@@ -9,9 +9,9 @@
 
 **目的**: 建立仓库级基础配置，为多模块结构奠定基础。
 
-- [ ] T001 创建 Go workspace 根文件 `go.work`，注册 `./framework` 与 `./tools/cli`
-- [ ] T002 配置根级 `package.json` 以声明 npm workspaces（指向 `sdk/workspace`）
-- [ ] T003 撰写仓库根 `README.md`，引用 quickstart 与技术设计文档
+- [X] T001 创建 Go workspace 根文件 `go.work`，注册 `./framework` 与 `./tools/cli`
+- [X] T002 配置根级 `package.json` 以声明 npm workspaces（指向 `sdk/workspace`）
+- [X] T003 撰写仓库根 `README.md`，引用 quickstart 与技术设计文档
 
 ---
 

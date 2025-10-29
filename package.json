@@ -1,0 +1,10 @@
+{
+  "name": "powerxplugin-monorepo",
+  "private": true,
+  "workspaces": [
+    "sdk/workspace"
+  ],
+  "scripts": {
+    "postinstall": "npm install --workspaces --include-workspace-root=false"
+  }
+}

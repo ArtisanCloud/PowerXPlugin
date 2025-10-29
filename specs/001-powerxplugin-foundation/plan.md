@@ -46,35 +46,66 @@ specs/001-powerxplugin-foundation/
 ### Source Code (repository root)
 
 ```text
-framework/
-├── backend/go/
-│   ├── bootstrap/
-│   ├── router/
-│   ├── middleware/
-│   └── manifest/
-├── sdk/workspace/
-│   └── frontend/nuxt/
-│       ├── framework-admin/
-│       └── framework-client/
-
-skeleton/
-├── backend/
-│   ├── cmd/plugin/
-│   └── internal/{routes,handler,service,repo,manifestx}
-└── web-admin/
-    ├── app/
-    ├── nuxt.config.ts
-    └── package.json
-
-scaffold/templates/
-├── backend/go-gin/
-└── web/nuxt/
-
-tools/cli/
-└── px-plugin (Go CLI 源码及嵌入模板)
+PowerXPlugin/
+├─ go.work                                 # Phase 0: 管理 framework/ 与 tools/cli/ 多模块
+├─ package.json                            # Phase 0: 根级 npm workspaces（可选）
+├─ framework/                              # Phase 3: 共享后端框架
+│  ├─ go.mod (module github.com/powerx-plugin/framework)
+│  └─ backend/go/
+│     ├─ bootstrap/                        # App 初始化（参考 Base/internal/bootstrap）
+│     ├─ router/                           # RegisterFrameworkRoutes/RegisterPluginRoutes
+│     ├─ middleware/                       # AuthGuard stub、Recovery、Trace
+│     ├─ manifest/                         # Manifest 类型与注册
+│     ├─ rbac/                             # 权限报告
+│     ├─ observability/                    # 指标 & Trace 集成
+│     ├─ tenancy/                          # 多租户上下文
+│     └─ shared/                           # 通用组件与工具
+├─ sdk/workspace/                          # Phase 3: Nuxt Layer + Client npm 包
+│  ├─ package.json (workspaces: frontend/nuxt/*)
+│  └─ frontend/nuxt/
+│     ├─ framework-admin/                  # @powerx-plugin/framework-admin
+│     │  ├─ layer/app/{components,middleware,pages,plugins}
+│     │  ├─ layer/nuxt.config.ts
+│     │  ├─ module.ts
+│     │  └─ index.ts (definePowerXAdminConfig)
+│     └─ framework-client/                 # @powerx-plugin/framework-client
+│        ├─ api.ts / http.ts
+│        └─ index.ts
+├─ skeleton/                               # Phase 2: 可运行样例
+│  ├─ backend/
+│  │  ├─ go.mod (require github.com/powerx-plugin/framework)
+│  │  ├─ cmd/plugin/main.go                # 6 步装配流程（参考 Base backend/cmd/plugin）
+│  │  └─ internal/
+│  │     ├─ routes/                        # `/api/v1/ping`
+│  │     ├─ handler/
+│  │     ├─ service/
+│  │     └─ manifestx/                     # Manifest 定义
+│  └─ web-admin/
+│     ├─ app/{components,pages,_p/...}
+│     ├─ nuxt.config.ts
+│     └─ package.json
+├─ scaffold/templates/                     # Phase 4: CLI 模板（与 skeleton 一一对应）
+│  ├─ backend/go-gin/
+│  │  ├─ cmd/plugin/main.go.tmpl
+│  │  └─ internal/*.tmpl
+│  └─ web/nuxt/
+│     ├─ nuxt.config.ts.tmpl
+│     └─ app/**/*.tmpl
+├─ tools/cli/                              # Phase 4: px-plugin CLI
+│  ├─ go.mod (module github.com/powerx-plugin/cli)
+│  └─ cmd/
+│     ├─ init.go
+│     ├─ package.go        # experimental
+│     ├─ dist.go           # experimental
+│     └─ publish.go        # experimental
+├─ docs/
+│  ├─ contracts/{manifest.json,rbac.json,openapi.yaml}
+│  └─ init-project.md
+├─ examples/starter/                       # Phase 5: CLI 生成物快照
+└─ config/config.yaml.example              # 配置样例
 ```
 
-**Structure Decision**: 维持仓库的多模块骨架：`framework/` 输出共享框架层、`skeleton/` 提供可运行样例、`scaffold/templates/` 供 CLI 渲染，`tools/cli/` 则负责 px-plugin 命令；所有目录需与 `docs/init-project.md` 指定结构一一对应。
+**Structure Decision**: 以 Base 插件实装为基准，强化多模块骨架：`framework/` 拆解 Base/internal 逻辑形成框架层，`skeleton/` 复制最小可运行流程，`scaffold/templates/` 与 skeleton 保持 100% 同步，`tools/cli/` 提供 px-plugin 命令；整体结构与 `docs/init-project.md` 及 `/com.powerx.plugin.base` 一致，确保 CLI、框架与示例互相验证。
 
 ## Complexity Tracking
 

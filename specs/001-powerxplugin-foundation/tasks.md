@@ -19,13 +19,13 @@
 
 **目的**: 准备所有用户故事共享的核心目录与模块骨架；未完成前禁止进入任一用户故事。
 
-- [ ] T004 建立 `framework/backend/go/` 目录骨架（bootstrap/router/middleware 等子目录）
-- [ ] T005 初始化 `framework/go.mod` 并声明模块 `github.com/powerx-plugin/framework`
-- [ ] T006 初始化 `tools/cli/go.mod` 与 `tools/cli/cmd/` 目录（预留 init/package/dist/publish 命令）
-- [ ] T007 配置 `sdk/workspace/package.json` 与 `frontend/nuxt/` 目录结构
-- [ ] T008 创建 `skeleton/backend` 与 `skeleton/web-admin` 目录骨架（含 `cmd/plugin`、`internal/`、`app/`）
-- [ ] T009 建立 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web/nuxt` 目录占位
-- [ ] T010 添加入仓 `config/config.yaml.example` 作为环境配置模板
+- [X] T004 建立 `framework/backend/go/` 目录骨架（bootstrap/router/middleware 等子目录）
+- [X] T005 初始化 `framework/go.mod` 并声明模块 `github.com/powerx-plugin/framework`
+- [X] T006 初始化 `tools/cli/go.mod` 与 `tools/cli/cmd/` 目录（预留 init/package/dist/publish 命令）
+- [X] T007 配置 `sdk/workspace/package.json` 与 `frontend/nuxt/` 目录结构
+- [X] T008 创建 `skeleton/backend` 与 `skeleton/web-admin` 目录骨架（含 `cmd/plugin`、`internal/`、`app/`）
+- [X] T009 建立 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web/nuxt` 目录占位
+- [X] T010 添加入仓 `config/config.yaml.example` 作为环境配置模板
 
 **Checkpoint**: 目录骨架与多模块配置完成，可开始用户故事实现。
 

@@ -39,25 +39,25 @@
 
 ### 实施任务
 
-- [ ] T011 [US1] 实现 `framework/backend/go/bootstrap/app.go`，定义 `App`/`Config` 结构体与 `NewAppFromEnv()`、`Run()`、`Shutdown()` 方法
-- [ ] T012 [P] [US1] 补充 `framework/backend/go/router/router.go` 与 `router.go`，导出 `RegisterFrameworkRoutes/RegisterPluginRoutes`
-- [ ] T013 [P] [US1] 定义 `framework/backend/go/manifest/manifest.go` 与类型 `Menu`、`Permission`
-- [ ] T014 [P] [US1] 定义 `framework/backend/go/rbac/rbac.go`，暴露角色与权限报告 API
-- [ ] T015 [P] [US1] 添加 `framework/backend/go/middleware/auth_guard.go` stub，默认返回 `501 Not Implemented`
-- [ ] T016 [P] [US1] 实现 `framework/backend/go/observability/metrics.go` 与 `tracing.go` 占位
-- [ ] T017 [US1] 创建 `skeleton/backend/go.mod`，引用 `github.com/powerx-plugin/framework`
-- [ ] T018 [US1] 编写 `skeleton/backend/cmd/plugin/main.go`，按六步装配流程注册框架与业务路由
-- [ ] T019 [P] [US1] 实现 `skeleton/backend/internal/routes/routes.go`，提供 `GET /api/v1/ping`
-- [ ] T020 [P] [US1] 实现 `skeleton/backend/internal/service/ping.go` 与 `handler/ping.go`
-- [ ] T021 [US1] 编写 `skeleton/backend/README.md`，记录 Go 1.21+ 依赖与启动命令
-- [ ] T022 [US1] 配置 `skeleton/web-admin/nuxt.config.ts`，引入 `definePowerXAdminConfig`
-- [ ] T023 [P] [US1] 创建 `skeleton/web-admin/app/pages/_p/com.powerx.sample/admin/index.vue` Starter 页面
-- [ ] T024 [P] [US1] 添加 `skeleton/web-admin/app/components/powerx/PXNav.vue` 覆盖示例
-- [ ] T025 [US1] 实现 `sdk/workspace/frontend/nuxt/framework-admin/index.ts` 与 Layer `nuxt.config.ts`
-- [ ] T026 [P] [US1] 实现 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 与 `$fetch` 包装
-- [ ] T027 [US1] 验证 `go run ./skeleton/backend/cmd/plugin` 启动成功并对 `GET /api/v1/ping` 返回 200
-- [ ] T028 [US1] 验证 `cd skeleton/web-admin && npm run dev` 可访问 Starter 页面并加载 PX 布局
-- [ ] T029 [US1] 在 `examples/verify-external/` 构建临时插件工程，引用框架包并执行 `go build` / `npm run build` 以验证外部编译通过
+- [X] T011 [US1] 实现 `framework/backend/go/bootstrap/app.go`，定义 `App`/`Config` 结构体与 `NewAppFromEnv()`、`Run()`、`Shutdown()` 方法
+- [X] T012 [P] [US1] 补充 `framework/backend/go/router/router.go` 与 `router.go`，导出 `RegisterFrameworkRoutes/RegisterPluginRoutes`
+- [X] T013 [P] [US1] 定义 `framework/backend/go/manifest/manifest.go` 与类型 `Menu`、`Permission`
+- [X] T014 [P] [US1] 定义 `framework/backend/go/rbac/rbac.go`，暴露角色与权限报告 API
+- [X] T015 [P] [US1] 添加 `framework/backend/go/middleware/auth_guard.go` stub，默认返回 `501 Not Implemented`
+- [X] T016 [P] [US1] 实现 `framework/backend/go/observability/metrics.go` 与 `tracing.go` 占位
+- [X] T017 [US1] 创建 `skeleton/backend/go.mod`，引用 `github.com/powerx-plugin/framework`
+- [X] T018 [US1] 编写 `skeleton/backend/cmd/plugin/main.go`，按六步装配流程注册框架与业务路由
+- [X] T019 [P] [US1] 实现 `skeleton/backend/internal/routes/routes.go`，提供 `GET /api/v1/ping`
+- [X] T020 [P] [US1] 实现 `skeleton/backend/internal/service/ping.go` 与 `handler/ping.go`
+- [X] T021 [US1] 编写 `skeleton/backend/README.md`，记录 Go 1.21+ 依赖与启动命令
+- [X] T022 [US1] 配置 `skeleton/web-admin/nuxt.config.ts`，引入 `definePowerXAdminConfig`
+- [X] T023 [P] [US1] 创建 `skeleton/web-admin/app/pages/_p/com.powerx.sample/admin/index.vue` Starter 页面
+- [X] T024 [P] [US1] 添加 `skeleton/web-admin/app/components/powerx/PXNav.vue` 覆盖示例
+- [X] T025 [US1] 实现 `sdk/workspace/frontend/nuxt/framework-admin/index.ts` 与 Layer `nuxt.config.ts`
+- [X] T026 [P] [US1] 实现 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 与 `$fetch` 包装
+- [X] T027 [US1] 验证 `go run ./skeleton/backend/cmd/plugin` 启动成功并对 `GET /api/v1/ping` 返回 200
+- [X] T028 [US1] 验证 `cd skeleton/web-admin && npm run dev` 可访问 Starter 页面并加载 PX 布局
+- [X] T029 [US1] 在 `examples/verify-external/` 构建临时插件工程，引用框架包并执行 `go build` / `npm run build` 以验证外部编译通过
 
 **Checkpoint**: Skeleton + Framework + Nuxt Layer 均可运行，满足外部引用需求。
 

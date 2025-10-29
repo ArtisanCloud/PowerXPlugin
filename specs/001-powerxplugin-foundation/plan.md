@@ -9,8 +9,8 @@
 
 ## Technical Context
 
-**Language/Version**: Go 1.21+, TypeScript 5.x (Nuxt 3)  
-**Primary Dependencies**: Gin 框架、Nuxt 3、`@powerx-plugin/framework-admin` Layer、`@powerx-plugin/framework-client`  
+**Language/Version**: Go 1.21+, TypeScript 5.x (Nuxt 4.2)  
+**Primary Dependencies**: Gin 框架、Nuxt 4.2、`@powerx-plugin/framework-admin` Layer、`@powerx-plugin/framework-client`  
 **Storage**: 暂不引入持久层（Skeleton/模板以内存或 mock 为主）  
 **Testing**: `go test ./...`、`npm run lint && npm run build`  
 **Target Platform**: PowerX Core 宿主环境（Linux 服务 + Nuxt SSR）  

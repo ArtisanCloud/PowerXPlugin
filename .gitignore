@@ -1,1 +1,32 @@
 .claude
+
+# Go build artifacts
+bin/
+*.exe
+examples/verify-external/backend/backend
+*.test
+*.out
+
+# Node/Nuxt workspaces
+node_modules/
+.nuxt/
+.output/
+.nitro/
+dist/
+build/
+
+# Dependency locks generated per workspace
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Logs & env files
+*.log
+*.tmp
+*.swp
+.env
+.env.*
+
+# macOS / misc
+.DS_Store
+Thumbs.db

@@ -2,8 +2,8 @@ import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@powerx-plugin/framework-admin'
 
 const powerx = definePowerXAdminConfig({
-  pluginId: 'com.powerx.sample',
-  starterPages: true
+  pluginId: 'com.powerx.verify',
+  starterPages: false
 })
 
 export default defineNuxtConfig({

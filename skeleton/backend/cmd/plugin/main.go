@@ -33,7 +33,9 @@ func main() {
 	router.RegisterFrameworkRoutes(app)
 	router.RegisterPluginRoutes(app, routes.Register)
 
-	manifest.Register(app, manifestx.Plugin())
+    if err := manifest.Register(app, manifestx.Plugin()); err != nil {
+        log.Fatalf("register manifest: %v", err)
+    }
 
 	go func() {
 		if err := app.Run(); err != nil {

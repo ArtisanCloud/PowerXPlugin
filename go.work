@@ -1,5 +1,7 @@
 go 1.21
 
 use ./framework
+
 use ./skeleton/backend
+
 use ./tools/cli

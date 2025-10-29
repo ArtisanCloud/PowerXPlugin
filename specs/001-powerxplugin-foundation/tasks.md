@@ -71,14 +71,14 @@
 
 ### 实施任务
 
-- [ ] T030 [US2] 填充 `docs/contracts/manifest.json`，对齐 Schema 约束与示例
-- [ ] T031 [P] [US2] 填充 `docs/contracts/rbac.json`，列出默认角色与权限键示例
-- [ ] T032 [P] [US2] 更新 `docs/contracts/openapi.yaml`，记录 `/api/v1/ping` 与 `/api/v1/admin/manifest`
-- [ ] T033 [US2] 在 `framework/backend/go/manifest/validator.go` 集成 Manifest Schema 校验
-- [ ] T034 [P] [US2] 在 `framework/backend/go/rbac/validator.go` 集成 RBAC Schema 校验
-- [ ] T035 [US2] 在 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 引入契约驱动的错误提示
-- [ ] T036 [US2] 创建 `.github/workflows/ci.yml`，包含 `go test ./...`、`npm ci && npm run lint && npm run build`、契约 Schema 校验与文档生成扫描
-- [ ] T037 [P] [US2] 撰写 `docs/contracts/README.md`，说明 Schema 更新流程与 CI 钩子
+- [X] T030 [US2] 填充 `docs/contracts/manifest.json`，对齐 Schema 约束与示例
+- [X] T031 [P] [US2] 填充 `docs/contracts/rbac.json`，列出默认角色与权限键示例
+- [X] T032 [P] [US2] 更新 `docs/contracts/openapi.yaml`，记录 `/api/v1/ping` 与 `/api/v1/admin/manifest`
+- [X] T033 [US2] 在 `framework/backend/go/manifest/validator.go` 集成 Manifest Schema 校验
+- [X] T034 [P] [US2] 在 `framework/backend/go/rbac/validator.go` 集成 RBAC Schema 校验
+- [X] T035 [US2] 在 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 引入契约驱动的错误提示
+- [X] T036 [US2] 创建 `.github/workflows/ci.yml`，包含 `go test ./...`、`npm ci && npm run lint && npm run build`、契约 Schema 校验与文档生成扫描
+- [X] T037 [P] [US2] 撰写 `docs/contracts/README.md`，说明 Schema 更新流程与 CI 钩子
 
 **Checkpoint**: CI 与运行时均受契约约束，防止实现偏离协议。
 

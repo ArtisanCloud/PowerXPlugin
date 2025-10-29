@@ -23,9 +23,13 @@ type App interface {
 }
 
 // Register 为调用方提供统一入口，方便 skeleton/框架调用。
-func Register(app App, p Plugin) {
+func Register(app App, p Plugin) error {
+	if err := Validate(p); err != nil {
+		return err
+	}
 	if app == nil {
-		return
+		return nil
 	}
 	app.RegisterManifest(p)
+	return nil
 }

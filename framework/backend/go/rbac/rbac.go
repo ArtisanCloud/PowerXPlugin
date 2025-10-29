@@ -14,7 +14,13 @@ type Reporter interface {
 
 // Report 将权限声明上报给宿主实现。
 func Report(target Reporter, perms []Permission) error {
-	if target == nil || len(perms) == 0 {
+	if len(perms) == 0 {
+		return nil
+	}
+	if err := Validate(perms); err != nil {
+		return err
+	}
+	if target == nil {
 		return nil
 	}
 	return target.RegisterPermissions(perms)

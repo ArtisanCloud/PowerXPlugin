@@ -22,7 +22,20 @@ export function usePluginApi(options: PluginApiOptions): PluginApi {
       ...init
     })
     if (!response.ok) {
-      throw new Error(`request failed: ${response.status}`)
+      let message = `request failed: ${response.status}`
+      try {
+        const body = await response.clone().json()
+        if (typeof body.message === 'string') {
+          message = body.message
+        } else if (typeof body.error === 'string') {
+          message = body.error
+        }
+      } catch {
+        // ignore parsing errors, fall back to default message
+      }
+      const error = new Error(message)
+      ;(error as any).status = response.status
+      throw error
     }
     return (await response.json()) as T
   }

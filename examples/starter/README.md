@@ -1,6 +1,6 @@
-# {{ .PluginName }}
+# Powerx Starter Plugin
 
-由 `px-plugin init {{ .PluginID }}` 生成的 PowerX 插件模板。
+由 `px-plugin init com.powerx.starter` 生成的 PowerX 插件模板。
 
 ## 快速开始
 

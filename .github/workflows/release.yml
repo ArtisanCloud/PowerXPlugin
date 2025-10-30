@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GO_VERSION: '1.21'
+  NODE_VERSION: '18'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install npm workspaces
+        run: npm install --workspaces --include-workspace-root=false
+
+      - name: Run Go unit tests
+        run: |
+          (cd framework && go test ./...)
+          (cd tools/cli && go test ./...)
+
+      - name: Build CLI binary
+        run: |
+          mkdir -p dist
+          go build -o dist/px-plugin ./tools/cli/cmd/px-plugin
+
+      - name: Generate release starter snapshot
+        run: go run ../tools/cli/cmd/px-plugin init com.powerx.release --force
+        working-directory: examples
+
+      - name: Run px-plugin package (experimental)
+        run: go run ../../tools/cli/cmd/px-plugin package
+        working-directory: examples/com.powerx.release
+
+      - name: Run px-plugin dist (experimental)
+        run: go run ../../tools/cli/cmd/px-plugin dist
+        working-directory: examples/com.powerx.release
+
+      - name: Run px-plugin publish (experimental)
+        run: go run ../../tools/cli/cmd/px-plugin publish --token="${{ secrets.MARKETPLACE_TOKEN || 'placeholder' }}"
+        working-directory: examples/com.powerx.release
+
+      - name: Archive CLI binary
+        run: tar -czf dist/px-plugin-${{ github.ref_name }}.tar.gz -C dist px-plugin
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: px-plugin-release-${{ github.run_id }}
+          path: |
+            dist/px-plugin
+            dist/px-plugin-${{ github.ref_name }}.tar.gz
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          cat <<'EOF' >> $GITHUB_STEP_SUMMARY
+          ## Release recap
+          - CLI binary built and uploaded.
+          - Starter snapshot generated via `px-plugin init`.
+          - Experimental package/dist/publish commands executed (no-op).
+          - Marketplace token expected via `MARKETPLACE_TOKEN` secret once API is ready.
+          EOF

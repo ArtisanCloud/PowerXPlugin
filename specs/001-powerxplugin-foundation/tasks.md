@@ -116,11 +116,11 @@
 
 ### 实施任务
 
-- [ ] T049 [US4] 使用 CLI 生成新项目并固化到 `examples/starter/`
-- [ ] T050 [US4] 创建 `.github/workflows/release.yml`，串联 `px-plugin package/dist/publish`
-- [ ] T051 [P] [US4] 撰写 `docs/release.md`，描述版本化与回滚流程
-- [ ] T052 [P] [US4] 更新 `CHANGELOG.md` 模板，记录 CLI 与框架同步发布
-- [ ] T053 [US4] 更新 `docs/backlog/multi-language.md`，标注多语言支持的 TODO 与依赖
+- [X] T049 [US4] 使用 CLI 生成新项目并固化到 `examples/starter/`
+- [X] T050 [US4] 创建 `.github/workflows/release.yml`，串联 `px-plugin package/dist/publish`
+- [X] T051 [P] [US4] 撰写 `docs/release.md`，描述版本化与回滚流程
+- [X] T052 [P] [US4] 更新 `CHANGELOG.md` 模板，记录 CLI 与框架同步发布
+- [X] T053 [US4] 更新 `docs/backlog/multi-language.md`，标注多语言支持的 TODO 与依赖
 
 **Checkpoint**: 发布流程可执行，示例项目可验证 CLI 产物。
 

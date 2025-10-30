@@ -92,17 +92,17 @@
 
 ### 实施任务
 
-- [ ] T038 [US3] 创建 `scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl` 与变量占位
-- [ ] T039 [P] [US3] 创建 `scaffold/templates/backend/go-gin/internal/routes.go.tmpl`、`handler/ping.go.tmpl`
-- [ ] T040 [P] [US3] 创建 `scaffold/templates/web/nuxt/nuxt.config.ts.tmpl` 与 Starter 页面模板
-- [ ] T041 [P] [US3] 创建 `scaffold/templates/web/nuxt/app/pages/_p/__plugin__/admin/index.vue.tmpl`
-- [ ] T042 [US3] 实现 `tools/cli/internal/templates/embed.go`，使用 `go:embed` 打包模板
-- [ ] T043 [US3] 实现 `tools/cli/cmd/init.go`，渲染模板并写入 `plugin.yaml`
-- [ ] T044 [P] [US3] 实现 `tools/cli/internal/contracts/embed.go`，内置 Manifest/RBAC/OpenAPI 元数据
-- [ ] T045 [US3] 实现 `tools/cli/cmd/package.go`（experimental 提示 + 构建占位）
-- [ ] T046 [P] [US3] 实现 `tools/cli/cmd/dist.go`（experimental 提示 + 打包占位）
-- [ ] T047 [P] [US3] 实现 `tools/cli/cmd/publish.go`（experimental 提示 + 上传占位）
-- [ ] T048 [US3] 更新 `tools/cli/README.md`，记录离线渲染、实验命令、使用示例
+- [X] T038 [US3] 创建 `scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl` 与变量占位
+- [X] T039 [P] [US3] 创建 `scaffold/templates/backend/go-gin/internal/routes.go.tmpl`、`handler/ping.go.tmpl`
+- [X] T040 [P] [US3] 创建 `scaffold/templates/web/nuxt/nuxt.config.ts.tmpl` 与 Starter 页面模板
+- [X] T041 [P] [US3] 创建 `scaffold/templates/web/nuxt/app/pages/_p/__plugin__/admin/index.vue.tmpl`
+- [X] T042 [US3] 实现 `tools/cli/internal/templates/embed.go`，使用 `go:embed` 打包模板
+- [X] T043 [US3] 实现 `tools/cli/cmd/init.go`，渲染模板并写入 `plugin.yaml`
+- [X] T044 [P] [US3] 实现 `tools/cli/internal/contracts/embed.go`，内置 Manifest/RBAC/OpenAPI 元数据
+- [X] T045 [US3] 实现 `tools/cli/cmd/package.go`（experimental 提示 + 构建占位）
+- [X] T046 [P] [US3] 实现 `tools/cli/cmd/dist.go`（experimental 提示 + 打包占位）
+- [X] T047 [P] [US3] 实现 `tools/cli/cmd/publish.go`（experimental 提示 + 上传占位）
+- [X] T048 [US3] 更新 `tools/cli/README.md`，记录离线渲染、实验命令、使用示例
 
 **Checkpoint**: CLI 输出与 skeleton/模板一致，离线可运行，实验命令有清晰标记。
 

@@ -99,7 +99,7 @@ go tool cover -func=coverage.out
 4. 运行测试
 
 ```bash
-PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test
+PLAYWRIGHT_BASE_URL=http://localhost:3031 npx playwright test
 
 # 完成 Phase 4 后，可改用脚本入口
 ./scripts/testing/regression.sh
@@ -110,7 +110,7 @@ PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test
 
 > 稳定性建议：确保 dev server 输出无 `PXAdminLayout` 等组件解析警告，再执行 Playwright。
 >
-> 脚本版本会自动启动后端 `go run ./skeleton/backend/cmd/plugin` 与前端 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`，若未指定则自动选择空闲端口；随后等待 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL` 可访问；相关日志保存在 `tmp/regression-backend.log` 与 `tmp/regression-frontend.log`。
+> 脚本版本会自动启动后端 `go run ./skeleton/backend/cmd/plugin` 与前端 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`，若未指定则自动选择空闲端口；随后等待 `http://127.0.0.1:8078/healthz` 与 `PLAYWRIGHT_BASE_URL` 可访问；相关日志保存在 `tmp/regression-backend.log` 与 `tmp/regression-frontend.log`。
 
 ### 4.3 契约校验
 
@@ -309,7 +309,7 @@ go test ./skeleton/backend/internal/... -run TestPingHandler_ReturnsOK -v
 
    ```bash
    cd skeleton/web-admin
-   PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test tests/e2e/settings.spec.ts
+   PLAYWRIGHT_BASE_URL=http://localhost:3031 npx playwright test tests/e2e/settings.spec.ts
    ```
 
 > 建议在 `test.beforeEach` 内准备登录态或初始化数据，保证测试可重复。
@@ -347,7 +347,7 @@ rm -rf "$TMP_DIR"
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
 | Playwright 报 “Failed to resolve component: PXAdminLayout” | 未安装 `@powerx-plugin/framework-admin` 依赖或 dev server 启动前 node_modules 残缺 | 重新执行 `npm install`，删除 `node_modules`/`package-lock.json` 后再装 |
-| E2E 测试访问超时 | 前端/后端端口未就绪 | 启动测试前手动访问 `http://localhost:3000/_p/...` 与 `http://localhost:8077/api/v1/ping`，或实现等待函数 |
+| E2E 测试访问超时 | 前端/后端端口未就绪 | 启动测试前手动访问 `http://localhost:3031/_p/...` 与 `http://localhost:8078/api/v1/ping`，或实现等待函数 |
 | CLI 生成命令失败 | 未 `go build` px-plugin 或 GOPATH 权限问题 | 先在仓库根执行 `go build -o bin/px-plugin ./tools/cli/cmd/px-plugin` |
 | 契约校验报语法错误 | JSON 文件格式化异常 | 使用 `python3 -m json.tool <file>` 定位具体报错行 |
 | 覆盖率下降 | 新增代码无测试 | 参考 `docs/test/testing_strategy.md` 中的改进建议，补充相应测试用例 |

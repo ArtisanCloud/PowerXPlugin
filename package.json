@@ -5,7 +5,6 @@
     "sdk/workspace"
   ],
   "scripts": {
-    "postinstall": "npm install --workspaces --include-workspace-root=false",
     "lint": "npm --workspaces --if-present run lint && npm --prefix skeleton/web-admin run lint",
     "build": "npm --workspaces --if-present run build && npm --prefix skeleton/web-admin run build"
   }

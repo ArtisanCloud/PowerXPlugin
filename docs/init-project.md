@@ -357,7 +357,7 @@ type App struct {
 }
 
 type Config struct {
-	Listen   string // ":8077"
+	Listen   string // ":8078"
 	Env      string // "dev|prod"
 	Standalone bool // STANDALONE=true 时启用 Demo/本地策略
 	// DB、缓存、追踪等...

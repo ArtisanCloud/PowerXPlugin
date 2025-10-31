@@ -1,0 +1,16 @@
+{
+  "name": "powerxplugin-external-web-admin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npx nuxi build"
+  },
+  "dependencies": {
+    "@powerx-plugin/framework-admin": "file:../../../sdk/workspace/frontend/nuxt/framework-admin",
+    "@powerx-plugin/framework-client": "file:../../../sdk/workspace/frontend/nuxt/framework-client",
+    "nuxt": "^4.2.0"
+  },
+  "devDependencies": {
+    "nuxi": "^3.29.3"
+  }
+}

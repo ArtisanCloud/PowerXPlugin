@@ -1,0 +1,16 @@
+{
+  "name": "@powerx-plugin/framework-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "files": [
+    "index.ts",
+    "api.ts"
+  ],
+  "peerDependencies": {
+    "nuxt": "^4.2.0"
+  }
+}

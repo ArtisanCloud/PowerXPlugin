@@ -1,50 +1,40 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# PowerXPlugin 宪章
 
-## Core Principles
+## 核心原则
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. 双重使命仓库
+PowerXPlugin 同时提供可运行的脚手架骨架和可复用的框架；任何改动都必须保持脚手架产出与框架包一致，让下游插件延续统一体验。
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. 契约优先兼容性
+Manifest、RBAC、健康检查与 API 契约是唯一真相：相关 Schema 必须存放于 `docs/contracts/**`，生成 OpenAPI/JSON Schema 工件，并在上线前通过代码生成或运行时校验被实现端消费。
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Go + Nuxt 基线
+默认技术栈为 Go（Gin）+ Nuxt；仓库依赖 `go.work` 管理离散模块（如 `framework/`、`tools/cli/`），并在 `sdk/workspace/` 下维护 npm workspace，锁定依赖并输出 `@powerx-plugin/framework-*` 套件。
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. 脚手架与 CLI 纪律
+`px-plugin` CLI 模板具有最高约束力：必须渲染当前骨架（后端 `go run ./cmd/plugin`、管理端 `npm run dev` 可直接运行），并清晰标注实验参数、占位实现（如 AuthGuard）及暂不支持的流程。
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. 透明交付与一致性
+文档、TODO 状态与发布记录必须真实反映实现情况；CI 强制执行 Go lint/test 与 `npm run build`，每个阶段推进都需满足 `docs/init-project.md` 的检查清单或明确记录延期。
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## 实施约束
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- 维持根目录 `go.work` 的多模块结构，确保 `framework/` 与 `tools/cli/` 可独立构建，并通过 `github.com/powerx-plugin/framework/...` 暴露导入路径。
+- 前端产物必须位于 `sdk/workspace/` 下的 npm workspace，锁定依赖版本并发布 `@powerx-plugin/framework-admin`、`@powerx-plugin/framework-client`，让 Nuxt 项目可直接安装使用。
+- 脚手架模板需提供可运行默认项：后端串联 `bootstrap`、`router` 与 Manifest 注册；前端提供 Nuxt 布局层、导航壳与可覆写的 API 助手。
+- `plugin.yaml` 元数据、脚手架模板（`scaffold/templates/**`）与 CLI 命令（`init` 及计划中的 `package/dist/publish`）必须保持一致，并为未实现命令标注“设计稿”状态。
+- 共用中间件（如 AuthGuard 占位）、可观测性钩子与契约适配器需沉淀于 `framework/` 内，以便插件项目在其之上扩展而非复制。
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## 开发流程与质量闸门
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+- 严格遵循分阶段路线：先完成仓库地基（Phase 0），再推进协议沉淀（Phase 1）、骨架抽取（Phase 2）、框架拆分（Phase 3）、CLI/模板扩展（Phase 4），最终通过生成示例验收（Phase 5）。
+- 契约变更视为上线闸门——更新 Schema 或 OpenAPI 时，必须同步提交代码生成/校验及文档改动。
+- 新增 CLI 能力或模板调整，需通过 `px-plugin init <plugin-id>` 实际生成验证，并在 `examples/` 中记录，审查时比对基准插件差异。
+- CI 必须覆盖 Go lint/test 与前端构建；除非在 `docs/init-project.md` 中明示临时豁免，否则禁止手动合并未通过检查的变更。
+- 任何占位或实验功能都要附带 TODO 与路线图关联，提醒使用者成熟度与风险。
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+## 治理
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+本宪章优先于既有实践；任何修订都必须经架构评审，更新路线图条目，提供现有插件的迁移指引，并同步更新 `docs/` 文档。评审需核验是否遵循上述原则、约束与流程闸门。
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**版本**: 0.1.0 | **批准日期**: 2025-10-29 | **最后修订**: 2025-10-29

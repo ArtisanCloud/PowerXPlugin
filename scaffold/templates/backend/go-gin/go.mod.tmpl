@@ -1,0 +1,13 @@
+module {{ .BackendModulePath }}
+
+go {{ .GoVersion }}
+
+require github.com/powerx-plugin/framework {{ .FrameworkVersion }}
+
+{{- if .SchemaDependency }}
+require {{ .SchemaDependency }} // indirect
+
+{{- end }}
+{{- if .FrameworkReplace }}
+replace github.com/powerx-plugin/framework => {{ .FrameworkReplace }}
+{{- end }}

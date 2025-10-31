@@ -1,0 +1,93 @@
+openapi: 3.1.0
+info:
+  title: PowerXPlugin Skeleton API
+  version: 0.1.0
+  description: >
+    最小可运行插件在 Standalone 模式下应暴露的默认端点。
+    所有路径在宿主环境中会被代理到 `/_p/<plugin-id>/api/**`。
+servers:
+  - url: http://localhost:8077/_p/{pluginId}
+    description: Standalone 开发模式
+    variables:
+      pluginId:
+        default: com.powerx.sample
+paths:
+  /api/v1/ping:
+    get:
+      summary: 健康探针
+      description: 返回 skeleton 后端的基本健康状态。
+      tags: [health]
+      responses:
+        "200":
+          description: 正常响应
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PingResponse"
+  /api/v1/admin/manifest:
+    get:
+      summary: 插件 Manifest
+      description: 由框架自动注册，返回菜单与权限定义。
+      tags: [manifest]
+      responses:
+        "200":
+          description: Manifest 文档
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Manifest"
+  /healthz:
+    get:
+      summary: 系统健康检查
+      description: 通过框架注册的统一健康检查端点。
+      tags: [health]
+      responses:
+        "200":
+          description: 健康
+components:
+  schemas:
+    PingResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+      required: [status]
+    Manifest:
+      type: object
+      properties:
+        pluginId:
+          type: string
+        version:
+          type: string
+        menus:
+          type: array
+          items:
+            $ref: "#/components/schemas/Menu"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+      required: [pluginId, version, menus, permissions]
+    Menu:
+      type: object
+      properties:
+        path:
+          type: string
+          pattern: "^/_p/[\\w\\.\\-]+/admin/"
+        title:
+          type: string
+        icon:
+          type: string
+        permission:
+          type: string
+      required: [path, title, permission]
+    Permission:
+      type: object
+      properties:
+        key:
+          type: string
+          pattern: "^[\\w\\.\\-]+\\.[\\w\\.\\-]+\\.[\\w\\.\\-]+$"
+        description:
+          type: string
+      required: [key]

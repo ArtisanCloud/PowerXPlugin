@@ -1,0 +1,8 @@
+{
+  "name": "@powerx-plugin/workspace-root",
+  "private": true,
+  "workspaces": [
+    "frontend/nuxt/framework-admin",
+    "frontend/nuxt/framework-client"
+  ]
+}

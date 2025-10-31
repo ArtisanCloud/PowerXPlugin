@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master", "develop", "001-powerxplugin-foundation"]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Go work sync
+        run: go work sync
+      - name: Go test (framework)
+        run: cd framework && go test ./...
+      - name: Go test (skeleton backend)
+        run: cd skeleton/backend && go test ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          npm install
+          cd skeleton/web-admin && npm install
+      - name: Lint
+        run: cd skeleton/web-admin && npx nuxi lint || true
+      - name: Build
+        run: cd skeleton/web-admin && npm run build
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Go work sync
+        run: go work sync
+      - name: Run contract validators
+        run: go test ./framework/backend/go/manifest ./framework/backend/go/rbac

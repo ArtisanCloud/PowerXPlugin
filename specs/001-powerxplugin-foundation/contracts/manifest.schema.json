@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PowerXPlugin Manifest",
+  "type": "object",
+  "required": ["pluginId", "version", "menus", "permissions"],
+  "properties": {
+    "pluginId": {
+      "type": "string",
+      "pattern": "^[a-z0-9\\.\\-]+$",
+      "description": "唯一插件 ID，同步用于目录与路由前缀。"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "语义化版本，用于宿主检测兼容性。"
+    },
+    "menus": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "title", "permission"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^/_p/[a-z0-9\\.\\-]+/admin/.*$",
+            "description": "Nuxt 页面路由前缀必须匹配 `/_p/<plugin-id>/admin/`。"
+          },
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "permission": {
+            "type": "string",
+            "pattern": "^[a-z0-9\\.\\-]+\\.[a-z0-9\\.\\-]+\\.[a-z0-9\\.\\-]+$",
+            "description": "权限键需遵循 `<plugin-id>.<domain>.<action>`。"
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["key"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9\\.\\-]+\\.[a-z0-9\\.\\-]+\\.[a-z0-9\\.\\-]+$"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "healthChecks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "可选：框架预置健康检查探针键。"
+    }
+  }
+}

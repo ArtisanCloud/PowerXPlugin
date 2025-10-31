@@ -8,5 +8,18 @@ const powerx = definePowerXAdminConfig({
 
 export default defineNuxtConfig({
   extends: powerx.extends,
-  appConfig: powerx.appConfig
+  appConfig: powerx.appConfig,
+  devServer: {
+    host: '0.0.0.0',
+    port: 3031
+  },
+  vite: {
+    server: {
+      hmr: {
+        protocol: 'ws',
+        host: 'localhost',
+        port: 24731
+      }
+    }
+  }
 })

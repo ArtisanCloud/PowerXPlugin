@@ -1,0 +1,27 @@
+# PowerXPlugin Quickstart
+
+欢迎来到 PowerXPlugin 指南中心！这里汇总仓库当前最重要的入门路径，帮助你在最短时间内启动 Standalone 环境、运行 CLI 并理解各模块之间的协作关系。仓库目前聚焦 **Go + Nuxt** 技术栈，其他语言仍在规划阶段。
+
+## 入门路线图
+
+1. **准备运行环境**  
+   - 安装 Go 1.21+（启用 `GOWORK=on`）与 Node.js 18+ / npm 9+。  
+   - 建议阅读 `docs/init-project.md` 了解更完整的环境说明。
+
+2. **Standalone 骨架演练**  
+   - 按照《[PowerXPlugin Standalone 启动教程](./standalone-mode.md)》同步依赖并启动 Skeleton 后端与管理端。  
+   - 验证 `GET /api/v1/ping` 与 Starter 页面，熟悉框架 App 生命周期。
+
+3. **CLI 模板生成与自测**  
+   - 参考《[使用 CLI 生成并运行插件骨架](./cli-plugin-tutorial.md)》构建 `px-plugin`、生成新插件、启动其后端与前端。  
+   - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。
+
+完成以上三个步骤，即可获得开发 PowerX 插件所需的核心能力：框架运行、模板生成与快速验证。
+
+## 进一步阅读
+
+- `docs/release.md`：了解版本发布与实验性 `package/dist/publish` 命令的最新状态。
+- `docs/test/testing_usage.md`：掌握 `make test-smoke` / `make test-regression` 的测试流程。
+- `docs/backlog/multi-language.md`：关注多语言支持与未来路线图。
+
+> 遇到问题时，可优先检查 Go/Node 版本，确认依赖安装无误，再回到两个教程逐步排查。欢迎在 README 中列出的渠道反馈问题与改进建议。

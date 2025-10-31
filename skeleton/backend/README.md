@@ -12,7 +12,7 @@
 3. 验证接口：
 
    ```bash
-   curl http://localhost:8077/api/v1/ping
+   curl http://localhost:8078/api/v1/ping
    ```
 
 示例仅包含 `GET /api/v1/ping`，实际项目可继续在 `internal/` 下扩展业务逻辑。

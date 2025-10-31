@@ -39,8 +39,8 @@ npm run dev
 
 验证：
 
-- `GET http://localhost:8077/api/v1/ping` 返回 `{ "status": "ok" }`
-- 浏览器访问 `http://localhost:3000/_p/com.powerx.sample/admin/`，可看到 Starter 页面
+- `GET http://localhost:8078/api/v1/ping` 返回 `{ "status": "ok" }`
+- 浏览器访问 `http://localhost:3031/_p/com.powerx.sample/admin/`，可看到 Starter 页面
 
 ## 3. 构建并运行 CLI
 

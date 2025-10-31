@@ -57,7 +57,7 @@ go build -o /tmp/px-plugin ./tools/cli/cmd/px-plugin
 # make test-smoke
 ```
 
-通过以上命令或脚本可初步确认后端逻辑、契约文件与 CLI 构建无异常。任何一步失败请参考第 7 节排查。
+通过以上命令或脚本可初步确认后端逻辑、契约文件与 CLI 构建无异常（示例输出末尾会打印 `=== Smoke workflow complete in Ns ===`，可直接记录耗时）。任何一步失败请参考第 7 节排查。
 
 ---
 
@@ -106,11 +106,11 @@ PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test
 # make test-regression
 ```
 
-5. 停止服务（Ctrl+C），若失败可在 `skeleton/web-admin/test-results/` 查看报告。
+5. 停止服务（Ctrl+C），若失败可在 `skeleton/web-admin/test-results/` 查看报告。脚本模式会输出 `=== Regression workflow complete in Ns ===` 并保留 `tmp/regression-backend.log` / `tmp/regression-frontend.log`。
 
 > 稳定性建议：确保 dev server 输出无 `PXAdminLayout` 等组件解析警告，再执行 Playwright。
 >
-> 脚本版本会自动启动后端 `go run ./skeleton/backend/cmd/plugin` 与前端 `npx nuxi dev --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT:-3030}`，并等待 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认 `http://127.0.0.1:3030`）可访问；相关日志保存在 `tmp/regression-backend.log` 与 `tmp/regression-frontend.log`。
+> 脚本版本会自动启动后端 `go run ./skeleton/backend/cmd/plugin` 与前端 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`，若未指定则自动选择空闲端口；随后等待 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL` 可访问；相关日志保存在 `tmp/regression-backend.log` 与 `tmp/regression-frontend.log`。
 
 ### 4.3 契约校验
 
@@ -160,6 +160,7 @@ rm -rf "$TMP_DIR"
 | Playwright 单用例 | `npx playwright test tests/e2e/starter.spec.ts` | 需先设定 `PLAYWRIGHT_BASE_URL` |
 | 契约变更验证 | 参考 4.3 | 修改 `docs/contracts/**` 后必跑 |
 | CLI 模块改动 | 参考 4.4 | 确保 `px-plugin init` 无回归 |
+| 测试采纳率审计 | `./scripts/testing/audit-test-adoption.sh` | 统计最近提交是否新增测试 |
 
 > 计划中的 `make`/`scripts` 聚合命令详见 `testing_strategy.md`，落实后可替换为单行入口。
 

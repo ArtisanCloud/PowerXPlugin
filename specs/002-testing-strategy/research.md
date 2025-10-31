@@ -30,3 +30,10 @@
 - **Decision**: Capture logs in `/tmp` and point to troubleshooting sections in docs/test/testing_usage.md; scripts should emit helpful messages on missing tooling or service startup failures.
 - **Rationale**: Speeds up incident triage and prevents silent failures during CI runs.
 - **Alternatives Considered**: Let commands fail without context — rejected for poor developer experience.
+
+## Implementation Retrospective (2025-10-31)
+- `regression.sh` 由 `npm run dev` 改为 `npx nuxi build + preview`，并自动选择空闲端口，避免本地已有服务（如 Grafana）冲突。
+- 添加代理变量清理与 Wait-for-HTTP 逻辑（允许 404 视作就绪），解决等待阶段长时间阻塞的问题。
+- 在 `smoke.sh` / `regression.sh` 输出统一耗时日志，为 SC-001 / SC-002 提供量化数据，Quickstart 对应更新。
+- CI 工作流新增 smoke/regression job，并缓存 Playwright 浏览器，保证一键验证与脚本保持一致。
+- 增补 `audit-test-adoption.sh` 脚本，为追踪测试采纳率提供自动化依据。

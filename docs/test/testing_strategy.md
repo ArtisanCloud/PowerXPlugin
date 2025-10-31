@@ -387,8 +387,8 @@ make test-smoke
 
 1. `go test ./framework/... ./skeleton/backend/... -coverprofile=tmp/coverage-regression.out`（覆盖更广的包）；
 2. 启动 `go run ./skeleton/backend/cmd/plugin`（输出写入 `tmp/regression-backend.log`）；
-3. 启动 `npx nuxi dev --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT:-3030}`（输出写入 `tmp/regression-frontend.log`）；
-4. 轮询 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认 `http://127.0.0.1:3030`）；
+3. 启动 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`（未显式设置时脚本会自动选择空闲端口；输出写入 `tmp/regression-frontend.log`）；
+4. 轮询 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认为 `http://127.0.0.1:<port>`）；
 5. 调用 `PLAYWRIGHT_BASE_URL=… npx playwright test`，失败时保留 `skeleton/web-admin/test-results/` 供排查；
 6. 结束后生成 `tmp/coverage.html` 并输出总耗时。
 
@@ -402,6 +402,34 @@ make test-smoke
 > **Playwright 稳定性**：网络/渲染波动可能导致偶发失败。建议：
 > - 如需重试，可使用 `npx playwright test --retries=1` 或在脚本外设置 `PLAYWRIGHT_RETRIES=1`（待进一步集成）；
 > - 若服务启动缓慢，可调整 `PLAYWRIGHT_BASE_URL` 并在脚本前 export `WAIT_RETRIES`/`WAIT_INTERVAL`（后续扩展时可加入参数）。
+
+### 3.5 测试采纳率审计
+
+`scripts/testing/audit-test-adoption.sh` 通过 `git log` 对最近提交进行抽样（默认 10 条），统计是否包含 Go `_test.go` 或 Playwright `.spec.ts` 文件：
+
+```bash
+# 查看最近 10 个提交的测试采纳情况
+./scripts/testing/audit-test-adoption.sh
+
+# 自定义范围
+AUDIT_COMMITS=20 AUDIT_BASE_REF=origin/main ./scripts/testing/audit-test-adoption.sh
+```
+
+输出示例：
+
+```
+Commit       Go       E2E      Title
+--------------------------------------
+1a2b3c4d     yes      no       add smoke workflow docs
+...
+--------------------------------------
+Commits inspected: 10
+Go tests added:    4
+E2E tests added:   3
+Combined adoption: 70%
+```
+
+该脚本为 SC-003 提供可量化的“新增功能必须附带测试”线索，建议在发布前或回顾时运行并将结果纳入报告。
 
 ### 3.3 Git Hook 集成
 

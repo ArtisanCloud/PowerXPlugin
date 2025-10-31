@@ -90,10 +90,10 @@
 
 - [X] T023 [P] `docs/test/testing_strategy.md` 与 `testing_usage.md` 进行终审校对（同步新指令、产物路径）
 - [X] T024 [P] 完善 `scripts/testing/README.md`，列出所有脚本/Makefile 目标与常见环境变量
-- [ ] T025 运行 `make test-smoke`、`make test-regression` 并更新 Quickstart 中的预计耗时数据
-- [ ] T026 在 `research.md` 添加实施后回顾（记录任何变更决策）
-- [ ] T027 在 `scripts/testing/smoke.sh`、`regression.sh` 中记录总执行耗时并在 `docs/test/testing_usage.md` 说明如何读取/对照 SC-001、SC-002
-- [ ] T028 编写 `scripts/testing/audit-test-adoption.sh` 并在 `docs/test/testing_strategy.md` 追加“测试采纳率”章节，用于统计近期 PR 是否附带测试（支撑 SC-003）
+- [X] T025 运行 `make test-smoke`、`make test-regression` 并更新 Quickstart 中的预计耗时数据
+- [X] T026 在 `research.md` 添加实施后回顾（记录任何变更决策）
+- [X] T027 在 `scripts/testing/smoke.sh`、`regression.sh` 中记录总执行耗时并在 `docs/test/testing_usage.md` 说明如何读取/对照 SC-001、SC-002
+- [X] T028 编写 `scripts/testing/audit-test-adoption.sh` 并在 `docs/test/testing_strategy.md` 追加“测试采纳率”章节，用于统计近期 PR 是否附带测试（支撑 SC-003）
 
 ---
 

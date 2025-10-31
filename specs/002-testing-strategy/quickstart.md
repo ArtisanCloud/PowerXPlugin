@@ -19,12 +19,16 @@ npx playwright install --prefix skeleton/web-admin
 make test-smoke
 ```
 
+> 实测（macOS / Go 1.23 / Node 22）：约 3 秒完成，脚本末尾会打印 `=== Smoke workflow complete in Ns ===`，可作为 SC-001 的佐证。
+
 ## 4. 执行全量回归
 ```bash
 ./scripts/testing/regression.sh
 # 或
 make test-regression
 ```
+
+> 实测同环境：约 12 秒完成，Playwright 报告与后端/前端日志可在 `tmp/` 与 `skeleton/web-admin/test-results/` 中查看。
 
 ## 5. 查看产物
 - 覆盖率：`tmp/coverage.html`

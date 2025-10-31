@@ -17,7 +17,20 @@ go tool cover -html=tmp/coverage-regression.out -o tmp/coverage.html
 
 BACKEND_LOG="tmp/regression-backend.log"
 FRONTEND_LOG="tmp/regression-frontend.log"
-FRONTEND_PORT="${REGRESSION_FRONTEND_PORT:-3030}"
+if [ -n "${REGRESSION_FRONTEND_PORT:-}" ]; then
+  FRONTEND_PORT="$REGRESSION_FRONTEND_PORT"
+else
+  FRONTEND_PORT=$(python3 - <<'PY'
+import socket
+sock = socket.socket()
+sock.bind(('', 0))
+port = sock.getsockname()[1]
+sock.close()
+print(port)
+PY
+  )
+fi
+echo "[info] Frontend port: $FRONTEND_PORT"
 mkdir -p tmp
 
 # ensure local services bypass proxies
@@ -45,10 +58,11 @@ echo "[R-2] Starting backend service"
 go run ./skeleton/backend/cmd/plugin >"$BACKEND_LOG" 2>&1 &
 backend_pid=$!
 
-echo "[R-3] Starting Nuxt dev server"
+echo "[R-3] Building Nuxt app"
 pushd skeleton/web-admin > /dev/null
 npm install >/dev/null 2>&1 || true
-NITRO_PORT="$FRONTEND_PORT" npx nuxi dev --hostname 127.0.0.1 --port "$FRONTEND_PORT" >"$ROOT_DIR/$FRONTEND_LOG" 2>&1 &
+npx nuxi build >/dev/null 2>&1
+NITRO_PORT="$FRONTEND_PORT" PORT="$FRONTEND_PORT" npx nuxi preview --hostname 127.0.0.1 --port "$FRONTEND_PORT" >"$ROOT_DIR/$FRONTEND_LOG" 2>&1 &
 frontend_pid=$!
 popd > /dev/null
 
@@ -58,8 +72,9 @@ wait_for() {
   local retries=30
   local wait=2
   for ((i=0; i<retries; i++)); do
-    if curl --noproxy '*' -fsS "$url" > /dev/null; then
-      echo "${name} ready: $url"
+    status=$(curl --noproxy '*' -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
+    if [[ "$status" =~ ^(200|204|301|302|404)$ ]]; then
+      echo "${name} ready (HTTP $status): $url"
       return 0
     fi
     sleep "$wait"

@@ -27,6 +27,17 @@ go version
 node --version
 npm --version
 python3 --version
+npx playwright --version
+```
+
+示例输出（供对照）：
+
+```
+go version go1.23.1 darwin/arm64
+v22.13.0
+9.3.1
+Python 3.12.3
+Version 1.56.1
 ```
 
 ---
@@ -40,9 +51,13 @@ go test ./skeleton/backend/internal/routes/... -v
 python3 -m json.tool docs/contracts/manifest.json > /dev/null
 python3 -m json.tool docs/contracts/rbac.json > /dev/null
 go build -o /tmp/px-plugin ./tools/cli/cmd/px-plugin
+
+# 完成 Phase 3 后，可改用脚本入口
+./scripts/testing/smoke.sh
+# make test-smoke
 ```
 
-通过以上命令可初步确认后端逻辑、契约文件与 CLI 构建无异常。任何一步失败请参考第 7 节排查。
+通过以上命令或脚本可初步确认后端逻辑、契约文件与 CLI 构建无异常。任何一步失败请参考第 7 节排查。
 
 ---
 
@@ -83,26 +98,33 @@ go tool cover -func=coverage.out
 
 4. 运行测试
 
-   ```bash
-   PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test
-   ```
+```bash
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test
+
+# 完成 Phase 4 后，可改用脚本入口
+./scripts/testing/regression.sh
+# make test-regression
+```
 
 5. 停止服务（Ctrl+C），若失败可在 `skeleton/web-admin/test-results/` 查看报告。
 
 > 稳定性建议：确保 dev server 输出无 `PXAdminLayout` 等组件解析警告，再执行 Playwright。
+>
+> 脚本版本会自动启动后端 `go run ./skeleton/backend/cmd/plugin` 与前端 `npx nuxi dev --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT:-3030}`，并等待 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认 `http://127.0.0.1:3030`）可访问；相关日志保存在 `tmp/regression-backend.log` 与 `tmp/regression-frontend.log`。
 
 ### 4.3 契约校验
 
 ```bash
-python3 -m json.tool docs/contracts/manifest.json > /dev/null
-python3 -m json.tool docs/contracts/rbac.json > /dev/null
-# 可选：验证 OpenAPI（需安装 swagger-cli）
-npx --yes @apidevtools/swagger-cli@4.0.4 validate docs/contracts/openapi.yaml
+./scripts/testing/validate-contracts.sh
 ```
 
-若需校验 CLI 生成物的契约，可执行：
+如需手动执行，可依次运行：
 
 ```bash
+python3 -m json.tool docs/contracts/manifest.json > /dev/null
+python3 -m json.tool docs/contracts/rbac.json > /dev/null
+npx --yes @apidevtools/swagger-cli@4.0.4 validate docs/contracts/openapi.yaml
+
 TEMP_DIR=$(mktemp -d)
 pushd "$TEMP_DIR" >/dev/null
 /path/to/PowerXPlugin/bin/px-plugin init com.powerx.temp-test --force --module github.com/example/temp
@@ -111,6 +133,8 @@ python3 -m json.tool com.powerx.temp-test/docs/contracts/rbac.json > /dev/null
 popd >/dev/null
 rm -rf "$TEMP_DIR"
 ```
+
+> 提示：设置 `KEEP_TEMP_DIR=1` 可保留脚本生成的临时目录以便排查。
 
 ### 4.4 CLI 验证
 
@@ -143,7 +167,15 @@ rm -rf "$TMP_DIR"
 
 ## 6. 编写与扩展测试用例
 
-新增代码时，请同步补充对应的测试覆盖。下面列举各层常见场景与最小示例，方便快速复制扩展。
+新增代码时，请同步补充对应的测试覆盖。下表列出了常用目录：
+
+| 类型 | 目录示例 | 说明 |
+|------|----------|------|
+| Go 单元测试 | `framework/backend/go/<pkg>/*_test.go`<br>`skeleton/backend/internal/<pkg>/*_test.go` | 与被测文件同目录，命名为 `*_test.go`，可被 `go test ./...` 自动发现 |
+| Playwright E2E | `skeleton/web-admin/tests/e2e/*.spec.ts` | 放在 `tests/e2e/` 下，命名 `*.spec.ts`，可被 `npx playwright test` 扫描 |
+| CLI 示例 | `tools/cli/cmd` + `scripts/testing/*.sh` | CLI 新增命令时需同步脚本调用与文档 |
+
+下面列举各层常见场景与最小示例，方便快速复制扩展。
 
 > **目录约定提醒**  
 > - Go 测试文件与实现同目录，命名为 `*_test.go`，便于 `go test ./...` 自动发现。  
@@ -228,6 +260,8 @@ func TestPingHandler_ReturnsOK(t *testing.T) {
   }
 }
 
+// 模板提示：将上面的 `handler`/`service` 替换为实际业务包，即可作为新增测试的起点。
+
 type stubContext struct {
   w      *httptest.ResponseRecorder
   status int
@@ -267,6 +301,8 @@ go test ./skeleton/backend/internal/... -run TestPingHandler_ReturnsOK -v
      await expect(page.getByText('当前版本')).toBeVisible();
    });
    ```
+
+   > 以上片段可作为新 spec 的模板，替换 `goto` 地址与断言内容即可。
 
 2. 启动后端与前端 dev server 后，仅运行该文件：
 
@@ -314,6 +350,7 @@ rm -rf "$TMP_DIR"
 | CLI 生成命令失败 | 未 `go build` px-plugin 或 GOPATH 权限问题 | 先在仓库根执行 `go build -o bin/px-plugin ./tools/cli/cmd/px-plugin` |
 | 契约校验报语法错误 | JSON 文件格式化异常 | 使用 `python3 -m json.tool <file>` 定位具体报错行 |
 | 覆盖率下降 | 新增代码无测试 | 参考 `docs/test/testing_strategy.md` 中的改进建议，补充相应测试用例 |
+| `scripts/testing/*.sh` 提前退出 | 依赖未装或日志被忽略 | 查看脚本输出末尾的 failing command，确认 `go`/`node`/`npx` 版本满足要求，必要时设置 `KEEP_TEMP_DIR=1` 保留排查现场 |
 
 ---
 

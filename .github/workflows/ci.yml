@@ -47,3 +47,82 @@ jobs:
         run: go work sync
       - name: Run contract validators
         run: go test ./framework/backend/go/manifest ./framework/backend/go/rbac
+
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Build px-plugin and scaffold sample project
+        run: |
+          go work sync
+          go build -o bin/px-plugin ./tools/cli/cmd/px-plugin
+          TMP_DIR=$(mktemp -d)
+          cd "$TMP_DIR"
+          "$GITHUB_WORKSPACE/bin/px-plugin" init com.powerx.ci --force --module github.com/example/ci > /dev/null
+          test -f com.powerx.ci/plugin.yaml
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: [backend, contracts, cli]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run smoke workflow
+        run: |
+          make test-smoke 2>&1 | tee smoke.log
+      - name: Upload smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-log
+          path: smoke.log
+
+  regression:
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json', 'skeleton/web-admin/package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - name: Install dependencies
+        run: |
+          npm install
+          cd skeleton/web-admin && npm install
+      - name: Install Playwright browsers
+        working-directory: skeleton/web-admin
+        run: npx playwright install --with-deps
+      - name: Run regression workflow
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        run: |
+          make test-regression 2>&1 | tee regression.log
+      - name: Upload regression artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-artifacts
+          path: |
+            regression.log
+            tmp/regression-backend.log
+            tmp/regression-frontend.log
+            tmp/coverage.html
+            skeleton/web-admin/test-results/

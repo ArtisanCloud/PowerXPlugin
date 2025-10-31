@@ -113,6 +113,6 @@ skeleton/web-admin/tests/e2e/        # Playwright suite extended per guidance
 - Implement `scripts/testing/*.sh` and associated Makefile targets.
 - Update `docs/test/testing_strategy.md` & `docs/test/testing_usage.md` with final command names.
 - Ensure generated artifacts align with documented paths (`tmp/coverage.html`, Playwright reports).
-- Integrate smoke/regression scripts into CI (update `.github/workflows/test.yml`, enable parallel backend/contracts/cli jobs, configure Playwright browser caching).
+- Integrate smoke/regression scripts into CI (update `.github/workflows/test.yml`, enable parallel backend/contracts/cli jobs, configure Playwright browser caching). *(TODO: 执行于 Phase 4 / US2 完成后)*
 - Emit runtime metrics within smoke/regression scripts and document how to capture them for SC-001/SC-002 verification.
 - Deliver a `scripts/testing/audit-test-adoption.sh` workflow (and documentation) to track SC-003 test-adoption criteria across recent PRs.

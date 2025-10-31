@@ -31,5 +31,6 @@ yarn.lock
 .DS_Store
 Thumbs.db
 
-# Testing artifacts
+# Testing artifacts (coverage reports, playwright output, temp CLI scaffolds)
 tmp/
+!tmp/README.md

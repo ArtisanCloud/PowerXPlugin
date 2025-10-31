@@ -305,6 +305,35 @@ echo "=== CLI 验证测试通过 ==="
 
 ---
 
+### 2.5 TestLayer ↔ TestWorkflow 映射示例
+
+| Workflow | 包含 TestLayer | 代表性代码片段 |
+|----------|----------------|------------------|
+| Smoke (`scripts/testing/smoke.sh`) | `unit`、`cli` | ```go
+// skeleton/backend/internal/routes/routes_test.go
+func TestRegisterAddsPingRoute(t *testing.T) {
+    app := bootstrap.NewApp(nil)
+    if err := router.AttachHTTPServer(app); err != nil {
+        t.Fatalf("attach: %v", err)
+    }
+    router.RegisterPluginRoutes(app, Register)
+    if _, ok := collectRoutes(app.Router)["/api/v1/ping"]; !ok {
+        t.Fatal("/api/v1/ping should be registered")
+    }
+}
+``` |
+| Regression (`scripts/testing/regression.sh`) | `unit`、`integration`、`e2e`、`cli` | ```ts
+// skeleton/web-admin/tests/e2e/starter.spec.ts
+test('starter page renders welcome message', async ({ page }) => {
+  await page.goto('/_p/com.powerx.sample/admin');
+  await expect(page.getByRole('heading', { name: 'PowerX Sample' })).toBeVisible();
+});
+``` |
+
+> Smoke workflow 聚焦最小验证，而 Regression 在执行 Smoke 的基础上继续拉起后台/前台服务并运行 Playwright，确保四层全部覆盖。
+
+---
+
 ## 3. 契约守护机制
 
 ### 3.1 契约文件清单
@@ -318,45 +347,61 @@ docs/contracts/
 
 ### 3.2 自动化校验脚本
 
+仓库提供 `scripts/testing/validate-contracts.sh` 用于一次性完成以下检查：
+
+1. 使用 `python3 -m json.tool` 验证 `docs/contracts/manifest.json` 与 `docs/contracts/rbac.json` 的语法；
+2. 如果检测到 `npx`，执行 `npx --yes @apidevtools/swagger-cli@4.0.4 validate docs/contracts/openapi.yaml`；
+3. 如需临时验证 CLI 生成物，脚本会调用 `px-plugin init` 生成样例契约并再次运行 JSON 校验。
+
+运行方式：
+
 ```bash
-#!/bin/bash
-# scripts/validate-contracts.sh
-# 依赖：python3 + PyYAML、(可选) npx @apidevtools/swagger-cli
-
-set -euo pipefail
-
-echo "=== 契约校验开始 ==="
-
-# 1. 验证 JSON Schema
-echo "1. 验证 JSON Schema 语法"
-python3 -m json.tool docs/contracts/manifest.json > /dev/null
-python3 -m json.tool docs/contracts/rbac.json > /dev/null
-
-# 2. 验证 OpenAPI（需预先安装 swagger-cli 或同类工具）
-if command -v npx >/dev/null; then
-  echo "2. 验证 OpenAPI 规范"
-  npx --yes @apidevtools/swagger-cli@4.0.4 validate docs/contracts/openapi.yaml
-else
-  echo "警告: 未检测到 npx，跳过 OpenAPI 验证"
-fi
-
-# 3. 校验示例契约
-echo "3. 校验 examples/starter/ 契约文件"
-python3 -m json.tool examples/starter/docs/contracts/manifest.json > /dev/null
-python3 -m json.tool examples/starter/docs/contracts/rbac.json > /dev/null
-
-# 4. 校验 CLI 生成项目的契约
-echo "4. 校验 CLI 生成项目的契约文件"
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
-pushd "$TEMP_DIR" >/dev/null
-/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/bin/px-plugin init com.powerx.temp-test --force --module github.com/example/temp >/dev/null
-python3 -m json.tool com.powerx.temp-test/docs/contracts/manifest.json > /dev/null
-python3 -m json.tool com.powerx.temp-test/docs/contracts/rbac.json > /dev/null
-popd >/dev/null
-
-echo "=== 契约校验通过 ==="
+./scripts/testing/validate-contracts.sh
+# KEEP_TEMP_DIR=1 ./scripts/testing/validate-contracts.sh  # 保留临时目录用于排查
 ```
+
+脚本默认会在 `bin/px-plugin` 缺失时触发一次 `go build`，并在结束后清理临时目录（除非显式设置 `KEEP_TEMP_DIR=1`）。
+
+### 3.3 Smoke 工作流脚本
+
+`scripts/testing/smoke.sh` 将“后端基础测试 → 契约校验 → CLI 验证”串成单一入口，默认 5 分钟内完成：
+
+1. 运行 `go test ./framework/backend/go/bootstrap/...`（生成 `tmp/coverage.out`）及 `go test ./skeleton/backend/internal/routes/...`；
+2. 调用 `go tool cover -html=tmp/coverage.out -o tmp/coverage.html` 生成可视化报告；
+3. 执行 `./scripts/testing/validate-contracts.sh` 复用契约校验逻辑；
+4. 必要时编译 `bin/px-plugin` 并在临时目录执行 `px-plugin init` 验证 CLI scaffolding。
+
+运行方式：
+
+```bash
+./scripts/testing/smoke.sh
+# 或使用 Makefile 包装（含 300s 超时与错误回显）
+make test-smoke
+```
+
+脚本会输出耗时统计并默认清理临时 scaffolding 目录；设置 `KEEP_TEMP_DIR=1` 可保留排查现场。
+
+### 3.4 Regression 工作流脚本
+
+`scripts/testing/regression.sh` 在执行 Smoke 工作流后继续完成：
+
+1. `go test ./framework/... ./skeleton/backend/... -coverprofile=tmp/coverage-regression.out`（覆盖更广的包）；
+2. 启动 `go run ./skeleton/backend/cmd/plugin`（输出写入 `tmp/regression-backend.log`）；
+3. 启动 `npx nuxi dev --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT:-3030}`（输出写入 `tmp/regression-frontend.log`）；
+4. 轮询 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认 `http://127.0.0.1:3030`）；
+5. 调用 `PLAYWRIGHT_BASE_URL=… npx playwright test`，失败时保留 `skeleton/web-admin/test-results/` 供排查；
+6. 结束后生成 `tmp/coverage.html` 并输出总耗时。
+
+运行方式：
+
+```bash
+./scripts/testing/regression.sh
+# make test-regression  # 含 3600s 超时、错误回显
+```
+
+> **Playwright 稳定性**：网络/渲染波动可能导致偶发失败。建议：
+> - 如需重试，可使用 `npx playwright test --retries=1` 或在脚本外设置 `PLAYWRIGHT_RETRIES=1`（待进一步集成）；
+> - 若服务启动缓慢，可调整 `PLAYWRIGHT_BASE_URL` 并在脚本前 export `WAIT_RETRIES`/`WAIT_INTERVAL`（后续扩展时可加入参数）。
 
 ### 3.3 Git Hook 集成
 

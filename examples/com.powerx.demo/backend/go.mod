@@ -1,4 +1,4 @@
-module github.com/powerx-plugins/com-powerx-starter/backend
+module github.com/powerx-plugins/com-powerx-demo/backend
 
 go 1.21
 

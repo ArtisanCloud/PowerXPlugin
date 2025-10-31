@@ -7,8 +7,8 @@
     "build": "nuxi build"
   },
   "dependencies": {
-    "@powerx-plugin/framework-admin": "latest",
-    "@powerx-plugin/framework-client": "latest",
+    "@powerx-plugin/framework-admin": "file:../../sdk/workspace/frontend/nuxt/framework-admin",
+    "@powerx-plugin/framework-client": "file:../../sdk/workspace/frontend/nuxt/framework-client",
     "nuxt": "^4.2.0"
   },
   "devDependencies": {

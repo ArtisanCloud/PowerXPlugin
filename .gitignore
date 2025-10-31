@@ -30,3 +30,6 @@ yarn.lock
 # macOS / misc
 .DS_Store
 Thumbs.db
+
+# Testing artifacts
+tmp/

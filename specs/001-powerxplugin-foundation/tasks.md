@@ -130,13 +130,13 @@
 
 **目的**: 全局文档、验证与收尾工作，提升整体可维护性。
 
-- [ ] T054 [P] 整理 `docs/quickstart.md`，同步 quickstart 手册至仓库文档
-- [ ] T055 运行一次 `go test ./...`、`npm run lint`、`npm run build`、`px-plugin init` 验证 Quickstart 步骤
-- [ ] T056 [P] 更新 `README.md` 与 `docs/init-project.md`，明确仅支持 Go + Nuxt 并指向 `docs/backlog/multi-language.md`
-- [ ] T057 [P] 为 `framework/backend/go` 编写核心单元测试（例如 `bootstrap/app_test.go`）并生成覆盖率报告
-- [ ] T058 [P] 为 `skeleton/backend` 编写集成测试（例如 `internal/routes/routes_test.go`）验证 `/api/v1/ping`
-- [ ] T059 [P] 在 `skeleton/web-admin/tests/e2e/` 添加前端 E2E 测试（Playwright/Cypress）覆盖 Starter 页面
-- [ ] T060 [P] 同步 `spec.md`、`plan.md`、`tasks.md` 版本号与状态标记
+- [X] T054 [P] 整理 `docs/quickstart.md`，同步 quickstart 手册至仓库文档
+- [X] T055 运行一次 `go test ./...`、`npm run lint`、`npm run build`、`px-plugin init` 验证 Quickstart 步骤
+- [X] T056 [P] 更新 `README.md` 与 `docs/init-project.md`，明确仅支持 Go + Nuxt 并指向 `docs/backlog/multi-language.md`
+- [X] T057 [P] 为 `framework/backend/go` 编写核心单元测试（例如 `bootstrap/app_test.go`）并生成覆盖率报告
+- [X] T058 [P] 为 `skeleton/backend` 编写集成测试（例如 `internal/routes/routes_test.go`）验证 `/api/v1/ping`
+- [X] T059 [P] 在 `skeleton/web-admin/tests/e2e/` 添加前端 E2E 测试（Playwright/Cypress）覆盖 Starter 页面
+- [X] T060 [P] 同步 `spec.md`、`plan.md`、`tasks.md` 版本号与状态标记
 
 ---
 

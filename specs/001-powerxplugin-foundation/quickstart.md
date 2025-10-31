@@ -1,5 +1,7 @@
 # Quickstart - PowerXPlugin 仓库基线落地
 
+> ℹ️ 本文档保留生成历史，最新快速上手指南请参阅 `docs/quickstart.md`。
+
 ## 必备环境
 
 - Go 1.21+，启用 `GOWORK=on`

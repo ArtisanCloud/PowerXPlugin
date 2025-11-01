@@ -33,8 +33,56 @@ Manifest、RBAC、健康检查与 API 契约是唯一真相：相关 Schema 必�
 - CI 必须覆盖 Go lint/test 与前端构建；除非在 `docs/init-project.md` 中明示临时豁免，否则禁止手动合并未通过检查的变更。
 - 任何占位或实验功能都要附带 TODO 与路线图关联，提醒使用者成熟度与风险。
 
+## VI. 插件项目产出规范
+
+PowerXPlugin 脚手架产出的插件项目必须遵循以下基本约束，以确保下游插件延续统一架构与体验：
+
+### 目录分层
+```
+backend/
+└── internal/
+    ├── transport/http/{admin,agent,...}/<domain>/
+    ├── services/{admin,agent,...}/<domain>/
+    └── domain/{models,repository}/<domain>/
+```
+- 使用 lower_snake_case 作为目录名
+- Handler 仅负责入参校验→鉴权→调用 Service→序列化
+- 业务编排逻辑必须在 `internal/services` 中完成
+- HTTP 与 gRPC 复用同一 Service 层
+
+### Repository 层约束
+- **必须内嵌** `repository.BaseRepository[T]` 并提供 `NewXXXRepository` 构造函数
+- **禁止直接暴露裸 `*gorm.DB` 字段**（维持读写封装一致性）
+- 所有读写操作须在租户上下文中执行：`BeginTenantTx` → `SET LOCAL app.tenant_id`
+- 参考完整规范：`com.powerx.plugin.base/.specify/memory/rulesets/crud/repository.yaml`
+
+### 统一响应格式
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "",
+  "error": null,
+  "timestamp": "2024-12-09T12:00:00Z",
+  "request_id": "rq-123"
+}
+```
+- 分页响应：`data` 字段内返回 `{ "items": [...], "total": 135, "page": 1, "page_size": 20 }`
+- 错误响应：`error` 字段包含 `{ "code": "ERROR_CODE", "message": "...", "details": {} }`
+
+### 中间件栈顺序
+1. `request_id` — 生成/透传请求 ID
+2. `ctx_verify` — JWT/HMAC 验签，抽取 `tenant_id/user_id/permissions`
+3. `rbac_guard` — 服务端权限判定
+4. `tenant_ctx` — 设置 DB 会话变量（RLS 支持）
+5. `recovery/logging` — 统一结构化日志与 panic 保护
+
+> 完整插件开发规范、DTO 校验、测试策略等详细内容，参见：
+> - `com.powerx.plugin.base/.specify/memory/constitution.md`
+> - `com.powerx.plugin.base/.specify/memory/rulesets/`
+
 ## 治理
 
 本宪章优先于既有实践；任何修订都必须经架构评审，更新路线图条目，提供现有插件的迁移指引，并同步更新 `docs/` 文档。评审需核验是否遵循上述原则、约束与流程闸门。
 
-**版本**: 0.1.0 | **批准日期**: 2025-10-29 | **最后修订**: 2025-10-29
+**版本**: 0.1.0 | **批准日期**: 2025-10-29 | **最后修订**: 2025-11-01

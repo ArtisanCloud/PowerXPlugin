@@ -1,5 +1,7 @@
 package bootstrap
 
+import "context"
+
 // Router 对外暴露最小路由能力，以避免绑定具体 HTTP 实现。
 type Router interface {
 	Group(rel string) Router
@@ -20,4 +22,8 @@ type Context interface {
 	BindJSON(v any) error
 	JSON(code int, v any)
 	Status(code int)
+	Header(name string) string
+	SetHeader(name, value string)
+	Context() context.Context
+	SetContext(ctx context.Context)
 }

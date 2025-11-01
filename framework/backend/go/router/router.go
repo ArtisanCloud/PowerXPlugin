@@ -61,14 +61,22 @@ func RegisterPluginRoutes(app *bootstrap.App, reg func(rg bootstrap.Router)) {
 }
 
 type httpRouterRoot struct {
-	mu       sync.RWMutex
-	routes   map[string]map[string]http.HandlerFunc
-	notFound http.HandlerFunc
+	mu          sync.RWMutex
+	static      map[string]map[string]http.HandlerFunc
+	paramRoutes map[string][]routeEntry
+	notFound    http.HandlerFunc
+}
+
+type routeEntry struct {
+	pattern  string
+	handler  bootstrap.Handler
+	segments []string
 }
 
 func newHTTPRouterRoot() *httpRouterRoot {
 	return &httpRouterRoot{
-		routes: make(map[string]map[string]http.HandlerFunc),
+		static:      make(map[string]map[string]http.HandlerFunc),
+		paramRoutes: make(map[string][]routeEntry),
 		notFound: func(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 		},
@@ -77,24 +85,47 @@ func newHTTPRouterRoot() *httpRouterRoot {
 
 func (r *httpRouterRoot) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.mu.RLock()
-	methodRoutes := r.routes[req.Method]
+	methodRoutes := r.static[req.Method]
 	handler, ok := methodRoutes[req.URL.Path]
+	paramEntries := append([]routeEntry(nil), r.paramRoutes[req.Method]...)
 	r.mu.RUnlock()
 
 	if !ok {
+		if len(paramEntries) > 0 {
+			pathSegments := splitPath(req.URL.Path)
+			for _, entry := range paramEntries {
+				if params, matched := matchSegments(entry.segments, pathSegments); matched {
+					ctx := newHTTPContext(w, req, params)
+					entry.handler(ctx)
+					return
+				}
+			}
+		}
 		r.notFound(w, req)
 		return
 	}
 	handler(w, req)
 }
 
-func (r *httpRouterRoot) register(method, fullPath string, handler http.HandlerFunc) {
+func (r *httpRouterRoot) register(method, fullPath string, handler bootstrap.Handler) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.routes[method]; !ok {
-		r.routes[method] = make(map[string]http.HandlerFunc)
+	if strings.Contains(fullPath, ":") {
+		entry := routeEntry{
+			pattern:  fullPath,
+			handler:  handler,
+			segments: splitPath(fullPath),
+		}
+		r.paramRoutes[method] = append(r.paramRoutes[method], entry)
+		return
 	}
-	r.routes[method][fullPath] = handler
+	if _, ok := r.static[method]; !ok {
+		r.static[method] = make(map[string]http.HandlerFunc)
+	}
+	r.static[method][fullPath] = func(w http.ResponseWriter, req *http.Request) {
+		ctx := newHTTPContext(w, req, nil)
+		handler(ctx)
+	}
 }
 
 type httpRouter struct {
@@ -118,11 +149,7 @@ func (r *httpRouter) Handle(method, p string, h bootstrap.Handler) {
 	for i := len(r.mws) - 1; i >= 0; i-- {
 		final = r.mws[i](final)
 	}
-
-	r.root.register(method, fullPath, func(w http.ResponseWriter, req *http.Request) {
-		ctx := &httpContext{w: w, req: req}
-		final(ctx)
-	})
+	r.root.register(method, fullPath, final)
 }
 
 func (r *httpRouter) Use(mw ...bootstrap.Middleware) {
@@ -135,11 +162,16 @@ func (r *httpRouter) Use(mw ...bootstrap.Middleware) {
 type httpContext struct {
 	w   http.ResponseWriter
 	req *http.Request
+	ctx context.Context
+
+	params map[string]string
 }
 
 func (c *httpContext) Param(name string) string {
-	// 当前实现不解析 Path 参数，占位保持接口稳定。
-	return ""
+	if c.params == nil {
+		return ""
+	}
+	return c.params[name]
 }
 
 func (c *httpContext) Query(name string) string {
@@ -159,6 +191,36 @@ func (c *httpContext) JSON(code int, v any) {
 
 func (c *httpContext) Status(code int) {
 	c.w.WriteHeader(code)
+}
+
+func (c *httpContext) Header(name string) string {
+	if v := c.req.Header.Get(name); v != "" {
+		return v
+	}
+	return c.w.Header().Get(name)
+}
+
+func (c *httpContext) SetHeader(name, value string) {
+	if value == "" {
+		c.w.Header().Del(name)
+		return
+	}
+	c.w.Header().Set(name, value)
+}
+
+func (c *httpContext) Context() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
+	return c.req.Context()
+}
+
+func (c *httpContext) SetContext(ctx context.Context) {
+	if ctx == nil {
+		return
+	}
+	c.ctx = ctx
+	c.req = c.req.WithContext(ctx)
 }
 
 func joinPaths(base, rel string) string {
@@ -186,4 +248,43 @@ func sanitizePath(p string) string {
 		return "/" + p
 	}
 	return p
+}
+
+func newHTTPContext(w http.ResponseWriter, req *http.Request, params map[string]string) *httpContext {
+	return &httpContext{
+		w:      w,
+		req:    req,
+		params: params,
+		ctx:    req.Context(),
+	}
+}
+
+func splitPath(p string) []string {
+	if p == "" || p == "/" {
+		return []string{}
+	}
+	trimmed := strings.Trim(p, "/")
+	if trimmed == "" {
+		return []string{}
+	}
+	return strings.Split(trimmed, "/")
+}
+
+func matchSegments(patternSegments, pathSegments []string) (map[string]string, bool) {
+	if len(patternSegments) != len(pathSegments) {
+		return nil, false
+	}
+	paramValues := make(map[string]string)
+	for idx, seg := range patternSegments {
+		part := pathSegments[idx]
+		if strings.HasPrefix(seg, ":") {
+			name := seg[1:]
+			paramValues[name] = part
+			continue
+		}
+		if seg != part {
+			return nil, false
+		}
+	}
+	return paramValues, true
 }

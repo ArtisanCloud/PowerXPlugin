@@ -33,7 +33,7 @@ As a skeleton maintainer, I can run `go run ./skeleton/backend/cmd/plugin` and i
 **Acceptance Scenarios**:
 
 1. **Given** the skeleton backend running, **When** a POST to `/api/v1/templates` is made with JSON payload and header `X-Tenant-ID: 100`, **Then** the resource is stored in-memory, tagged with tenant 100, and GET `/api/v1/templates` scoped to tenant 100 returns it.
-2. **Given** two tenants create templates, **When** tenant 100 requests tenant 200's template ID, **Then** the repository enforces `.specify/memory/constitution.md` rules and returns a 404 (or equivalent denial) without leaking the record.
+2. **Given** two tenants create templates, **When** tenant 100 requests tenant 200's template ID, **Then** the repository enforces `.specify/memory/constitution.md` rules and returns a 404 Not Found without leaking the record.
 
 ---
 
@@ -87,3 +87,9 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 - **SC-002**: Standalone `curl` smoke suite across two tenant IDs completes full CRUD cycle with average latency ≤1s per request.
 - **SC-003**: Skeleton frontend manual QA completes create/edit/delete flows without console errors and reflects persisted data immediately.
 - **SC-004**: CLI-rendered project passes `go test ./...` and `npm run lint` on first run with no manual code adjustments.
+
+## Clarifications
+
+### Session 2025-11-01
+
+- Q: 当租户 A 请求租户 B 的模板 ID 时，后端 `/api/v1/templates/:id` 应返回哪种 HTTP 状态码？ → A: 404 Not Found (隐藏资源是否存在)

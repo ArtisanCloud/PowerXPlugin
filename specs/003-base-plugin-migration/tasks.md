@@ -54,15 +54,15 @@
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] 定义模板数据结构于 skeleton/backend/internal/templates/model.go
-- [ ] T016 [US2] 实作内存 Repository（嵌入 BaseRepository）于 skeleton/backend/internal/templates/repository.go
-- [ ] T017 [US2] 在 Repository 中实现 BeginTenantTx 并执行 `SET LOCAL app.tenant_id`（含相关注释）
-- [ ] T018 [US2] 实作 Templates Service 逻辑于 skeleton/backend/internal/templates/service.go
-- [ ] T019 [US2] 编写 HTTP Handler 使用新框架上下文于 skeleton/backend/internal/templates/handler.go
-- [ ] T020 [US2] 在 skeleton/backend/internal/routes/routes.go 注册 CRUD 路由并执行种子数据初始化
-- [ ] T021 [P] [US2] 补充 Repository/Service 单元测试于 skeleton/backend/internal/templates/service_test.go
-- [ ] T022 [P] [US2] 为缺失/非法租户 ID、非数字模板 ID 等边界场景编写测试于 skeleton/backend/internal/templates/service_test.go
-- [ ] T023 [US2] 更新 skeleton/backend/README.md 说明内存存储、租户隔离与 `SET LOCAL` 行为
+- [x] T015 [US2] 定义模板数据结构于 skeleton/backend/internal/templates/model.go
+- [x] T016 [US2] 实作内存 Repository（嵌入 BaseRepository）于 skeleton/backend/internal/templates/repository.go
+- [x] T017 [US2] 在 Repository 中实现 BeginTenantTx 并执行 `SET LOCAL app.tenant_id`（含相关注释）
+- [x] T018 [US2] 实作 Templates Service 逻辑于 skeleton/backend/internal/templates/service.go
+- [x] T019 [US2] 编写 HTTP Handler 使用新框架上下文于 skeleton/backend/internal/templates/handler.go
+- [x] T020 [US2] 在 skeleton/backend/internal/routes/routes.go 注册 CRUD 路由并执行种子数据初始化
+- [x] T021 [P] [US2] 补充 Repository/Service 单元测试于 skeleton/backend/internal/templates/service_test.go
+- [x] T022 [P] [US2] 为缺失/非法租户 ID、非数字模板 ID 等边界场景编写测试于 skeleton/backend/internal/templates/service_test.go
+- [x] T023 [US2] 更新 skeleton/backend/README.md 说明内存存储、租户隔离与 `SET LOCAL` 行为
 
 **Checkpoint**: Skeleton 后端可独立提供多租户 CRUD 能力
 

@@ -1,17 +1,14 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/powerx-plugin/framework/backend/go/router"
 )
-
-type fakeRouter struct {
-	prefix string
-	routes *[]registeredRoute
-}
 
 type registeredRoute struct {
 	method  string
@@ -19,64 +16,133 @@ type registeredRoute struct {
 	handler bootstrap.Handler
 }
 
+type fakeRouter struct {
+	prefix string
+	routes *[]registeredRoute
+	mws    []bootstrap.Middleware
+}
+
 func (r *fakeRouter) Group(rel string) bootstrap.Router {
 	return &fakeRouter{
 		prefix: combine(r.prefix, rel),
 		routes: r.routes,
+		mws:    append([]bootstrap.Middleware{}, r.mws...),
 	}
 }
 
 func (r *fakeRouter) Handle(method, path string, h bootstrap.Handler) {
 	full := combine(r.prefix, path)
-	*r.routes = append(*r.routes, registeredRoute{
-		method:  method,
-		path:    full,
-		handler: h,
-	})
+	final := h
+	for i := len(r.mws) - 1; i >= 0; i-- {
+		final = r.mws[i](final)
+	}
+	*r.routes = append(*r.routes, registeredRoute{method: method, path: full, handler: final})
 }
 
-func (r *fakeRouter) Use(mw ...bootstrap.Middleware) {}
+func (r *fakeRouter) Use(mw ...bootstrap.Middleware) {
+	if len(mw) == 0 {
+		return
+	}
+	r.mws = append(r.mws, mw...)
+}
 
 type fakeContext struct {
-	status int
-	body   map[string]string
+	headers map[string]string
+	params  map[string]string
+	status  int
+	payload any
+	ctx     context.Context
 }
 
-func (c *fakeContext) Param(string) string { return "" }
+func newFakeContext(headers map[string]string, params map[string]string) *fakeContext {
+	return &fakeContext{headers: headers, params: params}
+}
+
+func (c *fakeContext) Param(name string) string {
+	if c.params == nil {
+		return ""
+	}
+	return c.params[name]
+}
+
 func (c *fakeContext) Query(string) string { return "" }
 func (c *fakeContext) BindJSON(any) error  { return nil }
 func (c *fakeContext) Status(code int)     { c.status = code }
 func (c *fakeContext) JSON(code int, v any) {
 	c.status = code
-	if payload, ok := v.(map[string]string); ok {
-		c.body = payload
-	}
+	c.payload = v
 }
+func (c *fakeContext) Header(name string) string {
+	if c.headers == nil {
+		return ""
+	}
+	return c.headers[name]
+}
+func (c *fakeContext) SetHeader(name, value string) {
+	if c.headers == nil {
+		c.headers = make(map[string]string)
+	}
+	c.headers[name] = value
+}
+func (c *fakeContext) Context() context.Context {
+	if c.ctx != nil {
+		return c.ctx
+	}
+	return context.Background()
+}
+func (c *fakeContext) SetContext(ctx context.Context) { c.ctx = ctx }
 
-func TestRegisterAddsPingRoute(t *testing.T) {
+func TestRegisterRegistersAllRoutes(t *testing.T) {
 	routes := make([]registeredRoute, 0)
 	r := &fakeRouter{prefix: "/api/v1", routes: &routes}
 
 	Register(r)
 
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
-	}
-	route := routes[0]
-	if route.method != http.MethodGet {
-		t.Fatalf("method = %s, want GET", route.method)
-	}
-	if route.path != "/api/v1/ping" {
-		t.Fatalf("path = %s, want /api/v1/ping", route.path)
+	if len(routes) != 6 {
+		t.Fatalf("expected 6 routes, got %d", len(routes))
 	}
 
-	ctx := &fakeContext{}
-	route.handler(ctx)
-	if ctx.status != http.StatusOK {
-		t.Fatalf("status = %d, want 200", ctx.status)
+	// 验证 ping 路由输出
+	var ping registeredRoute
+	for _, rt := range routes {
+		if rt.method == http.MethodGet && rt.path == "/api/v1/ping" {
+			ping = rt
+			break
+		}
 	}
-	if ctx.body["status"] != "ok" {
-		t.Fatalf("body status = %q, want ok", ctx.body["status"])
+	ctx := newFakeContext(nil, nil)
+	ping.handler(ctx)
+	if ctx.status != http.StatusOK {
+		t.Fatalf("ping status = %d, want 200", ctx.status)
+	}
+	switch payload := ctx.payload.(type) {
+	case router.Envelope:
+		if !payload.Success {
+			t.Fatalf("unexpected envelope: %#v", payload)
+		}
+	case map[string]string:
+		if payload["status"] != "ok" {
+			t.Fatalf("unexpected ping payload: %#v", payload)
+		}
+	default:
+		t.Fatalf("unexpected ping payload type: %#v", ctx.payload)
+	}
+
+	// 验证模板列表路由可以执行并返回成功
+	var list registeredRoute
+	for _, rt := range routes {
+		if rt.method == http.MethodGet && rt.path == "/api/v1/templates" {
+			list = rt
+			break
+		}
+	}
+	listCtx := newFakeContext(map[string]string{"X-Tenant-ID": "1"}, nil)
+	list.handler(listCtx)
+	if listCtx.status != http.StatusOK {
+		t.Fatalf("templates list status = %d, want 200", listCtx.status)
+	}
+	if env, ok := listCtx.payload.(router.Envelope); !ok || env.Success != true {
+		t.Fatalf("unexpected templates payload: %#v", listCtx.payload)
 	}
 }
 

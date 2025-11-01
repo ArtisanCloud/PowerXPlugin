@@ -62,3 +62,11 @@ func TenantIDFromContext(ctx context.Context) (uint64, bool) {
 	}
 	return 0, false
 }
+
+// WithTenantID 将租户 ID 写入上下文，可用于测试或内存实现。
+func WithTenantID(ctx context.Context, tenantID uint64) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, tenantKey, tenantID)
+}

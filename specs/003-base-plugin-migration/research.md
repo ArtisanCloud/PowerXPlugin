@@ -126,3 +126,10 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
   - `tenant=1` → `0.001355s`  
   - `tenant=2` → `0.001451s`  
 - 结果均远低于 1s SLA，命令执行后立即终止服务并保存原始响应到 `/tmp/tenant{1,2}.json` 供复核。
+
+## Nuxt 配置 Diff 记录（Phase 7 进行中）
+
+- 2025-11-02：Skeleton/CLI 已引入 Base `nuxt.config.ts` 主要段落（`compatibilityDate`、`ssr=false`、`runtimeConfig`、Nitro headers、`POWERX_PROXY` 切换、`@nuxt/icon`、`@pinia/nuxt`、`@nuxtjs/color-mode`）。  
+- 语言包目录统一调整为 `i18n/locales`（`langDir: '../i18n/locales'` / `i18n/locales`），Skeleton、CLI、Scaffold 模板已同步。  
+- 默认布局、导航栏、侧边菜单、主题/语言切换组件已迁移至 Skeleton，并复制到 CLI/scaffold 模板；当前实现保留简化版 Bridge（仅保留主题初始化，无宿主通信）。  
+- 待确认：桥接、store、Tailwind pipeline 是否需要 Stub；若不迁移，将在 Phase 7 输出差异说明。

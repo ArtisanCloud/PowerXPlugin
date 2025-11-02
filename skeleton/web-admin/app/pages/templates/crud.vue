@@ -15,6 +15,7 @@
     </div>
 
     <TemplateFormModal
+      v-if="showFormModal"
       v-model="showFormModal"
       :title="modalTitle"
       :submit-label="submitLabel"
@@ -30,16 +31,13 @@
           <UBadge variant="soft" color="primary">{{ templates.length }}</UBadge>
         </div>
       </template>
-
       <UTable
         :columns="columns"
         :data="templates"
         :loading="loading"
-        :ui="{
-          table:
-            'min-w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700',
-        }"
+        :ui="{ table: 'min-w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700' }"
       >
+        <!-- 注意：v3 是 -cell，不是 -data；row.original 才是你的对象 -->
         <template #description-header="{ column }">
           <span class="block w-64">
             {{ column.columnDef.header }}
@@ -68,7 +66,7 @@
               icon="i-heroicons-pencil"
               @click="startEdit(row.original)"
             >
-              {{ $t("common.edit") }}
+              {{ $t('common.edit') }}
             </UButton>
             <UButton
               size="xs"
@@ -77,21 +75,18 @@
               icon="i-heroicons-trash"
               @click="confirmDelete(row.original)"
             >
-              {{ $t("common.delete") }}
+              {{ $t('common.delete') }}
             </UButton>
           </div>
         </template>
       </UTable>
+
     </UCard>
 
     <ConfirmDialog
       v-model="deleteDialog"
       :title="$t('templates.crud.deleteTitle')"
-      :message="
-        $t('templates.crud.deleteConfirm', {
-          name: selectedTemplate?.name || '',
-        })
-      "
+      :message="$t('templates.crud.deleteConfirm', { name: selectedTemplate?.name || '' })"
       confirm-color="error"
       :confirm-text="$t('common.delete')"
       :loading="deleting"
@@ -103,155 +98,317 @@
       v-model="toast.visible"
       :title="toast.title"
       :message="toast.message"
+      :color="toast.color"
       :duration="toast.duration"
     />
   </UContainer>
 </template>
 
 <script setup lang="ts">
-import { useTemplateApi, type Template } from "~/composables/api/useTemplate";
-import TemplateFormModal from "~/components/templates/TemplateFormModal.vue";
-import ConfirmDialog from "~/components/ConfirmDialog.vue";
-import ToastAlert from "~/components/ToastAlert.vue";
+import ConfirmDialog from "~/components/ConfirmDialog.vue"
+import ToastAlert from "~/components/ToastAlert.vue"
+import { useTemplateApi } from "~/composables/api/useTemplate"
+import type { Template } from "~/composables/api/useTemplate"
+import TemplateFormModal from "~/components/templates/TemplateFormModal.vue"
+import { nextTick } from "vue"
+import { useI18n } from "vue-i18n"
+
+type TemplateFormState = {
+  name: string
+  description: string
+  content: string
+}
 
 const columns = [
-  { accessorKey: "name", header: "Name" },
-  { accessorKey: "description", header: "Description" },
-  { accessorKey: "content", header: "Content" },
-  { id: "actions", header: "" },
-] as const;
+  { accessorKey: 'name', header: 'Name' },
+  { accessorKey: 'description', header: 'Description' },
+  { accessorKey: 'content', header: 'Content' },
+  { id: 'actions', header: '' }
+] satisfies any
 
-const api = useTemplateApi();
-const templates = ref<Template[]>([]);
-const loading = ref(false);
-const saving = ref(false);
-const deleting = ref(false);
-const deleteDialog = ref(false);
-const showFormModal = ref(false);
-const editingId = ref<number | null>(null);
-const selectedTemplate = ref<Template | null>(null);
+const {
+  listTemplates,
+  createTemplate: createTemplateApi,
+  updateTemplate: updateTemplateApi,
+  deleteTemplate: deleteTemplateApi,
+} = useTemplateApi()
+
+const templates = ref<Template[]>([])
+const loading = ref(false)
+const saving = ref(false)
+const editingId = ref<number | null>(null)
+const showFormModal = ref(false)
+const deleteDialog = ref(false)
+const deleting = ref(false)
+const selectedTemplate = ref<Template | null>(null)
+
+type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
 
 const toast = reactive({
   visible: false,
   title: "",
   message: "",
+  color: "primary" as ToastColor,
   duration: 3000,
-});
+})
 
-type TemplateFormState = {
-  name: string;
-  description: string;
-  content: string;
-};
+const { t } = useI18n()
 
 const defaultFormValue = (): TemplateFormState => ({
   name: "",
   description: "",
   content: "",
-});
+})
 
-const formSnapshot = computed<TemplateFormState>(() => {
-  if (!showFormModal.value) return defaultFormValue();
-  if (editingId.value && selectedTemplate.value) {
-    return {
-      name: selectedTemplate.value.name,
-      description: selectedTemplate.value.description,
-      content: selectedTemplate.value.content,
-    };
-  }
-  return defaultFormValue();
-});
+const form = reactive<TemplateFormState>(defaultFormValue())
+
+const makeLogHandlers = (action: string, context: Record<string, any> = {}) => ({
+  onRequest({ request: _request, options: _options }: any) {
+    // console.debug(`[templates/crud] ${action} request`, {
+    //   baseURL: templateApiBase,
+    //   request,
+    //   options,
+    //   context,
+    // })
+  },
+  onResponse({ response: _response }: any) {
+    // console.debug(`[templates/crud] ${action} response`, {
+    //   status: response.status,
+    //   data: response._data,
+    //   headers: typeof response.headers?.get === "function"
+    //     ? {
+    //         "x-request-id": response.headers.get("x-request-id"),
+    //       }
+    //     : undefined,
+    //   context,
+    // })
+  },
+  onResponseError({ response }: any) {
+    console.error(`[templates/crud] ${action} response error`, {
+      status: response?.status,
+      data: response?._data,
+      context,
+    })
+  },
+})
 
 const modalTitle = computed(() =>
-  editingId.value
-    ? $t("templates.crud.actions.update")
-    : $t("templates.crud.create"),
-);
+  editingId.value ? t("templates.crud.actions.update") : t("templates.crud.create")
+)
 
 const submitLabel = computed(() =>
-  editingId.value
-    ? $t("templates.crud.actions.update")
-    : $t("templates.crud.actions.save"),
-);
+  editingId.value ? t("templates.crud.actions.update") : t("templates.crud.actions.save")
+)
 
-onMounted(fetchTemplates);
+const formSnapshot = computed(() => ({
+  name: form.name,
+  description: form.description,
+  content: form.content,
+}))
 
-async function fetchTemplates() {
-  loading.value = true;
+const fetchTemplates = async () => {
+  loading.value = true
   try {
-    const { data } = await api.listTemplates();
-    templates.value = data.list;
+    const query = { page: 1, page_size: 50 }
+    // console.debug('[templates/crud] fetching templates', {
+    //   baseURL: templateApiBase,
+    //   path: 'templates',
+    //   query,
+    // })
+
+    const res = await listTemplates(query.page, query.page_size, "", makeLogHandlers("templates:list", { query }))
+    // console.log(res?.success , res.data , Array.isArray(res.data.list),res)
+    if (res?.success && res.data && Array.isArray(res.data.list)) {
+      templates.value = res.data.list
+      // console.debug('[templates/crud] templates loaded', {
+      //   count: templates.value.length,
+      // })
+    } else {
+      templates.value = []
+      console.warn('[templates/crud] templates response unexpected', res)
+    }
+  } catch (error) {
+    console.error("[templates/crud] Failed to load templates", error)
+    templates.value = []
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
-function startCreate() {
-  editingId.value = null;
-  selectedTemplate.value = null;
-  showFormModal.value = true;
+const resetForm = () => {
+  editingId.value = null
+  Object.assign(form, defaultFormValue())
 }
 
-function startEdit(template: Template) {
-  editingId.value = template.id;
-  selectedTemplate.value = template;
-  showFormModal.value = true;
+const openFormModal = () => {
+  showFormModal.value = true
 }
 
-async function handleSubmit(payload: TemplateFormState) {
-  saving.value = true;
+const closeFormModal = () => {
+  showFormModal.value = false
+}
+
+const startCreate = () => {
+  resetForm()
+  openFormModal()
+}
+
+const startEdit = (tpl: Template) => {
+  editingId.value = tpl.id
+  Object.assign(form, {
+    name: tpl.name,
+    description: tpl.description,
+    content: tpl.content,
+  })
+  openFormModal()
+}
+
+const handleSubmit = async (payload: { name: string; description: string; content: string }) => {
+  if (!payload.name || !payload.description || !payload.content) {
+    return
+  }
+  saving.value = true
+  const isUpdate = Boolean(editingId.value)
   try {
     if (editingId.value) {
-      await api.updateTemplate(editingId.value, payload);
-      showToast($t("templates.crud.toast.updated"));
+      const res = await updateTemplateApi(
+        editingId.value,
+        payload,
+        makeLogHandlers("templates:update", { id: editingId.value, payload })
+      )
+      if (!res?.success) {
+        throw new Error(res?.message || "Update template failed")
+      }
     } else {
-      await api.createTemplate(payload);
-      showToast($t("templates.crud.toast.created"));
+      const res = await createTemplateApi(
+        payload,
+        makeLogHandlers("templates:create", { payload })
+      )
+      if (!res?.success) {
+        throw new Error(res?.message || "Create template failed")
+      }
     }
-    await fetchTemplates();
-    showFormModal.value = false;
+    await fetchTemplates()
+    closeFormModal()
+    resetForm()
+    showToast({
+      title: isUpdate ? t("templates.crud.actions.update") : t("templates.crud.create"),
+      message: isUpdate ? t("message.saveSuccess") : t("message.templateCreated"),
+      color: "success",
+    })
+  } catch (error: any) {
+    console.error("[templates/crud] Failed to save template", error)
+    showToast({
+      title: t("message.error"),
+      message: error?.message || t("message.error"),
+      color: "error",
+      duration: 5000,
+    })
   } finally {
-    saving.value = false;
+    saving.value = false
   }
 }
 
-function confirmDelete(template: Template) {
-  selectedTemplate.value = template;
-  deleteDialog.value = true;
+const confirmDelete = (tpl: Template) => {
+  selectedTemplate.value = tpl
+  deleteDialog.value = true
 }
 
-async function performDelete() {
-  if (!selectedTemplate.value) return;
-  deleting.value = true;
+const performDelete = async () => {
+  if (!selectedTemplate.value || deleting.value) return
+  deleting.value = true
   try {
-    await api.deleteTemplate(selectedTemplate.value.id);
-    showToast($t("templates.crud.toast.deleted"));
-    await fetchTemplates();
+    const res = await deleteTemplateApi(
+      selectedTemplate.value.id,
+      makeLogHandlers("templates:delete", { id: selectedTemplate.value.id })
+    )
+    if (!res?.success) {
+      throw new Error(res?.message || "Delete template failed")
+    }
+    await fetchTemplates()
+    deleteDialog.value = false
+    showToast({
+      title: t("templates.crud.deleteTitle"),
+      message: t("message.deleteSuccess"),
+      color: "success",
+    })
+  } catch (error: any) {
+    console.error("[templates/crud] Failed to delete template", error)
+    showToast({
+      title: t("message.error"),
+      message: error?.message || t("message.error"),
+      color: "error",
+      duration: 5000,
+    })
   } finally {
-    deleting.value = false;
-    deleteDialog.value = false;
+    deleting.value = false
   }
 }
 
-function handleDeleteCancel() {
-  selectedTemplate.value = null;
+const handleDeleteCancel = () => {
+  deleteDialog.value = false
 }
 
-function showToast(message: string) {
-  Object.assign(toast, {
-    visible: true,
-    title: $t("templates.crud.toast.title"),
-    message,
-  });
+watch(deleteDialog, (isOpen) => {
+  if (!isOpen) {
+    selectedTemplate.value = null
+    deleting.value = false
+  }
+})
+
+const normalizeToString = (value?: string | number | null) => {
+  if (value === null || value === undefined) {
+    return ""
+  }
+  return typeof value === "string" ? value : String(value)
 }
+
+const showToast = ({
+  title,
+  message,
+  color = "primary",
+  duration = 3000,
+}: {
+  title?: string
+  message: string | number
+  color?: ToastColor
+  duration?: number
+}) => {
+  const normalizedTitle = normalizeToString(title)
+  const normalizedMessage = normalizeToString(message)
+  toast.title = normalizedTitle
+  toast.message = normalizedMessage
+  toast.color = color
+  toast.duration = duration
+  if (!normalizedTitle && !normalizedMessage) {
+    toast.visible = false
+    return
+  }
+  toast.visible = false
+  nextTick(() => {
+    toast.visible = true
+  })
+}
+
+onMounted(() => {
+  fetchTemplates()
+})
 </script>
 
 <style scoped>
 .description-cell,
 .content-cell {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.description-cell {
+  max-width: 16rem;
+}
+
+.content-cell {
+  max-width: 24rem;
 }
 </style>

@@ -15,5 +15,8 @@
   ],
   "peerDependencies": {
     "nuxt": "^4.2.0"
+  },
+  "devDependencies": {
+    "nuxt": "^4.2.0"
   }
 }

@@ -1,0 +1,73 @@
+import { computed, readonly, watch } from 'vue'
+
+type ThemeKey = 'light' | 'dark' | 'system'
+
+export const useTheme = () => {
+  const colorMode = useColorMode()
+
+  const coerceTheme = (input?: string | null): ThemeKey | undefined => {
+    const value = String(input ?? '').trim().toLowerCase()
+    if (!value) return undefined
+    if (value === 'dark' || value === 'light') return value
+    if (value === 'system' || value === 'auto') return 'system'
+    return undefined
+  }
+
+  const theme = computed<ThemeKey>(() =>
+    coerceTheme(colorMode.preference ?? colorMode.value) ?? 'system'
+  )
+
+  const effective = computed<'light' | 'dark'>(() =>
+    colorMode.value === 'dark' ? 'dark' : 'light'
+  )
+
+  const themes = [
+    { value: 'light', label: '浅色主题' },
+    { value: 'dark', label: '深色主题' },
+  ]
+
+  const setTheme = (nextTheme: string) => {
+    const target = coerceTheme(nextTheme) ?? 'system'
+    colorMode.preference = target
+
+    if (import.meta.client) {
+      const applied = target === 'system' ? effective.value : target
+      document.documentElement.dataset.theme = applied
+      document.documentElement.setAttribute('data-color-mode', target)
+    }
+  }
+
+  const initTheme = () => {
+    if (!import.meta.client) return
+
+    const runtimeConfig = useRuntimeConfig()
+    const forced = coerceTheme(runtimeConfig.public.forceTheme)
+    const defaultTheme = coerceTheme(runtimeConfig.public.defaultTheme)
+    const initial = forced ?? coerceTheme(colorMode.preference) ?? defaultTheme
+    if (initial) {
+      setTheme(initial)
+    } else if (!document.documentElement.dataset.theme) {
+      setTheme('system')
+    }
+  }
+
+  if (import.meta.client) {
+    watch(
+      effective,
+      (value) => {
+        if (theme.value === 'system') {
+          document.documentElement.dataset.theme = value
+          document.documentElement.setAttribute('data-color-mode', 'system')
+        }
+      },
+      { immediate: true }
+    )
+  }
+
+  return {
+    theme: readonly(theme),
+    themes,
+    setTheme,
+    initTheme,
+  }
+}

@@ -1,0 +1,47 @@
+<template>
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <UContainer v-if="showNavigation" class="max-w-none">
+      <AppNavbar />
+    </UContainer>
+
+    <div class="flex">
+      <AppSidebar v-if="showNavigation" />
+
+      <main :class="mainContentClass">
+        <slot />
+      </main>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+const runtimeConfig = useRuntimeConfig()
+
+const insidePowerX = computed(() => {
+  const value = runtimeConfig.public.insidePowerX
+  return value === true || value === 'true'
+})
+
+const showNavigation = computed(() => {
+  if (insidePowerX.value) {
+    return false
+  }
+
+  const env = runtimeConfig.public.showNavigation
+  if (env !== undefined) {
+    return env === true || env === 'true'
+  }
+
+  return import.meta.dev
+})
+
+const mainContentClass = computed(() =>
+  showNavigation.value ? 'flex-1 p-6' : 'w-full p-6'
+)
+</script>
+
+<style scoped>
+main {
+  min-height: 100vh;
+}
+</style>

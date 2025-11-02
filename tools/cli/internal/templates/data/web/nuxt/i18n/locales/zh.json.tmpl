@@ -1,0 +1,75 @@
+{
+  "common": {
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "edit": "编辑",
+    "appName": "{{ .PluginName }}"
+  },
+  "navigation": {
+    "intro": "插件介绍",
+    "templates": "模板管理",
+    "templatesCrud": "模板 CRUD",
+    "templatesDevelop": "开发指南",
+    "profile": "个人中心",
+    "help": "帮助",
+    "logout": "退出登录"
+  },
+  "theme": {
+    "light": "浅色模式",
+    "dark": "深色模式"
+  },
+  "home": {
+    "title": "PowerX 插件 Skeleton",
+    "description": "先从简介页面了解目录结构与示例 CRUD，再根据需要扩展为真实业务。",
+    "viewIntro": "查看简介"
+  },
+  "templates": {
+    "overview": {
+      "title": "模板概览",
+      "description": "Skeleton 提供了一个基础的模板管理示例，可用于扩展真实业务。",
+      "cards": {
+        "create": "创建模板",
+        "createDescription": "通过示例了解如何创建并保存模板内容。",
+        "automation": "自动化体验",
+        "automationDescription": "结合 framework-client 探索表单与数据流管理。",
+        "analytics": "数据洞察",
+        "analyticsDescription": "未来可接入指标、日志等可观测能力。"
+      }
+    },
+    "crud": {
+      "title": "模板管理",
+      "description": "演示列表、创建、编辑与删除模板的完整流程。",
+      "create": "新增模板",
+      "listTitle": "模板列表",
+      "actions": {
+        "save": "保存",
+        "update": "更新"
+      },
+      "toast": {
+        "title": "操作提示",
+        "created": "模板创建成功",
+        "updated": "模板更新成功",
+        "deleted": "模板已删除"
+      },
+      "deleteTitle": "删除模板",
+      "deleteConfirm": "确定删除模板 {name} 吗？"
+    },
+    "develop": {
+      "title": "开发指南",
+      "intro": "以下信息帮助你理解 Skeleton 的前端目录与数据流。",
+      "description": "了解模板模块在后端与前端的关键实现步骤。",
+      "structure": "关键文件",
+      "steps": "实施步骤",
+      "step1": "在 backend/internal/templates 中定义模板模型与 DTO。",
+      "step2": "实现 Repository/Service，确保多租户隔离。",
+      "step3": "在 /api/v1/templates 下暴露带响应包络的 HTTP 接口。",
+      "step4": "将 Nuxt 页面接入 API，并完善用户体验。"
+    },
+    "form": {
+      "name": "模板名称",
+      "description": "模板描述",
+      "content": "模板内容"
+    }
+  }
+}

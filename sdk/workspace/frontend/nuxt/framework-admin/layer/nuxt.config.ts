@@ -1,18 +1,25 @@
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 import { defineNuxtConfig } from 'nuxt/config'
+
+const layerDir = dirname(fileURLToPath(import.meta.url))
+const appDir = resolve(layerDir, 'app')
 
 export default defineNuxtConfig({
   components: {
     dirs: [
-      { path: 'app/components', pathPrefix: false },
-      { path: 'app/components/templates', pathPrefix: false }
+      { path: resolve(appDir, 'components'), pathPrefix: false }
     ]
   },
   imports: {
-    dirs: ['app/composables', 'app/composables/api']
+    dirs: [
+      resolve(appDir, 'composables'),
+      resolve(appDir, 'composables/api')
+    ]
   },
   hooks: {
     'pages:extend'(pages, nuxt) {
-      const starterEnabled = (nuxt.options.appConfig?.powerx?.starterPages ?? true) as boolean
+      const starterEnabled = (nuxt?.options?.appConfig?.powerx?.starterPages ?? true) as boolean
       if (starterEnabled) {
         return
       }

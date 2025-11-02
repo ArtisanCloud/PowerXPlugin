@@ -63,10 +63,78 @@
 - 阶段 2 可选 Templates 模块验证迁移流程；阶段 3/4 聚焦框架抽象与 CLI 交付。
 - 完成后可为团队提供标准化 CRUD Skeleton，加速新插件启动，同时保留向真实生产实现升级的明确路径。
 
-## 8. 2025-11 实施回填
-- **Phase 1**：Router `Param/Query/BindJSON` 已上线并通过单测覆盖；响应助手输出 `{success,data,message,error,timestamp,request_id}`，`RequestID/TenantContext` 中间件默认读取 `X-Tenant-ID`，保持 Standalone 兼容。  
-- **Phase 2**：Skeleton Templates 模块提供内存仓储（线程安全 `map[tenantID]map[id]*Template`），`WithTenantTx` 模拟 Constitution 中的 `BeginTenantTx` 语义，所有 CRUD 入口均在服务层复用。  
-- **Phase 3**：前端迁移完成，`useTemplateApi` 仅演示如何基于 `@powerx-plugin/framework-client` 封装业务 API，Layer StarterPages 自动注册 CRUD 页面与菜单。  
-- **Phase 4**：CLI 模板与 Skeleton 同步，新增对 Vue `{{ }}` 的转义处理，`./bin/px-plugin init com.powerx.demo` 可直接生成可运行骨架并写入 contracts。  
-- **Phase 5/6（进行中）**：Quickstart/Standalone 文档已补充 CRUD/延迟校验说明；最终延迟统计与 CHANGELOG 汇总将在性能测试完成后回填。  
-- **已知限制**：仍为内存数据源、权限校验返回 501，需在后续引导文档中强调；多租户延迟数据需通过 `curl -w` 按阶段持续采集。
+---
+
+## 8. 2025-11-02 更新：差异快照与补充行动
+
+| 模块 | Base 插件 | PowerXPlugin 当前状态 | 行动项 |
+| --- | --- | --- | --- |
+| Router / Middleware | Gin + 自定义 | 框架 Param/Response/Tenant 已实现 | ✅ 完成 |
+| Templates 后端 | GORM + 租户隔离 | 内存 map + BaseRepository Stub | 补齐 DTO/错误码/服务编排 |
+| Nuxt 配置 | 完整 baseURL/runtimeConfig/Nitro | Skeleton 已复制主要常量，语言包路径调整 | ⚠️ 校准 `langDir`、`POWERX_PROXY`、代理、headers |
+| 前端页面/组件 | intro、templates、bridge-dev 等 | intro + templates + 首页，新组件就绪 | ⚠️ 未迁 Bridge/Stores，需列差异或规划 |
+| CLI 模板 | 与 Base 对齐 | 结构已同步，但配置/依赖待更新 | ⚠️ 更新 nuxt.config、package, docs |
+| 文档 | README/Quickstart/Standalone | Quickstart/Standalone 已补充 CRUD | ⚠️ 需追加差异说明与路线 |
+
+---
+
+## 9. 2025-11-02 更新：阶段计划修订
+
+- **Phase 0**：完成基线调研及 Clarifications。
+- **Phase 1**：框架增强已交付并达到覆盖率要求。
+- **Phase 2**：需要第二轮补强（DTO、错误码、README 升级路径）。
+- **Phase 3**：Nuxt 配置对齐 Base（`compatibilityDate`、`ssr`、`baseURL`、`runtimeConfig`、Nitro headers、代理、`@nuxt/icon`、`@pinia/nuxt`、`@nuxtjs/color-mode`）；语言包目录统一为 `i18n/locales`（Base 位于 `app/locales`，Skeleton 因 `srcDir: 'app'` 需通过 `langDir: '../i18n/locales'` 以兼容 CLI 模板与 Standalone），Bridge/Stores 评估是否迁移。
+- **Phase 4**：CLI 模板伴随 Skeleton 同步，`px-plugin init` 生成物需开箱即用。
+- **Phase 5**：文档更新（Quickstart、Standalone、Plan、Spec、Tasks）。
+- **Phase 6（新增）**：未迁功能评估与路线（Bridge、Operations、Dev Console、Tailwind4 等），给出优先级与排期建议。
+
+> Phase 6 评估维度：
+> 1. **使用频率**（高频能力优先迁移）
+> 2. **实现复杂度**（低复杂度优先落地）
+> 3. **依赖关系**（独立模块优先处理）
+>
+> 检查清单：Bridge 调试（`app/bridge/`）、Pinia Stores（`operations/`、`dev-console/`）、Tailwind v4 升级、运营面板、合规/安全工具等。评估结论需记录在 `research.md` 与 README/Plan 中，并明确「迁移 / Stub / 暂不支持」策略。
+
+---
+
+## 10. 风险与对策（补充）
+
+| 风险 | 描述 | 应对策略 |
+| --- | --- | --- |
+| 框架回归 | Router/Middleware 变更影响现有用户 | 全量单测 + `go test ./framework/backend/go/...` 作为必跑检查 |
+| Nuxt 配置偏差 | Skeleton/CLI 与 Base 差异导致路由/i18n 异常 | 维护 `research.md` 差异记录，完成 Phase 7 T039/T040 |
+| CLI 模板偏离 | Skeleton 与模板不同步 | `px-plugin init` smoke + diff，必要时在 CI 加自动对比 |
+| 文档滞后 | 新能力未在 Quickstart/Standalone 体现 | 将文档更新纳入任务检查清单 |
+| 未迁 Bridge/Stores | Base 的扩展功能暂未示例 | Phase 6 输出 roadmap 或标明不在模板范围 |
+
+---
+
+## 11. 验证清单（更新）
+
+1. `go test ./framework/backend/go/... -coverprofile=coverage.out`（≥90%，SC-001）
+2. `go test ./skeleton/backend/... -v` + `curl` 多租户 CRUD（SC-002）
+3. `curl -w 'time_total:%{time_total}'` 记录延迟；数据写入 `research.md`
+4. `npm run lint --silent` / `npm run build`（skeleton/web-admin、workspace layer）
+5. Skeleton 前端手动验证 `/`、`/_p/{pluginId}/admin/templates/crud`；`POWERX_PROXY=1` 场景验证 baseURL/代理
+6. `./bin/px-plugin init <plugin-id>` 后执行 `go test ./...`、`npm run lint --silent`，手动验证页面
+7. 文档（Quickstart、Standalone、Plan、Spec、Tasks）同步更新
+8. Phase 6 差异清单在 README/Plan 中明确
+
+---
+
+## 12. 当前状态（2025-11-02）
+
+- Phase 1 完成；Phase 2 需补强 DTO/错误码。
+- Phase 3/4 正在推进：Nuxt 配置已对齐核心常量，语言包路径统一为 `i18n/locales`，并在文档中说明与 Base (`app/locales`) 的差异及原因。
+- CLI 模板和依赖正在同步；`px-plugin init` Smoke 已执行，后续要补充新依赖文档。
+- 下一步：
+  1. 完成 Phase 2 补强（T037/T038）。
+  2. Phase 3 对齐 Nuxt 配置并在 `research.md` 写明差异（T039/T040）。
+  3. 更新 CLI 文档与 README（T041），并输出未迁能力清单（T042）。
+
+## 13. 依赖检查清单
+
+- [ ] `framework-admin` Layer 可用，StarterPages toggle 生效
+- [ ] `@powerx-plugin/framework-client` 暴露 `get/post/put/delete` 并透传 `X-Tenant-ID`
+- [ ] Skeleton 后端可独立运行并完成 CRUD Smoke（Phase 2 验证）
+- [ ] Skeleton 前端（含 `POWERX_PROXY=1` 场景）可访问首页与 Admin CRUD 页面

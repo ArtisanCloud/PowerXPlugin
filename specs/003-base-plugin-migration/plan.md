@@ -53,55 +53,38 @@ docs/
   memory/constitution.md  # reference only (no edits unless required)
 ```
 
-## Phase Plan
+## Phase Plan（修订）
 
-### Phase 0 – Discovery & Alignment
-- Review `com.powerx.plugin.base` implementation to confirm API shapes, response envelopes, middleware behaviour, and front-end menu/i18n expectations.
-- Inventory reusable assets (components, composables) and record deviations requiring simplification (e.g., Redis license cache).
-- Validate outstanding clarifications (e.g., 404 response) are reflected in spec; note remaining open items (data scale, availability) for later documentation if needed.
+### Phase 0 – Discovery & Baseline（完成）
+- 对照 Base 插件整理 API/响应/中间件/Nuxt 配置，沉淀在 `research.md`。  
+- 明确暂不迁移的能力（数据库、完整权限、Bridge 等），后续文档需说明。
 
-### Phase 1 – Framework Enhancements (Spec US1)
-- Extend `framework/backend/go/router`:
-  - Implement path parameter parsing, query helpers, JSON binding on `bootstrap.Context`.
-  - Add response helper producing `{success,data,error,timestamp,request_id}`.
-- Add middleware stubs:
-  - RequestID generator (UUID/ULID) attached to context.
-  - Tenant resolver reading `X-Tenant-ID` or fallback to Standalone default, storing value for repository consumption.
-- Update `@powerx-plugin/framework-client` to expose `get/post/put/delete`, injecting tenant header defaults.
-- Document helper usage via package comments/tests (`*_test.go`) covering param parsing and envelope output.
-- Capture coverage report (`go test -coverprofile`) ensuring framework router/middleware packages reach ≥90% statement coverage (SC-001 baseline).
-- Regression: run `go test ./framework/backend/go/...`.
+### Phase 1 – Framework Enhancements（完成，US1）
+- Router Param/Query/BindJSON、响应助手、RequestID/TenantContext 中间件。  
+- `@powerx-plugin/framework-client` PUT/DELETE，`framework-admin` StarterPages toggle。  
+- 覆盖率 ≥90%，回归 `go test ./framework/backend/go/...`。
 
-### Phase 2 – Skeleton Backend Migration (Spec US2)
-- Create `skeleton/backend/internal/templates/` with:
-  - `model.go` mirroring Base template fields.
-  - Repository embedding `BaseRepository[Template]`, providing `NewTemplateRepository`, maintaining tenant isolation in memory (map keyed by tenant).
-- Service orchestrating list/get/create/update/delete with validation hooks.
-- HTTP handler using new framework context + response helper.
-- Ensure repository `BeginTenantTx` executes `SET LOCAL app.tenant_id` per constitution and document behaviour.
-- Seed demo data (optional) within in-memory store during bootstrap.
-- Update router registration to mount `/api/v1/templates` CRUD + existing ping.
-- Add unit tests for repository/service covering tenant isolation and CRUD flows.
-- Add edge-case tests covering missing/invalid tenant headers and non-numeric template IDs returning structured errors.
-- Update skeleton README explaining in-memory persistence, tenant defaults, and extension points.
+### Phase 2 – Skeleton Backend Parity（进行中，US2）
+- **已交付**：内存仓储 + Service/Handler + 单测 + Tenant 隔离。  
+- **待补强**：迁移 Base `dto`/错误码、分页响应；补足 Handler 校验路径；文档说明与数据库版本差异。
 
-### Phase 3 – Frontend & Framework Layers (Spec US3)
-- Port Base plugin starter pages to `skeleton/web-admin/app`:
-  - `intro.vue`, `templates/index.vue`, `templates/crud.vue`, supporting components.
-  - Provide `app/composables/api/useTemplateApi.ts` referencing `framework-client`.
-- Enhance `@powerx-plugin/framework-admin` Layer to:
-  - Offer `starterPages` toggle that registers default menus/pages.
-  - Expose hooks for registering menus (if not already).
-- Ensure runtime config handles Standalone vs host base URLs, removing unused Bridge/debug artifacts.
-- Write front-end smoke tests (Playwright or component tests) verifying create/edit/delete flows.
-- `npm run lint` in skeleton and workspace.
+### Phase 3 – Nuxt 配置 & 页面对齐（进行中，US3/US4）
+- 复制 Base `nuxt.config.ts` 的关键项：`compatibilityDate`、`ssr`、`baseURL`、`runtimeConfig`、Nitro headers、`@nuxt/icon`、`@pinia/nuxt`、`@nuxtjs/color-mode`、HMR/代理。  
+- Skeleton 前端提供 Home + Intro + Templates CRUD；语言包存于 `i18n/`；Bridge/Dev Console 视需求列入差异说明。  
+- Layer/CLI 模板同步上述配置，确保 `POWERX_PROXY` 切换可用；`npm run lint`、手动 CRUD 验证通过。
 
-### Phase 4 – CLI Templates & Documentation
-- Sync skeleton backend/frontend into scaffold templates with placeholders for plugin IDs, names, menus, RBAC keys.
-- Update CLI logic (if required) to ensure `px-plugin init` fills placeholders and optionally toggles starter pages.
-- Add smoke script (Makefile target) that runs `px-plugin init com.powerx.demo --ui=starter`, diff-checks result vs skeleton expectation.
-- Update `docs/guide/quickstart.md` and `docs/guide/standalone-mode.md` to include CRUD verification steps and limitations (in-memory store, AuthGuard 501).
-- Append summary of changes to `docs/plan/002-plan-base-plugin-migration.md` if deviations arise.
+### Phase 4 – CLI 模板同步与生成验证（进行中）
+- 将 Skeleton Go/Nuxt 结构复制到 `scaffold/templates/**` 与 CLI 内嵌模板，完善占位符。  
+- `./bin/px-plugin init` smoke：生成项目 `go test ./...`、`npm run lint`、页面访问与 Skeleton 一致；补充 CLI README。  
+- 若发现差异，回写 `research.md` 与本计划。
+
+### Phase 5 – 文档与差异透明化（进行中）
+- 更新 Quickstart、Standalone、Plan（本文）等文档，列出运行步骤、环境变量、延迟测试示例、当前限制。  
+- 在 `tasks.md` 维护「未迁能力」列表供后续排期。
+
+### Phase 6 – 余项评估（待启动）
+- 评估是否需要 Stub Bridge/Operations/Stores；若不迁移，编写 ADR 或 README 说明。  
+- output 升级指南：如何从内存仓储切换到数据库、如何接入权限服务。
 
 ## Testing & Validation
 
@@ -111,8 +94,8 @@ docs/
 - `curl -w` latency check confirming Standalone CRUD ≤1s 平均时延（SC-002）。  
 - `npm run lint` / `npm run build` for skeleton web-admin and framework workspace (Phase 3).  
 - Playwright smoke for Templates CRUD (Phase 3 optional, recommended).  
-- `px-plugin init` smoke plus diff check/`npm run lint` on generated project (Phase 4).  
-- Document manual verification steps to satisfy Success Criteria SC-001..SC-004.
+- `px-plugin init` smoke plus diff check/`npm run lint` on generated project (Phase 4)。  
+- Document manual verification steps to satisfy Success Criteria SC-001..SC-005.
 
 ## Risks & Mitigations
 
@@ -124,6 +107,6 @@ docs/
 
 ## Next Steps
 
-1. Execute Phase 0 discovery and confirm no additional clarifications required.  
-2. Begin Phase 1 implementation on `framework/backend/go` and `framework-client`.  
-3. Upon Phase 1 completion, proceed with Phase 2 skeleton backend work, following with Phase 3/4 sequentially.
+1. Phase 2 补强（DTO/错误码/README）；完成后进入 Phase 3 Nuxt 配置 parity。  
+2. Phase 3 同步完成后立即执行 Phase 4 CLI smoke 并更新模板依赖。  
+3. Phase 5 文档回填，整理 Phase 6 未迁任务并排期。

@@ -23,8 +23,11 @@
 ```bash
 go work sync
 
-go -C framework mod tidy -e
-go -C tools/cli mod tidy -e
+cd framework
+go mod tidy -e
+cd ../tools/cli
+go mod tidy -e
+cd ..
 
 cd sdk/workspace
 npm install

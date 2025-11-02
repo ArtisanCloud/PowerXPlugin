@@ -1,46 +1,48 @@
 <template>
-  <UContainer class="prose dark:prose-invert max-w-3xl py-10">
-    <h1>{{ $t("templates.develop.title") }}</h1>
-    <p>{{ $t("templates.develop.intro") }}</p>
+  <UContainer class="py-10 space-y-6">
+    <div class="space-y-2">
+      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+        {{ $t("templates.develop.title") }}
+      </h1>
+      <p class="text-gray-600 dark:text-gray-300">
+        {{ $t("templates.develop.description") }}
+      </p>
+    </div>
 
-    <h2>目录结构</h2>
-    <pre><code>app/
-  pages/
-    intro.vue
-    templates/
-      index.vue
-      crud.vue
-      develop.vue
-  components/
-    templates/
-      TemplateFormModal.vue
-    ConfirmDialog.vue
-    ToastAlert.vue
-  composables/
-    api/
-      useTemplate.ts
-</code></pre>
+    <UCard>
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-heroicons-cpu-chip" class="text-primary" />
+          <span class="font-medium">{{ $t("templates.develop.structure") }}</span>
+        </div>
+      </template>
+      <ul class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+        <li>backend/internal/domain/models/template/template.go</li>
+        <li>backend/internal/services/admin/templates/template_service.go</li>
+        <li>backend/internal/transport/http/admin/templates/*</li>
+        <li>web-admin/app/pages/templates</li>
+      </ul>
+    </UCard>
 
-    <h2>数据流</h2>
-    <ul>
-      <li>组件通过 <code>useTemplateApi</code> 调用后端 API。</li>
-      <li>
-        <code>ConfirmDialog</code> 与 <code>ToastAlert</code> 用于统一交互反馈。
-      </li>
-      <li>Tenant ID 默认通过框架中间件注入，前端无需额外处理。</li>
-    </ul>
-
-    <h2>后续扩展建议</h2>
-    <ul>
-      <li>接入权限控制：结合 framework-admin 权限指令。</li>
-      <li>接入表格筛选/分页：透过 <code>listTemplates</code> 传参。</li>
-      <li>编写 E2E 自动化：使用 Playwright 检验 CRUD 流程。</li>
-    </ul>
+    <UCard>
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-heroicons-queue-list" class="text-primary" />
+          <span class="font-medium">{{ $t("templates.develop.steps") }}</span>
+        </div>
+      </template>
+      <ol class="list-decimal list-inside space-y-2 text-sm text-gray-600 dark:text-gray-300">
+        <li>{{ $t("templates.develop.step1") }}</li>
+        <li>{{ $t("templates.develop.step2") }}</li>
+        <li>{{ $t("templates.develop.step3") }}</li>
+        <li>{{ $t("templates.develop.step4") }}</li>
+      </ol>
+    </UCard>
   </UContainer>
 </template>
 
 <script setup lang="ts">
 definePageMeta({
-  title: "TemplatesDevelopGuide",
-});
+  title: "TemplatesDevelop",
+})
 </script>

@@ -1,0 +1,686 @@
+<template>
+  <UContainer class="py-10 space-y-6">
+    <header class="space-y-2">
+      <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        <UIcon name="i-heroicons-building-storefront" class="text-primary" />
+        <span class="uppercase tracking-wide">Integration · Marketplace</span>
+      </div>
+      <div class="space-y-1">
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Marketplace Listings</h1>
+        <p class="text-gray-600 dark:text-gray-300 max-w-3xl">
+          管理插件上架流程：草稿创建、Checklist 校验与审核发布。支持维护资产素材、定价计划，并追踪审核状态。
+        </p>
+      </div>
+    </header>
+
+    <div class="flex flex-wrap items-center gap-4">
+      <USelectMenu
+        v-model="filters.status"
+        :options="statusOptions"
+        multiple
+        placeholder="筛选状态"
+        class="w-64"
+      />
+      <UInput v-model="filters.search" placeholder="搜索标题、插件或 Vendor" class="w-72" icon="i-heroicons-magnifying-glass" />
+      <UButton color="primary" icon="i-heroicons-plus-circle" class="ml-auto" @click="openCreateModal">
+        新建 Listing
+      </UButton>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <UIcon name="i-heroicons-list-bullet" />
+              <span>Listing 列表</span>
+            </div>
+            <UButton color="gray" variant="soft" icon="i-heroicons-arrow-path" :loading="loading" @click="loadListings">
+              刷新
+            </UButton>
+          </div>
+        </template>
+
+        <UTable
+          :columns="columns"
+          :rows="listings"
+          :loading="loading"
+          @select="selectListing"
+          :sort="{ column: 'updated_at', direction: 'desc' }"
+        >
+          <template #status-data="{ row }">
+            <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ row.status }}</UBadge>
+          </template>
+          <template #title-data="{ row }">
+            <div class="space-y-0.5">
+              <span class="font-medium">{{ row.title }}</span>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ row.plugin_id }} · {{ row.vendor_id }}
+              </p>
+            </div>
+          </template>
+          <template #ready_checklist_score-data="{ row }">
+            <div class="flex items-center gap-2">
+              <UProgress :value="row.ready_checklist_score" :max="100" size="xs" />
+              <span class="text-xs text-gray-500">{{ row.ready_checklist_score }}%</span>
+            </div>
+          </template>
+        </UTable>
+
+        <div v-if="!loading && !listings.length" class="py-8 text-center text-gray-500 dark:text-gray-400">
+          尚无 Listing。点击右上角 “新建 Listing” 开始上架流程。
+        </div>
+      </UCard>
+
+      <div class="space-y-6">
+        <UCard v-if="selectedListing">
+          <template #header>
+            <div class="flex items-center justify-between gap-2">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <UBadge :color="statusBadgeColor(selectedListing.status)" class="uppercase tracking-wide">
+                    {{ selectedListing.status }}
+                  </UBadge>
+                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    {{ selectedListing.title }}
+                  </h2>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  插件 {{ selectedListing.plugin_id }} · Vendor {{ selectedListing.vendor_id }}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <UButton
+                  color="primary"
+                  variant="soft"
+                  size="sm"
+                  :disabled="selectedListing.status !== 'draft' && selectedListing.status !== 'suspended'"
+                  @click="submitForReview(selectedListing)"
+                >
+                  提交审核
+                </UButton>
+                <UButton
+                  color="success"
+                  variant="soft"
+                  size="sm"
+                  :disabled="selectedListing.status !== 'in_review'"
+                  @click="publishListing(selectedListing)"
+                >
+                  发布
+                </UButton>
+                <UButton
+                  color="orange"
+                  variant="soft"
+                  size="sm"
+                  :disabled="selectedListing.status !== 'published'"
+                  @click="suspendListing(selectedListing)"
+                >
+                  暂停
+                </UButton>
+              </div>
+            </div>
+          </template>
+
+          <form class="space-y-4" @submit.prevent="saveListing">
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormGroup label="标题" required>
+                <UInput v-model="editForm.title" />
+              </UFormGroup>
+              <UFormGroup label="Slug" required>
+                <UInput v-model="editForm.slug" />
+              </UFormGroup>
+              <UFormGroup label="Locale">
+                <USelect v-model="editForm.locale" :options="localeOptions" />
+              </UFormGroup>
+              <UFormGroup label="Checklist 得分">
+                <UInput v-model="editForm.ready_checklist_score" type="number" min="0" max="100" />
+              </UFormGroup>
+            </div>
+
+            <UFormGroup label="摘要">
+              <UTextarea v-model="editForm.summary" />
+            </UFormGroup>
+
+            <UFormGroup label="描述">
+              <UTextarea v-model="editForm.description" :rows="6" />
+            </UFormGroup>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormGroup label="Categories (逗号分隔)">
+                <UInput v-model="editForm.categories" />
+              </UFormGroup>
+              <UFormGroup label="Tags (逗号分隔)">
+                <UInput v-model="editForm.tags" />
+              </UFormGroup>
+            </div>
+
+            <UFormGroup label="Branding Theme (JSON)">
+              <UTextarea v-model="editForm.branding_theme" :rows="4" />
+            </UFormGroup>
+
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">资产素材</h3>
+                <UButton size="xs" color="gray" variant="soft" icon="i-heroicons-plus" @click="addEditAsset">
+                  添加资产
+                </UButton>
+              </div>
+              <div v-if="!editForm.assets.length" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                暂无资产。添加截图或视频用于前台展示。
+              </div>
+              <div v-else class="mt-4 space-y-3">
+                <div
+                  v-for="(asset, index) in editForm.assets"
+                  :key="asset.key"
+                  class="rounded border border-gray-200 p-3 dark:border-gray-700"
+                >
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <UFormGroup label="类型 (logo/cover/screenshot/video)" required>
+                      <UInput v-model="asset.asset_type" />
+                    </UFormGroup>
+                    <UFormGroup label="存储地址" required>
+                      <UInput v-model="asset.storage_uri" />
+                    </UFormGroup>
+                    <UFormGroup label="语言">
+                      <UInput v-model="asset.locale" placeholder="en" />
+                    </UFormGroup>
+                    <UFormGroup label="权重">
+                      <UInput type="number" v-model="asset.weight" />
+                    </UFormGroup>
+                    <div class="flex items-center gap-2">
+                      <UToggle v-model="asset.is_primary" />
+                      <span class="text-sm text-gray-600 dark:text-gray-300">主展示</span>
+                    </div>
+                  </div>
+                  <div class="mt-2 flex justify-end">
+                    <UButton size="xs" color="red" variant="ghost" @click="removeEditAsset(index)">移除</UButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2">
+              <UButton type="submit" color="primary" :loading="saving">
+                保存更新
+              </UButton>
+            </div>
+          </form>
+        </UCard>
+
+        <UCard v-else class="flex min-h-[320px] items-center justify-center text-gray-500 dark:text-gray-400">
+          选择左侧列表中的 Listing 查看详情。
+        </UCard>
+
+        <MarketplaceChecklistRunner
+          :listing-id="selectedListing?.id ?? null"
+          @triggered="handleChecklistTriggered"
+        />
+      </div>
+    </div>
+
+    <UModal v-model:open="createOpen">
+      <UCard class="w-full max-w-3xl">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-plus-circle" class="text-primary" />
+            <span class="font-semibold">新建 Listing</span>
+          </div>
+        </template>
+
+        <form class="space-y-4" @submit.prevent="submitCreate">
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormGroup label="插件 ID" required>
+              <UInput v-model="createForm.plugin_id" placeholder="com.powerx.sample" />
+            </UFormGroup>
+            <UFormGroup label="Vendor ID" required>
+              <UInput v-model="createForm.vendor_id" placeholder="vendor-001" />
+            </UFormGroup>
+            <UFormGroup label="标题" required>
+              <UInput v-model="createForm.title" />
+            </UFormGroup>
+            <UFormGroup label="Slug" required>
+              <UInput v-model="createForm.slug" />
+            </UFormGroup>
+            <UFormGroup label="Locale">
+              <USelect v-model="createForm.locale" :options="localeOptions" />
+            </UFormGroup>
+            <UFormGroup label="Checklist 总结 (可选)">
+              <UInput v-model="createForm.checklist_summary" placeholder="CI 自动触发" />
+            </UFormGroup>
+          </div>
+
+          <UFormGroup label="摘要">
+            <UTextarea v-model="createForm.summary" />
+          </UFormGroup>
+
+          <UFormGroup label="描述">
+            <UTextarea v-model="createForm.description" :rows="6" />
+          </UFormGroup>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormGroup label="Categories (逗号分隔)">
+              <UInput v-model="createForm.categories" />
+            </UFormGroup>
+            <UFormGroup label="Tags (逗号分隔)">
+              <UInput v-model="createForm.tags" />
+            </UFormGroup>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">资产素材</h3>
+              <UButton size="xs" color="gray" variant="soft" icon="i-heroicons-plus" @click="addCreateAsset">
+                添加资产
+              </UButton>
+            </div>
+            <div v-if="!createForm.assets.length" class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              建议至少提供一个封面或截图。
+            </div>
+            <div v-else class="mt-4 space-y-3">
+              <div
+                v-for="(asset, index) in createForm.assets"
+                :key="asset.key"
+                class="rounded border border-gray-200 p-3 dark:border-gray-700"
+              >
+                <div class="grid gap-3 md:grid-cols-2">
+                  <UFormGroup label="类型" required>
+                    <UInput v-model="asset.asset_type" placeholder="logo" />
+                  </UFormGroup>
+                  <UFormGroup label="存储地址" required>
+                    <UInput v-model="asset.storage_uri" placeholder="https://cdn.example/logo.png" />
+                  </UFormGroup>
+                  <UFormGroup label="语言">
+                    <UInput v-model="asset.locale" placeholder="en" />
+                  </UFormGroup>
+                  <UFormGroup label="权重">
+                    <UInput type="number" v-model="asset.weight" />
+                  </UFormGroup>
+                  <div class="flex items-center gap-2">
+                    <UToggle v-model="asset.is_primary" />
+                    <span class="text-sm text-gray-600 dark:text-gray-300">主展示</span>
+                  </div>
+                </div>
+                <div class="mt-2 flex justify-end">
+                  <UButton size="xs" color="red" variant="ghost" @click="removeCreateAsset(index)">移除</UButton>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2">
+            <UButton color="gray" variant="soft" @click="createOpen = false">取消</UButton>
+            <UButton type="submit" color="primary" :loading="creating">创建</UButton>
+          </div>
+        </form>
+      </UCard>
+    </UModal>
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+import { computed, reactive, ref, watch, onMounted } from "vue"
+import { useToast } from "#imports"
+import type { MarketplaceListing, MarketplaceListingStatus } from "~/types/integration"
+
+definePageMeta({
+  middleware: ["layout.global"],
+})
+
+const toast = useToast()
+const nuxtApp = useNuxtApp()
+const config = useRuntimeConfig()
+const apiBase = computed(() => config.public.apiBaseUrl as string)
+
+const loading = ref(false)
+const creating = ref(false)
+const saving = ref(false)
+const listings = ref<MarketplaceListing[]>([])
+const selectedListing = ref<MarketplaceListing | null>(null)
+
+const filters = reactive<{ status: MarketplaceListingStatus[]; search: string }>({
+  status: [],
+  search: "",
+})
+
+const columns = [
+  { key: "title", label: "Listing" },
+  { key: "status", label: "状态" },
+  { key: "locale", label: "语言" },
+  { key: "ready_checklist_score", label: "Checklist" },
+  { key: "updated_at", label: "更新时间" },
+]
+
+const statusOptions = [
+  { label: "草稿", value: "draft" },
+  { label: "审核中", value: "in_review" },
+  { label: "已发布", value: "published" },
+  { label: "已暂停", value: "suspended" },
+]
+
+const localeOptions = ["en", "zh-CN", "ja", "fr"].map((value) => ({ label: value, value }))
+
+function statusBadgeColor(status: MarketplaceListingStatus) {
+  switch (status) {
+    case "published":
+      return "primary"
+    case "in_review":
+      return "orange"
+    case "suspended":
+      return "red"
+    default:
+      return "gray"
+  }
+}
+
+async function loadListings() {
+  loading.value = true
+  try {
+    const response = await nuxtApp.$fetch<{ data: { items: MarketplaceListing[]; total: number } }>(
+      `${apiBase.value}/admin/marketplace/listings`,
+      {
+        query: {
+          status: filters.status.join(",") || undefined,
+          search: filters.search || undefined,
+        },
+      }
+    )
+    const payload = response?.data
+    listings.value = payload?.items ?? []
+    if (selectedListing.value) {
+      const updated = listings.value.find((item) => item.id === selectedListing.value?.id)
+      if (updated) {
+        selectedListing.value = updated
+        applyEditForm(updated)
+      } else if (listings.value.length) {
+        selectedListing.value = listings.value[0]
+        applyEditForm(selectedListing.value)
+      } else {
+        selectedListing.value = null
+      }
+    } else if (listings.value.length) {
+      selectedListing.value = listings.value[0]
+      applyEditForm(selectedListing.value)
+    }
+  } catch (error) {
+    toast.add({ title: "加载失败", description: String(error), color: "red" })
+  } finally {
+    loading.value = false
+  }
+}
+
+function selectListing(row: MarketplaceListing | null) {
+  selectedListing.value = row
+  if (row) {
+    applyEditForm(row)
+  }
+}
+
+const createOpen = ref(false)
+
+const createForm = reactive({
+  plugin_id: "com.powerx.sample",
+  vendor_id: "",
+  title: "",
+  slug: "",
+  summary: "",
+  description: "",
+  locale: "en",
+  categories: "",
+  tags: "",
+  checklist_summary: "",
+  assets: [] as Array<{
+    key: string
+    asset_type: string
+    storage_uri: string
+    is_primary: boolean
+    locale: string
+    weight: number
+  }>,
+})
+
+function resetCreateForm() {
+  createForm.vendor_id = ""
+  createForm.title = ""
+  createForm.slug = ""
+  createForm.summary = ""
+  createForm.description = ""
+  createForm.locale = "en"
+  createForm.categories = ""
+  createForm.tags = ""
+  createForm.checklist_summary = ""
+  createForm.assets = []
+}
+
+function openCreateModal() {
+  resetCreateForm()
+  createOpen.value = true
+}
+
+function addCreateAsset() {
+  createForm.assets.push({
+    key: crypto.randomUUID(),
+    asset_type: "screenshot",
+    storage_uri: "",
+    is_primary: false,
+    locale: "en",
+    weight: 0,
+  })
+}
+
+function removeCreateAsset(index: number) {
+  createForm.assets.splice(index, 1)
+}
+
+function splitCSV(input: string) {
+  return input
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function parseBranding(input: string) {
+  if (!input) return undefined
+  try {
+    return JSON.parse(input)
+  } catch (error) {
+    toast.add({ title: "Branding Theme 解析失败", description: String(error), color: "red" })
+    throw error
+  }
+}
+
+async function submitCreate() {
+  creating.value = true
+  try {
+    const payload = {
+      plugin_id: createForm.plugin_id,
+      vendor_id: createForm.vendor_id,
+      title: createForm.title,
+      slug: createForm.slug,
+      summary: createForm.summary || undefined,
+      description: createForm.description || undefined,
+      locale: createForm.locale,
+      categories: splitCSV(createForm.categories),
+      tags: splitCSV(createForm.tags),
+      assets: createForm.assets.map(({ asset_type, storage_uri, is_primary, locale, weight }) => ({
+        asset_type,
+        storage_uri,
+        is_primary,
+        locale,
+        weight,
+      })),
+    }
+    const response = await nuxtApp.$fetch<{ data: MarketplaceListing }>(`${apiBase.value}/admin/marketplace/listings`, {
+      method: "POST",
+      body: payload,
+    })
+    const listing = response.data
+    toast.add({ title: "Listing 已创建", color: "primary" })
+    createOpen.value = false
+    await loadListings()
+    if (listing) {
+      selectedListing.value = listings.value.find((item) => item.id === listing.id) ?? listing
+      applyEditForm(selectedListing.value)
+    }
+  } catch (error) {
+    toast.add({ title: "创建失败", description: String(error), color: "red" })
+  } finally {
+    creating.value = false
+  }
+}
+
+const editForm = reactive({
+  title: "",
+  slug: "",
+  locale: "en",
+  summary: "",
+  description: "",
+  categories: "",
+  tags: "",
+  branding_theme: "",
+  ready_checklist_score: 0,
+  assets: [] as Array<{
+    key: string
+    asset_type: string
+    storage_uri: string
+    is_primary: boolean
+    locale: string
+    weight: number
+  }>,
+})
+
+function applyEditForm(listing: MarketplaceListing | null) {
+  if (!listing) return
+  editForm.title = listing.title
+  editForm.slug = listing.slug
+  editForm.locale = listing.locale
+  editForm.summary = listing.summary ?? ""
+  editForm.description = listing.description ?? ""
+  editForm.categories = (listing.categories || []).join(", ")
+  editForm.tags = (listing.tags || []).join(", ")
+  editForm.branding_theme = listing.branding_theme ? JSON.stringify(listing.branding_theme, null, 2) : ""
+  editForm.ready_checklist_score = listing.ready_checklist_score ?? 0
+  editForm.assets = (listing.assets || []).map((asset) => ({
+    key: crypto.randomUUID(),
+    asset_type: asset.asset_type,
+    storage_uri: asset.storage_uri,
+    is_primary: asset.is_primary,
+    locale: asset.locale,
+    weight: asset.weight,
+  }))
+}
+
+function addEditAsset() {
+  editForm.assets.push({
+    key: crypto.randomUUID(),
+    asset_type: "screenshot",
+    storage_uri: "",
+    is_primary: false,
+    locale: "en",
+    weight: 0,
+  })
+}
+
+function removeEditAsset(index: number) {
+  editForm.assets.splice(index, 1)
+}
+
+async function saveListing() {
+  if (!selectedListing.value) return
+  saving.value = true
+  try {
+    const payload = {
+      title: editForm.title,
+      slug: editForm.slug,
+      locale: editForm.locale,
+      summary: editForm.summary || undefined,
+      description: editForm.description || undefined,
+      categories: splitCSV(editForm.categories),
+      tags: splitCSV(editForm.tags),
+      branding_theme: parseBranding(editForm.branding_theme),
+      assets: editForm.assets.map(({ asset_type, storage_uri, is_primary, locale, weight }) => ({
+        asset_type,
+        storage_uri,
+        is_primary,
+        locale,
+        weight,
+      })),
+    }
+    await nuxtApp.$fetch(`${apiBase.value}/admin/marketplace/listings/${selectedListing.value.id}`, {
+      method: "PATCH",
+      body: payload,
+    })
+    toast.add({ title: "已保存", color: "primary" })
+    await loadListings()
+  } catch (error) {
+    toast.add({ title: "保存失败", description: String(error), color: "red" })
+  } finally {
+    saving.value = false
+  }
+}
+
+async function submitForReview(listing: MarketplaceListing) {
+  try {
+    await nuxtApp.$fetch(`${apiBase.value}/admin/marketplace/listings/${listing.id}/review`, {
+      method: "POST",
+      body: {
+        submitted_by: "admin",
+        metadata: {
+          summary: editForm.summary,
+        },
+      },
+    })
+    toast.add({ title: "已提交审核", color: "primary" })
+    await loadListings()
+  } catch (error) {
+    toast.add({ title: "提交失败", description: String(error), color: "red" })
+  }
+}
+
+async function publishListing(listing: MarketplaceListing) {
+  try {
+    await nuxtApp.$fetch(`${apiBase.value}/admin/marketplace/listings/${listing.id}/publish`, {
+      method: "POST",
+      body: {
+        reviewer_id: "admin",
+        notes: "发布上线",
+      },
+    })
+    toast.add({ title: "Listing 已发布", color: "primary" })
+    await loadListings()
+  } catch (error) {
+    toast.add({ title: "发布失败", description: String(error), color: "red" })
+  }
+}
+
+async function suspendListing(listing: MarketplaceListing) {
+  try {
+    await nuxtApp.$fetch(`${apiBase.value}/admin/marketplace/listings/${listing.id}/suspend`, {
+      method: "POST",
+      body: {
+        reviewer_id: "admin",
+        notes: "暂时下架",
+      },
+    })
+    toast.add({ title: "Listing 已暂停", color: "orange" })
+    await loadListings()
+  } catch (error) {
+    toast.add({ title: "暂停失败", description: String(error), color: "red" })
+  }
+}
+
+function handleChecklistTriggered() {
+  if (!selectedListing.value) return
+  loadListings()
+}
+
+watch(
+  [() => filters.status.slice(), () => filters.search],
+  () => {
+    loadListings()
+  }
+)
+
+onMounted(() => {
+  loadListings()
+})
+</script>

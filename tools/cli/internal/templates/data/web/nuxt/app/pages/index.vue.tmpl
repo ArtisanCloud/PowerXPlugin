@@ -1,0 +1,21 @@
+<template>
+  <UContainer class="py-12">
+    <div class="text-center space-y-4">
+      <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">
+        {{ "{{ $t('home.title') }}" }}
+      </h1>
+      <p class="text-gray-600 dark:text-gray-300">
+        {{ "{{ $t('home.description') }}" }}
+      </p>
+      <UButton to="/intro" size="lg" color="primary">
+        {{ "{{ $t('home.viewIntro') }}" }}
+      </UButton>
+    </div>
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+definePageMeta({
+  title: 'PowerXSkeletonHome'
+})
+</script>

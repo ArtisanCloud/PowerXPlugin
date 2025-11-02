@@ -1,0 +1,64 @@
+<template>
+  <div class="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+    <div class="flex h-16 items-center justify-between px-6">
+      <div class="flex items-center">
+        <UIcon name="i-heroicons-rocket-launch" class="w-6 h-6 mr-3 text-primary-600" />
+        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+          {{ $t('common.appName') }}
+        </h1>
+      </div>
+
+      <div class="flex items-center space-x-4" />
+
+      <div class="flex items-center space-x-4">
+        <UButton variant="ghost" color="neutral" size="sm" square @click="toggleNotifications">
+          <UIcon name="i-heroicons-bell" class="w-5 h-5" />
+        </UButton>
+
+        <ThemeSelector />
+        <LanguageSelector />
+
+        <UDropdownMenu :items="userMenuItems" :popper="{ placement: 'bottom-end' }">
+          <UAvatar
+            src="https://avatars.githubusercontent.com/u/739984?v=4"
+            alt="admin"
+            size="sm"
+            class="cursor-pointer"
+          />
+        </UDropdownMenu>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+const { t } = useI18n()
+
+const userMenuItems = computed(() => [
+  [
+    {
+      label: t('navigation.profile'),
+      avatar: { src: 'https://avatars.githubusercontent.com/u/739984?v=4' },
+      click: () => navigateTo('/profile'),
+    },
+  ],
+  [
+    {
+      label: t('navigation.help'),
+      icon: 'i-heroicons-question-mark-circle',
+      click: () => navigateTo('/help'),
+    },
+  ],
+  [
+    {
+      label: t('navigation.logout'),
+      icon: 'i-heroicons-arrow-right-on-rectangle',
+      click: () => console.info('[navbar] logout clicked'),
+    },
+  ],
+])
+
+const toggleNotifications = () => {
+  console.info('[navbar] notifications clicked')
+}
+</script>

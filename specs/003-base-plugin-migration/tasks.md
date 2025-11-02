@@ -101,11 +101,24 @@
 
 ---
 
+## Phase 7: Base Parity 差距收敛（新增）
+
+**Purpose**: 对齐 Base 插件剩余能力，明确未迁部分与后续计划
+
+- [ ] T037 [US2] 迁移 Base DTO/错误码逻辑至 skeleton/backend/internal/templates/dto.go，并更新 handler/service 使用
+- [ ] T038 [US2] 将 DTO/错误码改动同步到 scaffold/templates/backend 与 CLI 内嵌模板
+- [ ] T039 [US4] 对照 `com.powerx.plugin.base/web-admin/nuxt.config.ts`，补齐 Skeleton/CLI Nuxt 配置（runtimeConfig、Nitro headers、HMR/代理、devtools），并在 research.md 记录 diff
+- [ ] T040 [US4] 校正语言包路径与加载策略（`langDir`、目录结构），确保 Skeleton 与 CLI 在 Standalone/宿主双模式均能加载
+- [ ] T041 [US4] 更新 CLI README / docs，说明新增环境变量、依赖与运行方式
+- [ ] T042 [Doc] 汇总未迁移能力（Bridge、Stores、Tailwind4 等）及后续 roadmap，写入 docs/plan/002-plan-base-plugin-migration.md 与 research.md
+
+---
+
 ## Dependencies & Execution Order
 
-- Setup (Phase 1) → Foundational (Phase 2) → User Stories (Phase 3~5) → Polish (Phase 6)
+- Setup (Phase 1) → Foundational (Phase 2) → User Stories (Phase 3~5) → Polish (Phase 6) → Parity Closure (Phase 7)
 - User Stories依规格优先级顺序：US1 → US2 → US3
-- US2/US3 依赖 US1 的框架增强完成；US3 还需 US2 提供稳定后端以供 UI/CLI 验证
+- US2/US3 依赖 US1 的框架增强完成；US3 还需 US2 提供稳定后端以供 UI/CLI 验证；Phase 7 关注 Base 差距收敛，需建立在 Phase 2~5 的产物之上
 
 ### Parallel Opportunities
 

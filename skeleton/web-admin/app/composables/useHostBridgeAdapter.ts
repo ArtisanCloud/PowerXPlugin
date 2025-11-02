@@ -1,0 +1,43 @@
+// app/composables/useHostBridgeAdapter.ts
+import { initPowerXBridge } from '~/bridge/powerx-bridge-client'
+import { useI18n, useRuntimeConfig } from '#imports'
+import { useTheme } from '~/composables/useTheme'
+
+type BridgeOptions = { pluginId?: string; instanceId?: string; debug?: boolean }
+
+/** 将宿主广播适配到项目内现有的语言/主题切换实现 */
+export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
+  const { setLocale, locale } = useI18n()
+  const { setTheme } = useTheme() // ← 不再解构 currentTheme
+  const runtimeConfig = useRuntimeConfig()
+
+  // 宿主 'system' ↔ 本地 'auto'
+  const fromHostTheme = (t: string) => (t === 'system' ? 'auto' : t)
+
+  const applyLocale = async (code: string) => {
+    if (!code || code === String(locale.value)) return
+    await setLocale(code)
+  }
+
+  const applyTheme = (t: string) => {
+    setTheme(fromHostTheme(t) as any)
+  }
+
+  const defaultDebug =
+    typeof runtimeConfig.public?.bridgeDebug === 'boolean'
+      ? runtimeConfig.public.bridgeDebug
+      : import.meta.dev
+
+  const bridge = initPowerXBridge({
+    debug: typeof opts.debug === 'boolean' ? opts.debug : defaultDebug,
+    pluginId: opts.pluginId ?? 'com.powerx.sample',
+    instanceId: opts.instanceId ?? 'dev-bridge',
+    allowedOrigins: ['*'],
+    // allowedOrigins: import.meta.env.DEV ? ['*'] : ['https://admin.powerx.cloud'],
+    onLocale: (code) => applyLocale(code),
+    onTheme:  (t)    => applyTheme(t),
+    onSync:   ({ locale, theme }) => { applyLocale(locale); applyTheme(theme) }
+  })
+
+  return { bridge }
+}

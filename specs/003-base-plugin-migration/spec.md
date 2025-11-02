@@ -41,14 +41,27 @@ As a skeleton maintainer, I can run `go run ./skeleton/backend/cmd/plugin` and i
 
 As a front-end/CLI maintainer, I can use the framework Layer starter pages and CLI templates to produce an admin UI showing intro + templates CRUD operations that communicate with the skeleton backend using `@powerx-plugin/framework-client`.
 
-**Why this priority**: Completes the end-to-end example and ensures downstream plugin authors receive a fully functional starter.
+**Why this priority**: Completes the end-to-end example and ensures downstream plugin authors接收的骨架与 Base 插件体验一致。
 
-**Independent Test**: Launch the skeleton web-admin dev server and perform CRUD actions against the backend, then render CLI templates and verify the generated project boots without manual fixes.
+**Independent Test**: Launch the skeleton web-admin dev server并执行 CRUD；随后用 CLI 生成项目并验证其按相同配置启动。
 
-**Acceptance Scenarios**:
+**Acceptance Scenarios**：
 
-1. **Given** the skeleton frontend dev server running, **When** a user navigates to `/templates/crud`, **Then** they can create, edit, and delete templates with toast feedback using framework-client `get/post/put/delete`.
-2. **Given** CLI templates render a new project, **When** the generated project is started, **Then** it contains the same starter pages and CRUD wiring as the skeleton with configurable plugin ID placeholders.
+1. **Given** skeleton 前端启动，**When** 访问 `/templates/crud`，**Then** 可完成创建/编辑/删除模板并收到 Toast 提示，页面无控制台错误。
+2. **Given** 使用 `px-plugin init` 生成新项目，**When** 启动其前端，**Then** 首页 `/` 与 `/_p/{pluginId}/admin/templates/crud` 呈现与 Skeleton 一致的页面，并持有正确的菜单/i18n/运行时配置。
+
+---
+
+### User Story 4 – Nuxt 配置与运行时对齐 (Priority: P3)
+
+作为模板维护者，我需要 Skeleton 与 CLI 输出的 Nuxt 工程复刻 Base 插件的关键配置（`baseURL`、`runtimeConfig`、Nitro headers、HMR 代理、`@nuxt/icon`、`@pinia/nuxt` 等），以便开发者能够在 Standalone 与宿主双场景下开箱运行。
+
+**Independent Test**: 对比 `com.powerx.plugin.base/web-admin/nuxt.config.ts` 与 Skeleton/CLI 模板的 Diff；手动/脚本验证 Standalone 下 `/`、`/_p/{pluginId}/admin` 访问路径、语言包加载、HMR、代理行为。
+
+**Acceptance Scenarios**：
+
+1. **Given** Skeleton 在 Standalone 模式运行，**When** 访问 `/` 与 `/_p/com.powerx.sample/admin`，**Then** 页面均可渲染，语言包正确加载，`runtimeConfig.public` 反映 Standalone API 基址。
+2. **Given** 通过环境变量切换 `POWERX_PROXY=1`，**When** 重新启动 Skeleton，**Then** `app.baseURL`、`apiBaseUrl`、Nitro headers 与 Base 插件一致，CLI 生成项目亦保持同样开关。
 
 ---
 
@@ -70,9 +83,10 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 - **FR-005**: Skeleton backend MUST implement a Templates repository/service pair embedding `repository.BaseRepository[Template]`, providing `NewTemplateRepository`, and honoring tenant isolation per `.specify/memory/constitution.md`.
 - **FR-006**: Skeleton backend MUST expose `/api/v1/templates` CRUD endpoints with in-memory storage and seed data for demo purposes.
 - **FR-007**: Skeleton handlers MUST remain thin (validation + serialization) and delegate business logic to services reusable by future HTTP/gRPC transports.
-- **FR-008**: Skeleton frontend MUST provide Intro and Templates CRUD pages that consume the framework client for API access and display toast/confirm feedback.
-- **FR-009**: CLI templates MUST render backend and frontend skeleton assets with placeholder substitution for plugin IDs, menu labels, and RBAC keys.
-- **FR-010**: Documentation (`docs/init-project.md`, quickstart, standalone guide) MUST outline new CRUD verification steps and clearly state current limitations (in-memory storage, AuthGuard 501, etc.).
+- **FR-008**: Skeleton frontend MUST提供 Intro、主页、Templates CRUD 页面，消费 framework-client 并复刻 Base 插件导航/菜单结构。
+- **FR-009**: Skeleton Nuxt 配置 MUST 复刻 Base 插件关键项：`compatibilityDate`、`ssr`、`baseURL`、`runtimeConfig`、Nitro headers、`@nuxt/icon`、`@pinia/nuxt`、`@nuxtjs/color-mode`、HMR/代理设置及语言包目录（`i18n/locales`）。
+- **FR-010**: CLI 模板 MUST 同步 Skeleton 的 Nuxt/Go 结构、依赖与配置，占位符包含插件 ID、菜单、RBAC、API 基址。
+- **FR-011**: 文档 (`docs/guide/quickstart.md`,`docs/guide/standalone-mode.md`,`docs/plan/002-plan-base-plugin-migration.md`) MUST 更新差异说明、运行步骤、局限性。
 
 ### Key Entities *(include if feature involves data)*
 
@@ -85,8 +99,9 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 - **SC-001**: Framework unit/integration tests covering Router path parameters, response helper, and middleware achieve ≥90% statement coverage.
 - **SC-002**: Standalone `curl` smoke suite across two tenant IDs completes full CRUD cycle with average latency ≤1s per request.
-- **SC-003**: Skeleton frontend manual QA completes create/edit/delete flows without console errors and reflects persisted data immediately.
-- **SC-004**: CLI-rendered project passes `go test ./...` and `npm run lint` on first run with no manual code adjustments.
+- **SC-003**: Skeleton frontend manual QA completes create/edit/delete flows without console errors and reflects persisted data immediately，且首页、Admin 路由、语言切换均正常。
+- **SC-004**: CLI-rendered project passes `go test ./...` and `npm run lint` on first run with no manual code adjustments，并在 Standalone 下 / 与 Admin 路由可访问。
+- **SC-005**: Skeleton 与 Base 插件 `nuxt.config.ts` 的关键信息差异需在 `research.md` 中记录并得到确认（要么对齐要么注明不迁）。
 
 ## Clarifications
 

@@ -24,6 +24,7 @@ type Context interface {
 	Status(code int)
 	Header(name string) string
 	SetHeader(name, value string)
+	Method() string
 	Context() context.Context
 	SetContext(ctx context.Context)
 }

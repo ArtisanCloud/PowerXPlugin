@@ -208,6 +208,13 @@ func (c *httpContext) SetHeader(name, value string) {
 	c.w.Header().Set(name, value)
 }
 
+func (c *httpContext) Method() string {
+	if c.req == nil {
+		return ""
+	}
+	return c.req.Method
+}
+
 func (c *httpContext) Context() context.Context {
 	if c.ctx != nil {
 		return c.ctx

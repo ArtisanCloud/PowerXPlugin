@@ -13,7 +13,7 @@ import (
 
 // Register 将业务路由挂载到框架提供的路由器上。
 func Register(r bootstrap.Router) {
-	r.Use(frameworkmw.RequestID(), frameworkmw.TenantContext())
+	r.Use(frameworkmw.CORS(), frameworkmw.RequestID(), frameworkmw.TenantContext())
 
 	pingHandler := handler.NewPingHandler(service.NewPingService())
 	r.Handle(http.MethodGet, "/ping", pingHandler.Handle())

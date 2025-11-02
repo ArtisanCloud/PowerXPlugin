@@ -4,13 +4,42 @@ import { definePowerXAdminConfig } from '@powerx-plugin/framework-admin'
 const pluginId = 'com.powerx.sample'
 const pluginAdminBase = `/_p/${pluginId}/admin/`
 const pluginApiBase = `/_p/${pluginId}/api/v1`
-const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8078/api/v1'
+const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8086/api/v1'
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
 const rawBridgeDebug = process.env.NUXT_PUBLIC_BRIDGE_DEBUG ?? process.env.BRIDGE_DEBUG
 const BRIDGE_DEBUG = rawBridgeDebug !== undefined
   ? /^(1|true)$/i.test(String(rawBridgeDebug))
   : !INSIDE_POWERX
+
+const imgSources = ["'self'", "data:", "https://avatars.githubusercontent.com"]
+const connectSources = ["'self'"]
+
+if (!INSIDE_POWERX) {
+  const apiCandidates = new Set<string>()
+  const registerCandidate = (value?: string) => {
+    if (!value) return
+    apiCandidates.add(value)
+  }
+
+  registerCandidate(localApiBase)
+  try {
+    const apiOrigin = new URL(localApiBase).origin
+    registerCandidate(apiOrigin)
+    if (apiOrigin.includes("localhost")) {
+      registerCandidate(apiOrigin.replace("localhost", "127.0.0.1"))
+    }
+  } catch {
+    // Swallow URL parse errors; fall back to raw string
+  }
+
+  registerCandidate("ws:")
+  registerCandidate("wss:")
+
+  connectSources.push(...apiCandidates)
+}
+
+connectSources.push("https://api.iconify.design")
 
 const powerx = definePowerXAdminConfig({
   pluginId,
@@ -95,14 +124,12 @@ export default defineNuxtConfig({
           'X-Frame-Options': 'SAMEORIGIN',
           'Content-Security-Policy': [
             "default-src 'self'",
-            "img-src 'self' data:",
+            `img-src ${imgSources.join(' ')}`,
             "style-src 'self' 'unsafe-inline'",
             INSIDE_POWERX
               ? "script-src 'self' 'unsafe-inline'"
               : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-            INSIDE_POWERX
-              ? "connect-src 'self'"
-              : `connect-src 'self' ${localApiBase} ws:`,
+            `connect-src ${connectSources.join(' ')}`,
             "font-src 'self' data:",
             "frame-ancestors 'self'"
           ].join('; ') + ';',
@@ -127,7 +154,7 @@ export default defineNuxtConfig({
         ? {}
         : {
             '/api': {
-              target: 'http://localhost:8078',
+              target: 'http://localhost:8086',
               changeOrigin: true,
               ws: true
             },

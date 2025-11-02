@@ -18,12 +18,14 @@ type stubContext struct {
 	status  int
 	payload any
 	ctx     context.Context
+	method  string
 }
 
 func newStubContext() *stubContext {
 	return &stubContext{
 		headers: make(http.Header),
 		ctx:     context.Background(),
+		method:  http.MethodGet,
 	}
 }
 
@@ -60,6 +62,10 @@ func (s *stubContext) SetHeader(name, value string) {
 		return
 	}
 	s.headers.Set(name, value)
+}
+
+func (s *stubContext) Method() string {
+	return s.method
 }
 
 func (s *stubContext) Context() context.Context {
@@ -113,5 +119,42 @@ func TestTenantContextMiddleware_Invalid(t *testing.T) {
 	env, ok := ctx.payload.(router.Envelope)
 	if !ok || env.Error == nil || env.Error.Code != "INVALID_TENANT_ID" {
 		t.Fatalf("unexpected payload: %#v", ctx.payload)
+	}
+}
+
+func TestCORSMiddleware_AllowsOrigin(t *testing.T) {
+	ctx := newStubContext()
+	ctx.SetHeader("Origin", "http://localhost:3031")
+
+	CORS()(func(c bootstrap.Context) {
+		c.Status(http.StatusOK)
+	})(ctx)
+
+	if ctx.Header("Access-Control-Allow-Origin") != "http://localhost:3031" {
+		t.Fatalf("expected allow origin header to echo request origin, got %q", ctx.Header("Access-Control-Allow-Origin"))
+	}
+	if ctx.Header("Access-Control-Allow-Credentials") != "true" {
+		t.Fatalf("expected allow credentials header to be true")
+	}
+	if ctx.Header("Access-Control-Allow-Methods") == "" {
+		t.Fatalf("expected allow methods header to be set")
+	}
+}
+
+func TestCORSMiddleware_Preflight(t *testing.T) {
+	ctx := newStubContext()
+	ctx.method = http.MethodOptions
+	ctx.SetHeader("Origin", "http://localhost:3031")
+
+	var called bool
+	CORS()(func(c bootstrap.Context) {
+		called = true
+	})(ctx)
+
+	if called {
+		t.Fatalf("expected middleware to short-circuit preflight")
+	}
+	if ctx.status != http.StatusNoContent {
+		t.Fatalf("expected status 204 for preflight, got %d", ctx.status)
 	}
 }

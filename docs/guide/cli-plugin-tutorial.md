@@ -21,9 +21,18 @@
 ```bash
 cd tools/cli
 go install ./cmd/px-plugin
+px-plugin --version  # 验证可执行文件已安装并输出版本信息
 ```
 
 执行完成后，`px-plugin` 可执行文件将安装到 `$(go env GOPATH)/bin`。请确保该目录已加入 `PATH`，之后即可在任意路径直接调用 `px-plugin`。
+
+> 默认输出形如 `px-plugin version dev (commit 1a2b3c4)`，其中 `dev` 表示未设置自定义版本。若想在发布时带上明确版本号，可在安装命令中附加：
+>
+> ```bash
+> go install -ldflags "-X main.version=v0.3.0" ./cmd/px-plugin
+> ```
+>
+> 这样再次运行 `px-plugin --version` 时就会显示 `px-plugin version v0.3.0 (commit 1a2b3c4)`。
 
 ## Step 2. 生成插件骨架
 

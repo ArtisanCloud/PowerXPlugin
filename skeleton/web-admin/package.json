@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nuxi dev",
-    "build": "nuxi build",
+    "dev": "node ./node_modules/nuxi/bin/nuxi.mjs dev",
+    "build": "node ./node_modules/nuxi/bin/nuxi.mjs build",
     "lint": "node -e \"console.log('Lint checks pending configuration');\"",
     "test:e2e": "playwright test"
   },

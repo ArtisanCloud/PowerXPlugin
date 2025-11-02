@@ -171,10 +171,11 @@ rm -rf "$TMP_DIR"
 | CLI 模块改动 | 参考 4.4 | 确保 `px-plugin init` 无回归 |
 | 测试采纳率审计 | `./scripts/testing/audit-test-adoption.sh` | 统计最近提交是否新增测试 |
 | 综合回归 | `make test-regression` | 启动后端/前端并执行 Playwright 与覆盖率 |
+| CI (act) | `make ci-all` | 依赖 [act](https://github.com/nektos/act)，在本地模拟 `.github/workflows/ci.yml` |
 
 > 详细脚本说明参见 `scripts/testing/README.md`，可了解超时或端口覆盖的环境变量。
 >
-> 查看所有可用 Make 目标：`make help`。
+> 查看所有可用 Make 目标：`make help`。若想本地复刻 GitHub CI，可先安装 `act`，再执行 `make ci-all`（或 `make ci-backend`、`make ci-frontend` 等) 调试单个 Job。
 
 ---
 

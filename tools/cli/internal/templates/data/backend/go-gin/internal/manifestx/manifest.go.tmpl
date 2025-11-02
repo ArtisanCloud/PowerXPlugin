@@ -12,10 +12,15 @@ func Plugin() manifest.Plugin {
 			{
 				Path:  "/_p/{{ .PluginID }}/admin",
 				Title: "{{ .PluginName }}",
+				Children: []manifest.Menu{
+					{Path: "/_p/{{ .PluginID }}/admin/intro", Title: "概览"},
+					{Path: "/_p/{{ .PluginID }}/admin/templates", Title: "模板管理"},
+				},
 			},
 		},
 		Permissions: []string{
-			"{{ .PluginID }}.admin.view",
+			"{{ .PluginID }}.templates.read",
+			"{{ .PluginID }}.templates.write",
 		},
 	}
 }

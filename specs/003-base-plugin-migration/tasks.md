@@ -76,13 +76,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] 迁移 Intro 页面至 skeleton/web-admin/app/pages/intro.vue
-- [ ] T025 [US3] 迁移 Templates 列表与 CRUD 页面至 skeleton/web-admin/app/pages/templates/
-- [ ] T026 [P] [US3] 迁移模态/确认/通知组件至 skeleton/web-admin/app/components/
-- [ ] T027 [US3] 创建 useTemplateApi 示例至 skeleton/web-admin/app/composables/api/useTemplateApi.ts
-- [ ] T028 [US3] 扩展 framework-admin Layer starterPages 逻辑于 sdk/workspace/frontend/nuxt/framework-admin/layer/nuxt.config.ts
-- [ ] T029 [US3] 同步 scaffold/backend 与 scaffold/web 模板以输出新 Skeleton 于 scaffold/templates/
-- [ ] T030 [US3] 验证并记录 `px-plugin init` 生成流程于 specs/003-base-plugin-migration/research.md
+- [x] T024 [US3] 迁移 Intro 页面至 skeleton/web-admin/app/pages/intro.vue
+- [x] T025 [US3] 迁移 Templates 列表与 CRUD 页面至 skeleton/web-admin/app/pages/templates/
+- [x] T026 [P] [US3] 迁移模态/确认/通知组件至 skeleton/web-admin/app/components/
+- [x] T027 [US3] 创建 useTemplateApi 示例至 skeleton/web-admin/app/composables/api/useTemplateApi.ts
+- [x] T028 [US3] 扩展 framework-admin Layer starterPages 逻辑于 sdk/workspace/frontend/nuxt/framework-admin/layer/nuxt.config.ts
+- [x] T029 [US3] 同步 scaffold/backend 与 scaffold/web 模板以输出新 Skeleton 于 scaffold/templates/
+- [x] T030 [US3] 验证并记录 `px-plugin init` 生成流程于 specs/003-base-plugin-migration/research.md
 
 **Checkpoint**: CLI 生成项目具备与 Skeleton 一致的前端 CRUD 体验
 
@@ -92,12 +92,12 @@
 
 **Purpose**: 文档与最终验证
 
-- [ ] T031 [P] 更新 docs/guide/quickstart.md 加入 CRUD 验证步骤与延迟测试说明
-- [ ] T032 [P] 更新 docs/guide/standalone-mode.md 说明内存存储与租户操作
-- [ ] T033 对 docs/plan/002-plan-base-plugin-migration.md 补记关键实施结果与偏差
-- [ ] T034 执行 go test ./...、npm run lint、px-plugin init 并记录结果到 specs/003-base-plugin-migration/research.md
-- [ ] T035 使用 `curl -w` 对不同租户执行 CRUD 测试并确认平均延迟 ≤1s，记录到 specs/003-base-plugin-migration/research.md
-- [ ] T036 整理最终交付总结至 CHANGELOG 或 README（如需要）
+- [x] T031 [P] 更新 docs/guide/quickstart.md 加入 CRUD 验证步骤与延迟测试说明
+- [x] T032 [P] 更新 docs/guide/standalone-mode.md 说明内存存储与租户操作
+- [x] T033 对 docs/plan/002-plan-base-plugin-migration.md 补记关键实施结果与偏差
+- [x] T034 执行 go test ./...、npm run lint、px-plugin init 并记录结果到 specs/003-base-plugin-migration/research.md
+- [x] T035 使用 `curl -w` 对不同租户执行 CRUD 测试并确认平均延迟 ≤1s，记录到 specs/003-base-plugin-migration/research.md
+- [x] T036 整理最终交付总结至 CHANGELOG 或 README（如需要）
 
 ---
 

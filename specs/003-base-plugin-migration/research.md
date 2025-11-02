@@ -105,3 +105,24 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 ## 覆盖率记录
 
 - 2025-11-01：`go test ./framework/backend/go/... -coverprofile=framework/backend/go/coverage.out`；router 包覆盖率 93.8%，结果已留存。
+
+## CLI 脚手架验证（T030）
+
+- 2025-11-02：`./bin/px-plugin init com.powerx.demo` 成功生成完整骨架。
+  - 新版模板已正确转义 Vue `{{ }}` 语法，未再出现 `function "templates" not defined` 报错。
+  - 输出目录包含内存版 Templates CRUD（backend/internal/templates/**）与前端页面/组件（web-admin/app/**）。
+  - CLI 同步写入 contracts（docs/contracts/*.json|yaml）与默认 README/插件元数据，符合 Phase 5 预期。
+  - 后续步骤：针对生成项目执行 `go test ./...`、`npm run lint` 并比对 Skeleton（T034/T035）。
+
+## 综合验证（T034）
+
+- 2025-11-02：`GOWORK=off go test ./...`（目录：`com.powerx.demo/backend`）通过，`manifest.Menu` 新增 `children` 字段后编译正常。  
+- 2025-11-02：`npm run lint`（目录：`com.powerx.demo/web-admin`）执行占位脚本，确认 CLI 模板内置占位 Lint 流程；`npm install` 安装本地 Layer 依赖成功。  
+- 2025-11-02：`./bin/px-plugin init --force com.powerx.demo` 再次运行验证模板幂等性，输出与 Skeleton 保持一致。
+
+## 延迟观测（T035）
+
+- 2025-11-02：通过脚本启动 `go run ./skeleton/backend/cmd/plugin` 并在 0.5s 间隔内轮询 `/api/v1/ping` 直至服务就绪；随后使用 `curl -w 'time_total:%{time_total}'` 观测多租户请求。  
+  - `tenant=1` → `0.001355s`  
+  - `tenant=2` → `0.001451s`  
+- 结果均远低于 1s SLA，命令执行后立即终止服务并保存原始响应到 `/tmp/tenant{1,2}.json` 供复核。

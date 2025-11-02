@@ -10,11 +10,16 @@ func Plugin() manifest.Plugin {
 		Menus: []manifest.Menu{
 			{
 				Path:  "/_p/com.powerx.sample/admin",
-				Title: "Sample Dashboard",
+				Title: "PowerX Skeleton",
+				Children: []manifest.Menu{
+					{Path: "/_p/com.powerx.sample/admin/intro", Title: "概览"},
+					{Path: "/_p/com.powerx.sample/admin/templates", Title: "模板管理"},
+				},
 			},
 		},
 		Permissions: []string{
-			"com.powerx.sample.admin.view",
+			"com.powerx.sample.templates.read",
+			"com.powerx.sample.templates.write",
 		},
 	}
 }

@@ -68,6 +68,28 @@ curl http://localhost:8078/api/v1/ping
 
 若收到 200 但响应为空，确认 `routes.Register` 已挂载；若命令报错，请检查端口是否被占用。
 
+### Templates CRUD（内存存储示例）
+
+Skeleton 的 Templates 模块完全运行在内存中，`repository` 使用 `map[tenantID]map[id]*Template` 按租户隔离，重启服务后数据会被清空。`WithTenantTx` 会在上下文中写入 `SET LOCAL app.tenant_id` 等价的租户信息，模拟 Constitution 要求的 `BeginTenantTx` 行为。
+
+- 默认租户：未提供 Header 时会退回到 Standalone 默认租户 `1`，建议显式设置。  
+- 隔离验证：
+  ```bash
+  curl -s -H 'X-Tenant-ID: 1' http://localhost:8078/api/v1/templates | jq
+  curl -s -H 'X-Tenant-ID: 2' http://localhost:8078/api/v1/templates | jq   # 另一租户独立数据
+  ```
+- CRUD 示例（发送 JSON 请求体）：
+  ```bash
+  curl -s -X POST -H 'X-Tenant-ID: 1' -H 'Content-Type: application/json' \
+    -d '{"name":"Quickstart","description":"Created in Standalone","content":"Hello"}' \
+    http://localhost:8078/api/v1/templates | jq
+  curl -s -X PUT -H 'X-Tenant-ID: 1' -H 'Content-Type: application/json' \
+    -d '{"name":"Quickstart","description":"Updated","content":"Hello 2"}' \
+    http://localhost:8078/api/v1/templates/1 | jq
+  curl -s -X DELETE -H 'X-Tenant-ID: 1' http://localhost:8078/api/v1/templates/1
+  ```
+- 延迟记录：使用 `curl -w 'time_total: %{time_total}\n'` 观测 API 响应时间，验证在 1s SLA 以内。若需要长期追踪，请将结果记录在 `specs/003-base-plugin-migration/research.md` 或自定义表格中。
+
 ## Step 3. 启动前端管理端
 
 Skeleton 管理端位于 `skeleton/web-admin`，基于 Nuxt 4.2 和 `@powerx-plugin/framework-admin` Layer。

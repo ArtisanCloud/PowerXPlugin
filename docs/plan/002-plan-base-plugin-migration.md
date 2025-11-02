@@ -62,3 +62,11 @@
 - **优先完成阶段 1（Router & 响应 & 中间件）**，这是 Templates 模块迁移的唯一硬性前置。
 - 阶段 2 可选 Templates 模块验证迁移流程；阶段 3/4 聚焦框架抽象与 CLI 交付。
 - 完成后可为团队提供标准化 CRUD Skeleton，加速新插件启动，同时保留向真实生产实现升级的明确路径。
+
+## 8. 2025-11 实施回填
+- **Phase 1**：Router `Param/Query/BindJSON` 已上线并通过单测覆盖；响应助手输出 `{success,data,message,error,timestamp,request_id}`，`RequestID/TenantContext` 中间件默认读取 `X-Tenant-ID`，保持 Standalone 兼容。  
+- **Phase 2**：Skeleton Templates 模块提供内存仓储（线程安全 `map[tenantID]map[id]*Template`），`WithTenantTx` 模拟 Constitution 中的 `BeginTenantTx` 语义，所有 CRUD 入口均在服务层复用。  
+- **Phase 3**：前端迁移完成，`useTemplateApi` 仅演示如何基于 `@powerx-plugin/framework-client` 封装业务 API，Layer StarterPages 自动注册 CRUD 页面与菜单。  
+- **Phase 4**：CLI 模板与 Skeleton 同步，新增对 Vue `{{ }}` 的转义处理，`./bin/px-plugin init com.powerx.demo` 可直接生成可运行骨架并写入 contracts。  
+- **Phase 5/6（进行中）**：Quickstart/Standalone 文档已补充 CRUD/延迟校验说明；最终延迟统计与 CHANGELOG 汇总将在性能测试完成后回填。  
+- **已知限制**：仍为内存数据源、权限校验返回 501，需在后续引导文档中强调；多租户延迟数据需通过 `curl -w` 按阶段持续采集。

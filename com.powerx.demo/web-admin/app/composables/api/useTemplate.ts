@@ -1,0 +1,41 @@
+import { usePluginApi } from '@powerx-plugin/framework-client'
+
+export interface Template {
+  id: number
+  tenant_id: number
+  name: string
+  description: string
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Page<T> {
+  list: T
+  page_index: number
+  page_size: number
+  total: number
+}
+
+export interface ListResponse {
+  success: boolean
+  data: Page<Template[]>
+}
+
+export function useTemplateApi() {
+  const api = usePluginApi({ pluginId: 'com.powerx.demo' })
+
+  const listTemplates = () => api.get<ListResponse>('/templates')
+  const getTemplate = (id: number | string) => api.get(`/templates/${id}`)
+  const createTemplate = (payload: Partial<Template>) => api.post('/templates', payload)
+  const updateTemplate = (id: number | string, payload: Partial<Template>) => api.put(`/templates/${id}`, payload)
+  const deleteTemplate = (id: number | string) => api.delete(`/templates/${id}`)
+
+  return {
+    listTemplates,
+    getTemplate,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate
+  }
+}

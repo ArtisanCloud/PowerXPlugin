@@ -1,0 +1,77 @@
+<template>
+  <UModal v-model="visible">
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ print "{{ title }}" }}</h3>
+          <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark" @click="close" />
+        </div>
+      </template>
+
+      <form class="space-y-4" @submit.prevent="submitForm">
+        <UFormGroup :label="$t('templates.form.name')" required>
+          <UInput v-model="form.name" placeholder="模板名称" />
+        </UFormGroup>
+
+        <UFormGroup :label="$t('templates.form.description')">
+          <UTextarea v-model="form.description" placeholder="模板描述" />
+        </UFormGroup>
+
+        <UFormGroup :label="$t('templates.form.content')" required>
+          <UTextarea v-model="form.content" placeholder="模板内容" />
+        </UFormGroup>
+
+        <div class="flex justify-end gap-2">
+          <UButton color="gray" variant="ghost" @click="close">
+            {{ print "{{ $t('common.cancel') }}" }}
+          </UButton>
+          <UButton type="submit" color="primary" :loading="loading">
+            {{ print "{{ submitLabel }}" }}
+          </UButton>
+        </div>
+      </form>
+    </UCard>
+  </UModal>
+</template>
+
+<script setup lang="ts">
+interface TemplateForm {
+  name: string
+  description: string
+  content: string
+}
+
+const props = defineProps<{
+  modelValue: boolean
+  title: string
+  submitLabel: string
+  initialValue: TemplateForm
+  loading?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'submit', value: TemplateForm): void
+}>()
+
+const visible = computed({
+  get: () => props.modelValue,
+  set: (val: boolean) => emit('update:modelValue', val)
+})
+
+const form = reactive<TemplateForm>({ ...props.initialValue })
+
+watch(
+  () => props.initialValue,
+  (val) => Object.assign(form, val),
+  { deep: true }
+)
+
+function close() {
+  visible.value = false
+}
+
+function submitForm() {
+  emit('submit', { ...form })
+}
+</script>

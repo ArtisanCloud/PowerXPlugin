@@ -1,0 +1,9 @@
+pluginId: com.powerx.demo
+name: Powerx Demo Plugin
+version: 0.1.0
+backend:
+  language: go
+  framework: go-gin
+frontend:
+  stack: nuxt
+  layer: '@powerx-plugin/framework-admin'

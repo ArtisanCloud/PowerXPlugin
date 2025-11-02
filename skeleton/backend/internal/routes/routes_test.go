@@ -52,10 +52,15 @@ type fakeContext struct {
 	status  int
 	payload any
 	ctx     context.Context
+	method  string
 }
 
 func newFakeContext(headers map[string]string, params map[string]string) *fakeContext {
-	return &fakeContext{headers: headers, params: params}
+	return &fakeContext{
+		headers: headers,
+		params:  params,
+		method:  http.MethodGet,
+	}
 }
 
 func (c *fakeContext) Param(name string) string {
@@ -83,6 +88,12 @@ func (c *fakeContext) SetHeader(name, value string) {
 		c.headers = make(map[string]string)
 	}
 	c.headers[name] = value
+}
+func (c *fakeContext) Method() string {
+	if c.method == "" {
+		return http.MethodGet
+	}
+	return c.method
 }
 func (c *fakeContext) Context() context.Context {
 	if c.ctx != nil {

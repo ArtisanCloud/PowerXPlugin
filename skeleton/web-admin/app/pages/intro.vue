@@ -2,11 +2,10 @@
   <UContainer class="py-12 space-y-10">
     <section class="space-y-4">
       <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">
-        PowerX Plugin Base 模板介绍
+        PowerX Sample
       </h1>
       <p class="text-gray-600 dark:text-gray-300">
-        Base 模板插件提供了一个轻量的 CRUD 示范，帮助团队快速理解如何在 PowerX 平台中构建自定义插件。
-        您可以使用模板功能为常见业务场景建立可复用的内容片段，加速初始化流程。
+        欢迎使用 PowerX 插件脚手架示例页面。该示例展示了如何在独立模式下快速搭建模板 CRUD、菜单导航与多语言体验。
       </p>
       <div class="grid gap-4 md:grid-cols-3">
         <UCard>

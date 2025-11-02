@@ -17,10 +17,25 @@ import (
 )
 
 func main() {
+	app, err := setupApp()
+	if err != nil {
+		log.Fatalf("setup app: %v", err)
+	}
+
+	go func() {
+		if err := app.Run(); err != nil {
+			log.Fatalf("run server: %v", err)
+		}
+	}()
+
+	waitForShutdown(app)
+}
+
+func setupApp() (*bootstrap.App, error) {
 	app := bootstrap.NewAppFromEnv()
 
 	if err := router.AttachHTTPServer(app); err != nil {
-		log.Fatalf("attach http server: %v", err)
+		return nil, err
 	}
 
 	if err := observability.InitMetrics(app); err != nil {
@@ -33,17 +48,11 @@ func main() {
 	router.RegisterFrameworkRoutes(app)
 	router.RegisterPluginRoutes(app, routes.Register)
 
-    if err := manifest.Register(app, manifestx.Plugin()); err != nil {
-        log.Fatalf("register manifest: %v", err)
-    }
+	if err := manifest.Register(app, manifestx.Plugin()); err != nil {
+		return nil, err
+	}
 
-	go func() {
-		if err := app.Run(); err != nil {
-			log.Fatalf("run server: %v", err)
-		}
-	}()
-
-	waitForShutdown(app)
+	return app, nil
 }
 
 func waitForShutdown(app *bootstrap.App) {

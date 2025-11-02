@@ -52,9 +52,8 @@ python3 -m json.tool docs/contracts/manifest.json > /dev/null
 python3 -m json.tool docs/contracts/rbac.json > /dev/null
 go build -o /tmp/px-plugin ./tools/cli/cmd/px-plugin
 
-# 完成 Phase 3 后，可改用脚本入口
-./scripts/testing/smoke.sh
-# make test-smoke
+# 推荐：使用聚合入口自动完成上述步骤
+make test-smoke         # 等价于 scripts/testing/smoke.sh，带超时与日志
 ```
 
 通过以上命令或脚本可初步确认后端逻辑、契约文件与 CLI 构建无异常（示例输出末尾会打印 `=== Smoke workflow complete in Ns ===`，可直接记录耗时）。任何一步失败请参考第 7 节排查。
@@ -71,6 +70,11 @@ go tool cover -func=coverage.out
 ```
 
 > 输出覆盖率后，可执行 `mkdir -p tmp && go tool cover -html=coverage.out -o tmp/coverage.html` 生成 HTML 报告。
+>
+> **覆盖率提示**  
+> - 目前框架层（`framework/backend/go/router`、`framework/backend/go/middleware` 等）覆盖率已超过 70%，`observability` 通过占位测试维持 100%。  
+> - Skeleton 侧 `internal/templates`、`internal/handler`、`internal/service` 已通过单元测试覆盖核心路径（>80%）。  
+> - `cmd/plugin` 亦提供了 `setupApp` 级别校验（≈30%），剩余 `internal/manifestx` 仍可考虑补充契约一致性测试。
 
 ### 4.2 前端 E2E
 
@@ -101,16 +105,21 @@ go tool cover -func=coverage.out
 ```bash
 PLAYWRIGHT_BASE_URL=http://localhost:3031 npx playwright test
 
-# 完成 Phase 4 后，可改用脚本入口
-./scripts/testing/regression.sh
-# make test-regression
+# 推荐：使用聚合入口自动完成构建与 E2E
+make test-regression    # 等价于 scripts/testing/regression.sh，含启动/清理
 ```
 
 5. 停止服务（Ctrl+C），若失败可在 `skeleton/web-admin/test-results/` 查看报告。脚本模式会输出 `=== Regression workflow complete in Ns ===` 并保留 `tmp/regression-backend.log` / `tmp/regression-frontend.log`。
 
-> 稳定性建议：确保 dev server 输出无 `PXAdminLayout` 等组件解析警告，再执行 Playwright。
+> 稳定性建议：确保 dev server 输出无 `PXAdminLayout` 等组件解析警告，再执行 Playwright。  
+> 回归脚本/Make 目标会自动：
+> 1. 运行 `make test-smoke`
+> 2. 启动样例后端（默认 `127.0.0.1:8078`，可用 `REGRESSION_BACKEND_HOST/PORT` 覆盖）
+> 3. 对 Nuxt 前端执行 `npm run lint`、`npm run build`，随后以 `npx nuxi preview` 启动预览服务（端口默认随机或取 `REGRESSION_FRONTEND_PORT`）
+> 4. 设置 `NUXT_PUBLIC_API_BASE` 指向上述后端并运行 Playwright（可用 `PLAYWRIGHT_BASE_URL` 覆盖）
+> 5. 将日志落地 `tmp/regression-backend.log` / `tmp/regression-frontend.log`，测试报告位于 `skeleton/web-admin/test-results/`
 >
-> 脚本版本会自动启动后端 `go run ./skeleton/backend/cmd/plugin` 与前端 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`，若未指定则自动选择空闲端口；随后等待 `http://127.0.0.1:8078/healthz` 与 `PLAYWRIGHT_BASE_URL` 可访问；相关日志保存在 `tmp/regression-backend.log` 与 `tmp/regression-frontend.log`。
+> 当前 `npm run lint` 仍输出 “Lint checks pending configuration”，配置 ESLint 规则后即可在聚合流程内自动执行真实 lint。
 
 ### 4.3 契约校验
 
@@ -161,8 +170,11 @@ rm -rf "$TMP_DIR"
 | 契约变更验证 | 参考 4.3 | 修改 `docs/contracts/**` 后必跑 |
 | CLI 模块改动 | 参考 4.4 | 确保 `px-plugin init` 无回归 |
 | 测试采纳率审计 | `./scripts/testing/audit-test-adoption.sh` | 统计最近提交是否新增测试 |
+| 综合回归 | `make test-regression` | 启动后端/前端并执行 Playwright 与覆盖率 |
 
-> 计划中的 `make`/`scripts` 聚合命令详见 `testing_strategy.md`，落实后可替换为单行入口。
+> 详细脚本说明参见 `scripts/testing/README.md`，可了解超时或端口覆盖的环境变量。
+>
+> 查看所有可用 Make 目标：`make help`。
 
 ---
 
@@ -357,9 +369,11 @@ rm -rf "$TMP_DIR"
 
 ## 9. 下一步建设
 
-- 在仓库新增 `scripts/` 目录与 Makefile 落地聚合命令
-- 将契约校验、CLI 生成和 Playwright 流程接入 CI/CD
-- 引入性能基准测试、测试仪表板等增强工具
+当前仓库已经提供 `scripts/testing/` 与按模块划分的 `make-files/`，后续仍有以下提升方向：
+
+- 将 `make test-smoke` / `make test-regression` 纳入 CI/CD，并在流水线中上传 Playwright 报告与覆盖率。
+- 为关键契约（Manifest / RBAC / OpenAPI）增加差异报警，接入 PR Gate。
+- 规划性能基准与长期指标可视化（如构建时长、测试通过率等），构建基础仪表板。
 
 如需对测试体系提出新需求或报告问题，请在仓库创建 Issue 或直接更新 `testing_strategy.md` 与本手册。
 

@@ -1,16 +1,28 @@
 {
   "common": {
+    "save": "Save",
     "cancel": "Cancel",
-    "confirm": "Confirm",
     "delete": "Delete",
     "edit": "Edit",
-    "appName": "PowerX Plugin Skeleton"
+    "add": "Add",
+    "search": "Search",
+    "loading": "Loading...",
+    "confirm": "Confirm",
+    "confirmation": "Confirmation",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "reset": "Reset",
+    "close": "Close",
+    "welcome": "Welcome",
+    "appName": "{{ .PluginName }}"
   },
   "navigation": {
     "intro": "Plugin Intro",
     "templates": "Templates",
     "templatesCrud": "Template CRUD",
-    "templatesDevelop": "Templates Develop Guide",
+    "templatesDevelop": "Development Guide",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -19,57 +31,70 @@
     "light": "Light Theme",
     "dark": "Dark Theme"
   },
-  "home": {
-    "title": "PowerX Plugin Skeleton",
-    "description": "Start with the intro guide to understand the layout and CRUD examples bundled with this skeleton.",
-    "viewIntro": "View Intro"
+  "intro": {
+    "title": "Plugin Starter Example",
+    "description": "Explore the PowerX plugin skeleton and quickly build reusable modules.",
+    "viewIntro": "View introduction"
   },
   "templates": {
     "overview": {
-      "title": "Templates Overview",
-      "description": "The skeleton showcases a lightweight template management flow you can extend.",
+      "title": "Template Overview",
+      "description": "Use templates to keep experiences consistent and ship faster with your team.",
       "cards": {
-        "create": "Create Templates",
-        "createDescription": "Learn how to create and persist templates with minimal setup.",
+        "create": "Create",
+        "createDescription": "Draft reusable templates that can be shared across flows and pages.",
         "automation": "Automation",
-        "automationDescription": "Explore how framework-client wires forms and data operations.",
-        "analytics": "Analytics",
-        "analyticsDescription": "Future enhancements can hook into metrics and logging capabilities."
+        "automationDescription": "Pair templates with automation to streamline rollout.",
+        "analytics": "Insights",
+        "analyticsDescription": "Track usage analytics and keep improving collaboration."
       }
-    },
-    "crud": {
-      "title": "Template Management",
-      "description": "Manage templates with list, create, edit, and delete actions.",
-      "create": "New Template",
-      "listTitle": "Templates",
-      "actions": {
-        "save": "Save",
-        "update": "Update"
-      },
-      "toast": {
-        "title": "Notification",
-        "created": "Template created",
-        "updated": "Template updated",
-        "deleted": "Template deleted"
-      },
-      "deleteTitle": "Delete Template",
-      "deleteConfirm": "Are you sure you want to delete {name}?"
     },
     "develop": {
       "title": "Development Guide",
-      "intro": "Use this skeleton structure as a reference when wiring real features.",
+      "intro": "Use the notes below to understand the directories and workflow before extending the module.",
       "description": "Understand the backend and frontend touch points for extending the template module.",
-      "structure": "Key files",
+      "structure": "Key directories",
       "steps": "Implementation steps",
-      "step1": "Define Template model and DTOs in backend/internal/templates.",
-      "step2": "Implement repository/service to enforce tenant isolation.",
-      "step3": "Expose HTTP APIs under /api/v1/templates with response envelopes.",
-      "step4": "Connect Nuxt pages to APIs and polish UX."
+      "step1": "Define the GORM model and migration for storing templates.",
+      "step2": "Expose repository and service layers to wrap business logic.",
+      "step3": "Register RBAC-protected HTTP APIs under /api/v1/templates.",
+      "step4": "Wire the Nuxt pages to the APIs and polish the user experience."
+    },
+    "crud": {
+      "title": "Template CRUD",
+      "description": "Create, update and delete sample templates to experience the full flow.",
+      "create": "New Template",
+      "formTitle": "Template Form",
+      "fields": {
+        "name": "Template Name",
+        "namePlaceholder": "Enter template name",
+        "description": "Description",
+        "descriptionPlaceholder": "Describe what this template is for",
+        "content": "Content",
+        "contentPlaceholder": "Write the template content"
+      },
+      "actions": {
+        "save": "Save Template",
+        "update": "Update Template"
+      },
+      "listTitle": "Templates",
+      "deleteTitle": "Delete Template",
+      "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
     },
     "form": {
+      "modalDescription": "Fill out the template details below.",
       "name": "Template Name",
       "description": "Description",
       "content": "Content"
     }
+  },
+  "message": {
+    "saveSuccess": "Saved successfully",
+    "deleteSuccess": "Deleted successfully",
+    "error": "Operation failed, please try again",
+    "confirmDelete": "Are you sure you want to delete? This action cannot be undone.",
+    "noData": "No data available",
+    "networkError": "Network error, please check your connection",
+    "templateCreated": "Template created successfully"
   }
 }

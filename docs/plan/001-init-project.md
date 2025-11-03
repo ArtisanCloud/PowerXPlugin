@@ -10,7 +10,7 @@
 
 ### Phase 0 · 仓库地基
 - 建立多模块结构：根目录添加 `go.work`，将 `framework/` 与 `tools/cli/` 注册为可独立构建的 Go Module。
-- 前端使用 `npm` workspaces：在 `sdk/workspace/` 准备 `package.json`（含 `workspaces` 声明）与 `package-lock.json`，统一锁定依赖版本。
+- 前端使用 `npm` workspaces：在 `framework/frontend/nuxt/` 下维护 Layer 包的 `package.json` 与锁定文件，统一管理依赖版本。
 - 配置基础 CI（Go Lint/Test、npm run build）和发布脚本，为后续版本化做准备。
 - 在 `docs/` 中写明“当前仅支持 Go + Nuxt 实现”，并将多语言扩展的需求与约束记录在单独的 backlog（如 `docs/backlog/multi-language.md`），待协议稳定后再启动。
 
@@ -26,8 +26,8 @@
 
 ### Phase 3 · 框架层拆分（以 Go + Nuxt 为首个实现）
 - 将 skeleton 中的公共装配、系统端点、Manifest/RBAC 逻辑沉淀到 `framework/backend/go`，通过根模块 `github.com/powerx-plugin/framework/...` 暴露为默认 Go 实现。
-- 将共享的前端 Layer 与客户端抽出到 `sdk/workspace/frontend/nuxt/framework-admin|client`。
-- 在文档中标注“未来可新增 `framework/backend/<lang>`、`sdk/workspace/frontend/<stack>`”。
+- 将共享的前端 Layer 与客户端抽出到 `framework/frontend/nuxt/framework-admin|client`。
+- 在文档中标注“未来可新增 `framework/backend/<lang>`、`framework/frontend/<stack>`”。
 
 ### Phase 4 · Scaffold 模板与 CLI 扩展
 - （进行中）研究 Base 插件的目录命名、配置文件，编写 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web/nuxt`，确保能渲染出 Phase 2 中定义的 Skeleton。
@@ -40,7 +40,7 @@
 - 使用全新目录执行 `px-plugin init <plugin-id>`（默认生成 Starter UI），与现有 Base 插件做差异对比，确认模板覆盖度。
 - 在 `examples/starter/` 保存 CLI 生成物，并记录多语言扩展的待办清单（而非完整指引），等实际实现到位后再回填案例。
 - 完成版本化发布：Go Module 打 Tag，npm 包发布；同时在 `docs/` 记录扩展协议、语言适配指南。CLI 在 Release 中提供编译好的 `px-plugin` 二进制（macOS/Linux/Windows），并生成安装脚本或 Homebrew/apt 仓库元数据。
-- （待自动化）提供脚本或 CI 任务，同步更新 `sdk/workspace` 中各 npm 包的版本号、生成 `CHANGELOG`，并回写脚手架模板的依赖锁定，降低多包发布的人工成本。
+- （待自动化）提供脚本或 CI 任务，同步更新 `framework/frontend/nuxt` 中各 npm 包的版本号、生成 `CHANGELOG`，并回写脚手架模板的依赖锁定，降低多包发布的人工成本。
 
 ### 阶段性检查项
 - [ ] skeleton 可独立运行，提供健康检查与示例 API。
@@ -74,7 +74,7 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
 │  ├─ go.mod                                 # module github.com/powerx-plugin/framework（默认 Go 实现的 import path）
 │  └─ README.md                              # 协议文档索引（Manifest/RBAC/Health 等），记录多语言扩展指引
 │
-├─ sdk/workspace/                            # [前端框架包] 被插件前端引用
+├─ framework/frontend/nuxt/                  # 前端运行时 Layer（admin/client）
 │  ├─ package.json                           # "workspaces": ["frontend/*"]
 │  └─ frontend/
 │     ├─ nuxt/
@@ -502,7 +502,7 @@ func Report(app any /* or a dedicated interface */, perms []Permission) error
 
 ## 1) `@powerx-plugin/framework-admin`
 
-> 位置：`sdk/workspace/frontend/nuxt/framework-admin`
+> 位置：`framework/frontend/nuxt/framework-admin`
 
 **目录**
 
@@ -608,7 +608,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
 ## 2) `@powerx-plugin/framework-client`
 
-> 位置：`sdk/workspace/frontend/nuxt/framework-client`
+> 位置：`framework/frontend/nuxt/framework-client`
 
 **目录**
 

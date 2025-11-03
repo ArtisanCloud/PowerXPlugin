@@ -88,54 +88,61 @@
           </div>
         </div>
       </div>
+
+      
     </nav>
   </aside>
 </template>
 
 <script setup lang="ts">
-const { t } = useI18n()
-const route = useRoute()
+const { t } = useI18n();
+const route = useRoute();
 
-const showTemplatesMenu = ref(true)
+const showTemplatesMenu = ref(true);
 
 const normalizePath = (value: string) => {
-  if (!value) return '/'
-  const trimmed = value.trim()
-  if (!trimmed) return '/'
-  if (trimmed !== '/' && trimmed.endsWith('/')) {
-    return trimmed.replace(/\/+$, '')
+  if (!value) {
+    return "/";
   }
-  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
-}
+  if (value !== "/" && value.endsWith("/")) {
+    return value.replace(/\/+$/, "");
+  }
+  return value;
+};
 
 const isExactActive = (target: string) => {
-  const current = normalizePath(route.path)
-  const normalizedTarget = normalizePath(target)
-  if (normalizedTarget === '/') {
-    return current === '/'
+  const current = normalizePath(route.path);
+  const normalizedTarget = normalizePath(target);
+
+  if (normalizedTarget === "/") {
+    return current === "/";
   }
-  return current === normalizedTarget
-}
+
+  return current === normalizedTarget;
+};
 
 const isGroupActive = (prefixes: string | string[]) => {
-  const current = normalizePath(route.path)
-  const list = Array.isArray(prefixes) ? prefixes : [prefixes]
+  const current = normalizePath(route.path);
+  const list = Array.isArray(prefixes) ? prefixes : [prefixes];
+
   return list.some((prefix) => {
-    const normalized = normalizePath(prefix)
-    return current === normalized || current.startsWith(`${normalized}/`)
-  })
-}
+    const normalizedPrefix = normalizePath(prefix);
+    return (
+      current === normalizedPrefix || current.startsWith(`${normalizedPrefix}/`)
+    );
+  });
+};
 
 const toggleTemplatesMenu = () => {
-  showTemplatesMenu.value = !showTemplatesMenu.value
-}
+  showTemplatesMenu.value = !showTemplatesMenu.value;
+};
 
 watch(
   () => route.path,
   (newPath) => {
-    if (newPath.startsWith('/templates')) {
-      showTemplatesMenu.value = true
+    if (newPath.startsWith("/templates")) {
+      showTemplatesMenu.value = true;
     }
   }
-)
+);
 </script>

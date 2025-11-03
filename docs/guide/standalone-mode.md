@@ -25,18 +25,17 @@ go work sync
 
 cd framework
 go mod tidy -e
+npm --prefix frontend/nuxt/framework-admin install
+npm --prefix frontend/nuxt/framework-client install
 cd ../tools/cli
 go mod tidy -e
 cd ..
-
-cd sdk/workspace
-npm install
 ```
 
 执行完成后，请确认：
 
 - `go.work` 中包含 `use ./framework` 与 `use ./tools/cli`
-- `sdk/workspace/package.json` 的 `workspaces` 指向 `frontend/nuxt/*`
+- `framework/frontend/nuxt/framework-admin|framework-client` 已完成 `npm install`
 - 两个 Go 模块（`framework/` 与 `tools/cli/`）的依赖已整理完成
 
 ## Step 2. 启动后端（Standalone）

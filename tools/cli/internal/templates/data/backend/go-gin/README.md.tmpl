@@ -1,8 +1,8 @@
-# {{ .PluginName }} Backend
+# Skeleton Backend
 
-该目录包含 `{{ .PluginID }}` 插件的后端示例：
+该目录提供最小可运行的 PowerX 插件后端示例：
 
-1. 在仓库根目录执行 `go work sync`（如适用），并保证 `github.com/powerx-plugin/framework` 可被下载或通过 replace 指向本地。
+1. 确保已在仓库根目录执行 `go work sync`。
 2. 切换到本目录并运行：
 
    ```bash
@@ -12,7 +12,19 @@
 3. 验证接口：
 
    ```bash
-   curl http://localhost:8077/api/v1/ping
+   curl http://localhost:8078/api/v1/ping
    ```
 
-更多路由与业务逻辑可在 `internal/` 目录扩展。
+4. 模板 CRUD 示例（Tenant 默认为 1，可通过 `X-Tenant-ID` 覆盖）：
+
+   ```bash
+   # 创建
+   curl -X POST http://localhost:8078/api/v1/templates \
+     -H 'Content-Type: application/json' \
+     -d '{"name":"Demo","description":"From skeleton","content":"Hello"}'
+
+   # 查询列表
+   curl http://localhost:8078/api/v1/templates
+   ```
+
+Skeleton 内部使用内存仓储模拟 constitution 约束（仓储内嵌 BaseRepository 语义、多租户隔离、`SET LOCAL app.tenant_id`），实际接入数据库时可直接替换 `internal/templates` 包中的实现。

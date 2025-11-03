@@ -2,7 +2,8 @@
   "name": "powerxplugin-monorepo",
   "private": true,
   "workspaces": [
-    "sdk/workspace"
+    "framework/frontend/nuxt/framework-admin",
+    "framework/frontend/nuxt/framework-client"
   ],
   "scripts": {
     "lint": "npm --workspaces --if-present run lint && npm --prefix skeleton/web-admin run lint",

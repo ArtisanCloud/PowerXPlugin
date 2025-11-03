@@ -36,7 +36,7 @@
 - [x] T007 [US1] 新增 JSON Response 助手（含 timestamp/request_id）于 framework/backend/go/router/response.go
 - [x] T008 [P] [US1] 实作 RequestID 中间件于 framework/backend/go/middleware/request_id.go
 - [x] T009 [P] [US1] 实作 Tenant Context 中间件于 framework/backend/go/middleware/tenant_context.go
-- [x] T010 [US1] 为 usePluginApi 补充 put/delete 能力于 sdk/workspace/frontend/nuxt/framework-client/api.ts
+- [x] T010 [US1] 为 usePluginApi 补充 put/delete 能力于 framework/frontend/nuxt/framework-client/api.ts
 - [x] T011 [US1] 编写 Router 与中间件单元测试于 framework/backend/go/router/router_test.go
 - [x] T012 [US1] 更新框架示例或文档注释以引用新助手于 framework/backend/go/router/doc.go
 - [x] T013 [US1] 评估并创建必要的 BaseRepository 内存适配层于 framework/backend/go/internal/memory_repository.go（如 Skeleton 需复用）
@@ -80,7 +80,7 @@
 - [x] T025 [US3] 迁移 Templates 列表与 CRUD 页面至 skeleton/web-admin/app/pages/templates/
 - [x] T026 [P] [US3] 迁移模态/确认/通知组件至 skeleton/web-admin/app/components/
 - [x] T027 [US3] 创建 useTemplateApi 示例至 skeleton/web-admin/app/composables/api/useTemplateApi.ts
-- [x] T028 [US3] 扩展 framework-admin Layer starterPages 逻辑于 sdk/workspace/frontend/nuxt/framework-admin/layer/nuxt.config.ts
+- [x] T028 [US3] 扩展 framework-admin Layer starterPages 逻辑于 framework/frontend/nuxt/framework-admin/layer/nuxt.config.ts
 - [x] T029 [US3] 同步 scaffold/backend 与 scaffold/web 模板以输出新 Skeleton 于 scaffold/templates/
 - [x] T030 [US3] 验证并记录 `px-plugin init` 生成流程于 specs/003-base-plugin-migration/research.md
 

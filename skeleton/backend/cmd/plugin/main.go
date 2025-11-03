@@ -1,65 +1,221 @@
 package main
 
 import (
-	"log"
-	"net/http"
+	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	fwbootstrap "github.com/powerx-plugin/framework/backend/go/bootstrap"
 	"github.com/powerx-plugin/framework/backend/go/manifest"
-	"github.com/powerx-plugin/framework/backend/go/observability"
-	"github.com/powerx-plugin/framework/backend/go/router"
-
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/manifestx"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/routes"
+	fwrouter "github.com/powerx-plugin/framework/backend/go/router"
+	pluginbootstrap "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/bootstrap"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
+	dbpkg "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/db"
+	marketplacerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/plugin"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/grpc/server"
+	marketplacejobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/jobs/marketplace"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
+	manifestx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/manifestx"
+	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
+	opsmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/operations"
+	pluginrouter "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/router"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/server"
+	agent "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent"
+	marketplacesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"
+	recommendation "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/recommendation"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/utils"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
-	app, err := setupApp()
-	if err != nil {
-		log.Fatalf("setup app: %v", err)
+	rootCtx := context.Background()
+	ctx, cancel := context.WithCancel(rootCtx)
+	defer cancel()
+
+	if os.Getenv("CONFIG_PATH") == "" && os.Getenv("POWERX_PLUGIN_CONFIG_DIR") != "" {
+		os.Setenv("CONFIG_PATH", os.Getenv("POWERX_PLUGIN_CONFIG_DIR"))
 	}
 
+	// 加载配置
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("Failed to load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 初始化日志隐私掩码规则
+	masking := cfg.SecurityBaselineConfig().MaskingRules
+	if len(masking.PIIFields) > 0 {
+		placeholder := masking.LogRedaction.Placeholder
+		logger.ConfigurePrivacyMasker(masking.PIIFields, placeholder)
+	}
+
+	// ★ 在这里把 HTTP/GRPC 的占位符先解析掉（一定要在起服务之前）
+	//   - HTTP 用 PORT（由 PowerX 的 supervisor 注入）
+	cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
+
+	//   - gRPC 用 POWERX_GRPC_PORT（由 PowerX 的 Enable 阶段注入）
+	if cfg.GRPCServer != nil {
+		// 如果你的字段叫 Addr，就把下一行改成：cfg.GRPCServer.Addr = resolveDynamicAddr(cfg.GRPCServer.Addr, "POWERX_GRPC_PORT")
+		cfg.GRPCServer.Addr = utils.ResolveDynamicAddr(cfg.GRPCServer.Addr, "POWERX_GRPC_PORT")
+	}
+
+	// 初始化插件
+	queryDB, err := pluginbootstrap.BootstrapPlugin(ctx, cfg)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to bootstrap plugin")
+	}
+
+	// 在初始化 gRPC 客户端之前，尝试从本地数据库加载租户凭证（若存在），以便通过 STS 获取短期令牌
+	if cfg.GRPCUpstream != nil && cfg.GRPCUpstream.TenantID > 0 {
+		// 延迟依赖：仅当配置未提供 STS client 时，尝试 DB 加载；若配置已有，则优先生效
+		if cfg.GRPCUpstream.STSClientID == "" || cfg.GRPCUpstream.STSClientSecret == "" {
+			repo := repository.NewCredentialsRepository(queryDB)
+			svc := agent.NewCredentialService(cfg, repo)
+			if cid, sec, err := svc.LoadDecryptedCredentials(rootCtx, cfg.GRPCUpstream.TenantID, app.PluginID); err == nil {
+				cfg.GRPCUpstream.STSClientID = cid
+				cfg.GRPCUpstream.STSClientSecret = sec
+				logger.Info("Loaded STS credentials for tenant from DB")
+			} else {
+				logger.WithError(err).Warn("No DB-stored credentials found or failed to decrypt; will rely on config/env if provided")
+			}
+		}
+	}
+
+	// 初始化 PowerX gRPC Client 客户端
+	pxc := bootstrap.BootstrapGRPCClient(rootCtx, cfg.GRPCUpstream)
+
+	taxLogger := logger.WithField("component", "tax_provider_client")
+	taxClient, err := marketplacesvc.NewTaxProviderClient(cfg, nil, taxLogger)
+	if err != nil {
+		taxLogger.WithError(err).Warn("Tax provider client initialization failed")
+	}
+
+	var licenseCache marketplacesvc.LicenseCache
+	cacheCfg := cfg.LicenseCacheConfig()
+	cacheLogger := logger.WithField("component", "marketplace_license_cache")
+	if strings.EqualFold(strings.TrimSpace(cacheCfg.Provider), "redis") {
+		if lc, err := marketplacesvc.NewRedisLicenseCache(cacheCfg.RedisURL, cacheCfg.KeyPrefix, cacheLogger); err != nil {
+			cacheLogger.WithError(err).Warn("license cache initialization failed")
+		} else {
+			licenseCache = lc
+		}
+	}
+
+	deps := &app.Deps{
+		DB:                  queryDB,
+		Ctx:                 rootCtx,
+		PowerXClient:        pxc,
+		Config:              cfg,
+		TaxProviderClient:   taxClient,
+		MarketplaceBilling:  nil,
+		LicenseAuthority:    nil,
+		LicenseCache:        licenseCache,
+		OperationsMetrics:   opsmetrics.NewMetrics(),
+		AdminConsoleMetrics: adminmetrics.NewMetrics(),
+	}
+
+	listingRepo := marketplacerepo.NewListingRepository(queryDB)
+	licenseRepoGlobal := marketplacerepo.NewLicenseRepository(queryDB)
+	metricsProvider := recommendation.NewListingMetricsProvider(listingRepo)
+	syncJob := marketplacejobs.NewSyncJob(cfg, listingRepo, metricsProvider, logger.WithField("component", "marketplace_recommendation_sync"), listingRepo.ListTenantIDs)
+	renewalJob := marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantIDs, nil)
+
+	// 设置 gin engine 路由
+	r := pluginrouter.NewRouter(cfg, deps)
+	engine := r.Setup()
+
+	// 创建 gRPC 服务器（可选）
+	gs, err := server.NewGRPCServer(ctx, deps, cfg.GRPCServer)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to create gRPC server")
+	}
+
+	appCfg := &fwbootstrap.Config{
+		Listen:     cfg.Server.BindAddr,
+		Env:        cfg.Server.Mode,
+		Standalone: true,
+	}
+	fwApp := fwbootstrap.NewApp(appCfg)
+
+	if err := fwrouter.AttachHTTPServer(fwApp); err != nil {
+		logger.WithError(err).Fatal("Failed to attach HTTP server")
+	}
+	fwrouter.RegisterFrameworkRoutes(fwApp)
+	fwrouter.RegisterPluginRoutes(fwApp, func(r fwbootstrap.Router) {
+		server.RegisterGinRoutes(r, engine)
+	})
+
+	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
+		logger.WithError(err).Fatal("Failed to register manifest")
+	}
+
+	// 使用 errgroup 并发启动服务器
+	g, groupCtx := errgroup.WithContext(ctx)
+
+	if cfg.Marketplace == nil || cfg.Marketplace.Recommendation.Enabled {
+		g.Go(func() error {
+			syncJob.Run(groupCtx)
+			return nil
+		})
+	}
+	if renewalJob != nil {
+		g.Go(func() error {
+			renewalJob.Run(groupCtx)
+			return nil
+		})
+	}
+
+	g.Go(func() error {
+		logger.WithField("addr", cfg.Server.BindAddr).Info("Starting HTTP server...")
+		return fwApp.Run()
+	})
+
+	if gs != nil {
+		g.Go(func() error {
+			return gs.Serve(groupCtx)
+		})
+	}
+
+	// 等待中断信号
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// 在单独的 goroutine 中等待信号
 	go func() {
-		if err := app.Run(); err != nil {
-			log.Fatalf("run server: %v", err)
+		<-quit
+		logger.Info("Shutting down servers...")
+
+		cancel()
+
+		if err := fwApp.Shutdown(); err != nil {
+			logger.WithError(err).Error("HTTP server shutdown error")
+		} else {
+			logger.Info("HTTP server shutdown completed")
+		}
+
+		// 关闭数据库连接
+		if err := dbpkg.Close(); err != nil {
+			logger.WithError(err).Error("DB close error")
+		} else {
+			logger.Info("Database connection closed")
+		}
+
+		if gs != nil {
+			gs.GracefulStop()
 		}
 	}()
 
-	waitForShutdown(app)
-}
-
-func setupApp() (*bootstrap.App, error) {
-	app := bootstrap.NewAppFromEnv()
-
-	if err := router.AttachHTTPServer(app); err != nil {
-		return nil, err
+	// 等待服务器启动失败或优雅关闭
+	if err := g.Wait(); err != nil {
+		logger.WithError(err).Error("Server error")
+		os.Exit(1)
 	}
 
-	if err := observability.InitMetrics(app); err != nil {
-		log.Printf("init metrics: %v", err)
-	}
-	if err := observability.InitTracing(app); err != nil {
-		log.Printf("init tracing: %v", err)
-	}
-
-	router.RegisterFrameworkRoutes(app)
-	router.RegisterPluginRoutes(app, routes.Register)
-
-	if err := manifest.Register(app, manifestx.Plugin()); err != nil {
-		return nil, err
-	}
-
-	return app, nil
-}
-
-func waitForShutdown(app *bootstrap.App) {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
-	if err := app.Shutdown(); err != nil && err != http.ErrServerClosed {
-		log.Printf("shutdown: %v", err)
-	}
+	logger.Info("All servers shutdown completed")
 }

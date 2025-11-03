@@ -107,7 +107,7 @@ const normalizePath = (value: string) => {
   if (value !== "/" && value.endsWith("/")) {
     return value.replace(/\/+$/, "");
   }
-  return value;
+  return value.startsWith("/") ? value : `/${value}`;
 };
 
 const isExactActive = (target: string) => {

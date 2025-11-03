@@ -1,77 +1,125 @@
 <template>
-  <UModal v-model="visible">
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h3 class="text-lg font-medium text-gray-900 dark:text-white">{{ print "{{ title }}" }}</h3>
-          <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark" @click="close" />
-        </div>
-      </template>
+  <UModal
+    v-model:open="open"
+    :dismissible="true"
+    :modal="true"
+    :portal="true"
+    :title="title"
+    :description="resolvedDescription"
+    :ui="{ content: `w-[min(95vw,${contentMaxWidth})] max-h-[calc(100dvh-2rem)] overflow-hidden` }"
+  >
+    <template #body>
+      <form id="template-form" class="space-y-6 p-1" @submit.prevent="handleSubmit">
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <UFormField :label="$t('templates.form.name')" name="name" required>
+            <UInput
+              v-model="form.name"
+              class="w-full"
+              :ui="{ base: inputBaseClass }"
+              :disabled="loading"
+            />
+          </UFormField>
 
-      <form class="space-y-4" @submit.prevent="submitForm">
-        <UFormGroup :label="$t('templates.form.name')" required>
-          <UInput v-model="form.name" placeholder="模板名称" />
-        </UFormGroup>
+          <UFormField :label="$t('templates.form.description')" name="description" required class="sm:col-span-2">
+            <UTextarea
+              v-model="form.description"
+              :rows="3"
+              class="w-full"
+              :ui="{ base: inputBaseClass }"
+              :disabled="loading"
+            />
+          </UFormField>
 
-        <UFormGroup :label="$t('templates.form.description')">
-          <UTextarea v-model="form.description" placeholder="模板描述" />
-        </UFormGroup>
-
-        <UFormGroup :label="$t('templates.form.content')" required>
-          <UTextarea v-model="form.content" placeholder="模板内容" />
-        </UFormGroup>
-
-        <div class="flex justify-end gap-2">
-          <UButton color="gray" variant="ghost" @click="close">
-            {{ print "{{ $t('common.cancel') }}" }}
-          </UButton>
-          <UButton type="submit" color="primary" :loading="loading">
-            {{ print "{{ submitLabel }}" }}
-          </UButton>
+          <UFormField :label="$t('templates.form.content')" name="content" required class="sm:col-span-2">
+            <UTextarea
+              v-model="form.content"
+              :rows="8"
+              class="w-full"
+              :ui="{ base: inputBaseClass }"
+              :disabled="loading"
+            />
+          </UFormField>
         </div>
       </form>
-    </UCard>
+    </template>
+
+    <template #footer>
+      <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+        <UButton color="neutral" variant="outline" :disabled="loading" @click="close">
+          {{ print "{{ $t('common.cancel') }}" }}
+        </UButton>
+        <UButton type="submit" form="template-form" color="primary" :loading="loading">
+          {{ print "{{ submitLabel }}" }}
+        </UButton>
+      </div>
+    </template>
   </UModal>
 </template>
 
 <script setup lang="ts">
-interface TemplateForm {
+import { computed, reactive, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+type TemplateFormValue = {
   name: string
   description: string
   content: string
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: boolean
   title: string
   submitLabel: string
-  initialValue: TemplateForm
   loading?: boolean
-}>()
-
-const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void
-  (e: 'submit', value: TemplateForm): void
-}>()
-
-const visible = computed({
-  get: () => props.modelValue,
-  set: (val: boolean) => emit('update:modelValue', val)
+  initialValue?: Partial<TemplateFormValue>
+  contentMaxWidth?: string
+  fieldMinWidth?: string
+  description?: string
+}>(), {
+  loading: false,
+  initialValue: () => ({}),
+  contentMaxWidth: '56rem',
+  fieldMinWidth: '720px'
 })
 
-const form = reactive<TemplateForm>({ ...props.initialValue })
+const emit = defineEmits<{
+  (e: 'update:modelValue', v: boolean): void
+  (e: 'submit', v: TemplateFormValue): void
+}>()
 
-watch(
-  () => props.initialValue,
-  (val) => Object.assign(form, val),
-  { deep: true }
+const open = computed({
+  get: () => props.modelValue,
+  set: (v: boolean) => emit('update:modelValue', v)
+})
+
+const { t } = useI18n()
+
+const close = () => (open.value = false)
+
+const form = reactive<TemplateFormValue>({
+  name: '',
+  description: '',
+  content: ''
+})
+
+const inputBaseClass = computed(() => `min-w-[${props.fieldMinWidth}]`)
+
+const resolvedDescription = computed(
+  () => props.description ?? t('templates.form.modalDescription')
 )
 
-function close() {
-  visible.value = false
-}
+watch(
+  () => [props.initialValue, props.modelValue],
+  () => {
+    form.name = props.initialValue?.name ?? ''
+    form.description = props.initialValue?.description ?? ''
+    form.content = props.initialValue?.content ?? ''
+  },
+  { immediate: true, deep: true }
+)
 
-function submitForm() {
+const handleSubmit = () => {
+  if (!form.name || !form.description || !form.content) return
   emit('submit', { ...form })
 }
 </script>

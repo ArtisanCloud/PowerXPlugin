@@ -1,0 +1,16 @@
+<template>
+  <UApp>
+    <NuxtLoadingIndicator :throttle="150" />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+    <ConfirmDialog />
+  </UApp>
+</template>
+
+<script setup>
+useSeoMeta({
+  title: "{{ .PluginName }}",
+  description: "Template management starter for the PowerX platform",
+});
+</script>

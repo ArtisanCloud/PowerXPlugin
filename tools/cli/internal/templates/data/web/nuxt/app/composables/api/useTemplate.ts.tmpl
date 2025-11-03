@@ -1,37 +1,43 @@
-import { usePluginApi } from '@powerx-plugin/framework-client'
+import { apiGet, apiPost, apiPut, apiDel, useApiClient } from './_client'
+import type { ApiResponse, Page } from './_base'
 
 export interface Template {
   id: number
-  tenant_id: number
   name: string
   description: string
   content: string
-  created_at: string
-  updated_at: string
-}
-
-export interface Page<T> {
-  list: T
-  page_index: number
-  page_size: number
-  total: number
-}
-
-export interface ListResponse {
-  success: boolean
-  data: Page<Template[]>
+  created_at?: string
+  updated_at?: string
 }
 
 export function useTemplateApi() {
-  const api = usePluginApi({ pluginId: '{{ .PluginID }}' })
+  const { baseURL } = useApiClient()
 
-  const listTemplates = () => api.get<ListResponse>('/templates')
-  const getTemplate = (id: number | string) => api.get(`/templates/${id}`)
-  const createTemplate = (payload: Partial<Template>) => api.post('/templates', payload)
-  const updateTemplate = (id: number | string, payload: Partial<Template>) => api.put(`/templates/${id}`, payload)
-  const deleteTemplate = (id: number | string) => api.delete(`/templates/${id}`)
+  const listTemplates = (page = 1, page_size = 20, q = '', init?: any) =>
+    apiGet<ApiResponse<Page<Template>>>(
+      'templates',
+      {
+        page,
+        page_size,
+        q: q || undefined
+      },
+      init
+    )
+
+  const getTemplate = (id: number | string, init?: any) =>
+    apiGet<ApiResponse<Template>>(`templates/${id}`, undefined, init)
+
+  const createTemplate = (data: Partial<Template>, init?: any) =>
+    apiPost<ApiResponse<Template>>('templates', data, init)
+
+  const updateTemplate = (id: number | string, data: Partial<Template>, init?: any) =>
+    apiPut<ApiResponse<Template>>(`templates/${id}`, data, init)
+
+  const deleteTemplate = (id: number | string, init?: any) =>
+    apiDel<ApiResponse<{ ok: boolean }>>(`templates/${id}`, init)
 
   return {
+    baseURL,
     listTemplates,
     getTemplate,
     createTemplate,

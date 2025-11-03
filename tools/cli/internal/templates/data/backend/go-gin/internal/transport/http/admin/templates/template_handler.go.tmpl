@@ -1,0 +1,103 @@
+package templates
+
+import (
+	"errors"
+	"strconv"
+
+	"{{ .BackendModulePath }}/internal/contracts"
+	srvtemplates "{{ .BackendModulePath }}/internal/services/admin/templates"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+type TemplateHandler struct{ TemplateService *srvtemplates.TemplateService }
+
+func NewTemplateHandler(deps *app.Deps) *TemplateHandler {
+	return &TemplateHandler{TemplateService: srvtemplates.NewTemplateService(deps.DB)}
+}
+
+func (h *TemplateHandler) GetTemplates(c *gin.Context) {
+	var q TemplateListRequest
+	if err := c.ShouldBindQuery(&q); err != nil {
+		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+
+	res, err := h.TemplateService.List(c.Request.Context(), q.Q, q.Page, q.PageSize)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, res)
+}
+
+func (h *TemplateHandler) GetTemplate(c *gin.Context) {
+	id, err := parseUint64(c.Param("id"))
+	if err != nil {
+		contracts.ResponseBadRequest(c, "invalid id")
+		return
+	}
+	tpl, err := h.TemplateService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			contracts.ResponseNotFound(c, "not found: "+err.Error())
+		default:
+			contracts.ResponseInternalError(c, err)
+		}
+		return
+	}
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
+	var req CreateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	tpl, err := h.TemplateService.Create(c.Request.Context(), req.Name, req.Description, req.Content)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
+	id, err := parseUint64(c.Param("id"))
+	if err != nil {
+		contracts.ResponseBadRequest(c, "invalid id")
+		return
+	}
+	var req UpdateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	tpl, err := h.TemplateService.Update(c.Request.Context(), id, req.Name, req.Description, req.Content)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
+	id, err := parseUint64(c.Param("id"))
+	if err != nil {
+		contracts.ResponseBadRequest(c, "invalid id")
+		return
+	}
+	if err := h.TemplateService.Delete(c.Request.Context(), id); err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func parseUint64(s string) (uint64, error) {
+	u, err := strconv.ParseUint(s, 10, 64)
+	return uint64(u), err
+}

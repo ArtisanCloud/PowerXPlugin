@@ -9,8 +9,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@powerx-plugin/framework-admin": "file:../../sdk/workspace/frontend/nuxt/framework-admin",
-    "@powerx-plugin/framework-client": "file:../../sdk/workspace/frontend/nuxt/framework-client",
+    "@powerx-plugin/framework-admin": "file:../../framework/frontend/nuxt/framework-admin",
+    "@powerx-plugin/framework-client": "file:../../framework/frontend/nuxt/framework-client",
     "nuxt": "^4.2.0"
   },
   "devDependencies": {

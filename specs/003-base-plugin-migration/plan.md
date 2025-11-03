@@ -30,7 +30,7 @@ Deliver end-to-end parity between the existing Base plugin example and the Power
 framework/backend/go/
   router/                 # Path param, response helper, context upgrades
   middleware/             # RequestID, tenant context stubs
-sdk/workspace/frontend/nuxt/
+framework/frontend/nuxt/
   framework-client/       # add put/delete helpers
   framework-admin/        # starter page toggle, layout wiring
 skeleton/backend/

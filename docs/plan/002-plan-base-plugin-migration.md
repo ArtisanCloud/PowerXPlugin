@@ -2,7 +2,7 @@
 
 ## 1. 目标
 - 在 `PowerXPlugin` 仓库沉淀一套可直接运行的 Base 模板：后端 CRUD、前端 Starter 页面、`plugin.yaml`/菜单/RBAC 清单。
-- 将公共能力抽象到 `framework/` 与 `sdk/workspace/`，为 `px-plugin init` 输出一致的骨架。
+- 将公共能力抽象到 `framework/`（Go runtime + Nuxt Layer），为 `px-plugin init` 输出一致的骨架。
 - 严格遵守《docs/init-project.md》中 Phase 2~4 的约束（Go + Nuxt、无持久层、Skeleton/框架分离、模板可渲染）。
 
 ## 2. 可直接迁移的能力（✅ 高度可行）
@@ -53,7 +53,7 @@
 
 ## 6. 验证清单
 - `go test ./skeleton/...`、`go test ./framework/backend/go/...`
-- `npm install && npm run lint`（`skeleton/web-admin` 与 `sdk/workspace/frontend/nuxt/framework-admin`）
+- `npm install && npm run lint`（`skeleton/web-admin` 与 `framework/frontend/nuxt/framework-admin`）
 - Standalone 自测：`go run ./skeleton/backend/cmd/plugin` + `npm run dev`，浏览器验证 `/intro`、`/templates/crud` CRUD 流程。
 - CLI 输出验证（准备就绪后）：`px-plugin init com.powerx.demo --ui=starter`，确保产物可直接运行。
 

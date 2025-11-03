@@ -24,18 +24,18 @@ ci-all: ## Run full GitHub CI workflow locally via act
 	  echo "Error: act is not installed. See https://github.com/nektos/act" >&2; \
 	  exit 1; \
 	fi
-	act -W .github/workflows/ci.yml
+	act -W .github/workflows/ci.yml $(ACT_OPTS)
 
 ci-backend: ## Run only backend job from CI workflow via act
 	@if ! command -v act >/dev/null 2>&1; then \
 	  echo "Error: act is not installed. See https://github.com/nektos/act" >&2; \
 	  exit 1; \
 	fi
-	act -W .github/workflows/ci.yml -j backend
+	act -W .github/workflows/ci.yml -j backend $(ACT_OPTS)
 
 ci-frontend: ## Run only frontend job from CI workflow via act
 	@if ! command -v act >/dev/null 2>&1; then \
 	  echo "Error: act is not installed. See https://github.com/nektos/act" >&2; \
 	  exit 1; \
 	fi
-	act -W .github/workflows/ci.yml -j frontend
+	act -W .github/workflows/ci.yml -j frontend $(ACT_OPTS)

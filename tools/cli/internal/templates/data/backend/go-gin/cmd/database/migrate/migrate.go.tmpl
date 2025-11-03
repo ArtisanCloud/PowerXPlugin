@@ -1,0 +1,66 @@
+package migrate
+
+import (
+	"context"
+
+	"{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/domain/models"
+	adminconsoleModel "{{ .BackendModulePath }}/internal/domain/models/admin_console"
+	marketplaceModel "{{ .BackendModulePath }}/internal/domain/models/marketplace"
+	operationsModel "{{ .BackendModulePath }}/internal/domain/models/operations"
+	runtimeOpsModel "{{ .BackendModulePath }}/internal/domain/models/runtime_ops"
+	securityModel "{{ .BackendModulePath }}/internal/domain/models/security"
+	templateModel "{{ .BackendModulePath }}/internal/domain/models/template"
+	toolgrantModel "{{ .BackendModulePath }}/internal/domain/models/tool_grant"
+	"gorm.io/gorm"
+)
+
+// MigratePluginModels 只做 AutoMigrate（最小实现）
+func MigratePluginModels(ctx context.Context, db *gorm.DB) error {
+	return db.AutoMigrate(
+		&models.PluginCredential{},
+		&models.PluginTenantExt{},
+		&templateModel.Template{},
+		&marketplaceModel.Listing{},
+		&marketplaceModel.ListingAsset{},
+		&marketplaceModel.ListingVersion{},
+		&marketplaceModel.ChecklistRun{},
+		&marketplaceModel.ChecklistItem{},
+		&marketplaceModel.PricingPlan{},
+		&marketplaceModel.PlanTier{},
+		&marketplaceModel.License{},
+		&marketplaceModel.LicenseEvent{},
+		&marketplaceModel.TaxTransaction{},
+		&runtimeOpsModel.MCPSession{},
+		&runtimeOpsModel.RuntimeAuditEvent{},
+		&runtimeOpsModel.QuotaLedger{},
+		&runtimeOpsModel.MarketplaceOverage{},
+		&operationsModel.SupportChannel{},
+		&operationsModel.SupportTicket{},
+		&operationsModel.SupportTicketEvent{},
+		&operationsModel.ReadinessChecklistItem{},
+		&operationsModel.SLAProfile{},
+		&operationsModel.SLAAdjustment{},
+		&operationsModel.Incident{},
+		&operationsModel.IncidentTimelineEntry{},
+		&operationsModel.IncidentChecklistItem{},
+		&securityModel.BaselineChecklist{},
+		&securityModel.AuditReport{},
+		&toolgrantModel.Revocation{},
+		&toolgrantModel.UsageEvent{},
+		&adminconsoleModel.AuditEvent{},
+		&adminconsoleModel.ConfigChange{},
+		&adminconsoleModel.JobRun{},
+	)
+}
+
+func ResetDatabase(ctx context.Context, db *gorm.DB, cfg *config.DatabaseConfig) error {
+	// 如果你用 GORM，可以直接 drop 所有表
+	// 或者先获取表名，再循环 drop
+	// 这里举例简单版本：
+	err := db.Exec("DROP SCHEMA " + cfg.Schema + " CASCADE; CREATE SCHEMA " + cfg.Schema + ";").Error
+	if err != nil {
+		return err
+	}
+	return nil
+}

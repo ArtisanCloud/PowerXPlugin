@@ -10,7 +10,7 @@
 ## 快速开始
 
 1. 安装 Go 1.21+ 与 Node.js 18+。
-2. 执行 `go work sync`，并在 `sdk/workspace/` 目录运行 `npm install`。
+2. 执行 `go work sync`，并在 `framework/frontend/nuxt` 下的各 Nuxt layer 目录运行 `npm install`。
 3. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
 
 更多背景、约束与阶段性目标，请阅读 `docs/init-project.md` 以及规范中列出的契约文件。

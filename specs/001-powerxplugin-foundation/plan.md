@@ -6,7 +6,7 @@
 
 ## Summary
 
-落实 PowerXPlugin Phase 0~4 的地基建设：提供 `go.work` 管理的多模块 Go 框架、`sdk/workspace` 下的 Nuxt Layer/npm workspace、可运行的 skeleton 以及与之完全对齐的 CLI 模板与实验性 `package/dist/publish` 工作流；所有实现与契约、目录、示例必须同步 `docs/init-project.md` 的技术设计。
+落实 PowerXPlugin Phase 0~4 的地基建设：提供 `go.work` 管理的多模块 Go 框架、`framework/frontend/nuxt` 下的 Nuxt Layer/npm workspace、可运行的 skeleton 以及与之完全对齐的 CLI 模板与实验性 `package/dist/publish` 工作流；所有实现与契约、目录、示例必须同步 `docs/init-project.md` 的技术设计。
 
 ## Technical Context
 
@@ -61,7 +61,7 @@ PowerXPlugin/
 │     ├─ observability/                    # 指标 & Trace 集成
 │     ├─ tenancy/                          # 多租户上下文
 │     └─ shared/                           # 通用组件与工具
-├─ sdk/workspace/                          # Phase 3: Nuxt Layer + Client npm 包
+├─ framework/frontend/nuxt/                # Phase 3: Nuxt Layer + Client npm 包
 │  ├─ package.json (workspaces: frontend/nuxt/*)
 │  └─ frontend/nuxt/
 │     ├─ framework-admin/                  # @powerx-plugin/framework-admin

@@ -10,7 +10,7 @@
 **目的**: 建立仓库级基础配置，为多模块结构奠定基础。
 
 - [X] T001 创建 Go workspace 根文件 `go.work`，注册 `./framework` 与 `./tools/cli`
-- [X] T002 配置根级 `package.json` 以声明 npm workspaces（指向 `sdk/workspace`）
+- [X] T002 配置根级 `package.json` 以声明 npm workspaces（指向 `framework/frontend/nuxt/*`）
 - [X] T003 撰写仓库根 `README.md`，引用 quickstart 与技术设计文档
 
 ---
@@ -22,7 +22,7 @@
 - [X] T004 建立 `framework/backend/go/` 目录骨架（bootstrap/router/middleware 等子目录）
 - [X] T005 初始化 `framework/go.mod` 并声明模块 `github.com/powerx-plugin/framework`
 - [X] T006 初始化 `tools/cli/go.mod` 与 `tools/cli/cmd/` 目录（预留 init/package/dist/publish 命令）
-- [X] T007 配置 `sdk/workspace/package.json` 与 `frontend/nuxt/` 目录结构
+- [X] T007 配置 `framework/frontend/nuxt` 下的 package.json 与目录结构
 - [X] T008 创建 `skeleton/backend` 与 `skeleton/web-admin` 目录骨架（含 `cmd/plugin`、`internal/`、`app/`）
 - [X] T009 建立 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web/nuxt` 目录占位
 - [X] T010 添加入仓 `config/config.yaml.example` 作为环境配置模板
@@ -53,8 +53,8 @@
 - [X] T022 [US1] 配置 `skeleton/web-admin/nuxt.config.ts`，引入 `definePowerXAdminConfig`
 - [X] T023 [P] [US1] 创建 `skeleton/web-admin/app/pages/_p/com.powerx.sample/admin/index.vue` Starter 页面
 - [X] T024 [P] [US1] 添加 `skeleton/web-admin/app/components/powerx/PXNav.vue` 覆盖示例
-- [X] T025 [US1] 实现 `sdk/workspace/frontend/nuxt/framework-admin/index.ts` 与 Layer `nuxt.config.ts`
-- [X] T026 [P] [US1] 实现 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 与 `$fetch` 包装
+- [X] T025 [US1] 实现 `framework/frontend/nuxt/framework-admin/index.ts` 与 Layer `nuxt.config.ts`
+- [X] T026 [P] [US1] 实现 `framework/frontend/nuxt/framework-client/api.ts` 与 `$fetch` 包装
 - [X] T027 [US1] 验证 `go run ./skeleton/backend/cmd/plugin` 启动成功并对 `GET /api/v1/ping` 返回 200
 - [X] T028 [US1] 验证 `cd skeleton/web-admin && npm run dev` 可访问 Starter 页面并加载 PX 布局
 - [X] T029 [US1] 在 `examples/verify-external/` 构建临时插件工程，引用框架包并执行 `go build` / `npm run build` 以验证外部编译通过
@@ -76,7 +76,7 @@
 - [X] T032 [P] [US2] 更新 `docs/contracts/openapi.yaml`，记录 `/api/v1/ping` 与 `/api/v1/admin/manifest`
 - [X] T033 [US2] 在 `framework/backend/go/manifest/validator.go` 集成 Manifest Schema 校验
 - [X] T034 [P] [US2] 在 `framework/backend/go/rbac/validator.go` 集成 RBAC Schema 校验
-- [X] T035 [US2] 在 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 引入契约驱动的错误提示
+- [X] T035 [US2] 在 `framework/frontend/nuxt/framework-client/api.ts` 引入契约驱动的错误提示
 - [X] T036 [US2] 创建 `.github/workflows/ci.yml`，包含 `go test ./...`、`npm ci && npm run lint && npm run build`、契约 Schema 校验与文档生成扫描
 - [X] T037 [P] [US2] 撰写 `docs/contracts/README.md`，说明 Schema 更新流程与 CI 钩子
 

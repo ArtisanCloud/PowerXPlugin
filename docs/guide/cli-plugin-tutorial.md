@@ -84,8 +84,8 @@ cd ..
 # 管理端依赖
 cd web-admin
 # 暂无 npm 发布版本，请将 package.json 中的依赖改为本地路径：
-# "@powerx-plugin/framework-admin": "file:/path/to/PowerXPlugin/sdk/workspace/frontend/nuxt/framework-admin"
-# "@powerx-plugin/framework-client": "file:/path/to/PowerXPlugin/sdk/workspace/frontend/nuxt/framework-client"
+# "@powerx-plugin/framework-admin": "file:/path/to/PowerXPlugin/framework/frontend/nuxt/framework-admin"
+# "@powerx-plugin/framework-client": "file:/path/to/PowerXPlugin/framework/frontend/nuxt/framework-client"
 npm install
 cd ..
 ```

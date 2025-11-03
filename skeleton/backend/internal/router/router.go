@@ -1,0 +1,240 @@
+package router
+
+import (
+	"os"
+	"strings"
+	"time"
+
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http"
+	middleware2 "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Router 路由器结构
+type Router struct {
+	engine *gin.Engine
+	cfg    *config.Config
+	deps   *app.Deps
+}
+
+// New 创建新的路由器
+func NewRouter(cfg *config.Config, deps *app.Deps) *Router {
+	return &Router{
+		cfg:  cfg,
+		deps: deps,
+	}
+}
+
+// Setup 设置路由
+func (r *Router) Setup() *gin.Engine {
+	// 设置 Gin 模式
+	if r.cfg.IsProduction() {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		gin.SetMode(gin.DebugMode)
+	}
+
+	// 创建 Gin 引擎
+	r.engine = gin.New()
+
+	// 设置全局中间件
+	r.setupGlobalMiddleware()
+
+	// 设置业务路由
+	r.setupRoutes()
+
+	logger.Info("Router setup completed")
+	return r.engine
+}
+
+// setupGlobalMiddleware 设置全局中间件
+func (r *Router) setupGlobalMiddleware() {
+
+	// 健康检查（在其它中间件前放行 /healthz）
+	r.engine.Use(middleware.HealthCheck("/healthz"))
+
+	// 恢复
+	r.engine.Use(middleware.Recovery())
+
+	// 请求日志
+	r.engine.Use(middleware.RequestLogger())
+
+	// 安全头
+	r.engine.Use(middleware.SecurityHeaders())
+
+	// CORS
+	r.engine.Use(middleware.CORS())
+
+	// 请求 ID
+	r.engine.Use(middleware.RequestID())
+
+	// 超时（30 秒）
+	r.engine.Use(middleware.Timeout(30 * time.Second))
+
+	// 速率限制（每分钟最多 100 个请求）
+	r.engine.Use(middleware.RateLimiter(100, time.Minute))
+
+	// —— 仅在“不在 PowerX 宿主内”且“非生产”时，才启用 DevSwitch —— //
+	// 避免 PowerX 模式被 DevSwitch 绕过鉴权。
+	if !r.cfg.IsProduction() && os.Getenv("POWERX_PROXY") != "1" {
+		tenantID := int64(1)
+		if r.cfg.GRPCUpstream != nil && r.cfg.GRPCUpstream.TenantID > 0 {
+			tenantID = r.cfg.GRPCUpstream.TenantID
+		}
+		r.engine.Use(middleware2.DevSwitch(true, middleware.TenantContext{
+			TenantID:    tenantID,
+			UserID:      0,
+			Roles:       []string{"superadmin"},
+			Permissions: []string{"*"},
+		}))
+	}
+}
+
+// setupRoutes 设置路由
+func (r *Router) setupRoutes() {
+	// —— API 前缀：默认 /api/v1，并确保带前导斜杠 —— //
+	prefix := r.cfg.Server.APIPrefix
+	if strings.TrimSpace(prefix) == "" {
+		prefix = "/api/v1"
+	}
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+
+	// 鉴权/权限组件
+	jwtCfg := r.buildJWT()
+	rbacCfg := r.buildRBAC()
+
+	// 使用 API 注册器注册所有路由（保持你现有的注册逻辑）
+	apiRegistry := http.NewRegistry(r.engine, r.deps)
+
+	// API 分组 + 鉴权 + RBAC
+	gApi := r.engine.Group(prefix)
+	gApi.Use(middleware2.RequestTrace())
+	gApi.Use(middleware2.JWTAuth(jwtCfg))
+	gApi.Use(middleware2.RBAC(rbacCfg, nil, nil))
+	apiRegistry.RegisterAPIRoutes(gApi)
+	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
+
+	// 如需调试：打印已注册路由
+	// apiRegistry.PrintRegisteredRoutes()
+}
+
+// GetEngine 获取 Gin 引擎
+func (r *Router) GetEngine() *gin.Engine {
+	return r.engine
+}
+
+// injectRBACFromRegistry 将各模块声明的 RBAC 合并到配置中。
+func (r *Router) injectRBACFromRegistry(rbacCfg *middleware.RBACConfig, reg *http.Registry) {
+	if rbacCfg == nil || reg == nil {
+		return
+	}
+	if rbacCfg.DelegateToPowerX {
+		return
+	}
+	for route, perm := range reg.RBACMap() {
+		rbacCfg.RoutePermissions[route] = perm
+	}
+}
+
+// RegisterCustomRoutes 注册自定义路由
+func (r *Router) RegisterCustomRoutes(fn func(*gin.Engine)) {
+	if r.engine != nil && fn != nil {
+		fn(r.engine)
+	}
+}
+
+// RegisterMiddleware 注册中间件
+func (r *Router) RegisterMiddleware(m gin.HandlerFunc) {
+	if r.engine != nil {
+		r.engine.Use(m)
+	}
+}
+
+// —— 从配置构造 JWT 配置（自动区分 PowerX 宿主/本地直连） —— //
+func (r *Router) buildJWT() middleware.JWTAuthConfig {
+	inPX := os.Getenv("POWERX_PROXY") == "1"
+	if inPX {
+		// PowerX 网关严格模式：使用宿主注入的安全参数
+		pid := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID"))
+		aud := strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_AUDIENCE"))
+		if aud == "" && pid != "" {
+			aud = "plugin:" + pid
+		}
+		return middleware.JWTAuthConfig{
+			Issuer:             strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_ISSUER")),
+			AcceptAudiences:    []string{aud},
+			HMACSecret:         strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_SECRET")), // 可为空：只走签名上下文
+			ContextHMACSecret:  strings.TrimSpace(os.Getenv("POWERX_SECURITY_CTX_HMAC_SECRET")),
+			AllowSignedContext: true,  // 允许 X-PowerX-CTX / X-PowerX-CTX-SIG
+			Optional:           false, // 严格：失败即 401
+			ClockSkewSeconds:   60,
+			MaxCtxAgeSeconds:   300,
+		}
+	}
+
+	// 本地直连开发：可放宽（Optional 由配置/环境决定）
+	prod := r.cfg.IsProduction()
+	cfg := middleware.JWTAuthConfig{
+		Issuer:           "powerx",
+		AcceptAudiences:  []string{"powerx:admin", "powerx:api"},
+		HMACSecret:       "", // 如需本地校验 HS256，可在 config.Context.HMACSecret 配置
+		ClockSkewSeconds: 60,
+		// 非生产环境可以 Optional=true，这样配合 DevSwitch 可免鉴权调试
+		Optional:           !prod || (r.cfg.Server.DevMode),
+		AllowSignedContext: false, // 本地通常不走签名上下文；如要测试，置 true 并填 ContextHMACSecret
+		ContextHMACSecret:  "",
+		MaxCtxAgeSeconds:   300,
+	}
+
+	// 如果你的 config 里有上下文字段，这里做一次覆盖（可选）
+	if r.cfg.Context != nil {
+		if v := strings.TrimSpace(r.cfg.Context.HMACSecret); v != "" {
+			cfg.HMACSecret = v
+		}
+		// 若需要本地也测签名上下文，在 config.Context 里提供同一把 HMAC
+		if v := strings.TrimSpace(r.cfg.Context.HMACSecret); v != "" {
+			cfg.ContextHMACSecret = v
+		}
+	}
+
+	return cfg
+}
+
+// —— 从配置构造 RBAC 配置 —— //
+func (r *Router) buildRBAC() *middleware.RBACConfig {
+	delegate := shouldDelegateToPowerX()
+	issuer := strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_ISSUER"))
+	aud := strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_AUDIENCE"))
+	if aud == "" {
+		if pid := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")); pid != "" {
+			aud = "plugin:" + pid
+		}
+	}
+	return &middleware.RBACConfig{
+		Enabled:          true,
+		DefaultDeny:      false,
+		SuperAdminRoles:  []string{"superadmin", "admin"},
+		RoutePermissions: map[string]middleware.Permission{},
+		DelegateToPowerX: delegate,
+		PowerXIssuer:     issuer,
+		PowerXAudience:   aud,
+	}
+}
+
+func shouldDelegateToPowerX() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("POWERX_RBAC_DELEGATE")))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+	return os.Getenv("POWERX_PROXY") == "1"
+}

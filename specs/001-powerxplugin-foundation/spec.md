@@ -81,7 +81,7 @@
 
 ## 技术设计概览 *(对齐参考)*
 
-- **仓库结构**：与 `docs/init-project.md#powerxplugin-structure` 对齐，涵盖 `framework/`（共享后端能力）、`sdk/workspace/frontend/nuxt`（Nuxt Layer 与客户端）、`skeleton/backend|web-admin`（可运行示例）以及 `scaffold/templates/**`（CLI 渲染模板），要求 skeleton 与模板职责对应。
+- **仓库结构**：与 `docs/init-project.md#powerxplugin-structure` 对齐，涵盖 `framework/`（共享后端能力）、`framework/frontend/nuxt`（Nuxt Layer 与客户端）、`skeleton/backend|web-admin`（可运行示例）以及 `scaffold/templates/**`（CLI 渲染模板），要求 skeleton 与模板职责对应。
 - **后端框架契约**：`bootstrap.App` 暴露 `Listen`、`Env`、`Standalone` 等配置，并注入日志、数据库与可插拔路由；`router.RegisterFrameworkRoutes(app)` 负责 `/healthz` 等系统端点，`router.RegisterPluginRoutes(app, internal.Routes)` 挂载业务入口。`manifest.Register(app, manifestx.Plugin())` 与 `rbac.Report(app)` 负责清单及权限上报，详见 `docs/init-project.md#framework-signatures`。
 - **运行模式**：实现需兼容 Standalone（`STANDALONE=true`，直接 `go run ./cmd/plugin` 暴露接口）与宿主代理模式（宿主透传 `/_p/<plugin-id>/api/**`）。CLI 与 skeleton README 需说明两种模式的切换方式。
 - **前端 Nuxt Layer**：`@powerx-plugin/framework-admin` 以 Layer + Module 形式提供 `definePowerXAdminConfig`，统一设置基准路由 `/_p/<plugin-id>/admin`，注入鉴权/租户中间件，自动导入 `PX*` 组件并提供 Starter 页面；同路径同名文件可覆盖默认实现。`@powerx-plugin/framework-client` 提供 `usePluginApi` 访问代理后的 REST 接口。
@@ -94,7 +94,7 @@
 ### 功能性需求
 
 - **FR-001**: 仓库根目录必须提供 `go.work`，显式 `use ./framework` 与 `use ./tools/cli`，并确保这两个模块可单独执行 `go test ./...`。
-- **FR-002**: `sdk/workspace/` 必须配置 npm workspace（含 `package.json` 的 `workspaces` 声明与配套 `package-lock.json`），覆盖 `frontend/nuxt/framework-admin` 与 `frontend/nuxt/framework-client` 并支持分别发布。
+- **FR-002**: `framework/frontend/nuxt` 必须配置 npm workspace（含 `package.json` 与锁定文件），覆盖 `framework-admin` 与 `framework-client` Layer 并支持分别发布。
 - **FR-003**: `skeleton/backend` 与 `skeleton/web-admin` 必须提供最小可运行示例：后端可直接执行 `go run ./skeleton/backend/cmd/plugin` 暴露 `GET /api/v1/ping`，前端在 `skeleton/web-admin` 内执行 `npm run dev` 并默认挂载 `@powerx-plugin/framework-admin` Layer，且 README 记录 Go 1.21+/Node 18+ 依赖与启动指引。
 - **FR-004**: Scaffold 模板（`scaffold/templates/backend/go-gin`、`scaffold/templates/web/nuxt`）必须与 skeleton 结构、入口代码和配置保持一致，CLI 渲染后的项目无需重命名或手工补档即可运行上述命令。
 - **FR-005**: `px-plugin init` 必须嵌入模板与契约元数据，在无网络环境中仍可生成完整项目，并在生成结果中写入包含 `backend`/`frontend`/`version` 字段的 `plugin.yaml` 以及 README/TODO 提示。

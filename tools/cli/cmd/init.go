@@ -198,7 +198,7 @@ func detectFrameworkReplace(backendDir string) string {
 }
 
 func detectWorkspaceRefs(webDir string) (string, string) {
-	workspace := filepath.Join(webDir, "..", "..", "sdk", "workspace", "frontend", "nuxt")
+	workspace := filepath.Join(webDir, "..", "..", "framework", "frontend", "nuxt")
 	admin := filepath.Join(workspace, "framework-admin")
 	client := filepath.Join(workspace, "framework-client")
 

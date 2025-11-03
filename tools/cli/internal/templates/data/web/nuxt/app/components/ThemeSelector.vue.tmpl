@@ -1,31 +1,36 @@
 <template>
   <UDropdownMenu :items="dropdownItems" :popper="{ placement: 'bottom-end' }">
     <UButton
-      color="neutral"
       variant="ghost"
-      :icon="currentThemeIcon"
+      color="neutral"
       size="sm"
-      square
+      trailing-icon="i-heroicons-chevron-down-20-solid"
+      :icon="currentThemeIcon"
     />
   </UDropdownMenu>
 </template>
 
 <script setup lang="ts">
-const { theme, themes, setTheme } = useTheme()
-const { t } = useI18n()
+const { theme, themes, setTheme } = useTheme();
+const { t } = useI18n();
 
-const themeIcons: Record<string, string> = {
+const themeIcons = {
   light: 'i-heroicons-sun',
   dark: 'i-heroicons-moon',
-}
+};
 
-const currentThemeIcon = computed(() => themeIcons[theme.value] || 'i-heroicons-sun')
+const currentThemeIcon = computed(() => {
+  return themeIcons[theme.value as keyof typeof themeIcons] || 'i-heroicons-sun';
+});
 
 const dropdownItems = computed(() => [
   themes.map((themeOption) => ({
     label: t(`theme.${themeOption.value}`),
-    icon: themeIcons[themeOption.value] || 'i-heroicons-sun',
-    onSelect: () => setTheme(themeOption.value),
+    icon: themeIcons[themeOption.value as keyof typeof themeIcons],
+    onSelect: () => {
+      console.log('切换主题到:', themeOption.value);
+      setTheme(themeOption.value);
+    },
   })),
-])
+]);
 </script>

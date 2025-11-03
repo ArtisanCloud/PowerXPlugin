@@ -1,0 +1,67 @@
+export function resolveApiBase(pathname?: string): string {
+  const currentPath =
+    pathname ??
+    (typeof window !== "undefined" ? window.location.pathname : "") ??
+    ""
+
+  const segments = currentPath.split("/").filter(Boolean)
+  const pivot = segments.indexOf("_p")
+  if (pivot >= 0) {
+    const pluginId = segments[pivot + 1]
+    const scope = segments[pivot + 2]
+    if (pluginId && scope === "admin") {
+      return `/_p/${pluginId}/api/v1`
+    }
+  }
+
+  const cfg =
+    (globalThis as any).__NUXT__?.config?.public ??
+    (typeof useRuntimeConfig === "function"
+      ? (useRuntimeConfig() as any).public
+      : undefined)
+
+  return cfg?.apiBaseUrl || "http://localhost:8086/api/v1"
+}
+
+export function getAuthToken(): string | undefined {
+  if (typeof document !== "undefined") {
+    const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/)
+    if (match) return decodeURIComponent(match[1])
+  }
+  return undefined
+}
+
+export function getTenantId(): string | undefined {
+  if (typeof document !== "undefined") {
+    const match = document.cookie.match(/(?:^|;\s*)tenant_id=([^;]+)/)
+    if (match) return decodeURIComponent(match[1])
+  }
+  const cfg =
+    typeof useRuntimeConfig === "function" ? useRuntimeConfig() : ({} as any)
+  return (cfg.public as any)?.defaultTenantId
+}
+
+export interface Page<T> {
+  list: T[]
+  page_index: number
+  page_size: number
+  total: number
+  items?: T[]
+  page?: number
+  limit?: number
+}
+
+export interface ApiResponse<T = any> {
+  success: boolean
+  data: T
+  message?: string
+  code?: number
+}
+
+export interface ListQuery {
+  page?: number
+  page_size?: number
+  search?: string
+  sort?: string
+  order?: "asc" | "desc"
+}

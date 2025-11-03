@@ -21,7 +21,7 @@ const dropdownItems = computed(() => [
   locales.value.map((localeOption) => ({
     label: localeOption.name,
     onSelect: () => {
-      console.log('切换语言到:', localeOption.code);
+      console.log("切换语言到:", localeOption.code);
       setLocale(localeOption.code);
     },
   })),

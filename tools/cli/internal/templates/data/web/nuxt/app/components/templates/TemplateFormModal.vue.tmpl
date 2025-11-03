@@ -6,11 +6,15 @@
     :portal="true"
     :title="title"
     :description="resolvedDescription"
-    :ui="{ content: `w-[min(95vw,${contentMaxWidth})] max-h-[calc(100dvh-2rem)] overflow-hidden` }"
+    :ui="{
+      /* 加宽弹窗主体：默认 4xl，可按需在 props 覆盖 */
+      content: `w-[min(95vw,${contentMaxWidth})] max-h-[calc(100dvh-2rem)] overflow-hidden`
+    }"
   >
+    <!-- 触发器插槽可不放任何按钮，我们由父组件控制 open -->
     <template #body>
       <form id="template-form" class="space-y-6 p-1" @submit.prevent="handleSubmit">
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <UFormField :label="$t('templates.form.name')" name="name" required>
             <UInput
               v-model="form.name"
@@ -72,8 +76,11 @@ const props = withDefaults(defineProps<{
   submitLabel: string
   loading?: boolean
   initialValue?: Partial<TemplateFormValue>
+  /** 弹窗最大宽度（例如 '56rem' | '960px'），默认 56rem（~896px） */
   contentMaxWidth?: string
+  /** 输入框最小宽度（例如 '720px' | '48rem'），默认 720px */
   fieldMinWidth?: string
+  /** 模态框描述文案，默认使用多语言 templates.form.modalDescription */
   description?: string
 }>(), {
   loading: false,
@@ -87,6 +94,7 @@ const emit = defineEmits<{
   (e: 'submit', v: TemplateFormValue): void
 }>()
 
+/** 对齐 Nuxt UI：用 v-model:open 控制开关 */
 const open = computed({
   get: () => props.modelValue,
   set: (v: boolean) => emit('update:modelValue', v)
@@ -96,18 +104,22 @@ const { t } = useI18n()
 
 const close = () => (open.value = false)
 
+/** 表单模型 */
 const form = reactive<TemplateFormValue>({
   name: '',
   description: '',
   content: ''
 })
 
+/** 加宽输入：Tailwind 任意值类 */
 const inputBaseClass = computed(() => `min-w-[${props.fieldMinWidth}]`)
 
+/** 模态框描述满足无障碍要求 */
 const resolvedDescription = computed(
   () => props.description ?? t('templates.form.modalDescription')
 )
 
+/** 同步 initialValue（打开时刷新） */
 watch(
   () => [props.initialValue, props.modelValue],
   () => {
@@ -118,8 +130,13 @@ watch(
   { immediate: true, deep: true }
 )
 
+/** 提交 */
 const handleSubmit = () => {
   if (!form.name || !form.description || !form.content) return
   emit('submit', { ...form })
 }
 </script>
+
+<style scoped>
+/* 让主体区域在小屏也不溢出：body slot 已经有 max-h，card 默认样式足够 */
+</style>

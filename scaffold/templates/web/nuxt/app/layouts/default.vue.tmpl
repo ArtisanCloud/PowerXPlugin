@@ -18,10 +18,10 @@
 </template>
 
 <script setup>
-import { watch } from 'vue';
-import { setupHostBridgeAdapter } from '~/composables/useHostBridgeAdapter';
-import { useTheme } from '~/composables/useTheme';
-import { PLUGIN_ID, isPluginAdminPath } from '~/utils/powerx-bridge';
+import { watch } from "vue";
+import { setupHostBridgeAdapter } from "~/composables/useHostBridgeAdapter";
+import { useTheme } from "~/composables/useTheme";
+import { PLUGIN_ID, isPluginAdminPath } from "~/utils/powerx-bridge";
 
 // 获取运行时配置
 const runtimeConfig = useRuntimeConfig();
@@ -52,7 +52,7 @@ const showNavigation = computed(() => {
 
   // 如果没有设置环境变量，开发环境默认显示，生产环境默认隐藏
   if (envShowNav !== undefined) {
-    return envShowNav === 'true' || envShowNav === true;
+    return envShowNav === "true" || envShowNav === true;
   }
 
   // 默认：开发环境显示，生产环境隐藏
@@ -61,7 +61,7 @@ const showNavigation = computed(() => {
 
 // 主内容区样式
 const mainContentClass = computed(() => {
-  return showNavigation.value ? 'flex-1 p-6' : 'w-full p-6';
+  return showNavigation.value ? "flex-1 p-6" : "w-full p-6";
 });
 
 const getAdapterRegistry = (win) => {
@@ -85,13 +85,13 @@ const mountBridgeIfNeeded = () => {
     theme.initTheme?.();
   } catch {}
 
-  const pluginId = typeof route.query.pluginId === 'string' ? route.query.pluginId : PLUGIN_ID;
-  const instanceId = typeof route.query.instanceId === 'string' ? route.query.instanceId : route.fullPath;
+  const pluginId = typeof route.query.pluginId === "string" ? route.query.pluginId : PLUGIN_ID;
+  const instanceId = typeof route.query.instanceId === "string" ? route.query.instanceId : route.fullPath;
   const registry = getAdapterRegistry(win);
   const adapterKey = `${pluginId}::${instanceId}`;
 
   if (registry[adapterKey]) {
-    console.info('[Bridge][Plugin] adapter already mounted, reuse existing instance.', {
+    console.info("[Bridge][Plugin] adapter already mounted, reuse existing instance.", {
       pluginId,
       instanceId,
     });
@@ -104,11 +104,11 @@ const mountBridgeIfNeeded = () => {
   });
 
   bridge.start?.();
-  console.info('[Bridge][Plugin] adapter mounted.');
+  console.info("[Bridge][Plugin] adapter mounted.");
   registry[adapterKey] = { bridge };
   win.__PX_ADAPTER_BOUND__ = true;
   win.__PX_ADAPTER__ = registry[adapterKey];
-  console.info('[embedded] Host bridge adapter mounted.', { pluginId, instanceId });
+  console.info("[embedded] Host bridge adapter mounted.", { pluginId, instanceId });
 };
 
 if (import.meta.client) {

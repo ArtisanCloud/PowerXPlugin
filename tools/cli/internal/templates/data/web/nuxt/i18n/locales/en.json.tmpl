@@ -16,13 +16,13 @@
     "reset": "Reset",
     "close": "Close",
     "welcome": "Welcome",
-    "appName": "{{ .PluginName }}"
+    "appName": "PowerX Base"
   },
   "navigation": {
     "intro": "Plugin Intro",
     "templates": "Templates",
     "templatesCrud": "Template CRUD",
-    "templatesDevelop": "Development Guide",
+    "templatesDevelop": "Templates Develop Guide",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -32,44 +32,43 @@
     "dark": "Dark Theme"
   },
   "intro": {
-    "title": "Plugin Starter Example",
-    "description": "Explore the PowerX plugin skeleton and quickly build reusable modules.",
+    "title": "Base Template Plugin",
+    "description": "Explore the starter template plugin for PowerX and learn how to build reusable modules quickly.",
     "viewIntro": "View introduction"
   },
   "templates": {
     "overview": {
       "title": "Template Overview",
-      "description": "Use templates to keep experiences consistent and ship faster with your team.",
+      "description": "Templates help you bootstrap new experiences with consistent structures and reusable content blocks.",
       "cards": {
         "create": "Create",
-        "createDescription": "Draft reusable templates that can be shared across flows and pages.",
+        "createDescription": "Draft reusable templates that can be applied across multiple pages or workflows.",
         "automation": "Automation",
-        "automationDescription": "Pair templates with automation to streamline rollout.",
+        "automationDescription": "Combine templates with automation to accelerate onboarding and delivery.",
         "analytics": "Insights",
-        "analyticsDescription": "Track usage analytics and keep improving collaboration."
+        "analyticsDescription": "Measure how templates are used and optimise collaboration in your team."
       }
     },
     "develop": {
       "title": "Development Guide",
-      "intro": "Use the notes below to understand the directories and workflow before extending the module.",
       "description": "Understand the backend and frontend touch points for extending the template module.",
       "structure": "Key directories",
       "steps": "Implementation steps",
-      "step1": "Define the GORM model and migration for storing templates.",
-      "step2": "Expose repository and service layers to wrap business logic.",
-      "step3": "Register RBAC-protected HTTP APIs under /api/v1/templates.",
-      "step4": "Wire the Nuxt pages to the APIs and polish the user experience."
+      "step1": "Define the GORM model and migrations for template storage.",
+      "step2": "Expose repository and service layers for business logic.",
+      "step3": "Register HTTP APIs under /api/v1/templates with RBAC protection.",
+      "step4": "Connect the Nuxt pages to the APIs and polish the user experience."
     },
     "crud": {
       "title": "Template CRUD",
-      "description": "Create, update and delete sample templates to experience the full flow.",
+      "description": "Manage demo templates with create, update and delete operations.",
       "create": "New Template",
       "formTitle": "Template Form",
       "fields": {
         "name": "Template Name",
         "namePlaceholder": "Enter template name",
         "description": "Description",
-        "descriptionPlaceholder": "Describe what this template is for",
+        "descriptionPlaceholder": "Describe the purpose of this template",
         "content": "Content",
         "contentPlaceholder": "Write the template content"
       },
@@ -77,7 +76,7 @@
         "save": "Save Template",
         "update": "Update Template"
       },
-      "listTitle": "Templates",
+      "listTitle": "Existing Templates",
       "deleteTitle": "Delete Template",
       "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
     },

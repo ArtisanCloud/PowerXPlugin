@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
-	"{{ .BackendModulePath }}/internal/bootstrap"
+	fwbootstrap "github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/powerx-plugin/framework/backend/go/manifest"
+	fwrouter "github.com/powerx-plugin/framework/backend/go/router"
+	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
 	"{{ .BackendModulePath }}/internal/config"
 	dbpkg "{{ .BackendModulePath }}/internal/db"
 	marketplacerepo "{{ .BackendModulePath }}/internal/domain/repository/marketplace"
@@ -19,9 +19,11 @@ import (
 	"{{ .BackendModulePath }}/internal/grpc/server"
 	marketplacejobs "{{ .BackendModulePath }}/internal/jobs/marketplace"
 	"{{ .BackendModulePath }}/internal/logger"
+	manifestx "{{ .BackendModulePath }}/internal/manifestx"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
-	"{{ .BackendModulePath }}/internal/router"
+	pluginrouter "{{ .BackendModulePath }}/internal/router"
+	"{{ .BackendModulePath }}/internal/server"
 	agent "{{ .BackendModulePath }}/internal/services/agent"
 	marketplacesvc "{{ .BackendModulePath }}/internal/services/marketplace"
 	recommendation "{{ .BackendModulePath }}/internal/services/recommendation"
@@ -31,8 +33,9 @@ import (
 )
 
 func main() {
-
 	rootCtx := context.Background()
+	ctx, cancel := context.WithCancel(rootCtx)
+	defer cancel()
 
 	if os.Getenv("CONFIG_PATH") == "" && os.Getenv("POWERX_PLUGIN_CONFIG_DIR") != "" {
 		os.Setenv("CONFIG_PATH", os.Getenv("POWERX_PLUGIN_CONFIG_DIR"))
@@ -63,7 +66,7 @@ func main() {
 	}
 
 	// 初始化插件
-	queryDB, err := bootstrap.BootstrapPlugin(rootCtx, cfg)
+	queryDB, err := pluginbootstrap.BootstrapPlugin(ctx, cfg)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to bootstrap plugin")
 	}
@@ -124,56 +127,58 @@ func main() {
 	renewalJob := marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantIDs, nil)
 
 	// 设置 gin engine 路由
-	r := router.NewRouter(cfg, deps)
+	r := pluginrouter.NewRouter(cfg, deps)
 	engine := r.Setup()
 
 	// 创建 gRPC 服务器（可选）
-	gs, err := server.NewGRPCServer(rootCtx, deps, cfg.GRPCServer)
+	gs, err := server.NewGRPCServer(ctx, deps, cfg.GRPCServer)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to create gRPC server")
 	}
 
-	// 创建 HTTP 服务器
-	httpServer := &http.Server{
-		Addr:    cfg.Server.BindAddr, // ★ 这里已经是解析后的地址了
-		Handler: engine,
+	appCfg := &fwbootstrap.Config{
+		Listen:     cfg.Server.BindAddr,
+		Env:        cfg.Server.Mode,
+		Standalone: true,
+	}
+	fwApp := fwbootstrap.NewApp(appCfg)
 
-		// 超时配置
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       120 * time.Second,
+	if err := fwrouter.AttachHTTPServer(fwApp); err != nil {
+		logger.WithError(err).Fatal("Failed to attach HTTP server")
+	}
+	fwrouter.RegisterFrameworkRoutes(fwApp)
+	fwrouter.RegisterPluginRoutes(fwApp, func(r fwbootstrap.Router) {
+		server.RegisterGinRoutes(r, engine)
+	})
 
-		// 最大头部大小
-		MaxHeaderBytes: 1 << 20, // 1MB
+	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
+		logger.WithError(err).Fatal("Failed to register manifest")
 	}
 
 	// 使用 errgroup 并发启动服务器
-	g, ctx := errgroup.WithContext(rootCtx)
+	g, groupCtx := errgroup.WithContext(ctx)
 
 	if cfg.Marketplace == nil || cfg.Marketplace.Recommendation.Enabled {
 		g.Go(func() error {
-			syncJob.Run(ctx)
+			syncJob.Run(groupCtx)
 			return nil
 		})
 	}
 	if renewalJob != nil {
 		g.Go(func() error {
-			renewalJob.Run(ctx)
+			renewalJob.Run(groupCtx)
 			return nil
 		})
 	}
 
-	// 启动 HTTP 服务器
 	g.Go(func() error {
 		logger.WithField("addr", cfg.Server.BindAddr).Info("Starting HTTP server...")
-		return httpServer.ListenAndServe()
+		return fwApp.Run()
 	})
 
-	// 启动 gRPC 服务器（如果启用）
 	if gs != nil {
 		g.Go(func() error {
-			return gs.Serve(ctx)
+			return gs.Serve(groupCtx)
 		})
 	}
 
@@ -186,12 +191,10 @@ func main() {
 		<-quit
 		logger.Info("Shutting down servers...")
 
-		// 优雅关闭 HTTP 服务器
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
+		cancel()
 
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			logger.WithError(err).Error("HTTP server forced to shutdown")
+		if err := fwApp.Shutdown(); err != nil {
+			logger.WithError(err).Error("HTTP server shutdown error")
 		} else {
 			logger.Info("HTTP server shutdown completed")
 		}
@@ -203,11 +206,13 @@ func main() {
 			logger.Info("Database connection closed")
 		}
 
-		// gRPC 服务器会通过 context 取消自动关闭
+		if gs != nil {
+			gs.GracefulStop()
+		}
 	}()
 
 	// 等待服务器启动失败或优雅关闭
-	if err := g.Wait(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if err := g.Wait(); err != nil {
 		logger.WithError(err).Error("Server error")
 		os.Exit(1)
 	}

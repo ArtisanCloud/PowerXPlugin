@@ -3,7 +3,9 @@
     v-model:open="open"
     :title="dialogTitle"
     :description="resolvedDescription || undefined"
-    :ui="{ content: 'w-full max-w-md space-y-4' }"
+    :ui="{
+      content: 'w-full max-w-md space-y-4'
+    }"
   >
     <template #body>
       <slot>
@@ -38,8 +40,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useSlots } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { computed, useSlots } from "vue"
+import { useI18n } from "vue-i18n"
 
 const props = withDefaults(defineProps<{
   modelValue?: boolean
@@ -48,18 +50,18 @@ const props = withDefaults(defineProps<{
   message?: string
   confirmText?: string
   cancelText?: string
-  confirmColor?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info' | 'neutral'
+  confirmColor?: "primary" | "secondary" | "success" | "error" | "warning" | "info" | "neutral"
   loading?: boolean
 }>(), {
   modelValue: false,
-  confirmColor: 'primary',
-  loading: false
+  confirmColor: "primary",
+  loading: false,
 })
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void
-  (e: 'confirm'): void
-  (e: 'cancel'): void
+  (e: "update:modelValue", value: boolean): void
+  (e: "confirm"): void
+  (e: "cancel"): void
 }>()
 
 const { t } = useI18n()
@@ -67,24 +69,43 @@ const slots = useSlots()
 
 const open = computed({
   get: () => props.modelValue,
-  set: (value: boolean) => emit('update:modelValue', value)
+  set: (value: boolean) => emit("update:modelValue", value),
 })
 
-const dialogTitle = computed(() => props.title || t('common.confirmation'))
-const confirmText = computed(() => props.confirmText || t('common.confirm'))
-const cancelText = computed(() => props.cancelText || t('common.cancel'))
+const dialogTitle = computed(
+  () => props.title || t("common.confirmation")
+)
+
+const confirmText = computed(
+  () => props.confirmText || t("common.confirm")
+)
+
+const cancelText = computed(
+  () => props.cancelText || t("common.cancel")
+)
+
 const loading = computed(() => props.loading)
+
 const buttonColor = computed(() => props.confirmColor)
-const resolvedDescription = computed(() => props.description ?? '')
-const bodyMessage = computed(() => props.message ?? '')
-const showBodyMessage = computed(() => !slots.default && !!bodyMessage.value)
+
+const resolvedDescription = computed(() =>
+  props.description ?? ""
+)
+
+const bodyMessage = computed(() =>
+  props.message ?? ""
+)
+
+const showBodyMessage = computed(() =>
+  !slots.default && !!bodyMessage.value
+)
 
 const handleCancel = () => {
-  emit('cancel')
+  emit("cancel")
   open.value = false
 }
 
 const handleConfirm = () => {
-  emit('confirm')
+  emit("confirm")
 }
 </script>

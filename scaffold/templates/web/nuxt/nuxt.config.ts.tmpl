@@ -4,7 +4,7 @@ import { definePowerXAdminConfig } from '@powerx-plugin/framework-admin'
 const pluginId = '{{ .PluginID }}'
 const pluginAdminBase = `/_p/${pluginId}/admin/`
 const pluginApiBase = `/_p/${pluginId}/api/v1`
-const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8078/api/v1'
+const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8086/api/v1'
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
 const rawBridgeDebug = process.env.NUXT_PUBLIC_BRIDGE_DEBUG ?? process.env.BRIDGE_DEBUG
@@ -26,20 +26,20 @@ if (!INSIDE_POWERX) {
   try {
     const apiOrigin = new URL(localApiBase).origin
     registerCandidate(apiOrigin)
-    if (apiOrigin.includes('localhost')) {
-      registerCandidate(apiOrigin.replace('localhost', '127.0.0.1'))
+    if (apiOrigin.includes("localhost")) {
+      registerCandidate(apiOrigin.replace("localhost", "127.0.0.1"))
     }
   } catch {
-    // ignore URL parse errors
+    // Swallow URL parse errors; fall back to raw string
   }
 
-  registerCandidate('ws:')
-  registerCandidate('wss:')
+  registerCandidate("ws:")
+  registerCandidate("wss:")
 
   connectSources.push(...apiCandidates)
 }
 
-connectSources.push('https://api.iconify.design')
+connectSources.push("https://api.iconify.design")
 
 const powerx = definePowerXAdminConfig({
   pluginId,
@@ -154,7 +154,7 @@ export default defineNuxtConfig({
         ? {}
         : {
             '/api': {
-              target: 'http://localhost:8078',
+              target: 'http://localhost:8086',
               changeOrigin: true,
               ws: true
             },

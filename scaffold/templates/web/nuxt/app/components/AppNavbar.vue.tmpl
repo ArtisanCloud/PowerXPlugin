@@ -10,7 +10,7 @@
           class="w-6 h-6 mr-3 text-primary-600"
         />
         <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
-          {{ print "{{ $t('common.appName') }}" }}
+          {{ print "{{ $t("common.appName") }}" }}
         </h1>
       </div>
 
@@ -57,24 +57,24 @@ const { t } = useI18n();
 const userMenuItems = [
   [
     {
-      label: t('navigation.profile'),
+      label: t("navigation.profile"),
       avatar: {
-        src: 'https://avatars.githubusercontent.com/u/739984?v=4',
+        src: "https://avatars.githubusercontent.com/u/739984?v=4",
       },
-      click: () => navigateTo('/profile'),
+      click: () => navigateTo("/profile"),
     },
   ],
   [
     {
-      label: t('navigation.help'),
-      icon: 'i-heroicons-question-mark-circle',
-      click: () => navigateTo('/help'),
+      label: t("navigation.help"),
+      icon: "i-heroicons-question-mark-circle",
+      click: () => navigateTo("/help"),
     },
   ],
   [
     {
-      label: t('navigation.logout'),
-      icon: 'i-heroicons-arrow-right-on-rectangle',
+      label: t("navigation.logout"),
+      icon: "i-heroicons-arrow-right-on-rectangle",
       click: () => logout(),
     },
   ],
@@ -83,12 +83,12 @@ const userMenuItems = [
 // 切换通知
 const toggleNotifications = () => {
   // TODO: 实现通知面板切换
-  console.log('切换通知');
+  console.log("切换通知");
 };
 
 // 退出登录
 const logout = () => {
   // TODO: 实现退出登录功能
-  console.log('退出登录');
+  console.log("退出登录");
 };
 </script>

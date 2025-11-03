@@ -6,6 +6,18 @@ on:
   pull_request:
 
 jobs:
+  template-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Verify template sync
+        run: npm run sync:templates -- --check
+
   backend:
     runs-on: ubuntu-latest
     steps:

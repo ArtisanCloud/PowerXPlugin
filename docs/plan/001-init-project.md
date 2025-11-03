@@ -21,8 +21,16 @@
 
 ### Phase 2 · Skeleton 抽取（当前 Go + Nuxt 实现）
 - 以现有 Base 插件为蓝本，筛出最小可运行逻辑搬运到仓库内的 `skeleton/backend/` 与 `skeleton/web-admin/`，要求：`go run ./cmd/plugin` 以及 `npm run dev` 可直接启动。
+- 调整 skeleton 后，务必执行 `npm run sync:templates`（读取 `scripts/template-sync-config.yaml`）同步至 `scaffold/templates` 与 CLI 模板。
 - 在此基础上整理 `{plugin-skeleton}/backend/`、`{plugin-skeleton}/web-admin/` 模板（脚手架输出目录），默认生成 `GET /api/v1/ping` 等示例 API。
 - 模板内不强制业务分层，只保留 routes/handler/service/repo 示例，鼓励团队按 DDD 自行划分。
+
+#### Skeleton → 模板同步流程
+
+1. **修改 Skeleton**：所有后端/前端示例代码的真源均位于 `skeleton/` 下，请勿直接改 scaffold 或 CLI 模板。
+2. **执行同步脚本**：在仓库根目录运行 `npm run sync:templates`，脚本会读取 `scripts/template-sync-config.yaml` 并根据 `include`/`exclude`、替换规则写入 `scaffold/templates/**` 与 `tools/cli/internal/templates/**`。
+3. **提交前自检**：可执行 `npm run sync:templates -- --check` 确认模板已与 Skeleton 对齐；CI 会在 PR 中自动运行同名命令。
+4. **新增文件类型**：若 Skeleton 引入新的文件扩展名或需要额外的变量替换，请同步更新 `template-sync-config.yaml`，确保脚本覆盖范围完整。
 
 ### Phase 3 · 框架层拆分（以 Go + Nuxt 为首个实现）
 - 将 skeleton 中的公共装配、系统端点、Manifest/RBAC 逻辑沉淀到 `framework/backend/go`，通过根模块 `github.com/powerx-plugin/framework/...` 暴露为默认 Go 实现。

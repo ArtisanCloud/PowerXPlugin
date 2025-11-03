@@ -1,0 +1,74 @@
+mappings:
+  - name: web-admin
+    source: skeleton/web-admin
+    targets:
+      - path: scaffold/templates/web/nuxt
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/web/nuxt
+        suffix: .tmpl
+    include:
+      - "app/**/*"
+      - "i18n/**/*"
+      - "nuxt.config.ts"
+      - "package.json"
+    exclude:
+      - "**/__tests__/**"
+      - "tests/**"
+      - "node_modules/**"
+      - ".nuxt/**"
+      - "**/.DS_Store"
+    replacements:
+      - globs: ["**/*.vue"]
+        regex: "{{\\s*(?!print)(.*?)\\s*}}"
+        flags: "gs"
+        replace: "{{ print \"{{ $1 }}\" }}"
+      - globs: ["nuxt.config.ts", "app/**/*.ts", "i18n/**/*.json", "package.json"]
+        literal: "'com.powerx.sample'"
+        replace: "'{{ .PluginID }}'"
+      - globs: ["nuxt.config.ts", "app/**/*.ts", "package.json"]
+        literal: '"com.powerx.sample"'
+        replace: '"{{ .PluginID }}"'
+      - globs: ["**/*"]
+        literal: "PowerX Sample Plugin"
+        replace: "{{ .PluginName }}"
+      - globs: ["**/*"]
+        literal: "PowerX Demo Plugin"
+        replace: "{{ .PluginName }}"
+      - globs: ["package.json"]
+        literal: "\"name\": \"powerxplugin-skeleton-web-admin\""
+        replace: "\"name\": \"{{ .PluginSlug }}-web-admin\""
+      - globs: ["app/app.vue"]
+        literal: 'title: "PowerX Sample Plugin"'
+        replace: 'title: "{{ .PluginName }}"'
+      - globs: ["app/pages/_p/__plugin__/admin/index.vue"]
+        literal: "欢迎使用 PowerX Sample Plugin 插件脚手架示例页面。"
+        replace: "欢迎使用 {{ print \"{{ .PluginName }}\" }} 插件脚手架示例页面。"
+  - name: backend
+    source: skeleton/backend
+    targets:
+      - path: scaffold/templates/backend/go-gin
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/backend/go-gin
+        suffix: .tmpl
+    include:
+      - "cmd/**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "internal/**/*"
+    exclude:
+      - "**/*_test.go"
+      - "internal/**/README.md"
+    replacements:
+      - globs: ["**/*.go", "go.mod", "go.sum"]
+        regex: "github\\.com/powerx-plugin/powerxplugin/skeleton/backend"
+        flags: "g"
+        replace: "{{ .BackendModulePath }}"
+      - globs: ["go.mod"]
+        literal: "module github.com/powerx-plugin/powerxplugin/skeleton/backend"
+        replace: "module {{ .BackendModulePath }}"
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'Name: "PowerX Demo Plugin"'
+        replace: 'Name: "{{ .PluginName }}"'
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'ID: "com.powerx.plugin.demo"'
+        replace: 'ID: "{{ .PluginID }}"'

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"{{ .BackendModulePath }}/internal/config"
-	model "{{ .BackendModulePath }}/internal/domain/models/admin_console"
+	model "{{ .BackendModulePath }}/internal/entity/models/admin_console"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
 	consolesvc "{{ .BackendModulePath }}/internal/services/admin/console"
 	"{{ .BackendModulePath }}/internal/shared/app"
@@ -13,7 +13,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"{{ .BackendModulePath }}/internal/domain/models"
+	"{{ .BackendModulePath }}/internal/entity/models"
 )
 
 func setupConfigService(t *testing.T) (*consolesvc.ConfigService, *gorm.DB) {

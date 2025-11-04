@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/admin_console"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	consolesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/console"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
@@ -13,7 +13,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
 )
 
 func setupConfigService(t *testing.T) (*consolesvc.ConfigService, *gorm.DB) {

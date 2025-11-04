@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	authmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	service "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"

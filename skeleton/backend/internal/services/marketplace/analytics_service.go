@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/marketplace"
+	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
 	marketobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/marketplace"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"

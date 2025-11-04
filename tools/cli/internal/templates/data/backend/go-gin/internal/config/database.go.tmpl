@@ -4,10 +4,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
 type DatabaseConfig struct {
+	// Driver 指定数据库驱动：postgres、sqlite、memory（别名 sqlite 内存）
+	Driver string `yaml:"driver" json:"driver"`
 	// 连接串：postgres://user:pass@host:5432/dbname?sslmode=disable
 	DSN string `yaml:"dsn" json:"dsn"`
 	// 默认 schema（会在连接后执行 CREATE SCHEMA IF NOT EXISTS + SET search_path）
@@ -35,6 +38,12 @@ type DatabaseConfig struct {
 }
 
 func (c *DatabaseConfig) ApplyDefaults() {
+	driver := strings.ToLower(strings.TrimSpace(c.Driver))
+	if driver == "" {
+		driver = "memory"
+	}
+	c.Driver = driver
+
 	if c.MaxIdleConns == 0 {
 		c.MaxIdleConns = 10
 	}
@@ -50,10 +59,6 @@ func (c *DatabaseConfig) ApplyDefaults() {
 	if c.SlowThreshold == 0 {
 		c.SlowThreshold = 200 * time.Millisecond
 	}
-	// 默认更轻的协议，降低 CPU
-	if !c.PreferSimpleProtocol {
-		c.PreferSimpleProtocol = true
-	}
 	if c.LogLevel == "" {
 		c.LogLevel = "silent"
 	}
@@ -64,9 +69,35 @@ func (c *DatabaseConfig) ApplyDefaults() {
 	if c.DevMode && (c.LogLevel == "silent" || c.LogLevel == "error") {
 		c.LogLevel = "info"
 	}
+
+	switch c.Driver {
+	case "memory", "sqlite":
+		if c.DSN == "" {
+			// 使用 shared cache 便于多连接共享数据
+			c.DSN = "file:powerxplugin?mode=memory&cache=shared"
+		}
+		// SQLite/memory 模式不需要 schema 前缀，保持为空即可
+		c.Schema = strings.TrimSpace(c.Schema)
+	default:
+		// 默认更轻的协议，降低 CPU（Postgres 专用）
+		if !c.PreferSimpleProtocol {
+			c.PreferSimpleProtocol = true
+		}
+	}
 }
 
 func (c *DatabaseConfig) Validate() error {
+	switch c.Driver {
+	case "memory", "sqlite":
+		// 允许使用内存/SQLite，不强制 DSN/schema
+		return nil
+	case "", "postgres":
+		// 兼容旧配置：缺省驱动等同 postgres
+		c.Driver = "postgres"
+	default:
+		return fmt.Errorf("unsupported database driver: %s", c.Driver)
+	}
+
 	if c.DSN == "" {
 		return errors.New("database dsn is required")
 	}

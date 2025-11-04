@@ -3,9 +3,9 @@ package runtime_ops
 import (
 	"context"
 
-	model "{{ .BackendModulePath }}/internal/domain/models/runtime_ops"
-	repository "{{ .BackendModulePath }}/internal/domain/repository"
-	runtimeRepo "{{ .BackendModulePath }}/internal/domain/repository/runtime_ops"
+	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
+	repository "{{ .BackendModulePath }}/internal/entity/repository"
+	runtimeRepo "{{ .BackendModulePath }}/internal/entity/repository/runtime_ops"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	"gorm.io/gorm"
 )

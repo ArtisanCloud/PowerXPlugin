@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/marketplace"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	svc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"

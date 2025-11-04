@@ -14,16 +14,16 @@ import (
 	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
 	"{{ .BackendModulePath }}/internal/config"
 	dbpkg "{{ .BackendModulePath }}/internal/db"
-	marketplacerepo "{{ .BackendModulePath }}/internal/domain/repository/marketplace"
-	repository "{{ .BackendModulePath }}/internal/domain/repository/plugin"
-	"{{ .BackendModulePath }}/internal/grpc/server"
+	marketplacerepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
+	repository "{{ .BackendModulePath }}/internal/entity/repository/plugin"
+	grpcserver "{{ .BackendModulePath }}/internal/grpc/server"
 	marketplacejobs "{{ .BackendModulePath }}/internal/jobs/marketplace"
 	"{{ .BackendModulePath }}/internal/logger"
 	manifestx "{{ .BackendModulePath }}/internal/manifestx"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
 	pluginrouter "{{ .BackendModulePath }}/internal/router"
-	"{{ .BackendModulePath }}/internal/server"
+	httpserver "{{ .BackendModulePath }}/internal/server"
 	agent "{{ .BackendModulePath }}/internal/services/agent"
 	marketplacesvc "{{ .BackendModulePath }}/internal/services/marketplace"
 	recommendation "{{ .BackendModulePath }}/internal/services/recommendation"
@@ -88,7 +88,7 @@ func main() {
 	}
 
 	// 初始化 PowerX gRPC Client 客户端
-	pxc := bootstrap.BootstrapGRPCClient(rootCtx, cfg.GRPCUpstream)
+	pxc := pluginbootstrap.BootstrapGRPCClient(rootCtx, cfg.GRPCUpstream)
 
 	taxLogger := logger.WithField("component", "tax_provider_client")
 	taxClient, err := marketplacesvc.NewTaxProviderClient(cfg, nil, taxLogger)
@@ -123,15 +123,22 @@ func main() {
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)
 	licenseRepoGlobal := marketplacerepo.NewLicenseRepository(queryDB)
 	metricsProvider := recommendation.NewListingMetricsProvider(listingRepo)
-	syncJob := marketplacejobs.NewSyncJob(cfg, listingRepo, metricsProvider, logger.WithField("component", "marketplace_recommendation_sync"), listingRepo.ListTenantIDs)
-	renewalJob := marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantIDs, nil)
+	var syncJob *marketplacejobs.SyncJob
+	if cfg == nil || cfg.Marketplace == nil || cfg.Marketplace.Recommendation.Enabled {
+		syncJob = marketplacejobs.NewSyncJob(cfg, listingRepo, metricsProvider, logger.WithField("component", "marketplace_recommendation_sync"), listingRepo.ListTenantIDs)
+	}
+
+	var renewalJob *marketplacejobs.RenewalNotifier
+	if cfg != nil && cfg.LicenseReminderLead() > 0 {
+		renewalJob = marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantIDs, nil)
+	}
 
 	// 设置 gin engine 路由
 	r := pluginrouter.NewRouter(cfg, deps)
 	engine := r.Setup()
 
 	// 创建 gRPC 服务器（可选）
-	gs, err := server.NewGRPCServer(ctx, deps, cfg.GRPCServer)
+	gs, err := grpcserver.NewGRPCServer(ctx, deps, cfg.GRPCServer)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to create gRPC server")
 	}
@@ -148,7 +155,7 @@ func main() {
 	}
 	fwrouter.RegisterFrameworkRoutes(fwApp)
 	fwrouter.RegisterPluginRoutes(fwApp, func(r fwbootstrap.Router) {
-		server.RegisterGinRoutes(r, engine)
+		httpserver.RegisterGinRoutes(r, engine)
 	})
 
 	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
@@ -158,7 +165,7 @@ func main() {
 	// 使用 errgroup 并发启动服务器
 	g, groupCtx := errgroup.WithContext(ctx)
 
-	if cfg.Marketplace == nil || cfg.Marketplace.Recommendation.Enabled {
+	if syncJob != nil {
 		g.Go(func() error {
 			syncJob.Run(groupCtx)
 			return nil

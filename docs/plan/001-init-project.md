@@ -20,6 +20,23 @@
 - （待接入）在 `framework/` 与 `sdk/` 中以代码生成或运行时校验的方式消费这些 Schema，保证契约与实现的映射关系可追踪。
 
 ### Phase 2 · Skeleton 抽取（当前 Go + Nuxt 实现）
+
+
+#### 目录结构与分层说明
+
+骨架项目采用按领域划分的 DDD 架构：
+
+| 层级 | 目录 | 职责 | 示例 |
+|------|------|------|------|
+| 传输层 | `internal/transport/http` / `internal/transport/grpc` | 输入输出适配、协议转换 | `internal/transport/http/admin/templates/handler.go` |
+| 服务层 | `internal/services/{domain}` | 编排应用服务、跨聚合协作 | `internal/services/marketplace/listing_service.go` |
+| 领域层 | `internal/entity/models/{domain}` | 领域实体、值对象、聚合根 | `internal/entity/models/marketplace/listing.go` |
+| 基础设施层 | `internal/entity/repository/{domain}` | 仓储接口及默认实现 | `internal/entity/repository/marketplace/listing_repository.go` |
+
+- 插件清单在 `internal/manifestx/manifest.go`，负责对宿主上报菜单、权限等元数据。
+- 路由挂载顺序固定为 `RegisterFrameworkRoutes(app)` → `RegisterPluginRoutes(app, routes.Register)`，前者提供健康检查、系统端点，后者承载业务接口。
+- 新增聚合时需同时补齐实体/仓储/服务/传输四层，并在 `services/{domain}` 内调度业务流程。
+
 - 以现有 Base 插件为蓝本，筛出最小可运行逻辑搬运到仓库内的 `skeleton/backend/` 与 `skeleton/web-admin/`，要求：`go run ./cmd/plugin` 以及 `npm run dev` 可直接启动。
 - 调整 skeleton 后，务必执行 `npm run sync:templates`（读取 `scripts/template-sync-config.yaml`）同步至 `scaffold/templates` 与 CLI 模板。
 - 在此基础上整理 `{plugin-skeleton}/backend/`、`{plugin-skeleton}/web-admin/` 模板（脚手架输出目录），默认生成 `GET /api/v1/ping` 等示例 API。

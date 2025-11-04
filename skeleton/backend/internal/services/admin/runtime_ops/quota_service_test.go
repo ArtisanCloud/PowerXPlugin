@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/runtime_ops"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/runtime_ops"
 	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

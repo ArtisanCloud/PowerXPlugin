@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/config"
-	model "{{ .BackendModulePath }}/internal/domain/models/runtime_ops"
-	repo "{{ .BackendModulePath }}/internal/domain/repository"
-	runtimeRepo "{{ .BackendModulePath }}/internal/domain/repository/runtime_ops"
+	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
+	repo "{{ .BackendModulePath }}/internal/entity/repository"
+	runtimeRepo "{{ .BackendModulePath }}/internal/entity/repository/runtime_ops"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	"github.com/google/uuid"
 	"gorm.io/gorm"

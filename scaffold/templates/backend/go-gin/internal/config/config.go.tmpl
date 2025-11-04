@@ -382,6 +382,7 @@ func getDefaultConfig() *Config {
 			},
 		},
 		Database: &DatabaseConfig{
+			Driver: "memory",
 			Schema: "px_plugin_base",
 		},
 		Runtime: &RuntimeConfig{

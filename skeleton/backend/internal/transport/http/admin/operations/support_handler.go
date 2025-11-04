@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/operations"
+	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/operations"
 	operationsvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/operations"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"

@@ -3,7 +3,7 @@ package integration
 import (
 	"time"
 
-	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	"github.com/sirupsen/logrus"
 )

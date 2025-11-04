@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/config"
-	secmodel "{{ .BackendModulePath }}/internal/domain/models/security"
-	secrepo "{{ .BackendModulePath }}/internal/domain/repository/security"
+	secmodel "{{ .BackendModulePath }}/internal/entity/models/security"
+	secrepo "{{ .BackendModulePath }}/internal/entity/repository/security"
 	secobs "{{ .BackendModulePath }}/internal/observability/security"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"

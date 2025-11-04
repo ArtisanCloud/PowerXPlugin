@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
-	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
+	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	integrationService "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	"github.com/gin-gonic/gin"
 )

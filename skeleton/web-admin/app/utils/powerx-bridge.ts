@@ -1,7 +1,8 @@
-export const PLUGIN_ID = "com.powerx.sample";
+export const PLUGIN_ID = "com.powerx.plugin.base";
 export const PLUGIN_ADMIN_PREFIX = `/_p/${PLUGIN_ID}/admin`;
-const LEGACY_EMBEDDED_PREFIX = `${PLUGIN_ADMIN_PREFIX}/plugins/sample`;
-const LEGACY_LOCAL_PREFIX = "/plugins/sample";
+const PLUGIN_SLUG = PLUGIN_ID.split(".").pop() || PLUGIN_ID;
+const LEGACY_EMBEDDED_PREFIX = `${PLUGIN_ADMIN_PREFIX}/plugins/${PLUGIN_SLUG}`;
+const LEGACY_LOCAL_PREFIX = `/plugins/${PLUGIN_SLUG}`;
 
 const SUPPORTED_LOCALES = ["zh", "en"] as const;
 type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
@@ -204,11 +205,11 @@ export const resolveCanonicalInternalPath = (
 };
 
 const stripLegacyPluginPrefix = (path: string): string => {
-  if (!path.startsWith("/plugins/sample")) {
+  if (!path.startsWith(`/plugins/${PLUGIN_SLUG}`)) {
     return path;
   }
 
-  const stripped = path.slice("/plugins/sample".length);
+  const stripped = path.slice(`/plugins/${PLUGIN_SLUG}`.length);
   return normalizePath(stripped || "/");
 };
 

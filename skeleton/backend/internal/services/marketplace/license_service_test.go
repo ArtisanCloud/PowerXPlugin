@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/marketplace"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"

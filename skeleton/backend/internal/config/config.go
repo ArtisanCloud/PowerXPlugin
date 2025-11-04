@@ -283,7 +283,8 @@ func Load() (*Config, error) {
 	cfg := getDefaultConfig()
 
 	// 尝试加载 YAML 配置文件
-	if err := loadYAMLConfig(cfg); err != nil {
+	configDir, err := loadYAMLConfig(cfg)
+	if err != nil {
 		logrus.WithError(err).Warn("Failed to load YAML config, using defaults only")
 	}
 
@@ -294,6 +295,10 @@ func Load() (*Config, error) {
 
 	// 统一归一化配置值，避免大小写/空白差异导致校验失败
 	normalizeConfig(cfg)
+
+	if configDir != "" && cfg.Database != nil {
+		cfg.Database.ResolvePaths(configDir)
+	}
 
 	// 同步向后兼容字段
 	syncBackwardCompatibility(cfg)
@@ -382,6 +387,7 @@ func getDefaultConfig() *Config {
 			},
 		},
 		Database: &DatabaseConfig{
+			Driver: "memory",
 			Schema: "px_plugin_base",
 		},
 		Runtime: &RuntimeConfig{
@@ -468,7 +474,7 @@ func getDefaultConfig() *Config {
 }
 
 // loadYAMLConfig 加载 YAML 配置文件
-func loadYAMLConfig(cfg *Config) error {
+func loadYAMLConfig(cfg *Config) (string, error) {
 	candidates := resolveConfigCandidates()
 
 	var configFile string
@@ -488,29 +494,34 @@ func loadYAMLConfig(cfg *Config) error {
 	}
 
 	if configFile == "" {
-		return fmt.Errorf("config file not found (searched: %s)", strings.Join(candidates, ", "))
+		return "", fmt.Errorf("config file not found (searched: %s)", strings.Join(candidates, ", "))
 	}
 
 	// 读取文件
 	file, err := os.Open(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to open config file %s: %w", configFile, err)
+		return "", fmt.Errorf("failed to open config file %s: %w", configFile, err)
 	}
 	defer file.Close()
 
 	// 读取文件内容
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
+		return "", fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	// 解析 YAML
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return fmt.Errorf("failed to parse YAML config: %w", err)
+		return "", fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
 	logrus.WithField("config_file", configFile).Info("YAML config loaded successfully")
-	return nil
+	dir := filepath.Dir(configFile)
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return dir, nil
+	}
+	return absDir, nil
 }
 
 func loadSecurityBaselineConfig(cfg *Config) {

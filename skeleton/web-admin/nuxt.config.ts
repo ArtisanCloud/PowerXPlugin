@@ -1,10 +1,10 @@
 import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@powerx-plugin/framework-admin'
 
-const pluginId = 'com.powerx.sample'
+const pluginId = 'com.powerx.plugin.base'
 const pluginAdminBase = `/_p/${pluginId}/admin/`
 const pluginApiBase = `/_p/${pluginId}/api/v1`
-const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8086/api/v1'
+const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8078/api/v1'
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
 const rawBridgeDebug = process.env.NUXT_PUBLIC_BRIDGE_DEBUG ?? process.env.BRIDGE_DEBUG

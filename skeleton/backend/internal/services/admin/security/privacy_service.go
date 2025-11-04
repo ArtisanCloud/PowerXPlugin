@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	privmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/privacy"
-	privrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/privacy"
+	privmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/privacy"
+	privrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/privacy"
 	secobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"

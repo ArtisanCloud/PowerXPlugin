@@ -11,7 +11,7 @@
 <script setup>
 // PowerX Skeleton Admin Interface
 useSeoMeta({
-  title: "PowerX Sample Plugin",
+  title: "PowerX Base Plugin",
   description: "Template management starter for the PowerX platform",
 });
 </script>

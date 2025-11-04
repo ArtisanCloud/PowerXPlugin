@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/operations"
+	"github.com/gin-gonic/gin"
+	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/operations"
 	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	opservice "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/operations"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
@@ -18,9 +19,9 @@ import (
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/templates"
 	agentapi "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/agent"
 	integrationapi "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/integration"
+	publicassets "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/public/assets"
 	publicmarketplace "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/public/marketplace"
 	tenantmarketplace "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/tenant/marketplace"
-	"github.com/gin-gonic/gin"
 )
 
 // Registry API 注册器
@@ -46,6 +47,9 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	templates.RegisterAPIRoutes(gApi, r.deps)
 	integrationapi.RegisterAPIRoutes(gApi, r.deps)
 	r.RegisterMarketplaceRoutes(gApi)
+	if isDevEnvironment(r.deps) {
+		r.registerDevAssetsRoute()
+	}
 
 	r.mergeRBAC(adminruntime.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminsecurity.RBACEntries(r.apiPrefix()))
@@ -111,6 +115,33 @@ func (r *Registry) apiPrefix() string {
 		}
 	}
 	return prefix
+}
+
+func isDevEnvironment(deps *app.Deps) bool {
+	if deps == nil || deps.Config == nil || deps.Config.Server == nil {
+		return true
+	}
+	server := deps.Config.Server
+	if server.DevMode {
+		return true
+	}
+	mode := strings.TrimSpace(strings.ToLower(server.Mode))
+	return mode == "" || mode == "debug"
+}
+
+func (r *Registry) registerDevAssetsRoute() {
+	if r.engine == nil {
+		return
+	}
+	paths := []string{"/assets/builds/meta/dev.json"}
+	apiPref := strings.TrimRight(r.apiPrefix(), "/")
+	if apiPref != "" && apiPref != "-" {
+		paths = append(paths, apiPref+"/assets/builds/meta/dev.json")
+	}
+
+	for _, p := range paths {
+		publicassets.RegisterDevRoute(r.engine, p)
+	}
 }
 
 func marketplacePublicRBACEntries(prefix string) map[string]authx.Permission {

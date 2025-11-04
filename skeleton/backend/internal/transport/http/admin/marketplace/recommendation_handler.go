@@ -3,7 +3,7 @@ package marketplace
 import (
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/recommendation"
 	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"

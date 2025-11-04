@@ -3,7 +3,7 @@ package security
 import (
 	"time"
 
-	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/security"
+	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/security"
 )
 
 // AdvisoryResponse represents the API payload for a vulnerability advisory.

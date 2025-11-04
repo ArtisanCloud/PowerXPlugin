@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	consoletransport "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/console"

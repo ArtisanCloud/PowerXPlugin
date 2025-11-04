@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
+	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	obs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/integration"
 	service "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	"github.com/sirupsen/logrus"

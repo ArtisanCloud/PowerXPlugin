@@ -2,7 +2,7 @@
   <UContainer class="py-12 space-y-10">
     <section class="space-y-4">
       <h1 class="text-3xl font-semibold text-gray-900 dark:text-white">
-        PowerX Sample
+        PowerX Base
       </h1>
       <p class="text-gray-600 dark:text-gray-300">
         欢迎使用 PowerX 插件脚手架示例页面。该示例展示了如何在独立模式下快速搭建模板 CRUD、菜单导航与多语言体验。

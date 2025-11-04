@@ -17,6 +17,9 @@ func qi(ident string) string {
 
 // createSchema: CREATE SCHEMA IF NOT EXISTS
 func createSchema(schema string) error {
+	if db == nil || db.Dialector == nil || db.Dialector.Name() != "postgres" {
+		return nil
+	}
 	if strings.TrimSpace(schema) == "" {
 		return errors.New("empty schema")
 	}
@@ -38,6 +41,9 @@ func createSchema(schema string) error {
 
 // setDefaultSchema: SET search_path（会话级）
 func setDefaultSchema(schema string) error {
+	if db == nil || db.Dialector == nil || db.Dialector.Name() != "postgres" {
+		return nil
+	}
 	if strings.TrimSpace(schema) == "" {
 		return errors.New("empty schema")
 	}
@@ -73,12 +79,18 @@ func Migrate(models ...interface{}) error {
 
 // EnableRLS 为表启用行级安全
 func EnableRLS(tableName string) error {
+	if db == nil || db.Dialector == nil || db.Dialector.Name() != "postgres" {
+		return nil
+	}
 	sql := fmt.Sprintf("ALTER TABLE %s ENABLE ROW LEVEL SECURITY", tableName)
 	return db.Exec(sql).Error
 }
 
 // CreateRLSPolicy 创建 RLS 策略
 func CreateRLSPolicy(tableName, policyName string) error {
+	if db == nil || db.Dialector == nil || db.Dialector.Name() != "postgres" {
+		return nil
+	}
 	sql := fmt.Sprintf(`
 		CREATE POLICY IF NOT EXISTS %s ON %s
 		USING (tenant_id::text = current_setting('app.tenant_id', true))
@@ -88,6 +100,9 @@ func CreateRLSPolicy(tableName, policyName string) error {
 
 // DropRLSPolicy 删除 RLS 策略
 func DropRLSPolicy(tableName, policyName string) error {
+	if db == nil || db.Dialector == nil || db.Dialector.Name() != "postgres" {
+		return nil
+	}
 	sql := fmt.Sprintf("DROP POLICY IF EXISTS %s ON %s", policyName, tableName)
 	return db.Exec(sql).Error
 }
@@ -105,7 +120,7 @@ func isPermissionDenied(err error) bool {
 }
 
 func schemaExists(schema string) (bool, error) {
-	if db == nil {
+	if db == nil || db.Dialector == nil || db.Dialector.Name() != "postgres" {
 		return false, errors.New("database not initialized")
 	}
 	var count int64

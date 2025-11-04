@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/security"
-	secrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/security"
+	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/security"
+	secrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/security"
 	secobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"

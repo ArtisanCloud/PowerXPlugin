@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	obs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/integration"
 	service "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	"github.com/sirupsen/logrus"

@@ -30,7 +30,7 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
 
   const bridge = initPowerXBridge({
     debug: typeof opts.debug === 'boolean' ? opts.debug : defaultDebug,
-    pluginId: opts.pluginId ?? 'com.powerx.sample',
+    pluginId: opts.pluginId ?? 'com.powerx.plugin.base',
     instanceId: opts.instanceId ?? 'dev-bridge',
     allowedOrigins: ['*'],
     // allowedOrigins: import.meta.env.DEV ? ['*'] : ['https://admin.powerx.cloud'],

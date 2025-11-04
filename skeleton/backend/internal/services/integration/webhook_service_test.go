@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
+	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	service "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

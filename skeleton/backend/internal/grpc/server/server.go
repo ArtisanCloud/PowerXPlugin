@@ -10,7 +10,7 @@ import (
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
 
 	cfgpkg "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	marketplacerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	marketplacerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	integrationService "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	marketplacesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"

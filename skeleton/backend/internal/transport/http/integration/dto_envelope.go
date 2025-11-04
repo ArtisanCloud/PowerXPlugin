@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
+	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
 	"github.com/google/uuid"
 )
 

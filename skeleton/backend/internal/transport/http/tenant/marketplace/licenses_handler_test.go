@@ -11,9 +11,9 @@ import (
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/marketplace"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	opsmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/operations"
 	svc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"

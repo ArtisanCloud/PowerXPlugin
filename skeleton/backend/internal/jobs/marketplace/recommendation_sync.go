@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/recommendation"
 	"github.com/sirupsen/logrus"
 )

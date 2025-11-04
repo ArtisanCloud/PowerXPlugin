@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/config"
-	tgmodel "{{ .BackendModulePath }}/internal/domain/models/tool_grant"
-	tgrepo "{{ .BackendModulePath }}/internal/domain/repository/tool_grant"
+	tgmodel "{{ .BackendModulePath }}/internal/entity/models/tool_grant"
+	tgrepo "{{ .BackendModulePath }}/internal/entity/repository/tool_grant"
 	seclog "{{ .BackendModulePath }}/internal/observability/security"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"

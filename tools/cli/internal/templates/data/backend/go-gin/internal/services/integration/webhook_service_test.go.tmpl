@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/config"
-	"{{ .BackendModulePath }}/internal/domain/models"
-	model "{{ .BackendModulePath }}/internal/domain/models/integration"
-	repo "{{ .BackendModulePath }}/internal/domain/repository/integration"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	model "{{ .BackendModulePath }}/internal/entity/models/integration"
+	repo "{{ .BackendModulePath }}/internal/entity/repository/integration"
 	service "{{ .BackendModulePath }}/internal/services/integration"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

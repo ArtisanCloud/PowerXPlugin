@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
+	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
 	integrationService "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	"github.com/sirupsen/logrus"
 )

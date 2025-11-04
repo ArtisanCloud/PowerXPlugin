@@ -17,7 +17,7 @@
         </div>
       </template>
       <ul class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-        <li>backend/internal/domain/models/template/template.go</li>
+        <li>backend/internal/entity/models/template/template.go</li>
         <li>backend/internal/services/admin/templates/template_service.go</li>
         <li>backend/internal/transport/http/admin/templates/*</li>
         <li>web-admin/app/pages/templates</li>

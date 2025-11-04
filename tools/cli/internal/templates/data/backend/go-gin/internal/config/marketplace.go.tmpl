@@ -131,8 +131,11 @@ func (cfg *Config) LicenseReminderLead() time.Duration {
 		return defaultLead
 	}
 	hours := cfg.Marketplace.License.Reminder.LeadHours
-	if hours <= 0 {
+	if hours < 0 {
 		return defaultLead
+	}
+	if hours == 0 {
+		return 0
 	}
 	return time.Duration(hours) * time.Hour
 }

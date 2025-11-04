@@ -5,17 +5,17 @@ import "github.com/powerx-plugin/framework/backend/go/manifest"
 // Plugin returns the manifest definition consumed by the framework/router layer.
 func Plugin() manifest.Plugin {
 	return manifest.Plugin{
-		ID:      "com.powerx.plugin.demo",
-		Name:    "PowerX Demo Plugin",
+		ID:      "com.powerx.plugin.base",
+		Name:    "PowerX Base Plugin",
 		Version: "0.1.0",
 		Menus: []manifest.Menu{
 			{
-				Path:  "/templates/intro",
-				Title: "Plugin Intro",
+				Path:  "/_p/{{ .PluginID }}/admin/templates/intro",
+				Title: "模板介绍",
 			},
 			{
-				Path:  "/templates/crud",
-				Title: "Template CRUD",
+				Path:  "/_p/{{ .PluginID }}/admin/templates/crud",
+				Title: "模板管理",
 			},
 		},
 	}

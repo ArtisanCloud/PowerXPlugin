@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/plugin"
+	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/plugin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"

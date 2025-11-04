@@ -25,7 +25,7 @@ const thm = computed(() => {
 const loc = computed(() => String(locale.value))
 
 onMounted(() => {
-  setupHostBridgeAdapter({ debug: true, pluginId: 'com.powerx.sample', instanceId: 'dev-bridge' })
+  setupHostBridgeAdapter({ debug: true, pluginId: 'com.powerx.plugin.base', instanceId: 'dev-bridge' })
 })
 
 // 自测按钮（可删）

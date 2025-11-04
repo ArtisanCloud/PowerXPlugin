@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
+	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
 	obs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/integration"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/crypto"

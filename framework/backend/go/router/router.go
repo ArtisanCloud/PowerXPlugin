@@ -110,7 +110,7 @@ func (r *httpRouterRoot) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (r *httpRouterRoot) register(method, fullPath string, handler bootstrap.Handler) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if strings.Contains(fullPath, ":") {
+	if strings.Contains(fullPath, ":") || strings.Contains(fullPath, "*") {
 		entry := routeEntry{
 			pattern:  fullPath,
 			handler:  handler,
@@ -230,6 +230,14 @@ func (c *httpContext) SetContext(ctx context.Context) {
 	c.req = c.req.WithContext(ctx)
 }
 
+func (c *httpContext) HTTPResponseWriter() http.ResponseWriter {
+	return c.w
+}
+
+func (c *httpContext) HTTPRequest() *http.Request {
+	return c.req
+}
+
 func joinPaths(base, rel string) string {
 	if rel == "" || rel == "/" {
 		return sanitizePath(base)
@@ -278,20 +286,39 @@ func splitPath(p string) []string {
 }
 
 func matchSegments(patternSegments, pathSegments []string) (map[string]string, bool) {
-	if len(patternSegments) != len(pathSegments) {
+	if len(patternSegments) > len(pathSegments) {
 		return nil, false
 	}
+
 	paramValues := make(map[string]string)
-	for idx, seg := range patternSegments {
+	for idx := 0; idx < len(patternSegments); idx++ {
+		seg := patternSegments[idx]
+
+		if strings.HasPrefix(seg, "*") {
+			name := seg[1:]
+			paramValues[name] = strings.Join(pathSegments[idx:], "/")
+			return paramValues, true
+		}
+
+		if idx >= len(pathSegments) {
+			return nil, false
+		}
+
 		part := pathSegments[idx]
 		if strings.HasPrefix(seg, ":") {
 			name := seg[1:]
 			paramValues[name] = part
 			continue
 		}
+
 		if seg != part {
 			return nil, false
 		}
 	}
+
+	if len(patternSegments) != len(pathSegments) {
+		return nil, false
+	}
+
 	return paramValues, true
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
-	templatemodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/template"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	templatemodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/template"
 	"gorm.io/gorm"
 )
 

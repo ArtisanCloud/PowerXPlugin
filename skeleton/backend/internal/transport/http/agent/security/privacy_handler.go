@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/privacy"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/privacy"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	secobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
 	agentsec "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent/security"

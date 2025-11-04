@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
-	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/integration"
+	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
+	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	obsintegration "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/integration"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"

@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"{{ .BackendModulePath }}/internal/contracts"
-	dbm "{{ .BackendModulePath }}/internal/domain/models/marketplace"
-	mrepo "{{ .BackendModulePath }}/internal/domain/repository/marketplace"
+	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
+	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
 	svc "{{ .BackendModulePath }}/internal/services/marketplace"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"

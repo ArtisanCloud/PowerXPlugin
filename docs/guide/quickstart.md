@@ -33,6 +33,7 @@
 
 - `docs/release.md`：了解版本发布与实验性 `package/dist/publish` 命令的最新状态。
 - `docs/test/testing_usage.md`：掌握 `make test-smoke` / `make test-regression` 的测试流程。
+- `docs/guide/bootstrap-context.md`：理解 `bootstrap.Context` 抽象与跨框架适配方式。
 - `docs/backlog/multi-language.md`：关注多语言支持与未来路线图。
 
 > 遇到问题时，可优先检查 Go/Node 版本，确认依赖安装无误，再回到两个教程逐步排查。欢迎在 README 中列出的渠道反馈问题与改进建议。

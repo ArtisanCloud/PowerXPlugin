@@ -9,7 +9,7 @@ import (
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/cmd/database/seed"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/db"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
 	"log"
 	"os"
 )

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	model "{{ .BackendModulePath }}/internal/domain/models/admin_console"
+	model "{{ .BackendModulePath }}/internal/entity/models/admin_console"
 	consolesvc "{{ .BackendModulePath }}/internal/services/admin/console"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/stretchr/testify/require"
@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 
 	"{{ .BackendModulePath }}/internal/config"
-	"{{ .BackendModulePath }}/internal/domain/models"
+	"{{ .BackendModulePath }}/internal/entity/models"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
 )
 

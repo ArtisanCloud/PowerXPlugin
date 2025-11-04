@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/runtime_ops"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/runtime_ops"
 	controller "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/mcp/controller"
 )
 

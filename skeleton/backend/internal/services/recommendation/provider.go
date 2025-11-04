@@ -3,8 +3,8 @@ package recommendation
 import (
 	"context"
 
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/marketplace"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 )
 
 // ListingMetricsProvider fetches signals using listing repository data.

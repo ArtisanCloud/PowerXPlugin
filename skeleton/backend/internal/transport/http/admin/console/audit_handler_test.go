@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/admin_console"
-	consolerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/admin_console"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
+	consolerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/admin_console"
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	consoletransport "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/console"

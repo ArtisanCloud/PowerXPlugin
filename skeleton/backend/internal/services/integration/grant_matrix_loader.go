@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/integration"
+	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"gorm.io/datatypes"

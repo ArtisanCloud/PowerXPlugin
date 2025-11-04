@@ -7,7 +7,7 @@
 
 ## 2. 可直接迁移的能力（✅ 高度可行）
 - **后端分层模式**：`routes/handler/service/repo/model` 的切分与当前 Skeleton 规划一致，目录可一一映射到 `skeleton/backend/internal/**`。
-- **目录约定**：沿用 `internal/transport/http`（Handler）、`internal/services`（业务编排）、`internal/domain/repository`（仓储）、`internal/domain/models`（数据模型）等路径，保持与 Base 插件一致的分层命名，便于 CLI 与文档互相校验。
+- **目录约定**：沿用 `internal/transport/http`（Handler）、`internal/services`（业务编排）、`internal/entity/repository`（仓储）、`internal/entity/models`（数据模型）等路径，保持与 Base 插件一致的分层命名，便于 CLI 与文档互相校验。
 - **前端页面与组件**：`intro.vue`、`templates/*.vue`、`TemplateFormModal.vue`、`ConfirmDialog.vue` 均可直接复用，路由结构与 Layer 预期保持一致。
 - **API 客户端**：`useTemplateApi` 及 `_client.ts` 的职责与 `@powerx-plugin/framework-client` 相符，可迁移并扩展现有客户端能力。
 - **启动流程**：相较 Base 插件复杂的 `main.go`，PowerXPlugin 的轻量启动更适合作为模板，可复用现有 Standalone 模式。

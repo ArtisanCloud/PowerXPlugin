@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	basemodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models"
-	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/operations"
-	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/operations"
+	basemodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/operations"
+	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/operations"
 	opmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/operations"
 	operationsvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/operations"
 	"github.com/stretchr/testify/require"

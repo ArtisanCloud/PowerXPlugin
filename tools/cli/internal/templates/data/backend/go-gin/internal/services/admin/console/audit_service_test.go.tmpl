@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/config"
-	"{{ .BackendModulePath }}/internal/domain/models"
-	model "{{ .BackendModulePath }}/internal/domain/models/admin_console"
-	consolerepo "{{ .BackendModulePath }}/internal/domain/repository/admin_console"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	model "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	consolerepo "{{ .BackendModulePath }}/internal/entity/repository/admin_console"
 	"{{ .BackendModulePath }}/internal/observability/admin_console"
 	consolesvc "{{ .BackendModulePath }}/internal/services/admin/console"
 	"{{ .BackendModulePath }}/internal/shared/app"

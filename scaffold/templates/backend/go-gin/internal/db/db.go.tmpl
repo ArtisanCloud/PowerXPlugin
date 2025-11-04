@@ -5,13 +5,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
+
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
-	"strings"
-	"time"
 )
 
 var db *gorm.DB
@@ -50,17 +52,28 @@ func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		},
 	)
 
-	dialector := postgres.New(postgres.Config{
-		DSN:                  cfg.DSN,
-		PreferSimpleProtocol: cfg.PreferSimpleProtocol,
-	})
-
 	gormConfig := &gorm.Config{
-		Logger:                 gLogger,
-		NowFunc:                func() time.Time { return time.Now().UTC() },
-		DisableAutomaticPing:   true,
-		PrepareStmt:            cfg.PrepareStmt,
-		SkipDefaultTransaction: cfg.SkipDefaultTx,
+		Logger:               gLogger,
+		NowFunc:              func() time.Time { return time.Now().UTC() },
+		DisableAutomaticPing: true,
+		PrepareStmt:          cfg.PrepareStmt,
+	}
+
+	var dialector gorm.Dialector
+	switch strings.ToLower(cfg.Driver) {
+	case "memory", "sqlite":
+		// SQLite 内存模式：禁用外键自动迁移，保留事务默认值
+		gormConfig.SkipDefaultTransaction = cfg.SkipDefaultTx
+		gormConfig.DisableForeignKeyConstraintWhenMigrating = true
+		dialector = sqlite.Open(cfg.DSN)
+	case "postgres":
+		gormConfig.SkipDefaultTransaction = cfg.SkipDefaultTx
+		dialector = postgres.New(postgres.Config{
+			DSN:                  cfg.DSN,
+			PreferSimpleProtocol: cfg.PreferSimpleProtocol,
+		})
+	default:
+		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
 	}
 
 	// 打开 + 简单重试
@@ -97,11 +110,13 @@ func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	}
 
 	// schema 准备
-	if err := createSchema(cfg.Schema); err != nil {
-		return nil, fmt.Errorf("failed to create schema: %w", err)
-	}
-	if err := setDefaultSchema(cfg.Schema); err != nil {
-		return nil, fmt.Errorf("failed to set default schema: %w", err)
+	if strings.ToLower(cfg.Driver) == "postgres" {
+		if err := createSchema(cfg.Schema); err != nil {
+			return nil, fmt.Errorf("failed to create schema: %w", err)
+		}
+		if err := setDefaultSchema(cfg.Schema); err != nil {
+			return nil, fmt.Errorf("failed to set default schema: %w", err)
+		}
 	}
 
 	logger.Infof("Database connected. schema=%s pool{idle=%d open=%d}", cfg.Schema, cfg.MaxIdleConns, cfg.MaxOpenConns)

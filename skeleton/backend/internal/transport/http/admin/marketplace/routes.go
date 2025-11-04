@@ -1,7 +1,7 @@
 package marketplace
 
 import (
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	recommendationservice "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/recommendation"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"

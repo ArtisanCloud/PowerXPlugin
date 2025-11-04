@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/marketplace"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
+	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
+	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	obs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/marketplace"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"

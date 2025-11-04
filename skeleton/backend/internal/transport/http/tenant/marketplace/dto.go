@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/marketplace"
+	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
 )
 
 type createLicenseRequest struct {

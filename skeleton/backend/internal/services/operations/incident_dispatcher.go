@@ -3,7 +3,7 @@ package operations
 import (
 	"context"
 
-	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/operations"
+	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/operations"
 	"github.com/sirupsen/logrus"
 )
 

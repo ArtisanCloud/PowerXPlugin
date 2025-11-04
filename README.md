@@ -7,6 +7,14 @@
 - 快速上手：`docs/quickstart.md`
 - 技术设计：`docs/init-project.md`
 
+
+
+## 深入指南
+
+- **架构设计**：[docs/plan/001-init-project.md](./docs/plan/001-init-project.md)
+- **Standalone 运行指南**：[docs/guide/standalone-mode.md](./docs/guide/standalone-mode.md)
+- **迁移实践**：[docs/guide/migration/base-to-skeleton.md](./docs/guide/migration/base-to-skeleton.md)
+
 ## 快速开始
 
 1. 安装 Go 1.21+ 与 Node.js 18+。

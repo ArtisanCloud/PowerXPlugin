@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	basemodels "{{ .BackendModulePath }}/internal/domain/models"
-	opmodels "{{ .BackendModulePath }}/internal/domain/models/operations"
-	oprepo "{{ .BackendModulePath }}/internal/domain/repository/operations"
+	basemodels "{{ .BackendModulePath }}/internal/entity/models"
+	opmodels "{{ .BackendModulePath }}/internal/entity/models/operations"
+	oprepo "{{ .BackendModulePath }}/internal/entity/repository/operations"
 	opmetrics "{{ .BackendModulePath }}/internal/observability/operations"
 	operationsvc "{{ .BackendModulePath }}/internal/services/operations"
 	"github.com/stretchr/testify/require"

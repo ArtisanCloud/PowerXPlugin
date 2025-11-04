@@ -1,131 +1,111 @@
-# PowerXPlugin Standalone 启动教程
 
-本教程演示如何在本地直接启动 PowerXPlugin 仓库自带的 Skeleton 示例（后端 + 管理端），用于验证框架与模板的基础功能。全程默认使用仓库内置的配置，避免依赖尚未实现的发布或安装流程。
+# Standalone 模式运行指南
 
-## 适用场景
+本文说明如何在宿主之外运行 Skeleton 插件，并阐释后端分层、扩展点与启动流程。
 
-- 验证 `framework/backend/go` 与 Skeleton 示例是否能够在本机运行。
-- 熟悉框架提供的 `App` 装配流程与 Standalone 环境变量。
-- 为后续编写自定义插件或运行测试脚本打基础。
+## 1. 目录结构与分层
 
-## 前置条件
+```
+backend/
+└─ internal/
+   ├─ bootstrap/         # 配置、依赖注入、进程生命周期
+   ├─ config/            # YAML/环境变量解析
+   ├─ entity/
+   │  ├─ models/{domain} # 领域实体、值对象
+   │  └─ repository/{domain} # 仓储接口与默认实现
+   ├─ services/{domain}  # 应用服务，编排业务用例
+   ├─ transport/
+   │  ├─ http/admin/{domain}   # Web Handler，DTO 到实体转换
+   │  └─ grpc/...              # gRPC Handler（可选）
+   ├─ manifestx/         # 插件清单（菜单、权限）
+   ├─ router/            # 注册 Gin 引擎、PowerX 框架路由
+   ├─ observability/     # 指标、日志、链路追踪
+   ├─ middleware/        # 跨域、RBAC、审计中间件
+   └─ shared/            # 共用工具、常量
+```
 
-- Go 1.21+，且启用 `GOWORK=on`
-- Node.js 18+ 与 npm 9+
-- （可选）GNU Make 或 `tmux`，便于同时运行前后端
+分层职责：
 
-建议首次运行前执行 `go version` 与 `node -v` 确认版本。仓库当前仅支持 **Go + Nuxt** 技术栈，其他语言路线仍在规划中。
+- **传输层** (`transport/http|grpc`)：只做协议转换，调用同域的服务层。
+- **服务层** (`services/{domain}`)：封装业务流程，依赖实体与仓储接口。
+- **领域层** (`entity/models` + `entity/repository`)：定义聚合根、值对象及仓储抽象。
+- **基础设施**（仓储默认实现、DB、外部 API）：位于 `entity/repository/{domain}` 与 `transport` 的适配层。
 
-## Step 1. 同步依赖
+Manifest 通过 `internal/manifestx/manifest.go` 暴露插件 ID、菜单、权限，供宿主读取。
 
-在仓库根目录执行以下命令，确保 Go Workspace 与前端依赖就绪：
+## 2. 启动流程
+
+Skeleton 入口位于 `cmd/plugin/main.go`，关键步骤如下：
+
+1. 读取配置：`config.Load()` 支持 `CONFIG_PATH` / `POWERX_PLUGIN_CONFIG_DIR`。
+2. 初始化依赖：`bootstrap.BootstrapPlugin` 注入数据库、缓存、PowerX gRPC 客户端等。
+3. 构建 Gin 引擎：`internal/router.NewRouter` 装配中间件与业务路由。
+4. 挂载框架路由：
+   ```go
+   fwrouter.AttachHTTPServer(app)
+   fwrouter.RegisterFrameworkRoutes(app)
+   fwrouter.RegisterPluginRoutes(app, func(r bootstrap.Router) {
+     httpserver.RegisterGinRoutes(r, engine)
+   })
+   ```
+5. 注册 Manifest：`manifest.Register(app, manifestx.Plugin())`。
+6. 启动 HTTP/gRPC、周期任务等，并监听退出信号安全关闭。
+
+## 3. 本地运行
 
 ```bash
-go work sync
+# 1. （可选）复制示例配置
+cp skeleton/backend/etc/config.example.yaml skeleton/backend/etc/config.yaml
+#    指向默认的 skeleton/.cache/powerxplugin.db（需提前创建目录）
+#    若放在其他目录，请通过 CONFIG_PATH 指向该目录
 
-cd framework
-go mod tidy -e
-npm --prefix frontend/nuxt/framework-admin install
-npm --prefix frontend/nuxt/framework-client install
-cd ../tools/cli
-go mod tidy -e
-cd ..
+# 2. 初始化数据库（setup = migrate + seed）
+cd skeleton/backend
+go run ./cmd/database/main.go setup
+#    如果需要单独执行，可替换为：
+#    go run ./cmd/database/main.go migrate
+#    go run ./cmd/database/main.go seed
+
+# 3. 启动后端（默认使用 SQLite 文件 powerxplugin.db 保存数据）
+go run ./cmd/plugin
+
+# 4. 访问健康检查
+curl http://127.0.0.1:8078/healthz
+
+# 5. 启动前端管理端
+cd ../web-admin && npm install && npm run dev
 ```
 
-执行完成后，请确认：
+常用调试端口：
 
-- `go.work` 中包含 `use ./framework` 与 `use ./tools/cli`
-- `framework/frontend/nuxt/framework-admin|framework-client` 已完成 `npm install`
-- 两个 Go 模块（`framework/` 与 `tools/cli/`）的依赖已整理完成
+- 后端 HTTP: `8078`（可通过 `PORT` 环境变量覆盖）
+- 后端 gRPC: `8079`（通过 `POWERX_GRPC_PORT` 覆盖）
+- 管理端 Nuxt: 默认 `3031`（冲突时自动寻找可用端口）
 
-## Step 2. 启动后端（Standalone）
+> `skeleton/backend/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
+>
+> Loader 在解析 SQLite DSN 时会自动创建目标目录，无需手动 `mkdir`。如果路径中包含 `../.cache`，会基于配置文件目录进行展开。
+>
+> 也可以将 `runtime.run_migrate` 设为 `true` 或在启动命令前加 `POWERX_RUN_MIGRATE=true`，这样服务启动时会自动运行迁移。种子数据仍需手动执行 `go run ./cmd/database/main.go seed`。
 
-Skeleton 后端入口位于 `skeleton/backend/cmd/plugin/main.go`，默认加载 `framework/backend/go/bootstrap` 的 Standalone 配置。
+## 4. 扩展点示例：新增模板审批接口
 
-```bash
-go run ./skeleton/backend/cmd/plugin
-```
+1. **领域模型**：在 `internal/entity/models/template` 新增 `approval.go`，描述审批状态。
+2. **仓储接口**：在 `internal/entity/repository/template` 添加 `approval_repository.go`，定义 `FindPending`、`Approve` 等方法，并提供最小内存实现。
+3. **应用服务**：于 `internal/services/template/approval_service.go` 编排审批流程，处理幂等与事件上报。
+4. **传输层 Handler**：在 `internal/transport/http/admin/templates/approval_handler.go` 实现接口，`POST /templates/:id/approve` 调用服务层。
+5. **路由注册**：更新 `internal/router/templates.go` 或所在域的路由，将新 Handler 挂载到 `/api/v1/templates` 子路由。
+6. **Manifest 更新**：在 `internal/manifestx/manifest.go` 增加菜单或权限项，并同步前端导航。
+7. **同步模板**：完成修改后执行 `npm run sync:templates`，确保 Scaffold/CLI 模板保持一致。
 
-首次启动会监听 `:8078`。若需要自定义端口或环境，可在启动前设置：
+## 5. 常见问题
 
-```bash
-export POWERX_LISTEN=":18078"
-export POWERX_ENV="development"
-# STANDALONE 默认为 true，可按需覆盖
-```
+- **403 或 401**：确认 `POWERX_SECURITY_*` 安全上下文配置正确；独立模式下可在配置中关闭严格模式。
+- **CORS 报错**：`internal/middleware/common.go` 中的 CORS 中间件需要加入前端 origin。
+- **模板漂移**：忘记执行 `npm run sync:templates` 会导致脚手架与 Skeleton 不一致；CI 会在 PR 中执行 `npm run sync:templates -- --check` 给出提示。
 
-### 验证 API
+## 6. 相关文档
 
-服务器启动后，另开终端执行：
-
-```bash
-curl http://localhost:8078/api/v1/ping
-```
-
-预期返回：
-
-```json
-{ "status": "ok" }
-```
-
-若收到 200 但响应为空，确认 `routes.Register` 已挂载；若命令报错，请检查端口是否被占用。
-
-### Templates CRUD（内存存储示例）
-
-Skeleton 的 Templates 模块完全运行在内存中，`repository` 使用 `map[tenantID]map[id]*Template` 按租户隔离，重启服务后数据会被清空。`WithTenantTx` 会在上下文中写入 `SET LOCAL app.tenant_id` 等价的租户信息，模拟 Constitution 要求的 `BeginTenantTx` 行为。
-
-- 默认租户：未提供 Header 时会退回到 Standalone 默认租户 `1`，建议显式设置。  
-- 隔离验证：
-  ```bash
-  curl -s -H 'X-Tenant-ID: 1' http://localhost:8078/api/v1/templates | jq
-  curl -s -H 'X-Tenant-ID: 2' http://localhost:8078/api/v1/templates | jq   # 另一租户独立数据
-  ```
-- CRUD 示例（发送 JSON 请求体）：
-  ```bash
-  curl -s -X POST -H 'X-Tenant-ID: 1' -H 'Content-Type: application/json' \
-    -d '{"name":"Quickstart","description":"Created in Standalone","content":"Hello"}' \
-    http://localhost:8078/api/v1/templates | jq
-  curl -s -X PUT -H 'X-Tenant-ID: 1' -H 'Content-Type: application/json' \
-    -d '{"name":"Quickstart","description":"Updated","content":"Hello 2"}' \
-    http://localhost:8078/api/v1/templates/1 | jq
-  curl -s -X DELETE -H 'X-Tenant-ID: 1' http://localhost:8078/api/v1/templates/1
-  ```
-- 延迟记录：使用 `curl -w 'time_total: %{time_total}\n'` 观测 API 响应时间，验证在 1s SLA 以内。若需要长期追踪，请将结果记录在 `specs/003-base-plugin-migration/research.md` 或自定义表格中。
-
-## Step 3. 启动前端管理端
-
-Skeleton 管理端位于 `skeleton/web-admin`，基于 Nuxt 4.2 和 `@powerx-plugin/framework-admin` Layer。
-
-```bash
-cd skeleton/web-admin
-npm run dev
-```
-
-Skeleton 已在 `nuxt.config.ts` 中固定 `devServer.port = 3031`，并将 Vite HMR 显式配置为 `ws://localhost:24731`。默认页面地址为 `http://localhost:3031/`。若你需要使用其他端口，可通过：
-
-```bash
-npm run dev -- --port <custom-port> --hmr-port <custom-hmr-port>
-```
-
-确保后端保持运行，否则页面请求会因 API 不可用而失败。
-
-### 验证界面
-
-在浏览器访问：
-
-```
-http://localhost:3031/_p/com.powerx.sample/admin/
-```
-
-若你自定义了端口，请将 `3031` 替换为对应值。可看到 “PowerX Sample” Starter 页面。若界面缺失 Layout 或 HMR 无法建立，请确认 `node_modules` 完整、端口未被占用，并根据需要调整 `--hmr-port`。
-
-## Step 4. 停止服务与清理
-
-- 后端：在运行终端按 `Ctrl+C`，`bootstrap.App` 会触发优雅关闭。
-- 前端：在运行终端按 `Ctrl+C` 停止 Nuxt Dev Server。
-
-如需重置依赖，可删除 `skeleton/web-admin/node_modules` 后重新安装。
-
----
-
-完成以上步骤，即可在本地以 Standalone 模式运行 PowerXPlugin Skeleton，实现后端 API 与管理端页面的联调验证。建议继续阅读《使用 CLI 生成并运行插件骨架》以了解如何构建独立插件项目。
+- [架构设计总览](../plan/001-init-project.md)
+- [从 Base 插件迁移指南](migration/base-to-skeleton.md)
+- [CLI 模板同步脚本](../../scripts/template-sync-config.yaml)

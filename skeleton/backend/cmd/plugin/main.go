@@ -14,16 +14,16 @@ import (
 	pluginbootstrap "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/bootstrap"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	dbpkg "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/db"
-	marketplacerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/marketplace"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/repository/plugin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/grpc/server"
+	marketplacerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
+	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/plugin"
+	grpcserver "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/grpc/server"
 	marketplacejobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/jobs/marketplace"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
 	manifestx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/manifestx"
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	opsmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/router"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/server"
+	httpserver "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/server"
 	agent "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent"
 	marketplacesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"
 	recommendation "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/recommendation"
@@ -88,7 +88,7 @@ func main() {
 	}
 
 	// 初始化 PowerX gRPC Client 客户端
-	pxc := bootstrap.BootstrapGRPCClient(rootCtx, cfg.GRPCUpstream)
+	pxc := pluginbootstrap.BootstrapGRPCClient(rootCtx, cfg.GRPCUpstream)
 
 	taxLogger := logger.WithField("component", "tax_provider_client")
 	taxClient, err := marketplacesvc.NewTaxProviderClient(cfg, nil, taxLogger)
@@ -123,15 +123,22 @@ func main() {
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)
 	licenseRepoGlobal := marketplacerepo.NewLicenseRepository(queryDB)
 	metricsProvider := recommendation.NewListingMetricsProvider(listingRepo)
-	syncJob := marketplacejobs.NewSyncJob(cfg, listingRepo, metricsProvider, logger.WithField("component", "marketplace_recommendation_sync"), listingRepo.ListTenantIDs)
-	renewalJob := marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantIDs, nil)
+	var syncJob *marketplacejobs.SyncJob
+	if cfg == nil || cfg.Marketplace == nil || cfg.Marketplace.Recommendation.Enabled {
+		syncJob = marketplacejobs.NewSyncJob(cfg, listingRepo, metricsProvider, logger.WithField("component", "marketplace_recommendation_sync"), listingRepo.ListTenantIDs)
+	}
+
+	var renewalJob *marketplacejobs.RenewalNotifier
+	if cfg != nil && cfg.LicenseReminderLead() > 0 {
+		renewalJob = marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantIDs, nil)
+	}
 
 	// 设置 gin engine 路由
 	r := pluginrouter.NewRouter(cfg, deps)
 	engine := r.Setup()
 
 	// 创建 gRPC 服务器（可选）
-	gs, err := server.NewGRPCServer(ctx, deps, cfg.GRPCServer)
+	gs, err := grpcserver.NewGRPCServer(ctx, deps, cfg.GRPCServer)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to create gRPC server")
 	}
@@ -148,7 +155,7 @@ func main() {
 	}
 	fwrouter.RegisterFrameworkRoutes(fwApp)
 	fwrouter.RegisterPluginRoutes(fwApp, func(r fwbootstrap.Router) {
-		server.RegisterGinRoutes(r, engine)
+		httpserver.RegisterGinRoutes(r, engine)
 	})
 
 	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
@@ -158,7 +165,7 @@ func main() {
 	// 使用 errgroup 并发启动服务器
 	g, groupCtx := errgroup.WithContext(ctx)
 
-	if cfg.Marketplace == nil || cfg.Marketplace.Recommendation.Enabled {
+	if syncJob != nil {
 		g.Go(func() error {
 			syncJob.Run(groupCtx)
 			return nil

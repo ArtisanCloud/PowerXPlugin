@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/domain/models/operations"
+	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/operations"
 	operationsvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/operations"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"

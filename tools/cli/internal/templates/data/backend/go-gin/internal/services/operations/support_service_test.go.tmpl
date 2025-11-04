@@ -49,7 +49,12 @@ func TestSupportService_ConfigurePlaybookAndMetrics(t *testing.T) {
 			{Channel: "marketplace_ticket", Address: "https://support.local/tickets", Escalates: []string{"agent", "engineer"}},
 			{Channel: "vendor_email", Address: "vendor@example.com", Escalates: []string{"agent"}},
 		},
-		KnowledgeBase: []operationsvc.KnowledgeBaseDoc{{Label: "README", URL: "https://docs.local/readme"}},
+		KnowledgeBase: []operationsvc.KnowledgeBaseDoc{
+			{
+				Label: "README",
+				URL:   "https://docs.local/readme",
+			},
+		},
 	}
 
 	payload, err := svc.ConfigurePlaybook(ctx, input)

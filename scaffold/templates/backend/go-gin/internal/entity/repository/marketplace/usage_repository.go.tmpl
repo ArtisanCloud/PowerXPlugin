@@ -54,7 +54,9 @@ func (r *UsageRepository) InsertEnvelopes(ctx context.Context, tenantID string, 
 			}
 		}
 		res := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "checksum"}},
+			Columns: []clause.Column{
+				{Name: "checksum"},
+			},
 			DoNothing: true,
 		}).Create(&envelopes)
 		if res.Error != nil {

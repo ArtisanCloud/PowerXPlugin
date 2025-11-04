@@ -47,7 +47,10 @@ func (r *Repository) RecordRevocation(ctx context.Context, rec *model.Revocation
 	if rec.TtlExpiry.IsZero() {
 		return nil, errors.New("ttl_expiry required")
 	}
-	return r.revocations.Upsert(ctx, rec, []clause.Column{{Name: "tenant_id"}, {Name: "toolgrant_id"}})
+	return r.revocations.Upsert(ctx, rec, []clause.Column{
+		{Name: "tenant_id"},
+		{Name: "toolgrant_id"},
+	})
 }
 
 func (r *Repository) ListRevocations(ctx context.Context, tenantID string, limit int) ([]*model.Revocation, error) {

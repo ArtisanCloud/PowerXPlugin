@@ -41,7 +41,9 @@ func (r *Repository) UpsertChecklist(ctx context.Context, checklist *model.Basel
 	if checklist.Version == "" {
 		return nil, errors.New("version required")
 	}
-	return r.checklists.Upsert(ctx, checklist, []clause.Column{{Name: "version"}})
+	return r.checklists.Upsert(ctx, checklist, []clause.Column{
+		{Name: "version"},
+	})
 }
 
 func (r *Repository) ListChecklists(ctx context.Context) ([]*model.BaselineChecklist, error) {

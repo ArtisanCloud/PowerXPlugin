@@ -26,7 +26,10 @@ func (r *CredentialsRepository) Upsert(ctx context.Context, pc *models.PluginCre
 		return errors.New("nil credential model")
 	}
 	return r.DB.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "tenant_id"}, {Name: "plugin_id"}},
+		Columns: []clause.Column{
+			{Name: "tenant_id"},
+			{Name: "plugin_id"},
+		},
 		DoUpdates: clause.AssignmentColumns([]string{"client_id", "secret_ciphertext", "iv_nonce", "key_version", "updated_at"}),
 	}).Create(pc).Error
 }

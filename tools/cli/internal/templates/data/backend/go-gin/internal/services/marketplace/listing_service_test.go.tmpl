@@ -195,9 +195,18 @@ func TestCreateAndUpdateDraft(t *testing.T) {
 		Locale:     "en",
 		Categories: []string{"automation"},
 		Tags:       []string{"beta"},
-		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+	Assets: []ListingAssetInput{
+		{
+			AssetType:  "cover",
+			StorageURI: "https://cdn.example/cover.png",
+			IsPrimary:  true,
+			Locale:     "en",
+			Metadata: map[string]any{
+				"width":  1920,
+				"height": 1080,
+			},
 		},
+	},
 	}
 
 	listing, err := svc.CreateDraft(ctx, "tenant-1", input)
@@ -208,9 +217,18 @@ func TestCreateAndUpdateDraft(t *testing.T) {
 		Title:      ptr("Updated Title"),
 		Summary:    ptr("updated summary"),
 		Categories: &[]string{"automation", "analytics"},
-		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover2.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+	Assets: []ListingAssetInput{
+		{
+			AssetType:  "cover",
+			StorageURI: "https://cdn.example/cover2.png",
+			IsPrimary:  true,
+			Locale:     "en",
+			Metadata: map[string]any{
+				"width":  1920,
+				"height": 1080,
+			},
 		},
+	},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "Updated Title", updated.Title)
@@ -230,9 +248,18 @@ func TestSubmitReviewAndPublish(t *testing.T) {
 		VendorID: "vendor-1",
 		Title:    "Listing",
 		Slug:     "listing",
-		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+	Assets: []ListingAssetInput{
+		{
+			AssetType:  "cover",
+			StorageURI: "https://cdn.example/cover.png",
+			IsPrimary:  true,
+			Locale:     "en",
+			Metadata: map[string]any{
+				"width":  1920,
+				"height": 1080,
+			},
 		},
+	},
 	})
 	require.NoError(t, err)
 
@@ -262,7 +289,16 @@ func TestVendorGuardBlocksSubmission(t *testing.T) {
 		Title:    "Listing",
 		Slug:     "listing",
 		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+			{
+				AssetType:  "cover",
+				StorageURI: "https://cdn.example/cover.png",
+				IsPrimary:  true,
+				Locale:     "en",
+				Metadata: map[string]any{
+					"width":  1920,
+					"height": 1080,
+				},
+			},
 		},
 	})
 	require.NoError(t, err)
@@ -281,7 +317,17 @@ func TestChecklistRunUpdatesScore(t *testing.T) {
 		VendorID: "vendor-1",
 		Title:    "Listing",
 		Slug:     "listing",
-		Assets:   []ListingAssetInput{{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}}},
+		Assets: []ListingAssetInput{
+			{
+				AssetType:  "cover",
+				StorageURI: "https://cdn.example/cover.png",
+				Locale:     "en",
+				Metadata: map[string]any{
+					"width":  1920,
+					"height": 1080,
+				},
+			},
+		},
 	})
 	require.NoError(t, err)
 

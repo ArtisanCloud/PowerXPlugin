@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
 	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
@@ -196,7 +196,16 @@ func TestCreateAndUpdateDraft(t *testing.T) {
 		Categories: []string{"automation"},
 		Tags:       []string{"beta"},
 		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+			{
+				AssetType:  "cover",
+				StorageURI: "https://cdn.example/cover.png",
+				IsPrimary:  true,
+				Locale:     "en",
+				Metadata: map[string]any{
+					"width":  1920,
+					"height": 1080,
+				},
+			},
 		},
 	}
 
@@ -209,7 +218,16 @@ func TestCreateAndUpdateDraft(t *testing.T) {
 		Summary:    ptr("updated summary"),
 		Categories: &[]string{"automation", "analytics"},
 		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover2.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+			{
+				AssetType:  "cover",
+				StorageURI: "https://cdn.example/cover2.png",
+				IsPrimary:  true,
+				Locale:     "en",
+				Metadata: map[string]any{
+					"width":  1920,
+					"height": 1080,
+				},
+			},
 		},
 	})
 	require.NoError(t, err)
@@ -231,7 +249,16 @@ func TestSubmitReviewAndPublish(t *testing.T) {
 		Title:    "Listing",
 		Slug:     "listing",
 		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+			{
+				AssetType:  "cover",
+				StorageURI: "https://cdn.example/cover.png",
+				IsPrimary:  true,
+				Locale:     "en",
+				Metadata: map[string]any{
+					"width":  1920,
+					"height": 1080,
+				},
+			},
 		},
 	})
 	require.NoError(t, err)
@@ -262,7 +289,16 @@ func TestVendorGuardBlocksSubmission(t *testing.T) {
 		Title:    "Listing",
 		Slug:     "listing",
 		Assets: []ListingAssetInput{
-			{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", IsPrimary: true, Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}},
+			{
+				AssetType:  "cover",
+				StorageURI: "https://cdn.example/cover.png",
+				IsPrimary:  true,
+				Locale:     "en",
+				Metadata: map[string]any{
+					"width":  1920,
+					"height": 1080,
+				},
+			},
 		},
 	})
 	require.NoError(t, err)
@@ -281,7 +317,17 @@ func TestChecklistRunUpdatesScore(t *testing.T) {
 		VendorID: "vendor-1",
 		Title:    "Listing",
 		Slug:     "listing",
-		Assets:   []ListingAssetInput{{AssetType: "cover", StorageURI: "https://cdn.example/cover.png", Locale: "en", Metadata: map[string]any{"width": 1920, "height": 1080}}},
+		Assets: []ListingAssetInput{
+			{
+				AssetType:  "cover",
+				StorageURI: "https://cdn.example/cover.png",
+				Locale:     "en",
+				Metadata: map[string]any{
+					"width":  1920,
+					"height": 1080,
+				},
+			},
+		},
 	})
 	require.NoError(t, err)
 

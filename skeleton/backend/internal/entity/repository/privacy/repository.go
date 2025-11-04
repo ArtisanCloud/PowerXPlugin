@@ -52,7 +52,10 @@ func (r *Repository) UpsertClassification(ctx context.Context, record *model.Dat
 	if record.TenantID == "" || record.AssetKey == "" {
 		return nil, errors.New("tenant_id and asset_key are required")
 	}
-	return r.classifications.Upsert(ctx, record, []clause.Column{{Name: "tenant_id"}, {Name: "asset_key"}})
+	return r.classifications.Upsert(ctx, record, []clause.Column{
+		{Name: "tenant_id"},
+		{Name: "asset_key"},
+	})
 }
 
 // ListClassifications returns all data classifications for a tenant ordered by asset key.

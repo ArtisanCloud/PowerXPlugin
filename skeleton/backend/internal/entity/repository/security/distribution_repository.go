@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/security"
 	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
-	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -55,7 +55,11 @@ func (r *DistributionRepository) Upsert(ctx context.Context, record *secmodel.Ad
 	}
 	record.UpdatedAt = now
 
-	result, err := r.base.Upsert(ctx, record, []clause.Column{{Name: "advisory_id"}, {Name: "tenant_id"}, {Name: "channel"}})
+	result, err := r.base.Upsert(ctx, record, []clause.Column{
+		{Name: "advisory_id"},
+		{Name: "tenant_id"},
+		{Name: "channel"},
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"reflect"
 
 	"github.com/gin-gonic/gin"
 	fwbootstrap "github.com/powerx-plugin/framework/backend/go/bootstrap"
@@ -43,17 +42,20 @@ func ginHandler(engine *gin.Engine) fwbootstrap.Handler {
 }
 
 func unwrapHTTP(ctx fwbootstrap.Context) (http.ResponseWriter, *http.Request) {
-	rv := reflect.ValueOf(ctx)
-	if rv.Kind() != reflect.Ptr {
+	type httpBridger interface {
+		HTTPResponseWriter() http.ResponseWriter
+		HTTPRequest() *http.Request
+	}
+
+	bridger, ok := ctx.(httpBridger)
+	if !ok {
 		return nil, nil
 	}
-	elem := rv.Elem()
-	wField := elem.FieldByName("w")
-	reqField := elem.FieldByName("req")
-	if !wField.IsValid() || !reqField.IsValid() {
+
+	writer := bridger.HTTPResponseWriter()
+	req := bridger.HTTPRequest()
+	if writer == nil || req == nil {
 		return nil, nil
 	}
-	writer, _ := wField.Interface().(http.ResponseWriter)
-	req, _ := reqField.Interface().(*http.Request)
 	return writer, req
 }

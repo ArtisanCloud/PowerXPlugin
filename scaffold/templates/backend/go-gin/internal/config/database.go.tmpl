@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -111,4 +112,42 @@ func (c *DatabaseConfig) Validate() error {
 		return fmt.Errorf("maxIdleConns(%d) cannot be greater than maxOpenConns(%d)", c.MaxIdleConns, c.MaxOpenConns)
 	}
 	return nil
+}
+
+// ResolvePaths 将 SQLite DSN 中的相对文件路径转换成以配置文件目录为基准的绝对路径。
+func (c *DatabaseConfig) ResolvePaths(baseDir string) {
+	if c == nil || baseDir == "" {
+		return
+	}
+
+	driver := strings.ToLower(strings.TrimSpace(c.Driver))
+	if driver != "sqlite" && driver != "memory" {
+		return
+	}
+
+	dsn := strings.TrimSpace(c.DSN)
+	if dsn == "" || !strings.HasPrefix(dsn, "file:") {
+		return
+	}
+
+	body := strings.TrimPrefix(dsn, "file:")
+	// 内存模式（file::memory:?cache=shared）无需处理。
+	if strings.HasPrefix(body, ":") {
+		return
+	}
+
+	var pathPart, suffix string
+	if idx := strings.IndexAny(body, "?#"); idx >= 0 {
+		pathPart = body[:idx]
+		suffix = body[idx:]
+	} else {
+		pathPart = body
+	}
+
+	if pathPart == "" || filepath.IsAbs(pathPart) {
+		return
+	}
+
+	resolved := filepath.Clean(filepath.Join(baseDir, pathPart))
+	c.DSN = "file:" + resolved + suffix
 }

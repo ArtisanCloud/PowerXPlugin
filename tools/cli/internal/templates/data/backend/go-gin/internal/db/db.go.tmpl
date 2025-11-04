@@ -5,6 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -62,6 +64,9 @@ func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 	switch strings.ToLower(cfg.Driver) {
 	case "memory", "sqlite":
+		if err := ensureSQLiteDir(cfg.DSN); err != nil {
+			return nil, err
+		}
 		// SQLite 内存模式：禁用外键自动迁移，保留事务默认值
 		gormConfig.SkipDefaultTransaction = cfg.SkipDefaultTx
 		gormConfig.DisableForeignKeyConstraintWhenMigrating = true
@@ -143,4 +148,38 @@ func SQL() (*sql.DB, error) {
 		return nil, fmt.Errorf("db not initialized")
 	}
 	return db.DB()
+}
+
+func ensureSQLiteDir(dsn string) error {
+	if dsn == "" || !strings.HasPrefix(dsn, "file:") {
+		return nil
+	}
+
+	body := strings.TrimPrefix(dsn, "file:")
+	if strings.HasPrefix(body, ":") {
+		// 内存模式无需处理
+		return nil
+	}
+
+	stopIdx := len(body)
+	if idx := strings.IndexAny(body, "?#"); idx >= 0 {
+		stopIdx = idx
+	}
+	pathPart := body[:stopIdx]
+	if pathPart == "" {
+		return nil
+	}
+	if !filepath.IsAbs(pathPart) {
+		abs, err := filepath.Abs(pathPart)
+		if err == nil {
+			pathPart = abs
+		}
+	}
+
+	dir := filepath.Dir(pathPart)
+	if dir == "." || dir == "" {
+		return nil
+	}
+
+	return os.MkdirAll(dir, 0o755)
 }

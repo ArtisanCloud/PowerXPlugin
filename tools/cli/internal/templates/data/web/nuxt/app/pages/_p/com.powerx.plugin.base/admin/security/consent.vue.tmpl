@@ -46,7 +46,7 @@
                       size="xs"
                       color="primary"
                     >
-                      {{ print "{{ status }}" }}
+                      {{ `{{ status }}` }}
                     </UBadge>
                     <span v-if="!selectedStatuses.length" class="text-gray-500 dark:text-gray-400"
                       >All statuses</span
@@ -89,7 +89,7 @@
 
             <UTable :rows="rows" :columns="columns" :loading="loading">
               <template #token-data="{ row }">
-                <span class="font-mono">{{ print "{{ row.token }}" }}</span>
+                <span class="font-mono">{{ `{{ row.token }}` }}</span>
               </template>
               <template #scope-data="{ row }">
                 <div class="flex flex-wrap gap-2">
@@ -100,7 +100,7 @@
                     color="primary"
                     variant="soft"
                   >
-                    {{ print "{{ scope }}" }}
+                    {{ `{{ scope }}` }}
                   </UBadge>
                 </div>
               </template>
@@ -110,7 +110,7 @@
                   size="xs"
                   class="uppercase"
                 >
-                  {{ print "{{ row.status }}" }}
+                  {{ `{{ row.status }}` }}
                 </UBadge>
               </template>
             </UTable>
@@ -118,7 +118,7 @@
             <div v-if="!loading && !rows.length" class="text-center py-10">
               <UIcon name="i-heroicons-document-magnifying-glass" class="text-4xl text-gray-300 dark:text-gray-600" />
               <p class="mt-3 text-gray-500 dark:text-gray-400">
-                {{ print "{{ tenantId ? "No consent tokens found for this tenant." : "Enter a tenant ID to begin." }}" }}
+                {{ `{{ tenantId ? "No consent tokens found for this tenant." : "Enter a tenant ID to begin." }}` }}
               </p>
             </div>
           </div>

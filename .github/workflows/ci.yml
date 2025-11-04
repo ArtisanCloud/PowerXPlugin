@@ -24,11 +24,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - name: Go work sync
         run: go work sync
       - name: Go test (framework)
@@ -58,11 +64,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - name: Go work sync
         run: go work sync
       - name: Run contract validators
@@ -72,11 +84,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - name: Build px-plugin and scaffold sample project
         run: |
           go work sync
@@ -91,11 +109,17 @@ jobs:
     needs: [backend, contracts, cli]
     env:
       GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -114,11 +138,17 @@ jobs:
     needs: [smoke]
     env:
       GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

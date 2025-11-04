@@ -31,7 +31,7 @@
 
     <div v-else>
       <div v-if="errorMessage" class="rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-600/60 dark:bg-red-900/40 dark:text-red-100">
-        {{ print "{{ errorMessage }}" }}
+        {{ `{{ errorMessage }}` }}
       </div>
 
       <div class="flex items-start gap-4">
@@ -55,14 +55,14 @@
           <div v-else-if="latestRun">
             <div class="flex items-center gap-3">
               <UBadge :color="statusColor(latestRun.status)" class="uppercase tracking-wide">
-                {{ print "{{ latestRun.status }}" }}
+                {{ `{{ latestRun.status }}` }}
               </UBadge>
               <span class="text-sm text-gray-500 dark:text-gray-400">
-                运行号 #{{ print "{{ latestRun.run_number }}" }} · {{ print "{{ formatDate(latestRun.started_at) }}" }}
+                运行号 #{{ `{{ latestRun.run_number }}` }} · {{ `{{ formatDate(latestRun.started_at) }}` }}
               </span>
             </div>
             <p v-if="latestRun.summary" class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              {{ print "{{ latestRun.summary }}" }}
+              {{ `{{ latestRun.summary }}` }}
             </p>
 
             <div class="mt-4 space-y-2">
@@ -74,19 +74,19 @@
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2">
                     <UBadge :color="statusColor(item.result)" size="xs" class="uppercase tracking-wide">
-                      {{ print "{{ item.result }}" }}
+                      {{ `{{ item.result }}` }}
                     </UBadge>
-                    <span class="font-medium">{{ print "{{ item.code }}" }}</span>
+                    <span class="font-medium">{{ `{{ item.code }}` }}</span>
                   </div>
                   <span v-if="item.evidence_uri" class="text-xs text-primary-600 dark:text-primary-300">
-                    {{ print "{{ item.evidence_uri }}" }}
+                    {{ `{{ item.evidence_uri }}` }}
                   </span>
                 </div>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
-                  {{ print "{{ item.description }}" }}
+                  {{ `{{ item.description }}` }}
                 </p>
                 <p v-if="item.notes" class="mt-1 text-sm text-amber-600 dark:text-amber-300">
-                  {{ print "{{ item.notes }}" }}
+                  {{ `{{ item.notes }}` }}
                 </p>
                 <ULink v-if="item.auto_fix_link" :to="item.auto_fix_link" class="text-xs text-primary-600 dark:text-primary-300">
                   查看修复指引
@@ -117,15 +117,15 @@
               <div>
                 <div class="flex items-center gap-2">
                   <UBadge :color="statusColor(run.status)" size="xs" class="uppercase tracking-wide">
-                    {{ print "{{ run.status }}" }}
+                    {{ `{{ run.status }}` }}
                   </UBadge>
-                  <span class="text-xs text-gray-500 dark:text-gray-400">#{{ print "{{ run.run_number }}" }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">#{{ `{{ run.run_number }}` }}</span>
                 </div>
                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {{ print "{{ formatDate(run.started_at) }}" }}
+                  {{ `{{ formatDate(run.started_at) }}` }}
                 </div>
                 <p v-if="run.summary" class="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                  {{ print "{{ run.summary }}" }}
+                  {{ `{{ run.summary }}` }}
                 </p>
               </div>
               <UIcon name="i-heroicons-arrow-path" class="mt-1 text-gray-400" />

@@ -46,7 +46,7 @@
             <UInput v-model="periodEnd" type="date" label="报表结束" />
           </div>
           <UAlert v-if="error" color="red" icon="i-heroicons-exclamation-triangle">
-            {{ print "{{ error }}" }}
+            {{ `{{ error }}` }}
           </UAlert>
         </div>
       </div>
@@ -67,8 +67,8 @@
             :color="alertColor(alert.severity)"
             :icon="alertIcon(alert.code)"
           >
-            <template #title>{{ print "{{ alert.code }}" }}</template>
-            {{ print "{{ alert.message }}" }}
+            <template #title>{{ `{{ alert.code }}` }}</template>
+            {{ `{{ alert.message }}` }}
           </UAlert>
         </div>
       </div>
@@ -80,7 +80,7 @@
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Usage 趋势</h2>
               <p class="text-xs text-gray-500 dark:text-gray-400">展示累计调用量、剩余配额与收入估算。</p>
             </div>
-            <UBadge color="gray" variant="soft">{{ print "{{ series.length }}" }} Points</UBadge>
+            <UBadge color="gray" variant="soft">{{ `{{ series.length }}` }} Points</UBadge>
           </div>
         </template>
 
@@ -90,7 +90,7 @@
 
         <UTable v-else :columns="usageColumns" :rows="usageRows" :sort="{ column: 'timestamp', direction: 'desc' }">
           <template #quota_remaining-data="{ row }">
-            <span v-if="row.quota_remaining !== null">{{ print "{{ row.quota_remaining }}" }}</span>
+            <span v-if="row.quota_remaining !== null">{{ `{{ row.quota_remaining }}` }}</span>
             <span v-else class="text-gray-400">—</span>
           </template>
         </UTable>
@@ -103,7 +103,7 @@
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">分润报表</h2>
               <p class="text-xs text-gray-500 dark:text-gray-400">根据查询条件列出分润明细。</p>
             </div>
-            <UBadge color="gray" variant="soft">{{ print "{{ reports.length }}" }} Reports</UBadge>
+            <UBadge color="gray" variant="soft">{{ `{{ reports.length }}` }} Reports</UBadge>
           </div>
         </template>
 

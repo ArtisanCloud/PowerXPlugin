@@ -50,10 +50,10 @@
     <template #footer>
       <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
         <UButton color="neutral" variant="outline" :disabled="loading" @click="close">
-          {{ print "{{ $t('common.cancel') }}" }}
+          {{ `{{ $t('common.cancel') }}` }}
         </UButton>
         <UButton type="submit" form="template-form" color="primary" :loading="loading">
-          {{ print "{{ submitLabel }}" }}
+          {{ `{{ submitLabel }}` }}
         </UButton>
       </div>
     </template>

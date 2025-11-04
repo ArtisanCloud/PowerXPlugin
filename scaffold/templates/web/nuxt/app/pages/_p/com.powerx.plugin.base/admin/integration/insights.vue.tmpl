@@ -21,7 +21,7 @@
         </div>
       </template>
       <div class="text-3xl font-semibold text-primary">
-        {{ print "{{ formatNumber(metrics.envelope_rate) }}" }} <span class="text-base font-normal text-gray-500">req/s</span>
+        {{ `{{ formatNumber(metrics.envelope_rate) }}` }} <span class="text-base font-normal text-gray-500">req/s</span>
       </div>
     </UCard>
 
@@ -36,7 +36,7 @@
         <div class="space-y-2">
           <UProgress :value="metrics.webhook_success_rate" :max="100" color="primary" />
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            成功 {{ print "{{ metrics.webhook_success_rate.toFixed(1) }}" }}% · 重试 {{ print "{{ metrics.webhook_retry_rate.toFixed(1) }}" }}%
+            成功 {{ `{{ metrics.webhook_success_rate.toFixed(1) }}` }}% · 重试 {{ `{{ metrics.webhook_retry_rate.toFixed(1) }}` }}%
           </p>
         </div>
       </UCard>
@@ -50,10 +50,10 @@
         </template>
         <div class="space-y-2">
           <div class="text-3xl font-semibold" :class="metrics.secrets_due_now > 0 ? 'text-orange-500' : 'text-primary'">
-            {{ print "{{ metrics.secrets_due_now }}" }}
+            {{ `{{ metrics.secrets_due_now }}` }}
           </div>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            24 小时内待轮换：{{ print "{{ metrics.secrets_due_24h }}" }}
+            24 小时内待轮换：{{ `{{ metrics.secrets_due_24h }}` }}
           </p>
         </div>
       </UCard>
@@ -66,7 +66,7 @@
         </template>
         <div class="space-y-2">
           <div class="text-3xl font-semibold" :class="metrics.idempotency_conflict_rate > 0 ? 'text-amber-500' : 'text-primary'">
-            {{ print "{{ metrics.idempotency_conflict_rate.toFixed(2) }}" }}
+            {{ `{{ metrics.idempotency_conflict_rate.toFixed(2) }}` }}
             <span class="text-base font-normal text-gray-500">/min</span>
           </div>
           <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -83,7 +83,7 @@
         </template>
         <div class="space-y-2">
           <div class="text-3xl font-semibold" :class="metrics.webhook_dlq_rate > 0 ? 'text-red-500' : 'text-primary'">
-            {{ print "{{ metrics.webhook_dlq_rate.toFixed(2) }}" }}
+            {{ `{{ metrics.webhook_dlq_rate.toFixed(2) }}` }}
             <span class="text-base font-normal text-gray-500">/min</span>
           </div>
           <p class="text-sm text-gray-500 dark:text-gray-400">

@@ -49,20 +49,20 @@
           :sort="{ column: 'updated_at', direction: 'desc' }"
         >
           <template #status-data="{ row }">
-            <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ print "{{ row.status }}" }}</UBadge>
+            <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ `{{ row.status }}` }}</UBadge>
           </template>
           <template #title-data="{ row }">
             <div class="space-y-0.5">
-              <span class="font-medium">{{ print "{{ row.title }}" }}</span>
+              <span class="font-medium">{{ `{{ row.title }}` }}</span>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ print "{{ row.plugin_id }}" }} · {{ print "{{ row.vendor_id }}" }}
+                {{ `{{ row.plugin_id }}` }} · {{ `{{ row.vendor_id }}` }}
               </p>
             </div>
           </template>
           <template #ready_checklist_score-data="{ row }">
             <div class="flex items-center gap-2">
               <UProgress :value="row.ready_checklist_score" :max="100" size="xs" />
-              <span class="text-xs text-gray-500">{{ print "{{ row.ready_checklist_score }}" }}%</span>
+              <span class="text-xs text-gray-500">{{ `{{ row.ready_checklist_score }}` }}%</span>
             </div>
           </template>
         </UTable>
@@ -79,14 +79,14 @@
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
                   <UBadge :color="statusBadgeColor(selectedListing.status)" class="uppercase tracking-wide">
-                    {{ print "{{ selectedListing.status }}" }}
+                    {{ `{{ selectedListing.status }}` }}
                   </UBadge>
                   <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    {{ print "{{ selectedListing.title }}" }}
+                    {{ `{{ selectedListing.title }}` }}
                   </h2>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  插件 {{ print "{{ selectedListing.plugin_id }}" }} · Vendor {{ print "{{ selectedListing.vendor_id }}" }}
+                  插件 {{ `{{ selectedListing.plugin_id }}` }} · Vendor {{ `{{ selectedListing.vendor_id }}` }}
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">

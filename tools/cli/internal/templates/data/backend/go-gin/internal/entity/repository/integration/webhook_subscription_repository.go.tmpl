@@ -52,9 +52,9 @@ func (r *WebhookSubscriptionRepository) Upsert(ctx context.Context, sub *model.W
 	err := r.WithTenantTx(ctx, sub.TenantID, func(tx *gorm.DB) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "tenant_id"},
-				{Name: "event_type"},
-				{Name: "target_url"},
+				{"{{"}}Name{{"}}": "tenant_id"},
+				{"{{"}}Name{{"}}": "event_type"},
+				{"{{"}}Name{{"}}": "target_url"},
 			},
 			DoUpdates: clause.AssignmentColumns([]string{
 				"secret",

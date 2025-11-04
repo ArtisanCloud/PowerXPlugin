@@ -38,10 +38,10 @@
             </template>
             <UTable :rows="revocations" :columns="revocationColumns" :loading="loading">
               <template #revokedAt-data="{ row }">
-                {{ print "{{ formatDate(row.revokedAt) }}" }}
+                {{ `{{ formatDate(row.revokedAt) }}` }}
               </template>
               <template #ttlExpiry-data="{ row }">
-                {{ print "{{ formatDate(row.ttlExpiry) }}" }}
+                {{ `{{ formatDate(row.ttlExpiry) }}` }}
               </template>
             </UTable>
             <div v-if="!loading && !revocations.length" class="py-6 text-center text-gray-500 dark:text-gray-400">
@@ -58,7 +58,7 @@
             </template>
             <UTable :rows="usageEvents" :columns="usageColumns" :loading="loading">
               <template #occurredAt-data="{ row }">
-                {{ print "{{ formatDate(row.occurredAt) }}" }}
+                {{ `{{ formatDate(row.occurredAt) }}` }}
               </template>
               <template #metadata-data="{ row }">
                 <UButton size="xs" variant="soft" color="gray" @click="showMetadata(row)">

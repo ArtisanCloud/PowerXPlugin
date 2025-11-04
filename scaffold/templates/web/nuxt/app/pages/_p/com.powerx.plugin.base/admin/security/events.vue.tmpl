@@ -44,7 +44,7 @@
                     color="primary"
                     variant="soft"
                   >
-                    {{ print "{{ type }}" }}
+                    {{ `{{ type }}` }}
                   </UBadge>
                   <span v-if="!selectedTypes.length" class="text-gray-500 dark:text-gray-400"
                     >All types</span
@@ -95,20 +95,20 @@
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="flex items-center gap-2">
                     <UBadge :color="eventStatusColor(event.status)" size="xs" class="uppercase">
-                      {{ print "{{ event.status }}" }}
+                      {{ `{{ event.status }}` }}
                     </UBadge>
-                    <span class="font-semibold">{{ print "{{ event.eventType }}" }}</span>
+                    <span class="font-semibold">{{ `{{ event.eventType }}` }}</span>
                   </div>
                   <span class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ print "{{ formatDate(event.occurredAt) }}" }}
+                    {{ `{{ formatDate(event.occurredAt) }}` }}
                   </span>
                 </div>
               </template>
 
               <div class="space-y-3 text-sm">
                 <div class="flex flex-wrap gap-3">
-                  <span><strong>Asset:</strong> {{ print "{{ event.assetKey }}" }}</span>
-                  <span><strong>Recorded By:</strong> {{ print "{{ event.recordedBy }}" }}</span>
+                  <span><strong>Asset:</strong> {{ `{{ event.assetKey }}` }}</span>
+                  <span><strong>Recorded By:</strong> {{ `{{ event.recordedBy }}` }}</span>
                 </div>
                 <UDivider />
                 <div>
@@ -124,7 +124,7 @@
           <div v-if="!loading && !events.length" class="text-center py-10">
             <UIcon name="i-heroicons-book-open" class="text-4xl text-gray-300 dark:text-gray-600" />
             <p class="mt-3 text-gray-500 dark:text-gray-400">
-              {{ print "{{ tenantId ? "No lifecycle events captured yet." : "Enter a tenant ID to inspect lifecycle events." }}" }}
+              {{ `{{ tenantId ? "No lifecycle events captured yet." : "Enter a tenant ID to inspect lifecycle events." }}` }}
             </p>
           </div>
         </div>

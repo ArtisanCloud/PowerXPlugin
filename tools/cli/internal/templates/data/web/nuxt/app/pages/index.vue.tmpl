@@ -2,13 +2,13 @@
   <UContainer class="py-12">
     <div class="text-center space-y-4">
       <h1 class="text-3xl font-semibold">
-        {{ print "{{ $t("intro.title") }}" }}
+        {{ `{{ $t("intro.title") }}` }}
       </h1>
       <p class="text-gray-500">
-        {{ print "{{ $t("intro.description") }}" }}
+        {{ `{{ $t("intro.description") }}` }}
       </p>
       <UButton to="/intro" size="lg" color="primary">
-        {{ print "{{ $t("intro.viewIntro") }}" }}
+        {{ `{{ $t("intro.viewIntro") }}` }}
       </UButton>
     </div>
   </UContainer>

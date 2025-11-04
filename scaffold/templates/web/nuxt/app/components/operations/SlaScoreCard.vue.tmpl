@@ -3,36 +3,36 @@
     <template #header>
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs text-gray-500 uppercase">{{ print "{{ planLabel }}" }}</p>
-          <h3 class="text-lg font-semibold">SLA Score: {{ print "{{ formattedScore }}" }}</h3>
+          <p class="text-xs text-gray-500 uppercase">{{ `{{ planLabel }}` }}</p>
+          <h3 class="text-lg font-semibold">SLA Score: {{ `{{ formattedScore }}` }}</h3>
         </div>
-        <UBadge :color="scoreColor" size="sm">{{ print "{{ scoreStatus }}" }}</UBadge>
+        <UBadge :color="scoreColor" size="sm">{{ `{{ scoreStatus }}` }}</UBadge>
       </div>
     </template>
 
     <div class="grid grid-cols-2 gap-4 text-sm">
       <div>
         <p class="text-gray-500">Uptime</p>
-        <p>{{ print "{{ profile.uptimeActual.toFixed(2) }}" }}% <span class="text-xs text-gray-400">(Target {{ print "{{ profile.uptimeTarget.toFixed(2) }}" }}%)</span></p>
+        <p>{{ `{{ profile.uptimeActual.toFixed(2) }}` }}% <span class="text-xs text-gray-400">(Target {{ `{{ profile.uptimeTarget.toFixed(2) }}` }}%)</span></p>
       </div>
       <div>
         <p class="text-gray-500">Response</p>
-        <p>{{ print "{{ profile.responseActualMs }}" }} ms <span class="text-xs text-gray-400">(Target {{ print "{{ profile.responseTargetMs }}" }} ms)</span></p>
+        <p>{{ `{{ profile.responseActualMs }}` }} ms <span class="text-xs text-gray-400">(Target {{ `{{ profile.responseTargetMs }}` }} ms)</span></p>
       </div>
       <div>
         <p class="text-gray-500">Success Rate</p>
-        <p>{{ print "{{ profile.successActualPct.toFixed(2) }}" }}% <span class="text-xs text-gray-400">(Target {{ print "{{ profile.successTargetPct.toFixed(2) }}" }}%)</span></p>
+        <p>{{ `{{ profile.successActualPct.toFixed(2) }}` }}% <span class="text-xs text-gray-400">(Target {{ `{{ profile.successTargetPct.toFixed(2) }}` }}%)</span></p>
       </div>
       <div>
         <p class="text-gray-500">Support FRT</p>
-        <p>{{ print "{{ profile.supportFrtActualHours.toFixed(2) }}" }} h <span class="text-xs text-gray-400">(Target {{ print "{{ profile.supportFrtTargetHours.toFixed(2) }}" }} h)</span></p>
+        <p>{{ `{{ profile.supportFrtActualHours.toFixed(2) }}` }} h <span class="text-xs text-gray-400">(Target {{ `{{ profile.supportFrtTargetHours.toFixed(2) }}` }} h)</span></p>
       </div>
     </div>
 
     <div class="mt-4 text-xs text-gray-500 flex items-center justify-between">
-      <span>Last recomputed: {{ print "{{ lastUpdated }}" }}</span>
-      <span v-if="profile.incentiveAppliedAt">Incentive: {{ print "{{ formatDate(profile.incentiveAppliedAt) }}" }}</span>
-      <span v-else-if="profile.penaltyAppliedAt" class="text-danger">Penalty: {{ print "{{ formatDate(profile.penaltyAppliedAt) }}" }}</span>
+      <span>Last recomputed: {{ `{{ lastUpdated }}` }}</span>
+      <span v-if="profile.incentiveAppliedAt">Incentive: {{ `{{ formatDate(profile.incentiveAppliedAt) }}` }}</span>
+      <span v-else-if="profile.penaltyAppliedAt" class="text-danger">Penalty: {{ `{{ formatDate(profile.penaltyAppliedAt) }}` }}</span>
     </div>
   </UCard>
 </template>

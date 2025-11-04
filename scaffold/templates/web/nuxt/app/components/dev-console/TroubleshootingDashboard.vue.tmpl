@@ -4,8 +4,8 @@
       <div>
         <h2 class="text-lg font-semibold">故障排查总览</h2>
         <p class="text-sm text-gray-500">
-          最近刷新时间：{{ print "{{ summary ? formatDate(summary.refreshed_at) : '尚未刷新' }}" }}
-          <span v-if="refreshLabel" class="ml-2 text-xs text-gray-400">{{ print "{{ refreshLabel }}" }}</span>
+          最近刷新时间：{{ `{{ summary ? formatDate(summary.refreshed_at) : '尚未刷新' }}` }}
+          <span v-if="refreshLabel" class="ml-2 text-xs text-gray-400">{{ `{{ refreshLabel }}` }}</span>
         </p>
       </div>
       <div class="flex gap-3">
@@ -28,8 +28,8 @@
           </template>
           <ul class="space-y-2">
             <li v-for="item in summary.health" :key="item.name" class="flex items-start justify-between">
-              <span class="font-medium text-sm">{{ print "{{ item.name }}" }}</span>
-              <UBadge :color="healthColor(item.status)">{{ print "{{ item.status }}" }}</UBadge>
+              <span class="font-medium text-sm">{{ `{{ item.name }}` }}</span>
+              <UBadge :color="healthColor(item.status)">{{ `{{ item.status }}` }}</UBadge>
             </li>
             <li v-if="!summary.health?.length" class="text-sm text-gray-500">暂无健康数据</li>
           </ul>
@@ -41,10 +41,10 @@
           <ul class="space-y-3">
             <li v-for="quota in summary.quota" :key="quota.capability" class="flex items-center justify-between text-sm">
               <div>
-                <div class="font-medium">{{ print "{{ quota.capability }}" }}</div>
-                <div v-if="quota.window" class="text-xs text-gray-500">窗口：{{ print "{{ quota.window }}" }}</div>
+                <div class="font-medium">{{ `{{ quota.capability }}` }}</div>
+                <div v-if="quota.window" class="text-xs text-gray-500">窗口：{{ `{{ quota.window }}` }}</div>
               </div>
-              <span>{{ print "{{ quota.usage_percent.toFixed(1) }}" }}%</span>
+              <span>{{ `{{ quota.usage_percent.toFixed(1) }}` }}%</span>
             </li>
             <li v-if="!summary.quota?.length" class="text-sm text-gray-500">暂无配额数据</li>
           </ul>
@@ -58,23 +58,23 @@
         <div class="grid gap-4 md:grid-cols-3 text-sm">
           <div>
             <div class="text-xs text-gray-500">成功率</div>
-            <div class="text-lg font-semibold">{{ print "{{ (summary.webhook_delivery.success_rate * 100).toFixed(1) }}" }}%</div>
+            <div class="text-lg font-semibold">{{ `{{ (summary.webhook_delivery.success_rate * 100).toFixed(1) }}` }}%</div>
           </div>
           <div>
             <div class="text-xs text-gray-500">重试率</div>
-            <div class="text-lg font-semibold">{{ print "{{ (summary.webhook_delivery.retry_rate * 100).toFixed(1) }}" }}%</div>
+            <div class="text-lg font-semibold">{{ `{{ (summary.webhook_delivery.retry_rate * 100).toFixed(1) }}` }}%</div>
           </div>
           <div>
             <div class="text-xs text-gray-500">死信率</div>
-            <div class="text-lg font-semibold">{{ print "{{ (summary.webhook_delivery.dlq_rate * 100).toFixed(1) }}" }}%</div>
+            <div class="text-lg font-semibold">{{ `{{ (summary.webhook_delivery.dlq_rate * 100).toFixed(1) }}` }}%</div>
           </div>
         </div>
         <div class="mt-4">
           <h3 class="text-sm font-semibold mb-2">近期失败</h3>
           <ul class="space-y-2">
             <li v-for="failure in summary.webhook_delivery.recent_failures" :key="failure.id" class="flex justify-between text-sm">
-              <span>{{ print "{{ failure.payload_id || failure.id }}" }}</span>
-              <span class="text-gray-500">{{ print "{{ failure.status }}" }}</span>
+              <span>{{ `{{ failure.payload_id || failure.id }}` }}</span>
+              <span class="text-gray-500">{{ `{{ failure.status }}` }}</span>
             </li>
             <li v-if="!summary.webhook_delivery.recent_failures?.length" class="text-sm text-gray-500">暂无失败记录</li>
           </ul>

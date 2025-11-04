@@ -15,13 +15,13 @@
       <div v-if="entries.length === 0" class="text-sm text-gray-500">暂无时间线记录</div>
       <div v-for="entry in entries" :key="entry.id" class="border rounded-md p-3">
         <div class="flex items-center justify-between">
-          <div class="font-medium capitalize">{{ print "{{ entry.entry_type.replace('_', ' ') }}" }}</div>
-          <div class="text-xs text-gray-500">{{ print "{{ formatDate(entry.posted_at) }}" }}</div>
+          <div class="font-medium capitalize">{{ `{{ entry.entry_type.replace('_', ' ') }}` }}</div>
+          <div class="text-xs text-gray-500">{{ `{{ formatDate(entry.posted_at) }}` }}</div>
         </div>
-        <p class="mt-2 whitespace-pre-line text-sm">{{ print "{{ entry.message }}" }}</p>
+        <p class="mt-2 whitespace-pre-line text-sm">{{ `{{ entry.message }}` }}</p>
         <div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-          <span v-if="entry.stakeholder_channel">Channel: {{ print "{{ entry.stakeholder_channel }}" }}</span>
-          <span v-if="entry.author_role">Author: {{ print "{{ entry.author_role }}" }}</span>
+          <span v-if="entry.stakeholder_channel">Channel: {{ `{{ entry.stakeholder_channel }}` }}</span>
+          <span v-if="entry.author_role">Author: {{ `{{ entry.author_role }}` }}</span>
         </div>
       </div>
     </div>

@@ -35,11 +35,11 @@
       <UTable :rows="subscriptions" :columns="columns" :loading="loading">
         <template #status-data="{ row }">
           <UBadge :color="statusBadgeColor(row.status)" variant="soft" class="uppercase tracking-wide">
-            {{ print "{{ row.status }}" }}
+            {{ `{{ row.status }}` }}
           </UBadge>
         </template>
         <template #retry_policy-data="{ row }">
-          <span v-if="row.retry_policy?.length">{{ print "{{ row.retry_policy.join('s · ') }}" }}s</span>
+          <span v-if="row.retry_policy?.length">{{ `{{ row.retry_policy.join('s · ') }}` }}s</span>
           <span v-else class="text-gray-400">默认</span>
         </template>
         <template #actions-data="{ row }">
@@ -112,7 +112,7 @@
               <span class="font-semibold">最近投递尝试</span>
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
-              {{ print "{{ selectedSubscription?.event_type }}" }} → {{ print "{{ selectedSubscription?.target_url }}" }}
+              {{ `{{ selectedSubscription?.event_type }}` }} → {{ `{{ selectedSubscription?.target_url }}` }}
             </p>
           </div>
         </template>
@@ -121,11 +121,11 @@
           <UTable :rows="attempts" :columns="attemptColumns" :loading="attemptLoading">
             <template #status-data="{ row }">
               <UBadge :color="statusBadgeColor(row.status)" variant="soft" class="uppercase tracking-wide">
-                {{ print "{{ row.status }}" }}
+                {{ `{{ row.status }}` }}
               </UBadge>
             </template>
             <template #payload_snapshot-data="{ row }">
-              <pre class="max-h-32 overflow-auto bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs">{{ print "{{ formatPayload(row.payload_snapshot) }}" }}</pre>
+              <pre class="max-h-32 overflow-auto bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs">{{ `{{ formatPayload(row.payload_snapshot) }}` }}</pre>
             </template>
             <template #actions-data="{ row }">
               <UButton

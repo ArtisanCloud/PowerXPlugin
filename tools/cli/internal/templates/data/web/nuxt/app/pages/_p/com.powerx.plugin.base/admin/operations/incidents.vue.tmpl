@@ -27,11 +27,11 @@
             @click="selectIncident(incident.id)"
           >
             <div class="flex items-center justify-between text-sm">
-              <span class="font-medium uppercase">{{ print "{{ incident.severity }}" }}</span>
-              <UBadge :color="statusColor(incident.status)" size="xs">{{ print "{{ incident.status }}" }}</UBadge>
+              <span class="font-medium uppercase">{{ `{{ incident.severity }}` }}</span>
+              <UBadge :color="statusColor(incident.status)" size="xs">{{ `{{ incident.status }}` }}</UBadge>
             </div>
-            <p class="mt-2 text-sm line-clamp-2">{{ print "{{ incident.summary }}" }}</p>
-            <div class="mt-2 text-xs text-gray-500">下一次更新：{{ print "{{ formatDate(incident.next_update_at) }}" }}</div>
+            <p class="mt-2 text-sm line-clamp-2">{{ `{{ incident.summary }}` }}</p>
+            <div class="mt-2 text-xs text-gray-500">下一次更新：{{ `{{ formatDate(incident.next_update_at) }}` }}</div>
           </div>
           <div v-if="store.incidents.length === 0" class="text-sm text-gray-500">暂无事故记录</div>
         </div>
@@ -42,14 +42,14 @@
           <template #header>
             <div class="flex items-center justify-between">
               <div>
-                <div class="text-sm text-gray-500">{{ print "{{ store.selected.incident.detection_source }}" }}</div>
-                <h2 class="text-xl font-semibold">{{ print "{{ store.selected.incident.summary }}" }}</h2>
+                <div class="text-sm text-gray-500">{{ `{{ store.selected.incident.detection_source }}` }}</div>
+                <h2 class="text-xl font-semibold">{{ `{{ store.selected.incident.summary }}` }}</h2>
               </div>
               <div class="flex gap-2 items-center">
                 <UBadge :color="statusColor(store.selected.incident.status)">
-                  {{ print "{{ store.selected.incident.status }}" }}
+                  {{ `{{ store.selected.incident.status }}` }}
                 </UBadge>
-                <UBadge variant="soft">SEV: {{ print "{{ store.selected.incident.severity.toUpperCase() }}" }}</UBadge>
+                <UBadge variant="soft">SEV: {{ `{{ store.selected.incident.severity.toUpperCase() }}` }}</UBadge>
               </div>
             </div>
           </template>
@@ -58,11 +58,11 @@
             <div>
               <h3 class="font-medium mb-2">事故详情</h3>
               <div class="space-y-2 text-sm">
-                <div>检测时间：{{ print "{{ formatDate(store.selected.incident.detected_at) }}" }}</div>
-                <div v-if="store.selected.incident.mitigation">缓解措施：{{ print "{{ store.selected.incident.mitigation }}" }}</div>
-                <div v-if="store.selected.incident.root_cause">根因：{{ print "{{ store.selected.incident.root_cause }}" }}</div>
+                <div>检测时间：{{ `{{ formatDate(store.selected.incident.detected_at) }}` }}</div>
+                <div v-if="store.selected.incident.mitigation">缓解措施：{{ `{{ store.selected.incident.mitigation }}` }}</div>
+                <div v-if="store.selected.incident.root_cause">根因：{{ `{{ store.selected.incident.root_cause }}` }}</div>
                 <div class="space-x-2">
-                  <UBadge v-for="label in visibleIncidentLabels" :key="label" variant="soft">#{{ print "{{ label }}" }}</UBadge>
+                  <UBadge v-for="label in visibleIncidentLabels" :key="label" variant="soft">#{{ `{{ label }}` }}</UBadge>
                 </div>
               </div>
             </div>

@@ -21,7 +21,7 @@ mappings:
       - globs: ["**/*.vue"]
         regex: "{{\\s*(?!print)(.*?)\\s*}}"
         flags: "gs"
-        replace: "{{ print \"{{ $1 }}\" }}"
+        replace: "{{ `{{ $1 }}` }}"
       - globs: ["nuxt.config.ts", "app/**/*.ts", "i18n/**/*.json", "package.json"]
         literal: "'com.powerx.plugin.base'"
         replace: "'{{ .PluginID }}'"
@@ -42,7 +42,7 @@ mappings:
         replace: 'title: "{{ .PluginName }}"'
       - globs: ["app/pages/_p/__plugin__/admin/index.vue"]
         literal: "欢迎使用 PowerX Sample Plugin 插件脚手架示例页面。"
-        replace: "欢迎使用 {{ print \"{{ .PluginName }}\" }} 插件脚手架示例页面。"
+        replace: "欢迎使用 {{ `{{ .PluginName }}` }} 插件脚手架示例页面。"
   - name: backend
     source: skeleton/backend
     targets:
@@ -87,3 +87,72 @@ mappings:
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Version: "0.1.0"'
         replace: 'Version: "{{ .Version }}"'
+      - globs: ["**/*.go"]
+        literal: '{Name: "checksum"}'
+        replace: '{"{{"}}Name{{"}}": "checksum"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "tenant_id"}'
+        replace: '{"{{"}}Name{{"}}": "tenant_id"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "license_id"}'
+        replace: '{"{{"}}Name{{"}}": "license_id"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "metric"}'
+        replace: '{"{{"}}Name{{"}}": "metric"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "window"}'
+        replace: '{"{{"}}Name{{"}}": "window"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "time_bucket"}'
+        replace: '{"{{"}}Name{{"}}": "time_bucket"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "event_type"}'
+        replace: '{"{{"}}Name{{"}}": "event_type"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "period_end"}'
+        replace: '{"{{"}}Name{{"}}": "period_end"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "period_start"}'
+        replace: '{"{{"}}Name{{"}}": "period_start"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "target_url"}'
+        replace: '{"{{"}}Name{{"}}": "target_url"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "vendor_id"}'
+        replace: '{"{{"}}Name{{"}}": "vendor_id"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "read", Description: "查看模板"}'
+        replace: '{"{{"}}Name{{"}}": "read", Description: "查看模板"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "create", Description: "创建模板"}'
+        replace: '{"{{"}}Name{{"}}": "create", Description: "创建模板"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "update", Description: "更新模板"}'
+        replace: '{"{{"}}Name{{"}}": "update", Description: "更新模板"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "delete", Description: "删除模板"}'
+        replace: '{"{{"}}Name{{"}}": "delete", Description: "删除模板"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "Webhooks", Status: "healthy", Message: "All systems go"}'
+        replace: '{"{{"}}Name{{"}}": "Webhooks", Status: "healthy", Message: "All systems go"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "plugin_id"}'
+        replace: '{"{{"}}Name{{"}}": "plugin_id"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "tenant_id"}'
+        replace: '{"{{"}}Name{{"}}": "tenant_id"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "advisory_id"}'
+        replace: '{"{{"}}Name{{"}}": "advisory_id"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "asset_key"}'
+        replace: '{"{{"}}Name{{"}}": "asset_key"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "channel"}'
+        replace: '{"{{"}}Name{{"}}": "channel"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "toolgrant_id"}'
+        replace: '{"{{"}}Name{{"}}": "toolgrant_id"}'
+      - globs: ["**/*.go"]
+        literal: '{Name: "version"}'
+        replace: '{"{{"}}Name{{"}}": "version"}'

@@ -13,7 +13,7 @@
           v-if="showBodyMessage"
           class="text-sm text-gray-600 dark:text-gray-300"
         >
-          {{ print "{{ bodyMessage }}" }}
+          {{ `{{ bodyMessage }}` }}
         </p>
       </slot>
     </template>
@@ -25,14 +25,14 @@
           :disabled="loading"
           @click="handleCancel"
         >
-          {{ print "{{ cancelText }}" }}
+          {{ `{{ cancelText }}` }}
         </UButton>
         <UButton
           :color="buttonColor"
           :loading="loading"
           @click="handleConfirm"
         >
-          {{ print "{{ confirmText }}" }}
+          {{ `{{ confirmText }}` }}
         </UButton>
       </div>
     </template>

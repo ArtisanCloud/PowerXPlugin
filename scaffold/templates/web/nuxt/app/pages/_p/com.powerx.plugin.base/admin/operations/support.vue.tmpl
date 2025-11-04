@@ -17,7 +17,7 @@
         <div v-for="(channel, index) in form.channels" :key="index" class="space-y-2 border rounded-md p-3 mb-3">
           <UInput v-model="channel.channel" label="渠道类型" placeholder="marketplace_ticket" />
           <UInput v-model="channel.address" label="地址" placeholder="https://support.example.com" />
-          <UTag v-for="role in channel.escalates" :key="role" class="mr-1">{{ print "{{ role }}" }}</UTag>
+          <UTag v-for="role in channel.escalates" :key="role" class="mr-1">{{ `{{ role }}` }}</UTag>
         </div>
         <UButton icon="i-heroicons-plus" variant="ghost" @click="addChannel">新增渠道</UButton>
       </UCard>
@@ -37,7 +37,7 @@
       <template #header>就绪检查</template>
       <div class="flex flex-wrap gap-2">
         <UBadge v-for="item in store.playbook?.readiness || []" :key="item.key" :color="item.completed ? 'success' : 'warning'">
-          {{ print "{{ item.key }}" }}
+          {{ `{{ item.key }}` }}
         </UBadge>
       </div>
     </UCard>

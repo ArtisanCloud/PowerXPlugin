@@ -53,8 +53,8 @@ func (r *Repository) UpsertClassification(ctx context.Context, record *model.Dat
 		return nil, errors.New("tenant_id and asset_key are required")
 	}
 	return r.classifications.Upsert(ctx, record, []clause.Column{
-		{Name: "tenant_id"},
-		{Name: "asset_key"},
+		{"{{"}}Name{{"}}": "tenant_id"},
+		{"{{"}}Name{{"}}": "asset_key"},
 	})
 }
 

@@ -53,17 +53,17 @@
 
             <div v-if="selectedPlan" class="rounded border border-gray-200 p-4 dark:border-gray-700">
               <h3 class="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                {{ print "{{ selectedPlan.plan_code }}" }}
+                {{ `{{ selectedPlan.plan_code }}` }}
                 <UBadge v-if="selectedPlan.is_default" color="primary" class="uppercase">默认</UBadge>
               </h3>
               <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                类型：{{ print "{{ selectedPlan.plan_type }}" }} · 币种：{{ print "{{ selectedPlan.currency }}" }}
-                <span v-if="selectedPlan.amount != null"> · 金额：{{ print "{{ selectedPlan.amount }}" }}</span>
+                类型：{{ `{{ selectedPlan.plan_type }}` }} · 币种：{{ `{{ selectedPlan.currency }}` }}
+                <span v-if="selectedPlan.amount != null"> · 金额：{{ `{{ selectedPlan.amount }}` }}</span>
               </p>
               <ul v-if="selectedPlan.tiers?.length" class="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-300">
                 <li v-for="tier in selectedPlan.tiers" :key="tier.id">
-                  {{ print "{{ tier.metric }}" }}: {{ print "{{ tier.range_from }}" }} -
-                  {{ print "{{ tier.range_to ?? '∞' }}" }} → {{ print "{{ tier.unit_amount }}" }}/{{ print "{{ tier.unit_name || 'unit' }}" }}
+                  {{ `{{ tier.metric }}` }}: {{ `{{ tier.range_from }}` }} -
+                  {{ `{{ tier.range_to ?? '∞' }}` }} → {{ `{{ tier.unit_amount }}` }}/{{ `{{ tier.unit_name || 'unit' }}` }}
                 </li>
               </ul>
             </div>
@@ -95,16 +95,16 @@
           <div v-else class="space-y-4">
             <div class="rounded border border-gray-200 p-4 dark:border-gray-700 space-y-2">
               <div class="flex items-center justify-between">
-                <h3 class="text-base font-semibold text-gray-900 dark:text-white">License #{{ print "{{ license.id }}" }}</h3>
-                <UBadge :color="licenseBadgeColor" class="uppercase">{{ print "{{ license.status }}" }}</UBadge>
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white">License #{{ `{{ license.id }}` }}</h3>
+                <UBadge :color="licenseBadgeColor" class="uppercase">{{ `{{ license.status }}` }}</UBadge>
               </div>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                计划 {{ print "{{ license.plan_id }}" }} · 过期时间 {{ print "{{ formatIso(license.expires_at) }}" }}
+                计划 {{ `{{ license.plan_id }}` }} · 过期时间 {{ `{{ formatIso(license.expires_at) }}` }}
               </p>
               <p v-if="license.offline_until" class="text-sm text-gray-500 dark:text-gray-400">
-                离线可用至 {{ print "{{ formatIso(license.offline_until) }}" }}
+                离线可用至 {{ `{{ formatIso(license.offline_until) }}` }}
               </p>
-              <p class="text-xs break-words text-gray-400">Token: {{ print "{{ license.token }}" }}</p>
+              <p class="text-xs break-words text-gray-400">Token: {{ `{{ license.token }}` }}</p>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">

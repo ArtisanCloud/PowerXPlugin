@@ -48,8 +48,8 @@ func (r *Repository) RecordRevocation(ctx context.Context, rec *model.Revocation
 		return nil, errors.New("ttl_expiry required")
 	}
 	return r.revocations.Upsert(ctx, rec, []clause.Column{
-		{Name: "tenant_id"},
-		{Name: "toolgrant_id"},
+		{"{{"}}Name{{"}}": "tenant_id"},
+		{"{{"}}Name{{"}}": "toolgrant_id"},
 	})
 }
 

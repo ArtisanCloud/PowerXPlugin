@@ -39,12 +39,12 @@ function localSetTheme(t: 'light'|'dark'|'system') {
 
 <template>
   <div class="wrap">
-    <h3>{{ print "{{ t('common.appName') }}" }}</h3>
+    <h3>{{ `{{ t('common.appName') }}` }}</h3>
     <div class="badges">
-      <span class="badge">locale: <b>{{ print "{{ loc }}" }}</b></span>
-      <span class="badge">theme:  <b>{{ print "{{ thm }}" }}</b></span>
+      <span class="badge">locale: <b>{{ `{{ loc }}` }}</b></span>
+      <span class="badge">theme:  <b>{{ `{{ thm }}` }}</b></span>
     </div>
-    <p>{{ print "{{ t('common.welcome') }}" }}</p>
+    <p>{{ `{{ t('common.welcome') }}` }}</p>
 
     <div class="ops">
       <button @click="localSetZh">中文</button>

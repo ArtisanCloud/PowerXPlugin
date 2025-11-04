@@ -62,12 +62,12 @@
         >
           <template #title-data="{ row }">
             <div class="space-y-0.5">
-              <span class="font-medium">{{ print "{{ row.title }}" }}</span>
-              <p class="text-xs text-gray-500 dark:text-gray-400">{{ print "{{ row.plugin_id }}" }}</p>
+              <span class="font-medium">{{ `{{ row.title }}` }}</span>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ row.plugin_id }}` }}</p>
             </div>
           </template>
           <template #status-data="{ row }">
-            <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ print "{{ row.status }}" }}</UBadge>
+            <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ `{{ row.status }}` }}</UBadge>
           </template>
         </UTable>
 
@@ -81,10 +81,10 @@
           <div class="flex items-center justify-between gap-2">
             <div class="space-y-1">
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {{ print "{{ selectedListing?.title }}" }} 价格计划
+                {{ `{{ selectedListing?.title }}` }} 价格计划
               </h2>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                Plugin {{ print "{{ selectedListing?.plugin_id }}" }} · Tenant Listing
+                Plugin {{ `{{ selectedListing?.plugin_id }}` }} · Tenant Listing
               </p>
             </div>
             <UButton color="primary" :loading="saving" @click="savePlans">保存变更</UButton>
@@ -105,7 +105,7 @@
               size="sm"
               @click="selectedPlanIndex = index"
             >
-              {{ print "{{ plan.plan_code || `计划 ${index + 1}` }}" }}
+              {{ `{{ plan.plan_code || `计划 ${index + 1}` }}` }}
             </UButton>
           </div>
 

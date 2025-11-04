@@ -2,10 +2,10 @@
   <UContainer class="py-10 space-y-6">
     <div class="space-y-2">
       <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-        {{ print "{{ $t("templates.overview.title") }}" }}
+        {{ `{{ $t("templates.overview.title") }}` }}
       </h1>
       <p class="text-gray-600 dark:text-gray-300">
-        {{ print "{{ $t("templates.overview.description") }}" }}
+        {{ `{{ $t("templates.overview.description") }}` }}
       </p>
     </div>
 
@@ -14,33 +14,33 @@
         <template #header>
           <div class="flex items-center gap-2">
             <UIcon name="i-heroicons-document-plus" class="text-primary" />
-            <span class="font-medium">{{ print "{{ $t("templates.overview.cards.create") }}" }}</span>
+            <span class="font-medium">{{ `{{ $t("templates.overview.cards.create") }}` }}</span>
           </div>
         </template>
         <p class="text-sm text-gray-600 dark:text-gray-300">
-          {{ print "{{ $t("templates.overview.cards.createDescription") }}" }}
+          {{ `{{ $t("templates.overview.cards.createDescription") }}` }}
         </p>
       </UCard>
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">
             <UIcon name="i-heroicons-rocket-launch" class="text-primary" />
-            <span class="font-medium">{{ print "{{ $t("templates.overview.cards.automation") }}" }}</span>
+            <span class="font-medium">{{ `{{ $t("templates.overview.cards.automation") }}` }}</span>
           </div>
         </template>
         <p class="text-sm text-gray-600 dark:text-gray-300">
-          {{ print "{{ $t("templates.overview.cards.automationDescription") }}" }}
+          {{ `{{ $t("templates.overview.cards.automationDescription") }}` }}
         </p>
       </UCard>
       <UCard>
         <template #header>
           <div class="flex items-center gap-2">
             <UIcon name="i-heroicons-chart-bar" class="text-primary" />
-            <span class="font-medium">{{ print "{{ $t("templates.overview.cards.analytics") }}" }}</span>
+            <span class="font-medium">{{ `{{ $t("templates.overview.cards.analytics") }}` }}</span>
           </div>
         </template>
         <p class="text-sm text-gray-600 dark:text-gray-300">
-          {{ print "{{ $t("templates.overview.cards.analyticsDescription") }}" }}
+          {{ `{{ $t("templates.overview.cards.analyticsDescription") }}` }}
         </p>
       </UCard>
     </div>

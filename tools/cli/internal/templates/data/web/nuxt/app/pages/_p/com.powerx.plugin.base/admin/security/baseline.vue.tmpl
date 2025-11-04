@@ -34,7 +34,7 @@
       <UTable :rows="rows" :columns="columns" :loading="loading">
         <template #status-data="{ row }">
           <UBadge :color="statusColor(row.status)" size="xs" class="uppercase">
-            {{ print "{{ row.status }}" }}
+            {{ `{{ row.status }}` }}
           </UBadge>
         </template>
         <template #findings-data="{ row }">

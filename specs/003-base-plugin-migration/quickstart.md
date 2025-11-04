@@ -2,7 +2,7 @@
 
 ## 前提条件
 
-- Go 1.21+，开启 `GOWORK=on`
+- Go 1.24+，开启 `GOWORK=on`
 - Node.js 18+、npm 9+
 - 已完成 Phase 1~3 的实现并执行 `go work sync`
 - 当前分支：`003-base-plugin-migration`

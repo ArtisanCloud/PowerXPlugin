@@ -5,7 +5,7 @@
 ## 入门路线图
 
 1. **准备运行环境**  
-   - 安装 Go 1.21+（启用 `GOWORK=on`）与 Node.js 18+ / npm 9+。  
+   - 安装 Go 1.24+（启用 `GOWORK=on`）与 Node.js 18+ / npm 9+。  
    - 建议阅读 `docs/init-project.md` 了解更完整的环境说明。
 
 2. **Standalone 骨架演练**  

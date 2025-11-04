@@ -14,7 +14,7 @@
 
 ## 2. 前置环境
 
-- Go 1.21+（确保 `go env GOWORK` 指向本仓库）
+- Go 1.24+（确保 `go env GOWORK` 指向本仓库）
 - Node.js 18+ 与 npm 9+
 - Playwright 1.48+（首次运行会自动安装浏览器二进制）
 - curl / bash / python3（契约校验脚本需要标准工具）

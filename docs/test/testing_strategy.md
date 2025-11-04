@@ -3,7 +3,7 @@
 **文档版本**: v1.0  
 **创建日期**: 2025-10-31  
 **项目阶段**: Phase 0-7 已完成，进入稳定维护期  
-**适用范围**: PowerXPlugin 仓库（Go 1.21+ / Nuxt 4.2+）
+**适用范围**: PowerXPlugin 仓库（Go 1.24+ / Nuxt 4.2+）
 
 ---
 
@@ -790,7 +790,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
           
       - name: Run Go tests
         run: |
@@ -829,7 +829,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
           
       - name: Setup Node
         uses: actions/setup-node@v4

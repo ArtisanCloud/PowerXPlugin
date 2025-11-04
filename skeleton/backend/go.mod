@@ -1,6 +1,6 @@
 module github.com/powerx-plugin/powerxplugin/skeleton/backend
 
-go 1.24.0
+go 1.24
 
 replace github.com/powerx-plugin/framework => ../../framework
 

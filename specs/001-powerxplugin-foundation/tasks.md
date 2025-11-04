@@ -49,7 +49,7 @@
 - [X] T018 [US1] 编写 `skeleton/backend/cmd/plugin/main.go`，按六步装配流程注册框架与业务路由
 - [X] T019 [P] [US1] 实现 `skeleton/backend/internal/routes/routes.go`，提供 `GET /api/v1/ping`
 - [X] T020 [P] [US1] 实现 `skeleton/backend/internal/service/ping.go` 与 `handler/ping.go`
-- [X] T021 [US1] 编写 `skeleton/backend/README.md`，记录 Go 1.21+ 依赖与启动命令
+- [X] T021 [US1] 编写 `skeleton/backend/README.md`，记录 Go 1.24+ 依赖与启动命令
 - [X] T022 [US1] 配置 `skeleton/web-admin/nuxt.config.ts`，引入 `definePowerXAdminConfig`
 - [X] T023 [P] [US1] 创建 `skeleton/web-admin/app/pages/_p/com.powerx.sample/admin/index.vue` Starter 页面
 - [X] T024 [P] [US1] 添加 `skeleton/web-admin/app/components/powerx/PXNav.vue` 覆盖示例

@@ -8,6 +8,8 @@ on:
 jobs:
   template-sync:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,11 +22,13 @@ jobs:
 
   backend:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
       - name: Go work sync
         run: go work sync
       - name: Go test (framework)
@@ -34,6 +38,8 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,11 +56,13 @@ jobs:
 
   contracts:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
       - name: Go work sync
         run: go work sync
       - name: Run contract validators
@@ -62,11 +70,13 @@ jobs:
 
   cli:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
       - name: Build px-plugin and scaffold sample project
         run: |
           go work sync
@@ -79,11 +89,13 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     needs: [backend, contracts, cli]
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -100,11 +112,13 @@ jobs:
   regression:
     runs-on: ubuntu-latest
     needs: [smoke]
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

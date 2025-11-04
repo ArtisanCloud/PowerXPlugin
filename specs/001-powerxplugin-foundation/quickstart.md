@@ -4,7 +4,7 @@
 
 ## 必备环境
 
-- Go 1.21+，启用 `GOWORK=on`
+- Go 1.24+，启用 `GOWORK=on`
 - Node.js 18+ / npm 9+
 - GNU make（可选，用于脚本化任务）
 

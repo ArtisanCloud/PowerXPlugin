@@ -1,6 +1,6 @@
 module github.com/powerx-plugins/com-powerx-demo/backend
 
-go 1.21
+go 1.24
 
 require github.com/powerx-plugin/framework v0.0.0
 

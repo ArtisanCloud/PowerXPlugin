@@ -5,7 +5,7 @@ This document standardises the entry points and expected behaviours for the smok
 ## Smoke Workflow (`scripts/testing/smoke.sh` / `make test-smoke`)
 - **Inputs**: None (runs from repository root).
 - **Prerequisites**:
-  - Go 1.21+ installed and available in `PATH`.
+  - Go 1.24+ installed and available in `PATH`.
   - Node.js 18+ / npm 9+ installed.
   - `PX_PLUGIN_BIN` optional override; otherwise script builds `bin/px-plugin`.
 - **Steps (must execute sequentially)**:

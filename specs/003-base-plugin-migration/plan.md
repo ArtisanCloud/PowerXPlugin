@@ -9,7 +9,7 @@ Deliver end-to-end parity between the existing Base plugin example and the Power
 
 ## Technical Context
 
-- **Languages & Tooling**: Go 1.21+, Gin-compatible router abstractions, Node.js 18+, Nuxt 4.2, npm 9+.  
+- **Languages & Tooling**: Go 1.24+, Gin-compatible router abstractions, Node.js 18+, Nuxt 4.2, npm 9+.  
 - **Framework Packages**: `framework/backend/go/router`, `bootstrap`, `middleware`, `manifest`, `@powerx-plugin/framework-client`, `@powerx-plugin/framework-admin`.  
 - **Skeleton Targets**: `skeleton/backend` (Go module), `skeleton/web-admin` (Nuxt app).  
 - **CLI & Templates**: `scaffold/templates/backend/go-gin`, `scaffold/templates/web/nuxt`, `tools/cli`.  

@@ -55,7 +55,7 @@
 - 在文档中标注“未来可新增 `framework/backend/<lang>`、`framework/frontend/<stack>`”。
 
 ### Phase 4 · Scaffold 模板与 CLI 扩展
-- （进行中）研究 Base 插件的目录命名、配置文件，编写 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web/nuxt`，确保能渲染出 Phase 2 中定义的 Skeleton。
+- （进行中）研究 Base 插件的目录命名、配置文件，编写 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web-admin/nuxt`，确保能渲染出 Phase 2 中定义的 Skeleton。
 - （规划中）CLI 首阶段只暴露 Go + Nuxt 模板，保留 `--backend`、`--frontend` 参数但标记为 `experimental`，待多语言模板准备就绪后再正式开放。
 - （规划中）`plugin.yaml` 中记录框架类型（`backend: go-gin`, `frontend: nuxt`），供宿主或 CLI 在构建、打包阶段读取。
 - （待开发）在 `px-plugin` CLI 中补齐 `package` / `dist` / `publish` 子命令的最小实现：`package` 负责编译后端（`go build`）与前端（`npm run build`），`dist` 将构建产物与 `plugin.yaml`、CHANGELOG 等打包，`publish` 则调用 Marketplace API 上传。当前文档中涉及这些命令的流程仅是设计稿，执行前需确认对应命令已实现并在 `CHANGELOG` 记录。
@@ -169,7 +169,7 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
   * 后端：`github.com/powerx-plugin/framework/...`（当前默认 Go 实现）
   * 前端：`@powerx-plugin/framework-admin` / `@powerx-plugin/framework-client`
 * **Scaffold** 只负责把“入口 + 钩子 + 占位文件 + 固定依赖版本”渲染到目标项目；**不会被 import**。
-* `@powerx-plugin/framework-*` 以 npm workspace 形式维护源码，但发布时需分别执行 `npm publish --workspace <pkg>`，并在每次 release 更新脚手架模板中的版本锁定（例如 `scaffold/templates/web/nuxt/package.json.tmpl`），否则外部插件无法锁定稳定依赖。
+* `@powerx-plugin/framework-*` 以 npm workspace 形式维护源码，但发布时需分别执行 `npm publish --workspace <pkg>`，并在每次 release 更新脚手架模板中的版本锁定（例如 `scaffold/templates/web-admin/nuxt/package.json.tmpl`），否则外部插件无法锁定稳定依赖。
 * 多语言与多前端栈仍在调研中：仓库结构中预留了目录，但没有任何非 Go/Nuxt 的可执行实现。开启新语言前需先在 `docs/backlog/multi-language.md` 完成设计评审。
 
 ---

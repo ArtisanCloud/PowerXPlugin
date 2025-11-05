@@ -89,7 +89,7 @@ PowerXPlugin/
 │  ├─ backend/go-gin/
 │  │  ├─ cmd/plugin/main.go.tmpl
 │  │  └─ internal/*.tmpl
-│  └─ web/nuxt/
+│  └─ web-admin/nuxt/
 │     ├─ nuxt.config.ts.tmpl
 │     └─ app/**/*.tmpl
 ├─ tools/cli/                              # Phase 4: px-plugin CLI

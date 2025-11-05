@@ -24,7 +24,7 @@
 - [X] T006 初始化 `tools/cli/go.mod` 与 `tools/cli/cmd/` 目录（预留 init/package/dist/publish 命令）
 - [X] T007 配置 `framework/frontend/nuxt` 下的 package.json 与目录结构
 - [X] T008 创建 `skeleton/backend` 与 `skeleton/web-admin` 目录骨架（含 `cmd/plugin`、`internal/`、`app/`）
-- [X] T009 建立 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web/nuxt` 目录占位
+- [X] T009 建立 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web-admin/nuxt` 目录占位
 - [X] T010 添加入仓 `config/config.yaml.example` 作为环境配置模板
 
 **Checkpoint**: 目录骨架与多模块配置完成，可开始用户故事实现。
@@ -94,8 +94,8 @@
 
 - [X] T038 [US3] 创建 `scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl` 与变量占位
 - [X] T039 [P] [US3] 创建 `scaffold/templates/backend/go-gin/internal/routes.go.tmpl`、`handler/ping.go.tmpl`
-- [X] T040 [P] [US3] 创建 `scaffold/templates/web/nuxt/nuxt.config.ts.tmpl` 与 Starter 页面模板
-- [X] T041 [P] [US3] 创建 `scaffold/templates/web/nuxt/app/pages/_p/__plugin__/admin/index.vue.tmpl`
+- [X] T040 [P] [US3] 创建 `scaffold/templates/web-admin/nuxt/nuxt.config.ts.tmpl` 与 Starter 页面模板
+- [X] T041 [P] [US3] 创建 `scaffold/templates/web-admin/nuxt/app/pages/_p/__plugin__/admin/index.vue.tmpl`
 - [X] T042 [US3] 实现 `tools/cli/internal/templates/embed.go`，使用 `go:embed` 打包模板
 - [X] T043 [US3] 实现 `tools/cli/cmd/init.go`，渲染模板并写入 `plugin.yaml`
 - [X] T044 [P] [US3] 实现 `tools/cli/internal/contracts/embed.go`，内置 Manifest/RBAC/OpenAPI 元数据

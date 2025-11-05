@@ -12,7 +12,7 @@ Deliver end-to-end parity between the existing Base plugin example and the Power
 - **Languages & Tooling**: Go 1.24+, Gin-compatible router abstractions, Node.js 18+, Nuxt 4.2, npm 9+.  
 - **Framework Packages**: `framework/backend/go/router`, `bootstrap`, `middleware`, `manifest`, `@powerx-plugin/framework-client`, `@powerx-plugin/framework-admin`.  
 - **Skeleton Targets**: `skeleton/backend` (Go module), `skeleton/web-admin` (Nuxt app).  
-- **CLI & Templates**: `scaffold/templates/backend/go-gin`, `scaffold/templates/web/nuxt`, `tools/cli`.  
+- **CLI & Templates**: `scaffold/templates/backend/go-gin`, `scaffold/templates/web-admin/nuxt`, `tools/cli`.  
 - **Docs & Contracts**: `docs/plan/001-init-project.md`, `docs/plan/002-plan-base-plugin-migration.md`, `docs/guide/quickstart.md`, `.specify/memory/constitution.md`.  
 - **Testing Stack**: `go test`, integration curl suites, Nuxt lint/build, Playwright (optional smoke), CLI generation diff checks.
 
@@ -44,7 +44,7 @@ skeleton/web-admin/
   app/composables/        # useTemplateApi example
 scaffold/templates/
   backend/go-gin/         # mirrored skeleton backend
-  web/nuxt/               # mirrored skeleton frontend
+  web-admin/nuxt/         # mirrored skeleton frontend
 docs/
   plan/002-plan-base-plugin-migration.md (link-back)
   guide/quickstart.md     # CRUD validation steps

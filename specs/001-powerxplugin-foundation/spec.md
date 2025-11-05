@@ -96,7 +96,7 @@
 - **FR-001**: 仓库根目录必须提供 `go.work`，显式 `use ./framework` 与 `use ./tools/cli`，并确保这两个模块可单独执行 `go test ./...`。
 - **FR-002**: `framework/frontend/nuxt` 必须配置 npm workspace（含 `package.json` 与锁定文件），覆盖 `framework-admin` 与 `framework-client` Layer 并支持分别发布。
 - **FR-003**: `skeleton/backend` 与 `skeleton/web-admin` 必须提供最小可运行示例：后端可直接执行 `go run ./skeleton/backend/cmd/plugin` 暴露 `GET /api/v1/ping`，前端在 `skeleton/web-admin` 内执行 `npm run dev` 并默认挂载 `@powerx-plugin/framework-admin` Layer，且 README 记录 Go 1.24+/Node 18+ 依赖与启动指引。
-- **FR-004**: Scaffold 模板（`scaffold/templates/backend/go-gin`、`scaffold/templates/web/nuxt`）必须与 skeleton 结构、入口代码和配置保持一致，CLI 渲染后的项目无需重命名或手工补档即可运行上述命令。
+- **FR-004**: Scaffold 模板（`scaffold/templates/backend/go-gin`、`scaffold/templates/web-admin/nuxt`）必须与 skeleton 结构、入口代码和配置保持一致，CLI 渲染后的项目无需重命名或手工补档即可运行上述命令。
 - **FR-005**: `px-plugin init` 必须嵌入模板与契约元数据，在无网络环境中仍可生成完整项目，并在生成结果中写入包含 `backend`/`frontend`/`version` 字段的 `plugin.yaml` 以及 README/TODO 提示。
 - **FR-006**: `docs/` 必须声明仅支持 Go + Nuxt，并将多语言扩展需求记录在 `docs/backlog/multi-language.md`，随迭代更新状态。
 - **FR-007**: Manifest、RBAC、健康检查与 API 契约必须以 JSON Schema/OpenAPI 形式维护在 `docs/contracts/manifest.json`、`docs/contracts/rbac.json`、`docs/contracts/openapi.yaml` 等文件中，并通过 CI 生成可阅读文档。

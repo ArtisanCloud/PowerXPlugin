@@ -2,9 +2,9 @@ mappings:
   - name: web-admin
     source: skeleton/web-admin
     targets:
-      - path: scaffold/templates/web/nuxt
+      - path: scaffold/templates/web-admin/nuxt
         suffix: .tmpl
-      - path: tools/cli/internal/templates/data/web/nuxt
+      - path: tools/cli/internal/templates/data/web-admin/nuxt
         suffix: .tmpl
     include:
       - "app/**/*"

@@ -42,7 +42,7 @@
 - 整理 `i18n` 文案，保持 `zh/en` 最小集合，并与 Manifest 菜单键值对应。
 
 ### 阶段 4：CLI 模板与交付
-- 将 Skeleton 结构渲染成 `scaffold/templates/backend/go-gin/**` 与 `scaffold/templates/web/nuxt/**`，占位符化插件 ID/名称/菜单。
+- 将 Skeleton 结构渲染成 `scaffold/templates/backend/go-gin/**` 与 `scaffold/templates/web-admin/nuxt/**`，占位符化插件 ID/名称/菜单。
 - 更新 CLI 文档及实现，确保 `px-plugin init` 能生成与 Skeleton 一致的 CRUD 示例。
 - 在 `docs/init-project.md`、`docs/guide/quickstart.md` 等文档同步新的模板能力与验证步骤。
 

@@ -13,8 +13,8 @@ mkdir -p tmp
 echo "[1/4] Running framework bootstrap tests"
 go test ./framework/backend/go/bootstrap/... -coverprofile=tmp/coverage.out
 
-echo "[2/4] Running skeleton route tests"
-go test ./skeleton/backend/internal/routes/... -v
+echo "[2/4] Running skeleton router tests"
+go test ./skeleton/backend/internal/router/... -v
 
 echo "Generating coverage report tmp/coverage.html"
 go tool cover -html=tmp/coverage.out -o tmp/coverage.html

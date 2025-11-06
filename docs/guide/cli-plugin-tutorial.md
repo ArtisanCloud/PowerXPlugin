@@ -83,6 +83,7 @@ CLI 会在 `plugins/com.powerx.helloworld` 下生成完整项目，并输出创�
 
 - `backend/`：Go 后端骨架，引用 `github.com/ArtisanCloud/PowerXPlugin/framework`
 - `web-admin/`：Nuxt 管理端骨架，引用 `@artisan-cloud/plugin-framework-admin`
+- `public/images/logo-s.png`：导航左上角默认 Logo，`AppNavbar` 会引用此文件
 - `docs/contracts/`：嵌入的 Manifest/RBAC/OpenAPI 契约
 - `plugin.yaml`：插件基础元数据（ID、版本、前后端堆栈）
 
@@ -169,6 +170,8 @@ http://localhost:3031/_p/com.powerx.helloworld/admin/
 应看到 Starter 页面，标题会根据你的插件 ID 自动生成，例如 “Powerx Helloworld Plugin”。
 
 > 默认首页 `/` 没有路由，会在终端输出 `No match found for location with path "/"` 的警告。请直接访问上述 plugin 路径。
+
+> Nuxt 导航栏左上角默认展示 `public/images/logo-s.png`。你可以用自己的图替换该文件（保持文件名不变），或在 `app/components/AppNavbar.vue` 中调整引用。
 
 ## Step 6. 验证契约与元数据
 

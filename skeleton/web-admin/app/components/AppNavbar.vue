@@ -5,9 +5,10 @@
     <div class="flex h-16 items-center justify-between px-6">
       <!-- 左侧品牌 -->
       <div class="flex items-center">
-        <UIcon
-          name="i-heroicons-rocket-launch"
-          class="w-6 h-6 mr-3 text-primary-600"
+        <img
+          src="/images/logo-s.png"
+          alt="PowerX Plugin Logo"
+          class="h-8 w-auto mr-3"
         />
         <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
           {{ $t("common.appName") }}

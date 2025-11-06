@@ -1,6 +1,6 @@
 module github.com/ArtisanCloud/PowerXPlugin/skeleton/backend
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/ArtisanCloud/PowerXPlugin/framework v0.0.1-alpha
@@ -57,6 +57,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.6.1 // indirect
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	golang.org/x/arch v0.21.0 // indirect

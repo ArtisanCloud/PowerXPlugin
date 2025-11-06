@@ -88,6 +88,8 @@ cd ../web-admin && npm install && npm run dev
 >
 > 也可以将 `runtime.run_migrate` 设为 `true` 或在启动命令前加 `POWERX_RUN_MIGRATE=true`，这样服务启动时会自动运行迁移。种子数据仍需手动执行 `go run ./cmd/database/main.go seed`。
 
+> 默认导航栏左上角引用 `public/images/logo-s.png`。如果要替换 Logo，可在生成项目的 `public/images` 目录中用同名文件覆盖，或调整 `app/components/AppNavbar.vue` 中的 `<img>` 引用。
+
 ## 4. 扩展点示例：新增模板审批接口
 
 1. **领域模型**：在 `internal/entity/models/template` 新增 `approval.go`，描述审批状态。

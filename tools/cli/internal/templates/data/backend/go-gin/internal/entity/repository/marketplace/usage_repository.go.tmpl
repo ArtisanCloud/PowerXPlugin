@@ -55,7 +55,7 @@ func (r *UsageRepository) InsertEnvelopes(ctx context.Context, tenantID string, 
 		}
 		res := tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{"{{"}}Name{{"}}": "checksum"},
+				{Name: "checksum"},
 			},
 			DoNothing: true,
 		}).Create(&envelopes)
@@ -83,11 +83,11 @@ func (r *UsageRepository) UpsertAggregate(ctx context.Context, aggregate *dbm.Us
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{"{{"}}Name{{"}}": "tenant_id"},
-				{"{{"}}Name{{"}}": "license_id"},
-				{"{{"}}Name{{"}}": "metric"},
-				{"{{"}}Name{{"}}": "window"},
-				{"{{"}}Name{{"}}": "time_bucket"},
+				{Name: "tenant_id"},
+				{Name: "license_id"},
+				{Name: "metric"},
+				{Name: "window"},
+				{Name: "time_bucket"},
 			},
 			DoUpdates: clause.Assignments(map[string]any{
 				"total":      aggregate.Total,

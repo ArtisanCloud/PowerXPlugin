@@ -3,8 +3,8 @@ package runtime_ops
 import (
 	"net/http"
 
-	runtimeops "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/runtime_ops"
 	"github.com/gin-gonic/gin"
+	runtimeops "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/runtime_ops"
 )
 
 // BootstrapHandler exposes runtime bootstrap endpoint.

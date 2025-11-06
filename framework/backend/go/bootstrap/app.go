@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/powerx-plugin/framework/backend/go/manifest"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 )
 
 // App 封装后端运行时依赖，供 skeleton 与框架层共享。

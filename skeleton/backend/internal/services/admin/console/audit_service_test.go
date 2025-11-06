@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
 	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
@@ -12,7 +13,6 @@ import (
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	consolesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/console"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"

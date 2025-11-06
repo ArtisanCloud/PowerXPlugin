@@ -1,8 +1,8 @@
 package integration
 
 import (
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
+	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // RegisterAPIRoutes 挂载 Integration 运行时 HTTP API。

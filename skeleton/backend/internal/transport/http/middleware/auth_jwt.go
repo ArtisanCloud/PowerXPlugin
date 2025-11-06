@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 )
 
 func JWTAuth(cfg authx.JWTAuthConfig) gin.HandlerFunc {

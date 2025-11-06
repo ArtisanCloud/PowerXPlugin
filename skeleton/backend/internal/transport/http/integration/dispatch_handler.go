@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
 	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	integrationService "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
-	"github.com/gin-gonic/gin"
 )
 
 // Dispatch 处理统一 Envelope 投递。

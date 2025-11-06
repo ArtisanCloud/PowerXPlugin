@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	secobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
 	adminsec "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/security"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/gin-gonic/gin"
 )
 
 // AuditReportHandler exposes read endpoints for audit reports.

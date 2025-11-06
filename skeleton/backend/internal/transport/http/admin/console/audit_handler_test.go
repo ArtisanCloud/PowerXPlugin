@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
 	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
@@ -14,8 +16,6 @@ import (
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	consoletransport "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/console"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"

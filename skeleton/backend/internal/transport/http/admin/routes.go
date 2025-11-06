@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	adminconsole "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/console"
 	adminintegration "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/integration"
@@ -8,7 +9,6 @@ import (
 	adminoperations "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/operations"
 	adminruntime "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/runtime_ops"
 	adminsecurity "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/security"
-	"github.com/gin-gonic/gin"
 )
 
 // Register 注册 Admin 路由

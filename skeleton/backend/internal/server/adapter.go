@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
+	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/gin-gonic/gin"
-	fwbootstrap "github.com/powerx-plugin/framework/backend/go/bootstrap"
 )
 
 var methods = []string{

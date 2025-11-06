@@ -1,9 +1,9 @@
 package agent
 
 import (
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/gin-gonic/gin"
 )
 
 type STSExchangeResponse struct {

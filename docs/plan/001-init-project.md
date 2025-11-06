@@ -1,4 +1,4 @@
-**PowerXPlugin 仓库的目标**是同时承载可运行的 Skeleton 以及可复用的“框架层”能力（供 PowerXPluginNote 等外部插件引用），并通过 `github.com/powerx-plugin/framework/...`（Go/Gin 默认实现）与 `@powerx-plugin/framework-admin` / `@powerx-plugin/framework-client` 输出统一组件生态。
+**PowerXPlugin 仓库的目标**是同时承载可运行的 Skeleton 以及可复用的“框架层”能力（供 PowerXPluginNote 等外部插件引用），并通过 `github.com/ArtisanCloud/PowerXPlugin/framework/...`（Go/Gin 默认实现）与 `@powerx-plugin/framework-admin` / `@powerx-plugin/framework-client` 输出统一组件生态。
 
 > ⚠️ 当前仓库仍处于文档与设计阶段，尚未提供完整的 Skeleton、框架层代码或可用 CLI。本文档在各章节中明确“已落地”“进行中”“待规划”状态，请在推进实现前先校对对应章节的约束与 TODO。
 
@@ -50,7 +50,7 @@
 4. **新增文件类型**：若 Skeleton 引入新的文件扩展名或需要额外的变量替换，请同步更新 `template-sync-config.yaml`，确保脚本覆盖范围完整。
 
 ### Phase 3 · 框架层拆分（以 Go + Nuxt 为首个实现）
-- 将 skeleton 中的公共装配、系统端点、Manifest/RBAC 逻辑沉淀到 `framework/backend/go`，通过根模块 `github.com/powerx-plugin/framework/...` 暴露为默认 Go 实现。
+- 将 skeleton 中的公共装配、系统端点、Manifest/RBAC 逻辑沉淀到 `framework/backend/go`，通过根模块 `github.com/ArtisanCloud/PowerXPlugin/framework/...` 暴露为默认 Go 实现。
 - 将共享的前端 Layer 与客户端抽出到 `framework/frontend/nuxt/framework-admin|client`。
 - 在文档中标注“未来可新增 `framework/backend/<lang>`、`framework/frontend/<stack>`”。
 
@@ -69,7 +69,7 @@
 
 ### 阶段性检查项
 - [ ] skeleton 可独立运行，提供健康检查与示例 API。
-- [ ] 外部插件通过 import `github.com/powerx-plugin/framework` 编译通过。
+- [ ] 外部插件通过 import `github.com/ArtisanCloud/PowerXPlugin/framework` 编译通过。
 - [ ] CLI 生成的项目（后端 + 前端）即取即用，默认即可运行。
 - [ ] 文档覆盖初始化流程、目录约定、扩展点说明。
 
@@ -96,7 +96,7 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
 │  │  │  ├─ observability/                   # metrics、tracing
 │  │  │  ├─ shared/                          # 错误/常量/工具
 │  │  │  └─ README.md                        # 说明 Go 实现结构
-│  ├─ go.mod                                 # module github.com/powerx-plugin/framework（默认 Go 实现的 import path）
+│  ├─ go.mod                                 # module github.com/ArtisanCloud/PowerXPlugin/framework（默认 Go 实现的 import path）
 │  └─ README.md                              # 协议文档索引（Manifest/RBAC/Health 等），记录多语言扩展指引
 │
 ├─ framework/frontend/nuxt/                  # 前端运行时 Layer（admin/client）
@@ -166,7 +166,7 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
 * **PowerXPlugin 仓库本身可直接运行（skeleton 目录）**，也是“最佳实践参考”。
 * **其他插件项目**（如 PowerXPluginNote）只**import 框架**：
 
-  * 后端：`github.com/powerx-plugin/framework/...`（当前默认 Go 实现）
+  * 后端：`github.com/ArtisanCloud/PowerXPlugin/framework/...`（当前默认 Go 实现）
   * 前端：`@powerx-plugin/framework-admin` / `@powerx-plugin/framework-client`
 * **Scaffold** 只负责把“入口 + 钩子 + 占位文件 + 固定依赖版本”渲染到目标项目；**不会被 import**。
 * `@powerx-plugin/framework-*` 以 npm workspace 形式维护源码，但发布时需分别执行 `npm publish --workspace <pkg>`，并在每次 release 更新脚手架模板中的版本锁定（例如 `scaffold/templates/web-admin/nuxt/package.json.tmpl`），否则外部插件无法锁定稳定依赖。
@@ -201,7 +201,7 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
 com.powerx.note/
 ├─ plugin.yaml
 ├─ backend/
-│  ├─ go.mod                         # require github.com/powerx-plugin/framework vX.Y.Z
+│  ├─ go.mod                         # require github.com/ArtisanCloud/PowerXPlugin/framework vX.Y.Z
 │  └─ cmd/plugin/main.go             # 入口：只做装配与挂载
 │     internal/
 │       ├─ routes.go                 # 业务路由（/_p/<id>/api/v1/**）
@@ -235,10 +235,10 @@ com.powerx.note/
 package main
 
 import (
-  "github.com/powerx-plugin/framework/bootstrap"
-  "github.com/powerx-plugin/framework/router"
-  "github.com/powerx-plugin/framework/manifest"
-  "github.com/powerx-plugin/framework/rbac"
+  "github.com/ArtisanCloud/PowerXPlugin/framework/bootstrap"
+  "github.com/ArtisanCloud/PowerXPlugin/framework/router"
+  "github.com/ArtisanCloud/PowerXPlugin/framework/manifest"
+  "github.com/ArtisanCloud/PowerXPlugin/framework/rbac"
 
   "github.com/acme/powerx-plugin-note/internal"
   "github.com/acme/powerx-plugin-note/internal/manifestx"
@@ -359,7 +359,7 @@ px-plugin init com.powerx.note --ui=blank
 
 ## 1) Go 后端（bootstrap）
 
-> 位置：`framework/backend/go/bootstrap`（对外 import 为 `github.com/powerx-plugin/framework/bootstrap`）
+> 位置：`framework/backend/go/bootstrap`（对外 import 为 `github.com/ArtisanCloud/PowerXPlugin/framework/bootstrap`）
 
 **`framework/backend/go/bootstrap/app.go`**
 
@@ -442,7 +442,7 @@ type Context interface {
 ```go
 package router
 
-import "github.com/powerx-plugin/framework/bootstrap"
+import "github.com/ArtisanCloud/PowerXPlugin/framework/bootstrap"
 
 const (
 	HealthzPath = "/healthz" // 健康检查端点
@@ -517,9 +517,9 @@ func Report(app any /* or a dedicated interface */, perms []Permission) error
 
 ## 5) 其他（按需）
 
-* Go 实现目录（`framework/backend/go/middleware`，对外 import: `github.com/powerx-plugin/framework/middleware`）：`Recovery()`, `Trace()`, `Audit()`, `AuthGuard()`
-* Go 实现目录（`framework/backend/go/observability`，import: `github.com/powerx-plugin/framework/observability`）：`InitMetrics(app)`, `InitTracing(app)`
-* Go 实现目录（`framework/backend/go/tenancy`，import: `github.com/powerx-plugin/framework/tenancy`）：`WithTenant(ctx, tenantID string) context.Context`, `TenantFrom(ctx)`
+* Go 实现目录（`framework/backend/go/middleware`，对外 import: `github.com/ArtisanCloud/PowerXPlugin/framework/middleware`）：`Recovery()`, `Trace()`, `Audit()`, `AuthGuard()`
+* Go 实现目录（`framework/backend/go/observability`，import: `github.com/ArtisanCloud/PowerXPlugin/framework/observability`）：`InitMetrics(app)`, `InitTracing(app)`
+* Go 实现目录（`framework/backend/go/tenancy`，import: `github.com/ArtisanCloud/PowerXPlugin/framework/tenancy`）：`WithTenant(ctx, tenantID string) context.Context`, `TenantFrom(ctx)`
 
 ---
 
@@ -691,8 +691,8 @@ export * from './api'
 package main
 
 import (
-  "github.com/powerx-plugin/framework/bootstrap"
-  "github.com/powerx-plugin/framework/router"
+  "github.com/ArtisanCloud/PowerXPlugin/framework/bootstrap"
+  "github.com/ArtisanCloud/PowerXPlugin/framework/router"
 
   "github.com/acme/powerx-plugin-note/internal"
   "github.com/acme/powerx-plugin-note/internal/manifestx"

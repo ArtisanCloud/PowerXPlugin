@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 )
 
 func TestRoutePathParam(t *testing.T) {

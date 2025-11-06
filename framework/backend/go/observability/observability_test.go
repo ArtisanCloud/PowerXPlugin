@@ -3,7 +3,7 @@ package observability
 import (
 	"testing"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 )
 
 func TestInitMetricsAndTracing(t *testing.T) {

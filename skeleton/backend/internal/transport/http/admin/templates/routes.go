@@ -1,9 +1,9 @@
 package templates
 
 import (
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {

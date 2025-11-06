@@ -15,7 +15,7 @@
 
 ### 用户故事 1：可运行骨架与框架同步 (Priority: P1)
 
-作为 PowerXPlugin 仓库维护者，我希望仓库既能直接运行 skeleton 后端与管理端，又能产出 `github.com/powerx-plugin/framework/...` 与 `@powerx-plugin/framework-*` 套件，这样外部插件能立即接入一致的默认能力。
+作为 PowerXPlugin 仓库维护者，我希望仓库既能直接运行 skeleton 后端与管理端，又能产出 `github.com/ArtisanCloud/PowerXPlugin/framework/...` 与 `@powerx-plugin/framework-*` 套件，这样外部插件能立即接入一致的默认能力。
 
 **优先级原因**：骨架与框架的一致性是仓库价值核心，缺失会导致后续 CLI 与插件建设全部失效。
 
@@ -24,7 +24,7 @@
 **验收场景**：
 
 1. 若开发者在全新拉取的仓库中安装 Go/Node 依赖，当其于 `skeleton/backend` 执行 `go run ./cmd/plugin` 时，应成功启动服务并返回 `GET /api/v1/ping` 正常响应。
-2. 若外部插件项目引用 `github.com/powerx-plugin/framework/router` 与 `@powerx-plugin/framework-admin`，当编译后端并启动 Nuxt 管理端时，应无编译错误且默认路由/布局可用。
+2. 若外部插件项目引用 `github.com/ArtisanCloud/PowerXPlugin/framework/router` 与 `@powerx-plugin/framework-admin`，当编译后端并启动 Nuxt 管理端时，应无编译错误且默认路由/布局可用。
 
 ---
 
@@ -109,7 +109,7 @@
 ### 核心实体 *(如涉及数据需说明)*
 
 - **插件契约 Schema**: 描述 Manifest、RBAC、健康检查、API 结构的 JSON Schema/OpenAPI 文件，是仓库与外部插件共享的协议源。
-- **框架套件**: `github.com/powerx-plugin/framework/...` 与 `@powerx-plugin/framework-*` 输出的可复用组件，封装公共装配、端点、中间件与前端 Layer。
+- **框架套件**: `github.com/ArtisanCloud/PowerXPlugin/framework/...` 与 `@powerx-plugin/framework-*` 输出的可复用组件，封装公共装配、端点、中间件与前端 Layer。
 - **脚手架模板产物**: `scaffold/templates/**` 中供 CLI 渲染的模板文件集合，产出 `{plugin-skeleton}` 项目的目录、配置、占位代码与版本锁定。
 
 ## 假设

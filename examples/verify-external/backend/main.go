@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
-	"github.com/powerx-plugin/framework/backend/go/router"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 )
 
 func main() {

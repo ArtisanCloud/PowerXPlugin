@@ -1,6 +1,6 @@
 package manifestx
 
-import "github.com/powerx-plugin/framework/backend/go/manifest"
+import "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 
 // Plugin returns the manifest definition consumed by the framework/router layer.
 func Plugin() manifest.Plugin {

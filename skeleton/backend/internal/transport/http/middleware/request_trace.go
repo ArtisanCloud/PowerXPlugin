@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
+	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 )
 
 // RequestTrace 输出请求关键信息，辅助排查网关/本地两种模式的差异。

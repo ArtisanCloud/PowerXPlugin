@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	middleware "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	agentsecurity "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent/security"
-	"github.com/gin-gonic/gin"
 )
 
 // AssetExtractor extracts the list of asset keys that the handler intends to

@@ -1,10 +1,10 @@
 package operations
 
 import (
+	"github.com/gin-gonic/gin"
 	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/operations"
 	opservice "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/operations"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes registers Operations admin endpoints under /admin/operations.

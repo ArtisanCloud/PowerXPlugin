@@ -1,4 +1,4 @@
-module github.com/powerx-plugin/framework
+module github.com/ArtisanCloud/PowerXPlugin/framework
 
 go 1.24
 

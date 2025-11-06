@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
 	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
 	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	service "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/google/uuid"
 	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
 	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 

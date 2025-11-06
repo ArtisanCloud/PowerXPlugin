@@ -41,10 +41,10 @@ func (r *RevenueRepository) UpsertReport(ctx context.Context, report *dbm.Revenu
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{"{{"}}Name{{"}}": "tenant_id"},
-				{"{{"}}Name{{"}}": "vendor_id"},
-				{"{{"}}Name{{"}}": "period_start"},
-				{"{{"}}Name{{"}}": "period_end"},
+				{Name: "tenant_id"},
+				{Name: "vendor_id"},
+				{Name: "period_start"},
+				{Name: "period_end"},
 			},
 			DoUpdates: clause.Assignments(map[string]any{
 				"gross_amount":   report.GrossAmount,

@@ -1,9 +1,9 @@
 package security
 
 import (
+	"github.com/gin-gonic/gin"
 	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes wires the admin security namespace.

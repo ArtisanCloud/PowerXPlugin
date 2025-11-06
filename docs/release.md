@@ -6,7 +6,7 @@
 
 - **触发方式**：推送符合 `v*` 的 Git Tag 或手动执行 `Release` Workflow。
 - **输出物**：
-  - `github.com/powerx-plugin/framework` Go Module Tag
+  - `github.com/ArtisanCloud/PowerXPlugin/framework` Go Module Tag
   - `@powerx-plugin/framework-admin`、`@powerx-plugin/framework-client` npm 版本
   - `px-plugin` CLI 二进制（压缩包 + 校验文件）
   - `examples/starter/` 中的最新 CLI 生成物快照
@@ -45,7 +45,7 @@
 3. 提交并合并变更，随后创建 `vX.Y.Z` Tag
 4. 确认 Release Workflow 运行通过
 5. 将构建好的 npm 包发布到 Registry（待自动化）
-6. 通过 `go list -m github.com/powerx-plugin/framework@vX.Y.Z` 验证模块可用
+6. 通过 `go list -m github.com/ArtisanCloud/PowerXPlugin/framework@vX.Y.Z` 验证模块可用
 
 ## 待办与后续迭代
 

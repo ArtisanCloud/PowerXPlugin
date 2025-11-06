@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
+	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 )
 
 // RBAC 仅做粗粒度权限判定；在 DelegateToPowerX 模式下只校验令牌来源

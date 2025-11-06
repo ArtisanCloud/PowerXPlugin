@@ -42,7 +42,7 @@ func (r *Repository) UpsertChecklist(ctx context.Context, checklist *model.Basel
 		return nil, errors.New("version required")
 	}
 	return r.checklists.Upsert(ctx, checklist, []clause.Column{
-		{"{{"}}Name{{"}}": "version"},
+		{Name: "version"},
 	})
 }
 

@@ -7,12 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	consoletransport "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/console"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

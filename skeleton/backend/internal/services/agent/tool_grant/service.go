@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	tgmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/tool_grant"
 	tgrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/tool_grant"
 	seclog "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"

@@ -3,9 +3,9 @@ package console
 import (
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes wires the admin console API group.

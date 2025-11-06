@@ -20,7 +20,7 @@
 **目的**: 准备所有用户故事共享的核心目录与模块骨架；未完成前禁止进入任一用户故事。
 
 - [X] T004 建立 `framework/backend/go/` 目录骨架（bootstrap/router/middleware 等子目录）
-- [X] T005 初始化 `framework/go.mod` 并声明模块 `github.com/powerx-plugin/framework`
+- [X] T005 初始化 `framework/go.mod` 并声明模块 `github.com/ArtisanCloud/PowerXPlugin/framework`
 - [X] T006 初始化 `tools/cli/go.mod` 与 `tools/cli/cmd/` 目录（预留 init/package/dist/publish 命令）
 - [X] T007 配置 `framework/frontend/nuxt` 下的 package.json 与目录结构
 - [X] T008 创建 `skeleton/backend` 与 `skeleton/web-admin` 目录骨架（含 `cmd/plugin`、`internal/`、`app/`）
@@ -35,7 +35,7 @@
 
 **Goal**: skeleton 后端/前端可直接运行；同时输出与 skeleton 对齐的 Go 框架与 Nuxt Layer，供外部插件引用。
 
-**Independent Test**: `go run ./skeleton/backend/cmd/plugin` 返回 `GET /api/v1/ping`=200；在独立项目引用 `github.com/powerx-plugin/framework` 与 `@powerx-plugin/framework-admin` 可成功构建/启动。
+**Independent Test**: `go run ./skeleton/backend/cmd/plugin` 返回 `GET /api/v1/ping`=200；在独立项目引用 `github.com/ArtisanCloud/PowerXPlugin/framework` 与 `@powerx-plugin/framework-admin` 可成功构建/启动。
 
 ### 实施任务
 
@@ -45,7 +45,7 @@
 - [X] T014 [P] [US1] 定义 `framework/backend/go/rbac/rbac.go`，暴露角色与权限报告 API
 - [X] T015 [P] [US1] 添加 `framework/backend/go/middleware/auth_guard.go` stub，默认返回 `501 Not Implemented`
 - [X] T016 [P] [US1] 实现 `framework/backend/go/observability/metrics.go` 与 `tracing.go` 占位
-- [X] T017 [US1] 创建 `skeleton/backend/go.mod`，引用 `github.com/powerx-plugin/framework`
+- [X] T017 [US1] 创建 `skeleton/backend/go.mod`，引用 `github.com/ArtisanCloud/PowerXPlugin/framework`
 - [X] T018 [US1] 编写 `skeleton/backend/cmd/plugin/main.go`，按六步装配流程注册框架与业务路由
 - [X] T019 [P] [US1] 实现 `skeleton/backend/internal/routes/routes.go`，提供 `GET /api/v1/ping`
 - [X] T020 [P] [US1] 实现 `skeleton/backend/internal/service/ping.go` 与 `handler/ping.go`

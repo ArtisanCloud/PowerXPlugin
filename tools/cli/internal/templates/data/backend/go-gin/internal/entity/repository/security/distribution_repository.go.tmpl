@@ -56,9 +56,9 @@ func (r *DistributionRepository) Upsert(ctx context.Context, record *secmodel.Ad
 	record.UpdatedAt = now
 
 	result, err := r.base.Upsert(ctx, record, []clause.Column{
-		{"{{"}}Name{{"}}": "advisory_id"},
-		{"{{"}}Name{{"}}": "tenant_id"},
-		{"{{"}}Name{{"}}": "channel"},
+		{Name: "advisory_id"},
+		{Name: "tenant_id"},
+		{Name: "channel"},
 	})
 	if err != nil {
 		return nil, err

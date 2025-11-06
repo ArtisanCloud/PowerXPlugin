@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
@@ -18,7 +19,6 @@ import (
 	opsmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/operations"
 	svc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 )
 
 const (

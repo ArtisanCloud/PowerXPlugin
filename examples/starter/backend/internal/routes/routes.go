@@ -3,7 +3,7 @@ package routes
 import (
 	"net/http"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 
 	"github.com/powerx-plugins/com-powerx-starter/backend/internal/handler"
 	"github.com/powerx-plugins/com-powerx-starter/backend/internal/service"

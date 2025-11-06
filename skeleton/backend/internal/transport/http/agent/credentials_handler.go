@@ -3,12 +3,12 @@ package agent
 import (
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
 	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/plugin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/gin-gonic/gin"
 )
 
 // 凭证投递请求

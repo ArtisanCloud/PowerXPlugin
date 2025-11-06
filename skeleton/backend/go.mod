@@ -2,11 +2,8 @@ module github.com/powerx-plugin/powerxplugin/skeleton/backend
 
 go 1.24
 
-replace github.com/powerx-plugin/framework => ../../framework
-
-//replace github.com/ArtisanCloud/PowerX/api/grpc/gen/go => ../../../PowerX/api/grpc/gen/go
-
 require (
+	github.com/ArtisanCloud/PowerXPlugin/framework v0.0.0-alpha
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0

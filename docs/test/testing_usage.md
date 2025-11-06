@@ -208,7 +208,7 @@ rm -rf "$TMP_DIR"
      "net/http"
      "testing"
 
-     "github.com/powerx-plugin/framework/backend/go/bootstrap"
+     "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
    )
 
    func TestRegisterPluginRoutesAddsPrefix(t *testing.T) {
@@ -253,7 +253,7 @@ import (
   "strings"
   "testing"
 
-  "github.com/powerx-plugin/framework/backend/go/bootstrap"
+  "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
   "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/handler"
   "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/service"
 )

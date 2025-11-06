@@ -51,7 +51,7 @@ PowerXPlugin/
 ├─ go.work                                 # Phase 0: 管理 framework/ 与 tools/cli/ 多模块
 ├─ package.json                            # Phase 0: 根级 npm workspaces（可选）
 ├─ framework/                              # Phase 3: 共享后端框架
-│  ├─ go.mod (module github.com/powerx-plugin/framework)
+│  ├─ go.mod (module github.com/ArtisanCloud/PowerXPlugin/framework)
 │  └─ backend/go/
 │     ├─ bootstrap/                        # App 初始化（参考 Base/internal/bootstrap）
 │     ├─ router/                           # RegisterFrameworkRoutes/RegisterPluginRoutes
@@ -74,7 +74,7 @@ PowerXPlugin/
 │        └─ index.ts
 ├─ skeleton/                               # Phase 2: 可运行样例
 │  ├─ backend/
-│  │  ├─ go.mod (require github.com/powerx-plugin/framework)
+│  │  ├─ go.mod (require github.com/ArtisanCloud/PowerXPlugin/framework)
 │  │  ├─ cmd/plugin/main.go                # 6 步装配流程（参考 Base backend/cmd/plugin）
 │  │  └─ internal/
 │  │     ├─ routes/                        # `/api/v1/ping`

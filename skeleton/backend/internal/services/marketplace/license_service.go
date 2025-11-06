@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
 	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	marketobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/marketplace"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

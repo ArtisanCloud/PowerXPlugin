@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
 	consolerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/admin_console"
 	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 

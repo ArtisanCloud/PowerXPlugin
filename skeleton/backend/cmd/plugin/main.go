@@ -8,9 +8,9 @@ import (
 	"strings"
 	"syscall"
 
-	fwbootstrap "github.com/powerx-plugin/framework/backend/go/bootstrap"
-	"github.com/powerx-plugin/framework/backend/go/manifest"
-	fwrouter "github.com/powerx-plugin/framework/backend/go/router"
+	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 	pluginbootstrap "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/bootstrap"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	dbpkg "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/db"

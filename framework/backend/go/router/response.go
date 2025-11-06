@@ -3,7 +3,7 @@ package router
 import (
 	"time"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 )
 
 // Envelope 定义统一的响应结构。

@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
 	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	toolgrantservice "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent/tool_grant"
-	"github.com/gin-gonic/gin"
 )
 
 func BenchmarkMiddleware(b *testing.B) {

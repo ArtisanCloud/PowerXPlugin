@@ -3,8 +3,8 @@ package middleware
 // internal/transport/http/middleware/dev_switch.go
 
 import (
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
+	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 )
 
 // DevSwitch：开发模式下，未鉴权时注入一个默认 TenantContext

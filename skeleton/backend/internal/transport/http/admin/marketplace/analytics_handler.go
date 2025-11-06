@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
+	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
+	svc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
-	svc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
 )
 
 // AnalyticsHandler exposes usage ingest and analytics endpoints.

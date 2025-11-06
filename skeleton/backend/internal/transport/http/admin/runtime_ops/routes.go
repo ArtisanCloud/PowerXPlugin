@@ -1,9 +1,9 @@
 package runtime_ops
 
 import (
+	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	runtimeops "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/runtime_ops"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // RegisterRoutes wires runtime ops endpoints behind the admin router.

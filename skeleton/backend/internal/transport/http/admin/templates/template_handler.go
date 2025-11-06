@@ -4,10 +4,10 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	srvtemplates "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/templates"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	"gorm.io/gorm"
 )
 

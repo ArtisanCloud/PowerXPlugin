@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	secmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
+	secmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 )
 
 const (

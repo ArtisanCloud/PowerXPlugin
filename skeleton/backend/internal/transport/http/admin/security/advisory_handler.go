@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
+	adminsec "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/security"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	adminsec "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/security"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )

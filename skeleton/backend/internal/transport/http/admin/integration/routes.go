@@ -1,8 +1,8 @@
 package integration
 
 import (
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // RegisterRoutes 挂载 Integration 管理端路由。

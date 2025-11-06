@@ -3,7 +3,7 @@ package integration
 import (
 	"strings"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 )
 
 // RBACEntries 返回 Integration 管理端的权限映射。

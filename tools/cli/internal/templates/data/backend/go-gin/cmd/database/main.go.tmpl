@@ -5,13 +5,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
+	"os"
+
 	"{{ .BackendModulePath }}/cmd/database/migrate"
 	"{{ .BackendModulePath }}/cmd/database/seed"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/db"
 	"{{ .BackendModulePath }}/internal/entity/models"
-	"log"
-	"os"
 )
 
 func main() {

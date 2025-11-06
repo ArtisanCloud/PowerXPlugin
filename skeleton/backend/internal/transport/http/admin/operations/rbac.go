@@ -3,7 +3,7 @@ package operations
 import (
 	"strings"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 )
 
 // RBACEntries returns the Operations admin RBAC definitions.

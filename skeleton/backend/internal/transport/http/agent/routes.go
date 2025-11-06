@@ -1,9 +1,9 @@
 package agent
 
 import (
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	agentsecurity "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/agent/security"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	agentsecurity "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/agent/security"
 )
 
 // RegisterAPIRoutes 注册 Agent 相关路由

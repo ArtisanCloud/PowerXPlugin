@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/template"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"gorm.io/gorm"
 )
 

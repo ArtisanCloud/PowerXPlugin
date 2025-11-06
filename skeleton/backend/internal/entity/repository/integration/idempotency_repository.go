@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
+	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"

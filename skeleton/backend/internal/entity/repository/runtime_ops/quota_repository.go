@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/runtime_ops"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
+	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"gorm.io/gorm"
 )
 

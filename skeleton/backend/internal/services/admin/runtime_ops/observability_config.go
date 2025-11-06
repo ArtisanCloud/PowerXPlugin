@@ -3,7 +3,7 @@ package runtime_ops
 import (
 	"sync"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 )
 
 var (

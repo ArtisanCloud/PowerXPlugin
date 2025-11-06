@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http"
-	middleware2 "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http"
+	middleware2 "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 
 	"github.com/gin-gonic/gin"
 )

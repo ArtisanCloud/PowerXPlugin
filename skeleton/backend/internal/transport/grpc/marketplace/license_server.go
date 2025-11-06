@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
-	svc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/marketplace"
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
+	svc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"

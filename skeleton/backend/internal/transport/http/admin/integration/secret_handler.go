@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
+	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	service "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
-	authmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
-	service "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
 	"gorm.io/gorm"
 )
 

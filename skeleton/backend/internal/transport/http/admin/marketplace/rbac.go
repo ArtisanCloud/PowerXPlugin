@@ -3,7 +3,7 @@ package marketplace
 import (
 	"strings"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 )
 
 // RBACEntries declares admin marketplace route-to-permission mappings.

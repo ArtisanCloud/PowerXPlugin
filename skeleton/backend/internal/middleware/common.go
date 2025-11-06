@@ -7,8 +7,8 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
 )
 
 // CORS 跨域中间件

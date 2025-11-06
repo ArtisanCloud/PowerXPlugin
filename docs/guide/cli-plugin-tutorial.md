@@ -23,13 +23,16 @@ cd /path/to/PowerXPlugin             # 仓库根目录
 npm run sync:templates -- --check    # 可选：仅检查差异
 npm run sync:templates -- --verbose  # 同步模板并输出写入文件
 # npm install --workspaces           # 可选：安装 framework-admin / framework-client
+# go work sync                       # 让 go.work 中的本地模块依赖立即生效
 ```
 
 > 说明：只有在需要直接引用仓库内的前端框架源码时，才执行 `npm install --workspaces`。若使用发布版本，可跳过此命令，并在生成后的项目中将 `@powerx-plugin/framework-*` 调整为目标版本号。
 
+执行 `go work sync` 能确保 `framework/` 模块使用最新的 `module github.com/ArtisanCloud/PowerXPlugin/framework` 声明，避免由于缓存旧模块路径而导致的 `module declares its path` 报错。如果你使用全新 GOPROXY 版本或外部仓库发布版，可视情况省略。
+
 完成同步后再继续构建 CLI／生成插件，可确保 Skeleton、scaffold 与 CLI 模板保持一致。
 
-> 如果你计划发布或复用 Go 框架模块，请使用 `git tag framework/v0.0.0-alpha && git push origin framework/v0.0.0-alpha`（或更高版本号）在仓库根目录打 tag，供外部 `go get github.com/ArtisanCloud/PowerXPlugin/framework@v0.0.0-alpha` 直接引用。
+> 如果你计划发布或复用 Go 框架模块，请使用 `git tag framework/v0.0.1-alpha && git push origin framework/v0.0.1-alpha`（或更高版本号）在仓库根目录打 tag，供外部 `go get github.com/ArtisanCloud/PowerXPlugin/framework@v0.0.1-alpha` 直接引用。
 
 ## Step 2. 构建 px-plugin CLI
 
@@ -83,7 +86,7 @@ cd ..
 
 ### 4.2 框架依赖（可选）
 
-默认依赖 `github.com/ArtisanCloud/PowerXPlugin/framework {{ .FrameworkVersion }}`（当前为 `v0.0.0-alpha`）。如需直接引用本仓库源码，可在 `backend/go.mod` 添加：
+默认依赖 `github.com/ArtisanCloud/PowerXPlugin/framework {{ .FrameworkVersion }}`（当前为 `v0.0.1-alpha`）。如需直接引用本仓库源码，可在 `backend/go.mod` 添加：
 
 ```
 replace github.com/ArtisanCloud/PowerXPlugin/framework => /path/to/PowerXPlugin/framework

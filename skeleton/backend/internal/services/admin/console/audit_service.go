@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
-	consolerepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/admin_console"
-	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
+	consolerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/admin_console"
+	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 )
 
 // AuditService coordinates audit history queries and exports.

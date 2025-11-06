@@ -3,7 +3,7 @@ package admin_console
 import (
 	"time"
 
-	basemodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	"gorm.io/datatypes"
 )
 

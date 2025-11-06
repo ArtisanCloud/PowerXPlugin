@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/plugin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/crypto"
 	"time"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/crypto"
 )
 
 // CredentialService 负责插件凭证的加密与持久化

@@ -1,14 +1,14 @@
 package admin
 
 import (
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	adminconsole "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/console"
+	adminintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/integration"
+	adminmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/marketplace"
+	adminoperations "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/operations"
+	adminruntime "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/runtime_ops"
+	adminsecurity "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/security"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	adminconsole "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/console"
-	adminintegration "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/integration"
-	adminmarketplace "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/marketplace"
-	adminoperations "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/operations"
-	adminruntime "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/runtime_ops"
-	adminsecurity "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/admin/security"
 )
 
 // Register 注册 Admin 路由

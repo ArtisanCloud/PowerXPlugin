@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
+	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
 	"github.com/google/uuid"
-	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/security"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )

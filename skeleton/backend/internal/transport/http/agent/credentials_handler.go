@@ -3,12 +3,12 @@ package agent
 import (
 	"strconv"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/plugin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // 凭证投递请求

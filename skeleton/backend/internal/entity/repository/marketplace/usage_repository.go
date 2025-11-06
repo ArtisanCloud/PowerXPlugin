@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
+	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
 	"github.com/google/uuid"
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

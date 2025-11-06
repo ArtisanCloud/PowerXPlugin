@@ -17,7 +17,7 @@ import (
 const (
 	defaultVersion          = "0.1.0"
 	defaultGoVersion        = "1.24"
-	defaultFrameworkVersion = "v0.0.0-alpha"
+	defaultFrameworkVersion = "v0.0.1-alpha"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
 	defaultAdminVersion     = "latest"
 	defaultClientVersion    = "latest"
@@ -68,7 +68,7 @@ func runInit(args []string) error {
 
 	moduleRoot := *module
 	if moduleRoot == "" {
-		moduleRoot = fmt.Sprintf("github.com/powerx-plugins/%s", pluginSlug)
+		moduleRoot = fmt.Sprintf("github.com/ArtisanCloud/PowerXPlugin/plugins/%s", pluginSlug)
 	}
 
 	backendModule := moduleRoot + "/backend"

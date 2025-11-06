@@ -254,8 +254,8 @@ import (
   "testing"
 
   "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
-  "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/handler"
-  "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/service"
+  "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/handler"
+  "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/service"
 )
 
 func TestPingHandler_ReturnsOK(t *testing.T) {

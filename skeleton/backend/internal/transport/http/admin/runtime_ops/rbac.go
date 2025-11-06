@@ -3,7 +3,7 @@ package runtime_ops
 import (
 	"strings"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 )
 
 // RBACEntries exposes route-to-permission mappings for runtime ops admin APIs.

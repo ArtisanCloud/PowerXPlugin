@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
 	"gorm.io/gorm"
 )
 

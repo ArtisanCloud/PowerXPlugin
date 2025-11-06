@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/recommendation"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	"github.com/sirupsen/logrus"
 )
 

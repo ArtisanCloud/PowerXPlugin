@@ -6,16 +6,16 @@ import (
 	"testing"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/admin_console"
-	consolesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/console"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
+	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
-	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 )
 
 type stubLocker struct {

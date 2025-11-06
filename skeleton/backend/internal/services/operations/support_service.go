@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/operations"
-	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/operations"
-	opmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/operations"
-	runtimeops "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/runtime_ops"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	opmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
+	oprepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/operations"
+	opmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
+	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"gorm.io/datatypes"
 )
 

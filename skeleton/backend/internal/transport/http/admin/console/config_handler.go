@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
-	consolesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/console"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // ConfigHandler exposes configuration endpoints for the Dev Console.

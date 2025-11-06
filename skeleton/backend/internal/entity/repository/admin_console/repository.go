@@ -3,7 +3,7 @@ package admin_console
 import (
 	"context"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
 	"gorm.io/gorm"
 )
 

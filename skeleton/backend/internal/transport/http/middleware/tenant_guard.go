@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 )
 
 const TenantIDContextKey = "tenant_id_uint64"

@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 )
 
 // FieldOption represents selectable values for a field.

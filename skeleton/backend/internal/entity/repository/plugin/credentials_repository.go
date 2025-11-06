@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

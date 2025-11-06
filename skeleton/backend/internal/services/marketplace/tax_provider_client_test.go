@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 )
 
 func TestNewTaxProviderClientUnsupported(t *testing.T) {

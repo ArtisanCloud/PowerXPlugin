@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	"github.com/stretchr/testify/require"
 )
 

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	"gorm.io/gorm"
 )
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/template"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
-	trepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/template"
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	trepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/template"
 	"gorm.io/gorm"
 )
 

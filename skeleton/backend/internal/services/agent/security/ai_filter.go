@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 )
 
 type AIFilter struct {

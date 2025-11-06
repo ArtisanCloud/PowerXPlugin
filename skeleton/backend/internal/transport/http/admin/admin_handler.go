@@ -3,9 +3,9 @@ package admin
 import (
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 
 	"github.com/gin-gonic/gin"
 )

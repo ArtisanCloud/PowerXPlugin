@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	operationsvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/operations"
+	operationsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/operations"
 	"github.com/sirupsen/logrus"
 )
 

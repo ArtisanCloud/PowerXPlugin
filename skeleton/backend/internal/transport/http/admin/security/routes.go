@@ -1,9 +1,9 @@
 package security
 
 import (
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // RegisterRoutes wires the admin security namespace.

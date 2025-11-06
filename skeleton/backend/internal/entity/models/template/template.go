@@ -2,7 +2,7 @@ package template
 
 // internal/entity/models/template/template.go
 
-import "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+import "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 
 // Template represents a reusable snippet that can be shared across the Base plugin.
 type Template struct {

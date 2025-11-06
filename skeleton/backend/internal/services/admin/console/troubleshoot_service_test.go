@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	consolesvc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/console"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/stretchr/testify/require"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	adminmetrics "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/admin_console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 )
 
 type healthSourceStub struct {

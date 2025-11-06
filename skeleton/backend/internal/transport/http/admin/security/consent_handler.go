@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
+	adminsec "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/security"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	secobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
-	adminsec "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/security"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // ConsentHandler exposes admin endpoints for managing consent tokens and lifecycle records.

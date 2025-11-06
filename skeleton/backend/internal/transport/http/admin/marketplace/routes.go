@@ -1,11 +1,11 @@
 package marketplace
 
 import (
+	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
+	recommendationservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
-	recommendationservice "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/recommendation"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/http/middleware"
 )
 
 // RegisterRoutes wires marketplace admin endpoints.

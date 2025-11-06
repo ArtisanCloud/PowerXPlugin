@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts/capability"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts/capability"
 	yaml "gopkg.in/yaml.v3"
 )
 

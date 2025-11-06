@@ -3,9 +3,9 @@ package console
 import (
 	"strings"
 
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // RegisterRoutes wires the admin console API group.

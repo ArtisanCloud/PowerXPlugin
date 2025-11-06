@@ -1,7 +1,7 @@
 package integration
 
 import (
-	integrationService "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
+	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )

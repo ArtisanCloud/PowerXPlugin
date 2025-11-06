@@ -3,9 +3,9 @@ package integration
 import (
 	"net/http"
 
+	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	integrationService "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/integration"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 	"github.com/sirupsen/logrus"
 )
 

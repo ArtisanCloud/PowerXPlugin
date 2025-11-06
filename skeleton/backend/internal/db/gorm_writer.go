@@ -3,7 +3,8 @@ package db
 
 import (
 	"fmt"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 
 	gormLogger "gorm.io/gorm/logger"
 )

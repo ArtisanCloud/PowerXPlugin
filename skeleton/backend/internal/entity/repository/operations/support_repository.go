@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
+	opmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
+	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
 	"github.com/google/uuid"
-	opmodels "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/operations"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
 	"gorm.io/gorm"
 )
 

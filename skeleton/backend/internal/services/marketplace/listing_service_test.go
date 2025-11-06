@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
+	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	"github.com/google/uuid"
-	dbm "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/marketplace"
-	mrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/marketplace"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
 	"github.com/google/uuid"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 )

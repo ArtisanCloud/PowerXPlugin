@@ -80,7 +80,7 @@
 2. 模板生成完成后，可手动执行一次 CLI 自举验证：
    ```bash
    go build -o bin/px-plugin ./tools/cli/cmd/px-plugin
-   ./bin/px-plugin init com.powerx.demo --force --module github.com/powerx-plugins/com-powerx-demo
+   ./bin/px-plugin init com.powerx.demo --force --module github.com/ArtisanCloud/PowerXPlugin/plugins/com-powerx-demo
    ```
 3. 对比 `examples/com.powerx.demo` 与 CLI 生成物，确认关键结构一致。
 

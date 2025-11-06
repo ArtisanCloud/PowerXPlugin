@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/security"
+	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	"github.com/sirupsen/logrus"
 )
 

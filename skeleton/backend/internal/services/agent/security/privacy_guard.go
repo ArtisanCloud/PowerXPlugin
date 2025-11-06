@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	privmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/privacy"
-	privrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/privacy"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	privmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/privacy"
+	privrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/privacy"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

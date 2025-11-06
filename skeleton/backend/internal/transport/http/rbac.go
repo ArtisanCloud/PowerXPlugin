@@ -3,7 +3,7 @@ package http
 import (
 	"strings"
 
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 )
 
 // integrationRBACEntries 返回 Integration 运行时 API 权限映射。

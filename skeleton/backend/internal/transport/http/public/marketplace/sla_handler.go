@@ -1,11 +1,11 @@
 package marketplace
 
 import (
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	oprepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/operations"
+	opservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/operations"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/contracts"
-	oprepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/operations"
-	opservice "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/operations"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // SLAHandler exposes public SLA transparency endpoint.

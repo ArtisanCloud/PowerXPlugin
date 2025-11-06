@@ -2,9 +2,10 @@ package bootstrap
 
 import (
 	"context"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/grpc/client"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 func BootstrapGRPCClient(ctx context.Context, cfg *config.GRPCUpstream) *client.PowerXServiceClient {

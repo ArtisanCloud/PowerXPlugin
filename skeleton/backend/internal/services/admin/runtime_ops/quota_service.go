@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	runtimeRepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/runtime_ops"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/google/uuid"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/runtime_ops"
-	repo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
-	runtimeRepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/runtime_ops"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 	"gorm.io/gorm"
 )
 

@@ -1,8 +1,8 @@
 package grpc
 
 import (
-	integrationtransport "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/grpc/integration"
-	marketplacegrpc "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/transport/grpc/marketplace"
+	integrationtransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/integration"
+	marketplacegrpc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/marketplace"
 	"google.golang.org/grpc"
 )
 

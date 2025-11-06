@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
-	secmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/security"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

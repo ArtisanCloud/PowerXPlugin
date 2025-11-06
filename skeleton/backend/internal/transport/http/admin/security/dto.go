@@ -3,7 +3,7 @@ package security
 import (
 	"time"
 
-	privmodel "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/privacy"
+	privmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/privacy"
 )
 
 type ConsentTokenResponse struct {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	oprepo "{{ .BackendModulePath }}/internal/entity/repository/operations"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	opservice "{{ .BackendModulePath }}/internal/services/operations"
@@ -22,6 +21,7 @@ import (
 	publicassets "{{ .BackendModulePath }}/internal/transport/http/public/assets"
 	publicmarketplace "{{ .BackendModulePath }}/internal/transport/http/public/marketplace"
 	tenantmarketplace "{{ .BackendModulePath }}/internal/transport/http/tenant/marketplace"
+	"github.com/gin-gonic/gin"
 )
 
 // Registry API 注册器

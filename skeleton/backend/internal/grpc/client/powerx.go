@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	cfgpkg "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/config"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
+	cfgpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

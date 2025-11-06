@@ -3,8 +3,8 @@ package integration
 import (
 	"time"
 
-	idrepo "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository/integration"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+	idrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/sirupsen/logrus"
 )
 

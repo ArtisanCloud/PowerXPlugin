@@ -1,6 +1,6 @@
 package console
 
-import "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
+import "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 
 // Service aggregates shared dependencies for admin console workflows.
 type Service struct {

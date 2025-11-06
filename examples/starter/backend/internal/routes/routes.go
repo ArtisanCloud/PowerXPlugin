@@ -5,8 +5,8 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 
-	"github.com/powerx-plugins/com-powerx-starter/backend/internal/handler"
-	"github.com/powerx-plugins/com-powerx-starter/backend/internal/service"
+	"github.com/ArtisanCloud/PowerXPlugin/examples/com-powerx-starter/backend/internal/handler"
+	"github.com/ArtisanCloud/PowerXPlugin/examples/com-powerx-starter/backend/internal/service"
 )
 
 // Register 挂载插件业务路由。

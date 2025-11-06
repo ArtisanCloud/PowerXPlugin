@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
+	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/google/uuid"
-	model "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
-	repository "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/repository"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/logger"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

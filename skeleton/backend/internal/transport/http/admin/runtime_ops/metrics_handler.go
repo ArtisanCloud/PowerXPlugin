@@ -1,8 +1,8 @@
 package runtime_ops
 
 import (
+	service "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
 	"github.com/gin-gonic/gin"
-	service "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/admin/runtime_ops"
 )
 
 // MetricsHandler exposes runtime ops metrics endpoint.

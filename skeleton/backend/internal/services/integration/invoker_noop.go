@@ -3,7 +3,7 @@ package integration
 import (
 	"context"
 
-	domain "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models/integration"
+	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	"github.com/sirupsen/logrus"
 )
 

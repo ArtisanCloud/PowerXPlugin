@@ -12,8 +12,8 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/observability"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 
-	"github.com/powerx-plugins/com-powerx-demo/backend/internal/manifestx"
-	"github.com/powerx-plugins/com-powerx-demo/backend/internal/routes"
+	"github.com/ArtisanCloud/PowerXPlugin/examples/com-powerx-demo/backend/internal/manifestx"
+	"github.com/ArtisanCloud/PowerXPlugin/examples/com-powerx-demo/backend/internal/routes"
 )
 
 func main() {

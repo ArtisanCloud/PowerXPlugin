@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
-	authx "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
 )
 
 func TestJWTAuthOptionalAllowsRequests(t *testing.T) {

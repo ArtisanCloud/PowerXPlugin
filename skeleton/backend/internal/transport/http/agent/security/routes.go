@@ -1,10 +1,10 @@
 package security
 
 import (
+	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
+	agentsec "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent/security"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
-	secobs "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/observability/security"
-	agentsec "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent/security"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/shared/app"
 )
 
 // RegisterRoutes wires the agent security namespace (privacy consent endpoints).

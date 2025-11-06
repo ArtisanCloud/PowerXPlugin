@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	toolgrantservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent/tool_grant"
 	"github.com/gin-gonic/gin"
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/middleware"
-	toolgrantservice "github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/services/agent/tool_grant"
 )
 
 // Middleware validates ToolGrant tokens on protected routes.

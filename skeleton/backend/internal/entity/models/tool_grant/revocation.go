@@ -3,7 +3,7 @@ package tool_grant
 import (
 	"time"
 
-	"github.com/powerx-plugin/powerxplugin/skeleton/backend/internal/entity/models"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 )
 
 // Revocation records a revoked ToolGrant lease.

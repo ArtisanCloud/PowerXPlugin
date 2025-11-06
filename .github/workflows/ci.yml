@@ -127,7 +127,7 @@ jobs:
         run: |
           make test-smoke 2>&1 | tee smoke.log
       - name: Upload smoke log
-        if: always()
+        if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: smoke-log
@@ -172,7 +172,7 @@ jobs:
         run: |
           make test-regression 2>&1 | tee regression.log
       - name: Upload regression artifacts
-        if: always()
+        if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: regression-artifacts

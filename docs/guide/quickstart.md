@@ -5,15 +5,26 @@
 ## 入门路线图
 
 1. **准备运行环境**  
-   - 安装 Go 1.21+（启用 `GOWORK=on`）与 Node.js 18+ / npm 9+。  
+   - 安装 Go 1.24+（启用 `GOWORK=on`）与 Node.js 18+ / npm 9+。  
    - 建议阅读 `docs/init-project.md` 了解更完整的环境说明。
 
 2. **Standalone 骨架演练**  
    - 按照《[PowerXPlugin Standalone 启动教程](./standalone-mode.md)》同步依赖并启动 Skeleton 后端与管理端。  
+   - 使用多租户 Header 验证 Templates CRUD 示例（默认租户为 `X-Tenant-ID: 1`）：  
+     ```bash
+     # 列表/创建/更新/删除示例
+     curl -s -H 'X-Tenant-ID: 1' http://localhost:8080/api/v1/templates | jq
+     curl -s -X POST -H 'X-Tenant-ID: 1' -H 'Content-Type: application/json' \
+       -d '{"name":"Demo","description":"From Quickstart","content":"Hello"}' \
+       http://localhost:8080/api/v1/templates | jq
+     ```  
+     创建后刷新 `http://localhost:3000/_p/com.powerx.sample/admin/templates/crud`，确认前端可读取并编辑记录。  
+   - 使用 `curl -w 'time_total: %{time_total}\n'` 记录 CRUD API 延迟（目标 <1s），必要时在 docs/research 中登记结果。  
    - 验证 `GET /api/v1/ping` 与 Starter 页面，熟悉框架 App 生命周期。
 
 3. **CLI 模板生成与自测**  
-   - 参考《[使用 CLI 生成并运行插件骨架](./cli-plugin-tutorial.md)》构建 `px-plugin`、生成新插件、启动其后端与前端。  
+   - 参考《[使用 CLI 生成并运行插件骨架](./cli-plugin-tutorial.md)》构建 `px-plugin`、执行 `./bin/px-plugin init <plugin-id>` 生成骨架。  
+   - 在新项目中运行 `go test ./...`、`npm run lint` 并复用上述 CRUD/延迟脚本，确认 CLI 输出与 Skeleton 行为一致。  
    - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。
 
 完成以上三个步骤，即可获得开发 PowerX 插件所需的核心能力：框架运行、模板生成与快速验证。
@@ -22,6 +33,7 @@
 
 - `docs/release.md`：了解版本发布与实验性 `package/dist/publish` 命令的最新状态。
 - `docs/test/testing_usage.md`：掌握 `make test-smoke` / `make test-regression` 的测试流程。
+- `docs/guide/bootstrap-context.md`：理解 `bootstrap.Context` 抽象与跨框架适配方式。
 - `docs/backlog/multi-language.md`：关注多语言支持与未来路线图。
 
 > 遇到问题时，可优先检查 Go/Node 版本，确认依赖安装无误，再回到两个教程逐步排查。欢迎在 README 中列出的渠道反馈问题与改进建议。

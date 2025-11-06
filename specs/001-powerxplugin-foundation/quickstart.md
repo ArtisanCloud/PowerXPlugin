@@ -4,7 +4,7 @@
 
 ## 必备环境
 
-- Go 1.21+，启用 `GOWORK=on`
+- Go 1.24+，启用 `GOWORK=on`
 - Node.js 18+ / npm 9+
 - GNU make（可选，用于脚本化任务）
 
@@ -16,14 +16,16 @@ go work sync
 go mod tidy -e ./framework/... ./tools/cli/...
 
 # 安装前端 workspace 依赖
-cd sdk/workspace
+cd framework/frontend/nuxt/framework-admin
+npm install
+cd ../framework-client
 npm install
 ```
 
 确认以下结构存在并与 `docs/init-project.md` 一致：
 
 - `go.work` → `use ./framework`、`use ./tools/cli`
-- `sdk/workspace/package.json` → `workspaces` 指向 `frontend/nuxt/*`
+- `framework/frontend/nuxt/framework-admin`、`framework-client` 完成依赖安装
 
 ## 2. 运行 Skeleton
 

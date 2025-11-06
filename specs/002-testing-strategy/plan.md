@@ -17,7 +17,7 @@ Implement a repository-wide testing strategy that delivers (1) smoke and full re
   the iteration process.
 -->
 
-**Language/Version**: Go 1.21+, Node.js 18+, npm 9+, Bash (POSIX)  
+**Language/Version**: Go 1.24+, Node.js 18+, npm 9+, Bash (POSIX)  
 **Primary Dependencies**: Go toolchain (`go test`, `go tool cover`), Playwright 1.48+, Nuxt CLI (`nuxi`), jq/standard UNIX utilities  
 **Storage**: N/A (documentation and scripts only)  
 **Testing**: `go test`, Playwright (`npx playwright test`), Shell-based validation scripts  

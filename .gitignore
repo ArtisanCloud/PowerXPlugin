@@ -34,3 +34,6 @@ Thumbs.db
 # Testing artifacts (coverage reports, playwright output, temp CLI scaffolds)
 tmp/
 !tmp/README.md
+.cache/
+skeleton/backend/etc/config.yaml
+skeleton/backend/etc/host-values.yaml

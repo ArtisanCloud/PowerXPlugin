@@ -1,6 +1,6 @@
 # Powerx Demo Plugin Web Admin
 
-该目录基于 Nuxt 4 与 `@powerx-plugin/framework-admin` Layer，默认启用 Starter 页面。
+该目录基于 Nuxt 4 与 `@artisan-cloud/plugin-framework-admin` Layer，默认启用 Starter 页面。
 
 ```bash
 npm install

@@ -10,7 +10,7 @@
 **目的**: 建立仓库级基础配置，为多模块结构奠定基础。
 
 - [X] T001 创建 Go workspace 根文件 `go.work`，注册 `./framework` 与 `./tools/cli`
-- [X] T002 配置根级 `package.json` 以声明 npm workspaces（指向 `sdk/workspace`）
+- [X] T002 配置根级 `package.json` 以声明 npm workspaces（指向 `framework/frontend/nuxt/*`）
 - [X] T003 撰写仓库根 `README.md`，引用 quickstart 与技术设计文档
 
 ---
@@ -20,11 +20,11 @@
 **目的**: 准备所有用户故事共享的核心目录与模块骨架；未完成前禁止进入任一用户故事。
 
 - [X] T004 建立 `framework/backend/go/` 目录骨架（bootstrap/router/middleware 等子目录）
-- [X] T005 初始化 `framework/go.mod` 并声明模块 `github.com/powerx-plugin/framework`
+- [X] T005 初始化 `framework/go.mod` 并声明模块 `github.com/ArtisanCloud/PowerXPlugin/framework`
 - [X] T006 初始化 `tools/cli/go.mod` 与 `tools/cli/cmd/` 目录（预留 init/package/dist/publish 命令）
-- [X] T007 配置 `sdk/workspace/package.json` 与 `frontend/nuxt/` 目录结构
+- [X] T007 配置 `framework/frontend/nuxt` 下的 package.json 与目录结构
 - [X] T008 创建 `skeleton/backend` 与 `skeleton/web-admin` 目录骨架（含 `cmd/plugin`、`internal/`、`app/`）
-- [X] T009 建立 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web/nuxt` 目录占位
+- [X] T009 建立 `scaffold/templates/backend/go-gin` 与 `scaffold/templates/web-admin/nuxt` 目录占位
 - [X] T010 添加入仓 `config/config.yaml.example` 作为环境配置模板
 
 **Checkpoint**: 目录骨架与多模块配置完成，可开始用户故事实现。
@@ -35,7 +35,7 @@
 
 **Goal**: skeleton 后端/前端可直接运行；同时输出与 skeleton 对齐的 Go 框架与 Nuxt Layer，供外部插件引用。
 
-**Independent Test**: `go run ./skeleton/backend/cmd/plugin` 返回 `GET /api/v1/ping`=200；在独立项目引用 `github.com/powerx-plugin/framework` 与 `@powerx-plugin/framework-admin` 可成功构建/启动。
+**Independent Test**: `go run ./skeleton/backend/cmd/plugin` 返回 `GET /api/v1/ping`=200；在独立项目引用 `github.com/ArtisanCloud/PowerXPlugin/framework` 与 `@artisan-cloud/plugin-framework-admin` 可成功构建/启动。
 
 ### 实施任务
 
@@ -45,16 +45,16 @@
 - [X] T014 [P] [US1] 定义 `framework/backend/go/rbac/rbac.go`，暴露角色与权限报告 API
 - [X] T015 [P] [US1] 添加 `framework/backend/go/middleware/auth_guard.go` stub，默认返回 `501 Not Implemented`
 - [X] T016 [P] [US1] 实现 `framework/backend/go/observability/metrics.go` 与 `tracing.go` 占位
-- [X] T017 [US1] 创建 `skeleton/backend/go.mod`，引用 `github.com/powerx-plugin/framework`
+- [X] T017 [US1] 创建 `skeleton/backend/go.mod`，引用 `github.com/ArtisanCloud/PowerXPlugin/framework`
 - [X] T018 [US1] 编写 `skeleton/backend/cmd/plugin/main.go`，按六步装配流程注册框架与业务路由
 - [X] T019 [P] [US1] 实现 `skeleton/backend/internal/routes/routes.go`，提供 `GET /api/v1/ping`
 - [X] T020 [P] [US1] 实现 `skeleton/backend/internal/service/ping.go` 与 `handler/ping.go`
-- [X] T021 [US1] 编写 `skeleton/backend/README.md`，记录 Go 1.21+ 依赖与启动命令
+- [X] T021 [US1] 编写 `skeleton/backend/README.md`，记录 Go 1.24+ 依赖与启动命令
 - [X] T022 [US1] 配置 `skeleton/web-admin/nuxt.config.ts`，引入 `definePowerXAdminConfig`
 - [X] T023 [P] [US1] 创建 `skeleton/web-admin/app/pages/_p/com.powerx.sample/admin/index.vue` Starter 页面
 - [X] T024 [P] [US1] 添加 `skeleton/web-admin/app/components/powerx/PXNav.vue` 覆盖示例
-- [X] T025 [US1] 实现 `sdk/workspace/frontend/nuxt/framework-admin/index.ts` 与 Layer `nuxt.config.ts`
-- [X] T026 [P] [US1] 实现 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 与 `$fetch` 包装
+- [X] T025 [US1] 实现 `framework/frontend/nuxt/framework-admin/index.ts` 与 Layer `nuxt.config.ts`
+- [X] T026 [P] [US1] 实现 `framework/frontend/nuxt/framework-client/api.ts` 与 `$fetch` 包装
 - [X] T027 [US1] 验证 `go run ./skeleton/backend/cmd/plugin` 启动成功并对 `GET /api/v1/ping` 返回 200
 - [X] T028 [US1] 验证 `cd skeleton/web-admin && npm run dev` 可访问 Starter 页面并加载 PX 布局
 - [X] T029 [US1] 在 `examples/verify-external/` 构建临时插件工程，引用框架包并执行 `go build` / `npm run build` 以验证外部编译通过
@@ -76,7 +76,7 @@
 - [X] T032 [P] [US2] 更新 `docs/contracts/openapi.yaml`，记录 `/api/v1/ping` 与 `/api/v1/admin/manifest`
 - [X] T033 [US2] 在 `framework/backend/go/manifest/validator.go` 集成 Manifest Schema 校验
 - [X] T034 [P] [US2] 在 `framework/backend/go/rbac/validator.go` 集成 RBAC Schema 校验
-- [X] T035 [US2] 在 `sdk/workspace/frontend/nuxt/framework-client/api.ts` 引入契约驱动的错误提示
+- [X] T035 [US2] 在 `framework/frontend/nuxt/framework-client/api.ts` 引入契约驱动的错误提示
 - [X] T036 [US2] 创建 `.github/workflows/ci.yml`，包含 `go test ./...`、`npm ci && npm run lint && npm run build`、契约 Schema 校验与文档生成扫描
 - [X] T037 [P] [US2] 撰写 `docs/contracts/README.md`，说明 Schema 更新流程与 CI 钩子
 
@@ -94,8 +94,8 @@
 
 - [X] T038 [US3] 创建 `scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl` 与变量占位
 - [X] T039 [P] [US3] 创建 `scaffold/templates/backend/go-gin/internal/routes.go.tmpl`、`handler/ping.go.tmpl`
-- [X] T040 [P] [US3] 创建 `scaffold/templates/web/nuxt/nuxt.config.ts.tmpl` 与 Starter 页面模板
-- [X] T041 [P] [US3] 创建 `scaffold/templates/web/nuxt/app/pages/_p/__plugin__/admin/index.vue.tmpl`
+- [X] T040 [P] [US3] 创建 `scaffold/templates/web-admin/nuxt/nuxt.config.ts.tmpl` 与 Starter 页面模板
+- [X] T041 [P] [US3] 创建 `scaffold/templates/web-admin/nuxt/app/pages/_p/__plugin__/admin/index.vue.tmpl`
 - [X] T042 [US3] 实现 `tools/cli/internal/templates/embed.go`，使用 `go:embed` 打包模板
 - [X] T043 [US3] 实现 `tools/cli/cmd/init.go`，渲染模板并写入 `plugin.yaml`
 - [X] T044 [P] [US3] 实现 `tools/cli/internal/contracts/embed.go`，内置 Manifest/RBAC/OpenAPI 元数据

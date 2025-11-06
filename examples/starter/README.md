@@ -24,7 +24,7 @@ cd web-admin
 npm run dev
 ```
 
-> **注意**：此示例项目用于在 PowerXPlugin 仓库内验证，不依赖已发布的框架包。若要在独立环境中使用，请先发布 `@powerx-plugin/framework-admin` 与 `@powerx-plugin/framework-client` 到 npm，然后将 `package.json` 中的依赖版本改为具体版本号。
+> **注意**：此示例项目用于在 PowerXPlugin 仓库内验证，不依赖已发布的框架包。若要在独立环境中使用，请先发布 `@artisan-cloud/plugin-framework-admin` 与 `@artisan-cloud/plugin-framework-client` 到 npm，然后将 `package.json` 中的依赖版本改为具体版本号。
 
 ## 下一步
 

@@ -19,7 +19,7 @@ Manifest、RBAC、健康检查与 API 契约是唯一真相：相关 Schema 必�
 
 ## 实施约束
 
-- 维持根目录 `go.work` 的多模块结构，确保 `framework/` 与 `tools/cli/` 可独立构建，并通过 `github.com/powerx-plugin/framework/...` 暴露导入路径。
+- 维持根目录 `go.work` 的多模块结构，确保 `framework/` 与 `tools/cli/` 可独立构建，并通过 `github.com/ArtisanCloud/PowerXPlugin/framework/...` 暴露导入路径。
 - 前端产物必须位于 `sdk/workspace/` 下的 npm workspace，锁定依赖版本并发布 `@powerx-plugin/framework-admin`、`@powerx-plugin/framework-client`，让 Nuxt 项目可直接安装使用。
 - 脚手架模板需提供可运行默认项：后端串联 `bootstrap`、`router` 与 Manifest 注册；前端提供 Nuxt 布局层、导航壳与可覆写的 API 助手。
 - `plugin.yaml` 元数据、脚手架模板（`scaffold/templates/**`）与 CLI 命令（`init` 及计划中的 `package/dist/publish`）必须保持一致，并为未实现命令标注“设计稿”状态。

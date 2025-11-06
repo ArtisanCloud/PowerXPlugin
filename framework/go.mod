@@ -1,5 +1,5 @@
-module github.com/powerx-plugin/framework
+module github.com/ArtisanCloud/PowerXPlugin/framework
 
-go 1.21
+go 1.24
 
 require github.com/santhosh-tekuri/jsonschema/v5 v5.3.0

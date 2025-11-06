@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"github.com/powerx-plugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 
-	"github.com/powerx-plugins/com-powerx-starter/backend/internal/service"
+	"github.com/ArtisanCloud/PowerXPlugin/examples/com-powerx-starter/backend/internal/service"
 )
 
 // PingHandler 演示如何组合 service 与框架 Handler。

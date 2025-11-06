@@ -1,20 +1,22 @@
 package manifestx
 
-import "github.com/powerx-plugin/framework/backend/go/manifest"
+import "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 
-// Plugin 返回 skeleton 示例的 Manifest 定义。
+// Plugin returns the manifest definition consumed by the framework/router layer.
 func Plugin() manifest.Plugin {
 	return manifest.Plugin{
-		ID:   "com.powerx.sample",
-		Name: "PowerX Sample Plugin",
+		ID:      "com.powerx.plugin.base",
+		Name:    "PowerX Base Plugin",
+		Version: "0.1.0",
 		Menus: []manifest.Menu{
 			{
-				Path:  "/_p/com.powerx.sample/admin",
-				Title: "Sample Dashboard",
+				Path:  "/_p/com.powerx.plugin.base/admin/templates/intro",
+				Title: "模板介绍",
 			},
-		},
-		Permissions: []string{
-			"com.powerx.sample.admin.view",
+			{
+				Path:  "/_p/com.powerx.plugin.base/admin/templates/crud",
+				Title: "模板管理",
+			},
 		},
 	}
 }

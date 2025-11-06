@@ -22,7 +22,7 @@
   - Creating new hidden directories — rejected to avoid onboarding confusion.
 
 ## Decision 4: Toolchain Baseline
-- **Decision**: Require Go 1.21+, Node 18+, npm 9+, Playwright 1.48+ across workflows.
+- **Decision**: Require Go 1.24+, Node 18+, npm 9+, Playwright 1.48+ across workflows.
 - **Rationale**: Aligns with project baseline (Phase 7 foundation) and ensures compatibility with existing skeleton/framework code.
 - **Alternatives Considered**: Supporting earlier versions — rejected due to increased matrix complexity and lack of guarantees.
 

@@ -3,7 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 )
+
+// Version holds the build version string. Overridden at build time via ldflags.
+var Version = "dev"
 
 // Execute routes CLI invocations.
 func Execute(args []string) error {
@@ -15,6 +19,9 @@ func Execute(args []string) error {
 	switch args[0] {
 	case "help", "-h", "--help":
 		printHelp()
+		return nil
+	case "version", "--version", "-v":
+		printVersion()
 		return nil
 	case "init":
 		return runInit(args[1:])
@@ -40,6 +47,39 @@ Commands:
   package    Experimental packaging workflow
   dist       Experimental distribution workflow
   publish    Experimental publish workflow
+  version    Print CLI version information
   help       Show this help message
 `)
+}
+
+func printVersion() {
+	version := Version
+	commit := ""
+	dirty := ""
+
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+		for _, setting := range info.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				if len(setting.Value) >= 7 {
+					commit = setting.Value[:7]
+				} else {
+					commit = setting.Value
+				}
+			case "vcs.modified":
+				if setting.Value == "true" {
+					dirty = "-dirty"
+				}
+			}
+		}
+	}
+
+	if commit != "" {
+		fmt.Fprintf(os.Stdout, "px-plugin version %s (commit %s%s)\n", version, commit, dirty)
+	} else {
+		fmt.Fprintf(os.Stdout, "px-plugin version %s\n", version)
+	}
 }

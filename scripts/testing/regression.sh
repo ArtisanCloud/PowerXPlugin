@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+color() {
+  local code="$1"; shift
+  if [ -t 1 ]; then
+    printf '\033[%sm%s\033[0m' "$code" "$*"
+  else
+    printf '%s' "$*"
+  fi
+}
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
 cd "$ROOT_DIR"
 
@@ -12,8 +21,13 @@ echo "=== Regression workflow start ==="
 
 echo "[R-1] Running full Go test suite"
 go test ./framework/... ./skeleton/backend/... -coverprofile=tmp/coverage-regression.out
-
 go tool cover -html=tmp/coverage-regression.out -o tmp/coverage.html
+
+BACKEND_PORT="${REGRESSION_BACKEND_PORT:-8087}"
+BACKEND_HOST="${REGRESSION_BACKEND_HOST:-127.0.0.1}"
+BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
+API_BASE_URL="${BACKEND_BASE_URL}/api/v1"
+echo "[info] Backend base URL: ${API_BASE_URL}"
 
 BACKEND_LOG="tmp/regression-backend.log"
 FRONTEND_LOG="tmp/regression-frontend.log"
@@ -55,14 +69,16 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[R-2] Starting backend service"
-go run ./skeleton/backend/cmd/plugin >"$BACKEND_LOG" 2>&1 &
+POWERX_LISTEN=":${BACKEND_PORT}" go run ./skeleton/backend/cmd/plugin >"$BACKEND_LOG" 2>&1 &
 backend_pid=$!
 
-echo "[R-3] Building Nuxt app"
+echo "[R-3] Preparing frontend dependencies"
 pushd skeleton/web-admin > /dev/null
-npm install >/dev/null 2>&1 || true
-npx nuxi build >/dev/null 2>&1
-NITRO_PORT="$FRONTEND_PORT" PORT="$FRONTEND_PORT" npx nuxi preview --hostname 127.0.0.1 --port "$FRONTEND_PORT" >"$ROOT_DIR/$FRONTEND_LOG" 2>&1 &
+npm install
+npm run lint
+NUXT_PUBLIC_API_BASE="$API_BASE_URL" npm run build
+NUXT_PUBLIC_API_BASE="$API_BASE_URL" NITRO_PORT="$FRONTEND_PORT" PORT="$FRONTEND_PORT" \
+  npx nuxi preview --hostname 127.0.0.1 --port "$FRONTEND_PORT" >"$ROOT_DIR/$FRONTEND_LOG" 2>&1 &
 frontend_pid=$!
 popd > /dev/null
 
@@ -83,14 +99,14 @@ wait_for() {
   return 1
 }
 
-wait_for "http://127.0.0.1:8077/healthz" "Backend"
+wait_for "${BACKEND_BASE_URL}/healthz" "Backend"
 PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://127.0.0.1:$FRONTEND_PORT}"
 wait_for "$PLAYWRIGHT_BASE_URL" "Frontend"
 
 echo "[R-4] Running Playwright tests against $PLAYWRIGHT_BASE_URL"
 (
   cd skeleton/web-admin
-  PLAYWRIGHT_BASE_URL="$PLAYWRIGHT_BASE_URL" npx playwright test
+  PLAYWRIGHT_BASE_URL="$PLAYWRIGHT_BASE_URL" NUXT_PUBLIC_API_BASE="$API_BASE_URL" npx playwright test
 )
 
 echo "Playwright report directory: skeleton/web-admin/test-results/"

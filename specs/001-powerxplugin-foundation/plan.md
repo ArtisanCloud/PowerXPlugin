@@ -6,12 +6,12 @@
 
 ## Summary
 
-落实 PowerXPlugin Phase 0~4 的地基建设：提供 `go.work` 管理的多模块 Go 框架、`sdk/workspace` 下的 Nuxt Layer/npm workspace、可运行的 skeleton 以及与之完全对齐的 CLI 模板与实验性 `package/dist/publish` 工作流；所有实现与契约、目录、示例必须同步 `docs/init-project.md` 的技术设计。
+落实 PowerXPlugin Phase 0~4 的地基建设：提供 `go.work` 管理的多模块 Go 框架、`framework/frontend/nuxt` 下的 Nuxt Layer/npm workspace、可运行的 skeleton 以及与之完全对齐的 CLI 模板与实验性 `package/dist/publish` 工作流；所有实现与契约、目录、示例必须同步 `docs/init-project.md` 的技术设计。
 
 ## Technical Context
 
-**Language/Version**: Go 1.21+, TypeScript 5.x (Nuxt 4.2)  
-**Primary Dependencies**: Gin 框架、Nuxt 4.2、`@powerx-plugin/framework-admin` Layer、`@powerx-plugin/framework-client`  
+**Language/Version**: Go 1.24+, TypeScript 5.x (Nuxt 4.2)  
+**Primary Dependencies**: Gin 框架、Nuxt 4.2、`@artisan-cloud/plugin-framework-admin` Layer、`@artisan-cloud/plugin-framework-client`  
 **Storage**: 暂不引入持久层（Skeleton/模板以内存或 mock 为主）  
 **Testing**: `go test ./...`、`npm run lint && npm run build`  
 **Target Platform**: PowerX Core 宿主环境（Linux 服务 + Nuxt SSR）  
@@ -51,7 +51,7 @@ PowerXPlugin/
 ├─ go.work                                 # Phase 0: 管理 framework/ 与 tools/cli/ 多模块
 ├─ package.json                            # Phase 0: 根级 npm workspaces（可选）
 ├─ framework/                              # Phase 3: 共享后端框架
-│  ├─ go.mod (module github.com/powerx-plugin/framework)
+│  ├─ go.mod (module github.com/ArtisanCloud/PowerXPlugin/framework)
 │  └─ backend/go/
 │     ├─ bootstrap/                        # App 初始化（参考 Base/internal/bootstrap）
 │     ├─ router/                           # RegisterFrameworkRoutes/RegisterPluginRoutes
@@ -61,20 +61,20 @@ PowerXPlugin/
 │     ├─ observability/                    # 指标 & Trace 集成
 │     ├─ tenancy/                          # 多租户上下文
 │     └─ shared/                           # 通用组件与工具
-├─ sdk/workspace/                          # Phase 3: Nuxt Layer + Client npm 包
+├─ framework/frontend/nuxt/                # Phase 3: Nuxt Layer + Client npm 包
 │  ├─ package.json (workspaces: frontend/nuxt/*)
 │  └─ frontend/nuxt/
-│     ├─ framework-admin/                  # @powerx-plugin/framework-admin
+│     ├─ framework-admin/                  # @artisan-cloud/plugin-framework-admin
 │     │  ├─ layer/app/{components,middleware,pages,plugins}
 │     │  ├─ layer/nuxt.config.ts
 │     │  ├─ module.ts
 │     │  └─ index.ts (definePowerXAdminConfig)
-│     └─ framework-client/                 # @powerx-plugin/framework-client
+│     └─ framework-client/                 # @artisan-cloud/plugin-framework-client
 │        ├─ api.ts / http.ts
 │        └─ index.ts
 ├─ skeleton/                               # Phase 2: 可运行样例
 │  ├─ backend/
-│  │  ├─ go.mod (require github.com/powerx-plugin/framework)
+│  │  ├─ go.mod (require github.com/ArtisanCloud/PowerXPlugin/framework)
 │  │  ├─ cmd/plugin/main.go                # 6 步装配流程（参考 Base backend/cmd/plugin）
 │  │  └─ internal/
 │  │     ├─ routes/                        # `/api/v1/ping`
@@ -89,7 +89,7 @@ PowerXPlugin/
 │  ├─ backend/go-gin/
 │  │  ├─ cmd/plugin/main.go.tmpl
 │  │  └─ internal/*.tmpl
-│  └─ web/nuxt/
+│  └─ web-admin/nuxt/
 │     ├─ nuxt.config.ts.tmpl
 │     └─ app/**/*.tmpl
 ├─ tools/cli/                              # Phase 4: px-plugin CLI

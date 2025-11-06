@@ -1,7 +1,7 @@
 # Testing Strategy Quickstart
 
 ## 1. 环境准备
-- Go 1.21+
+- Go 1.24+
 - Node.js 18+ / npm 9+
 - Playwright 1.48+ (`npx playwright install`)
 - Python 3（用于 JSON 校验）
@@ -19,7 +19,7 @@ npx playwright install --prefix skeleton/web-admin
 make test-smoke
 ```
 
-> 实测（macOS / Go 1.23 / Node 22）：约 3 秒完成，脚本末尾会打印 `=== Smoke workflow complete in Ns ===`，可作为 SC-001 的佐证。
+> 实测（macOS / Go 1.24 / Node 22）：约 3 秒完成，脚本末尾会打印 `=== Smoke workflow complete in Ns ===`，可作为 SC-001 的佐证。
 
 ## 4. 执行全量回归
 ```bash

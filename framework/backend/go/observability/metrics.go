@@ -1,6 +1,6 @@
 package observability
 
-import "github.com/powerx-plugin/framework/backend/go/bootstrap"
+import "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 
 // InitMetrics 预留指标初始化入口。
 func InitMetrics(app *bootstrap.App) error {

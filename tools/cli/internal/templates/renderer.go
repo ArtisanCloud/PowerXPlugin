@@ -58,6 +58,7 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		}
 
 		targetRel := strings.TrimSuffix(rel, ".tmpl")
+		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugin.base", data.PluginID)
 		targetRel = strings.ReplaceAll(targetRel, "__plugin__", data.PluginID)
 		targetRel = normalizeTargetPath(targetRel)
 
@@ -118,8 +119,8 @@ func normalizeTargetPath(rel string) string {
 	switch {
 	case strings.HasPrefix(rel, "backend/go-gin/"):
 		return "backend/" + strings.TrimPrefix(rel, "backend/go-gin/")
-	case strings.HasPrefix(rel, "web/nuxt/"):
-		return "web-admin/" + strings.TrimPrefix(rel, "web/nuxt/")
+	case strings.HasPrefix(rel, "web-admin/nuxt/"):
+		return "web-admin/" + strings.TrimPrefix(rel, "web-admin/nuxt/")
 	default:
 		return rel
 	}

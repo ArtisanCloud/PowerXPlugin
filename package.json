@@ -2,10 +2,17 @@
   "name": "powerxplugin-monorepo",
   "private": true,
   "workspaces": [
-    "sdk/workspace"
+    "framework/frontend/nuxt/framework-admin",
+    "framework/frontend/nuxt/framework-client"
   ],
   "scripts": {
     "lint": "npm --workspaces --if-present run lint && npm --prefix skeleton/web-admin run lint",
-    "build": "npm --workspaces --if-present run build && npm --prefix skeleton/web-admin run build"
+    "build": "npm --workspaces --if-present run build && npm --prefix skeleton/web-admin run build",
+    "sync:templates": "node scripts/sync-templates.mjs"
+  },
+  "dependencies": {
+    "fast-glob": "^3.3.3",
+    "micromatch": "^4.0.8",
+    "yaml": "^2.8.1"
   }
 }

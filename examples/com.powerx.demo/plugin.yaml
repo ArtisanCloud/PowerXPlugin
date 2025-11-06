@@ -6,4 +6,4 @@ backend:
   framework: go-gin
 frontend:
   stack: nuxt
-  layer: '@powerx-plugin/framework-admin'
+  layer: '@artisan-cloud/plugin-framework-admin'

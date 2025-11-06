@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/powerx-plugin/framework/backend/go/manifest"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 )
 
 func TestNewAppFromEnvDefaults(t *testing.T) {
@@ -13,7 +13,7 @@ func TestNewAppFromEnvDefaults(t *testing.T) {
 	t.Setenv("STANDALONE", "")
 
 	app := NewAppFromEnv()
-	if got, want := app.Config.Listen, ":8078"; got != want {
+	if got, want := app.Config.Listen, ":8087"; got != want {
 		t.Fatalf("Listen = %q, want %q", got, want)
 	}
 	if got, want := app.Config.Env, "development"; got != want {
@@ -47,8 +47,8 @@ func TestWithStandaloneDefaults(t *testing.T) {
 	if !cfg.Standalone {
 		t.Fatalf("Standalone = false, want true")
 	}
-	if cfg.Listen != ":8078" {
-		t.Fatalf("Listen = %q, want :8078", cfg.Listen)
+	if cfg.Listen != ":8087" {
+		t.Fatalf("Listen = %q, want :8087", cfg.Listen)
 	}
 	if cfg.Env != "development" {
 		t.Fatalf("Env = %q, want development", cfg.Env)

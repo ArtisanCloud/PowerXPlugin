@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/powerx-plugin/framework/backend/go/manifest"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 )
 
 // App 封装后端运行时依赖，供 skeleton 与框架层共享。
@@ -63,7 +63,7 @@ func WithStandaloneDefaults() Option {
 	return func(cfg *Config) {
 		cfg.Standalone = true
 		if cfg.Listen == "" {
-			cfg.Listen = ":8078"
+			cfg.Listen = ":8087"
 		}
 		if cfg.Env == "" {
 			cfg.Env = "development"
@@ -75,7 +75,7 @@ func WithStandaloneDefaults() Option {
 func NewApp(cfg *Config) *App {
 	if cfg == nil {
 		cfg = &Config{
-			Listen:     ":8078",
+			Listen:     ":8087",
 			Env:        "development",
 			Standalone: true,
 		}
@@ -91,7 +91,7 @@ func NewApp(cfg *Config) *App {
 // NewAppFromEnv 读取环境变量并应用可选项构造 App。
 func NewAppFromEnv(opts ...Option) *App {
 	cfg := &Config{
-		Listen:     getEnvOrDefault("POWERX_LISTEN", ":8078"),
+		Listen:     getEnvOrDefault("POWERX_LISTEN", ":8087"),
 		Env:        getEnvOrDefault("POWERX_ENV", "development"),
 		Standalone: parseBoolEnv("STANDALONE", true),
 	}

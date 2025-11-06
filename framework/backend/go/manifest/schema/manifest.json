@@ -3,6 +3,34 @@
   "title": "PowerX Plugin Manifest",
   "type": "object",
   "required": ["id", "name"],
+  "$defs": {
+    "menu": {
+      "type": "object",
+      "required": ["path", "title"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/_p/[a-z0-9.-]+/admin(/.*)?$"
+        },
+        "title": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/menu"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
   "properties": {
     "id": {
       "type": "string",
@@ -19,23 +47,7 @@
     "menus": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["path", "title"],
-        "properties": {
-          "path": {
-            "type": "string",
-            "pattern": "^/_p/[a-z0-9.-]+/admin(/.*)?$"
-          },
-          "title": {
-            "type": "string"
-          },
-          "icon": {
-            "type": "string"
-          },
-          "order": {
-            "type": "integer"
-          }
-        }
+        "$ref": "#/$defs/menu"
       }
     },
     "permissions": {

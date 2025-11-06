@@ -2,10 +2,11 @@ package manifest
 
 // Menu 描述管理端导航项。
 type Menu struct {
-	Path  string `json:"path"`
-	Title string `json:"title"`
-	Icon  string `json:"icon,omitempty"`
-	Order int    `json:"order,omitempty"`
+	Path     string `json:"path"`
+	Title    string `json:"title"`
+	Icon     string `json:"icon,omitempty"`
+	Order    int    `json:"order,omitempty"`
+	Children []Menu `json:"children,omitempty"`
 }
 
 // Plugin 汇总插件向宿主上报的基础信息。

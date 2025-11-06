@@ -6,13 +6,35 @@ on:
   pull_request:
 
 jobs:
+  template-sync:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Verify template sync
+        run: npm run sync:templates -- --check
+
   backend:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - name: Go work sync
         run: go work sync
       - name: Go test (framework)
@@ -22,6 +44,8 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,11 +62,19 @@ jobs:
 
   contracts:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - name: Go work sync
         run: go work sync
       - name: Run contract validators
@@ -50,11 +82,19 @@ jobs:
 
   cli:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - name: Build px-plugin and scaffold sample project
         run: |
           go work sync
@@ -67,11 +107,19 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     needs: [backend, contracts, cli]
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -79,7 +127,7 @@ jobs:
         run: |
           make test-smoke 2>&1 | tee smoke.log
       - name: Upload smoke log
-        if: always()
+        if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: smoke-log
@@ -88,11 +136,19 @@ jobs:
   regression:
     runs-on: ubuntu-latest
     needs: [smoke]
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -116,7 +172,7 @@ jobs:
         run: |
           make test-regression 2>&1 | tee regression.log
       - name: Upload regression artifacts
-        if: always()
+        if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: regression-artifacts

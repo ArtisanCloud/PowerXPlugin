@@ -1,0 +1,163 @@
+package console_test
+
+import (
+	"bytes"
+	"context"
+	"testing"
+	"time"
+
+	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/stretchr/testify/require"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
+)
+
+type healthSourceStub struct {
+	count int
+	items []consolesvc.HealthStatus
+}
+
+func (s *healthSourceStub) FetchHealth(_ context.Context, _ *string) ([]consolesvc.HealthStatus, error) {
+	s.count++
+	return s.items, nil
+}
+
+type quotaSourceStub struct {
+	count int
+	items []consolesvc.QuotaUsage
+}
+
+func (s *quotaSourceStub) FetchQuota(_ context.Context, _ *string) ([]consolesvc.QuotaUsage, error) {
+	s.count++
+	return s.items, nil
+}
+
+type webhookSourceStub struct {
+	count int
+	item  consolesvc.WebhookDeliverySummary
+}
+
+func (s *webhookSourceStub) FetchWebhookSummary(_ context.Context, _ *string) (consolesvc.WebhookDeliverySummary, error) {
+	s.count++
+	return s.item, nil
+}
+
+type guidanceStub struct {
+	count int
+	items []consolesvc.GuidanceItem
+}
+
+func (s *guidanceStub) FetchGuidance(_ context.Context, _ *string) ([]consolesvc.GuidanceItem, error) {
+	s.count++
+	return s.items, nil
+}
+
+func setupTroubleshootService(t *testing.T) (*consolesvc.TroubleshootService, *healthSourceStub, *quotaSourceStub, *webhookSourceStub, *guidanceStub, *adminmetrics.Metrics, *timeStub) {
+	t.Helper()
+	cfg := &config.Config{
+		AdminConsole: &config.AdminConsoleConfig{
+			Troubleshooting: config.AdminConsoleTroubleshooting{
+				RefreshIntervalSeconds: 300,
+				CacheTTLSeconds:        120,
+			},
+		},
+	}
+	metrics := adminmetrics.NewMetrics()
+	health := &healthSourceStub{
+		items: []consolesvc.HealthStatus{
+			{Name: "Webhooks", Status: "healthy", Message: "All systems go"},
+		},
+	}
+	quota := &quotaSourceStub{
+		items: []consolesvc.QuotaUsage{
+			{Capability: "api_calls", UsagePercent: 42.5, ThresholdPercent: 80, Window: "5m"},
+		},
+	}
+	webhooks := &webhookSourceStub{
+		item: consolesvc.WebhookDeliverySummary{
+			SuccessRate: 0.92,
+			RetryRate:   0.05,
+			DLQRate:     0.03,
+			RecentFailures: []consolesvc.WebhookAttemptSummary{
+				{ID: "attempt-1", Status: "failed", ResponseCode: 500, PayloadID: "evt-1"},
+			},
+		},
+	}
+	guidance := &guidanceStub{
+		items: []consolesvc.GuidanceItem{
+			{Title: "重试失败的任务", Description: "检查下游服务状态后再执行重试。"},
+		},
+	}
+	clock := &timeStub{current: time.Unix(1_700_000_000, 0)}
+
+	deps := &app.Deps{
+		Config:              cfg,
+		AdminConsoleMetrics: metrics,
+	}
+	svc := consolesvc.NewTroubleshootService(deps,
+		consolesvc.WithHealthSource(health),
+		consolesvc.WithQuotaSource(quota),
+		consolesvc.WithWebhookSource(webhooks),
+		consolesvc.WithGuidanceSource(guidance),
+		consolesvc.WithTroubleshootClock(clock.Now),
+	)
+	return svc, health, quota, webhooks, guidance, metrics, clock
+}
+
+type timeStub struct {
+	current time.Time
+}
+
+func (s *timeStub) Now() time.Time {
+	return s.current
+}
+
+func TestTroubleshootServiceAggregatesSources(t *testing.T) {
+	svc, health, quota, webhooks, guidance, metrics, clock := setupTroubleshootService(t)
+	tenant := "tenant-agg"
+	summary, err := svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	require.NoError(t, err)
+	require.NotNil(t, summary)
+	require.Equal(t, 1, health.count)
+	require.Equal(t, 1, quota.count)
+	require.Equal(t, 1, webhooks.count)
+	require.Equal(t, 1, guidance.count)
+	require.Equal(t, clock.current.UTC(), summary.RefreshedAt.UTC())
+	require.Equal(t, 300, summary.RefreshIntervalSeconds)
+	require.Len(t, summary.Health, 1)
+	require.Len(t, summary.Quota, 1)
+	require.Equal(t, 0.92, summary.WebhookDelivery.SuccessRate)
+	require.Len(t, summary.WebhookDelivery.RecentFailures, 1)
+
+	var buf bytes.Buffer
+	metrics.RenderPrometheus(&buf)
+	require.Contains(t, buf.String(), `powerx_admin_console_dashboard_refresh_seconds{scope="tenant:tenant-agg"} 0`)
+}
+
+func TestTroubleshootServiceCacheRespectsTTL(t *testing.T) {
+	svc, health, quota, webhooks, guidance, _, clock := setupTroubleshootService(t)
+	tenant := "tenant-cache"
+	_, err := svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	require.NoError(t, err)
+	require.Equal(t, 1, health.count)
+	require.Equal(t, 1, quota.count)
+	require.Equal(t, 1, webhooks.count)
+	require.Equal(t, 1, guidance.count)
+
+	// Second call without advancing time should use cache.
+	_, err = svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	require.NoError(t, err)
+	require.Equal(t, 1, health.count)
+	require.Equal(t, 1, quota.count)
+	require.Equal(t, 1, webhooks.count)
+
+	// Advance beyond TTL to force refresh.
+	clock.current = clock.current.Add(2*time.Minute + time.Second)
+	_, err = svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	require.NoError(t, err)
+	require.Equal(t, 2, health.count)
+	require.Equal(t, 2, quota.count)
+	require.Equal(t, 2, webhooks.count)
+}

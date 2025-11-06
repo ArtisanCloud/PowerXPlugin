@@ -1,16 +1,10 @@
-SMOKE_TIMEOUT ?= 300
-REGRESSION_TIMEOUT ?= 3600
+# Root Makefile: include modular task definitions from make-files/
 
-.PHONY: test-smoke test-regression
+MAKEFILES_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-## Smoke workflow: wrapper around scripts/testing/smoke.sh with timeout/diagnostics
-test-smoke:
-	@echo "=== Smoke Tests Start ==="
-	@python3 scripts/testing/run_with_timeout.py --timeout $(SMOKE_TIMEOUT) ./scripts/testing/smoke.sh
-	@echo "=== Smoke Tests Finished ==="
+include make-files/test.mk
 
-## Regression workflow wrapper (runs smoke + Playwright)
-test-regression:
-	@echo "=== Regression Tests Start ==="
-	@python3 scripts/testing/run_with_timeout.py --timeout $(REGRESSION_TIMEOUT) ./scripts/testing/regression.sh
-	@echo "=== Regression Tests Finished ==="
+.PHONY: help
+help: ## Show available make targets
+	@echo "Available targets:"
+	@grep -hE '^[[:alnum:]_.-]+:.*##' make-files/*.mk | awk 'BEGIN {FS = ":.*##"}; {printf "  %-24s %s\n", $$1, $$2}'

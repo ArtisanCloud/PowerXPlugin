@@ -3,7 +3,7 @@
 **文档版本**: v1.0  
 **创建日期**: 2025-10-31  
 **项目阶段**: Phase 0-7 已完成，进入稳定维护期  
-**适用范围**: PowerXPlugin 仓库（Go 1.21+ / Nuxt 4.2+）
+**适用范围**: PowerXPlugin 仓库（Go 1.24+ / Nuxt 4.2+）
 
 ---
 
@@ -197,7 +197,7 @@ func TestPingHandler_Success(t *testing.T) {
    - 将 `tests/e2e/starter.spec.ts` 的 heading 与文案断言改为匹配当前 `app/pages/_p/com.powerx.sample/admin/index.vue` 的实际文本
 
 3. **待拓展的流程**
-   - 若未来需要在 Nuxt 中显式注册 module，可在 `nuxt.config.ts` 中引入 `modules: ['@powerx-plugin/framework-admin/module']`（当前 layer 可正常工作时无需调整）
+   - 若未来需要在 Nuxt 中显式注册 module，可在 `nuxt.config.ts` 中引入 `modules: ['@artisan-cloud/plugin-framework-admin/module']`（当前 layer 可正常工作时无需调整）
 
 #### 扩展测试场景
 
@@ -790,7 +790,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
           
       - name: Run Go tests
         run: |
@@ -829,7 +829,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
           
       - name: Setup Node
         uses: actions/setup-node@v4

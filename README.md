@@ -14,6 +14,7 @@
 - **架构设计**：[docs/plan/001-init-project.md](./docs/plan/001-init-project.md)
 - **Standalone 运行指南**：[docs/guide/standalone-mode.md](./docs/guide/standalone-mode.md)
 - **迁移实践**：[docs/guide/migration/base-to-skeleton.md](./docs/guide/migration/base-to-skeleton.md)
+- **框架发布指南**：[docs/guide/framework-release.md](./docs/guide/framework-release.md)
 
 ## 快速开始
 

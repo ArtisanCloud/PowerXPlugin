@@ -7,7 +7,7 @@
 - **触发方式**：推送符合 `v*` 的 Git Tag 或手动执行 `Release` Workflow。
 - **输出物**：
   - `github.com/ArtisanCloud/PowerXPlugin/framework` Go Module Tag
-  - `@powerx-plugin/framework-admin`、`@powerx-plugin/framework-client` npm 版本
+  - `@artisan-cloud/plugin-framework-admin`、`@artisan-cloud/plugin-framework-client` npm 版本
   - `px-plugin` CLI 二进制（压缩包 + 校验文件）
   - `examples/starter/` 中的最新 CLI 生成物快照
   - `CHANGELOG.md` 中的对应版本条目

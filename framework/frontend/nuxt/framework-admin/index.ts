@@ -5,7 +5,7 @@ export interface PowerXAdminConfigOptions {
 
 export function definePowerXAdminConfig(options: PowerXAdminConfigOptions) {
   return {
-    extends: ['@powerx-plugin/framework-admin/layer'],
+    extends: ['@artisan-cloud/plugin-framework-admin/layer'],
     appConfig: {
       powerx: {
         pluginId: options.pluginId,

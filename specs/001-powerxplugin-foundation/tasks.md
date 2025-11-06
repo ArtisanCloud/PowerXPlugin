@@ -35,7 +35,7 @@
 
 **Goal**: skeleton 后端/前端可直接运行；同时输出与 skeleton 对齐的 Go 框架与 Nuxt Layer，供外部插件引用。
 
-**Independent Test**: `go run ./skeleton/backend/cmd/plugin` 返回 `GET /api/v1/ping`=200；在独立项目引用 `github.com/ArtisanCloud/PowerXPlugin/framework` 与 `@powerx-plugin/framework-admin` 可成功构建/启动。
+**Independent Test**: `go run ./skeleton/backend/cmd/plugin` 返回 `GET /api/v1/ping`=200；在独立项目引用 `github.com/ArtisanCloud/PowerXPlugin/framework` 与 `@artisan-cloud/plugin-framework-admin` 可成功构建/启动。
 
 ### 实施任务
 

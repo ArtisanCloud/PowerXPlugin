@@ -1,4 +1,4 @@
-**PowerXPlugin 仓库的目标**是同时承载可运行的 Skeleton 以及可复用的“框架层”能力（供 PowerXPluginNote 等外部插件引用），并通过 `github.com/ArtisanCloud/PowerXPlugin/framework/...`（Go/Gin 默认实现）与 `@powerx-plugin/framework-admin` / `@powerx-plugin/framework-client` 输出统一组件生态。
+**PowerXPlugin 仓库的目标**是同时承载可运行的 Skeleton 以及可复用的“框架层”能力（供 PowerXPluginNote 等外部插件引用），并通过 `github.com/ArtisanCloud/PowerXPlugin/framework/...`（Go/Gin 默认实现）与 `@artisan-cloud/plugin-framework-admin` / `@artisan-cloud/plugin-framework-client` 输出统一组件生态。
 
 > ⚠️ 当前仓库仍处于文档与设计阶段，尚未提供完整的 Skeleton、框架层代码或可用 CLI。本文档在各章节中明确“已落地”“进行中”“待规划”状态，请在推进实现前先校对对应章节的约束与 TODO。
 
@@ -103,7 +103,7 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
 │  ├─ package.json                           # "workspaces": ["frontend/*"]
 │  └─ frontend/
 │     ├─ nuxt/
-│     │  ├─ framework-admin/                 # npm: @powerx-plugin/framework-admin
+│     │  ├─ framework-admin/                 # npm: @artisan-cloud/plugin-framework-admin
 │     │  │  ├─ layer/                        # Nuxt Layer：默认布局/中间件/Starter页
 │     │  │  │  ├─ app/
 │     │  │  │  │  ├─ components/powerx/      # PX* 组件（可被插件同路径重载）
@@ -119,7 +119,7 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
 │     │  │  ├─ module.ts                     # Nuxt Module（注入 baseURL、中间件、auto-import）
 │     │  │  ├─ index.ts                      # definePowerXAdminConfig({ pluginId, starterPages })
 │     │  │  └─ package.json
-│     │  └─ framework-client/                # npm: @powerx-plugin/framework-client
+│     │  └─ framework-client/                # npm: @artisan-cloud/plugin-framework-client
 │     │     ├─ http.ts                       # $fetch/axios 包装，401/403 统一处理
 │     │     ├─ api.ts                        # createPluginApi / usePluginApi（自动拼 /_p/<id>/api/v1）
 │     │     ├─ index.ts
@@ -167,9 +167,9 @@ PowerXPlugin/                               # ← 仓库根（品牌 PowerXPlugi
 * **其他插件项目**（如 PowerXPluginNote）只**import 框架**：
 
   * 后端：`github.com/ArtisanCloud/PowerXPlugin/framework/...`（当前默认 Go 实现）
-  * 前端：`@powerx-plugin/framework-admin` / `@powerx-plugin/framework-client`
+  * 前端：`@artisan-cloud/plugin-framework-admin` / `@artisan-cloud/plugin-framework-client`
 * **Scaffold** 只负责把“入口 + 钩子 + 占位文件 + 固定依赖版本”渲染到目标项目；**不会被 import**。
-* `@powerx-plugin/framework-*` 以 npm workspace 形式维护源码，但发布时需分别执行 `npm publish --workspace <pkg>`，并在每次 release 更新脚手架模板中的版本锁定（例如 `scaffold/templates/web-admin/nuxt/package.json.tmpl`），否则外部插件无法锁定稳定依赖。
+* `@artisan-cloud/plugin-framework-*` 以 npm workspace 形式维护源码，但发布时需分别执行 `npm publish --workspace <pkg>`，并在每次 release 更新脚手架模板中的版本锁定（例如 `scaffold/templates/web-admin/nuxt/package.json.tmpl`），否则外部插件无法锁定稳定依赖。
 * 多语言与多前端栈仍在调研中：仓库结构中预留了目录，但没有任何非 Go/Nuxt 的可执行实现。开启新语言前需先在 `docs/backlog/multi-language.md` 完成设计评审。
 
 ---
@@ -211,7 +211,7 @@ com.powerx.note/
 │       └─ manifestx/manifest.go     # Menus/Permissions（与前端菜单对齐）
 │
 └─ web-admin/
-   ├─ package.json                   # 依赖 @powerx-plugin/framework-admin/client
+   ├─ package.json                   # 依赖 @artisan-cloud/plugin-framework-admin/client
    ├─ nuxt.config.ts                 # definePowerXAdminConfig({ pluginId: 'com.powerx.note' })
    └─ app/
       ├─ components/                 # 可定义（或覆盖 PX* 组件）
@@ -271,7 +271,7 @@ func Routes(rg *gin.RouterGroup) {
 
 # 三、前端的“默认可用 + 自定义重载”机制
 
-**框架包 `@powerx-plugin/framework-admin` 是 Nuxt Layer + Module**：
+**框架包 `@artisan-cloud/plugin-framework-admin` 是 Nuxt Layer + Module**：
 
 * `definePowerXAdminConfig({ pluginId, starterPages })`
 
@@ -290,8 +290,8 @@ func Routes(rg *gin.RouterGroup) {
 
 ```vue
 <script setup lang="ts">
-import { PXAdminLayout } from '@powerx-plugin/framework-admin'
-import { usePluginApi } from '@powerx-plugin/framework-client'
+import { PXAdminLayout } from '@artisan-cloud/plugin-framework-admin'
+import { usePluginApi } from '@artisan-cloud/plugin-framework-client'
 
 const api = usePluginApi({ pluginId: 'com.powerx.note' })
 const { data: notes } = await api.get('/api/v1/notes')
@@ -382,7 +382,7 @@ type App struct {
 }
 
 type Config struct {
-	Listen   string // ":8078"
+	Listen   string // ":8087"
 	Env      string // "dev|prod"
 	Standalone bool // STANDALONE=true 时启用 Demo/本地策略
 	// DB、缓存、追踪等...
@@ -525,7 +525,7 @@ func Report(app any /* or a dedicated interface */, perms []Permission) error
 
 # 前端（TS/Nuxt）
 
-## 1) `@powerx-plugin/framework-admin`
+## 1) `@artisan-cloud/plugin-framework-admin`
 
 > 位置：`framework/frontend/nuxt/framework-admin`
 
@@ -559,7 +559,7 @@ export interface PowerXAdminOptions {
 export function definePowerXAdminConfig(opts: PowerXAdminOptions) {
   const { pluginId, starterPages = true } = opts
   return defineNuxtConfig({
-    extends: ['@powerx-plugin/framework-admin/layer'],
+    extends: ['@artisan-cloud/plugin-framework-admin/layer'],
     modules: [[FrameworkAdmin, { pluginId, starterPages }]],
     app: { baseURL: `/_p/${pluginId}/admin` },
   })
@@ -579,7 +579,7 @@ import { defineNuxtModule, addImportsDir, addComponentsDir, createResolver } fro
 
 export interface ModuleOptions { pluginId: string; starterPages?: boolean }
 export default defineNuxtModule<ModuleOptions>({
-  meta: { name: '@powerx-plugin/framework-admin' },
+  meta: { name: '@artisan-cloud/plugin-framework-admin' },
   defaults: { starterPages: true },
   setup(opts, nuxt) {
     const r = createResolver(import.meta.url)
@@ -631,7 +631,7 @@ export default defineNuxtRouteMiddleware((to) => {
 
 ---
 
-## 2) `@powerx-plugin/framework-client`
+## 2) `@artisan-cloud/plugin-framework-client`
 
 > 位置：`framework/frontend/nuxt/framework-client`
 
@@ -710,7 +710,7 @@ func main() {
 **前端 `nuxt.config.ts`**
 
 ```ts
-import { definePowerXAdminConfig } from '@powerx-plugin/framework-admin'
+import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 export default definePowerXAdminConfig({ pluginId: 'com.powerx.note', starterPages: true })
 ```
 
@@ -718,8 +718,8 @@ export default definePowerXAdminConfig({ pluginId: 'com.powerx.note', starterPag
 
 ```vue
 <script setup lang="ts">
-import { PXAdminLayout } from '@powerx-plugin/framework-admin'
-import { usePluginApi } from '@powerx-plugin/framework-client'
+import { PXAdminLayout } from '@artisan-cloud/plugin-framework-admin'
+import { usePluginApi } from '@artisan-cloud/plugin-framework-client'
 const api = usePluginApi({ pluginId: 'com.powerx.note' })
 const { data } = await api.get('/api/v1/ping')
 </script>

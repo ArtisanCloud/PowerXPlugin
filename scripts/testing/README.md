@@ -22,7 +22,7 @@ See `specs/002-testing-strategy/plan.md` 与 `docs/test/testing_usage.md` 获取
 
 - `SMOKE_TIMEOUT`：`make test-smoke` 的超时时间（默认 300 秒）。
 - `REGRESSION_TIMEOUT`：`make test-regression` 的超时时间（默认 3600 秒）。
-- `REGRESSION_BACKEND_PORT` / `REGRESSION_BACKEND_HOST`：覆盖回归流程启动的样例后端监听地址（默认 `127.0.0.1:8078`）。
+- `REGRESSION_BACKEND_PORT` / `REGRESSION_BACKEND_HOST`：覆盖回归流程启动的样例后端监听地址（默认 `127.0.0.1:8087`）。
 - `REGRESSION_FRONTEND_PORT`：指定前端预览服务端口（默认随机空闲端口）。
 - `PLAYWRIGHT_BASE_URL`：Playwright 访问的前端地址，默认使用脚本动态分配的 preview 端口（形如 `http://127.0.0.1:<port>`）。
 - `KEEP_TEMP_DIR`：设为 `1` 时保留脚本生成的临时目录用于排查。

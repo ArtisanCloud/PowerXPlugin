@@ -26,13 +26,29 @@ npm run sync:templates -- --verbose  # 同步模板并输出写入文件
 # go work sync                       # 让 go.work 中的本地模块依赖立即生效
 ```
 
-> 说明：只有在需要直接引用仓库内的前端框架源码时，才执行 `npm install --workspaces`。若使用发布版本，可跳过此命令，并在生成后的项目中将 `@powerx-plugin/framework-*` 调整为目标版本号。
+> 说明：只有在需要直接引用仓库内的前端框架源码时，才执行 `npm install --workspaces`。若使用发布版本，可跳过此命令，并在生成后的项目中将 `@artisan-cloud/plugin-framework-*` 调整为目标版本号。
 
 执行 `go work sync` 能确保 `framework/` 模块使用最新的 `module github.com/ArtisanCloud/PowerXPlugin/framework` 声明，避免由于缓存旧模块路径而导致的 `module declares its path` 报错。如果你使用全新 GOPROXY 版本或外部仓库发布版，可视情况省略。
 
 完成同步后再继续构建 CLI／生成插件，可确保 Skeleton、scaffold 与 CLI 模板保持一致。
 
 > 如果你计划发布或复用 Go 框架模块，请使用 `git tag framework/v0.0.1-alpha && git push origin framework/v0.0.1-alpha`（或更高版本号）在仓库根目录打 tag，供外部 `go get github.com/ArtisanCloud/PowerXPlugin/framework@v0.0.1-alpha` 直接引用。
+
+### 发布 `@artisan-cloud/plugin-framework-*` 到 npm
+
+框架前端包需要先发布到 npm，再由 CLI 生成的脚手架引用：
+
+```bash
+# 1. 在 framework/frontend/nuxt/framework-admin
+npm version 0.0.1-alpha
+npm publish --access public
+
+# 2. 在 framework/frontend/nuxt/framework-client
+npm version 0.0.1-alpha
+npm publish --access public
+```
+
+> 版本号需与 CLI 模板中的默认值（当前 `^0.0.1-alpha`）保持一致。发布前请确认 `package.json` 的 `files` 列表完整可用，并已通过 `npm run lint && npm run build`。
 
 ## Step 2. 构建 px-plugin CLI
 
@@ -66,7 +82,7 @@ px-plugin init com.powerx.helloworld
 CLI 会在 `plugins/com.powerx.helloworld` 下生成完整项目，并输出创建的文件列表。常见目录包括：
 
 - `backend/`：Go 后端骨架，引用 `github.com/ArtisanCloud/PowerXPlugin/framework`
-- `web-admin/`：Nuxt 管理端骨架，引用 `@powerx-plugin/framework-admin`
+- `web-admin/`：Nuxt 管理端骨架，引用 `@artisan-cloud/plugin-framework-admin`
 - `docs/contracts/`：嵌入的 Manifest/RBAC/OpenAPI 契约
 - `plugin.yaml`：插件基础元数据（ID、版本、前后端堆栈）
 
@@ -102,7 +118,7 @@ npm install
 cd ..
 ```
 
-> 建议在生成插件前，先在仓库根目录执行 `npm install --workspaces`，确保 `framework/frontend/nuxt/framework-admin|client` 已安装。CLI 会自动引用这些目录；若要独立发布，可改为正式版本号或私有 registry。
+> CLI 默认写入 `@artisan-cloud/plugin-framework-admin` / `@artisan-cloud/plugin-framework-client` 的已发布版本（当前建议 `^0.0.1-alpha`）。若你在 monorepo 中调试 Layer，需要引用本地源码，可在执行 `px-plugin init` 前设置 `POWERXPLUGIN_USE_LOCAL_FRONTEND=1`，随后重新运行 `npm install`。
 
 ### 4.4 数据库配置
 
@@ -126,7 +142,7 @@ cd backend
 go run ./cmd/plugin # 注意包含 ./ 指向当前目录下的 main 包
 ```
 
-CLI 模板与 Skeleton 一致，默认监听 `:8078`。可以重复使用 Step 3 的 `curl http://localhost:8078/api/v1/ping` 验证输出。
+CLI 模板与 Skeleton 一致，默认监听 `:8087`。可以重复使用 Step 3 的 `curl http://localhost:8087/api/v1/ping` 验证输出。
 
 ### 常见问题
 

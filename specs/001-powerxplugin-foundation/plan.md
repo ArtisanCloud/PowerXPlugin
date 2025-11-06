@@ -11,7 +11,7 @@
 ## Technical Context
 
 **Language/Version**: Go 1.24+, TypeScript 5.x (Nuxt 4.2)  
-**Primary Dependencies**: Gin 框架、Nuxt 4.2、`@powerx-plugin/framework-admin` Layer、`@powerx-plugin/framework-client`  
+**Primary Dependencies**: Gin 框架、Nuxt 4.2、`@artisan-cloud/plugin-framework-admin` Layer、`@artisan-cloud/plugin-framework-client`  
 **Storage**: 暂不引入持久层（Skeleton/模板以内存或 mock 为主）  
 **Testing**: `go test ./...`、`npm run lint && npm run build`  
 **Target Platform**: PowerX Core 宿主环境（Linux 服务 + Nuxt SSR）  
@@ -64,12 +64,12 @@ PowerXPlugin/
 ├─ framework/frontend/nuxt/                # Phase 3: Nuxt Layer + Client npm 包
 │  ├─ package.json (workspaces: frontend/nuxt/*)
 │  └─ frontend/nuxt/
-│     ├─ framework-admin/                  # @powerx-plugin/framework-admin
+│     ├─ framework-admin/                  # @artisan-cloud/plugin-framework-admin
 │     │  ├─ layer/app/{components,middleware,pages,plugins}
 │     │  ├─ layer/nuxt.config.ts
 │     │  ├─ module.ts
 │     │  └─ index.ts (definePowerXAdminConfig)
-│     └─ framework-client/                 # @powerx-plugin/framework-client
+│     └─ framework-client/                 # @artisan-cloud/plugin-framework-client
 │        ├─ api.ts / http.ts
 │        └─ index.ts
 ├─ skeleton/                               # Phase 2: 可运行样例

@@ -1,5 +1,5 @@
 import { defineNuxtConfig } from 'nuxt/config'
-import { definePowerXAdminConfig } from '@powerx-plugin/framework-admin'
+import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
 const powerx = definePowerXAdminConfig({
   pluginId: 'com.powerx.starter',

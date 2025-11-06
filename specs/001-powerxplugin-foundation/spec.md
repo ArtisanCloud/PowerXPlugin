@@ -15,7 +15,7 @@
 
 ### 用户故事 1：可运行骨架与框架同步 (Priority: P1)
 
-作为 PowerXPlugin 仓库维护者，我希望仓库既能直接运行 skeleton 后端与管理端，又能产出 `github.com/ArtisanCloud/PowerXPlugin/framework/...` 与 `@powerx-plugin/framework-*` 套件，这样外部插件能立即接入一致的默认能力。
+作为 PowerXPlugin 仓库维护者，我希望仓库既能直接运行 skeleton 后端与管理端，又能产出 `github.com/ArtisanCloud/PowerXPlugin/framework/...` 与 `@artisan-cloud/plugin-framework-*` 套件，这样外部插件能立即接入一致的默认能力。
 
 **优先级原因**：骨架与框架的一致性是仓库价值核心，缺失会导致后续 CLI 与插件建设全部失效。
 
@@ -24,7 +24,7 @@
 **验收场景**：
 
 1. 若开发者在全新拉取的仓库中安装 Go/Node 依赖，当其于 `skeleton/backend` 执行 `go run ./cmd/plugin` 时，应成功启动服务并返回 `GET /api/v1/ping` 正常响应。
-2. 若外部插件项目引用 `github.com/ArtisanCloud/PowerXPlugin/framework/router` 与 `@powerx-plugin/framework-admin`，当编译后端并启动 Nuxt 管理端时，应无编译错误且默认路由/布局可用。
+2. 若外部插件项目引用 `github.com/ArtisanCloud/PowerXPlugin/framework/router` 与 `@artisan-cloud/plugin-framework-admin`，当编译后端并启动 Nuxt 管理端时，应无编译错误且默认路由/布局可用。
 
 ---
 
@@ -84,7 +84,7 @@
 - **仓库结构**：与 `docs/init-project.md#powerxplugin-structure` 对齐，涵盖 `framework/`（共享后端能力）、`framework/frontend/nuxt`（Nuxt Layer 与客户端）、`skeleton/backend|web-admin`（可运行示例）以及 `scaffold/templates/**`（CLI 渲染模板），要求 skeleton 与模板职责对应。
 - **后端框架契约**：`bootstrap.App` 暴露 `Listen`、`Env`、`Standalone` 等配置，并注入日志、数据库与可插拔路由；`router.RegisterFrameworkRoutes(app)` 负责 `/healthz` 等系统端点，`router.RegisterPluginRoutes(app, internal.Routes)` 挂载业务入口。`manifest.Register(app, manifestx.Plugin())` 与 `rbac.Report(app)` 负责清单及权限上报，详见 `docs/init-project.md#framework-signatures`。
 - **运行模式**：实现需兼容 Standalone（`STANDALONE=true`，直接 `go run ./cmd/plugin` 暴露接口）与宿主代理模式（宿主透传 `/_p/<plugin-id>/api/**`）。CLI 与 skeleton README 需说明两种模式的切换方式。
-- **前端 Nuxt Layer**：`@powerx-plugin/framework-admin` 以 Layer + Module 形式提供 `definePowerXAdminConfig`，统一设置基准路由 `/_p/<plugin-id>/admin`，注入鉴权/租户中间件，自动导入 `PX*` 组件并提供 Starter 页面；同路径同名文件可覆盖默认实现。`@powerx-plugin/framework-client` 提供 `usePluginApi` 访问代理后的 REST 接口。
+- **前端 Nuxt Layer**：`@artisan-cloud/plugin-framework-admin` 以 Layer + Module 形式提供 `definePowerXAdminConfig`，统一设置基准路由 `/_p/<plugin-id>/admin`，注入鉴权/租户中间件，自动导入 `PX*` 组件并提供 Starter 页面；同路径同名文件可覆盖默认实现。`@artisan-cloud/plugin-framework-client` 提供 `usePluginApi` 访问代理后的 REST 接口。
 - **路由前缀与代理约束**：所有前端路由以 `/_p/<plugin-id>/admin/` 为基准前缀，后端业务 API 以 `/_p/<plugin-id>/api/v1/` 为基准，确保与宿主路由代理和 `framework-client` 默认行为一致。
 - **契约产物**：Phase 1 输出 `docs/contracts/manifest.json`、`docs/contracts/rbac.json`、`docs/contracts/openapi.yaml` 等文件，CI 需生成可阅读文档并提供框架/SDK 校验钩子。
 - **示例与模板**：`docs/init-project.md` 中的后端入口、路由、前端页面以及 Manifest/RBAC 示例具有约束力，skeleton 与模板需保持一致，确保 CLI 输出与文档示例匹配。
@@ -95,7 +95,7 @@
 
 - **FR-001**: 仓库根目录必须提供 `go.work`，显式 `use ./framework` 与 `use ./tools/cli`，并确保这两个模块可单独执行 `go test ./...`。
 - **FR-002**: `framework/frontend/nuxt` 必须配置 npm workspace（含 `package.json` 与锁定文件），覆盖 `framework-admin` 与 `framework-client` Layer 并支持分别发布。
-- **FR-003**: `skeleton/backend` 与 `skeleton/web-admin` 必须提供最小可运行示例：后端可直接执行 `go run ./skeleton/backend/cmd/plugin` 暴露 `GET /api/v1/ping`，前端在 `skeleton/web-admin` 内执行 `npm run dev` 并默认挂载 `@powerx-plugin/framework-admin` Layer，且 README 记录 Go 1.24+/Node 18+ 依赖与启动指引。
+- **FR-003**: `skeleton/backend` 与 `skeleton/web-admin` 必须提供最小可运行示例：后端可直接执行 `go run ./skeleton/backend/cmd/plugin` 暴露 `GET /api/v1/ping`，前端在 `skeleton/web-admin` 内执行 `npm run dev` 并默认挂载 `@artisan-cloud/plugin-framework-admin` Layer，且 README 记录 Go 1.24+/Node 18+ 依赖与启动指引。
 - **FR-004**: Scaffold 模板（`scaffold/templates/backend/go-gin`、`scaffold/templates/web-admin/nuxt`）必须与 skeleton 结构、入口代码和配置保持一致，CLI 渲染后的项目无需重命名或手工补档即可运行上述命令。
 - **FR-005**: `px-plugin init` 必须嵌入模板与契约元数据，在无网络环境中仍可生成完整项目，并在生成结果中写入包含 `backend`/`frontend`/`version` 字段的 `plugin.yaml` 以及 README/TODO 提示。
 - **FR-006**: `docs/` 必须声明仅支持 Go + Nuxt，并将多语言扩展需求记录在 `docs/backlog/multi-language.md`，随迭代更新状态。
@@ -109,7 +109,7 @@
 ### 核心实体 *(如涉及数据需说明)*
 
 - **插件契约 Schema**: 描述 Manifest、RBAC、健康检查、API 结构的 JSON Schema/OpenAPI 文件，是仓库与外部插件共享的协议源。
-- **框架套件**: `github.com/ArtisanCloud/PowerXPlugin/framework/...` 与 `@powerx-plugin/framework-*` 输出的可复用组件，封装公共装配、端点、中间件与前端 Layer。
+- **框架套件**: `github.com/ArtisanCloud/PowerXPlugin/framework/...` 与 `@artisan-cloud/plugin-framework-*` 输出的可复用组件，封装公共装配、端点、中间件与前端 Layer。
 - **脚手架模板产物**: `scaffold/templates/**` 中供 CLI 渲染的模板文件集合，产出 `{plugin-skeleton}` 项目的目录、配置、占位代码与版本锁定。
 
 ## 假设

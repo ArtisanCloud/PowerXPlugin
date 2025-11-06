@@ -343,7 +343,7 @@ func defaultSecurityBaselineConfig() *SecurityBaselineConfig {
 func getDefaultConfig() *Config {
 	return &Config{
 		Server: &ServerConfig{
-			BindAddr: ":8086",
+			BindAddr: ":8087",
 			LogLevel: "info",
 			DevMode:  false,
 		},

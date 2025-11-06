@@ -114,7 +114,7 @@ make test-regression    # 等价于 scripts/testing/regression.sh，含启动/�
 > 稳定性建议：确保 dev server 输出无 `PXAdminLayout` 等组件解析警告，再执行 Playwright。  
 > 回归脚本/Make 目标会自动：
 > 1. 运行 `make test-smoke`
-> 2. 启动样例后端（默认 `127.0.0.1:8078`，可用 `REGRESSION_BACKEND_HOST/PORT` 覆盖）
+> 2. 启动样例后端（默认 `127.0.0.1:8087`，可用 `REGRESSION_BACKEND_HOST/PORT` 覆盖）
 > 3. 对 Nuxt 前端执行 `npm run lint`、`npm run build`，随后以 `npx nuxi preview` 启动预览服务（端口默认随机或取 `REGRESSION_FRONTEND_PORT`）
 > 4. 设置 `NUXT_PUBLIC_API_BASE` 指向上述后端并运行 Playwright（可用 `PLAYWRIGHT_BASE_URL` 覆盖）
 > 5. 将日志落地 `tmp/regression-backend.log` / `tmp/regression-frontend.log`，测试报告位于 `skeleton/web-admin/test-results/`
@@ -359,8 +359,8 @@ rm -rf "$TMP_DIR"
 
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
-| Playwright 报 “Failed to resolve component: PXAdminLayout” | 未安装 `@powerx-plugin/framework-admin` 依赖或 dev server 启动前 node_modules 残缺 | 重新执行 `npm install`，删除 `node_modules`/`package-lock.json` 后再装 |
-| E2E 测试访问超时 | 前端/后端端口未就绪 | 启动测试前手动访问 `http://localhost:3031/_p/...` 与 `http://localhost:8078/api/v1/ping`，或实现等待函数 |
+| Playwright 报 “Failed to resolve component: PXAdminLayout” | 未安装 `@artisan-cloud/plugin-framework-admin` 依赖或 dev server 启动前 node_modules 残缺 | 重新执行 `npm install`，删除 `node_modules`/`package-lock.json` 后再装 |
+| E2E 测试访问超时 | 前端/后端端口未就绪 | 启动测试前手动访问 `http://localhost:3031/_p/...` 与 `http://localhost:8087/api/v1/ping`，或实现等待函数 |
 | CLI 生成命令失败 | 未 `go build` px-plugin 或 GOPATH 权限问题 | 先在仓库根执行 `go build -o bin/px-plugin ./tools/cli/cmd/px-plugin` |
 | 契约校验报语法错误 | JSON 文件格式化异常 | 使用 `python3 -m json.tool <file>` 定位具体报错行 |
 | 覆盖率下降 | 新增代码无测试 | 参考 `docs/test/testing_strategy.md` 中的改进建议，补充相应测试用例 |

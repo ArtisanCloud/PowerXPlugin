@@ -39,7 +39,7 @@ As a skeleton maintainer, I can run `go run ./skeleton/backend/cmd/plugin` and i
 
 ### User Story 3 - Admin starter & CLI alignment (Priority: P3)
 
-As a front-end/CLI maintainer, I can use the framework Layer starter pages and CLI templates to produce an admin UI showing intro + templates CRUD operations that communicate with the skeleton backend using `@powerx-plugin/framework-client`.
+As a front-end/CLI maintainer, I can use the framework Layer starter pages and CLI templates to produce an admin UI showing intro + templates CRUD operations that communicate with the skeleton backend using `@artisan-cloud/plugin-framework-client`.
 
 **Why this priority**: Completes the end-to-end example and ensures downstream plugin authors接收的骨架与 Base 插件体验一致。
 
@@ -79,7 +79,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 - **FR-001**: Framework Router MUST support path parameters, query strings, and JSON body binding through `bootstrap.Context`.
 - **FR-002**: Framework Router MUST expose a response helper that emits envelopes containing `success`, `data`, `error`, `timestamp`, and `request_id`.
 - **FR-003**: Framework middleware MUST populate request IDs and tenant context (`X-Tenant-ID` header or Standalone default) for every request.
-- **FR-004**: `@powerx-plugin/framework-client` MUST expose `get`, `post`, `put`, and `delete` helpers that forward tenant headers automatically.
+- **FR-004**: `@artisan-cloud/plugin-framework-client` MUST expose `get`, `post`, `put`, and `delete` helpers that forward tenant headers automatically.
 - **FR-005**: Skeleton backend MUST implement a Templates repository/service pair embedding `repository.BaseRepository[Template]`, providing `NewTemplateRepository`, and honoring tenant isolation per `.specify/memory/constitution.md`.
 - **FR-006**: Skeleton backend MUST expose `/api/v1/templates` CRUD endpoints with in-memory storage and seed data for demo purposes.
 - **FR-007**: Skeleton handlers MUST remain thin (validation + serialization) and delegate business logic to services reusable by future HTTP/gRPC transports.

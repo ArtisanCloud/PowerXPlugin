@@ -19,8 +19,8 @@ const (
 	defaultGoVersion        = "1.24"
 	defaultFrameworkVersion = "v0.0.1-alpha"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
-	defaultAdminVersion     = "latest"
-	defaultClientVersion    = "latest"
+	defaultAdminVersion     = "^0.0.1-alpha"
+	defaultClientVersion    = "^0.0.1-alpha"
 )
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
@@ -198,17 +198,19 @@ func detectFrameworkReplace(backendDir string) string {
 }
 
 func detectWorkspaceRefs(webDir string) (string, string) {
-	workspace := filepath.Join(webDir, "..", "..", "framework", "frontend", "nuxt")
-	admin := filepath.Join(workspace, "framework-admin")
-	client := filepath.Join(workspace, "framework-client")
+	if os.Getenv("POWERXPLUGIN_USE_LOCAL_FRONTEND") != "" {
+		workspace := filepath.Join(webDir, "..", "..", "framework", "frontend", "nuxt")
+		admin := filepath.Join(workspace, "framework-admin")
+		client := filepath.Join(workspace, "framework-client")
 
-	if info, err := os.Stat(admin); err == nil && info.IsDir() {
-		relAdmin, errAdmin := filepath.Rel(webDir, admin)
-		relClient, errClient := filepath.Rel(webDir, client)
-		if errAdmin == nil && errClient == nil {
-			adminRef := "file:" + toSlash(relAdmin)
-			clientRef := "file:" + toSlash(relClient)
-			return adminRef, clientRef
+		if info, err := os.Stat(admin); err == nil && info.IsDir() {
+			relAdmin, errAdmin := filepath.Rel(webDir, admin)
+			relClient, errClient := filepath.Rel(webDir, client)
+			if errAdmin == nil && errClient == nil {
+				adminRef := "file:" + toSlash(relAdmin)
+				clientRef := "file:" + toSlash(relClient)
+				return adminRef, clientRef
+			}
 		}
 	}
 

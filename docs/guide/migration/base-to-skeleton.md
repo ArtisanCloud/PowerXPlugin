@@ -65,7 +65,7 @@
 
 ## 3. 迁移步骤（前端）
 
-1. 按模块迁移组件与页面，注意重用 `@powerx-plugin/framework-admin` 提供的 Layout/中间件。
+1. 按模块迁移组件与页面，注意重用 `@artisan-cloud/plugin-framework-admin` 提供的 Layout/中间件。
 2. API 访问统一走 `~/app/composables/api` 提供的 `apiGet/apiPost`。
 3. 在 `app/app.vue`、`nuxt.config.ts` 等位置更新插件名称、描述、ID。
 4. 执行 `npm install` 与 `npm run dev`，确认页面无报错。

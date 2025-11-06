@@ -197,7 +197,7 @@ func TestPingHandler_Success(t *testing.T) {
    - 将 `tests/e2e/starter.spec.ts` 的 heading 与文案断言改为匹配当前 `app/pages/_p/com.powerx.sample/admin/index.vue` 的实际文本
 
 3. **待拓展的流程**
-   - 若未来需要在 Nuxt 中显式注册 module，可在 `nuxt.config.ts` 中引入 `modules: ['@powerx-plugin/framework-admin/module']`（当前 layer 可正常工作时无需调整）
+   - 若未来需要在 Nuxt 中显式注册 module，可在 `nuxt.config.ts` 中引入 `modules: ['@artisan-cloud/plugin-framework-admin/module']`（当前 layer 可正常工作时无需调整）
 
 #### 扩展测试场景
 

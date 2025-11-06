@@ -9,7 +9,7 @@
 - **后端分层模式**：`routes/handler/service/repo/model` 的切分与当前 Skeleton 规划一致，目录可一一映射到 `skeleton/backend/internal/**`。
 - **目录约定**：沿用 `internal/transport/http`（Handler）、`internal/services`（业务编排）、`internal/entity/repository`（仓储）、`internal/entity/models`（数据模型）等路径，保持与 Base 插件一致的分层命名，便于 CLI 与文档互相校验。
 - **前端页面与组件**：`intro.vue`、`templates/*.vue`、`TemplateFormModal.vue`、`ConfirmDialog.vue` 均可直接复用，路由结构与 Layer 预期保持一致。
-- **API 客户端**：`useTemplateApi` 及 `_client.ts` 的职责与 `@powerx-plugin/framework-client` 相符，可迁移并扩展现有客户端能力。
+- **API 客户端**：`useTemplateApi` 及 `_client.ts` 的职责与 `@artisan-cloud/plugin-framework-client` 相符，可迁移并扩展现有客户端能力。
 - **启动流程**：相较 Base 插件复杂的 `main.go`，PowerXPlugin 的轻量启动更适合作为模板，可复用现有 Standalone 模式。
 - **规范引用**：迁移后的 Repository/Service 层需继续遵循 `.specify/memory/constitution.md` 中的约束——包括内嵌 `repository.BaseRepository[T]`、提供 `NewXXXRepository` 构造函数、在事务中设置 `app.tenant_id` 以及禁止直接暴露裸 `*gorm.DB`。
 
@@ -25,7 +25,7 @@
 - 实现 Router 路径参数解析、Query/Body 绑定，并扩展 `bootstrap.Context`（`Param` / `Query` / `BindJSON` / `JSON`）。
 - 输出统一响应助手（建议 `framework/backend/go/router/response.go`），兼容 `{success, data, message, error, timestamp, request_id}` 并默认注入请求 ID。
 - 添加轻量 RequestID 与 Tenant Context 中间件（默认从 Header 读取，Fallback 到 `Standalone` 默认值）。
-- 为 `@powerx-plugin/framework-client` 补充 `put/delete` 等基础方法并支持透传 Tenant header，确保包内仅包含通用 HTTP 基础设施；同步在 `framework-admin` Layer 内引入 Starter 配置开关。
+- 为 `@artisan-cloud/plugin-framework-client` 补充 `put/delete` 等基础方法并支持透传 Tenant header，确保包内仅包含通用 HTTP 基础设施；同步在 `framework-admin` Layer 内引入 Starter 配置开关。
 
 ### 阶段 2：Skeleton 后端模板
 - 在 `skeleton/backend/internal/templates` 实现内存版本的 `model/service/repository/handler`，Repository 必须内嵌 `repository.BaseRepository[Template]`、提供 `NewTemplateRepository` 构造函数，并在 `BeginTenantTx` 中显式执行 `SET LOCAL app.tenant_id`（内存实现可通过上下文记录/校验该值，保持接口与调用顺序与数据库版本完全一致）。
@@ -37,7 +37,7 @@
 ### 阶段 3：前端迁移与框架提炼
 - 将 `intro.vue`、`templates/index.vue`、`templates/crud.vue` 及组件迁移到 `skeleton/web-admin/app`，去除仅针对宿主的桥接逻辑。
 - Skeleton 在 `app/composables/api/useTemplateApi.ts` 中提供示例封装，内部调用 `usePluginApi`，作为业务层如何复用 framework-client 的参考；该文件仅做样例，CLI 生成项目可按需改写。
-- 保持 `@powerx-plugin/framework-client` 仅输出通用 HTTP 封装（`get/post/put/delete`），不承载任何业务 API；框架更新后 Skeleton 与插件项目基于此自行封装。
+- 保持 `@artisan-cloud/plugin-framework-client` 仅输出通用 HTTP 封装（`get/post/put/delete`），不承载任何业务 API；框架更新后 Skeleton 与插件项目基于此自行封装。
 - 在 `framework-admin` Layer 提供 `starterPages` 选项，自动注册 Starter 菜单、页面与必要的全局组件；Skeleton 默认启用。
 - 整理 `i18n` 文案，保持 `zh/en` 最小集合，并与 Manifest 菜单键值对应。
 
@@ -135,6 +135,6 @@
 ## 13. 依赖检查清单
 
 - [ ] `framework-admin` Layer 可用，StarterPages toggle 生效
-- [ ] `@powerx-plugin/framework-client` 暴露 `get/post/put/delete` 并透传 `X-Tenant-ID`
+- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `X-Tenant-ID`
 - [ ] Skeleton 后端可独立运行并完成 CRUD Smoke（Phase 2 验证）
 - [ ] Skeleton 前端（含 `POWERX_PROXY=1` 场景）可访问首页与 Admin CRUD 页面

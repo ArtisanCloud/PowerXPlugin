@@ -10,7 +10,7 @@ Deliver end-to-end parity between the existing Base plugin example and the Power
 ## Technical Context
 
 - **Languages & Tooling**: Go 1.24+, Gin-compatible router abstractions, Node.js 18+, Nuxt 4.2, npm 9+.  
-- **Framework Packages**: `framework/backend/go/router`, `bootstrap`, `middleware`, `manifest`, `@powerx-plugin/framework-client`, `@powerx-plugin/framework-admin`.  
+- **Framework Packages**: `framework/backend/go/router`, `bootstrap`, `middleware`, `manifest`, `@artisan-cloud/plugin-framework-client`, `@artisan-cloud/plugin-framework-admin`.  
 - **Skeleton Targets**: `skeleton/backend` (Go module), `skeleton/web-admin` (Nuxt app).  
 - **CLI & Templates**: `scaffold/templates/backend/go-gin`, `scaffold/templates/web-admin/nuxt`, `tools/cli`.  
 - **Docs & Contracts**: `docs/plan/001-init-project.md`, `docs/plan/002-plan-base-plugin-migration.md`, `docs/guide/quickstart.md`, `.specify/memory/constitution.md`.  
@@ -61,7 +61,7 @@ docs/
 
 ### Phase 1 – Framework Enhancements（完成，US1）
 - Router Param/Query/BindJSON、响应助手、RequestID/TenantContext 中间件。  
-- `@powerx-plugin/framework-client` PUT/DELETE，`framework-admin` StarterPages toggle。  
+- `@artisan-cloud/plugin-framework-client` PUT/DELETE，`framework-admin` StarterPages toggle。  
 - 覆盖率 ≥90%，回归 `go test ./framework/backend/go/...`。
 
 ### Phase 2 – Skeleton Backend Parity（进行中，US2）

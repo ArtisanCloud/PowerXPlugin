@@ -6,8 +6,8 @@
     "build": "npx nuxi build"
   },
   "dependencies": {
-    "@powerx-plugin/framework-admin": "file:../../../framework/frontend/nuxt/framework-admin",
-    "@powerx-plugin/framework-client": "file:../../../framework/frontend/nuxt/framework-client",
+    "@artisan-cloud/plugin-framework-admin": "^0.0.1-alpha",
+    "@artisan-cloud/plugin-framework-client": "^0.0.1-alpha",
     "nuxt": "^4.2.0"
   },
   "devDependencies": {

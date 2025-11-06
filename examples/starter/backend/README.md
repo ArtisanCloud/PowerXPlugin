@@ -12,7 +12,7 @@
 3. 验证接口：
 
    ```bash
-   curl http://localhost:8078/api/v1/ping
+   curl http://localhost:8087/api/v1/ping
    ```
 
 更多路由与业务逻辑可在 `internal/` 目录扩展。

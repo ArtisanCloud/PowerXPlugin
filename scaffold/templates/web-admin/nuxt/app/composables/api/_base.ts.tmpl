@@ -24,7 +24,7 @@ export function resolveApiBase(pathname?: string): string {
       ? (useRuntimeConfig() as any).public
       : undefined);
 
-  return cfg?.apiBaseUrl || "http://localhost:8086/api/v1";
+  return cfg?.apiBaseUrl || "http://localhost:8087/api/v1";
 }
 
 export function getAuthToken(): string | undefined {

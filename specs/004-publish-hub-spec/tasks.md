@@ -131,10 +131,46 @@
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T042 [P] Backfill unit/integration tests：`tests/cli/publish.spec.ts`, `tests/cli/dist.spec.ts`, `tests/devapi/dev_plugins_test.go`, `tests/admin/install_flow.spec.ts`。
-- [ ] T043 Harden security docs `docs/security/publish-hub.md`（威胁模型、密钥旋转、RBAC 与审计策略）。
-- [ ] T044 Performance & SLA验证脚本 `scripts/perf/publish-hub-bench.sh`（热加载 ≤2s、publish ≤10min、离线审核 ≤1d、安装回滚 ≤5min），输出报告。
-- [ ] T045 Update `quickstart.md` 最终 checklist & 截图，确保操作人员按步骤复现。
+- [X] T042 [P] Backfill unit/integration tests：`tests/cli/publish.spec.ts`, `tests/cli/dist.spec.ts`, `tests/devapi/dev_plugins_test.go`, `tests/admin/install_flow.spec.ts`。
+- [X] T043 Harden security docs `docs/security/publish-hub.md`（威胁模型、密钥旋转、RBAC 与审计策略）。
+- [X] T044 Performance & SLA验证脚本 `scripts/perf/publish-hub-bench.sh`（热加载 ≤2s、publish ≤10min、离线审核 ≤1d、安装回滚 ≤5min），输出报告。
+- [X] T045 Update `quickstart.md` 最终 checklist & 截图，确保操作人员按步骤复现。
+
+---
+
+## Phase 9: Security & Reliability Enhancements (P1→P2)
+
+**Goal**: 补齐安全层、回滚机制、SLA监控、测试覆盖与权限控制，提升生产就绪度
+
+### P1 Priority: Security & Rollback
+
+- [X] T046 [P1] Implement mTLS for SessionClient：`tools/cli/src/runtime/hotreload/session.ts` 添加证书加载、mTLS配置、重试与Backoff机制
+- [X] T047 [P1] Add mTLS verification in Dev API：`framework/backend/go/runtime/devapi/handlers/dev_plugins.go` 集成 mTLS 中间件，校验客户端证书
+- [X] T048 [P1] Implement 5-min auto rollback：`framework/backend/go/runtime/admin/services/plugin_deployer.go` 引入状态机、定时器与自动回滚逻辑
+- [X] T049 [P1] Wire rollback telemetry & events：`framework/backend/go/runtime/admin/events/install_events.go` 记录回滚事件，更新 SC-004 指标
+- [X] T050 [P1] Offline signature verification：`framework/backend/go/runtime/marketplace/services/offline_validator.go` 实现 manifest.signature 验证、证书链校验、CRL检查
+
+### P2 Priority: Monitoring & Testing
+
+- [X] T051 [P2] SLA Dashboard wiring：落地 `config/alerts/publish-hub.yaml` 到 Grafana/Prometheus，在线/离线 tracker 与实际指标 wiring
+- [X] T052 [P2] Playwright E2E tests：补全 `tests/admin/install_flow.spec.ts` 真实页面交互测试（安装/回滚流程、SSE日志）
+- [X] T053 [P2] RBAC integration：`framework/backend/go/runtime/common/middleware/rbac_guard.go` 接入真实 auth service/权限表与审计日志
+
+### P3 Priority: Documentation & Polish
+
+- [X] T054 [P3] Update `quickstart.md` with mTLS cert setup、rollback verification steps
+- [X] T055 [P3] Add mTLS cert rotation guide to `docs/security/publish-hub.md`
+- [X] T056 [P3] Create SLA runbook in `docs/operations/publish-hub-sla.md`
+
+### Execution Order (Phase 9)
+
+1. **mTLS** (T046→T047) → 补齐安全基础
+2. **Rollback** (T048→T049) → 提升可靠性
+3. **Offline Verification** (T050) → 补齐安全链
+4. **SLA Dashboard** (T051) → 可观测性
+5. **E2E Tests** (T052) → 质量保证
+6. **RBAC** (T053) → 访问控制
+7. **Docs** (T054→T056) → 文档完善
 
 ---
 

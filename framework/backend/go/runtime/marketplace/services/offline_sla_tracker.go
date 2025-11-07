@@ -3,6 +3,8 @@ package services
 import (
 	"log/slog"
 	"time"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/observability"
 )
 
 // OfflineSLATracker enforces 1 business day SLA for offline uploads.
@@ -22,9 +24,21 @@ func NewOfflineSLATracker(threshold time.Duration, logger *slog.Logger) *Offline
 }
 
 func (t *OfflineSLATracker) Record(duration time.Duration, publishID string) {
+	durationMinutes := duration.Minutes()
+	plugin := "unknown"
+	status := "completed"
+
 	if duration > t.threshold {
-		t.logger.Warn("offline publish SLA exceeded", slog.String("publishId", publishID), slog.Duration("duration", duration))
+		status = "sla_exceeded"
+		t.logger.Warn("offline publish SLA exceeded",
+			slog.String("publishId", publishID),
+			slog.Duration("duration", duration),
+		)
 	} else {
+		status = "completed"
 		t.logger.Info("offline publish review", slog.Duration("duration", duration))
 	}
+
+	// Record Prometheus metric
+	observability.RecordOfflineApprovalDuration(durationMinutes, plugin, status)
 }

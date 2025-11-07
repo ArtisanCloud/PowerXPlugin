@@ -7,6 +7,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/services"
 )
 
 // Role enumerates Publish Hub actor types.
@@ -17,8 +18,10 @@ const (
 	RoleReviewer      Role = "marketplace_reviewer"
 	RoleTenantAdmin   Role = "tenant_admin"
 	RoleOps           Role = "platform_ops"
-	roleHeader             = "X-Powerx-Role"
-	permissionsHeader      = "X-Powerx-Permissions"
+
+	roleHeader       = "X-Powerx-Role"
+	permissionsHeader = "X-Powerx-Permissions"
+	userIdHeader      = "X-Powerx-User-Id"
 )
 
 // GuardOptions drive RBACGuard behaviour.
@@ -26,9 +29,12 @@ type GuardOptions struct {
 	AllowedRoles        []Role
 	RequiredPermissions []string
 	AuditLogger         *slog.Logger
+	AuthService         *services.AuthService
+	Resource            string
+	Action              string
 }
 
-// RBACGuard enforces role + permission requirements using request headers.
+// RBACGuard enforces role + permission requirements with real auth service integration.
 func RBACGuard(opts GuardOptions) bootstrap.Middleware {
 	allowed := make(map[Role]struct{}, len(opts.AllowedRoles))
 	for _, r := range opts.AllowedRoles {
@@ -43,24 +49,74 @@ func RBACGuard(opts GuardOptions) bootstrap.Middleware {
 
 	return func(next bootstrap.Handler) bootstrap.Handler {
 		return func(ctx bootstrap.Context) {
+			// Get user identity from headers
+			userID := strings.TrimSpace(ctx.Header(userIdHeader))
 			roleValue := strings.TrimSpace(ctx.Header(roleHeader))
 			role := Role(strings.ToLower(roleValue))
+
+			// Validate authentication (userId must be present)
+			if userID == "" {
+				recordDeny(opts.AuditLogger, "unknown", "missing_user_id")
+				router.RespondError(ctx, http.StatusUnauthorized, "RBAC_DENY", "authentication required", nil)
+				return
+			}
+
+			// Verify user exists in auth service
+			if opts.AuthService != nil {
+				_, err := opts.AuthService.GetUserByID(userID)
+				if err != nil {
+					recordDeny(opts.AuditLogger, userID, "user_not_found")
+					router.RespondError(ctx, http.StatusUnauthorized, "RBAC_DENY", "invalid user", nil)
+					return
+				}
+			}
+
+			// Check role requirements
 			if len(allowed) > 0 {
 				if _, ok := allowed[role]; !ok {
-					recordDeny(opts.AuditLogger, roleValue, "role_not_allowed")
+					recordDeny(opts.AuditLogger, userID, "role_not_allowed")
 					router.RespondError(ctx, http.StatusForbidden, "RBAC_DENY", "role not allowed", map[string]any{"expected": opts.AllowedRoles})
 					return
 				}
 			}
 
+			// Check permission requirements
 			if len(requiredPerms) > 0 {
-				provided := parseCSV(ctx.Header(permissionsHeader))
-				if !containsAll(provided, requiredPerms) {
-					recordDeny(opts.AuditLogger, roleValue, "missing_permission")
-					router.RespondError(ctx, http.StatusForbidden, "RBAC_PERMISSION_DENY", "missing required permission", map[string]any{"required": requiredPerms})
-					return
+				// Check with auth service if available
+				if opts.AuthService != nil {
+					for _, perm := range requiredPerms {
+						if !opts.AuthService.CheckPermission(userID, perm) {
+							recordDeny(opts.AuditLogger, userID, "missing_permission_"+perm)
+							router.RespondError(ctx, http.StatusForbidden, "RBAC_PERMISSION_DENY", "missing required permission", map[string]any{"required": perm})
+							return
+						}
+					}
+				} else {
+					// Fallback to header-based permissions
+					provided := parseCSV(ctx.Header(permissionsHeader))
+					if !containsAll(provided, requiredPerms) {
+						recordDeny(opts.AuditLogger, userID, "missing_permission")
+						router.RespondError(ctx, http.StatusForbidden, "RBAC_PERMISSION_DENY", "missing required permission", map[string]any{"required": requiredPerms})
+						return
+					}
 				}
 			}
+
+			// Record successful access
+			if opts.AuthService != nil {
+				opts.AuthService.RecordAccess(userID, opts.Resource, opts.Action, true)
+			}
+
+			// Deny logging for successful access (for audit trail)
+			if opts.AuditLogger != nil {
+				opts.AuditLogger.Info("rbac access granted",
+					slog.String("userId", userID),
+					slog.String("role", string(role)),
+					slog.String("resource", opts.Resource),
+					slog.String("action", opts.Action),
+				)
+			}
+
 			next(ctx)
 		}
 	}

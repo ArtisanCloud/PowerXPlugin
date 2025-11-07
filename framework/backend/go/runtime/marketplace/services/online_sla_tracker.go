@@ -3,6 +3,8 @@ package services
 import (
 	"log/slog"
 	"time"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/observability"
 )
 
 // SLATracker calculates average review time and emits warnings if exceeding thresholds.
@@ -22,9 +24,21 @@ func NewOnlineSLATracker(threshold time.Duration, logger *slog.Logger) *SLATrack
 }
 
 func (t *SLATracker) Record(reviewDuration time.Duration, publishID string) {
+	durationMs := float64(reviewDuration.Nanoseconds()) / 1e6
+	channel := "online"
+	status := "completed"
+
 	if reviewDuration > t.threshold {
-		t.logger.Warn("online publish SLA exceeded", slog.String("publishId", publishID), slog.Duration("duration", reviewDuration))
+		status = "sla_exceeded"
+		t.logger.Warn("online publish SLA exceeded",
+			slog.String("publishId", publishID),
+			slog.Duration("duration", reviewDuration),
+		)
 	} else {
+		status = "completed"
 		t.logger.Info("online publish review", slog.Duration("duration", reviewDuration))
 	}
+
+	// Record Prometheus metric
+	observability.RecordPublishPipelineDuration(durationMs, channel, status)
 }

@@ -99,11 +99,11 @@
 
 ### Implementation
 
-- [ ] T031 [US4] Build offline upload API `framework/backend/go/runtime/marketplace/handlers/offline_upload.go`（接收 `.pxp`、密钥封装、audit log）。
-- [ ] T032 [P] [US4] Implement key unwrap adapter `framework/backend/go/runtime/marketplace/services/keyvault_adapter.go`（Marketplace 私钥、过期检测）。
-- [ ] T033 [US4] Extend integrity & audit 校验 `framework/backend/go/runtime/marketplace/services/offline_validator.go`（比对 `integrity.txt`, `report.json`, 敏感字段）。
-- [ ] T034 [P] [US4] Add离线审批 UI `sdk/workspace/packages/framework-admin/src/pages/marketplace/offline-review.vue`（白名单配置、SLA 提示）。
-- [ ] T035 [US4] Update CLI docs `docs/guides/publish/offline.md` 的加密/密钥交付章节。
+- [X] T031 [US4] Build offline upload API `framework/backend/go/runtime/marketplace/handlers/offline_upload.go`（接收 `.pxp`、密钥封装、audit log）。
+- [X] T032 [P] [US4] Implement key unwrap adapter `framework/backend/go/runtime/marketplace/services/keyvault_adapter.go`（Marketplace 私钥、过期检测）。
+- [X] T033 [US4] Extend integrity & audit 校验 `framework/backend/go/runtime/marketplace/services/offline_validator.go`（比对 `integrity.txt`, `report.json`, 敏感字段）。
+- [X] T034 [P] [US4] Add离线审批 UI `examples/starter/web-admin/app/pages/marketplace/offline-review.vue`（白名单配置、SLA 提示）。
+- [X] T035 [US4] Update CLI docs `docs/guides/publish/offline.md` 的加密/密钥交付章节。
 
 ### Parallel Opportunities
 - API handler (T031) 依赖 key unwrap (T032)；UI (T034) & 文档 (T035) 可在接口定型后执行。

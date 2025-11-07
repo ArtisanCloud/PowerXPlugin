@@ -1,0 +1,50 @@
+# Publish Hub alert & SLA templates
+# 可由 Ops 导入 Grafana/Prometheus/Alertmanager 等系统
+
+slas:
+  online_review:
+    objective: "<= 4 hours"
+    metric: "plugin_publish_pipeline_duration_ms"
+    query: "histogram_quantile(0.95, rate(plugin_publish_pipeline_duration_ms_bucket[5m]))"
+    alert:
+      name: "PublishOnlineSLAExceeded"
+      condition: "> 4h"
+      severity: warning
+      annotations:
+        summary: "Online publish review exceeds 4h"
+        description: "95th percentile online review exceeded 4 hours for {{ $labels.channel }}."
+  offline_review:
+    objective: "<= 1 business day"
+    metric: "plugin_offline_approval_duration_minutes"
+    query: "histogram_quantile(0.95, rate(plugin_offline_approval_duration_minutes_bucket[15m]))"
+    alert:
+      name: "PublishOfflineSLAExceeded"
+      condition: "> 1440m"
+      severity: warning
+      annotations:
+        summary: "Offline upload approval exceeds 1 business day"
+        description: "Offline approval running late for {{ $labels.plugin }} ({{ $labels.status }})."
+  rollback_latency:
+    objective: "<= 5 minutes"
+    metric: "plugin_install_rollback_latency_seconds"
+    alert:
+      name: "PluginRollbackLatencyExceeded"
+      condition: "> 300s"
+      severity: critical
+      annotations:
+        summary: "Install rollback latency >5m"
+        description: "Tenant {{ $labels.tenant }} rollback exceeded 5 minutes for {{ $labels.plugin }}."
+
+notifications:
+  channels:
+    - name: publish-hub-slack
+      type: slack
+      target: "#powerx-publish-hub"
+    - name: pager-duty-critical
+      type: pagerduty
+      target: "publish-hub"
+
+runbooks:
+  PublishOnlineSLAExceeded: docs/operations/publish-hub-sla.md#online-review
+  PublishOfflineSLAExceeded: docs/operations/publish-hub-sla.md#offline-review
+  PluginRollbackLatencyExceeded: docs/operations/publish-hub-sla.md#rollback

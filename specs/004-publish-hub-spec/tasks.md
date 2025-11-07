@@ -18,12 +18,12 @@
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T005 Define `.pxp` artefact schema + integrity/encryption 字段到 `docs/contracts/artefacts/pxp-schema.yaml`（对齐数据模型）。
-- [ ] T006 Implement encryption & key-envelope helper at `tools/cli/src/lib/security/keyEnvelope.ts`（生成对称密钥、用 Marketplace 公钥封装）。
-- [ ] T007 Extend telemetry baseline `framework/observability/metrics/publish_metrics.go` 以覆盖 `dev.hotload.*`, `plugin.publish.*`, `plugin.offline.*`。
-- [ ] T008 [P] Add SLA +告警阈值模板到 `config/alerts/publish-hub.yaml`（在线 ≤4h、离线 ≤1d、安装回滚 ≤5min）。
-- [ ] T009 Harden RBAC guard + permission mapping `framework/runtime/common/middleware/rbac_guard.go` & `framework/runtime/admin/middleware/rbac_guard.go`（覆盖开发者/审核员/租户角色）。
-- [ ] T010 Implement audit log retention policy (≥180 天) in `framework/runtime/common/audit/log_retention.go` + `config/logging.yaml` 并记录清理任务。
+- [X] T005 Define `.pxp` artefact schema + integrity/encryption 字段到 `docs/contracts/artefacts/pxp-schema.yaml`（对齐数据模型）。
+- [X] T006 Implement encryption & key-envelope helper at `tools/cli/src/lib/security/keyEnvelope.ts`（生成对称密钥、用 Marketplace 公钥封装）。
+- [X] T007 Extend telemetry baseline `framework/observability/metrics/publish_metrics.go` 以覆盖 `dev.hotload.*`, `plugin.publish.*`, `plugin.offline.*`。
+- [X] T008 [P] Add SLA +告警阈值模板到 `config/alerts/publish-hub.yaml`（在线 ≤4h、离线 ≤1d、安装回滚 ≤5min）。
+- [X] T009 Harden RBAC guard + permission mapping `framework/backend/go/runtime/common/middleware/rbac_guard.go` & `framework/backend/go/runtime/admin/middleware/rbac_guard.go`（覆盖开发者/审核员/租户角色）。
+- [X] T010 Implement audit log retention policy (≥180 天) in `framework/backend/go/runtime/common/audit/log_retention.go` + `config/logging.yaml` 并记录清理任务。
 
 **Checkpoint**: Artefact契约、加密、Telemetry、SLA、权限与审计基建 ready。
 
@@ -60,8 +60,8 @@
 
 - [ ] T018 [P] [US5] Refactor CLI watch command `tools/cli/src/commands/dev/watch.ts`（增量构建、差异包限流、错误提示）。
 - [ ] T019 [US5] Update SessionClient `tools/cli/src/runtime/hotreload/session.ts`（mTLS、幂等 `x-reload-id`、自动重试、stop API）。
-- [ ] T020 [P] [US5] Implement Dev API handlers `framework/runtime/devapi/handlers/dev_plugins.go` 覆盖 register/reload/delete + SSE 日志。
-- [ ] T021 [US5] Add telemetry & log piping `framework/runtime/devapi/telemetry/hotload_metrics.go`（写入 Redis/Kafka）。
+- [ ] T020 [P] [US5] Implement Dev API handlers `framework/backend/go/runtime/devapi/handlers/dev_plugins.go` 覆盖 register/reload/delete + SSE 日志。
+- [ ] T021 [US5] Add telemetry & log piping `framework/backend/go/runtime/devapi/telemetry/hotload_metrics.go`（写入 Redis/Kafka）。
 - [ ] T022 [P] [US5] Update Admin SSE viewer `sdk/workspace/packages/framework-admin/src/pages/plugins/dev-hotload.vue`（session 状态、错误提示、7 天日志列表）。
 - [ ] T023 [US5] Extend quickstart `quickstart.md` Dev 章节，写入 stop/resume/故障排查步骤。
 
@@ -77,14 +77,14 @@
 
 ### Implementation
 
-- [ ] T024 [US2] Implement publish submission handler `framework/runtime/marketplace/handlers/publish.go`（入队、扫描、SLA 记录）。
-- [ ] T025 [P] [US2] Add 自动化扫描 pipeline `framework/runtime/marketplace/services/scanner.go`（签名/哈希/依赖）并输出报告。
-- [ ] T026 [US2] Emit `plugin.publish.approved` +租户通知事件 `framework/runtime/marketplace/events/publish_events.go`。
+- [ ] T024 [US2] Implement publish submission handler `framework/backend/go/runtime/marketplace/handlers/publish.go`（入队、扫描、SLA 记录）。
+- [ ] T025 [P] [US2] Add 自动化扫描 pipeline `framework/backend/go/runtime/marketplace/services/scanner.go`（签名/哈希/依赖）并输出报告。
+- [ ] T026 [US2] Emit `plugin.publish.approved` +租户通知事件 `framework/backend/go/runtime/marketplace/events/publish_events.go`。
 - [ ] T027 [P] [US2] Update reviewer console `sdk/workspace/packages/framework-admin/src/pages/marketplace/review.vue`（队列视图、SLA 计时器、审批动作）。
 - [ ] T028 [US2] Document reviewer SOP `docs/guides/publish/marketplace-review.md`（含 SLA & checklist）。
-- [ ] T029 [P] [US2] Implement online SLA tracker job `framework/runtime/marketplace/services/online_sla_tracker.go`（统计在线审核耗时、触发告警）。
+- [ ] T029 [P] [US2] Implement online SLA tracker job `framework/backend/go/runtime/marketplace/services/online_sla_tracker.go`（统计在线审核耗时、触发告警）。
 - [ ] T030 [US2] Add online Grafana/alert wiring `docs/operations/publish-hub-sla.md` + dashboards（映射 SC-002 指标）。
-- [ ] T031 [P] [US4] Implement offline SLA tracker job `framework/runtime/marketplace/services/offline_sla_tracker.go`（监控离线上传→审批 ≤1 工作日，超时告警）。
+- [ ] T031 [P] [US4] Implement offline SLA tracker job `framework/backend/go/runtime/marketplace/services/offline_sla_tracker.go`（监控离线上传→审批 ≤1 工作日，超时告警）。
 - [ ] T032 [US4] Add离线 SLA dashboard & playbook `docs/operations/publish-hub-sla.md`（新增离线 tab +告警处理流程）。
 
 ### Parallel Opportunities
@@ -99,9 +99,9 @@
 
 ### Implementation
 
-- [ ] T031 [US4] Build offline upload API `framework/runtime/marketplace/handlers/offline_upload.go`（接收 `.pxp`、密钥封装、audit log）。
-- [ ] T032 [P] [US4] Implement key unwrap adapter `framework/runtime/marketplace/services/keyvault_adapter.go`（Marketplace 私钥、过期检测）。
-- [ ] T033 [US4] Extend integrity & audit 校验 `framework/runtime/marketplace/services/offline_validator.go`（比对 `integrity.txt`, `report.json`, 敏感字段）。
+- [ ] T031 [US4] Build offline upload API `framework/backend/go/runtime/marketplace/handlers/offline_upload.go`（接收 `.pxp`、密钥封装、audit log）。
+- [ ] T032 [P] [US4] Implement key unwrap adapter `framework/backend/go/runtime/marketplace/services/keyvault_adapter.go`（Marketplace 私钥、过期检测）。
+- [ ] T033 [US4] Extend integrity & audit 校验 `framework/backend/go/runtime/marketplace/services/offline_validator.go`（比对 `integrity.txt`, `report.json`, 敏感字段）。
 - [ ] T034 [P] [US4] Add离线审批 UI `sdk/workspace/packages/framework-admin/src/pages/marketplace/offline-review.vue`（白名单配置、SLA 提示）。
 - [ ] T035 [US4] Update CLI docs `docs/guides/publish/offline.md` 的加密/密钥交付章节。
 
@@ -117,11 +117,11 @@
 
 ### Implementation
 
-- [ ] T036 [US3] Implement install URL handler `framework/runtime/admin/handlers/plugins_install_url.go`（下载 artefact、调用安装流水线、回滚超时）。
-- [ ] T037 [P] [US3] Implement install local handler `framework/runtime/admin/handlers/plugins_install_local.go`（上传 `.pxp`、验证签名+密钥封装）。
-- [ ] T038 [US3] Enhance deployment orchestration `framework/runtime/admin/services/plugin_deployer.go`（状态机、rollback link、日志聚合）。
+- [ ] T036 [US3] Implement install URL handler `framework/backend/go/runtime/admin/handlers/plugins_install_url.go`（下载 artefact、调用安装流水线、回滚超时）。
+- [ ] T037 [P] [US3] Implement install local handler `framework/backend/go/runtime/admin/handlers/plugins_install_local.go`（上传 `.pxp`、验证签名+密钥封装）。
+- [ ] T038 [US3] Enhance deployment orchestration `framework/backend/go/runtime/admin/services/plugin_deployer.go`（状态机、rollback link、日志聚合）。
 - [ ] T039 [P] [US3] Update Admin UI `sdk/workspace/packages/framework-admin/src/pages/plugins/manage.vue`（版本列表、灰度批次、回滚按钮、日志）。
-- [ ] T040 [US3] Add tenant notifications & telemetry wiring `framework/runtime/admin/events/install_events.go`。
+- [ ] T040 [US3] Add tenant notifications & telemetry wiring `framework/backend/go/runtime/admin/events/install_events.go`。
 - [ ] T041 [US3] Extend quickstart `quickstart.md` 安装/回滚章节，明确“失败 5 分钟内回退”验证步骤。
 
 ### Parallel Opportunities

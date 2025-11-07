@@ -77,15 +77,15 @@
 
 ### Implementation
 
-- [ ] T024 [US2] Implement publish submission handler `framework/backend/go/runtime/marketplace/handlers/publish.go`（入队、扫描、SLA 记录）。
-- [ ] T025 [P] [US2] Add 自动化扫描 pipeline `framework/backend/go/runtime/marketplace/services/scanner.go`（签名/哈希/依赖）并输出报告。
-- [ ] T026 [US2] Emit `plugin.publish.approved` +租户通知事件 `framework/backend/go/runtime/marketplace/events/publish_events.go`。
-- [ ] T027 [P] [US2] Update reviewer console `sdk/workspace/packages/framework-admin/src/pages/marketplace/review.vue`（队列视图、SLA 计时器、审批动作）。
-- [ ] T028 [US2] Document reviewer SOP `docs/guides/publish/marketplace-review.md`（含 SLA & checklist）。
-- [ ] T029 [P] [US2] Implement online SLA tracker job `framework/backend/go/runtime/marketplace/services/online_sla_tracker.go`（统计在线审核耗时、触发告警）。
-- [ ] T030 [US2] Add online Grafana/alert wiring `docs/operations/publish-hub-sla.md` + dashboards（映射 SC-002 指标）。
-- [ ] T031 [P] [US4] Implement offline SLA tracker job `framework/backend/go/runtime/marketplace/services/offline_sla_tracker.go`（监控离线上传→审批 ≤1 工作日，超时告警）。
-- [ ] T032 [US4] Add离线 SLA dashboard & playbook `docs/operations/publish-hub-sla.md`（新增离线 tab +告警处理流程）。
+- [X] T024 [US2] Implement publish submission handler `framework/backend/go/runtime/marketplace/handlers/publish.go`（入队、扫描、SLA 记录）。
+- [X] T025 [P] [US2] Add 自动化扫描 pipeline `framework/backend/go/runtime/marketplace/services/scanner.go`（签名/哈希/依赖）并输出报告。
+- [X] T026 [US2] Emit `plugin.publish.approved` +租户通知事件 `framework/backend/go/runtime/marketplace/events/publish_events.go`。
+- [X] T027 [P] [US2] Update reviewer console `examples/starter/web-admin/app/pages/marketplace/review.vue`（队列视图、SLA 计时器、审批动作）。
+- [X] T028 [US2] Document reviewer SOP `docs/guides/publish/marketplace-review.md`（含 SLA & checklist）。
+- [X] T029 [P] [US2] Implement online SLA tracker job `framework/backend/go/runtime/marketplace/services/online_sla_tracker.go`（统计在线审核耗时、触发告警）。
+- [X] T030 [US2] Add online Grafana/alert wiring `docs/operations/publish-hub-sla.md` + dashboards（映射 SC-002 指标）。
+- [X] T031 [P] [US4] Implement offline SLA tracker job `framework/backend/go/runtime/marketplace/services/offline_sla_tracker.go`（监控离线上传→审批 ≤1 工作日，超时告警）。
+- [X] T032 [US4] Add离线 SLA dashboard & playbook `docs/operations/publish-hub-sla.md`（新增离线 tab +告警处理流程）。
 
 ### Parallel Opportunities
 - Handler/Scanner/Events (T024–T026)并行；UI (T027) 和文档 (T028) 可在 API 稳定后跟进；SLA tracker (T029) 与 dashboards (T030) 紧随。

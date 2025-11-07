@@ -1,0 +1,338 @@
+openapi: 3.0.3
+info:
+  title: PowerX Publish Hub Contracts
+  version: 0.1.0
+  description: >-
+    Contracts covering px-plugin publish/dist/dev flows, Marketplace 审核以及
+    PowerX Admin 安装接口。所有字段均来自 `specs/004-publish-hub-spec/spec.md`。
+servers:
+  - url: https://marketplace.powerx.local
+    description: Marketplace API
+  - url: https://dev-api.powerx.local
+    description: Dev API Gateway
+  - url: https://admin.powerx.local
+    description: PowerX Admin Backend
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    mtls:
+      type: mutualTLS
+  schemas:
+    PublishRequest:
+      type: object
+      required: [publishId, pluginId, version, channel, manifest, notes]
+      properties:
+        publishId:
+          type: string
+          format: uuid
+        pluginId:
+          type: string
+        version:
+          type: string
+          description: SemVer string, must be greater than last approved version.
+        channel:
+          type: string
+          enum: [stable, beta]
+        manifest:
+          $ref: '#/components/schemas/PluginManifest'
+        notes:
+          type: string
+        autoUpgrade:
+          type: boolean
+        rolloutPlan:
+          $ref: '#/components/schemas/RolloutPlan'
+        artefact:
+          type: object
+          properties:
+            uploadUrl:
+              type: string
+            sha256:
+              type: string
+    PluginManifest:
+      type: object
+      required: [id, name, version, permissions]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        runtime:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+    RolloutPlan:
+      type: object
+      properties:
+        batches:
+          type: array
+          items:
+            type: object
+            required: [percentage, waitMinutes]
+            properties:
+              percentage:
+                type: integer
+              waitMinutes:
+                type: integer
+        tenantAllowList:
+          type: array
+          items:
+            type: string
+    OfflineUpload:
+      type: object
+      required: [publishId, pluginId, version, integrityFile, signatureFile]
+      properties:
+        publishId:
+          type: string
+          format: uuid
+        pluginId:
+          type: string
+        version:
+          type: string
+        integrityFile:
+          type: string
+        signatureFile:
+          type: string
+        pxp:
+          type: string
+          format: binary
+        auditLog:
+          type: string
+        notes:
+          type: string
+    DevRegisterRequest:
+      type: object
+      required: [pluginId, version, tenantId, manifest, bundleMeta]
+      properties:
+        pluginId:
+          type: string
+        version:
+          type: string
+        tenantId:
+          type: string
+        manifest:
+          $ref: '#/components/schemas/PluginManifest'
+        bundleMeta:
+          type: object
+          properties:
+            hash:
+              type: string
+            sizeBytes:
+              type: integer
+            entry:
+              type: string
+        cliVersion:
+          type: string
+        tracingId:
+          type: string
+    DevReloadRequest:
+      type: object
+      required: [sessionId, reloadToken, changedFiles]
+      properties:
+        sessionId:
+          type: string
+        reloadToken:
+          type: string
+        changedFiles:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              hash:
+                type: string
+        diagnostics:
+          type: array
+          items:
+            type: object
+            properties:
+              level:
+                type: string
+                enum: [info, warn, error]
+              message:
+                type: string
+    InstallURLRequest:
+      type: object
+      required: [pluginId, version, sourceUrl]
+      properties:
+        pluginId:
+          type: string
+        version:
+          type: string
+        sourceUrl:
+          type: string
+          format: uri
+        autoRollbackMinutes:
+          type: integer
+          default: 5
+    InstallLocalRequest:
+      type: object
+      required: [pluginId, version]
+      properties:
+        pluginId:
+          type: string
+        version:
+          type: string
+        pxp:
+          type: string
+          format: binary
+        integrityFile:
+          type: string
+        signatureFile:
+          type: string
+paths:
+  /api/marketplace/plugins/publish:
+    post:
+      summary: Submit online publish request
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishRequest'
+      responses:
+        '202':
+          description: Accepted and enqueued for review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versionId:
+                    type: string
+                  reviewQueueId:
+                    type: string
+                  uploadUrl:
+                    type: string
+        '400':
+          description: Validation error
+  /api/marketplace/plugins/offline-upload:
+    post:
+      summary: Upload offline `.pxp` bundle & integrity files
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OfflineUpload'
+      responses:
+        '202':
+          description: Offline review queued (≤1 business day)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviewQueueId:
+                    type: string
+                  slaDeadline:
+                    type: string
+                    format: date-time
+  /internal/dev/plugins/register:
+    post:
+      summary: Register dev hotload session
+      security:
+        - mtls: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevRegisterRequest'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  reloadToken:
+                    type: string
+                  adminPreviewUrl:
+                    type: string
+  /internal/dev/plugins/reload:
+    post:
+      summary: Reload dev session with incremental bundle
+      security:
+        - mtls: []
+      parameters:
+        - in: header
+          name: x-reload-id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevReloadRequest'
+      responses:
+        '200':
+          description: Reload applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  logsRef:
+                    type: string
+        '409':
+          description: Duplicate reload id
+  /internal/dev/plugins/register/{sessionId}:
+    delete:
+      summary: Stop dev session
+      security:
+        - mtls: []
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Session deleted
+  /admin/plugins/install/url:
+    post:
+      summary: Install plugin from Marketplace artefact
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstallURLRequest'
+      responses:
+        '202':
+          description: Installation started; result provided via events/logs
+  /admin/plugins/install/local:
+    post:
+      summary: Install plugin from local `.pxp`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InstallLocalRequest'
+      responses:
+        '202':
+          description: Installation started for local upload

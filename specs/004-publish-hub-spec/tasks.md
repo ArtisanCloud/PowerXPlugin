@@ -36,13 +36,13 @@
 
 ### Implementation
 
-- [ ] T011 [P] [US1] Update `tools/cli/src/commands/publish.ts` 串联预检→签名→上传→回执输出，并写 `publish-receipt.json`。
-- [ ] T012 [P] [US1] Enhance publish pipeline `tools/cli/src/lib/publish/pipeline.ts`（版本递增、依赖/权限/灰度校验）。
-- [ ] T013 [US1] Extend `tools/cli/src/lib/publish/precheck.ts` 加入测试覆盖率、签名材料、渠道策略校验。
-- [ ] T014 [P] [US1] Implement `.pxp` 打包 & integrity 导出 `tools/cli/src/commands/dist.ts` + `tools/cli/src/lib/dist/offlinePackager.ts`（含 `integrity.txt`, `report.json`, `audit.log`）。
-- [ ] T015 [US1] Wire encryption+密钥封装模块 `tools/cli/src/lib/dist/encryptor.ts` 并向上传 payload 注入密钥元数据。
-- [ ] T016 [P] [US1] Update Telemetry emitter `tools/cli/src/lib/telemetry/emitter.ts` 输出 `plugin.publish.*` / `plugin.offline.*` 事件。
-- [ ] T017 [US1] 更新 CLI 文档 `docs/guides/publish/online.md`、`docs/guides/publish/offline.md`（命令示例、加密要求、回执说明）。
+- [X] T011 [P] [US1] Update `tools/cli/src/commands/publish.ts` 串联预检→签名→上传→回执输出，并写 `publish-receipt.json`。
+- [X] T012 [P] [US1] Enhance publish pipeline `tools/cli/src/lib/publish/pipeline.ts`（版本递增、依赖/权限/灰度校验）。
+- [X] T013 [US1] Extend `tools/cli/src/lib/publish/precheck.ts` 加入测试覆盖率、签名材料、渠道策略校验。
+- [X] T014 [P] [US1] Implement `.pxp` 打包 & integrity 导出 `tools/cli/src/commands/dist.ts` + `tools/cli/src/lib/dist/offlinePackager.ts`（含 `integrity.txt`, `report.json`, `audit.log`）。
+- [X] T015 [US1] Wire encryption+密钥封装模块 `tools/cli/src/lib/dist/encryptor.ts` 并向上传 payload 注入密钥元数据。
+- [X] T016 [P] [US1] Update Telemetry emitter `tools/cli/src/lib/telemetry/emitter.ts` 输出 `plugin.publish.*` / `plugin.offline.*` 事件。
+- [X] T017 [US1] 更新 CLI 文档 `docs/guides/publish/online.md`、`docs/guides/publish/offline.md`（命令示例、加密要求、回执说明）。
 
 **Checkpoint**: CLI 提交/打包能力完整可演示。
 

@@ -58,12 +58,12 @@
 
 ### Implementation
 
-- [ ] T018 [P] [US5] Refactor CLI watch command `tools/cli/src/commands/dev/watch.ts`（增量构建、差异包限流、错误提示）。
-- [ ] T019 [US5] Update SessionClient `tools/cli/src/runtime/hotreload/session.ts`（mTLS、幂等 `x-reload-id`、自动重试、stop API）。
-- [ ] T020 [P] [US5] Implement Dev API handlers `framework/backend/go/runtime/devapi/handlers/dev_plugins.go` 覆盖 register/reload/delete + SSE 日志。
-- [ ] T021 [US5] Add telemetry & log piping `framework/backend/go/runtime/devapi/telemetry/hotload_metrics.go`（写入 Redis/Kafka）。
-- [ ] T022 [P] [US5] Update Admin SSE viewer `sdk/workspace/packages/framework-admin/src/pages/plugins/dev-hotload.vue`（session 状态、错误提示、7 天日志列表）。
-- [ ] T023 [US5] Extend quickstart `quickstart.md` Dev 章节，写入 stop/resume/故障排查步骤。
+- [X] T018 [P] [US5] Refactor CLI watch command `tools/cli/src/commands/dev/watch.ts`（增量构建、差异包限流、错误提示）。
+- [X] T019 [US5] Update SessionClient `tools/cli/src/runtime/hotreload/session.ts`（mTLS、幂等 `x-reload-id`、自动重试、stop API）。
+- [X] T020 [P] [US5] Implement Dev API handlers `framework/backend/go/runtime/devapi/handlers/dev_plugins.go` 覆盖 register/reload/delete + SSE 日志。
+- [X] T021 [US5] Add telemetry & log piping `framework/backend/go/runtime/devapi/telemetry/hotload_metrics.go`（写入 Redis/Kafka）。
+- [X] T022 [P] [US5] Update Admin SSE viewer `examples/starter/web-admin/app/pages/plugins/dev-hotload.vue`（session 状态、错误提示、7 天日志列表）。
+- [X] T023 [US5] Extend quickstart `quickstart.md` Dev 章节，写入 stop/resume/故障排查步骤。
 
 ### Parallel Opportunities
 - CLI (T018/T019) 与 Go Dev API (T020/T021) 并行；Admin 前端 (T022) 与文档 (T023) 随后补充。

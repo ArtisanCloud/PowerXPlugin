@@ -10,10 +10,10 @@
 4. 确保 Feature Flags：`PX_PLUGIN_DEV_MODE`, `PX_PLUGIN_PUBLISH`, `PX_MARKET_PUBLISH_ENABLED`, `PX_MARKET_OFFLINE_UPLOAD`, `PX_PLUGIN_HUB_ENABLED` 均开启。
 
 ## 2. Dev 热加载链路
-1. 在插件仓执行 `px-plugin dev --watch --tenant demo-tenant`。
-2. 观察 CLI 输出：`sessionId`, `reloadToken`, Admin 调试地址。
-3. 修改代码并保存，确认 diff 构建耗时 ≤2s，Admin SSE 获取 `reload` 日志。
-4. 结束调试：`px-plugin dev --stop`，验证 Dev API 删除 session 且日志归档 7 天。
+1. 在插件仓执行 `px-plugin dev --watch --tenant demo-tenant --entry ./dist`（实现参考 `tools/cli/src/commands/dev/watch.ts`）。
+2. CLI 将读取 `dist/manifest.json` 并向 Dev API (`tools/cli/src/runtime/hotreload/session.ts`) 发送 register 请求，输出 `sessionId`, `reloadToken`, Admin 调试地址。
+3. 修改代码并保存，CLI watcher 会在 250ms 去抖后聚合 diff，调用 Dev API reload；确认构建耗时 ≤2s，Admin SSE 获取 `reload` 日志。
+4. 结束调试：运行 `px-plugin dev --stop`（或 `CTRL+C`），Dev API 删除 session 并由 `framework/backend/go/runtime/devapi/handlers/dev_plugins.go` 记录审计，日志保留 7 天。
 
 ## 3. 在线发布链路
 1. 运行 `npm run lint && npm test && go test ./...`，确保预检输入准备就绪。

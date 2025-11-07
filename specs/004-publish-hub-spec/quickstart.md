@@ -28,6 +28,12 @@
 3. 运维在 Marketplace 离线入口上传，并勾选目标租户白名单。
 4. 审核通过后，租户管理员使用 `install/local` 导入；失败时 5 分钟内执行回滚。
 
+## 5. Admin 安装 / 回滚验证
+1. 在线安装：调用 `framework/backend/go/runtime/admin/handlers/plugins_install_url.go` 暴露的 API（或 Admin 界面）选择远程版本。观察响应 `status=installing` 并查看 `framework/backend/go/runtime/admin/services/plugin_deployer.go` 打印的 deploymentId。
+2. 离线导入：使用 `plugins_install_local.go` 上传 `.pxp`，确保 CLI 输出的 manifest/签名/密钥信息被校验。
+3. 回滚测试：人为构造失败（或调用 `PluginDeployer.Rollback`），确认 `framework/backend/go/runtime/admin/events/install_events.go` 记录 `tenant.install.rolled_back`，并在 5 分钟内恢复上一版本。
+4. UI 校验：在 `examples/starter/web-admin/app/pages/plugins/manage.vue` 刷新版本列表，验证安装状态与回滚按钮可正常触发。
+
 ## 5. Telemetry & 验证
 1. 使用 `npm run e2e:dev-hotload`、`npm run e2e:publish-online` 运行端到端验证（如已提供）。
 2. 通过 Grafana / Workflow Metrics 检查以下指标：

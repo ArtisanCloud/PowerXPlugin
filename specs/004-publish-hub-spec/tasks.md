@@ -117,12 +117,12 @@
 
 ### Implementation
 
-- [ ] T036 [US3] Implement install URL handler `framework/backend/go/runtime/admin/handlers/plugins_install_url.go`（下载 artefact、调用安装流水线、回滚超时）。
-- [ ] T037 [P] [US3] Implement install local handler `framework/backend/go/runtime/admin/handlers/plugins_install_local.go`（上传 `.pxp`、验证签名+密钥封装）。
-- [ ] T038 [US3] Enhance deployment orchestration `framework/backend/go/runtime/admin/services/plugin_deployer.go`（状态机、rollback link、日志聚合）。
-- [ ] T039 [P] [US3] Update Admin UI `sdk/workspace/packages/framework-admin/src/pages/plugins/manage.vue`（版本列表、灰度批次、回滚按钮、日志）。
-- [ ] T040 [US3] Add tenant notifications & telemetry wiring `framework/backend/go/runtime/admin/events/install_events.go`。
-- [ ] T041 [US3] Extend quickstart `quickstart.md` 安装/回滚章节，明确“失败 5 分钟内回退”验证步骤。
+- [X] T036 [US3] Implement install URL handler `framework/backend/go/runtime/admin/handlers/plugins_install_url.go`（下载 artefact、调用安装流水线、回滚超时）。
+- [X] T037 [P] [US3] Implement install local handler `framework/backend/go/runtime/admin/handlers/plugins_install_local.go`（上传 `.pxp`、验证签名+密钥封装）。
+- [X] T038 [US3] Enhance deployment orchestration `framework/backend/go/runtime/admin/services/plugin_deployer.go`（状态机、rollback link、日志聚合）。
+- [X] T039 [P] [US3] Update Admin UI `examples/starter/web-admin/app/pages/plugins/manage.vue`（版本列表、灰度批次、回滚按钮、日志）。
+- [X] T040 [US3] Add tenant notifications & telemetry wiring `framework/backend/go/runtime/admin/events/install_events.go`。
+- [X] T041 [US3] Extend quickstart `quickstart.md` 安装/回滚章节，明确“失败 5 分钟内回退”验证步骤。
 
 ### Parallel Opportunities
 - URL/Local handlers (T036/T037) 可并行；UI (T039) 与事件 (T040) 可在 API stub 完成后跟进；文档 (T041) 收尾。

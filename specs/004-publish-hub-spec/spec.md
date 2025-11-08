@@ -4,6 +4,7 @@
 **Created**: 2025-11-07  
 **Status**: Draft  
 **Input**: User description: "请根据docs/use_cases/_from_hub/SCN-PUBLISH-HUB-001路径下的所有需求用例文档，生成spec相关文档"
+**Additional Inputs (2025-11-20)**: docs/use_cases/_from_hub/SCN-DEV-PLUGIN-INIT-001, docs/use_cases/_from_hub/SCN-DEV-PLUGIN-DEBUG-001, docs/use_cases/_from_hub/SCN-DEV-PLUGIN-PUBLISH-001（覆盖 CLI 工程初始化、宿主模拟调试与发布/Marketplace 主场景）
 
 ## Context & Scope
 
@@ -23,6 +24,22 @@
 7. 离线 `.pxp` 包在存储与传输过程中必须使用临时对称密钥加密，CLI 需生成该密钥并用 Marketplace 公钥封装后随 artefact 上传，审核节点解密后再执行签名与 hash 校验。
 
 ## User Scenarios & Testing *(mandatory)*
+
+### User Story 0 - Plugin scaffolding & compliance bootstrap (Priority: P1)
+
+> 来源：docs/use_cases/_from_hub/SCN-DEV-PLUGIN-INIT-001（CLI 初始化、团队协作、第三方导入）
+
+PowerX 需要在 1 分钟内通过 `px-plugin init` 生成标准化工程，串联模板选择、依赖安装、许可证扫描、Git 注册与 `px-plugin doctor` 团队诊断，确保第三方源码导入也能留痕和审批。
+
+**Why this priority**: 没有统一脚手架和合规守护，后续 dev/publish 流程无法保证 artefact 与权限一致性。
+
+**Independent Test**: 执行 `px-plugin init demo --template react-dashboard`，观察模板渲染、依赖安装、SBOM/扫描、Git 注册与 `publish.yml`/`manifest` 生成；随后由团队成员跑 `px-plugin doctor`，第三方源码导入触发 `plugin-import-audit`。
+
+**Acceptance Scenarios**:
+
+1. **Given** 开发者启用 `PX_PLUGIN_SCAFFOLD_V2`，**When** 运行 `px-plugin init --template react-dashboard --org demo`, **Then** CLI 在 60 秒内生成目录、写入 manifest/权限声明、执行依赖安装并通过 `POST /internal/plugins/bootstrap/validate` 注册 Git 仓与 CI，返回扫描报告。
+2. **Given** 团队成员克隆仓库，**When** 运行 `px-plugin doctor --fix`, **Then** 命令校验 Node/Go 版本、依赖与 Feature Flag，输出 ≥95% 的健康检查通过率并将结果写入审计日志。
+3. **Given** 需要导入第三方源码包，**When** 调用 `px-plugin import --source tar.gz --policy external`, **Then** 许可证/漏洞扫描在 15 分钟内完成，若发现高危依赖立即阻断并要求审批，审批结果同步到 CLI 重试。
 
 ### User Story 1 - Developer submits publish candidate (Priority: P1)
 
@@ -104,8 +121,46 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 
 ---
 
+### User Story 6 - Host simulator & sandbox validation close the debug loop (Priority: P1)
+
+> 来源：docs/use_cases/_from_hub/SCN-DEV-PLUGIN-DEBUG-001（宿主模拟、沙箱验证、错误诊断）
+
+调试阶段需要 `px-plugin host start --mock`、`px-plugin debug attach`、沙箱租户与脱敏数据，加上错误诊断报告和工单闭环，确保 1 分钟复现场景、10 分钟完成沙箱验证并输出可追踪报告。
+
+**Why this priority**: 调试体验是 Publish Hub artefact 质量的起点，缺少受控宿主与沙箱验证将导致上线合规风险。
+
+**Independent Test**: 启动宿主模拟器→执行 `px-plugin dev --watch`→触发 `POST /internal/sandbox/deploy`→收集 `POST /internal/debug/report` 结果并在 Admin/工单中查看诊断。
+
+**Acceptance Scenarios**:
+
+1. **Given** 开发者执行 `px-plugin host start --mock --plugin order-sync`, **When** CLI 校验宿主镜像与 manifest 匹配, **Then** 宿主在 30 秒内启动，自动阻断访问生产资源并将 sessionId 写入 Telemetry (`debug.host.version_mismatch_total`=0)。
+2. **Given** 需要挂载断点与日志，**When** 运行 `px-plugin debug attach --session <id>` 并使用 `px-plugin dev --watch`, **Then** SessionClient 将断点/变量同步到宿主，日志脱敏并通过 `debug-observability-v2` 上报。
+3. **Given** 沙箱租户执行自动化验证，**When** 触发 `POST /internal/sandbox/deploy` 并完成 `plugin-sandbox-suite`, **Then** `POST /internal/debug/report` 生成错误诊断，自动推送至工单系统并保留 ≥180 天审计。
+
+---
+
+### User Story 7 - Release pipeline & multi-channel Marketplace orchestration (Priority: P1)
+
+> 来源：docs/use_cases/_from_hub/SCN-DEV-PLUGIN-PUBLISH-001（发布审批、灰度、在线/离线上架）
+
+发布经理需要通过 `px-plugin publish create/deploy`, `px-plugin pack`, `px-plugin import --offline` 与 Marketplace 审核入口，贯穿测试租户门禁、灰度策略、自动回滚与上架同步。
+
+**Why this priority**: 发布与 Marketplace 上架是业务交付的最终环节，需统一 artefact、审批、灰度和离线送审，确保 SLA（在线 4h / 离线 1d / 审核 3d）。
+
+**Independent Test**: 使用 `px-plugin publish create` → `px-plugin publish deploy --strategy canary` → `px-plugin pack` → `px-plugin import --offline` → `POST /marketplace/listing/apply`，验证版本可追踪、灰度/回滚策略触发、线上/离线上架同步。
+
+**Acceptance Scenarios**:
+
+1. **Given** 新版本在测试租户通过质量门禁，**When** 运维执行 `px-plugin publish create --channel stable` 并 `px-plugin publish deploy --strategy canary`, **Then** 流水线自动生成发布计划、5 分钟内可触发回滚、指标写入 `publish.gray.error_rate`。
+2. **Given** 需要向隔离环境交付，**When** 运行 `px-plugin pack --mode release` 并在运维端调用 `px-plugin import --offline --pkg dist/app.pxp`, **Then** 离线校验与签名报告和在线 artefact 一致，导入成功率 ≥98%。
+3. **Given** 发布通过审批，**When** 调用 `POST /marketplace/listing/apply` 同步元数据, **Then** `marketplace.listing.sla_hours` 跟踪 3 个工作日 SLA，`plugin.publish.approved` 与 `marketplace.listing.status` 事件双向关联。
+
+---
+
 ### Edge Cases
 
+- 模板索引缺少依赖或扫描失败时，`px-plugin init` 必须回滚输出并提示补齐镜像/豁免。
+- 宿主模拟器版本落后或访问生产资源时必须阻断 `px-plugin host start` 并上报 `debug.host.version_mismatch_total` 告警。
 - 离线包体积超过阈值或缺少签名时必须阻断导入并给出可操作提示。
 - 发布版本号回退或重复提交需拒绝并提示开发者校正 manifest。
 - 审核 SLA 超时（>4h 在线 / >1 工作日离线）时，系统需通知发布者与运营，避免版本滞留。
@@ -121,11 +176,15 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 
 | 模块 | 负责人 | 主要职责 |
 |------|--------|----------|
+| TemplateRegistry & ScaffoldExecutor | PowerX Plugin CLI | 管理模板索引、脚手架渲染、post-hook 与 Git 初始化 |
 | BundleBuilder | PowerX Plugin CLI | 收集 artefact、计算 diff、控制包体大小（默认 <300MB）、生成 `.pxp` |
 | SessionClient | PowerX Plugin CLI | 管理 Dev API register/reload/delete、mTLS、重试、Backoff |
 | PublishPipeline | PowerX Plugin CLI | 预检、签名、上传、生成 `publish-receipt.json` |
-| OfflinePackager | PowerX Plugin CLI | 生成 `.pxp`、`integrity.txt`、`manifest.signature`、`dist/audit.log` |
+| OfflinePackager / `px-plugin pack` | PowerX Plugin CLI | 生成 `.pxp`、`integrity.txt`、`manifest.signature`、`dist/audit.log`、密钥封装 |
+| HostSimulator Controller | PowerX Plugin CLI + Core | `px-plugin host start --mock`、断点/日志挂载、版本兼容守护 |
+| SandboxValidation Service | PowerX Core | `POST /internal/sandbox/deploy`、脱敏数据、测试结果与 `POST /internal/debug/report` |
 | Marketplace Reviewer Console | PowerX Marketplace | 在线/离线审核队列、签名校验、SLA 计时、操作记录 |
+| ReleasePipeline Orchestrator | PowerX Core | `px-plugin publish create/deploy`、灰度策略、自动回滚与指标采集 |
 | Dev API Gateway | PowerX Core | `POST /internal/dev/plugins/{register|reload}`、SSE 日志、异常回滚 |
 | Admin Installer | PowerX Web Admin | `install/url`, `install/local`, 灰度、回滚、日志/告警 |
 | RBACGuard Middleware | PowerX Core/Admin | 统一校验开发者/审核员/租户权限，写入审计日志 |
@@ -136,10 +195,24 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 
 - `px-plugin dev --watch [--tenant <id>] [--entry <dir>] [--max-bundle-size <MB>] [--no-telemetry]`
   - 输出 `sessionId`, `reloadToken`, Admin 调试链接，支持 `--resume` 和 `--stop`.
-- `px-plugin publish --channel <stable|beta> [--notes ./release.md] [--skip-precheck]`
-  - 依赖 `publish.yml` 中的渠道、灰度、租户名单、回滚策略。
+- `px-plugin host start --mock [--plugin <id>] [--runtime <version>]`
+  - 启动宿主模拟器、校验 manifest/运行时、隔离资源并生成 sessionId。
+- `px-plugin debug attach --session <id> [--breakpoints ./launch.json]`
+  - 将断点/变量快照同步给宿主模拟器，聚合日志并可触发 `POST /internal/debug/report`。
+- `px-plugin publish create --channel <stable|beta> [--window <ts>]`
+  - 生成发布计划、触发测试租户门禁、记录审批链。
+- `px-plugin publish deploy --strategy canary [--batch 20%]`
+  - 编排灰度/扩容/回滚，并推送 `publish.gray.*` 指标。
 - `px-plugin dist --target offline [--sign <pem>] [--kms-key-id <id>] [--artifact-dir dist]`
   - 生成 `.pxp`、`integrity.txt`、`manifest.signature`、`report.json`、`dist/audit.log`，并可输出上传指令。
+- `px-plugin pack --mode release [--channel offline]`
+  - 在 `dist/` 输出 release artefact、签名材料与 `px-plugin import` 所需 metadata。
+- `px-plugin import --offline --pkg dist/app.pxp [--tenant <id>]`
+  - 调用离线导入 API，执行签名/hash 验证、白名单校验与审计记录。
+- `px-plugin init <name> --template <id> [--org <org>] [--lang <lang>]`
+  - 渲染模板、安装依赖、生成 manifest/publish.yml、触发许可证扫描与 Git 注册。
+- `px-plugin doctor [--fix]`
+  - 校验多语言运行时/依赖/Flag、填充 `.doctor/report.json` 并输出 remediation。
 
 ### 配置文件与 `.pxp` 结构
 
@@ -157,6 +230,10 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
   - Headers: `x-reload-id`（幂等）。
 - `DELETE /internal/dev/plugins/register/{sessionId}`
   - 清理沙盒、释放资源、记录审计日志。
+- `POST /internal/sandbox/deploy`
+  - Body: `sessionId`, `datasetId`, `testPlanId`, `flags[]`; 负责加载脱敏数据、执行 `plugin-sandbox-suite` 并返回进度。
+- `POST /internal/debug/report`
+  - Body: `sessionId`, `logs`, `metrics`, `ticketRef`; 生成可脱敏的错误诊断报告并同步工单系统。
 
 ## Requirements *(mandatory)*
 
@@ -175,6 +252,10 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 - **FR-011**: Dev API MUST对 register/reload/delete 请求执行权限校验、mTLS、幂等控制，失败时返回可操作错误并触发 Admin SSE。
 - **FR-012**: Marketplace MUST区分在线/离线审核 SLA（≤4h / ≤1 工作日），并在超时后自动通知发布者与运营。
 - **FR-013**: Offline packaging MUST encrypt `.pxp` artefacts with short-lived symmetric keys，并用 Marketplace 公钥封装该密钥（或其引用），以便审核节点解密后再执行签名/完整性校验。
+- **FR-014**: CLI MUST提供 `px-plugin init`、模板版本治理与 Git 注册 API，对应 SBOM/许可证扫描与审计留痕。
+- **FR-015**: CLI MUST提供 `px-plugin doctor` 用于团队克隆/第三方导入场景，输出环境/依赖/Flag 诊断与自动修复建议。
+- **FR-016**: Host simulator & sandbox validation MUST支持 `px-plugin host start --mock`、`px-plugin debug attach`、`POST /internal/sandbox/deploy`、`POST /internal/debug/report`，在 10 分钟内完成验证并沉淀报告。
+- **FR-017**: Release pipeline MUST公开 `px-plugin publish create/deploy --strategy canary`、`px-plugin pack`、`px-plugin import --offline`，实现测试租户门禁、灰度扩容、自动回滚与 Marketplace 上架同步。
 
 ### Key Entities *(include if feature involves data)*
 

@@ -25,6 +25,20 @@ const (
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
 
+var templatePresets = map[string]struct {
+	Backend  string
+	Frontend string
+}{
+	"fullstack-go-nuxt": {
+		Backend:  "go-gin",
+		Frontend: "nuxt",
+	},
+	"backend-go-lite": {
+		Backend:  "go-gin",
+		Frontend: "",
+	},
+}
+
 func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	var (
@@ -32,10 +46,25 @@ func runInit(args []string) error {
 		backend  = fs.String("backend", "go-gin", "backend template (only go-gin supported)")
 		frontend = fs.String("frontend", "nuxt", "frontend template (only nuxt supported)")
 		force    = fs.Bool("force", false, "overwrite existing files")
+		template = fs.String("template", "", "template preset id (e.g. fullstack-go-nuxt, backend-go-lite)")
 	)
 	fs.SetOutput(os.Stdout)
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if tmpl := strings.TrimSpace(*template); tmpl != "" {
+		if preset, ok := templatePresets[tmpl]; ok {
+			if preset.Backend != "" {
+				*backend = preset.Backend
+			}
+			if preset.Frontend != "" {
+				*frontend = preset.Frontend
+			}
+			fmt.Fprintf(os.Stdout, "Using template preset %q (backend=%s frontend=%s)\n", tmpl, *backend, *frontend)
+		} else {
+			fmt.Fprintf(os.Stdout, "warning: template preset %q not recognized, falling back to manual flags\n", tmpl)
+		}
 	}
 
 	if fs.NArg() < 1 {

@@ -77,3 +77,20 @@ tests/
 ## Complexity Tracking
 
 No constitution violations identified — 不需要额外复杂度豁免。
+
+## Additional Scope from SCN-DEV-PLUGIN-INIT/DEBUG/PUBLISH
+
+### Workstream A – CLI Scaffold & Compliance Bootstrap (SCN-DEV-PLUGIN-INIT-001)
+- **Deliverables**: `px-plugin init` + `px-plugin doctor` CLI（`tools/cli/src/commands/plugin/*.ts`）、模板索引+执行器（`scaffold/templates/**` 或 `packages/template-registry/index.yaml`）、第三方导入策略（`config/compliance/external_source_policy.yaml`）、bootstrap 服务（`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`）与许可证扫描接入。
+- **Acceptance**: 初始化 ≤60s、依赖安装成功率 ≥98%、Git/CI 自动注册、SBOM+许可证扫描报告可追踪，团队克隆运行 `plugin doctor` 后健康项 ≥95%，第三方导入 15 分钟内完成审批。
+- **Testing**: `scripts/workflows/scaffold-smoke.mjs`, CLI 集成测试覆盖模板渲染/导入/doctor, Go 单测覆盖 bootstrap handler、scanner 适配。
+
+### Workstream B – Host Simulator & Sandbox Validation (SCN-DEV-PLUGIN-DEBUG-001)
+- **Deliverables**: `px-plugin host start --mock` + `px-plugin debug attach`（`tools/cli/src/commands/dev/host.ts`, `tools/cli/src/runtime/hotreload/session.ts` 扩展）、宿主模拟器控制器（`framework/backend/go/runtime/devapi/handlers/host_simulator.go`）、沙箱验证与报告 API（`framework/backend/go/runtime/devapi/handlers/sandbox_validation.go`, `.../telemetry/debug_reports.go`）、调试报告文档/工单集成（`docs/guides/publish/marketplace-review.md`, `docs/guides/bootstrap-context.md` 更新）。
+- **Acceptance**: 宿主启动 ≤30s、热更新延迟 ≤2s、沙箱验证 ≤10min、错误诊断 1min 生成并自动关联工单，敏感字段全部脱敏。
+- **Testing**: `npm run e2e:dev-hotload` 扩展 host simulator 路径、Go integration 覆盖 sandbox deploy/report、Playwright/Admin 验证调试日志面板。
+
+### Workstream C – Release Pipeline & Marketplace Orchestration (SCN-DEV-PLUGIN-PUBLISH-001)
+- **Deliverables**: `px-plugin publish create/deploy` CLI（`tools/cli/src/commands/publish/create.ts`, `publish/deploy.ts`）、`px-plugin pack` + `px-plugin import --offline`（`tools/cli/src/commands/dist.ts` & 新 pack 执行器）、发布流水线 orchestrator + canary 策略（`framework/backend/go/runtime/publish/pipeline_handler.go`, `config/publish/approval_flows.yaml`）、Marketplace listing UI/API（`examples/starter/web-admin/app/pages/publish/pipelines.vue`, `framework/backend/go/runtime/marketplace/services/listing.go`）。
+- **Acceptance**: 测试租户门禁 + 审批在 24h 内闭环，灰度可 5 分钟回滚，离线导入成功率 ≥98%，Marketplace 审核 ≤3 个工作日且事件同步率 ≥99%。
+- **Testing**: CI pipeline smoke tests、Playwright 发布/回滚/Marketplace 审核剧本、离线导入 fixture、Grafana SLA 仪表板验证。

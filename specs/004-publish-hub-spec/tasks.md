@@ -174,31 +174,93 @@
 
 ---
 
+## Phase 10: User Story 0 – Plugin scaffolding & compliance bootstrap (Priority P1)
+
+**Goal**: 让 `px-plugin init`、模板仓、合规扫描与 Git 注册形成 1 分钟交付链，并通过 `px-plugin doctor` / 第三方导入策略支撑团队协作（SCN-DEV-PLUGIN-INIT-001）。
+**Independent Test**: 执行 `px-plugin init demo --template react-dashboard` → 自动安装依赖 → 上传 SBOM → 完成 Git 注册；团队成员克隆仓库后运行 `px-plugin doctor --fix` 并导入一个第三方源码包，观察审计与豁免流程。
+
+### Implementation
+
+- [ ] T057 [P] [US0] Introduce CLI scaffold entry `tools/cli/src/commands/plugin/init.ts` + executor（`tools/cli/src/executors/scaffold.ts`）以处理参数解析、模板下载、变量渲染、依赖安装、SBOM 生成与 `publish.yml`/`manifest` 写入。
+- [ ] T058 [US0] Build template registry metadata `packages/template-registry/index.yaml`（或 `scaffold/templates/index.yaml`）与版本锁策略，并支持 per-template hooks / language 要求；补充示例模板与回滚策略。
+- [ ] T059 [US0] Extend bootstrap + compliance services：`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`、`internal/compliance/scanner/license_scanner.go` 支持 CLI 请求校验、Git 注册、许可证/漏洞扫描以及 `plugin-import-audit` Webhook。
+- [ ] T060 [US0] Implement `px-plugin doctor`（`tools/cli/src/commands/plugin/doctor.ts` + `tools/cli/src/executors/doctor.ts`）完成环境/依赖/flag 诊断、自动修复与 `.doctor/report.json` 生成。
+- [ ] T061 [US0] Add第三方源码导入守护：`tools/cli/src/commands/plugin/import.ts` + `config/compliance/external_source_policy.yaml` + `docs/standards/powerx-plugin/integration/04_security_and_compliance/Plugin_Security_Checklist.md` 更新审批/豁免流程。
+- [ ] T062 [US0] Refresh developer docs `docs/guides/bootstrap-context.md`, `docs/guides/cli-plugin-tutorial.md`, `quickstart.md` 加入模板选择、依赖镜像、`plugin doctor`、第三方导入与 Git 注册截图。
+
+### Parallel Opportunities
+- T057/T058 可并行（CLI vs 模板仓）；T059 依赖 CLI 协议确定；T060/T061 可在模板完成后推进；T062 收尾。
+
+---
+
+## Phase 11: User Story 6 – Host simulator & sandbox validation close the debug loop (Priority P1)
+
+**Goal**: 提供 `px-plugin host start --mock` + `px-plugin debug attach` + 沙箱验证/错误诊断的端到端工具链（SCN-DEV-PLUGIN-DEBUG-001）。
+**Independent Test**: 启动宿主模拟器 → 使用 `px-plugin dev --watch` 重载 → `px-plugin debug attach` 推送断点 → 执行 `plugin-sandbox-suite` → 生成 `POST /internal/debug/report` 并同步工单。
+
+### Implementation
+
+- [ ] T063 [P] [US6] Add host simulator CLI: `tools/cli/src/commands/dev/host.ts`（start/stop/status/attach）串联镜像校验、权限隔离、日志挂载，并输出 sessionId + host endpoint。
+- [ ] T064 [US6] Extend SessionClient `tools/cli/src/runtime/hotreload/session.ts` 与调试配置以复用 host session、分发断点、自动重试、`debug-observability-v2` 指标。
+- [ ] T065 [P] [US6] Implement Go-side controllers：`framework/backend/go/runtime/devapi/handlers/host_simulator.go`（宿主生命周期、版本守护）与 `sandbox_validation.go`（`POST /internal/sandbox/deploy` orchestration、脱敏数据加载、权限模板）。
+- [ ] T066 [US6] Add error diagnostics pipeline：`framework/backend/go/runtime/devapi/telemetry/debug_reports.go`、`framework/backend/go/runtime/devapi/handlers/debug_report.go` 生成脱敏报告、推送工单、记录 `debug.report.generate_ms`。
+- [ ] T067 [US6] Update docs & runbooks：`docs/guides/publish/marketplace-review.md`, `docs/guides/bootstrap-context.md`, `docs/guides/cli-plugin-tutorial.md` 添加宿主模拟器、沙箱验证、故障排查与审计流程。
+
+### Parallel Opportunities
+- CLI (T063/T064) 与 Go handlers (T065/T066) 并行；文档 (T067) 收尾但需依赖 API 输出。
+
+---
+
+## Phase 12: User Story 7 – Release pipeline & Marketplace orchestration (Priority P1)
+
+**Goal**: 让 `px-plugin publish create/deploy`, `px-plugin pack`, `px-plugin import --offline`、Marketplace 审核和 canary/回滚策略形成统一发布体验（SCN-DEV-PLUGIN-PUBLISH-001）。
+**Independent Test**: CLI 创建版本 → 流水线自动门禁 → `px-plugin publish deploy --strategy canary` → `px-plugin pack` 生成 artefact → `px-plugin import --offline` → Marketplace 审核/上架 → 指标/告警合格。
+
+### Implementation
+
+- [ ] T068 [P] [US7] Implement release CLI commands：`tools/cli/src/commands/publish/create.ts` & `publish/deploy.ts`（窗口、批次、审批、灰度/回滚、事件上报）。
+- [ ] T069 [US7] Add `px-plugin pack` + offline import wiring：扩展 `tools/cli/src/commands/dist.ts` / 新 `pack.ts` + `tools/cli/src/commands/plugin/import.ts`（pack metadata、signing、`px-plugin import --offline` API 调用、Integrity 校验）。
+- [ ] T070 [P] [US7] Build release orchestrator：`framework/backend/go/runtime/publish/pipeline_handler.go`, `config/publish/approval_flows.yaml`、`framework/backend/go/runtime/marketplace/services/offline_validator.go` 扩展 canary/灰度/回滚、SLA 计时与事件。
+- [ ] T071 [US7] Update Marketplace/Admin UI：`examples/starter/web-admin/app/pages/publish/pipelines.vue`, `docs/guides/publish/marketplace-review.md`，展示发布计划、灰度状态、Marketplace 审核详情与订阅通知。
+- [ ] T072 [US7] Wire metrics & alerts：`framework/observability/metrics/publish_metrics.go`, `config/alerts/publish-hub.yaml`, `workflow-metrics.mjs` 记录 `publish.local.iteration_cycle_time`, `publish.gray.error_rate`, `marketplace.listing.sla_hours` 等新增指标。
+
+### Parallel Opportunities
+- CLI (T068/T069) 可与 Go orchestrator (T070) 协同设计协议；UI (T071) 与 Telemetry (T072) 根据 API stub 并行。
+
+---
+
 ## Dependencies & Execution Order
 
 1. **Setup (Phase 1)** → 完成契约/依赖/flag/文档入口。
 2. **Foundational (Phase 2)** → 提供 artefact 契约、加密、Telemetry、SLA 模板、RBAC、审计保留，所有用户故事依赖此阶段。
 3. **User Stories**:
-   - US1 + US5 (P1) 可在 Phase 2 完成后并行，构成 MVP。
+   - US0（Phase 10）先于所有 CLI/发布故事，确保 artefact/manifest/模板一致；完成后可启动 US1/US5。
+   - US1 + US5 (P1) 可在 Phase 2 + US0 完成后并行，构成开发者端 MVP。
+   - US6（Phase 11）与 US5 紧耦合，需在 Dev API 稳定后补齐宿主/沙箱验证，再反哺调试 SLA。
    - US2 + US4 (P2) 依赖 US1 artefact & 加密输出，可在 P1 完成后并行；SLA tracker/dashboards (T029/T030) 确保 SC-002。
+   - US7（Phase 12）构建 `px-plugin publish create/deploy` 与 Marketplace 编排，依赖 US2/US4 的审核能力与 US3 的安装链路。
    - US3 (P3) 依赖 Marketplace 输出的版本与 `.pxp` 流程；UI 可提前基于 mock 开发。
 4. **Polish (Phase 8)** → 全局测试、安全文档、性能基准、Quickstart 校验。
+5. **Hardening (Phase 9)** → 安全/可靠性收尾，为新增 Workstream 奠定 mTLS、回滚与 SLA 监控。
 
 ### Story Dependency Graph
 ```
-US1 ─┬─> US2 ─┐
-      │       ├─> US3
-      ├─> US4 ┘
-US5 ─┘  (独立，但 P1 与 US1 并行)
+US0 ─┐
+     ├─> US1 ─┬─> US2 ─┐
+US5 ─┘        │       ├─> US3
+US6 ──────────┘       └─> US4
+US7 <─────────────── US2/US4 输出
 ```
 
 ### Parallel Execution Examples
-- CLI publish/dist (US1) vs Dev hotload (US5)；Marketplace 在线/离线 (US2/US4)；Admin 安装 (US3) 可与 UI/文档并进。
-- Telemetry/SLA（T029–T030, T044）与安全/Quickstart (T043, T045) 可在主功能完成度 ≥80% 时穿插。
+- US0 模板/CLI（T057/T058/T059）与 doctor/import（T060/T061）可交错，结束后并行推进 US1/US5。
+- CLI publish/dist (US1) vs Dev hotload (US5) & Host simulator (US6)；Marketplace 在线/离线 (US2/US4)；Admin 安装 (US3) 可与 UI/文档并进。
+- Release orchestrator (US7) 可与 Marketplace UI/Telemetry (T071/T072) 并行，只需共享协议；Telemetry/SLA（T029–T030, T044, T072）与安全/Quickstart (T043, T045, T062) 可在主功能完成度 ≥80% 时穿插。
 
 ## Implementation Strategy
 
-1. **MVP**: Setup → Foundational → US1 + US5；验证开发者端链路闭环。
-2. **Increment 2**: 完成 US2 + US4（Marketplace 在线/离线审核 + SLA 监控）。
-3. **Increment 3**: 完成 US3（租户安装/灰度/回滚）。
-4. **Hardening**: Phase 8 处理测试、安全、性能、操作文档。
+- **MVP-A (Scaffold)**: Phase 10（US0）让 CLI 初始化/合规守住 artefact 基线。
+- **MVP-B (Dev)**: Phase 2 → US1 + US5 + US6，确保开发/调试闭环。
+- **Increment 2 (Marketplace)**: 完成 US2 + US4 → 允许在线/离线审核 + SLA 监控。
+- **Increment 3 (Tenant Deploy & Release)**: 完成 US3 + US7 → 覆盖安装/灰度/回滚 + 发布/Marketplace 编排。
+- **Polish & Hardening**: Phase 8–9 处理测试、安全、性能、操作文档并维持 SLA。

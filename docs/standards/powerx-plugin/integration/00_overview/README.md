@@ -114,7 +114,7 @@ com.powerx.plugin.example/
 2. **初始化插件**
 
    ```bash
-   powerx plugin init com.powerx.plugin.example
+   px-plugin init com.powerx.plugin.example
    ```
 
 3. **编辑 Manifest**

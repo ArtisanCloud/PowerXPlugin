@@ -181,12 +181,12 @@
 
 ### Implementation
 
-- [ ] T057 [P] [US0] Introduce CLI scaffold entry `tools/cli/src/commands/plugin/init.ts` + executor（`tools/cli/src/executors/scaffold.ts`）以处理参数解析、模板下载、变量渲染、依赖安装、SBOM 生成与 `publish.yml`/`manifest` 写入。
-- [ ] T058 [US0] Build template registry metadata `packages/template-registry/index.yaml`（或 `scaffold/templates/index.yaml`）与版本锁策略，并支持 per-template hooks / language 要求；补充示例模板与回滚策略。
-- [ ] T059 [US0] Extend bootstrap + compliance services：`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`、`internal/compliance/scanner/license_scanner.go` 支持 CLI 请求校验、Git 注册、许可证/漏洞扫描以及 `plugin-import-audit` Webhook。
-- [ ] T060 [US0] Implement `px-plugin doctor`（`tools/cli/src/commands/plugin/doctor.ts` + `tools/cli/src/executors/doctor.ts`）完成环境/依赖/flag 诊断、自动修复与 `.doctor/report.json` 生成。
-- [ ] T061 [US0] Add第三方源码导入守护：`tools/cli/src/commands/plugin/import.ts` + `config/compliance/external_source_policy.yaml` + `docs/standards/powerx-plugin/integration/04_security_and_compliance/Plugin_Security_Checklist.md` 更新审批/豁免流程。
-- [ ] T062 [US0] Refresh developer docs `docs/guides/bootstrap-context.md`, `docs/guides/cli-plugin-tutorial.md`, `quickstart.md` 加入模板选择、依赖镜像、`plugin doctor`、第三方导入与 Git 注册截图。
+- [X] T057 [P] [US0] Introduce CLI scaffold entry `tools/cli/src/commands/plugin/init.ts` + executor（`tools/cli/src/executors/scaffold.ts`）以处理参数解析、模板下载、变量渲染、依赖安装、SBOM 生成与 `publish.yml`/`manifest` 写入。
+- [X] T058 [US0] Build template registry metadata `packages/template-registry/index.yaml`（或 `scaffold/templates/index.yaml`）与版本锁策略，并支持 per-template hooks / language 要求；补充示例模板与回滚策略。
+- [X] T059 [US0] Extend bootstrap + compliance services：`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`、`framework/backend/go/internal/compliance/scanner/license_scanner.go` 支持 CLI 请求校验、Git 注册、许可证/漏洞扫描以及 `plugin-import-audit` Webhook。
+- [X] T060 [US0] Implement `px-plugin doctor`（`tools/cli/src/commands/plugin/doctor.ts` + `tools/cli/src/executors/doctor.ts`）完成环境/依赖/flag 诊断、自动修复与 `.doctor/report.json` 生成。
+- [X] T061 [US0] Add第三方源码导入守护：`tools/cli/src/commands/plugin/import.ts` + `config/compliance/external_source_policy.yaml` + `docs/standards/powerx-plugin/integration/04_security_and_compliance/Plugin_Security_Checklist.md` 更新审批/豁免流程。
+- [X] T062 [US0] Refresh developer docs `docs/guides/bootstrap-context.md`, `docs/guides/cli-plugin-tutorial.md`, `quickstart.md` 加入模板选择、依赖镜像、`plugin doctor`、第三方导入与 Git 注册截图。
 
 ### Parallel Opportunities
 - T057/T058 可并行（CLI vs 模板仓）；T059 依赖 CLI 协议确定；T060/T061 可在模板完成后推进；T062 收尾。

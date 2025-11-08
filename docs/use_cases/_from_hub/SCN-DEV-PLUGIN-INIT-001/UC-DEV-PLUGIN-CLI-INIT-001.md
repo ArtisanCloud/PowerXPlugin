@@ -29,7 +29,7 @@ code_refs:
     path: internal/plugins/bootstrap/service/bootstrap_handler.go
     description: 初始化校验、仓库注册、审计落库
   - repo: powerx
-    path: internal/compliance/scanner/license_scanner.go
+    path: framework/backend/go/internal/compliance/scanner/license_scanner.go
     description: 许可证/漏洞扫描、风险报告生成
 feature_flags:
   - PX_PLUGIN_SCAFFOLD_V2
@@ -72,7 +72,7 @@ last_reviewed_at: 2025-11-20
 | CLI 命令层 | `packages/cli/src/commands/plugin/init.ts` | 解析参数、校验 CLI 版本、串联执行器与报告渲染 | `packages/cli` |
 | 模板管理层 | `packages/template-registry/index.yaml` | 模板元数据、依赖锁定、post-hook 定义 | `packages/template-registry` |
 | 执行器层 | `packages/cli/src/executors/scaffold.ts` | 下载/渲染模板、写入配置、hook 执行 | `packages/cli` |
-| 合规扫描层 | `internal/compliance/scanner/license_scanner.go` | 生成 SBOM、执行许可证/漏洞扫描、产出报告 | `services/compliance` |
+| 合规扫描层 | `framework/backend/go/internal/compliance/scanner/license_scanner.go` | 生成 SBOM、执行许可证/漏洞扫描、产出报告 | `services/compliance` |
 | 仓库注册层 | `internal/plugins/bootstrap/service/bootstrap_handler.go` | 创建远程仓、推送首个提交、生成 CI 配置 | `services/bootstrap` |
 
 ## 流程与时序

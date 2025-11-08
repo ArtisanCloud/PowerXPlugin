@@ -1,5 +1,10 @@
 # Quickstart — Publish Hub Feature
 
+## 0. 脚手架与合规准备
+1. 在任意工作目录执行 `px-plugin init <plugin-id> --template fullstack-go-nuxt --org <team>`，生成标准骨架并写入 `publish.yml`、`reports/sbom.json`。
+2. 运行 `px-plugin doctor --fix`，确保 Node/Go 版本、Feature Flag 以及 `backend/go.mod`、`web-admin/node_modules` 状态满足要求，查看 `.doctor/report.json`。
+3. 如果需要导入第三方源码（客户模板、历史仓库），执行 `px-plugin import --source ./vendor.tar.gz --license MIT`，CLI 会依据 `config/compliance/external_source_policy.yaml` 生成 `./.compliance/import-report.json`，并将信息发送到 `plugin-import-audit` Webhook。
+
 ## 1. 环境准备
 1. 安装 Go 1.24+、Node.js 18+、npm 9+、Playwright 1.48+。
 2. 运行 `npm install && npm run bootstrap` 以确保 `tools/cli` 与 `sdk/workspace` 依赖同步。

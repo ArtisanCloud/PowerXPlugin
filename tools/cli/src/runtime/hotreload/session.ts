@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 
 interface SessionClientOptions {
   baseUrl: string;
@@ -9,6 +10,7 @@ interface SessionClientOptions {
   caPath?: string;
   maxRetries?: number;
   retryDelayMs?: number;
+  hostSessionId?: string;
 }
 
 interface RegisterPayload {
@@ -28,6 +30,11 @@ interface ReloadPayload {
   changedFiles: string[];
 }
 
+interface AttachPayload {
+  breakpoints: Array<{ file: string; line: number }>;
+  variables?: Record<string, string>;
+}
+
 interface CertificateConfig {
   cert?: Buffer;
   key?: Buffer;
@@ -38,15 +45,21 @@ export class SessionClient {
   private readonly certConfig: CertificateConfig;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  private hostSessionId?: string;
 
   constructor(private readonly options: SessionClientOptions) {
     this.maxRetries = options.maxRetries ?? 3;
     this.retryDelayMs = options.retryDelayMs ?? 1000;
+    this.hostSessionId = options.hostSessionId;
     this.certConfig = {
       cert: options.certPath ? this.loadCert(options.certPath) : undefined,
       key: options.keyPath ? this.loadCert(options.keyPath) : undefined,
       ca: options.caPath ? this.loadCert(options.caPath) : undefined,
     };
+  }
+
+  configureHostSession(hostSessionId: string) {
+    this.hostSessionId = hostSessionId;
   }
 
   private loadCert(certPath: string): Buffer {
@@ -59,6 +72,7 @@ export class SessionClient {
   }
 
   async register(payload: RegisterPayload, retryCount = 0): Promise<RegisterResponse> {
+    const startedAt = performance.now();
     const requestOptions: RequestInit = {
       method: "POST",
       headers: {
@@ -80,8 +94,9 @@ export class SessionClient {
         }
         throw new Error(`register failed: ${response.status} ${response.statusText}`);
       }
-
-      return (await response.json()) as RegisterResponse;
+      const json = (await response.json()) as RegisterResponse;
+      this.emitMetric("dev.hotload.register_ms", performance.now() - startedAt);
+      return json;
     } catch (error) {
       if (retryCount < this.maxRetries) {
         console.warn(`Register error (attempt ${retryCount + 1}): ${error}, retrying...`);
@@ -93,6 +108,7 @@ export class SessionClient {
   }
 
   async reload(payload: ReloadPayload, retryCount = 0): Promise<void> {
+    const startedAt = performance.now();
     const reloadId = crypto.randomUUID();
     const requestOptions: RequestInit = {
       method: "POST",
@@ -115,6 +131,7 @@ export class SessionClient {
         }
         throw new Error(`reload failed: ${response.status} ${response.statusText}`);
       }
+      this.emitMetric("dev.hotload.reload_ms", performance.now() - startedAt);
     } catch (error) {
       if (retryCount < this.maxRetries) {
         console.warn(`Reload error (attempt ${retryCount + 1}): ${error}, retrying...`);
@@ -157,7 +174,44 @@ export class SessionClient {
     }
   }
 
+  async attachBreakpoints(payload: AttachPayload, retryCount = 0): Promise<void> {
+    if (!this.hostSessionId) {
+      console.warn("host session id not configured, skip attaching breakpoints");
+      return;
+    }
+    const requestOptions: RequestInit = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "px-plugin-cli/1.0",
+      },
+      body: JSON.stringify(payload),
+    };
+    try {
+      const url = `${this.options.baseUrl}/internal/dev/hosts/sessions/${this.hostSessionId}/attach`;
+      const response = await fetch(url, requestOptions);
+      if (!response.ok) {
+        if (response.status >= 500 && retryCount < this.maxRetries) {
+          await this.delay(this.retryDelayMs * Math.pow(2, retryCount));
+          return this.attachBreakpoints(payload, retryCount + 1);
+        }
+        throw new Error(`attach failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      if (retryCount < this.maxRetries) {
+        await this.delay(this.retryDelayMs * Math.pow(2, retryCount));
+        return this.attachBreakpoints(payload, retryCount + 1);
+      }
+      throw error;
+    }
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private emitMetric(name: string, value: number) {
+    const line = `${name}=${value.toFixed(2)}ms`;
+    console.debug(`[telemetry] ${line}`);
   }
 }

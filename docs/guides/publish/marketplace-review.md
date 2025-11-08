@@ -974,3 +974,20 @@ curl -H "X-Powerx-User-Id: $USER_ID" \
 - 审核员培训手册: `docs/training/marketplace-reviewer.md`
 - 安全审核指南: `docs/security/review-guidelines.md`
 - 平台政策文档: `docs/policies/platform-policies.md`
+
+---
+
+## 调试/沙箱诊断协同
+
+Phase 11 引入的宿主模拟器与沙箱验证链路能协助审核员更快确认问题：
+
+1. **宿主模拟器日志**  
+   开发者运行 `px-plugin host start --mock --plugin <id>`（API：`POST /internal/dev/hosts/sessions`）后会获得 `sessionId` 与日志端点。审核员如需实时日志，可访问 `GET /internal/dev/hosts/sessions/{sessionId}/logs` 或在 Admin Dev Console 的 SSE 面板订阅 `plugin.debug.hot_reload`，确认热更新与断点同步情况。
+
+2. **沙箱验证记录**  
+   `px-plugin sandbox deploy --host-session <id>`（API：`POST /internal/dev/sandbox/deploy`）会输出 `validationId` 与数据集/测试执行结果。审核过程中可要求开发者在提交材料时附带该 ID 及 CLI 输出，快速了解覆盖率、性能与脱敏策略。
+
+3. **调试报告**  
+   `px-plugin debug report --session <id>` 触发 `POST /internal/dev/debug/report`，生成带 `debug.report.generate_ms` 指标的脱敏报告并同步工单系统。审核员可直接查看结构化报告，减少重复复现成本。
+
+遇到需要联合诊断的场景，请确保目标环境开启 `debug-observability-v2` Feature Flag，并通过 Slack `#powerx-dev-hotload` 或 Admin 控制台的调试视图实时跟进。

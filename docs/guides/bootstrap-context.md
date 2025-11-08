@@ -61,3 +61,19 @@
 3. `px-plugin import --source <path>`：根据 `config/compliance/external_source_policy.yaml` 校验第三方源码来源、许可证、包体大小、校验和等信息，并生成 `./.compliance/import-report.json`，供合规审核追踪 `plugin-import-audit` Webhook。
 
 开发者在修改 `bootstrap.Context` 或模板实现后，务必重新运行上述命令并记录报告，以确保新的接口约定与 CLI/文档保持一致。
+
+## 宿主模拟器与沙箱验证
+
+Phase 11 引入的宿主模拟器与沙箱验证同样通过 `bootstrap.Context` 暴露 API：
+
+1. `px-plugin host start --mock` → `POST /internal/dev/hosts/sessions`  
+   - Handler：`framework/backend/go/runtime/devapi/handlers/host_simulator.go`  
+   - 返回 `sessionId`、`endpoint`，并可通过 `GET /logs`、`POST /attach` 注入断点/变量。
+2. `px-plugin dev --watch` / `SessionClient.attachBreakpoints`  
+   - CLI 通过 `tools/cli/src/runtime/hotreload/session.ts` 的新方法向宿主推送断点并统计 `dev.hotload.*` 指标。
+3. `px-plugin sandbox deploy` → `POST /internal/dev/sandbox/deploy`  
+   - Handler：`framework/backend/go/runtime/devapi/handlers/sandbox_validation.go`，负责 orchestration、脱敏数据加载与 `validationId` 输出。
+4. `px-plugin debug report` → `POST /internal/dev/debug/report`  
+   - Handler：`framework/backend/go/runtime/devapi/handlers/debug_report.go`，调用 `telemetry.NewRecorder` 将诊断结果写入监控/工单。
+
+无论是 CLI 还是宿主 API，最终都依赖 `bootstrap.Context` 统一访问参数、响应和中间件，因此在扩展至 Rust/Java 等语言时仅需保持该接口一致。

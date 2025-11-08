@@ -213,7 +213,39 @@ px-plugin doctor --fix
 
 报告建议随同 `publish.yml`、`reports/sbom.json` 一并提交到代码评审或合规工单。
 
-## Step 9. 第三方源码导入（可选）
+## Step 9. 宿主模拟器与沙箱验证
+
+完成基础开发后，可以利用 Phase 11 的链路在本地模拟宿主、执行沙箱测试并生成调试报告：
+
+1. **启动宿主模拟器**
+   ```bash
+   px-plugin host start --mock \
+     --plugin com.powerx.helloworld \
+     --runtime-version latest \
+     --tenant demo-tenant
+   ```
+   命令会返回 `sessionId`、`endpoint` 与日志地址；可通过 `px-plugin host status --session <id>` 与 `px-plugin host logs --session <id>` 查看运行情况，底层对应 API 为 `POST/GET /internal/dev/hosts/sessions`。
+
+2. **执行沙箱验证**
+   ```bash
+   px-plugin sandbox deploy \
+     --host-session host-123 \
+     --dataset demo \
+     --test-plan hotload-suite
+   ```
+   CLI 会调用 `POST /internal/dev/sandbox/deploy`，输出 `validationId` 供 Marketplace 审核或自测记录。
+
+3. **上传调试报告**
+   ```bash
+   px-plugin debug report \
+     --session host-123 \
+     --input ./reports/debug.json
+   ```
+   触发 `POST /internal/dev/debug/report`，记录 `debug.report.generate_ms` 指标并将脱敏报告同步到工单系统。
+
+调试完成后，可使用 `px-plugin host stop --session <id>` 释放资源。
+
+## Step 10. 第三方源码导入（可选）
 
 若需要将外部模板或客户源码导入到插件仓库，请在执行 `px-plugin init` 之后运行：
 
@@ -228,7 +260,7 @@ CLI 会读取 `config/compliance/external_source_policy.yaml`，根据域名、�
 
 > 建议将 import/doctor 报告附到变更工单，方便 Marketplace 审核人员追踪第三方源码的来源、许可证和扫描结果。
 
-## Step 10. 清理或复用工程
+## Step 11. 清理或复用工程
 
 - 不再需要时，可删除 `plugins/com.powerx.helloworld` 目录。
 - 若计划长期开发，请更新 `backend/go.mod` 的 module 名称并提交到独立仓库。

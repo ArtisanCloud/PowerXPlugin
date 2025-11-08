@@ -1,15 +1,17 @@
 package middleware
 
 import (
-	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 )
+
+type httpRequestProvider interface {
+	HTTPRequest() *http.Request
+}
 
 // MTLSConfig holds mTLS configuration
 type MTLSConfig struct {
@@ -23,14 +25,13 @@ type MTLSConfig struct {
 func NewMTLSMiddleware(config MTLSConfig) bootstrap.Middleware {
 	return func(next bootstrap.Handler) bootstrap.Handler {
 		return func(ctx bootstrap.Context) {
-			// Get the underlying HTTP request
-			req := ctx.HTTPRequest()
-			if req == nil {
-				ctx.JSON(http.StatusInternalServerError, map[string]string{
-					"error": "internal server error",
-				})
+			provider, ok := ctx.(httpRequestProvider)
+			if !ok {
+				slog.Warn("context does not expose HTTPRequest, skipping mTLS validation")
+				next(ctx)
 				return
 			}
+			req := provider.HTTPRequest()
 
 			// Get TLS connection state from request
 			tlsConn := req.TLS

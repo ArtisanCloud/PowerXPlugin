@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
@@ -30,7 +31,7 @@ func (h *OfflineUploadHandler) Upload(ctx bootstrap.Context) {
 	router.RespondSuccess(ctx, http.StatusAccepted, map[string]any{
 		"publishId":   payload.PublishID,
 		"status":      "pending",
-		"receivedAt":  services.Now(),
+		"receivedAt":  time.Now().UTC(),
 		"whiteListed": payload.AllowedTenants,
 	}, "offline upload accepted")
 }

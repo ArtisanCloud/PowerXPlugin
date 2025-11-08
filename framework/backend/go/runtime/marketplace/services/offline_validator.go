@@ -2,6 +2,7 @@ package services
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -190,7 +191,7 @@ func (v *OfflineValidator) UnwrapKey(envelope KeyEnvelope, marketplacePrivateKey
 	}
 
 	// Decrypt the symmetric key using RSA-OAEP
-	symmetricKey, err := rsa.DecryptPKCS1v15(rsaPrivateKey, wrappedKeyBytes)
+	symmetricKey, err := rsa.DecryptPKCS1v15(rand.Reader, rsaPrivateKey, wrappedKeyBytes)
 	if err != nil {
 		return nil, errors.New("failed to decrypt symmetric key: " + err.Error())
 	}

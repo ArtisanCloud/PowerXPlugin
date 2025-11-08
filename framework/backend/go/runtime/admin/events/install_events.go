@@ -56,17 +56,23 @@ func (e *InstallEventEmitter) EmitRollbackScheduled(deploymentID string, rollbac
 
 // EmitRollbackCompleted logs when a rollback operation completes
 func (e *InstallEventEmitter) EmitRollbackCompleted(deploymentID, pluginID, version string, duration time.Duration, autoTriggered bool) {
-	level := slog.LevelWarn
-	if !autoTriggered {
-		level = slog.Info
-	}
-	e.logger.Log(level, "tenant.install.rolled_back",
+	msg := "tenant.install.rolled_back"
+	fields := []slog.Attr{
 		slog.String("deploymentId", deploymentID),
 		slog.String("plugin", pluginID),
 		slog.String("version", version),
 		slog.Duration("duration", duration),
 		slog.Bool("autoTriggered", autoTriggered),
-	)
+	}
+	args := make([]any, len(fields))
+	for i, attr := range fields {
+		args[i] = attr
+	}
+	if autoTriggered {
+		e.logger.Warn(msg, args...)
+		return
+	}
+	e.logger.Info(msg, args...)
 }
 
 // EmitRollbackCancelled logs when a rollback is manually cancelled

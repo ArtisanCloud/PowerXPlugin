@@ -24,16 +24,16 @@ const (
 
 // DeploymentStatus tracks the status of a plugin deployment
 type DeploymentStatus struct {
-	DeploymentID  string          `json:"deploymentId"`
-	TenantID      string          `json:"tenantId"`
-	PluginID      string          `json:"pluginId"`
-	Version       string          `json:"version"`
-	State         DeploymentState `json:"status"`
-	PreviousID    string          `json:"previousDeploymentId,omitempty"`
-	CreatedAt     time.Time       `json:"createdAt"`
-	UpdatedAt     time.Time       `json:"updatedAt"`
-	AutoRollback  bool            `json:"autoRollback"`
-	RollbackAt    time.Time       `json:"rollbackAt,omitempty"`
+	DeploymentID string          `json:"deploymentId"`
+	TenantID     string          `json:"tenantId"`
+	PluginID     string          `json:"pluginId"`
+	Version      string          `json:"version"`
+	State        DeploymentState `json:"status"`
+	PreviousID   string          `json:"previousDeploymentId,omitempty"`
+	CreatedAt    time.Time       `json:"createdAt"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
+	AutoRollback bool            `json:"autoRollback"`
+	RollbackAt   time.Time       `json:"rollbackAt,omitempty"`
 }
 
 // PluginDeployer orchestrates install + rollback operations for tenants.
@@ -76,16 +76,16 @@ func (d *PluginDeployer) Deploy(tenantID, pluginID, version string, previousID s
 
 	// Create new deployment status
 	status := &DeploymentStatus{
-		DeploymentID:  deploymentID,
-		TenantID:      tenantID,
-		PluginID:      pluginID,
-		Version:       version,
-		State:         StatePending,
-		PreviousID:    previousID,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-		AutoRollback:  true,
-		RollbackAt:    time.Now().Add(d.autoRollbackAt),
+		DeploymentID: deploymentID,
+		TenantID:     tenantID,
+		PluginID:     pluginID,
+		Version:      version,
+		State:        StatePending,
+		PreviousID:   previousID,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+		AutoRollback: true,
+		RollbackAt:   time.Now().Add(d.autoRollbackAt),
 	}
 
 	d.deployments[deploymentID] = status
@@ -193,7 +193,6 @@ func (d *PluginDeployer) updateStatus(deploymentID string, newState DeploymentSt
 	defer d.deploymentsMu.Unlock()
 
 	if status, exists := d.deployments[deploymentID]; exists {
-		oldState := status.State
 		status.State = newState
 		status.UpdatedAt = time.Now()
 

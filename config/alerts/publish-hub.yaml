@@ -34,6 +34,36 @@ slas:
       annotations:
         summary: "Install rollback latency >5m"
         description: "Tenant {{ $labels.tenant }} rollback exceeded 5 minutes for {{ $labels.plugin }}."
+  local_iteration:
+    objective: "<= 15 minutes"
+    metric: "publish_local_iteration_cycle_time"
+    alert:
+      name: "PublishLocalIterationSlow"
+      condition: "> 900000ms"
+      severity: warning
+      annotations:
+        summary: "Local iteration cycle exceeds 15m"
+        description: "Publish create → deploy loop slower than target for {{ $labels.channel }}."
+  gray_error_rate:
+    objective: "< 5%"
+    metric: "publish_gray_error_rate"
+    alert:
+      name: "PublishGrayErrorRateHigh"
+      condition: "> 0.05"
+      severity: warning
+      annotations:
+        summary: "Gray deploy error rate high"
+        description: "Canary batches failing frequently for {{ $labels.channel }}."
+  marketplace_listing:
+    objective: "<= 72 hours"
+    metric: "marketplace_listing_sla_hours"
+    alert:
+      name: "MarketplaceListingSLAExceeded"
+      condition: "> 72h"
+      severity: warning
+      annotations:
+        summary: "Marketplace listing exceeded 72h SLA"
+        description: "Listing propagation slow for {{ $labels.channel }} releases."
 
 notifications:
   channels:

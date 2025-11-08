@@ -45,6 +45,27 @@ var (
 		Labels:      []string{"reason"},
 		Recommended: "counter",
 	}
+	MetricPublishLocalIterationCycle = MetricDescriptor{
+		Name:        "publish_local_iteration_cycle_time",
+		Help:        "Duration from px-plugin publish create to successful deploy window approval",
+		Unit:        "milliseconds",
+		Labels:      []string{"channel"},
+		Recommended: "histogram",
+	}
+	MetricPublishGrayErrorRate = MetricDescriptor{
+		Name:        "publish_gray_error_rate",
+		Help:        "Ratio of failed canary batches within the last window",
+		Unit:        "ratio",
+		Labels:      []string{"channel"},
+		Recommended: "gauge",
+	}
+	MetricMarketplaceListingSLAHours = MetricDescriptor{
+		Name:        "marketplace_listing_sla_hours",
+		Help:        "Time spent from approval to Marketplace listing visibility",
+		Unit:        "hours",
+		Labels:      []string{"channel"},
+		Recommended: "histogram",
+	}
 )
 
 // PublishHubMetrics lists all base metrics to register with the host runtime.
@@ -55,5 +76,8 @@ func PublishHubMetrics() []MetricDescriptor {
 		MetricOfflineApprovalDuration,
 		MetricInstallRollbackLatency,
 		MetricPublishErrorsTotal,
+		MetricPublishLocalIterationCycle,
+		MetricPublishGrayErrorRate,
+		MetricMarketplaceListingSLAHours,
 	}
 }

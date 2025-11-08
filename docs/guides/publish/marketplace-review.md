@@ -991,3 +991,14 @@ Phase 11 引入的宿主模拟器与沙箱验证链路能协助审核员更快�
    `px-plugin debug report --session <id>` 触发 `POST /internal/dev/debug/report`，生成带 `debug.report.generate_ms` 指标的脱敏报告并同步工单系统。审核员可直接查看结构化报告，减少重复复现成本。
 
 遇到需要联合诊断的场景，请确保目标环境开启 `debug-observability-v2` Feature Flag，并通过 Slack `#powerx-dev-hotload` 或 Admin 控制台的调试视图实时跟进。
+
+## 发布计划视图（Admin）
+
+新版 Admin 页面 `/_p/<tenant>/publish/pipelines`（参见 `examples/starter/web-admin/app/pages/publish/pipelines.vue`）提供以下能力，方便审核与运维协作：
+
+1. **Plan 列表**：列出 `px-plugin publish create` 生成的计划，展示 `planId/publishId/channel/status`。
+2. **策略编辑**：支持调整 rollout strategy、批次比例与等待时间，提交后会调用 `POST /internal/publish/create`。
+3. **部署进度**：界面轮询 `GET /internal/publish/plans`（或 CLI 输出的部署状态），同步 `px-plugin publish deploy --strategy canary` 的批次进展，失败时提供回滚按钮。
+4. **SLA 指标**：集成 `publish.local.iteration_cycle_time`、`publish.gray.error_rate`、`marketplace.listing.sla_hours`，当 Grafana 触发 `PublishOnlineSLAExceeded`/`PublishGrayErrorRate` 告警时在 UI 左侧显示警示条。
+
+审核员在审批前可快速查看计划窗口、灰度批次与回滚 token，并与开发者对齐策略后再执行最终批准。

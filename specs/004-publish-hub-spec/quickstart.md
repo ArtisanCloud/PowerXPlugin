@@ -32,19 +32,34 @@
 
 ## 3. 在线发布链路
 1. 运行 `npm run lint && npm test && go test ./...`，确保预检输入准备就绪。
-2. 执行 `px-plugin publish --channel stable --notes ./CHANGELOG.md`。
-3. 检查 `publish-receipt.json`（含 `publishId`, `versionId`, `reviewQueueId`）。
-4. 进入 Marketplace 审核队列查看状态；若失败，根据 CLI 提示修复。
-5. 审核通过后确认租户在 30 分钟内收到通知。
-6. **SLA 监控**：在线发布审核应在 4 小时内完成，可在 Grafana 中查看 `plugin_publish_pipeline_duration_ms` 指标。
+2. 使用新的 create 命令编排窗口：
+   ```bash
+   px-plugin publish create \
+     --manifest ./dist/manifest.json \
+     --channel stable \
+     --notes ./CHANGELOG.md
+   ```
+   记录返回的 `planId` 与 `publishId`，并在 Admin `/publish/pipelines` 页面查看。
+3. 部署至测试/灰度租户：
+   ```bash
+   px-plugin publish deploy \
+     --plan <planId> \
+     --strategy canary \
+     --batches '[{"percentage":20,"wait":"10m"},{"percentage":80}]'
+   ```
+   CLI 将输出 `deploymentId` 与 `rollbackToken`，方便后续回退。
+4. 可选：运行 `px-plugin publish --channel stable --notes ./CHANGELOG.md` 触发旧版流水线，确保兼容。
+5. 检查 `publish-receipt.json`（含 `publishId`, `versionId`, `reviewQueueId`），进入 Marketplace 审核队列查看状态；若失败，根据 CLI 提示修复。
+6. 审核通过后确认租户在 30 分钟内收到通知。
+7. **SLA 监控**：在线发布审核应在 4 小时内完成，可在 Grafana 中查看 `plugin_publish_pipeline_duration_ms` 与 `publish_local_iteration_cycle_time` 指标。
 
 ## 4. 离线发布链路
-1. 运行 `px-plugin dist --target offline --sign ./cert.pem`。
-2. 验证输出：`.pxp`, `integrity.txt`, `manifest.signature`, `dist/report.json`, `dist/audit.log`。
-3. 运维在 Marketplace 离线入口上传，并勾选目标租户白名单。
+1. 运行 `px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --channel offline --notes "隔离租户发版" --sign ./cert.pem`，命令会复用 `.pxp` 打包逻辑并输出 `release.manifest.json`。
+2. 执行 `px-plugin import --offline --pkg dist/<plugin>.pxp --integrity dist/integrity.txt --signature dist/manifest.signature --whitelist tenant-a,tenant-b`，CLI 会调用 `POST /internal/marketplace/offline/import` 并返回审核队列 ID。
+3. 运维在 Marketplace 离线入口确认队列信息，并勾选目标租户白名单。
 4. 审核通过后，租户管理员使用 `install/local` 导入；失败时 5 分钟内执行回滚。
-5. **离线签名验证**：系统会验证 RSA-PSS 签名和密钥封装，确保包完整性
-6. **SLA 监控**：离线审核应在 1 个工作日内完成，可在 Grafana 中查看 `plugin_offline_approval_duration_minutes` 指标。
+5. **离线签名验证**：系统会验证 RSA-PSS 签名和密钥封装，确保包完整性。
+6. **SLA 监控**：离线审核应在 1 个工作日内完成，可在 Grafana 中查看 `plugin_offline_approval_duration_minutes` 与 `marketplace_listing_sla_hours` 指标。
 
 ## 5. Admin 安装 / 回滚验证
 1. 在线安装：调用 `framework/backend/go/runtime/admin/handlers/plugins_install_url.go` 暴露的 API（或 Admin 界面）选择远程版本。观察响应 `status=installing` 并查看 `framework/backend/go/runtime/admin/services/plugin_deployer.go` 打印的 deploymentId。
@@ -68,11 +83,14 @@
 
 ## 5. Telemetry & 验证
 1. 使用 `npm run e2e:dev-hotload`、`npm run e2e:publish-online` 运行端到端验证（如已提供）。
-2. 通过 Grafana / Workflow Metrics 检查以下指标：
+2. 通过 Grafana / `scripts/qa/workflow-metrics.mjs` 检查以下指标：
    - `dev.hotload.cli_reload_duration_ms` (目标：≤2s)
    - `plugin_publish_pipeline_duration_ms` (目标：95th percentile ≤4h)
    - `plugin_offline_approval_duration_minutes` (目标：95th percentile ≤1d)
    - `plugin_install_rollback_latency_seconds` (目标：≤300s)
+   - `publish_local_iteration_cycle_time` (目标：≤15m)
+   - `publish_gray_error_rate` (目标：<5%)
+   - `marketplace_listing_sla_hours` (目标：≤72h)
    - `plugin_deployments_total` (成功/失败率统计)
 3. **mTLS 验证**：
    - 查看 Dev API 日志，确认 mTLS 握手成功

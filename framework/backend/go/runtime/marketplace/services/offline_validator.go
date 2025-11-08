@@ -13,7 +13,7 @@ import (
 
 // KeyEnvelope holds the encrypted symmetric key and metadata
 type KeyEnvelope struct {
-	Algorithm  string `json:"algorithm"`  // Should be "AES-256-GCM"
+	Algorithm  string `json:"algorithm"` // Should be "AES-256-GCM"
 	KeyID      string `json:"keyId"`
 	WrappedKey string `json:"wrappedKey"` // Base64 ciphertext
 	IV         string `json:"iv"`         // Base64 IV used for artefact chunks
@@ -22,14 +22,15 @@ type KeyEnvelope struct {
 
 // OfflineUploadPayload describes `.pxp` + integrity + signature metadata.
 type OfflineUploadPayload struct {
-	PublishID        string       `json:"publishId"`
-	PluginID         string       `json:"pluginId"`
-	Version          string       `json:"version"`
-	IntegrityFile    []byte       `json:"integrityFile"`
-	ManifestHash     string       `json:"manifestHash"`
-	KeyEnvelope      KeyEnvelope  `json:"keyEnvelope"`
-	Signature        []byte       `json:"signature"`
-	AllowedTenants   []string     `json:"allowedTenants"`
+	PublishID       string         `json:"publishId"`
+	PluginID        string         `json:"pluginId"`
+	Version         string         `json:"version"`
+	IntegrityFile   []byte         `json:"integrityFile"`
+	ManifestHash    string         `json:"manifestHash"`
+	KeyEnvelope     KeyEnvelope    `json:"keyEnvelope"`
+	Signature       []byte         `json:"signature"`
+	AllowedTenants  []string       `json:"allowedTenants"`
+	ReleaseMetadata map[string]any `json:"releaseMetadata,omitempty"`
 }
 
 // OfflineValidator performs validation and signature verification for offline packages.
@@ -93,6 +94,17 @@ func (v *OfflineValidator) Validate(payload OfflineUploadPayload) error {
 		return err
 	}
 
+	return nil
+}
+
+// ValidateMetadata ensures release metadata (channel, notes, rollout) is attached.
+func (v *OfflineValidator) ValidateMetadata(metadata map[string]any) error {
+	if metadata == nil {
+		return errors.New("release metadata missing")
+	}
+	if _, ok := metadata["channel"]; !ok {
+		return errors.New("release metadata missing channel")
+	}
 	return nil
 }
 

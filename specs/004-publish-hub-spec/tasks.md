@@ -218,11 +218,11 @@
 
 ### Implementation
 
-- [ ] T068 [P] [US7] Implement release CLI commands：`tools/cli/src/commands/publish/create.ts` & `publish/deploy.ts`（窗口、批次、审批、灰度/回滚、事件上报）。
-- [ ] T069 [US7] Add `px-plugin pack` + offline import wiring：扩展 `tools/cli/src/commands/dist.ts` / 新 `pack.ts` + `tools/cli/src/commands/plugin/import.ts`（pack metadata、signing、`px-plugin import --offline` API 调用、Integrity 校验）。
-- [ ] T070 [P] [US7] Build release orchestrator：`framework/backend/go/runtime/publish/pipeline_handler.go`, `config/publish/approval_flows.yaml`、`framework/backend/go/runtime/marketplace/services/offline_validator.go` 扩展 canary/灰度/回滚、SLA 计时与事件。
-- [ ] T071 [US7] Update Marketplace/Admin UI：`examples/starter/web-admin/app/pages/publish/pipelines.vue`, `docs/guides/publish/marketplace-review.md`，展示发布计划、灰度状态、Marketplace 审核详情与订阅通知。
-- [ ] T072 [US7] Wire metrics & alerts：`framework/observability/metrics/publish_metrics.go`, `config/alerts/publish-hub.yaml`, `workflow-metrics.mjs` 记录 `publish.local.iteration_cycle_time`, `publish.gray.error_rate`, `marketplace.listing.sla_hours` 等新增指标。
+- [X] T068 [P] [US7] Implement release CLI commands：`tools/cli/src/commands/publish/create.ts` & `publish/deploy.ts`（窗口、批次、审批、灰度/回滚、事件上报）。
+- [X] T069 [US7] Add `px-plugin pack` + offline import wiring：扩展 `tools/cli/src/commands/dist.ts` / 新 `pack.ts` + `tools/cli/src/commands/plugin/import.ts`（pack metadata、signing、`px-plugin import --offline` API 调用、Integrity 校验）。
+- [X] T070 [P] [US7] Build release orchestrator：`framework/backend/go/runtime/publish/pipeline_handler.go`, `config/publish/approval_flows.yaml`、`framework/backend/go/runtime/marketplace/services/offline_validator.go` 扩展 canary/灰度/回滚、SLA 计时与事件。
+- [X] T071 [US7] Update Marketplace/Admin UI：`examples/starter/web-admin/app/pages/publish/pipelines.vue`, `docs/guides/publish/marketplace-review.md`，展示发布计划、灰度状态、Marketplace 审核详情与订阅通知。
+- [X] T072 [US7] Wire metrics & alerts：`framework/observability/metrics/publish_metrics.go`, `config/alerts/publish-hub.yaml`, `workflow-metrics.mjs` 记录 `publish.local.iteration_cycle_time`, `publish.gray.error_rate`, `marketplace.listing.sla_hours` 等新增指标。
 
 ### Parallel Opportunities
 - CLI (T068/T069) 可与 Go orchestrator (T070) 协同设计协议；UI (T071) 与 Telemetry (T072) 根据 API stub 并行。

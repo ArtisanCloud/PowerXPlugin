@@ -1,0 +1,565 @@
+openapi: 3.0.3
+info:
+  title: PowerX Plugin Dev API
+  description: |
+    Development API for PowerX Plugin hot reload and debugging.
+
+    This API provides endpoints for plugin registration, hot reload, and log streaming
+    to support the `px-plugin dev --watch` workflow.
+  version: 1.0.0
+  contact:
+    name: PowerX Plugin Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8077
+    description: Local development server
+  - url: https://dev-api.powerx.cloud
+    description: Production development API
+
+security:
+  - ReloadToken: []
+  - ApiKeyAuth: []
+
+paths:
+  /api/v1/dev/register:
+    post:
+      summary: Register a plugin for development
+      description: |
+        Registers a plugin with the Dev API to enable hot reload functionality.
+        Returns a session ID and reload token for subsequent operations.
+      tags:
+        - Session Management
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              pluginId: "my-awesome-plugin"
+              version: "0.1.0"
+              entryPath: "/path/to/plugin"
+              tenant: "default"
+              metadata:
+                buildCommand: "npm run build"
+                watchPatterns:
+                  - "src/**/*.go"
+                  - "web-admin/**/*.vue"
+      responses:
+        '201':
+          description: Plugin registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+              example:
+                sessionId: "550e8400-e29b-41d4-a716-446655440000"
+                reloadToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                devUrl: "http://localhost:8077/dev/550e8400-e29b-41d4-a716-446655440000"
+                expiresAt: "2025-11-09T16:30:45.123Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Plugin already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "CONFLICT"
+                message: "Plugin my-awesome-plugin v0.1.0 is already registered"
+                code: 1001
+
+  /api/v1/dev/{sessionId}/reload:
+    post:
+      summary: Trigger a hot reload
+      description: |
+        Triggers a hot reload of the plugin after a successful build.
+        The reload token must match the token provided during registration.
+      tags:
+        - Hot Reload
+      security:
+        - ReloadToken: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Session ID from registration
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReloadRequest'
+            example:
+              bundleHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+              bundleSize: 1234567
+              buildDuration: 2500
+              changedFiles:
+                - path: "src/main.go"
+                  type: "modify"
+                - path: "web-admin/src/App.vue"
+                  type: "create"
+              strategy: "incremental"
+      responses:
+        '200':
+          description: Reload triggered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReloadResponse'
+              example:
+                status: "success"
+                reloadId: "reload-12345"
+                estimatedTime: 100
+                message: "Plugin reloaded successfully"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "NOT_FOUND"
+                message: "Session 550e8400-e29b-41d4-a716-446655440000 not found"
+                code: 1004
+        '409':
+          description: Plugin already reloading
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "CONFLICT"
+                message: "Plugin is already reloading, please wait"
+                code: 1002
+        '422':
+          description: Reload rejected (hash mismatch)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "INVALID_HASH"
+                message: "Bundle hash does not match expected hash"
+                code: 1003
+
+  /api/v1/dev/{sessionId}:
+    delete:
+      summary: Unregister a plugin
+      description: |
+        Unregisters a plugin from the Dev API and cleans up the session.
+        Requires the reload token from registration.
+      tags:
+        - Session Management
+      security:
+        - ReloadToken: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Session ID from registration
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Plugin unregistered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+              example:
+                status: "success"
+                message: "Plugin unregistered successfully"
+                sessionDuration: 3600
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/dev/{sessionId}/logs:
+    get:
+      summary: Stream plugin logs
+      description: |
+        Opens a Server-Sent Events (SSE) stream for real-time log output
+        from the plugin's execution environment.
+      tags:
+        - Logging
+      security:
+        - ReloadToken: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Session ID from registration
+          schema:
+            type: string
+            format: uuid
+        - name: level
+          in: query
+          description: Minimum log level to stream
+          schema:
+            type: string
+            enum: [debug, info, warn, error]
+            default: info
+        - name: tail
+          in: query
+          description: Number of recent log lines to include initially
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: SSE stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                id: 1
+                event: log
+                data: {"timestamp":"2025-11-09T15:30:45.123Z","level":"info","message":"Plugin started","source":"main"}
+
+                id: 2
+                event: log
+                data: {"timestamp":"2025-11-09T15:30:45.456Z","level":"info","message":"Build complete","source":"build"}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/dev/{sessionId}/status:
+    get:
+      summary: Get session status
+      description: |
+        Retrieves the current status of a development session.
+      tags:
+        - Session Management
+      security:
+        - ReloadToken: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Session ID from registration
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              example:
+                sessionId: "550e8400-e29b-41d4-a716-446655440000"
+                status: "active"
+                pluginId: "my-awesome-plugin"
+                version: "0.1.0"
+                registeredAt: "2025-11-09T15:30:45.123Z"
+                lastReload: "2025-11-09T15:31:45.456Z"
+                reloadCount: 12
+                uptime: 3600
+                buildStats:
+                  avgBuildTime: 2500
+                  successRate: 0.95
+                  lastBuildDuration: 2200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    ReloadToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - pluginId
+        - version
+        - entryPath
+      properties:
+        pluginId:
+          type: string
+          description: Unique plugin identifier
+          example: "my-awesome-plugin"
+        version:
+          type: string
+          description: Plugin version (semver)
+          example: "0.1.0"
+        entryPath:
+          type: string
+          description: Path to plugin source directory
+          example: "/path/to/plugin"
+        tenant:
+          type: string
+          description: Tenant identifier for multi-tenant setups
+          example: "default"
+        metadata:
+          type: object
+          description: Additional plugin metadata
+          additionalProperties: true
+          example:
+            buildCommand: "npm run build"
+            watchPatterns: ["src/**/*.go", "web-admin/**/*.vue"]
+
+    RegisterResponse:
+      type: object
+      required:
+        - sessionId
+        - reloadToken
+        - devUrl
+        - expiresAt
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: Unique session identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        reloadToken:
+          type: string
+          description: JWT token for reload operations
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        devUrl:
+          type: string
+          format: uri
+          description: URL for development dashboard
+          example: "http://localhost:8077/dev/550e8400-e29b-41d4-a716-446655440000"
+        expiresAt:
+          type: string
+          format: date-time
+          description: Session expiration time (ISO 8601)
+          example: "2025-11-09T16:30:45.123Z"
+
+    ReloadRequest:
+      type: object
+      required:
+        - bundleHash
+        - bundleSize
+      properties:
+        bundleHash:
+          type: string
+          description: SHA-256 hash of the new bundle
+          example: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+        bundleSize:
+          type: integer
+          description: Size of the bundle in bytes
+          example: 1234567
+        buildDuration:
+          type: integer
+          description: Build time in milliseconds
+          example: 2500
+        strategy:
+          type: string
+          enum: [full, incremental, diff]
+          description: Build strategy used
+          example: "incremental"
+        changedFiles:
+          type: array
+          description: List of files that changed
+          items:
+            $ref: '#/components/schemas/ChangedFile'
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Additional build metadata
+
+    ReloadResponse:
+      type: object
+      required:
+        - status
+        - reloadId
+      properties:
+        status:
+          type: string
+          enum: [success, error, pending]
+          description: Reload status
+          example: "success"
+        reloadId:
+          type: string
+          description: Unique reload identifier
+          example: "reload-12345"
+        estimatedTime:
+          type: integer
+          description: Estimated reload time in milliseconds
+          example: 100
+        message:
+          type: string
+          description: Human-readable status message
+          example: "Plugin reloaded successfully"
+        error:
+          type: string
+          description: Error message if status is error
+          example: null
+
+    DeleteResponse:
+      type: object
+      required:
+        - status
+        - message
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        message:
+          type: string
+          example: "Plugin unregistered successfully"
+        sessionDuration:
+          type: integer
+          description: Total session duration in seconds
+          example: 3600
+
+    StatusResponse:
+      type: object
+      required:
+        - sessionId
+        - status
+        - pluginId
+        - version
+        - registeredAt
+        - reloadCount
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, stopping, stopped, error]
+        pluginId:
+          type: string
+        version:
+          type: string
+        registeredAt:
+          type: string
+          format: date-time
+        lastReload:
+          type: string
+          format: date-time
+        reloadCount:
+          type: integer
+        uptime:
+          type: integer
+        buildStats:
+          $ref: '#/components/schemas/BuildStats'
+
+    BuildStats:
+      type: object
+      properties:
+        avgBuildTime:
+          type: integer
+          description: Average build time in milliseconds
+          example: 2500
+        successRate:
+          type: number
+          format: float
+          description: Build success rate (0.0 - 1.0)
+          example: 0.95
+        lastBuildDuration:
+          type: integer
+          description: Last build duration in milliseconds
+          example: 2200
+
+    ChangedFile:
+      type: object
+      required:
+        - path
+        - type
+      properties:
+        path:
+          type: string
+          description: File path relative to entry path
+          example: "src/main.go"
+        type:
+          type: string
+          enum: [create, modify, delete]
+          description: Type of change
+          example: "modify"
+        hash:
+          type: string
+          description: File hash (optional)
+          example: "c3ab8ff13720e8e9045307e8ee9b94f7"
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - code
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "BAD_REQUEST"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid request parameters"
+        code:
+          type: integer
+          description: Numeric error code
+          example: 1000
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "BAD_REQUEST"
+            message: "Missing required field: pluginId"
+            code: 1000
+
+    Unauthorized:
+      description: Unauthorized access
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "UNAUTHORIZED"
+            message: "Invalid or missing authentication token"
+            code: 1001
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "NOT_FOUND"
+            message: "Session 550e8400-e29b-41d4-a716-446655440000 not found"
+            code: 1004

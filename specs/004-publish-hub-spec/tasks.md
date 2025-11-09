@@ -242,16 +242,16 @@
 - [X] T075 [Go CLI] Create file watcher package: `tools/cli/internal/watch/filewatcher.go` using `fsnotify` with 250ms debounce, ignore patterns (`.git`, `node_modules`, `dist/**`), and SHA256 hash calculation
 - [X] T076 [Go CLI] Build session manager: `tools/cli/internal/session/manager.go` with persistence to `~/.px-plugin/sessions/{id}.json`, TTL management (7 days), status tracking (active/error/stopped)
 - [X] T077 [P] [Go CLI] Add dependencies to `tools/cli/go.mod`: `github.com/fsnotify/fsnotify@v1.7.0`, update go to 1.24
-- [P] T078 [Go CLI] Unit tests for core components: `tools/cli/internal/devapi/client_test.go` (httptest), `tools/cli/internal/watch/filewatcher_test.go` (testfs), `tools/cli/internal/session/manager_test.go` (memstore)
+- [X] T078 [Go CLI] Unit tests for core components: `tools/cli/internal/devapi/client_test.go` (httptest), `tools/cli/internal/watch/filewatcher_test.go` (testfs), `tools/cli/internal/session/manager_test.go` (memstore)
 
 ### Week 3-4: Core Functionality
 
 - [X] T079 [P] [Go CLI] Implement incremental builder interface: `tools/cli/internal/build/builder.go` with BuildStrategy (Full/Incremental/Diff), parallel build for Go+Node, and cache机制
 - [X] T080 [Go CLI] Wire dev command flow: Parse `--watch`, `--entry`, `--tenant`, `--ignore` flags → load `plugin.yaml` manifest → call Dev API register → start file watcher → trigger reload on changes
-- [ ] T081 [P] [Go CLI] Add session persistence: Save/Load/List/Delete sessions in `~/.px-plugin/sessions/`, support `px-plugin dev resume <id>` and `px-plugin dev stop <id>`
-- [ ] T082 [Go CLI] Implement audit logging: `tools/cli/internal/audit/logger.go` with JSON Lines format, write to `stdout` + `~/.px-plugin/logs/audit.log`, emit `dev.hotload.*` metrics
-- [ ] T083 [P] [Go CLI] Dev API contract alignment: Ensure request/response models match OpenAPI spec (`specs/004-publish-hub-spec/contracts/publish-hub.openapi.yaml`)
-- [ ] T084 [Go CLI] Integration tests: Start mock Dev API (httptest server) → run `px-plugin dev --watch` → simulate file changes → verify API calls and responses
+- [X] T081 [P] [Go CLI] Add session persistence: Save/Load/List/Delete sessions in `~/.px-plugin/sessions/`, support `px-plugin dev resume <id>` and `px-plugin dev stop <id>`
+- [X] T082 [Go CLI] Implement audit logging: `tools/cli/internal/audit/logger.go` with JSON Lines format, write to `stdout` + `~/.px-plugin/logs/audit.log`, emit `dev.hotload.*` metrics
+- [X] T083 [P] [Go CLI] Dev API contract alignment: Ensure request/response models match OpenAPI spec (`docs/api/dev-api-spec.yaml`)
+- [X] T084 [Go CLI] Integration tests: Start mock Dev API (httptest server) → run `px-plugin dev --watch` → simulate file changes → verify API calls and responses
 
 ### Week 5-6: Advanced Features
 
@@ -326,7 +326,8 @@ tools/cli/
 
 ### Success Criteria for Go CLI
 
-- [ ] **Functional**: All `px-plugin dev` subcommands work identically to TypeScript version
+- [X] **Functional**: Core infrastructure complete (T073-T084): CLI commands, Dev API client, file watcher, session manager, build system, audit logging, OpenAPI contract, integration tests
+- [ ] **Functional**: All `px-plugin dev` subcommands work identically to TypeScript version (T085+)
 - [ ] **Performance**: Reload P95 ≤2s, memory ≤100MB, CPU ≤10% during watch
 - [ ] **Reliability**: Network errors auto-retry, session persistence 100%, idempotent reload
 - [ ] **Compatibility**: 100% API contract match with TypeScript version

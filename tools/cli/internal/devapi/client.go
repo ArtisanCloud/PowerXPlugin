@@ -2,257 +2,247 @@ package devapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
+
+	"github.com/powerx-plugin/cli/internal/watch"
 )
 
-// Client is the Dev API client
-type Client struct {
-	baseURL    string
-	httpClient *http.Client
-	mtlsConfig *tls.Config
-	maxRetries int
-	retryDelay time.Duration
+// ClientOptions holds configuration for the Dev API client
+type ClientOptions struct {
+	BaseURL       string
+	APIKey        string
+	ReloadToken   string
+	Timeout       time.Duration
+	MaxRetries    int
+	MTLSCertPath  string
+	MTLSKeyPath   string
+	MTLSCACertPath string
 }
 
-// RegisterRequest is the request for registering a dev session
-type RegisterRequest struct {
-	Manifest map[string]interface{} `json:"manifest"`
-	Tenant   string                 `json:"tenant,omitempty"`
-}
-
-// RegisterResponse is the response from registering a dev session
-type RegisterResponse struct {
-	SessionID    string `json:"sessionId"`
-	ReloadToken  string `json:"reloadToken"`
-	AdminPreview string `json:"adminPreviewUrl,omitempty"`
-}
-
-// ReloadRequest is the request for reloading a dev session
-type ReloadRequest struct {
-	SessionID     string            `json:"sessionId"`
-	ReloadToken   string            `json:"reloadToken"`
-	ChangedFiles  []ChangedFile     `json:"changedFiles"`
-	Diagnostics   []Diagnostic      `json:"diagnostics,omitempty"`
-	ReloadID      string            `json:"-"` // Used for x-reload-id header
-}
-
-// ChangedFile represents a changed file
-type ChangedFile struct {
-	Path string `json:"path"`
-	Hash string `json:"hash"`
-}
-
-// Diagnostic represents a diagnostic message
-type Diagnostic struct {
-	Level   string `json:"level"`
-	Message string `json:"message"`
-}
-
-// ReloadResponse is the response from reloading a dev session
-type ReloadResponse struct {
-	Status  string `json:"status"`
-	LogsRef string `json:"logsRef,omitempty"`
-}
-
-// ErrorResponse represents an error response from the API
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
+// DevClient is the Dev API client
+type DevClient struct {
+	baseURL     string
+	apiKey      string
+	reloadToken string
+	httpClient  *http.Client
+	maxRetries  int
 }
 
 // NewClient creates a new Dev API client
-func NewClient(baseURL string, opts ...ClientOption) *Client {
-	client := &Client{
-		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+func NewClient(opts ClientOptions) *DevClient {
+	client := &DevClient{
+		baseURL:     opts.BaseURL,
+		apiKey:      opts.APIKey,
+		reloadToken: opts.ReloadToken,
+		httpClient: &http.Client{
+			Timeout: opts.Timeout,
+		},
 		maxRetries: 3,
-		retryDelay: 1 * time.Second,
 	}
 
-	for _, opt := range opts {
-		opt(client)
+	// Set max retries if specified
+	if opts.MaxRetries > 0 {
+		client.maxRetries = opts.MaxRetries
 	}
 
 	return client
 }
 
-// ClientOption is a function that configures the client
-type ClientOption func(*Client)
-
-// WithHTTPClient sets a custom HTTP client
-func WithHTTPClient(httpClient *http.Client) ClientOption {
-	return func(c *Client) {
-		c.httpClient = httpClient
-	}
+// RegisterRequest is the request for registering a dev session
+type RegisterRequest struct {
+	PluginID  string            `json:"pluginId"`
+	Version   string            `json:"version"`
+	EntryPath string            `json:"entryPath"`
+	Tenant    string            `json:"tenant,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
-// WithMTLS sets up mTLS configuration
-func WithMTLS(certPath, keyPath, caPath string) ClientOption {
-	return func(c *Client) {
-		// Load client certificate
-		cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+// RegisterResponse is the response from registering a dev session
+type RegisterResponse struct {
+	SessionID   string `json:"sessionId"`
+	ReloadToken string `json:"reloadToken"`
+	DevUrl      string `json:"devUrl,omitempty"`
+	ExpiresAt   string `json:"expiresAt,omitempty"`
+}
+
+// ReloadRequest is the request for reloading a dev session
+type ReloadRequest struct {
+	BundleHash     int64              `json:"bundleHash"`
+	BundleSize     int64              `json:"bundleSize"`
+	BuildDuration  int64              `json:"buildDuration,omitempty"`
+	Strategy       string             `json:"strategy,omitempty"`
+	ChangedFiles   []watch.FileEvent  `json:"changedFiles,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// ReloadResponse is the response from reloading a dev session
+type ReloadResponse struct {
+	Status        string `json:"status"`
+	ReloadID      string `json:"reloadId"`
+	EstimatedTime int64  `json:"estimatedTime"`
+	Message       string `json:"message"`
+	Error         string `json:"error,omitempty"`
+}
+
+// StatusResponse is the response from getting session status
+type StatusResponse struct {
+	SessionID    string      `json:"sessionId"`
+	Status       string      `json:"status"`
+	PluginID     string      `json:"pluginId"`
+	Version      string      `json:"version"`
+	RegisteredAt time.Time   `json:"registeredAt"`
+	LastReload   *time.Time  `json:"lastReload,omitempty"`
+	ReloadCount  int         `json:"reloadCount"`
+	Uptime       int         `json:"uptime"`
+	BuildStats   *BuildStats `json:"buildStats,omitempty"`
+}
+
+// BuildStats represents build statistics
+type BuildStats struct {
+	AvgBuildTime      int     `json:"avgBuildTime"`
+	SuccessRate       float64 `json:"successRate"`
+	LastBuildDuration int     `json:"lastBuildDuration"`
+}
+
+// Register registers a plugin for development
+func (c *DevClient) Register(ctx context.Context, req *RegisterRequest) (*RegisterResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/dev/register", c.baseURL)
+
+	resp, err := c.makeRequest(ctx, "POST", url, req, c.apiKey)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var registerResp RegisterResponse
+	if err := json.NewDecoder(resp.Body).Decode(&registerResp); err != nil {
+		return nil, fmt.Errorf("failed to decode register response: %w", err)
+	}
+
+	return &registerResp, nil
+}
+
+// Reload triggers a hot reload of the plugin
+func (c *DevClient) Reload(ctx context.Context, sessionID string, req *ReloadRequest) (*ReloadResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/dev/%s/reload", c.baseURL, sessionID)
+
+	resp, err := c.makeRequest(ctx, "POST", url, req, "", c.reloadToken)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var reloadResp ReloadResponse
+	if err := json.NewDecoder(resp.Body).Decode(&reloadResp); err != nil {
+		return nil, fmt.Errorf("failed to decode reload response: %w", err)
+	}
+
+	return &reloadResp, nil
+}
+
+// GetStatus retrieves the current session status
+func (c *DevClient) GetStatus(ctx context.Context, sessionID string) (*StatusResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/dev/%s/status", c.baseURL, sessionID)
+
+	resp, err := c.makeRequest(ctx, "GET", url, nil, "", c.reloadToken)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var statusResp StatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&statusResp); err != nil {
+		return nil, fmt.Errorf("failed to decode status response: %w", err)
+	}
+
+	return &statusResp, nil
+}
+
+// Delete unregisters a plugin
+func (c *DevClient) Delete(ctx context.Context, sessionID string) error {
+	url := fmt.Sprintf("%s/api/v1/dev/%s", c.baseURL, sessionID)
+
+	resp, err := c.makeRequest(ctx, "DELETE", url, nil, "", c.reloadToken)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
+// makeRequest performs an HTTP request with authentication
+func (c *DevClient) makeRequest(ctx context.Context, method, url string, body interface{}, apiKey, reloadToken string) (*http.Response, error) {
+	// Create request body
+	var reqBody []byte
+	if body != nil {
+		var err error
+		reqBody, err = json.Marshal(body)
 		if err != nil {
-			// In production, this should be handled better
-			fmt.Printf("Warning: failed to load mTLS cert: %v\n", err)
-			return
-		}
-
-		// Load CA certificate
-		caCert, err := loadCACert(caPath)
-		if err != nil {
-			fmt.Printf("Warning: failed to load CA cert: %v\n", err)
-			return
-		}
-
-		c.mtlsConfig = &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			RootCAs:      caCert,
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 	}
-}
 
-// WithMaxRetries sets the maximum number of retries
-func WithMaxRetries(maxRetries int) ClientOption {
-	return func(c *Client) {
-		c.maxRetries = maxRetries
-	}
-}
-
-// WithRetryDelay sets the base retry delay
-func WithRetryDelay(delay time.Duration) ClientOption {
-	return func(c *Client) {
-		c.retryDelay = delay
-	}
-}
-
-// Register registers a new dev session
-func (c *Client) Register(req *RegisterRequest) (*RegisterResponse, error) {
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	var resp *RegisterResponse
-	err = c.doRequest(http.MethodPost, "/internal/dev/plugins/register", body, &resp)
-	if err != nil {
-		return nil, fmt.Errorf("register failed: %w", err)
-	}
-
-	return resp, nil
-}
-
-// Reload triggers a reload of a dev session
-func (c *Client) Reload(req *ReloadRequest) error {
-	body, err := json.Marshal(req)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Prepare headers
-	headers := make(map[string]string)
-	if req.ReloadID != "" {
-		headers["x-reload-id"] = req.ReloadID
-	}
-
-	return c.doRequestWithHeaders(http.MethodPost, "/internal/dev/plugins/reload", body, headers, nil)
-}
-
-// Delete deletes a dev session
-func (c *Client) Delete(sessionID string) error {
-	return c.doRequest(http.MethodDelete, fmt.Sprintf("/internal/dev/plugins/register/%s", sessionID), nil, nil)
-}
-
-// doRequest performs an HTTP request with retry logic
-func (c *Client) doRequest(method, path string, body []byte, result interface{}) error {
-	return c.doRequestWithHeaders(method, path, body, nil, result)
-}
-
-// doRequestWithHeaders performs an HTTP request with custom headers and retry logic
-func (c *Client) doRequestWithHeaders(method, path string, body []byte, headers map[string]string, result interface{}) error {
+	// Create HTTP request
 	var err error
-	delay := c.retryDelay
+	var req *http.Request
+	if reqBody != nil {
+		req, err = http.NewRequestWithContext(ctx, method, url, bytes.NewReader(reqBody))
+	} else {
+		req, err = http.NewRequestWithContext(ctx, method, url, nil)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "px-plugin-go-cli/1.0")
+
+	// Add authentication
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+	if reloadToken != "" {
+		req.Header.Set("Authorization", "Bearer "+reloadToken)
+	}
+
+	// Make request with retries
+	var resp *http.Response
+	delay := time.Second
 
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
-		// Create request
-		var req *http.Request
-		if body != nil {
-			req, err = http.NewRequest(method, c.baseURL+path, bytes.NewReader(body))
-		} else {
-			req, err = http.NewRequest(method, c.baseURL+path, nil)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
-		}
-
-		// Set headers
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "px-plugin-cli/1.0")
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
-
-		// Set up transport with mTLS if configured
-		transport := &http.Transport{}
-		if c.mtlsConfig != nil {
-			transport.TLSClientConfig = c.mtlsConfig
-		}
-		c.httpClient.Transport = transport
-
-		// Make request
-		resp, err := c.httpClient.Do(req)
+		resp, err = c.httpClient.Do(req)
 		if err != nil {
 			if attempt == c.maxRetries {
-				return fmt.Errorf("request failed after %d attempts: %w", c.maxRetries, err)
+				return nil, fmt.Errorf("request failed after %d attempts: %w", c.maxRetries, err)
 			}
-			// Wait before retry
 			time.Sleep(delay)
-			delay = delay * 2 // Exponential backoff
+			delay = delay * 2
 			continue
-		}
-		defer resp.Body.Close()
-
-		// Read response
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("failed to read response: %w", err)
 		}
 
 		// Check status code
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			// Success
-			if result != nil && len(respBody) > 0 {
-				if err := json.Unmarshal(respBody, result); err != nil {
-					return fmt.Errorf("failed to unmarshal response: %w", err)
-				}
-			}
-			return nil
+			return resp, nil
 		}
 
-		// Check for duplicate reload (409)
-		if resp.StatusCode == http.StatusConflict {
-			return fmt.Errorf("duplicate reload request (x-reload-id already processed)")
-		}
-
-		// Check if retryable (5xx)
+		// Check for retryable errors
 		if resp.StatusCode >= 500 && attempt < c.maxRetries {
 			time.Sleep(delay)
 			delay = delay * 2
 			continue
 		}
 
-		// Not retryable
-		var errResp ErrorResponse
-		if len(respBody) > 0 {
-			json.Unmarshal(respBody, &errResp)
-		}
-		return fmt.Errorf("request failed: %d %s", resp.StatusCode, errResp.Message)
+		// Non-retryable error
+		break
 	}
 
-	return nil
+	// Return response for error handling by caller
+	return resp, nil
 }

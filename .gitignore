@@ -21,6 +21,7 @@ pnpm-lock.yaml
 yarn.lock
 
 # Logs & env files
+logs
 *.log
 *.tmp
 *.swp

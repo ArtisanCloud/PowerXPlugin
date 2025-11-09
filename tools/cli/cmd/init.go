@@ -1,14 +1,17 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/powerx-plugin/cli/internal/contracts"
 	"github.com/powerx-plugin/cli/internal/templates"
@@ -25,46 +28,29 @@ const (
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
 
-var templatePresets = map[string]struct {
-	Backend  string
-	Frontend string
-}{
-	"fullstack-go-nuxt": {
-		Backend:  "go-gin",
-		Frontend: "nuxt",
-	},
-	"backend-go-lite": {
-		Backend:  "go-gin",
-		Frontend: "",
-	},
-}
-
 func runInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	var (
-		module   = fs.String("module", "", "override backend module import path (default derives from plugin id)")
-		backend  = fs.String("backend", "go-gin", "backend template (only go-gin supported)")
-		frontend = fs.String("frontend", "nuxt", "frontend template (only nuxt supported)")
-		force    = fs.Bool("force", false, "overwrite existing files")
-		template = fs.String("template", "", "template preset id (e.g. fullstack-go-nuxt, backend-go-lite)")
+		module              = fs.String("module", "", "override backend module import path (default derives from plugin id)")
+		backend             = fs.String("backend", templates.BackendGoGin, fmt.Sprintf("backend framework (supported: %v)", templates.SupportedBackends()))
+		adminFrontend       = fs.String("admin", templates.FrontendNuxt, fmt.Sprintf("admin frontend framework (supported: %v)", templates.SupportedFrontends()))
+		appFrontend         = fs.String("app", "", "app frontend framework (optional)")
+		force               = fs.Bool("force", false, "overwrite existing files")
+		directory           = fs.String("directory", "", "target directory (default: ./<plugin-id>)")
+		version             = fs.String("version", defaultVersion, "plugin version")
+		goVersion           = fs.String("go-version", defaultGoVersion, "Go version to use")
+		installDeps         = fs.Bool("install-deps", false, "automatically install dependencies (go mod tidy & npm install)")
+		sbomPath            = fs.String("sbom-path", "", "path to write SBOM file (default: <target>/reports/sbom.json)")
+		publishManifestPath = fs.String("publish-manifest-path", "", "path to write publish manifest (default: <target>/publish.yml)")
 	)
 	fs.SetOutput(os.Stdout)
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	if tmpl := strings.TrimSpace(*template); tmpl != "" {
-		if preset, ok := templatePresets[tmpl]; ok {
-			if preset.Backend != "" {
-				*backend = preset.Backend
-			}
-			if preset.Frontend != "" {
-				*frontend = preset.Frontend
-			}
-			fmt.Fprintf(os.Stdout, "Using template preset %q (backend=%s frontend=%s)\n", tmpl, *backend, *frontend)
-		} else {
-			fmt.Fprintf(os.Stdout, "warning: template preset %q not recognized, falling back to manual flags\n", tmpl)
-		}
+	// Handle optional app frontend
+	if *appFrontend == "" {
+		*appFrontend = *adminFrontend // Default to same as admin if not specified
 	}
 
 	if fs.NArg() < 1 {
@@ -75,21 +61,16 @@ func runInit(args []string) error {
 		return fmt.Errorf("invalid plugin id %q: must match %s", pluginID, pluginIDPattern.String())
 	}
 
-	if *backend != "go-gin" {
-		fmt.Fprintf(os.Stdout, "warning: only backend=go-gin is supported, ignoring %q\n", *backend)
+	if err := templates.ValidateTemplateTypes(*backend, *adminFrontend); err != nil {
+		return err
 	}
-	if *frontend != "nuxt" {
-		fmt.Fprintf(os.Stdout, "warning: only frontend=nuxt is supported, ignoring %q\n", *frontend)
+	if err := templates.ValidateTemplateTypes(*backend, *appFrontend); err != nil {
+		return err
 	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("determine working dir: %w", err)
-	}
-
-	targetRoot := filepath.Join(cwd, pluginID)
-	if err := ensureTargetDir(targetRoot, *force); err != nil {
-		return err
 	}
 
 	pluginName := derivePluginName(pluginID)
@@ -101,6 +82,20 @@ func runInit(args []string) error {
 	}
 
 	backendModule := moduleRoot + "/backend"
+
+	// Determine target root directory
+	targetRoot := filepath.Join(cwd, pluginID)
+	if *directory != "" {
+		if filepath.IsAbs(*directory) {
+			targetRoot = *directory
+		} else {
+			targetRoot = filepath.Join(cwd, *directory)
+		}
+	}
+	if err := ensureTargetDir(targetRoot, *force); err != nil {
+		return err
+	}
+
 	backendDir := filepath.Join(targetRoot, "backend")
 	webDir := filepath.Join(targetRoot, "web-admin")
 
@@ -111,9 +106,12 @@ func runInit(args []string) error {
 		PluginID:           pluginID,
 		PluginName:         pluginName,
 		PluginSlug:         pluginSlug,
-		Version:            defaultVersion,
-		GoVersion:          defaultGoVersion,
+		Version:            *version,
+		GoVersion:          *goVersion,
 		BackendModulePath:  backendModule,
+		BackendType:        *backend,
+		FrontendType:       *adminFrontend,
+		AppFrontendType:    *appFrontend,
 		FrameworkVersion:   defaultFrameworkVersion,
 		FrameworkReplace:   frameworkReplace,
 		SchemaDependency:   schemaDependency,
@@ -131,6 +129,33 @@ func runInit(args []string) error {
 		return err
 	}
 
+	// Generate SBOM if requested or use default path
+	if *sbomPath == "" {
+		*sbomPath = filepath.Join(targetRoot, "reports", "sbom.json")
+	}
+	preset := struct{ Backend, Frontend string }{
+		Backend:  *backend,
+		Frontend: *adminFrontend,
+	}
+	if err := writeSbom(*sbomPath, pluginID, *version, moduleRoot, renderResult.Files, preset); err != nil {
+		return err
+	}
+
+	// Generate publish manifest if requested or use default path
+	if *publishManifestPath == "" {
+		*publishManifestPath = filepath.Join(targetRoot, "publish.yml")
+	}
+	if err := writePublishManifest(*publishManifestPath, pluginID); err != nil {
+		return err
+	}
+
+	// Install dependencies if requested
+	if *installDeps {
+		if err := installDependencies(backendDir, webDir); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to install dependencies: %v\n", err)
+		}
+	}
+
 	fmt.Fprintf(os.Stdout, "Initialized plugin %q at %s\n", pluginID, targetRoot)
 	for _, path := range renderResult.Files {
 		if strings.HasPrefix(path, targetRoot) {
@@ -140,9 +165,17 @@ func runInit(args []string) error {
 	for _, path := range contractFiles {
 		fmt.Fprintf(os.Stdout, "  created %s\n", strings.TrimPrefix(path, targetRoot+string(os.PathSeparator)))
 	}
+	if *sbomPath != "" {
+		fmt.Fprintf(os.Stdout, "  created %s\n", strings.TrimPrefix(*sbomPath, targetRoot+string(os.PathSeparator)))
+	}
+	if *publishManifestPath != "" {
+		fmt.Fprintf(os.Stdout, "  created %s\n", strings.TrimPrefix(*publishManifestPath, targetRoot+string(os.PathSeparator)))
+	}
 	fmt.Fprintln(os.Stdout, "Next steps:")
 	fmt.Fprintln(os.Stdout, "  - Update go.mod module path if necessary.")
-	fmt.Fprintln(os.Stdout, "  - Run go mod tidy && npm install in the generated project.")
+	if !*installDeps {
+		fmt.Fprintln(os.Stdout, "  - Run go mod tidy && npm install in the generated project.")
+	}
 	fmt.Fprintln(os.Stdout, "  - Review plugin.yaml and README for TODO items.")
 
 	return nil
@@ -272,4 +305,126 @@ func writeContracts(root string, force bool) ([]string, error) {
 		written = append(written, target)
 	}
 	return written, nil
+}
+
+func writeSbom(sbomPath, pluginID, version, modulePath string, files []string, preset struct{ Backend, Frontend string }) error {
+	// Convert files to relative paths
+	relFiles := make([]string, 0, len(files))
+	for _, file := range files {
+		rel := filepath.Base(file)
+		relFiles = append(relFiles, rel)
+	}
+
+	// Determine template preset
+	presetID := ""
+	if preset.Backend != "" || preset.Frontend != "" {
+		parts := []string{}
+		if preset.Backend != "" {
+			parts = append(parts, preset.Backend)
+		}
+		if preset.Frontend != "" {
+			parts = append(parts, preset.Frontend)
+		}
+		presetID = strings.Join(parts, "-")
+	}
+
+	type sbomData struct {
+		Schema        string `json:"schema"`
+		GeneratedAt   string `json:"generatedAt"`
+		Plugin        struct {
+			ID      string `json:"id"`
+			Version string `json:"version"`
+			Module  string `json:"module"`
+		} `json:"plugin"`
+		TemplatePreset string   `json:"templatePreset"`
+		Files          []string `json:"files"`
+	}
+
+	data := sbomData{
+		Schema:      "powerx.plugin.sbom@v1",
+		GeneratedAt: time.Now().Format(time.RFC3339),
+		Plugin: struct {
+			ID      string `json:"id"`
+			Version string `json:"version"`
+			Module  string `json:"module"`
+		}{
+			ID:      pluginID,
+			Version: version,
+			Module:  modulePath,
+		},
+		TemplatePreset: presetID,
+		Files:          relFiles,
+	}
+
+	if err := os.MkdirAll(filepath.Dir(sbomPath), 0o755); err != nil {
+		return fmt.Errorf("create sbom dir: %w", err)
+	}
+
+	payload, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal sbom: %w", err)
+	}
+
+	if err := os.WriteFile(sbomPath, payload, 0o644); err != nil {
+		return fmt.Errorf("write sbom: %w", err)
+	}
+
+	return nil
+}
+
+func writePublishManifest(publishPath, pluginID string) error {
+	content := []string{
+		"# Generated by px-plugin init",
+		fmt.Sprintf("plugin: %s", pluginID),
+		"channels:",
+		"  - stable",
+		"  - beta",
+		"rollout:",
+		"  strategy: canary",
+		"  batches:",
+		"    - percentage: 20",
+		"      wait: 10m",
+		"    - percentage: 80",
+		"      wait: 20m",
+		"rollback:",
+		"  strategy: automatic",
+		"  maxFailingTenants: 5",
+		"",
+	}
+
+	if err := os.MkdirAll(filepath.Dir(publishPath), 0o755); err != nil {
+		return fmt.Errorf("create publish dir: %w", err)
+	}
+
+	if err := os.WriteFile(publishPath, []byte(strings.Join(content, "\n")), 0o644); err != nil {
+		return fmt.Errorf("write publish manifest: %w", err)
+	}
+
+	return nil
+}
+
+func installDependencies(backendDir, webDir string) error {
+	// Install Go dependencies
+	if info, err := os.Stat(filepath.Join(backendDir, "go.mod")); err == nil && !info.IsDir() {
+		cmd := exec.Command("go", "mod", "tidy")
+		cmd.Dir = backendDir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("go mod tidy failed: %w", err)
+		}
+	}
+
+	// Install npm dependencies
+	if info, err := os.Stat(filepath.Join(webDir, "package.json")); err == nil && !info.IsDir() {
+		cmd := exec.Command("npm", "install")
+		cmd.Dir = webDir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("npm install failed: %w", err)
+		}
+	}
+
+	return nil
 }

@@ -1,9 +1,133 @@
-pluginId: {{ .PluginID }}
+# plugin.yaml 是 PowerX 插件管理器读取的 Manifest，声明插件固定的元信息与能力。
+# 生成后请根据实际情况补充描述、数据使用、权限等信息。
+id: {{ .PluginID }}
 name: {{ .PluginName }}
 version: {{ .Version }}
+description: "{{ .PluginName }} 插件描述"
+corex_version: ">=0.1.0"
+security_baseline_version: "2025.10"
+
+data_usage:
+  - purpose: tenant_data_classification
+    type: pii_inventory
+    retention: 365d
+    requires_consent: true
+
+runtime:
+  kind: process
+  entry: backend/bin/plugin
+  env:
+    POWERX_BIND_ADDR: ${POWERX_BIND_ADDR:-:8086}
+    POWERX_PROXY: "1"
+    POWERX_PLUGIN_ID: "{{ .PluginID }}"
+    POWERX_SECURITY_JWT_ISSUER: "powerx-auth"
+    POWERX_SECURITY_JWT_AUDIENCE: "plugin:{{ .PluginID }}"
+    POWERX_SECURITY_JWT_SECRET: "${POWERX_AUTH_JWTSECRET}"
+  health:
+    http: /healthz
+    interval: 10s
+    timeout: 3s
+
 backend:
-  language: go
-  framework: go-gin
+  entry: backend/bin/plugin
+  port: 8086
+  health: /healthz
+
+endpoints:
+  http_base_path: /api/v1
+
 frontend:
-  stack: nuxt
-  layer: '@artisan-cloud/plugin-framework-admin'
+  admin:
+    kind: process
+    process:
+      entry: node
+      args: ["./web-admin/.output/server/index.mjs"]
+      env:
+        NODE_ENV: production
+        POWERX_PROXY: "1"
+      health:
+        http: /healthz
+        interval: 5s
+        timeout: 2s
+    static_dir: web-admin/.output/public
+    i18n:
+      dir: web-admin/i18n
+      format: i18next
+      default_namespace: menus
+      namespaces: [menus]
+      locales: [zh-CN, en]
+    menus:
+      - id: plugins.{{ .PluginID }}
+        title: {{ .PluginName }}
+        icon: i-heroicons-clipboard-document-check
+        path: /intro
+        route: intro
+        order: 20
+        required_policies: [{{ .PluginID }}:resource:read]
+
+routes:
+  basePath: /api/v1
+  adminManifest: /api/v1/admin/manifest
+  rbac: /api/v1/admin/rbac
+
+rbac:
+  resources:
+    - resource: {{ .PluginID }}:resource
+      actions: [read, create, update, delete]
+
+permissions:
+  - resource: {{ .PluginID }}:resource
+    actions: [read, create, update, delete]
+
+agents:
+  - id: {{ .PluginID }}.assistant
+    plugin_id: {{ .PluginID }}
+    name: {{ .PluginName }} 助理
+    description: "{{ .PluginName }} 内置 Agent"
+    default_tools:
+      - {{ .PluginID }}.tool.create
+
+capabilities:
+  provides:
+    - id: {{ .PluginID }}.tool.create
+      version: 1.0.0
+      descriptor: contracts/capabilities/{{ .PluginID }}.tool.create.yaml
+
+# 工具清单侧重声明接口契约，真实业务参数通过 config.yaml 或环境变量注入
+tools:
+  - id: {{ .PluginID }}.tool.create
+    plugin_id: {{ .PluginID }}
+    name: 创建示例
+    description: 创建示例数据
+    transport: http
+    endpoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/resources
+    method: POST
+    rbac_resource: {{ .PluginID }}:resource
+
+dependencies:
+  requires: []
+
+migrations:
+  driver: go
+  entry: backend/bin/migrate
+  args: ["setup"]
+  workdir: ./backend
+  once: true
+  timeout: 60s
+
+events:
+  produces: []
+
+assets:
+  public_dir: ./web-admin/public
+  webAdminPath: ./web-admin/.output
+
+checksums:
+  package_sha256: ""
+
+signature:
+  enabled: false
+
+metadata:
+  author: {{ .PluginName }} Team
+  license: MIT

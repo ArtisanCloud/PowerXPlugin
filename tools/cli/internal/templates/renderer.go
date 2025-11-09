@@ -20,11 +20,14 @@ type Data struct {
 	Version            string
 	GoVersion          string
 	BackendModulePath  string
+	BackendType        string
+	FrontendType       string
 	FrameworkVersion   string
 	FrameworkReplace   string
 	SchemaDependency   string
 	FrameworkAdminRef  string
 	FrameworkClientRef string
+	AppFrontendType    string // 可选的第二个前端框架
 }
 
 // Options 控制渲染行为。
@@ -60,7 +63,7 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		targetRel := strings.TrimSuffix(rel, ".tmpl")
 		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugin.base", data.PluginID)
 		targetRel = strings.ReplaceAll(targetRel, "__plugin__", data.PluginID)
-		targetRel = normalizeTargetPath(targetRel)
+		targetRel = normalizeTargetPath(targetRel, data.BackendType, data.FrontendType)
 
 		targetPath := filepath.Join(baseDir, filepath.FromSlash(targetRel))
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
@@ -115,13 +118,25 @@ func executeTemplate(name string, raw []byte, data Data) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func normalizeTargetPath(rel string) string {
+func normalizeTargetPath(rel, backendType, frontendType string) string {
+	// Dynamic mapping based on backend and frontend types
 	switch {
-	case strings.HasPrefix(rel, "backend/go-gin/"):
-		return "backend/" + strings.TrimPrefix(rel, "backend/go-gin/")
-	case strings.HasPrefix(rel, "web-admin/nuxt/"):
-		return "web-admin/" + strings.TrimPrefix(rel, "web-admin/nuxt/")
+	case strings.HasPrefix(rel, "backend/"+backendType+"/"):
+		return "backend/" + strings.TrimPrefix(rel, "backend/"+backendType+"/")
+	case strings.HasPrefix(rel, "web-admin/"+frontendType+"/"):
+		return "web-admin/" + strings.TrimPrefix(rel, "web-admin/"+frontendType+"/")
 	default:
 		return rel
 	}
+}
+
+// ValidateTemplateTypes checks if the given backend and frontend types are supported.
+func ValidateTemplateTypes(backendType, frontendType string) error {
+	if !IsValidBackend(backendType) {
+		return fmt.Errorf("unsupported backend type: %q (supported: %v)", backendType, SupportedBackends())
+	}
+	if !IsValidFrontend(frontendType) {
+		return fmt.Errorf("unsupported frontend type: %q (supported: %v)", frontendType, SupportedFrontends())
+	}
+	return nil
 }

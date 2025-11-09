@@ -94,3 +94,31 @@ No constitution violations identified — 不需要额外复杂度豁免。
 - **Deliverables**: `px-plugin publish create/deploy` CLI（`tools/cli/src/commands/publish/create.ts`, `publish/deploy.ts`）、`px-plugin pack` + `px-plugin import --offline`（`tools/cli/src/commands/dist.ts` & 新 pack 执行器）、发布流水线 orchestrator + canary 策略（`framework/backend/go/runtime/publish/pipeline_handler.go`, `config/publish/approval_flows.yaml`）、Marketplace listing UI/API（`examples/starter/web-admin/app/pages/publish/pipelines.vue`, `framework/backend/go/runtime/marketplace/services/listing.go`）。
 - **Acceptance**: 测试租户门禁 + 审批在 24h 内闭环，灰度可 5 分钟回滚，离线导入成功率 ≥98%，Marketplace 审核 ≤3 个工作日且事件同步率 ≥99%。
 - **Testing**: CI pipeline smoke tests、Playwright 发布/回滚/Marketplace 审核剧本、离线导入 fixture、Grafana SLA 仪表板验证。
+
+### Workstream D – Go CLI Implementation of dev --watch (New)
+- **Deliverables**:
+  - Go CLI dev 命令实现（`tools/cli/cmd/dev.go`）
+  - Dev API 客户端（`tools/cli/internal/devapi/client.go`）
+  - 文件监听器（`tools/cli/internal/watch/filewatcher.go`）
+  - 会话管理器（`tools/cli/internal/session/manager.go`）
+  - 增量构建器（`tools/cli/internal/build/incremental.go`）
+  - SSE 日志客户端（`tools/cli/internal/sse/client.go`）
+  - 审计日志系统（`tools/cli/internal/audit/logger.go`）
+- **Architecture**:
+  - 分层设计：命令层 → Dev API 客户端层 → 传输层（HTTP/mTLS）
+  - 并发模型：文件监听（fsnotify）→ 去抖聚合（250ms）→ 增量构建 → API 调用 → SSE 监听
+  - 依赖选择：fsnotify（文件监听）、stdlib http.Client（HTTP）、encoding/json（序列化）
+- **Acceptance**:
+  - 命令对齐：`px-plugin dev --watch --entry --tenant --ignore` 参数与 TypeScript 版一致
+  - 性能指标：reload P95 ≤2s、文件变更到 API 调用 ≤250ms、CLI 内存 ≤100MB
+  - 可靠性：网络错误 3 次重试、幂等性（x-reload-id）、会话持久化
+  - 兼容性：与 TypeScript 版 100% 对齐，遵循 OpenAPI spec
+- **Testing**:
+  - 单元测试：Client（httptest）、Watcher（testfs）、Session（memstore）
+  - 集成测试：本地 mock Dev API
+  - E2E 测试：真实 PowerX Dev API
+- **Reference**:
+  - TypeScript 实现：`tools/cli/src/commands/dev/watch.ts`, `tools/cli/src/runtime/hotreload/session.ts`
+  - 契约：`specs/004-publish-hub-spec/contracts/publish-hub.openapi.yaml`
+  - Backend 实现：`framework/backend/go/runtime/devapi/handlers/dev_plugins.go`
+- **Timeline**: 8 周（Week 1-2 基础设施，Week 3-4 核心功能，Week 5-6 高级特性，Week 7-8 测试优化）

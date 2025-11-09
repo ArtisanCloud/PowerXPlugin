@@ -229,6 +229,119 @@
 
 ---
 
+## Phase 13: Go CLI Implementation of dev --watch (New)
+
+**Goal**: 用 Go 实现完整的 `px-plugin dev --watch` 命令链，平替 TypeScript 版，提供 file watching、Dev API 交互、session 管理、增量构建、SSE 日志和审计功能。
+**Independent Test**: 构建 Go CLI → 运行 `px-plugin dev --watch` → 修改文件 → 验证 reload → 检查 session 持久化 → 对比 TypeScript 版行为完全一致。
+**Timeline**: 8 周（Week 1-2 基础设施，Week 3-4 核心功能，Week 5-6 高级特性，Week 7-8 测试优化）
+
+### Week 1-2: Infrastructure Setup
+
+- [X] T073 [P] [Go CLI] Add `dev` command to CLI router: Update `tools/cli/cmd/root.go` to add `case "dev"` and implement `runDev()` function in `tools/cli/cmd/dev.go`
+- [X] T074 [Go CLI] Implement Dev API client package: `tools/cli/internal/devapi/client.go` with Register/Reload/Delete methods, HTTP retry logic, mTLS support, and idempotency via `x-reload-id`
+- [X] T075 [Go CLI] Create file watcher package: `tools/cli/internal/watch/filewatcher.go` using `fsnotify` with 250ms debounce, ignore patterns (`.git`, `node_modules`, `dist/**`), and SHA256 hash calculation
+- [X] T076 [Go CLI] Build session manager: `tools/cli/internal/session/manager.go` with persistence to `~/.px-plugin/sessions/{id}.json`, TTL management (7 days), status tracking (active/error/stopped)
+- [X] T077 [P] [Go CLI] Add dependencies to `tools/cli/go.mod`: `github.com/fsnotify/fsnotify@v1.7.0`, update go to 1.24
+- [P] T078 [Go CLI] Unit tests for core components: `tools/cli/internal/devapi/client_test.go` (httptest), `tools/cli/internal/watch/filewatcher_test.go` (testfs), `tools/cli/internal/session/manager_test.go` (memstore)
+
+### Week 3-4: Core Functionality
+
+- [X] T079 [P] [Go CLI] Implement incremental builder interface: `tools/cli/internal/build/builder.go` with BuildStrategy (Full/Incremental/Diff), parallel build for Go+Node, and cache机制
+- [X] T080 [Go CLI] Wire dev command flow: Parse `--watch`, `--entry`, `--tenant`, `--ignore` flags → load `plugin.yaml` manifest → call Dev API register → start file watcher → trigger reload on changes
+- [ ] T081 [P] [Go CLI] Add session persistence: Save/Load/List/Delete sessions in `~/.px-plugin/sessions/`, support `px-plugin dev resume <id>` and `px-plugin dev stop <id>`
+- [ ] T082 [Go CLI] Implement audit logging: `tools/cli/internal/audit/logger.go` with JSON Lines format, write to `stdout` + `~/.px-plugin/logs/audit.log`, emit `dev.hotload.*` metrics
+- [ ] T083 [P] [Go CLI] Dev API contract alignment: Ensure request/response models match OpenAPI spec (`specs/004-publish-hub-spec/contracts/publish-hub.openapi.yaml`)
+- [ ] T084 [Go CLI] Integration tests: Start mock Dev API (httptest server) → run `px-plugin dev --watch` → simulate file changes → verify API calls and responses
+
+### Week 5-6: Advanced Features
+
+- [ ] T085 [P] [Go CLI] Implement mTLS authentication: Load certs from `~/.px-plugin/certs/`, configure `*tls.Config`, handle certificate rotation detection
+- [ ] T086 [Go CLI] SSE log streaming client: `tools/cli/internal/sse/client.go` with auto-reconnect, event filtering by sessionId, parallel console+file output
+- [ ] T087 [P] [Go CLI] Add performance optimizations: File hash cache (mtime + content), HTTP keep-alive + connection pool, concurrent API requests with backpressure
+- [ ] T088 [Go CLI] Error handling & recovery: Network error retry (exponential backoff: 1s, 2s, 4s, 8s, 30s), build failure rollback, API health check with `px-plugin doctor`
+- [ ] T089 [P] [Go CLI] Resource limits: CPU throttling (build processes), memory limit (2GB max), file descriptor limits (10k watch files)
+- [ ] T090 [Go CLI] Configuration management: `tools/cli/internal/config/config.go` with mTLS paths, Dev API endpoint, auth tokens, feature flags
+
+### Week 7-8: Testing & Optimization
+
+- [ ] T091 [P] [Go CLI] End-to-end tests: Start real PowerX Dev API → build Go CLI (`go build -o px-plugin ./tools/cli/cmd/px-plugin`) → run `px-plugin dev --watch` → modify code → verify reload within 2s → check SSE logs
+- [ ] T092 [Go CLI] Performance validation: Run `scripts/perf/dev-hotload-bench.sh` to verify P95 ≤2s, file change to API ≤250ms, CLI memory ≤100MB
+- [ ] T093 [P] [Go CLI] Compatibility verification: Compare Go CLI vs TypeScript CLI behavior using same test cases, ensure 100% API contract alignment
+- [ ] T094 [Go CLI] Add Go CLI docs: `docs/guides/cli/go-cli-dev-watch.md` with setup, usage examples, troubleshooting, comparison with TypeScript version
+- [ ] T095 [P] [Go CLI] Cross-platform testing: Build and test on macOS/Linux/Windows, verify fsnotify compatibility and file path handling
+- [ ] T096 [Go CLI] Final polish: Update help text in `root.go`, add command examples, improve error messages, add progress indicators for long operations
+
+### Parallel Opportunities
+- T073/T074 can start immediately (command + client)
+- T075/T076 can parallel (watcher + session)
+- T079/T080 depend on T073/T074/T075/T076
+- T085/T086/T087 need T079/T080 completed first
+- T091/T092/T093 require most components ready
+
+### Go CLI Code Structure
+
+```
+tools/cli/
+├── cmd/
+│   ├── root.go              (update with "dev" case)
+│   ├── dev.go               (NEW: dev command entry)
+│   └── dev_test.go          (NEW: basic tests)
+├── internal/
+│   ├── devapi/
+│   │   ├── client.go        (NEW: Dev API client)
+│   │   ├── client_test.go   (NEW: httptest)
+│   │   ├── retry.go         (NEW: retry logic)
+│   │   ├── types.go         (NEW: request/response)
+│   │   └── errors.go        (NEW: error types)
+│   ├── watch/
+│   │   ├── filewatcher.go   (NEW: fsnotify wrapper)
+│   │   ├── filewatcher_test.go  (NEW: testfs)
+│   │   ├── debounce.go      (NEW: 250ms debounce)
+│   │   ├── ignore.go        (NEW: ignore patterns)
+│   │   └── types.go         (NEW: file events)
+│   ├── session/
+│   │   ├── manager.go       (NEW: session lifecycle)
+│   │   ├── store.go         (NEW: JSON persistence)
+│   │   ├── manager_test.go  (NEW: memstore)
+│   │   └── models.go        (NEW: session model)
+│   ├── build/
+│   │   ├── builder.go       (NEW: build interface)
+│   │   ├── incremental.go   (NEW: diff build)
+│   │   └── types.go         (NEW: build result)
+│   ├── sse/
+│   │   ├── client.go        (NEW: SSE streaming)
+│   │   ├── decoder.go       (NEW: parse SSE)
+│   │   └── types.go         (NEW: event model)
+│   ├── audit/
+│   │   ├── logger.go        (NEW: JSON logs)
+│   │   ├── logger_test.go   (NEW: verify format)
+│   │   └── metrics.go       (NEW: dev.hotload.*)
+│   ├── config/
+│   │   ├── config.go        (NEW: configuration)
+│   │   ├── auth.go          (NEW: mTLS config)
+│   │   └── config_test.go   (NEW: test data)
+│   └── watch/               (directory for watcher)
+└── go.mod                   (add fsnotify)
+```
+
+### Success Criteria for Go CLI
+
+- [ ] **Functional**: All `px-plugin dev` subcommands work identically to TypeScript version
+- [ ] **Performance**: Reload P95 ≤2s, memory ≤100MB, CPU ≤10% during watch
+- [ ] **Reliability**: Network errors auto-retry, session persistence 100%, idempotent reload
+- [ ] **Compatibility**: 100% API contract match with TypeScript version
+- [ ] **Security**: mTLS authentication, audit logging, certificate rotation
+- [ ] **Testability**: ≥90% unit test coverage, passing integration & E2E tests
+
+### Reference Documents
+
+- Design Doc: `/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/tmp/go-cli-dev-watch-design.md`
+- TypeScript Reference: `tools/cli/src/commands/dev/watch.ts`, `tools/cli/src/runtime/hotreload/session.ts`
+- API Contract: `specs/004-publish-hub-spec/contracts/publish-hub.openapi.yaml`
+- Backend Implementation: `framework/backend/go/runtime/devapi/handlers/dev_plugins.go`
+
+---
+
 ## Dependencies & Execution Order
 
 1. **Setup (Phase 1)** → 完成契约/依赖/flag/文档入口。

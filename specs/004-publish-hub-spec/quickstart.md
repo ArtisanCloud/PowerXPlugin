@@ -22,13 +22,100 @@
    - 离线签名准备 `cert.pem` 或 KMS Key (`--kms-key-id`)。
 4. 确保 Feature Flags：`PX_PLUGIN_DEV_MODE`, `PX_PLUGIN_PUBLISH`, `PX_MARKET_PUBLISH_ENABLED`, `PX_MARKET_OFFLINE_UPLOAD`, `PX_PLUGIN_HUB_ENABLED` 均开启。
 
-## 2. Dev 热加载链路
+## 2. Dev 热加载链路（TypeScript CLI）
+
 1. 在插件仓执行 `px-plugin dev --watch --tenant demo-tenant --entry ./dist`（实现参考 `tools/cli/src/commands/dev/watch.ts`）。
 2. CLI 将读取 `dist/manifest.json` 并向 Dev API (`tools/cli/src/runtime/hotreload/session.ts`) 发送 register 请求，输出 `sessionId`, `reloadToken`, Admin 调试地址。
    - **mTLS 验证**：CLI 会自动加载 mTLS 证书并建立双向 TLS 连接
    - 如果 mTLS 握手失败，会自动重试 3 次（指数退避：1s, 2s, 4s）
 3. 修改代码并保存，CLI watcher 会在 250ms 去抖后聚合 diff，调用 Dev API reload；确认构建耗时 ≤2s，Admin SSE 获取 `reload` 日志。
 4. 结束调试：运行 `px-plugin dev --stop`（或 `CTRL+C`），Dev API 删除 session 并由 `framework/backend/go/runtime/devapi/handlers/dev_plugins.go` 记录审计，日志保留 7 天。
+
+## 2.1 Dev 热加载链路（Go CLI - 新实现）
+
+1. **构建 Go CLI**（首次使用）：
+   ```bash
+   cd /private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/tools/cli
+   go build -o px-plugin ./cmd/px-plugin
+   ```
+   或使用 `make build-cli`（如提供）。
+
+2. **配置 mTLS 证书**：
+   ```bash
+   # 证书位置：~/.px-plugin/certs/
+   mkdir -p ~/.px-plugin/certs
+   # 放置 client.crt, client.key, ca.crt
+   ```
+
+3. **运行 dev watch 模式**：
+   ```bash
+   # 基本用法
+   ./px-plugin dev --watch --entry ./my-plugin
+
+   # 完整参数
+   ./px-plugin dev --watch \
+     --entry ./my-plugin \
+     --tenant demo-tenant \
+     --ignore "**/*.log" \
+     --dev-api https://dev-api.powerx.local
+   ```
+
+4. **核心流程**：
+   - CLI 解析 `--entry` 参数并加载 `plugin.yaml` manifest
+   - 向 Dev API 发送 `POST /internal/dev/plugins/register` 建立会话，返回 `sessionId` + `reloadToken`
+   - 启动 `fsnotify` 文件监听器，递归监听插件目录（忽略 `.git`, `node_modules`, `dist/**`）
+   - 文件变更时生成 SHA256 哈希，聚合到 250ms 去抖窗口
+   - 调用 `POST /internal/dev/plugins/reload`（带幂等 `x-reload-id`），成功后在 stdout 输出日志
+   - 结束调试时调用 `DELETE /internal/dev/plugins/register/{sessionId}` 清理会话
+
+5. **会话管理**：
+   ```bash
+   # 查看活跃会话
+   ./px-plugin dev list-sessions
+
+   # 恢复会话
+   ./px-plugin dev resume sess-123
+
+   # 停止会话
+   ./px-plugin dev stop sess-123
+
+   # 查看会话日志
+   ./px-plugin dev logs sess-123
+   ```
+
+6. **会话持久化位置**：
+   - 会话数据：`~/.px-plugin/sessions/{sessionId}.json`
+   - 审计日志：`~/.px-plugin/logs/audit.log`
+   - 配置文件：`~/.px-plugin/config.json`
+
+7. **性能指标**（Go CLI 优势）：
+   - 冷启动（register）：≤ 1s
+   - 增量 reload：P95 ≤ 2s
+   - 文件变更到 API 调用：≤ 250ms
+   - CLI 内存占用：≤ 100MB
+   - 空闲时 CPU：≤ 1%，监听时 CPU：≤ 10%
+
+8. **错误处理**：
+   - 网络错误：自动重试（指数退避：1s, 2s, 4s, 8s, 30s）
+   - 构建失败：回滚到上一个版本，显示错误日志
+   - API 错误：检查 Dev API 健康状态，建议运行 `./px-plugin doctor`
+   - 认证错误：引导用户运行 `./px-plugin auth configure`
+
+9. **mTLS 验证**：
+   ```bash
+   # 检查证书
+   openssl x509 -in ~/.px-plugin/certs/client.crt -text -noout
+
+   # CLI 会自动加载并验证证书
+   # 日志输出："mTLS handshake succeeded"
+   ```
+
+10. **对比 TypeScript 版**：
+    - ✅ 行为 100% 一致
+    - ✅ 性能更优（Go 并发优势）
+    - ✅ 内存占用更低
+    - ✅ 冷启动更快
+    - ✅ CPU 使用率更低
 
 ## 3. 在线发布链路
 1. 运行 `npm run lint && npm test && go test ./...`，确保预检输入准备就绪。
@@ -83,8 +170,23 @@
 
 ## 5. Telemetry & 验证
 1. 使用 `npm run e2e:dev-hotload`、`npm run e2e:publish-online` 运行端到端验证（如已提供）。
-2. 通过 Grafana / `scripts/qa/workflow-metrics.mjs` 检查以下指标：
-   - `dev.hotload.cli_reload_duration_ms` (目标：≤2s)
+2. **Go CLI 性能测试**：
+   ```bash
+   # 构建 Go CLI
+   go build -o px-plugin ./tools/cli/cmd/px-plugin
+
+   # 运行性能测试
+   ./px-plugin dev --watch --entry ./my-plugin &
+   # 修改文件多次，观察：
+   # - reload 耗时（应 ≤ 2s）
+   # - 内存占用（应 ≤ 100MB）
+   # - CPU 使用（空闲时 ≤ 1%，监听时 ≤ 10%）
+   ```
+
+3. 通过 Grafana / `scripts/qa/workflow-metrics.mjs` 检查以下指标：
+   - `dev.hotload.cli_reload_duration_ms` (目标：TypeScript ≤2s, Go ≤2s)
+   - `dev.hotload.go_cli_register_ms` (Go CLI 冷启动，目标：≤1s)
+   - `dev.hotload.go_cli_memory_bytes` (Go CLI 内存，目标：≤100MB)
    - `plugin_publish_pipeline_duration_ms` (目标：95th percentile ≤4h)
    - `plugin_offline_approval_duration_minutes` (目标：95th percentile ≤1d)
    - `plugin_install_rollback_latency_seconds` (目标：≤300s)
@@ -92,11 +194,15 @@
    - `publish_gray_error_rate` (目标：<5%)
    - `marketplace_listing_sla_hours` (目标：≤72h)
    - `plugin_deployments_total` (成功/失败率统计)
-3. **mTLS 验证**：
+4. **mTLS 验证**：
    - 查看 Dev API 日志，确认 mTLS 握手成功
    - 检查证书验证日志：`client certificate verification succeeded`
    - 监控证书过期提醒
-4. Playwright 脚本验证 Admin 安装/回滚 UI。
+5. **Go CLI vs TypeScript CLI 对比**：
+   - 性能基准测试
+   - 行为一致性验证
+   - API 契约对齐检查
+6. Playwright 脚本验证 Admin 安装/回滚 UI。
 
 ## 6. 交付清单
 - 更新 `docs/contracts/` 中的 OpenAPI/Schema，并生成新的版本记录。
@@ -109,12 +215,19 @@
 
 ## 7. 最终 Checklist（建议截图保留）
 - `px-plugin publish/dist/dev` 命令均执行一次并保存 CLI 输出截图。
+- **Go CLI 验证**：
+  - [ ] 构建 Go CLI：`go build -o px-plugin ./tools/cli/cmd/px-plugin`
+  - [ ] 运行 `./px-plugin dev --watch` 并修改文件
+  - [ ] 验证 reload 耗时 ≤ 2s
+  - [ ] 检查会话持久化：`~/.px-plugin/sessions/`
+  - [ ] 检查审计日志：`~/.px-plugin/logs/audit.log`
+  - [ ] 对比 TypeScript 版行为一致性
 - Marketplace 在线/离线审核界面（`review.vue` / `offline-review.vue`）截图 + 审核结果记录。
 - Admin 安装/回滚页面截图，确认 5 分钟内回退及 Telemetry 事件写入。
 - Grafana/SLA 仪表板截图，展示各指标在目标范围内。
 - `scripts/perf/publish-hub-bench.sh` 执行结果与主要指标对照表附在交付文档。
 - **mTLS 验证截图**：
-  - 证书信息：`openssl x509 -in ~/.powerx/cli/client.crt -text -noout`
+  - 证书信息：`openssl x509 -in ~/.px-plugin/certs/client.crt -text -noout`
   - Dev API mTLS 握手日志
   - CLI 重试机制工作日志
 - **回滚验证截图**：

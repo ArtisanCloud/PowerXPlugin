@@ -43,7 +43,7 @@ PowerX 需要在 1 分钟内通过 `px-plugin init` 生成标准化工程，串�
 
 ### User Story 1 - Developer submits publish candidate (Priority: P1)
 
-Plugin developers需要从本地热加载产物生成合规 artefact，并将版本与元数据分别推送至在线/离线渠道，使任意交付路径都能进入审核。
+Plugin developers需要从本地热加载产物生成合规 artefact，并将版本与元数据分别推送至在线/离线渠道，使任意交付路径都能进入审核。**Go CLI 版实现使用 `tools/cli` 提供完整的 dev/publish/dist 命令链，与 TypeScript 版功能对齐。**
 
 **Why this priority**: 没有合规 artefact，审核与安装链路无法启动；它直接驱动 Marketplace 审核与租户更新。
 
@@ -53,7 +53,16 @@ Plugin developers需要从本地热加载产物生成合规 artefact，并将版
 
 1. **Given** 开发者已通过 lint/test 且具备 publish 权限，**When** 运行 `px-plugin publish --channel stable`，**Then** CLI 完成预检、签名、上传并返回 `publishId`、审核链接与 Telemetry 事件。
 2. **Given** 客户环境无法访问公网，**When** 开发者执行 `px-plugin dist --target offline --sign ./cert.pem`，**Then** CLI 产出 `.pxp`、`integrity.txt`、`manifest.signature`、`report.json` 并写入 `dist/audit.log`。
-3. **Given** 开发者在热加载模式下调试，**When** `px-plugin dev --watch` 触发 reload，**Then** Admin 立即获取最新插件入口并保留 session 日志 7 天。
+3. **Given** 开发者在热加载模式下调试（Go CLI），**When** `px-plugin dev --watch` 触发 reload，**Then** CLI 的 FileWatcher 在 250ms 去抖后调用 Dev API reload，Admin 立即获取最新插件入口并保留 session 日志 7 天，reload 耗时 ≤2s。
+4. **Given** 开发者使用 Go CLI 进行热加载调试，**When** 运行 `px-plugin dev --watch --tenant <id> --entry <path>`，**Then** CLI 执行以下流程：
+   - 解析 `--entry` 参数并加载 `plugin.yaml` manifest
+   - 向 Dev API 发送 `POST /internal/dev/plugins/register` 建立会话，返回 `sessionId` + `reloadToken`
+   - 启动 `fsnotify` 文件监听器，递归监听 `<path>` 目录（忽略 `.git`, `node_modules`, `dist/**`）
+   - 文件变更时生成 SHA256 哈希，聚合到 250ms 去抖窗口
+   - 调用 `POST /internal/dev/plugins/reload`（带幂等 `x-reload-id`），成功后在 stdout 输出日志
+   - 结束调试时调用 `DELETE /internal/dev/plugins/register/{sessionId}` 清理会话
+   - 会话数据持久化到 `~/.px-plugin/sessions/{sessionId}.json`，支持 `px-plugin dev resume <id>` 恢复
+   - 所有操作记录到 `~/.px-plugin/logs/audit.log`，格式与 TypeScript 版完全对齐（`dev.hotload.*` metrics）
 
 ---
 

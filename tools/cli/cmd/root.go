@@ -34,6 +34,8 @@ func Execute(args []string) error {
 		return runDist(args[1:])
 	case "publish":
 		return runPublish(args[1:])
+	case "dev":
+		return runDev(args[1:])
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}

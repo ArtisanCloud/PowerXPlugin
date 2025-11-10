@@ -21,9 +21,6 @@ MARKDOWN_REPORT="$BENCH_ROOT/go-cli-dev-watch-bench.md"
 
 mkdir -p "$BENCH_ROOT" "$PLUGIN_DIR"
 
-# Ensure standalone builds are not affected by repository go.work.
-export GOWORK=off
-
 # Thresholds (ms or MB)
 STARTUP_THRESHOLD=500           # CLI help
 DEV_READY_THRESHOLD=5000        # Initial build ready
@@ -353,7 +350,7 @@ DEV_API_URL="http://127.0.0.1:$MOCK_PORT"
 # ----------------------------------------------------------------------
 CLI_START_MS="$(now_ms)"
 : > "$CLI_LOG"
-"$CLI_BIN" dev --watch --entry "$PLUGIN_DIR" --dev-api "$DEV_API_URL" >"$CLI_LOG" 2>&1 &
+GOWORK=off "$CLI_BIN" dev --watch --entry "$PLUGIN_DIR" --dev-api "$DEV_API_URL" >"$CLI_LOG" 2>&1 &
 CLI_PID=$!
 sleep 1
 

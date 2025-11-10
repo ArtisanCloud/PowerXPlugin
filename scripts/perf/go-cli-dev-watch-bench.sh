@@ -21,6 +21,9 @@ MARKDOWN_REPORT="$BENCH_ROOT/go-cli-dev-watch-bench.md"
 
 mkdir -p "$BENCH_ROOT" "$PLUGIN_DIR"
 
+# Ensure standalone builds are not affected by repository go.work.
+export GOWORK=off
+
 # Thresholds (ms or MB)
 STARTUP_THRESHOLD=500           # CLI help
 DEV_READY_THRESHOLD=5000        # Initial build ready
@@ -54,6 +57,10 @@ log_success() {
 
 log_error() {
     printf "${RED}✗${NC} %s\n" "$1"
+}
+
+upper() {
+    echo "$1" | tr '[:lower:]' '[:upper:]'
 }
 
 require_cmd() {
@@ -216,6 +223,13 @@ func main() {
 }
 EOF
 
+# Minimal go.mod to ensure builder detects Go project.
+cat > "$PLUGIN_DIR/go.mod" <<'EOF'
+module go-cli-perf-bench
+
+go 1.24
+EOF
+
 log_success "Sample plugin prepared at $PLUGIN_DIR"
 
 # ----------------------------------------------------------------------
@@ -372,7 +386,7 @@ MEMORY_MB="$(get_memory_usage_mb "$CLI_PID" || true)"
 if [[ -n "$MEMORY_MB" ]]; then
     log_info "dev --watch memory usage ≈ ${MEMORY_MB}MB"
 else
-    log_error "Unable to determine memory usage"
+    log_info "Unable to determine memory usage (likely unsupported on host OS)"
 fi
 
 # Modify file to trigger reload
@@ -510,21 +524,21 @@ EOF
 cat > "$MARKDOWN_REPORT" <<EOF
 # Go CLI dev --watch Benchmark
 
-- Generated: $TIMESTAMP
-- Dev API: $DEV_API_URL
-- CLI Binary: $CLI_BIN
-- CLI Log: $CLI_LOG
+- Generated: ${TIMESTAMP}
+- Dev API: ${DEV_API_URL}
+- CLI Binary: ${CLI_BIN}
+- CLI Log: ${CLI_LOG}
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
-| Startup (--help) | ${STARTUP_TIME_MS}ms | < ${STARTUP_THRESHOLD}ms | ${STATUS_STARTUP^^} |
-| Initial build ready | ${DEV_READY_TIME_MS:-n/a}ms | < ${DEV_READY_THRESHOLD}ms | ${STATUS_READY^^} |
-| Memory usage | ${MEMORY_MB:-n/a}MB | < ${MEMORY_THRESHOLD_MB}MB | ${STATUS_MEMORY^^} |
-| List sessions | ${LIST_SESSIONS_TIME_MS}ms | < ${LIST_SESSIONS_THRESHOLD}ms | ${STATUS_LIST^^} |
-| File change → Dev API | ${FILE_TO_API_MS:-n/a}ms | < ${FILE_TO_API_THRESHOLD}ms | ${STATUS_FILE_TO_API^^} |
-| Reload latency | ${RELOAD_LATENCY_MS:-n/a}ms | < ${RELOAD_THRESHOLD}ms | ${STATUS_RELOAD^^} |
+| Startup (--help) | ${STARTUP_TIME_MS}ms | < ${STARTUP_THRESHOLD}ms | $(upper "${STATUS_STARTUP}") |
+| Initial build ready | ${DEV_READY_TIME_MS:-n/a}ms | < ${DEV_READY_THRESHOLD}ms | $(upper "${STATUS_READY}") |
+| Memory usage | ${MEMORY_MB:-n/a}MB | < ${MEMORY_THRESHOLD_MB}MB | $(upper "${STATUS_MEMORY}") |
+| List sessions | ${LIST_SESSIONS_TIME_MS}ms | < ${LIST_SESSIONS_THRESHOLD}ms | $(upper "${STATUS_LIST}") |
+| File change → Dev API | ${FILE_TO_API_MS:-n/a}ms | < ${FILE_TO_API_THRESHOLD}ms | $(upper "${STATUS_FILE_TO_API}") |
+| Reload latency | ${RELOAD_LATENCY_MS:-n/a}ms | < ${RELOAD_THRESHOLD}ms | $(upper "${STATUS_RELOAD}") |
 
-**Overall:** ${OVERALL_STATUS^^} (${TEST_PASS}/${TEST_TOTAL} tests passed)
+**Overall:** $(upper "${OVERALL_STATUS}") (${TEST_PASS}/${TEST_TOTAL} tests passed)
 EOF
 
 log_success "JSON report -> $JSON_REPORT"

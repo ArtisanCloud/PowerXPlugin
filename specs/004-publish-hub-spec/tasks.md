@@ -333,18 +333,19 @@
 
 ### Week 7-8: Testing & Optimization
 
-- [ ] **T091 [P] 端到端验证**
+- [x] **T091 [P] 端到端验证**
   - 联动真实 PowerX Dev API：`go build -o px-plugin ./tools/cli/cmd/px-plugin` → `./px-plugin dev --watch` → 修改文件 → 观测 reload ≤2s、Admin SSE 日志。
   - ✅ 记录步骤于 `docs/development/t084-integration-tests-summary.md#真实-dev-api-e2e-验证（t091）`。
 
-- [ ] **T092 性能基准**
+- [x] **T092 性能基准**
   - `scripts/perf/dev-hotload-bench.sh` 生成 benchmark，输出延迟/CPU/内存，确保 P95 ≤2s、文件变化→API ≤250ms、内存 ≤100MB。
-  - ✅ `scripts/perf/go-cli-dev-watch-bench.sh` 产出 JSON/Markdown，含 mock Dev API 回放与 Reload 指标（file-change→API、reload latency、memory）。
+  - ✅ `scripts/perf/go-cli-dev-watch-bench.sh` 产出 JSON/Markdown，含 mock Dev API 回放与 Reload 指标（file-change→API、reload latency、memory）- 最新输出位于 `tmp/go-cli-dev-watch-bench/*`。
 
-- [ ] **T093 [P] 兼容性对比**
+- [x] **T093 [P] 兼容性对比**
   - 用同一插件分别跑 Go CLI 与 TS CLI，对比 payload/行为/日志，确保 100% 契约一致，记录在 `docs/development/t083-dev-api-contract-alignment.md`。
+  - ✅ 文档新增 “Go vs TypeScript CLI Compatibility” 小节（mock Dev API 回放 + payload 比对）。
 
-- [ ] **T094 文档**
+- [x] **T094 文档**
   - 新增 `docs/guides/cli/go-cli-dev-watch.md`，更新 quickstart/spec 中的 CLI 章节、FAQ、故障排查。
   - ✅ Quickstart 已补充 dev --watch/doctor 流程：`docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断`。
   - ✅ `specs/004-publish-hub-spec/spec.md#documentation--enablement` 收敛 doctor/rollback/quickstart 资料，供产品/QA 引用。
@@ -352,12 +353,12 @@
   - ✅ CLI FAQ：`docs/guides/cli/go-cli-troubleshooting.md` 提供 doctor/SSE/跨平台脚本排查指引。
   - 同步 `docs/development/t085/t090` 等附录描述实现。
 
-- [ ] **T095 [P] 跨平台测试**
+- [x] **T095 [P] 跨平台测试**
   - 在 macOS/Linux/Windows 构建 & 运行 watch 流程，验证 fsnotify 行为、路径分隔符、证书路径。
   - 记录差异及 workaround。
   - ✅ 脚本已在 macOS/arm64 跑通（完整运行）、Linux/Windows 交叉编译成功且标记 `BUILD_ONLY`；参考 `docs/development/t095-cross-platform-summary.md`，CI 需在 native Linux/Windows 环境补跑 runtime tests。
 
-- [ ] **T096 最终打磨**
+- [x] **T096 最终打磨**
   - 改善 CLI 输出（进度、错误信息、示例），`root.go` help 中突出 Go CLI 特性。
   - `go fmt`, `golangci-lint`, 更新 `CHANGELOG`, 确认所有文档/任务对齐。
   - ✅ `px-plugin help` 增加 doctor/文档提示，未知命令指向 `px-plugin help`。

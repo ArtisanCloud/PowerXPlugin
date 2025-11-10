@@ -1,10 +1,13 @@
 package devapi
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/powerx-plugin/cli/internal/watch"
 )
 
 func TestClient_Register(t *testing.T) {
@@ -29,18 +32,17 @@ func TestClient_Register(t *testing.T) {
 	defer server.Close()
 
 	// Create client
-	client := NewClient(server.URL)
+	client := NewClient(ClientOptions{BaseURL: server.URL})
 
-	// Test register
 	req := &RegisterRequest{
-		Manifest: map[string]interface{}{
-			"id":      "test-plugin",
-			"version": "1.0.0",
-		},
-		Tenant: "test-tenant",
+		PluginID:  "test-plugin",
+		Version:   "1.0.0",
+		EntryPath: "/tmp/plugin",
+		Tenant:    "test-tenant",
 	}
 
-	resp, err := client.Register(req)
+	ctx := context.Background()
+	resp, err := client.Register(ctx, req)
 	if err != nil {
 		t.Errorf("Register failed: %v", err)
 	}
@@ -80,18 +82,20 @@ func TestClient_Reload(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Create client
-	client := NewClient(server.URL)
+	ctx := context.Background()
+	client := NewClient(ClientOptions{BaseURL: server.URL})
+	client.SetReloadToken("token-456")
 
-	// Test reload
 	req := &ReloadRequest{
-		SessionID:    "sess-123",
-		ReloadToken:  "token-456",
-		ChangedFiles: []ChangedFile{{Path: "test.go", Hash: "abc123"}},
-		ReloadID:     "reload-789",
+		SessionID:  "sess-123",
+		BundleHash: "hash",
+		BundleSize: 123,
+		ChangedFiles: []watch.FileEvent{
+			{Path: "test.go", Type: watch.EventModify},
+		},
 	}
 
-	err := client.Reload(req)
+	_, err := client.Reload(ctx, req)
 	if err != nil {
 		t.Errorf("Reload failed: %v", err)
 	}
@@ -111,26 +115,27 @@ func TestClient_Delete(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Create client
-	client := NewClient(server.URL)
+	ctx := context.Background()
+	client := NewClient(ClientOptions{BaseURL: server.URL})
+	client.SetReloadToken("token-456")
 
 	// Test delete
-	err := client.Delete("sess-123")
+	err := client.Delete(ctx, "sess-123")
 	if err != nil {
 		t.Errorf("Delete failed: %v", err)
 	}
 }
 
 func TestClient_WithMaxRetries(t *testing.T) {
-	client := NewClient("http://test", WithMaxRetries(5))
+	client := NewClient(ClientOptions{BaseURL: "http://test", MaxRetries: 5})
 	if client.maxRetries != 5 {
 		t.Errorf("Expected max retries 5, got %d", client.maxRetries)
 	}
 }
 
 func TestClient_WithRetryDelay(t *testing.T) {
-	client := NewClient("http://test", WithRetryDelay(2*time.Second))
-	if client.retryDelay != 2*time.Second {
-		t.Errorf("Expected retry delay 2s, got %v", client.retryDelay)
+	client := NewClient(ClientOptions{BaseURL: "http://test", Timeout: 5 * time.Second})
+	if client.httpClient.Timeout != 5*time.Second {
+		t.Errorf("Expected timeout 5s, got %v", client.httpClient.Timeout)
 	}
 }

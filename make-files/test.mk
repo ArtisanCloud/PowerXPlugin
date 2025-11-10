@@ -3,7 +3,7 @@
 SMOKE_TIMEOUT ?= 300
 REGRESSION_TIMEOUT ?= 3600
 
-.PHONY: test-smoke test-regression ci-all ci-backend ci-frontend
+.PHONY: test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend
 
 ## Testing ------------------------------------------------------------------
 
@@ -16,6 +16,11 @@ test-regression: ## Run full regression suite (smoke + Go + frontend + Playwrigh
 	@echo "=== Regression Tests Start ==="
 	@python3 scripts/testing/run_with_timeout.py --timeout $(REGRESSION_TIMEOUT) ./scripts/testing/regression.sh
 	@echo "=== Regression Tests Finished ==="
+
+test-cli-devwatch: ## Run CLI dev watch stack go tests (devwatch/devapi/watch)
+	@echo "=== CLI Dev Watch Tests Start ==="
+	@cd tools/cli && go test ./internal/devwatch ./internal/devapi ./internal/watch
+	@echo "=== CLI Dev Watch Tests Finished ==="
 
 ## CI Simulation -------------------------------------------------------------
 

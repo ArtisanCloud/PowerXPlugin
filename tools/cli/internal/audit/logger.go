@@ -13,46 +13,47 @@ type EventType string
 
 const (
 	// Session events
-	EventSessionCreate    EventType = "session.create"
-	EventSessionResume    EventType = "session.resume"
-	EventSessionStop      EventType = "session.stop"
-	EventSessionDelete    EventType = "session.delete"
-	EventSessionExpire    EventType = "session.expire"
+	EventSessionCreate EventType = "session.create"
+	EventSessionResume EventType = "session.resume"
+	EventSessionStop   EventType = "session.stop"
+	EventSessionDelete EventType = "session.delete"
+	EventSessionExpire EventType = "session.expire"
+	EventSessionLogs   EventType = "session.logs"
 
 	// Build events
-	EventBuildStart       EventType = "build.start"
-	EventBuildComplete    EventType = "build.complete"
-	EventBuildFail        EventType = "build.fail"
-	EventBuildCancel      EventType = "build.cancel"
+	EventBuildStart    EventType = "build.start"
+	EventBuildComplete EventType = "build.complete"
+	EventBuildFail     EventType = "build.fail"
+	EventBuildCancel   EventType = "build.cancel"
 
 	// Reload events
-	EventReloadTrigger    EventType = "reload.trigger"
-	EventReloadSuccess    EventType = "reload.success"
-	EventReloadFail       EventType = "reload.fail"
+	EventReloadTrigger EventType = "reload.trigger"
+	EventReloadSuccess EventType = "reload.success"
+	EventReloadFail    EventType = "reload.fail"
 
 	// API events
-	EventAPIRegister      EventType = "api.register"
-	EventAPIDelete        EventType = "api.delete"
-	EventAPIErrors        EventType = "api.errors"
+	EventAPIRegister EventType = "api.register"
+	EventAPIDelete   EventType = "api.delete"
+	EventAPIErrors   EventType = "api.errors"
 )
 
 // Event represents a single audit log entry
 type Event struct {
-	ID          string      `json:"id"`          // Unique event ID (UUID)
-	Timestamp   time.Time   `json:"timestamp"`   // When the event occurred
-	EventType   EventType   `json:"eventType"`   // Type of event
-	SessionID   string      `json:"sessionId"`   // Associated session ID
-	PluginID    string      `json:"pluginId"`    // Plugin identifier
-	Version     string      `json:"version"`     // Plugin version
-	Tenant      string      `json:"tenant"`      // Tenant ID
-	EntryPath   string      `json:"entryPath"`   // Plugin entry path
-	User        string      `json:"user"`        // Current user
-	IP          string      `json:"ip"`          // Client IP
-	Command     string      `json:"command"`     // CLI command
-	Success     bool        `json:"success"`     // Whether operation succeeded
-	Error       string      `json:"error"`       // Error message if failed
-	Duration    int64       `json:"duration"`    // Duration in milliseconds
-	Metadata    json.RawMessage `json:"metadata,omitempty"` // Additional data
+	ID        string          `json:"id"`                 // Unique event ID (UUID)
+	Timestamp time.Time       `json:"timestamp"`          // When the event occurred
+	EventType EventType       `json:"eventType"`          // Type of event
+	SessionID string          `json:"sessionId"`          // Associated session ID
+	PluginID  string          `json:"pluginId"`           // Plugin identifier
+	Version   string          `json:"version"`            // Plugin version
+	Tenant    string          `json:"tenant"`             // Tenant ID
+	EntryPath string          `json:"entryPath"`          // Plugin entry path
+	User      string          `json:"user"`               // Current user
+	IP        string          `json:"ip"`                 // Client IP
+	Command   string          `json:"command"`            // CLI command
+	Success   bool            `json:"success"`            // Whether operation succeeded
+	Error     string          `json:"error"`              // Error message if failed
+	Duration  int64           `json:"duration"`           // Duration in milliseconds
+	Metadata  json.RawMessage `json:"metadata,omitempty"` // Additional data
 }
 
 // Logger handles audit logging

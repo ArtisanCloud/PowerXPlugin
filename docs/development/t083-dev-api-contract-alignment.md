@@ -231,6 +231,19 @@ type ReloadResponse struct {
 ```
 **Alignment**: ✅ Fully matches OpenAPI schema
 
+## Go vs TypeScript CLI Compatibility (T093)
+
+- **Test scenario**：以 `examples/starter/go-admin` 为基准插件，分别通过 TS CLI（`tools/cli/src/commands/dev/watch.ts`）与 Go CLI (`tools/cli/cmd/dev.go`) 执行 `px-plugin dev --watch --entry ./examples/starter/go-admin --tenant demo --dev-api http://127.0.0.1:8077`，并借助同一 Mock Dev API (`tools/cli/internal/devapi/mock_api.go`) 捕捉 register / reload / delete 请求。
+- **Payload 比对**：
+  - `pluginId`、`version`、`entryPath`、`tenant`、`metadata.backend.entry` 保持一致；
+  - Reload 请求的 `bundleHash/Size`、`changedFiles` 与 TS CLI 的结构完全一致（Go 版额外传递 `strategy` 字段，其值与 TS CLI 默认 `incremental` 相同）；
+  - Delete 请求均携带相同的 `Authorization: Bearer <reloadToken>` 头。
+- **行为对齐**：
+  1. 两个 CLI 均会在 register 成功后写入 `sessionId` 与 `reloadToken`，并在终止时调用 `DELETE /register/{sessionId}`；
+  2. SSE 日志（`px-plugin dev --logs <session>`）使用相同的 `level`/`tail` 查询参数，Go 版额外支持 `--logs-file` 与 `--no-color`，对 TS CLI 兼容；
+  3. Telemetry 事件与审计日志（`audit.EventReloadSuccess/Fail` 等）与 TS 版字段重合，可由 `docs/guides/cli/go-cli-dev-watch.md` 的指标段落佐证。
+- **结论**：Go CLI 与 TS CLI 在 Dev API 合约层面 100% 对齐，已在 `tmp/go-cli-dev-watch-bench/` 及 `internal/devapi/integration_test.go` 中以同一 mock server 做回归验证。
+
 ## Client Updates Needed
 
 ### 1. Update RegisterResponse Field

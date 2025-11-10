@@ -1,35 +1,35 @@
 package devapi
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
 
 // MockDevAPI provides a mock Dev API server for testing
 type MockDevAPI struct {
-	server     *httptest.Server
-	requests   []RequestLog
+	server      *httptest.Server
+	requests    []RequestLog
 	reloadToken string
 }
 
 // RequestLog tracks API requests for verification
 type RequestLog struct {
-	Method   string
-	Path     string
-	Body     map[string]interface{}
-	Headers  map[string]string
-	Time     time.Time
+	Method  string
+	Path    string
+	Body    map[string]interface{}
+	Headers map[string]string
+	Time    time.Time
 }
 
 // NewMockDevAPI creates a new mock Dev API server
 func NewMockDevAPI() *MockDevAPI {
 	m := &MockDevAPI{
-		requests:   make([]RequestLog, 0),
+		requests:    make([]RequestLog, 0),
 		reloadToken: "test-reload-token-12345",
 	}
 
@@ -44,7 +44,7 @@ func (m *MockDevAPI) Close() {
 }
 
 // URL returns the server URL
-func (m *MockAPI) URL() string {
+func (m *MockDevAPI) URL() string {
 	return m.server.URL
 }
 
@@ -71,20 +71,21 @@ func (m *MockDevAPI) handler(w http.ResponseWriter, r *http.Request) {
 		Time:    time.Now(),
 	})
 
-	// Route requests
+	// Route requests to match Go client paths
 	switch {
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/dev/register":
+	case r.Method == http.MethodPost && r.URL.Path == "/internal/dev/plugins/register":
 		m.handleRegister(w, r, body)
-	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/dev/test-session/reload":
+	case r.Method == http.MethodPost && r.URL.Path == "/internal/dev/plugins/reload":
 		m.handleReload(w, r, body)
-	case r.Method == http.MethodDelete && r.URL.Path == "/api/v1/dev/test-session":
+	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/internal/dev/plugins/register/"):
 		m.handleDelete(w, r)
-	case r.Method == http.MethodGet && r.URL.Path == "/api/v1/dev/test-session/status":
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/internal/dev/plugins/"):
 		m.handleStatus(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error":   "NOT_FOUND",
+			"code":    "DEV_NOT_FOUND",
 			"message": fmt.Sprintf("Mock API: Path %s not found", r.URL.Path),
 		})
 	}
@@ -92,13 +93,22 @@ func (m *MockDevAPI) handler(w http.ResponseWriter, r *http.Request) {
 
 // handleRegister handles registration requests
 func (m *MockDevAPI) handleRegister(w http.ResponseWriter, r *http.Request, body map[string]interface{}) {
+	getString := func(key string) string {
+		if v, ok := body[key]; ok {
+			if s, ok := v.(string); ok {
+				return strings.TrimSpace(s)
+			}
+		}
+		return ""
+	}
+
 	// Validate required fields
-	if body["pluginId"] == nil || body["version"] == nil {
+	if getString("pluginId") == "" || getString("version") == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "BAD_REQUEST",
 			"message": "Missing required fields: pluginId, version",
-			"code":    1000,
+			"code":    "DEV_BAD_REQUEST",
 		})
 		return
 	}
@@ -109,7 +119,7 @@ func (m *MockDevAPI) handleRegister(w http.ResponseWriter, r *http.Request, body
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "CONFLICT",
 			"message": "Plugin already registered",
-			"code":    1001,
+			"code":    "DEV_CONFLICT",
 		})
 		return
 	}
@@ -133,7 +143,7 @@ func (m *MockDevAPI) handleReload(w http.ResponseWriter, r *http.Request, body m
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
-			"code":    1001,
+			"code":    "DEV_UNAUTHORIZED",
 		})
 		return
 	}
@@ -144,7 +154,7 @@ func (m *MockDevAPI) handleReload(w http.ResponseWriter, r *http.Request, body m
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "CONFLICT",
 			"message": "Plugin is already reloading",
-			"code":    1002,
+			"code":    "DEV_RELOAD_CONFLICT",
 		})
 		return
 	}
@@ -168,7 +178,7 @@ func (m *MockDevAPI) handleDelete(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
-			"code":    1001,
+			"code":    "DEV_UNAUTHORIZED",
 		})
 		return
 	}
@@ -176,8 +186,8 @@ func (m *MockDevAPI) handleDelete(w http.ResponseWriter, r *http.Request) {
 	// Success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status":         "success",
-		"message":        "Plugin unregistered successfully",
+		"status":          "success",
+		"message":         "Plugin unregistered successfully",
 		"sessionDuration": 3600,
 	})
 }
@@ -191,7 +201,7 @@ func (m *MockDevAPI) handleStatus(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
-			"code":    1001,
+			"code":    "DEV_UNAUTHORIZED",
 		})
 		return
 	}
@@ -199,10 +209,10 @@ func (m *MockDevAPI) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// Success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"sessionId":   "test-session",
-		"status":      "active",
-		"pluginId":    "test-plugin",
-		"version":     "0.1.0",
+		"sessionId":    "test-session",
+		"status":       "active",
+		"pluginId":     "test-plugin",
+		"version":      "0.1.0",
 		"registeredAt": time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
 		"lastReload":   time.Now().Format(time.RFC3339),
 		"reloadCount":  5,

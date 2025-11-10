@@ -90,8 +90,7 @@ func (s *Store) Delete(id string) error {
 func (s *Store) List() ([]*Session, error) {
 	var sessions []*Session
 
-	// Read all files in the sessions directory
-	files, err := os.ReadDir(s.baseDir)
+	entries, err := os.ReadDir(s.baseDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return sessions, nil
@@ -99,23 +98,22 @@ func (s *Store) List() ([]*Session, error) {
 		return nil, fmt.Errorf("failed to read sessions directory: %w", err)
 	}
 
-	for _, file := range files {
-		// Skip non-files
-		if !file.IsDir() {
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
 
-		// Read session file
-		filename := filepath.Join(s.baseDir, file.Name(), "session.json")
+		filename := filepath.Join(s.baseDir, entry.Name())
 		data, err := os.ReadFile(filename)
 		if err != nil {
-			// Skip unreadable files
 			continue
 		}
 
 		var session Session
 		if err := json.Unmarshal(data, &session); err != nil {
-			// Skip corrupted sessions
 			continue
 		}
 

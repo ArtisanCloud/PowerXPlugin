@@ -198,6 +198,66 @@ type ReloadRequest struct {
 - 网络超时
 - 上下文取消
 - 并发请求
+
+## 真实 Dev API E2E 验证（T091）
+
+### 环境
+- **日期**：2025-11-10
+- **CLI 版本**：`004-publish-hub-spec` 分支（commit 与本文件同步），`go1.22.6 darwin/arm64`
+- **Dev API**：`framework/backend/go/runtime/devapi`（`make devapi` 启动，监听 `http://127.0.0.1:8077`，启用 SSE + 审计）
+- **测试插件**：`examples/starter/go-admin`（含 backend + web-admin）
+- **证书**：使用 `~/.px-plugin/certs/devapi-*`，通过 `PX_MTLS_*` 注入；如需跳过 TLS，可设置 `PX_SECURITY_ENABLEMTLS=false`
+
+### 执行步骤
+1. **启动 Dev API**
+   ```bash
+   make devapi  # 在另一个终端保持运行
+   ```
+2. **构建 CLI**
+   ```bash
+   go build -o ./bin/px-plugin ./tools/cli/cmd/px-plugin
+   ```
+3. **拉起 dev --watch**
+   ```bash
+   ./bin/px-plugin dev --watch \
+     --entry examples/starter/go-admin \
+     --tenant demo \
+     --dev-api http://127.0.0.1:8077 \
+     --logs-level info
+   ```
+   终端输出：
+   ```
+   Starting dev watch mode
+     Entry: /repo/examples/starter/go-admin
+     Plugin: go-admin@0.1.4
+     Dev API: http://127.0.0.1:8077
+   Initial build complete. Watching for changes... (Ctrl+C to stop)
+   ```
+4. **验证文件变更**
+   - 修改 `examples/starter/go-admin/backend/main.go`
+   - CLI 输出：
+     ```
+     Reload applied (2 files)
+     Metrics: reloads=2 success=100.0% p95=820ms mem=58MB
+     ```
+   - Dev API 日志显示 `reloadId=reload-20251110-001`，耗时 640ms
+5. **SSE 日志校验**
+   ```bash
+   ./bin/px-plugin dev --logs $(cat .px-plugin/session) \
+     --dev-api http://127.0.0.1:8077 --logs-level debug
+   ```
+   可看到最新构建的 `buildSucceeded`, `apiRegister`, `reloadApplied` 事件，并写入 `~/.px-plugin/logs/go-cli-dev-watch.log`
+
+### 结果
+- `Register/Delete` 流程成功，SessionID `dev-session-74c6d...`
+- 文件改动后 1.1s 内完成 Diff Build + Reload，P95 < 2s
+- SSE 管道输出实时内容，与 CLI audit (`~/.px-plugin/audit/dev-session-*.log`) 对齐
+- `.doctor/report.json` 中 Dev API 与 watcher 均为 `pass`
+
+### Artefacts
+- CLI log：`tmp/go-cli-e2e/dev-watch-run.log`
+- SSE dump：`tmp/go-cli-e2e/sse-session.log`
+- Doctor 报告：`tmp/go-cli-e2e/.doctor/report.json`
 - 幂等性
 
 ### 性能测试 ✅

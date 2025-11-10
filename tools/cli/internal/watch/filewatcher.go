@@ -7,21 +7,30 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/powerx-plugin/cli/internal/performance"
 )
 
 // FileWatcher implements file watching with debouncing and ignore patterns
 type FileWatcher struct {
-	config    *Config
-	watcher   *fsnotify.Watcher
-	events    chan []FileEvent
-	stopCh    chan struct{}
-	mu        sync.Mutex
+	config     *Config
+	watcher    *fsnotify.Watcher
+	events     chan []FileEvent
+	stopCh     chan struct{}
+	mu         sync.Mutex
 	isWatching bool
+	debouncer  *Debouncer
+	watchCount int
+	maxFiles   int
 
-	// File hash cache
-	hashCache map[string]string
+	// Performance optimizations
+	hashCache   *performance.HashCache
+	fastHasher  *performance.FastHasher
+	metrics     *performance.MetricsCollector
+	stringPool  *performance.StringPool
+	concurrency *performance.ConcurrencyLimiter
 
 	// Ignore matcher
 	matcher *Matcher
@@ -32,13 +41,21 @@ func NewFileWatcher(config *Config) *FileWatcher {
 	if config == nil {
 		config = DefaultConfig(".")
 	}
+	if config.MaxFiles <= 0 {
+		config.MaxFiles = 10000
+	}
 
 	return &FileWatcher{
-		config:    config,
-		events:    make(chan []FileEvent, 100),
-		stopCh:    make(chan struct{}),
-		hashCache: make(map[string]string),
-		matcher:   NewMatcher(config.Ignore),
+		config:      config,
+		events:      make(chan []FileEvent, 100),
+		stopCh:      make(chan struct{}),
+		hashCache:   performance.NewHashCache(),
+		fastHasher:  performance.NewFastHasher(),
+		metrics:     performance.NewMetricsCollector(),
+		stringPool:  performance.NewStringPool(),
+		concurrency: performance.NewConcurrencyLimiter(10),
+		matcher:     NewMatcher(config.Ignore),
+		maxFiles:    config.MaxFiles,
 	}
 }
 
@@ -66,6 +83,13 @@ func (w *FileWatcher) Start() error {
 
 	w.isWatching = true
 
+	w.debouncer = NewDebouncer(w.config.Debounce, func(events []FileEvent) {
+		select {
+		case w.events <- events:
+		case <-w.stopCh:
+		}
+	})
+
 	// Start listening for events
 	go w.eventListener()
 
@@ -86,6 +110,10 @@ func (w *FileWatcher) Stop() error {
 
 	if w.watcher != nil {
 		w.watcher.Close()
+	}
+
+	if w.debouncer != nil {
+		w.debouncer.Stop()
 	}
 
 	return nil
@@ -111,13 +139,11 @@ func (w *FileWatcher) addPath(path string) error {
 	}
 
 	if info.IsDir() {
-		// Walk directory and add all files
 		return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 
-			// Skip ignored paths
 			if w.matcher.ShouldIgnore(p) {
 				if d.IsDir() {
 					return filepath.SkipDir
@@ -125,24 +151,31 @@ func (w *FileWatcher) addPath(path string) error {
 				return nil
 			}
 
-			// Add file to watcher
-			if !d.IsDir() {
-				return w.watcher.Add(p)
+			if d.IsDir() {
+				if err := w.watcher.Add(p); err != nil {
+					return fmt.Errorf("failed to watch %s: %w", p, err)
+				}
+				if err := w.registerWatch(p); err != nil {
+					return err
+				}
 			}
-
-			// Add directory to watcher
-			return w.watcher.Add(p)
+			return nil
 		})
 	}
 
-	// Add single file
-	return w.watcher.Add(path)
+	// Add single file (non-recursive use-case)
+	if err := w.watcher.Add(path); err != nil {
+		return err
+	}
+	return w.registerWatch(path)
 }
 
 // eventListener listens for file events
 func (w *FileWatcher) eventListener() {
 	for {
 		select {
+		case <-w.stopCh:
+			return
 		case event, ok := <-w.watcher.Events:
 			if !ok {
 				return
@@ -169,7 +202,7 @@ func (w *FileWatcher) eventListener() {
 			fileEvent := FileEvent{
 				Type:      eventType,
 				Path:      event.Name,
-				Timestamp: event.Timestamp,
+				Timestamp: time.Now(),
 			}
 
 			// Compute hash for non-delete events
@@ -182,20 +215,17 @@ func (w *FileWatcher) eventListener() {
 
 			// Check if file/directory was added or removed from watch
 			if event.Op&fsnotify.Create == fsnotify.Create {
-				info, err := os.Stat(event.Name)
-				if err == nil && info.IsDir() {
-					// Add new directory to watcher
-					w.watcher.Add(event.Name)
+				if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
+					_ = w.addPath(event.Name)
 				}
 			} else if event.Op&fsnotify.Remove == fsnotify.Remove {
-				// File/directory was removed
-				w.mu.Lock()
-				delete(w.hashCache, event.Name)
-				w.mu.Unlock()
+				w.hashCache.Delete(event.Name)
 			}
 
 			// Add to debouncer
-			w.debouncer().AddEvent(fileEvent)
+			if w.debouncer != nil {
+				w.debouncer.AddEvent(fileEvent)
+			}
 
 		case err, ok := <-w.watcher.Errors:
 			if !ok {
@@ -206,25 +236,21 @@ func (w *FileWatcher) eventListener() {
 	}
 }
 
-// debouncer gets or creates a debouncer
-func (w *FileWatcher) debouncer() *Debouncer {
-	// This is a simple implementation
-	// In production, you might want to manage this more carefully
-	return NewDebouncer(w.config.Debounce, func(events []FileEvent) {
-		select {
-		case w.events <- events:
-		case <-w.stopCh:
-		}
-	})
+func (w *FileWatcher) registerWatch(path string) error {
+	if w.maxFiles <= 0 {
+		return nil
+	}
+	w.watchCount++
+	if w.watchCount > w.maxFiles {
+		return fmt.Errorf("watch limit exceeded (%d). Use --max-watch-files or PX_MAX_WATCH_FILES to increase the limit", w.maxFiles)
+	}
+	return nil
 }
 
 // computeHash computes SHA256 hash of a file
 func (w *FileWatcher) computeHash(path string) (string, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	// Check cache first
-	if hash, ok := w.hashCache[path]; ok {
+	if hash, ok := w.hashCache.Get(path); ok {
 		return hash, nil
 	}
 
@@ -249,7 +275,7 @@ func (w *FileWatcher) computeHash(path string) (string, error) {
 	hash := fmt.Sprintf("%x", sha256.Sum256(data))
 
 	// Cache the hash
-	w.hashCache[path] = hash
+	w.hashCache.Set(path, hash)
 
 	return hash, nil
 }

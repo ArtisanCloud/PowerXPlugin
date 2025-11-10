@@ -36,8 +36,10 @@ func Execute(args []string) error {
 		return runPublish(args[1:])
 	case "dev":
 		return runDev(args[1:])
+	case "doctor":
+		return runDoctor(args[1:])
 	default:
-		return fmt.Errorf("unknown command: %s", args[0])
+		return fmt.Errorf("unknown command: %s\nRun 'px-plugin help' to see available commands.", args[0])
 	}
 }
 
@@ -57,6 +59,8 @@ Commands:
   package    Experimental packaging workflow
   dist       Experimental distribution workflow
   publish    Experimental publish workflow
+  dev        Development mode with file watching and hot reload
+  doctor     Run toolchain/mTLS/Dev API diagnostics
   version    Print CLI version information
   help       Show this help message
 
@@ -73,16 +77,54 @@ Init command flags:
   --sbom-path <path>               Path to write SBOM file
   --publish-manifest-path <path>   Path to write publish manifest
 
+Dev command (Go CLI - High Performance):
+  --watch                          Enable file watching and hot reload
+  --entry <path>                   Path to the plugin entry directory (required for --watch)
+  --tenant <id>                    Tenant ID for the dev session
+  --ignore <pattern>               File patterns to ignore (can be repeated)
+  --dev-api <url>                  Dev API endpoint URL (default: http://localhost:8077)
+  --list-sessions                  List all active sessions
+  --resume <id>                    Resume an existing session by ID
+  --stop <id>                      Stop a running session by ID
+  --logs <id>                      Show logs for a specific session
+  --logs-level <level>             Minimum log level (debug, info, warn, error)
+  --logs-file <path>               Write logs to a file
+  --no-color                       Disable colored output
+
+  Examples:
+    px-plugin dev --watch --entry ./my-plugin
+    px-plugin dev --watch --entry ./web-admin --tenant production
+    px-plugin dev --list-sessions
+    px-plugin dev --resume session-123
+    px-plugin dev --stop session-123
+    px-plugin dev --logs session-123 --logs-level debug
+    px-plugin dev --logs session-123 --logs-file /tmp/plugin.log
+
+  Features:
+    • High-performance native Go implementation
+    • Real-time file watching with 250ms debounce
+    • Automatic hot reload on file changes
+    • Session persistence (7-day TTL)
+    • mTLS authentication support
+    • SSE log streaming with filtering
+    • Incremental builds for faster reloads
+    • Complete audit logging
+    • Resource limits and performance optimization
+
 Available frameworks:
   --backend: %s
   --admin/--app: %s
 
-Examples:
+Init examples:
   px-plugin init com.example.myplugin
   px-plugin init --backend %s --admin %s com.example.myplugin
   px-plugin init --backend %s --admin %s --app %s com.example.myplugin
   px-plugin init --directory ./my-plugin --version 1.0.0 com.example.myplugin
   px-plugin init --install-deps --force com.example.myplugin
+
+More help:
+  docs/guides/cli/go-cli-dev-watch.md
+  docs/guides/cli/go-cli-troubleshooting.md
 `, templates.BackendGoGin, templates.FrontendNuxt, backendList, frontendList,
 		templates.BackendGoGin, templates.FrontendNuxt,
 		templates.BackendGoGin, templates.FrontendNuxt, templates.FrontendNuxt)

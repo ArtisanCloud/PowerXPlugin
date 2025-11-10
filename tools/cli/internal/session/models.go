@@ -22,6 +22,7 @@ type Session struct {
 	SessionID    string         `json:"sessionId"`
 	ReloadToken  string         `json:"reloadToken"`
 	Status       Status         `json:"status"`
+	DevAPIURL    string         `json:"devApiUrl,omitempty"`
 
 	CreatedAt    time.Time      `json:"createdAt"`
 	LastReloadAt *time.Time     `json:"lastReloadAt,omitempty"`

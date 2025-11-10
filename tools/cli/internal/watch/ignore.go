@@ -35,13 +35,12 @@ func (m *Matcher) ShouldIgnore(path string) bool {
 
 	// Check each pattern
 	for _, pattern := range m.patterns {
-		if match, err := filepath.Match(pattern, rel); err == nil && match {
+		if matchPattern(pattern, rel) {
 			return true
 		}
-		// Also check with filepath.Separator replacement for cross-platform
 		altPattern := strings.ReplaceAll(pattern, "/", string(os.PathSeparator))
 		altRel := strings.ReplaceAll(rel, "/", string(os.PathSeparator))
-		if match, err := filepath.Match(altPattern, altRel); err == nil && match {
+		if matchPattern(altPattern, altRel) {
 			return true
 		}
 	}
@@ -60,4 +59,15 @@ func normalizePattern(pattern string) string {
 	pattern = strings.ReplaceAll(pattern, string(os.PathSeparator), "/")
 
 	return pattern
+}
+
+func matchPattern(pattern, rel string) bool {
+	if strings.HasSuffix(pattern, "/**") {
+		base := strings.TrimSuffix(pattern, "/**")
+		if rel == base || strings.HasPrefix(rel, base+"/") {
+			return true
+		}
+	}
+	match, err := filepath.Match(pattern, rel)
+	return err == nil && match
 }

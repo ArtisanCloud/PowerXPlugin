@@ -27,6 +27,19 @@
    - 在新项目中运行 `go test ./...`、`npm run lint` 并复用上述 CRUD/延迟脚本，确认 CLI 输出与 Skeleton 行为一致。  
    - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。
 
+4. **Dev API 热更新与 Doctor 诊断**  
+   - 启动本地 Dev API（`make devapi`），并在示例插件目录执行：  
+     ```bash
+     go build -o ./bin/px-plugin ./tools/cli/cmd/px-plugin
+     ./bin/px-plugin dev --watch \
+       --entry examples/starter/go-admin \
+       --tenant demo \
+       --dev-api http://127.0.0.1:8077
+     ```  
+     观察 `Initial build complete. Watching for changes...`，随后修改任意源码文件，确保终端输出 `Reload applied` 且耗时 ≤2s。  
+   - 另开终端执行 `./bin/px-plugin dev --logs <session-id>`，校验 SSE 日志能实时显示 `buildSucceeded/reloadApplied`。  
+   - 最后运行 `./bin/px-plugin doctor --entry examples/starter/go-admin`，确认 `.doctor/report.json` 中 Toolchain / mTLS / Dev API / Watcher 状态均为 `pass`，便于新成员快速验证环境。
+
 完成以上三个步骤，即可获得开发 PowerX 插件所需的核心能力：框架运行、模板生成与快速验证。
 
 ## 进一步阅读

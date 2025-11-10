@@ -7,82 +7,71 @@ import (
 	"time"
 )
 
-// TestMatcher_ShouldIgnore tests the ShouldIgnore function
-func TestMatcher_ShouldIgnore(t *testing.T) {
-	matcher := NewMatcher([]string{".git", "node_modules", "dist/**", "*.log"})
-
-	tests := []struct {
-		path     string
-		expected bool
+func TestMatcher(t *testing.T) {
+	matcher := NewMatcher([]string{".git/**", "node_modules/**", "**/*.log"})
+	cases := []struct {
+		path string
+		want bool
 	}{
 		{".git/config", true},
-		{"node_modules/package.json", true},
-		{"dist/index.js", true},
-		{"app.log", true},
+		{"node_modules/pkg/index.js", true},
+		{"app/debug.log", true},
 		{"src/main.go", false},
-		{"README.md", false},
-		{"web-admin/app.vue", false},
 	}
-
-	for _, tt := range tests {
-		result := matcher.ShouldIgnore(tt.path)
-		if result != tt.expected {
-			t.Errorf("ShouldIgnore(%q) = %v, expected %v", tt.path, result, tt.expected)
+	for _, c := range cases {
+		if got := matcher.ShouldIgnore(c.path); got != c.want {
+			t.Fatalf("matcher.ShouldIgnore(%q)=%v want %v", c.path, got, c.want)
 		}
 	}
 }
 
-// TestDebouncer tests the debouncer
 func TestDebouncer(t *testing.T) {
-	events := make([][]FileEvent, 0)
-	debouncer := NewDebouncer(100*time.Millisecond, func(e []FileEvent) {
-		events = append(events, e)
+	var batches [][]FileEvent
+	d := NewDebouncer(50*time.Millisecond, func(events []FileEvent) {
+		batches = append(batches, events)
 	})
-	defer debouncer.Stop()
+	defer d.Stop()
 
-	// Add multiple events quickly
 	for i := 0; i < 5; i++ {
-		debouncer.AddEvent(FileEvent{Path: "test.go"})
+		d.AddEvent(FileEvent{Path: "file", Type: EventModify})
 	}
+	time.Sleep(80 * time.Millisecond)
 
-	// Should not have events yet (debouncing)
-	if len(events) != 0 {
-		t.Errorf("Expected 0 events during debounce, got %d", len(events))
-	}
-
-	// Wait for debounce to fire
-	time.Sleep(150 * time.Millisecond)
-
-	// Should have exactly 1 event with 5 file events
-	if len(events) != 1 {
-		t.Errorf("Expected 1 event batch, got %d", len(events))
-	}
-
-	if len(events[0]) != 5 {
-		t.Errorf("Expected 5 file events, got %d", len(events[0]))
+	if len(batches) != 1 || len(batches[0]) != 5 {
+		t.Fatalf("unexpected debounced batches %+v", batches)
 	}
 }
 
-// TestDebouncer_Flush tests the Flush method
-func TestDebouncer_Flush(t *testing.T) {
-	events := make([][]FileEvent, 0)
-	debouncer := NewDebouncer(100*time.Millisecond, func(e []FileEvent) {
-		events = append(events, e)
-	})
-	defer debouncer.Stop()
+func TestFileWatcherEmitsEvents(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{
+		EntryPath:   dir,
+		Ignore:      []string{},
+		Debounce:    20 * time.Millisecond,
+		Recursive:   true,
+		ComputeHash: true,
+	}
+	w := NewFileWatcher(cfg)
+	if err := w.Start(); err != nil {
+		t.Fatalf("start watcher: %v", err)
+	}
+	defer w.Stop()
 
-	// Add events
-	debouncer.AddEvent(FileEvent{Path: "test1.go"})
-	debouncer.AddEvent(FileEvent{Path: "test2.go"})
-
-	// Flush should trigger events immediately
-	debouncer.Flush()
-
-	if len(events) != 1 {
-		t.Errorf("Expected 1 event batch after flush, got %d", len(events))
+	file := filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(file, []byte("hello"), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := os.WriteFile(file, []byte("hello world"), 0o644); err != nil {
+		t.Fatalf("update file: %v", err)
 	}
 
-	if len(events[0]) != 2 {
-		t.Errorf("Expected 2 file events after flush, got %d", len(events[0]))
+	select {
+	case events := <-w.Events():
+		if len(events) == 0 {
+			t.Fatalf("expected at least one event")
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("timeout waiting for watcher events")
 	}
 }

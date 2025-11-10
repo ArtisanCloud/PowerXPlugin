@@ -95,9 +95,13 @@ jobs:
         run: |
           go env -w GOPROXY=$GOPROXY
           go env -w GOSUMDB=$GOSUMDB
-      - name: Build px-plugin and scaffold sample project
+      - name: Go test (cli devwatch/devapi/watch)
         run: |
           go work sync
+          cd tools/cli
+          go test ./internal/devwatch ./internal/devapi ./internal/watch
+      - name: Build px-plugin and scaffold sample project
+        run: |
           go build -o bin/px-plugin ./tools/cli/cmd/px-plugin
           TMP_DIR=$(mktemp -d)
           cd "$TMP_DIR"

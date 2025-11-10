@@ -34,6 +34,7 @@ type Config struct {
 	Debounce    time.Duration
 	Recursive   bool
 	ComputeHash bool
+	MaxFiles    int
 }
 
 // DefaultConfig returns a default watcher configuration
@@ -44,5 +45,6 @@ func DefaultConfig(entryPath string) *Config {
 		Debounce:    250 * time.Millisecond,
 		Recursive:   true,
 		ComputeHash: true,
+		MaxFiles:    10000,
 	}
 }

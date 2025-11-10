@@ -9,11 +9,14 @@
 - CLI 生成物示例 `examples/starter/`，对齐 Phase 6 用户故事
 - Skeleton Templates CRUD 栈（后端内存仓储 + 前端页面 + `useTemplateApi` 示例）并同步至 CLI 脚手架模板
 - `px-plugin init` 输出 Nuxt 项目新增 `lint` / `test:e2e` 占位脚本，便于后续扩展质量闸门
+- Go CLI 故障排查手册 `docs/guides/cli/go-cli-troubleshooting.md`，涵盖 doctor、SSE、跨平台脚本 FAQ
 
 ### Changed
 - 脚手架模板 README 增加 Release 指引与多语言 TODO 提示
 - Manifest Schema 追加菜单 `children` 递归定义，Skeleton/CLI 均可注册嵌套导航
 - Quickstart / Standalone 指南补充多租户 CRUD 验证与延迟记录流程
+- `px-plugin` 顶级帮助新增 doctor 命令说明，并提示 CLI/FAQ 文档入口；`px-plugin doctor` 输出分步骤进度，便于跟踪卡顿环节
+- `px-plugin dev` 会读取 `~/.px-plugin/config.json` 与 `PX_DEV_TENANT` 等环境变量作为默认值（entry/tenant/dev-api/ignore/mTLS）
 
 ### Deprecated
 - 无

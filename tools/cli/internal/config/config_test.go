@@ -266,9 +266,7 @@ func TestConfigManager_Load(t *testing.T) {
 func TestConfigManager_AddWatcher(t *testing.T) {
 	cm := NewConfigManager()
 
-	called := false
 	watcher := func(config *Config) {
-		called = true
 	}
 
 	cm.AddWatcher("test-path", watcher)

@@ -103,10 +103,13 @@ jobs:
         run: |
           go work sync
           cd tools/cli
+          GOWORK=off go mod download
           GOWORK=off go test ./internal/devwatch ./internal/devapi ./internal/watch
       - name: Build px-plugin and scaffold sample project
         run: |
-          go build -o bin/px-plugin ./tools/cli/cmd/px-plugin
+          go work sync
+          cd tools/cli
+          GOWORK=off go build -o ../../bin/px-plugin ./cmd/px-plugin
           TMP_DIR=$(mktemp -d)
           cd "$TMP_DIR"
           "$GITHUB_WORKSPACE/bin/px-plugin" init com.powerx.ci --force --module github.com/example/ci > /dev/null

@@ -2,7 +2,6 @@ package compatibility
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"

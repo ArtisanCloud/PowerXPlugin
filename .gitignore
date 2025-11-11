@@ -13,7 +13,8 @@ node_modules/
 .output/
 .nitro/
 dist/
-skeleton/web-admin/build/
+build/
+!tools/cli/internal/build/
 tools/cli/cmd/px-plugin
 
 # Dependency locks generated per workspace

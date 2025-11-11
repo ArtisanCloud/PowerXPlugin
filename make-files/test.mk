@@ -19,7 +19,7 @@ test-regression: ## Run full regression suite (smoke + Go + frontend + Playwrigh
 
 test-cli-devwatch: ## Run CLI dev watch stack go tests (devwatch/devapi/watch)
 	@echo "=== CLI Dev Watch Tests Start ==="
-	@cd tools/cli && go test ./internal/devwatch ./internal/devapi ./internal/watch
+	@cd tools/cli && GOWORK=auto go test ./internal/devwatch ./internal/devapi ./internal/watch
 	@echo "=== CLI Dev Watch Tests Finished ==="
 
 ## CI Simulation -------------------------------------------------------------

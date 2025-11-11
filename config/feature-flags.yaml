@@ -1,0 +1,32 @@
+# PowerX Publish Hub feature-flag defaults
+# 每个 flag 定义其用途以及在不同环境下的默认状态
+
+flags:
+  PX_PLUGIN_DEV_MODE:
+    description: Enable local px-plugin dev hotload endpoints & relaxed sandbox policies
+    environments:
+      development: true
+      staging: false
+      production: false
+  PX_PLUGIN_PUBLISH:
+    description: Allow px-plugin publish/dist commands to access Marketplace endpoints
+    environments:
+      development: true
+      staging: true
+      production: true
+  PX_MARKET_OFFLINE_UPLOAD:
+    description: Enable Marketplace offline upload flow (.pxp import + reviewer tooling)
+    environments:
+      development: true
+      staging: true
+      production: true
+  PX_PLUGIN_HUB_ENABLED:
+    description: Turn on Publish Hub orchestration (SLA tracker, telemetry, installer surfacing)
+    environments:
+      development: true
+      staging: true
+      production: true
+
+# NOTE:
+# - Operations 可以在每个环境中通过 config server/helm values 覆盖上列默认值。
+# - 生产环境若需暂时禁用 Publish Hub，可将 PX_PLUGIN_PUBLISH/PX_PLUGIN_HUB_ENABLED 设置为 false 并同步公告。

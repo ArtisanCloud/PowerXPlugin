@@ -70,14 +70,28 @@ px-plugin --version  # 验证可执行文件已安装并输出版本信息
 
 ## Step 3. 生成插件骨架
 
-选择一个新的插件 ID（推荐反向域名）。以下示例使用 `com.powerx.helloworld`，并在自定义的 `plugins/` 目录中创建项目（请将 `{your}/{customer}/{path}` 替换为你实际的工作目录）：
+选择一个新的插件 ID（推荐反向域名），并指定模板/组织信息。以下示例使用 `com.powerx.helloworld`，同时通过 `--template` 选择 `fullstack-go-nuxt`，CLI 会读取 `packages/template-registry/index.yaml`，验证模板版本、运行时要求与依赖锁定：
 
 ```bash
 cd {your}/{customer}/{path}
 mkdir -p plugins
 cd plugins
-px-plugin init com.powerx.helloworld
+px-plugin init com.powerx.helloworld \
+  --template fullstack-go-nuxt \
+  --module github.com/demo/acme-plugin \
+  --org demo-team
 ```
+
+命令执行期间会触发：
+
+1. 模板渲染：复制 `scaffold/templates` 中的 backend/frontend/manifest 模板。
+2. Bootstrap 校验：调用 `POST /internal/plugins/bootstrap/validate`（`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`）生成 Git 注册建议、`publish.yml`、`reports/sbom.json`。
+3. 合规扫描：产出 `publish.yml`、`reports/sbom.json` 并记录 `validationId`，CLI 会在输出中显示。
+
+> 模板选择：
+> - `--template fullstack-go-nuxt`（默认）包含 Gin + Nuxt Web Admin。
+> - `--template backend-go-lite` 仅生成后端骨架，适合纯 API 插件。
+> - 可在 `packages/template-registry/index.yaml` 查看最小运行时和 Hook 列表。
 
 CLI 会在 `plugins/com.powerx.helloworld` 下生成完整项目，并输出创建的文件列表。常见目录包括：
 
@@ -87,7 +101,7 @@ CLI 会在 `plugins/com.powerx.helloworld` 下生成完整项目，并输出创�
 - `docs/contracts/`：嵌入的 Manifest/RBAC/OpenAPI 契约
 - `plugin.yaml`：插件基础元数据（ID、版本、前后端堆栈）
 
-若目录已存在且不为空，可使用 `--force` 覆盖（谨慎操作）。
+若目录已存在且不为空，可使用 `--force` 覆盖（谨慎操作）。完成后请在仓库根目录执行 `git init`/`git remote add`，或者根据 bootstrap 响应中的 `gitRepository.url` 直接创建远程仓库。
 
 ## Step 4. 安装生成项目的依赖
 
@@ -173,7 +187,7 @@ http://localhost:3031/_p/com.powerx.helloworld/admin/
 
 > Nuxt 导航栏左上角默认展示 `public/images/logo-s.png`。你可以用自己的图替换该文件（保持文件名不变），或在 `app/components/AppNavbar.vue` 中调整引用。
 
-## Step 6. 验证契约与元数据
+## Step 7. 验证契约与元数据
 
 CLI 会自动写入契约文件与 `plugin.yaml`。建议检查以下内容：
 
@@ -183,7 +197,70 @@ CLI 会自动写入契约文件与 `plugin.yaml`。建议检查以下内容：
 
 必要时，可将生成项目与 `examples/starter/` 做差异对比，确认模板未意外 drift。
 
-## Step 7. 清理或复用工程
+## Step 8. 运行 `px-plugin doctor`
+
+在插件根目录执行：
+
+```bash
+px-plugin doctor --fix
+```
+
+该命令会输出 `.doctor/report.json`，校验以下内容：
+
+1. Node/Go 版本是否满足 `>=18` / `>=1.24`。
+2. `backend/go.mod`、`web-admin/package.json`、`web-admin/node_modules/` 是否齐全（`--fix` 会自动执行 `go mod tidy` / `npm install`）。
+3. 必需 Feature Flag（`PX_PLUGIN_SCAFFOLD_V2`, `plugin-import-audit`, `gitops-bootstrap` 等）是否已配置。
+
+报告建议随同 `publish.yml`、`reports/sbom.json` 一并提交到代码评审或合规工单。
+
+## Step 9. 宿主模拟器与沙箱验证
+
+完成基础开发后，可以利用 Phase 11 的链路在本地模拟宿主、执行沙箱测试并生成调试报告：
+
+1. **启动宿主模拟器**
+   ```bash
+   px-plugin host start --mock \
+     --plugin com.powerx.helloworld \
+     --runtime-version latest \
+     --tenant demo-tenant
+   ```
+   命令会返回 `sessionId`、`endpoint` 与日志地址；可通过 `px-plugin host status --session <id>` 与 `px-plugin host logs --session <id>` 查看运行情况，底层对应 API 为 `POST/GET /internal/dev/hosts/sessions`。
+
+2. **执行沙箱验证**
+   ```bash
+   px-plugin sandbox deploy \
+     --host-session host-123 \
+     --dataset demo \
+     --test-plan hotload-suite
+   ```
+   CLI 会调用 `POST /internal/dev/sandbox/deploy`，输出 `validationId` 供 Marketplace 审核或自测记录。
+
+3. **上传调试报告**
+   ```bash
+   px-plugin debug report \
+     --session host-123 \
+     --input ./reports/debug.json
+   ```
+   触发 `POST /internal/dev/debug/report`，记录 `debug.report.generate_ms` 指标并将脱敏报告同步到工单系统。
+
+调试完成后，可使用 `px-plugin host stop --session <id>` 释放资源。
+
+## Step 10. 第三方源码导入（可选）
+
+若需要将外部模板或客户源码导入到插件仓库，请在执行 `px-plugin init` 之后运行：
+
+```bash
+px-plugin import --source ./vendor/crm.tar.gz \
+  --type tarball \
+  --provider github.com \
+  --license MIT
+```
+
+CLI 会读取 `config/compliance/external_source_policy.yaml`，根据域名、包体大小、许可证以及校验和要求进行评估，并生成 `./.compliance/import-report.json`。若命中 denylist 或超过阈值，命令会提示需要人工审批的联系人，同时把事件写入 `plugin-import-audit` Webhook（由后端 `bootstrap_handler` 记录）。
+
+> 建议将 import/doctor 报告附到变更工单，方便 Marketplace 审核人员追踪第三方源码的来源、许可证和扫描结果。
+
+## Step 11. 清理或复用工程
 
 - 不再需要时，可删除 `plugins/com.powerx.helloworld` 目录。
 - 若计划长期开发，请更新 `backend/go.mod` 的 module 名称并提交到独立仓库。

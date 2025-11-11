@@ -1,9 +1,128 @@
-pluginId: com.powerx.demo
-name: Powerx Demo Plugin
+id: com.powerx.demo
+name: PowerX Demo Plugin
 version: 0.1.0
+description: "Demo 插件"
+corex_version: ">=0.1.0"
+security_baseline_version: "2025.10"
+
+data_usage:
+  - purpose: demo_usage
+    type: operational_log
+    retention: 30d
+    requires_consent: false
+
+runtime:
+  kind: process
+  entry: backend/bin/plugin
+  env:
+    POWERX_BIND_ADDR: ${POWERX_BIND_ADDR:-:8088}
+    POWERX_PROXY: "1"
+    POWERX_PLUGIN_ID: "com.powerx.demo"
+    POWERX_SECURITY_JWT_ISSUER: "powerx-auth"
+    POWERX_SECURITY_JWT_AUDIENCE: "plugin:com.powerx.demo"
+    POWERX_SECURITY_JWT_SECRET: "${POWERX_AUTH_JWTSECRET}"
+  health:
+    http: /healthz
+    interval: 10s
+    timeout: 3s
+
 backend:
-  language: go
-  framework: go-gin
+  entry: backend/bin/plugin
+  port: 8088
+  health: /healthz
+
+endpoints:
+  http_base_path: /api/v1
+
 frontend:
-  stack: nuxt
-  layer: '@artisan-cloud/plugin-framework-admin'
+  admin:
+    kind: process
+    process:
+      entry: node
+      args: ["./web-admin/.output/server/index.mjs"]
+      env:
+        NODE_ENV: production
+        POWERX_PROXY: "1"
+      health:
+        http: /healthz
+        interval: 5s
+        timeout: 2s
+    static_dir: web-admin/.output/public
+    i18n:
+      dir: web-admin/i18n
+      format: i18next
+      default_namespace: menus
+      namespaces: [menus]
+      locales: [zh-CN, en]
+    menus:
+      - id: plugins.demo
+        title: Demo 控制台
+        title_i18n:
+          namespace: menus
+          key: menu.demo.home
+          default: Demo Home
+        icon: i-heroicons-cube-transparent
+        path: /intro
+        route: intro
+        order: 15
+        required_policies: [demo:resource:read]
+
+routes:
+  basePath: /api/v1
+  adminManifest: /api/v1/admin/manifest
+  rbac: /api/v1/admin/rbac
+
+rbac:
+  resources:
+    - resource: demo:resource
+      actions: [read, create, update, delete]
+
+permissions:
+  - resource: demo:resource
+    actions: [read, create, update, delete]
+
+agents:
+  - id: demo.assistant
+    plugin_id: com.powerx.demo
+    name: Demo 助理
+    description: Demo 插件 Agent
+    default_tools:
+      - demo.resource.create
+
+capabilities:
+  provides:
+    - id: demo.resource.create
+      version: 0.1.0
+      descriptor: contracts/capabilities/demo.resource.create.yaml
+
+tools:
+  - id: demo.resource.create
+    plugin_id: com.powerx.demo
+    name: 创建资源
+    description: Demo 资源创建 API
+    transport: http
+    endpoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/resources
+    method: POST
+    rbac_resource: demo:resource
+
+migrations:
+  driver: go
+  entry: backend/bin/migrate
+  args: ["setup"]
+  workdir: ./backend
+  once: true
+  timeout: 60s
+
+assets:
+  public_dir: ./web-admin/public
+  webAdminPath: ./web-admin/.output
+
+checksums:
+  package_sha256: ""
+
+signature:
+  enabled: false
+
+metadata:
+  author: PowerX Demo Team
+  license: MIT

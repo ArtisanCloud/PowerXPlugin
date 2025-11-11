@@ -1,0 +1,24 @@
+version: v0.1.0
+updatedAt: 2025-11-25T00:00:00Z
+flows:
+  standard:
+    description: "Default publish approval flow for stable channel"
+    steps:
+      - name: test-tenant-validation
+        owners: ["qa@powerx.dev"]
+        sla: "4h"
+      - name: marketplace-approval
+        owners: ["marketplace@powerx.dev"]
+        sla: "4h"
+      - name: release-manager-signoff
+        owners: ["ops@powerx.dev"]
+        sla: "2h"
+  expedited:
+    description: "Expedited flow for hotfix or beta releases"
+    steps:
+      - name: limited-validation
+        owners: ["qa@powerx.dev"]
+        sla: "1h"
+      - name: release-manager-signoff
+        owners: ["ops@powerx.dev"]
+        sla: "1h"

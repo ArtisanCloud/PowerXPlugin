@@ -26,6 +26,7 @@ jobs:
       GOTOOLCHAIN: local
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: sum.golang.org
+      GOWORK: auto
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -66,6 +67,7 @@ jobs:
       GOTOOLCHAIN: local
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: sum.golang.org
+      GO111MODULE: on
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -78,7 +80,9 @@ jobs:
       - name: Go work sync
         run: go work sync
       - name: Run contract validators
-        run: go test ./framework/backend/go/manifest ./framework/backend/go/rbac
+        run: |
+          cd framework
+          go test ./backend/go/manifest ./backend/go/rbac
 
   cli:
     runs-on: ubuntu-latest
@@ -86,6 +90,7 @@ jobs:
       GOTOOLCHAIN: local
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: sum.golang.org
+      GO111MODULE: on
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -95,10 +100,16 @@ jobs:
         run: |
           go env -w GOPROXY=$GOPROXY
           go env -w GOSUMDB=$GOSUMDB
+      - name: Go test (cli devwatch/devapi/watch)
+        run: |
+          go work sync
+          cd tools/cli
+          go test ./internal/devwatch ./internal/devapi ./internal/watch
       - name: Build px-plugin and scaffold sample project
         run: |
           go work sync
-          go build -o bin/px-plugin ./tools/cli/cmd/px-plugin
+          cd tools/cli
+          go build -o ../../bin/px-plugin ./cmd/px-plugin
           TMP_DIR=$(mktemp -d)
           cd "$TMP_DIR"
           "$GITHUB_WORKSPACE/bin/px-plugin" init com.powerx.ci --force --module github.com/example/ci > /dev/null

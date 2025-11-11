@@ -119,6 +119,36 @@ export POWERX_DB_DSN="postgres://plugin_crm:9s7d1h@db.powerx:5432/powerx?search_
 | 凭证轮换      | 宿主定期轮换密码                     |
 | 卸载清理      | 宿主执行 DROP SCHEMA CASCADE（受控） |
 
+---
+
+## 🧩 六、第三方源码导入与合规策略
+
+当插件需要引入外部模板、供应商源码或客户特定实现时，必须遵循以下流程（与 `px-plugin import` 命令保持一致）：
+
+1. **策略文件**：所有导入规则在仓库根目录 `config/compliance/external_source_policy.yaml` 中维护，定义允许的域名/协议、最大文件尺寸、许可白名单/黑名单、审批联系人以及 `plugin-import-audit` Webhook。
+2. **CLI 审核**：在插件项目根目录运行：
+
+   ```bash
+   px-plugin import --source ./vendor/crm.tar.gz \
+     --type tarball \
+     --provider github.com \
+     --license MIT
+   ```
+
+   - 命令会解析策略文件，检查包体大小、来源域名、许可证、校验和要求；
+   - 结果写入 `./.compliance/import-report.json`，并将状态推送到 `https://audit.powerx.dev/hooks/plugin-import`。
+
+3. **审批判定**：
+   - 许可证在 `licenses.deny` 中 → **阻断**，不得纳入仓库；
+   - 未提供许可证或包体超过 `maxSizeMb` → 触发策略中的 `approvals.requiredFor` 条目，需发送 import 报告给 `approvals.contacts`；
+   - 所有字段满足策略 → 状态为 `pass`，可继续执行 `px-plugin init` / `px-plugin doctor` / 提交 PR。
+
+4. **工单与审计**：
+   - 将 `import-report.json`、`publish.yml`、`reports/sbom.json` 附加到 Marketplace 审核或内部合规工单；
+   - 所有导入操作需在 `plugin-import-audit` 日志中保留至少 365 天。
+
+> **提示**：如果策略需要自定义域名或新增许可证，请先更新 `config/compliance/external_source_policy.yaml` 并通过 PR 评审；CLI 会在下次执行时自动采用最新规则。
+
 ### 🔹 插件职责
 
 | 项目         | 要求             |

@@ -21,6 +21,13 @@
 1. 安装 Go 1.24+ 与 Node.js 18+。
 2. 执行 `go work sync`，并在 `framework/frontend/nuxt` 下的各 Nuxt layer 目录运行 `npm install`。
 3. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
+4. 体验 Go CLI 热加载：请按照 `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 构建 `px-plugin`、运行 `px-plugin dev --watch` / `dev --logs`，并通过 `px-plugin doctor` 生成 `.doctor/report.json` 以验证 Toolchain、mTLS、Dev API、Watcher 状态。
+
+## Publish Hub 链路（CLI → 审核 → 安装）
+
+1. **CLI 构建/发布**：阅读 `specs/004-publish-hub-spec/spec.md` 与 `specs/004-publish-hub-spec/quickstart.md`，依照 `px-plugin dev/publish/dist` 命令准备 manifest、签名与 `.pxp` artefact；Node 18 + TypeScript 5 依赖位于 `tools/cli/package.json`。
+2. **Marketplace 审核**：`docs/guides/publish/marketplace-review.md` 描述在线/离线审核 checklist、SLA 监控、告警与 reviewer 控制台；配套任务见 `specs/004-publish-hub-spec/tasks.md` Phase 5 & 6。
+3. **租户安装/回滚**：按照 `specs/004-publish-hub-spec/tasks.md` Phase 7 以及 quickstart 中的 “Install / Rollback” 步骤，通过 PowerX Admin `install/url` 或 `install/local` 完成安装、灰度与 5 分钟内回滚验证。
 
 ## 模板同步流程
 

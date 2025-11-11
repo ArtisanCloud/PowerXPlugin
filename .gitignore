@@ -14,6 +14,8 @@ node_modules/
 .nitro/
 dist/
 build/
+!tools/cli/internal/build/
+tools/cli/cmd/px-plugin
 
 # Dependency locks generated per workspace
 package-lock.json
@@ -21,6 +23,7 @@ pnpm-lock.yaml
 yarn.lock
 
 # Logs & env files
+logs
 *.log
 *.tmp
 *.swp

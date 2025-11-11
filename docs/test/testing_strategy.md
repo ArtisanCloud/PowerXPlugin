@@ -603,6 +603,14 @@ echo "🎉 快速验证完成！所有基础测试通过。"
 echo "💡 运行 'make test-e2e' 进行完整 E2E 测试"
 ```
 
+为了确保 Go 版 dev --watch 与 Dev API mock 行为保持一致，新增 CLI 专用回归命令：
+
+```bash
+# 运行 devwatch/devapi/watch 三个包的 mock 测试矩阵
+make test-cli-devwatch
+# 等价于：cd tools/cli && go test ./internal/devwatch ./internal/devapi ./internal/watch
+```
+
 ---
 
 ## 5. 回归测试策略

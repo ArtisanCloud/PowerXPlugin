@@ -31,7 +31,7 @@ plugins/
 └── com.powerx.plugins.base/
 └── plugin.yaml
 
-````
+```
 
 扫描到后：
 
@@ -45,225 +45,288 @@ plugins/
 
 ## 二、基本结构
 
-以下为一个完整示例：
+`plugin.yaml` 现行 schema 与 `docs/lifecycle/examples/plugin.yaml` 保持 1:1 对齐，顶层通常包含：
+
+1. **元信息**：`id/name/version/description/corex_version/security_baseline_version/data_usage`
+2. **运行入口**：`runtime`（宿主如何启动进程）、`backend`（供反代的 HTTP 服务）、`endpoints`
+3. **前端托管**：`frontend.admin`（Nuxt/Nitro 服务、静态兜底、i18n、菜单）
+4. **路由与权限**：`routes`、`rbac`、`permissions`
+5. **能力声明**：`events`、`agents`、`capabilities`、`tools`、`workflows`
+6. **分发与合规**：`dependencies`、`migrations`、`assets`、`checksums`、`signature`、`metadata`
+
+以下示例节选自 `docs/lifecycle/examples/plugin.yaml`，其余字段请直接参考该文件：
 
 ```yaml
 id: com.powerx.plugins.base
-name: Base Template Plugin
-version: 0.1.0
+name: Base template Plugin
+version: 0.7.0
+description: "PowerX 基础任务管理插件，提供任务、权限与 Agent 能力"
+corex_version: ">=0.1.0"
+security_baseline_version: "2025.10"
 
-description: >
-  适配 PowerX 插件生态的最小可运行模板，包含 RLS、多租户、Agent 注册与 RBAC 示例。
+data_usage:
+  - purpose: tenant_data_classification
+    type: pii_inventory
+    retention: 365d
+    requires_consent: true
 
-author: ArtisanCloud
-license: MIT
-homepage: https://github.com/ArtisanCloud/PowerX
+runtime:
+  kind: process
+  entry: backend/bin/plugin
+  env:
+    POWERX_BIND_ADDR: ${POWERX_BIND_ADDR:-:8086}
+    POWERX_SECURITY_JWT_SECRET: "${POWERX_AUTH_JWTSECRET}"
+  health:
+    http: /healthz
+    interval: 10s
+    timeout: 3s
 
 backend:
   entry: backend/bin/plugin
-  port: 8087
+  port: 8086
   health: /healthz
 
+endpoints:
+  http_base_path: /api/v1
+
+frontend:
+  admin:
+    kind: process
+    process:
+      entry: node
+      args: ["./web-admin/.output/server/index.mjs"]
+      env:
+        NODE_ENV: production
+        POWERX_PROXY: "1"
+    static_dir: web-admin/.output/public
+    i18n:
+      dir: web-admin/i18n
+      format: i18next
+      default_namespace: menus
+      locales: [zh-CN, en]
+    menus:
+      - id: plugins.base
+        title_i18n:
+          namespace: menus
+          key: menu.base.template
+          default: Base Plugin
+        path: /intro
+        required_policies: [base:template:read]
+
 routes:
-  basePath: /v1
+  basePath: /api/v1
   adminManifest: /api/v1/admin/manifest
   rbac: /api/v1/admin/rbac
+  operations:
+    admin: /api/v1/admin/operations
+  marketplace:
+    admin: /api/v1/admin/marketplace
+    public: /api/v1/marketplace
+    checklist_graphql: /api/v1/admin/marketplace/checklist/graphql
+
+rbac:
+  resources:
+    - resource: base:template
+      actions: [read, create, update, delete]
 
 permissions:
   - resource: base:template
     actions: [read, create, update, delete]
 
-menus:
-  - id: "plugins.base"
-    title: "menu.base.template"
-    icon: "i-heroicons-clipboard-document-check"
-    path: "/plugins/base/templates"
-    order: 20
-
-assets:
-  webAdminPath: web-admin/.output  # 可选
-
 agents:
-  - id: "base.assistant"
-    name: "Note 助理"
-    description: "生成任务计划、执行模板管理"
-    default_tools: ["template.template.create"]
+  - id: base.assistant
+    plugin_id: com.powerx.plugins.base
+    default_tools:
+      - base.template.create
+      - base.template.query
+
+capabilities:
+  provides:
+    - id: base.template.create
+      descriptor: contracts/capabilities/base.template.create.yaml
 
 tools:
-  - id: "template.template.create"
-    name: "创建任务"
-    transport: "grpc"
-    endpoint: "127.0.0.1:51031"
+  - id: base.template.create
+    transport: http
+    endpoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates
+    method: POST
+    rbac_resource: base:template
 
-workflows:
-  - id: "template.plan.generate"
-    name: "生成 Sprint 计划"
-    endpoint: "grpc://127.0.0.1:51031/workflows/plan_generate"
+events:
+  produces:
+    - topic: marketplace.license.renewal.due
+      description: "License 续费任务触发事件"
 
-dependencies:
-  requires:
-    - com.powerx.plugins.crm >=0.5.0
-  conflicts:
-    - com.powerx.plugins.demo
-````
+migrations:
+  driver: go
+  entry: backend/bin/migrate
+  args: ["setup"]
+  workdir: ./backend
+
+assets:
+  public_dir: ./web-admin/public
+  webAdminPath: ./web-admin/.output
+
+checksums:
+  package_sha256: ""
+
+signature:
+  enabled: false
+
+metadata:
+  author: PowerX Team
+  category: productivity
+  homepage: https://powerx.dev/plugins/base
+```
 
 ---
 
 ## 三、字段详解
 
-| 字段            | 类型     | 必填 | 说明                                          |
-| ------------- | ------ | -- | ------------------------------------------- |
-| `id`          | string | ✅  | 插件唯一标识，命名空间风格：`com.<org>.<category>.<name>` |
-| `name`        | string | ✅  | 插件显示名称（多语言通过 i18n 实现）                       |
-| `version`     | string | ✅  | 语义化版本号（遵循 semver）                           |
-| `description` | string | ☐  | 简要说明                                        |
-| `author`      | string | ☐  | 作者或组织名称                                     |
-| `license`     | string | ☐  | 开源协议                                        |
-| `homepage`    | string | ☐  | 项目主页或文档链接                                   |
+> 下表与后续小节均以示例文件为准，如需新增字段，请先更新 `docs/lifecycle/examples/plugin.yaml` 再回写本规范。
 
----
+### 1️⃣ 元信息（Metadata）
 
-### 1️⃣ backend（后端运行配置）
+| 字段                       | 类型     | 必填 | 说明 |
+| ------------------------ | ------ | -- | --- |
+| `id`                     | string | ✅  | 插件唯一标识，命名空间风格：`com.<org>.<category>.<name>`。 |
+| `name`                   | string | ✅  | 插件显示名称，可结合前端 i18n。 |
+| `version`                | string | ✅  | 语义化版本，遵循 `semver`。 |
+| `description`            | string | ☐  | 简要说明。 |
+| `corex_version`          | string | ✅  | 所需 PowerX Core/Plugin Manager 版本范围，例如 `>=0.1.0`。 |
+| `security_baseline_version` | string | ☐  | 当前遵循的安全基线版本号，用于 Marketplace 审核。 |
 
-| 字段       | 类型     | 说明                    |
-| -------- | ------ | --------------------- |
-| `entry`  | string | 后端二进制文件路径（相对于插件根目录）   |
-| `port`   | int    | 插件服务监听端口              |
-| `health` | string | 健康检查路径（HTTP 200 视为存活） |
+> `author`、`license`、`homepage` 等信息统一收敛到文末的 `metadata` 段，避免重复。
 
-PowerX 启动插件时执行：
+### 2️⃣ 数据使用（`data_usage`）
 
-```bash
-PLUGIN_ID=com.powerx.plugins.base ./backend/bin/plugin
+- 描述插件涉及的用户 / 租户数据处理场景，供安全与隐私审计。
+- 每一项包含：
+
+| 字段               | 说明 |
+| ---------------- | ---- |
+| `purpose`        | 数据处理目的（如 `tenant_data_classification`）。 |
+| `type`           | 数据类别，示例：`pii_inventory`、`operational_log`。 |
+| `retention`      | 保留时长，单位可为 `d`、`h`。 |
+| `requires_consent` | 是否需要租户额外同意。 |
+
+### 3️⃣ runtime（运行时托管）
+
+| 字段        | 说明 |
+| ---------- | ---- |
+| `kind`     | 当前仅支持 `process`，表示由宿主直接 `exec` 二进制或 Node 进程。 |
+| `entry`    | 可执行文件路径，通常与 `backend.entry` 相同。 |
+| `env`      | 启动所需环境变量，支持 `${VAR:-default}` 模板，敏感值由宿主注入。 |
+| `health`   | 存活探针：`http`（路径）、`interval`、`timeout`。 |
+
+PowerX 将渲染 `POWERX_*` 变量后启动该进程，并按健康检查结果做重试或告警。
+
+### 4️⃣ backend（反代入口）
+
+| 字段     | 说明 |
+| ------ | ---- |
+| `entry` | 后端二进制（或脚本）相对路径。 |
+| `port`  | 插件监听端口（宿主在本地回环访问）。 |
+| `health`| HTTP 健康检查路径，仅返回 200 即视为存活。 |
+
+### 5️⃣ endpoints
+
+- `http_base_path`：插件内业务 API 的统一前缀，例如 `/api/v1`，便于 tools / Agent 构造 URL。
+
+### 6️⃣ frontend.admin（后台 UI 与菜单）
+
+| 字段 | 说明 |
+| --- | --- |
+| `kind` | `process` 或 `static`，Nuxt 4 默认 `process`。 |
+| `process.entry/args/env` | 如何启动 Nitro Server。 |
+| `process.health` | 前端健康检查，推荐实现 `/healthz` 路由。 |
+| `static_dir` | 静态兜底目录，当 SSR 宕机时直接喂文件。 |
+| `i18n` | 包含 `dir`、`format`（如 `i18next`）、`default_namespace`、`namespaces`、`locales`。 |
+| `menus` | 菜单树，与前端路由和权限绑定。子项可递归包含：`id`、`title`/`title_i18n`、`icon`、`path`、`route`、`order`、`slot`、`required_policies`、`children`。 |
+
+> 菜单标题需配合 i18n key，`required_policies` 应与 `permissions` / `rbac.resources` 中的动作匹配。
+
+### 7️⃣ routes（路由映射）
+
+| 字段                       | 说明 |
+| ------------------------ | ---- |
+| `basePath`               | 插件业务 API 前缀（建议 `/api/v1`）。 |
+| `adminManifest`          | 管理端 Manifest 接口。 |
+| `rbac`                   | RBAC 清单接口。 |
+| `operations.admin`       | Ops 控制面接口，用于任务编排或运行观测。 |
+| `marketplace.admin`      | Marketplace 管理端接口。 |
+| `marketplace.public`     | Marketplace 公共查询接口。 |
+| `marketplace.checklist_graphql` | 审核清单 GraphQL 入口（如适用）。 |
+
+宿主反代规则示例：
+
+```
+/_p/<plugin-id>/api/*   → backend:port
+/_p/<plugin-id>/admin/* → frontend.admin.static_dir / 进程
 ```
 
-并通过 HTTP 检查：
+### 8️⃣ rbac（资源与动作）
 
-```
-GET http://127.0.0.1:8087/healthz
-```
+`rbac.resources` 描述宿主需要聚合的资源、动作及用途：
 
----
-
-### 2️⃣ routes（路由映射）
-
-定义宿主平台与插件后端的接口映射规则：
-
-| 字段              | 说明                    |
-| --------------- | --------------------- |
-| `basePath`      | 插件自身 API 前缀（建议 `/v1`） |
-| `adminManifest` | manifest 上报接口路径       |
-| `rbac`          | 权限上报接口路径              |
-
-PowerX 反代挂载：
-
-```
-/_p/<plugin-id>/api/* → backend:port
+```yaml
+rbac:
+  resources:
+    - resource: marketplace.listings
+      actions: [read, write, review]
 ```
 
-并根据 routes 解析 manifest/rbac 信息。
+此结构会与 `/api/v1/admin/rbac` 响应进行校验，必须与运行时代码保持一致。
 
----
+### 9️⃣ permissions（权限声明）
 
-### 3️⃣ permissions（权限声明）
-
-插件自定义权限树。
-宿主 PowerX 会聚合所有插件的声明，统一呈现在「系统设置 / 权限管理」中。
+权限数组用于 Marketplace 与宿主 UI 展示，结构与 `rbac.resources` 类似，但更关注插件内部消费：
 
 ```yaml
 permissions:
   - resource: base:template
     actions: [read, create, update, delete]
-  - resource: base:settings
-    actions: [read, update]
 ```
 
-> 插件只需声明自身资源与动作，不需保存角色绑定。
-> PowerX 会在运行时注入授权结果（permissions 数组）。
+> 插件无需在 YAML 中声明角色或绑定关系，宿主会根据租户策略注入最终权限列表。
 
----
-
-### 4️⃣ menus（菜单注册）
-
-插件的前端入口在 PowerX 后台侧边栏中显示：
-
-| 字段      | 类型     | 说明                                     |
-| ------- | ------ | -------------------------------------- |
-| `id`    | string | 菜单唯一标识                                 |
-| `title` | string | 菜单标题键（多语言 key，例如 `menu.base.template`） |
-| `icon`  | string | 图标标识（HeroIcons / Lucide）               |
-| `path`  | string | 前端访问路径                                 |
-| `order` | int    | 排序权重（越小越靠上）                            |
-
-示例：
+### 🔟 events（事件能力）
 
 ```yaml
-menus:
-  - id: "plugins.base.intro"
-    title: "menu.base.intro"
-    icon: "i-heroicons-sparkles"
-    path: "/plugins/base/intro"
-    order: 10
+events:
+  produces:
+    - topic: marketplace.license.renewal.due
+      description: "License 续费任务触发事件"
 ```
 
----
+- `produces`：插件将投递的事件主题，用于订阅/审计。
+- 预留 `consumes` 字段，可在未来版本声明依赖的事件源。
 
-### 5️⃣ assets（前端构建产物）
+### 1️⃣1 Agents / Capabilities / Tools / Workflows
 
-```yaml
-assets:
-  webAdminPath: web-admin/.output
-```
+- **agents**：声明 Agent ID、描述、默认工具、所需权限等，详见 [Agent Contract](./agent_contract.md)。
+- **capabilities**：`provides`/`consumes` 引用能力描述文件（YAML/JSON），并指向输入输出 schema。
+- **tools**：对接 HTTP/GRPC 接口，必须包含 `transport`、`endpoint`、`rbac_resource`，并推荐提供 JSON Schema。
+- **workflows**（可选）：声明多步骤编排，字段包含 `steps`、`required_permissions` 等。
 
-说明：
+这些字段共同驱动 Agent Hub、px-plugin CLI 以及 Marketplace 的能力目录。
 
-- 指向前端打包产物路径；
-- 若为空，则插件为纯后端插件；
-- PowerX 反代规则：
+### 1️⃣2 dependencies / migrations
 
-  ```
-  /_p/<plugin-id>/admin/* → <webAdminPath>
-  ```
+| 字段          | 说明 |
+| ----------- | ---- |
+| `dependencies.requires` | 需要先安装/启用的其他插件或外部服务。 |
+| `dependencies.conflicts` | 不可同时启用的插件列表。 |
+| `dependencies.replaces` | 替换/升级关系。 |
+| `migrations` | 描述迁移命令：`driver`（go/bash/tern）、`entry`、`args`、`workdir`、`once`、`timeout`。 |
 
----
+### 1️⃣3 assets / checksums / signature / metadata
 
-### 6️⃣ agents / tools / workflows（Agent 能力注册）
-
-详见 👉 [Agent Contract 规范](./agent_contract.md)
-
-示例：
-
-```yaml
-agents:
-  - id: base.assistant
-    name: Note 助理
-tools:
-  - id: template.template.create
-    transport: grpc
-    endpoint: 127.0.0.1:51031
-```
-
-PowerX 会在安装或启用插件时自动注册到 Agent Hub。
-
----
-
-### 7️⃣ dependencies（依赖与冲突）
-
-| 字段          | 说明             |
-| ----------- | -------------- |
-| `requires`  | 插件依赖（需先安装）     |
-| `conflicts` | 冲突插件（不可共存）     |
-| `replaces`  | 替代插件（升级或迁移时使用） |
-
-示例：
-
-```yaml
-dependencies:
-  requires:
-    - com.powerx.plugins.crm >=0.5.0
-  conflicts:
-    - com.powerx.plugins.demo
-```
+- `assets.public_dir`：静态资源根目录。
+- `assets.webAdminPath`：Nuxt 打包目录（供宿主直接挂载静态资源）。
+- `checksums.package_sha256`：发布后由 CI 写入，用于完整性校验。
+- `signature`：是否启用离线包签名，后续若启用需补充算法与公钥。
+- `metadata`：作者、分类、标签、图标、主页、许可证等 Marketplace 展示信息。
 
 ---
 

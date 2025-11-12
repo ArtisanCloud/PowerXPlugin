@@ -166,6 +166,25 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 
 ---
 
+### User Story 8 - Local install fast path keeps developer velocity (Priority: P2)
+
+> 来源：SCN-DEV-PLUGIN-PUBLISH-001 · `SCN-DEV-PLUGIN-LOCAL-DEBUG-001`
+
+开发/运维团队需要在 Marketplace 审核之前快速验证包体，或在隔离环境直接安装插件，因此 Publish Hub 必须提供 dist → `/admin/plugins/install/local` 的标准流程，同时保留 `.pxp` 交付路径。
+
+**Why this priority**: 没有统一的本地打包与安装脚本，CLI、脚手架和 PowerX 核心会出现体验断层，调试效率受限。
+
+**Independent Test**: 在 `px-plugin init` 生成的 helloworld 项目中执行 `make dist && make local-install API_BASE=https://admin.powerx.dev/api/v1 TOKEN=...`，完成 dist 构建、调用 `/admin/plugins/install/local` 并启用版本；同时参照 `docs/guides/publish/local-install.md` 走 `.pxp` 路径，验证文档流程。
+
+**Acceptance Scenarios**:
+
+1. `make dist`/`make pack` 串联 go build + npm build + artefact 汇聚，输出与 `px-plugin dist` 相同的目录结构，并在 60 秒内完成。
+2. `make local-install` 默认读取 `publish.yml`/`manifest`、支持 `API_BASE/TOKEN/ENABLE/FORCE` 参数，将 dist 目录上传至 `/admin/plugins/install/local`，日志包含安装/启用状态；失败时回滚并给出补救建议。
+3. 文档 `docs/guides/publish/local-install.md` 描述 dist、zip、`.pxp` 三种本地安装路径、API 请求示例、Makefile 命令与常见错误；Quickstart 与 Publish 指南链接到该文档。
+4. 通过 `px-plugin doctor` + Admin UI 可验证安装版本已启用，Workflows 指标 `plugin.local.iteration_cycle_time` 记录 15 分钟内闭环。
+
+---
+
 ### Edge Cases
 
 - 模板索引缺少依赖或扫描失败时，`px-plugin init` 必须回滚输出并提示补齐镜像/豁免。
@@ -184,7 +203,8 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 1. **Quickstart 路线**：`docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 新增 Go CLI 热加载/Doctor 步骤，覆盖 Dev API 启动、`px-plugin dev --watch`、`dev --logs`、`px-plugin doctor` 报告，确保新成员 5 分钟内验证环境。
 2. **CLI 深入指南**：`docs/guides/publish/go-cli-dev-watch.md#health-checks` 与 `#error-recovery--rollback` 描述 doctor flag、报告格式、指数退避与自动回滚逻辑，对应 T088/T091 的实现细节。
 3. **E2E 验证记录**：`docs/development/t084-integration-tests-summary.md#真实-dev-api-e2e-验证（t091）` 保存了真实 Dev API 流程、终端输出与 artefact 路径，为 QA/Docs 提供复现脚本。
-4. **后续文档任务**：T094 仍需同步 FAQ / Admin Guide，确保 doctor/rollback 能力纳入上线前检查清单。
+4. **本地安装指南**：新增 `docs/guides/publish/local-install.md`（T098）详解 dist/zip/`.pxp` 本地安装流程、`/admin/plugins/install/local` 参数、Makefile 命令与错误排查；Quickstart 与 Publish 文档需链接该指南。
+5. **后续文档任务**：T094 仍需同步 FAQ / Admin Guide，确保 doctor/rollback 能力纳入上线前检查清单。
 
 ## High-Level Architecture & CLI Contracts
 

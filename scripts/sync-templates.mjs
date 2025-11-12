@@ -59,7 +59,7 @@ for (const mapping of config.mappings) {
 
   for (const relative of files) {
     const srcPath = path.join(sourceRoot, relative)
-    const isBinary = isBinaryAsset(relative)
+    const isBinary = isBinaryAsset(relative, mapping.binaryExts)
     let content
     if (isBinary) {
       content = fs.readFileSync(srcPath)
@@ -134,7 +134,14 @@ function applyReplacements(input, relativePath, replacements) {
   return result
 }
 
-function isBinaryAsset(relativePath) {
+function isBinaryAsset(relativePath, overrides) {
   const ext = path.extname(relativePath).toLowerCase()
+  if (overrides?.length) {
+    const overrideSet = new Set(overrides.map((item) => item.toLowerCase()))
+    if (overrideSet.has(ext)) {
+      return true
+    }
+    return binaryExtensions.has(ext)
+  }
   return binaryExtensions.has(ext)
 }

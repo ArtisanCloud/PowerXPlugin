@@ -95,7 +95,7 @@
 ## 6. 参考资源
 
 - [架构设计总览](../plan/001-init-project.md)
-- [Standalone 运行指南](../standalone-mode.md)
+- [Standalone 运行指南](../develop/standalone-mode.md)
 - [模板同步脚本配置](../../scripts/template-sync-config.yaml)
 
 ## 7. 当前 Skeleton 的选择

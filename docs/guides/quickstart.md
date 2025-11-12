@@ -9,7 +9,7 @@
    - 建议阅读 `docs/init-project.md` 了解更完整的环境说明。
 
 2. **Standalone 骨架演练**  
-   - 按照《[PowerXPlugin Standalone 启动教程](./standalone-mode.md)》同步依赖并启动 Skeleton 后端与管理端。  
+   - 按照《[PowerXPlugin Standalone 启动教程](./develop/standalone-mode.md)》同步依赖并启动 Skeleton 后端与管理端。  
    - 使用多租户 Header 验证 Templates CRUD 示例（默认租户为 `X-Tenant-ID: 1`）：  
      ```bash
      # 列表/创建/更新/删除示例
@@ -23,7 +23,7 @@
    - 验证 `GET /api/v1/ping` 与 Starter 页面，熟悉框架 App 生命周期。
 
 3. **CLI 模板生成与自测**  
-   - 参考《[使用 CLI 生成并运行插件骨架](./cli-plugin-tutorial.md)》构建 `px-plugin`、执行 `./bin/px-plugin init <plugin-id>` 生成骨架。  
+   - 参考《[使用 CLI 生成并运行插件骨架](./develop/cli-plugin-tutorial.md)》构建 `px-plugin`、执行 `./bin/px-plugin init <plugin-id>` 生成骨架。  
    - 在新项目中运行 `go test ./...`、`npm run lint` 并复用上述 CRUD/延迟脚本，确认 CLI 输出与 Skeleton 行为一致。  
    - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。
 

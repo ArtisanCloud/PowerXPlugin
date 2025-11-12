@@ -93,7 +93,7 @@
 **Purpose**: 文档与最终验证
 
 - [x] T031 [P] 更新 docs/guide/quickstart.md 加入 CRUD 验证步骤与延迟测试说明
-- [x] T032 [P] 更新 docs/guide/standalone-mode.md 说明内存存储与租户操作
+- [x] T032 [P] 更新 docs/guides/develop/standalone-mode.md 说明内存存储与租户操作
 - [x] T033 对 docs/plan/002-plan-base-plugin-migration.md 补记关键实施结果与偏差
 - [x] T034 执行 go test ./...、npm run lint、px-plugin init 并记录结果到 specs/003-base-plugin-migration/research.md
 - [x] T035 使用 `curl -w` 对不同租户执行 CRUD 测试并确认平均延迟 ≤1s，记录到 specs/003-base-plugin-migration/research.md

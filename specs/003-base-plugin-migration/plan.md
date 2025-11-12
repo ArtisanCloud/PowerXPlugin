@@ -48,7 +48,7 @@ scaffold/templates/
 docs/
   plan/002-plan-base-plugin-migration.md (link-back)
   guide/quickstart.md     # CRUD validation steps
-  guide/standalone-mode.md# standalone CRUD walkthrough
+  guides/develop/standalone-mode.md# standalone CRUD walkthrough
 .specify/
   memory/constitution.md  # reference only (no edits unless required)
 ```

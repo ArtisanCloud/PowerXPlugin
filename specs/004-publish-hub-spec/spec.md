@@ -182,7 +182,7 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 ## Documentation & Enablement
 
 1. **Quickstart 路线**：`docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 新增 Go CLI 热加载/Doctor 步骤，覆盖 Dev API 启动、`px-plugin dev --watch`、`dev --logs`、`px-plugin doctor` 报告，确保新成员 5 分钟内验证环境。
-2. **CLI 深入指南**：`docs/guides/cli/go-cli-dev-watch.md#health-checks` 与 `#error-recovery--rollback` 描述 doctor flag、报告格式、指数退避与自动回滚逻辑，对应 T088/T091 的实现细节。
+2. **CLI 深入指南**：`docs/guides/publish/go-cli-dev-watch.md#health-checks` 与 `#error-recovery--rollback` 描述 doctor flag、报告格式、指数退避与自动回滚逻辑，对应 T088/T091 的实现细节。
 3. **E2E 验证记录**：`docs/development/t084-integration-tests-summary.md#真实-dev-api-e2e-验证（t091）` 保存了真实 Dev API 流程、终端输出与 artefact 路径，为 QA/Docs 提供复现脚本。
 4. **后续文档任务**：T094 仍需同步 FAQ / Admin Guide，确保 doctor/rollback 能力纳入上线前检查清单。
 

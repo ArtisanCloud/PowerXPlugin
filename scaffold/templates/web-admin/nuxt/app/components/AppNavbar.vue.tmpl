@@ -6,7 +6,7 @@
       <!-- 左侧品牌 -->
       <div class="flex items-center">
         <img
-          src="/images/logo-s.png"
+          :src="logoSrc"
           alt="PowerX Plugin Logo"
           class="h-8 w-auto mr-3"
         />
@@ -52,7 +52,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+
 const { t } = useI18n();
+const runtimeConfig = useRuntimeConfig();
+
+const logoSrc = computed(() => {
+  const base = runtimeConfig.public.insidePowerX
+    ? runtimeConfig.public.pluginAdminBase ?? "/"
+    : "/";
+  return `${base.replace(/\/$/, "")}/images/logo-s.png`;
+});
 
 // 用户菜单项
 const userMenuItems = [

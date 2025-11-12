@@ -186,7 +186,7 @@
 - [X] T059 [US0] Extend bootstrap + compliance services：`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`、`framework/backend/go/internal/compliance/scanner/license_scanner.go` 支持 CLI 请求校验、Git 注册、许可证/漏洞扫描以及 `plugin-import-audit` Webhook。
 - [X] T060 [US0] Implement `px-plugin doctor`（`tools/cli/src/commands/plugin/doctor.ts` + `tools/cli/src/executors/doctor.ts`）完成环境/依赖/flag 诊断、自动修复与 `.doctor/report.json` 生成。
 - [X] T061 [US0] Add第三方源码导入守护：`tools/cli/src/commands/plugin/import.ts` + `config/compliance/external_source_policy.yaml` + `docs/standards/powerx-plugin/integration/04_security_and_compliance/Plugin_Security_Checklist.md` 更新审批/豁免流程。
-- [X] T062 [US0] Refresh developer docs `docs/guides/bootstrap-context.md`, `docs/guides/cli-plugin-tutorial.md`, `quickstart.md` 加入模板选择、依赖镜像、`plugin doctor`、第三方导入与 Git 注册截图。
+- [X] T062 [US0] Refresh developer docs `docs/guides/bootstrap-context.md`, `docs/guides/develop/cli-plugin-tutorial.md`, `quickstart.md` 加入模板选择、依赖镜像、`plugin doctor`、第三方导入与 Git 注册截图。
 
 ### Parallel Opportunities
 - T057/T058 可并行（CLI vs 模板仓）；T059 依赖 CLI 协议确定；T060/T061 可在模板完成后推进；T062 收尾。
@@ -204,7 +204,7 @@
 - [X] T064 [US6] Extend SessionClient `tools/cli/src/runtime/hotreload/session.ts` 与调试配置以复用 host session、分发断点、自动重试、`debug-observability-v2` 指标。
 - [X] T065 [P] [US6] Implement Go-side controllers：`framework/backend/go/runtime/devapi/handlers/host_simulator.go`（宿主生命周期、版本守护）与 `sandbox_validation.go`（`POST /internal/sandbox/deploy` orchestration、脱敏数据加载、权限模板）。
 - [X] T066 [US6] Add error diagnostics pipeline：`framework/backend/go/runtime/devapi/telemetry/debug_reports.go`、`framework/backend/go/runtime/devapi/handlers/debug_report.go` 生成脱敏报告、推送工单、记录 `debug.report.generate_ms`。
-- [X] T067 [US6] Update docs & runbooks：`docs/guides/publish/marketplace-review.md`, `docs/guides/bootstrap-context.md`, `docs/guides/cli-plugin-tutorial.md` 添加宿主模拟器、沙箱验证、故障排查与审计流程。
+- [X] T067 [US6] Update docs & runbooks：`docs/guides/publish/marketplace-review.md`, `docs/guides/bootstrap-context.md`, `docs/guides/develop/cli-plugin-tutorial.md` 添加宿主模拟器、沙箱验证、故障排查与审计流程。
 
 ### Parallel Opportunities
 - CLI (T063/T064) 与 Go handlers (T065/T066) 并行；文档 (T067) 收尾但需依赖 API 输出。
@@ -319,7 +319,7 @@
 - [x] **T088 错误恢复**
   - 网络错误指数退避（1s→2s→4s→8s→30s）+ reload 失败自动回滚至上一成功 bundle（`tools/cli/internal/devwatch/runner.go` / `TestRunner_BackoffAndRollbackOnReloadFailure`）。
   - `px-plugin doctor` 增加 Dev API 健康诊断，遇到证书/网络问题提供 remediation（`go test ./tools/cli/internal/devwatch` 2025-11-10 通过）。
-  - `px-plugin doctor` Health Checks 文档：`docs/guides/cli/go-cli-dev-watch.md#health-checks`。
+  - `px-plugin doctor` Health Checks 文档：`docs/guides/publish/go-cli-dev-watch.md#health-checks`。
 
 - [x] **T089 [P] 资源限制**
   - CPU ≤10%、内存 ≤100MB、watch 文件 ≤10k，超过时告警或限流。
@@ -346,7 +346,7 @@
   - ✅ 文档新增 “Go vs TypeScript CLI Compatibility” 小节（mock Dev API 回放 + payload 比对）。
 
 - [x] **T094 文档**
-  - 新增 `docs/guides/cli/go-cli-dev-watch.md`，更新 quickstart/spec 中的 CLI 章节、FAQ、故障排查。
+  - 新增 `docs/guides/publish/go-cli-dev-watch.md`，更新 quickstart/spec 中的 CLI 章节、FAQ、故障排查。
   - ✅ Quickstart 已补充 dev --watch/doctor 流程：`docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断`。
   - ✅ `specs/004-publish-hub-spec/spec.md#documentation--enablement` 收敛 doctor/rollback/quickstart 资料，供产品/QA 引用。
   - ✅ README 快速开始指向新流程：`README.md#快速开始`。

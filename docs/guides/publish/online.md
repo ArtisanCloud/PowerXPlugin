@@ -165,7 +165,55 @@ tsc --noEmit
 - ✅ 无类型错误
 - ✅ Go 测试全部通过
 
-### 步骤 2: 执行发布命令
+### 步骤 2: 创建发布计划（px-plugin publish create）
+
+004-publish-hub-spec 启用后，所有在线发布都应通过计划（Plan）驱动，以便串联灰度、回滚和 SLA 监控。
+
+```bash
+px-plugin publish create \
+  --manifest ./dist/manifest.json \
+  --channel stable \
+  --notes ./CHANGELOG.md \
+  --rollout-strategy canary \
+  --batches '[{"percentage":20,"wait":"10m"},{"percentage":80}]' \
+  --window-start "2025-11-07T10:00:00Z" \
+  --window-end "2025-11-07T12:00:00Z"
+```
+
+**参数说明**:
+- `--manifest` - manifest 路径，Plan 会将其内联保存，供审批比对。
+- `--channel` - stable/beta，写入 `plan.channel`。
+- `--notes` - 一般映射到 `CHANGELOG.md`，Plan 审核页会显示。
+- `--rollout-strategy` - `canary`（默认）或 `direct`。
+- `--batches` - JSON 数组，定义每个批次的百分比与等待时间（ISO-8601 或 `10m`/`2h`）。
+- `--window-*` - 控制审批窗口，便于 QA/发布经理锁定时间。
+- `--auto-rollback/--dry-run` - 是否自动触发回滚、是否只演练流程。
+
+CLI 会调用 `POST /internal/publish/create` 并返回 Plan 元数据，Plan 会实时同步到 Admin `/_p/<tenant>/publish/pipelines` 页面。
+
+### 步骤 3: 部署计划并管理灰度（px-plugin publish deploy）
+
+计划获批后，执行部署命令触发灰度批次与回滚令牌生成：
+
+```bash
+px-plugin publish deploy \
+  --plan $PLAN_ID \
+  --strategy canary \
+  --batches '[{"percentage":20,"wait":"15m"},{"percentage":80}]' \
+  --notes "stable rollout" \
+  --commit $(git rev-parse HEAD)
+```
+
+**要点**:
+- `--plan` 对应步骤 2 输出的 `planId`。
+- `--strategy` 支持 `canary`、`blue-green`、`direct`；当批次数组为空时默认为 100%。
+- `--batches` 可与 `publish create` 阶段配置不同，用于紧急调整。
+- `--commit` 便于回溯构建来源；`--dry-run` 可用于演练。
+- 响应包含 `deploymentId`、`rollbackToken`，后续灰度失败时 5 分钟内可回滚。
+
+### 步骤 4: 兼容旧版流水线（px-plugin publish，可选）
+
+如需与旧版 Marketplace 审核流程对齐或回归测试，可继续使用单步命令：
 
 ```bash
 px-plugin publish \
@@ -175,15 +223,49 @@ px-plugin publish \
   --receipt ./artifacts/publish-receipt.json
 ```
 
-**参数说明**:
-- `--manifest` - 插件 manifest 文件路径
-- `--channel` - 发布渠道（stable/beta）
-- `--notes` - 发布说明文件路径
-- `--receipt` - 发布回执文件路径（可选）
+此命令仍会执行预检、签名、上传，并写入 `publish-receipt.json` 供审计，但不再承载灰度批次与 Plan 元数据。官方推荐优先使用步骤 2-3 的新链路。
 
-### 步骤 3: 验证发布回执
+### 步骤 5: 保存回执与计划记录
 
-发布成功后，CLI 会生成 `publish-receipt.json`:
+#### 5.1 发布计划响应
+
+```json
+{
+  "planId": "plan-1730978931123",
+  "publishId": "publish-1730978931567",
+  "channel": "stable",
+  "status": "draft",
+  "window": {
+    "start": "2025-11-07T10:00:00Z",
+    "end": "2025-11-07T12:00:00Z"
+  },
+  "autoRollback": true,
+  "dryRun": false
+}
+```
+
+- `planId`/`publishId`：Plan 与 Marketplace 审核之间的桥梁，需写入变更记录。
+- `window`：审批窗口，Admin 会根据该信息提示 SLA。
+
+#### 5.2 部署响应
+
+```json
+{
+  "deploymentId": "deploy-1730979000444",
+  "planId": "plan-1730978931123",
+  "state": "running",
+  "batches": [
+    { "percentage": 20, "status": "scheduled" },
+    { "percentage": 80, "status": "scheduled" }
+  ],
+  "rollbackToken": "rollback-1730979000501"
+}
+```
+
+- `deploymentId`：用于查询灰度状态、生成安装/回滚日志。
+- `rollbackToken`：回滚 API/Admin 使用的凭证，必须安全保存。
+
+#### 5.3 兼容模式回执（publish-receipt.json）
 
 ```json
 {
@@ -200,38 +282,35 @@ px-plugin publish \
 }
 ```
 
-**关键字段**:
-- `publishId` - 发布请求唯一标识
-- `reviewQueueId` - 审核队列标识
-- `submittedAt` - 提交时间
-- `sla.expectedReviewDuration` - 预期审核时长（4 小时）
+仍可用来对接历史工单或自动化脚本；若使用 Plan，则以 `planId`/`deploymentId` 作为主键。
 
-### 步骤 4: 监控发布状态
+### 步骤 6: 监控发布状态
 
-#### 4.1 查看发布状态
+#### 6.1 追踪发布计划/灰度
 
-```bash
-# 查看发布状态
-curl -H "X-Powerx-User-Id: $USER_ID" \
-     -H "X-Powerx-Role: plugin_developer" \
-     $PX_MARKETPLACE_API_URL/publish/status/$PUBLISH_ID
-```
+- CLI：
+  ```bash
+  curl -H "X-Powerx-User-Id: $USER_ID" \
+       -H "X-Powerx-Role: plugin_developer" \
+       "$PX_MARKETPLACE_API_URL/internal/publish/plans/$PLAN_ID"
+  ```
+- Admin：访问 `/_p/<tenant>/publish/pipelines` 查看 Plan、批次进展与回滚按钮。
+- 指标：`framework/backend/go/observability/publish_metrics.go` 会把 Plan → Deploy 耗时写入 `plugin_publish_pipeline_duration_ms` 与 `publish_local_iteration_cycle_time`。
 
-#### 4.2 查看审核队列
+#### 6.2 查看审核队列
 
 访问 Marketplace 审核界面：
 - URL: `https://admin.powerx.dev/marketplace/review`
-- 查看您的发布是否在队列中
-- 状态应显示为 `pending_review`
+- 确认 Plan 关联的 `publishId` 已入队，状态应显示为 `pending_review`
 
-#### 4.3 监控 Telemetry
+#### 6.3 监控 Telemetry
 
-发布过程会产生以下 Telemetry 事件：
-- `plugin.publish.submitted` - 提交发布
-- `plugin.publish.pipeline.started` - 流水线开始
-- `plugin.publish.pipeline.completed` - 流水线完成
-- `plugin.publish.approved` - 审核通过
-- `plugin.publish.rejected` - 审核拒绝
+Plan/Deploy 会新增以下事件：
+- `plugin.publish.plan.created` - Plan 创建成功
+- `plugin.publish.plan.deployed` - 灰度启动
+- `plugin.publish.deploy.rollback_queued` - 自动回滚触发
+- `plugin.publish.submitted` / `plugin.publish.pipeline.*` - 兼容旧版流水线
+- `plugin.publish.approved` / `plugin.publish.rejected` - 审核结果
 
 ---
 
@@ -249,7 +328,16 @@ curl -H "X-Powerx-User-Id: $USER_ID" \
 - 验证签名材料存在
 - 确认 Stable 渠道包含发布说明
 
-### 2. 流水线阶段 (Pipeline)
+### 2. 发布计划编排 (Release Pipeline Orchestrator)
+
+**文件位置**: `framework/backend/go/runtime/publish/pipeline_handler.go`
+
+- `POST /internal/publish/create`：持久化 `planId/publishId`、rollout 配置与审批窗口，CLI `publish create` 直接调用。
+- `POST /internal/publish/deploy`：根据计划生成 `deploymentId`、批次状态与 `rollbackToken`，并把耗时写入 `plugin_publish_pipeline_duration_ms`/`publish_local_iteration_cycle_time`。
+- `planStore`（内存实现）负责追踪 Plan/Deploy 状态，Admin Pipelines 视图通过它拉取数据。
+- 失败时返回结构化错误（`PLAN_NOT_FOUND`、`INVALID_*`），CLI 将错误传播到终端，方便开发者修复。
+
+### 3. 旧版流水线阶段 (Pipeline)
 
 **文件位置**: `tools/cli/src/lib/publish/pipeline.ts`
 
@@ -260,20 +348,20 @@ curl -H "X-Powerx-User-Id: $USER_ID" \
 - 生成上传地址
 - 创建发布请求记录
 
-### 3. 签名阶段
+### 4. 签名阶段
 
 使用 Marketplace 公钥对 artefact 进行签名：
 - RSA-PSS 签名算法
 - SHA-256 哈希
 - 签名存储在 `manifest.signature`
 
-### 4. 上传阶段
+### 5. 上传阶段
 
 - 上传 artefact 到对象存储
 - 生成临时访问 URL
 - 记录上传状态
 
-### 5. 事件广播
+### 6. 事件广播
 
 **文件位置**: `tools/cli/src/lib/telemetry/emitter.ts`
 
@@ -295,7 +383,9 @@ curl -H "X-Powerx-User-Id: $USER_ID" \
 |------|--------|----------|
 | 发布流水线执行时间 | ≤ 10 分钟 | `plugin_publish_pipeline_duration_ms` |
 | 在线审核时间 | ≤ 4 小时 | `plugin_publish_review_duration_ms` |
+| 本地迭代周期 | ≤ 15 分钟 | `publish_local_iteration_cycle_time` |
 | 租户通知时间 | ≤ 30 分钟 | `plugin_notification_delay_seconds` |
+| 灰度失败率 | < 5% | `publish_gray_error_rate` |
 
 ### 查看 SLA 仪表板
 

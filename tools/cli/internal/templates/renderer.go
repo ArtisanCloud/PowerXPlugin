@@ -8,9 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"unicode/utf8"
 )
 
 const templateRoot = "data/"
+
+var binaryExtensions = []string{
+	".png", ".jpg", ".jpeg", ".gif", ".svg",
+	".webp", ".avif", ".ico", ".ttf", ".woff", ".woff2",
+}
 
 // Data 提供渲染模板所需的上下文。
 type Data struct {
@@ -56,11 +62,12 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		if err != nil {
 			return err
 		}
-		if !strings.HasSuffix(rel, ".tmpl") {
-			return nil
+		targetRel := rel
+		isTemplate := strings.HasSuffix(rel, ".tmpl")
+		shouldRender := isTemplate && !isBinaryTemplate(rel)
+		if isTemplate {
+			targetRel = strings.TrimSuffix(rel, ".tmpl")
 		}
-
-		targetRel := strings.TrimSuffix(rel, ".tmpl")
 		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugin.base", data.PluginID)
 		targetRel = strings.ReplaceAll(targetRel, "__plugin__", data.PluginID)
 		targetRel = normalizeTargetPath(targetRel, data.BackendType, data.FrontendType)
@@ -81,9 +88,14 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 			return fmt.Errorf("read template %s: %w", path, err)
 		}
 
-		rendered, err := executeTemplate(rel, raw, data)
-		if err != nil {
-			return err
+		var rendered []byte
+		if shouldRender {
+			rendered, err = executeTemplate(rel, raw, data)
+			if err != nil {
+				return err
+			}
+		} else {
+			rendered = raw
 		}
 
 		if err := os.WriteFile(targetPath, rendered, 0o644); err != nil {
@@ -106,6 +118,11 @@ func relativeTemplatePath(path string) (string, error) {
 }
 
 func executeTemplate(name string, raw []byte, data Data) ([]byte, error) {
+	if !utf8.Valid(raw) {
+		// Binary files may still carry .tmpl suffix for sync convenience.
+		// In that case, skip template parsing and return bytes as-is.
+		return raw, nil
+	}
 	tpl, err := template.New(name).Option("missingkey=error").Parse(string(raw))
 	if err != nil {
 		return nil, fmt.Errorf("parse template %s: %w", name, err)
@@ -128,6 +145,15 @@ func normalizeTargetPath(rel, backendType, frontendType string) string {
 	default:
 		return rel
 	}
+}
+
+func isBinaryTemplate(rel string) bool {
+	for _, ext := range binaryExtensions {
+		if strings.HasSuffix(rel, ext+".tmpl") {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateTemplateTypes checks if the given backend and frontend types are supported.

@@ -176,34 +176,52 @@ npm run generate:manifest
 - ✅ `dist/` 目录包含所有必要文件
 - ✅ `dist/manifest.json` 格式正确
 
-### 步骤 2: 执行离线打包
+### 步骤 2: 执行离线打包（px-plugin pack）
 
-#### 2.1 使用 PEM 证书签名
+`px-plugin pack` 基于 specs/004-publish-hub-spec 的新实现，会生成 `.pxp`、`integrity.txt`、`manifest.signature`、`release.manifest.json` 以及审计/报告文件，统一写入 `artifacts/` 目录。
+
+#### 2.1 使用 PEM 证书/Marketplace 公钥
 
 ```bash
-px-plugin dist \
-  --target offline \
+px-plugin pack \
+  --manifest ./dist/manifest.json \
+  --artefact ./dist \
+  --output ./artifacts \
+  --channel offline \
+  --notes "隔离租户发版" \
   --sign ./cert.pem \
-  --artifact-dir dist \
-  --output ./artifacts
+  --key-id marketplace-prod
 ```
 
-#### 2.2 使用 KMS 密钥签名
+- `--sign` 指向包含 Marketplace 公钥的 PEM 文件（或经审批的发行证书）。
+- `--key-id` 用于在 `release.manifest.json` 中标记签名/加密材料，便于审核溯源。
+- 可多次传入 `--artefact` 以追加 backend、web-admin、assets 等目录。
+
+#### 2.2 使用 KMS 密钥签名/封装
 
 ```bash
-px-plugin dist \
-  --target offline \
+px-plugin pack \
+  --manifest ./dist/manifest.json \
+  --artefact ./dist \
+  --output ./artifacts \
+  --channel offline \
+  --notes "隔离租户发版" \
   --kms-key-id $KMS_KEY_ID \
-  --artifact-dir dist \
-  --output ./artifacts
+  --kms-provider aws \
+  --key-id marketplace-prod
 ```
+
+- `--kms-key-id` 对接云厂商密钥（aws/azure/gcp），CLI 会调用各自 SDK 生成 RSA-OAEP 封装。
+- `--kms-provider`（可选）显式指定厂商，默认 `aws`。
 
 **参数说明**:
-- `--target offline` - 指定离线模式
-- `--sign <pem>` - PEM 证书路径
-- `--kms-key-id <id>` - KMS 密钥 ID
-- `--artifact-dir <dir>` - 产物目录（默认 dist）
-- `--output <dir>` - 输出目录（默认 artifacts）
+- `--manifest` - manifest 路径，会写入 `.pxp` 与完整性列表。
+- `--artefact <path>` - 要打包的目录/文件，可重复。
+- `--output` - 输出目录（默认 `./dist`，推荐设置为 `./artifacts`）。
+- `--channel` - 记录在 `release.manifest.json`，便于审核查看（建议 `offline`）。
+- `--notes` - 发布备注，同步到离线上传表单。
+- `--sign` / `--kms-key-id` - 选择 PEM 或 KMS 模式。
+- `--key-id` - Marketplace 端识别密钥/证书的 ID，需与运维约定。
 
 ### 步骤 3: 验证输出文件
 
@@ -211,12 +229,12 @@ px-plugin dist \
 
 ```
 artifacts/
-├── demo-plugin-1.4.0.pxp           # 离线包（加密）
-├── integrity.txt                    # 完整性校验列表
-├── manifest.signature               # manifest 签名
-├── report.json                      # 打包报告
-└── dist/
-    └── audit.log                    # 审计日志
+├── demo-plugin-1.4.0.pxp           # 离线包（加密 + 密钥封装）
+├── integrity.txt                   # 完整性校验列表
+├── manifest.signature              # manifest 签名
+├── release.manifest.json           # Plan/导入使用的摘要
+├── report.json                     # 打包报告
+└── dist-audit.log                  # 审计日志（payload 中仍记录 dist/audit.log）
 ```
 
 #### 3.1 检查 .pxp 包
@@ -265,7 +283,27 @@ cat artifacts/manifest.signature
 }
 ```
 
-#### 3.4 检查报告文件
+#### 3.4 检查 release.manifest.json
+
+```bash
+cat artifacts/release.manifest.json | jq
+```
+
+**示例内容**:
+```json
+{
+  "channel": "offline",
+  "notes": "隔离租户发版",
+  "package": "demo-plugin-1.4.0.pxp",
+  "integrityFile": "integrity.txt",
+  "generatedAt": "2025-11-07T08:42:12.000Z",
+  "keyId": "marketplace-prod"
+}
+```
+
+将该文件随同 `.pxp` 附在审批工单，可帮助审核员快速定位产物、渠道与密钥来源。
+
+#### 3.5 检查报告文件
 
 ```bash
 # 查看打包报告
@@ -294,11 +332,11 @@ cat artifacts/report.json
 }
 ```
 
-#### 3.5 检查审计日志
+#### 3.6 检查审计日志
 
 ```bash
-# 查看审计日志
-cat dist/audit.log
+# 查看审计日志（pack 输出 dist-audit.log，payload metadata 仍指向 dist/audit.log）
+cat artifacts/dist-audit.log
 ```
 
 **示例内容**:
@@ -323,22 +361,57 @@ cat dist/audit.log
 
 ⚠️ **此步骤由运维团队执行**
 
-#### 4.1 登录 Marketplace 离线入口
+#### 4.1 使用 CLI 预注册离线包（px-plugin import --offline）
+
+004-publish-hub-spec 要求运维在上传前先通过 CLI 把 `.pxp` 与完整性/签名材料注册到 Marketplace，生成 `reviewQueueId` 与审计痕迹：
+
+```bash
+export PX_MARKETPLACE_API_URL="https://api.powerx.dev"   # 如 CI 中已配置可省略
+
+px-plugin import --offline \
+  --pkg ./artifacts/demo-plugin-1.4.0.pxp \
+  --integrity ./artifacts/integrity.txt \
+  --signature ./artifacts/manifest.signature \
+  --whitelist tenant-a,tenant-b \
+  --notes "隔离租户发版"
+```
+
+- `--pkg`：`px-plugin pack` 生成的 `.pxp`。
+- `--integrity` / `--signature`：与包绑定的校验文件。
+- `--whitelist`：逗号分隔或多次传入，CLI 会序列化为数组。
+- `--notes`：补充信息，将显示在审核页面。
+- CLI 默认读取 `PX_MARKETPLACE_API_URL`；如需覆盖，可在命令前设置环境变量。
+
+示例响应：
+
+```json
+{
+  "reviewQueueId": "offline-queue-1730979100123",
+  "status": "pending_review",
+  "whitelist": ["tenant-a", "tenant-b"],
+  "submittedAt": "2025-11-07T09:00:00.000Z"
+}
+```
+
+若目标环境网络隔离，仍可直接使用 Admin UI（见下文），但建议事后使用 CLI 同步记录生成的 `reviewQueueId`。
+
+#### 4.2 登录 Marketplace 离线入口
 
 访问 Admin 控制台：
 - URL: `https://admin.powerx.dev/marketplace/offline-review`
 - 角色要求: `platform_ops` 或 `marketplace_reviewer`
 
-#### 4.2 上传离线包
+#### 4.3 上传离线包
 
 1. 点击 "上传离线包" 按钮
 2. 选择 `artifacts/demo-plugin-1.4.0.pxp`
 3. 上传 `artifacts/integrity.txt`
 4. 上传 `artifacts/manifest.signature`
-5. 上传 `artifacts/report.json`
-6. 上传 `dist/audit.log`（可选）
+5. 上传 `artifacts/release.manifest.json`
+6. 上传 `artifacts/report.json`
+7. 上传 `artifacts/dist-audit.log`（或 CLI 输出的 `dist/audit.log`，二者任选其一）
 
-#### 4.3 配置租户白名单
+#### 4.4 配置租户白名单
 
 在 "目标租户" 字段中：
 - 输入租户 ID（每行一个）
@@ -350,7 +423,7 @@ cat dist/audit.log
   offline-tenant-003
   ```
 
-#### 4.4 提交审核
+#### 4.5 提交审核
 
 点击 "提交审核" 按钮，系统会：
 1. 验证 `.pxp` 包完整性
@@ -385,7 +458,8 @@ cat dist/audit.log
 5. 使用 RSA-PSS 对 `manifest.json` 签名
 6. 生成 `manifest.signature` 文件
 7. 创建 `report.json` 打包报告
-8. 记录 `dist/audit.log` 审计日志
+8. 记录 `dist-audit.log` 审计日志（`.pxp` metadata 仍输出 `dist/audit.log` 以兼容旧工具）
+9. 写出 `release.manifest.json`（`pack.ts` 追加的摘要文件），供 CLI/运维在导入和工单中引用
 
 ### 3. 离线验证
 
@@ -571,7 +645,7 @@ openssl rsa -pubin -in $PX_MARKETPLACE_PUBLIC_KEY -text -noout
 
 # 3. 重新生成密钥
 rm -f ~/.powerx/cli/symmetric.key
-px-plugin dist --target offline --sign ./cert.pem
+px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --sign ./cert.pem
 ```
 
 #### 问题 2: RSA-PSS 签名失败
@@ -598,7 +672,7 @@ chmod 600 ./cert.pem
 openssl rsa -in ./cert.pem -check
 
 # 4. 重新签名
-px-plugin dist --target offline --sign ./cert.pem
+px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --sign ./cert.pem
 ```
 
 #### 问题 3: KMS 签名失败
@@ -647,7 +721,7 @@ npm run build
 sha256sum dist/backend/main.go
 
 # 3. 重新打包
-px-plugin dist --target offline --sign ./cert.pem
+px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --sign ./cert.pem
 ```
 
 #### 问题 5: 包体积超限
@@ -683,7 +757,7 @@ compression:
   level: 9
 
 # 4. 重新打包
-px-plugin dist --target offline --sign ./cert.pem
+px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --sign ./cert.pem
 ```
 
 ### 运维常见问题

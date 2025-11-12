@@ -241,7 +241,7 @@ type ReloadResponse struct {
 - **行为对齐**：
   1. 两个 CLI 均会在 register 成功后写入 `sessionId` 与 `reloadToken`，并在终止时调用 `DELETE /register/{sessionId}`；
   2. SSE 日志（`px-plugin dev --logs <session>`）使用相同的 `level`/`tail` 查询参数，Go 版额外支持 `--logs-file` 与 `--no-color`，对 TS CLI 兼容；
-  3. Telemetry 事件与审计日志（`audit.EventReloadSuccess/Fail` 等）与 TS 版字段重合，可由 `docs/guides/cli/go-cli-dev-watch.md` 的指标段落佐证。
+  3. Telemetry 事件与审计日志（`audit.EventReloadSuccess/Fail` 等）与 TS 版字段重合，可由 `docs/guides/publish/go-cli-dev-watch.md` 的指标段落佐证。
 - **结论**：Go CLI 与 TS CLI 在 Dev API 合约层面 100% 对齐，已在 `tmp/go-cli-dev-watch-bench/` 及 `internal/devapi/integration_test.go` 中以同一 mock server 做回归验证。
 
 ## Client Updates Needed

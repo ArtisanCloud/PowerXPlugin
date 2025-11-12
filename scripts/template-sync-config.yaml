@@ -8,6 +8,7 @@ mappings:
         suffix: .tmpl
     include:
       - "app/**/*"
+      - "public/**/*"
       - "i18n/**/*"
       - "nuxt.config.ts"
       - "package.json"

@@ -86,7 +86,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 - **FR-008**: Skeleton frontend MUST提供 Intro、主页、Templates CRUD 页面，消费 framework-client 并复刻 Base 插件导航/菜单结构。
 - **FR-009**: Skeleton Nuxt 配置 MUST 复刻 Base 插件关键项：`compatibilityDate`、`ssr`、`baseURL`、`runtimeConfig`、Nitro headers、`@nuxt/icon`、`@pinia/nuxt`、`@nuxtjs/color-mode`、HMR/代理设置及语言包目录（`i18n/locales`）。
 - **FR-010**: CLI 模板 MUST 同步 Skeleton 的 Nuxt/Go 结构、依赖与配置，占位符包含插件 ID、菜单、RBAC、API 基址。
-- **FR-011**: 文档 (`docs/guide/quickstart.md`,`docs/guide/standalone-mode.md`,`docs/plan/002-plan-base-plugin-migration.md`) MUST 更新差异说明、运行步骤、局限性。
+- **FR-011**: 文档 (`docs/guide/quickstart.md`,`docs/guides/develop/standalone-mode.md`,`docs/plan/002-plan-base-plugin-migration.md`) MUST 更新差异说明、运行步骤、局限性。
 
 ### Key Entities *(include if feature involves data)*
 

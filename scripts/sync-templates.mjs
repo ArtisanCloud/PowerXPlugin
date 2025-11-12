@@ -28,6 +28,20 @@ const checkMode = args.includes('--check')
 let diffCount = 0
 const diffFiles = []
 
+const binaryExtensions = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".svg",
+  ".webp",
+  ".avif",
+  ".ico",
+  ".ttf",
+  ".woff",
+  ".woff2",
+])
+
 for (const mapping of config.mappings) {
   const sourceRoot = path.resolve(rootDir, mapping.source)
   if (!fs.existsSync(sourceRoot)) {
@@ -45,8 +59,14 @@ for (const mapping of config.mappings) {
 
   for (const relative of files) {
     const srcPath = path.join(sourceRoot, relative)
-    let content = fs.readFileSync(srcPath, 'utf8')
-    content = applyReplacements(content, relative, mapping.replacements || [])
+    const isBinary = isBinaryAsset(relative)
+    let content
+    if (isBinary) {
+      content = fs.readFileSync(srcPath)
+    } else {
+      content = fs.readFileSync(srcPath, 'utf8')
+      content = applyReplacements(content, relative, mapping.replacements || [])
+    }
 
     for (const target of mapping.targets || []) {
       const targetRoot = path.resolve(rootDir, target.path)
@@ -65,14 +85,14 @@ for (const mapping of config.mappings) {
           diffFiles.push(outPath)
           continue
         }
-        const existing = fs.readFileSync(outPath, 'utf8')
-        if (existing !== content) {
+        const existing = fs.readFileSync(outPath, isBinary ? undefined : 'utf8')
+        if ((isBinary && !existing.equals(content)) || (!isBinary && existing !== content)) {
           diffCount++
           diffFiles.push(outPath)
         }
       } else {
         fs.mkdirSync(path.dirname(outPath), { recursive: true })
-        fs.writeFileSync(outPath, content)
+        fs.writeFileSync(outPath, content, isBinary ? undefined : 'utf8')
       }
     }
   }
@@ -112,4 +132,9 @@ function applyReplacements(input, relativePath, replacements) {
     }
   }
   return result
+}
+
+function isBinaryAsset(relativePath) {
+  const ext = path.extname(relativePath).toLowerCase()
+  return binaryExtensions.has(ext)
 }

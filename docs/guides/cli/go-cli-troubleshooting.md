@@ -31,11 +31,11 @@
 
 | 症状 | 排查步骤 | 参考文档 |
 |------|----------|----------|
-| `reload failed: tls handshake timeout` | 检查 `px auth configure` 产出的证书是否过期；可在 `go-cli-dev-watch.md#health-checks` 里找到证书更新流程 | `docs/guides/cli/go-cli-dev-watch.md` |
+| `reload failed: tls handshake timeout` | 检查 `px auth configure` 产出的证书是否过期；可在 `docs/guides/publish/go-cli-dev-watch.md#health-checks` 找到证书更新流程 | `docs/guides/publish/go-cli-dev-watch.md` |
 | `session register failed: 401` | `PX_DEV_API_BASE` 指向生产但未配置 `PX_MTLS_*`；在 `~/.px-plugin/config.json` 补上 mTLS | `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` |
 | `fsnotify watcher failed` | macOS 需允许终端“完全磁盘访问”，Windows 建议排除杀毒对 `px-plugin` 的阻断；跨平台脚本可用于验证差异 | `scripts/test/cross-platform-test.sh` |
-| `watch limit exceeded (10000)` | 使用 `--max-watch-files` 或 `PX_MAX_WATCH_FILES` 放宽限制；也可在 `~/.px-plugin/config.json` 的 `watch.maxFiles` 中配置 | `docs/guides/cli/go-cli-dev-watch.md` |
-| `rollback missing bundle` | 表示首次 reload 尚未成功；可运行 `px-plugin dev --watch` 再触发一次构建，使回滚缓存就绪 | `docs/guides/cli/go-cli-dev-watch.md#error-recovery--rollback` |
+| `watch limit exceeded (10000)` | 使用 `--max-watch-files` 或 `PX_MAX_WATCH_FILES` 放宽限制；也可在 `~/.px-plugin/config.json` 的 `watch.maxFiles` 中配置 | `docs/guides/publish/go-cli-dev-watch.md` |
+| `rollback missing bundle` | 表示首次 reload 尚未成功；可运行 `px-plugin dev --watch` 再触发一次构建，使回滚缓存就绪 | `docs/guides/publish/go-cli-dev-watch.md#error-recovery--rollback` |
 
 ## 3. 跨平台自检脚本
 
@@ -69,6 +69,6 @@ bash ../scripts/test/cross-platform-test.sh
 ## 5. 相关参考
 
 - `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断`
-- `docs/guides/cli/go-cli-dev-watch.md`
+- `docs/guides/publish/go-cli-dev-watch.md`
 - `docs/development/t095-cross-platform-summary.md`
 - `scripts/test/cross-platform-test.sh`

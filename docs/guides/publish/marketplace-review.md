@@ -76,6 +76,13 @@ curl -H "X-Powerx-User-Id: $USER_ID" \
 | `scanStatus` | 自动化扫描状态 |
 | `riskLevel` | 风险等级（低/中/高） |
 
+> **Plan/Deploy 上下文（px-plugin publish create/deploy）**  
+> 004-publish-hub-spec 引入的 Plan 机制会在 CLI 阶段生成 `planId`、`deploymentId` 与 `rollbackToken`。审核员在 Admin `/_p/<tenant>/publish/pipelines` 页面可查看：  
+> - `planId`：对应 CLI `publish create` 输出，需与审核记录关联。  
+> - `deploymentId` + 批次：`publish deploy` 触发，可用于确认灰度与回滚策略。  
+> - `rollbackToken`：若审核后触发回滚，请确保记录该 token 并在审批备注中引用。  
+> 若发现队列中的版本缺少 Plan 信息，应退回开发者补充，避免绕过灰度/回滚守护。
+
 **状态说明**:
 - `pending_review` - 等待审核
 - `in_review` - 正在审核

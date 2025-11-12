@@ -36,6 +36,41 @@
     "description": "Explore the starter template plugin for PowerX and learn how to build reusable modules quickly.",
     "viewIntro": "View introduction"
   },
+  "landing": {
+    "hero": {
+      "title": "PowerX Base Plugin",
+      "description": "Welcome to the starter intro page. It highlights template CRUD, navigation and multilingual experiences for local development.",
+      "cards": {
+        "quickstart": {
+          "title": "Quickstart",
+          "body": "Use the template management example to understand plugin configs, menus and permission declarations."
+        },
+        "reusable": {
+          "title": "Reusable templates",
+          "body": "Extract common sections into templates and reuse them across pages for a consistent experience."
+        },
+        "api": {
+          "title": "API showcase",
+          "body": "The backend ships a minimal template API that can connect to PowerX or be extended for production workloads."
+        }
+      }
+    },
+    "next": {
+      "title": "What\u2019s next",
+      "cards": {
+        "crud": {
+          "title": "Explore template CRUD",
+          "body": "Visit the \"Template CRUD\" page to experience list, create, edit and delete flows end-to-end.",
+          "cta": "Open template manager"
+        },
+        "guide": {
+          "title": "Read the developer guide",
+          "body": "The \"Develop Guide\" explains folder structure, dependency injection and API registration steps.",
+          "cta": "View develop guide"
+        }
+      }
+    }
+  },
   "templates": {
     "overview": {
       "title": "Template Overview",

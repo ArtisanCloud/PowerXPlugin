@@ -22,12 +22,9 @@
 
 ## 流程总览
 
-1. **准备产物**：先完成「路径 A」生成 dist（必选），如需审计再执行「路径 B」生成可选的 `.pxp`。
-2. **传输到 PowerX**：将 `dist/` 或 `.pxp` 拷贝到 PowerX 服务器可访问的路径，或上传到内网对象存储/HTTP 服务。
-3. **调用 Admin API**：
-   - 目录模式：`POST {apiPrefix}/admin/plugins/install/local`，参数为服务器上的 `src_dir`。
-   - URL 模式：`POST {apiPrefix}/admin/plugins/install/url`，参数为可下载的包地址。
-4. **启用与验证**：通过 `POST /admin/plugins/:id/enable`、`GET /admin/plugins/:id/status`、`GET /admin/plugins/:id/logs` 确认状态。
+- **方案 A（推荐）**：构建 dist → 将 `dist/<version>` 拷贝到 PowerX → 调 `POST /admin/plugins/install/local` 安装 → 验证。
+- **方案 B（可选）**：在 dist 基础上额外生成 `.pxp` → 传输 `.pxp` → 在 PowerX 上解包成 dist 目录 → 再按方案 A 调用 Admin API。
+- URL 模式（`/install/url`）和 `apiPrefix` 说明对两种方案都适用。
 
 ---
 
@@ -50,25 +47,49 @@ export ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 ---
 
-## 1. 路径 A：构建可运行的 dist（必选）
+## 方案 A：dist 直装（推荐）
 
 Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：包含后端二进制、Nuxt 构建结果、`plugin.yaml`、`publish.yml`、`manifest.json` 等。**这一部分是所有流程都必须完成的基础**，可以用 Makefile 或手动方式完成。
 
-### 1.1 使用脚手架 Makefile（推荐）
+### 步骤 1：准备依赖
 
-Phase 14 合并后，`px-plugin init` 会自动把 `skeleton/Makefile` 与 `make-files/` 带入新项目。若当前版本尚未同步，可参考 `skeleton/` 或 `com.powerx.plugin.base` 手动复制。一旦具备 Makefile，可直接执行：
+在执行 `make dist` 之前，请先在插件项目根目录安装好后端与前端依赖，否则 Nuxt 构建阶段会尝试下载临时包，导致版本不一致或出现 “Cannot find module 'nuxt/config'” 之类的错误。
+
+```bash
+cd /path/to/your-plugin        # 例如 plugins/com.powerx.helloworld
+
+# Go 依赖
+# 若项目未启用 go.work，可忽略 go work sync 的提示
+go work sync 2>/dev/null || true
+cd backend
+go mod tidy
+cd ..
+
+# Web Admin 依赖
+cd web-admin
+npm install
+cd ..
+```
+
+若之前在 web-admin 目录执行过 `npm install` 但后来清理了 `node_modules/`，请重新安装，确保 `web-admin/node_modules/.bin/nuxi` 与 `nuxt/config` 均来自模板声明的 Nuxt 4.2.x。
+
+### 步骤 2：使用脚手架 Makefile 构建 dist
+
+Phase 14 合并后，`px-plugin init` 会自动把 `skeleton/Makefile` 与 `make-files/` 带入新项目。完成上一步依赖安装后，即可直接运行；若需要覆盖默认版本号，可一并在命令前设置 `VERSION=`：
 
 ```bash
 # 构建后端 + 前端，输出到 dist/
 make dist
 
-# 基于 dist/ 生成 .pxp 元数据（调用 px-plugin pack）
-make pack KEY_ID=marketplace-dev PUBLIC_KEY=./keys/marketplace.pem
+# 构建特定版本
+VERSION=0.2.0 make dist
 ```
 
-> `make dist` 默认依次执行 `go build`, `npm install`, `npm run build` 并将产物归档到 `dist/`。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
+如需额外生成 `.pxp`，请跳转到「方案 B · 步骤 2」使用 `make pack`。
 
-### 1.2 手动构建（当前可用方案）
+`make dist` 默认依次执行 `go build`, `npm install`, `npm run build` 并将产物归档到 `dist/`。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
+
+### 步骤 3：手动构建（可选）
 
 如果 CLI/Makefile 尚未完善，可直接在插件项目手工构建：
 
@@ -97,11 +118,11 @@ cp publish.yml dist/
 
 ---
 
-## 2. 路径 B：生成 `.pxp` 元数据包（可选）
+## 方案 B：`.pxp` + dist 解包（可选）
 
-如果你需要在 PowerX Marketplace 或离线审核链路中保留完整的签名/完整性信息，可以在完成 dist 之后再执行这一路径。`.pxp` **不会取代** dist，只是附加的校验材料；不需要这类审计时可直接跳到后续步骤。
+如果你需要在 PowerX Marketplace 或离线审核链路中保留完整的签名/完整性信息，可以在完成 dist 之后再执行这一路径。`.pxp` **不会取代** dist，只是附加的校验材料；如果只想快速安装，可跳回方案 A。
 
-### 2.1 CLI（规划中）
+### 步骤 1：使用 CLI 生成 `.pxp`（规划中）
 
 Go 版本 CLI 已提供 `px-plugin dist`/`px-plugin pack` 子命令，但目前仍是 “experimental” 占位（见 `tools/cli/cmd/dist.go`, `package.go`）。Phase 14 将把 TypeScript 的打包逻辑迁移到 Go CLI，届时命令形态如下：
 
@@ -123,7 +144,7 @@ px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --output-dir ./
 - `report.json`
 - `manifest.signature`
 
-### 2.2 使用 Makefile
+### 步骤 2：使用 Makefile 生成 `.pxp`
 
 当 Phase 14 的 Makefile 集成完成后，可直接运行：
 
@@ -131,49 +152,94 @@ px-plugin pack --manifest ./dist/manifest.json --artefact ./dist --output-dir ./
 make pack KEY_ID=marketplace-dev PUBLIC_KEY=./keys/marketplace.pem
 ```
 
-脚本内部会调用 `px-plugin pack` 并把 `.pxp` 与配套校验文件放到 `dist/artifacts/`。若本地环境尚未升级，可暂时跳过 `.pxp` 步骤，只保留 dist 即可完成 local install。
+脚本内部会调用 `px-plugin pack` 并把 `.pxp` 与配套校验文件放到 `dist/artifacts/`。运行该命令不会动 `dist/<version>/` 里的运行时代码，典型输出包括：
+
+- `dist/artifacts/<pluginId>-<version>.pxp`
+- `dist/artifacts/integrity.txt`
+- `dist/artifacts/manifest.signature`
+- `dist/artifacts/report.json`
+
+> `.pxp` 只是带签名/校验信息的元数据包，不要把它塞进 `dist/<version>` 的运行目录；PowerX 仍然直接读取 `dist/<version>/backend`、`dist/<version>/web-admin` 等子目录。
+
+#### 准备 `./keys/marketplace.pem`
+
+`PUBLIC_KEY` 应指向一份 PEM（`-----BEGIN PUBLIC KEY-----` 或证书）文件，`px-plugin pack` 会使用它封装 `.pxp` 内部的对称密钥。通常把该文件放在仓库根目录 `keys/` 下，并通过 `.gitignore` 排除。
+
+1. **使用官方 Marketplace 公钥（推荐）**
+   ```bash
+   mkdir -p keys
+   cp ~/Downloads/marketplace-dev.pem ./keys/marketplace.pem
+   ```
+   拿到的是 `.crt` 时，可执行 `openssl x509 -pubkey -noout -in marketplace.crt > ./keys/marketplace.pem` 提取纯公钥。
+
+2. **仅供本地验证的自签名公钥**
+   ```bash
+   mkdir -p keys
+   openssl genrsa -out ./keys/marketplace-dev.key 2048
+   openssl req -new -x509 -key ./keys/marketplace-dev.key \
+     -subj "/CN=marketplace-dev" -days 365 \
+     -out ./keys/marketplace-dev.crt
+   openssl x509 -pubkey -noout -in ./keys/marketplace-dev.crt \
+     > ./keys/marketplace.pem
+   ```
+   请勿把测试密钥用于生产；生产环境必须使用官方下发的公钥或受信任 CA 证书。
+
+若本地环境尚未升级，可暂时跳过 `.pxp` 步骤，只保留 dist 即可完成 local install。
 
 > 当前实现中 `.pxp` 仍是 JSON 元数据，不包含真实文件。无论是否生成 `.pxp`，PowerX 都必须能读到 dist 目录或已解包的文件。
 
 ---
 
-## 3. 将产物同步到 PowerX
+### 步骤 4：传输 dist 目录（可选）
 
-根据部署环境选择其一：
+如果 PowerX Admin API 与打包机部署在同一节点，可直接在本地路径上执行安装，跳过本步骤。只有在 PowerX 运行于远程服务器、需要把 dist 搬过去时再执行以下操作。
 
-### 3.1 拷贝 dist 目录
-
-```bash
-# 示例：拷贝到 PowerX 服务器
-rsync -avz dist/ powerx-admin:/srv/powerx/plugins/com.powerx.helloworld/dist
-```
-
-### 3.2 上传压缩包或 .pxp
+dist 输出位于 `dist/<version>/...`，可将整个版本目录同步到 PowerX 服务器，例如：
 
 ```bash
-# 打包 dist
-cd dist && zip -r ../com.powerx.helloworld-0.1.0.zip .
-
-# 上传到对象存储/内网 HTTP
-aws s3 cp ../com.powerx.helloworld-0.1.0.zip s3://internal-artifacts/
-# 或
-curl -F file=@../com.powerx.helloworld-0.1.0.zip https://upload.local/artifacts
+DIST_VERSION=0.1.0
+rsync -avz dist/$DIST_VERSION \
+  powerx-admin:/srv/powerx/plugins/com.powerx.helloworld/dist/$DIST_VERSION
 ```
 
-> 如果只得到 `.pxp`，需要在 PowerX 服务器上解包（`mkdir /tmp/pxp && tar -xf xxx.pxp -C /tmp/pxp` 或 `px-plugin artefact inspect`）后再执行 local install。
+也可以先压缩再上传：
 
----
+```bash
+cd dist && zip -r ../com.powerx.helloworld-$DIST_VERSION.zip $DIST_VERSION
+aws s3 cp ../com.powerx.helloworld-$DIST_VERSION.zip s3://internal-artifacts/
+```
 
-## 4. 执行 Admin API 安装
+到服务器后解压至目标目录（例如 `/srv/powerx/plugins/com.powerx.helloworld/dist/0.1.0`）。
 
-### 4.1 目录模式：`/admin/plugins/install/local`
+### 步骤 5：调用 `/admin/plugins/install/local`
+
+不论 dist 在本机还是远程服务器，最终都需要调用 Admin API 告诉 PowerX 去读取那个目录。
+
+- **本地环境**：`src_dir` 填写绝对路径（例如 `$(pwd)/dist/0.1.0`）。
+- **远程环境**：`src_dir` 填远程服务器上的同步路径（配合上方步骤 4）。
+
+本地示例：
+
+```bash
+DIST_VERSION=0.1.0
+curl -X POST "$API_BASE/admin/plugins/install/local" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+        \"src_dir\": \"$(pwd)/dist/$DIST_VERSION\",
+        \"enable\": true,
+        \"force\": false
+      }"
+```
+
+远程示例：
 
 ```bash
 curl -X POST "$API_BASE/admin/plugins/install/local" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-        "src_dir": "/srv/powerx/plugins/com.powerx.helloworld/dist",
+        "src_dir": "/srv/powerx/plugins/com.powerx.helloworld/dist/0.1.0",
         "enable": true,
         "force": false
       }'
@@ -195,7 +261,7 @@ curl -X POST "$API_BASE/admin/plugins/install/local" \
 }
 ```
 
-### 4.2 URL 模式：`/admin/plugins/install/url`
+### 步骤 6：URL 模式（可选）
 
 用于 zip/pxp 已上传到可访问的 HTTP/S 位置：
 
@@ -213,7 +279,7 @@ curl -X POST "$API_BASE/admin/plugins/install/url" \
 - `sha256` 可选，提供时 PowerX 会校验包体完整性。
 - `.pxp` 目前仍需在服务器侧解包后才能运行；此模式主要方便上传存档，安装逻辑仍复用 `InstallFromFile`。
 
-### 4.3 关于 `apiPrefix`
+### 步骤 7：关于 `apiPrefix`
 
 `backend/etc/config.yaml`（或相应环境的配置）中的 `server.apiPrefix` 决定了最终 URL：
 
@@ -222,7 +288,42 @@ curl -X POST "$API_BASE/admin/plugins/install/url" \
 
 ---
 
-## 5. 安装后的验证
+### 步骤 3：传输 `.pxp`
+
+```bash
+aws s3 cp dist/artifacts/com.powerx.helloworld-0.1.0.pxp s3://internal-artifacts/
+# 或
+scp dist/artifacts/com.powerx.helloworld-0.1.0.pxp powerx-admin:/opt/powerx/uploads/
+```
+
+### 步骤 4：在 PowerX 解包并调用 local install
+
+```bash
+make local-install-pxp \
+  PACKAGE=./dist/artifacts/com.powerx.helloworld-0.1.0.pxp \
+  API_BASE=https://dev-api.powerx.local/api/v1 \
+  TOKEN=eyJhbGciOi...
+```
+
+或手工：
+
+```bash
+mkdir -p /tmp/pxp && unzip com.powerx.helloworld-0.1.0.pxp -d /tmp/pxp
+curl -X POST "$API_BASE/admin/plugins/install/local" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "src_dir": "/tmp/pxp/com.powerx.helloworld-0.1.0",
+        "enable": false,
+        "force": false
+      }'
+```
+
+> 解包后若目录结构不同，请确保 `src_dir` 指向含有 `plugin.yaml`/`backend`/`web-admin` 的根，随后重复方案 A 的验证/启用步骤。
+
+---
+
+## 安装后的验证
 
 ```bash
 # 查看插件列表

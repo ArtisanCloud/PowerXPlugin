@@ -2,6 +2,8 @@
 
 本指南详细说明如何使用 `px-plugin publish` 将插件版本推送到 Publish Hub，通过 Marketplace 在线审核链路分发到租户。若需要跳过 Marketplace、直接在 PowerX Admin API 上执行本地安装，请结合《[本地安装指南](./local-install.md)》。
 
+> 📌 在执行下述步骤前，请优先按《[能力注册与暴露指南](./capabilities.md)》完成 capability 定义与提交，确保 `.px-plugin/capabilities.json` 处于 approved 状态，否则 `px-plugin dist/publish` 会被自动阻断。
+
 **适用对象**: 插件开发者 (plugin_developer)
 **预计耗时**: 10 分钟（预检+入队）+ 4 小时（审核 SLA）
 **相关 SLA**: 在线发布审核 ≤ 4 小时

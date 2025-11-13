@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { assertCapabilitiesApproved } from "../lib/capabilities/state";
 import { runPrechecks } from "../lib/publish/precheck";
 import { executePublishPipeline, PublishPipelineOptions, PublishPipelineResult } from "../lib/publish/pipeline";
 import { TelemetryEmitter } from "../lib/telemetry/emitter";
@@ -13,6 +14,7 @@ export interface PublishCommandOptions {
 }
 
 export async function runPublishCommand(options: PublishCommandOptions): Promise<PublishPipelineResult> {
+  assertCapabilitiesApproved({ manifestPath: options.manifestPath });
   const manifest = await loadManifest(options.manifestPath);
   await runPrechecks({
     manifest,

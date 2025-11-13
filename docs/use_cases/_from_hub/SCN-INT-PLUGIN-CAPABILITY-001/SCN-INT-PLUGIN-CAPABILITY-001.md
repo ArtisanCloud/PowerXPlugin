@@ -96,6 +96,17 @@ sequenceDiagram
 - **Configs / Schemas**：`docs/standards/powerx-plugin/integration/02_capabilities_and_schema/Capability_Design_Guide.md`、`docs/standards/powerx-plugin/integration/02_capabilities_and_schema/IO_Schema_and_Validation.md`、`docs/standards/powerx-plugin/integration/01_plugin_lifecycle/deprecation.md`。
 - **Security / Compliance**：敏感字段绑定数据分级标签，高敏双人复核并附脱敏方案；所有暴露配置写入 `audit.capability.*` 日志留存 ≥365 天；例外审批需记录审批号与回滚策略。
 
+## Capability Exposure Stack（插件视角）
+
+| 层级 | 描述 | 主要产物 / 责任 |
+|------|------|----------------|
+| **声明层（Manifest）** | 在 `plugin.yaml`/`publish.yml` 中声明 `capabilities.provides`、`exposure.channels`、`rbac`。 | PowerXPlugin 脚手架 + CLI `px-plugin capabilities init/lint` |
+| **契约层（Contracts）** | `contracts/capabilities/*.yaml` + `contracts/schema/input|output/*.json` 定义输入输出、错误码、示例。 | CLI 自动生成/校验，供 PowerX 能力注册中心消费 |
+| **执行层（Handler）** | 插件内部 `backend/internal/handlers/**` 或 Nuxt API route，是真实执行能力的最小单元。 | 框架提供 Auto-Register；能力 ID → handler 的映射记录在 registry |
+| **治理层（PowerX API）** | `/internal/plugins/capabilities/**` 等接口完成注册、审核、暴露、租户授权与灰度。 | PowerX Core/安全/运营协作 |
+
+> 能力注册的本质是：**Manifest 与 contracts 只是声明，最终都归结到插件 handler**。所有暴露（REST、Agent Tool、Workflow、SDK）都需要落回插件代码中的可执行入口，PowerX 负责统一注册、授权与调用。
+
 # Related Links
 
 - `UC-INT-PLUGIN-CAPABILITY-MODELING-001` — 能力建模与 Schema 校验。

@@ -26,6 +26,7 @@
    - 参考《[使用 CLI 生成并运行插件骨架](./develop/cli-plugin-tutorial.md)》构建 `px-plugin`、执行 `./bin/px-plugin init <plugin-id>` 生成骨架。  
    - 在新项目中运行 `go test ./...`、`npm run lint` 并复用上述 CRUD/延迟脚本，确认 CLI 输出与 Skeleton 行为一致。  
    - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。
+   - 若需暴露能力，请同步阅读《[能力注册与暴露指南](./publish/capabilities.md)》，并在提交发布之前运行 `px-plugin capabilities init/lint/submit`，避免发布阶段被能力审核阻断。
 
 4. **Dev API 热更新与 Doctor 诊断**  
    - 启动本地 Dev API（`make devapi`），并在示例插件目录执行：  

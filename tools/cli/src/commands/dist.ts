@@ -1,5 +1,6 @@
 import path from "node:path";
 import { packageOfflineBuild } from "../lib/dist/offlinePackager";
+import { assertCapabilitiesApproved } from "../lib/capabilities/state";
 
 export interface DistCommandOptions {
   manifestPath: string;
@@ -14,6 +15,7 @@ export async function runDistCommand(options: DistCommandOptions) {
   if (!options.manifestPath) {
     throw new Error("manifestPath is required");
   }
+  assertCapabilitiesApproved({ manifestPath: options.manifestPath });
   if (!options.marketplacePublicKeyPem) {
     throw new Error("marketplace public key is required");
   }

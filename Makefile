@@ -3,6 +3,7 @@
 MAKEFILES_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
 include make-files/test.mk
+include make-files/validate.mk
 
 .PHONY: help
 help: ## Show available make targets

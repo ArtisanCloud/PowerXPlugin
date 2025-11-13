@@ -136,17 +136,39 @@ agents:
     name: {{ .PluginName }} 助理
     description: "{{ .PluginName }} 内置 Agent"
     default_tools:
-      - {{ .PluginID }}.tool.create
+      - {{ .PluginID }}.template.create
 
 capabilities:
   provides:
-    - id: {{ .PluginID }}.tool.create
+    - id: {{ .PluginID }}.template.create
       version: 1.0.0
-      descriptor: contracts/capabilities/{{ .PluginID }}.tool.create.yaml
+      descriptor: contracts/capabilities/{{ .PluginID }}.template.create.yaml
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.create.json
+        output: contracts/schema/output/{{ .PluginID }}.template.create.json
+
+# Agent tool registry – handler stub 位于 backend/internal/handlers/capabilities/template/create_handler.go
+agent_tools:
+  - id: {{ .PluginID }}.template.create
+    capability: {{ .PluginID }}.template.create
+    handler: backend/internal/handlers/capabilities/template/create_handler.go
+    description: 创建示例模板
+
+exposure:
+  channels:
+    - type: rest
+      capability: {{ .PluginID }}.template.create
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/resources
+      method: POST
+      auth: jwt
+      rbac: {{ .PluginID }}:template
+    - type: agent_tool
+      capability: {{ .PluginID }}.template.create
+      agent_tool_id: {{ .PluginID }}.template.create
 
 # 工具清单侧重声明接口契约，真实业务参数通过 config.yaml 或环境变量注入
 tools:
-  - id: {{ .PluginID }}.tool.create
+  - id: {{ .PluginID }}.template.create
     plugin_id: {{ .PluginID }}
     name: 创建示例
     description: 创建示例数据

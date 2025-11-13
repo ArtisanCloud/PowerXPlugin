@@ -204,6 +204,48 @@
    - API 契约对齐检查
 6. Playwright 脚本验证 Admin 安装/回滚 UI。
 
+## 5. 能力注册与暴露快速演练
+
+1. **示例插件**：进入 `examples/com.powerx.demo`，该工程现已内置 `com.powerx.demo.templates.create` 能力（manifest + contracts + handler + Go tests）。
+2. **Lint 契约**
+   ```bash
+   cd examples/com.powerx.demo
+   npm --prefix ../../tools/cli exec tsx ../../tests/cli/capabilities.cli.spec.ts
+   # 或手动执行
+   npm --prefix ../../tools/cli exec tsx ../../tools/cli/src/commands/capabilities/lint.ts --manifest ./plugin.yaml
+   ```
+3. **Submit + Exposure + 状态文件**：
+   ```bash
+   npm --prefix ../../tools/cli exec tsx ../../tools/cli/src/commands/capabilities/submit.ts \
+     --manifest ./plugin.yaml \
+     --base-url https://dev-api.powerx.local \
+     --token $PX_DEV_API_TOKEN
+   cat .px-plugin/capabilities.json
+   ```
+4. **Quota 示例与 Postman Bundle**：
+   ```bash
+   npm --prefix ../../tools/cli exec tsx ../../tools/cli/src/commands/capabilities/quota.ts \
+     --capability-id com.powerx.demo.templates.create \
+     --tenant demo \
+     --base-url https://dev-api.powerx.local \
+     --token $PX_DEV_API_TOKEN
+   ls dist/capabilities/com.powerx.demo.templates.create/samples/
+   ```
+5. **Diff 报告**：在示例仓库修改 Schema 后执行
+   ```bash
+   npm --prefix ../../tools/cli exec tsx ../../tools/cli/src/commands/capabilities/diff.ts \
+     --from HEAD~1:plugin.yaml \
+     --to plugin.yaml \
+     --output release/capabilities-change-report.md
+   ```
+   报告包含 Schema/RBAC/通道差异与灰度计划 YAML。
+6. **示例 Handler 回归**：
+   ```bash
+   cd backend
+   GOWORK=off go test ./...
+   ```
+   通过 `internal/handler` 与 `internal/service` 的单元测试验证 REST & Agent Tool 能力的最小实现。
+
 ## 6. 交付清单
 - 更新 `docs/contracts/` 中的 OpenAPI/Schema，并生成新的版本记录。
 - 在 `examples/` 中运行 `px-plugin init demo-plugin` 验证 CLI 输出。

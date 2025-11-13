@@ -96,3 +96,15 @@ mappings:
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Version: "0.1.0"'
         replace: 'Version: "{{ .Version }}"'
+  - name: root-makefiles
+    source: skeleton
+    include:
+      - "Makefile"
+      - "make-files/**/*"
+    exclude:
+      - "make-files/**/.DS_Store"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl

@@ -27,5 +27,32 @@ npm run dev
 - 更新 `plugin.yaml` 中的版本与元数据。
 - 扩展 `backend/internal/` 与 `web-admin/app/` 以实现业务逻辑。
 - 查看 PowerXPlugin 仓库的 `docs/release.md` 获取发布流程概览。
-- `package`/`dist`/`publish` 命令仍为实验特性，执行前请阅读 CLI README。
+- 使用 `Makefile`（见下）快速构建 dist/pack，并参阅 PowerXPlugin 仓库的 `docs/guides/publish/local-install.md` 了解 PowerX 接口。
 - 多语言扩展暂未开放，关注仓库 `docs/backlog/multi-language.md` 中的 TODO。
+
+## Makefile 快速构建与安装
+
+模板默认附带 `Makefile` + `make-files/`，支持以下命令：
+
+```bash
+# 1. 构建 dist 目录（后端 + web-admin）
+make dist
+
+# 2. 生成 .pxp 元数据（需要 PX CLI，可选）
+make pack KEY_ID=marketplace-dev PUBLIC_KEY=./keys/marketplace.pem
+
+# 3. 调用 PowerX Admin API 安装
+make local-install \
+  API_BASE=https://dev-api.powerx.local/api/v1 \
+  TOKEN=eyJhbGciOi... \
+  ENABLE=true \
+  FORCE=false
+
+# 4. 已有 .pxp 包体时，可先解包再安装
+make local-install-pxp \
+  PACKAGE=./dist/artifacts/com.powerx.example-0.1.0.pxp \
+  API_BASE=https://dev-api.powerx.local/api/v1 \
+  TOKEN=...
+```
+
+> `local-install` 依赖 PowerX 主仓的 `/admin/plugins/install/local` 接口，默认读取 `dist/<version>` 目录；如需了解 API 或离线流程，请参考 PowerXPlugin 仓库 `docs/guides/publish/local-install.md` 与 `docs/guides/publish/offline.md`。

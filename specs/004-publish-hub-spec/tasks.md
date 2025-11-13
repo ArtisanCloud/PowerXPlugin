@@ -362,7 +362,7 @@
   - 改善 CLI 输出（进度、错误信息、示例），`root.go` help 中突出 Go CLI 特性。
   - `go fmt`, `golangci-lint`, 更新 `CHANGELOG`, 确认所有文档/任务对齐。
   - ✅ `px-plugin help` 增加 doctor/文档提示，未知命令指向 `px-plugin help`。
-  - ✅ `px-plugin doctor` 输出分步骤进度；`CHANGELOG.md` 记录 FAQ/帮助更新。
+- ✅ `px-plugin doctor` 输出分步骤进度；`CHANGELOG.md` 记录 FAQ/帮助更新。
 
 ### Parallel Opportunities
 - T073/T074 can start immediately (command + client)
@@ -370,6 +370,41 @@
 - T079/T080 depend on T073/T074/T075/T076
 - T085/T086/T087 need T079/T080 completed first
 - T091/T092/T093 require most components ready
+
+---
+
+## Phase 14: Local install fast path（Priority P2）
+
+**Goal**: 让脚手架工程内建 Makefile + 本地安装脚本，并发布 `docs/guides/publish/local-install.md`，覆盖 dist/zip/`.pxp` 三种路径和 `/admin/plugins/install/local` API 操作。
+
+- [X] **T097a [P] [US8] Skeleton/模板接入 Makefile**
+  1. 以 `../com.powerx.plugin.base/Makefile` 与 `../com.powerx.plugin.base/make-files/**` 为源，拷贝至本仓 `skeleton/`，保持目录结构一致（路径均以当前仓库根目录为相对基准）。
+  2. 运行 `npm run sync:templates -- --verbose`，确认 `scaffold/templates/**` 与 `tools/cli/internal/templates/data/**` 生成对应 `.tmpl`。
+  3. 执行 `px-plugin init demo.local`，验证输出工程包含 Makefile/make-files，`git status` 仅显示预期变更。
+
+- [X] **T097b [US8] Make target 串联 dist/pack/local-install**
+  1. 在 Makefile 增加变量（`DIST_DIR`, `API_BASE`, `TOKEN`, `ENABLE`, `FORCE`, `PACKAGE`），`make dist` 串联 go build + npm build 并产出 `${DIST_DIR}`。
+  2. `make pack` 复用 `px-plugin pack` 或 dist 产物输出 `.pxp`，在注释中示例命令。
+  3. `make local-install` 调用 `/admin/plugins/install/local`（curl 示例）并根据 `ENABLE/FORCE` 输出安装日志。
+  4. `make local-install-pxp` 先解包 `${PACKAGE}` 到临时目录再调用 local install，并在日志中声明 `.pxp` 限制。
+  5. 在示例工程执行 `make dist` 与 `make local-install API_BASE=... TOKEN=...`，记录步骤至 README。
+
+- [X] **T097c [US8] CI 与示例验证**
+  1. 在示例或 CI pipeline 中新增 `make dist` smoke job（≤60s）；可选：保留 artefact。
+  2. 评估 sandbox 环境运行 `make local-install` 可行性（需 Admin API）。若不可行，在文档注明需手动执行。
+  3. README / Quickstart 增加 “Makefile 快速安装” 小节并链接 `docs/guides/publish/local-install.md`。
+
+- [X] **T098a [P] [US8] 撰写 `docs/guides/publish/local-install.md`**
+  1. 文档结构：概述 → 前置条件 → dist 安装 → zip 安装 → `.pxp` 安装 → 常见错误/FAQ。
+  2. 提供 `px-plugin dist/pack`、Makefile、`curl /admin/plugins/install/local`、`curl /admin/plugins/install/url` 示例，并说明权限/凭证要求。
+
+- [X] **T098b [US8] 在 Quickstart/Publish 文档中引用**
+  1. `docs/guides/quickstart.md`、`docs/guides/publish/offline.md`、`docs/guides/publish/online.md` 增加链接，Spec `Documentation & Enablement` 保持一致。
+  2. 在 Publish/FAQ/Runbook 段落提及 “local install fast path”。
+
+- [X] **T098c [US8] 文档审校与样例验证**
+  1. DevRel/QA 依文档执行 dist/zip/`.pxp` 流程，确认可复现并记录截图/日志。
+  2. 更新 docmap/导航，确保 `docs/guides/publish/local-install.md` 可检索；必要时在 FAQ 中增加入口。
 
 ### Go CLI Code Structure
 

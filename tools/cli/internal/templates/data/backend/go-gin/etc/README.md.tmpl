@@ -55,6 +55,11 @@ Skeleton 与 Base 插件保持相同的字段结构，可直接复用宿主侧�
 | `POWERX_DB_SCHEMA` | 覆盖数据库 Schema 名称 |
 | `POWERX_RUN_MIGRATE` | 设置为 `true` 强制执行数据库迁移 |
 | `POWERX_LOG_LEVEL` | 覆盖日志级别（debug/info/warn/error） |
+| `POWERX_CORE_ENDPOINT` | Delegated 模式访问宿主 Core API 的基址（如 `http://localhost:8077`） |
+| `POWERX_AUTH_TOKEN` | 插件 → 宿主 Core 调用时使用的服务 Token |
+| `POWERX_RBAC_DELEGATE` | 设为 `true/1/on` 时强制使用宿主 IAM；`false` 时可落到本地 IAM |
+| `PLUGIN_IAM_ADMIN_EMAIL` | Local 模式默认管理员邮箱，`go run ./cmd/database/main.go setup` 时必填 |
+| `PLUGIN_IAM_ADMIN_PASSWORD` | Local 模式默认管理员密码，配合上方邮箱使用 |
 
 > 建议在生产环境通过配置文件写入敏感信息，仅在必要时才使用环境变量覆盖。
 

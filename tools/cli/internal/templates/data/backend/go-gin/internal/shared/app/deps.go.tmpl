@@ -10,6 +10,8 @@ import (
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
+	"{{ .BackendModulePath }}/internal/services/authproxy"
+	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	marketplacesvc "{{ .BackendModulePath }}/internal/services/marketplace"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -27,6 +29,9 @@ type Deps struct {
 	LicenseCache        marketplacesvc.LicenseCache
 	OperationsMetrics   *opsmetrics.Metrics
 	AdminConsoleMetrics *adminmetrics.Metrics
+	IAMMode             iamservice.IAMMode
+	IAMModeSource       string
+	AuthProxy           *authproxy.DelegatedClient
 }
 
 // RuntimeDefaults returns the configured runtime ops defaults (if any).

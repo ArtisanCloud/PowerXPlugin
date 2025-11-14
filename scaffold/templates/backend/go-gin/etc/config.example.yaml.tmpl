@@ -1,5 +1,12 @@
 # Skeleton 插件示例配置
 # 将本文件复制为 backend/etc/config.yaml 即可覆盖默认配置。
+#
+# Auth / IAM 相关环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
+#   POWERX_CORE_ENDPOINT      - Delegated 模式访问宿主 Core API 的基址（默认 http://localhost:8077）
+#   POWERX_AUTH_TOKEN         - 插件向宿主 Core 鉴权用的服务 Token
+#   POWERX_RBAC_DELEGATE      - 设为 true/1/on 时强制走 Delegated IAM（即使 POWERX_PROXY!=1）
+#   PLUGIN_IAM_ADMIN_EMAIL    - Local 模式默认管理员邮箱（用于 migrate/seed）
+#   PLUGIN_IAM_ADMIN_PASSWORD - Local 模式默认管理员密码（用于 migrate/seed）
 
 server:
   bind_addr: ":8087"

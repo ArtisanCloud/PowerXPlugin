@@ -11,6 +11,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http"
 	middleware2 "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	publicauth "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/public"
 
 	"github.com/gin-gonic/gin"
 )
@@ -109,6 +110,8 @@ func (r *Router) setupRoutes() {
 	// 鉴权/权限组件
 	jwtCfg := r.buildJWT()
 	rbacCfg := r.buildRBAC()
+
+	publicauth.RegisterAuthRoutes(r.engine.Group(prefix), r.deps)
 
 	// 使用 API 注册器注册所有路由（保持你现有的注册逻辑）
 	apiRegistry := http.NewRegistry(r.engine, r.deps)

@@ -52,6 +52,7 @@ func (h *TemplateHandler) GetTemplate(c *gin.Context) {
 }
 
 func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
+	// capability: com.powerx.skeleton.template.create
 	var req CreateTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())

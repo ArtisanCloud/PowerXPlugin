@@ -31,20 +31,20 @@
 
 ### Implementation
 
-- [ ] T009 [US1] 在 `skeleton/web-admin/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
-- [ ] T010 [P] [US1] 扩展 `skeleton/web-admin/app/composables/api/_client.ts`，注入 `Authorization` / `X-Tenant-ID`，在 401 时自动调 `authService.refreshToken` 并重放请求。
-- [ ] T011 [P] [US1] 新建 `skeleton/web-admin/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
-- [ ] T012 [US1] 添加 `skeleton/web-admin/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
-- [ ] T013 [US1] 完成 `skeleton/web-admin/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。
-- [ ] T014 [P] [US1] 注册 `skeleton/web-admin/app/plugins/auth.client.ts` 在客户端初始化 `initAuth`，并在全局导航（如 `app/components/AppNavbar.vue`）加入 Logout。
-- [ ] T015 [P] [US1] 为 `useAuth` 新增单元/组件测试（例如 `skeleton/web-admin/tests/unit/useAuth.fallback.spec.ts`），覆盖 localStorage 访问失败时的 cookie 回退/强制登录行为。
-- [ ] T016 [US1] 在 `skeleton/backend/internal/services/authproxy/delegated_client.go` 调用 `POWERX_CORE_ENDPOINT` (`/admin/user/auth/*`) 并附带 `POWERX_AUTH_TOKEN`。
-- [ ] T017 [US1] 新增 `skeleton/backend/internal/transport/http/public/auth_handler.go` 与路由注册 `/api/v1/auth/login|refresh|logout|me/context`，代理 Delegated client 并执行 fail-closed。
-- [ ] T018 [US1] 更新 `skeleton/backend/internal/router/router.go`，挂载 public auth 路由、受保护 `me` 路由，并确认 Phase2 中间件在所有业务路由生效。
-- [ ] T019 [US1] 更新 `skeleton/backend/internal/manifestx/manifest.go` 与 `docs/contracts/manifest.yaml` / `docs/contracts/rbac.schema.json`，声明插件运行所需的 `iam.user.read`/`iam.role.read` 等 scope，并同步 `scaffold/templates/**` 与 CLI manifest。
-- [ ] T020 [P] [US1] 编写 Playwright E2E (`skeleton/web-admin/tests/e2e/auth-delegated.spec.ts`)，覆盖登录成功、token 刷新、Core 断连提示。
-- [ ] T021 [US1] 在 `skeleton/backend/internal/transport/http/public/auth_handler_test.go` 编写 Go 测试，mock Delegated client，验证成功/401/超时。
-- [ ] T022 [US1] 执行 `npm run sync:templates`，同步 Skeleton 改动到 `scaffold/templates/**` 与 `tools/cli/internal/templates/**`，并更新 `CHANGELOG.md` 记录命令。
+- [X] T009 [US1] 在 `skeleton/web-admin/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
+- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/app/composables/api/_client.ts`，注入 `Authorization` / `X-Tenant-ID`，在 401 时自动调 `authService.refreshToken` 并重放请求。
+- [X] T011 [P] [US1] 新建 `skeleton/web-admin/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
+- [X] T012 [US1] 添加 `skeleton/web-admin/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
+- [X] T013 [US1] 完成 `skeleton/web-admin/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。
+- [X] T014 [P] [US1] 注册 `skeleton/web-admin/app/plugins/auth.client.ts` 在客户端初始化 `initAuth`，并在全局导航（如 `app/components/AppNavbar.vue`）加入 Logout。
+- [X] T015 [P] [US1] 为 `useAuth` 新增单元/组件测试（`skeleton/web-admin/tests/unit/useAuth.fallback.spec.ts` + `vitest.config.ts`），覆盖 localStorage 回退与强制登录行为。
+- [X] T016 [US1] 在 `skeleton/backend/internal/services/authproxy/delegated_client.go` 实现对宿主 `/admin/user/auth/*` 的代理并附带 `POWERX_AUTH_TOKEN`。
+- [X] T017 [US1] 新增 `skeleton/backend/internal/transport/http/public/auth_handler.go` 与公共路由 `/api/v1/auth/login|refresh|logout|me/context`，完成 fail-closed 代理。
+- [X] T018 [US1] 更新 `skeleton/backend/internal/router/router.go`，挂载 public auth 路由并沿用 Phase2 中间件；`shared/app/deps.go`、`cmd/plugin/main.go` 注入依赖。
+- [X] T019 [US1] 更新 `skeleton/backend/internal/manifestx/manifest.go`、`docs/contracts/manifest.yaml`、`docs/contracts/rbac.schema.json` 及模板/CLI，声明所需 IAM scope。
+- [X] T020 [P] [US1] 编写 Playwright E2E `skeleton/web-admin/tests/e2e/auth-delegated.spec.ts`，覆盖登录成功与 Core 不可用提示。
+- [X] T021 [US1] 在 `skeleton/backend/internal/transport/http/public/auth_handler_test.go` 添加 Go 测试，mock Delegated client 覆盖成功/401/503 分支。
+- [X] T022 [US1] 执行 `npm run sync:templates`，同步 Skeleton → `scaffold/templates/**` → CLI，并在 `CHANGELOG.md` 记录。
 
 **Checkpoint**：Delegated 模式可独立演示 + manifest 权限齐备。
 

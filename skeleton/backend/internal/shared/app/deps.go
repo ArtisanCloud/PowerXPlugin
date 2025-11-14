@@ -10,6 +10,7 @@ import (
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	"github.com/sirupsen/logrus"
@@ -30,6 +31,7 @@ type Deps struct {
 	AdminConsoleMetrics *adminmetrics.Metrics
 	IAMMode             iamservice.IAMMode
 	IAMModeSource       string
+	AuthProxy           *authproxy.DelegatedClient
 }
 
 // RuntimeDefaults returns the configured runtime ops defaults (if any).

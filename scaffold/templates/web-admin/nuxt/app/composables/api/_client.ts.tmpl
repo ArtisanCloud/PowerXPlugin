@@ -1,6 +1,7 @@
 // 统一创建 $fetch 实例（单例）+ 便捷方法
 
 import { resolveApiBase, getAuthToken, getTenantId } from "./_base";
+import { useAuth } from "~/composables/useAuth";
 
 type Json = Record<string, any>;
 
@@ -16,8 +17,10 @@ export function useApiClient() {
   const client = $fetch.create({
     baseURL,
     timeout: 30_000,
-    onRequest({ options }) {
+    async onRequest({ options }) {
       const headers = (options.headers ||= {}) as Record<string, string>;
+      const skipAuth = Boolean((options as any).skipAuth);
+      const auth = useAuth();
 
       if (!("Accept" in headers)) headers["Accept"] = "application/json";
 
@@ -30,17 +33,18 @@ export function useApiClient() {
         headers["Content-Type"] = "application/json";
       }
 
-      // 鉴权
-      if (!headers["Authorization"]) {
-        const token =
-          (options as any).authToken ||
-          (options as any).token ||
-          (options as any).accessToken ||
-          getAuthToken();
-        if (token)
-          headers["Authorization"] = /^Bearer\s/i.test(String(token))
-            ? String(token)
-            : `Bearer ${token}`;
+      let authToken: string | null = null;
+      if (!skipAuth) {
+        authToken = (options as any).authToken || (options as any).token;
+        if (!authToken) {
+          authToken = (await auth.ensureFreshToken()) || getAuthToken();
+        }
+      }
+
+      if (authToken && !headers["Authorization"]) {
+        headers["Authorization"] = /^Bearer\\s/i.test(String(authToken))
+          ? String(authToken)
+          : `Bearer ${authToken}`;
       }
 
       // 多租户
@@ -51,6 +55,10 @@ export function useApiClient() {
     },
     onResponseError({ response }) {
       console.error("API error:", response.status, response._data);
+      if (response.status === 401) {
+        const auth = useAuth();
+        auth.clearAuth();
+      }
     },
   });
 

@@ -25,6 +25,8 @@ import (
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	recommendation "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -93,6 +95,16 @@ func main() {
 		"source": iamResolver.Source(),
 	}).Info("IAM mode resolved")
 
+	var authClient *authproxy.DelegatedClient
+	if iamResolver.Mode() == iamservice.IAMModeDelegated {
+		client, err := authproxy.NewDelegatedClient("", "")
+		if err != nil {
+			logger.WithError(err).Warn("Failed to initialize delegated auth proxy; auth endpoints will be unavailable")
+		} else {
+			authClient = client
+		}
+	}
+
 	// 初始化 PowerX gRPC Client 客户端
 	pxc := pluginbootstrap.BootstrapGRPCClient(rootCtx, cfg.GRPCUpstream)
 
@@ -126,6 +138,7 @@ func main() {
 		AdminConsoleMetrics: adminmetrics.NewMetrics(),
 		IAMMode:             iamResolver.Mode(),
 		IAMModeSource:       iamResolver.Source(),
+		AuthProxy:           authClient,
 	}
 
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)

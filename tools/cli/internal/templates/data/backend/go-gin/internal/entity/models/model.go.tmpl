@@ -66,4 +66,12 @@ const (
 	TableAdminConsoleAuditEvents         = "admin_console_audit_events"
 	TableAdminConsoleConfigChanges       = "admin_console_config_changes"
 	TableAdminConsoleJobRuns             = "admin_console_job_runs"
+	TableIAMTenants                      = "iam_tenants"
+	TableIAMUsers                        = "iam_users"
+	TableIAMMembers                      = "iam_members"
+	TableIAMRoles                        = "iam_roles"
+	TableIAMPermissions                  = "iam_permissions"
+	TableIAMDepartments                  = "iam_departments"
+	TableIAMMemberRoles                  = "iam_member_roles"
+	TableIAMRolePermissions              = "iam_role_permissions"
 )

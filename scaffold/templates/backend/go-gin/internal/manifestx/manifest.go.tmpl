@@ -8,6 +8,11 @@ func Plugin() manifest.Plugin {
 		ID:      "com.powerx.plugin.base",
 		Name:    "PowerX Base Plugin",
 		Version: "0.1.0",
+		Permissions: []string{
+			"iam.user.read",
+			"iam.role.read",
+			"iam.department.read",
+		},
 		Menus: []manifest.Menu{
 			{
 				Path:  "/_p/{{ .PluginID }}/admin/templates/intro",

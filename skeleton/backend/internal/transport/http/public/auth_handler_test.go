@@ -1,0 +1,169 @@
+package public
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+)
+
+func TestAuthHandler_LoginSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tokens := &iamservice.AuthTokens{
+		TokenType:    "Bearer",
+		AccessToken:  "access",
+		RefreshToken: "refresh",
+		Scope:        "access",
+		ExpiresIn:    3600,
+		ExpiresAt:    time.Unix(1710000000, 0),
+	}
+	proxy := &stubProxy{
+		loginFn: func(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error) {
+			require.Equal(t, "user@example.com", req.Identifier)
+			require.Equal(t, "secret", req.Password)
+			return tokens, nil
+		},
+	}
+	router := gin.New()
+	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	router.POST("/auth/login", handler.Login)
+
+	body := `{"identifier":"user@example.com","password":"secret"}`
+	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	var payload contracts.APIResponse
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	require.True(t, payload.Success)
+	data := payload.Data.(map[string]any)
+	require.Equal(t, "access", data["access_token"])
+	require.Equal(t, float64(3600), data["expires_in"])
+	require.Equal(t, "refresh", data["refresh_token"])
+}
+
+func TestAuthHandler_LoginUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	proxy := &stubProxy{
+		loginFn: func(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error) {
+			return nil, iamservice.ErrAuthUnavailable
+		},
+	}
+	router := gin.New()
+	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	router.POST("/auth/login", handler.Login)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"identifier":"a","password":"b"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusServiceUnavailable, resp.Code)
+	var payload contracts.APIResponse
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	require.False(t, payload.Success)
+}
+
+func TestAuthHandler_RefreshUnauthorized(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	proxy := &stubProxy{
+		refreshFn: func(ctx context.Context, token string) (*iamservice.AuthTokens, error) {
+			return nil, iamservice.ErrUnauthorized
+		},
+	}
+	router := gin.New()
+	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	router.POST("/auth/refresh", handler.Refresh)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBufferString(`{"refresh_token":"abc"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusUnauthorized, resp.Code)
+}
+
+func TestAuthHandler_MeContextSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctxResp := &authproxy.MeContext{
+		IsRoot:          true,
+		CurrentTenantID: 42,
+		Members: []authproxy.MeMemberBrief{{
+			TenantID:   42,
+			TenantName: "ACME",
+			MemberID:   7,
+			IsAdmin:    true,
+		}},
+	}
+	proxy := &stubProxy{
+		meFn: func(ctx context.Context, token string) (*authproxy.MeContext, error) {
+			require.Equal(t, "bearer-token", token)
+			return ctxResp, nil
+		},
+	}
+	router := gin.New()
+	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	router.GET("/auth/me/context", handler.MeContext)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/me/context", nil)
+	req.Header.Set("Authorization", "Bearer bearer-token")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	var payload contracts.APIResponse
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	data := payload.Data.(map[string]any)
+	require.Equal(t, float64(42), data["current_tenant_id"])
+}
+
+type stubProxy struct {
+	loginFn   func(context.Context, iamservice.LoginRequest) (*iamservice.AuthTokens, error)
+	refreshFn func(context.Context, string) (*iamservice.AuthTokens, error)
+	logoutFn  func(context.Context, string) error
+	meFn      func(context.Context, string) (*authproxy.MeContext, error)
+}
+
+func (s *stubProxy) Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error) {
+	if s.loginFn != nil {
+		return s.loginFn(ctx, req)
+	}
+	return nil, nil
+}
+
+func (s *stubProxy) Refresh(ctx context.Context, token string) (*iamservice.AuthTokens, error) {
+	if s.refreshFn != nil {
+		return s.refreshFn(ctx, token)
+	}
+	return nil, nil
+}
+
+func (s *stubProxy) Logout(ctx context.Context, token string) error {
+	if s.logoutFn != nil {
+		return s.logoutFn(ctx, token)
+	}
+	return nil
+}
+
+func (s *stubProxy) MeContext(ctx context.Context, token string) (*authproxy.MeContext, error) {
+	if s.meFn != nil {
+		return s.meFn(ctx, token)
+	}
+	return nil, nil
+}

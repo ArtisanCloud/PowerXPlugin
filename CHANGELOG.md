@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- Delegated IAM Auth Proxy（Go）与 `/api/v1/auth/*` 公共路由，覆盖 login/refresh/logout/me/context 及 `docs/contracts/manifest.yaml` 示范清单
+- `useAuth` Vitest 单测与 `tests/e2e/auth-delegated.spec.ts` Playwright 场景，验证 token fallback/Fail-Closed 交互
 - 初始发布流程文档与 Release Workflow (`docs/release.md`, `.github/workflows/release.yml`)
 - CLI 生成物示例 `examples/starter/`，对齐 Phase 6 用户故事
 - Skeleton Templates CRUD 栈（后端内存仓储 + 前端页面 + `useTemplateApi` 示例）并同步至 CLI 脚手架模板
@@ -12,6 +14,7 @@
 - Go CLI 故障排查手册 `docs/guides/cli/go-cli-troubleshooting.md`，涵盖 doctor、SSE、跨平台脚本 FAQ
 
 ### Changed
+- 脚手架与 CLI Manifest 模板默认声明 `iam.user.read/iam.role.read/iam.department.read` Scope，便于宿主在安装期提示所需权限
 - 脚手架模板 README 增加 Release 指引与多语言 TODO 提示
 - Manifest Schema 追加菜单 `children` 递归定义，Skeleton/CLI 均可注册嵌套导航
 - Quickstart / Standalone 指南补充多租户 CRUD 验证与延迟记录流程

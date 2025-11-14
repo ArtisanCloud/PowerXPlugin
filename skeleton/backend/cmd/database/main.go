@@ -10,9 +10,11 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/database/migrate"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/database/seed"
+	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 )
 
 func main() {
@@ -29,6 +31,9 @@ func main() {
 	}
 	models.InitSchemaFrom(cfg.Database.Schema) // 必须在所有 DB 操作之前
 
+	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
+	includeIAM := iamResolver.Mode() == iamservice.IAMModeLocal
+
 	ctx := context.Background()
 	// 连接数据库
 	db, err := db.Connect(cfg.Database)
@@ -38,7 +43,7 @@ func main() {
 
 	switch cmd {
 	case "migrate":
-		if err := migrate.MigratePluginModels(ctx, db); err != nil {
+		if err := migrate.MigratePluginModels(ctx, db, includeIAM); err != nil {
 			log.Fatal("migrate failed:", err)
 		}
 		fmt.Println("migrate ok")
@@ -47,16 +52,26 @@ func main() {
 		if err := seed.SeedPluginData(ctx, db); err != nil {
 			log.Fatal("seed failed:", err)
 		}
+		if includeIAM {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+				log.Fatal("iam seed failed:", err)
+			}
+		}
 		fmt.Println("seed ok")
 
 	case "setup":
-		if err := migrate.MigratePluginModels(ctx, db); err != nil {
+		if err := migrate.MigratePluginModels(ctx, db, includeIAM); err != nil {
 			log.Fatal("migrate failed:", err)
 		}
 		fmt.Println("migrate ok")
 
 		if err := seed.SeedPluginData(ctx, db); err != nil {
 			log.Fatal("seed failed:", err)
+		}
+		if includeIAM {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+				log.Fatal("iam seed failed:", err)
+			}
 		}
 		fmt.Println("seed ok")
 
@@ -68,7 +83,7 @@ func main() {
 		fmt.Println("reset ok")
 
 		// 再 migrate
-		if err := migrate.MigratePluginModels(ctx, db); err != nil {
+		if err := migrate.MigratePluginModels(ctx, db, includeIAM); err != nil {
 			log.Fatal("migrate failed:", err)
 		}
 		fmt.Println("migrate ok")
@@ -76,6 +91,11 @@ func main() {
 		// 最后 seed
 		if err := seed.SeedPluginData(ctx, db); err != nil {
 			log.Fatal("seed failed:", err)
+		}
+		if includeIAM {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+				log.Fatal("iam seed failed:", err)
+			}
 		}
 		fmt.Println("seed ok")
 

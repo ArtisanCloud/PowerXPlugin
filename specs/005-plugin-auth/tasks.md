@@ -12,12 +12,12 @@
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T003 创建 `skeleton/backend/internal/services/iam/directory.go`，定义 `IAMDirectory` 接口、`IAMMode` 枚举、Token DTO 与通用错误类型。
-- [ ] T004 在 `skeleton/backend/internal/bootstrap/iam_resolver.go` 实现 IAM 模式解析逻辑，依序读取 `context.iam_mode`、`POWERX_RBAC_DELEGATE`、`POWERX_PROXY` 并缓存在依赖容器。
-- [ ] T005 新增 IAM 实体（`Tenant`/`User`/`Member`/`Role`/`Permission`/`Department`）到 `skeleton/backend/internal/entity/models/iam/`，含 Gorm 标签与关系定义。
-- [ ] T006 拆分 `skeleton/backend/cmd/database/migrate/migrate.go` 的 AutoMigrate 流程，使 IAM 表仅在 Local 模式执行；更新 `cmd/database/main.go` 以读取 resolver 结果。
-- [ ] T007 在 `skeleton/backend/internal/services/iam/seeder.go` 实现本地管理员种子（依赖 `PLUGIN_IAM_ADMIN_*`），并在 `cmd/database/main.go setup` 中强制校验/失败。
-- [ ] T008 实现/更新 `skeleton/backend/internal/transport/http/middleware/auth_jwt.go`（及签名上下文相关文件），确保所有受保护路由同时支持 Bearer Token 与 `X-PowerX-CTX`，并添加 Go 测试覆盖 JWT 与 Signed-Context 流程。
+- [X] T003 创建 `skeleton/backend/internal/services/iam/directory.go`，定义 `IAMDirectory` 接口、`IAMMode` 枚举、Token DTO 与通用错误类型。
+- [X] T004 在 `skeleton/backend/internal/bootstrap/iam_resolver.go` 实现 IAM 模式解析逻辑，依序读取 `context.iam_mode`、`POWERX_RBAC_DELEGATE`、`POWERX_PROXY` 并缓存在依赖容器。
+- [X] T005 新增 IAM 实体（`Tenant`/`User`/`Member`/`Role`/`Permission`/`Department`）到 `skeleton/backend/internal/entity/models/iam/`，含 Gorm 标签与关系定义。
+- [X] T006 拆分 `skeleton/backend/cmd/database/migrate/migrate.go` 的 AutoMigrate 流程，使 IAM 表仅在 Local 模式执行；更新 `cmd/database/main.go` 以读取 resolver 结果。
+- [X] T007 在 `skeleton/backend/internal/services/iam/seeder.go` 实现本地管理员种子（依赖 `PLUGIN_IAM_ADMIN_*`），并在 `cmd/database/main.go setup` 中强制校验/失败。
+- [X] T008 实现/更新 `skeleton/backend/internal/transport/http/middleware/auth_jwt.go`（及签名上下文相关文件），确保所有受保护路由同时支持 Bearer Token 与 `X-PowerX-CTX`，并添加 Go 测试覆盖 JWT 与 Signed-Context 流程。
 
 **Checkpoint**：IAM 接口 + Resolver + 中间件栈就绪。
 

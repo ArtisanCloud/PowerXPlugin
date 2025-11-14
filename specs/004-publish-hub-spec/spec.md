@@ -185,6 +185,24 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 
 ---
 
+### User Story 9 - Capability registration & exposure pipeline (Priority: P1)
+
+> 来源：docs/use_cases/_from_hub/SCN-INT-PLUGIN-CAPABILITY-001（能力建模/审核/暴露/生命周期）
+
+Publish Hub 需要让插件在 manifest/contract 中声明能力 ID、Schema、RBAC 与通道，再通过 CLI 与 PowerX 能力注册 API 完成建模、审核、暴露、租户授权与灰度。`px-plugin capabilities init/lint/submit/quota/diff` 必须覆盖这一闭环，并把状态写入 `.px-plugin/`，同时确保每个能力都落在真实 handler（REST/GraphQL/Agent Tool/Webhook/SDK）。
+
+**Why this priority**: 没有统一的能力注册/暴露管线，宿主无法识别插件功能、也无法授予租户调用权限，Marketplace 与 Publish Hub 也无法对能力版本、SLA、审计进行治理。
+
+**Independent Test**: 在 `examples/com.powerx.demo` 中运行 `px-plugin capabilities init com.powerx.demo.template.create` → 填写 handler/Schema → `px-plugin capabilities lint` → `px-plugin capabilities submit --dev-api https://dev-api.powerx.local` → `px-plugin capabilities quota --tenant demo` → `px-plugin capabilities diff --from manifest.prev --to manifest.next`，期间验证 `.px-plugin/capabilities.json` 状态、PowerX API 回执、Telemetry (`capability.registry.*`, `capability.exposure.*`) 与 REST/Agent Tool handler 均可被调用。
+
+**Acceptance Scenarios**:
+
+1. **Given** CLI 模板与脚手架已更新，**When** 执行 `px-plugin capabilities init com.powerx.demo.template.create --type rest`, **Then** 60 秒内生成 manifest 片段、`contracts/capabilities/*.yaml`、`contracts/schema/input|output/*.json` 以及 handler stub，并在 `make dist`/`px-plugin init` 默认项目中可直接使用。
+2. **Given** 能力契约已填写，**When** 运行 `px-plugin capabilities lint && px-plugin capabilities submit --dev-api …`, **Then** CLI 校验命名/Schema/RBAC/handler 绑定，通过后调用 `POST /internal/plugins/capabilities` 与 `PATCH /internal/plugins/capabilities/{id}/exposure`，返回能力 ID/状态、写入 `.px-plugin/capabilities.json` 与审计日志，若状态 ≠ approved 则 `make dist`/`px-plugin publish` 报警阻断。
+3. **Given** 需要授权与版本变更通知，**When** 执行 `px-plugin capabilities quota --tenant demo --capability com.powerx.demo.template.create` 与 `px-plugin capabilities diff --from manifest.prev --to manifest.next`, **Then** CLI 调用 PowerX API 更新租户额度、生成 Postman/SDK bundle，并输出差异报告（Schema/RBAC/通道变更与灰度计划模板），Telemetry 在 3 分钟内可见。
+
+---
+
 ### Edge Cases
 
 - 模板索引缺少依赖或扫描失败时，`px-plugin init` 必须回滚输出并提示补齐镜像/豁免。
@@ -205,6 +223,7 @@ CLI 与 Dev API 必须支撑 `px-plugin dev --watch`、register/reload/delete、
 3. **E2E 验证记录**：`docs/development/t084-integration-tests-summary.md#真实-dev-api-e2e-验证（t091）` 保存了真实 Dev API 流程、终端输出与 artefact 路径，为 QA/Docs 提供复现脚本。
 4. **本地安装指南**：新增 `docs/guides/publish/local-install.md`（T098）详解 dist/zip/`.pxp` 本地安装流程、`/admin/plugins/install/local` 参数、Makefile 命令与错误排查；Quickstart 与 Publish 文档需链接该指南。
 5. **后续文档任务**：T094 仍需同步 FAQ / Admin Guide，确保 doctor/rollback 能力纳入上线前检查清单。
+6. **能力注册与暴露**：`docs/guides/publish/capabilities.md`（T104）统一说明 capability 定义、契约生成、提交/授权/灰度流程；Quickstart、在线/离线发布文档已插入引用。
 
 ## High-Level Architecture & CLI Contracts
 

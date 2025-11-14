@@ -1,0 +1,29 @@
+package capabilities
+
+import (
+	caphandlers "{{ .BackendModulePath }}/internal/handlers/capabilities/template"
+	"{{ .BackendModulePath }}/internal/shared/app"
+
+	"github.com/gin-gonic/gin"
+)
+
+type Router struct {
+	deps           *app.Deps
+	templateCreate *caphandlers.CreateHandler
+}
+
+func NewRouter(deps *app.Deps) *Router {
+	return &Router{
+		deps:           deps,
+		templateCreate: caphandlers.NewCreateHandler(),
+	}
+}
+
+// RegisterAPIRoutes exposes capability handlers over REST entrypoints defined in manifest.exposure.channels.
+func (r *Router) RegisterAPIRoutes(group *gin.RouterGroup) {
+	if group == nil {
+		return
+	}
+	// 默认根据模板生成 `/resources` 路径，可根据 manifest.exposure.channels 覆写。
+	group.POST("/resources", r.templateCreate.Handle)
+}

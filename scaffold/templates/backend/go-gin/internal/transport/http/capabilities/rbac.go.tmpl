@@ -1,0 +1,13 @@
+package capabilities
+
+import authx "{{ .BackendModulePath }}/internal/middleware"
+
+func RBACEntries(prefix string) map[string]authx.Permission {
+	base := prefix
+	if base == "" {
+		base = "/api/v1"
+	}
+	return map[string]authx.Permission{
+		"POST:" + base + "/resources": {Resource: "{{ .PluginID }}:template", Action: "create"},
+	}
+}

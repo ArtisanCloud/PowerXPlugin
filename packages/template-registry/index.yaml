@@ -48,6 +48,8 @@ templates:
     notes:
       - "默认启用 README.md.tmpl 和 docs/contracts，适合 CLI 快速演示。"
       - "可通过 POWERXPLUGIN_USE_LOCAL_FRONTEND=1 复用 monorepo layer。"
+    features:
+      - capabilities.v1
 
   - id: backend-go-lite
     displayName: Backend Only (Go + Gin)
@@ -76,4 +78,6 @@ templates:
         type: manual
         owners:
           - ops@artisan-cloud.com
+    features:
+      - capabilities.v1
 *** End Patch

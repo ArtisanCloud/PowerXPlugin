@@ -2,6 +2,8 @@
 
 本指南详细说明如何为网络隔离环境创建 `.pxp` 离线包，通过离线上传审核链路分发到租户。如需跳过 Marketplace，直接在 PowerX 安装 dist/zip/`.pxp` 包，请参考《[本地安装指南](./local-install.md)》。
 
+> ⚠️ 离线打包前请完成《[能力注册与暴露指南](./capabilities.md)》中的流程并确认能力状态为 approved，避免 `px-plugin dist --target offline` 因 capability 未审核而失败。
+
 **适用对象**: 插件开发者 (plugin_developer) + 运维团队 (platform_ops)
 **预计耗时**: 15 分钟（打包）+ 1 个工作日（审核 SLA）
 **相关 SLA**: 离线审核 ≤ 1 个工作日

@@ -127,3 +127,19 @@ No constitution violations identified — 不需要额外复杂度豁免。
 - **Deliverables**: 将原 `/com.powerx.plugin.base` 中的 `Makefile` 与 `make-files/*.mk` 搬运到 `skeleton/` 并同步到模板/CLI embed，使 `px-plugin init` 输出的工程默认具备 `make dist`, `make pack`, `make local-install`、`make local-install-pxp` 等目标；补充 `docs/guides/publish/local-install.md` 描述 dist/zip/`.pxp` 安装方式、`/admin/plugins/install/local` 调用示例及故障排查，并在 Quickstart/Publish 文档加引用。
 - **Acceptance**: 运行 `make dist` 能在 60 秒内完成 go+npm 构建并输出标准 artefact；`make local-install API_BASE=… TOKEN=…` 成功调用 Admin API（含 Force/Enable 参数），日志清晰；`make local-install-pxp PACKAGE=./artifacts/demo.pxp` 先解包/校验再调用 local install 并在文档中声明约束；`docs/guides/publish/local-install.md` 覆盖 dist/zip/`.pxp` 三种路径。
 - **Testing**: CI 增加 `make dist` smoke；在示例 helloworld 工程执行 `make local-install` 指向 sandbox Admin API；文档经 DevRel/QA 校验。
+
+### Workstream F – Capability registration & exposure (SCN-INT-PLUGIN-CAPABILITY-001)
+- **Deliverables**:
+  - 模板/脚手架更新：`scaffold/templates/plugin.yaml.tmpl`, `tools/cli/internal/templates/data/plugin.yaml.tmpl`, `packages/template-registry/index.yaml` 默认包含 `capabilities.provides`, `agent_tools`, `exposure.channels` 及 handler stub。
+  - Contracts 与 Schema 生成：`scripts/capabilities/validate-capabilities.mjs`, `contracts/capabilities/*.yaml`, `contracts/schema/input|output/*.json` 自动化工具。
+  - CLI 命令链：`px-plugin capabilities init|lint|submit|quota|diff`（`tools/cli/src/commands/capabilities/*.ts` + 新 lib），写入 `.px-plugin/capabilities.json` 审计状态并调用 `/internal/plugins/capabilities/**`。
+  - 租户授权与示例：`px-plugin capabilities quota` + Postman/SDK bundle 生成器、`examples/com.powerx.demo` REST + Agent Tool handler、`docs/guides/publish/capabilities.md`。
+  - 版本比较与灰度：`px-plugin capabilities diff` 输出 Schema/RBAC/通道差异、灰度计划模板、Telemetry hook（`capability.registry.*`, `capability.exposure.*`）。
+- **Acceptance**:
+  - 运行 `px-plugin capabilities init com.powerx.demo.template.create` 在 60 秒内生成 manifest 片段、contract/schema 与 handler skeleton；`px-plugin init` 输出的所有模板都带 capability scaffolding。
+  - `px-plugin capabilities lint` 校验命名/Schema/RBAC/handler 绑定，通过后 `px-plugin capabilities submit --dev-api …` 在 1 分钟内调用 PowerX API，写入 `.px-plugin/capabilities.json` 与审计日志，若状态 ≠ approved 则 `make dist/pack` 自动警告。
+  - `px-plugin capabilities quota --tenant demo` 和 `px-plugin capabilities diff --from manifest.prev --to manifest.next` 成功更新租户额度、生成 Postman/SDK bundle、输出通知/灰度计划，Telemetry 在 3 分钟内可视化。
+- **Testing**:
+  - 单元：`npm test` 覆盖 CLI commands/lib、`go test ./tools/cli/internal/capabilities`（若新增 Go 辅助）、Schema 校验脚本。
+  - 集成：mock PowerX API（`tools/cli/test/fixtures/capabilities-api.mock.ts`）+ `.px-plugin` state 回写；Playwright 或 Go tests 调用示例 handler (`examples/com.powerx.demo`) 验证 REST/Agent Tool 能力。
+  - 文档：DevRel/QA walkthrough 运行 `docs/guides/publish/capabilities.md` 步骤，确保 5 分钟内完成建模→提交→授权→diff。

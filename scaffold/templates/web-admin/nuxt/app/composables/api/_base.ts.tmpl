@@ -28,11 +28,24 @@ export function resolveApiBase(pathname?: string): string {
 }
 
 export function getAuthToken(): string | undefined {
-  // TODO: 换成你的 Pinia/Cookie 逻辑
-  if (typeof document !== "undefined") {
-    const m = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
-    if (m) return decodeURIComponent(m[1]);
+  if (typeof window !== "undefined") {
+    try {
+      const storedToken = window.localStorage?.getItem("access_token");
+      if (storedToken) {
+        return storedToken;
+      }
+    } catch (error) {
+      console.warn("[PowerXPlugin] failed to read localStorage access_token", error);
+    }
   }
+
+  if (typeof document !== "undefined") {
+    const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+    if (match) {
+      return decodeURIComponent(match[1]);
+    }
+  }
+
   return undefined;
 }
 

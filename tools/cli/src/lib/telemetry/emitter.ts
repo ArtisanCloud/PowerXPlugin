@@ -11,10 +11,18 @@ export class TelemetryEmitter {
   }
 
   static emitPublishEvent(event: TelemetryEvent) {
-    this.dispatch({ ...event, emittedAt: new Date().toISOString() });
+    this.enqueue(event);
   }
 
   static emitOfflinePackaging(event: TelemetryEvent) {
+    this.enqueue(event);
+  }
+
+  static emitCapabilityEvent(event: TelemetryEvent) {
+    this.enqueue(event);
+  }
+
+  private static enqueue(event: TelemetryEvent) {
     this.dispatch({ ...event, emittedAt: new Date().toISOString() });
   }
 

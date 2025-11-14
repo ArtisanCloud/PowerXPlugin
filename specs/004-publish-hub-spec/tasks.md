@@ -406,6 +406,67 @@
   1. DevRel/QA 依文档执行 dist/zip/`.pxp` 流程，确认可复现并记录截图/日志。
   2. 更新 docmap/导航，确保 `docs/guides/publish/local-install.md` 可检索；必要时在 FAQ 中增加入口。
 
+---
+
+## Phase 15: Capability registration & exposure（Priority P1）
+
+**Goal**: 让插件在脚手架/manifest/contract 中声明能力，CLI 提供 `px-plugin capabilities init/lint/submit/quota/diff`，并与 PowerX 能力中心 API、租户授权、灰度/通知串联闭环。
+
+- [X] **T099 [P] [US9] 模板与脚手架补齐 capability/exposure 结构**
+  1. 更新 `scaffold/templates/plugin.yaml.tmpl`, `tools/cli/internal/templates/data/plugin.yaml.tmpl`, `packages/template-registry/index.yaml`，默认包含 `capabilities.provides`, `agent_tools`, `exposure.channels`、RBAC 以及 handler stub 注释。
+  2. 在 `px-plugin init` 输出工程验证 `contracts/` 目录、handler skeleton 自动生成，`git status` 仅含预期文件。
+  3. `npm run sync:templates` + `px-plugin init demo.capability` smoke，记录步骤于 `docs/development/t099-capability-scaffold.md`。
+
+- [X] **T100 [US9] Contracts/Schema 生成与 lint 脚本**
+  1. 新增 `scripts/capabilities/validate-capabilities.mjs`（或 Go 等效）用于生成/校验 `contracts/capabilities/*.yaml` 与 `contracts/schema/input|output/*.json`。
+  2. 在 `make validate`、`npm test` pipeline 中调用脚本，校验命名冲突、Schema 引用、handler 存在性。
+  3. 单元测试：`npm run test -- src/lib/capabilities/__tests__`；编写 `docs/development/t100-capability-contracts.md` 记录格式。
+
+- [X] **T101 [P] [US9] CLI `px-plugin capabilities init|lint` 命令**
+  1. 在 `tools/cli/src/commands/capabilities/init.ts`/`lint.ts` 实现参数解析（capability ID、类型、通道），绑定脚手架模板与契约生成。
+  2. 共用 `tools/cli/src/lib/capabilities/manifestWriter.ts`、`schemaWriter.ts` 与 handler stub 生成器。
+  3. 为命令编写 Jest/ts-jest 测试与 CLI 集成脚本（`tests/cli/capabilities-init.test.ts`）。
+
+- [X] **T102 [P] [US9] CLI `submit` + `.px-plugin` 状态管理**
+  1. 新增 `tools/cli/src/commands/capabilities/submit.ts`：调用 `POST /internal/plugins/capabilities`, `PATCH /internal/plugins/capabilities/{id}/exposure`，处理审批状态。
+  2. 在 `.px-plugin/capabilities.json` 记录能力 ID、版本、状态、最后提交时间；出错时写 `.px-plugin/audit/capability-submit.log`。
+  3. `px-plugin capabilities submit --dev-api ...` 集成测试使用 mock server（`tests/fixtures/capabilities-api.mock.ts`）；`go test ./tools/cli/internal/capabilities` 覆盖状态管理。
+
+- [X] **T103 [US9] 构建/发布阶段的状态执法与审计**
+  1. `make dist`, `make pack`, `px-plugin publish` 读取 `.px-plugin/capabilities.json`，若存在 `pending/rejected` 状态则阻断并提示待办。
+  2. Audit：`docs/development/t103-capability-audit.md` 记录状态流转、JSON 格式与操作人。
+  3. 在 CLI 输出 Telemetry (`capability.registry.submit_total`, `capability.registry.blocked_total`)。
+
+- [X] **T104 [US9] 能力暴露文档与示例**
+  1. 新增 `docs/guides/publish/capabilities.md`，覆盖命名规范、contracts、CLI 流程、PowerX 审核、租户授权、灰度通知。
+  2. 在 Quickstart、Publish、Marketplace 文档和 SPEC 文档引用该指南；更新 docmap。
+  3. DevRel/QA 走一遍指南，记录截图/日志。
+
+- [X] **T105 [US9] `exposure.channels` & handler 绑定**
+  1. Manifest 增加 `exposure.channels`（REST/GraphQL/Webhook/Workflow/SDK）解析逻辑，支持自定义 entrypoint/auth/rate limit。
+  2. 在 CLI/Go 模板提供 handler 目录约定（`backend/internal/handlers/capabilities/<domain>/<action>_handler.go`）+ AutoRegister（`framework/backend/go/runtime/plugin/registry.go`）钩子。
+  3. 为 REST + Agent Tool handler 写示例 (`examples/com.powerx.demo`) 并在 `go test ./examples/com.powerx.demo/backend/internal/handlers/...` 覆盖。
+
+- [X] **T106 [US9] `px-plugin capabilities quota` 与 Postman/SDK Bundle**
+  1. 命令调用 `POST /internal/plugins/capabilities/{id}/tenants/{tenantId}/quota`，支持 QPS/调用量/数据域配置。
+  2. 自动生成 Postman collection / SDK snippet，输出到 `dist/capabilities/<id>/samples/`。
+  3. Integration test：mock API + 检查生成文件；文档在 `docs/guides/publish/capabilities.md#tenant-quota` 演示。
+
+- [X] **T107 [US9] `px-plugin capabilities diff` + 灰度计划模板**
+  1. 对比两份 manifest/contracts，输出字段差异、Schema 版本、RBAC/通道变化以及通知计划 YAML（订阅方、渠道、窗口、回滚策略）。
+  2. CLI 支持 `--from/--to manifest.yaml` 或 Git refs，生成 `release/capabilities-change-report.md`。
+  3. `npm test -- capabilities-diff` + e2e fixture 验证；在 docs 中提供示例报告。
+
+- [X] **T108 [US9] Telemetry & Enforcement**
+  1. 后端 metrics：`framework/backend/go/runtime/observability/capability_metrics.go` 输出 `capability.registry.duration_ms`, `capability.exposure.activate_rate`。
+  2. CLI Telemetry emitter 写入 `capability.cli.init_total`, `capability.cli.submit_total`, `capability.cli.quota_total`。
+  3. Grafana/Kibana 仪表板更新说明记录在 `docs/operations/publish-hub-dashboard.md`。
+
+- [X] **T109 [US9] 示例/CI 覆盖**
+  1. 在 `examples/com.powerx.demo` 中实现一个 REST + Agent Tool 能力（含 handler、contracts、manifest、tests），CI 运行 `px-plugin capabilities lint/submit/quota/diff`。
+  2. Playwright or Go E2E：模拟 PowerX API，确保 CLI 命令全流程通过。
+  3. 更新 `quickstart.md` 与 SPEC Documentation 章节，添加能力注册/暴露 Quickstart。
+
 ### Go CLI Code Structure
 
 ```

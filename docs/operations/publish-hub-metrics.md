@@ -85,6 +85,38 @@ sum(rate(plugin_deployments_total{status="success"}[5m])) /
 sum by (status) (rate(plugin_deployments_total[5m]))
 ```
 
+### Capability Registry & Exposure
+- **Metric**: `capability_registry_duration_ms`
+  - **Type**: Histogram
+  - **Labels**: `operation` (init/submit/quota/diff), `result` (success/failure/pending)
+  - **Usage**: 观测 CLI/Dev API 交互耗时（70% < 3s，95% < 15s）
+  - **Query**:
+    ```promql
+    histogram_quantile(0.95, rate(capability_registry_duration_ms_bucket[5m]))
+    ```
+- **Metric**: `capability_exposure_activate_rate`
+  - **Type**: Gauge
+  - **Labels**: `capability`, `channel`
+  - **Usage**: 记录最近窗口暴露成功率（0~1），用于灰度/回滚告警
+  - **Query**:
+    ```promql
+    capability_exposure_activate_rate
+    ```
+- **CLI Telemetry**: `capability.cli.init_total`, `capability.cli.submit_total`, `capability.cli.quota_total`, `capability.cli.diff_total`
+  - 通过 Kibana/Fluentd 收集自 `px-plugin`，字段包含 `capabilityId / tenantId / status / reportPath`
+  - 可结合 Prometheus metrics 建立「端到端注册链路」仪表：CLI → Dev API → Host Runtime
+
+示例 Grafana 可视化：
+
+```promql
+# 成功率
+sum(rate(capability_registry_duration_ms_sum{result="success"}[5m])) /
+  sum(rate(capability_registry_duration_ms_count[5m]))
+
+# 暴露通道掉线监控
+1 - capability_exposure_activate_rate{channel="rest"}
+```
+
 ## Alertmanager Configuration
 
 Import `config/alerts/publish-hub.yaml` into Alertmanager to set up:

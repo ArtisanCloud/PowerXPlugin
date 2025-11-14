@@ -1,0 +1,25 @@
+package templatecap
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// CreateHandler is a placeholder for the {{ .PluginID }}.template.create capability.
+// TODO: Wire this handler in router/internal services and replace response payload.
+type CreateHandler struct{}
+
+func NewCreateHandler() *CreateHandler {
+	return &CreateHandler{}
+}
+
+func (h *CreateHandler) Handle(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": map[string]any{
+			"id":      "template-id",
+			"message": "TODO: replace capability handler logic",
+		},
+	})
+}

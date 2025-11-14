@@ -27,7 +27,9 @@ const sampleTokens = () => ({
 
 describe("useAuth", () => {
   let localStore: Record<string, string>;
+  let sessionStore: Record<string, string>;
   let cookieJar = "";
+  let storageHandler: ((event: StorageEvent) => void) | undefined;
 
   beforeEach(() => {
     vi.resetModules();
@@ -43,7 +45,21 @@ describe("useAuth", () => {
     vi.stubGlobal("onBeforeUnmount", vi.fn());
 
     vi.stubGlobal("navigateTo", vi.fn());
-    vi.stubGlobal("sessionStorage", { clear: vi.fn() } as any);
+
+    sessionStore = {};
+    const sessionMock = {
+      getItem: vi.fn((key: string) => sessionStore[key] ?? null),
+      setItem: vi.fn((key: string, val: string) => {
+        sessionStore[key] = val;
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete sessionStore[key];
+      }),
+      clear: vi.fn(() => {
+        sessionStore = {};
+      }),
+    };
+    vi.stubGlobal("sessionStorage", sessionMock as any);
 
     localStore = {};
     const localStorageMock = {
@@ -61,8 +77,16 @@ describe("useAuth", () => {
 
     vi.stubGlobal("window", {
       localStorage: localStorageMock,
-      addEventListener: vi.fn(),
+      addEventListener: vi.fn((event: string, handler: any) => {
+        if (event === "storage") {
+          storageHandler = handler as (event: StorageEvent) => void;
+        }
+      }),
       removeEventListener: vi.fn(),
+      location: {
+        pathname: "/agent",
+        search: "",
+      },
     } as any);
     vi.stubGlobal("localStorage", localStorageMock);
 
@@ -169,5 +193,27 @@ describe("useAuth", () => {
     expect(auth.token.value).toBeNull();
     expect(sessionStorage.clear).toHaveBeenCalled();
     expect(navigateTo).toHaveBeenCalledWith("/users/login");
+  });
+
+  it("storage 事件触发时会同步 token 状态", async () => {
+    const auth = await loadAuth();
+    auth.initAuth();
+
+    localStore["access_token"] = "shared-token";
+    localStore["refresh_token"] = "shared-refresh";
+    localStore["expires_at"] = String(Date.now() + 60000);
+
+    storageHandler?.({ key: "access_token" } as StorageEvent);
+
+    expect(auth.token.value).toBe("shared-token");
+    expect(auth.refreshToken.value).toBe("shared-refresh");
+  });
+
+  it("consumeAuthError 读取一次后即清除提示", async () => {
+    const auth = await loadAuth();
+    auth.failClosed?.("宿主认证不可用");
+
+    expect(auth.consumeAuthError()).toContain("宿主认证不可用");
+    expect(auth.consumeAuthError()).toBe("");
   });
 });

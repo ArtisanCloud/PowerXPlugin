@@ -10,6 +10,8 @@ const STORAGE_KEYS = [
   "scope",
 ];
 
+const AUTH_ERROR_KEY = "powerx-auth-error";
+
 type Nullable<T> = T | null;
 
 const readCookie = (name: string) => {
@@ -65,6 +67,7 @@ export const useAuth = () => {
   const token = useState<Nullable<string>>("auth.token", () => null);
   const refreshToken = useState<Nullable<string>>("auth.refreshToken", () => null);
   const expiresAt = useState<Nullable<number>>("auth.expiresAt", () => null);
+  const lastError = useState<string>("auth.lastError", () => "");
 
   const { refreshToken: refresh, logout: apiLogout } = useAuthService();
 
@@ -93,7 +96,15 @@ export const useAuth = () => {
     if (process.client) {
       STORAGE_KEYS.forEach((key) => safeLocalStorage.removeItem(key));
       writeCookie("token", null);
-      sessionStorage?.clear();
+      try {
+        const preserved = sessionStorage?.getItem(AUTH_ERROR_KEY);
+        sessionStorage?.clear();
+        if (preserved) {
+          sessionStorage?.setItem(AUTH_ERROR_KEY, preserved);
+        }
+      } catch (err) {
+        console.warn("[useAuth] sessionStorage.clear failed", err);
+      }
       const legacyCookies = [
         "px_token",
         "auth_token",
@@ -149,6 +160,10 @@ export const useAuth = () => {
       isAuthenticated.value = !isTokenExpired();
     } else {
       clearAuth();
+      if (!window.location.pathname.startsWith("/users")) {
+        const redirect = window.location.pathname + window.location.search;
+        navigateTo({ path: "/users/login", query: { redirect } });
+      }
     }
   };
 
@@ -161,8 +176,13 @@ export const useAuth = () => {
         persist(resp.data);
         return resp.data.access_token;
       }
-    } catch (error) {
-      console.warn("[useAuth] refresh failed", error);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 503) {
+        failClosed(error?.response?._data?.message || "宿主认证不可用，请稍后重试");
+      } else {
+        console.warn("[useAuth] refresh failed", error);
+      }
     }
     clearAuth();
     return null;
@@ -201,6 +221,38 @@ export const useAuth = () => {
     }
   };
 
+  const rememberAuthError = (message?: string) => {
+    if (!process.client || !message) return;
+    try {
+      sessionStorage?.setItem(AUTH_ERROR_KEY, message);
+      lastError.value = message;
+    } catch (err) {
+      console.warn("[useAuth] failed to persist auth error", err);
+    }
+  };
+
+  const consumeAuthError = () => {
+    if (!process.client) return "";
+    try {
+      const msg = sessionStorage?.getItem(AUTH_ERROR_KEY) || lastError.value;
+      if (msg) {
+        sessionStorage?.removeItem(AUTH_ERROR_KEY);
+        lastError.value = "";
+      }
+      return msg || "";
+    } catch (err) {
+      console.warn("[useAuth] failed to read auth error", err);
+      return "";
+    }
+  };
+
+  const failClosed = (message?: string) => {
+    clearAuth();
+    if (message) {
+      rememberAuthError(message);
+    }
+  };
+
   return {
     isAuthenticated: readonly(isAuthenticated),
     user: readonly(user),
@@ -214,5 +266,8 @@ export const useAuth = () => {
     ensureFreshToken,
     initAuth,
     logout,
+    consumeAuthError,
+    failClosed,
+    rememberAuthError,
   };
 };

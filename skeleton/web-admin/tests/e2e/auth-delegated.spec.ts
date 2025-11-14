@@ -55,4 +55,28 @@ test.describe('Delegated Auth Flow', () => {
 
     await expect(page.getByRole('alert')).toContainText('宿主认证不可用');
   });
+
+  test('storage event logout clears token and redirects to login', async ({ page }) => {
+    await page.route('**/auth/login', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginPayload),
+      });
+    });
+
+    await page.goto('/users/login');
+    await page.locator('input[name="identifier"]').fill('admin@example.com');
+    await page.locator('input[name="password"]').fill('secret');
+    await page.getByRole('button', { name: /登录|sign/i }).click();
+    await expect(page).toHaveURL(/\/(agent|templates)/);
+
+    await page.evaluate(() => {
+      window.localStorage.removeItem('access_token');
+      window.localStorage.removeItem('refresh_token');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'access_token' }));
+    });
+
+    await expect(page).toHaveURL(/\/users\/login/);
+  });
 });

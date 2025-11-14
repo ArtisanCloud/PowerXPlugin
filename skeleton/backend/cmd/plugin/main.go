@@ -21,6 +21,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	manifestx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/manifestx"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
@@ -94,6 +95,7 @@ func main() {
 		"mode":   iamResolver.Mode(),
 		"source": iamResolver.Source(),
 	}).Info("IAM mode resolved")
+	auth.ObserveMode(iamResolver.Mode().String())
 
 	var authClient *authproxy.DelegatedClient
 	var localIAM iamservice.IAMDirectory

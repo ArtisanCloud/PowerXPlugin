@@ -21,6 +21,7 @@ import (
 	"{{ .BackendModulePath }}/internal/logger"
 	manifestx "{{ .BackendModulePath }}/internal/manifestx"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
+	"{{ .BackendModulePath }}/internal/observability/auth"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
 	pluginrouter "{{ .BackendModulePath }}/internal/router"
 	httpserver "{{ .BackendModulePath }}/internal/server"
@@ -94,6 +95,7 @@ func main() {
 		"mode":   iamResolver.Mode(),
 		"source": iamResolver.Source(),
 	}).Info("IAM mode resolved")
+	auth.ObserveMode(iamResolver.Mode().String())
 
 	var authClient *authproxy.DelegatedClient
 	var localIAM iamservice.IAMDirectory

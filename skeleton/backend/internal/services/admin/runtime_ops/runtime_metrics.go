@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	authmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	secmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 )
 
@@ -228,6 +229,7 @@ func renderMetrics(w io.Writer) {
 		}
 	}
 
+	authmetrics.RenderMetrics(w)
 	secmetrics.RenderMetrics(w)
 }
 

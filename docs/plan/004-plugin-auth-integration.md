@@ -39,6 +39,8 @@
 - **Auth 服务抽象**：在 `skeleton/web-admin/app/composables/api/services/authService.ts` 中复刻宿主 DTO，Base URL 允许同时调用 Plugin API（默认）与宿主 Core API：  
 - 通过 `useRuntimeConfig().public.powerxCoreBase`（新增配置）决定 Core Auth API 域名；独立模式缺省为 `.env` 中的 `POWERX_CORE_ENDPOINT`。  
 - Local 模式新增 `LocalDirectory`，依赖 `PLUGIN_IAM_TENANT_*` 与 `PLUGIN_IAM_ADMIN_*` 在迁移/种子阶段初始化默认租户、部门、角色和权限，`/api/v1/auth/*` 会在 `POWERX_PROXY=0` 时走本地实现。
+- Token 生命周期增强：`useAuth` 监听 `storage` 事件并在 Token 丢失时强制跳转登录页，Delegated 模式 503 时前端提示“宿主认证不可用”。
+- 观测指标新增 `plugin_auth_login_total`、`plugin_auth_refresh_total`、`plugin_auth_logout_total`、`plugin_iam_mode`、`plugin_iam_delegate_errors_total`，统一通过 `/api/v1/admin/runtime/metrics` 暴露。
   - 登录、刷新、登出默认直连宿主 `/admin/user/auth/*`；`skipAuth: true` 选项保证登录前可调用。
 - **状态管理**：新增 `useAuth` composable（结构对齐 PowerX），负责：  
   - `setAuth`：写入 `access_token`、`refresh_token`、`token_type`、`expires_in`、`scope`、`expires_at` 到 `localStorage`，并同步 `token` Cookie（供 iframe/Bridge）。  

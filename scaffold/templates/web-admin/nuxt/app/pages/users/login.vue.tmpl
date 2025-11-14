@@ -6,10 +6,13 @@ definePageMeta({
 });
 
 const { t } = useI18n();
+const route = useRoute();
+const router = useRouter();
+const auth = useAuth();
+const { setAuth, consumeAuthError } = auth;
 
 // 导入认证服务
 const { login } = useAuthService();
-const { setAuth } = useAuth();
 
 // 表单数据
 const form = reactive({
@@ -47,7 +50,6 @@ const handleLogin = async () => {
       setAuth(response.data);
 
       // 获取重定向URL
-      const route = useRoute();
       const redirectTo = (route.query.redirect as string) || "/agent";
 
       // 登录成功后跳转
@@ -68,6 +70,17 @@ const handleForgotPassword = () => {
   // 这里添加忘记密码逻辑
   console.log("忘记密码");
 };
+
+onMounted(() => {
+  const stored = consumeAuthError?.();
+  if (stored) {
+    error.value = stored;
+  }
+  if (typeof route.query.error === "string" && route.query.error) {
+    error.value = route.query.error;
+    router.replace({ path: route.path, query: { ...route.query, error: undefined } });
+  }
+});
 </script>
 
 <template>

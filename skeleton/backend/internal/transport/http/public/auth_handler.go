@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	authmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	middleware "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
@@ -127,14 +128,18 @@ func (h *AuthHandler) ensureDelegated(c *gin.Context) bool {
 func (h *AuthHandler) handleProxyErr(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, iamservice.ErrAuthUnavailable):
+		authmetrics.RecordDelegateError("unavailable")
 		contracts.ResponseServiceUnavailable(c, "宿主认证不可用，请稍后重试", nil)
 	case errors.Is(err, iamservice.ErrUnauthorized):
+		authmetrics.RecordDelegateError("unauthorized")
 		contracts.ResponseUnauthorized(c, "认证失败，请重新登录")
 	default:
 		var perr *authproxy.ProxyError
 		if errors.As(err, &perr) {
+			authmetrics.RecordDelegateError("proxy")
 			contracts.ResponseError(c, perr.Status, contracts.ErrCodeInternalError, perr.Message)
 		} else {
+			authmetrics.RecordDelegateError("other")
 			contracts.ResponseInternalError(c, err)
 		}
 	}
@@ -166,9 +171,11 @@ func (h *AuthHandler) handleDelegatedLogin(c *gin.Context) {
 		Remember:   req.Remember,
 	})
 	if err != nil {
+		authmetrics.RecordLogin(h.modeLabel(), "failure")
 		h.handleProxyErr(c, err)
 		return
 	}
+	authmetrics.RecordLogin(h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -180,9 +187,11 @@ func (h *AuthHandler) handleDelegatedRefresh(c *gin.Context) {
 	}
 	tokens, err := h.proxy.Refresh(c.Request.Context(), req.RefreshToken)
 	if err != nil {
+		authmetrics.RecordRefresh(h.modeLabel(), "failure")
 		h.handleProxyErr(c, err)
 		return
 	}
+	authmetrics.RecordRefresh(h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -196,6 +205,7 @@ func (h *AuthHandler) handleDelegatedLogout(c *gin.Context) {
 		h.handleProxyErr(c, err)
 		return
 	}
+	authmetrics.RecordLogout(h.modeLabel())
 	contracts.ResponseSuccess(c, gin.H{"ok": true})
 }
 
@@ -230,9 +240,11 @@ func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
 		Remember:   req.Remember,
 	})
 	if err != nil {
+		authmetrics.RecordLogin(h.modeLabel(), "failure")
 		h.handleLocalErr(c, err)
 		return
 	}
+	authmetrics.RecordLogin(h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -248,9 +260,11 @@ func (h *AuthHandler) handleLocalRefresh(c *gin.Context) {
 	}
 	tokens, err := h.local.Refresh(c.Request.Context(), req.RefreshToken)
 	if err != nil {
+		authmetrics.RecordRefresh(h.modeLabel(), "failure")
 		h.handleLocalErr(c, err)
 		return
 	}
+	authmetrics.RecordRefresh(h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -268,6 +282,7 @@ func (h *AuthHandler) handleLocalLogout(c *gin.Context) {
 		h.handleLocalErr(c, err)
 		return
 	}
+	authmetrics.RecordLogout(h.modeLabel())
 	contracts.ResponseSuccess(c, gin.H{"ok": true})
 }
 
@@ -344,6 +359,13 @@ func extractBearer(header string) string {
 		return strings.TrimSpace(header[len("Bearer "):])
 	}
 	return ""
+}
+
+func (h *AuthHandler) modeLabel() string {
+	if h == nil {
+		return ""
+	}
+	return string(h.mode)
 }
 
 type loginRequest struct {

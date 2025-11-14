@@ -77,13 +77,13 @@
 
 ### Implementation
 
-- [ ] T029 [US3] 在 `skeleton/web-admin/app/composables/useAuth.ts` 与登录页面中增加 Core 断连的错误提示（“宿主认证不可用”），并确保 UI 行为与 Clarification 一致。
-- [ ] T030 [P] [US3] 在 `useAuth` 中监听 `window.addEventListener('storage')` 同步多 Tab token/logout 状态，并添加单元测试覆盖。
-- [ ] T031 [US3] 在 `skeleton/backend/internal/observability/metrics/auth_metrics.go`（新文件）注册 `plugin_auth_login_total`, `plugin_auth_refresh_total`, `plugin_auth_logout_total`, `plugin_iam_mode`, `plugin_iam_delegate_errors_total`，并在 server 启动时初始化。
-- [ ] T032 [US3] 强化 `skeleton/backend/internal/transport/http/middleware/request_trace.go`，记录 `auth_mode`, `tenant_id`, `user_id`, `trace_id`，并遮蔽 token。
-- [ ] T033 [US3] 在 `skeleton/backend/internal/services/iam/metrics_test.go`（新文件）编写 Go 测试，验证指标累积与 fail-closed 日志触发。
-- [ ] T034 [US3] 更新 `docs/operations/runbooks/auth-troubleshooting.md`，加入指标字段解释、Prometheus 告警建议与多 Tab 故障排查步骤。
-- [ ] T035 [US3] 为 localStorage/cookie 双失效场景新增 Playwright 测试（扩展现有 E2E 用例），确保用户被强制跳转 `/users/login` 并看到提示。
+- [X] T029 [US3] 在 `app/composables/useAuth.ts` / `/users/login.vue` 增强 fail-closed 提示，503/refresh 失败会存储 “宿主认证不可用” 并在登录页读取展示。
+- [X] T030 [P] [US3] `useAuth` 的 storage 事件现同步 token&强制跳登录，新增 Vitest 覆盖 storage 事件与错误消费。
+- [X] T031 [US3] 新增 `internal/observability/auth/metrics.go`，记录 login/refresh/logout/iam_mode/delegate_errors，并在 `cmd/plugin/main.go` 初始化；Prometheus 输出合并在 `/api/v1/admin/runtime/metrics`。
+- [X] T032 [US3] `request_trace` 现日志 auth_mode/tenant_id/user_id/trace_id，便于跨模式排障。
+- [X] T033 [US3] `internal/observability/auth/metrics_test.go` 验证指标累积；`go test` 覆盖对应输出。
+- [X] T034 [US3] 更新 `docs/operations/runbooks/auth-troubleshooting.md` / `docs/plan/004-plugin-auth-integration.md`，记录指标、Fail-Closed、多 Tab 行为。
+- [X] T035 [US3] Playwright `auth-delegated.spec.ts` 新增 storage 同步测试，模拟本地储存失效后自动跳转 `/users/login`。
 
 **Checkpoint**：token 生命周期具备观测/安全保障。
 

@@ -30,11 +30,13 @@
    PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \
    npm --prefix skeleton/web-admin run test:e2e -- auth-local
    ```
+7. 多 Tab 同步：任一浏览器 Tab 清除 token（storage event）后，其他 Tab 会自动跳转登入页，可在控制台执行 `localStorage.removeItem('access_token')` 验证。
 
 ## 指标
 - `plugin_iam_mode{mode="delegated|local"}` – 当前模式。
 - `plugin_auth_login_total{mode}` – 登录次数。
-- `plugin_auth_delegate_errors_total{type}` – 委托模式错误（网络/401）。
-- `plugin_auth_logout_total` – 登出次数。
+- `plugin_auth_refresh_total{mode}` – 刷新次数及成功率，可结合 `result` 标签区分成功/失败。
+- `plugin_auth_delegate_errors_total{type}` – 委托模式错误（网络/401/其它）。
+- `plugin_auth_logout_total{mode}` – 登出次数。
 
 若指标缺失，确认 `monitoring.metrics.enabled` 为 true 并已将 `/api/v1/admin/runtime/metrics` 暴露给 Prometheus。

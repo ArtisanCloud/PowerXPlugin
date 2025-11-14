@@ -5,6 +5,10 @@ const pluginId = 'com.powerx.plugin.base'
 const pluginAdminBase = `/_p/${pluginId}/admin/`
 const pluginApiBase = `/_p/${pluginId}/api/v1`
 const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8087/api/v1'
+const powerxCoreBase =
+  process.env.NUXT_PUBLIC_POWERX_CORE_BASE ||
+  process.env.POWERX_CORE_ENDPOINT ||
+  'http://localhost:8077'
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
 const rawBridgeDebug = process.env.NUXT_PUBLIC_BRIDGE_DEBUG ?? process.env.BRIDGE_DEBUG
@@ -109,7 +113,8 @@ export default defineNuxtConfig({
       apiBaseUrl: INSIDE_POWERX ? pluginApiBase : localApiBase,
       insidePowerX: INSIDE_POWERX,
       pluginAdminBase,
-      bridgeDebug: BRIDGE_DEBUG
+      bridgeDebug: BRIDGE_DEBUG,
+      powerxCoreBase
     }
   },
   nitro: {

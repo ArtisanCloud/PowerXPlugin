@@ -106,6 +106,8 @@
   - `plugin_iam_delegate_errors_total`、`plugin_iam_local_sync_seconds` 等指标帮助定位问题；  
   - 日志中统一输出 `mode=delegated`/`mode=local` 及主要环境变量值（遮蔽 Token）。
 
+> **模式切换环境变量速记**：`POWERX_PROXY=1` 默认启用 Delegated IAM；若 `POWERX_RBAC_DELEGATE` 显式设为 truthy（`1/true/on`）也强制委托；反之在 `POWERX_PROXY!=1` 且未设置 Delegate 的场景会落入 Local IAM。`context.iam_mode`（YAML 配置）可作为最终 override。
+
 ### 4. Scaffold & CLI 同步
 - 执行 `npm run sync:templates` 将新文件同步到：  
   - `scaffold/templates/web-admin/nuxt/app/**`、`scaffold/templates/backend/go-gin/**`;  

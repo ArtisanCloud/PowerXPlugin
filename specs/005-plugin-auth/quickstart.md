@@ -74,6 +74,18 @@ cd tools/cli && go run ./cmd/px-plugin init dev.plugin.test
 - 运行 `go run ./cmd/plugin` + `npm run dev` 验证 CLI 产物的登录流程。
 
 ## 6. Observability Checklist
-- 确认 `plugin_iam_mode`, `plugin_auth_login_total`, `plugin_iam_delegate_errors_total` 指标在 `/metrics` 暴露。
-- `request_trace` 日志需含 `auth_mode`, `tenant_id`, `user_id`, `trace_id`。
+- 确认 `plugin_iam_mode`, `plugin_auth_login_total`, `plugin_auth_refresh_total`, `plugin_auth_logout_total`, `plugin_iam_delegate_errors_total` 指标在 `/metrics` 暴露。
+- `request_trace` 日志需含 `iam_mode`, `auth`, `tenant_id`, `user_id`, `trace_id`。
 - 打开/关闭 Local 模式应各自写一条 Info 日志。
+
+## 7. 验收与性能
+- 验证命令：
+  ```bash
+  npm run lint
+  cd skeleton/backend && go test ./...
+  npm --prefix skeleton/web-admin run test:unit
+  npm run sync:templates -- --check
+  ```
+- Delegated E2E（需另启 `npm --prefix skeleton/web-admin run dev`）：`npm --prefix skeleton/web-admin run test:e2e -- auth-delegated`
+- Local E2E：`PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local`
+- 性能参考：在 Apple M3 Pro + Chromium Headless 上，Delegated 登录单次 ~1.8s；Postgres 15 中执行 `go run ./cmd/database/main.go setup` 约 4.6s（包含 IAM migrate+seed）。详细说明见 `docs/guides/develop/auth.md#6-性能与耗时`。

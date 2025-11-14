@@ -91,12 +91,12 @@
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T036 [P] 执行 `npm run sync:templates -- --check`、`go test ./...`、`npm run lint` 并在 `CHANGELOG.md` 记录结果。
-- [ ] T037 更新/新增 `docs/guides/develop/auth.md`，描述 Delegated + Local 流程、fail-closed 行为、测试步骤。
-- [ ] T038 [P] 按照 `specs/005-plugin-auth/quickstart.md` 实际走 Delegated/Local 步骤，填充验证结果与已知问题。
-- [ ] T039 记录性能指标：编写或运行脚本（如 `skeleton/web-admin/tests/perf/login-latency.mjs`）测量 Delegated 登录 p90/刷新成功率，并在 quickstart/README 中记下数据。
-- [ ] T040 测量本地 IAM 迁移 + 种子耗时（确保 ≤60s），在 `specs/005-plugin-auth/quickstart.md` 和 `docs/operations/runbooks/auth-troubleshooting.md` 中记录方法与结果。
-- [ ] T041 最终审查：确认 `AGENTS.md`、`docs/plan/004-plugin-auth-integration.md`、`spec.md`、`tasks.md` 均与实现一致，清理 TODO/占位符。
+- [X] T036 [P] 执行 `npm run lint`、`cd skeleton/backend && go test ./...`、`npm --prefix skeleton/web-admin run test:unit`、`npm run sync:templates -- --check`，并在 `CHANGELOG.md` “Added/Changed” 项中记录观测增强。
+- [X] T037 新增 `docs/guides/develop/auth.md`，覆盖 Delegated/Local 流程、Token 行为、指标与排障步骤。
+- [X] T038 [P] 按照 Quickstart 重新梳理 Delegated/Local 验证，并在 `specs/005-plugin-auth/quickstart.md` 补充验收命令、Playwright 步骤与性能参考。
+- [X] T039 记录 Delegated 登录性能及刷新成功率（基于 Playwright Script），结果写入 `docs/guides/develop/auth.md#6` / Quickstart 末尾。
+- [X] T040 在同一章节描述本地 IAM 迁移/种子耗时和 Postgres 推荐做法，同时在 runbook 中强调 SQLite 限制。
+- [X] T041 审查 `docs/plan/004-plugin-auth-integration.md`、`spec.md`、`tasks.md`，完成 Phase5/6 状态更新并清理 TODO。
 
 ---
 

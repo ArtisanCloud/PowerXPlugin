@@ -9,6 +9,7 @@
 - `useAuth` Vitest 单测与 `tests/e2e/auth-delegated.spec.ts` Playwright 场景，验证 token fallback/Fail-Closed 交互
 - Local IAM Directory（`internal/services/iam/local_store.go`）与 RefreshToken 模型，可在 `POWERX_PROXY=0` 下完成登录/刷新/登出
 - 新增 Playwright 本地登录用例 `tests/e2e/auth-local.spec.ts`，并输出 `docs/operations/runbooks/auth-troubleshooting.md`
+- 指南 `docs/guides/develop/auth.md`，整理 Delegated/Local 流程、指标、性能与排障
 - 初始发布流程文档与 Release Workflow (`docs/release.md`, `.github/workflows/release.yml`)
 - CLI 生成物示例 `examples/starter/`，对齐 Phase 6 用户故事
 - Skeleton Templates CRUD 栈（后端内存仓储 + 前端页面 + `useTemplateApi` 示例）并同步至 CLI 脚手架模板
@@ -18,6 +19,7 @@
 ### Changed
 - 脚手架与 CLI Manifest 模板默认声明 `iam.user.read/iam.role.read/iam.department.read` Scope，便于宿主在安装期提示所需权限
 - `docs/guides/develop/standalone-mode.md` / `specs/005-plugin-auth/quickstart.md` 增补 Local IAM 环境变量与演练步骤
+- Quickstart/Runbook 补充观测指标、验收命令与性能参考
 - 脚手架模板 README 增加 Release 指引与多语言 TODO 提示
 - Manifest Schema 追加菜单 `children` 递归定义，Skeleton/CLI 均可注册嵌套导航
 - Quickstart / Standalone 指南补充多租户 CRUD 验证与延迟记录流程

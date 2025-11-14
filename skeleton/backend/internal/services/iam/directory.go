@@ -42,6 +42,7 @@ type UserContext struct {
 	TenantID      uint64
 	TenantKey     string
 	TenantName    string
+	MemberID      uint64
 	UserID        uint64
 	Username      string
 	Email         string

@@ -96,6 +96,7 @@ func main() {
 	}).Info("IAM mode resolved")
 
 	var authClient *authproxy.DelegatedClient
+	var localIAM iamservice.IAMDirectory
 	if iamResolver.Mode() == iamservice.IAMModeDelegated {
 		client, err := authproxy.NewDelegatedClient("", "")
 		if err != nil {
@@ -103,6 +104,12 @@ func main() {
 		} else {
 			authClient = client
 		}
+	} else {
+		dir, err := iamservice.NewLocalDirectory(queryDB, cfg)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize local IAM directory")
+		}
+		localIAM = dir
 	}
 
 	// 初始化 PowerX gRPC Client 客户端
@@ -139,6 +146,7 @@ func main() {
 		IAMMode:             iamResolver.Mode(),
 		IAMModeSource:       iamResolver.Source(),
 		AuthProxy:           authClient,
+		IAMDirectory:        localIAM,
 	}
 
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)

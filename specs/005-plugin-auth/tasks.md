@@ -58,12 +58,12 @@
 
 ### Implementation
 
-- [ ] T023 [US2] 实现 `skeleton/backend/internal/services/iam/local_store.go`（`Login/Refresh/Logout/GetCurrentUser/ListRoles/ListDepartments/CheckPermission`）。
-- [ ] T024 [US2] 在 Resolver 注入 local store，并在 `auth_handler` 根据模式选择 Delegated 或 Local 实现；覆盖 `/auth/*` 与 `/auth/me/context`。
-- [ ] T025 [P] [US2] 扩展 `skeleton/backend/cmd/database/seed/local_iam_seed.go`（或等效文件）创建示例租户/角色/权限/部门。
-- [ ] T026 [US2] 新增 Playwright/E2E (`skeleton/web-admin/tests/e2e/auth-local.spec.ts`) 使用本地管理员账号验证登录/登出。
-- [ ] T027 [US2] 将 Local 模式步骤与 env 说明写入 `specs/005-plugin-auth/quickstart.md` 和 `docs/guides/develop/standalone-mode.md`。
-- [ ] T028 [US2] 更新 `docs/plan/004-plugin-auth-integration.md` 与 `docs/operations/runbooks/auth-troubleshooting.md`，覆盖 Local IAM、管理员注入及排障流程。
+- [X] T023 [US2] 实现 `skeleton/backend/internal/services/iam/local_store.go`，涵盖 Login/Refresh/Logout、JWT 签发、RefreshToken 存储、角色/权限查询与 `UserContextFromToken`。
+- [X] T024 [US2] Resolver 注入 Local store（`cmd/plugin/main.go` + `internal/shared/app/deps.go`），`public/auth_handler.go` 根据 IAM Mode 切换 Delegated/Local，并复用新 store。
+- [X] T025 [P] [US2] 扩展 `internal/services/iam/seeder.go` 新增默认部门、权限与 role-permission 绑定。
+- [X] T026 [US2] 新增 Playwright E2E `skeleton/web-admin/tests/e2e/auth-local.spec.ts`（可通过 `PLAYWRIGHT_LOCAL_IAM=1` 驱动本地管理员登录）。
+- [X] T027 [US2] 更新 `specs/005-plugin-auth/quickstart.md` 与 `docs/guides/develop/standalone-mode.md`，记录 Local IAM 环境变量、登录步骤及 E2E 验证方式。
+- [X] T028 [US2] 在 `docs/plan/004-plugin-auth-integration.md` 补充 Local 模式说明，并新增 `docs/operations/runbooks/auth-troubleshooting.md` 记录 Delegated/Local 排障步骤。
 
 **Checkpoint**：Local 模式运行完整，并有文档说明。
 

@@ -42,14 +42,28 @@ npm run dev
 cd skeleton/backend
 export POWERX_PROXY=0
 export POWERX_RBAC_DELEGATE=false
+export PLUGIN_IAM_TENANT_KEY=px_local
+export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
 export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'
 go run ./cmd/database/main.go setup
 POWERX_RUN_MIGRATE=true go run ./cmd/plugin
 ```
-- 登录凭证：即 `PLUGIN_IAM_ADMIN_*` 值。
-- 可通过 `go test ./...` + `npm run test` 验证基本逻辑。
-- Playwright: `npm run test:e2e -- auth`（需要在 `web-admin` 中配置）。
+- 登录凭证：`PLUGIN_IAM_ADMIN_EMAIL` / `PLUGIN_IAM_ADMIN_PASSWORD`。
+- 默认会生成 `iam_departments` 与 `iam_permissions` 示例数据，并把管理员绑定到 `system.admin` 角色。
+- 运行 `cd skeleton/web-admin && npm install && npm run dev` 后，即可在 `/users/login` 输入本地管理员完成登录。
+- 自动化校验：
+  - `cd skeleton/backend && go test ./...`（覆盖 Local IAM store 行为）。
+  - `cd skeleton/web-admin && npm run test:unit`（`useAuth` fallback 行为）。
+  - Playwright Local 测试：
+    ```bash
+    cd skeleton/web-admin
+    PLAYWRIGHT_LOCAL_IAM=1 \
+    PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \
+    PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \
+    npm run test:e2e -- auth-local
+    ```
+    需要先启动本地后端。
 
 ## 5. Template Sync & CLI Check
 ```bash

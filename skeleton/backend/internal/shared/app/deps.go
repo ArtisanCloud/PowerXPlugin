@@ -17,6 +17,13 @@ import (
 	"gorm.io/gorm"
 )
 
+type DelegatedAuthProxy interface {
+	Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error)
+	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
+	Logout(ctx context.Context, refreshToken string) error
+	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+}
+
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
 	DB                  *gorm.DB
@@ -31,7 +38,8 @@ type Deps struct {
 	AdminConsoleMetrics *adminmetrics.Metrics
 	IAMMode             iamservice.IAMMode
 	IAMModeSource       string
-	AuthProxy           *authproxy.DelegatedClient
+	AuthProxy           DelegatedAuthProxy
+	IAMDirectory        iamservice.IAMDirectory
 }
 
 // RuntimeDefaults returns the configured runtime ops defaults (if any).

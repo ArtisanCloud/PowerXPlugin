@@ -170,6 +170,65 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 			}
 		}
 
-		return nil
+		deptID, err := ensureDefaultDepartment(tx, tenant.ID)
+		if err != nil {
+			return err
+		}
+		if deptID != nil && (member.DepartmentID == nil || *deptID != *member.DepartmentID) {
+			if err := tx.Model(&member).Update("department_id", deptID).Error; err != nil {
+				return err
+			}
+		}
+		return seedDefaultPermissions(tx, tenant.ID, role.ID)
 	})
+}
+
+func ensureDefaultDepartment(tx *gorm.DB, tenantID uint64) (*uint64, error) {
+	var dept iamm.Department
+	if err := tx.Where("tenant_id = ? AND code = ?", tenantID, "general").First(&dept).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			dept = iamm.Department{
+				BaseModel:   basemodels.BaseModel{TenantID: tenantID},
+				Name:        "General",
+				Code:        "general",
+				Description: "Default department",
+			}
+			if err := tx.Create(&dept).Error; err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+	}
+	return &dept.ID, nil
+}
+
+func seedDefaultPermissions(tx *gorm.DB, tenantID, roleID uint64) error {
+	perms := []struct {
+		Resource string
+		Action   string
+		Desc     string
+	}{
+		{"iam.user", "read", "Read IAM users"},
+		{"iam.role", "read", "Read IAM roles"},
+		{"iam.department", "read", "Read IAM departments"},
+	}
+	for _, p := range perms {
+		var perm iamm.Permission
+		if err := tx.Where("resource = ? AND action = ?", p.Resource, p.Action).First(&perm).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				perm = iamm.Permission{Resource: p.Resource, Action: p.Action, Description: p.Desc}
+				if err := tx.Create(&perm).Error; err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		}
+		rp := iamm.RolePermission{RoleID: roleID, PermissionID: perm.ID}
+		if err := tx.Where("role_id = ? AND permission_id = ?", roleID, perm.ID).FirstOrCreate(&rp).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

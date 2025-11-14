@@ -61,6 +61,12 @@ cp skeleton/backend/etc/config.example.yaml skeleton/backend/etc/config.yaml
 
 # 2. 初始化数据库（setup = migrate + seed）
 cd skeleton/backend
+export POWERX_PROXY=0
+export POWERX_RBAC_DELEGATE=false
+export PLUGIN_IAM_TENANT_KEY=px_local
+export PLUGIN_IAM_TENANT_NAME="Local Tenant"
+export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
+export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'
 go run ./cmd/database/main.go setup
 #    如果需要单独执行，可替换为：
 #    go run ./cmd/database/main.go migrate
@@ -72,8 +78,15 @@ go run ./cmd/plugin
 # 4. 访问健康检查
 curl http://127.0.0.1:8087/healthz
 
-# 5. 启动前端管理端
+# 5. 启动前端管理端（使用本地管理员登录）
 cd ../web-admin && npm install && npm run dev
+
+# 6. （可选）运行本地 IAM E2E
+cd ../web-admin
+PLAYWRIGHT_LOCAL_IAM=1 \\
+PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \\
+PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \\
+npm run test:e2e -- auth-local
 ```
 
 常用调试端口：

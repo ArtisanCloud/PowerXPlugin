@@ -100,3 +100,16 @@ type RolePermission struct {
 }
 
 func (RolePermission) TableName() string { return models.S(models.TableIAMRolePermissions) }
+
+type RefreshToken struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	TokenHash string    `gorm:"size:128;uniqueIndex" json:"token_hash"`
+	UserID    uint64    `gorm:"index" json:"user_id"`
+	TenantID  uint64    `gorm:"index" json:"tenant_id"`
+	MemberID  uint64    `gorm:"index" json:"member_id"`
+	ExpiresAt time.Time `gorm:"index" json:"expires_at"`
+	Revoked   bool      `gorm:"default:false" json:"revoked"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (RefreshToken) TableName() string { return models.S(models.TableIAMRefreshTokens) }

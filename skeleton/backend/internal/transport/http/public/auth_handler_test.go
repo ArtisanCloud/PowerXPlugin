@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
@@ -35,7 +36,7 @@ func TestAuthHandler_LoginSuccess(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
 	router.POST("/auth/login", handler.Login)
 
 	body := `{"identifier":"user@example.com","password":"secret"}`
@@ -63,7 +64,7 @@ func TestAuthHandler_LoginUnavailable(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
 	router.POST("/auth/login", handler.Login)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"identifier":"a","password":"b"}`))
@@ -86,7 +87,7 @@ func TestAuthHandler_RefreshUnauthorized(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
 	router.POST("/auth/refresh", handler.Refresh)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBufferString(`{"refresh_token":"abc"}`))
@@ -117,7 +118,7 @@ func TestAuthHandler_MeContextSuccess(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(iamservice.IAMModeDelegated, proxy)
+	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
 	router.GET("/auth/me/context", handler.MeContext)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/me/context", nil)
@@ -164,6 +165,115 @@ func (s *stubProxy) Logout(ctx context.Context, token string) error {
 func (s *stubProxy) MeContext(ctx context.Context, token string) (*authproxy.MeContext, error) {
 	if s.meFn != nil {
 		return s.meFn(ctx, token)
+	}
+	return nil, nil
+}
+
+func TestAuthHandler_LocalLogin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	local := &localDirStub{
+		loginFn: func(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, *iamservice.UserContext, error) {
+			return &iamservice.AuthTokens{
+				TokenType:    "Bearer",
+				AccessToken:  "local-access",
+				RefreshToken: "local-refresh",
+				ExpiresIn:    600,
+				Scope:        "access",
+				ExpiresAt:    time.Now().Add(time.Minute),
+			}, &iamservice.UserContext{TenantID: 1}, nil
+		},
+	}
+	router := gin.New()
+	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeLocal, IAMDirectory: local})
+	router.POST("/auth/login", handler.Login)
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"identifier":"admin","password":"pwd"}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	var payload contracts.APIResponse
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	data := payload.Data.(map[string]any)
+	require.Equal(t, "local-access", data["access_token"])
+}
+
+func TestAuthHandler_LocalMeContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	local := &localDirStub{
+		ctxFn: func(ctx context.Context, token string) (*iamservice.UserContext, error) {
+			return &iamservice.UserContext{TenantID: 9, TenantKey: "px_local", TenantName: "Local", UserID: 5, Username: "admin"}, nil
+		},
+	}
+	router := gin.New()
+	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeLocal, IAMDirectory: local})
+	router.GET("/auth/me/context", handler.MeContext)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/me/context", nil)
+	req.Header.Set("Authorization", "Bearer local-token")
+	resp := httptest.NewRecorder()
+
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusOK, resp.Code)
+	var payload contracts.APIResponse
+	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
+	data := payload.Data.(map[string]any)
+	tenant := data["tenant"].(map[string]any)
+	require.Equal(t, float64(9), tenant["id"])
+}
+
+type localDirStub struct {
+	loginFn   func(context.Context, iamservice.LoginRequest) (*iamservice.AuthTokens, *iamservice.UserContext, error)
+	refreshFn func(context.Context, string) (*iamservice.AuthTokens, error)
+	logoutFn  func(context.Context, string) error
+	ctxFn     func(context.Context, string) (*iamservice.UserContext, error)
+}
+
+func (l *localDirStub) Mode() iamservice.IAMMode { return iamservice.IAMModeLocal }
+
+func (l *localDirStub) Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, *iamservice.UserContext, error) {
+	if l.loginFn != nil {
+		return l.loginFn(ctx, req)
+	}
+	return nil, nil, nil
+}
+
+func (l *localDirStub) Refresh(ctx context.Context, token string) (*iamservice.AuthTokens, error) {
+	if l.refreshFn != nil {
+		return l.refreshFn(ctx, token)
+	}
+	return nil, nil
+}
+
+func (l *localDirStub) Logout(ctx context.Context, token string) error {
+	if l.logoutFn != nil {
+		return l.logoutFn(ctx, token)
+	}
+	return nil
+}
+
+func (l *localDirStub) CurrentUser(ctx context.Context) (*iamservice.UserContext, error) {
+	return nil, nil
+}
+
+func (l *localDirStub) ListRoles(ctx context.Context, tenantID uint64) ([]iamservice.RoleInfo, error) {
+	return nil, nil
+}
+
+func (l *localDirStub) ListDepartments(ctx context.Context, tenantID uint64) ([]iamservice.DepartmentInfo, error) {
+	return nil, nil
+}
+
+func (l *localDirStub) CheckPermission(ctx context.Context, tc iamservice.TenantContext, resource, action string) error {
+	return nil
+}
+
+func (l *localDirStub) UserContextFromToken(ctx context.Context, token string) (*iamservice.UserContext, error) {
+	if l.ctxFn != nil {
+		return l.ctxFn(ctx, token)
 	}
 	return nil, nil
 }

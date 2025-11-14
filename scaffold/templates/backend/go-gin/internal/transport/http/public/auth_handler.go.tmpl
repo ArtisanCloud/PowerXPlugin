@@ -27,11 +27,15 @@ type authProxy interface {
 type AuthHandler struct {
 	mode  iamservice.IAMMode
 	proxy authProxy
+	local iamservice.IAMDirectory
 }
 
 // NewAuthHandler builds a handler for the given IAM mode.
-func NewAuthHandler(mode iamservice.IAMMode, proxy authProxy) *AuthHandler {
-	return &AuthHandler{mode: mode, proxy: proxy}
+func NewAuthHandler(deps *app.Deps) *AuthHandler {
+	if deps == nil {
+		return &AuthHandler{}
+	}
+	return &AuthHandler{mode: deps.IAMMode, proxy: deps.AuthProxy, local: deps.IAMDirectory}
 }
 
 // RegisterAuthRoutes wires /auth routes beneath the API prefix.
@@ -39,7 +43,7 @@ func RegisterAuthRoutes(group *gin.RouterGroup, deps *app.Deps) {
 	if group == nil || deps == nil {
 		return
 	}
-	handler := NewAuthHandler(deps.IAMMode, deps.AuthProxy)
+	handler := NewAuthHandler(deps)
 	authGroup := group.Group("/auth")
 	authGroup.Use(middleware.RequestTrace())
 	authGroup.POST("/login", handler.Login)
@@ -50,83 +54,67 @@ func RegisterAuthRoutes(group *gin.RouterGroup, deps *app.Deps) {
 
 // Login proxies login requests to PowerX Core.
 func (h *AuthHandler) Login(c *gin.Context) {
-	if !h.ensureAvailable(c) {
-		return
+	switch h.mode {
+	case iamservice.IAMModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedLogin(c)
+	case iamservice.IAMModeLocal:
+		h.handleLocalLogin(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
 	}
-	var req loginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		contracts.ResponseBadRequest(c, "参数错误: "+err.Error())
-		return
-	}
-	tokens, err := h.proxy.Login(c.Request.Context(), iamservice.LoginRequest{
-		Tenant:     req.Tenant,
-		Identifier: req.Identifier,
-		Password:   req.Password,
-		Remember:   req.Remember,
-	})
-	if err != nil {
-		h.handleProxyErr(c, err)
-		return
-	}
-	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
 // Refresh exchanges refresh_token for a new access token.
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	if !h.ensureAvailable(c) {
-		return
+	switch h.mode {
+	case iamservice.IAMModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedRefresh(c)
+	case iamservice.IAMModeLocal:
+		h.handleLocalRefresh(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
 	}
-	var req refreshRequest
-	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
-		contracts.ResponseBadRequest(c, "refresh_token 必填")
-		return
-	}
-	tokens, err := h.proxy.Refresh(c.Request.Context(), req.RefreshToken)
-	if err != nil {
-		h.handleProxyErr(c, err)
-		return
-	}
-	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
 // Logout revokes the current refresh token upstream.
 func (h *AuthHandler) Logout(c *gin.Context) {
-	if !h.ensureAvailable(c) {
-		return
+	switch h.mode {
+	case iamservice.IAMModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedLogout(c)
+	case iamservice.IAMModeLocal:
+		h.handleLocalLogout(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
 	}
-	var req refreshRequest
-	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
-		contracts.ResponseBadRequest(c, "refresh_token 必填")
-		return
-	}
-	if err := h.proxy.Logout(c.Request.Context(), req.RefreshToken); err != nil {
-		h.handleProxyErr(c, err)
-		return
-	}
-	contracts.ResponseSuccess(c, gin.H{"ok": true})
 }
 
 // MeContext fetches the active user context from PowerX Core.
 func (h *AuthHandler) MeContext(c *gin.Context) {
-	if !h.ensureAvailable(c) {
-		return
+	switch h.mode {
+	case iamservice.IAMModeDelegated:
+		if !h.ensureDelegated(c) {
+			return
+		}
+		h.handleDelegatedMeContext(c)
+	case iamservice.IAMModeLocal:
+		h.handleLocalMeContext(c)
+	default:
+		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
 	}
-	token := extractBearer(c.GetHeader("Authorization"))
-	if token == "" {
-		contracts.ResponseUnauthorized(c, "缺少 Authorization Bearer token")
-		return
-	}
-	ctx, err := h.proxy.MeContext(c.Request.Context(), token)
-	if err != nil {
-		h.handleProxyErr(c, err)
-		return
-	}
-	contracts.ResponseSuccess(c, ctx)
 }
 
-func (h *AuthHandler) ensureAvailable(c *gin.Context) bool {
+func (h *AuthHandler) ensureDelegated(c *gin.Context) bool {
 	if h.mode != iamservice.IAMModeDelegated {
-		contracts.ResponseServiceUnavailable(c, "Local IAM 模式暂未实现", nil)
+		contracts.ResponseServiceUnavailable(c, "当前路由仅支持 Delegated 模式", nil)
 		return false
 	}
 	if h.proxy == nil {
@@ -149,6 +137,183 @@ func (h *AuthHandler) handleProxyErr(c *gin.Context, err error) {
 		} else {
 			contracts.ResponseInternalError(c, err)
 		}
+	}
+}
+
+func (h *AuthHandler) handleLocalErr(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, iamservice.ErrUnauthorized):
+		contracts.ResponseUnauthorized(c, "认证失败，请重新登录")
+	case errors.Is(err, iamservice.ErrInvalidArguments):
+		contracts.ResponseBadRequest(c, "请求参数无效")
+	case errors.Is(err, iamservice.ErrAuthUnavailable):
+		contracts.ResponseServiceUnavailable(c, "本地认证暂不可用", nil)
+	default:
+		contracts.ResponseInternalError(c, err)
+	}
+}
+
+func (h *AuthHandler) handleDelegatedLogin(c *gin.Context) {
+	var req loginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	tokens, err := h.proxy.Login(c.Request.Context(), iamservice.LoginRequest{
+		Tenant:     req.Tenant,
+		Identifier: req.Identifier,
+		Password:   req.Password,
+		Remember:   req.Remember,
+	})
+	if err != nil {
+		h.handleProxyErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleDelegatedRefresh(c *gin.Context) {
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	tokens, err := h.proxy.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		h.handleProxyErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleDelegatedLogout(c *gin.Context) {
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	if err := h.proxy.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		h.handleProxyErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func (h *AuthHandler) handleDelegatedMeContext(c *gin.Context) {
+	token := extractBearer(c.GetHeader("Authorization"))
+	if token == "" {
+		contracts.ResponseUnauthorized(c, "缺少 Authorization Bearer token")
+		return
+	}
+	ctx, err := h.proxy.MeContext(c.Request.Context(), token)
+	if err != nil {
+		h.handleProxyErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, ctx)
+}
+
+func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	var req loginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "参数错误: "+err.Error())
+		return
+	}
+	tokens, _, err := h.local.Login(c.Request.Context(), iamservice.LoginRequest{
+		Tenant:     req.Tenant,
+		Identifier: req.Identifier,
+		Password:   req.Password,
+		Remember:   req.Remember,
+	})
+	if err != nil {
+		h.handleLocalErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleLocalRefresh(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	tokens, err := h.local.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		h.handleLocalErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, mapTokens(tokens))
+}
+
+func (h *AuthHandler) handleLocalLogout(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		contracts.ResponseBadRequest(c, "refresh_token 必填")
+		return
+	}
+	if err := h.local.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		h.handleLocalErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func (h *AuthHandler) handleLocalMeContext(c *gin.Context) {
+	if h.local == nil {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
+		return
+	}
+	token := extractBearer(c.GetHeader("Authorization"))
+	if token == "" {
+		contracts.ResponseUnauthorized(c, "缺少 Authorization Bearer token")
+		return
+	}
+	decoder, ok := h.local.(interface {
+		UserContextFromToken(context.Context, string) (*iamservice.UserContext, error)
+	})
+	if !ok {
+		contracts.ResponseServiceUnavailable(c, "本地 IAM 不支持上下文解析", nil)
+		return
+	}
+	uc, err := decoder.UserContextFromToken(c.Request.Context(), token)
+	if err != nil {
+		h.handleLocalErr(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, mapUserContext(uc))
+}
+
+func mapUserContext(uc *iamservice.UserContext) gin.H {
+	if uc == nil {
+		return gin.H{}
+	}
+	return gin.H{
+		"tenant": gin.H{
+			"id":   uc.TenantID,
+			"key":  uc.TenantKey,
+			"name": uc.TenantName,
+		},
+		"user": gin.H{
+			"id":           uc.UserID,
+			"username":     uc.Username,
+			"email":        uc.Email,
+			"display_name": uc.DisplayName,
+		},
+		"roles":       uc.Roles,
+		"permissions": uc.Permissions,
 	}
 }
 

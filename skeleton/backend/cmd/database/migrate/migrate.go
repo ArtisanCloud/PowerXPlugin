@@ -62,6 +62,7 @@ var iamTables = []interface{}{
 	&iammodel.Department{},
 	&iammodel.MemberRole{},
 	&iammodel.RolePermission{},
+	&iammodel.RefreshToken{},
 }
 
 // MigratePluginModels 只做 AutoMigrate（最小实现）

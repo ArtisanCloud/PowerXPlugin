@@ -74,4 +74,5 @@ const (
 	TableIAMDepartments                  = "iam_departments"
 	TableIAMMemberRoles                  = "iam_member_roles"
 	TableIAMRolePermissions              = "iam_role_permissions"
+	TableIAMRefreshTokens                = "iam_refresh_tokens"
 )

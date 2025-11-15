@@ -1,0 +1,145 @@
+# Implementation Plan: PowerX Publish Hub Distribution Spec
+
+**Branch**: `004-publish-hub-spec` | **Date**: 2025-11-07 | **Spec**: [spec.md](./spec.md)  
+**Input**: Feature specification from `/specs/004-publish-hub-spec/spec.md`
+
+## Summary
+
+Publish Hub 需要一个端到端方案，将 `px-plugin dev/publish/dist` 产物统一到单一真相，借助 Marketplace 在线/离线审核来保证安全与 SLA，并让租户在 PowerX Admin 中完成安装、灰度与回滚。实现重点：定义 `.pxp` 契约、Dev API register/reload 协议、在线/离线审核流程、RBAC + 180 天审计策略与 Telemetry/SLA 监控，再以 CLI/Go/Nuxt 既有堆栈落地。
+
+## Technical Context
+
+**Language/Version**: Go 1.24 (PowerX Core/Dev API), TypeScript 5 + Node.js 18 (px-plugin CLI & tooling), Nuxt 4.2 (Admin)  
+**Primary Dependencies**: Gin、`@artisan-cloud/plugin-framework-*`、px-plugin CLI runtime、S3/MinIO 对象存储、Redis/Kafka 链路、Playwright 1.48+  
+**Storage**: Artefacts + integrity 文件放置于对象存储；Marketplace 复用既有 DB 持久化版本/审核记录，本阶段不新增数据库  
+**Testing**: `go test ./...`, `go tool cover`, `npm test && npm run lint`, `npm run e2e:dev-hotload`, Playwright Admin 流程、CLI 集成测试  
+**Target Platform**: 多租户 PowerX 运行时（Linux/k8s），CLI 面向 macOS/Linux/Windows；Admin 基于 Nuxt 4  
+**Project Type**: Go 服务 + Node CLI + Nuxt Admin 的多项目单仓（Monorepo）  
+**Performance Goals**: `px-plugin dev` reload P95 ≤ 2s；`px-plugin publish` 预检+入队 ≤ 10min；在线审核 ≤ 4h；离线审核 ≤ 1 工作日（可观测且可告警）；租户通知 ≤ 30min；安装失败 5min 内可回滚；`.pxp` 校验 100% 通过  
+**Constraints**: `.pxp` 默认 <300MB；契约优先并同步到 docs/contracts；CLI 模板与脚手架输出一致；Dev API 必须 mTLS/幂等；离线环境零公网依赖；RBAC 守卫覆盖开发者/审核员/租户角色并保留 180 天审计日志；在线/离线 SLA 需具备独立监测与仪表板
+**Scale/Scope**: 覆盖数百插件、上千租户；支持 ≥50 并发租户升级以及数十并行开发者热加载
+
+## Constitution Check
+
+- **I. 双重使命仓库** — ✅ CLI 命令、docs/contracts 与脚手架保持一致，确保模板/框架产出统一。
+- **II. 契约优先兼容性** — ✅ 所有新 API、manifest、`.pxp` Schema 先落在 `specs/004-publish-hub-spec/contracts/` 并与 `docs/contracts/**` 对齐。
+- **III. Go + Nuxt 基线** — ✅ 继续在 Go/Gin 服务 + Nuxt Admin 上扩展，无引入额外运行时。
+- **IV. 脚手架与 CLI 纪律** — ✅ `px-plugin dev/publish/dist` 均在 CLI 侧定义参数/示例，并与 `px-plugin init` 模板验证。
+- **V. 透明交付与一致性** — ✅ research/data-model/quickstart/contracts 统一沉淀，方便路线图追踪与 docmap 更新。
+- **Post-Design Re-check** — ✅ Phase 1 artefacts（research/data-model/contracts/quickstart）未引入新的栈或结构，所有闸门保持通过。
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/004-publish-hub-spec/
+├── plan.md              # 本文件
+├── research.md          # Phase 0 输出
+├── data-model.md        # Phase 1 输出
+├── quickstart.md        # Phase 1 输出
+├── contracts/           # Phase 1 输出（OpenAPI/Schema）
+└── tasks.md             # Phase 2 (/speckit.tasks) 生成
+```
+
+### Source Code (repository root)
+
+```text
+framework/
+├── runtime/
+├── plugins/
+└── observability/
+
+tools/
+└── cli/                      # px-plugin CLI (dev/publish/dist)
+
+sdk/workspace/
+├── packages/framework-admin/
+└── packages/framework-client/
+
+docs/
+├── contracts/
+└── use_cases/_from_hub/SCN-PUBLISH-HUB-001/
+
+specs/
+└── 004-publish-hub-spec/
+
+make-files/
+└── targets/cli.mk            # 统一 npm/go 目标
+
+tests/
+├── cli/
+└── e2e/
+```
+
+**Structure Decision**: 保持现有多语言 Monorepo，不新增子项目；CLI 改动集中在 `tools/cli`，Go/Nuxt 侧按既有目录拓展，所有设计 artefact 均存放在 `specs/004-publish-hub-spec/`，方便链路追踪。
+
+## Complexity Tracking
+
+No constitution violations identified — 不需要额外复杂度豁免。
+
+## Additional Scope from SCN-DEV-PLUGIN-INIT/DEBUG/PUBLISH
+
+### Workstream A – CLI Scaffold & Compliance Bootstrap (SCN-DEV-PLUGIN-INIT-001)
+- **Deliverables**: `px-plugin init` + `px-plugin doctor` CLI（`tools/cli/src/commands/plugin/*.ts`）、模板索引+执行器（`scaffold/templates/**` 或 `packages/template-registry/index.yaml`）、第三方导入策略（`config/compliance/external_source_policy.yaml`）、bootstrap 服务（`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`）与许可证扫描接入。
+- **Acceptance**: 初始化 ≤60s、依赖安装成功率 ≥98%、Git/CI 自动注册、SBOM+许可证扫描报告可追踪，团队克隆运行 `plugin doctor` 后健康项 ≥95%，第三方导入 15 分钟内完成审批。
+- **Testing**: `scripts/workflows/scaffold-smoke.mjs`, CLI 集成测试覆盖模板渲染/导入/doctor, Go 单测覆盖 bootstrap handler、scanner 适配。
+
+### Workstream B – Host Simulator & Sandbox Validation (SCN-DEV-PLUGIN-DEBUG-001)
+- **Deliverables**: `px-plugin host start --mock` + `px-plugin debug attach`（`tools/cli/src/commands/dev/host.ts`, `tools/cli/src/runtime/hotreload/session.ts` 扩展）、宿主模拟器控制器（`framework/backend/go/runtime/devapi/handlers/host_simulator.go`）、沙箱验证与报告 API（`framework/backend/go/runtime/devapi/handlers/sandbox_validation.go`, `.../telemetry/debug_reports.go`）、调试报告文档/工单集成（`docs/guides/publish/marketplace-review.md`, `docs/guides/bootstrap-context.md` 更新）。
+- **Acceptance**: 宿主启动 ≤30s、热更新延迟 ≤2s、沙箱验证 ≤10min、错误诊断 1min 生成并自动关联工单，敏感字段全部脱敏。
+- **Testing**: `npm run e2e:dev-hotload` 扩展 host simulator 路径、Go integration 覆盖 sandbox deploy/report、Playwright/Admin 验证调试日志面板。
+
+### Workstream C – Release Pipeline & Marketplace Orchestration (SCN-DEV-PLUGIN-PUBLISH-001)
+- **Deliverables**: `px-plugin publish create/deploy` CLI（`tools/cli/src/commands/publish/create.ts`, `publish/deploy.ts`）、`px-plugin pack` + `px-plugin import --offline`（`tools/cli/src/commands/dist.ts` & 新 pack 执行器）、发布流水线 orchestrator + canary 策略（`framework/backend/go/runtime/publish/pipeline_handler.go`, `config/publish/approval_flows.yaml`）、Marketplace listing UI/API（`examples/starter/web-admin/app/pages/publish/pipelines.vue`, `framework/backend/go/runtime/marketplace/services/listing.go`）。
+- **Acceptance**: 测试租户门禁 + 审批在 24h 内闭环，灰度可 5 分钟回滚，离线导入成功率 ≥98%，Marketplace 审核 ≤3 个工作日且事件同步率 ≥99%。
+- **Testing**: CI pipeline smoke tests、Playwright 发布/回滚/Marketplace 审核剧本、离线导入 fixture、Grafana SLA 仪表板验证。
+
+### Workstream D – Go CLI Implementation of dev --watch (New)
+- **Deliverables**:
+  - Go CLI dev 命令实现（`tools/cli/cmd/dev.go`）
+  - Dev API 客户端（`tools/cli/internal/devapi/client.go`）
+  - 文件监听器（`tools/cli/internal/watch/filewatcher.go`）
+  - 会话管理器（`tools/cli/internal/session/manager.go`）
+  - 增量构建器（`tools/cli/internal/build/incremental.go`）
+  - SSE 日志客户端（`tools/cli/internal/sse/client.go`）
+  - 审计日志系统（`tools/cli/internal/audit/logger.go`）
+- **Architecture**:
+  - 分层设计：命令层 → Dev API 客户端层 → 传输层（HTTP/mTLS）
+  - 并发模型：文件监听（fsnotify）→ 去抖聚合（250ms）→ 增量构建 → API 调用 → SSE 监听
+  - 依赖选择：fsnotify（文件监听）、stdlib http.Client（HTTP）、encoding/json（序列化）
+- **Acceptance**:
+  - 命令对齐：`px-plugin dev --watch --entry --tenant --ignore` 参数与 TypeScript 版一致
+  - 性能指标：reload P95 ≤2s、文件变更到 API 调用 ≤250ms、CLI 内存 ≤100MB
+  - 可靠性：网络错误 3 次重试、幂等性（x-reload-id）、会话持久化
+  - 兼容性：与 TypeScript 版 100% 对齐，遵循 OpenAPI spec
+- **Testing**:
+  - 单元测试：Client（httptest）、Watcher（testfs）、Session（memstore）
+  - 集成测试：本地 mock Dev API
+  - E2E 测试：真实 PowerX Dev API
+- **Reference**:
+  - TypeScript 实现：`tools/cli/src/commands/dev/watch.ts`, `tools/cli/src/runtime/hotreload/session.ts`
+  - 契约：`specs/004-publish-hub-spec/contracts/publish-hub.openapi.yaml`
+  - Backend 实现：`framework/backend/go/runtime/devapi/handlers/dev_plugins.go`
+- **Timeline**: 8 周（Week 1-2 基础设施，Week 3-4 核心功能，Week 5-6 高级特性，Week 7-8 测试优化）
+
+### Workstream E – Local install fast path (Makefile + Docs)
+- **Deliverables**: 将原 `/com.powerx.plugin.base` 中的 `Makefile` 与 `make-files/*.mk` 搬运到 `skeleton/` 并同步到模板/CLI embed，使 `px-plugin init` 输出的工程默认具备 `make dist`, `make pack`, `make local-install`、`make local-install-pxp` 等目标；补充 `docs/guides/publish/local-install.md` 描述 dist/zip/`.pxp` 安装方式、`/admin/plugins/install/local` 调用示例及故障排查，并在 Quickstart/Publish 文档加引用。
+- **Acceptance**: 运行 `make dist` 能在 60 秒内完成 go+npm 构建并输出标准 artefact；`make local-install API_BASE=… TOKEN=…` 成功调用 Admin API（含 Force/Enable 参数），日志清晰；`make local-install-pxp PACKAGE=./artifacts/demo.pxp` 先解包/校验再调用 local install 并在文档中声明约束；`docs/guides/publish/local-install.md` 覆盖 dist/zip/`.pxp` 三种路径。
+- **Testing**: CI 增加 `make dist` smoke；在示例 helloworld 工程执行 `make local-install` 指向 sandbox Admin API；文档经 DevRel/QA 校验。
+
+### Workstream F – Capability registration & exposure (SCN-INT-PLUGIN-CAPABILITY-001)
+- **Deliverables**:
+  - 模板/脚手架更新：`scaffold/templates/plugin.yaml.tmpl`, `tools/cli/internal/templates/data/plugin.yaml.tmpl`, `packages/template-registry/index.yaml` 默认包含 `capabilities.provides`, `agent_tools`, `exposure.channels` 及 handler stub。
+  - Contracts 与 Schema 生成：`scripts/capabilities/validate-capabilities.mjs`, `contracts/capabilities/*.yaml`, `contracts/schema/input|output/*.json` 自动化工具。
+  - CLI 命令链：`px-plugin capabilities init|lint|submit|quota|diff`（`tools/cli/src/commands/capabilities/*.ts` + 新 lib），写入 `.px-plugin/capabilities.json` 审计状态并调用 `/internal/plugins/capabilities/**`。
+  - 租户授权与示例：`px-plugin capabilities quota` + Postman/SDK bundle 生成器、`examples/com.powerx.demo` REST + Agent Tool handler、`docs/guides/publish/capabilities.md`。
+  - 版本比较与灰度：`px-plugin capabilities diff` 输出 Schema/RBAC/通道差异、灰度计划模板、Telemetry hook（`capability.registry.*`, `capability.exposure.*`）。
+- **Acceptance**:
+  - 运行 `px-plugin capabilities init com.powerx.demo.template.create` 在 60 秒内生成 manifest 片段、contract/schema 与 handler skeleton；`px-plugin init` 输出的所有模板都带 capability scaffolding。
+  - `px-plugin capabilities lint` 校验命名/Schema/RBAC/handler 绑定，通过后 `px-plugin capabilities submit --dev-api …` 在 1 分钟内调用 PowerX API，写入 `.px-plugin/capabilities.json` 与审计日志，若状态 ≠ approved 则 `make dist/pack` 自动警告。
+  - `px-plugin capabilities quota --tenant demo` 和 `px-plugin capabilities diff --from manifest.prev --to manifest.next` 成功更新租户额度、生成 Postman/SDK bundle、输出通知/灰度计划，Telemetry 在 3 分钟内可视化。
+- **Testing**:
+  - 单元：`npm test` 覆盖 CLI commands/lib、`go test ./tools/cli/internal/capabilities`（若新增 Go 辅助）、Schema 校验脚本。
+  - 集成：mock PowerX API（`tools/cli/test/fixtures/capabilities-api.mock.ts`）+ `.px-plugin` state 回写；Playwright 或 Go tests 调用示例 handler (`examples/com.powerx.demo`) 验证 REST/Agent Tool 能力。
+  - 文档：DevRel/QA walkthrough 运行 `docs/guides/publish/capabilities.md` 步骤，确保 5 分钟内完成建模→提交→授权→diff。

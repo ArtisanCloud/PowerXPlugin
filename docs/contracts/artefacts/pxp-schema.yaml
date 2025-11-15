@@ -1,0 +1,214 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://docs.artisancloud.com/powerx/contracts/pxp-schema.yaml
+title: PowerX Plugin Package (.pxp)
+description: >-
+  Schema describing the metadata + artefacts bundled inside a PowerX `.pxp` file,
+  including manifest, build artefacts, integrity evidence, signature chain and
+  encryption envelope required by Publish Hub.
+type: object
+additionalProperties: false
+required:
+  - manifest
+  - artefacts
+  - integrity
+  - signature
+  - encryption
+  - audit
+  - report
+properties:
+  manifest:
+    type: object
+    description: Plugin manifest extracted from plugin.yaml / manifest.json.
+    required: [id, name, version, runtime, permissions]
+    properties:
+      id:
+        type: string
+        pattern: "^[a-z0-9-_.]+$"
+      name:
+        type: string
+      version:
+        type: string
+        description: Semantic version string aligned with Publish Request.
+      runtime:
+        type: string
+        enum: ["powerx-go", "powerx-js", "hybrid"]
+      permissions:
+        type: array
+        minItems: 0
+        items:
+          type: string
+      targets:
+        type: array
+        items:
+          type: string
+        description: Deployment channels or tenant filters bundled with this build.
+  artefacts:
+    type: object
+    additionalProperties: false
+    required: [backend_bundle, frontend_bundle]
+    properties:
+      backend_bundle:
+        type: object
+        description: Path + metadata for backend binaries/assets.
+        required: [path, hash, size_bytes]
+        properties:
+          path:
+            type: string
+            description: Relative path inside `.pxp` archive (e.g. backend/bin/app).
+          hash:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          size_bytes:
+            type: integer
+            minimum: 0
+      frontend_bundle:
+        type: object
+        required: [path, hash, size_bytes]
+        properties:
+          path:
+            type: string
+          hash:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          size_bytes:
+            type: integer
+            minimum: 0
+      migrations:
+        type: array
+        description: Optional migration scripts included with the package.
+        items:
+          type: object
+          required: [path, hash]
+          properties:
+            path:
+              type: string
+            hash:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+      assets:
+        type: array
+        items:
+          type: object
+          required: [path, hash]
+          properties:
+            path:
+              type: string
+            hash:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+      extensions:
+        type: array
+        description: Optional extension folders (docs/contracts, extensions/** etc.).
+        items:
+          type: object
+          required: [path]
+          properties:
+            path:
+              type: string
+            hash:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+  integrity:
+    type: object
+    description: Integrity evidence generated during `px-plugin dist`.
+    required: [manifest_path, file]
+    properties:
+      manifest_path:
+        type: string
+        description: Relative path to `manifest.json` inside `.pxp`.
+      file:
+        type: string
+        description: Relative path to `integrity.txt` (SHA256 listing).
+      entries:
+        type: array
+        items:
+          type: object
+          required: [path, hash]
+          properties:
+            path:
+              type: string
+            hash:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+  signature:
+    type: object
+    description: Signature metadata recorded by CLI.
+    required: [file, algorithm, certificate_chain]
+    properties:
+      file:
+        type: string
+        description: Relative path to `manifest.signature`.
+      algorithm:
+        type: string
+        enum: ["RSASSA-PKCS1-v1_5", "ECDSA-P256-SHA256"]
+      certificate_chain:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          required: [subject, issuer, not_after]
+          properties:
+            subject:
+              type: string
+            issuer:
+              type: string
+            not_after:
+              type: string
+              format: date-time
+  encryption:
+    type: object
+    description: Metadata required to decrypt `.pxp` contents.
+    required: [algorithm, wrapped_key, key_id, expires_at]
+    properties:
+      algorithm:
+        type: string
+        enum: ["AES-256-GCM"]
+      wrapped_key:
+        type: string
+        description: Base64-encoded ciphertext of the symmetric key encrypted with Marketplace public key.
+      key_id:
+        type: string
+        description: Identifier for the Marketplace public key used to wrap the payload key.
+      iv:
+        type: string
+        description: Base64-encoded initialization vector used for encrypting artefacts.
+      auth_tag:
+        type: string
+        description: Base64-encoded authentication tag generated by GCM.
+      expires_at:
+        type: string
+        format: date-time
+        description: When this package encryption key expires (must be ≤24h after build).
+  report:
+    type: object
+    description: Build report summarising artefact sizes、linters与测试通过率。
+    required: [path]
+    properties:
+      path:
+        type: string
+      summary:
+        type: object
+        additionalProperties: true
+  audit:
+    type: object
+    description: Audit log emitted by CLI (`dist/audit.log`).
+    required: [path]
+    properties:
+      path:
+        type: string
+      events:
+        type: array
+        items:
+          type: object
+          required: [timestamp, action]
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+            action:
+              type: string
+            actor:
+              type: string
+            metadata:
+              type: object
+              additionalProperties: true

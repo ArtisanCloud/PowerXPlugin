@@ -1,0 +1,134 @@
+package migrate
+
+import (
+	"context"
+	"log"
+	"strings"
+
+	"{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	adminconsoleModel "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
+	marketplaceModel "{{ .BackendModulePath }}/internal/entity/models/marketplace"
+	operationsModel "{{ .BackendModulePath }}/internal/entity/models/operations"
+	runtimeOpsModel "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
+	securityModel "{{ .BackendModulePath }}/internal/entity/models/security"
+	templateModel "{{ .BackendModulePath }}/internal/entity/models/template"
+	toolgrantModel "{{ .BackendModulePath }}/internal/entity/models/tool_grant"
+	"gorm.io/gorm"
+)
+
+var businessTables = []interface{}{
+	&models.PluginCredential{},
+	&models.PluginTenantExt{},
+	&templateModel.Template{},
+	&marketplaceModel.Listing{},
+	&marketplaceModel.ListingAsset{},
+	&marketplaceModel.ListingVersion{},
+	&marketplaceModel.ChecklistRun{},
+	&marketplaceModel.ChecklistItem{},
+	&marketplaceModel.PricingPlan{},
+	&marketplaceModel.PlanTier{},
+	&marketplaceModel.License{},
+	&marketplaceModel.LicenseEvent{},
+	&marketplaceModel.TaxTransaction{},
+	&runtimeOpsModel.MCPSession{},
+	&runtimeOpsModel.RuntimeAuditEvent{},
+	&runtimeOpsModel.QuotaLedger{},
+	&runtimeOpsModel.MarketplaceOverage{},
+	&operationsModel.SupportChannel{},
+	&operationsModel.SupportTicket{},
+	&operationsModel.SupportTicketEvent{},
+	&operationsModel.ReadinessChecklistItem{},
+	&operationsModel.SLAProfile{},
+	&operationsModel.SLAAdjustment{},
+	&operationsModel.Incident{},
+	&operationsModel.IncidentTimelineEntry{},
+	&operationsModel.IncidentChecklistItem{},
+	&securityModel.BaselineChecklist{},
+	&securityModel.AuditReport{},
+	&toolgrantModel.Revocation{},
+	&toolgrantModel.UsageEvent{},
+	&adminconsoleModel.AuditEvent{},
+	&adminconsoleModel.ConfigChange{},
+	&adminconsoleModel.JobRun{},
+}
+
+var iamTables = []interface{}{
+	&iammodel.Tenant{},
+	&iammodel.User{},
+	&iammodel.Member{},
+	&iammodel.Role{},
+	&iammodel.Permission{},
+	&iammodel.Department{},
+	&iammodel.MemberRole{},
+	&iammodel.RolePermission{},
+	&iammodel.RefreshToken{},
+}
+
+// MigratePluginModels 只做 AutoMigrate（最小实现）
+func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) error {
+	if db == nil {
+		return nil
+	}
+	tables := append([]interface{}{}, businessTables...)
+	if isSQLite(db) {
+		tables = filterSQLiteIncompatibleTables(tables)
+	}
+	if includeIAM {
+		tables = append(tables, iamTables...)
+	}
+	if len(tables) == 0 {
+		return nil
+	}
+	return db.WithContext(ctx).AutoMigrate(tables...)
+}
+
+func isSQLite(db *gorm.DB) bool {
+	if db == nil || db.Dialector == nil {
+		return false
+	}
+	return strings.EqualFold(db.Dialector.Name(), "sqlite")
+}
+
+func filterSQLiteIncompatibleTables(tables []interface{}) []interface{} {
+	filtered := make([]interface{}, 0, len(tables))
+	skipped := 0
+	for _, tbl := range tables {
+		if !isSQLiteSafeTable(tbl) {
+			skipped++
+			continue
+		}
+		filtered = append(filtered, tbl)
+	}
+	if skipped > 0 {
+		log.Printf("[migrate] sqlite 环境仅迁移 IAM + 插件核心表，跳过 %d 张业务表", skipped)
+	}
+	return filtered
+}
+
+func isSQLiteSafeTable(tbl interface{}) bool {
+	switch tbl.(type) {
+	case *models.PluginCredential,
+		*models.PluginTenantExt,
+		*templateModel.Template:
+		return true
+	default:
+		return false
+	}
+}
+
+func ResetDatabase(ctx context.Context, db *gorm.DB, cfg *config.DatabaseConfig) error {
+	if db.Dialector.Name() == "sqlite" || strings.TrimSpace(cfg.Schema) == "" {
+		return db.WithContext(ctx).Migrator().DropTable(&templateModel.Template{})
+	}
+
+	// 如果你用 GORM，可以直接 drop 所有表
+	// 或者先获取表名，再循环 drop
+	// 这里举例简单版本：
+	err := db.Exec("DROP SCHEMA " + cfg.Schema + " CASCADE; CREATE SCHEMA " + cfg.Schema + ";").Error
+	if err != nil {
+		return err
+	}
+	return nil
+}

@@ -1,0 +1,40 @@
+package consent_guard
+
+import (
+	"fmt"
+	"net/http"
+
+	middleware "{{ .BackendModulePath }}/internal/middleware"
+	agentsecurity "{{ .BackendModulePath }}/internal/services/agent/security"
+	"github.com/gin-gonic/gin"
+)
+
+// AssetExtractor extracts the list of asset keys that the handler intends to
+// access. The implementation can inspect the request and context.
+type AssetExtractor func(*gin.Context) []string
+
+// Middleware enforces consent against the provided PrivacyGuard using the
+// extractor to determine required asset keys.
+func Middleware(guard *agentsecurity.PrivacyGuard, extractor AssetExtractor) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if guard == nil {
+			c.Next()
+			return
+		}
+		tenantUint, ok := middleware.TenantIDFromContext(c.Request.Context())
+		if !ok || tenantUint == 0 {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
+			return
+		}
+		tenantID := fmt.Sprintf("%d", tenantUint)
+		required := []string(nil)
+		if extractor != nil {
+			required = extractor(c)
+		}
+		if err := guard.EnsureConsent(c.Request.Context(), tenantID, required); err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		c.Next()
+	}
+}

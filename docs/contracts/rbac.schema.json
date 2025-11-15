@@ -1,0 +1,20 @@
+{
+  "pluginId": "com.powerx.plugin.base",
+  "roles": [
+    {
+      "name": "powerx.plugin.base.admin",
+      "description": "Plugin administrators inherit host IAM context",
+      "permissions": [
+        "iam.user.read",
+        "iam.role.read",
+        "iam.department.read"
+      ]
+    }
+  ],
+  "defaultAssignments": [
+    {
+      "hostRole": "powerx.admin",
+      "pluginRole": "powerx.plugin.base.admin"
+    }
+  ]
+}

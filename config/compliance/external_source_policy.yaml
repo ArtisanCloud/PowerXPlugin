@@ -1,0 +1,36 @@
+version: v1
+updatedAt: 2025-11-25T00:00:00Z
+sources:
+  allow:
+    - type: git
+      domains:
+        - github.com
+        - gitlab.com
+        - bitbucket.org
+      maxRepoSizeMb: 2048
+    - type: tarball
+      maxSizeMb: 300
+      checksumRequired: true
+licenses:
+  allow:
+    - MIT
+    - Apache-2.0
+    - BSD-3-Clause
+    - BSD-2-Clause
+    - ISC
+  deny:
+    - GPL-3.0
+    - AGPL-3.0
+    - LGPL-3.0
+    - SSPL-1.0
+approvals:
+  requiredFor:
+    - unknown_license
+    - exceeds_max_size
+    - missing_checksum
+  contacts:
+    - compliance@artisan-cloud.com
+    - security@artisan-cloud.com
+audit:
+  webhook: https://audit.powerx.dev/hooks/plugin-import
+  retentionDays: 365

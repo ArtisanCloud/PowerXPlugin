@@ -1,0 +1,37 @@
+package tool_grant_verifier
+
+import (
+	"fmt"
+	"net/http"
+
+	"{{ .BackendModulePath }}/internal/middleware"
+	toolgrantservice "{{ .BackendModulePath }}/internal/services/agent/tool_grant"
+	"github.com/gin-gonic/gin"
+)
+
+// Middleware validates ToolGrant tokens on protected routes.
+func Middleware(service *toolgrantservice.Service, extractToken func(*gin.Context) string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if service == nil {
+			c.Next()
+			return
+		}
+		token := ""
+		if extractToken != nil {
+			token = extractToken(c)
+		} else {
+			token = c.GetHeader("X-ToolGrant")
+		}
+		tenantUint, ok := middleware.TenantIDFromContext(c.Request.Context())
+		if !ok || tenantUint == 0 {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
+			return
+		}
+		tenantID := fmt.Sprintf("%d", tenantUint)
+		if _, err := service.Validate(c.Request.Context(), tenantID, token); err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": err.Error(), "code": "TOOLGRANT_INVALID"})
+			return
+		}
+		c.Next()
+	}
+}

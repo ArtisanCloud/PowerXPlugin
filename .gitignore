@@ -1,0 +1,42 @@
+.claude
+
+# Go build artifacts
+bin/
+*.exe
+examples/verify-external/backend/backend
+*.test
+*.out
+
+# Node/Nuxt workspaces
+node_modules/
+.nuxt/
+.output/
+.nitro/
+dist/
+build/
+!tools/cli/internal/build/
+tools/cli/cmd/px-plugin
+
+# Dependency locks generated per workspace
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Logs & env files
+logs
+*.log
+*.tmp
+*.swp
+.env
+.env.*
+
+# macOS / misc
+.DS_Store
+Thumbs.db
+
+# Testing artifacts (coverage reports, playwright output, temp CLI scaffolds)
+tmp/
+!tmp/README.md
+.cache/
+skeleton/backend/etc/config.yaml
+skeleton/backend/etc/host-values.yaml

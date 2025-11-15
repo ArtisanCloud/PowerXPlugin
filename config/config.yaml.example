@@ -1,0 +1,9 @@
+server:
+  listen: ":8087"
+  env: "development"
+
+logging:
+  level: "info"
+
+database:
+  dsn: "postgres://user:pass@localhost:5432/powerx?sslmode=disable"

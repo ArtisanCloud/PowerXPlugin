@@ -1,0 +1,83 @@
+version: v0.1.0
+lastSynced: 2025-11-25T00:00:00Z
+defaults:
+  go: "1.24"
+  node: "18"
+  packageManager: npm
+templates:
+  - id: fullstack-go-nuxt
+    displayName: Fullstack Go + Nuxt 4.2
+    description: >
+      标准全栈模板，包含 Gin + GORM 后端、Nuxt 4 管理端、manifest/rbac 契约以及
+      README/quickstart。配套 `publish.yml`、SBOM 和审计脚本，适合大多数插件项目。
+    recommended: true
+    stack:
+      backend: go-gin
+      frontend: nuxt
+    templatePaths:
+      root: scaffold/templates
+      backend: scaffold/templates/backend/go-gin
+      frontend: scaffold/templates/web-admin/nuxt
+      manifest: scaffold/templates/plugin.yaml.tmpl
+      docs: scaffold/templates/README.md.tmpl
+    languages:
+      go: ">=1.24"
+      node: ">=18"
+      packageManager: npm
+    dependencies:
+      go:
+        framework: github.com/ArtisanCloud/PowerXPlugin/framework@v0.0.1-alpha
+        schema: github.com/santhosh-tekuri/jsonschema/v5@v5.3.0
+      node:
+        adminLayer: "@artisan-cloud/plugin-framework-admin@^0.0.1-alpha"
+        clientLayer: "@artisan-cloud/plugin-framework-client@^0.0.1-alpha"
+    hooks:
+      preRender: []
+      postRender:
+        - id: update-worktree
+          description: "写入 publish.yml、reports/sbom.json，并提示 go work sync"
+          path: scripts/hooks/templates/post-render-fullstack.mjs
+    rollout:
+      channels:
+        - stable
+        - beta
+      strategy: canary
+      rollbackPlan:
+        type: automatic
+        maxFailingTenants: 5
+    notes:
+      - "默认启用 README.md.tmpl 和 docs/contracts，适合 CLI 快速演示。"
+      - "可通过 POWERXPLUGIN_USE_LOCAL_FRONTEND=1 复用 monorepo layer。"
+    features:
+      - capabilities.v1
+
+  - id: backend-go-lite
+    displayName: Backend Only (Go + Gin)
+    description: >
+      精简后端模板，仅包含 Gin 服务与 manifest/rbac 契约，适用于无 Admin UI 的插件或
+      仅暴露 API 的集成场景。默认关闭前端/Playwright 依赖。
+    stack:
+      backend: go-gin
+    templatePaths:
+      root: scaffold/templates
+      backend: scaffold/templates/backend/go-gin
+      manifest: scaffold/templates/plugin.yaml.tmpl
+    languages:
+      go: ">=1.24"
+    dependencies:
+      go:
+        framework: github.com/ArtisanCloud/PowerXPlugin/framework@v0.0.1-alpha
+    hooks:
+      preRender: []
+      postRender: []
+    rollout:
+      channels:
+        - stable
+      strategy: direct
+      rollbackPlan:
+        type: manual
+        owners:
+          - ops@artisan-cloud.com
+    features:
+      - capabilities.v1
+*** End Patch

@@ -1,0 +1,195 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master", "develop", "001-powerxplugin-foundation"]
+  pull_request:
+
+jobs:
+  template-sync:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Verify template sync
+        run: npm run sync:templates -- --check
+
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
+      GOWORK: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
+      - name: Go work sync
+        run: go work sync
+      - name: Go test (framework)
+        run: cd framework && go test ./...
+      - name: Go test (skeleton backend)
+        run: cd skeleton/backend && go test ./...
+
+  frontend:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          npm install
+          cd skeleton/web-admin && npm install
+      - name: Lint
+        run: cd skeleton/web-admin && npx nuxi lint || true
+      - name: Build
+        run: cd skeleton/web-admin && npm run build
+
+  contracts:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
+      GO111MODULE: on
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
+      - name: Go work sync
+        run: go work sync
+      - name: Run contract validators
+        run: |
+          cd framework
+          go test ./backend/go/manifest ./backend/go/rbac
+
+  cli:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
+      GO111MODULE: on
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
+      - name: Go test (cli devwatch/devapi/watch)
+        run: |
+          go work sync
+          cd tools/cli
+          go test ./internal/devwatch ./internal/devapi ./internal/watch
+      - name: Build px-plugin and scaffold sample project
+        run: |
+          go work sync
+          cd tools/cli
+          go build -o ../../bin/px-plugin ./cmd/px-plugin
+          TMP_DIR=$(mktemp -d)
+          cd "$TMP_DIR"
+          "$GITHUB_WORKSPACE/bin/px-plugin" init com.powerx.ci --force --module github.com/example/ci > /dev/null
+          test -f com.powerx.ci/plugin.yaml
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: [backend, contracts, cli]
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run smoke workflow
+        run: |
+          make test-smoke 2>&1 | tee smoke.log
+      - name: Upload smoke log
+        if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-log
+          path: smoke.log
+
+  regression:
+    runs-on: ubuntu-latest
+    needs: [smoke]
+    env:
+      GOTOOLCHAIN: local
+      GOPROXY: https://goproxy.cn,direct
+      GOSUMDB: sum.golang.org
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Configure Go proxy
+        run: |
+          go env -w GOPROXY=$GOPROXY
+          go env -w GOSUMDB=$GOSUMDB
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json', 'skeleton/web-admin/package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - name: Install dependencies
+        run: |
+          npm install
+          cd skeleton/web-admin && npm install
+      - name: Install Playwright browsers
+        working-directory: skeleton/web-admin
+        run: npx playwright install --with-deps
+      - name: Run regression workflow
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        run: |
+          make test-regression 2>&1 | tee regression.log
+      - name: Upload regression artifacts
+        if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-artifacts
+          path: |
+            regression.log
+            tmp/regression-backend.log
+            tmp/regression-frontend.log
+            tmp/coverage.html
+            skeleton/web-admin/test-results/

@@ -1,0 +1,77 @@
+package app
+
+import (
+	"context"
+	"strconv"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
+	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
+	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+)
+
+type DelegatedAuthProxy interface {
+	Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error)
+	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
+	Logout(ctx context.Context, refreshToken string) error
+	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+}
+
+// Deps bundles shared infrastructure dependencies for handlers and services.
+type Deps struct {
+	DB                  *gorm.DB
+	Ctx                 context.Context
+	PowerXClient        *client.PowerXServiceClient
+	Config              *config.Config
+	TaxProviderClient   *marketplacesvc.TaxProviderClient
+	MarketplaceBilling  marketplacesvc.BillingClient
+	LicenseAuthority    marketplacesvc.LicenseAuthority
+	LicenseCache        marketplacesvc.LicenseCache
+	OperationsMetrics   *opsmetrics.Metrics
+	AdminConsoleMetrics *adminmetrics.Metrics
+	IAMMode             iamservice.IAMMode
+	IAMModeSource       string
+	AuthProxy           DelegatedAuthProxy
+	IAMDirectory        iamservice.IAMDirectory
+}
+
+// RuntimeDefaults returns the configured runtime ops defaults (if any).
+func (d *Deps) RuntimeDefaults() *config.RuntimeOpsDefaults {
+	if d == nil || d.Config == nil {
+		return nil
+	}
+	return d.Config.RuntimeOps
+}
+
+// RuntimeLogger provides a structured logger enriched with runtime metadata.
+func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logrus.Entry {
+	if extra == nil {
+		extra = logger.Fields{}
+	}
+	if ctx == nil && d != nil {
+		ctx = d.Ctx
+	}
+
+	var tenantID string
+	if tid, ok := authx.TenantIDFromContext(ctx); ok && tid > 0 {
+		tenantID = strconv.FormatUint(tid, 10)
+	}
+
+	traceID := ""
+	if ctx != nil {
+		if v := ctx.Value("request_id"); v != nil {
+			if s, ok := v.(string); ok {
+				traceID = s
+			}
+		}
+	}
+
+	return logger.WithRuntimeFields(PluginID, tenantID, traceID, component, extra)
+}

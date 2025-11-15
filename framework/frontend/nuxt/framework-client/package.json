@@ -1,0 +1,15 @@
+{
+  "name": "@artisan-cloud/plugin-framework-client",
+  "version": "0.0.1-alpha",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "files": [
+    "index.ts",
+    "api.ts"
+  ],
+  "peerDependencies": {
+    "nuxt": "^4.2.0"
+  }
+}

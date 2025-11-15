@@ -1,0 +1,110 @@
+mappings:
+  - name: web-admin
+    source: skeleton/web-admin
+    targets:
+      - path: scaffold/templates/web-admin/nuxt
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/web-admin/nuxt
+        suffix: .tmpl
+    include:
+      - "app/**/*"
+      - "public/**/*"
+      - "i18n/**/*"
+      - "nuxt.config.ts"
+      - "package.json"
+    exclude:
+      - "**/__tests__/**"
+      - "tests/**"
+      - "node_modules/**"
+      - ".nuxt/**"
+      - "**/.DS_Store"
+    replacements:
+      - globs: ["**/*.vue"]
+        regex: "{{\\s*(?!print)(.*?)\\s*}}"
+        flags: "gs"
+        replace: "{{ `{{ $1 }}` }}"
+      - globs: ["nuxt.config.ts", "app/**/*.ts", "i18n/**/*.json", "package.json"]
+        literal: "'com.powerx.plugin.base'"
+        replace: "'{{ .PluginID }}'"
+      - globs: ["nuxt.config.ts", "app/**/*.ts", "package.json"]
+        literal: '"com.powerx.plugin.base"'
+        replace: '"{{ .PluginID }}"'
+      - globs: ["**/*"]
+        literal: "PowerX Base Plugin"
+        replace: "{{ .PluginName }}"
+      - globs: ["**/*"]
+        literal: "PowerX Demo Plugin"
+        replace: "{{ .PluginName }}"
+      - globs: ["package.json"]
+        literal: '"name": "powerxplugin-skeleton-web-admin"'
+        replace: '"name": "{{ .PluginSlug }}-web-admin"'
+      - globs: ["app/app.vue"]
+        literal: 'title: "PowerX Sample Plugin"'
+        replace: 'title: "{{ .PluginName }}"'
+      - globs: ["app/pages/_p/__plugin__/admin/index.vue"]
+        literal: "欢迎使用 PowerX Sample Plugin 插件脚手架示例页面。"
+        replace: "欢迎使用 {{ `{{ .PluginName }}` }} 插件脚手架示例页面。"
+  - name: backend
+    source: skeleton/backend
+    targets:
+      - path: scaffold/templates/backend/go-gin
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/backend/go-gin
+        suffix: .tmpl
+    include:
+      - "cmd/**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "etc/**/*"
+      - "internal/**/*"
+      - ".gitignore"
+    exclude:
+      - "**/*_test.go"
+      - "internal/**/README.md"
+    replacements:
+      - globs: ["**/*.go", "go.mod", "go.sum"]
+        regex: "github\\.com/ArtisanCloud/PowerXPlugin/skeleton/backend"
+        flags: "g"
+        replace: "{{ .BackendModulePath }}"
+      - globs: ["go.mod"]
+        literal: "module github.com/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/backend"
+        replace: "module {{ .BackendModulePath }}"
+      - globs: ["go.mod"]
+        literal: "go 1.24"
+        replace: "go {{ .GoVersion }}"
+      - globs: ["go.mod"]
+        literal: "github.com/ArtisanCloud/PowerXPlugin/framework v0.0.0"
+        replace: "github.com/ArtisanCloud/PowerXPlugin/framework {{ .FrameworkVersion }}"
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'Name: "PowerX Base Plugin"'
+        replace: 'Name: "{{ .PluginName }}"'
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'ID: "com.powerx.plugin.base"'
+        replace: 'ID: "{{ .PluginID }}"'
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'Path:  "/_p/com.powerx.plugin.base/admin/templates/intro"'
+        replace: 'Path:  "/_p/{{ .PluginID }}/admin/templates/intro"'
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'Path:  "/_p/com.powerx.plugin.base/admin/templates/crud"'
+        replace: 'Path:  "/_p/{{ .PluginID }}/admin/templates/crud"'
+      - globs: ["internal/manifestx/manifest.go.tmpl"]
+        literal: 'Name: "PowerX Base Plugin"'
+        replace: 'Name: "{{ .PluginName }}"'
+      - globs: ["internal/manifestx/manifest.go.tmpl"]
+        literal: 'ID: "com.powerx.plugin.base"'
+        replace: 'ID: "{{ .PluginID }}"'
+      - globs: ["internal/manifestx/manifest.go.tmpl"]
+        literal: 'Version: "0.1.0"'
+        replace: 'Version: "{{ .Version }}"'
+  - name: root-makefiles
+    source: skeleton
+    include:
+      - "Makefile"
+      - "make-files/**/*"
+    exclude:
+      - "make-files/**/.DS_Store"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl

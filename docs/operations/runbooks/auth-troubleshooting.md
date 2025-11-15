@@ -6,7 +6,7 @@
 | 现象 | 可能原因 | 排查步骤 |
 |------|----------|----------|
 | 登录页提示“宿主认证不可用” | `POWERX_CORE_ENDPOINT` 无法访问或 `POWERX_AUTH_TOKEN` 失效 | 查看插件日志 `auth_mode=delegated` 的错误，确认宿主 API 返回码；必要时在宿主上刷新服务 Token |
-| 登录永远 401（Local） | `PLUGIN_IAM_ADMIN_*` 未设置或密码错误 | 检查环境变量；运行 `go run ./cmd/database/main.go seed` 重新注入管理员；确认 bcrypt hash 长度 |
+| 登录永远 401（Local） | 默认管理员凭证无效（未覆盖或密码输错） | 检查环境变量；若未设置将使用 `admin@local.test` / `S3cret!!`；运行 `go run ./cmd/database/main.go seed` 重新注入管理员；确认 bcrypt hash 长度 |
 | 刷新 token 失败 | refresh token 过期或被删除 | 在 DB `iam_refresh_tokens` 表检查 `expires_at`；确保 `PLUGIN_IAM_REFRESH_TTL` 足够长 |
 | `/auth/me/context` 返回空 | 请求缺少 `Authorization` header 或本地 JWT Secret 与配置不一致 | 确认前端 `localStorage` 存在 `access_token`；检查 `context.hmac_secret` |
 

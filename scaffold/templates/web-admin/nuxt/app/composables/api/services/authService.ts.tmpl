@@ -167,32 +167,53 @@ export interface DepartmentFilters extends PaginationParams {
   search?: string;
 }
 
+type FetchOptions<TBody = any> = {
+  method?: string;
+  body?: TBody;
+  skipAuth?: boolean;
+};
+
+const normalizeBody = (body: any) => {
+  if (!body || typeof body === "string" || body instanceof FormData) {
+    return body;
+  }
+  return JSON.stringify(body);
+};
+
 export const useAuthService = () => {
-  const apiClient = useApiClient();
+  const { client } = useApiClient();
   const adminBaseUrl = "/admin"; // 添加管理员基础URL
   const baseUrl = adminBaseUrl + "/user/auth";
+
+  const request = <T>(url: string, opts: FetchOptions = {}) => {
+    const { body, ...rest } = opts;
+    return client<T>(url, {
+      ...rest,
+      body: normalizeBody(body),
+    });
+  };
 
   return {
     /**
      * 用户登录
      */
     login: (data: LoginParams) => {
-      return apiClient.post<ApiResponse<LoginResponse>>(
-        `${baseUrl}/login`,
-        data,
-        { skipAuth: true }
-      );
+      return request<ApiResponse<LoginResponse>>(`${baseUrl}/login`, {
+        method: "POST",
+        body: data,
+        skipAuth: true,
+      });
     },
 
     /**
      * 用户注册
      */
     register: (data: RegisterParams) => {
-      return apiClient.post<ApiResponse<RegisterResponse>>(
-        `${baseUrl}/register`,
-        data,
-        { skipAuth: true }
-      );
+      return request<ApiResponse<RegisterResponse>>(`${baseUrl}/register`, {
+        method: "POST",
+        body: data,
+        skipAuth: true,
+      });
     },
 
     /**
@@ -223,36 +244,41 @@ export const useAuthService = () => {
      * 用户登出
      */
     logout: (refreshToken: string) => {
-      return apiClient.post<ApiResponse<null>>(
-        `${baseUrl}/logout`,
-        { refresh_token: refreshToken },
-        { skipAuth: true }
-      );
+      return request<ApiResponse<null>>(`${baseUrl}/logout`, {
+        method: "POST",
+        body: { refresh_token: refreshToken },
+        skipAuth: true,
+      });
     },
 
     /**
      * 刷新访问令牌
      */
     refreshToken: (data: RefreshTokenParams) => {
-      return apiClient.post<ApiResponse<LoginResponse>>(
-        `${baseUrl}/refresh`,
-        { refresh_token: data.refreshToken },
-        { skipAuth: true }
-      );
+      return request<ApiResponse<LoginResponse>>(`${baseUrl}/refresh`, {
+        method: "POST",
+        body: { refresh_token: data.refreshToken },
+        skipAuth: true,
+      });
     },
 
     /**
      * 获取当前用户信息
      */
     getCurrentUser: () => {
-      return apiClient.get<ApiResponse<UserInfoResponse>>(`${baseUrl}/me`);
+      return request<ApiResponse<UserInfoResponse>>(`${baseUrl}/me`, {
+        method: "GET",
+      });
     },
 
     /**
      * 更新用户资料
      */
     updateProfile: (data: Partial<User>) => {
-      return apiClient.put<ApiResponse<User>>(`${baseUrl}/profile`, data);
+      return request<ApiResponse<User>>(`${baseUrl}/profile`, {
+        method: "PUT",
+        body: data,
+      });
     },
 
     /**

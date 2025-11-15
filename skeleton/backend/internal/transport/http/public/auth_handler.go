@@ -45,12 +45,12 @@ func RegisterAuthRoutes(group *gin.RouterGroup, deps *app.Deps) {
 		return
 	}
 	handler := NewAuthHandler(deps)
-	authGroup := group.Group("/auth")
-	authGroup.Use(middleware.RequestTrace())
-	authGroup.POST("/login", handler.Login)
-	authGroup.POST("/refresh", handler.Refresh)
-	authGroup.POST("/logout", handler.Logout)
-	authGroup.GET("/me/context", handler.MeContext)
+	adminAuth := group.Group("/admin/user/auth")
+	adminAuth.Use(middleware.RequestTrace())
+	adminAuth.POST("/login", handler.Login)
+	adminAuth.POST("/refresh", handler.Refresh)
+	adminAuth.POST("/logout", handler.Logout)
+	adminAuth.GET("/me/context", handler.MeContext)
 }
 
 // Login proxies login requests to PowerX Core.

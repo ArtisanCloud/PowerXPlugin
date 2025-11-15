@@ -68,6 +68,7 @@ export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
 export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'
 go run ./cmd/database/main.go setup
+#    上述环境变量可选；若未设置，系统会使用 admin@local.test / S3cret!! 等默认值（仅限本地环境，生产务必覆盖）
 #    如果需要单独执行，可替换为：
 #    go run ./cmd/database/main.go migrate
 #    go run ./cmd/database/main.go seed

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 definePageMeta({
-  layout: false, // 禁用layout
+  layout: "default",
+  fullBleed: true,
+  public: true,
 });
 
 const { t } = useI18n();
+const localePath = useLocalePath();
 
 // ========== 强制阅读功能开关 ==========
 // 设置为 false 可以关闭强制阅读功能，用户可以直接勾选同意
@@ -304,7 +307,6 @@ const handleRegister = async () => {
         if (countdown.value <= 0) {
           clearInterval(timer);
           // 跳转到首页
-          const localePath = useLocalePath();
           navigateTo(localePath("/"));
         }
       }, 1000);
@@ -384,15 +386,32 @@ const handleRegister = async () => {
                   name="i-heroicons-check-circle"
                   class="w-5 h-5 text-green-500"
                 />
-                <span class="text-green-800 font-semibold">注册成功！</span>
+                <span class="text-green-800 font-semibold">
+                  {{ $t("auth.registerSuccessTitle") }}
+                </span>
               </div>
             </template>
             <template #description>
               <p class="text-green-700">
-                恭喜您注册成功！{{ countdown }}秒后将自动跳转到首页...
+                {{ $t("auth.registerSuccessDesc", { seconds: countdown }) }}
               </p>
             </template>
           </UAlert>
+
+          <div v-if="success" class="text-center space-y-4">
+            <UButton :to="localePath('/')" color="primary">
+              {{ $t("auth.backToHome") }}
+            </UButton>
+            <p class="text-sm text-gray-500">
+              {{ $t("auth.hasAccount") }}
+              <NuxtLink
+                :to="localePath('/users/login')"
+                class="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {{ $t("auth.signInNow") }}
+              </NuxtLink>
+            </p>
+          </div>
 
           <form v-else @submit.prevent="handleRegister" class="space-y-5">
             <!-- 错误提示 -->
@@ -555,14 +574,14 @@ const handleRegister = async () => {
               class="text-xs text-amber-600 dark:text-amber-400 flex items-center space-x-1"
             >
               <UIcon name="i-heroicons-information-circle" class="w-4 h-4" />
-              <span>请先阅读并同意服务条款和隐私政策</span>
+              <span>{{ $t("auth.terms.mustRead") }}</span>
             </div>
             <div
               v-else-if="ENABLE_FORCED_READING && canAgree && !form.agree"
               class="text-xs text-green-600 dark:text-green-400 flex items-center space-x-1"
             >
               <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
-              <span>您已完成阅读，现在可以勾选同意</span>
+              <span>{{ $t("auth.terms.ready") }}</span>
             </div>
             <div
               v-else-if="!ENABLE_FORCED_READING"
@@ -621,7 +640,7 @@ const handleRegister = async () => {
         <header
           class="px-4 py-3 border-b shrink-0 flex justify-between items-center"
         >
-          <h3 class="text-base font-semibold">服务条款</h3>
+          <h3 class="text-base font-semibold">{{ $t("auth.termsModal.title") }}</h3>
           <UButton
             variant="ghost"
             icon="i-heroicons-x-mark"
@@ -658,7 +677,9 @@ const handleRegister = async () => {
                     "
                   >
                     {{
-                      termsScrolledToBottom ? "已阅读完整内容" : "请滚动到底部"
+                      termsScrolledToBottom
+                        ? $t("auth.reading.complete")
+                        : $t("auth.reading.scroll")
                     }}
                   </span>
                 </div>
@@ -686,8 +707,10 @@ const handleRegister = async () => {
                   >
                     {{
                       termsRemainingTime === 0
-                        ? "阅读时间充足"
-                        : `还需 ${termsRemainingTime} 秒`
+                        ? $t("auth.reading.enough")
+                        : $t("auth.reading.remainingTime", {
+                            seconds: termsRemainingTime,
+                          })
                     }}
                   </span>
                 </div>
@@ -699,7 +722,7 @@ const handleRegister = async () => {
                 class="flex items-center space-x-2 text-green-600"
               >
                 <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
-                <span class="text-sm font-medium">可以同意条款</span>
+                <span class="text-sm font-medium">{{ $t("auth.reading.readyTerms") }}</span>
               </div>
             </div>
           </div>
@@ -712,13 +735,13 @@ const handleRegister = async () => {
             variant="soft"
             :disabled="!canCloseTerms"
             @click="handleTermsAgree(false)"
-            >关闭</UButton
+            >{{ $t("common.close") }}</UButton
           >
           <UButton
             color="primary"
             :disabled="!canCloseTerms"
             @click="handleTermsAgree(true)"
-            >我已阅读并同意</UButton
+            >{{ $t("auth.modal.accept") }}</UButton
           >
         </footer>
       </template>
@@ -738,7 +761,7 @@ const handleRegister = async () => {
         <header
           class="px-4 py-3 border-b shrink-0 flex justify-between items-center"
         >
-          <h3 class="text-base font-semibold">隐私政策</h3>
+          <h3 class="text-base font-semibold">{{ $t("auth.privacyModal.title") }}</h3>
           <UButton
             variant="ghost"
             icon="i-heroicons-x-mark"
@@ -780,8 +803,8 @@ const handleRegister = async () => {
                   >
                     {{
                       privacyScrolledToBottom
-                        ? "已阅读完整内容"
-                        : "请滚动到底部"
+                        ? $t("auth.reading.complete")
+                        : $t("auth.reading.scroll")
                     }}
                   </span>
                 </div>
@@ -809,8 +832,10 @@ const handleRegister = async () => {
                   >
                     {{
                       privacyRemainingTime === 0
-                        ? "阅读时间充足"
-                        : `还需 ${privacyRemainingTime} 秒`
+                        ? $t("auth.reading.enough")
+                        : $t("auth.reading.remainingTime", {
+                            seconds: privacyRemainingTime,
+                          })
                     }}
                   </span>
                 </div>
@@ -822,7 +847,7 @@ const handleRegister = async () => {
                 class="flex items-center space-x-2 text-green-600"
               >
                 <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
-                <span class="text-sm font-medium">可以同意政策</span>
+                <span class="text-sm font-medium">{{ $t("auth.reading.readyPrivacy") }}</span>
               </div>
             </div>
           </div>
@@ -835,13 +860,13 @@ const handleRegister = async () => {
             variant="soft"
             :disabled="!canClosePrivacy"
             @click="handlePrivacyAgree(false)"
-            >关闭</UButton
+            >{{ $t("common.close") }}</UButton
           >
           <UButton
             color="primary"
             :disabled="!canClosePrivacy"
             @click="handlePrivacyAgree(true)"
-            >我已阅读并同意</UButton
+            >{{ $t("auth.modal.accept") }}</UButton
           >
         </footer>
       </template>

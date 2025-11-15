@@ -2,7 +2,9 @@
 import { useAuthService } from "~/composables/api/services/authService";
 
 definePageMeta({
-  layout: false, // 禁用layout
+  layout: "default",
+  fullBleed: true,
+  public: true,
 });
 
 const { t } = useI18n();
@@ -45,12 +47,12 @@ const handleLogin = async () => {
 
     // console.log("登录结果:", response);
 
-    if (response.code === 200) {
+    if (response.success) {
       // 保存认证信息
       setAuth(response.data);
 
       // 获取重定向URL
-      const redirectTo = (route.query.redirect as string) || "/agent";
+      const redirectTo = (route.query.redirect as string) || "/";
 
       // 登录成功后跳转
       await navigateTo(redirectTo);
@@ -210,7 +212,7 @@ onMounted(() => {
                 :loading="loading"
                 class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
-                {{ loading ? $t("auth.signingIn") : $t("login") }}
+                {{ loading ? $t("auth.signingIn") : $t("auth.loginButton") }}
               </UButton>
             </div>
           </form>

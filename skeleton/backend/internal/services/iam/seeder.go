@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -27,6 +28,14 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 		return errors.New("iam: db is nil")
 	}
 
+	const (
+		defaultTenantKey  = "px_local"
+		defaultTenantName = "Local Tenant"
+		defaultAdminEmail = "admin@local.test"
+		defaultAdminPwd   = "S3cret!!"
+		defaultAdminName  = "Local Admin"
+	)
+
 	opts := SeedOptions{
 		TenantKey:  strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_KEY")),
 		TenantName: strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_NAME")),
@@ -35,13 +44,18 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 		AdminName:  strings.TrimSpace(os.Getenv("PLUGIN_IAM_ADMIN_NAME")),
 	}
 	if opts.TenantKey == "" {
-		opts.TenantKey = "px_local"
+		opts.TenantKey = defaultTenantKey
 	}
 	if opts.TenantName == "" {
-		opts.TenantName = "Local Tenant"
+		opts.TenantName = defaultTenantName
 	}
-	if opts.AdminEmail == "" || strings.TrimSpace(opts.AdminPwd) == "" {
-		return fmt.Errorf("PLUGIN_IAM_ADMIN_EMAIL and PLUGIN_IAM_ADMIN_PASSWORD must be provided when IAM mode is local")
+	if opts.AdminEmail == "" {
+		opts.AdminEmail = defaultAdminEmail
+		log.Printf("[iam] PLUGIN_IAM_ADMIN_EMAIL not set, using default %s", opts.AdminEmail)
+	}
+	if strings.TrimSpace(opts.AdminPwd) == "" {
+		opts.AdminPwd = defaultAdminPwd
+		log.Printf("[iam] PLUGIN_IAM_ADMIN_PASSWORD not set, using default %s", opts.AdminPwd)
 	}
 	if len(opts.AdminPwd) < 6 {
 		return fmt.Errorf("PLUGIN_IAM_ADMIN_PASSWORD must be at least 6 characters")
@@ -50,7 +64,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 		if idx := strings.Index(opts.AdminEmail, "@"); idx > 0 {
 			opts.AdminName = opts.AdminEmail[:idx]
 		} else {
-			opts.AdminName = "Local Admin"
+			opts.AdminName = defaultAdminName
 		}
 	}
 

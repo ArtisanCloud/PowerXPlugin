@@ -8,7 +8,7 @@
 | Delegated (宿主) | `POWERX_PROXY=1` 或 `POWERX_RBAC_DELEGATE=true`<br>`POWERX_CORE_ENDPOINT`<br>`POWERX_AUTH_TOKEN` | 所有 `/api/v1/auth` 请求代理到宿主 `/admin/user/auth/*`，Token/组织信息完全复用 PowerX Core。宿主故障时 fail-closed。|
 | Local (Standalone) | `POWERX_PROXY=0`<br>`PLUGIN_IAM_TENANT_*`<br>`PLUGIN_IAM_ADMIN_*` | 插件自持 IAM 表（`iam_*`），`go run ./cmd/database/main.go setup` 会创建默认租户/管理员，前端通过同一 `/users/login` 页面登录。|
 
-> **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。
+> **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。
 
 ## 2. 前端 Token 生命周期
 - `useAuth` 将 `access_token`、`refresh_token`、`expires_at` 保存在 localStorage + `token` Cookie，刷新失败或宿主 503 时会调用 `failClosed()`，清空状态并在登录页展示“宿主认证不可用”提示。
@@ -40,8 +40,52 @@
 | 前端单测（`useAuth`逻辑） | `npm --prefix skeleton/web-admin run test:unit` |
 | Lint/Snapshot | `npm run lint` |
 | 模板同步 | `npm run sync:templates` |
-| Delegated E2E（需另启 `npm run dev`） | `npm --prefix skeleton/web-admin run test:e2e -- auth-delegated` |
-| Local E2E | `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local` |
+| Delegated E2E（需先启动后端/前端，见 5.1） | `npm --prefix skeleton/web-admin run test:e2e -- auth-delegated` |
+| Local E2E（需先启动后端/前端，见 5.2） | `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local` |
+
+### 5.1 Delegated Playwright 步骤
+1. **启动后端（宿主代理）**
+   ```bash
+   cd skeleton/backend
+   POWERX_PROXY=1 POWERX_RBAC_DELEGATE=true \
+   POWERX_CORE_ENDPOINT="http://localhost:8077" \
+   POWERX_AUTH_TOKEN="dev-token" \
+   go run ./cmd/plugin
+   ```
+   替换为实际宿主 Endpoint/Token；若依赖 PowerX Core，请确认 Core Dev 环境已启动。
+2. **启动前端开发服务器**
+   ```bash
+   cd skeleton/web-admin
+   npm install
+   npm run dev   # 默认 http://localhost:3031
+   ```
+3. **运行 Playwright**（另开终端）
+   ```bash
+   npm --prefix skeleton/web-admin run test:e2e -- auth-delegated
+   ```
+
+### 5.2 Local Playwright 步骤
+1. **迁移 + 启动 Local IAM**
+   ```bash
+   cd skeleton/backend
+   export POWERX_PROXY=0
+   export POWERX_RBAC_DELEGATE=false
+   export PLUGIN_IAM_TENANT_KEY=px_local
+   export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
+   export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'
+   go run ./cmd/database/main.go setup
+   go run ./cmd/plugin
+   ```
+   > 看到 `sqlite 环境仅迁移 IAM + 插件核心表，跳过 30 张业务表`、`migrate ok`、`seed ok` 即表示初始化成功。接下来保持此终端运行 `go run ./cmd/plugin` 作为本地 IAM API 服务。
+   > ⚠️ 默认 SQLite 驱动只会迁移 IAM + 插件核心表（`plugin_credentials` / `plugin_tenant_ext` / `template`），若需要 marketplace/ops 等全量表结构，请改用 Postgres。
+2. **启动前端 dev server**（同上 `npm run dev`）。
+3. **运行 Playwright**
+   ```bash
+   PLAYWRIGHT_LOCAL_IAM=1 \
+   PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \
+   PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \
+   npm --prefix skeleton/web-admin run test:e2e -- auth-local
+   ```
 
 ## 6. 性能与耗时
 | 指标 | 测量方法 | 结果（Apple M3 Pro，本地 Chromium Headless） |

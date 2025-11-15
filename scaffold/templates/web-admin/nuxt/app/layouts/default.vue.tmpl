@@ -1,5 +1,8 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+  <div v-if="disableShell" class="min-h-screen">
+    <slot />
+  </div>
+  <div v-else class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- 顶部导航栏 - 根据环境变量控制显示 -->
     <UContainer v-if="showNavigation" class="max-w-none">
       <AppNavbar />
@@ -28,6 +31,13 @@ const runtimeConfig = useRuntimeConfig();
 const route = useRoute();
 const theme = useTheme();
 
+const disableShell = computed(() => {
+  if (route.meta?.fullBleed === true) {
+    return true;
+  }
+  return route.meta?.layout === false;
+});
+
 // 是否处于 PowerX 宿主的插件嵌入路径下
 const insidePowerX = computed(() => {
   const value = runtimeConfig.public.insidePowerX;
@@ -43,7 +53,7 @@ const isEmbeddedInPowerX = computed(() => {
 
 // 控制导航显示的环境变量
 const showNavigation = computed(() => {
-  if (isEmbeddedInPowerX.value) {
+  if (disableShell.value || isEmbeddedInPowerX.value) {
     return false;
   }
 
@@ -61,6 +71,9 @@ const showNavigation = computed(() => {
 
 // 主内容区样式
 const mainContentClass = computed(() => {
+  if (disableShell.value) {
+    return "w-full";
+  }
   return showNavigation.value ? "flex-1 p-6" : "w-full p-6";
 });
 

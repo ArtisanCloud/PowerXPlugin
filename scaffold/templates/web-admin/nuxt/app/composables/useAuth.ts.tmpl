@@ -217,7 +217,7 @@ export const useAuth = () => {
       } catch (err) {
         console.warn("[useAuth] user store not available", err);
       }
-      await navigateTo("/users/login");
+      await navigateTo("/");
     }
   };
 

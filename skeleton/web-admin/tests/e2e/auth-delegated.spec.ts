@@ -22,7 +22,7 @@ const failClosedPayload = {
 
 test.describe('Delegated Auth Flow', () => {
   test('logs in and redirects when Core responds with success', async ({ page }) => {
-    await page.route('**/auth/login', async (route) => {
+    await page.route('**/admin/user/auth/login', async (route) => {
       await route.fulfill({
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -40,7 +40,7 @@ test.describe('Delegated Auth Flow', () => {
   });
 
   test('shows fail-closed error when Core is unavailable', async ({ page }) => {
-    await page.route('**/auth/login', async (route) => {
+    await page.route('**/admin/user/auth/login', async (route) => {
       await route.fulfill({
         status: 503,
         headers: { 'Content-Type': 'application/json' },
@@ -57,7 +57,7 @@ test.describe('Delegated Auth Flow', () => {
   });
 
   test('storage event logout clears token and redirects to login', async ({ page }) => {
-    await page.route('**/auth/login', async (route) => {
+    await page.route('**/admin/user/auth/login', async (route) => {
       await route.fulfill({
         status: 200,
         headers: { 'Content-Type': 'application/json' },

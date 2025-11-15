@@ -1,10 +1,17 @@
 import { useAuth } from "~/composables/useAuth";
 
+const PUBLIC_ROUTE_PREFIXES = ["/users"];
+
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (to.path.startsWith("/users")) {
+  if (!process.client) return;
+
+  if (to.meta?.public === true) {
     return;
   }
-  if (!process.client) return;
+
+  if (PUBLIC_ROUTE_PREFIXES.some((prefix) => to.path.startsWith(prefix))) {
+    return;
+  }
 
   const auth = useAuth();
   await auth.ensureFreshToken();

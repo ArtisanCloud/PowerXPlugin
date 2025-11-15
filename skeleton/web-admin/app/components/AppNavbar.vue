@@ -67,6 +67,10 @@ const logoSrc = computed(() => {
 });
 
 // 用户菜单项
+const handleLogout = async () => {
+  await auth.logout();
+};
+
 const userMenuItems = [
   [
     {
@@ -88,7 +92,7 @@ const userMenuItems = [
     {
       label: t("navigation.logout"),
       icon: "i-heroicons-arrow-right-on-rectangle",
-      click: () => logout(),
+      onSelect: () => handleLogout(),
     },
   ],
 ];
@@ -100,5 +104,5 @@ const toggleNotifications = () => {
 };
 
 // 退出登录
-const logout = () => auth.logout();
+const logout = handleLogout;
 </script>

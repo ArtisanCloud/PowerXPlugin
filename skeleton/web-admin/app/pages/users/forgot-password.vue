@@ -1,9 +1,12 @@
 <script setup lang="ts">
 definePageMeta({
-  layout: false, // 禁用layout
+  layout: "default",
+  fullBleed: true,
+  public: true,
 });
 
 const { t } = useI18n();
+const localePath = useLocalePath();
 
 // 表单数据
 const form = reactive({
@@ -19,11 +22,11 @@ const emailSent = ref(false);
 // 表单验证
 const validateForm = () => {
   if (!form.email.trim()) {
-    error.value = "请输入邮箱地址";
+    error.value = t("auth.forgot.requiredEmail");
     return false;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    error.value = "请输入有效的邮箱地址";
+    error.value = t("auth.invalidEmail");
     return false;
   }
   return true;
@@ -43,7 +46,7 @@ const handleSendResetEmail = async () => {
     emailSent.value = true;
     success.value = true;
   } catch (err) {
-    error.value = "发送重置密码邮件失败，请稍后重试";
+    error.value = t("auth.forgot.sendError");
   } finally {
     loading.value = false;
   }
@@ -81,7 +84,7 @@ const handleResendEmail = async () => {
               d="M15 19l-7-7 7-7"
             ></path>
           </svg>
-          返回登录
+          {{ $t("auth.backToLogin") }}
         </NuxtLink>
       </div>
 
@@ -96,13 +99,17 @@ const handleResendEmail = async () => {
               PowerX
             </h1>
             <h2 class="text-xl font-semibold text-gray-900 mb-2">
-              {{ emailSent ? "邮件已发送" : "重置密码" }}
+              {{
+                emailSent
+                  ? $t("auth.forgot.sentTitleShort")
+                  : $t("auth.forgot.title")
+              }}
             </h2>
             <p class="text-gray-600 text-sm">
               {{
                 emailSent
-                  ? "请检查您的邮箱并点击重置链接"
-                  : "输入您的邮箱地址，我们将发送重置密码链接"
+                  ? $t("auth.forgot.sentSubtitle")
+                  : $t("auth.forgot.subtitle")
               }}
             </p>
           </div>
@@ -127,8 +134,8 @@ const handleResendEmail = async () => {
             <UAlert
               color="success"
               variant="soft"
-              :title="'重置邮件已发送到 ' + form.email"
-              description="请检查您的邮箱（包括垃圾邮件文件夹），点击邮件中的链接重置密码。"
+              :title="$t('auth.forgot.sentTitle', { email: form.email })"
+              :description="$t('auth.forgot.sentDesc')"
               class="text-left"
             />
 
@@ -141,19 +148,25 @@ const handleResendEmail = async () => {
                 @click="handleResendEmail"
                 variant="outline"
               >
-                {{ loading ? "发送中..." : "重新发送邮件" }}
+                {{
+                  loading
+                    ? $t("auth.forgot.sending")
+                    : $t("auth.forgot.resend")
+                }}
               </UButton>
 
-              <NuxtLink :to="$localePath('/users/login')">
-                <UButton block size="lg" variant="soft"> 返回登录 </UButton>
+              <NuxtLink :to="localePath('/users/login')">
+                <UButton block size="lg" variant="soft">
+                  {{ $t("auth.backToLogin") }}
+                </UButton>
               </NuxtLink>
             </div>
 
             <!-- 提示信息 -->
             <div class="text-xs text-gray-500 space-y-2">
-              <p>• 重置链接将在24小时后过期</p>
-              <p>• 如果没有收到邮件，请检查垃圾邮件文件夹</p>
-              <p>• 确保邮箱地址输入正确</p>
+              <p>{{ $t("auth.forgot.tips.expire") }}</p>
+              <p>{{ $t("auth.forgot.tips.spam") }}</p>
+              <p>{{ $t("auth.forgot.tips.email") }}</p>
             </div>
           </div>
 
@@ -181,21 +194,22 @@ const handleResendEmail = async () => {
                 for="email"
                 class="block text-sm font-medium text-gray-700 mb-3"
               >
-                邮箱地址 <span class="text-red-500">*</span>
+                {{ $t("auth.forgot.emailLabel") }}
+                <span class="text-red-500">*</span>
               </label>
               <UInput
                 id="email"
                 name="email"
                 v-model="form.email"
                 type="email"
-                placeholder="请输入您的邮箱地址"
+                :placeholder="$t('auth.forgot.emailPlaceholder')"
                 size="lg"
                 :disabled="loading"
                 class="w-full"
                 icon="i-heroicons-envelope"
               />
               <p class="text-xs text-gray-500 mt-2">
-                我们将向此邮箱发送密码重置链接
+                {{ $t("auth.forgot.emailHint") }}
               </p>
             </div>
 
@@ -209,7 +223,11 @@ const handleResendEmail = async () => {
                 :disabled="!form.email.trim()"
                 class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
-                {{ loading ? "发送中..." : "发送重置邮件" }}
+                {{
+                  loading
+                    ? $t("auth.forgot.sending")
+                    : $t("auth.forgot.send")
+                }}
               </UButton>
             </div>
           </form>

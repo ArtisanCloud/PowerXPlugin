@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
@@ -71,6 +72,9 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 		return nil
 	}
 	tables := append([]interface{}{}, businessTables...)
+	if isSQLite(db) {
+		tables = filterSQLiteIncompatibleTables(tables)
+	}
 	if includeIAM {
 		tables = append(tables, iamTables...)
 	}
@@ -78,6 +82,40 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 		return nil
 	}
 	return db.WithContext(ctx).AutoMigrate(tables...)
+}
+
+func isSQLite(db *gorm.DB) bool {
+	if db == nil || db.Dialector == nil {
+		return false
+	}
+	return strings.EqualFold(db.Dialector.Name(), "sqlite")
+}
+
+func filterSQLiteIncompatibleTables(tables []interface{}) []interface{} {
+	filtered := make([]interface{}, 0, len(tables))
+	skipped := 0
+	for _, tbl := range tables {
+		if !isSQLiteSafeTable(tbl) {
+			skipped++
+			continue
+		}
+		filtered = append(filtered, tbl)
+	}
+	if skipped > 0 {
+		log.Printf("[migrate] sqlite 环境仅迁移 IAM + 插件核心表，跳过 %d 张业务表", skipped)
+	}
+	return filtered
+}
+
+func isSQLiteSafeTable(tbl interface{}) bool {
+	switch tbl.(type) {
+	case *models.PluginCredential,
+		*models.PluginTenantExt,
+		*templateModel.Template:
+		return true
+	default:
+		return false
+	}
 }
 
 func ResetDatabase(ctx context.Context, db *gorm.DB, cfg *config.DatabaseConfig) error {

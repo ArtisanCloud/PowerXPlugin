@@ -274,6 +274,9 @@ type ContextConfig struct {
 	Issuer   string        `yaml:"issuer" json:"issuer"`
 	Audience string        `yaml:"audience" json:"audience"`
 	TTL      time.Duration `yaml:"ttl" json:"ttl"`
+
+	// IAM 模式（可选）：delegated / local，留空按环境变量规则推断
+	IAMMode string `yaml:"iam_mode" json:"iam_mode"`
 }
 
 // Load 加载配置，优先级：YAML 文件 > 默认值（不再从环境变量覆盖）

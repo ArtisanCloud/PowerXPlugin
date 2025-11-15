@@ -21,10 +21,13 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	manifestx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/manifestx"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	recommendation "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -87,6 +90,30 @@ func main() {
 		}
 	}
 
+	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
+	logger.WithFields(logger.Fields{
+		"mode":   iamResolver.Mode(),
+		"source": iamResolver.Source(),
+	}).Info("IAM mode resolved")
+	auth.ObserveMode(iamResolver.Mode().String())
+
+	var authClient *authproxy.DelegatedClient
+	var localIAM iamservice.IAMDirectory
+	if iamResolver.Mode() == iamservice.IAMModeDelegated {
+		client, err := authproxy.NewDelegatedClient("", "")
+		if err != nil {
+			logger.WithError(err).Warn("Failed to initialize delegated auth proxy; auth endpoints will be unavailable")
+		} else {
+			authClient = client
+		}
+	} else {
+		dir, err := iamservice.NewLocalDirectory(queryDB, cfg)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize local IAM directory")
+		}
+		localIAM = dir
+	}
+
 	// 初始化 PowerX gRPC Client 客户端
 	pxc := pluginbootstrap.BootstrapGRPCClient(rootCtx, cfg.GRPCUpstream)
 
@@ -118,6 +145,10 @@ func main() {
 		LicenseCache:        licenseCache,
 		OperationsMetrics:   opsmetrics.NewMetrics(),
 		AdminConsoleMetrics: adminmetrics.NewMetrics(),
+		IAMMode:             iamResolver.Mode(),
+		IAMModeSource:       iamResolver.Source(),
+		AuthProxy:           authClient,
+		IAMDirectory:        localIAM,
 	}
 
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)

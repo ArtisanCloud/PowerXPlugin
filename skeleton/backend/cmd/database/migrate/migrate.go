@@ -2,11 +2,13 @@ package migrate
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	adminconsoleModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
+	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	marketplaceModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	operationsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
 	runtimeOpsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
@@ -16,7 +18,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var pluginTables = []interface{}{
+var businessTables = []interface{}{
 	&models.PluginCredential{},
 	&models.PluginTenantExt{},
 	&templateModel.Template{},
@@ -52,13 +54,68 @@ var pluginTables = []interface{}{
 	&adminconsoleModel.JobRun{},
 }
 
+var iamTables = []interface{}{
+	&iammodel.Tenant{},
+	&iammodel.User{},
+	&iammodel.Member{},
+	&iammodel.Role{},
+	&iammodel.Permission{},
+	&iammodel.Department{},
+	&iammodel.MemberRole{},
+	&iammodel.RolePermission{},
+	&iammodel.RefreshToken{},
+}
+
 // MigratePluginModels 只做 AutoMigrate（最小实现）
-func MigratePluginModels(ctx context.Context, db *gorm.DB) error {
-	switch db.Dialector.Name() {
-	case "sqlite", "sqlite3":
-		return db.AutoMigrate(&templateModel.Template{})
+func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) error {
+	if db == nil {
+		return nil
 	}
-	return db.AutoMigrate(pluginTables...)
+	tables := append([]interface{}{}, businessTables...)
+	if isSQLite(db) {
+		tables = filterSQLiteIncompatibleTables(tables)
+	}
+	if includeIAM {
+		tables = append(tables, iamTables...)
+	}
+	if len(tables) == 0 {
+		return nil
+	}
+	return db.WithContext(ctx).AutoMigrate(tables...)
+}
+
+func isSQLite(db *gorm.DB) bool {
+	if db == nil || db.Dialector == nil {
+		return false
+	}
+	return strings.EqualFold(db.Dialector.Name(), "sqlite")
+}
+
+func filterSQLiteIncompatibleTables(tables []interface{}) []interface{} {
+	filtered := make([]interface{}, 0, len(tables))
+	skipped := 0
+	for _, tbl := range tables {
+		if !isSQLiteSafeTable(tbl) {
+			skipped++
+			continue
+		}
+		filtered = append(filtered, tbl)
+	}
+	if skipped > 0 {
+		log.Printf("[migrate] sqlite 环境仅迁移 IAM + 插件核心表，跳过 %d 张业务表", skipped)
+	}
+	return filtered
+}
+
+func isSQLiteSafeTable(tbl interface{}) bool {
+	switch tbl.(type) {
+	case *models.PluginCredential,
+		*models.PluginTenantExt,
+		*templateModel.Template:
+		return true
+	default:
+		return false
+	}
 }
 
 func ResetDatabase(ctx context.Context, db *gorm.DB, cfg *config.DatabaseConfig) error {

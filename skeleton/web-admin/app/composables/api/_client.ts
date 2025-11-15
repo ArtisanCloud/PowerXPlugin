@@ -1,60 +1,126 @@
 // 统一创建 $fetch 实例（单例）+ 便捷方法
 
 import { resolveApiBase, getAuthToken, getTenantId } from "./_base";
+import { useAuth } from "~/composables/useAuth";
+import { useRouter, useToast } from "#imports";
 
 type Json = Record<string, any>;
 
 let _client: typeof $fetch | null = null;
 let _baseURL: string | null = null;
+let _clientEnv: "client" | "server" | null = null;
 
 export function useApiClient() {
-  if (_client) return { client: _client, baseURL: _baseURL! };
+  const env = typeof window === "undefined" ? "server" : "client";
+  if (_client && _clientEnv === env) {
+    return { client: _client, baseURL: _baseURL! };
+  }
 
   const baseURL = resolveApiBase();
+  const router = useRouter();
   _baseURL = baseURL;
 
-  const client = $fetch.create({
+  const baseClient = $fetch.create({
     baseURL,
     timeout: 30_000,
-    onRequest({ options }) {
-      const headers = (options.headers ||= {}) as Record<string, string>;
-
-      if (!("Accept" in headers)) headers["Accept"] = "application/json";
-
-      const isFormData =
-        options.body &&
-        typeof FormData !== "undefined" &&
-        options.body instanceof FormData;
-
-      if (!isFormData && !("Content-Type" in headers)) {
-        headers["Content-Type"] = "application/json";
-      }
-
-      // 鉴权
-      if (!headers["Authorization"]) {
-        const token =
-          (options as any).authToken ||
-          (options as any).token ||
-          (options as any).accessToken ||
-          getAuthToken();
-        if (token)
-          headers["Authorization"] = /^Bearer\s/i.test(String(token))
-            ? String(token)
-            : `Bearer ${token}`;
-      }
-
-      // 多租户
-      if (!headers["X-Tenant-ID"]) {
-        const tenant = (options as any).tenantId || getTenantId();
-        if (tenant) headers["X-Tenant-ID"] = String(tenant);
-      }
-    },
-    onResponseError({ response }) {
-      console.error("API error:", response.status, response._data);
-    },
   });
 
+  const prepareOptions = async (options?: Record<string, any>) => {
+    const next: Record<string, any> = options ? { ...options } : {};
+    const headers =
+      options?.headers instanceof Headers
+        ? new Headers(options.headers)
+        : new Headers((options?.headers as HeadersInit) || undefined);
+    next.headers = headers;
+    const skipAuth = Boolean((options as any)?.skipAuth);
+    const auth = useAuth();
+
+    if (!headers.has("Accept")) {
+      headers.set("Accept", "application/json");
+    }
+
+    const isFormData =
+      next.body &&
+      typeof FormData !== "undefined" &&
+      next.body instanceof FormData;
+
+    if (!isFormData && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+
+    let authToken: string | null = null;
+    if (!skipAuth) {
+      authToken = (next as any).authToken || (next as any).token;
+      if (!authToken) {
+        authToken = (await auth.ensureFreshToken()) || getAuthToken();
+      }
+    }
+
+    if (authToken && !headers.has("Authorization")) {
+      headers.set(
+        "Authorization",
+        /^Bearer\\s/i.test(String(authToken))
+          ? String(authToken)
+          : `Bearer ${authToken}`
+      );
+    }
+
+    if (!headers.has("X-Tenant-ID")) {
+      const tenant = (next as any).tenantId || getTenantId();
+      if (tenant) headers.set("X-Tenant-ID", String(tenant));
+    }
+
+    return next;
+  };
+
+  const toast = process.client ? useToast() : null;
+
+  const handleAuthError = (response?: { status?: number; _data?: any }) => {
+    if (!response) return;
+    const auth = useAuth();
+    if (response.status === 503) {
+      console.error("API error:", response.status, response._data);
+      const message = response._data?.message || "宿主认证不可用，请稍后重试";
+      auth.failClosed?.(message);
+      if (process.client) {
+        const redirect = window.location.pathname + window.location.search;
+        router?.push({ path: "/users/login", query: { redirect } });
+      }
+      return;
+    }
+    if (response.status === 401) {
+      console.error("API error:", response.status, response._data);
+      auth.clearAuth();
+      if (process.client) {
+        toast?.add?.({
+          title: "登录状态已失效",
+          description: "请重新登录后再试",
+          color: "red",
+        });
+      }
+    }
+  };
+
+  const invokeClient = async (request: any, options?: any, raw = false) => {
+    const prepared = await prepareOptions(options);
+    try {
+      return await (raw
+        ? baseClient.raw(request, prepared)
+        : baseClient(request, prepared));
+    } catch (error: any) {
+      handleAuthError(error?.response);
+      throw error;
+    }
+  };
+
+  const client = ((request: any, options?: any) =>
+    invokeClient(request, options)) as typeof baseClient;
+
+  client.raw = (request: any, options?: any) => invokeClient(request, options, true);
+  client.native = baseClient.native;
+
   _client = client;
+  _clientEnv = env;
   return { client, baseURL };
 }
 

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	authmetrics "{{ .BackendModulePath }}/internal/observability/auth"
 	secmetrics "{{ .BackendModulePath }}/internal/observability/security"
 )
 
@@ -228,6 +229,7 @@ func renderMetrics(w io.Writer) {
 		}
 	}
 
+	authmetrics.RenderMetrics(w)
 	secmetrics.RenderMetrics(w)
 }
 

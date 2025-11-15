@@ -53,9 +53,11 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useAuth } from "~/composables/useAuth";
 
 const { t } = useI18n();
 const runtimeConfig = useRuntimeConfig();
+const auth = useAuth();
 
 const logoSrc = computed(() => {
   const base = runtimeConfig.public.insidePowerX
@@ -65,6 +67,10 @@ const logoSrc = computed(() => {
 });
 
 // 用户菜单项
+const handleLogout = async () => {
+  await auth.logout();
+};
+
 const userMenuItems = [
   [
     {
@@ -86,7 +92,7 @@ const userMenuItems = [
     {
       label: t("navigation.logout"),
       icon: "i-heroicons-arrow-right-on-rectangle",
-      click: () => logout(),
+      onSelect: () => handleLogout(),
     },
   ],
 ];
@@ -98,8 +104,5 @@ const toggleNotifications = () => {
 };
 
 // 退出登录
-const logout = () => {
-  // TODO: 实现退出登录功能
-  console.log("退出登录");
-};
+const logout = handleLogout;
 </script>

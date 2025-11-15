@@ -21,6 +21,7 @@ require (
 require (
 	github.com/ArtisanCloud/PowerX/api/grpc/gen/go v0.1.0-alpha
 	github.com/stretchr/testify v1.10.0
+	golang.org/x/crypto v0.42.0
 	google.golang.org/protobuf v1.36.9
 )
 
@@ -61,7 +62,6 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	golang.org/x/arch v0.21.0 // indirect
-	golang.org/x/crypto v0.42.0 // indirect
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect

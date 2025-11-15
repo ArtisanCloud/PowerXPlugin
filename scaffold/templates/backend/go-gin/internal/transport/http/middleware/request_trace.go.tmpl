@@ -19,18 +19,25 @@ func RequestTrace() gin.HandlerFunc {
 	}
 
 	mode := requestMode()
+	iamMode := iamModeFromEnv()
 	return func(c *gin.Context) {
 		start := time.Now()
 
 		authMode, authPreview := detectAuth(c)
 		userAgent := shorten(c.GetHeader("User-Agent"), 80)
+		traceID := traceIdentifier(c)
+		tenantCtx, _ := authx.GetTenantContext(c)
 
-		log.Printf("[PLUGIN-REQ-TRACE] stage=begin mode=%s method=%s path=%s auth=%s auth.head=%s ip=%s ua=%s",
+		log.Printf("[PLUGIN-REQ-TRACE] stage=begin mode=%s iam_mode=%s method=%s path=%s auth=%s auth.head=%s tenant_id=%d user_id=%d trace=%s ip=%s ua=%s",
 			mode,
+			iamMode,
 			c.Request.Method,
 			c.Request.URL.Path,
 			authMode,
 			authPreview,
+			tenantCtx.TenantID,
+			tenantCtx.UserID,
+			traceID,
 			c.ClientIP(),
 			userAgent,
 		)
@@ -44,12 +51,16 @@ func RequestTrace() gin.HandlerFunc {
 			authMode = "bearer(validated)"
 		}
 
-		log.Printf("[PLUGIN-REQ-TRACE] stage=end mode=%s status=%d latency=%s auth=%s auth.head=%s",
+		log.Printf("[PLUGIN-REQ-TRACE] stage=end mode=%s iam_mode=%s status=%d latency=%s auth=%s auth.head=%s tenant_id=%d user_id=%d trace=%s",
 			mode,
+			iamMode,
 			status,
 			latency,
 			authMode,
 			authPreview,
+			tenantCtx.TenantID,
+			tenantCtx.UserID,
+			traceID,
 		)
 	}
 }
@@ -82,6 +93,35 @@ func detectAuth(c *gin.Context) (mode, preview string) {
 		return "signed_ctx", shorten(ctx, 40)
 	}
 	return "none", ""
+}
+
+func iamModeFromEnv() string {
+	if truthy(os.Getenv("POWERX_RBAC_DELEGATE")) || strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
+		return "delegated"
+	}
+	return "local"
+}
+
+func traceIdentifier(c *gin.Context) string {
+	if id := strings.TrimSpace(c.GetHeader("X-Request-ID")); id != "" {
+		return id
+	}
+	if id := strings.TrimSpace(c.GetHeader("Request-ID")); id != "" {
+		return id
+	}
+	if v := strings.TrimSpace(c.GetString("request_id")); v != "" {
+		return v
+	}
+	return ""
+}
+
+func truthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func shorten(raw string, keep int) string {

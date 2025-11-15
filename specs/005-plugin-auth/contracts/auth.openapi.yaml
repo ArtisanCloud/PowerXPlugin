@@ -1,0 +1,283 @@
+openapi: 3.1.0
+info:
+  title: Plugin Auth API
+  version: 0.1.0
+  description: |
+    Auth endpoints consumed by the plugin web-admin. Delegated mode proxies to PowerX Core,
+    Local mode serves from plugin IAM tables.
+servers:
+  - url: /api/v1
+paths:
+  /auth/login:
+    post:
+      summary: Login with tenant identifier + password
+      operationId: login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthError'
+  /auth/refresh:
+    post:
+      summary: Refresh access token using refresh_token
+      operationId: refresh
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Refresh successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '401':
+          description: Refresh token invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthError'
+  /auth/logout:
+    post:
+      summary: Logout current session
+      operationId: logout
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: Logout acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+  /auth/me/context:
+    get:
+      summary: Fetch user + tenant context for the active token
+      operationId: meContext
+      tags: [Auth]
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+            example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+        - in: header
+          name: X-Tenant-ID
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Context payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeContextSuccess'
+        '401':
+          description: Token invalid/expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthError'
+components:
+  schemas:
+    AuthSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AuthTokens'
+        message:
+          type: string
+          nullable: true
+      required: [success, data]
+    AuthTokens:
+      type: object
+      properties:
+        token_type:
+          type: string
+          example: Bearer
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          description: Lifetime in seconds
+        scope:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+          description: Epoch milliseconds
+      required: [token_type, access_token, expires_in, refresh_token, scope]
+    AuthError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: UNAUTHORIZED
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        message:
+          type: string
+      required: [success, error]
+    LogoutSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          properties:
+            ok:
+              type: boolean
+          required: [ok]
+      required: [success, data]
+    LoginRequest:
+      type: object
+      properties:
+        tenant:
+          type: string
+          description: Optional tenant key, blank for default
+        identifier:
+          type: string
+          description: email / phone / username (lowercase)
+        password:
+          type: string
+        remember:
+          type: boolean
+          default: false
+      required: [identifier, password]
+    RefreshRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+      required: [refresh_token]
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Delegated mode requires it to revoke Core token
+      required: [refresh_token]
+    MeContextSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/MeContext'
+      required: [success, data]
+    MeContext:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        tenant:
+          $ref: '#/components/schemas/Tenant'
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+      required: [user]
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        status:
+          type: integer
+      required: [id, email, display_name, status]
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        status:
+          type: integer
+      required: [id, key, name]
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+      required: [id, code, name]
+    Permission:
+      type: object
+      properties:
+        id:
+          type: string
+        resource:
+          type: string
+        action:
+          type: string
+        description:
+          type: string
+          nullable: true
+      required: [id, resource, action]

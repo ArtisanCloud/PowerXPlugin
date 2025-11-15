@@ -10,10 +10,19 @@ import (
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
+
+type DelegatedAuthProxy interface {
+	Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, error)
+	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
+	Logout(ctx context.Context, refreshToken string) error
+	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+}
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
@@ -27,6 +36,10 @@ type Deps struct {
 	LicenseCache        marketplacesvc.LicenseCache
 	OperationsMetrics   *opsmetrics.Metrics
 	AdminConsoleMetrics *adminmetrics.Metrics
+	IAMMode             iamservice.IAMMode
+	IAMModeSource       string
+	AuthProxy           DelegatedAuthProxy
+	IAMDirectory        iamservice.IAMDirectory
 }
 
 // RuntimeDefaults returns the configured runtime ops defaults (if any).

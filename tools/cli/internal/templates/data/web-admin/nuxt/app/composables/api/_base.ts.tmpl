@@ -28,6 +28,7 @@ export function resolveApiBase(pathname?: string): string {
 }
 
 export function getAuthToken(): string | undefined {
+  // 优先读取 localStorage，保持与宿主 Web Admin 的 useAuth 逻辑一致
   if (typeof window !== "undefined") {
     try {
       const storedToken = window.localStorage?.getItem("access_token");
@@ -39,6 +40,7 @@ export function getAuthToken(): string | undefined {
     }
   }
 
+  // 兼容旧版：仍尝试从 cookie 获取 token（例如同域 iframe 场景）
   if (typeof document !== "undefined") {
     const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
     if (match) {

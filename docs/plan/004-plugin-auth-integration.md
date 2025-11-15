@@ -37,7 +37,10 @@
 
 ### 1. Nuxt 4 前端认证基座
 - **Auth 服务抽象**：在 `skeleton/web-admin/app/composables/api/services/authService.ts` 中复刻宿主 DTO，Base URL 允许同时调用 Plugin API（默认）与宿主 Core API：  
-  - 通过 `useRuntimeConfig().public.powerxCoreBase`（新增配置）决定 Core Auth API 域名；独立模式缺省为 `.env` 中的 `POWERX_CORE_ENDPOINT`。  
+- 通过 `useRuntimeConfig().public.powerxCoreBase`（新增配置）决定 Core Auth API 域名；独立模式缺省为 `.env` 中的 `POWERX_CORE_ENDPOINT`。  
+- Local 模式新增 `LocalDirectory`，依赖 `PLUGIN_IAM_TENANT_*` 与 `PLUGIN_IAM_ADMIN_*` 在迁移/种子阶段初始化默认租户、部门、角色和权限，`/api/v1/auth/*` 会在 `POWERX_PROXY=0` 时走本地实现。
+- Token 生命周期增强：`useAuth` 监听 `storage` 事件并在 Token 丢失时强制跳转登录页，Delegated 模式 503 时前端提示“宿主认证不可用”。
+- 观测指标新增 `plugin_auth_login_total`、`plugin_auth_refresh_total`、`plugin_auth_logout_total`、`plugin_iam_mode`、`plugin_iam_delegate_errors_total`，统一通过 `/api/v1/admin/runtime/metrics` 暴露。
   - 登录、刷新、登出默认直连宿主 `/admin/user/auth/*`；`skipAuth: true` 选项保证登录前可调用。
 - **状态管理**：新增 `useAuth` composable（结构对齐 PowerX），负责：  
   - `setAuth`：写入 `access_token`、`refresh_token`、`token_type`、`expires_in`、`scope`、`expires_at` 到 `localStorage`，并同步 `token` Cookie（供 iframe/Bridge）。  
@@ -105,6 +108,8 @@
   - 新增 `plugin_iam_mode{mode="delegated|local"}` Gauge；  
   - `plugin_iam_delegate_errors_total`、`plugin_iam_local_sync_seconds` 等指标帮助定位问题；  
   - 日志中统一输出 `mode=delegated`/`mode=local` 及主要环境变量值（遮蔽 Token）。
+
+> **模式切换环境变量速记**：`POWERX_PROXY=1` 默认启用 Delegated IAM；若 `POWERX_RBAC_DELEGATE` 显式设为 truthy（`1/true/on`）也强制委托；反之在 `POWERX_PROXY!=1` 且未设置 Delegate 的场景会落入 Local IAM。`context.iam_mode`（YAML 配置）可作为最终 override。
 
 ### 4. Scaffold & CLI 同步
 - 执行 `npm run sync:templates` 将新文件同步到：  

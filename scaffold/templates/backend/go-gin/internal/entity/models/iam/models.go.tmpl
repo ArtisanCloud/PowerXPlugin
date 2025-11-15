@@ -1,0 +1,115 @@
+package iam
+
+import (
+	"time"
+
+	"{{ .BackendModulePath }}/internal/entity/models"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const (
+	StatusActive   = "active"
+	StatusDisabled = "disabled"
+)
+
+type Tenant struct {
+	ID        uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
+	Key       string         `gorm:"size:64;not null;uniqueIndex:idx_iam_tenants_key" json:"key"`
+	Name      string         `gorm:"size:128;not null" json:"name"`
+	Status    string         `gorm:"size:32;not null;default:'active'" json:"status"`
+	Plan      string         `gorm:"size:64;not null;default:'free'" json:"plan"`
+	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (Tenant) TableName() string { return models.S(models.TableIAMTenants) }
+
+type User struct {
+	ID           uint64            `gorm:"primaryKey;autoIncrement" json:"id"`
+	Email        string            `gorm:"size:255;uniqueIndex:idx_iam_users_email" json:"email"`
+	Phone        string            `gorm:"size:32;index" json:"phone"`
+	DisplayName  string            `gorm:"size:128" json:"display_name"`
+	AvatarURL    string            `gorm:"size:255" json:"avatar_url"`
+	Status       string            `gorm:"size:32;not null;default:'active'" json:"status"`
+	PasswordHash string            `gorm:"size:255;not null" json:"-"`
+	Meta         datatypes.JSONMap `gorm:"type:jsonb" json:"meta"`
+	CreatedAt    time.Time         `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt    time.Time         `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt    gorm.DeletedAt    `gorm:"index" json:"deleted_at,omitempty"`
+}
+
+func (User) TableName() string { return models.S(models.TableIAMUsers) }
+
+type Member struct {
+	models.BaseModel
+	UserID       uint64            `gorm:"not null;index" json:"user_id"`
+	Username     string            `gorm:"size:64;not null;uniqueIndex:idx_iam_member_username,priority:1" json:"username"`
+	DisplayName  string            `gorm:"size:128" json:"display_name"`
+	AvatarURL    string            `gorm:"size:255" json:"avatar_url"`
+	Status       string            `gorm:"size:32;not null;default:'active'" json:"status"`
+	DepartmentID *uint64           `gorm:"index" json:"department_id"`
+	Meta         datatypes.JSONMap `gorm:"type:jsonb" json:"meta"`
+}
+
+func (Member) TableName() string { return models.S(models.TableIAMMembers) }
+
+type Role struct {
+	models.BaseModel
+	Code        string `gorm:"size:64;not null;uniqueIndex:idx_iam_roles_code,priority:1" json:"code"`
+	Name        string `gorm:"size:128;not null" json:"name"`
+	Description string `gorm:"size:255" json:"description"`
+}
+
+func (Role) TableName() string { return models.S(models.TableIAMRoles) }
+
+type Permission struct {
+	ID          uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	Resource    string    `gorm:"size:128;not null;uniqueIndex:idx_iam_permissions_resource_action,priority:1" json:"resource"`
+	Action      string    `gorm:"size:64;not null;uniqueIndex:idx_iam_permissions_resource_action,priority:2" json:"action"`
+	Description string    `gorm:"size:255" json:"description"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (Permission) TableName() string { return models.S(models.TableIAMPermissions) }
+
+type Department struct {
+	models.BaseModel
+	Name        string  `gorm:"size:128;not null" json:"name"`
+	Code        string  `gorm:"size:64;not null;uniqueIndex:idx_iam_departments_code,priority:1" json:"code"`
+	ParentID    *uint64 `gorm:"index" json:"parent_id"`
+	Description string  `gorm:"size:255" json:"description"`
+}
+
+func (Department) TableName() string { return models.S(models.TableIAMDepartments) }
+
+type MemberRole struct {
+	MemberID  uint64    `gorm:"primaryKey" json:"member_id"`
+	RoleID    uint64    `gorm:"primaryKey" json:"role_id"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (MemberRole) TableName() string { return models.S(models.TableIAMMemberRoles) }
+
+type RolePermission struct {
+	RoleID       uint64    `gorm:"primaryKey" json:"role_id"`
+	PermissionID uint64    `gorm:"primaryKey" json:"permission_id"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (RolePermission) TableName() string { return models.S(models.TableIAMRolePermissions) }
+
+type RefreshToken struct {
+	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	TokenHash string    `gorm:"size:128;uniqueIndex" json:"token_hash"`
+	UserID    uint64    `gorm:"index" json:"user_id"`
+	TenantID  uint64    `gorm:"index" json:"tenant_id"`
+	MemberID  uint64    `gorm:"index" json:"member_id"`
+	ExpiresAt time.Time `gorm:"index" json:"expires_at"`
+	Revoked   bool      `gorm:"default:false" json:"revoked"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (RefreshToken) TableName() string { return models.S(models.TableIAMRefreshTokens) }

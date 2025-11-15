@@ -36,6 +36,95 @@
     "description": "了解 PowerX 基础模板插件，快速搭建可复用的业务模块。",
     "viewIntro": "查看介绍"
   },
+  "auth": {
+    "backToHome": "返回首页",
+    "backToLogin": "返回登录",
+    "welcomeBack": "欢迎回来",
+    "loginSubtitle": "使用 PowerX 账号登录，继续管理插件。",
+    "identifier": "邮箱或手机号",
+    "email": "邮箱地址",
+    "password": "密码",
+    "remember": "记住登录状态",
+    "required": "请填写必填信息",
+    "loginFailed": "登录失败，请检查账号或密码。",
+    "signingIn": "登录中...",
+    "loginButton": "登录",
+    "signUpNow": "立即注册",
+    "signInNow": "立即登录",
+    "createAccount": "创建账号",
+    "creatingAccount": "正在创建账号...",
+    "registerSubtitle": "设置管理员信息，解锁本地 IAM 能力。",
+    "registerFailed": "注册失败，请稍后重试。",
+    "registerSuccessTitle": "注册成功！",
+    "registerSuccessDesc": "恭喜您注册成功！{seconds} 秒后将自动跳转到首页。",
+    "invalidEmail": "请输入有效的邮箱地址",
+    "passwordTooShort": "密码至少需要 6 位字符",
+    "passwordMismatch": "两次输入的密码不一致",
+    "mustAgreeTerms": "请阅读并同意条款后继续。",
+    "agreeTerms": "我已阅读并同意",
+    "and": "以及",
+    "termsInfo": "阅读并勾选即视为同意条款，可在设置中更新偏好。",
+    "terms": {
+      "mustRead": "请先阅读并同意服务条款和隐私政策",
+      "ready": "您已完成阅读，现在可以勾选同意"
+    },
+    "passwordStrength": {
+      "weak": "弱",
+      "medium": "中",
+      "strong": "强"
+    },
+    "login": {
+      "forgotPassword": "忘记密码？",
+      "noAccount": "还没有账号？"
+    },
+    "register": {
+      "username": "用户名",
+      "confirmPassword": "确认密码"
+    },
+    "hasAccount": "已经有账号？",
+    "signInNow": "立即登录",
+    "backToLogin": "返回登录",
+    "reading": {
+      "complete": "已阅读完整内容",
+      "scroll": "请滚动到底部",
+      "enough": "阅读时间充足",
+      "remainingTime": "还需 {seconds} 秒",
+      "readyTerms": "可以同意条款",
+      "readyPrivacy": "可以同意政策"
+    },
+    "termsModal": {
+      "title": "服务条款"
+    },
+    "privacyModal": {
+      "title": "隐私政策"
+    },
+    "modal": {
+      "accept": "我已阅读并同意"
+    },
+    "forgot": {
+      "title": "重置密码",
+      "subtitle": "输入您的邮箱地址，我们将发送重置密码链接。",
+      "sentTitleShort": "邮件已发送",
+      "sentSubtitle": "请检查您的邮箱并点击重置链接。",
+      "sentTitle": "重置邮件已发送到 {email}",
+      "sentDesc": "请检查邮箱（包含垃圾邮箱），点击邮件中的链接完成密码重置。",
+      "resend": "重新发送邮件",
+      "send": "发送重置邮件",
+      "sending": "发送中...",
+      "requiredEmail": "请输入邮箱地址",
+      "sendError": "发送重置密码邮件失败，请稍后重试。",
+      "emailLabel": "邮箱地址",
+      "emailPlaceholder": "请输入您的邮箱地址",
+      "emailHint": "我们将向此邮箱发送密码重置链接。",
+      "tips": {
+        "expire": "• 重置链接将在 24 小时后过期",
+        "spam": "• 如果没有收到邮件，请检查垃圾邮件文件夹",
+        "email": "• 确保邮箱地址输入正确"
+      }
+    }
+  },
+  "termsOfService": "服务条款",
+  "privacyPolicy": "隐私政策",
   "landing": {
     "hero": {
       "title": "PowerX 基础插件",
@@ -53,6 +142,11 @@
           "title": "API 演示",
           "body": "后端提供最小实现的模板 API，可直接对接 PowerX 平台或扩展为生产级服务。"
         }
+      },
+      "ctaLogin": "体验登录",
+      "stats": {
+        "adminShell": "前端壳层",
+        "backend": "后端服务"
       }
     },
     "next": {

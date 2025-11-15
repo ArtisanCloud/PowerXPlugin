@@ -43,10 +43,25 @@ func TestBuildJWTInDevModeOptional(t *testing.T) {
 	t.Setenv("POWERX_SECURITY_JWT_SECRET", "")
 
 	jwtCfg := r.buildJWT()
-	if !jwtCfg.Optional {
-		t.Fatal("expected optional JWT when running locally in dev mode")
+	if jwtCfg.Optional {
+		t.Fatal("expected strict JWT by default even in dev mode")
 	}
 	if jwtCfg.AllowSignedContext {
 		t.Fatal("expected signed context disabled for local dev by default")
+	}
+}
+
+func TestBuildJWTOptionalOverride(t *testing.T) {
+	cfg := &config.Config{
+		Server: &config.ServerConfig{DevMode: true},
+	}
+	r := &Router{cfg: cfg}
+
+	t.Setenv("POWERX_PROXY", "0")
+	t.Setenv("POWERX_AUTH_OPTIONAL", "true")
+
+	jwtCfg := r.buildJWT()
+	if !jwtCfg.Optional {
+		t.Fatal("expected optional JWT when POWERX_AUTH_OPTIONAL=true")
 	}
 }

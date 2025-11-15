@@ -8,7 +8,7 @@
 | Delegated (宿主) | `POWERX_PROXY=1` 或 `POWERX_RBAC_DELEGATE=true`<br>`POWERX_CORE_ENDPOINT`<br>`POWERX_AUTH_TOKEN` | 所有 `/api/v1/auth` 请求代理到宿主 `/admin/user/auth/*`，Token/组织信息完全复用 PowerX Core。宿主故障时 fail-closed。|
 | Local (Standalone) | `POWERX_PROXY=0`<br>`PLUGIN_IAM_TENANT_*`<br>`PLUGIN_IAM_ADMIN_*` | 插件自持 IAM 表（`iam_*`），`go run ./cmd/database/main.go setup` 会创建默认租户/管理员，前端通过同一 `/users/login` 页面登录。|
 
-> **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。
+> **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。本地模式默认同样强制校验 Authorization Header，如需临时跳过，可设置 `POWERX_AUTH_OPTIONAL=true`。
 
 ## 2. 前端 Token 生命周期
 - `useAuth` 将 `access_token`、`refresh_token`、`expires_at` 保存在 localStorage + `token` Cookie，刷新失败或宿主 503 时会调用 `failClosed()`，清空状态并在登录页展示“宿主认证不可用”提示。

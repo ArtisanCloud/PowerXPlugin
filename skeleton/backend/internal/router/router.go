@@ -182,32 +182,64 @@ func (r *Router) buildJWT() middleware.JWTAuthConfig {
 		}
 	}
 
-	// 本地直连开发：可放宽（Optional 由配置/环境决定）
+	// 本地直连开发：默认也严格验证，可通过 POWERX_AUTH_OPTIONAL 手动放宽
 	prod := r.cfg.IsProduction()
+	optional := false
+	if v := strings.TrimSpace(os.Getenv("POWERX_AUTH_OPTIONAL")); v != "" {
+		optional = v == "1" || strings.EqualFold(v, "true")
+	} else if !prod && r.cfg.Server.DevMode {
+		optional = false
+	}
+
+	issuer := "powerx-local"
+	audiences := []string{"powerx:plugin"}
+	if ctx := r.cfg.Context; ctx != nil {
+		if v := strings.TrimSpace(ctx.Issuer); v != "" {
+			issuer = v
+		}
+		if v := strings.TrimSpace(ctx.Audience); v != "" {
+			audiences = splitAudiences(v)
+		}
+	}
+
 	cfg := middleware.JWTAuthConfig{
-		Issuer:           "powerx",
-		AcceptAudiences:  []string{"powerx:admin", "powerx:api"},
-		HMACSecret:       "", // 如需本地校验 HS256，可在 config.Context.HMACSecret 配置
-		ClockSkewSeconds: 60,
-		// 非生产环境可以 Optional=true，这样配合 DevSwitch 可免鉴权调试
-		Optional:           !prod || (r.cfg.Server.DevMode),
+		Issuer:             issuer,
+		AcceptAudiences:    audiences,
+		HMACSecret:         "", // 如需本地校验 HS256，可在 config.Context.HMACSecret 配置
+		ClockSkewSeconds:   60,
+		Optional:           optional,
 		AllowSignedContext: false, // 本地通常不走签名上下文；如要测试，置 true 并填 ContextHMACSecret
 		ContextHMACSecret:  "",
 		MaxCtxAgeSeconds:   300,
 	}
 
-	// 如果你的 config 里有上下文字段，这里做一次覆盖（可选）
-	if r.cfg.Context != nil {
-		if v := strings.TrimSpace(r.cfg.Context.HMACSecret); v != "" {
+	if ctx := r.cfg.Context; ctx != nil {
+		if v := strings.TrimSpace(ctx.HMACSecret); v != "" {
 			cfg.HMACSecret = v
-		}
-		// 若需要本地也测签名上下文，在 config.Context 里提供同一把 HMAC
-		if v := strings.TrimSpace(r.cfg.Context.HMACSecret); v != "" {
-			cfg.ContextHMACSecret = v
+			if cfg.ContextHMACSecret == "" {
+				cfg.ContextHMACSecret = v
+			}
 		}
 	}
 
 	return cfg
+}
+
+func splitAudiences(raw string) []string {
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';'
+	})
+	var cleaned []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			cleaned = append(cleaned, p)
+		}
+	}
+	if len(cleaned) == 0 {
+		return []string{strings.TrimSpace(raw)}
+	}
+	return cleaned
 }
 
 // —— 从配置构造 RBAC 配置 —— //

@@ -168,8 +168,22 @@ export const useAuth = () => {
   };
 
   const ensureFreshToken = async () => {
-    if (!refreshToken.value) return token.value;
-    if (!isTokenExpired()) return token.value;
+    if (!process.client) return token.value;
+    if (!token.value || !refreshToken.value) {
+      syncFromStorage();
+    }
+    if (!token.value) {
+      token.value = getStoredToken();
+    }
+    if (!refreshToken.value) {
+      return token.value;
+    }
+    if (!isTokenExpired()) {
+      if (!token.value) {
+        token.value = getStoredToken();
+      }
+      return token.value;
+    }
     try {
       const resp = await refresh({ refreshToken: refreshToken.value });
       if (resp.success) {

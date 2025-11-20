@@ -22,7 +22,7 @@
 3. **SSE 日志**  
    ```bash
    ./bin/px-plugin dev --logs <session-id> \
-     --dev-api http://127.0.0.1:8077 \
+     --dev-api http://127.0.0.1:8077/api/v1 \
      --logs-level debug
    ```
    若连接失败，请确认 `sessionId` 来自 `.px-plugin/sessions/*.json`，且 Dev API `GET /internal/dev/plugins/{session}` 可访问。
@@ -51,7 +51,7 @@ bash ../scripts/test/cross-platform-test.sh
 ## 4. FAQ
 
 1. **如何切换 Dev API**  
-   - 临时指定：`px-plugin dev --watch --dev-api http://10.0.0.8:8077`  
+   - 临时指定：`px-plugin dev --watch --dev-api http://10.0.0.8:8077/api/v1`  
    - 全局配置：在 `~/.px-plugin/config.json` 写入 `{"devApi":{"baseUrl":"https://dev.powerx.example"}}`
 
 2. **能否禁用 Telemetry？**  
@@ -59,7 +59,7 @@ bash ../scripts/test/cross-platform-test.sh
    - 仍会记录审计日志（本地 `.px-plugin/audit`），符合法规要求。
 
 3. **如何在离线机器调试？**  
-   - 运行 `px-plugin dev --watch --dev-api http://localhost:8077 --mtls-skip-verify` 与自签证书。  
+   - 运行 `px-plugin dev --watch --dev-api http://localhost:8077/api/v1 --mtls-skip-verify` 与自签证书。  
    - 若需完全离线，可使用 mock Dev API（`tools/cli/internal/devapi/mock_api.go`）并在测试中注入。
 
 4. **跨平台注意事项**  

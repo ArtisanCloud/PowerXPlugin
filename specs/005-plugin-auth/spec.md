@@ -59,6 +59,22 @@
 
 ---
 
+### User Story 4 - CLI Package & Publish Workflow (Priority: P2)
+
+作为插件开发者，我需要在完成本地开发后，通过 `px-plugin package` 自动构建前端/后端 artefact 并生成标准包，再使用 `px-plugin publish` 将包上传到指定的 PowerX Registry，这样宿主的 Marketplace/插件后台才能看到“待审核版本”，无需手动整理文件。
+
+**Why this priority**：现阶段 CLI 仅支持热加载，package/publish 仍是占位命令，开发者必须手动运行 `go build`、`npm run build` 并上传 artefact，效率低且容易出错。补齐发布链路可确保插件进入 Marketplace 审核流程。
+
+**Independent Test**：在带有示例插件的仓库执行 `px-plugin package --entry .`，查看 `.px-plugin/build` 下生成 `package.tar.gz`、`metadata.json`、`manifest.json` 等 artefact；随后运行 `px-plugin publish --entry . --channel dev --notes "feat"`，CLI 应向配置的 Registry（mock server）发送签名的包并返回 `publishId`。Package 成功后使用 `px-plugin doctor --check-devapi` 验证配置无误。
+
+**Acceptance Scenarios**：
+
+1. **Given** 插件仓库具有 `backend/` 与 `web-admin/`，`package.json`、`go.mod` 均可用，**When** 执行 `px-plugin package --entry .`，**Then** CLI 会依次运行 `npm --prefix web-admin run build`、`go build ./backend/cmd/plugin`、收集 manifest/RBAC/metadata，并在 `.px-plugin/build/<timestamp>/package.tar.gz` 与 `metadata.json` 中写入 artefact 列表、版本、hash；命令输出中列出 artefact 路径。
+2. **Given** `~/.px-plugin/config.json` 或环境变量中设置了 `publishApi.baseUrl`、`publishApi.apiKey`，**When** 执行 `px-plugin publish --entry . --channel beta --notes "fix"`，**Then** CLI 会上传 package、manifest、metadata 到 `POST {publishApi.baseUrl}/internal/plugins/releases`，返回 `publishId`，在 PowerX 管理后台可看到待审核版本；如 Registry 不可达或返回错误，CLI 输出 remediation 并保持幂等。
+3. **Given** 开发者尚未执行 package 或 `.px-plugin/build` 缺失 artefact，**When** 执行 publish，**Then** CLI 报错提示需先 package；若 config 中既未设置 Registry 基址也未提供 Token，则 publish 提示“缺少 publish API 配置”，并指向文档。
+
+---
+
 ### Edge Cases
 
 - Token 在后台刷新时浏览器 localStorage 不可用（Safari 隐私模式、跨 iframe 限制）如何处理？→ 需回退到 cookie 中的 `token` 或触发强制登录。
@@ -80,6 +96,8 @@
 - **FR-009**: Manifest 与 RBAC 输出必须声明插件运行所需的 IAM scope，例如 `iam.user.read`、`iam.role.read`，以便宿主在安装期提示权限需求。
 - **FR-010**: 系统必须输出认证相关指标（登录成功/失败、刷新次数、Delegated 调用错误、当前 IAM 模式 Gauge），并将关键事件写入日志（含 trace_id 与租户信息）。
 - **FR-011**: Delegated 模式下一旦 `POWERX_CORE_ENDPOINT` 无法访问或超时，登录与刷新请求必须 fail-closed——立即向用户返回“宿主认证不可用”提示并阻断继续操作，不得自动降级或复用过期 Token。
+- **FR-012**: CLI `px-plugin package` 必须运行前端/后端构建（允许 `--skip-frontend`、`--skip-backend`），生成包含 manifest/RBAC/二进制/静态资源的 `package.tar.gz`、`metadata.json`，并写入 `.px-plugin/build/<version>/`，以便 publish 使用。
+- **FR-013**: CLI `px-plugin publish` 必须读取配置中的 Registry 基址与 Token（允许 `--publish-api`、`--publish-token` 覆盖），将 package 与 metadata 上传到 PowerX Registry，并输出 `publishId`、审核链接；若 Registry 以 envelope (`{"code":...,"data":...}`) 返回，则需解析后反馈；失败需提供 remediation。
 
 ### Key Entities *(include if feature involves data)*
 

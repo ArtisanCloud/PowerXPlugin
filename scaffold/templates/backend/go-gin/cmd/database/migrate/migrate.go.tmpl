@@ -2,6 +2,8 @@ package migrate
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -15,6 +17,7 @@ import (
 	securityModel "{{ .BackendModulePath }}/internal/entity/models/security"
 	templateModel "{{ .BackendModulePath }}/internal/entity/models/template"
 	toolgrantModel "{{ .BackendModulePath }}/internal/entity/models/tool_grant"
+	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -81,7 +84,86 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 	if len(tables) == 0 {
 		return nil
 	}
-	return db.WithContext(ctx).AutoMigrate(tables...)
+	return safeAutoMigrate(ctx, db, tables)
+}
+
+func safeAutoMigrate(ctx context.Context, db *gorm.DB, tables []interface{}) error {
+	for _, tbl := range tables {
+		if err := migrateWithTolerance(ctx, db, tbl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func migrateWithTolerance(ctx context.Context, db *gorm.DB, table interface{}) error {
+	const maxRetries = 5
+	for attempts := 0; attempts < maxRetries; attempts++ {
+		if err := db.WithContext(ctx).AutoMigrate(table); err != nil {
+			handled, handleErr := tryHandleAutoMigrateError(ctx, db, table, err)
+			if !handled {
+				return err
+			}
+			if handleErr != nil {
+				return handleErr
+			}
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("auto migrate retries exceeded for %T", table)
+}
+
+func tryHandleAutoMigrateError(ctx context.Context, db *gorm.DB, table interface{}, migrateErr error) (bool, error) {
+	if !strings.EqualFold(db.Dialector.Name(), "postgres") {
+		return false, nil
+	}
+	var pgErr *pgconn.PgError
+	if !errors.As(migrateErr, &pgErr) {
+		return false, nil
+	}
+	if pgErr.Code != duplicateObjectCode {
+		return false, nil
+	}
+	if strings.TrimSpace(pgErr.ConstraintName) == "" {
+		log.Printf("[migrate] duplicate object reported without constraint name, cannot auto fix: %v", migrateErr)
+		return false, nil
+	}
+	tableName, err := resolveTableName(db, table)
+	if err != nil {
+		return true, err
+	}
+	if err := dropConstraintIfExists(ctx, db, tableName, pgErr.ConstraintName); err != nil {
+		return true, err
+	}
+	log.Printf("[migrate] dropped duplicate constraint %q on %s, retrying migrate", pgErr.ConstraintName, tableName)
+	if retryErr := db.WithContext(ctx).AutoMigrate(table); retryErr != nil {
+		return true, retryErr
+	}
+	return true, nil
+}
+
+const duplicateObjectCode = "42710"
+
+func dropConstraintIfExists(ctx context.Context, db *gorm.DB, tableName, constraintName string) error {
+	query := fmt.Sprintf(`ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s`, tableName, quoteIdentifier(constraintName))
+	return db.WithContext(ctx).Exec(query).Error
+}
+
+func resolveTableName(db *gorm.DB, table interface{}) (string, error) {
+	stmt := &gorm.Statement{DB: db}
+	if err := stmt.Parse(table); err != nil {
+		return "", err
+	}
+	if stmt.Schema == nil || stmt.Schema.Table == "" {
+		return "", fmt.Errorf("failed to resolve table name for %T", table)
+	}
+	return stmt.Schema.Table, nil
+}
+
+func quoteIdentifier(name string) string {
+	escaped := strings.ReplaceAll(name, "\"", "\"\"")
+	return fmt.Sprintf(`"%s"`, escaped)
 }
 
 func isSQLite(db *gorm.DB) bool {

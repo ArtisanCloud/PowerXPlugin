@@ -10,6 +10,37 @@
 
 ---
 
+## 快速命令一览（CLI 已支持 package/publish）
+
+1. **本地构建 artefacts**
+   ```bash
+   px-plugin package --entry .
+   ```
+   产物写入 `<plugin>/.px-plugin/build/<timestamp>/package.tar.gz`、`metadata.json`、`payload/**`，可通过 `--skip-frontend/--skip-backend` 控制构建范围。
+2. **配置 Publish API** – 任一方式均可：
+   - 在 `~/.px-plugin/config.json` 增加：
+     ```json
+     {
+       "publishApi": {
+         "baseUrl": "http://127.0.0.1:8077/api/v1",
+         "apiKey": "<registry-token>"
+       }
+     }
+     ```
+   - 或设置环境变量 `PX_PUBLISH_API_BASE`、`PX_PUBLISH_API_TOKEN`（CI/CD 友好）。
+3. **上传到当前 PowerX Registry**
+   ```bash
+   px-plugin publish \
+     --entry . \
+     --channel beta \
+     --notes "feat: 新审批流程"
+   ```
+   命令会读取最近一次 package 产物并调用 `POST {publishApi.baseUrl}/internal/plugins/releases`。成功输出 `publishId` 后，即可在 PowerX Marketplace/插件管理后台进入审核阶段。
+
+若命令提示缺少配置、证书或 artefact，按提示修复即可；不需要再手动上传 tar 包或改写宿主 `plugins/installed`。
+
+---
+
 ## 前置准备
 
 ### 1. 环境要求
@@ -80,12 +111,14 @@ openssl verify -CAfile ~/.powerx/cli/ca.crt ~/.powerx/cli/client.crt
 
 ### 5. 环境变量配置
 
-在 `~/.powerx-plugin/config.json` 或环境变量中配置：
+在 `~/.px-plugin/config.json` 或环境变量中配置：
 
 ```bash
-# Marketplace API 配置
-export PX_MARKETPLACE_API_URL="https://api.powerx.dev"
-export PX_MARKETPLACE_TOKEN="your_token_here"
+# Dev / Publish API 配置
+export PX_DEV_API_BASE="http://127.0.0.1:8077/api/v1"
+export PX_DEV_API_TOKEN="dev-api-token"
+export PX_PUBLISH_API_BASE="http://127.0.0.1:8077/api/v1"
+export PX_PUBLISH_API_TOKEN="registry-token"
 
 # 签名相关
 export PX_MARKETPLACE_PUBLIC_KEY="$(cat /path/to/marketplace-public-key.pem)"
@@ -131,13 +164,14 @@ rollbackPlan:
   previousVersion: "1.3.0"
 ```
 
-#### 6.3 CHANGELOG.md
+#### 6.3 CHANGELOG.md 与 CLI 产物
 
-Stable 渠道发布必须包含发布说明：
-- 新功能
-- 修复的问题
-- breaking changes
-- 升级指南
+Stable 渠道发布必须包含发布说明（新功能 / 修复 / Breaking Changes / 升级指南），建议同步写入 `CHANGELOG.md`。在运行 `px-plugin package` 后，可使用以下命令检查 artefact：
+
+```bash
+ls -R .px-plugin/build/latest
+jq '.' .px-plugin/build/latest/metadata.json
+```
 
 ---
 

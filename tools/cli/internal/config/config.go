@@ -18,6 +18,9 @@ type Config struct {
 	// Dev API settings
 	DevAPI DevAPIConfig `json:"devApi"`
 
+	// Publish API settings
+	PublishAPI PublishAPIConfig `json:"publishApi"`
+
 	// Dev command settings
 	Dev DevConfig `json:"dev"`
 
@@ -66,6 +69,13 @@ type DevAPIConfig struct {
 	CertPath   string `json:"certPath,omitempty"`
 	KeyPath    string `json:"keyPath,omitempty"`
 	CACertPath string `json:"caCertPath,omitempty"`
+}
+
+// PublishAPIConfig contains PowerX Registry configuration
+type PublishAPIConfig struct {
+	BaseURL string `json:"baseUrl,omitempty"`
+	APIKey  string `json:"apiKey,omitempty"`
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 // DevConfig contains dev command configuration
@@ -416,6 +426,9 @@ func DefaultConfig() *Config {
 			RetryDelay: 1,
 			EnableMTLS: false,
 		},
+		PublishAPI: PublishAPIConfig{
+			Timeout: 30,
+		},
 		Dev: DevConfig{
 			Watch:         false,
 			WatchInterval: 500,
@@ -587,6 +600,16 @@ func mergeConfigs(base, override *Config) *Config {
 		merged.Global.TempDir = override.Global.TempDir
 	}
 
+	if override.PublishAPI.BaseURL != "" {
+		merged.PublishAPI.BaseURL = override.PublishAPI.BaseURL
+	}
+	if override.PublishAPI.APIKey != "" {
+		merged.PublishAPI.APIKey = override.PublishAPI.APIKey
+	}
+	if override.PublishAPI.Timeout > 0 {
+		merged.PublishAPI.Timeout = override.PublishAPI.Timeout
+	}
+
 	// Merge other configs...
 	// (Similar pattern for other fields)
 
@@ -629,6 +652,16 @@ func validateConfig(config *Config) error {
 
 	if config.DevAPI.Retries < 0 {
 		return fmt.Errorf("DevAPI retries must be non-negative")
+	}
+
+	if config.PublishAPI.BaseURL != "" {
+		if !strings.HasPrefix(config.PublishAPI.BaseURL, "http://") &&
+			!strings.HasPrefix(config.PublishAPI.BaseURL, "https://") {
+			return fmt.Errorf("PublishAPI baseUrl must start with http:// or https://")
+		}
+	}
+	if config.PublishAPI.Timeout < 0 {
+		return fmt.Errorf("PublishAPI timeout must be non-negative")
 	}
 
 	// Validate security config

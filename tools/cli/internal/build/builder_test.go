@@ -163,6 +163,17 @@ func TestDetectProjectType(t *testing.T) {
 		t.Errorf("Expected project type 'mixed', got %q", projectType)
 	}
 
+	// Test plugin layout
+	pluginProject := filepath.Join(tmpDir, "plugin-project")
+	os.MkdirAll(filepath.Join(pluginProject, "backend"), 0o755)
+	os.MkdirAll(filepath.Join(pluginProject, "web-admin"), 0o755)
+	os.WriteFile(filepath.Join(pluginProject, "backend", "go.mod"), []byte("module plugin\n"), 0o644)
+	os.WriteFile(filepath.Join(pluginProject, "web-admin", "package.json"), []byte("{}"), 0o644)
+	projectType = detectProjectType(pluginProject)
+	if projectType != "plugin" {
+		t.Errorf("Expected project type 'plugin', got %q", projectType)
+	}
+
 	// Test unknown project
 	emptyProject := filepath.Join(tmpDir, "empty-project")
 	os.MkdirAll(emptyProject, 0755)

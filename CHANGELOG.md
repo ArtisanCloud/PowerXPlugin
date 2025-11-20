@@ -15,6 +15,9 @@
 - Skeleton Templates CRUD 栈（后端内存仓储 + 前端页面 + `useTemplateApi` 示例）并同步至 CLI 脚手架模板
 - `px-plugin init` 输出 Nuxt 项目新增 `lint` / `test:e2e` 占位脚本，便于后续扩展质量闸门
 - Go CLI 故障排查手册 `docs/guides/cli/go-cli-troubleshooting.md`，涵盖 doctor、SSE、跨平台脚本 FAQ
+- `px-plugin package` / `px-plugin publish` 完成真实构建与上传：新增 `internal/package` builder + metadata、`internal/publish` 客户端、CLI flags（`--channel`/`--artifact`/`--publish-api`），并在 smoke 流程中校验。
+- `~/.px-plugin/config.json` 支持 `publishApi.{baseUrl,apiKey}`，`docs/guides/develop/go-cli-dev-watch.md`、`docs/guides/publish/online.md`、`specs/005-plugin-auth/quickstart.md` 补充 package/publish 步骤与配置示例。
+- `tools/cli/internal/package/builder_test.go`、`tools/cli/internal/publish/client_test.go` 以及 `scripts/testing/smoke.sh` 新增测试覆盖，确保缺失 artefact/Registry 异常可检测，并在 CI 中实测 package/publish。
 
 ### Changed
 - 脚手架与 CLI Manifest 模板默认声明 `iam.user.read/iam.role.read/iam.department.read` Scope，便于宿主在安装期提示所需权限

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -96,11 +97,14 @@ func NewClient(opts ClientOptions) *DevClient {
 
 // RegisterRequest is the request for registering a dev session
 type RegisterRequest struct {
-	PluginID  string            `json:"pluginId"`
-	Version   string            `json:"version"`
-	EntryPath string            `json:"entryPath"`
-	Tenant    string            `json:"tenant,omitempty"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	PluginID     string            `json:"pluginId"`
+	Version      string            `json:"version"`
+	EntryPath    string            `json:"entryPath"`
+	Tenant       string            `json:"tenant,omitempty"`
+	TenantID     uint64            `json:"tenantId,omitempty"`
+	DeveloperID  uint64            `json:"developerId,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	Capabilities []string          `json:"capabilities,omitempty"`
 }
 
 // RegisterResponse is the response from registering a dev session
@@ -114,6 +118,7 @@ type RegisterResponse struct {
 // ReloadRequest is the request for reloading a dev session
 type ReloadRequest struct {
 	SessionID     string                 `json:"sessionId"`
+	ReloadToken   string                 `json:"reloadToken,omitempty"`
 	BundleHash    string                 `json:"bundleHash"`
 	BundleSize    int64                  `json:"bundleSize"`
 	BuildDuration int64                  `json:"buildDuration,omitempty"`
@@ -151,13 +156,57 @@ type BuildStats struct {
 	LastBuildDuration int     `json:"lastBuildDuration"`
 }
 
+// DeleteSessionsRequest requests bulk deletion.
+type DeleteSessionsRequest struct {
+	PluginID  string `json:"pluginId,omitempty"`
+	TenantID  uint64 `json:"tenantId,omitempty"`
+	Status    string `json:"status,omitempty"`
+	Force     bool   `json:"force,omitempty"`
+	Confirm   bool   `json:"confirm,omitempty"`
+	SessionID string `json:"sessionId,omitempty"`
+}
+
+// DeleteSessionsResponse contains deletion summary.
+type DeleteSessionsResponse struct {
+	Deleted    int      `json:"deleted"`
+	Force      bool     `json:"force"`
+	SessionIDs []string `json:"sessionIds"`
+}
+
+// ListSessionsFilter allows querying Dev API sessions with optional filters.
+type ListSessionsFilter struct {
+	PluginID    string
+	TenantID    uint64
+	DeveloperID uint64
+	Status      string
+	SessionID   string
+}
+
+// SessionRecord describes a session returned by the Dev API list endpoint.
+type SessionRecord struct {
+	SessionID   string    `json:"sessionId"`
+	PluginID    string    `json:"pluginId"`
+	Version     string    `json:"version"`
+	Tenant      string    `json:"tenant"`
+	TenantID    uint64    `json:"tenantId"`
+	Status      string    `json:"status"`
+	DeveloperID uint64    `json:"developerId"`
+	DevURL      string    `json:"devUrl"`
+	ReloadToken string    `json:"reloadToken"`
+	ExpiresAt   time.Time `json:"expiresAt"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	LastReload  time.Time `json:"lastReload"`
+}
+
 // Register registers a plugin for development
 func (c *DevClient) Register(ctx context.Context, req *RegisterRequest) (*RegisterResponse, error) {
 	url := fmt.Sprintf("%s/internal/dev/plugins/register", c.baseURL)
 
 	headers := map[string]string{}
-	if strings.TrimSpace(c.apiKey) != "" {
-		headers["X-API-Key"] = c.apiKey
+	if token := strings.TrimSpace(c.apiKey); token != "" {
+		headers["X-API-Key"] = token
+		headers["Authorization"] = "Bearer " + token
 	}
 
 	resp, err := c.makeRequest(ctx, http.MethodPost, url, req, headers)
@@ -166,11 +215,21 @@ func (c *DevClient) Register(ctx context.Context, req *RegisterRequest) (*Regist
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	data, err := decodeAPIData(body)
+	if err != nil {
+		return nil, err
+	}
 	var registerResp RegisterResponse
-	if err := json.NewDecoder(resp.Body).Decode(&registerResp); err != nil {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("dev api register response missing data")
+	}
+	if err := json.Unmarshal(data, &registerResp); err != nil {
 		return nil, fmt.Errorf("failed to decode register response: %w", err)
 	}
-
 	return &registerResp, nil
 }
 
@@ -193,12 +252,21 @@ func (c *DevClient) Reload(ctx context.Context, req *ReloadRequest) (*ReloadResp
 		return nil, err
 	}
 	defer resp.Body.Close()
-
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	data, err := decodeAPIData(body)
+	if err != nil {
+		return nil, err
+	}
 	var reloadResp ReloadResponse
-	if err := json.NewDecoder(resp.Body).Decode(&reloadResp); err != nil {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("dev api reload response missing data")
+	}
+	if err := json.Unmarshal(data, &reloadResp); err != nil {
 		return nil, fmt.Errorf("failed to decode reload response: %w", err)
 	}
-
 	return &reloadResp, nil
 }
 
@@ -216,12 +284,21 @@ func (c *DevClient) GetStatus(ctx context.Context, sessionID string) (*StatusRes
 		return nil, err
 	}
 	defer resp.Body.Close()
-
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	data, err := decodeAPIData(body)
+	if err != nil {
+		return nil, err
+	}
 	var statusResp StatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&statusResp); err != nil {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("dev api status response missing data")
+	}
+	if err := json.Unmarshal(data, &statusResp); err != nil {
 		return nil, fmt.Errorf("failed to decode status response: %w", err)
 	}
-
 	return &statusResp, nil
 }
 
@@ -230,17 +307,190 @@ func (c *DevClient) Delete(ctx context.Context, sessionID string) error {
 	url := fmt.Sprintf("%s/internal/dev/plugins/register/%s", c.baseURL, sessionID)
 
 	headers := map[string]string{}
-	if strings.TrimSpace(c.reloadToken) != "" {
-		headers["Authorization"] = "Bearer " + strings.TrimSpace(c.reloadToken)
+	if apiToken := strings.TrimSpace(c.apiKey); apiToken != "" {
+		headers["Authorization"] = "Bearer " + apiToken
+		headers["X-API-Key"] = apiToken
+	} else if reloadToken := strings.TrimSpace(c.reloadToken); reloadToken != "" {
+		headers["Authorization"] = "Bearer " + reloadToken
 	}
-
+	headers["Content-Type"] = "application/json"
 	resp, err := c.makeRequest(ctx, http.MethodDelete, url, nil, headers)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if _, err := decodeAPIData(body); err != nil {
+		return err
+	}
 	return nil
+}
+
+// DeleteSessions bulk deletes sessions via Dev API.
+func (c *DevClient) DeleteSessions(ctx context.Context, reqPayload *DeleteSessionsRequest) (*DeleteSessionsResponse, error) {
+	urlStr := fmt.Sprintf("%s/internal/dev/plugins/sessions", c.baseURL)
+	if reqPayload != nil {
+		values := url.Values{}
+		if reqPayload.PluginID != "" {
+			values.Set("pluginId", reqPayload.PluginID)
+		}
+		if reqPayload.TenantID != 0 {
+			values.Set("tenantId", strconv.FormatUint(reqPayload.TenantID, 10))
+		}
+		if reqPayload.Status != "" {
+			values.Set("status", reqPayload.Status)
+		}
+		if reqPayload.SessionID != "" {
+			values.Set("sessionId", reqPayload.SessionID)
+		}
+		if reqPayload.Force {
+			values.Set("force", "true")
+			if reqPayload.Confirm {
+				values.Set("confirm", "true")
+			}
+		}
+		if encoded := values.Encode(); encoded != "" {
+			urlStr = urlStr + "?" + encoded
+		}
+	}
+
+	headers := map[string]string{}
+	if apiToken := strings.TrimSpace(c.apiKey); apiToken != "" {
+		headers["Authorization"] = "Bearer " + apiToken
+		headers["X-API-Key"] = apiToken
+	} else if reloadToken := strings.TrimSpace(c.reloadToken); reloadToken != "" {
+		headers["Authorization"] = "Bearer " + reloadToken
+	}
+	if reqPayload != nil && reqPayload.Force && reqPayload.Confirm {
+		headers["X-Force-Delete"] = "true"
+	}
+
+	resp, err := c.makeRequest(ctx, http.MethodDelete, urlStr, nil, headers)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := decodeAPIData(body)
+	if err != nil {
+		return nil, err
+	}
+	var deleteResp DeleteSessionsResponse
+	if len(data) == 0 {
+		return &deleteResp, nil
+	}
+	if err := json.Unmarshal(data, &deleteResp); err != nil {
+		return nil, fmt.Errorf("failed to decode delete sessions response: %w", err)
+	}
+	return &deleteResp, nil
+}
+
+// ListSessions fetches remote Dev API sessions.
+func (c *DevClient) ListSessions(ctx context.Context, filter *ListSessionsFilter) ([]SessionRecord, error) {
+	urlStr := fmt.Sprintf("%s/internal/dev/plugins/sessions", c.baseURL)
+	if filter != nil {
+		values := url.Values{}
+		if filter.PluginID != "" {
+			values.Set("pluginId", filter.PluginID)
+		}
+		if filter.TenantID != 0 {
+			values.Set("tenantId", strconv.FormatUint(filter.TenantID, 10))
+		}
+		if filter.DeveloperID != 0 {
+			values.Set("developerId", strconv.FormatUint(filter.DeveloperID, 10))
+		}
+		if filter.Status != "" {
+			values.Set("status", filter.Status)
+		}
+		if filter.SessionID != "" {
+			values.Set("sessionId", filter.SessionID)
+		}
+		if encoded := values.Encode(); encoded != "" {
+			urlStr = urlStr + "?" + encoded
+		}
+	}
+
+	headers := map[string]string{}
+	if apiToken := strings.TrimSpace(c.apiKey); apiToken != "" {
+		headers["Authorization"] = "Bearer " + apiToken
+		headers["X-API-Key"] = apiToken
+	}
+
+	resp, err := c.makeRequest(ctx, http.MethodGet, urlStr, nil, headers)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	data, err := decodeAPIData(body)
+	if err != nil {
+		return nil, err
+	}
+	sessions, err := decodeSessionList(data)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected session list response: %s", strings.TrimSpace(string(data)))
+	}
+	return sessions, nil
+}
+
+func decodeSessionList(data []byte) ([]SessionRecord, error) {
+	var direct []SessionRecord
+	if err := json.Unmarshal(data, &direct); err == nil {
+		return direct, nil
+	}
+
+	var wrapper struct {
+		Sessions []SessionRecord `json:"sessions"`
+		Items    []SessionRecord `json:"items"`
+		Data     json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(data, &wrapper); err != nil {
+		return nil, err
+	}
+	if len(wrapper.Sessions) > 0 {
+		return wrapper.Sessions, nil
+	}
+	if len(wrapper.Items) > 0 {
+		return wrapper.Items, nil
+	}
+	if len(wrapper.Data) > 0 {
+		if sessions, err := decodeSessionList(wrapper.Data); err == nil {
+			return sessions, nil
+		}
+	}
+	return []SessionRecord{}, nil
+}
+
+type apiEnvelope struct {
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
+}
+
+func decodeAPIData(body []byte) (json.RawMessage, error) {
+	var env apiEnvelope
+	if err := json.Unmarshal(body, &env); err != nil {
+		return nil, fmt.Errorf("decode dev api envelope: %w", err)
+	}
+	if env.Code != 0 && env.Code != http.StatusOK && env.Code != http.StatusCreated {
+		msg := env.Message
+		if msg == "" {
+			msg = strings.TrimSpace(string(body))
+		}
+		return nil, fmt.Errorf("dev api error %d: %s", env.Code, msg)
+	}
+	return env.Data, nil
 }
 
 // makeRequest performs an HTTP request with authentication
@@ -314,14 +564,17 @@ func (c *DevClient) parseAPIError(status int, body []byte) *DevAPIError {
 		return nil
 	}
 
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil
+	}
+
 	var payload struct {
 		Error   string      `json:"error"`
 		Message string      `json:"message"`
 		Code    interface{} `json:"code"`
 	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return nil
-	}
+	_ = json.Unmarshal(body, &payload)
 
 	code := ""
 	switch v := payload.Code.(type) {
@@ -329,6 +582,8 @@ func (c *DevClient) parseAPIError(status int, body []byte) *DevAPIError {
 		code = v
 	case float64:
 		code = strconv.FormatInt(int64(v), 10)
+	case int:
+		code = strconv.Itoa(v)
 	}
 	if code == "" {
 		code = payload.Error
@@ -336,6 +591,17 @@ func (c *DevClient) parseAPIError(status int, body []byte) *DevAPIError {
 	message := payload.Message
 	if message == "" {
 		message = strings.TrimSpace(string(body))
+	}
+
+	details := make(map[string]interface{}, len(raw))
+	for k, v := range raw {
+		if k == "error" || k == "message" || k == "code" {
+			continue
+		}
+		var decoded interface{}
+		if err := json.Unmarshal(v, &decoded); err == nil {
+			details[k] = decoded
+		}
 	}
 
 	errType := ErrAPI
@@ -349,6 +615,8 @@ func (c *DevClient) parseAPIError(status int, body []byte) *DevAPIError {
 		Message:   message,
 		Original:  fmt.Errorf("status %d", status),
 		Retryable: status >= 500,
+		Status:    status,
+		Details:   details,
 	}
 }
 

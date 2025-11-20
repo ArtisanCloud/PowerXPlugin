@@ -4,7 +4,7 @@ import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 const pluginId = 'com.powerx.plugin.base'
 const pluginAdminBase = `/_p/${pluginId}/admin/`
 const pluginApiBase = `/_p/${pluginId}/api/v1`
-const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8087/api/v1'
+const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8078/api/v1'
 const powerxCoreBase =
   process.env.NUXT_PUBLIC_POWERX_CORE_BASE ||
   process.env.POWERX_CORE_ENDPOINT ||
@@ -159,7 +159,7 @@ export default defineNuxtConfig({
         ? {}
         : {
             '/api': {
-              target: 'http://localhost:8087',
+              target: 'http://localhost:8078',
               changeOrigin: true,
               ws: true
             },

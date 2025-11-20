@@ -157,7 +157,7 @@ cd backend
 go run ./cmd/plugin # 注意包含 ./ 指向当前目录下的 main 包
 ```
 
-CLI 模板与 Skeleton 一致，默认监听 `:8087`。可以重复使用 Step 3 的 `curl http://localhost:8087/api/v1/ping` 验证输出。
+CLI 模板与 Skeleton 一致，默认监听 `:8078`。可以重复使用 Step 3 的 `curl http://localhost:8078/api/v1/ping` 验证输出。
 
 ### 常见问题
 
@@ -213,7 +213,24 @@ px-plugin doctor --fix
 
 报告建议随同 `publish.yml`、`reports/sbom.json` 一并提交到代码评审或合规工单。
 
-## Step 9. 宿主模拟器与沙箱验证
+## Step 9. 使用 dev --watch 联调 PowerX
+
+在进入宿主模拟器或发布流程之前，建议先用 `px-plugin dev --watch` 与 PowerX Dev API 建立热加载会话，直接验证后端、前端与数据库行为。最基本的流程如下：
+
+```bash
+cd plugins/com.powerx.helloworld
+px-plugin dev --watch \
+  --entry . \
+  --tenant demo-tenant \
+  --dev-api https://dev-api.powerx.local \
+  --logs-level info
+```
+
+该命令会在 Dev API 注册 `sessionId` 并监听本地文件变更，约 250ms 内完成增量打包与热更新，可通过 `px-plugin dev --list-sessions` / `--resume` / `--stop` 管理各个会话。完整的前置条件、证书配置与常见问题请查看《docs/guides/develop/dev-watch.md》，若需要更深入的原理说明可参考发布指南中的《docs/guides/publish/go-cli-dev-watch.md》。
+
+联调完成后再继续执行宿主模拟器、沙箱或发布操作，可以显著减少环境问题带来的干扰。
+
+## Step 10. 宿主模拟器与沙箱验证
 
 完成基础开发后，可以利用 Phase 11 的链路在本地模拟宿主、执行沙箱测试并生成调试报告：
 
@@ -245,7 +262,7 @@ px-plugin doctor --fix
 
 调试完成后，可使用 `px-plugin host stop --session <id>` 释放资源。
 
-## Step 10. 第三方源码导入（可选）
+## Step 11. 第三方源码导入（可选）
 
 若需要将外部模板或客户源码导入到插件仓库，请在执行 `px-plugin init` 之后运行：
 
@@ -260,7 +277,7 @@ CLI 会读取 `config/compliance/external_source_policy.yaml`，根据域名、�
 
 > 建议将 import/doctor 报告附到变更工单，方便 Marketplace 审核人员追踪第三方源码的来源、许可证和扫描结果。
 
-## Step 11. 清理或复用工程
+## Step 12. 清理或复用工程
 
 - 不再需要时，可删除 `plugins/com.powerx.helloworld` 目录。
 - 若计划长期开发，请更新 `backend/go.mod` 的 module 名称并提交到独立仓库。

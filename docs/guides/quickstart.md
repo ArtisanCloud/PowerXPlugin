@@ -35,7 +35,7 @@
      ./bin/px-plugin dev --watch \
        --entry examples/starter/go-admin \
        --tenant demo \
-       --dev-api http://127.0.0.1:8077
+       --dev-api http://127.0.0.1:8077/api/v1
      ```  
      观察 `Initial build complete. Watching for changes...`，随后修改任意源码文件，确保终端输出 `Reload applied` 且耗时 ≤2s。  
    - 另开终端执行 `./bin/px-plugin dev --logs <session-id>`，校验 SSE 日志能实时显示 `buildSucceeded/reloadApplied`。  

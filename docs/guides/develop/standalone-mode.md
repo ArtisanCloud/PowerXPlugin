@@ -78,7 +78,7 @@ go run ./cmd/database/main.go setup
 go run ./cmd/plugin
 
 # 4. 访问健康检查
-curl http://127.0.0.1:8087/healthz
+curl http://127.0.0.1:8078/healthz
 
 # 5. 启动前端管理端（使用本地管理员登录）
 cd ../web-admin && npm install && npm run dev
@@ -93,7 +93,7 @@ npm run test:e2e -- auth-local
 
 常用调试端口：
 
-- 后端 HTTP: `8087`（可通过 `PORT` 环境变量覆盖）
+- 后端 HTTP: `8078`（可通过 `PORT` 环境变量覆盖）
 - 后端 gRPC: `8079`（通过 `POWERX_GRPC_PORT` 覆盖）
 - 管理端 Nuxt: 默认 `3031`（冲突时自动寻找可用端口）
 

@@ -23,7 +23,7 @@ echo "[R-1] Running full Go test suite"
 go test ./framework/... ./skeleton/backend/... -coverprofile=tmp/coverage-regression.out
 go tool cover -html=tmp/coverage-regression.out -o tmp/coverage.html
 
-BACKEND_PORT="${REGRESSION_BACKEND_PORT:-8087}"
+BACKEND_PORT="${REGRESSION_BACKEND_PORT:-8078}"
 BACKEND_HOST="${REGRESSION_BACKEND_HOST:-127.0.0.1}"
 BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
 API_BASE_URL="${BACKEND_BASE_URL}/api/v1"

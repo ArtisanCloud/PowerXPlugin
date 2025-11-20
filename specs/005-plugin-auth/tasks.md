@@ -100,6 +100,30 @@
 
 ---
 
+## Phase 7: CLI Packaging & Publish Enablement
+
+- [X] **T042 [CLI] 实现 `px-plugin package` 构建流程**：
+  1. 在 `tools/cli/cmd/package.go`（若不存在则新增）调用 `internal/package/builder`，解析 `--entry`、`--frontend-dir`、`--backend-dir`、`--skip-frontend`、`--skip-backend` 等参数；默认前端目录为 `<entry>/web-admin`，后端目录为 `<entry>/backend`。
+  2. 执行 `npm --prefix <frontend> run build`（可配置命令）并捕获错误信息，提示开发者先 `npm install`；执行 `go build ./backend/cmd/plugin`，输出位置 `.px-plugin/build/<timestamp>/backend/bin/plugin`。
+  3. 收集 artefact：前端 dist（支持 `dist/` 或 `.output/`）、后端二进制、`manifest.json`、`rbac.json`、静态资源、`package.json`/`package-lock.json`（可选）。若 dist/manifest/rbac 缺失则报错并给出 remediation。
+  4. 将 artefact 拷贝到 `.px-plugin/build/<timestamp>/payload/`，写入 `package.tar.gz`（tarball 结构明确：`frontend/**`、`backend/bin/plugin`、`manifest.json`、`rbac.json` 等）。打包完成后在 CLI 输出 artefact 列表和路径。
+
+- [X] **T043 [CLI] 输出 metadata/signature**：
+  1. 在 `tools/cli/internal/package/metadata.go`（或等效文件）生成 `metadata.json`，字段包含：`version`（来自 `manifest.version` 或 flag）、`channel`、`buildTime`、`cliVersion`、`gitCommit`（若可用）、`artifacts`（名称/路径/hash/size）、`distHash`（SHA256）。
+  2. 若 `manifest.json` 或 `rbac.json` 缺失，metadata builder 必须报错并提示运行 `npm run sync:manifest`；哈希计算失败时给出 remediation。
+  3. 若需要签名/校验，可预留 `--signing-key` 参数或 TODO（记录在 metadata 中 `"signature": null`）。
+  4. 编写 `tools/cli/internal/package/builder_test.go` 覆盖成功/缺失 dist/缺失 manifest 等场景，验证 metadata 内容和 hash 计算结果。
+
+- [X] **T044 [CLI] 实现 `px-plugin publish`**：
+  1. 新增 `tools/cli/cmd/publish.go`，支持 `--entry`、`--artifact <package path>`、`--channel`、`--notes`、`--publish-api`、`--publish-token`。默认从 `.px-plugin/build` 读取最新 `package.tar.gz` 和 `metadata.json`。
+  2. 解析配置：优先 flag/env（`PX_PUBLISH_API_BASE`、`PX_PUBLISH_API_TOKEN`），其次 `~/.px-plugin/config.json` 中的 `publishApi.{baseUrl,apiKey}`；若缺失则报错并指向文档。
+  3. 上传：`POST {baseUrl}/internal/plugins/releases`，Form 或 JSON 包含 package、metadata、channel、notes；解析 PowerX envelope (`{"code":...,"data":{"publishId":...}}`)，成功输出 `publishId`、审核链接；失败时根据 `code/message` 提供 remediation。
+  4. CLI 必须处理网络错误/超时，提供重试或明确提示；上传成功后提示“请到 PowerX Marketplace/插件管理审核并安装”。
+- [X] **T045 [Docs] 更新配置与指南**：在 `~/.px-plugin/config.json` schema 及样例中加入 `publishApi`，更新 `docs/guides/develop/go-cli-dev-watch.md`、`docs/guides/publish/online.md`、`specs/005-plugin-auth/quickstart.md` 以描述 package/publish 步骤、配置项、常见错误；`CHANGELOG.md` 记录 CLI 功能上线。
+- [X] **T046 [CI/QA] 增加测试**：在 `tools/cli/internal/package/builder_test.go`、`publish_client_test.go` 添加单测，验证构建/上传/错误路径；在 CI workflows 或 Makefile 中新增 smoke job（可使用 httptest mock registry）运行 `px-plugin package`、`px-plugin publish --publish-api http://127.0.0.1:XXXXX`，确保命令在无网络环境可执行。
+
+**Checkpoint**：`px-plugin package/publish` 命令可用于真实交付，文档与配置同步更新。
+
 ## Dependencies & Execution Order
 
 1. Phase 1 → Phase 2：完成基础配置后再构建 IAM 架构。

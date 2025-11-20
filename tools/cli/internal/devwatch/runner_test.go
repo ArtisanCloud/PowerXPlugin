@@ -41,6 +41,8 @@ func TestRunner_FullLifecycle(t *testing.T) {
 	runner, err := NewRunner(RunnerOptions{
 		EntryPath:   entryDir,
 		Tenant:      "tenant-a",
+		TenantID:    1,
+		DeveloperID: 1,
 		DevAPIBase:  "http://127.0.0.1:8077",
 		Manifest:    manifestData,
 		BuildDir:    filepath.Join(entryDir, ".px-plugin", "build"),
@@ -137,6 +139,8 @@ func TestRunner_BackoffAndRollbackOnReloadFailure(t *testing.T) {
 	runner, err := NewRunner(RunnerOptions{
 		EntryPath:       entryDir,
 		Tenant:          "tenant-b",
+		TenantID:        2,
+		DeveloperID:     1,
 		DevAPIBase:      "http://127.0.0.1:8077",
 		Manifest:        manifestData,
 		BuildDir:        filepath.Join(entryDir, ".px-plugin", "build"),
@@ -195,6 +199,117 @@ func TestRunner_BackoffAndRollbackOnReloadFailure(t *testing.T) {
 	}
 	if runner.backoffIndex == 0 {
 		t.Fatalf("expected backoff index increment after failure")
+	}
+}
+
+func TestRunner_ReusesExistingSession(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	entryDir := filepath.Join(t.TempDir(), "plugin-entry")
+	if err := os.MkdirAll(entryDir, 0o755); err != nil {
+		t.Fatalf("create entry dir: %v", err)
+	}
+
+	manifestData := &manifest.PluginManifest{ID: "plugin.resume", Version: "0.2.0"}
+	manifestData.Backend.Entry = "cmd/main.go"
+
+	builder := newFakeBuilder()
+	client := newMockDevAPI()
+	auditLogger := &fakeAuditLogger{}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	runner, err := NewRunner(RunnerOptions{
+		EntryPath:           entryDir,
+		Tenant:              "tenant-c",
+		TenantID:            3,
+		DeveloperID:         7,
+		DevAPIBase:          "http://127.0.0.1:8077",
+		Manifest:            manifestData,
+		BuildDir:            filepath.Join(entryDir, ".px-plugin", "build"),
+		CommandName:         "dev --resume",
+		Mode:                ModeSingle,
+		UseExistingSession:  true,
+		ExistingSessionID:   "sess-existing",
+		ExistingReloadToken: "reload-existing",
+	}, Dependencies{
+		Builder:        builder,
+		Watcher:        nil,
+		Client:         client,
+		AuditLogger:    auditLogger,
+		SessionManager: session.NewManager(),
+	})
+	if err != nil {
+		t.Fatalf("NewRunner failed: %v", err)
+	}
+
+	if err := runner.Run(ctx); err != nil {
+		t.Fatalf("runner returned error: %v", err)
+	}
+
+	if client.RegisterCount() != 0 {
+		t.Fatalf("expected register to be skipped, got %d", client.RegisterCount())
+	}
+	if client.DeleteCount() != 1 || client.LastDeletedSession() != "sess-existing" {
+		t.Fatalf("expected delete of reused session, got %d (%s)", client.DeleteCount(), client.LastDeletedSession())
+	}
+}
+
+func TestRunner_SingleRunMode(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	entryDir := filepath.Join(t.TempDir(), "plugin-entry")
+	if err := os.MkdirAll(entryDir, 0o755); err != nil {
+		t.Fatalf("create entry dir: %v", err)
+	}
+
+	manifestData := &manifest.PluginManifest{
+		ID:      "plugin.single.run",
+		Version: "0.1.0",
+	}
+	manifestData.Backend.Entry = "cmd/main.go"
+
+	builder := newFakeBuilder()
+	client := newMockDevAPI()
+	auditLogger := &fakeAuditLogger{}
+
+	runner, err := NewRunner(RunnerOptions{
+		EntryPath:   entryDir,
+		Tenant:      "tenant-c",
+		TenantID:    3,
+		DeveloperID: 2,
+		DevAPIBase:  "http://127.0.0.1:8077",
+		Manifest:    manifestData,
+		BuildDir:    filepath.Join(entryDir, ".px-plugin", "build"),
+		CommandName: "dev",
+		Mode:        ModeSingle,
+	}, Dependencies{
+		Builder:        builder,
+		Watcher:        nil,
+		Client:         client,
+		AuditLogger:    auditLogger,
+		SessionManager: session.NewManager(),
+	})
+	if err != nil {
+		t.Fatalf("NewRunner failed: %v", err)
+	}
+
+	if err := runner.Run(context.Background()); err != nil {
+		t.Fatalf("runner returned error: %v", err)
+	}
+
+	if client.RegisterCount() != 1 {
+		t.Fatalf("expected 1 register call, got %d", client.RegisterCount())
+	}
+	if client.ReloadCount() != 1 {
+		t.Fatalf("expected 1 reload call, got %d", client.ReloadCount())
+	}
+	if client.DeleteCount() != 1 {
+		t.Fatalf("expected 1 delete call, got %d", client.DeleteCount())
+	}
+	strategies := builder.Strategies()
+	if len(strategies) != 1 || strategies[0] != build.StrategyFull {
+		t.Fatalf("expected single full build, got %+v", strategies)
 	}
 }
 
@@ -434,6 +549,10 @@ func (m *mockDevAPI) FailNextReloads(count int, err error) {
 	defer m.mu.Unlock()
 	m.reloadFailCount = count
 	m.reloadFailErr = err
+}
+
+func (m *mockDevAPI) ListSessions(ctx context.Context, filter *devapi.ListSessionsFilter) ([]devapi.SessionRecord, error) {
+	return []devapi.SessionRecord{}, nil
 }
 
 type fakeAuditLogger struct {

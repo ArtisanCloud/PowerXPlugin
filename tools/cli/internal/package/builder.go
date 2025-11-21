@@ -573,9 +573,13 @@ func defaultFrontendBuild(ctx context.Context, opts *Options) error {
 }
 
 func defaultBackendBuild(ctx context.Context, opts *Options, outputPath string) error {
-	args := []string{"build", "-o", outputPath, "./backend/cmd/plugin"}
+	backendDir := opts.BackendDir
+	if backendDir == "" {
+		backendDir = filepath.Join(opts.EntryPath, "backend")
+	}
+	args := []string{"build", "-o", outputPath, "./cmd/plugin"}
 	cmd := exec.CommandContext(ctx, "go", args...)
-	cmd.Dir = opts.EntryPath
+	cmd.Dir = backendDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

@@ -122,6 +122,8 @@
 - [X] **T045 [Docs] 更新配置与指南**：在 `~/.px-plugin/config.json` schema 及样例中加入 `publishApi`，更新 `docs/guides/develop/go-cli-dev-watch.md`、`docs/guides/publish/online.md`、`specs/005-plugin-auth/quickstart.md` 以描述 package/publish 步骤、配置项、常见错误；`CHANGELOG.md` 记录 CLI 功能上线。
 - [X] **T046 [CI/QA] 增加测试**：在 `tools/cli/internal/package/builder_test.go`、`publish_client_test.go` 添加单测，验证构建/上传/错误路径；在 CI workflows 或 Makefile 中新增 smoke job（可使用 httptest mock registry）运行 `px-plugin package`、`px-plugin publish --publish-api http://127.0.0.1:XXXXX`，确保命令在无网络环境可执行。
 
+- [X] **T047 [CLI] init 附带治理目录**：`px-plugin init` 在生成插件工程时，同时将仓库根目录的 `.specify/` 与 `.codex/` 复制到新插件项目根目录（若目标已存在则跳过或加 `--include-governance` flag 控制）；并在 README 或初始化输出中提示这些目录主要用于 Speckit/ Codex 自动化，允许用户根据需要删除/调整路径。
+
 **Checkpoint**：`px-plugin package/publish` 命令可用于真实交付，文档与配置同步更新。
 
 ## Dependencies & Execution Order

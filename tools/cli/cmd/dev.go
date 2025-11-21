@@ -241,6 +241,15 @@ func runDevAuthSetup(opts *DevOptions) error {
 	}
 	if token != "" {
 		cfg.DevAPI.APIKey = token
+		if cfg.PublishAPI.APIKey == "" {
+			cfg.PublishAPI.APIKey = token
+		}
+	}
+	if cfg.PublishAPI.BaseURL == "" {
+		cfg.PublishAPI.BaseURL = devAPIBase
+	}
+	if cfg.PublishAPI.Timeout == 0 {
+		cfg.PublishAPI.Timeout = 30
 	}
 
 	defaultIgnore := []string{".git/**", "node_modules/**", ".nuxt/**", ".output/**", ".px-plugin/**"}

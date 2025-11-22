@@ -103,6 +103,8 @@ npm run test:e2e -- auth-local
 >
 > 也可以将 `runtime.run_migrate` 设为 `true` 或在启动命令前加 `POWERX_RUN_MIGRATE=true`，这样服务启动时会自动运行迁移。种子数据仍需手动执行 `go run ./cmd/database/main.go seed`。
 
+> SQLite 下默认只迁移“核心/安全”表，目的是避免功能依赖与 FK/RLS 兼容性问题，方便做 IAM/启动层的最小验证。已经将 RSS 表加入白名单，本地可跑 RSS。若要开发完整业务，建议切到 Postgres（默认迁所有表，更接近上线），或者按需扩白名单再在 SQLite 上重跑 `go run ./cmd/database/main.go setup`。
+
 > 默认导航栏左上角引用 `public/images/logo-s.png`。如果要替换 Logo，可在生成项目的 `public/images` 目录中用同名文件覆盖，或调整 `app/components/AppNavbar.vue` 中的 `<img>` 引用。
 
 ## 4. 扩展点示例：新增模板审批接口

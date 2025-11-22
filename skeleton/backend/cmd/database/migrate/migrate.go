@@ -100,6 +100,16 @@ func migrateWithTolerance(ctx context.Context, db *gorm.DB, table interface{}) e
 	const maxRetries = 5
 	for attempts := 0; attempts < maxRetries; attempts++ {
 		if err := db.WithContext(ctx).AutoMigrate(table); err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == duplicateObjectCode {
+				log.Printf("[migrate] duplicate constraint for %T, skipping: %s", table, pgErr.ConstraintName)
+				return nil
+			}
+			// 部分包装错误解析不到 pgErr，但文本包含 already exists/constraint，直接跳过以保证幂等
+			if strings.Contains(err.Error(), "already exists") && strings.Contains(err.Error(), "constraint") {
+				log.Printf("[migrate] duplicate constraint (fallback) for %T, skipping: %v", table, err)
+				return nil
+			}
 			handled, handleErr := tryHandleAutoMigrateError(ctx, db, table, err)
 			if !handled {
 				return err
@@ -146,7 +156,8 @@ func tryHandleAutoMigrateError(ctx context.Context, db *gorm.DB, table interface
 const duplicateObjectCode = "42710"
 
 func dropConstraintIfExists(ctx context.Context, db *gorm.DB, tableName, constraintName string) error {
-	query := fmt.Sprintf(`ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s`, tableName, quoteIdentifier(constraintName))
+	clean := sanitizeConstraintName(constraintName)
+	query := fmt.Sprintf(`ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s`, tableName, quoteIdentifier(clean))
 	return db.WithContext(ctx).Exec(query).Error
 }
 
@@ -164,6 +175,17 @@ func resolveTableName(db *gorm.DB, table interface{}) (string, error) {
 func quoteIdentifier(name string) string {
 	escaped := strings.ReplaceAll(name, "\"", "\"\"")
 	return fmt.Sprintf(`"%s"`, escaped)
+}
+
+// sanitizeConstraintName strips surrounding quotes and schema prefixes that may appear in pg error messages.
+func sanitizeConstraintName(name string) string {
+	trimmed := strings.Trim(name, `"`)
+	// drop all quotes that may be embedded (fk_"public"_foo)
+	trimmed = strings.ReplaceAll(trimmed, `"`, "")
+	// remove schema prefix like public_ or public__
+	trimmed = strings.TrimPrefix(trimmed, `public_`)
+	trimmed = strings.ReplaceAll(trimmed, `public__`, ``)
+	return trimmed
 }
 
 func isSQLite(db *gorm.DB) bool {

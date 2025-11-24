@@ -107,6 +107,7 @@
 2. 执行：
    ```bash
    px-plugin publish \
+     --tenant <tenant-uuid> \
      --entry . \
      --channel dev \
      --notes "feat: 支持新的审批流"

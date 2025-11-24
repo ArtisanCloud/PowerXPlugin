@@ -32,10 +32,12 @@
    ```bash
    px-plugin publish \
      --entry . \
+     --tenant <tenant-uuid> \
      --channel beta \
      --notes "feat: 新审批流程"
    ```
-   命令会读取最近一次 package 产物并调用 `POST {publishApi.baseUrl}/internal/plugins/releases`。成功输出 `publishId` 后，即可在 PowerX Marketplace/插件管理后台进入审核阶段。
+   - `--tenant` 为必填，传租户 UUID（例如本地 dev tenant）。
+   - 命令会读取最近一次 package 产物并调用 `POST {publishApi.baseUrl}/internal/plugins/releases`。成功输出 `publishId` 后，即可在 PowerX Marketplace/插件管理后台进入审核阶段。
 
 若命令提示缺少配置、证书或 artefact，按提示修复即可；不需要再手动上传 tar 包或改写宿主 `plugins/installed`。
 

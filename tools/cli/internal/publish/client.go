@@ -6,10 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -31,15 +28,17 @@ type Client struct {
 
 // SubmitRequest describes a publish submission.
 type SubmitRequest struct {
-	PluginID     string
-	Version      string
-	Channel      string
-	Notes        string
-	PackagePath  string
-	MetadataPath string
-	ManifestPath string
-	RBACPath     string
-	CLIVersion   string
+	TenantUUID      string            `json:"tenantUuid"`
+	PluginID        string            `json:"pluginId"`
+	Version         string            `json:"version"`
+	Channel         string            `json:"channel"`
+	ReleaseNotes    string            `json:"releaseNotes,omitempty"`
+	BuildArtifact   string            `json:"buildArtifactUri"`
+	CommitHash      string            `json:"commitHash,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+	Metadata        map[string]string `json:"metadata,omitempty"`
+	ApprovalContext string            `json:"approvalContext,omitempty"`
+	CLIVersion      string            `json:"cliVersion,omitempty"`
 }
 
 // SubmitResponse contains registry response details.
@@ -78,14 +77,8 @@ func (c *Client) Submit(ctx context.Context, req *SubmitRequest) (*SubmitRespons
 	if req == nil {
 		return nil, fmt.Errorf("publish request is required")
 	}
-	if req.PackagePath == "" {
-		return nil, fmt.Errorf("package path is required")
-	}
-	if req.MetadataPath == "" {
-		return nil, fmt.Errorf("metadata path is required")
-	}
-	if req.ManifestPath == "" {
-		return nil, fmt.Errorf("manifest path is required")
+	if req.TenantUUID == "" {
+		return nil, fmt.Errorf("tenant UUID is required")
 	}
 	if req.PluginID == "" {
 		return nil, fmt.Errorf("plugin ID is required")
@@ -96,50 +89,13 @@ func (c *Client) Submit(ctx context.Context, req *SubmitRequest) (*SubmitRespons
 	if req.Channel == "" {
 		return nil, fmt.Errorf("channel is required (use --channel)")
 	}
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	writeField := func(key, value string) error {
-		if value == "" {
-			return nil
-		}
-		return writer.WriteField(key, value)
+	if req.BuildArtifact == "" {
+		return nil, fmt.Errorf("buildArtifactUri is required")
 	}
 
-	if err := writeField("pluginId", req.PluginID); err != nil {
-		return nil, err
-	}
-	if err := writeField("version", req.Version); err != nil {
-		return nil, err
-	}
-	if err := writeField("channel", req.Channel); err != nil {
-		return nil, err
-	}
-	if err := writeField("notes", req.Notes); err != nil {
-		return nil, err
-	}
-	if err := writeField("cliVersion", req.CLIVersion); err != nil {
-		return nil, err
-	}
-
-	if err := addFilePart(writer, "package", req.PackagePath); err != nil {
-		return nil, err
-	}
-	if err := addFilePart(writer, "metadata", req.MetadataPath); err != nil {
-		return nil, err
-	}
-	if err := addFilePart(writer, "manifest", req.ManifestPath); err != nil {
-		return nil, err
-	}
-	if req.RBACPath != "" {
-		if err := addFilePart(writer, "rbac", req.RBACPath); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := writer.Close(); err != nil {
-		return nil, err
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("encode publish payload: %w", err)
 	}
 
 	endpoint := c.baseURL + "/internal/plugins/releases"
@@ -147,11 +103,11 @@ func (c *Client) Submit(ctx context.Context, req *SubmitRequest) (*SubmitRespons
 		ctx = context.Background()
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return nil, fmt.Errorf("create publish request: %w", err)
 	}
-	httpReq.Header.Set("Content-Type", writer.FormDataContentType())
+	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
 	if ua := buildUserAgent(req.CLIVersion); ua != "" {
 		httpReq.Header.Set("User-Agent", ua)
@@ -180,39 +136,27 @@ func (c *Client) Submit(ctx context.Context, req *SubmitRequest) (*SubmitRespons
 		return nil, fmt.Errorf("decode publish response: %w", err)
 	}
 
-	if envelope.Code != 0 && envelope.Code != 200 {
+	if envelope.Code != 0 && envelope.Code != 200 && envelope.Code != 201 {
 		if envelope.Message == "" {
 			envelope.Message = "registry returned non-success code"
 		}
 		return nil, fmt.Errorf("publish failed (code %d): %s", envelope.Code, envelope.Message)
 	}
-	if envelope.Data.PublishID == "" {
-		return nil, fmt.Errorf("publish response missing publishId")
+
+	pubID := envelope.Data.PublishID
+	if pubID == "" {
+		pubID = envelope.Data.CandidateID
+	}
+	if pubID == "" {
+		return nil, fmt.Errorf("publish response missing publishId/candidateId")
 	}
 
 	return &SubmitResponse{
-		PublishID: envelope.Data.PublishID,
+		PublishID: pubID,
 		ReviewURL: envelope.Data.ReviewURL,
 		Status:    envelope.Data.Status,
 		Message:   envelope.Message,
 	}, nil
-}
-
-func addFilePart(writer *multipart.Writer, fieldName, path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("open %s: %w", path, err)
-	}
-	defer file.Close()
-
-	part, err := writer.CreateFormFile(fieldName, filepath.Base(path))
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(part, file); err != nil {
-		return fmt.Errorf("stream %s: %w", path, err)
-	}
-	return nil
 }
 
 func buildUserAgent(version string) string {
@@ -234,8 +178,9 @@ type registryResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    struct {
-		PublishID string `json:"publishId"`
-		ReviewURL string `json:"reviewUrl"`
-		Status    string `json:"status"`
+		PublishID   string `json:"publishId"`
+		CandidateID string `json:"candidateId"`
+		ReviewURL   string `json:"reviewUrl"`
+		Status      string `json:"status"`
 	} `json:"data"`
 }

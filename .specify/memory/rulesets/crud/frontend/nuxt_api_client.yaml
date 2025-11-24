@@ -22,5 +22,13 @@ client:
           item: "TemplateItem"
           create: "TemplateCreateReq"
           update: "TemplateUpdateReq"
+  usage:
+    import: |
+      import { apiGet, apiPost, apiPatch, apiPut, apiDel, useApiClient } from "~/composables/api";
+    notes:
+      - 不要直接调用 $fetch；统一用 apiGet/apiPost/apiPatch/apiPut/apiDel 以附带认证/租户头并获得一致的错误处理。
+      - apiGet(path, query?, init?) / apiPost(path, body?, init?) 语义同 $fetch，body 默认自动 JSON.stringify，FormData 保持原样。
+      - useApiClient() 暴露 client/baseURL，如需底层访问请使用 client.raw。
+      - 页面/组件不要直接调用 apiGet/apiPost；按域封装 useXXX 组合式函数（参考 web-admin/app/composables/api/useTemplate.ts、useRss.ts），在 ~/composables/api/index.ts 暴露入口，统一类型/字段规范。
 
 gates.require: [PG-FE-API-001]

@@ -7,12 +7,12 @@ i18n:
     - { code: "en", file: "en.json" }
     - { code: "zh", file: "zh.json" }
   files:
-    - target: web-admin/i18n/en.json
+    - target: web-admin/i18n/locales/en.json
       template: builtin/i18n_dict_minimal
       params:
         entries:
           templates: { title: "Templates", create: "Create", edit: "Edit", delete: "Delete", detail: "Detail" }
-    - target: web-admin/i18n/zh.json
+    - target: web-admin/i18n/locales/zh.json
       template: builtin/i18n_dict_minimal
       params:
         entries:

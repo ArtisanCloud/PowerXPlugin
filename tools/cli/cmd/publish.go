@@ -6,9 +6,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/powerx-plugin/cli/internal/config"
@@ -25,6 +27,8 @@ type publishFlags struct {
 	RBAC         string
 	Channel      string
 	Notes        string
+	TenantUUID   string
+	Approval     string
 	PublishAPI   string
 	PublishToken string
 	Timeout      int
@@ -42,6 +46,8 @@ func runPublish(args []string) error {
 	fs.StringVar(&flags.RBAC, "rbac", "", "Path to rbac.json (optional)")
 	fs.StringVar(&flags.Channel, "channel", "", "Release channel (default: metadata.channel or dev)")
 	fs.StringVar(&flags.Notes, "notes", "", "Release notes / description")
+	fs.StringVar(&flags.TenantUUID, "tenant", "", "Tenant UUID (required)")
+	fs.StringVar(&flags.Approval, "approval-context", "", "Approval context, e.g. ci/manual")
 	fs.StringVar(&flags.PublishAPI, "publish-api", "", "Override Publish API base URL")
 	fs.StringVar(&flags.PublishToken, "publish-token", "", "Override Publish API token")
 	fs.IntVar(&flags.Timeout, "timeout", 60, "Publish HTTP timeout in seconds")
@@ -112,6 +118,9 @@ func runPublish(args []string) error {
 	if err := ensureFileExists(flags.Manifest, "manifest.json", "run 'px-plugin package' first"); err != nil {
 		return err
 	}
+	if flags.TenantUUID == "" {
+		return fmt.Errorf("tenant UUID is required (use --tenant)")
+	}
 
 	meta, err := readMetadata(flags.Metadata)
 	if err != nil {
@@ -129,8 +138,8 @@ func runPublish(args []string) error {
 		return fmt.Errorf("load plugin manifest: %w", err)
 	}
 
-	fmt.Printf("Publishing package\n  Entry: %s\n  Plugin: %s@%s\n  Channel: %s\n  Registry: %s\n  Artifact: %s\n",
-		entryPath, pluginManifest.ID, pluginManifest.Version, flags.Channel, baseURL, flags.Artifact)
+	fmt.Printf("Publishing package\n  Entry: %s\n  Plugin: %s@%s\n  Channel: %s\n  Registry: %s\n  Artifact: %s\n  Tenant: %s\n",
+		entryPath, pluginManifest.ID, pluginManifest.Version, flags.Channel, baseURL, flags.Artifact, flags.TenantUUID)
 
 	client, err := publish.NewClient(publish.Options{
 		BaseURL:  baseURL,
@@ -144,16 +153,36 @@ func runPublish(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(flags.Timeout)*time.Second)
 	defer cancel()
 
+	artifactURI, err := fileURI(flags.Artifact)
+	if err != nil {
+		return fmt.Errorf("resolve artifact URI: %w", err)
+	}
+
+	md := metadataToStrings(meta)
+	if flags.Channel != "" {
+		if md == nil {
+			md = map[string]string{}
+		}
+		md["channel"] = flags.Channel
+	}
+
+	labels := map[string]string{}
+	if flags.Channel != "" {
+		labels["channel"] = flags.Channel
+	}
+
 	resp, err := client.Submit(ctx, &publish.SubmitRequest{
-		PluginID:     pluginManifest.ID,
-		Version:      pluginManifest.Version,
-		Channel:      flags.Channel,
-		Notes:        flags.Notes,
-		PackagePath:  flags.Artifact,
-		MetadataPath: flags.Metadata,
-		ManifestPath: flags.Manifest,
-		RBACPath:     flags.RBAC,
-		CLIVersion:   Version,
+		TenantUUID:      flags.TenantUUID,
+		PluginID:        pluginManifest.ID,
+		Version:         pluginManifest.Version,
+		Channel:         flags.Channel,
+		ReleaseNotes:    flags.Notes,
+		BuildArtifact:   artifactURI,
+		CommitHash:      meta.GitCommit,
+		Labels:          labels,
+		Metadata:        md,
+		ApprovalContext: flags.Approval,
+		CLIVersion:      Version,
 	})
 	if err != nil {
 		return err
@@ -233,4 +262,39 @@ func readMetadata(path string) (*packagepkg.Metadata, error) {
 		return nil, fmt.Errorf("decode metadata: %w", err)
 	}
 	return &meta, nil
+}
+
+func metadataToStrings(meta *packagepkg.Metadata) map[string]string {
+	if meta == nil {
+		return nil
+	}
+	out := map[string]string{}
+	if meta.GitCommit != "" {
+		out["gitCommit"] = meta.GitCommit
+	}
+	if meta.DistHash != "" {
+		out["distHash"] = meta.DistHash
+	}
+	if meta.CLIVersion != "" {
+		out["cliVersion"] = meta.CLIVersion
+	}
+	if !meta.BuildTime.IsZero() {
+		out["builtAt"] = meta.BuildTime.UTC().Format(time.RFC3339)
+	}
+	return out
+}
+
+func fileURI(p string) (string, error) {
+	if strings.TrimSpace(p) == "" {
+		return "", fmt.Errorf("empty path")
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return "", err
+	}
+	u := url.URL{
+		Scheme: "file",
+		Path:   filepath.ToSlash(abs),
+	}
+	return u.String(), nil
 }

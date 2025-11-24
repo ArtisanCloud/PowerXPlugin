@@ -112,6 +112,11 @@ func migrateWithTolerance(ctx context.Context, db *gorm.DB, table interface{}) e
 			}
 			handled, handleErr := tryHandleAutoMigrateError(ctx, db, table, err)
 			if !handled {
+				// 兜底：即便未被处理但仍是 42710，也不让迁移失败
+				if errors.As(err, &pgErr) && pgErr.Code == duplicateObjectCode {
+					log.Printf("[migrate] duplicate constraint (post-handle) for %T, skipping: %v", table, err)
+					return nil
+				}
 				return err
 			}
 			if handleErr != nil {

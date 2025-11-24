@@ -42,9 +42,11 @@ type Result struct {
 	PayloadDir        string
 	PackagePath       string
 	MetadataPath      string
+	PluginYAMLPath    string
 	ManifestPath      string
 	RBACPath          string
 	BackendBinaryPath string
+	MigrateBinaryPath string
 	FrontendPath      string
 	Artifacts         []Artifact
 	DistHash          string
@@ -178,13 +180,14 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	}
 
 	result := &Result{
-		BuildID:      buildID,
-		BuildDir:     buildDir,
-		PayloadDir:   payloadDir,
-		ManifestPath: filepath.Join(payloadDir, "manifest.json"),
-		RBACPath:     filepath.Join(payloadDir, "rbac.json"),
-		MetadataPath: filepath.Join(buildDir, "metadata.json"),
-		PackagePath:  filepath.Join(buildDir, "package.tar.gz"),
+		BuildID:        buildID,
+		BuildDir:       buildDir,
+		PayloadDir:     payloadDir,
+		PluginYAMLPath: filepath.Join(payloadDir, "plugin.yaml"),
+		ManifestPath:   filepath.Join(payloadDir, "manifest.json"),
+		RBACPath:       filepath.Join(payloadDir, "rbac.json"),
+		MetadataPath:   filepath.Join(buildDir, "metadata.json"),
+		PackagePath:    filepath.Join(buildDir, "package.tar.gz"),
 	}
 
 	var artifacts []Artifact
@@ -223,35 +226,68 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 		if err := ensureFileExists(filepath.Join(opts.BackendDir, "go.mod"), "backend go.mod", "run 'go mod tidy' inside backend"); err != nil {
 			return nil, err
 		}
-		binaryName := "plugin"
-		if runtime.GOOS == "windows" {
-			binaryName += ".exe"
-		}
-		buildBinary := filepath.Join(buildDir, "backend", "bin", binaryName)
-		if err := os.MkdirAll(filepath.Dir(buildBinary), 0o755); err != nil {
-			return nil, fmt.Errorf("create backend build dir: %w", err)
-		}
-		if err := b.backendBuilder(ctx, opts, buildBinary); err != nil {
-			return nil, fmt.Errorf("backend build failed: %w", err)
-		}
-
-		result.BackendBinaryPath = filepath.Join(payloadDir, "backend", "bin", binaryName)
-		if err := os.MkdirAll(filepath.Dir(result.BackendBinaryPath), 0o755); err != nil {
-			return nil, fmt.Errorf("create backend payload dir: %w", err)
-		}
-		if _, err := copyFile(buildBinary, result.BackendBinaryPath); err != nil {
-			return nil, fmt.Errorf("copy backend binary: %w", err)
-		}
-		hash, size, err := hashFile(result.BackendBinaryPath)
+		cmdDir := filepath.Join(opts.BackendDir, "cmd")
+		cmdEntries, err := os.ReadDir(cmdDir)
 		if err != nil {
-			return nil, fmt.Errorf("hash backend binary: %w", err)
+			return nil, fmt.Errorf("list backend/cmd: %w", err)
 		}
-		artifacts = append(artifacts, Artifact{
-			Name: "backend/bin/" + filepath.Base(result.BackendBinaryPath),
-			Path: rel(result.BackendBinaryPath, buildDir),
-			Size: size,
-			Hash: hash,
-		})
+		for _, entry := range cmdEntries {
+			if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			name := entry.Name()
+			outputName := name
+			if name == "database" {
+				outputName = "migrate" // 安装端历史期望的二进制名
+			}
+			if runtime.GOOS == "windows" {
+				outputName += ".exe"
+				if name == "database" {
+					name += ".exe"
+				}
+			}
+			buildBinary := filepath.Join(buildDir, "backend", "bin", outputName)
+			if err := os.MkdirAll(filepath.Dir(buildBinary), 0o755); err != nil {
+				return nil, fmt.Errorf("create backend build dir: %w", err)
+			}
+			target := "./cmd/" + name
+			if err := buildBackendCommand(ctx, opts, target, buildBinary); err != nil {
+				return nil, fmt.Errorf("build backend cmd %s: %w", entry.Name(), err)
+			}
+
+			payloadNames := []string{outputName}
+			if outputName != entry.Name() {
+				payloadNames = append(payloadNames, entry.Name())
+			}
+
+			for _, outName := range payloadNames {
+				payloadPath := filepath.Join(payloadDir, "backend", "bin", outName)
+				if err := os.MkdirAll(filepath.Dir(payloadPath), 0o755); err != nil {
+					return nil, fmt.Errorf("create backend payload dir: %w", err)
+				}
+				if _, err := copyFile(buildBinary, payloadPath); err != nil {
+					return nil, fmt.Errorf("copy backend binary %s: %w", outName, err)
+				}
+				hash, size, err := hashFile(payloadPath)
+				if err != nil {
+					return nil, fmt.Errorf("hash backend binary %s: %w", outName, err)
+				}
+				artifacts = append(artifacts, Artifact{
+					Name: "backend/bin/" + filepath.Base(payloadPath),
+					Path: rel(payloadPath, buildDir),
+					Size: size,
+					Hash: hash,
+				})
+
+				base := strings.TrimSuffix(outName, ".exe")
+				if base == "plugin" {
+					result.BackendBinaryPath = payloadPath
+				}
+				if base == "migrate" || base == "database" {
+					result.MigrateBinaryPath = payloadPath
+				}
+			}
+		}
 	}
 
 	if _, err := copyFile(opts.ManifestPath, result.ManifestPath); err != nil {
@@ -259,6 +295,13 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 	}
 	if _, err := copyFile(opts.RBACPath, result.RBACPath); err != nil {
 		return nil, fmt.Errorf("copy rbac.json: %w", err)
+	}
+	pluginYAML := filepath.Join(opts.EntryPath, "plugin.yaml")
+	if err := ensureFileExists(pluginYAML, "plugin.yaml", "ensure plugin.yaml exists in project root"); err != nil {
+		return nil, err
+	}
+	if _, err := copyFile(pluginYAML, result.PluginYAMLPath); err != nil {
+		return nil, fmt.Errorf("copy plugin.yaml: %w", err)
 	}
 
 	if hash, size, err := hashFile(result.ManifestPath); err == nil {
@@ -281,6 +324,16 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 		})
 	} else {
 		return nil, fmt.Errorf("hash rbac.json: %w", err)
+	}
+	if hash, size, err := hashFile(result.PluginYAMLPath); err == nil {
+		artifacts = append(artifacts, Artifact{
+			Name: "plugin.yaml",
+			Path: rel(result.PluginYAMLPath, buildDir),
+			Size: size,
+			Hash: hash,
+		})
+	} else {
+		return nil, fmt.Errorf("hash plugin.yaml: %w", err)
 	}
 
 	metaDir := filepath.Join(payloadDir, "meta")
@@ -578,6 +631,19 @@ func defaultBackendBuild(ctx context.Context, opts *Options, outputPath string) 
 		backendDir = filepath.Join(opts.EntryPath, "backend")
 	}
 	args := []string{"build", "-o", outputPath, "./cmd/plugin"}
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = backendDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func buildBackendCommand(ctx context.Context, opts *Options, target, outputPath string) error {
+	backendDir := opts.BackendDir
+	if backendDir == "" {
+		backendDir = filepath.Join(opts.EntryPath, "backend")
+	}
+	args := []string{"build", "-o", outputPath, target}
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = backendDir
 	cmd.Stdout = os.Stdout

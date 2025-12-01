@@ -61,6 +61,7 @@ mappings:
     exclude:
       - "**/*_test.go"
       - "internal/**/README.md"
+      - "etc/config.yaml"
     replacements:
       - globs: ["**/*.go", "go.mod", "go.sum"]
         regex: "github\\.com/ArtisanCloud/PowerXPlugin/skeleton/backend"

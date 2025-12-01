@@ -9,6 +9,7 @@ mappings:
     include:
       - "app/**/*"
       - "public/**/*"
+      - ".env.example"
       - "i18n/**/*"
       - "nuxt.config.ts"
       - "package.json"
@@ -58,6 +59,7 @@ mappings:
       - "etc/**/*"
       - "internal/**/*"
       - ".gitignore"
+      - ".env.example"
     exclude:
       - "**/*_test.go"
       - "internal/**/README.md"
@@ -101,6 +103,7 @@ mappings:
     source: skeleton
     include:
       - "Makefile"
+      - ".gitignore"
       - "make-files/**/*"
     exclude:
       - "make-files/**/.DS_Store"

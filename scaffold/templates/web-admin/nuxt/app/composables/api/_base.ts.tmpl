@@ -1,6 +1,15 @@
 // 解析 API 基址 + 获取 Token/Tenant 的小工具
 
 export function resolveApiBase(pathname?: string): string {
+  const runtimePublic =
+    (typeof useRuntimeConfig === "function"
+      ? (useRuntimeConfig() as any)?.public
+      : undefined) ?? (globalThis as any).__NUXT__?.config?.public;
+
+  if (runtimePublic?.apiBaseUrl) {
+    return runtimePublic.apiBaseUrl;
+  }
+
   const p =
     pathname ??
     (typeof window !== "undefined" ? window.location.pathname : "") ??
@@ -17,14 +26,7 @@ export function resolveApiBase(pathname?: string): string {
     }
   }
 
-  // 兜底：runtimeConfig.public.apiBaseUrl
-  const cfg =
-    (globalThis as any).__NUXT__?.config?.public ??
-    (typeof useRuntimeConfig === "function"
-      ? (useRuntimeConfig() as any).public
-      : undefined);
-
-  return cfg?.apiBaseUrl || "http://localhost:8078/api/v1";
+  return "http://localhost:8078/api/v1";
 }
 
 export function getAuthToken(): string | undefined {

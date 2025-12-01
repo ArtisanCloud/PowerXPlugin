@@ -1,4 +1,5 @@
 import { getCurrentScope, onScopeDispose } from "vue";
+import { useRuntimeConfig } from "#imports";
 import type { LoginResponse } from "~/composables/api/services/authService";
 import { useAuthService } from "~/composables/api/services/authService";
 
@@ -104,6 +105,10 @@ const safeLocalStorage = {
 };
 
 export const useAuth = () => {
+  const runtimeConfig = useRuntimeConfig();
+  // Standalone 模式下宿主/脚手架可能只广播 access token（无 refresh token），允许继续维持会话。
+  const allowRefreshlessSession = runtimeConfig.public?.insidePowerX !== true;
+
   const isAuthenticated = useState("auth.isAuthenticated", () => false);
   const user = useState("auth.user", () => null);
   const token = useState<Nullable<string>>("auth.token", () => null);
@@ -197,9 +202,14 @@ export const useAuth = () => {
     const storedToken = getStoredToken();
     const storedRefresh = safeLocalStorage.getItem("refresh_token");
     const storedExpires = safeLocalStorage.getItem("expires_at");
-    if (storedToken && storedRefresh && storedExpires) {
-      token.value = storedToken;
-      refreshToken.value = storedRefresh;
+    const hasTokenAndExpiry = Boolean(storedToken && storedExpires);
+    const hasRefresh = Boolean(storedRefresh);
+    const canRestoreSession =
+      hasTokenAndExpiry && (hasRefresh || allowRefreshlessSession);
+
+    if (canRestoreSession) {
+      token.value = storedToken!;
+      refreshToken.value = hasRefresh ? storedRefresh : null;
       expiresAt.value = Number(storedExpires);
       isAuthenticated.value = !isTokenExpired();
     } else {

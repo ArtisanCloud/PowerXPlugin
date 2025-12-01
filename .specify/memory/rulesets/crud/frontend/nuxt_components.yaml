@@ -48,6 +48,8 @@ nuxt_ui:
       inputs:
         useModelValue: true
         textareaRowsDefault: 3
+        notes:
+          - Nuxt UI 3 中不存在 `UFormGroup`，请使用 `UFormField` 包裹输入项
     buttons:
       cancel:
         color: neutral

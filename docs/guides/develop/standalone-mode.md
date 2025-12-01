@@ -97,6 +97,36 @@ npm run test:e2e -- auth-local
 - 后端 gRPC: `8079`（通过 `POWERX_GRPC_PORT` 覆盖）
 - 管理端 Nuxt: 默认 `3031`（冲突时自动寻找可用端口）
 
+### 3.1 模拟 `_p/<plugin-id>/admin` 访问
+
+要在本地复刻宿主 iframe（`/_p/<plugin-id>/admin/**`），目前推荐直接让 Nuxt 以 `_p` 为基准运行。Skeleton 的 Go 进程不会自动把 `/_p/**` 代理到前端，因此如果没有外部反代，就必须在 Nuxt 启动参数里切换到“宿主模式”。
+
+1. **前端开启宿主模式**：启动 dev server 前设置 `POWERX_PROXY=1`（或 `NUXT_PUBLIC_INSIDE_POWERX=1`）。Nuxt 会将 `app.baseURL` 与 `runtimeConfig.public.pluginAdminBase` 设为 `/_p/<plugin-id>/admin/`。为了避免本地 Dev Server 将 `_p/<plugin-id>/api` 当成静态路由，`runtimeConfig.public.apiBaseUrl` 会在开发模式下自动退回到 `/_p/<plugin-id>/api/v1`，从而始终命中 Vite 的代理。
+2. **补齐 Vite 代理（已在 `skeleton/web-admin/nuxt.config.ts` 内置）**：配置依赖以下环境变量，便于在需要时修改目标地址：
+   - `NUXT_DEV_API_PROXY`：HTTP 代理目标（默认 `http://localhost:8078`）
+   - `NUXT_DEV_WS_PROXY`：WebSocket 代理目标（默认 `ws://127.0.0.1:4000`）
+
+   对应配置代码如下，`/_p/${pluginId}/api` 的条目仅在 `POWERX_PROXY=1` 时注入：
+   ```ts
+   const pluginId = 'com.powerx.plugin.base'
+   const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
+   const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:4000'
+
+   const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
+   const devProxy: Record<string, any> = {
+     '/api': { target: devApiProxyTarget, changeOrigin: true, ws: true },
+     '/ws': { target: devWsProxyTarget, changeOrigin: true, ws: true }
+   }
+   if (INSIDE_POWERX) {
+     devProxy[`/_p/${pluginId}/api`] = { target: devApiProxyTarget, changeOrigin: true }
+   }
+   ```
+   如此前端直接访问 `http://localhost:3031/_p/com.powerx.plugin.base/admin/templates/crud` 时，所有 API 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
+   同时在宿主模式下会自动关闭 Nuxt `appManifest`，避免 `manifest-route-rule` 在 `_p` 前缀下无法匹配路由而抛错。
+3. **后端保持默认**：`POWERX_PROXY=0 go run ./cmd/plugin`，只需暴露 `/api/v1/**`。由于前端代理会把 `/_p/...` 请求映射回本地接口，后端无需额外改动。
+
+配置完上述环境后，直接访问 `http://localhost:3031/_p/<plugin-id>/admin/...` 即可模拟宿主 iframe，Bridge/CTX/主题等行为与宿主一致。
+
 > `skeleton/backend/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
 >
 > Loader 在解析 SQLite DSN 时会自动创建目标目录，无需手动 `mkdir`。如果路径中包含 `../.cache`，会基于配置文件目录进行展开。

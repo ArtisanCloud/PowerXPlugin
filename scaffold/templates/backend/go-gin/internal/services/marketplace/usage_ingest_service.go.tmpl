@@ -171,7 +171,7 @@ func (s *UsageIngestService) buildEnvelope(tenantID string, input UsageEnvelopeI
 
 	checksum := dbm.ComputeUsageChecksum(tenantID, licenseID, signature, metrics, start, end)
 	envelope := &dbm.UsageEnvelope{
-		TenantUuid:       tenantID,
+		TenantUuid:     tenantID,
 		LicenseID:      licenseID,
 		PluginID:       pluginID,
 		TimestampStart: start,

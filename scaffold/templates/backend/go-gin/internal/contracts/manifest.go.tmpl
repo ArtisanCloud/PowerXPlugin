@@ -272,9 +272,9 @@ type PluginStatus struct {
 
 // PluginConfig 插件配置实例
 type PluginConfig struct {
-	PluginID  string                 `json:"plugin_id"`
-	TenantUuid  string                 `json:"tenant_uuid,omitempty"`
-	Config    map[string]interface{} `json:"config"`
-	Enabled   bool                   `json:"enabled"`
-	UpdatedAt time.Time              `json:"updated_at"`
+	PluginID   string                 `json:"plugin_id"`
+	TenantUuid string                 `json:"tenant_uuid,omitempty"`
+	Config     map[string]interface{} `json:"config"`
+	Enabled    bool                   `json:"enabled"`
+	UpdatedAt  time.Time              `json:"updated_at"`
 }

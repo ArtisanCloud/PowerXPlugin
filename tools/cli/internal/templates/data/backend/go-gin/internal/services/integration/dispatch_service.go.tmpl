@@ -168,7 +168,7 @@ func (s *DispatchService) handleIdempotencyClaim(
 
 	record := &domain.IdempotencyRecord{
 		Key:         key,
-		TenantUuid:    envelope.TenantUuid,
+		TenantUuid:  envelope.TenantUuid,
 		Scope:       envelope.ToolScope,
 		Operation:   fmt.Sprintf("%s:%s", channel, normalizeResource(resource)),
 		PayloadHash: hashPayloadRef(envelope.PayloadRef),
@@ -194,7 +194,7 @@ func (s *DispatchService) handleIdempotencyClaim(
 		}
 		s.logger.WithFields(logrus.Fields{
 			"idempotency_key": envelope.IdempotencyKey,
-			"tenant_uuid":       envelope.TenantUuid,
+			"tenant_uuid":     envelope.TenantUuid,
 			"tool_scope":      envelope.ToolScope,
 			"channel":         channel,
 		}).Info("integration dispatch replayed from idempotency record")

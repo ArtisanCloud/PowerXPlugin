@@ -23,14 +23,14 @@ func NewMCPSessionRepository(db *gorm.DB) *MCPSessionRepository {
 
 // Create inserts a session record, ensuring tenant scope consistency.
 func (r *MCPSessionRepository) Create(ctx context.Context, session *model.MCPSession) (*model.MCPSession, error) {
-	tenantUUID, err := authx.RequireTenantUUID(ctx)
+	tenantID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	if session.TenantUuid == "" {
-		session.TenantUuid = tenantUUID
-	} else if session.TenantUuid != tenantUUID {
+		session.TenantUuid = tenantID
+	} else if session.TenantUuid != tenantID {
 		return nil, gorm.ErrInvalidData
 	}
 
@@ -39,14 +39,14 @@ func (r *MCPSessionRepository) Create(ctx context.Context, session *model.MCPSes
 
 // UpdateFields updates session fields while enforcing tenant filter.
 func (r *MCPSessionRepository) UpdateFields(ctx context.Context, id string, fields map[string]interface{}) (*model.MCPSession, error) {
-	tenantUUID, err := authx.RequireTenantUUID(ctx)
+	tenantID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	updated, err := r.BaseRepository.Patch(ctx, map[string]interface{}{
 		"id":          id,
-		"tenant_uuid": tenantUUID,
+		"tenant_uuid": tenantID,
 	}, fields)
 	if err != nil {
 		return nil, err

@@ -1,13 +1,19 @@
 <template>
   <div class="space-y-6">
     <header class="space-y-2">
-      <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <div
+        class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+      >
         <UIcon name="i-heroicons-command-line" class="text-primary" />
         <span class="uppercase tracking-wide">Dev Console</span>
       </div>
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">配置与治理</h1>
-        <p class="text-sm text-gray-600 dark:text-gray-300">管理 Dev Console 的默认参数、导出策略和安全操作。</p>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+          配置与治理
+        </h1>
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+          管理 Dev Console 的默认参数、导出策略和安全操作。
+        </p>
       </div>
     </header>
 
@@ -29,7 +35,7 @@
           :key="section.key"
           :section="section"
           :pending="savingKey === section.key"
-          @submit="values => saveSection(section.key, values)"
+          @submit="(values) => saveSection(section.key, values)"
         />
       </div>
     </section>
@@ -51,18 +57,17 @@
         @load-more="loadMoreAuditEvents"
       >
         <template #actions>
-          <AuditExportDialog v-model="exportFormat" :pending="auditStore.exporting" @export="exportAuditEvents" />
+          <AuditExportDialog
+            v-model="exportFormat"
+            :pending="auditStore.exporting"
+            @export="exportAuditEvents"
+          />
         </template>
       </AuditHistoryTable>
     </section>
 
     <section v-else class="space-y-6">
-      <UAlert
-        v-if="runsError"
-        color="red"
-        variant="soft"
-        :title="runsError"
-      />
+      <UAlert v-if="runsError" color="red" variant="soft" :title="runsError" />
 
       <UAlert
         v-if="summaryError"
@@ -82,7 +87,9 @@
         @retry="handleRetry"
       >
         <template #actions>
-          <UButton size="xs" variant="soft" color="primary" @click="loadJobRuns">刷新列表</UButton>
+          <UButton size="xs" variant="soft" color="primary" @click="loadJobRuns"
+            >刷新列表</UButton
+          >
         </template>
       </JobRunsTable>
 
@@ -95,7 +102,10 @@
             <USelect v-model="safeOpForm.action" :options="safeOpActions" />
           </UFormGroup>
           <UFormGroup label="作用域类型">
-            <USelect v-model="safeOpForm.scope_type" :options="safeOpScopeTypes" />
+            <USelect
+              v-model="safeOpForm.scope_type"
+              :options="safeOpScopeTypes"
+            />
           </UFormGroup>
           <UFormGroup label="作用域标识">
             <UInput v-model="safeOpForm.scope_ref" placeholder="tenant-1" />
@@ -113,7 +123,9 @@
             <UInput v-model="safeOpForm.tenant_uuid" placeholder="tenant-1" />
           </UFormGroup>
           <div class="md:col-span-3 flex justify-end gap-3">
-            <UButton type="submit" color="primary" :loading="safeOpsLoading">提交操作</UButton>
+            <UButton type="submit" color="primary" :loading="safeOpsLoading"
+              >提交操作</UButton
+            >
           </div>
         </form>
       </UCard>
@@ -130,30 +142,42 @@
 </template>
 
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { useDevConsoleConfigStore } from '~/stores/dev-console/config'
-import { useDevConsoleAuditStore } from '~/stores/dev-console/audit'
-import { useDevConsoleTroubleshootStore } from '~/stores/dev-console/troubleshoot'
-import type { JobRun, JobRunFilters, SafeOpPayload } from '~/stores/dev-console/troubleshoot'
-import ConfigSectionCard from '~/components/dev-console/ConfigSectionCard.vue'
-import AuditHistoryTable from '~/components/dev-console/AuditHistoryTable.vue'
-import AuditExportDialog from '~/components/dev-console/AuditExportDialog.vue'
-import JobRunsTable from '~/components/dev-console/JobRunsTable.vue'
-import TroubleshootingDashboard from '~/components/dev-console/TroubleshootingDashboard.vue'
-import TroubleshootingHelpPanel from '~/components/dev-console/TroubleshootingHelpPanel.vue'
-import { useSafeOps } from '~/composables/useSafeOps'
+import { storeToRefs } from "pinia";
+import { useDevConsoleConfigStore } from "~/stores/dev-console/config";
+import { useDevConsoleAuditStore } from "~/stores/dev-console/audit";
+import { useDevConsoleTroubleshootStore } from "~/stores/dev-console/troubleshoot";
+import type {
+  JobRun,
+  JobRunFilters,
+  SafeOpPayload,
+} from "~/stores/dev-console/troubleshoot";
+import ConfigSectionCard from "~/components/dev-console/ConfigSectionCard.vue";
+import AuditHistoryTable from "~/components/dev-console/AuditHistoryTable.vue";
+import AuditExportDialog from "~/components/dev-console/AuditExportDialog.vue";
+import JobRunsTable from "~/components/dev-console/JobRunsTable.vue";
+import TroubleshootingDashboard from "~/components/dev-console/TroubleshootingDashboard.vue";
+import TroubleshootingHelpPanel from "~/components/dev-console/TroubleshootingHelpPanel.vue";
+import { useSafeOps } from "~/composables/useSafeOps";
 
 const tabs = [
-  { label: '配置管理', value: 'config', icon: 'i-heroicons-adjustments-horizontal' },
-  { label: '审计历史', value: 'audit', icon: 'i-heroicons-clock' },
-  { label: '故障排查', value: 'troubleshoot', icon: 'i-heroicons-wrench-screwdriver' },
-]
+  {
+    label: "配置管理",
+    value: "config",
+    icon: "i-heroicons-adjustments-horizontal",
+  },
+  { label: "审计历史", value: "audit", icon: "i-heroicons-clock" },
+  {
+    label: "故障排查",
+    value: "troubleshoot",
+    icon: "i-heroicons-wrench-screwdriver",
+  },
+];
 
-const configStore = useDevConsoleConfigStore()
-const auditStore = useDevConsoleAuditStore()
-const troubleshootStore = useDevConsoleTroubleshootStore()
-const { sections: configSections } = storeToRefs(configStore)
-const { events: auditEvents } = storeToRefs(auditStore)
+const configStore = useDevConsoleConfigStore();
+const auditStore = useDevConsoleAuditStore();
+const troubleshootStore = useDevConsoleTroubleshootStore();
+const { sections: configSections } = storeToRefs(configStore);
+const { events: auditEvents } = storeToRefs(auditStore);
 const {
   runs,
   nextCursor: runsNextCursor,
@@ -163,180 +187,198 @@ const {
   loadingSummary,
   summaryError,
   runsFilters,
-} = storeToRefs(troubleshootStore)
-const toast = useToast()
-const savingKey = ref('')
-const activeTab = ref<'config' | 'audit' | 'troubleshoot'>('config')
-const auditFilters = ref(auditStore.filters)
-const exportFormat = ref<'csv' | 'json'>('csv')
-const jobFilters = ref<JobRunFilters>({ ...runsFilters.value })
-const retrying = ref(false)
-const safeOps = useSafeOps()
-const safeOpsLoading = computed(() => safeOps.loading.value)
+} = storeToRefs(troubleshootStore);
+const toast = useToast();
+const savingKey = ref("");
+const activeTab = ref<"config" | "audit" | "troubleshoot">("config");
+const auditFilters = ref(auditStore.filters);
+const exportFormat = ref<"csv" | "json">("csv");
+const jobFilters = ref<JobRunFilters>({ ...runsFilters.value });
+const retrying = ref(false);
+const safeOps = useSafeOps();
+const safeOpsLoading = computed(() => safeOps.loading.value);
 const safeOpForm = reactive<SafeOpPayload>({
-  action: 'replay',
-  scope_type: 'tenant',
-  scope_ref: '',
-  target_id: '',
-  reason: '',
+  action: "replay",
+  scope_type: "tenant",
+  scope_ref: "",
+  target_id: "",
+  reason: "",
   dry_run: false,
-  tenant_uuid: '',
-  environment: '',
-})
+  tenant_uuid: "",
+  environment: "",
+});
 
 const safeOpActions = [
-  { label: '重放 Webhook', value: 'replay' },
-  { label: '任务重试', value: 'retry' },
-  { label: '队列 Drain', value: 'drain' },
-  { label: '禁用', value: 'disable' },
-]
+  { label: "重放 Webhook", value: "replay" },
+  { label: "任务重试", value: "retry" },
+  { label: "队列 Drain", value: "drain" },
+  { label: "禁用", value: "disable" },
+];
 
 const safeOpScopeTypes = [
-  { label: '租户', value: 'tenant' },
-  { label: '环境', value: 'environment' },
-  { label: '订阅', value: 'subscription' },
-]
+  { label: "租户", value: "tenant" },
+  { label: "环境", value: "environment" },
+  { label: "订阅", value: "subscription" },
+];
 
 onMounted(async () => {
   if (!configSections.value.length) {
-    await configStore.fetchSections().catch(() => {})
+    await configStore.fetchSections().catch(() => {});
   }
-})
+});
 
 watch(
   runsFilters,
-  value => {
-    jobFilters.value = { ...value }
+  (value) => {
+    jobFilters.value = { ...value };
   },
   { deep: true }
-)
+);
 
 watch(
   () => jobFilters.value.tenant_uuid,
-  value => {
-    const cleaned = value?.trim() ?? ''
-    safeOpForm.tenant_uuid = cleaned
-    if (safeOpForm.scope_type === 'tenant') {
-      safeOpForm.scope_ref = cleaned
+  (value) => {
+    const cleaned = value?.trim() ?? "";
+    safeOpForm.tenant_uuid = cleaned;
+    if (safeOpForm.scope_type === "tenant") {
+      safeOpForm.scope_ref = cleaned;
     }
   },
   { immediate: true }
-)
+);
 
 watch(
   () => safeOpForm.scope_type,
-  value => {
-    if (value === 'tenant' && jobFilters.value.tenant_uuid) {
-      safeOpForm.scope_ref = jobFilters.value.tenant_uuid
+  (value) => {
+    if (value === "tenant" && jobFilters.value.tenant_uuid) {
+      safeOpForm.scope_ref = jobFilters.value.tenant_uuid;
     }
   }
-)
+);
 
 async function saveSection(key: string, values: Record<string, any>) {
-  savingKey.value = key
+  savingKey.value = key;
   try {
-    await configStore.updateSection(key, { values })
-    toast.add({ title: '配置已更新', color: 'green' })
+    await configStore.updateSection(key, { values });
+    toast.add({ title: "配置已更新", color: "green" });
   } catch (error: any) {
-    toast.add({ title: '保存失败', description: error?.message ?? '请稍后再试', color: 'red' })
+    toast.add({
+      title: "保存失败",
+      description: error?.message ?? "请稍后再试",
+      color: "red",
+    });
   } finally {
-    savingKey.value = ''
+    savingKey.value = "";
   }
 }
 
 watch(
   () => activeTab.value,
-  async value => {
-    if (value !== 'troubleshoot') {
-      troubleshootStore.stopAutoRefresh()
+  async (value) => {
+    if (value !== "troubleshoot") {
+      troubleshootStore.stopAutoRefresh();
     }
-    if (value === 'audit' && !auditEvents.value.length && !auditStore.loading) {
-      await loadAuditEvents().catch(() => {})
+    if (value === "audit" && !auditEvents.value.length && !auditStore.loading) {
+      await loadAuditEvents().catch(() => {});
     }
-    if (value === 'troubleshoot') {
+    if (value === "troubleshoot") {
       if (!runs.value.length && !loadingRuns.value) {
-        await loadJobRuns().catch(() => {})
+        await loadJobRuns().catch(() => {});
       }
-      await refreshSummary().catch(() => {})
+      await refreshSummary().catch(() => {});
     }
   }
-)
+);
 
 watch(
   () => auditStore.filters,
-  value => {
-    auditFilters.value = { ...value }
+  (value) => {
+    auditFilters.value = { ...value };
   }
-)
+);
 
 onBeforeUnmount(() => {
-  troubleshootStore.stopAutoRefresh()
-})
+  troubleshootStore.stopAutoRefresh();
+});
 
 async function loadAuditEvents() {
-  auditStore.setFilters({ ...auditFilters.value })
-  await auditStore.fetchEvents().catch(() => {})
+  auditStore.setFilters({ ...auditFilters.value });
+  await auditStore.fetchEvents().catch(() => {});
 }
 
 async function loadMoreAuditEvents() {
   if (!auditStore.nextCursor) {
-    return
+    return;
   }
-  await auditStore.fetchEvents(auditStore.nextCursor).catch(() => {})
+  await auditStore.fetchEvents(auditStore.nextCursor).catch(() => {});
 }
 
 async function exportAuditEvents() {
-  await auditStore.exportEvents(exportFormat.value).catch(() => {})
+  await auditStore.exportEvents(exportFormat.value).catch(() => {});
 }
 
 async function loadJobRuns(cursor?: string) {
-  const payload: Record<string, any> = { ...jobFilters.value }
-  if (payload.tenant_uuid) payload.tenant_uuid = payload.tenant_uuid.trim()
-  if (payload.status) payload.status = payload.status.trim()
-  if (payload.job_type) payload.job_type = payload.job_type.trim()
+  const payload: Record<string, any> = { ...jobFilters.value };
+  if (payload.tenant_uuid) payload.tenant_uuid = payload.tenant_uuid.trim();
+  if (payload.status) payload.status = payload.status.trim();
+  if (payload.job_type) payload.job_type = payload.job_type.trim();
   if (cursor) {
-    payload.cursor = cursor
+    payload.cursor = cursor;
   }
   try {
-    await troubleshootStore.fetchRuns(payload)
+    await troubleshootStore.fetchRuns(payload);
   } catch (error: any) {
-    toast.add({ title: '加载任务失败', description: error?.message ?? '请稍后再试', color: 'red' })
+    toast.add({
+      title: "加载任务失败",
+      description: error?.message ?? "请稍后再试",
+      color: "red",
+    });
   }
 }
 
 async function loadMoreRuns() {
   if (!runsNextCursor.value) {
-    return
+    return;
   }
-  await loadJobRuns(runsNextCursor.value)
+  await loadJobRuns(runsNextCursor.value);
 }
 
 async function handleRetry(run: JobRun) {
-  retrying.value = true
+  retrying.value = true;
   try {
-    await troubleshootStore.retryRun(run.id, { tenant_uuid: jobFilters.value.tenant_uuid })
-    toast.add({ title: '已发起重试', color: 'green' })
+    await troubleshootStore.retryRun(run.id, {
+      tenant_uuid: jobFilters.value.tenant_uuid,
+    });
+    toast.add({ title: "已发起重试", color: "green" });
   } catch (error: any) {
-    toast.add({ title: '重试失败', description: error?.message ?? '请稍后再试', color: 'red' })
+    toast.add({
+      title: "重试失败",
+      description: error?.message ?? "请稍后再试",
+      color: "red",
+    });
   } finally {
-    retrying.value = false
+    retrying.value = false;
   }
 }
 
 async function refreshSummary() {
-  const tenant = jobFilters.value.tenant_uuid?.trim()
+  const tenant = jobFilters.value.tenant_uuid?.trim();
   try {
-    await troubleshootStore.fetchSummary({ tenant_uuid: tenant || undefined })
+    await troubleshootStore.fetchSummary({ tenant_uuid: tenant || undefined });
   } catch (error: any) {
-    toast.add({ title: '加载看板失败', description: error?.message ?? '请稍后再试', color: 'red' })
+    toast.add({
+      title: "加载看板失败",
+      description: error?.message ?? "请稍后再试",
+      color: "red",
+    });
   }
 }
 
 async function submitSafeOp() {
-  const scopeRef = safeOpForm.scope_ref?.trim()
+  const scopeRef = safeOpForm.scope_ref?.trim();
   if (!scopeRef) {
-    toast.add({ title: '请输入作用域标识', color: 'red' })
-    return
+    toast.add({ title: "请输入作用域标识", color: "red" });
+    return;
   }
   const payload: SafeOpPayload = {
     action: safeOpForm.action,
@@ -347,11 +389,11 @@ async function submitSafeOp() {
     dry_run: safeOpForm.dry_run,
     tenant_uuid: safeOpForm.tenant_uuid?.trim() || undefined,
     environment: safeOpForm.environment?.trim() || undefined,
-  }
+  };
   try {
-    await safeOps.execute(payload)
-    safeOpForm.reason = ''
-    safeOpForm.target_id = ''
+    await safeOps.execute(payload);
+    safeOpForm.reason = "";
+    safeOpForm.target_id = "";
   } catch {
     // toast handled by composable
   }

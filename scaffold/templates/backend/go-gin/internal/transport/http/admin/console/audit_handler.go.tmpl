@@ -28,7 +28,7 @@ func NewAuditHandler(deps *app.Deps) *AuditHandler {
 }
 
 type listAuditQuery struct {
-	TenantUuid       string `form:"tenant_uuid"`
+	TenantUuid     string `form:"tenant_uuid"`
 	ActorID        string `form:"actor_id"`
 	Action         string `form:"action"`
 	PermissionCode string `form:"permission_code"`
@@ -87,7 +87,7 @@ func (h *AuditHandler) ListEvents(c *gin.Context) {
 }
 
 type exportAuditQuery struct {
-	TenantUuid       string `form:"tenant_uuid"`
+	TenantUuid     string `form:"tenant_uuid"`
 	ActorID        string `form:"actor_id"`
 	Action         string `form:"action"`
 	PermissionCode string `form:"permission_code"`

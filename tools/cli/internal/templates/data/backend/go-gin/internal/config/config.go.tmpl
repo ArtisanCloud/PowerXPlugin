@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -262,10 +263,10 @@ type GRPCUpstream struct {
 
 // GRPCServer 插件 gRPC 服务器配置
 type GRPCServer struct {
-	Enable         bool   `yaml:"enable" json:"enable"`
-	Addr           string `yaml:"addr" json:"addr"`
-	Port           int    `yaml:"port" json:"port"`
-	PortMaxRetries int    `yaml:"port_max_retries" json:"port_max_retries"`
+	Enable         bool   `yaml:"enable" json:"enable"`                     // 是否启用插件自己的 gRPC Server
+	Addr           string `yaml:"addr" json:"addr"`                         // 插件 gRPC 监听，如 ":9101"
+	Port           int    `yaml:"port" json:"port"`                         // 仅提供端口时自动拼接监听地址
+	PortMaxRetries int    `yaml:"port_max_retries" json:"port_max_retries"` // 端口冲突时最多尝试次数
 	UseTLS         bool   `yaml:"use_tls" json:"use_tls"`
 	Cert           string `yaml:"cert" json:"cert"`
 	Key            string `yaml:"key" json:"key"`
@@ -768,6 +769,7 @@ func loadEnvConfig(cfg *Config) {
 	if grpcTenantUUID := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_TENANT_UUID")); grpcTenantUUID != "" {
 		cfg.GRPCUpstream.TenantUUID = grpcTenantUUID
 	} else if grpcTenantUuid := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_TENANT_ID")); grpcTenantUuid != "" {
+		// 兼容旧变量 POWERX_GRPC_UPSTREAM_TENANT_ID，后续统一迁移为 *_TENANT_UUID。
 		cfg.GRPCUpstream.TenantUUID = grpcTenantUuid
 	}
 	if grpcUseTLS := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_USE_TLS")); strings.EqualFold(grpcUseTLS, "true") {
@@ -880,6 +882,15 @@ func normalizeConfig(cfg *Config) {
 		cfg.Logging.Format = strings.ToLower(resolveConfigValue(cfg.Logging.Format))
 		cfg.Logging.Output = strings.ToLower(resolveConfigValue(cfg.Logging.Output))
 	}
+	if cfg.GRPCUpstream != nil {
+		cfg.GRPCUpstream.Address = resolveConfigValue(cfg.GRPCUpstream.Address)
+		cfg.GRPCUpstream.Token = resolveConfigValue(cfg.GRPCUpstream.Token)
+		cfg.GRPCUpstream.TenantUUID = strings.ToLower(resolveConfigValue(cfg.GRPCUpstream.TenantUUID))
+		cfg.GRPCUpstream.STSClientID = resolveConfigValue(cfg.GRPCUpstream.STSClientID)
+		cfg.GRPCUpstream.STSClientSecret = resolveConfigValue(cfg.GRPCUpstream.STSClientSecret)
+		cfg.GRPCUpstream.STSAudience = resolveConfigValue(cfg.GRPCUpstream.STSAudience)
+		cfg.GRPCUpstream.STSScope = resolveConfigValue(cfg.GRPCUpstream.STSScope)
+	}
 	if cfg.GRPCServer != nil {
 		cfg.GRPCServer.Addr = resolveConfigValue(cfg.GRPCServer.Addr)
 		normalizeGRPCServerConfig(cfg.GRPCServer)
@@ -904,7 +915,10 @@ func normalizeGRPCServerConfig(server *GRPCServer) {
 
 func extractPort(addr string) int {
 	addr = strings.TrimSpace(addr)
-	if addr == "" || !strings.Contains(addr, ":") {
+	if addr == "" {
+		return 0
+	}
+	if !strings.Contains(addr, ":") {
 		return 0
 	}
 	if _, portStr, err := net.SplitHostPort(addr); err == nil {
@@ -1075,6 +1089,15 @@ func (c *Config) Validate() error {
 	if c.Logging.Output == "file" && c.Logging.FilePath == "" {
 		return NewConfigError("logging file path must be specified when output is 'file'")
 	}
+
+	if c.GRPCUpstream != nil {
+		if tenantUUID := strings.TrimSpace(c.GRPCUpstream.TenantUUID); tenantUUID != "" {
+			if _, err := uuid.Parse(tenantUUID); err != nil {
+				return NewConfigError("grpc_upstream.tenant_uuid must be a valid UUID string")
+			}
+		}
+	}
+
 	if c.GRPCServer != nil {
 		if c.GRPCServer.Port <= 0 {
 			return NewConfigError("grpc_server.port must be positive")

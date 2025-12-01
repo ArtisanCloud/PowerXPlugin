@@ -72,7 +72,7 @@ func (h *AnalyticsHandler) Ingest(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid usage payload: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -100,7 +100,7 @@ func (h *AnalyticsHandler) GetMetrics(c *gin.Context) {
 		return
 	}
 	pathTenant := strings.TrimSpace(c.Param("tenantId"))
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		tenantID = pathTenant
 	}
@@ -158,7 +158,7 @@ func (h *AnalyticsHandler) ListRevenueReports(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query parameters: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok || tenantID == "" {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return

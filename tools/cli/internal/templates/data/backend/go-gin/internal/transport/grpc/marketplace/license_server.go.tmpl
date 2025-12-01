@@ -32,12 +32,12 @@ func (s *LicenseServer) Issue(ctx context.Context, req *IssueLicenseRequest) (*I
 		return nil, status.Error(codes.InvalidArgument, "request is nil")
 	}
 	params := svc.IssueLicenseParams{
-		TenantUuid:  req.TenantId,
-		ListingID: req.ListingId,
-		PlanID:    req.PlanId,
-		IssuedBy:  firstNonEmpty(req.IssuedBy, req.TenantId),
-		Trial:     req.Trial,
-		Metadata:  map[string]any{},
+		TenantUuid: req.TenantId,
+		ListingID:  req.ListingId,
+		PlanID:     req.PlanId,
+		IssuedBy:   firstNonEmpty(req.IssuedBy, req.TenantId),
+		Trial:      req.Trial,
+		Metadata:   map[string]any{},
 	}
 	if req.PaymentIntentId != "" {
 		params.Metadata["payment_intent_id"] = req.PaymentIntentId
@@ -61,7 +61,7 @@ func (s *LicenseServer) Renew(ctx context.Context, req *RenewLicenseRequest) (*R
 		return nil, status.Error(codes.InvalidArgument, "request is nil")
 	}
 	params := svc.RenewLicenseParams{
-		TenantUuid:     req.TenantId,
+		TenantUuid:   req.TenantId,
 		LicenseID:    req.LicenseId,
 		PlanID:       req.PlanId,
 		RenewalToken: req.RenewalToken,

@@ -6,7 +6,7 @@ import "time"
 type MCPSession struct {
 	ID                  string     `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	RuntimeAssignmentID string     `gorm:"column:runtime_assignment_id;type:uuid;not null" json:"runtime_assignment_id"`
-	TenantUuid            string     `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
+	TenantUuid          string     `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
 	State               string     `gorm:"column:state;type:text;not null" json:"state"`
 	JWTID               string     `gorm:"column:jwt_id;type:text" json:"jwt_id,omitempty"`
 	CapabilitiesHash    string     `gorm:"column:capabilities_hash;type:text" json:"capabilities_hash,omitempty"`

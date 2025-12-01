@@ -40,7 +40,6 @@ type Server struct {
 }
 
 // NewGRPCServer 创建新的插件 gRPC 服务器
-
 func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*Server, error) {
 	if c == nil {
 		logger.Info("gRPC server config not provided; skipping")

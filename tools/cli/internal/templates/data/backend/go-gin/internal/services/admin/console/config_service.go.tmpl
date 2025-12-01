@@ -127,7 +127,7 @@ func (s *ConfigService) ListSections(ctx context.Context, tenantID *string) ([]C
 
 // UpdateSectionInput describes update payload.
 type UpdateSectionInput struct {
-	TenantUuid   *string
+	TenantUuid *string
 	SectionKey string
 	Values     map[string]any
 	Comment    string
@@ -193,7 +193,7 @@ func (s *ConfigService) UpdateSection(ctx context.Context, input UpdateSectionIn
 		}
 		audit := &model.AuditEvent{
 			PluginID:       app.PluginID,
-			TenantUuid:       input.TenantUuid,
+			TenantUuid:     input.TenantUuid,
 			ActorID:        input.Actor.ID,
 			ActorName:      actorName,
 			ActorEmail:     actorEmail,
@@ -211,7 +211,7 @@ func (s *ConfigService) UpdateSection(ctx context.Context, input UpdateSectionIn
 
 		change := &model.ConfigChange{
 			PluginID:         app.PluginID,
-			TenantUuid:         tenantKey,
+			TenantUuid:       tenantKey,
 			SectionKey:       def.Key,
 			ChangeType:       changeType,
 			PreviousSnapshot: mapToJSON(previous),

@@ -39,7 +39,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 
 		Backend: contracts.BackendConfig{
 			Entry:  "backend/bin/plugin",
-		Port:   8078,
+			Port:   8078,
 			Health: "/healthz",
 		},
 

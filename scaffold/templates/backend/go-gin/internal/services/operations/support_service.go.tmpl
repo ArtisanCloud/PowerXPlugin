@@ -71,7 +71,7 @@ type KnowledgeBaseDoc struct {
 
 // ConfigurePlaybookInput describes playbook update payloads.
 type ConfigurePlaybookInput struct {
-	TenantUuid      *string               `json:"tenant_uuid"`
+	TenantUuid    *string               `json:"tenant_uuid"`
 	Channels      []SupportChannelInput `json:"channels"`
 	KnowledgeBase []KnowledgeBaseDoc    `json:"knowledge_base"`
 }
@@ -307,7 +307,7 @@ func (s *SupportService) GetPlaybook(ctx context.Context, tenantID *string) (*Su
 
 // CreateTicketRequest describes ticket creation payloads.
 type CreateTicketRequest struct {
-	TenantUuid    string         `json:"tenant_uuid" binding:"required"`
+	TenantUuid  string         `json:"tenant_uuid" binding:"required"`
 	ChannelID   *string        `json:"channel_id"`
 	Subject     string         `json:"subject" binding:"required"`
 	Description string         `json:"description"`
@@ -326,7 +326,7 @@ func (s *SupportService) CreateTicket(ctx context.Context, req CreateTicketReque
 
 	ticket := &opmodels.SupportTicket{
 		PluginID:    app.PluginID,
-		TenantUuid:    strings.TrimSpace(req.TenantUuid),
+		TenantUuid:  strings.TrimSpace(req.TenantUuid),
 		ChannelID:   req.ChannelID,
 		Subject:     req.Subject,
 		Description: req.Description,

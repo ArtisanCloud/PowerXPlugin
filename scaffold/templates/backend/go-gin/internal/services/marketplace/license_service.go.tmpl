@@ -40,18 +40,18 @@ type LicenseCache interface {
 
 // LicenseIssueRequest captures issuance payload for authority calls.
 type LicenseIssueRequest struct {
-	TenantUuid  string
-	ListingID string
-	PlanID    string
-	Metadata  map[string]any
+	TenantUuid string
+	ListingID  string
+	PlanID     string
+	Metadata   map[string]any
 }
 
 // LicenseRenewRequest captures renew payload for authority calls.
 type LicenseRenewRequest struct {
-	LicenseID string
-	TenantUuid  string
-	PlanID    string
-	Metadata  map[string]any
+	LicenseID  string
+	TenantUuid string
+	PlanID     string
+	Metadata   map[string]any
 }
 
 // LicenseIssueResponse represents license authority response.
@@ -63,7 +63,7 @@ type LicenseIssueResponse struct {
 
 // IssueLicenseParams encapsulates inputs for issuing license.
 type IssueLicenseParams struct {
-	TenantUuid    string
+	TenantUuid  string
 	ListingID   string
 	PlanID      string
 	IssuedBy    string
@@ -76,7 +76,7 @@ type IssueLicenseParams struct {
 // RenewLicenseParams encapsulates inputs for renewal.
 type RenewLicenseParams struct {
 	LicenseID    string
-	TenantUuid     string
+	TenantUuid   string
 	IssuedBy     string
 	PlanID       string
 	RenewalToken string
@@ -190,7 +190,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 		}
 		itemUnits := amountUnits
 		req := &TaxChargeRequest{
-			TenantUuid:           params.TenantUuid,
+			TenantUuid:         params.TenantUuid,
 			ListingID:          params.ListingID,
 			Currency:           plan.Currency,
 			AmountMinorUnits:   amountUnits,
@@ -222,10 +222,10 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 	issueRes := &LicenseIssueResponse{}
 	if s.authority != nil {
 		payload := &LicenseIssueRequest{
-			TenantUuid:  params.TenantUuid,
-			ListingID: params.ListingID,
-			PlanID:    params.PlanID,
-			Metadata:  params.Metadata,
+			TenantUuid: params.TenantUuid,
+			ListingID:  params.ListingID,
+			PlanID:     params.PlanID,
+			Metadata:   params.Metadata,
 		}
 		resp, err := s.authority.Issue(ctx, payload)
 		if err != nil {
@@ -277,7 +277,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 	}
 
 	license := &dbm.License{
-		TenantUuid:        params.TenantUuid,
+		TenantUuid:      params.TenantUuid,
 		ListingID:       params.ListingID,
 		PlanID:          params.PlanID,
 		LicenseToken:    issueRes.Token,
@@ -305,7 +305,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 		eventPayload["tax_transaction_id"] = taxResult.ExternalTransactionID
 	}
 	event := &dbm.LicenseEvent{
-		TenantUuid:     params.TenantUuid,
+		TenantUuid:   params.TenantUuid,
 		EventType:    dbm.LicenseEventIssued,
 		EventPayload: toJSONMap(eventPayload),
 	}
@@ -342,7 +342,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 			settlementAmount = &value
 		}
 		txn := &dbm.TaxTransaction{
-			TenantUuid:              params.TenantUuid,
+			TenantUuid:            params.TenantUuid,
 			BillingID:             billingID,
 			ExternalProvider:      s.taxClient.Provider(),
 			ExternalTransactionID: stringPtr(taxResult.ExternalTransactionID),
@@ -367,7 +367,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 			failPayload["error"] = taxErr.Error()
 		}
 		txn := &dbm.TaxTransaction{
-			TenantUuid:           params.TenantUuid,
+			TenantUuid:         params.TenantUuid,
 			BillingID:          billingID,
 			ExternalProvider:   s.taxClient.Provider(),
 			Currency:           strings.ToUpper(strings.TrimSpace(plan.Currency)),
@@ -431,10 +431,10 @@ func (s *LicenseService) RenewLicense(ctx context.Context, params RenewLicensePa
 
 	if s.authority != nil {
 		resp, err := s.authority.Renew(ctx, &LicenseRenewRequest{
-			LicenseID: license.ID,
-			TenantUuid:  params.TenantUuid,
-			PlanID:    license.PlanID,
-			Metadata:  params.Metadata,
+			LicenseID:  license.ID,
+			TenantUuid: params.TenantUuid,
+			PlanID:     license.PlanID,
+			Metadata:   params.Metadata,
 		})
 		if err != nil {
 			return nil, err
@@ -466,9 +466,9 @@ func (s *LicenseService) RenewLicense(ctx context.Context, params RenewLicensePa
 	}
 
 	event := &dbm.LicenseEvent{
-		TenantUuid:  params.TenantUuid,
-		LicenseID: license.ID,
-		EventType: dbm.LicenseEventRenewed,
+		TenantUuid: params.TenantUuid,
+		LicenseID:  license.ID,
+		EventType:  dbm.LicenseEventRenewed,
 		EventPayload: toJSONMap(map[string]any{
 			"expires_at": expiry,
 			"plan_id":    license.PlanID,
@@ -544,9 +544,9 @@ func (s *LicenseService) RevokeLicense(ctx context.Context, tenantID, licenseID,
 		return err
 	}
 	event := &dbm.LicenseEvent{
-		TenantUuid:  tenantID,
-		LicenseID: licenseID,
-		EventType: dbm.LicenseEventRevoked,
+		TenantUuid: tenantID,
+		LicenseID:  licenseID,
+		EventType:  dbm.LicenseEventRevoked,
 		EventPayload: toJSONMap(map[string]any{
 			"reason": reason,
 		}),
@@ -576,9 +576,9 @@ func (s *LicenseService) ExtendOffline(ctx context.Context, tenantID, licenseID 
 		return err
 	}
 	event := &dbm.LicenseEvent{
-		TenantUuid:  tenantID,
-		LicenseID: licenseID,
-		EventType: dbm.LicenseEventOfflineExtend,
+		TenantUuid: tenantID,
+		LicenseID:  licenseID,
+		EventType:  dbm.LicenseEventOfflineExtend,
 		EventPayload: toJSONMap(map[string]any{
 			"offline_until": target,
 		}),

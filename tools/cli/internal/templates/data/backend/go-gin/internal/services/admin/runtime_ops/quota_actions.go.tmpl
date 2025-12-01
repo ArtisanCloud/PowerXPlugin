@@ -27,7 +27,7 @@ func (s *QuotaService) HandleBreach(ctx context.Context, pluginID, scopeRef, cap
 	case ActionNotifyMarket:
 		_, _ = s.ScheduleMarketplaceSummary(ctx, &model.MarketplaceOverage{
 			PluginID:    pluginID,
-			TenantUuid:    scopeRef,
+			TenantUuid:  scopeRef,
 			QuotaMetric: capability,
 			HourWindow:  time.Now().Truncate(time.Hour),
 			BreachCount: 1,

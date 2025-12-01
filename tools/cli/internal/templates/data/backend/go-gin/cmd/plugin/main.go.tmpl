@@ -75,12 +75,12 @@ func main() {
 	}
 
 	// 在初始化 gRPC 客户端之前，尝试从本地数据库加载租户凭证（若存在），以便通过 STS 获取短期令牌
-	if cfg.GRPCUpstream != nil && cfg.GRPCUpstream.TenantUuid > 0 {
+	if cfg.GRPCUpstream != nil && strings.TrimSpace(cfg.GRPCUpstream.TenantUUID) != "" {
 		// 延迟依赖：仅当配置未提供 STS client 时，尝试 DB 加载；若配置已有，则优先生效
 		if cfg.GRPCUpstream.STSClientID == "" || cfg.GRPCUpstream.STSClientSecret == "" {
 			repo := repository.NewCredentialsRepository(queryDB)
 			svc := agent.NewCredentialService(cfg, repo)
-			if cid, sec, err := svc.LoadDecryptedCredentials(rootCtx, cfg.GRPCUpstream.TenantUuid, app.PluginID); err == nil {
+			if cid, sec, err := svc.LoadDecryptedCredentials(rootCtx, cfg.GRPCUpstream.TenantUUID, app.PluginID); err == nil {
 				cfg.GRPCUpstream.STSClientID = cid
 				cfg.GRPCUpstream.STSClientSecret = sec
 				logger.Info("Loaded STS credentials for tenant from DB")

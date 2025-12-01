@@ -36,7 +36,10 @@ export function getAuthToken(): string | undefined {
         return storedToken;
       }
     } catch (error) {
-      console.warn("[PowerXPlugin] failed to read localStorage access_token", error);
+      console.warn(
+        "[PowerXPlugin] failed to read localStorage access_token",
+        error
+      );
     }
   }
 

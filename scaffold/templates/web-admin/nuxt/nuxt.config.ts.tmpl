@@ -51,9 +51,6 @@ const powerx = definePowerXAdminConfig({
   starterPages: true
 })
 
-const envBaseURL = process.env.NUXT_APP_BASE_URL
-const resolvedBaseURL = envBaseURL || (INSIDE_POWERX ? pluginAdminBase : '/')
-
 export default defineNuxtConfig({
   extends: powerx.extends,
   appConfig: powerx.appConfig,
@@ -64,8 +61,8 @@ export default defineNuxtConfig({
     enabled: !INSIDE_POWERX
   },
   app: {
-    baseURL: resolvedBaseURL,
-    buildAssetsDir: 'assets/', // 相对前缀，避免落到宿主根路径
+    baseURL: INSIDE_POWERX ? pluginAdminBase : '/',
+    buildAssetsDir: 'assets/',
     head: {
       meta: [
         { name: 'referrer', content: 'no-referrer' },

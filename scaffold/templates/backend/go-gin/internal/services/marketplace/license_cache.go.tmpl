@@ -128,7 +128,7 @@ func (c *RedisLicenseCache) cacheKey(tenantID, listingID string) string {
 
 type licenseCacheEntry struct {
 	ID              string                 `json:"id"`
-	TenantUuid        string                 `json:"tenant_uuid"`
+	TenantUuid      string                 `json:"tenant_uuid"`
 	ListingID       string                 `json:"listing_id"`
 	PlanID          string                 `json:"plan_id"`
 	LicenseToken    string                 `json:"license_token"`
@@ -152,7 +152,7 @@ func licenseCacheEntryFromModel(license *dbm.License) *licenseCacheEntry {
 	}
 	return &licenseCacheEntry{
 		ID:              license.ID,
-		TenantUuid:        license.TenantUuid,
+		TenantUuid:      license.TenantUuid,
 		ListingID:       license.ListingID,
 		PlanID:          license.PlanID,
 		LicenseToken:    license.LicenseToken,
@@ -177,7 +177,7 @@ func (e *licenseCacheEntry) toModel() *dbm.License {
 	}
 	return &dbm.License{
 		ID:              e.ID,
-		TenantUuid:        e.TenantUuid,
+		TenantUuid:      e.TenantUuid,
 		ListingID:       e.ListingID,
 		PlanID:          e.PlanID,
 		LicenseToken:    e.LicenseToken,

@@ -57,7 +57,7 @@ func (s *PrivacyService) RevokeConsentToken(ctx context.Context, tenantID, token
 		actor = "admin"
 	}
 	_, err := s.repo.CreateLifecycleEvent(ctx, &privmodel.LifecycleEvent{
-		TenantUuid:   tenantID,
+		TenantUuid: tenantID,
 		EventType:  privmodel.LifecycleEventConsentRevoke,
 		AssetKey:   "*",
 		RecordedBy: actor,
@@ -103,7 +103,7 @@ func (s *PrivacyService) IssueConsentToken(ctx context.Context, token *privmodel
 	}
 	secobs.RecordConsentEvent(privmodel.LifecycleEventConsentRenew, privmodel.LifecycleStatusSucceeded)
 	_, logErr := s.repo.CreateLifecycleEvent(ctx, &privmodel.LifecycleEvent{
-		TenantUuid:   token.TenantUuid,
+		TenantUuid: token.TenantUuid,
 		EventType:  privmodel.LifecycleEventConsentRenew,
 		AssetKey:   "*",
 		RecordedBy: token.IssuedBy,

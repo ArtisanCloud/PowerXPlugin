@@ -36,9 +36,9 @@ func (r *TemplateRepository) Create(ctx context.Context, t *dbm.Template) (*dbm.
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(t.TenantUUID) == "" {
-		t.TenantUUID = tenantUUID
-	} else if !strings.EqualFold(t.TenantUUID, tenantUUID) {
+	if strings.TrimSpace(t.TenantUuid) == "" {
+		t.TenantUuid = tenantUUID
+	} else if !strings.EqualFold(t.TenantUuid, tenantUUID) {
 		return nil, gorm.ErrInvalidData
 	}
 	return r.BaseRepository.Create(ctx, t)

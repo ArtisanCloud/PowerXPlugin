@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -48,10 +49,11 @@ type PowerXServiceClient struct {
 	// 基于 proto 的强类型客户端
 	sts stsv1.STSServiceClient
 
-	token      string
-	tenantUUID string
-	cfg        *cfgpkg.GRPCUpstream
-	tm         *TokenManager
+	token          string
+	tenantUUID     string
+	tenantLegacyID int64
+	cfg            *cfgpkg.GRPCUpstream
+	tm             *TokenManager
 }
 
 // NewPowerX 根据配置拨号 PowerX gRPC
@@ -60,11 +62,13 @@ func NewPowerXServiceClient(ctx context.Context, c *cfgpkg.GRPCUpstream) (*Power
 		return nil, fmt.Errorf("grpc upstream address is required")
 	}
 
+	tenantUUID := strings.TrimSpace(strings.ToLower(c.TenantUUID))
 	p := &PowerXServiceClient{
-		conn:       nil,
-		token:      c.Token,
-		tenantUUID: strings.TrimSpace(strings.ToLower(c.TenantUUID)),
-		cfg:        c,
+		conn:           nil,
+		token:          c.Token,
+		tenantUUID:     tenantUUID,
+		tenantLegacyID: parseLegacyTenantUuid(tenantUUID),
+		cfg:            c,
 	}
 
 	// eager 模式：启动即连接；lazy 模式：首次调用再连接
@@ -89,8 +93,18 @@ func NewPowerXServiceClient(ctx context.Context, c *cfgpkg.GRPCUpstream) (*Power
 			}
 			// STS Exchange 通常不带原有 Authorization
 			// 但仍可携带租户信息到 Ctx
+			ctxPayload := &commonv1.RequestContext{}
+			if p.tenantLegacyID > 0 {
+				ctxPayload.TenantId = p.tenantLegacyID
+			}
+			if p.tenantUUID != "" {
+				if ctxPayload.Attributes == nil {
+					ctxPayload.Attributes = map[string]string{}
+				}
+				ctxPayload.Attributes["tenant_uuid"] = p.tenantUUID
+			}
 			pr := &stsv1.ExchangeRequest{
-				Ctx:          &commonv1.RequestContext{TenantUUID: p.tenantUUID},
+				Ctx:          ctxPayload,
 				ClientId:     req.ClientID,
 				ClientSecret: req.ClientSecret,
 				Audience:     req.Audience,
@@ -212,7 +226,6 @@ func (p *PowerXServiceClient) Outgoing(ctx context.Context) context.Context {
 	if p.tenantUUID != "" {
 		md.Set("x-powerx-tenant-uuid", p.tenantUUID)
 	}
-
 	return metadata.NewOutgoingContext(ctx, md)
 }
 
@@ -240,8 +253,8 @@ func (p *PowerXServiceClient) HasToken() bool {
 	return false
 }
 
-// GetTenantUuid 获取租户 ID
-func (p *PowerXServiceClient) GetTenantUuid() string {
+// GetTenantUUID 获取租户 UUID
+func (p *PowerXServiceClient) GetTenantUUID() string {
 	return p.tenantUUID
 }
 
@@ -470,4 +483,15 @@ func (p *PowerXServiceClient) Reconnect(ctx context.Context) error {
 
 	*p = *newClient
 	return nil
+}
+
+func parseLegacyTenantUuid(raw string) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		return v
+	}
+	return 0
 }

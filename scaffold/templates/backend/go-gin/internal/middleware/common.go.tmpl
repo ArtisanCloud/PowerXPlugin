@@ -55,7 +55,7 @@ func RequestLogger() gin.HandlerFunc {
 		// 获取租户信息
 		var tenantUUID string
 		if tenantCtx, exists := GetTenantContext(c); exists {
-			tenantUUID = strings.TrimSpace(tenantCtx.TenantUUID)
+			tenantUUID = tenantCtx.TenantUUID
 		}
 
 		// 构建日志字段
@@ -72,7 +72,7 @@ func RequestLogger() gin.HandlerFunc {
 			fields["query"] = raw
 		}
 
-		if tenantUUID != "" {
+		if strings.TrimSpace(tenantUUID) != "" {
 			fields["tenant_uuid"] = tenantUUID
 		}
 

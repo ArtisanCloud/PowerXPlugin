@@ -88,7 +88,7 @@ func (h *SupportHandler) GetMetrics(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "support service unavailable", nil)
 		return
 	}
-	tenantID, _ := httpmw.TenantUUIDString(c) // optional for future scoping
+	tenantID, _ := httpmw.TenantUuidString(c) // optional for future scoping
 	_ = tenantID
 	metrics, err := h.svc.ComputeMetrics(c.Request.Context())
 	if err != nil {

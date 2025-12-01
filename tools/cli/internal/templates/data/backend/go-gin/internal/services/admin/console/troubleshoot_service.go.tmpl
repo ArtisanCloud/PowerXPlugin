@@ -59,7 +59,7 @@ type GuidanceItem struct {
 type WebhookAttempt struct {
 	ID              string     `json:"id"`
 	SubscriptionID  string     `json:"subscription_id"`
-	TenantUuid        string     `json:"tenant_uuid"`
+	TenantUuid      string     `json:"tenant_uuid"`
 	Status          string     `json:"status"`
 	DeliveryCount   int        `json:"delivery_count"`
 	RetryCount      int        `json:"retry_count"`
@@ -79,7 +79,7 @@ type WebhookAttemptList struct {
 
 // WebhookAttemptListInput defines filters for attempts listing.
 type WebhookAttemptListInput struct {
-	TenantUuid       string
+	TenantUuid     string
 	Status         string
 	SubscriptionID string
 	Since          *time.Time
@@ -99,7 +99,7 @@ type TroubleshootingSummary struct {
 
 // TroubleshootSummaryInput controls summary fetching.
 type TroubleshootSummaryInput struct {
-	TenantUuid     *string
+	TenantUuid   *string
 	ForceRefresh bool
 }
 
@@ -399,7 +399,7 @@ func (s *TroubleshootService) refreshInterval() int {
 type attemptRow struct {
 	ID              string
 	SubscriptionID  string
-	TenantUuid        string
+	TenantUuid      string
 	Status          string
 	RetryCount      int
 	LastError       string
@@ -414,7 +414,7 @@ func mapAttemptRow(row attemptRow) WebhookAttempt {
 	attempt := WebhookAttempt{
 		ID:              row.ID,
 		SubscriptionID:  row.SubscriptionID,
-		TenantUuid:        row.TenantUuid,
+		TenantUuid:      row.TenantUuid,
 		Status:          strings.ToLower(strings.TrimSpace(row.Status)),
 		RetryCount:      row.RetryCount,
 		DeliveryCount:   row.RetryCount + 1,

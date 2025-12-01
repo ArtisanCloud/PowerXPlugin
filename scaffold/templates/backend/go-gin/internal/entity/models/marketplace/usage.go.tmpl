@@ -37,7 +37,7 @@ type UsageMetric struct {
 // UsageEnvelope captures raw usage data batches submitted by SDK or integrations.
 type UsageEnvelope struct {
 	ID             string         `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantUuid       string         `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
+	TenantUuid     string         `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	LicenseID      string         `gorm:"column:license_id;type:uuid;not null;index" json:"license_id"`
 	PluginID       string         `gorm:"column:plugin_id;type:text;not null;index" json:"plugin_id"`
 	Metrics        datatypes.JSON `gorm:"column:metrics;type:jsonb;not null" json:"metrics"`
@@ -59,7 +59,7 @@ func (*UsageEnvelope) TableName() string {
 // UsageAggregate stores aggregated usage values per window/metric for dashboards.
 type UsageAggregate struct {
 	ID         string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantUuid   string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
+	TenantUuid string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	LicenseID  string            `gorm:"column:license_id;type:uuid;not null;index" json:"license_id"`
 	Metric     string            `gorm:"column:metric;type:text;not null;index:idx_usage_agg_metric" json:"metric"`
 	Window     AggregationWindow `gorm:"column:window;type:text;not null;index:idx_usage_agg_metric" json:"window"`

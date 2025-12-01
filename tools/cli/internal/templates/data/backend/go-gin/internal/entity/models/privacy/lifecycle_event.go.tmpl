@@ -24,7 +24,7 @@ const (
 // LifecycleEvent stores evidence for retention, export, and erasure actions.
 type LifecycleEvent struct {
 	ID         string         `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantUuid   string         `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
+	TenantUuid string         `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
 	EventType  string         `gorm:"column:event_type;type:text;not null" json:"event_type"`
 	AssetKey   string         `gorm:"column:asset_key;type:text;not null" json:"asset_key"`
 	Payload    datatypes.JSON `gorm:"column:payload;type:jsonb" json:"payload,omitempty"`

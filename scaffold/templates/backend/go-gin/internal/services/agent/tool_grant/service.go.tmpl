@@ -35,7 +35,7 @@ func NewService(db *gorm.DB, cfg *config.Config, logger *logrus.Entry, signingKe
 
 // Claims defines ToolGrant JWT payload.
 type Claims struct {
-	TenantUuid     string   `json:"tenant_uuid"`
+	TenantUuid   string   `json:"tenant_uuid"`
 	ToolID       string   `json:"tool_id"`
 	Capabilities []string `json:"capabilities"`
 	AgentID      string   `json:"agent_id"`
@@ -53,7 +53,7 @@ func (s *Service) Issue(ctx context.Context, tenantID, toolID, agentID string, c
 	ttl := s.cfg.ToolGrantTTL()
 	now := time.Now().UTC()
 	claims := Claims{
-		TenantUuid:     tenantID,
+		TenantUuid:   tenantID,
 		ToolID:       toolID,
 		Capabilities: caps,
 		AgentID:      agentID,
@@ -70,7 +70,7 @@ func (s *Service) Issue(ctx context.Context, tenantID, toolID, agentID string, c
 		return "", err
 	}
 	_, recErr := s.repo.RecordUsageEvent(ctx, &tgmodel.UsageEvent{
-		TenantUuid:    tenantID,
+		TenantUuid:  tenantID,
 		ToolGrantID: claims.ID,
 		EventType:   "ISSUED",
 		Capability:  toolID,
@@ -97,7 +97,7 @@ func (s *Service) Revoke(ctx context.Context, tenantID, toolGrantID, reason, act
 		ttlExpiry = time.Now().UTC()
 	}
 	_, err := s.repo.RecordRevocation(ctx, &tgmodel.Revocation{
-		TenantUuid:    tenantID,
+		TenantUuid:  tenantID,
 		ToolGrantID: toolGrantID,
 		RevokedBy:   actor,
 		Reason:      reason,
@@ -108,7 +108,7 @@ func (s *Service) Revoke(ctx context.Context, tenantID, toolGrantID, reason, act
 		return err
 	}
 	_, recErr := s.repo.RecordUsageEvent(ctx, &tgmodel.UsageEvent{
-		TenantUuid:    tenantID,
+		TenantUuid:  tenantID,
 		ToolGrantID: toolGrantID,
 		EventType:   "REVOKED",
 		Capability:  "",

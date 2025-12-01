@@ -3,6 +3,7 @@ package public
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -315,12 +316,19 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 	if uc == nil {
 		return gin.H{}
 	}
+	tenantUUID := strings.TrimSpace(uc.TenantUUID)
+	tenant := gin.H{
+		"uuid": tenantUUID,
+		"key":  uc.TenantKey,
+		"name": uc.TenantName,
+	}
+	if legacyRaw := strings.TrimSpace(uc.TenantUuid); legacyRaw != "" {
+		if legacyID, err := strconv.ParseUint(legacyRaw, 10, 64); err == nil && legacyID > 0 {
+			tenant["legacy_id"] = legacyID
+		}
+	}
 	return gin.H{
-		"tenant": gin.H{
-			"id":   uc.TenantUuid,
-			"key":  uc.TenantKey,
-			"name": uc.TenantName,
-		},
+		"tenant": tenant,
 		"user": gin.H{
 			"id":           uc.UserID,
 			"username":     uc.Username,

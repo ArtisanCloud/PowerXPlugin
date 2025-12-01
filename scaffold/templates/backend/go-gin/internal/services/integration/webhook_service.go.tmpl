@@ -55,7 +55,7 @@ func NewWebhookService(
 
 // CreateSubscriptionParams captures creation parameters.
 type CreateSubscriptionParams struct {
-	TenantUUID        string
+	TenantUuid      string
 	EventType       string
 	TargetURL       string
 	SecretPlaintext string
@@ -66,7 +66,7 @@ type CreateSubscriptionParams struct {
 
 // UpdateSubscriptionParams captures updatable fields.
 type UpdateSubscriptionParams struct {
-	TenantUUID       string
+	TenantUuid     string
 	SubscriptionID string
 	TargetURL      *string
 	Status         *string
@@ -84,7 +84,7 @@ type DeliveryResultParams struct {
 	NextRetryAt    *time.Time
 	RetryCount     int
 	Payload        any
-	TenantUUID       string
+	TenantUuid     string
 }
 
 // CreateSubscription registers or updates a subscription entry.
@@ -93,11 +93,11 @@ func (s *WebhookService) CreateSubscription(ctx context.Context, p CreateSubscri
 		return nil, errors.New("subscription repository not configured")
 	}
 	sub := &model.WebhookSubscription{
-		TenantUUID:  strings.TrimSpace(p.TenantUUID),
-		EventType: strings.TrimSpace(p.EventType),
-		TargetURL: strings.TrimSpace(p.TargetURL),
-		Status:    strings.ToUpper(strings.TrimSpace(p.Status)),
-		Metadata:  datatypes.JSONMap{},
+		TenantUuid: strings.TrimSpace(p.TenantUuid),
+		EventType:  strings.TrimSpace(p.EventType),
+		TargetURL:  strings.TrimSpace(p.TargetURL),
+		Status:     strings.ToUpper(strings.TrimSpace(p.Status)),
+		Metadata:   datatypes.JSONMap{},
 	}
 	if sub.Status == "" {
 		sub.Status = model.WebhookStatusActive
@@ -114,7 +114,7 @@ func (s *WebhookService) CreateSubscription(ctx context.Context, p CreateSubscri
 	}
 
 	if strings.TrimSpace(p.SecretPlaintext) != "" {
-		secret, err := s.encryptSecret(sub.TenantUUID, sub.EventType, sub.TargetURL, p.SecretPlaintext)
+		secret, err := s.encryptSecret(sub.TenantUuid, sub.EventType, sub.TargetURL, p.SecretPlaintext)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +125,7 @@ func (s *WebhookService) CreateSubscription(ctx context.Context, p CreateSubscri
 	if err != nil {
 		return nil, err
 	}
-	s.submitApproval(ctx, saved.TenantUUID, saved.ID, "create", sanitizeSubscription(saved))
+	s.submitApproval(ctx, saved.TenantUuid, saved.ID, "create", sanitizeSubscription(saved))
 	return sanitizeSubscription(saved), nil
 }
 
@@ -134,7 +134,7 @@ func (s *WebhookService) UpdateSubscription(ctx context.Context, p UpdateSubscri
 	if s.subscriptions == nil {
 		return nil, errors.New("subscription repository not configured")
 	}
-	sub, err := s.subscriptions.GetByID(ctx, p.TenantUUID, p.SubscriptionID)
+	sub, err := s.subscriptions.GetByID(ctx, p.TenantUuid, p.SubscriptionID)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s *WebhookService) UpdateSubscription(ctx context.Context, p UpdateSubscri
 		sub.Status = strings.ToUpper(strings.TrimSpace(*p.Status))
 	}
 	if p.NewSecretPlain != nil && strings.TrimSpace(*p.NewSecretPlain) != "" {
-		secret, err := s.encryptSecret(sub.TenantUUID, sub.EventType, sub.TargetURL, *p.NewSecretPlain)
+		secret, err := s.encryptSecret(sub.TenantUuid, sub.EventType, sub.TargetURL, *p.NewSecretPlain)
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +170,7 @@ func (s *WebhookService) UpdateSubscription(ctx context.Context, p UpdateSubscri
 	if err != nil {
 		return nil, err
 	}
-	s.submitApproval(ctx, saved.TenantUUID, saved.ID, "update", sanitizeSubscription(saved))
+	s.submitApproval(ctx, saved.TenantUuid, saved.ID, "update", sanitizeSubscription(saved))
 	return sanitizeSubscription(saved), nil
 }
 
@@ -248,8 +248,8 @@ func (s *WebhookService) RecordDeliveryAttempt(ctx context.Context, params Deliv
 		}
 	}
 	created, err := s.attempts.Create(ctx, attempt)
-	if err == nil && params.TenantUUID != "" {
-		obs.RecordWebhookAttempt(strings.ToLower(params.Status), params.TenantUUID)
+	if err == nil && params.TenantUuid != "" {
+		obs.RecordWebhookAttempt(strings.ToLower(params.Status), params.TenantUuid)
 	}
 	return created, err
 }
@@ -294,7 +294,7 @@ func (s *WebhookService) SignPayload(ctx context.Context, tenantID, subscription
 	if sub == nil {
 		return "", gorm.ErrRecordNotFound
 	}
-	secret, err := s.decryptSecret(sub.TenantUUID, sub.EventType, sub.TargetURL, sub.Secret)
+	secret, err := s.decryptSecret(sub.TenantUuid, sub.EventType, sub.TargetURL, sub.Secret)
 	if err != nil {
 		return "", err
 	}

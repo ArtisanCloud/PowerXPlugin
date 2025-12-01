@@ -156,7 +156,7 @@ func (h *ListingHandler) List(c *gin.Context) {
 		return
 	}
 	statuses := normalizeListFilter(query.Status)
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -184,7 +184,7 @@ func (h *ListingHandler) Get(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "listing service not available", nil)
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -212,7 +212,7 @@ func (h *ListingHandler) Create(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -236,7 +236,7 @@ func (h *ListingHandler) Update(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -264,7 +264,7 @@ func (h *ListingHandler) SubmitForReview(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -301,7 +301,7 @@ func (h *ListingHandler) applyReviewerDecision(c *gin.Context, status string, su
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return

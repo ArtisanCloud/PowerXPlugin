@@ -2,7 +2,6 @@ package security
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"{{ .BackendModulePath }}/internal/entity/models/privacy"
@@ -25,12 +24,11 @@ func NewPrivacyHandler(deps *app.Deps, guard *agentsec.PrivacyGuard, audit *seco
 }
 
 func (h *PrivacyHandler) GetActiveConsent(c *gin.Context) {
-	tenantUint, ok := middleware.TenantUuidFromContext(c.Request.Context())
-	if !ok || tenantUint == 0 {
+	tenantID, ok := middleware.TenantUUIDFromContext(c.Request.Context())
+	if !ok || tenantID == "" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
 		return
 	}
-	tenantID := fmt.Sprintf("%d", tenantUint)
 	tokens, err := h.guard.ActiveConsentTokens(c.Request.Context(), tenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -60,14 +58,13 @@ func (h *PrivacyHandler) AcknowledgeLifecycleEvent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
-	tenantUint, ok := middleware.TenantUuidFromContext(c.Request.Context())
-	if !ok || tenantUint == 0 {
+	tenantID, ok := middleware.TenantUUIDFromContext(c.Request.Context())
+	if !ok || tenantID == "" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
 		return
 	}
-	tenantID := fmt.Sprintf("%d", tenantUint)
 	event := &privacy.LifecycleEvent{
-		TenantUuid:   tenantID,
+		TenantUuid: tenantID,
 		EventType:  payload.EventType,
 		AssetKey:   payload.AssetKey,
 		RecordedBy: "agent",

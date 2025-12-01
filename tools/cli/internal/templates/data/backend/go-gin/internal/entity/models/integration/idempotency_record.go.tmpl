@@ -9,7 +9,7 @@ import (
 // IdempotencyRecord 表示幂等键的持久化记录。
 type IdempotencyRecord struct {
 	Key         string            `gorm:"column:key;primaryKey" json:"key"`
-	TenantUuid    string            `gorm:"column:tenant_uuid;not null" json:"tenant_uuid"`
+	TenantUuid  string            `gorm:"column:tenant_uuid;not null" json:"tenant_uuid"`
 	Scope       string            `gorm:"column:scope" json:"scope"`
 	Operation   string            `gorm:"column:operation" json:"operation"`
 	PayloadHash string            `gorm:"column:payload_hash" json:"payload_hash"`

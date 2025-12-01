@@ -31,7 +31,7 @@ func (r *AuditRepository) Create(ctx context.Context, evt *model.AuditEvent) err
 // ListOptions encapsulates filters for audit event queries.
 type ListOptions struct {
 	PluginID       string
-	TenantUuid       *string
+	TenantUuid     *string
 	ActorID        string
 	Action         string
 	PermissionCode string
@@ -44,7 +44,7 @@ type ListOptions struct {
 // ExportOptions defines export query boundaries.
 type ExportOptions struct {
 	PluginID       string
-	TenantUuid       *string
+	TenantUuid     *string
 	ActorID        string
 	Action         string
 	PermissionCode string

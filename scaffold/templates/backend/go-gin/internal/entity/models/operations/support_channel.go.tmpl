@@ -11,7 +11,7 @@ import (
 type SupportChannel struct {
 	ID             string            `gorm:"primaryKey;type:uuid" json:"id"`
 	PluginID       string            `gorm:"column:plugin_id;index:idx_support_channels_scope" json:"plugin_id"`
-	TenantUuid       *string           `gorm:"column:tenant_uuid;index:idx_support_channels_scope" json:"tenant_uuid,omitempty"`
+	TenantUuid     *string           `gorm:"column:tenant_uuid;index:idx_support_channels_scope" json:"tenant_uuid,omitempty"`
 	Channel        string            `gorm:"column:channel" json:"channel"`
 	IsEnabled      bool              `gorm:"column:is_enabled" json:"is_enabled"`
 	ServiceWindow  datatypes.JSONMap `gorm:"column:service_window" json:"service_window"`

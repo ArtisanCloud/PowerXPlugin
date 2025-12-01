@@ -105,7 +105,7 @@ func NewIncidentService(repo *oprepo.IncidentRepository, cfg *config.Config, met
 
 // CreateIncidentRequest captures inputs for incident creation.
 type CreateIncidentRequest struct {
-	TenantUuid        *string         `json:"tenant_uuid"`
+	TenantUuid      *string         `json:"tenant_uuid"`
 	Severity        string          `json:"severity"`
 	DetectionSource string          `json:"detection_source"`
 	Summary         string          `json:"summary"`

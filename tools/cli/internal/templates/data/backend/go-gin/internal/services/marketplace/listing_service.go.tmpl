@@ -217,7 +217,7 @@ func (s *ListingService) CreateDraft(ctx context.Context, tenantID string, input
 
 	listing := &dbm.Listing{
 		ID:          coalesceID(input.ID),
-		TenantUuid:    tenantID,
+		TenantUuid:  tenantID,
 		PluginID:    strings.TrimSpace(input.PluginID),
 		VendorID:    strings.TrimSpace(input.VendorID),
 		Title:       strings.TrimSpace(input.Title),
@@ -360,7 +360,7 @@ func (s *ListingService) SubmitForReview(ctx context.Context, tenantID, listingI
 	version := &dbm.ListingVersion{
 		ID:          uuid.NewString(),
 		ListingID:   listing.ID,
-		TenantUuid:    tenantID,
+		TenantUuid:  tenantID,
 		Version:     coalesce(listing.Version, "draft"),
 		Changelog:   metadataString(metadata, "changelog"),
 		Metadata:    toJSONMap(metadata),
@@ -428,7 +428,7 @@ func (s *ListingService) RecordChecklistRun(ctx context.Context, tenantID, listi
 	run := dbm.ChecklistRun{
 		ID:            coalesceID(input.ID),
 		ListingID:     listingID,
-		TenantUuid:      tenantID,
+		TenantUuid:    tenantID,
 		TriggerSource: fallbackTrigger(input.TriggerSource),
 		RunNumber:     nextRunNumber(input.RunNumber),
 		Status:        fallbackStatus(input.Status),
@@ -534,7 +534,7 @@ func convertPricingPlans(inputs []PricingPlanInput, tenantID string) []dbm.Prici
 	for i, in := range inputs {
 		plan := dbm.PricingPlan{
 			ID:              coalesceID(in.ID),
-			TenantUuid:        tenantID,
+			TenantUuid:      tenantID,
 			PlanCode:        in.PlanCode,
 			PlanType:        fallbackPlanType(in.PlanType),
 			Currency:        strings.ToUpper(strings.TrimSpace(in.Currency)),
@@ -551,7 +551,7 @@ func convertPricingPlans(inputs []PricingPlanInput, tenantID string) []dbm.Prici
 			for j, tier := range in.Tiers {
 				plan.Tiers[j] = dbm.PlanTier{
 					ID:         coalesceID(tier.ID),
-					TenantUuid:   tenantID,
+					TenantUuid: tenantID,
 					Metric:     tier.Metric,
 					RangeFrom:  tier.RangeFrom,
 					RangeTo:    tier.RangeTo,

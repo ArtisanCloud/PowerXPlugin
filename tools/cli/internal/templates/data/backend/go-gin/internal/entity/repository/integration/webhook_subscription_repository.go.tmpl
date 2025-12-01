@@ -31,7 +31,7 @@ func (r *WebhookSubscriptionRepository) Upsert(ctx context.Context, sub *model.W
 	if sub == nil {
 		return nil, errors.New("webhook subscription is nil")
 	}
-	if strings.TrimSpace(sub.TenantUUID) == "" {
+	if strings.TrimSpace(sub.TenantUuid) == "" {
 		return nil, errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(sub.EventType) == "" {
@@ -49,7 +49,7 @@ func (r *WebhookSubscriptionRepository) Upsert(ctx context.Context, sub *model.W
 		sub.ID = uuid.NewString()
 	}
 
-	err := r.WithTenantTx(ctx, sub.TenantUUID, func(tx *gorm.DB) error {
+	err := r.WithTenantTx(ctx, sub.TenantUuid, func(tx *gorm.DB) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
 				{Name: "tenant_uuid"},
@@ -155,7 +155,7 @@ func (r *WebhookSubscriptionRepository) DebugLogSubscription(sub *model.WebhookS
 		return
 	}
 	logger.WithField("subscription_id", sub.ID).
-		WithField("tenant_uuid", sub.TenantUUID).
+		WithField("tenant_uuid", sub.TenantUuid).
 		WithField("event_type", sub.EventType).
 		WithField("status", sub.Status).
 		Debug("webhook subscription persisted")

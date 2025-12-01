@@ -8,7 +8,7 @@ import (
 
 type ConsentTokenResponse struct {
 	ID            string   `json:"id"`
-	TenantUuid      string   `json:"tenant_uuid"`
+	TenantUuid    string   `json:"tenant_uuid"`
 	Token         string   `json:"token"`
 	Scope         []string `json:"scope"`
 	Status        string   `json:"status"`
@@ -25,13 +25,13 @@ func NewConsentTokenResponse(token *privmodel.ConsentToken) *ConsentTokenRespons
 	}
 	scope, _ := token.ScopeValues()
 	resp := &ConsentTokenResponse{
-		ID:       token.ID,
+		ID:         token.ID,
 		TenantUuid: token.TenantUuid,
-		Token:    token.Token,
-		Scope:    scope,
-		Status:   token.Status,
-		IssuedAt: token.IssuedAt.UTC().Format(time.RFC3339),
-		IssuedBy: token.IssuedBy,
+		Token:      token.Token,
+		Scope:      scope,
+		Status:     token.Status,
+		IssuedAt:   token.IssuedAt.UTC().Format(time.RFC3339),
+		IssuedBy:   token.IssuedBy,
 	}
 	if token.ExpiresAt != nil {
 		resp.ExpiresAt = token.ExpiresAt.UTC().Format(time.RFC3339)
@@ -64,7 +64,7 @@ type RevokeConsentRequest struct {
 
 type LifecycleEventResponse struct {
 	ID         string      `json:"id"`
-	TenantUuid   string      `json:"tenant_uuid"`
+	TenantUuid string      `json:"tenant_uuid"`
 	EventType  string      `json:"event_type"`
 	AssetKey   string      `json:"asset_key"`
 	Status     string      `json:"status"`
@@ -79,7 +79,7 @@ func NewLifecycleEventResponse(evt *privmodel.LifecycleEvent) *LifecycleEventRes
 	}
 	resp := &LifecycleEventResponse{
 		ID:         evt.ID,
-		TenantUuid:   evt.TenantUuid,
+		TenantUuid: evt.TenantUuid,
 		EventType:  evt.EventType,
 		AssetKey:   evt.AssetKey,
 		Status:     evt.Status,

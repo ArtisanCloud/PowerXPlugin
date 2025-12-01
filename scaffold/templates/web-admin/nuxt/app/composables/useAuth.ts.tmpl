@@ -1,3 +1,4 @@
+import { getCurrentScope, onScopeDispose } from "vue";
 import type { LoginResponse } from "~/composables/api/services/authService";
 import { useAuthService } from "~/composables/api/services/authService";
 
@@ -31,34 +32,6 @@ const writeCookie = (name: string, value: string | null) => {
   document.cookie = `${name}=${encodeURIComponent(
     value
   )}; path=/; SameSite=Lax`;
-};
-
-const safeLocalStorage = {
-  getItem(key: string) {
-    if (typeof window === "undefined") return null;
-    try {
-      return window.localStorage?.getItem(key);
-    } catch (err) {
-      console.warn("[useAuth] localStorage.getItem failed", err);
-      return null;
-    }
-  },
-  setItem(key: string, value: string) {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage?.setItem(key, value);
-    } catch (err) {
-      console.warn("[useAuth] localStorage.setItem failed", err);
-    }
-  },
-  removeItem(key: string) {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage?.removeItem(key);
-    } catch (err) {
-      console.warn("[useAuth] localStorage.removeItem failed", err);
-    }
-  },
 };
 
 const decodeBase64Url = (input: string) => {
@@ -100,6 +73,34 @@ const extractTenantUuidFromToken = (token?: string | null) => {
 const storeTenantUuidFromToken = (token?: string | null) => {
   const uuid = extractTenantUuidFromToken(token);
   writeCookie("tenant_uuid", uuid && uuid.length ? uuid : null);
+};
+
+const safeLocalStorage = {
+  getItem(key: string) {
+    if (typeof window === "undefined") return null;
+    try {
+      return window.localStorage?.getItem(key);
+    } catch (err) {
+      console.warn("[useAuth] localStorage.getItem failed", err);
+      return null;
+    }
+  },
+  setItem(key: string, value: string) {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.setItem(key, value);
+    } catch (err) {
+      console.warn("[useAuth] localStorage.setItem failed", err);
+    }
+  },
+  removeItem(key: string) {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.removeItem(key);
+    } catch (err) {
+      console.warn("[useAuth] localStorage.removeItem failed", err);
+    }
+  },
 };
 
 export const useAuth = () => {
@@ -253,9 +254,11 @@ export const useAuth = () => {
       syncFromStorage();
     };
     window.addEventListener("storage", handler);
-    onBeforeUnmount(() => {
-      window.removeEventListener("storage", handler);
-    });
+    if (getCurrentScope()) {
+      onScopeDispose(() => {
+        window.removeEventListener("storage", handler);
+      });
+    }
   };
 
   const logout = async () => {

@@ -23,12 +23,12 @@ type LicenseRecoveryService struct {
 
 // RecoveryRequest describes the payload required to reconcile a delayed issuance.
 type RecoveryRequest struct {
-	TenantUuid  string
-	ListingID string
-	PlanID    string
-	BillingID string
-	IssuedBy  string
-	Metadata  map[string]any
+	TenantUuid string
+	ListingID  string
+	PlanID     string
+	BillingID  string
+	IssuedBy   string
+	Metadata   map[string]any
 }
 
 // NewLicenseRecoveryService constructs a recovery coordinator.
@@ -89,7 +89,7 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	}
 
 	license, err := s.licenseService.IssueLicense(ctx, IssueLicenseParams{
-		TenantUuid:    req.TenantUuid,
+		TenantUuid:  req.TenantUuid,
 		ListingID:   req.ListingID,
 		PlanID:      req.PlanID,
 		IssuedBy:    issuedBy,
@@ -99,10 +99,10 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	if err != nil {
 		if s.logger != nil {
 			s.logger.WithError(err).WithFields(logrus.Fields{
-				"tenant_uuid":  req.TenantUuid,
-				"listing_id": req.ListingID,
-				"plan_id":    req.PlanID,
-				"billing_id": req.BillingID,
+				"tenant_uuid": req.TenantUuid,
+				"listing_id":  req.ListingID,
+				"plan_id":     req.PlanID,
+				"billing_id":  req.BillingID,
 			}).Error("license recovery failed")
 		}
 		return nil, false, err
@@ -110,11 +110,11 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 
 	if s.logger != nil {
 		s.logger.WithFields(logrus.Fields{
-			"tenant_uuid":  req.TenantUuid,
-			"listing_id": req.ListingID,
-			"plan_id":    req.PlanID,
-			"license_id": license.ID,
-			"billing_id": req.BillingID,
+			"tenant_uuid": req.TenantUuid,
+			"listing_id":  req.ListingID,
+			"plan_id":     req.PlanID,
+			"license_id":  license.ID,
+			"billing_id":  req.BillingID,
 		}).Info("license recovered after billing delay")
 	}
 	return license, true, nil

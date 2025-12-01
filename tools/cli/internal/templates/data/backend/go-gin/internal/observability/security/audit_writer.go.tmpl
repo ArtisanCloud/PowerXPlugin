@@ -47,17 +47,17 @@ func (w *AuditWriter) Emit(event AuditEvent) error {
 		event.Timestamp = time.Now().UTC()
 	}
 	data := struct {
-		Timestamp time.Time              `json:"timestamp"`
-		Event     string                 `json:"event"`
-		TenantUuid  string                 `json:"tenant_uuid,omitempty"`
-		Actor     string                 `json:"actor,omitempty"`
-		Metadata  map[string]interface{} `json:"metadata,omitempty"`
+		Timestamp  time.Time              `json:"timestamp"`
+		Event      string                 `json:"event"`
+		TenantUuid string                 `json:"tenant_uuid,omitempty"`
+		Actor      string                 `json:"actor,omitempty"`
+		Metadata   map[string]interface{} `json:"metadata,omitempty"`
 	}{
-		Timestamp: event.Timestamp,
-		Event:     event.Event,
-		TenantUuid:  event.TenantUuid,
-		Actor:     event.Actor,
-		Metadata:  event.Metadata,
+		Timestamp:  event.Timestamp,
+		Event:      event.Event,
+		TenantUuid: event.TenantUuid,
+		Actor:      event.Actor,
+		Metadata:   event.Metadata,
 	}
 	payload, err := json.Marshal(data)
 	if err != nil {
@@ -82,19 +82,19 @@ func (w *AuditWriter) Close() error {
 
 // AuditEvent describes the structured payload persisted by AuditWriter.
 type AuditEvent struct {
-	Event     string                 `json:"event"`
-	TenantUuid  string                 `json:"tenant_uuid,omitempty"`
-	Actor     string                 `json:"actor,omitempty"`
-	Timestamp time.Time              `json:"timestamp"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Event      string                 `json:"event"`
+	TenantUuid string                 `json:"tenant_uuid,omitempty"`
+	Actor      string                 `json:"actor,omitempty"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // EmitLifecycleSuccess helper for lifecycle events.
 func (w *AuditWriter) EmitLifecycleSuccess(tenantID, eventType, actor string, metadata map[string]interface{}) error {
 	return w.Emit(AuditEvent{
-		Event:    eventType,
+		Event:      eventType,
 		TenantUuid: tenantID,
-		Actor:    actor,
-		Metadata: metadata,
+		Actor:      actor,
+		Metadata:   metadata,
 	})
 }

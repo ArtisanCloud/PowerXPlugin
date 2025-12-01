@@ -193,7 +193,7 @@ type SafeOpDetails struct {
 type JobRunRecord struct {
 	ID             string        `json:"id"`
 	PluginID       string        `json:"plugin_id"`
-	TenantUUID       string        `json:"tenant_uuid,omitempty"`
+	TenantUuid     string        `json:"tenant_uuid,omitempty"`
 	Environment    string        `json:"environment,omitempty"`
 	JobType        JobType       `json:"job_type"`
 	TriggerSource  TriggerSource `json:"trigger_source"`
@@ -212,7 +212,7 @@ type JobRunRecord struct {
 
 // ScheduleSafeOpInput captures parameters for safe operation scheduling.
 type ScheduleSafeOpInput struct {
-	TenantUUID      *string
+	TenantUuid    *string
 	Environment   string
 	JobType       JobType
 	TriggerSource TriggerSource
@@ -228,9 +228,9 @@ type ScheduleSafeOpInput struct {
 
 // RetryRunInput describes retry invocation parameters.
 type RetryRunInput struct {
-	RunID    string
-	TenantUUID *string
-	Actor    Actor
+	RunID      string
+	TenantUuid *string
+	Actor      Actor
 }
 
 // UpdateRunStatusInput updates job run status lifecycle.
@@ -292,8 +292,8 @@ func (s *JobService) RetryRun(ctx context.Context, input RetryRunInput) (*JobRun
 	if !isRetryableStatus(existing.Status) {
 		return nil, ErrRetryNotAllowed
 	}
-	if input.TenantUUID != nil {
-		if existing.TenantUUID == nil || strings.TrimSpace(*existing.TenantUUID) != strings.TrimSpace(*input.TenantUUID) {
+	if input.TenantUuid != nil {
+		if existing.TenantUuid == nil || strings.TrimSpace(*existing.TenantUuid) != strings.TrimSpace(*input.TenantUuid) {
 			return nil, ErrRetryNotAllowed
 		}
 	}
@@ -310,7 +310,7 @@ func (s *JobService) RetryRun(ctx context.Context, input RetryRunInput) (*JobRun
 		action = SafeOpActionRetry
 	}
 	scheduleInput := ScheduleSafeOpInput{
-		TenantUUID:      existing.TenantUUID,
+		TenantUuid:    existing.TenantUuid,
 		Environment:   existing.Environment,
 		JobType:       JobType(existing.JobType),
 		TriggerSource: TriggerSourceManual,
@@ -377,12 +377,12 @@ func (s *JobService) ListRuns(ctx context.Context, tenantID *string, jobType str
 		return nil, "", ErrJobServiceUnavailable
 	}
 	opts := consolerepo.JobRunListOptions{
-		PluginID: app.PluginID,
-		TenantUUID: tenantID,
-		JobType:  jobType,
-		Status:   status,
-		Cursor:   cursor,
-		Limit:    limit,
+		PluginID:   app.PluginID,
+		TenantUuid: tenantID,
+		JobType:    jobType,
+		Status:     status,
+		Cursor:     cursor,
+		Limit:      limit,
 	}
 	runs, next, err := s.repo.List(ctx, opts)
 	if err != nil {
@@ -403,7 +403,7 @@ func (s *JobService) ListRuns(ctx context.Context, tenantID *string, jobType str
 }
 
 func (s *JobService) checkActiveRun(ctx context.Context, input ScheduleSafeOpInput) error {
-	active, err := s.repo.HasActiveRun(ctx, app.PluginID, input.TenantUUID, string(input.Action), string(input.ScopeType), input.ScopeRef)
+	active, err := s.repo.HasActiveRun(ctx, app.PluginID, input.TenantUuid, string(input.Action), string(input.ScopeType), input.ScopeRef)
 	if err != nil {
 		return err
 	}
@@ -418,8 +418,8 @@ func (s *JobService) buildRun(input ScheduleSafeOpInput, retryOf *string) *model
 	runID := uuid.NewString()
 	scopeRef := strings.TrimSpace(input.ScopeRef)
 	var tenantID *string
-	if input.TenantUUID != nil && strings.TrimSpace(*input.TenantUUID) != "" {
-		clean := strings.TrimSpace(*input.TenantUUID)
+	if input.TenantUuid != nil && strings.TrimSpace(*input.TenantUuid) != "" {
+		clean := strings.TrimSpace(*input.TenantUuid)
 		tenantID = &clean
 	}
 	var retryPtr *string
@@ -441,7 +441,7 @@ func (s *JobService) buildRun(input ScheduleSafeOpInput, retryOf *string) *model
 	return &model.JobRun{
 		ID:            runID,
 		PluginID:      app.PluginID,
-		TenantUUID:      tenantID,
+		TenantUuid:    tenantID,
 		Environment:   strings.TrimSpace(input.Environment),
 		JobType:       string(input.JobType),
 		TriggerSource: string(input.TriggerSource),
@@ -546,8 +546,8 @@ func mapJobRunRecord(run *model.JobRun, scopeType SafeOpScope, scopeRef string, 
 			DryRun:    dryRun,
 		},
 	}
-	if run.TenantUUID != nil {
-		record.TenantUUID = *run.TenantUUID
+	if run.TenantUuid != nil {
+		record.TenantUuid = *run.TenantUuid
 	}
 	if run.Message != nil {
 		record.Message = *run.Message

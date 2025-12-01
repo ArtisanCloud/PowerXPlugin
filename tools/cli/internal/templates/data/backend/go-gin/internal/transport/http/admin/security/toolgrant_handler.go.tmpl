@@ -23,7 +23,7 @@ func NewToolGrantHandler(deps *app.Deps) *ToolGrantHandler {
 
 func (h *ToolGrantHandler) Revoke(c *gin.Context) {
 	var payload struct {
-		TenantUuid    string `json:"tenant_uuid" binding:"required"`
+		TenantUuid  string `json:"tenant_uuid" binding:"required"`
 		ToolGrantID string `json:"toolgrant_id" binding:"required"`
 		Reason      string `json:"reason"`
 		RequestedBy string `json:"requested_by"`

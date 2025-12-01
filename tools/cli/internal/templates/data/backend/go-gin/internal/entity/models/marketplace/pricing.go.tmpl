@@ -18,7 +18,7 @@ const (
 type PricingPlan struct {
 	ID              string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	ListingID       string            `gorm:"column:listing_id;type:uuid;not null;index" json:"listing_id"`
-	TenantUuid        string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
+	TenantUuid      string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	PlanCode        string            `gorm:"column:plan_code;type:text;not null" json:"plan_code"`
 	PlanType        string            `gorm:"column:plan_type;type:text;not null" json:"plan_type"`
 	Currency        string            `gorm:"column:currency;type:text;not null" json:"currency"`
@@ -43,7 +43,7 @@ func (*PricingPlan) TableName() string {
 type PlanTier struct {
 	ID         string    `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	PlanID     string    `gorm:"column:plan_id;type:uuid;not null;index" json:"plan_id"`
-	TenantUuid   string    `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
+	TenantUuid string    `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	Metric     string    `gorm:"column:metric;type:text;not null" json:"metric"`
 	RangeFrom  float64   `gorm:"column:range_from;type:numeric(18,4);not null" json:"range_from"`
 	RangeTo    *float64  `gorm:"column:range_to;type:numeric(18,4)" json:"range_to,omitempty"`

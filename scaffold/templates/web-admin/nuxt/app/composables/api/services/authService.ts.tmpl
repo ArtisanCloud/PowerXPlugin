@@ -221,7 +221,9 @@ export const useAuthService = () => {
      * 前端表单注册（转换数据格式）
      */
     registerFromForm: (formData: RegisterFormData) => {
-      const fallbackTenant = getTenantUuid() || "tenant-demo";
+      const fallbackTenant =
+        getTenantUuid() ||
+        "tenant-demo";
       const registerData: RegisterParams = {
         tenant_uuid: fallbackTenant,
         username: formData.username,

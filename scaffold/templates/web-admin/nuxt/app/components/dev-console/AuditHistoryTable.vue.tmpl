@@ -8,7 +8,10 @@
         <UInput v-model="filters.action" placeholder="config.section.update" />
       </UFormGroup>
       <UFormGroup label="权限代码">
-        <UInput v-model="filters.permission_code" placeholder="operations.plugin.admin" />
+        <UInput
+          v-model="filters.permission_code"
+          placeholder="operations.plugin.admin"
+        />
       </UFormGroup>
       <UFormGroup label="租户 ID">
         <UInput v-model="filters.tenant_uuid" placeholder="tenant-1" />
@@ -34,12 +37,17 @@
         <span v-if="row.actor.email" class="block text-xs text-gray-500">{{ `{{ row.actor.email }}` }}</span>
       </template>
       <template #summary-data="{ row }">
-        <span>{{ `{{ row.summary || '-' }}` }}</span>
+        <span>{{ `{{ row.summary || "-" }}` }}</span>
       </template>
     </UTable>
 
     <div class="flex justify-between items-center">
-      <UButton color="primary" :disabled="!nextCursor || loading" variant="soft" @click="$emit('load-more')">
+      <UButton
+        color="primary"
+        :disabled="!nextCursor || loading"
+        variant="soft"
+        @click="$emit('load-more')"
+      >
         加载更多
       </UButton>
       <slot name="actions" />
@@ -48,60 +56,63 @@
 </template>
 
 <script setup lang="ts">
-import type { AuditEvent, AuditFilters } from '~/stores/dev-console/audit'
+import type { AuditEvent, AuditFilters } from "~/stores/dev-console/audit";
 
 const props = defineProps<{
-  events: AuditEvent[]
-  loading?: boolean
-  nextCursor?: string
-  modelValue: AuditFilters
-}>()
+  events: AuditEvent[];
+  loading?: boolean;
+  nextCursor?: string;
+  modelValue: AuditFilters;
+}>();
 
 const emit = defineEmits<{
-  (event: 'update:modelValue', payload: AuditFilters): void
-  (event: 'apply'): void
-  (event: 'load-more'): void
-}>()
+  (event: "update:modelValue", payload: AuditFilters): void;
+  (event: "apply"): void;
+  (event: "load-more"): void;
+}>();
 
-const filters = reactive<AuditFilters>({ ...props.modelValue })
-const nextCursor = computed(() => props.nextCursor)
+const filters = reactive<AuditFilters>({ ...props.modelValue });
+const nextCursor = computed(() => props.nextCursor);
 
 watch(
   () => props.modelValue,
-  value => {
-    Object.assign(filters, value)
+  (value) => {
+    Object.assign(filters, value);
   }
-)
+);
 
 const columns = [
-  { key: 'occurred_at', label: '时间' },
-  { key: 'actor', label: '操作人' },
-  { key: 'action', label: '动作' },
-  { key: 'permission_code', label: '权限' },
-  { key: 'resource_type', label: '资源' },
-  { key: 'summary', label: '概要' },
-]
+  { key: "occurred_at", label: "时间" },
+  { key: "actor", label: "操作人" },
+  { key: "action", label: "动作" },
+  { key: "permission_code", label: "权限" },
+  { key: "resource_type", label: "资源" },
+  { key: "summary", label: "概要" },
+];
 
 function applyFilters() {
-  const clean: AuditFilters = {}
+  const clean: AuditFilters = {};
   for (const [key, value] of Object.entries(filters)) {
-    if (value !== undefined && value !== '') {
-      (clean as any)[key] = value
+    if (value !== undefined && value !== "") {
+      (clean as any)[key] = value;
     }
   }
-  emit('update:modelValue', clean)
-  emit('apply')
+  emit("update:modelValue", clean);
+  emit("apply");
 }
 
 function reset() {
   for (const key of Object.keys(filters)) {
-    (filters as any)[key] = undefined
+    (filters as any)[key] = undefined;
   }
-  applyFilters()
+  applyFilters();
 }
 
 function formatDate(value?: string) {
-  if (!value) return '-'
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("zh-CN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 </script>

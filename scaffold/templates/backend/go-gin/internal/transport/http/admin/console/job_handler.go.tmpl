@@ -42,10 +42,10 @@ func respondAccepted(c *gin.Context, data any) {
 
 type listRunsQuery struct {
 	TenantUuid string `form:"tenant_uuid"`
-	JobType  string `form:"job_type"`
-	Status   string `form:"status"`
-	Cursor   string `form:"cursor"`
-	Limit    int    `form:"limit"`
+	JobType    string `form:"job_type"`
+	Status     string `form:"status"`
+	Cursor     string `form:"cursor"`
+	Limit      int    `form:"limit"`
 }
 
 // ListRuns returns recent job runs filtered by tenant/job type.
@@ -114,9 +114,9 @@ func (h *JobHandler) RetryRun(c *gin.Context) {
 	actor := resolveActor(c)
 	actor.PermissionCode = "operations.plugin.ops"
 	result, err := h.jobs.RetryRun(c.Request.Context(), consolesvc.RetryRunInput{
-		RunID:    runID,
+		RunID:      runID,
 		TenantUuid: tenantPtr,
-		Actor:    actor,
+		Actor:      actor,
 	})
 	if err != nil {
 		switch {
@@ -141,7 +141,7 @@ func (h *JobHandler) RetryRun(c *gin.Context) {
 }
 
 type safeOpBody struct {
-	TenantUuid    string `json:"tenant_uuid"`
+	TenantUuid  string `json:"tenant_uuid"`
 	Environment string `json:"environment"`
 	Action      string `json:"action" binding:"required"`
 	ScopeType   string `json:"scope_type" binding:"required"`
@@ -170,7 +170,7 @@ func (h *JobHandler) ExecuteSafeOp(c *gin.Context) {
 		tenantPtr = &clean
 	}
 	request := consolesvc.SafeOpRequest{
-		TenantUuid:    tenantPtr,
+		TenantUuid:  tenantPtr,
 		Environment: strings.TrimSpace(body.Environment),
 		Action:      consolesvc.SafeOpAction(strings.ToLower(strings.TrimSpace(body.Action))),
 		ScopeType:   consolesvc.SafeOpScope(strings.ToLower(strings.TrimSpace(body.ScopeType))),

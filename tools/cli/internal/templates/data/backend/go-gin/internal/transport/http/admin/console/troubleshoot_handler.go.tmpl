@@ -59,7 +59,7 @@ func (h *TroubleshootHandler) Summary(c *gin.Context) {
 }
 
 type attemptsQuery struct {
-	TenantUuid       string `form:"tenant_uuid"`
+	TenantUuid     string `form:"tenant_uuid"`
 	Status         string `form:"status"`
 	SubscriptionID string `form:"subscription_id"`
 	Since          string `form:"since"`
@@ -93,7 +93,7 @@ func (h *TroubleshootHandler) ListWebhookAttempts(c *gin.Context) {
 		sincePtr = &parsed
 	}
 	list, err := h.svc.ListWebhookAttempts(c.Request.Context(), consolesvc.WebhookAttemptListInput{
-		TenantUuid:       tenant,
+		TenantUuid:     tenant,
 		Status:         strings.TrimSpace(query.Status),
 		SubscriptionID: strings.TrimSpace(query.SubscriptionID),
 		Since:          sincePtr,

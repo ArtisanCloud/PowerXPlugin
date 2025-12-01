@@ -95,7 +95,7 @@ func (h *Handler) ListWebhooks(c *gin.Context) {
 			statuses = append(statuses, strings.ToUpper(strings.TrimSpace(status)))
 		}
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -119,13 +119,13 @@ func (h *Handler) CreateWebhook(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
 	}
 	sub, err := h.webhookService.CreateSubscription(c.Request.Context(), service.CreateSubscriptionParams{
-		TenantUuid:        tenantID,
+		TenantUuid:      tenantID,
 		EventType:       req.EventType,
 		TargetURL:       req.TargetURL,
 		SecretPlaintext: req.Secret,
@@ -151,13 +151,13 @@ func (h *Handler) UpdateWebhook(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
 	}
 	sub, err := h.webhookService.UpdateSubscription(c.Request.Context(), service.UpdateSubscriptionParams{
-		TenantUuid:       tenantID,
+		TenantUuid:     tenantID,
 		SubscriptionID: c.Param("id"),
 		TargetURL:      req.TargetURL,
 		Status:         req.Status,
@@ -182,7 +182,7 @@ func (h *Handler) DeleteWebhook(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "webhook service not available", nil)
 		return
 	}
-	tenantID, ok := httpmw.TenantUUIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return

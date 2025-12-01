@@ -106,9 +106,7 @@ export function useApiClient() {
     }
 
     if (!headers.has("X-Tenant-UUID")) {
-      const tenant =
-        (next as any).tenantUuid ||
-        getTenantUuid();
+      const tenant = (next as any).tenantUuid || getTenantUuid();
       if (tenant) {
         headers.set("X-Tenant-UUID", String(tenant));
       }

@@ -112,7 +112,7 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 	}
 	userCtx := &UserContext{
 		TenantUUID:    tenantUUID,
-		TenantUuid:      tenantUUID,
+		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
 		MemberID:      member.ID,
@@ -155,9 +155,10 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 	if member.DepartmentID != nil {
 		deptIDs = append(deptIDs, *member.DepartmentID)
 	}
+	tenantUUID := tenantIdentifier(tenant)
 	userCtx := &UserContext{
 		TenantUUID:    tenantUUID,
-		TenantUuid:      tenantUUID,
+		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
 		MemberID:      member.ID,
@@ -206,7 +207,7 @@ func (d *LocalDirectory) ListRoles(ctx context.Context, tenantUUID string) ([]Ro
 		result = append(result, RoleInfo{
 			ID:          r.ID,
 			TenantUUID:  scopeTenant,
-			TenantUuid:    r.TenantUuid,
+			TenantUuid:  r.TenantUuid,
 			Code:        r.Code,
 			Name:        r.Name,
 			Description: r.Description,
@@ -230,7 +231,7 @@ func (d *LocalDirectory) ListDepartments(ctx context.Context, tenantUUID string)
 		info := DepartmentInfo{
 			ID:          dep.ID,
 			TenantUUID:  scopeTenant,
-			TenantUuid:    dep.TenantUuid,
+			TenantUuid:  dep.TenantUuid,
 			Name:        dep.Name,
 			Code:        dep.Code,
 			Description: dep.Description,
@@ -296,7 +297,7 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 	}
 	return &UserContext{
 		TenantUUID:    resolvedTenant,
-		TenantUuid:      resolvedTenant,
+		TenantUuid:    resolvedTenant,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
 		MemberID:      member.ID,
@@ -420,11 +421,11 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 func (d *LocalDirectory) persistRefreshToken(ctx context.Context, uc *UserContext, refreshToken string) error {
 	hash := hashToken(refreshToken)
 	rec := &iamm.RefreshToken{
-		TokenHash: hash,
-		UserID:    uc.UserID,
-		TenantUuid:  uc.TenantUuid,
-		MemberID:  uc.MemberID,
-		ExpiresAt: time.Now().Add(d.refreshTTL),
+		TokenHash:  hash,
+		UserID:     uc.UserID,
+		TenantUuid: uc.TenantUuid,
+		MemberID:   uc.MemberID,
+		ExpiresAt:  time.Now().Add(d.refreshTTL),
 	}
 	return d.db.WithContext(ctx).Create(rec).Error
 }
@@ -435,11 +436,11 @@ func (d *LocalDirectory) rotateRefreshToken(ctx context.Context, rec *iamm.Refre
 			return err
 		}
 		return tx.Create(&iamm.RefreshToken{
-			TokenHash: hashToken(newToken),
-			UserID:    uc.UserID,
-			TenantUuid:  uc.TenantUuid,
-			MemberID:  uc.MemberID,
-			ExpiresAt: time.Now().Add(d.refreshTTL),
+			TokenHash:  hashToken(newToken),
+			UserID:     uc.UserID,
+			TenantUuid: uc.TenantUuid,
+			MemberID:   uc.MemberID,
+			ExpiresAt:  time.Now().Add(d.refreshTTL),
 		}).Error
 	})
 }

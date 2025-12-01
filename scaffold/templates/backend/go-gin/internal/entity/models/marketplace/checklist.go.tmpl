@@ -20,7 +20,7 @@ const (
 type ChecklistRun struct {
 	ID            string          `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	ListingID     string          `gorm:"column:listing_id;type:uuid;not null;index" json:"listing_id"`
-	TenantUuid      string          `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
+	TenantUuid    string          `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	TriggerSource string          `gorm:"column:trigger_source;type:text;not null" json:"trigger_source"`
 	RunNumber     int             `gorm:"column:run_number;type:int;not null;default:1" json:"run_number"`
 	Status        string          `gorm:"column:status;type:text;not null;default:'pending'" json:"status"`
@@ -40,7 +40,7 @@ func (*ChecklistRun) TableName() string {
 type ChecklistItem struct {
 	ID             string    `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	ChecklistRunID string    `gorm:"column:checklist_run_id;type:uuid;not null;index" json:"checklist_run_id"`
-	TenantUuid       string    `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
+	TenantUuid     string    `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	Code           string    `gorm:"column:code;type:text;not null" json:"code"`
 	Description    string    `gorm:"column:description;type:text;not null" json:"description"`
 	Result         string    `gorm:"column:result;type:text;not null" json:"result"`

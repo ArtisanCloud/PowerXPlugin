@@ -185,7 +185,7 @@ func (s *AnalyticsService) RecordEnvelope(ctx context.Context, tenantID string, 
 			}
 			aggregate := &dbm.UsageAggregate{
 				ID:         "",
-				TenantUuid:   tenantID,
+				TenantUuid: tenantID,
 				LicenseID:  license.ID,
 				Metric:     metric.Name,
 				Window:     window,
@@ -217,7 +217,7 @@ func (s *AnalyticsService) RecordEnvelope(ctx context.Context, tenantID string, 
 		for _, alert := range alerts {
 			if listing != nil && strings.TrimSpace(listing.VendorID) != "" && s.notificationRepo != nil {
 				payload := dbm.Notification{
-					TenantUuid:      tenantID,
+					TenantUuid:    tenantID,
 					RecipientType: "vendor",
 					RecipientID:   listing.VendorID,
 					Channel:       "in_app",
@@ -333,7 +333,7 @@ func (s *AnalyticsService) EnsureRevenueReport(ctx context.Context, tenantID, ve
 		currency = split.Currency
 	}
 	report := &dbm.RevenueShareReport{
-		TenantUuid:      tenantID,
+		TenantUuid:    tenantID,
 		VendorID:      vendorID,
 		PeriodStart:   periodStart.UTC(),
 		PeriodEnd:     periodEnd.UTC(),

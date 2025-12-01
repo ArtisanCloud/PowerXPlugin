@@ -31,8 +31,8 @@ func (r *WebhookSubscriptionRepository) Upsert(ctx context.Context, sub *model.W
 	if sub == nil {
 		return nil, errors.New("webhook subscription is nil")
 	}
-	if strings.TrimSpace(sub.TenantID) == "" {
-		return nil, errors.New("tenant_id is required")
+	if strings.TrimSpace(sub.TenantUuid) == "" {
+		return nil, errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(sub.EventType) == "" {
 		return nil, errors.New("event_type is required")
@@ -49,10 +49,10 @@ func (r *WebhookSubscriptionRepository) Upsert(ctx context.Context, sub *model.W
 		sub.ID = uuid.NewString()
 	}
 
-	err := r.WithTenantTx(ctx, sub.TenantID, func(tx *gorm.DB) error {
+	err := r.WithTenantTx(ctx, sub.TenantUuid, func(tx *gorm.DB) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "tenant_id"},
+				{Name: "tenant_uuid"},
 				{Name: "event_type"},
 				{Name: "target_url"},
 			},
@@ -75,7 +75,7 @@ func (r *WebhookSubscriptionRepository) Upsert(ctx context.Context, sub *model.W
 func (r *WebhookSubscriptionRepository) GetByID(ctx context.Context, tenantID, subscriptionID string) (*model.WebhookSubscription, error) {
 	var sub model.WebhookSubscription
 	if err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND id = ?", tenantID, subscriptionID).
+		Where("tenant_uuid = ? AND id = ?", tenantID, subscriptionID).
 		First(&sub).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -102,7 +102,7 @@ func (r *WebhookSubscriptionRepository) GetBySubscriptionID(ctx context.Context,
 // ListByTenant returns all subscriptions for a tenant filtered by status.
 func (r *WebhookSubscriptionRepository) ListByTenant(ctx context.Context, tenantID string, statuses []string) ([]*model.WebhookSubscription, error) {
 	var subs []*model.WebhookSubscription
-	query := r.DB.WithContext(ctx).Where("tenant_id = ?", tenantID)
+	query := r.DB.WithContext(ctx).Where("tenant_uuid = ?", tenantID)
 	if len(statuses) > 0 {
 		query = query.Where("status IN ?", statuses)
 	}
@@ -115,7 +115,7 @@ func (r *WebhookSubscriptionRepository) ListByTenant(ctx context.Context, tenant
 // Delete removes a subscription.
 func (r *WebhookSubscriptionRepository) Delete(ctx context.Context, tenantID, subscriptionID string) error {
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
-		res := tx.Where("tenant_id = ? AND id = ?", tenantID, subscriptionID).Delete(&model.WebhookSubscription{})
+		res := tx.Where("tenant_uuid = ? AND id = ?", tenantID, subscriptionID).Delete(&model.WebhookSubscription{})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -134,7 +134,7 @@ func (r *WebhookSubscriptionRepository) UpdateStatus(ctx context.Context, tenant
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		res := tx.Model(&model.WebhookSubscription{}).
-			Where("tenant_id = ? AND id = ?", tenantID, subscriptionID).
+			Where("tenant_uuid = ? AND id = ?", tenantID, subscriptionID).
 			Updates(map[string]any{
 				"status":     status,
 				"updated_at": time.Now().UTC(),
@@ -155,7 +155,7 @@ func (r *WebhookSubscriptionRepository) DebugLogSubscription(sub *model.WebhookS
 		return
 	}
 	logger.WithField("subscription_id", sub.ID).
-		WithField("tenant_id", sub.TenantID).
+		WithField("tenant_uuid", sub.TenantUuid).
 		WithField("event_type", sub.EventType).
 		WithField("status", sub.Status).
 		Debug("webhook subscription persisted")

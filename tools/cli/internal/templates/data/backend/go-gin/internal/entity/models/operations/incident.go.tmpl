@@ -11,7 +11,7 @@ import (
 type Incident struct {
 	ID              string            `gorm:"primaryKey;type:uuid" json:"id"`
 	PluginID        string            `gorm:"column:plugin_id;index:idx_operations_incidents_scope" json:"plugin_id"`
-	TenantID        *string           `gorm:"column:tenant_id;index:idx_operations_incidents_scope" json:"tenant_id,omitempty"`
+	TenantUuid        *string           `gorm:"column:tenant_uuid;index:idx_operations_incidents_scope" json:"tenant_uuid,omitempty"`
 	Severity        string            `gorm:"column:severity" json:"severity"`
 	Status          string            `gorm:"column:status" json:"status"`
 	DetectionSource string            `gorm:"column:detection_source" json:"detection_source"`

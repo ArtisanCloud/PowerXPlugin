@@ -27,7 +27,7 @@ func NewTroubleshootHandler(deps *app.Deps) *TroubleshootHandler {
 }
 
 type summaryQuery struct {
-	TenantID string `form:"tenant_id"`
+	TenantUuid string `form:"tenant_uuid"`
 }
 
 // Summary returns troubleshooting dashboard data.
@@ -42,11 +42,11 @@ func (h *TroubleshootHandler) Summary(c *gin.Context) {
 		return
 	}
 	var tenantPtr *string
-	if strings.TrimSpace(query.TenantID) != "" {
-		clean := strings.TrimSpace(query.TenantID)
+	if strings.TrimSpace(query.TenantUuid) != "" {
+		clean := strings.TrimSpace(query.TenantUuid)
 		tenantPtr = &clean
 	}
-	summary, err := h.svc.Summary(c.Request.Context(), consolesvc.TroubleshootSummaryInput{TenantID: tenantPtr})
+	summary, err := h.svc.Summary(c.Request.Context(), consolesvc.TroubleshootSummaryInput{TenantUuid: tenantPtr})
 	if err != nil {
 		if errors.Is(err, consolesvc.ErrJobServiceUnavailable) {
 			contracts.ResponseServiceUnavailable(c, err.Error(), nil)
@@ -59,7 +59,7 @@ func (h *TroubleshootHandler) Summary(c *gin.Context) {
 }
 
 type attemptsQuery struct {
-	TenantID       string `form:"tenant_id"`
+	TenantUuid       string `form:"tenant_uuid"`
 	Status         string `form:"status"`
 	SubscriptionID string `form:"subscription_id"`
 	Since          string `form:"since"`
@@ -78,9 +78,9 @@ func (h *TroubleshootHandler) ListWebhookAttempts(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query parameters: "+err.Error())
 		return
 	}
-	tenant := strings.TrimSpace(query.TenantID)
+	tenant := strings.TrimSpace(query.TenantUuid)
 	if tenant == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, "tenant_id is required")
+		contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, "tenant_uuid is required")
 		return
 	}
 	var sincePtr *time.Time
@@ -93,7 +93,7 @@ func (h *TroubleshootHandler) ListWebhookAttempts(c *gin.Context) {
 		sincePtr = &parsed
 	}
 	list, err := h.svc.ListWebhookAttempts(c.Request.Context(), consolesvc.WebhookAttemptListInput{
-		TenantID:       tenant,
+		TenantUuid:       tenant,
 		Status:         strings.TrimSpace(query.Status),
 		SubscriptionID: strings.TrimSpace(query.SubscriptionID),
 		Since:          sincePtr,
@@ -116,7 +116,7 @@ func (h *TroubleshootHandler) ListWebhookAttempts(c *gin.Context) {
 }
 
 type attemptQuery struct {
-	TenantID string `form:"tenant_id"`
+	TenantUuid string `form:"tenant_uuid"`
 }
 
 // GetWebhookAttempt returns attempt details when found.
@@ -135,9 +135,9 @@ func (h *TroubleshootHandler) GetWebhookAttempt(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query parameters: "+err.Error())
 		return
 	}
-	tenant := strings.TrimSpace(query.TenantID)
+	tenant := strings.TrimSpace(query.TenantUuid)
 	if tenant == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, "tenant_id is required")
+		contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, "tenant_uuid is required")
 		return
 	}
 	attempt, err := h.svc.GetWebhookAttempt(c.Request.Context(), attemptID, tenant)

@@ -15,12 +15,12 @@ func TestPricingRepository_CreateAndUpdatePlan(t *testing.T) {
 
 	amount := 19.99
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "standard",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
-		Amount:    &amount,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "standard",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
+		Amount:     &amount,
 	}
 	tiers := []dbm.PlanTier{
 		{Metric: "requests", RangeFrom: 0, RangeTo: floatPtr(1000), UnitAmount: 0.01, UnitName: "call"},
@@ -54,20 +54,20 @@ func TestPricingRepository_SetDefaultPlan(t *testing.T) {
 	ctx := context.Background()
 
 	standard := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "standard",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "standard",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
 	}
 	require.NoError(t, repo.CreatePlan(ctx, standard, nil))
 
 	premium := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "premium",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "premium",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
 	}
 	require.NoError(t, repo.CreatePlan(ctx, premium, nil))
 

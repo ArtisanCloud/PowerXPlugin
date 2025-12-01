@@ -18,10 +18,10 @@
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-end gap-4">
-          <UFormGroup label="Tenant ID" required class="w-full sm:w-64">
-            <UInput v-model="tenantId" placeholder="tenant-123" :disabled="loading" />
+          <UFormGroup label="Tenant UUID" required class="w-full sm:w-64">
+            <UInput v-model="tenantUuid" placeholder="tenant-123" :disabled="loading" />
           </UFormGroup>
-          <UButton color="primary" :loading="loading" :disabled="!tenantId" @click="loadData">
+          <UButton color="primary" :loading="loading" :disabled="!tenantUuid" @click="loadData">
             Refresh
           </UButton>
         </div>
@@ -99,7 +99,7 @@ import type { ToolGrantRevocation, ToolGrantUsageEvent } from "~/types/security"
 const runtimeConfig = useRuntimeConfig();
 const toast = useToast();
 
-const tenantId = ref("");
+const tenantUuid = ref("");
 const loading = ref(false);
 const revocations = ref<ToolGrantRevocation[]>([]);
 const usageEvents = ref<ToolGrantUsageEvent[]>([]);
@@ -126,19 +126,19 @@ const usageColumns = [
 const formatDate = (value?: string) => (value ? new Date(value).toLocaleString() : "");
 
 const loadData = async () => {
-  if (!tenantId.value) {
-    toast.add({ title: "Tenant ID required", color: "red" });
+  if (!tenantUuid.value) {
+    toast.add({ title: "Tenant UUID required", color: "red" });
     return;
   }
   loading.value = true;
   try {
     const [revResp, usageResp] = await Promise.all([
       $fetch<{ data: ToolGrantRevocation[] }>(`${runtimeConfig.public.apiBaseUrl}/admin/security/toolgrants/revocations`, {
-        params: { tenant_id: tenantId.value },
+          params: { tenant_uuid: tenantUuid.value },
         credentials: "include",
       }),
       $fetch<{ data: ToolGrantUsageEvent[] }>(`${runtimeConfig.public.apiBaseUrl}/admin/security/toolgrants/usage`, {
-        params: { tenant_id: tenantId.value },
+          params: { tenant_uuid: tenantUuid.value },
         credentials: "include",
       }),
     ]);

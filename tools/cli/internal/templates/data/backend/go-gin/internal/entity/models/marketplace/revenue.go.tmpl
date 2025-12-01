@@ -16,7 +16,7 @@ const (
 // RevenueShareReport captures vendor/platform revenue distribution for a period.
 type RevenueShareReport struct {
 	ID            string    `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID      string    `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid      string    `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	VendorID      string    `gorm:"column:vendor_id;type:text;not null;index" json:"vendor_id"`
 	PeriodStart   time.Time `gorm:"column:period_start;type:timestamptz;not null;index" json:"period_start"`
 	PeriodEnd     time.Time `gorm:"column:period_end;type:timestamptz;not null;index" json:"period_end"`

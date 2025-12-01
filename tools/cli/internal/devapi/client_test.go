@@ -23,11 +23,11 @@ func TestClient_Register(t *testing.T) {
 		// Write response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{
+		w.Write([]byte(`{"code":201,"message":"ok","data":{
 			"sessionId": "sess-123",
 			"reloadToken": "token-456",
 			"adminPreviewUrl": "/admin/dev/preview"
-		}`))
+		}}`))
 	}))
 	defer server.Close()
 
@@ -78,7 +78,7 @@ func TestClient_Reload(t *testing.T) {
 
 		// Write response
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "success", "logsRef": "/admin/logs/123"}`))
+		w.Write([]byte(`{"code":200,"message":"ok","data":{"status": "success", "reloadId":"reload-1","estimatedTime":0}}`))
 	}))
 	defer server.Close()
 
@@ -111,7 +111,8 @@ func TestClient_Delete(t *testing.T) {
 			t.Errorf("Expected path /internal/dev/plugins/register/sess-123, got %s", r.URL.Path)
 		}
 
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"code":200,"message":"ok","data":{}}`))
 	}))
 	defer server.Close()
 

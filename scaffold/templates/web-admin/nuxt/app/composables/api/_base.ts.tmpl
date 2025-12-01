@@ -51,15 +51,16 @@ export function getAuthToken(): string | undefined {
   return undefined;
 }
 
-export function getTenantId(): string | undefined {
+export function getTenantUuid(): string | undefined {
   // TODO: 换成你的 Pinia/Cookie 逻辑
   if (typeof document !== "undefined") {
-    const m = document.cookie.match(/(?:^|;\s*)tenant_id=([^;]+)/);
+    const m = document.cookie.match(/(?:^|;\s*)tenant_uuid=([^;]+)/);
     if (m) return decodeURIComponent(m[1]);
   }
   const cfg =
     typeof useRuntimeConfig === "function" ? useRuntimeConfig() : ({} as any);
-  return (cfg.public as any)?.defaultTenantId;
+  const publicCfg = cfg.public as any;
+  return publicCfg?.defaultTenantUuid || publicCfg?.defaultTenantId;
 }
 
 // 通用类型定义

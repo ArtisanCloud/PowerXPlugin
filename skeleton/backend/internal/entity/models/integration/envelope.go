@@ -16,7 +16,7 @@ type IntegrationEnvelope struct {
 	MessageID      uuid.UUID
 	TraceID        uuid.UUID
 	CorrelationID  uuid.UUID
-	TenantID       string
+	TenantUuid     string
 	ToolScope      string
 	IssuedAt       time.Time
 	IdempotencyKey string
@@ -81,8 +81,8 @@ func (e *IntegrationEnvelope) Validate(now time.Time, payloadThresholdBytes int6
 	if e.CorrelationID == uuid.Nil {
 		errs = append(errs, EnvelopeValidationError{Field: "correlation_id", Reason: "must be a valid UUID"})
 	}
-	if strings.TrimSpace(e.TenantID) == "" {
-		errs = append(errs, EnvelopeValidationError{Field: "tenant_id", Reason: "required"})
+	if strings.TrimSpace(e.TenantUuid) == "" {
+		errs = append(errs, EnvelopeValidationError{Field: "tenant_uuid", Reason: "required"})
 	}
 	if strings.TrimSpace(e.ToolScope) == "" {
 		errs = append(errs, EnvelopeValidationError{Field: "tool_scope", Reason: "required"})
@@ -137,7 +137,7 @@ func (e *IntegrationEnvelope) Validate(now time.Time, payloadThresholdBytes int6
 
 // Normalize 将部分字段标准化。
 func (e *IntegrationEnvelope) Normalize() {
-	e.TenantID = strings.TrimSpace(e.TenantID)
+	e.TenantUuid = strings.TrimSpace(e.TenantUuid)
 	e.ToolScope = strings.TrimSpace(e.ToolScope)
 	e.IdempotencyKey = strings.TrimSpace(e.IdempotencyKey)
 	e.PayloadRef = strings.TrimSpace(e.PayloadRef)

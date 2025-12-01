@@ -1,7 +1,7 @@
 export interface IntegrationEnvelopePreview {
   messageId: string
   toolScope: string
-  tenantId: string
+  tenantUuid: string
   issuedAt: string
 }
 
@@ -15,7 +15,7 @@ export interface IntegrationApprovalStatus {
 
 export interface IntegrationWebhookSubscription {
   id: string
-  tenant_id: string
+  tenant_uuid: string
   event_type: string
   target_url: string
   retry_policy?: number[]
@@ -39,7 +39,7 @@ export interface IntegrationWebhookAttempt {
 
 export interface IntegrationSecret {
   id: string
-  tenant_id: string
+  tenant_uuid: string
   integration_type: string
   current_secret_ref?: string
   pending_secret_ref?: string
@@ -197,7 +197,7 @@ export interface MarketplaceUsageDashboard {
 
 export interface MarketplaceRevenueReport {
   id: string
-  tenant_id: string
+  tenant_uuid: string
   vendor_id: string
   period_start: string
   period_end: string

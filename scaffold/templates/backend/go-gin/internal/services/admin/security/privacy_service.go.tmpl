@@ -35,7 +35,7 @@ func NewPrivacyService(db *gorm.DB, cfg *config.Config, logger *logrus.Entry, au
 // ListConsentTokens returns consent tokens for a tenant filtered by optional status values.
 func (s *PrivacyService) ListConsentTokens(ctx context.Context, tenantID string, statuses ...string) ([]*privmodel.ConsentToken, error) {
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	return s.repo.ListConsentTokensByStatus(ctx, tenantID, statuses...)
 }
@@ -43,7 +43,7 @@ func (s *PrivacyService) ListConsentTokens(ctx context.Context, tenantID string,
 // RevokeConsentToken marks a consent token as revoked and appends lifecycle evidence.
 func (s *PrivacyService) RevokeConsentToken(ctx context.Context, tenantID, tokenID, reason, actor string) error {
 	if tenantID == "" || tokenID == "" {
-		return errors.New("tenant_id and token_id are required")
+		return errors.New("tenant_uuid and token_id are required")
 	}
 	if reason == "" {
 		reason = "revoked_by_admin"
@@ -57,7 +57,7 @@ func (s *PrivacyService) RevokeConsentToken(ctx context.Context, tenantID, token
 		actor = "admin"
 	}
 	_, err := s.repo.CreateLifecycleEvent(ctx, &privmodel.LifecycleEvent{
-		TenantID:   tenantID,
+		TenantUuid:   tenantID,
 		EventType:  privmodel.LifecycleEventConsentRevoke,
 		AssetKey:   "*",
 		RecordedBy: actor,
@@ -86,7 +86,7 @@ func (s *PrivacyService) UpsertClassification(ctx context.Context, record *privm
 // DeleteClassification removes a classification mapping.
 func (s *PrivacyService) DeleteClassification(ctx context.Context, tenantID, assetKey string) error {
 	if tenantID == "" || assetKey == "" {
-		return errors.New("tenant_id and asset_key are required")
+		return errors.New("tenant_uuid and asset_key are required")
 	}
 	return s.repo.DeleteClassification(ctx, tenantID, assetKey)
 }
@@ -103,7 +103,7 @@ func (s *PrivacyService) IssueConsentToken(ctx context.Context, token *privmodel
 	}
 	secobs.RecordConsentEvent(privmodel.LifecycleEventConsentRenew, privmodel.LifecycleStatusSucceeded)
 	_, logErr := s.repo.CreateLifecycleEvent(ctx, &privmodel.LifecycleEvent{
-		TenantID:   token.TenantID,
+		TenantUuid:   token.TenantUuid,
 		EventType:  privmodel.LifecycleEventConsentRenew,
 		AssetKey:   "*",
 		RecordedBy: token.IssuedBy,
@@ -111,7 +111,7 @@ func (s *PrivacyService) IssueConsentToken(ctx context.Context, token *privmodel
 	})
 	if logErr != nil && s.logger != nil {
 		s.logger.WithError(logErr).
-			WithField("tenant_id", token.TenantID).
+			WithField("tenant_uuid", token.TenantUuid).
 			Warn("failed to record consent issuance lifecycle event")
 	}
 	if s.audit != nil {
@@ -119,9 +119,9 @@ func (s *PrivacyService) IssueConsentToken(ctx context.Context, token *privmodel
 			"token_id":  out.ID,
 			"issued_by": out.IssuedBy,
 		}
-		if err := s.audit.EmitLifecycleSuccess(out.TenantID, privmodel.LifecycleEventConsentRenew, out.IssuedBy, meta); err != nil && s.logger != nil {
+		if err := s.audit.EmitLifecycleSuccess(out.TenantUuid, privmodel.LifecycleEventConsentRenew, out.IssuedBy, meta); err != nil && s.logger != nil {
 			s.logger.WithError(err).
-				WithField("tenant_id", out.TenantID).
+				WithField("tenant_uuid", out.TenantUuid).
 				Warn("failed to emit audit log for consent issuance")
 		}
 	}

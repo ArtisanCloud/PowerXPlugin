@@ -19,7 +19,7 @@
 
 - 新增指标：
   - `powerx_integration_envelopes_total{channel,result}`
-  - `powerx_integration_webhook_attempts_total{status,tenant_id}`
+  - `powerx_integration_webhook_attempts_total{status,tenant_uuid}`
   - `powerx_integration_secrets_rotations_due{window}`
 - Dashboard 定义：`docs/observability/integration-dashboard.json`。
 - CI 校验脚本：`scripts/ci/verify_integration_metrics.sh`。

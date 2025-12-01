@@ -6,7 +6,7 @@ import "time"
 type MarketplaceOverage struct {
 	ID           string     `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	PluginID     string     `gorm:"column:plugin_id;type:text;not null" json:"plugin_id"`
-	TenantID     string     `gorm:"column:tenant_id;type:text" json:"tenant_id,omitempty"`
+	TenantUuid   string     `gorm:"column:tenant_uuid;type:uuid" json:"tenant_uuid,omitempty"`
 	HourWindow   time.Time  `gorm:"column:hour_window;type:timestamptz;not null" json:"hour_window"`
 	QuotaMetric  string     `gorm:"column:quota_metric;type:text;not null" json:"quota_metric"`
 	BreachCount  int        `gorm:"column:breach_count;type:int;not null;default:0" json:"breach_count"`

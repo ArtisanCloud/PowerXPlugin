@@ -23,7 +23,7 @@ func NewToolGrantHandler(deps *app.Deps) *ToolGrantHandler {
 
 func (h *ToolGrantHandler) Revoke(c *gin.Context) {
 	var payload struct {
-		TenantID    string `json:"tenant_id" binding:"required"`
+		TenantUuid    string `json:"tenant_uuid" binding:"required"`
 		ToolGrantID string `json:"toolgrant_id" binding:"required"`
 		Reason      string `json:"reason"`
 		RequestedBy string `json:"requested_by"`
@@ -36,7 +36,7 @@ func (h *ToolGrantHandler) Revoke(c *gin.Context) {
 		payload.RequestedBy = "admin"
 	}
 	ttl := time.Now().UTC()
-	if err := h.service.Revoke(c.Request.Context(), payload.TenantID, payload.ToolGrantID, payload.Reason, payload.RequestedBy, ttl); err != nil {
+	if err := h.service.Revoke(c.Request.Context(), payload.TenantUuid, payload.ToolGrantID, payload.Reason, payload.RequestedBy, ttl); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -44,9 +44,9 @@ func (h *ToolGrantHandler) Revoke(c *gin.Context) {
 }
 
 func (h *ToolGrantHandler) ListRevocations(c *gin.Context) {
-	tenantID := c.Query("tenant_id")
+	tenantID := c.Query("tenant_uuid")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
 	limit := 0
@@ -64,9 +64,9 @@ func (h *ToolGrantHandler) ListRevocations(c *gin.Context) {
 }
 
 func (h *ToolGrantHandler) ListUsageEvents(c *gin.Context) {
-	tenantID := c.Query("tenant_id")
+	tenantID := c.Query("tenant_uuid")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
 	toolGrantID := c.Query("toolgrant_id")

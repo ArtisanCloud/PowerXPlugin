@@ -18,7 +18,7 @@ const (
 type ListingAsset struct {
 	ID         string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	ListingID  string            `gorm:"column:listing_id;type:uuid;not null;index" json:"listing_id"`
-	TenantID   string            `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid   string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	AssetType  string            `gorm:"column:asset_type;type:text;not null" json:"asset_type"`
 	StorageURI string            `gorm:"column:storage_uri;type:text;not null" json:"storage_uri"`
 	Checksum   string            `gorm:"column:checksum;type:text" json:"checksum,omitempty"`

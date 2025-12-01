@@ -22,7 +22,7 @@
 | `internal/services/authproxy/delegated_client.go` | Delegated 模式 HTTP 代理，负责附带 `POWERX_AUTH_TOKEN` 调宿主 `/admin/user/auth/*`。|
 | `internal/transport/http/public/auth_handler.go` | `/api/v1/auth/login|refresh|logout|me/context`；根据 `IAMMode` 决定走 Proxy 或 Local，实现 fail-closed 和指标打点。|
 | `internal/observability/auth/metrics.go` | 输出 `plugin_auth_login_total`、`plugin_auth_refresh_total`、`plugin_auth_logout_total`、`plugin_iam_mode`、`plugin_iam_delegate_errors_total`，Prometheus 入口 `/api/v1/admin/runtime/metrics`。|
-| `internal/transport/http/middleware/request_trace.go` | 新增 `iam_mode`, `tenant_id`, `user_id`, `trace_id` 字段，定位跨模式问题。|
+| `internal/transport/http/middleware/request_trace.go` | 新增 `iam_mode`, `tenant_uuid`, `user_id`, `trace_id` 字段，定位跨模式问题。|
 
 ## 4. 指标与日志
 - **核心指标**（全部可在 `/api/v1/admin/runtime/metrics` 查看）：

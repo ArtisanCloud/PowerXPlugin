@@ -15,7 +15,7 @@
    curl http://localhost:8078/api/v1/ping
    ```
 
-4. 模板 CRUD 示例（Tenant 默认为 1，可通过 `X-Tenant-ID` 覆盖）：
+4. 模板 CRUD 示例（Tenant 默认为 1，可通过 `X-Tenant-UUID` 覆盖）：
 
    ```bash
    # 创建
@@ -27,4 +27,4 @@
    curl http://localhost:8078/api/v1/templates
    ```
 
-Skeleton 内部使用内存仓储模拟 constitution 约束（仓储内嵌 BaseRepository 语义、多租户隔离、`SET LOCAL app.tenant_id`），实际接入数据库时可直接替换 `internal/templates` 包中的实现。
+Skeleton 内部使用内存仓储模拟 constitution 约束（仓储内嵌 BaseRepository 语义、多租户隔离、`SET LOCAL app.tenant_uuid`），实际接入数据库时可直接替换 `internal/templates` 包中的实现。

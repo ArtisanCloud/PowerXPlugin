@@ -15,7 +15,7 @@ func TestPricingRepository_CreateAndUpdatePlan(t *testing.T) {
 
 	amount := 19.99
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
+		TenantUuid:  "tenant-1",
 		ListingID: "listing-1",
 		PlanCode:  "standard",
 		PlanType:  dbm.PricingPlanTypeSubscription,
@@ -54,7 +54,7 @@ func TestPricingRepository_SetDefaultPlan(t *testing.T) {
 	ctx := context.Background()
 
 	standard := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
+		TenantUuid:  "tenant-1",
 		ListingID: "listing-1",
 		PlanCode:  "standard",
 		PlanType:  dbm.PricingPlanTypeSubscription,
@@ -63,7 +63,7 @@ func TestPricingRepository_SetDefaultPlan(t *testing.T) {
 	require.NoError(t, repo.CreatePlan(ctx, standard, nil))
 
 	premium := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
+		TenantUuid:  "tenant-1",
 		ListingID: "listing-1",
 		PlanCode:  "premium",
 		PlanType:  dbm.PricingPlanTypeSubscription,

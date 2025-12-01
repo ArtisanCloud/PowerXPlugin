@@ -15,4 +15,4 @@ checks:
       target: backend/migrations/**
       pattern:
         - "ALTER TABLE"
-        - "USING (tenant_id = current_setting('app.tenant_id')::uuid)"
+        - "USING (tenant_uuid = current_setting('app.tenant_uuid')::uuid)"

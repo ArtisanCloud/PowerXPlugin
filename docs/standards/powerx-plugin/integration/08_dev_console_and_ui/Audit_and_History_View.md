@@ -59,7 +59,7 @@
 {
   "id": "audit_20251013_0001",
   "plugin_id": "com.powerx.plugin.crm",
-  "tenant_id": "tenant_abc",
+  "tenant_uuid": "tenant_abc",
   "actor": {
     "type": "user",
     "id": "user_123",
@@ -88,7 +88,7 @@
 
 ```bash
 GET /api/v1/admin/plugin/audit
-?tenant_id=tenant_abc
+?tenant_uuid=tenant_abc
 &resource=crm.settings
 &actor=user_123
 &date_start=2025-10-01
@@ -241,7 +241,7 @@ PowerX 宿主系统会同步以下来源的数据至插件：
 type AuditLog struct {
     ID        string    `json:"id"`
     PluginID  string    `json:"plugin_id"`
-    TenantID  string    `json:"tenant_id"`
+    TenantUuid  string    `json:"tenant_uuid"`
     Actor     string    `json:"actor"`
     Action    string    `json:"action"`
     Resource  string    `json:"resource"`
@@ -263,7 +263,7 @@ func (s *AuditService) Record(log *AuditLog) error {
 | 项目   | 建议                                 |
 | ---- | ---------------------------------- |
 | 存储   | PostgreSQL 独立表 `plugin_audit_logs` |
-| 索引   | `(tenant_id, created_at)` 复合索引     |
+| 索引   | `(tenant_uuid, created_at)` 复合索引     |
 | 分页   | Cursor-based 分页，默认 50 条            |
 | 导出   | CSV/JSON 统一格式                      |
 | 清理策略 | 定时归档超期数据（>180 天）                   |

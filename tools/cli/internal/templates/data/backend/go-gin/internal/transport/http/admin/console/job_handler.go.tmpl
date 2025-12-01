@@ -41,7 +41,7 @@ func respondAccepted(c *gin.Context, data any) {
 }
 
 type listRunsQuery struct {
-	TenantID string `form:"tenant_id"`
+	TenantUuid string `form:"tenant_uuid"`
 	JobType  string `form:"job_type"`
 	Status   string `form:"status"`
 	Cursor   string `form:"cursor"`
@@ -60,8 +60,8 @@ func (h *JobHandler) ListRuns(c *gin.Context) {
 		return
 	}
 	var tenantPtr *string
-	if strings.TrimSpace(query.TenantID) != "" {
-		clean := strings.TrimSpace(query.TenantID)
+	if strings.TrimSpace(query.TenantUuid) != "" {
+		clean := strings.TrimSpace(query.TenantUuid)
 		tenantPtr = &clean
 	}
 	runs, next, err := h.jobs.ListRuns(
@@ -87,7 +87,7 @@ func (h *JobHandler) ListRuns(c *gin.Context) {
 }
 
 type retryRunQuery struct {
-	TenantID string `form:"tenant_id"`
+	TenantUuid string `form:"tenant_uuid"`
 }
 
 // RetryRun triggers a retry for a failed job run when eligible.
@@ -107,15 +107,15 @@ func (h *JobHandler) RetryRun(c *gin.Context) {
 		return
 	}
 	var tenantPtr *string
-	if strings.TrimSpace(query.TenantID) != "" {
-		clean := strings.TrimSpace(query.TenantID)
+	if strings.TrimSpace(query.TenantUuid) != "" {
+		clean := strings.TrimSpace(query.TenantUuid)
 		tenantPtr = &clean
 	}
 	actor := resolveActor(c)
 	actor.PermissionCode = "operations.plugin.ops"
 	result, err := h.jobs.RetryRun(c.Request.Context(), consolesvc.RetryRunInput{
 		RunID:    runID,
-		TenantID: tenantPtr,
+		TenantUuid: tenantPtr,
 		Actor:    actor,
 	})
 	if err != nil {
@@ -141,7 +141,7 @@ func (h *JobHandler) RetryRun(c *gin.Context) {
 }
 
 type safeOpBody struct {
-	TenantID    string `json:"tenant_id"`
+	TenantUuid    string `json:"tenant_uuid"`
 	Environment string `json:"environment"`
 	Action      string `json:"action" binding:"required"`
 	ScopeType   string `json:"scope_type" binding:"required"`
@@ -165,12 +165,12 @@ func (h *JobHandler) ExecuteSafeOp(c *gin.Context) {
 	actor := resolveActor(c)
 	actor.PermissionCode = "operations.plugin.ops"
 	var tenantPtr *string
-	if strings.TrimSpace(body.TenantID) != "" {
-		clean := strings.TrimSpace(body.TenantID)
+	if strings.TrimSpace(body.TenantUuid) != "" {
+		clean := strings.TrimSpace(body.TenantUuid)
 		tenantPtr = &clean
 	}
 	request := consolesvc.SafeOpRequest{
-		TenantID:    tenantPtr,
+		TenantUuid:    tenantPtr,
 		Environment: strings.TrimSpace(body.Environment),
 		Action:      consolesvc.SafeOpAction(strings.ToLower(strings.TrimSpace(body.Action))),
 		ScopeType:   consolesvc.SafeOpScope(strings.ToLower(strings.TrimSpace(body.ScopeType))),

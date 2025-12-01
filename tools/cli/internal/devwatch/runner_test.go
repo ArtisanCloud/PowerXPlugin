@@ -41,7 +41,7 @@ func TestRunner_FullLifecycle(t *testing.T) {
 	runner, err := NewRunner(RunnerOptions{
 		EntryPath:   entryDir,
 		Tenant:      "tenant-a",
-		TenantID:    1,
+		TenantUUID:  "tenant-a-uuid",
 		DeveloperID: 1,
 		DevAPIBase:  "http://127.0.0.1:8077",
 		Manifest:    manifestData,
@@ -139,7 +139,7 @@ func TestRunner_BackoffAndRollbackOnReloadFailure(t *testing.T) {
 	runner, err := NewRunner(RunnerOptions{
 		EntryPath:       entryDir,
 		Tenant:          "tenant-b",
-		TenantID:        2,
+		TenantUUID:      "tenant-b-uuid",
 		DeveloperID:     1,
 		DevAPIBase:      "http://127.0.0.1:8077",
 		Manifest:        manifestData,
@@ -222,7 +222,7 @@ func TestRunner_ReusesExistingSession(t *testing.T) {
 	runner, err := NewRunner(RunnerOptions{
 		EntryPath:           entryDir,
 		Tenant:              "tenant-c",
-		TenantID:            3,
+		TenantUUID:          "tenant-c-uuid",
 		DeveloperID:         7,
 		DevAPIBase:          "http://127.0.0.1:8077",
 		Manifest:            manifestData,
@@ -276,7 +276,7 @@ func TestRunner_SingleRunMode(t *testing.T) {
 	runner, err := NewRunner(RunnerOptions{
 		EntryPath:   entryDir,
 		Tenant:      "tenant-c",
-		TenantID:    3,
+		TenantUUID:  "tenant-c-uuid",
 		DeveloperID: 2,
 		DevAPIBase:  "http://127.0.0.1:8077",
 		Manifest:    manifestData,

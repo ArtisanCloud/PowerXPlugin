@@ -37,7 +37,7 @@ Service → STS Client (ensure token) → Host API (with Bearer STS.***)
 - **错误处理**：  
   - 401/403：Scope 或 token 失效 → 记录并切换降级逻辑  
   - 5xx：宿主暂时不可用 → 重试（带抖动），超出阈值快速失败  
-- **观测**：记录 `tenant_id/request_id/plugin_id`，便于宿主端关联追踪
+- **观测**：记录 `tenant_uuid/request_id/plugin_id`，便于宿主端关联追踪
 
 ## 5. 安全注意事项
 

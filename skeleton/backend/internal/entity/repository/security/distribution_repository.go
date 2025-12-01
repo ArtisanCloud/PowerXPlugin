@@ -40,8 +40,8 @@ func (r *DistributionRepository) Upsert(ctx context.Context, record *secmodel.Ad
 	if record == nil {
 		return nil, gorm.ErrInvalidData
 	}
-	if record.AdvisoryID == "" || record.TenantID == "" || record.Channel == "" {
-		return nil, errors.New("advisory_id, tenant_id, and channel are required")
+	if record.AdvisoryID == "" || record.TenantUuid == "" || record.Channel == "" {
+		return nil, errors.New("advisory_id, tenant_uuid, and channel are required")
 	}
 	if record.Status == "" {
 		record.Status = secmodel.DistributionStatusPending
@@ -57,7 +57,7 @@ func (r *DistributionRepository) Upsert(ctx context.Context, record *secmodel.Ad
 
 	result, err := r.base.Upsert(ctx, record, []clause.Column{
 		{Name: "advisory_id"},
-		{Name: "tenant_id"},
+		{Name: "tenant_uuid"},
 		{Name: "channel"},
 	})
 	if err != nil {
@@ -109,11 +109,11 @@ func (r *DistributionRepository) ListByAdvisory(ctx context.Context, advisoryID 
 // FindForTenant returns the distribution row for a specific tenant/channel pair.
 func (r *DistributionRepository) FindForTenant(ctx context.Context, advisoryID, tenantID, channel string) (*secmodel.AdvisoryDistribution, error) {
 	if advisoryID == "" || tenantID == "" || channel == "" {
-		return nil, errors.New("advisory_id, tenant_id, and channel are required")
+		return nil, errors.New("advisory_id, tenant_uuid, and channel are required")
 	}
 	var record secmodel.AdvisoryDistribution
 	err := r.db.WithContext(ctx).
-		Where("advisory_id = ? AND tenant_id = ? AND channel = ?", advisoryID, tenantID, channel).
+		Where("advisory_id = ? AND tenant_uuid = ? AND channel = ?", advisoryID, tenantID, channel).
 		Take(&record).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil

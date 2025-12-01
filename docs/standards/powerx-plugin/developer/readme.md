@@ -52,7 +52,7 @@ PowerX 调用插件时注入**签名上下文**（二选一）：
 - `X-PowerX-CTX-JWT: "Bearer <jwt>`（**生产推荐**，公钥校验，JWKS 轮换）"
 - `X-PowerX-CTX: "<payload>.<sig>`（HMAC，对称密钥，适合本地开发）"
 
-上下文包含：`tenant_id, user_id, permissions, request_id, exp, iat, iss, aud`。  
+上下文包含：`tenant_uuid, user_id, permissions, request_id, exp, iat, iss, aud`。  
 插件的 **Middleware** 负责验证并注入 `TenantContext` 用于 RLS。
 
 ### 1.3 授权回流（出站）

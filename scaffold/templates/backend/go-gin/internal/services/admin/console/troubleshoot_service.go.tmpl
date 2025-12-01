@@ -59,7 +59,7 @@ type GuidanceItem struct {
 type WebhookAttempt struct {
 	ID              string     `json:"id"`
 	SubscriptionID  string     `json:"subscription_id"`
-	TenantID        string     `json:"tenant_id"`
+	TenantUuid        string     `json:"tenant_uuid"`
 	Status          string     `json:"status"`
 	DeliveryCount   int        `json:"delivery_count"`
 	RetryCount      int        `json:"retry_count"`
@@ -79,7 +79,7 @@ type WebhookAttemptList struct {
 
 // WebhookAttemptListInput defines filters for attempts listing.
 type WebhookAttemptListInput struct {
-	TenantID       string
+	TenantUuid       string
 	Status         string
 	SubscriptionID string
 	Since          *time.Time
@@ -99,7 +99,7 @@ type TroubleshootingSummary struct {
 
 // TroubleshootSummaryInput controls summary fetching.
 type TroubleshootSummaryInput struct {
-	TenantID     *string
+	TenantUuid     *string
 	ForceRefresh bool
 }
 
@@ -236,7 +236,7 @@ func (s *TroubleshootService) Summary(ctx context.Context, input TroubleshootSum
 	if s == nil {
 		return nil, ErrJobServiceUnavailable
 	}
-	key := cacheKey(input.TenantID)
+	key := cacheKey(input.TenantUuid)
 	if !input.ForceRefresh {
 		if summary := s.cached(key); summary != nil {
 			return summary, nil
@@ -245,19 +245,19 @@ func (s *TroubleshootService) Summary(ctx context.Context, input TroubleshootSum
 	now := s.now()
 	refreshInterval := s.refreshInterval()
 
-	health, err := s.health.FetchHealth(ctx, input.TenantID)
+	health, err := s.health.FetchHealth(ctx, input.TenantUuid)
 	if err != nil {
 		return nil, err
 	}
-	quota, err := s.quota.FetchQuota(ctx, input.TenantID)
+	quota, err := s.quota.FetchQuota(ctx, input.TenantUuid)
 	if err != nil {
 		return nil, err
 	}
-	webhookSummary, err := s.webhooks.FetchWebhookSummary(ctx, input.TenantID)
+	webhookSummary, err := s.webhooks.FetchWebhookSummary(ctx, input.TenantUuid)
 	if err != nil {
 		return nil, err
 	}
-	guidance, err := s.guidance.FetchGuidance(ctx, input.TenantID)
+	guidance, err := s.guidance.FetchGuidance(ctx, input.TenantUuid)
 	if err != nil {
 		return nil, err
 	}
@@ -284,9 +284,9 @@ func (s *TroubleshootService) ListWebhookAttempts(ctx context.Context, input Web
 	if s == nil || s.db == nil {
 		return nil, ErrJobServiceUnavailable
 	}
-	tenant := strings.TrimSpace(input.TenantID)
+	tenant := strings.TrimSpace(input.TenantUuid)
 	if tenant == "" {
-		return nil, validationError{Field: "tenant_id", Message: "tenant id is required"}
+		return nil, validationError{Field: "tenant_uuid", Message: "tenant id is required"}
 	}
 	limit := input.Limit
 	if limit <= 0 || limit > 100 {
@@ -294,10 +294,10 @@ func (s *TroubleshootService) ListWebhookAttempts(ctx context.Context, input Web
 	}
 	query := s.db.WithContext(ctx).
 		Table("integration_webhook_attempts AS a").
-		Select(`a.id, a.subscription_id, s.tenant_id, a.status, a.retry_count, a.last_error, a.next_delivery_at, a.payload_snapshot, a.created_at, a.updated_at, dlq.failure_reason AS dlq_reason`).
+		Select(`a.id, a.subscription_id, s.tenant_uuid, a.status, a.retry_count, a.last_error, a.next_delivery_at, a.payload_snapshot, a.created_at, a.updated_at, dlq.failure_reason AS dlq_reason`).
 		Joins("JOIN integration_webhook_subscriptions AS s ON s.id = a.subscription_id").
 		Joins("LEFT JOIN integration_webhook_dlq AS dlq ON dlq.attempt_id = a.id").
-		Where("s.tenant_id = ?", tenant)
+		Where("s.tenant_uuid = ?", tenant)
 	if status := strings.TrimSpace(input.Status); status != "" {
 		query = query.Where("LOWER(a.status) = ?", strings.ToLower(status))
 	}
@@ -346,14 +346,14 @@ func (s *TroubleshootService) GetWebhookAttempt(ctx context.Context, attemptID s
 	}
 	tenant := strings.TrimSpace(tenantID)
 	if tenant == "" {
-		return nil, validationError{Field: "tenant_id", Message: "tenant id is required"}
+		return nil, validationError{Field: "tenant_uuid", Message: "tenant id is required"}
 	}
 	query := s.db.WithContext(ctx).
 		Table("integration_webhook_attempts AS a").
-		Select(`a.id, a.subscription_id, s.tenant_id, a.status, a.retry_count, a.last_error, a.next_delivery_at, a.payload_snapshot, a.created_at, a.updated_at, dlq.failure_reason AS dlq_reason`).
+		Select(`a.id, a.subscription_id, s.tenant_uuid, a.status, a.retry_count, a.last_error, a.next_delivery_at, a.payload_snapshot, a.created_at, a.updated_at, dlq.failure_reason AS dlq_reason`).
 		Joins("JOIN integration_webhook_subscriptions AS s ON s.id = a.subscription_id").
 		Joins("LEFT JOIN integration_webhook_dlq AS dlq ON dlq.attempt_id = a.id").
-		Where("a.id = ? AND s.tenant_id = ?", cleanAttempt, tenant)
+		Where("a.id = ? AND s.tenant_uuid = ?", cleanAttempt, tenant)
 	var row attemptRow
 	res := query.Take(&row)
 	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
@@ -399,7 +399,7 @@ func (s *TroubleshootService) refreshInterval() int {
 type attemptRow struct {
 	ID              string
 	SubscriptionID  string
-	TenantID        string
+	TenantUuid        string
 	Status          string
 	RetryCount      int
 	LastError       string
@@ -414,7 +414,7 @@ func mapAttemptRow(row attemptRow) WebhookAttempt {
 	attempt := WebhookAttempt{
 		ID:              row.ID,
 		SubscriptionID:  row.SubscriptionID,
-		TenantID:        row.TenantID,
+		TenantUuid:        row.TenantUuid,
 		Status:          strings.ToLower(strings.TrimSpace(row.Status)),
 		RetryCount:      row.RetryCount,
 		DeliveryCount:   row.RetryCount + 1,

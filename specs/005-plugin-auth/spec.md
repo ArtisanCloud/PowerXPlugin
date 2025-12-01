@@ -87,7 +87,7 @@
 
 - **FR-001**: 插件前端必须提供与 PowerX 宿主一致的登录、注册、忘记密码页面，并在 `setAuth` 中把 `access_token`、`refresh_token`、`token_type`、`expires_in`、`scope`、`expires_at` 以及 `token` cookie 写入 localStorage/cookie。
 - **FR-002**: `useAuth` 必须实现 `initAuth`、`getToken`、`isTokenExpired`、`logout`，并在登出时清理 localStorage、sessionStorage、`px_*` cookie 与 Pinia 用户 store。
-- **FR-003**: `useApiClient` 必须在请求前自动附加 `Authorization` 与 `X-Tenant-ID`，并在收到 401 时自动调用 `/admin/user/auth/refresh`（或本地 IAM 刷新接口）后重放原请求；刷新失败时需调用 `clearAuth` 并重定向到 `/users/login`。
+- **FR-003**: `useApiClient` 必须在请求前自动附加 `Authorization` 与 `X-Tenant-UUID`，并在收到 401 时自动调用 `/admin/user/auth/refresh`（或本地 IAM 刷新接口）后重放原请求；刷新失败时需调用 `clearAuth` 并重定向到 `/users/login`。
 - **FR-004**: 前端需要在全局中间件拦截所有除 `users/*` 白名单外的路由，未登录用户必须被导航到登录页，并带上原目标的 `redirect` 参数。
 - **FR-005**: 后端必须提供 `internal/services/iam.IAMDirectory` 接口及 Delegated、Local 双实现，Resolver 根据 `POWERX_PROXY`、`POWERX_RBAC_DELEGATE`、`context.iam_mode` 决定模式。
 - **FR-006**: Delegated 模式下，后端必须使用 `POWERX_CORE_ENDPOINT`、`POWERX_AUTH_TOKEN` 调用宿主 `/admin/user/auth/login|refresh|logout|me/context`，并将宿主响应原样返回前端。
@@ -103,7 +103,7 @@
 
 - **AuthTokens**: 表示 `access_token`、`refresh_token`、`token_type`、`expires_in`、`scope`、`expires_at` 组成的结构；由 `useAuth` 与 `IAMDirectory.Login/Refresh` 返回并存储。
 - **IAMDirectory**: 封装 Delegated/Local 两种实现的接口；方法包括 `Login`、`Refresh`、`Logout`、`CurrentUser`、`ListRoles`、`ListDepartments`、`CheckPermission`，供 HTTP handler 与中间件使用。
-- **TenantContext**: 包含 `tenant_id`、`user_id`、`roles`、`permissions`、`policy_version` 等字段，可来自 JWT Claims 或 Signed Context Header，用于 RBAC 判定与日志审计。
+- **TenantContext**: 包含 `tenant_uuid`、`user_id`、`roles`、`permissions`、`policy_version` 等字段，可来自 JWT Claims 或 Signed Context Header，用于 RBAC 判定与日志审计。
 
 ## Success Criteria *(mandatory)*
 

@@ -93,7 +93,7 @@ func CreateRLSPolicy(tableName, policyName string) error {
 	}
 	sql := fmt.Sprintf(`
 		CREATE POLICY IF NOT EXISTS %s ON %s
-		USING (tenant_id::text = current_setting('app.tenant_id', true))
+		USING (tenant_uuid::text = current_setting('app.tenant_uuid', true))
 	`, policyName, tableName)
 	return db.Exec(sql).Error
 }

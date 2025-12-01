@@ -56,7 +56,7 @@
 ```json
 {
   "plugin_id": "com.powerx.plugin.crm",
-  "tenant_id": "tenant_abc",
+  "tenant_uuid": "tenant_abc",
   "license_id": "lic_123",
   "version": "1.3.2",
   "metrics": {
@@ -92,7 +92,7 @@ SDK 内部特性：
 
 - 自动缓存与批量上报；
 - 断网时持久化至本地；
-- 自动附带 license_id 与 tenant_id；
+- 自动附带 license_id 与 tenant_uuid；
 - 签名与 ToolGrant 认证。
 
 ---
@@ -161,7 +161,7 @@ Marketplace 会按照以下维度聚合数据：
 
 | 维度            | 示例                   |
 | ------------- | -------------------- |
-| 租户（tenant_id） | tenant_abc           |
+| 租户（tenant_uuid） | tenant_abc           |
 | 插件版本          | 1.3.2                |
 | 价格计划（plan_id） | pro                  |
 | 时间窗口          | 每小时 / 每天 / 每月        |
@@ -222,7 +222,7 @@ Tenant（租户）也能查看自身插件使用统计：
 | 数据脱敏  | 不上报用户 PII        |
 | 传输加密  | HTTPS / gRPC-TLS |
 | 存储加密  | AES256 at rest   |
-| 多租户隔离 | 按 tenant_id 分区   |
+| 多租户隔离 | 按 tenant_uuid 分区   |
 | 数据保留  | 默认 180 天         |
 | 审计日志  | 记录所有上报事件         |
 | 用户同意  | 租户同意后方可采集扩展指标    |

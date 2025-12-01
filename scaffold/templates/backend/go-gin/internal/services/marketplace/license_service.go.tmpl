@@ -40,7 +40,7 @@ type LicenseCache interface {
 
 // LicenseIssueRequest captures issuance payload for authority calls.
 type LicenseIssueRequest struct {
-	TenantID  string
+	TenantUuid  string
 	ListingID string
 	PlanID    string
 	Metadata  map[string]any
@@ -49,7 +49,7 @@ type LicenseIssueRequest struct {
 // LicenseRenewRequest captures renew payload for authority calls.
 type LicenseRenewRequest struct {
 	LicenseID string
-	TenantID  string
+	TenantUuid  string
 	PlanID    string
 	Metadata  map[string]any
 }
@@ -63,7 +63,7 @@ type LicenseIssueResponse struct {
 
 // IssueLicenseParams encapsulates inputs for issuing license.
 type IssueLicenseParams struct {
-	TenantID    string
+	TenantUuid    string
 	ListingID   string
 	PlanID      string
 	IssuedBy    string
@@ -76,7 +76,7 @@ type IssueLicenseParams struct {
 // RenewLicenseParams encapsulates inputs for renewal.
 type RenewLicenseParams struct {
 	LicenseID    string
-	TenantID     string
+	TenantUuid     string
 	IssuedBy     string
 	PlanID       string
 	RenewalToken string
@@ -129,15 +129,15 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 		if s.taxClient != nil {
 			provider = s.taxClient.Provider()
 		}
-		marketobs.ObserveLicenseVerification(resultLabel, provider, params.TenantID, time.Since(start))
+		marketobs.ObserveLicenseVerification(resultLabel, provider, params.TenantUuid, time.Since(start))
 	}()
 
-	if hasEmpty(params.TenantID, params.ListingID, params.PlanID) {
+	if hasEmpty(params.TenantUuid, params.ListingID, params.PlanID) {
 		resultLabel = "invalid_request"
-		return nil, errors.New("tenant_id, listing_id, plan_id are required")
+		return nil, errors.New("tenant_uuid, listing_id, plan_id are required")
 	}
 
-	plan, err := s.pricingRepo.GetPlan(ctx, params.TenantID, params.PlanID)
+	plan, err := s.pricingRepo.GetPlan(ctx, params.TenantUuid, params.PlanID)
 	if err != nil {
 		resultLabel = "plan_not_found"
 		return nil, err
@@ -172,7 +172,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 			resultLabel = "billing_unavailable"
 			return nil, errors.New("billing client not configured")
 		}
-		id, billErr := s.billingClient.ChargeSubscription(ctx, params.TenantID, plan, params.Metadata)
+		id, billErr := s.billingClient.ChargeSubscription(ctx, params.TenantUuid, plan, params.Metadata)
 		if billErr != nil {
 			resultLabel = "billing_failed"
 			return nil, fmt.Errorf("billing charge failed: %w", billErr)
@@ -190,7 +190,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 		}
 		itemUnits := amountUnits
 		req := &TaxChargeRequest{
-			TenantID:           params.TenantID,
+			TenantUuid:           params.TenantUuid,
 			ListingID:          params.ListingID,
 			Currency:           plan.Currency,
 			AmountMinorUnits:   amountUnits,
@@ -222,7 +222,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 	issueRes := &LicenseIssueResponse{}
 	if s.authority != nil {
 		payload := &LicenseIssueRequest{
-			TenantID:  params.TenantID,
+			TenantUuid:  params.TenantUuid,
 			ListingID: params.ListingID,
 			PlanID:    params.PlanID,
 			Metadata:  params.Metadata,
@@ -236,7 +236,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 			expiry = resp.ExpiresAt
 		}
 	} else {
-		token := generateToken(params.TenantID, params.ListingID, params.PlanID)
+		token := generateToken(params.TenantUuid, params.ListingID, params.PlanID)
 		issueRes.Token = token
 		issueRes.Metadata = params.Metadata
 	}
@@ -277,7 +277,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 	}
 
 	license := &dbm.License{
-		TenantID:        params.TenantID,
+		TenantUuid:        params.TenantUuid,
 		ListingID:       params.ListingID,
 		PlanID:          params.PlanID,
 		LicenseToken:    issueRes.Token,
@@ -305,7 +305,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 		eventPayload["tax_transaction_id"] = taxResult.ExternalTransactionID
 	}
 	event := &dbm.LicenseEvent{
-		TenantID:     params.TenantID,
+		TenantUuid:     params.TenantUuid,
 		EventType:    dbm.LicenseEventIssued,
 		EventPayload: toJSONMap(eventPayload),
 	}
@@ -342,7 +342,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 			settlementAmount = &value
 		}
 		txn := &dbm.TaxTransaction{
-			TenantID:              params.TenantID,
+			TenantUuid:              params.TenantUuid,
 			BillingID:             billingID,
 			ExternalProvider:      s.taxClient.Provider(),
 			ExternalTransactionID: stringPtr(taxResult.ExternalTransactionID),
@@ -367,7 +367,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 			failPayload["error"] = taxErr.Error()
 		}
 		txn := &dbm.TaxTransaction{
-			TenantID:           params.TenantID,
+			TenantUuid:           params.TenantUuid,
 			BillingID:          billingID,
 			ExternalProvider:   s.taxClient.Provider(),
 			Currency:           strings.ToUpper(strings.TrimSpace(plan.Currency)),
@@ -388,7 +388,7 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 
 	if s.cache != nil {
 		ttl := licenseCacheTTL(license, allowance)
-		s.cache.Set(ctx, params.TenantID, params.ListingID, license, ttl)
+		s.cache.Set(ctx, params.TenantUuid, params.ListingID, license, ttl)
 	}
 	s.emitRenewalScheduled(license)
 	return license, nil
@@ -396,18 +396,18 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 
 // RenewLicense renews an existing license.
 func (s *LicenseService) RenewLicense(ctx context.Context, params RenewLicenseParams) (*dbm.License, error) {
-	if hasEmpty(params.TenantID, params.LicenseID) {
-		return nil, errors.New("tenant_id and license_id are required")
+	if hasEmpty(params.TenantUuid, params.LicenseID) {
+		return nil, errors.New("tenant_uuid and license_id are required")
 	}
 
-	license, err := s.licenseRepo.GetLicense(ctx, params.TenantID, params.LicenseID)
+	license, err := s.licenseRepo.GetLicense(ctx, params.TenantUuid, params.LicenseID)
 	if err != nil {
 		return nil, err
 	}
 
 	planChanged := false
 	if strings.TrimSpace(params.PlanID) != "" && !strings.EqualFold(params.PlanID, license.PlanID) {
-		plan, err := s.pricingRepo.GetPlan(ctx, params.TenantID, params.PlanID)
+		plan, err := s.pricingRepo.GetPlan(ctx, params.TenantUuid, params.PlanID)
 		if err != nil {
 			return nil, err
 		}
@@ -432,7 +432,7 @@ func (s *LicenseService) RenewLicense(ctx context.Context, params RenewLicensePa
 	if s.authority != nil {
 		resp, err := s.authority.Renew(ctx, &LicenseRenewRequest{
 			LicenseID: license.ID,
-			TenantID:  params.TenantID,
+			TenantUuid:  params.TenantUuid,
 			PlanID:    license.PlanID,
 			Metadata:  params.Metadata,
 		})
@@ -461,12 +461,12 @@ func (s *LicenseService) RenewLicense(ctx context.Context, params RenewLicensePa
 	if planChanged {
 		fields["plan_id"] = license.PlanID
 	}
-	if err := s.licenseRepo.UpdateLicenseToken(ctx, params.TenantID, license.ID, fields); err != nil {
+	if err := s.licenseRepo.UpdateLicenseToken(ctx, params.TenantUuid, license.ID, fields); err != nil {
 		return nil, err
 	}
 
 	event := &dbm.LicenseEvent{
-		TenantID:  params.TenantID,
+		TenantUuid:  params.TenantUuid,
 		LicenseID: license.ID,
 		EventType: dbm.LicenseEventRenewed,
 		EventPayload: toJSONMap(map[string]any{
@@ -486,7 +486,7 @@ func (s *LicenseService) RenewLicense(ctx context.Context, params RenewLicensePa
 	license.OfflineUntil = offlinePtr
 	if s.cache != nil {
 		ttl := licenseCacheTTL(license, allowance)
-		s.cache.Set(ctx, params.TenantID, license.ListingID, license, ttl)
+		s.cache.Set(ctx, params.TenantUuid, license.ListingID, license, ttl)
 	}
 
 	s.emitRenewalScheduled(license)
@@ -496,7 +496,7 @@ func (s *LicenseService) RenewLicense(ctx context.Context, params RenewLicensePa
 // GetLicense returns a license by identifier.
 func (s *LicenseService) GetLicense(ctx context.Context, tenantID, licenseID string) (*dbm.License, error) {
 	if hasEmpty(tenantID, licenseID) {
-		return nil, errors.New("tenant_id and license_id are required")
+		return nil, errors.New("tenant_uuid and license_id are required")
 	}
 	return s.licenseRepo.GetLicense(ctx, tenantID, licenseID)
 }
@@ -504,7 +504,7 @@ func (s *LicenseService) GetLicense(ctx context.Context, tenantID, licenseID str
 // VerifyLicense checks the cache and repository to ensure license validity.
 func (s *LicenseService) VerifyLicense(ctx context.Context, tenantID, listingID string) (*VerifyResult, error) {
 	if hasEmpty(tenantID, listingID) {
-		return nil, errors.New("tenant_id and listing_id are required")
+		return nil, errors.New("tenant_uuid and listing_id are required")
 	}
 	allowance := s.offlineAllowance()
 	if s.cache != nil {
@@ -530,7 +530,7 @@ func (s *LicenseService) VerifyLicense(ctx context.Context, tenantID, listingID 
 // RevokeLicense transitions a license to revoked state.
 func (s *LicenseService) RevokeLicense(ctx context.Context, tenantID, licenseID, reason string) error {
 	if hasEmpty(tenantID, licenseID) {
-		return errors.New("tenant_id and license_id are required")
+		return errors.New("tenant_uuid and license_id are required")
 	}
 	if s.authority != nil {
 		if err := s.authority.Revoke(ctx, licenseID, reason); err != nil {
@@ -544,7 +544,7 @@ func (s *LicenseService) RevokeLicense(ctx context.Context, tenantID, licenseID,
 		return err
 	}
 	event := &dbm.LicenseEvent{
-		TenantID:  tenantID,
+		TenantUuid:  tenantID,
 		LicenseID: licenseID,
 		EventType: dbm.LicenseEventRevoked,
 		EventPayload: toJSONMap(map[string]any{
@@ -561,7 +561,7 @@ func (s *LicenseService) RevokeLicense(ctx context.Context, tenantID, licenseID,
 // ExtendOffline updates offline window within 72 hour constraint.
 func (s *LicenseService) ExtendOffline(ctx context.Context, tenantID, licenseID string, until time.Time) error {
 	if hasEmpty(tenantID, licenseID) {
-		return errors.New("tenant_id and license_id are required")
+		return errors.New("tenant_uuid and license_id are required")
 	}
 	target := until
 	allowance := s.offlineAllowance()
@@ -576,7 +576,7 @@ func (s *LicenseService) ExtendOffline(ctx context.Context, tenantID, licenseID 
 		return err
 	}
 	event := &dbm.LicenseEvent{
-		TenantID:  tenantID,
+		TenantUuid:  tenantID,
 		LicenseID: licenseID,
 		EventType: dbm.LicenseEventOfflineExtend,
 		EventPayload: toJSONMap(map[string]any{

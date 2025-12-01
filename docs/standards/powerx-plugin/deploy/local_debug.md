@@ -61,7 +61,7 @@ go run ./cmd/plugin
 
 ```
 [INFO] Starting plugin com.powerx.plugins.base on :8078
-[DEBUG] tenant_id=1 ctx_mode=hmac
+[DEBUG] tenant_uuid=1 ctx_mode=hmac
 [INFO] Health check endpoint /healthz ready
 ```
 
@@ -132,7 +132,7 @@ Payload 示例：
 
 ```json
 {
-  "tenant_id": 1,
+  "tenant_uuid": 1,
   "user_id": 1001,
   "permissions": ["base:template:read"],
   "exp": 1735698195

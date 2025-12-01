@@ -18,7 +18,7 @@ const (
 // ConsentToken records a host-issued consent artifact authorising data use.
 type ConsentToken struct {
 	ID            string         `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID      string         `gorm:"column:tenant_id;type:text;not null" json:"tenant_id"`
+	TenantUuid    string         `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
 	Token         string         `gorm:"column:consent_token;type:text;not null" json:"consent_token"`
 	Scope         datatypes.JSON `gorm:"column:scope;type:jsonb;not null" json:"scope"`
 	ExpiresAt     *time.Time     `gorm:"column:expires_at;type:timestamptz" json:"expires_at,omitempty"`

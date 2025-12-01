@@ -75,12 +75,12 @@ func main() {
 	}
 
 	// 在初始化 gRPC 客户端之前，尝试从本地数据库加载租户凭证（若存在），以便通过 STS 获取短期令牌
-	if cfg.GRPCUpstream != nil && cfg.GRPCUpstream.TenantID > 0 {
+	if cfg.GRPCUpstream != nil && cfg.GRPCUpstream.TenantUuid > 0 {
 		// 延迟依赖：仅当配置未提供 STS client 时，尝试 DB 加载；若配置已有，则优先生效
 		if cfg.GRPCUpstream.STSClientID == "" || cfg.GRPCUpstream.STSClientSecret == "" {
 			repo := repository.NewCredentialsRepository(queryDB)
 			svc := agent.NewCredentialService(cfg, repo)
-			if cid, sec, err := svc.LoadDecryptedCredentials(rootCtx, cfg.GRPCUpstream.TenantID, app.PluginID); err == nil {
+			if cid, sec, err := svc.LoadDecryptedCredentials(rootCtx, cfg.GRPCUpstream.TenantUuid, app.PluginID); err == nil {
 				cfg.GRPCUpstream.STSClientID = cid
 				cfg.GRPCUpstream.STSClientSecret = sec
 				logger.Info("Loaded STS credentials for tenant from DB")
@@ -156,12 +156,12 @@ func main() {
 	metricsProvider := recommendation.NewListingMetricsProvider(listingRepo)
 	var syncJob *marketplacejobs.SyncJob
 	if cfg == nil || cfg.Marketplace == nil || cfg.Marketplace.Recommendation.Enabled {
-		syncJob = marketplacejobs.NewSyncJob(cfg, listingRepo, metricsProvider, logger.WithField("component", "marketplace_recommendation_sync"), listingRepo.ListTenantIDs)
+		syncJob = marketplacejobs.NewSyncJob(cfg, listingRepo, metricsProvider, logger.WithField("component", "marketplace_recommendation_sync"), listingRepo.ListTenantUuids)
 	}
 
 	var renewalJob *marketplacejobs.RenewalNotifier
 	if cfg != nil && cfg.LicenseReminderLead() > 0 {
-		renewalJob = marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantIDs, nil)
+		renewalJob = marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantUuids, nil)
 	}
 
 	// 设置 gin engine 路由

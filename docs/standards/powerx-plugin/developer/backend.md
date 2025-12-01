@@ -94,7 +94,7 @@ func main() {
 | **Transport**  | 接收 HTTP/gRPC 请求，解析上下文、参数验证 | `/transport/http/admin/manifest.go`     |
 | **Service**    | 领域逻辑封装，可组合多个 Repo 操作       | `/services/agent/credential_service.go` |
 | **Repository** | 直接与数据库交互，隐藏 GORM 实现细节      | `/domain/repository/template_repo.go`   |
-| **Model**      | 实体定义（含 `tenant_id` 与审计字段）  | `/domain/models/template.go`            |
+| **Model**      | 实体定义（含 `tenant_uuid` 与审计字段）  | `/domain/models/template.go`            |
 
 **好处：**
 
@@ -117,8 +117,8 @@ Gin Request → TenantContext Middleware
 
 关键点：
 
-* `TenantContext` 从 JWT/HMAC 上下文中提取 `tenant_id`；
-* 每个请求开启事务，执行 `SET LOCAL app.tenant_id=?`；
+* `TenantContext` 从 JWT/HMAC 上下文中提取 `tenant_uuid`；
+* 每个请求开启事务，执行 `SET LOCAL app.tenant_uuid=?`；
 * RLS 保证即使查询未带 where 也不会跨租户；
 * Dev 模式（`POWERX_DEV_MODE=1`）下允许旁路调试。
 

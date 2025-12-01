@@ -22,7 +22,7 @@ func NewIncidentHandler(svc *operationsvc.IncidentService) *IncidentHandler {
 }
 
 type incidentCreateRequest struct {
-	TenantID        *string         `json:"tenant_id"`
+	TenantUuid        *string         `json:"tenant_uuid"`
 	Severity        string          `json:"severity" binding:"required"`
 	DetectionSource string          `json:"detection_source" binding:"required"`
 	Summary         string          `json:"summary" binding:"required"`
@@ -70,7 +70,7 @@ func (h *IncidentHandler) CreateIncident(c *gin.Context) {
 		return
 	}
 	payload, err := h.svc.CreateIncident(c.Request.Context(), operationsvc.CreateIncidentRequest{
-		TenantID:        req.TenantID,
+		TenantUuid:        req.TenantUuid,
 		Severity:        req.Severity,
 		DetectionSource: req.DetectionSource,
 		Summary:         req.Summary,

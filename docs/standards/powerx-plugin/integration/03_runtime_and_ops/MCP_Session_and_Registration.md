@@ -195,7 +195,7 @@ runtime_ops:
   "type": "INVOKE",
   "capability": "crm.contact.create",
   "session_id": "sess_88b9b2d4",
-  "tenant_id": "tenant_123",
+  "tenant_uuid": "tenant_123",
   "params": { "name": "Alice", "email": "alice@example.com" }
 }
 ```
@@ -369,7 +369,7 @@ func StartMCPClient() {
 
 - 插件启动后必须完成 REGISTER + CAPABILITY_SYNC 才能进入 `READY` 状态；
 - MCP Session 应独立线程运行，保持心跳；
-- 所有调用应带 session_id 与 tenant_id；
+- 所有调用应带 session_id 与 tenant_uuid；
 - 插件在退出时应主动发送 `CLOSE` 消息；
 - Agent 工具注册（ToolBridge）必须与 manifest.capabilities 对齐；
 - 不建议多个插件共享同一 MCP 通道；

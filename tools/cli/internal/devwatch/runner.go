@@ -58,7 +58,7 @@ const (
 type RunnerOptions struct {
 	EntryPath           string
 	Tenant              string
-	TenantID            uint64
+	TenantUUID          string
 	DeveloperID         uint64
 	DevAPIBase          string
 	APIToken            string
@@ -274,7 +274,7 @@ func (r *Runner) register(ctx context.Context, auditLogger AuditLogger) error {
 		Version:     r.opts.Manifest.Version,
 		EntryPath:   r.opts.EntryPath,
 		Tenant:      r.opts.Tenant,
-		TenantID:    r.opts.TenantID,
+		TenantUUID:  strings.TrimSpace(r.opts.TenantUUID),
 		DeveloperID: r.opts.DeveloperID,
 		Metadata: map[string]string{
 			"backend.entry": r.opts.Manifest.Backend.Entry,
@@ -330,15 +330,15 @@ func (r *Runner) describeRegisterFailure(ctx context.Context, err error) {
 		defer cancel()
 		sessions, listErr := r.deps.Client.ListSessions(listCtx, &devapi.ListSessionsFilter{
 			PluginID:    r.opts.Manifest.ID,
-			TenantID:    r.opts.TenantID,
+			TenantUUID:  strings.TrimSpace(r.opts.TenantUUID),
 			DeveloperID: r.opts.DeveloperID,
 		})
 		if listErr == nil && len(sessions) > 0 {
 			fmt.Println("  Remote sessions:")
 			for _, s := range sessions {
 				tenantLabel := s.Tenant
-				if tenantLabel == "" && s.TenantID != 0 {
-					tenantLabel = fmt.Sprintf("#%d", s.TenantID)
+				if tenantLabel == "" {
+					tenantLabel = s.TenantUUID
 				}
 				fmt.Printf("    - %s  plugin=%s  tenant=%s  status=%s\n", s.SessionID, s.PluginID, tenantLabel, s.Status)
 			}

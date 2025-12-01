@@ -145,7 +145,7 @@ type ListListingsOptions struct {
 func (s *ListingService) ListListings(ctx context.Context, tenantID string, opts ListListingsOptions) ([]*dbm.Listing, int64, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, 0, errors.New("tenant_id is required")
+		return nil, 0, errors.New("tenant_uuid is required")
 	}
 	query := mrepo.ListingQuery{
 		Status: dedupeStrings(opts.Status),
@@ -161,7 +161,7 @@ func (s *ListingService) ListListings(ctx context.Context, tenantID string, opts
 func (s *ListingService) GetListing(ctx context.Context, tenantID, listingID string) (*dbm.Listing, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	listingID = strings.TrimSpace(listingID)
 	if listingID == "" {
@@ -177,7 +177,7 @@ func (s *ListingService) ListChecklistRuns(ctx context.Context, tenantID, listin
 	}
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	listingID = strings.TrimSpace(listingID)
 	if listingID == "" {
@@ -193,7 +193,7 @@ func (s *ListingService) LatestChecklistRun(ctx context.Context, tenantID, listi
 	}
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	listingID = strings.TrimSpace(listingID)
 	if listingID == "" {
@@ -206,7 +206,7 @@ func (s *ListingService) LatestChecklistRun(ctx context.Context, tenantID, listi
 func (s *ListingService) CreateDraft(ctx context.Context, tenantID string, input ListingDraftInput) (*dbm.Listing, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	if err := validateDraftInput(input); err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func (s *ListingService) CreateDraft(ctx context.Context, tenantID string, input
 
 	listing := &dbm.Listing{
 		ID:          coalesceID(input.ID),
-		TenantID:    tenantID,
+		TenantUuid:    tenantID,
 		PluginID:    strings.TrimSpace(input.PluginID),
 		VendorID:    strings.TrimSpace(input.VendorID),
 		Title:       strings.TrimSpace(input.Title),
@@ -258,7 +258,7 @@ func (s *ListingService) CreateDraft(ctx context.Context, tenantID string, input
 func (s *ListingService) UpdateDraft(ctx context.Context, tenantID, listingID string, input ListingUpdateInput) (*dbm.Listing, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	listingID = strings.TrimSpace(listingID)
 	if listingID == "" {
@@ -327,7 +327,7 @@ func (s *ListingService) SubmitForReview(ctx context.Context, tenantID, listingI
 	}()
 
 	if tenantID == "" {
-		err = errors.New("tenant_id is required")
+		err = errors.New("tenant_uuid is required")
 		return
 	}
 	if listingID == "" {
@@ -360,7 +360,7 @@ func (s *ListingService) SubmitForReview(ctx context.Context, tenantID, listingI
 	version := &dbm.ListingVersion{
 		ID:          uuid.NewString(),
 		ListingID:   listing.ID,
-		TenantID:    tenantID,
+		TenantUuid:    tenantID,
 		Version:     coalesce(listing.Version, "draft"),
 		Changelog:   metadataString(metadata, "changelog"),
 		Metadata:    toJSONMap(metadata),
@@ -377,7 +377,7 @@ func (s *ListingService) SubmitForReview(ctx context.Context, tenantID, listingI
 func (s *ListingService) UpdateListingStatus(ctx context.Context, tenantID, listingID, reviewerID, status, notes string) (*dbm.Listing, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	listingID = strings.TrimSpace(listingID)
 	if listingID == "" {
@@ -416,7 +416,7 @@ func (s *ListingService) UpdateListingStatus(ctx context.Context, tenantID, list
 func (s *ListingService) RecordChecklistRun(ctx context.Context, tenantID, listingID string, input ChecklistRunInput) (*dbm.ChecklistRun, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	listingID = strings.TrimSpace(listingID)
 	if listingID == "" {
@@ -428,7 +428,7 @@ func (s *ListingService) RecordChecklistRun(ctx context.Context, tenantID, listi
 	run := dbm.ChecklistRun{
 		ID:            coalesceID(input.ID),
 		ListingID:     listingID,
-		TenantID:      tenantID,
+		TenantUuid:      tenantID,
 		TriggerSource: fallbackTrigger(input.TriggerSource),
 		RunNumber:     nextRunNumber(input.RunNumber),
 		Status:        fallbackStatus(input.Status),
@@ -534,7 +534,7 @@ func convertPricingPlans(inputs []PricingPlanInput, tenantID string) []dbm.Prici
 	for i, in := range inputs {
 		plan := dbm.PricingPlan{
 			ID:              coalesceID(in.ID),
-			TenantID:        tenantID,
+			TenantUuid:        tenantID,
 			PlanCode:        in.PlanCode,
 			PlanType:        fallbackPlanType(in.PlanType),
 			Currency:        strings.ToUpper(strings.TrimSpace(in.Currency)),
@@ -551,7 +551,7 @@ func convertPricingPlans(inputs []PricingPlanInput, tenantID string) []dbm.Prici
 			for j, tier := range in.Tiers {
 				plan.Tiers[j] = dbm.PlanTier{
 					ID:         coalesceID(tier.ID),
-					TenantID:   tenantID,
+					TenantUuid:   tenantID,
 					Metric:     tier.Metric,
 					RangeFrom:  tier.RangeFrom,
 					RangeTo:    tier.RangeTo,

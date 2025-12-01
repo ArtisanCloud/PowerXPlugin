@@ -12,16 +12,16 @@ type InstallLocalHandler struct{}
 
 func (InstallLocalHandler) Install(ctx bootstrap.Context) {
 	var payload struct {
-		TenantID string `json:"tenantId"`
-		PluginID string `json:"pluginId"`
-		Version  string `json:"version"`
+		TenantUuid string `json:"tenantId"`
+		PluginID   string `json:"pluginId"`
+		Version    string `json:"version"`
 	}
 	if err := ctx.BindJSON(&payload); err != nil {
 		router.RespondError(ctx, http.StatusBadRequest, "INVALID_REQUEST", "unable to parse install payload", nil)
 		return
 	}
 	router.RespondSuccess(ctx, http.StatusAccepted, map[string]any{
-		"tenant":  payload.TenantID,
+		"tenant":  payload.TenantUuid,
 		"plugin":  payload.PluginID,
 		"version": payload.Version,
 		"status":  "installing",

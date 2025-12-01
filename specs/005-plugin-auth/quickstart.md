@@ -75,7 +75,7 @@ cd tools/cli && go run ./cmd/px-plugin init dev.plugin.test
 
 ## 6. Observability Checklist
 - 确认 `plugin_iam_mode`, `plugin_auth_login_total`, `plugin_auth_refresh_total`, `plugin_auth_logout_total`, `plugin_iam_delegate_errors_total` 指标在 `/metrics` 暴露。
-- `request_trace` 日志需含 `iam_mode`, `auth`, `tenant_id`, `user_id`, `trace_id`。
+- `request_trace` 日志需含 `iam_mode`, `auth`, `tenant_uuid`, `user_id`, `trace_id`。
 - 打开/关闭 Local 模式应各自写一条 Info 日志。
 
 ## 7. 验收与性能

@@ -164,6 +164,18 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 		version = opts.VersionOverride
 	}
 
+	// 确保 Nuxt 构建使用插件前缀，避免产物引用宿主根路径的 /assets/**
+	if os.Getenv("NUXT_APP_BASE_URL") == "" {
+		_ = os.Setenv("NUXT_APP_BASE_URL", fmt.Sprintf("/_p/%s/admin/", manifestFile.ID))
+	}
+	// 默认作为宿主模式构建，便于复用宿主 token 与代理
+	if os.Getenv("POWERX_PROXY") == "" {
+		_ = os.Setenv("POWERX_PROXY", "1")
+	}
+	if os.Getenv("NUXT_PUBLIC_POWERX_PROXY") == "" {
+		_ = os.Setenv("NUXT_PUBLIC_POWERX_PROXY", "1")
+	}
+
 	if err := ensureFileExists(opts.ManifestPath, "manifest.json", "run 'npm run sync:manifest' first"); err != nil {
 		return nil, err
 	}
@@ -205,7 +217,22 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 		if err != nil {
 			return nil, err
 		}
-		result.FrontendPath = filepath.Join(payloadDir, "frontend")
+		frontBase := filepath.Base(opts.FrontendDir)
+		distBase := filepath.Base(distPath)
+		result.FrontendPath = filepath.Join(payloadDir, frontBase, distBase)
+
+		// 确认 Nuxt 产物关键文件存在（避免缺少 server/public 导致运行时 404）
+		serverEntry := filepath.Join(distPath, "server", "index.mjs")
+		publicDir := filepath.Join(distPath, "public")
+		if _, err := os.Stat(serverEntry); err != nil {
+			return nil, fmt.Errorf("frontend build missing server entry (%s): %w", serverEntry, err)
+		}
+		if empty, err := dirEmpty(publicDir); err != nil {
+			return nil, fmt.Errorf("stat frontend public dir: %w", err)
+		} else if empty {
+			return nil, fmt.Errorf("frontend public assets empty at %s (run npm run build)", publicDir)
+		}
+
 		size, err := copyDir(distPath, result.FrontendPath)
 		if err != nil {
 			return nil, fmt.Errorf("copy frontend dist: %w", err)
@@ -368,6 +395,10 @@ func (b *Builder) Build(ctx context.Context, userOpts *Options) (*Result, error)
 
 	result.Artifacts = artifacts
 	result.DistHash = distHash
+
+	// 清理中间 backend 编译产物（payload 已包含最终文件）
+	_ = os.RemoveAll(filepath.Join(buildDir, "backend"))
+
 	return result, nil
 }
 
@@ -383,9 +414,9 @@ func ensureFileExists(path, label, remediation string) error {
 
 func detectFrontendDist(frontendDir string) (string, error) {
 	candidates := []string{
-		filepath.Join(frontendDir, "dist"),
-		filepath.Join(frontendDir, ".output", "public"),
-		filepath.Join(frontendDir, ".output"),
+		filepath.Join(frontendDir, ".output"),           // Nuxt full output (server + public)
+		filepath.Join(frontendDir, "dist"),              // Legacy Vite/Nuxt2 build
+		filepath.Join(frontendDir, ".output", "public"), // Fallback: only public assets
 	}
 	for _, candidate := range candidates {
 		info, err := os.Stat(candidate)

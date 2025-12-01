@@ -128,12 +128,17 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 			username = fmt.Sprintf("admin-%d", tenant.ID)
 		}
 
+		tenantUUID := strings.TrimSpace(strings.ToLower(tenant.Key))
+		if tenantUUID == "" {
+			tenantUUID = fmt.Sprintf("%d", tenant.ID)
+		}
+
 		var member iamm.Member
-		memberWhere := "tenant_id = ? AND user_id = ?"
-		if err := tx.Where(memberWhere, tenant.ID, user.ID).First(&member).Error; err != nil {
+		memberWhere := "tenant_uuid = ? AND user_id = ?"
+		if err := tx.Where(memberWhere, tenantUUID, user.ID).First(&member).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				member = iamm.Member{
-					BaseModel:   basemodels.BaseModel{TenantID: tenant.ID},
+					BaseModel:   basemodels.BaseModel{TenantUuid: tenantUUID},
 					UserID:      user.ID,
 					Username:    username,
 					DisplayName: opts.AdminName,
@@ -156,10 +161,10 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 		}
 
 		var role iamm.Role
-		if err := tx.Where("tenant_id = ? AND code = ?", tenant.ID, "system.admin").First(&role).Error; err != nil {
+		if err := tx.Where("tenant_uuid = ? AND code = ?", tenantUUID, "system.admin").First(&role).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				role = iamm.Role{
-					BaseModel:   basemodels.BaseModel{TenantID: tenant.ID},
+					BaseModel:   basemodels.BaseModel{TenantUuid: tenantUUID},
 					Code:        "system.admin",
 					Name:        "System Admin",
 					Description: "Default administrator role",
@@ -184,7 +189,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 			}
 		}
 
-		deptID, err := ensureDefaultDepartment(tx, tenant.ID)
+		deptID, err := ensureDefaultDepartment(tx, tenantUUID)
 		if err != nil {
 			return err
 		}
@@ -193,16 +198,16 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 				return err
 			}
 		}
-		return seedDefaultPermissions(tx, tenant.ID, role.ID)
+		return seedDefaultPermissions(tx, role.ID)
 	})
 }
 
-func ensureDefaultDepartment(tx *gorm.DB, tenantID uint64) (*uint64, error) {
+func ensureDefaultDepartment(tx *gorm.DB, tenantUUID string) (*uint64, error) {
 	var dept iamm.Department
-	if err := tx.Where("tenant_id = ? AND code = ?", tenantID, "general").First(&dept).Error; err != nil {
+	if err := tx.Where("tenant_uuid = ? AND code = ?", tenantUUID, "general").First(&dept).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			dept = iamm.Department{
-				BaseModel:   basemodels.BaseModel{TenantID: tenantID},
+				BaseModel:   basemodels.BaseModel{TenantUuid: tenantUUID},
 				Name:        "General",
 				Code:        "general",
 				Description: "Default department",
@@ -217,7 +222,7 @@ func ensureDefaultDepartment(tx *gorm.DB, tenantID uint64) (*uint64, error) {
 	return &dept.ID, nil
 }
 
-func seedDefaultPermissions(tx *gorm.DB, tenantID, roleID uint64) error {
+func seedDefaultPermissions(tx *gorm.DB, roleID uint64) error {
 	perms := []struct {
 		Resource string
 		Action   string

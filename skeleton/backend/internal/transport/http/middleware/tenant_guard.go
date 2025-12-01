@@ -7,15 +7,16 @@ import (
 
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-const TenantIDContextKey = "tenant_id_uint64"
+const TenantUUIDContextKey = "tenant_uuid"
 
 // EnsureTenant ensures a valid tenant exists on the request and propagates it through contexts.
 func EnsureTenant() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if tenantID, ok := resolveTenantID(c); ok && tenantID > 0 {
-			attachTenant(c, tenantID)
+		if tenantUUID, ok := resolveTenantUUID(c); ok && tenantUUID != "" {
+			attachTenant(c, tenantUUID)
 			c.Next()
 			return
 		}
@@ -26,102 +27,109 @@ func EnsureTenant() gin.HandlerFunc {
 	}
 }
 
-func resolveTenantID(c *gin.Context) (uint64, bool) {
-	if id, ok := authx.TenantIDFromContext(c.Request.Context()); ok && id > 0 {
+func resolveTenantUUID(c *gin.Context) (string, bool) {
+	if id, ok := authx.TenantUUIDFromContext(c.Request.Context()); ok && id != "" {
 		return id, true
 	}
 
-	if id, ok := tenantIDFromGinState(c); ok && id > 0 {
+	if id, ok := tenantUUIDFromGinState(c); ok && id != "" {
 		return id, true
 	}
 
-	if tc, ok := authx.GetTenantContext(c); ok && tc.TenantID > 0 {
-		return uint64(tc.TenantID), true
+	if tc, ok := authx.GetTenantContext(c); ok && strings.TrimSpace(tc.TenantUUID) != "" {
+		return strings.TrimSpace(tc.TenantUUID), true
 	}
 
-	if id, ok := parseTenantID(c.GetHeader("X-Tenant-ID")); ok {
+	if id, ok := parseTenantUUID(c.GetHeader("X-Tenant-UUID")); ok {
 		return id, true
 	}
 
-	if id, ok := parseTenantID(c.Query("tenant_id")); ok {
+	if id, ok := parseTenantUUID(c.Query("tenant_uuid")); ok {
 		return id, true
 	}
 
-	return 0, false
+	return "", false
 }
 
-func tenantIDFromGinState(c *gin.Context) (uint64, bool) {
-	if id, ok := c.Get(TenantIDContextKey); ok {
+func tenantUUIDFromGinState(c *gin.Context) (string, bool) {
+	if id, ok := c.Get(TenantUUIDContextKey); ok {
 		switch v := id.(type) {
+		case string:
+			if strings.TrimSpace(v) != "" {
+				return strings.TrimSpace(v), true
+			}
 		case uint64:
 			if v > 0 {
-				return v, true
+				return strconv.FormatUint(v, 10), true
 			}
 		case int64:
 			if v > 0 {
-				return uint64(v), true
+				return strconv.FormatInt(v, 10), true
 			}
 		case int:
 			if v > 0 {
-				return uint64(v), true
+				return strconv.Itoa(v), true
 			}
 		}
 	}
-	return 0, false
+	return "", false
 }
 
-func parseTenantID(raw string) (uint64, bool) {
+func parseTenantUUID(raw string) (string, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return 0, false
+		return "", false
 	}
-	val, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil || val == 0 {
-		return 0, false
+	if _, err := uuid.Parse(raw); err != nil {
+		return "", false
 	}
-	return val, true
+	return strings.ToLower(raw), true
 }
 
-func attachTenant(c *gin.Context, tenantID uint64) {
-	if tenantID == 0 {
+func attachTenant(c *gin.Context, tenantUUID string) {
+	if strings.TrimSpace(tenantUUID) == "" {
 		return
 	}
 
-	c.Set(TenantIDContextKey, tenantID)
+	c.Set(TenantUUIDContextKey, tenantUUID)
 
 	if tc, ok := authx.GetTenantContext(c); ok {
-		if tc.TenantID == 0 {
-			tc.TenantID = int64(tenantID)
+		if strings.TrimSpace(tc.TenantUUID) == "" {
+			tc.TenantUUID = tenantUUID
 			authx.SetTenantContext(c, tc)
 		}
 	} else {
-		authx.SetTenantContext(c, authx.TenantContext{TenantID: int64(tenantID)})
+		authx.SetTenantContext(c, authx.TenantContext{TenantUUID: tenantUUID})
 	}
 
-	ctx := authx.ContextWithTenantID(c.Request.Context(), tenantID)
+	ctx := authx.ContextWithTenantUUID(c.Request.Context(), tenantUUID)
 	if ctx != nil {
 		c.Request = c.Request.WithContext(ctx)
 	}
 }
 
-// TenantIDFromContext returns the resolved tenant ID if present.
-func TenantIDFromContext(c *gin.Context) (uint64, bool) {
-	if id, ok := authx.TenantIDFromContext(c.Request.Context()); ok && id > 0 {
+// TenantUUIDFromContext returns the resolved tenant ID if present.
+func TenantUUIDFromContext(c *gin.Context) (string, bool) {
+	if id, ok := authx.TenantUUIDFromContext(c.Request.Context()); ok && id != "" {
 		return id, true
 	}
-	if id, ok := tenantIDFromGinState(c); ok && id > 0 {
+	if id, ok := tenantUUIDFromGinState(c); ok && id != "" {
 		return id, true
 	}
-	if tc, ok := authx.GetTenantContext(c); ok && tc.TenantID > 0 {
-		return uint64(tc.TenantID), true
-	}
-	return 0, false
-}
-
-// TenantIDString returns tenant id as string if present.
-func TenantIDString(c *gin.Context) (string, bool) {
-	if id, ok := TenantIDFromContext(c); ok && id > 0 {
-		return strconv.FormatUint(id, 10), true
+	if tc, ok := authx.GetTenantContext(c); ok && strings.TrimSpace(tc.TenantUUID) != "" {
+		return strings.TrimSpace(tc.TenantUUID), true
 	}
 	return "", false
+}
+
+// TenantUUIDString returns tenant id as string if present.
+func TenantUUIDString(c *gin.Context) (string, bool) {
+	return TenantUUIDFromContext(c)
+}
+
+// TenantUuidString is a deprecated helper kept for backward compatibility with handlers
+// that still expect a numeric tenant identifier. It now simply returns the resolved
+// tenant UUID string; callers should migrate to TenantUUIDString.
+func TenantUuidString(c *gin.Context) (string, bool) {
+	return TenantUUIDString(c)
 }

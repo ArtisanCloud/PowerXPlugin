@@ -11,10 +11,10 @@ checks:
       pattern:
         - BaseRepository
   - id: repo-tenant-tx
-    desc: 读写在 BeginTenantTx 中执行，并设置 app.tenant_id
+    desc: 读写在 BeginTenantTx 中执行，并设置 app.tenant_uuid
     assert:
       type: grep
       target: backend/internal/domain/repository/**
       pattern:
         - BeginTenantTx
-        - "SET LOCAL app.tenant_id"
+        - "SET LOCAL app.tenant_uuid"

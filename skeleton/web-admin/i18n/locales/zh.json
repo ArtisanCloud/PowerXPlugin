@@ -207,6 +207,7 @@
       },
       "listTitle": "模板列表",
       "deleteTitle": "删除模板",
+      "deleteDescription": "确认删除该模板？",
       "deleteConfirm": "确认删除 \"{name}\" 模板？"
     },
     "form": {

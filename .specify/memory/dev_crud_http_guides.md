@@ -52,9 +52,9 @@
 ## 3. 中间件栈（顺序建议）
 
 1. `request_id` — 生成/透传请求 ID
-2. `ctx_verify` — **JWT/HMAC 验签**，抽取 `tenant_id/user_id/permissions/...`（PG-CTX-001）
+2. `ctx_verify` — **JWT/HMAC 验签**，抽取 `tenant_uuid/user_id/permissions/...`（PG-CTX-001）
 3. `rbac_guard` — **服务端**权限判定（PG-RBAC-001）
-4. `tenant_ctx` — 设置 DB 会话变量：`SET LOCAL app.tenant_id = ?`（PG-CTX-001/RLS）
+4. `tenant_ctx` — 设置 DB 会话变量：`SET LOCAL app.tenant_uuid = ?`（PG-CTX-001/RLS）
 5. `recovery/logging` — 统一结构化日志与 panic 保护
 6. `throttle/ratelimit` — 可选
 
@@ -96,7 +96,7 @@ backend/
 ## 7. 测试策略
 
 * **Contract Test**：路由/响应码/响应体
-* **Integration Test**：多租户隔离（不同 tenant_id 不可互访）
+* **Integration Test**：多租户隔离（不同 tenant_uuid 不可互访）
 * **Migration Smoke**：如涉及表结构变更
 
 ## 8. 合规清单（Checklist）

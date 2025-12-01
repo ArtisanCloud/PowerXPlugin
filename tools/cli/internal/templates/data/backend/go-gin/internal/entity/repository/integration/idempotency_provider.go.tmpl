@@ -333,7 +333,7 @@ func (p *RedisIdempotencyProvider) namespacedKey(key string) string {
 // redisRecord 是 Redis 中序列化的结构。
 type redisRecord struct {
 	Key         string          `json:"key"`
-	TenantID    string          `json:"tenant_id"`
+	TenantUuid    string          `json:"tenant_uuid"`
 	Scope       string          `json:"scope"`
 	Operation   string          `json:"operation"`
 	PayloadHash string          `json:"payload_hash"`
@@ -362,7 +362,7 @@ func toRedisRecord(record *model.IdempotencyRecord, now time.Time, ttl time.Dura
 
 	return &redisRecord{
 		Key:         record.Key,
-		TenantID:    record.TenantID,
+		TenantUuid:    record.TenantUuid,
 		Scope:       record.Scope,
 		Operation:   record.Operation,
 		PayloadHash: record.PayloadHash,
@@ -394,7 +394,7 @@ func (r *redisRecord) toModel() *model.IdempotencyRecord {
 	expiry := r.ExpiresAt.UTC()
 	return &model.IdempotencyRecord{
 		Key:         r.Key,
-		TenantID:    r.TenantID,
+		TenantUuid:    r.TenantUuid,
 		Scope:       r.Scope,
 		Operation:   r.Operation,
 		PayloadHash: r.PayloadHash,

@@ -21,15 +21,15 @@
 
 ## 3. Metadata 与多租户
 
-- 入站拦截器从 `metadata` 读取并验证：`authorization`（JWT/HMAC）、`x-tenant-id`、`x-request-id` 等  
-- 通过拦截器把 `tenant_id` 注入 DB 会话（RLS）：`SET LOCAL app.tenant_id = ?`  
+- 入站拦截器从 `metadata` 读取并验证：`authorization`（JWT/HMAC）、`x-tenant-uuid`、`x-request-id` 等  
+- 通过拦截器把 `tenant_uuid` 注入 DB 会话（RLS）：`SET LOCAL app.tenant_uuid = ?`  
 - 与 HTTP 一致（PG-CTX-001）
 
 ## 4. 拦截器链（服务端）
 
 - `auth`（验签/上下文注入）  
 - `tenant`（RLS/会话变量）  
-- `logging`（结构化日志，含 request_id/tenant_id）  
+- `logging`（结构化日志，含 request_id/tenant_uuid）  
 - `recovery`（panic 捕获，统一错误）
 
 > 所有业务实现均**复用同一 Service**（PG-SVC-001），禁止把业务写在 gRPC handler 中。
@@ -59,7 +59,7 @@
 ## 8. 合规清单（Checklist）
 
 - [ ] SDK 版本固定且与宿主协议保持一致  
-- [ ] metadata 注入/校验（JWT/HMAC + tenant_id + request_id）  
+- [ ] metadata 注入/校验（JWT/HMAC + tenant_uuid + request_id）  
 - [ ] 拦截器链完整  
 - [ ] 与 HTTP 复用同一 Service  
 - [ ] 错误码映射一致  

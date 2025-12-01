@@ -3,7 +3,6 @@ package runtime_ops
 import (
 	"context"
 	"errors"
-	"strconv"
 	"time"
 
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
@@ -35,11 +34,11 @@ func (r *QuotaRepository) RecordUsage(ctx context.Context, entry *model.QuotaLed
 		return nil, errors.New("window end must be after start")
 	}
 	if entry.ScopeType == "tenant" && entry.ScopeRef == "" {
-		tid, err := authx.RequireTenantID(ctx)
+		tid, err := authx.RequireTenantUUID(ctx)
 		if err != nil {
 			return nil, err
 		}
-		entry.ScopeRef = strconv.FormatUint(tid, 10)
+		entry.ScopeRef = tid
 	}
 	return r.ledger.Create(ctx, entry)
 }

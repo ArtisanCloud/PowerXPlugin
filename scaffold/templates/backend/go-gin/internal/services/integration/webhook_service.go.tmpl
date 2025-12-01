@@ -55,7 +55,7 @@ func NewWebhookService(
 
 // CreateSubscriptionParams captures creation parameters.
 type CreateSubscriptionParams struct {
-	TenantID        string
+	TenantUUID        string
 	EventType       string
 	TargetURL       string
 	SecretPlaintext string
@@ -66,7 +66,7 @@ type CreateSubscriptionParams struct {
 
 // UpdateSubscriptionParams captures updatable fields.
 type UpdateSubscriptionParams struct {
-	TenantID       string
+	TenantUUID       string
 	SubscriptionID string
 	TargetURL      *string
 	Status         *string
@@ -84,7 +84,7 @@ type DeliveryResultParams struct {
 	NextRetryAt    *time.Time
 	RetryCount     int
 	Payload        any
-	TenantID       string
+	TenantUUID       string
 }
 
 // CreateSubscription registers or updates a subscription entry.
@@ -93,7 +93,7 @@ func (s *WebhookService) CreateSubscription(ctx context.Context, p CreateSubscri
 		return nil, errors.New("subscription repository not configured")
 	}
 	sub := &model.WebhookSubscription{
-		TenantID:  strings.TrimSpace(p.TenantID),
+		TenantUUID:  strings.TrimSpace(p.TenantUUID),
 		EventType: strings.TrimSpace(p.EventType),
 		TargetURL: strings.TrimSpace(p.TargetURL),
 		Status:    strings.ToUpper(strings.TrimSpace(p.Status)),
@@ -114,7 +114,7 @@ func (s *WebhookService) CreateSubscription(ctx context.Context, p CreateSubscri
 	}
 
 	if strings.TrimSpace(p.SecretPlaintext) != "" {
-		secret, err := s.encryptSecret(sub.TenantID, sub.EventType, sub.TargetURL, p.SecretPlaintext)
+		secret, err := s.encryptSecret(sub.TenantUUID, sub.EventType, sub.TargetURL, p.SecretPlaintext)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +125,7 @@ func (s *WebhookService) CreateSubscription(ctx context.Context, p CreateSubscri
 	if err != nil {
 		return nil, err
 	}
-	s.submitApproval(ctx, saved.TenantID, saved.ID, "create", sanitizeSubscription(saved))
+	s.submitApproval(ctx, saved.TenantUUID, saved.ID, "create", sanitizeSubscription(saved))
 	return sanitizeSubscription(saved), nil
 }
 
@@ -134,7 +134,7 @@ func (s *WebhookService) UpdateSubscription(ctx context.Context, p UpdateSubscri
 	if s.subscriptions == nil {
 		return nil, errors.New("subscription repository not configured")
 	}
-	sub, err := s.subscriptions.GetByID(ctx, p.TenantID, p.SubscriptionID)
+	sub, err := s.subscriptions.GetByID(ctx, p.TenantUUID, p.SubscriptionID)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s *WebhookService) UpdateSubscription(ctx context.Context, p UpdateSubscri
 		sub.Status = strings.ToUpper(strings.TrimSpace(*p.Status))
 	}
 	if p.NewSecretPlain != nil && strings.TrimSpace(*p.NewSecretPlain) != "" {
-		secret, err := s.encryptSecret(sub.TenantID, sub.EventType, sub.TargetURL, *p.NewSecretPlain)
+		secret, err := s.encryptSecret(sub.TenantUUID, sub.EventType, sub.TargetURL, *p.NewSecretPlain)
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +170,7 @@ func (s *WebhookService) UpdateSubscription(ctx context.Context, p UpdateSubscri
 	if err != nil {
 		return nil, err
 	}
-	s.submitApproval(ctx, saved.TenantID, saved.ID, "update", sanitizeSubscription(saved))
+	s.submitApproval(ctx, saved.TenantUUID, saved.ID, "update", sanitizeSubscription(saved))
 	return sanitizeSubscription(saved), nil
 }
 
@@ -248,8 +248,8 @@ func (s *WebhookService) RecordDeliveryAttempt(ctx context.Context, params Deliv
 		}
 	}
 	created, err := s.attempts.Create(ctx, attempt)
-	if err == nil && params.TenantID != "" {
-		obs.RecordWebhookAttempt(strings.ToLower(params.Status), params.TenantID)
+	if err == nil && params.TenantUUID != "" {
+		obs.RecordWebhookAttempt(strings.ToLower(params.Status), params.TenantUUID)
 	}
 	return created, err
 }
@@ -294,7 +294,7 @@ func (s *WebhookService) SignPayload(ctx context.Context, tenantID, subscription
 	if sub == nil {
 		return "", gorm.ErrRecordNotFound
 	}
-	secret, err := s.decryptSecret(sub.TenantID, sub.EventType, sub.TargetURL, sub.Secret)
+	secret, err := s.decryptSecret(sub.TenantUUID, sub.EventType, sub.TargetURL, sub.Secret)
 	if err != nil {
 		return "", err
 	}
@@ -323,7 +323,7 @@ func (s *WebhookService) submitApproval(ctx context.Context, tenantID, targetID,
 	_, err := s.approvalSvc.SubmitChange(ctx, SubmitChangeRequest{
 		TargetType:  "webhook_subscription",
 		TargetID:    targetID,
-		Payload:     map[string]any{"tenant_id": tenantID, "action": action, "data": payload},
+		Payload:     map[string]any{"tenant_uuid": tenantID, "action": action, "data": payload},
 		SubmittedBy: fmt.Sprintf("system:%s", tenantID),
 	})
 	if err != nil {

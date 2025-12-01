@@ -38,7 +38,7 @@ type DevOptions struct {
 	AuthSetup          bool
 	Entry              string
 	Tenant             string
-	TenantID           uint64
+	TenantUUID         string
 	DeveloperID        uint64
 	Ignore             []string
 	DevAPI             string
@@ -80,7 +80,7 @@ func runDev(args []string) error {
 	fs.BoolVar(&opts.AuthSetup, "auth", false, "Set up px-plugin auth defaults (~/.px-plugin/config.json & certs) and exit")
 	fs.StringVar(&opts.Entry, "entry", "", "Path to the plugin entry directory")
 	fs.StringVar(&opts.Tenant, "tenant", "", "Tenant slug for the dev session")
-	fs.Uint64Var(&opts.TenantID, "tenant-id", 0, "Numeric tenant ID used when registering Dev API session")
+	fs.StringVar(&opts.TenantUUID, "tenant-uuid", "", "Tenant UUID used when registering Dev API session (preferred)")
 	fs.Uint64Var(&opts.DeveloperID, "developer-id", 0, "Developer/member ID used for Dev API session ownership")
 	fs.Var((*StringSliceFlag)(&opts.Ignore), "ignore", "File patterns to ignore (can be repeated)")
 	fs.StringVar(&opts.DevAPI, "dev-api", "", "Dev API endpoint URL")
@@ -385,7 +385,7 @@ func runDevWatch(opts *DevOptions) error {
 	runner, err := devwatch.NewRunner(devwatch.RunnerOptions{
 		EntryPath:   entryPath,
 		Tenant:      opts.Tenant,
-		TenantID:    resolveTenantID(opts),
+		TenantUUID:  resolveTenantUUID(opts),
 		DeveloperID: resolveDeveloperID(opts),
 		DevAPIBase:  devAPIBase,
 		APIToken:    apiToken,
@@ -471,7 +471,7 @@ func runDevOnce(opts *DevOptions) error {
 	runner, err := devwatch.NewRunner(devwatch.RunnerOptions{
 		EntryPath:   entryPath,
 		Tenant:      opts.Tenant,
-		TenantID:    resolveTenantID(opts),
+		TenantUUID:  resolveTenantUUID(opts),
 		DeveloperID: resolveDeveloperID(opts),
 		DevAPIBase:  devAPIBase,
 		APIToken:    apiToken,
@@ -518,8 +518,8 @@ func runDevListSessions(opts *DevOptions) error {
 	if pid := detectPluginID(opts); pid != "" {
 		filter.PluginID = pid
 	}
-	if opts.TenantID != 0 {
-		filter.TenantID = opts.TenantID
+	if tenantUUID := resolveTenantUUID(opts); tenantUUID != "" {
+		filter.TenantUUID = tenantUUID
 	}
 	if opts.DeveloperID != 0 {
 		filter.DeveloperID = opts.DeveloperID
@@ -556,10 +556,10 @@ func runDevListSessions(opts *DevOptions) error {
 	for _, s := range sessions {
 		fmt.Printf("  Session:  %s\n", s.SessionID)
 		fmt.Printf("  Plugin:   %s@%s\n", s.PluginID, s.Version)
-		if s.Tenant != "" || s.TenantID != 0 {
+		if s.Tenant != "" || s.TenantUUID != "" {
 			label := s.Tenant
 			if label == "" {
-				label = fmt.Sprintf("#%d", s.TenantID)
+				label = s.TenantUUID
 			}
 			fmt.Printf("  Tenant:   %s\n", label)
 		}
@@ -634,8 +634,8 @@ func runDevResumeSession(sessionID string, opts *DevOptions) error {
 	if opts.Tenant == "" && info.Tenant != "" {
 		opts.Tenant = info.Tenant
 	}
-	if opts.TenantID == 0 && info.TenantID != 0 {
-		opts.TenantID = info.TenantID
+	if opts.TenantUUID == "" && strings.TrimSpace(info.TenantUUID) != "" {
+		opts.TenantUUID = strings.TrimSpace(info.TenantUUID)
 	}
 	if opts.DeveloperID == 0 && info.DeveloperID != 0 {
 		opts.DeveloperID = info.DeveloperID
@@ -672,7 +672,7 @@ func runDevResumeSession(sessionID string, opts *DevOptions) error {
 	runner, err := devwatch.NewRunner(devwatch.RunnerOptions{
 		EntryPath:           entryPath,
 		Tenant:              opts.Tenant,
-		TenantID:            resolveTenantID(opts),
+		TenantUUID:          resolveTenantUUID(opts),
 		DeveloperID:         resolveDeveloperID(opts),
 		DevAPIBase:          devAPIBase,
 		APIToken:            apiToken,
@@ -909,8 +909,8 @@ func runDevClearSessions(opts *DevOptions) error {
 	} else {
 		req.Status = "terminated"
 	}
-	if tenantID := resolveTenantID(opts); tenantID != 0 {
-		req.TenantID = tenantID
+	if tenantUUID := resolveTenantUUID(opts); tenantUUID != "" {
+		req.TenantUUID = tenantUUID
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -1415,19 +1415,28 @@ func filterSessionsByStatus(sessions []devapi.SessionRecord, filter string) []de
 	return filtered
 }
 
-func resolveTenantID(opts *DevOptions) uint64 {
-	if opts.TenantID != 0 {
-		return opts.TenantID
+func resolveTenantUUID(opts *DevOptions) string {
+	if opts == nil {
+		return ""
 	}
-	if env := os.Getenv("PX_DEV_TENANT_ID"); env != "" {
-		if v, err := strconv.ParseUint(env, 10, 64); err == nil {
-			return v
+	if t := strings.TrimSpace(opts.TenantUUID); t != "" {
+		return t
+	}
+	if env := strings.TrimSpace(os.Getenv("PX_DEV_TENANT_UUID")); env != "" {
+		return env
+	}
+	if env := strings.TrimSpace(os.Getenv("PX_DEV_TENANT_ID")); env != "" {
+		return env
+	}
+	if creds, _ := loadPowerXCredentials(); creds != nil {
+		if uuid := strings.TrimSpace(creds.TenantUUID); uuid != "" {
+			return uuid
+		}
+		if creds.TenantUuid > 0 {
+			return strconv.FormatUint(creds.TenantUuid, 10)
 		}
 	}
-	if creds, _ := loadPowerXCredentials(); creds != nil && creds.TenantID > 0 {
-		return creds.TenantID
-	}
-	return 0
+	return ""
 }
 
 func resolveDeveloperID(opts *DevOptions) uint64 {
@@ -1470,7 +1479,8 @@ func tokenFromPowerXCredentials(devAPIBase string) string {
 type powerXCredentials struct {
 	APIBase     string
 	AccessToken string
-	TenantID    uint64
+	TenantUUID  string
+	TenantUuid  uint64
 	DeveloperID uint64
 }
 
@@ -1505,13 +1515,15 @@ func loadPowerXCredentials() (*powerXCredentials, error) {
 	return &powerXCredentials{
 		APIBase:     strings.TrimSpace(file.API),
 		AccessToken: token,
-		TenantID:    claims.TenantID,
+		TenantUUID:  claims.TenantUUID,
+		TenantUuid:  claims.TenantUuid,
 		DeveloperID: claims.DeveloperID,
 	}, nil
 }
 
 type powerXClaims struct {
-	TenantID    uint64
+	TenantUUID  string
+	TenantUuid  uint64
 	DeveloperID uint64
 }
 
@@ -1526,22 +1538,38 @@ func decodePowerXClaims(token string) (*powerXClaims, error) {
 	if err != nil {
 		return nil, err
 	}
-	var raw struct {
-		TenantNumber float64 `json:"tid_n"`
-		MemberNumber float64 `json:"mid_n"`
-		UserNumber   float64 `json:"uid_n"`
-	}
+	var raw map[string]any
 	if err := json.Unmarshal(decoded, &raw); err != nil {
 		return nil, err
 	}
 	claims := &powerXClaims{}
-	if raw.TenantNumber > 0 {
-		claims.TenantID = uint64(raw.TenantNumber)
+	if v, ok := raw["tid"]; ok {
+		switch t := v.(type) {
+		case string:
+			claims.TenantUUID = strings.TrimSpace(t)
+		case float64:
+			claims.TenantUUID = strconv.FormatUint(uint64(t), 10)
+		}
 	}
-	if raw.MemberNumber > 0 {
-		claims.DeveloperID = uint64(raw.MemberNumber)
-	} else if raw.UserNumber > 0 {
-		claims.DeveloperID = uint64(raw.UserNumber)
+	if claims.TenantUUID == "" {
+		if v, ok := raw["tenant_uuid"]; ok {
+			if s, ok := v.(string); ok {
+				claims.TenantUUID = strings.TrimSpace(s)
+			}
+		}
+	}
+	if v, ok := raw["tid_n"].(float64); ok && v > 0 {
+		claims.TenantUuid = uint64(v)
+	}
+	if claims.TenantUuid == 0 && claims.TenantUUID != "" {
+		if parsed, err := strconv.ParseUint(claims.TenantUUID, 10, 64); err == nil {
+			claims.TenantUuid = parsed
+		}
+	}
+	if v, ok := raw["mid_n"].(float64); ok && v > 0 {
+		claims.DeveloperID = uint64(v)
+	} else if v, ok := raw["uid_n"].(float64); ok && v > 0 {
+		claims.DeveloperID = uint64(v)
 	}
 	return claims, nil
 }
@@ -1563,8 +1591,12 @@ func applyPowerXCredentialDefaults(opts *DevOptions, devAPIBase string) {
 	if matchesAPIBase(creds.APIBase, devAPIBase) && opts.DevAPIToken == "" {
 		opts.DevAPIToken = creds.AccessToken
 	}
-	if opts.TenantID == 0 && creds.TenantID > 0 {
-		opts.TenantID = creds.TenantID
+	if opts.TenantUUID == "" {
+		if uuid := strings.TrimSpace(creds.TenantUUID); uuid != "" {
+			opts.TenantUUID = uuid
+		} else if creds.TenantUuid > 0 {
+			opts.TenantUUID = strconv.FormatUint(creds.TenantUuid, 10)
+		}
 	}
 	if opts.DeveloperID == 0 && creds.DeveloperID > 0 {
 		opts.DeveloperID = creds.DeveloperID

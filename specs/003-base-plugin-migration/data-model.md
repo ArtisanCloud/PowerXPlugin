@@ -3,7 +3,7 @@
 ## TemplateRecord
 
 - **id** (uint64) — 自增主键，对应 `models.BaseModel.ID`
-- **tenant_id** (uint64) — 必填，来自 `X-Tenant-ID`，用于多租户隔离
+- **tenant_uuid** (uuid) — 必填，来自 `X-Tenant-UUID`，用于多租户隔离
 - **name** (string, ≤255) — 模板名称
 - **description** (string, text) — 模板描述
 - **content** (string, text) — 模板内容
@@ -11,13 +11,13 @@
 
 ### 行为约束
 
-- 所有查询/更新必须附带 `tenant_id = ?`
+- 所有查询/更新必须附带 `tenant_uuid = ?`
 - 删除采用软删除（跟随 `gorm.DeletedAt` 约定）
 - Skeleton 内存实现需保持同样字段，允许未来轻松切换数据库
 
 ## TenantContext
 
-- **tenant_id** (uint64) — 中间件解析得到，如果缺失则在 Standalone 模式下默认 1
+- **tenant_uuid** (uint64) — 中间件解析得到，如果缺失则在 Standalone 模式下默认 1
 - **request_id** (string) — RequestID 中间件生成的标识，用于响应包与日志关联
 
 ### 作用范围

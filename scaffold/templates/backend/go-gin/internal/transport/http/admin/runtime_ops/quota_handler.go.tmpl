@@ -42,7 +42,7 @@ func NewQuotaHandler(deps *app.Deps, defaults *config.RuntimeOpsDefaults) *Quota
 // GetStatus returns current quota utilization for a tenant scope.
 func (h *QuotaHandler) GetStatus(c *gin.Context) {
 	pluginID := c.DefaultQuery("plugin_id", app.PluginID)
-	tenantID := c.Query("tenant_id")
+	tenantID := c.Query("tenant_uuid")
 
 	defaults := h.svc.Defaults()
 	window := 5 * time.Minute
@@ -54,7 +54,7 @@ func (h *QuotaHandler) GetStatus(c *gin.Context) {
 	entries, err := h.svc.ListUsage(c.Request.Context(), "tenant", tenantID, start, time.Now())
 	if err != nil {
 		h.log(c, logrus.ErrorLevel, "failed to list quota ledger", logger.Fields{
-			"tenant_id": tenantID,
+			"tenant_uuid": tenantID,
 			"plugin_id": pluginID,
 			"error":     err.Error(),
 		})
@@ -63,14 +63,14 @@ func (h *QuotaHandler) GetStatus(c *gin.Context) {
 	}
 
 	h.log(c, logrus.InfoLevel, "quota ledger retrieved", logger.Fields{
-		"tenant_id": tenantID,
+		"tenant_uuid": tenantID,
 		"plugin_id": pluginID,
 		"entries":   len(entries),
 	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"plugin_id": pluginID,
-		"tenant_id": tenantID,
+		"tenant_uuid": tenantID,
 		"ledger":    entries,
 		"window": gin.H{
 			"minutes": int(window.Minutes()),
@@ -84,7 +84,7 @@ func (h *QuotaHandler) GetStatus(c *gin.Context) {
 func (h *QuotaHandler) SetOverride(c *gin.Context) {
 	var req struct {
 		PluginID   string `json:"plugin_id"`
-		TenantID   string `json:"tenant_id"`
+		TenantUuid   string `json:"tenant_uuid"`
 		Capability string `json:"capability"`
 		Action     string `json:"action"`
 	}
@@ -97,10 +97,10 @@ func (h *QuotaHandler) SetOverride(c *gin.Context) {
 		return
 	}
 
-	h.svc.HandleBreach(c.Request.Context(), req.PluginID, req.TenantID, req.Capability, req.Action)
+	h.svc.HandleBreach(c.Request.Context(), req.PluginID, req.TenantUuid, req.Capability, req.Action)
 	h.log(c, logrus.InfoLevel, "manual quota override accepted", logger.Fields{
 		"plugin_id": req.PluginID,
-		"tenant_id": req.TenantID,
+		"tenant_uuid": req.TenantUuid,
 		"action":    req.Action,
 		"path":      c.FullPath(),
 	})

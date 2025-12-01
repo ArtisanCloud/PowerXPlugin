@@ -40,13 +40,13 @@ export const useDevConsoleConfigStore = defineStore('dev-console.config', {
       const base = config.public?.apiBaseUrl || '/api/v1'
       return `${base.replace(/\/$/, '')}/admin/dev-console`
     },
-    async fetchSections(params: { tenant_id?: string } = {}) {
+    async fetchSections(params: { tenant_uuid?: string } = {}) {
       this.loading = true
       this.error = null
       try {
         const query = new URLSearchParams()
-        if (params.tenant_id) {
-          query.set('tenant_id', params.tenant_id)
+        if (params.tenant_uuid) {
+          query.set('tenant_uuid', params.tenant_uuid)
         }
         const resp = await $fetch<{ success: boolean; data: ConfigResponse }>(`${this.apiBase()}/config/sections${query.size ? `?${query.toString()}` : ''}`, {
           credentials: 'include',
@@ -59,7 +59,7 @@ export const useDevConsoleConfigStore = defineStore('dev-console.config', {
         this.loading = false
       }
     },
-    async updateSection(key: string, payload: { values: Record<string, any>; tenant_id?: string; comment?: string }) {
+    async updateSection(key: string, payload: { values: Record<string, any>; tenant_uuid?: string; comment?: string }) {
       this.error = null
       try {
         const resp = await $fetch<{ success: boolean; data: ConfigSection }>(`${this.apiBase()}/config/sections/${encodeURIComponent(key)}`, {

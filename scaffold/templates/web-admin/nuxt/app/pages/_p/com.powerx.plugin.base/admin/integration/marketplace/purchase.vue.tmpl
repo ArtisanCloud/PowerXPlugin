@@ -28,8 +28,8 @@
         </template>
 
         <div class="space-y-4">
-          <UFormGroup label="租户 ID">
-            <UInput v-model="tenantId" placeholder="1" />
+          <UFormGroup label="租户 UUID">
+            <UInput v-model="tenantUuid" placeholder="tenant-123" />
           </UFormGroup>
 
           <UFormGroup label="选择 Listing">
@@ -168,7 +168,7 @@ const purchasing = ref(false)
 const renewing = ref(false)
 const extending = ref(false)
 
-const tenantId = ref("1")
+const tenantUuid = ref("tenant-demo")
 const listings = ref<MarketplaceListing[]>([])
 const selectedListingId = ref<string | null>(null)
 const selectedPlanId = ref<string | null>(null)
@@ -272,8 +272,8 @@ function handleListingChange(value: string | null) {
 }
 
 function ensureTenantQuery(): Record<string, string> {
-  const id = tenantId.value.trim()
-  return id ? { tenant_id: id } : {}
+  const id = tenantUuid.value.trim()
+  return id ? { tenant_uuid: id } : {}
 }
 
 async function purchaseLicense() {

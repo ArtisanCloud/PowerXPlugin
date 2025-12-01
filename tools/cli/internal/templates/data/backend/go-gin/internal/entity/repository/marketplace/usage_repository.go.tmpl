@@ -31,7 +31,7 @@ func NewUsageRepository(db *gorm.DB) *UsageRepository {
 func (r *UsageRepository) InsertEnvelopes(ctx context.Context, tenantID string, envelopes []*dbm.UsageEnvelope) (int, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return 0, errors.New("tenant_id is required")
+		return 0, errors.New("tenant_uuid is required")
 	}
 	if len(envelopes) == 0 {
 		return 0, nil
@@ -42,7 +42,7 @@ func (r *UsageRepository) InsertEnvelopes(ctx context.Context, tenantID string, 
 			if env == nil {
 				continue
 			}
-			env.TenantID = tenantID
+			env.TenantUuid = tenantID
 			if strings.TrimSpace(env.ID) == "" {
 				env.ID = uuid.NewString()
 			}
@@ -73,9 +73,9 @@ func (r *UsageRepository) UpsertAggregate(ctx context.Context, aggregate *dbm.Us
 	if aggregate == nil {
 		return errors.New("aggregate is required")
 	}
-	tenantID := strings.TrimSpace(aggregate.TenantID)
+	tenantID := strings.TrimSpace(aggregate.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(aggregate.ID) == "" {
 		aggregate.ID = uuid.NewString()
@@ -83,7 +83,7 @@ func (r *UsageRepository) UpsertAggregate(ctx context.Context, aggregate *dbm.Us
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "tenant_id"},
+				{Name: "tenant_uuid"},
 				{Name: "license_id"},
 				{Name: "metric"},
 				{Name: "window"},
@@ -105,10 +105,10 @@ func (r *UsageRepository) ListAggregates(ctx context.Context, tenantID, licenseI
 	tenantID = strings.TrimSpace(tenantID)
 	licenseID = strings.TrimSpace(licenseID)
 	if tenantID == "" || licenseID == "" {
-		return nil, errors.New("tenant_id and license_id are required")
+		return nil, errors.New("tenant_uuid and license_id are required")
 	}
 	query := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND license_id = ? AND window = ?", tenantID, licenseID, string(window)).
+		Where("tenant_uuid = ? AND license_id = ? AND window = ?", tenantID, licenseID, string(window)).
 		Order("time_bucket ASC")
 	var aggregates []*dbm.UsageAggregate
 	if err := query.Find(&aggregates).Error; err != nil {
@@ -123,11 +123,11 @@ func (r *UsageRepository) LatestAggregate(ctx context.Context, tenantID, license
 	licenseID = strings.TrimSpace(licenseID)
 	metric = strings.TrimSpace(metric)
 	if tenantID == "" || licenseID == "" || metric == "" {
-		return nil, errors.New("tenant_id, license_id and metric are required")
+		return nil, errors.New("tenant_uuid, license_id and metric are required")
 	}
 	var aggregate dbm.UsageAggregate
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND license_id = ? AND metric = ? AND window = ?", tenantID, licenseID, metric, string(window)).
+		Where("tenant_uuid = ? AND license_id = ? AND metric = ? AND window = ?", tenantID, licenseID, metric, string(window)).
 		Order("time_bucket DESC").
 		First(&aggregate).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -145,11 +145,11 @@ func (r *UsageRepository) GetAggregate(ctx context.Context, tenantID, licenseID,
 	licenseID = strings.TrimSpace(licenseID)
 	metric = strings.TrimSpace(metric)
 	if tenantID == "" || licenseID == "" || metric == "" {
-		return nil, errors.New("tenant_id, license_id and metric are required")
+		return nil, errors.New("tenant_uuid, license_id and metric are required")
 	}
 	var aggregate dbm.UsageAggregate
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND license_id = ? AND metric = ? AND window = ? AND time_bucket = ?", tenantID, licenseID, metric, string(window), bucket.UTC()).
+		Where("tenant_uuid = ? AND license_id = ? AND metric = ? AND window = ? AND time_bucket = ?", tenantID, licenseID, metric, string(window), bucket.UTC()).
 		First(&aggregate).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -165,12 +165,12 @@ func (r *UsageRepository) DeleteEnvelopesBefore(ctx context.Context, tenantID, l
 	tenantID = strings.TrimSpace(tenantID)
 	licenseID = strings.TrimSpace(licenseID)
 	if tenantID == "" || licenseID == "" {
-		return 0, errors.New("tenant_id and license_id are required")
+		return 0, errors.New("tenant_uuid and license_id are required")
 	}
 	before = before.UTC()
 	var affected int64
 	err := r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
-		res := tx.Where("tenant_id = ? AND license_id = ? AND timestamp_end <= ?", tenantID, licenseID, before).
+		res := tx.Where("tenant_uuid = ? AND license_id = ? AND timestamp_end <= ?", tenantID, licenseID, before).
 			Delete(&dbm.UsageEnvelope{})
 		if res.Error != nil {
 			return res.Error
@@ -186,12 +186,12 @@ func (r *UsageRepository) DeleteAggregatesBefore(ctx context.Context, tenantID, 
 	tenantID = strings.TrimSpace(tenantID)
 	licenseID = strings.TrimSpace(licenseID)
 	if tenantID == "" || licenseID == "" {
-		return 0, errors.New("tenant_id and license_id are required")
+		return 0, errors.New("tenant_uuid and license_id are required")
 	}
 	before = before.UTC()
 	var affected int64
 	err := r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
-		res := tx.Where("tenant_id = ? AND license_id = ? AND time_bucket <= ?", tenantID, licenseID, before).
+		res := tx.Where("tenant_uuid = ? AND license_id = ? AND time_bucket <= ?", tenantID, licenseID, before).
 			Delete(&dbm.UsageAggregate{})
 		if res.Error != nil {
 			return res.Error

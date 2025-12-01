@@ -27,7 +27,7 @@ func NewConfigHandler(deps *app.Deps) *ConfigHandler {
 }
 
 type configSectionsQuery struct {
-	TenantID string `form:"tenant_id"`
+	TenantUuid string `form:"tenant_uuid"`
 }
 
 // ListSections returns configuration schema merged with current values.
@@ -42,8 +42,8 @@ func (h *ConfigHandler) ListSections(c *gin.Context) {
 		return
 	}
 	var tenantPtr *string
-	if strings.TrimSpace(query.TenantID) != "" {
-		clean := strings.TrimSpace(query.TenantID)
+	if strings.TrimSpace(query.TenantUuid) != "" {
+		clean := strings.TrimSpace(query.TenantUuid)
 		tenantPtr = &clean
 	}
 	sections, err := h.svc.ListSections(c.Request.Context(), tenantPtr)
@@ -59,7 +59,7 @@ func (h *ConfigHandler) ListSections(c *gin.Context) {
 }
 
 type updateSectionBody struct {
-	TenantID *string        `json:"tenant_id"`
+	TenantUuid *string        `json:"tenant_uuid"`
 	Values   map[string]any `json:"values" binding:"required"`
 	Comment  string         `json:"comment"`
 }
@@ -85,7 +85,7 @@ func (h *ConfigHandler) UpdateSection(c *gin.Context) {
 		actor.PermissionCode = "operations.plugin.admin"
 	}
 	input := consolesvc.UpdateSectionInput{
-		TenantID:   body.TenantID,
+		TenantUuid:   body.TenantUuid,
 		SectionKey: sectionKey,
 		Values:     body.Values,
 		Comment:    body.Comment,

@@ -70,7 +70,7 @@
   "timestamp": "2025-10-13T10:32:21Z",
   "level": "INFO",
   "plugin_id": "com.powerx.plugin.crm",
-  "tenant_id": "tenant_123",
+  "tenant_uuid": "tenant_123",
   "component": "contact_service",
   "message": "Contact created successfully",
   "trace_id": "2cf0c83d8bfc49cb"
@@ -83,7 +83,7 @@
 ### 3️⃣ 代码实现约定
 
 - 使用 `backend/internal/logger` 提供的统一封装写日志，不要直接实例化 logrus。`logger.Init()` 由应用入口执行。  
-- 记录插件运行事件时，调用 `logger.WithRuntimeFields(pluginID, tenantID, traceID, component, extraFields)` 自动补齐 `plugin_id`、`tenant_id`、`trace_id`、`component` 等字段，确保日志与宿主采集规则一致。  
+- 记录插件运行事件时，调用 `logger.WithRuntimeFields(pluginID, tenantID, traceID, component, extraFields)` 自动补齐 `plugin_id`、`tenant_uuid`、`trace_id`、`component` 等字段，确保日志与宿主采集规则一致。  
 - 如需追加自定义字段，传入 `extraFields`（`logger.Fields`）；框架会合并后输出。  
 - 本地调试仍可通过 `logger.SetOutput` 将日志重定向到文件或缓冲区；生产环境保持 stdout 输出以便宿主收集。
 
@@ -347,7 +347,7 @@ func main() {
 | 项目         | 要求                    |
 | ---------- | --------------------- |
 | **隐私数据脱敏** | 日志中禁止直接输出手机号、邮箱、Token |
-| **多租户隔离**  | 必须在日志中显式标注 tenant_id  |
+| **多租户隔离**  | 必须在日志中显式标注 tenant_uuid  |
 | **日志保留策略** | 默认 30 天，敏感插件可自定义      |
 | **安全访问**   | 所有指标端点需鉴权或仅限宿主访问      |
 
@@ -375,6 +375,6 @@ func main() {
 
 - 定义了插件日志输出、指标暴露与链路追踪的标准；
 - 全面兼容 PowerX 宿主的 Loki / Prometheus / Tempo 三栈；
-- 要求日志含 `plugin_id`、`tenant_id`、`trace_id`；
+- 要求日志含 `plugin_id`、`tenant_uuid`、`trace_id`；
 - 支持跨租户可观测性与快速调试；
 - 下一章节将进入 **04_security_and_compliance**，开始定义插件安全、隐私与漏洞响应规范。  

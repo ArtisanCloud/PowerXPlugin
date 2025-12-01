@@ -11,7 +11,7 @@ import (
 type AuditEvent struct {
 	ID             string         `gorm:"column:id;primaryKey" json:"id"`
 	PluginID       string         `gorm:"column:plugin_id;type:text;not null" json:"plugin_id"`
-	TenantID       *string        `gorm:"column:tenant_id;type:text" json:"tenant_id,omitempty"`
+	TenantUUID     *string        `gorm:"column:tenant_uuid;type:uuid" json:"tenant_uuid,omitempty"`
 	ActorID        string         `gorm:"column:actor_id;type:text;not null" json:"actor_id"`
 	ActorName      *string        `gorm:"column:actor_name;type:text" json:"actor_name,omitempty"`
 	ActorEmail     *string        `gorm:"column:actor_email;type:text" json:"actor_email,omitempty"`
@@ -36,7 +36,7 @@ func (AuditEvent) TableName() string {
 type ConfigChange struct {
 	ID                string         `gorm:"column:id;primaryKey" json:"id"`
 	PluginID          string         `gorm:"column:plugin_id;type:text;not null" json:"plugin_id"`
-	TenantID          *string        `gorm:"column:tenant_id;type:text" json:"tenant_id,omitempty"`
+	TenantUUID        *string        `gorm:"column:tenant_uuid;type:uuid" json:"tenant_uuid,omitempty"`
 	SectionKey        string         `gorm:"column:section_key;type:text;not null" json:"section_key"`
 	ChangeType        string         `gorm:"column:change_type;type:text;not null" json:"change_type"`
 	PreviousSnapshot  datatypes.JSON `gorm:"column:previous_snapshot;type:jsonb" json:"previous_snapshot,omitempty"`
@@ -56,7 +56,7 @@ func (ConfigChange) TableName() string {
 type JobRun struct {
 	ID             string         `gorm:"column:id;primaryKey" json:"id"`
 	PluginID       string         `gorm:"column:plugin_id;type:text;not null" json:"plugin_id"`
-	TenantID       *string        `gorm:"column:tenant_id;type:text" json:"tenant_id,omitempty"`
+	TenantUUID     *string        `gorm:"column:tenant_uuid;type:uuid" json:"tenant_uuid,omitempty"`
 	Environment    string         `gorm:"column:environment;type:text" json:"environment"`
 	JobType        string         `gorm:"column:job_type;type:text;not null" json:"job_type"`
 	TriggerSource  string         `gorm:"column:trigger_source;type:text;not null" json:"trigger_source"`

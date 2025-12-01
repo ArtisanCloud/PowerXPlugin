@@ -193,7 +193,7 @@ type SafeOpDetails struct {
 type JobRunRecord struct {
 	ID             string        `json:"id"`
 	PluginID       string        `json:"plugin_id"`
-	TenantID       string        `json:"tenant_id,omitempty"`
+	TenantUUID       string        `json:"tenant_uuid,omitempty"`
 	Environment    string        `json:"environment,omitempty"`
 	JobType        JobType       `json:"job_type"`
 	TriggerSource  TriggerSource `json:"trigger_source"`
@@ -212,7 +212,7 @@ type JobRunRecord struct {
 
 // ScheduleSafeOpInput captures parameters for safe operation scheduling.
 type ScheduleSafeOpInput struct {
-	TenantID      *string
+	TenantUUID      *string
 	Environment   string
 	JobType       JobType
 	TriggerSource TriggerSource
@@ -229,7 +229,7 @@ type ScheduleSafeOpInput struct {
 // RetryRunInput describes retry invocation parameters.
 type RetryRunInput struct {
 	RunID    string
-	TenantID *string
+	TenantUUID *string
 	Actor    Actor
 }
 
@@ -292,8 +292,8 @@ func (s *JobService) RetryRun(ctx context.Context, input RetryRunInput) (*JobRun
 	if !isRetryableStatus(existing.Status) {
 		return nil, ErrRetryNotAllowed
 	}
-	if input.TenantID != nil {
-		if existing.TenantID == nil || strings.TrimSpace(*existing.TenantID) != strings.TrimSpace(*input.TenantID) {
+	if input.TenantUUID != nil {
+		if existing.TenantUUID == nil || strings.TrimSpace(*existing.TenantUUID) != strings.TrimSpace(*input.TenantUUID) {
 			return nil, ErrRetryNotAllowed
 		}
 	}
@@ -310,7 +310,7 @@ func (s *JobService) RetryRun(ctx context.Context, input RetryRunInput) (*JobRun
 		action = SafeOpActionRetry
 	}
 	scheduleInput := ScheduleSafeOpInput{
-		TenantID:      existing.TenantID,
+		TenantUUID:      existing.TenantUUID,
 		Environment:   existing.Environment,
 		JobType:       JobType(existing.JobType),
 		TriggerSource: TriggerSourceManual,
@@ -378,7 +378,7 @@ func (s *JobService) ListRuns(ctx context.Context, tenantID *string, jobType str
 	}
 	opts := consolerepo.JobRunListOptions{
 		PluginID: app.PluginID,
-		TenantID: tenantID,
+		TenantUUID: tenantID,
 		JobType:  jobType,
 		Status:   status,
 		Cursor:   cursor,
@@ -403,7 +403,7 @@ func (s *JobService) ListRuns(ctx context.Context, tenantID *string, jobType str
 }
 
 func (s *JobService) checkActiveRun(ctx context.Context, input ScheduleSafeOpInput) error {
-	active, err := s.repo.HasActiveRun(ctx, app.PluginID, input.TenantID, string(input.Action), string(input.ScopeType), input.ScopeRef)
+	active, err := s.repo.HasActiveRun(ctx, app.PluginID, input.TenantUUID, string(input.Action), string(input.ScopeType), input.ScopeRef)
 	if err != nil {
 		return err
 	}
@@ -418,8 +418,8 @@ func (s *JobService) buildRun(input ScheduleSafeOpInput, retryOf *string) *model
 	runID := uuid.NewString()
 	scopeRef := strings.TrimSpace(input.ScopeRef)
 	var tenantID *string
-	if input.TenantID != nil && strings.TrimSpace(*input.TenantID) != "" {
-		clean := strings.TrimSpace(*input.TenantID)
+	if input.TenantUUID != nil && strings.TrimSpace(*input.TenantUUID) != "" {
+		clean := strings.TrimSpace(*input.TenantUUID)
 		tenantID = &clean
 	}
 	var retryPtr *string
@@ -441,7 +441,7 @@ func (s *JobService) buildRun(input ScheduleSafeOpInput, retryOf *string) *model
 	return &model.JobRun{
 		ID:            runID,
 		PluginID:      app.PluginID,
-		TenantID:      tenantID,
+		TenantUUID:      tenantID,
 		Environment:   strings.TrimSpace(input.Environment),
 		JobType:       string(input.JobType),
 		TriggerSource: string(input.TriggerSource),
@@ -546,8 +546,8 @@ func mapJobRunRecord(run *model.JobRun, scopeType SafeOpScope, scopeRef string, 
 			DryRun:    dryRun,
 		},
 	}
-	if run.TenantID != nil {
-		record.TenantID = *run.TenantID
+	if run.TenantUUID != nil {
+		record.TenantUUID = *run.TenantUUID
 	}
 	if run.Message != nil {
 		record.Message = *run.Message

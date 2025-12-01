@@ -184,9 +184,7 @@ func (cm *ConfigManager) Load() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	config := &Config{
-		Custom: make(map[string]interface{}),
-	}
+	config := DefaultConfig()
 
 	// Load from all sources
 	for _, source := range cm.sources {

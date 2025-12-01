@@ -32,7 +32,7 @@ func (s *LicenseServer) Issue(ctx context.Context, req *IssueLicenseRequest) (*I
 		return nil, status.Error(codes.InvalidArgument, "request is nil")
 	}
 	params := svc.IssueLicenseParams{
-		TenantID:  req.TenantId,
+		TenantUuid:  req.TenantId,
 		ListingID: req.ListingId,
 		PlanID:    req.PlanId,
 		IssuedBy:  firstNonEmpty(req.IssuedBy, req.TenantId),
@@ -61,7 +61,7 @@ func (s *LicenseServer) Renew(ctx context.Context, req *RenewLicenseRequest) (*R
 		return nil, status.Error(codes.InvalidArgument, "request is nil")
 	}
 	params := svc.RenewLicenseParams{
-		TenantID:     req.TenantId,
+		TenantUuid:     req.TenantId,
 		LicenseID:    req.LicenseId,
 		PlanID:       req.PlanId,
 		RenewalToken: req.RenewalToken,
@@ -127,7 +127,7 @@ func toLicenseProto(l *dbm.License) *License {
 	}
 	proto := &License{
 		Id:            l.ID,
-		TenantId:      l.TenantID,
+		TenantId:      l.TenantUuid,
 		ListingId:     l.ListingID,
 		PlanId:        l.PlanID,
 		Status:        l.Status,

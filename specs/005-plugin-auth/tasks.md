@@ -32,7 +32,7 @@
 ### Implementation
 
 - [X] T009 [US1] 在 `skeleton/web-admin/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
-- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/app/composables/api/_client.ts`，注入 `Authorization` / `X-Tenant-ID`，在 401 时自动调 `authService.refreshToken` 并重放请求。
+- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/app/composables/api/_client.ts`，注入 `Authorization` / `X-Tenant-UUID`，在 401 时自动调 `authService.refreshToken` 并重放请求。
 - [X] T011 [P] [US1] 新建 `skeleton/web-admin/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
 - [X] T012 [US1] 添加 `skeleton/web-admin/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
 - [X] T013 [US1] 完成 `skeleton/web-admin/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。
@@ -80,7 +80,7 @@
 - [X] T029 [US3] 在 `app/composables/useAuth.ts` / `/users/login.vue` 增强 fail-closed 提示，503/refresh 失败会存储 “宿主认证不可用” 并在登录页读取展示。
 - [X] T030 [P] [US3] `useAuth` 的 storage 事件现同步 token&强制跳登录，新增 Vitest 覆盖 storage 事件与错误消费。
 - [X] T031 [US3] 新增 `internal/observability/auth/metrics.go`，记录 login/refresh/logout/iam_mode/delegate_errors，并在 `cmd/plugin/main.go` 初始化；Prometheus 输出合并在 `/api/v1/admin/runtime/metrics`。
-- [X] T032 [US3] `request_trace` 现日志 auth_mode/tenant_id/user_id/trace_id，便于跨模式排障。
+- [X] T032 [US3] `request_trace` 现日志 auth_mode/tenant_uuid/user_id/trace_id，便于跨模式排障。
 - [X] T033 [US3] `internal/observability/auth/metrics_test.go` 验证指标累积；`go test` 覆盖对应输出。
 - [X] T034 [US3] 更新 `docs/operations/runbooks/auth-troubleshooting.md` / `docs/plan/004-plugin-auth-integration.md`，记录指标、Fail-Closed、多 Tab 行为。
 - [X] T035 [US3] Playwright `auth-delegated.spec.ts` 新增 storage 同步测试，模拟本地储存失效后自动跳转 `/users/login`。

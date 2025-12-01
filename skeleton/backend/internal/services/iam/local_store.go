@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -93,7 +94,8 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 	if err != nil {
 		return nil, nil, err
 	}
-	member, user, err := d.findMember(ctx, tenant.ID, identifier)
+	tenantUUID := tenantIdentifier(tenant)
+	member, user, err := d.findMember(ctx, tenantUUID, identifier)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -109,7 +111,8 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 		deptIDs = append(deptIDs, *member.DepartmentID)
 	}
 	userCtx := &UserContext{
-		TenantID:      tenant.ID,
+		TenantUUID:    tenantUUID,
+		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
 		MemberID:      member.ID,
@@ -152,8 +155,10 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 	if member.DepartmentID != nil {
 		deptIDs = append(deptIDs, *member.DepartmentID)
 	}
+	tenantUUID := tenantIdentifier(tenant)
 	userCtx := &UserContext{
-		TenantID:      tenant.ID,
+		TenantUUID:    tenantUUID,
+		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
 		MemberID:      member.ID,
@@ -187,26 +192,50 @@ func (d *LocalDirectory) CurrentUser(ctx context.Context) (*UserContext, error) 
 	return nil, ErrUnsupportedMode
 }
 
-func (d *LocalDirectory) ListRoles(ctx context.Context, tenantID uint64) ([]RoleInfo, error) {
+func (d *LocalDirectory) ListRoles(ctx context.Context, tenantUUID string) ([]RoleInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	scopeTenant := tenantIdentifier(tenant)
 	var roles []iamm.Role
-	if err := d.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Find(&roles).Error; err != nil {
+	if err := d.db.WithContext(ctx).Where("tenant_uuid = ?", scopeTenant).Find(&roles).Error; err != nil {
 		return nil, err
 	}
 	result := make([]RoleInfo, 0, len(roles))
 	for _, r := range roles {
-		result = append(result, RoleInfo{ID: r.ID, TenantID: r.TenantID, Code: r.Code, Name: r.Name, Description: r.Description})
+		result = append(result, RoleInfo{
+			ID:          r.ID,
+			TenantUUID:  scopeTenant,
+			TenantUuid:  r.TenantUuid,
+			Code:        r.Code,
+			Name:        r.Name,
+			Description: r.Description,
+		})
 	}
 	return result, nil
 }
 
-func (d *LocalDirectory) ListDepartments(ctx context.Context, tenantID uint64) ([]DepartmentInfo, error) {
+func (d *LocalDirectory) ListDepartments(ctx context.Context, tenantUUID string) ([]DepartmentInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	scopeTenant := tenantIdentifier(tenant)
 	var deps []iamm.Department
-	if err := d.db.WithContext(ctx).Where("tenant_id = ?", tenantID).Find(&deps).Error; err != nil {
+	if err := d.db.WithContext(ctx).Where("tenant_uuid = ?", scopeTenant).Find(&deps).Error; err != nil {
 		return nil, err
 	}
 	result := make([]DepartmentInfo, 0, len(deps))
 	for _, dep := range deps {
-		info := DepartmentInfo{ID: dep.ID, TenantID: dep.TenantID, Name: dep.Name, Code: dep.Code, Description: dep.Description}
+		info := DepartmentInfo{
+			ID:          dep.ID,
+			TenantUUID:  scopeTenant,
+			TenantUuid:  dep.TenantUuid,
+			Name:        dep.Name,
+			Code:        dep.Code,
+			Description: dep.Description,
+		}
 		if dep.ParentID != nil {
 			info.ParentID = dep.ParentID
 		}
@@ -247,18 +276,19 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 	if err != nil || token == nil || !token.Valid {
 		return nil, ErrUnauthorized
 	}
-	tenantID := uint64(claims.TenantID)
-	userID := uint64(claims.UserID)
-	var tenant iamm.Tenant
-	if err := d.db.WithContext(ctx).Where("id = ?", tenantID).First(&tenant).Error; err != nil {
+	tenantUUID := strings.TrimSpace(claims.TenantUUID.String())
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
 		return nil, err
 	}
+	resolvedTenant := tenantIdentifier(tenant)
+	userID := uint64(claims.UserID)
 	var user iamm.User
 	if err := d.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error; err != nil {
 		return nil, err
 	}
 	var member iamm.Member
-	if err := d.db.WithContext(ctx).Where("tenant_id = ? AND user_id = ?", tenantID, userID).First(&member).Error; err != nil {
+	if err := d.db.WithContext(ctx).Where("tenant_uuid = ? AND user_id = ?", resolvedTenant, userID).First(&member).Error; err != nil {
 		return nil, err
 	}
 	deptIDs := []uint64{}
@@ -266,7 +296,8 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 		deptIDs = append(deptIDs, *member.DepartmentID)
 	}
 	return &UserContext{
-		TenantID:      tenantID,
+		TenantUUID:    resolvedTenant,
+		TenantUuid:    resolvedTenant,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
 		MemberID:      member.ID,
@@ -300,10 +331,10 @@ func (d *LocalDirectory) resolveTenant(ctx context.Context, key string) (*iamm.T
 	return &tenant, nil
 }
 
-func (d *LocalDirectory) findMember(ctx context.Context, tenantID uint64, identifier string) (*iamm.Member, *iamm.User, error) {
+func (d *LocalDirectory) findMember(ctx context.Context, tenantUUID string, identifier string) (*iamm.Member, *iamm.User, error) {
 	ident := strings.ToLower(strings.TrimSpace(identifier))
 	var member iamm.Member
-	query := d.db.WithContext(ctx).Model(&iamm.Member{}).Where("tenant_id = ?", tenantID).Where("status = ?", iamm.StatusActive)
+	query := d.db.WithContext(ctx).Model(&iamm.Member{}).Where("tenant_uuid = ?", tenantUUID).Where("status = ?", iamm.StatusActive)
 	if strings.Contains(ident, "@") {
 		var user iamm.User
 		if err := d.db.WithContext(ctx).Where("lower(email) = ?", ident).First(&user).Error; err == nil {
@@ -356,7 +387,7 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 	now := time.Now()
 	expires := now.Add(d.accessTTL)
 	claims := authx.PowerXClaims{
-		TenantID:      int64(userCtx.TenantID),
+		TenantUUID:    authx.TenantClaim(strings.TrimSpace(userCtx.TenantUUID)),
 		UserID:        int64(userCtx.UserID),
 		Roles:         userCtx.Roles,
 		Permissions:   userCtx.Permissions,
@@ -390,11 +421,11 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 func (d *LocalDirectory) persistRefreshToken(ctx context.Context, uc *UserContext, refreshToken string) error {
 	hash := hashToken(refreshToken)
 	rec := &iamm.RefreshToken{
-		TokenHash: hash,
-		UserID:    uc.UserID,
-		TenantID:  uc.TenantID,
-		MemberID:  uc.MemberID,
-		ExpiresAt: time.Now().Add(d.refreshTTL),
+		TokenHash:  hash,
+		UserID:     uc.UserID,
+		TenantUuid: uc.TenantUuid,
+		MemberID:   uc.MemberID,
+		ExpiresAt:  time.Now().Add(d.refreshTTL),
 	}
 	return d.db.WithContext(ctx).Create(rec).Error
 }
@@ -405,11 +436,11 @@ func (d *LocalDirectory) rotateRefreshToken(ctx context.Context, rec *iamm.Refre
 			return err
 		}
 		return tx.Create(&iamm.RefreshToken{
-			TokenHash: hashToken(newToken),
-			UserID:    uc.UserID,
-			TenantID:  uc.TenantID,
-			MemberID:  uc.MemberID,
-			ExpiresAt: time.Now().Add(d.refreshTTL),
+			TokenHash:  hashToken(newToken),
+			UserID:     uc.UserID,
+			TenantUuid: uc.TenantUuid,
+			MemberID:   uc.MemberID,
+			ExpiresAt:  time.Now().Add(d.refreshTTL),
 		}).Error
 	})
 }
@@ -417,6 +448,36 @@ func (d *LocalDirectory) rotateRefreshToken(ctx context.Context, rec *iamm.Refre
 func (d *LocalDirectory) revokeRefreshToken(ctx context.Context, token string) error {
 	hash := hashToken(token)
 	return d.db.WithContext(ctx).Delete(&iamm.RefreshToken{}, "token_hash = ?", hash).Error
+}
+
+func tenantIdentifier(tenant *iamm.Tenant) string {
+	if tenant == nil {
+		return ""
+	}
+	if key := strings.TrimSpace(tenant.Key); key != "" {
+		return strings.ToLower(key)
+	}
+	return fmt.Sprintf("%d", tenant.ID)
+}
+
+func (d *LocalDirectory) findTenantByIdentifier(ctx context.Context, identifier string) (*iamm.Tenant, error) {
+	search := strings.TrimSpace(identifier)
+	var tenant iamm.Tenant
+	if search != "" {
+		if err := d.db.WithContext(ctx).Where("lower(key) = ?", strings.ToLower(search)).First(&tenant).Error; err == nil {
+			return &tenant, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	if id, err := strconv.ParseUint(search, 10, 64); err == nil && id > 0 {
+		if err := d.db.WithContext(ctx).Where("id = ?", id).First(&tenant).Error; err == nil {
+			return &tenant, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	return nil, ErrUnauthorized
 }
 
 func (d *LocalDirectory) lookupRefreshToken(ctx context.Context, token string) (*iamm.RefreshToken, error) {
@@ -436,8 +497,8 @@ func (d *LocalDirectory) lookupRefreshToken(ctx context.Context, token string) (
 }
 
 func (d *LocalDirectory) loadSessionPrincipals(ctx context.Context, rec *iamm.RefreshToken) (*iamm.Member, *iamm.User, *iamm.Tenant, error) {
-	var tenant iamm.Tenant
-	if err := d.db.WithContext(ctx).Where("id = ?", rec.TenantID).First(&tenant).Error; err != nil {
+	tenant, err := d.findTenantByIdentifier(ctx, rec.TenantUuid)
+	if err != nil {
 		return nil, nil, nil, err
 	}
 	var member iamm.Member
@@ -448,7 +509,7 @@ func (d *LocalDirectory) loadSessionPrincipals(ctx context.Context, rec *iamm.Re
 	if err := d.db.WithContext(ctx).Where("id = ?", rec.UserID).First(&user).Error; err != nil {
 		return nil, nil, nil, err
 	}
-	return &member, &user, &tenant, nil
+	return &member, &user, tenant, nil
 }
 
 func generateRandomToken() (string, error) {

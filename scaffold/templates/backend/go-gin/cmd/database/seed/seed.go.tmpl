@@ -32,11 +32,11 @@ func SeedPluginData(ctx context.Context, db *gorm.DB) error {
 	ctxDB := db.WithContext(ctx)
 	for _, tpl := range seedTemplates {
 		var existing templatemodel.Template
-		err := ctxDB.Where("tenant_id = ? AND name = ?", tenantID, tpl.Name).First(&existing).Error
+		err := ctxDB.Where("tenant_uuid = ? AND name = ?", tenantID, tpl.Name).First(&existing).Error
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			newTpl := templatemodel.Template{
-				BaseModel:   models.BaseModel{TenantID: tenantID},
+				BaseModel:   models.BaseModel{TenantUuid: tenantID},
 				Name:        tpl.Name,
 				Description: tpl.Description,
 				Content:     tpl.Content,

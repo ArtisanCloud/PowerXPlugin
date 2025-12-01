@@ -1,6 +1,6 @@
 export interface ConsentTokenResponse {
   id: string
-  tenantId: string
+  tenantUuid: string
   token: string
   scope: string[]
   status: string
@@ -17,7 +17,7 @@ export interface ConsentTokenListResponse {
 
 export interface LifecycleEventResponse {
   id: string
-  tenantId: string
+  tenantUuid: string
   eventType: string
   assetKey: string
   status: string
@@ -49,7 +49,7 @@ export interface AuditReportListResponse {
 
 export interface ToolGrantRevocation {
   id: string
-  tenant_id: string
+  tenant_uuid: string
   toolgrant_id: string
   revoked_at: string
   revoked_by: string
@@ -60,7 +60,7 @@ export interface ToolGrantRevocation {
 
 export interface ToolGrantUsageEvent {
   id: string
-  tenant_id: string
+  tenant_uuid: string
   toolgrant_id: string
   event_type: string
   capability: string

@@ -110,7 +110,7 @@
             <UToggle v-model="safeOpForm.dry_run" />
           </UFormGroup>
           <UFormGroup label="租户 ID" class="md:col-span-3">
-            <UInput v-model="safeOpForm.tenant_id" placeholder="tenant-1" />
+            <UInput v-model="safeOpForm.tenant_uuid" placeholder="tenant-1" />
           </UFormGroup>
           <div class="md:col-span-3 flex justify-end gap-3">
             <UButton type="submit" color="primary" :loading="safeOpsLoading">提交操作</UButton>
@@ -180,7 +180,7 @@ const safeOpForm = reactive<SafeOpPayload>({
   target_id: '',
   reason: '',
   dry_run: false,
-  tenant_id: '',
+  tenant_uuid: '',
   environment: '',
 })
 
@@ -212,10 +212,10 @@ watch(
 )
 
 watch(
-  () => jobFilters.value.tenant_id,
+  () => jobFilters.value.tenant_uuid,
   value => {
     const cleaned = value?.trim() ?? ''
-    safeOpForm.tenant_id = cleaned
+    safeOpForm.tenant_uuid = cleaned
     if (safeOpForm.scope_type === 'tenant') {
       safeOpForm.scope_ref = cleaned
     }
@@ -226,8 +226,8 @@ watch(
 watch(
   () => safeOpForm.scope_type,
   value => {
-    if (value === 'tenant' && jobFilters.value.tenant_id) {
-      safeOpForm.scope_ref = jobFilters.value.tenant_id
+    if (value === 'tenant' && jobFilters.value.tenant_uuid) {
+      safeOpForm.scope_ref = jobFilters.value.tenant_uuid
     }
   }
 )
@@ -291,7 +291,7 @@ async function exportAuditEvents() {
 
 async function loadJobRuns(cursor?: string) {
   const payload: Record<string, any> = { ...jobFilters.value }
-  if (payload.tenant_id) payload.tenant_id = payload.tenant_id.trim()
+  if (payload.tenant_uuid) payload.tenant_uuid = payload.tenant_uuid.trim()
   if (payload.status) payload.status = payload.status.trim()
   if (payload.job_type) payload.job_type = payload.job_type.trim()
   if (cursor) {
@@ -314,7 +314,7 @@ async function loadMoreRuns() {
 async function handleRetry(run: JobRun) {
   retrying.value = true
   try {
-    await troubleshootStore.retryRun(run.id, { tenant_id: jobFilters.value.tenant_id })
+    await troubleshootStore.retryRun(run.id, { tenant_uuid: jobFilters.value.tenant_uuid })
     toast.add({ title: '已发起重试', color: 'green' })
   } catch (error: any) {
     toast.add({ title: '重试失败', description: error?.message ?? '请稍后再试', color: 'red' })
@@ -324,9 +324,9 @@ async function handleRetry(run: JobRun) {
 }
 
 async function refreshSummary() {
-  const tenant = jobFilters.value.tenant_id?.trim()
+  const tenant = jobFilters.value.tenant_uuid?.trim()
   try {
-    await troubleshootStore.fetchSummary({ tenant_id: tenant || undefined })
+    await troubleshootStore.fetchSummary({ tenant_uuid: tenant || undefined })
   } catch (error: any) {
     toast.add({ title: '加载看板失败', description: error?.message ?? '请稍后再试', color: 'red' })
   }
@@ -345,7 +345,7 @@ async function submitSafeOp() {
     target_id: safeOpForm.target_id?.trim() || undefined,
     reason: safeOpForm.reason?.trim() || undefined,
     dry_run: safeOpForm.dry_run,
-    tenant_id: safeOpForm.tenant_id?.trim() || undefined,
+    tenant_uuid: safeOpForm.tenant_uuid?.trim() || undefined,
     environment: safeOpForm.environment?.trim() || undefined,
   }
   try {

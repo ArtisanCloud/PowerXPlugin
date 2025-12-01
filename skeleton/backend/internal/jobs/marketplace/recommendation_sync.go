@@ -76,11 +76,11 @@ func (j *SyncJob) execute(ctx context.Context) {
 	for _, tenantID := range tenants {
 		result, err := engine.RefreshRecommendations(ctx, tenantID)
 		if err != nil {
-			j.logger.WithError(err).WithField("tenant_id", tenantID).Error("recommendation sync failed")
+			j.logger.WithError(err).WithField("tenant_uuid", tenantID).Error("recommendation sync failed")
 			continue
 		}
 		j.logger.WithFields(logrus.Fields{
-			"tenant_id":         tenantID,
+			"tenant_uuid":         tenantID,
 			"updated":           result.UpdatedCount,
 			"average_weight":    result.AverageWeight,
 			"exploration_share": result.ExplorationShare,

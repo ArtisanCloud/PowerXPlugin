@@ -29,12 +29,20 @@ backend:
 	webAdmin := filepath.Join(tmp, "web-admin")
 	distDir := filepath.Join(webAdmin, "dist")
 	mkDir(t, distDir)
+	serverDir := filepath.Join(distDir, "server")
+	publicDir := filepath.Join(distDir, "public")
+	mkDir(t, serverDir)
+	mkDir(t, publicDir)
 	writeFile(t, filepath.Join(webAdmin, "package.json"), `{"name":"demo-web","scripts":{"build":"nuxt build"}}`)
 	writeFile(t, filepath.Join(distDir, "index.html"), "<html>demo</html>")
+	writeFile(t, filepath.Join(serverDir, "index.mjs"), "export default {}")
+	writeFile(t, filepath.Join(publicDir, "favicon.ico"), "binary")
 
 	backendDir := filepath.Join(tmp, "backend")
 	mkDir(t, backendDir)
 	writeFile(t, filepath.Join(backendDir, "go.mod"), "module example.com/demo\n")
+	mkDir(t, filepath.Join(backendDir, "cmd", "plugin"))
+	writeFile(t, filepath.Join(backendDir, "cmd", "plugin", "main.go"), "package main\nfunc main() {}\n")
 
 	fixed := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 

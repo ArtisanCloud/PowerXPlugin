@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"strconv"
 
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/grpc/client"
@@ -60,8 +59,8 @@ func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger
 	}
 
 	var tenantID string
-	if tid, ok := authx.TenantIDFromContext(ctx); ok && tid > 0 {
-		tenantID = strconv.FormatUint(tid, 10)
+	if tid, ok := authx.TenantUUIDFromContext(ctx); ok && tid != "" {
+		tenantID = tid
 	}
 
 	traceID := ""

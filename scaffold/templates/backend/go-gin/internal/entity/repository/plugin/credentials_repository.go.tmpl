@@ -27,7 +27,7 @@ func (r *CredentialsRepository) Upsert(ctx context.Context, pc *models.PluginCre
 	}
 	return r.DB.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{
-			{Name: "tenant_id"},
+			{Name: "tenant_uuid"},
 			{Name: "plugin_id"},
 		},
 		DoUpdates: clause.AssignmentColumns([]string{"client_id", "secret_ciphertext", "iv_nonce", "key_version", "updated_at"}),
@@ -35,10 +35,10 @@ func (r *CredentialsRepository) Upsert(ctx context.Context, pc *models.PluginCre
 }
 
 // GetByTenantPlugin fetches credentials for a tenant-plugin combination.
-func (r *CredentialsRepository) GetByTenantPlugin(ctx context.Context, tenantID int64, pluginID string) (*models.PluginCredential, error) {
+func (r *CredentialsRepository) GetByTenantPlugin(ctx context.Context, tenantUUID string, pluginID string) (*models.PluginCredential, error) {
 	var pc models.PluginCredential
 	if err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND plugin_id = ?", tenantID, pluginID).
+		Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, pluginID).
 		First(&pc).Error; err != nil {
 		return nil, err
 	}

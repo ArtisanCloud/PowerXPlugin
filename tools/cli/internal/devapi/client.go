@@ -101,7 +101,7 @@ type RegisterRequest struct {
 	Version      string            `json:"version"`
 	EntryPath    string            `json:"entryPath"`
 	Tenant       string            `json:"tenant,omitempty"`
-	TenantID     uint64            `json:"tenantId,omitempty"`
+	TenantUUID   string            `json:"tenantUuid,omitempty"`
 	DeveloperID  uint64            `json:"developerId,omitempty"`
 	Metadata     map[string]string `json:"metadata,omitempty"`
 	Capabilities []string          `json:"capabilities,omitempty"`
@@ -158,12 +158,12 @@ type BuildStats struct {
 
 // DeleteSessionsRequest requests bulk deletion.
 type DeleteSessionsRequest struct {
-	PluginID  string `json:"pluginId,omitempty"`
-	TenantID  uint64 `json:"tenantId,omitempty"`
-	Status    string `json:"status,omitempty"`
-	Force     bool   `json:"force,omitempty"`
-	Confirm   bool   `json:"confirm,omitempty"`
-	SessionID string `json:"sessionId,omitempty"`
+	PluginID   string `json:"pluginId,omitempty"`
+	TenantUUID string `json:"tenantUuid,omitempty"`
+	Status     string `json:"status,omitempty"`
+	Force      bool   `json:"force,omitempty"`
+	Confirm    bool   `json:"confirm,omitempty"`
+	SessionID  string `json:"sessionId,omitempty"`
 }
 
 // DeleteSessionsResponse contains deletion summary.
@@ -176,7 +176,7 @@ type DeleteSessionsResponse struct {
 // ListSessionsFilter allows querying Dev API sessions with optional filters.
 type ListSessionsFilter struct {
 	PluginID    string
-	TenantID    uint64
+	TenantUUID  string
 	DeveloperID uint64
 	Status      string
 	SessionID   string
@@ -188,7 +188,7 @@ type SessionRecord struct {
 	PluginID    string    `json:"pluginId"`
 	Version     string    `json:"version"`
 	Tenant      string    `json:"tenant"`
-	TenantID    uint64    `json:"tenantId"`
+	TenantUUID  string    `json:"tenantUuid"`
 	Status      string    `json:"status"`
 	DeveloperID uint64    `json:"developerId"`
 	DevURL      string    `json:"devUrl"`
@@ -337,8 +337,8 @@ func (c *DevClient) DeleteSessions(ctx context.Context, reqPayload *DeleteSessio
 		if reqPayload.PluginID != "" {
 			values.Set("pluginId", reqPayload.PluginID)
 		}
-		if reqPayload.TenantID != 0 {
-			values.Set("tenantId", strconv.FormatUint(reqPayload.TenantID, 10))
+		if reqPayload.TenantUUID != "" {
+			values.Set("tenantUuid", reqPayload.TenantUUID)
 		}
 		if reqPayload.Status != "" {
 			values.Set("status", reqPayload.Status)
@@ -401,8 +401,8 @@ func (c *DevClient) ListSessions(ctx context.Context, filter *ListSessionsFilter
 		if filter.PluginID != "" {
 			values.Set("pluginId", filter.PluginID)
 		}
-		if filter.TenantID != 0 {
-			values.Set("tenantId", strconv.FormatUint(filter.TenantID, 10))
+		if filter.TenantUUID != "" {
+			values.Set("tenantUuid", filter.TenantUUID)
 		}
 		if filter.DeveloperID != 0 {
 			values.Set("developerId", strconv.FormatUint(filter.DeveloperID, 10))
@@ -483,12 +483,38 @@ func decodeAPIData(body []byte) (json.RawMessage, error) {
 	if err := json.Unmarshal(body, &env); err != nil {
 		return nil, fmt.Errorf("decode dev api envelope: %w", err)
 	}
-	if env.Code != 0 && env.Code != http.StatusOK && env.Code != http.StatusCreated {
+	if env.Code != 0 && env.Code != http.StatusOK && env.Code != http.StatusCreated && env.Code != http.StatusAccepted {
+		var detail map[string]interface{}
+		if len(env.Data) > 0 {
+			_ = json.Unmarshal(env.Data, &detail)
+		}
+		apiCode := ""
+		if detail != nil {
+			if v, ok := detail["code"].(string); ok && v != "" {
+				apiCode = v
+			}
+		}
+		if apiCode == "" {
+			apiCode = fmt.Sprintf("DEV_%d", env.Code)
+		}
 		msg := env.Message
+		if msg == "" {
+			if detail != nil {
+				if v, ok := detail["message"].(string); ok && v != "" {
+					msg = v
+				}
+			}
+		}
 		if msg == "" {
 			msg = strings.TrimSpace(string(body))
 		}
-		return nil, fmt.Errorf("dev api error %d: %s", env.Code, msg)
+		return nil, &DevAPIError{
+			Type:    ErrAPI,
+			Code:    apiCode,
+			Message: msg,
+			Status:  env.Code,
+			Details: detail,
+		}
 	}
 	return env.Data, nil
 }
@@ -562,6 +588,43 @@ func (c *DevClient) makeRequest(ctx context.Context, method, url string, body in
 func (c *DevClient) parseAPIError(status int, body []byte) *DevAPIError {
 	if len(body) == 0 {
 		return nil
+	}
+
+	var env apiEnvelope
+	if err := json.Unmarshal(body, &env); err == nil && (env.Code != 0 || len(env.Data) > 0) {
+		detail := map[string]interface{}{}
+		if len(env.Data) > 0 {
+			_ = json.Unmarshal(env.Data, &detail)
+		}
+		apiCode := ""
+		if v, ok := detail["code"].(string); ok && v != "" {
+			apiCode = v
+		}
+		if apiCode == "" {
+			apiCode = fmt.Sprintf("DEV_%d", status)
+		}
+		message := env.Message
+		if message == "" {
+			if v, ok := detail["message"].(string); ok && v != "" {
+				message = v
+			}
+		}
+		if message == "" {
+			message = strings.TrimSpace(string(body))
+		}
+		errType := ErrAPI
+		if status == http.StatusUnauthorized || status == http.StatusForbidden {
+			errType = ErrAuth
+		}
+		return &DevAPIError{
+			Type:      errType,
+			Code:      apiCode,
+			Message:   message,
+			Original:  fmt.Errorf("status %d", status),
+			Retryable: status >= 500,
+			Status:    status,
+			Details:   detail,
+		}
 	}
 
 	var raw map[string]json.RawMessage

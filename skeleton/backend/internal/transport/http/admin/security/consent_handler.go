@@ -23,9 +23,9 @@ func NewConsentHandler(deps *app.Deps, audit *secobs.AuditWriter) *ConsentHandle
 }
 
 func (h *ConsentHandler) ListConsentTokens(c *gin.Context) {
-	tenantID := c.Query("tenant_id")
+	tenantID := c.Query("tenant_uuid")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
 	statuses := c.QueryArray("status")
@@ -38,9 +38,9 @@ func (h *ConsentHandler) ListConsentTokens(c *gin.Context) {
 }
 
 func (h *ConsentHandler) RevokeConsentToken(c *gin.Context) {
-	tenantID := c.Query("tenant_id")
+	tenantID := c.Query("tenant_uuid")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
 	tokenID := c.Param("tokenId")
@@ -65,9 +65,9 @@ func (h *ConsentHandler) RevokeConsentToken(c *gin.Context) {
 }
 
 func (h *ConsentHandler) ListLifecycleEvents(c *gin.Context) {
-	tenantID := c.Query("tenant_id")
+	tenantID := c.Query("tenant_uuid")
 	if tenantID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
 	eventTypes := c.QueryArray("event_type")

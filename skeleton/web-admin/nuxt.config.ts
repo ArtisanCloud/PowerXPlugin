@@ -3,6 +3,7 @@ import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
 const pluginId = 'com.powerx.plugin.base'
 const pluginAdminBase = `/_p/${pluginId}/admin/`
+const hostApiBase = '/api/v1'
 const pluginApiBase = `/_p/${pluginId}/api/v1`
 const localApiBase = process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8078/api/v1'
 const powerxCoreBase =
@@ -61,7 +62,7 @@ export default defineNuxtConfig({
   },
   app: {
     baseURL: INSIDE_POWERX ? pluginAdminBase : '/',
-    buildAssetsDir: '/assets/',
+    buildAssetsDir: 'assets/',
     head: {
       meta: [
         { name: 'referrer', content: 'no-referrer' },
@@ -87,6 +88,9 @@ export default defineNuxtConfig({
     '@nuxtjs/color-mode',
     '@nuxtjs/i18n'
   ],
+  imports: {
+    dirs: ['stores']
+  },
   colorMode: {
     preference: 'system',
     fallback: 'light',
@@ -110,7 +114,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBaseUrl: INSIDE_POWERX ? pluginApiBase : localApiBase,
+      apiBaseUrl: INSIDE_POWERX ? hostApiBase : localApiBase,
       insidePowerX: INSIDE_POWERX,
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,

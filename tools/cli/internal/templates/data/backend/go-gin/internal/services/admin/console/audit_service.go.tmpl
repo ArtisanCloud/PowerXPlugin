@@ -61,7 +61,7 @@ type AuditEventDTO struct {
 
 // ListAuditInput defines filters for audit history queries.
 type ListAuditInput struct {
-	TenantID       *string
+	TenantUuid       *string
 	ActorID        string
 	Action         string
 	PermissionCode string
@@ -79,7 +79,7 @@ type ListAuditResult struct {
 
 // ExportAuditInput defines audit export filters.
 type ExportAuditInput struct {
-	TenantID       *string
+	TenantUuid       *string
 	ActorID        string
 	Action         string
 	PermissionCode string
@@ -102,7 +102,7 @@ func (s *AuditService) ListEvents(ctx context.Context, input ListAuditInput) (*L
 	}
 	opts := consolerepo.ListOptions{
 		PluginID:       app.PluginID,
-		TenantID:       input.TenantID,
+		TenantUuid:       input.TenantUuid,
 		ActorID:        input.ActorID,
 		Action:         input.Action,
 		PermissionCode: input.PermissionCode,
@@ -136,7 +136,7 @@ func (s *AuditService) ExportEvents(ctx context.Context, input ExportAuditInput)
 	}
 	opts := consolerepo.ExportOptions{
 		PluginID:       app.PluginID,
-		TenantID:       input.TenantID,
+		TenantUuid:       input.TenantUuid,
 		ActorID:        input.ActorID,
 		Action:         input.Action,
 		PermissionCode: input.PermissionCode,

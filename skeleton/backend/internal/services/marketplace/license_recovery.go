@@ -23,12 +23,12 @@ type LicenseRecoveryService struct {
 
 // RecoveryRequest describes the payload required to reconcile a delayed issuance.
 type RecoveryRequest struct {
-	TenantID  string
-	ListingID string
-	PlanID    string
-	BillingID string
-	IssuedBy  string
-	Metadata  map[string]any
+	TenantUuid string
+	ListingID  string
+	PlanID     string
+	BillingID  string
+	IssuedBy   string
+	Metadata   map[string]any
 }
 
 // NewLicenseRecoveryService constructs a recovery coordinator.
@@ -50,11 +50,11 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	if s == nil || s.licenseService == nil || s.licenseRepo == nil {
 		return nil, false, errors.New("recovery service not fully configured")
 	}
-	if hasEmpty(req.TenantID, req.ListingID, req.PlanID, req.BillingID) {
-		return nil, false, errors.New("tenant_id, listing_id, plan_id and billing_id are required")
+	if hasEmpty(req.TenantUuid, req.ListingID, req.PlanID, req.BillingID) {
+		return nil, false, errors.New("tenant_uuid, listing_id, plan_id and billing_id are required")
 	}
 
-	existing, err := s.licenseRepo.FindByBillingID(ctx, req.TenantID, req.BillingID)
+	existing, err := s.licenseRepo.FindByBillingID(ctx, req.TenantUuid, req.BillingID)
 	if err == nil && existing != nil {
 		return existing, false, nil
 	}
@@ -63,7 +63,7 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	}
 
 	if s.pricingRepo != nil {
-		plan, err := s.pricingRepo.GetPlan(ctx, req.TenantID, req.PlanID)
+		plan, err := s.pricingRepo.GetPlan(ctx, req.TenantUuid, req.PlanID)
 		if err != nil {
 			return nil, false, err
 		}
@@ -89,7 +89,7 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	}
 
 	license, err := s.licenseService.IssueLicense(ctx, IssueLicenseParams{
-		TenantID:    req.TenantID,
+		TenantUuid:  req.TenantUuid,
 		ListingID:   req.ListingID,
 		PlanID:      req.PlanID,
 		IssuedBy:    issuedBy,
@@ -99,10 +99,10 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	if err != nil {
 		if s.logger != nil {
 			s.logger.WithError(err).WithFields(logrus.Fields{
-				"tenant_id":  req.TenantID,
-				"listing_id": req.ListingID,
-				"plan_id":    req.PlanID,
-				"billing_id": req.BillingID,
+				"tenant_uuid": req.TenantUuid,
+				"listing_id":  req.ListingID,
+				"plan_id":     req.PlanID,
+				"billing_id":  req.BillingID,
 			}).Error("license recovery failed")
 		}
 		return nil, false, err
@@ -110,11 +110,11 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 
 	if s.logger != nil {
 		s.logger.WithFields(logrus.Fields{
-			"tenant_id":  req.TenantID,
-			"listing_id": req.ListingID,
-			"plan_id":    req.PlanID,
-			"license_id": license.ID,
-			"billing_id": req.BillingID,
+			"tenant_uuid": req.TenantUuid,
+			"listing_id":  req.ListingID,
+			"plan_id":     req.PlanID,
+			"license_id":  license.ID,
+			"billing_id":  req.BillingID,
 		}).Info("license recovered after billing delay")
 	}
 	return license, true, nil

@@ -37,15 +37,15 @@ func (r *BaseRepository[T]) OnConflictDoNothing() clause.OnConflict {
 	return clause.OnConflict{DoNothing: true}
 }
 
-// ErrTenantIDRequired 指示缺少租户上下文。
-var ErrTenantIDRequired = errors.New("tenant id is required for tenant-scoped operations")
+// ErrTenantUuidRequired 指示缺少租户上下文。
+var ErrTenantUuidRequired = errors.New("tenant id is required for tenant-scoped operations")
 
-// BeginTenantTx 启动租户级事务并设置 app.tenant_id。
+// BeginTenantTx 启动租户级事务并设置 app.tenant_uuid。
 func (r *BaseRepository[T]) BeginTenantTx(ctx context.Context, tenantID any) (*gorm.DB, error) {
 	if r.DB == nil {
 		return nil, errors.New("repository database is not initialized")
 	}
-	id, err := normalizeTenantID(tenantID)
+	id, err := normalizeTenantUuid(tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (r *BaseRepository[T]) BeginTenantTx(ctx context.Context, tenantID any) (*g
 		return nil, tx.Error
 	}
 	if tx.Dialector != nil && tx.Dialector.Name() != "sqlite" {
-		if err := tx.Exec("SET LOCAL app.tenant_id = ?", id).Error; err != nil {
+		if err := tx.Exec("SET LOCAL app.tenant_uuid = ?", id).Error; err != nil {
 			_ = tx.Rollback()
 			return nil, err
 		}
@@ -446,41 +446,41 @@ func (r *BaseRepository[T]) Exists(ctx context.Context, query interface{}, args 
 	return count > 0, nil
 }
 
-func normalizeTenantID(tenantID any) (string, error) {
+func normalizeTenantUuid(tenantID any) (string, error) {
 	switch v := tenantID.(type) {
 	case string:
 		id := strings.TrimSpace(v)
 		if id == "" {
-			return "", ErrTenantIDRequired
+			return "", ErrTenantUuidRequired
 		}
 		return id, nil
 	case fmt.Stringer:
 		id := strings.TrimSpace(v.String())
 		if id == "" {
-			return "", ErrTenantIDRequired
+			return "", ErrTenantUuidRequired
 		}
 		return id, nil
 	case uint64:
 		if v == 0 {
-			return "", ErrTenantIDRequired
+			return "", ErrTenantUuidRequired
 		}
 		return fmt.Sprintf("%d", v), nil
 	case uint32:
 		if v == 0 {
-			return "", ErrTenantIDRequired
+			return "", ErrTenantUuidRequired
 		}
 		return fmt.Sprintf("%d", v), nil
 	case int64:
 		if v <= 0 {
-			return "", ErrTenantIDRequired
+			return "", ErrTenantUuidRequired
 		}
 		return fmt.Sprintf("%d", v), nil
 	case int:
 		if v <= 0 {
-			return "", ErrTenantIDRequired
+			return "", ErrTenantUuidRequired
 		}
 		return fmt.Sprintf("%d", v), nil
 	default:
-		return "", ErrTenantIDRequired
+		return "", ErrTenantUuidRequired
 	}
 }

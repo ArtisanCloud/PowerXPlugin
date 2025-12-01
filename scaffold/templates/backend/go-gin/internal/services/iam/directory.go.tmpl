@@ -39,7 +39,8 @@ type AuthTokens struct {
 }
 
 type UserContext struct {
-	TenantID      uint64
+	TenantUUID    string
+	TenantUuid      string
 	TenantKey     string
 	TenantName    string
 	MemberID      uint64
@@ -57,7 +58,8 @@ type UserContext struct {
 
 type RoleInfo struct {
 	ID          uint64
-	TenantID    uint64
+	TenantUUID  string
+	TenantUuid    string
 	Code        string
 	Name        string
 	Description string
@@ -65,7 +67,8 @@ type RoleInfo struct {
 
 type DepartmentInfo struct {
 	ID          uint64
-	TenantID    uint64
+	TenantUUID  string
+	TenantUuid    string
 	Name        string
 	Code        string
 	ParentID    *uint64
@@ -73,7 +76,8 @@ type DepartmentInfo struct {
 }
 
 type TenantContext struct {
-	TenantID    uint64
+	TenantUUID  string
+	TenantUuid    string
 	UserID      uint64
 	Roles       []string
 	Permissions []string
@@ -86,7 +90,7 @@ type IAMDirectory interface {
 	Refresh(ctx context.Context, refreshToken string) (*AuthTokens, error)
 	Logout(ctx context.Context, refreshToken string) error
 	CurrentUser(ctx context.Context) (*UserContext, error)
-	ListRoles(ctx context.Context, tenantID uint64) ([]RoleInfo, error)
-	ListDepartments(ctx context.Context, tenantID uint64) ([]DepartmentInfo, error)
+	ListRoles(ctx context.Context, tenantUUID string) ([]RoleInfo, error)
+	ListDepartments(ctx context.Context, tenantUUID string) ([]DepartmentInfo, error)
 	CheckPermission(ctx context.Context, tc TenantContext, resource, action string) error
 }

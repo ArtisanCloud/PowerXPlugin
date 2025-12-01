@@ -110,12 +110,12 @@ process.env.POWERX_PLUGIN_ID
 | `POWERX_TENANT_MODE`       | `multi` / `single` | 是否启用多租户隔离               |
 | `POWERX_DEFAULT_TENANT_ID` | `1`                | 开发模式下默认租户               |
 | `POWERX_RLS_ENABLED`       | `1`                | 是否启用 Row Level Security |
-| `POWERX_TENANT_CTX_VAR`    | `app.tenant_id`    | 数据库中租户上下文变量名            |
+| `POWERX_TENANT_CTX_VAR`    | `app.tenant_uuid`    | 数据库中租户上下文变量名            |
 
 Postgres 示例：
 
 ```sql
-SET LOCAL app.tenant_id = <tenant_id>;
+SET LOCAL app.tenant_uuid = <tenant_uuid>;
 ```
 
 ---
@@ -151,7 +151,7 @@ httpRequest.Header.Set("Authorization", "Bearer "+token)
 示例输出：
 
 ```json
-{"level":"info","msg":"create template","tenant_id":1024,"plugin":"com.powerx.plugins.base","request_id":"req-98af31"}
+{"level":"info","msg":"create template","tenant_uuid":1024,"plugin":"com.powerx.plugins.base","request_id":"req-98af31"}
 ```
 
 ---

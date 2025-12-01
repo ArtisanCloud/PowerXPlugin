@@ -30,3 +30,17 @@ checks:
         - POST /api/v1/{resource}
         - PUT /api/v1/{resource}/:id
         - DELETE /api/v1/{resource}/:id
+  - id: api-rest-validate
+    desc: 写接口必须有参数验证
+    assert:
+      type: grep
+      target: backend/internal/transport/http/**
+      pattern:
+        - binding:"
+  - id: api-rest-response
+    desc: 返回统一使用 contracts.ResponseXXX 辅助方法
+    assert:
+      type: grep
+      target: backend/internal/transport/http/**
+      pattern:
+        - "contracts.Response"

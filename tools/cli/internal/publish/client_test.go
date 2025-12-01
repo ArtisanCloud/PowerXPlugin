@@ -5,20 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestClientSubmitSuccess(t *testing.T) {
-	tmp := t.TempDir()
-	pkg := writeTempFile(t, tmp, "plugin.tar.gz", "binary-data")
-	meta := writeTempFile(t, tmp, "metadata.json", `{"version":"0.1.0"}`)
-	manifest := writeTempFile(t, tmp, "manifest.json", `{"name":"demo"}`)
-	rbac := writeTempFile(t, tmp, "rbac.json", `{"rules":[]}`)
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/internal/plugins/releases" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -26,14 +18,21 @@ func TestClientSubmitSuccess(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
 			t.Fatalf("missing auth header, got %s", got)
 		}
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			t.Fatalf("parse multipart: %v", err)
+		var payload SubmitRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
 		}
-		if r.FormValue("pluginId") != "com.test.demo" {
-			t.Fatalf("pluginId mismatch: %s", r.FormValue("pluginId"))
+		if payload.PluginID != "com.test.demo" {
+			t.Fatalf("pluginId mismatch: %s", payload.PluginID)
 		}
-		if r.FormValue("channel") != "beta" {
-			t.Fatalf("channel mismatch: %s", r.FormValue("channel"))
+		if payload.Channel != "beta" {
+			t.Fatalf("channel mismatch: %s", payload.Channel)
+		}
+		if payload.TenantUUID != "tenant-uuid" {
+			t.Fatalf("tenant uuid missing: %s", payload.TenantUUID)
+		}
+		if payload.BuildArtifact != "s3://bucket/pkg.tar.gz" {
+			t.Fatalf("artifact mismatch: %s", payload.BuildArtifact)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -58,15 +57,13 @@ func TestClientSubmitSuccess(t *testing.T) {
 	}
 
 	resp, err := client.Submit(context.Background(), &SubmitRequest{
-		PluginID:     "com.test.demo",
-		Version:      "0.1.0",
-		Channel:      "beta",
-		Notes:        "demo",
-		PackagePath:  pkg,
-		MetadataPath: meta,
-		ManifestPath: manifest,
-		RBACPath:     rbac,
-		CLIVersion:   "test",
+		TenantUUID:    "tenant-uuid",
+		PluginID:      "com.test.demo",
+		Version:       "0.1.0",
+		Channel:       "beta",
+		ReleaseNotes:  "demo",
+		BuildArtifact: "s3://bucket/pkg.tar.gz",
+		CLIVersion:    "test",
 	})
 	if err != nil {
 		t.Fatalf("Submit error: %v", err)
@@ -83,11 +80,6 @@ func TestClientSubmitSuccess(t *testing.T) {
 }
 
 func TestClientSubmitEnvelopeError(t *testing.T) {
-	tmp := t.TempDir()
-	pkg := writeTempFile(t, tmp, "plugin.tar.gz", "binary-data")
-	meta := writeTempFile(t, tmp, "metadata.json", "{}")
-	manifest := writeTempFile(t, tmp, "manifest.json", "{}")
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"code":    409,
@@ -102,12 +94,11 @@ func TestClientSubmitEnvelopeError(t *testing.T) {
 	}
 
 	_, err = client.Submit(context.Background(), &SubmitRequest{
-		PluginID:     "com.test.demo",
-		Version:      "0.1.0",
-		Channel:      "dev",
-		PackagePath:  pkg,
-		MetadataPath: meta,
-		ManifestPath: manifest,
+		TenantUUID:    "tenant-uuid",
+		PluginID:      "com.test.demo",
+		Version:       "0.1.0",
+		Channel:       "dev",
+		BuildArtifact: "s3://bucket/dev.tar.gz",
 	})
 	if err == nil || !strings.Contains(err.Error(), "duplicate") {
 		t.Fatalf("expected duplicate error, got %v", err)
@@ -115,11 +106,6 @@ func TestClientSubmitEnvelopeError(t *testing.T) {
 }
 
 func TestClientSubmitHTTPError(t *testing.T) {
-	tmp := t.TempDir()
-	pkg := writeTempFile(t, tmp, "plugin.tar.gz", "binary-data")
-	meta := writeTempFile(t, tmp, "metadata.json", "{}")
-	manifest := writeTempFile(t, tmp, "manifest.json", "{}")
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
@@ -131,23 +117,13 @@ func TestClientSubmitHTTPError(t *testing.T) {
 	}
 
 	_, err = client.Submit(context.Background(), &SubmitRequest{
-		PluginID:     "com.test.demo",
-		Version:      "0.1.0",
-		Channel:      "dev",
-		PackagePath:  pkg,
-		MetadataPath: meta,
-		ManifestPath: manifest,
+		TenantUUID:    "tenant-uuid",
+		PluginID:      "com.test.demo",
+		Version:       "0.1.0",
+		Channel:       "dev",
+		BuildArtifact: "s3://bucket/pkg.tar.gz",
 	})
 	if err == nil || !strings.Contains(err.Error(), "HTTP 500") {
 		t.Fatalf("expected HTTP error, got %v", err)
 	}
-}
-
-func writeTempFile(t *testing.T, dir, name, content string) string {
-	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatalf("write %s: %v", path, err)
-	}
-	return path
 }

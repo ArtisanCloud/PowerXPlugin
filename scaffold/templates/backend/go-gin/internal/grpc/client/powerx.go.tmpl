@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	cfgpkg "{{ .BackendModulePath }}/internal/config"
@@ -32,7 +33,7 @@ import (
 
 // 通用请求和响应结构（与 PowerX proto 兼容）
 type RequestContext struct {
-	TenantId    int64  `json:"tenant_id"`
+	TenantUUID  string `json:"tenant_uuid"`
 	AccessToken string `json:"access_token"`
 }
 
@@ -47,10 +48,10 @@ type PowerXServiceClient struct {
 	// 基于 proto 的强类型客户端
 	sts stsv1.STSServiceClient
 
-	token    string
-	tenantID int64
-	cfg      *cfgpkg.GRPCUpstream
-	tm       *TokenManager
+	token      string
+	tenantUUID string
+	cfg        *cfgpkg.GRPCUpstream
+	tm         *TokenManager
 }
 
 // NewPowerX 根据配置拨号 PowerX gRPC
@@ -60,10 +61,10 @@ func NewPowerXServiceClient(ctx context.Context, c *cfgpkg.GRPCUpstream) (*Power
 	}
 
 	p := &PowerXServiceClient{
-		conn:     nil,
-		token:    c.Token,
-		tenantID: c.TenantID,
-		cfg:      c,
+		conn:       nil,
+		token:      c.Token,
+		tenantUUID: strings.TrimSpace(strings.ToLower(c.TenantUUID)),
+		cfg:        c,
 	}
 
 	// eager 模式：启动即连接；lazy 模式：首次调用再连接
@@ -89,7 +90,7 @@ func NewPowerXServiceClient(ctx context.Context, c *cfgpkg.GRPCUpstream) (*Power
 			// STS Exchange 通常不带原有 Authorization
 			// 但仍可携带租户信息到 Ctx
 			pr := &stsv1.ExchangeRequest{
-				Ctx:          &commonv1.RequestContext{TenantId: p.tenantID},
+				Ctx:          &commonv1.RequestContext{TenantUUID: p.tenantUUID},
 				ClientId:     req.ClientID,
 				ClientSecret: req.ClientSecret,
 				Audience:     req.Audience,
@@ -169,7 +170,7 @@ func (p *PowerXServiceClient) Close() error {
 
 func (p *PowerXServiceClient) RC() *RequestContext {
 	return &RequestContext{
-		TenantId:    p.tenantID,
+		TenantUUID:  p.tenantUUID,
 		AccessToken: p.token,
 	}
 }
@@ -208,8 +209,8 @@ func (p *PowerXServiceClient) Outgoing(ctx context.Context) context.Context {
 		md.Set("authorization", "Bearer "+bearer)
 	}
 
-	if p.tenantID > 0 {
-		md.Set("x-powerx-tenant-id", fmt.Sprint(p.tenantID))
+	if p.tenantUUID != "" {
+		md.Set("x-powerx-tenant-uuid", p.tenantUUID)
 	}
 
 	return metadata.NewOutgoingContext(ctx, md)
@@ -239,9 +240,9 @@ func (p *PowerXServiceClient) HasToken() bool {
 	return false
 }
 
-// GetTenantID 获取租户 ID
-func (p *PowerXServiceClient) GetTenantID() int64 {
-	return p.tenantID
+// GetTenantUuid 获取租户 UUID
+func (p *PowerXServiceClient) GetTenantUuid() string {
+	return p.tenantUUID
 }
 
 // IsConnected 检查连接状态

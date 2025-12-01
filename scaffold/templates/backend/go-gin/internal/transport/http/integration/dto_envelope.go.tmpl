@@ -13,7 +13,7 @@ type DispatchRequest struct {
 	MessageID      string         `json:"message_id"`
 	TraceID        string         `json:"trace_id"`
 	CorrelationID  string         `json:"correlation_id"`
-	TenantID       string         `json:"tenant_id"`
+	TenantUuid       string         `json:"tenant_uuid"`
 	ToolScope      string         `json:"tool_scope"`
 	IssuedAt       string         `json:"issued_at"`
 	IdempotencyKey string         `json:"idempotency_key,omitempty"`
@@ -52,7 +52,7 @@ func (r *DispatchRequest) ToDomain() (*domain.IntegrationEnvelope, error) {
 		MessageID:      messageID,
 		TraceID:        traceID,
 		CorrelationID:  correlationID,
-		TenantID:       r.TenantID,
+		TenantUuid:       r.TenantUuid,
 		ToolScope:      r.ToolScope,
 		IssuedAt:       issuedAt.UTC(),
 		IdempotencyKey: r.IdempotencyKey,

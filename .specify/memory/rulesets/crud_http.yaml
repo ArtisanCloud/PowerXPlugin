@@ -51,9 +51,9 @@ checks:
         - direct_db_access
         - business_flow_in_handler
   - id: http-rls
-    desc: DB 会话必须注入 tenant_id（RLS）
+    desc: DB 会话必须注入 tenant_uuid（RLS）
     assert:
       type: grep
       target: backend/internal/**
       pattern:
-        - "SET LOCAL app.tenant_id"
+        - "SET LOCAL app.tenant_uuid"

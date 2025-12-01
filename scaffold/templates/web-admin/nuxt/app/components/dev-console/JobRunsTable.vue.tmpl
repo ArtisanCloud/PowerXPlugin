@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <UForm class="grid gap-4 md:grid-cols-3" @submit.prevent="apply">
       <UFormGroup label="租户 ID">
-        <UInput v-model="filters.tenant_id" placeholder="tenant-1" />
+        <UInput v-model="filters.tenant_uuid" placeholder="tenant-1" />
       </UFormGroup>
       <UFormGroup label="任务类型">
         <UInput v-model="filters.job_type" placeholder="webhook_replay" />

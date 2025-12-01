@@ -243,7 +243,7 @@ powerx plugin verify com.powerx.plugin.crm-1.3.0.pxp
 {
   "timestamp": "2025-10-13T12:00:00Z",
   "actor": "user_321",
-  "tenant_id": "tenant_123",
+  "tenant_uuid": "tenant_123",
   "action": "contact.delete",
   "result": "success",
   "trace_id": "81a22f9dcb13"

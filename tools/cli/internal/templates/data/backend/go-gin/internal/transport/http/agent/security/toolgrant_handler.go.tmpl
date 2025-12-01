@@ -29,7 +29,7 @@ func (h *ToolGrantHandler) Verify(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
-	tenantUint, ok := middleware.TenantIDFromContext(c.Request.Context())
+	tenantUint, ok := middleware.TenantUuidFromContext(c.Request.Context())
 	if !ok || tenantUint == 0 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
 		return

@@ -49,13 +49,13 @@ func (w *AuditWriter) Emit(event AuditEvent) error {
 	data := struct {
 		Timestamp time.Time              `json:"timestamp"`
 		Event     string                 `json:"event"`
-		TenantID  string                 `json:"tenant_id,omitempty"`
+		TenantUuid  string                 `json:"tenant_uuid,omitempty"`
 		Actor     string                 `json:"actor,omitempty"`
 		Metadata  map[string]interface{} `json:"metadata,omitempty"`
 	}{
 		Timestamp: event.Timestamp,
 		Event:     event.Event,
-		TenantID:  event.TenantID,
+		TenantUuid:  event.TenantUuid,
 		Actor:     event.Actor,
 		Metadata:  event.Metadata,
 	}
@@ -83,7 +83,7 @@ func (w *AuditWriter) Close() error {
 // AuditEvent describes the structured payload persisted by AuditWriter.
 type AuditEvent struct {
 	Event     string                 `json:"event"`
-	TenantID  string                 `json:"tenant_id,omitempty"`
+	TenantUuid  string                 `json:"tenant_uuid,omitempty"`
 	Actor     string                 `json:"actor,omitempty"`
 	Timestamp time.Time              `json:"timestamp"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
@@ -93,7 +93,7 @@ type AuditEvent struct {
 func (w *AuditWriter) EmitLifecycleSuccess(tenantID, eventType, actor string, metadata map[string]interface{}) error {
 	return w.Emit(AuditEvent{
 		Event:    eventType,
-		TenantID: tenantID,
+		TenantUuid: tenantID,
 		Actor:    actor,
 		Metadata: metadata,
 	})

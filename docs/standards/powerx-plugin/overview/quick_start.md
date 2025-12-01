@@ -70,8 +70,8 @@ go -C backend run ./cmd/database/seed
 > 迁移应完成：
 >
 > - 创建 `${POWERX_DB_SCHEMA}`
-> - 创建示例业务表（均含 `tenant_id BIGINT NOT NULL`）
-> - 启用 **Row Level Security (RLS)** 与 `app.tenant_id` 基于 `SET LOCAL` 的策略
+> - 创建示例业务表（均含 `tenant_uuid BIGINT NOT NULL`）
+> - 启用 **Row Level Security (RLS)** 与 `app.tenant_uuid` 基于 `SET LOCAL` 的策略
 
 ---
 
@@ -96,7 +96,7 @@ curl :8078/v1/ping
 > 说明
 >
 > - 生产环境**不要**设置 `POWERX_DEV_MODE=1`。
-> - 非旁路模式下，业务接口需要来自 PowerX 的上下文（HMAC/JWT）头部，用于注入 `tenant_id`、`permissions` 等。
+> - 非旁路模式下，业务接口需要来自 PowerX 的上下文（HMAC/JWT）头部，用于注入 `tenant_uuid`、`permissions` 等。
 
 ---
 
@@ -174,7 +174,7 @@ docker run --rm -p 8078:8078 \
 - **schema 不存在 / 权限不足**：检查 `POWERX_DB_SCHEMA`、数据库用户权限。
 - **JWT/HMAC 验签失败**：确认 `POWERX_CTX_JWKS_URL`（JWT）或 `PLUGIN_CTX_HMAC_SECRET`（HMAC）是否由宿主正确注入。
 - **通过宿主访问 404**：确认**前端请求路径**包含 `/v1/...`，且反代已挂载 `/_p/<plugin-id>/api/*`。
-- **跨租户数据**：检查是否开启 RLS，并确保每请求事务正确执行 `SET LOCAL app.tenant_id=?`。
+- **跨租户数据**：检查是否开启 RLS，并确保每请求事务正确执行 `SET LOCAL app.tenant_uuid=?`。
 
 ---
 

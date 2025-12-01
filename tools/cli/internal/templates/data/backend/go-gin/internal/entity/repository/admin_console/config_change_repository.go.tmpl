@@ -30,9 +30,9 @@ func (r *ConfigChangeRepository) LatestBySection(ctx context.Context, pluginID s
 		Preload("AuditEvent").
 		Order("applied_at DESC")
 	if tenantID == nil {
-		query = query.Where("tenant_id IS NULL")
+		query = query.Where("tenant_uuid IS NULL")
 	} else {
-		query = query.Where("tenant_id = ?", *tenantID)
+		query = query.Where("tenant_uuid = ?", *tenantID)
 	}
 	var change model.ConfigChange
 	if err := query.First(&change).Error; err != nil {

@@ -261,8 +261,7 @@ func runDoctorDevAPICheck(opts *DoctorOptions, entryPath, devAPIBase string) Doc
 	if devOpts.DevAPIToken == "" {
 		devOpts.DevAPIToken = resolveDevAPIToken(devOpts, devAPIBase)
 	}
-	// Resolve numeric IDs (required by updated Dev API schema).
-	devOpts.TenantID = resolveTenantID(devOpts)
+	devOpts.TenantUUID = resolveTenantUUID(devOpts)
 	devOpts.DeveloperID = resolveDeveloperID(devOpts)
 
 	mtlsClient, err := resolveMTLSClient(devOpts, devAPIBase)
@@ -304,7 +303,7 @@ func runDoctorDevAPICheck(opts *DoctorOptions, entryPath, devAPIBase string) Doc
 		Version:     version,
 		EntryPath:   entryPath,
 		Tenant:      devOpts.Tenant,
-		TenantID:    devOpts.TenantID,
+		TenantUUID:  devOpts.TenantUUID,
 		DeveloperID: devOpts.DeveloperID,
 		Metadata: map[string]string{
 			"backend.entry": backendEntry,

@@ -8,7 +8,7 @@ import (
 )
 
 type createLicenseRequest struct {
-	TenantID          string `json:"tenant_id"`
+	TenantUuid          string `json:"tenant_uuid"`
 	ListingID         string `json:"listing_id" binding:"required"`
 	PlanID            string `json:"plan_id" binding:"required"`
 	PaymentIntentID   string `json:"payment_intent_id" binding:"required"`

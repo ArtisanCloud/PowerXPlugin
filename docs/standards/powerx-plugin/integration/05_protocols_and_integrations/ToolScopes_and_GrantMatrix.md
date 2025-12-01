@@ -37,7 +37,7 @@
   "grant_id": "tg_01HDS2XE...",
   "issued_to": "agent.crm.sales",
   "issued_by": "powerx.core",
-  "tenant_id": "tenant_abc",
+  "tenant_uuid": "tenant_abc",
   "scopes": ["crm.contact.create", "crm.contact.search"],
   "capabilities": ["crm.contact.*"],
   "ttl": 3600,
@@ -198,7 +198,7 @@ func VerifyToolGrant(token string) error {
 {
   "event": "toolgrant.issued",
   "grant_id": "tg_01HDS2XE",
-  "tenant_id": "tenant_abc",
+  "tenant_uuid": "tenant_abc",
   "issued_to": "agent.crm.sales",
   "scopes": ["crm.contact.create"],
   "ttl": 3600,

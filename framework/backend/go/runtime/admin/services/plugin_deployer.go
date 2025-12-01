@@ -25,7 +25,7 @@ const (
 // DeploymentStatus tracks the status of a plugin deployment
 type DeploymentStatus struct {
 	DeploymentID string          `json:"deploymentId"`
-	TenantID     string          `json:"tenantId"`
+	TenantUuid   string          `json:"tenantId"`
 	PluginID     string          `json:"pluginId"`
 	Version      string          `json:"version"`
 	State        DeploymentState `json:"status"`
@@ -77,7 +77,7 @@ func (d *PluginDeployer) Deploy(tenantID, pluginID, version string, previousID s
 	// Create new deployment status
 	status := &DeploymentStatus{
 		DeploymentID: deploymentID,
-		TenantID:     tenantID,
+		TenantUuid:   tenantID,
 		PluginID:     pluginID,
 		Version:      version,
 		State:        StatePending,
@@ -280,7 +280,7 @@ func (d *PluginDeployer) performRollback(deploymentID string) {
 	d.deploymentsMu.Unlock()
 
 	// Record rollback latency metric
-	observability.RecordRollbackLatency(rollbackDuration.Seconds(), status.TenantID, status.PluginID, trigger)
+	observability.RecordRollbackLatency(rollbackDuration.Seconds(), status.TenantUuid, status.PluginID, trigger)
 
 	// Emit rollback completed event (auto-triggered)
 	d.eventEmitter.EmitRollbackCompleted(deploymentID, status.PluginID, status.Version, rollbackDuration, true)
@@ -308,7 +308,7 @@ func (d *PluginDeployer) Rollback(deploymentID string) error {
 
 	// Record metric for manual rollback
 	rollbackDuration := time.Since(status.CreatedAt)
-	observability.RecordRollbackLatency(rollbackDuration.Seconds(), status.TenantID, status.PluginID, "manual")
+	observability.RecordRollbackLatency(rollbackDuration.Seconds(), status.TenantUuid, status.PluginID, "manual")
 
 	// Perform rollback
 	d.performRollback(deploymentID)

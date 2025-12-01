@@ -33,7 +33,7 @@ func NewRecommendationHandler(cfg *config.Config, repo *mrepo.ListingRepository,
 
 // GetConfig returns recommendation configuration and current recommendations for the tenant.
 func (h *RecommendationHandler) GetConfig(c *gin.Context) {
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -41,7 +41,7 @@ func (h *RecommendationHandler) GetConfig(c *gin.Context) {
 
 	topListings, err := h.repo.TopRecommended(c.Request.Context(), tenantID, 10)
 	if err != nil {
-		h.logger.WithError(err).WithField("tenant_id", tenantID).Error("failed to load recommended listings")
+		h.logger.WithError(err).WithField("tenant_uuid", tenantID).Error("failed to load recommended listings")
 		contracts.ResponseInternalError(c, err)
 		return
 	}
@@ -73,7 +73,7 @@ func (h *RecommendationHandler) GetConfig(c *gin.Context) {
 
 // TriggerSync recomputes recommendation weights immediately for the tenant.
 func (h *RecommendationHandler) TriggerSync(c *gin.Context) {
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -82,13 +82,13 @@ func (h *RecommendationHandler) TriggerSync(c *gin.Context) {
 	engine := recommendation.NewEngine(h.repo, h.provider, h.logger)
 	result, err := engine.RefreshRecommendations(c.Request.Context(), tenantID)
 	if err != nil {
-		h.logger.WithError(err).WithField("tenant_id", tenantID).Error("manual recommendation sync failed")
+		h.logger.WithError(err).WithField("tenant_uuid", tenantID).Error("manual recommendation sync failed")
 		contracts.ResponseInternalError(c, err)
 		return
 	}
 
 	contracts.ResponseSuccess(c, gin.H{
-		"tenant_id":         tenantID,
+		"tenant_uuid":       tenantID,
 		"updated":           result.UpdatedCount,
 		"average_weight":    result.AverageWeight,
 		"exploration_share": result.ExplorationShare,
@@ -106,7 +106,7 @@ func (h *RecommendationHandler) UpdateExperiment(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "marketplace configuration missing")
 		return
 	}
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -122,7 +122,7 @@ func (h *RecommendationHandler) UpdateExperiment(c *gin.Context) {
 	}
 	h.cfg.Marketplace.Recommendation.DefaultWeight = req.DefaultWeight
 	contracts.ResponseSuccess(c, gin.H{
-		"tenant_id":      tenantID,
+		"tenant_uuid":    tenantID,
 		"default_weight": req.DefaultWeight,
 	})
 }

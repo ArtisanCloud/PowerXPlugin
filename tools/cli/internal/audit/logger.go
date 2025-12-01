@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -154,23 +155,28 @@ func (l *Logger) GetEvents(sessionID string) ([]*Event, error) {
 			continue
 		}
 
-		// Read log file
 		filepath := filepath.Join(l.directory, file.Name())
-		data, err := os.ReadFile(filepath)
+		f, err := os.Open(filepath)
 		if err != nil {
 			continue
 		}
 
-		// Unmarshal event
-		var event Event
-		if err := json.Unmarshal(data, &event); err != nil {
-			continue
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+			var event Event
+			if err := json.Unmarshal(line, &event); err != nil {
+				continue
+			}
+			if event.SessionID == sessionID {
+				copyEvent := event
+				events = append(events, &copyEvent)
+			}
 		}
-
-		// Filter by session ID
-		if event.SessionID == sessionID {
-			events = append(events, &event)
-		}
+		f.Close()
 	}
 
 	return events, nil

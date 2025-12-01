@@ -95,7 +95,7 @@ func (n *RenewalNotifier) execute(ctx context.Context) {
 	for _, tenantID := range tenants {
 		licenses, err := n.repo.ListExpiringWithin(ctx, tenantID, window)
 		if err != nil {
-			n.logger.WithError(err).WithField("tenant_id", tenantID).Warn("failed to query expiring licenses")
+			n.logger.WithError(err).WithField("tenant_uuid", tenantID).Warn("failed to query expiring licenses")
 			continue
 		}
 		for _, license := range licenses {
@@ -114,7 +114,7 @@ func (n *RenewalNotifier) execute(ctx context.Context) {
 			if n.dispatcher != nil {
 				if err := n.dispatcher.DispatchRenewalReminder(ctx, license, channels); err != nil {
 					n.logger.WithError(err).WithFields(logrus.Fields{
-						"tenant_id":  tenantID,
+						"tenant_uuid":  tenantID,
 						"license_id": license.ID,
 					}).Warn("failed to dispatch renewal reminder")
 				}

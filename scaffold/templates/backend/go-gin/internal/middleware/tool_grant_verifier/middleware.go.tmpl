@@ -1,7 +1,6 @@
 package tool_grant_verifier
 
 import (
-	"fmt"
 	"net/http"
 
 	"{{ .BackendModulePath }}/internal/middleware"
@@ -22,12 +21,11 @@ func Middleware(service *toolgrantservice.Service, extractToken func(*gin.Contex
 		} else {
 			token = c.GetHeader("X-ToolGrant")
 		}
-		tenantUint, ok := middleware.TenantIDFromContext(c.Request.Context())
-		if !ok || tenantUint == 0 {
+		tenantID, ok := middleware.TenantUUIDFromContext(c.Request.Context())
+		if !ok || tenantID == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
 			return
 		}
-		tenantID := fmt.Sprintf("%d", tenantUint)
 		if _, err := service.Validate(c.Request.Context(), tenantID, token); err != nil {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": err.Error(), "code": "TOOLGRANT_INVALID"})
 			return

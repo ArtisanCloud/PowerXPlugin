@@ -1,4 +1,4 @@
-import { useApiClient } from "../index";
+import { useApiClient, getTenantUuid } from "../index";
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -16,7 +16,7 @@ export interface LoginParams {
 }
 
 export interface RegisterParams {
-  tenant_id: number;
+  tenant_uuid: string;
   username: string;
   email: string;
   phone?: string;
@@ -73,7 +73,7 @@ export interface Member {
   id: string;
   created_at: string;
   updated_at: string;
-  tenant_id: number;
+  tenant_uuid: string;
   user_id: number;
   username: string; // 建议统一小写
   display_name?: string;
@@ -182,6 +182,7 @@ const normalizeBody = (body: any) => {
 
 export const useAuthService = () => {
   const { client } = useApiClient();
+  const apiClient = client;
   const adminBaseUrl = "/admin"; // 添加管理员基础URL
   const baseUrl = adminBaseUrl + "/user/auth";
 
@@ -220,8 +221,11 @@ export const useAuthService = () => {
      * 前端表单注册（转换数据格式）
      */
     registerFromForm: (formData: RegisterFormData) => {
+      const fallbackTenant =
+        getTenantUuid() ||
+        "tenant-demo";
       const registerData: RegisterParams = {
-        tenant_id: 1, // 默认租户ID，可以根据需要调整
+        tenant_uuid: fallbackTenant,
         username: formData.username,
         email: formData.email,
         phone: formData.phone,

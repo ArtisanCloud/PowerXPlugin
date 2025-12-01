@@ -317,7 +317,7 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 	}
 	return gin.H{
 		"tenant": gin.H{
-			"id":   uc.TenantID,
+			"id":   uc.TenantUuid,
 			"key":  uc.TenantKey,
 			"name": uc.TenantName,
 		},

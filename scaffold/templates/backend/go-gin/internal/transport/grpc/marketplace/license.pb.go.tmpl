@@ -23,7 +23,7 @@ const (
 
 type IssueLicenseRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	TenantId        string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	TenantId        string                 `protobuf:"bytes,1,opt,name=tenant_uuid,json=tenantId,proto3" json:"tenant_uuid,omitempty"`
 	ListingId       string                 `protobuf:"bytes,2,opt,name=listing_id,json=listingId,proto3" json:"listing_id,omitempty"`
 	PlanId          string                 `protobuf:"bytes,3,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
 	IssuedBy        string                 `protobuf:"bytes,4,opt,name=issued_by,json=issuedBy,proto3" json:"issued_by,omitempty"`
@@ -159,7 +159,7 @@ func (x *IssueLicenseResponse) GetLicense() *License {
 
 type RenewLicenseRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_uuid,json=tenantId,proto3" json:"tenant_uuid,omitempty"`
 	LicenseId     string                 `protobuf:"bytes,2,opt,name=license_id,json=licenseId,proto3" json:"license_id,omitempty"`
 	PlanId        string                 `protobuf:"bytes,3,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
 	RenewalToken  string                 `protobuf:"bytes,4,opt,name=renewal_token,json=renewalToken,proto3" json:"renewal_token,omitempty"`
@@ -279,7 +279,7 @@ func (x *RenewLicenseResponse) GetLicense() *License {
 
 type VerifyLicenseRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_uuid,json=tenantId,proto3" json:"tenant_uuid,omitempty"`
 	ListingId     string                 `protobuf:"bytes,2,opt,name=listing_id,json=listingId,proto3" json:"listing_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -392,7 +392,7 @@ func (x *VerifyLicenseResponse) GetLicense() *License {
 type License struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	TenantId           string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	TenantId           string                 `protobuf:"bytes,2,opt,name=tenant_uuid,json=tenantId,proto3" json:"tenant_uuid,omitempty"`
 	ListingId          string                 `protobuf:"bytes,3,opt,name=listing_id,json=listingId,proto3" json:"listing_id,omitempty"`
 	PlanId             string                 `protobuf:"bytes,4,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
 	Status             string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`

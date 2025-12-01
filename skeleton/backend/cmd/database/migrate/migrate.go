@@ -228,8 +228,10 @@ func isSQLiteSafeTable(tbl interface{}) bool {
 }
 
 func ResetDatabase(ctx context.Context, db *gorm.DB, cfg *config.DatabaseConfig) error {
-	if db.Dialector.Name() == "sqlite" || strings.TrimSpace(cfg.Schema) == "" {
-		return db.WithContext(ctx).Migrator().DropTable(&templateModel.Template{})
+	if strings.EqualFold(db.Dialector.Name(), "sqlite") || strings.TrimSpace(cfg.Schema) == "" {
+		tables := append([]interface{}{}, businessTables...)
+		tables = append(tables, iamTables...)
+		return db.WithContext(ctx).Migrator().DropTable(tables...)
 	}
 
 	// 如果你用 GORM，可以直接 drop 所有表

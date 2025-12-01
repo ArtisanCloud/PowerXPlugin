@@ -88,7 +88,7 @@ func RecordToolGrantEvent(event, tenantID string) {
 		"event": strings.ToLower(event),
 	}
 	if tenantID != "" {
-		labels["tenant_id"] = tenantID
+		labels["tenant_uuid"] = tenantID
 	}
 	key, _ := labelsKey(labels)
 	counterFor(metricToolGrantEventsTotal)[key]++

@@ -63,7 +63,8 @@ rulesets:
 ### II. Tenant Isolation & Zero Trust（多租户与零信任）
 
 - 入站请求在读写状态前**必须**验签（JWT/HMAC）；`POWERX_DEV_MODE` 仅限本地。
-- 模型携带 `tenant_id`，启用 **RLS**；Repo 在 `BeginTenantTx` 中执行并 `SET LOCAL app.tenant_id`。
+- 模型携带 `tenant_uuid`，启用 **RLS**；Repo 在 `BeginTenantTx` 中执行并 `SET LOCAL app.tenant_uuid`。
+- 所有租户上下文（字段、请求/响应、配置、日志标签）一律使用 **Tenant UUID**（字符串/UUID 类型）；禁止新增或保留 `tenant_id`（数字）字段与变量，历史遗留必须迁移并移除。
 - 秘钥/令牌/DB 角色遵循**最小权限**并可轮换（STS/环境托管）。
 
 ### III. Service-Centric Architecture（服务为中心）
@@ -76,7 +77,7 @@ rulesets:
 
 ### IV. Observable & Testable Delivery（可观测与可测试）
 
-- 结构化日志（含 request_id/tenant_id）、`/healthz`、必要指标钩子。
+- 结构化日志（含 request_id/tenant_uuid）、`/healthz`、必要指标钩子。
 - 事件、遥测、审计等观测器/Emitter 统一放置在 `backend/internal/observability/<domain>`，由 Service/作业统一调用，避免 Handler 与 Service 内部混杂日志装饰。
 - 变更须配套测试：Service 单测、多租户集成测、迁移冒烟；迁移可幂等、可回滚，并受 `POWERX_RUN_MIGRATE` 控制。
 

@@ -45,11 +45,9 @@ const joinApiBase = (base?: string | null, prefix?: string | null) => {
 const envApiBase = joinApiBase(process.env.NUXT_PUBLIC_API_BASE, process.env.NUXT_PUBLIC_API_PREFIX)
 const defaultPluginApiBase = `/_p/${pluginId}/api/v1`
 const defaultLocalApiBase = 'http://localhost:8078/api/v1'
-// Host API fallback: when dev + proxy mode, prefer `_p/.../api` to hit Vite proxy
+// Host API fallback: inside PowerX 始终走插件 API，其余场景退回宿主 /api/v1
 const fallbackHostApiBase =
-  process.env.NODE_ENV !== 'production' && process.env.POWERX_PROXY === '1'
-    ? defaultPluginApiBase
-    : '/api/v1'
+  process.env.POWERX_PROXY === '1' ? defaultPluginApiBase : '/api/v1'
 const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase

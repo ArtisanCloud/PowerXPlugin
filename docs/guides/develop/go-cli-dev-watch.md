@@ -92,14 +92,19 @@
 ### 4.1 本地打包（package）
 
 1. 确认 manifest、能力契约（capabilities）、lint/test 均通过；必要时运行 `make lint && make test`。
-2. 在插件仓库根目录执行：
+2. （可选）如果你想在包裹 CLI 之前先确认前端构建结果，可手动执行：
+   ```bash
+   POWERX_PROXY=1 npm --prefix web-admin run build
+   ```
+   > `px-plugin package` 本身也会调用 `npm --prefix web-admin run build`，因此这一步只是提前验证/调试。无论是否手动构建，**发布给宿主时都只需保留 `POWERX_PROXY=1`**；不要在构建阶段设置 `NUXT_PUBLIC_API_BASE=http://localhost:8078`、`NUXT_DEV_API_PROXY` 等本地联调变量，否则产物会写死到本地接口，安装进 PowerX 后无法访问。PowerX 会提供 `/api/v1` 与 `/_p/<pluginId>/admin/` 所需的前缀，无需自定义。
+3. 在插件仓库根目录执行：
    ```bash
    px-plugin package \
      --entry . \
      --output .px-plugin/build
    ```
    > 默认会在 `<plugin>/.px-plugin/build` 下生成 `package.tar.gz`、`metadata.json`、`manifest.json`、hash/signature 等 artefact。可根据需要调整 `--entry`、`--output` 或 `--channel` 等参数（具体以 CLI 版本为准）。
-3. 用 `ls .px-plugin/build`、`jq` 等命令检查 artefact 是否包含前端 dist、后端 bin、manifest、RBAC、Telemetry 结构。
+4. 用 `ls .px-plugin/build`、`jq` 等命令检查 artefact 是否包含前端 dist、后端 bin、manifest、RBAC、Telemetry 结构。
 
 ### 4.2 上传到 PowerX Registry（publish）
 
@@ -118,11 +123,32 @@
 
 ### 4.3 在 PowerX 后台安装/启用
 
-1. 登录 PowerX Admin（宿主环境），打开 **插件管理 / Marketplace**：
-   - 如果走 publish：在“待审核版本”中找到刚提交的版本 → 审核通过 → 指定安装租户。
-   - 如果走手动导入：点击 “上传包”/“本地安装”，选择 `.px-plugin/build/package.tar.gz`。
-2. 完成安装后，版本会出现在 `plugins/installed`、数据库 registry 中；管理员可在 UI 中启用/禁用、绑定租户。
-3. **必须完成这一步，插件菜单/权限才会存在**。后续的 `px-plugin dev`/热加载都是在此基础上替换沙盒资源。
+1. **UI 安装（适合发布链路）**：登录 PowerX Admin（宿主环境），打开 **插件管理 / Marketplace**。
+   - 如果版本是通过 `px-plugin publish` 上传的：在“待审核版本”中找到该版本 → 审核通过 → 指定安装租户。
+   - 如果是本地包：选择 “上传包/本地安装”，浏览到 `.px-plugin/build/<timestamp>/package.tar.gz`。
+2. **API 安装（本地调试/脚本化）**：可直接在 PowerX 宿主机器上调用 Admin API，传入 tarball 所在路径：
+   ```
+   POST http://<powerx-host>:8077/api/v1/admin/plugins/install/local
+   Content-Type: application/json
+
+   {
+     "src_dir": "/absolute/path/to/<plugin>/.px-plugin/build/<timestamp>/package.tar.gz",
+     "enable": true,
+     "force": true
+   }
+   ```
+   - `src_dir` 必须是 PowerX 宿主机器可访问的路径。
+   - `enable=true` 表示安装完成后立即启用；`force=true` 可在同版本存在时覆盖安装（慎用）。
+   - 请求需要管理员凭证（与宿主 Admin 登录一致）。
+   - 若宿主 DB 中的插件 schema 尚未创建，API 会自动运行插件包里的 `backend/bin/migrate`。如见到 `invalid input syntax for type uuid` 等错误，可在源插件仓库用相同的配置复现：
+     ```bash
+     cd /path/to/com.powerx.helloworld/backend
+     CONFIG_PATH=/path/to/config \
+     POWERX_PROXY=1 \
+     go run ./cmd/database/main.go migrate
+     ```
+     调整配置或迁移脚本后重新 `px-plugin package`。
+3. 不论 UI 还是 API，成功安装后版本会出现在宿主的 `plugins/installed` 目录与数据库 registry 中。**只有安装/启用完成，插件菜单和权限才会生效**，此后 `px-plugin dev` 或热加载才有意义。
 
 （可选）安装完成后，可在 PowerX Admin 中打开插件页面确认基础功能正常，再开始热加载调试。
 

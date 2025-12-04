@@ -16,7 +16,7 @@
 
 - 使用脚手架：`px-plugin capabilities init com.powerx.demo.template.create --method POST --description "创建模板"`。
 - 命令会自动更新：
-  - `plugin.yaml` 的 `capabilities.provides`、`agent_tools`、`exposure.channels`;
+  - `plugin.yaml` 的 `capabilities.imports/provides`、`agent_tools`、`exposure.channels`;
   - `contracts/capabilities/<id>.yaml`;
   - `contracts/schema/input|output/<id>.json`;
   - `backend/internal/handlers/capabilities/...` handler stub。

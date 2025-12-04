@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
@@ -29,6 +30,7 @@ type Deps struct {
 	Ctx                 context.Context
 	PowerXClient        *client.PowerXServiceClient
 	Config              *config.Config
+	CapabilitiesManager capabilities.Manager
 	TaxProviderClient   *marketplacesvc.TaxProviderClient
 	MarketplaceBilling  marketplacesvc.BillingClient
 	LicenseAuthority    marketplacesvc.LicenseAuthority

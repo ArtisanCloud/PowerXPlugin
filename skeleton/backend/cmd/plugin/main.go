@@ -11,7 +11,9 @@ import (
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	runtimecap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin/runtime"
 	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
@@ -134,11 +136,18 @@ func main() {
 		}
 	}
 
+	capLog := logger.WithField("component", "capabilities_manager")
+	capManager := capabilities.NewManager(cfg, capLog)
+	if err := runtimecap.SyncCapabilities(ctx, capManager, nil); err != nil {
+		logger.WithError(err).Fatal("Failed to initialize capability catalog")
+	}
+
 	deps := &app.Deps{
 		DB:                  queryDB,
 		Ctx:                 rootCtx,
 		PowerXClient:        pxc,
 		Config:              cfg,
+		CapabilitiesManager: capManager,
 		TaxProviderClient:   taxClient,
 		MarketplaceBilling:  nil,
 		LicenseAuthority:    nil,

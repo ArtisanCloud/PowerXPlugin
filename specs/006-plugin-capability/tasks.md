@@ -11,13 +11,13 @@
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T010 Define Capabilities Manager interfaces in `skeleton/backend/internal/capabilities/manager.go` (ListCapabilities/ExportProtocols/RegisterWithHost) and wire dependency injection.
-- [ ] T011 Implement capability catalog parser for `plugin.yaml` + `capabilities/*.yaml` in `scripts/capabilities/catalog-parser.ts`, producing normalized JSON for Go runtime。
-- [ ] T012 Create OpenAPI/Proto/Workflow/MCP/SSE asset generation commands (`scripts/capabilities/export.ts`) referencing `specs/006-plugin-capability/contracts/`.
-- [ ] T013 Add manifest schema support for `capabilities.imports` + protocol descriptors in `scaffold/plugin.yaml.tmpl` 与 `docs/guides`。
-- [ ] T014 Wire failure handling + rollback hooks in plugin installer (`skeleton/backend/cmd/server/runtime/install.go`) when `capability_registry` sync返回失败。
-- [ ] T015 [US5] Enforce default sync/async contract：在 `scripts/capabilities/export.ts` 与 `skeleton/backend/internal/capabilities/manager.go` 校验 `async` 标记，默认同步执行，async 能力需声明回调/SSE + 状态查询字段。
-- [ ] T016 [P][US5] Add unit tests `tests/capabilities/async_mode_test.go`（或等价）验证默认同步/async 行为与回滚策略。
+- [X] T010 Define Capabilities Manager interfaces in `skeleton/backend/internal/capabilities/manager.go` (ListCapabilities/ExportProtocols/RegisterWithHost) and wire dependency injection.
+- [X] T011 Implement capability catalog parser for `plugin.yaml` + `capabilities/*.yaml` in `scripts/capabilities/catalog-parser.ts`, producing normalized JSON for Go runtime。
+- [X] T012 Create OpenAPI/Proto/Workflow/MCP/SSE asset generation commands (`scripts/capabilities/export.ts`) referencing `specs/006-plugin-capability/contracts/`.
+- [X] T013 Add manifest schema support for `capabilities.imports` + protocol descriptors in `scaffold/plugin.yaml.tmpl` 与 `docs/guides`。
+- [X] T014 Wire failure handling + rollback hooks in plugin installer (`skeleton/backend/cmd/server/runtime/install.go`) when `capability_registry` sync返回失败。
+- [X] T015 [US5] Enforce default sync/async contract：在 `scripts/capabilities/export.ts` 与 `skeleton/backend/internal/capabilities/manager.go` 校验 `async` 标记，默认同步执行，async 能力需声明回调/SSE + 状态查询字段。
+- [X] T016 [P][US5] Add unit tests `tests/capabilities/async_mode_test.go`（或等价）验证默认同步/async 行为与回滚策略。
 
 **Checkpoint**: Capabilities Manager +目录解析+资产生成 ready。
 

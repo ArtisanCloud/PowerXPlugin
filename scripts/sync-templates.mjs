@@ -74,7 +74,7 @@ for (const mapping of config.mappings) {
       if (target.prefix) {
         targetRel = path.join(target.prefix, targetRel)
       }
-      if (target.suffix) {
+      if (target.suffix && !targetRel.endsWith(target.suffix)) {
         targetRel = `${targetRel}${target.suffix}`
       }
       const outPath = path.join(targetRoot, targetRel)

@@ -1,16 +1,19 @@
 package devapi
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 // ErrorType represents the type of error
 type ErrorType string
 
 const (
-	ErrNetwork  ErrorType = "NETWORK"
-	ErrBuild    ErrorType = "BUILD"
-	ErrAPI      ErrorType = "API"
-	ErrAuth     ErrorType = "AUTH"
-	ErrConfig   ErrorType = "CONFIG"
+	ErrNetwork ErrorType = "NETWORK"
+	ErrBuild   ErrorType = "BUILD"
+	ErrAPI     ErrorType = "API"
+	ErrAuth    ErrorType = "AUTH"
+	ErrConfig  ErrorType = "CONFIG"
 )
 
 // DevAPIError is a custom error type for Dev API errors
@@ -20,6 +23,8 @@ type DevAPIError struct {
 	Message   string
 	Original  error
 	Retryable bool
+	Status    int
+	Details   map[string]interface{}
 }
 
 func (e *DevAPIError) Error() string {
@@ -81,5 +86,28 @@ func NewConfigError(message string) *DevAPIError {
 		Message:   message,
 		Original:  nil,
 		Retryable: false,
+	}
+}
+
+// DetailString returns the stringified detail entry for a given key.
+func (e *DevAPIError) DetailString(key string) string {
+	if e == nil || e.Details == nil {
+		return ""
+	}
+	val, ok := e.Details[key]
+	if !ok {
+		return ""
+	}
+	switch v := val.(type) {
+	case string:
+		return v
+	case float64:
+		return strconv.FormatInt(int64(v), 10)
+	case int:
+		return strconv.FormatInt(int64(v), 10)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	default:
+		return fmt.Sprintf("%v", v)
 	}
 }

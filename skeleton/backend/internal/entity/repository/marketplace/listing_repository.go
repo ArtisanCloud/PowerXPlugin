@@ -37,11 +37,11 @@ func (r *ListingRepository) Create(ctx context.Context, listing *dbm.Listing) er
 	if listing == nil {
 		return errors.New("listing is required")
 	}
-	tenantID := strings.TrimSpace(listing.TenantID)
+	tenantID := strings.TrimSpace(listing.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
-	listing.TenantID = tenantID
+	listing.TenantUuid = tenantID
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		return tx.Create(listing).Error
 	})
@@ -52,11 +52,11 @@ func (r *ListingRepository) Update(ctx context.Context, listing *dbm.Listing) er
 	if listing == nil {
 		return errors.New("listing is required")
 	}
-	tenantID := strings.TrimSpace(listing.TenantID)
+	tenantID := strings.TrimSpace(listing.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
-	listing.TenantID = tenantID
+	listing.TenantUuid = tenantID
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		return tx.Save(listing).Error
 	})
@@ -121,13 +121,13 @@ func (r *ListingRepository) ReplaceAssets(ctx context.Context, tenantID, listing
 	tenantID = strings.TrimSpace(tenantID)
 	listingID = strings.TrimSpace(listingID)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if listingID == "" {
 		return errors.New("listing_id is required")
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
-		if err := tx.Where("listing_id = ? AND tenant_id = ?", listingID, tenantID).
+		if err := tx.Where("listing_id = ? AND tenant_uuid = ?", listingID, tenantID).
 			Delete(&dbm.ListingAsset{}).Error; err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func (r *ListingRepository) ReplaceAssets(ctx context.Context, tenantID, listing
 		}
 		for i := range assets {
 			assets[i].ListingID = listingID
-			assets[i].TenantID = tenantID
+			assets[i].TenantUuid = tenantID
 		}
 		return tx.Create(&assets).Error
 	})
@@ -147,7 +147,7 @@ func (r *ListingRepository) ReplacePricingPlans(ctx context.Context, tenantID, l
 	tenantID = strings.TrimSpace(tenantID)
 	listingID = strings.TrimSpace(listingID)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if listingID == "" {
 		return errors.New("listing_id is required")
@@ -156,10 +156,10 @@ func (r *ListingRepository) ReplacePricingPlans(ctx context.Context, tenantID, l
 		tiersTable := models.S(models.TableMarketplacePlanTiers)
 		plansTable := models.S(models.TableMarketplacePricingPlans)
 
-		if err := tx.Exec("DELETE FROM "+tiersTable+" WHERE plan_id IN (SELECT id FROM "+plansTable+" WHERE listing_id = ? AND tenant_id = ?)", listingID, tenantID).Error; err != nil {
+		if err := tx.Exec("DELETE FROM "+tiersTable+" WHERE plan_id IN (SELECT id FROM "+plansTable+" WHERE listing_id = ? AND tenant_uuid = ?)", listingID, tenantID).Error; err != nil {
 			return err
 		}
-		if err := tx.Exec("DELETE FROM "+plansTable+" WHERE listing_id = ? AND tenant_id = ?", listingID, tenantID).Error; err != nil {
+		if err := tx.Exec("DELETE FROM "+plansTable+" WHERE listing_id = ? AND tenant_uuid = ?", listingID, tenantID).Error; err != nil {
 			return err
 		}
 		if len(plans) == 0 {
@@ -168,7 +168,7 @@ func (r *ListingRepository) ReplacePricingPlans(ctx context.Context, tenantID, l
 		for i := range plans {
 			plan := &plans[i]
 			plan.ListingID = listingID
-			plan.TenantID = tenantID
+			plan.TenantUuid = tenantID
 			tiers := plan.Tiers
 			plan.Tiers = nil
 			if err := tx.Create(plan).Error; err != nil {
@@ -177,7 +177,7 @@ func (r *ListingRepository) ReplacePricingPlans(ctx context.Context, tenantID, l
 			if len(tiers) > 0 {
 				for j := range tiers {
 					tiers[j].PlanID = plan.ID
-					tiers[j].TenantID = tenantID
+					tiers[j].TenantUuid = tenantID
 				}
 				if err := tx.Create(&tiers).Error; err != nil {
 					return err
@@ -193,11 +193,11 @@ func (r *ListingRepository) CreateVersion(ctx context.Context, version *dbm.List
 	if version == nil {
 		return errors.New("version is required")
 	}
-	tenantID := strings.TrimSpace(version.TenantID)
+	tenantID := strings.TrimSpace(version.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
-	version.TenantID = tenantID
+	version.TenantUuid = tenantID
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		return tx.Create(version).Error
 	})
@@ -208,14 +208,14 @@ func (r *ListingRepository) UpdateRecommendedWeight(ctx context.Context, tenantI
 	tenantID = strings.TrimSpace(tenantID)
 	listingID = strings.TrimSpace(listingID)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if listingID == "" {
 		return errors.New("listing_id is required")
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		res := tx.Model(&dbm.Listing{}).
-			Where("id = ? AND tenant_id = ?", listingID, tenantID).
+			Where("id = ? AND tenant_uuid = ?", listingID, tenantID).
 			Update("recommended_weight", weight)
 		if res.Error != nil {
 			return res.Error
@@ -227,10 +227,10 @@ func (r *ListingRepository) UpdateRecommendedWeight(ctx context.Context, tenantI
 	})
 }
 
-// ListTenantIDs returns distinct tenant identifiers that have listings.
-func (r *ListingRepository) ListTenantIDs(ctx context.Context) ([]string, error) {
+// ListTenantUuids returns distinct tenant identifiers that have listings.
+func (r *ListingRepository) ListTenantUuids(ctx context.Context) ([]string, error) {
 	var ids []string
-	if err := r.DB.WithContext(ctx).Model(&dbm.Listing{}).Distinct().Pluck("tenant_id", &ids).Error; err != nil {
+	if err := r.DB.WithContext(ctx).Model(&dbm.Listing{}).Distinct().Pluck("tenant_uuid", &ids).Error; err != nil {
 		return nil, err
 	}
 	out := make([]string, 0, len(ids))
@@ -247,7 +247,7 @@ func (r *ListingRepository) ListTenantIDs(ctx context.Context) ([]string, error)
 func (r *ListingRepository) baseQuery(ctx context.Context, tenantID string) *gorm.DB {
 	db := r.DB.WithContext(ctx).Model(&dbm.Listing{})
 	if tenantID != "" {
-		db = db.Where("tenant_id = ?", tenantID)
+		db = db.Where("tenant_uuid = ?", tenantID)
 	}
 	return db
 }

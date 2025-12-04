@@ -147,6 +147,9 @@ func TestDevClient_WithoutMTLS(t *testing.T) {
 
 // TestMTLS_Setup tests the mTLS setup function
 func TestMTLS_Setup(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	// Test setup creates directory
 	err := mtls.Setup()
 	if err != nil {
@@ -162,6 +165,9 @@ func TestMTLS_Setup(t *testing.T) {
 
 // TestMTLS_PrintInfo tests the mTLS info printing
 func TestMTLS_PrintInfo(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	// Setup first
 	err := mtls.Setup()
 	if err != nil {
@@ -177,6 +183,9 @@ func TestMTLS_PrintInfo(t *testing.T) {
 
 // TestMTLS_VerifySetup tests the mTLS setup verification
 func TestMTLS_VerifySetup(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	// Setup first
 	err := mtls.Setup()
 	if err != nil {

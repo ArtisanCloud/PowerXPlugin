@@ -27,7 +27,7 @@ func setupHandler(t *testing.T) (*consoletransport.ConfigHandler, *gorm.DB) {
 	require.NoError(t, db.Exec(`CREATE TABLE IF NOT EXISTS admin_console_audit_events (
 		id TEXT PRIMARY KEY,
 		plugin_id TEXT NOT NULL,
-		tenant_id TEXT,
+		tenant_uuid TEXT,
 		actor_id TEXT NOT NULL,
 		actor_name TEXT,
 		actor_email TEXT,
@@ -43,7 +43,7 @@ func setupHandler(t *testing.T) (*consoletransport.ConfigHandler, *gorm.DB) {
 	require.NoError(t, db.Exec(`CREATE TABLE IF NOT EXISTS admin_console_config_changes (
 		id TEXT PRIMARY KEY,
 		plugin_id TEXT NOT NULL,
-		tenant_id TEXT,
+		tenant_uuid TEXT,
 		section_key TEXT NOT NULL,
 		change_type TEXT NOT NULL,
 		previous_snapshot TEXT,

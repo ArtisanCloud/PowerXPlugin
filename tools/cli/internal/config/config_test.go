@@ -366,12 +366,14 @@ func TestParseCommandLine(t *testing.T) {
 
 	cmdConfig := parseCommandLine(args)
 
-	if cmdConfig["global_debug"] != "true" {
-		t.Error("Expected global_debug to be true")
+	global, ok := cmdConfig["global"].(map[string]interface{})
+	if !ok || global["debug"] != "true" {
+		t.Error("Expected global.debug to be true")
 	}
 
-	if cmdConfig["devapi_timeout"] != "60" {
-		t.Error("Expected devapi_timeout to be 60")
+	devapi, ok := cmdConfig["devapi"].(map[string]interface{})
+	if !ok || devapi["timeout"] != "60" {
+		t.Error("Expected devapi.timeout to be 60")
 	}
 }
 

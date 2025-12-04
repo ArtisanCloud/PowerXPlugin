@@ -185,7 +185,7 @@ func (s *AnalyticsService) RecordEnvelope(ctx context.Context, tenantID string, 
 			}
 			aggregate := &dbm.UsageAggregate{
 				ID:         "",
-				TenantID:   tenantID,
+				TenantUuid: tenantID,
 				LicenseID:  license.ID,
 				Metric:     metric.Name,
 				Window:     window,
@@ -217,7 +217,7 @@ func (s *AnalyticsService) RecordEnvelope(ctx context.Context, tenantID string, 
 		for _, alert := range alerts {
 			if listing != nil && strings.TrimSpace(listing.VendorID) != "" && s.notificationRepo != nil {
 				payload := dbm.Notification{
-					TenantID:      tenantID,
+					TenantUuid:    tenantID,
 					RecipientType: "vendor",
 					RecipientID:   listing.VendorID,
 					Channel:       "in_app",
@@ -323,7 +323,7 @@ func (s *AnalyticsService) BuildDashboard(ctx context.Context, tenantID, license
 // EnsureRevenueReport upserts the revenue share report for the given period and gross amount.
 func (s *AnalyticsService) EnsureRevenueReport(ctx context.Context, tenantID, vendorID string, periodStart, periodEnd time.Time, gross float64, currency string) (*dbm.RevenueShareReport, error) {
 	if strings.TrimSpace(tenantID) == "" || strings.TrimSpace(vendorID) == "" {
-		return nil, errors.New("tenant_id and vendor_id are required")
+		return nil, errors.New("tenant_uuid and vendor_id are required")
 	}
 	if periodEnd.Before(periodStart) {
 		periodStart, periodEnd = periodEnd, periodStart
@@ -333,7 +333,7 @@ func (s *AnalyticsService) EnsureRevenueReport(ctx context.Context, tenantID, ve
 		currency = split.Currency
 	}
 	report := &dbm.RevenueShareReport{
-		TenantID:      tenantID,
+		TenantUuid:    tenantID,
 		VendorID:      vendorID,
 		PeriodStart:   periodStart.UTC(),
 		PeriodEnd:     periodEnd.UTC(),

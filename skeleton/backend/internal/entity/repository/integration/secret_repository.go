@@ -29,8 +29,8 @@ func (r *SecretRepository) Create(ctx context.Context, secret *model.SecretCrede
 	if secret == nil {
 		return nil, errors.New("secret credential is nil")
 	}
-	if strings.TrimSpace(secret.TenantID) == "" {
-		return nil, errors.New("tenant_id is required")
+	if strings.TrimSpace(secret.TenantUuid) == "" {
+		return nil, errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(secret.IntegrationType) == "" {
 		return nil, errors.New("integration_type is required")
@@ -46,7 +46,7 @@ func (r *SecretRepository) Create(ctx context.Context, secret *model.SecretCrede
 	secret.CreatedAt = now
 	secret.UpdatedAt = now
 
-	err := r.WithTenantTx(ctx, secret.TenantID, func(tx *gorm.DB) error {
+	err := r.WithTenantTx(ctx, secret.TenantUuid, func(tx *gorm.DB) error {
 		return tx.Create(secret).Error
 	})
 	if err != nil {
@@ -61,7 +61,7 @@ func (r *SecretRepository) Update(ctx context.Context, secret *model.SecretCrede
 		return errors.New("secret credential is nil")
 	}
 	secret.UpdatedAt = time.Now().UTC()
-	return r.WithTenantTx(ctx, secret.TenantID, func(tx *gorm.DB) error {
+	return r.WithTenantTx(ctx, secret.TenantUuid, func(tx *gorm.DB) error {
 		return tx.Model(&model.SecretCredential{}).
 			Where("id = ?", secret.ID).
 			Updates(map[string]any{
@@ -82,7 +82,7 @@ func (r *SecretRepository) Update(ctx context.Context, secret *model.SecretCrede
 func (r *SecretRepository) GetByID(ctx context.Context, tenantID, secretID string) (*model.SecretCredential, error) {
 	var secret model.SecretCredential
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND id = ?", tenantID, secretID).
+		Where("tenant_uuid = ? AND id = ?", tenantID, secretID).
 		First(&secret).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -97,7 +97,7 @@ func (r *SecretRepository) GetByID(ctx context.Context, tenantID, secretID strin
 func (r *SecretRepository) GetByIntegrationType(ctx context.Context, tenantID, integrationType string) (*model.SecretCredential, error) {
 	var secret model.SecretCredential
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND integration_type = ?", tenantID, integrationType).
+		Where("tenant_uuid = ? AND integration_type = ?", tenantID, integrationType).
 		First(&secret).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -112,7 +112,7 @@ func (r *SecretRepository) GetByIntegrationType(ctx context.Context, tenantID, i
 func (r *SecretRepository) ListByTenant(ctx context.Context, tenantID string) ([]*model.SecretCredential, error) {
 	var secrets []*model.SecretCredential
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ?", tenantID).
+		Where("tenant_uuid = ?", tenantID).
 		Order("created_at DESC").
 		Find(&secrets).Error
 	if err != nil {

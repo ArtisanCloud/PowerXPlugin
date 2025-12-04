@@ -28,14 +28,14 @@ func RequestTrace() gin.HandlerFunc {
 		traceID := traceIdentifier(c)
 		tenantCtx, _ := authx.GetTenantContext(c)
 
-		log.Printf("[PLUGIN-REQ-TRACE] stage=begin mode=%s iam_mode=%s method=%s path=%s auth=%s auth.head=%s tenant_id=%d user_id=%d trace=%s ip=%s ua=%s",
+		log.Printf("[PLUGIN-REQ-TRACE] stage=begin mode=%s iam_mode=%s method=%s path=%s auth=%s auth.head=%s tenant_uuid=%s user_id=%d trace=%s ip=%s ua=%s",
 			mode,
 			iamMode,
 			c.Request.Method,
 			c.Request.URL.Path,
 			authMode,
 			authPreview,
-			tenantCtx.TenantID,
+			tenantCtx.TenantUUID,
 			tenantCtx.UserID,
 			traceID,
 			c.ClientIP(),
@@ -51,14 +51,14 @@ func RequestTrace() gin.HandlerFunc {
 			authMode = "bearer(validated)"
 		}
 
-		log.Printf("[PLUGIN-REQ-TRACE] stage=end mode=%s iam_mode=%s status=%d latency=%s auth=%s auth.head=%s tenant_id=%d user_id=%d trace=%s",
+		log.Printf("[PLUGIN-REQ-TRACE] stage=end mode=%s iam_mode=%s status=%d latency=%s auth=%s auth.head=%s tenant_uuid=%s user_id=%d trace=%s",
 			mode,
 			iamMode,
 			status,
 			latency,
 			authMode,
 			authPreview,
-			tenantCtx.TenantID,
+			tenantCtx.TenantUUID,
 			tenantCtx.UserID,
 			traceID,
 		)

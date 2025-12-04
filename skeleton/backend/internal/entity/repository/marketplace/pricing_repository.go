@@ -28,11 +28,11 @@ func (r *PricingRepository) ListPlans(ctx context.Context, tenantID, listingID s
 	tenantID = strings.TrimSpace(tenantID)
 	listingID = strings.TrimSpace(listingID)
 	if tenantID == "" || listingID == "" {
-		return nil, errors.New("tenant_id and listing_id are required")
+		return nil, errors.New("tenant_uuid and listing_id are required")
 	}
 	var plans []*dbm.PricingPlan
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND listing_id = ?", tenantID, listingID).
+		Where("tenant_uuid = ? AND listing_id = ?", tenantID, listingID).
 		Order("created_at ASC").
 		Preload("Tiers", func(tx *gorm.DB) *gorm.DB { return tx.Order("range_from ASC") }).
 		Find(&plans).Error
@@ -44,11 +44,11 @@ func (r *PricingRepository) GetPlan(ctx context.Context, tenantID, planID string
 	tenantID = strings.TrimSpace(tenantID)
 	planID = strings.TrimSpace(planID)
 	if tenantID == "" || planID == "" {
-		return nil, errors.New("tenant_id and plan_id are required")
+		return nil, errors.New("tenant_uuid and plan_id are required")
 	}
 	var plan dbm.PricingPlan
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND id = ?", tenantID, planID).
+		Where("tenant_uuid = ? AND id = ?", tenantID, planID).
 		Preload("Tiers", func(tx *gorm.DB) *gorm.DB { return tx.Order("range_from ASC") }).
 		First(&plan).Error
 	if err != nil {
@@ -62,9 +62,9 @@ func (r *PricingRepository) CreatePlan(ctx context.Context, plan *dbm.PricingPla
 	if plan == nil {
 		return errors.New("plan is required")
 	}
-	tenantID := strings.TrimSpace(plan.TenantID)
+	tenantID := strings.TrimSpace(plan.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(plan.ID) == "" {
 		plan.ID = uuid.NewString()
@@ -81,7 +81,7 @@ func (r *PricingRepository) CreatePlan(ctx context.Context, plan *dbm.PricingPla
 				tiers[i].ID = uuid.NewString()
 			}
 			tiers[i].PlanID = plan.ID
-			tiers[i].TenantID = tenantID
+			tiers[i].TenantUuid = tenantID
 		}
 		return tx.Create(&tiers).Error
 	})
@@ -92,14 +92,14 @@ func (r *PricingRepository) UpdatePlan(ctx context.Context, plan *dbm.PricingPla
 	if plan == nil {
 		return errors.New("plan is required")
 	}
-	tenantID := strings.TrimSpace(plan.TenantID)
+	tenantID := strings.TrimSpace(plan.TenantUuid)
 	if tenantID == "" || strings.TrimSpace(plan.ID) == "" {
-		return errors.New("tenant_id and plan id are required")
+		return errors.New("tenant_uuid and plan id are required")
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		if err := tx.Model(&dbm.PricingPlan{}).
-			Where("id = ? AND tenant_id = ?", plan.ID, tenantID).
-			Omit("id", "tenant_id", "listing_id").
+			Where("id = ? AND tenant_uuid = ?", plan.ID, tenantID).
+			Omit("id", "tenant_uuid", "listing_id").
 			Updates(plan).Error; err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func (r *PricingRepository) UpdatePlan(ctx context.Context, plan *dbm.PricingPla
 				tiers[i].ID = uuid.NewString()
 			}
 			tiers[i].PlanID = plan.ID
-			tiers[i].TenantID = tenantID
+			tiers[i].TenantUuid = tenantID
 		}
 		return tx.Create(&tiers).Error
 	})
@@ -125,13 +125,13 @@ func (r *PricingRepository) DeletePlan(ctx context.Context, tenantID, planID str
 	tenantID = strings.TrimSpace(tenantID)
 	planID = strings.TrimSpace(planID)
 	if tenantID == "" || planID == "" {
-		return errors.New("tenant_id and plan_id are required")
+		return errors.New("tenant_uuid and plan_id are required")
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		if err := tx.Where("plan_id = ?", planID).Delete(&dbm.PlanTier{}).Error; err != nil {
 			return err
 		}
-		res := tx.Where("id = ? AND tenant_id = ?", planID, tenantID).Delete(&dbm.PricingPlan{})
+		res := tx.Where("id = ? AND tenant_uuid = ?", planID, tenantID).Delete(&dbm.PricingPlan{})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -148,16 +148,16 @@ func (r *PricingRepository) SetDefaultPlan(ctx context.Context, tenantID, listin
 	listingID = strings.TrimSpace(listingID)
 	planID = strings.TrimSpace(planID)
 	if tenantID == "" || listingID == "" || planID == "" {
-		return errors.New("tenant_id, listing_id and plan_id are required")
+		return errors.New("tenant_uuid, listing_id and plan_id are required")
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		if err := tx.Model(&dbm.PricingPlan{}).
-			Where("tenant_id = ? AND listing_id = ?", tenantID, listingID).
+			Where("tenant_uuid = ? AND listing_id = ?", tenantID, listingID).
 			Update("is_default", false).Error; err != nil {
 			return err
 		}
 		res := tx.Model(&dbm.PricingPlan{}).
-			Where("tenant_id = ? AND id = ?", tenantID, planID).
+			Where("tenant_uuid = ? AND id = ?", tenantID, planID).
 			Update("is_default", true)
 		if res.Error != nil {
 			return res.Error

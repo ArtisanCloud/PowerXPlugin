@@ -105,7 +105,7 @@ a2a:
   "to": "agent.ai.email",
   "intent": "ai.email.send",
   "context": {
-    "tenant_id": "tenant_123",
+    "tenant_uuid": "tenant_123",
     "trace_id": "c94aab8a-1a9b-4d4b"
   },
   "auth": {

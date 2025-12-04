@@ -8,7 +8,7 @@ import (
 )
 
 type PluginTenantExt struct {
-	BaseNoTenantModel                // 含 tenant_id/软删/时间
+	BaseNoTenantModel                // 含 tenant_uuid/软删/时间
 	Status            int16          `gorm:"type:smallint;not null;default:0" json:"status"`
 	Plan              string         `gorm:"type:varchar(32);not null;default:'free'" json:"plan"`
 	Flags             datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"flags"`

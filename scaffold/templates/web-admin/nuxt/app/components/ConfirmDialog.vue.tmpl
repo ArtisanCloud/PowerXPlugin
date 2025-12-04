@@ -2,7 +2,7 @@
   <UModal
     v-model:open="open"
     :title="dialogTitle"
-    :description="resolvedDescription || undefined"
+    :description="dialogDescription"
     :ui="{
       content: 'w-full max-w-md space-y-4'
     }"
@@ -88,17 +88,23 @@ const loading = computed(() => props.loading)
 
 const buttonColor = computed(() => props.confirmColor)
 
-const resolvedDescription = computed(() =>
-  props.description ?? ""
-)
-
 const bodyMessage = computed(() =>
   props.message ?? ""
 )
 
-const showBodyMessage = computed(() =>
-  !slots.default && !!bodyMessage.value
-)
+const dialogDescription = computed(() => {
+  const desc = props.description?.trim()
+  if (desc) return desc
+  const body = bodyMessage.value?.trim?.()
+  if (body) return body
+  return t("common.confirmation")
+})
+
+const showBodyMessage = computed(() => {
+  if (slots.default) return false
+  const msg = bodyMessage.value?.trim?.()
+  return !!msg
+})
 
 const handleCancel = () => {
   emit("cancel")

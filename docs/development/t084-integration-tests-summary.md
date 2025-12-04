@@ -222,7 +222,7 @@ type ReloadRequest struct {
    ./bin/px-plugin dev --watch \
      --entry examples/starter/go-admin \
      --tenant demo \
-     --dev-api http://127.0.0.1:8077 \
+     --dev-api http://127.0.0.1:8077/api/v1 \
      --logs-level info
    ```
    终端输出：
@@ -230,7 +230,7 @@ type ReloadRequest struct {
    Starting dev watch mode
      Entry: /repo/examples/starter/go-admin
      Plugin: go-admin@0.1.4
-     Dev API: http://127.0.0.1:8077
+     Dev API: http://127.0.0.1:8077/api/v1
    Initial build complete. Watching for changes... (Ctrl+C to stop)
    ```
 4. **验证文件变更**
@@ -244,7 +244,7 @@ type ReloadRequest struct {
 5. **SSE 日志校验**
    ```bash
    ./bin/px-plugin dev --logs $(cat .px-plugin/session) \
-     --dev-api http://127.0.0.1:8077 --logs-level debug
+     --dev-api http://127.0.0.1:8077/api/v1 --logs-level debug
    ```
    可看到最新构建的 `buildSucceeded`, `apiRegister`, `reloadApplied` 事件，并写入 `~/.px-plugin/logs/go-cli-dev-watch.log`
 

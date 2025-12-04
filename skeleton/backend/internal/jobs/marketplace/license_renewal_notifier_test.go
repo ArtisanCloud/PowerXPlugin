@@ -48,13 +48,13 @@ func TestLicenseRenewalNotifier_ExecuteDispatchesReminders(t *testing.T) {
 
 	baseTime := time.Date(2025, 10, 30, 12, 0, 0, 0, time.UTC)
 	expiring := &dbm.License{
-		ID:        "lic-1",
-		TenantID:  "tenant-1",
-		ListingID: "listing-9",
-		PlanID:    "plan-x",
-		Status:    dbm.LicenseStatusActive,
-		IssuedAt:  baseTime.Add(-48 * time.Hour),
-		ExpiresAt: baseTime.Add(20 * time.Hour),
+		ID:         "lic-1",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-9",
+		PlanID:     "plan-x",
+		Status:     dbm.LicenseStatusActive,
+		IssuedAt:   baseTime.Add(-48 * time.Hour),
+		ExpiresAt:  baseTime.Add(20 * time.Hour),
 		RenewalToken: func() *string {
 			val := "renew-1"
 			return &val

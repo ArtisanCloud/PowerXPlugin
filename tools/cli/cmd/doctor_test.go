@@ -63,13 +63,15 @@ func TestRunDoctorDevAPICheck(t *testing.T) {
 
 	var registerCalled bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v1")
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/internal/dev/plugins/register":
+		case r.Method == http.MethodPost && path == "/internal/dev/plugins/register":
 			registerCalled = true
 			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprint(w, `{"sessionId":"session-1","reloadToken":"reload-token"}`)
-		case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/internal/dev/plugins/register/"):
-			w.WriteHeader(http.StatusNoContent)
+			fmt.Fprint(w, `{"code":201,"message":"success","data":{"sessionId":"session-1","reloadToken":"reload-token"}}`)
+		case r.Method == http.MethodDelete && strings.HasPrefix(path, "/internal/dev/plugins/register/"):
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"code":200,"message":"success","data":{}}`)
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}

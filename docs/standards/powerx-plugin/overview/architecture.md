@@ -35,7 +35,7 @@ PowerX 平台本身不直接托管插件逻辑，而是通过 **Plugin Manager**
 │            PowerX Plugin (Base)            │
 │────────────────────────────────────────────│
 │  • 独立进程（Gin + GORM + Postgres Schema） │
-│  • 每个请求含租户上下文（tenant_id）         │
+│  • 每个请求含租户上下文（tenant_uuid）         │
 │  • 启用 RLS 防止跨租户访问                  │
 │  • 提供接口：                              │
 │      - /v1/...                → 业务接口    │
@@ -55,8 +55,8 @@ PowerX 平台本身不直接托管插件逻辑，而是通过 **Plugin Manager**
 | ② 环境注入     | PowerX → 插件      | 注入 DB、JWT/HMAC、schema、端口等环境变量            |
 | ③ 注册与汇报    | 插件 → PowerX      | 插件暴露 manifest、rbac、agent 注册接口            |
 | ④ 请求调度     | 用户 → PowerX → 插件 | PowerX 反代用户请求到 `/_p/:id/api/...`         |
-| ⑤ 上下文校验    | 插件中间件            | 验签 JWT/HMAC，提取 `tenant_id`、`permissions` |
-| ⑥ RLS 执行   | Postgres         | 执行 `SET LOCAL app.tenant_id`，数据库层隔离      |
+| ⑤ 上下文校验    | 插件中间件            | 验签 JWT/HMAC，提取 `tenant_uuid`、`permissions` |
+| ⑥ RLS 执行   | Postgres         | 执行 `SET LOCAL app.tenant_uuid`，数据库层隔离      |
 | ⑦ Agent 调度 | Agent Hub        | 调用注册的 Agent Tool / Workflow 能力           |
 
 ---
@@ -89,20 +89,20 @@ PowerX 平台本身不直接托管插件逻辑，而是通过 **Plugin Manager**
 插件端中间件负责解签并写入请求上下文，供数据库事务读取。
 
 ```go
-SET LOCAL app.tenant_id = <tenant_id>
+SET LOCAL app.tenant_uuid = <tenant_uuid>
 ```
 
 ---
 
 ### 2️⃣ 数据库级 RLS（Row Level Security）
 
-* 每张业务表都必须包含 `tenant_id BIGINT NOT NULL`
+* 每张业务表都必须包含 `tenant_uuid BIGINT NOT NULL`
 * 启用 RLS 策略：
 
   ```sql
   ALTER TABLE <schema>.<table> ENABLE ROW LEVEL SECURITY;
   CREATE POLICY tenant_isolation ON <schema>.<table>
-    USING (tenant_id::text = current_setting('app.tenant_id', true));
+    USING (tenant_uuid::text = current_setting('app.tenant_uuid', true));
   ```
 
 * 即使应用层漏写 where 条件，也不会泄露其他租户数据。

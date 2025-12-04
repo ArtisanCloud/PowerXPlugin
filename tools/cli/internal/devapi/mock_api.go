@@ -82,8 +82,7 @@ func (m *MockDevAPI) handler(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/internal/dev/plugins/"):
 		m.handleStatus(w, r)
 	default:
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
+		writeEnvelope(w, http.StatusNotFound, map[string]interface{}{
 			"error":   "NOT_FOUND",
 			"code":    "DEV_NOT_FOUND",
 			"message": fmt.Sprintf("Mock API: Path %s not found", r.URL.Path),
@@ -104,8 +103,7 @@ func (m *MockDevAPI) handleRegister(w http.ResponseWriter, r *http.Request, body
 
 	// Validate required fields
 	if getString("pluginId") == "" || getString("version") == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeEnvelope(w, http.StatusBadRequest, map[string]interface{}{
 			"error":   "BAD_REQUEST",
 			"message": "Missing required fields: pluginId, version",
 			"code":    "DEV_BAD_REQUEST",
@@ -115,8 +113,7 @@ func (m *MockDevAPI) handleRegister(w http.ResponseWriter, r *http.Request, body
 
 	// Check if already registered (simulate conflict)
 	if body["pluginId"] == "conflict-plugin" {
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeEnvelope(w, http.StatusConflict, map[string]interface{}{
 			"error":   "CONFLICT",
 			"message": "Plugin already registered",
 			"code":    "DEV_CONFLICT",
@@ -125,8 +122,7 @@ func (m *MockDevAPI) handleRegister(w http.ResponseWriter, r *http.Request, body
 	}
 
 	// Success response
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeEnvelope(w, http.StatusCreated, map[string]interface{}{
 		"sessionId":   "test-session",
 		"reloadToken": m.reloadToken,
 		"devUrl":      fmt.Sprintf("%s/dev/test-session", m.server.URL),
@@ -139,8 +135,7 @@ func (m *MockDevAPI) handleReload(w http.ResponseWriter, r *http.Request, body m
 	// Validate reload token
 	auth := r.Header.Get("Authorization")
 	if auth == "" || auth != "Bearer "+m.reloadToken {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeEnvelope(w, http.StatusUnauthorized, map[string]interface{}{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 			"code":    "DEV_UNAUTHORIZED",
@@ -150,8 +145,7 @@ func (m *MockDevAPI) handleReload(w http.ResponseWriter, r *http.Request, body m
 
 	// Check if already reloading (simulate conflict)
 	if body["bundleHash"] == "conflict-hash" {
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeEnvelope(w, http.StatusConflict, map[string]interface{}{
 			"error":   "CONFLICT",
 			"message": "Plugin is already reloading",
 			"code":    "DEV_RELOAD_CONFLICT",
@@ -160,8 +154,7 @@ func (m *MockDevAPI) handleReload(w http.ResponseWriter, r *http.Request, body m
 	}
 
 	// Success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeEnvelope(w, http.StatusOK, map[string]interface{}{
 		"status":        "success",
 		"reloadId":      "reload-12345",
 		"estimatedTime": 100,
@@ -174,8 +167,7 @@ func (m *MockDevAPI) handleDelete(w http.ResponseWriter, r *http.Request) {
 	// Validate reload token
 	auth := r.Header.Get("Authorization")
 	if auth == "" || auth != "Bearer "+m.reloadToken {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeEnvelope(w, http.StatusUnauthorized, map[string]interface{}{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 			"code":    "DEV_UNAUTHORIZED",
@@ -184,8 +176,7 @@ func (m *MockDevAPI) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeEnvelope(w, http.StatusOK, map[string]interface{}{
 		"status":          "success",
 		"message":         "Plugin unregistered successfully",
 		"sessionDuration": 3600,
@@ -197,8 +188,7 @@ func (m *MockDevAPI) handleStatus(w http.ResponseWriter, r *http.Request) {
 	// Validate reload token
 	auth := r.Header.Get("Authorization")
 	if auth == "" || auth != "Bearer "+m.reloadToken {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		writeEnvelope(w, http.StatusUnauthorized, map[string]interface{}{
 			"error":   "UNAUTHORIZED",
 			"message": "Invalid or missing authentication token",
 			"code":    "DEV_UNAUTHORIZED",
@@ -207,8 +197,7 @@ func (m *MockDevAPI) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Success response
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	writeEnvelope(w, http.StatusOK, map[string]interface{}{
 		"sessionId":    "test-session",
 		"status":       "active",
 		"pluginId":     "test-plugin",
@@ -269,4 +258,14 @@ func (m *MockDevAPI) AssertRequestCount(t *testing.T, expected int) {
 	if actual != expected {
 		t.Errorf("Expected %d requests, got %d", expected, actual)
 	}
+}
+
+func writeEnvelope(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    status,
+		"message": http.StatusText(status),
+		"data":    data,
+	})
 }

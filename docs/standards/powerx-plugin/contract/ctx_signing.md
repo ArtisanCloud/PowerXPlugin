@@ -46,7 +46,7 @@ X-PowerX-CTX-JWT: <JWT token>
 
 ```json
 {
-  "tenant_id": 1024,
+  "tenant_uuid": 1024,
   "user_id": 501,
   "role_ids": [1, 3],
   "permissions": ["crm:lead:create", "crm:lead:read"],
@@ -60,7 +60,7 @@ X-PowerX-CTX-JWT: <JWT token>
 
 | 字段            | 类型       | 说明               |
 | ------------- | -------- | ---------------- |
-| `tenant_id`   | number   | 当前租户 ID          |
+| `tenant_uuid`   | number   | 当前租户 ID          |
 | `user_id`     | number   | 当前用户 ID          |
 | `role_ids`    | number[] | 当前用户绑定的角色 ID     |
 | `permissions` | string[] | 当前请求权限列表         |
@@ -170,8 +170,8 @@ func VerifyJWT(token string, jwksUrl string) (*Context, error) {
         return nil, err
     }
     return &Context{
-        TenantID: (*claims)["tenant_id"].(float64),
-        UserID:   (*claims)["user_id"].(float64),
+        TenantUuid: (*claims)["tenant_uuid"].(string),
+        UserID:     cast.ToInt64((*claims)["user_id"]),
         Permissions: cast.ToStringSlice((*claims)["permissions"]),
     }, nil
 }
@@ -196,7 +196,7 @@ func VerifyJWT(token string, jwksUrl string) (*Context, error) {
 
 ```go
 type PowerXContext struct {
-    TenantID    int64
+    TenantUuid  string
     UserID      int64
     Permissions []string
     RequestID   string
@@ -211,7 +211,7 @@ func (c *gin.Context) GetPowerX() *PowerXContext {
 然后业务层即可直接访问：
 
 ```go
-tenantID := c.GetPowerX().TenantID
+tenantID := c.GetPowerX().TenantUuid
 ```
 
 ---
@@ -228,7 +228,7 @@ Plugin Reverse Proxy (/_p/:id/api/v1/...)
   ↓
 Plugin Middleware (verify signature)
   ↓
-BeginTenantTx → SET LOCAL app.tenant_id
+BeginTenantTx → SET LOCAL app.tenant_uuid
   ↓
 Postgres (RLS) → Response
 ```
@@ -252,7 +252,7 @@ Postgres (RLS) → Response
 ✅ **JWT 模式优先**：生产部署应使用 RSA/EC 公钥机制。
 ✅ **短期凭据**：Token 有效期不应超过 5 分钟。
 ✅ **防重放**：通过 `request_id` 或 nonce 防止重复请求。
-✅ **多租户隔离**：插件必须从上下文提取 `tenant_id`，不可信任客户端传参。
+✅ **多租户隔离**：插件必须从上下文提取 `tenant_uuid`，不可信任客户端传参。
 ✅ **日志保护**：勿打印完整 Token，仅记录前 10 位。
 ✅ **密钥轮换**：HMAC 建议每季度轮换；JWT JWKS 支持多 key 并行过渡。
 

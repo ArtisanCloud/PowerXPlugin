@@ -96,12 +96,12 @@ func TestTenantContextMiddleware_Default(t *testing.T) {
 	ctx := newStubContext()
 	TenantContext()(func(c bootstrap.Context) {})(ctx)
 
-	if ctx.Header(tenantHeaderName) != "1" {
-		t.Fatalf("expected default tenant header 1, got %s", ctx.Header(tenantHeaderName))
+	if ctx.Header(tenantHeaderName) != defaultTenantUUID {
+		t.Fatalf("expected default tenant header %s, got %s", defaultTenantUUID, ctx.Header(tenantHeaderName))
 	}
-	id, ok := TenantIDFromContext(ctx.Context())
-	if !ok || id != 1 {
-		t.Fatalf("expected tenant id 1 from context, got %d (ok=%v)", id, ok)
+	id, ok := TenantUUIDFromContext(ctx.Context())
+	if !ok || id != defaultTenantUUID {
+		t.Fatalf("expected tenant id %s from context, got %s (ok=%v)", defaultTenantUUID, id, ok)
 	}
 }
 
@@ -117,7 +117,7 @@ func TestTenantContextMiddleware_Invalid(t *testing.T) {
 		t.Fatalf("expected status 400, got %d", ctx.status)
 	}
 	env, ok := ctx.payload.(router.Envelope)
-	if !ok || env.Error == nil || env.Error.Code != "INVALID_TENANT_ID" {
+	if !ok || env.Error == nil || env.Error.Code != "INVALID_TENANT_UUID" {
 		t.Fatalf("unexpected payload: %#v", ctx.payload)
 	}
 }

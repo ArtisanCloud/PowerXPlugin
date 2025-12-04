@@ -233,7 +233,7 @@ type ReloadResponse struct {
 
 ## Go vs TypeScript CLI Compatibility (T093)
 
-- **Test scenario**：以 `examples/starter/go-admin` 为基准插件，分别通过 TS CLI（`tools/cli/src/commands/dev/watch.ts`）与 Go CLI (`tools/cli/cmd/dev.go`) 执行 `px-plugin dev --watch --entry ./examples/starter/go-admin --tenant demo --dev-api http://127.0.0.1:8077`，并借助同一 Mock Dev API (`tools/cli/internal/devapi/mock_api.go`) 捕捉 register / reload / delete 请求。
+- **Test scenario**：以 `examples/starter/go-admin` 为基准插件，分别通过 TS CLI（`tools/cli/src/commands/dev/watch.ts`）与 Go CLI (`tools/cli/cmd/dev.go`) 执行 `px-plugin dev --watch --entry ./examples/starter/go-admin --tenant demo --dev-api http://127.0.0.1:8077/api/v1`，并借助同一 Mock Dev API (`tools/cli/internal/devapi/mock_api.go`) 捕捉 register / reload / delete 请求。
 - **Payload 比对**：
   - `pluginId`、`version`、`entryPath`、`tenant`、`metadata.backend.entry` 保持一致；
   - Reload 请求的 `bundleHash/Size`、`changedFiles` 与 TS CLI 的结构完全一致（Go 版额外传递 `strategy` 字段，其值与 TS CLI 默认 `incremental` 相同）；

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"{{ .BackendModulePath }}/internal/logger"
@@ -26,6 +27,11 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+const (
+	defaultGRPCPort        = 9101
+	defaultGRPCPortRetries = 10
+)
+
 // Server 插件 gRPC 服务器
 type Server struct {
 	*grpc.Server
@@ -35,21 +41,18 @@ type Server struct {
 
 // NewGRPCServer 创建新的插件 gRPC 服务器
 func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*Server, error) {
+	if c == nil {
+		logger.Info("gRPC server config not provided; skipping")
+		return nil, nil
+	}
 	if !c.Enable {
 		logger.Info("gRPC server is disabled")
 		return nil, nil
 	}
 
-	addr := os.Getenv("POWERX_GRPC_ADDR")
-	if strings.TrimSpace(addr) == "" {
-		addr = os.Getenv("GRPC_ADDR")
-	}
-	if strings.TrimSpace(addr) == "" {
-		addr = ":9101" // 兜底
-	}
-	lis, err := net.Listen("tcp", addr)
+	lis, err := acquireListener(c)
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen on %s: %w", c.Addr, err)
+		return nil, err
 	}
 
 	var opts []grpc.ServerOption
@@ -108,14 +111,96 @@ func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*
 		Marketplace: marketplaceServer,
 	})
 
-	//logger.WithField("address", lis.Addr().String()).Info("gRPC server configured")
-	logger.Info("gRPC server configured")
+	logger.WithField("address", lis.Addr().String()).Info("gRPC server configured")
 
 	return &Server{
 		Server: s,
 		lis:    lis,
 		config: c,
 	}, nil
+}
+
+func acquireListener(c *cfgpkg.GRPCServer) (net.Listener, error) {
+	envSources := []string{"POWERX_GRPC_ADDR", "GRPC_ADDR"}
+	for _, key := range envSources {
+		if addr := strings.TrimSpace(os.Getenv(key)); addr != "" {
+			lis, err := net.Listen("tcp", addr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to listen on %s=%s: %w", key, addr, err)
+			}
+			c.Addr = addr
+			if port := extractPort(addr); port > 0 {
+				c.Port = port
+			}
+			logger.WithFields(logger.Fields{
+				"address": addr,
+				"source":  key,
+			}).Info("gRPC server address resolved from environment")
+			return lis, nil
+		}
+	}
+
+	host, basePort := deriveHostPort(c)
+	attempts := c.PortMaxRetries
+	if attempts <= 0 {
+		attempts = defaultGRPCPortRetries
+	}
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		candidatePort := basePort + i
+		addr := net.JoinHostPort(host, strconv.Itoa(candidatePort))
+		lis, err := net.Listen("tcp", addr)
+		if err == nil {
+			c.Addr = addr
+			c.Port = candidatePort
+			if i > 0 {
+				logger.WithFields(logger.Fields{
+					"address":  addr,
+					"attempts": i + 1,
+				}).Info("gRPC server port auto-incremented to avoid conflicts")
+			}
+			return lis, nil
+		}
+		lastErr = err
+		logger.WithError(err).Warnf("Failed to bind gRPC address %s (attempt %d/%d)", addr, i+1, attempts)
+	}
+
+	return nil, fmt.Errorf("failed to bind gRPC port starting at %d after %d attempts: %w", basePort, attempts, lastErr)
+}
+
+func deriveHostPort(c *cfgpkg.GRPCServer) (string, int) {
+	host := ""
+	basePort := c.Port
+	addr := strings.TrimSpace(c.Addr)
+	if addr != "" {
+		if strings.Contains(addr, ":") {
+			if h, p, err := net.SplitHostPort(addr); err == nil {
+				host = h
+				if basePort == 0 {
+					if portVal, err := strconv.Atoi(p); err == nil {
+						basePort = portVal
+					}
+				}
+			}
+		}
+	}
+	if basePort <= 0 {
+		basePort = defaultGRPCPort
+	}
+	return host, basePort
+}
+
+func extractPort(addr string) int {
+	addr = strings.TrimSpace(addr)
+	if addr == "" || !strings.Contains(addr, ":") {
+		return 0
+	}
+	if _, p, err := net.SplitHostPort(addr); err == nil {
+		if portVal, err := strconv.Atoi(p); err == nil {
+			return portVal
+		}
+	}
+	return 0
 }
 
 // Serve 启动 gRPC 服务器

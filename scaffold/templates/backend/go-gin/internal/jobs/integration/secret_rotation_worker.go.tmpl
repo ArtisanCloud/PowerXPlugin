@@ -74,15 +74,15 @@ func (w *SecretRotationWorker) Run(ctx context.Context) error {
 		}
 
 		_, err := w.service.RotateSecret(ctx, service.RotateSecretParams{
-			TenantID: secret.TenantID,
-			SecretID: secret.ID,
-			Generate: true,
-			Actor:    "system-rotation-worker",
+			TenantUuid: secret.TenantUuid,
+			SecretID:   secret.ID,
+			Generate:   true,
+			Actor:      "system-rotation-worker",
 		})
 		if err != nil {
 			w.logger.WithError(err).WithFields(logrus.Fields{
-				"tenant_id": secret.TenantID,
-				"secret_id": secret.ID,
+				"tenant_uuid": secret.TenantUuid,
+				"secret_id":   secret.ID,
 			}).Warn("failed to schedule automatic rotation")
 			continue
 		}

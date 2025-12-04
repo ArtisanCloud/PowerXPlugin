@@ -83,12 +83,12 @@ func (r *Router) setupGlobalMiddleware() {
 	// —— 仅在“不在 PowerX 宿主内”且“非生产”时，才启用 DevSwitch —— //
 	// 避免 PowerX 模式被 DevSwitch 绕过鉴权。
 	if !r.cfg.IsProduction() && os.Getenv("POWERX_PROXY") != "1" {
-		tenantID := int64(1)
-		if r.cfg.GRPCUpstream != nil && r.cfg.GRPCUpstream.TenantID > 0 {
-			tenantID = r.cfg.GRPCUpstream.TenantID
+		tenantUUID := "00000000-0000-0000-0000-000000000001"
+		if r.cfg.GRPCUpstream != nil && strings.TrimSpace(r.cfg.GRPCUpstream.TenantUUID) != "" {
+			tenantUUID = strings.TrimSpace(r.cfg.GRPCUpstream.TenantUUID)
 		}
 		r.engine.Use(middleware2.DevSwitch(true, middleware.TenantContext{
-			TenantID:    tenantID,
+			TenantUUID:  tenantUUID,
 			UserID:      0,
 			Roles:       []string{"superadmin"},
 			Permissions: []string{"*"},

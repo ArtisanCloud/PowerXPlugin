@@ -102,10 +102,10 @@ func TestAuthHandler_RefreshUnauthorized(t *testing.T) {
 func TestAuthHandler_MeContextSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctxResp := &authproxy.MeContext{
-		IsRoot:          true,
-		CurrentTenantID: 42,
+		IsRoot:            true,
+		CurrentTenantUUID: "tenant-42",
 		Members: []authproxy.MeMemberBrief{{
-			TenantID:   42,
+			TenantUUID: "tenant-42",
 			TenantName: "ACME",
 			MemberID:   7,
 			IsAdmin:    true,
@@ -131,7 +131,7 @@ func TestAuthHandler_MeContextSuccess(t *testing.T) {
 	var payload contracts.APIResponse
 	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
 	data := payload.Data.(map[string]any)
-	require.Equal(t, float64(42), data["current_tenant_id"])
+	require.Equal(t, "tenant-42", data["current_tenant_uuid"])
 }
 
 type stubProxy struct {
@@ -180,7 +180,7 @@ func TestAuthHandler_LocalLogin(t *testing.T) {
 				ExpiresIn:    600,
 				Scope:        "access",
 				ExpiresAt:    time.Now().Add(time.Minute),
-			}, &iamservice.UserContext{TenantID: 1}, nil
+			}, &iamservice.UserContext{TenantUUID: "tenant-1", TenantUuid: "1"}, nil
 		},
 	}
 	router := gin.New()
@@ -204,7 +204,7 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	local := &localDirStub{
 		ctxFn: func(ctx context.Context, token string) (*iamservice.UserContext, error) {
-			return &iamservice.UserContext{TenantID: 9, TenantKey: "px_local", TenantName: "Local", UserID: 5, Username: "admin"}, nil
+			return &iamservice.UserContext{TenantUUID: "tenant-local", TenantUuid: "9", TenantKey: "00000000-0000-0000-0000-000000000001", TenantName: "Local", UserID: 5, Username: "admin"}, nil
 		},
 	}
 	router := gin.New()
@@ -222,7 +222,7 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
 	data := payload.Data.(map[string]any)
 	tenant := data["tenant"].(map[string]any)
-	require.Equal(t, float64(9), tenant["id"])
+	require.Equal(t, "tenant-local", tenant["uuid"])
 }
 
 type localDirStub struct {
@@ -259,11 +259,11 @@ func (l *localDirStub) CurrentUser(ctx context.Context) (*iamservice.UserContext
 	return nil, nil
 }
 
-func (l *localDirStub) ListRoles(ctx context.Context, tenantID uint64) ([]iamservice.RoleInfo, error) {
+func (l *localDirStub) ListRoles(ctx context.Context, tenantUUID string) ([]iamservice.RoleInfo, error) {
 	return nil, nil
 }
 
-func (l *localDirStub) ListDepartments(ctx context.Context, tenantID uint64) ([]iamservice.DepartmentInfo, error) {
+func (l *localDirStub) ListDepartments(ctx context.Context, tenantUUID string) ([]iamservice.DepartmentInfo, error) {
 	return nil, nil
 }
 

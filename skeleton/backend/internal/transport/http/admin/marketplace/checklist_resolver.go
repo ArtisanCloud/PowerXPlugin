@@ -43,7 +43,7 @@ func (h *ChecklistGraphQLHandler) Resolve(c *gin.Context) {
 		return
 	}
 
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return

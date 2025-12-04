@@ -127,7 +127,7 @@ Body:
 {
   "access_token": "STS.ABC123",
   "expires_in": 300,
-  "tenant_id": 1024
+  "tenant_uuid": 1024
 }
 ```
 
@@ -184,7 +184,7 @@ PowerX 会通过环境变量或 STDOUT 流注入日志上下文：
 
 | 字段           | 说明       |
 | ------------ | -------- |
-| `tenant_id`  | 当前租户     |
+| `tenant_uuid`  | 当前租户     |
 | `request_id` | 请求 ID    |
 | `plugin_id`  | 插件标识     |
 | `span_id`    | 分布式追踪 ID |
@@ -192,7 +192,7 @@ PowerX 会通过环境变量或 STDOUT 流注入日志上下文：
 建议插件标准输出 JSON 格式日志：
 
 ```json
-{"level":"info","msg":"request handled","tenant_id":1024,"plugin_id":"com.powerx.plugins.base"}
+{"level":"info","msg":"request handled","tenant_uuid":1024,"plugin_id":"com.powerx.plugins.base"}
 ```
 
 宿主会统一采集、聚合并输出到 Loki / ELK。
@@ -233,10 +233,10 @@ resp.Header.Set("Authorization", "Bearer "+stsToken)
 
 ## 十一、上下文注入与 RLS 配合
 
-PowerX 在每个请求注入 `tenant_id` 和 `permissions`，插件中间件在验证后执行：
+PowerX 在每个请求注入 `tenant_uuid` 和 `permissions`，插件中间件在验证后执行：
 
 ```sql
-SET LOCAL app.tenant_id = <tenant_id>;
+SET LOCAL app.tenant_uuid = <tenant_uuid>;
 ```
 
 从而激活 PostgreSQL RLS。
@@ -289,7 +289,7 @@ plugin.api_version == powerx.api_version
       ↓
       TenantContext Middleware → Verify JWT/HMAC
       ↓
-      BeginTenantTx → SET LOCAL app.tenant_id
+      BeginTenantTx → SET LOCAL app.tenant_uuid
       ↓
       Repository / RLS → PostgreSQL
       ↓

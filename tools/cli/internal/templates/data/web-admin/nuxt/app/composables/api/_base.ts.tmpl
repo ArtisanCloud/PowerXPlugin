@@ -1,6 +1,15 @@
 // 解析 API 基址 + 获取 Token/Tenant 的小工具
 
 export function resolveApiBase(pathname?: string): string {
+  const runtimePublic =
+    (typeof useRuntimeConfig === "function"
+      ? (useRuntimeConfig() as any)?.public
+      : undefined) ?? (globalThis as any).__NUXT__?.config?.public;
+
+  if (runtimePublic?.apiBaseUrl) {
+    return runtimePublic.apiBaseUrl;
+  }
+
   const p =
     pathname ??
     (typeof window !== "undefined" ? window.location.pathname : "") ??
@@ -17,14 +26,7 @@ export function resolveApiBase(pathname?: string): string {
     }
   }
 
-  // 兜底：runtimeConfig.public.apiBaseUrl
-  const cfg =
-    (globalThis as any).__NUXT__?.config?.public ??
-    (typeof useRuntimeConfig === "function"
-      ? (useRuntimeConfig() as any).public
-      : undefined);
-
-  return cfg?.apiBaseUrl || "http://localhost:8087/api/v1";
+  return "http://localhost:8078/api/v1";
 }
 
 export function getAuthToken(): string | undefined {
@@ -36,7 +38,10 @@ export function getAuthToken(): string | undefined {
         return storedToken;
       }
     } catch (error) {
-      console.warn("[PowerXPlugin] failed to read localStorage access_token", error);
+      console.warn(
+        "[PowerXPlugin] failed to read localStorage access_token",
+        error
+      );
     }
   }
 
@@ -51,15 +56,16 @@ export function getAuthToken(): string | undefined {
   return undefined;
 }
 
-export function getTenantId(): string | undefined {
+export function getTenantUuid(): string | undefined {
   // TODO: 换成你的 Pinia/Cookie 逻辑
   if (typeof document !== "undefined") {
-    const m = document.cookie.match(/(?:^|;\s*)tenant_id=([^;]+)/);
+    const m = document.cookie.match(/(?:^|;\s*)tenant_uuid=([^;]+)/);
     if (m) return decodeURIComponent(m[1]);
   }
   const cfg =
     typeof useRuntimeConfig === "function" ? useRuntimeConfig() : ({} as any);
-  return (cfg.public as any)?.defaultTenantId;
+  const publicCfg = cfg.public as any;
+  return publicCfg?.defaultTenantUuid || publicCfg?.defaultTenantId;
 }
 
 // 通用类型定义

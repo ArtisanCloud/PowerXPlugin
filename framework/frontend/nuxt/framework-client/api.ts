@@ -1,6 +1,10 @@
 export interface PluginApiOptions {
   pluginId: string;
   baseURL?: string;
+  tenantUuid?: string;
+  /**
+   * @deprecated Please migrate to tenantUuid.
+   */
   tenantId?: string | number;
 }
 
@@ -11,7 +15,7 @@ export interface PluginApi {
   delete<T>(path: string, init?: RequestInit): Promise<T>;
 }
 
-const tenantHeaderName = "X-Tenant-ID";
+const tenantHeaderName = "X-Tenant-UUID";
 
 export function usePluginApi(options: PluginApiOptions): PluginApi {
   const prefix = (options.baseURL ?? `/_p/${options.pluginId}/api/v1`).replace(
@@ -33,8 +37,15 @@ export function usePluginApi(options: PluginApiOptions): PluginApi {
       }
     }
 
-    if (options.tenantId !== undefined && !headers.has(tenantHeaderName)) {
-      headers.set(tenantHeaderName, String(options.tenantId));
+    const tenantHeader =
+      options.tenantUuid ??
+      (options.tenantId !== undefined ? String(options.tenantId) : undefined);
+    if (
+      tenantHeader !== undefined &&
+      tenantHeader !== "" &&
+      !headers.has(tenantHeaderName)
+    ) {
+      headers.set(tenantHeaderName, tenantHeader);
     }
 
     const response = await fetch(`${prefix}${route}`, {

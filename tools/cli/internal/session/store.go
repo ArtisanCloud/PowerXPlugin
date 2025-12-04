@@ -1,147 +1,80 @@
 package session
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"sync"
 )
 
-// Store handles session persistence
+// Store holds sessions in memory only (no filesystem persistence).
 type Store struct {
-	baseDir string
+	mu       sync.RWMutex
+	sessions map[string]*Session
 }
 
-// NewStore creates a new session store
+// NewStore creates a new in-memory session store.
 func NewStore() *Store {
-	// Get home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		// Fallback to current directory
-		homeDir = "."
-	}
-
-	baseDir := filepath.Join(homeDir, ".px-plugin", "sessions")
-
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(baseDir, 0700); err != nil {
-		fmt.Printf("Warning: failed to create sessions directory: %v\n", err)
-	}
-
 	return &Store{
-		baseDir: baseDir,
+		sessions: make(map[string]*Session),
 	}
 }
 
-// Save saves a session to disk
+// Save stores a session in memory.
 func (s *Store) Save(session *Session) error {
 	if session == nil {
 		return fmt.Errorf("session is nil")
 	}
-
-	data, err := json.MarshalIndent(session, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal session: %w", err)
-	}
-
-	filename := s.getSessionPath(session.ID)
-	if err := os.WriteFile(filename, data, 0600); err != nil {
-		return fmt.Errorf("failed to write session file: %w", err)
-	}
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	clone := *session
+	s.sessions[session.ID] = &clone
 	return nil
 }
 
-// Load loads a session from disk
+// Load retrieves a session from memory.
 func (s *Store) Load(id string) (*Session, error) {
 	if id == "" {
 		return nil, fmt.Errorf("session id is empty")
 	}
-
-	filename := s.getSessionPath(id)
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read session file: %w", err)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if session, ok := s.sessions[id]; ok {
+		clone := *session
+		return &clone, nil
 	}
-
-	var session Session
-	if err := json.Unmarshal(data, &session); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal session: %w", err)
-	}
-
-	return &session, nil
+	return nil, fmt.Errorf("session not found")
 }
 
-// Delete deletes a session from disk
+// Delete removes a session from memory.
 func (s *Store) Delete(id string) error {
 	if id == "" {
 		return fmt.Errorf("session id is empty")
 	}
-
-	filename := s.getSessionPath(id)
-	if err := os.Remove(filename); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to delete session file: %w", err)
-	}
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.sessions, id)
 	return nil
 }
 
-// List lists all sessions
+// List lists all sessions from memory.
 func (s *Store) List() ([]*Session, error) {
-	var sessions []*Session
-
-	entries, err := os.ReadDir(s.baseDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return sessions, nil
-		}
-		return nil, fmt.Errorf("failed to read sessions directory: %w", err)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sessions := make([]*Session, 0, len(s.sessions))
+	for _, sess := range s.sessions {
+		clone := *sess
+		sessions = append(sessions, &clone)
 	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if filepath.Ext(entry.Name()) != ".json" {
-			continue
-		}
-
-		filename := filepath.Join(s.baseDir, entry.Name())
-		data, err := os.ReadFile(filename)
-		if err != nil {
-			continue
-		}
-
-		var session Session
-		if err := json.Unmarshal(data, &session); err != nil {
-			continue
-		}
-
-		sessions = append(sessions, &session)
-	}
-
 	return sessions, nil
 }
 
-// Cleanup removes expired sessions
+// Cleanup removes expired sessions.
 func (s *Store) Cleanup() error {
-	sessions, err := s.List()
-	if err != nil {
-		return err
-	}
-
-	for _, session := range sessions {
-		if session.IsExpired() {
-			if err := s.Delete(session.ID); err != nil {
-				fmt.Printf("Warning: failed to delete expired session %s: %v\n", session.ID, err)
-			}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, sess := range s.sessions {
+		if sess != nil && sess.IsExpired() {
+			delete(s.sessions, id)
 		}
 	}
-
 	return nil
-}
-
-// getSessionPath returns the file path for a session
-func (s *Store) getSessionPath(id string) string {
-	return filepath.Join(s.baseDir, id+".json")
 }

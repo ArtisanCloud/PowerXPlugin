@@ -72,7 +72,7 @@ quotas:
 宿主维护租户级表：
 
 ```
-tenant_plugin_quota(tenant_id, plugin_id, used_calls, used_storage, last_reset)
+tenant_plugin_quota(tenant_uuid, plugin_id, used_calls, used_storage, last_reset)
 ```
 
 ### 典型配额类型
@@ -136,7 +136,7 @@ runtime_ops:
 
 | 资源类型     | 隔离方式                       | 说明              |
 | -------- | -------------------------- | --------------- |
-| API 调用   | `tenant_id + plugin_id` 双键 | 每租户独立统计         |
+| API 调用   | `tenant_uuid + plugin_id` 双键 | 每租户独立统计         |
 | 存储空间     | schema 分区                  | 物理隔离            |
 | 并发连接     | Session 级别                 | MCP Session 数限制 |
 | AI Token | 每租户独立计数器                   | 用于 AI 类插件       |
@@ -147,7 +147,7 @@ runtime_ops:
 ```
 tenant_plugin_usage
 ---------------------
-tenant_id
+tenant_uuid
 plugin_id
 calls_today
 storage_mb
@@ -198,7 +198,7 @@ costs:
 ```json
 {
   "plugin_id": "com.powerx.plugin.crm",
-  "tenant_id": "tenant_123",
+  "tenant_uuid": "tenant_123",
   "capability": "crm.contact.create",
   "cost": 0.0132,
   "metrics": {
@@ -217,7 +217,7 @@ costs:
 | 字段        | 示例                    | 描述            |
 | --------- | --------------------- | ------------- |
 | plugin_id | com.powerx.plugin.crm | 插件标识          |
-| tenant_id | tenant_123            | 租户            |
+| tenant_uuid | tenant_123            | 租户            |
 | calls     | 2048                  | 调用次数          |
 | cost      | 20.48                 | PowerX Credit |
 | timestamp | 2025-10-13T00:00Z     | 结算时间          |
@@ -225,10 +225,10 @@ costs:
 示例 SQL：
 
 ```sql
-SELECT plugin_id, tenant_id, SUM(cost) AS total_cost
+SELECT plugin_id, tenant_uuid, SUM(cost) AS total_cost
 FROM plugin_billing
 WHERE date = CURRENT_DATE
-GROUP BY plugin_id, tenant_id;
+GROUP BY plugin_id, tenant_uuid;
 ```
 
 结果会上传至 Marketplace 后台，用于结算和分润。
@@ -242,7 +242,7 @@ PowerX 监控系统（Prometheus / Grafana）暴露如下指标：
 ```
 powerx_plugin_request_total{plugin_id="crm", capability="bootstrap"} 8421
 powerx_plugin_quota_usage{plugin_id="crm", scope="tenant", scope_ref="123"} 0.83
-powerx_plugin_cost_total{plugin_id="crm", tenant_id="123"} 42.13
+powerx_plugin_cost_total{plugin_id="crm", tenant_uuid="123"} 42.13
 powerx_mcp_sessions_total{plugin_id="crm"} 3
 ```
 
@@ -255,7 +255,7 @@ powerx_mcp_sessions_total{plugin_id="crm"} 3
 | 指标 | 说明 |
 |------|------|
 | `powerx_plugin_quota_usage{scope,scope_ref}` | 当前配额使用率 (0~1) |
-| `powerx_plugin_cost_total{plugin_id,tenant_id}` | 累计成本合计 |
+| `powerx_plugin_cost_total{plugin_id,tenant_uuid}` | 累计成本合计 |
 | `powerx_plugin_restart_total{plugin_id,instance_id}` | 插件实例重启次数 |
 | `powerx_plugin_health_status{plugin_id,instance_id}` | 健康状态（1/0） |
 
@@ -281,7 +281,7 @@ powerx_mcp_sessions_total{plugin_id="crm"} 3
   "topic": "plugin.quota.exceeded",
   "data": {
     "plugin_id": "com.powerx.plugin.crm",
-    "tenant_id": "tenant_123",
+    "tenant_uuid": "tenant_123",
     "metric": "daily_calls",
     "limit": 10000
   }

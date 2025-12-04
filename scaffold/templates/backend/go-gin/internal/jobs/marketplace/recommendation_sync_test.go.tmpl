@@ -31,7 +31,7 @@ func setupListingRepoForJob(t *testing.T) *mrepo.ListingRepository {
 	require.NoError(t, db.Exec(`DROP TABLE IF EXISTS marketplace_listings`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE marketplace_listings (
         id TEXT PRIMARY KEY,
-        tenant_id TEXT NOT NULL,
+        tenant_uuid TEXT NOT NULL,
         plugin_id TEXT NOT NULL,
         vendor_id TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -60,7 +60,7 @@ func setupListingRepoForJob(t *testing.T) *mrepo.ListingRepository {
 	require.NoError(t, db.Exec(`CREATE TABLE marketplace_listing_assets (
         id TEXT PRIMARY KEY,
         listing_id TEXT NOT NULL,
-        tenant_id TEXT NOT NULL,
+        tenant_uuid TEXT NOT NULL,
         asset_type TEXT,
         storage_uri TEXT,
         created_at DATETIME,
@@ -69,7 +69,7 @@ func setupListingRepoForJob(t *testing.T) *mrepo.ListingRepository {
 	require.NoError(t, db.Exec(`DROP TABLE IF EXISTS marketplace_pricing_plans`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE marketplace_pricing_plans (
         id TEXT PRIMARY KEY,
-        tenant_id TEXT NOT NULL,
+        tenant_uuid TEXT NOT NULL,
         listing_id TEXT NOT NULL,
         plan_code TEXT,
         plan_type TEXT,
@@ -80,8 +80,8 @@ func setupListingRepoForJob(t *testing.T) *mrepo.ListingRepository {
     )`).Error)
 	repo := mrepo.NewListingRepository(db)
 	seed := []*dbm.Listing{
-		{ID: "l1", TenantID: "tenant-a", PluginID: "p", VendorID: "v", Status: dbm.ListingStatusPublished, Title: "A", Slug: "a"},
-		{ID: "l2", TenantID: "tenant-b", PluginID: "p", VendorID: "v", Status: dbm.ListingStatusDraft, Title: "B", Slug: "b"},
+		{ID: "l1", TenantUuid: "tenant-a", PluginID: "p", VendorID: "v", Status: dbm.ListingStatusPublished, Title: "A", Slug: "a"},
+		{ID: "l2", TenantUuid: "tenant-b", PluginID: "p", VendorID: "v", Status: dbm.ListingStatusDraft, Title: "B", Slug: "b"},
 	}
 	for _, listing := range seed {
 		require.NoError(t, repo.Create(context.Background(), listing))
@@ -96,7 +96,7 @@ func TestSyncJobRefreshesWeights(t *testing.T) {
 			{ListingID: "l1", ReadyChecklistScore: 90},
 		},
 	}}
-	job := NewSyncJob(nil, repo, provider, logrus.New().WithField("test", "sync"), repo.ListTenantIDs)
+	job := NewSyncJob(nil, repo, provider, logrus.New().WithField("test", "sync"), repo.ListTenantUuids)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 

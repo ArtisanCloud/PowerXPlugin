@@ -91,7 +91,7 @@
 
 ```yaml
 ticket_id: "PX-TKT-20251013-001"
-tenant_id: "tenant_abc"
+tenant_uuid: "tenant_abc"
 plugin_id: "com.powerx.plugin.crm"
 priority: P1
 status: in_progress
@@ -116,7 +116,7 @@ POST /api/v1/support/webhook
   "ticket_id": "PX-TKT-20251013-001",
   "plugin_id": "com.powerx.plugin.crm",
   "severity": "P1",
-  "tenant_id": "tenant_abc"
+  "tenant_uuid": "tenant_abc"
 }
 ```
 

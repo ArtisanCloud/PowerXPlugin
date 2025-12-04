@@ -26,7 +26,7 @@ const (
 type AdvisoryDistribution struct {
 	ID          string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	AdvisoryID  string            `gorm:"column:advisory_id;type:uuid;not null" json:"advisory_id"`
-	TenantID    string            `gorm:"column:tenant_id;type:text;not null" json:"tenant_id"`
+	TenantUuid  string            `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
 	Channel     string            `gorm:"column:channel;type:text;not null" json:"channel"`
 	DeliveredAt *time.Time        `gorm:"column:delivered_at;type:timestamptz" json:"delivered_at,omitempty"`
 	Status      string            `gorm:"column:status;type:text;not null" json:"status"`

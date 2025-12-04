@@ -9,14 +9,15 @@
 #   PLUGIN_IAM_ADMIN_PASSWORD - Local 模式默认管理员密码（用于 migrate/seed）
 
 server:
-  bind_addr: ":8087"
+  bind_addr: ":8078"
+  api_prefix: "/api/v1"
   log_level: "debug"
   dev_mode: true
 
 # gRPC 上游（可选，默认关闭）
 grpc_upstream:
   address: "localhost:8079"
-  tenant_id: 1
+  tenant_uuid: "00000000-0000-0000-0000-000000000001"
   use_tls: false
   connect_mode: "lazy"
   optional: true
@@ -24,7 +25,7 @@ grpc_upstream:
 database:
   # driver 可选 memory / sqlite / postgres。缺省值为 memory（内存 SQLite）。
   driver: "sqlite"
-  dsn: "file:../../../.cache/powerxplugin.db?cache=shared&_fk=1"
+  dsn: "file:../../.cache/powerxplugin.db?cache=shared&_fk=1"
   schema: ""
   maxIdleConns: 10
   maxOpenConns: 100

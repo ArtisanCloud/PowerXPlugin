@@ -54,7 +54,7 @@ func NewSecretService(
 
 // CreateSecretParams holds create options.
 type CreateSecretParams struct {
-	TenantID             string
+	TenantUuid           string
 	IntegrationType      string
 	RotationIntervalDays int
 	Metadata             map[string]any
@@ -71,10 +71,10 @@ type CreateSecretResult struct {
 
 // RotateSecretParams captures rotation options.
 type RotateSecretParams struct {
-	TenantID string
-	SecretID string
-	Generate bool
-	Actor    string
+	TenantUuid string
+	SecretID   string
+	Generate   bool
+	Actor      string
 }
 
 // RotateSecretResult returns pending material if generated.
@@ -89,10 +89,10 @@ func (s *SecretService) CreateSecret(ctx context.Context, params CreateSecretPar
 	if s.repo == nil {
 		return nil, errors.New("secret repository not configured")
 	}
-	params.TenantID = strings.TrimSpace(params.TenantID)
+	params.TenantUuid = strings.TrimSpace(params.TenantUuid)
 	params.IntegrationType = strings.TrimSpace(params.IntegrationType)
-	if params.TenantID == "" {
-		return nil, errors.New("tenant_id is required")
+	if params.TenantUuid == "" {
+		return nil, errors.New("tenant_uuid is required")
 	}
 	if params.IntegrationType == "" {
 		return nil, errors.New("integration_type is required")
@@ -102,7 +102,7 @@ func (s *SecretService) CreateSecret(ctx context.Context, params CreateSecretPar
 	}
 
 	secret := &model.SecretCredential{
-		TenantID:         params.TenantID,
+		TenantUuid:       params.TenantUuid,
 		IntegrationType:  params.IntegrationType,
 		CurrentSecretRef: strings.TrimSpace(params.ExistingSecretRef),
 		RotationInterval: params.RotationIntervalDays,
@@ -115,7 +115,7 @@ func (s *SecretService) CreateSecret(ctx context.Context, params CreateSecretPar
 
 	var generatedPlain string
 	if params.Generate {
-		mat, err := s.provider.Issue(ctx, params.TenantID, params.IntegrationType)
+		mat, err := s.provider.Issue(ctx, params.TenantUuid, params.IntegrationType)
 		if err != nil {
 			return nil, err
 		}
@@ -137,13 +137,13 @@ func (s *SecretService) CreateSecret(ctx context.Context, params CreateSecretPar
 	if err != nil {
 		return nil, err
 	}
-	s.submitApproval(ctx, params.TenantID, created.ID, "create", created, params.Actor)
+	s.submitApproval(ctx, params.TenantUuid, created.ID, "create", created, params.Actor)
 	return &CreateSecretResult{Secret: sanitizeSecret(created), GeneratedPlain: generatedPlain}, nil
 }
 
 // RotateSecret schedules a rotation and optionally generates a pending secret.
 func (s *SecretService) RotateSecret(ctx context.Context, params RotateSecretParams) (*RotateSecretResult, error) {
-	secret, err := s.repo.GetByID(ctx, params.TenantID, params.SecretID)
+	secret, err := s.repo.GetByID(ctx, params.TenantUuid, params.SecretID)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (s *SecretService) RotateSecret(ctx context.Context, params RotateSecretPar
 
 	var generated string
 	if params.Generate {
-		mat, err := s.provider.Issue(ctx, params.TenantID, secret.IntegrationType)
+		mat, err := s.provider.Issue(ctx, params.TenantUuid, secret.IntegrationType)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func (s *SecretService) RotateSecret(ctx context.Context, params RotateSecretPar
 	if err := s.repo.Update(ctx, secret); err != nil {
 		return nil, err
 	}
-	s.submitApproval(ctx, secret.TenantID, secret.ID, "schedule_rotation", sanitizeSecret(secret), params.Actor)
+	s.submitApproval(ctx, secret.TenantUuid, secret.ID, "schedule_rotation", sanitizeSecret(secret), params.Actor)
 	return &RotateSecretResult{
 		Secret:             sanitizeSecret(secret),
 		PendingSecretRef:   secret.PendingSecretRef,
@@ -338,7 +338,7 @@ func (s *SecretService) submitApproval(ctx context.Context, tenantID, targetID, 
 	req := SubmitChangeRequest{
 		TargetType:  "secret_credential",
 		TargetID:    targetID,
-		Payload:     map[string]any{"tenant_id": tenantID, "action": action, "snapshot": payload},
+		Payload:     map[string]any{"tenant_uuid": tenantID, "action": action, "snapshot": payload},
 		SubmittedBy: defaultActor(actor),
 	}
 	if _, err := s.approvals.SubmitChange(ctx, req); err != nil {

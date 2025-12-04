@@ -52,7 +52,7 @@ PowerX 调用插件时注入**签名上下文**（二选一）：
 - `X-PowerX-CTX-JWT: "Bearer <jwt>`（**生产推荐**，公钥校验，JWKS 轮换）"
 - `X-PowerX-CTX: "<payload>.<sig>`（HMAC，对称密钥，适合本地开发）"
 
-上下文包含：`tenant_id, user_id, permissions, request_id, exp, iat, iss, aud`。  
+上下文包含：`tenant_uuid, user_id, permissions, request_id, exp, iat, iss, aud`。  
 插件的 **Middleware** 负责验证并注入 `TenantContext` 用于 RLS。
 
 ### 1.3 授权回流（出站）
@@ -136,7 +136,7 @@ web-admin/  (Nuxt 4 + Nuxt UI 3.3.2)
 
 **运行模式：**
 
-- **本地开发**：`/` → 直连 `http://127.0.0.1:8087/v1`
+- **本地开发**：`/` → 直连 `http://127.0.0.1:8078/v1`
 - **宿主反代**：`/_p/<plugin-id>/admin/` → API 前缀 `/_p/<plugin-id>/api/v1`
 
 在 `nuxt.config.ts` 里通过 `runtimeConfig.public.apiBaseUrl` 动态切换。
@@ -207,14 +207,14 @@ func (t *Template) TableName() string { return models.S(models.TableTemplate) }
 * **本地开发**
 
   * 后端：`POWERX_DEV_MODE=1 go run ./backend/cmd/plugin`
-  * 前端：`npm run dev`（默认直连 `:8087/v1`）
+  * 前端：`npm run dev`（默认直连 `:8078/v1`）
 * **发布打包**
 
   * `make release && make package-release` → `target/<ver>/*.zip`
 * **Docker**
 
   * `docker build -t <image:ver> -f backend/Dockerfile .`
-  * 宿主通过内部网络反代 `/_p/<plugin-id>/*` 到插件容器 `:8087`
+  * 宿主通过内部网络反代 `/_p/<plugin-id>/*` 到插件容器 `:8078`
 
 ---
 

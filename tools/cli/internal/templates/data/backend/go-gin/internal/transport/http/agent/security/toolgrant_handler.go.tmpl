@@ -1,7 +1,6 @@
 package security
 
 import (
-	"fmt"
 	"net/http"
 
 	"{{ .BackendModulePath }}/internal/middleware"
@@ -29,12 +28,11 @@ func (h *ToolGrantHandler) Verify(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
-	tenantUint, ok := middleware.TenantIDFromContext(c.Request.Context())
-	if !ok || tenantUint == 0 {
+	tenantID, ok := middleware.TenantUUIDFromContext(c.Request.Context())
+	if !ok || tenantID == "" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
 		return
 	}
-	tenantID := fmt.Sprintf("%d", tenantUint)
 	claims, err := h.service.Validate(c.Request.Context(), tenantID, payload.Token)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})

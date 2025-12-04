@@ -25,7 +25,7 @@ func setupLicenseServiceDB(t *testing.T, name string) *gorm.DB {
 	statements := []string{
 		`CREATE TABLE IF NOT EXISTS marketplace_pricing_plans (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             listing_id TEXT NOT NULL,
             plan_code TEXT NOT NULL,
             plan_type TEXT NOT NULL,
@@ -44,7 +44,7 @@ func setupLicenseServiceDB(t *testing.T, name string) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_plan_tiers (
             id TEXT PRIMARY KEY,
             plan_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             metric TEXT NOT NULL,
             range_from REAL NOT NULL,
             range_to REAL,
@@ -55,7 +55,7 @@ func setupLicenseServiceDB(t *testing.T, name string) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_licenses (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             listing_id TEXT NOT NULL,
             plan_id TEXT NOT NULL,
             license_token TEXT NOT NULL,
@@ -72,7 +72,7 @@ func setupLicenseServiceDB(t *testing.T, name string) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_license_events (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             license_id TEXT NOT NULL,
             event_type TEXT NOT NULL,
             event_payload TEXT,
@@ -83,7 +83,7 @@ func setupLicenseServiceDB(t *testing.T, name string) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_tax_transactions (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             billing_id TEXT NOT NULL,
             external_provider TEXT NOT NULL,
             external_transaction_id TEXT,
@@ -215,12 +215,12 @@ func TestLicenseService_IssueLicenseSuccess(t *testing.T) {
 
 	amount := 29.99
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "pro",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
-		Amount:    &amount,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "pro",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
+		Amount:     &amount,
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 	require.NotEmpty(t, plan.ID)
@@ -256,12 +256,12 @@ func TestLicenseService_IssueLicenseSuccess(t *testing.T) {
 
 	expiresAt := time.Now().Add(24 * time.Hour)
 	license, err := svc.IssueLicense(ctx, IssueLicenseParams{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanID:    plan.ID,
-		IssuedBy:  "tester",
-		Metadata:  map[string]any{"source": "unit-test"},
-		ExpiresAt: expiresAt,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanID:     plan.ID,
+		IssuedBy:   "tester",
+		Metadata:   map[string]any{"source": "unit-test"},
+		ExpiresAt:  expiresAt,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, license)
@@ -278,7 +278,7 @@ func TestLicenseService_IssueLicenseSuccess(t *testing.T) {
 	require.Equal(t, "tenant-1", billing.lastTenant)
 	require.Equal(t, plan.ID, billing.lastPlan)
 	require.NotNil(t, taxAdapter.request)
-	require.Equal(t, "tenant-1", taxAdapter.request.TenantID)
+	require.Equal(t, "tenant-1", taxAdapter.request.TenantUuid)
 
 	events, err := licenseRepo.ListEvents(ctx, "tenant-1", license.ID, 5)
 	require.NoError(t, err)
@@ -322,13 +322,13 @@ func TestLicenseService_IssueLicenseSkipBilling(t *testing.T) {
 
 	amount := 49.0
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "enterprise",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
-		Amount:    &amount,
-		Status:    "active",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "enterprise",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
+		Amount:     &amount,
+		Status:     "active",
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 
@@ -346,7 +346,7 @@ func TestLicenseService_IssueLicenseSkipBilling(t *testing.T) {
 	meta := map[string]any{"billing_id": "existing-billing-1"}
 
 	license, err := service.IssueLicense(ctx, IssueLicenseParams{
-		TenantID:    "tenant-1",
+		TenantUuid:  "tenant-1",
 		ListingID:   "listing-1",
 		PlanID:      plan.ID,
 		IssuedBy:    "recovery-bot",
@@ -378,16 +378,16 @@ func TestLicenseService_RenewLicenseUpdatesExpiry(t *testing.T) {
 	ctx := context.Background()
 
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "pro",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "pro",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 
 	license := &dbm.License{
-		TenantID:     "tenant-1",
+		TenantUuid:   "tenant-1",
 		ListingID:    "listing-1",
 		PlanID:       plan.ID,
 		LicenseToken: "initial-token",
@@ -408,10 +408,10 @@ func TestLicenseService_RenewLicenseUpdatesExpiry(t *testing.T) {
 	svc := NewLicenseService(&config.Config{}, pricingRepo, licenseRepo, nil, nil, authority, cache, testLogger())
 
 	updated, err := svc.RenewLicense(ctx, RenewLicenseParams{
-		LicenseID: license.ID,
-		TenantID:  "tenant-1",
-		IssuedBy:  "tester",
-		Metadata:  map[string]any{"initiator": "unit-test"},
+		LicenseID:  license.ID,
+		TenantUuid: "tenant-1",
+		IssuedBy:   "tester",
+		Metadata:   map[string]any{"initiator": "unit-test"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "renewed-token", updated.LicenseToken)
@@ -433,16 +433,16 @@ func TestLicenseService_ExtendOfflineClampsTo72Hours(t *testing.T) {
 	ctx := context.Background()
 
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "pro",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "pro",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 
 	license := &dbm.License{
-		TenantID:     "tenant-1",
+		TenantUuid:   "tenant-1",
 		ListingID:    "listing-1",
 		PlanID:       plan.ID,
 		LicenseToken: "token",
@@ -477,12 +477,12 @@ func TestLicenseService_IssueLicensePlanMismatch(t *testing.T) {
 
 	amount := 9.99
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-other",
-		PlanCode:  "basic",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
-		Amount:    &amount,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-other",
+		PlanCode:   "basic",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
+		Amount:     &amount,
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 
@@ -490,9 +490,9 @@ func TestLicenseService_IssueLicensePlanMismatch(t *testing.T) {
 	svc := NewLicenseService(&config.Config{}, pricingRepo, licenseRepo, nil, billing, nil, nil, testLogger())
 
 	_, err := svc.IssueLicense(ctx, IssueLicenseParams{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanID:    plan.ID,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanID:     plan.ID,
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "does not belong")
@@ -507,13 +507,13 @@ func TestLicenseService_IssueLicenseInactivePlan(t *testing.T) {
 
 	amount := 9.99
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "basic",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
-		Amount:    &amount,
-		Status:    "inactive",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "basic",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
+		Amount:     &amount,
+		Status:     "inactive",
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 
@@ -521,9 +521,9 @@ func TestLicenseService_IssueLicenseInactivePlan(t *testing.T) {
 	svc := NewLicenseService(&config.Config{}, pricingRepo, licenseRepo, nil, billing, nil, nil, testLogger())
 
 	_, err := svc.IssueLicense(ctx, IssueLicenseParams{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanID:    plan.ID,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanID:     plan.ID,
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not active")
@@ -537,11 +537,11 @@ func TestLicenseService_IssueLicenseSkipsBillingForFreePlan(t *testing.T) {
 	ctx := context.Background()
 
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "free",
-		PlanType:  dbm.PricingPlanTypeFree,
-		Currency:  "USD",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "free",
+		PlanType:   dbm.PricingPlanTypeFree,
+		Currency:   "USD",
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 
@@ -550,11 +550,11 @@ func TestLicenseService_IssueLicenseSkipsBillingForFreePlan(t *testing.T) {
 	svc := NewLicenseService(&config.Config{}, pricingRepo, licenseRepo, nil, billing, nil, cache, testLogger())
 
 	license, err := svc.IssueLicense(ctx, IssueLicenseParams{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanID:    plan.ID,
-		IssuedBy:  "tester",
-		Trial:     true,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanID:     plan.ID,
+		IssuedBy:   "tester",
+		Trial:      true,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, license)
@@ -571,12 +571,12 @@ func TestLicenseService_TaxFailureRecordsTransaction(t *testing.T) {
 
 	amount := 15.0
 	plan := &dbm.PricingPlan{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanCode:  "std",
-		PlanType:  dbm.PricingPlanTypeSubscription,
-		Currency:  "USD",
-		Amount:    &amount,
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanCode:   "std",
+		PlanType:   dbm.PricingPlanTypeSubscription,
+		Currency:   "USD",
+		Amount:     &amount,
 	}
 	require.NoError(t, pricingRepo.CreatePlan(ctx, plan, nil))
 
@@ -592,10 +592,10 @@ func TestLicenseService_TaxFailureRecordsTransaction(t *testing.T) {
 	svc := NewLicenseService(&config.Config{}, pricingRepo, licenseRepo, taxClient, billing, nil, cache, testLogger())
 
 	license, err := svc.IssueLicense(ctx, IssueLicenseParams{
-		TenantID:  "tenant-1",
-		ListingID: "listing-1",
-		PlanID:    plan.ID,
-		IssuedBy:  "tester",
+		TenantUuid: "tenant-1",
+		ListingID:  "listing-1",
+		PlanID:     plan.ID,
+		IssuedBy:   "tester",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, license)

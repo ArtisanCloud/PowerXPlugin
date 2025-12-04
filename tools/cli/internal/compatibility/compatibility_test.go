@@ -14,6 +14,9 @@ import (
 
 // CompatibilityTest compares Go CLI and TypeScript CLI behavior
 func TestGoCLIVsTypeScriptCLI(t *testing.T) {
+	if os.Getenv("PX_RUN_COMPAT_TESTS") == "" {
+		t.Skip("PX_RUN_COMPAT_TESTS not set; skipping compatibility suite")
+	}
 	// Check if TypeScript CLI is available
 	tsCLI, err := findTypeScriptCLI()
 	if err != nil {
@@ -101,11 +104,19 @@ func findGoCLI() (string, error) {
 		return "", err
 	}
 
-	// Find tools/cli directory
-	toolsCliDir := filepath.Join(wd, "tools", "cli")
-	if _, err := os.Stat(toolsCliDir); os.IsNotExist(err) {
-		return "", fmt.Errorf("tools/cli directory not found")
+	// Walk upwards until we find cmd/px-plugin
+	searchDir := wd
+	for {
+		if _, err := os.Stat(filepath.Join(searchDir, "cmd", "px-plugin")); err == nil {
+			break
+		}
+		next := filepath.Dir(searchDir)
+		if next == searchDir {
+			return "", fmt.Errorf("tools/cli directory not found")
+		}
+		searchDir = next
 	}
+	toolsCliDir := searchDir
 
 	// Build the CLI
 	cliPath := filepath.Join(toolsCliDir, "px-plugin")

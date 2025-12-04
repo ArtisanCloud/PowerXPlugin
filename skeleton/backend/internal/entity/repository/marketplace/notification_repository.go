@@ -29,9 +29,9 @@ func (r *NotificationRepository) QueueNotification(ctx context.Context, notifica
 	if notification == nil {
 		return errors.New("notification is required")
 	}
-	tenantID := strings.TrimSpace(notification.TenantID)
+	tenantID := strings.TrimSpace(notification.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(notification.ID) == "" {
 		notification.ID = uuid.NewString()
@@ -51,11 +51,11 @@ func (r *NotificationRepository) QueueNotification(ctx context.Context, notifica
 func (r *NotificationRepository) ListByTenant(ctx context.Context, tenantID string) ([]*dbm.Notification, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	var notifications []*dbm.Notification
 	if err := r.DB.WithContext(ctx).
-		Where("tenant_id = ?", tenantID).
+		Where("tenant_uuid = ?", tenantID).
 		Order("created_at DESC").
 		Find(&notifications).Error; err != nil {
 		return nil, err

@@ -27,7 +27,7 @@ PowerX 所有事件都采用统一的 Envelope 格式：
   "event_type": "crm.contact.created",
   "source": "powerx.crm",
   "target": "com.powerx.plugin.analytics",
-  "tenant_id": "tenant_abc",
+  "tenant_uuid": "tenant_abc",
   "timestamp": "2025-10-13T12:30:00Z",
   "context": {
     "trace_id": "c94aab8a-1a9b-4d4b",
@@ -55,7 +55,7 @@ PowerX 所有事件都采用统一的 Envelope 格式：
 | `event_type`       | 事件类型（命名空间风格，如 `crm.contact.created`）   |
 | `source`           | 事件发起方（PowerX Core / Plugin / External） |
 | `target`           | 事件目标接收者                                |
-| `tenant_id`        | 所属租户，保证隔离                              |
+| `tenant_uuid`        | 所属租户，保证隔离                              |
 | `context.trace_id` | 追踪调用链                                  |
 | `signature`        | 消息签名（由宿主生成，插件验证）                       |
 

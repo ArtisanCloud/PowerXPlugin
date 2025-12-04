@@ -28,7 +28,7 @@ func TestMetricsHTTPHandler_ExposesCoreSeries(t *testing.T) {
 	expectedSnippets := []string{
 		`powerx_plugin_request_total{capability="bootstrap",plugin_id="plugin.demo"} 1`,
 		`powerx_plugin_quota_usage{plugin_id="plugin.demo",scope="tenant",scope_ref="tenant-1"} 0.75`,
-		`powerx_plugin_cost_total{plugin_id="plugin.demo",tenant_id="tenant-1"} 3.5`,
+		`powerx_plugin_cost_total{plugin_id="plugin.demo",tenant_uuid="tenant-1"} 3.5`,
 		`powerx_mcp_sessions_total{plugin_id="plugin.demo"} 2`,
 	}
 

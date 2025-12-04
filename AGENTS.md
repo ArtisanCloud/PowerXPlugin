@@ -33,4 +33,5 @@ Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 - 002-testing-strategy: Added Go 1.24+, Node.js 18+, npm 9+, Bash (POSIX) + Go toolchain (`go test`, `go tool cover`), Playwright 1.48+, Nuxt CLI (`nuxi`), jq/standard UNIX utilities
 
 <!-- MANUAL ADDITIONS START -->
+Always respond in Chinese-simplified
 <!-- MANUAL ADDITIONS END -->

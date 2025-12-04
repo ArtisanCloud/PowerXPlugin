@@ -3,19 +3,19 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	"github.com/google/uuid"
 )
 
 type tenantContextKey string
 
 const (
-	tenantHeaderName                  = "X-Tenant-ID"
-	defaultTenantID  uint64           = 1
-	tenantKey        tenantContextKey = "framework.tenant_id"
+	tenantHeaderName                   = "X-Tenant-UUID"
+	defaultTenantUUID                  = "00000000-0000-0000-0000-000000000001"
+	tenantKey         tenantContextKey = "framework.tenant_uuid"
 )
 
 // TenantContext 根据请求头解析租户 ID，缺省时写入默认值。
@@ -26,24 +26,23 @@ func TenantContext() bootstrap.Middleware {
 				return
 			}
 			raw := strings.TrimSpace(ctx.Header(tenantHeaderName))
-			var tenantID uint64
+			var tenantUUID string
 			if raw == "" {
-				tenantID = defaultTenantID
-				ctx.SetHeader(tenantHeaderName, strconv.FormatUint(tenantID, 10))
+				tenantUUID = defaultTenantUUID
+				ctx.SetHeader(tenantHeaderName, tenantUUID)
 			} else {
-				id, err := strconv.ParseUint(raw, 10, 64)
-				if err != nil || id == 0 {
-					router.RespondError(ctx, http.StatusBadRequest, "INVALID_TENANT_ID", "invalid tenant id", nil)
+				if _, err := uuid.Parse(raw); err != nil {
+					router.RespondError(ctx, http.StatusBadRequest, "INVALID_TENANT_UUID", "invalid tenant uuid", nil)
 					return
 				}
-				tenantID = id
+				tenantUUID = strings.ToLower(raw)
 			}
 
 			current := ctx.Context()
 			if current == nil {
 				current = context.Background()
 			}
-			ctx.SetContext(context.WithValue(current, tenantKey, tenantID))
+			ctx.SetContext(context.WithValue(current, tenantKey, tenantUUID))
 
 			if next != nil {
 				next(ctx)
@@ -52,21 +51,21 @@ func TenantContext() bootstrap.Middleware {
 	}
 }
 
-// TenantIDFromContext 从上下文中读取租户 ID。
-func TenantIDFromContext(ctx context.Context) (uint64, bool) {
+// TenantUUIDFromContext 从上下文中读取租户 ID。
+func TenantUUIDFromContext(ctx context.Context) (string, bool) {
 	if ctx == nil {
-		return 0, false
+		return "", false
 	}
-	if v, ok := ctx.Value(tenantKey).(uint64); ok && v > 0 {
+	if v, ok := ctx.Value(tenantKey).(string); ok && v != "" {
 		return v, true
 	}
-	return 0, false
+	return "", false
 }
 
-// WithTenantID 将租户 ID 写入上下文，可用于测试或内存实现。
-func WithTenantID(ctx context.Context, tenantID uint64) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
+// WithTenantUUID 将租户 ID 写入上下文，可用于测试或内存实现。
+func WithTenantUUID(ctx context.Context, tenantUUID string) context.Context {
+	if ctx == nil || strings.TrimSpace(tenantUUID) == "" {
+		return ctx
 	}
-	return context.WithValue(ctx, tenantKey, tenantID)
+	return context.WithValue(ctx, tenantKey, strings.TrimSpace(tenantUUID))
 }

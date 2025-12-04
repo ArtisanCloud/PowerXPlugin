@@ -152,7 +152,7 @@ PowerX 提供 `<AgentWidget />` 微前端组件，
 - 每个 Tool 绑定一个 `rbac_resource`，执行时会带入当前上下文权限；
 - 插件端可使用 `RBACGuard` 中间件校验；
 - Agent Hub 在调度时自动注入 `X-PowerX-CTX-JWT`；
-- 所有调用均记录 `request_id` 与 `tenant_id`，便于审计。
+- 所有调用均记录 `request_id` 与 `tenant_uuid`，便于审计。
 
 ---
 

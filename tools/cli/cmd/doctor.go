@@ -30,6 +30,7 @@ var (
 type DoctorOptions struct {
 	Entry          string
 	DevAPI         string
+	DevAPIToken    string
 	Tenant         string
 	Output         string
 	CheckEnv       bool
@@ -68,6 +69,7 @@ func runDoctor(args []string) error {
 
 	fs.StringVar(&opts.Entry, "entry", "", "Path to the plugin directory (default: current)")
 	fs.StringVar(&opts.DevAPI, "dev-api", "", "Dev API endpoint URL")
+	fs.StringVar(&opts.DevAPIToken, "dev-api-token", "", "Dev API bearer/API token (optional)")
 	fs.StringVar(&opts.Tenant, "tenant", "", "Tenant ID for diagnostic Dev API calls")
 	fs.StringVar(&opts.Output, "output", "", "Path to write doctor report (default: <entry>/.doctor/report.json)")
 	fs.BoolVar(&opts.CheckEnv, "check-env", false, "Run toolchain checks")
@@ -101,9 +103,9 @@ func runDoctor(args []string) error {
 	}
 
 	if opts.DevAPI == "" {
-		opts.DevAPI = resolveDevAPIBase("")
+		opts.DevAPI = resolveDevAPIBaseWithPrefix("", entryPath)
 	}
-	devAPIBase := resolveDevAPIBase(opts.DevAPI)
+	devAPIBase := resolveDevAPIBaseWithPrefix(opts.DevAPI, entryPath)
 
 	if opts.Output == "" {
 		opts.Output = filepath.Join(entryPath, ".doctor", "report.json")
@@ -243,12 +245,25 @@ func runDoctorMTLSCheck(opts *DoctorOptions) DoctorCheckResult {
 func runDoctorDevAPICheck(opts *DoctorOptions, entryPath, devAPIBase string) DoctorCheckResult {
 	start := time.Now()
 	devOpts := &DevOptions{
+		DevAPI:         devAPIBase,
+		DevAPIToken:    opts.DevAPIToken,
+		Tenant:         opts.Tenant,
 		MTLSCert:       opts.MTLSCert,
 		MTLSKey:        opts.MTLSKey,
 		MTLSCA:         opts.MTLSCA,
 		MTLSServerName: opts.MTLSServerName,
 		MTLSSkipVerify: opts.MTLSSkipVerify,
 	}
+	devOpts.userConfig = loadUserConfig()
+	// Populate defaults (config/env/credentials) for Dev API token and mTLS.
+	applyDevDefaults(devOpts)
+	applyPowerXCredentialDefaults(devOpts, devAPIBase)
+	if devOpts.DevAPIToken == "" {
+		devOpts.DevAPIToken = resolveDevAPIToken(devOpts, devAPIBase)
+	}
+	devOpts.TenantUUID = resolveTenantUUID(devOpts)
+	devOpts.DeveloperID = resolveDeveloperID(devOpts)
+
 	mtlsClient, err := resolveMTLSClient(devOpts, devAPIBase)
 	if err != nil {
 		return DoctorCheckResult{
@@ -265,6 +280,7 @@ func runDoctorDevAPICheck(opts *DoctorOptions, entryPath, devAPIBase string) Doc
 
 	client := devapi.NewClient(devapi.ClientOptions{
 		BaseURL:    devAPIBase,
+		APIKey:     resolveDevAPIToken(devOpts, devAPIBase),
 		Timeout:    10 * time.Second,
 		MTLSClient: mtlsClient,
 	})
@@ -283,10 +299,12 @@ func runDoctorDevAPICheck(opts *DoctorOptions, entryPath, devAPIBase string) Doc
 	}
 
 	resp, err := client.Register(ctx, &devapi.RegisterRequest{
-		PluginID:  pluginID,
-		Version:   version,
-		EntryPath: entryPath,
-		Tenant:    opts.Tenant,
+		PluginID:    pluginID,
+		Version:     version,
+		EntryPath:   entryPath,
+		Tenant:      devOpts.Tenant,
+		TenantUUID:  devOpts.TenantUUID,
+		DeveloperID: devOpts.DeveloperID,
 		Metadata: map[string]string{
 			"backend.entry": backendEntry,
 		},

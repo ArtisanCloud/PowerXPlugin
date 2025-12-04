@@ -28,11 +28,11 @@ func (r *ChecklistRepository) CreateRun(ctx context.Context, run *dbm.ChecklistR
 	if run == nil {
 		return errors.New("checklist run is required")
 	}
-	tenantID := strings.TrimSpace(run.TenantID)
+	tenantID := strings.TrimSpace(run.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
-	run.TenantID = tenantID
+	run.TenantUuid = tenantID
 	if strings.TrimSpace(run.ID) == "" {
 		run.ID = uuid.NewString()
 	}
@@ -45,7 +45,7 @@ func (r *ChecklistRepository) CreateRun(ctx context.Context, run *dbm.ChecklistR
 		}
 		for i := range items {
 			items[i].ChecklistRunID = run.ID
-			items[i].TenantID = run.TenantID
+			items[i].TenantUuid = run.TenantUuid
 			if strings.TrimSpace(items[i].ID) == "" {
 				items[i].ID = uuid.NewString()
 			}
@@ -64,7 +64,7 @@ func (r *ChecklistRepository) LatestRun(ctx context.Context, tenantID, listingID
 	var run dbm.ChecklistRun
 	err := r.DB.WithContext(ctx).
 		Preload("Items").
-		Where("tenant_id = ? AND listing_id = ?", tenantID, listingID).
+		Where("tenant_uuid = ? AND listing_id = ?", tenantID, listingID).
 		Order("run_number DESC, created_at DESC").
 		First(&run).Error
 	if err != nil {
@@ -86,7 +86,7 @@ func (r *ChecklistRepository) UpdateRunResult(ctx context.Context, runID, tenant
 	}
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
@@ -94,7 +94,7 @@ func (r *ChecklistRepository) UpdateRunResult(ctx context.Context, runID, tenant
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		res := tx.Model(&dbm.ChecklistRun{}).
-			Where("id = ? AND tenant_id = ?", runID, tenantID).
+			Where("id = ? AND tenant_uuid = ?", runID, tenantID).
 			Updates(updates)
 		if res.Error != nil {
 			return res.Error
@@ -114,7 +114,7 @@ func (r *ChecklistRepository) ListRuns(ctx context.Context, tenantID, listingID 
 	var runs []*dbm.ChecklistRun
 	err := r.DB.WithContext(ctx).
 		Preload("Items").
-		Where("tenant_id = ? AND listing_id = ?", tenantID, listingID).
+		Where("tenant_uuid = ? AND listing_id = ?", tenantID, listingID).
 		Order("run_number DESC").
 		Limit(limit).
 		Find(&runs).Error

@@ -21,7 +21,7 @@ type Tenant struct {
 	Plan      string         `gorm:"size:64;not null;default:'free'" json:"plan"`
 	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
 }
 
 func (Tenant) TableName() string { return models.S(models.TableIAMTenants) }
@@ -37,7 +37,7 @@ type User struct {
 	Meta         datatypes.JSONMap `gorm:"type:jsonb" json:"meta"`
 	CreatedAt    time.Time         `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt    time.Time         `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt    gorm.DeletedAt    `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedAt    gorm.DeletedAt    `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
 }
 
 func (User) TableName() string { return models.S(models.TableIAMUsers) }
@@ -102,14 +102,14 @@ type RolePermission struct {
 func (RolePermission) TableName() string { return models.S(models.TableIAMRolePermissions) }
 
 type RefreshToken struct {
-	ID        uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
-	TokenHash string    `gorm:"size:128;uniqueIndex" json:"token_hash"`
-	UserID    uint64    `gorm:"index" json:"user_id"`
-	TenantID  uint64    `gorm:"index" json:"tenant_id"`
-	MemberID  uint64    `gorm:"index" json:"member_id"`
-	ExpiresAt time.Time `gorm:"index" json:"expires_at"`
-	Revoked   bool      `gorm:"default:false" json:"revoked"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID         uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	TokenHash  string    `gorm:"size:128;uniqueIndex" json:"token_hash"`
+	UserID     uint64    `gorm:"index" json:"user_id"`
+	TenantUuid string    `gorm:"type:uuid;index" json:"tenant_uuid"`
+	MemberID   uint64    `gorm:"index" json:"member_id"`
+	ExpiresAt  time.Time `gorm:"index" json:"expires_at"`
+	Revoked    bool      `gorm:"default:false" json:"revoked"`
+	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (RefreshToken) TableName() string { return models.S(models.TableIAMRefreshTokens) }

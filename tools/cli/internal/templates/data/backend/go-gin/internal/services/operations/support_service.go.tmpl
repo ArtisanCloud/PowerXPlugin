@@ -71,7 +71,7 @@ type KnowledgeBaseDoc struct {
 
 // ConfigurePlaybookInput describes playbook update payloads.
 type ConfigurePlaybookInput struct {
-	TenantID      *string               `json:"tenant_id"`
+	TenantUuid    *string               `json:"tenant_uuid"`
 	Channels      []SupportChannelInput `json:"channels"`
 	KnowledgeBase []KnowledgeBaseDoc    `json:"knowledge_base"`
 }
@@ -119,8 +119,8 @@ func (s *SupportService) ConfigurePlaybook(ctx context.Context, input ConfigureP
 
 	pluginID := app.PluginID
 	var tenantID *string
-	if input.TenantID != nil && strings.TrimSpace(*input.TenantID) != "" {
-		clean := strings.TrimSpace(*input.TenantID)
+	if input.TenantUuid != nil && strings.TrimSpace(*input.TenantUuid) != "" {
+		clean := strings.TrimSpace(*input.TenantUuid)
 		tenantID = &clean
 	}
 
@@ -147,7 +147,7 @@ func (s *SupportService) ConfigurePlaybook(ctx context.Context, input ConfigureP
 			ServiceWindow:  serviceWindow,
 		}
 		if tenantID != nil {
-			sc.TenantID = tenantID
+			sc.TenantUuid = tenantID
 		}
 		if ch.Enabled != nil {
 			sc.IsEnabled = *ch.Enabled
@@ -171,7 +171,7 @@ func (s *SupportService) ConfigurePlaybook(ctx context.Context, input ConfigureP
 			},
 		}
 		if tenantID != nil {
-			sc.TenantID = tenantID
+			sc.TenantUuid = tenantID
 		}
 		if _, err := s.repo.UpsertChannel(ctx, sc); err != nil {
 			return nil, err
@@ -307,7 +307,7 @@ func (s *SupportService) GetPlaybook(ctx context.Context, tenantID *string) (*Su
 
 // CreateTicketRequest describes ticket creation payloads.
 type CreateTicketRequest struct {
-	TenantID    string         `json:"tenant_id" binding:"required"`
+	TenantUuid  string         `json:"tenant_uuid" binding:"required"`
 	ChannelID   *string        `json:"channel_id"`
 	Subject     string         `json:"subject" binding:"required"`
 	Description string         `json:"description"`
@@ -317,8 +317,8 @@ type CreateTicketRequest struct {
 
 // CreateTicket creates a support ticket and emits events.
 func (s *SupportService) CreateTicket(ctx context.Context, req CreateTicketRequest) (*opmodels.SupportTicket, error) {
-	if strings.TrimSpace(req.TenantID) == "" {
-		return nil, errors.New("tenant_id is required")
+	if strings.TrimSpace(req.TenantUuid) == "" {
+		return nil, errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(req.Subject) == "" {
 		return nil, errors.New("subject is required")
@@ -326,7 +326,7 @@ func (s *SupportService) CreateTicket(ctx context.Context, req CreateTicketReque
 
 	ticket := &opmodels.SupportTicket{
 		PluginID:    app.PluginID,
-		TenantID:    strings.TrimSpace(req.TenantID),
+		TenantUuid:  strings.TrimSpace(req.TenantUuid),
 		ChannelID:   req.ChannelID,
 		Subject:     req.Subject,
 		Description: req.Description,
@@ -354,7 +354,7 @@ func (s *SupportService) CreateTicket(ctx context.Context, req CreateTicketReque
 	}
 
 	s.metrics.RecordSupportTicket(saved.Status, saved.Priority)
-	_ = s.dispatcher.DispatchSupportEvent(ctx, saved.TenantID, "operations.support.ticket.created", eventPayload)
+	_ = s.dispatcher.DispatchSupportEvent(ctx, saved.TenantUuid, "operations.support.ticket.created", eventPayload)
 	return saved, nil
 }
 

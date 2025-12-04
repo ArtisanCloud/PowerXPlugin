@@ -19,7 +19,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS marketplace_listings (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             plugin_id TEXT NOT NULL,
             vendor_id TEXT NOT NULL,
             status TEXT NOT NULL,
@@ -47,7 +47,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_listing_assets (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             asset_type TEXT NOT NULL,
             storage_uri TEXT NOT NULL,
             checksum TEXT,
@@ -61,7 +61,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_listing_versions (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             version TEXT NOT NULL,
             changelog TEXT,
             metadata TEXT,
@@ -74,7 +74,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_pricing_plans (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             plan_code TEXT NOT NULL,
             plan_type TEXT NOT NULL,
             currency TEXT NOT NULL,
@@ -92,7 +92,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_plan_tiers (
             id TEXT PRIMARY KEY,
             plan_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             metric TEXT NOT NULL,
             range_from REAL NOT NULL,
             range_to REAL,
@@ -104,7 +104,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_checklist_runs (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             trigger_source TEXT NOT NULL,
             run_number INTEGER NOT NULL,
             status TEXT NOT NULL,
@@ -117,7 +117,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_checklist_items (
             id TEXT PRIMARY KEY,
             checklist_run_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             code TEXT NOT NULL,
             description TEXT NOT NULL,
             result TEXT NOT NULL,
@@ -129,7 +129,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_licenses (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             listing_id TEXT NOT NULL,
             plan_id TEXT NOT NULL,
             license_token TEXT NOT NULL,
@@ -146,7 +146,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_license_events (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             license_id TEXT NOT NULL,
             event_type TEXT NOT NULL,
             event_payload TEXT,
@@ -157,7 +157,7 @@ func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_tax_transactions (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             billing_id TEXT NOT NULL,
             external_provider TEXT NOT NULL,
             external_transaction_id TEXT,
@@ -187,7 +187,7 @@ func TestListingRepository_CreateAndFind(t *testing.T) {
 
 	listing := &dbm.Listing{
 		ID:         "listing-create",
-		TenantID:   "1",
+		TenantUuid:   "1",
 		PluginID:   "com.example.plugin",
 		VendorID:   "vendor-1",
 		Title:      "Test Listing",
@@ -213,7 +213,7 @@ func TestListingRepository_ReplaceAssets(t *testing.T) {
 
 	listing := &dbm.Listing{
 		ID:       "listing-asset",
-		TenantID: "1",
+		TenantUuid: "1",
 		PluginID: "com.example.plugin",
 		VendorID: "vendor-1",
 		Title:    "Listing",
@@ -248,9 +248,9 @@ func TestListingRepository_ListFilters(t *testing.T) {
 	ctx := context.Background()
 
 	listings := []*dbm.Listing{
-		{ID: "listing-alpha", TenantID: "1", PluginID: "p1", VendorID: "v1", Title: "Alpha", Slug: "alpha", Status: dbm.ListingStatusDraft},
-		{ID: "listing-beta", TenantID: "1", PluginID: "p2", VendorID: "v1", Title: "Beta", Slug: "beta", Status: dbm.ListingStatusPublished},
-		{ID: "listing-gamma", TenantID: "1", PluginID: "p3", VendorID: "v1", Title: "Gamma", Slug: "gamma", Status: dbm.ListingStatusInReview},
+		{ID: "listing-alpha", TenantUuid: "1", PluginID: "p1", VendorID: "v1", Title: "Alpha", Slug: "alpha", Status: dbm.ListingStatusDraft},
+		{ID: "listing-beta", TenantUuid: "1", PluginID: "p2", VendorID: "v1", Title: "Beta", Slug: "beta", Status: dbm.ListingStatusPublished},
+		{ID: "listing-gamma", TenantUuid: "1", PluginID: "p3", VendorID: "v1", Title: "Gamma", Slug: "gamma", Status: dbm.ListingStatusInReview},
 	}
 	for _, l := range listings {
 		require.NoError(t, repo.Create(ctx, l))
@@ -272,7 +272,7 @@ func TestListingRepository_ReplacePricingPlans(t *testing.T) {
 
 	listing := &dbm.Listing{
 		ID:       "listing-pricing",
-		TenantID: "1",
+		TenantUuid: "1",
 		PluginID: "plugin",
 		VendorID: "vendor",
 		Title:    "Pricing Test",

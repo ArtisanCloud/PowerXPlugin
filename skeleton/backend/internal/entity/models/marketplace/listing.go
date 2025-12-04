@@ -18,7 +18,7 @@ const (
 // Listing represents a marketplace listing submitted by a vendor.
 type Listing struct {
 	ID                  string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID            string            `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid          string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	PluginID            string            `gorm:"column:plugin_id;type:text;not null;index" json:"plugin_id"`
 	VendorID            string            `gorm:"column:vendor_id;type:text;not null;index" json:"vendor_id"`
 	Status              string            `gorm:"column:status;type:text;not null;default:'draft';index" json:"status"`
@@ -41,7 +41,7 @@ type Listing struct {
 	BrandingTheme       datatypes.JSONMap `gorm:"column:branding_theme;type:jsonb" json:"branding_theme"`
 	CreatedAt           time.Time         `gorm:"column:created_at;type:timestamptz;autoCreateTime" json:"created_at"`
 	UpdatedAt           time.Time         `gorm:"column:updated_at;type:timestamptz;autoUpdateTime" json:"updated_at"`
-	DeletedAt           gorm.DeletedAt    `gorm:"column:deleted_at;type:timestamptz;index" json:"deleted_at,omitempty"`
+	DeletedAt           gorm.DeletedAt    `gorm:"column:deleted_at;type:timestamptz" json:"deleted_at,omitempty"`
 	Assets              []ListingAsset    `gorm:"foreignKey:ListingID" json:"assets,omitempty"`
 	PricingPlans        []PricingPlan     `gorm:"foreignKey:ListingID" json:"pricing_plans,omitempty"`
 }
@@ -54,7 +54,7 @@ func (*Listing) TableName() string {
 type ListingVersion struct {
 	ID          string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	ListingID   string            `gorm:"column:listing_id;type:uuid;not null;index" json:"listing_id"`
-	TenantID    string            `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid  string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	Version     string            `gorm:"column:version;type:text;not null" json:"version"`
 	Changelog   string            `gorm:"column:changelog;type:text" json:"changelog,omitempty"`
 	Metadata    datatypes.JSONMap `gorm:"column:metadata;type:jsonb" json:"metadata"`

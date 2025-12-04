@@ -50,9 +50,9 @@ func (r *SupportRepository) UpsertChannel(ctx context.Context, channel *opmodels
 func (r *SupportRepository) ListChannels(ctx context.Context, pluginID string, tenantID *string) ([]*opmodels.SupportChannel, error) {
 	query := r.db.WithContext(ctx).Where("plugin_id = ?", pluginID)
 	if tenantID != nil {
-		query = query.Where("tenant_id = ?", tenantID)
+		query = query.Where("tenant_uuid = ?", tenantID)
 	} else {
-		query = query.Where("tenant_id IS NULL")
+		query = query.Where("tenant_uuid IS NULL")
 	}
 	var channels []*opmodels.SupportChannel
 	if err := query.Order("channel").Find(&channels).Error; err != nil {
@@ -65,9 +65,9 @@ func (r *SupportRepository) ListChannels(ctx context.Context, pluginID string, t
 func (r *SupportRepository) DeleteChannels(ctx context.Context, pluginID string, tenantID *string) error {
 	query := r.db.WithContext(ctx).Where("plugin_id = ?", pluginID)
 	if tenantID != nil {
-		query = query.Where("tenant_id = ?", tenantID)
+		query = query.Where("tenant_uuid = ?", tenantID)
 	} else {
-		query = query.Where("tenant_id IS NULL")
+		query = query.Where("tenant_uuid IS NULL")
 	}
 	return query.Delete(&opmodels.SupportChannel{}).Error
 }

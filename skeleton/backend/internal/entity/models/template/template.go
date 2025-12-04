@@ -7,7 +7,6 @@ import "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/mo
 // Template represents a reusable snippet that can be shared across the Base plugin.
 type Template struct {
 	models.BaseModel
-
 	Name        string `gorm:"type:varchar(255);not null;comment:模板名称" json:"name"`
 	Description string `gorm:"type:text;comment:模板描述" json:"description"`
 	Content     string `gorm:"type:text;comment:模板内容" json:"content"`

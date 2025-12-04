@@ -1,7 +1,9 @@
 <template>
   <UContainer class="py-10 space-y-6">
     <header class="space-y-2">
-      <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <div
+        class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+      >
         <UIcon name="i-heroicons-queue-list" class="text-primary" />
         <span class="uppercase tracking-wide">Security · Lifecycle</span>
       </div>
@@ -10,7 +12,9 @@
           Lifecycle Events
         </h1>
         <p class="text-gray-600 dark:text-gray-300 max-w-3xl">
-          Inspect retention, export, and erasure events emitted by the plugin. Payload previews are filtered for sensitive keys to comply with masking rules.
+          Inspect retention, export, and erasure events emitted by the plugin.
+          Payload previews are filtered for sensitive keys to comply with
+          masking rules.
         </p>
       </div>
     </header>
@@ -18,9 +22,9 @@
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-end gap-4">
-          <UFormGroup label="Tenant ID" required class="w-full sm:w-64">
+          <UFormGroup label="Tenant UUID" required class="w-full sm:w-64">
             <UInput
-              v-model="tenantId"
+              v-model="tenantUuid"
               placeholder="tenant-123"
               @keyup.enter="loadEvents"
               :disabled="loading"
@@ -46,7 +50,9 @@
                   >
                     {{ type }}
                   </UBadge>
-                  <span v-if="!selectedTypes.length" class="text-gray-500 dark:text-gray-400"
+                  <span
+                    v-if="!selectedTypes.length"
+                    class="text-gray-500 dark:text-gray-400"
                     >All types</span
                   >
                 </div>
@@ -66,7 +72,7 @@
 
           <UButton
             color="primary"
-            :disabled="!tenantId"
+            :disabled="!tenantUuid"
             :loading="loading"
             @click="loadEvents"
           >
@@ -94,7 +100,11 @@
               <template #header>
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="flex items-center gap-2">
-                    <UBadge :color="eventStatusColor(event.status)" size="xs" class="uppercase">
+                    <UBadge
+                      :color="eventStatusColor(event.status)"
+                      size="xs"
+                      class="uppercase"
+                    >
                       {{ event.status }}
                     </UBadge>
                     <span class="font-semibold">{{ event.eventType }}</span>
@@ -108,23 +118,38 @@
               <div class="space-y-3 text-sm">
                 <div class="flex flex-wrap gap-3">
                   <span><strong>Asset:</strong> {{ event.assetKey }}</span>
-                  <span><strong>Recorded By:</strong> {{ event.recordedBy }}</span>
+                  <span
+                    ><strong>Recorded By:</strong> {{ event.recordedBy }}</span
+                  >
                 </div>
                 <UDivider />
                 <div>
-                  <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                  <p
+                    class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2"
+                  >
                     Payload Preview
                   </p>
-                  <UCode :code="prettyPayload(event.payload)" language="json" class="text-xs" />
+                  <UCode
+                    :code="prettyPayload(event.payload)"
+                    language="json"
+                    class="text-xs"
+                  />
                 </div>
               </div>
             </UCard>
           </div>
 
           <div v-if="!loading && !events.length" class="text-center py-10">
-            <UIcon name="i-heroicons-book-open" class="text-4xl text-gray-300 dark:text-gray-600" />
+            <UIcon
+              name="i-heroicons-book-open"
+              class="text-4xl text-gray-300 dark:text-gray-600"
+            />
             <p class="mt-3 text-gray-500 dark:text-gray-400">
-              {{ tenantId ? "No lifecycle events captured yet." : "Enter a tenant ID to inspect lifecycle events." }}
+              {{
+                tenantUuid
+                  ? "No lifecycle events captured yet."
+                  : "Enter a tenant UUID to inspect lifecycle events."
+              }}
             </p>
           </div>
         </div>
@@ -134,10 +159,13 @@
 </template>
 
 <script setup lang="ts">
-import type { LifecycleEventListResponse, LifecycleEventResponse } from "~/types/security";
+import type {
+  LifecycleEventListResponse,
+  LifecycleEventResponse,
+} from "~/types/security";
 
 const runtimeConfig = useRuntimeConfig();
-const tenantId = ref("");
+const tenantUuid = ref("");
 const selectedTypes = ref<string[]>([]);
 const limit = ref(50);
 const loading = ref(false);
@@ -181,7 +209,7 @@ const eventStatusColor = (status: string) => {
 };
 
 const loadEvents = async () => {
-  if (!tenantId.value) {
+  if (!tenantUuid.value) {
     return;
   }
   loading.value = true;
@@ -192,7 +220,7 @@ const loadEvents = async () => {
       `${runtimeConfig.public.apiBaseUrl}/admin/security/lifecycle-events`,
       {
         params: {
-          tenant_id: tenantId.value,
+          tenant_uuid: tenantUuid.value,
           event_type: selectedTypes.value,
           limit: limit.value > 0 ? limit.value : undefined,
         },
@@ -209,7 +237,7 @@ const loadEvents = async () => {
 };
 
 watch([selectedTypes, limit], () => {
-  if (tenantId.value) {
+  if (tenantUuid.value) {
     loadEvents();
   }
 });

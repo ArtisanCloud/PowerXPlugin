@@ -28,7 +28,7 @@ func setupWebhookService(t *testing.T) (*service.WebhookService, context.Context
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS integration_webhook_subscriptions (
       id TEXT PRIMARY KEY,
-      tenant_id TEXT NOT NULL,
+      tenant_uuid TEXT NOT NULL,
       event_type TEXT NOT NULL,
       target_url TEXT NOT NULL,
       secret TEXT,
@@ -37,7 +37,7 @@ func setupWebhookService(t *testing.T) (*service.WebhookService, context.Context
       metadata TEXT,
       created_at DATETIME,
       updated_at DATETIME,
-      UNIQUE (tenant_id, event_type, target_url)
+      UNIQUE (tenant_uuid, event_type, target_url)
     )`,
 		`CREATE TABLE IF NOT EXISTS integration_webhook_attempts (
 		id TEXT PRIMARY KEY,
@@ -74,9 +74,9 @@ func TestWebhookService_ReplayAttemptFlow(t *testing.T) {
 	svc, ctx := setupWebhookService(t)
 
 	sub, err := svc.CreateSubscription(ctx, service.CreateSubscriptionParams{
-		TenantID:  "42",
-		EventType: "integration.dispatch",
-		TargetURL: "https://example.org/webhook",
+		TenantUuid: "42",
+		EventType:  "integration.dispatch",
+		TargetURL:  "https://example.org/webhook",
 	})
 	if err != nil {
 		t.Fatalf("CreateSubscription failed: %v", err)
@@ -87,7 +87,7 @@ func TestWebhookService_ReplayAttemptFlow(t *testing.T) {
 
 	attempt, err := svc.RecordDeliveryAttempt(ctx, service.DeliveryResultParams{
 		SubscriptionID: sub.ID,
-		TenantID:       sub.TenantID,
+		TenantUuid:     sub.TenantUuid,
 		Status:         model.AttemptStatusDLQ,
 		RetryCount:     2,
 	})
@@ -99,7 +99,7 @@ func TestWebhookService_ReplayAttemptFlow(t *testing.T) {
 	}
 
 	now := time.Now().UTC()
-	if err := svc.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusPending, attempt.RetryCount, &now, "", sub.TenantID); err != nil {
+	if err := svc.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusPending, attempt.RetryCount, &now, "", sub.TenantUuid); err != nil {
 		t.Fatalf("UpdateAttemptStatus failed: %v", err)
 	}
 

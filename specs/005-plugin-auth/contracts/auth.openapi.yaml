@@ -87,7 +87,7 @@ paths:
             type: string
             example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
         - in: header
-          name: X-Tenant-ID
+          name: X-Tenant-UUID
           required: false
           schema:
             type: string

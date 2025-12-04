@@ -5,12 +5,14 @@ package middleware
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 type TenantContext struct {
-	TenantID      int64    `json:"tenant_id"`
+	TenantUUID    string   `json:"tenant_uuid"`
 	UserID        int64    `json:"user_id"`
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"permissions"`
@@ -22,9 +24,9 @@ const (
 	ctxKeyToken  = "raw_bearer_token"
 )
 
-type tenantIDContextKey struct{}
+type tenantUUIDContextKey struct{}
 
-var ctxKeyTenantID = tenantIDContextKey{}
+var ctxKeyTenantUUID = tenantUUIDContextKey{}
 
 var ErrTenantMissing = errors.New("tenant context missing")
 
@@ -51,42 +53,70 @@ func GetRawBearerToken(c *gin.Context) (string, bool) {
 	return s, ok && s != ""
 }
 
-// ContextWithTenantID stores tenant ID into a standard context.
-func ContextWithTenantID(ctx context.Context, tenantID uint64) context.Context {
-	if ctx == nil || tenantID == 0 {
+// ContextWithTenantUUID stores tenant UUID into a standard context.
+func ContextWithTenantUUID(ctx context.Context, tenantUUID string) context.Context {
+	if ctx == nil || strings.TrimSpace(tenantUUID) == "" {
 		return ctx
 	}
-	return context.WithValue(ctx, ctxKeyTenantID, tenantID)
+	return context.WithValue(ctx, ctxKeyTenantUUID, strings.TrimSpace(tenantUUID))
 }
 
-// TenantIDFromContext extracts tenant ID from a standard context.
-func TenantIDFromContext(ctx context.Context) (uint64, bool) {
+// TenantUUIDFromContext extracts tenant UUID from a standard context.
+func TenantUUIDFromContext(ctx context.Context) (string, bool) {
 	if ctx == nil {
-		return 0, false
+		return "", false
 	}
-	if v := ctx.Value(ctxKeyTenantID); v != nil {
+	if v := ctx.Value(ctxKeyTenantUUID); v != nil {
 		switch id := v.(type) {
+		case string:
+			if strings.TrimSpace(id) != "" {
+				return strings.TrimSpace(id), true
+			}
 		case uint64:
 			if id > 0 {
-				return id, true
+				return strconv.FormatUint(id, 10), true
 			}
 		case int64:
 			if id > 0 {
-				return uint64(id), true
+				return strconv.FormatInt(id, 10), true
 			}
 		case int:
 			if id > 0 {
-				return uint64(id), true
+				return strconv.Itoa(id), true
 			}
+		}
+	}
+	return "", false
+}
+
+// RequireTenantUUID retrieves tenant UUID from context or returns ErrTenantMissing.
+func RequireTenantUUID(ctx context.Context) (string, error) {
+	if tenantUUID, ok := TenantUUIDFromContext(ctx); ok && tenantUUID != "" {
+		return tenantUUID, nil
+	}
+	return "", ErrTenantMissing
+}
+
+// Deprecated compatibility helpers —— convert numeric IDs into UUID strings if possible.
+func ContextWithTenantUuid(ctx context.Context, tenantID uint64) context.Context {
+	if tenantID == 0 {
+		return ctx
+	}
+	return ContextWithTenantUUID(ctx, strconv.FormatUint(tenantID, 10))
+}
+
+func TenantUuidFromContext(ctx context.Context) (uint64, bool) {
+	if uuidVal, ok := TenantUUIDFromContext(ctx); ok && uuidVal != "" {
+		if num, err := strconv.ParseUint(uuidVal, 10, 64); err == nil {
+			return num, true
 		}
 	}
 	return 0, false
 }
 
-// RequireTenantID retrieves tenant ID from context or returns ErrTenantMissing.
-func RequireTenantID(ctx context.Context) (uint64, error) {
-	if tenantID, ok := TenantIDFromContext(ctx); ok && tenantID > 0 {
-		return tenantID, nil
+func RequireTenantUuid(ctx context.Context) (uint64, error) {
+	if id, ok := TenantUuidFromContext(ctx); ok && id > 0 {
+		return id, nil
 	}
 	return 0, ErrTenantMissing
 }

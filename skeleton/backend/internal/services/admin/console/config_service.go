@@ -127,7 +127,7 @@ func (s *ConfigService) ListSections(ctx context.Context, tenantID *string) ([]C
 
 // UpdateSectionInput describes update payload.
 type UpdateSectionInput struct {
-	TenantID   *string
+	TenantUuid *string
 	SectionKey string
 	Values     map[string]any
 	Comment    string
@@ -151,10 +151,10 @@ func (s *ConfigService) UpdateSection(ctx context.Context, input UpdateSectionIn
 		return nil, err
 	}
 	defaults := def.DefaultValues(s.cfg)
-	tenantKey := normalizeTenantKey(input.TenantID)
+	tenantKey := normalizeTenantKey(input.TenantUuid)
 
 	var latest *model.ConfigChange
-	latest, err = s.changes.LatestBySection(ctx, app.PluginID, input.TenantID, def.Key)
+	latest, err = s.changes.LatestBySection(ctx, app.PluginID, input.TenantUuid, def.Key)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (s *ConfigService) UpdateSection(ctx context.Context, input UpdateSectionIn
 		changeType = "update"
 	}
 
-	err = s.withTransaction(ctx, input.TenantID, func(tx *gorm.DB) error {
+	err = s.withTransaction(ctx, input.TenantUuid, func(tx *gorm.DB) error {
 		auditRepo := consolerepo.NewAuditRepository(tx)
 		changeRepo := consolerepo.NewConfigChangeRepository(tx)
 
@@ -193,7 +193,7 @@ func (s *ConfigService) UpdateSection(ctx context.Context, input UpdateSectionIn
 		}
 		audit := &model.AuditEvent{
 			PluginID:       app.PluginID,
-			TenantID:       input.TenantID,
+			TenantUuid:     input.TenantUuid,
 			ActorID:        input.Actor.ID,
 			ActorName:      actorName,
 			ActorEmail:     actorEmail,
@@ -211,7 +211,7 @@ func (s *ConfigService) UpdateSection(ctx context.Context, input UpdateSectionIn
 
 		change := &model.ConfigChange{
 			PluginID:         app.PluginID,
-			TenantID:         tenantKey,
+			TenantUuid:       tenantKey,
 			SectionKey:       def.Key,
 			ChangeType:       changeType,
 			PreviousSnapshot: mapToJSON(previous),
@@ -228,7 +228,7 @@ func (s *ConfigService) UpdateSection(ctx context.Context, input UpdateSectionIn
 		return nil, err
 	}
 
-	sections, err := s.ListSections(ctx, input.TenantID)
+	sections, err := s.ListSections(ctx, input.TenantUuid)
 	if err != nil {
 		return nil, err
 	}

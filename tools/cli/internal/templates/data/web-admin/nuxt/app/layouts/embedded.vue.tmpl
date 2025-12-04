@@ -48,7 +48,8 @@ onMounted(() => {
   try {
     const { bridge } = setupHostBridgeAdapter({
       pluginId,
-      instanceId
+      instanceId,
+      debug: runtimeConfig.public.bridgeDebug === true
     })
 
     bridge.start?.()

@@ -32,7 +32,7 @@
         </div>
       </template>
       <UTable
-        :columns="columns"
+        :columns="tableColumns"
         :data="templates"
         :loading="loading"
         :ui="{ table: 'min-w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700' }"
@@ -86,6 +86,7 @@
     <ConfirmDialog
       v-model="deleteDialog"
       :title="$t('templates.crud.deleteTitle')"
+      :description="$t('templates.crud.deleteDescription')"
       :message="$t('templates.crud.deleteConfirm', { name: selectedTemplate?.name || '' })"
       confirm-color="error"
       :confirm-text="$t('common.delete')"
@@ -119,13 +120,6 @@ type TemplateFormState = {
   content: string
 }
 
-const columns = [
-  { accessorKey: 'name', header: 'Name' },
-  { accessorKey: 'description', header: 'Description' },
-  { accessorKey: 'content', header: 'Content' },
-  { id: 'actions', header: '' }
-] satisfies any
-
 const {
   listTemplates,
   createTemplate: createTemplateApi,
@@ -153,6 +147,13 @@ const toast = reactive({
 })
 
 const { t } = useI18n()
+
+const tableColumns = computed(() => [
+  { accessorKey: 'name', header: t('templates.crud.fields.name') },
+  { accessorKey: 'description', header: t('templates.crud.fields.description') },
+  { accessorKey: 'content', header: t('templates.crud.fields.content') },
+  { id: 'actions', header: '' },
+] satisfies any)
 
 const defaultFormValue = (): TemplateFormState => ({
   name: "",

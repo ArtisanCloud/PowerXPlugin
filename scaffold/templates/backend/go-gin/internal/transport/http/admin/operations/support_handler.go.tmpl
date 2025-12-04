@@ -27,7 +27,7 @@ func NewSupportHandler(deps *app.Deps) *SupportHandler {
 }
 
 type supportPlaybookQuery struct {
-	TenantID string `form:"tenant_id"`
+	TenantUuid string `form:"tenant_uuid"`
 }
 
 // GetPlaybook returns the current support playbook configuration.
@@ -42,8 +42,8 @@ func (h *SupportHandler) GetPlaybook(c *gin.Context) {
 		return
 	}
 	var tenantID *string
-	if strings.TrimSpace(query.TenantID) != "" {
-		clean := strings.TrimSpace(query.TenantID)
+	if strings.TrimSpace(query.TenantUuid) != "" {
+		clean := strings.TrimSpace(query.TenantUuid)
 		tenantID = &clean
 	}
 	payload, err := h.svc.GetPlaybook(c.Request.Context(), tenantID)
@@ -88,7 +88,7 @@ func (h *SupportHandler) GetMetrics(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "support service unavailable", nil)
 		return
 	}
-	tenantID, _ := httpmw.TenantIDString(c) // optional for future scoping
+	tenantID, _ := httpmw.TenantUuidString(c) // optional for future scoping
 	_ = tenantID
 	metrics, err := h.svc.ComputeMetrics(c.Request.Context())
 	if err != nil {

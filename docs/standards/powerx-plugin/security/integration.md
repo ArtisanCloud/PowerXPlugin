@@ -4,7 +4,7 @@
 
 ## 1. A2A Envelope 校验
 
-- 所有外部请求必须携带标准 Envelope 字段：`message_id`、`trace_id`、`correlation_id`、`tenant_id`、`tool_scope`、`issued_at`、`payload_ref`、`signature`。
+- 所有外部请求必须携带标准 Envelope 字段：`message_id`、`trace_id`、`correlation_id`、`tenant_uuid`、`tool_scope`、`issued_at`、`payload_ref`、`signature`。
 - 当 `payload_ref` 为预签名 URL 时，调用方需验证过期时间并限制只读访问；超过 1 MB 的大 payload 必须走 URL 引用。
 - 服务端通过 `DispatchService` 顺序执行：ToolScope → 幂等 → 宿主调用 → 观测上报。`integration.dispatch:invoke` RBAC 资源用于限制入口。
 
@@ -47,7 +47,7 @@
 
 - 成功标准（见 `specs/005-protocols-integrations/spec.md`）通过以下指标观测：
   - SC-001（Envelope 采用率）：`powerx_integration_envelopes_total{channel,result}`；
-  - SC-002（Webhook 成功率）：`powerx_integration_webhook_attempts_total{status,tenant_id}` 与 `powerx_integration_webhook_delivery_seconds`；
+  - SC-002（Webhook 成功率）：`powerx_integration_webhook_attempts_total{status,tenant_uuid}` 与 `powerx_integration_webhook_delivery_seconds`；
   - SC-003（Secrets 轮换时效）：`powerx_integration_secrets_rotations_due{window}`；
   - SC-004（支持工单下降、采用率）：结合 Envelope 指标与 `integration_change_approvals` 审批日志抽样；
   - SC-005（幂等/权限异常告警）：`powerx_integration_idempotency_events_total{outcome}`、GrantMatrix 拒绝日志、RBAC 审计事件。

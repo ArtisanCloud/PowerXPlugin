@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -25,12 +26,40 @@ type JWTAuthConfig struct {
 }
 
 type PowerXClaims struct {
-	TenantID      int64    `json:"tid"`
-	UserID        int64    `json:"uid"`
-	Roles         []string `json:"roles"`
-	Permissions   []string `json:"perms"`
-	PolicyVersion string   `json:"policy_version"`
+	TenantUUID    TenantClaim `json:"tid"`
+	UserID        int64       `json:"uid"`
+	Roles         []string    `json:"roles"`
+	Permissions   []string    `json:"perms"`
+	PolicyVersion string      `json:"policy_version"`
 	jwt.RegisteredClaims
+}
+
+type TenantClaim string
+
+func (t *TenantClaim) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || bytes.Equal(data, []byte("null")) {
+		*t = ""
+		return nil
+	}
+	if data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		*t = TenantClaim(strings.TrimSpace(s))
+		return nil
+	}
+	var num json.Number
+	if err := json.Unmarshal(data, &num); err != nil {
+		return err
+	}
+	*t = TenantClaim(strings.TrimSpace(num.String()))
+	return nil
+}
+
+func (t TenantClaim) String() string {
+	return string(t)
 }
 
 func ParseFromHeaders(h func(string) string, cfg JWTAuthConfig) (tc TenantContext, rawBearer string, ok bool) {
@@ -69,13 +98,13 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 		return TenantContext{}, errors.New("invalid token")
 	}
 	return TenantContext{
-		TenantID: claims.TenantID, UserID: claims.UserID, Roles: claims.Roles,
+		TenantUUID: strings.TrimSpace(claims.TenantUUID.String()), UserID: claims.UserID, Roles: claims.Roles,
 		Permissions: claims.Permissions, PolicyVersion: claims.PolicyVersion,
 	}, nil
 }
 
 type signedCtx struct {
-	TenantID      int64    `json:"tid"`
+	TenantUUID    string   `json:"tid"`
 	UserID        int64    `json:"uid"`
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"perms"`
@@ -108,13 +137,13 @@ func tryLoadSignedContext(h func(string) string, secret string, maxAgeSec int64)
 	if maxAgeSec > 0 && (time.Now().Unix()-sc.TS) > maxAgeSec {
 		return TenantContext{}, false
 	}
-	return TenantContext{TenantID: sc.TenantID, UserID: sc.UserID, Roles: sc.Roles,
+	return TenantContext{TenantUUID: strings.TrimSpace(sc.TenantUUID), UserID: sc.UserID, Roles: sc.Roles,
 		Permissions: sc.Permissions, PolicyVersion: sc.PolicyVersion}, true
 }
 
 // 供客户端出站兜底：把 TenantContext 签成 X-PowerX-CTX / SIG
 func SignContext(tc TenantContext, secret string) (ctxB64, sigHex string, ts int64, err error) {
-	sc := signedCtx{TenantID: tc.TenantID, UserID: tc.UserID, Roles: tc.Roles,
+	sc := signedCtx{TenantUUID: strings.TrimSpace(tc.TenantUUID), UserID: tc.UserID, Roles: tc.Roles,
 		Permissions: tc.Permissions, PolicyVersion: tc.PolicyVersion, TS: time.Now().Unix()}
 	b, e := json.Marshal(&sc)
 	if e != nil {

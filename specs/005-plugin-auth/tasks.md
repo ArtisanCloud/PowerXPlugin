@@ -32,7 +32,7 @@
 ### Implementation
 
 - [X] T009 [US1] 在 `skeleton/web-admin/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
-- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/app/composables/api/_client.ts`，注入 `Authorization` / `X-Tenant-ID`，在 401 时自动调 `authService.refreshToken` 并重放请求。
+- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/app/composables/api/_client.ts`，注入 `Authorization` / `X-Tenant-UUID`，在 401 时自动调 `authService.refreshToken` 并重放请求。
 - [X] T011 [P] [US1] 新建 `skeleton/web-admin/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
 - [X] T012 [US1] 添加 `skeleton/web-admin/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
 - [X] T013 [US1] 完成 `skeleton/web-admin/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。
@@ -80,7 +80,7 @@
 - [X] T029 [US3] 在 `app/composables/useAuth.ts` / `/users/login.vue` 增强 fail-closed 提示，503/refresh 失败会存储 “宿主认证不可用” 并在登录页读取展示。
 - [X] T030 [P] [US3] `useAuth` 的 storage 事件现同步 token&强制跳登录，新增 Vitest 覆盖 storage 事件与错误消费。
 - [X] T031 [US3] 新增 `internal/observability/auth/metrics.go`，记录 login/refresh/logout/iam_mode/delegate_errors，并在 `cmd/plugin/main.go` 初始化；Prometheus 输出合并在 `/api/v1/admin/runtime/metrics`。
-- [X] T032 [US3] `request_trace` 现日志 auth_mode/tenant_id/user_id/trace_id，便于跨模式排障。
+- [X] T032 [US3] `request_trace` 现日志 auth_mode/tenant_uuid/user_id/trace_id，便于跨模式排障。
 - [X] T033 [US3] `internal/observability/auth/metrics_test.go` 验证指标累积；`go test` 覆盖对应输出。
 - [X] T034 [US3] 更新 `docs/operations/runbooks/auth-troubleshooting.md` / `docs/plan/004-plugin-auth-integration.md`，记录指标、Fail-Closed、多 Tab 行为。
 - [X] T035 [US3] Playwright `auth-delegated.spec.ts` 新增 storage 同步测试，模拟本地储存失效后自动跳转 `/users/login`。
@@ -99,6 +99,32 @@
 - [X] T041 审查 `docs/plan/004-plugin-auth-integration.md`、`spec.md`、`tasks.md`，完成 Phase5/6 状态更新并清理 TODO。
 
 ---
+
+## Phase 7: CLI Packaging & Publish Enablement
+
+- [X] **T042 [CLI] 实现 `px-plugin package` 构建流程**：
+  1. 在 `tools/cli/cmd/package.go`（若不存在则新增）调用 `internal/package/builder`，解析 `--entry`、`--frontend-dir`、`--backend-dir`、`--skip-frontend`、`--skip-backend` 等参数；默认前端目录为 `<entry>/web-admin`，后端目录为 `<entry>/backend`。
+  2. 执行 `npm --prefix <frontend> run build`（可配置命令）并捕获错误信息，提示开发者先 `npm install`；执行 `go build ./backend/cmd/plugin`，输出位置 `.px-plugin/build/<timestamp>/backend/bin/plugin`。
+  3. 收集 artefact：前端 dist（支持 `dist/` 或 `.output/`）、后端二进制、`manifest.json`、`rbac.json`、静态资源、`package.json`/`package-lock.json`（可选）。若 dist/manifest/rbac 缺失则报错并给出 remediation。
+  4. 将 artefact 拷贝到 `.px-plugin/build/<timestamp>/payload/`，写入 `package.tar.gz`（tarball 结构明确：`frontend/**`、`backend/bin/plugin`、`manifest.json`、`rbac.json` 等）。打包完成后在 CLI 输出 artefact 列表和路径。
+
+- [X] **T043 [CLI] 输出 metadata/signature**：
+  1. 在 `tools/cli/internal/package/metadata.go`（或等效文件）生成 `metadata.json`，字段包含：`version`（来自 `manifest.version` 或 flag）、`channel`、`buildTime`、`cliVersion`、`gitCommit`（若可用）、`artifacts`（名称/路径/hash/size）、`distHash`（SHA256）。
+  2. 若 `manifest.json` 或 `rbac.json` 缺失，metadata builder 必须报错并提示运行 `npm run sync:manifest`；哈希计算失败时给出 remediation。
+  3. 若需要签名/校验，可预留 `--signing-key` 参数或 TODO（记录在 metadata 中 `"signature": null`）。
+  4. 编写 `tools/cli/internal/package/builder_test.go` 覆盖成功/缺失 dist/缺失 manifest 等场景，验证 metadata 内容和 hash 计算结果。
+
+- [X] **T044 [CLI] 实现 `px-plugin publish`**：
+  1. 新增 `tools/cli/cmd/publish.go`，支持 `--entry`、`--artifact <package path>`、`--channel`、`--notes`、`--publish-api`、`--publish-token`。默认从 `.px-plugin/build` 读取最新 `package.tar.gz` 和 `metadata.json`。
+  2. 解析配置：优先 flag/env（`PX_PUBLISH_API_BASE`、`PX_PUBLISH_API_TOKEN`），其次 `~/.px-plugin/config.json` 中的 `publishApi.{baseUrl,apiKey}`；若缺失则报错并指向文档。
+  3. 上传：`POST {baseUrl}/internal/plugins/releases`，Form 或 JSON 包含 package、metadata、channel、notes；解析 PowerX envelope (`{"code":...,"data":{"publishId":...}}`)，成功输出 `publishId`、审核链接；失败时根据 `code/message` 提供 remediation。
+  4. CLI 必须处理网络错误/超时，提供重试或明确提示；上传成功后提示“请到 PowerX Marketplace/插件管理审核并安装”。
+- [X] **T045 [Docs] 更新配置与指南**：在 `~/.px-plugin/config.json` schema 及样例中加入 `publishApi`，更新 `docs/guides/develop/go-cli-dev-watch.md`、`docs/guides/publish/online.md`、`specs/005-plugin-auth/quickstart.md` 以描述 package/publish 步骤、配置项、常见错误；`CHANGELOG.md` 记录 CLI 功能上线。
+- [X] **T046 [CI/QA] 增加测试**：在 `tools/cli/internal/package/builder_test.go`、`publish_client_test.go` 添加单测，验证构建/上传/错误路径；在 CI workflows 或 Makefile 中新增 smoke job（可使用 httptest mock registry）运行 `px-plugin package`、`px-plugin publish --publish-api http://127.0.0.1:XXXXX`，确保命令在无网络环境可执行。
+
+- [X] **T047 [CLI] init 附带治理目录**：`px-plugin init` 在生成插件工程时，同时将仓库根目录的 `.specify/` 与 `.codex/` 复制到新插件项目根目录（若目标已存在则跳过或加 `--include-governance` flag 控制）；并在 README 或初始化输出中提示这些目录主要用于 Speckit/ Codex 自动化，允许用户根据需要删除/调整路径。
+
+**Checkpoint**：`px-plugin package/publish` 命令可用于真实交付，文档与配置同步更新。
 
 ## Dependencies & Execution Order
 

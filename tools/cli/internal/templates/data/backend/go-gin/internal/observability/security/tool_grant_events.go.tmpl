@@ -14,7 +14,7 @@ func EmitToolGrantEvent(logger *logrus.Entry, event string, tenantID string, met
 	}
 	payload := map[string]interface{}{
 		"event":     event,
-		"tenant_id": tenantID,
+		"tenant_uuid": tenantID,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
 	for k, v := range metadata {

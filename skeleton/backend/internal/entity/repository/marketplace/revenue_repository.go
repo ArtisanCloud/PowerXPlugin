@@ -30,18 +30,18 @@ func (r *RevenueRepository) UpsertReport(ctx context.Context, report *dbm.Revenu
 	if report == nil {
 		return errors.New("report is required")
 	}
-	tenantID := strings.TrimSpace(report.TenantID)
+	tenantID := strings.TrimSpace(report.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(report.ID) == "" {
 		report.ID = uuid.NewString()
 	}
-	report.TenantID = tenantID
+	report.TenantUuid = tenantID
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		return tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
-				{Name: "tenant_id"},
+				{Name: "tenant_uuid"},
 				{Name: "vendor_id"},
 				{Name: "period_start"},
 				{Name: "period_end"},
@@ -64,9 +64,9 @@ func (r *RevenueRepository) UpsertReport(ctx context.Context, report *dbm.Revenu
 func (r *RevenueRepository) ListReports(ctx context.Context, tenantID, vendorID string, from, to time.Time) ([]*dbm.RevenueShareReport, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
-	query := r.DB.WithContext(ctx).Where("tenant_id = ?", tenantID)
+	query := r.DB.WithContext(ctx).Where("tenant_uuid = ?", tenantID)
 	if vendorID = strings.TrimSpace(vendorID); vendorID != "" {
 		query = query.Where("vendor_id = ?", vendorID)
 	}

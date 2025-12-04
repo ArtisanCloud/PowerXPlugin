@@ -50,7 +50,7 @@ process.env.POWERX_PLUGIN_ID
 | ----------------------- | ----------------------------------- | ------------ |
 | `POWERX_PLUGIN_ID`      | `com.powerx.plugins.base`           | 插件唯一标识       |
 | `POWERX_PLUGIN_VERSION` | `0.1.0`                             | 插件版本号        |
-| `POWERX_BIND_ADDR`      | `:8087`                             | 插件监听地址       |
+| `POWERX_BIND_ADDR`      | `:8078`                             | 插件监听地址       |
 | `POWERX_ENV`            | `dev` / `prod`                      | 当前运行环境       |
 | `POWERX_DEV_MODE`       | `1` / `0`                           | 开发模式（跳过签名验证） |
 | `POWERX_LOG_LEVEL`      | `info` / `debug` / `warn` / `error` | 日志级别         |
@@ -110,12 +110,12 @@ process.env.POWERX_PLUGIN_ID
 | `POWERX_TENANT_MODE`       | `multi` / `single` | 是否启用多租户隔离               |
 | `POWERX_DEFAULT_TENANT_ID` | `1`                | 开发模式下默认租户               |
 | `POWERX_RLS_ENABLED`       | `1`                | 是否启用 Row Level Security |
-| `POWERX_TENANT_CTX_VAR`    | `app.tenant_id`    | 数据库中租户上下文变量名            |
+| `POWERX_TENANT_CTX_VAR`    | `app.tenant_uuid`    | 数据库中租户上下文变量名            |
 
 Postgres 示例：
 
 ```sql
-SET LOCAL app.tenant_id = <tenant_id>;
+SET LOCAL app.tenant_uuid = <tenant_uuid>;
 ```
 
 ---
@@ -151,7 +151,7 @@ httpRequest.Header.Set("Authorization", "Bearer "+token)
 示例输出：
 
 ```json
-{"level":"info","msg":"create template","tenant_id":1024,"plugin":"com.powerx.plugins.base","request_id":"req-98af31"}
+{"level":"info","msg":"create template","tenant_uuid":1024,"plugin":"com.powerx.plugins.base","request_id":"req-98af31"}
 ```
 
 ---
@@ -184,7 +184,7 @@ const api = config.public.apiBaseUrl
 | `POWERX_LOG_LEVEL=debug`                   | 打印详细日志            |
 | `POWERX_DB_LOG_SQL=1`                      | 打印 SQL 查询         |
 | `POWERX_DEFAULT_TENANT_ID=1`               | 强制使用默认租户 ID       |
-| `POWERX_BIND_ADDR=:8087`                   | 启动本地 HTTP 监听      |
+| `POWERX_BIND_ADDR=:8078`                   | 启动本地 HTTP 监听      |
 | `POWERX_PLUGIN_ID=com.powerx.plugins.base` | 标识插件身份            |
 
 本地启动命令：

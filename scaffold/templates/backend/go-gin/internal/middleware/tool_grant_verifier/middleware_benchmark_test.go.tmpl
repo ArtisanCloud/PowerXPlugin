@@ -19,7 +19,7 @@ func BenchmarkMiddleware(b *testing.B) {
 	c, _ := gin.CreateTestContext(nil)
 	token, _ := svc.Issue(context.Background(), "tenant", "tool", "agent", nil, "test")
 	req, _ := http.NewRequest("GET", "/", nil)
-	req = req.WithContext(middleware.ContextWithTenantID(context.Background(), 1))
+	req = req.WithContext(middleware.ContextWithTenantUuid(context.Background(), 1))
 	req.Header.Set("X-ToolGrant", token)
 	c.Request = req
 

@@ -65,7 +65,7 @@ func RecordIdempotency(outcome string) {
 func RecordWebhookAttempt(status, tenantID string) {
 	labels := labelKey(map[string]string{
 		"status":    normalize(status),
-		"tenant_id": normalize(tenantID),
+		"tenant_uuid": normalize(tenantID),
 	})
 	increment(metricWebhookAttempts, labels, 1)
 }

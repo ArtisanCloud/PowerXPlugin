@@ -27,20 +27,20 @@ go run ./skeleton/backend/cmd/plugin &
 
 ```bash
 # 创建模板
-curl -X POST http://localhost:8087/api/v1/templates \
+curl -X POST http://localhost:8078/api/v1/templates \
   -H 'Content-Type: application/json' \
-  -H 'X-Tenant-ID: 100' \
+  -H 'X-Tenant-UUID: 100' \
   -d '{"name":"Demo","description":"From Quickstart","content":"Hello"}'
 
 # 查询当前租户列表
-curl -H 'X-Tenant-ID: 100' http://localhost:8087/api/v1/templates
+curl -H 'X-Tenant-UUID: 100' http://localhost:8078/api/v1/templates
 
 # 访问其他租户资源应返回 404
-curl -H 'X-Tenant-ID: 200' http://localhost:8087/api/v1/templates/1
+curl -H 'X-Tenant-UUID: 200' http://localhost:8078/api/v1/templates/1
 
 # 测量延迟（多次执行，确认 ≤1s）
 curl -w 'TOTAL_TIME=%{time_total}\n' -o /dev/null -s \
-  -H 'X-Tenant-ID: 100' http://localhost:8087/api/v1/templates
+  -H 'X-Tenant-UUID: 100' http://localhost:8078/api/v1/templates
 ```
 
 结束后停止后端进程。

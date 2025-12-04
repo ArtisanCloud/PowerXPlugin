@@ -9,7 +9,7 @@ import (
 // Revocation records a revoked ToolGrant lease.
 type Revocation struct {
 	ID          string    `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID    string    `gorm:"column:tenant_id;type:text;not null" json:"tenant_id"`
+	TenantUuid  string    `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
 	ToolGrantID string    `gorm:"column:toolgrant_id;type:text;not null" json:"toolgrant_id"`
 	RevokedAt   time.Time `gorm:"column:revoked_at;type:timestamptz;not null" json:"revoked_at"`
 	RevokedBy   string    `gorm:"column:revoked_by;type:text;not null" json:"revoked_by"`

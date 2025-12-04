@@ -127,3 +127,25 @@ scaffold/templates/** + tools/cli/** mirror skeleton
 | 细化任务拆解 | 交给 `/speckit.tasks`：前端、后端、模板、测试、文档、CI |
 | 定义验收测试 | Playwright login/refresh/logout，Go 单测覆盖 IAMResolver、AuthProxy |
 | 集成计划 | 先在 Skeleton 验证，再同步模板 + CLI，最后运行 `px-plugin init` 生成样例并 smoke test |
+
+---
+
+## Phase 3 – CLI Packaging & Publish Enablement
+
+**Goal**：补齐 `px-plugin package`/`px-plugin publish`，让开发者可以一键打包 artefacts 并上传到自建 PowerX Registry，形成从 Auth → 发布 → 安装 → Dev 热加载的闭环。
+
+### Deliverables
+
+| Deliverable | Description |
+|-------------|-------------|
+| CLI Package Pipeline | 在 `tools/cli/cmd/package.go` 等处实现真实打包：读取 `package.json`、`go.mod`，执行 `npm --prefix <frontend> run build` 与 `go build ./backend/cmd/plugin`（可用 `--frontend-dir`、`--backend-dir` 覆盖），收集 dist、后端二进制、manifest/RBAC/metadata，并输出到 `.px-plugin/build/<timestamp>/package.tar.gz`。 |
+| Package Metadata & Validation | 生成 `metadata.json`（版本、channel、hash、commit、CLI 版本、artefact 概览）与 `manifest.json`、`rbac.json`，并对输出文件做 SHA256 校验，供 publish/Registry 校验。 |
+| CLI Publish Client | 在 `tools/cli/cmd/publish.go` 实现 `POST {publishApi.baseUrl}/internal/plugins/releases` 上传 package + metadata；支持 `--channel`、`--notes`、`--artifact <path>`、`--publish-api`、`--publish-token`，解析 PowerX envelope 返回 `publishId` 与审核链接。失败时输出 remediation。 |
+| Config/Docs 更新 | `~/.px-plugin/config.json` 增加 `publishApi.{baseUrl,apiKey}`，`docs/guides/develop/go-cli-dev-watch.md`、`docs/guides/publish/online.md`、`specs/005-plugin-auth/quickstart.md` 补充 package/publish 步骤与排障；`CHANGELOG.md` 记录 CLI 新能力。 |
+| Tests & CI | `tools/cli/internal/package/builder_test.go`、`publish_client_test.go` 等单测；在 CI 中新增 smoke job（可用 httptest/mock server）验证 package/publish。 |
+
+### Exit Criteria
+
+1. `px-plugin package --entry examples/com.powerx.demo` 生成 `.px-plugin/build/<timestamp>/package.tar.gz`、`metadata.json` 并列出 artefacts/hashes。
+2. `px-plugin publish --entry examples/com.powerx.demo --channel dev --notes "feat"` 在带有 mock Registry 的环境中返回 `publishId`，PowerX Admin 可看到待审核版本；缺少配置时 CLI 给出可操作提示。
+3. Quickstart/Go CLI 文档加入完整“package → publish → install → dev”步骤，运行 `px-plugin doctor --check-devapi` 验证配置后能顺利热加载。

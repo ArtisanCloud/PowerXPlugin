@@ -176,7 +176,7 @@ func (s *AdvisoryService) PublishAdvisory(ctx context.Context, params PublishAdv
 		for _, channel := range channels {
 			record := &secmodel.AdvisoryDistribution{
 				AdvisoryID: advisory.ID,
-				TenantID:   "*",
+				TenantUuid: "*",
 				Channel:    channel,
 				Status:     secmodel.DistributionStatusPending,
 			}

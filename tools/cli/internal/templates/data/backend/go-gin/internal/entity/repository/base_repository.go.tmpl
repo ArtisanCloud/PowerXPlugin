@@ -132,17 +132,23 @@ func getUpdatableColumns[T any](db *gorm.DB) []string {
 
 // Upsert 插入或更新单个记录，并返回执行后的对象
 func (r *BaseRepository[T]) Upsert(ctx context.Context, obj *T, uniqueFields []clause.Column) (*T, error) {
+	conflict := clause.OnConflict{
+		Columns: uniqueFields,
+	}
+	return r.UpsertWithConflict(ctx, obj, conflict)
+}
+
+// UpsertWithConflict allows callers to customize the ON CONFLICT target (columns, where clause, etc).
+// DoUpdates will default to all updatable columns when not explicitly set.
+func (r *BaseRepository[T]) UpsertWithConflict(ctx context.Context, obj *T, conflict clause.OnConflict) (*T, error) {
+	if conflict.DoUpdates == nil {
+		conflict.DoUpdates = clause.AssignmentColumns(getUpdatableColumns[T](r.DB))
+	}
 	query := r.DB.WithContext(ctx)
-
-	result := query.Clauses(clause.OnConflict{
-		Columns:   uniqueFields,
-		DoUpdates: clause.AssignmentColumns(getUpdatableColumns[T](r.DB)),
-	}).Create(obj)
-
+	result := query.Clauses(conflict).Create(obj)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-
 	return obj, nil
 }
 

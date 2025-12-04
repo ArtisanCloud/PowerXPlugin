@@ -1,0 +1,303 @@
+openapi: 3.0.3
+info:
+  title: PowerX Plugin Capability Sync API
+  version: "0.1.0"
+  description: |
+    Contract between PowerX Plugin (caller) and PowerX Core (host) to register capabilities,
+    synchronize protocol assets, and expose workflow/agent nodes. All requests require STS JWT
+    with tenant + plugin scopes.
+servers:
+  - url: https://powerx-host/_p/{pluginId}/api/v1
+    variables:
+      pluginId:
+        default: com.powerx.demo
+paths:
+  /internal/plugins/capabilities:
+    post:
+      summary: Submit or update a capability definition
+      operationId: submitCapability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilitySubmission'
+      responses:
+        '201':
+          description: Capability accepted for review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityRecord'
+  /internal/plugins/capabilities/{capabilityId}/exposure:
+    patch:
+      summary: Configure exposure channels, quotas, and docs bundle
+      operationId: configureExposure
+      parameters:
+        - in: path
+          name: capabilityId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExposurePackage'
+      responses:
+        '200':
+          description: Exposure configuration accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExposureSyncResult'
+  /internal/plugins/capabilities/catalog:
+    get:
+      summary: Retrieve catalog snapshot metadata
+      operationId: listCatalogEntries
+      responses:
+        '200':
+          description: Catalog entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogSnapshot'
+    post:
+      summary: Register catalog + multi-protocol assets (sync)
+      operationId: registerCatalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CatalogSyncRequest'
+      responses:
+        '202':
+          description: Sync started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogSyncResult'
+  /internal/plugins/capabilities/{capabilityId}/workflow:
+    post:
+      summary: Import workflow/agent templates for a capability or composite
+      operationId: importWorkflowTemplates
+      parameters:
+        - in: path
+          name: capabilityId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowTemplateBundle'
+      responses:
+        '201':
+          description: Workflow/Agent templates stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTemplateResult'
+components:
+  schemas:
+    CapabilitySubmission:
+      type: object
+      required: [id, name, version, sensitivity, schemas, protocols]
+      properties:
+        id:
+          type: string
+          example: com.powerx.demo.template.create
+        name:
+          type: string
+        version:
+          type: string
+          description: SemVer string
+        sensitivity:
+          type: string
+          enum: [low, medium, high]
+        schemas:
+          type: object
+          properties:
+            input:
+              type: string
+              description: Path to JSON schema
+            output:
+              type: string
+        protocols:
+          type: object
+          description: Map of protocol descriptors (rest/graphql/grpc/mcp/workflow/agent_sse)
+        tags:
+          type: array
+          items:
+            type: string
+    CapabilityRecord:
+      allOf:
+        - $ref: '#/components/schemas/CapabilitySubmission'
+        - type: object
+          properties:
+            status:
+              type: string
+              enum: [draft, under_review, approved, exposure_pending, exposed, deprecated]
+            audit:
+              type: object
+              properties:
+                created_at:
+                  type: string
+                  format: date-time
+                updated_at:
+                  type: string
+                  format: date-time
+    ExposurePackage:
+      type: object
+      required: [channels]
+      properties:
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelConfig'
+        auth_strategy:
+          type: string
+        rate_limit:
+          type: object
+          properties:
+            rps:
+              type: integer
+            burst:
+              type: integer
+        quota:
+          type: integer
+        tenants:
+          type: array
+          items:
+            type: string
+    ChannelConfig:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [rest, graphql, grpc, webhook, workflow, agent_tool, agent_sse]
+        asset_ref:
+          type: string
+          description: Path within contracts/
+        async:
+          type: boolean
+    ExposureSyncResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [syncing, active, failed]
+        synced_at:
+          type: string
+          format: date-time
+    CatalogSnapshot:
+      type: object
+      properties:
+        checksum:
+          type: string
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              capability_id:
+                type: string
+              version:
+                type: string
+              protocols:
+                type: array
+                items:
+                  type: string
+    CatalogSyncRequest:
+      type: object
+      required: [catalog, assets]
+      properties:
+        catalog:
+          type: object
+          properties:
+            manifest_version:
+              type: string
+            imports:
+              type: array
+              items:
+                type: string
+            entries:
+              type: array
+              items:
+                type: object
+                properties:
+                  capability_id:
+                    type: string
+                  checksum:
+                    type: string
+        assets:
+          type: array
+          description: Multi-protocol bundle metadata
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              path:
+                type: string
+    CatalogSyncResult:
+      type: object
+      properties:
+        sync_status:
+          type: string
+          enum: [syncing, active, failed, blocked]
+        message:
+          type: string
+    WorkflowTemplateBundle:
+      type: object
+      required: [nodes, edges]
+      properties:
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              kind:
+                type: string
+              use:
+                type: string
+              params:
+                type: object
+              io:
+                type: object
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: string
+              to:
+                type: string
+              condition:
+                type: string
+        agent_tools:
+          type: array
+          items:
+            type: object
+            properties:
+              manifest_ref:
+                type: string
+              sse_channel:
+                type: string
+    WorkflowTemplateResult:
+      type: object
+      properties:
+        workflow_id:
+          type: string
+        agent_tools_registered:
+          type: array
+          items:
+            type: string

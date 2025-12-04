@@ -28,9 +28,9 @@ npm test && npm run lint
 Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 
 ## Recent Changes
+- 006-plugin-capability: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 - 005-plugin-auth: Added Go 1.24 (backend), TypeScript 5 / Nuxt 4.2 (web admin) + Gin, Gorm, `$fetch`/Nitro、Pinia、`@nuxt/ui`, PowerX framework middleware、`@artisan-cloud/plugin-framework-*`
 - 004-publish-hub-spec: Added Go 1.24 (PowerX Core/Dev API), TypeScript 5 + Node.js 18 (px-plugin CLI & tooling), Nuxt 4.2 (Admin) + Gin、`@artisan-cloud/plugin-framework-*`、px-plugin CLI runtime、S3/MinIO 对象存储、Redis/Kafka 链路、Playwright 1.48+
-- 002-testing-strategy: Added Go 1.24+, Node.js 18+, npm 9+, Bash (POSIX) + Go toolchain (`go test`, `go tool cover`), Playwright 1.48+, Nuxt CLI (`nuxi`), jq/standard UNIX utilities
 
 <!-- MANUAL ADDITIONS START -->
 Always respond in Chinese-simplified

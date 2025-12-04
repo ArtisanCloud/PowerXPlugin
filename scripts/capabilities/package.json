@@ -1,0 +1,9 @@
+{
+  "name": "powerxplugin-capabilities-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node validate-capabilities.mjs",
+    "export": "node export.mjs"
+  }
+}

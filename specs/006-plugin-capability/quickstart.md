@@ -2,6 +2,7 @@
 
 1. **准备工作**
    - 安装 Go 1.24、Node 20、npm 9、Buf CLI、OpenAPI Generator。
+   - 执行 `npm --prefix scripts/capabilities install`（若尚未安装），以便后续调用 `scripts/capabilities` 下的工具。
    - 运行 `make deps && npm install`，确保 `px-plugin` CLI 可用。
 
 2. **声明能力**
@@ -9,8 +10,8 @@
    - 完成 Handler (`backend/internal/handlers/capabilities/...`) 与 Service 逻辑，更新 `contracts/schema/input|output`。
 
 3. **生成协议资产**
-   - 运行 `npm run capabilities:lint`（或 `make capabilities-lint`）校验 imports/Schema。
-   - 执行 `npm run capabilities:export` 生成 OpenAPI、Proto、Workflow Step、MCP manifest、Agent SSE、SDK bundle（产物位于 `contracts/exposure/**` 及 `dist/agent-sdk/`）。
+   - 运行 `make capabilities-lint`（或 `npm --prefix scripts/capabilities run lint`）校验 imports/Schema。
+   - 执行 `make capabilities-export` 生成 OpenAPI、Proto、Workflow Step、MCP manifest、Agent SSE、SDK bundle（产物位于 `contracts/exposure/**` 及 `dist/agent-sdk/`）。
 
 4. **同步目录到 PowerX**
    - 安装/升级插件前执行 `px-plugin capabilities submit --env dev`，验证 Capabilities Manager 可以列出全部能力。

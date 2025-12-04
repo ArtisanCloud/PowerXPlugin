@@ -18,10 +18,11 @@
 
 ## 快速开始
 
-1. 安装 Go 1.24+ 与 Node.js 18+。
+1. 安装 Go 1.24+、Node.js 20+（npm 9+）、Buf CLI 与 OpenAPI Generator，确保 `PATH` 中可直接调用。
 2. 执行 `go work sync`，并在 `framework/frontend/nuxt` 下的各 Nuxt layer 目录运行 `npm install`。
-3. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
-4. 体验 Go CLI 热加载：请按照 `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 构建 `px-plugin`、运行 `px-plugin dev --watch` / `dev --logs`，并通过 `px-plugin doctor` 生成 `.doctor/report.json` 以验证 Toolchain、mTLS、Dev API、Watcher 状态。
+3. 初始化能力工具链：如需 CLI 校验/导出，请运行 `npm --prefix scripts/capabilities install`（若尚未安装依赖），并使用 `make capabilities-lint`、`make capabilities-export` 驱动 `scripts/capabilities` 工具。
+4. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
+5. 体验 Go CLI 热加载：请按照 `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 构建 `px-plugin`、运行 `px-plugin dev --watch` / `dev --logs`，并通过 `px-plugin doctor` 生成 `.doctor/report.json` 以验证 Toolchain、mTLS、Dev API、Watcher 状态。
 
 ## Publish Hub 链路（CLI → 审核 → 安装）
 

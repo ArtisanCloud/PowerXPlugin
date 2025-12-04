@@ -4,8 +4,8 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 [P] Initialize capability workspace directories (`capabilities/`, `contracts/exposure/`, `dist/agent-sdk/`) and ensure Make/NPM scripts exist for lint/export (update `scripts/capabilities/package.json`).
-- [ ] T002 [P] Add Go/Nuxt toolchain prerequisites to `README.md` + `quickstart.md` and wire `make capabilities-lint/export` targets.
+- [X] T001 [P] Initialize capability workspace directories (`capabilities/`, `contracts/exposure/`, `dist/agent-sdk/`) and ensure Make/NPM scripts exist for lint/export (update `scripts/capabilities/package.json`).
+- [X] T002 [P] Add Go/Nuxt toolchain prerequisites to `README.md` + `quickstart.md` and wire `make capabilities-lint/export` targets.
 
 ---
 

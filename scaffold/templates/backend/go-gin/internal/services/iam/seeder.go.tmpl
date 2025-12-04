@@ -29,7 +29,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 	}
 
 	const (
-		defaultTenantKey  = "px_local"
+		defaultTenantKey  = " 00000000-0000-0000-0000-000000000001"
 		defaultTenantName = "Local Tenant"
 		defaultAdminEmail = "admin@local.test"
 		defaultAdminPwd   = "S3cret!!"

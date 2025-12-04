@@ -56,7 +56,7 @@
 
 - [x] T015 [US2] 定义模板数据结构于 skeleton/backend/internal/templates/model.go
 - [x] T016 [US2] 实作内存 Repository（嵌入 BaseRepository）于 skeleton/backend/internal/templates/repository.go
-- [x] T017 [US2] 在 Repository 中实现 BeginTenantTx 并执行 `SET LOCAL app.tenant_id`（含相关注释）
+- [x] T017 [US2] 在 Repository 中实现 BeginTenantTx 并执行 `SET LOCAL app.tenant_uuid`（含相关注释）
 - [x] T018 [US2] 实作 Templates Service 逻辑于 skeleton/backend/internal/templates/service.go
 - [x] T019 [US2] 编写 HTTP Handler 使用新框架上下文于 skeleton/backend/internal/templates/handler.go
 - [x] T020 [US2] 在 skeleton/backend/internal/routes/routes.go 注册 CRUD 路由并执行种子数据初始化

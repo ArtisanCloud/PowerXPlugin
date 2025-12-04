@@ -134,6 +134,8 @@ cd ..
 ```
 
 > CLI 默认写入 `@artisan-cloud/plugin-framework-admin` / `@artisan-cloud/plugin-framework-client` 的已发布版本（当前建议 `^0.0.1-alpha`）。若你在 monorepo 中调试 Layer，需要引用本地源码，可在执行 `px-plugin init` 前设置 `POWERXPLUGIN_USE_LOCAL_FRONTEND=1`，随后重新运行 `npm install`。
+>
+> ⚠️ **构建宿主包前务必清理本地联调环境变量**：`npm run build` 会把 `.env`（或 shell 环境）中的 `POWERX_PROXY`、`NUXT_PUBLIC_API_BASE=http://localhost:8078`、`NUXT_DEV_API_PROXY` 等值烘焙进产物。入驻 PowerX 宿主时，保持默认（仅 `POWERX_PROXY=1`）即可让前端自动使用 `/_p/<pluginId>/api/v1` 与宿主注入的 API。若仍保留指向本地的变量，部署后会直接访问你的 8078 实例或触发 CSP，导致宿主环境无法登录。
 
 ### 4.4 数据库配置
 
@@ -157,7 +159,7 @@ cd backend
 go run ./cmd/plugin # 注意包含 ./ 指向当前目录下的 main 包
 ```
 
-CLI 模板与 Skeleton 一致，默认监听 `:8087`。可以重复使用 Step 3 的 `curl http://localhost:8087/api/v1/ping` 验证输出。
+CLI 模板与 Skeleton 一致，默认监听 `:8078`。可以重复使用 Step 3 的 `curl http://localhost:8078/api/v1/ping` 验证输出。
 
 ### 常见问题
 
@@ -213,54 +215,17 @@ px-plugin doctor --fix
 
 报告建议随同 `publish.yml`、`reports/sbom.json` 一并提交到代码评审或合规工单。
 
-## Step 9. 宿主模拟器与沙箱验证
+## Step 9. 下一步：发布与热加载
 
-完成基础开发后，可以利用 Phase 11 的链路在本地模拟宿主、执行沙箱测试并生成调试报告：
+本教程完成后，通常会继续：
 
-1. **启动宿主模拟器**
-   ```bash
-   px-plugin host start --mock \
-     --plugin com.powerx.helloworld \
-     --runtime-version latest \
-     --tenant demo-tenant
-   ```
-   命令会返回 `sessionId`、`endpoint` 与日志地址；可通过 `px-plugin host status --session <id>` 与 `px-plugin host logs --session <id>` 查看运行情况，底层对应 API 为 `POST/GET /internal/dev/hosts/sessions`。
+- 使用 `px-plugin package`/`publish` 生成并上传 artefacts。
+- 通过 `px-plugin dev --watch` 进行 Dev API 热加载，或配合 `host`/`sandbox` 管道验证宿主模拟器。
+- 借助 `px-plugin import` 审核第三方源码。
 
-2. **执行沙箱验证**
-   ```bash
-   px-plugin sandbox deploy \
-     --host-session host-123 \
-     --dataset demo \
-     --test-plan hotload-suite
-   ```
-   CLI 会调用 `POST /internal/dev/sandbox/deploy`，输出 `validationId` 供 Marketplace 审核或自测记录。
+这些命令的完整示例、参数说明与排障建议已汇总在《docs/guides/develop/go-cli-dev-watch.md》，请以该文档为准，以免在多处重复维护。
 
-3. **上传调试报告**
-   ```bash
-   px-plugin debug report \
-     --session host-123 \
-     --input ./reports/debug.json
-   ```
-   触发 `POST /internal/dev/debug/report`，记录 `debug.report.generate_ms` 指标并将脱敏报告同步到工单系统。
-
-调试完成后，可使用 `px-plugin host stop --session <id>` 释放资源。
-
-## Step 10. 第三方源码导入（可选）
-
-若需要将外部模板或客户源码导入到插件仓库，请在执行 `px-plugin init` 之后运行：
-
-```bash
-px-plugin import --source ./vendor/crm.tar.gz \
-  --type tarball \
-  --provider github.com \
-  --license MIT
-```
-
-CLI 会读取 `config/compliance/external_source_policy.yaml`，根据域名、包体大小、许可证以及校验和要求进行评估，并生成 `./.compliance/import-report.json`。若命中 denylist 或超过阈值，命令会提示需要人工审批的联系人，同时把事件写入 `plugin-import-audit` Webhook（由后端 `bootstrap_handler` 记录）。
-
-> 建议将 import/doctor 报告附到变更工单，方便 Marketplace 审核人员追踪第三方源码的来源、许可证和扫描结果。
-
-## Step 11. 清理或复用工程
+## Step 10. 清理或复用工程
 
 - 不再需要时，可删除 `plugins/com.powerx.helloworld` 目录。
 - 若计划长期开发，请更新 `backend/go.mod` 的 module 名称并提交到独立仓库。

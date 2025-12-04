@@ -30,7 +30,7 @@ func setupListingRepo(t *testing.T) *mrepo.ListingRepository {
 	require.NoError(t, db.Exec(`DROP TABLE IF EXISTS marketplace_listings`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE marketplace_listings (
         id TEXT PRIMARY KEY,
-        tenant_id TEXT NOT NULL,
+        tenant_uuid TEXT NOT NULL,
         plugin_id TEXT NOT NULL,
         vendor_id TEXT NOT NULL,
         status TEXT NOT NULL,
@@ -59,7 +59,7 @@ func setupListingRepo(t *testing.T) *mrepo.ListingRepository {
 	require.NoError(t, db.Exec(`CREATE TABLE marketplace_listing_assets (
         id TEXT PRIMARY KEY,
         listing_id TEXT NOT NULL,
-        tenant_id TEXT NOT NULL,
+        tenant_uuid TEXT NOT NULL,
         asset_type TEXT,
         storage_uri TEXT,
         created_at DATETIME,
@@ -68,7 +68,7 @@ func setupListingRepo(t *testing.T) *mrepo.ListingRepository {
 	require.NoError(t, db.Exec(`DROP TABLE IF EXISTS marketplace_pricing_plans`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE marketplace_pricing_plans (
         id TEXT PRIMARY KEY,
-        tenant_id TEXT NOT NULL,
+        tenant_uuid TEXT NOT NULL,
         listing_id TEXT NOT NULL,
         plan_code TEXT,
         plan_type TEXT,
@@ -81,7 +81,7 @@ func setupListingRepo(t *testing.T) *mrepo.ListingRepository {
 	repo := mrepo.NewListingRepository(db)
 	listing := &dbm.Listing{
 		ID:        "listing-1",
-		TenantID:  "tenant-1",
+		TenantUuid:  "tenant-1",
 		PluginID:  "com.example.plugin",
 		VendorID:  "vendor-1",
 		Status:    dbm.ListingStatusPublished,

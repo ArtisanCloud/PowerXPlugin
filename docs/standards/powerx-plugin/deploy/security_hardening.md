@@ -92,13 +92,13 @@ POWERX_DB_SCHEMA=px_com_powerx_plugins_base
 ```sql
 ALTER TABLE <schema>.<table> ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON <schema>.<table>
-  USING (tenant_id::text = current_setting('app.tenant_id', true));
+  USING (tenant_uuid::text = current_setting('app.tenant_uuid', true));
 ```
 
 应用层执行：
 
 ```sql
-SET LOCAL app.tenant_id = <tenant_id>;
+SET LOCAL app.tenant_uuid = <tenant_uuid>;
 ```
 
 确保跨租户访问永远失败。
@@ -157,7 +157,7 @@ PowerX 验证：
 | --------- | ---------------------------------------------- |
 | **签名算法**  | HMAC-SHA256 或 RS256                            |
 | **有效期**   | ≤ 5 分钟                                         |
-| **上下文字段** | tenant_id / user_id / permissions / request_id |
+| **上下文字段** | tenant_uuid / user_id / permissions / request_id |
 | **防篡改**   | 签名或公钥验证失败即拒绝请求                                 |
 | **防重放**   | PowerX 可配置 request_id nonce 校验                 |
 
@@ -214,7 +214,7 @@ PowerX 验证：
 统一使用 JSON：
 
 ```json
-{"time":"2025-10-10T12:00:00Z","level":"info","plugin":"com.powerx.plugins.base","msg":"create template","tenant_id":1001,"user_id":501}
+{"time":"2025-10-10T12:00:00Z","level":"info","plugin":"com.powerx.plugins.base","msg":"create template","tenant_uuid":1001,"user_id":501}
 ```
 
 ### 2️⃣ 宿主审计日志
@@ -223,7 +223,7 @@ PowerX 验证：
 
 - request_id
 - plugin_id
-- tenant_id
+- tenant_uuid
 - user_id
 - endpoint
 - action

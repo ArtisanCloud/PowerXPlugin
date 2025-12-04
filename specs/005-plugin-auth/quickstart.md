@@ -42,7 +42,7 @@ npm run dev
 cd skeleton/backend
 export POWERX_PROXY=0
 export POWERX_RBAC_DELEGATE=false
-export PLUGIN_IAM_TENANT_KEY=px_local
+export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
 export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'
@@ -75,7 +75,7 @@ cd tools/cli && go run ./cmd/px-plugin init dev.plugin.test
 
 ## 6. Observability Checklist
 - 确认 `plugin_iam_mode`, `plugin_auth_login_total`, `plugin_auth_refresh_total`, `plugin_auth_logout_total`, `plugin_iam_delegate_errors_total` 指标在 `/metrics` 暴露。
-- `request_trace` 日志需含 `iam_mode`, `auth`, `tenant_id`, `user_id`, `trace_id`。
+- `request_trace` 日志需含 `iam_mode`, `auth`, `tenant_uuid`, `user_id`, `trace_id`。
 - 打开/关闭 Local 模式应各自写一条 Info 日志。
 
 ## 7. 验收与性能
@@ -89,3 +89,21 @@ cd tools/cli && go run ./cmd/px-plugin init dev.plugin.test
 - Delegated E2E（需另启 `npm --prefix skeleton/web-admin run dev`）：`npm --prefix skeleton/web-admin run test:e2e -- auth-delegated`
 - Local E2E：`PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local`
 - 性能参考：在 Apple M3 Pro + Chromium Headless 上，Delegated 登录单次 ~1.8s；Postgres 15 中执行 `go run ./cmd/database/main.go setup` 约 4.6s（包含 IAM migrate+seed）。详细说明见 `docs/guides/develop/auth.md#6-性能与耗时`。
+
+## 8. CLI Package / Publish 快速演练
+
+完成 IAM 场景后，可用同一仓库演练发布链路：
+
+1. 生成 artefact：`px-plugin package --entry <plugin>`（必要时使用 `--skip-frontend/--skip-backend`）。
+2. 在 `~/.px-plugin/config.json` 写入：
+   ```json
+   {
+     "publishApi": {
+       "baseUrl": "http://127.0.0.1:8077/api/v1",
+       "apiKey": "dev-registry-token"
+     }
+   }
+   ```
+   或通过 `PX_PUBLISH_API_BASE` / `PX_PUBLISH_API_TOKEN` 覆盖。
+3. 上传：`px-plugin publish --entry <plugin> --channel dev --notes "feat: auth"`。命令会输出 `publishId` 与审核链接，随后即可在 PowerX Marketplace / 插件管理后台看到「待审核版本」。
+4. 在宿主后台安装/启用该版本后，即可回到 `px-plugin dev --watch` 热加载流程，形成「安装一次 → 热载调试 → package/publish」闭环。

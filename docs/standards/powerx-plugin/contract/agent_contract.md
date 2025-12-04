@@ -203,7 +203,7 @@ Authorization: Bearer <PowerX-CTX-JWT>
 | 机制               | 说明                                   |
 | ---------------- | ------------------------------------ |
 | **JWT/HMAC 上下文** | Agent Hub 调用时自动注入 `X-PowerX-CTX-JWT` |
-| **租户隔离**         | `tenant_id` 会包含在签名上下文中               |
+| **租户隔离**         | `tenant_uuid` 会包含在签名上下文中               |
 | **RBAC 校验**      | 插件根据 `rbac_resource` 检查是否授权执行        |
 | **请求溯源**         | 每次 Tool 调用都会包含 `request_id`          |
 | **安全策略**         | 插件不得主动执行外部 HTTP 调用到宿主以外域名（除非声明允许）    |

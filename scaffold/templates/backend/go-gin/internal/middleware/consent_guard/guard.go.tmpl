@@ -1,7 +1,6 @@
 package consent_guard
 
 import (
-	"fmt"
 	"net/http"
 
 	middleware "{{ .BackendModulePath }}/internal/middleware"
@@ -21,12 +20,11 @@ func Middleware(guard *agentsecurity.PrivacyGuard, extractor AssetExtractor) gin
 			c.Next()
 			return
 		}
-		tenantUint, ok := middleware.TenantIDFromContext(c.Request.Context())
-		if !ok || tenantUint == 0 {
+		tenantID, ok := middleware.TenantUUIDFromContext(c.Request.Context())
+		if !ok || tenantID == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "tenant context missing"})
 			return
 		}
-		tenantID := fmt.Sprintf("%d", tenantUint)
 		required := []string(nil)
 		if extractor != nil {
 			required = extractor(c)

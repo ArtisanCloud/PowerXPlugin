@@ -58,12 +58,12 @@ func (h *LicenseHandler) Create(c *gin.Context) {
 		return
 	}
 
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
 	}
-	if strings.TrimSpace(req.TenantID) != "" && req.TenantID != tenantID {
+	if strings.TrimSpace(req.TenantUuid) != "" && req.TenantUuid != tenantID {
 		contracts.ResponseUnauthorized(c, "tenant mismatch")
 		return
 	}
@@ -75,11 +75,11 @@ func (h *LicenseHandler) Create(c *gin.Context) {
 	metadata["channel"] = "marketplace_api"
 
 	params := svc.IssueLicenseParams{
-		TenantID:  tenantID,
-		ListingID: req.ListingID,
-		PlanID:    req.PlanID,
-		IssuedBy:  tenantID,
-		Metadata:  metadata,
+		TenantUuid: tenantID,
+		ListingID:  req.ListingID,
+		PlanID:     req.PlanID,
+		IssuedBy:   tenantID,
+		Metadata:   metadata,
 	}
 
 	if req.TrialOverrideDays != nil && *req.TrialOverrideDays > 0 {
@@ -110,7 +110,7 @@ func (h *LicenseHandler) Get(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "license service not available", nil)
 		return
 	}
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -140,7 +140,7 @@ func (h *LicenseHandler) Renew(c *gin.Context) {
 		return
 	}
 
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -148,7 +148,7 @@ func (h *LicenseHandler) Renew(c *gin.Context) {
 
 	params := svc.RenewLicenseParams{
 		LicenseID:    c.Param("id"),
-		TenantID:     tenantID,
+		TenantUuid:   tenantID,
 		IssuedBy:     tenantID,
 		PlanID:       strings.TrimSpace(req.PlanID),
 		RenewalToken: strings.TrimSpace(req.RenewalToken),
@@ -184,7 +184,7 @@ func (h *LicenseHandler) ExtendOffline(c *gin.Context) {
 		return
 	}
 
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return

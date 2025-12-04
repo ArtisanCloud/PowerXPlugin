@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <UForm class="grid gap-4 md:grid-cols-3" @submit.prevent="apply">
       <UFormGroup label="租户 ID">
-        <UInput v-model="filters.tenant_id" placeholder="tenant-1" />
+        <UInput v-model="filters.tenant_uuid" placeholder="tenant-1" />
       </UFormGroup>
       <UFormGroup label="任务类型">
         <UInput v-model="filters.job_type" placeholder="webhook_replay" />
@@ -25,14 +25,14 @@
       </template>
       <template #scope-data="{ row }">
         <span>
-          {{ `{{ row.safe_op.scope_type || '-' }}` }}
+          {{ `{{ row.safe_op.scope_type || "-" }}` }}
           <template v-if="row.safe_op.scope_ref">
             :{{ `{{ row.safe_op.scope_ref }}` }}
           </template>
         </span>
       </template>
       <template #message-data="{ row }">
-        {{ `{{ row.message || '-' }}` }}
+        {{ `{{ row.message || "-" }}` }}
       </template>
       <template #actions-data="{ row }">
         <UButton
@@ -62,90 +62,93 @@
 </template>
 
 <script setup lang="ts">
-import type { JobRun, JobRunFilters } from '~/stores/dev-console/troubleshoot'
+import type { JobRun, JobRunFilters } from "~/stores/dev-console/troubleshoot";
 
 const props = defineProps<{
-  runs: JobRun[]
-  loading?: boolean
-  nextCursor?: string
-  modelValue: JobRunFilters
-  retrying?: boolean
-}>()
+  runs: JobRun[];
+  loading?: boolean;
+  nextCursor?: string;
+  modelValue: JobRunFilters;
+  retrying?: boolean;
+}>();
 
 const emit = defineEmits<{
-  (event: 'update:modelValue', payload: JobRunFilters): void
-  (event: 'apply'): void
-  (event: 'load-more'): void
-  (event: 'retry', payload: JobRun): void
-}>()
+  (event: "update:modelValue", payload: JobRunFilters): void;
+  (event: "apply"): void;
+  (event: "load-more"): void;
+  (event: "retry", payload: JobRun): void;
+}>();
 
-const filters = reactive<JobRunFilters>({ ...props.modelValue })
+const filters = reactive<JobRunFilters>({ ...props.modelValue });
 
 watch(
   () => props.modelValue,
-  value => {
-    Object.assign(filters, value)
+  (value) => {
+    Object.assign(filters, value);
   }
-)
+);
 
 const columns = [
-  { key: 'created_at', label: '创建时间' },
-  { key: 'job_type', label: '任务类型' },
-  { key: 'status', label: '状态' },
-  { key: 'environment', label: '环境' },
-  { key: 'trigger_source', label: '触发来源' },
-  { key: 'scope', label: '作用域', sortable: false },
-  { key: 'message', label: '备注' },
-  { key: 'actions', label: '操作', sortable: false },
-]
+  { key: "created_at", label: "创建时间" },
+  { key: "job_type", label: "任务类型" },
+  { key: "status", label: "状态" },
+  { key: "environment", label: "环境" },
+  { key: "trigger_source", label: "触发来源" },
+  { key: "scope", label: "作用域", sortable: false },
+  { key: "message", label: "备注" },
+  { key: "actions", label: "操作", sortable: false },
+];
 
-const nextCursor = computed(() => props.nextCursor)
-const retrying = computed(() => props.retrying)
+const nextCursor = computed(() => props.nextCursor);
+const retrying = computed(() => props.retrying);
 
 function apply() {
-  const clean: JobRunFilters = {}
+  const clean: JobRunFilters = {};
   for (const [key, value] of Object.entries(filters)) {
     if (value) {
-      ;(clean as any)[key] = value
+      (clean as any)[key] = value;
     }
   }
-  emit('update:modelValue', clean)
-  emit('apply')
+  emit("update:modelValue", clean);
+  emit("apply");
 }
 
 function reset() {
   for (const key of Object.keys(filters)) {
-    ;(filters as any)[key] = ''
+    (filters as any)[key] = "";
   }
-  apply()
+  apply();
 }
 
 function formatDate(value?: string) {
-  if (!value) return '-'
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("zh-CN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function formatStatus(status: string) {
-  return status?.toUpperCase() || 'UNKNOWN'
+  return status?.toUpperCase() || "UNKNOWN";
 }
 
 function statusColor(status: string) {
-  switch ((status || '').toLowerCase()) {
-    case 'succeeded':
-      return 'green'
-    case 'failed':
-      return 'red'
-    case 'running':
-      return 'primary'
-    case 'pending':
-      return 'orange'
+  switch ((status || "").toLowerCase()) {
+    case "succeeded":
+      return "green";
+    case "failed":
+      return "red";
+    case "running":
+      return "primary";
+    case "pending":
+      return "orange";
     default:
-      return 'neutral'
+      return "neutral";
   }
 }
 
 function canRetry(run: JobRun) {
-  const status = (run.status || '').toLowerCase()
-  return status === 'failed' || status === 'cancelled'
+  const status = (run.status || "").toLowerCase();
+  return status === "failed" || status === "cancelled";
 }
 </script>

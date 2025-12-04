@@ -65,6 +65,7 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		targetRel := rel
 		isTemplate := strings.HasSuffix(rel, ".tmpl")
 		shouldRender := isTemplate && !isBinaryTemplate(rel)
+
 		if isTemplate {
 			targetRel = strings.TrimSuffix(rel, ".tmpl")
 		}

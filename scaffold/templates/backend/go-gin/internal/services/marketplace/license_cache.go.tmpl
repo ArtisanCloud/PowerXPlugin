@@ -118,7 +118,7 @@ func (c *RedisLicenseCache) Delete(ctx context.Context, tenantID, listingID stri
 		return
 	}
 	if err := c.client.Del(ctx, c.cacheKey(tenantID, listingID)).Err(); err != nil && c.logger != nil && !errors.Is(err, redis.Nil) {
-		c.logger.WithError(err).WithField("tenant_id", tenantID).WithField("listing_id", listingID).Debug("failed to delete license cache entry")
+		c.logger.WithError(err).WithField("tenant_uuid", tenantID).WithField("listing_id", listingID).Debug("failed to delete license cache entry")
 	}
 }
 
@@ -128,7 +128,7 @@ func (c *RedisLicenseCache) cacheKey(tenantID, listingID string) string {
 
 type licenseCacheEntry struct {
 	ID              string                 `json:"id"`
-	TenantID        string                 `json:"tenant_id"`
+	TenantUuid      string                 `json:"tenant_uuid"`
 	ListingID       string                 `json:"listing_id"`
 	PlanID          string                 `json:"plan_id"`
 	LicenseToken    string                 `json:"license_token"`
@@ -152,7 +152,7 @@ func licenseCacheEntryFromModel(license *dbm.License) *licenseCacheEntry {
 	}
 	return &licenseCacheEntry{
 		ID:              license.ID,
-		TenantID:        license.TenantID,
+		TenantUuid:      license.TenantUuid,
 		ListingID:       license.ListingID,
 		PlanID:          license.PlanID,
 		LicenseToken:    license.LicenseToken,
@@ -177,7 +177,7 @@ func (e *licenseCacheEntry) toModel() *dbm.License {
 	}
 	return &dbm.License{
 		ID:              e.ID,
-		TenantID:        e.TenantID,
+		TenantUuid:      e.TenantUuid,
 		ListingID:       e.ListingID,
 		PlanID:          e.PlanID,
 		LicenseToken:    e.LicenseToken,

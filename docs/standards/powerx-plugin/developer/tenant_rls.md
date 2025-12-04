@@ -13,7 +13,7 @@
 
 | 层级 | 隔离手段 | 作用 |
 |------|-----------|------|
-| **应用层** | 每请求提取 `tenant_id`，事务执行 `SET LOCAL app.tenant_id` | 请求级作用域 |
+| **应用层** | 每请求提取 `tenant_uuid`，事务执行 `SET LOCAL app.tenant_uuid` | 请求级作用域 |
 | **数据库层** | PostgreSQL **Row Level Security (RLS)** 策略 | 行级安全兜底 |
 
 即使应用层 where 条件书写错误，RLS 仍会阻止跨租户读写。
@@ -24,9 +24,9 @@
 
 ```text
 1️⃣ PowerX → 插件请求（携带 JWT/HMAC 上下文）
-2️⃣ TenantContext 中间件解签上下文，提取 tenant_id
+2️⃣ TenantContext 中间件解签上下文，提取 tenant_uuid
 3️⃣ BeginTenantTx 开启事务，并执行：
-      SET LOCAL app.tenant_id = <tenant_id>
+      SET LOCAL app.tenant_uuid = <tenant_uuid>
 4️⃣ 所有 GORM 查询均在该事务内执行
 5️⃣ Postgres RLS 自动校验行级访问
 ````
@@ -43,7 +43,7 @@ PowerX Request
  [TenantContext Middleware]
      │
      ▼
- BeginTenantTx()  →  SET LOCAL app.tenant_id = ?
+ BeginTenantTx()  →  SET LOCAL app.tenant_uuid = ?
      │
      ▼
  GORM / SQL 操作（受 RLS 策略保护）
@@ -60,7 +60,7 @@ CREATE SCHEMA IF NOT EXISTS template;
 
 CREATE TABLE IF NOT EXISTS px_com_plugin_base.template (
   id         BIGSERIAL PRIMARY KEY,
-  tenant_id  BIGINT NOT NULL,
+  tenant_uuid  BIGINT NOT NULL,
   title      VARCHAR(200) NOT NULL,
   status     VARCHAR(24)  NOT NULL DEFAULT 'todo',
   assignee   BIGINT NULL,
@@ -76,12 +76,12 @@ ALTER TABLE px_com_plugin_base.template ENABLE ROW LEVEL SECURITY;
 -- 定义租户隔离策略
 CREATE POLICY p_tenant_isolation
   ON px_com_plugin_base.template
-  USING (tenant_id::text = current_setting('app.tenant_id', true));
+  USING (tenant_uuid::text = current_setting('app.tenant_uuid', true));
 ```
 
 说明：
 
-* **`current_setting('app.tenant_id', true)`**
+* **`current_setting('app.tenant_uuid', true)`**
   取自当前事务中通过 `SET LOCAL` 设置的租户变量；
 * **`USING` 子句**
   定义允许访问的行；
@@ -109,7 +109,7 @@ CREATE POLICY p_tenant_isolation
 ```go
 func TenantContext(c *gin.Context) {
     ctx, tenantID := extractTenantFromHeader(c)
-    c.Set("tenant_id", tenantID)
+    c.Set("tenant_uuid", tenantID)
     c.Next()
 }
 ```
@@ -123,7 +123,7 @@ func TenantContext(c *gin.Context) {
 职责：
 
 * 开启事务；
-* 执行 `SET LOCAL app.tenant_id = ?`；
+* 执行 `SET LOCAL app.tenant_uuid = ?`；
 * 将事务句柄注入到当前请求作用域；
 * 提供 commit/rollback 的一致性封装。
 
@@ -132,7 +132,7 @@ func TenantContext(c *gin.Context) {
 ```go
 func BeginTenantTx(ctx context.Context, db *gorm.DB, tenantID int64) (*gorm.DB, error) {
     tx := db.Begin()
-    if err := tx.Exec("SET LOCAL app.tenant_id = ?", tenantID).Error; err != nil {
+    if err := tx.Exec("SET LOCAL app.tenant_uuid = ?", tenantID).Error; err != nil {
         return nil, err
     }
     return tx, nil
@@ -152,7 +152,7 @@ export POWERX_DEV_MODE=1
 作用：
 
 * 跳过 JWT/HMAC 验签；
-* 使用默认租户 ID（例如 `tenant_id = 1`）；
+* 使用默认租户 ID（例如 `tenant_uuid = 1`）；
 * 允许本地直连后端测试。
 
 ⚠️ **注意**：
@@ -166,24 +166,24 @@ export POWERX_DEV_MODE=1
 所有业务模型必须包含：
 
 ```go
-TenantID int64 `gorm:"column:tenant_id;not null"`
+TenantUuid string `gorm:"column:tenant_uuid;type:uuid;not null"`
 ```
 
 ✅ **避免直接使用 `db.Raw`**
 若必须执行原生 SQL，应确保：
 
 ```sql
-WHERE tenant_id = current_setting('app.tenant_id', true)
+WHERE tenant_uuid = current_setting('app.tenant_uuid', true)
 ```
 
 ✅ **事务必经 `BeginTenantTx`**
 不要在业务层直接使用 `db.Begin()`。
 
 ✅ **禁止租户写入越权**
-当 API 提交 payload 时，忽略前端传入的 tenant_id，统一以上下文为准。
+当 API 提交 payload 时，忽略前端传入的 tenant_uuid，统一以上下文为准。
 
 ✅ **日志追踪**
-在日志中记录 `tenant_id`、`request_id`、`user_id`，便于排查多租户问题。
+在日志中记录 `tenant_uuid`、`request_id`、`user_id`，便于排查多租户问题。
 
 ---
 
@@ -203,7 +203,7 @@ WHERE tenant_id = current_setting('app.tenant_id', true)
 高级场景下，你可以为每个租户派生加密密钥：
 
 ```text
-租户主密钥 = HMAC(platform_secret, tenant_id)
+租户主密钥 = HMAC(platform_secret, tenant_uuid)
 ```
 
 可用于：
@@ -219,7 +219,7 @@ WHERE tenant_id = current_setting('app.tenant_id', true)
 | 模块   | 文件                     | 关键职责             |
 | ---- | ---------------------- | ---------------- |
 | 中间件  | `middleware/tenant.go` | 提取租户上下文          |
-| 事务封装 | `db/tenant_tx.go`      | 注入 app.tenant_id |
+| 事务封装 | `db/tenant_tx.go`      | 注入 app.tenant_uuid |
 | 数据层  | `Postgres RLS`         | 强制行级隔离           |
 | 调试模式 | `POWERX_DEV_MODE`      | 本地绕过验签           |
 | 安全兜底 | 双层隔离机制                 | 防止跨租户访问          |

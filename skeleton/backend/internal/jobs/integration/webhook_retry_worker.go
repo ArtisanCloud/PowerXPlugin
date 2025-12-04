@@ -88,20 +88,20 @@ func (w *WebhookRetryWorker) Run(ctx context.Context) error {
 
 		next, moveToDLQ := w.service.NextRetry(sub, attempt.RetryCount)
 		if moveToDLQ {
-			if err := w.service.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusDLQ, attempt.RetryCount, nil, attempt.LastError, sub.TenantID); err != nil {
+			if err := w.service.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusDLQ, attempt.RetryCount, nil, attempt.LastError, sub.TenantUuid); err != nil {
 				w.logger.WithError(err).WithField("attempt_id", attempt.ID).Warn("failed to mark attempt as DLQ")
 				continue
 			}
-			obs.RecordWebhookAttempt("dlq", sub.TenantID)
+			obs.RecordWebhookAttempt("dlq", sub.TenantUuid)
 			continue
 		}
 
-		err = w.service.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusRetrying, attempt.RetryCount+1, &next, attempt.LastError, sub.TenantID)
+		err = w.service.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusRetrying, attempt.RetryCount+1, &next, attempt.LastError, sub.TenantUuid)
 		if err != nil {
 			w.logger.WithError(err).WithField("attempt_id", attempt.ID).Warn("failed to schedule next retry")
 			continue
 		}
-		obs.RecordWebhookAttempt("retrying", sub.TenantID)
+		obs.RecordWebhookAttempt("retrying", sub.TenantUuid)
 	}
 
 	return nil

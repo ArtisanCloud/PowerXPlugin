@@ -28,7 +28,7 @@
 
       <div class="grid gap-4 md:grid-cols-2">
         <div class="space-y-3">
-          <UInput v-model="tenantId" label="Tenant ID" placeholder="tenant-123" />
+          <UInput v-model="tenantUuid" label="Tenant UUID" placeholder="tenant-123" />
           <UInput v-model="licenseId" label="License ID" placeholder="license-abc" />
           <USelectMenu
             v-model="window"
@@ -132,7 +132,7 @@ const analyticsStore = useMarketplaceAnalyticsStore()
 const { reports, reportsLoading } = storeToRefs(analyticsStore)
 const { series, alerts, loading, error, load } = useUsageMetrics()
 
-const tenantId = ref<string>((route.query.tenant as string) || "")
+const tenantUuid = ref<string>((route.query.tenant as string) || "")
 const licenseId = ref<string>((route.query.license as string) || "")
 const window = ref<string>((route.query.window as string) || "day")
 const metric = ref<string>((route.query.metric as string) || "")
@@ -205,11 +205,11 @@ function alertIcon(code: string) {
 }
 
 async function loadDashboard() {
-  if (!tenantId.value || !licenseId.value) {
-    toast.add({ title: "请输入 Tenant 与 License", color: "orange" })
+  if (!tenantUuid.value || !licenseId.value) {
+    toast.add({ title: "请输入 Tenant UUID 与 License", color: "orange" })
     return
   }
-  await load(tenantId.value, licenseId.value, {
+  await load(tenantUuid.value, licenseId.value, {
     window: window.value,
     metric: metric.value || undefined,
   })
@@ -224,7 +224,7 @@ async function loadDashboard() {
 }
 
 onMounted(() => {
-  if (tenantId.value && licenseId.value) {
+  if (tenantUuid.value && licenseId.value) {
     loadDashboard()
   }
 })

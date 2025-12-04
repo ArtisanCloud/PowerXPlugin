@@ -141,7 +141,7 @@ egress:
   "event": "secret.rotated",
   "plugin_id": "com.powerx.plugin.ai",
   "secret_key": "OPENAI_API_KEY",
-  "tenant_id": "tenant_abc"
+  "tenant_uuid": "tenant_abc"
 }
 ```
 

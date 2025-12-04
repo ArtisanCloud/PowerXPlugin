@@ -50,7 +50,7 @@
   - `logout`：调用 `authService.logout() → clearAuth → navigateTo('/users/login')`。
 - **HTTP 拦截器**：拓展 `skeleton/web-admin/app/composables/api/_client.ts`：  
   - 在 `onResponseError` 中捕捉 401 → 自动尝试 `refreshToken`（若 `refresh_token` 存在）→ 成功则重播原请求，失败则 `clearAuth()` 并跳转登录。  
-  - 请求头继续沿用 `Authorization: Bearer <token>` 与 `X-Tenant-ID`。
+  - 请求头继续沿用 `Authorization: Bearer <token>` 与 `X-Tenant-UUID`。
 - **路由保护**：新增 `middleware/auth.global.ts`：  
   - 对除 `users/login|register|forgot-password` 外的页面强制检测 `useAuth().token`；  
   - 若缺失则重定向登录并附带 `redirect` query。  
@@ -142,7 +142,7 @@
 - **核心 API 可用性**：独立模式下若无法访问 PowerX Core，需要缓存/降级策略（可在 Phase 2 评估本地 Mock Auth）。  
 - **跨域/iframe 兼容**：插件注入到宿主时的域名可能不同，需确认登录页是否允许被 iframe；必要时提供 `redirectToHostLogin` 的配置。  
 - **Token 双存储**：LocalStorage + Cookie 需注意 XSS/CSRF；计划启用 `sameSite=lax` + 短期 Refresh Token。  
-- **多租户上下文**：`tenant_id` 读取逻辑仍是占位（`getTenantId()`），需在 Phase 1 内与宿主桥接（例如通过 `Bridge` 同步 tenant）。  
+- **多租户上下文**：`tenant_uuid` 读取逻辑仍是占位（`getTenantUuid()`），需在 Phase 1 内与宿主桥接（例如通过 `Bridge` 同步 tenant）。  
 - **退出流程**：宿主 `/logout` 依赖 `refresh_token`；需确认插件能安全保存 Refresh（可考虑加密存储）。  
 - **后续扩展**：若未来插件需脱离 PowerX Auth，自建 IdP 则需另立计划。
 

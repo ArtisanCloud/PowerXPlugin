@@ -31,7 +31,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS marketplace_listings (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             plugin_id TEXT NOT NULL,
             vendor_id TEXT NOT NULL,
             status TEXT NOT NULL,
@@ -59,7 +59,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_listing_assets (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             asset_type TEXT NOT NULL,
             storage_uri TEXT NOT NULL,
             checksum TEXT,
@@ -73,7 +73,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_listing_versions (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             version TEXT NOT NULL,
             changelog TEXT,
             metadata TEXT,
@@ -86,7 +86,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_pricing_plans (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             plan_code TEXT NOT NULL,
             plan_type TEXT NOT NULL,
             currency TEXT NOT NULL,
@@ -104,7 +104,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_plan_tiers (
             id TEXT PRIMARY KEY,
             plan_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             metric TEXT NOT NULL,
             range_from REAL NOT NULL,
             unit_amount REAL NOT NULL,
@@ -116,7 +116,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_checklist_runs (
             id TEXT PRIMARY KEY,
             listing_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             trigger_source TEXT NOT NULL,
             run_number INTEGER NOT NULL,
             status TEXT NOT NULL,
@@ -129,7 +129,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS marketplace_checklist_items (
             id TEXT PRIMARY KEY,
             checklist_run_id TEXT NOT NULL,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             code TEXT NOT NULL,
             description TEXT NOT NULL,
             result TEXT NOT NULL,
@@ -141,7 +141,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_licenses (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             listing_id TEXT NOT NULL,
             plan_id TEXT NOT NULL,
             license_token TEXT NOT NULL,
@@ -158,7 +158,7 @@ func setupServiceDB(t *testing.T) *gorm.DB {
         );`,
 		`CREATE TABLE IF NOT EXISTS marketplace_license_events (
             id TEXT PRIMARY KEY,
-            tenant_id TEXT NOT NULL,
+            tenant_uuid TEXT NOT NULL,
             license_id TEXT NOT NULL,
             event_type TEXT NOT NULL,
             event_payload TEXT,

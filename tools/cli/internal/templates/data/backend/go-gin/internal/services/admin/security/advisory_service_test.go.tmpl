@@ -48,14 +48,14 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		`CREATE TABLE IF NOT EXISTS security_advisory_distributions (
 			id TEXT PRIMARY KEY,
 			advisory_id TEXT NOT NULL,
-			tenant_id TEXT NOT NULL,
+			tenant_uuid TEXT NOT NULL,
 			channel TEXT NOT NULL,
 			delivered_at DATETIME,
 			status TEXT NOT NULL,
 			metadata TEXT,
 			created_at DATETIME,
 			updated_at DATETIME,
-			UNIQUE (advisory_id, tenant_id, channel)
+			UNIQUE (advisory_id, tenant_uuid, channel)
 		)`,
 	}
 	for _, stmt := range stmts {

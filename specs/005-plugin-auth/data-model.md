@@ -16,13 +16,13 @@
 - **Relationships**: 与 `Tenant` 通过 `Member` 关联；可属于多个 `Role` via `MemberRole`。
 
 ### Member (TenantUser)
-- **Fields**: `id`, `tenant_id`, `user_id`, `username (lowercase unique per tenant)`, `display_name`, `avatar_url`, `status`, `meta JSONB`.
-- **Constraints**: `(tenant_id, username)` 唯一；`status` 继承 User 状态。
+- **Fields**: `id`, `tenant_uuid`, `user_id`, `username (lowercase unique per tenant)`, `display_name`, `avatar_url`, `status`, `meta JSONB`.
+- **Constraints**: `(tenant_uuid, username)` 唯一；`status` 继承 User 状态。
 - **Relationships**: 多对多连接 `Role`（表 `member_roles`）。
 
 ### Role
-- **Fields**: `id`, `tenant_id`, `code (string)`, `name`, `description`, `created_at`, `updated_at`.
-- **Constraints**: `(tenant_id, code)` 唯一；`code` 仅小写字母+冒号。
+- **Fields**: `id`, `tenant_uuid`, `code (string)`, `name`, `description`, `created_at`, `updated_at`.
+- **Constraints**: `(tenant_uuid, code)` 唯一；`code` 仅小写字母+冒号。
 - **Relationships**: 多对多 `Permission`（`role_permissions`）与 `Member`。
 
 ### Permission
@@ -31,8 +31,8 @@
 - **Relationships**: 关联 `Role`。
 
 ### Department
-- **Fields**: `id`, `tenant_id`, `name`, `code`, `parent_id`, `description`, `created_at`, `updated_at`.
-- **Constraints**: `(tenant_id, code)` 唯一；`parent_id` 可为空形成树。
+- **Fields**: `id`, `tenant_uuid`, `name`, `code`, `parent_id`, `description`, `created_at`, `updated_at`.
+- **Constraints**: `(tenant_uuid, code)` 唯一；`parent_id` 可为空形成树。
 - **Relationships**: 自引用形成组织结构；`Member` 可关联 Department。
 
 ### AuthTokens (volatile)
@@ -41,7 +41,7 @@
 - **Usage**: 存于 localStorage + cookie；后端仅透传。
 
 ### TenantContext (derived)
-- **Fields**: `tenant_id`, `user_id`, `roles[]`, `permissions[]`, `policy_version`, `issued_at`.
+- **Fields**: `tenant_uuid`, `user_id`, `roles[]`, `permissions[]`, `policy_version`, `issued_at`.
 - **Constraints**: 来自 JWT 或 Signed Context；需在 request middleware 校验；`roles` 用于 RBAC。
 
 ### IAMModeSetting
@@ -61,6 +61,6 @@ AuthTokens ↔ TenantContext (runtime only)
 ## Validation Rules
 - 登录 identifier 必须匹配 email/phone/username 中之一，全部标准化为 lower-case。
 - Local 模式管理员凭证必须由 env/config 提供，否则 migrate 失败。
-- Delegated 模式 API 请求必须携带 `X-Tenant-ID`（来自 cookie/localStorage），并自动附带 `Authorization: Bearer <token>`。
+- Delegated 模式 API 请求必须携带 `X-Tenant-UUID`（来自 cookie/localStorage），并自动附带 `Authorization: Bearer <token>`。
 - 所有刷新请求若 token 已过期则先清理本地缓存再提示登录。
 - `plugin_iam_mode` 指标需在服务启动和模式切换时更新。

@@ -95,7 +95,7 @@ func (h *Handler) ListWebhooks(c *gin.Context) {
 			statuses = append(statuses, strings.ToUpper(strings.TrimSpace(status)))
 		}
 	}
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -119,13 +119,13 @@ func (h *Handler) CreateWebhook(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
 	}
 	sub, err := h.webhookService.CreateSubscription(c.Request.Context(), service.CreateSubscriptionParams{
-		TenantID:        tenantID,
+		TenantUuid:      tenantID,
 		EventType:       req.EventType,
 		TargetURL:       req.TargetURL,
 		SecretPlaintext: req.Secret,
@@ -151,13 +151,13 @@ func (h *Handler) UpdateWebhook(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
 	}
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
 	}
 	sub, err := h.webhookService.UpdateSubscription(c.Request.Context(), service.UpdateSubscriptionParams{
-		TenantID:       tenantID,
+		TenantUuid:     tenantID,
 		SubscriptionID: c.Param("id"),
 		TargetURL:      req.TargetURL,
 		Status:         req.Status,
@@ -182,7 +182,7 @@ func (h *Handler) DeleteWebhook(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "webhook service not available", nil)
 		return
 	}
-	tenantID, ok := httpmw.TenantIDString(c)
+	tenantID, ok := httpmw.TenantUuidString(c)
 	if !ok {
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 		return
@@ -249,7 +249,7 @@ func (h *Handler) ReplayAttempt(c *gin.Context) {
 	}
 
 	now := time.Now().UTC()
-	if err := h.webhookService.UpdateAttemptStatus(c.Request.Context(), attempt.ID, model.AttemptStatusPending, attempt.RetryCount, &now, "", sub.TenantID); err != nil {
+	if err := h.webhookService.UpdateAttemptStatus(c.Request.Context(), attempt.ID, model.AttemptStatusPending, attempt.RetryCount, &now, "", sub.TenantUuid); err != nil {
 		contracts.ResponseInternalError(c, err)
 		return
 	}

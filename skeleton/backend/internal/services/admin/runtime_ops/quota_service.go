@@ -2,7 +2,6 @@ package runtime_ops
 
 import (
 	"context"
-	"strconv"
 	"sync"
 	"time"
 
@@ -97,14 +96,14 @@ func (s *QuotaService) ListUsage(ctx context.Context, scopeType, scopeRef string
 
 // RecordBreach stores audit event for quota breach.
 func (s *QuotaService) RecordBreach(ctx context.Context, pluginID, scopeRef, capability, action string) error {
-	tenantID, err := authx.RequireTenantID(ctx)
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return err
 	}
 	event := &model.RuntimeAuditEvent{
 		ID:         uuid.NewString(),
 		PluginID:   pluginID,
-		TenantID:   strconv.FormatUint(tenantID, 10),
+		TenantUUID: tenantUUID,
 		EventType:  "quota_breach",
 		Payload:    capability + ":" + action,
 		OccurredAt: time.Now(),

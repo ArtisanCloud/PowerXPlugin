@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
@@ -22,7 +23,7 @@ func CORS() gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Headers",
 			"Content-Type, Content-Length, Accept-Encoding, "+
 				"X-CSRF-Token, Authorization, accept, origin, Cache-Control, "+
-				"X-Requested-With, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT",
+				"X-Requested-With, X-Tenant-UUID, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT",
 		)
 		c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 
@@ -52,9 +53,9 @@ func RequestLogger() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 
 		// 获取租户信息
-		var tenantID int64
+		var tenantUUID string
 		if tenantCtx, exists := GetTenantContext(c); exists {
-			tenantID = tenantCtx.TenantID
+			tenantUUID = tenantCtx.TenantUUID
 		}
 
 		// 构建日志字段
@@ -71,8 +72,8 @@ func RequestLogger() gin.HandlerFunc {
 			fields["query"] = raw
 		}
 
-		if tenantID > 0 {
-			fields["tenant_id"] = tenantID
+		if strings.TrimSpace(tenantUUID) != "" {
+			fields["tenant_uuid"] = tenantUUID
 		}
 
 		// 根据状态码选择日志级别

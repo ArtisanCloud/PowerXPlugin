@@ -70,8 +70,8 @@ go -C backend run ./cmd/database/seed
 > 迁移应完成：
 >
 > - 创建 `${POWERX_DB_SCHEMA}`
-> - 创建示例业务表（均含 `tenant_id BIGINT NOT NULL`）
-> - 启用 **Row Level Security (RLS)** 与 `app.tenant_id` 基于 `SET LOCAL` 的策略
+> - 创建示例业务表（均含 `tenant_uuid BIGINT NOT NULL`）
+> - 启用 **Row Level Security (RLS)** 与 `app.tenant_uuid` 基于 `SET LOCAL` 的策略
 
 ---
 
@@ -80,23 +80,23 @@ go -C backend run ./cmd/database/seed
 开发期可启用**受控旁路**以便单跑：
 
 ```bash
-export POWERX_BIND_ADDR=":8087"
+export POWERX_BIND_ADDR=":8078"
 export POWERX_LOG_LEVEL="debug"
 export POWERX_DEV_MODE=1   # 仅开发期启用，线上务必关闭
 
 go -C backend run ./cmd/plugin
 
 # 健康检查
-curl :8087/healthz
+curl :8078/healthz
 
 # 示例业务接口（开发旁路下可不带签名，或模拟携带）
-curl :8087/v1/ping
+curl :8078/v1/ping
 ```
 
 > 说明
 >
 > - 生产环境**不要**设置 `POWERX_DEV_MODE=1`。
-> - 非旁路模式下，业务接口需要来自 PowerX 的上下文（HMAC/JWT）头部，用于注入 `tenant_id`、`permissions` 等。
+> - 非旁路模式下，业务接口需要来自 PowerX 的上下文（HMAC/JWT）头部，用于注入 `tenant_uuid`、`permissions` 等。
 
 ---
 
@@ -132,7 +132,7 @@ curl "http://localhost:8080/_p/com.powerx.plugins.base/api/v1/ping"
 cd web-admin
 npm i
 npm run dev
-# 根据 nuxt.config.ts，开发期通常直连 http://127.0.0.1:8087/v1
+# 根据 nuxt.config.ts，开发期通常直连 http://127.0.0.1:8078/v1
 ```
 
 **构建产物供 PowerX 反代**
@@ -156,8 +156,8 @@ npm run build
 # 在仓库根目录
 docker build -t powerx-plugin-base:0.1.0 .
 
-docker run --rm -p 8087:8087 \
-  -e POWERX_BIND_ADDR=":8087" \
+docker run --rm -p 8078:8078 \
+  -e POWERX_BIND_ADDR=":8078" \
   -e POWERX_DB_DSN="postgres://user:pwd@host:5432/powerx?sslmode=disable" \
   -e POWERX_DB_SCHEMA="px_com_powerx_plugins_base" \
   -e POWERX_CTX_JWKS_URL="http://powerx/_p/_internal/jwks" \
@@ -174,7 +174,7 @@ docker run --rm -p 8087:8087 \
 - **schema 不存在 / 权限不足**：检查 `POWERX_DB_SCHEMA`、数据库用户权限。
 - **JWT/HMAC 验签失败**：确认 `POWERX_CTX_JWKS_URL`（JWT）或 `PLUGIN_CTX_HMAC_SECRET`（HMAC）是否由宿主正确注入。
 - **通过宿主访问 404**：确认**前端请求路径**包含 `/v1/...`，且反代已挂载 `/_p/<plugin-id>/api/*`。
-- **跨租户数据**：检查是否开启 RLS，并确保每请求事务正确执行 `SET LOCAL app.tenant_id=?`。
+- **跨租户数据**：检查是否开启 RLS，并确保每请求事务正确执行 `SET LOCAL app.tenant_uuid=?`。
 
 ---
 

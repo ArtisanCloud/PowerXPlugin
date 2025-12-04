@@ -14,7 +14,7 @@ func RegisterRuntimeMasker(masker func(Fields) Fields) {
 func WithRuntimeFields(pluginID, tenantID, traceID, component string, extra Fields) *logrus.Entry {
 	fields := Fields{
 		"plugin_id": pluginID,
-		"tenant_id": tenantID,
+		"tenant_uuid": tenantID,
 		"trace_id":  traceID,
 		"component": component,
 	}

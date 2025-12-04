@@ -110,7 +110,7 @@ License 是插件合法运行的核心凭证。
 | ------------ | ---------------------------- |
 | `license_id` | 唯一标识符（UUID）                  |
 | `plugin_id`  | 插件标识（com.powerx.plugin.crm）  |
-| `tenant_id`  | 授权租户                         |
+| `tenant_uuid`  | 授权租户                         |
 | `plan_id`    | 对应价格计划                       |
 | `status`     | active / expired / suspended |
 | `issued_at`  | 签发时间                         |
@@ -133,7 +133,7 @@ participant LicenseServer
 participant Plugin
 
 Tenant->>Marketplace: 购买 Plan
-Marketplace->>LicenseServer: Issue License (plugin_id, plan_id, tenant_id)
+Marketplace->>LicenseServer: Issue License (plugin_id, plan_id, tenant_uuid)
 LicenseServer-->>Marketplace: License Token
 Marketplace-->>Tenant: 返回 License Key
 Tenant->>Plugin: 安装时填写 License Key
@@ -147,7 +147,7 @@ LicenseServer-->>Plugin: Valid / Invalid
 {
   "license_id": "lic_12345",
   "plugin_id": "com.powerx.plugin.crm",
-  "tenant_id": "tenant_abc",
+  "tenant_uuid": "tenant_abc",
   "plan_id": "pro",
   "issued_at": "2025-10-13T12:00:00Z",
   "expires_at": "2026-10-13T12:00:00Z",

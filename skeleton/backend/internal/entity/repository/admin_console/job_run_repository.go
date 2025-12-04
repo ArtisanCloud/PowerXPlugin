@@ -88,12 +88,12 @@ func (r *JobRunRepository) GetByID(ctx context.Context, runID string) (*model.Jo
 
 // JobRunListOptions describes filters for listing job runs.
 type JobRunListOptions struct {
-	PluginID string
-	TenantID *string
-	JobType  string
-	Status   string
-	Cursor   string
-	Limit    int
+	PluginID   string
+	TenantUuid *string
+	JobType    string
+	Status     string
+	Cursor     string
+	Limit      int
 }
 
 // List returns job runs ordered by created_at desc with cursor pagination.
@@ -107,8 +107,8 @@ func (r *JobRunRepository) List(ctx context.Context, opts JobRunListOptions) ([]
 	}
 	query := r.DB.WithContext(ctx).
 		Where("plugin_id = ?", opts.PluginID)
-	if opts.TenantID != nil && strings.TrimSpace(*opts.TenantID) != "" {
-		query = query.Where("tenant_id = ?", strings.TrimSpace(*opts.TenantID))
+	if opts.TenantUuid != nil && strings.TrimSpace(*opts.TenantUuid) != "" {
+		query = query.Where("tenant_uuid = ?", strings.TrimSpace(*opts.TenantUuid))
 	}
 	if strings.TrimSpace(opts.JobType) != "" {
 		query = query.Where("job_type = ?", strings.TrimSpace(opts.JobType))
@@ -152,7 +152,7 @@ func (r *JobRunRepository) HasActiveRun(ctx context.Context, pluginID string, te
 		query = query.Where("scope_type = ?", scopeType)
 	}
 	if tenantID != nil && strings.TrimSpace(*tenantID) != "" {
-		query = query.Where("tenant_id = ?", strings.TrimSpace(*tenantID))
+		query = query.Where("tenant_uuid = ?", strings.TrimSpace(*tenantID))
 	}
 	var count int64
 	if err := query.Count(&count).Error; err != nil {

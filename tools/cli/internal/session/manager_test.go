@@ -6,11 +6,7 @@ import (
 )
 
 func TestManager_CreateAndPersistSession(t *testing.T) {
-	dir := t.TempDir()
-	mgr := &Manager{
-		store:  &Store{baseDir: dir},
-		active: make(map[string]*Session),
-	}
+	mgr := &Manager{store: NewStore(), active: make(map[string]*Session)}
 
 	s, err := mgr.CreateSession("plugin.test", "1.0.0", "/tmp/plugin", "tenant-A")
 	if err != nil {
@@ -35,11 +31,7 @@ func TestManager_CreateAndPersistSession(t *testing.T) {
 }
 
 func TestManager_RecordReloadMetrics(t *testing.T) {
-	dir := t.TempDir()
-	mgr := &Manager{
-		store:  &Store{baseDir: dir},
-		active: make(map[string]*Session),
-	}
+	mgr := &Manager{store: NewStore(), active: make(map[string]*Session)}
 
 	s, _ := mgr.CreateSession("plugin.test", "1.0.0", "/tmp/plugin", "")
 
@@ -61,11 +53,7 @@ func TestManager_RecordReloadMetrics(t *testing.T) {
 }
 
 func TestManager_StopAndDeleteSession(t *testing.T) {
-	dir := t.TempDir()
-	mgr := &Manager{
-		store:  &Store{baseDir: dir},
-		active: make(map[string]*Session),
-	}
+	mgr := &Manager{store: NewStore(), active: make(map[string]*Session)}
 
 	s, _ := mgr.CreateSession("plugin.test", "1.0.0", "/tmp/plugin", "")
 
@@ -86,8 +74,7 @@ func TestManager_StopAndDeleteSession(t *testing.T) {
 }
 
 func TestManager_CleanupExpired(t *testing.T) {
-	dir := t.TempDir()
-	mgr := &Manager{store: &Store{baseDir: dir}, active: make(map[string]*Session)}
+	mgr := &Manager{store: NewStore(), active: make(map[string]*Session)}
 
 	s, _ := mgr.CreateSession("plugin.test", "1.0.0", "/tmp/plugin", "")
 	s.CreatedAt = time.Now().Add(-8 * 24 * time.Hour)

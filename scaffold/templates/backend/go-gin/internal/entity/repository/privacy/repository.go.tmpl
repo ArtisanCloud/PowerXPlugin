@@ -49,11 +49,11 @@ func (r *Repository) UpsertClassification(ctx context.Context, record *model.Dat
 	if record == nil {
 		return nil, gorm.ErrInvalidData
 	}
-	if record.TenantID == "" || record.AssetKey == "" {
-		return nil, errors.New("tenant_id and asset_key are required")
+	if record.TenantUuid == "" || record.AssetKey == "" {
+		return nil, errors.New("tenant_uuid and asset_key are required")
 	}
 	return r.classifications.Upsert(ctx, record, []clause.Column{
-		{Name: "tenant_id"},
+		{Name: "tenant_uuid"},
 		{Name: "asset_key"},
 	})
 }
@@ -63,7 +63,7 @@ func (r *Repository) ListClassifications(ctx context.Context, tenantID string) (
 	var results []*model.DataClassification
 	if err := r.db.WithContext(ctx).
 		Model(&model.DataClassification{}).
-		Where("tenant_id = ?", tenantID).
+		Where("tenant_uuid = ?", tenantID).
 		Order("asset_key ASC").
 		Find(&results).Error; err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (r *Repository) ListClassifications(ctx context.Context, tenantID string) (
 // DeleteClassification removes a classification mapping for the given tenant asset.
 func (r *Repository) DeleteClassification(ctx context.Context, tenantID, assetKey string) error {
 	return r.db.WithContext(ctx).
-		Where("tenant_id = ? AND asset_key = ?", tenantID, assetKey).
+		Where("tenant_uuid = ? AND asset_key = ?", tenantID, assetKey).
 		Delete(&model.DataClassification{}).Error
 }
 
@@ -83,8 +83,8 @@ func (r *Repository) IssueConsentToken(ctx context.Context, token *model.Consent
 	if token == nil {
 		return nil, gorm.ErrInvalidData
 	}
-	if token.TenantID == "" || token.Token == "" {
-		return nil, errors.New("tenant_id and consent_token are required")
+	if token.TenantUuid == "" || token.Token == "" {
+		return nil, errors.New("tenant_uuid and consent_token are required")
 	}
 	if len(scope) > 0 {
 		blob, err := json.Marshal(scope)
@@ -106,7 +106,7 @@ func (r *Repository) IssueConsentToken(ctx context.Context, token *model.Consent
 func (r *Repository) GetConsentToken(ctx context.Context, tenantID, tokenID string) (*model.ConsentToken, error) {
 	var record model.ConsentToken
 	err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND id = ?", tenantID, tokenID).
+		Where("tenant_uuid = ? AND id = ?", tenantID, tokenID).
 		Take(&record).Error
 	if err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (r *Repository) GetConsentToken(ctx context.Context, tenantID, tokenID stri
 func (r *Repository) ListConsentTokensByStatus(ctx context.Context, tenantID string, statuses ...string) ([]*model.ConsentToken, error) {
 	query := r.db.WithContext(ctx).
 		Model(&model.ConsentToken{}).
-		Where("tenant_id = ?", tenantID)
+		Where("tenant_uuid = ?", tenantID)
 	if len(statuses) > 0 {
 		query = query.Where("status IN ?", statuses)
 	}
@@ -138,7 +138,7 @@ func (r *Repository) ActiveConsentTokens(ctx context.Context, tenantID string, n
 	}
 	var tokens []*model.ConsentToken
 	if err := r.db.WithContext(ctx).
-		Where("tenant_id = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", tenantID, model.ConsentStatusActive, now).
+		Where("tenant_uuid = ? AND status = ? AND (expires_at IS NULL OR expires_at > ?)", tenantID, model.ConsentStatusActive, now).
 		Order("issued_at DESC").
 		Find(&tokens).Error; err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func (r *Repository) RevokeConsentToken(ctx context.Context, tenantID, tokenID, 
 	}
 	return r.db.WithContext(ctx).
 		Model(&model.ConsentToken{}).
-		Where("tenant_id = ? AND id = ?", tenantID, tokenID).
+		Where("tenant_uuid = ? AND id = ?", tenantID, tokenID).
 		Updates(updates).Error
 }
 
@@ -164,8 +164,8 @@ func (r *Repository) CreateLifecycleEvent(ctx context.Context, event *model.Life
 	if event == nil {
 		return nil, gorm.ErrInvalidData
 	}
-	if event.TenantID == "" || event.AssetKey == "" {
-		return nil, errors.New("tenant_id and asset_key are required")
+	if event.TenantUuid == "" || event.AssetKey == "" {
+		return nil, errors.New("tenant_uuid and asset_key are required")
 	}
 	if event.EventType == "" {
 		return nil, errors.New("event_type is required")
@@ -180,7 +180,7 @@ func (r *Repository) CreateLifecycleEvent(ctx context.Context, event *model.Life
 func (r *Repository) ListLifecycleEvents(ctx context.Context, tenantID string, eventTypes []string, limit int) ([]*model.LifecycleEvent, error) {
 	query := r.db.WithContext(ctx).
 		Model(&model.LifecycleEvent{}).
-		Where("tenant_id = ?", tenantID)
+		Where("tenant_uuid = ?", tenantID)
 	if len(eventTypes) > 0 {
 		query = query.Where("event_type IN ?", eventTypes)
 	}
@@ -209,6 +209,6 @@ func (r *Repository) UpdateLifecycleEventStatus(ctx context.Context, tenantID, e
 	}
 	return r.db.WithContext(ctx).
 		Model(&model.LifecycleEvent{}).
-		Where("tenant_id = ? AND id = ?", tenantID, eventID).
+		Where("tenant_uuid = ? AND id = ?", tenantID, eventID).
 		Updates(updates).Error
 }

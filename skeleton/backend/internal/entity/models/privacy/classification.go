@@ -25,7 +25,7 @@ const (
 // DataClassification maps tenant datasets to classification tiers and lawful basis.
 type DataClassification struct {
 	ID              string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID        string            `gorm:"column:tenant_id;type:text;not null" json:"tenant_id"`
+	TenantUuid      string            `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
 	AssetKey        string            `gorm:"column:asset_key;type:text;not null" json:"asset_key"`
 	Category        string            `gorm:"column:category;type:text;not null" json:"category"`
 	LawfulBasis     string            `gorm:"column:lawful_basis;type:text;not null" json:"lawful_basis"`

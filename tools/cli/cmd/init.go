@@ -149,6 +149,10 @@ func runInit(args []string) error {
 		return err
 	}
 
+	if err := copyGovernanceDirs(targetRoot, *force); err != nil {
+		return err
+	}
+
 	// Install dependencies if requested
 	if *installDeps {
 		if err := installDependencies(backendDir, webDir); err != nil {
@@ -171,6 +175,7 @@ func runInit(args []string) error {
 	if *publishManifestPath != "" {
 		fmt.Fprintf(os.Stdout, "  created %s\n", strings.TrimPrefix(*publishManifestPath, targetRoot+string(os.PathSeparator)))
 	}
+	fmt.Fprintln(os.Stdout, "  governance .specify/ & .codex copied from CLI repo for Speckit/Codex automation (safe to remove or relocate if not needed).")
 	fmt.Fprintln(os.Stdout, "Next steps:")
 	fmt.Fprintln(os.Stdout, "  - Update go.mod module path if necessary.")
 	if !*installDeps {
@@ -329,9 +334,9 @@ func writeSbom(sbomPath, pluginID, version, modulePath string, files []string, p
 	}
 
 	type sbomData struct {
-		Schema        string `json:"schema"`
-		GeneratedAt   string `json:"generatedAt"`
-		Plugin        struct {
+		Schema      string `json:"schema"`
+		GeneratedAt string `json:"generatedAt"`
+		Plugin      struct {
 			ID      string `json:"id"`
 			Version string `json:"version"`
 			Module  string `json:"module"`
@@ -427,4 +432,92 @@ func installDependencies(backendDir, webDir string) error {
 	}
 
 	return nil
+}
+
+func copyGovernanceDirs(targetRoot string, force bool) error {
+	sourceDirs := []string{".specify", ".codex"}
+	projectRoot := findRepoRoot()
+	if projectRoot == "" {
+		return nil
+	}
+	for _, dir := range sourceDirs {
+		src := filepath.Join(projectRoot, dir)
+		info, err := os.Stat(src)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		dst := filepath.Join(targetRoot, dir)
+		if _, err := os.Stat(dst); err == nil && !force {
+			continue
+		}
+		if err := copyDirFiltered(src, dst); err != nil {
+			return fmt.Errorf("copy %s: %w", dir, err)
+		}
+	}
+	return nil
+}
+
+func copyDirFiltered(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if rel == ".git" || strings.HasPrefix(rel, ".git/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		target := filepath.Join(dst, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, info.Mode())
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		return copyFileContents(path, target, info.Mode())
+	})
+}
+
+func copyFileContents(src, dst string, mode os.FileMode) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, mode)
+}
+
+func findRepoRoot() string {
+	starts := []string{}
+	if exe, err := os.Executable(); err == nil {
+		starts = append(starts, filepath.Dir(exe))
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		starts = append(starts, cwd)
+	}
+	for _, start := range starts {
+		if root := ascendUntilGit(start); root != "" {
+			return root
+		}
+	}
+	return ""
+}
+
+func ascendUntilGit(start string) string {
+	current := start
+	for {
+		gitPath := filepath.Join(current, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			return current
+		}
+		next := filepath.Dir(current)
+		if next == current {
+			return ""
+		}
+		current = next
+	}
 }

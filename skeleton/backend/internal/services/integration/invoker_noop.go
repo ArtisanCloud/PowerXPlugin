@@ -19,8 +19,8 @@ func NewNoopInvoker(logger *logrus.Entry) HostInvoker {
 func (n *noopInvoker) Invoke(_ context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
 	if n.logger != nil && envelope != nil {
 		n.logger.WithFields(logrus.Fields{
-			"tenant_id":  envelope.TenantID,
-			"tool_scope": envelope.ToolScope,
+			"tenant_uuid": envelope.TenantUuid,
+			"tool_scope":  envelope.ToolScope,
 		}).Debug("noop host invoker executed")
 	}
 	return &HostInvocationResult{

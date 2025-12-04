@@ -164,7 +164,7 @@ func SetQuotaUsage(pluginID, scope, scopeRef string, usage float64) {
 func AddCost(pluginID, tenantID string, amount float64) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
-	key, _ := labelsKey(map[string]string{"plugin_id": pluginID, "tenant_id": tenantID})
+	key, _ := labelsKey(map[string]string{"plugin_id": pluginID, "tenant_uuid": tenantID})
 	ensureCounter(metricCostTotal)[key] += amount
 }
 

@@ -3,6 +3,7 @@ package template
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
@@ -21,53 +22,45 @@ func NewTemplateRepository(db *gorm.DB) *TemplateRepository {
 }
 
 func (r *TemplateRepository) FindByID(ctx context.Context, id uint64) (*dbm.Template, error) {
-	tenantID, err := authx.RequireTenantID(ctx)
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return r.BaseRepository.GetById(ctx, id, func(db *gorm.DB) *gorm.DB {
-		if tenantID > 0 {
-			return db.Where("tenant_id = ?", tenantID)
-		}
-		return db
+		return db.Where("tenant_uuid = ?", tenantUUID)
 	})
 }
 
 func (r *TemplateRepository) Create(ctx context.Context, t *dbm.Template) (*dbm.Template, error) {
-	tenantID, err := authx.RequireTenantID(ctx)
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if t.TenantID == 0 {
-		t.TenantID = tenantID
-	} else if t.TenantID != tenantID {
+	if strings.TrimSpace(t.TenantUuid) == "" {
+		t.TenantUuid = tenantUUID
+	} else if !strings.EqualFold(t.TenantUuid, tenantUUID) {
 		return nil, gorm.ErrInvalidData
 	}
 	return r.BaseRepository.Create(ctx, t)
 }
 
 func (r *TemplateRepository) UpdateByID(ctx context.Context, id uint64, fields map[string]interface{}) (*dbm.Template, error) {
-	tenantID, err := authx.RequireTenantID(ctx)
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return r.BaseRepository.UpdateByID(ctx, id, fields, func(db *gorm.DB) *gorm.DB {
-		if tenantID > 0 {
-			return db.Where("tenant_id = ?", tenantID)
-		}
-		return db
+		return db.Where("tenant_uuid = ?", tenantUUID)
 	})
 }
 
 func (r *TemplateRepository) DeleteByID(ctx context.Context, id uint64) error {
-	tenantID, err := authx.RequireTenantID(ctx)
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return err
 	}
 	where := map[string]interface{}{"id": id}
-	if tenantID > 0 {
-		where["tenant_id"] = tenantID
-	}
+	where["tenant_uuid"] = tenantUUID
 	_, err = r.BaseRepository.Delete(ctx, where, nil, true)
 	return err
 }
@@ -79,12 +72,12 @@ func (r *TemplateRepository) FindPage(
 	cb func(*gorm.DB, interface{}) *gorm.DB,
 	opt interface{},
 ) (*repository.Page[[]*dbm.Template], error) {
-	tenantID, err := authx.RequireTenantID(ctx)
+	tenantUUID, err := authx.RequireTenantUUID(ctx)
 	if err != nil {
 		return nil, err
 	}
 	conds := map[string]interface{}{
-		"tenant_id = ?": tenantID,
+		"tenant_uuid = ?": tenantUUID,
 	}
 	if len(conditions) > 0 {
 		for k, v := range conditions {
@@ -94,18 +87,18 @@ func (r *TemplateRepository) FindPage(
 	return r.BaseRepository.FindByCondition(ctx, conds, page, pageSize, cb, opt)
 }
 
-func (r *TemplateRepository) CurrentTenantID(ctx context.Context) (uint64, bool, error) {
+func (r *TemplateRepository) CurrentTenantUUID(ctx context.Context) (string, bool, error) {
 	if r.DB == nil || r.DB.Dialector == nil || r.DB.Dialector.Name() != "postgres" {
-		return 0, false, nil
+		return "", false, nil
 	}
-	var tid sql.NullInt64
+	var tid sql.NullString
 	err := r.DB.WithContext(ctx).
-		Raw(`SELECT current_setting('app.tenant_id', true)::bigint`).Scan(&tid).Error
+		Raw(`SELECT current_setting('app.tenant_uuid', true)`).Scan(&tid).Error
 	if err != nil {
-		return 0, false, err
+		return "", false, err
 	}
 	if !tid.Valid {
-		return 0, false, nil
+		return "", false, nil
 	}
-	return uint64(tid.Int64), true, nil
+	return strings.TrimSpace(tid.String), true, nil
 }

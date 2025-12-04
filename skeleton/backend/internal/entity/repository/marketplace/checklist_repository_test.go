@@ -18,7 +18,7 @@ func TestChecklistRepository_CreateAndFetch(t *testing.T) {
 	run := &dbm.ChecklistRun{
 		ID:            "run-1",
 		ListingID:     "listing-1",
-		TenantID:      "1",
+		TenantUuid:    "1",
 		RunNumber:     1,
 		TriggerSource: dbm.ChecklistTriggerVendor,
 	}
@@ -44,7 +44,7 @@ func TestChecklistRepository_UpdateRunResult(t *testing.T) {
 	run := &dbm.ChecklistRun{
 		ID:            "run-2",
 		ListingID:     "listing-2",
-		TenantID:      "1",
+		TenantUuid:    "1",
 		RunNumber:     1,
 		TriggerSource: dbm.ChecklistTriggerCI,
 	}
@@ -68,7 +68,7 @@ func TestChecklistRepository_ListRuns(t *testing.T) {
 		run := &dbm.ChecklistRun{
 			ID:            fmt.Sprintf("run-3-%d", i),
 			ListingID:     "listing-3",
-			TenantID:      "1",
+			TenantUuid:    "1",
 			RunNumber:     i,
 			TriggerSource: dbm.ChecklistTriggerAuto,
 		}

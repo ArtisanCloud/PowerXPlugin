@@ -304,7 +304,7 @@ func LoadConfigFromDir(dir string) (*Config, error) {
 	// Check if directory exists
 	if info, err := os.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("mTLS config directory does not exist: %s", dir)
+			return nil, fmt.Errorf("mTLS config directory does not exist: %w", err)
 		}
 		return nil, fmt.Errorf("failed to stat mTLS config directory: %w", err)
 	} else if !info.IsDir() {

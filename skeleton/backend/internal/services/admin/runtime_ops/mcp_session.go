@@ -31,7 +31,7 @@ func (s *MCPSessionService) Register(ctx context.Context, session *model.MCPSess
 	if session == nil {
 		return nil, gorm.ErrInvalidData
 	}
-	if _, err := authx.RequireTenantID(ctx); err != nil {
+	if _, err := authx.RequireTenantUUID(ctx); err != nil {
 		return nil, err
 	}
 	if s.repo == nil {

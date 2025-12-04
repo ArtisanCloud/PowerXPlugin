@@ -31,7 +31,7 @@ func (r *AuditRepository) Create(ctx context.Context, evt *model.AuditEvent) err
 // ListOptions encapsulates filters for audit event queries.
 type ListOptions struct {
 	PluginID       string
-	TenantID       *string
+	TenantUuid     *string
 	ActorID        string
 	Action         string
 	PermissionCode string
@@ -44,7 +44,7 @@ type ListOptions struct {
 // ExportOptions defines export query boundaries.
 type ExportOptions struct {
 	PluginID       string
-	TenantID       *string
+	TenantUuid     *string
 	ActorID        string
 	Action         string
 	PermissionCode string
@@ -66,7 +66,7 @@ func (r *AuditRepository) ListEvents(ctx context.Context, opts ListOptions) ([]m
 		limit = 25
 	}
 
-	query := r.baseQuery(ctx, opts.PluginID, opts.TenantID, opts.ActorID, opts.Action, opts.PermissionCode, opts.OccurredAfter, opts.OccurredBefore)
+	query := r.baseQuery(ctx, opts.PluginID, opts.TenantUuid, opts.ActorID, opts.Action, opts.PermissionCode, opts.OccurredAfter, opts.OccurredBefore)
 	if opts.Cursor != "" {
 		ts, id, err := decodeCursor(opts.Cursor)
 		if err != nil {
@@ -97,7 +97,7 @@ func (r *AuditRepository) ExportEvents(ctx context.Context, opts ExportOptions) 
 	if opts.PluginID == "" {
 		return nil, fmt.Errorf("plugin id is required")
 	}
-	query := r.baseQuery(ctx, opts.PluginID, opts.TenantID, opts.ActorID, opts.Action, opts.PermissionCode, opts.OccurredAfter, opts.OccurredBefore)
+	query := r.baseQuery(ctx, opts.PluginID, opts.TenantUuid, opts.ActorID, opts.Action, opts.PermissionCode, opts.OccurredAfter, opts.OccurredBefore)
 	query = query.Order("occurred_at ASC").Order("id ASC")
 	var events []model.AuditEvent
 	if err := query.Find(&events).Error; err != nil {
@@ -118,9 +118,9 @@ func (r *AuditRepository) LatestForAction(ctx context.Context, pluginID string, 
 		query = query.Where("resource_ref = ?", resourceRef)
 	}
 	if tenantID == nil {
-		query = query.Where("tenant_id IS NULL")
+		query = query.Where("tenant_uuid IS NULL")
 	} else {
-		query = query.Where("tenant_id = ?", *tenantID)
+		query = query.Where("tenant_uuid = ?", *tenantID)
 	}
 	var evt model.AuditEvent
 	if err := query.First(&evt).Error; err != nil {
@@ -132,9 +132,9 @@ func (r *AuditRepository) LatestForAction(ctx context.Context, pluginID string, 
 func (r *AuditRepository) baseQuery(ctx context.Context, pluginID string, tenantID *string, actorID, action, permission string, after, before *time.Time) *gorm.DB {
 	query := r.DB.WithContext(ctx).Where("plugin_id = ?", pluginID)
 	if tenantID == nil {
-		query = query.Where("tenant_id IS NULL")
+		query = query.Where("tenant_uuid IS NULL")
 	} else {
-		query = query.Where("tenant_id = ?", *tenantID)
+		query = query.Where("tenant_uuid = ?", *tenantID)
 	}
 	if strings.TrimSpace(actorID) != "" {
 		query = query.Where("actor_id = ?", strings.TrimSpace(actorID))

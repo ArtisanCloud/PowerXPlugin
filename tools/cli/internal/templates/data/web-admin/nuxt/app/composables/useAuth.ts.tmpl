@@ -1,3 +1,5 @@
+import { getCurrentScope, onScopeDispose } from "vue";
+import { useRuntimeConfig } from "#imports";
 import type { LoginResponse } from "~/composables/api/services/authService";
 import { useAuthService } from "~/composables/api/services/authService";
 
@@ -33,6 +35,47 @@ const writeCookie = (name: string, value: string | null) => {
   )}; path=/; SameSite=Lax`;
 };
 
+const decodeBase64Url = (input: string) => {
+  if (!input) return "";
+  let output = input.replace(/-/g, "+").replace(/_/g, "/");
+  while (output.length % 4 !== 0) {
+    output += "=";
+  }
+  if (typeof atob === "function") {
+    return atob(output);
+  }
+  if (typeof globalThis !== "undefined" && (globalThis as any).Buffer) {
+    return (globalThis as any).Buffer.from(output, "base64").toString("utf-8");
+  }
+  return "";
+};
+
+const extractTenantUuidFromToken = (token?: string | null) => {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const payload = JSON.parse(decodeBase64Url(parts[1]));
+    const candidate =
+      payload?.tid ??
+      payload?.tenant_uuid ??
+      payload?.tenantUuid ??
+      payload?.tenantID ??
+      payload?.tenantId;
+    if (typeof candidate === "string" && candidate.trim() !== "") {
+      return candidate.trim();
+    }
+  } catch (err) {
+    console.warn("[useAuth] failed to parse tenant uuid from token", err);
+  }
+  return null;
+};
+
+const storeTenantUuidFromToken = (token?: string | null) => {
+  const uuid = extractTenantUuidFromToken(token);
+  writeCookie("tenant_uuid", uuid && uuid.length ? uuid : null);
+};
+
 const safeLocalStorage = {
   getItem(key: string) {
     if (typeof window === "undefined") return null;
@@ -62,6 +105,10 @@ const safeLocalStorage = {
 };
 
 export const useAuth = () => {
+  const runtimeConfig = useRuntimeConfig();
+  // Standalone 模式下宿主/脚手架可能只广播 access token（无 refresh token），允许继续维持会话。
+  const allowRefreshlessSession = runtimeConfig.public?.insidePowerX !== true;
+
   const isAuthenticated = useState("auth.isAuthenticated", () => false);
   const user = useState("auth.user", () => null);
   const token = useState<Nullable<string>>("auth.token", () => null);
@@ -80,6 +127,7 @@ export const useAuth = () => {
     safeLocalStorage.setItem("scope", data.scope);
     safeLocalStorage.setItem("expires_at", expires.toString());
     writeCookie("token", data.access_token);
+    storeTenantUuidFromToken(data.access_token);
     token.value = data.access_token;
     refreshToken.value = data.refresh_token;
     expiresAt.value = expires;
@@ -96,6 +144,7 @@ export const useAuth = () => {
     if (process.client) {
       STORAGE_KEYS.forEach((key) => safeLocalStorage.removeItem(key));
       writeCookie("token", null);
+      writeCookie("tenant_uuid", null);
       try {
         const preserved = sessionStorage?.getItem(AUTH_ERROR_KEY);
         sessionStorage?.clear();
@@ -153,9 +202,14 @@ export const useAuth = () => {
     const storedToken = getStoredToken();
     const storedRefresh = safeLocalStorage.getItem("refresh_token");
     const storedExpires = safeLocalStorage.getItem("expires_at");
-    if (storedToken && storedRefresh && storedExpires) {
-      token.value = storedToken;
-      refreshToken.value = storedRefresh;
+    const hasTokenAndExpiry = Boolean(storedToken && storedExpires);
+    const hasRefresh = Boolean(storedRefresh);
+    const canRestoreSession =
+      hasTokenAndExpiry && (hasRefresh || allowRefreshlessSession);
+
+    if (canRestoreSession) {
+      token.value = storedToken!;
+      refreshToken.value = hasRefresh ? storedRefresh : null;
       expiresAt.value = Number(storedExpires);
       isAuthenticated.value = !isTokenExpired();
     } else {
@@ -210,9 +264,11 @@ export const useAuth = () => {
       syncFromStorage();
     };
     window.addEventListener("storage", handler);
-    onBeforeUnmount(() => {
-      window.removeEventListener("storage", handler);
-    });
+    if (getCurrentScope()) {
+      onScopeDispose(() => {
+        window.removeEventListener("storage", handler);
+      });
+    }
   };
 
   const logout = async () => {

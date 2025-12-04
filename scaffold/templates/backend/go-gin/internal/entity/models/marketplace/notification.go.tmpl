@@ -16,7 +16,7 @@ const (
 // Notification represents marketplace-scoped communication entries (email/webhook/in-app).
 type Notification struct {
 	ID            string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID      string            `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid    string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	RecipientType string            `gorm:"column:recipient_type;type:text;not null" json:"recipient_type"`
 	RecipientID   string            `gorm:"column:recipient_id;type:text;not null" json:"recipient_id"`
 	Channel       string            `gorm:"column:channel;type:text;not null" json:"channel"`

@@ -5,7 +5,7 @@ package marketplace;
 option go_package = "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/marketplace";
 
 message IssueLicenseRequest {
-  string tenant_id = 1;
+  string tenant_uuid = 1;
   string listing_id = 2;
   string plan_id = 3;
   string issued_by = 4;
@@ -19,7 +19,7 @@ message IssueLicenseResponse {
 }
 
 message RenewLicenseRequest {
-  string tenant_id = 1;
+  string tenant_uuid = 1;
   string license_id = 2;
   string plan_id = 3;
   string renewal_token = 4;
@@ -31,7 +31,7 @@ message RenewLicenseResponse {
 }
 
 message VerifyLicenseRequest {
-  string tenant_id = 1;
+  string tenant_uuid = 1;
   string listing_id = 2;
 }
 
@@ -43,7 +43,7 @@ message VerifyLicenseResponse {
 
 message License {
   string id = 1;
-  string tenant_id = 2;
+  string tenant_uuid = 2;
   string listing_id = 3;
   string plan_id = 4;
   string status = 5;

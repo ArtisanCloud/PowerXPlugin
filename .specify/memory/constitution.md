@@ -1,88 +1,135 @@
-# PowerXPlugin 宪章
+---
+# ① Manifest Path（manifest 解析声明）
+manifest: .specify/memory/manifest.yaml
 
-## 核心原则
+# ② 别名启用（插件侧）
+use:
+  - "@plugin-crud-http"
+  - "@plugin-crud-grpc"
+  - "@plugin-frontend-admin"   # 前端（web-admin）聚合别名
 
-### I. 双重使命仓库
-PowerXPlugin 同时提供可运行的脚手架骨架和可复用的框架；任何改动都必须保持脚手架产出与框架包一致，让下游插件延续统一体验。
+# ③ 指南文件（用于 /plan 语义扩展）
+include:
+  - dev_crud_http_guides.md
+  - dev_crud_grpc_guides.md
+  - dev_sts_guides.md
+  - dev_frontend_guides.md      # 前端开发约定（Nuxt 4 + Nuxt UI 3.3.x）
 
-### II. 契约优先兼容性
-Manifest、RBAC、健康检查与 API 契约是唯一真相：相关 Schema 必须存放于 `docs/contracts/**`，生成 OpenAPI/JSON Schema 工件，并在上线前通过代码生成或运行时校验被实现端消费。
+# ④ Ruleset Paths（显式暴露以便 Runner 能读取）
+rulesets:
+  # 后端顶层
+  - rulesets/crud_http.yaml
+  - rulesets/crud_grpc.yaml
+  - rulesets/sts.yaml
 
-### III. Go + Nuxt 基线
-默认技术栈为 Go（Gin）+ Nuxt；仓库依赖 `go.work` 管理离散模块（如 `framework/`、`tools/cli/`），并在 `sdk/workspace/` 下维护 npm workspace，锁定依赖并输出 `@powerx-plugin/framework-*` 套件。
+  # 前端顶层
+  - rulesets/frontend_admin.yaml
 
-### IV. 脚手架与 CLI 纪律
-`px-plugin` CLI 模板具有最高约束力：必须渲染当前骨架（后端 `go run ./cmd/plugin`、管理端 `npm run dev` 可直接运行），并清晰标注实验参数、占位实现（如 AuthGuard）及暂不支持的流程。
+  # 后端细分
+  - rulesets/crud/api_rest.yaml
+  - rulesets/crud/handler_http.yaml
+  - rulesets/crud/dto.yaml
+  - rulesets/crud/service.yaml
+  - rulesets/crud/repository.yaml
+  - rulesets/crud/model.yaml
+  - rulesets/crud/migration.yaml
+  - rulesets/crud/transport_grpc.yaml
+  - rulesets/crud/proto_gen.yaml
+  - rulesets/crud/di.yaml
+  - rulesets/crud/test.yaml
 
-### V. 透明交付与一致性
-文档、TODO 状态与发布记录必须真实反映实现情况；CI 强制执行 Go lint/test 与 `npm run build`，每个阶段推进都需满足 `docs/init-project.md` 的检查清单或明确记录延期。
+  # 前端细分
+  - rulesets/crud/frontend/nuxt_api_client.yaml
+  - rulesets/crud/frontend/nuxt_pages.yaml
+  - rulesets/crud/frontend/nuxt_components.yaml
+  - rulesets/crud/frontend/nuxt_stores.yaml
+  - rulesets/crud/frontend/nuxt_i18n.yaml
+  - rulesets/crud/frontend/nuxt_layout.yaml
+  - rulesets/crud/frontend/nuxt_tests.yaml
+---
 
-## 实施约束
+# PowerXPlugin Constitution (Plugins Only)
 
-- 维持根目录 `go.work` 的多模块结构，确保 `framework/` 与 `tools/cli/` 可独立构建，并通过 `github.com/ArtisanCloud/PowerXPlugin/framework/...` 暴露导入路径。
-- 前端产物必须位于 `sdk/workspace/` 下的 npm workspace，锁定依赖版本并发布 `@powerx-plugin/framework-admin`、`@powerx-plugin/framework-client`，让 Nuxt 项目可直接安装使用。
-- 脚手架模板需提供可运行默认项：后端串联 `bootstrap`、`router` 与 Manifest 注册；前端提供 Nuxt 布局层、导航壳与可覆写的 API 助手。
-- `plugin.yaml` 元数据、脚手架模板（`scaffold/templates/**`）与 CLI 命令（`init` 及计划中的 `package/dist/publish`）必须保持一致，并为未实现命令标注“设计稿”状态。
-- 共用中间件（如 AuthGuard 占位）、可观测性钩子与契约适配器需沉淀于 `framework/` 内，以便插件项目在其之上扩展而非复制。
+> 本宪章仅约束 **插件侧仓库（PowerXPlugin）**：包含后端 API 与 **web-admin 等前端实现**。  
+> CoreX 的规则以 PowerX 仓库中的 Constitution 为准，本文件不替代、不覆盖 Core 配置。
 
-## 开发流程与质量闸门
+## Core Principles
 
-- 严格遵循分阶段路线：先完成仓库地基（Phase 0），再推进协议沉淀（Phase 1）、骨架抽取（Phase 2）、框架拆分（Phase 3）、CLI/模板扩展（Phase 4），最终通过生成示例验收（Phase 5）。
-- 契约变更视为上线闸门——更新 Schema 或 OpenAPI 时，必须同步提交代码生成/校验及文档改动。
-- 新增 CLI 能力或模板调整，需通过 `px-plugin init <plugin-id>` 实际生成验证，并在 `examples/` 中记录，审查时比对基准插件差异。
-- CI 必须覆盖 Go lint/test 与前端构建；除非在 `docs/init-project.md` 中明示临时豁免，否则禁止手动合并未通过检查的变更。
-- 任何占位或实验功能都要附带 TODO 与路线图关联，提醒使用者成熟度与风险。
+### I. Host Contract First（反代合同优先）
 
-## VI. 插件项目产出规范
+- 业务 API 暴露在 `/v1/**`；管理端点：`/api/v1/admin/{manifest,rbac}`；`plugin.yaml` 与运行时清单保持一致。
+- 出站访问 PowerX 必须使用 **STS** 短期凭证；禁止直接耦合宿主内部实现。
 
-PowerXPlugin 脚手架产出的插件项目必须遵循以下基本约束，以确保下游插件延续统一架构与体验：
+### II. Tenant Isolation & Zero Trust（多租户与零信任）
 
-### 目录分层
-```
-backend/
-└── internal/
-    ├── transport/http/{admin,agent,...}/<domain>/
-    ├── services/{admin,agent,...}/<domain>/
-    └── domain/{models,repository}/<domain>/
-```
-- 使用 lower_snake_case 作为目录名
-- Handler 仅负责入参校验→鉴权→调用 Service→序列化
-- 业务编排逻辑必须在 `internal/services` 中完成
-- HTTP 与 gRPC 复用同一 Service 层
+- 入站请求在读写状态前**必须**验签（JWT/HMAC）；`POWERX_DEV_MODE` 仅限本地。
+- 模型携带 `tenant_uuid`，启用 **RLS**；Repo 在 `BeginTenantTx` 中执行并 `SET LOCAL app.tenant_uuid`。
+- 所有租户上下文（字段、请求/响应、配置、日志标签）一律使用 **Tenant UUID**（字符串/UUID 类型）；禁止新增或保留 `tenant_id`（数字）字段与变量，历史遗留必须迁移并移除。
+- 秘钥/令牌/DB 角色遵循**最小权限**并可轮换（STS/环境托管）。
 
-### Repository 层约束
-- **必须内嵌** `repository.BaseRepository[T]` 并提供 `NewXXXRepository` 构造函数
-- **禁止直接暴露裸 `*gorm.DB` 字段**（维持读写封装一致性）
-- 所有读写操作须在租户上下文中执行：`BeginTenantTx` → `SET LOCAL app.tenant_id`
-- 参考完整规范：`com.powerx.plugin.base/.specify/memory/rulesets/crud/repository.yaml`
+### III. Service-Centric Architecture（服务为中心）
 
-### 统一响应格式
-```json
-{
-  "success": true,
-  "data": {},
-  "message": "",
-  "error": null,
-  "timestamp": "2024-12-09T12:00:00Z",
-  "request_id": "rq-123"
-}
-```
-- 分页响应：`data` 字段内返回 `{ "items": [...], "total": 135, "page": 1, "page_size": 20 }`
-- 错误响应：`error` 字段包含 `{ "code": "ERROR_CODE", "message": "...", "details": {} }`
+- Handler 保持**薄**：校验→鉴权→调用 Service→序列化；业务编排**仅在** `internal/services`。
+- Repo 封装数据访问细节；HTTP 与 gRPC **复用同一** Service。
+- 依赖通过容器注入（配置、日志、客户端），保证可测试与可重放构造。
+- 新增子域须沿用目录分层：`internal/transport/http/{admin,agent,...}/<domain>` → `internal/services/{admin,agent,...}/<domain>` → `internal/domain/{models,repository}/<domain>`，目录名使用 lower_snake_case，避免自定义层级。
+ - Repository 必须内嵌 `*repository.BaseRepository[T]` 并提供 `NewXXXRepository` 构造函数；禁止直接暴露裸 `*gorm.DB` 字段以维持一致的读写封装。
 
-### 中间件栈顺序
-1. `request_id` — 生成/透传请求 ID
-2. `ctx_verify` — JWT/HMAC 验签，抽取 `tenant_id/user_id/permissions`
-3. `rbac_guard` — 服务端权限判定
-4. `tenant_ctx` — 设置 DB 会话变量（RLS 支持）
-5. `recovery/logging` — 统一结构化日志与 panic 保护
+### IV. Observable & Testable Delivery（可观测与可测试）
 
-> 完整插件开发规范、DTO 校验、测试策略等详细内容，参见：
-> - `com.powerx.plugin.base/.specify/memory/constitution.md`
-> - `com.powerx.plugin.base/.specify/memory/rulesets/`
+- 结构化日志（含 request_id/tenant_uuid）、`/healthz`、必要指标钩子。
+- 事件、遥测、审计等观测器/Emitter 统一放置在 `backend/internal/observability/<domain>`，由 Service/作业统一调用，避免 Handler 与 Service 内部混杂日志装饰。
+- 变更须配套测试：Service 单测、多租户集成测、迁移冒烟；迁移可幂等、可回滚，并受 `POWERX_RUN_MIGRATE` 控制。
 
-## 治理
+### V. Minimal Footprint & Versioned Releases（轻量与版本化）
 
-本宪章优先于既有实践；任何修订都必须经架构评审，更新路线图条目，提供现有插件的迁移指引，并同步更新 `docs/` 文档。评审需核验是否遵循上述原则、约束与流程闸门。
+- 依赖最小化，优先模板栈（Go + Nuxt）；发布前清理死代码。
+- 交付必须更新文档/清单，并通过 `make release && make package-release`（或 CI 等价）打包。
+- 破坏性变更需 **SemVer** 升级并提供迁移指南。
 
-**版本**: 0.1.0 | **批准日期**: 2025-10-29 | **最后修订**: 2025-11-01
+## Operational Constraints
+
+- **Language Versions**: Backend services MUST target Go 1.24; frontend/admin stacks MUST use Node 20 with TypeScript 4.x plus Nuxt 4 presets.
+- **Database Schema**: Plugin-managed tables deploy under the `powerx_plugin_base` schema defined in `plugin.yaml`; only local, isolated development may fall back to `public`.
+- **Database**：Postgres ≥ 13；插件使用 `plugin.yaml` 中声明的单一 schema（默认 `powerx_plugin_base`）；RLS 强制；迁移使用项目提供工具链。
+- **Model Declaration**：所有需要持久化的领域模型必须显式声明 `gorm` 列定义与 `json` 标签，并在 `backend/cmd/database/migrate/migrate.go` 中注册，确保 `AutoMigrate` 同步表结构。
+  - 表名常量统一集中在 `backend/internal/domain/models/model.go`；`TableName()` 必须通过 `models.S(<TABLE_CONSTANT>)` 返回，禁止直接使用硬编码字符串。
+- **Configuration Layout**：后端运行配置统一存放 `backend/etc/`（含 manifest runtime overrides）；禁止在仓库其他目录自定义配置副本。
+- **Runtime**：生产禁用 `POWERX_DEV_MODE`；配置 `POWERX_CTX_*`（issuer/audience）；服务监听 `POWERX_BIND_ADDR`。
+- **Networking（反代）**：宿主路由  
+  `/_p/<plugin-id>/admin/* → web-admin/.output/**`  
+  `/_p/<plugin-id>/api/*   → backend /v1/**`  
+  前端与 SDK **必须**遵守该前缀。
+- **Secrets & Credentials**：访问 PowerX API 需调用 `/_p/_internal/sts/exchange` 获取 STS；禁止长效凭据。
+- **Frontend（web-admin 等）**：  
+  - Nuxt 运行期基于 `runtimeConfig.public.apiBaseUrl` 适配「直连 `:8086/v1`」与「宿主反代 `/_p/<plugin-id>/api/v1`」。  
+  - 打包产物**固定**在 `web-admin/.output/` 并**随发布包交付**。  
+  - `plugin.yaml → frontend.admin.menus` 记录的是插件安装时向宿主登记的菜单；该列表由开发者按需求精简，允许与本地开发时展示的调试菜单不同。诸如 `plugins.base.integration` 仅用于本地演示，不应写入 manifest，而 `plugins.base.operations` 需在交付前确认策略与入口并显式声明。
+  - UI 组件遵循 Nuxt UI 3.3.x：`UModal v-model:open`、`USwitch`（无 `UToggle`）、`color ∈ {primary,secondary,success,info,warning,error,neutral}`。
+  - 共享 TypeScript 类型集中存放在 `web-admin/app/types/`，通过 `~/types/...` 引入；新增/更新类型需同步文档、生成器或脚手架规范。
+  - Go 代码中的导入别名必须使用 UpperCamel 命名（例如 `runtimeOpsModel`、`securityModel`），避免 snake_case 或简写影响可读性。
+  - 前端依赖管理默认使用 **npm**；执行安装、构建、测试时请使用 `npm install`、`npm run build` 等命令，除非另有说明。
+
+## Development Workflow & Quality Gates
+
+- **Spec → Plan → Tasks**：自规范开始；`plan.md` 通过 Constitution Check；`tasks.md` 按用户故事分组，保持 MVP 切片。
+- **Gate Reviews**：实装前评审合同/租户/测试覆盖；完工评审可观测与迁移纪律。
+- **CI**：`make test`、迁移冒烟、（有前端则）Nuxt lint/build；未绿灯不合并。
+- **Release Readiness**：交付包含 `plugin.yaml`、manifest/RBAC、版本号与 `docs/` 更新。
+- **Incidents**：前滚修复并补测试；回滚需保持 schema 兼容。
+- **Documentation Hygiene**：禁止提交无实际内容的 `doc.go` 或其它文档占位文件；同样禁止生成仅含空结构或注释占位的源码文件（如 `registry.go` 模板）。若目录需要说明或占位，必须写入具备实际指导意义的注释/实现，否则直接删除该文件。
+
+## Governance
+
+- 本宪章优先级高于其他约定；偏离需提 RFC 并经 Core 审核，记录到 `docs/references/changelog.md`。
+- 修订遵循 SemVer；记录动机与迁移要求。
+- 评审与发版环节强制检查合规并留痕。
+- 模板同步由文档维护；新增 TODO 必须指定负责人与截止时间。
+
+## Appendix A: UI Layer Definition（Optional）
+
+- **ID**: PX-FE-001  
+- “frontend” 为**泛指**：`web-admin/`、`web-app/`、`mini-app/`、`mobile-app/` 等任一 UI 层。  
+- 每个项目需在 `plan.md → Project Structure` 明确本次涉及的 UI 层，并与 rulesets 的输出路径一致。
+
+**Version**: 1.0.0 | **Ratified**: 2025-10-11 | **Last Amended**: 2025-10-11

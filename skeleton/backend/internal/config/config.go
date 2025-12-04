@@ -3,14 +3,21 @@ package config
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+)
+
+const (
+	defaultGRPCPort        = 9101
+	defaultGRPCPortRetries = 10
 )
 
 // Config 插件配置结构
@@ -234,11 +241,11 @@ type LoggingConfig struct {
 
 // GRPCUpstream PowerX gRPC 上游配置
 type GRPCUpstream struct {
-	Address  string `yaml:"address" json:"address"`     // PowerX 网关/服务地址，如 "localhost:9001"
-	Token    string `yaml:"token" json:"token"`         // Capability Token（插件安装后下发）
-	TenantID int64  `yaml:"tenant_id" json:"tenant_id"` // 当前租户
-	UseTLS   bool   `yaml:"use_tls" json:"use_tls"`     // 上线后建议 true
-	CACert   string `yaml:"ca_cert" json:"ca_cert"`     // 可选：根证书（UseTLS=true 时）
+	Address    string `yaml:"address" json:"address"`         // PowerX 网关/服务地址，如 "localhost:9001"
+	Token      string `yaml:"token" json:"token"`             // Capability Token（插件安装后下发）
+	TenantUUID string `yaml:"tenant_uuid" json:"tenant_uuid"` // 当前租户（UUID）
+	UseTLS     bool   `yaml:"use_tls" json:"use_tls"`         // 上线后建议 true
+	CACert     string `yaml:"ca_cert" json:"ca_cert"`         // 可选：根证书（UseTLS=true 时）
 	// STS 交换短期令牌（可选）：若配置，则优先通过 STS 获取内存 Token
 	STSClientID     string        `yaml:"sts_client_id" json:"sts_client_id"`
 	STSClientSecret string        `yaml:"sts_client_secret" json:"sts_client_secret"`
@@ -256,11 +263,13 @@ type GRPCUpstream struct {
 
 // GRPCServer 插件 gRPC 服务器配置
 type GRPCServer struct {
-	Enable bool   `yaml:"enable" json:"enable"` // 是否启用插件自己的 gRPC Server
-	Addr   string `yaml:"addr" json:"addr"`     // 插件 gRPC 监听，如 ":9101"
-	UseTLS bool   `yaml:"use_tls" json:"use_tls"`
-	Cert   string `yaml:"cert" json:"cert"`
-	Key    string `yaml:"key" json:"key"`
+	Enable         bool   `yaml:"enable" json:"enable"`                     // 是否启用插件自己的 gRPC Server
+	Addr           string `yaml:"addr" json:"addr"`                         // 插件 gRPC 监听，如 ":9101"
+	Port           int    `yaml:"port" json:"port"`                         // 仅提供端口时自动拼接监听地址
+	PortMaxRetries int    `yaml:"port_max_retries" json:"port_max_retries"` // 端口冲突时最多尝试次数
+	UseTLS         bool   `yaml:"use_tls" json:"use_tls"`
+	Cert           string `yaml:"cert" json:"cert"`
+	Key            string `yaml:"key" json:"key"`
 }
 
 // ContextConfig PowerX 上下文相关配置
@@ -346,7 +355,7 @@ func defaultSecurityBaselineConfig() *SecurityBaselineConfig {
 func getDefaultConfig() *Config {
 	return &Config{
 		Server: &ServerConfig{
-			BindAddr: ":8087",
+			BindAddr: ":8078",
 			LogLevel: "info",
 			DevMode:  false,
 		},
@@ -456,7 +465,7 @@ func getDefaultConfig() *Config {
 		GRPCUpstream: &GRPCUpstream{
 			Address:     "localhost:9001",
 			Token:       "",
-			TenantID:    1,
+			TenantUUID:  "",
 			UseTLS:      false,
 			CACert:      "",
 			STSAudience: "powerx:api",
@@ -466,11 +475,13 @@ func getDefaultConfig() *Config {
 			Optional:    false,
 		},
 		GRPCServer: &GRPCServer{
-			Enable: true,
-			Addr:   ":9101",
-			UseTLS: false,
-			Cert:   "",
-			Key:    "",
+			Enable:         true,
+			Addr:           ":9101",
+			Port:           9101,
+			PortMaxRetries: 10,
+			UseTLS:         false,
+			Cert:           "",
+			Key:            "",
 		},
 		SecurityBaseline: defaultSecurityBaselineConfig(),
 	}
@@ -755,10 +766,11 @@ func loadEnvConfig(cfg *Config) {
 	if grpcToken := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_TOKEN")); grpcToken != "" {
 		cfg.GRPCUpstream.Token = grpcToken
 	}
-	if grpcTenantID := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_TENANT_ID")); grpcTenantID != "" {
-		if tenantID, err := strconv.ParseInt(grpcTenantID, 10, 64); err == nil {
-			cfg.GRPCUpstream.TenantID = tenantID
-		}
+	if grpcTenantUUID := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_TENANT_UUID")); grpcTenantUUID != "" {
+		cfg.GRPCUpstream.TenantUUID = grpcTenantUUID
+	} else if grpcTenantUuid := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_TENANT_ID")); grpcTenantUuid != "" {
+		// 兼容旧变量 POWERX_GRPC_UPSTREAM_TENANT_ID，后续统一迁移为 *_TENANT_UUID。
+		cfg.GRPCUpstream.TenantUUID = grpcTenantUuid
 	}
 	if grpcUseTLS := resolveConfigValue(os.Getenv("POWERX_GRPC_UPSTREAM_USE_TLS")); strings.EqualFold(grpcUseTLS, "true") {
 		cfg.GRPCUpstream.UseTLS = true
@@ -792,6 +804,16 @@ func loadEnvConfig(cfg *Config) {
 	}
 	if grpcServerAddr := resolveConfigValue(os.Getenv("POWERX_GRPC_SERVER_ADDR")); grpcServerAddr != "" {
 		cfg.GRPCServer.Addr = grpcServerAddr
+	}
+	if grpcServerPort := resolveConfigValue(os.Getenv("POWERX_GRPC_SERVER_PORT")); grpcServerPort != "" {
+		if portVal, err := strconv.Atoi(grpcServerPort); err == nil {
+			cfg.GRPCServer.Port = portVal
+		}
+	}
+	if grpcServerRetry := resolveConfigValue(os.Getenv("POWERX_GRPC_SERVER_PORT_MAX_RETRIES")); grpcServerRetry != "" {
+		if retryVal, err := strconv.Atoi(grpcServerRetry); err == nil {
+			cfg.GRPCServer.PortMaxRetries = retryVal
+		}
 	}
 	if grpcServerUseTLS := resolveConfigValue(os.Getenv("POWERX_GRPC_SERVER_USE_TLS")); strings.EqualFold(grpcServerUseTLS, "true") {
 		cfg.GRPCServer.UseTLS = true
@@ -860,6 +882,51 @@ func normalizeConfig(cfg *Config) {
 		cfg.Logging.Format = strings.ToLower(resolveConfigValue(cfg.Logging.Format))
 		cfg.Logging.Output = strings.ToLower(resolveConfigValue(cfg.Logging.Output))
 	}
+	if cfg.GRPCUpstream != nil {
+		cfg.GRPCUpstream.Address = resolveConfigValue(cfg.GRPCUpstream.Address)
+		cfg.GRPCUpstream.Token = resolveConfigValue(cfg.GRPCUpstream.Token)
+		cfg.GRPCUpstream.TenantUUID = strings.ToLower(resolveConfigValue(cfg.GRPCUpstream.TenantUUID))
+		cfg.GRPCUpstream.STSClientID = resolveConfigValue(cfg.GRPCUpstream.STSClientID)
+		cfg.GRPCUpstream.STSClientSecret = resolveConfigValue(cfg.GRPCUpstream.STSClientSecret)
+		cfg.GRPCUpstream.STSAudience = resolveConfigValue(cfg.GRPCUpstream.STSAudience)
+		cfg.GRPCUpstream.STSScope = resolveConfigValue(cfg.GRPCUpstream.STSScope)
+	}
+	if cfg.GRPCServer != nil {
+		cfg.GRPCServer.Addr = resolveConfigValue(cfg.GRPCServer.Addr)
+		normalizeGRPCServerConfig(cfg.GRPCServer)
+	}
+}
+
+func normalizeGRPCServerConfig(server *GRPCServer) {
+	if server == nil {
+		return
+	}
+	if server.Port <= 0 {
+		if port := extractPort(server.Addr); port > 0 {
+			server.Port = port
+		} else {
+			server.Port = defaultGRPCPort
+		}
+	}
+	if server.PortMaxRetries <= 0 {
+		server.PortMaxRetries = defaultGRPCPortRetries
+	}
+}
+
+func extractPort(addr string) int {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return 0
+	}
+	if !strings.Contains(addr, ":") {
+		return 0
+	}
+	if _, portStr, err := net.SplitHostPort(addr); err == nil {
+		if portVal, err := strconv.Atoi(portStr); err == nil {
+			return portVal
+		}
+	}
+	return 0
 }
 
 func resolveConfigValue(value string) string {
@@ -1021,6 +1088,23 @@ func (c *Config) Validate() error {
 
 	if c.Logging.Output == "file" && c.Logging.FilePath == "" {
 		return NewConfigError("logging file path must be specified when output is 'file'")
+	}
+
+	if c.GRPCUpstream != nil {
+		if tenantUUID := strings.TrimSpace(c.GRPCUpstream.TenantUUID); tenantUUID != "" {
+			if _, err := uuid.Parse(tenantUUID); err != nil {
+				return NewConfigError("grpc_upstream.tenant_uuid must be a valid UUID string")
+			}
+		}
+	}
+
+	if c.GRPCServer != nil {
+		if c.GRPCServer.Port <= 0 {
+			return NewConfigError("grpc_server.port must be positive")
+		}
+		if c.GRPCServer.PortMaxRetries < 1 {
+			return NewConfigError("grpc_server.port_max_retries must be positive")
+		}
 	}
 
 	return nil

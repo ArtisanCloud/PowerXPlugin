@@ -16,7 +16,7 @@ const (
 // SecretCredential 描述外部 API 凭证的生命周期信息。
 type SecretCredential struct {
 	ID                string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID          string            `gorm:"column:tenant_id;type:text;not null" json:"tenant_id"`
+	TenantUuid        string            `gorm:"column:tenant_uuid;type:uuid;not null" json:"tenant_uuid"`
 	IntegrationType   string            `gorm:"column:integration_type;type:text;not null" json:"integration_type"`
 	CurrentSecretRef  string            `gorm:"column:current_secret_ref;type:text" json:"current_secret_ref,omitempty"`
 	PendingSecretRef  string            `gorm:"column:pending_secret_ref;type:text" json:"pending_secret_ref,omitempty"`

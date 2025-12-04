@@ -105,7 +105,7 @@ func NewIncidentService(repo *oprepo.IncidentRepository, cfg *config.Config, met
 
 // CreateIncidentRequest captures inputs for incident creation.
 type CreateIncidentRequest struct {
-	TenantID        *string         `json:"tenant_id"`
+	TenantUuid      *string         `json:"tenant_uuid"`
 	Severity        string          `json:"severity"`
 	DetectionSource string          `json:"detection_source"`
 	Summary         string          `json:"summary"`
@@ -182,9 +182,9 @@ func (s *IncidentService) CreateIncident(ctx context.Context, req CreateIncident
 		Mitigation:      req.Mitigation,
 		Confidentiality: strings.TrimSpace(req.Confidentiality),
 	}
-	if req.TenantID != nil && strings.TrimSpace(*req.TenantID) != "" {
-		clean := strings.TrimSpace(*req.TenantID)
-		incident.TenantID = &clean
+	if req.TenantUuid != nil && strings.TrimSpace(*req.TenantUuid) != "" {
+		clean := strings.TrimSpace(*req.TenantUuid)
+		incident.TenantUuid = &clean
 	}
 	incident.Labels = make(datatypes.JSONMap)
 	for k, v := range req.Labels {

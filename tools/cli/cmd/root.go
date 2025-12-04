@@ -58,7 +58,7 @@ Commands:
   init       Generate a new plugin project from scaffold templates
   package    Experimental packaging workflow
   dist       Experimental distribution workflow
-  publish    Experimental publish workflow
+  publish    Upload packaged plugin artefacts to a PowerX registry
   dev        Development mode with file watching and hot reload
   doctor     Run toolchain/mTLS/Dev API diagnostics
   version    Print CLI version information
@@ -123,7 +123,7 @@ Init examples:
   px-plugin init --install-deps --force com.example.myplugin
 
 More help:
-  docs/guides/publish/go-cli-dev-watch.md
+  docs/guides/develop/go-cli-dev-watch.md
   docs/guides/cli/go-cli-troubleshooting.md
 `, templates.BackendGoGin, templates.FrontendNuxt, backendList, frontendList,
 		templates.BackendGoGin, templates.FrontendNuxt,

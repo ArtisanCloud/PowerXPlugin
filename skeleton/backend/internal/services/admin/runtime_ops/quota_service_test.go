@@ -22,7 +22,7 @@ func TestRecordBreachPersistsAuditEvent(t *testing.T) {
 
 	svc := NewQuotaService(db, nil)
 
-	ctx := authx.ContextWithTenantID(context.Background(), 42)
+	ctx := authx.ContextWithTenantUUID(context.Background(), "00000000-0000-0000-0000-000000000042")
 	if err := svc.RecordBreach(ctx, "plugin.demo", "tenant-1", "bootstrap", ActionThrottle); err != nil {
 		t.Fatalf("RecordBreach failed: %v", err)
 	}
@@ -69,7 +69,7 @@ func createRuntimeOpsTables(t *testing.T, db *gorm.DB) {
 		`CREATE TABLE IF NOT EXISTS runtime_audit_events (
       id TEXT PRIMARY KEY,
       plugin_id TEXT NOT NULL,
-      tenant_id TEXT,
+      tenant_uuid TEXT,
       event_type TEXT NOT NULL,
       payload TEXT,
       occurred_at DATETIME,
@@ -92,7 +92,7 @@ func createRuntimeOpsTables(t *testing.T, db *gorm.DB) {
 		`CREATE TABLE IF NOT EXISTS marketplace_overages (
       id TEXT PRIMARY KEY,
       plugin_id TEXT NOT NULL,
-      tenant_id TEXT,
+      tenant_uuid TEXT,
       hour_window DATETIME NOT NULL,
       quota_metric TEXT NOT NULL,
       breach_count INTEGER DEFAULT 0,

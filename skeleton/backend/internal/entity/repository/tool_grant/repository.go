@@ -38,8 +38,8 @@ func (r *Repository) RecordRevocation(ctx context.Context, rec *model.Revocation
 	if rec == nil {
 		return nil, gorm.ErrInvalidData
 	}
-	if rec.TenantID == "" || rec.ToolGrantID == "" {
-		return nil, errors.New("tenant_id and toolgrant_id required")
+	if rec.TenantUuid == "" || rec.ToolGrantID == "" {
+		return nil, errors.New("tenant_uuid and toolgrant_id required")
 	}
 	if rec.RevokedAt.IsZero() {
 		rec.RevokedAt = time.Now().UTC()
@@ -48,7 +48,7 @@ func (r *Repository) RecordRevocation(ctx context.Context, rec *model.Revocation
 		return nil, errors.New("ttl_expiry required")
 	}
 	return r.revocations.Upsert(ctx, rec, []clause.Column{
-		{Name: "tenant_id"},
+		{Name: "tenant_uuid"},
 		{Name: "toolgrant_id"},
 	})
 }
@@ -56,7 +56,7 @@ func (r *Repository) RecordRevocation(ctx context.Context, rec *model.Revocation
 func (r *Repository) ListRevocations(ctx context.Context, tenantID string, limit int) ([]*model.Revocation, error) {
 	query := r.db.WithContext(ctx).
 		Model(&model.Revocation{}).
-		Where("tenant_id = ?", tenantID).
+		Where("tenant_uuid = ?", tenantID).
 		Order("revoked_at DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -72,8 +72,8 @@ func (r *Repository) RecordUsageEvent(ctx context.Context, evt *model.UsageEvent
 	if evt == nil {
 		return nil, gorm.ErrInvalidData
 	}
-	if evt.TenantID == "" || evt.ToolGrantID == "" {
-		return nil, errors.New("tenant_id and toolgrant_id required")
+	if evt.TenantUuid == "" || evt.ToolGrantID == "" {
+		return nil, errors.New("tenant_uuid and toolgrant_id required")
 	}
 	if evt.EventType == "" {
 		return nil, errors.New("event_type required")
@@ -90,7 +90,7 @@ func (r *Repository) RecordUsageEvent(ctx context.Context, evt *model.UsageEvent
 func (r *Repository) ListUsageEvents(ctx context.Context, tenantID, toolGrantID string, limit int) ([]*model.UsageEvent, error) {
 	query := r.db.WithContext(ctx).
 		Model(&model.UsageEvent{}).
-		Where("tenant_id = ?", tenantID)
+		Where("tenant_uuid = ?", tenantID)
 	if toolGrantID != "" {
 		query = query.Where("toolgrant_id = ?", toolGrantID)
 	}

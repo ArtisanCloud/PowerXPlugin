@@ -1,0 +1,72 @@
+kind: ruleset
+name: plugin/crud/frontend/nuxt_components
+version: 1
+
+components:
+  files:
+    - target: web-admin/app/components/templates/TemplateForm.vue
+      template: builtin/nuxt_component_form_modal
+      params:
+        # Nuxt UI 3.3.2：使用 UModal + v-model:open；按钮 color 使用 {primary|secondary|...}
+        fields:
+          - { key: "name", label: "Name", type: "text", required: true, max: 255 }
+          - { key: "description", label: "Description", type: "textarea" }
+          - { key: "content", label: "Content", type: "textarea" }
+
+nuxt_ui:
+  colors: [primary, secondary, success, info, warning, error, neutral]  # palette reference
+  select:
+    syntax: '<USelect v-model="value" :items="items" class="w-48" />'
+    notes:
+      - Use `items` (not `options`) to pass choices.
+      - Add width classes (e.g., `w-full`) when needed.
+  modal:
+    preferUModal: true
+    paddingClass: "p-4 sm:p-5"
+    width: "max-w-3xl w-full"
+    notes:
+      - 如需更宽的编辑表单，可覆盖 `ui.content`（例如 `'max-w-6xl w-[90vw] mx-auto'`）而不是直接设置 inline 样式，保持组件一致性。
+    close:
+      useCloseProp: true
+      preventClose: true
+    slots:
+      body: Place form fields in `#body` slot to ensure they render.
+      footer: Place action buttons in `#footer`.
+      contentSlot: content
+    accessibility:
+      - Blur active element before closing to avoid aria-hidden focus warnings.
+      - Provide `title` and `description` for dialog accessibility.
+  form:
+    useFormComponent: true
+    schemaLibrary: valibot
+    submitEvent: FormSubmitEvent
+    layout:
+      spacingClass: space-y-4
+      containerClass: "p-4 sm:p-5"
+      buttonsAlign: end
+    fields:
+      wrapWithFormField: true
+      labelI18nKey: recommended
+      inputs:
+        useModelValue: true
+        textareaRowsDefault: 3
+        notes:
+          - Nuxt UI 3 中不存在 `UFormGroup`，请使用 `UFormField` 包裹输入项
+    buttons:
+      cancel:
+        color: neutral
+        variant: subtle
+        type: button
+      submit:
+        color: primary
+        type: submit
+    dropdown_menu:
+      items:
+        handlerProp: onSelect
+        notes:
+          - "子项点击使用 `onSelect` 回调（Nuxt UI 3 语义），而不是自定义 click。例：`[{ label: '删除', icon: 'i-heroicons-trash', onSelect() { ... } }]`。"
+    errorHandling:
+      schemaValidation: true
+      toastOnError: optional
+
+gates.require: [PG-FE-UI-001]

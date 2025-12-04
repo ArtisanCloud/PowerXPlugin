@@ -27,7 +27,24 @@ export interface PowerXLocalePayload {
   locale: string
 }
 
-export type PowerXMessage = PowerXSyncPayload | PowerXThemePayload | PowerXLocalePayload
+export interface PowerXAuthTokenPayload {
+  source: 'powerx'
+  type: 'auth-token'
+  accessToken: string
+  refreshToken?: string
+  tokenType?: string
+  expiresIn?: number
+  expiresAt?: number
+  scope?: string
+  pluginId?: string
+  hostOrigin?: string
+}
+
+export type PowerXMessage =
+  | PowerXSyncPayload
+  | PowerXThemePayload
+  | PowerXLocalePayload
+  | PowerXAuthTokenPayload
 
 export interface PluginReadyPayload {
   source: 'plugin'
@@ -61,6 +78,8 @@ export interface BridgeOptions {
   onLocale?: (locale: string) => void
   /** 回调：接到同步包（包含 locale、theme、hostOrigin 等） */
   onSync?: (payload: PowerXSyncPayload) => void
+  /** 回调：接到宿主注入的短时 token */
+  onAuthToken?: (payload: PowerXAuthTokenPayload) => void
 }
 
 export class PowerXBridgeClient {
@@ -70,6 +89,7 @@ export class PowerXBridgeClient {
   public onTheme?: (t: ThemeKey) => void
   public onLocale?: (l: string) => void
   public onSync?: (p: PowerXSyncPayload) => void
+  public onAuthToken?: (p: PowerXAuthTokenPayload) => void
 
   private allowedOrigins: Set<string>
   private _bound = false
@@ -83,10 +103,12 @@ export class PowerXBridgeClient {
     this.onTheme = opts.onTheme
     this.onLocale = opts.onLocale
     this.onSync = opts.onSync
+    this.onAuthToken = opts.onAuthToken
 
     const defaultAllow = this._defaultAllowedOrigins()
     const extra = (opts.allowedOrigins || []).filter(Boolean)
-    this.allowedOrigins = new Set([...defaultAllow, ...extra])
+    // 放宽：统一加入 '*'，避免宿主代理导致的 origin 不一致
+    this.allowedOrigins = new Set(['*', ...defaultAllow, ...extra])
 
     this._log('init', {
       pluginId: this.pluginId,
@@ -100,7 +122,7 @@ export class PowerXBridgeClient {
 
   /** 启动监听（幂等） */
   start() {
-    console.log('[Bridge][Plugin] start() called, binding message listener')
+    this._log('start() called, binding message listener')
     if (this._bound || this._stopped) return
     this._bound = true
 
@@ -209,6 +231,26 @@ export class PowerXBridgeClient {
         }
         break
       }
+      case 'auth-token': {
+        this._lastHostOrigin = data.hostOrigin || e.origin
+        if (!data.accessToken) {
+          this._log('drop auth-token: empty accessToken', data)
+          return
+        }
+        this._log('onAuthToken <-', {
+          origin: e.origin,
+          expiresIn: data.expiresIn,
+          expiresAt: data.expiresAt,
+          pluginId: data.pluginId,
+          token: data.accessToken ? `${data.accessToken.slice(0, 6)}...` : '<empty>'
+        })
+        try {
+          this.onAuthToken?.(data)
+        } catch (err) {
+          this._log('onAuthToken error', err)
+        }
+        break
+      }
     }
   }
 
@@ -278,6 +320,7 @@ export function initPowerXBridge(opts: BridgeOptions = {}) {
     client.onLocale = opts.onLocale || client.onLocale
     client.onTheme = opts.onTheme || client.onTheme
     client.onSync = opts.onSync || client.onSync
+    client.onAuthToken = opts.onAuthToken || client.onAuthToken
     return client
   }
 
@@ -285,9 +328,9 @@ export function initPowerXBridge(opts: BridgeOptions = {}) {
   client.start()
   g[k] = client
 
-    if (opts.debug) {
-      // 暴露一些调试入口
-      g.__PX_DEBUG__ = {
+  if (opts.debug) {
+    // 暴露一些调试入口
+    g.__PX_DEBUG__ = {
       info: () => ({
         location: window.location.origin,
         referrer: document.referrer,

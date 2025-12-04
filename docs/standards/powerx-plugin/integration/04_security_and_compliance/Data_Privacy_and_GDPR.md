@@ -53,12 +53,12 @@ PowerX 宿主在插件安装时，为每个租户自动分配独立的 Schema �
 | **Schema 隔离** | 每租户独立 Schema |
 | **Role 隔离** | 不同租户不同数据库账号 |
 | **Token 隔离** | PowerX Core 注入独立 JWT |
-| **API 隔离** | 插件必须携带 `tenant_id` 参数 |
+| **API 隔离** | 插件必须携带 `tenant_uuid` 参数 |
 
 示例：
 
 ```sql
-SELECT * FROM contacts WHERE tenant_id = $CURRENT_TENANT
+SELECT * FROM contacts WHERE tenant_uuid = $CURRENT_TENANT
 ```
 
 > ⚠️ 插件不得自行创建或操作跨租户 Schema。
@@ -173,7 +173,7 @@ DELETE FROM contacts WHERE updated_at < now() - interval '30 days'
 
 ```json
 {
-  "tenant_id": "t123",
+  "tenant_uuid": "t123",
   "exported_at": "2025-10-13T10:00:00Z",
   "data": {
     "contacts": [...],

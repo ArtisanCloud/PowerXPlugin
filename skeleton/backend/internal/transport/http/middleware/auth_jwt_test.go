@@ -24,7 +24,7 @@ func TestJWTAuthAllowsSignedContext(t *testing.T) {
 	router.Use(httpmw.JWTAuth(cfg))
 	router.GET("/", func(c *gin.Context) { c.Status(http.StatusOK) })
 
-	tc := authx.TenantContext{TenantID: 1, UserID: 42, Roles: []string{"admin"}}
+	tc := authx.TenantContext{TenantUUID: "00000000-0000-0000-0000-000000000001", UserID: 42, Roles: []string{"admin"}}
 	ctxB64, sig, _, err := authx.SignContext(tc, cfg.ContextHMACSecret)
 	if err != nil {
 		t.Fatalf("sign context: %v", err)

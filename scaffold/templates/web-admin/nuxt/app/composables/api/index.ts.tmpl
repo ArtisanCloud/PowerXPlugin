@@ -10,5 +10,5 @@ export {
   apiPatch,
   apiDel,
 } from "./_client";
-export { resolveApiBase, getAuthToken, getTenantId } from "./_base";
+export { resolveApiBase, getAuthToken, getTenantUuid } from "./_base";
 export type { Page, ApiResponse, ListQuery } from "./_base";

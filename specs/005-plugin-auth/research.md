@@ -28,6 +28,6 @@
   - *使用内存/JSON 存储* ➜ 无法支持 CI、示例测试；被拒。
 
 ## 5. 观测指标与日志
-- **Decision**: 暴露 `plugin_auth_login_total{mode}`、`plugin_auth_refresh_total{result}`、`plugin_auth_logout_total`、`plugin_iam_mode{mode}`、`plugin_iam_delegate_errors_total{type}`，并在 request_trace 中打印 `auth_mode`、`tenant_id`、`user_id`（遮蔽 PII）。
+- **Decision**: 暴露 `plugin_auth_login_total{mode}`、`plugin_auth_refresh_total{result}`、`plugin_auth_logout_total`、`plugin_iam_mode{mode}`、`plugin_iam_delegate_errors_total{type}`，并在 request_trace 中打印 `auth_mode`、`tenant_uuid`、`user_id`（遮蔽 PII）。
 - **Rationale**: 与 PowerX 观测规范兼容，便于排障/审计。
 - **Alternatives considered**: 仅在日志中附带信息但不出指标 ➜ 难以做实时告警；被拒。

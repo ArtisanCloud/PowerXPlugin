@@ -19,7 +19,7 @@ func NewStore(db *gorm.DB) *Store {
 	}
 }
 
-// WithTenant executes a scoped transaction that sets app.tenant_id.
+// WithTenant executes a scoped transaction that sets app.tenant_uuid.
 func (s *Store) WithTenant(ctx context.Context, tenantID string, fn func(tx *gorm.DB) error) error {
 	return s.BaseRepository.WithTenantTx(ctx, tenantID, fn)
 }

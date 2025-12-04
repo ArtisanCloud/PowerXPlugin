@@ -140,7 +140,7 @@ func (s *DispatchService) Dispatch(ctx context.Context, channel, resource, actio
 
 	if err := s.persistIdempotentResponse(ctx, channel, envelope, outcome, result); err != nil {
 		s.logger.WithError(err).
-			WithField("tenant_id", envelope.TenantID).
+			WithField("tenant_uuid", envelope.TenantUuid).
 			WithField("tool_scope", envelope.ToolScope).
 			Warn("failed to persist idempotent response")
 	}
@@ -159,7 +159,7 @@ func (s *DispatchService) handleIdempotencyClaim(
 		return false, nil
 	}
 
-	key := buildIdempotencyKey(envelope.TenantID, envelope.ToolScope, envelope.IdempotencyKey)
+	key := buildIdempotencyKey(envelope.TenantUuid, envelope.ToolScope, envelope.IdempotencyKey)
 	metadata := datatypes.JSONMap{
 		"trace_id":       envelope.TraceID.String(),
 		"correlation_id": envelope.CorrelationID.String(),
@@ -168,7 +168,7 @@ func (s *DispatchService) handleIdempotencyClaim(
 
 	record := &domain.IdempotencyRecord{
 		Key:         key,
-		TenantID:    envelope.TenantID,
+		TenantUuid:  envelope.TenantUuid,
 		Scope:       envelope.ToolScope,
 		Operation:   fmt.Sprintf("%s:%s", channel, normalizeResource(resource)),
 		PayloadHash: hashPayloadRef(envelope.PayloadRef),
@@ -194,7 +194,7 @@ func (s *DispatchService) handleIdempotencyClaim(
 		}
 		s.logger.WithFields(logrus.Fields{
 			"idempotency_key": envelope.IdempotencyKey,
-			"tenant_id":       envelope.TenantID,
+			"tenant_uuid":     envelope.TenantUuid,
 			"tool_scope":      envelope.ToolScope,
 			"channel":         channel,
 		}).Info("integration dispatch replayed from idempotency record")
@@ -237,7 +237,7 @@ func (s *DispatchService) persistIdempotentResponse(
 
 	_, saveErr := s.idempotency.SaveResponse(
 		ctx,
-		buildIdempotencyKey(envelope.TenantID, envelope.ToolScope, envelope.IdempotencyKey),
+		buildIdempotencyKey(envelope.TenantUuid, envelope.ToolScope, envelope.IdempotencyKey),
 		json.RawMessage(raw),
 		map[string]any{
 			"status": outcome.Status,

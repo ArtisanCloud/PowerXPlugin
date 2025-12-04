@@ -2,11 +2,14 @@ package devwatch
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/powerx-plugin/cli/internal/audit"
@@ -34,6 +37,7 @@ type DevAPIClient interface {
 	Reload(ctx context.Context, req *devapi.ReloadRequest) (*devapi.ReloadResponse, error)
 	Delete(ctx context.Context, sessionID string) error
 	SetReloadToken(token string)
+	ListSessions(ctx context.Context, filter *devapi.ListSessionsFilter) ([]devapi.SessionRecord, error)
 }
 
 // AuditLogger lists the audit logging capabilities required by the runner.
@@ -42,16 +46,32 @@ type AuditLogger interface {
 }
 
 // RunnerOptions contains the configuration necessary to run dev watch mode.
+// RunnerMode indicates whether the runner should watch for changes or exit after
+// a single reload.
+type RunnerMode int
+
+const (
+	ModeWatch RunnerMode = iota
+	ModeSingle
+)
+
 type RunnerOptions struct {
-	EntryPath       string
-	Tenant          string
-	DevAPIBase      string
-	Manifest        *manifest.PluginManifest
-	BuildDir        string
-	CommandName     string
-	Metrics         *performance.MetricsCollector
-	Resources       *resources.ResourceMonitor
-	BackoffSchedule []time.Duration
+	EntryPath           string
+	Tenant              string
+	TenantUUID          string
+	DeveloperID         uint64
+	DevAPIBase          string
+	APIToken            string
+	Manifest            *manifest.PluginManifest
+	BuildDir            string
+	CommandName         string
+	Metrics             *performance.MetricsCollector
+	Resources           *resources.ResourceMonitor
+	BackoffSchedule     []time.Duration
+	Mode                RunnerMode
+	UseExistingSession  bool
+	ExistingSessionID   string
+	ExistingReloadToken string
 }
 
 // Dependencies enumerates the injectable collaborators.
@@ -88,6 +108,9 @@ func NewRunner(opts RunnerOptions, deps Dependencies) (*Runner, error) {
 	if opts.EntryPath == "" {
 		return nil, fmt.Errorf("entry path is required")
 	}
+	if opts.Mode != ModeWatch && opts.Mode != ModeSingle {
+		opts.Mode = ModeWatch
+	}
 	if opts.BuildDir == "" {
 		opts.BuildDir = filepath.Join(opts.EntryPath, ".px-plugin", "build")
 	}
@@ -104,7 +127,7 @@ func NewRunner(opts RunnerOptions, deps Dependencies) (*Runner, error) {
 	switch {
 	case deps.Builder == nil:
 		return nil, fmt.Errorf("builder dependency is required")
-	case deps.Watcher == nil:
+	case deps.Watcher == nil && opts.Mode == ModeWatch:
 		return nil, fmt.Errorf("watcher dependency is required")
 	case deps.Client == nil:
 		return nil, fmt.Errorf("dev api client dependency is required")
@@ -159,6 +182,14 @@ func (r *Runner) Run(ctx context.Context) error {
 
 	if err := r.register(ctx, auditLogger); err != nil {
 		return err
+	}
+
+	if r.opts.Mode == ModeSingle {
+		if err := r.buildAndReload(ctx, build.StrategyFull, nil, time.Now()); err != nil {
+			return err
+		}
+		fmt.Println("Reload applied (single run). Exiting.")
+		return nil
 	}
 
 	if err := r.deps.Watcher.Start(); err != nil {
@@ -223,25 +254,53 @@ func (r *Runner) Run(ctx context.Context) error {
 
 func (r *Runner) register(ctx context.Context, auditLogger AuditLogger) error {
 	registerStart := time.Now()
-	regResp, err := r.deps.Client.Register(ctx, &devapi.RegisterRequest{
-		PluginID:  r.opts.Manifest.ID,
-		Version:   r.opts.Manifest.Version,
-		EntryPath: r.opts.EntryPath,
-		Tenant:    r.opts.Tenant,
+	if r.opts.UseExistingSession {
+		if r.opts.ExistingSessionID == "" || r.opts.ExistingReloadToken == "" {
+			return fmt.Errorf("existing session information is incomplete")
+		}
+		r.session.SessionID = r.opts.ExistingSessionID
+		r.session.ReloadToken = r.opts.ExistingReloadToken
+		r.session.DevAPIURL = r.opts.DevAPIBase
+		r.deps.Client.SetReloadToken(r.opts.ExistingReloadToken)
+		if err := r.deps.SessionManager.UpdateSession(r.session); err != nil {
+			return fmt.Errorf("update session: %w", err)
+		}
+		auditLogger.Log(audit.EventAPIRegister, r.session.ID, r.session.PluginID, r.session.Version, r.session.Tenant, r.session.EntryPath, r.opts.CommandName, true, time.Since(registerStart).Milliseconds(), nil)
+		fmt.Printf("Reusing remote session %s\n", r.session.SessionID)
+		return nil
+	}
+	regReq := &devapi.RegisterRequest{
+		PluginID:    r.opts.Manifest.ID,
+		Version:     r.opts.Manifest.Version,
+		EntryPath:   r.opts.EntryPath,
+		Tenant:      r.opts.Tenant,
+		TenantUUID:  strings.TrimSpace(r.opts.TenantUUID),
+		DeveloperID: r.opts.DeveloperID,
 		Metadata: map[string]string{
 			"backend.entry": r.opts.Manifest.Backend.Entry,
 		},
-	})
+	}
+	regResp, err := r.deps.Client.Register(ctx, regReq)
 	if err != nil {
+		r.describeRegisterFailure(ctx, err)
 		auditLogger.Log(audit.EventAPIRegister, "", r.opts.Manifest.ID, r.opts.Manifest.Version, r.opts.Tenant, r.opts.EntryPath, r.opts.CommandName, false, time.Since(registerStart).Milliseconds(), err)
 		return errors2.WrapError(err, errors2.ErrAPI, "dev api register",
 			errors2.WithContext("pluginId", r.opts.Manifest.ID))
 	}
 
-	r.deps.Client.SetReloadToken(regResp.ReloadToken)
+	reloadToken := strings.TrimSpace(regResp.ReloadToken)
+	if reloadToken == "" {
+		fallback := strings.TrimSpace(r.opts.APIToken)
+		if fallback == "" {
+			return fmt.Errorf("dev api register succeeded but no reload token returned; provide --dev-api-token or PX_DEV_API_TOKEN")
+		}
+		fmt.Println("Warning: Dev API did not return reload token; falling back to API token for reload operations.")
+		reloadToken = fallback
+	}
+	r.deps.Client.SetReloadToken(reloadToken)
 
 	r.session.SessionID = regResp.SessionID
-	r.session.ReloadToken = regResp.ReloadToken
+	r.session.ReloadToken = reloadToken
 	r.session.DevAPIURL = r.opts.DevAPIBase
 
 	if err := r.deps.SessionManager.UpdateSession(r.session); err != nil {
@@ -250,6 +309,46 @@ func (r *Runner) register(ctx context.Context, auditLogger AuditLogger) error {
 
 	auditLogger.Log(audit.EventAPIRegister, r.session.ID, r.session.PluginID, r.session.Version, r.session.Tenant, r.session.EntryPath, r.opts.CommandName, true, time.Since(registerStart).Milliseconds(), nil)
 	return nil
+}
+
+func (r *Runner) describeRegisterFailure(ctx context.Context, err error) {
+	var apiErr *devapi.DevAPIError
+	if !errors.As(err, &apiErr) {
+		return
+	}
+	if apiErr.Status != http.StatusConflict {
+		return
+	}
+	fmt.Println("Dev API indicates an active dev session already exists for this plugin/tenant.")
+	printedDetail := false
+	if sid := apiErr.DetailString("sessionId"); sid != "" {
+		fmt.Printf("  Existing session: %s\n", sid)
+		printedDetail = true
+	}
+	if r.deps.Client != nil {
+		listCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		sessions, listErr := r.deps.Client.ListSessions(listCtx, &devapi.ListSessionsFilter{
+			PluginID:    r.opts.Manifest.ID,
+			TenantUUID:  strings.TrimSpace(r.opts.TenantUUID),
+			DeveloperID: r.opts.DeveloperID,
+		})
+		if listErr == nil && len(sessions) > 0 {
+			fmt.Println("  Remote sessions:")
+			for _, s := range sessions {
+				tenantLabel := s.Tenant
+				if tenantLabel == "" {
+					tenantLabel = s.TenantUUID
+				}
+				fmt.Printf("    - %s  plugin=%s  tenant=%s  status=%s\n", s.SessionID, s.PluginID, tenantLabel, s.Status)
+			}
+			printedDetail = true
+		}
+	}
+	if !printedDetail {
+		fmt.Println("  Use 'px-plugin dev --list-sessions' to inspect active sessions.")
+	}
+	fmt.Println("Stop the existing session via 'px-plugin dev --force-stop <session-id>' or resume it if it's still running.")
 }
 
 func (r *Runner) buildAndReload(ctx context.Context, strategy build.BuildStrategy, events []watch.FileEvent, changeStart time.Time) error {
@@ -281,6 +380,7 @@ func (r *Runner) buildAndReload(ctx context.Context, strategy build.BuildStrateg
 
 	reloadReq := &devapi.ReloadRequest{
 		SessionID:     r.session.SessionID,
+		ReloadToken:   r.session.ReloadToken,
 		BundleHash:    result.BundleHash,
 		BundleSize:    result.BundleSize,
 		BuildDuration: result.BuildDuration.Milliseconds(),

@@ -25,7 +25,7 @@ const (
 // License represents an active authorization granted to a tenant.
 type License struct {
 	ID              string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID        string            `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid      string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	ListingID       string            `gorm:"column:listing_id;type:uuid;not null;index" json:"listing_id"`
 	PlanID          string            `gorm:"column:plan_id;type:uuid;not null;index" json:"plan_id"`
 	LicenseToken    string            `gorm:"column:license_token;type:text;not null" json:"license_token"`
@@ -49,7 +49,7 @@ func (*License) TableName() string {
 // LicenseEvent records significant lifecycle actions for a license.
 type LicenseEvent struct {
 	ID           string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID     string            `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid   string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	LicenseID    string            `gorm:"column:license_id;type:uuid;not null;index" json:"license_id"`
 	EventType    string            `gorm:"column:event_type;type:text;not null" json:"event_type"`
 	EventPayload datatypes.JSONMap `gorm:"column:event_payload;type:jsonb" json:"event_payload"`
@@ -66,7 +66,7 @@ func (*LicenseEvent) TableName() string {
 // TaxTransaction stores interactions with external tax providers.
 type TaxTransaction struct {
 	ID                    string            `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	TenantID              string            `gorm:"column:tenant_id;type:text;not null;index" json:"tenant_id"`
+	TenantUuid            string            `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	BillingID             string            `gorm:"column:billing_id;type:text;not null" json:"billing_id"`
 	ExternalProvider      string            `gorm:"column:external_provider;type:text;not null" json:"external_provider"`
 	ExternalTransactionID *string           `gorm:"column:external_transaction_id;type:text" json:"external_transaction_id,omitempty"`

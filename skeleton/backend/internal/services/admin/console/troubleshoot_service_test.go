@@ -117,7 +117,7 @@ func (s *timeStub) Now() time.Time {
 func TestTroubleshootServiceAggregatesSources(t *testing.T) {
 	svc, health, quota, webhooks, guidance, metrics, clock := setupTroubleshootService(t)
 	tenant := "tenant-agg"
-	summary, err := svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	summary, err := svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantUuid: &tenant})
 	require.NoError(t, err)
 	require.NotNil(t, summary)
 	require.Equal(t, 1, health.count)
@@ -139,7 +139,7 @@ func TestTroubleshootServiceAggregatesSources(t *testing.T) {
 func TestTroubleshootServiceCacheRespectsTTL(t *testing.T) {
 	svc, health, quota, webhooks, guidance, _, clock := setupTroubleshootService(t)
 	tenant := "tenant-cache"
-	_, err := svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	_, err := svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantUuid: &tenant})
 	require.NoError(t, err)
 	require.Equal(t, 1, health.count)
 	require.Equal(t, 1, quota.count)
@@ -147,7 +147,7 @@ func TestTroubleshootServiceCacheRespectsTTL(t *testing.T) {
 	require.Equal(t, 1, guidance.count)
 
 	// Second call without advancing time should use cache.
-	_, err = svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	_, err = svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantUuid: &tenant})
 	require.NoError(t, err)
 	require.Equal(t, 1, health.count)
 	require.Equal(t, 1, quota.count)
@@ -155,7 +155,7 @@ func TestTroubleshootServiceCacheRespectsTTL(t *testing.T) {
 
 	// Advance beyond TTL to force refresh.
 	clock.current = clock.current.Add(2*time.Minute + time.Second)
-	_, err = svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantID: &tenant})
+	_, err = svc.Summary(context.Background(), consolesvc.TroubleshootSummaryInput{TenantUuid: &tenant})
 	require.NoError(t, err)
 	require.Equal(t, 2, health.count)
 	require.Equal(t, 2, quota.count)

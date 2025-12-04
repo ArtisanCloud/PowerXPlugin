@@ -171,7 +171,7 @@ func CreateTemplate(c *gin.Context) {
 
 * 所有 gRPC 服务以 `com.powerx.plugins.<id>.v1` 为命名空间；
 * 使用 protobuf3；
-* 包含 `tenant_id` 与 `request_id` 字段；
+* 包含 `tenant_uuid` 与 `request_id` 字段；
 * 错误使用标准 `google.rpc.Status`。
 
 ---
@@ -183,13 +183,13 @@ func CreateTemplate(c *gin.Context) {
 | `X-PowerX-CTX`     | HMAC 模式签名    | `base64(hmac(payload))`          |
 | `X-PowerX-CTX-JWT` | JWT 模式签名     | `Bearer eyJhbGciOiJSUzI1NiIs...` |
 | `X-Request-ID`     | 请求唯一标识       | 自动生成                             |
-| `X-Tenant-ID`      | （仅开发模式）显式传租户 | `1`                              |
+| `X-Tenant-UUID`    | （仅开发模式）显式传租户 | `00000000-0000-0000-0000-000000000001` |
 
 ---
 
 ## 八、日志与追踪要求
 
-* 日志必须包含 `request_id`、`tenant_id`；
+* 日志必须包含 `request_id`、`tenant_uuid`；
 * 建议打印：方法、路径、耗时、状态码；
 * 长耗时请求 (>500ms) 应标记为 `slow request`；
 * 出错时应打印堆栈并返回结构化 JSON。

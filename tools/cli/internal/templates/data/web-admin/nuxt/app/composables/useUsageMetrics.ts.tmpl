@@ -12,8 +12,8 @@ export function useUsageMetrics() {
   const loading = computed(() => store.metricsLoading)
   const error = computed(() => store.metricsError)
 
-  async function load(tenantId: string, licenseId: string, params: MetricsParams = {}) {
-    return store.fetchMetrics(tenantId, licenseId, params)
+  async function load(tenantUuid: string, licenseId: string, params: MetricsParams = {}) {
+    return store.fetchMetrics(tenantUuid, licenseId, params)
   }
 
   function clear() {

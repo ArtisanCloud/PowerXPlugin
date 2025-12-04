@@ -77,7 +77,7 @@
 |------|-----------|
 | 签名无效 | 重新激活 License |
 | 过期 | 在 Marketplace 续订 |
-| 绑定租户错误 | 检查 `tenant_id` 一致性 |
+| 绑定租户错误 | 检查 `tenant_uuid` 一致性 |
 | 网络异常 | 确认能访问 License Server |
 
 可通过 CLI：
@@ -198,7 +198,7 @@ usage.Report(map[string]int{
 **A：**
 宿主在连接时自动注入：
 
-- `x-tenant-id` 请求头；
+- `x-tenant-uuid` 请求头；
 - 租户隔离 Schema；
 - 独立的 ToolGrant Token。
   插件侧只需校验这些字段，不得自行信任前端传入的 tenant 参数。

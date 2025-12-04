@@ -30,15 +30,17 @@ export const useMarketplaceAnalyticsStore = defineStore("marketplaceAnalytics", 
   const reportsLoading = ref(false)
   const reportsError = ref<string | null>(null)
 
-  async function fetchMetrics(tenantId: string, licenseId: string, params: MetricsParams = {}) {
-    if (!tenantId || !licenseId) {
-      metricsError.value = "tenantId 和 licenseId 不能为空"
+  async function fetchMetrics(tenantUuid: string, licenseId: string, params: MetricsParams = {}) {
+    if (!tenantUuid || !licenseId) {
+      metricsError.value = "tenantUuid 和 licenseId 不能为空"
       return null
     }
     metricsLoading.value = true
     metricsError.value = null
     try {
-      const url = `${apiBase.value}/admin/marketplace/usage/tenants/${encodeURIComponent(tenantId)}/licenses/${encodeURIComponent(licenseId)}/metrics`
+      const url = `${apiBase.value}/admin/marketplace/usage/tenants/${encodeURIComponent(
+        tenantUuid
+      )}/licenses/${encodeURIComponent(licenseId)}/metrics`
       const response = await $fetch<{ data: MarketplaceUsageDashboard | null }>(url, {
         params: {
           window: params.window,

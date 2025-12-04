@@ -307,11 +307,11 @@ func parseProxyError(resp *http.Response) error {
 
 // MeContext mirrors PowerX Core /auth/me/context payload.
 type MeContext struct {
-	IsRoot          bool            `json:"is_root"`
-	CurrentTenantID uint64          `json:"current_tenant_id"`
-	CurrentMemberID *uint64         `json:"current_member_id,omitempty"`
-	User            *MeUserBrief    `json:"user,omitempty"`
-	Members         []MeMemberBrief `json:"members"`
+	IsRoot            bool            `json:"is_root"`
+	CurrentTenantUUID string          `json:"current_tenant_uuid"`
+	CurrentMemberID   *uint64         `json:"current_member_id,omitempty"`
+	User              *MeUserBrief    `json:"user,omitempty"`
+	Members           []MeMemberBrief `json:"members"`
 }
 
 type MeUserBrief struct {
@@ -326,7 +326,7 @@ type MeUserBrief struct {
 }
 
 type MeMemberBrief struct {
-	TenantID   uint64 `json:"tenant_id"`
+	TenantUUID string `json:"tenant_uuid"`
 	TenantName string `json:"tenant_name"`
 	MemberID   uint64 `json:"member_id"`
 	IsAdmin    bool   `json:"is_admin"`

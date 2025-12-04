@@ -32,7 +32,7 @@ As a skeleton maintainer, I can run `go run ./skeleton/backend/cmd/plugin` and i
 
 **Acceptance Scenarios**:
 
-1. **Given** the skeleton backend running, **When** a POST to `/api/v1/templates` is made with JSON payload and header `X-Tenant-ID: 100`, **Then** the resource is stored in-memory, tagged with tenant 100, and GET `/api/v1/templates` scoped to tenant 100 returns it.
+1. **Given** the skeleton backend running, **When** a POST to `/api/v1/templates` is made with JSON payload and header `X-Tenant-UUID: 100`, **Then** the resource is stored in-memory, tagged with tenant 100, and GET `/api/v1/templates` scoped to tenant 100 returns it.
 2. **Given** two tenants create templates, **When** tenant 100 requests tenant 200's template ID, **Then** the repository enforces `.specify/memory/constitution.md` rules and returns a 404 Not Found without leaking the record.
 
 ---
@@ -67,7 +67,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 ### Edge Cases
 
-- Missing or malformed `X-Tenant-ID` header triggers middleware to apply Standalone defaults (tenant `1`) while logging a warning.
+- Missing or malformed `X-Tenant-UUID` header triggers middleware to apply Standalone defaults (tenant `1`) while logging a warning.
 - Path parameters containing non-numeric template IDs return a structured error envelope with `success=false` and HTTP 400.
 - Response helper handles handlers returning `nil` data or explicit errors without panicking and always produces the full envelope.
 - CLI template rendering fails fast with a descriptive error if required placeholders (plugin ID, menus, permissions) are absent.
@@ -78,7 +78,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 - **FR-001**: Framework Router MUST support path parameters, query strings, and JSON body binding through `bootstrap.Context`.
 - **FR-002**: Framework Router MUST expose a response helper that emits envelopes containing `success`, `data`, `error`, `timestamp`, and `request_id`.
-- **FR-003**: Framework middleware MUST populate request IDs and tenant context (`X-Tenant-ID` header or Standalone default) for every request.
+- **FR-003**: Framework middleware MUST populate request IDs and tenant context (`X-Tenant-UUID` header or Standalone default) for every request.
 - **FR-004**: `@artisan-cloud/plugin-framework-client` MUST expose `get`, `post`, `put`, and `delete` helpers that forward tenant headers automatically.
 - **FR-005**: Skeleton backend MUST implement a Templates repository/service pair embedding `repository.BaseRepository[Template]`, providing `NewTemplateRepository`, and honoring tenant isolation per `.specify/memory/constitution.md`.
 - **FR-006**: Skeleton backend MUST expose `/api/v1/templates` CRUD endpoints with in-memory storage and seed data for demo purposes.
@@ -90,7 +90,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 ### Key Entities *(include if feature involves data)*
 
-- **TemplateRecord**: Tenant-scoped reusable template with attributes `id`, `tenant_id`, `name`, `description`, `content`, `created_at`, `updated_at`.
+- **TemplateRecord**: Tenant-scoped reusable template with attributes `id`, `tenant_uuid`, `name`, `description`, `content`, `created_at`, `updated_at`.
 - **TenantContext**: Middleware-derived context capturing effective tenant ID and request metadata consumed by repositories for isolation checks.
 
 ## Success Criteria *(mandatory)*

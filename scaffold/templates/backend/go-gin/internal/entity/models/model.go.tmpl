@@ -10,18 +10,18 @@ import (
 
 // BaseModel 基础模型，包含通用字段
 type BaseModel struct {
-	ID        uint64         `gorm:"primaryKey;autoIncrement;comment:自增ID" json:"id"`
-	TenantID  uint64         `gorm:"not null;index;comment:租户ID"           json:"tenant_id"`
-	CreatedAt time.Time      `gorm:"autoCreateTime;comment:创建时间"          json:"created_at"`
-	UpdatedAt time.Time      `gorm:"autoUpdateTime;comment:更新时间"          json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index;comment:软删除时间"                  json:"deleted_at,omitempty"`
+	ID         uint64         `gorm:"primaryKey;autoIncrement;comment:自增ID" json:"id"`
+	TenantUuid string         `gorm:"type:uuid;not null;index;comment:租户UUID" json:"tenant_uuid"`
+	CreatedAt  time.Time      `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
+	UpdatedAt  time.Time      `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at“ comment:软删除时间" json:"deleted_at,omitempty"`
 }
 
 type BaseNoTenantModel struct {
 	ID        uint64         `gorm:"primaryKey;autoIncrement"`
 	CreatedAt time.Time      `gorm:"autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"autoUpdateTime"`
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at“ json:"deleted_at,omitempty"`
 }
 
 const (

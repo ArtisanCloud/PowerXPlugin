@@ -28,7 +28,7 @@ func NewAuditHandler(deps *app.Deps) *AuditHandler {
 }
 
 type listAuditQuery struct {
-	TenantID       string `form:"tenant_id"`
+	TenantUuid     string `form:"tenant_uuid"`
 	ActorID        string `form:"actor_id"`
 	Action         string `form:"action"`
 	PermissionCode string `form:"permission_code"`
@@ -55,9 +55,9 @@ func (h *AuditHandler) ListEvents(c *gin.Context) {
 		PermissionCode: strings.TrimSpace(query.PermissionCode),
 		Cursor:         strings.TrimSpace(query.Cursor),
 	}
-	if strings.TrimSpace(query.TenantID) != "" {
-		clean := strings.TrimSpace(query.TenantID)
-		input.TenantID = &clean
+	if strings.TrimSpace(query.TenantUuid) != "" {
+		clean := strings.TrimSpace(query.TenantUuid)
+		input.TenantUuid = &clean
 	}
 	if strings.TrimSpace(query.Limit) != "" {
 		if n, err := strconv.Atoi(query.Limit); err == nil {
@@ -87,7 +87,7 @@ func (h *AuditHandler) ListEvents(c *gin.Context) {
 }
 
 type exportAuditQuery struct {
-	TenantID       string `form:"tenant_id"`
+	TenantUuid     string `form:"tenant_uuid"`
 	ActorID        string `form:"actor_id"`
 	Action         string `form:"action"`
 	PermissionCode string `form:"permission_code"`
@@ -113,9 +113,9 @@ func (h *AuditHandler) ExportEvents(c *gin.Context) {
 		PermissionCode: strings.TrimSpace(query.PermissionCode),
 		Format:         strings.TrimSpace(query.Format),
 	}
-	if strings.TrimSpace(query.TenantID) != "" {
-		clean := strings.TrimSpace(query.TenantID)
-		input.TenantID = &clean
+	if strings.TrimSpace(query.TenantUuid) != "" {
+		clean := strings.TrimSpace(query.TenantUuid)
+		input.TenantUuid = &clean
 	}
 	if query.OccurredAfter != "" {
 		if ts, err := time.Parse(time.RFC3339, query.OccurredAfter); err == nil {

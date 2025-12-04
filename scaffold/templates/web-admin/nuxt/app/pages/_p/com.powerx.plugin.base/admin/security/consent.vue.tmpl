@@ -1,7 +1,9 @@
 <template>
   <UContainer class="py-10 space-y-6">
     <header class="space-y-2">
-      <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+      <div
+        class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+      >
         <UIcon name="i-heroicons-shield-check" class="text-primary" />
         <span class="uppercase tracking-wide">Security · Privacy</span>
       </div>
@@ -11,7 +13,9 @@
             Consent Tokens
           </h1>
           <p class="text-gray-600 dark:text-gray-300 max-w-2xl">
-            Review tenant-issued consent tokens, confirm authorised data scopes, and revoke access when obligations change. Token previews are masked to avoid accidental PII exposure.
+            Review tenant-issued consent tokens, confirm authorised data scopes,
+            and revoke access when obligations change. Token previews are masked
+            to avoid accidental PII exposure.
           </p>
         </div>
       </div>
@@ -21,9 +25,9 @@
       <UCard>
         <template #header>
           <div class="flex flex-wrap items-end gap-4">
-            <UFormGroup label="Tenant ID" required class="w-full sm:w-64">
+            <UFormGroup label="Tenant UUID" required class="w-full sm:w-64">
               <UInput
-                v-model="tenantId"
+                v-model="tenantUuid"
                 placeholder="tenant-123"
                 @keyup.enter="loadTokens"
                 :disabled="loading"
@@ -48,7 +52,9 @@
                     >
                       {{ `{{ status }}` }}
                     </UBadge>
-                    <span v-if="!selectedStatuses.length" class="text-gray-500 dark:text-gray-400"
+                    <span
+                      v-if="!selectedStatuses.length"
+                      class="text-gray-500 dark:text-gray-400"
                       >All statuses</span
                     >
                   </div>
@@ -59,7 +65,7 @@
             <div class="flex items-center gap-3">
               <UButton
                 color="primary"
-                :disabled="!tenantId"
+                :disabled="!tenantUuid"
                 :loading="loading"
                 @click="loadTokens"
               >
@@ -68,7 +74,7 @@
               <UButton
                 variant="soft"
                 color="gray"
-                :disabled="!tenantId || loading"
+                :disabled="!tenantUuid || loading"
                 @click="exportAudit"
               >
                 Export Audit
@@ -116,9 +122,14 @@
             </UTable>
 
             <div v-if="!loading && !rows.length" class="text-center py-10">
-              <UIcon name="i-heroicons-document-magnifying-glass" class="text-4xl text-gray-300 dark:text-gray-600" />
+              <UIcon
+                name="i-heroicons-document-magnifying-glass"
+                class="text-4xl text-gray-300 dark:text-gray-600"
+              />
               <p class="mt-3 text-gray-500 dark:text-gray-400">
-                {{ `{{ tenantId ? "No consent tokens found for this tenant." : "Enter a tenant ID to begin." }}` }}
+              {{ `{{ tenantUuid
+                  ? "No consent tokens found for this tenant."
+                  : "Enter a tenant UUID to begin." }}` }}
               </p>
             </div>
           </div>
@@ -129,12 +140,15 @@
 </template>
 
 <script setup lang="ts">
-import type { ConsentTokenResponse, ConsentTokenListResponse } from "~/types/security";
+import type {
+  ConsentTokenResponse,
+  ConsentTokenListResponse,
+} from "~/types/security";
 
 const runtimeConfig = useRuntimeConfig();
 const toast = useToast();
 
-const tenantId = ref("");
+const tenantUuid = ref("");
 const selectedStatuses = ref<string[]>(["ACTIVE"]);
 const loading = ref(false);
 const rows = ref<ConsentTokenResponse[]>([]);
@@ -181,8 +195,8 @@ const statusColor = (status: string) => {
 };
 
 const loadTokens = async () => {
-  if (!tenantId.value) {
-    toast.add({ title: "Tenant ID required", color: "red" });
+  if (!tenantUuid.value) {
+    toast.add({ title: "Tenant UUID required", color: "red" });
     return;
   }
 
@@ -194,7 +208,7 @@ const loadTokens = async () => {
       `${runtimeConfig.public.apiBaseUrl}/admin/security/consent-tokens`,
       {
         params: {
-          tenant_id: tenantId.value,
+          tenant_uuid: tenantUuid.value,
           status: selectedStatuses.value,
         },
         credentials: "include",
@@ -210,9 +224,11 @@ const loadTokens = async () => {
 };
 
 const exportAudit = async () => {
-  const path = runtimeConfig.public.apiBaseUrl.replace("/api/v1", "") + "/admin/security/lifecycle-events";
+  const path =
+    runtimeConfig.public.apiBaseUrl.replace("/api/v1", "") +
+    "/admin/security/lifecycle-events";
   await navigator.clipboard.writeText(
-    `${path}?tenant_id=${encodeURIComponent(tenantId.value || "")}`
+    `${path}?tenant_uuid=${encodeURIComponent(tenantUuid.value || "")}`
   );
   toast.add({
     title: "Audit endpoint copied",
@@ -222,13 +238,13 @@ const exportAudit = async () => {
 };
 
 onMounted(() => {
-  if (tenantId.value) {
+  if (tenantUuid.value) {
     loadTokens();
   }
 });
 
 watch(selectedStatuses, () => {
-  if (tenantId.value) {
+  if (tenantUuid.value) {
     loadTokens();
   }
 });

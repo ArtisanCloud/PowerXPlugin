@@ -37,7 +37,7 @@ func (s *PrivacyService) PurgeUsageData(ctx context.Context, tenantID, licenseID
 	tenantID = strings.TrimSpace(tenantID)
 	licenseID = strings.TrimSpace(licenseID)
 	if tenantID == "" || licenseID == "" {
-		return nil, errors.New("tenant_id and license_id are required")
+		return nil, errors.New("tenant_uuid and license_id are required")
 	}
 	if cutoff.IsZero() {
 		cutoff = time.Now().UTC()
@@ -53,7 +53,7 @@ func (s *PrivacyService) PurgeUsageData(ctx context.Context, tenantID, licenseID
 	}
 	if s.logger != nil {
 		s.logger.WithFields(logrus.Fields{
-			"tenant_id":          tenantID,
+			"tenant_uuid":          tenantID,
 			"license_id":         licenseID,
 			"cutoff":             cutoff.Format(time.RFC3339),
 			"envelopes_deleted":  envDeleted,

@@ -45,7 +45,7 @@ func (p *RandomSecretProvider) Issue(ctx context.Context, tenantID, integrationT
 		return nil, err
 	}
 	p.logger.WithFields(logrus.Fields{
-		"tenant_id":        tenantID,
+		"tenant_uuid":        tenantID,
 		"integration_type": integrationType,
 	}).Debug("issued random secret material")
 	return &SecretMaterial{
@@ -57,7 +57,7 @@ func (p *RandomSecretProvider) Issue(ctx context.Context, tenantID, integrationT
 // Revoke logs the revocation request—it is a no-op for local provider.
 func (p *RandomSecretProvider) Revoke(ctx context.Context, tenantID, reference string) error {
 	p.logger.WithFields(logrus.Fields{
-		"tenant_id": tenantID,
+		"tenant_uuid": tenantID,
 		"reference": reference,
 	}).Debug("revoked secret reference")
 	return nil

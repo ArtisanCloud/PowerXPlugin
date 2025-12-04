@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -89,6 +91,8 @@ func (b *SimpleBuilder) buildFull(ctx context.Context, opts *BuildOptions, resul
 		err = b.buildNode(ctx, opts)
 	case "mixed":
 		err = b.buildMixed(ctx, opts)
+	case "plugin":
+		err = b.buildPlugin(ctx, opts)
 	default:
 		err = fmt.Errorf("unknown project type")
 	}
@@ -120,6 +124,8 @@ func (b *SimpleBuilder) buildIncremental(ctx context.Context, opts *BuildOptions
 		err = b.buildNode(ctx, opts)
 	case "mixed":
 		err = b.buildMixed(ctx, opts)
+	case "plugin":
+		err = b.buildPlugin(ctx, opts)
 	default:
 		err = fmt.Errorf("unknown project type")
 	}
@@ -171,8 +177,21 @@ func (b *SimpleBuilder) buildDiff(ctx context.Context, opts *BuildOptions, resul
 
 // buildGo builds a Go project
 func (b *SimpleBuilder) buildGo(ctx context.Context, opts *BuildOptions) error {
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", filepath.Join(opts.OutDir, "plugin"), opts.EntryPath)
-	cmd.Dir = opts.EntryPath
+	goDir := detectGoModuleDir(opts.EntryPath)
+	if goDir == "" {
+		return fmt.Errorf("go project not found")
+	}
+	if err := os.MkdirAll(filepath.Join(opts.OutDir, "backend"), 0o755); err != nil {
+		return err
+	}
+	targetPath := filepath.Join(opts.OutDir, "backend", "plugin")
+	buildTarget := detectGoBuildTarget(goDir)
+	args := []string{"build", "-o", targetPath}
+	if buildTarget != "" {
+		args = append(args, buildTarget)
+	}
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = goDir
 
 	if opts.Verbose {
 		cmd.Stdout = os.Stdout
@@ -184,16 +203,22 @@ func (b *SimpleBuilder) buildGo(ctx context.Context, opts *BuildOptions) error {
 
 // buildNode builds a Node.js project
 func (b *SimpleBuilder) buildNode(ctx context.Context, opts *BuildOptions) error {
-	// For Node.js, we run npm run build if available
+	nodeDir := detectNodeProjectDir(opts.EntryPath)
+	if nodeDir == "" {
+		return fmt.Errorf("node project not found")
+	}
 	cmd := exec.CommandContext(ctx, "npm", "run", "build")
-	cmd.Dir = opts.EntryPath
+	cmd.Dir = nodeDir
 
 	if opts.Verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 	}
 
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return copyNodeArtifacts(nodeDir, filepath.Join(opts.OutDir, "web-admin"))
 }
 
 // buildMixed builds a mixed Go/Node project
@@ -204,6 +229,14 @@ func (b *SimpleBuilder) buildMixed(ctx context.Context, opts *BuildOptions) erro
 	}
 
 	// Build frontend (Node)
+	return b.buildNode(ctx, opts)
+}
+
+// buildPlugin builds a plugin layout (backend + web-admin subdirectories).
+func (b *SimpleBuilder) buildPlugin(ctx context.Context, opts *BuildOptions) error {
+	if err := b.buildGo(ctx, opts); err != nil {
+		return err
+	}
 	return b.buildNode(ctx, opts)
 }
 
@@ -257,27 +290,108 @@ func (b *SimpleBuilder) calculateBundleInfo(opts *BuildOptions, result *BuildRes
 
 // detectProjectType detects the project type
 func detectProjectType(entryPath string) string {
-	goModPath := filepath.Join(entryPath, "go.mod")
-	packageJSONPath := filepath.Join(entryPath, "package.json")
+	goDir := detectGoModuleDir(entryPath)
+	nodeDir := detectNodeProjectDir(entryPath)
 
-	hasGoMod := false
-	hasPackageJSON := false
-
-	if _, err := os.Stat(goModPath); err == nil {
-		hasGoMod = true
-	}
-
-	if _, err := os.Stat(packageJSONPath); err == nil {
-		hasPackageJSON = true
-	}
-
-	if hasGoMod && hasPackageJSON {
+	switch {
+	case goDir != "" && nodeDir != "":
+		if strings.HasPrefix(goDir, filepath.Join(entryPath, "backend")) || strings.HasPrefix(nodeDir, filepath.Join(entryPath, "web-admin")) {
+			return "plugin"
+		}
 		return "mixed"
-	} else if hasGoMod {
+	case goDir != "":
 		return "go"
-	} else if hasPackageJSON {
+	case nodeDir != "":
 		return "node"
+	default:
+		return "unknown"
 	}
+}
 
-	return "unknown"
+func detectGoModuleDir(entryPath string) string {
+	candidates := []string{
+		entryPath,
+		filepath.Join(entryPath, "backend"),
+		filepath.Join(entryPath, "server"),
+	}
+	for _, dir := range candidates {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+	}
+	return ""
+}
+
+func detectNodeProjectDir(entryPath string) string {
+	candidates := []string{
+		entryPath,
+		filepath.Join(entryPath, "web-admin"),
+		filepath.Join(entryPath, "frontend"),
+	}
+	for _, dir := range candidates {
+		if _, err := os.Stat(filepath.Join(dir, "package.json")); err == nil {
+			return dir
+		}
+	}
+	return ""
+}
+
+func detectGoBuildTarget(goDir string) string {
+	cmdPlugin := filepath.Join(goDir, "cmd", "plugin")
+	if info, err := os.Stat(cmdPlugin); err == nil && info.IsDir() {
+		return "./cmd/plugin"
+	}
+	if _, err := os.Stat(filepath.Join(goDir, "main.go")); err == nil {
+		return "."
+	}
+	return ""
+}
+
+func copyNodeArtifacts(srcDir, dstDir string) error {
+	prefer := []string{".output", "dist", "build"}
+	var src string
+	for _, candidate := range prefer {
+		path := filepath.Join(srcDir, candidate)
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			src = path
+			break
+		}
+	}
+	if src == "" {
+		return nil
+	}
+	return copyDir(src, dstDir)
+}
+
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		dstFile, err := os.Create(target)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			dstFile.Close()
+			return err
+		}
+		return dstFile.Close()
+	})
 }

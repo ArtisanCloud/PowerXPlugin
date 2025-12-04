@@ -113,7 +113,7 @@ CREATE TABLE plugin_settings (
   plugin_id TEXT,
   key TEXT,
   value JSONB,
-  tenant_id TEXT,
+  tenant_uuid TEXT,
   updated_at TIMESTAMP DEFAULT now()
 );
 ```

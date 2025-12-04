@@ -19,7 +19,7 @@ import (
 
 // SafeOpRequest represents the user request to execute a safe operation.
 type SafeOpRequest struct {
-	TenantID    *string
+	TenantUuid  *string
 	Environment string
 	Action      SafeOpAction
 	ScopeType   SafeOpScope
@@ -85,7 +85,7 @@ func (s *SafeOpsService) Execute(ctx context.Context, input SafeOpRequest) (*Job
 	}
 	jobType := jobTypeForAction(input.Action)
 	scheduleInput := ScheduleSafeOpInput{
-		TenantID:      input.TenantID,
+		TenantUuid:    input.TenantUuid,
 		Environment:   input.Environment,
 		JobType:       jobType,
 		TriggerSource: TriggerSourceManual,
@@ -144,9 +144,9 @@ func (s *SafeOpsService) createAuditEvent(ctx context.Context, request SafeOpReq
 		OccurredAt:     now,
 		CreatedAt:      now,
 	}
-	if request.TenantID != nil && strings.TrimSpace(*request.TenantID) != "" {
-		clean := strings.TrimSpace(*request.TenantID)
-		audit.TenantID = &clean
+	if request.TenantUuid != nil && strings.TrimSpace(*request.TenantUuid) != "" {
+		clean := strings.TrimSpace(*request.TenantUuid)
+		audit.TenantUuid = &clean
 	}
 	if strings.TrimSpace(request.Actor.Name) != "" {
 		audit.ActorName = strPtr(request.Actor.Name)

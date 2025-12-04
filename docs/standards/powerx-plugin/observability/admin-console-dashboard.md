@@ -20,7 +20,7 @@
 ## 性能基线
 
 - **审计导出**：使用 1,500 条事件数据抓样（PostgreSQL + JSON 导出）。CSV 和 JSON 导出均在 3.6s 内完成。性能依赖于索引 `idx_admin_console_audit_plugin_action_time` 与导出的批量分页实现。
-- **Webhook Attempts 查询**：新增索引 `idx_integration_webhook_attempts_created`，使用 `tenant_id + status` 查询 10k 条数据时响应 < 2s。
+- **Webhook Attempts 查询**：新增索引 `idx_integration_webhook_attempts_created`，使用 `tenant_uuid + status` 查询 10k 条数据时响应 < 2s。
 - **Job Run 历史**：分页游标基于 `(created_at, id)`，建议页面请求 `limit <= 50`，可稳定支撑并发 20。
 
 > 若在 staging/production 发现导出耗时 >5s，可先排查数据库统计信息是否过期（`ANALYZE admin_console_audit_events`），必要时启用只读副本执行导出。

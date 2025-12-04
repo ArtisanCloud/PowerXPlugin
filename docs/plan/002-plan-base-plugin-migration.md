@@ -11,13 +11,13 @@
 - **前端页面与组件**：`intro.vue`、`templates/*.vue`、`TemplateFormModal.vue`、`ConfirmDialog.vue` 均可直接复用，路由结构与 Layer 预期保持一致。
 - **API 客户端**：`useTemplateApi` 及 `_client.ts` 的职责与 `@artisan-cloud/plugin-framework-client` 相符，可迁移并扩展现有客户端能力。
 - **启动流程**：相较 Base 插件复杂的 `main.go`，PowerXPlugin 的轻量启动更适合作为模板，可复用现有 Standalone 模式。
-- **规范引用**：迁移后的 Repository/Service 层需继续遵循 `.specify/memory/constitution.md` 中的约束——包括内嵌 `repository.BaseRepository[T]`、提供 `NewXXXRepository` 构造函数、在事务中设置 `app.tenant_id` 以及禁止直接暴露裸 `*gorm.DB`。
+- **规范引用**：迁移后的 Repository/Service 层需继续遵循 `.specify/memory/constitution.md` 中的约束——包括内嵌 `repository.BaseRepository[T]`、提供 `NewXXXRepository` 构造函数、在事务中设置 `app.tenant_uuid` 以及禁止直接暴露裸 `*gorm.DB`。
 
 ## 3. 必须先完成的改造（⚠️ 阻塞项）
 1. **Router Path Param 支持**：`framework/backend/go/router/router.go:140` 的 `Context.Param` 目前返回空，需实现路径参数解析，否则 `/templates/:id` 无法工作。
 2. **数据存储层替换**：Base 插件依赖 GORM + 数据库；需改造成符合 `.specify/memory/constitution.md` 的内存仓储（map 或 `sync.Map`），同时保持 Repository 结构内嵌 `BaseRepository[T]` 并完整实现租户隔离规范。
 3. **统一响应格式**：Base 使用 `{success, data, message, error, timestamp, request_id}`；框架需提供同结构的 JSON 响应助手，供 Skeleton 与未来模板共享。
-4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `X-Tenant-ID` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
+4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `X-Tenant-UUID` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
 
 ## 4. 实施里程碑
 
@@ -28,7 +28,7 @@
 - 为 `@artisan-cloud/plugin-framework-client` 补充 `put/delete` 等基础方法并支持透传 Tenant header，确保包内仅包含通用 HTTP 基础设施；同步在 `framework-admin` Layer 内引入 Starter 配置开关。
 
 ### 阶段 2：Skeleton 后端模板
-- 在 `skeleton/backend/internal/templates` 实现内存版本的 `model/service/repository/handler`，Repository 必须内嵌 `repository.BaseRepository[Template]`、提供 `NewTemplateRepository` 构造函数，并在 `BeginTenantTx` 中显式执行 `SET LOCAL app.tenant_id`（内存实现可通过上下文记录/校验该值，保持接口与调用顺序与数据库版本完全一致）。
+- 在 `skeleton/backend/internal/templates` 实现内存版本的 `model/service/repository/handler`，Repository 必须内嵌 `repository.BaseRepository[Template]`、提供 `NewTemplateRepository` 构造函数，并在 `BeginTenantTx` 中显式执行 `SET LOCAL app.tenant_uuid`（内存实现可通过上下文记录/校验该值，保持接口与调用顺序与数据库版本完全一致）。
 - 更新 `skeleton/backend/internal/routes/routes.go`，新增 `/templates` CRUD，保留 `ping`。
 - Service 层保持原先职责：HTTP Handler 只负责校验/鉴权/序列化，所有业务编排封装在 `internal/services/templates`，并为未来的 HTTP/gRPC 复用保留同一 Service 实例。
 - 在 `manifestx/manifest.go` 声明菜单与 `base:template:*` 权限，添加示例租户。
@@ -135,6 +135,6 @@
 ## 13. 依赖检查清单
 
 - [ ] `framework-admin` Layer 可用，StarterPages toggle 生效
-- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `X-Tenant-ID`
+- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `X-Tenant-UUID`
 - [ ] Skeleton 后端可独立运行并完成 CRUD Smoke（Phase 2 验证）
 - [ ] Skeleton 前端（含 `POWERX_PROXY=1` 场景）可访问首页与 Admin CRUD 页面

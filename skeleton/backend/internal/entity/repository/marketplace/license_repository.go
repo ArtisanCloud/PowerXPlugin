@@ -29,9 +29,9 @@ func (r *LicenseRepository) CreateLicense(ctx context.Context, license *dbm.Lice
 	if license == nil {
 		return errors.New("license is required")
 	}
-	tenantID := strings.TrimSpace(license.TenantID)
+	tenantID := strings.TrimSpace(license.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(license.ID) == "" {
 		license.ID = uuid.NewString()
@@ -45,7 +45,7 @@ func (r *LicenseRepository) CreateLicense(ctx context.Context, license *dbm.Lice
 				event.ID = uuid.NewString()
 			}
 			event.LicenseID = license.ID
-			event.TenantID = tenantID
+			event.TenantUuid = tenantID
 			if event.EmittedAt.IsZero() {
 				event.EmittedAt = time.Now()
 			}
@@ -62,14 +62,14 @@ func (r *LicenseRepository) UpdateLicenseToken(ctx context.Context, tenantID, li
 	tenantID = strings.TrimSpace(tenantID)
 	licenseID = strings.TrimSpace(licenseID)
 	if tenantID == "" || licenseID == "" {
-		return errors.New("tenant_id and license_id are required")
+		return errors.New("tenant_uuid and license_id are required")
 	}
 	if len(fields) == 0 {
 		return errors.New("no fields to update")
 	}
 	return r.WithTenantTx(ctx, tenantID, func(tx *gorm.DB) error {
 		res := tx.Model(&dbm.License{}).
-			Where("id = ? AND tenant_id = ?", licenseID, tenantID).
+			Where("id = ? AND tenant_uuid = ?", licenseID, tenantID).
 			Updates(fields)
 		if res.Error != nil {
 			return res.Error
@@ -86,11 +86,11 @@ func (r *LicenseRepository) GetLicense(ctx context.Context, tenantID, licenseID 
 	tenantID = strings.TrimSpace(tenantID)
 	licenseID = strings.TrimSpace(licenseID)
 	if tenantID == "" || licenseID == "" {
-		return nil, errors.New("tenant_id and license_id are required")
+		return nil, errors.New("tenant_uuid and license_id are required")
 	}
 	var license dbm.License
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND id = ?", tenantID, licenseID).
+		Where("tenant_uuid = ? AND id = ?", tenantID, licenseID).
 		First(&license).Error
 	if err != nil {
 		return nil, err
@@ -103,11 +103,11 @@ func (r *LicenseRepository) FindActiveLicense(ctx context.Context, tenantID, lis
 	tenantID = strings.TrimSpace(tenantID)
 	listingID = strings.TrimSpace(listingID)
 	if tenantID == "" || listingID == "" {
-		return nil, errors.New("tenant_id and listing_id are required")
+		return nil, errors.New("tenant_uuid and listing_id are required")
 	}
 	var license dbm.License
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND listing_id = ? AND status IN ?", tenantID, listingID, []string{dbm.LicenseStatusActive, dbm.LicenseStatusTrial}).
+		Where("tenant_uuid = ? AND listing_id = ? AND status IN ?", tenantID, listingID, []string{dbm.LicenseStatusActive, dbm.LicenseStatusTrial}).
 		Order("expires_at DESC").
 		First(&license).Error
 	if err != nil {
@@ -121,9 +121,9 @@ func (r *LicenseRepository) CreateEvent(ctx context.Context, event *dbm.LicenseE
 	if event == nil {
 		return errors.New("event is required")
 	}
-	tenantID := strings.TrimSpace(event.TenantID)
+	tenantID := strings.TrimSpace(event.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(event.ID) == "" {
 		event.ID = uuid.NewString()
@@ -141,10 +141,10 @@ func (r *LicenseRepository) ListEvents(ctx context.Context, tenantID, licenseID 
 	tenantID = strings.TrimSpace(tenantID)
 	licenseID = strings.TrimSpace(licenseID)
 	if tenantID == "" || licenseID == "" {
-		return nil, errors.New("tenant_id and license_id are required")
+		return nil, errors.New("tenant_uuid and license_id are required")
 	}
 	query := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND license_id = ?", tenantID, licenseID).
+		Where("tenant_uuid = ? AND license_id = ?", tenantID, licenseID).
 		Order("emitted_at DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -167,9 +167,9 @@ func (r *LicenseRepository) RecordTaxTransaction(ctx context.Context, txn *dbm.T
 	if txn == nil {
 		return errors.New("transaction is required")
 	}
-	tenantID := strings.TrimSpace(txn.TenantID)
+	tenantID := strings.TrimSpace(txn.TenantUuid)
 	if tenantID == "" {
-		return errors.New("tenant_id is required")
+		return errors.New("tenant_uuid is required")
 	}
 	if strings.TrimSpace(txn.ID) == "" {
 		txn.ID = uuid.NewString()
@@ -184,11 +184,11 @@ func (r *LicenseRepository) FindByBillingID(ctx context.Context, tenantID, billi
 	tenantID = strings.TrimSpace(tenantID)
 	billingID = strings.TrimSpace(billingID)
 	if tenantID == "" || billingID == "" {
-		return nil, errors.New("tenant_id and billing_id are required")
+		return nil, errors.New("tenant_uuid and billing_id are required")
 	}
 	var licenses []dbm.License
 	if err := r.DB.WithContext(ctx).
-		Where("tenant_id = ?", tenantID).
+		Where("tenant_uuid = ?", tenantID).
 		Find(&licenses).Error; err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (r *LicenseRepository) FindByBillingID(ctx context.Context, tenantID, billi
 func (r *LicenseRepository) ListExpiringWithin(ctx context.Context, tenantID string, window time.Duration) ([]*dbm.License, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
-		return nil, errors.New("tenant_id is required")
+		return nil, errors.New("tenant_uuid is required")
 	}
 	if window <= 0 {
 		window = 24 * time.Hour
@@ -212,7 +212,7 @@ func (r *LicenseRepository) ListExpiringWithin(ctx context.Context, tenantID str
 	horizon := time.Now().Add(window)
 	var licenses []*dbm.License
 	err := r.DB.WithContext(ctx).
-		Where("tenant_id = ? AND status IN ?", tenantID, []string{dbm.LicenseStatusActive, dbm.LicenseStatusTrial}).
+		Where("tenant_uuid = ? AND status IN ?", tenantID, []string{dbm.LicenseStatusActive, dbm.LicenseStatusTrial}).
 		Where("(expires_at <= ?) OR (offline_until IS NOT NULL AND offline_until <= ?)", horizon, horizon).
 		Order("expires_at ASC").
 		Find(&licenses).Error

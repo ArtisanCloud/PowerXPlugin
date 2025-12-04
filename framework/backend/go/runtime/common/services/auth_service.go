@@ -7,33 +7,33 @@ import (
 
 // AuthUser represents a user in the system
 type AuthUser struct {
-	UserID     string            `json:"userId"`
-	Username   string            `json:"username"`
-	Email      string            `json:"email"`
-	Roles      []string          `json:"roles"`
-	Permissions []string         `json:"permissions"`
-	TenantID   string            `json:"tenantId"`
-	Metadata   map[string]string `json:"metadata"`
-	CreatedAt  time.Time         `json:"createdAt"`
-	UpdatedAt  time.Time         `json:"updatedAt"`
+	UserID      string            `json:"userId"`
+	Username    string            `json:"username"`
+	Email       string            `json:"email"`
+	Roles       []string          `json:"roles"`
+	Permissions []string          `json:"permissions"`
+	TenantUuid  string            `json:"tenantId"`
+	Metadata    map[string]string `json:"metadata"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	UpdatedAt   time.Time         `json:"updatedAt"`
 }
 
 // Permission constants for Publish Hub
 const (
 	// Plugin permissions
-	PermPluginInstall    = "plugin:install"
-	PermPluginRollback   = "plugin:rollback"
-	PermPluginView       = "plugin:view"
-	PermPluginManage     = "plugin:manage"
+	PermPluginInstall  = "plugin:install"
+	PermPluginRollback = "plugin:rollback"
+	PermPluginView     = "plugin:view"
+	PermPluginManage   = "plugin:manage"
 
 	// Publish permissions
-	PermPublishSubmit    = "publish:submit"
-	PermPublishApprove   = "publish:approve"
-	PermPublishReject    = "publish:reject"
-	PermPublishView      = "publish:view"
+	PermPublishSubmit  = "publish:submit"
+	PermPublishApprove = "publish:approve"
+	PermPublishReject  = "publish:reject"
+	PermPublishView    = "publish:view"
 
 	// Marketplace permissions
-	PermMarketplaceReview = "marketplace:review"
+	PermMarketplaceReview  = "marketplace:review"
 	PermMarketplaceOffline = "marketplace:offline"
 
 	// Admin permissions
@@ -101,7 +101,7 @@ func NewAuthService(logger *slog.Logger) *AuthService {
 			Email:       "dev1@example.com",
 			Roles:       []string{"plugin_developer"},
 			Permissions: RolePermissions["plugin_developer"],
-			TenantID:    "tenant_dev",
+			TenantUuid:  "tenant_dev",
 			Metadata:    map[string]string{"department": "engineering"},
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -112,7 +112,7 @@ func NewAuthService(logger *slog.Logger) *AuthService {
 			Email:       "reviewer1@example.com",
 			Roles:       []string{"marketplace_reviewer"},
 			Permissions: RolePermissions["marketplace_reviewer"],
-			TenantID:    "tenant_marketplace",
+			TenantUuid:  "tenant_marketplace",
 			Metadata:    map[string]string{"team": "security"},
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -123,7 +123,7 @@ func NewAuthService(logger *slog.Logger) *AuthService {
 			Email:       "admin1@tenant.com",
 			Roles:       []string{"tenant_admin"},
 			Permissions: RolePermissions["tenant_admin"],
-			TenantID:    "tenant_001",
+			TenantUuid:  "tenant_001",
 			Metadata:    map[string]string{"tier": "enterprise"},
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -134,7 +134,7 @@ func NewAuthService(logger *slog.Logger) *AuthService {
 			Email:       "ops@example.com",
 			Roles:       []string{"platform_ops"},
 			Permissions: RolePermissions["platform_ops"],
-			TenantID:    "platform",
+			TenantUuid:  "platform",
 			Metadata:    map[string]string{"shift": "primary"},
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
@@ -239,8 +239,8 @@ func (e *AuthError) Error() string {
 
 // Auth error codes
 const (
-	AuthErrUserNotFound   = "USER_NOT_FOUND"
-	AuthErrInvalidCreds   = "INVALID_CREDENTIALS"
-	AuthErrTokenExpired   = "TOKEN_EXPIRED"
+	AuthErrUserNotFound     = "USER_NOT_FOUND"
+	AuthErrInvalidCreds     = "INVALID_CREDENTIALS"
+	AuthErrTokenExpired     = "TOKEN_EXPIRED"
 	AuthErrPermissionDenied = "PERMISSION_DENIED"
 )

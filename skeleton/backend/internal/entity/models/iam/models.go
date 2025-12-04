@@ -21,7 +21,7 @@ type Tenant struct {
 	Plan      string         `gorm:"size:64;not null;default:'free'" json:"plan"`
 	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
 }
 
 func (Tenant) TableName() string { return models.S(models.TableIAMTenants) }
@@ -37,7 +37,7 @@ type User struct {
 	Meta         datatypes.JSONMap `gorm:"type:jsonb" json:"meta"`
 	CreatedAt    time.Time         `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt    time.Time         `gorm:"autoUpdateTime" json:"updated_at"`
-	DeletedAt    gorm.DeletedAt    `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedAt    gorm.DeletedAt    `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
 }
 
 func (User) TableName() string { return models.S(models.TableIAMUsers) }

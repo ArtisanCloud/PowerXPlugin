@@ -18,8 +18,8 @@ type RevenueShareReport struct {
 	ID            string    `gorm:"column:id;type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	TenantUuid    string    `gorm:"column:tenant_uuid;type:uuid;not null;index" json:"tenant_uuid"`
 	VendorID      string    `gorm:"column:vendor_id;type:text;not null;index" json:"vendor_id"`
-	PeriodStart   time.Time `gorm:"column:period_start;type:timestamptz;not null;index" json:"period_start"`
-	PeriodEnd     time.Time `gorm:"column:period_end;type:timestamptz;not null;index" json:"period_end"`
+	PeriodStart   time.Time `gorm:"column:period_start;type:timestamptz;not null" json:"period_start"`
+	PeriodEnd     time.Time `gorm:"column:period_end;type:timestamptz;not null" json:"period_end"`
 	GrossAmount   float64   `gorm:"column:gross_amount;type:numeric(18,4);not null" json:"gross_amount"`
 	VendorShare   float64   `gorm:"column:vendor_share;type:numeric(18,4);not null" json:"vendor_share"`
 	PlatformShare float64   `gorm:"column:platform_share;type:numeric(18,4);not null" json:"platform_share"`

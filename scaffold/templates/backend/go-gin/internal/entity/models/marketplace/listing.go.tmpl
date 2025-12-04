@@ -41,7 +41,7 @@ type Listing struct {
 	BrandingTheme       datatypes.JSONMap `gorm:"column:branding_theme;type:jsonb" json:"branding_theme"`
 	CreatedAt           time.Time         `gorm:"column:created_at;type:timestamptz;autoCreateTime" json:"created_at"`
 	UpdatedAt           time.Time         `gorm:"column:updated_at;type:timestamptz;autoUpdateTime" json:"updated_at"`
-	DeletedAt           gorm.DeletedAt    `gorm:"column:deleted_at;type:timestamptz;index" json:"deleted_at,omitempty"`
+	DeletedAt           gorm.DeletedAt    `gorm:"column:deleted_at;type:timestamptz" json:"deleted_at,omitempty"`
 	Assets              []ListingAsset    `gorm:"foreignKey:ListingID" json:"assets,omitempty"`
 	PricingPlans        []PricingPlan     `gorm:"foreignKey:ListingID" json:"pricing_plans,omitempty"`
 }

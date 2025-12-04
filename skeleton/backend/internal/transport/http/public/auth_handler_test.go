@@ -204,7 +204,7 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	local := &localDirStub{
 		ctxFn: func(ctx context.Context, token string) (*iamservice.UserContext, error) {
-			return &iamservice.UserContext{TenantUUID: "tenant-local", TenantUuid: "9", TenantKey: "px_local", TenantName: "Local", UserID: 5, Username: "admin"}, nil
+			return &iamservice.UserContext{TenantUUID: "tenant-local", TenantUuid: "9", TenantKey: "00000000-0000-0000-0000-000000000001", TenantName: "Local", UserID: 5, Username: "admin"}, nil
 		},
 	}
 	router := gin.New()

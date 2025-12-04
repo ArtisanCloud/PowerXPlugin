@@ -29,7 +29,7 @@ logs
 *.swp
 .env
 .env.*
-!.env.example
+!.env.example*
 
 # macOS / misc
 .DS_Store

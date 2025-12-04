@@ -65,7 +65,7 @@ cp skeleton/backend/etc/config.example.yaml skeleton/backend/etc/config.yaml
 cd skeleton/backend
 export POWERX_PROXY=0
 export POWERX_RBAC_DELEGATE=false
-export PLUGIN_IAM_TENANT_KEY=px_local
+export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
 export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'

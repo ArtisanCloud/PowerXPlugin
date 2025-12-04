@@ -11,6 +11,8 @@ mkdir -p tmp
 
 publish_server_pid=""
 MOCK_SERVER_SCRIPT=""
+# Provide deterministic tenant UUID for publish flow; override via SMOKE_TENANT_UUID if needed
+SMOKE_TENANT_UUID="${SMOKE_TENANT_UUID:-00000000-0000-0000-0000-000000000001}"
 cleanup() {
   if [ -n "$publish_server_pid" ] && kill -0 "$publish_server_pid" 2>/dev/null; then
     kill "$publish_server_pid" >/dev/null 2>&1 || true
@@ -42,9 +44,8 @@ echo "[3/5] Validating contracts"
 # 3. CLI scaffold sanity
 echo "[4/5] Building px-plugin and scaffolding smoke project"
 PX_PLUGIN_BIN="${PX_PLUGIN_BIN:-$ROOT_DIR/bin/px-plugin}"
-if [ ! -x "$PX_PLUGIN_BIN" ]; then
-  go build -o "$PX_PLUGIN_BIN" ./tools/cli/cmd/px-plugin
-fi
+# Always rebuild CLI to ensure latest flags/features are present
+go build -o "$PX_PLUGIN_BIN" ./tools/cli/cmd/px-plugin
 SMOKE_DIR=$(mktemp -d)
 if [ "${KEEP_TEMP_DIR:-}" = "1" ]; then
   echo "Keeping smoke temp dir: $SMOKE_DIR"
@@ -134,6 +135,7 @@ PX_PUBLISH_API_TOKEN="smoke-token" "$PX_PLUGIN_BIN" publish \
   --entry "$SMOKE_PLUGIN_DIR" \
   --channel smoke \
   --notes "smoke test" \
+  --tenant "$SMOKE_TENANT_UUID" \
   --publish-api "http://127.0.0.1:${MOCK_PORT}" \
   --publish-token "smoke-token" > /dev/null
 kill "$publish_server_pid" >/dev/null 2>&1 || true

@@ -69,7 +69,7 @@ func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error)
 	}
 	tenantKey := strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_KEY"))
 	if tenantKey == "" {
-		tenantKey = "px_local"
+		tenantKey = "00000000-0000-0000-0000-000000000001"
 	}
 	return &LocalDirectory{
 		db:               db,

@@ -12,6 +12,8 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	}
 	handler := NewRegisterHandler(deps)
 	reviewHandler := NewReviewHandler(deps)
+	exposureHandler := NewExposureHandler(deps)
+	quotaHandler := NewQuotaHandler(deps)
 	if handler == nil {
 		return
 	}
@@ -28,6 +30,21 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 			reviews.POST("/:capabilityID/resubmit", reviewHandler.Resubmit)
 			reviews.POST("/tasks/:taskID/comments", reviewHandler.AddComment)
 			reviews.POST("/tasks/:taskID/decision", reviewHandler.Decide)
+		}
+	}
+	if exposureHandler != nil {
+		exposure := rg.Group("/capabilities/exposure")
+		{
+			exposure.GET("/template", exposureHandler.GetTemplate)
+			exposure.GET("/:capabilityID", exposureHandler.Get)
+			exposure.PUT("/:capabilityID", exposureHandler.Upsert)
+		}
+	}
+	if quotaHandler != nil {
+		quotas := rg.Group("/capabilities/quotas")
+		{
+			quotas.GET("/:capabilityID", quotaHandler.List)
+			quotas.POST("/:capabilityID", quotaHandler.Upsert)
 		}
 	}
 }

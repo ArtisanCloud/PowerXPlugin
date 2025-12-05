@@ -52,10 +52,10 @@
 
 **Goal**: 多协议通道配置、租户授权、文档/SDK 自动生成。
 
-- [ ] T301 [US3] 提供多协议通道配置 UI `skeleton/web-admin/app/pages/capabilities/ExposureForm.vue`（REST/GraphQL/gRPC/Webhook/Workflow/Agent/SDK），支持限流/额度。
-- [ ] T302 [US3] 在 `skeleton/backend/internal/services/capability/exposure_service.go` 同步渠道配置、生成 docs bundle、SDK bundle。
-- [ ] T303 [P][US3] 实现租户授权 API `skeleton/backend/internal/transport/http/admin/capability/quota_handler.go`，支持额度调整与审计。
-- [ ] T304 [US3] 更新 `contracts/exposure/openapi.yaml` & `dist/agent-sdk/` 生成脚本，确保 3 分钟内同步至 API Gateway/Portal。
+- [X] T301 [US3] 提供多协议通道配置 UI `skeleton/web-admin/app/pages/capabilities/ExposureForm.vue`（REST/GraphQL/gRPC/Webhook/Workflow/Agent/SDK），支持限流/额度。
+- [X] T302 [US3] 在 `skeleton/backend/internal/services/capability/exposure_service.go` 同步渠道配置、生成 docs bundle、SDK bundle。
+- [X] T303 [P][US3] 实现租户授权 API `skeleton/backend/internal/transport/http/admin/capability/quota_handler.go`，支持额度调整与审计。
+- [X] T304 [US3] 更新 `contracts/exposure/openapi.yaml` & `dist/agent-sdk/` 生成脚本，确保 3 分钟内同步至 API Gateway/Portal。
 
 ---
 

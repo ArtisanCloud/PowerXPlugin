@@ -24,6 +24,7 @@
     "templatesCrud": "Template CRUD",
     "templatesDevelop": "Templates Develop Guide",
     "capabilities": "Capabilities",
+    "capabilitiesExposure": "Exposure & Quotas",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -110,6 +111,60 @@
         "invalidJson": "JSON parse error",
         "fixJson": "Please verify the sample request/response fields.",
         "genericError": "Unexpected error, please try again."
+      }
+    },
+    "exposure": {
+      "title": "Capability Exposure & Tenant Quotas",
+      "description": "Configure REST/GraphQL/gRPC/Webhook/Workflow/Agent channels, authentication strategies, rate limits and tenant authorizations for approved capabilities. Generated assets are synced to PowerX within minutes.",
+      "capability": "Capability ID",
+      "updatedAt": "Last updated: {time}",
+      "sections": {
+        "channels": "Channel matrix",
+        "enabled": "channels enabled",
+        "channelHint": "Once enabled the channel appears in API Gateway, Workflow Builder, or Agent Hub.",
+        "auth": "Authentication",
+        "rateLimit": "Rate limiting",
+        "quotas": "Tenant quotas",
+        "tenantHint": "Unauthorized or over-quota tenants are blocked automatically.",
+        "noQuotas": "No tenant quotas yet. Add an entry below."
+      },
+      "fields": {
+        "capabilityId": "Capability ID",
+        "docsVersion": "Docs version",
+        "sdkVersion": "SDK version",
+        "tenant": "Tenant",
+        "displayName": "Display name",
+        "target": "Target service/topic",
+        "description": "Description",
+        "scopes": "Channel scopes",
+        "scopePlaceholder": "scope.one, scope.two",
+        "strategy": "Strategy",
+        "audience": "Audience",
+        "scopeList": "OAuth scopes",
+        "rpm": "Requests per minute",
+        "burst": "Burst limit",
+        "concurrency": "Concurrency",
+        "tenant": "Tenant",
+        "tenantId": "Tenant ID",
+        "tenantName": "Tenant name",
+        "quota": "Quota",
+        "status": "Status",
+        "notes": "Notes"
+      },
+      "actions": {
+        "load": "Load Configuration",
+        "resetChannels": "Reset Channels",
+        "addTenant": "Save tenant quota"
+      },
+      "toast": {
+        "templateFail": "Failed to load channel template",
+        "capabilityRequired": "Capability ID is required",
+        "loadFail": "Unable to load exposure configuration",
+        "saveSuccess": "Exposure settings saved",
+        "saveFailed": "Save failed, please retry later",
+        "quotaSaved": "Tenant quota updated",
+        "quotaFailed": "Failed to update tenant quota",
+        "tenantRequired": "Tenant ID is required"
       }
     }
   },

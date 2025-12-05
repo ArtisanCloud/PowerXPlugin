@@ -1,7 +1,6 @@
 package capability
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"

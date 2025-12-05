@@ -13,6 +13,10 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 	resource := app.PluginID + ":capability"
 	reviewBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/reviews"
 	reviewRes := app.PluginID + ":capability.review"
+	exposureBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/exposure"
+	exposureRes := app.PluginID + ":capability.exposure"
+	quotaBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/quotas"
+	quotaRes := app.PluginID + ":capability.quota"
 	return map[string]authx.Permission{
 		"GET:" + base + "/template":                {Resource: resource, Action: "read"},
 		"POST:" + base + "/validate":               {Resource: resource, Action: "create"},
@@ -21,5 +25,10 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 		"POST:" + reviewBase + "/*/resubmit":       {Resource: reviewRes, Action: "update"},
 		"POST:" + reviewBase + "/tasks/*/comments": {Resource: reviewRes, Action: "update"},
 		"POST:" + reviewBase + "/tasks/*/decision": {Resource: reviewRes, Action: "review"},
+		"GET:" + exposureBase + "/template":        {Resource: exposureRes, Action: "read"},
+		"GET:" + exposureBase + "/*":               {Resource: exposureRes, Action: "read"},
+		"PUT:" + exposureBase + "/*":               {Resource: exposureRes, Action: "write"},
+		"GET:" + quotaBase + "/*":                  {Resource: quotaRes, Action: "read"},
+		"POST:" + quotaBase + "/*":                 {Resource: quotaRes, Action: "manage"},
 	}
 }

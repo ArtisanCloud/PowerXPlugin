@@ -24,6 +24,7 @@
     "templatesCrud": "模板 CRUD",
     "templatesDevelop": "开发指南",
     "capabilities": "能力注册",
+    "capabilitiesExposure": "能力暴露配置",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
@@ -207,6 +208,60 @@
         "invalidJson": "JSON 无法解析",
         "fixJson": "请检查示例请求/响应字段。",
         "genericError": "发生未知错误，请稍后重试。"
+      }
+    },
+    "exposure": {
+      "title": "能力暴露通道配置",
+      "description": "为通过审批的能力配置多协议通道、鉴权策略、限流与租户授权，并同步到宿主工作流/Agent/开放平台。",
+      "capability": "能力 ID",
+      "updatedAt": "最近更新：{time}",
+      "sections": {
+        "channels": "通道配置",
+        "enabled": "通道已启用",
+        "channelHint": "启用后将出现在宿主的 API/Workflow/Agent 列表中",
+        "auth": "鉴权与凭证",
+        "rateLimit": "限流与熔断",
+        "quotas": "租户授权与配额",
+        "tenantHint": "未授权租户无法调用；额度超限将被阻断",
+        "noQuotas": "暂无租户授权，可在下方添加。"
+      },
+      "fields": {
+        "capabilityId": "能力 ID",
+        "docsVersion": "文档版本",
+        "sdkVersion": "SDK 版本",
+        "tenant": "租户",
+        "displayName": "展示名称",
+        "target": "目标 Service/Topic",
+        "description": "描述",
+        "scopes": "作用域",
+        "scopePlaceholder": "scope.one, scope.two",
+        "strategy": "鉴权策略",
+        "audience": "Audience",
+        "scopeList": "OAuth Scope 列表",
+        "rpm": "每分钟请求数",
+        "burst": "突发上限",
+        "concurrency": "并发数",
+        "tenant": "租户",
+        "tenantId": "租户 ID",
+        "tenantName": "租户名称",
+        "quota": "额度",
+        "status": "状态",
+        "notes": "备注"
+      },
+      "actions": {
+        "load": "加载配置",
+        "resetChannels": "重置通道",
+        "addTenant": "保存租户额度"
+      },
+      "toast": {
+        "templateFail": "无法加载通道模板",
+        "capabilityRequired": "请先填写能力 ID",
+        "loadFail": "加载暴露配置失败",
+        "saveSuccess": "暴露配置已保存",
+        "saveFailed": "保存失败，请稍后重试",
+        "quotaSaved": "租户额度已更新",
+        "quotaFailed": "租户额度更新失败",
+        "tenantRequired": "请填写租户 ID"
       }
     }
   },

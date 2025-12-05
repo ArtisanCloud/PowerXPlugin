@@ -1,1 +1,5 @@
-# OpenAPI exposure placeholder
+openapi: 3.0.3
+info:
+  title: com.powerx.plugins.base Capability Exposure
+  version: 1.0.0
+paths: {}

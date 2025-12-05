@@ -63,10 +63,10 @@
 
 **Goal**: 生成差异报告、灰度计划、通知/回滚。
 
-- [ ] T401 [US4] 实现变更申请入口 `skeleton/web-admin/app/pages/capabilities/Lifecycle.vue`，允许上传 diff、配置灰度窗口。
-- [ ] T402 [US4] 服务层 `skeleton/backend/internal/services/capability_lifecycle/plan_service.go` 生成差异报告、触发通知、控制双版本并行。
-- [ ] T403 [US4] 实现通知编排 `skeleton/backend/internal/observability/capability/lifecycle_notifier.go`，保证 100% 覆盖与失败重试。
-- [ ] T404 [US4] 集成测试 `tests/integration/capability_lifecycle_plan_test.go` 验证灰度暂停/回滚。
+- [X] T401 [US4] 实现变更申请入口 `skeleton/web-admin/app/pages/capabilities/Lifecycle.vue`，允许上传 diff、配置灰度窗口。
+- [X] T402 [US4] 服务层 `skeleton/backend/internal/services/capability_lifecycle/plan_service.go` 生成差异报告、触发通知、控制双版本并行。
+- [X] T403 [US4] 实现通知编排 `skeleton/backend/internal/observability/capability/lifecycle_notifier.go`，保证 100% 覆盖与失败重试。
+- [X] T404 [US4] 集成测试 `tests/integration/capability_lifecycle_plan_test.go` 验证灰度暂停/回滚。
 
 ---
 

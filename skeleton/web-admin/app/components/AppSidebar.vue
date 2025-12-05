@@ -119,6 +119,19 @@
           <UIcon name="i-heroicons-adjustments-horizontal" class="w-4 h-4 mr-3" />
           {{ t('navigation.capabilitiesExposure') }}
         </UButton>
+        <UButton
+          to="/capabilities/lifecycle"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/capabilities/lifecycle'),
+          }"
+        >
+          <UIcon name="i-heroicons-clock" class="w-4 h-4 mr-3" />
+          {{ t('navigation.capabilitiesLifecycle') }}
+        </UButton>
       </div>
     </nav>
   </aside>

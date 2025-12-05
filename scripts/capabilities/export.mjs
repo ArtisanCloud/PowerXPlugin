@@ -39,6 +39,7 @@ function ensureExposurePlaceholders() {
     { file: path.join(repoRoot, "contracts", "exposure", "workflow", "README.md"), header: "# Workflow step templates\n" },
     { file: path.join(repoRoot, "contracts", "exposure", "mcp-tools", "README.md"), header: "# MCP manifests\n" },
     { file: path.join(repoRoot, "contracts", "exposure", "agent-streams", "README.md"), header: "# Agent SSE channels\n" },
+    { file: path.join(repoRoot, "contracts", "exposure", "capability-lifecycle.json"), header: JSON.stringify({ plans: [], updated_at: new Date(0).toISOString() }, null, 2) + "\n" },
     { file: path.join(repoRoot, "dist", "agent-sdk", "README.md"), header: "# SDK bundle output\n" }
   ];
 

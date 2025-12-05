@@ -17,6 +17,8 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 	exposureRes := app.PluginID + ":capability.exposure"
 	quotaBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/quotas"
 	quotaRes := app.PluginID + ":capability.quota"
+	lifecycleBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/lifecycle"
+	lifecycleRes := app.PluginID + ":capability.lifecycle"
 	return map[string]authx.Permission{
 		"GET:" + base + "/template":                {Resource: resource, Action: "read"},
 		"POST:" + base + "/validate":               {Resource: resource, Action: "create"},
@@ -30,5 +32,9 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 		"PUT:" + exposureBase + "/*":               {Resource: exposureRes, Action: "write"},
 		"GET:" + quotaBase + "/*":                  {Resource: quotaRes, Action: "read"},
 		"POST:" + quotaBase + "/*":                 {Resource: quotaRes, Action: "manage"},
+		"GET:" + lifecycleBase + "/template":       {Resource: lifecycleRes, Action: "read"},
+		"GET:" + lifecycleBase:                     {Resource: lifecycleRes, Action: "read"},
+		"POST:" + lifecycleBase:                    {Resource: lifecycleRes, Action: "write"},
+		"POST:" + lifecycleBase + "/*/status":      {Resource: lifecycleRes, Action: "manage"},
 	}
 }

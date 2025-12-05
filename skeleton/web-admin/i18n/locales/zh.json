@@ -25,6 +25,7 @@
     "templatesDevelop": "开发指南",
     "capabilities": "能力注册",
     "capabilitiesExposure": "能力暴露配置",
+    "capabilitiesLifecycle": "生命周期治理",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
@@ -262,6 +263,82 @@
         "quotaSaved": "租户额度已更新",
         "quotaFailed": "租户额度更新失败",
         "tenantRequired": "请填写租户 ID"
+      }
+    },
+    "lifecycle": {
+      "badge": "版本治理",
+      "title": "能力生命周期计划",
+      "description": "生成能力升级/下线的差异说明、灰度窗口和通知矩阵，确保订阅方提前感知并可随时回滚。",
+      "fields": {
+        "capabilityId": "能力 ID",
+        "changeType": "变更类型",
+        "notificationChannels": "通知渠道",
+        "graceHours": "灰度观察时长（小时）",
+        "dualRun": "双版本并行截止",
+        "diffSummary": "差异摘要",
+        "rollbackPlan": "回滚策略",
+        "impactScope": "影响范围",
+        "migrationGuide": "迁移指引/链接",
+        "statusNotes": "状态备注"
+      },
+      "placeholders": {
+        "capability": "com.powerx.demo.template.create",
+        "changeType": "请选择变更类型",
+        "channels": "选择需要通知的渠道",
+        "graceHours": "72",
+        "diffSummary": "说明新旧版本差异、影响范围、订阅方动作...",
+        "rollbackPlan": "描述回退入口、负责人、时间线等",
+        "impactScope": "如 租户A、生产环境",
+        "migrationGuide": "迁移文档链接或备注",
+        "windowLabel": "wave-1",
+        "percent": "50",
+        "condition": "条件（可选）"
+      },
+      "sections": {
+        "windows": "灰度窗口",
+        "windowHint": "按照波次拆分灰度百分比、时间与条件，便于追踪通知与执行",
+        "windowLabel": "灰度节点",
+        "noWindow": "尚未添加灰度窗口，可点击右上角“新增波次”。",
+        "channels": "通知渠道",
+        "noChannels": "尚未配置渠道",
+        "grace": "观察期",
+        "dualRun": "双版本并行",
+        "notSet": "未设置",
+        "windowTimeline": "执行波次"
+      },
+      "actions": {
+        "loadPlans": "加载计划",
+        "addWindow": "新增波次",
+        "removeWindow": "移除波次",
+        "createPlan": "创建生命周期计划",
+        "refresh": "刷新列表"
+      },
+      "list": {
+        "title": "计划列表",
+        "description": "包含当前能力的全部生命周期计划，可随时暂停、回滚或完成。",
+        "empty": "暂无计划，先创建一条生命周期计划即可在此处管理。",
+        "planMeta": "由 {author} 于 {time} 创建"
+      },
+      "units": {
+        "hours": "小时"
+      },
+      "status": {
+        "draft": "草稿",
+        "pending": "待执行",
+        "approved": "已批准",
+        "paused": "已暂停",
+        "completed": "已完成"
+      },
+      "toast": {
+        "templateFailed": "无法加载生命周期模板",
+        "loadFailed": "加载生命周期计划失败",
+        "capabilityRequired": "请填写能力 ID 后再操作",
+        "required": "请先完成必填字段",
+        "planCreated": "生命周期计划已创建",
+        "createFailed": "创建生命周期计划失败",
+        "statusUpdated": "状态已更新",
+        "statusDesc": "计划已切换至 {status}",
+        "statusFailed": "更新计划状态失败"
       }
     }
   },

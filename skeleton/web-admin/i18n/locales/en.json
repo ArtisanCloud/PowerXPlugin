@@ -25,6 +25,7 @@
     "templatesDevelop": "Templates Develop Guide",
     "capabilities": "Capabilities",
     "capabilitiesExposure": "Exposure & Quotas",
+    "capabilitiesLifecycle": "Lifecycle Governance",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -165,6 +166,82 @@
         "quotaSaved": "Tenant quota updated",
         "quotaFailed": "Failed to update tenant quota",
         "tenantRequired": "Tenant ID is required"
+      }
+    },
+    "lifecycle": {
+      "badge": "Lifecycle",
+      "title": "Capability Lifecycle Plans",
+      "description": "Describe upgrade/deprecation diffs, rollout windows, and notification channels so subscribers are warned and can roll back safely.",
+      "fields": {
+        "capabilityId": "Capability ID",
+        "changeType": "Change type",
+        "notificationChannels": "Notification channels",
+        "graceHours": "Observation window (hours)",
+        "dualRun": "Dual-run deadline",
+        "diffSummary": "Diff summary",
+        "rollbackPlan": "Rollback plan",
+        "impactScope": "Impact scope",
+        "migrationGuide": "Migration guide / URL",
+        "statusNotes": "Status notes"
+      },
+      "placeholders": {
+        "capability": "com.powerx.demo.template.create",
+        "changeType": "Select change type",
+        "channels": "Choose notification channels",
+        "graceHours": "72",
+        "diffSummary": "Explain breaking changes, tenants, required actions...",
+        "rollbackPlan": "Document the fallback procedure",
+        "impactScope": "e.g. tenant A, production env",
+        "migrationGuide": "Documentation link or notes",
+        "windowLabel": "wave-1",
+        "percent": "50",
+        "condition": "Condition (optional)"
+      },
+      "sections": {
+        "windows": "Rollout windows",
+        "windowHint": "Split rollout into waves with percentage, time range, and optional conditions.",
+        "windowLabel": "Rollout wave",
+        "noWindow": "No rollout window yet. Add one to describe the gray release plan.",
+        "channels": "Notification channels",
+        "noChannels": "Not configured",
+        "grace": "Observation window",
+        "dualRun": "Dual-run",
+        "notSet": "Not set",
+        "windowTimeline": "Execution timeline"
+      },
+      "actions": {
+        "loadPlans": "Load plans",
+        "addWindow": "Add wave",
+        "removeWindow": "Remove wave",
+        "createPlan": "Create lifecycle plan",
+        "refresh": "Refresh"
+      },
+      "list": {
+        "title": "Lifecycle plans",
+        "description": "Manage version upgrades, deprecation, and rollback paths for the selected capability.",
+        "empty": "No lifecycle plans yet. Create one to govern version changes.",
+        "planMeta": "Created by {author} at {time}"
+      },
+      "units": {
+        "hours": "hours"
+      },
+      "status": {
+        "draft": "Draft",
+        "pending": "Pending",
+        "approved": "Approved",
+        "paused": "Paused",
+        "completed": "Completed"
+      },
+      "toast": {
+        "templateFailed": "Failed to load lifecycle template",
+        "loadFailed": "Failed to load lifecycle plans",
+        "capabilityRequired": "Capability ID is required",
+        "required": "Please complete the required fields",
+        "planCreated": "Lifecycle plan created",
+        "createFailed": "Failed to create lifecycle plan",
+        "statusUpdated": "Status updated",
+        "statusDesc": "Plan switched to {status}",
+        "statusFailed": "Failed to update lifecycle status"
       }
     }
   },

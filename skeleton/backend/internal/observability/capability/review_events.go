@@ -25,6 +25,8 @@ type Event struct {
 	Message      string
 	Deadline     time.Time
 	Metadata     map[string]any
+	Payload      map[string]any
+	Channels     []string
 }
 
 // EmitReviewEvent sends the event to the shared logger for downstream sinks.
@@ -44,6 +46,12 @@ func EmitReviewEvent(ctx context.Context, log *logrus.Entry, evt Event) {
 	}
 	for k, v := range evt.Metadata {
 		fields[k] = v
+	}
+	if len(evt.Channels) > 0 {
+		fields["channels"] = evt.Channels
+	}
+	if len(evt.Payload) > 0 {
+		fields["payload"] = evt.Payload
 	}
 	if ctx != nil {
 		if reqID := ctx.Value("request_id"); reqID != nil {

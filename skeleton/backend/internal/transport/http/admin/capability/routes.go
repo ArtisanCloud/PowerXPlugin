@@ -14,6 +14,7 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	reviewHandler := NewReviewHandler(deps)
 	exposureHandler := NewExposureHandler(deps)
 	quotaHandler := NewQuotaHandler(deps)
+	lifecycleHandler := NewLifecycleHandler(deps)
 	if handler == nil {
 		return
 	}
@@ -45,6 +46,15 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		{
 			quotas.GET("/:capabilityID", quotaHandler.List)
 			quotas.POST("/:capabilityID", quotaHandler.Upsert)
+		}
+	}
+	if lifecycleHandler != nil {
+		lifecycle := rg.Group("/capabilities/lifecycle")
+		{
+			lifecycle.GET("/template", lifecycleHandler.GetTemplate)
+			lifecycle.GET("", lifecycleHandler.List)
+			lifecycle.POST("", lifecycleHandler.Create)
+			lifecycle.POST("/:planID/status", lifecycleHandler.UpdateStatus)
 		}
 	}
 }

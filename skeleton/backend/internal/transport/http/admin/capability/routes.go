@@ -11,6 +11,7 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		return
 	}
 	handler := NewRegisterHandler(deps)
+	reviewHandler := NewReviewHandler(deps)
 	if handler == nil {
 		return
 	}
@@ -19,5 +20,14 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		group.GET("/template", handler.GetTemplate)
 		group.POST("/validate", handler.ValidateDraft)
 		group.POST("", handler.Submit)
+	}
+	if reviewHandler != nil {
+		reviews := rg.Group("/capabilities/reviews")
+		{
+			reviews.GET("/:capabilityID", reviewHandler.List)
+			reviews.POST("/:capabilityID/resubmit", reviewHandler.Resubmit)
+			reviews.POST("/tasks/:taskID/comments", reviewHandler.AddComment)
+			reviews.POST("/tasks/:taskID/decision", reviewHandler.Decide)
+		}
 	}
 }

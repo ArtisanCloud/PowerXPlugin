@@ -41,10 +41,10 @@
 
 **Goal**: 审核工作流自动派发、评论、整改、双人复核。
 
-- [ ] T201 [US2] 更新服务 `skeleton/backend/internal/services/capability_review/workflow_service.go`，根据敏感度生成任务、SLA、升级策略。
-- [ ] T202 [P][US2] 扩展 `skeleton/backend/internal/transport/http/admin/capability/review_handler.go` 支持评论、附件、整改再提交。
-- [ ] T203 [US2] 实现复核/升级事件推送（Notification Center）于 `skeleton/backend/internal/observability/capability/review_events.go`。
-- [ ] T204 [US2] 编写审核流程集成自测 `tests/integration/capability_review_flow_test.go`。
+- [X] T201 [US2] 更新服务 `skeleton/backend/internal/services/capability_review/workflow_service.go`，根据敏感度生成任务、SLA、升级策略。
+- [X] T202 [P][US2] 扩展 `skeleton/backend/internal/transport/http/admin/capability/review_handler.go` 支持评论、附件、整改再提交。
+- [X] T203 [US2] 实现复核/升级事件推送（Notification Center）于 `skeleton/backend/internal/observability/capability/review_events.go`。
+- [X] T204 [US2] 编写审核流程集成自测 `skeleton/backend/tests/integration/capability_review_flow_test.go`（需位于 skeleton 模块下以访问 internal 包）。
 
 ---
 

@@ -2,6 +2,7 @@
 
 export * from "./useTemplate";
 export * from "./useStream";
+export * from "./useCapabilityRegistry";
 export {
   useApiClient,
   apiGet,

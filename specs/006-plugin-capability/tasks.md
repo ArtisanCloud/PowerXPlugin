@@ -27,11 +27,11 @@
 
 **Goal**: 表单/CLI 引导完成能力建模并通过校验；生成能力 ID 与审计。
 
-- [ ] T101 [US1] 更新 web-admin 表单页面 `skeleton/web-admin/app/pages/capabilities/RegisterForm.vue`，支持字段模板、多语言提示、草稿恢复。
-- [ ] T102 [P][US1] 扩展 CLI `scripts/capabilities/registry-cli.mjs`，新增 `capabilities new` 与 Schema stub 生成。
-- [ ] T103 [US1] 实现后台 Handler `skeleton/backend/internal/transport/http/admin/capability/register_handler.go`，接入服务层校验/审计。
-- [ ] T104 [US1] 在 `skeleton/backend/internal/services/capability/register_service.go` 实现命名冲突检查、Schema 校验、ID 生成、审计写入。
-- [ ] T105 [US1] 添加 Go 单元测试 `tests/capability/register_service_test.go` 覆盖冲突/草稿场景。
+- [X] T101 [US1] 更新 web-admin 表单页面 `skeleton/web-admin/app/pages/capabilities/RegisterForm.vue`，支持字段模板、多语言提示、草稿恢复。
+- [X] T102 [P][US1] 扩展 CLI `scripts/capabilities/registry-cli.mjs`，新增 `capabilities new` 与 Schema stub 生成。
+- [X] T103 [US1] 实现后台 Handler `skeleton/backend/internal/transport/http/admin/capability/register_handler.go`，接入服务层校验/审计。
+- [X] T104 [US1] 在 `skeleton/backend/internal/services/capability/register_service.go` 实现命名冲突检查、Schema 校验、ID 生成、审计写入。
+- [X] T105 [US1] 添加 Go 单元测试 `skeleton/backend/internal/services/capability/register_service_test.go` 覆盖冲突/草稿场景。
 
 **Independent test**: 表单 + CLI 提交→能力 ID 与审计。
 

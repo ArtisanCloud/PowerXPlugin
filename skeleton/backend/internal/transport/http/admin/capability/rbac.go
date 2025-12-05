@@ -1,0 +1,19 @@
+package capability
+
+import (
+	"strings"
+
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+)
+
+// RBACEntries describes the minimal permissions required by capability routes.
+func RBACEntries(prefix string) map[string]authx.Permission {
+	base := strings.TrimRight(prefix, "/") + "/admin/capabilities/register"
+	resource := app.PluginID + ":capability"
+	return map[string]authx.Permission{
+		"GET:" + base + "/template":  {Resource: resource, Action: "read"},
+		"POST:" + base + "/validate": {Resource: resource, Action: "create"},
+		"POST:" + base:               {Resource: resource, Action: "create"},
+	}
+}

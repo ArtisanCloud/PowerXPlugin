@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"{{ .BackendModulePath }}/internal/capabilities"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/grpc/client"
 	"{{ .BackendModulePath }}/internal/logger"
@@ -29,6 +30,7 @@ type Deps struct {
 	Ctx                 context.Context
 	PowerXClient        *client.PowerXServiceClient
 	Config              *config.Config
+	CapabilitiesManager capabilities.Manager
 	TaxProviderClient   *marketplacesvc.TaxProviderClient
 	MarketplaceBilling  marketplacesvc.BillingClient
 	LicenseAuthority    marketplacesvc.LicenseAuthority

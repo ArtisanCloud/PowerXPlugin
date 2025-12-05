@@ -89,7 +89,24 @@
         </div>
       </div>
 
-      
+      <div>
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.capabilities') }}
+        </div>
+        <UButton
+          to="/capabilities/register"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/capabilities/register') || isExactActive('/capabilities/register-form'),
+          }"
+        >
+          <UIcon name="i-heroicons-cube-transparent" class="w-4 h-4 mr-3" />
+          {{ t('navigation.capabilities') }}
+        </UButton>
+      </div>
     </nav>
   </aside>
 </template>

@@ -23,6 +23,7 @@ import (
 	"{{ .BackendModulePath }}/internal/logger"
 	manifestx "{{ .BackendModulePath }}/internal/manifestx"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
+	capmetrics "{{ .BackendModulePath }}/internal/observability/capability"
 	"{{ .BackendModulePath }}/internal/observability/auth"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
 	pluginrouter "{{ .BackendModulePath }}/internal/router"
@@ -138,7 +139,8 @@ func main() {
 
 	capLog := logger.WithField("component", "capabilities_manager")
 	capManager := capabilities.NewManager(cfg, capLog)
-	if err := runtimecap.SyncCapabilities(ctx, capManager, nil); err != nil {
+	capMetrics := capmetrics.NewMetrics()
+	if err := runtimecap.SyncCapabilities(ctx, capManager, nil, capMetrics); err != nil {
 		logger.WithError(err).Fatal("Failed to initialize capability catalog")
 	}
 
@@ -148,6 +150,7 @@ func main() {
 		PowerXClient:        pxc,
 		Config:              cfg,
 		CapabilitiesManager: capManager,
+		CapabilityMetrics:   capMetrics,
 		TaxProviderClient:   taxClient,
 		MarketplaceBilling:  nil,
 		LicenseAuthority:    nil,

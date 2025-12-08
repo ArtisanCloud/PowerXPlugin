@@ -110,7 +110,7 @@ func NewManager(cfg *config.Config, log *logrus.Entry) Manager {
 				return strings.HasSuffix(path, ".proto")
 			}},
 			{dir: filepath.Join(exposureDir, "workflow"), protocolType: protocolWorkflow, matcher: nil},
-			{dir: filepath.Join(exposureDir, "mcp-tools"), protocolType: protocolMCP, matcher: nil},
+			{dir: filepath.Join(exposureDir, "mcp-tools.json"), protocolType: protocolMCP, matcher: nil},
 			{dir: filepath.Join(exposureDir, "agent-streams"), protocolType: protocolAgentStream, matcher: nil},
 			{dir: agentSDKDir, protocolType: "sdk", matcher: nil},
 		},

@@ -5,6 +5,7 @@ export * from "./useStream";
 export * from "./useCapabilityRegistry";
 export * from "./useCapabilityExposure";
 export * from "./useCapabilityLifecycle";
+export * from "./useCapabilityCatalog";
 export {
   useApiClient,
   apiGet,

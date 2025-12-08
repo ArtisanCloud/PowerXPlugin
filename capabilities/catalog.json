@@ -1,0 +1,77 @@
+{
+  "plugin_id": "com.powerx.plugins.base",
+  "manifest_version": "0.7.0",
+  "generated_at": "2025-12-06T14:31:21.913Z",
+  "imports": [
+    "contracts/capabilities/com.powerx.plugins.base.template.create.yaml",
+    "contracts/capabilities/com.powerx.plugins.base.template.review.yaml",
+    "contracts/capabilities/com.powerx.plugins.base.template.publish.yaml",
+    "contracts/capabilities/com.powerx.plugins.base.template.compose.yaml"
+  ],
+  "entries": [
+    {
+      "id": "com.powerx.plugins.base.template.create",
+      "version": "1.0.0",
+      "descriptor": "contracts/capabilities/com.powerx.plugins.base.template.create.yaml",
+      "schemas": {},
+      "protocols": {},
+      "tags": [],
+      "execution": {
+        "mode": "sync",
+        "callback_url": "",
+        "sse_channel": "",
+        "status_endpoint": "",
+        "timeout_seconds": 0
+      },
+      "checksum": "075c4dc006090d2839f63038c7d93719e0b175479f4560a7c40bf4b426b552b0"
+    },
+    {
+      "id": "com.powerx.plugins.base.template.review",
+      "version": "1.0.0",
+      "descriptor": "contracts/capabilities/com.powerx.plugins.base.template.review.yaml",
+      "schemas": {},
+      "protocols": {},
+      "tags": [],
+      "execution": {
+        "mode": "sync",
+        "callback_url": "",
+        "sse_channel": "",
+        "status_endpoint": "",
+        "timeout_seconds": 0
+      },
+      "checksum": "cf8ffd6fb8e5b5be27aa0f83c69d246e5e6bf4f0d694b43a65aea469ba0146c4"
+    },
+    {
+      "id": "com.powerx.plugins.base.template.publish",
+      "version": "1.0.0",
+      "descriptor": "contracts/capabilities/com.powerx.plugins.base.template.publish.yaml",
+      "schemas": {},
+      "protocols": {},
+      "tags": [],
+      "execution": {
+        "mode": "sync",
+        "callback_url": "",
+        "sse_channel": "",
+        "status_endpoint": "",
+        "timeout_seconds": 0
+      },
+      "checksum": "9aaa83c03b7b4e66b64943c088d9608938f388c3cd02b03dc8a5a2acee9f7c78"
+    },
+    {
+      "id": "com.powerx.plugins.base.template.compose",
+      "version": "1.0.0",
+      "descriptor": "contracts/capabilities/com.powerx.plugins.base.template.compose.yaml",
+      "schemas": {},
+      "protocols": {},
+      "tags": [],
+      "execution": {
+        "mode": "sync",
+        "callback_url": "",
+        "sse_channel": "",
+        "status_endpoint": "",
+        "timeout_seconds": 0
+      },
+      "checksum": "e482caabe56226797bcd61e2cc4ea15b9044c149cdef639b042e1dbc812cfab3"
+    }
+  ]
+}

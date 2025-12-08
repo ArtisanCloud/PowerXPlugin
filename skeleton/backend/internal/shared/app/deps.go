@@ -9,6 +9,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
+	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -31,6 +32,7 @@ type Deps struct {
 	PowerXClient        *client.PowerXServiceClient
 	Config              *config.Config
 	CapabilitiesManager capabilities.Manager
+	CapabilityMetrics   *capmetrics.Metrics
 	TaxProviderClient   *marketplacesvc.TaxProviderClient
 	MarketplaceBilling  marketplacesvc.BillingClient
 	LicenseAuthority    marketplacesvc.LicenseAuthority

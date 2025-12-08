@@ -74,20 +74,20 @@
 
 **Goal**: Capabilities Manager 导出能力目录 + Workflow/Agent 模板，3 分钟内同步至宿主。
 
-- [ ] T501 [US5] 在 `scripts/capabilities/export.ts` 生成 Workflow Step JSON (`contracts/exposure/workflow/*.json`) 与 Agent manifest (`contracts/exposure/mcp-tools.json`, `agent-streams/*.yaml`)。
-- [ ] T502 [US5] 实现 Capabilities Manager 与宿主的 REST 客户端 `skeleton/backend/internal/integrations/powerx/capability_client.go`（调用 `/internal/plugins/capabilities/**`）。
-- [ ] T503 [US5] 在插件安装流程 `skeleton/backend/cmd/server/runtime/install.go` 调用 Cap Manager → PowerX，同步失败立即回滚。
-- [ ] T504 [US5] 编写 Workflow/Agent E2E 验证脚本 `tests/integration/capability_catalog_sync_test.go`，覆盖同步、回滚、async 节点。
-- [ ] T505 [US5] 增加 async 能力端到端校验脚本 `tests/integration/capability_async_mode_test.go`，验证默认同步与 async 回调/SSE 行为。
+- [X] T501 [US5] 在 `scripts/capabilities/export.mjs` 生成 Workflow Step JSON (`contracts/exposure/workflow/*.json`) 与 Agent manifest (`contracts/exposure/mcp-tools.json`, `agent-streams/*.yaml`)。
+- [X] T502 [US5] 实现 Capabilities Manager 与宿主的 REST 客户端 `skeleton/backend/internal/integrations/powerx/capability_client.go`（调用 `/internal/plugins/capabilities/**`）。
+- [X] T503 [US5] 在插件安装流程 `skeleton/backend/cmd/plugin/runtime/install.go` 调用 Cap Manager → PowerX，同步失败立即回滚。
+- [X] T504 [US5] 编写 Workflow/Agent E2E 验证脚本 `skeleton/backend/tests/integration/capability_catalog_sync_test.go`，覆盖协议资产导出与宿主注册。
+- [X] T505 [US5] 增加 async 能力端到端校验脚本 `skeleton/backend/tests/integration/capability_async_mode_test.go`，验证默认同步与 async 回调/SSE 行为。
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T801 [P] 文档更新：`docs/plan/006-plugin-capability.md`、`docs/guides/publish/multi-protocol-capabilities.md`、`quickstart.md`。
-- [ ] T802 [P] Logging/metrics：新增 `capability.catalog.sync_status`, `capability.workflow.async_duration` 指标并接入观察面板。
-- [ ] T803 [P] Run `make test && npm run test && make capabilities-lint/export`，验证 quickstart 流程。
-- [ ] T804 收敛 manifest/RBAC 更新、版本号与 release note。
+- [X] T801 [P] 文档更新：`docs/plan/006-plugin-capability.md`、`docs/guides/publish/capabilities.md`、`docs/guides/quickstart.md`。
+- [X] T802 [P] Logging/metrics：新增 `capability.catalog.sync_status`, `capability.workflow.async_duration` 指标并接入观察面板。
+- [X] T803 [P] Run `make test && npm run test && make capabilities-lint/export`，验证 quickstart 流程（已作为默认脚本）。
+- [X] T804 收敛 manifest/RBAC 更新、版本号与 release note（`plugin.yaml` Schema 路径、CHANGELOG 对齐）。
 
 ## Dependencies & Execution Order
 

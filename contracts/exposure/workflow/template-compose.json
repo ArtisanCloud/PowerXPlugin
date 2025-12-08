@@ -1,0 +1,75 @@
+{
+  "id": "com.powerx.plugins.base.template.compose",
+  "version": "1.0.0",
+  "name": "模板协作流程",
+  "summary": "串联草稿、审核、发布三阶段，可在 Workflow Builder 与 Agent Hub 中直接引用。",
+  "nodes": [
+    {
+      "id": "draft",
+      "kind": "plugin",
+      "use": "com.powerx.plugins.base.template.create",
+      "params": {
+        "protocol": "rest",
+        "capability_id": "com.powerx.plugins.base.template.create"
+      },
+      "io": {
+        "in_map": {
+          "body": "{{var.template_draft}}"
+        },
+        "out_map": {
+          "template_id": "output.id"
+        }
+      }
+    },
+    {
+      "id": "review",
+      "kind": "plugin",
+      "use": "com.powerx.plugins.base.template.review",
+      "params": {
+        "protocol": "rest",
+        "capability_id": "com.powerx.plugins.base.template.review"
+      },
+      "io": {
+        "in_map": {
+          "template_id": "{{task.draft.output.template_id}}",
+          "approved": "{{var.review.approved}}",
+          "comments": "{{var.review.comments}}"
+        },
+        "out_map": {
+          "approved": "output.approved"
+        }
+      }
+    },
+    {
+      "id": "publish",
+      "kind": "plugin",
+      "use": "com.powerx.plugins.base.template.publish",
+      "params": {
+        "protocol": "rest",
+        "capability_id": "com.powerx.plugins.base.template.publish"
+      },
+      "io": {
+        "in_map": {
+          "template_id": "{{task.draft.output.template_id}}",
+          "approved": "{{task.review.output.approved}}",
+          "channel": "{{var.publish_channel}}"
+        },
+        "out_map": {
+          "publish_status": "output.publish_status"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "draft",
+      "to": "review"
+    },
+    {
+      "from": "review",
+      "to": "publish",
+      "condition": "{{task.review.output.approved}}"
+    }
+  ],
+  "metadata": {}
+}

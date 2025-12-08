@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
-	reviewevents "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
+	capobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	capsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/capability"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/google/uuid"
@@ -48,7 +48,8 @@ type reviewPolicy struct {
 
 // WorkflowService coordinates review task generation and lifecycle management.
 type WorkflowService struct {
-	logger *logrus.Entry
+	logger  *logrus.Entry
+	metrics *capobs.Metrics
 
 	mu            sync.RWMutex
 	tasks         map[string]*ReviewTask
@@ -139,14 +140,17 @@ type Escalation struct {
 // NewWorkflowService builds a service instance with default policies.
 func NewWorkflowService(deps *app.Deps) *WorkflowService {
 	var log *logrus.Entry
+	var metrics *capobs.Metrics
 	if deps != nil {
 		log = deps.RuntimeLogger(deps.Ctx, "capability_review_service", nil)
+		metrics = deps.CapabilityMetrics
 	}
 	if log == nil {
 		log = logger.WithRuntimeFields(app.PluginID, "", "", "capability_review_service", nil)
 	}
 	return &WorkflowService{
 		logger:        log,
+		metrics:       metrics,
 		tasks:         make(map[string]*ReviewTask),
 		byCapability:  make(map[string][]string),
 		capabilityRef: make(map[string]*capsvc.CapabilityRecord),
@@ -211,8 +215,8 @@ func (s *WorkflowService) EnsureTasks(ctx context.Context, record *capsvc.Capabi
 		}
 		s.tasks[task.ID] = task
 		taskIDs = append(taskIDs, task.ID)
-		reviewevents.EmitReviewEvent(ctx, s.logger, reviewevents.Event{
-			Type:         reviewevents.EventTaskCreated,
+		capobs.EmitReviewEvent(ctx, s.logger, capobs.Event{
+			Type:         capobs.EventTaskCreated,
 			CapabilityID: record.ID,
 			TaskID:       task.ID,
 			Status:       task.Status,
@@ -270,8 +274,8 @@ func (s *WorkflowService) AddComment(ctx context.Context, taskID string, input C
 	task.UpdatedAt = now
 	s.mu.Unlock()
 
-	reviewevents.EmitReviewEvent(ctx, s.logger, reviewevents.Event{
-		Type:         reviewevents.EventCommentAdded,
+	capobs.EmitReviewEvent(ctx, s.logger, capobs.Event{
+		Type:         capobs.EventCommentAdded,
 		CapabilityID: task.CapabilityID,
 		TaskID:       task.ID,
 		Status:       task.Status,
@@ -334,8 +338,8 @@ func (s *WorkflowService) Resolve(ctx context.Context, taskID string, input Deci
 	task.DecisionBy = strings.TrimSpace(input.Actor)
 	task.UpdatedAt = now
 
-	reviewevents.EmitReviewEvent(ctx, s.logger, reviewevents.Event{
-		Type:         reviewevents.EventTaskUpdated,
+	capobs.EmitReviewEvent(ctx, s.logger, capobs.Event{
+		Type:         capobs.EventTaskUpdated,
 		CapabilityID: task.CapabilityID,
 		TaskID:       task.ID,
 		Status:       task.Status,
@@ -345,6 +349,9 @@ func (s *WorkflowService) Resolve(ctx context.Context, taskID string, input Deci
 			"actor": task.DecisionBy,
 		},
 	})
+	if s.metrics != nil {
+		s.metrics.ObserveAsyncWorkflowDuration(task.CapabilityID, "review", task.Status, now.Sub(task.CreatedAt))
+	}
 
 	return cloneTask(task), nil
 }
@@ -389,8 +396,8 @@ func (s *WorkflowService) Resubmit(ctx context.Context, capabilityID string, inp
 		}
 	}
 
-	reviewevents.EmitReviewEvent(ctx, s.logger, reviewevents.Event{
-		Type:         reviewevents.EventCapabilityResubmitted,
+	capobs.EmitReviewEvent(ctx, s.logger, capobs.Event{
+		Type:         capobs.EventCapabilityResubmitted,
 		CapabilityID: capabilityID,
 		Status:       StatusPending,
 		Message:      strings.TrimSpace(input.Note),
@@ -432,8 +439,8 @@ func (s *WorkflowService) EvaluateSLA(ctx context.Context, now time.Time) []Esca
 		task.LastEscalation = now
 		task.Escalations = append(task.Escalations, esc)
 		escalations = append(escalations, esc)
-		reviewevents.EmitReviewEvent(ctx, s.logger, reviewevents.Event{
-			Type:         reviewevents.EventTaskEscalated,
+		capobs.EmitReviewEvent(ctx, s.logger, capobs.Event{
+			Type:         capobs.EventTaskEscalated,
 			CapabilityID: task.CapabilityID,
 			TaskID:       task.ID,
 			Status:       task.Status,

@@ -9,6 +9,7 @@ import (
 	"{{ .BackendModulePath }}/internal/logger"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
+	capmetrics "{{ .BackendModulePath }}/internal/observability/capability"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
 	"{{ .BackendModulePath }}/internal/services/authproxy"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
@@ -31,6 +32,7 @@ type Deps struct {
 	PowerXClient        *client.PowerXServiceClient
 	Config              *config.Config
 	CapabilitiesManager capabilities.Manager
+	CapabilityMetrics   *capmetrics.Metrics
 	TaxProviderClient   *marketplacesvc.TaxProviderClient
 	MarketplaceBilling  marketplacesvc.BillingClient
 	LicenseAuthority    marketplacesvc.LicenseAuthority

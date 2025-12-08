@@ -7,6 +7,7 @@ import YAML from "yaml";
 
 const cwd = process.cwd();
 const repoRoot = path.resolve(cwd, "..", "..");
+const exposureRoot = path.join(repoRoot, "contracts", "exposure");
 
 runCatalog();
 ensureExposurePlaceholders();
@@ -34,12 +35,13 @@ function getTsxBinary() {
 
 function ensureExposurePlaceholders() {
   const files = [
-    { file: path.join(repoRoot, "contracts", "exposure", "openapi.yaml"), header: "# OpenAPI exposure placeholder\n" },
-    { file: path.join(repoRoot, "contracts", "exposure", "proto", "README.md"), header: "# Proto definitions\n" },
-    { file: path.join(repoRoot, "contracts", "exposure", "workflow", "README.md"), header: "# Workflow step templates\n" },
-    { file: path.join(repoRoot, "contracts", "exposure", "mcp-tools", "README.md"), header: "# MCP manifests\n" },
-    { file: path.join(repoRoot, "contracts", "exposure", "agent-streams", "README.md"), header: "# Agent SSE channels\n" },
-    { file: path.join(repoRoot, "contracts", "exposure", "capability-lifecycle.json"), header: JSON.stringify({ plans: [], updated_at: new Date(0).toISOString() }, null, 2) + "\n" },
+    { file: path.join(exposureRoot, "openapi.yaml"), header: "# OpenAPI exposure placeholder\n" },
+    { file: path.join(exposureRoot, "proto", "README.md"), header: "# Proto definitions\n" },
+    { file: path.join(exposureRoot, "workflow", "README.md"), header: "# Workflow step templates\n" },
+    { file: path.join(exposureRoot, "agent-streams", "README.md"), header: "# Agent SSE channels\n" },
+    { file: path.join(exposureRoot, "composites", "README.md"), header: "# Workflow composites\n" },
+    { file: path.join(exposureRoot, "capability-lifecycle.json"), header: JSON.stringify({ plans: [], updated_at: new Date(0).toISOString() }, null, 2) + "\n" },
+    { file: path.join(exposureRoot, "mcp-tools.json"), header: JSON.stringify({ plugin_id: "", version: "", generated_at: new Date(0).toISOString(), tools: [] }, null, 2) + "\n" },
     { file: path.join(repoRoot, "dist", "agent-sdk", "README.md"), header: "# SDK bundle output\n" }
   ];
 
@@ -52,7 +54,7 @@ function ensureExposurePlaceholders() {
 }
 
 function generateExposureArtifacts() {
-  const exposureFile = path.join(repoRoot, "contracts", "exposure", "exposure-packages.json");
+  const exposureFile = path.join(exposureRoot, "exposure-packages.json");
   const catalogFile = path.join(repoRoot, "capabilities", "catalog.json");
   let packages = [];
   if (fs.existsSync(exposureFile)) {
@@ -78,8 +80,12 @@ function generateExposureArtifacts() {
     }
   }
 
+  const composites = loadComposites();
   writeOpenAPI(pluginId, manifestVersion, packages);
   writeAgentBundle(pluginId, manifestVersion, packages);
+  writeCompositeWorkflowAssets(composites, manifestVersion);
+  writeAgentStreams(composites, manifestVersion);
+  writeMCPManifest(pluginId, manifestVersion, composites);
 }
 
 function writeOpenAPI(pluginId, manifestVersion, packages) {
@@ -149,4 +155,94 @@ function writeAgentBundle(pluginId, manifestVersion, packages) {
   const target = path.join(repoRoot, "dist", "agent-sdk", "manifest.json");
   fs.writeFileSync(target, JSON.stringify(manifest, null, 2), "utf8");
   console.log(`[capabilities] agent SDK manifest generated → ${path.relative(repoRoot, target)}`);
+}
+
+function loadComposites() {
+  const dir = path.join(exposureRoot, "composites");
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+  const files = fs.readdirSync(dir).filter((file) => file.endsWith(".json"));
+  const composites = [];
+  for (const file of files) {
+    const abs = path.join(dir, file);
+    try {
+      const parsed = JSON.parse(fs.readFileSync(abs, "utf8"));
+      composites.push(parsed);
+    } catch (error) {
+      console.warn(`[capabilities] failed to parse composite ${file}:`, error.message);
+    }
+  }
+  return composites;
+}
+
+function writeCompositeWorkflowAssets(composites, manifestVersion) {
+  for (const composite of composites) {
+    if (!composite?.workflow_step) continue;
+    const payload = {
+      id: composite.id,
+      version: composite.version || manifestVersion,
+      name: composite.name || composite.id,
+      summary: composite.summary || "",
+      nodes: composite.graph?.nodes || [],
+      edges: composite.graph?.edges || [],
+      metadata: composite.metadata || {}
+    };
+    const target = path.join(repoRoot, composite.workflow_step);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(payload, null, 2), "utf8");
+    console.log(`[capabilities] workflow template generated → ${path.relative(repoRoot, target)}`);
+  }
+}
+
+function writeAgentStreams(composites, manifestVersion) {
+  for (const composite of composites) {
+    const stream = composite?.agent_stream;
+    if (!stream || !stream.path) continue;
+    const payload = {
+      capability_id: composite.id,
+      version: composite.version || manifestVersion,
+      intent: stream.intent || composite.id,
+      summary: stream.summary || composite.summary || "",
+      events: stream.events || [],
+      generated_at: new Date().toISOString()
+    };
+    const target = path.join(repoRoot, stream.path);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, YAML.stringify(payload), "utf8");
+    console.log(`[capabilities] agent stream generated → ${path.relative(repoRoot, target)}`);
+  }
+}
+
+function writeMCPManifest(pluginId, manifestVersion, composites) {
+  const dedup = new Map();
+  for (const composite of composites) {
+    for (const tool of composite.agent_tools || []) {
+      if (!tool?.id) continue;
+      const key = tool.id;
+      if (dedup.has(key)) continue;
+      dedup.set(key, {
+        id: tool.id,
+        capability_id: tool.capability_id || composite.id,
+        name: tool.name || tool.id,
+        description: tool.description || composite.summary || "",
+        transport: tool.transport || "http",
+        endpoint: tool.endpoint || "",
+        method: tool.method || "POST",
+        input_schema: tool.input_schema || "",
+        output_schema: tool.output_schema || ""
+      });
+    }
+  }
+
+  const manifest = {
+    plugin_id: pluginId,
+    version: manifestVersion,
+    generated_at: new Date().toISOString(),
+    tools: Array.from(dedup.values())
+  };
+  const target = path.join(exposureRoot, "mcp-tools.json");
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify(manifest, null, 2), "utf8");
+  console.log(`[capabilities] MCP manifest generated → ${path.relative(repoRoot, target)}`);
 }

@@ -1,4 +1,54 @@
 {
-  "packages": [],
-  "updated_at": null
+  "packages": [
+    {
+      "capability_id": "com.powerx.plugins.base.template.create",
+      "channels": [
+        {
+          "type": "rest",
+          "name": "Template Create REST",
+          "method": "POST",
+          "path": "/api/v1/templates",
+          "description": "PowerX Gateway 公共入口",
+          "enabled": true,
+          "scopes": ["templates:create"]
+        },
+        {
+          "type": "workflow",
+          "name": "Template Compose Node",
+          "target": "contracts/exposure/workflow/template-compose.json",
+          "description": "Workflow Builder 节点引用",
+          "enabled": true
+        },
+        {
+          "type": "agent",
+          "name": "Template Compose Tool",
+          "target": "contracts/exposure/mcp-tools.json",
+          "description": "MCP 工具清单",
+          "enabled": true
+        },
+        {
+          "type": "agent_sse",
+          "name": "Template Compose SSE",
+          "target": "contracts/exposure/agent-streams/template-compose.yaml",
+          "description": "实时推送模板草稿/审核/发布状态",
+          "enabled": true
+        }
+      ],
+      "auth": {
+        "strategy": "powerx_session"
+      },
+      "rate_limit": {
+        "requests_per_minute": 600,
+        "burst": 120,
+        "concurrency": 10
+      },
+      "tenants": [],
+      "docs_version": "1.0.0",
+      "sdk_version": "1.0.0",
+      "sync_status": "pending",
+      "updated_by": "system",
+      "updated_at": "2025-12-05T00:00:00Z"
+    }
+  ],
+  "updated_at": "2025-12-05T00:00:00Z"
 }

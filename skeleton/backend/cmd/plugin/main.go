@@ -19,11 +19,13 @@ import (
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
 	grpcserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/server"
+	powerxclient "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/powerx"
 	marketplacejobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/jobs/marketplace"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	manifestx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/manifestx"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
+	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
@@ -138,7 +140,9 @@ func main() {
 
 	capLog := logger.WithField("component", "capabilities_manager")
 	capManager := capabilities.NewManager(cfg, capLog)
-	if err := runtimecap.SyncCapabilities(ctx, capManager, nil); err != nil {
+	capClient := powerxclient.NewCapabilityClientFromEnv(capLog)
+	capMetrics := capmetrics.NewMetrics()
+	if err := runtimecap.SyncCapabilities(ctx, capManager, capClient, capMetrics); err != nil {
 		logger.WithError(err).Fatal("Failed to initialize capability catalog")
 	}
 
@@ -148,6 +152,7 @@ func main() {
 		PowerXClient:        pxc,
 		Config:              cfg,
 		CapabilitiesManager: capManager,
+		CapabilityMetrics:   capMetrics,
 		TaxProviderClient:   taxClient,
 		MarketplaceBilling:  nil,
 		LicenseAuthority:    nil,

@@ -23,11 +23,34 @@ function sanitizeFileName(capId) {
   return capId.replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function dedupeStrings(values) {
+  const seen = new Set();
+  const result = [];
+  for (const value of values) {
+    if (!isNonEmptyString(value)) continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+
 const cwd = process.cwd();
-const manifestPath = path.resolve(
-  cwd,
-  getArgValue("--manifest") ?? "plugin.yaml",
-);
+const manifestArg = getArgValue("--manifest");
+let manifestPath = path.resolve(cwd, manifestArg ?? "plugin.yaml");
+if (!fs.existsSync(manifestPath) && !manifestArg) {
+  const fallback = path.resolve(cwd, "..", "..", "plugin.yaml");
+  if (fs.existsSync(fallback)) {
+    console.log(
+      "[capabilities] manifest not found in scripts/capabilities, fallback to ../../plugin.yaml",
+    );
+    manifestPath = fallback;
+  }
+}
 
 if (!fs.existsSync(manifestPath)) {
   console.error(`[capabilities] manifest not found: ${manifestPath}`);
@@ -82,16 +105,42 @@ for (const cap of provides) {
     cap.schemas = {};
     manifestUpdated = true;
   }
-  if (!cap.schemas.input) {
-    cap.schemas.input = toPosix(
-      path.relative(manifestDir, path.join(inputSchemaDir, `${fileSafe}.json`)),
-    );
+  const defaultInputRel = toPosix(
+    path.relative(manifestDir, path.join(inputSchemaDir, `${fileSafe}.json`)),
+  );
+  const defaultOutputRel = toPosix(
+    path.relative(manifestDir, path.join(outputSchemaDir, `${fileSafe}.json`)),
+  );
+
+  let inputRefs = [];
+  if (Array.isArray(cap.schemas.input)) {
+    inputRefs = dedupeStrings(cap.schemas.input);
+    if (inputRefs.length === 0) {
+      cap.schemas.input.push(defaultInputRel);
+      inputRefs.push(defaultInputRel);
+      manifestUpdated = true;
+    }
+  } else if (isNonEmptyString(cap.schemas.input)) {
+    inputRefs = [cap.schemas.input];
+  } else {
+    cap.schemas.input = defaultInputRel;
+    inputRefs = [defaultInputRel];
     manifestUpdated = true;
   }
-  if (!cap.schemas.output) {
-    cap.schemas.output = toPosix(
-      path.relative(manifestDir, path.join(outputSchemaDir, `${fileSafe}.json`)),
-    );
+
+  let outputRefs = [];
+  if (Array.isArray(cap.schemas.output)) {
+    outputRefs = dedupeStrings(cap.schemas.output);
+    if (outputRefs.length === 0) {
+      cap.schemas.output.push(defaultOutputRel);
+      outputRefs.push(defaultOutputRel);
+      manifestUpdated = true;
+    }
+  } else if (isNonEmptyString(cap.schemas.output)) {
+    outputRefs = [cap.schemas.output];
+  } else {
+    cap.schemas.output = defaultOutputRel;
+    outputRefs = [defaultOutputRel];
     manifestUpdated = true;
   }
 
@@ -112,8 +161,11 @@ for (const cap of provides) {
     createdDescriptors.push(descriptorPath);
   }
 
-  const inputSchemaPath = path.resolve(manifestDir, cap.schemas.input);
-  if (!fs.existsSync(inputSchemaPath)) {
+  for (const schemaRel of inputRefs) {
+    const inputSchemaPath = path.resolve(manifestDir, schemaRel);
+    if (fs.existsSync(inputSchemaPath)) {
+      continue;
+    }
     const schemaStub = {
       $schema: "https://json-schema.org/draft/2020-12/schema",
       title: `${cap.id}Input`,
@@ -131,8 +183,11 @@ for (const cap of provides) {
     createdSchemas.push(inputSchemaPath);
   }
 
-  const outputSchemaPath = path.resolve(manifestDir, cap.schemas.output);
-  if (!fs.existsSync(outputSchemaPath)) {
+  for (const schemaRel of outputRefs) {
+    const outputSchemaPath = path.resolve(manifestDir, schemaRel);
+    if (fs.existsSync(outputSchemaPath)) {
+      continue;
+    }
     const schemaStub = {
       $schema: "https://json-schema.org/draft/2020-12/schema",
       title: `${cap.id}Output`,

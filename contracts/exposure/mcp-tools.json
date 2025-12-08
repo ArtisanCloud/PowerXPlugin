@@ -1,0 +1,40 @@
+{
+  "plugin_id": "com.powerx.plugins.base",
+  "version": "0.7.0",
+  "generated_at": "2025-12-06T14:31:21.929Z",
+  "tools": [
+    {
+      "id": "base.template.create",
+      "capability_id": "com.powerx.plugins.base.template.create",
+      "name": "创建模板",
+      "description": "根据输入草稿创建模板。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.create.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.create.json"
+    },
+    {
+      "id": "base.template.review",
+      "capability_id": "com.powerx.plugins.base.template.review",
+      "name": "审核模板",
+      "description": "审核草稿并附加评论。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}/review",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.review.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.review.json"
+    },
+    {
+      "id": "base.template.publish",
+      "capability_id": "com.powerx.plugins.base.template.publish",
+      "name": "发布模板",
+      "description": "将审核通过的模板发布到业务租户。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}/publish",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.publish.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.publish.json"
+    }
+  ]
+}

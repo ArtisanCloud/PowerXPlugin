@@ -1,5 +1,14 @@
 openapi: 3.0.3
 info:
   title: com.powerx.plugins.base Capability Exposure
-  version: 1.0.0
-paths: {}
+  version: 0.7.0
+paths:
+  /api/v1/templates:
+    post:
+      tags:
+        - com.powerx.plugins.base.template.create
+      summary: Template Create REST
+      description: PowerX Gateway 公共入口
+      responses:
+        "200":
+          description: Success

@@ -11,6 +11,7 @@ import (
 func RBACEntries(prefix string) map[string]authx.Permission {
 	base := strings.TrimRight(prefix, "/") + "/admin/capabilities/register"
 	resource := app.PluginID + ":capability"
+	listBase := strings.TrimRight(prefix, "/") + "/admin/capabilities"
 	reviewBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/reviews"
 	reviewRes := app.PluginID + ":capability.review"
 	exposureBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/exposure"
@@ -20,6 +21,7 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 	lifecycleBase := strings.TrimRight(prefix, "/") + "/admin/capabilities/lifecycle"
 	lifecycleRes := app.PluginID + ":capability.lifecycle"
 	return map[string]authx.Permission{
+		"GET:" + listBase:                          {Resource: resource, Action: "read"},
 		"GET:" + base + "/template":                {Resource: resource, Action: "read"},
 		"POST:" + base + "/validate":               {Resource: resource, Action: "create"},
 		"POST:" + base:                             {Resource: resource, Action: "create"},

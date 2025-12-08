@@ -1,0 +1,40 @@
+package capability
+
+import (
+	"net/http"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	capservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/capability"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+)
+
+// CatalogHandler exposes read-only capability catalog endpoints.
+type CatalogHandler struct {
+	service *capservice.CatalogService
+}
+
+// NewCatalogHandler wires catalog handler when the service is available.
+func NewCatalogHandler(deps *app.Deps) *CatalogHandler {
+	svc := capservice.NewCatalogService(deps)
+	if svc == nil {
+		return nil
+	}
+	return &CatalogHandler{service: svc}
+}
+
+// List returns all capabilities collected in the catalog snapshot.
+func (h *CatalogHandler) List(c *gin.Context) {
+	entries, err := h.service.List(c.Request.Context())
+	if err != nil {
+		contracts.ResponseErrorWithDetails(
+			c,
+			http.StatusInternalServerError,
+			contracts.ErrCodeInternalError,
+			"failed to load capability catalog",
+			gin.H{"error": err.Error()},
+		)
+		return
+	}
+	contracts.ResponseSuccess(c, entries)
+}

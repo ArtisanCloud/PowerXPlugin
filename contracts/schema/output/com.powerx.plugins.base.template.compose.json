@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplateComposeOutput",
+  "type": "object",
+  "properties": {
+    "draft_id": { "type": "string" },
+    "approved": { "type": "boolean" },
+    "publish_status": { "type": "string" }
+  },
+  "required": ["draft_id", "publish_status"],
+  "additionalProperties": true
+}

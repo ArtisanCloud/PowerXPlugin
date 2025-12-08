@@ -26,6 +26,7 @@
    - 参考《[使用 CLI 生成并运行插件骨架](./develop/cli-plugin-tutorial.md)》构建 `px-plugin`、执行 `./bin/px-plugin init <plugin-id>` 生成骨架。  
    - 在新项目中运行 `go test ./...`、`npm run lint` 并复用上述 CRUD/延迟脚本，确认 CLI 输出与 Skeleton 行为一致。  
    - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。
+   - 运行 `npm run test`（默认使用 `./backend/etc/plugin.yaml`，若不存在会自动回退到根目录清单），以及 `make capabilities-export`，确保能力目录与多协议资产均已生成；导出的 `contracts/exposure/*` 与 `dist/agent-sdk/manifest.json` 将用于 Workflow / Agent 注册。
    - 若需暴露能力，请同步阅读《[能力注册与暴露指南](./publish/capabilities.md)》，并在提交发布之前运行 `px-plugin capabilities init/lint/submit`，避免发布阶段被能力审核阻断。
 
 4. **Dev API 热更新与 Doctor 诊断**  
@@ -42,6 +43,8 @@
    - 最后运行 `./bin/px-plugin doctor --entry examples/starter/go-admin`，确认 `.doctor/report.json` 中 Toolchain / mTLS / Dev API / Watcher 状态均为 `pass`，便于新成员快速验证环境。
 
 完成以上三个步骤，即可获得开发 PowerX 插件所需的核心能力：框架运行、模板生成与快速验证。
+
+- **观测提示**：安装自测后，PowerX 会自动暴露 `capability.catalog.sync_status` 与 `capability.workflow.async_duration` 指标（Prometheus 名称分别为 `powerx_capability_catalog_sync_status` 与 `powerx_capability_workflow_async_duration_seconds`）。通过宿主监控面板即可确认目录同步与复合 Workflow 耗时，排查安装或审核瓶颈。
 
 ## 进一步阅读
 

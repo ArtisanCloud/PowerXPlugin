@@ -11,12 +11,16 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		return
 	}
 	handler := NewRegisterHandler(deps)
+	catalogHandler := NewCatalogHandler(deps)
 	reviewHandler := NewReviewHandler(deps)
 	exposureHandler := NewExposureHandler(deps)
 	quotaHandler := NewQuotaHandler(deps)
 	lifecycleHandler := NewLifecycleHandler(deps)
 	if handler == nil {
 		return
+	}
+	if catalogHandler != nil {
+		rg.GET("/capabilities", catalogHandler.List)
 	}
 	group := rg.Group("/capabilities/register")
 	{

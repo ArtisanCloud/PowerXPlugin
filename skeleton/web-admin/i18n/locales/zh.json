@@ -129,6 +129,27 @@
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",
   "capabilities": {
+    "list": {
+      "title": "能力目录",
+      "description": "查看插件当前注册的原子能力与复合任务，快速发起新能力的建模与审批。",
+      "refresh": "刷新",
+      "createButton": "注册能力",
+      "tableTitle": "已注册能力",
+      "tableHint": "包含能力 ID、执行模式与标签。提交新的能力后会自动刷新列表。",
+      "tableEmpty": "暂无能力",
+      "column": {
+        "capability": "能力",
+        "execution": "执行模式",
+        "tags": "标签",
+        "checksum": "版本校验"
+      },
+      "versionLabel": "版本 {version}",
+      "noTags": "未设置标签",
+      "empty": "尚未注册任何能力，点击“注册能力”即可创建第一条记录。",
+      "toast": {
+        "loadFailed": "加载能力目录失败"
+      }
+    },
     "form": {
       "title": "插件能力注册",
       "description": "填写能力元数据、协议与示例，提交后即可触发审批与暴露流程。",
@@ -216,6 +237,27 @@
       "description": "为通过审批的能力配置多协议通道、鉴权策略、限流与租户授权，并同步到宿主工作流/Agent/开放平台。",
       "capability": "能力 ID",
       "updatedAt": "最近更新：{time}",
+      "list": {
+        "title": "已注册能力",
+        "description": "选择一个能力，打开其 REST/gRPC/Workflow/MCP 等暴露通道。",
+        "refresh": "刷新列表",
+        "empty": "暂无可配置的能力，请先完成能力注册。",
+        "updatedAt": "上次同步：{time}",
+        "columns": {
+          "capability": "能力",
+          "descriptor": "描述",
+          "exposure": "暴露状态"
+        },
+        "actions": {
+          "configure": "配置通道"
+        },
+        "status": {
+          "unconfigured": "未配置",
+          "synced": "已同步",
+          "pending": "待同步",
+          "failed": "同步失败"
+        }
+      },
       "sections": {
         "channels": "通道配置",
         "enabled": "通道已启用",
@@ -258,6 +300,7 @@
         "templateFail": "无法加载通道模板",
         "capabilityRequired": "请先填写能力 ID",
         "loadFail": "加载暴露配置失败",
+        "catalogFailed": "无法加载能力列表",
         "saveSuccess": "暴露配置已保存",
         "saveFailed": "保存失败，请稍后重试",
         "quotaSaved": "租户额度已更新",
@@ -269,6 +312,27 @@
       "badge": "版本治理",
       "title": "能力生命周期计划",
       "description": "生成能力升级/下线的差异说明、灰度窗口和通知矩阵，确保订阅方提前感知并可随时回滚。",
+      "catalog": {
+        "title": "可管理的能力",
+        "description": "同步插件能力目录，挑选需要规划生命周期的能力。",
+        "refresh": "刷新列表",
+        "empty": "暂无可管理的能力，请先完成能力注册。",
+        "updatedAt": "最近变更：{time}",
+        "columns": {
+          "capability": "能力",
+          "descriptor": "描述",
+          "status": "状态"
+        },
+        "actions": {
+          "manage": "管理计划"
+        },
+        "status": {
+          "unplanned": "未创建",
+          "pending": "待审批",
+          "scheduled": "执行中",
+          "completed": "已完成"
+        }
+      },
       "fields": {
         "capabilityId": "能力 ID",
         "changeType": "变更类型",
@@ -331,6 +395,7 @@
       },
       "toast": {
         "templateFailed": "无法加载生命周期模板",
+        "catalogFailed": "无法加载能力目录",
         "loadFailed": "加载生命周期计划失败",
         "capabilityRequired": "请填写能力 ID 后再操作",
         "required": "请先完成必填字段",

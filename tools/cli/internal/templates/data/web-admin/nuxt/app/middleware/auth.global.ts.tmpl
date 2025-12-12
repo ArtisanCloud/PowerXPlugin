@@ -4,6 +4,10 @@ const PUBLIC_ROUTE_PREFIXES = ["/users"];
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (!process.client) return;
+  const runtimeConfig = useRuntimeConfig();
+  const insidePowerX =
+    runtimeConfig.public?.insidePowerX === true ||
+    runtimeConfig.public?.insidePowerX === "true";
 
   if (to.meta?.public === true) {
     return;
@@ -17,6 +21,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
   await auth.ensureFreshToken();
 
   if (!auth.token.value) {
+    if (insidePowerX) {
+      if (!auth.delegatedError?.value) {
+        auth.rememberAuthError?.("PowerX 会话已失效，请回到宿主重新登录");
+      }
+      return;
+    }
     return navigateTo({
       path: "/users/login",
       query: { redirect: to.fullPath },

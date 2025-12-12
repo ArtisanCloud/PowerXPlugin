@@ -35,7 +35,7 @@ npm run dev
 ```
 - 登录入口：`http://localhost:3031/users/login`
 - 成功后访问受保护页面（如 `/intro`），请求应携带宿主 Token。
-- 断开 PowerX Core 以验证 fail-closed：登录会提示“宿主认证不可用”。
+- 断开 PowerX Core 或在 DevTools 中执行 `localStorage.removeItem('access_token')`，应看到页面顶部的 Delegated Auth Banner（不会跳到 `/users/login`），提示“宿主认证不可用”，点击“重试请求”会向宿主重新请求 token。
 
 ## 4. Local Mode (Standalone)
 ```bash

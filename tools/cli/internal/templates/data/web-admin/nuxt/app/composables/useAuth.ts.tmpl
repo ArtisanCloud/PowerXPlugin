@@ -1,4 +1,4 @@
-import { getCurrentScope, onScopeDispose } from "vue";
+import { getCurrentScope, onScopeDispose, readonly } from "vue";
 import { useRuntimeConfig } from "#imports";
 import type { LoginResponse } from "~/composables/api/services/authService";
 import { useAuthService } from "~/composables/api/services/authService";
@@ -104,10 +104,20 @@ const safeLocalStorage = {
   },
 };
 
+const resolveInsidePowerX = (value: unknown) => {
+  if (value === true) return true;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes";
+  }
+  return false;
+};
+
 export const useAuth = () => {
   const runtimeConfig = useRuntimeConfig();
+  const insidePowerX = resolveInsidePowerX(runtimeConfig.public?.insidePowerX);
   // Standalone 模式下宿主/脚手架可能只广播 access token（无 refresh token），允许继续维持会话。
-  const allowRefreshlessSession = runtimeConfig.public?.insidePowerX !== true;
+  const allowRefreshlessSession = !insidePowerX;
 
   const isAuthenticated = useState("auth.isAuthenticated", () => false);
   const user = useState("auth.user", () => null);
@@ -115,6 +125,8 @@ export const useAuth = () => {
   const refreshToken = useState<Nullable<string>>("auth.refreshToken", () => null);
   const expiresAt = useState<Nullable<number>>("auth.expiresAt", () => null);
   const lastError = useState<string>("auth.lastError", () => "");
+  const hasAuthenticated = useState("auth.hasAuthenticated", () => false);
+  const delegatedAuthError = useState<string>("auth.delegatedError", () => "");
 
   const { refreshToken: refresh, logout: apiLogout } = useAuthService();
 
@@ -132,11 +144,19 @@ export const useAuth = () => {
     refreshToken.value = data.refresh_token;
     expiresAt.value = expires;
     isAuthenticated.value = true;
+    hasAuthenticated.value = true;
   };
 
   const setAuth = (payload: LoginResponse) => {
     if (process.client) {
       persist(payload);
+      delegatedAuthError.value = "";
+      lastError.value = "";
+      try {
+        sessionStorage?.removeItem(AUTH_ERROR_KEY);
+      } catch (err) {
+        console.warn("[useAuth] failed to clear auth error", err);
+      }
     }
   };
 
@@ -213,11 +233,11 @@ export const useAuth = () => {
       expiresAt.value = Number(storedExpires);
       isAuthenticated.value = !isTokenExpired();
     } else {
-      clearAuth();
-      if (!window.location.pathname.startsWith("/users")) {
-        const redirect = window.location.pathname + window.location.search;
-        navigateTo({ path: "/users/login", query: { redirect } });
+      if (insidePowerX && !hasAuthenticated.value) {
+        clearAuth();
+        return;
       }
+      failClosed();
     }
   };
 
@@ -252,7 +272,7 @@ export const useAuth = () => {
         console.warn("[useAuth] refresh failed", error);
       }
     }
-    clearAuth();
+    failClosed();
     return null;
   };
 
@@ -280,6 +300,14 @@ export const useAuth = () => {
       console.error("logout API failed", error);
     } finally {
       clearAuth();
+      delegatedAuthError.value = "";
+      lastError.value = "";
+      hasAuthenticated.value = false;
+      try {
+        sessionStorage?.removeItem(AUTH_ERROR_KEY);
+      } catch (err) {
+        console.warn("[useAuth] failed to clear auth error state", err);
+      }
       try {
         const { useUserStore } = await import("~/stores/user");
         const userStore = useUserStore();
@@ -298,6 +326,9 @@ export const useAuth = () => {
       lastError.value = message;
     } catch (err) {
       console.warn("[useAuth] failed to persist auth error", err);
+    }
+    if (insidePowerX) {
+      delegatedAuthError.value = message;
     }
   };
 
@@ -318,8 +349,35 @@ export const useAuth = () => {
 
   const failClosed = (message?: string) => {
     clearAuth();
-    if (message) {
-      rememberAuthError(message);
+    const fallbackMessage =
+      message ||
+      (insidePowerX
+        ? "PowerX 会话已失效，请回到宿主重新登录"
+        : "会话已失效，请重新登录");
+    if (fallbackMessage) {
+      rememberAuthError(fallbackMessage);
+    }
+    if (insidePowerX) {
+      return;
+    }
+    if (
+      process.client &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/users")
+    ) {
+      const redirect = window.location.pathname + window.location.search;
+      navigateTo({ path: "/users/login", query: { redirect } });
+    }
+  };
+
+  const clearDelegatedError = () => {
+    delegatedAuthError.value = "";
+    lastError.value = "";
+    if (!process.client) return;
+    try {
+      sessionStorage?.removeItem(AUTH_ERROR_KEY);
+    } catch (err) {
+      console.warn("[useAuth] failed to clear delegated error", err);
     }
   };
 
@@ -339,5 +397,8 @@ export const useAuth = () => {
     consumeAuthError,
     failClosed,
     rememberAuthError,
+    delegatedError: readonly(delegatedAuthError),
+    clearDelegatedError,
+    restoreFromStorage: syncFromStorage,
   };
 };

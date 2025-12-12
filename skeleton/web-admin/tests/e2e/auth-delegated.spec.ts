@@ -21,6 +21,11 @@ const failClosedPayload = {
 };
 
 test.describe('Delegated Auth Flow', () => {
+  const insidePowerX =
+    process.env.POWERX_PROXY === '1' ||
+    process.env.NUXT_PUBLIC_POWERX_PROXY === '1' ||
+    process.env.NUXT_POWERX_PROXY === '1';
+
   test('logs in and redirects when Core responds with success', async ({ page }) => {
     await page.route('**/admin/user/auth/login', async (route) => {
       await route.fulfill({
@@ -56,7 +61,7 @@ test.describe('Delegated Auth Flow', () => {
     await expect(page.getByRole('alert')).toContainText('宿主认证不可用');
   });
 
-  test('storage event logout clears token and redirects to login', async ({ page }) => {
+  test('storage event logout clears token and triggers delegated banner', async ({ page }) => {
     await page.route('**/admin/user/auth/login', async (route) => {
       await route.fulfill({
         status: 200,
@@ -77,6 +82,11 @@ test.describe('Delegated Auth Flow', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'access_token' }));
     });
 
-    await expect(page).toHaveURL(/\/users\/login/);
+    if (insidePowerX) {
+      await expect(page).not.toHaveURL(/\/users\/login/);
+      await expect(page.locator('[data-test="delegated-auth-banner"]')).toContainText('PowerX 会话已失效');
+    } else {
+      await expect(page).toHaveURL(/\/users\/login/);
+    }
   });
 });

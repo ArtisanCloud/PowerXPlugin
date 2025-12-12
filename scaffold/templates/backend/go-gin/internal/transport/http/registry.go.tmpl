@@ -59,6 +59,7 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	r.mergeRBAC(adminconsole.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminmarketplace.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(admincapability.RBACEntries(r.apiPrefix()))
+	r.mergeRBAC(templates.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(integrationRBACEntries(r.apiPrefix()))
 	r.mergeRBAC(marketplacePublicRBACEntries(r.apiPrefix()))
 }

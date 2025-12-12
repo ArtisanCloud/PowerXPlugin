@@ -126,6 +126,16 @@
 
 **Checkpoint**：`px-plugin package/publish` 命令可用于真实交付，文档与配置同步更新。
 
+---
+
+## Phase 8: Delegated UX & Template RBAC Hardening
+
+- [X] **T048 [US1 Extension] Delegated token 失效 UX**：更新 `skeleton/web-admin/app/middleware/auth.global.ts`、`app/composables/useAuth.ts` 并新增 `app/components/DelegatedAuthBanner.vue` + 布局挂载逻辑；当 `runtimeConfig.public.insidePowerX === true` 且 token 缺失/刷新失败时，不再跳 `/users/login`，而是展示 Banner，点击“重试”会向宿主 `postMessage` 请求新的 token，同时新增 Vitest（`tests/unit/useAuth.fallback.spec.ts`）与 Playwright（`tests/e2e/auth-delegated.spec.ts`）覆盖。
+- [X] **T049 [Docs] 记录宿主模式差异**：在 `docs/guides/develop/standalone-mode.md`、`docs/guides/develop/auth.md`、`specs/005-plugin-auth/quickstart.md` 添加 Banner 行为、手动触发方式与排障提示，并同步 `CHANGELOG.md`（如需）。
+- [X] **T050 [RBAC] 模板 CRUD 权限**：新增 `skeleton/backend/internal/transport/http/admin/templates/rbac.go` + `registry.go`/manifest 权限声明，确保 `/templates` 路由映射到 `base.templates.read/manage`；前端 CRUD 页面根据 Delegated 模式自动只读并展示提示，模板/CLI 对应文件同步；相关单元/Go 测试、Playwright 验证也更新完成。
+
+**Checkpoint**：Delegated 模式 token 失效体验、模板 RBAC 对齐并通过 Standalone/Delegated 双模式验证。
+
 ## Dependencies & Execution Order
 
 1. Phase 1 → Phase 2：完成基础配置后再构建 IAM 架构。

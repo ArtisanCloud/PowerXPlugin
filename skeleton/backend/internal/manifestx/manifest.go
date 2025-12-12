@@ -12,6 +12,8 @@ func Plugin() manifest.Plugin {
 			"iam.user.read",
 			"iam.role.read",
 			"iam.department.read",
+			"base.templates.read",
+			"base.templates.manage",
 		},
 		Menus: []manifest.Menu{
 			{

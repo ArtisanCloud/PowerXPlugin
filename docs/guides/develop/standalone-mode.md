@@ -149,6 +149,8 @@ npm run test:e2e -- auth-local
 6. **Manifest 更新**：在 `internal/manifestx/manifest.go` 增加菜单或权限项，并同步前端导航。
 7. **同步模板**：完成修改后执行 `npm run sync:templates`，确保 Scaffold/CLI 模板保持一致。
 
+> **模板权限提示**：自 005-plugin-auth Phase 8 起，模板 CRUD 路由会声明 `base.templates.read` / `base.templates.manage` 两个 RBAC 资源。Standalone 模式可在本地 IAM 中分配这两项权限；Delegated 模式下宿主会读取该映射并控制实际写权限，插件前端会在无权限时自动切换为只读并提示“宿主控制模板权限”。
+
 ### 1.5 常见问题
 
 - **403 或 401**：确认 `POWERX_SECURITY_*` 安全上下文配置正确；独立模式下可在配置中关闭严格模式。
@@ -251,6 +253,12 @@ iframe.contentWindow?.postMessage(
 - [Auth 集成说明](auth.md)
 - [CLI 发布/热加载指南](go-cli-dev-watch.md)
 - [CLI 入门教程](cli-plugin-tutorial.md)
+
+### 2.10 Delegated Token 失效提醒
+
+- 宿主 Token 过期或刷新失败时，`useAuth.failClosed()` 不再将 iframe 跳转到 `/users/login`，而是触发全局 `DelegatedAuthBanner`。Banner 会提示“PowerX 会话已失效，请回到宿主重新登录”，并提供“重试请求”按钮向宿主广播 `auth-token:request` 消息。
+- 当宿主重新注入 Token（`postMessage(type='auth-token')`）或开发者点击 Banner 的“关闭”按钮时，提示会自动消失，当前路由保持不变。
+- Standalone 模式仍旧采用传统行为：缺少 Token 时立即携带 `redirect` 参数跳转到登录页，确保本地 IAM 体验不受影响。
 
 ## 3. 打包与环境变量注意事项
 

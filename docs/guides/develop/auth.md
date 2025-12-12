@@ -13,9 +13,9 @@
 > **运行模式**：关于 Standalone 与 Delegated 的端到端流程（`/_p/<pluginId>/admin`、Vite 代理、打包注意事项等）已整合到《docs/guides/develop/standalone-mode.md》。下文仅聚焦 IAM 组件与测试矩阵，涉及运行/部署的细节请参阅该文档。
 
 ## 2. 前端 Token 生命周期
-- `useAuth` 将 `access_token`、`refresh_token`、`expires_at` 保存在 localStorage + `token` Cookie，刷新失败或宿主 503 时会调用 `failClosed()`，清空状态并在登录页展示“宿主认证不可用”提示。
-- `storage` 事件会同步跨 Tab 的登录/登出：任一 Tab 清理 Token，其它 Tab 将强制跳回 `/users/login`。
-- `auth.global.ts` 中间件会在首屏调用 `ensureFreshToken()`，若 token 丢失则将原目标地址写入 `redirect` query。
+- `useAuth` 将 `access_token`、`refresh_token`、`expires_at` 保存在 localStorage + `token` Cookie。刷新失败或宿主 503 时会调用 `failClosed()`：在 Standalone 模式下清空状态并重定向到 `/users/login`；在 Delegated 模式下保持当前 iframe、不再跳转，而是在全局顶部展示“PowerX 会话已失效，请回到宿主重新登录”的 Banner，并等待宿主重新注入 Token。
+- `storage` 事件会同步跨 Tab 的登录/登出：Standalone 场景仍会强制跳回登录；Delegated 场景则转为只读提示（Banner）并保留当前路由，方便宿主统一处理登录。
+- `auth.global.ts` 中间件会在首屏调用 `ensureFreshToken()`。若 token 丢失，Standalone 模式下依旧携带 `redirect` 参数跳转登录；Delegated 模式下只设置提示文案，并通过 `window.parent.postMessage({type: 'auth-token:request'})` 请求宿主重发凭证。
 
 ## 3. 后端组件
 | 文件 | 责任 |

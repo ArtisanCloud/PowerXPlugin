@@ -15,6 +15,11 @@ vi.mock("~/stores/user", () => ({
   useUserStore: () => ({ clearUserState: vi.fn() }),
 }));
 
+let runtimeConfigStub = { public: { insidePowerX: false } };
+vi.mock("#imports", () => ({
+  useRuntimeConfig: () => runtimeConfigStub,
+}));
+
 const loadAuth = async () => (await import("~/composables/useAuth")).useAuth();
 
 const sampleTokens = () => ({
@@ -105,6 +110,7 @@ describe("useAuth", () => {
     cookieJar = "";
 
     vi.stubGlobal("process", { client: true });
+    runtimeConfigStub = { public: { insidePowerX: false } };
 
     refreshMock.mockReset();
     logoutMock.mockReset();
@@ -181,6 +187,10 @@ describe("useAuth", () => {
     expect(token).toBeNull();
     expect(auth.token.value).toBeNull();
     expect(auth.refreshToken.value).toBeNull();
+    expect(navigateTo).toHaveBeenCalledWith({
+      path: "/users/login",
+      query: { redirect: "/agent" },
+    });
   });
 
   it("logout 会调用后端并清空所有存储", async () => {
@@ -192,7 +202,7 @@ describe("useAuth", () => {
     expect(logoutMock).toHaveBeenCalledWith("refresh-token");
     expect(auth.token.value).toBeNull();
     expect(sessionStorage.clear).toHaveBeenCalled();
-    expect(navigateTo).toHaveBeenCalledWith("/users/login");
+    expect(navigateTo).toHaveBeenCalledWith("/");
   });
 
   it("storage 事件触发时会同步 token 状态", async () => {
@@ -215,5 +225,17 @@ describe("useAuth", () => {
 
     expect(auth.consumeAuthError()).toContain("宿主认证不可用");
     expect(auth.consumeAuthError()).toBe("");
+  });
+
+  it("delegated failClosed 仅展示 Banner 而不跳转登录", async () => {
+    runtimeConfigStub.public.insidePowerX = true;
+    const auth = await loadAuth();
+    auth.setAuth(sampleTokens() as any);
+
+    (window.location as any).pathname = "/templates";
+    auth.failClosed?.("PowerX 会话已失效");
+
+    expect(auth.delegatedError.value).toContain("PowerX 会话已失效");
+    expect(navigateTo).not.toHaveBeenCalled();
   });
 });

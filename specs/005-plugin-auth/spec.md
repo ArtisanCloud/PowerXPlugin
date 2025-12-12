@@ -75,6 +75,36 @@
 
 ---
 
+### User Story 5 - Delegated Token 失效体验 (Priority: P1)
+
+作为被宿主 iframe 拉起的插件使用者，当宿主颁发的 Token 失效或刷新失败时，我希望仍然停留在当前页面并收到明确提示，而不是被强制跳转到插件自带的登录页，这样可以避免破坏宿主 UI/UX，并引导用户回到 PowerX 重新登录。
+
+**Why this priority**：宿主模式是 Marketplace 的默认运行方式，错误地跳转到插件登录页会导致 iframe 黑屏、回退困难及审核不通过。
+
+**Independent Test**：在 `POWERX_PROXY=1` + `insidePowerX=true` 的构建产物内，通过 Playwright 模拟 token 过期（删除 localStorage token 或让 refresh 返回 401/503），验证页面展示宿主模式专用的错误 Banner，未发起 `/users/login` 跳转，且 `px-bridge` 仍可在重新注入 token 后恢复。
+
+**Acceptance Scenarios**：
+
+1. **Given** 插件运行在 Delegated 模式，`useRuntimeConfig().public.insidePowerX === true`，**When** `useAuth.ensureFreshToken()` 检测到 token 缺失或 refresh 返回 401，**Then** `useAuth.failClosed()` 会清空本地存储、记录错误信息，并通过全局状态触发“请在 PowerX 中重新登录”的提示组件，页面保持在当前路由。
+2. **Given** Delegated 模式下宿主 Access Token 由 postMessage 重新注入，**When** 用户点击提示中的“重试”或宿主重新发送 token，**Then** `useAuth.initAuth()` 会重新建立会话并自动移除提示，无需刷新页面或跳出 iframe。
+
+---
+
+### User Story 6 - Template CRUD RBAC 与模式切换 (Priority: P2)
+
+作为插件开发者/审核者，我需要模板 CRUD API 在 Standalone 与 Delegated 模式下均声明、检查 RBAC 资源，这样在本地可以通过自有 IAM 控制权限，在宿主模式下也能让 PowerX 识别所需的 action 并做权限映射。
+
+**Why this priority**：模板 CRUD 是脚手架交付的核心示例，缺乏 RBAC 信息会导致安全审计不过关，也让宿主无法自动收敛权限列表。
+
+**Independent Test**：在 Standalone 模式下为角色授予 `base.templates.read/manage` 后访问 `/api/v1/templates`，未授予则收到 403；在 Delegated 模式下启用 `POWERX_RBAC_DELEGATE=true`，即使插件不再维护角色，也能在 manifest 和 `/admin/rbac` 输出中看到模板相关资源，方便宿主 IAM 映射。
+
+**Acceptance Scenarios**：
+
+1. **Given** Standalone 模式，`POWERX_RBAC_DELEGATE=false`，**When** 用户调用模板 CRUD API，**Then** `middleware.RBAC` 会从 Route→Permission Map 匹配 `base.templates.read`/`base.templates.manage` 并根据本地权限判定 200 或 403。
+2. **Given** Delegated 模式，`POWERX_RBAC_DELEGATE=true`，**When** 插件返回 manifest/RBAC 信息，**Then** PowerX 核心可读取 `base.templates.*` 资源并在宿主 IAM 中映射，同时插件前端根据 runtimeConfig 自动将模板页面切换为只读或展示“由宿主控制权限”的提示，不再要求 iframe 登录。
+
+---
+
 ### Edge Cases
 
 - Token 在后台刷新时浏览器 localStorage 不可用（Safari 隐私模式、跨 iframe 限制）如何处理？→ 需回退到 cookie 中的 `token` 或触发强制登录。
@@ -98,6 +128,8 @@
 - **FR-011**: Delegated 模式下一旦 `POWERX_CORE_ENDPOINT` 无法访问或超时，登录与刷新请求必须 fail-closed——立即向用户返回“宿主认证不可用”提示并阻断继续操作，不得自动降级或复用过期 Token。
 - **FR-012**: CLI `px-plugin package` 必须运行前端/后端构建（允许 `--skip-frontend`、`--skip-backend`），生成包含 manifest/RBAC/二进制/静态资源的 `package.tar.gz`、`metadata.json`，并写入 `.px-plugin/build/<version>/`，以便 publish 使用。
 - **FR-013**: CLI `px-plugin publish` 必须读取配置中的 Registry 基址与 Token（允许 `--publish-api`、`--publish-token` 覆盖），将 package 与 metadata 上传到 PowerX Registry，并输出 `publishId`、审核链接；若 Registry 以 envelope (`{"code":...,"data":...}`) 返回，则需解析后反馈；失败需提供 remediation。
+- **FR-014**: 当 `useRuntimeConfig().public.insidePowerX === true` 且 token 失效或刷新失败时，前端不得重定向至 `/users/login`，而是展示 Delegated 专用的错误提示、维持当前路由，并允许在收到宿主重新注入 token 后自动恢复；Standalone 模式仍沿用跳转策略。
+- **FR-015**: 模板 CRUD 路由必须声明并输出 `base.templates.read` / `base.templates.manage` 等权限，后端 RBAC 中间件需要在 Standalone 模式下强制校验，在 Delegated 模式下保持 route→resource 映射供宿主 IAM 使用，前端需根据权限/模式控制 CRUD 按钮或显示“宿主控制”的提示。
 
 ### Key Entities *(include if feature involves data)*
 

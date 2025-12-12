@@ -1,5 +1,12 @@
 <template>
   <div v-if="disableShell" class="min-h-screen">
+    <div v-if="showDelegatedBanner" class="px-4 pt-4">
+      <DelegatedAuthBanner
+        :message="delegatedBannerMessage"
+        @retry="handleDelegatedRetry"
+        @dismiss="handleDelegatedDismiss"
+      />
+    </div>
     <slot />
   </div>
   <div v-else class="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -14,6 +21,12 @@
 
       <!-- 主内容区 -->
       <main :class="mainContentClass">
+        <DelegatedAuthBanner
+          v-if="showDelegatedBanner"
+          :message="delegatedBannerMessage"
+          @retry="handleDelegatedRetry"
+          @dismiss="handleDelegatedDismiss"
+        />
         <slot />
       </main>
     </div>
@@ -25,11 +38,14 @@ import { watch } from "vue";
 import { setupHostBridgeAdapter } from "~/composables/useHostBridgeAdapter";
 import { useTheme } from "~/composables/useTheme";
 import { PLUGIN_ID, isPluginAdminPath } from "~/utils/powerx-bridge";
+import { useAuth } from "~/composables/useAuth";
+import DelegatedAuthBanner from "~/components/DelegatedAuthBanner.vue";
 
 // 获取运行时配置
 const runtimeConfig = useRuntimeConfig();
 const route = useRoute();
 const theme = useTheme();
+const auth = useAuth();
 
 const disableShell = computed(() => {
   if (route.meta?.fullBleed === true) {
@@ -76,6 +92,42 @@ const mainContentClass = computed(() => {
   }
   return showNavigation.value ? "flex-1 p-6" : "w-full p-6";
 });
+
+const delegatedBannerMessage = computed(() => auth.delegatedError?.value || "");
+const showDelegatedBanner = computed(
+  () => insidePowerX.value && Boolean(delegatedBannerMessage.value)
+);
+
+const requestHostToken = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.parent?.postMessage(
+      {
+        source: "powerx-plugin",
+        type: "auth-token:request",
+        pluginId: PLUGIN_ID,
+        instanceId:
+          typeof route.query.instanceId === "string"
+            ? route.query.instanceId
+            : route.fullPath,
+      },
+      "*"
+    );
+  } catch (error) {
+    console.warn("[Bridge][Plugin] failed to request auth token", error);
+  }
+};
+
+const handleDelegatedRetry = () => {
+  auth.restoreFromStorage?.();
+  requestHostToken();
+};
+
+const handleDelegatedDismiss = () => {
+  auth.clearDelegatedError?.();
+};
 
 const getAdapterRegistry = (win) => {
   if (!win.__PX_ADAPTERS__) {

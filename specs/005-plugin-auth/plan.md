@@ -149,3 +149,26 @@ scaffold/templates/** + tools/cli/** mirror skeleton
 1. `px-plugin package --entry examples/com.powerx.demo` 生成 `.px-plugin/build/<timestamp>/package.tar.gz`、`metadata.json` 并列出 artefacts/hashes。
 2. `px-plugin publish --entry examples/com.powerx.demo --channel dev --notes "feat"` 在带有 mock Registry 的环境中返回 `publishId`，PowerX Admin 可看到待审核版本；缺少配置时 CLI 给出可操作提示。
 3. Quickstart/Go CLI 文档加入完整“package → publish → install → dev”步骤，运行 `px-plugin doctor --check-devapi` 验证配置后能顺利热加载。
+
+---
+
+## Phase 4 – Delegated UX & Template RBAC Hardening
+
+**Context**：在 Spec 中新增的两个需求需要单独跟进：
+
+1. **Delegated Token 失效体验**：`insidePowerX` 环境下 token 失效不可再跳 `/users/login`，而是展示宿主模式专属提示，并在宿主重新注入 token 后恢复。
+2. **Template CRUD RBAC**：模板示例必须声明/输出 RBAC 资源；Standalone 模式 enforce，Delegated 模式暴露给宿主 IAM 并让前端根据权限/模式调整 UI。
+
+### Deliverables
+
+| Deliverable | Description |
+|-------------|-------------|
+| Delegated Token UX | `useAuth` / `auth.global.ts` 分支逻辑：Delegated 模式触发 `failClosed` 时只清理 token + 记录错误提示，不调用 `navigateTo('/users/login')`；提供 Banner 组件/Store，允许“重试”触发宿主 token 注入；Playwright delegated 用例覆盖；文档更新。 |
+| Token Rehydration Flow | 与 `px-bridge` 集成：当宿主 `postMessage` 发送新 token 时重新调用 `initAuth()`，关闭 Banner。 |
+| Template RBAC Server | 新增 `internal/transport/http/admin/templates/rbac.go` + registry 注入；manifest/RBAC 输出 `base.templates.read/manage`；Go 单测覆盖。 |
+| Template RBAC Frontend | `pages/templates/**` 根据 `useAuth`/`useRuntimeConfig` 检查权限/模式，隐藏或禁用 CRUD 操作，Delegated 模式显示“宿主控制权限”提示；文档记录差异。 |
+
+### Exit Criteria
+
+1. Delegated 模式下刻意删除 token 或让 refresh 返回 401/503，页面不跳登录且出现提示；宿主重新注入 token 后无需刷新即可恢复。
+2. `GET /api/v1/admin/rbac`、manifest 和文档中均包含模板资源；Standalone 模式未授权时模板 CRUD 返回 403；Delegated 模式 manifest 依旧暴露资源但由宿主判定。

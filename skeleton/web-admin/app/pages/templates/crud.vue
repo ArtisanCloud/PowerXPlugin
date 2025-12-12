@@ -9,10 +9,27 @@
           {{ $t("templates.crud.description") }}
         </p>
       </div>
-      <UButton icon="i-heroicons-plus" color="primary" @click="startCreate">
+      <UButton
+        icon="i-heroicons-plus"
+        color="primary"
+        :disabled="isDelegatedReadOnly"
+        @click="startCreate"
+      >
         {{ $t("templates.crud.create") }}
       </UButton>
     </div>
+
+    <UAlert
+      v-if="isDelegatedReadOnly"
+      color="info"
+      variant="soft"
+      icon="i-heroicons-information-circle"
+    >
+      <template #title>{{ $t("templates.crud.readonlyTitle") }}</template>
+      <template #description>
+        {{ $t("templates.crud.readonlyDescription") }}
+      </template>
+    </UAlert>
 
     <TemplateFormModal
       v-if="showFormModal"
@@ -64,6 +81,7 @@
               size="xs"
               variant="soft"
               icon="i-heroicons-pencil"
+              :disabled="isDelegatedReadOnly"
               @click="startEdit(row.original)"
             >
               {{ $t('common.edit') }}
@@ -73,6 +91,7 @@
               variant="soft"
               color="error"
               icon="i-heroicons-trash"
+              :disabled="isDelegatedReadOnly"
               @click="confirmDelete(row.original)"
             >
               {{ $t('common.delete') }}
@@ -147,6 +166,16 @@ const toast = reactive({
 })
 
 const { t } = useI18n()
+
+const runtimeConfig = useRuntimeConfig()
+const isDelegatedReadOnly = computed(() => {
+  const value = runtimeConfig.public?.insidePowerX
+  if (value === true) return true
+  if (typeof value === "string") {
+    return value === "true" || value === "1"
+  }
+  return false
+})
 
 const tableColumns = computed(() => [
   { accessorKey: 'name', header: t('templates.crud.fields.name') },
@@ -249,12 +278,27 @@ const closeFormModal = () => {
   showFormModal.value = false
 }
 
+const ensureWritable = () => {
+  if (!isDelegatedReadOnly.value) {
+    return true
+  }
+  showToast({
+    title: t("templates.crud.readonlyTitle"),
+    message: t("templates.crud.readonlyToast"),
+    color: "warning",
+    duration: 4500,
+  })
+  return false
+}
+
 const startCreate = () => {
+  if (!ensureWritable()) return
   resetForm()
   openFormModal()
 }
 
 const startEdit = (tpl: Template) => {
+  if (!ensureWritable()) return
   editingId.value = tpl.id
   Object.assign(form, {
     name: tpl.name,
@@ -265,6 +309,10 @@ const startEdit = (tpl: Template) => {
 }
 
 const handleSubmit = async (payload: { name: string; description: string; content: string }) => {
+  if (isDelegatedReadOnly.value) {
+    ensureWritable()
+    return
+  }
   if (!payload.name || !payload.description || !payload.content) {
     return
   }
@@ -311,12 +359,17 @@ const handleSubmit = async (payload: { name: string; description: string; conten
 }
 
 const confirmDelete = (tpl: Template) => {
+  if (!ensureWritable()) return
   selectedTemplate.value = tpl
   deleteDialog.value = true
 }
 
 const performDelete = async () => {
   if (!selectedTemplate.value || deleting.value) return
+  if (isDelegatedReadOnly.value) {
+    ensureWritable()
+    return
+  }
   deleting.value = true
   try {
     const res = await deleteTemplateApi(
@@ -355,6 +408,14 @@ watch(deleteDialog, (isOpen) => {
     selectedTemplate.value = null
     deleting.value = false
   }
+})
+
+watch(isDelegatedReadOnly, (readonlyMode) => {
+  if (!readonlyMode) {
+    return
+  }
+  showFormModal.value = false
+  deleteDialog.value = false
 })
 
 const normalizeToString = (value?: string | number | null) => {

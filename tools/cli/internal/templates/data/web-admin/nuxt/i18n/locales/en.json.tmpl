@@ -333,6 +333,11 @@
         "spam": "• Check your spam folder if you don’t see the email",
         "email": "• Make sure the email address is correct"
       }
+    },
+    "delegated": {
+      "bannerTitle": "PowerX session expired",
+      "bannerDescription": "The host login is no longer valid. Please return to PowerX or wait for the administrator to reinject the credential.",
+      "retry": "Request token"
     }
   },
   "landing": {
@@ -418,7 +423,10 @@
       "listTitle": "Existing Templates",
       "deleteTitle": "Delete Template",
       "deleteDescription": "This action cannot be undone.",
-      "deleteConfirm": "Are you sure you want to delete \"{name}\"?"
+      "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+      "readonlyTitle": "Templates are controlled by the host",
+      "readonlyDescription": "Running in Delegated mode. CRUD is read-only until the host grants `base.templates.*` permissions.",
+      "readonlyToast": "Read-only mode enforced by PowerX. Ask your admin to grant template permissions."
     },
     "form": {
       "modalDescription": "Fill out the template details below.",

@@ -1,12 +1,13 @@
 .PHONY: validate validate-capabilities
 
-VALIDATE_MANIFEST ?=
+VALIDATE_MANIFEST ?= ./skeleton/plugin.yaml
 
 validate-capabilities: ## Validate capability contracts (set VALIDATE_MANIFEST=/path/to/plugin.yaml)
-	@if [ -n "$(VALIDATE_MANIFEST)" ]; then \
+	@if [ -f "$(VALIDATE_MANIFEST)" ]; then \
+		echo "[validate] using manifest $(VALIDATE_MANIFEST)"; \
 		node scripts/capabilities/validate-capabilities.mjs --manifest "$(VALIDATE_MANIFEST)"; \
 	else \
-		echo "Skip capability validation (set VALIDATE_MANIFEST=/path/to/plugin.yaml)"; \
+		echo "Skip capability validation (manifest not found: $(VALIDATE_MANIFEST))"; \
 	fi
 
 validate: validate-capabilities

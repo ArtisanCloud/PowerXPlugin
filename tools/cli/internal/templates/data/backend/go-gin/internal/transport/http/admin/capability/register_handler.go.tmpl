@@ -5,6 +5,7 @@ import (
 
 	"{{ .BackendModulePath }}/internal/contracts"
 	"{{ .BackendModulePath }}/internal/services/capability"
+	reviewsvc "{{ .BackendModulePath }}/internal/services/capability_review"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
@@ -12,6 +13,7 @@ import (
 // RegisterHandler exposes capability registration endpoints.
 type RegisterHandler struct {
 	service *capability.RegisterService
+	review  *reviewsvc.WorkflowService
 }
 
 // NewRegisterHandler builds a handler instance.
@@ -21,6 +23,7 @@ func NewRegisterHandler(deps *app.Deps) *RegisterHandler {
 	}
 	return &RegisterHandler{
 		service: capability.NewRegisterService(deps),
+		review:  reviewsvc.SharedWorkflowService(deps),
 	}
 }
 
@@ -76,6 +79,12 @@ func (h *RegisterHandler) Submit(c *gin.Context) {
 	if validation != nil && !validation.Valid {
 		contracts.ResponseErrorWithDetails(c, http.StatusUnprocessableEntity, contracts.ErrCodeValidationFailed, "capability validation failed", validation)
 		return
+	}
+	if h.review != nil && record != nil && !record.Draft {
+		if _, err := h.review.EnsureTasks(c.Request.Context(), record); err != nil {
+			contracts.ResponseInternalError(c, err)
+			return
+		}
 	}
 	contracts.ResponseSuccess(c, record)
 }

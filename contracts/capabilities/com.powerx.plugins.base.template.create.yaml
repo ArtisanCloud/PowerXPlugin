@@ -27,6 +27,7 @@ metadata:
       template: contracts/exposure/workflow/template-compose.json
     agent_tool:
       id: base.template.create
+      scope: agent.template.create
       transport: http
       endpoint: /api/v1/templates
     agent_stream:

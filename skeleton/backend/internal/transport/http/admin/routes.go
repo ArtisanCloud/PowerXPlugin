@@ -23,7 +23,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		admin.GET("/manifest", adminHandler.GetManifest) // 获取插件清单
 		admin.GET("/rbac", adminHandler.GetRBACInfo)     // 获取权限信息
 
-		runtimeOps := admin.Group("/runtime")
+		runtimeOps := admin.Group("/runtime", httpmw.EnsureTenant())
 		adminruntime.RegisterRoutes(runtimeOps, deps)
 
 		adminmarketplace.RegisterRoutes(adminTenantGroup(admin, deps), deps)

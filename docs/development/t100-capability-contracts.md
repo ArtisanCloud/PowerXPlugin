@@ -13,13 +13,13 @@
 
 ```bash
 # 验证当前插件（MANIFEST 默认为 plugin.yaml，可通过 --capabilities-dir/--schemas-dir 定制）
-node scripts/capabilities/validate-capabilities.mjs --manifest ./plugin.yaml
+node scripts/capabilities/validate-capabilities.mjs --manifest ./skeleton/plugin.yaml
 
 # 在 CI 中
-VALIDATE_MANIFEST=./plugin.yaml make validate
+VALIDATE_MANIFEST=./skeleton/plugin.yaml make validate
 
 # NPM 流水线（需要显式设置 CAP_MANIFEST）
-CAP_MANIFEST=./plugin.yaml npm test
+CAP_MANIFEST=./skeleton/plugin.yaml npm test
 ```
 
 脚本只会在指定 manifest 存在时执行；否则会提示缺少文件并退出。

@@ -1,0 +1,234 @@
+id: com.powerx.plugins.base
+name: PowerX Base Plugin
+version: 0.7.0
+description: "PowerX 基础模板插件，提供模板 CRUD、能力注册与多协议暴露示例。"
+runtime:
+  kind: process
+  entry: backend/bin/plugin
+  env:
+    POWERX_PLUGIN_ID: com.powerx.plugins.base
+    POWERX_SECURITY_JWT_AUDIENCE: plugin:com.powerx.plugins.base
+backend:
+  entry: backend/bin/plugin
+  port: 8078
+  health: /healthz
+frontend:
+  admin:
+    kind: nuxt
+    entry: web-admin/.output/server/index.mjs
+    static_dir: web-admin/.output/public
+    routes:
+      intro: /_p/com.powerx.plugins.base/admin/intro
+      templates: /_p/com.powerx.plugins.base/admin/templates
+rbac:
+  resources:
+    - resource: base:template
+      actions: [read, create, update, delete]
+capabilities:
+  provides:
+    - id: com.powerx.plugins.base.template.list
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.list.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.list.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.list.json
+    - id: com.powerx.plugins.base.template.read
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.read.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.read.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.read.json
+    - id: com.powerx.plugins.base.template.create
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.create.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.create.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.create.json
+    - id: com.powerx.plugins.base.template.update
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.update.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.update.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.update.json
+    - id: com.powerx.plugins.base.template.delete
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.delete.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.delete.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.delete.json
+    - id: com.powerx.plugins.base.template.review
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.review.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.review.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.review.json
+    - id: com.powerx.plugins.base.template.publish
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.publish.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.publish.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.publish.json
+    - id: com.powerx.plugins.base.template.compose
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.compose.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.compose.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.compose.json
+    - id: com.powerx.plugins.base.template.audit
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.audit.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.audit.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.audit.json
+    - id: com.powerx.plugins.base.template.batch_clone
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.batch_clone.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.batch_clone.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.batch_clone.json
+    - id: com.powerx.plugins.base.template.validate
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.validate.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.validate.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.validate.json
+    - id: com.powerx.plugins.base.template.quality_distribute
+      version: 1.0.0
+      descriptor: contracts/capabilities/com.powerx.plugins.base.template.quality_distribute.yaml
+      schemas:
+        input:
+          - contracts/schema/input/com.powerx.plugins.base.template.quality_distribute.json
+        output:
+          - contracts/schema/output/com.powerx.plugins.base.template.quality_distribute.json
+  imports:
+    - contracts/capabilities/com.powerx.plugins.base.template.list.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.read.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.create.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.update.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.delete.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.review.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.publish.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.compose.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.audit.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.batch_clone.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.validate.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.quality_distribute.yaml
+agent_tools:
+  - id: base.template.create
+    capability: com.powerx.plugins.base.template.create
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#CreateTemplate
+    description: "以 REST/API 形式创建模板，并为 Agent 暴露工具。"
+  - id: base.template.compose
+    capability: com.powerx.plugins.base.template.compose
+    handler: contracts/exposure/workflow/template-compose.json
+    description: "复合 Workflow，串联草稿、审核与发布步骤。"
+  - id: base.template.audit
+    capability: com.powerx.plugins.base.template.audit
+    handler: contracts/exposure/workflow/template-audit.json
+    description: "巡检模板库并在检测到异常时自动修复+发布。"
+  - id: base.template.batch_clone
+    capability: com.powerx.plugins.base.template.batch_clone
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#BatchCloneTemplates
+    description: "批量克隆模板的 REST/API 工具。"
+  - id: base.template.validate
+    capability: com.powerx.plugins.base.template.validate
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#ValidateTemplateCapability
+    description: "模板质量巡检工具，返回违规项供 Agent 决策。"
+  - id: base.template.quality_distribute
+    capability: com.powerx.plugins.base.template.quality_distribute
+    handler: contracts/exposure/workflow/template-quality-distribute.json
+    description: "巡检 + 克隆 + 发布的复合 Workflow。"
+exposure:
+  channels:
+    - type: rest
+      capability: com.powerx.plugins.base.template.list
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates
+      method: GET
+      auth: jwt
+      rbac: base:template:read
+    - type: rest
+      capability: com.powerx.plugins.base.template.read
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}
+      method: GET
+      auth: jwt
+      rbac: base:template:read
+    - type: rest
+      capability: com.powerx.plugins.base.template.create
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates
+      method: POST
+      auth: jwt
+      rbac: base:template:create
+    - type: rest
+      capability: com.powerx.plugins.base.template.update
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}
+      method: PUT
+      auth: jwt
+      rbac: base:template:update
+    - type: rest
+      capability: com.powerx.plugins.base.template.delete
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}
+      method: DELETE
+      auth: jwt
+      rbac: base:template:delete
+    - type: workflow
+      capability: com.powerx.plugins.base.template.compose
+      entrypoint: contracts/exposure/workflow/template-compose.json
+      auth: workflow
+    - type: agent_tool
+      capability: com.powerx.plugins.base.template.compose
+      entrypoint: contracts/exposure/mcp-tools.json
+      auth: toolgrant
+    - type: workflow
+      capability: com.powerx.plugins.base.template.audit
+      entrypoint: contracts/exposure/workflow/template-audit.json
+      auth: workflow
+    - type: agent_tool
+      capability: com.powerx.plugins.base.template.audit
+      entrypoint: contracts/exposure/mcp-tools.json
+      auth: toolgrant
+    - type: rest
+      capability: com.powerx.plugins.base.template.batch_clone
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/batch-clone
+      method: POST
+      auth: jwt
+      rbac: base:template:create
+    - type: rest
+      capability: com.powerx.plugins.base.template.validate
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}/validate
+      method: POST
+      auth: jwt
+      rbac: base:template:read
+    - type: workflow
+      capability: com.powerx.plugins.base.template.quality_distribute
+      entrypoint: contracts/exposure/workflow/template-quality-distribute.json
+      auth: workflow
+    - type: agent_tool
+      capability: com.powerx.plugins.base.template.quality_distribute
+      entrypoint: contracts/exposure/mcp-tools.json
+      auth: toolgrant
+    - type: agent_stream
+      capability: com.powerx.plugins.base.template.quality_distribute
+      entrypoint: contracts/exposure/agent-streams/template-quality-distribute.yaml
+      auth: workflow

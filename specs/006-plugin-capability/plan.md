@@ -85,3 +85,33 @@ contracts/
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | _None_ | | |
+
+## Add-on Scope：模板基础能力扩展
+
+为保证 demo 模型具备更贴近真实业务的“模板治理”能力，本迭代新增两条原子能力 + 一个 Workflow：
+
+1. **模板批量克隆/导入（`com.powerx.plugins.base.template.batch_clone`）**
+   - HTTP（能力出口）：`POST /api/v1/templates/batch-clone`，Body 包含源模板 ID 列表、克隆数量、目标标签/租户；返回 `created_ids`、`failed` 列表。
+   - HTTP（Admin 业务面）：在 `skeleton/backend/internal/transport/http/admin/templates` 下新增 `/admin/api/templates/batch-clone`（或同等路径）供 Web Admin 调用，协议字段可更丰富（含草稿备注/审批人），但内部仍委托 `TemplateService.BatchClone`。
+   - gRPC：`TemplateService/BatchCloneTemplates`，复用相同请求/响应结构。
+   - Handler 位置：
+     - 能力接口 handler：`.../transport/http/admin/templates/template_capability_handler.go`（新增文件）或同目录下新增方法，通过 `contracts/exposure/openapi.yaml` 暴露。
+     - Admin 接口 handler：继续位于 `template_handler.go`，挂在 `/admin` 路由组。
+     - 两者都依赖服务 `TemplateService.BatchClone`（内部封装事务、批量 insert、克隆标签/内容）。
+   - 契约：新增 `contracts/schema/input|output/com.powerx.plugins.base.template.batch_clone.json` 与能力描述 `contracts/capabilities/com.powerx.plugins.base.template.batch_clone.yaml`，并在 `plugin.yaml` + `capabilities/catalog.json` 注册。
+   - 暴露：REST/gRPC 必选，同时在 `contracts/exposure/workflow/`、`agent-streams/` 中声明，方便 Workflow/Agent 节点批量拉起模板。
+
+2. **模板检测/校验（`com.powerx.plugins.base.template.validate`）**
+   - HTTP（能力出口）：`POST /api/v1/templates/{id}/validate`，请求可指定规则集（lint/profile），响应返回 `violations[]`、`severity`、建议修复字段。
+   - HTTP（Admin 业务）：在 `/admin/api/templates/{id}/validate` 追加管理端 API，供后台直接发起巡检任务或批量触发，接口形态可附带“保存记录/备注”字段。
+   - gRPC：`TemplateService/ValidateTemplate`。
+   - Handler：与批量克隆相同，拆分能力接口 handler（走开放 OpenAPI）与 Admin handler（内部业务）；Service：`TemplateService.Validate`（加载模板、运行校验器、返回结果）。
+   - 套件：新增 `contracts/schema/input/output/com.powerx.plugins.base.template.validate.*` 与能力文件，SSE 事件用于推送校验完成通知。
+
+3. **Workflow「模板巡检 + 批量分发」**
+   - 文件：`contracts/exposure/workflow/template-quality-distribute.json`。
+   - DAG：`list → validate (loop over violations) → batch_clone (生成多份修复版) → update/publish`，将巡检与批量克隆串联，展示“质量检测 + 分发”场景。
+   - Agent Tool：`base.template.quality_distribute`（transport=workflow），SSE intent `template.quality_distribute`。
+   - 依赖：上述两个原子能力完成后再导出 Workflow，并在文档中新增场景章节（`docs/guides/publish/capabilities/workflow-agent-guide.md`、`mcp-guide.md`）。
+
+本 Add-on Scope 需要更新 contracts、handler/service、workflow、mcp 工具与文档，确保模板模型在 demo 中具备“CRUD + 批处理 + 质量巡检”三类能力以支撑 PowerX 意图识别测试。

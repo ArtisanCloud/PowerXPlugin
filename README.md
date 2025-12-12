@@ -24,6 +24,12 @@
 4. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
 5. 体验 Go CLI 热加载：请按照 `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 构建 `px-plugin`、运行 `px-plugin dev --watch` / `dev --logs`，并通过 `px-plugin doctor` 生成 `.doctor/report.json` 以验证 Toolchain、mTLS、Dev API、Watcher 状态。
 
+## Manifest 位置说明
+
+- 仓库真实的开发态 manifest 存放在 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅是一个指向它的符号链接，方便旧脚本兼容。
+- 运行 `npm test`、`make validate`、`px-plugin capabilities ...` 等命令时，请在 `skeleton/` 目录中执行（或显式传入 `--manifest skeleton/plugin.yaml` / `CAP_MANIFEST=./skeleton/plugin.yaml`），以免引用到不存在的文件。
+- 当你使用 `px-plugin init` 生成独立插件仓库时，`plugin.yaml` 位于其根目录，命令可继续按常规相对路径执行。
+
 ## Publish Hub 链路（CLI → 审核 → 安装）
 
 1. **CLI 构建/发布**：阅读 `specs/004-publish-hub-spec/spec.md` 与 `specs/004-publish-hub-spec/quickstart.md`，依照 `px-plugin dev/publish/dist` 命令准备 manifest、签名与 `.pxp` artefact；Node 18 + TypeScript 5 依赖位于 `tools/cli/package.json`。

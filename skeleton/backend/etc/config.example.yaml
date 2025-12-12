@@ -27,6 +27,9 @@ database:
   driver: "sqlite"
   dsn: "file:../../.cache/powerxplugin.db?cache=shared&_fk=1"
   schema: ""
+  # driver: "postgres"
+  # dsn: "postgres://user:pwd@localhost:5432/com_powerx_plugin_base?sslmode=disable"
+  # schema: "public"
   maxIdleConns: 10
   maxOpenConns: 100
   connMaxLifetime: 1h

@@ -8,6 +8,8 @@
 - 已通过 `px-plugin init` 生成脚手架工程，包含 `plugin.yaml`、`contracts/` 与 `.px-plugin/` 目录。
 - 拥有 Dev API 凭证：`PX_DEV_API_BASE`、`PX_DEV_API_TOKEN`。
 
+> 仓库内置 skeleton 的 manifest 位于 `skeleton/plugin.yaml`。若你在 PowerXPlugin 仓库中演练本文流程，请先进入 `repo-root/skeleton`，然后再执行以下命令（命令中的 `./plugin.yaml` 即指向该文件）。若是在你自己的插件仓库中运行，则继续使用仓库根目录的 `plugin.yaml`。
+
 ## 1. 声明能力
 
 使用 CLI 初始化能力契约：
@@ -32,7 +34,7 @@ node scripts/capabilities/validate-capabilities.mjs --manifest ./plugin.yaml
 px-plugin capabilities lint --manifest ./plugin.yaml
 ```
 
-校验会检查 catalog 与 artefacts 是否一致、JSON Schema 是否存在、ID 是否命名正确。`npm run test` 也会默认加载 `./backend/etc/plugin.yaml`（如果不存在则回退到根目录），可通过 `CAP_MANIFEST=<path>` 覆盖。
+校验会检查 catalog 与 artefacts 是否一致、JSON Schema 是否存在、ID 是否命名正确。`npm run test` 也会默认加载 `./skeleton/plugin.yaml`（如果不存在则回退到根目录），可通过 `CAP_MANIFEST=<path>` 覆盖。
 
 ## 3. 导出多协议资产
 
@@ -88,7 +90,7 @@ px-plugin capabilities quota \
 
 ## 6. Skeleton 插件验证（可选）
 
-在 `repo-root/skeleton` 目录可按以下顺序验证：
+在 `repo-root/skeleton` 目录可按以下顺序验证（请先 `cd skeleton`）：
 
 1. `node ../scripts/capabilities/discover-handlers.mjs --plugin . --handlers backend/internal/transport/http/admin/templates`
 2. `npx --yes tsx ../tools/cli/src/commands/capabilities/init.ts --manifest ./plugin.yaml --capability-id com.powerx.skeleton.template.create ...`
@@ -102,7 +104,7 @@ px-plugin capabilities quota \
 
 ## 7. Init 输出工程（全新插件）
 
-当你使用 `px-plugin init` 生成新插件仓库时，可在仓库根目录执行：
+当你使用 `px-plugin init` 生成新插件仓库时，可在该仓库根目录执行：
 
 1. `px-plugin init com.example.capability --backend go-gin --admin nuxt --force`
 2. `npm install && go mod tidy ./backend`

@@ -43,12 +43,24 @@ const cwd = process.cwd();
 const manifestArg = getArgValue("--manifest");
 let manifestPath = path.resolve(cwd, manifestArg ?? "plugin.yaml");
 if (!fs.existsSync(manifestPath) && !manifestArg) {
-  const fallback = path.resolve(cwd, "..", "..", "plugin.yaml");
-  if (fs.existsSync(fallback)) {
-    console.log(
-      "[capabilities] manifest not found in scripts/capabilities, fallback to ../../plugin.yaml",
-    );
-    manifestPath = fallback;
+  const fallbacks = [
+    {
+      path: path.resolve(cwd, "..", "..", "skeleton", "plugin.yaml"),
+      note: "../../skeleton/plugin.yaml",
+    },
+    {
+      path: path.resolve(cwd, "..", "..", "plugin.yaml"),
+      note: "../../plugin.yaml",
+    },
+  ];
+  for (const candidate of fallbacks) {
+    if (fs.existsSync(candidate.path)) {
+      console.log(
+        `[capabilities] manifest not found in scripts/capabilities, fallback to ${candidate.note}`,
+      );
+      manifestPath = candidate.path;
+      break;
+    }
   }
 }
 

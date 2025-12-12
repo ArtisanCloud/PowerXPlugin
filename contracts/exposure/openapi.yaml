@@ -12,3 +12,21 @@ paths:
       responses:
         "200":
           description: Success
+  /api/v1/templates/batch-clone:
+    post:
+      tags:
+        - com.powerx.plugins.base.template.batch_clone
+      summary: Template Batch Clone REST
+      description: 批量克隆模板的公开入口
+      responses:
+        "200":
+          description: Success
+  /api/v1/templates/{id}/validate:
+    post:
+      tags:
+        - com.powerx.plugins.base.template.validate
+      summary: Template Validate REST
+      description: 模板巡检 REST 能力
+      responses:
+        "200":
+          description: Success

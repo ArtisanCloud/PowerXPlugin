@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 
-const defaultManifest = "./backend/etc/plugin.yaml";
+const defaultManifest = "./skeleton/plugin.yaml";
 const fallbackManifest = "./plugin.yaml";
 
 const manifestEnv = process.env.CAP_MANIFEST;

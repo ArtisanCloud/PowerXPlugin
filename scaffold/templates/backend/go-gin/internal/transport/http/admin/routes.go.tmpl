@@ -1,6 +1,7 @@
 package admin
 
 import (
+	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	admincapability "{{ .BackendModulePath }}/internal/transport/http/admin/capability"
 	adminconsole "{{ .BackendModulePath }}/internal/transport/http/admin/console"
@@ -9,6 +10,7 @@ import (
 	adminoperations "{{ .BackendModulePath }}/internal/transport/http/admin/operations"
 	adminruntime "{{ .BackendModulePath }}/internal/transport/http/admin/runtime_ops"
 	adminsecurity "{{ .BackendModulePath }}/internal/transport/http/admin/security"
+	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,14 +23,28 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		admin.GET("/manifest", adminHandler.GetManifest) // 获取插件清单
 		admin.GET("/rbac", adminHandler.GetRBACInfo)     // 获取权限信息
 
-		runtimeOps := admin.Group("/runtime")
+		runtimeOps := admin.Group("/runtime", httpmw.EnsureTenant())
 		adminruntime.RegisterRoutes(runtimeOps, deps)
 
-		adminmarketplace.RegisterRoutes(admin, deps)
+		adminmarketplace.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminoperations.RegisterRoutes(admin, deps)
 		adminconsole.RegisterRoutes(admin, deps)
-		admincapability.RegisterRoutes(admin, deps)
+		admincapability.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminintegration.RegisterRoutes(admin, deps)
-		adminsecurity.RegisterRoutes(admin, deps)
+		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 	}
+}
+
+func adminTenantGroup(parent *gin.RouterGroup, deps *app.Deps) *gin.RouterGroup {
+	if parent == nil {
+		return nil
+	}
+	needTenant := false
+	if deps != nil && deps.IAMMode == iamservice.IAMModeDelegated {
+		needTenant = true
+	}
+	if !needTenant {
+		return parent.Group("")
+	}
+	return parent.Group("", httpmw.EnsureTenant())
 }

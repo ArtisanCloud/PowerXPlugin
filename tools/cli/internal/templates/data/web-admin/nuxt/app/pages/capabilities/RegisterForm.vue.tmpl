@@ -1,61 +1,209 @@
 <template>
-  <UContainer class="py-10 space-y-8">
-    <div class="flex flex-col gap-2">
+  <UContainer class="py-10 space-y-6">
+    <section class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex flex-col gap-1">
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ $t("capabilities.form.title") }}` }}
+          {{ `{{ $t("capabilities.list.title") }}` }}
         </h1>
         <p class="text-gray-600 dark:text-gray-300">
-          {{ `{{ $t("capabilities.form.description") }}` }}
+          {{ `{{ $t("capabilities.list.description") }}` }}
         </p>
       </div>
-      <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-        <div class="inline-flex items-center gap-1">
-          <UIcon name="i-heroicons-identification" />
-          <span class="font-medium">{{ `{{ $t("capabilities.form.capabilityId") }}` }}:</span>
-          <code class="rounded bg-gray-100 px-2 py-0.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
-            {{ `{{ capabilityId || "—" }}` }}
-          </code>
-        </div>
-        <UBadge :label="validationBadge.label" :color="validationBadge.color" variant="soft" />
+      <div class="flex flex-wrap gap-3">
+        <UButton
+          icon="i-heroicons-arrow-path"
+          variant="ghost"
+          color="neutral"
+          :loading="catalogLoading"
+          @click="loadCatalog"
+        >
+          {{ `{{ $t("capabilities.list.refresh") }}` }}
+        </UButton>
+        <UButton icon="i-heroicons-plus" color="primary" @click="openForm">
+          {{ `{{ $t("capabilities.list.createButton") }}` }}
+        </UButton>
       </div>
-    </div>
+    </section>
 
-    <UCard :ui="{ body: 'space-y-8' }">
+    <UCard>
       <template #header>
-        <div class="flex flex-col gap-2">
-          <USteps v-model="currentStep" :items="stepItems" />
+        <div class="flex flex-col gap-1">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+            {{ `{{ $t("capabilities.list.tableTitle") }}` }}
+          </h2>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ `{{ stepItems[currentStep]?.description }}` }}
+            {{ `{{ $t("capabilities.list.tableHint") }}` }}
           </p>
         </div>
       </template>
-
-      <div v-if="loadingTemplate" class="flex items-center justify-center py-16">
-        <ULoader size="lg" />
+      <div v-if="catalogLoading" class="flex items-center justify-center py-16 text-gray-500 dark:text-gray-400">
+        {{ `{{ $t("common.loading") }}` }}
       </div>
+      <div v-else>
+        <UTable
+          v-if="catalogRows.length"
+          :rows="catalogRows"
+          :columns="tableColumns"
+          :ui="{ td: { base: 'align-top' } }"
+        >
+          <template #capability_id-data="{ row }">
+            <div class="flex flex-col">
+              <span class="font-semibold text-gray-900 dark:text-white">
+                {{ `{{ row.capability_id }}` }}
+              </span>
+              <small class="text-xs text-gray-500 dark:text-gray-400">
+                {{ `{{ $t("capabilities.list.versionLabel", { version: row.version }) }}` }}
+              </small>
+            </div>
+          </template>
+          <template #execution-data="{ row }">
+            <UBadge
+              :label="row.execution.mode.toUpperCase()"
+              :color="row.execution.mode === 'async' ? 'primary' : 'gray'"
+              variant="soft"
+            />
+            <p v-if="row.execution.callback_url" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ `{{ row.execution.callback_url }}` }}
+            </p>
+          </template>
+          <template #tags-data="{ row }">
+            <div class="flex flex-wrap gap-1.5">
+              <UBadge
+                v-for="tag in row.tags"
+                :key="`${row.capability_id}-${tag}`"
+                :label="tag"
+                variant="subtle"
+              />
+              <span v-if="!row.tags.length" class="text-xs text-gray-400">
+                {{ `{{ $t("capabilities.list.noTags") }}` }}
+              </span>
+            </div>
+          </template>
+          <template #checksum-data="{ row }">
+            <code class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ row.checksum }}` }}</code>
+          </template>
+        </UTable>
+        <div v-else class="py-16 text-center">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            {{ `{{ $t("capabilities.list.empty") }}` }}
+          </p>
+        </div>
+      </div>
+    </UCard>
 
-      <template v-else>
+    <UModal
+      v-model:open="formOpen"
+      prevent-close
+      :ui="{ content: 'max-w-6xl w-[95vw] mx-auto' }"
+    >
+      <template #body>
+        <div class="space-y-6">
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                  {{ `{{ $t("capabilities.form.title") }}` }}
+                </h2>
+                <p class="text-gray-600 dark:text-gray-300">
+                  {{ `{{ $t("capabilities.form.description") }}` }}
+                </p>
+              </div>
+              <UButton icon="i-heroicons-x-mark" variant="ghost" color="neutral" @click="closeForm" />
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+              <div class="inline-flex items-center gap-1">
+                <UIcon name="i-heroicons-identification" />
+                <span class="font-medium">{{ `{{ $t("capabilities.form.capabilityId") }}` }}:</span>
+                <code class="rounded bg-gray-100 px-2 py-0.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+                  {{ `{{ capabilityId || "—" }}` }}
+                </code>
+              </div>
+              <UBadge :label="validationBadge.label" :color="validationBadge.color" variant="soft" />
+            </div>
+          </div>
+
+          <UCard :ui="{ body: 'space-y-8' }">
+            <template #header>
+              <div class="flex flex-col gap-2">
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    v-for="(item, idx) in stepItems"
+                    :key="item.label"
+                    type="button"
+                    class="flex items-center gap-2 rounded-full border px-4 py-1 text-sm transition"
+                    :class="idx === currentStep
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-950 dark:text-primary-300'
+                      : 'border-gray-200 text-gray-500 dark:border-gray-800 dark:text-gray-400'"
+                    @click="currentStep = idx"
+                  >
+                    <span
+                      class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold"
+                      :class="idx === currentStep
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300'"
+                    >
+                      {{ `{{ idx + 1 }}` }}
+                    </span>
+                    {{ `{{ item.label }}` }}
+                  </button>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ `{{ stepItems[currentStep]?.description }}` }}
+                </p>
+              </div>
+            </template>
+
+            <div
+              v-if="loadingTemplate"
+              class="flex items-center justify-center py-16 text-gray-500 dark:text-gray-400"
+            >
+              {{ `{{ $t("common.loading") }}` }}
+            </div>
+
+            <template v-else>
         <section v-if="currentStep === 0" class="space-y-6">
-          <div class="grid gap-4 md:grid-cols-3">
+          <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="$t('capabilities.form.namespace')" required>
               <UInput v-model="form.namespace" />
             </UFormField>
             <UFormField :label="$t('capabilities.form.resource')" required>
               <UInput v-model="form.resource" />
             </UFormField>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="$t('capabilities.form.action')" required>
               <UInput v-model="form.action" />
             </UFormField>
+            <UFormField :label="$t('capabilities.form.sensitivity')" required>
+              <USelectMenu
+                v-model="form.sensitivity"
+                :options="template?.sensitivity_options || ['low','medium','high']"
+              />
+            </UFormField>
           </div>
 
-        <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormField :label="$t('capabilities.form.tenantScope')">
+              <UInput v-model="form.tenant_scope" placeholder="global" />
+            </UFormField>
+            <UFormField :label="$t('capabilities.form.tags')" :description="$t('capabilities.form.tagsHint')">
+              <UInput v-model="tagsText" placeholder="workflow,agent" />
+            </UFormField>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormField class="md:col-span-2" :label="$t('capabilities.form.scenario')" :description="$t('capabilities.form.scenarioHint')" required>
+              <UTextarea v-model="form.scenario" :rows="3" />
+            </UFormField>
+          </div>
+
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
               {{ `{{ $t("capabilities.form.displayName") }}` }}
               <span class="text-red-500">*</span>
-            </label>
-            <div class="grid gap-2 md:grid-cols-2">
+            </p>
+            <div class="grid gap-4 md:grid-cols-2">
               <UFormField :label="$t('capabilities.form.localeZh')" required>
                 <UInput v-model="form.name.zh" />
               </UFormField>
@@ -64,12 +212,13 @@
               </UFormField>
             </div>
           </div>
+
           <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
               {{ `{{ $t("capabilities.form.summary") }}` }}
               <span class="text-red-500">*</span>
-            </label>
-            <div class="grid gap-2 md:grid-cols-2">
+            </p>
+            <div class="grid gap-4 md:grid-cols-2">
               <UFormField :label="$t('capabilities.form.localeZh')" required>
                 <UInput v-model="form.summary.zh" />
               </UFormField>
@@ -78,42 +227,21 @@
               </UFormField>
             </div>
           </div>
-        </div>
 
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            {{ `{{ $t("capabilities.form.descriptionField") }}` }}
-          </label>
-          <div class="grid gap-2 md:grid-cols-2">
-            <UFormField :label="$t('capabilities.form.localeZh')">
-              <UTextarea v-model="form.description.zh" :rows="4" />
-            </UFormField>
-            <UFormField :label="$t('capabilities.form.localeEn')">
-              <UTextarea v-model="form.description.en" :rows="4" />
-            </UFormField>
-          </div>
-        </div>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="$t('capabilities.form.scenario')" :description="$t('capabilities.form.scenarioHint')" required>
-              <UTextarea v-model="form.scenario" :rows="3" />
-            </UFormField>
-            <UFormField :label="$t('capabilities.form.tags')" :description="$t('capabilities.form.tagsHint')">
-              <UInput v-model="tagsText" placeholder="workflow,agent" />
-            </UFormField>
+          <div class="space-y-2">
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ `{{ $t("capabilities.form.descriptionField") }}` }}
+            </p>
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField :label="$t('capabilities.form.localeZh')">
+                <UTextarea v-model="form.description.zh" :rows="4" />
+              </UFormField>
+              <UFormField :label="$t('capabilities.form.localeEn')">
+                <UTextarea v-model="form.description.en" :rows="4" />
+              </UFormField>
+            </div>
           </div>
 
-          <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="$t('capabilities.form.sensitivity')" required>
-              <USelectMenu
-                v-model="form.sensitivity"
-                :options="template?.sensitivity_options || ['low','medium','high']"
-              />
-            </UFormField>
-            <UFormField :label="$t('capabilities.form.tenantScope')">
-              <UInput v-model="form.tenant_scope" placeholder="global" />
-            </UFormField>
-          </div>
         </section>
 
         <section v-else-if="currentStep === 1" class="space-y-6">
@@ -299,6 +427,9 @@
         </div>
       </template>
     </UCard>
+  </div>
+</template>
+    </UModal>
   </UContainer>
 </template>
 
@@ -311,6 +442,8 @@ import {
   type CapabilityTemplate,
   type CapabilityRegisterPayload,
   type CapabilityValidationResult,
+  useCapabilityCatalogApi,
+  type CapabilityCatalogEntry,
 } from "~/composables/api";
 
 definePageMeta({
@@ -324,7 +457,9 @@ const {
   validateDraft,
   submitDraft,
 } = useCapabilityRegistryApi();
+const { list: listCatalog } = useCapabilityCatalogApi();
 
+const formOpen = ref(false);
 const loadingTemplate = ref(true);
 const currentStep = ref(0);
 const template = ref<CapabilityTemplate | null>(null);
@@ -335,6 +470,8 @@ const validationResult = ref<CapabilityValidationResult | null>(null);
 const savedAt = ref<string | null>(null);
 const autoValidate = ref(false);
 const draftStorageKey = "powerxplugin::capability-register-draft";
+const catalogLoading = ref(false);
+const catalog = ref<CapabilityCatalogEntry[]>([]);
 
 const form = reactive(createDefaultForm());
 
@@ -385,10 +522,34 @@ const tagsText = computed({
   },
 });
 
+const tableColumns = computed(() => [
+  { key: "capability_id", label: t("capabilities.list.column.capability") },
+  { key: "execution", label: t("capabilities.list.column.execution") },
+  { key: "tags", label: t("capabilities.list.column.tags") },
+  { key: "checksum", label: t("capabilities.list.column.checksum") },
+]);
+
+const catalogRows = computed(() =>
+  (catalog.value || []).map((entry) => ({
+    capability_id: entry.id,
+    version: entry.version,
+    descriptor: entry.descriptor,
+    tags: entry.tags || [],
+    checksum: entry.checksum,
+    execution: entry.execution || { mode: "sync" },
+  })),
+);
+
 onMounted(async () => {
-  await loadTemplate();
+  await Promise.all([loadTemplate(), loadCatalog()]);
   hydrateDraft();
   watchFormForPersist();
+});
+
+watch(formOpen, (isOpen) => {
+  if (!isOpen) {
+    currentStep.value = 0;
+  }
 });
 
 async function loadTemplate() {
@@ -408,6 +569,30 @@ async function loadTemplate() {
   } finally {
     loadingTemplate.value = false;
   }
+}
+
+async function loadCatalog() {
+  catalogLoading.value = true;
+  try {
+    catalog.value = await listCatalog();
+  } catch (error) {
+    console.error("[capabilities] failed to load catalog", error);
+    toast.add({
+      title: t("capabilities.list.toast.loadFailed"),
+      description: String(error),
+      color: "rose",
+    });
+  } finally {
+    catalogLoading.value = false;
+  }
+}
+
+function openForm() {
+  formOpen.value = true;
+}
+
+function closeForm() {
+  formOpen.value = false;
 }
 
 function createDefaultForm() {
@@ -441,6 +626,14 @@ function createDefaultForm() {
     draft: true,
     metadata: { source: "web-admin" } as Record<string, string>,
   };
+}
+
+function resetFormState() {
+  Object.assign(form, createDefaultForm());
+  currentStep.value = 0;
+  validationResult.value = null;
+  autoValidate.value = false;
+  savedAt.value = null;
 }
 
 function hydrateDraft() {
@@ -575,6 +768,9 @@ async function handleSubmit() {
       color: "green",
     });
     clearDraft();
+    await loadCatalog();
+    resetFormState();
+    closeForm();
   } catch (error) {
     handleSubmitError(error);
   } finally {

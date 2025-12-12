@@ -32,6 +32,12 @@ Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 - 005-plugin-auth: Added Go 1.24 (backend), TypeScript 5 / Nuxt 4.2 (web admin) + Gin, Gorm, `$fetch`/Nitro、Pinia、`@nuxt/ui`, PowerX framework middleware、`@artisan-cloud/plugin-framework-*`
 - 004-publish-hub-spec: Added Go 1.24 (PowerX Core/Dev API), TypeScript 5 + Node.js 18 (px-plugin CLI & tooling), Nuxt 4.2 (Admin) + Gin、`@artisan-cloud/plugin-framework-*`、px-plugin CLI runtime、S3/MinIO 对象存储、Redis/Kafka 链路、Playwright 1.48+
 
+## Manifest 迁移公告（2025-12-08）
+- 开发态唯一清单移动到 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。
+- 本地执行 `npm test`、`make validate`、`px-plugin capabilities *`、`make dist` 等命令时，请在 `skeleton/` 目录下运行或显式传入 `--manifest ./skeleton/plugin.yaml`。
+- `scripts/capabilities/run-from-package.mjs` 与 `validate-capabilities.mjs` 默认回退到 `./skeleton/plugin.yaml`，CI 环节无需额外设定；若在独立插件仓库操作则保持原有路径。
+- QA/发布同学在具备 Dev API 凭证时，请使用迁移文档中的命令验证 `px-plugin capabilities submit/quota`，以覆盖新的 manifest 路径。
+
 <!-- MANUAL ADDITIONS START -->
 Always respond in Chinese-simplified
 <!-- MANUAL ADDITIONS END -->

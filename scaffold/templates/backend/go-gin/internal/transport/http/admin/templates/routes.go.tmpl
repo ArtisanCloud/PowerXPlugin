@@ -16,5 +16,13 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		g.POST("", h.CreateTemplate)
 		g.PUT("/:id", h.UpdateTemplate)
 		g.DELETE("/:id", h.DeleteTemplate)
+		g.POST("/batch-clone", h.BatchCloneTemplates)
+		g.POST("/:id/validate", h.ValidateTemplateCapability)
+	}
+
+	adminGroup := rg.Group("/admin/templates", httpmw.EnsureTenant())
+	{
+		adminGroup.POST("/batch-clone", h.BatchCloneTemplates)
+		adminGroup.POST("/:id/validate", h.ValidateTemplateCapability)
 	}
 }

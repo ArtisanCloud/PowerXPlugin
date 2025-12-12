@@ -2,6 +2,8 @@
 
 以 skeleton 中的 `template` CRUD 为例，说明 PowerX 如何识别、同步并调用插件能力。
 
+> 在 PowerXPlugin 仓库中演练时，请进入 `repo-root/skeleton` 再执行文中的 CLI 命令——这里使用的 `./plugin.yaml` 即 `skeleton/plugin.yaml`。若是在你自己的插件仓库，则继续使用其根目录下的 `plugin.yaml`。
+
 ## 能力是什么？
 
 - **能力（Capability）**：插件对外提供、可被 PowerX Workflow/Agent 调度的受控接口，拥有全球唯一 `namespace.resource.action` ID，例如 `com.powerx.skeleton.template.create`。
@@ -18,6 +20,16 @@
 | 能力目录层 | `capabilities/catalog.json`、`contracts/capabilities/*.yaml` | 声明能力基础信息，供 Capabilities Manager 及 CLI 使用。 |
 | 暴露资产层 | `contracts/exposure/*`、`dist/agent-sdk` | 生成 Workflow Step、Agent 工具、OpenAPI/Proto 等 artefacts，提供给 PowerX Builder/Agent Hub。 |
 | 调度层 | PowerX Workflow/Agent + Host Gateway | PowerX Loader 在插件安装时读取 catalog，Host Gateway 根据 `protocols.rest`/`protocols.grpc` 等字段建立路由；Workflow Builder / Agent Hub 将 `com.powerx.xxx.*` 节点拖入流程，执行时由宿主统一调度，附带租户上下文与 RBAC，再通过代理调用插件 handler 并回传结果。 |
+
+### Workflow / Agent 如何复用能力
+
+- 每个能力的 `metadata.protocols` 块除了 `rest`/`grpc` 外，还可以包含 `workflow`（引用 `contracts/exposure/workflow/*.json`）、`agent_tool`（指向 `contracts/exposure/mcp-tools.json` 中的条目）、`agent_stream`（流式推送）。  
+- 当你运行 `npm --prefix scripts/capabilities run export` 时，这些协议描述会被同步到 `contracts/exposure/*` 和 `dist/agent-sdk/manifest.json` 中；PowerX Workflow Builder 可以直接读取 Workflow JSON 渲染节点，Agent Hub 则使用 MCP manifest + SSE 定义生成工具和订阅。  
+- 操作手册：
+  - 《[Agent REST/gRPC 联调手册](./agent-rest-grpc-guide.md)》
+  - 《[Workflow + Agent 联调手册（模板示例）](./workflow-agent-guide.md)》
+  - 《[MCP 会话与流式能力联调手册](./mcp-guide.md)》
+- 复合场景的落地示例仍可参考《[Workflow + Agent 联调手册（模板示例）](./workflow-agent-guide.md)》，该文聚焦业务案例；具体调试步骤请阅读上面的三份手册。
 
 ## 能力接口与普通开放接口的区分
 

@@ -22,5 +22,6 @@ metadata:
       description: "供审核人提交复核意见"
     agent_tool:
       id: base.template.review
+      scope: agent.template.review
       transport: http
       endpoint: /api/v1/templates/{id}/review

@@ -60,6 +60,12 @@ nuxt_ui:
       submit:
         color: primary
         type: submit
+    notifications:
+      preferredComponent: "~/components/ToastAlert.vue"
+      notes:
+        - 所有跨页成功/失败/提醒提示优先使用 `ToastAlert`，保持右下角 Teleport 样式一致。
+        - 通过 `v-model` 控制显隐，例如 `<ToastAlert v-model="toast.visible" :title="toast.title" :message="toast.message" :color="toast.color" />`。
+        - 仅当宿主页面已经提供现成通知栈且必须复用时，才可直接使用 Nuxt UI 的 `useToast()`，否则请维护本地响应式状态驱动 `ToastAlert`。
     dropdown_menu:
       items:
         handlerProp: onSelect

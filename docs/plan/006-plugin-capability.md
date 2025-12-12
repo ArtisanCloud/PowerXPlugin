@@ -38,6 +38,12 @@
 | Webhook（订阅） | `contracts/exposure/webhook/*.json` | Host Push | PowerX 通知中心 |
 | SDK Bundle | `dist/agent-sdk/*` | N/A | 对外 SDK / Postman 包 |
 
+### Add-on：Quality Distribute 场景
+
+- **原子能力**：`com.powerx.plugins.base.template.batch_clone`、`com.powerx.plugins.base.template.validate`，分别提供批量克隆与模板校验 REST/gRPC/MCP 接口。
+- **复合能力**：`com.powerx.plugins.base.template.quality_distribute`（Workflow + MCP Tool + SSE），DAG 为 `list → validate → batch_clone → update → publish`，意图 `template.quality_distribute`，工具 ID `base.template.quality_distribute`。
+- **更新文档**：`workflow-agent-guide.md`、`agent-rest-grpc-guide.md`、`mcp-guide.md` 添加第三个模板场景，方便 QA/发布侧验证 PowerX 的意图识别与多 Workflow 联调。
+
 `plugin.yaml` 示例：
 ```yaml
 capabilities:
@@ -301,7 +307,7 @@ tags: [integration, atomic]
   - `capability.catalog.sync_status`：标记插件目录同步成功/失败（区分 warmup vs register 模式）。
   - `capability.workflow.async_duration`：记录异步 Workflow/审核流程的耗时（按 capability_id、workflow、status 维度输出秒数）。
   这些指标在 `RenderPrometheus` 时会落地为 `powerx_capability_catalog_sync_status`、`powerx_capability_workflow_async_duration_seconds` 供宿主抓取。
-- **目录校验脚本**：`npm run test` 现在默认读取 `./backend/etc/plugin.yaml`，若不存在会退回仓库根的 `plugin.yaml` 并提示；必要时可通过 `CAP_MANIFEST=<path>` 覆盖路径。
+- **目录校验脚本**：`npm run test` 现在默认读取 `./skeleton/plugin.yaml`，若不存在会退回仓库根的 `plugin.yaml` 并提示；必要时可通过 `CAP_MANIFEST=<path>` 覆盖路径。
 - **资产导出**：`make capabilities-export`（或 `npm --prefix scripts/capabilities run export`）会生成/刷新 `capabilities/catalog.json`、`contracts/exposure/*`、`dist/agent-sdk/manifest.json` 等产物，需在提交前执行，确保 PowerX 能在 3 分钟内感知全部协议。
 - **Schema 规范**：`plugin.yaml` 的 `schemas.input/output` 统一指向 `contracts/schema/...`，避免 `scripts/capabilities/validate-capabilities.mjs` 重新生成 `schema/` 目录；如需自定义多个 JSON Schema，可在同一字段下列出数组。
 - **安装前自检**：按 `make test && npm run test && make capabilities-export` 顺序执行，覆盖 Go 单测、能力契约校验以及多协议产物生成；CI 也复用该序列确保 dx 一致。

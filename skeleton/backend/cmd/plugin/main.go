@@ -54,6 +54,9 @@ func main() {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
+	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
+		logger.WithError(err).Fatal("Failed to ensure local IAM secret")
+	}
 
 	// 初始化日志隐私掩码规则
 	masking := cfg.SecurityBaselineConfig().MaskingRules

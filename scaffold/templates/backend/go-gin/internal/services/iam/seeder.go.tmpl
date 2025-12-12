@@ -228,6 +228,7 @@ func seedDefaultPermissions(tx *gorm.DB, roleID uint64) error {
 		Action   string
 		Desc     string
 	}{
+		{"*", "*", "Full access"},
 		{"iam.user", "read", "Read IAM users"},
 		{"iam.role", "read", "Read IAM roles"},
 		{"iam.department", "read", "Read IAM departments"},

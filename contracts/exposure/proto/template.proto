@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package powerx.template;
+
+option go_package = "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/template;templatepb";
+
+import "google/protobuf/empty.proto";
+
+message Template {
+  uint64 id = 1;
+  string name = 2;
+  string description = 3;
+  string content = 4;
+  int64 created_at_unix = 5;
+  int64 updated_at_unix = 6;
+  string tenant_uuid = 7;
+}
+
+message GetTemplateRequest {
+  uint64 id = 1;
+  string tenant_uuid = 2;
+}
+
+message TemplateResponse {
+  Template template = 1;
+}
+
+message ListTemplatesRequest {
+  string q = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  string tenant_uuid = 4;
+}
+
+message ListTemplatesResponse {
+  repeated Template items = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  int64 total = 4;
+}
+
+message CreateTemplateRequest {
+  string name = 1;
+  string description = 2;
+  string content = 3;
+  string tenant_uuid = 4;
+}
+
+message UpdateTemplateRequest {
+  uint64 id = 1;
+  string name = 2;
+  string description = 3;
+  string content = 4;
+  string tenant_uuid = 5;
+}
+
+message DeleteTemplateRequest {
+  uint64 id = 1;
+  string tenant_uuid = 2;
+}
+
+message BatchCloneTemplatesRequest {
+  repeated uint64 source_ids = 1;
+  int32 copies = 2;
+  string name_prefix = 3;
+  string description_prefix = 4;
+  string tenant_uuid = 5;
+}
+
+message BatchCloneFailure {
+  uint64 source_id = 1;
+  string reason = 2;
+}
+
+message BatchCloneTemplatesResponse {
+  repeated uint64 created_ids = 1;
+  repeated BatchCloneFailure failed = 2;
+}
+
+message ValidateTemplateRequest {
+  uint64 id = 1;
+  repeated string rules = 2;
+  bool strict = 3;
+  string tenant_uuid = 4;
+}
+
+message ValidationViolation {
+  string rule = 1;
+  string field = 2;
+  string severity = 3;
+  string message = 4;
+}
+
+message ValidateTemplateResponse {
+  uint64 template_id = 1;
+  bool valid = 2;
+  repeated ValidationViolation violations = 3;
+}
+
+service TemplateService {
+  rpc ListTemplates(ListTemplatesRequest) returns (ListTemplatesResponse);
+  rpc GetTemplate(GetTemplateRequest) returns (TemplateResponse);
+  rpc CreateTemplate(CreateTemplateRequest) returns (TemplateResponse);
+  rpc UpdateTemplate(UpdateTemplateRequest) returns (TemplateResponse);
+  rpc DeleteTemplate(DeleteTemplateRequest) returns (google.protobuf.Empty);
+  rpc BatchCloneTemplates(BatchCloneTemplatesRequest) returns (BatchCloneTemplatesResponse);
+  rpc ValidateTemplate(ValidateTemplateRequest) returns (ValidateTemplateResponse);
+}

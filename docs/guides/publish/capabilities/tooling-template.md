@@ -4,27 +4,27 @@
 
 ## Skeleton 模式：仓库内置样板
 
-> 前提：`skeleton/plugin.yaml` 已存在（可复制自模板或运行一次 `px-plugin init`）。以下命令均在 `repo-root/skeleton` 中执行。
+> 前提：`skeleton/plugin.yaml` 为唯一的开发态 manifest（根目录仅保留指向该文件的 symlink）。以下命令均在 `repo-root/skeleton` 中执行。
 
 1. **扫描 handler → 输出能力清单**
    ```bash
    node ../scripts/capabilities/discover-handlers.mjs \
      --plugin . \
-     --handlers backend/internal/transport/http/admin/templates
+     --handlers backend/internal/transport/http/admin/templates \
+     --manifest ./plugin.yaml \
+     --output tmp/template-capabilities.json
    ```
-   - 解析 `// capability:` 注解；
-   - 输出 JSON/控制台列表，供下一步 `init` 使用。
+   - 解析 `// capability:` 注解并写入 `tmp/template-capabilities.json`；
+   - 如果在其他目录执行，可通过 `--plugin <dir> --manifest <path>` 调整根路径。
 
 2. **初始化或更新能力契约**
    ```bash
    npx --yes tsx ../tools/cli/src/commands/capabilities/init.ts \
      --manifest ./plugin.yaml \
-     --capability-id com.powerx.skeleton.template.create \
-     --method POST \
-     --description "Skeleton 模板能力"
+     --batch tmp/template-capabilities.json
    ```
-   - 可多次运行（增量覆盖）；
-   - 支持 `--batch ./scripts/capabilities/template-crud.json` 一次性初始化所有 CRUD 能力。
+   - `tmp/template-capabilities.json` 即上一步的扫描结果，可手动编辑以覆盖多模型；
+   - 若只想生成单个能力，可改用 `--capability-id <id> --method <VERB>`。
 
 3. **Lint / Schema 校验**
    ```bash
@@ -32,7 +32,7 @@
    CAP_MANIFEST=./plugin.yaml npm test
    ```
    - `lint`：检查 catalog + contracts；
-   - `npm test`：验证 `scripts/capabilities/run-from-package.mjs`，默认读取 `./backend/etc/plugin.yaml`。
+  - `npm test`：验证 `scripts/capabilities/run-from-package.mjs`，默认读取 `./skeleton/plugin.yaml`。
 
 4. **提交 + 暴露**
    ```bash

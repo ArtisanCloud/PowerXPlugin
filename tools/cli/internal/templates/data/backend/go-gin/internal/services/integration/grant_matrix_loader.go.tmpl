@@ -63,7 +63,10 @@ type GrantMatrixLoader struct {
 func NewGrantMatrixLoader(db *gorm.DB, logger *logrus.Entry, opts LoaderOptions) *GrantMatrixLoader {
 	staticFS := opts.StaticFS
 	if staticFS == nil {
-		staticFS = os.DirFS("backend/etc")
+		basePath := resolveGrantMatrixBaseDir()
+		if basePath != "" {
+			staticFS = os.DirFS(basePath)
+		}
 	}
 
 	staticPath := opts.StaticPath
@@ -323,4 +326,14 @@ func decodeJSONMap(data datatypes.JSON) (map[string]any, error) {
 		out = map[string]any{}
 	}
 	return out, nil
+}
+
+func resolveGrantMatrixBaseDir() string {
+	candidates := []string{"backend/etc", "etc"}
+	for _, path := range candidates {
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			return path
+		}
+	}
+	return ""
 }

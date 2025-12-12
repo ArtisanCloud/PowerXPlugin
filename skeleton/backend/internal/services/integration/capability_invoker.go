@@ -489,10 +489,13 @@ func (h *templateAuditHandler) Handle(ctx context.Context, envelope *domain.Inte
 			"template_id": updated.ID,
 			"description": updated.Description,
 		}
-		response["events"] = []map[string]any{{
-			"name":    "audit.template.updated",
-			"payload": evtPayload,
-		}}
+		events := []map[string]any{
+			{
+				"name":    "audit.template.updated",
+				"payload": evtPayload,
+			},
+		}
+		response["events"] = events
 		emitEvent(h.broker, envelope, "audit.template.updated", evtPayload)
 	}
 	payloadBytes, _ := json.Marshal(response)

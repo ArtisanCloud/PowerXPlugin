@@ -3,6 +3,7 @@ package grpc
 import (
 	integrationtransport "{{ .BackendModulePath }}/internal/transport/grpc/integration"
 	marketplacegrpc "{{ .BackendModulePath }}/internal/transport/grpc/marketplace"
+	templategrpc "{{ .BackendModulePath }}/internal/transport/grpc/template"
 	"google.golang.org/grpc"
 )
 
@@ -10,6 +11,7 @@ import (
 type Registrar struct {
 	Integration *integrationtransport.Server
 	Marketplace marketplacegrpc.LicenseServiceServer
+	Template    templategrpc.TemplateServiceServer
 }
 
 // Register 将可用的 gRPC 服务注册到给定 server。
@@ -22,5 +24,8 @@ func Register(server *grpc.Server, registrar Registrar) {
 	}
 	if registrar.Marketplace != nil {
 		marketplacegrpc.RegisterLicenseServiceServer(server, registrar.Marketplace)
+	}
+	if registrar.Template != nil {
+		templategrpc.RegisterTemplateServiceServer(server, registrar.Template)
 	}
 }

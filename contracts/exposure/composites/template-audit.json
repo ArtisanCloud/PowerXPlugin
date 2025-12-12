@@ -1,0 +1,100 @@
+{
+  "id": "com.powerx.plugins.base.template.audit",
+  "version": "1.0.0",
+  "name": "模板巡检与修复",
+  "summary": "扫描模板库、提取首个命中项并自动修复。",
+  "graph": {
+    "nodes": [
+      {
+        "id": "collect-stale",
+        "kind": "plugin",
+        "use": "com.powerx.plugins.base.template.list",
+        "io": {
+          "in_map": {
+            "page": "{{var.filters.page}}",
+            "page_size": "{{var.filters.page_size}}",
+            "status": "{{var.filters.status}}",
+            "tags": "{{var.filters.tags}}"
+          },
+          "out_map": {
+            "total": "output.total",
+            "candidates": "output.items"
+          }
+        }
+      },
+      {
+        "id": "inspect-primary",
+        "kind": "plugin",
+        "use": "com.powerx.plugins.base.template.read",
+        "io": {
+          "in_map": {
+            "id": "{{task.collect-stale.output.candidates[0].id}}"
+          },
+          "out_map": {
+            "template_id": "output.id",
+            "current_content": "output.content"
+          }
+        }
+      },
+      {
+        "id": "update-primary",
+        "kind": "plugin",
+        "use": "com.powerx.plugins.base.template.update",
+        "io": {
+          "in_map": {
+            "id": "{{task.inspect-primary.output.template_id}}",
+            "body": "{{var.update_payload}}"
+          },
+          "out_map": {
+            "updated_id": "output.id"
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "from": "collect-stale", "to": "inspect-primary", "condition": "{{task.collect-stale.output.total > 0}}" },
+      { "from": "inspect-primary", "to": "update-primary" }
+    ]
+  },
+  "workflow_step": "contracts/exposure/workflow/template-audit.json",
+  "agent_stream": {
+    "path": "contracts/exposure/agent-streams/template-audit.yaml",
+    "intent": "template.audit",
+    "summary": "巡检完成、更新与发布环节通过 SSE 推送到 Agent。"
+  },
+  "agent_tools": [
+    {
+      "id": "base.template.list",
+      "capability_id": "com.powerx.plugins.base.template.list",
+      "name": "列出模板",
+      "description": "按过滤条件获取模板列表。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates",
+      "method": "GET",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.list.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.list.json"
+    },
+    {
+      "id": "base.template.read",
+      "capability_id": "com.powerx.plugins.base.template.read",
+      "name": "读取模板",
+      "description": "获取指定模板详情。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}",
+      "method": "GET",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.read.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.read.json"
+    },
+    {
+      "id": "base.template.update",
+      "capability_id": "com.powerx.plugins.base.template.update",
+      "name": "更新模板",
+      "description": "批量或单条修改模板内容。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}",
+      "method": "PUT",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.update.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.update.json"
+    }
+  ]
+}

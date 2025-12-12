@@ -128,6 +128,12 @@ if (INSIDE_POWERX) {
   }
 }
 
+const devServerPort = Number(
+  process.env.NUXT_DEV_PORT ||
+    process.env.PORT ||
+    3031
+)
+
 const buildConnectSources = () => {
   const sources = new Set<string>()
   sources.add("'self'")
@@ -287,7 +293,7 @@ export default defineNuxtConfig({
   },
   devServer: {
     host: '0.0.0.0',
-    port: 3031
+    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : 3031
   },
   ui: {
     fonts: false

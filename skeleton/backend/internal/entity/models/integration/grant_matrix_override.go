@@ -3,6 +3,7 @@ package integration
 import (
 	"time"
 
+	models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	"gorm.io/datatypes"
 )
 
@@ -23,5 +24,5 @@ type GrantMatrixOverride struct {
 }
 
 func (GrantMatrixOverride) TableName() string {
-	return "integration_grant_matrix_overrides"
+	return models.S(models.TableIntegrationGrantMatrixOverrides)
 }

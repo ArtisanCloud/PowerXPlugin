@@ -23,6 +23,9 @@
     "templates": "模板管理",
     "templatesCrud": "模板 CRUD",
     "templatesDevelop": "开发指南",
+    "capabilities": "能力注册",
+    "capabilitiesExposure": "能力暴露配置",
+    "capabilitiesLifecycle": "生命周期治理",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
@@ -125,6 +128,285 @@
   },
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",
+  "capabilities": {
+    "list": {
+      "title": "能力目录",
+      "description": "查看插件当前注册的原子能力与复合任务，快速发起新能力的建模与审批。",
+      "refresh": "刷新",
+      "createButton": "注册能力",
+      "tableTitle": "已注册能力",
+      "tableHint": "包含能力 ID、执行模式与标签。提交新的能力后会自动刷新列表。",
+      "tableEmpty": "暂无能力",
+      "column": {
+        "capability": "能力",
+        "execution": "执行模式",
+        "tags": "标签",
+        "checksum": "版本校验"
+      },
+      "versionLabel": "版本 {version}",
+      "noTags": "未设置标签",
+      "empty": "尚未注册任何能力，点击“注册能力”即可创建第一条记录。",
+      "toast": {
+        "loadFailed": "加载能力目录失败"
+      }
+    },
+    "form": {
+      "title": "插件能力注册",
+      "description": "填写能力元数据、协议与示例，提交后即可触发审批与暴露流程。",
+      "capabilityId": "能力 ID",
+      "validationUnknown": "等待校验",
+      "validationPassed": "校验通过",
+      "validationFailedShort": "校验未通过",
+      "steps": {
+        "basic": "基础信息",
+        "basicDesc": "命名空间、展示名称、摘要、场景与标签",
+        "protocol": "协议与 Schema",
+        "protocolDesc": "输入/输出 Schema、REST、gRPC、Workflow、Agent 等入口",
+        "samples": "示例与提交",
+        "samplesDesc": "示例请求/响应、错误码、演示入口与负责人"
+      },
+      "namespace": "命名空间",
+      "resource": "资源名称",
+      "action": "动作",
+      "displayName": "展示名称",
+      "summary": "摘要",
+      "descriptionField": "描述",
+      "localeZh": "中文",
+      "localeEn": "English",
+      "scenario": "应用场景",
+      "scenarioHint": "说明能力适用的业务场景、租户范围、输入前置条件等",
+      "tags": "标签",
+      "tagsHint": "使用逗号分隔，例如 workflow,agent",
+      "sensitivity": "敏感级别",
+      "tenantScope": "租户范围",
+      "inputSchema": "输入 Schema",
+      "outputSchema": "输出 Schema",
+      "restPath": "REST 路径",
+      "grpcService": "gRPC Service",
+      "workflowTemplate": "Workflow 模板",
+      "agentStream": "Agent SSE 通道",
+      "asyncTitle": "执行与异步配置",
+      "executionMode": "执行模式",
+      "callbackUrl": "Callback URL",
+      "statusEndpoint": "状态查询接口",
+      "sseChannel": "SSE 通道",
+      "sampleRequest": "示例请求",
+      "sampleResponse": "示例响应",
+      "jsonHint": "请输入合法 JSON，便于文档与审核复用",
+      "errorCodes": "错误码列表",
+      "addRow": "新增一行",
+      "errorCode": "错误码",
+      "errorMessage": "错误描述",
+      "errorSolution": "解决建议",
+      "errorEmpty": "暂无错误码，可点击“新增一行”。",
+      "demoUrl": "体验地址",
+      "demoHint": "例如体验账号、租户名称、登录方式等",
+      "ownerName": "负责人姓名",
+      "ownerEmail": "负责人邮箱",
+      "previewTitle": "预览",
+      "previewName": "中文名称",
+      "previewOwner": "联系人",
+      "previewSummary": "摘要",
+      "previewPlaceholder": "暂未填写摘要",
+      "validationFailed": "存在待修复的问题",
+      "validateButton": "校验",
+      "saveDraft": "保存草稿",
+      "lastSaved": "草稿已于 {time} 自动保存",
+      "stepsButton": {
+        "basic": "基础信息",
+        "protocol": "协议与 Schema",
+        "samples": "示例"
+      },
+      "toast": {
+        "templateFailed": "无法加载表单模板",
+        "validateFailed": "校验失败",
+        "saved": "草稿已保存",
+        "savedDesc": "我们已将草稿同步到后端，稍后可继续编辑。",
+        "validateBlock": "校验未通过",
+        "fixBeforeSubmit": "请修复提示后再尝试提交。",
+        "submitted": "提交成功",
+        "submittedDesc": "能力 {id} 已进入审核列表。",
+        "submitFailed": "提交失败",
+        "invalidJson": "JSON 无法解析",
+        "fixJson": "请检查示例请求/响应字段。",
+        "genericError": "发生未知错误，请稍后重试。"
+      }
+    },
+    "exposure": {
+      "title": "能力暴露通道配置",
+      "description": "为通过审批的能力配置多协议通道、鉴权策略、限流与租户授权，并同步到宿主工作流/Agent/开放平台。",
+      "capability": "能力 ID",
+      "updatedAt": "最近更新：{time}",
+      "list": {
+        "title": "已注册能力",
+        "description": "选择一个能力，打开其 REST/gRPC/Workflow/MCP 等暴露通道。",
+        "refresh": "刷新列表",
+        "empty": "暂无可配置的能力，请先完成能力注册。",
+        "updatedAt": "上次同步：{time}",
+        "columns": {
+          "capability": "能力",
+          "descriptor": "描述",
+          "exposure": "暴露状态"
+        },
+        "actions": {
+          "configure": "配置通道"
+        },
+        "status": {
+          "unconfigured": "未配置",
+          "synced": "已同步",
+          "pending": "待同步",
+          "failed": "同步失败"
+        }
+      },
+      "sections": {
+        "channels": "通道配置",
+        "enabled": "通道已启用",
+        "channelHint": "启用后将出现在宿主的 API/Workflow/Agent 列表中",
+        "auth": "鉴权与凭证",
+        "rateLimit": "限流与熔断",
+        "quotas": "租户授权与配额",
+        "tenantHint": "未授权租户无法调用；额度超限将被阻断",
+        "noQuotas": "暂无租户授权，可在下方添加。"
+      },
+      "fields": {
+        "capabilityId": "能力 ID",
+        "docsVersion": "文档版本",
+        "sdkVersion": "SDK 版本",
+        "tenant": "租户",
+        "displayName": "展示名称",
+        "target": "目标 Service/Topic",
+        "description": "描述",
+        "scopes": "作用域",
+        "scopePlaceholder": "scope.one, scope.two",
+        "strategy": "鉴权策略",
+        "audience": "Audience",
+        "scopeList": "OAuth Scope 列表",
+        "rpm": "每分钟请求数",
+        "burst": "突发上限",
+        "concurrency": "并发数",
+        "tenant": "租户",
+        "tenantId": "租户 ID",
+        "tenantName": "租户名称",
+        "quota": "额度",
+        "status": "状态",
+        "notes": "备注"
+      },
+      "actions": {
+        "load": "加载配置",
+        "resetChannels": "重置通道",
+        "addTenant": "保存租户额度"
+      },
+      "toast": {
+        "templateFail": "无法加载通道模板",
+        "capabilityRequired": "请先填写能力 ID",
+        "loadFail": "加载暴露配置失败",
+        "catalogFailed": "无法加载能力列表",
+        "saveSuccess": "暴露配置已保存",
+        "saveFailed": "保存失败，请稍后重试",
+        "quotaSaved": "租户额度已更新",
+        "quotaFailed": "租户额度更新失败",
+        "tenantRequired": "请填写租户 ID"
+      }
+    },
+    "lifecycle": {
+      "badge": "版本治理",
+      "title": "能力生命周期计划",
+      "description": "生成能力升级/下线的差异说明、灰度窗口和通知矩阵，确保订阅方提前感知并可随时回滚。",
+      "catalog": {
+        "title": "可管理的能力",
+        "description": "同步插件能力目录，挑选需要规划生命周期的能力。",
+        "refresh": "刷新列表",
+        "empty": "暂无可管理的能力，请先完成能力注册。",
+        "updatedAt": "最近变更：{time}",
+        "columns": {
+          "capability": "能力",
+          "descriptor": "描述",
+          "status": "状态"
+        },
+        "actions": {
+          "manage": "管理计划"
+        },
+        "status": {
+          "unplanned": "未创建",
+          "pending": "待审批",
+          "scheduled": "执行中",
+          "completed": "已完成"
+        }
+      },
+      "fields": {
+        "capabilityId": "能力 ID",
+        "changeType": "变更类型",
+        "notificationChannels": "通知渠道",
+        "graceHours": "灰度观察时长（小时）",
+        "dualRun": "双版本并行截止",
+        "diffSummary": "差异摘要",
+        "rollbackPlan": "回滚策略",
+        "impactScope": "影响范围",
+        "migrationGuide": "迁移指引/链接",
+        "statusNotes": "状态备注"
+      },
+      "placeholders": {
+        "capability": "com.powerx.demo.template.create",
+        "changeType": "请选择变更类型",
+        "channels": "选择需要通知的渠道",
+        "graceHours": "72",
+        "diffSummary": "说明新旧版本差异、影响范围、订阅方动作...",
+        "rollbackPlan": "描述回退入口、负责人、时间线等",
+        "impactScope": "如 租户A、生产环境",
+        "migrationGuide": "迁移文档链接或备注",
+        "windowLabel": "wave-1",
+        "percent": "50",
+        "condition": "条件（可选）"
+      },
+      "sections": {
+        "windows": "灰度窗口",
+        "windowHint": "按照波次拆分灰度百分比、时间与条件，便于追踪通知与执行",
+        "windowLabel": "灰度节点",
+        "noWindow": "尚未添加灰度窗口，可点击右上角“新增波次”。",
+        "channels": "通知渠道",
+        "noChannels": "尚未配置渠道",
+        "grace": "观察期",
+        "dualRun": "双版本并行",
+        "notSet": "未设置",
+        "windowTimeline": "执行波次"
+      },
+      "actions": {
+        "loadPlans": "加载计划",
+        "addWindow": "新增波次",
+        "removeWindow": "移除波次",
+        "createPlan": "创建生命周期计划",
+        "refresh": "刷新列表"
+      },
+      "list": {
+        "title": "计划列表",
+        "description": "包含当前能力的全部生命周期计划，可随时暂停、回滚或完成。",
+        "empty": "暂无计划，先创建一条生命周期计划即可在此处管理。",
+        "planMeta": "由 {author} 于 {time} 创建"
+      },
+      "units": {
+        "hours": "小时"
+      },
+      "status": {
+        "draft": "草稿",
+        "pending": "待执行",
+        "approved": "已批准",
+        "paused": "已暂停",
+        "completed": "已完成"
+      },
+      "toast": {
+        "templateFailed": "无法加载生命周期模板",
+        "catalogFailed": "无法加载能力目录",
+        "loadFailed": "加载生命周期计划失败",
+        "capabilityRequired": "请填写能力 ID 后再操作",
+        "required": "请先完成必填字段",
+        "planCreated": "生命周期计划已创建",
+        "createFailed": "创建生命周期计划失败",
+        "statusUpdated": "状态已更新",
+        "statusDesc": "计划已切换至 {status}",
+        "statusFailed": "更新计划状态失败"
+      }
+    }
+  },
   "landing": {
     "hero": {
       "title": "PowerX 基础插件",

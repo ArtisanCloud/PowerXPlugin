@@ -11,6 +11,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	adminconsoleModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
 	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	integrationModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	marketplaceModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	operationsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
 	runtimeOpsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
@@ -48,6 +49,7 @@ var businessTables = []interface{}{
 	&operationsModel.Incident{},
 	&operationsModel.IncidentTimelineEntry{},
 	&operationsModel.IncidentChecklistItem{},
+	&integrationModel.GrantMatrixOverride{},
 	&securityModel.BaselineChecklist{},
 	&securityModel.AuditReport{},
 	&toolgrantModel.Revocation{},

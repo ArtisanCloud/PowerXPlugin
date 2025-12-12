@@ -37,6 +37,8 @@ type DispatchOutcome struct {
 	CorrelationID string
 	Replay        bool
 	Latency       time.Duration
+	Payload       json.RawMessage
+	Metadata      map[string]any
 }
 
 // DispatchService orchestrates envelope validation, idempotency, GrantMatrix checks and host invocation.
@@ -128,6 +130,14 @@ func (s *DispatchService) Dispatch(ctx context.Context, channel, resource, actio
 	if err != nil {
 		obsintegration.RecordEnvelope(channel, "error")
 		return nil, err
+	}
+	if result != nil {
+		if len(result.Payload) > 0 {
+			outcome.Payload = result.Payload
+		}
+		if len(result.Metadata) > 0 {
+			outcome.Metadata = result.Metadata
+		}
 	}
 
 	if result != nil && strings.TrimSpace(result.Status) != "" {

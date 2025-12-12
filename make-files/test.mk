@@ -3,9 +3,11 @@
 SMOKE_TIMEOUT ?= 300
 REGRESSION_TIMEOUT ?= 3600
 
-.PHONY: test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend
+.PHONY: test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend
 
 ## Testing ------------------------------------------------------------------
+
+test: test-smoke ## Run default smoke test suite
 
 test-smoke: ## Run smoke checks (Go/unit/contract/CLI) with timeout
 	@echo "=== Smoke Tests Start ==="

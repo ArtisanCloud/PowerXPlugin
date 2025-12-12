@@ -10,6 +10,7 @@ import (
 	"{{ .BackendModulePath }}/internal/middleware"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"{{ .BackendModulePath }}/internal/transport/http"
+	mcptransport "{{ .BackendModulePath }}/internal/transport/http/mcp"
 	middleware2 "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	publicauth "{{ .BackendModulePath }}/internal/transport/http/public"
 
@@ -123,6 +124,8 @@ func (r *Router) setupRoutes() {
 	gApi.Use(middleware2.RBAC(rbacCfg, nil, nil))
 	apiRegistry.RegisterAPIRoutes(gApi)
 	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
+
+	mcptransport.RegisterRoutes(r.engine, prefix)
 
 	// 如需调试：打印已注册路由
 	// apiRegistry.PrintRegisteredRoutes()

@@ -10,6 +10,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http"
+	mcptransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/mcp"
 	middleware2 "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	publicauth "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/public"
 
@@ -123,6 +124,8 @@ func (r *Router) setupRoutes() {
 	gApi.Use(middleware2.RBAC(rbacCfg, nil, nil))
 	apiRegistry.RegisterAPIRoutes(gApi)
 	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
+
+	mcptransport.RegisterRoutes(r.engine, prefix)
 
 	// 如需调试：打印已注册路由
 	// apiRegistry.PrintRegisteredRoutes()

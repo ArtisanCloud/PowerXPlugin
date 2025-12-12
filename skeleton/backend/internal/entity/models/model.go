@@ -14,14 +14,14 @@ type BaseModel struct {
 	TenantUuid string         `gorm:"type:uuid;not null;index;comment:租户UUID" json:"tenant_uuid"`
 	CreatedAt  time.Time      `gorm:"autoCreateTime;comment:创建时间" json:"created_at"`
 	UpdatedAt  time.Time      `gorm:"autoUpdateTime;comment:更新时间" json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at“ comment:软删除时间" json:"deleted_at,omitempty"`
+	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at;comment:软删除时间" json:"deleted_at,omitempty"`
 }
 
 type BaseNoTenantModel struct {
 	ID        uint64         `gorm:"primaryKey;autoIncrement"`
 	CreatedAt time.Time      `gorm:"autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"autoUpdateTime"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at“ json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at,omitempty"`
 }
 
 const (
@@ -40,6 +40,7 @@ const (
 	TableIntegrationWebhookSubscriptions = "integration_webhook_subscriptions"
 	TableIntegrationWebhookAttempts      = "integration_webhook_attempts"
 	TableIntegrationSecrets              = "integration_secrets"
+	TableIntegrationGrantMatrixOverrides = "integration_grant_matrix_overrides"
 	TableMarketplaceListings             = "marketplace_listings"
 	TableMarketplaceListingAssets        = "marketplace_listing_assets"
 	TableMarketplaceListingVersions      = "marketplace_listing_versions"

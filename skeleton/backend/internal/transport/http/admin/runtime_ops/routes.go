@@ -13,6 +13,10 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 
 	sessions := NewSessionsHandler(deps)
 	router.POST("/sessions/register", sessions.Register)
+	router.POST("/sessions/:sessionID/ack", sessions.Ack)
+	router.POST("/sessions/:sessionID/heartbeat", sessions.Heartbeat)
+	router.POST("/sessions/:sessionID/close", sessions.Close)
+	router.POST("/sessions/:sessionID/invoke", sessions.Invoke)
 
 	quotaHandler := NewQuotaHandler(deps, deps.Config.RuntimeOps)
 	quota := router.Group("/quota")

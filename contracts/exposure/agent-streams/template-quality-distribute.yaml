@@ -1,0 +1,12 @@
+capability_id: com.powerx.plugins.base.template.quality_distribute
+version: 1.0.0
+intent: template.quality_distribute
+summary: 推送巡检、克隆、更新进度
+events:
+  - name: template.validate.completed
+    payload: contracts/schema/output/com.powerx.plugins.base.template.validate.json
+  - name: template.batch_clone.completed
+    payload: contracts/schema/output/com.powerx.plugins.base.template.batch_clone.json
+  - name: template.update.completed
+    payload: contracts/schema/output/com.powerx.plugins.base.template.update.json
+generated_at: 2025-12-10T13:00:00Z

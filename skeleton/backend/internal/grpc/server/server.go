@@ -12,12 +12,14 @@ import (
 
 	cfgpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
+	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
 	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	grpcTransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc"
 	integrationTransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/integration"
 	marketplaceTransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/marketplace"
+	templateTransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/template"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -106,9 +108,15 @@ func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*
 		marketplaceServer = marketplaceTransport.NewLicenseServer(licenseService)
 	}
 
+	var templateServer templateTransport.TemplateServiceServer
+	if deps != nil && deps.DB != nil {
+		templateServer = templateTransport.NewServer(srvtemplates.NewTemplateService(deps.DB))
+	}
+
 	grpcTransport.Register(s, grpcTransport.Registrar{
 		Integration: integrationTransport.NewServer(dispatchService, logger.WithField("component", "integration.grpc")),
 		Marketplace: marketplaceServer,
+		Template:    templateServer,
 	})
 
 	logger.WithField("address", lis.Addr().String()).Info("gRPC server configured")

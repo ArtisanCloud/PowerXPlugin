@@ -1,0 +1,6 @@
+capability_id: com.powerx.plugins.base.template.audit
+version: 1.0.0
+intent: template.audit
+summary: 巡检完成、更新与发布环节通过 SSE 推送到 Agent。
+events: []
+generated_at: 2025-12-10T06:14:50.480Z

@@ -11,17 +11,21 @@ import (
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	runtimecap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin/runtime"
 	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
 	grpcserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/server"
+	powerxclient "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/powerx"
 	marketplacejobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/jobs/marketplace"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	manifestx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/manifestx"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
+	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
@@ -49,6 +53,9 @@ func main() {
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
+	}
+	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
+		logger.WithError(err).Fatal("Failed to ensure local IAM secret")
 	}
 
 	// 初始化日志隐私掩码规则
@@ -134,11 +141,21 @@ func main() {
 		}
 	}
 
+	capLog := logger.WithField("component", "capabilities_manager")
+	capManager := capabilities.NewManager(cfg, capLog)
+	capClient := powerxclient.NewCapabilityClientFromEnv(capLog)
+	capMetrics := capmetrics.NewMetrics()
+	if err := runtimecap.SyncCapabilities(ctx, capManager, capClient, capMetrics); err != nil {
+		logger.WithError(err).Fatal("Failed to initialize capability catalog")
+	}
+
 	deps := &app.Deps{
 		DB:                  queryDB,
 		Ctx:                 rootCtx,
 		PowerXClient:        pxc,
 		Config:              cfg,
+		CapabilitiesManager: capManager,
+		CapabilityMetrics:   capMetrics,
 		TaxProviderClient:   taxClient,
 		MarketplaceBilling:  nil,
 		LicenseAuthority:    nil,

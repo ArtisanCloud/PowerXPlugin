@@ -4,7 +4,6 @@ import (
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	recommendationservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,7 +21,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	recommendationHandler := NewRecommendationHandler(deps.Config, listingRepo, metricsProvider, recommendationLogger)
 	analyticsHandler := NewAnalyticsHandler(deps)
 
-	group := admin.Group("/marketplace", httpmw.EnsureTenant())
+	group := admin.Group("/marketplace")
 	{
 		listings := group.Group("/listings")
 		{

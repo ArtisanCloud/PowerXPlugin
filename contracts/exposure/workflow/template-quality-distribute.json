@@ -1,0 +1,18 @@
+{
+  "id": "com.powerx.plugins.base.template.quality_distribute",
+  "version": "1.0.0",
+  "name": "模板巡检 + 批量分发",
+  "summary": "扫描模板→校验→批量克隆→更新",
+  "nodes": [
+    { "id": "scan", "kind": "plugin", "use": "com.powerx.plugins.base.template.list" },
+    { "id": "validate", "kind": "plugin", "use": "com.powerx.plugins.base.template.validate" },
+    { "id": "batch-clone", "kind": "plugin", "use": "com.powerx.plugins.base.template.batch_clone" },
+    { "id": "update", "kind": "plugin", "use": "com.powerx.plugins.base.template.update" }
+  ],
+  "edges": [
+    { "from": "scan", "to": "validate" },
+    { "from": "validate", "to": "batch-clone" },
+    { "from": "batch-clone", "to": "update" }
+  ],
+  "metadata": {}
+}

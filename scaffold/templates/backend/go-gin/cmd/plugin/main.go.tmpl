@@ -11,17 +11,21 @@ import (
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	runtimecap "{{ .BackendModulePath }}/cmd/plugin/runtime"
 	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
+	"{{ .BackendModulePath }}/internal/capabilities"
 	"{{ .BackendModulePath }}/internal/config"
 	dbpkg "{{ .BackendModulePath }}/internal/db"
 	marketplacerepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
 	repository "{{ .BackendModulePath }}/internal/entity/repository/plugin"
 	grpcserver "{{ .BackendModulePath }}/internal/grpc/server"
+	powerxclient "{{ .BackendModulePath }}/internal/integrations/powerx"
 	marketplacejobs "{{ .BackendModulePath }}/internal/jobs/marketplace"
 	"{{ .BackendModulePath }}/internal/logger"
 	manifestx "{{ .BackendModulePath }}/internal/manifestx"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
 	"{{ .BackendModulePath }}/internal/observability/auth"
+	capmetrics "{{ .BackendModulePath }}/internal/observability/capability"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
 	pluginrouter "{{ .BackendModulePath }}/internal/router"
 	httpserver "{{ .BackendModulePath }}/internal/server"
@@ -49,6 +53,9 @@ func main() {
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
+	}
+	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
+		logger.WithError(err).Fatal("Failed to ensure local IAM secret")
 	}
 
 	// 初始化日志隐私掩码规则
@@ -134,11 +141,21 @@ func main() {
 		}
 	}
 
+	capLog := logger.WithField("component", "capabilities_manager")
+	capManager := capabilities.NewManager(cfg, capLog)
+	capClient := powerxclient.NewCapabilityClientFromEnv(capLog)
+	capMetrics := capmetrics.NewMetrics()
+	if err := runtimecap.SyncCapabilities(ctx, capManager, capClient, capMetrics); err != nil {
+		logger.WithError(err).Fatal("Failed to initialize capability catalog")
+	}
+
 	deps := &app.Deps{
 		DB:                  queryDB,
 		Ctx:                 rootCtx,
 		PowerXClient:        pxc,
 		Config:              cfg,
+		CapabilitiesManager: capManager,
+		CapabilityMetrics:   capMetrics,
 		TaxProviderClient:   taxClient,
 		MarketplaceBilling:  nil,
 		LicenseAuthority:    nil,

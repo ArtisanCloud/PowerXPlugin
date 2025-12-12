@@ -4,6 +4,8 @@ import (
 	"time"
 
 	idrepo "{{ .BackendModulePath }}/internal/entity/repository/integration"
+	"{{ .BackendModulePath }}/internal/mcp/stream"
+	srvtemplates "{{ .BackendModulePath }}/internal/services/admin/templates"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/sirupsen/logrus"
 )
@@ -24,17 +26,20 @@ func BuildDispatchService(deps *app.Deps, logger *logrus.Entry) *DispatchService
 	)
 	grantService := NewGrantMatrixService(loader, logger.WithField("component", "integration.grant_matrix_service"))
 
-	var fallback idrepo.IdempotencyProvider
+	var fallbackStore idrepo.IdempotencyProvider
 	if deps.DB != nil {
 		ttl := 24 * time.Hour
 		if deps.Config != nil {
 			ttl = deps.Config.IntegrationIdempotencyTTL()
 		}
-		fallback = idrepo.NewPostgresIdempotencyProvider(deps.DB, ttl)
+		fallbackStore = idrepo.NewPostgresIdempotencyProvider(deps.DB, ttl)
 	}
-	repository := idrepo.NewIdempotencyRepository(deps.DB, nil, fallback, logger.WithField("component", "integration.idempotency_repository"))
+	repository := idrepo.NewIdempotencyRepository(deps.DB, nil, fallbackStore, logger.WithField("component", "integration.idempotency_repository"))
 
-	invoker := NewNoopInvoker(logger.WithField("component", "integration.host_invoker"))
+	templateService := srvtemplates.NewTemplateService(deps.DB)
+	hostLogger := logger.WithField("component", "integration.host_invoker")
+	noopInvoker := NewNoopInvoker(hostLogger)
+	invoker := NewCapabilityInvoker(templateService, stream.DefaultBroker(), hostLogger, noopInvoker)
 
 	return NewDispatchService(deps.Config, grantService, repository, invoker, logger.WithField("component", "integration.dispatch_service"))
 }

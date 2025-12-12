@@ -70,7 +70,7 @@ web-admin/
 | **Modal**        | 使用 `UModal` + `v-model:open`，并利用 `#content`、`#footer` 插槽组织表单。 |           |         |      |         |       |          |
 | **Switch**       | 无 `UToggle`，使用 `USwitch` 替代。                                  |           |         |      |         |       |          |
 | **Button**       | 使用 `UButton`，推荐语义 `label` 与 `variant/subtle/outline`。         |           |         |      |         |       |          |
-| **FormGroup**    | 使用 `UFormGroup` + `UInput` / `UTextarea`；所有必填项需添加 `required`。 |           |         |      |         |       |          |
+| **FormField**    | 使用 `UFormField` 包裹 `UInput` / `UTextarea` 等输入组件，必填项需 `required`。 |           |         |      |         |       |          |
 | **Color 枚举**     | `primary                                                      | secondary | success | info | warning | error | neutral` |
 | **Layout / Nav** | 左侧导航与顶栏遵守 RBAC 可见性规则（PG-FE-RBAC-001）。                         |           |         |      |         |       |          |
 

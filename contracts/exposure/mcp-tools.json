@@ -1,0 +1,73 @@
+{
+  "plugin_id": "com.powerx.plugins.base",
+  "version": "0.7.0",
+  "generated_at": "2025-12-10T06:14:50.482Z",
+  "tools": [
+    {
+      "id": "base.template.list",
+      "capability_id": "com.powerx.plugins.base.template.list",
+      "name": "列出模板",
+      "description": "按过滤条件获取模板列表。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates",
+      "method": "GET",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.list.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.list.json"
+    },
+    {
+      "id": "base.template.read",
+      "capability_id": "com.powerx.plugins.base.template.read",
+      "name": "读取模板",
+      "description": "获取指定模板详情。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}",
+      "method": "GET",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.read.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.read.json"
+    },
+    {
+      "id": "base.template.update",
+      "capability_id": "com.powerx.plugins.base.template.update",
+      "name": "更新模板",
+      "description": "批量或单条修改模板内容。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}",
+      "method": "PUT",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.update.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.update.json"
+    },
+    {
+      "id": "base.template.create",
+      "capability_id": "com.powerx.plugins.base.template.create",
+      "name": "创建模板",
+      "description": "根据输入草稿创建模板。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.create.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.create.json"
+    },
+    {
+      "id": "base.template.validate",
+      "capability_id": "com.powerx.plugins.base.template.validate",
+      "name": "模板巡检",
+      "description": "运行一组规则校验模板。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}/validate",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.validate.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.validate.json"
+    },
+    {
+      "id": "base.template.batch_clone",
+      "capability_id": "com.powerx.plugins.base.template.batch_clone",
+      "name": "批量克隆模板",
+      "description": "批量生成模板副本。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/batch-clone",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.batch_clone.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.batch_clone.json"
+    }
+  ]
+}

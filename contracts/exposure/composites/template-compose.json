@@ -1,0 +1,110 @@
+{
+  "id": "com.powerx.plugins.base.template.compose",
+  "version": "1.0.0",
+  "name": "模板协作流程",
+  "summary": "串联草稿、审核、发布三阶段，可在 Workflow Builder 与 Agent Hub 中直接引用。",
+  "graph": {
+    "nodes": [
+      {
+        "id": "draft",
+        "kind": "plugin",
+        "use": "com.powerx.plugins.base.template.create",
+        "params": {
+          "protocol": "rest",
+          "capability_id": "com.powerx.plugins.base.template.create"
+        },
+        "io": {
+          "in_map": {
+            "body": "{{var.template_draft}}"
+          },
+          "out_map": {
+            "template_id": "output.id"
+          }
+        }
+      },
+      {
+        "id": "review",
+        "kind": "plugin",
+        "use": "com.powerx.plugins.base.template.review",
+        "params": {
+          "protocol": "rest",
+          "capability_id": "com.powerx.plugins.base.template.review"
+        },
+        "io": {
+          "in_map": {
+            "template_id": "{{task.draft.output.template_id}}",
+            "approved": "{{var.review.approved}}",
+            "comments": "{{var.review.comments}}"
+          },
+          "out_map": {
+            "approved": "output.approved"
+          }
+        }
+      },
+      {
+        "id": "publish",
+        "kind": "plugin",
+        "use": "com.powerx.plugins.base.template.publish",
+        "params": {
+          "protocol": "rest",
+          "capability_id": "com.powerx.plugins.base.template.publish"
+        },
+        "io": {
+          "in_map": {
+            "template_id": "{{task.draft.output.template_id}}",
+            "approved": "{{task.review.output.approved}}",
+            "channel": "{{var.publish_channel}}"
+          },
+          "out_map": {
+            "publish_status": "output.publish_status"
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "from": "draft", "to": "review" },
+      { "from": "review", "to": "publish", "condition": "{{task.review.output.approved}}" }
+    ]
+  },
+  "workflow_step": "contracts/exposure/workflow/template-compose.json",
+  "agent_stream": {
+    "path": "contracts/exposure/agent-streams/template-compose.yaml",
+    "intent": "template.compose",
+    "summary": "实时推送模板草稿、审核、发布的状态更新"
+  },
+  "agent_tools": [
+    {
+      "id": "base.template.create",
+      "capability_id": "com.powerx.plugins.base.template.create",
+      "name": "创建模板",
+      "description": "根据输入草稿创建模板。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.create.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.create.json"
+    },
+    {
+      "id": "base.template.review",
+      "capability_id": "com.powerx.plugins.base.template.review",
+      "name": "审核模板",
+      "description": "审核草稿并附加评论。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}/review",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.review.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.review.json"
+    },
+    {
+      "id": "base.template.publish",
+      "capability_id": "com.powerx.plugins.base.template.publish",
+      "name": "发布模板",
+      "description": "将审核通过的模板发布到业务租户。",
+      "transport": "http",
+      "endpoint": "/api/v1/templates/{id}/publish",
+      "method": "POST",
+      "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.publish.json",
+      "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.publish.json"
+    }
+  ]
+}

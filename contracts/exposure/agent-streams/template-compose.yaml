@@ -1,0 +1,6 @@
+capability_id: com.powerx.plugins.base.template.compose
+version: 1.0.0
+intent: template.compose
+summary: 实时推送模板草稿、审核、发布的状态更新
+events: []
+generated_at: 2025-12-10T06:14:50.481Z

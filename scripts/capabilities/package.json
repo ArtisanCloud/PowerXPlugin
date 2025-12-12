@@ -1,0 +1,19 @@
+{
+  "name": "powerxplugin-capabilities-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node validate-capabilities.mjs",
+    "catalog": "tsx catalog-parser.ts",
+    "export": "node export.mjs",
+    "registry": "node registry-cli.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

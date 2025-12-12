@@ -29,6 +29,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
+	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
+		log.Fatalf("初始化本地 IAM Secret 失败: %v", err)
+	}
 	models.InitSchemaFrom(cfg.Database.Schema) // 必须在所有 DB 操作之前
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)

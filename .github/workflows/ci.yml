@@ -41,7 +41,7 @@ jobs:
       - name: Go test (framework)
         run: cd framework && go test ./...
       - name: Go test (skeleton backend)
-        run: cd skeleton/backend && go test ./...
+        run: cd skeleton/backend && go test ./... -count=1
 
   frontend:
     runs-on: ubuntu-latest

@@ -9,6 +9,7 @@ import (
 	opservice "{{ .BackendModulePath }}/internal/services/operations"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"{{ .BackendModulePath }}/internal/transport/http/admin"
+	admincapability "{{ .BackendModulePath }}/internal/transport/http/admin/capability"
 	adminconsole "{{ .BackendModulePath }}/internal/transport/http/admin/console"
 	adminintegration "{{ .BackendModulePath }}/internal/transport/http/admin/integration"
 	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
@@ -57,6 +58,7 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	r.mergeRBAC(adminoperations.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminconsole.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminmarketplace.RBACEntries(r.apiPrefix()))
+	r.mergeRBAC(admincapability.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(integrationRBACEntries(r.apiPrefix()))
 	r.mergeRBAC(marketplacePublicRBACEntries(r.apiPrefix()))
 }

@@ -33,12 +33,29 @@ func HasPerm(userPerms []string, need Permission) bool {
 	if len(userPerms) == 0 {
 		return false
 	}
-	want := strings.ToLower(strings.TrimSpace(need.Resource)) + ":" + strings.ToLower(strings.TrimSpace(need.Action))
-	for _, p := range userPerms {
-		p = strings.ToLower(strings.TrimSpace(p))
-		switch {
-		case p == want, p == "*", p == need.Resource+":*", strings.HasSuffix(p, ":*") && strings.TrimSuffix(p, ":*") == need.Resource:
+	res := strings.ToLower(strings.TrimSpace(need.Resource))
+	act := strings.ToLower(strings.TrimSpace(need.Action))
+	want := res + ":" + act
+	for _, perm := range userPerms {
+		p := strings.ToLower(strings.TrimSpace(perm))
+		if p == "" {
+			continue
+		}
+		if p == "*" || p == "*:*" {
 			return true
+		}
+		if p == want {
+			return true
+		}
+		parts := strings.SplitN(p, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		pr, pa := parts[0], parts[1]
+		if pr == "*" || pr == res {
+			if pa == "*" || pa == act {
+				return true
+			}
 		}
 	}
 	return false

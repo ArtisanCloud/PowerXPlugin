@@ -29,7 +29,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 	}
 
 	const (
-		defaultTenantKey  = " 00000000-0000-0000-0000-000000000001"
+		defaultTenantKey  = "00000000-0000-0000-0000-000000000001"
 		defaultTenantName = "Local Tenant"
 		defaultAdminEmail = "admin@local.test"
 		defaultAdminPwd   = "S3cret!!"
@@ -228,6 +228,7 @@ func seedDefaultPermissions(tx *gorm.DB, roleID uint64) error {
 		Action   string
 		Desc     string
 	}{
+		{"*", "*", "Full access"},
 		{"iam.user", "read", "Read IAM users"},
 		{"iam.role", "read", "Read IAM roles"},
 		{"iam.department", "read", "Read IAM departments"},

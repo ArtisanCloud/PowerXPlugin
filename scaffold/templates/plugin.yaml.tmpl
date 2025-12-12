@@ -139,6 +139,8 @@ agents:
       - {{ .PluginID }}.template.create
 
 capabilities:
+  imports:
+    - capabilities/{{ .PluginID }}.template.create.yaml
   provides:
     - id: {{ .PluginID }}.template.create
       version: 1.0.0

@@ -1,0 +1,156 @@
+openapi: 3.0.3
+info:
+  title: Standalone IAM Admin API
+  version: 0.1.0
+servers:
+  - url: /api/v1/admin/iam
+paths:
+  /tenants:
+    get:
+      summary: List tenants
+      tags: [Tenant]
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Create tenant
+      tags: [Tenant]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, name]
+              properties:
+                key: {type: string}
+                name: {type: string}
+      responses:
+        '201': {description: Created}
+  /tenants/{id}:
+    patch:
+      summary: Update tenant metadata/status
+      tags: [Tenant]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Updated}
+  /departments:
+    get:
+      summary: List departments tree per tenant
+      tags: [Department]
+      parameters:
+        - in: query
+          name: tenant_uuid
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Create department node
+      tags: [Department]
+      responses:
+        '201': {description: Created}
+  /departments/{id}:
+    patch:
+      summary: Update department name/parent
+      tags: [Department]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Updated}
+    delete:
+      summary: Delete department (if empty)
+      tags: [Department]
+      responses:
+        '204': {description: Deleted}
+  /members:
+    get:
+      summary: List members with filters
+      tags: [Member]
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Invite or create member
+      tags: [Member]
+      responses:
+        '201': {description: Created}
+  /members/{id}:
+    patch:
+      summary: Update member profile or status
+      tags: [Member]
+      responses:
+        '200': {description: Updated}
+  /members/import:
+    post:
+      summary: Bulk import members (CSV)
+      tags: [Member]
+      responses:
+        '202': {description: Accepted}
+  /roles:
+    get:
+      summary: List roles with scopes
+      tags: [Role]
+      responses:
+        '200': {description: OK}
+    post:
+      summary: Create role / clone existing
+      tags: [Role]
+      responses:
+        '201': {description: Created}
+  /roles/{id}:
+    patch:
+      summary: Update role metadata
+      tags: [Role]
+      responses:
+        '200': {description: Updated}
+    delete:
+      summary: Archive role
+      tags: [Role]
+      responses:
+        '204': {description: Deleted}
+  /roles/{id}/permissions:
+    put:
+      summary: Replace permissions list
+      tags: [Role]
+      responses:
+        '200': {description: Updated}
+  /roles/{id}/members:
+    post:
+      summary: Assign members to role
+      tags: [Role]
+      responses:
+        '200': {description: Assigned}
+    delete:
+      summary: Remove members from role
+      tags: [Role]
+      responses:
+        '200': {description: Removed}
+  /permissions:
+    get:
+      summary: List available scopes (from Manifest)
+      tags: [Permission]
+      responses:
+        '200': {description: OK}
+  /audit/logs:
+    get:
+      summary: Query audit logs (scoped)
+      tags: [Audit]
+      parameters:
+        - in: query
+          name: tenant_uuid
+          required: false
+          schema: {type: string}
+      responses:
+        '200': {description: OK}
+  /auth/local/sts:
+    post:
+      summary: Mint short-term token (local mode)
+      tags: [Auth]
+      responses:
+        '200': {description: OK}

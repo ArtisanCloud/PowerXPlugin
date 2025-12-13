@@ -1,12 +1,17 @@
 # Skeleton 插件示例配置
 # 将本文件复制为 backend/etc/config.yaml 即可覆盖默认配置。
 #
-# Auth / IAM 相关环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
-#   POWERX_CORE_ENDPOINT      - Delegated 模式访问宿主 Core API 的基址（默认 http://localhost:8077）
-#   POWERX_AUTH_TOKEN         - 插件向宿主 Core 鉴权用的服务 Token
-#   POWERX_RBAC_DELEGATE      - 设为 true/1/on 时强制走 Delegated IAM（即使 POWERX_PROXY!=1）
-#   PLUGIN_IAM_ADMIN_EMAIL    - Local 模式默认管理员邮箱（用于 migrate/seed）
-#   PLUGIN_IAM_ADMIN_PASSWORD - Local 模式默认管理员密码（用于 migrate/seed）
+# Auth / IAM / 运行模式环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
+#   POWERX_PROXY                - 设为 1 时表示运行在宿主 iframe/代理下（Delegated 模式）
+#   POWERX_RBAC_DELEGATE        - true/1/on 时强制委托宿主 IAM（即使 POWERX_PROXY=0），只读本地数据
+#   POWERX_CORE_ENDPOINT        - Delegated 模式访问宿主 Core API 的基址（默认 http://localhost:8077）
+#   POWERX_AUTH_TOKEN           - 插件向宿主 Core 鉴权用的服务 Token
+#   POWERX_AUTH_OPTIONAL        - 调试专用，true 时允许未携带 Token 的请求（仅限本地）
+#   PLUGIN_IAM_TENANT_KEY/NAME  - Standalone 模式默认租户唯一键与显示名
+#   PLUGIN_IAM_ADMIN_EMAIL      - Standalone 模式默认管理员邮箱（用于 migrate/seed）
+#   PLUGIN_IAM_ADMIN_PASSWORD   - Standalone 模式默认管理员密码（用于 migrate/seed）
+#   NUXT_PUBLIC_INSIDE_POWERX   - 前端运行时使用，'1' 代表宿主模式；否则渲染 Standalone 菜单（含“组织与权限”）
+#   NUXT_PUBLIC_POWERX_PROXY    - 与上类似，供 runtimeConfig 判断 API Base
 
 server:
   bind_addr: ":8078"

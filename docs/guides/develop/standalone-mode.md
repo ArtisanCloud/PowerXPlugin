@@ -5,6 +5,33 @@
 
 ## 1. Standalone 模式
 
+### 1.0 环境预检
+
+在启动 Skeleton 前，先确认基础工具链就绪，并跑一次“后端 + 前端”自检命令：
+
+| 工具 | 要求 | 检查命令 |
+|------|------|----------|
+| Go | 1.24+ | `go version`（期望输出 go1.24.x） |
+| Node.js | 20.x | `node -v` |
+| npm | 9.x+ | `npm -v` |
+| Playwright 依赖 | 由 `npm install` 自动安装 | `npm --prefix skeleton/web-admin run test:e2e -- --help` |
+
+```bash
+# 验证 backend 可以迁移 + 运行
+cd skeleton/backend
+go run ./cmd/database/main.go setup
+go run ./cmd/plugin &
+PID=$!
+curl -sSf http://127.0.0.1:8078/healthz && kill $PID
+
+# 验证 web-admin 可以启动
+cd ../web-admin
+npm install
+npm run dev -- --help >/dev/null
+```
+
+若任一命令失败（例如 Go 版本过低或 npm 依赖缺失），请先升级本地环境再继续下面的步骤。
+
 ### 1.1 目录结构与分层
 
 ```
@@ -128,6 +155,23 @@ npm run test:e2e -- auth-local
 3. **后端保持默认**：`POWERX_PROXY=0 go run ./cmd/plugin`，只需暴露 `/api/v1/**`。由于前端代理会把 `/_p/...` 请求映射回本地接口，后端无需额外改动。
 
 配置完上述环境后，直接访问 `http://localhost:3031/_p/<plugin-id>/admin/...` 即可模拟宿主 iframe，Bridge/CTX/主题等行为与宿主一致。
+
+#### 1.3.2 Standalone / Delegated 环境变量速查
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `POWERX_PROXY` | `0` | `1` 表示运行在宿主 iframe 下；本地 Standalone 必须为 `0`，否则“组织与权限”菜单会隐藏。 |
+| `POWERX_RBAC_DELEGATE` | `false` | 强制委托宿主 IAM；即使 `POWERX_PROXY=0` 也会禁用本地 IAM API。 |
+| `POWERX_CORE_ENDPOINT` | `http://localhost:8077` | Delegated 模式访问宿主 Core API 的地址。 |
+| `POWERX_AUTH_TOKEN` | N/A | 插件后端调用宿主 `/admin/user/auth/*` 时使用的服务 Token。 |
+| `POWERX_AUTH_OPTIONAL` | `false` | 仅限调试。设为 `true` 时可跳过后端 Token 校验，不可用于生产。 |
+| `PLUGIN_IAM_TENANT_KEY` / `NAME` | 示例值见 Quickstart | Standalone 运行时默认租户唯一键与名称。 |
+| `PLUGIN_IAM_ADMIN_EMAIL` / `PASSWORD` | `admin@local.test` / `S3cret!!` | 本地管理员初始凭据，`setup` 会读取并写入数据库。 |
+| `NUXT_PUBLIC_INSIDE_POWERX` | `0` | 前端 runtime 判定宿主模式用，`1` 时 baseURL 调整为 `/_p/<pluginId>/admin/`。 |
+| `NUXT_PUBLIC_POWERX_PROXY` | `0` | 与上类似，供前端组件/Bridge 判断当前运行模式。 |
+| `NUXT_DEV_API_PROXY` / `NUXT_DEV_WS_PROXY` | `http://localhost:8078` / `ws://127.0.0.1:4000` | Vite 代理目标，宿主模式下会额外注入 `/_p/<pluginId>/api`。 |
+
+> ⚠️ 只有当 `POWERX_PROXY=0` **且** `POWERX_RBAC_DELEGATE` 未开启时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
 
 > `skeleton/backend/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
 >

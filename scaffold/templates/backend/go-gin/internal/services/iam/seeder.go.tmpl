@@ -23,7 +23,15 @@ type SeedOptions struct {
 	AdminName  string
 }
 
-func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error {
+func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode IAMMode) error {
+	if mode != IAMModeLocal {
+		log.Printf("[iam] skip local admin seed (mode=%s)", mode)
+		return nil
+	}
+	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" || truthy(os.Getenv("POWERX_RBAC_DELEGATE")) {
+		log.Printf("[iam] POWERX_PROXY/POWERX_RBAC_DELEGATE indicates delegated mode, skip local admin seed")
+		return nil
+	}
 	if db == nil {
 		return errors.New("iam: db is nil")
 	}
@@ -200,6 +208,15 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config) error 
 		}
 		return seedDefaultPermissions(tx, role.ID)
 	})
+}
+
+func truthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func ensureDefaultDepartment(tx *gorm.DB, tenantUUID string) (*uint64, error) {

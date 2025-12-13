@@ -78,3 +78,25 @@ func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger
 
 	return logger.WithRuntimeFields(PluginID, tenantID, traceID, component, extra)
 }
+
+func (d *Deps) LocalIAMEnabled() bool {
+	return d != nil && d.IAMMode == iamservice.IAMModeLocal && d.IAMDirectory != nil
+}
+
+func (d *Deps) DelegatedIAMEnabled() bool {
+	return d != nil && d.IAMMode == iamservice.IAMModeDelegated && d.AuthProxy != nil
+}
+
+func (d *Deps) LocalDirectory() iamservice.IAMDirectory {
+	if d.LocalIAMEnabled() {
+		return d.IAMDirectory
+	}
+	return nil
+}
+
+func (d *Deps) DelegatedProxy() DelegatedAuthProxy {
+	if d.DelegatedIAMEnabled() {
+		return d.AuthProxy
+	}
+	return nil
+}

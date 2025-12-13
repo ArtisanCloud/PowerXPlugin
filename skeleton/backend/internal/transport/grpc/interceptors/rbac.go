@@ -36,6 +36,12 @@ func RBACUnary(d RBACDeps) grpc.UnaryServerInterceptor {
 		method := "POST"
 		full := info.FullMethod // 形如 /package.Service/Method
 		perm, has := authx.MatchRoute(method, full, d.RBAC.RoutePermissions)
+		if !has {
+			if inferred, ok := authx.InferPermission(method, full); ok {
+				perm = inferred
+				has = true
+			}
+		}
 
 		passRBAC := (!has && !d.RBAC.DefaultDeny) || (has && authx.HasPerm(tc.Permissions, perm))
 		if !passRBAC {
@@ -81,6 +87,12 @@ func RBACStream(d RBACDeps) grpc.StreamServerInterceptor {
 		method := "POST"
 		full := info.FullMethod
 		perm, has := authx.MatchRoute(method, full, d.RBAC.RoutePermissions)
+		if !has {
+			if inferred, ok := authx.InferPermission(method, full); ok {
+				perm = inferred
+				has = true
+			}
+		}
 
 		passRBAC := (!has && !d.RBAC.DefaultDeny) || (has && authx.HasPerm(tc.Permissions, perm))
 		if !passRBAC {

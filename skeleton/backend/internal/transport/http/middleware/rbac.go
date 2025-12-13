@@ -24,12 +24,19 @@ func RBAC(cfg *authx.RBACConfig, _ authx.ABACClient, _ func(string, string) (boo
 			c.Next()
 			return
 		}
+		if isHealthEndpoint(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
 
 		if cfg.DelegateToPowerX {
 			if allowPowerXDelegate(c, cfg) {
 				c.Next()
 			} else {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Role unauthorized"})
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "PowerX delegated authentication required",
+					"hint":  "请在宿主 PowerX 登录后再访问插件，或设置 POWERX_PROXY=0 运行 Standalone 模式",
+				})
 			}
 			return
 		}
@@ -49,6 +56,12 @@ func RBAC(cfg *authx.RBACConfig, _ authx.ABACClient, _ func(string, string) (boo
 			full = c.Request.URL.Path
 		}
 		perm, has := authx.MatchRoute(c.Request.Method, full, cfg.RoutePermissions)
+		if !has {
+			if inferred, ok := authx.InferPermission(c.Request.Method, c.Request.URL.Path); ok {
+				perm = inferred
+				has = true
+			}
+		}
 		passRBAC := (!has && !cfg.DefaultDeny) || (has && authx.HasPerm(tc.Permissions, perm))
 		if !passRBAC {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
@@ -129,3 +142,17 @@ func audienceMatches(aud any, expected string) bool {
 }
 
 var errInvalidToken = errors.New("invalid token")
+
+func isHealthEndpoint(path string) bool {
+	p := strings.ToLower(strings.TrimSpace(path))
+	if p == "" {
+		return false
+	}
+	if strings.HasPrefix(p, "/healthz") {
+		return true
+	}
+	if strings.HasPrefix(p, "/api/v1/admin/runtime/metrics") {
+		return true
+	}
+	return false
+}

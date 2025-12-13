@@ -56,7 +56,7 @@ func main() {
 			log.Fatal("seed failed:", err)
 		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
 		}
@@ -72,7 +72,7 @@ func main() {
 			log.Fatal("seed failed:", err)
 		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
 		}
@@ -96,7 +96,7 @@ func main() {
 			log.Fatal("seed failed:", err)
 		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
 		}

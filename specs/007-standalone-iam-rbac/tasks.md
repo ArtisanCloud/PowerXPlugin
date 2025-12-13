@@ -5,14 +5,14 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 准备 `skeleton/backend` 与 `skeleton/web-admin` 的本地运行环境，验证 `go run ./cmd/database/main.go setup` 与 `npm run dev` 可启动。
-- [ ] T002 更新 `skeleton/backend/etc/config.example.yaml`、`docs/guides/develop/standalone-mode.md` 记录 Standalone/Delegated 环境变量、菜单显隐说明。
+- [x] T001 准备 `skeleton/backend` 与 `skeleton/web-admin` 的本地运行环境，验证 `go run ./cmd/database/main.go setup` 与 `npm run dev` 可启动。
+- [x] T002 更新 `skeleton/backend/etc/config.example.yaml`、`docs/guides/develop/standalone-mode.md` 记录 Standalone/Delegated 环境变量、菜单显隐说明。
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [ ] T003 拆分 `cmd/database/migrate` 与 `internal/services/iam/seeder.go`，确保默认租户/管理员种子仅在 Standalone 执行，且 `POWERX_PROXY` 切换安全。
-- [ ] T004 调整 `internal/bootstrap/iam_resolver.go`、`internal/shared/app/deps.go`，注入 Local IAM store、RBAC service、STS mint 服务所需依赖。
-- [ ] T005 更新 `internal/middleware/rbac.go` 与请求上下文，加入 `plugin/resource/action` 三元推导、健康检查白名单、Delegated 模式下的提示行为。
+- [x] T003 拆分 `cmd/database/migrate` 与 `internal/services/iam/seeder.go`，确保默认租户/管理员种子仅在 Standalone 执行，且 `POWERX_PROXY` 切换安全。
+- [x] T004 调整 `internal/bootstrap/iam_resolver.go`、`internal/shared/app/deps.go`，注入 Local IAM store、RBAC service、STS mint 服务所需依赖。
+- [x] T005 更新 `internal/middleware/rbac.go` 与请求上下文，加入 `plugin/resource/action` 三元推导、健康检查白名单、Delegated 模式下的提示行为。
 
 ## Phase 3: User Story 1 – 初始化本地 IAM (Priority P1)
 

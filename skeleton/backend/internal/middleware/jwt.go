@@ -31,6 +31,7 @@ type PowerXClaims struct {
 	Roles         []string    `json:"roles"`
 	Permissions   []string    `json:"perms"`
 	PolicyVersion string      `json:"policy_version"`
+	PluginID      string      `json:"plugin_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -98,8 +99,12 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 		return TenantContext{}, errors.New("invalid token")
 	}
 	return TenantContext{
-		TenantUUID: strings.TrimSpace(claims.TenantUUID.String()), UserID: claims.UserID, Roles: claims.Roles,
-		Permissions: claims.Permissions, PolicyVersion: claims.PolicyVersion,
+		TenantUUID:    strings.TrimSpace(claims.TenantUUID.String()),
+		UserID:        claims.UserID,
+		Roles:         claims.Roles,
+		Permissions:   claims.Permissions,
+		PolicyVersion: claims.PolicyVersion,
+		PluginID:      strings.TrimSpace(claims.PluginID),
 	}, nil
 }
 
@@ -109,6 +114,7 @@ type signedCtx struct {
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"perms"`
 	PolicyVersion string   `json:"policy_version"`
+	PluginID      string   `json:"plugin_id,omitempty"`
 	TS            int64    `json:"ts"`
 }
 
@@ -138,13 +144,13 @@ func tryLoadSignedContext(h func(string) string, secret string, maxAgeSec int64)
 		return TenantContext{}, false
 	}
 	return TenantContext{TenantUUID: strings.TrimSpace(sc.TenantUUID), UserID: sc.UserID, Roles: sc.Roles,
-		Permissions: sc.Permissions, PolicyVersion: sc.PolicyVersion}, true
+		Permissions: sc.Permissions, PolicyVersion: sc.PolicyVersion, PluginID: strings.TrimSpace(sc.PluginID)}, true
 }
 
 // 供客户端出站兜底：把 TenantContext 签成 X-PowerX-CTX / SIG
 func SignContext(tc TenantContext, secret string) (ctxB64, sigHex string, ts int64, err error) {
 	sc := signedCtx{TenantUUID: strings.TrimSpace(tc.TenantUUID), UserID: tc.UserID, Roles: tc.Roles,
-		Permissions: tc.Permissions, PolicyVersion: tc.PolicyVersion, TS: time.Now().Unix()}
+		Permissions: tc.Permissions, PolicyVersion: tc.PolicyVersion, PluginID: tc.PluginID, TS: time.Now().Unix()}
 	b, e := json.Marshal(&sc)
 	if e != nil {
 		return "", "", 0, e

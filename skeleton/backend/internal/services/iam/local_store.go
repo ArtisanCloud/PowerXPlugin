@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	defaultAccessTTL  = 15 * time.Minute
-	defaultRefreshTTL = 30 * 24 * time.Hour
+	defaultAccessTTL     = 15 * time.Minute
+	defaultRefreshTTL    = 30 * 24 * time.Hour
+	defaultPolicyVersion = "local.v1"
+	defaultPluginID      = "com.powerx.plugins.base"
 )
 
 // LocalDirectory implements IAMDirectory against the plugin's own database.
@@ -35,6 +37,8 @@ type LocalDirectory struct {
 	accessTTL        time.Duration
 	refreshTTL       time.Duration
 	defaultTenantKey string
+	pluginID         string
+	policyVersion    string
 }
 
 func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error) {
@@ -71,6 +75,11 @@ func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error)
 	if tenantKey == "" {
 		tenantKey = "00000000-0000-0000-0000-000000000001"
 	}
+	pluginID := resolvePluginID()
+	policyVersion := strings.TrimSpace(os.Getenv("PLUGIN_IAM_POLICY_VERSION"))
+	if policyVersion == "" {
+		policyVersion = defaultPolicyVersion
+	}
 	return &LocalDirectory{
 		db:               db,
 		cfg:              cfg,
@@ -80,6 +89,8 @@ func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error)
 		accessTTL:        ttl,
 		refreshTTL:       refreshTTL,
 		defaultTenantKey: strings.ToLower(tenantKey),
+		pluginID:         pluginID,
+		policyVersion:    policyVersion,
 	}, nil
 }
 
@@ -123,6 +134,8 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 		Roles:         roles,
 		Permissions:   perms,
 		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PluginID:      d.pluginID,
 		IssuedAt:      time.Now(),
 	}
 	tokens, err := d.issueTokens(userCtx)
@@ -169,6 +182,8 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 		Roles:         roles,
 		Permissions:   perms,
 		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PluginID:      d.pluginID,
 		IssuedAt:      time.Now(),
 	}
 	tokens, err := d.issueTokens(userCtx)
@@ -295,6 +310,14 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 	if member.DepartmentID != nil {
 		deptIDs = append(deptIDs, *member.DepartmentID)
 	}
+	policyVersion := strings.TrimSpace(claims.PolicyVersion)
+	if policyVersion == "" {
+		policyVersion = d.policyVersion
+	}
+	pluginID := strings.TrimSpace(claims.PluginID)
+	if pluginID == "" {
+		pluginID = d.pluginID
+	}
 	return &UserContext{
 		TenantUUID:    resolvedTenant,
 		TenantUuid:    resolvedTenant,
@@ -308,7 +331,8 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 		Roles:         claims.Roles,
 		Permissions:   claims.Permissions,
 		DepartmentIDs: deptIDs,
-		PolicyVersion: claims.PolicyVersion,
+		PolicyVersion: policyVersion,
+		PluginID:      pluginID,
 		IssuedAt:      time.Now(),
 	}, nil
 }
@@ -392,6 +416,7 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		Roles:         userCtx.Roles,
 		Permissions:   userCtx.Permissions,
 		PolicyVersion: userCtx.PolicyVersion,
+		PluginID:      d.pluginID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    d.issuer,
 			Audience:  jwt.ClaimStrings{d.audience},
@@ -409,12 +434,14 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		return nil, err
 	}
 	return &AuthTokens{
-		TokenType:    "Bearer",
-		AccessToken:  signed,
-		RefreshToken: refreshToken,
-		ExpiresIn:    int64(d.accessTTL.Seconds()),
-		Scope:        "access",
-		ExpiresAt:    expires,
+		TokenType:     "Bearer",
+		AccessToken:   signed,
+		RefreshToken:  refreshToken,
+		ExpiresIn:     int64(d.accessTTL.Seconds()),
+		Scope:         "access",
+		ExpiresAt:     expires,
+		PluginID:      d.pluginID,
+		PolicyVersion: d.policyVersion,
 	}, nil
 }
 
@@ -532,4 +559,17 @@ func valueOrDefault(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func resolvePluginID() string {
+	envs := []string{
+		os.Getenv("POWERX_PLUGIN_ID"),
+		os.Getenv("PLUGIN_ID"),
+	}
+	for _, candidate := range envs {
+		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+			return trimmed
+		}
+	}
+	return defaultPluginID
 }

@@ -28,53 +28,22 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 		log.Printf("[iam] skip local admin seed (mode=%s)", mode)
 		return nil
 	}
-	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" || truthy(os.Getenv("POWERX_RBAC_DELEGATE")) {
-		log.Printf("[iam] POWERX_PROXY/POWERX_RBAC_DELEGATE indicates delegated mode, skip local admin seed")
+	if reason, ok := delegatedModeOverride(); ok {
+		log.Printf("[iam] %s indicates delegated mode, skip local admin seed", reason)
 		return nil
 	}
 	if db == nil {
 		return errors.New("iam: db is nil")
 	}
 
-	const (
-		defaultTenantKey  = "00000000-0000-0000-0000-000000000001"
-		defaultTenantName = "Local Tenant"
-		defaultAdminEmail = "admin@local.test"
-		defaultAdminPwd   = "S3cret!!"
-		defaultAdminName  = "Local Admin"
-	)
-
-	opts := SeedOptions{
-		TenantKey:  strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_KEY")),
-		TenantName: strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_NAME")),
-		AdminEmail: strings.TrimSpace(os.Getenv("PLUGIN_IAM_ADMIN_EMAIL")),
-		AdminPwd:   os.Getenv("PLUGIN_IAM_ADMIN_PASSWORD"),
-		AdminName:  strings.TrimSpace(os.Getenv("PLUGIN_IAM_ADMIN_NAME")),
+	opts, warnings := loadSeedOptionsFromEnv()
+	for _, msg := range warnings {
+		log.Printf("[iam] %s", msg)
 	}
-	if opts.TenantKey == "" {
-		opts.TenantKey = defaultTenantKey
+	if err := opts.Validate(); err != nil {
+		return err
 	}
-	if opts.TenantName == "" {
-		opts.TenantName = defaultTenantName
-	}
-	if opts.AdminEmail == "" {
-		opts.AdminEmail = defaultAdminEmail
-		log.Printf("[iam] PLUGIN_IAM_ADMIN_EMAIL not set, using default %s", opts.AdminEmail)
-	}
-	if strings.TrimSpace(opts.AdminPwd) == "" {
-		opts.AdminPwd = defaultAdminPwd
-		log.Printf("[iam] PLUGIN_IAM_ADMIN_PASSWORD not set, using default %s", opts.AdminPwd)
-	}
-	if len(opts.AdminPwd) < 6 {
-		return fmt.Errorf("PLUGIN_IAM_ADMIN_PASSWORD must be at least 6 characters")
-	}
-	if opts.AdminName == "" {
-		if idx := strings.Index(opts.AdminEmail, "@"); idx > 0 {
-			opts.AdminName = opts.AdminEmail[:idx]
-		} else {
-			opts.AdminName = defaultAdminName
-		}
-	}
+	log.Printf("[iam] seeding local admin tenant=%s admin=%s", opts.TenantKey, opts.AdminEmail)
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(opts.AdminPwd), bcrypt.DefaultCost)
 	if err != nil {
@@ -208,6 +177,68 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 		}
 		return seedDefaultPermissions(tx, role.ID)
 	})
+}
+
+func delegatedModeOverride() (string, bool) {
+	if truthy(os.Getenv("POWERX_RBAC_DELEGATE")) {
+		return "POWERX_RBAC_DELEGATE", true
+	}
+	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
+		return "POWERX_PROXY", true
+	}
+	return "", false
+}
+
+func loadSeedOptionsFromEnv() (SeedOptions, []string) {
+	const (
+		defaultTenantKey  = "00000000-0000-0000-0000-000000000001"
+		defaultTenantName = "Local Tenant"
+		defaultAdminEmail = "admin@local.test"
+		defaultAdminPwd   = "S3cret!!"
+		defaultAdminName  = "Local Admin"
+	)
+
+	opts := SeedOptions{
+		TenantKey:  strings.ToLower(strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_KEY"))),
+		TenantName: strings.TrimSpace(os.Getenv("PLUGIN_IAM_TENANT_NAME")),
+		AdminEmail: strings.TrimSpace(os.Getenv("PLUGIN_IAM_ADMIN_EMAIL")),
+		AdminPwd:   strings.TrimSpace(os.Getenv("PLUGIN_IAM_ADMIN_PASSWORD")),
+		AdminName:  strings.TrimSpace(os.Getenv("PLUGIN_IAM_ADMIN_NAME")),
+	}
+	warnings := make([]string, 0, 4)
+	if opts.TenantKey == "" {
+		opts.TenantKey = defaultTenantKey
+		warnings = append(warnings, "PLUGIN_IAM_TENANT_KEY not set, using default tenant UUID")
+	}
+	if opts.TenantName == "" {
+		opts.TenantName = defaultTenantName
+		warnings = append(warnings, "PLUGIN_IAM_TENANT_NAME not set, using default tenant name")
+	}
+	if opts.AdminEmail == "" {
+		opts.AdminEmail = defaultAdminEmail
+		warnings = append(warnings, "PLUGIN_IAM_ADMIN_EMAIL not set, using default admin email")
+	} else {
+		opts.AdminEmail = strings.ToLower(opts.AdminEmail)
+	}
+	if opts.AdminPwd == "" {
+		opts.AdminPwd = defaultAdminPwd
+		warnings = append(warnings, "PLUGIN_IAM_ADMIN_PASSWORD not set, using default password")
+	}
+	if opts.AdminName == "" {
+		if idx := strings.Index(opts.AdminEmail, "@"); idx > 0 {
+			opts.AdminName = opts.AdminEmail[:idx]
+		} else {
+			opts.AdminName = defaultAdminName
+		}
+	}
+	return opts, warnings
+}
+
+func (o SeedOptions) Validate() error {
+	if len(o.AdminPwd) < 6 {
+		return fmt.Errorf("PLUGIN_IAM_ADMIN_PASSWORD must be at least 6 characters")
+	}
+	return nil
 }
 
 func truthy(value string) bool {

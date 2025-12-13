@@ -159,22 +159,26 @@ func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*M
 // ----- HTTP helpers -----
 
 type loginResponse struct {
-	TokenType    string `json:"token_type"`
-	AccessToken  string `json:"access_token"`
-	ExpiresIn    int    `json:"expires_in"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	Scope        string `json:"scope"`
+	TokenType     string `json:"token_type"`
+	AccessToken   string `json:"access_token"`
+	ExpiresIn     int    `json:"expires_in"`
+	RefreshToken  string `json:"refresh_token,omitempty"`
+	Scope         string `json:"scope"`
+	PluginID      string `json:"plugin_id,omitempty"`
+	PolicyVersion string `json:"policy_version,omitempty"`
 }
 
 func (lr loginResponse) toTokens(refresh string) *iamservice.AuthTokens {
 	expires := time.Now().Add(time.Duration(lr.ExpiresIn) * time.Second)
 	return &iamservice.AuthTokens{
-		TokenType:    lr.TokenType,
-		AccessToken:  lr.AccessToken,
-		RefreshToken: refresh,
-		ExpiresIn:    int64(lr.ExpiresIn),
-		Scope:        lr.Scope,
-		ExpiresAt:    expires,
+		TokenType:     lr.TokenType,
+		AccessToken:   lr.AccessToken,
+		RefreshToken:  refresh,
+		ExpiresIn:     int64(lr.ExpiresIn),
+		Scope:         lr.Scope,
+		ExpiresAt:     expires,
+		PluginID:      lr.PluginID,
+		PolicyVersion: lr.PolicyVersion,
 	}
 }
 

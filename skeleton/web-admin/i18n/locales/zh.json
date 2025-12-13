@@ -26,6 +26,7 @@
     "capabilities": "能力注册",
     "capabilitiesExposure": "能力暴露配置",
     "capabilitiesLifecycle": "生命周期治理",
+    "iam": "组织与权限",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
@@ -128,7 +129,8 @@
     "delegated": {
       "bannerTitle": "PowerX 会话已失效",
       "bannerDescription": "宿主登录态不可用，请返回 PowerX 重新登录或等待管理员重新注入凭证。",
-      "retry": "重试请求"
+      "retry": "重试请求",
+      "loginDisabled": "当前运行于宿主 Delegated 模式，本地登录入口已禁用，请回到 PowerX 宿主完成登录。"
     }
   },
   "termsOfService": "服务条款",

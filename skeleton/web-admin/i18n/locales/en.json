@@ -26,6 +26,7 @@
     "capabilities": "Capabilities",
     "capabilitiesExposure": "Exposure & Quotas",
     "capabilitiesLifecycle": "Lifecycle Governance",
+    "iam": "IAM & Access",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -337,7 +338,8 @@
     "delegated": {
       "bannerTitle": "PowerX session expired",
       "bannerDescription": "The host login is no longer valid. Please return to PowerX or wait for the administrator to reinject the credential.",
-      "retry": "Request token"
+      "retry": "Request token",
+      "loginDisabled": "Running in delegated mode. Please return to the PowerX host console to authenticate."
     }
   },
   "landing": {

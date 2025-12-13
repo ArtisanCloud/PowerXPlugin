@@ -23,6 +23,7 @@
 3. 初始化能力工具链：如需 CLI 校验/导出，请运行 `npm --prefix scripts/capabilities install`（若尚未安装依赖），并使用 `make capabilities-lint`、`make capabilities-export` 驱动 `scripts/capabilities` 工具。
 4. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
 5. 体验 Go CLI 热加载：请按照 `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 构建 `px-plugin`、运行 `px-plugin dev --watch` / `dev --logs`，并通过 `px-plugin doctor` 生成 `.doctor/report.json` 以验证 Toolchain、mTLS、Dev API、Watcher 状态。
+6. 验证 Standalone IAM：按照 `specs/007-standalone-iam-rbac/quickstart.md` 导出 `PLUGIN_IAM_*` 环境变量运行 `go run ./cmd/database/main.go setup`，再使用 `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local` 验证本地管理员登录；若要确认 Delegated 模式入口隐藏，可设置 `PLAYWRIGHT_LOCAL_IAM=0`。
 
 ## Manifest 位置说明
 

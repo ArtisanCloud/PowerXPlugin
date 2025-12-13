@@ -60,41 +60,57 @@ func normalizedMode(mode string) string {
 	return mode
 }
 
+func normalizedPluginID(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return "unknown"
+	}
+	return id
+}
+
 // RecordLogin increments login counters grouped by IAM mode and result.
-func RecordLogin(mode, result string) {
+func RecordLogin(pluginID, mode, result string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
 	labels := map[string]string{
-		"mode":   normalizedMode(mode),
-		"result": strings.ToLower(strings.TrimSpace(result)),
+		"mode":      normalizedMode(mode),
+		"result":    strings.ToLower(strings.TrimSpace(result)),
+		"plugin_id": normalizedPluginID(pluginID),
 	}
 	ensureCounter(metricLoginTotal)[labelKey(labels)]++
 }
 
 // RecordRefresh increments refresh counters grouped by IAM mode and result.
-func RecordRefresh(mode, result string) {
+func RecordRefresh(pluginID, mode, result string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
 	labels := map[string]string{
-		"mode":   normalizedMode(mode),
-		"result": strings.ToLower(strings.TrimSpace(result)),
+		"mode":      normalizedMode(mode),
+		"result":    strings.ToLower(strings.TrimSpace(result)),
+		"plugin_id": normalizedPluginID(pluginID),
 	}
 	ensureCounter(metricRefreshTotal)[labelKey(labels)]++
 }
 
 // RecordLogout increments logout counters grouped by IAM mode.
-func RecordLogout(mode string) {
+func RecordLogout(pluginID, mode string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
-	labels := map[string]string{"mode": normalizedMode(mode)}
+	labels := map[string]string{
+		"mode":      normalizedMode(mode),
+		"plugin_id": normalizedPluginID(pluginID),
+	}
 	ensureCounter(metricLogoutTotal)[labelKey(labels)]++
 }
 
 // RecordDelegateError tracks delegated auth errors grouped by category.
-func RecordDelegateError(category string) {
+func RecordDelegateError(pluginID, category string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
-	labels := map[string]string{"type": strings.ToLower(strings.TrimSpace(category))}
+	labels := map[string]string{
+		"type":      strings.ToLower(strings.TrimSpace(category)),
+		"plugin_id": normalizedPluginID(pluginID),
+	}
 	ensureCounter(metricDelegateErrorsTotal)[labelKey(labels)]++
 }
 

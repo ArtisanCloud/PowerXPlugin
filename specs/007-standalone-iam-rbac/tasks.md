@@ -22,11 +22,22 @@
 
 ### Implementation Tasks
 
-- [ ] T006 [US1] 在 `internal/services/iam/local_store.go` 增强租户/管理员种子逻辑，校验环境变量并输出日志。
-- [ ] T007 [US1] 在 `skeleton/backend/internal/transport/http/public/auth_handler.go` 与 `/auth/login|refresh|logout|me/context` 路由中注入 Standalone 模式分支，并记录 `plugin_id`、`policy_version`。
-- [ ] T008 [US1] 修改 `web-admin/app/plugins/auth.client.ts`、`app/middleware/auth.global.ts`，确保 Standalone 模式展示登录页与“组织与权限”菜单，Delegated 模式隐藏。
-- [ ] T009 [P] [US1] 编写/更新 `web-admin/tests/e2e/auth-local.spec.ts`，覆盖 Standalone 登录、菜单显示；补充 Delegated 模式隐藏断言。
-- [ ] T010 [US1] Quickstart 文档与 README 增加 Standalone 初始化步骤、Playwright 用例入口。
+- [x] T006 [US1] 在 `internal/services/iam/local_store.go` 增强租户/管理员种子逻辑，校验环境变量并输出日志。
+  - [x] T006a 提炼 `SeedOptions` 加载/校验模块，输出警告日志并在 Delegated 模式跳过种子。
+  - [x] T006b 为 LocalDirectory 注入 `plugin_id`、`policy_version` 配置，扩展 `AuthTokens`/`UserContext` 与 JWT Claims。
+  - [x] T006c 编写单测覆盖空 env、弱密码、Delegated 下跳过等边界场景。
+- [x] T007 [US1] 在 `skeleton/backend/internal/transport/http/public/auth_handler.go` 与 `/auth/login|refresh|logout|me/context` 路由中注入 Standalone 模式分支，并记录 `plugin_id`、`policy_version`。
+  - [x] T007a 统一 `/auth/login|refresh|logout|me/context` Handler 的模式分支与错误提示，补充 `plugin_id/policy_version` 响应字段。
+  - [x] T007b 更新路由/中间件注册，确保 Standalone 模式默认启用本地目录，Delegated 模式保持回退，同时扩展 auth metrics 标签。
+- [x] T008 [US1] 修改 `web-admin/app/plugins/auth.client.ts`、`app/middleware/auth.global.ts`，确保 Standalone 模式展示登录页与“组织与权限”菜单，Delegated 模式隐藏。
+  - [x] T008a 在 `useAuth`/`auth.client.ts` 增加 `localIAMEnabled` 与 `delegatedIAM` runtime flag，控制登录流程与错误提示。
+  - [x] T008b 在 `AppSidebar`/导航区域按 flag 渲染“组织与权限”菜单，Delegated 模式完全隐藏。
+- [x] T009 [P] [US1] 编写/更新 `web-admin/tests/e2e/auth-local.spec.ts`，覆盖 Standalone 登录、菜单显示；补充 Delegated 模式隐藏断言。
+  - [x] T009a Standalone 用例：模拟本地管理员登录，断言 token/storage、菜单可见。
+  - [x] T009b Delegated 用例：设置 `PLAYWRIGHT_LOCAL_IAM=0` 或代理 env，断言登录入口隐藏或给出提示。
+- [x] T010 [US1] Quickstart 文档与 README 增加 Standalone 初始化步骤、Playwright 用例入口。
+  - [x] T010a 在 Quickstart/README 中记录 `go run ./cmd/database/main.go setup`、环境变量表、预期日志。
+  - [x] T010b 文档新增 Playwright `auth-local` 运行方式与默认管理员凭证，强调 Delegated 切换步骤。
 
 ## Phase 4: User Story 2 – 组织结构与成员管理 (Priority P1)
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useAuthService } from "~/composables/api/services/authService";
 
 definePageMeta({
@@ -12,6 +13,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
 const { setAuth, consumeAuthError } = auth;
+const isDelegatedMode = computed(() => auth.delegatedIAM?.value ?? false);
 
 // 导入认证服务
 const { login } = useAuthService();
@@ -29,6 +31,10 @@ const error = ref("");
 
 // 登录处理
 const handleLogin = async () => {
+  if (isDelegatedMode.value) {
+    error.value = t("auth.delegated.loginDisabled");
+    return;
+  }
   if (!form.identifier || !form.password) {
     error.value = t("auth.required");
     return;
@@ -55,11 +61,11 @@ const handleLogin = async () => {
       const redirectTo = (route.query.redirect as string) || "/";
 
       // 登录成功后跳转
-      await navigateTo(redirectTo);
-    } else {
-      error.value = response.message || t("auth.loginFailed");
-    }
-  } catch (err: any) {
+    await navigateTo(redirectTo);
+  } else {
+    error.value = response.message || t("auth.loginFailed");
+  }
+} catch (err: any) {
     console.error("登录错误:", err);
     error.value = err.response?.data?.message || t("auth.loginFailed");
   } finally {
@@ -148,6 +154,15 @@ onMounted(() => {
               class="mb-1"
             />
 
+            <UAlert
+              v-if="isDelegatedMode"
+              color="warning"
+              variant="soft"
+              :title="$t('auth.delegated.bannerTitle')"
+              :description="$t('auth.delegated.loginDisabled')"
+              class="mb-1"
+            />
+
             <!-- 邮箱输入 -->
             <div class="mb-6">
               <label
@@ -163,7 +178,7 @@ onMounted(() => {
                 type="text"
                 :placeholder="$t('auth.identifier')"
                 size="lg"
-                :disabled="loading"
+                :disabled="loading || isDelegatedMode"
                 class="w-full"
               />
             </div>
@@ -183,7 +198,7 @@ onMounted(() => {
                 type="password"
                 :placeholder="$t('auth.password')"
                 size="lg"
-                :disabled="loading"
+                :disabled="loading || isDelegatedMode"
                 class="w-full"
               />
             </div>
@@ -192,7 +207,7 @@ onMounted(() => {
             <div class="flex items-center justify-between mb-6">
               <UCheckbox
                 v-model="form.remember"
-                :disabled="loading"
+                :disabled="loading || isDelegatedMode"
                 :label="$t('auth.remember')"
               />
               <NuxtLink
@@ -210,6 +225,7 @@ onMounted(() => {
                 block
                 size="lg"
                 :loading="loading"
+                :disabled="isDelegatedMode"
                 class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
                 {{ loading ? $t("auth.signingIn") : $t("auth.loginButton") }}

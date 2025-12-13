@@ -133,6 +133,25 @@
           {{ t('navigation.capabilitiesLifecycle') }}
         </UButton>
       </div>
+
+      <div v-if="showIAMMenu">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.iam') }}
+        </div>
+        <UButton
+          to="/admin/iam/overview"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/admin/iam/overview'),
+          }"
+        >
+          <UIcon name="i-heroicons-user-group" class="w-4 h-4 mr-3" />
+          {{ t('navigation.iam') }}
+        </UButton>
+      </div>
     </nav>
   </aside>
 </template>
@@ -140,8 +159,10 @@
 <script setup lang="ts">
 const { t } = useI18n();
 const route = useRoute();
+const auth = useAuth();
 
 const showTemplatesMenu = ref(true);
+const showIAMMenu = computed(() => auth.localIAMEnabled?.value ?? false);
 
 const normalizePath = (value: string) => {
   if (!value) {

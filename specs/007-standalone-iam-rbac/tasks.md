@@ -47,12 +47,13 @@
 
 ### Implementation Tasks
 
-- [ ] T011 [US2] 在 `internal/entity/models/iam/`、`cmd/database/migrate` 添加 Department/Member/AuditLog 相关模型、迁移与约束。
-- [ ] T012 [US2] 实现 `internal/services/iam/tenant_service.go`、`department_service.go`、`member_service.go`，包含审计记录与缓存失效。
-- [ ] T013 [US2] 在 `internal/transport/http/admin/iam/tenant_handler.go`、`department_handler.go`、`member_handler.go` 实现 REST 路由与 DTO，调用服务层。
-- [ ] T014 [US2] 新增 `web-admin/app/pages/admin/iam/overview.vue`、`/members/index.vue`、`/departments/index.vue` 及对应组件/Pinia store，实现 CRUD UI、批量导入表单。
-- [ ] T015 [P] [US2] 扩展 Playwright `iam-local` 用例，验证部门调整、成员邀请/禁用、审计日志过滤。
-- [ ] T016 [US2] 在 `docs/operations/runbooks/iam-rbac.md` 记录租户锁定、成员解锁、审计查询步骤。
+- [x] T011 [US2] 在 `internal/entity/models/iam/`、`cmd/database/migrate` 添加 Department/Member/AuditLog 相关模型、迁移与约束。
+- [x] T012 [US2] 实现 `internal/services/iam/tenant_service.go`、`department_service.go`、`member_service.go`，包含审计记录与缓存失效。
+- [x] T013 [US2] 在 `internal/transport/http/admin/iam/tenant_handler.go`、`department_handler.go`、`member_handler.go` 实现 REST 路由与 DTO，调用服务层。
+- [x] T014 [US2] 新增 `web-admin/app/pages/admin/iam/overview.vue`、`/members/index.vue`、`/departments/index.vue` 及对应组件/Pinia store，实现 CRUD UI、批量导入表单。
+- [x] T015 [P] [US2] 扩展 Playwright `iam-local` 用例，验证部门调整、成员邀请/禁用、审计日志过滤。
+- [x] T016 [US2] 在 `docs/operations/runbooks/iam-rbac.md` 记录租户锁定、成员解锁、审计查询步骤，并补充账号跨租户验证流程。
+  - [x] T016a Runbook 新增“同一账号加入多个租户”场景，说明 API/SQL 验证与 UI 切换步骤。
 
 ## Phase 5: User Story 3 – 角色与权限治理 (Priority P2)
 
@@ -62,12 +63,12 @@
 
 ### Implementation Tasks
 
-- [ ] T017 [US3] 扩展 `internal/entity/models/iam/role.go`、`role_permissions.go`，支持 `scope_type`、policy_version 字段；迁移与种子注入。
-- [ ] T018 [US3] 在 `internal/services/iam/role_service.go` 实现角色 CRUD、克隆、权限勾选与成员绑定操作。
-- [ ] T019 [US3] 更新 `internal/transport/http/admin/iam/role_handler.go`、`permissions_handler.go`、`role_members_handler.go`，实现 API 合约。
-- [ ] T020 [US3] 在 `web-admin/app/pages/admin/iam/roles/index.vue`、`components/iam/PermissionTree.vue` 实现权限树 UI、角色克隆与成员绑定交互。
-- [ ] T021 [P] [US3] 扩展 API/Go 单测覆盖角色 CRUD、权限绑定、RBAC 决策缓存刷新逻辑。
-- [ ] T022 [US3] 更新 `internal/observability/auth/metrics.go` 与 Prometheus 指标，增加角色变更、RBAC 拒绝计数；Quickstart 增加观测说明。
+- [x] T017 [US3] 扩展 `internal/entity/models/iam/role.go`、`role_permissions.go`，支持 `scope_type`、policy_version 字段；迁移与种子注入。
+- [x] T018 [US3] 在 `internal/services/iam/role_service.go` 实现角色 CRUD、克隆、权限勾选与成员绑定操作。
+- [x] T019 [US3] 更新 `internal/transport/http/admin/iam/role_handler.go`、`permissions_handler.go`、`role_members_handler.go`，实现 API 合约。
+- [x] T020 [US3] 在 `web-admin/app/pages/admin/iam/roles/index.vue`、`components/iam/PermissionTree.vue` 实现权限树 UI、角色克隆与成员绑定交互。
+- [x] T021 [P] [US3] 扩展 API/Go 单测覆盖角色 CRUD、权限绑定、RBAC 决策缓存刷新逻辑。
+- [x] T022 [US3] 更新 `internal/observability/auth/metrics.go` 与 Prometheus 指标，增加角色变更、RBAC 拒绝计数；Quickstart 增加观测说明。
 
 ## Phase 6: User Story 4 – RBAC Enforcement & STS 合规 (Priority P2)
 
@@ -77,17 +78,17 @@
 
 ### Implementation Tasks
 
-- [ ] T023 [US4] 在 `internal/middleware/rbac.go` 与 `internal/transport/http/router.go` 声明显式 scope 映射，未声明路径自动推导 `resource/action`。
-- [ ] T024 [US4] 实现 `internal/services/iam/sts_service.go`，提供 `MintSTS(ctx)` 与审计记录，支持 `plugin_id`、`policy_version`。
-- [ ] T025 [US4] 在 `internal/transport/http/admin/iam/audit_handler.go` 与 `audit/logs` API 中注入过滤规则（系统管理员全局、租户管理员仅自身）。
-- [ ] T026 [US4] 更新 `docs/contracts/rbac.schema.json`、`internal/manifestx/manifest.go`，声明所有新资源/动作映射。
-- [ ] T027 [P] [US4] 在 `skeleton/web-admin/app/composables/api/_client.ts`、`app/components/AppNavbar.vue` 增加 Delegated/Standalone 模式提示与 STS 失效提示，配合 Playwright 覆盖。
+- [x] T023 [US4] 在 `internal/middleware/rbac.go` 与 `internal/transport/http/router.go` 声明显式 scope 映射，未声明路径自动推导 `resource/action`。
+- [x] T024 [US4] 实现 `internal/services/iam/sts_service.go`，提供 `MintSTS(ctx)` 与审计记录，支持 `plugin_id`、`policy_version`。
+- [x] T025 [US4] 在 `internal/transport/http/admin/iam/audit_handler.go` 与 `audit/logs` API 中注入过滤规则（系统管理员全局、租户管理员仅自身）。
+- [x] T026 [US4] 更新 `docs/contracts/rbac.schema.json`、`internal/manifestx/manifest.go`，声明所有新资源/动作映射。
+- [x] T027 [P] [US4] 在 `skeleton/web-admin/app/composables/api/_client.ts`、`app/components/AppNavbar.vue` 增加 Delegated/Standalone 模式提示与 STS 失效提示，配合 Playwright 覆盖。
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T028 整理 CLI `px-plugin iam export/seed` 命令、文档示例与错误处理，确保 10 秒内完成导出。
-- [ ] T029 执行回归脚本：`go test ./...`、`npm run lint`、`npm --prefix skeleton/web-admin run test:unit`、Playwright `auth-local` & `iam-local`、`px-plugin iam export` 冒烟。
-- [ ] T030 更新 `CHANGELOG.md`、Manifest、RBAC schema、Quickstart、Runbook，确保交付 artifacts 一致。
+- [x] T028 整理 CLI `px-plugin iam export/seed` 命令、文档示例与错误处理，确保 10 秒内完成导出。
+- [x] T029 执行回归脚本：`go test ./...`、`npm run lint`、`npm --prefix skeleton/web-admin run test:unit`、Playwright `auth-local` & `iam-local`、`px-plugin iam export` 冒烟。
+- [x] T030 更新 `CHANGELOG.md`、Manifest、RBAC schema、Quickstart、Runbook，确保交付 artifacts 一致。
 
 ## Dependencies & Parallelization
 

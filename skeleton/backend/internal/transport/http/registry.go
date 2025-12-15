@@ -11,6 +11,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin"
 	admincapability "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/capability"
 	adminconsole "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/console"
+	adminiam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/iam"
 	adminintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/integration"
 	adminmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/marketplace"
 	adminoperations "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/operations"
@@ -59,6 +60,7 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	r.mergeRBAC(adminconsole.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminmarketplace.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(admincapability.RBACEntries(r.apiPrefix()))
+	r.mergeRBAC(adminiam.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(templates.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(integrationRBACEntries(r.apiPrefix()))
 	r.mergeRBAC(marketplacePublicRBACEntries(r.apiPrefix()))

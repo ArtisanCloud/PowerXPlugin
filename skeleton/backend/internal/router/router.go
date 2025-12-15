@@ -1,6 +1,7 @@
 package router
 
 import (
+	stdhttp "net/http"
 	"os"
 	"strings"
 	"time"
@@ -124,6 +125,7 @@ func (r *Router) setupRoutes() {
 	gApi.Use(middleware2.RBAC(rbacCfg, nil, nil))
 	apiRegistry.RegisterAPIRoutes(gApi)
 	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
+	r.inferRBACFromRoutes(rbacCfg, prefix)
 
 	mcptransport.RegisterRoutes(r.engine, prefix)
 
@@ -145,7 +147,31 @@ func (r *Router) injectRBACFromRegistry(rbacCfg *middleware.RBACConfig, reg *htt
 		return
 	}
 	for route, perm := range reg.RBACMap() {
-		rbacCfg.RoutePermissions[route] = perm
+		rbacCfg.RoutePermissions[route] = rbacCfg.NormalizePermission(perm)
+	}
+}
+
+func (r *Router) inferRBACFromRoutes(rbacCfg *middleware.RBACConfig, prefix string) {
+	if r == nil || r.engine == nil || rbacCfg == nil || rbacCfg.DelegateToPowerX {
+		return
+	}
+	basis := strings.TrimRight(prefix, "/")
+	for _, route := range r.engine.Routes() {
+		if route.Method == stdhttp.MethodOptions {
+			continue
+		}
+		if basis != "" && !strings.HasPrefix(route.Path, basis) {
+			continue
+		}
+		key := route.Method + ":" + route.Path
+		if _, exists := rbacCfg.RoutePermissions[key]; exists {
+			continue
+		}
+		perm, ok := middleware.InferPermission(route.Method, route.Path)
+		if !ok {
+			continue
+		}
+		rbacCfg.RoutePermissions[key] = rbacCfg.NormalizePermission(perm)
 	}
 }
 
@@ -257,12 +283,13 @@ func (r *Router) buildRBAC() *middleware.RBACConfig {
 	}
 	return &middleware.RBACConfig{
 		Enabled:          true,
-		DefaultDeny:      false,
+		DefaultDeny:      true,
 		SuperAdminRoles:  []string{"superadmin", "admin"},
 		RoutePermissions: map[string]middleware.Permission{},
 		DelegateToPowerX: delegate,
 		PowerXIssuer:     issuer,
 		PowerXAudience:   aud,
+		PluginID:         app.PluginID,
 	}
 }
 

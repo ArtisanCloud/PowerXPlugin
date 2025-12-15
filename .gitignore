@@ -6,6 +6,7 @@ bin/
 examples/verify-external/backend/backend
 *.test
 *.out
+vendor/
 
 # Node/Nuxt workspaces
 node_modules/

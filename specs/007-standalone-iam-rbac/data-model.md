@@ -18,6 +18,21 @@
 - **Relationships**: N:N Roles（member_roles），N:1 Department。
 - **State Transitions**: `active ↔ disabled`（手动），`active → locked`（风控）。
 
+## Account vs Member 关系梳理
+- `iam_users`（Account）保存跨租户的账号凭证（邮箱、密码、头像等），不附带 `tenant_uuid`，因此同一账号可加入多个租户。
+- `iam_members`（Member）是账号在具体租户下的实例，带有 `tenant_uuid`、组织与状态字段，并通过 `user_id` 指向 Account。
+- `iam_member_roles` 连接 Member 与 Role，`iam_departments` 通过 `department_id` 与 Member 相联；审计、Token 等附属表同样以 Member 作为租户内主体。
+
+```
+iam_users (Account)
+      │ 1:N
+      ▼
+iam_members (Member) ──< iam_member_roles >── iam_roles ──< iam_role_permissions >── iam_permissions
+      │
+      ├─ N:1 iam_departments
+      └─ 1:N iam_refresh_tokens / iam_audit_logs
+```
+
 ## Role
 - **Fields**: `id (UUID)`, `tenant_uuid`, `code (string)`, `name`, `scope_type (system|tenant)`, `description`。
 - **Constraints**: `(tenant_uuid, code)` 唯一；系统角色仅平台管理员可编辑。

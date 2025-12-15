@@ -98,6 +98,13 @@
 - **Permission**: 最小权限单元，与 Manifest 中的 `resource.action` 对齐，可由种子或同步工具写入。
 - **Policy (可选)**: 为未来 ABAC 留扩展点，记录 JSON 规则并与角色绑定，但本阶段仅占位。
 
+### IAM 表关系约束
+
+- `iam_users`（Account）存储跨租户的账号凭证（邮箱、密码哈希、头像等）；同一账号可加入多个租户。
+- `iam_members`（Member）是账号在特定租户下的实例，携带 `tenant_uuid`、部门、状态与审计字段，并通过 `user_id` 指向 `iam_users`；`iam_member_roles` 连接成员与 `iam_roles`。
+- `iam_roles`、`iam_permissions`、`iam_role_permissions` 形成 RBAC 树；`policy_version` 字段用于缓存刷新，`scope_type` 区分系统/租户级角色。
+- `iam_departments` 通过 `parent_id`、`path` 构建组织树；`iam_refresh_tokens`、`iam_audit_logs` 以成员为主体记录会话与操作，支撑 Runbook 中“账号加入多个租户”验证步骤。
+
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes

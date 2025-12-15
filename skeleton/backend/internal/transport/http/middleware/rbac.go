@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	authobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
 
@@ -56,14 +58,23 @@ func RBAC(cfg *authx.RBACConfig, _ authx.ABACClient, _ func(string, string) (boo
 			full = c.Request.URL.Path
 		}
 		perm, has := authx.MatchRoute(c.Request.Method, full, cfg.RoutePermissions)
-		if !has {
-			if inferred, ok := authx.InferPermission(c.Request.Method, c.Request.URL.Path); ok {
-				perm = inferred
-				has = true
-			}
+		if has {
+			perm = cfg.NormalizePermission(perm)
+		} else if inferred, ok := authx.InferPermission(c.Request.Method, c.Request.URL.Path); ok {
+			perm = cfg.NormalizePermission(inferred)
+			has = true
 		}
 		passRBAC := (!has && !cfg.DefaultDeny) || (has && authx.HasPerm(tc.Permissions, perm))
 		if !passRBAC {
+			resource := perm.Resource
+			action := perm.Action
+			if strings.TrimSpace(resource) == "" {
+				resource = "unknown"
+			}
+			if strings.TrimSpace(action) == "" {
+				action = "unknown"
+			}
+			authobs.RecordRBACDenied(app.PluginID, resource, action)
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"error":             "Insufficient permissions",
 				"required_resource": perm.Resource,

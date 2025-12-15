@@ -394,15 +394,26 @@ func (d *LocalDirectory) loadRolePermissionCodes(ctx context.Context, memberID u
 	}
 	permTable := iamm.Permission{}.TableName()
 	rolePermTable := iamm.RolePermission{}.TableName()
-	var perms []string
+	var rows []struct {
+		Resource string
+		Action   string
+	}
 	if err := d.db.WithContext(ctx).
 		Table(permTable+" p").
-		Select("p.resource || ':' || p.action").
+		Select("p.resource, p.action").
 		Joins("JOIN "+rolePermTable+" rp ON rp.permission_id = p.id").
 		Joins("JOIN "+memberRoleTable+" mr ON mr.role_id = rp.role_id").
 		Where("mr.member_id = ?", memberID).
-		Scan(&perms).Error; err != nil {
+		Scan(&rows).Error; err != nil {
 		return roles, nil, err
+	}
+	perms := make([]string, 0, len(rows))
+	for _, row := range rows {
+		code := d.formatPermissionCode(row.Resource, row.Action)
+		if code == "" {
+			continue
+		}
+		perms = append(perms, code)
 	}
 	return roles, perms, nil
 }
@@ -451,7 +462,7 @@ func (d *LocalDirectory) persistRefreshToken(ctx context.Context, uc *UserContex
 		TokenHash:  hash,
 		UserID:     uc.UserID,
 		TenantUuid: uc.TenantUuid,
-		MemberID:   uc.MemberID,
+		UserRecord: uc.MemberID,
 		ExpiresAt:  time.Now().Add(d.refreshTTL),
 	}
 	return d.db.WithContext(ctx).Create(rec).Error
@@ -466,7 +477,7 @@ func (d *LocalDirectory) rotateRefreshToken(ctx context.Context, rec *iamm.Refre
 			TokenHash:  hashToken(newToken),
 			UserID:     uc.UserID,
 			TenantUuid: uc.TenantUuid,
-			MemberID:   uc.MemberID,
+			UserRecord: uc.MemberID,
 			ExpiresAt:  time.Now().Add(d.refreshTTL),
 		}).Error
 	})
@@ -480,6 +491,9 @@ func (d *LocalDirectory) revokeRefreshToken(ctx context.Context, token string) e
 func tenantIdentifier(tenant *iamm.Tenant) string {
 	if tenant == nil {
 		return ""
+	}
+	if uuid := strings.TrimSpace(tenant.UUID); uuid != "" {
+		return strings.ToLower(uuid)
 	}
 	if key := strings.TrimSpace(tenant.Key); key != "" {
 		return strings.ToLower(key)
@@ -529,7 +543,7 @@ func (d *LocalDirectory) loadSessionPrincipals(ctx context.Context, rec *iamm.Re
 		return nil, nil, nil, err
 	}
 	var member iamm.Member
-	if err := d.db.WithContext(ctx).Where("id = ?", rec.MemberID).First(&member).Error; err != nil {
+	if err := d.db.WithContext(ctx).Where("id = ?", rec.UserRecord).First(&member).Error; err != nil {
 		return nil, nil, nil, err
 	}
 	var user iamm.User
@@ -550,6 +564,19 @@ func generateRandomToken() (string, error) {
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+func (d *LocalDirectory) formatPermissionCode(resource, action string) string {
+	res := strings.TrimSpace(resource)
+	act := strings.TrimSpace(action)
+	if res == "" || act == "" {
+		return ""
+	}
+	plugID := strings.TrimSpace(d.pluginID)
+	if plugID != "" && !strings.Contains(res, ":") {
+		res = plugID + ":" + res
+	}
+	return res + ":" + act
 }
 
 func valueOrDefault(values ...string) string {

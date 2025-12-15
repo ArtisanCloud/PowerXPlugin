@@ -127,6 +127,8 @@ export const useAuth = () => {
   const lastError = useState<string>("auth.lastError", () => "");
   const hasAuthenticated = useState("auth.hasAuthenticated", () => false);
   const delegatedAuthError = useState<string>("auth.delegatedError", () => "");
+  const localIAMEnabled = useState("auth.localIAMEnabled", () => !insidePowerX);
+  const delegatedIAM = useState("auth.delegatedIAM", () => insidePowerX);
 
   const { refreshToken: refresh, logout: apiLogout } = useAuthService();
 
@@ -291,6 +293,11 @@ export const useAuth = () => {
     }
   };
 
+  const setIAMModeFlags = (isDelegated: boolean) => {
+    delegatedIAM.value = isDelegated;
+    localIAMEnabled.value = !isDelegated;
+  };
+
   const logout = async () => {
     try {
       if (refreshToken.value) {
@@ -400,5 +407,8 @@ export const useAuth = () => {
     delegatedError: readonly(delegatedAuthError),
     clearDelegatedError,
     restoreFromStorage: syncFromStorage,
+    localIAMEnabled: readonly(localIAMEnabled),
+    delegatedIAM: readonly(delegatedIAM),
+    setIAMModeFlags,
   };
 };

@@ -132,10 +132,18 @@ export function useApiClient() {
     }
     if (response.status === 401) {
       console.error("API error:", response.status, response._data);
+      const stsExpired = auth.localIAMEnabled?.value;
+      if (stsExpired && process.client) {
+        toast?.add?.({
+          title: "会话已过期",
+          description: "短期 STS 令牌已失效，请重新登录刷新上下文",
+          color: "orange",
+        });
+      }
       auth.clearAuth();
       if (process.client) {
         toast?.add?.({
-          title: "登录状态已失效",
+          title: stsExpired ? "STS 令牌已过期" : "登录状态已失效",
           description: "请重新登录后再试",
           color: "red",
         });

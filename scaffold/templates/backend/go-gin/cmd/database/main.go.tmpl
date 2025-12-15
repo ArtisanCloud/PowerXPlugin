@@ -36,6 +36,7 @@ func main() {
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
 	includeIAM := iamResolver.Mode() == iamservice.IAMModeLocal
+	log.Printf("[iam] mode=%s source=%s includeIAM=%v", iamResolver.Mode(), iamResolver.Source(), includeIAM)
 
 	ctx := context.Background()
 	// 连接数据库

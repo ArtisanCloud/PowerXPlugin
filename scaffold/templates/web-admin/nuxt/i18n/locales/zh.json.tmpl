@@ -15,6 +15,7 @@
     "submit": "提交",
     "reset": "重置",
     "close": "关闭",
+    "refresh": "刷新",
     "welcome": "欢迎",
     "appName": "PowerX 基础插件"
   },
@@ -26,9 +27,178 @@
     "capabilities": "能力注册",
     "capabilitiesExposure": "能力暴露配置",
     "capabilitiesLifecycle": "生命周期治理",
+    "iam": "组织与权限",
+    "iamOverview": "租户总览",
+    "iamDepartments": "组织结构",
+    "iamMembers": "成员管理",
+    "iamRoles": "角色权限",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
+  },
+  "iam": {
+    "notifications": {
+      "loadTenantsFailed": "加载租户失败",
+      "selectTenant": "请先选择租户"
+    },
+    "overview": {
+      "title": "租户总览",
+      "caption": "查看并管理 Standalone 租户、套餐与状态。",
+      "createTenant": "新建租户",
+      "adjustPlan": "调整套餐",
+      "planDrawer": {
+        "title": "更新套餐与名称",
+        "planLabel": "套餐档位",
+        "displayName": "展示名称"
+      },
+      "createModal": {
+        "title": "注册租户",
+        "caption": "租户 Key 需保持唯一。",
+        "key": "租户 Key",
+        "name": "租户名称",
+        "plan": "套餐",
+        "status": "状态"
+      },
+      "status": {
+        "active": "启用",
+        "suspended": "停用"
+      },
+      "statusUpdated": "租户状态已更新",
+      "updateFailed": "更新租户失败",
+      "createSuccess": "租户创建成功",
+      "createFailed": "创建租户失败"
+    },
+    "departments": {
+      "title": "组织与部门",
+      "caption": "构建树形结构以划分成员职责与权限范围。",
+      "selectTenant": "选择租户",
+      "createButton": "新建部门",
+      "treeTitle": "部门树",
+      "emptyState": "暂未创建部门，点击右上角按钮即可新增。",
+      "noDescription": "暂无描述",
+      "editTitle": "编辑部门",
+      "createTitle": "创建部门",
+      "parentRoot": "根节点（无上级）",
+      "fields": {
+        "name": "名称",
+        "code": "唯一编码",
+        "description": "描述",
+        "parent": "上级部门",
+        "sortOrder": "排序"
+      },
+      "loadFailed": "加载部门失败",
+      "saveSuccess": "部门已保存",
+      "saveFailed": "保存部门失败",
+      "deleteConfirm": "确认删除 {name} 吗？",
+      "deleteSuccess": "部门已删除",
+      "deleteFailed": "删除部门失败"
+    },
+    "members": {
+      "title": "成员管理",
+      "caption": "邀请成员、调整部门并在必要时禁用账号。",
+      "selectTenant": "选择租户",
+      "createButton": "邀请成员",
+      "importButton": "批量导入",
+      "searchPlaceholder": "邮箱、用户名或姓名",
+      "statusFilter": "状态筛选",
+      "noRoles": "暂无角色",
+      "disable": "禁用",
+      "enable": "启用",
+      "editModal": {
+        "title": "编辑成员",
+        "caption": "更新成员信息、部门与状态。"
+      },
+      "fields": {
+        "email": "邮箱",
+        "displayName": "显示名",
+        "username": "用户名",
+        "phone": "手机号",
+        "department": "所属部门",
+        "status": "状态",
+        "noDepartment": "未分配部门"
+      },
+      "table": {
+        "name": "姓名",
+        "status": "状态",
+        "roles": "角色",
+        "department": "部门"
+      },
+      "status": {
+        "active": "启用",
+        "disabled": "禁用",
+        "locked": "锁定"
+      },
+      "loadFailed": "加载成员失败",
+      "saveSuccess": "成员已保存",
+      "saveFailed": "保存成员失败",
+      "statusUpdated": "成员状态已更新",
+      "updateFailed": "更新成员失败",
+      "importModal": {
+        "title": "批量导入成员",
+        "caption": "每行一个成员，格式：email,显示名",
+        "hint": "仅邮箱为必填字段，可选显示名；导入后可在列表中继续编辑。",
+        "placeholder": "示例：user＠example.com，张三",
+        "submit": "开始导入",
+        "empty": "请至少输入一行成员信息",
+        "success": "导入完成",
+        "failed": "导入失败",
+        "summary": "成功 {success} 条，失败 {failed} 条。"
+      }
+    },
+    "roles": {
+      "title": "角色与权限",
+      "caption": "根据 Manifest 定义的 Scope 创建、克隆角色，并管理成员与权限。",
+      "selectTenant": "选择租户",
+      "searchPlaceholder": "按名称或编码搜索",
+      "scopeFilter": "按作用域筛选",
+      "create": "新建角色",
+      "editTitle": "编辑角色",
+      "formCaption": "设置角色基础信息与作用域",
+      "managePermissions": "权限配置",
+      "manageMembers": "成员管理",
+      "table": {
+        "name": "角色",
+        "scope": "作用域",
+        "members": "成员数",
+        "createdAt": "创建时间"
+      },
+      "fields": {
+        "code": "角色编码",
+        "name": "显示名称",
+        "description": "描述",
+        "scope": "作用域",
+        "cloneRole": "克隆权限来源"
+      },
+      "clonePlaceholder": "可选，复制其他角色权限",
+      "scopeTenant": "租户级",
+      "scopeSystem": "系统级",
+      "validationRequired": "请填写必填字段",
+      "saveSuccess": "角色已保存",
+      "saveFailed": "保存角色失败",
+      "loadFailed": "加载角色失败",
+      "deleteConfirm": "确认删除角色 {role} 吗？该操作不可撤销。",
+      "deleteSuccess": "角色已删除",
+      "deleteFailed": "删除角色失败",
+      "permissionsTitle": "权限 · {role}",
+      "permissionsCaption": "从权限树中勾选与 Manifest 对齐的 Scope",
+      "permissionsLoadFailed": "加载权限列表失败",
+      "permissionsSaved": "权限已更新",
+      "permissionsFailed": "更新权限失败",
+      "membersTitle": "成员 · {role}",
+      "membersCaption": "分配或移除角色成员，变更即时生效",
+      "membersSearch": "搜索成员",
+      "noMembers": "暂无成员",
+      "membersSaved": "成员列表已更新",
+      "membersFailed": "更新成员失败",
+      "permissionTree": {
+        "search": "搜索权限",
+        "selectAll": "全选",
+        "clear": "清空",
+        "emptyTitle": "暂无可用权限",
+        "emptyDescription": "请先从 Manifest 同步或执行种子脚本。",
+        "total": "共 {count} 条"
+      }
+    }
   },
   "theme": {
     "light": "浅色模式",
@@ -128,7 +298,8 @@
     "delegated": {
       "bannerTitle": "PowerX 会话已失效",
       "bannerDescription": "宿主登录态不可用，请返回 PowerX 重新登录或等待管理员重新注入凭证。",
-      "retry": "重试请求"
+      "retry": "重试请求",
+      "loginDisabled": "当前运行于宿主 Delegated 模式，本地登录入口已禁用，请回到 PowerX 宿主完成登录。"
     }
   },
   "termsOfService": "服务条款",

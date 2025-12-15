@@ -51,17 +51,33 @@ PLAYWRIGHT_LOCAL_IAM=0 npm --prefix skeleton/web-admin run test:e2e -- auth-loca
 ```
 
 ## 4. CLI 工具
-```bash
-# 导出租户/角色/权限
-px-plugin iam export --entry skeleton --output /tmp/iam-export.json
+`px-plugin iam` 命令用于离线备份与管理员重置，默认读取 `--entry`（插件根目录）的 `backend/etc/config.yaml` 连接数据库。
 
-# 重置管理员凭据
-px-plugin iam seed --entry skeleton --admin-email new@tenant.test --admin-password 'NewP@ssw0rd'
+```bash
+# 备份所有租户/角色/成员到 JSON，默认 10 秒内完成
+px-plugin iam export \
+  --entry skeleton \
+  --output tmp/iam-backup.json \
+  --pretty
+
+# 仅导出指定租户（根据 key/UUID 匹配）
+px-plugin iam export --entry skeleton --tenant 00000000-0000-0000-0000-000000000001 --output /tmp/local-tenant.json
+
+# 在 Delegated 模式下强制重置管理员（谨慎使用）
+px-plugin iam seed \
+  --entry skeleton \
+  --tenant-key 00000000-0000-0000-0000-000000000001 \
+  --tenant-name "Local Tenant" \
+  --admin-email admin@local.test \
+  --admin-password S3cret!! \
+  --force
 ```
+
+导出的 JSON 包含 `tenants`、`accounts`、`members`、`roles`、`role_permissions` 等完整结构，可直接用于灾备/迁移；`iam seed` 会在事务里重建管理员密码、默认角色与部门，并对 Delegated 模式给出提示。
 
 ## 5. 指标与审计
 - Prometheus 端点：`GET /api/v1/admin/runtime/metrics`
-  - 关注 `plugin_iam_member_total`, `plugin_rbac_denied_total`, `plugin_iam_seed_duration_seconds`
+  - 关注 `plugin_iam_member_total`, `plugin_rbac_denied_total`, `plugin_iam_role_change_total`, `plugin_iam_seed_duration_seconds`
 - 审计日志：`/api/v1/admin/iam/audit/logs` 支持按租户过滤；系统管理员查看全局，租户管理员仅限自身租户。
 
 ## 6. 文档/Manifest 更新

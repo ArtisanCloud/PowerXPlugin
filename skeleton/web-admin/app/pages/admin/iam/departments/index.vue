@@ -1,0 +1,327 @@
+<template>
+  <div class="space-y-6">
+    <UCard>
+      <template #header>
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold">{{ t("iam.departments.title") }}</h2>
+            <p class="text-sm text-gray-500">
+              {{ t("iam.departments.caption") }}
+            </p>
+          </div>
+          <div class="flex flex-col md:flex-row gap-3">
+            <USelectMenu
+              :options="tenantOptions"
+              v-model="selectedTenantUuid"
+              :placeholder="t('iam.departments.selectTenant')"
+              class="w-full md:w-64"
+              data-testid="tenant-select"
+            />
+            <UButton
+              icon="i-heroicons-plus"
+              color="primary"
+              @click="startCreate()"
+              data-testid="create-department"
+            >
+              {{ t("iam.departments.createButton") }}
+            </UButton>
+            <UButton
+              icon="i-heroicons-arrow-path"
+              variant="soft"
+              :loading="loading"
+              @click="refreshDepartments"
+            >
+              {{ t("common.refresh") }}
+            </UButton>
+          </div>
+        </div>
+      </template>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <h3 class="text-sm font-semibold text-gray-500 mb-2">
+            {{ t("iam.departments.treeTitle") }}
+          </h3>
+          <div v-if="!departmentRows.length" class="text-sm text-gray-500">
+            {{ t("iam.departments.emptyState") }}
+          </div>
+          <ul class="space-y-1">
+            <li
+              v-for="node in departmentRows"
+              :key="node.id"
+              class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2"
+              :style="{ marginLeft: `${node.depth * 16}px` }"
+            >
+              <div>
+                <p class="text-sm font-medium">
+                  {{ node.name }}
+                  <span class="text-xs text-gray-500 ml-2">{{ node.code }}</span>
+                </p>
+                <p class="text-xs text-gray-500">
+                  {{ node.description || t("iam.departments.noDescription") }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <UButton
+                  icon="i-heroicons-plus"
+                  size="2xs"
+                  variant="ghost"
+                  @click="startCreate(node.id)"
+                />
+                <UButton
+                  icon="i-heroicons-pencil-square"
+                  size="2xs"
+                  variant="ghost"
+                  @click="startEdit(node)"
+                  data-testid="edit-department"
+                />
+                <UButton
+                  icon="i-heroicons-trash"
+                  size="2xs"
+                  variant="ghost"
+                  color="red"
+                  @click="removeDepartment(node)"
+                />
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-semibold text-gray-500 mb-2">
+            {{ editingId ? t("iam.departments.editTitle") : t("iam.departments.createTitle") }}
+          </h3>
+          <UForm :state="formState" class="space-y-4">
+            <UFormGroup :label="t('iam.departments.fields.name')" required>
+              <UInput v-model="formState.name" placeholder="Ops Team" />
+            </UFormGroup>
+            <UFormGroup :label="t('iam.departments.fields.code')" required>
+              <UInput v-model="formState.code" placeholder="ops-team" />
+            </UFormGroup>
+            <UFormGroup :label="t('iam.departments.fields.description')">
+              <UTextarea v-model="formState.description" />
+            </UFormGroup>
+            <UFormGroup :label="t('iam.departments.fields.parent')">
+              <USelectMenu
+                v-model="formState.parent_id"
+                :options="parentOptions"
+                value-attribute="value"
+                option-attribute="label"
+                searchable
+              />
+            </UFormGroup>
+            <UFormGroup :label="t('iam.departments.fields.sortOrder')">
+              <UInput v-model="formState.sort_order" type="number" />
+            </UFormGroup>
+          </UForm>
+          <div class="mt-6 flex justify-end gap-2">
+            <UButton variant="soft" @click="resetForm">
+              {{ t("common.reset") }}
+            </UButton>
+            <UButton color="primary" :loading="saving" @click="submitDepartment">
+              {{ t("common.save") }}
+            </UButton>
+          </div>
+        </div>
+      </div>
+    </UCard>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, reactive, watch, onMounted } from "vue";
+import { useDebounceFn } from "@vueuse/core";
+import { useToast } from "#imports";
+import { useIAMService } from "~/composables/api/services/iamService";
+import { useIAMStore } from "~/stores/iam";
+
+definePageMeta({
+  layout: "default",
+});
+
+const iam = useIAMService();
+const store = useIAMStore();
+const toast = useToast();
+const { t } = useI18n();
+
+const loading = ref(false);
+const saving = ref(false);
+const editingId = ref<number | null>(null);
+const selectedTenantUuid = computed({
+  get: () => store.activeTenantUuid,
+  set: (value: string | null) => {
+    if (value) {
+      store.setActiveTenant(value);
+    }
+  },
+});
+
+const formState = reactive({
+  name: "",
+  code: "",
+  description: "",
+  parent_id: undefined as number | undefined,
+  sort_order: 0,
+});
+
+const tenantOptions = computed(() =>
+  (store.tenants ?? []).map((tenant) => ({
+    label: `${tenant.name} (${tenant.key})`,
+    value: tenant.key,
+  }))
+);
+
+const parentOptions = computed(() => [
+  { label: t("iam.departments.parentRoot"), value: undefined },
+  ...store.departments.map((dept) => ({
+    label: `${dept.name} (${dept.code})`,
+    value: dept.id,
+  })),
+]);
+
+const departmentRows = computed(() =>
+  store.departments.map((dept) => {
+    const depth = Math.max(0, dept.path.split(".").length - 1);
+    return { ...dept, depth };
+  })
+);
+
+const ensureTenants = async () => {
+  if (store.tenants.length > 0) return;
+  await fetchTenants();
+};
+
+const fetchTenants = async () => {
+  try {
+    const response = await iam.listTenants();
+    store.setTenants(response?.data?.items ?? []);
+  } catch (error: any) {
+    toast.add({
+      title: t("iam.notifications.loadTenantsFailed"),
+      description: error?.data?.message || error?.message,
+      color: "red",
+    });
+  }
+};
+
+const refreshDepartments = async () => {
+  if (!store.activeTenantUuid) return;
+  loading.value = true;
+  try {
+    const response = await iam.listDepartments(store.activeTenantUuid);
+    store.setDepartments(response?.data?.items ?? []);
+  } catch (error: any) {
+    toast.add({
+      title: t("iam.departments.loadFailed"),
+      description: error?.data?.message || error?.message,
+      color: "red",
+    });
+  } finally {
+    loading.value = false;
+  }
+};
+
+const resetForm = () => {
+  editingId.value = null;
+  formState.name = "";
+  formState.code = "";
+  formState.description = "";
+  formState.parent_id = undefined;
+  formState.sort_order = 0;
+};
+
+const startCreate = (parentId?: number) => {
+  resetForm();
+  if (parentId) {
+    formState.parent_id = parentId;
+  }
+};
+
+const startEdit = (dept: any) => {
+  editingId.value = dept.id;
+  formState.name = dept.name;
+  formState.code = dept.code;
+  formState.description = dept.description || "";
+  formState.parent_id = dept.parent_id;
+  formState.sort_order = dept.sort_order ?? 0;
+};
+
+const submitDepartment = async () => {
+  if (!store.activeTenantUuid) {
+    toast.add({
+      title: t("iam.notifications.selectTenant"),
+      color: "red",
+    });
+    return;
+  }
+  saving.value = true;
+  try {
+    if (editingId.value) {
+      await iam.updateDepartment(editingId.value, {
+        name: formState.name,
+        description: formState.description,
+        parent_id: formState.parent_id ?? null,
+        sort_order: Number(formState.sort_order) || 0,
+      });
+    } else {
+      await iam.createDepartment({
+        tenant_uuid: store.activeTenantUuid,
+        name: formState.name,
+        code: formState.code,
+        description: formState.description,
+        parent_id: formState.parent_id ?? null,
+        sort_order: Number(formState.sort_order) || 0,
+      });
+    }
+    toast.add({
+      title: t("iam.departments.saveSuccess"),
+      color: "green",
+    });
+    resetForm();
+    await refreshDepartments();
+  } catch (error: any) {
+    toast.add({
+      title: t("iam.departments.saveFailed"),
+      description: error?.data?.message || error?.message,
+      color: "red",
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
+const removeDepartment = async (dept: any) => {
+  if (!window.confirm(t("iam.departments.deleteConfirm", { name: dept.name }))) {
+    return;
+  }
+  try {
+    await iam.deleteDepartment(dept.id);
+    toast.add({ title: t("iam.departments.deleteSuccess") });
+    await refreshDepartments();
+  } catch (error: any) {
+    toast.add({
+      title: t("iam.departments.deleteFailed"),
+      description: error?.data?.message || error?.message,
+      color: "red",
+    });
+  }
+};
+
+const debouncedFetch = useDebounceFn(refreshDepartments, 100);
+
+watch(
+  () => store.activeTenantUuid,
+  async (next) => {
+    if (next) {
+      await debouncedFetch();
+    }
+  }
+);
+
+onMounted(async () => {
+  await ensureTenants();
+  if (store.activeTenantUuid) {
+    await refreshDepartments();
+  }
+});
+</script>

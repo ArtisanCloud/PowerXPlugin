@@ -115,13 +115,13 @@ integration:
     tax_provider: stripe_tax
     stripe_tax:
       api_key: "sk_test_xxx"
-      account_id: ""
+      user_id: ""
       location: "US"
       api_base_url: "https://api.stripe.com"
       webhook_secret: ""
       timeout_seconds: 15
     avalara:
-      account_id: ""
+      user_id: ""
       license_key: ""
       company_code: ""
       environment: "sandbox"

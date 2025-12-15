@@ -17,6 +17,7 @@ type TenantContext struct {
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"permissions"`
 	PolicyVersion string   `json:"policy_version"`
+	PluginID      string   `json:"plugin_id"`
 }
 
 const (

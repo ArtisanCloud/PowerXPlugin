@@ -73,3 +73,9 @@ scripts/ & tools/
 ## Complexity Tracking
 
 无偏离宪章的额外复杂度。
+
+## 数据模型与 Runbook 对齐（2025-12-15 更新）
+
+- `iam_users`/`iam_members` 的职责区分需要在数据模型文档中明确：Account 持有跨租户凭证，Member 负责租户内的组织/RBAC 状态，并通过 `iam_member_roles` 关联 `iam_roles`。
+- 所有 IAM 相关表（tenants/users/members/roles/permissions/departments/member_roles/role_permissions/refresh_tokens/audit_logs）必须在迁移与模型层保持一致命名，并在 Runbook 中提供“同一账号加入多个租户”的验证步骤，方便运维复现问题。
+- Phase 4 的文档任务需补充上述说明；若后续实现导致模型再次变更，需同时回传到 `data-model.md` 与 `docs/operations/runbooks/iam-rbac.md`。

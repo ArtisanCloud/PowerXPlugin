@@ -15,6 +15,7 @@ type RBACConfig struct {
 	DelegateToPowerX bool
 	PowerXIssuer     string
 	PowerXAudience   string
+	PluginID         string
 }
 
 func IsSuperAdmin(userRoles, superRoles []string) bool {
@@ -135,4 +136,18 @@ func methodToAction(method string) string {
 	default:
 		return ""
 	}
+}
+
+// NormalizePermission ensures permission resources follow plugin scope namespace.
+func (cfg *RBACConfig) NormalizePermission(perm Permission) Permission {
+	perm.Resource = strings.TrimSpace(perm.Resource)
+	perm.Action = strings.TrimSpace(perm.Action)
+	if cfg == nil {
+		return perm
+	}
+	pluginID := strings.TrimSpace(cfg.PluginID)
+	if pluginID != "" && perm.Resource != "" && !strings.Contains(perm.Resource, ":") {
+		perm.Resource = pluginID + ":" + perm.Resource
+	}
+	return perm
 }

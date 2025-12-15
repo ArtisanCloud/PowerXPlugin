@@ -15,6 +15,7 @@
     "submit": "Submit",
     "reset": "Reset",
     "close": "Close",
+    "refresh": "Refresh",
     "welcome": "Welcome",
     "appName": "PowerX Base"
   },
@@ -27,9 +28,177 @@
     "capabilitiesExposure": "Exposure & Quotas",
     "capabilitiesLifecycle": "Lifecycle Governance",
     "iam": "IAM & Access",
+    "iamOverview": "IAM Overview",
+    "iamDepartments": "Departments",
+    "iamMembers": "Members",
+    "iamRoles": "Roles",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
+  },
+  "iam": {
+    "notifications": {
+      "loadTenantsFailed": "Unable to load tenants",
+      "selectTenant": "Please select a tenant first"
+    },
+    "overview": {
+      "title": "Tenant Overview",
+      "caption": "Manage tenant lifecycle, plans, and isolation for Standalone IAM.",
+      "createTenant": "Create Tenant",
+      "adjustPlan": "Adjust Plan",
+      "planDrawer": {
+        "title": "Update tenant plan",
+        "planLabel": "Plan tier",
+        "displayName": "Display name"
+      },
+      "createModal": {
+        "title": "Register tenant",
+        "caption": "Provide a unique tenant key and name.",
+        "key": "Tenant Key",
+        "name": "Display Name",
+        "plan": "Plan",
+        "status": "Status"
+      },
+      "status": {
+        "active": "Active",
+        "suspended": "Suspended"
+      },
+      "statusUpdated": "Tenant status updated",
+      "updateFailed": "Failed to update tenant",
+      "createSuccess": "Tenant created",
+      "createFailed": "Failed to create tenant"
+    },
+    "departments": {
+      "title": "Departments",
+      "caption": "Build a tree structure to organize members and scope permissions.",
+      "selectTenant": "Select tenant",
+      "createButton": "New Department",
+      "treeTitle": "Department tree",
+      "emptyState": "No departments yet. Create the first node to start building the tree.",
+      "noDescription": "No description",
+      "editTitle": "Edit department",
+      "createTitle": "Create department",
+      "parentRoot": "Root (no parent)",
+      "fields": {
+        "name": "Name",
+        "code": "Code",
+        "description": "Description",
+        "parent": "Parent",
+        "sortOrder": "Sort order"
+      },
+      "loadFailed": "Failed to load departments",
+      "saveSuccess": "Department saved",
+      "saveFailed": "Failed to save department",
+      "deleteConfirm": "Remove department {name}?",
+      "deleteSuccess": "Department removed",
+      "deleteFailed": "Failed to delete department"
+    },
+    "members": {
+      "title": "Members",
+      "caption": "Invite members, assign departments, and lock accounts when needed.",
+      "selectTenant": "Select tenant",
+      "createButton": "Invite Member",
+      "importButton": "Bulk Import",
+      "searchPlaceholder": "Search by email, username, or name",
+      "statusFilter": "Filter by status",
+      "noRoles": "No roles",
+      "disable": "Disable",
+      "enable": "Enable",
+      "editModal": {
+        "title": "Edit member",
+        "caption": "Update profile, department, or status."
+      },
+      "fields": {
+        "email": "Email",
+        "displayName": "Display name",
+        "username": "Username",
+        "phone": "Phone",
+        "department": "Department",
+        "status": "Status",
+        "noDepartment": "No department"
+      },
+      "table": {
+        "name": "Name",
+        "status": "Status",
+        "roles": "Roles",
+        "department": "Department"
+      },
+      "status": {
+        "active": "Active",
+        "disabled": "Disabled",
+        "locked": "Locked"
+      },
+      "loadFailed": "Failed to load members",
+      "saveSuccess": "Member saved",
+      "saveFailed": "Failed to save member",
+      "statusUpdated": "Member status updated",
+      "updateFailed": "Failed to update member",
+      "importModal": {
+        "title": "Bulk import members",
+        "caption": "Paste one member per line. Format: email,displayName",
+        "hint": "Only email is required. Optional values include display name. Members will receive default roles after creation.",
+        "placeholder": "user@example.com, Display Name",
+        "submit": "Import",
+        "empty": "Please provide at least one row",
+        "success": "Import finished",
+        "failed": "Import failed",
+        "summary": "{success} succeeded, {failed} failed."
+      }
+    },
+    "roles": {
+      "title": "Roles & Permissions",
+      "caption": "Create roles, clone defaults, and manage permission scopes per tenant.",
+      "selectTenant": "Select tenant",
+      "searchPlaceholder": "Search by name or code",
+      "scopeFilter": "Filter by scope",
+      "create": "Create Role",
+      "editTitle": "Edit role",
+      "formCaption": "Role metadata and scope settings",
+      "managePermissions": "Permissions",
+      "manageMembers": "Members",
+      "table": {
+        "name": "Role",
+        "scope": "Scope",
+        "members": "Members",
+        "createdAt": "Created"
+      },
+      "fields": {
+        "code": "Role code",
+        "name": "Display name",
+        "description": "Description",
+        "scope": "Scope",
+        "cloneRole": "Clone permissions from"
+      },
+      "clonePlaceholder": "Optional, copy from existing role",
+      "scopeTenant": "Tenant",
+      "scopeSystem": "System",
+      "validationRequired": "Please fill in the required fields",
+      "saveSuccess": "Role saved",
+      "saveFailed": "Failed to save role",
+      "loadFailed": "Unable to load role",
+      "deleteConfirm": "Delete role {role}? This cannot be undone.",
+      "deleteSuccess": "Role deleted",
+      "deleteFailed": "Failed to delete role",
+      "permissionsTitle": "Permissions · {role}",
+      "permissionsCaption": "Select scopes from the manifest-aligned tree",
+      "permissionsLoadFailed": "Unable to load permissions",
+      "permissionsSaved": "Permissions updated",
+      "permissionsFailed": "Failed to update permissions",
+      "membersTitle": "Members · {role}",
+      "membersCaption": "Assign or remove members, changes apply immediately",
+      "membersSearch": "Search members",
+      "noMembers": "No members found",
+      "membersSaved": "Members updated",
+      "membersFailed": "Failed to update members",
+      "permissionTree": {
+        "search": "Search permissions",
+        "selectAll": "Select all",
+        "clear": "Clear",
+        "emptyTitle": "No permissions available",
+        "emptyDescription": "Import from manifest or seed defaults.",
+        "total": "{count} scopes"
+      }
+    }
   },
   "theme": {
     "light": "Light Theme",

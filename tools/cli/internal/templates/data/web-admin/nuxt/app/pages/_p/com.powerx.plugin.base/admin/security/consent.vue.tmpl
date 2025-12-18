@@ -94,10 +94,10 @@
             />
 
             <UTable :rows="rows" :columns="columns" :loading="loading">
-              <template #token-data="{ row }">
+              <template #token-cell="{ row }">
                 <span class="font-mono">{{ `{{ row.token }}` }}</span>
               </template>
-              <template #scope-data="{ row }">
+              <template #scope-cell="{ row }">
                 <div class="flex flex-wrap gap-2">
                   <UBadge
                     v-for="scope in row.scope"
@@ -110,7 +110,7 @@
                   </UBadge>
                 </div>
               </template>
-              <template #status-data="{ row }">
+              <template #status-cell="{ row }">
                 <UBadge
                   :color="statusColor(row.status)"
                   size="xs"
@@ -144,6 +144,7 @@ import type {
   ConsentTokenResponse,
   ConsentTokenListResponse,
 } from "~/types/security";
+import { useNormalizedColumns } from "~/utils/table";
 
 const runtimeConfig = useRuntimeConfig();
 const toast = useToast();
@@ -154,14 +155,14 @@ const loading = ref(false);
 const rows = ref<ConsentTokenResponse[]>([]);
 const error = ref<string | null>(null);
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "token", label: "Consent Token" },
   { key: "scope", label: "Scopes" },
   { key: "status", label: "Status" },
   { key: "issuedAt", label: "Issued At" },
   { key: "expiresAt", label: "Expires At" },
   { key: "issuedBy", label: "Issued By" },
-];
+]);
 
 const statusOptions = ["ACTIVE", "REVOKED", "EXPIRED"];
 

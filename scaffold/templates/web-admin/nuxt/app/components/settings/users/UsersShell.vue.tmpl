@@ -26,19 +26,6 @@ const view = computed(() => {
   return "member";
 });
 
-watch(
-  [isRoot, isCurrentTenantAdmin, currentTenantUuid],
-  () => {
-    console.info("[user-shell] view state", {
-      isRoot: isRoot.value,
-      isCurrentTenantAdmin: isCurrentTenantAdmin.value,
-      currentTenantUuid: currentTenantUuid.value,
-      view: view.value,
-    });
-  },
-  { immediate: true }
-);
-
 // 组件挂载时加载用户上下文
 onMounted(async () => {
   try {
@@ -52,29 +39,30 @@ onMounted(async () => {
 <template>
   <div>
     <!-- 加载状态 -->
-    <div v-if="isLoading" class="flex items-center justify-center py-12">
+    <div
+      v-if="isLoading"
+      class="flex items-center justify-center py-12 text-gray-600 dark:text-slate-200"
+    >
       <UIcon
         name="i-heroicons-arrow-path"
         class="animate-spin h-8 w-8 text-blue-600"
       />
-      <span class="ml-3 text-gray-600">{{ $t("common.loading") }}</span>
+      <span class="ml-3">{{ `{{ $t("common.loading") }}` }}</span>
     </div>
 
     <!-- 错误状态 -->
     <div
       v-else-if="error"
-      class="p-6 bg-red-50 border border-red-200 rounded-lg"
+      class="p-6 bg-red-50 border border-red-200 rounded-lg dark:bg-red-500/15 dark:border-red-500/40"
     >
       <div class="flex items-center">
         <UIcon
           name="i-heroicons-exclamation-triangle"
-          class="h-5 w-5 text-red-600"
+          class="h-5 w-5 text-red-600 dark:text-red-200"
         />
-        <span class="ml-2 text-red-800 font-medium">{{
-          $t("common.error")
-        }}</span>
+        <span class="ml-2 text-red-800 font-medium dark:text-red-200">{{ `{{ $t("common.error") }}` }}</span>
       </div>
-      <p class="mt-2 text-red-700">{{ error }}</p>
+      <p class="mt-2 text-red-700 dark:text-red-200/80">{{ `{{ error }}` }}</p>
       <UButton
         class="mt-3"
         color="primary"
@@ -82,7 +70,7 @@ onMounted(async () => {
         size="sm"
         @click="userStore.fetchUserContext"
       >
-        {{ $t("common.retry") }}
+        {{ `{{ $t("common.retry") }}` }}
       </UButton>
     </div>
 

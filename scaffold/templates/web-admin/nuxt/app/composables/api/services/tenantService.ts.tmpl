@@ -88,12 +88,22 @@ export const useTenantService = () => {
         payload?.pagination ?? {
           total: payload?.data?.total ?? payload?.total ?? items.length,
           page: params?.page ?? 1,
-          page_size: params?.page_size ?? items.length || 1,
+          page_size:
+            params?.page_size ??
+            payload?.data?.pagination?.page_size ??
+            payload?.pagination?.page_size ??
+            (items.length || 1),
           pages: Math.max(
             1,
             Math.ceil(
               (payload?.data?.total ?? payload?.total ?? items.length) /
-                Math.max(1, params?.page_size ?? items.length || 1)
+                Math.max(
+                  1,
+                  params?.page_size ??
+                    payload?.data?.pagination?.page_size ??
+                    payload?.pagination?.page_size ??
+                    (items.length || 1)
+                )
             )
           ),
         };

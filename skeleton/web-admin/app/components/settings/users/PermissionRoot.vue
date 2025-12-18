@@ -409,8 +409,12 @@ const deletePermission = async (permission: any) => {
     <!-- 标题 -->
     <div class="flex justify-between items-center">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">权限管理</h1>
-        <p class="text-gray-600 mt-1">管理系统权限和访问控制</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+          权限管理
+        </h1>
+        <p class="text-gray-600 mt-1 dark:text-slate-200">
+          管理系统权限和访问控制
+        </p>
       </div>
       <UButton
         icon="i-heroicons-plus"

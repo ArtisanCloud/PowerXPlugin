@@ -35,20 +35,20 @@
       </template>
 
       <UTable :rows="advisories" :columns="columns" :loading="loading">
-        <template #severity-data="{ row }">
+        <template #severity-cell="{ row }">
           <UBadge :color="severityColor(row.severity)" variant="soft" class="uppercase tracking-wide">
             {{ `{{ row.severity }}` }}
           </UBadge>
         </template>
-        <template #status-data="{ row }">
+        <template #status-cell="{ row }">
           <UBadge :color="statusBadgeColor(row.status)" variant="soft" class="uppercase tracking-wide">
             {{ `{{ row.status }}` }}
           </UBadge>
         </template>
-        <template #published_at-data="{ row }">
+        <template #published_at-cell="{ row }">
           {{ `{{ formatDate(row.published_at) }}` }}
         </template>
-        <template #actions-data="{ row }">
+        <template #actions-cell="{ row }">
           <div class="flex flex-wrap gap-2">
             <UButton
               size="xs"
@@ -149,6 +149,7 @@
 
 <script setup lang="ts">
 import type { VulnerabilityAdvisory } from "~/types/security"
+import { useNormalizedColumns } from "~/utils/table"
 
 const runtimeConfig = useRuntimeConfig()
 const toast = useToast()
@@ -188,13 +189,13 @@ const channelOptions = [
   { label: "Webhook", value: "WEBHOOK" },
 ]
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "reference", label: "Reference" },
   { key: "severity", label: "Severity" },
   { key: "status", label: "Status" },
   { key: "published_at", label: "Published" },
   { key: "actions", label: "Actions" },
-]
+])
 
 const apiBase = computed(() => runtimeConfig.public.apiBaseUrl)
 

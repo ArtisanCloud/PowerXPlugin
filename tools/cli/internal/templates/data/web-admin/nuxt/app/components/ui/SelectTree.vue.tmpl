@@ -1,6 +1,6 @@
 <!-- components/ui/SelectTree.vue -->
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 
 /** ==== 类型 ==== */
 interface TreeNode {
@@ -80,6 +80,8 @@ const internalValue = ref<string | string[] | null>(
   normalizeToValue(props.modelValue ?? null, !!props.multiple)
 );
 const expanded = ref<string[]>([]);
+const triggerRef = ref<any>(null);
+const searchInputRef = ref<any>(null);
 
 /** ==== 依赖数据 ==== */
 // 扁平索引，便于快速找节点/叶子判断/取 label

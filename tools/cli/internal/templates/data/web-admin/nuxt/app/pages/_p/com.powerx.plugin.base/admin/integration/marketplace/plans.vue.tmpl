@@ -60,13 +60,13 @@
           :sort="{ column: 'updated_at', direction: 'desc' }"
           @select="selectListing"
         >
-          <template #title-data="{ row }">
+          <template #title-cell="{ row }">
             <div class="space-y-0.5">
               <span class="font-medium">{{ `{{ row.title }}` }}</span>
               <p class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ row.plugin_id }}` }}</p>
             </div>
           </template>
-          <template #status-data="{ row }">
+          <template #status-cell="{ row }">
             <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ `{{ row.status }}` }}</UBadge>
           </template>
         </UTable>
@@ -208,6 +208,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue"
 import { useNuxtApp, useRuntimeConfig, useToast } from "#imports"
+import { useNormalizedColumns } from "~/utils/table"
 import type {
   MarketplaceListing,
   MarketplaceListingStatus,
@@ -262,11 +263,11 @@ const filters = reactive<{ status: MarketplaceListingStatus[]; search: string }>
   search: "",
 })
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "title", label: "Listing" },
   { key: "status", label: "状态" },
   { key: "updated_at", label: "更新时间" },
-]
+])
 
 const statusOptions = [
   { label: "草稿", value: "draft" },

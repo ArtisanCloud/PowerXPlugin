@@ -12,6 +12,25 @@ components:
           - { key: "name", label: "Name", type: "text", required: true, max: 255 }
           - { key: "description", label: "Description", type: "textarea" }
           - { key: "content", label: "Content", type: "textarea" }
+  tokens:
+    members_panel:
+      description: |
+        Members 页面（/admin/iam/members）使用与 PowerX 底座一致的“高对比卡片”主题：浅色模式为半透明白板，深色模式为 #0f192a~#111a2b 的海军蓝，并保持 16px 圆角。
+      light:
+        panel: "`bg-white/95 border border-gray-100 shadow-lg`"
+        heading: "`text-gray-900 font-semibold`"
+        body: "`text-gray-600`（正文） / `text-gray-500`（次级）"
+      dark:
+        panel: "`dark:bg-slate-900/80 dark:border-slate-800/70`"
+        heading: "`dark:text-white`"
+        body: "`dark:text-slate-200`"
+    members_section_heading:
+      description: |
+        卡片或面板内的区块（部门、成员、权限等）在亮/暗模式下的文本、图标配色必须对齐：标题为纯白 (#fdfcff)，描述/辅助文字为淡蓝灰 (#d6e2ff)，禁用文字不低于 #94a3b8。
+      classes:
+        title: "`text-gray-900 dark:text-white`"
+        description: "`text-gray-600 dark:text-slate-200`"
+        icon: "`text-primary-600 dark:text-slate-100`（必要时使用 #93c5fd）"
 
 nuxt_ui:
   colors: [primary, secondary, success, info, warning, error, neutral]  # palette reference

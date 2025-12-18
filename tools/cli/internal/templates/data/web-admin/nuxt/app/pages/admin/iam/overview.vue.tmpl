@@ -16,9 +16,6 @@
         <UButton icon="i-heroicons-plus-circle" color="primary" @click="openCreateTenant">
           {{ `{{ $t("iam.overview.createTenant") }}` }}
         </UButton>
-        <UButton icon="i-heroicons-adjustments-horizontal" variant="soft" @click="showQuickSettingsModal = true">
-          {{ `{{ $t("iam.overview.quickSettings.title") }}` }}
-        </UButton>
         <UButton
           icon="i-heroicons-squares-2x2"
           variant="soft"
@@ -96,108 +93,6 @@
       </UTable>
     </UCard>
 
-    <UModal
-      v-model:open="showQuickSettingsModal"
-      :ui="{ content: 'max-w-3xl w-full' }"
-    >
-      <template #title>
-        {{ `{{ $t("iam.overview.quickSettings.title") }}` }}
-      </template>
-      <template #description>
-        {{ `{{ $t("iam.overview.quickSettings.caption") }}` }}
-      </template>
-      <template #body>
-        <div class="space-y-8 p-4 sm:p-5">
-          <section>
-            <h3 class="text-sm font-semibold mb-4">基础信息</h3>
-            <div class="space-y-4">
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p class="font-medium text-sm">显示名称</p>
-                  <p class="text-xs text-gray-500">用于登录页和通知的品牌名称</p>
-                </div>
-                <UInput v-model="quickSettings.siteName" class="w-full sm:w-64" />
-              </div>
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p class="font-medium text-sm">描述</p>
-                  <p class="text-xs text-gray-500">MC/管理员了解 IAM 的一句话</p>
-                </div>
-                <UInput v-model="quickSettings.siteDescription" class="w-full sm:w-64" />
-              </div>
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p class="font-medium text-sm">默认语言</p>
-                  <p class="text-xs text-gray-500">影响欢迎邮件与通知模板</p>
-                </div>
-                <USelect v-model="quickSettings.defaultLanguage" :items="languageOptions" class="w-full sm:w-48" />
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <h3 class="text-sm font-semibold mb-4">功能开关</h3>
-            <div class="grid gap-4 md:grid-cols-2">
-              <div
-                v-for="toggle in featureToggles"
-                :key="toggle.key"
-                class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2"
-              >
-                <div>
-                  <p class="text-sm font-medium">{{ `{{ toggle.label }}` }}</p>
-                  <p class="text-xs text-gray-500">{{ `{{ toggle.description }}` }}</p>
-                </div>
-                <USwitch v-model="quickSettings[toggle.key]" />
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <h3 class="text-sm font-semibold mb-4">安全策略</h3>
-            <div class="grid gap-4 md:grid-cols-2">
-              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
-                <div>
-                  <p class="text-sm font-medium">强制 HTTPS</p>
-                  <p class="text-xs text-gray-500"> web Admin 仅允许 https+samesite</p>
-                </div>
-                <USwitch v-model="quickSettings.forceHttps" />
-              </div>
-              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
-                <div>
-                  <p class="text-sm font-medium">两步验证</p>
-                  <p class="text-xs text-gray-500">管理员登录是否强制 MFA</p>
-                </div>
-                <USwitch v-model="quickSettings.twoFactorAuth" />
-              </div>
-              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
-                <div>
-                  <p class="text-sm font-medium">登录失败次数</p>
-                  <p class="text-xs text-gray-500">触发锁定前允许的失败次数</p>
-                </div>
-                <UInput v-model="quickSettings.maxLoginAttempts" type="number" class="w-24" />
-              </div>
-              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
-                <div>
-                  <p class="text-sm font-medium">审计保留天数</p>
-                  <p class="text-xs text-gray-500">超出后将被自动滚动清理</p>
-                </div>
-                <UInput v-model="quickSettings.auditRetentionDays" type="number" class="w-24" />
-              </div>
-            </div>
-          </section>
-        </div>
-      </template>
-      <template #footer>
-        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <UButton variant="soft" @click="resetQuickSettings">
-            {{ `{{ $t("common.reset") }}` }}
-          </UButton>
-          <UButton color="primary" @click="saveQuickSettings">
-            {{ `{{ $t("common.save") }}` }}
-          </UButton>
-        </div>
-      </template>
-    </UModal>
 
     <UModal
       v-model:open="showPlanDrawer"
@@ -307,7 +202,6 @@ const creating = ref(false);
 const planSaving = ref(false);
 const showCreateModal = ref(false);
 const showPlanDrawer = ref(false);
-const showQuickSettingsModal = ref(false);
 const selectedTenant = ref<TenantSummary | null>(null);
 
 const createForm = reactive({
@@ -331,51 +225,6 @@ const planItems = [
   { label: "Free", value: "free" },
   { label: "Standard", value: "standard" },
   { label: "Premium", value: "premium" },
-];
-
-const quickSettingDefaults = () => ({
-  siteName: "PowerX Plugin IAM",
-  siteDescription: "集中管理租户、部门与角色的 Standalone 控制台",
-  defaultLanguage: "zh-CN",
-  allowRegistration: true,
-  emailNotifications: false,
-  maintenanceMode: false,
-  enableAuditStreaming: true,
-  enablePortal: true,
-  forceHttps: true,
-  twoFactorAuth: false,
-  maxLoginAttempts: 5,
-  auditRetentionDays: 30,
-});
-
-const quickSettings = reactive(quickSettingDefaults());
-
-const languageOptions = [
-  { label: "简体中文", value: "zh-CN" },
-  { label: "English", value: "en" },
-];
-
-const featureToggles = [
-  {
-    key: "allowRegistration",
-    label: "用户自注册",
-    description: "允许通过邀请链接直接加入租户",
-  },
-  {
-    key: "emailNotifications",
-    label: "邮件通知",
-    description: "触发成员邀请、密码重置等邮件",
-  },
-  {
-    key: "maintenanceMode",
-    label: "维护模式",
-    description: "暂停全部租户的前台访问",
-  },
-  {
-    key: "enableAuditStreaming",
-    label: "审计流式同步",
-    description: "实时推送关键审计事件到宿主",
-  },
 ];
 
 const columns = useNormalizedColumns([
@@ -409,7 +258,7 @@ const settingCategories = computed(() => [
     description: "切换计划、调整租户状态",
     icon: "i-heroicons-cog-6-tooth",
     iconBg: "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-300",
-    path: "/admin/iam/overview",
+    path: "/admin/iam/settings",
   },
 ]);
 
@@ -444,22 +293,6 @@ const formatStatus = (status: string) => {
     return t("iam.overview.status.suspended");
   }
   return t("iam.overview.status.active");
-};
-
-const saveQuickSettings = () => {
-  toast.add({
-    title: "设置已保存",
-    description: "本地存储成功，可在下次迭代接入实际 API。",
-    color: "primary",
-  });
-};
-
-const resetQuickSettings = () => {
-  Object.assign(quickSettings, quickSettingDefaults());
-  toast.add({
-    title: "已重置",
-    description: "恢复默认的 IAM 显示和安全策略。",
-  });
 };
 
 const changeTenantStatus = async (tenant: TenantSummary, status: string) => {
@@ -575,7 +408,6 @@ const blurOnClose = (value: boolean, oldValue?: boolean) => {
   }
 };
 
-watch(showQuickSettingsModal, blurOnClose);
 watch(showPlanDrawer, (value, oldValue) => {
   blurOnClose(value, oldValue);
   if (!value && oldValue) {

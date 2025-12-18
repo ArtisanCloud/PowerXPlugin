@@ -5,6 +5,7 @@ import {
   useRoleService,
   type Role,
   type RoleListParams,
+  type RoleListResponse,
   type RoleCreateParams,
   type RoleUpdateParams,
   type CreateRoleWithPermsResponse,
@@ -12,6 +13,17 @@ import {
 
 export const useRoleStore = defineStore("role", () => {
   const roleService = useRoleService();
+  const isApiSuccess = (response: any): boolean => {
+    if (typeof response?.success === "boolean") {
+      return response.success;
+    }
+    if (typeof response?.code === "number") {
+      return response.code >= 200 && response.code < 400;
+    }
+    return false;
+  };
+  const unwrapResponse = <T>(response: any): T | undefined =>
+    (response?.data ?? response) as T | undefined;
 
   // 状态
   const roles = ref<Role[]>([]);
@@ -88,23 +100,22 @@ export const useRoleStore = defineStore("role", () => {
 
     try {
       const response = await roleService.getRoles(params);
-
-      if (response.code === 200 && response.data) {
-        const items = response.data.items || [];
-        roles.value = items.map(normalizeRole);
-        const paginationData =
-          response.data.pagination || {
-            total: items.length,
-            page: 1,
-            page_size: items.length || 1,
-            pages: 1,
-          };
-        pagination.value = paginationData;
-        initialized.value = true;
-        lastFetchTime.value = Date.now();
-      } else {
-        throw new Error(response.message || "获取角色列表失败");
+      if (!isApiSuccess(response)) {
+        throw new Error(response?.message || "获取角色列表失败");
       }
+      const payload = unwrapResponse<RoleListResponse>(response);
+      const items = payload?.items ?? [];
+      roles.value = items.map(normalizeRole);
+      const paginationData =
+        payload?.pagination || {
+          total: items.length,
+          page: 1,
+          page_size: items.length || 1,
+          pages: 1,
+        };
+      pagination.value = paginationData;
+      initialized.value = true;
+      lastFetchTime.value = Date.now();
     } catch (err) {
       error.value = err instanceof Error ? err.message : "获取角色列表失败";
       console.error("获取角色列表失败:", err);
@@ -119,13 +130,15 @@ export const useRoleStore = defineStore("role", () => {
 
     try {
       const response = await roleService.getRole(id);
-
-      if (response.code === 200 && response.data) {
-        currentRole.value = normalizeRole(response.data);
-        return currentRole.value;
-      } else {
-        throw new Error(response.message || "获取角色信息失败");
+      if (!isApiSuccess(response)) {
+        throw new Error(response?.message || "获取角色信息失败");
       }
+      const payload = unwrapResponse<Role>(response);
+      if (!payload) {
+        throw new Error("角色数据为空");
+      }
+      currentRole.value = normalizeRole(payload);
+      return currentRole.value;
     } catch (err) {
       error.value = err instanceof Error ? err.message : "获取角色信息失败";
       console.error("获取角色信息失败:", err);
@@ -144,23 +157,19 @@ export const useRoleStore = defineStore("role", () => {
 
     try {
       const response = await roleService.createRole(data);
-
-      if (response.code === 200 && response.data) {
-        // 新的响应格式：{ role: Role, perm?: SetIDsResult }
-        const roleData = normalizeRole(response.data.role || response.data);
-        const permResult = response.data.perm;
-
-        // 添加到本地状态
-        roles.value.push(roleData);
-
-        // 返回完整的创建结果（包含角色和权限信息）
-        return {
-          role: roleData,
-          perm: permResult,
-        };
-      } else {
-        throw new Error(response.message || "创建角色失败");
+      if (!isApiSuccess(response)) {
+        throw new Error(response?.message || "创建角色失败");
       }
+      const payload = unwrapResponse<Role>(response);
+      if (!payload) {
+        throw new Error("创建角色失败：返回数据为空");
+      }
+      const roleData = normalizeRole(payload);
+      roles.value.push(roleData);
+      return {
+        role: roleData,
+        perm: (payload as any)?.perm,
+      };
     } catch (err) {
       error.value = err instanceof Error ? err.message : "创建角色失败";
       console.error("创建角色失败:", err);
@@ -176,29 +185,27 @@ export const useRoleStore = defineStore("role", () => {
 
     try {
       const response = await roleService.updateRole(id, data);
-
-      if (response.code === 200) {
-        // 更新本地状态
-        const index = roles.value.findIndex((role) => role.id === id);
-        if (index !== -1) {
-          roles.value[index] = normalizeRole({
-            ...roles.value[index],
-            ...data,
-          });
-        }
-
-        // 如果当前角色是被更新的角色，也更新它
-        if (currentRole.value?.id === id) {
-          currentRole.value = normalizeRole({
-            ...currentRole.value,
-            ...data,
-          });
-        }
-
-        return true;
-      } else {
-        throw new Error(response.message || "更新角色失败");
+      if (!isApiSuccess(response)) {
+        throw new Error(response?.message || "更新角色失败");
       }
+      const payload = unwrapResponse<Role>(response);
+      const nextRole = payload
+        ? normalizeRole(payload)
+        : normalizeRole({
+            ...(roles.value.find((role) => role.id === id) || {}),
+            ...data,
+          });
+
+      const index = roles.value.findIndex((role) => role.id === id);
+      if (index !== -1) {
+        roles.value[index] = nextRole;
+      }
+
+      if (currentRole.value?.id === id) {
+        currentRole.value = nextRole;
+      }
+
+      return true;
     } catch (err) {
       error.value = err instanceof Error ? err.message : "更新角色失败";
       throw err;
@@ -213,26 +220,22 @@ export const useRoleStore = defineStore("role", () => {
 
     try {
       const response = await roleService.deleteRole(id);
-
-      if (response.code === 200) {
-        // 从本地状态中移除
-        const index = roles.value.findIndex((role) => role.id === id);
-        if (index !== -1) {
-          roles.value.splice(index, 1);
-        }
-
-        // 如果删除的是当前角色，清空当前角色
-        if (currentRole.value?.id === id) {
-          currentRole.value = null;
-        }
-
-        // 更新分页信息
-        pagination.value.total = Math.max(0, pagination.value.total - 1);
-
-        return true;
-      } else {
-        throw new Error(response.message || "删除角色失败");
+      if (!isApiSuccess(response)) {
+        throw new Error(response?.message || "删除角色失败");
       }
+
+      const index = roles.value.findIndex((role) => role.id === id);
+      if (index !== -1) {
+        roles.value.splice(index, 1);
+      }
+
+      if (currentRole.value?.id === id) {
+        currentRole.value = null;
+      }
+
+      pagination.value.total = Math.max(0, pagination.value.total - 1);
+
+      return true;
     } catch (err) {
       error.value = err instanceof Error ? err.message : "删除角色失败";
       console.error("删除角色失败:", err);

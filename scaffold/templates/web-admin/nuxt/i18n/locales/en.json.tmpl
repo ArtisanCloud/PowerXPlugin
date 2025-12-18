@@ -18,8 +18,19 @@
     "refresh": "Refresh",
     "error": "Something went wrong",
     "retry": "Retry",
+    "reload": "Reload",
+    "all": "All",
+    "selected": "{count} selected",
+    "total": "Total {count}",
+    "view": "View",
+    "export": "Export",
+    "import": "Import",
     "welcome": "Welcome",
     "appName": "PowerX Base"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
   },
   "menu": {
     "openMarket": "Open Market",
@@ -68,6 +79,7 @@
     "iamDepartments": "Departments",
     "iamMembers": "Members",
     "iamRoles": "Roles",
+    "iamSettings": "IAM Settings",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -267,7 +279,8 @@
         "code": "Role code",
         "scope": "Scope",
         "tenant": "Tenant",
-        "description": "Description"
+        "description": "Description",
+        "hint": "Provide the role name, scope, tenant, and optional description."
       },
       "permissionDrawer": {
         "caption": "Select plugin permissions for this role"
@@ -311,6 +324,37 @@
         "membersSaved": "Members updated",
         "membersFailed": "Failed to update members"
       }
+    }
+  },
+  "product": {
+    "sku": {
+      "title": "SKU Center",
+      "basicInfo": "Basic information",
+      "inventory": "Inventory",
+      "logistics": "Logistics",
+      "constraints": "Constraints",
+      "skus": "SKU list",
+      "add": "Add SKU",
+      "detail": "SKU detail",
+      "search": "Search SKU, code or specification",
+      "status": "Status",
+      "category": "Category",
+      "brand": "Brand",
+      "skuCode": "SKU Code",
+      "spu": "SPU",
+      "specifications": "Specifications",
+      "price": "Price",
+      "availableStock": "Available stock",
+      "inventoryStatus": "Inventory status",
+      "actions": "Actions",
+      "inStock": "In stock",
+      "lowStock": "Low stock"
+    }
+  },
+  "tenant": {
+    "add": "Add Tenant",
+    "tooltips": {
+      "saasSupport": "SaaS support enabled"
     }
   },
   "organization": {
@@ -407,6 +451,32 @@
       },
       "import": {
         "button": "Import members"
+      }
+    },
+    "permission": {
+      "title": "Permission governance",
+      "description": "Bundle common role templates and keep authorization consistent.",
+      "roleList": "Role list",
+      "search": "Search roles or keywords",
+      "systemRole": "System role",
+      "userCount": "{count} members",
+      "empty": {
+        "title": "No roles yet",
+        "create": "Create role",
+        "noResults": "No matching roles"
+      },
+      "add": "Add role template",
+      "edit": "Edit role template",
+      "roleConfig": "Role permission config",
+      "configDesc": "Select plugin resources that should be granted to this role.",
+      "form": {
+        "name": "Role name",
+        "namePlaceholder": "e.g. Admin / Reviewer",
+        "code": "Role code",
+        "codePlaceholder": "Lowercase letters, numbers, dots, or hyphen only",
+        "description": "Description",
+        "descriptionPlaceholder": "Explain usage scenario or scope",
+        "permissions": "Available permissions"
       }
     }
   },
@@ -723,7 +793,7 @@
   },
   "landing": {
     "hero": {
-      "title": "PowerX Base Plugin",
+      "title": "{{ .PluginName }}",
       "description": "Welcome to the starter intro page. It highlights template CRUD, navigation and multilingual experiences for local development.",
       "cards": {
         "quickstart": {

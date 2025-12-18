@@ -19,8 +19,18 @@
     "error": "Something went wrong",
     "retry": "Retry",
     "reload": "Reload",
+    "all": "All",
+    "selected": "{count} selected",
+    "total": "Total {count}",
+    "view": "View",
+    "export": "Export",
+    "import": "Import",
     "welcome": "Welcome",
     "appName": "PowerX Base"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
   },
   "menu": {
     "openMarket": "Open Market",
@@ -314,6 +324,31 @@
         "membersSaved": "Members updated",
         "membersFailed": "Failed to update members"
       }
+    }
+  },
+  "product": {
+    "sku": {
+      "title": "SKU Center",
+      "basicInfo": "Basic information",
+      "inventory": "Inventory",
+      "logistics": "Logistics",
+      "constraints": "Constraints",
+      "skus": "SKU list",
+      "add": "Add SKU",
+      "detail": "SKU detail",
+      "search": "Search SKU, code or specification",
+      "status": "Status",
+      "category": "Category",
+      "brand": "Brand",
+      "skuCode": "SKU Code",
+      "spu": "SPU",
+      "specifications": "Specifications",
+      "price": "Price",
+      "availableStock": "Available stock",
+      "inventoryStatus": "Inventory status",
+      "actions": "Actions",
+      "inStock": "In stock",
+      "lowStock": "Low stock"
     }
   },
   "tenant": {

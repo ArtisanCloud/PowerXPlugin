@@ -157,47 +157,59 @@ onMounted(async () => {
   <div class="space-y-6">
     <!-- 页面标题 -->
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">权限配置</h1>
-      <p class="text-gray-600 mt-1">配置租户可用的系统权限</p>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">权限配置</h1>
+      <p class="text-gray-600 mt-1 dark:text-slate-200">配置租户可用的系统权限</p>
     </div>
 
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <UCard>
+      <UCard class="dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
         <div class="flex items-center">
-          <div class="p-2 bg-blue-100 rounded-lg">
-            <UIcon name="i-heroicons-key" class="h-6 w-6 text-blue-600" />
-          </div>
-          <div class="ml-4">
-            <p class="text-sm text-gray-600">总权限数</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
-          </div>
-        </div>
-      </UCard>
-
-      <UCard>
-        <div class="flex items-center">
-          <div class="p-2 bg-green-100 rounded-lg">
+          <div class="p-2 bg-blue-100 rounded-lg dark:bg-blue-500/20">
             <UIcon
-              name="i-heroicons-check-circle"
-              class="h-6 w-6 text-green-600"
+              name="i-heroicons-key"
+              class="h-6 w-6 text-blue-600 dark:text-blue-200"
             />
           </div>
           <div class="ml-4">
-            <p class="text-sm text-gray-600">已启用</p>
-            <p class="text-2xl font-bold text-green-600">{{ stats.enabled }}</p>
+            <p class="text-sm text-gray-600 dark:text-slate-200">总权限数</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">
+              {{ stats.total }}
+            </p>
           </div>
         </div>
       </UCard>
 
-      <UCard>
+      <UCard class="dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
         <div class="flex items-center">
-          <div class="p-2 bg-gray-100 rounded-lg">
-            <UIcon name="i-heroicons-x-circle" class="h-6 w-6 text-gray-600" />
+          <div class="p-2 bg-green-100 rounded-lg dark:bg-green-500/20">
+            <UIcon
+              name="i-heroicons-check-circle"
+              class="h-6 w-6 text-green-600 dark:text-green-200"
+            />
           </div>
           <div class="ml-4">
-            <p class="text-sm text-gray-600">已禁用</p>
-            <p class="text-2xl font-bold text-gray-600">{{ stats.disabled }}</p>
+            <p class="text-sm text-gray-600 dark:text-slate-200">已启用</p>
+            <p class="text-2xl font-bold text-green-600 dark:text-green-300">
+              {{ stats.enabled }}
+            </p>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard class="dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
+        <div class="flex items-center">
+          <div class="p-2 bg-gray-100 rounded-lg dark:bg-slate-800/60">
+            <UIcon
+              name="i-heroicons-x-circle"
+              class="h-6 w-6 text-gray-600 dark:text-slate-100"
+            />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm text-gray-600 dark:text-slate-200">已禁用</p>
+            <p class="text-2xl font-bold text-gray-600 dark:text-slate-200">
+              {{ stats.disabled }}
+            </p>
           </div>
         </div>
       </UCard>

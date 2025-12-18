@@ -18,8 +18,19 @@
     "refresh": "刷新",
     "error": "发生错误",
     "retry": "重试",
+    "reload": "重新加载",
+    "all": "全部",
+    "selected": "已选 {count} 项",
+    "total": "共 {count} 条",
+    "view": "查看",
+    "export": "导出",
+    "import": "导入",
     "welcome": "欢迎",
     "appName": "PowerX 基础插件"
+  },
+  "status": {
+    "active": "启用",
+    "inactive": "停用"
   },
   "menu": {
     "openMarket": "开放市场",
@@ -68,6 +79,7 @@
     "iamDepartments": "组织结构",
     "iamMembers": "成员管理",
     "iamRoles": "角色权限",
+    "iamSettings": "租户配置",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
@@ -267,7 +279,8 @@
         "code": "角色代码",
         "scope": "作用域",
         "tenant": "归属租户",
-        "description": "角色描述"
+        "description": "角色描述",
+        "hint": "填写角色名称、作用域与所属租户。"
       },
       "permissionDrawer": {
         "caption": "勾选需要授权的插件权限"
@@ -311,6 +324,37 @@
         "membersSaved": "成员列表已更新",
         "membersFailed": "更新成员失败"
       }
+    }
+  },
+  "product": {
+    "sku": {
+      "title": "SKU 管理",
+      "basicInfo": "基础信息",
+      "inventory": "库存信息",
+      "logistics": "物流信息",
+      "constraints": "约束规则",
+      "skus": "SKU 列表",
+      "add": "新增 SKU",
+      "detail": "SKU 详情",
+      "search": "搜索 SKU、编码或规格",
+      "status": "状态",
+      "category": "分类",
+      "brand": "品牌",
+      "skuCode": "SKU 编码",
+      "spu": "所属 SPU",
+      "specifications": "规格参数",
+      "price": "售卖价格",
+      "availableStock": "可用库存",
+      "inventoryStatus": "库存状态",
+      "actions": "操作",
+      "inStock": "现货",
+      "lowStock": "低库存"
+    }
+  },
+  "tenant": {
+    "add": "新增租户",
+    "tooltips": {
+      "saasSupport": "标记为支持 SaaS 托管"
     }
   },
   "organization": {
@@ -407,6 +451,32 @@
       },
       "import": {
         "button": "导入成员"
+      }
+    },
+    "permission": {
+      "title": "权限治理",
+      "description": "组合常用角色模板并统一授权。",
+      "roleList": "角色列表",
+      "search": "搜索角色或关键字",
+      "systemRole": "系统角色",
+      "userCount": "{count} 名成员",
+      "empty": {
+        "title": "暂无角色",
+        "create": "创建角色",
+        "noResults": "没有匹配的角色"
+      },
+      "add": "新增角色模板",
+      "edit": "编辑角色模板",
+      "roleConfig": "角色权限配置",
+      "configDesc": "为角色挑选需要授权的插件资源。",
+      "form": {
+        "name": "角色名称",
+        "namePlaceholder": "例如：管理员/审核员",
+        "code": "角色代码",
+        "codePlaceholder": "只允许小写字母、数字、点或连字符",
+        "description": "描述",
+        "descriptionPlaceholder": "说明角色用途或适用范围",
+        "permissions": "可用权限"
       }
     }
   },

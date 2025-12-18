@@ -589,7 +589,10 @@ func replaceRolePermissionsTx(ctx context.Context, tx *gorm.DB, role *iamm.Role,
 
 func clauseOnConflictDoNothing() clause.OnConflict {
 	return clause.OnConflict{
-		Columns:   []clause.Column{{Name: "member_id"}, {Name: "role_id"}},
+		Columns: []clause.Column{
+			{Name: "member_id"},
+			{Name: "role_id"},
+		},
 		DoNothing: true,
 	}
 }

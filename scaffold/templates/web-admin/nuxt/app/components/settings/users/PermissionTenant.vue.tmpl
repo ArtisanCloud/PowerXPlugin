@@ -30,8 +30,8 @@ const columns = [
 
 // 搜索和过滤
 const searchQuery = ref("");
-const selectedCategory = ref("");
-const statusFilter = ref(""); // all, enabled, disabled
+const selectedCategory = ref<string>("all");
+const statusFilter = ref<"all" | "enabled" | "disabled">("all");
 
 const categories = computed(() => {
   const cats = new Set(
@@ -63,7 +63,7 @@ const filteredPermissions = computed(() => {
     );
   }
 
-  if (selectedCategory.value) {
+  if (selectedCategory.value !== "all") {
     filtered = filtered.filter((p) => p.category === selectedCategory.value);
   }
 
@@ -157,47 +157,59 @@ onMounted(async () => {
   <div class="space-y-6">
     <!-- 页面标题 -->
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">权限配置</h1>
-      <p class="text-gray-600 mt-1">配置租户可用的系统权限</p>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">权限配置</h1>
+      <p class="text-gray-600 mt-1 dark:text-slate-200">配置租户可用的系统权限</p>
     </div>
 
     <!-- 统计卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <UCard>
+      <UCard class="dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
         <div class="flex items-center">
-          <div class="p-2 bg-blue-100 rounded-lg">
-            <UIcon name="i-heroicons-key" class="h-6 w-6 text-blue-600" />
-          </div>
-          <div class="ml-4">
-            <p class="text-sm text-gray-600">总权限数</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.total }}</p>
-          </div>
-        </div>
-      </UCard>
-
-      <UCard>
-        <div class="flex items-center">
-          <div class="p-2 bg-green-100 rounded-lg">
+          <div class="p-2 bg-blue-100 rounded-lg dark:bg-blue-500/20">
             <UIcon
-              name="i-heroicons-check-circle"
-              class="h-6 w-6 text-green-600"
+              name="i-heroicons-key"
+              class="h-6 w-6 text-blue-600 dark:text-blue-200"
             />
           </div>
           <div class="ml-4">
-            <p class="text-sm text-gray-600">已启用</p>
-            <p class="text-2xl font-bold text-green-600">{{ stats.enabled }}</p>
+            <p class="text-sm text-gray-600 dark:text-slate-200">总权限数</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">
+              {{ `{{ stats.total }}` }}
+            </p>
           </div>
         </div>
       </UCard>
 
-      <UCard>
+      <UCard class="dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
         <div class="flex items-center">
-          <div class="p-2 bg-gray-100 rounded-lg">
-            <UIcon name="i-heroicons-x-circle" class="h-6 w-6 text-gray-600" />
+          <div class="p-2 bg-green-100 rounded-lg dark:bg-green-500/20">
+            <UIcon
+              name="i-heroicons-check-circle"
+              class="h-6 w-6 text-green-600 dark:text-green-200"
+            />
           </div>
           <div class="ml-4">
-            <p class="text-sm text-gray-600">已禁用</p>
-            <p class="text-2xl font-bold text-gray-600">{{ stats.disabled }}</p>
+            <p class="text-sm text-gray-600 dark:text-slate-200">已启用</p>
+            <p class="text-2xl font-bold text-green-600 dark:text-green-300">
+              {{ `{{ stats.enabled }}` }}
+            </p>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard class="dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
+        <div class="flex items-center">
+          <div class="p-2 bg-gray-100 rounded-lg dark:bg-slate-800/60">
+            <UIcon
+              name="i-heroicons-x-circle"
+              class="h-6 w-6 text-gray-600 dark:text-slate-100"
+            />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm text-gray-600 dark:text-slate-200">已禁用</p>
+            <p class="text-2xl font-bold text-gray-600 dark:text-slate-200">
+              {{ `{{ stats.disabled }}` }}
+            </p>
           </div>
         </div>
       </UCard>
@@ -214,7 +226,7 @@ onMounted(async () => {
       <USelect
         v-model="selectedCategory"
         :options="[
-          { label: '全部分类', value: '' },
+          { label: '全部分类', value: 'all' },
           ...categories.map((c) => ({ label: c, value: c })),
         ]"
         placeholder="选择分类"
@@ -223,7 +235,7 @@ onMounted(async () => {
       <USelect
         v-model="statusFilter"
         :options="[
-          { label: '全部状态', value: '' },
+          { label: '全部状态', value: 'all' },
           { label: '已启用', value: 'enabled' },
           { label: '已禁用', value: 'disabled' },
         ]"
@@ -238,7 +250,7 @@ onMounted(async () => {
       class="flex items-center gap-3 p-4 bg-blue-50 rounded-lg"
     >
       <span class="text-sm text-blue-700">
-        已选择 {{ selectedPermissions.length }} 个权限
+        已选择 {{ `{{ selectedPermissions.length }}` }} 个权限
       </span>
       <div class="flex gap-2">
         <UButton size="sm" color="success" @click="batchEnable">
@@ -266,7 +278,7 @@ onMounted(async () => {
           <div class="flex items-center gap-3">
             <UCheckbox v-model="isSelectAll" label="全选" />
             <span class="text-sm text-gray-500">
-              共 {{ filteredPermissions.length }} 个权限
+              共 {{ `{{ filteredPermissions.length }}` }} 个权限
             </span>
           </div>
         </div>
@@ -299,28 +311,26 @@ onMounted(async () => {
                 }
               "
             />
-            <div class="font-medium text-gray-900">{{ row.name }}</div>
+            <div class="font-medium text-gray-900">{{ `{{ row.name }}` }}</div>
           </div>
         </template>
 
         <template #code-data="{ row }">
-          <code class="px-2 py-1 bg-gray-100 rounded text-sm">{{
-            row.code
-          }}</code>
+          <code class="px-2 py-1 bg-gray-100 rounded text-sm">{{ `{{ row.code }}` }}</code>
         </template>
 
         <template #description-data="{ row }">
-          <span class="text-gray-600">{{ row.description || "-" }}</span>
+          <span class="text-gray-600">{{ `{{ row.description || "-" }}` }}</span>
         </template>
 
         <template #category-data="{ row }">
-          <UBadge v-if="row.category" variant="soft">{{ row.category }}</UBadge>
+          <UBadge v-if="row.category" variant="soft">{{ `{{ row.category }}` }}</UBadge>
           <span v-else class="text-gray-400">-</span>
         </template>
 
         <template #enabled-data="{ row }">
           <UBadge :color="row.enabled ? 'green' : 'gray'" variant="soft">
-            {{ row.enabled ? "已启用" : "已禁用" }}
+            {{ `{{ row.enabled ? "已启用" : "已禁用" }}` }}
           </UBadge>
         </template>
 

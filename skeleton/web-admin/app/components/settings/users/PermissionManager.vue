@@ -549,10 +549,10 @@ const isFormModulePartiallySelected = (module: string) => {
     <!-- 权限管理头部 -->
     <div class="flex justify-between items-center mb-6">
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">
           {{ $t("organization.permission.title") }}
         </h2>
-        <p class="text-sm text-gray-500 mt-1">
+        <p class="text-sm text-gray-500 mt-1 dark:text-gray-300">
           {{ $t("organization.permission.description") }}
         </p>
       </div>
@@ -579,9 +579,9 @@ const isFormModulePartiallySelected = (module: string) => {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 角色列表 -->
       <div class="lg:col-span-1">
-        <div class="bg-white rounded-lg shadow">
+        <div class="bg-white rounded-lg shadow dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
           <div class="p-4 border-b">
-            <h3 class="text-lg font-medium text-gray-900">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
               {{ $t("organization.permission.roleList") }}
             </h3>
             <UInput
@@ -607,7 +607,7 @@ const isFormModulePartiallySelected = (module: string) => {
               <div class="flex justify-between items-start">
                 <div>
                   <div class="flex items-center">
-                    <h4 class="font-medium text-gray-900">{{ role.name }}</h4>
+                    <h4 class="font-medium text-gray-900 dark:text-white">{{ role.name }}</h4>
                     <UBadge
                       v-if="role.builtin"
                       color="primary"
@@ -618,11 +618,11 @@ const isFormModulePartiallySelected = (module: string) => {
                       {{ $t("organization.permission.systemRole") }}
                     </UBadge>
                   </div>
-                  <p class="text-sm text-gray-500 mt-1">{{ role.code }}</p>
-                  <p class="text-sm text-gray-600 mt-1">
+                  <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">{{ role.code }}</p>
+                  <p class="text-sm text-gray-600 mt-1 dark:text-gray-300">
                     {{ role.description }}
                   </p>
-                  <p class="text-xs text-gray-500 mt-2">
+                  <p class="text-xs text-gray-500 mt-2 dark:text-gray-400">
                     <UIcon
                       name="i-heroicons-users"
                       class="w-4 h-4 inline-block mr-1"
@@ -655,12 +655,12 @@ const isFormModulePartiallySelected = (module: string) => {
             <div v-if="filteredRoles.length === 0" class="p-8 text-center">
               <UIcon
                 name="i-heroicons-user-group"
-                class="w-12 h-12 text-gray-400 mx-auto mb-4"
+                class="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4"
               />
-              <h3 class="text-lg font-medium text-gray-900 mb-2">
+              <h3 class="text-lg font-medium text-gray-900 mb-2 dark:text-white">
                 {{ $t("organization.permission.empty.title") }}
               </h3>
-              <p class="text-gray-500 mb-4">
+              <p class="text-gray-500 mb-4 dark:text-gray-300">
                 {{
                   searchQuery
                     ? $t("organization.permission.empty.noResults")
@@ -681,15 +681,15 @@ const isFormModulePartiallySelected = (module: string) => {
 
       <!-- 权限配置 -->
       <div class="lg:col-span-2">
-        <div class="bg-white rounded-lg shadow">
+        <div class="bg-white rounded-lg shadow dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
           <div class="p-4 border-b">
-            <h3 class="text-lg font-medium text-gray-900">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
               {{
                 (selectedRole && selectedRole.name) ||
                 $t("organization.permission.roleConfig")
               }}
             </h3>
-            <p class="text-sm text-gray-500 mt-1">
+            <p class="text-sm text-gray-500 mt-1 dark:text-gray-300">
               {{ $t("organization.permission.configDesc") }}
             </p>
           </div>
@@ -708,7 +708,7 @@ const isFormModulePartiallySelected = (module: string) => {
                     toggleModulePermissions(module, $event as boolean)
                   "
                 />
-                <h4 class="ml-2 font-bold text-gray-900 text-lg">
+                <h4 class="ml-2 font-bold text-gray-900 text-lg dark:text-white">
                   {{ module }}
                 </h4>
               </div>
@@ -720,7 +720,7 @@ const isFormModulePartiallySelected = (module: string) => {
                   class="space-y-2"
                 >
                   <h5
-                    class="text-sm font-medium text-gray-600 border-b border-gray-100 pb-1"
+                    class="text-sm font-medium text-gray-600 border-b border-gray-100 pb-1 dark:text-gray-300 dark:border-slate-800/60"
                   >
                     {{ getPermissionTypeLabel(type) }}权限
                   </h5>
@@ -745,7 +745,7 @@ const isFormModulePartiallySelected = (module: string) => {
                           </span>
                         </div>
                         <UTooltip :text="perm.name">
-                          <div class="text-xs text-gray-500">
+                          <div class="text-xs text-gray-500 dark:text-gray-400">
                             {{ perm.description }}
                           </div>
                         </UTooltip>
@@ -795,7 +795,7 @@ const isFormModulePartiallySelected = (module: string) => {
     >
       <template #content>
         <div class="py-12 px-24">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">
+          <h3 class="text-lg font-medium text-gray-900 mb-4 dark:text-white">
             {{
               isEditing
                 ? $t("organization.permission.edit")
@@ -871,7 +871,7 @@ const isFormModulePartiallySelected = (module: string) => {
                           toggleFormModulePermissions(module, $event as boolean)
                         "
                       />
-                      <h4 class="ml-2 font-semibold text-gray-900">
+                      <h4 class="ml-2 font-semibold text-gray-900 dark:text-white">
                         {{ module }}
                       </h4>
                     </div>
@@ -884,7 +884,7 @@ const isFormModulePartiallySelected = (module: string) => {
                         :key="type"
                         class="space-y-2"
                       >
-                        <h5 class="text-xs font-medium text-gray-600">
+                        <h5 class="text-xs font-medium text-gray-600 dark:text-gray-300">
                           {{ getPermissionTypeLabel(type) }}
                         </h5>
 
@@ -918,7 +918,7 @@ const isFormModulePartiallySelected = (module: string) => {
                                   {{ perm.httpMethod }}
                                 </UBadge>
                               </div>
-                              <div class="text-xs text-gray-500">
+                              <div class="text-xs text-gray-500 dark:text-gray-400">
                                 {{ perm.description }}
                                 <template
                                   v-if="perm.type === 'api' && perm.apiEndpoint"

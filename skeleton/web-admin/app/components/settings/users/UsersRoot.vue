@@ -193,11 +193,11 @@ onMounted(() => {
     <div v-if="!selectedTenant">
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h2 class="text-xl font-semibold">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
             {{ t("organization.user.title") }} ·
             {{ t("organization.user.rootManagement") }}
           </h2>
-          <p class="text-sm text-gray-500">
+          <p class="text-sm text-gray-500 dark:text-gray-300">
             {{ t("organization.user.selectTenantDesc") }}
           </p>
         </div>
@@ -218,7 +218,7 @@ onMounted(() => {
       </div>
 
       <!-- 搜索和筛选 -->
-      <div class="mb-6 bg-white p-4 rounded-lg shadow-sm">
+      <div class="mb-6 rounded-lg bg-white p-4 shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
         <div class="flex flex-wrap gap-4 items-end">
           <div class="flex-grow min-w-[300px]">
             <UInput
@@ -254,39 +254,41 @@ onMounted(() => {
       </div>
 
       <!-- 租户列表 -->
-      <div class="bg-white rounded-lg shadow-sm">
+      <div class="rounded-lg bg-white shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
         <div
           v-if="paginatedTenants.length === 0"
-          class="p-8 text-center text-gray-500"
+          class="p-8 text-center text-gray-500 dark:text-slate-200"
         >
           <UIcon
             name="i-heroicons-building-office"
-            class="h-12 w-12 mx-auto mb-4 text-gray-300"
+            class="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-slate-700"
           />
           <p>{{ t("organization.user.noTenantsFound") }}</p>
         </div>
 
-        <div v-else class="divide-y divide-gray-200">
+        <div v-else class="divide-y divide-gray-200 dark:divide-slate-800/50">
           <div
             v-for="tenant in paginatedTenants"
             :key="tenant.id"
-            class="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+            class="p-4 rounded-xl cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-slate-900/60 dark:bg-transparent"
             @click="selectTenant(tenant)"
           >
             <div class="flex items-center justify-between">
               <div class="flex-1">
                 <div class="flex items-center gap-3">
                   <div
-                    class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center"
+                    class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center dark:bg-blue-500/20"
                   >
                     <UIcon
                       name="i-heroicons-building-office"
-                      class="h-5 w-5 text-blue-600"
+                      class="h-5 w-5 text-blue-600 dark:text-blue-200"
                     />
                   </div>
                   <div>
-                    <h3 class="font-medium text-gray-900">{{ tenant.name }}</h3>
-                    <p class="text-sm text-gray-500">
+                    <h3 class="font-medium text-gray-900 dark:text-white">
+                      {{ tenant.name }}
+                    </h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-300">
                       {{ tenant.domain || t("organization.user.noDomain") }}
                     </p>
                   </div>
@@ -295,10 +297,10 @@ onMounted(() => {
 
               <div class="flex items-center gap-4 text-sm">
                 <div class="text-center">
-                  <p class="font-medium text-gray-900">
+                  <p class="font-medium text-gray-900 dark:text-white">
                     {{ tenant.userCount }}
                   </p>
-                  <p class="text-gray-500">
+                  <p class="text-gray-500 dark:text-gray-300">
                     {{ t("organization.user.userCount") }}
                   </p>
                 </div>
@@ -316,15 +318,17 @@ onMounted(() => {
                 </div>
 
                 <div class="text-center">
-                  <p class="text-gray-500">{{ tenant.createdAt }}</p>
-                  <p class="text-gray-400 text-xs">
+                  <p class="text-gray-500 dark:text-gray-300">
+                    {{ tenant.createdAt }}
+                  </p>
+                  <p class="text-gray-400 text-xs dark:text-gray-400">
                     {{ t("organization.user.createdAt") }}
                   </p>
                 </div>
 
                 <UIcon
                   name="i-heroicons-chevron-right"
-                  class="h-5 w-5 text-gray-400"
+                  class="h-5 w-5 text-gray-400 dark:text-gray-300"
                 />
               </div>
             </div>
@@ -337,7 +341,7 @@ onMounted(() => {
           class="px-6 py-4 border-t border-gray-200"
         >
           <div class="flex justify-between items-center">
-            <div class="text-sm text-gray-600">
+            <div class="text-sm text-gray-600 dark:text-gray-300">
               {{
                 t("organization.user.pagination.showing", {
                   start: (pagination.page - 1) * pagination.pageSize + 1,
@@ -387,16 +391,18 @@ onMounted(() => {
         <div class="h-6 w-px bg-gray-300"></div>
         <div class="flex items-center gap-3">
           <div
-            class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center"
+            class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center dark:bg-blue-500/20"
           >
             <UIcon
               name="i-heroicons-building-office"
-              class="h-4 w-4 text-blue-600"
+              class="h-4 w-4 text-blue-600 dark:text-blue-300"
             />
           </div>
           <div>
-            <h2 class="text-xl font-semibold">{{ selectedTenant.name }}</h2>
-            <p class="text-sm text-gray-500">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+              {{ selectedTenant.name }}
+            </h2>
+            <p class="text-sm text-gray-500 dark:text-gray-300">
               {{ selectedTenant.domain || t("organization.user.noDomain") }} ·
               {{
                 t("organization.user.userCountText", {

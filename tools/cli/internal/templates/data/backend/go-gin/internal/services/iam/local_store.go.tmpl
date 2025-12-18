@@ -575,9 +575,12 @@ func (d *LocalDirectory) formatPermissionCode(resource, action string) string {
 	if res == "" || act == "" {
 		return ""
 	}
-	plugID := strings.TrimSpace(d.pluginID)
-	if plugID != "" && !strings.Contains(res, ":") {
-		res = plugID + ":" + res
+	// 保留通配符 “*” 作为全局资源，不要追加插件前缀，确保 `*:*` 仍能匹配所有权限。
+	if res != "*" {
+		plugID := strings.TrimSpace(d.pluginID)
+		if plugID != "" && !strings.Contains(res, ":") {
+			res = plugID + ":" + res
+		}
 	}
 	return res + ":" + act
 }

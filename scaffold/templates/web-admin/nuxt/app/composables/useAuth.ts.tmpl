@@ -234,13 +234,22 @@ export const useAuth = () => {
       refreshToken.value = hasRefresh ? storedRefresh : null;
       expiresAt.value = Number(storedExpires);
       isAuthenticated.value = !isTokenExpired();
-    } else {
-      if (insidePowerX && !hasAuthenticated.value) {
-        clearAuth();
-        return;
-      }
-      failClosed();
+      return;
     }
+
+    // 没有任何会话数据（首次访问/手动清除），无需提示“会话失效”。
+    const hasAnySessionData = Boolean(storedToken || storedRefresh || storedExpires);
+    if (!hasAnySessionData) {
+      clearAuth();
+      hasAuthenticated.value = false;
+      return;
+    }
+
+    if (insidePowerX && !hasAuthenticated.value) {
+      clearAuth();
+      return;
+    }
+    failClosed();
   };
 
   const ensureFreshToken = async () => {

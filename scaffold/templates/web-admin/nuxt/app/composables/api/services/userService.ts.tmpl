@@ -126,7 +126,10 @@ export const useUserService = () => {
       items.length;
     const page = params.page ?? payload?.data?.pagination?.page ?? 1;
     const pageSize =
-      params.page_size ?? payload?.data?.pagination?.page_size ?? items.length || 1;
+      params.page_size ??
+      payload?.data?.pagination?.page_size ??
+      payload?.pagination?.page_size ??
+      (items.length || 1);
     const pages =
       payload?.data?.pagination?.pages ??
       payload?.pagination?.pages ??

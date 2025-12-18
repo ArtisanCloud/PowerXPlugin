@@ -17,6 +17,7 @@ export interface TenantListParams {
   query?: string;
   page?: number;
   pageSize?: number;
+  plan?: string;
 }
 
 export interface Department {
@@ -87,6 +88,7 @@ export const useIAMService = () => {
           q: params.query,
           page: params.page,
           page_size: params.pageSize,
+          plan: params.plan,
         })}`,
         {
           method: "GET",

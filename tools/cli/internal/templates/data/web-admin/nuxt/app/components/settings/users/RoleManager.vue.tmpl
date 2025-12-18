@@ -60,8 +60,17 @@ const pagination = reactive({
 });
 
 const searchQuery = ref("");
-const selectedScope = ref<string>("");
-const selectedBuiltin = ref<boolean | undefined>(undefined);
+const selectedScope = ref<"all" | "system" | "tenant">("all");
+const selectedBuiltin = ref<"all" | "builtin" | "custom">("all");
+
+const scopeFilter = computed(() =>
+  selectedScope.value === "all" ? undefined : selectedScope.value
+);
+const builtinFilter = computed(() => {
+  if (selectedBuiltin.value === "builtin") return true;
+  if (selectedBuiltin.value === "custom") return false;
+  return undefined;
+});
 
 const loading = computed(() => roleStore.loading);
 const error = computed(() => roleStore.error);
@@ -82,10 +91,9 @@ const roleForm = reactive({
 
 const filteredRoles = computed(() => {
   let list = roles.value || [];
-  if (selectedBuiltin.value !== undefined) {
-    list = list.filter((role) =>
-      selectedBuiltin.value ? role.builtin : !role.builtin
-    );
+  const builtin = builtinFilter.value;
+  if (builtin !== undefined) {
+    list = list.filter((role) => (builtin ? role.builtin : !role.builtin));
   }
   return list;
 });
@@ -94,6 +102,13 @@ const paginatedRoles = computed(() => {
   const start = (pagination.page - 1) * pagination.pageSize;
   return filteredRoles.value.slice(start, start + pagination.pageSize);
 });
+
+const modalTitle = computed(() =>
+  isEditing.value
+    ? t("iam.roles.form.editTitle")
+    : t("iam.roles.form.createTitle")
+);
+const modalDescription = computed(() => t("iam.roles.form.hint"));
 
 watch(
   () => [filteredRoles.value.length, pagination.pageSize],
@@ -144,7 +159,7 @@ const loadRoles = async (force = true) => {
       {
         tenant_uuid: selectedTenantUuid.value,
         keyword: searchQuery.value.trim() || undefined,
-        scope_type: selectedScope.value || undefined,
+        scope_type: scopeFilter.value,
       },
       force
     );
@@ -669,13 +684,13 @@ onMounted(async () => {
     >
       <div>
         <p class="text-xs font-semibold uppercase text-gray-500">
-          {{ t("iam.roles.hero.kicker") }}
+          {{ `{{ t("iam.roles.hero.kicker") }}` }}
         </p>
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ t("iam.roles.hero.title") }}
+          {{ `{{ t("iam.roles.hero.title") }}` }}
         </h1>
         <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl">
-          {{ t("iam.roles.hero.description") }}
+          {{ `{{ t("iam.roles.hero.description") }}` }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -693,7 +708,7 @@ onMounted(async () => {
           color="primary"
           @click="openAddForm"
         >
-          {{ t("iam.roles.actions.create") }}
+          {{ `{{ t("iam.roles.actions.create") }}` }}
         </UButton>
       </div>
     </div>
@@ -712,7 +727,7 @@ onMounted(async () => {
           <USelect
             v-model="selectedScope"
             :items="[
-              { label: t('iam.roles.scopeFilter.all'), value: '' },
+              { label: t('iam.roles.scopeFilter.all'), value: 'all' },
               { label: t('iam.roles.scope.system'), value: 'system' },
               { label: t('iam.roles.scope.tenant'), value: 'tenant' },
             ]"
@@ -721,9 +736,9 @@ onMounted(async () => {
           <USelect
             v-model="selectedBuiltin"
             :items="[
-              { label: t('iam.roles.typeFilter.all'), value: undefined },
-              { label: t('iam.roles.typeFilter.system'), value: true },
-              { label: t('iam.roles.typeFilter.custom'), value: false },
+              { label: t('iam.roles.typeFilter.all'), value: 'all' },
+              { label: t('iam.roles.typeFilter.system'), value: 'builtin' },
+              { label: t('iam.roles.typeFilter.custom'), value: 'custom' },
             ]"
             class="w-full md:w-40"
           />
@@ -743,13 +758,11 @@ onMounted(async () => {
             class="flex flex-col gap-3 border-t border-gray-100 dark:border-gray-800 pt-4 mt-4 md:flex-row md:items-center md:justify-between"
           >
             <p class="text-sm text-gray-500">
-              {{
-                t("iam.roles.pagination.summary", {
+              {{ `{{ t("iam.roles.pagination.summary", {
                   start: paginationInfo.start,
                   end: paginationInfo.end,
                   total: pagination.total,
-                })
-              }}
+                }) }}` }}
             </p>
             <div class="flex items-center gap-2">
               <UButton
@@ -760,7 +773,7 @@ onMounted(async () => {
                 @click="changePage(pagination.page - 1)"
               />
               <span class="text-sm text-gray-600">
-                {{ pagination.page }} / {{ pagination.totalPages }}
+                {{ `{{ pagination.page }}` }} / {{ `{{ pagination.totalPages }}` }}
               </span>
               <UButton
                 size="sm"
@@ -785,117 +798,101 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div
-      v-if="!loading && !paginatedRoles.length"
-      class="bg-gray-50 dark:bg-gray-800 rounded-lg py-12 text-center"
+    <UModal
+      v-model:open="showForm"
+      :title="modalTitle"
+      :description="modalDescription"
+      :ui="{ content: 'max-w-3xl w-full' }"
     >
-      <UIcon
-        name="i-heroicons-shield-check"
-        class="mx-auto h-10 w-10 text-gray-400 mb-4"
-      />
-      <p class="text-gray-600">
-        {{
-          searchQuery
-            ? t("iam.roles.empty.search")
-            : t("iam.roles.empty.default")
-        }}
-      </p>
-    </div>
-
-    <UModal v-model:open="showForm" :ui="{ content: 'sm:max-w-md' }">
-      <template #header>
-        <div>
-          <h3 class="text-lg font-semibold text-gray-900">
-            {{
-              isEditing
-                ? t("iam.roles.form.editTitle")
-                : t("iam.roles.form.createTitle")
-            }}
-          </h3>
-        </div>
-      </template>
-
-      <template #default>
-        <UFormField :label="t('iam.roles.form.name')" required>
-          <UInput v-model="roleForm.name" />
-        </UFormField>
-        <UFormField :label="t('iam.roles.form.code')" required>
-          <UInput v-model="roleForm.code" />
-        </UFormField>
-        <UFormField :label="t('iam.roles.form.scope')">
-          <USelect
-            v-model="roleForm.scope"
-            :items="[
-              { label: t('iam.roles.scope.tenant'), value: 'tenant' },
-              { label: t('iam.roles.scope.system'), value: 'system' },
-            ]"
-          />
-        </UFormField>
-        <UFormField :label="t('iam.roles.form.tenant')" required>
-          <USelectMenu
-            v-model="roleForm.tenant_uuid"
-            :items="tenantOptions"
-            searchable
-            :loading="tenantFilterLoading"
-            :placeholder="t('iam.roles.filters.tenantPlaceholder')"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField :label="t('iam.roles.form.description')">
-          <UTextarea v-model="roleForm.description" :rows="3" />
-        </UFormField>
+      <template #body>
+        <form id="role-form" class="space-y-4 p-4 sm:p-5" @submit.prevent="saveRole">
+          <UFormField :label="t('iam.roles.form.name')" required>
+            <UInput v-model="roleForm.name" />
+          </UFormField>
+          <UFormField :label="t('iam.roles.form.code')" required>
+            <UInput v-model="roleForm.code" />
+          </UFormField>
+          <UFormField :label="t('iam.roles.form.scope')">
+            <USelect
+              v-model="roleForm.scope"
+              :items="[
+                { label: t('iam.roles.scope.tenant'), value: 'tenant' },
+                { label: t('iam.roles.scope.system'), value: 'system' },
+              ]"
+            />
+          </UFormField>
+          <UFormField :label="t('iam.roles.form.tenant')" required>
+            <USelectMenu
+              v-model="roleForm.tenant_uuid"
+              :items="tenantOptions"
+              searchable
+              :loading="tenantFilterLoading"
+              :placeholder="t('iam.roles.filters.tenantPlaceholder')"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField :label="t('iam.roles.form.description')">
+            <UTextarea v-model="roleForm.description" :rows="3" />
+          </UFormField>
+        </form>
       </template>
 
       <template #footer>
-        <div class="flex justify-end gap-2">
-          <UButton variant="ghost" @click="showForm = false">
-            {{ t("common.cancel") }}
+        <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <UButton color="neutral" variant="subtle" @click="showForm = false">
+            {{ `{{ t("common.cancel") }}` }}
           </UButton>
-          <UButton color="primary" @click="saveRole">
-            {{ t("common.save") }}
+          <UButton color="primary" type="submit" form="role-form">
+            {{ `{{ t("common.save") }}` }}
           </UButton>
         </div>
       </template>
     </UModal>
 
-    <USlideover v-model:open="permissionDrawerOpen">
-      <template #header>
-        <div>
-          <p class="text-sm text-gray-500">
-            {{ t("iam.roles.permissionDrawer.caption") }}
-          </p>
-          <h3 class="text-lg font-semibold text-gray-900">
-            {{ activeRole?.name }}
-          </h3>
+    <UModal
+      v-if="permissionDrawerOpen"
+      v-model:open="permissionDrawerOpen"
+      :title="activeRole?.name || t('iam.roles.actions.permissions')"
+      :description="t('iam.roles.permissionDrawer.caption')"
+      :ui="{ content: 'max-w-5xl w-full' }"
+    >
+      <template #body>
+        <div class="p-4 sm:p-6">
+          <PermissionTree
+            v-model="permissionSelection"
+            :permissions="permissionList"
+            :loading="permissionDrawerLoading || permissionBusy"
+          />
         </div>
       </template>
-      <div class="p-4">
-        <PermissionTree
-          v-model="permissionSelection"
-          :permissions="permissionList"
-          :loading="permissionDrawerLoading || permissionBusy"
-        />
-      </div>
       <template #footer>
-        <div class="flex justify-end gap-2 border-t border-gray-100 p-4">
-          <UButton variant="ghost" @click="permissionDrawerOpen = false">
-            {{ t("common.cancel") }}
+        <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+          <UButton
+            color="neutral"
+            variant="subtle"
+            @click="permissionDrawerOpen = false"
+          >
+            {{ `{{ t("common.cancel") }}` }}
           </UButton>
           <UButton color="primary" @click="savePermissionSelection">
-            {{ t("common.save") }}
+            {{ `{{ t("common.save") }}` }}
           </UButton>
         </div>
       </template>
-    </USlideover>
+    </UModal>
 
-    <USlideover v-model:open="membersDrawerOpen">
+    <USlideover
+      v-if="membersDrawerOpen"
+      v-model:open="membersDrawerOpen"
+      :portal="true"
+    >
       <template #header>
         <div>
           <p class="text-sm text-gray-500">
-            {{ t("iam.roles.membersDrawer.caption") }}
+            {{ `{{ t("iam.roles.membersDrawer.caption") }}` }}
           </p>
           <h3 class="text-lg font-semibold text-gray-900">
-            {{ activeRole?.name }}
+            {{ `{{ activeRole?.name }}` }}
           </h3>
         </div>
       </template>
@@ -918,9 +915,9 @@ onMounted(async () => {
             class="flex items-center justify-between gap-3 py-2"
           >
             <div>
-              <p class="font-medium text-sm">{{ member.display_name }}</p>
+              <p class="font-medium text-sm">{{ `{{ member.display_name }}` }}</p>
               <p class="text-xs text-gray-500">
-                {{ member.email || member.username }}
+                {{ `{{ member.email || member.username }}` }}
               </p>
             </div>
             <UCheckbox
@@ -932,29 +929,27 @@ onMounted(async () => {
             v-if="!filteredMemberCandidates.length"
             class="text-sm text-gray-500 py-6 text-center"
           >
-            {{ t("iam.roles.membersDrawer.empty") }}
+            {{ `{{ t("iam.roles.membersDrawer.empty") }}` }}
           </p>
         </div>
       </div>
       <template #footer>
         <div class="flex justify-between items-center border-t border-gray-100 p-4">
           <p class="text-sm text-gray-500">
-            {{
-              t("iam.roles.membersDrawer.selectionSummary", {
+            {{ `{{ t("iam.roles.membersDrawer.selectionSummary", {
                 count: selectedMemberIds.length,
-              })
-            }}
+              }) }}` }}
           </p>
           <div class="flex gap-2">
             <UButton variant="ghost" @click="membersDrawerOpen = false">
-              {{ t("common.cancel") }}
+              {{ `{{ t("common.cancel") }}` }}
             </UButton>
             <UButton
               color="primary"
               :loading="membersSaving"
               @click="saveMembers"
             >
-              {{ t("common.save") }}
+              {{ `{{ t("common.save") }}` }}
             </UButton>
           </div>
         </div>

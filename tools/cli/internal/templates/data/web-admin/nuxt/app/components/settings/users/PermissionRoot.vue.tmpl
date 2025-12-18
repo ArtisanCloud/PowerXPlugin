@@ -409,8 +409,12 @@ const deletePermission = async (permission: any) => {
     <!-- 标题 -->
     <div class="flex justify-between items-center">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">权限管理</h1>
-        <p class="text-gray-600 mt-1">管理系统权限和访问控制</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+          权限管理
+        </h1>
+        <p class="text-gray-600 mt-1 dark:text-slate-200">
+          管理系统权限和访问控制
+        </p>
       </div>
       <UButton
         icon="i-heroicons-plus"
@@ -446,7 +450,7 @@ const deletePermission = async (permission: any) => {
         <div class="flex flex-wrap gap-3 justify-between items-center">
           <h3 class="text-lg font-semibold">权限列表</h3>
           <div class="flex items-center gap-3">
-            <span class="text-sm text-gray-500">共 {{ total }} 个</span>
+            <span class="text-sm text-gray-500">共 {{ `{{ total }}` }} 个</span>
             <USelect
               v-model="pageSize"
               :items="[
@@ -473,15 +477,15 @@ const deletePermission = async (permission: any) => {
             <!-- 上：Badge 拼接 -->
             <div class="flex items-center gap-1 flex-wrap">
               <UBadge variant="outline" size="sm">
-                {{ row.original.__raw?.plugin ?? "core" }}
+                {{ `{{ row.original.__raw?.plugin ?? "core" }}` }}
               </UBadge>
               <span class="text-gray-400">/</span>
               <UBadge variant="soft" size="sm" class="max-w-[160px] truncate">
-                {{ row.original.__raw?.resource }}
+                {{ `{{ row.original.__raw?.resource }}` }}
               </UBadge>
               <span class="text-gray-400">/</span>
               <UBadge variant="soft" size="sm">
-                {{ row.original.__raw?.action }}
+                {{ `{{ row.original.__raw?.action }}` }}
               </UBadge>
             </div>
 
@@ -491,7 +495,7 @@ const deletePermission = async (permission: any) => {
                 <code
                   class="text-xs bg-gray-50 rounded px-1 py-0.5 truncate max-w-[260px]"
                 >
-                  {{ row.original.codeFull }}
+                  {{ `{{ row.original.codeFull }}` }}
                 </code>
               </UTooltip>
               <UButton
@@ -518,11 +522,11 @@ const deletePermission = async (permission: any) => {
                     : 'secondary'
                 "
               >
-                {{ row.original.__raw?.meta?.http_method }}
+                {{ `{{ row.original.__raw?.meta?.http_method }}` }}
               </UBadge>
               <UTooltip :text="row.original.__raw?.meta?.api_endpoint">
                 <span class="text-xs text-gray-600 truncate max-w-[260px]">
-                  {{ row.original.__raw?.meta?.api_endpoint }}
+                  {{ `{{ row.original.__raw?.meta?.api_endpoint }}` }}
                 </span>
               </UTooltip>
             </div>
@@ -532,14 +536,14 @@ const deletePermission = async (permission: any) => {
         <!-- 描述 -->
         <template #description-cell="{ row }">
           <span class="text-gray-600">
-            {{ row.original.description || "-" }}
+            {{ `{{ row.original.description || "-" }}` }}
           </span>
         </template>
 
         <!-- 分类 -->
         <template #category-cell="{ row }">
           <UBadge v-if="row.original.category" variant="soft">
-            {{ row.original.category }}
+            {{ `{{ row.original.category }}` }}
           </UBadge>
           <span v-else class="text-gray-400">-</span>
         </template>
@@ -560,7 +564,7 @@ const deletePermission = async (permission: any) => {
                 size="xs"
                 variant="soft"
               >
-                {{ statusText(row.original.lifecycle) }}
+                {{ `{{ statusText(row.original.lifecycle) }}` }}
               </UBadge>
             </UTooltip>
 
@@ -578,7 +582,7 @@ const deletePermission = async (permission: any) => {
         <!-- 创建时间 -->
         <template #created_at-cell="{ row }">
           <span class="text-sm text-gray-500">
-            {{ formatDate(row.original.created_at) }}
+            {{ `{{ formatDate(row.original.created_at) }}` }}
           </span>
         </template>
 
@@ -779,7 +783,7 @@ const deletePermission = async (permission: any) => {
                   <code
                     class="px-2 py-1 bg-gray-100 rounded text-sm truncate max-w-[320px]"
                   >
-                    {{ editingForm.code }}
+                    {{ `{{ editingForm.code }}` }}
                   </code>
                   <UButton
                     size="2xs"

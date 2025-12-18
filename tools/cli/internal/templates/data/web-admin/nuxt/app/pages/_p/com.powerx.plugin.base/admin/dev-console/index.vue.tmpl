@@ -117,7 +117,7 @@
             <UTextarea v-model="safeOpForm.reason" placeholder="本次操作原因" />
           </UFormField>
           <UFormField label="Dry Run" class="md:col-span-3">
-            <UToggle v-model="safeOpForm.dry_run" />
+            <USwitch v-model="safeOpForm.dry_run" />
           </UFormField>
           <UFormField label="租户 ID" class="md:col-span-3">
             <UInput v-model="safeOpForm.tenant_uuid" placeholder="tenant-1" />

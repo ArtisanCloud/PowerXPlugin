@@ -19,8 +19,18 @@
     "error": "发生错误",
     "retry": "重试",
     "reload": "重新加载",
+    "all": "全部",
+    "selected": "已选 {count} 项",
+    "total": "共 {count} 条",
+    "view": "查看",
+    "export": "导出",
+    "import": "导入",
     "welcome": "欢迎",
     "appName": "PowerX 基础插件"
+  },
+  "status": {
+    "active": "启用",
+    "inactive": "停用"
   },
   "menu": {
     "openMarket": "开放市场",
@@ -314,6 +324,31 @@
         "membersSaved": "成员列表已更新",
         "membersFailed": "更新成员失败"
       }
+    }
+  },
+  "product": {
+    "sku": {
+      "title": "SKU 管理",
+      "basicInfo": "基础信息",
+      "inventory": "库存信息",
+      "logistics": "物流信息",
+      "constraints": "约束规则",
+      "skus": "SKU 列表",
+      "add": "新增 SKU",
+      "detail": "SKU 详情",
+      "search": "搜索 SKU、编码或规格",
+      "status": "状态",
+      "category": "分类",
+      "brand": "品牌",
+      "skuCode": "SKU 编码",
+      "spu": "所属 SPU",
+      "specifications": "规格参数",
+      "price": "售卖价格",
+      "availableStock": "可用库存",
+      "inventoryStatus": "库存状态",
+      "actions": "操作",
+      "inStock": "现货",
+      "lowStock": "低库存"
     }
   },
   "tenant": {

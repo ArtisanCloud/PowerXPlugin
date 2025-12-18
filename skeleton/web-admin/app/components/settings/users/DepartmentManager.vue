@@ -579,10 +579,10 @@ function buildUpdatePayload(): DepartmentUpdateParams {
   <div class="p-4">
     <div class="flex justify-between items-center mb-6">
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white">
           {{ $t("organization.department.title") }}
         </h2>
-        <p class="text-sm text-gray-500 mt-1">
+        <p class="text-sm text-gray-500 mt-1 dark:text-gray-300">
           {{ $t("organization.department.description") }}
         </p>
       </div>
@@ -627,7 +627,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
         </div>
         <div
           v-else-if="treeItems.length === 0"
-          class="text-center py-4 text-gray-500"
+          class="text-center py-4 text-gray-500 dark:text-gray-400"
         >
           {{ $t("organization.department.empty.title") }}
         </div>
@@ -652,7 +652,9 @@ function buildUpdatePayload(): DepartmentUpdateParams {
                 "
                 :class="[
                   'h-4 w-4',
-                  item.hasChildren ? 'text-amber-500' : 'text-gray-400',
+                  item.hasChildren
+                    ? 'text-amber-500 dark:text-amber-300'
+                    : 'text-gray-400 dark:text-slate-200',
                 ]"
               />
             </template>
@@ -702,14 +704,14 @@ function buildUpdatePayload(): DepartmentUpdateParams {
               }}
             </h3>
             <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-600">{{
+              <span class="text-sm text-gray-600 dark:text-gray-300">{{
                 $t("organization.department.table.name")
               }}</span>
             </div>
           </div>
         </template>
 
-        <div class="bg-white rounded-lg">
+        <div class="bg-white rounded-lg dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
           <UTable
             :data="paginatedDepartments"
             :columns="columns"
@@ -721,14 +723,14 @@ function buildUpdatePayload(): DepartmentUpdateParams {
             class="px-6 py-4 border-t border-gray-200"
           >
             <div class="flex justify-between items-center">
-              <div class="text-sm text-gray-600">
+              <div class="text-sm text-gray-600 dark:text-gray-300">
                 第 {{ pagination.page }} /
                 {{ pagination.totalPages }} 页；本级子部门
                 {{ pagination.total }} 个
               </div>
               <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
-                  <span class="text-sm text-gray-600">每页：</span>
+                  <span class="text-sm text-gray-600 dark:text-gray-300">每页：</span>
                   <USelect
                     :model-value="pagination.pageSize"
                     :items="pageSizeOptions"
@@ -762,7 +764,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
         </div>
 
         <template #footer>
-          <div class="flex justify-between items-center text-sm text-gray-500">
+          <div class="flex justify-between items-center text-sm text-gray-500 dark:text-gray-300">
             <span>
               {{
                 t("organization.department.pagination.showing", {
@@ -780,7 +782,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
     <!-- 空状态（针对右侧列表） -->
     <div
       v-if="!isLoadingTree && filteredDepartments.length === 0"
-      class="text-center py-10 text-gray-500"
+      class="text-center py-10 text-gray-500 dark:text-gray-400"
     >
       {{ $t("organization.department.empty.noResults") }}
     </div>
@@ -795,7 +797,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
       <template #content>
         <UCard>
           <template #header>
-            <h3 class="text-lg font-medium text-gray-900">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">
               {{
                 isEditing
                   ? $t("organization.department.edit")
@@ -874,7 +876,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
                         v === '' ? null : v === null ? null : Number(v))
                   "
                 />
-                <p class="text-xs text-gray-500 mt-1">
+                <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">
                   不选择则不移动；选择“无上级”将把部门提升为根节点。
                 </p>
               </UFormField>

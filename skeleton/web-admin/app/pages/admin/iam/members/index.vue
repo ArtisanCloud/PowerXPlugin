@@ -24,22 +24,21 @@ const { isRoot, isCurrentTenantAdmin, isLoading, error } =
 const tabs = computed(() => {
   const baseTabs = [
     {
-      id: "departments",
-      name: t("organization.tabs.departments"),
+      value: "departments",
+      label: t("organization.tabs.departments"),
       icon: "i-heroicons-building-office",
     },
     {
-      id: "users",
-      name: t("organization.tabs.users"),
+      value: "users",
+      label: t("organization.tabs.users"),
       icon: "i-heroicons-users",
     },
   ];
 
-  // 只有 root 用户或租户管理员才能看到权限管理
   if (isRoot.value || isCurrentTenantAdmin.value) {
     baseTabs.push({
-      id: "permissions",
-      name: t("organization.tabs.permissions"),
+      value: "permissions",
+      label: t("organization.tabs.permissions"),
       icon: "i-heroicons-lock-closed",
     });
   }
@@ -60,51 +59,95 @@ onMounted(async () => {
 <template>
   <div class="p-6">
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">
+      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
         {{ t("menu.userManagement") }}
       </h1>
-      <p class="text-gray-600 mt-2">{{ t("organization.description") }}</p>
+      <p class="mt-2 text-gray-600 dark:text-gray-300">
+        {{ t("organization.description") }}
+      </p>
     </div>
 
-    <div class="bg-white rounded-lg shadow">
-      <!-- 选项卡导航 -->
-      <div class="border-b border-gray-200">
-        <nav class="flex -mb-px">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            @click="activeTab = tab.id"
-            :class="[
-              'px-6 py-4 text-sm font-medium flex items-center',
-              activeTab === tab.id
-                ? 'border-b-2 border-primary-500 text-primary-600'
-                : 'text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300',
-            ]"
-          >
-            <UIcon :name="tab.icon" class="w-5 h-5 mr-2" />
-            {{ tab.name }}
-          </button>
-        </nav>
+    <section
+      class="members-panel rounded-3xl border border-gray-100 bg-white/95 p-6 shadow-lg dark:border-slate-800/70 dark:bg-slate-900/80"
+    >
+      <div
+        class="flex flex-wrap gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1 dark:border-transparent dark:bg-slate-900/50"
+      >
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          @click="activeTab = tab.value"
+          :class="[
+            'flex-1 rounded-xl px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-2',
+            activeTab === tab.value
+              ? 'bg-white text-primary-600 shadow dark:bg-slate-950/70 dark:text-white'
+              : 'text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100',
+          ]"
+        >
+          <UIcon :name="tab.icon" class="h-4 w-4" />
+          {{ tab.label }}
+        </button>
       </div>
 
-      <!-- 选项卡内容 -->
-      <div class="p-6">
-        <!-- 部门管理 -->
-        <div v-if="activeTab === 'departments'">
-          <DepartmentManager />
-        </div>
-
-        <!-- 用户管理 -->
-        <!-- 用户管理 -->
-        <div v-if="activeTab === 'users'">
-          <UserShell />
-        </div>
-
-        <!-- 权限管理 -->
-        <div v-if="activeTab === 'permissions'">
-          <PermissionShell />
-        </div>
+      <div class="mt-8 space-y-8 text-gray-900 dark:text-gray-100">
+        <DepartmentManager v-if="activeTab === 'departments'" />
+        <UserShell v-else-if="activeTab === 'users'" />
+        <PermissionShell v-else-if="activeTab === 'permissions'" />
       </div>
-    </div>
+    </section>
   </div>
 </template>
+
+<style scoped>
+:global(.dark) .members-panel :deep(.bg-white) {
+  background-color: rgba(13, 23, 42, 0.7);
+}
+:global(.dark) .members-panel :deep(.bg-white\/95) {
+  background-color: rgba(13, 23, 42, 0.82);
+}
+:global(.dark) .members-panel :deep(.bg-gray-50) {
+  background-color: rgba(15, 23, 42, 0.4);
+}
+:global(.dark) .members-panel :deep(.bg-gray-100) {
+  background-color: rgba(15, 23, 42, 0.5);
+}
+:global(.dark) .members-panel :deep(.text-gray-900) {
+  color: #fdfcff;
+}
+:global(.dark) .members-panel :deep(.text-gray-800) {
+  color: #f1f6ff;
+}
+:global(.dark) .members-panel :deep(.text-gray-700) {
+  color: #e4ecff;
+}
+:global(.dark) .members-panel :deep(.text-gray-600) {
+  color: #d6e2ff;
+}
+:global(.dark) .members-panel :deep(.text-gray-500) {
+  color: #c7d6ff;
+}
+:global(.dark) .members-panel :deep(.text-gray-400) {
+  color: #b9caff;
+}
+:global(.dark) .members-panel :deep(.text-gray-300) {
+  color: #dfe7ff;
+}
+:global(.dark) .members-panel :deep(.text-gray-200) {
+  color: #eef3ff;
+}
+:global(.dark) .members-panel :deep(.border-gray-200) {
+  border-color: rgba(148, 163, 184, 0.25);
+}
+:global(.dark) .members-panel :deep(.border-gray-300) {
+  border-color: rgba(148, 163, 184, 0.35);
+}
+:global(.dark) .members-panel :deep(.divide-gray-200 > :not([hidden]) ~ :not([hidden])) {
+  border-color: rgba(148, 163, 184, 0.25);
+}
+:global(.dark) .members-panel :deep(.bg-blue-100) {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+:global(.dark) .members-panel :deep(.text-blue-600) {
+  color: #93c5fd;
+}
+</style>

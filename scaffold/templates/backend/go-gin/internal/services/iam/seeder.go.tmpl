@@ -313,6 +313,7 @@ func seedDefaultPermissions(tx *gorm.DB, roleID uint64, tenantUUID string) error
 		{"*", "*", "Full access"},
 		{"iam.user", "read", "Read IAM users"},
 		{"iam.role", "read", "Read IAM roles"},
+		{"iam.tenant", "read", "Read IAM tenants"},
 		{"iam.department", "read", "Read IAM departments"},
 	}
 	for _, p := range perms {

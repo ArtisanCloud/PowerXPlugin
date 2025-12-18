@@ -216,8 +216,8 @@ func (r *Router) buildJWT() middleware.JWTAuthConfig {
 	optional := false
 	if v := strings.TrimSpace(os.Getenv("POWERX_AUTH_OPTIONAL")); v != "" {
 		optional = v == "1" || strings.EqualFold(v, "true")
-	} else if !prod && r.cfg.Server.DevMode {
-		optional = false
+	} else if !prod {
+		optional = true
 	}
 
 	issuer := "powerx-local"

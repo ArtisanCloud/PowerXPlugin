@@ -48,10 +48,10 @@
           @select="selectListing"
           :sort="{ column: 'updated_at', direction: 'desc' }"
         >
-          <template #status-data="{ row }">
+          <template #status-cell="{ row }">
             <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ `{{ row.status }}` }}</UBadge>
           </template>
-          <template #title-data="{ row }">
+          <template #title-cell="{ row }">
             <div class="space-y-0.5">
               <span class="font-medium">{{ `{{ row.title }}` }}</span>
               <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -59,7 +59,7 @@
               </p>
             </div>
           </template>
-          <template #ready_checklist_score-data="{ row }">
+          <template #ready_checklist_score-cell="{ row }">
             <div class="flex items-center gap-2">
               <UProgress :value="row.ready_checklist_score" :max="100" size="xs" />
               <span class="text-xs text-gray-500">{{ `{{ row.ready_checklist_score }}` }}%</span>
@@ -188,7 +188,7 @@
                       <UInput type="number" v-model="asset.weight" />
                     </UFormField>
                     <div class="flex items-center gap-2">
-                      <UToggle v-model="asset.is_primary" />
+                      <USwitch v-model="asset.is_primary" />
                       <span class="text-sm text-gray-600 dark:text-gray-300">主展示</span>
                     </div>
                   </div>
@@ -296,7 +296,7 @@
                     <UInput type="number" v-model="asset.weight" />
                   </UFormField>
                   <div class="flex items-center gap-2">
-                    <UToggle v-model="asset.is_primary" />
+                    <USwitch v-model="asset.is_primary" />
                     <span class="text-sm text-gray-600 dark:text-gray-300">主展示</span>
                   </div>
                 </div>
@@ -321,6 +321,7 @@
 import { computed, reactive, ref, watch, onMounted } from "vue"
 import { useToast } from "#imports"
 import type { MarketplaceListing, MarketplaceListingStatus } from "~/types/integration"
+import { useNormalizedColumns } from "~/utils/table"
 
 definePageMeta({
   middleware: ["layout.global"],
@@ -342,13 +343,13 @@ const filters = reactive<{ status: MarketplaceListingStatus[]; search: string }>
   search: "",
 })
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "title", label: "Listing" },
   { key: "status", label: "状态" },
   { key: "locale", label: "语言" },
   { key: "ready_checklist_score", label: "Checklist" },
   { key: "updated_at", label: "更新时间" },
-]
+])
 
 const statusOptions = [
   { label: "草稿", value: "draft" },

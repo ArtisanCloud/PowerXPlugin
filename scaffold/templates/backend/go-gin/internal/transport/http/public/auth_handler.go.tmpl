@@ -328,8 +328,8 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 		}
 	}
 	resp := gin.H{
-		"tenant":             tenant,
-		"is_root":            uc.IsRoot,
+		"tenant":              tenant,
+		"is_root":             uc.IsRoot,
 		"current_tenant_uuid": tenantUUID,
 		"current_member_id":   uc.MemberID,
 		"user": gin.H{

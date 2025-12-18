@@ -290,8 +290,8 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 		diff := map[string]any{
 			"member_id": created.ID,
 			"user_id":   created.UserID,
-			"username":   created.Username,
-			"status":     created.Status,
+			"username":  created.Username,
+			"status":    created.Status,
 		}
 		if len(created.Roles) > 0 {
 			diff["roles"] = created.Roles

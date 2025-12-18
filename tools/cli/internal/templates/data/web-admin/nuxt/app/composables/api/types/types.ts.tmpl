@@ -10,13 +10,8 @@ export interface PaginationParams {
   sortOrder?: "asc" | "desc";
 }
 
-// 基础响应结构
-export interface ApiResponse<T> {
-  code: number;
-  message: string;
-  data: T;
-  timestamp: number;
-}
+// 直接复用统一响应定义，确保与 useApiClient/_base 一致
+export type { ApiResponse } from "../_base";
 
 // 分页响应结构
 export interface PaginatedResponse<T> {

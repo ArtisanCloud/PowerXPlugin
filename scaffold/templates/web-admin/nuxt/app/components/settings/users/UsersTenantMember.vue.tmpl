@@ -242,18 +242,24 @@ onMounted(async () => {
     <div class="mb-6">
       <div class="flex justify-between items-start mb-4">
         <div>
-          <h2 class="text-xl font-semibold text-gray-800">
-            {{ $t("organization.user.title") }}
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+            {{ `{{ $t("organization.user.title") }}` }}
           </h2>
-          <p class="text-sm text-gray-500 mt-1">查看同事信息（只读权限）</p>
+          <p class="text-sm text-gray-500 mt-1 dark:text-slate-200">
+            查看同事信息（只读权限）
+          </p>
         </div>
         <div class="text-right">
-          <p class="text-sm text-gray-600">当前用户：{{ displayName }}</p>
+          <p class="text-sm text-gray-600 dark:text-slate-200">
+            当前用户：{{ `{{ displayName }}` }}
+          </p>
         </div>
       </div>
 
       <!-- 租户选择器 -->
-      <div class="bg-white p-4 rounded-lg shadow-sm">
+      <div
+        class="bg-white p-4 rounded-lg shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60"
+      >
         <div class="flex items-center gap-4">
           <UFormField label="选择租户" class="flex-shrink-0">
             <USelect
@@ -270,10 +276,10 @@ onMounted(async () => {
           <div v-if="selectedTenant" class="flex-1">
             <div class="flex items-center gap-2">
               <UBadge color="primary" variant="subtle">
-                {{ selectedTenant.name }}
+                {{ `{{ selectedTenant.name }}` }}
               </UBadge>
-              <span class="text-sm text-gray-500">
-                {{ selectedTenant.domain }}
+              <span class="text-sm text-gray-500 dark:text-slate-200">
+                {{ `{{ selectedTenant.domain }}` }}
               </span>
             </div>
           </div>
@@ -282,7 +288,7 @@ onMounted(async () => {
     </div>
 
     <!-- 搜索栏 -->
-    <div class="mb-6 bg-white p-4 rounded-lg shadow-sm">
+    <div class="mb-6 rounded-lg bg-white p-4 shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
       <div class="flex items-center gap-4">
         <div class="flex-1">
           <UInput
@@ -292,32 +298,38 @@ onMounted(async () => {
             class="w-full"
           />
         </div>
-        <div class="text-sm text-gray-500">
-          共 {{ filteredUsers.length }} 位同事
+        <div class="text-sm text-gray-500 dark:text-slate-200">
+          共 {{ `{{ filteredUsers.length }}` }} 位同事
         </div>
       </div>
     </div>
 
     <!-- 用户列表 -->
-    <div class="bg-white rounded-lg shadow-sm">
+    <div class="rounded-lg bg-white shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
       <!-- 加载状态 -->
-      <div v-if="isLoading" class="flex items-center justify-center py-12">
+      <div
+        v-if="isLoading"
+        class="flex items-center justify-center py-12 text-gray-600 dark:text-slate-200"
+      >
         <UIcon
           name="i-heroicons-arrow-path"
           class="animate-spin h-6 w-6 text-blue-600"
         />
-        <span class="ml-2 text-gray-600">加载中...</span>
+        <span class="ml-2">加载中...</span>
       </div>
 
       <!-- 空状态 -->
       <div
         v-else-if="filteredUsers.length === 0"
-        class="text-center py-12 text-gray-500"
+        class="text-center py-12 text-gray-500 dark:text-slate-300"
       >
-        <UIcon name="i-heroicons-users" class="h-12 w-12 mx-auto mb-4" />
+        <UIcon
+          name="i-heroicons-users"
+          class="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-slate-600"
+        />
         <p class="text-lg font-medium mb-2">暂无同事信息</p>
         <p class="text-sm">
-          {{ searchQuery ? "没有找到匹配的同事" : "当前租户暂无其他成员" }}
+          {{ `{{ searchQuery ? "没有找到匹配的同事" : "当前租户暂无其他成员" }}` }}
         </p>
       </div>
 
@@ -328,15 +340,19 @@ onMounted(async () => {
     </div>
 
     <!-- 权限说明 -->
-    <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+    <div
+      class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg dark:bg-slate-900/60 dark:border-slate-800/70"
+    >
       <div class="flex items-start">
         <UIcon
           name="i-heroicons-information-circle"
-          class="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0"
+          class="h-5 w-5 text-blue-600 dark:text-blue-200 mt-0.5 mr-3 flex-shrink-0"
         />
         <div class="text-sm">
-          <p class="font-medium text-blue-800 mb-1">权限说明</p>
-          <ul class="text-blue-700 space-y-1">
+          <p class="font-medium text-blue-800 dark:text-slate-100 mb-1">
+            权限说明
+          </p>
+          <ul class="text-blue-700 dark:text-slate-200 space-y-1">
             <li>• 您只能查看有权限访问的同事信息</li>
             <li>• 无法编辑、添加或删除用户</li>
             <li>• 可以在您所属的租户间切换查看</li>

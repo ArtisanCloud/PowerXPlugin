@@ -32,12 +32,12 @@
       </template>
 
       <UTable :rows="rows" :columns="columns" :loading="loading">
-        <template #status-data="{ row }">
+        <template #status-cell="{ row }">
           <UBadge :color="statusColor(row.status)" size="xs" class="uppercase">
             {{ `{{ row.status }}` }}
           </UBadge>
         </template>
-        <template #findings-data="{ row }">
+        <template #findings-cell="{ row }">
           <UButton
             v-if="row.findings"
             size="xs"
@@ -49,7 +49,7 @@
           </UButton>
           <span v-else class="text-gray-400">—</span>
         </template>
-        <template #artifactPath-data="{ row }">
+        <template #artifactPath-cell="{ row }">
           <NuxtLink
             v-if="row.artifactPath"
             :to="row.artifactPath"
@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import type { AuditReport, AuditReportListResponse } from "~/types/security";
+import { useNormalizedColumns } from "~/utils/table";
 
 const runtimeConfig = useRuntimeConfig();
 const router = useRouter();
@@ -98,14 +99,14 @@ const rows = ref<AuditReport[]>([]);
 const findingsOpen = ref(false);
 const findingsJson = ref("{}");
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "checklistVersion", label: "Checklist" },
   { key: "status", label: "Status" },
   { key: "initiatedBy", label: "Initiated By" },
   { key: "createdAt", label: "Timestamp" },
   { key: "findings", label: "Findings" },
   { key: "artifactPath", label: "Artifacts" },
-];
+]);
 
 const mapRow = (report: AuditReport) => ({
   id: report.id,

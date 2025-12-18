@@ -543,10 +543,10 @@ onMounted(async () => {
     <!-- 顶部：导入导出 + 新增 -->
     <div class="flex justify-between items-center mb-6">
       <div>
-        <h2 class="text-xl font-semibold text-gray-800">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
           {{ $t("organization.user.title") }}
         </h2>
-        <p class="text-sm text-gray-500 mt-1">
+        <p class="text-sm text-gray-500 mt-1 dark:text-slate-200">
           {{ $t("organization.user.description") }}
         </p>
       </div>
@@ -567,15 +567,15 @@ onMounted(async () => {
     </div>
 
     <!-- 搜索与筛选（与你现有一致） -->
-    <div class="mb-6 bg-white p-4 rounded-lg shadow-sm">
+    <div class="mb-6 rounded-lg bg-white p-4 shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
       <div class="flex flex-wrap gap-4 items-end">
         <div class="flex-grow min-w-[200px]">
           <UInput
             v-model="searchQuery"
             icon="i-heroicons-magnifying-glass"
-            :placeholder="$t('organization.user.search')"
-          />
-        </div>
+        :placeholder="$t('organization.user.search')"
+        />
+      </div>
         <UFormField :label="$t('organization.user.form.department')">
           <SelectTree
             v-model="filters.department"
@@ -622,7 +622,9 @@ onMounted(async () => {
     </div>
 
     <!-- 表格 + 分页 -->
-    <div class="bg-white rounded-lg shadow-sm">
+    <div
+      class="rounded-lg bg-white shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60"
+    >
       <UTable
         :data="paginatedUsers"
         :columns="columns"
@@ -635,9 +637,9 @@ onMounted(async () => {
       />
       <div
         v-if="pagination.totalPages > 1"
-        class="px-6 py-4 border-t border-gray-200 flex justify-between items-center"
+        class="px-6 py-4 border-t border-gray-200 dark:border-slate-800/60 flex justify-between items-center"
       >
-        <div class="text-sm text-gray-600">
+        <div class="text-sm text-gray-600 dark:text-slate-200">
           第 {{ pagination.page }} / {{ pagination.totalPages }} 页， 共
           {{ pagination.total }} 条
         </div>

@@ -51,11 +51,12 @@ func HasPerm(userPerms []string, need Permission) bool {
 		if p == want {
 			return true
 		}
-		parts := strings.SplitN(p, ":", 2)
-		if len(parts) != 2 {
+		idx := strings.LastIndex(p, ":")
+		if idx <= 0 || idx >= len(p)-1 {
 			continue
 		}
-		pr, pa := parts[0], parts[1]
+		pr := p[:idx]
+		pa := p[idx+1:]
 		if pr == "*" || pr == res {
 			if pa == "*" || pa == act {
 				return true

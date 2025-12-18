@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node ./node_modules/nuxi/bin/nuxi.mjs dev",
     "build": "node ./node_modules/nuxi/bin/nuxi.mjs build",
-    "postinstall": "npm rebuild lightningcss --force || true",
+    "postinstall": "node ./node_modules/lightningcss/install.js || true",
     "lint": "node -e \"console.log('Lint checks pending configuration');\"",
     "test:unit": "node ./node_modules/vitest/dist/cli.js run --dir tests/unit",
     "test:e2e": "playwright test"

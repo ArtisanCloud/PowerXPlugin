@@ -215,7 +215,7 @@
         "title": "Bulk import members",
         "caption": "Paste one member per line. Format: email,displayName",
         "hint": "Only email is required. Optional values include display name. Members will receive default roles after creation.",
-        "placeholder": "user@example.com, Display Name",
+        "placeholder": "user\\u0040example.com, Display Name",
         "submit": "Import",
         "empty": "Please provide at least one row",
         "success": "Import finished",

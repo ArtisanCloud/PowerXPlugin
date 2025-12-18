@@ -698,7 +698,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
           <div class="flex justify-between items-center">
             <h3 class="text-lg font-medium">
               {{ `{{ activeNode
-                  ? `${activeNode.name} - ${$t("organization.department.title")}`
+                  ? activeNode.name + " - " + $t("organization.department.title")
                   : $t("organization.department.title") }}` }}
             </h3>
             <div class="flex items-center gap-2">

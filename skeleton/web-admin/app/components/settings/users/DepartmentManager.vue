@@ -699,7 +699,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
             <h3 class="text-lg font-medium">
               {{
                 activeNode
-                  ? `${activeNode.name} - ${$t("organization.department.title")}`
+                  ? activeNode.name + " - " + $t("organization.department.title")
                   : $t("organization.department.title")
               }}
             </h3>

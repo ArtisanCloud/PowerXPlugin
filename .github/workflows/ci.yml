@@ -56,7 +56,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install && node ./node_modules/lightningcss/install.js || true
+          cd skeleton/web-admin && npm install && npm install lightningcss-linux-x64-gnu@1.30.2 --no-save
       - name: Lint
         run: cd skeleton/web-admin && npx nuxi lint || true
       - name: Build
@@ -175,7 +175,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install && node ./node_modules/lightningcss/install.js || true
+          cd skeleton/web-admin && npm install && npm install lightningcss-linux-x64-gnu@1.30.2 --no-save
       - name: Install Playwright browsers
         working-directory: skeleton/web-admin
         run: npx playwright install --with-deps

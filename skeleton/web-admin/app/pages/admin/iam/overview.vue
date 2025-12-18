@@ -1,44 +1,84 @@
 <template>
   <div class="space-y-6">
+    <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div>
+        <p class="text-sm uppercase tracking-wide text-gray-500">
+          Organization &amp; Access
+        </p>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+          {{ $t("iam.overview.title") }}
+        </h1>
+        <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl">
+          {{ $t("iam.overview.caption") }}
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <UButton icon="i-heroicons-plus-circle" color="primary" @click="openCreateTenant">
+          {{ $t("iam.overview.createTenant") }}
+        </UButton>
+        <UButton
+          icon="i-heroicons-squares-2x2"
+          variant="soft"
+          :disabled="!tenantRows.length"
+          @click="openPlanModal"
+        >
+          {{ $t("iam.overview.planDrawer.title") }}
+        </UButton>
+        <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="fetchTenants">
+          {{ $t("common.refresh") }}
+        </UButton>
+      </div>
+    </section>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <UCard
+        v-for="category in settingCategories"
+        :key="category.key"
+        class="cursor-pointer transition hover:shadow-lg"
+        @click="navigateToCategory(category)"
+      >
+        <div class="flex items-start gap-4">
+          <div class="rounded-lg p-3" :class="category.iconBg">
+            <UIcon :name="category.icon" class="w-6 h-6" />
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ category.title }}
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ category.description }}
+            </p>
+          </div>
+        </div>
+      </UCard>
+    </div>
+
     <UCard>
       <template #header>
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-lg font-semibold">
-              {{ $t("iam.overview.title") }}
+              {{ $t("iam.overview.tenantTable.title") }}
             </h2>
             <p class="text-sm text-gray-500">
-              {{ $t("iam.overview.caption") }}
+              {{ $t("iam.overview.tenantTable.caption") }}
             </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <UButton icon="i-heroicons-plus" color="primary" @click="openCreateTenant">
-              {{ $t("iam.overview.createTenant") }}
-            </UButton>
-            <UButton
-              icon="i-heroicons-arrow-path"
-              variant="soft"
-              :loading="loading"
-              @click="fetchTenants"
-            >
-              {{ $t("common.refresh") }}
-            </UButton>
           </div>
         </div>
       </template>
       <UTable :rows="tenantRows" :columns="columns" :loading="loading">
-        <template #status-data="{ row }">
+        <template #status-cell="{ row }">
           <UBadge :color="row.status === 'active' ? 'green' : 'yellow'">
             {{ formatStatus(row.status) }}
           </UBadge>
         </template>
-        <template #actions-data="{ row }">
+        <template #actions-cell="{ row }">
           <div class="flex items-center gap-2">
-            <USelectMenu
-              :options="statusOptions"
+            <USelect
               v-model="row.status"
-              size="sm"
-              @update:model-value="(value) => changeTenantStatus(row, value)"
+              :items="statusItems"
+              class="w-32"
+              @update:model-value="(value) => changeTenantStatus(row, value as string)"
             />
             <UButton
               size="xs"
@@ -53,106 +93,109 @@
       </UTable>
     </UCard>
 
-    <USlideover v-model="showPlanDrawer">
-      <UCard class="w-full max-w-md">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold">
-              {{ $t("iam.overview.planDrawer.title") }}
-            </h3>
-            <UButton
-              icon="i-heroicons-x-mark"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              @click="showPlanDrawer = false"
-            />
-          </div>
-        </template>
-        <div v-if="selectedTenant">
-          <UForm :state="planForm">
-            <UFormGroup :label="$t('iam.overview.planDrawer.planLabel')">
-              <USelect v-model="planForm.plan" :options="planOptions" />
-            </UFormGroup>
-            <UFormGroup class="mt-3" :label="$t('iam.overview.planDrawer.displayName')">
-              <UInput v-model="planForm.name" />
-            </UFormGroup>
-          </UForm>
-          <div class="mt-6 flex justify-end gap-2">
-            <UButton variant="soft" @click="showPlanDrawer = false">
-              {{ $t("common.cancel") }}
-            </UButton>
-            <UButton color="primary" :loading="planSaving" @click="submitPlanForm">
-              {{ $t("common.save") }}
-            </UButton>
-          </div>
-        </div>
-      </UCard>
-    </USlideover>
 
-    <UModal v-model="showCreateModal">
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-base font-semibold">
-                {{ $t("iam.overview.createModal.title") }}
-              </h3>
-              <p class="text-sm text-gray-500">
-                {{ $t("iam.overview.createModal.caption") }}
-              </p>
-            </div>
-            <UButton icon="i-heroicons-x-mark" variant="ghost" color="neutral" @click="closeCreate" />
-          </div>
-        </template>
-        <UForm :state="createForm" class="space-y-4">
-          <UFormGroup :label="$t('iam.overview.createModal.key')" required>
+    <UModal
+      v-model:open="showPlanDrawer"
+      :ui="{ content: 'max-w-md w-full' }"
+    >
+      <template #title>
+        {{ $t("iam.overview.planDrawer.title") }}
+      </template>
+      <template #description>
+        {{ $t("iam.overview.planDrawer.caption") }}
+      </template>
+      <template #body>
+        <div class="space-y-4" v-if="selectedTenant">
+          <p class="text-sm text-gray-500">
+            {{ selectedTenant?.name }} · {{ selectedTenant?.key }}
+          </p>
+          <UForm :state="planForm" class="space-y-4">
+            <UFormField :label="$t('iam.overview.planDrawer.planLabel')">
+              <USelect v-model="planForm.plan" :items="planItems" class="w-full" />
+            </UFormField>
+            <UFormField :label="$t('iam.overview.planDrawer.displayName')">
+              <UInput v-model="planForm.name" />
+            </UFormField>
+          </UForm>
+        </div>
+        <div v-else class="text-sm text-gray-500">
+          {{ $t('iam.notifications.selectTenant') }}
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <UButton variant="soft" @click="closePlanModal">
+            {{ $t("common.cancel") }}
+          </UButton>
+          <UButton color="primary" :loading="planSaving" @click="submitPlanForm">
+            {{ $t("common.save") }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showCreateModal"
+      :prevent-close="creating"
+      :ui="{ width: 'w-full', content: 'max-w-2xl w-full' }"
+    >
+      <template #title>
+        {{ $t("iam.overview.createModal.title") }}
+      </template>
+      <template #description>
+        {{ $t("iam.overview.createModal.caption") }}
+      </template>
+      <template #body>
+        <UForm :state="createForm" class="space-y-4 p-4 sm:p-5">
+          <UFormField :label="$t('iam.overview.createModal.key')" required>
             <UInput v-model="createForm.key" placeholder="tenant-key" />
-          </UFormGroup>
-          <UFormGroup :label="$t('iam.overview.createModal.name')" required>
+          </UFormField>
+          <UFormField :label="$t('iam.overview.createModal.name')" required>
             <UInput v-model="createForm.name" />
-          </UFormGroup>
+          </UFormField>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <UFormGroup :label="$t('iam.overview.createModal.plan')">
-              <USelect v-model="createForm.plan" :options="planOptions" />
-            </UFormGroup>
-            <UFormGroup :label="$t('iam.overview.createModal.status')">
-              <USelect v-model="createForm.status" :options="statusOptions" />
-            </UFormGroup>
+            <UFormField :label="$t('iam.overview.createModal.plan')">
+              <USelect v-model="createForm.plan" :items="planItems" class="w-full" />
+            </UFormField>
+            <UFormField :label="$t('iam.overview.createModal.status')">
+              <USelect v-model="createForm.status" :items="statusItems" class="w-full" />
+            </UFormField>
           </div>
         </UForm>
-        <template #footer>
-          <div class="flex justify-end gap-2">
-            <UButton variant="soft" @click="closeCreate">
-              {{ $t("common.cancel") }}
-            </UButton>
-            <UButton color="primary" :loading="creating" @click="submitCreate">
-              {{ $t("common.save") }}
-            </UButton>
-          </div>
-        </template>
-      </UCard>
+      </template>
+      <template #footer>
+        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <UButton color="neutral" variant="soft" :disabled="creating" @click="closeCreate">
+            {{ $t("common.cancel") }}
+          </UButton>
+          <UButton color="primary" :loading="creating" @click="submitCreate">
+            {{ $t("common.save") }}
+          </UButton>
+        </div>
+      </template>
     </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from "vue";
-import { useToast } from "#imports";
+import { ref, reactive, computed, onMounted, watch } from "vue";
+import { useRouter, useToast } from "#imports";
 import {
   useIAMService,
   type TenantSummary,
 } from "~/composables/api/services/iamService";
 import { useIAMStore } from "~/stores/iam";
-const { t } = useI18n();
+import { useNormalizedColumns } from "~/utils/table";
 
+const { t } = useI18n();
 definePageMeta({
   layout: "default",
 });
 
 const iam = useIAMService();
-const toast = useToast();
 const store = useIAMStore();
+const toast = useToast();
+const router = useRouter();
 
 const loading = ref(false);
 const creating = ref(false);
@@ -173,30 +216,61 @@ const planForm = reactive({
   name: "",
 });
 
-const statusOptions = [
+const statusItems = [
   { label: "Active", value: "active" },
   { label: "Suspended", value: "suspended" },
 ];
 
-const planOptions = [
+const planItems = [
   { label: "Free", value: "free" },
   { label: "Standard", value: "standard" },
   { label: "Premium", value: "premium" },
 ];
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "name", label: "Tenant" },
   { key: "key", label: "Key" },
   { key: "status", label: "Status" },
   { key: "plan", label: "Plan" },
   { key: "actions", label: "" },
-];
+]);
+
+const settingCategories = computed(() => [
+  {
+    key: "members",
+    title: "成员与部门",
+    description: "维护组织结构与租户成员",
+    icon: "i-heroicons-user-group",
+    iconBg: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300",
+    path: "/admin/iam/members",
+  },
+  {
+    key: "roles",
+    title: "角色权限",
+    description: "配置角色、权限树与授权",
+    icon: "i-heroicons-shield-check",
+    iconBg: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300",
+    path: "/admin/iam/roles",
+  },
+  {
+    key: "settings",
+    title: "租户配置",
+    description: "切换计划、调整租户状态",
+    icon: "i-heroicons-cog-6-tooth",
+    iconBg: "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-300",
+    path: "/admin/iam/settings",
+  },
+]);
 
 const tenantRows = computed(() =>
   (store.tenants ?? []).map((tenant) => ({
     ...tenant,
   }))
 );
+
+const navigateToCategory = (category: { path: string }) => {
+  router.push(category.path);
+};
 
 const fetchTenants = async () => {
   loading.value = true;
@@ -242,6 +316,20 @@ const openPlanDrawer = (tenant: TenantSummary) => {
   showPlanDrawer.value = true;
 };
 
+const closePlanModal = () => {
+  blurActiveElement();
+  showPlanDrawer.value = false;
+};
+
+const openPlanModal = () => {
+  const target = selectedTenant.value ?? tenantRows.value[0];
+  if (!target) {
+    toast.add({ title: t("iam.notifications.selectTenant"), color: "yellow" });
+    return;
+  }
+  openPlanDrawer(target);
+};
+
 const submitPlanForm = async () => {
   if (!selectedTenant.value) return;
   planSaving.value = true;
@@ -251,7 +339,7 @@ const submitPlanForm = async () => {
       name: planForm.name,
     });
     toast.add({ title: t("common.save"), description: t("common.confirm") });
-    showPlanDrawer.value = false;
+    closePlanModal();
     await fetchTenants();
   } catch (error: any) {
     toast.add({
@@ -269,11 +357,14 @@ const openCreateTenant = () => {
 };
 
 const closeCreate = () => {
+  blurActiveElement();
   showCreateModal.value = false;
-  createForm.key = "";
-  createForm.name = "";
-  createForm.plan = "free";
-  createForm.status = "active";
+  Object.assign(createForm, {
+    key: "",
+    name: "",
+    plan: "free",
+    status: "active",
+  });
 };
 
 const submitCreate = async () => {
@@ -299,10 +390,29 @@ const submitCreate = async () => {
   }
 };
 
-const toggleTenantStatus = async (tenant: TenantSummary) => {
-  const nextStatus = tenant.status === "active" ? "suspended" : "active";
-  await changeTenantStatus(tenant, nextStatus);
+onMounted(fetchTenants);
+
+const blurActiveElement = () => {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const active = document.activeElement;
+  if (active && "blur" in active && typeof active.blur === "function") {
+    active.blur();
+  }
 };
 
-onMounted(fetchTenants);
+const blurOnClose = (value: boolean, oldValue?: boolean) => {
+  if (!value && oldValue) {
+    blurActiveElement();
+  }
+};
+
+watch(showPlanDrawer, (value, oldValue) => {
+  blurOnClose(value, oldValue);
+  if (!value && oldValue) {
+    selectedTenant.value = null;
+  }
+});
+watch(showCreateModal, blurOnClose);
 </script>

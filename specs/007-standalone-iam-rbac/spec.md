@@ -89,6 +89,25 @@
 - **FR-009**: 必须提供 CLI 工具导出/备份本地租户、角色、权限，以及重新注入管理员凭据。
 - **FR-010**: 必须更新文档（Standalone 指南、Runbook、Quickstart）记载环境变量、模式切换、菜单显隐与验证步骤。
 
+### UI/UX Reference (与 PowerX 现有实现对齐)
+
+为降低认知成本、方便跨插件共用体验，Standalone IAM 的 Web Admin 需要参考宿主 PowerX `settings` 套件（路径示例：`Core/PowerX/web-admin/app/pages/settings/*`）的交互模式，包含但不限于：
+
+1. **设置入口与导航一致性**  
+   - 参考 `settings/index.vue` 的卡片导航 + “快速设置”布局，为 Standalone 菜单提供概览与快捷入口；组织/租户相关菜单需在栅格中呈现自解释简介与图标。
+2. **用户/部门/权限 3 合 1 视图**  
+   - `settings/users/index.vue` 采用 Tab 切换 + `DepartmentManager`/`UserShell`/`PermissionShell` 组件，Standalone 版本也需提供 *部门树*、*成员列表*、*权限预览* 三个区域，依据 `tabs` 动态拼装，并根据用户角色（root、租户管理员）显隐 “权限” tab。
+3. **角色管理体验**  
+   - `components/settings/users/RoleManager.vue` 中的列过滤、租户远程搜索、分页、克隆/编辑抽屉等交互需复用：  
+     - 角色列表必须支持按 scope/内置标记过滤、支持分页与搜索；  
+     - 创建/编辑抽屉需提供租户下拉（远程搜索 + 保留已选项）、角色代码/名称/描述输入与 scope 选择；  
+     - 权限树勾选逻辑与 Manifest scope 对应关系需在 UI 中即时反馈；  
+     - 操作完成后弹出一次性的 Alert（`useOneShotAlert`）提示成功/失败。
+4. **租户/配置联动**  
+   - 参考 `settings/config` 页面快速设置区块，Standalone 的租户配置页应提供基础属性（Key/Name/Status/Plan）与功能开关（注册、邮件、维护模式等）表单，操作按钮（保存/重置）布局、描述文本风格与宿主保持一致。
+
+> **Implementation note**：上述 UI 规格要求我们在 `skeleton/web-admin` 内提供对应的组件与样式，并在 CLI scaffold 中输出同样的结构，确保插件模板延续宿主体验。
+
 ### Key Entities
 
 - **Tenant**: 表示独立租户（含 `id`, `key`, `name`, `status`），关联多部门、角色、成员，决定数据隔离范围。

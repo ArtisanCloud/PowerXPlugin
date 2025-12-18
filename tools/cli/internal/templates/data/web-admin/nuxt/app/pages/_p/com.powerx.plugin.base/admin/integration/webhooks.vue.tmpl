@@ -75,21 +75,21 @@
         </template>
 
         <form class="space-y-4" @submit.prevent="submitCreate">
-          <UFormGroup label="事件类型" required>
+          <UFormField label="事件类型" required>
             <UInput v-model="createForm.eventType" placeholder="integration.envelope.dispatch" />
-          </UFormGroup>
+          </UFormField>
 
-          <UFormGroup label="目标 URL" required>
+          <UFormField label="目标 URL" required>
             <UInput v-model="createForm.targetUrl" placeholder="https://example.com/webhooks" />
-          </UFormGroup>
+          </UFormField>
 
-          <UFormGroup label="签名密钥 (可选)" help="用于签名头 X-PowerX-Signature 的密钥，建议使用随机字符串">
+          <UFormField label="签名密钥 (可选)" help="用于签名头 X-PowerX-Signature 的密钥，建议使用随机字符串">
             <UInput v-model="createForm.secret" placeholder="留空则沿用默认密钥策略" />
-          </UFormGroup>
+          </UFormField>
 
-          <UFormGroup label="重试策略 (秒)" help="填写逗号分隔的秒数，例如 60,300,900">
+          <UFormField label="重试策略 (秒)" help="填写逗号分隔的秒数，例如 60,300,900">
             <UInput v-model="createForm.retryPolicyInput" placeholder="60,300,900" />
-          </UFormGroup>
+          </UFormField>
 
           <div class="flex justify-end gap-2">
             <UButton color="gray" variant="soft" @click="createOpen = false">

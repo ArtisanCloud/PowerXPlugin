@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,11 @@ import (
 
 type DepartmentHandler struct {
 	service *srviam.DepartmentService
+}
+
+type departmentNode struct {
+	iamm.Department
+	Children []*departmentNode `json:"children,omitempty"`
 }
 
 func NewDepartmentHandler(svc *srviam.DepartmentService) *DepartmentHandler {
@@ -29,6 +35,35 @@ func (h *DepartmentHandler) List(c *gin.Context) {
 		return
 	}
 	contracts.ResponseSuccess(c, gin.H{"items": deps})
+}
+
+func (h *DepartmentHandler) Tree(c *gin.Context) {
+	var query DepartmentListQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+	deps, err := h.service.List(c.Request.Context(), srviam.DepartmentFilter{TenantUUID: query.TenantUUID})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	nodes := make(map[uint64]*departmentNode, len(deps))
+	for i := range deps {
+		copy := deps[i]
+		nodes[copy.ID] = &departmentNode{Department: copy}
+	}
+	var roots []*departmentNode
+	for _, node := range nodes {
+		if node.ParentID != nil {
+			if parent, ok := nodes[*node.ParentID]; ok {
+				parent.Children = append(parent.Children, node)
+				continue
+			}
+		}
+		roots = append(roots, node)
+	}
+	contracts.ResponseSuccess(c, roots)
 }
 
 func (h *DepartmentHandler) Create(c *gin.Context) {

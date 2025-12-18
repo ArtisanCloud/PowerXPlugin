@@ -79,3 +79,14 @@ scripts/ & tools/
 - `iam_users`/`iam_members` 的职责区分需要在数据模型文档中明确：Account 持有跨租户凭证，Member 负责租户内的组织/RBAC 状态，并通过 `iam_member_roles` 关联 `iam_roles`。
 - 所有 IAM 相关表（tenants/users/members/roles/permissions/departments/member_roles/role_permissions/refresh_tokens/audit_logs）必须在迁移与模型层保持一致命名，并在 Runbook 中提供“同一账号加入多个租户”的验证步骤，方便运维复现问题。
 - Phase 4 的文档任务需补充上述说明；若后续实现导致模型再次变更，需同时回传到 `data-model.md` 与 `docs/operations/runbooks/iam-rbac.md`。
+
+## UI Parity Tasks（参考 PowerX settings 页面）
+
+| Task | Description | Reference |
+| ---- | ----------- | --------- |
+| U1 | 在 `/admin/iam/overview` 建立“系统设置”式的卡片导航与快速设置区块，重用 `UCard + grid + quick settings` 模式，确保入口与 `settings/index.vue` 相似。 | `Core/PowerX/web-admin/app/pages/settings/index.vue` |
+| U2 | 复制 `settings/users/index.vue` 的 Tab 行为（部门/用户/权限），并基于 Pinia store 判断 root/tenant-admin 显隐权限 Tab；部门/成员/权限三个子组件需要 Standalone 版本。 | `Core/PowerX/.../settings/users/index.vue` |
+| U3 | 在角色列表中实现租户远程搜索、分页、过滤与克隆/编辑抽屉，逻辑对齐 `components/settings/users/RoleManager.vue`（含 `useOneShotAlert` 提示与 scope/scope_type 过滤）。 | `Core/PowerX/.../components/settings/users/RoleManager.vue` |
+| U4 | 将租户配置表单（Plan Drawer、创建租户 Modal、功能开关）设计成 `settings/config` 的“快速设置”风格，复用 label/description/按钮布局与 `USelect`/`USwitch` 交互。 | `Core/PowerX/web-admin/app/pages/settings/config/index.vue` |
+
+> 以上任务要在 skeleton + scaffold 模板同时实现，并在 PR 中附上对比截图；Quickstart 第 2.1 节已加入 UI 自检 checklist。

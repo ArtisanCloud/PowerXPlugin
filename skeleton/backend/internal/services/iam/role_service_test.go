@@ -185,6 +185,7 @@ func createIAMTablesForTest(db *gorm.DB) error {
 			display_name TEXT,
 			avatar_url TEXT,
 			status TEXT,
+			is_root BOOLEAN DEFAULT 0,
 			password_hash TEXT,
 			meta TEXT,
 			created_at DATETIME,

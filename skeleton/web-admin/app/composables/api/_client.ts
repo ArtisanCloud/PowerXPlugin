@@ -8,14 +8,154 @@ import { PLUGIN_ID } from "~/utils/powerx-bridge";
 
 type Json = Record<string, any>;
 
-let _client: typeof $fetch | null = null;
+type RequestParams = Record<string, any> | URLSearchParams;
+
+type ApiClientRequestOptions = Record<string, any> & {
+  params?: RequestParams;
+};
+
+type ApiClientShortcuts = {
+  request<T>(request: any, options?: ApiClientRequestOptions): Promise<T>;
+  get<T>(request: any, options?: ApiClientRequestOptions): Promise<T>;
+  delete<T>(request: any, options?: ApiClientRequestOptions): Promise<T>;
+  post<T>(
+    request: any,
+    data?: any,
+    options?: ApiClientRequestOptions
+  ): Promise<T>;
+  put<T>(
+    request: any,
+    data?: any,
+    options?: ApiClientRequestOptions
+  ): Promise<T>;
+  patch<T>(
+    request: any,
+    data?: any,
+    options?: ApiClientRequestOptions
+  ): Promise<T>;
+};
+
+type ApiClientInstance = typeof $fetch & ApiClientShortcuts;
+
+function searchParamsToObject(params: URLSearchParams) {
+  const obj: Record<string, string> = {};
+  params.forEach((value, key) => {
+    obj[key] = value;
+  });
+  return obj;
+}
+
+function normalizeRequestOptions(
+  options?: ApiClientRequestOptions | null
+): Record<string, any> | undefined {
+  if (!options) {
+    return options || undefined;
+  }
+
+  const hasParams = Boolean(options.params);
+  const queryIsSearchParams = options.query instanceof URLSearchParams;
+
+  if (!hasParams && !queryIsSearchParams) {
+    return options;
+  }
+
+  const next: Record<string, any> = { ...options };
+
+  if (queryIsSearchParams) {
+    next.query = searchParamsToObject(options.query as URLSearchParams);
+  } else if (options.query && typeof options.query === "object") {
+    next.query = { ...options.query };
+  }
+
+  if (hasParams && options.params) {
+    const paramsObj =
+      options.params instanceof URLSearchParams
+        ? searchParamsToObject(options.params)
+        : { ...options.params };
+    next.query = { ...(next.query || {}), ...paramsObj };
+    delete next.params;
+  }
+
+  return next;
+}
+
+const isFormData = (value: any): value is FormData =>
+  typeof FormData !== "undefined" && value instanceof FormData;
+const isBlob = (value: any): value is Blob =>
+  typeof Blob !== "undefined" && value instanceof Blob;
+const isArrayBuffer = (value: any): value is ArrayBuffer =>
+  typeof ArrayBuffer !== "undefined" && value instanceof ArrayBuffer;
+const isUrlEncoded = (value: any): value is URLSearchParams =>
+  typeof URLSearchParams !== "undefined" && value instanceof URLSearchParams;
+
+function normalizeBodyPayload(body: any) {
+  if (body === undefined) {
+    return undefined;
+  }
+
+  if (
+    typeof body === "string" ||
+    isFormData(body) ||
+    isBlob(body) ||
+    isArrayBuffer(body) ||
+    isUrlEncoded(body)
+  ) {
+    return body;
+  }
+
+  return JSON.stringify(body);
+}
+
+function applyHttpShortcuts(client: ApiClientInstance) {
+  client.request = <T>(request: any, options?: ApiClientRequestOptions) =>
+    client<T>(request, options);
+
+  const methodWithoutBody = (method: "GET" | "DELETE") => {
+    return <T>(request: any, options?: ApiClientRequestOptions) =>
+      client<T>(request, { ...(options || {}), method });
+  };
+
+  const methodWithBody = (method: "POST" | "PUT" | "PATCH") => {
+    return <T>(
+      request: any,
+      data?: any,
+      options?: ApiClientRequestOptions
+    ) => {
+      const init: Record<string, any> = { ...(options || {}), method };
+      const normalizedBody = normalizeBodyPayload(data);
+      if (normalizedBody !== undefined) {
+        init.body = normalizedBody;
+      }
+      return client<T>(request, init);
+    };
+  };
+
+  client.get = methodWithoutBody("GET");
+  client.delete = methodWithoutBody("DELETE");
+  client.post = methodWithBody("POST");
+  client.put = methodWithBody("PUT");
+  client.patch = methodWithBody("PATCH");
+
+  return client;
+}
+
+let _client: ApiClientInstance | null = null;
 let _baseURL: string | null = null;
 let _clientEnv: "client" | "server" | null = null;
 
 export function useApiClient() {
   const env = typeof window === "undefined" ? "server" : "client";
   if (_client && _clientEnv === env) {
-    return { client: _client, baseURL: _baseURL! };
+    return {
+      client: _client,
+      baseURL: _baseURL!,
+      request: _client.request,
+      get: _client.get,
+      post: _client.post,
+      put: _client.put,
+      patch: _client.patch,
+      delete: _client.delete,
+    };
   }
 
   const baseURL = resolveApiBase();
@@ -151,8 +291,13 @@ export function useApiClient() {
     }
   };
 
-  const invokeClient = async (request: any, options?: any, raw = false) => {
-    const prepared = await prepareOptions(options);
+  const invokeClient = async (
+    request: any,
+    options?: ApiClientRequestOptions,
+    raw = false
+  ) => {
+    const normalizedOptions = normalizeRequestOptions(options);
+    const prepared = await prepareOptions(normalizedOptions);
     try {
       return await (raw
         ? baseClient.raw(request, prepared)
@@ -163,15 +308,27 @@ export function useApiClient() {
     }
   };
 
-  const client = ((request: any, options?: any) =>
-    invokeClient(request, options)) as typeof baseClient;
+  const client = ((request: any, options?: ApiClientRequestOptions) =>
+    invokeClient(request, options)) as ApiClientInstance;
 
-  client.raw = (request: any, options?: any) => invokeClient(request, options, true);
+  client.raw = (request: any, options?: ApiClientRequestOptions) =>
+    invokeClient(request, options, true);
   client.native = baseClient.native;
+
+  applyHttpShortcuts(client);
 
   _client = client;
   _clientEnv = env;
-  return { client, baseURL };
+  return {
+    client,
+    baseURL,
+    request: client.request,
+    get: client.get,
+    post: client.post,
+    put: client.put,
+    patch: client.patch,
+    delete: client.delete,
+  };
 }
 
 // 常用 CRUD 便捷封装

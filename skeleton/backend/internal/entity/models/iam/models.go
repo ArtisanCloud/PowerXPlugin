@@ -39,6 +39,7 @@ type User struct {
 	DisplayName  string            `gorm:"size:128" json:"display_name"`
 	AvatarURL    string            `gorm:"size:255" json:"avatar_url"`
 	Status       string            `gorm:"size:32;not null;default:'active'" json:"status"`
+	IsRoot       bool              `gorm:"column:is_root;not null;default:false;index:idx_iam_users_is_root" json:"is_root"`
 	PasswordHash string            `gorm:"size:255;not null" json:"-"`
 	Meta         datatypes.JSONMap `gorm:"type:jsonb" json:"meta"`
 	CreatedAt    time.Time         `gorm:"autoCreateTime" json:"created_at"`

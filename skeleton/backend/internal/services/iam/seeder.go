@@ -92,6 +92,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 				account = iamm.User{
 					Email:        strings.ToLower(opts.AdminEmail),
 					DisplayName:  opts.AdminName,
+					IsRoot:       true,
 					Status:       iamm.StatusActive,
 					PasswordHash: string(hashed),
 				}
@@ -106,6 +107,7 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 				"display_name":  opts.AdminName,
 				"status":        iamm.StatusActive,
 				"password_hash": string(hashed),
+				"is_root":       true,
 			}
 			if err := tx.Model(&account).Updates(update).Error; err != nil {
 				return err
@@ -311,6 +313,7 @@ func seedDefaultPermissions(tx *gorm.DB, roleID uint64, tenantUUID string) error
 		{"*", "*", "Full access"},
 		{"iam.user", "read", "Read IAM users"},
 		{"iam.role", "read", "Read IAM roles"},
+		{"iam.tenant", "read", "Read IAM tenants"},
 		{"iam.department", "read", "Read IAM departments"},
 	}
 	for _, p := range perms {

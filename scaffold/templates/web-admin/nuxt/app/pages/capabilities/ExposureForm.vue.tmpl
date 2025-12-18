@@ -167,7 +167,7 @@
                         {{ `{{ $t("capabilities.exposure.sections.channelHint") }}` }}
                       </span>
                     </div>
-                    <UToggle v-model="channel.enabled" color="primary" />
+                    <USwitch v-model="channel.enabled" color="primary" />
                   </div>
                   <div class="grid gap-3">
                     <UFormField :label="$t('capabilities.exposure.fields.displayName')">

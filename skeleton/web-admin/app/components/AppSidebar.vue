@@ -153,19 +153,6 @@
             {{ t('navigation.iamOverview') }}
           </UButton>
           <UButton
-            to="/admin/iam/departments"
-            variant="ghost"
-            color="neutral"
-            class="w-full justify-start"
-            :class="{
-              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-                isExactActive('/admin/iam/departments'),
-            }"
-          >
-            <UIcon name="i-heroicons-building-office-2" class="w-4 h-4 mr-3" />
-            {{ t('navigation.iamDepartments') }}
-          </UButton>
-          <UButton
             to="/admin/iam/members"
             variant="ghost"
             color="neutral"
@@ -190,6 +177,19 @@
           >
             <UIcon name="i-heroicons-key" class="w-4 h-4 mr-3" />
             {{ t('navigation.iamRoles') }}
+          </UButton>
+          <UButton
+            to="/admin/iam/settings"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/settings'),
+            }"
+          >
+            <UIcon name="i-heroicons-cog-6-tooth" class="w-4 h-4 mr-3" />
+            {{ t('navigation.iamSettings') }}
           </UButton>
         </div>
       </div>

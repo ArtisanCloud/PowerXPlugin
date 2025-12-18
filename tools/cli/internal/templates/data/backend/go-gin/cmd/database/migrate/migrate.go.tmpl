@@ -297,7 +297,7 @@ func backfillRolePermissionTenant(ctx context.Context, db *gorm.DB) error {
 		)
 	} else {
 		query = fmt.Sprintf(
-			`UPDATE %s rp SET tenant_uuid = r.tenant_uuid FROM %s r WHERE rp.role_id = r.id AND (rp.tenant_uuid IS NULL OR rp.tenant_uuid = '')`,
+			`UPDATE %s rp SET tenant_uuid = r.tenant_uuid FROM %s r WHERE rp.role_id = r.id AND (rp.tenant_uuid IS NULL OR rp.tenant_uuid::text = '')`,
 			rolePerms, roles,
 		)
 	}

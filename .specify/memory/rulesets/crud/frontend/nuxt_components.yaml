@@ -74,5 +74,9 @@ nuxt_ui:
     errorHandling:
       schemaValidation: true
       toastOnError: optional
+  table:
+    columns:
+      notes:
+        - "Nuxt UI 3 的 `UTable` 依赖 TanStack 列定义，`key/label` 需要通过 `useNormalizedColumns([...])` 转换为 `accessorKey/header`，并在模板中使用 `#<column>-cell` 槽位。"
 
 gates.require: [PG-FE-UI-001]

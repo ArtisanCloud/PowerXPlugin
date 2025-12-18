@@ -1,44 +1,87 @@
 <template>
   <div class="space-y-6">
+    <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div>
+        <p class="text-sm uppercase tracking-wide text-gray-500">
+          Organization &amp; Access
+        </p>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+          {{ `{{ $t("iam.overview.title") }}` }}
+        </h1>
+        <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl">
+          {{ `{{ $t("iam.overview.caption") }}` }}
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <UButton icon="i-heroicons-plus-circle" color="primary" @click="openCreateTenant">
+          {{ `{{ $t("iam.overview.createTenant") }}` }}
+        </UButton>
+        <UButton icon="i-heroicons-adjustments-horizontal" variant="soft" @click="showQuickSettingsModal = true">
+          {{ `{{ $t("iam.overview.quickSettings.title") }}` }}
+        </UButton>
+        <UButton
+          icon="i-heroicons-squares-2x2"
+          variant="soft"
+          :disabled="!tenantRows.length"
+          @click="openPlanModal"
+        >
+          {{ `{{ $t("iam.overview.planDrawer.title") }}` }}
+        </UButton>
+        <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="fetchTenants">
+          {{ `{{ $t("common.refresh") }}` }}
+        </UButton>
+      </div>
+    </section>
+
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <UCard
+        v-for="category in settingCategories"
+        :key="category.key"
+        class="cursor-pointer transition hover:shadow-lg"
+        @click="navigateToCategory(category)"
+      >
+        <div class="flex items-start gap-4">
+          <div class="rounded-lg p-3" :class="category.iconBg">
+            <UIcon :name="category.icon" class="w-6 h-6" />
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ `{{ category.title }}` }}
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ `{{ category.description }}` }}
+            </p>
+          </div>
+        </div>
+      </UCard>
+    </div>
+
     <UCard>
       <template #header>
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-lg font-semibold">
-              {{ `{{ $t("iam.overview.title") }}` }}
+              {{ `{{ $t("iam.overview.tenantTable.title") }}` }}
             </h2>
             <p class="text-sm text-gray-500">
-              {{ `{{ $t("iam.overview.caption") }}` }}
+              {{ `{{ $t("iam.overview.tenantTable.caption") }}` }}
             </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <UButton icon="i-heroicons-plus" color="primary" @click="openCreateTenant">
-              {{ `{{ $t("iam.overview.createTenant") }}` }}
-            </UButton>
-            <UButton
-              icon="i-heroicons-arrow-path"
-              variant="soft"
-              :loading="loading"
-              @click="fetchTenants"
-            >
-              {{ `{{ $t("common.refresh") }}` }}
-            </UButton>
           </div>
         </div>
       </template>
       <UTable :rows="tenantRows" :columns="columns" :loading="loading">
-        <template #status-data="{ row }">
+        <template #status-cell="{ row }">
           <UBadge :color="row.status === 'active' ? 'green' : 'yellow'">
             {{ `{{ formatStatus(row.status) }}` }}
           </UBadge>
         </template>
-        <template #actions-data="{ row }">
+        <template #actions-cell="{ row }">
           <div class="flex items-center gap-2">
-            <USelectMenu
-              :options="statusOptions"
+            <USelect
               v-model="row.status"
-              size="sm"
-              @update:model-value="(value) => changeTenantStatus(row, value)"
+              :items="statusItems"
+              class="w-32"
+              @update:model-value="(value) => changeTenantStatus(row, value as string)"
             />
             <UButton
               size="xs"
@@ -53,112 +96,218 @@
       </UTable>
     </UCard>
 
-    <USlideover v-model="showPlanDrawer">
-      <UCard class="w-full max-w-md">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold">
-              {{ `{{ $t("iam.overview.planDrawer.title") }}` }}
-            </h3>
-            <UButton
-              icon="i-heroicons-x-mark"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-              @click="showPlanDrawer = false"
-            />
-          </div>
-        </template>
-        <div v-if="selectedTenant">
-          <UForm :state="planForm">
-            <UFormGroup :label="$t('iam.overview.planDrawer.planLabel')">
-              <USelect v-model="planForm.plan" :options="planOptions" />
-            </UFormGroup>
-            <UFormGroup class="mt-3" :label="$t('iam.overview.planDrawer.displayName')">
-              <UInput v-model="planForm.name" />
-            </UFormGroup>
-          </UForm>
-          <div class="mt-6 flex justify-end gap-2">
-            <UButton variant="soft" @click="showPlanDrawer = false">
-              {{ `{{ $t("common.cancel") }}` }}
-            </UButton>
-            <UButton color="primary" :loading="planSaving" @click="submitPlanForm">
-              {{ `{{ $t("common.save") }}` }}
-            </UButton>
-          </div>
-        </div>
-      </UCard>
-    </USlideover>
-
-    <UModal v-model="showCreateModal">
-      <UCard>
-        <template #header>
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-base font-semibold">
-                {{ `{{ $t("iam.overview.createModal.title") }}` }}
-              </h3>
-              <p class="text-sm text-gray-500">
-                {{ `{{ $t("iam.overview.createModal.caption") }}` }}
-              </p>
+    <UModal
+      v-model:open="showQuickSettingsModal"
+      :ui="{ content: 'max-w-3xl w-full' }"
+    >
+      <template #title>
+        {{ `{{ $t("iam.overview.quickSettings.title") }}` }}
+      </template>
+      <template #description>
+        {{ `{{ $t("iam.overview.quickSettings.caption") }}` }}
+      </template>
+      <template #body>
+        <div class="space-y-8 p-4 sm:p-5">
+          <section>
+            <h3 class="text-sm font-semibold mb-4">基础信息</h3>
+            <div class="space-y-4">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p class="font-medium text-sm">显示名称</p>
+                  <p class="text-xs text-gray-500">用于登录页和通知的品牌名称</p>
+                </div>
+                <UInput v-model="quickSettings.siteName" class="w-full sm:w-64" />
+              </div>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p class="font-medium text-sm">描述</p>
+                  <p class="text-xs text-gray-500">MC/管理员了解 IAM 的一句话</p>
+                </div>
+                <UInput v-model="quickSettings.siteDescription" class="w-full sm:w-64" />
+              </div>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p class="font-medium text-sm">默认语言</p>
+                  <p class="text-xs text-gray-500">影响欢迎邮件与通知模板</p>
+                </div>
+                <USelect v-model="quickSettings.defaultLanguage" :items="languageOptions" class="w-full sm:w-48" />
+              </div>
             </div>
-            <UButton icon="i-heroicons-x-mark" variant="ghost" color="neutral" @click="closeCreate" />
-          </div>
-        </template>
-        <UForm :state="createForm" class="space-y-4">
-          <UFormGroup :label="$t('iam.overview.createModal.key')" required>
+          </section>
+
+          <section>
+            <h3 class="text-sm font-semibold mb-4">功能开关</h3>
+            <div class="grid gap-4 md:grid-cols-2">
+              <div
+                v-for="toggle in featureToggles"
+                :key="toggle.key"
+                class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2"
+              >
+                <div>
+                  <p class="text-sm font-medium">{{ `{{ toggle.label }}` }}</p>
+                  <p class="text-xs text-gray-500">{{ `{{ toggle.description }}` }}</p>
+                </div>
+                <USwitch v-model="quickSettings[toggle.key]" />
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="text-sm font-semibold mb-4">安全策略</h3>
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
+                <div>
+                  <p class="text-sm font-medium">强制 HTTPS</p>
+                  <p class="text-xs text-gray-500"> web Admin 仅允许 https+samesite</p>
+                </div>
+                <USwitch v-model="quickSettings.forceHttps" />
+              </div>
+              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
+                <div>
+                  <p class="text-sm font-medium">两步验证</p>
+                  <p class="text-xs text-gray-500">管理员登录是否强制 MFA</p>
+                </div>
+                <USwitch v-model="quickSettings.twoFactorAuth" />
+              </div>
+              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
+                <div>
+                  <p class="text-sm font-medium">登录失败次数</p>
+                  <p class="text-xs text-gray-500">触发锁定前允许的失败次数</p>
+                </div>
+                <UInput v-model="quickSettings.maxLoginAttempts" type="number" class="w-24" />
+              </div>
+              <div class="flex items-center justify-between rounded border border-gray-100 dark:border-gray-800 px-3 py-2">
+                <div>
+                  <p class="text-sm font-medium">审计保留天数</p>
+                  <p class="text-xs text-gray-500">超出后将被自动滚动清理</p>
+                </div>
+                <UInput v-model="quickSettings.auditRetentionDays" type="number" class="w-24" />
+              </div>
+            </div>
+          </section>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <UButton variant="soft" @click="resetQuickSettings">
+            {{ `{{ $t("common.reset") }}` }}
+          </UButton>
+          <UButton color="primary" @click="saveQuickSettings">
+            {{ `{{ $t("common.save") }}` }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showPlanDrawer"
+      :ui="{ content: 'max-w-md w-full' }"
+    >
+      <template #title>
+        {{ `{{ $t("iam.overview.planDrawer.title") }}` }}
+      </template>
+      <template #description>
+        {{ `{{ $t("iam.overview.planDrawer.caption") }}` }}
+      </template>
+      <template #body>
+        <div class="space-y-4" v-if="selectedTenant">
+          <p class="text-sm text-gray-500">
+            {{ `{{ selectedTenant?.name }}` }} · {{ `{{ selectedTenant?.key }}` }}
+          </p>
+          <UForm :state="planForm" class="space-y-4">
+            <UFormField :label="$t('iam.overview.planDrawer.planLabel')">
+              <USelect v-model="planForm.plan" :items="planItems" class="w-full" />
+            </UFormField>
+            <UFormField :label="$t('iam.overview.planDrawer.displayName')">
+              <UInput v-model="planForm.name" />
+            </UFormField>
+          </UForm>
+        </div>
+        <div v-else class="text-sm text-gray-500">
+          {{ `{{ $t('iam.notifications.selectTenant') }}` }}
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <UButton variant="soft" @click="closePlanModal">
+            {{ `{{ $t("common.cancel") }}` }}
+          </UButton>
+          <UButton color="primary" :loading="planSaving" @click="submitPlanForm">
+            {{ `{{ $t("common.save") }}` }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showCreateModal"
+      :prevent-close="creating"
+      :ui="{ width: 'w-full', content: 'max-w-2xl w-full' }"
+    >
+      <template #title>
+        {{ `{{ $t("iam.overview.createModal.title") }}` }}
+      </template>
+      <template #description>
+        {{ `{{ $t("iam.overview.createModal.caption") }}` }}
+      </template>
+      <template #body>
+        <UForm :state="createForm" class="space-y-4 p-4 sm:p-5">
+          <UFormField :label="$t('iam.overview.createModal.key')" required>
             <UInput v-model="createForm.key" placeholder="tenant-key" />
-          </UFormGroup>
-          <UFormGroup :label="$t('iam.overview.createModal.name')" required>
+          </UFormField>
+          <UFormField :label="$t('iam.overview.createModal.name')" required>
             <UInput v-model="createForm.name" />
-          </UFormGroup>
+          </UFormField>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <UFormGroup :label="$t('iam.overview.createModal.plan')">
-              <USelect v-model="createForm.plan" :options="planOptions" />
-            </UFormGroup>
-            <UFormGroup :label="$t('iam.overview.createModal.status')">
-              <USelect v-model="createForm.status" :options="statusOptions" />
-            </UFormGroup>
+            <UFormField :label="$t('iam.overview.createModal.plan')">
+              <USelect v-model="createForm.plan" :items="planItems" class="w-full" />
+            </UFormField>
+            <UFormField :label="$t('iam.overview.createModal.status')">
+              <USelect v-model="createForm.status" :items="statusItems" class="w-full" />
+            </UFormField>
           </div>
         </UForm>
-        <template #footer>
-          <div class="flex justify-end gap-2">
-            <UButton variant="soft" @click="closeCreate">
-              {{ `{{ $t("common.cancel") }}` }}
-            </UButton>
-            <UButton color="primary" :loading="creating" @click="submitCreate">
-              {{ `{{ $t("common.save") }}` }}
-            </UButton>
-          </div>
-        </template>
-      </UCard>
+      </template>
+      <template #footer>
+        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <UButton color="neutral" variant="soft" :disabled="creating" @click="closeCreate">
+            {{ `{{ $t("common.cancel") }}` }}
+          </UButton>
+          <UButton color="primary" :loading="creating" @click="submitCreate">
+            {{ `{{ $t("common.save") }}` }}
+          </UButton>
+        </div>
+      </template>
     </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from "vue";
-import { useToast } from "#imports";
+import { ref, reactive, computed, onMounted, watch } from "vue";
+import { useRouter, useToast } from "#imports";
 import {
   useIAMService,
   type TenantSummary,
 } from "~/composables/api/services/iamService";
 import { useIAMStore } from "~/stores/iam";
-const { t } = useI18n();
+import { useNormalizedColumns } from "~/utils/table";
 
+const { t } = useI18n();
 definePageMeta({
   layout: "default",
 });
 
 const iam = useIAMService();
-const toast = useToast();
 const store = useIAMStore();
+const toast = useToast();
+const router = useRouter();
 
 const loading = ref(false);
 const creating = ref(false);
 const planSaving = ref(false);
 const showCreateModal = ref(false);
 const showPlanDrawer = ref(false);
+const showQuickSettingsModal = ref(false);
 const selectedTenant = ref<TenantSummary | null>(null);
 
 const createForm = reactive({
@@ -173,30 +322,106 @@ const planForm = reactive({
   name: "",
 });
 
-const statusOptions = [
+const statusItems = [
   { label: "Active", value: "active" },
   { label: "Suspended", value: "suspended" },
 ];
 
-const planOptions = [
+const planItems = [
   { label: "Free", value: "free" },
   { label: "Standard", value: "standard" },
   { label: "Premium", value: "premium" },
 ];
 
-const columns = [
+const quickSettingDefaults = () => ({
+  siteName: "PowerX Plugin IAM",
+  siteDescription: "集中管理租户、部门与角色的 Standalone 控制台",
+  defaultLanguage: "zh-CN",
+  allowRegistration: true,
+  emailNotifications: false,
+  maintenanceMode: false,
+  enableAuditStreaming: true,
+  enablePortal: true,
+  forceHttps: true,
+  twoFactorAuth: false,
+  maxLoginAttempts: 5,
+  auditRetentionDays: 30,
+});
+
+const quickSettings = reactive(quickSettingDefaults());
+
+const languageOptions = [
+  { label: "简体中文", value: "zh-CN" },
+  { label: "English", value: "en" },
+];
+
+const featureToggles = [
+  {
+    key: "allowRegistration",
+    label: "用户自注册",
+    description: "允许通过邀请链接直接加入租户",
+  },
+  {
+    key: "emailNotifications",
+    label: "邮件通知",
+    description: "触发成员邀请、密码重置等邮件",
+  },
+  {
+    key: "maintenanceMode",
+    label: "维护模式",
+    description: "暂停全部租户的前台访问",
+  },
+  {
+    key: "enableAuditStreaming",
+    label: "审计流式同步",
+    description: "实时推送关键审计事件到宿主",
+  },
+];
+
+const columns = useNormalizedColumns([
   { key: "name", label: "Tenant" },
   { key: "key", label: "Key" },
   { key: "status", label: "Status" },
   { key: "plan", label: "Plan" },
   { key: "actions", label: "" },
-];
+]);
+
+const settingCategories = computed(() => [
+  {
+    key: "members",
+    title: "成员与部门",
+    description: "维护组织结构与租户成员",
+    icon: "i-heroicons-user-group",
+    iconBg: "bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300",
+    path: "/admin/iam/members",
+  },
+  {
+    key: "roles",
+    title: "角色权限",
+    description: "配置角色、权限树与授权",
+    icon: "i-heroicons-shield-check",
+    iconBg: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300",
+    path: "/admin/iam/roles",
+  },
+  {
+    key: "settings",
+    title: "租户配置",
+    description: "切换计划、调整租户状态",
+    icon: "i-heroicons-cog-6-tooth",
+    iconBg: "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-300",
+    path: "/admin/iam/overview",
+  },
+]);
 
 const tenantRows = computed(() =>
   (store.tenants ?? []).map((tenant) => ({
     ...tenant,
   }))
 );
+
+const navigateToCategory = (category: { path: string }) => {
+  router.push(category.path);
+};
 
 const fetchTenants = async () => {
   loading.value = true;
@@ -221,6 +446,22 @@ const formatStatus = (status: string) => {
   return t("iam.overview.status.active");
 };
 
+const saveQuickSettings = () => {
+  toast.add({
+    title: "设置已保存",
+    description: "本地存储成功，可在下次迭代接入实际 API。",
+    color: "primary",
+  });
+};
+
+const resetQuickSettings = () => {
+  Object.assign(quickSettings, quickSettingDefaults());
+  toast.add({
+    title: "已重置",
+    description: "恢复默认的 IAM 显示和安全策略。",
+  });
+};
+
 const changeTenantStatus = async (tenant: TenantSummary, status: string) => {
   try {
     await iam.updateTenant(tenant.id, { status });
@@ -242,6 +483,20 @@ const openPlanDrawer = (tenant: TenantSummary) => {
   showPlanDrawer.value = true;
 };
 
+const closePlanModal = () => {
+  blurActiveElement();
+  showPlanDrawer.value = false;
+};
+
+const openPlanModal = () => {
+  const target = selectedTenant.value ?? tenantRows.value[0];
+  if (!target) {
+    toast.add({ title: t("iam.notifications.selectTenant"), color: "yellow" });
+    return;
+  }
+  openPlanDrawer(target);
+};
+
 const submitPlanForm = async () => {
   if (!selectedTenant.value) return;
   planSaving.value = true;
@@ -251,7 +506,7 @@ const submitPlanForm = async () => {
       name: planForm.name,
     });
     toast.add({ title: t("common.save"), description: t("common.confirm") });
-    showPlanDrawer.value = false;
+    closePlanModal();
     await fetchTenants();
   } catch (error: any) {
     toast.add({
@@ -269,11 +524,14 @@ const openCreateTenant = () => {
 };
 
 const closeCreate = () => {
+  blurActiveElement();
   showCreateModal.value = false;
-  createForm.key = "";
-  createForm.name = "";
-  createForm.plan = "free";
-  createForm.status = "active";
+  Object.assign(createForm, {
+    key: "",
+    name: "",
+    plan: "free",
+    status: "active",
+  });
 };
 
 const submitCreate = async () => {
@@ -299,10 +557,30 @@ const submitCreate = async () => {
   }
 };
 
-const toggleTenantStatus = async (tenant: TenantSummary) => {
-  const nextStatus = tenant.status === "active" ? "suspended" : "active";
-  await changeTenantStatus(tenant, nextStatus);
+onMounted(fetchTenants);
+
+const blurActiveElement = () => {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const active = document.activeElement;
+  if (active && "blur" in active && typeof active.blur === "function") {
+    active.blur();
+  }
 };
 
-onMounted(fetchTenants);
+const blurOnClose = (value: boolean, oldValue?: boolean) => {
+  if (!value && oldValue) {
+    blurActiveElement();
+  }
+};
+
+watch(showQuickSettingsModal, blurOnClose);
+watch(showPlanDrawer, (value, oldValue) => {
+  blurOnClose(value, oldValue);
+  if (!value && oldValue) {
+    selectedTenant.value = null;
+  }
+});
+watch(showCreateModal, blurOnClose);
 </script>

@@ -32,6 +32,16 @@ npm run dev
 - Standalone 模式访问 `http://localhost:3031/admin/iam/overview`。
 - Delegated 模式访问 `_p/<plugin-id>/admin`，IAM 菜单不可见。
 
+### 2.1 UI 对齐自检（与 PowerX settings* 页面一致）
+对照宿主仓库 `Core/PowerX/web-admin/app/pages/settings/{index,users,roles,config}`，确认以下要点：
+
+- **入口导航**：`/admin/iam/overview` 需要出现与 `settings/index.vue` 相同的卡片导航+概览副标题；quick links 里的“组织结构”“角色管理”“租户配置”指向 Standalone 页面。
+- **组织管理 Tab**：`/admin/iam/members` 的 Tab 组合/显隐与 `settings/users/index.vue` 保持一致——部门/用户/权限三栏，并根据 root/tenant admin 权限动态出现 “权限” Tab。
+- **角色面板**：角色列表、筛选、分页、远程租户选择以及“克隆/编辑”抽屉的布局与 `components/settings/users/RoleManager.vue` 对齐；scope、描述、权限树勾选行为一致。
+- **租户/配置表单**：`/admin/iam/overview` 中的 Plan Drawer + 创建租户弹窗，以及 `/admin/iam/tenants`（若拆页）上的基础属性/功能开关段落，与 `settings/config` 的“快速设置”风格保持一致（含表头、描述、按钮排布）。
+
+> 若 UI 差异较大，记录截图并在 PR 描述中说明原因；文档默认参考 PowerX settings 页面作为 UX baseline。
+
 ## 3. Playwright 验证
 ```bash
 # Delegated 登录（需宿主）

@@ -45,6 +45,7 @@ type UserContext struct {
 	TenantUuid    string
 	TenantKey     string
 	TenantName    string
+	IsRoot        bool
 	MemberID      uint64
 	UserID        uint64
 	Username      string

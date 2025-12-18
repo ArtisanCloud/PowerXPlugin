@@ -19,9 +19,9 @@
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-end gap-3">
-          <UFormGroup label="Limit" class="w-full sm:w-32">
+          <UFormField label="Limit" class="w-full sm:w-32">
             <UInput type="number" min="1" max="200" v-model.number="limit" />
-          </UFormGroup>
+          </UFormField>
           <UButton color="primary" :loading="loading" @click="loadReports">
             Refresh
           </UButton>
@@ -143,7 +143,13 @@ const loadReports = async () => {
         credentials: "include",
       }
     );
-    rows.value = (response?.data || []).map(mapRow);
+    const raw = response?.data || [];
+    console.info("[security/baseline] fetched reports", {
+      limit: limit.value,
+      count: raw.length,
+      data: raw,
+    });
+    rows.value = raw.map(mapRow);
   } catch (err) {
     console.error("Failed to load audit reports", err);
     rows.value = [];

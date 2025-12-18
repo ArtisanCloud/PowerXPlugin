@@ -98,30 +98,30 @@
           <div class="font-medium">安全操作</div>
         </template>
         <form class="grid gap-4 md:grid-cols-3" @submit.prevent="submitSafeOp">
-          <UFormGroup label="动作">
+          <UFormField label="动作">
             <USelect v-model="safeOpForm.action" :options="safeOpActions" />
-          </UFormGroup>
-          <UFormGroup label="作用域类型">
+          </UFormField>
+          <UFormField label="作用域类型">
             <USelect
               v-model="safeOpForm.scope_type"
               :options="safeOpScopeTypes"
             />
-          </UFormGroup>
-          <UFormGroup label="作用域标识">
+          </UFormField>
+          <UFormField label="作用域标识">
             <UInput v-model="safeOpForm.scope_ref" placeholder="tenant-1" />
-          </UFormGroup>
-          <UFormGroup label="目标 ID" class="md:col-span-3">
+          </UFormField>
+          <UFormField label="目标 ID" class="md:col-span-3">
             <UInput v-model="safeOpForm.target_id" placeholder="hook-evt-123" />
-          </UFormGroup>
-          <UFormGroup label="备注" class="md:col-span-3">
+          </UFormField>
+          <UFormField label="备注" class="md:col-span-3">
             <UTextarea v-model="safeOpForm.reason" placeholder="本次操作原因" />
-          </UFormGroup>
-          <UFormGroup label="Dry Run" class="md:col-span-3">
+          </UFormField>
+          <UFormField label="Dry Run" class="md:col-span-3">
             <UToggle v-model="safeOpForm.dry_run" />
-          </UFormGroup>
-          <UFormGroup label="租户 ID" class="md:col-span-3">
+          </UFormField>
+          <UFormField label="租户 ID" class="md:col-span-3">
             <UInput v-model="safeOpForm.tenant_uuid" placeholder="tenant-1" />
-          </UFormGroup>
+          </UFormField>
           <div class="md:col-span-3 flex justify-end gap-3">
             <UButton type="submit" color="primary" :loading="safeOpsLoading"
               >提交操作</UButton

@@ -24,18 +24,9 @@ test.describe('IAM organization flows', () => {
     await loginIfNeeded(page);
   });
 
-  test('creates department and member in local IAM', async ({ page }) => {
+  test('invites member in local IAM', async ({ page }) => {
     const suffix = Date.now();
-    const deptName = `测试部门-${suffix}`;
-    const deptCode = `qa-${suffix}`;
     const memberEmail = `iam-e2e-${suffix}@local.test`;
-
-    await page.goto('/admin/iam/departments');
-    await page.getByTestId('create-department').click();
-    await page.getByPlaceholder('Ops Team').fill(deptName);
-    await page.getByPlaceholder('ops-team').fill(deptCode);
-    await page.getByRole('button', { name: /保存|save/i }).last().click();
-    await expect(page.getByText(deptName)).toBeVisible();
 
     await page.goto('/admin/iam/members');
     await page.getByTestId('create-member').click();

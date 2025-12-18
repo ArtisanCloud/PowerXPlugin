@@ -25,16 +25,16 @@
       <UCard>
         <template #header>
           <div class="flex flex-wrap items-end gap-4">
-            <UFormGroup label="Tenant UUID" required class="w-full sm:w-64">
+            <UFormField label="Tenant UUID" required class="w-full sm:w-64">
               <UInput
                 v-model="tenantUuid"
                 placeholder="tenant-123"
                 @keyup.enter="loadTokens"
                 :disabled="loading"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="Status" class="w-full sm:w-48">
+            <UFormField label="Status" class="w-full sm:w-48">
               <USelectMenu
                 v-model="selectedStatuses"
                 :options="statusOptions"
@@ -60,7 +60,7 @@
                   </div>
                 </template>
               </USelectMenu>
-            </UFormGroup>
+            </UFormField>
 
             <div class="flex items-center gap-3">
               <UButton

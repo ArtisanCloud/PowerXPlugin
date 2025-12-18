@@ -126,6 +126,7 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
 		UserID:        user.ID,
 		Username:      member.Username,
@@ -174,6 +175,7 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
 		UserID:        user.ID,
 		Username:      member.Username,
@@ -323,6 +325,7 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 		TenantUuid:    resolvedTenant,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
 		UserID:        userID,
 		Username:      member.Username,
@@ -572,9 +575,12 @@ func (d *LocalDirectory) formatPermissionCode(resource, action string) string {
 	if res == "" || act == "" {
 		return ""
 	}
-	plugID := strings.TrimSpace(d.pluginID)
-	if plugID != "" && !strings.Contains(res, ":") {
-		res = plugID + ":" + res
+	// 保留通配符 “*” 作为全局资源，不要追加插件前缀，确保 `*:*` 仍能匹配所有权限。
+	if res != "*" {
+		plugID := strings.TrimSpace(d.pluginID)
+		if plugID != "" && !strings.Contains(res, ":") {
+			res = plugID + ":" + res
+		}
 	}
 	return res + ":" + act
 }

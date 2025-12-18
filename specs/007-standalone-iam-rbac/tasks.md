@@ -51,6 +51,18 @@
 - [x] T012 [US2] 实现 `internal/services/iam/tenant_service.go`、`department_service.go`、`member_service.go`，包含审计记录与缓存失效。
 - [x] T013 [US2] 在 `internal/transport/http/admin/iam/tenant_handler.go`、`department_handler.go`、`member_handler.go` 实现 REST 路由与 DTO，调用服务层。
 - [x] T014 [US2] 新增 `web-admin/app/pages/admin/iam/overview.vue`、`/members/index.vue`、`/departments/index.vue` 及对应组件/Pinia store，实现 CRUD UI、批量导入表单。
+  - [x] T014a [UI-Parity] `/admin/iam/overview` 复刻 PowerX `settings/index.vue` 的卡片导航与“快速设置”布局，提供租户配置入口、Plan Drawer、快速开关。
+  - [x] T014b [UI-Parity] `/admin/iam/members` 采用 Tab 结构（部门/用户/权限）以及权限 Tab 显隐逻辑，与 `settings/users/index.vue` 保持一致。
+  - [x] T014c [UI-Parity] 角色列表 UI/交互对齐 `components/settings/users/RoleManager.vue`，包含远程租户搜索、分页、克隆/编辑抽屉、`useOneShotAlert` 提示。
+  - [x] T014d [UI-Parity] 租户/配置表单沿用 `settings/config` 的快速设置样式（label/description/按钮排布、`USwitch`/`USelect` 组合）。
+- [x] **T014e [UI-Parity – Host Reuse]** 将 `/Core/PowerX/web-admin/app/pages/settings/users` 及 `components/settings/users` 整体移植到插件仓库（新增 alias 或 `powerx-settings` 入口），保留原始 Tabs、Shell、Store 结构：
+    - [x] T014e-1 拷贝/重命名宿主组件（DepartmentManager、UsersShell、PermissionShell、RoleManager 等），调整 import 指向插件内 `useIAMService` / `useIAMStore`。
+    - [x] T014e-2 对齐宿主 store 接口（如 `useUserStore` 的上下文字段、`isRoot` 判定），补充缺失的 mock 数据/API 适配层，保证成员列表、邀请、权限页 100% 复现宿主交互。
+    - [x] T014e-3 落地 E2E/单测（以现有单测回归为起点，后续补充 Playwright `iam-local`），对新组件进行验证，确保“复制 + 适配”后行为无回归。
+  - [x] **T014f [UI-Parity – Host Roles]** 复用宿主 `/Core/PowerX/web-admin/app/pages/settings/roles` 及 `components/settings/users/RoleManager.vue`：
+    - [x] T014f-1 引入 RoleManager 相关依赖（如 PermissionShell、MembersDrawer）并适配插件 API（role 列表、权限树、成员列表、clone 等接口）。
+    - [x] T014f-2 补齐宿主里用到的 `useOneShotAlert`、valibot schema、toast/提示文案，与插件 i18n 统一。
+    - [x] T014f-3 重新跑前端/Playwright 回归，确认角色 CRUD、权限/成员抽屉逻辑跟宿主一致，文档与截图同步更新。（当前完成单元测试，Playwright 场景待串联）
 - [x] T015 [P] [US2] 扩展 Playwright `iam-local` 用例，验证部门调整、成员邀请/禁用、审计日志过滤。
 - [x] T016 [US2] 在 `docs/operations/runbooks/iam-rbac.md` 记录租户锁定、成员解锁、审计查询步骤，并补充账号跨租户验证流程。
   - [x] T016a Runbook 新增“同一账号加入多个租户”场景，说明 API/SQL 验证与 UI 切换步骤。

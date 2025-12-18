@@ -1,27 +1,27 @@
 <template>
   <div class="space-y-4">
     <UForm class="grid gap-4 md:grid-cols-2" @submit.prevent="applyFilters">
-      <UFormGroup label="操作人" description="Actor ID">
+      <UFormField label="操作人" description="Actor ID">
         <UInput v-model="filters.actor_id" placeholder="user:123" />
-      </UFormGroup>
-      <UFormGroup label="操作动作" description="Action keyword">
+      </UFormField>
+      <UFormField label="操作动作" description="Action keyword">
         <UInput v-model="filters.action" placeholder="config.section.update" />
-      </UFormGroup>
-      <UFormGroup label="权限代码">
+      </UFormField>
+      <UFormField label="权限代码">
         <UInput
           v-model="filters.permission_code"
           placeholder="operations.plugin.admin"
         />
-      </UFormGroup>
-      <UFormGroup label="租户 ID">
+      </UFormField>
+      <UFormField label="租户 ID">
         <UInput v-model="filters.tenant_uuid" placeholder="tenant-1" />
-      </UFormGroup>
-      <UFormGroup label="起始时间">
+      </UFormField>
+      <UFormField label="起始时间">
         <UInput v-model="filters.occurred_after" type="datetime-local" />
-      </UFormGroup>
-      <UFormGroup label="结束时间">
+      </UFormField>
+      <UFormField label="结束时间">
         <UInput v-model="filters.occurred_before" type="datetime-local" />
-      </UFormGroup>
+      </UFormField>
       <div class="md:col-span-2 flex gap-3 justify-end">
         <UButton color="neutral" variant="soft" @click="reset">清除</UButton>
         <UButton color="primary" type="submit">筛选</UButton>

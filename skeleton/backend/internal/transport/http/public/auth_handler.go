@@ -328,21 +328,45 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 		}
 	}
 	resp := gin.H{
-		"tenant": tenant,
+		"tenant":              tenant,
+		"is_root":             uc.IsRoot,
+		"current_tenant_uuid": tenantUUID,
+		"current_member_id":   uc.MemberID,
 		"user": gin.H{
 			"id":           uc.UserID,
 			"username":     uc.Username,
 			"email":        uc.Email,
 			"display_name": uc.DisplayName,
+			"is_root":      uc.IsRoot,
 		},
 		"roles":          uc.Roles,
 		"permissions":    uc.Permissions,
 		"policy_version": uc.PolicyVersion,
 	}
+	members := make([]gin.H, 0, 1)
+	if tenantUUID != "" {
+		members = append(members, gin.H{
+			"tenant_uuid": tenantUUID,
+			"tenant_name": uc.TenantName,
+			"member_id":   uc.MemberID,
+			"is_admin":    uc.IsRoot || hasAdminRole(uc.Roles),
+		})
+	}
+	resp["members"] = members
 	if strings.TrimSpace(uc.PluginID) != "" {
 		resp["plugin_id"] = uc.PluginID
 	}
 	return resp
+}
+
+func hasAdminRole(roles []string) bool {
+	for _, role := range roles {
+		switch strings.ToLower(strings.TrimSpace(role)) {
+		case "system.admin", "tenant.admin", "admin":
+			return true
+		}
+	}
+	return false
 }
 
 func mapTokens(tokens *iamservice.AuthTokens) gin.H {

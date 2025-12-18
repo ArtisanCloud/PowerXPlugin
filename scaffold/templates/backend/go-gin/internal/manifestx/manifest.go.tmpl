@@ -43,10 +43,6 @@ func Plugin() manifest.Plugin {
 				Title: "成员管理",
 			},
 			{
-				Path:  "/_p/com.powerx.plugins.base/admin/iam/departments",
-				Title: "部门结构",
-			},
-			{
 				Path:  "/_p/com.powerx.plugins.base/admin/iam/roles",
 				Title: "角色与权限",
 			},

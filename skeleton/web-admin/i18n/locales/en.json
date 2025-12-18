@@ -16,8 +16,45 @@
     "reset": "Reset",
     "close": "Close",
     "refresh": "Refresh",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "reload": "Reload",
     "welcome": "Welcome",
     "appName": "PowerX Base"
+  },
+  "menu": {
+    "openMarket": "Open Market",
+    "pluginMarketplace": "Plugin Marketplace",
+    "pluginReleaseCandidates": "Release Candidates",
+    "agent": "Agent",
+    "aiSettings": "AI Settings",
+    "aiSettingsModel": "Model Settings",
+    "aiSettingsCost": "Cost Settings",
+    "badge": "Badge",
+    "customers": "Customers",
+    "customerList": "Customer List",
+    "customerGroups": "Customer Groups",
+    "products": "Products",
+    "productList": "Product List",
+    "productCategories": "Product Categories",
+    "orders": "Orders",
+    "knowledgeSpace": "Knowledge Space",
+    "workflow": "Workflow",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "userManagement": "User Management",
+    "roleManagement": "Role Management",
+    "systemConfig": "System Config",
+    "pluginsMarket": "Plugins Market",
+    "pluginsInstalled": "Installed Plugins",
+    "loadFailed": "Failed to load menus",
+    "loadFailedDesc": "Unable to load menu data. Please check your network connection.",
+    "noItemsWarning": "No menu items found",
+    "itemCount": "{count} items",
+    "untitled": "Untitled",
+    "section": {
+      "untitled": "Untitled Section"
+    }
   },
   "navigation": {
     "intro": "Plugin Intro",
@@ -32,6 +69,7 @@
     "iamDepartments": "Departments",
     "iamMembers": "Members",
     "iamRoles": "Roles",
+    "iamSettings": "IAM Settings",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -46,8 +84,17 @@
       "caption": "Manage tenant lifecycle, plans, and isolation for Standalone IAM.",
       "createTenant": "Create Tenant",
       "adjustPlan": "Adjust Plan",
+      "quickSettings": {
+        "title": "Quick settings",
+        "caption": "Prototype configuration knobs while the real API is still wiring up."
+      },
+      "tenantTable": {
+        "title": "Tenant list",
+        "caption": "Tenant details, plans, and statuses inside the plugin."
+      },
       "planDrawer": {
         "title": "Update tenant plan",
+        "caption": "Pick a plan tier and adjust the display name shown in the console.",
         "planLabel": "Plan tier",
         "displayName": "Display name"
       },
@@ -96,6 +143,27 @@
     "members": {
       "title": "Members",
       "caption": "Invite members, assign departments, and lock accounts when needed.",
+      "hero": {
+        "kicker": "Organization & Access",
+        "title": "Organization & Permissions",
+        "description": "Review tenants, departments, members, and roles in a single view to maintain standalone IAM."
+      },
+      "tabs": {
+        "departments": "Departments",
+        "users": "Members",
+        "permissions": "Permissions"
+      },
+      "tabsDescription": {
+        "departments": "Maintain each tenant's department tree and reporting structure.",
+        "users": "Invite members, bulk import, and toggle status quickly.",
+        "permissions": "Preview recent roles and jump into the role center."
+      },
+      "metrics": {
+        "tenants": "Tenants",
+        "departments": "Departments",
+        "members": "Members",
+        "roles": "Roles preview"
+      },
       "selectTenant": "Select tenant",
       "createButton": "Invite Member",
       "importButton": "Bulk Import",
@@ -143,60 +211,237 @@
         "success": "Import finished",
         "failed": "Import failed",
         "summary": "{success} succeeded, {failed} failed."
+      },
+      "permissionsTab": {
+        "title": "Permissions",
+        "caption": "Preview recently used roles and jump to the role manager.",
+        "cta": "Open role manager",
+        "empty": "No roles for this tenant yet.",
+        "members": "{count} members",
+        "manage": "Manage role"
       }
     },
     "roles": {
-      "title": "Roles & Permissions",
-      "caption": "Create roles, clone defaults, and manage permission scopes per tenant.",
-      "selectTenant": "Select tenant",
-      "searchPlaceholder": "Search by name or code",
-      "scopeFilter": "Filter by scope",
-      "create": "Create Role",
-      "editTitle": "Edit role",
-      "formCaption": "Role metadata and scope settings",
-      "managePermissions": "Permissions",
-      "manageMembers": "Members",
+      "hero": {
+        "kicker": "Roles & Access",
+        "title": "Role Governance",
+        "description": "Manage scopes and member assignments so Standalone IAM mirrors the host experience."
+      },
+      "planLabel": "Plan",
+      "filters": {
+        "tenantPlaceholder": "Select tenant",
+        "searchPlaceholder": "Search roles by name or code"
+      },
+      "scopeFilter": {
+        "all": "All scopes",
+        "system": "System roles",
+        "tenant": "Tenant roles"
+      },
+      "typeFilter": {
+        "all": "All types",
+        "system": "Built-in",
+        "custom": "Custom"
+      },
+      "scope": {
+        "system": "System",
+        "tenant": "Tenant"
+      },
       "table": {
         "name": "Role",
+        "code": "Code",
         "scope": "Scope",
         "members": "Members",
-        "createdAt": "Created"
+        "actions": "Actions"
       },
-      "fields": {
+      "badges": {
+        "system": "System"
+      },
+      "actions": {
+        "permissions": "Permissions",
+        "members": "Members",
+        "clone": "Clone",
+        "create": "Create Role"
+      },
+      "form": {
+        "createTitle": "Create role",
+        "editTitle": "Edit role",
+        "name": "Role name",
         "code": "Role code",
-        "name": "Display name",
-        "description": "Description",
         "scope": "Scope",
-        "cloneRole": "Clone permissions from"
+        "tenant": "Tenant",
+        "description": "Description",
+        "hint": "Provide the role name, scope, tenant, and optional description."
       },
-      "clonePlaceholder": "Optional, copy from existing role",
-      "scopeTenant": "Tenant",
-      "scopeSystem": "System",
-      "validationRequired": "Please fill in the required fields",
-      "saveSuccess": "Role saved",
-      "saveFailed": "Failed to save role",
-      "loadFailed": "Unable to load role",
-      "deleteConfirm": "Delete role {role}? This cannot be undone.",
-      "deleteSuccess": "Role deleted",
-      "deleteFailed": "Failed to delete role",
-      "permissionsTitle": "Permissions · {role}",
-      "permissionsCaption": "Select scopes from the manifest-aligned tree",
-      "permissionsLoadFailed": "Unable to load permissions",
-      "permissionsSaved": "Permissions updated",
-      "permissionsFailed": "Failed to update permissions",
-      "membersTitle": "Members · {role}",
-      "membersCaption": "Assign or remove members, changes apply immediately",
-      "membersSearch": "Search members",
-      "noMembers": "No members found",
-      "membersSaved": "Members updated",
-      "membersFailed": "Failed to update members",
+      "permissionDrawer": {
+        "caption": "Select plugin permissions for this role"
+      },
+      "membersDrawer": {
+        "caption": "Choose members that belong to this role",
+        "searchPlaceholder": "Search by name or email",
+        "empty": "No members available",
+        "selectionSummary": "{count} selected"
+      },
       "permissionTree": {
         "search": "Search permissions",
         "selectAll": "Select all",
         "clear": "Clear",
         "emptyTitle": "No permissions available",
-        "emptyDescription": "Import from manifest or seed defaults.",
+        "emptyDescription": "Seed permissions from the manifest first.",
         "total": "{count} scopes"
+      },
+      "pagination": {
+        "summary": "Showing {start}-{end} of {total}"
+      },
+      "empty": {
+        "default": "No roles yet. Click “Create role” to get started.",
+        "search": "No roles matched your filters."
+      },
+      "notifications": {
+        "missingFieldsTitle": "Complete the required fields",
+        "missingFieldsDesc": "Role name and code cannot be empty",
+        "tenantRequiredTitle": "Select a tenant",
+        "tenantRequiredDesc": "Specify a tenant before creating or editing roles",
+        "updated": "Role updated",
+        "created": "Role created",
+        "saveFailedTitle": "Failed to save role",
+        "saveFailedDesc": "Please retry or check your connection",
+        "deleteConfirm": "Delete this role? This cannot be undone.",
+        "deleteSuccess": "Role deleted",
+        "deleteFailed": "Failed to delete role",
+        "loadFailed": "Unable to load role details",
+        "permissionsSaved": "Permissions updated",
+        "permissionsFailed": "Failed to update permissions",
+        "membersSaved": "Members updated",
+        "membersFailed": "Failed to update members"
+      }
+    }
+  },
+  "tenant": {
+    "add": "Add Tenant",
+    "tooltips": {
+      "saasSupport": "SaaS support enabled"
+    }
+  },
+  "organization": {
+    "description": "Manage organization, members, and permissions.",
+    "common": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "reset": "Reset",
+      "up": "Move up",
+      "down": "Move down",
+      "edit": "Edit",
+      "delete": "Delete",
+      "none": "None",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "tabs": {
+      "departments": "Departments",
+      "users": "Users",
+      "permissions": "Permissions"
+    },
+    "department": {
+      "title": "Department management",
+      "description": "Maintain the organizational hierarchy and owners.",
+      "search": "Search departments…",
+      "add": "Add department",
+      "edit": "Edit department",
+      "empty": {
+        "title": "No departments yet",
+        "noResults": "No matching departments"
+      },
+      "table": {
+        "name": "Name",
+        "actions": "Actions"
+      },
+      "form": {
+        "name": "Name",
+        "parent": "Parent",
+        "noParent": "No parent",
+        "moveParent": "Move to",
+        "key": "Unique key",
+        "sort": "Sort order",
+        "leader": "Owner",
+        "status": "Status",
+        "meta": "Meta (JSON)"
+      },
+      "confirmDelete": "Delete this department?",
+      "pagination": {
+        "showing": "Showing {start}-{end} of {total}"
+      }
+    },
+    "user": {
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "suspended": "Suspended"
+      },
+      "title": "Tenant directory",
+      "rootManagement": "Root view",
+      "selectTenantDesc": "Pick a tenant to manage its users and roles.",
+      "searchTenants": "Search tenants…",
+      "filter": {
+        "status": "Status",
+        "plan": "Plan",
+        "allStatus": "All statuses",
+        "allPlans": "All plans"
+      },
+      "plan": {
+        "free": "Free",
+        "pro": "Pro",
+        "enterprise": "Enterprise"
+      },
+      "noTenantsFound": "No tenants found",
+      "noDomain": "No domain configured",
+      "userCount": "Users",
+      "createdAt": "Created at",
+      "loadFailed": "Failed to load tenants",
+      "description": "Manage tenant members, roles, and permissions.",
+      "importExport": "Import/Export",
+      "form": {
+        "title": "Invite member",
+        "name": "Name",
+        "username": "Username",
+        "email": "Email",
+        "phone": "Phone",
+        "department": "Department",
+        "role": "Role",
+        "status": "Status",
+        "selectRole": "Select role"
+      },
+      "export": {
+        "csv": "Export CSV",
+        "json": "Export JSON"
+      },
+      "import": {
+        "button": "Import members"
+      }
+    },
+    "permission": {
+      "title": "Permission governance",
+      "description": "Bundle common role templates and keep authorization consistent.",
+      "roleList": "Role list",
+      "search": "Search roles or keywords",
+      "systemRole": "System role",
+      "userCount": "{count} members",
+      "empty": {
+        "title": "No roles yet",
+        "create": "Create role",
+        "noResults": "No matching roles"
+      },
+      "add": "Add role template",
+      "edit": "Edit role template",
+      "roleConfig": "Role permission config",
+      "configDesc": "Select plugin resources that should be granted to this role.",
+      "form": {
+        "name": "Role name",
+        "namePlaceholder": "e.g. Admin / Reviewer",
+        "code": "Role code",
+        "codePlaceholder": "Lowercase letters, numbers, dots, or hyphen only",
+        "description": "Description",
+        "descriptionPlaceholder": "Explain usage scenario or scope",
+        "permissions": "Available permissions"
       }
     }
   },

@@ -47,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local
+      LIGHTNINGCSS_FORCE_WASM: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -151,6 +152,7 @@ jobs:
       GOTOOLCHAIN: local
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: sum.golang.org
+      LIGHTNINGCSS_FORCE_WASM: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

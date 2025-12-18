@@ -36,5 +36,10 @@
     "esbuild": "0.27.2",
     "typescript": "^5.9.3",
     "vitest": "^4.0.8"
+  },
+  "optionalDependencies": {
+    "@oxc-minify/binding-linux-x64-gnu": "0.95.0",
+    "@oxc-parser/binding-linux-x64-gnu": "0.95.0",
+    "@oxc-transform/binding-linux-x64-gnu": "0.95.0"
   }
 }

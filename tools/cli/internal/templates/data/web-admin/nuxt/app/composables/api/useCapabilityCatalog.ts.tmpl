@@ -5,6 +5,8 @@ export type CapabilityCatalogEntry = {
   id: string;
   version: string;
   descriptor: string;
+  module?: string;
+  kind?: string;
   tags: string[];
   checksum: string;
   execution: {
@@ -13,6 +15,7 @@ export type CapabilityCatalogEntry = {
     sse_channel?: string;
     status_endpoint?: string;
   };
+  protocols?: Record<string, any>;
 };
 
 export function useCapabilityCatalogApi() {

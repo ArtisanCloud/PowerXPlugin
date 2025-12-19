@@ -39,28 +39,32 @@
       <div v-else>
         <UTable
           v-if="catalogRows.length"
-          :rows="catalogRows"
+          :data="catalogRows"
           :columns="tableColumns"
           :ui="{ td: { base: 'align-top' } }"
         >
           <template #capability_id-cell="{ row }">
             <div class="flex flex-col">
               <span class="font-semibold text-gray-900 dark:text-white">
-                {{ `{{ row.capability_id }}` }}
+                {{ `{{ row.original.capability_id }}` }}
               </span>
               <small class="text-xs text-gray-500 dark:text-gray-400">
-                {{ `{{ $t("capabilities.list.versionLabel", { version: row.version }) }}` }}
+                {{ `{{ $t("capabilities.list.versionLabel", { version: row.original.version }) }}` }}
               </small>
             </div>
           </template>
           <template #descriptor-cell="{ row }">
-            <p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ row.descriptor }}` }}</p>
+            <p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ row.original.descriptor }}` }}</p>
           </template>
           <template #exposure-cell="{ row }">
             <div class="flex flex-col gap-1">
-              <UBadge :label="exposureBadge(row.syncStatus).label" :color="exposureBadge(row.syncStatus).color" variant="soft" />
-              <span v-if="row.updatedAt" class="text-xs text-gray-500">
-                {{ `{{ $t("capabilities.exposure.list.updatedAt", { time: row.updatedAt }) }}` }}
+              <UBadge
+                :label="exposureBadge(row.original.syncStatus).label"
+                :color="exposureBadge(row.original.syncStatus).color"
+                variant="soft"
+              />
+              <span v-if="row.original.updatedAt" class="text-xs text-gray-500">
+                {{ `{{ $t("capabilities.exposure.list.updatedAt", { time: row.original.updatedAt }) }}` }}
               </span>
             </div>
           </template>
@@ -68,7 +72,7 @@
             <UButton
               size="xs"
               icon="i-heroicons-adjustments-horizontal"
-              @click="openForm(row.capability_id)"
+              @click="openForm(row.original.capability_id)"
             >
               {{ `{{ $t("capabilities.exposure.list.actions.configure") }}` }}
             </UButton>

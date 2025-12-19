@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"{{ .BackendModulePath }}/internal/contracts"
+	"{{ .BackendModulePath }}/internal/logger"
 	capservice "{{ .BackendModulePath }}/internal/services/capability"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,9 @@ func NewCatalogHandler(deps *app.Deps) *CatalogHandler {
 func (h *CatalogHandler) List(c *gin.Context) {
 	entries, err := h.service.List(c.Request.Context())
 	if err != nil {
+		logger.WithError(err).
+			WithField("component", "capability_catalog_handler").
+			Error("failed to load capability catalog")
 		contracts.ResponseErrorWithDetails(
 			c,
 			http.StatusInternalServerError,
@@ -36,5 +40,10 @@ func (h *CatalogHandler) List(c *gin.Context) {
 		)
 		return
 	}
+	logger.WithFields(logger.Fields{
+		"component":    "capability_catalog_handler",
+		"entry_count":  len(entries),
+		"request_path": c.FullPath(),
+	}).Info("capability catalog request handled")
 	contracts.ResponseSuccess(c, entries)
 }

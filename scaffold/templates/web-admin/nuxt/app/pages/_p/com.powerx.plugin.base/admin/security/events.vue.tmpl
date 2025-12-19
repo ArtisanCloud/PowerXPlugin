@@ -22,16 +22,16 @@
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-end gap-4">
-          <UFormGroup label="Tenant UUID" required class="w-full sm:w-64">
+          <UFormField label="Tenant UUID" required class="w-full sm:w-64">
             <UInput
               v-model="tenantUuid"
               placeholder="tenant-123"
               @keyup.enter="loadEvents"
               :disabled="loading"
             />
-          </UFormGroup>
+          </UFormField>
 
-          <UFormGroup label="Event Types" class="w-full sm:w-72">
+          <UFormField label="Event Types" class="w-full sm:w-72">
             <USelectMenu
               v-model="selectedTypes"
               :options="eventTypeOptions"
@@ -58,9 +58,9 @@
                 </div>
               </template>
             </USelectMenu>
-          </UFormGroup>
+          </UFormField>
 
-          <UFormGroup label="Limit" class="w-full sm:w-32">
+          <UFormField label="Limit" class="w-full sm:w-32">
             <UInput
               v-model.number="limit"
               type="number"
@@ -68,7 +68,7 @@
               max="200"
               :disabled="loading"
             />
-          </UFormGroup>
+          </UFormField>
 
           <UButton
             color="primary"

@@ -129,18 +129,18 @@ func (h *AuthHandler) ensureDelegated(c *gin.Context) bool {
 func (h *AuthHandler) handleProxyErr(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, iamservice.ErrAuthUnavailable):
-		authmetrics.RecordDelegateError("unavailable")
+		authmetrics.RecordDelegateError(app.PluginID, "unavailable")
 		contracts.ResponseServiceUnavailable(c, "宿主认证不可用，请稍后重试", nil)
 	case errors.Is(err, iamservice.ErrUnauthorized):
-		authmetrics.RecordDelegateError("unauthorized")
+		authmetrics.RecordDelegateError(app.PluginID, "unauthorized")
 		contracts.ResponseUnauthorized(c, "认证失败，请重新登录")
 	default:
 		var perr *authproxy.ProxyError
 		if errors.As(err, &perr) {
-			authmetrics.RecordDelegateError("proxy")
+			authmetrics.RecordDelegateError(app.PluginID, "proxy")
 			contracts.ResponseError(c, perr.Status, contracts.ErrCodeInternalError, perr.Message)
 		} else {
-			authmetrics.RecordDelegateError("other")
+			authmetrics.RecordDelegateError(app.PluginID, "other")
 			contracts.ResponseInternalError(c, err)
 		}
 	}
@@ -172,11 +172,11 @@ func (h *AuthHandler) handleDelegatedLogin(c *gin.Context) {
 		Remember:   req.Remember,
 	})
 	if err != nil {
-		authmetrics.RecordLogin(h.modeLabel(), "failure")
+		authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "failure")
 		h.handleProxyErr(c, err)
 		return
 	}
-	authmetrics.RecordLogin(h.modeLabel(), "success")
+	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -188,11 +188,11 @@ func (h *AuthHandler) handleDelegatedRefresh(c *gin.Context) {
 	}
 	tokens, err := h.proxy.Refresh(c.Request.Context(), req.RefreshToken)
 	if err != nil {
-		authmetrics.RecordRefresh(h.modeLabel(), "failure")
+		authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "failure")
 		h.handleProxyErr(c, err)
 		return
 	}
-	authmetrics.RecordRefresh(h.modeLabel(), "success")
+	authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -206,7 +206,7 @@ func (h *AuthHandler) handleDelegatedLogout(c *gin.Context) {
 		h.handleProxyErr(c, err)
 		return
 	}
-	authmetrics.RecordLogout(h.modeLabel())
+	authmetrics.RecordLogout(app.PluginID, h.modeLabel())
 	contracts.ResponseSuccess(c, gin.H{"ok": true})
 }
 
@@ -241,11 +241,11 @@ func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
 		Remember:   req.Remember,
 	})
 	if err != nil {
-		authmetrics.RecordLogin(h.modeLabel(), "failure")
+		authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "failure")
 		h.handleLocalErr(c, err)
 		return
 	}
-	authmetrics.RecordLogin(h.modeLabel(), "success")
+	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -261,11 +261,11 @@ func (h *AuthHandler) handleLocalRefresh(c *gin.Context) {
 	}
 	tokens, err := h.local.Refresh(c.Request.Context(), req.RefreshToken)
 	if err != nil {
-		authmetrics.RecordRefresh(h.modeLabel(), "failure")
+		authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "failure")
 		h.handleLocalErr(c, err)
 		return
 	}
-	authmetrics.RecordRefresh(h.modeLabel(), "success")
+	authmetrics.RecordRefresh(app.PluginID, h.modeLabel(), "success")
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -283,7 +283,7 @@ func (h *AuthHandler) handleLocalLogout(c *gin.Context) {
 		h.handleLocalErr(c, err)
 		return
 	}
-	authmetrics.RecordLogout(h.modeLabel())
+	authmetrics.RecordLogout(app.PluginID, h.modeLabel())
 	contracts.ResponseSuccess(c, gin.H{"ok": true})
 }
 
@@ -327,17 +327,46 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 			tenant["legacy_id"] = legacyID
 		}
 	}
-	return gin.H{
-		"tenant": tenant,
+	resp := gin.H{
+		"tenant":              tenant,
+		"is_root":             uc.IsRoot,
+		"current_tenant_uuid": tenantUUID,
+		"current_member_id":   uc.MemberID,
 		"user": gin.H{
 			"id":           uc.UserID,
 			"username":     uc.Username,
 			"email":        uc.Email,
 			"display_name": uc.DisplayName,
+			"is_root":      uc.IsRoot,
 		},
-		"roles":       uc.Roles,
-		"permissions": uc.Permissions,
+		"roles":          uc.Roles,
+		"permissions":    uc.Permissions,
+		"policy_version": uc.PolicyVersion,
 	}
+	members := make([]gin.H, 0, 1)
+	if tenantUUID != "" {
+		members = append(members, gin.H{
+			"tenant_uuid": tenantUUID,
+			"tenant_name": uc.TenantName,
+			"member_id":   uc.MemberID,
+			"is_admin":    uc.IsRoot || hasAdminRole(uc.Roles),
+		})
+	}
+	resp["members"] = members
+	if strings.TrimSpace(uc.PluginID) != "" {
+		resp["plugin_id"] = uc.PluginID
+	}
+	return resp
+}
+
+func hasAdminRole(roles []string) bool {
+	for _, role := range roles {
+		switch strings.ToLower(strings.TrimSpace(role)) {
+		case "system.admin", "tenant.admin", "admin":
+			return true
+		}
+	}
+	return false
 }
 
 func mapTokens(tokens *iamservice.AuthTokens) gin.H {
@@ -349,12 +378,14 @@ func mapTokens(tokens *iamservice.AuthTokens) gin.H {
 		expiresAt = time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
 	}
 	return gin.H{
-		"token_type":    tokens.TokenType,
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-		"expires_in":    tokens.ExpiresIn,
-		"expires_at":    expiresAt.UnixMilli(),
-		"scope":         tokens.Scope,
+		"token_type":     tokens.TokenType,
+		"access_token":   tokens.AccessToken,
+		"refresh_token":  tokens.RefreshToken,
+		"expires_in":     tokens.ExpiresIn,
+		"expires_at":     expiresAt.UnixMilli(),
+		"scope":          tokens.Scope,
+		"policy_version": tokens.PolicyVersion,
+		"plugin_id":      tokens.PluginID,
 	}
 }
 

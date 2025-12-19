@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       - name: Install dependencies
         run: npm install
       - name: Verify template sync
@@ -47,15 +47,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local
+      LIGHTNINGCSS_FORCE_WASM: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install
+          cd skeleton/web-admin && npm install && npm install lightningcss-linux-x64-gnu@1.30.2 @tailwindcss/oxide-linux-x64-gnu --no-save
       - name: Lint
         run: cd skeleton/web-admin && npx nuxi lint || true
       - name: Build
@@ -133,7 +134,7 @@ jobs:
           go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       - name: Run smoke workflow
         run: |
           make test-smoke 2>&1 | tee smoke.log
@@ -151,6 +152,7 @@ jobs:
       GOTOOLCHAIN: local
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: sum.golang.org
+      LIGHTNINGCSS_FORCE_WASM: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -162,7 +164,7 @@ jobs:
           go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
@@ -173,7 +175,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install
+          cd skeleton/web-admin && npm install && npm install lightningcss-linux-x64-gnu@1.30.2 @tailwindcss/oxide-linux-x64-gnu --no-save
       - name: Install Playwright browsers
         working-directory: skeleton/web-admin
         run: npx playwright install --with-deps

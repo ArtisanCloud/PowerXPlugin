@@ -16,7 +16,18 @@
       </div>
 
       <!-- 中间快捷操作 -->
-      <div class="flex items-center space-x-4"></div>
+      <div class="flex items-center space-x-3">
+        <UBadge
+          :color="iamModeBadge.color"
+          variant="subtle"
+          class="text-xs font-semibold"
+        >
+          {{ iamModeBadge.label }}
+        </UBadge>
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          {{ iamModeBadge.description }}
+        </p>
+      </div>
 
       <!-- 右侧控制区 -->
       <div class="flex items-center space-x-4">
@@ -70,6 +81,17 @@ const logoSrc = computed(() => {
 const handleLogout = async () => {
   await auth.logout();
 };
+
+const iamModeBadge = computed(() => {
+  const standalone = auth.localIAMEnabled?.value ?? false;
+  return {
+    label: standalone ? "本地 IAM" : "Delegated IAM",
+    description: standalone
+      ? "当前使用本地目录与 STS"
+      : "通过宿主 PowerX 鉴权",
+    color: standalone ? "green" : "yellow",
+  };
+});
 
 const userMenuItems = [
   [

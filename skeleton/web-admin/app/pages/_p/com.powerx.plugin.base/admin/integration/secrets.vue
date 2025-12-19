@@ -33,15 +33,15 @@
       </template>
 
       <UTable :rows="secrets" :columns="columns" :loading="loading">
-        <template #status-data="{ row }">
+        <template #status-cell="{ row }">
           <UBadge :color="statusBadgeColor(row.status)" variant="soft" class="uppercase tracking-wide">
             {{ row.status }}
           </UBadge>
         </template>
-        <template #next_rotation_due_at-data="{ row }">
+        <template #next_rotation_due_at-cell="{ row }">
           {{ formatDate(row.next_rotation_due_at) || '-' }}
         </template>
-        <template #actions-data="{ row }">
+        <template #actions-cell="{ row }">
           <div class="flex flex-wrap gap-2">
             <UButton size="xs" color="primary" variant="soft" @click="rotate(row)">
               轮换
@@ -74,20 +74,20 @@
         </template>
 
         <form class="space-y-4" @submit.prevent="submitCreate">
-          <UFormGroup label="集成类型" required>
+          <UFormField label="集成类型" required>
             <UInput v-model="createForm.integrationType" placeholder="webhook.target" />
-          </UFormGroup>
-          <UFormGroup label="轮换间隔（天）" required>
+          </UFormField>
+          <UFormField label="轮换间隔（天）" required>
             <UInput v-model.number="createForm.rotationIntervalDays" type="number" min="1" />
-          </UFormGroup>
-          <UFormGroup label="附加元数据 (JSON)" help='例如 {"owner":"security"}'>
+          </UFormField>
+          <UFormField label="附加元数据 (JSON)" help='例如 {"owner":"security"}'>
             <UTextarea v-model="createForm.metadataInput" :rows="3" placeholder="可选" />
-          </UFormGroup>
+          </UFormField>
           <UCheckbox v-model="createForm.generate" label="立即生成新密钥" />
           <div v-if="!createForm.generate" class="space-y-2">
-            <UFormGroup label="现有 Secret 引用">
+            <UFormField label="现有 Secret 引用">
               <UInput v-model="createForm.secretRef" placeholder="例如 secret://provider/ref" />
-            </UFormGroup>
+            </UFormField>
           </div>
           <div class="flex justify-end gap-2">
             <UButton color="gray" variant="soft" @click="createOpen = false">
@@ -161,6 +161,7 @@
 
 <script setup lang="ts">
 import type { IntegrationSecret, IntegrationSecretAuditEntry } from "~/types/integration"
+import { useNormalizedColumns } from "~/utils/table"
 
 const runtimeConfig = useRuntimeConfig()
 const toast = useToast()
@@ -179,13 +180,13 @@ const auditOpen = ref(false)
 const auditEntries = ref<{ title: string; description?: string; timestamp?: string }[]>([])
 const selectedSecret = ref<IntegrationSecret | null>(null)
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "integration_type", label: "集成类型" },
   { key: "status", label: "状态" },
   { key: "rotation_interval_days", label: "轮换间隔" },
   { key: "next_rotation_due_at", label: "下次轮换" },
   { key: "actions", label: "操作" },
-]
+])
 
 const createForm = reactive({
   integrationType: "",

@@ -133,6 +133,66 @@
           {{ `{{ t('navigation.capabilitiesLifecycle') }}` }}
         </UButton>
       </div>
+
+      <div v-if="showIAMMenu">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ `{{ t('navigation.iam') }}` }}
+        </div>
+        <div class="space-y-1">
+          <UButton
+            to="/admin/iam/overview"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/overview'),
+            }"
+          >
+            <UIcon name="i-heroicons-chart-pie" class="w-4 h-4 mr-3" />
+            {{ `{{ t('navigation.iamOverview') }}` }}
+          </UButton>
+          <UButton
+            to="/admin/iam/members"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/members'),
+            }"
+          >
+            <UIcon name="i-heroicons-users" class="w-4 h-4 mr-3" />
+            {{ `{{ t('navigation.iamMembers') }}` }}
+          </UButton>
+          <UButton
+            to="/admin/iam/roles"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/roles'),
+            }"
+          >
+            <UIcon name="i-heroicons-key" class="w-4 h-4 mr-3" />
+            {{ `{{ t('navigation.iamRoles') }}` }}
+          </UButton>
+          <UButton
+            to="/admin/iam/settings"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/settings'),
+            }"
+          >
+            <UIcon name="i-heroicons-cog-6-tooth" class="w-4 h-4 mr-3" />
+            {{ `{{ t('navigation.iamSettings') }}` }}
+          </UButton>
+        </div>
+      </div>
     </nav>
   </aside>
 </template>
@@ -140,8 +200,10 @@
 <script setup lang="ts">
 const { t } = useI18n();
 const route = useRoute();
+const auth = useAuth();
 
 const showTemplatesMenu = ref(true);
+const showIAMMenu = computed(() => auth.localIAMEnabled?.value ?? false);
 
 const normalizePath = (value: string) => {
   if (!value) {

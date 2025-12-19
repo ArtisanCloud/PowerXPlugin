@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	defaultAccessTTL  = 15 * time.Minute
-	defaultRefreshTTL = 30 * 24 * time.Hour
+	defaultAccessTTL     = 15 * time.Minute
+	defaultRefreshTTL    = 30 * 24 * time.Hour
+	defaultPolicyVersion = "local.v1"
+	defaultPluginID      = "com.powerx.plugins.base"
 )
 
 // LocalDirectory implements IAMDirectory against the plugin's own database.
@@ -35,6 +37,8 @@ type LocalDirectory struct {
 	accessTTL        time.Duration
 	refreshTTL       time.Duration
 	defaultTenantKey string
+	pluginID         string
+	policyVersion    string
 }
 
 func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error) {
@@ -71,6 +75,11 @@ func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error)
 	if tenantKey == "" {
 		tenantKey = "00000000-0000-0000-0000-000000000001"
 	}
+	pluginID := resolvePluginID()
+	policyVersion := strings.TrimSpace(os.Getenv("PLUGIN_IAM_POLICY_VERSION"))
+	if policyVersion == "" {
+		policyVersion = defaultPolicyVersion
+	}
 	return &LocalDirectory{
 		db:               db,
 		cfg:              cfg,
@@ -80,6 +89,8 @@ func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error)
 		accessTTL:        ttl,
 		refreshTTL:       refreshTTL,
 		defaultTenantKey: strings.ToLower(tenantKey),
+		pluginID:         pluginID,
+		policyVersion:    policyVersion,
 	}, nil
 }
 
@@ -115,6 +126,7 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
 		UserID:        user.ID,
 		Username:      member.Username,
@@ -123,6 +135,8 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 		Roles:         roles,
 		Permissions:   perms,
 		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PluginID:      d.pluginID,
 		IssuedAt:      time.Now(),
 	}
 	tokens, err := d.issueTokens(userCtx)
@@ -161,6 +175,7 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
 		UserID:        user.ID,
 		Username:      member.Username,
@@ -169,6 +184,8 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 		Roles:         roles,
 		Permissions:   perms,
 		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PluginID:      d.pluginID,
 		IssuedAt:      time.Now(),
 	}
 	tokens, err := d.issueTokens(userCtx)
@@ -295,11 +312,20 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 	if member.DepartmentID != nil {
 		deptIDs = append(deptIDs, *member.DepartmentID)
 	}
+	policyVersion := strings.TrimSpace(claims.PolicyVersion)
+	if policyVersion == "" {
+		policyVersion = d.policyVersion
+	}
+	pluginID := strings.TrimSpace(claims.PluginID)
+	if pluginID == "" {
+		pluginID = d.pluginID
+	}
 	return &UserContext{
 		TenantUUID:    resolvedTenant,
 		TenantUuid:    resolvedTenant,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
 		UserID:        userID,
 		Username:      member.Username,
@@ -308,7 +334,8 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 		Roles:         claims.Roles,
 		Permissions:   claims.Permissions,
 		DepartmentIDs: deptIDs,
-		PolicyVersion: claims.PolicyVersion,
+		PolicyVersion: policyVersion,
+		PluginID:      pluginID,
 		IssuedAt:      time.Now(),
 	}, nil
 }
@@ -370,15 +397,26 @@ func (d *LocalDirectory) loadRolePermissionCodes(ctx context.Context, memberID u
 	}
 	permTable := iamm.Permission{}.TableName()
 	rolePermTable := iamm.RolePermission{}.TableName()
-	var perms []string
+	var rows []struct {
+		Resource string
+		Action   string
+	}
 	if err := d.db.WithContext(ctx).
 		Table(permTable+" p").
-		Select("p.resource || ':' || p.action").
+		Select("p.resource, p.action").
 		Joins("JOIN "+rolePermTable+" rp ON rp.permission_id = p.id").
 		Joins("JOIN "+memberRoleTable+" mr ON mr.role_id = rp.role_id").
 		Where("mr.member_id = ?", memberID).
-		Scan(&perms).Error; err != nil {
+		Scan(&rows).Error; err != nil {
 		return roles, nil, err
+	}
+	perms := make([]string, 0, len(rows))
+	for _, row := range rows {
+		code := d.formatPermissionCode(row.Resource, row.Action)
+		if code == "" {
+			continue
+		}
+		perms = append(perms, code)
 	}
 	return roles, perms, nil
 }
@@ -392,6 +430,7 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		Roles:         userCtx.Roles,
 		Permissions:   userCtx.Permissions,
 		PolicyVersion: userCtx.PolicyVersion,
+		PluginID:      d.pluginID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    d.issuer,
 			Audience:  jwt.ClaimStrings{d.audience},
@@ -409,12 +448,14 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		return nil, err
 	}
 	return &AuthTokens{
-		TokenType:    "Bearer",
-		AccessToken:  signed,
-		RefreshToken: refreshToken,
-		ExpiresIn:    int64(d.accessTTL.Seconds()),
-		Scope:        "access",
-		ExpiresAt:    expires,
+		TokenType:     "Bearer",
+		AccessToken:   signed,
+		RefreshToken:  refreshToken,
+		ExpiresIn:     int64(d.accessTTL.Seconds()),
+		Scope:         "access",
+		ExpiresAt:     expires,
+		PluginID:      d.pluginID,
+		PolicyVersion: d.policyVersion,
 	}, nil
 }
 
@@ -424,7 +465,7 @@ func (d *LocalDirectory) persistRefreshToken(ctx context.Context, uc *UserContex
 		TokenHash:  hash,
 		UserID:     uc.UserID,
 		TenantUuid: uc.TenantUuid,
-		MemberID:   uc.MemberID,
+		UserRecord: uc.MemberID,
 		ExpiresAt:  time.Now().Add(d.refreshTTL),
 	}
 	return d.db.WithContext(ctx).Create(rec).Error
@@ -439,7 +480,7 @@ func (d *LocalDirectory) rotateRefreshToken(ctx context.Context, rec *iamm.Refre
 			TokenHash:  hashToken(newToken),
 			UserID:     uc.UserID,
 			TenantUuid: uc.TenantUuid,
-			MemberID:   uc.MemberID,
+			UserRecord: uc.MemberID,
 			ExpiresAt:  time.Now().Add(d.refreshTTL),
 		}).Error
 	})
@@ -453,6 +494,9 @@ func (d *LocalDirectory) revokeRefreshToken(ctx context.Context, token string) e
 func tenantIdentifier(tenant *iamm.Tenant) string {
 	if tenant == nil {
 		return ""
+	}
+	if uuid := strings.TrimSpace(tenant.UUID); uuid != "" {
+		return strings.ToLower(uuid)
 	}
 	if key := strings.TrimSpace(tenant.Key); key != "" {
 		return strings.ToLower(key)
@@ -502,7 +546,7 @@ func (d *LocalDirectory) loadSessionPrincipals(ctx context.Context, rec *iamm.Re
 		return nil, nil, nil, err
 	}
 	var member iamm.Member
-	if err := d.db.WithContext(ctx).Where("id = ?", rec.MemberID).First(&member).Error; err != nil {
+	if err := d.db.WithContext(ctx).Where("id = ?", rec.UserRecord).First(&member).Error; err != nil {
 		return nil, nil, nil, err
 	}
 	var user iamm.User
@@ -525,6 +569,22 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func (d *LocalDirectory) formatPermissionCode(resource, action string) string {
+	res := strings.TrimSpace(resource)
+	act := strings.TrimSpace(action)
+	if res == "" || act == "" {
+		return ""
+	}
+	// 保留通配符 “*” 作为全局资源，不要追加插件前缀，确保 `*:*` 仍能匹配所有权限。
+	if res != "*" {
+		plugID := strings.TrimSpace(d.pluginID)
+		if plugID != "" && !strings.Contains(res, ":") {
+			res = plugID + ":" + res
+		}
+	}
+	return res + ":" + act
+}
+
 func valueOrDefault(values ...string) string {
 	for _, v := range values {
 		if strings.TrimSpace(v) != "" {
@@ -532,4 +592,17 @@ func valueOrDefault(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func resolvePluginID() string {
+	envs := []string{
+		os.Getenv("POWERX_PLUGIN_ID"),
+		os.Getenv("PLUGIN_ID"),
+	}
+	for _, candidate := range envs {
+		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+			return trimmed
+		}
+	}
+	return defaultPluginID
 }

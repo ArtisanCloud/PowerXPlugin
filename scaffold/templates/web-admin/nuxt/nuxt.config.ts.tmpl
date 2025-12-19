@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url'
+import { resolve as resolvePath } from 'node:path'
 import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
@@ -74,6 +76,9 @@ const powerxCoreBase =
   process.env.NUXT_PUBLIC_POWERX_CORE_BASE ||
   process.env.POWERX_CORE_ENDPOINT ||
   'http://localhost:8077'
+const rootDir = fileURLToPath(new URL('./', import.meta.url))
+const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
+const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
 // 在宿主代理模式下指定 api base，即“模拟 standalone” 场景
@@ -282,6 +287,12 @@ export default defineNuxtConfig({
     }
   },
   vite: {
+    resolve: {
+      alias: {
+        "@vueuse/core": vueUseShim,
+        "@vueuse/core-original": vueUseReal
+      }
+    },
     server: {
       hmr: {
         protocol: 'ws',

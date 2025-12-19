@@ -47,12 +47,12 @@
         </div>
 
         <div class="mt-4 space-y-4">
-          <UFormGroup label="调整默认权重" help="实验用途，不会持久化到配置文件">
+          <UFormField label="调整默认权重" help="实验用途，不会持久化到配置文件">
             <div class="flex gap-2">
               <UInput v-model.number="experiment.defaultWeight" type="number" min="0" step="0.05" class="w-32" />
               <UButton color="primary" :loading="saving" @click="updateDefaultWeight">应用</UButton>
             </div>
-          </UFormGroup>
+          </UFormField>
           <UButton color="primary" variant="soft" :loading="syncing" icon="i-heroicons-play" @click="triggerSync">
             手动刷新推荐权重
           </UButton>
@@ -73,7 +73,7 @@
 
         <div v-else>
           <UTable :columns="columns" :rows="topListings">
-            <template #title-data="{ row }">
+            <template #title-cell="{ row }">
               <div class="space-y-0.5">
                 <span class="font-medium">{{ row.title }}</span>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -81,7 +81,7 @@
                 </p>
               </div>
             </template>
-            <template #recommended_weight-data="{ row }">
+            <template #recommended_weight-cell="{ row }">
               <span class="text-sm font-medium text-primary-600 dark:text-primary-300">
                 {{ row.recommended_weight.toFixed(4) }}
               </span>
@@ -97,6 +97,8 @@
 </template>
 
 <script setup lang="ts">
+import { useNormalizedColumns } from "~/utils/table"
+
 const nuxtApp = useNuxtApp()
 const config = reactive({
   enabled: true,
@@ -115,11 +117,11 @@ const toast = useToast()
 const runtime = useRuntimeConfig()
 const apiBase = computed(() => runtime.public.apiBaseUrl as string)
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "title", label: "Listing" },
   { key: "status", label: "状态" },
   { key: "recommended_weight", label: "权重" },
-]
+])
 
 async function loadConfig() {
   loading.value = true

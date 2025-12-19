@@ -51,6 +51,14 @@ func (r *IAMResolver) Source() string {
 	return r.source
 }
 
+func (r *IAMResolver) IsLocal() bool {
+	return r != nil && r.mode == iamservice.IAMModeLocal
+}
+
+func (r *IAMResolver) IsDelegated() bool {
+	return r != nil && r.mode == iamservice.IAMModeDelegated
+}
+
 func parseIAMMode(val string) (iamservice.IAMMode, bool) {
 	v := strings.ToLower(strings.TrimSpace(val))
 	switch v {

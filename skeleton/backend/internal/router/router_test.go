@@ -43,8 +43,8 @@ func TestBuildJWTInDevModeOptional(t *testing.T) {
 	t.Setenv("POWERX_SECURITY_JWT_SECRET", "")
 
 	jwtCfg := r.buildJWT()
-	if jwtCfg.Optional {
-		t.Fatal("expected strict JWT by default even in dev mode")
+	if !jwtCfg.Optional {
+		t.Fatal("expected optional JWT in dev mode for standalone DX")
 	}
 	if jwtCfg.AllowSignedContext {
 		t.Fatal("expected signed context disabled for local dev by default")

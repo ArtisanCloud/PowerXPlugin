@@ -43,7 +43,7 @@
           :columns="tableColumns"
           :ui="{ td: { base: 'align-top' } }"
         >
-          <template #capability_id-data="{ row }">
+          <template #capability_id-cell="{ row }">
             <div class="flex flex-col">
               <span class="font-semibold text-gray-900 dark:text-white">{{ `{{ row.capability_id }}` }}</span>
               <small class="text-xs text-gray-500 dark:text-gray-400">
@@ -51,10 +51,10 @@
               </small>
             </div>
           </template>
-          <template #descriptor-data="{ row }">
+          <template #descriptor-cell="{ row }">
             <p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ row.descriptor }}` }}</p>
           </template>
-          <template #status-data="{ row }">
+          <template #status-cell="{ row }">
             <div class="flex flex-col gap-1">
               <UBadge
                 :label="lifecycleBadge(row.status).label"
@@ -66,7 +66,7 @@
               </span>
             </div>
           </template>
-          <template #actions-data="{ row }">
+          <template #actions-cell="{ row }">
             <UButton
               size="xs"
               icon="i-heroicons-arrow-right-circle"
@@ -398,6 +398,7 @@ import {
   type LifecyclePlan,
   type PlanTemplate,
 } from "~/composables/api";
+import { useNormalizedColumns } from "~/utils/table";
 
 definePageMeta({
   alias: ["/capabilities/lifecycle"],
@@ -472,7 +473,7 @@ const catalogRows = computed(() =>
   }),
 );
 
-const tableColumns = computed(() => [
+const tableColumns = useNormalizedColumns([
   { key: "capability_id", label: t("capabilities.lifecycle.catalog.columns.capability") },
   { key: "descriptor", label: t("capabilities.lifecycle.catalog.columns.descriptor") },
   { key: "status", label: t("capabilities.lifecycle.catalog.columns.status") },

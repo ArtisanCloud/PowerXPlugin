@@ -30,12 +30,14 @@ type LoginRequest struct {
 }
 
 type AuthTokens struct {
-	TokenType    string
-	AccessToken  string
-	RefreshToken string
-	ExpiresIn    int64
-	Scope        string
-	ExpiresAt    time.Time
+	TokenType     string
+	AccessToken   string
+	RefreshToken  string
+	ExpiresIn     int64
+	Scope         string
+	ExpiresAt     time.Time
+	PluginID      string
+	PolicyVersion string
 }
 
 type UserContext struct {
@@ -43,6 +45,7 @@ type UserContext struct {
 	TenantUuid    string
 	TenantKey     string
 	TenantName    string
+	IsRoot        bool
 	MemberID      uint64
 	UserID        uint64
 	Username      string
@@ -53,6 +56,7 @@ type UserContext struct {
 	Permissions   []string
 	DepartmentIDs []uint64
 	PolicyVersion string
+	PluginID      string
 	IssuedAt      time.Time
 }
 

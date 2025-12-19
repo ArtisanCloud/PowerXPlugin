@@ -69,6 +69,7 @@ var iamTables = []interface{}{
 	&iammodel.MemberRole{},
 	&iammodel.RolePermission{},
 	&iammodel.RefreshToken{},
+	&iammodel.AuditLog{},
 }
 
 // MigratePluginModels 只做 AutoMigrate（最小实现）
@@ -86,7 +87,15 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 	if len(tables) == 0 {
 		return nil
 	}
-	return safeAutoMigrate(ctx, db, tables)
+	if err := safeAutoMigrate(ctx, db, tables); err != nil {
+		return err
+	}
+	if includeIAM {
+		if err := ensureIAMConstraints(ctx, db); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func safeAutoMigrate(ctx context.Context, db *gorm.DB, tables []interface{}) error {
@@ -227,6 +236,80 @@ func isSQLiteSafeTable(tbl interface{}) bool {
 	default:
 		return false
 	}
+}
+
+func ensureIAMConstraints(ctx context.Context, db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	departments := models.S(models.TableIAMDepartments)
+	users := models.S(models.TableIAMMembers)
+	audits := models.S(models.TableIAMAuditLogs)
+	roles := models.S(models.TableIAMRoles)
+	rolePerms := models.S(models.TableIAMRolePermissions)
+	memberRoles := models.S(models.TableIAMMemberRoles)
+
+	statements := []string{
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_departments_tenant_code ON %s (tenant_uuid, lower(code))`, departments),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_departments_tenant_parent ON %s (tenant_uuid, parent_id)`, departments),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_tenant_account ON %s (tenant_uuid, user_id)`, users),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_tenant_username ON %s (tenant_uuid, lower(username))`, users),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_users_tenant_status ON %s (tenant_uuid, status)`, users),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_audit_logs_tenant_created ON %s (tenant_uuid, created_at DESC)`, audits),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_audit_logs_actor_created ON %s (actor_member_id, created_at DESC)`, audits),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_roles_tenant_code ON %s (tenant_uuid, lower(code))`, roles),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_roles_scope ON %s (tenant_uuid, scope_type)`, roles),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_role_permissions_version ON %s (role_id, policy_version)`, rolePerms),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_role_permissions_tenant_uuid ON %s (tenant_uuid)`, rolePerms),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_member_roles_role ON %s (role_id)`, memberRoles),
+	}
+
+	for _, stmt := range statements {
+		if strings.TrimSpace(stmt) == "" {
+			continue
+		}
+		if err := execIgnoreExists(ctx, db, stmt); err != nil {
+			return err
+		}
+	}
+	return backfillRolePermissionTenant(ctx, db)
+}
+
+func execIgnoreExists(ctx context.Context, db *gorm.DB, stmt string) error {
+	if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "already exists") {
+			log.Printf("[migrate] index exists, skip: %s", stmt)
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func backfillRolePermissionTenant(ctx context.Context, db *gorm.DB) error {
+	rolePerms := models.S(models.TableIAMRolePermissions)
+	roles := models.S(models.TableIAMRoles)
+	var query string
+	if strings.EqualFold(db.Dialector.Name(), "sqlite") {
+		query = fmt.Sprintf(
+			`UPDATE %[1]s SET tenant_uuid = (SELECT tenant_uuid FROM %[2]s WHERE %[2]s.id = %[1]s.role_id) WHERE tenant_uuid IS NULL OR trim(tenant_uuid) = ''`,
+			rolePerms, roles,
+		)
+	} else {
+		query = fmt.Sprintf(
+			`UPDATE %s rp SET tenant_uuid = r.tenant_uuid FROM %s r WHERE rp.role_id = r.id AND (rp.tenant_uuid IS NULL OR rp.tenant_uuid::text = '')`,
+			rolePerms, roles,
+		)
+	}
+	if err := db.WithContext(ctx).Exec(query).Error; err != nil {
+		lower := strings.ToLower(err.Error())
+		if strings.Contains(lower, "tenant_uuid") && strings.Contains(lower, "column") {
+			log.Printf("[migrate] tenant_uuid column missing on %s, skip backfill: %v", rolePerms, err)
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func ResetDatabase(ctx context.Context, db *gorm.DB, cfg *config.DatabaseConfig) error {

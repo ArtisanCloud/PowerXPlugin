@@ -12,7 +12,7 @@
 
     <form class="space-y-4" @submit.prevent="submit">
       <div v-for="field in section.fields" :key="field.name">
-        <UFormGroup :label="field.label" :description="field.help_text" :required="field.required">
+        <UFormField :label="field.label" :description="field.help_text" :required="field.required">
           <template #default>
             <component
               :is="resolveInputComponent(field)"
@@ -23,7 +23,7 @@
               class="w-full"
             />
           </template>
-        </UFormGroup>
+        </UFormField>
       </div>
 
       <div class="flex items-center justify-end gap-3">

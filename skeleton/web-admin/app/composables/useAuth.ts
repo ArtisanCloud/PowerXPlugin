@@ -127,6 +127,8 @@ export const useAuth = () => {
   const lastError = useState<string>("auth.lastError", () => "");
   const hasAuthenticated = useState("auth.hasAuthenticated", () => false);
   const delegatedAuthError = useState<string>("auth.delegatedError", () => "");
+  const localIAMEnabled = useState("auth.localIAMEnabled", () => !insidePowerX);
+  const delegatedIAM = useState("auth.delegatedIAM", () => insidePowerX);
 
   const { refreshToken: refresh, logout: apiLogout } = useAuthService();
 
@@ -232,13 +234,22 @@ export const useAuth = () => {
       refreshToken.value = hasRefresh ? storedRefresh : null;
       expiresAt.value = Number(storedExpires);
       isAuthenticated.value = !isTokenExpired();
-    } else {
-      if (insidePowerX && !hasAuthenticated.value) {
-        clearAuth();
-        return;
-      }
-      failClosed();
+      return;
     }
+
+    // 没有任何会话数据（首次访问/手动清除），无需提示“会话失效”。
+    const hasAnySessionData = Boolean(storedToken || storedRefresh || storedExpires);
+    if (!hasAnySessionData) {
+      clearAuth();
+      hasAuthenticated.value = false;
+      return;
+    }
+
+    if (insidePowerX && !hasAuthenticated.value) {
+      clearAuth();
+      return;
+    }
+    failClosed();
   };
 
   const ensureFreshToken = async () => {
@@ -289,6 +300,11 @@ export const useAuth = () => {
         window.removeEventListener("storage", handler);
       });
     }
+  };
+
+  const setIAMModeFlags = (isDelegated: boolean) => {
+    delegatedIAM.value = isDelegated;
+    localIAMEnabled.value = !isDelegated;
   };
 
   const logout = async () => {
@@ -400,5 +416,8 @@ export const useAuth = () => {
     delegatedError: readonly(delegatedAuthError),
     clearDelegatedError,
     restoreFromStorage: syncFromStorage,
+    localIAMEnabled: readonly(localIAMEnabled),
+    delegatedIAM: readonly(delegatedIAM),
+    setIAMModeFlags,
   };
 };

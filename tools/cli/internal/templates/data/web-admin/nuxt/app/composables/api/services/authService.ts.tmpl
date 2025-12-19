@@ -119,6 +119,8 @@ export interface LoginResponse {
   expires_in: number;
   refresh_token: string;
   scope: string;
+  plugin_id?: string;
+  policy_version?: string;
 }
 
 // 用户信息响应接口（用于获取用户详情）

@@ -36,6 +36,7 @@ func main() {
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
 	includeIAM := iamResolver.Mode() == iamservice.IAMModeLocal
+	log.Printf("[iam] mode=%s source=%s includeIAM=%v", iamResolver.Mode(), iamResolver.Source(), includeIAM)
 
 	ctx := context.Background()
 	// 连接数据库
@@ -56,7 +57,7 @@ func main() {
 			log.Fatal("seed failed:", err)
 		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
 		}
@@ -72,7 +73,7 @@ func main() {
 			log.Fatal("seed failed:", err)
 		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
 		}
@@ -96,7 +97,7 @@ func main() {
 			log.Fatal("seed failed:", err)
 		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
 		}

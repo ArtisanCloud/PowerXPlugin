@@ -3,8 +3,64 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestLoadFallsBackToMemoryDefaults(t *testing.T) {
+	tempDir := t.TempDir()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("获取当前目录失败: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("切换工作目录失败: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+
+	t.Setenv("CONFIG_PATH", "")
+	t.Setenv("POWERX_DB_DSN", "")
+	t.Setenv("POWERX_DB_SCHEMA", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载默认配置失败: %v", err)
+	}
+	if cfg.Server == nil || !cfg.Server.DevMode {
+		t.Fatalf("默认配置应启用 dev_mode 便于本地启动")
+	}
+	if cfg.Database == nil {
+		t.Fatal("默认数据库配置缺失")
+	}
+	if cfg.Database.Driver != "memory" {
+		t.Fatalf("默认数据库驱动应为 memory，实际 %q", cfg.Database.Driver)
+	}
+	if strings.TrimSpace(cfg.Database.DSN) == "" {
+		t.Fatal("默认内存数据库 DSN 不应为空")
+	}
+}
+
+func TestLoadRespectsIAMModeEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("获取当前目录失败: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("切换工作目录失败: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+
+	t.Setenv("IAM_MODE", "delegated")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.Context == nil || cfg.Context.IAMMode != "delegated" {
+		t.Fatalf("IAM_MODE 环境变量未生效，期望 delegated 实际 %q", cfg.Context.IAMMode)
+	}
+}
 
 func TestLoadAppliesEnvOverrides(t *testing.T) {
 	const (

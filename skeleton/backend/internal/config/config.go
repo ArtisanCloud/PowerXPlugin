@@ -308,8 +308,11 @@ func Load() (*Config, error) {
 	// 统一归一化配置值，避免大小写/空白差异导致校验失败
 	normalizeConfig(cfg)
 
-	if configDir != "" && cfg.Database != nil {
-		cfg.Database.ResolvePaths(configDir)
+	if cfg.Database != nil {
+		cfg.Database.ApplyDefaults()
+		if configDir != "" {
+			cfg.Database.ResolvePaths(configDir)
+		}
 	}
 
 	// 同步向后兼容字段
@@ -354,10 +357,11 @@ func defaultSecurityBaselineConfig() *SecurityBaselineConfig {
 
 func getDefaultConfig() *Config {
 	return &Config{
+		DevMode: true,
 		Server: &ServerConfig{
 			BindAddr: ":8078",
 			LogLevel: "info",
-			DevMode:  false,
+			DevMode:  true,
 		},
 		Integration: &IntegrationConfig{
 			Idempotency: IntegrationIdempotencyConfig{
@@ -601,6 +605,7 @@ func resolveSecurityBaselineCandidates() []string {
 	candidates = append(candidates,
 		filepath.Join("config", "security_baseline.yaml"),
 		filepath.Join("backend", "etc", "security_baseline.yaml"),
+		filepath.Join("skeleton", "backend", "etc", "security_baseline.yaml"),
 		"security_baseline.yaml",
 	)
 
@@ -679,6 +684,7 @@ func resolveConfigCandidates() []string {
 		"./config.yaml",
 		"./etc/config.yaml",
 		"./backend/etc/config.yaml",
+		"./skeleton/backend/etc/config.yaml",
 		"../config/host-values.yaml",
 		"../config/config.yaml",
 		"../etc/config.yaml",
@@ -757,6 +763,11 @@ func loadEnvConfig(cfg *Config) {
 		if ttl, err := time.ParseDuration(ttlStr); err == nil {
 			cfg.Context.TTL = ttl
 		}
+	}
+	if iamMode := resolveConfigValue(os.Getenv("IAM_MODE")); iamMode != "" {
+		cfg.Context.IAMMode = iamMode
+	} else if iamModeCamel := resolveConfigValue(os.Getenv("IAMMode")); iamModeCamel != "" {
+		cfg.Context.IAMMode = iamModeCamel
 	}
 
 	// gRPC 上游配置
@@ -1039,8 +1050,12 @@ func (c *Config) IsJWTMode() bool {
 // Validate 验证配置
 func (c *Config) Validate() error {
 	// 数据库配置验证
-	if c.Database.DSN == "" && c.DBDSN == "" {
-		return NewConfigError("database DSN is required (configure in YAML)")
+	if c.Database == nil {
+		return NewConfigError("database config is required")
+	}
+	c.Database.ApplyDefaults()
+	if err := c.Database.Validate(); err != nil {
+		return NewConfigError(err.Error())
 	}
 
 	// 认证模式验证

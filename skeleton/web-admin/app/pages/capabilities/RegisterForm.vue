@@ -40,49 +40,93 @@
         {{ $t("common.loading") }}
       </div>
       <div v-else>
-        <UTable
-          v-if="catalogRows.length"
-          :rows="catalogRows"
-          :columns="tableColumns"
-          :ui="{ td: { base: 'align-top' } }"
-        >
-          <template #capability_id-cell="{ row }">
-            <div class="flex flex-col">
-              <span class="font-semibold text-gray-900 dark:text-white">
-                {{ row.capability_id }}
-              </span>
-              <small class="text-xs text-gray-500 dark:text-gray-400">
-                {{ $t("capabilities.list.versionLabel", { version: row.version }) }}
-              </small>
+        <div v-if="groupedCatalog.length" class="space-y-4">
+          <section
+            v-for="group in groupedCatalog"
+            :key="group.module"
+            class="rounded-2xl border border-white/5 bg-[#0f192a]/80 px-1 py-1 shadow-inner shadow-black/40 transition"
+          >
+            <button
+              type="button"
+              class="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left transition hover:border-primary-500/40 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+              @click="toggleModule(group.module)"
+            >
+              <div>
+                <p class="text-lg font-semibold text-white">
+                  {{ group.displayName }}
+                </p>
+                <p class="text-xs text-[#93c5fd]">
+                  {{ group.module }} · {{ group.items.length }} 个能力
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <UBadge
+                  v-for="badge in group.kindBadges"
+                  :key="badge.label"
+                  :label="badge.label"
+                  :color="badge.color"
+                  variant="soft"
+                  class="bg-white/10 text-white backdrop-blur"
+                />
+                <UIcon
+                  :name="isModuleExpanded(group.module) ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+                  class="h-5 w-5 text-white/70"
+                />
+              </div>
+            </button>
+            <div v-if="isModuleExpanded(group.module)" class="border-t border-white/5 bg-black/10">
+              <UTable
+                :data="group.items"
+                :columns="tableColumns"
+                :ui="{ td: { base: 'align-top' } }"
+              >
+                <template #capability_id-cell="{ row }">
+                  <div class="flex flex-col">
+                    <span class="font-semibold text-gray-900 dark:text-white">
+                      {{ row.original.capability_id }}
+                    </span>
+                    <small class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ $t("capabilities.list.versionLabel", { version: row.original.version }) }}
+                    </small>
+                  </div>
+                </template>
+                <template #kind-cell="{ row }">
+                  <UBadge
+                    :label="formatKindLabel(row.original.kind)"
+                    :color="kindColor(row.original.kind)"
+                    variant="soft"
+                  />
+                </template>
+                <template #execution-cell="{ row }">
+                  <UBadge
+                    :label="row.original.execution.mode.toUpperCase()"
+                    :color="row.original.execution.mode === 'async' ? 'primary' : 'gray'"
+                    variant="soft"
+                  />
+                  <p v-if="row.original.execution.callback_url" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ row.original.execution.callback_url }}
+                  </p>
+                </template>
+                <template #tags-cell="{ row }">
+                  <div class="flex flex-wrap gap-1.5">
+                    <UBadge
+                      v-for="tag in row.original.tags"
+                      :key="`${row.original.capability_id}-${tag}`"
+                      :label="tag"
+                      variant="subtle"
+                    />
+                    <span v-if="!row.original.tags.length" class="text-xs text-gray-400">
+                      {{ $t("capabilities.list.noTags") }}
+                    </span>
+                  </div>
+                </template>
+                <template #checksum-cell="{ row }">
+                  <code class="text-xs text-gray-500 dark:text-gray-400">{{ row.original.checksum }}</code>
+                </template>
+              </UTable>
             </div>
-          </template>
-          <template #execution-cell="{ row }">
-            <UBadge
-              :label="row.execution.mode.toUpperCase()"
-              :color="row.execution.mode === 'async' ? 'primary' : 'gray'"
-              variant="soft"
-            />
-            <p v-if="row.execution.callback_url" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ row.execution.callback_url }}
-            </p>
-          </template>
-          <template #tags-cell="{ row }">
-            <div class="flex flex-wrap gap-1.5">
-              <UBadge
-                v-for="tag in row.tags"
-                :key="`${row.capability_id}-${tag}`"
-                :label="tag"
-                variant="subtle"
-              />
-              <span v-if="!row.tags.length" class="text-xs text-gray-400">
-                {{ $t("capabilities.list.noTags") }}
-              </span>
-            </div>
-          </template>
-          <template #checksum-cell="{ row }">
-            <code class="text-xs text-gray-500 dark:text-gray-400">{{ row.checksum }}</code>
-          </template>
-        </UTable>
+          </section>
+        </div>
         <div v-else class="py-16 text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ $t("capabilities.list.empty") }}
@@ -473,6 +517,52 @@ const autoValidate = ref(false);
 const draftStorageKey = "powerxplugin::capability-register-draft";
 const catalogLoading = ref(false);
 const catalog = ref<CapabilityCatalogEntry[]>([]);
+type CatalogRow = {
+  capability_id: string;
+  version: string;
+  descriptor: string;
+  tags: string[];
+  checksum: string;
+  execution: CapabilityCatalogEntry["execution"];
+  module: string;
+  kind: string;
+};
+const catalogRows = ref<CatalogRow[]>([]);
+type ModuleGroup = {
+  module: string;
+  displayName: string;
+  items: CatalogRow[];
+  kindBadges: { label: string; color: string }[];
+};
+const groupedCatalog = computed<ModuleGroup[]>(() => {
+  const groups = new Map<string, CatalogRow[]>();
+  catalogRows.value.forEach((row) => {
+    const moduleKey = row.module || deriveModuleFromId(row.capability_id);
+    if (!groups.has(moduleKey)) {
+      groups.set(moduleKey, []);
+    }
+    groups.get(moduleKey)!.push(row);
+  });
+  return Array.from(groups.entries())
+    .map(([module, items]) => {
+      const stats = items.reduce<Record<string, number>>((acc, item) => {
+        const key = normalizeKind(item.kind);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      return {
+        module,
+        displayName: formatModuleDisplay(module),
+        items: items.sort((a, b) => a.capability_id.localeCompare(b.capability_id)),
+        kindBadges: Object.entries(stats).map(([kind, count]) => ({
+          label: `${formatKindLabel(kind)} · ${count}`,
+          color: kindColor(kind),
+        })),
+      };
+    })
+    .sort((a, b) => a.module.localeCompare(b.module));
+});
+const expandedModules = ref<Record<string, boolean>>({});
 
 const form = reactive(createDefaultForm());
 
@@ -525,21 +615,11 @@ const tagsText = computed({
 
 const tableColumns = useNormalizedColumns([
   { key: "capability_id", label: t("capabilities.list.column.capability") },
+  { key: "kind", label: t("capabilities.list.column.kind") },
   { key: "execution", label: t("capabilities.list.column.execution") },
   { key: "tags", label: t("capabilities.list.column.tags") },
   { key: "checksum", label: t("capabilities.list.column.checksum") },
 ]);
-
-const catalogRows = computed(() =>
-  (catalog.value || []).map((entry) => ({
-    capability_id: entry.id,
-    version: entry.version,
-    descriptor: entry.descriptor,
-    tags: entry.tags || [],
-    checksum: entry.checksum,
-    execution: entry.execution || { mode: "sync" },
-  })),
-);
 
 onMounted(async () => {
   await Promise.all([loadTemplate(), loadCatalog()]);
@@ -552,6 +632,66 @@ watch(formOpen, (isOpen) => {
     currentStep.value = 0;
   }
 });
+
+watch(
+  groupedCatalog,
+  (groups) => {
+    groups.forEach((group) => {
+      if (!(group.module in expandedModules.value)) {
+        expandedModules.value[group.module] = true;
+      }
+    });
+  },
+  { immediate: true },
+);
+
+function isModuleExpanded(module: string) {
+  const state = expandedModules.value[module];
+  return state === undefined ? true : state;
+}
+
+function toggleModule(module: string) {
+  expandedModules.value[module] = !isModuleExpanded(module);
+}
+
+function deriveModuleFromId(id: string) {
+  const parts = id.split(".");
+  if (parts.length <= 1) {
+    return id;
+  }
+  return parts.slice(0, -1).join(".");
+}
+
+function formatModuleDisplay(module: string) {
+  const parts = module.split(".");
+  if (parts.length <= 1) {
+    return module;
+  }
+  return parts.slice(-1)[0];
+}
+
+function normalizeKind(kind?: string) {
+  return kind?.trim() || "Capability";
+}
+
+function formatKindLabel(kind?: string) {
+  const normalized = normalizeKind(kind).toLowerCase();
+  if (normalized === "workflow" || normalized === "tool") {
+    return t("capabilities.list.kind.workflow");
+  }
+  if (normalized === "capability") {
+    return t("capabilities.list.kind.capability");
+  }
+  return t("capabilities.list.kind.default");
+}
+
+function kindColor(kind?: string) {
+  const normalized = normalizeKind(kind).toLowerCase();
+  if (normalized === "workflow" || normalized === "tool") {
+    return "primary";
+  }
+  return "gray";
+}
 
 async function loadTemplate() {
   loadingTemplate.value = true;
@@ -575,7 +715,18 @@ async function loadTemplate() {
 async function loadCatalog() {
   catalogLoading.value = true;
   try {
-    catalog.value = await listCatalog();
+    const entries = await listCatalog();
+    catalog.value = entries;
+    catalogRows.value = entries.map((entry) => ({
+      capability_id: entry.id,
+      version: entry.version,
+      descriptor: entry.descriptor,
+      tags: entry.tags || [],
+      checksum: entry.checksum,
+      execution: normalizeExecution(entry.execution),
+      module: entry.module || deriveModuleFromId(entry.id),
+      kind: normalizeKind(entry.kind),
+    }));
   } catch (error) {
     console.error("[capabilities] failed to load catalog", error);
     toast.add({
@@ -586,6 +737,13 @@ async function loadCatalog() {
   } finally {
     catalogLoading.value = false;
   }
+}
+
+function normalizeExecution(execution?: CapabilityCatalogEntry["execution"]) {
+  if (!execution || !execution.mode) {
+    return { mode: "sync" };
+  }
+  return execution;
 }
 
 function openForm() {

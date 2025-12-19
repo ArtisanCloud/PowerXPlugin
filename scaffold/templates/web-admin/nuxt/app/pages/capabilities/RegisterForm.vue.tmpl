@@ -46,7 +46,7 @@
           :columns="tableColumns"
           :ui="{ td: { base: 'align-top' } }"
         >
-          <template #capability_id-data="{ row }">
+          <template #capability_id-cell="{ row }">
             <div class="flex flex-col">
               <span class="font-semibold text-gray-900 dark:text-white">
                 {{ `{{ row.capability_id }}` }}
@@ -56,7 +56,7 @@
               </small>
             </div>
           </template>
-          <template #execution-data="{ row }">
+          <template #execution-cell="{ row }">
             <UBadge
               :label="row.execution.mode.toUpperCase()"
               :color="row.execution.mode === 'async' ? 'primary' : 'gray'"
@@ -66,7 +66,7 @@
               {{ `{{ row.execution.callback_url }}` }}
             </p>
           </template>
-          <template #tags-data="{ row }">
+          <template #tags-cell="{ row }">
             <div class="flex flex-wrap gap-1.5">
               <UBadge
                 v-for="tag in row.tags"
@@ -79,7 +79,7 @@
               </span>
             </div>
           </template>
-          <template #checksum-data="{ row }">
+          <template #checksum-cell="{ row }">
             <code class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ row.checksum }}` }}</code>
           </template>
         </UTable>
@@ -445,6 +445,7 @@ import {
   useCapabilityCatalogApi,
   type CapabilityCatalogEntry,
 } from "~/composables/api";
+import { useNormalizedColumns } from "~/utils/table";
 
 definePageMeta({
   alias: ["/capabilities/register"],
@@ -522,7 +523,7 @@ const tagsText = computed({
   },
 });
 
-const tableColumns = computed(() => [
+const tableColumns = useNormalizedColumns([
   { key: "capability_id", label: t("capabilities.list.column.capability") },
   { key: "execution", label: t("capabilities.list.column.execution") },
   { key: "tags", label: t("capabilities.list.column.tags") },

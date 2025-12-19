@@ -65,7 +65,7 @@ const channels = [
   { label: 'Status Page', value: 'status_page' },
   { label: 'Security Email', value: 'security_email' },
   { label: 'Hotline', value: 'hotline' },
-  { label: 'Skip Notification', value: '' },
+  { label: 'Skip Notification', value: 'skip_notification' },
 ]
 
 const form = reactive<TimelineCreatePayload>({
@@ -80,7 +80,13 @@ const submit = () => {
   if (!form.message.trim()) {
     return
   }
-  emit('create', { ...form })
+  emit('create', {
+    ...form,
+    stakeholder_channel:
+      form.stakeholder_channel === 'skip_notification'
+        ? ''
+        : form.stakeholder_channel,
+  })
   form.message = ''
   form.entry_type = 'update'
   form.stakeholder_channel = 'support_hub'

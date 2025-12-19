@@ -51,7 +51,7 @@ type IntegrationBillingConfig struct {
 // IntegrationStripeTaxConfig 保存 Stripe Tax 凭据。
 type IntegrationStripeTaxConfig struct {
 	APIKey         string `yaml:"api_key" json:"api_key"`
-	AccountID      string `yaml:"account_id" json:"account_id"`
+	UserID         string `yaml:"user_id" json:"user_id"`
 	Location       string `yaml:"location" json:"location"`
 	APIBaseURL     string `yaml:"api_base_url" json:"api_base_url"`
 	WebhookSecret  string `yaml:"webhook_secret" json:"webhook_secret"`
@@ -60,7 +60,7 @@ type IntegrationStripeTaxConfig struct {
 
 // IntegrationAvalaraConfig 保存 Avalara 凭据。
 type IntegrationAvalaraConfig struct {
-	AccountID      string `yaml:"account_id" json:"account_id"`
+	UserID         string `yaml:"user_id" json:"user_id"`
 	LicenseKey     string `yaml:"license_key" json:"license_key"`
 	CompanyCode    string `yaml:"company_code" json:"company_code"`
 	Environment    string `yaml:"environment" json:"environment"`

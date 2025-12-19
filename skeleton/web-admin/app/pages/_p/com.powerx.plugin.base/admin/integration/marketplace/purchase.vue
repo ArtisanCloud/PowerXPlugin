@@ -42,11 +42,11 @@
         </template>
 
         <div class="space-y-4">
-          <UFormGroup label="租户 UUID">
+          <UFormField label="租户 UUID">
             <UInput v-model="tenantUuid" placeholder="tenant-123" />
-          </UFormGroup>
+          </UFormField>
 
-          <UFormGroup label="选择 Listing">
+          <UFormField label="选择 Listing">
             <USelectMenu
               v-model="selectedListingId"
               :options="listingOptions"
@@ -54,16 +54,16 @@
               placeholder="选择 Listing"
               @update:model-value="handleListingChange"
             />
-          </UFormGroup>
+          </UFormField>
 
           <div v-if="selectedListing">
-            <UFormGroup label="选择价格计划">
+            <UFormField label="选择价格计划">
               <USelectMenu
                 v-model="selectedPlanId"
                 :options="planOptions"
                 placeholder="选择计划"
               />
-            </UFormGroup>
+            </UFormField>
 
             <div
               v-if="selectedPlan"
@@ -124,9 +124,9 @@
         </template>
 
         <div class="space-y-4">
-          <UFormGroup label="Payment Intent ID">
+          <UFormField label="Payment Intent ID">
             <UInput v-model="paymentIntent" placeholder="pi_mock_123" />
-          </UFormGroup>
+          </UFormField>
 
           <UAlert
             v-if="!license"
@@ -197,14 +197,14 @@
                   >
                 </template>
                 <div class="space-y-2">
-                  <UFormGroup label="延长小时数" help="最大 72 小时">
+                  <UFormField label="延长小时数" help="最大 72 小时">
                     <UInput
                       v-model="extendHours"
                       type="number"
                       min="1"
                       max="72"
                     />
-                  </UFormGroup>
+                  </UFormField>
                   <UButton
                     color="gray"
                     :loading="extending"

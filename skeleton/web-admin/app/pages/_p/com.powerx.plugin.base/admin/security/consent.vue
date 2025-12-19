@@ -25,16 +25,16 @@
       <UCard>
         <template #header>
           <div class="flex flex-wrap items-end gap-4">
-            <UFormGroup label="Tenant UUID" required class="w-full sm:w-64">
+            <UFormField label="Tenant UUID" required class="w-full sm:w-64">
               <UInput
                 v-model="tenantUuid"
                 placeholder="tenant-123"
                 @keyup.enter="loadTokens"
                 :disabled="loading"
               />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="Status" class="w-full sm:w-48">
+            <UFormField label="Status" class="w-full sm:w-48">
               <USelectMenu
                 v-model="selectedStatuses"
                 :options="statusOptions"
@@ -60,7 +60,7 @@
                   </div>
                 </template>
               </USelectMenu>
-            </UFormGroup>
+            </UFormField>
 
             <div class="flex items-center gap-3">
               <UButton
@@ -94,10 +94,10 @@
             />
 
             <UTable :rows="rows" :columns="columns" :loading="loading">
-              <template #token-data="{ row }">
+              <template #token-cell="{ row }">
                 <span class="font-mono">{{ row.token }}</span>
               </template>
-              <template #scope-data="{ row }">
+              <template #scope-cell="{ row }">
                 <div class="flex flex-wrap gap-2">
                   <UBadge
                     v-for="scope in row.scope"
@@ -110,7 +110,7 @@
                   </UBadge>
                 </div>
               </template>
-              <template #status-data="{ row }">
+              <template #status-cell="{ row }">
                 <UBadge
                   :color="statusColor(row.status)"
                   size="xs"
@@ -146,6 +146,7 @@ import type {
   ConsentTokenResponse,
   ConsentTokenListResponse,
 } from "~/types/security";
+import { useNormalizedColumns } from "~/utils/table";
 
 const runtimeConfig = useRuntimeConfig();
 const toast = useToast();
@@ -156,14 +157,14 @@ const loading = ref(false);
 const rows = ref<ConsentTokenResponse[]>([]);
 const error = ref<string | null>(null);
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "token", label: "Consent Token" },
   { key: "scope", label: "Scopes" },
   { key: "status", label: "Status" },
   { key: "issuedAt", label: "Issued At" },
   { key: "expiresAt", label: "Expires At" },
   { key: "issuedBy", label: "Issued By" },
-];
+]);
 
 const statusOptions = ["ACTIVE", "REVOKED", "EXPIRED"];
 

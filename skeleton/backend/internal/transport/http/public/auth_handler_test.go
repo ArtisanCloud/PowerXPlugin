@@ -204,7 +204,17 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	local := &localDirStub{
 		ctxFn: func(ctx context.Context, token string) (*iamservice.UserContext, error) {
-			return &iamservice.UserContext{TenantUUID: "tenant-local", TenantUuid: "9", TenantKey: "00000000-0000-0000-0000-000000000001", TenantName: "Local", UserID: 5, Username: "admin"}, nil
+			return &iamservice.UserContext{
+				TenantUUID: "tenant-local",
+				TenantUuid: "9",
+				TenantKey:  "00000000-0000-0000-0000-000000000001",
+				TenantName: "Local",
+				UserID:     5,
+				Username:   "admin",
+				MemberID:   12,
+				IsRoot:     true,
+				Roles:      []string{"system.admin"},
+			}, nil
 		},
 	}
 	router := gin.New()
@@ -221,8 +231,16 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 	var payload contracts.APIResponse
 	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
 	data := payload.Data.(map[string]any)
+	require.True(t, data["is_root"].(bool))
+	require.Equal(t, "tenant-local", data["current_tenant_uuid"])
+	require.EqualValues(t, 12, data["current_member_id"])
 	tenant := data["tenant"].(map[string]any)
 	require.Equal(t, "tenant-local", tenant["uuid"])
+	members := data["members"].([]any)
+	require.Len(t, members, 1)
+	member := members[0].(map[string]any)
+	require.Equal(t, "tenant-local", member["tenant_uuid"])
+	require.Equal(t, true, member["is_admin"])
 }
 
 type localDirStub struct {

@@ -43,7 +43,7 @@
           :columns="tableColumns"
           :ui="{ td: { base: 'align-top' } }"
         >
-          <template #capability_id-data="{ row }">
+          <template #capability_id-cell="{ row }">
             <div class="flex flex-col">
               <span class="font-semibold text-gray-900 dark:text-white">
                 {{ row.capability_id }}
@@ -53,10 +53,10 @@
               </small>
             </div>
           </template>
-          <template #descriptor-data="{ row }">
+          <template #descriptor-cell="{ row }">
             <p class="text-sm text-gray-600 dark:text-gray-300">{{ row.descriptor }}</p>
           </template>
-          <template #exposure-data="{ row }">
+          <template #exposure-cell="{ row }">
             <div class="flex flex-col gap-1">
               <UBadge :label="exposureBadge(row.syncStatus).label" :color="exposureBadge(row.syncStatus).color" variant="soft" />
               <span v-if="row.updatedAt" class="text-xs text-gray-500">
@@ -64,7 +64,7 @@
               </span>
             </div>
           </template>
-          <template #actions-data="{ row }">
+          <template #actions-cell="{ row }">
             <UButton
               size="xs"
               icon="i-heroicons-adjustments-horizontal"
@@ -167,7 +167,7 @@
                         {{ $t("capabilities.exposure.sections.channelHint") }}
                       </span>
                     </div>
-                    <UToggle v-model="channel.enabled" color="primary" />
+                    <USwitch v-model="channel.enabled" color="primary" />
                   </div>
                   <div class="grid gap-3">
                     <UFormField :label="$t('capabilities.exposure.fields.displayName')">
@@ -327,6 +327,7 @@ import {
   type ExposureTemplate,
   type TenantQuota,
 } from "~/composables/api";
+import { useNormalizedColumns } from "~/utils/table";
 
 definePageMeta({
   alias: ["/capabilities/exposure"],
@@ -417,7 +418,7 @@ const catalogRows = computed(() =>
   }),
 );
 
-const tableColumns = computed(() => [
+const tableColumns = useNormalizedColumns([
   { key: "capability_id", label: t("capabilities.exposure.list.columns.capability") },
   { key: "descriptor", label: t("capabilities.exposure.list.columns.descriptor") },
   { key: "exposure", label: t("capabilities.exposure.list.columns.exposure") },

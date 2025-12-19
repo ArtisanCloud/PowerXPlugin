@@ -21,13 +21,13 @@
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-end gap-4">
-          <UFormGroup label="Tenant UUID" required class="w-full sm:w-64">
+          <UFormField label="Tenant UUID" required class="w-full sm:w-64">
             <UInput
               v-model="tenantUuid"
               placeholder="tenant-123"
               :disabled="loading"
             />
-         </UFormGroup>
+         </UFormField>
          <UButton
             color="primary"
             :loading="loading"
@@ -53,10 +53,10 @@
               :columns="revocationColumns"
               :loading="loading"
             >
-              <template #revokedAt-data="{ row }">
+              <template #revokedAt-cell="{ row }">
                 {{ formatDate(row.revokedAt) }}
               </template>
-              <template #ttlExpiry-data="{ row }">
+              <template #ttlExpiry-cell="{ row }">
                 {{ formatDate(row.ttlExpiry) }}
               </template>
             </UTable>
@@ -80,10 +80,10 @@
               :columns="usageColumns"
               :loading="loading"
             >
-              <template #occurredAt-data="{ row }">
+              <template #occurredAt-cell="{ row }">
                 {{ formatDate(row.occurredAt) }}
               </template>
-              <template #metadata-data="{ row }">
+              <template #metadata-cell="{ row }">
                 <UButton
                   size="xs"
                   variant="soft"
@@ -131,6 +131,7 @@ import type {
   ToolGrantRevocation,
   ToolGrantUsageEvent,
 } from "~/types/security";
+import { useNormalizedColumns } from "~/utils/table";
 
 const runtimeConfig = useRuntimeConfig();
 const toast = useToast();
@@ -142,22 +143,22 @@ const usageEvents = ref<ToolGrantUsageEvent[]>([]);
 const metadataOpen = ref(false);
 const metadataJson = ref("{}");
 
-const revocationColumns = [
+const revocationColumns = useNormalizedColumns([
   { key: "toolGrantId", label: "ToolGrant ID" },
   { key: "revokedBy", label: "Revoked By" },
   { key: "reason", label: "Reason" },
   { key: "revokedAt", label: "Revoked At" },
   { key: "ttlExpiry", label: "TTL Expiry" },
-];
+]);
 
-const usageColumns = [
+const usageColumns = useNormalizedColumns([
   { key: "toolGrantId", label: "ToolGrant ID" },
   { key: "eventType", label: "Event" },
   { key: "capability", label: "Capability" },
   { key: "agentId", label: "Agent" },
   { key: "occurredAt", label: "Timestamp" },
   { key: "metadata", label: "Metadata" },
-];
+]);
 
 const formatDate = (value?: string) =>
   value ? new Date(value).toLocaleString() : "";

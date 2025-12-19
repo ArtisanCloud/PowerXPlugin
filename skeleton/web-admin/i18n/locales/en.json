@@ -487,6 +487,34 @@
   "termsOfService": "Terms of Service",
   "privacyPolicy": "Privacy Policy",
   "capabilities": {
+    "list": {
+      "title": "Capability catalog",
+      "description": "Review registered atomic capabilities and composite workflows. Grouped modules keep large catalogs scannable.",
+      "refresh": "Refresh",
+      "createButton": "Register capability",
+      "tableTitle": "Registered capabilities",
+      "tableHint": "Includes capability ID, type, execution mode and tags. After new submissions the list refreshes automatically.",
+      "tableEmpty": "No capability yet",
+      "column": {
+        "capability": "Capability",
+        "kind": "Type",
+        "execution": "Execution",
+        "tags": "Tags",
+        "checksum": "Checksum"
+      },
+      "kind": {
+        "workflow": "Workflow",
+        "capability": "Capability",
+        "tool": "Tool",
+        "default": "Capability"
+      },
+      "versionLabel": "Version {version}",
+      "noTags": "No tags",
+      "empty": "No capability registered yet. Click “Register capability” to add the first entry.",
+      "toast": {
+        "loadFailed": "Failed to load capability catalog"
+      }
+    },
     "form": {
       "title": "Capability Registration",
       "description": "Describe the capability, protocols, and samples so reviewers and PowerX workflows can reuse it instantly.",

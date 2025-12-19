@@ -585,6 +585,11 @@
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",
   "capabilities": {
+    "catalogSync": {
+      "title": "能力目录未刷新？",
+      "desc": "修改 skeleton/plugin.yaml 或 contracts/capabilities/*.yaml 后，请在仓库根目录执行 catalog 命令以生成最新的 capabilities/catalog.json。",
+      "command": "npm --prefix scripts/capabilities run catalog -- --manifest \"$(pwd)/skeleton/plugin.yaml\""
+    },
     "list": {
       "title": "能力目录",
       "description": "查看插件当前注册的原子能力与复合任务，快速发起新能力的建模与审批。",
@@ -595,9 +600,16 @@
       "tableEmpty": "暂无能力",
       "column": {
         "capability": "能力",
+        "kind": "类型",
         "execution": "执行模式",
         "tags": "标签",
         "checksum": "版本校验"
+      },
+      "kind": {
+        "workflow": "Workflow（流程）",
+        "capability": "原子能力",
+        "tool": "工具",
+        "default": "能力"
       },
       "versionLabel": "版本 {version}",
       "noTags": "未设置标签",
@@ -718,6 +730,7 @@
         "channels": "通道配置",
         "enabled": "通道已启用",
         "channelHint": "启用后将出现在宿主的 API/Workflow/Agent 列表中",
+        "descriptorNote": "协议细节来自 {path} 的 metadata.protocols.{key}，如需调整请编辑 YAML",
         "auth": "鉴权与凭证",
         "rateLimit": "限流与熔断",
         "quotas": "租户授权与配额",
@@ -745,7 +758,13 @@
         "tenantName": "租户名称",
         "quota": "额度",
         "status": "状态",
-        "notes": "备注"
+        "notes": "备注",
+        "method": "方法",
+        "path": "路径",
+        "service": "Service",
+        "template": "Workflow 模板",
+        "channelPath": "通道文件",
+        "toolId": "工具 ID"
       },
       "actions": {
         "load": "加载配置",
@@ -839,6 +858,7 @@
         "empty": "暂无计划，先创建一条生命周期计划即可在此处管理。",
         "planMeta": "由 {author} 于 {time} 创建"
       },
+      "modalHint": "填写计划后可提交执行，必要时可以暂停或回滚。",
       "units": {
         "hours": "小时"
       },

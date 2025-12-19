@@ -25,6 +25,20 @@
       </div>
     </section>
 
+    <UAlert variant="soft" color="neutral" class="bg-white/5 dark:bg-white/5">
+      <template #title>
+        {{ `{{ $t("capabilities.catalogSync.title") }}` }}
+      </template>
+      <template #description>
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+          {{ `{{ $t("capabilities.catalogSync.desc") }}` }}
+        </p>
+        <code class="mt-1 inline-flex select-all rounded bg-gray-900/80 px-2 py-1 font-mono text-xs text-white">
+          {{ `{{ catalogCommand }}` }}
+        </code>
+      </template>
+    </UAlert>
+
     <UCard>
       <template #header>
         <div class="flex flex-col gap-1">
@@ -40,49 +54,114 @@
         {{ `{{ $t("common.loading") }}` }}
       </div>
       <div v-else>
-        <UTable
-          v-if="catalogRows.length"
-          :rows="catalogRows"
-          :columns="tableColumns"
-          :ui="{ td: { base: 'align-top' } }"
-        >
-          <template #capability_id-cell="{ row }">
-            <div class="flex flex-col">
-              <span class="font-semibold text-gray-900 dark:text-white">
-                {{ `{{ row.capability_id }}` }}
-              </span>
-              <small class="text-xs text-gray-500 dark:text-gray-400">
-                {{ `{{ $t("capabilities.list.versionLabel", { version: row.version }) }}` }}
-              </small>
+        <div v-if="groupedCatalog.length" class="space-y-4">
+          <section
+            v-for="group in groupedCatalog"
+            :key="group.module"
+            class="rounded-2xl border border-white/5 bg-[#0f192a]/80 px-1 py-1 shadow-inner shadow-black/40 transition"
+          >
+            <button
+              type="button"
+              class="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left transition hover:border-primary-500/40 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+              @click="toggleModule(group.module)"
+            >
+              <div>
+                <p class="text-lg font-semibold text-white">
+                  {{ `{{ group.displayName }}` }}
+                </p>
+                <p class="text-xs text-[#93c5fd]">
+                  {{ `{{ group.module }}` }} · {{ `{{ group.items.length }}` }} 个能力
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <UBadge
+                  v-for="badge in group.kindBadges"
+                  :key="badge.label"
+                  :label="badge.label"
+                  :color="badge.color"
+                  variant="soft"
+                  class="bg-white/10 text-white backdrop-blur"
+                />
+                <UIcon
+                  :name="isModuleExpanded(group.module) ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+                  class="h-5 w-5 text-white/70"
+                />
+              </div>
+            </button>
+            <div v-if="isModuleExpanded(group.module)" class="border-t border-white/5 bg-black/10">
+              <UTable
+                :data="group.items"
+                :columns="tableColumns"
+                :ui="{ td: { base: 'align-top' } }"
+              >
+                <template #capability_id-cell="{ row }">
+                  <div class="flex flex-col">
+                    <span class="font-semibold text-gray-900 dark:text-white">
+                      {{ `{{ row.original.capability_id }}` }}
+                    </span>
+                    <small class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ `{{ $t("capabilities.list.versionLabel", { version: row.original.version }) }}` }}
+                    </small>
+                  </div>
+                </template>
+                <template #kind-cell="{ row }">
+                  <UBadge
+                    :label="formatKindLabel(row.original.kind)"
+                    :color="kindColor(row.original.kind)"
+                    variant="soft"
+                  />
+                </template>
+                <template #execution-cell="{ row }">
+                  <UBadge
+                    :label="row.original.execution.mode.toUpperCase()"
+                    :color="row.original.execution.mode === 'async' ? 'primary' : 'gray'"
+                    variant="soft"
+                  />
+                  <p v-if="row.original.execution.callback_url" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ `{{ row.original.execution.callback_url }}` }}
+                  </p>
+                </template>
+                <template #tags-cell="{ row }">
+                  <div class="flex flex-wrap gap-1.5">
+                    <UBadge
+                      v-for="tag in row.original.tags"
+                      :key="`${row.original.capability_id}-${tag}`"
+                      :label="tag"
+                      variant="subtle"
+                    />
+                    <span v-if="!row.original.tags.length" class="text-xs text-gray-400">
+                      {{ `{{ $t("capabilities.list.noTags") }}` }}
+                    </span>
+                  </div>
+                </template>
+                <template #exposure-cell="{ row }">
+                  <div class="flex flex-col gap-1">
+                    <UBadge
+                      :label="exposureBadge(row.original.syncStatus).label"
+                      :color="exposureBadge(row.original.syncStatus).color"
+                      variant="soft"
+                    />
+                    <span v-if="row.original.updatedAt" class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ `{{ $t("capabilities.exposure.list.updatedAt", { time: row.original.updatedAt }) }}` }}
+                    </span>
+                  </div>
+                </template>
+                <template #checksum-cell="{ row }">
+                  <code class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ row.original.checksum }}` }}</code>
+                </template>
+                <template #actions-cell="{ row }">
+                  <UButton
+                    size="xs"
+                    icon="i-heroicons-adjustments-horizontal"
+                    @click="openExposureForm(row.original.capability_id)"
+                  >
+                    {{ `{{ $t("capabilities.exposure.list.actions.configure") }}` }}
+                  </UButton>
+                </template>
+              </UTable>
             </div>
-          </template>
-          <template #execution-cell="{ row }">
-            <UBadge
-              :label="row.execution.mode.toUpperCase()"
-              :color="row.execution.mode === 'async' ? 'primary' : 'gray'"
-              variant="soft"
-            />
-            <p v-if="row.execution.callback_url" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ `{{ row.execution.callback_url }}` }}
-            </p>
-          </template>
-          <template #tags-cell="{ row }">
-            <div class="flex flex-wrap gap-1.5">
-              <UBadge
-                v-for="tag in row.tags"
-                :key="`${row.capability_id}-${tag}`"
-                :label="tag"
-                variant="subtle"
-              />
-              <span v-if="!row.tags.length" class="text-xs text-gray-400">
-                {{ `{{ $t("capabilities.list.noTags") }}` }}
-              </span>
-            </div>
-          </template>
-          <template #checksum-cell="{ row }">
-            <code class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ row.checksum }}` }}</code>
-          </template>
-        </UTable>
+          </section>
+        </div>
         <div v-else class="py-16 text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ `{{ $t("capabilities.list.empty") }}` }}
@@ -430,13 +509,251 @@
   </div>
 </template>
     </UModal>
+
+    <UModal
+      v-model:open="exposureFormOpen"
+      prevent-close
+      :ui="{ content: 'max-w-6xl w-[95vw] mx-auto' }"
+    >
+      <template #body>
+        <div class="space-y-6">
+          <div class="flex flex-col gap-2">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                  {{ `{{ $t("capabilities.exposure.title") }}` }}
+                </h2>
+                <p class="text-gray-600 dark:text-gray-300">
+                  {{ `{{ $t("capabilities.exposure.description") }}` }}
+                </p>
+              </div>
+              <UButton icon="i-heroicons-x-mark" variant="ghost" color="neutral" @click="closeExposureForm" />
+            </div>
+            <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+              <div class="inline-flex items-center gap-1">
+                <UIcon name="i-heroicons-cube" />
+                <span class="font-medium">{{ `{{ $t("capabilities.exposure.capability") }}` }}:</span>
+                <code class="rounded bg-gray-100 px-2 py-0.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+                  {{ `{{ exposureForm.capability_id || "—" }}` }}
+                </code>
+              </div>
+              <div class="inline-flex items-center gap-2">
+                <UBadge :label="exposureModalStatus.label" :color="exposureModalStatus.color" variant="soft" />
+                <span class="text-xs text-gray-500">
+                  {{ `{{ $t("capabilities.exposure.updatedAt", { time: exposurePackageInfo?.updated_at || "—" }) }}` }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <UCard :ui="{ body: 'space-y-8' }">
+            <section class="space-y-4">
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField :label="$t('capabilities.exposure.fields.capabilityId')" required class="md:col-span-2">
+                  <UInput v-model="exposureForm.capability_id" readonly />
+                </UFormField>
+                <UFormField :label="$t('capabilities.exposure.fields.docsVersion')">
+                  <UInput v-model="exposureForm.docs_version" placeholder="1.0.0" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.exposure.fields.sdkVersion')">
+                  <UInput v-model="exposureForm.sdk_version" placeholder="1.0.0" />
+                </UFormField>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <UButton variant="ghost" color="neutral" :loading="exposureLoading" @click="handleExposureLoad">
+                  {{ `{{ $t("capabilities.exposure.actions.load") }}` }}
+                </UButton>
+                <UButton variant="ghost" color="neutral" @click="resetExposureChannels">
+                  {{ `{{ $t("capabilities.exposure.actions.resetChannels") }}` }}
+                </UButton>
+                <UButton color="primary" :disabled="!exposureForm.capability_id" :loading="exposureSaving" @click="handleExposureSave">
+                  {{ `{{ $t("common.save") }}` }}
+                </UButton>
+              </div>
+            </section>
+
+            <section class="space-y-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold">
+                  {{ `{{ $t("capabilities.exposure.sections.channels") }}` }}
+                </h2>
+                <span class="text-sm text-gray-500">
+                  {{ `{{ selectedExposureChannels.length }}` }}/{{ `{{ exposureForm.channels.length }}` }}
+                  {{ `{{ $t("capabilities.exposure.sections.enabled") }}` }}
+                </span>
+              </div>
+              <div class="grid gap-4 lg:grid-cols-2">
+                <div
+                  v-for="channel in exposureForm.channels"
+                  :key="channel.type"
+                  class="border rounded-lg border-gray-200 dark:border-gray-800 p-4 space-y-3"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex flex-col">
+                      <span class="font-semibold">{{ `{{ channel.name }}` }}</span>
+                      <span class="text-xs text-gray-500">
+                        <template v-if="channel.definitionKey && selectedCapability">
+                          {{ `{{ $t("capabilities.exposure.sections.descriptorNote", {
+                            path: selectedCapability.descriptor,
+                            key: channel.definitionKey,
+                          }) }}` }}
+                        </template>
+                        <template v-else>
+                          {{ `{{ $t("capabilities.exposure.sections.channelHint") }}` }}
+                        </template>
+                      </span>
+                    </div>
+                    <USwitch v-model="channel.enabled" color="primary" />
+                  </div>
+                  <div class="space-y-3">
+                    <div
+                      v-if="channel.definition"
+                      class="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-white/5 p-3 text-xs space-y-1"
+                    >
+                      <div
+                        v-for="entry in channelDefinitionEntries(channel)"
+                        :key="`${channel.type}-${entry.label}`"
+                        class="flex items-start justify-between gap-3"
+                      >
+                        <span class="text-gray-500">{{ `{{ entry.label }}` }}</span>
+                        <span class="font-semibold text-gray-200 dark:text-white break-all">{{ `{{ entry.value }}` }}</span>
+                      </div>
+                    </div>
+                    <div v-else class="text-xs text-gray-500">
+                      {{ `{{ $t("capabilities.exposure.sections.channelHint") }}` }}
+                    </div>
+                    <UFormField :label="$t('capabilities.exposure.fields.scopes')">
+                      <UInput
+                        v-model="channel.scopesText"
+                        :placeholder="$t('capabilities.exposure.fields.scopePlaceholder')"
+                        @change="syncExposureScopeList(channel)"
+                      />
+                    </UFormField>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="grid gap-4 md:grid-cols-2">
+              <div class="space-y-3">
+                <h2 class="text-lg font-semibold">
+                  {{ `{{ $t("capabilities.exposure.sections.auth") }}` }}
+                </h2>
+                <UFormField :label="$t('capabilities.exposure.fields.strategy')">
+                  <USelectMenu v-model="exposureForm.auth.strategy" :options="exposureTemplate?.auth_strategies || []" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.exposure.fields.audience')">
+                  <UInput v-model="exposureForm.auth.audience" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.exposure.fields.scopeList')">
+                  <UInput
+                    v-model="exposureAuthScopes"
+                    :placeholder="$t('capabilities.exposure.fields.scopePlaceholder')"
+                    @change="syncExposureAuthScopes"
+                  />
+                </UFormField>
+              </div>
+              <div class="space-y-3">
+                <h2 class="text-lg font-semibold">
+                  {{ `{{ $t("capabilities.exposure.sections.rateLimit") }}` }}
+                </h2>
+                <UFormField :label="$t('capabilities.exposure.fields.rpm')">
+                  <UInput v-model.number="exposureForm.rate_limit.requests_per_minute" type="number" min="1" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.exposure.fields.burst')">
+                  <UInput v-model.number="exposureForm.rate_limit.burst" type="number" min="1" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.exposure.fields.concurrency')">
+                  <UInput v-model.number="exposureForm.rate_limit.concurrency" type="number" min="1" />
+                </UFormField>
+              </div>
+            </section>
+
+            <section class="space-y-4">
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold">
+                  {{ `{{ $t("capabilities.exposure.sections.quotas") }}` }}
+                </h2>
+                <div class="text-sm text-gray-500">
+                  {{ `{{ $t("capabilities.exposure.sections.tenantHint") }}` }}
+                </div>
+              </div>
+              <div class="overflow-x-auto border rounded-lg border-gray-200 dark:border-gray-800">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
+                  <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                      <th class="px-4 py-2 text-left font-semibold">{{ `{{ $t("capabilities.exposure.fields.tenant") }}` }}</th>
+                      <th class="px-4 py-2 text-left font-semibold">{{ `{{ $t("capabilities.exposure.fields.quota") }}` }}</th>
+                      <th class="px-4 py-2 text-left font-semibold">{{ `{{ $t("capabilities.exposure.fields.status") }}` }}</th>
+                      <th class="px-4 py-2 text-left font-semibold w-48">{{ `{{ $t("capabilities.exposure.fields.notes") }}` }}</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tr v-if="exposureQuotasList.length === 0">
+                      <td colspan="4" class="px-4 py-4 text-center text-gray-500">
+                        {{ `{{ $t("capabilities.exposure.sections.noQuotas") }}` }}
+                      </td>
+                    </tr>
+                    <tr v-for="quota in exposureQuotasList" :key="quota.tenant_id">
+                      <td class="px-4 py-2">
+                        <div class="font-medium">{{ `{{ quota.tenant_id }}` }}</div>
+                        <div class="text-xs text-gray-500">{{ `{{ quota.tenant_name }}` }}</div>
+                      </td>
+                      <td class="px-4 py-2">
+                        {{ `{{ quota.used || 0 }}` }} / {{ `{{ quota.quota }}` }}
+                      </td>
+                      <td class="px-4 py-2">
+                        <UBadge :label="quota.status || 'active'" color="primary" variant="soft" />
+                      </td>
+                      <td class="px-4 py-2 break-words">
+                        <span class="text-xs text-gray-500">{{ `{{ quota.notes }}` }}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="border rounded-lg border-gray-200 dark:border-gray-800 p-4 space-y-3">
+                <div class="grid gap-3 md:grid-cols-2">
+                  <UFormField :label="$t('capabilities.exposure.fields.tenantId')" required>
+                    <UInput v-model="newExposureQuota.tenant_id" />
+                  </UFormField>
+                  <UFormField :label="$t('capabilities.exposure.fields.tenantName')">
+                    <UInput v-model="newExposureQuota.tenant_name" />
+                  </UFormField>
+                  <UFormField :label="$t('capabilities.exposure.fields.quota')" required>
+                    <UInput v-model.number="newExposureQuota.quota" type="number" min="0" />
+                  </UFormField>
+                  <UFormField :label="$t('capabilities.exposure.fields.status')">
+                    <USelectMenu v-model="newExposureQuota.status" :options="statusOptions" />
+                  </UFormField>
+                  <UFormField class="md:col-span-2" :label="$t('capabilities.exposure.fields.notes')">
+                    <UInput v-model="newExposureQuota.notes" />
+                  </UFormField>
+                </div>
+                <div class="flex justify-end">
+                  <UButton
+                    color="neutral"
+                    variant="soft"
+                    :disabled="!exposureForm.capability_id"
+                    :loading="exposureQuotaSaving"
+                    @click="handleExposureQuotaSave"
+                  >
+                    {{ `{{ $t("capabilities.exposure.actions.addTenant") }}` }}
+                  </UButton>
+                </div>
+              </div>
+            </section>
+          </UCard>
+        </div>
+      </template>
+    </UModal>
   </UContainer>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
-import { useI18n, useToast } from "#imports";
+import { useI18n, useRoute, useRouter, useToast } from "#imports";
 import {
   useCapabilityRegistryApi,
   type CapabilityTemplate,
@@ -445,20 +762,36 @@ import {
   useCapabilityCatalogApi,
   type CapabilityCatalogEntry,
 } from "~/composables/api";
+import {
+  useCapabilityExposureApi,
+  type ExposureTemplate,
+  type ExposureChannel,
+  type ExposurePackage,
+  type TenantQuota,
+} from "~/composables/api/useCapabilityExposure";
 import { useNormalizedColumns } from "~/utils/table";
 
 definePageMeta({
-  alias: ["/capabilities/register"],
+  alias: ["/capabilities/register", "/capabilities/exposure"],
 });
 
 const { t } = useI18n();
 const toast = useToast();
+const route = useRoute();
+const router = useRouter();
 const {
   fetchTemplate,
   validateDraft,
   submitDraft,
 } = useCapabilityRegistryApi();
 const { list: listCatalog } = useCapabilityCatalogApi();
+const {
+  getTemplate: getExposureTemplate,
+  getPackage: fetchExposurePackage,
+  upsertPackage: saveExposurePackage,
+  listQuotas: fetchExposureQuotas,
+  upsertQuota: saveExposureQuota,
+} = useCapabilityExposureApi();
 
 const formOpen = ref(false);
 const loadingTemplate = ref(true);
@@ -473,6 +806,124 @@ const autoValidate = ref(false);
 const draftStorageKey = "powerxplugin::capability-register-draft";
 const catalogLoading = ref(false);
 const catalog = ref<CapabilityCatalogEntry[]>([]);
+const catalogCommand = computed(() => t("capabilities.catalogSync.command"));
+type CatalogRow = {
+  capability_id: string;
+  version: string;
+  descriptor: string;
+  tags: string[];
+  checksum: string;
+  execution: CapabilityCatalogEntry["execution"];
+  module: string;
+  kind: string;
+  syncStatus: string;
+  updatedAt?: string;
+};
+const catalogRows = ref<CatalogRow[]>([]);
+type ModuleGroup = {
+  module: string;
+  displayName: string;
+  items: CatalogRow[];
+  kindBadges: { label: string; color: string }[];
+};
+type ChannelFormEntry = ExposureChannel & {
+  scopesText?: string;
+  definition?: Record<string, any> | null;
+  definitionKey?: string;
+};
+type ExposureMetaState = { status: string; updated_at?: string };
+type StatusBadge = { label: string; color: string };
+const exposureFormOpen = ref(false);
+const exposureTemplate = ref<ExposureTemplate | null>(null);
+const exposurePackageInfo = ref<ExposurePackage | null>(null);
+const exposureLoading = ref(false);
+const exposureSaving = ref(false);
+const exposureQuotaSaving = ref(false);
+const exposureForm = reactive({
+  capability_id: "",
+  docs_version: "1.0.0",
+  sdk_version: "1.0.0",
+  auth: {
+    strategy: "powerx_session",
+    audience: "",
+    scopes: [] as string[],
+  },
+  rate_limit: {
+    requests_per_minute: 600,
+    burst: 120,
+    concurrency: 10,
+  },
+  channels: [] as ChannelFormEntry[],
+});
+const exposureQuotas = ref<TenantQuota[]>([]);
+const newExposureQuota = reactive({
+  tenant_id: "",
+  tenant_name: "",
+  quota: 1000,
+  status: "active",
+  notes: "",
+});
+const exposureAuthScopes = ref("");
+const exposureMeta = ref<Record<string, ExposureMetaState>>({});
+const statusOptions = ["active", "suspended"];
+const groupedCatalog = computed<ModuleGroup[]>(() => {
+  const groups = new Map<string, CatalogRow[]>();
+  catalogRows.value.forEach((row) => {
+    const moduleKey = row.module || deriveModuleFromId(row.capability_id);
+    if (!groups.has(moduleKey)) {
+      groups.set(moduleKey, []);
+    }
+    groups.get(moduleKey)!.push(row);
+  });
+  return Array.from(groups.entries())
+    .map(([module, items]) => {
+      const stats = items.reduce<Record<string, number>>((acc, item) => {
+        const key = normalizeKind(item.kind);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      return {
+        module,
+        displayName: formatModuleDisplay(module),
+        items: items.sort((a, b) => a.capability_id.localeCompare(b.capability_id)),
+        kindBadges: Object.entries(stats).map(([kind, count]) => ({
+          label: `${formatKindLabel(kind)} · ${count}`,
+          color: kindColor(kind),
+        })),
+      };
+    })
+    .sort((a, b) => a.module.localeCompare(b.module));
+});
+const selectedExposureChannels = computed(() =>
+  exposureForm.channels.filter((channel) => channel.enabled),
+);
+const exposureQuotasList = computed(() => exposureQuotas.value ?? []);
+const statusPresets = computed<Record<string, StatusBadge>>(() => ({
+  unconfigured: {
+    label: t("capabilities.exposure.list.status.unconfigured"),
+    color: "gray",
+  },
+  synced: {
+    label: t("capabilities.exposure.list.status.synced"),
+    color: "primary",
+  },
+  pending: {
+    label: t("capabilities.exposure.list.status.pending"),
+    color: "amber",
+  },
+  failed: {
+    label: t("capabilities.exposure.list.status.failed"),
+    color: "rose",
+  },
+}));
+const exposureModalStatus = computed(() =>
+  exposureBadge(exposurePackageInfo.value?.sync_status),
+);
+const selectedCapability = computed(() =>
+  catalog.value.find((entry) => entry.id === exposureForm.capability_id) ||
+  null,
+);
+const expandedModules = ref<Record<string, boolean>>({});
 
 const form = reactive(createDefaultForm());
 
@@ -525,33 +976,112 @@ const tagsText = computed({
 
 const tableColumns = useNormalizedColumns([
   { key: "capability_id", label: t("capabilities.list.column.capability") },
+  { key: "kind", label: t("capabilities.list.column.kind") },
   { key: "execution", label: t("capabilities.list.column.execution") },
+  { key: "exposure", label: t("capabilities.exposure.list.columns.exposure") },
   { key: "tags", label: t("capabilities.list.column.tags") },
   { key: "checksum", label: t("capabilities.list.column.checksum") },
+  { key: "actions", label: "" },
 ]);
 
-const catalogRows = computed(() =>
-  (catalog.value || []).map((entry) => ({
-    capability_id: entry.id,
-    version: entry.version,
-    descriptor: entry.descriptor,
-    tags: entry.tags || [],
-    checksum: entry.checksum,
-    execution: entry.execution || { mode: "sync" },
-  })),
-);
-
 onMounted(async () => {
-  await Promise.all([loadTemplate(), loadCatalog()]);
+  await Promise.all([loadTemplate(), loadCatalog(), hydrateExposureTemplate()]);
   hydrateDraft();
   watchFormForPersist();
+  const capabilityFromQuery = route.query.capability as string | undefined;
+  if (capabilityFromQuery) {
+    await openExposureForm(capabilityFromQuery);
+  }
 });
+
+watch(
+  () => catalog.value,
+  () => syncCatalogRows(),
+  { deep: true },
+);
+
+watch(
+  () => exposureMeta.value,
+  () => syncCatalogRows(),
+  { deep: true },
+);
+
+watch(
+  () => route.query.capability,
+  async (capability) => {
+    if (typeof capability === "string" && capability) {
+      if (exposureForm.capability_id !== capability || !exposureFormOpen.value) {
+        await openExposureForm(capability);
+      }
+    }
+  },
+);
 
 watch(formOpen, (isOpen) => {
   if (!isOpen) {
     currentStep.value = 0;
   }
 });
+
+watch(
+  groupedCatalog,
+  (groups) => {
+    groups.forEach((group) => {
+      if (!(group.module in expandedModules.value)) {
+        expandedModules.value[group.module] = true;
+      }
+    });
+  },
+  { immediate: true },
+);
+
+function isModuleExpanded(module: string) {
+  const state = expandedModules.value[module];
+  return state === undefined ? true : state;
+}
+
+function toggleModule(module: string) {
+  expandedModules.value[module] = !isModuleExpanded(module);
+}
+
+function deriveModuleFromId(id: string) {
+  const parts = id.split(".");
+  if (parts.length <= 1) {
+    return id;
+  }
+  return parts.slice(0, -1).join(".");
+}
+
+function formatModuleDisplay(module: string) {
+  const parts = module.split(".");
+  if (parts.length <= 1) {
+    return module;
+  }
+  return parts.slice(-1)[0];
+}
+
+function normalizeKind(kind?: string) {
+  return kind?.trim() || "Capability";
+}
+
+function formatKindLabel(kind?: string) {
+  const normalized = normalizeKind(kind).toLowerCase();
+  if (normalized === "workflow" || normalized === "tool") {
+    return t("capabilities.list.kind.workflow");
+  }
+  if (normalized === "capability") {
+    return t("capabilities.list.kind.capability");
+  }
+  return t("capabilities.list.kind.default");
+}
+
+function kindColor(kind?: string) {
+  const normalized = normalizeKind(kind).toLowerCase();
+  if (normalized === "workflow" || normalized === "tool") {
+    return "primary";
+  }
+  return "gray";
+}
 
 async function loadTemplate() {
   loadingTemplate.value = true;
@@ -575,7 +1105,9 @@ async function loadTemplate() {
 async function loadCatalog() {
   catalogLoading.value = true;
   try {
-    catalog.value = await listCatalog();
+    const entries = await listCatalog();
+    catalog.value = entries;
+    syncCatalogRows();
   } catch (error) {
     console.error("[capabilities] failed to load catalog", error);
     toast.add({
@@ -586,6 +1118,31 @@ async function loadCatalog() {
   } finally {
     catalogLoading.value = false;
   }
+}
+
+function syncCatalogRows() {
+  catalogRows.value = (catalog.value || []).map((entry) => {
+    const meta = exposureMeta.value[entry.id] || { status: "unconfigured" };
+    return {
+      capability_id: entry.id,
+      version: entry.version,
+      descriptor: entry.descriptor,
+      tags: entry.tags || [],
+      checksum: entry.checksum,
+      execution: normalizeExecution(entry.execution),
+      module: entry.module || deriveModuleFromId(entry.id),
+      kind: normalizeKind(entry.kind),
+      syncStatus: meta.status,
+      updatedAt: meta.updated_at,
+    };
+  });
+}
+
+function normalizeExecution(execution?: CapabilityCatalogEntry["execution"]) {
+  if (!execution || !execution.mode) {
+    return { mode: "sync" };
+  }
+  return execution;
 }
 
 function openForm() {
@@ -901,5 +1458,406 @@ function extractErrorMessage(error: any) {
     error?.message ||
     t("capabilities.form.toast.genericError")
   );
+}
+
+async function hydrateExposureTemplate() {
+  try {
+    exposureTemplate.value = await getExposureTemplate();
+    if (exposureTemplate.value?.default_rate) {
+      exposureForm.rate_limit = { ...exposureTemplate.value.default_rate };
+    }
+    if (!exposureForm.channels.length) {
+      exposureForm.channels = buildChannelEntriesForCapability(
+        selectedCapability.value,
+      );
+    }
+  } catch (error) {
+    console.error("[capabilities] failed to load exposure template", error);
+    toast.add({
+      title: t("capabilities.exposure.toast.templateFail"),
+      color: "rose",
+    });
+  }
+}
+
+function buildTemplateChannelEntries(types: string[]): ChannelFormEntry[] {
+  return types.map((type) => ({
+    type,
+    name: formatChannelLabel(type),
+    method: type === "rest" ? "POST" : "",
+    path: "",
+    target: "",
+    description: "",
+    enabled: false,
+    scopes: [],
+    scopesText: "",
+    definition: null,
+  }));
+}
+
+function buildChannelEntriesForCapability(capability?: CapabilityCatalogEntry | null) {
+  const protocols = (capability?.protocols || {}) as Record<string, any>;
+  const entries: ChannelFormEntry[] = [];
+  const pushChannel = (
+    type: string,
+    definitionKey?: string,
+    definition?: Record<string, any> | null,
+    overrides?: Partial<ChannelFormEntry>,
+  ) => {
+    entries.push({
+      type,
+      name: overrides?.name || formatChannelLabel(type),
+      method: overrides?.method || definition?.method || "",
+      path: overrides?.path || definition?.path || "",
+      target: overrides?.target || "",
+      description: overrides?.description || definition?.description || "",
+      enabled: false,
+      scopes: [],
+      scopesText: "",
+      definition: definition || null,
+      definitionKey,
+    });
+  };
+
+  const ensureRecord = (value: any): Record<string, any> | null => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as Record<string, any>;
+    }
+    return null;
+  };
+
+  const rest = ensureRecord(protocols.rest);
+  if (rest) {
+    pushChannel("rest", "rest", rest, {
+      method: rest.method || "POST",
+      path: rest.path || "",
+    });
+  }
+  const grpc = ensureRecord(protocols.grpc);
+  if (grpc) {
+    pushChannel("grpc", "grpc", grpc, {
+      target: [grpc.service, grpc.method].filter(Boolean).join("/"),
+    });
+  }
+  const workflow = ensureRecord(protocols.workflow);
+  if (workflow) {
+    pushChannel("workflow", "workflow", workflow, {
+      target: workflow.template || "",
+    });
+  }
+  const webhook = ensureRecord(protocols.webhook);
+  if (webhook) {
+    pushChannel("webhook", "webhook", webhook);
+  }
+  const graphql = ensureRecord(protocols.graphql);
+  if (graphql) {
+    pushChannel("graphql", "graphql", graphql);
+  }
+  const agentStream = ensureRecord(protocols.agent_stream);
+  if (agentStream) {
+    pushChannel("agent_sse", "agent_stream", agentStream, {
+      target: agentStream.channel || "",
+    });
+  }
+  const agentTool = ensureRecord(protocols.agent_tool);
+  if (agentTool) {
+    pushChannel("agent", "agent_tool", agentTool, {
+      target: agentTool.endpoint || "",
+    });
+  }
+
+  if (entries.length === 0) {
+    return buildTemplateChannelEntries(exposureTemplate.value?.channel_types || []);
+  }
+  return entries;
+}
+
+function resetExposureChannels() {
+  exposureForm.channels = buildChannelEntriesForCapability(
+    selectedCapability.value,
+  );
+}
+
+function formatChannelLabel(type: string) {
+  const map: Record<string, string> = {
+    rest: "REST",
+    grpc: "gRPC",
+    graphql: "GraphQL",
+    webhook: "Webhook",
+    workflow: "Workflow",
+    agent: "Agent",
+    agent_sse: "Agent SSE",
+    sdk: "SDK",
+  };
+  if (map[type]) {
+    return map[type];
+  }
+  return type.replace(/_/g, " ").toUpperCase();
+}
+
+function channelDefinitionEntries(channel: ChannelFormEntry) {
+  const definition = channel.definition || {};
+  const entries: Array<{ label: string; value: string }> = [];
+  const asText = (value: any) => (value === undefined || value === null ? "—" : String(value));
+
+  switch (channel.definitionKey) {
+    case "rest":
+      entries.push(
+        { label: t("capabilities.exposure.fields.method"), value: asText(definition.method) },
+        { label: t("capabilities.exposure.fields.path"), value: asText(definition.path) },
+      );
+      if (definition.description) {
+        entries.push({ label: t("capabilities.exposure.fields.description"), value: asText(definition.description) });
+      }
+      break;
+    case "grpc":
+      entries.push(
+        { label: t("capabilities.exposure.fields.service"), value: asText(definition.service) },
+        { label: t("capabilities.exposure.fields.method"), value: asText(definition.method) },
+      );
+      break;
+    case "workflow":
+      entries.push({ label: t("capabilities.exposure.fields.template"), value: asText(definition.template) });
+      break;
+    case "agent_stream":
+      entries.push({ label: t("capabilities.exposure.fields.channelPath"), value: asText(definition.channel) });
+      break;
+    case "agent_tool":
+      entries.push(
+        { label: t("capabilities.exposure.fields.toolId"), value: asText(definition.id) },
+        { label: t("capabilities.exposure.fields.scopeList"), value: asText(definition.scope) },
+        { label: t("capabilities.exposure.fields.target"), value: asText(definition.endpoint) },
+      );
+      break;
+    default:
+      break;
+  }
+
+  if (!entries.length) {
+    Object.entries(definition).forEach(([key, value]) => {
+      entries.push({ label: key, value: asText(value) });
+    });
+  }
+  return entries;
+}
+
+async function openExposureForm(capabilityId: string) {
+  if (!capabilityId) {
+    toast.add({
+      title: t("capabilities.exposure.toast.capabilityRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  exposureForm.capability_id = capabilityId;
+  exposureFormOpen.value = true;
+  resetExposureChannels();
+  await handleExposureLoad();
+}
+
+function closeExposureForm() {
+  exposureFormOpen.value = false;
+  const nextQuery = { ...route.query };
+  if (Reflect.has(nextQuery, "capability")) {
+    delete (nextQuery as Record<string, any>).capability;
+    router.replace({ query: nextQuery });
+  }
+}
+
+function setExposureMeta(capabilityId: string, status?: string, updatedAt?: string) {
+  if (!capabilityId) return;
+  exposureMeta.value = {
+    ...exposureMeta.value,
+    [capabilityId]: {
+      status: status || "unconfigured",
+      updated_at: updatedAt,
+    },
+  };
+}
+
+function exposureBadge(status?: string): StatusBadge {
+  const presets = statusPresets.value;
+  if (status && presets[status]) {
+    return presets[status];
+  }
+  if (status && !presets[status]) {
+    return { label: status, color: "gray" };
+  }
+  return presets.unconfigured;
+}
+
+async function handleExposureLoad() {
+  if (!exposureForm.capability_id) {
+    toast.add({
+      title: t("capabilities.exposure.toast.capabilityRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  exposureLoading.value = true;
+  try {
+    const data = await fetchExposurePackage(exposureForm.capability_id);
+    const pkg = data?.package || null;
+    exposurePackageInfo.value = pkg;
+    if (pkg) {
+      exposureForm.docs_version = pkg.docs_version || "1.0.0";
+      exposureForm.sdk_version = pkg.sdk_version || "1.0.0";
+      exposureForm.auth = {
+        strategy: pkg.auth?.strategy || "powerx_session",
+        audience: pkg.auth?.audience || "",
+        scopes: pkg.auth?.scopes || [],
+      };
+      exposureAuthScopes.value = (pkg.auth?.scopes || []).join(", ");
+      exposureForm.rate_limit = { ...pkg.rate_limit };
+      syncExposureChannelEntries(pkg.channels || []);
+      exposureQuotas.value = pkg.tenants || [];
+      setExposureMeta(pkg.capability_id, pkg.sync_status, pkg.updated_at);
+    } else {
+      exposurePackageInfo.value = null;
+      resetExposureChannels();
+      exposureQuotas.value = [];
+      setExposureMeta(exposureForm.capability_id, "unconfigured", undefined);
+    }
+    const quotaResp = await fetchExposureQuotas(exposureForm.capability_id);
+    exposureQuotas.value = quotaResp?.quotas || [];
+    await router.replace({
+      query: {
+        ...route.query,
+        capability: exposureForm.capability_id,
+      },
+    });
+  } catch (error) {
+    console.error("[capabilities] failed to load exposure", error);
+    toast.add({
+      title: t("capabilities.exposure.toast.loadFail"),
+      color: "rose",
+    });
+  } finally {
+    exposureLoading.value = false;
+  }
+}
+
+function syncExposureChannelEntries(existing: ExposureChannel[]) {
+  const combined = buildChannelEntriesForCapability(selectedCapability.value);
+  const map = new Map(existing.map((channel) => [channel.type, channel] as const));
+  for (const entry of combined) {
+    const defined = map.get(entry.type);
+    if (!defined) continue;
+    entry.enabled = defined.enabled ?? true;
+    entry.scopes = defined.scopes || [];
+    entry.scopesText = (defined.scopes || []).join(", ");
+  }
+  exposureForm.channels = combined;
+}
+
+function syncExposureScopeList(channel: ChannelFormEntry) {
+  channel.scopes = (channel.scopesText || "")
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+}
+
+function syncExposureAuthScopes() {
+  exposureForm.auth.scopes = exposureAuthScopes.value
+    .split(",")
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+}
+
+async function handleExposureSave() {
+  if (!exposureForm.capability_id) {
+    toast.add({
+      title: t("capabilities.exposure.toast.capabilityRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  exposureSaving.value = true;
+  try {
+    const payload = {
+      capability_id: exposureForm.capability_id,
+      docs_version: exposureForm.docs_version,
+      sdk_version: exposureForm.sdk_version,
+      auth: { ...exposureForm.auth },
+      rate_limit: { ...exposureForm.rate_limit },
+      channels: exposureForm.channels.map((channel) => ({
+        type: channel.type,
+        name: channel.name,
+        enabled: channel.enabled,
+        method: channel.method,
+        path: channel.path,
+        target: channel.target,
+        description: channel.description,
+        scopes: channel.scopes,
+      })),
+      tenants: exposureQuotas.value,
+    };
+    const record = await saveExposurePackage(payload);
+    exposurePackageInfo.value = record;
+    setExposureMeta(record.capability_id, record.sync_status, record.updated_at);
+    await loadCatalog();
+    toast.add({
+      title: t("capabilities.exposure.toast.saveSuccess"),
+      color: "primary",
+    });
+  } catch (error) {
+    console.error("[capabilities] failed to save exposure", error);
+    toast.add({
+      title: t("capabilities.exposure.toast.saveFailed"),
+      color: "rose",
+    });
+  } finally {
+    exposureSaving.value = false;
+  }
+}
+
+async function handleExposureQuotaSave() {
+  if (!exposureForm.capability_id) {
+    toast.add({
+      title: t("capabilities.exposure.toast.capabilityRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  if (!newExposureQuota.tenant_id) {
+    toast.add({
+      title: t("capabilities.exposure.toast.tenantRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  exposureQuotaSaving.value = true;
+  try {
+    const payload: TenantQuota = {
+      tenant_id: newExposureQuota.tenant_id,
+      tenant_name: newExposureQuota.tenant_name,
+      quota: newExposureQuota.quota,
+      status: newExposureQuota.status,
+      notes: newExposureQuota.notes,
+    };
+    const record = await saveExposureQuota(exposureForm.capability_id, payload);
+    exposureQuotas.value = record.tenants || [];
+    exposurePackageInfo.value = record;
+    setExposureMeta(record.capability_id, record.sync_status, record.updated_at);
+    Object.assign(newExposureQuota, {
+      tenant_id: "",
+      tenant_name: "",
+      quota: 1000,
+      status: "active",
+      notes: "",
+    });
+    toast.add({
+      title: t("capabilities.exposure.toast.quotaSaved"),
+      color: "primary",
+    });
+  } catch (error) {
+    console.error("[capabilities] failed to save quota", error);
+    toast.add({
+      title: t("capabilities.exposure.toast.quotaFailed"),
+      color: "rose",
+    });
+  } finally {
+    exposureQuotaSaving.value = false;
+  }
 }
 </script>

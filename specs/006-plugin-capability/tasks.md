@@ -56,6 +56,7 @@
 - [X] T302 [US3] 在 `skeleton/backend/internal/services/capability/exposure_service.go` 同步渠道配置、生成 docs bundle、SDK bundle。
 - [X] T303 [P][US3] 实现租户授权 API `skeleton/backend/internal/transport/http/admin/capability/quota_handler.go`，支持额度调整与审计。
 - [X] T304 [US3] 更新 `contracts/exposure/openapi.yaml` & `dist/agent-sdk/` 生成脚本，确保 3 分钟内同步至 API Gateway/Portal。
+- [X] T305 [US3] 将暴露配置整合进能力注册页：复用 catalog 协议（`metadata.protocols.*`）生成只读通道模板，统一在 `RegisterForm.vue` 中管理租户授权/限流，并移除 `/capabilities/exposure` 独立页面；同时在 UI 与 `spec.md` 里明确要求开发者在修改 `skeleton/plugin.yaml` 或 `contracts/capabilities/*.yaml` 后执行 `scripts/capabilities run catalog -- --manifest "$(pwd)/skeleton/plugin.yaml"` 以保持 `capabilities/catalog.json` 最新。
 
 ---
 

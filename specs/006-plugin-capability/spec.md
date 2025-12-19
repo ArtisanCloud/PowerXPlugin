@@ -112,6 +112,7 @@ PowerX 底座在插件安装或版本升级时调用 Capabilities Manager，获�
 - **FR-014**: 智能体工具同步需覆盖 MCP 工具清单与 SSE 通道，PowerX Agent Hub 在意图触发时必须能够选择插件原子能力、复合任务或插件 Workflow，调用时自动完成租户/额度校验与审计。
 - **FR-015**: 若能力目录或协议资产注册到 PowerX 失败，安装/升级流程必须立即阻断并回滚到上一版本，待问题修复后重新触发同步。
 - **FR-016**: 原子能力与 Workflow 节点默认采用同步请求-响应模式；若声明 `async`，必须提供回调/SSE 说明、状态查询接口与超时/重试策略。
+- **FR-017**: 插件仓库必须提供一键生成能力目录快照的 CLI（如 `scripts/capabilities run catalog -- --manifest <path>`），并在开发文档与 UI（刷新提示）中明确提醒开发者在修改 `skeleton/plugin.yaml` 或 `contracts/capabilities/*.yaml` 后立即执行，以保证前端 Admin 与后端 API 始终读取最新的 `capabilities/catalog.json`。
 
 ### Key Entities *(include if feature involves data)*
 
@@ -147,3 +148,7 @@ PowerX 底座在插件安装或版本升级时调用 Capabilities Manager，获�
 
 - Q: 对于插件安装或升级时能力目录/协议资产同步 PowerX 失败的处理策略是什么？ → A: 立即终止安装并回滚到上一版本，待问题修复后重新同步。
 - Q: 插件能力在 Workflow/Agent 中执行时默认是同步还是异步？ → A: 默认同步执行，仅 `async` 标记的能力可通过回调或 SSE 完成。
+
+### Session 2025-12-19
+
+- Q: 能否在前端直接点击“刷新列表”就自动生成新的 `capabilities/catalog.json`？ → A: 为避免浏览器执行仓库写操作并考虑脚本依赖 Node/tsx，仍由开发者在仓库根目录执行 `npm --prefix scripts/capabilities run catalog -- --manifest "$(pwd)/skeleton/plugin.yaml"`，该命令需在修改能力/manifest 后或启动 Admin/后端前手动触发。

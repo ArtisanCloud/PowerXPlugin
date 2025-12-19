@@ -69,6 +69,8 @@ type CatalogEntry struct {
 	Tags       []string               `json:"tags"`
 	Execution  ExecutionConfig        `json:"execution"`
 	Checksum   string                 `json:"checksum"`
+	Module     string                 `json:"module,omitempty"`
+	Kind       string                 `json:"kind,omitempty"`
 }
 
 // ExecutionConfig controls sync/async semantics of a capability.
@@ -95,7 +97,7 @@ type manager struct {
 
 // NewManager builds a filesystem-based manager using repo defaults.
 func NewManager(cfg *config.Config, log *logrus.Entry) Manager {
-	catalogPath := os.Getenv(catalogEnvKey)
+	catalogPath := resolveCatalogPath(os.Getenv(catalogEnvKey))
 	if strings.TrimSpace(catalogPath) == "" {
 		catalogPath = defaultCatalogPath
 	}
@@ -167,6 +169,7 @@ type fileSystemCatalogLoader struct {
 }
 
 func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnapshot, error) {
+	log := logger.WithField("component", "capability_catalog_loader")
 	p := strings.TrimSpace(l.path)
 	if p == "" {
 		p = defaultCatalogPath
@@ -175,15 +178,20 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 		cwd, _ := os.Getwd()
 		p = filepath.Join(cwd, p)
 	}
+	log = log.WithField("catalog_path", p)
+	log.Debug("loading capability catalog from disk")
 	data, err := os.ReadFile(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			log.WithError(err).Warn("capability catalog not found, returning empty snapshot")
 			return &CatalogSnapshot{GeneratedAt: time.Now().UTC().Format(time.RFC3339), Entries: []CatalogEntry{}}, nil
 		}
+		log.WithError(err).Error("failed to read capability catalog")
 		return nil, fmt.Errorf("capabilities: failed to read catalog %s: %w", p, err)
 	}
 	var snapshot CatalogSnapshot
 	if err := json.Unmarshal(data, &snapshot); err != nil {
+		log.WithError(err).Error("failed to parse capability catalog JSON")
 		return nil, fmt.Errorf("capabilities: invalid catalog JSON %s: %w", p, err)
 	}
 	if strings.TrimSpace(snapshot.GeneratedAt) == "" {
@@ -192,6 +200,13 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if snapshot.Entries == nil {
 		snapshot.Entries = []CatalogEntry{}
 	}
+	log.WithFields(logrus.Fields{
+		"entry_count":  len(snapshot.Entries),
+		"import_count": len(snapshot.Imports),
+		"generated_at": snapshot.GeneratedAt,
+		"plugin_id":    snapshot.PluginID,
+		"manifest_ver": snapshot.ManifestVersion,
+	}).Info("capability catalog loaded")
 	return &snapshot, nil
 }
 
@@ -306,4 +321,18 @@ func EnsureManager(ctx context.Context, mgr Manager, log *logrus.Entry) error {
 
 func managerLogger(component string) *logrus.Entry {
 	return logger.WithField("component", component)
+}
+
+func resolveCatalogPath(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.Contains(trimmed, "$(pwd)") {
+		if cwd, err := os.Getwd(); err == nil {
+			trimmed = strings.ReplaceAll(trimmed, "$(pwd)", cwd)
+		}
+	}
+	trimmed = os.ExpandEnv(trimmed)
+	return strings.TrimSpace(trimmed)
 }

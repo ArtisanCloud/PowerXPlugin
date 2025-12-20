@@ -32,7 +32,6 @@ Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 ## Recent Changes
 - 007-standalone-iam-rbac: Added Go 1.24（后端），TypeScript 5 + Nuxt 4.2（前端），Node.js 20 + Gin、Gorm、Pinia、`@nuxt/ui`、PowerX 插件框架、px-plugin CLI
 - 006-plugin-capability: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
-- 005-plugin-auth: Added Go 1.24 (backend), TypeScript 5 / Nuxt 4.2 (web admin) + Gin, Gorm, `$fetch`/Nitro、Pinia、`@nuxt/ui`, PowerX framework middleware、`@artisan-cloud/plugin-framework-*`
 
 ## Manifest 迁移公告（2025-12-08）
 - 开发态唯一清单移动到 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。

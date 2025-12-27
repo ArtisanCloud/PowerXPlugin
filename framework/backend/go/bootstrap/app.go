@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 )
 
@@ -26,6 +27,8 @@ type App struct {
 	shutdown func(context.Context) error
 	closeFn  func() error
 
+	gatewayClient *gateway.Client
+
 	mu       sync.RWMutex
 	manifest *manifest.Plugin
 }
@@ -35,6 +38,19 @@ type Config struct {
 	Listen     string
 	Env        string
 	Standalone bool
+	Gateway    GatewayConfig
+}
+
+// GatewayConfig 描述 Integration Gateway 所需的凭证。
+type GatewayConfig struct {
+	BaseURL            string
+	ToolToken          string
+	TenantID           string
+	GRPCTarget         string
+	Timeout            time.Duration
+	UserAgent          string
+	ContractVersion    string
+	ContractDigestPath string
 }
 
 // Option 用于在构造 App 时覆盖默认配置。
@@ -71,6 +87,13 @@ func WithStandaloneDefaults() Option {
 	}
 }
 
+// WithGatewayConfig 用于显式设置 Gateway 凭证。
+func WithGatewayConfig(g GatewayConfig) Option {
+	return func(cfg *Config) {
+		cfg.Gateway = g
+	}
+}
+
 // NewApp 根据显式配置构造 App。
 func NewApp(cfg *Config) *App {
 	if cfg == nil {
@@ -81,11 +104,13 @@ func NewApp(cfg *Config) *App {
 		}
 	}
 	ctx := context.Background()
-	return &App{
+	app := &App{
 		Ctx:    ctx,
 		Config: cfg,
 		Logger: slog.Default(),
 	}
+	app.initGatewayClient()
+	return app
 }
 
 // NewAppFromEnv 读取环境变量并应用可选项构造 App。
@@ -94,6 +119,21 @@ func NewAppFromEnv(opts ...Option) *App {
 		Listen:     getEnvOrDefault("POWERX_LISTEN", ":8078"),
 		Env:        getEnvOrDefault("POWERX_ENV", "development"),
 		Standalone: parseBoolEnv("STANDALONE", true),
+	}
+	cfg.Gateway = GatewayConfig{
+		BaseURL:         getEnvOrDefault("PX_GATEWAY_BASE_URL", ""),
+		ToolToken:       firstNonEmpty(strings.TrimSpace(os.Getenv("PX_PLUGIN_TOOL_TOKEN")), strings.TrimSpace(os.Getenv("PX_TOOL_TOKEN"))),
+		TenantID:        getEnvOrDefault("PX_TENANT_UUID", ""),
+		GRPCTarget:      strings.TrimSpace(os.Getenv("PX_GATEWAY_GRPC_TARGET")),
+		ContractVersion: strings.TrimSpace(os.Getenv("PX_GATEWAY_CONTRACT_VERSION")),
+	}
+	if timeoutStr := strings.TrimSpace(os.Getenv("PX_GATEWAY_TIMEOUT")); timeoutStr != "" {
+		if d, err := time.ParseDuration(timeoutStr); err == nil {
+			cfg.Gateway.Timeout = d
+		}
+	}
+	if ua := strings.TrimSpace(os.Getenv("PX_GATEWAY_USER_AGENT")); ua != "" {
+		cfg.Gateway.UserAgent = ua
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -122,6 +162,7 @@ func (a *App) Run() error {
 
 // Shutdown 优雅关闭已附加的服务。
 func (a *App) Shutdown() error {
+	defer a.closeGateway()
 	if a.shutdown == nil {
 		return nil
 	}
@@ -159,6 +200,59 @@ func (a *App) Manifest() *manifest.Plugin {
 	return &cp
 }
 
+// GatewayClient 返回已注入的 Gateway Client（可能为空）。
+func (a *App) GatewayClient() *gateway.Client {
+	return a.gatewayClient
+}
+
+func (a *App) initGatewayClient() {
+	if a.Config == nil || !a.Config.Gateway.enabled() {
+		return
+	}
+	gcfg := gateway.Config{
+		BaseURL:    a.Config.Gateway.BaseURL,
+		ToolToken:  a.Config.Gateway.ToolToken,
+		TenantUUID: a.Config.Gateway.TenantID,
+	}
+	if a.Config.Gateway.Timeout > 0 {
+		gcfg.RequestTimeout = a.Config.Gateway.Timeout
+	}
+	if ua := strings.TrimSpace(a.Config.Gateway.UserAgent); ua != "" {
+		gcfg.UserAgent = ua
+	}
+	if target := strings.TrimSpace(a.Config.Gateway.GRPCTarget); target != "" {
+		gcfg.GRPCTarget = target
+	}
+	if cv := strings.TrimSpace(a.Config.Gateway.ContractVersion); cv != "" {
+		gcfg.ContractVersion = cv
+	}
+	if digestPath := strings.TrimSpace(a.Config.Gateway.ContractDigestPath); digestPath != "" {
+		gcfg.ContractDigestPath = digestPath
+	}
+	client, err := gateway.NewClient(gcfg)
+	if err != nil {
+		if a.Logger != nil {
+			a.Logger.Warn("failed to initialize gateway client", slog.String("error", err.Error()))
+		}
+		return
+	}
+	a.gatewayClient = client
+}
+
+func (a *App) closeGateway() {
+	if a.gatewayClient == nil {
+		return
+	}
+	if err := a.gatewayClient.Close(); err != nil && a.Logger != nil {
+		a.Logger.Warn("failed to close gateway client", slog.String("error", err.Error()))
+	}
+	a.gatewayClient = nil
+}
+
+func (cfg GatewayConfig) enabled() bool {
+	return strings.TrimSpace(cfg.BaseURL) != "" && strings.TrimSpace(cfg.ToolToken) != "" && strings.TrimSpace(cfg.TenantID) != ""
+}
+
 func getEnvOrDefault(key, fallback string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
@@ -176,4 +270,13 @@ func parseBoolEnv(key string, fallback bool) bool {
 		}
 	}
 	return fallback
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }

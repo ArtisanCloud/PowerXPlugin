@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/devapi/handlers"
 )
 
@@ -42,8 +42,12 @@ func TestRegisterReturnsCreated(t *testing.T) {
 	if ctx.status != 201 {
 		t.Fatalf("expected 201, got %d", ctx.status)
 	}
-	resp, ok := ctx.payload.(handlers.RegisterResponse)
-	if !ok || resp.SessionID == "" {
-		t.Fatalf("expected register response payload")
+	envelope, ok := ctx.payload.(router.Envelope)
+	if !ok || !envelope.Success {
+		t.Fatalf("expected router envelope payload")
+	}
+	resp, ok := envelope.Data.(handlers.RegisterResponse)
+	if !ok || resp.SessionID == "" || resp.ReloadToken == "" {
+		t.Fatalf("expected register response data, got %v", envelope.Data)
 	}
 }

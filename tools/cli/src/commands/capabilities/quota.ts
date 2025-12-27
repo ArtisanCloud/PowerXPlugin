@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import YAML from "yaml";
 import { TelemetryEmitter } from "../../lib/telemetry/emitter";
 
 export interface CapabilitiesQuotaOptions {
-  capabilityId: string;
+  capabilityId?: string;
   tenantId: string;
   baseUrl?: string;
   token?: string;
@@ -12,6 +13,7 @@ export interface CapabilitiesQuotaOptions {
   limits?: number;
   dataScope?: string;
   rootDir?: string;
+  manifestPath?: string;
 }
 
 interface QuotaResponse {
@@ -38,6 +40,84 @@ function resolveBaseUrl(options: CapabilitiesQuotaOptions) {
 
 function resolveToken(options: CapabilitiesQuotaOptions) {
   return options.token || process.env.PX_DEV_API_TOKEN || "";
+}
+
+interface ManifestContext {
+  manifestPath: string;
+  rootDir: string;
+  capabilityIds: string[];
+}
+
+function loadManifestContext(manifestPath: string): ManifestContext {
+  const resolved = path.resolve(process.cwd(), manifestPath);
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`manifest not found: ${manifestPath}`);
+  }
+  const raw = fs.readFileSync(resolved, "utf8");
+  const parsed = YAML.parse(raw) ?? {};
+  const provides: any[] = Array.isArray(parsed?.capabilities?.provides)
+    ? parsed.capabilities.provides
+    : [];
+  const capabilityIds = provides
+    .map((entry) => {
+      if (typeof entry === "string") {
+        return entry.trim();
+      }
+      if (entry && typeof entry === "object") {
+        return String(entry.id ?? "").trim();
+      }
+      return "";
+    })
+    .filter((value) => value.length > 0);
+  return {
+    manifestPath: resolved,
+    rootDir: path.dirname(resolved),
+    capabilityIds,
+  };
+}
+
+function resolveCapabilityId(
+  provided: string | undefined,
+  manifestCtx?: ManifestContext,
+) {
+  if (provided?.trim()) {
+    const trimmed = provided.trim();
+    if (
+      manifestCtx &&
+      manifestCtx.capabilityIds.length > 0 &&
+      !manifestCtx.capabilityIds.includes(trimmed)
+    ) {
+      throw new Error(
+        `capabilityId ${trimmed} 不存在 ${manifestCtx.manifestPath}，请确认 manifest.capabilities.provides`,
+      );
+    }
+    return trimmed;
+  }
+  if (!manifestCtx) {
+    throw new Error("capabilityId is required");
+  }
+  if (manifestCtx.capabilityIds.length === 0) {
+    throw new Error(
+      `manifest ${manifestCtx.manifestPath} 缺少 capabilities.provides，请使用 --capability-id 显式指定`,
+    );
+  }
+  if (manifestCtx.capabilityIds.length > 1) {
+    const preview = manifestCtx.capabilityIds.slice(0, 5).join(", ");
+    throw new Error(
+      `manifest ${manifestCtx.manifestPath} 含多个 capability，请使用 --capability-id 选择其一（可选: ${preview}${manifestCtx.capabilityIds.length > 5 ? " ..." : ""})`,
+    );
+  }
+  return manifestCtx.capabilityIds[0];
+}
+
+function resolveRootDir(
+  options: CapabilitiesQuotaOptions,
+  manifestCtx?: ManifestContext,
+) {
+  if (options.rootDir) {
+    return path.resolve(process.cwd(), options.rootDir);
+  }
+  return manifestCtx?.rootDir ?? process.cwd();
 }
 
 async function postJSON(
@@ -132,15 +212,18 @@ function writeSamples(
 export async function runCapabilitiesQuotaCommand(
   options: CapabilitiesQuotaOptions,
 ) {
-  if (!options?.capabilityId) {
-    throw new Error("capabilityId is required");
-  }
   if (!options?.tenantId) {
     throw new Error("tenantId is required");
   }
 
+  const manifestCtx = options.manifestPath
+    ? loadManifestContext(options.manifestPath)
+    : undefined;
+  const capabilityId = resolveCapabilityId(options.capabilityId, manifestCtx);
+  const rootDir = resolveRootDir(options, manifestCtx);
+
   const payload = {
-    capabilityId: options.capabilityId,
+    capabilityId,
     tenantId: options.tenantId,
     qps: options.qps ?? 10,
     burst: options.burst ?? 20,
@@ -151,23 +234,23 @@ export async function runCapabilitiesQuotaCommand(
   const baseUrl = resolveBaseUrl(options);
   const token = resolveToken(options);
   const url = `${baseUrl}/internal/plugins/capabilities/${encodeURIComponent(
-    options.capabilityId,
+    capabilityId,
   )}/tenants/${encodeURIComponent(options.tenantId)}/quota`;
 
   const response = (await postJSON(url, token, payload)) as QuotaResponse;
   writeSamples(
-    options.capabilityId,
+    capabilityId,
     options.tenantId,
     {
       url,
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: payload,
     },
-    options.rootDir,
+    rootDir,
   );
   TelemetryEmitter.emitCapabilityEvent({
     type: "capability.cli.quota_total",
-    capabilityId: options.capabilityId,
+    capabilityId,
     tenantId: options.tenantId,
     qps: payload.qps,
     burst: payload.burst,

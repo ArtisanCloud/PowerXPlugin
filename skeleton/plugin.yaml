@@ -25,6 +25,13 @@ rbac:
     - resource: base:template
       actions: [read, create, update, delete]
 capabilities:
+  required:
+    # 所有将通过 Gateway 调用的 Core 能力必须列在此处，提交前请运行
+    #   px-plugin capabilities plan --manifest ./skeleton/plugin.yaml
+    #   px-plugin capabilities apply --manifest ./skeleton/plugin.yaml
+    # 以校验 Registry 已授权。下面示例可按需替换为真实 capabilityId。
+    - com.corex.media.assets.manage # 示例：媒体管理能力
+    - com.corex.eventfabric.publish # 示例：事件总线调用能力
   provides:
     - id: com.powerx.plugins.base.template.list
       version: 1.0.0

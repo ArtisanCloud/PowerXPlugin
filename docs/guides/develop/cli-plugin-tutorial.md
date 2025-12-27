@@ -68,6 +68,31 @@ px-plugin --version  # 验证可执行文件已安装并输出版本信息
 >
 > 这样再次运行 `px-plugin --version` 时就会显示 `px-plugin version v0.3.0 (commit 1a2b3c4)`。
 
+## Step 2.5  获取 Skeleton Gateway 凭证（可选）
+
+在本仓库的 Skeleton 或你生成的插件项目内调试 PowerX 通用能力时，需要先获取 Dev Gateway 的 Tool Token。CLI 提供 `login` 命令，默认把凭证写入 `~/.powerx/credentials`，你可再同步到 `.env.local`：
+
+```bash
+cd /path/to/PowerXPlugin/skeleton
+px-plugin login --manifest ./plugin.yaml \
+  --base-url https://gateway.powerx.dev \
+  --tenant demo-tenant-uuid
+
+# 将凭证写入 Skeleton 的 .env.local（示例脚本）
+cat <<'EOF' > .env.local
+PX_GATEWAY_BASE_URL=https://gateway.powerx.dev/_tenant
+PX_TOOL_TOKEN=$(jq -r '.credentials.toolToken' ~/.powerx/credentials)
+PX_TENANT_UUID=$(jq -r '.credentials.tenantUuid' ~/.powerx/credentials)
+EOF
+```
+
+说明：
+
+1. **宿主模式**无需执行 `login`，运维会在部署清单中注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`。
+2. `px-plugin login` 会根据 manifest 中的插件 ID、所需能力向 Dev Gateway 发起 STS 交换，请确保你拥有对应环境的 Token/Key（若需要，请联系平台团队）。
+3. `.env.local` 会被 `skeleton/web-admin` 与 `skeleton/backend` 自动载入，你也可以使用 `scripts/capabilities/run-from-package.mjs --mode skeleton`，它会优先读取 `.env.local` 的 `PX_*` 变量。
+4. 当 Token 即将过期或失效时，重新执行 `px-plugin login` 并覆盖 `.env.local` 即可。
+
 ## Step 3. 生成插件骨架
 
 选择一个新的插件 ID（推荐反向域名），并指定模板/组织信息。以下示例使用 `com.powerx.helloworld`，同时通过 `--template` 选择 `fullstack-go-nuxt`，CLI 会读取 `packages/template-registry/index.yaml`，验证模板版本、运行时要求与依赖锁定：

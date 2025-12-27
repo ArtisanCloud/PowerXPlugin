@@ -9,8 +9,8 @@
 
 插件在宿主与 Skeleton 模式需要统一消费 PowerX 核心能力。我们将在 framework/backend/frontend/脚本层封装 Integration Gateway 调用（REST/gRPC）、Tool Grant 凭证、Mock 降级与观测，配合文档/CLI 引导 manifest 申领与速查，并确保调用链满足零信任、Tenant UUID、限流与 trace 要求。
 
-关键交付：
-- Gateway Client + 前后端封装：统一 `/tenant/invocations`/gRPC 调用、凭证注入、错误/trace 处理；
+- 关键交付：
+- Gateway Client + 后端服务封装：统一 `/tenant/invocations`/gRPC 调用、凭证注入、错误/trace 处理，并对前端暴露受控 API；
 - Skeleton dev 体验：`px-plugin login`、`.env.local`、Mock 降级、CLI 辅助工具；
 - 契约升级守护：生成能力契约版本摘要、比对并提醒插件开发者在兼容窗口内升级；
 - 限流/配额治理：暴露配置入口、命令及观测指标，确保调用链尊重 Registry/租户额度。

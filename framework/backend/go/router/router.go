@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/services/capability_invoker"
 )
 
 const (
@@ -18,7 +20,13 @@ const (
 	HealthzPath = "/healthz"
 	// APIPrefix 是业务路由的统一前缀。
 	APIPrefix = "/api/v1"
+	// contractStatusHeader 将契约信息传递给前端。
+	contractStatusHeader = "X-PowerX-Contract-Status"
 )
+
+var capabilityProxyForwardHeaders = []string{
+	"X-PX-Use-Mock",
+}
 
 // AttachHTTPServer 构造基础 HTTP 服务器并与 App 绑定。
 func AttachHTTPServer(app *bootstrap.App) error {
@@ -50,6 +58,7 @@ func RegisterFrameworkRoutes(app *bootstrap.App) {
 	app.Router.Handle(http.MethodGet, HealthzPath, func(ctx bootstrap.Context) {
 		ctx.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
+	registerCapabilityProxy(app)
 }
 
 // RegisterPluginRoutes 暴露业务路由挂载点。
@@ -321,4 +330,160 @@ func matchSegments(patternSegments, pathSegments []string) (map[string]string, b
 	}
 
 	return paramValues, true
+}
+
+func registerCapabilityProxy(app *bootstrap.App) {
+	if app == nil || app.Router == nil {
+		return
+	}
+	client := app.GatewayClient()
+	if client == nil {
+		return
+	}
+	service := capabilityinvoker.NewService(client, app.Logger)
+	statusProvider := func() *gateway.ContractStatus {
+		if client == nil {
+			return nil
+		}
+		return client.ContractStatus()
+	}
+	group := app.Router.Group(APIPrefix)
+	group.Handle(http.MethodPost, "/integration/capabilities/invoke", capabilityInvokeHandler(service, statusProvider))
+}
+
+type capabilityInvokeRequest struct {
+	CapabilityID string                 `json:"capabilityId"`
+	Action       string                 `json:"action"`
+	Payload      map[string]any         `json:"payload"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider func() *gateway.ContractStatus) bootstrap.Handler {
+	return func(ctx bootstrap.Context) {
+		if service == nil {
+			ctx.JSON(http.StatusServiceUnavailable, map[string]string{"error": "capability service unavailable"})
+			return
+		}
+		var warnings []string
+		if statusProvider != nil {
+			if status := statusProvider(); status != nil && status.Outdated {
+				warning := status.Message
+				if strings.TrimSpace(warning) == "" {
+					warning = "Gateway 契约版本需升级，请同步最新 contracts。"
+				}
+				ctx.SetHeader(contractStatusHeader, warning)
+				warnings = append(warnings, warning)
+			}
+		}
+		var req capabilityInvokeRequest
+		if err := ctx.BindJSON(&req); err != nil {
+			ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid capability payload"})
+			return
+		}
+		if req.Payload == nil {
+			req.Payload = map[string]any{}
+		}
+		headers := collectCapabilityProxyHeaders(ctx)
+		if module := proxyMockModule(headers); module != "" {
+			warnings = append(warnings, "通过 X-PX-Use-Mock 请求 Mock 模块: "+module)
+		}
+		tenantUUID := strings.TrimSpace(ctx.Header("X-Tenant-UUID"))
+		if tenantUUID != "" {
+			if headers == nil {
+				headers = make(map[string]string, 1)
+			}
+			headers["X-Tenant-UUID"] = tenantUUID
+		}
+		result, err := service.Invoke(ctx.Context(), capabilityinvoker.InvokeParams{
+			CapabilityID: req.CapabilityID,
+			Action:       req.Action,
+			Payload:      req.Payload,
+			Headers:      headers,
+			RequestID:    ctx.Header("X-Request-ID"),
+			TenantUUID:   tenantUUID,
+		})
+		if err != nil {
+			writeCapabilityError(ctx, err, warnings)
+			return
+		}
+		response := map[string]any{
+			"traceId": result.TraceID,
+			"status":  result.Status,
+			"data":    result.Data,
+		}
+		if len(warnings) > 0 {
+			response["warnings"] = warnings
+		}
+		if len(result.Raw) > 0 {
+			response["raw"] = json.RawMessage(result.Raw)
+		}
+		if result.TraceID != "" {
+			ctx.SetHeader("X-Trace-Id", result.TraceID)
+		}
+		ctx.JSON(http.StatusOK, response)
+	}
+}
+
+func writeCapabilityError(ctx bootstrap.Context, err error, warnings []string) {
+	invokeErr := &capabilityinvoker.InvokeError{}
+	if !errors.As(err, &invokeErr) {
+		ctx.JSON(http.StatusBadGateway, map[string]any{
+			"error":   err.Error(),
+			"traceId": "",
+		})
+		return
+	}
+	status := http.StatusBadGateway
+	switch invokeErr.Category {
+	case capabilityinvoker.ErrorCategoryValidation:
+		status = http.StatusBadRequest
+	case capabilityinvoker.ErrorCategoryUnauthorized:
+		status = http.StatusUnauthorized
+	case capabilityinvoker.ErrorCategoryRateLimited:
+		status = http.StatusTooManyRequests
+	default:
+		if invokeErr.Status >= 400 {
+			status = invokeErr.Status
+		}
+	}
+	if invokeErr.TraceID != "" {
+		ctx.SetHeader("X-Trace-Id", invokeErr.TraceID)
+	}
+	payload := map[string]any{
+		"error": map[string]any{
+			"code":    invokeErr.Code,
+			"message": invokeErr.Message,
+			"type":    invokeErr.Category,
+		},
+		"traceId": invokeErr.TraceID,
+	}
+	if len(warnings) > 0 {
+		payload["warnings"] = warnings
+	}
+	ctx.JSON(status, payload)
+}
+
+func collectCapabilityProxyHeaders(ctx bootstrap.Context) map[string]string {
+	if ctx == nil {
+		return nil
+	}
+	headers := make(map[string]string, len(capabilityProxyForwardHeaders))
+	for _, name := range capabilityProxyForwardHeaders {
+		value := strings.TrimSpace(ctx.Header(name))
+		if value == "" {
+			continue
+		}
+		headers[name] = value
+	}
+	if len(headers) == 0 {
+		return nil
+	}
+	return headers
+}
+
+func proxyMockModule(headers map[string]string) string {
+	if len(headers) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(headers["X-PX-Use-Mock"])
 }

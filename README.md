@@ -6,6 +6,7 @@
 - 实现计划：`specs/001-powerxplugin-foundation/plan.md`
 - 快速上手：`docs/quickstart.md`
 - 技术设计：`docs/init-project.md`
+- PowerX 通用能力消费方案：[docs/plan/009-consume-powerx-capability.md](./docs/plan/009-consume-powerx-capability.md)（含 Skeleton/宿主示例与观测策略）
 
 
 

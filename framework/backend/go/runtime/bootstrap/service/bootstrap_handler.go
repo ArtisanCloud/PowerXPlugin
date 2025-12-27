@@ -10,6 +10,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/compliance/scanner"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 )
 
@@ -21,6 +22,17 @@ type BootstrapHandler struct {
 	templates  map[string]TemplateSpec
 	scanner    *scanner.LicenseScanner
 	defaultOrg string
+	gateway    *gateway.Client
+}
+
+// HandlerOption 提供可选依赖注入。
+type HandlerOption func(*BootstrapHandler)
+
+// WithGatewayClient 注入预构建的 Gateway Client。
+func WithGatewayClient(client *gateway.Client) HandlerOption {
+	return func(h *BootstrapHandler) {
+		h.gateway = client
+	}
 }
 
 // TemplateSpec captures registry metadata snippet for validation.
@@ -34,7 +46,7 @@ type TemplateSpec struct {
 }
 
 // NewBootstrapHandler builds a handler with default registry entries.
-func NewBootstrapHandler(logger *slog.Logger) *BootstrapHandler {
+func NewBootstrapHandler(logger *slog.Logger, opts ...HandlerOption) *BootstrapHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -53,12 +65,19 @@ func NewBootstrapHandler(logger *slog.Logger) *BootstrapHandler {
 			MinGo:   "1.24",
 		},
 	}
-	return &BootstrapHandler{
+	h := &BootstrapHandler{
 		logger:     logger,
 		templates:  templates,
 		scanner:    scanner.NewLicenseScanner(logger),
 		defaultOrg: "powerx-plugins",
 	}
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		opt(h)
+	}
+	return h
 }
 
 // Validate processes incoming CLI bootstrap validation requests.

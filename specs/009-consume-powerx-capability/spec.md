@@ -9,7 +9,7 @@
 
 ### User Story 1 - 宿主插件统一调用核心能力 (Priority: P1)
 
-宿主部署的插件开发者在 Capability Registry 中申领 `source=corex` 能力，框架在后端与前端自动注入 Gateway Client，并以清单中的能力 ID 向 `/tenant/invocations` 或 `IntegrationGatewayTenantService` 发起调用，开发者只需提供业务参数即可获得 Media、事件、Scheduler、Workflow 等服务。
+宿主部署的插件开发者在 Capability Registry 中申领 `source=corex` 能力，框架在后端自动注入 Gateway Client，并通过统一的服务层/HTTP 接口向前端或业务 handler 暴露调用入口；所有请求都由插件后端以清单中的能力 ID 向 `/tenant/invocations` 或 `IntegrationGatewayTenantService` 发起，开发者只需提供业务参数即可获得 Media、事件、Scheduler、Workflow 等服务。
 
 **Why this priority**: 宿主环境是绝大多数线上流量的入口，若无法快速复用核心能力，将继续依赖内部 API，违背开放计划目标。
 
@@ -17,22 +17,22 @@
 
 **Acceptance Scenarios**:
 
-1. **Given** 插件 manifest 已声明 `com.corex.media.assets.manage`，**When** 开发者在宿主环境通过框架调用该能力，**Then** Gateway 根据能力 ID 正确路由请求并返回 MediaX 的上传凭证。
-2. **Given** 能力调用发生错误或被限流，**When** Gateway 返回错误码与 `traceId`，**Then** 插件框架必须将 `traceId` 写入日志并向业务抛出统一的错误对象。
+1. **Given** 插件 manifest 已声明 `com.corex.media.assets.manage`，**When** 开发者在宿主环境通过插件后端暴露的服务层/API 触发该能力，**Then** Gateway 根据能力 ID 正确路由请求并返回 MediaX 的上传凭证。
+2. **Given** 能力调用发生错误或被限流，**When** Gateway 返回错误码与 `traceId`，**Then** 插件后端框架必须将 `traceId` 写入日志并向业务抛出统一的错误对象，同时透传给前端调用者。
 
 ---
 
 ### User Story 2 - Skeleton 模式复用同一封装 (Priority: P2)
 
-Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN` 写入 `.env.local`，并使用框架内置的 Go Client 与 Nuxt Composable 发起远程调用或在 Gateway 不可用时切换到 Mock，实现与宿主一致的行为以便预先验证调用链与权限配置。
+Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN` 写入 `.env.local`，并使用框架内置的 Go Client 在 Skeleton 后端发起远程调用（前端通过插件后端提供的 API 间接访问 Gateway）或在 Gateway 不可用时切换到 Mock，实现与宿主一致的行为以便预先验证调用链与权限配置。
 
 **Why this priority**: Skeleton 是插件开发调试的默认入口，若无法直连 PowerX 能力，将导致环境差异和额外搬运成本。
 
-**Independent Test**: 只需在本地运行 Skeleton 服务，调用 `usePowerXCapability` 向 Dev Gateway 拉取媒资列表，即可独立验证凭证、环境配置和 Mock 回退逻辑。
+**Independent Test**: 只需在本地运行 Skeleton 服务，通过插件后端提供的 `capability invoke` API 向 Dev Gateway 拉取媒资列表，即可独立验证凭证、环境配置和 Mock 回退逻辑。
 
 **Acceptance Scenarios**:
 
-1. **Given** 开发者完成本地登录并写入 `.env.local`，**When** 运行 Skeleton 服务并调用 `usePowerXCapability('com.corex.media.assets.read', 'List', payload)`，**Then** 能够在不修改业务代码的情况下获得真实媒资列表。
+1. **Given** 开发者完成本地登录并写入 `.env.local`，**When** 运行 Skeleton 服务并通过插件后端公开的 REST/gRPC API 请求 `com.corex.media.assets.read` 的列表能力，**Then** 能够在不修改业务代码的情况下获得真实媒资列表。
 2. **Given** Dev Gateway 暂不可达，**When** 开发者启动带 `--use-mock=media` 的 Skeleton 服务，**Then** 框架会自动切换到内存 Mock 并提示本次调用未连接到真实 PowerX。
 
 ---
@@ -49,6 +49,7 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 
 1. **Given** 插件调用 `com.corex.eventfabric.publish`，**When** Gateway 返回成功响应，**Then** 观测系统可查到一条包含能力 ID、租户、traceId、耗时的记录。
 2. **Given** 插件在 1 分钟内连续调用超过额度，**When** 限流器生效，**Then** Gateway 返回标准化错误并触发框架记录 `rateLimitExceeded` 事件供运维订阅。
+3. **Given** Skeleton 开发者在 web-admin 的 Capability Lab 页面填写 `capabilityId/action/payload`，**When** 点击 Invoke，**Then** 插件后端收到请求并调用 Gateway 或 Mock，页面需展示响应/TraceId/耗时，并在后端返回 `warnings`（如契约版本过期或 Mock 提示）时显式告警。
 
 ### Edge Cases
 
@@ -63,9 +64,9 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 ### Functional Requirements
 
 - **FR-001**: 插件 manifest 与 `skeleton/plugin.yaml` 必须支持声明 `requiredCapabilities`，并在 CI 中通过 `px-plugin capabilities plan|apply --manifest ./skeleton/plugin.yaml` 进行校验，未声明即调用时需阻断。
-- **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK 与 Nuxt Composable），默认读取 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`X-Tenant-UUID` 等环境变量。
+- **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK），默认读取 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`X-Tenant-UUID` 等环境变量，并通过插件后端对前端暴露统一 API（禁止前端直连 Gateway）。
 - **FR-003**: 在宿主模式，部署系统需自动注入 Tool Token；在 Skeleton 模式，开发者通过 `px-plugin login` 与脚本生成本地凭证，并由框架自动刷新或提醒即将过期。
-- **FR-004**: 所有调用必须统一走 `/tenant/invocations` REST 或 `IntegrationGatewayTenantService.InvokeCapability` gRPC，框架不得允许直接访问底座内部 API。
+- **FR-004**: 所有调用必须由插件后端统一走 `/tenant/invocations` REST 或 `IntegrationGatewayTenantService.InvokeCapability` gRPC，框架不得允许前端或其他组件直接访问底座内部 API。
 - **FR-005**: Gateway Client 需对每次调用自动附带 `capabilityId`、`action`、`payload`、`X-Request-ID`，并把 Gateway 返回的 `traceId` 注入日志与指标。
 - **FR-006**: 当 Gateway 返回限流、鉴权失败或 5xx 错误时，框架需提供标准化错误对象，包含能力 ID、traceId、错误类别，方便业务捕获与重试。
 - **FR-007**: Skeleton 模式必须支持 `--use-mock=<module>` 参数，将指定能力映射到内存实现，并清晰标记响应来源。
@@ -74,6 +75,9 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 - **FR-010**: 当能力契约（OpenAPI/Proto）升级时，框架需提供版本提示与向后兼容策略，至少支持一次向后兼容窗口并提醒开发者更新依赖。
 - **FR-011**: 文档与教程需覆盖如何在宿主与 Skeleton 环境配置凭证、调用示例、错误排查以及能力速查表，保证新人在 1 天内可完成首次调用。
 - **FR-012**: 平台需提供限流/配额管理接口，允许管理员针对插件或租户设置 `rateLimit`、`quota`，并确保调用链实时尊重这些配置。
+- **FR-013**: Skeleton web-admin 必须提供“Capability Lab” 调试页面，覆盖 Capability 选择、Action/Payload 编辑、请求预览、响应/Trace 可视化、Mock 切换与告警提示，仅 `IsRoot` 或系统管理员可访问，便于本地验证 PowerX 能力且避免普通用户误用。
+- **FR-014**: `/tenant/invocations` REST 调用需要显式传入 `preferred_protocol + method + endpoint` 等字段；插件后端在 API 层要校验并拒绝缺失字段，Capability Lab/文档需给出模板或构建器提示，防止开发者误以为 `action` 可以自动拼接 URL。
+- **FR-015**: Skeleton `/api/v1/admin/capabilities` 在未指定 `source` 时返回本地 manifest，而当 `source=corex` 时必须通过 Gateway 调用 PowerX `/tenant/capabilities` 并把底座能力转换为 CatalogEntry 数据，供 Capability Lab、CLI 与文档使用。
 
 ### Key Entities *(include if feature involves data)*
 
@@ -98,3 +102,8 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 - 插件框架可在宿主部署时获取环境变量并安全注入到后端/前端进程。
 - Skeleton 模式允许开发者访问 Dev Gateway，且 `px-plugin login` 能获取可调用核心能力的临时凭证。
 - 平台观测系统已具备聚合能力，新增指标/日志只需提供结构化字段即可接入。
+
+## Manifest / Docs Consistency（2025-12-22）
+
+- `skeleton/plugin.yaml` → `capabilities.required` 默认示例保持与 Quickstart/Plan 中一致的 CoreX 能力（`com.corex.media.assets.manage`、`com.corex.eventfabric.publish`），`capabilities.provides` 指向 `contracts/capabilities/com.powerx.plugins.base.template.*`，方便 docs/plan/009 引用。
+- `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_TENANT_UUID/NUXT_PUBLIC_POWERX_*`），并对应 manifest 注释，确保读者可在三个入口间互相对照。

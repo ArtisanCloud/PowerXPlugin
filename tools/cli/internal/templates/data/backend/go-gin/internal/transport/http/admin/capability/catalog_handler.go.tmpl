@@ -2,6 +2,7 @@ package capability
 
 import (
 	"net/http"
+	"strings"
 
 	"{{ .BackendModulePath }}/internal/contracts"
 	"{{ .BackendModulePath }}/internal/logger"
@@ -26,7 +27,8 @@ func NewCatalogHandler(deps *app.Deps) *CatalogHandler {
 
 // List returns all capabilities collected in the catalog snapshot.
 func (h *CatalogHandler) List(c *gin.Context) {
-	entries, err := h.service.List(c.Request.Context())
+	source := strings.TrimSpace(c.Query("source"))
+	entries, err := h.service.List(c.Request.Context(), capservice.ListOptions{Source: source})
 	if err != nil {
 		logger.WithError(err).
 			WithField("component", "capability_catalog_handler").

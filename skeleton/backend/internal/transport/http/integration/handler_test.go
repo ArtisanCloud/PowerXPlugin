@@ -31,6 +31,10 @@ func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.Invo
 	return f.result, nil
 }
 
+func (f *fakeCapabilityGateway) ListPlatformCapabilities(_ context.Context, _ capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
+	return nil, nil
+}
+
 func (f *fakeCapabilityGateway) Close() error { return nil }
 
 func TestInvokeCapabilitySuccess(t *testing.T) {

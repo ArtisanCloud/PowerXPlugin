@@ -27,6 +27,17 @@ grpc_upstream:
   connect_mode: "lazy"
   optional: true
 
+gateway:
+  # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN / PX_TENANT_UUID。
+  # 若留空则默认关闭 Gateway 调用，`PX_USE_MOCK` 可指定 media,eventfabric 等模块名称以启用内存 Mock。
+  base_url: "http://127.0.0.1:8077/api/v1"
+  tool_token: ""
+  refresh_token: ""
+  tenant_uuid: "00000000-0000-0000-0000-000000000001"
+  timeout: "10s"
+  user_agent: "powerx-plugin-skeleton/dev"
+  use_mock: []
+
 database:
   # driver 可选 memory / sqlite / postgres。缺省值为 memory（内存 SQLite）。
   driver: "sqlite"

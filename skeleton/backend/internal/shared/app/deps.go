@@ -6,6 +6,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
@@ -30,6 +31,7 @@ type Deps struct {
 	DB                  *gorm.DB
 	Ctx                 context.Context
 	PowerXClient        *client.PowerXServiceClient
+	CapabilityGateway   gatewayClient
 	Config              *config.Config
 	CapabilitiesManager capabilities.Manager
 	CapabilityMetrics   *capmetrics.Metrics
@@ -43,6 +45,13 @@ type Deps struct {
 	IAMModeSource       string
 	AuthProxy           DelegatedAuthProxy
 	IAMDirectory        iamservice.IAMDirectory
+}
+
+type gatewayClient interface {
+	Enabled() bool
+	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
+	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	Close() error
 }
 
 // RuntimeDefaults returns the configured runtime ops defaults (if any).

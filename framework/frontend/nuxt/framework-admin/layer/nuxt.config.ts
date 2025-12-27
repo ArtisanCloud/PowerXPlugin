@@ -6,6 +6,14 @@ const layerDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(layerDir, 'app')
 
 const config: NuxtConfig = {
+  runtimeConfig: {
+    public: {
+      powerx: {
+        apiBase: process.env.NUXT_PUBLIC_POWERX_API_BASE ?? '',
+        capabilityEndpoint: process.env.NUXT_PUBLIC_POWERX_CAPABILITY_ENDPOINT ?? '/integration/capabilities/invoke'
+      }
+    }
+  },
   imports: {
     dirs: [
       resolve(appDir, 'composables'),
@@ -35,3 +43,12 @@ const config: NuxtConfig = {
 }
 
 export default config
+
+declare module 'nuxt/schema' {
+  interface PublicRuntimeConfig {
+    powerx: {
+      apiBase: string
+      capabilityEndpoint: string
+    }
+  }
+}

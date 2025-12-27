@@ -19,9 +19,10 @@ export type CapabilityCatalogEntry = {
 };
 
 export function useCapabilityCatalogApi() {
-  const list = () =>
+  const list = (query?: Record<string, any>) =>
     apiGet<ApiResponse<CapabilityCatalogEntry[]>>(
       "admin/capabilities",
+      query,
     ).then((res) => res.data);
 
   return {

@@ -30,7 +30,7 @@ MCP 运行期是一个“先建会话、再注入工具、最后执行任务”�
 **影响**：成功后会分配 `session_id` 并锁定租户上下文（相当于给该客户端开辟一个独立沙箱）；后续所有 Ack/Invoke 请求都必须带上这个 ID，否则宿主无法把事件路由回正确的客户端。若此步骤省略，PowerX 会认为 MCP 客户端尚未处于可调度状态。
 
 ```bash
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/register \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/register \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -79,12 +79,12 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/register \
 **影响**：只要 Ack 未完成，Agent Hub 就不会把真实 Invoke 投递到该 session；心跳中断也会触发 Force Close，SSE/WS 立即断开。
 
 ```bash
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/ack \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/ack \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{ "state": "ready", "capabilities_hash": "sha256:..." }'
 
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/heartbeat \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/heartbeat \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{ "missed_heartbeats": 0 }'
@@ -99,7 +99,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/hea
 `invoke` 接口复用 Integration Dispatch：
 
 ```bash
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -151,7 +151,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/inv
 ```bash
 curl -N \
   -H "Authorization: Bearer <token>" \
-  "http://127.0.0.1:8178/api/v1/mcp/sse?session_id=<sessionID>"
+  "http://127.0.0.1:8078/api/v1/mcp/sse?session_id=<sessionID>"
 ```
 
 - `-N` 关闭 curl 缓冲，可以连续看到 `event:`/`data:` 输出。
@@ -162,7 +162,7 @@ curl -N \
 ```bash
 npx wscat \
   -H "Authorization: Bearer <token>" \
-  -c "ws://127.0.0.1:8178/api/v1/mcp/ws?session_id=<sessionID>"
+  -c "ws://127.0.0.1:8078/api/v1/mcp/ws?session_id=<sessionID>"
 ```
 
 - 也可以使用 Insomnia/Postman/Newman 等工具发起 WebSocket 连接，只要在 Header 中附带 `Authorization` 即可。
@@ -180,7 +180,7 @@ npx wscat \
 
 ```bash
 # 场景 A：template.compose（草稿→审核→清理）
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -225,7 +225,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ```bash
 # 场景 B：template.audit（巡检→修复）
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -268,7 +268,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ```bash
 # 场景 C：template.quality_distribute（巡检 + 批量克隆 + 更新）
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -340,7 +340,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ```bash
 # list（分页查询模板）
-curl -s -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -s -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -362,7 +362,7 @@ curl -s -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/
 
 ```bash
 # read（读取模板详情）
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -384,7 +384,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ```bash
 # create（创建单个模板）
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -406,7 +406,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ```bash
 # update（缺省字段沿用现值）
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -428,7 +428,7 @@ curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ```bash
 # delete（删除模板）
-curl -X POST http://127.0.0.1:8178/api/v1/admin/runtime/sessions/<sessionID>/invoke \
+curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/invoke \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -475,9 +475,9 @@ PowerX 宿主会把插件整体挂载到 `/api/v1` 前缀之下，因此本地�
   ```bash
   curl -N \
     -H "Authorization: Bearer <token>" \
-    "http://127.0.0.1:8178/api/v1/mcp/sse?session_id=<sessionID>"
+    "http://127.0.0.1:8078/api/v1/mcp/sse?session_id=<sessionID>"
   ```
-- WebSocket：使用 Insomnia/Postman 或 `wscat` 连接 `ws://127.0.0.1:8178/api/v1/mcp/ws?session_id=<sessionID>`。
+- WebSocket：使用 Insomnia/Postman 或 `wscat` 连接 `ws://127.0.0.1:8078/api/v1/mcp/ws?session_id=<sessionID>`。
 
 订阅成功后连接会保持打开，屏幕没有任何输出属于正常现象——只要再发一次 Heartbeat/Invoke，就能在 SSE/WS 终端看到对应的 `session.heartbeat`、`invoke.completed` 等事件；每隔 25 秒还会有 `ping` 用于保活。SSE/WS 只是“观察窗口”，真正触发 Workflow 的步骤仍然是上文提到的 `/invoke` 接口。
 

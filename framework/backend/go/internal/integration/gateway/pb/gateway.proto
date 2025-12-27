@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package plugin.framework.integration.gateway.v1;
+
+option go_package = "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway/pb;gatewaypb";
+
+message InvokeCapabilityRequest {
+  string capability_id = 1;
+  string action = 2;
+  bytes payload_json = 3;
+  string request_id = 4;
+}
+
+message GatewayError {
+  string code = 1;
+  string message = 2;
+}
+
+message InvokeCapabilityResponse {
+  string trace_id = 1;
+  bytes result_json = 2;
+  repeated GatewayError errors = 3;
+  string status = 4;
+}
+
+service IntegrationGatewayTenantService {
+  rpc InvokeCapability(InvokeCapabilityRequest) returns (InvokeCapabilityResponse);
+}

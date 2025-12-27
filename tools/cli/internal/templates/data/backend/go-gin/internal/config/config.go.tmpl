@@ -65,6 +65,9 @@ type Config struct {
 	// AdminConsole 配置。
 	AdminConsole *AdminConsoleConfig `yaml:"admin_console" json:"admin_console"`
 
+	// Gateway 能力调用配置。
+	Gateway *GatewayConfig `yaml:"gateway" json:"gateway"`
+
 	// 向后兼容的字段（从环境变量或旧配置中填充）
 	BindAddr   string `yaml:"-" json:"bind_addr,omitempty"`
 	LogLevel   string `yaml:"-" json:"log_level,omitempty"`
@@ -161,6 +164,18 @@ type SecurityConfig struct {
 	GatewayAllowlist []string        `yaml:"gateway_allowlist" json:"gateway_allowlist"`
 	RequireTLS13     bool            `yaml:"require_tls13" json:"require_tls13"`
 	ToolGrantSecret  string          `yaml:"toolgrant_secret" json:"toolgrant_secret"`
+}
+
+// GatewayConfig 描述 Integration Gateway 所需配置。
+type GatewayConfig struct {
+	BaseURL      string        `yaml:"base_url" json:"base_url"`
+	ToolToken    string        `yaml:"tool_token" json:"tool_token"`
+	TenantUUID   string        `yaml:"tenant_uuid" json:"tenant_uuid"`
+	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
+	UserAgent    string        `yaml:"user_agent" json:"user_agent"`
+	UseMock      []string      `yaml:"use_mock" json:"use_mock"`
+	RefreshToken string        `yaml:"refresh_token" json:"refresh_token"`
+	AuthBaseURL  string        `yaml:"auth_base_url" json:"auth_base_url"`
 }
 
 // RateLimitConfig 限流配置
@@ -488,6 +503,9 @@ func getDefaultConfig() *Config {
 			Key:            "",
 		},
 		SecurityBaseline: defaultSecurityBaselineConfig(),
+		Gateway: &GatewayConfig{
+			UseMock: []string{},
+		},
 	}
 }
 
@@ -835,6 +853,41 @@ func loadEnvConfig(cfg *Config) {
 	if grpcServerKey := resolveConfigValue(os.Getenv("POWERX_GRPC_SERVER_KEY")); grpcServerKey != "" {
 		cfg.GRPCServer.Key = grpcServerKey
 	}
+
+	// Gateway 能力调用配置
+	if cfg.Gateway == nil {
+		cfg.Gateway = &GatewayConfig{}
+	}
+	if baseURL := resolveConfigValue(os.Getenv("PX_GATEWAY_BASE_URL")); baseURL != "" {
+		cfg.Gateway.BaseURL = baseURL
+	}
+	token := firstNonEmpty(
+		resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN")),
+		resolveConfigValue(os.Getenv("PX_TOOL_TOKEN")),
+	)
+	if token != "" {
+		cfg.Gateway.ToolToken = token
+	}
+	if tenant := resolveConfigValue(os.Getenv("PX_TENANT_UUID")); tenant != "" {
+		cfg.Gateway.TenantUUID = tenant
+	}
+	if timeout := resolveConfigValue(os.Getenv("PX_GATEWAY_TIMEOUT")); timeout != "" {
+		if d, err := time.ParseDuration(timeout); err == nil {
+			cfg.Gateway.Timeout = d
+		}
+	}
+	if ua := resolveConfigValue(os.Getenv("PX_GATEWAY_USER_AGENT")); ua != "" {
+		cfg.Gateway.UserAgent = ua
+	}
+	if mockModules := resolveConfigValue(os.Getenv("PX_USE_MOCK")); mockModules != "" {
+		cfg.Gateway.UseMock = splitCSV(mockModules)
+	}
+	if refreshToken := resolveConfigValue(os.Getenv("PX_TOOL_REFRESH_TOKEN")); refreshToken != "" {
+		cfg.Gateway.RefreshToken = refreshToken
+	}
+	if authBase := resolveConfigValue(os.Getenv("PX_AUTH_BASE_URL")); authBase != "" {
+		cfg.Gateway.AuthBaseURL = authBase
+	}
 }
 
 // syncBackwardCompatibility 同步向后兼容字段
@@ -992,6 +1045,36 @@ func resolveConfigValueWithDepth(value string, depth, maxDepth int) string {
 	return resolved
 }
 
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func splitCSV(input string) []string {
+	if strings.TrimSpace(input) == "" {
+		return nil
+	}
+	parts := strings.Split(input, ",")
+	result := make([]string, 0, len(parts))
+	seen := make(map[string]struct{})
+	for _, part := range parts {
+		trimmed := strings.ToLower(strings.TrimSpace(part))
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
+}
+
 // GetString 获取字符串配置，支持默认值
 func GetString(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
@@ -1119,6 +1202,22 @@ func (c *Config) Validate() error {
 		}
 		if c.GRPCServer.PortMaxRetries < 1 {
 			return NewConfigError("grpc_server.port_max_retries must be positive")
+		}
+	}
+
+	if c.Gateway != nil {
+		hasGatewayFields := strings.TrimSpace(c.Gateway.BaseURL) != "" ||
+			strings.TrimSpace(c.Gateway.ToolToken) != "" ||
+			strings.TrimSpace(c.Gateway.TenantUUID) != ""
+		if hasGatewayFields {
+			if strings.TrimSpace(c.Gateway.BaseURL) == "" ||
+				strings.TrimSpace(c.Gateway.ToolToken) == "" ||
+				strings.TrimSpace(c.Gateway.TenantUUID) == "" {
+				return NewConfigError("gateway config requires base_url, tool_token and tenant_uuid when enabled")
+			}
+			if _, err := uuid.Parse(strings.TrimSpace(c.Gateway.TenantUUID)); err != nil {
+				return NewConfigError("gateway.tenant_uuid must be a valid UUID string")
+			}
 		}
 	}
 

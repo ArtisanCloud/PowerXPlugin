@@ -81,6 +81,8 @@ const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
+const capabilityInvokeEndpoint = '/integration/capabilities/invoke'
+const capabilityApiBase = INSIDE_POWERX ? hostApiBase : localApiBase
 // 在宿主代理模式下指定 api base，即“模拟 standalone” 场景
 const simulateStandalone = INSIDE_POWERX && Boolean(envApiBase)
 
@@ -252,7 +254,11 @@ export default defineNuxtConfig({
       insidePowerX: INSIDE_POWERX,
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,
-      powerxCoreBase
+      powerxCoreBase,
+      powerx: {
+        apiBase: capabilityApiBase,
+        capabilityEndpoint: capabilityInvokeEndpoint
+      }
     }
   },
   nitro: {

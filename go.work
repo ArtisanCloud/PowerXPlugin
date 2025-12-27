@@ -5,3 +5,5 @@ use ./framework
 use ./skeleton/backend
 
 use ./tools/cli
+
+use ./tests

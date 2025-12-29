@@ -71,9 +71,10 @@
     "templates": "Templates",
     "templatesCrud": "Template CRUD",
     "templatesDevelop": "Templates Develop Guide",
-    "capabilities": "Capabilities",
+    "capabilities": "Plugin Capability Registry",
     "capabilitiesExposure": "Exposure & Quotas",
     "capabilitiesLifecycle": "Lifecycle Governance",
+    "capabilityLab": "PowerX Capability Lab",
     "iam": "IAM & Access",
     "iamOverview": "IAM Overview",
     "iamDepartments": "Departments",
@@ -487,6 +488,34 @@
   "termsOfService": "Terms of Service",
   "privacyPolicy": "Privacy Policy",
   "capabilities": {
+    "list": {
+      "title": "Capability catalog",
+      "description": "Review registered atomic capabilities and composite workflows. Grouped modules keep large catalogs scannable.",
+      "refresh": "Refresh",
+      "createButton": "Register capability",
+      "tableTitle": "Registered capabilities",
+      "tableHint": "Includes capability ID, type, execution mode and tags. After new submissions the list refreshes automatically.",
+      "tableEmpty": "No capability yet",
+      "column": {
+        "capability": "Capability",
+        "kind": "Type",
+        "execution": "Execution",
+        "tags": "Tags",
+        "checksum": "Checksum"
+      },
+      "kind": {
+        "workflow": "Workflow",
+        "capability": "Capability",
+        "tool": "Tool",
+        "default": "Capability"
+      },
+      "versionLabel": "Version {version}",
+      "noTags": "No tags",
+      "empty": "No capability registered yet. Click “Register capability” to add the first entry.",
+      "toast": {
+        "loadFailed": "Failed to load capability catalog"
+      }
+    },
     "form": {
       "title": "Capability Registration",
       "description": "Describe the capability, protocols, and samples so reviewers and PowerX workflows can reuse it instantly.",
@@ -562,7 +591,135 @@
         "invalidJson": "JSON parse error",
         "fixJson": "Please verify the sample request/response fields.",
         "genericError": "Unexpected error, please try again."
+      },
+      "debug": {
+        "title": "Capability Debugger",
+        "description": "Preview payloads and invoke plugin endpoints directly without going through the PowerX gateway.",
+        "docLink": "View guide",
+        "capability": "Capability ID",
+        "action": "Action",
+        "protocol": "Protocol",
+        "targetMode": "Target",
+        "target": {
+          "local": "Plugin endpoint",
+          "gateway": "PowerX gateway"
+        },
+        "apiBase": "API base URL",
+        "payload": "Payload template",
+        "payloadInvalid": "Invalid JSON payload",
+        "resetTemplate": "Reset",
+        "applyTemplate": "Apply template",
+        "tenantUuid": "Tenant UUID",
+        "mockModule": "Mock module",
+        "requestId": "Request ID",
+        "invoke": "Start debugging",
+        "requestPreview": "Request preview",
+        "collapsedPreview": "Click to expand request preview",
+        "status": "Status",
+        "statusFailed": "Failed",
+        "statusIdle": "Idle",
+        "duration": "Duration",
+        "traceId": "Trace ID",
+        "warnings": "Warnings",
+        "errors": "Errors",
+        "errorDetails": "Error details",
+        "responseData": "Response data",
+        "rawResponse": "Raw response",
+        "history": "Recent history",
+        "historySuccess": "Success",
+        "historyFail": "Failed",
+        "clearHistory": "Clear history",
+        "noHistory": "No history entries",
+        "capabilityRequired": "Capability ID is required",
+        "openDraft": "Debug current draft",
+        "openExisting": "Debug",
+        "payloadHint": "Only payload.body/query are sent to the actual endpoint; metadata is client-side only."
       }
+    },
+    "mcp": {
+      "openPanel": "MCP session debugger",
+      "panelTitle": "MCP session debugger",
+      "panelDescription": "Register or resume MCP sessions, send heartbeats, and invoke tools without leaving the plugin admin console.",
+      "docLink": "MCP guide",
+      "session": {
+        "title": "Session control",
+        "description": "Create runtime assignments, acknowledge readiness, refresh heartbeats, or close the session after debugging."
+      },
+      "fields": {
+        "runtimeAssignment": "Runtime assignment ID",
+        "jwtId": "JWT ID",
+        "registerState": "Register state",
+        "capabilitiesHash": "Capabilities hash",
+        "ackState": "ACK state",
+        "heartbeatMissed": "Missed heartbeats",
+        "closeReason": "Close reason",
+        "tenantUuid": "Tenant UUID",
+        "lastPing": "Last ping",
+        "createdAt": "Created at",
+        "updatedAt": "Updated at",
+        "sessionId": "Session ID",
+        "toolScope": "Tool scope",
+        "capabilityId": "Capability ID",
+        "intent": "Intent",
+        "idempotencyKey": "Idempotency key",
+        "signature": "Signature",
+        "messageId": "Message ID",
+        "traceId": "Trace ID",
+        "correlationId": "Correlation ID",
+        "issuedAt": "Issued at",
+        "payload": "Payload",
+        "metadata": "Metadata"
+      },
+      "actions": {
+        "register": "Register session",
+        "ack": "Send ACK",
+        "heartbeat": "Heartbeat",
+        "close": "Close session",
+        "invoke": "Invoke MCP tool",
+        "applyCapability": "Use current capability",
+        "debugCapability": "MCP debug",
+        "clearHistory": "Clear history",
+        "connectStream": "Connect SSE",
+        "disconnectStream": "Disconnect",
+        "clearEvents": "Clear events",
+        "issuedNow": "Now"
+      },
+      "toast": {
+        "runtimeRequired": "Runtime assignment ID is required.",
+        "sessionRequired": "Please create or select a session first.",
+        "toolScopeRequired": "Tool scope is required.",
+        "registered": "Session registered",
+        "acknowledged": "Session acknowledged",
+        "heartbeat": "Heartbeat sent",
+        "closed": "Session closed",
+        "invoked": "Invoke completed",
+        "capabilityMissing": "Current draft has no capability ID yet.",
+        "capabilitySynced": "Capability synced to MCP payload"
+      },
+      "invoke": {
+        "title": "Invoke envelope",
+        "description": "Fill the integration envelope, including trace IDs and payload_ref JSON. The payload is automatically minified before sending.",
+        "status": "Status",
+        "failed": "Failed",
+        "idle": "Idle",
+        "history": "Invoke history",
+        "historySuccess": "Success",
+        "historyFail": "Failed",
+        "noHistory": "No invoke history yet."
+      },
+      "errors": {
+        "invalidPayload": "Payload JSON is invalid.",
+        "invalidMetadata": "Metadata JSON is invalid.",
+        "invalidIssuedAt": "Issued-at timestamp is invalid."
+      },
+      "stream": {
+        "title": "SSE events",
+        "description": "Subscribe to /mcp/sse for the active session to watch register/ack/heartbeat/invoke events in real time.",
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "empty": "No stream events yet. Connect after registering a session."
+      },
+      "streamError": "Stream connection failed. Retry or reconnect."
     },
     "exposure": {
       "title": "Capability Exposure & Tenant Quotas",

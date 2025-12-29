@@ -304,6 +304,64 @@ iframe.contentWindow?.postMessage(
 - 当宿主重新注入 Token（`postMessage(type='auth-token')`）或开发者点击 Banner 的“关闭”按钮时，提示会自动消失，当前路由保持不变。
 - Standalone 模式仍旧采用传统行为：缺少 Token 时立即携带 `redirect` 参数跳转到登录页，确保本地 IAM 体验不受影响。
 
+### 2.11 Gateway 能力调用代理（宿主模式必走插件后端）
+
+从 009 consume-capability 版本开始，**宿主模式的能力调用必须经过插件后端代理**，所有 `PX_*` 凭证仅注入给 Go 进程，前端永远通过插件自有 API 转发。这么做可以：
+
+1. 统一注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`，由 `bootstrap.NewAppFromEnv` 填入 Gateway Client；避免在浏览器暴露 Tool Token。
+2. 通过 `framework/backend/go/router` 中的 `POST /api/v1/integration/capabilities/invoke` 统一做 action/payload 校验、traceId 记录与错误整形。
+3. 让 Admin/Skeleton 前端和 CLI 共用一套 `usePowerXCapability()` 封装，既能获得 `traceId` 也能透传限流/鉴权提示。
+
+#### 调用流程
+
+```mermaid
+sequenceDiagram
+    participant UI as Admin UI
+    participant PluginAPI as 插件后端 /api/v1
+    participant Gateway as PowerX Integration Gateway
+    UI->>PluginAPI: POST /integration/capabilities/invoke\n{capabilityId, action, payload}
+    PluginAPI->>Gateway: POST /tenant/invocations\nAuthorization: Bearer <PX_PLUGIN_TOOL_TOKEN>
+    Gateway-->>PluginAPI: 200 {"traceId":"...","status":"ok"}
+    PluginAPI-->>UI: 200 {"traceId":"...","data":{...}} + X-Trace-Id
+```
+
+- **前端**：在宿主模式中，`framework-admin` Layer 已挂载 `app/plugins/powerx-capability.client.ts` 与 `usePowerXCapability()`，仅需要向 runtimeConfig 设置 `public.powerx.apiBase = '/api/v1'`、`public.powerx.capabilityEndpoint = '/integration/capabilities/invoke'`。示例：
+
+  ```ts
+  const { invokeCapability } = usePowerXCapability()
+  const { data, traceId } = await invokeCapability({
+    capabilityId: 'com.corex.media.assets.manage',
+    action: 'List',
+    payload: { folder: 'inbox' }
+  })
+  ```
+
+- **后端**：`capabilityinvoker.Service` 会将 `X-Tenant-UUID`、`X-Request-ID` 透传到 Gateway（有则转发），成功时在响应体与 `X-Trace-Id` Header 写回 traceId。返回 JSON 结构：
+
+  ```json
+  {
+    "traceId": "trace-media-success",
+    "status": "ok",
+    "data": { "mediaId": "media-1" }
+  }
+  ```
+
+  前端拿到 traceId 后即可在 Kibana/日志中对照 `capability.invoke.success`。
+
+#### 常见错误与排查
+
+| 错误类型 (`error.type`) | HTTP | 典型原因 | 排查步骤 |
+| --- | --- | --- | --- |
+| `validation` | `400` | `capabilityId`/`action` 为空、payload 缺字段 | 检查入参是否符合能力契约；`tests/capabilities/media_invocation_test.go` 展示了最小 payload；必要时查看 router 打印的校验日志。 |
+| `unauthorized` | `401/403` | `PX_PLUGIN_TOOL_TOKEN` 已过期或租户 UUID 不匹配 | 使用 `px-plugin login` 重新申请 Grant，或在宿主部署脚本中刷新环境变量；确认请求头 `X-Tenant-UUID` 是否与运维配置一致。 |
+| `rate_limited` | `429` | 能力 QPS 超限 | 响应会包含 `traceId` 与 `error.code=RATE_LIMIT`；先查看宿主 Gateway 仪表板或联系平台扩容，再在前端提示用户稍后重试。 |
+| `upstream` | `502/504` | Gateway 不可达、action 未发布 | 查看插件后端日志 `capability.invoke.failure`，确认 `statusCode` 与 `message`；必要时将结果写入告警或切换 `PX_USE_MOCK`。 |
+
+> ✅ 任何错误都会在响应头写入 `X-Trace-Id` 并包含 `traceId` 字段，便于与 Gateway 日志对齐。  
+> ✅ 如需脚本化验证，可运行 `go test ./tests/capabilities`，该用例会启动 stub Gateway 校验成功与限流场景。
+
+**不要**在 Nuxt `.env` 内保留 `PX_GATEWAY_BASE_URL` / `PX_PLUGIN_TOOL_TOKEN`。宿主构建 (`POWERX_PROXY=1 npm run build`) 会忽略这些变量，仅保留 `NUXT_PUBLIC_POWERX_API_BASE` 等“可公开”字段；若检测到遗留 `PX_*`，请立即移除并重新构建。
+
 ## 3. 打包与环境变量注意事项
 
 - 给宿主发布的资产必须保持 `POWERX_PROXY=1` 且不要附带任何 `NUXT_PUBLIC_API_BASE=http://localhost:8078`、`NUXT_DEV_*` 之类的本地值，否则构建产物会把 API 指向你的本地端口，安装到宿主后无法加载。

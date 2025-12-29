@@ -1,7 +1,7 @@
 {
   "plugin_id": "com.powerx.plugins.base",
   "manifest_version": "0.7.0",
-  "generated_at": "2025-12-10T06:14:50.459Z",
+  "generated_at": "2025-12-19T16:19:46.115Z",
   "imports": [
     "contracts/capabilities/com.powerx.plugins.base.template.list.yaml",
     "contracts/capabilities/com.powerx.plugins.base.template.read.yaml",
@@ -31,7 +31,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "b4664f6c65ad2f9707d8033011941c094333b0ea908f77082efb7ca7dc74c204"
+      "checksum": "25bc6d692e5ec56646d93184ad1a7e29a89260a7f4a284869d9a91e578534e91"
     },
     {
       "id": "com.powerx.plugins.base.template.read",
@@ -47,7 +47,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "c552731c5a2265ea64ebf8d13730f9e501ff19887ed00fbed8b612a57c1ce7eb"
+      "checksum": "a593e2d0af3b378d13102d4e1fe19f24fe4eb7dd263a7d8d73be96eb4dbe938d"
     },
     {
       "id": "com.powerx.plugins.base.template.create",
@@ -63,7 +63,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "075c4dc006090d2839f63038c7d93719e0b175479f4560a7c40bf4b426b552b0"
+      "checksum": "c7f645ed70e5d7b3501b07afaec72843066e8d18fa16bad86354a7d38e0e0dc3"
     },
     {
       "id": "com.powerx.plugins.base.template.update",
@@ -79,7 +79,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "1a49feb6af45b3b627ed91193cae020d1edea57701205c944e945126f494cfa7"
+      "checksum": "5defdabd023e12b9cea9c6b74afa188c3d7d62845c50a35c7b856a2ee5f3e5fa"
     },
     {
       "id": "com.powerx.plugins.base.template.delete",
@@ -95,7 +95,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "99b0c67a164e36881673e96247c05b0db4dceb9a06a32a1508d1a9105cfe7fc5"
+      "checksum": "1e7b89f0a8fb042465f1bf108c95d93bc3141a9c05aecdba720f8fd162bedcc4"
     },
     {
       "id": "com.powerx.plugins.base.template.review",
@@ -111,7 +111,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "cf8ffd6fb8e5b5be27aa0f83c69d246e5e6bf4f0d694b43a65aea469ba0146c4"
+      "checksum": "5c9d0a4156fbd250c16dbd0b868ee904bc33d07cbdf074770d1e7497097eea3b"
     },
     {
       "id": "com.powerx.plugins.base.template.publish",
@@ -143,7 +143,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "e482caabe56226797bcd61e2cc4ea15b9044c149cdef639b042e1dbc812cfab3"
+      "checksum": "1bfac894f3964b6b8ad8a16e31798212715c6139ff6cef73b0c90a84f5d4f9eb"
     },
     {
       "id": "com.powerx.plugins.base.template.audit",
@@ -159,7 +159,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "3207e604d3a1f363759a6343841b2d8d2d03cdf803495a49c113c7dba9315312"
+      "checksum": "32fc42a0e7142e47ce85eaf0a6b0fb0d48b30e0ad86f79162b6c1c5f22b7d43c"
     },
     {
       "id": "com.powerx.plugins.base.template.batch_clone",
@@ -175,7 +175,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "1885d9c19db21678e131abcd57f259936ee35d605fa1570fc2c5d99dcf7bb8c9"
+      "checksum": "12ea2e62145305fee4480bfe3d6536834f075b104643fbdacaecaf0540b4d1bf"
     },
     {
       "id": "com.powerx.plugins.base.template.validate",
@@ -191,7 +191,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "5332a70672b82a662c4d2c3ae7479ba05c037f8514f4b8a9b951057e03b84755"
+      "checksum": "86ee4f50c9e23427157109f7613c25b95499e7891fd2b573f3c7c10a82d36214"
     },
     {
       "id": "com.powerx.plugins.base.template.quality_distribute",
@@ -207,7 +207,7 @@
         "status_endpoint": "",
         "timeout_seconds": 0
       },
-      "checksum": "34812b59fc1f97b47c08dfe1398662f925b5dcf6dbb6c147ae4a09082520a440"
+      "checksum": "5a3dd9e95b98fc2f84a48acbb1c76e39460524861a6a8de28401767766b3c679"
     }
   ]
 }

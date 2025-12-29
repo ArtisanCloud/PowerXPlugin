@@ -2,8 +2,10 @@ package capability
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	capservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/capability"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
@@ -25,8 +27,12 @@ func NewCatalogHandler(deps *app.Deps) *CatalogHandler {
 
 // List returns all capabilities collected in the catalog snapshot.
 func (h *CatalogHandler) List(c *gin.Context) {
-	entries, err := h.service.List(c.Request.Context())
+	source := strings.TrimSpace(c.Query("source"))
+	entries, err := h.service.List(c.Request.Context(), capservice.ListOptions{Source: source})
 	if err != nil {
+		logger.WithError(err).
+			WithField("component", "capability_catalog_handler").
+			Error("failed to load capability catalog")
 		contracts.ResponseErrorWithDetails(
 			c,
 			http.StatusInternalServerError,
@@ -36,5 +42,10 @@ func (h *CatalogHandler) List(c *gin.Context) {
 		)
 		return
 	}
+	logger.WithFields(logger.Fields{
+		"component":    "capability_catalog_handler",
+		"entry_count":  len(entries),
+		"request_path": c.FullPath(),
+	}).Info("capability catalog request handled")
 	contracts.ResponseSuccess(c, entries)
 }

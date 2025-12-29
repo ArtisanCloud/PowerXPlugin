@@ -107,19 +107,6 @@
           {{ `{{ t('navigation.capabilities') }}` }}
         </UButton>
         <UButton
-          to="/capabilities/exposure"
-          variant="ghost"
-          color="neutral"
-          class="w-full justify-start mt-1"
-          :class="{
-            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-              isExactActive('/capabilities/exposure'),
-          }"
-        >
-          <UIcon name="i-heroicons-adjustments-horizontal" class="w-4 h-4 mr-3" />
-          {{ `{{ t('navigation.capabilitiesExposure') }}` }}
-        </UButton>
-        <UButton
           to="/capabilities/lifecycle"
           variant="ghost"
           color="neutral"
@@ -131,6 +118,20 @@
         >
           <UIcon name="i-heroicons-clock" class="w-4 h-4 mr-3" />
           {{ `{{ t('navigation.capabilitiesLifecycle') }}` }}
+        </UButton>
+        <UButton
+          v-if="showCapabilityLab"
+          to="/powerx/capability-lab"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/powerx/capability-lab'),
+          }"
+        >
+          <UIcon name="i-heroicons-beaker" class="w-4 h-4 mr-3" />
+          {{ `{{ t('navigation.capabilityLab') }}` }}
         </UButton>
       </div>
 
@@ -198,12 +199,27 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from "vue";
+import { storeToRefs } from "pinia";
+import { useUserStore } from "~/stores/user";
+
 const { t } = useI18n();
 const route = useRoute();
 const auth = useAuth();
 
 const showTemplatesMenu = ref(true);
 const showIAMMenu = computed(() => auth.localIAMEnabled?.value ?? false);
+const userStore = useUserStore();
+const { isRoot } = storeToRefs(userStore);
+const showCapabilityLab = computed(() => Boolean(isRoot.value));
+
+onMounted(() => {
+  if (!userStore.context && !userStore.isLoading) {
+    userStore.fetchUserContext().catch(() => {
+      /* ignore sidebar fetch errors */
+    });
+  }
+});
 
 const normalizePath = (value: string) => {
   if (!value) {

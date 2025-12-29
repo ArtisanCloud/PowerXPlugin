@@ -25,7 +25,17 @@
 3. **CLI 模板生成与自测**  
    - 参考《[使用 CLI 生成并运行插件骨架](./develop/cli-plugin-tutorial.md)》构建 `px-plugin`、执行 `./bin/px-plugin init <plugin-id>` 生成骨架。  
    - 在新项目中运行 `go test ./...`、`npm run lint` 并复用上述 CRUD/延迟脚本，确认 CLI 输出与 Skeleton 行为一致。  
-   - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。**注意**：本仓库的 manifest 真源在 `skeleton/plugin.yaml`，根目录的 `plugin.yaml` 为 symlink，运行相关命令时建议在 `skeleton/` 内执行或显式传入 `--manifest ./skeleton/plugin.yaml`。
+   - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。**注意**：本仓库的 manifest 真源在 `skeleton/plugin.yaml`，根目录的 `plugin.yaml` 为 symlink，运行相关命令时建议在 `skeleton/` 内执行或显式传入 `--manifest ./skeleton/plugin.yaml`。  
+  - 如需调用 PowerX 通用能力，请在 `skeleton/plugin.yaml` 的 `capabilities.required`（即 manifest 的 `requiredCapabilities` 区块）填入授权 ID，并运行：  
+     ```bash
+     px-plugin capabilities plan --manifest ./skeleton/plugin.yaml
+     px-plugin capabilities apply --manifest ./skeleton/plugin.yaml  # 将核准的能力写回 Registry
+     ```  
+     其中：
+     1. `plan` 会比对 `capabilities.required` 与 Registry，若缺少授权会列出差异，阻止继续构建；
+     2. `apply`/`lint|submit` 用于将审批通过的能力同步回 manifest，常在 CI/CD 中执行；
+     3. 未传入 `--manifest` 时脚本现已自动回退到 `./skeleton/plugin.yaml`，建议总是显式指定以避免误操作。
+     详细流程与示例请参考《[009-插件侧调用 PowerX 通用开放能力方案](../plan/009-consume-powerx-capability.md)》以及 `specs/009-consume-powerx-capability/quickstart.md`。
    - 运行 `npm run test`（默认使用 `./skeleton/plugin.yaml`，若不存在会自动回退到根目录清单），以及 `make capabilities-export`，确保能力目录与多协议资产均已生成；导出的 `contracts/exposure/*` 与 `dist/agent-sdk/manifest.json` 将用于 Workflow / Agent 注册。
    - 若需暴露能力，请同步阅读《[能力注册与暴露指南](./publish/capabilities.md)》，并在提交发布之前运行 `px-plugin capabilities init/lint/submit`，避免发布阶段被能力审核阻断。
 

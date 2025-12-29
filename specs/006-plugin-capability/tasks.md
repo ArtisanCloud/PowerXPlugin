@@ -56,6 +56,15 @@
 - [X] T302 [US3] 在 `skeleton/backend/internal/services/capability/exposure_service.go` 同步渠道配置、生成 docs bundle、SDK bundle。
 - [X] T303 [P][US3] 实现租户授权 API `skeleton/backend/internal/transport/http/admin/capability/quota_handler.go`，支持额度调整与审计。
 - [X] T304 [US3] 更新 `contracts/exposure/openapi.yaml` & `dist/agent-sdk/` 生成脚本，确保 3 分钟内同步至 API Gateway/Portal。
+- [X] T305 [US3] 将暴露配置整合进能力注册页：复用 catalog 协议（`metadata.protocols.*`）生成只读通道模板，统一在 `RegisterForm.vue` 中管理租户授权/限流，并移除 `/capabilities/exposure` 独立页面；同时在 UI 与 `spec.md` 里明确要求开发者在修改 `skeleton/plugin.yaml` 或 `contracts/capabilities/*.yaml` 后执行 `scripts/capabilities run catalog -- --manifest "$(pwd)/skeleton/plugin.yaml"` 以保持 `capabilities/catalog.json` 最新。
+
+---
+
+## Phase 5b: 插件本地调试模式 (P1)
+
+- [X] T306 [US6] 在 `skeleton/web-admin/app/pages/capabilities/RegisterForm.vue` 与 `useCapabilityLab` 中新增“本地调试”适配器：默认直接调用插件 REST/gRPC/Workflow 端口，支持在 UI 中展示/切换模式，且无需依赖 `/api/v1/integration/capabilities/invoke` 或租户授权。
+- [X] T307 [US6] 扩展前端/后端支持文件：为 REST 模式实现 `fetchLocalCapability`（拼接 `apiBase + path`）、为 gRPC 模式提供本地代理/反向代理配置，并在 tests/e2e 中覆盖“本地调试”成功与错误提示。
+- [X] T308 [P][US6] 更新文档与 i18n：`docs/guides/develop/plugin-capability/README.md`、页面帮助文案以及 `spec.md/plan.md`，明确默认行为为“插件独立运行直接调试”，并添加快速排障指引。
 
 ---
 

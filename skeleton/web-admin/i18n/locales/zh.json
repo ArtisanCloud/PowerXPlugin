@@ -71,9 +71,10 @@
     "templates": "模板管理",
     "templatesCrud": "模板 CRUD",
     "templatesDevelop": "开发指南",
-    "capabilities": "能力注册",
+    "capabilities": "插件能力注册",
     "capabilitiesExposure": "能力暴露配置",
     "capabilitiesLifecycle": "生命周期治理",
+    "capabilityLab": "PowerX 能力调试",
     "iam": "组织与权限",
     "iamOverview": "租户总览",
     "iamDepartments": "组织结构",
@@ -585,6 +586,11 @@
   "termsOfService": "服务条款",
   "privacyPolicy": "隐私政策",
   "capabilities": {
+    "catalogSync": {
+      "title": "能力目录未刷新？",
+      "desc": "修改 skeleton/plugin.yaml 或 contracts/capabilities/*.yaml 后，请在仓库根目录执行 catalog 命令以生成最新的 capabilities/catalog.json。",
+      "command": "npm --prefix scripts/capabilities run catalog -- --manifest \"$(pwd)/skeleton/plugin.yaml\""
+    },
     "list": {
       "title": "能力目录",
       "description": "查看插件当前注册的原子能力与复合任务，快速发起新能力的建模与审批。",
@@ -595,9 +601,16 @@
       "tableEmpty": "暂无能力",
       "column": {
         "capability": "能力",
+        "kind": "类型",
         "execution": "执行模式",
         "tags": "标签",
         "checksum": "版本校验"
+      },
+      "kind": {
+        "workflow": "Workflow（流程）",
+        "capability": "原子能力",
+        "tool": "工具",
+        "default": "能力"
       },
       "versionLabel": "版本 {version}",
       "noTags": "未设置标签",
@@ -686,7 +699,135 @@
         "invalidJson": "JSON 无法解析",
         "fixJson": "请检查示例请求/响应字段。",
         "genericError": "发生未知错误，请稍后重试。"
+      },
+      "debug": {
+        "title": "能力调试面板",
+        "description": "无需依赖 PowerX Gateway，直接调用插件本地接口验证协议配置是否正确。",
+        "docLink": "查看文档",
+        "capability": "能力 ID",
+        "action": "动作",
+        "protocol": "协议",
+        "targetMode": "调试目标",
+        "target": {
+          "local": "插件本地接口",
+          "gateway": "PowerX 网关"
+        },
+        "apiBase": "API Base 地址",
+        "payload": "调试 Payload",
+        "payloadInvalid": "JSON 解析失败",
+        "resetTemplate": "重置",
+        "applyTemplate": "套用模板",
+        "tenantUuid": "Tenant UUID",
+        "mockModule": "Mock 模块",
+        "requestId": "请求 ID",
+        "invoke": "开始调试",
+        "requestPreview": "请求预览",
+        "collapsedPreview": "点击展开请求预览",
+        "status": "状态",
+        "statusFailed": "失败",
+        "statusIdle": "未调用",
+        "duration": "耗时",
+        "traceId": "Trace ID",
+        "warnings": "警告",
+        "errors": "错误",
+        "errorDetails": "错误详情",
+        "responseData": "响应数据",
+        "rawResponse": "原始响应",
+        "history": "最近调用记录",
+        "historySuccess": "成功",
+        "historyFail": "失败",
+        "clearHistory": "清空记录",
+        "noHistory": "暂无记录",
+        "capabilityRequired": "请先填写能力 ID",
+        "openDraft": "调试当前草稿",
+        "openExisting": "调试",
+        "payloadHint": "只有 payload.body/query 会真正发送到接口，其他字段仅用于构造请求。"
       }
+    },
+    "mcp": {
+      "openPanel": "MCP 会话调试",
+      "panelTitle": "MCP 会话调试",
+      "panelDescription": "无需 curl，就能在插件后台完成 REGISTER / ACK / Heartbeat / Invoke / SSE 全流程联调。",
+      "docLink": "阅读 MCP 手册",
+      "session": {
+        "title": "会话控制",
+        "description": "创建 Runtime Assignment、发送 ACK/Heartbeat，并在调试结束后主动关闭会话。"
+      },
+      "fields": {
+        "runtimeAssignment": "Runtime Assignment ID",
+        "jwtId": "JWT ID",
+        "registerState": "注册状态",
+        "capabilitiesHash": "能力清单哈希",
+        "ackState": "ACK 状态",
+        "heartbeatMissed": "漏心跳次数",
+        "closeReason": "关闭原因",
+        "tenantUuid": "租户 UUID",
+        "lastPing": "最后心跳",
+        "createdAt": "创建时间",
+        "updatedAt": "更新时间",
+        "sessionId": "Session ID",
+        "toolScope": "Tool Scope",
+        "capabilityId": "能力 ID",
+        "intent": "Intent",
+        "idempotencyKey": "幂等键",
+        "signature": "签名",
+        "messageId": "Message ID",
+        "traceId": "Trace ID",
+        "correlationId": "Correlation ID",
+        "issuedAt": "Issued At",
+        "payload": "Payload JSON",
+        "metadata": "Metadata JSON"
+      },
+      "actions": {
+        "register": "注册会话",
+        "ack": "发送 ACK",
+        "heartbeat": "发送心跳",
+        "close": "关闭会话",
+        "invoke": "执行 Invoke",
+        "applyCapability": "引用当前能力",
+        "debugCapability": "MCP 调试",
+        "clearHistory": "清空历史",
+        "connectStream": "连接 SSE",
+        "disconnectStream": "断开",
+        "clearEvents": "清空事件",
+        "issuedNow": "当前时间"
+      },
+      "toast": {
+        "runtimeRequired": "Runtime Assignment ID 不能为空。",
+        "sessionRequired": "请先创建或选择一个 Session。",
+        "toolScopeRequired": "必须填写 Tool Scope。",
+        "registered": "会话注册成功",
+        "acknowledged": "ACK 已提交",
+        "heartbeat": "心跳已发送",
+        "closed": "会话已关闭",
+        "invoked": "Invoke 完成",
+        "capabilityMissing": "当前草稿还没有能力 ID。",
+        "capabilitySynced": "已将当前能力写入 MCP payload。"
+      },
+      "invoke": {
+        "title": "Invoke 数据包",
+        "description": "填写 Integration Envelope（含 Trace/Correlation/IssuedAt 与 payload_ref JSON），直接调用 MCP 工具。",
+        "status": "状态",
+        "failed": "失败",
+        "idle": "空闲",
+        "history": "调用历史",
+        "historySuccess": "成功",
+        "historyFail": "失败",
+        "noHistory": "暂无历史记录"
+      },
+      "errors": {
+        "invalidPayload": "Payload JSON 无法解析。",
+        "invalidMetadata": "Metadata JSON 无法解析。",
+        "invalidIssuedAt": "IssuedAt 时间格式不正确。"
+      },
+      "stream": {
+        "title": "SSE 事件",
+        "description": "订阅 /mcp/sse，实时查看 register/ack/heartbeat/invoke 推送。",
+        "connected": "已连接",
+        "disconnected": "未连接",
+        "empty": "暂无事件，请先连接 SSE。"
+      },
+      "streamError": "SSE 连接失败，请重试。"
     },
     "exposure": {
       "title": "能力暴露通道配置",
@@ -718,6 +859,7 @@
         "channels": "通道配置",
         "enabled": "通道已启用",
         "channelHint": "启用后将出现在宿主的 API/Workflow/Agent 列表中",
+        "descriptorNote": "协议细节来自 {path} 的 metadata.protocols.{key}，如需调整请编辑 YAML",
         "auth": "鉴权与凭证",
         "rateLimit": "限流与熔断",
         "quotas": "租户授权与配额",
@@ -745,7 +887,13 @@
         "tenantName": "租户名称",
         "quota": "额度",
         "status": "状态",
-        "notes": "备注"
+        "notes": "备注",
+        "method": "方法",
+        "path": "路径",
+        "service": "Service",
+        "template": "Workflow 模板",
+        "channelPath": "通道文件",
+        "toolId": "工具 ID"
       },
       "actions": {
         "load": "加载配置",
@@ -839,6 +987,7 @@
         "empty": "暂无计划，先创建一条生命周期计划即可在此处管理。",
         "planMeta": "由 {author} 于 {time} 创建"
       },
+      "modalHint": "填写计划后可提交执行，必要时可以暂停或回滚。",
       "units": {
         "hours": "小时"
       },

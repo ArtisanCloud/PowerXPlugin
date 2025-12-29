@@ -22,6 +22,20 @@
       </div>
     </section>
 
+    <UAlert variant="soft" color="neutral" class="bg-white/5 dark:bg-white/5">
+      <template #title>
+        {{ `{{ $t("capabilities.catalogSync.title") }}` }}
+      </template>
+      <template #description>
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+          {{ `{{ $t("capabilities.catalogSync.desc") }}` }}
+        </p>
+        <code class="mt-1 inline-flex select-all rounded bg-gray-900/80 px-2 py-1 font-mono text-xs text-white">
+          {{ `{{ catalogCommand }}` }}
+        </code>
+      </template>
+    </UAlert>
+
     <UCard>
       <template #header>
         <div class="flex flex-col gap-1">
@@ -39,30 +53,30 @@
       <div v-else>
         <UTable
           v-if="catalogRows.length"
-          :rows="catalogRows"
+          :data="catalogRows"
           :columns="tableColumns"
           :ui="{ td: { base: 'align-top' } }"
         >
           <template #capability_id-cell="{ row }">
             <div class="flex flex-col">
-              <span class="font-semibold text-gray-900 dark:text-white">{{ `{{ row.capability_id }}` }}</span>
+              <span class="font-semibold text-gray-900 dark:text-white">{{ `{{ row.original.capability_id }}` }}</span>
               <small class="text-xs text-gray-500 dark:text-gray-400">
-                {{ `{{ $t("capabilities.list.versionLabel", { version: row.version }) }}` }}
+                {{ `{{ $t("capabilities.list.versionLabel", { version: row.original.version }) }}` }}
               </small>
             </div>
           </template>
           <template #descriptor-cell="{ row }">
-            <p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ row.descriptor }}` }}</p>
+            <p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ row.original.descriptor }}` }}</p>
           </template>
           <template #status-cell="{ row }">
             <div class="flex flex-col gap-1">
               <UBadge
-                :label="lifecycleBadge(row.status).label"
-                :color="lifecycleBadge(row.status).color"
+                :label="lifecycleBadge(row.original.status).label"
+                :color="lifecycleBadge(row.original.status).color"
                 variant="soft"
               />
-              <span v-if="row.updatedAt" class="text-xs text-gray-500">
-                {{ `{{ $t("capabilities.lifecycle.catalog.updatedAt", { time: row.updatedAt }) }}` }}
+              <span v-if="row.original.updatedAt" class="text-xs text-gray-500">
+                {{ `{{ $t("capabilities.lifecycle.catalog.updatedAt", { time: row.original.updatedAt }) }}` }}
               </span>
             </div>
           </template>
@@ -70,16 +84,24 @@
             <UButton
               size="xs"
               icon="i-heroicons-arrow-right-circle"
-              @click="openManager(row.capability_id)"
+              @click="openManager(row.original.capability_id)"
             >
               {{ `{{ $t("capabilities.lifecycle.catalog.actions.manage") }}` }}
             </UButton>
           </template>
         </UTable>
         <div v-else class="py-16 text-center">
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ `{{ $t("capabilities.lifecycle.catalog.empty") }}` }}
-          </p>
+          <div class="space-y-3">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ `{{ $t("capabilities.lifecycle.catalog.empty") }}` }}
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ `{{ $t("capabilities.catalogSync.desc") }}` }}
+              <code class="ml-1 rounded bg-gray-900/80 px-2 py-1 font-mono text-[11px] text-white">
+                {{ `{{ catalogCommand }}` }}
+              </code>
+            </p>
+          </div>
         </div>
       </div>
     </UCard>
@@ -89,33 +111,33 @@
       prevent-close
       :ui="{ content: 'max-w-5xl w-[95vw] mx-auto' }"
     >
+      <template #header>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+            {{ `{{ $t("capabilities.lifecycle.title") }}` }}
+          </h2>
+          <p class="text-sm text-gray-500 dark:text-gray-300">
+            {{ `{{ $t("capabilities.lifecycle.description") }}` }}
+          </p>
+        </div>
+      </template>
+      <template #description>
+        {{ `{{ $t("capabilities.lifecycle.modalHint") }}` }}
+      </template>
       <template #body>
         <div class="space-y-6">
-          <div class="flex flex-col gap-2">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                  {{ `{{ $t("capabilities.lifecycle.title") }}` }}
-                </h2>
-                <p class="text-gray-600 dark:text-gray-300">
-                  {{ `{{ $t("capabilities.lifecycle.description") }}` }}
-                </p>
-              </div>
-              <UButton icon="i-heroicons-x-mark" variant="ghost" color="neutral" @click="closeManager" />
+          <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
+            <div class="inline-flex items-center gap-1">
+              <UIcon name="i-heroicons-cube" />
+              <span class="font-medium">{{ `{{ $t("capabilities.lifecycle.fields.capabilityId") }}` }}:</span>
+              <code class="rounded bg-gray-100 px-2 py-0.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+                {{ `{{ planForm.capability_id || "—" }}` }}
+              </code>
             </div>
-            <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-              <div class="inline-flex items-center gap-1">
-                <UIcon name="i-heroicons-cube" />
-                <span class="font-medium">{{ `{{ $t("capabilities.lifecycle.fields.capabilityId") }}` }}:</span>
-                <code class="rounded bg-gray-100 px-2 py-0.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
-                  {{ `{{ planForm.capability_id || "—" }}` }}
-                </code>
-              </div>
-              <UBadge :label="modalStatus.label" :color="modalStatus.color" variant="soft" />
-              <span v-if="lifecycleMeta[planForm.capability_id]?.updated_at" class="text-xs text-gray-500">
-                {{ `{{ $t("capabilities.lifecycle.catalog.updatedAt", { time: lifecycleMeta[planForm.capability_id]?.updated_at }) }}` }}
-              </span>
-            </div>
+            <UBadge :label="modalStatus.label" :color="modalStatus.color" variant="soft" />
+            <span v-if="lifecycleMeta[planForm.capability_id]?.updated_at" class="text-xs text-gray-500">
+              {{ `{{ $t("capabilities.lifecycle.catalog.updatedAt", { time: lifecycleMeta[planForm.capability_id]?.updated_at }) }}` }}
+            </span>
           </div>
 
           <UCard :ui="{ body: 'space-y-6' }">
@@ -436,6 +458,7 @@ const catalogLoading = ref(false);
 const catalog = ref<CapabilityCatalogEntry[]>([]);
 const formOpen = ref(false);
 const lifecycleMeta = reactive<Record<string, LifecycleMetaState>>({});
+const catalogCommand = computed(() => t("capabilities.catalogSync.command"));
 
 const planForm = reactive({
   capability_id: "",

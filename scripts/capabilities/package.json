@@ -6,7 +6,8 @@
     "lint": "node validate-capabilities.mjs",
     "catalog": "tsx catalog-parser.ts",
     "export": "node export.mjs",
-    "registry": "node registry-cli.mjs"
+    "registry": "node registry-cli.mjs",
+    "digest": "node contract-digest.mjs"
   },
   "dependencies": {
     "yaml": "^2.8.1"

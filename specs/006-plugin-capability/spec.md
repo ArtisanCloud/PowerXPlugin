@@ -80,6 +80,21 @@ PowerX 底座在插件安装或版本升级时调用 Capabilities Manager，获�
 1. **Given** 插件安装完成并暴露 `capabilities/*.yaml`，**When** PowerX 启动能力同步流程，**Then** `/admin/capability_registry` 中新增对应能力记录，Workflow/Agent 后台可查询到节点或工具。
 2. **Given** 插件新增复合 Workflow 与 Agent SSE 模板，**When** Capabilities Manager 导出最新协议并提交，**Then** Workflow Builder 可拖拽该 Workflow 节点，Agent Hub 可在意图匹配时调度该工具并接收 SSE 事件。
 
+---
+
+### User Story 6 - 插件本地能力调试零依赖宿主 (Priority: P1)
+
+在插件仅以独立模式运行时，开发者需要在 `/capabilities/register` 页面一边填写协议，一边直接调用插件自身的 REST/gRPC/Workflow 接口验证链路，无需宿主租户授权、Registry 配置或 PowerX Gateway；该调试体验需与 `/powerx/capability-lab` 一致，包括请求预览、TraceId、错误/Mock 提示。
+
+**Why this priority**: 插件开发者在提交 PR 之前必须验证接口是否可用；若需要依赖宿主授权或额外配置，会拖慢开发速度并无法复现实验环境。
+
+**Independent Test**: 启动插件 Web Admin + Backend（不连接宿主），在 `/capabilities/register` 中填写协议，直接调用插件本地端口（REST `8078`、gRPC `9090` 等），确认 2 条能力在未配置暴露/租户授权的情况下均能调试成功且获得 Trace ID/历史记录。
+
+**Acceptance Scenarios**:
+
+1. **Given** 插件后端暴露 REST 能力 `/api/v1/media/assets`，**When** 开发者在调试面板选择 REST 协议并点击“开始调试”，**Then** 请求直接命中插件本地端口并返回响应，即便未在“能力曝光/租户配额”中配置也不会出现 `registry.capability_forbidden`。
+2. **Given** 插件填写了 gRPC service `powerx.media.v1.MediaAssetAdminService/ListMediaAssets`，**When** 切换协议为 gRPC，**Then** 调试面板使用本地 gRPC 端口发起调用，Trace ID/Raw 响应与 `/powerx/capability-lab` 一致并写入调用历史。
+
 ### Edge Cases
 
 - 当能力名称、别名或 URI 与现有能力冲突时，系统必须列出冲突详情并阻止提交，避免 ID 分配错误。
@@ -113,6 +128,7 @@ PowerX 底座在插件安装或版本升级时调用 Capabilities Manager，获�
 - **FR-015**: 若能力目录或协议资产注册到 PowerX 失败，安装/升级流程必须立即阻断并回滚到上一版本，待问题修复后重新触发同步。
 - **FR-016**: 原子能力与 Workflow 节点默认采用同步请求-响应模式；若声明 `async`，必须提供回调/SSE 说明、状态查询接口与超时/重试策略。
 - **FR-017**: 插件仓库必须提供一键生成能力目录快照的 CLI（如 `scripts/capabilities run catalog -- --manifest <path>`），并在开发文档与 UI（刷新提示）中明确提醒开发者在修改 `skeleton/plugin.yaml` 或 `contracts/capabilities/*.yaml` 后立即执行，以保证前端 Admin 与后端 API 始终读取最新的 `capabilities/catalog.json`。
+- **FR-018**: `/capabilities/register` 页面必须内置“插件本地调试”模式：不依赖 `/api/v1/integration/capabilities/invoke` 或宿主授权即可直接命中插件 REST/gRPC/Workflow 端点，提供与 `/powerx/capability-lab` 相同的请求预览、TraceId、Mock/错误提示、历史记录与文档入口。
 
 ### Key Entities *(include if feature involves data)*
 

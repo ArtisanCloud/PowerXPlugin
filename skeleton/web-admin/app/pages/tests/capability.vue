@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { usePowerXCapability } from '~/composables/usePowerXCapability'
+import { useCapabilityLab } from '~/composables/useCapabilityLab'
 
 definePageMeta({
   title: 'Capability Invocation Playground'
@@ -11,6 +12,14 @@ type CapabilityMode = 'success' | 'fail' | 'mock'
 const { invoke, loading, lastTraceId, lastError } = usePowerXCapability()
 const lastStatus = ref('idle')
 const lastPayload = ref<string>('{}')
+const {
+  invokeCapability: invokeCapabilityLab,
+  result: labResult,
+  errorMessage: labErrorMessage,
+  lastTraceId: labTraceId
+} = useCapabilityLab()
+const localStatus = ref('idle')
+const localPayloadPreview = ref('{}')
 
 async function triggerInvocation(mode: CapabilityMode) {
   lastStatus.value = 'pending'
@@ -25,6 +34,45 @@ async function triggerInvocation(mode: CapabilityMode) {
       error?.message || 'Capability invocation failed - see toast for traceId and reason.'
   }
 }
+
+async function triggerLocalDebug() {
+  localStatus.value = 'pending'
+  const payload = {
+    method: 'POST',
+    endpoint: '/tests/local-api',
+    headers: {
+      'X-Test-Header': 'local-debug'
+    },
+    query: {
+      page: 1,
+      tag: 'demo'
+    },
+    body: {
+      message: 'hello from local debug'
+    }
+  }
+  const payloadText = JSON.stringify(payload, null, 2)
+  localPayloadPreview.value = payloadText
+  try {
+    await invokeCapabilityLab({
+      capabilityId: 'com.demo.local',
+      action: 'LocalCall',
+      payload,
+      payloadText,
+      mode: 'local',
+      preferredProtocol: 'rest'
+    })
+    localStatus.value = labResult.value?.status || 'completed'
+  } catch {
+    localStatus.value = 'error'
+  }
+}
+
+const localTraceText = computed(() => labTraceId.value || 'pending')
+const localErrorText = computed(() => labErrorMessage.value || 'none')
+const localResponsePreview = computed(() =>
+  labResult.value?.data ? JSON.stringify(labResult.value.data, null, 2) : '{}'
+)
 </script>
 
 <template>
@@ -60,6 +108,15 @@ async function triggerInvocation(mode: CapabilityMode) {
       >
         触发 Mock 模式
       </button>
+      <button
+        data-testid="trigger-local-debug"
+        :disabled="loading"
+        type="button"
+        class="local"
+        @click="triggerLocalDebug"
+      >
+        本地调试（REST）
+      </button>
     </div>
 
     <div class="state-grid">
@@ -82,6 +139,36 @@ async function triggerInvocation(mode: CapabilityMode) {
         <h2>响应数据</h2>
       </header>
       <pre data-testid="payload-viewer">{{ lastPayload }}</pre>
+    </section>
+
+    <section class="payload">
+      <header>
+        <h2>本地调试</h2>
+      </header>
+      <div class="local-state">
+        <div>
+          <span>Trace ID</span>
+          <strong data-testid="local-trace">{{ localTraceText }}</strong>
+        </div>
+        <div>
+          <span>状态</span>
+          <strong data-testid="local-status">{{ localStatus }}</strong>
+        </div>
+        <div>
+          <span>错误</span>
+          <strong data-testid="local-error">{{ localErrorText }}</strong>
+        </div>
+      </div>
+      <div class="local-panels">
+        <div>
+          <h3>请求 Payload</h3>
+          <pre data-testid="local-request-preview">{{ localPayloadPreview }}</pre>
+        </div>
+        <div>
+          <h3>响应数据</h3>
+          <pre data-testid="local-response-preview">{{ localResponsePreview }}</pre>
+        </div>
+      </div>
     </section>
   </div>
 </template>
@@ -132,6 +219,12 @@ async function triggerInvocation(mode: CapabilityMode) {
   border-color: #fed7aa;
   background: #ffedd5;
   color: #c2410c;
+}
+
+.actions button.local {
+  border-color: #c7f9cc;
+  background: #ecfccb;
+  color: #15803d;
 }
 
 .actions button:disabled {
@@ -186,5 +279,52 @@ async function triggerInvocation(mode: CapabilityMode) {
   overflow-x: auto;
   line-height: 1.4;
   color: #111827;
+}
+
+.local-state {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.local-state div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.local-state span {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.local-state strong {
+  font-size: 0.95rem;
+  color: #111827;
+  word-break: break-all;
+}
+
+.local-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.local-panels h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.local-panels pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  min-height: 180px;
 }
 </style>

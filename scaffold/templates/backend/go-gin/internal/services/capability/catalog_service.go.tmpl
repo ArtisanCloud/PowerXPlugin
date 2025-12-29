@@ -334,6 +334,17 @@ func (resp platformCapabilitiesResponse) toPlatformRecords() []gateway.PlatformC
 	}
 	return records
 }
+
+var descriptorSearchBases = []string{
+	".",
+	"..",
+	"../..",
+	"../../..",
+	"../../../..",
+	"../../../../..",
+	"../../../../../..",
+}
+
 func (s *CatalogService) lookupDescriptorMeta(path string) *descriptorMetadata {
 	if s == nil {
 		return nil
@@ -351,9 +362,15 @@ func (s *CatalogService) lookupDescriptorMeta(path string) *descriptorMetadata {
 	}
 	s.descriptorCacheMux.RUnlock()
 
-	data, err := os.ReadFile(normalized)
+	resolved := resolveDescriptorPath(normalized)
+	if resolved == "" {
+		logger.WithField("descriptor", normalized).Debug("capability descriptor not found for metadata inference")
+		return nil
+	}
+
+	data, err := os.ReadFile(resolved)
 	if err != nil {
-		logger.WithError(err).WithField("descriptor", normalized).Debug("failed to read capability descriptor for metadata inference")
+		logger.WithError(err).WithField("descriptor", resolved).Debug("failed to read capability descriptor for metadata inference")
 		return nil
 	}
 	var manifest struct {
@@ -363,7 +380,7 @@ func (s *CatalogService) lookupDescriptorMeta(path string) *descriptorMetadata {
 		} `yaml:"metadata"`
 	}
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
-		logger.WithError(err).WithField("descriptor", normalized).Debug("failed to parse capability descriptor for metadata inference")
+		logger.WithError(err).WithField("descriptor", resolved).Debug("failed to parse capability descriptor for metadata inference")
 		return nil
 	}
 
@@ -374,8 +391,46 @@ func (s *CatalogService) lookupDescriptorMeta(path string) *descriptorMetadata {
 
 	s.descriptorCacheMux.Lock()
 	s.descriptorCache[normalized] = meta
+	if resolved != normalized {
+		s.descriptorCache[resolved] = meta
+	}
 	s.descriptorCacheMux.Unlock()
 	return meta
+}
+
+func resolveDescriptorPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	if filepath.IsAbs(path) {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+		return ""
+	}
+
+	seen := map[string]struct{}{}
+	candidates := []string{path}
+	seen[path] = struct{}{}
+	for _, base := range descriptorSearchBases {
+		candidate := filepath.Clean(filepath.Join(base, path))
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		candidates = append(candidates, candidate)
+		seen[candidate] = struct{}{}
+	}
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			if abs, err := filepath.Abs(candidate); err == nil {
+				return abs
+			}
+			return candidate
+		}
+	}
+
+	return ""
 }
 
 func classifyCapabilityKind(declared string, protocols map[string]interface{}) string {

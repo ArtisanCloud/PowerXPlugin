@@ -7,6 +7,8 @@
 
 为插件生态交付统一的能力注册与多协议暴露管线：开发者在插件侧声明原子能力、协议矩阵与复合 Workflow/Agent 模板，Capabilities Manager 负责解析 `capabilities/*.yaml`、生成 OpenAPI/Proto/MCP/Workflow 契约，并在插件安装或升级时 3 分钟内同步至 PowerX Core（`capability_registry`、Workflow Builder、Agent Hub）。方案要求所有能力默认同步执行，必要时显式声明 `async`，并在目录同步失败时立即阻断安装回滚，确保宿主获取到一致的节点/工具目录。
 
+此外，本迭代新增“插件本地调试模式”，要求 `/capabilities/register` 的调试面板在插件独立运行时即可直接调用本地 REST/gRPC/Workflow 端点，不依赖 PowerX Gateway 或租户授权；实现需复用 `useCapabilityLab` 的 UI/状态管理，但调用适配器必须支持两种模式（本地 / 宿主代理），默认启用本地模式。
+
 ## Technical Context
 
 **Language/Version**: Backend Go 1.24、Frontend/CLI Node.js 20 + TypeScript 5 + Nuxt 4.2、脚本 Bash/Node 18 兼容。  
@@ -115,3 +117,10 @@ contracts/
    - 依赖：上述两个原子能力完成后再导出 Workflow，并在文档中新增场景章节（`docs/guides/publish/capabilities/workflow-agent-guide.md`、`mcp-guide.md`）。
 
 本 Add-on Scope 需要更新 contracts、handler/service、workflow、mcp 工具与文档，确保模板模型在 demo 中具备“CRUD + 批处理 + 质量巡检”三类能力以支撑 PowerX 意图识别测试。
+
+## Additional Scope：插件本地调试模式
+
+1. **调试模式切换**：在 `useCapabilityLab` 内新增 `invokeLocalCapability` 适配器，默认通过 REST/fetch 或 gRPC proxy 直接命中插件端口，仅在显式选择“宿主代理”时才回退到 `/api/v1/integration/capabilities/invoke`。
+2. **协议映射**：根据表单的 REST/gRPC/Workflow 字段构造真实请求（URL、method、service/method、workflow template），无需依赖 Registry/Exposure 配置。
+3. **错误处理**：将本地接口返回的 HTTP/gRPC 错误透传到调试面板，同时保留 TraceId/raw response 记录，确保体验与 `/powerx/capability-lab` 一致。
+4. **文档与帮助**：更新 `docs/guides/develop/plugin-capability/README.md`、UI 文案与 i18n，强调“本地调试默认直连插件后端”。

@@ -60,6 +60,14 @@
 
 ---
 
+## Phase 5b: 插件本地调试模式 (P1)
+
+- [X] T306 [US6] 在 `skeleton/web-admin/app/pages/capabilities/RegisterForm.vue` 与 `useCapabilityLab` 中新增“本地调试”适配器：默认直接调用插件 REST/gRPC/Workflow 端口，支持在 UI 中展示/切换模式，且无需依赖 `/api/v1/integration/capabilities/invoke` 或租户授权。
+- [X] T307 [US6] 扩展前端/后端支持文件：为 REST 模式实现 `fetchLocalCapability`（拼接 `apiBase + path`）、为 gRPC 模式提供本地代理/反向代理配置，并在 tests/e2e 中覆盖“本地调试”成功与错误提示。
+- [X] T308 [P][US6] 更新文档与 i18n：`docs/guides/develop/plugin-capability/README.md`、页面帮助文案以及 `spec.md/plan.md`，明确默认行为为“插件独立运行直接调试”，并添加快速排障指引。
+
+---
+
 ## Phase 6: User Story 4 — 订阅方感知能力版本变更与下线 (P4)
 
 **Goal**: 生成差异报告、灰度计划、通知/回滚。

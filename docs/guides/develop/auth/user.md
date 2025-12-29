@@ -6,7 +6,7 @@
 | 模式 | 关键环境变量 | 说明 |
 |------|--------------|------|
 | Delegated (宿主) | `POWERX_PROXY=1` 或 `POWERX_RBAC_DELEGATE=true`<br>`POWERX_CORE_ENDPOINT`<br>`POWERX_AUTH_TOKEN` | 所有 `/api/v1/auth` 请求代理到宿主 `/admin/user/auth/*`，Token/组织信息完全复用 PowerX Core。宿主故障时 fail-closed。|
-| Local (Standalone) | `POWERX_PROXY=0`<br>`PLUGIN_IAM_TENANT_*`<br>`PLUGIN_IAM_ADMIN_*` | 插件自持 IAM 表（`iam_*`），`go run ./cmd/database/main.go setup` 会创建默认租户/管理员，前端通过同一 `/users/login` 页面登录。|
+| Local (Standalone) | `POWERX_PROXY=0`<br>`PLUGIN_IAM_TENANT_*`<br>`PLUGIN_IAM_ADMIN_*` | 插件自持 IAM 表（`iam_*`），`go run ./cmd/database/main.go setup` 会创建默认租户/管理员，前端通过同一 `/users/login` 页面登录。若插件还需要对 mini-app/2C 客户做鉴权，请参考下文“Customer Auth”，额外启用 `customer_accounts` 表保存客户登录凭证。|
 
 > **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。本地模式默认同样强制校验 Authorization Header，如需临时跳过，可设置 `POWERX_AUTH_OPTIONAL=true`。
 >
@@ -25,6 +25,22 @@
 | `internal/transport/http/public/auth_handler.go` | `/api/v1/auth/login|refresh|logout|me/context`；根据 `IAMMode` 决定走 Proxy 或 Local，实现 fail-closed 和指标打点。|
 | `internal/observability/auth/metrics.go` | 输出 `plugin_auth_login_total`、`plugin_auth_refresh_total`、`plugin_auth_logout_total`、`plugin_iam_mode`、`plugin_iam_delegate_errors_total`，Prometheus 入口 `/api/v1/admin/runtime/metrics`。|
 | `internal/transport/http/middleware/request_trace.go` | 新增 `iam_mode`, `tenant_uuid`, `user_id`, `trace_id` 字段，定位跨模式问题。|
+
+### 3.1 Customer Auth（mini-app 客户鉴权）
+- **适用场景**：插件暴露 `/mini-app/**` API，需要同时识别租户 + Customer 身份。Skeleton 模式需自行维护客户账号体系；宿主模式可代理宿主的 customer token。
+- **数据拆分**：
+  - `customers`（已有）：保留客户档案信息（姓名、会员等级、标签等），供 CRM/商品模块使用。
+  - `customer_accounts`（新增）：仅存储 mini-app 登录凭证（identifier、password_hash、last_login_at 等）。将账号字段与 CRM 字段分离，便于加索引、控制权限，也避免把密码哈希写入业务表。
+- **配置**：`customer_auth` 段（`mode`/`delegate_endpoint`/`service_token`/`jwt_secret`/`jwt_issuer`/`jwt_audience`/`jwt_expires`/`cache_ttl`）。`Config.ResolveCustomerAuthMode()` 会结合该段与 `POWERX_CUSTOMER_DELEGATE`、`POWERX_PROXY` 判定最终模式。
+- **Local 模式**：
+  - `internal/services/customer/auth/local_service.go`：处理注册/登录，写入 `customers` 与 `customer_accounts`，并使用配置的 `jwt_secret` 签发 mini-app token（payload 至少包含 `tenant_uuid` + `customer_id`）。
+  - `miniapp/auth/handler.go`：提供 `/mini-app/auth/register`、`/mini-app/auth/login`；客户端拿到 token 后写到 Authorization header，访问其它 mini-app API。
+- **Delegated 模式**：
+  - `internal/services/customer/auth/delegate_authenticator.go`：调用宿主 `/api/v1/customer/auth/validate` 校验 token，只检查 tenant/customer UUID 并可做短期缓存；不在插件内落库。
+  - 通过 `customer_auth.delegate_endpoint`、`service_token` 配置宿主接口，失败时统一 401。
+- **中间件注入**：
+  - `internal/transport/http/middleware/customer_auth.go`：在 `httpmw.EnsureTenant()` 后执行，解析 `Authorization`/`X-Customer-Token`，调用对应 authenticator，成功后把 `CustomerContext` 写入 gin context。
+  - `internal/transport/http/miniapp/router.go`：先挂载 `/mini-app/auth/*`（无需 token），再对子路由应用 `CustomerAuthenticate`，确保产品/下单等接口都必须携带客户 token。
 
 ## 4. 指标与日志
 - **核心指标**（全部可在 `/api/v1/admin/runtime/metrics` 查看）：

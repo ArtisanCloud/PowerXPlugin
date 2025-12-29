@@ -2,99 +2,118 @@ package capability
 
 import (
 	"context"
-	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
-	"github.com/stretchr/testify/require"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
-type fakeCapabilitiesManager struct {
-	entries []capabilities.CatalogEntry
-	err     error
-}
-
-func (f *fakeCapabilitiesManager) ListCapabilities(ctx context.Context) ([]capabilities.CatalogEntry, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.entries, nil
-}
-
-func (f *fakeCapabilitiesManager) ExportProtocols(ctx context.Context) ([]capabilities.ProtocolAsset, error) {
-	return nil, nil
-}
-
-func (f *fakeCapabilitiesManager) RegisterWithHost(ctx context.Context, client capabilities.HostSyncClient) error {
-	return nil
-}
-
-type fakeGatewayClient struct {
-	records []gateway.PlatformCapabilityRecord
-	err     error
-}
-
-func (f *fakeGatewayClient) Enabled() bool { return true }
-
-func (f *fakeGatewayClient) Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (f *fakeGatewayClient) ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.records, nil
-}
-
-func (f *fakeGatewayClient) Close() error { return nil }
-
-func TestCatalogServiceUsesPlatformCatalogWhenRequested(t *testing.T) {
-	manager := &fakeCapabilitiesManager{
-		entries: []capabilities.CatalogEntry{
-			{ID: "com.demo.local.capability", Version: "0.1.0"},
-		},
-	}
-	gw := &fakeGatewayClient{
-		records: []gateway.PlatformCapabilityRecord{
-			{
-				CapabilityID:  "com.corex.media.assets.read",
-				PluginVersion: "1.0.0",
-				Protocols: []gateway.PlatformCapabilityProtocol{
-					{Channel: "rest", Endpoint: "/api/v1/media/assets", Method: "GET"},
-				},
-				CapabilitiesHash: "abc",
-			},
-		},
-	}
+func TestCatalogServiceLookupDescriptorMeta(t *testing.T) {
 	svc := &CatalogService{
-		manager: manager,
-		gateway: gw,
+		descriptorCache: make(map[string]*descriptorMetadata),
 	}
-	entries, err := svc.List(context.Background(), ListOptions{Source: "corex"})
-	require.NoError(t, err)
-	require.Len(t, entries, 1)
-	require.Equal(t, "com.corex.media.assets.read", entries[0].ID)
-	require.Equal(t, "com.corex.media.assets", entries[0].Module)
-	require.NotNil(t, entries[0].Protocols["rest"])
+	meta := svc.lookupDescriptorMeta("contracts/capabilities/com.powerx.plugins.base.template.list.yaml")
+	if meta == nil {
+		t.Fatalf("expected metadata from descriptor, got nil")
+	}
+	if meta.Protocols == nil || len(meta.Protocols) == 0 {
+		t.Fatalf("expected protocols to be populated, got %+v", meta.Protocols)
+	}
+	if meta.Kind == "" {
+		t.Fatalf("expected kind to be inferred, got empty")
+	}
 }
 
-func TestCatalogServiceFallsBackToLocalWhenPlatformFails(t *testing.T) {
-	manager := &fakeCapabilitiesManager{
-		entries: []capabilities.CatalogEntry{
-			{ID: "com.demo.local.capability", Version: "0.1.0"},
-		},
+func TestListLocalCatalogDecoratesProtocols(t *testing.T) {
+	root := findRepoRoot(t)
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
 	}
-	gw := &fakeGatewayClient{
-		err: errors.New("remote unavailable"),
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("chdir repo root: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = os.Chdir(orig)
+	})
+
+	manager := capabilities.NewManager(nil, logger.WithField("component", "test"))
 	svc := &CatalogService{
-		manager: manager,
-		gateway: gw,
+		manager:         manager,
+		descriptorCache: make(map[string]*descriptorMetadata),
 	}
-	entries, err := svc.List(context.Background(), ListOptions{Source: "corex"})
-	require.NoError(t, err)
-	require.Len(t, entries, 1)
-	require.Equal(t, "com.demo.local.capability", entries[0].ID)
+
+	entries, err := svc.listLocalCatalog(context.Background())
+	if err != nil {
+		t.Fatalf("listLocalCatalog error: %v", err)
+	}
+	var target *capabilities.CatalogEntry
+	for i := range entries {
+		if entries[i].ID == "com.powerx.plugins.base.template.list" {
+			target = &entries[i]
+			break
+		}
+	}
+	if target == nil {
+		t.Fatalf("target capability not found in catalog")
+	}
+	rest, ok := target.Protocols["rest"].(map[string]interface{})
+	if !ok || len(rest) == 0 {
+		t.Fatalf("expected rest protocol to be populated, got %+v", target.Protocols["rest"])
+	}
+	if rest["path"] == "" && rest["endpoint"] == "" {
+		t.Fatalf("rest protocol missing path/endpoint: %+v", rest)
+	}
+}
+
+func TestResolveDescriptorPathFromNestedDir(t *testing.T) {
+	const relPath = "contracts/capabilities/com.powerx.plugins.base.template.list.yaml"
+
+	rootDir := findRepoRoot(t)
+	absExpected := filepath.Join(rootDir, relPath)
+	if _, err := os.Stat(absExpected); err != nil {
+		t.Fatalf("expected descriptor at %s: %v", absExpected, err)
+	}
+
+	nested := filepath.Join(rootDir, "skeleton", "backend")
+	if _, err := os.Stat(nested); err != nil {
+		t.Fatalf("expected nested dir %s: %v", nested, err)
+	}
+
+	if err := os.Chdir(nested); err != nil {
+		t.Fatalf("chdir nested: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(rootDir)
+	})
+
+	resolved := resolveDescriptorPath(relPath)
+	if resolved == "" {
+		t.Fatalf("resolveDescriptorPath returned empty result")
+	}
+	resolved = filepath.Clean(resolved)
+	if !strings.HasSuffix(resolved, relPath) {
+		t.Fatalf("resolved path %s does not end with %s", resolved, relPath)
+	}
+}
+
+func findRepoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.work")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatalf("could not locate repo root from %s", dir)
+		}
+		dir = parent
+	}
 }

@@ -17,13 +17,13 @@
           :loading="catalogLoading"
           @click="loadCatalog"
         >
-          {{ `{{ $t("capabilities.list.refresh") }}` }}
-        </UButton>
-        <UButton icon="i-heroicons-plus" color="primary" @click="openForm">
-          {{ `{{ $t("capabilities.list.createButton") }}` }}
-        </UButton>
-      </div>
-    </section>
+      {{ `{{ $t("capabilities.list.refresh") }}` }}
+    </UButton>
+    <UButton icon="i-heroicons-plus" color="primary" @click="openForm">
+      {{ `{{ $t("capabilities.list.createButton") }}` }}
+    </UButton>
+  </div>
+</section>
 
     <UAlert variant="soft" color="neutral" class="bg-white/5 dark:bg-white/5">
       <template #title>
@@ -156,6 +156,25 @@
                     @click="openExposureForm(row.original.capability_id)"
                   >
                     {{ `{{ $t("capabilities.exposure.list.actions.configure") }}` }}
+                  </UButton>
+                  <UButton
+                    v-if="isWorkflowKind(row.original.kind)"
+                    size="xs"
+                    variant="outline"
+                    color="primary"
+                    icon="i-heroicons-command-line"
+                    @click="openMcpPanelForCapability(row.original.capability_id)"
+                  >
+                    {{ `{{ $t("capabilities.mcp.actions.debugCapability") }}` }}
+                  </UButton>
+                  <UButton
+                    v-if="!isWorkflowKind(row.original.kind)"
+                    size="xs"
+                    variant="ghost"
+                    icon="i-heroicons-beaker-20-solid"
+                    @click="openDebugPanelFromCatalog(row.original)"
+                  >
+                    {{ `{{ $t("capabilities.form.debug.openExisting") }}` }}
                   </UButton>
                 </template>
               </UTable>
@@ -499,6 +518,9 @@
             <UButton variant="soft" color="primary" :loading="savingDraft" @click="handleSaveDraft">
               {{ `{{ $t("capabilities.form.saveDraft") }}` }}
             </UButton>
+            <UButton variant="soft" color="neutral" @click="openDebugPanelForDraft">
+              {{ `{{ $t("capabilities.form.debug.openDraft") }}` }}
+            </UButton>
             <UButton color="primary" :loading="submitting" @click="handleSubmit">
               {{ `{{ $t("common.submit") }}` }}
             </UButton>
@@ -508,6 +530,695 @@
     </UCard>
   </div>
 </template>
+    </UModal>
+
+    <UModal
+      v-model:open="debugModalOpen"
+      prevent-close
+      :title="$t('capabilities.form.debug.title')"
+      :description="$t('capabilities.form.debug.description')"
+      :ui="{ content: 'max-w-none w-full sm:w-[95vw] sm:max-w-6xl h-screen sm:h-[90vh] flex flex-col overflow-hidden' }"
+    >
+      <template #actions>
+        <NuxtLink
+          :href="pluginCapabilityDocUrl"
+          target="_blank"
+          rel="noreferrer"
+          class="text-xs text-primary-600 dark:text-primary-200 hover:underline"
+        >
+          {{ `{{ $t("capabilities.form.debug.docLink") }}` }}
+        </NuxtLink>
+      </template>
+      <template #body>
+        <div class="flex flex-1 flex-col gap-6 overflow-hidden">
+          <div class="grid flex-1 gap-6 overflow-hidden lg:grid-cols-[1.1fr_0.9fr]">
+            <UCard
+              class="h-full border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30"
+              :ui="{ body: 'p-0 h-full' }"
+            >
+              <div class="flex h-full flex-col">
+                <div class="flex-1 overflow-y-auto px-5 py-5 text-sm">
+                  <div class="grid gap-5 lg:grid-cols-12">
+                    <UFormField class="lg:col-span-6" :label="$t('capabilities.form.debug.capability')">
+                      <UInput v-model="debugForm.capabilityId" readonly />
+                    </UFormField>
+                    <UFormField class="lg:col-span-6" :label="$t('capabilities.form.debug.action')">
+                      <UInput v-model="debugForm.action" />
+                    </UFormField>
+                    <UFormField class="lg:col-span-4" :label="$t('capabilities.form.debug.protocol')">
+                      <USelectMenu
+                        v-model="debugForm.preferredProtocol"
+                        :options="debugProtocolOptions"
+                        option-attribute="label"
+                        value-attribute="value"
+                        :portal="false"
+                        class="w-full"
+                      />
+                    </UFormField>
+                    <UFormField class="lg:col-span-4" :label="$t('capabilities.form.debug.targetMode')">
+                      <USelectMenu
+                        v-model="debugForm.targetMode"
+                        :options="debugTargetOptions"
+                        option-attribute="label"
+                        value-attribute="value"
+                        :portal="false"
+                        class="w-full"
+                      />
+                    </UFormField>
+                    <UFormField class="lg:col-span-4" :label="$t('capabilities.form.debug.apiBase')">
+                      <UInput v-model="debugForm.apiBase" placeholder="http://127.0.0.1:8078" />
+                    </UFormField>
+                    <div class="lg:col-span-12 space-y-3">
+                      <label class="text-sm font-medium text-white">
+                        {{ `{{ $t("capabilities.form.debug.payload") }}` }}
+                      </label>
+                      <UTextarea
+                        v-model="debugForm.payloadText"
+                        :rows="14"
+                        class="w-full min-h-[320px] font-mono text-xs"
+                      />
+                      <div class="flex flex-wrap items-center justify-between text-xs text-gray-300">
+                        <span>
+                          {{ `{{ debugPayloadValid ? "JSON OK" : $t("capabilities.form.debug.payloadInvalid") }}` }}
+                        </span>
+                        <div class="flex items-center gap-3">
+                          <UButton variant="link" size="xs" color="neutral" @click="resetDebugPayload">
+                            {{ `{{ $t("capabilities.form.debug.resetTemplate") }}` }}
+                          </UButton>
+                          <UButton
+                            variant="link"
+                            size="xs"
+                            color="neutral"
+                            :disabled="!debugPayloadTemplate"
+                            @click="applyDebugPayloadTemplate"
+                          >
+                            {{ `{{ $t("capabilities.form.debug.applyTemplate") }}` }}
+                          </UButton>
+                        </div>
+                      </div>
+                    </div>
+                    <UFormField class="lg:col-span-6" :label="$t('capabilities.form.debug.tenantUuid')">
+                      <UInput v-model="debugForm.tenantUuid" placeholder="00000000-0000-0000-0000-000000000001" />
+                    </UFormField>
+                    <UFormField class="lg:col-span-6" :label="$t('capabilities.form.debug.mockModule')">
+                      <UInput v-model="debugForm.mockModule" placeholder="media / workflow" />
+                    </UFormField>
+                    <UFormField class="lg:col-span-12" :label="$t('capabilities.form.debug.requestId')">
+                      <div class="flex gap-2">
+                        <UInput v-model="debugForm.requestId" />
+                        <UButton
+                          variant="ghost"
+                          color="neutral"
+                          size="xs"
+                          @click="regenerateDebugRequestId"
+                        >
+                          <UIcon name="i-heroicons-arrow-path" />
+                        </UButton>
+                      </div>
+                    </UFormField>
+                    <div class="lg:col-span-12 space-y-2">
+                      <div class="flex items-center justify-between">
+                        <p class="text-sm font-medium text-white">
+                          {{ `{{ $t("capabilities.form.debug.requestPreview") }}` }}
+                        </p>
+                        <UButton
+                          color="gray"
+                          variant="ghost"
+                          size="xs"
+                          :icon="debugShowRequestPreview ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+                          @click="debugShowRequestPreview = !debugShowRequestPreview"
+                        />
+                      </div>
+                      <pre
+                        v-if="debugShowRequestPreview"
+                        class="rounded bg-black/40 p-4 text-xs text-white/80"
+                      >
+{{ `{{ debugRequestPreviewText }}` }}
+                      </pre>
+                      <p v-else class="text-xs text-gray-300">
+                        {{ `{{ $t("capabilities.form.debug.collapsedPreview") }}` }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="border-t border-white/10 px-5 py-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-xs text-white/60">
+                      {{ `{{ $t("capabilities.form.debug.payloadHint") }}` }}
+                    </p>
+                    <UButton
+                      color="primary"
+                      :loading="debugInvokeLoading"
+                      :disabled="!debugPayloadValid"
+                      @click="handleDebugInvoke"
+                    >
+                      {{ `{{ $t("capabilities.form.debug.invoke") }}` }}
+                    </UButton>
+                  </div>
+                </div>
+              </div>
+            </UCard>
+
+            <UCard
+              class="h-full border border-white/5 bg-[#0d1828]/90 text-white/80 shadow-inner shadow-black/30"
+              :ui="{ body: 'p-0 h-full' }"
+            >
+              <div class="flex h-full flex-col">
+                <div class="flex-1 space-y-4 overflow-y-auto px-5 py-5 text-sm">
+                  <div class="flex flex-wrap gap-3">
+                    <span>
+                      {{ `{{ $t("capabilities.form.debug.status") }}` }}：
+                      <strong
+                        :class="{
+                          'text-green-400': !!debugResult,
+                          'text-rose-400': !!debugErrorMessage,
+                        }"
+                      >
+                        {{ `{{ debugResult?.status ||
+                            (debugErrorMessage
+                              ? $t("capabilities.form.debug.statusFailed")
+                              : $t("capabilities.form.debug.statusIdle")) }}` }}
+                      </strong>
+                    </span>
+                    <span v-if="debugDuration">
+                      {{ `{{ $t("capabilities.form.debug.duration") }}` }}：{{ `{{ debugDuration.toFixed(1) }}` }} ms
+                    </span>
+                    <span>
+                      {{ `{{ $t("capabilities.form.debug.traceId") }}` }}：
+                      {{ `{{ debugLastTraceId || "—" }}` }}
+                    </span>
+                  </div>
+
+                  <div v-if="debugWarnings.length" class="space-y-1">
+                    <p class="text-xs uppercase tracking-wide text-yellow-300">
+                      {{ `{{ $t("capabilities.form.debug.warnings") }}` }}
+                    </p>
+                    <ul class="list-disc pl-4 text-xs text-yellow-200">
+                      <li v-for="warn in debugWarnings" :key="warn">{{ `{{ warn }}` }}</li>
+                    </ul>
+                  </div>
+
+                  <div v-if="debugErrorMessage" class="space-y-2">
+                    <p class="text-xs uppercase tracking-wide text-rose-300">
+                      {{ `{{ $t("capabilities.form.debug.errors") }}` }}
+                    </p>
+                    <p class="rounded bg-rose-500/10 p-3 text-sm text-rose-100">
+                      {{ `{{ debugErrorMessage }}` }}
+                    </p>
+                    <pre
+                      v-if="debugErrorDetails"
+                      class="rounded bg-black/30 p-3 text-xs text-white/80"
+                    >
+{{ `{{ JSON.stringify(debugErrorDetails, null, 2) }}` }}
+                    </pre>
+                  </div>
+
+                  <div v-if="debugResult?.data" class="space-y-2">
+                    <p class="text-xs uppercase tracking-wide text-primary-200">
+                      {{ `{{ $t("capabilities.form.debug.responseData") }}` }}
+                    </p>
+                    <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+{{ `{{ JSON.stringify(debugResult.data, null, 2) }}` }}
+                    </pre>
+                  </div>
+
+                  <div v-if="debugResult?.raw" class="space-y-2">
+                    <p class="text-xs uppercase tracking-wide text-gray-200">
+                      {{ `{{ $t("capabilities.form.debug.rawResponse") }}` }}
+                    </p>
+                    <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+{{ `{{ JSON.stringify(debugResult.raw, null, 2) }}` }}
+                    </pre>
+                  </div>
+
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <p class="text-sm font-medium text-white">
+                        {{ `{{ $t("capabilities.form.debug.history") }}` }}
+                      </p>
+                      <UButton
+                        size="xs"
+                        variant="ghost"
+                        color="neutral"
+                        @click="clearDebugHistory"
+                      >
+                        {{ `{{ $t("capabilities.form.debug.clearHistory") }}` }}
+                      </UButton>
+                    </div>
+                    <div v-if="debugHistoryEntries.length" class="space-y-3">
+                      <UCard
+                        v-for="entry in debugHistoryEntries"
+                        :key="entry.id"
+                        class="bg-black/30 text-xs text-white/80"
+                      >
+                        <template #header>
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="text-sm font-semibold">
+                              {{ `{{ entry.capabilityId }}` }} · {{ `{{ entry.action }}` }}
+                            </span>
+                            <UBadge :color="entry.success ? 'green' : 'rose'" variant="soft">
+                              {{ `{{ entry.success
+                                  ? $t("capabilities.form.debug.historySuccess")
+                                  : $t("capabilities.form.debug.historyFail") }}` }}
+                            </UBadge>
+                          </div>
+                          <p class="text-[11px] text-white/60">
+                            {{ `{{ $t("capabilities.form.debug.duration") }}` }}：{{ `{{ entry.duration.toFixed(1) }}` }} ms ·
+                            {{ `{{ $t("capabilities.form.debug.traceId") }}` }}：{{ `{{ entry.traceId || "—" }}` }}
+                          </p>
+                        </template>
+                        <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
+{{ `{{ entry.rawText }}` }}
+                        </pre>
+                      </UCard>
+                    </div>
+                    <p v-else class="text-xs text-gray-400">
+                      {{ `{{ $t("capabilities.form.debug.noHistory") }}` }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </UCard>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="mcpModalOpen"
+      prevent-close
+      :title="$t('capabilities.mcp.panelTitle')"
+      :description="$t('capabilities.mcp.panelDescription')"
+      :ui="{ content: 'max-w-6xl w-[95vw] mx-auto' }"
+    >
+      <template #actions>
+        <NuxtLink
+          :href="mcpGuideUrl"
+          target="_blank"
+          rel="noreferrer"
+          class="text-xs text-primary-600 dark:text-primary-200 hover:underline"
+        >
+          {{ `{{ $t("capabilities.mcp.docLink") }}` }}
+        </NuxtLink>
+      </template>
+      <template #body>
+        <div class="space-y-6">
+          <UCard class="border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30">
+            <template #header>
+              <div>
+                <h2 class="text-lg font-semibold text-white">
+                  {{ `{{ $t("capabilities.mcp.session.title") }}` }}
+                </h2>
+                <p class="text-sm text-white/70">
+                  {{ `{{ $t("capabilities.mcp.session.description") }}` }}
+                </p>
+              </div>
+            </template>
+            <div class="space-y-6 text-sm">
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField :label="$t('capabilities.mcp.fields.runtimeAssignment')">
+                  <div class="flex gap-2">
+                    <UInput v-model="mcpSessionForm.runtimeAssignmentId" placeholder="uuid" />
+                    <UButton
+                      icon="i-heroicons-arrow-path"
+                      variant="ghost"
+                      color="neutral"
+                      size="xs"
+                      @click="regenerateMcpRuntimeAssignment"
+                    />
+                  </div>
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.jwtId')">
+                  <UInput v-model="mcpSessionForm.jwtId" placeholder="dev-mcp-client" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.registerState')">
+                  <UInput v-model="mcpSessionForm.registerState" placeholder="registering" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.capabilitiesHash')">
+                  <UInput v-model="mcpSessionForm.capabilitiesHash" placeholder="sha256:..." />
+                </UFormField>
+              </div>
+              <div class="flex flex-wrap gap-3">
+                <UButton
+                  color="primary"
+                  :loading="mcpRegisterLoading"
+                  @click="handleMcpRegister"
+                >
+                  {{ `{{ $t("capabilities.mcp.actions.register") }}` }}
+                </UButton>
+              </div>
+              <div class="grid gap-4 lg:grid-cols-3">
+                <div class="space-y-2">
+                  <UFormField :label="$t('capabilities.mcp.fields.ackState')">
+                    <UInput v-model="mcpSessionForm.ackState" placeholder="ready" />
+                  </UFormField>
+                  <UButton
+                    block
+                    variant="soft"
+                    color="primary"
+                    :disabled="!mcpSessionForm.sessionId"
+                    :loading="mcpAckLoading"
+                    @click="handleMcpAck"
+                  >
+                    {{ `{{ $t("capabilities.mcp.actions.ack") }}` }}
+                  </UButton>
+                </div>
+                <div class="space-y-2">
+                  <UFormField :label="$t('capabilities.mcp.fields.heartbeatMissed')">
+                    <UInput
+                      v-model.number="mcpSessionForm.heartbeatMissed"
+                      type="number"
+                      min="0"
+                    />
+                  </UFormField>
+                  <UButton
+                    block
+                    variant="soft"
+                    color="primary"
+                    :disabled="!mcpSessionForm.sessionId"
+                    :loading="mcpHeartbeatLoading"
+                    @click="handleMcpHeartbeat"
+                  >
+                    {{ `{{ $t("capabilities.mcp.actions.heartbeat") }}` }}
+                  </UButton>
+                </div>
+                <div class="space-y-2">
+                  <UFormField :label="$t('capabilities.mcp.fields.closeReason')">
+                    <UInput v-model="mcpSessionForm.closeReason" placeholder="optional" />
+                  </UFormField>
+                  <UButton
+                    block
+                    variant="ghost"
+                    color="neutral"
+                    :disabled="!mcpSessionForm.sessionId"
+                    :loading="mcpCloseLoading"
+                    @click="handleMcpClose"
+                  >
+                    {{ `{{ $t("capabilities.mcp.actions.close") }}` }}
+                  </UButton>
+                </div>
+              </div>
+              <div
+                v-if="mcpSession"
+                class="rounded-2xl border border-white/10 bg-black/20 p-4 text-xs text-white/80"
+              >
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                  <span class="font-semibold">ID：{{ `{{ mcpSession.id }}` }}</span>
+                  <UBadge :label="mcpSession.state" :color="mcpSession.state === 'ready' ? 'green' : 'gray'" />
+                </div>
+                <dl class="mt-3 grid gap-2 md:grid-cols-2">
+                  <div>
+                    <dt class="text-white/60">{{ `{{ $t("capabilities.mcp.fields.tenantUuid") }}` }}</dt>
+                    <dd>{{ `{{ mcpSession.tenant_uuid }}` }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-white/60">{{ `{{ $t("capabilities.mcp.fields.lastPing") }}` }}</dt>
+                    <dd>{{ `{{ mcpSession.last_ping_at || "—" }}` }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-white/60">{{ `{{ $t("capabilities.mcp.fields.createdAt") }}` }}</dt>
+                    <dd>{{ `{{ mcpSession.created_at }}` }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-white/60">{{ `{{ $t("capabilities.mcp.fields.updatedAt") }}` }}</dt>
+                    <dd>{{ `{{ mcpSession.updated_at }}` }}</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </UCard>
+
+          <UCard class="border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30">
+            <template #header>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-white">
+                    {{ `{{ $t("capabilities.mcp.invoke.title") }}` }}
+                  </h2>
+                  <p class="text-sm text-white/70">
+                    {{ `{{ $t("capabilities.mcp.invoke.description") }}` }}
+                  </p>
+                </div>
+                <UButton
+                  size="xs"
+                  variant="ghost"
+                  color="neutral"
+                  @click="applyCurrentCapabilityToMcp"
+                >
+                  {{ `{{ $t("capabilities.mcp.actions.applyCapability") }}` }}
+                </UButton>
+              </div>
+            </template>
+            <div class="space-y-4 text-sm">
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField :label="$t('capabilities.mcp.fields.sessionId')">
+                  <UInput v-model="mcpInvokeForm.sessionId" placeholder="session uuid" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.tenantUuid')">
+                  <UInput v-model="mcpInvokeForm.tenantUuid" placeholder="00000000-..." />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.toolScope')">
+                  <UInput v-model="mcpInvokeForm.toolScope" placeholder="agent.template.compose" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.capabilityId')">
+                  <UInput v-model="mcpInvokeForm.capabilityId" placeholder="com.powerx.plugins.base.template.compose" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.intent')">
+                  <UInput v-model="mcpInvokeForm.intent" placeholder="template.compose" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.idempotencyKey')">
+                  <UInput v-model="mcpInvokeForm.idempotencyKey" placeholder="optional" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.signature')">
+                  <UInput v-model="mcpInvokeForm.signature" placeholder="stub-signature" />
+                </UFormField>
+              </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField :label="$t('capabilities.mcp.fields.messageId')">
+                  <div class="flex gap-2">
+                    <UInput v-model="mcpInvokeForm.messageId" />
+                    <UButton
+                      variant="ghost"
+                      color="neutral"
+                      size="xs"
+                      @click="regenerateInvokeIdentifiers"
+                    >
+                      <UIcon name="i-heroicons-arrow-path" />
+                    </UButton>
+                  </div>
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.traceId')">
+                  <UInput v-model="mcpInvokeForm.traceId" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.correlationId')">
+                  <UInput v-model="mcpInvokeForm.correlationId" />
+                </UFormField>
+                <UFormField :label="$t('capabilities.mcp.fields.issuedAt')">
+                  <div class="flex gap-2">
+                    <UInput v-model="mcpInvokeForm.issuedAt" placeholder="2025-12-11T06:10:00Z" />
+                    <UButton
+                      variant="ghost"
+                      color="neutral"
+                      size="xs"
+                      @click="setIssuedAtNow"
+                    >
+                      {{ `{{ $t("capabilities.mcp.actions.issuedNow") }}` }}
+                    </UButton>
+                  </div>
+                </UFormField>
+              </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label class="text-xs font-medium text-white/80">
+                    {{ `{{ $t("capabilities.mcp.fields.payload") }}` }}
+                  </label>
+                  <UTextarea
+                    v-model="mcpInvokeForm.payloadText"
+                    :rows="10"
+                    class="mt-1 font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-white/80">
+                    {{ `{{ $t("capabilities.mcp.fields.metadata") }}` }}
+                  </label>
+                  <UTextarea
+                    v-model="mcpInvokeForm.metadataText"
+                    :rows="10"
+                    class="mt-1 font-mono text-xs"
+                  />
+                </div>
+              </div>
+              <UButton
+                color="primary"
+                :loading="mcpInvokeLoading"
+                @click="handleMcpInvoke"
+              >
+                {{ `{{ $t("capabilities.mcp.actions.invoke") }}` }}
+              </UButton>
+              <div class="space-y-2 text-xs">
+                <div class="flex flex-wrap gap-3">
+                  <span>
+                    {{ `{{ $t("capabilities.mcp.invoke.status") }}` }}：
+                    <strong
+                      :class="{
+                        'text-green-400': !!mcpInvokeResult,
+                        'text-rose-400': !!mcpInvokeErrorMessage,
+                      }"
+                    >
+                      {{ `{{ mcpInvokeResult?.status || (mcpInvokeErrorMessage ? $t("capabilities.mcp.invoke.failed") : $t("capabilities.mcp.invoke.idle")) }}` }}
+                    </strong>
+                  </span>
+                  <span>
+                    Trace：{{ `{{ mcpInvokeResult?.trace_id || "—" }}` }}
+                  </span>
+                  <span>
+                    Correlation：{{ `{{ mcpInvokeResult?.correlation_id || "—" }}` }}
+                  </span>
+                </div>
+                <div v-if="mcpInvokeResult?.payload" class="space-y-1">
+                  <p class="text-xs uppercase tracking-wide text-primary-200">
+                    {{ `{{ $t("capabilities.mcp.fields.payload") }}` }}
+                  </p>
+                  <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+{{ `{{ JSON.stringify(mcpInvokeResult.payload, null, 2) }}` }}
+                  </pre>
+                </div>
+                <div v-if="mcpInvokeResult?.metadata" class="space-y-1">
+                  <p class="text-xs uppercase tracking-wide text-primary-200">
+                    {{ `{{ $t("capabilities.mcp.fields.metadata") }}` }}
+                  </p>
+                  <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+{{ `{{ JSON.stringify(mcpInvokeResult.metadata, null, 2) }}` }}
+                  </pre>
+                </div>
+                <div v-if="mcpInvokeErrorMessage" class="space-y-1">
+                  <p class="text-xs uppercase tracking-wide text-rose-300">
+                    {{ `{{ $t("capabilities.mcp.invoke.failed") }}` }}
+                  </p>
+                  <p class="rounded bg-rose-500/10 p-3 text-xs text-rose-100">
+                    {{ `{{ mcpInvokeErrorMessage }}` }}
+                  </p>
+                  <pre
+                    v-if="mcpInvokeErrorDetails"
+                    class="rounded bg-black/30 p-3 text-xs text-white/80"
+                  >
+{{ `{{ JSON.stringify(mcpInvokeErrorDetails, null, 2) }}` }}
+                  </pre>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-medium text-white">
+                    {{ `{{ $t("capabilities.mcp.invoke.history") }}` }}
+                  </p>
+                  <UButton
+                    size="xs"
+                    variant="ghost"
+                    color="neutral"
+                    @click="clearMcpInvokeHistory"
+                  >
+                    {{ `{{ $t("capabilities.mcp.actions.clearHistory") }}` }}
+                  </UButton>
+                </div>
+                <div v-if="mcpInvokeHistory.length" class="space-y-3">
+                  <UCard
+                    v-for="entry in mcpInvokeHistory"
+                    :key="entry.id"
+                    class="bg-black/30 text-xs text-white/80"
+                  >
+                    <template #header>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-sm font-semibold">
+                          {{ `{{ entry.status }}` }}
+                        </span>
+                        <UBadge
+                          :color="entry.success ? 'green' : 'rose'"
+                          variant="soft"
+                          :label="entry.success ? $t('capabilities.mcp.invoke.historySuccess') : $t('capabilities.mcp.invoke.historyFail')"
+                        />
+                        <span class="text-white/60">{{ `{{ entry.timestamp }}` }}</span>
+                      </div>
+                      <p class="text-white/60">
+                        Trace：{{ `{{ entry.traceId || "—" }}` }} · Correlation：{{ `{{ entry.correlationId || "—" }}` }}
+                      </p>
+                    </template>
+                    <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
+{{ `{{ entry.payload ? JSON.stringify(entry.payload, null, 2) : entry.error }}` }}
+                    </pre>
+                  </UCard>
+                </div>
+                <p v-else class="text-xs text-white/60">
+                  {{ `{{ $t("capabilities.mcp.invoke.noHistory") }}` }}
+                </p>
+              </div>
+            </div>
+          </UCard>
+
+          <UCard class="border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30">
+            <template #header>
+              <div class="flex items-center justify-between">
+                <div>
+                  <h2 class="text-lg font-semibold text-white">
+                    {{ `{{ $t("capabilities.mcp.stream.title") }}` }}
+                  </h2>
+                  <p class="text-sm text-white/70">
+                    {{ `{{ $t("capabilities.mcp.stream.description") }}` }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <UBadge
+                    :label="mcpStreamConnected ? $t('capabilities.mcp.stream.connected') : $t('capabilities.mcp.stream.disconnected')"
+                    :color="mcpStreamConnected ? 'green' : 'gray'"
+                  />
+                  <UButton
+                    size="xs"
+                    variant="soft"
+                    color="primary"
+                    :disabled="!mcpSessionForm.sessionId"
+                    @click="toggleMcpStream"
+                  >
+                    {{ `{{ mcpStreamConnected ? $t("capabilities.mcp.actions.disconnectStream") : $t("capabilities.mcp.actions.connectStream") }}` }}
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    variant="ghost"
+                    color="neutral"
+                    @click="clearMcpEvents"
+                  >
+                    {{ `{{ $t("capabilities.mcp.actions.clearEvents") }}` }}
+                  </UButton>
+                </div>
+              </div>
+            </template>
+            <div class="space-y-3 text-xs">
+              <p v-if="mcpStreamError" class="text-rose-300">
+                {{ `{{ mcpStreamError }}` }}
+              </p>
+              <div v-if="mcpEvents.length" class="space-y-3">
+                <UCard
+                  v-for="event in mcpEvents"
+                  :key="`${event.type}-${event.timestamp}`"
+                  class="bg-black/30 text-white/80"
+                >
+                  <template #header>
+                    <div class="flex items-center justify-between">
+                      <span class="font-semibold">{{ `{{ event.type }}` }}</span>
+                      <span class="text-white/60">{{ `{{ event.timestamp }}` }}</span>
+                    </div>
+                  </template>
+                  <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
+{{ `{{ JSON.stringify(event.payload, null, 2) }}` }}
+                  </pre>
+                </UCard>
+              </div>
+              <p v-else class="text-white/60">
+                {{ `{{ $t("capabilities.mcp.stream.empty") }}` }}
+              </p>
+            </div>
+          </UCard>
+        </div>
+      </template>
     </UModal>
 
     <UModal
@@ -751,7 +1462,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
 import { useI18n, useRoute, useRouter, useToast } from "#imports";
 import {
@@ -769,6 +1480,12 @@ import {
   type ExposurePackage,
   type TenantQuota,
 } from "~/composables/api/useCapabilityExposure";
+import {
+  useMcpSessionApi,
+  type McpSession,
+  type McpInvokeResult,
+} from "~/composables/api/useMcpSession";
+import { resolveApiBase } from "~/composables/api/_base";
 import { useNormalizedColumns } from "~/utils/table";
 
 definePageMeta({
@@ -792,6 +1509,117 @@ const {
   listQuotas: fetchExposureQuotas,
   upsertQuota: saveExposureQuota,
 } = useCapabilityExposureApi();
+const runtimeConfig = useRuntimeConfig();
+const pluginCapabilityDocUrl = "https://github.com/ArtisanCloud/PowerXPlugin/blob/main/docs/guides/develop/plugin-capability/README.md";
+const mcpGuideUrl = "https://github.com/ArtisanCloud/PowerXPlugin/blob/main/docs/guides/publish/capabilities/mcp-guide.md";
+const {
+  invokeCapability: invokeDebugCapability,
+  clearHistory: clearDebugHistory,
+  loading: debugInvokeLoading,
+  result: debugResult,
+  warnings: debugWarnings,
+  errorMessage: debugErrorMessage,
+  lastTraceId: debugLastTraceId,
+  durationMs: debugDuration,
+  history: debugHistory,
+  errorDetails: debugErrorDetails,
+} = useCapabilityLab();
+
+const runtimeDebugApiBase =
+  (runtimeConfig.public?.powerx?.apiBase as string | undefined) ??
+  (runtimeConfig.public?.apiBase as string | undefined) ??
+  "";
+const defaultDebugApiBase = normalizeLocalDebugApiBase(runtimeDebugApiBase);
+const gatewayDebugApiFallback = runtimeDebugApiBase || "/api/v1";
+const debugDefaults = {
+  capabilityId: "",
+  action: "",
+  preferredProtocol: "",
+  targetMode: "local" as "local" | "gateway",
+  payloadText: "{\n  \n}",
+  tenantUuid: "00000000-0000-0000-0000-000000000001",
+  mockModule: "",
+  requestId: generateDebugRequestId(),
+  apiBase: defaultDebugApiBase,
+};
+const mcpInvokeSamples: Record<
+  string,
+  {
+    toolScope: string;
+    payload: JsonMap;
+  }
+> = {
+  "com.powerx.plugins.base.template.compose": {
+    toolScope: "agent.template.compose",
+    payload: {
+      draft: {
+        name: "Demo Template",
+        description: "由 MCP 指南自动创建",
+        content: "## hello world",
+      },
+      review: {
+        reviewer: "qa-bot",
+        comment: "looks good",
+      },
+      publish_channel: "channel:demo",
+      cleanup: {
+        reason: "archived after publish",
+      },
+    },
+  },
+  "com.powerx.plugins.base.template.audit": {
+    toolScope: "agent.template.audit",
+    payload: {
+      filters: {
+        status: "",
+        page: 1,
+        page_size: 5,
+      },
+      update_payload: {
+        description: "reviewed by qa-team",
+        content: "## patched content",
+        metadata: {
+          owner: "qa-team",
+        },
+      },
+    },
+  },
+  "com.powerx.plugins.base.template.quality_distribute": {
+    toolScope: "agent.template.quality_distribute",
+    payload: {
+      scan_filter: {
+        q: "demo",
+        page: 1,
+        page_size: 5,
+      },
+      validate_rules: ["name_not_empty", "content_min_length"],
+      clone: {
+        copies: 2,
+        name_prefix: "qa-copy-",
+        description_prefix: "[auto]",
+      },
+      update_payload: {
+        description: "distributed by QA",
+        content: "## fixed content",
+      },
+      publish_channel: "channel:qa-lab",
+    },
+  },
+};
+const debugForm = reactive({ ...debugDefaults });
+const debugPayloadTouched = ref(false);
+const debugAutoFillingPayload = ref(false);
+const debugShowRequestPreview = ref(true);
+const debugActionTouched = ref(false);
+type DebugContext = "draft" | "catalog" | null;
+type DebugProtocols = {
+  rest?: { method?: string; path?: string };
+  grpc?: { service?: string; method?: string };
+  workflow?: { template?: string };
+};
+const debugModalOpen = ref(false);
+const debugContext = ref<DebugContext>(null);
+const debugSourceProtocols = ref<DebugProtocols | null>(null);
 
 const formOpen = ref(false);
 const loadingTemplate = ref(true);
@@ -818,6 +1646,7 @@ type CatalogRow = {
   kind: string;
   syncStatus: string;
   updatedAt?: string;
+  protocols?: Record<string, any>;
 };
 const catalogRows = ref<CatalogRow[]>([]);
 type ModuleGroup = {
@@ -833,6 +1662,7 @@ type ChannelFormEntry = ExposureChannel & {
 };
 type ExposureMetaState = { status: string; updated_at?: string };
 type StatusBadge = { label: string; color: string };
+type JsonMap = Record<string, any>;
 const exposureFormOpen = ref(false);
 const exposureTemplate = ref<ExposureTemplate | null>(null);
 const exposurePackageInfo = ref<ExposurePackage | null>(null);
@@ -983,6 +1813,294 @@ const tableColumns = useNormalizedColumns([
   { key: "checksum", label: t("capabilities.list.column.checksum") },
   { key: "actions", label: "" },
 ]);
+const debugTargetOptions = computed(() => [
+  { value: "local", label: t("capabilities.form.debug.target.local") },
+  { value: "gateway", label: t("capabilities.form.debug.target.gateway") },
+]);
+const debugProtocolOptions = computed(() => {
+  const protocols = debugSourceProtocols.value || {};
+  const options: Array<{ value: string; label: string }> = [];
+  if (protocols.rest) {
+    options.push({ value: "rest", label: "REST" });
+  }
+  if (protocols.grpc) {
+    options.push({ value: "grpc", label: "gRPC" });
+  }
+  if (protocols.workflow) {
+    options.push({ value: "workflow", label: "Workflow" });
+  }
+  if (!options.length) {
+    options.push({ value: "rest", label: "REST" });
+  }
+  return options;
+});
+const debugPayloadTemplate = computed(() => {
+  const isLocal = debugForm.targetMode === "local";
+  switch (debugForm.preferredProtocol) {
+    case "rest":
+      return buildDebugRestTemplate();
+    case "grpc":
+      return isLocal ? buildLocalGrpcTemplate() : buildDebugGrpcTemplate();
+    case "workflow":
+      return isLocal ? buildLocalWorkflowTemplate() : buildDebugWorkflowTemplate();
+    default:
+      return "";
+  }
+});
+const debugPayloadValid = computed(() => {
+  try {
+    parseDebugPayload();
+    return true;
+  } catch {
+    return false;
+  }
+});
+const debugRequestPreview = computed(() => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (debugForm.tenantUuid.trim()) {
+    headers["X-Tenant-UUID"] = debugForm.tenantUuid.trim();
+  }
+  if (debugForm.mockModule.trim()) {
+    headers["X-PX-Use-Mock"] = debugForm.mockModule.trim();
+  }
+  if (debugForm.requestId.trim()) {
+    headers["X-Request-ID"] = debugForm.requestId.trim();
+  }
+  if (debugForm.targetMode === "local") {
+    const payload = safeDebugPayload();
+    const method = typeof payload?.method === "string" ? payload.method.toUpperCase() : "GET";
+    const endpoint = typeof payload?.endpoint === "string" ? payload.endpoint : "<missing endpoint>";
+    const url = buildPreviewLocalUrl(debugForm.apiBase || defaultDebugApiBase, endpoint, payload?.query);
+    return {
+      mode: "local",
+      method,
+      url,
+      headers: {
+        ...headers,
+        ...(payload?.headers || {}),
+      },
+      body: payload?.body ?? {},
+    };
+  }
+  const body: Record<string, any> = {
+    capabilityId: debugForm.capabilityId || capabilityId.value || "<empty>",
+    action: debugForm.action || form.action || "<empty>",
+    payload: safeDebugPayload(),
+  };
+  if (debugForm.preferredProtocol) {
+    body.preferredProtocol = debugForm.preferredProtocol;
+  }
+  return {
+    mode: "gateway",
+    url: combineURL(
+      ensureGatewayApiBase(debugForm.apiBase || defaultDebugApiBase, gatewayDebugApiFallback),
+      "/integration/capabilities/invoke",
+    ),
+    method: "POST",
+    headers,
+    body,
+  };
+});
+const debugRequestPreviewText = computed(() =>
+  JSON.stringify(debugRequestPreview.value, null, 2),
+);
+const debugHistoryEntries = computed(() => {
+  const targetId = debugForm.capabilityId?.trim();
+  const targetAction = debugForm.action?.trim();
+  return debugHistory.value.filter((entry) => {
+    if (targetId && entry.capabilityId !== targetId) {
+      return false;
+    }
+    if (targetAction && entry.action !== targetAction) {
+      return false;
+    }
+    return true;
+  });
+});
+
+const {
+  registerSession,
+  ackSession,
+  heartbeatSession,
+  closeSession,
+  invokeSession,
+} = useMcpSessionApi();
+
+type McpStreamEvent = {
+  session_id: string;
+  type: string;
+  payload?: any;
+  timestamp: string;
+};
+
+type McpInvokeHistoryEntry = {
+  id: string;
+  timestamp: string;
+  status: string;
+  traceId?: string;
+  correlationId?: string;
+  payload?: any;
+  success: boolean;
+  error?: string | null;
+};
+
+const mcpModalOpen = ref(false);
+const mcpSession = ref<McpSession | null>(null);
+const mcpSessionForm = reactive(createDefaultMcpSessionForm());
+const mcpRegisterLoading = ref(false);
+const mcpAckLoading = ref(false);
+const mcpHeartbeatLoading = ref(false);
+const mcpCloseLoading = ref(false);
+const mcpInvokeForm = reactive(createDefaultMcpInvokeForm());
+const mcpInvokeLoading = ref(false);
+const mcpInvokeResult = ref<McpInvokeResult | null>(null);
+const mcpInvokeErrorMessage = ref<string | null>(null);
+const mcpInvokeErrorDetails = ref<any>(null);
+const mcpInvokeHistory = ref<McpInvokeHistoryEntry[]>([]);
+const mcpEvents = ref<McpStreamEvent[]>([]);
+const mcpStreamConnected = ref(false);
+const mcpStreamError = ref<string | null>(null);
+const mcpEventSource = ref<EventSource | null>(null);
+
+watch(debugModalOpen, (open) => {
+  if (!open) {
+    debugContext.value = null;
+    debugSourceProtocols.value = null;
+    debugPayloadTouched.value = false;
+    debugActionTouched.value = false;
+  }
+});
+
+watch(
+  capabilityId,
+  (value) => {
+    if (debugContext.value === "draft" && debugModalOpen.value) {
+      debugForm.capabilityId = value || "";
+    }
+  },
+);
+
+let syncingDebugAction = false;
+watch(
+  () => form.action,
+  (value) => {
+    if (debugContext.value !== "draft" || !debugModalOpen.value) {
+      return;
+    }
+    if (debugActionTouched.value) {
+      return;
+    }
+    syncingDebugAction = true;
+    debugForm.action = value || "";
+    syncingDebugAction = false;
+  },
+);
+
+watch(
+  () => debugForm.action,
+  () => {
+    if (!syncingDebugAction) {
+      debugActionTouched.value = true;
+    }
+  },
+);
+
+watch(
+  debugProtocolOptions,
+  (options) => {
+    if (!options.length) {
+      debugForm.preferredProtocol = "";
+      debugPayloadTouched.value = false;
+      return;
+    }
+    if (!options.some((option) => option.value === debugForm.preferredProtocol)) {
+      debugForm.preferredProtocol = options[0].value;
+      debugPayloadTouched.value = false;
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => debugPayloadTemplate.value,
+  (template) => {
+    if (!debugModalOpen.value) return;
+    if (!template) return;
+    if (debugPayloadTouched.value) return;
+    debugAutoFillingPayload.value = true;
+    debugForm.payloadText = template;
+    nextTick(() => {
+      debugAutoFillingPayload.value = false;
+    });
+  },
+  { immediate: true },
+);
+
+watch(
+  () => debugForm.payloadText,
+  () => {
+    if (!debugAutoFillingPayload.value && debugModalOpen.value) {
+      debugPayloadTouched.value = true;
+    }
+  },
+);
+
+watch(
+  () => ({
+    restMethod: form.protocols.rest.method,
+    restPath: form.protocols.rest.path,
+    grpcService: form.protocols.grpc.service,
+    workflowTemplate: form.protocols.workflow.template,
+  }),
+  () => {
+    if (debugContext.value !== "draft" || !debugModalOpen.value) {
+      return;
+    }
+    debugSourceProtocols.value = buildDebugProtocolsFromForm();
+  },
+);
+
+watch(
+  () => mcpSessionForm.sessionId,
+  (sessionId, previousSessionId) => {
+    mcpInvokeForm.sessionId = sessionId || "";
+    if (sessionId) {
+      ensureMcpMetadataSession(sessionId);
+      if (mcpStreamConnected.value && sessionId !== previousSessionId) {
+        connectMcpStream(sessionId);
+      }
+    } else if (mcpStreamConnected.value) {
+      disconnectMcpStream();
+    }
+  },
+);
+
+watch(
+  () => mcpInvokeForm.capabilityId,
+  (capabilityId) => {
+    ensureMcpMetadataSession();
+    maybeApplyMcpSample(capabilityId?.trim());
+  },
+);
+
+watch(
+  () => mcpInvokeForm.intent,
+  () => {
+    ensureMcpMetadataSession();
+  },
+);
+
+watch(mcpModalOpen, (open) => {
+  if (!open && mcpStreamConnected.value) {
+    disconnectMcpStream();
+  }
+});
+
+onUnmounted(() => {
+  disconnectMcpStream();
+});
 
 onMounted(async () => {
   await Promise.all([loadTemplate(), loadCatalog(), hydrateExposureTemplate()]);
@@ -1083,6 +2201,528 @@ function kindColor(kind?: string) {
   return "gray";
 }
 
+function isWorkflowKind(kind?: string) {
+  const normalized = normalizeKind(kind).toLowerCase();
+  return normalized === "workflow" || normalized === "tool";
+}
+
+function createDefaultMcpSessionForm() {
+  return {
+    runtimeAssignmentId: "",
+    registerState: "registering",
+    jwtId: "dev-mcp-client",
+    capabilitiesHash: "",
+    sessionId: "",
+    ackState: "ready",
+    heartbeatMissed: 0,
+    closeReason: "",
+  };
+}
+
+function createDefaultMcpInvokeForm() {
+  return {
+    sessionId: "",
+    tenantUuid: debugDefaults.tenantUuid,
+    toolScope: "",
+    capabilityId: "",
+    intent: "",
+    messageId: generateUuid(),
+    traceId: generateUuid(),
+    correlationId: generateUuid(),
+    issuedAt: new Date().toISOString(),
+    idempotencyKey: "",
+    payloadText: "{\n  \n}",
+    metadataText: "{\n  \n}",
+    signature: "stub-signature",
+  };
+}
+
+function openMcpPanel() {
+  if (!mcpSessionForm.runtimeAssignmentId) {
+    regenerateMcpRuntimeAssignment();
+  }
+  mcpModalOpen.value = true;
+}
+
+function openMcpPanelForCapability(capabilityId?: string) {
+  const trimmed = capabilityId?.trim();
+  if (trimmed) {
+    mcpInvokeForm.capabilityId = trimmed;
+    mcpInvokeForm.intent = trimmed;
+    applyMcpSample(trimmed, { force: true });
+    if (!mcpInvokeForm.toolScope.trim()) {
+      mcpInvokeForm.toolScope = deriveToolScopeFromCapability(trimmed);
+    }
+    ensureMcpMetadataSession();
+  }
+  openMcpPanel();
+}
+
+function regenerateMcpRuntimeAssignment() {
+  mcpSessionForm.runtimeAssignmentId = generateUuid();
+}
+
+async function handleMcpRegister() {
+  if (!mcpSessionForm.runtimeAssignmentId.trim()) {
+    toast.add({
+      title: t("capabilities.mcp.toast.runtimeRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  mcpRegisterLoading.value = true;
+  try {
+    const session = await registerSession({
+      runtime_assignment_id: mcpSessionForm.runtimeAssignmentId.trim(),
+      state: mcpSessionForm.registerState?.trim() || "registering",
+      jwt_id: mcpSessionForm.jwtId?.trim() || undefined,
+      capabilities_hash: mcpSessionForm.capabilitiesHash?.trim() || undefined,
+    });
+    applyMcpSession(session);
+    toast.add({
+      title: t("capabilities.mcp.toast.registered"),
+      color: "green",
+    });
+  } catch (error) {
+    toast.add({
+      title: extractErrorMessage(error),
+      color: "rose",
+    });
+  } finally {
+    mcpRegisterLoading.value = false;
+  }
+}
+
+async function handleMcpAck() {
+  if (!mcpSessionForm.sessionId.trim()) {
+    toast.add({
+      title: t("capabilities.mcp.toast.sessionRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  mcpAckLoading.value = true;
+  try {
+    const session = await ackSession(mcpSessionForm.sessionId.trim(), {
+      state: mcpSessionForm.ackState?.trim() || "ready",
+      capabilities_hash: mcpSessionForm.capabilitiesHash?.trim() || undefined,
+    });
+    applyMcpSession(session);
+    toast.add({
+      title: t("capabilities.mcp.toast.acknowledged"),
+      color: "green",
+    });
+  } catch (error) {
+    toast.add({
+      title: extractErrorMessage(error),
+      color: "rose",
+    });
+  } finally {
+    mcpAckLoading.value = false;
+  }
+}
+
+async function handleMcpHeartbeat() {
+  if (!mcpSessionForm.sessionId.trim()) {
+    toast.add({
+      title: t("capabilities.mcp.toast.sessionRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  mcpHeartbeatLoading.value = true;
+  try {
+    const session = await heartbeatSession(mcpSessionForm.sessionId.trim(), {
+      missed_heartbeats: mcpSessionForm.heartbeatMissed || 0,
+    });
+    applyMcpSession(session);
+    toast.add({
+      title: t("capabilities.mcp.toast.heartbeat"),
+      color: "green",
+    });
+  } catch (error) {
+    toast.add({
+      title: extractErrorMessage(error),
+      color: "rose",
+    });
+  } finally {
+    mcpHeartbeatLoading.value = false;
+  }
+}
+
+async function handleMcpClose() {
+  if (!mcpSessionForm.sessionId.trim()) {
+    toast.add({
+      title: t("capabilities.mcp.toast.sessionRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  mcpCloseLoading.value = true;
+  try {
+    const session = await closeSession(mcpSessionForm.sessionId.trim(), {
+      reason: mcpSessionForm.closeReason?.trim() || undefined,
+    });
+    applyMcpSession(session);
+    toast.add({
+      title: t("capabilities.mcp.toast.closed"),
+      color: "green",
+    });
+  } catch (error) {
+    toast.add({
+      title: extractErrorMessage(error),
+      color: "rose",
+    });
+  } finally {
+    mcpCloseLoading.value = false;
+  }
+}
+
+async function handleMcpInvoke() {
+  if (!mcpInvokeForm.sessionId.trim()) {
+    toast.add({
+      title: t("capabilities.mcp.toast.sessionRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  if (!mcpInvokeForm.toolScope.trim()) {
+    toast.add({
+      title: t("capabilities.mcp.toast.toolScopeRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  mcpInvokeLoading.value = true;
+  try {
+    const payloadRef = buildPayloadRef(mcpInvokeForm.payloadText);
+    const metadata = buildInvokeMetadata();
+    const issuedAt = normalizeIssuedAt(mcpInvokeForm.issuedAt);
+    const result = await invokeSession(mcpInvokeForm.sessionId.trim(), {
+      message_id: mcpInvokeForm.messageId.trim() || generateUuid(),
+      trace_id: mcpInvokeForm.traceId.trim() || generateUuid(),
+      correlation_id: mcpInvokeForm.correlationId.trim() || generateUuid(),
+      tenant_uuid: mcpInvokeForm.tenantUuid.trim() || debugDefaults.tenantUuid,
+      tool_scope: mcpInvokeForm.toolScope.trim(),
+      issued_at: issuedAt,
+      idempotency_key: mcpInvokeForm.idempotencyKey?.trim() || undefined,
+      payload_ref: payloadRef,
+      metadata,
+      signature: mcpInvokeForm.signature?.trim() || "stub-signature",
+    });
+    mcpInvokeResult.value = result;
+    mcpInvokeErrorMessage.value = null;
+    mcpInvokeErrorDetails.value = null;
+    pushMcpInvokeHistory({
+      id: generateUuid(),
+      timestamp: new Date().toISOString(),
+      status: result.status,
+      traceId: result.trace_id,
+      correlationId: result.correlation_id,
+      payload: result.payload ?? result.metadata ?? null,
+      success: true,
+      error: null,
+    });
+    toast.add({
+      title: t("capabilities.mcp.toast.invoked"),
+      color: "green",
+    });
+  } catch (error: any) {
+    const message = error instanceof Error ? error.message : extractErrorMessage(error);
+    const details =
+      error?.response?._data?.error?.details ??
+      error?.response?._data?.data ??
+      error?.response?._data ??
+      null;
+    mcpInvokeResult.value = null;
+    mcpInvokeErrorMessage.value = message;
+    mcpInvokeErrorDetails.value = details;
+    pushMcpInvokeHistory({
+      id: generateUuid(),
+      timestamp: new Date().toISOString(),
+      status: "error",
+      traceId: details?.trace_id || undefined,
+      correlationId: details?.correlation_id || undefined,
+      payload: details,
+      success: false,
+      error: message,
+    });
+    toast.add({
+      title: message,
+      color: "rose",
+    });
+  } finally {
+    mcpInvokeLoading.value = false;
+  }
+}
+
+function applyMcpSession(session: McpSession | null) {
+  if (!session) {
+    mcpSession.value = null;
+    return;
+  }
+  const resolvedSessionId =
+    session.id?.trim() ||
+    mcpSessionForm.sessionId?.trim() ||
+    mcpSession.value?.id ||
+    "";
+  const resolvedAssignmentId =
+    session.runtime_assignment_id?.trim() ||
+    mcpSessionForm.runtimeAssignmentId?.trim() ||
+    mcpSession.value?.runtime_assignment_id ||
+    "";
+  const resolvedTenantUuid =
+    session.tenant_uuid?.trim() || mcpSession.value?.tenant_uuid || "";
+
+  mcpSession.value = {
+    ...session,
+    id: resolvedSessionId,
+    runtime_assignment_id: resolvedAssignmentId,
+    tenant_uuid: resolvedTenantUuid,
+  };
+
+  if (resolvedSessionId) {
+    mcpSessionForm.sessionId = resolvedSessionId;
+    mcpInvokeForm.sessionId = resolvedSessionId;
+  }
+  if (session.runtime_assignment_id?.trim()) {
+    mcpSessionForm.runtimeAssignmentId = session.runtime_assignment_id.trim();
+  }
+  if (session.capabilities_hash) {
+    mcpSessionForm.capabilitiesHash = session.capabilities_hash;
+  }
+  if (resolvedTenantUuid) {
+    mcpInvokeForm.tenantUuid = resolvedTenantUuid;
+  }
+  ensureMcpMetadataSession(resolvedSessionId);
+}
+
+function pushMcpInvokeHistory(entry: McpInvokeHistoryEntry) {
+  mcpInvokeHistory.value = [entry, ...mcpInvokeHistory.value].slice(0, 5);
+}
+
+function clearMcpInvokeHistory() {
+  mcpInvokeHistory.value = [];
+}
+
+function buildPayloadRef(text: string) {
+  const trimmed = text?.trim();
+  if (!trimmed) {
+    return "{}";
+  }
+  try {
+    return JSON.stringify(JSON.parse(trimmed));
+  } catch {
+    throw new Error(t("capabilities.mcp.errors.invalidPayload"));
+  }
+}
+
+function buildInvokeMetadata() {
+  const trimmed = mcpInvokeForm.metadataText?.trim();
+  let metadata: Record<string, any> = {};
+  if (trimmed) {
+    try {
+      metadata = JSON.parse(trimmed);
+    } catch {
+      throw new Error(t("capabilities.mcp.errors.invalidMetadata"));
+    }
+  }
+  if (mcpInvokeForm.sessionId) {
+    metadata.session_id = metadata.session_id || mcpInvokeForm.sessionId;
+  }
+  if (mcpInvokeForm.intent) {
+    metadata.intent = metadata.intent || mcpInvokeForm.intent;
+  }
+  if (mcpInvokeForm.capabilityId) {
+    metadata.capability_id = metadata.capability_id || mcpInvokeForm.capabilityId;
+  }
+  return metadata;
+}
+
+function normalizeIssuedAt(value: string) {
+  if (!value?.trim()) {
+    return new Date().toISOString();
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(t("capabilities.mcp.errors.invalidIssuedAt"));
+  }
+  return parsed.toISOString();
+}
+
+function ensureMcpMetadataSession(sessionId?: string) {
+  const trimmed = mcpInvokeForm.metadataText?.trim();
+  if (!trimmed) {
+    if (sessionId || mcpInvokeForm.intent || mcpInvokeForm.capabilityId) {
+      const metadata: Record<string, any> = {};
+      if (sessionId) metadata.session_id = sessionId;
+      if (mcpInvokeForm.intent) metadata.intent = mcpInvokeForm.intent;
+      if (mcpInvokeForm.capabilityId) metadata.capability_id = mcpInvokeForm.capabilityId;
+      mcpInvokeForm.metadataText = JSON.stringify(metadata, null, 2);
+    }
+    return;
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    let changed = false;
+    if (sessionId && parsed.session_id !== sessionId) {
+      parsed.session_id = sessionId;
+      changed = true;
+    }
+    if (mcpInvokeForm.intent && !parsed.intent) {
+      parsed.intent = mcpInvokeForm.intent;
+      changed = true;
+    }
+    if (mcpInvokeForm.capabilityId && !parsed.capability_id) {
+      parsed.capability_id = mcpInvokeForm.capabilityId;
+      changed = true;
+    }
+    if (changed) {
+      mcpInvokeForm.metadataText = JSON.stringify(parsed, null, 2);
+    }
+  } catch {
+    // ignore invalid JSON until用户手动修复
+  }
+}
+
+function regenerateInvokeIdentifiers() {
+  mcpInvokeForm.messageId = generateUuid();
+  mcpInvokeForm.traceId = generateUuid();
+  mcpInvokeForm.correlationId = generateUuid();
+}
+
+function setIssuedAtNow() {
+  mcpInvokeForm.issuedAt = new Date().toISOString();
+}
+
+function applyCurrentCapabilityToMcp() {
+  const candidate = debugForm.capabilityId?.trim() || capabilityId.value || "";
+  if (!candidate) {
+    toast.add({
+      title: t("capabilities.mcp.toast.capabilityMissing"),
+      color: "rose",
+    });
+    return;
+  }
+  mcpInvokeForm.capabilityId = candidate;
+  mcpInvokeForm.intent = candidate;
+  applyMcpSample(candidate, { force: true });
+  ensureMcpMetadataSession();
+  toast.add({
+    title: t("capabilities.mcp.toast.capabilitySynced"),
+    color: "green",
+  });
+}
+
+function maybeApplyMcpSample(capabilityId?: string | null) {
+  if (!capabilityId) {
+    return;
+  }
+  applyMcpSample(capabilityId, { force: false });
+}
+
+function applyMcpSample(capabilityId: string, options?: { force?: boolean }) {
+  const sample = mcpInvokeSamples[capabilityId];
+  if (!sample) {
+    return;
+  }
+  const force = Boolean(options?.force);
+  if (force || !mcpInvokeForm.toolScope.trim()) {
+    mcpInvokeForm.toolScope = sample.toolScope;
+  }
+  if (force || needsPayloadSeed(mcpInvokeForm.payloadText)) {
+    mcpInvokeForm.payloadText = JSON.stringify(sample.payload, null, 2);
+  }
+}
+
+function needsPayloadSeed(current?: string | null) {
+  if (!current) {
+    return true;
+  }
+  const trimmed = current.trim();
+  if (!trimmed || trimmed === "{}" || current === "{\n  \n}") {
+    return true;
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed.length === 0;
+    }
+    if (isPlainObjectValue(parsed)) {
+      return Object.keys(parsed).length === 0;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function isPlainObjectValue(value: unknown): value is JsonMap {
+  return Object.prototype.toString.call(value) === "[object Object]";
+}
+
+function connectMcpStream(sessionId: string) {
+  if (typeof window === "undefined" || !sessionId) {
+    return;
+  }
+  disconnectMcpStream();
+  const endpoint = buildApiUrl("mcp/sse");
+  const url = new URL(endpoint);
+  url.searchParams.set("session_id", sessionId);
+  const source = new EventSource(url.toString());
+  mcpEventSource.value = source;
+  source.onopen = () => {
+    mcpStreamConnected.value = true;
+    mcpStreamError.value = null;
+  };
+  source.onmessage = (event) => {
+    try {
+      const parsed = JSON.parse(event.data);
+      mcpEvents.value = [parsed, ...mcpEvents.value].slice(0, 20);
+    } catch {
+      // ignore parse error
+    }
+  };
+  source.onerror = () => {
+    mcpStreamConnected.value = false;
+    mcpStreamError.value = t("capabilities.mcp.streamError");
+  };
+}
+
+function disconnectMcpStream() {
+  if (mcpEventSource.value) {
+    mcpEventSource.value.close();
+    mcpEventSource.value = null;
+  }
+  mcpStreamConnected.value = false;
+}
+
+function toggleMcpStream() {
+  if (mcpStreamConnected.value) {
+    disconnectMcpStream();
+    return;
+  }
+  if (mcpSessionForm.sessionId) {
+    connectMcpStream(mcpSessionForm.sessionId);
+  }
+}
+
+function clearMcpEvents() {
+  mcpEvents.value = [];
+}
+
+function buildApiUrl(path: string) {
+  const base = resolveApiBase();
+  if (/^https?:\/\//i.test(base)) {
+    return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  }
+  if (typeof window === "undefined") {
+    return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  }
+  const normalizedBase = base.startsWith("/") ? base : `/${base}`;
+  return `${window.location.origin}${normalizedBase.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+}
+
 async function loadTemplate() {
   loadingTemplate.value = true;
   try {
@@ -1134,6 +2774,7 @@ function syncCatalogRows() {
       kind: normalizeKind(entry.kind),
       syncStatus: meta.status,
       updatedAt: meta.updated_at,
+      protocols: entry.protocols || {},
     };
   });
 }
@@ -1431,6 +3072,271 @@ function buildProtocols() {
   return matrix;
 }
 
+function buildDebugProtocolsFromForm(): DebugProtocols {
+  const protocols: DebugProtocols = {};
+  if (form.protocols.rest.path) {
+    protocols.rest = {
+      method: form.protocols.rest.method,
+      path: form.protocols.rest.path,
+    };
+  }
+  if (form.protocols.grpc.service) {
+    const parsed = parseGrpcServiceField(form.protocols.grpc.service || "");
+    protocols.grpc = {
+      service: parsed.service || "",
+      method: parsed.method || "",
+    };
+  }
+  if (form.protocols.workflow.template) {
+    protocols.workflow = {
+      template: form.protocols.workflow.template,
+    };
+  }
+  return protocols;
+}
+
+function normalizeDebugProtocols(source?: CapabilityCatalogEntry["protocols"] | null): DebugProtocols {
+  const protocols: DebugProtocols = {};
+  if (!source) {
+    return protocols;
+  }
+  const rest = firstProtocolRecord(source.rest || source.http);
+  if (rest) {
+    protocols.rest = {
+      method: rest.method || rest.httpMethod || rest.verb || "POST",
+      path: rest.path || rest.endpoint || rest.url || "",
+    };
+  }
+  const grpc = firstProtocolRecord(source.grpc);
+  if (grpc) {
+    protocols.grpc = {
+      service: grpc.service || grpc.endpoint || "",
+      method: grpc.method || grpc.rpc || "",
+    };
+  }
+  const workflow = firstProtocolRecord(source.workflow_step || source.workflow);
+  if (workflow) {
+    protocols.workflow = {
+      template: workflow.template || workflow.name || "",
+    };
+  }
+  return protocols;
+}
+
+function firstProtocolRecord(value: any): Record<string, any> | null {
+  if (Array.isArray(value)) {
+    return ensureProtocolRecord(value[0]);
+  }
+  return ensureProtocolRecord(value);
+}
+
+function ensureProtocolRecord(value: any): Record<string, any> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, any>;
+  }
+  return null;
+}
+
+function buildDebugRestTemplate() {
+  const rest = debugSourceProtocols.value?.rest;
+  const method = rest?.method || "POST";
+  const path = rest?.path || "/api/v1/<resource>";
+  return JSON.stringify(
+    {
+      method,
+      endpoint: path,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      query: {},
+      body: {},
+    },
+    null,
+    2,
+  );
+}
+
+function parseGrpcServiceField(value: string) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) {
+    return { service: "", method: "" };
+  }
+  const [service, method] = trimmed.split("/", 2);
+  return { service: service || "", method: method || "" };
+}
+
+function buildDebugGrpcTemplate() {
+  const grpc = debugSourceProtocols.value?.grpc;
+  const service = grpc?.service || "powerx.module.v1.Service";
+  const method = grpc?.method || "Method";
+  return JSON.stringify(
+    {
+      endpoint: service,
+      rpc: method || service,
+      metadata: {},
+      body: {},
+    },
+    null,
+    2,
+  );
+}
+
+function buildDebugWorkflowTemplate() {
+  return JSON.stringify(
+    {
+      workflow: {
+        template: debugSourceProtocols.value?.workflow?.template || "contracts/exposure/workflow/example.json",
+      },
+      payload: {},
+    },
+    null,
+    2,
+  );
+}
+
+function buildLocalGrpcTemplate() {
+  const grpc = debugSourceProtocols.value?.grpc;
+  const service = grpc?.service || "powerx.module.v1.Service";
+  const method = grpc?.method || "Method";
+  return JSON.stringify(
+    {
+      method: "POST",
+      endpoint: `/grpc/${service}/${method}`,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: {
+        service,
+        rpc: method,
+        input: {},
+        metadata: {},
+      },
+    },
+    null,
+    2,
+  );
+}
+
+function buildLocalWorkflowTemplate() {
+  const capability =
+    debugForm.capabilityId?.trim() || capabilityId.value || "com.powerx.plugins.base.template.compose";
+  const intent = capability;
+  const sessionPlaceholder = "<session-id>";
+  const toolScope = deriveToolScopeFromCapability(capability);
+  const workflowTemplate = debugSourceProtocols.value?.workflow?.template || capability;
+  const inlinePayload = {
+    workflow_id: workflowTemplate,
+    vars: {
+      filters: {
+        status: "",
+        tags: [],
+        page: 1,
+        page_size: 20,
+      },
+      update_payload: {
+        description: "来自调试面板的示例更新",
+        content: "## Updated content\n\n- 保持 JSON 有效\n- 根据能力要求调整",
+        metadata: {
+          source: "debug-panel",
+        },
+      },
+    },
+  };
+  return JSON.stringify(
+    {
+      method: "POST",
+      endpoint: `/api/v1/admin/runtime/sessions/${sessionPlaceholder}/invoke`,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: {
+        message_id: generateUuid(),
+        trace_id: generateUuid(),
+        correlation_id: generateUuid(),
+        tenant_uuid: debugDefaults.tenantUuid,
+        tool_scope: toolScope,
+        issued_at: new Date().toISOString(),
+        payload_ref: JSON.stringify(inlinePayload),
+        metadata: {
+          session_id: sessionPlaceholder,
+          intent,
+          capability_id: capability,
+        },
+        signature: "stub-signature",
+      },
+    },
+    null,
+    2,
+  );
+}
+
+function parseDebugPayload() {
+  if (!debugForm.payloadText.trim()) {
+    return {};
+  }
+  return JSON.parse(debugForm.payloadText);
+}
+
+function safeDebugPayload() {
+  try {
+    return parseDebugPayload();
+  } catch {
+    return "<invalid json>";
+  }
+}
+
+function applyDebugPayloadTemplate() {
+  if (!debugPayloadTemplate.value) return;
+  debugPayloadTouched.value = false;
+  debugAutoFillingPayload.value = true;
+  debugForm.payloadText = debugPayloadTemplate.value;
+  nextTick(() => {
+    debugAutoFillingPayload.value = false;
+  });
+}
+
+function resetDebugPayload() {
+  debugPayloadTouched.value = false;
+  debugAutoFillingPayload.value = true;
+  debugForm.payloadText = debugDefaults.payloadText;
+  nextTick(() => {
+    debugAutoFillingPayload.value = false;
+  });
+}
+
+function generateUuid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.floor(Math.random() * 1e6)
+    .toString(16)
+    .padStart(5, "0")}`;
+}
+
+function generateDebugRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `req-${Date.now()}`;
+}
+
+function buildPreviewLocalUrl(base: string, endpoint: string, query?: Record<string, any>) {
+  const normalized = isAbsoluteURL(endpoint) ? endpoint : combineURL(base, endpoint);
+  if (!query || typeof query !== "object") return normalized;
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (Array.isArray(value)) {
+      value.forEach((entry) => params.append(key, String(entry)));
+    } else {
+      params.append(key, String(value));
+    }
+  });
+  const qs = params.toString();
+  if (!qs) return normalized;
+  return normalized.includes("?") ? `${normalized}&${qs}` : `${normalized}?${qs}`;
+}
+
 function addErrorCode() {
   form.samples.errors.push({ code: "", message: "", solution: "" });
 }
@@ -1458,6 +3364,145 @@ function extractErrorMessage(error: any) {
     error?.message ||
     t("capabilities.form.toast.genericError")
   );
+}
+
+function normalizeLocalDebugApiBase(value?: string | null) {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) {
+    return value.replace(/\/api\/v1\/?$/i, "");
+  }
+  return value;
+}
+
+function ensureGatewayApiBase(value: string | undefined, fallback: string) {
+  const fallbackBase = fallback?.trim() || "/api/v1";
+  const candidate = (value || "").trim();
+  if (!candidate) {
+    return fallbackBase;
+  }
+  const normalized = candidate.replace(/\/+$/, "");
+  if (/\/api\/v1$/i.test(normalized)) {
+    return normalized;
+  }
+  return `${normalized}/api/v1`;
+}
+
+function combineURL(base?: string, endpoint?: string) {
+  const normalizedBase = (base || "").replace(/\/+$/, "");
+  const normalizedEndpoint = ("/" + (endpoint || "").replace(/^\/+/, "")).replace(/\/{2,}/g, "/");
+  if (!normalizedBase) {
+    return normalizedEndpoint;
+  }
+  return `${normalizedBase}${normalizedEndpoint}`;
+}
+
+function isAbsoluteURL(value: string) {
+  return /^https?:\/\//i.test(value || "");
+}
+
+function deriveActionFromCapability(capability: string) {
+  const tail = (capability || "").split(".").pop() || "Invoke";
+  return tail.replace(/[-_]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()).replace(/\s+/g, "");
+}
+
+function deriveToolScopeFromCapability(capability: string) {
+  const parts = (capability || "").split(".").filter(Boolean);
+  if (parts.length >= 2) {
+    const tail = parts.slice(-2).join(".");
+    return `agent.${tail}`;
+  }
+  return "agent.workflow";
+}
+
+function openDebugPanelFromCatalog(row: CatalogRow) {
+  debugContext.value = "catalog";
+  debugSourceProtocols.value = normalizeDebugProtocols(row.protocols || {});
+  debugForm.capabilityId = row.capability_id;
+  debugForm.action = deriveActionFromCapability(row.capability_id);
+  debugForm.apiBase = defaultDebugApiBase;
+  debugForm.mockModule = "";
+  debugForm.tenantUuid = debugDefaults.tenantUuid;
+  debugForm.requestId = generateDebugRequestId();
+  debugForm.targetMode = "local";
+  debugPayloadTouched.value = false;
+  debugActionTouched.value = false;
+  resetDebugOutputs();
+  debugModalOpen.value = true;
+}
+
+function openDebugPanelForDraft() {
+  debugContext.value = "draft";
+  debugSourceProtocols.value = buildDebugProtocolsFromForm();
+  debugForm.capabilityId = capabilityId.value || "";
+  debugForm.action = form.action || deriveActionFromCapability(capabilityId.value || "");
+  debugForm.apiBase = defaultDebugApiBase;
+  debugForm.mockModule = "";
+  debugForm.tenantUuid = debugDefaults.tenantUuid;
+  debugForm.requestId = generateDebugRequestId();
+  debugForm.targetMode = "local";
+  debugPayloadTouched.value = false;
+  debugActionTouched.value = false;
+  resetDebugOutputs();
+  debugModalOpen.value = true;
+}
+
+async function handleDebugInvoke() {
+  if (!debugForm.capabilityId && debugForm.targetMode !== "local") {
+    toast.add({
+      title: t("capabilities.form.debug.capabilityRequired"),
+      color: "rose",
+    });
+    return;
+  }
+  if (!debugPayloadValid.value) {
+    toast.add({
+      title: t("capabilities.form.debug.payloadInvalid"),
+      color: "rose",
+    });
+    return;
+  }
+  const headers: Record<string, string> = {};
+  if (debugForm.tenantUuid.trim()) {
+    headers["X-Tenant-UUID"] = debugForm.tenantUuid.trim();
+  }
+  if (debugForm.mockModule.trim()) {
+    headers["X-PX-Use-Mock"] = debugForm.mockModule.trim();
+  }
+  try {
+    const rawApiBase = (debugForm.apiBase?.trim() || defaultDebugApiBase || "").trim();
+    const resolvedApiBase =
+      debugForm.targetMode === "gateway"
+        ? ensureGatewayApiBase(rawApiBase, gatewayDebugApiFallback)
+        : rawApiBase;
+    await invokeDebugCapability({
+      capabilityId: debugForm.capabilityId.trim() || capabilityId.value || "local-debug",
+      action: (debugForm.action || form.action || "Invoke").trim(),
+      payload: parseDebugPayload(),
+      payloadText: debugForm.payloadText,
+      headers,
+      requestId: debugForm.requestId?.trim() || undefined,
+      apiBase: resolvedApiBase || undefined,
+      preferredProtocol: debugForm.preferredProtocol || undefined,
+      mode: debugForm.targetMode,
+    });
+    if (!debugForm.requestId) {
+      debugForm.requestId = generateDebugRequestId();
+    }
+  } catch {
+    // handled in composable
+  }
+}
+
+function resetDebugOutputs() {
+  debugResult.value = null;
+  debugWarnings.value = [];
+  debugErrorMessage.value = "";
+  debugErrorDetails.value = null;
+  debugLastTraceId.value = null;
+}
+
+function regenerateDebugRequestId() {
+  debugForm.requestId = generateDebugRequestId();
 }
 
 async function hydrateExposureTemplate() {

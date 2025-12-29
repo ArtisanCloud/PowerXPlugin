@@ -1,9 +1,9 @@
 import { ref } from 'vue'
 import { useToast } from '#imports'
 import { usePowerXCapability } from '~/composables/usePowerXCapability'
-import type {
+import {
   PowerXCapabilityBridgeError,
-  PowerXCapabilityResponse
+  type PowerXCapabilityResponse
 } from '~/plugins/powerx-capability.client'
 
 export interface CapabilityLabHistoryEntry {
@@ -28,6 +28,7 @@ export interface CapabilityLabInvokeRequest {
   requestId?: string
   apiBase?: string
   preferredProtocol?: string
+  mode?: 'gateway' | 'local'
 }
 
 const now = () => {
@@ -104,14 +105,17 @@ export const useCapabilityLab = () => {
   const invokeCapability = async (request: CapabilityLabInvokeRequest) => {
     const started = now()
     try {
-      const response = await invoke(request.capabilityId, request.action, request.payload, {
-        headers: request.headers,
-        requestId: request.requestId,
-        apiBase: request.apiBase,
-        preferredProtocol: request.preferredProtocol,
-        notifyOnSuccess: false,
-        notifyOnError: false
-      })
+      const response =
+        request.mode === 'local'
+          ? await invokeLocalCapability(request)
+          : await invoke(request.capabilityId, request.action, request.payload, {
+              headers: request.headers,
+              requestId: request.requestId,
+              apiBase: request.apiBase,
+              preferredProtocol: request.preferredProtocol,
+              notifyOnSuccess: false,
+              notifyOnError: false
+            })
 
       durationMs.value = now() - started
       result.value = response
@@ -170,5 +174,145 @@ export const useCapabilityLab = () => {
     durationMs,
     history,
     errorDetails
+  }
+}
+
+const combineURL = (base?: string, endpoint?: string) => {
+  const normalizedBase = (base || '').replace(/\/+$/, '')
+  const normalizedEndpoint = ('/' + (endpoint || '').replace(/^\/+/, '')).replace(/\/{2,}/g, '/')
+  if (!normalizedBase) {
+    return normalizedEndpoint
+  }
+  return `${normalizedBase}${normalizedEndpoint}`
+}
+
+const isAbsoluteURL = (value: string) => /^https?:\/\//i.test(value)
+
+const appendQuery = (url: string, query?: Record<string, any>) => {
+  if (!query || typeof query !== 'object') {
+    return url
+  }
+  const entries = Object.entries(query).filter(([, v]) => v !== undefined && v !== null)
+  if (!entries.length) {
+    return url
+  }
+  const search = new URLSearchParams()
+  entries.forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => search.append(key, String(item)))
+      return
+    }
+    search.append(key, String(value))
+  })
+  const qs = search.toString()
+  if (!qs) {
+    return url
+  }
+  return url.includes('?') ? `${url}&${qs}` : `${url}?${qs}`
+}
+
+const normalizeHeaderMap = (value?: Record<string, any>) => {
+  if (!value || typeof value !== 'object') {
+    return {}
+  }
+  return Object.entries(value).reduce<Record<string, string>>((acc, [key, val]) => {
+    if (typeof val === 'undefined' || val === null) {
+      return acc
+    }
+    acc[String(key)] = String(val)
+    return acc
+  }, {})
+}
+
+const ensureBody = (body: any) => {
+  if (body === undefined || body === null) {
+    return undefined
+  }
+  if (typeof body === 'string') {
+    return body
+  }
+  try {
+    return JSON.stringify(body)
+  } catch {
+    return String(body)
+  }
+}
+
+const parseBodySafely = (text: string) => {
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+const buildLocalUrl = (apiBase: string | undefined, endpoint: string) => {
+  if (!endpoint) return ''
+  if (isAbsoluteURL(endpoint)) {
+    return endpoint
+  }
+  if (!apiBase) {
+    return endpoint
+  }
+  return combineURL(apiBase, endpoint)
+}
+
+const invokeLocalCapability = async (
+  request: CapabilityLabInvokeRequest
+): Promise<PowerXCapabilityResponse> => {
+  const payload = request.payload || {}
+  const endpoint = String(payload.endpoint || '').trim()
+  if (!endpoint) {
+    throw new PowerXCapabilityBridgeError('本地调试需要在 payload.endpoint 中指定接口路径')
+  }
+  const method = String(payload.method || 'GET').toUpperCase()
+  const url = buildLocalUrl(request.apiBase, endpoint)
+  if (!url) {
+    throw new PowerXCapabilityBridgeError('请在调试面板中填写 API Base 或完整的 endpoint URL')
+  }
+  const headers = {
+    'Content-Type': 'application/json',
+    ...normalizeHeaderMap(payload.headers),
+    ...(request.headers || {})
+  }
+  const finalUrl = appendQuery(url, payload.query)
+  const hasBody = !['GET', 'HEAD', 'OPTIONS'].includes(method)
+  const body = hasBody ? ensureBody(payload.body ?? {}) : undefined
+
+  let response: Response
+  try {
+    response = await fetch(finalUrl, {
+      method,
+      headers,
+      body
+    })
+  } catch (error: any) {
+    throw new PowerXCapabilityBridgeError(
+      error instanceof Error ? error.message : '本地接口请求失败'
+    )
+  }
+
+  const traceId = response.headers.get('x-trace-id') || request.requestId || undefined
+  const text = await response.text()
+  const parsed = parseBodySafely(text)
+
+  if (!response.ok) {
+    throw new PowerXCapabilityBridgeError(
+      `HTTP ${response.status} ${response.statusText || ''}`.trim(),
+      {
+        status: response.status,
+        traceId,
+        details: parsed
+      }
+    )
+  }
+
+  return {
+    traceId,
+    status: 'completed',
+    data: typeof parsed === 'object' ? parsed : { value: parsed },
+    warnings: null,
+    raw: text ? parsed : null
   }
 }

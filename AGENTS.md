@@ -30,6 +30,7 @@ npm test && npm run lint
 Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 
 ## Recent Changes
+- 010-auth-customer: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 - 007-standalone-iam-rbac: Added Go 1.24（后端），TypeScript 5 + Nuxt 4.2（前端），Node.js 20 + Gin、Gorm、Pinia、`@nuxt/ui`、PowerX 插件框架、px-plugin CLI
 - 006-plugin-capability: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 

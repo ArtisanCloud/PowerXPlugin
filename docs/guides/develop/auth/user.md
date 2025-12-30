@@ -40,7 +40,7 @@
   - 通过 `customer_auth.delegate_endpoint`、`service_token` 配置宿主接口，失败时统一 401。
 - **中间件注入**：
   - `internal/transport/http/middleware/customer_auth.go`：在 `httpmw.EnsureTenant()` 后执行，解析 `Authorization`/`X-Customer-Token`，调用对应 authenticator，成功后把 `CustomerContext` 写入 gin context。
-  - `internal/transport/http/miniapp/router.go`：先挂载 `/mini-app/auth/*`（无需 token），再对子路由应用 `CustomerAuthenticate`，确保产品/下单等接口都必须携带客户 token。
+  - `internal/transport/http/mini-app/routes.go`：先挂载 `/mini-app/auth/*`（无需 token），再对子路由应用 `CustomerAuthenticate`，并在认证后注入 `tenant_uuid` 供 `EnsureTenant()` 使用。
 
 ## 4. 指标与日志
 - **核心指标**（全部可在 `/api/v1/admin/runtime/metrics` 查看）：

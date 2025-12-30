@@ -10,6 +10,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/entity/models"
 	adminconsoleModel "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	customerModel "{{ .BackendModulePath }}/internal/entity/models/customer"
 	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
 	integrationModel "{{ .BackendModulePath }}/internal/entity/models/integration"
 	marketplaceModel "{{ .BackendModulePath }}/internal/entity/models/marketplace"
@@ -36,6 +37,7 @@ var businessTables = []interface{}{
 	&marketplaceModel.License{},
 	&marketplaceModel.LicenseEvent{},
 	&marketplaceModel.TaxTransaction{},
+	&customerModel.CustomerAccount{},
 	&runtimeOpsModel.MCPSession{},
 	&runtimeOpsModel.RuntimeAuditEvent{},
 	&runtimeOpsModel.QuotaLedger{},

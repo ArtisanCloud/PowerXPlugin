@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -68,6 +69,9 @@ type Config struct {
 	// Gateway 能力调用配置。
 	Gateway *GatewayConfig `yaml:"gateway" json:"gateway"`
 
+	// CustomerAuth (mini-app / 2C) 鉴权配置。
+	CustomerAuth *CustomerAuthConfig `yaml:"customer_auth" json:"customer_auth"`
+
 	// 向后兼容的字段（从环境变量或旧配置中填充）
 	BindAddr   string `yaml:"-" json:"bind_addr,omitempty"`
 	LogLevel   string `yaml:"-" json:"log_level,omitempty"`
@@ -75,6 +79,17 @@ type Config struct {
 	DBDSN      string `yaml:"-" json:"db_dsn,omitempty"`
 	DBSchema   string `yaml:"-" json:"db_schema,omitempty"`
 	RunMigrate bool   `yaml:"-" json:"run_migrate,omitempty"`
+}
+
+// CustomerAuthConfig 控制 mini-app（2C）鉴权模式。
+type CustomerAuthConfig struct {
+	Mode             string `yaml:"mode" json:"mode"`
+	DelegateEndpoint string `yaml:"delegate_endpoint" json:"delegate_endpoint"`
+	DelegateTimeout  string `yaml:"delegate_timeout" json:"delegate_timeout"`
+	JWTIssuer        string `yaml:"jwt_issuer" json:"jwt_issuer"`
+	JWTAudience      string `yaml:"jwt_audience" json:"jwt_audience"`
+	JWTSecret        string `yaml:"jwt_secret" json:"jwt_secret"`
+	CacheTTLSeconds  int    `yaml:"cache_ttl_seconds" json:"cache_ttl_seconds"`
 }
 
 // ServerConfig 服务配置
@@ -505,6 +520,15 @@ func getDefaultConfig() *Config {
 		SecurityBaseline: defaultSecurityBaselineConfig(),
 		Gateway: &GatewayConfig{
 			UseMock: []string{},
+		},
+		CustomerAuth: &CustomerAuthConfig{
+			Mode:             "local",
+			DelegateEndpoint: "",
+			DelegateTimeout:  "3s",
+			JWTIssuer:        "",
+			JWTAudience:      "",
+			JWTSecret:        "",
+			CacheTTLSeconds:  0,
 		},
 	}
 }
@@ -959,6 +983,14 @@ func normalizeConfig(cfg *Config) {
 		cfg.GRPCServer.Addr = resolveConfigValue(cfg.GRPCServer.Addr)
 		normalizeGRPCServerConfig(cfg.GRPCServer)
 	}
+	if cfg.CustomerAuth != nil {
+		cfg.CustomerAuth.Mode = strings.ToLower(resolveConfigValue(cfg.CustomerAuth.Mode))
+		cfg.CustomerAuth.DelegateEndpoint = resolveConfigValue(cfg.CustomerAuth.DelegateEndpoint)
+		cfg.CustomerAuth.DelegateTimeout = resolveConfigValue(cfg.CustomerAuth.DelegateTimeout)
+		cfg.CustomerAuth.JWTIssuer = resolveConfigValue(cfg.CustomerAuth.JWTIssuer)
+		cfg.CustomerAuth.JWTAudience = resolveConfigValue(cfg.CustomerAuth.JWTAudience)
+		cfg.CustomerAuth.JWTSecret = resolveConfigValue(cfg.CustomerAuth.JWTSecret)
+	}
 }
 
 func normalizeGRPCServerConfig(server *GRPCServer) {
@@ -1144,6 +1176,48 @@ func (c *Config) Validate() error {
 	// 认证模式验证
 	if !c.Server.DevMode && !c.IsHMACMode() && !c.IsJWTMode() {
 		return NewConfigError("either HMAC or JWT mode must be configured in production")
+	}
+
+	// Customer 鉴权配置验证
+	if c.CustomerAuth == nil {
+		c.CustomerAuth = &CustomerAuthConfig{Mode: "local", DelegateTimeout: "3s"}
+	}
+	if mode := strings.ToLower(strings.TrimSpace(c.CustomerAuth.Mode)); mode == "" {
+		c.CustomerAuth.Mode = "local"
+	} else {
+		c.CustomerAuth.Mode = mode
+	}
+	switch c.CustomerAuth.Mode {
+	case "local", "delegate":
+	default:
+		return NewConfigError("customer_auth.mode must be one of: local, delegate")
+	}
+
+	if strings.TrimSpace(c.CustomerAuth.DelegateTimeout) == "" {
+		c.CustomerAuth.DelegateTimeout = "3s"
+	}
+	if _, err := time.ParseDuration(c.CustomerAuth.DelegateTimeout); err != nil {
+		return NewConfigError("customer_auth.delegate_timeout must be a valid duration (e.g. 3s, 500ms)")
+	}
+	if c.CustomerAuth.CacheTTLSeconds < 0 {
+		return NewConfigError("customer_auth.cache_ttl_seconds must be non-negative")
+	}
+
+	if c.CustomerAuth.Mode == "delegate" {
+		endpoint := strings.TrimSpace(c.CustomerAuth.DelegateEndpoint)
+		if endpoint == "" {
+			return NewConfigError("customer_auth.delegate_endpoint is required when mode=delegate")
+		}
+		parsed, err := url.Parse(endpoint)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return NewConfigError("customer_auth.delegate_endpoint must be an absolute URL")
+		}
+	}
+
+	if c.CustomerAuth.Mode == "local" && c.IsProduction() {
+		if strings.TrimSpace(c.CustomerAuth.JWTSecret) == "" {
+			return NewConfigError("customer_auth.jwt_secret is required in production when mode=local")
+		}
 	}
 
 	// 安全配置验证

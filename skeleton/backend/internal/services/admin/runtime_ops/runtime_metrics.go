@@ -9,6 +9,7 @@ import (
 	"time"
 
 	authmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
+	customermetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/customer"
 	secmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 )
 
@@ -231,6 +232,7 @@ func renderMetrics(w io.Writer) {
 
 	authmetrics.RenderMetrics(w)
 	secmetrics.RenderMetrics(w)
+	customermetrics.RenderMetrics(w)
 }
 
 func sortedKeys(m map[string]float64) []string {

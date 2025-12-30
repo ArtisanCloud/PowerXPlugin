@@ -13,6 +13,7 @@ import (
 	"{{ .BackendModulePath }}/internal/transport/http"
 	mcptransport "{{ .BackendModulePath }}/internal/transport/http/mcp"
 	middleware2 "{{ .BackendModulePath }}/internal/transport/http/middleware"
+	"{{ .BackendModulePath }}/internal/transport/http/mini-app"
 	publicauth "{{ .BackendModulePath }}/internal/transport/http/public"
 
 	"github.com/gin-gonic/gin"
@@ -115,15 +116,20 @@ func (r *Router) setupRoutes() {
 
 	publicauth.RegisterAuthRoutes(r.engine.Group(prefix), r.deps)
 
+	// Mini-app routes use customer auth and should not be guarded by admin JWT/RBAC middleware.
+	gMiniApp := r.engine.Group(prefix)
+	gMiniApp.Use(middleware2.RequestTrace())
+	miniapp.RegisterAPIRoutes(gMiniApp, r.deps)
+
 	// 使用 API 注册器注册所有路由（保持你现有的注册逻辑）
 	apiRegistry := http.NewRegistry(r.engine, r.deps)
 
-	// API 分组 + 鉴权 + RBAC
-	gApi := r.engine.Group(prefix)
-	gApi.Use(middleware2.RequestTrace())
-	gApi.Use(middleware2.JWTAuth(jwtCfg))
-	gApi.Use(middleware2.RBAC(rbacCfg, nil, nil))
-	apiRegistry.RegisterAPIRoutes(gApi)
+	// API 分组 + 鉴权 + RBAC（Admin / Integration / Marketplace 等）
+	gProtected := r.engine.Group(prefix)
+	gProtected.Use(middleware2.RequestTrace())
+	gProtected.Use(middleware2.JWTAuth(jwtCfg))
+	gProtected.Use(middleware2.RBAC(rbacCfg, nil, nil))
+	apiRegistry.RegisterAPIRoutes(gProtected)
 	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
 	r.inferRBACFromRoutes(rbacCfg, prefix)
 

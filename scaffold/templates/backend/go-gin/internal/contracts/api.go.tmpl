@@ -69,6 +69,8 @@ const (
 	// 租户相关错误码
 	ErrCodeTenantNotFound = "TENANT_NOT_FOUND"
 	ErrCodeTenantMismatch = "TENANT_MISMATCH"
+	// 登录前租户选择（多租户 Customer 登录场景）
+	ErrCodeTenantSelectionRequired = "TENANT_SELECTION_REQUIRED"
 
 	// Agent 相关错误码
 	ErrCodeAgentToolNotFound = "AGENT_TOOL_NOT_FOUND"

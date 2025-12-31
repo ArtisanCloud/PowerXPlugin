@@ -81,6 +81,17 @@ rulesets:
 - 事件、遥测、审计等观测器/Emitter 统一放置在 `backend/internal/observability/<domain>`，由 Service/作业统一调用，避免 Handler 与 Service 内部混杂日志装饰。
 - 变更须配套测试：Service 单测、多租户集成测、迁移冒烟；迁移可幂等、可回滚，并受 `POWERX_RUN_MIGRATE` 控制。
 
+### V. Event Contracts & TaskBus Readiness（事件契约与 TaskBus 就绪）
+
+- **Topic 命名**：必须遵循 `powerx.<domain>.<subdomain>.<action>.v<version>`；破坏性变更必须升版本（例如 `v2`），禁止在同一版本 topic 下改变语义。
+- **通用 Meta 必填**：每条事件必须包含 `tenant_uuid`、`request_id`、`trace_id`、`source_plugin`、`occurred_at`、`payload_version`；其中 `tenant_uuid` 强制（不得缺失或为空）。
+- **敏感信息**：事件 payload 禁止包含明显敏感字段或明文凭证（例如 `password`/`secret`/`token`/`access_key`）；应使用引用 ID、脱敏字段或服务端二次查询替代。
+- **最小权限**：发布/订阅必须在 manifest 中按最小权限声明（精确到 topic + 版本号，避免通配符），运行时必须 enforce（deny + log + metric）。
+- **投递语义与幂等**：默认按 at-least-once 设计，consumer 必须幂等；默认幂等 key 为 `topic + tenant_uuid + trace_id`。当 `trace_id` 缺失时允许退化为“尽力而为”，但必须记录告警/指标以便发现链路缺失。
+- **降级与回滚**：TaskBus 不可用时必须可降级到本地实现（主流程不 panic），并通过开关可快速回滚。
+- **可观测性**：必须暴露 publish/consume 的成功率、失败率与延迟指标（至少能按 `plugin_id/tenant_uuid/topic/result/op` 维度聚合）。
+- **外部插件项目一致性**：外部插件项目在接入 PowerXPlugin Framework 时，必须保持事件抽象（Emitter/Meta/Contracts）的形态一致，并通过可注入的 provider/adapter 对接宿主 TaskBus（避免业务层直接依赖宿主 SDK）。
+
 ### V. Minimal Footprint & Versioned Releases（轻量与版本化）
 
 - 依赖最小化，优先模板栈（Go + Nuxt）；发布前清理死代码。
@@ -132,4 +143,4 @@ rulesets:
 - “frontend” 为**泛指**：`web-admin/`、`web-app/`、`mini-app/`、`mobile-app/` 等任一 UI 层。  
 - 每个项目需在 `plan.md → Project Structure` 明确本次涉及的 UI 层，并与 rulesets 的输出路径一致。
 
-**Version**: 1.0.0 | **Ratified**: 2025-10-11 | **Last Amended**: 2025-10-11
+**Version**: 1.0.1 | **Ratified**: 2025-10-11 | **Last Amended**: 2025-12-31

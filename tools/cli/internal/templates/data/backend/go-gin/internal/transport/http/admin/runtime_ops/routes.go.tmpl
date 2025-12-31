@@ -24,4 +24,8 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	quota.POST("/overrides", quotaHandler.SetOverride)
 
 	router.GET("/metrics", MetricsHandler)
+
+	if deps != nil && deps.Config != nil && deps.Config.Server.DevMode {
+		router.POST("/event-bridge/emit", EventBridgeEmitHandler(deps))
+	}
 }

@@ -1,12 +1,15 @@
-# PowerXPlugin Framework TaskBus 集成指引
+# PowerXPlugin Framework TaskBus 集成指引（Event Bridge）
 
-本指引帮助将仓库中的渠道主数据与商品渠道任务迁移到 PowerXPlugin Framework TaskBus 提供的事件/观测通道。按步骤完成后，可在自身插件与宿主 PowerX 之间共享事件流、指标与后台任务调度能力。
+本指引描述 PowerXPlugin Skeleton 后端如何通过统一的事件出口（EventBridge）对接宿主 TaskBus（若可用），并在 TaskBus 不可用时自动降级到本地实现，支持灰度/回滚与契约治理。
+
+本仓库对应的落地实现与 Spec/Tasks 位于：`specs/008-framework-task-bus/`。
+快速上手与验证步骤见：`specs/008-framework-task-bus/quickstart.md`。
 
 ## 1. 目标与范围
 
-- **覆盖模块**：`backend/internal/jobs/channel/{product,master}`、`backend/internal/observability/channel/master`、`backend/internal/services/admin/{channel_master,product/spu}` 中所有直接写日志、直接触发 job 的逻辑。
-- **输出能力**：审批 SLA 告警、渠道凭证巡检结果、KPI 刷新、SPU 发布/撤回/同步、任务中心反馈。
-- **迁移原则**：保持业务层接口不变，新增事件发射器/监听器抽象，允许本地实现与 framework TaskBus 实现并存，便于灰度。
+- **目标**：把“直接写日志/直接触发 job/直接写 DB”的副作用收敛到统一事件出口；业务侧只负责“发事件/处理事件”。
+- **范围**：以 Channel 域事件为先导（凭证巡检、KPI 刷新、SPU 发布任务），逐步扩展到其他域。
+- **约束**：多租户上下文使用 `tenant_uuid`；Topic 权限按最小权限声明；TaskBus 不可用时主流程不 panic（自动降级）。
 
 ## 2. 事件契约设计
 
@@ -14,60 +17,49 @@
    - `powerx.channel.master.credential_inspection.v1`
    - `powerx.channel.product.publish_task.v1`
 2. **通用字段**：
-   - `tenantUuid`、`requestId`、`sourcePlugin`、`traceId`。
-   - `occurredAt` (RFC3339)，`payloadVersion`。
-3. **Payload Schema**：把现有 DTO/模型映射成事件体（可在 `docs/contracts/` 或 `contracts/channel-events.yaml` 内维护）。建议包含：
-   - 凭证事件：`channelId`、`credentialType`、`expiresAt`、`status`、`alertLevel`。
-   - KPI 事件：`channelId`、`window`、`metrics`（GMV、orders 等）、`healthScore`。
-   - 发布事件：`spuId`、`versionId`、`channels[]`、`action`、`taskId`、`operator`。
+   - `tenant_uuid`、`request_id`、`source_plugin`、`trace_id`。
+   - `occurred_at`（RFC3339），`payload_version`。
+3. **契约文件（仓库内治理）**：事件契约集中在 `specs/008-framework-task-bus/contracts/channel-events.yaml`，并由 CI 校验（topic 唯一、meta.required 必填字段、敏感字段名 lint）。
+   - 本地校验入口：`./scripts/contracts/validate-taskbus-contracts.sh`
+   - 校验实现：`tools/contracts/validate-taskbus-contracts.go`
 
 ## 3. 抽象接口
 
-在 `backend/internal/observability/channel/master` 和 `backend/internal/jobs/channel/*` 中新增接口层：
+- **事件模型**：`skeleton/backend/internal/domain/event/*`
+- **事件出口（Emitter）**：`skeleton/backend/internal/services/event_bridge/*`
+- **业务侧适配器（示例：Channel）**：`skeleton/backend/internal/observability/channel/event_emitter.go`
+- **Consumer/Dispatcher（本地 in-process 示例）**：`skeleton/backend/internal/services/event_bridge/consumer.go`
+- **权限与运行时边界**：`skeleton/backend/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 publish/subscribe 并执行 deny + log）
 
-```go
-type ChannelEventEmitter interface {
-    Emit(ctx context.Context, evt ChannelEvent) error
-}
-
-type ChannelEvent struct {
-    Name    string
-    Payload any
-    Meta    map[string]string
-}
-
-type EventConsumer interface {
-    Handle(ctx context.Context, evt ChannelEvent) error
-}
-```
-
-- 默认实现：保留现有结构化日志/DB 写入，适用于本地或离线模式。
-- TaskBus 实现：封装 `framework/backend/go/event` 提供的 `Emitter`、`Subscriber`，在 `app.Deps` 中注入，供服务层选择。
+说明：
+- 本仓库以“本地 emitter + 可注入 TaskBus provider”的方式完成切换与灰度；真实 TaskBus SDK 由宿主/框架提供后再实现 provider。
 
 ## 4. 框架接入步骤
 
-1. **依赖注入**：在 `backend/cmd/plugin/main.go` 中创建 TaskBus 客户端（`frameworkevent.Client`），把 `ChannelEventEmitter` 实例放入 `app.Deps`。
-2. **注册 Topic**：在 `plugin.yaml` 或 manifest 中声明事件发布/订阅权限，例如：
+1. **依赖注入**：在 `skeleton/backend/cmd/plugin/main.go` 初始化 `event_bridge.Factory` 并注入到 `app.Deps.EventEmitter`。
+2. **声明 Topic 权限（开发态）**：在 `skeleton/plugin.yaml` 增加：
    ```yaml
    events:
      publish:
-       - powerx.channel.master.*
-     subscribe:
-       - powerx.channel.product.*
+       - powerx.channel.master.credential_inspection.v1
+       - powerx.channel.master.kpi_refreshed.v1
+       - powerx.channel.product.publish_task.v1
+     subscribe: []
    ```
-3. **Handler 绑定**：使用 TaskBus router 将 `EventConsumer` 绑定到具体 Topic，支持并发度/重试配置：
-   ```go
-   frameworkevent.RegisterHandler(app, "powerx.channel.master.credential_inspection.v1", handler)
-   ```
-4. **配置开关**：在 `config/` 中增加 `EventBridge.Enabled` 标志，可在 `app.Deps` 中判断是走本地实现还是 TaskBus。
+   - Manifest 路径可通过环境变量覆盖：`POWERX_PLUGIN_MANIFEST_PATH`
+3. **配置开关**：在 `skeleton/backend/internal/config/config.go` 使用 `event_bridge` 配置：
+   - `event_bridge.enabled`：开启/关闭 TaskBus 模式
+   - `event_bridge.mode`：`local|taskbus|dual`
+   - `event_bridge.fallback_to_local`：TaskBus 不可用时是否自动降级
+4. **消费侧绑定（示例）**：本仓库提供本地 `Dispatcher` + `IdempotencyFilter` 的示例实现；真实 TaskBus 订阅由宿主/框架接入后完成。
 
 ## 5. 代码迁移策略
 
 | 步骤 | 动作 | 说明 |
 | --- | --- | --- |
-| S1 | 在服务层注入 `ChannelEventEmitter` | `ChannelMasterService`, `SPU Service` 等通过接口发事件。 |
-| S2 | Job 改造为事件 Handler | 如 `CredentialChecker` 检测完后发事件，由 TaskBus Handler 写入 `channel_alerts`。 |
-| S3 | 双写/双读 | 在一到两周内同时写旧日志与新事件；消费者同时监听旧路径与框架事件。 |
+| S1 | 在服务层注入 `EventEmitter` | 业务层通过统一 emitter 发事件（Topic + payload + meta）。 |
+| S2 | 把“处理副作用”迁移到 Consumer | 例如将巡检结果写入/告警改为 consumer handler 处理。 |
+| S3 | 双写/双读 | `event_bridge.mode=dual` 支持迁移期双写；对比旧链路与新链路结果一致性。 |
 | S4 | 清理 Legacy | 待验证稳定后移除直接 DB/日志写入逻辑，仅保留事件驱动实现。 |
 
 ## 6. 测试与验证
@@ -78,17 +70,19 @@ type EventConsumer interface {
 
 ## 7. 运维与监控
 
-- Dashboard：宿主 PowerX 可统一展示上述事件 Topic 的吞吐、失败率。
-- 重试策略：使用 TaskBus 提供的死信队列或延迟重试，避免 job panic 影响主流程。
-- 审计：事件 payload 中保留 operator/tenant，满足合规要求。
+- 指标：本仓库提供最小 metrics hooks（Prometheus exposition），见 `skeleton/backend/internal/observability/event_bridge/metrics.go`。
+- 指标抓取（本仓库 Skeleton Admin）：`GET /api/v1/admin/runtime/metrics`
+- 建议关注：
+  - `plugin_event_bridge_emit_total` / `plugin_event_bridge_consume_total`（按 topic/tenant_uuid/result）
+  - `plugin_event_bridge_latency_ms`（emit/consume 最近一次延迟（ms），按 op/topic/tenant_uuid）
+- 回滚：当 TaskBus 不可用/失败率升高时，优先切回 `event_bridge.enabled=false` 或 `event_bridge.mode=local`（本地实现兜底）。
 
 ## 8. Checklist
 
-1. [ ] 完成事件 schema 文档并通过评审。
-2. [ ] 在 `app.Deps` 注入 TaskBus emitter/consumer。
-3. [ ] 所有 job/observability 代码改用接口层。
-4. [ ] 配置文件新增事件相关开关并默认开启本地实现。
-5. [ ] 编写迁移计划与回滚步骤，更新 `docs/guides/channel_master.md`。
-6. [ ] 在 staging 环境双写验证 ≥1 周，再切换到 TaskBus-only 模式。
+1. [ ] 契约变更走 PR + CI 校验（`./scripts/contracts/validate-taskbus-contracts.sh`）。
+2. [ ] 确认 manifest 事件权限（`skeleton/plugin.yaml`）满足最小权限，并在运行时 enforcement 生效。
+3. [ ] 在 `app.Deps` 注入 emitter，并完成 TaskBus provider 对接（若宿主 SDK 已就绪）。
+4. [ ] 业务路径完成至少一个 job → consumer 的迁移示例，并保留双写/回滚路径。
+5. [ ] staging 双写验证 ≥1 周，对比一致性与 `emit/consume` 指标趋势后，再切换到 TaskBus-only 模式。
 
 完成上述步骤后，即使将 Channel 模块拆分为独立的 PowerXPlugin Framework 组件，也能直接复用这份事件抽象，实现即插即用的观测与后台任务能力。

@@ -1,0 +1,179 @@
+openapi: 3.1.0
+info:
+  title: Customer Mini-App Authentication
+  version: 0.1.0
+  description: >
+    Skeleton-mode endpoints for customer registration and login.
+servers:
+  - url: https://{host}/api/v1
+    variables:
+      host:
+        default: localhost:8078
+paths:
+  /mini-app/auth/register:
+    post:
+      summary: Register a new customer (Skeleton mode only)
+      tags: [MiniAppAuth]
+      parameters:
+        - in: header
+          name: X-Tenant-UUID
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: >
+            Target tenant. If omitted, `tenant_uuid` must be provided in request body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email or phone already exists for tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /mini-app/auth/login:
+    post:
+      summary: Login and obtain customer token
+      tags: [MiniAppAuth]
+      parameters:
+        - in: header
+          name: X-Tenant-UUID
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: >
+            Optional tenant hint. If omitted, the backend will auto-select a tenant when the login
+            exists in exactly one tenant; otherwise it returns TENANT_SELECTION_REQUIRED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '409':
+          description: Tenant selection required for this login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials or disabled account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '423':
+          description: Account locked or tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [password]
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+          description: Optional when X-Tenant-UUID header is provided.
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+          minLength: 8
+        metadata:
+          type: object
+          additionalProperties: true
+    RegisterResponse:
+      type: object
+      properties:
+        customer_uuid:
+          type: string
+          format: uuid
+        tenant_uuid:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, disabled]
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+          description: Optional. If omitted (and no X-Tenant-UUID), backend may require tenant selection.
+        login:
+          description: Email or phone
+          type: string
+        identifier:
+          description: Backward-compatible alias of login (email or phone).
+          type: string
+        password:
+          type: string
+          minLength: 8
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT string
+        expires_in:
+          type: integer
+          format: int64
+          description: Seconds until expiry
+        customer_uuid:
+          type: string
+          format: uuid
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+              description: >
+                For TENANT_SELECTION_REQUIRED, details contains {tenants:[{tenant_uuid:string}]}.
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

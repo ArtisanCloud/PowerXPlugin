@@ -16,6 +16,8 @@
 - **Standalone 运行指南**：[docs/guides/develop/standalone-mode.md](./docs/guides/develop/standalone-mode.md)
 - **迁移实践**：[docs/guide/migration/base-to-skeleton.md](./docs/guide/migration/base-to-skeleton.md)
 - **框架发布指南**：[docs/guides/develop/framework-release.md](./docs/guides/develop/framework-release.md)
+- **Mini-App Customer 鉴权**：[docs/guides/develop/auth/customer.md](./docs/guides/develop/auth/customer.md)（含 Skeleton/Delegated 与观测指标）
+- **EventBridge / TaskBus 测试指南**：[docs/guides/develop/event-bridge-taskbus-testing.md](./docs/guides/develop/event-bridge-taskbus-testing.md)
 
 ## 快速开始
 

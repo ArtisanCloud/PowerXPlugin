@@ -51,6 +51,7 @@ const (
 	TableMarketplaceLicenses             = "marketplace_licenses"
 	TableMarketplaceLicenseEvents        = "marketplace_license_events"
 	TableMarketplaceTaxTransactions      = "marketplace_tax_transactions"
+	TableCustomerAccounts                = "customer_accounts"
 	TableMarketplaceUsageEnvelopes       = "marketplace_usage_envelopes"
 	TableMarketplaceUsageAggregates      = "marketplace_usage_aggregates"
 	TableMarketplaceRevenueReports       = "marketplace_revenue_share_reports"

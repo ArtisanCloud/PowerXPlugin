@@ -97,6 +97,18 @@ security:
   rate_limit:
     enabled: false
 
+# Customer 鉴权（Mini-App / 2C）
+# - local: Skeleton 模式，插件自管 customer 表与登录签发
+# - delegate: 宿主模式，插件转发到 PowerX CRM/IAM 校验端点，不落库
+customer_auth:
+  mode: "local" # local | delegate
+  delegate_endpoint: "" # delegate 模式必填，例如 http://127.0.0.1:8077/api/v1/customer/auth/validate
+  delegate_timeout: "3s"
+  jwt_issuer: ""   # local 模式可选：覆盖 issuer
+  jwt_audience: "" # local 模式可选：覆盖 audience
+  jwt_secret: ""   # local 模式必填（生产环境），开发可通过 env 注入
+  cache_ttl_seconds: 0 # 0=禁用；delegate 模式缓存 TTL 不得超过 token exp
+
 monitoring:
   metrics:
     enabled: true

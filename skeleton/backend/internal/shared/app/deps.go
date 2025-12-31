@@ -17,6 +17,8 @@ import (
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 type DelegatedAuthProxy interface {
@@ -41,6 +43,7 @@ type Deps struct {
 	LicenseCache        marketplacesvc.LicenseCache
 	OperationsMetrics   *opsmetrics.Metrics
 	AdminConsoleMetrics *adminmetrics.Metrics
+	EventEmitter        fweventbridge.Emitter
 	IAMMode             iamservice.IAMMode
 	IAMModeSource       string
 	AuthProxy           DelegatedAuthProxy

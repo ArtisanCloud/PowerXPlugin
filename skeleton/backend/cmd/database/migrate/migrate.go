@@ -10,6 +10,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	adminconsoleModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
+	customerModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/customer"
 	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	integrationModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	marketplaceModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
@@ -36,6 +37,7 @@ var businessTables = []interface{}{
 	&marketplaceModel.License{},
 	&marketplaceModel.LicenseEvent{},
 	&marketplaceModel.TaxTransaction{},
+	&customerModel.CustomerAccount{},
 	&runtimeOpsModel.MCPSession{},
 	&runtimeOpsModel.RuntimeAuditEvent{},
 	&runtimeOpsModel.QuotaLedger{},

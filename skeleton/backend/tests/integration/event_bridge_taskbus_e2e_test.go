@@ -6,43 +6,33 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestEventBridge_TaskBusMode_E2EWithStub(t *testing.T) {
-	cfg := config.EventBridgeConfig{
+	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
 		Enabled:         true,
 		Mode:            "taskbus",
 		FallbackToLocal: false,
 		LocalQueueSize:  10,
-		SourcePlugin:    "com.powerx.plugins.base",
-		PayloadVersion:  "v1",
-	}
+	})
+	require.NoError(t, err)
 
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-
-	stub := event_bridge.NewTaskBusStub(logrus.NewEntry(logger))
+	stub := fweventbridge.NewTaskBusStub()
 	var consumed int32
 	stub.Subscribe("powerx.channel.master.credential_inspection.v1", func(ctx context.Context, e event.Event) error {
 		atomic.AddInt32(&consumed, 1)
 		return nil
 	})
 
-	factory := event_bridge.NewFactory(cfg, logrus.NewEntry(logger)).
-		WithTaskBusProvider(func(logger *logrus.Entry) (event_bridge.Emitter, error) {
-			return stub, nil
-		})
-
+	factory.WithTaskBusProvider(func() (fweventbridge.Emitter, error) { return stub, nil })
 	emitter, err := factory.NewEmitter()
 	require.NoError(t, err)
 
-	mb := event.NewMetaBuilder(cfg.SourcePlugin, cfg.PayloadVersion)
+	mb := event.NewMetaBuilder("com.powerx.plugins.base", "v1")
 	meta, err := mb.Build("00000000-0000-0000-0000-000000000001", "req-1", "trace-1")
 	require.NoError(t, err)
 

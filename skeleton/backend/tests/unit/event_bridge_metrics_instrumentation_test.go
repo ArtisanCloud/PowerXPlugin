@@ -8,35 +8,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
 	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestEventBridge_MetricsInstrumentation_EmitAndConsume(t *testing.T) {
 	ebmetrics.Reset()
 
-	cfg := config.EventBridgeConfig{
+	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
 		Enabled:         false,
 		Mode:            "local",
 		FallbackToLocal: true,
 		LocalQueueSize:  10,
-		SourcePlugin:    "com.powerx.plugins.base",
-		PayloadVersion:  "v1",
-	}
-
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-
-	factory := event_bridge.NewFactory(cfg, logrus.NewEntry(logger))
+	})
+	require.NoError(t, err)
+	factory.WithMetrics(bridgeRecorder{})
 	emitter, err := factory.NewEmitter()
 	require.NoError(t, err)
 
-	mb := event.NewMetaBuilder(cfg.SourcePlugin, cfg.PayloadVersion)
+	mb := event.NewMetaBuilder("com.powerx.plugins.base", "v1")
 	mb.Now = func() time.Time { return time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC) }
 	meta, err := mb.Build("00000000-0000-0000-0000-000000000001", "req-1", "trace-1")
 	require.NoError(t, err)
@@ -49,7 +43,7 @@ func TestEventBridge_MetricsInstrumentation_EmitAndConsume(t *testing.T) {
 
 	require.NoError(t, emitter.Emit(context.Background(), ev))
 
-	dispatcher := event_bridge.NewDispatcher(event_bridge.NewIdempotencyFilter(100, logrus.NewEntry(logger)), logrus.NewEntry(logger))
+	dispatcher := fweventbridge.NewDispatcher(fweventbridge.NewIdempotencyFilter(100)).WithMetrics(bridgeRecorder{})
 	dispatcher.Register(ev.Topic, func(ctx context.Context, ev event.Event) error { return nil })
 	require.NoError(t, dispatcher.Dispatch(context.Background(), ev))
 

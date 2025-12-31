@@ -28,13 +28,13 @@ import (
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
+	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	recommendation "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
@@ -42,7 +42,23 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/utils"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
+
+type bridgeRecorder struct{}
+
+func (bridgeRecorder) RecordEmit(pluginID, tenantUUID, topic, result string) {
+	ebmetrics.RecordEmit(pluginID, tenantUUID, topic, result)
+}
+
+func (bridgeRecorder) RecordConsume(pluginID, tenantUUID, topic, result string) {
+	ebmetrics.RecordConsume(pluginID, tenantUUID, topic, result)
+}
+
+func (bridgeRecorder) ObserveLatencyMs(pluginID, tenantUUID, topic, op string, ms float64) {
+	ebmetrics.ObserveLatencyMs(pluginID, tenantUUID, topic, op, ms)
+}
 
 func main() {
 	rootCtx := context.Background()
@@ -166,11 +182,28 @@ func main() {
 	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
 		eventCfg.SourcePlugin = app.PluginID
 	}
-	bridgeFactory := event_bridge.NewFactory(*eventCfg, eventLogger)
-	bridgeEmitter, err := bridgeFactory.NewEmitter()
-	if err != nil {
-		eventLogger.WithError(err).Warn("Failed to initialize event bridge emitter; falling back to local emitter")
-		bridgeEmitter = event_bridge.NewLocalEmitter(1024, eventLogger)
+
+	var bridgeEmitter fweventbridge.Emitter
+	if eventCfg == nil {
+		bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
+	} else {
+		factory, err := fweventbridge.NewFactory(fweventbridge.Config{
+			Enabled:         eventCfg.Enabled,
+			Mode:            eventCfg.Mode,
+			FallbackToLocal: eventCfg.FallbackToLocal,
+			LocalQueueSize:  eventCfg.LocalQueueSize,
+		})
+		if err != nil {
+			eventLogger.WithError(err).Warn("Invalid event bridge config; falling back to local emitter")
+			bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
+		} else {
+			factory.WithMetrics(bridgeRecorder{})
+			bridgeEmitter, err = factory.NewEmitter()
+			if err != nil {
+				eventLogger.WithError(err).Warn("Failed to initialize event bridge emitter; falling back to local emitter")
+				bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
+			}
+		}
 	}
 
 	// 运行时事件权限：从 plugin.yaml 解析 publish/subscribe（若未声明则默认不强制）

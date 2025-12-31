@@ -6,8 +6,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/channel"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
 )
 
 // HandleCredentialInspectionEvent is a minimal "job -> consumer" migration example:

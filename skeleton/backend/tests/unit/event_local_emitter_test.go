@@ -6,18 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestLocalEmitter_Emit_DoesNotPanicWhenQueueFull(t *testing.T) {
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-
-	emitter := event_bridge.NewLocalEmitter(1, logrus.NewEntry(logger))
+	emitter := fweventbridge.NewLocalEmitter(1)
 
 	ev := event.Event{
 		Topic: "powerx.channel.master.credential_inspection.v1",

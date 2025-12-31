@@ -1,33 +1,26 @@
-package event_bridge
+package eventbridge
 
 import (
 	"fmt"
 	"strings"
 	"sync"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
 )
 
 type IdempotencyFilter struct {
 	mu      sync.Mutex
 	seen    map[string]struct{}
 	maxSize int
-	logger  *logrus.Entry
 }
 
-func NewIdempotencyFilter(maxSize int, logger *logrus.Entry) *IdempotencyFilter {
+func NewIdempotencyFilter(maxSize int) *IdempotencyFilter {
 	if maxSize <= 0 {
 		maxSize = 10000
-	}
-	if logger == nil {
-		logger = logrus.NewEntry(logrus.StandardLogger())
 	}
 	return &IdempotencyFilter{
 		seen:    map[string]struct{}{},
 		maxSize: maxSize,
-		logger:  logger,
 	}
 }
 
@@ -37,12 +30,6 @@ func NewIdempotencyFilter(maxSize int, logger *logrus.Entry) *IdempotencyFilter 
 func (f *IdempotencyFilter) SeenBefore(ev event.Event) bool {
 	key, ok := defaultIdempotencyKey(ev)
 	if !ok {
-		if f != nil && f.logger != nil {
-			f.logger.WithFields(logrus.Fields{
-				"topic":       string(ev.Topic),
-				"tenant_uuid": ev.Meta.TenantUUID,
-			}).Warn("event idempotency key missing trace_id; best-effort dedupe disabled")
-		}
 		return false
 	}
 
@@ -67,3 +54,4 @@ func defaultIdempotencyKey(ev event.Event) (string, bool) {
 	}
 	return fmt.Sprintf("%s|%s|%s", strings.TrimSpace(string(ev.Topic)), strings.TrimSpace(ev.Meta.TenantUUID), traceID), true
 }
+

@@ -25,10 +25,10 @@
 
 ## 3. 抽象接口
 
-- **事件模型**：`skeleton/backend/internal/domain/event/*`
-- **事件出口（Emitter）**：`skeleton/backend/internal/services/event_bridge/*`
+- **事件模型（Framework 对外包）**：`framework/event/*`
+- **事件出口（Framework 对外包）**：`framework/eventbridge/*`
 - **业务侧适配器（示例：Channel）**：`skeleton/backend/internal/observability/channel/event_emitter.go`
-- **Consumer/Dispatcher（本地 in-process 示例）**：`skeleton/backend/internal/services/event_bridge/consumer.go`
+- **Consumer/Dispatcher（Framework）**：`framework/eventbridge/consumer.go`
 - **权限与运行时边界**：`skeleton/backend/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 publish/subscribe 并执行 deny + log）
 
 说明：

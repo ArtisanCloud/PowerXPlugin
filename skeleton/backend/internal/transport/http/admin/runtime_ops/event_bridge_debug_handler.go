@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
 )
 
 type eventBridgeEmitRequest struct {
@@ -83,4 +83,3 @@ func EventBridgeEmitHandler(deps *app.Deps) gin.HandlerFunc {
 		})
 	}
 }
-

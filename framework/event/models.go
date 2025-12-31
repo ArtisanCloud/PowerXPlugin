@@ -25,3 +25,4 @@ type Event struct {
 type Subscription struct {
 	Topic Topic `json:"topic" yaml:"topic"`
 }
+

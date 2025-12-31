@@ -10,9 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestLoadEventPermissionsFromManifest_EnforcedWhenEventsPresent(t *testing.T) {
@@ -50,7 +51,7 @@ events:
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 
-	inner := event_bridge.NewLocalEmitter(10, logrus.NewEntry(logger))
+	inner := fweventbridge.NewLocalEmitter(10)
 	emitter := security.NewPermissionedEmitter(inner, perms, logrus.NewEntry(logger))
 
 	mb := event.NewMetaBuilder("com.powerx.plugins.base", "v1")
@@ -84,7 +85,7 @@ events:
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 
-	inner := event_bridge.NewLocalEmitter(10, logrus.NewEntry(logger))
+	inner := fweventbridge.NewLocalEmitter(10)
 	emitter := security.NewPermissionedEmitter(inner, perms, logrus.NewEntry(logger))
 
 	mb := event.NewMetaBuilder("com.powerx.plugins.base", "v1")

@@ -1,12 +1,10 @@
-package event_bridge
+package eventbridge
 
 import (
 	"context"
 	"sync"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
 )
 
 // TaskBusStub is an in-process TaskBus-like emitter used for integration tests.
@@ -14,16 +12,11 @@ import (
 type TaskBusStub struct {
 	mu       sync.RWMutex
 	handlers map[event.Topic][]func(context.Context, event.Event) error
-	logger   *logrus.Entry
 }
 
-func NewTaskBusStub(logger *logrus.Entry) *TaskBusStub {
-	if logger == nil {
-		logger = logrus.NewEntry(logrus.StandardLogger())
-	}
+func NewTaskBusStub() *TaskBusStub {
 	return &TaskBusStub{
 		handlers: map[event.Topic][]func(context.Context, event.Event) error{},
-		logger:   logger,
 	}
 }
 
@@ -46,11 +39,9 @@ func (b *TaskBusStub) Emit(ctx context.Context, ev event.Event) error {
 
 	for _, h := range handlers {
 		if err := h(ctx, ev); err != nil {
-			if b.logger != nil {
-				b.logger.WithError(err).Warn("taskbus stub handler failed")
-			}
 			return err
 		}
 	}
 	return nil
 }
+

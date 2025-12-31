@@ -40,7 +40,7 @@ flowchart LR
 1. 复用同一套抽象（`event.Event` + `event_bridge.Emitter` + `event.MetaBuilder` 的形态不变）。
 2. 在 bootstrap 时注入一个 `TaskBusProvider`（当 Framework/宿主提供 SDK 后实现；未就绪时可先走 local/dual + stub）。
 
-关键调用点在 `skeleton/backend/internal/services/event_bridge/emitter.go` 的 `Factory.WithTaskBusProvider(...)`：外部插件项目需要实现的就是一个“把 Framework TaskBus SDK 包装成 `event_bridge.Emitter` 的适配器”。
+关键调用点在 `framework/eventbridge/emitter.go` 的 `Factory.WithTaskBusProvider(...)`：外部插件项目需要实现的就是一个“把 Framework TaskBus SDK 包装成 `eventbridge.Emitter` 的适配器”。
 
 路径对照（便于你在外部插件仓库里找文件）：
 
@@ -185,18 +185,16 @@ events:
 
 对应实现参照：
 
-- `skeleton/backend/internal/services/event_bridge/emitter.go`（Factory + dual/fallback + metrics）
+- `framework/eventbridge/emitter.go`（Factory + dual/fallback + metrics）
 - `skeleton/backend/internal/security/event_permissions.go`（manifest 权限 enforcement）
 
 如果你是在“外部插件独立仓库”里做接入：
 
 - 若是由本仓库模板生成：通常会有同名代码目录（只是路径从 `skeleton/backend/...` 变为 `backend/...`）。
-- 若不是模板生成：建议直接拷贝本仓库的以下最小集合后再做适配：
-  - `backend/internal/domain/event/*`
-  - `backend/internal/services/event_bridge/*`
-  - `backend/internal/security/event_permissions.go`
-  - （可选）`backend/internal/observability/event_bridge/*`
-  - 契约校验：`scripts/contracts/validate-taskbus-contracts.sh` + `tools/contracts/validate-taskbus-contracts.go` + `make-files/validate.mk` 相关目标
+- 若不是模板生成：建议优先直接依赖 framework（避免复制代码造成漂移）：
+  - `github.com/ArtisanCloud/PowerXPlugin/framework/event`
+  - `github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge`
+  - 权限 enforcement 可参考：`skeleton/backend/internal/security/event_permissions.go`
 
 当 Framework TaskBus SDK 就绪后，实现一个 adapter（示意）：
 
@@ -214,10 +212,14 @@ func (a *TaskBusEmitterAdapter) Emit(ctx context.Context, ev event.Event) error 
 然后通过 `WithTaskBusProvider` 注入：
 
 ```go
-factory := event_bridge.NewFactory(cfg.EventBridge, logger).
-  WithTaskBusProvider(func(logger *logrus.Entry) (event_bridge.Emitter, error) {
-    return &TaskBusEmitterAdapter{/* ... */}, nil
-  })
+factory, _ := eventbridge.NewFactory(eventbridge.Config{
+  Enabled: true,
+  Mode: "taskbus",
+  FallbackToLocal: true,
+})
+factory.WithTaskBusProvider(func() (eventbridge.Emitter, error) {
+  return &TaskBusEmitterAdapter{/* ... */}, nil
+})
 ```
 
 ### 5.4 业务侧：只发“领域事件”

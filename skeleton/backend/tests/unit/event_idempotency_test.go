@@ -7,19 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestIdempotencyFilter_SkipsDuplicatesByTopicTenantTrace(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
-	filter := event_bridge.NewIdempotencyFilter(100, logrus.NewEntry(log))
-	dispatcher := event_bridge.NewDispatcher(filter, logrus.NewEntry(log))
+	filter := fweventbridge.NewIdempotencyFilter(100)
+	dispatcher := fweventbridge.NewDispatcher(filter)
 
 	var handled int32
 	dispatcher.Register("powerx.channel.master.credential_inspection.v1", func(ctx context.Context, ev event.Event) error {
@@ -46,11 +42,8 @@ func TestIdempotencyFilter_SkipsDuplicatesByTopicTenantTrace(t *testing.T) {
 }
 
 func TestIdempotencyFilter_AllowsWhenTraceIDMissing(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
-	filter := event_bridge.NewIdempotencyFilter(100, logrus.NewEntry(log))
-	dispatcher := event_bridge.NewDispatcher(filter, logrus.NewEntry(log))
+	filter := fweventbridge.NewIdempotencyFilter(100)
+	dispatcher := fweventbridge.NewDispatcher(filter)
 
 	var handled int32
 	dispatcher.Register("powerx.channel.master.credential_inspection.v1", func(ctx context.Context, ev event.Event) error {

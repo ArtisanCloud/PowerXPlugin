@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
 )
 
 func TestMetaBuilder_Build_RequiresTenantUUID(t *testing.T) {

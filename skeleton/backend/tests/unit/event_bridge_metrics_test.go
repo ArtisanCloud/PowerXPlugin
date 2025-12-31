@@ -8,32 +8,27 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
 	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestEventBridge_Emitter_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
 	ebmetrics.Reset()
 
-	cfg := config.EventBridgeConfig{
+	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
 		Enabled:        false,
 		LocalQueueSize: 10,
-		SourcePlugin:   "com.powerx.plugins.base",
-		PayloadVersion: "v1",
-	}
-
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-
-	emitter, err := event_bridge.NewFactory(cfg, logrus.NewEntry(logger)).NewEmitter()
+	})
+	require.NoError(t, err)
+	factory.WithMetrics(bridgeRecorder{})
+	emitter, err := factory.NewEmitter()
 	require.NoError(t, err)
 
-	mb := event.NewMetaBuilder(cfg.SourcePlugin, cfg.PayloadVersion)
+	mb := event.NewMetaBuilder("com.powerx.plugins.base", "v1")
 	meta, err := mb.Build("00000000-0000-0000-0000-000000000001", "req-1", "trace-emit-1")
 	require.NoError(t, err)
 
@@ -60,10 +55,7 @@ func TestEventBridge_Emitter_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
 func TestEventBridge_Dispatcher_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
 	ebmetrics.Reset()
 
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-
-	dispatcher := event_bridge.NewDispatcher(nil, logrus.NewEntry(logger))
+	dispatcher := fweventbridge.NewDispatcher(nil).WithMetrics(bridgeRecorder{})
 
 	topic := event.Topic("powerx.channel.master.credential_inspection.v1")
 	dispatcher.Register(topic, func(ctx context.Context, ev event.Event) error { return nil })
@@ -83,7 +75,7 @@ func TestEventBridge_Dispatcher_RecordsMetricsOnSuccessAndFailure(t *testing.T) 
 	})
 	require.Error(t, err)
 
-	dispatcherSuccess := event_bridge.NewDispatcher(nil, logrus.NewEntry(logger))
+	dispatcherSuccess := fweventbridge.NewDispatcher(nil).WithMetrics(bridgeRecorder{})
 	dispatcherSuccess.Register(topic, func(ctx context.Context, ev event.Event) error { return nil })
 	require.NoError(t, dispatcherSuccess.Dispatch(context.Background(), event.Event{
 		Topic: topic,
@@ -103,4 +95,18 @@ func TestEventBridge_Dispatcher_RecordsMetricsOnSuccessAndFailure(t *testing.T) 
 	require.Contains(t, body, "plugin_event_bridge_consume_total{plugin_id=\"com.powerx.plugins.base\",result=\"error\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"} 1")
 	require.Contains(t, body, "plugin_event_bridge_consume_total{plugin_id=\"com.powerx.plugins.base\",result=\"success\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"} 1")
 	require.True(t, strings.Contains(body, "plugin_event_bridge_latency_ms{op=\"consume\",plugin_id=\"com.powerx.plugins.base\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"}"))
+}
+
+type bridgeRecorder struct{}
+
+func (bridgeRecorder) RecordEmit(pluginID, tenantUUID, topic, result string) {
+	ebmetrics.RecordEmit(pluginID, tenantUUID, topic, result)
+}
+
+func (bridgeRecorder) RecordConsume(pluginID, tenantUUID, topic, result string) {
+	ebmetrics.RecordConsume(pluginID, tenantUUID, topic, result)
+}
+
+func (bridgeRecorder) ObserveLatencyMs(pluginID, tenantUUID, topic, op string, ms float64) {
+	ebmetrics.ObserveLatencyMs(pluginID, tenantUUID, topic, op, ms)
 }

@@ -7,36 +7,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestEventBridge_FallbackToLocalWhenTaskBusUnavailable(t *testing.T) {
-	cfg := config.EventBridgeConfig{
+	factory, err := fweventbridge.NewFactory(fweventbridge.Config{
 		Enabled:         true,
 		Mode:            "taskbus",
 		FallbackToLocal: true,
 		LocalQueueSize:  10,
-		SourcePlugin:    "com.powerx.plugins.base",
-		PayloadVersion:  "v1",
-	}
-
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-
-	factory := event_bridge.NewFactory(cfg, logrus.NewEntry(logger)).
-		WithTaskBusProvider(func(logger *logrus.Entry) (event_bridge.Emitter, error) {
-			return nil, errors.New("taskbus unavailable")
-		})
-
+	})
+	require.NoError(t, err)
+	factory.WithTaskBusProvider(func() (fweventbridge.Emitter, error) { return nil, errors.New("taskbus unavailable") })
 	emitter, err := factory.NewEmitter()
 	require.NoError(t, err)
 
-	meta := event.NewMetaBuilder(cfg.SourcePlugin, cfg.PayloadVersion)
+	meta := event.NewMetaBuilder("com.powerx.plugins.base", "v1")
 	evtMeta, err := meta.Build("00000000-0000-0000-0000-000000000001", "req-1", "trace-1")
 	require.NoError(t, err)
 
@@ -51,10 +40,7 @@ func TestEventBridge_FallbackToLocalWhenTaskBusUnavailable(t *testing.T) {
 }`),
 	}))
 
-	drainer, ok := emitter.(interface{ Drain() []event.Event })
-	require.True(t, ok, "expected fallback emitter to support Drain()")
-
-	drained := drainer.Drain()
+	drained := fweventbridge.Drain(emitter)
 	require.Len(t, drained, 1)
 	require.Equal(t, "00000000-0000-0000-0000-000000000001", drained[0].Meta.TenantUUID)
 	require.Equal(t, "trace-1", drained[0].Meta.TraceID)

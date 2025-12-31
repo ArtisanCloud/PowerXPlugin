@@ -64,3 +64,4 @@ func (b MetaBuilder) Build(tenantUUID, requestID, traceID string) (Meta, error) 
 		PayloadVersion: b.PayloadVersion,
 	}, nil
 }
+

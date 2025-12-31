@@ -5,19 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/event"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/channel"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 func TestChannelEventEmitter_EmitsWithIdempotencyKeyMaterial(t *testing.T) {
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-
-	local := event_bridge.NewLocalEmitter(10, logrus.NewEntry(logger))
+	local := fweventbridge.NewLocalEmitter(10)
 
 	metaBuilder := event.NewMetaBuilder("com.powerx.plugins.base", "v1")
 	metaBuilder.Now = func() time.Time { return time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC) }

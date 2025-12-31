@@ -11,8 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
-	"{{ .BackendModulePath }}/internal/domain/event"
-	"{{ .BackendModulePath }}/internal/services/event_bridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 var ErrEventPermissionDenied = errors.New("event permission denied")
@@ -112,12 +112,12 @@ func defaultManifestPath() string {
 }
 
 type PermissionedEmitter struct {
-	inner  event_bridge.Emitter
+	inner  fweventbridge.Emitter
 	perms  EventPermissions
 	logger *logrus.Entry
 }
 
-func NewPermissionedEmitter(inner event_bridge.Emitter, perms EventPermissions, logger *logrus.Entry) event_bridge.Emitter {
+func NewPermissionedEmitter(inner fweventbridge.Emitter, perms EventPermissions, logger *logrus.Entry) fweventbridge.Emitter {
 	if inner == nil {
 		return nil
 	}

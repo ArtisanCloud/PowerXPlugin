@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"{{ .BackendModulePath }}/internal/domain/event"
-	"{{ .BackendModulePath }}/internal/services/event_bridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
 )
 
 const (
@@ -25,10 +25,10 @@ type CredentialInspectionPayload struct {
 
 type ChannelEventEmitter struct {
 	metaBuilder event.MetaBuilder
-	emitter     event_bridge.Emitter
+	emitter     fweventbridge.Emitter
 }
 
-func NewChannelEventEmitter(metaBuilder event.MetaBuilder, emitter event_bridge.Emitter) *ChannelEventEmitter {
+func NewChannelEventEmitter(metaBuilder event.MetaBuilder, emitter fweventbridge.Emitter) *ChannelEventEmitter {
 	return &ChannelEventEmitter{
 		metaBuilder: metaBuilder,
 		emitter:     emitter,

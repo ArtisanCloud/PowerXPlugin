@@ -84,6 +84,8 @@ jobs:
         run: |
           cd framework
           go test ./backend/go/manifest ./backend/go/rbac
+      - name: Run TaskBus contracts validator (optional)
+        run: scripts/contracts/validate-taskbus-contracts.sh
 
   cli:
     runs-on: ubuntu-latest

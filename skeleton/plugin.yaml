@@ -239,3 +239,10 @@ exposure:
       capability: com.powerx.plugins.base.template.quality_distribute
       entrypoint: contracts/exposure/agent-streams/template-quality-distribute.yaml
       auth: workflow
+
+events:
+  publish:
+    - powerx.channel.master.credential_inspection.v1
+    - powerx.channel.master.kpi_refreshed.v1
+    - powerx.channel.product.publish_task.v1
+  subscribe: []

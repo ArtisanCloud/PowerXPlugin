@@ -30,9 +30,11 @@ import (
 	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/event_bridge"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	recommendation "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
@@ -158,6 +160,27 @@ func main() {
 		capabilityGateway = capgateway.NewClient(cfg, logger.WithField("component", "capability_gateway_client"))
 	}
 
+	// 初始化 EventBridge Emitter（本地/TaskBus/双写；TaskBus SDK 未就绪时可自动降级到本地 emitter）
+	eventLogger := logger.WithField("component", "event_bridge")
+	eventCfg := cfg.EventBridge
+	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
+		eventCfg.SourcePlugin = app.PluginID
+	}
+	bridgeFactory := event_bridge.NewFactory(*eventCfg, eventLogger)
+	bridgeEmitter, err := bridgeFactory.NewEmitter()
+	if err != nil {
+		eventLogger.WithError(err).Warn("Failed to initialize event bridge emitter; falling back to local emitter")
+		bridgeEmitter = event_bridge.NewLocalEmitter(1024, eventLogger)
+	}
+
+	// 运行时事件权限：从 plugin.yaml 解析 publish/subscribe（若未声明则默认不强制）
+	perms, err := security.LoadEventPermissionsFromManifest("", eventLogger)
+	if err != nil {
+		eventLogger.WithError(err).Warn("Failed to load event permissions; permissions enforcement disabled")
+	} else if perms.Enforced() {
+		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
+	}
+
 	deps := &app.Deps{
 		DB:                  queryDB,
 		Ctx:                 rootCtx,
@@ -172,6 +195,7 @@ func main() {
 		LicenseCache:        licenseCache,
 		OperationsMetrics:   opsmetrics.NewMetrics(),
 		AdminConsoleMetrics: adminmetrics.NewMetrics(),
+		EventEmitter:        bridgeEmitter,
 		IAMMode:             iamResolver.Mode(),
 		IAMModeSource:       iamResolver.Source(),
 		AuthProxy:           authClient,

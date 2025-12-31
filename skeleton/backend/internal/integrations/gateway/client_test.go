@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -88,7 +89,7 @@ func (s *stubTransport) Invoke(ctx context.Context, req frameworkgateway.InvokeR
 func (s *stubTransport) Close() error { return nil }
 
 func TestListPlatformCapabilitiesSuccess(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tenant/capabilities" {
 			http.NotFound(w, r)
 			return
@@ -118,9 +119,20 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 						"status":"published"
 					}
 				]
-			}
-		}`)
-	}))
+				}
+			}`)
+	})
+	l, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: l,
+		Config: &http.Server{
+			Handler: handler,
+		},
+	}
+	server.Start()
 	defer server.Close()
 
 	cfg := &config.Config{
@@ -141,9 +153,20 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 }
 
 func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
-	}))
+	})
+	l, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: l,
+		Config: &http.Server{
+			Handler: handler,
+		},
+	}
+	server.Start()
 	defer server.Close()
 
 	cfg := &config.Config{
@@ -155,6 +178,6 @@ func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 	}
 	client := NewClient(cfg, nil)
 
-	_, err := client.ListPlatformCapabilities(context.Background(), ListPlatformCapabilitiesOptions{Source: "corex"})
-	require.Error(t, err)
+	_, listErr := client.ListPlatformCapabilities(context.Background(), ListPlatformCapabilitiesOptions{Source: "corex"})
+	require.Error(t, listErr)
 }

@@ -46,6 +46,14 @@ consumer 必须按该规则做幂等去重（at-least-once 语义）。
 
 ## 7) 运维信号（对应 SC-004）
 
-- 指标：至少应能看到 emit/consume 的成功/失败计数与延迟（本地与 TaskBus 模式一致口径）
-- 告警建议：TaskBus 模式下 `emit_error_rate` 或 `consume_error_rate` 持续升高、或连续 N 分钟无消费成功时告警
+- 指标（Prometheus exposition）：
+  - Skeleton Admin Metrics Endpoint：`GET /api/v1/admin/runtime/metrics`
+  - `plugin_event_bridge_emit_total{plugin_id,tenant_uuid,topic,result}`
+  - `plugin_event_bridge_consume_total{plugin_id,tenant_uuid,topic,result}`
+  - `plugin_event_bridge_latency_ms{plugin_id,tenant_uuid,topic,op}`
+- 说明：
+  - `result`: `success|error`
+  - `op`: `emit|consume`
+  - `plugin_event_bridge_latency_ms` 为“最近一次观测到的延迟（ms）”。
+- 告警建议：TaskBus 模式下 `plugin_event_bridge_emit_total{result="error"}` 或 `plugin_event_bridge_consume_total{result="error"}` 的占比持续升高、或连续 N 分钟无消费成功时告警
 - 回滚策略：优先切回 `event_bridge.enabled=false`（本地实现）；必要时关闭双写并保留契约校验

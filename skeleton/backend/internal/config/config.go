@@ -72,6 +72,9 @@ type Config struct {
 	// CustomerAuth (mini-app / 2C) 鉴权配置。
 	CustomerAuth *CustomerAuthConfig `yaml:"customer_auth" json:"customer_auth"`
 
+	// EventBridge (TaskBus / 本地事件桥) 配置。
+	EventBridge *EventBridgeConfig `yaml:"event_bridge" json:"event_bridge"`
+
 	// 向后兼容的字段（从环境变量或旧配置中填充）
 	BindAddr   string `yaml:"-" json:"bind_addr,omitempty"`
 	LogLevel   string `yaml:"-" json:"log_level,omitempty"`
@@ -79,6 +82,16 @@ type Config struct {
 	DBDSN      string `yaml:"-" json:"db_dsn,omitempty"`
 	DBSchema   string `yaml:"-" json:"db_schema,omitempty"`
 	RunMigrate bool   `yaml:"-" json:"run_migrate,omitempty"`
+}
+
+// EventBridgeConfig 控制事件桥接（本地 emitter / TaskBus emitter / 双写）的行为。
+type EventBridgeConfig struct {
+	Enabled         bool   `yaml:"enabled" json:"enabled"`
+	Mode            string `yaml:"mode" json:"mode"` // local|taskbus|dual（为空时按 enabled 推断）
+	FallbackToLocal bool   `yaml:"fallback_to_local" json:"fallback_to_local"`
+	LocalQueueSize  int    `yaml:"local_queue_size" json:"local_queue_size"`
+	SourcePlugin    string `yaml:"source_plugin" json:"source_plugin"`
+	PayloadVersion  string `yaml:"payload_version" json:"payload_version"`
 }
 
 // CustomerAuthConfig 控制 mini-app（2C）鉴权模式。
@@ -1218,6 +1231,41 @@ func (c *Config) Validate() error {
 		if strings.TrimSpace(c.CustomerAuth.JWTSecret) == "" {
 			return NewConfigError("customer_auth.jwt_secret is required in production when mode=local")
 		}
+	}
+
+	// EventBridge 配置默认值与验证
+	if c.EventBridge == nil {
+		c.EventBridge = &EventBridgeConfig{
+			Enabled:         false,
+			Mode:            "",
+			FallbackToLocal: true,
+			LocalQueueSize:  1024,
+			SourcePlugin:    "",
+			PayloadVersion:  "v1",
+		}
+	}
+	if c.EventBridge.LocalQueueSize <= 0 {
+		c.EventBridge.LocalQueueSize = 1024
+	}
+	if strings.TrimSpace(c.EventBridge.PayloadVersion) == "" {
+		c.EventBridge.PayloadVersion = "v1"
+	}
+	mode := strings.ToLower(strings.TrimSpace(c.EventBridge.Mode))
+	if mode == "" {
+		if c.EventBridge.Enabled {
+			mode = "taskbus"
+		} else {
+			mode = "local"
+		}
+	}
+	switch mode {
+	case "local", "taskbus", "dual":
+		c.EventBridge.Mode = mode
+	default:
+		return NewConfigError("event_bridge.mode must be one of: local, taskbus, dual")
+	}
+	if !c.EventBridge.Enabled && c.EventBridge.Mode != "local" {
+		c.EventBridge.Mode = "local"
 	}
 
 	// 安全配置验证

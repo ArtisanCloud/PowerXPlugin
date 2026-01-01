@@ -65,6 +65,18 @@ export CLIENT_VERSION=0.0.1-alpha
 ```
 根据语义化版本递增，例如 `0.0.1-alpha.1`、`0.1.0` 等。请确保与 CLI 模板默认值一致。
 
+### 1.1 先查看远程当前版本（避免误判）
+
+注意：`npm view <pkg> version` 默认返回 **dist-tag `latest`** 指向的版本，与你刚发布到 `--tag alpha` 的版本可能不同。
+
+```bash
+npm view @artisan-cloud/plugin-framework-admin version
+npm dist-tag ls @artisan-cloud/plugin-framework-admin
+
+npm view @artisan-cloud/plugin-framework-client version
+npm dist-tag ls @artisan-cloud/plugin-framework-client
+```
+
 ### 2. 更新仓库内引用
 需同步调整的位置：
 1. `framework/frontend/nuxt/framework-admin/package.json` → `version`
@@ -98,14 +110,28 @@ npm publish --access public --tag alpha
 ### 4. 验证结果
 ```bash
 npm whoami
-npm view @artisan-cloud/plugin-framework-admin version --json
-npm view @artisan-cloud/plugin-framework-client version --json
+npm view @artisan-cloud/plugin-framework-admin version --json   # latest
+npm view @artisan-cloud/plugin-framework-admin@alpha version --json
+npm dist-tag ls @artisan-cloud/plugin-framework-admin
+
+npm view @artisan-cloud/plugin-framework-client version --json  # latest
+npm view @artisan-cloud/plugin-framework-client@alpha version --json
+npm dist-tag ls @artisan-cloud/plugin-framework-client
 ```
 确认返回版本正确。也可在临时目录执行：
 ```bash
 npm install @artisan-cloud/plugin-framework-admin@$ADMIN_VERSION
 ```
 确保能正常安装。
+
+### 4.1 （可选）将 `alpha` 版本提升为 `latest`
+
+仅当你确认该版本要作为默认安装版本（不再是预发布）时才执行：
+
+```bash
+npm dist-tag add @artisan-cloud/plugin-framework-admin@$ADMIN_VERSION latest
+npm dist-tag add @artisan-cloud/plugin-framework-client@$CLIENT_VERSION latest
+```
 
 ### 5. 同步脚手架
 1. **刷新锁文件**（根目录）：

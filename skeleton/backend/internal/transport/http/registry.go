@@ -138,14 +138,14 @@ func (r *Registry) registerDevAssetsRoute() {
 	if r.engine == nil {
 		return
 	}
-	paths := []string{"/assets/builds/meta/dev.json"}
+	paths := []string{"/assets/builds/meta"}
 	apiPref := strings.TrimRight(r.apiPrefix(), "/")
 	if apiPref != "" && apiPref != "-" {
-		paths = append(paths, apiPref+"/assets/builds/meta/dev.json")
+		paths = append(paths, apiPref+"/assets/builds/meta")
 	}
 
 	for _, p := range paths {
-		publicassets.RegisterDevRoute(r.engine, p)
+		publicassets.RegisterBuildMetaRoutes(r.engine, p)
 	}
 }
 

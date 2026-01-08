@@ -205,7 +205,32 @@ export const useAuth = () => {
 
   const getStoredToken = () => {
     if (!process.client) return null;
-    return safeLocalStorage.getItem("access_token") ?? readCookie("token");
+    const tryLocalStorageGet = (key: string): string | null | undefined => {
+      if (typeof window === "undefined") return null;
+      try {
+        return window.localStorage?.getItem(key) ?? null;
+      } catch {
+        return undefined;
+      }
+    };
+
+    const stored = tryLocalStorageGet("access_token");
+    // If localStorage is blocked (throws), fall back to cookie token.
+    if (stored === undefined) return readCookie("token");
+    if (stored) return stored;
+
+    // If localStorage still contains auth footprint but access_token is gone,
+    // treat it as a logout/invalid session and do NOT fall back to cookies.
+    // This makes cross-tab logout (storage event) consistent.
+    const hasFootprint = Boolean(
+      safeLocalStorage.getItem("expires_at") ||
+        safeLocalStorage.getItem("refresh_token") ||
+        safeLocalStorage.getItem("token_type") ||
+        safeLocalStorage.getItem("scope")
+    );
+    if (hasFootprint) return null;
+
+    return readCookie("token");
   };
 
   const getToken = () => {
@@ -291,7 +316,9 @@ export const useAuth = () => {
     if (!process.client) return;
     syncFromStorage();
     const handler = (event: StorageEvent) => {
-      if (!event.key || !STORAGE_KEYS.includes(event.key)) return;
+      // `storage` event may fire with `key === null` (e.g. clear()) or when
+      // simulated in tests; in that case we still want to reconcile auth state.
+      if (event.key && !STORAGE_KEYS.includes(event.key)) return;
       syncFromStorage();
     };
     window.addEventListener("storage", handler);

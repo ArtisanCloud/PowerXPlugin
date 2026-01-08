@@ -2,16 +2,20 @@ package assets
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-// RegisterDevRoute wires a development asset endpoint used by the Nuxt dev server.
-func RegisterDevRoute(engine *gin.Engine, fullPath string) {
-	if engine == nil || fullPath == "" {
+// RegisterBuildMetaRoutes wires development build meta endpoints used by the web admin shell.
+// It serves both `/dev.json` and `/:buildId(.json)` requests with a lightweight JSON payload.
+func RegisterBuildMetaRoutes(engine *gin.Engine, basePath string) {
+	if engine == nil || basePath == "" {
 		return
 	}
+
+	base := strings.TrimRight(basePath, "/")
 
 	handler := func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -23,14 +27,24 @@ func RegisterDevRoute(engine *gin.Engine, fullPath string) {
 			return
 		}
 
+		buildID := strings.TrimSpace(c.Param("buildId"))
+		if buildID == "" {
+			buildID = "dev"
+		}
+		buildID = strings.TrimPrefix(buildID, "/")
+		buildID = strings.TrimSuffix(buildID, ".json")
+		if buildID == "" {
+			buildID = "dev"
+		}
+
 		c.JSON(http.StatusOK, gin.H{
-			"id":          "dev",
+			"id":          buildID,
 			"timestamp":   time.Now().UnixMilli(),
 			"matcher":     gin.H{"static": gin.H{}, "wildcard": gin.H{}, "dynamic": gin.H{}},
 			"prerendered": []interface{}{},
 		})
 	}
 
-	engine.GET(fullPath, handler)
-	engine.OPTIONS(fullPath, handler)
+	engine.GET(base+"/:buildId", handler)
+	engine.OPTIONS(base+"/:buildId", handler)
 }

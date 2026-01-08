@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +25,7 @@ func (s stubVendorGuard) VendorRevoked(ctx context.Context, vendorID string) (bo
 func setupServiceDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	dsn := fmt.Sprintf("file:%s-%s?mode=memory&cache=private", t.Name(), uuid.NewString())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector(dsn), &gorm.Config{})
 	require.NoError(t, err)
 
 	stmts := []string{

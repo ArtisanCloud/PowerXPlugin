@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	dbtemplate "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
@@ -17,7 +18,6 @@ import (
 	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -257,7 +257,7 @@ func mustParseUint64(t *testing.T, value string) uint64 {
 func setupTemplateService(t *testing.T) (*gorm.DB, *srvtemplates.TemplateService) {
 	t.Helper()
 	models.ForceSchemaForTests("")
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&dbtemplate.Template{}))
 	return db, srvtemplates.NewTemplateService(db)

@@ -41,5 +41,7 @@ Thumbs.db
 tmp/
 !tmp/README.md
 .cache/
+skeleton/web-admin/test-results/
+skeleton/web-admin/playwright-report/
 skeleton/backend/etc/config.yaml
 skeleton/backend/etc/host-values.yaml

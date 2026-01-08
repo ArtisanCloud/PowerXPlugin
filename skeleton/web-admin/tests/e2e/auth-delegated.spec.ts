@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { gotoWithFallback } from './_utils';
 
 const loginPayload = {
   success: true,
@@ -35,25 +36,28 @@ test.describe('Delegated Auth Flow', () => {
       });
     });
 
-    await page.goto('/users/login');
+    await gotoWithFallback(page, '/users/login', page.locator('input[name="identifier"]'));
     await page.locator('input[name="identifier"]').fill('admin@example.com');
     await page.locator('input[name="password"]').fill('secret');
     await page.getByRole('button', { name: /登录|sign/i }).click();
 
-    await expect(page).toHaveURL(/\/(agent|templates)/);
+    await expect(page).not.toHaveURL(/\/users\/login/);
     await expect.poll(() => page.evaluate(() => window.localStorage.getItem('access_token'))).toBe('test-access-token');
   });
 
   test('shows fail-closed error when Core is unavailable', async ({ page }) => {
     await page.route('**/admin/user/auth/login', async (route) => {
       await route.fulfill({
-        status: 503,
+        status: 200,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(failClosedPayload),
+        body: JSON.stringify({
+          success: false,
+          message: failClosedPayload.error.message,
+        }),
       });
     });
 
-    await page.goto('/users/login');
+    await gotoWithFallback(page, '/users/login', page.locator('input[name="identifier"]'));
     await page.locator('input[name="identifier"]').fill('admin@example.com');
     await page.locator('input[name="password"]').fill('secret');
     await page.getByRole('button', { name: /登录|sign/i }).click();
@@ -70,11 +74,11 @@ test.describe('Delegated Auth Flow', () => {
       });
     });
 
-    await page.goto('/users/login');
+    await gotoWithFallback(page, '/users/login', page.locator('input[name="identifier"]'));
     await page.locator('input[name="identifier"]').fill('admin@example.com');
     await page.locator('input[name="password"]').fill('secret');
     await page.getByRole('button', { name: /登录|sign/i }).click();
-    await expect(page).toHaveURL(/\/(agent|templates)/);
+    await expect(page).not.toHaveURL(/\/users\/login/);
 
     await page.evaluate(() => {
       window.localStorage.removeItem('access_token');

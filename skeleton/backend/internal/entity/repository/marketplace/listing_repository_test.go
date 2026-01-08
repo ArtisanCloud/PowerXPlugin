@@ -4,17 +4,17 @@ import (
 	"context"
 	"testing"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func setupMarketplaceTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	models.ForceSchemaForTests("")
-	db, err := gorm.Open(sqlite.Open("file:marketplace_tests?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:marketplace_tests?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	stmts := []string{
 		`CREATE TABLE IF NOT EXISTS marketplace_listings (

@@ -1,7 +1,6 @@
 // 统一创建 $fetch 实例（单例）+ 便捷方法
 
 import { resolveApiBase, getAuthToken, getTenantUuid } from "./_base";
-import { useAuth } from "~/composables/useAuth";
 import { useRouter, useToast } from "#imports";
 import { useHostCtxStore } from "~/stores/hostCtx";
 import { PLUGIN_ID } from "~/utils/powerx-bridge";
@@ -168,6 +167,12 @@ export function useApiClient() {
   });
   const hostCtxStore = process.client ? useHostCtxStore() : null;
 
+  const resolveAuth = async () => {
+    if (!process.client) return null;
+    const mod = await import("~/composables/useAuth");
+    return mod.useAuth();
+  };
+
   const prepareOptions = async (options?: Record<string, any>) => {
     const next: Record<string, any> = options ? { ...options } : {};
     const headers =
@@ -176,7 +181,6 @@ export function useApiClient() {
         : new Headers((options?.headers as HeadersInit) || undefined);
     next.headers = headers;
     const skipAuth = Boolean((options as any)?.skipAuth);
-    const auth = useAuth();
     const pluginOrigin =
       typeof window !== "undefined" ? window.location.origin : "plugin";
     const requestPluginId =
@@ -203,9 +207,12 @@ export function useApiClient() {
 
     let authToken: string | null = null;
     if (!skipAuth) {
+      const auth = await resolveAuth();
       authToken = (next as any).authToken || (next as any).token;
       if (!authToken) {
-        authToken = (await auth.ensureFreshToken()) || getAuthToken();
+        authToken =
+          (await auth?.ensureFreshToken?.()) ||
+          getAuthToken();
       }
     }
 
@@ -257,9 +264,10 @@ export function useApiClient() {
 
   const toast = process.client ? useToast() : null;
 
-  const handleAuthError = (response?: { status?: number; _data?: any }) => {
+  const handleAuthError = async (response?: { status?: number; _data?: any }) => {
     if (!response) return;
-    const auth = useAuth();
+    const auth = await resolveAuth();
+    if (!auth) return;
     if (response.status === 503) {
       console.error("API error:", response.status, response._data);
       const message = response._data?.message || "宿主认证不可用，请稍后重试";
@@ -303,7 +311,7 @@ export function useApiClient() {
         ? baseClient.raw(request, prepared)
         : baseClient(request, prepared));
     } catch (error: any) {
-      handleAuthError(error?.response);
+      await handleAuthError(error?.response);
       throw error;
     }
   };

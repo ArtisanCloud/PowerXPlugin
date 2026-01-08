@@ -56,9 +56,11 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install && npm install lightningcss-linux-x64-gnu@1.30.2 @tailwindcss/oxide-linux-x64-gnu --no-save
+          (cd skeleton/web-admin && npm install)
+          # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
+          (cd skeleton/web-admin && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
       - name: Lint
-        run: cd skeleton/web-admin && npx nuxi lint || true
+        run: cd skeleton/web-admin && npm run lint
       - name: Build
         run: cd skeleton/web-admin && npm run build
 
@@ -150,7 +152,7 @@ jobs:
   regression:
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.48.2-noble
+      image: mcr.microsoft.com/playwright:v1.57.0-noble
     needs: [smoke]
     env:
       GOTOOLCHAIN: local
@@ -160,6 +162,10 @@ jobs:
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     steps:
       - uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y make
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -173,11 +179,15 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install && npm install lightningcss-linux-x64-gnu@1.30.2 @tailwindcss/oxide-linux-x64-gnu --no-save
+          (cd skeleton/web-admin && npm install)
+          # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
+          (cd skeleton/web-admin && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
       - name: Run regression workflow
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        shell: bash
         run: |
+          set -o pipefail
           make test-regression 2>&1 | tee regression.log
       - name: Upload regression artifacts
         if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}

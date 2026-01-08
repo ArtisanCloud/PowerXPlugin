@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func TestRecordBreachPersistsAuditEvent(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{
+	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
@@ -37,7 +37,7 @@ func TestRecordBreachPersistsAuditEvent(t *testing.T) {
 }
 
 func TestRecordUsageAssignsID(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{
+	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {

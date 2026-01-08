@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
 	service "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -19,7 +19,7 @@ func setupWebhookService(t *testing.T) (*service.WebhookService, context.Context
 
 	models.ForceSchemaForTests("")
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{
+	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {

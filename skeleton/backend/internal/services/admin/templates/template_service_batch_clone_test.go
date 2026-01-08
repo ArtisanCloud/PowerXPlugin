@@ -4,18 +4,18 @@ import (
 	"context"
 	"testing"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	entmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	dbtemplate "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func newTemplateServiceForTest(t *testing.T) (*TemplateService, context.Context) {
 	t.Helper()
 	entmodels.ForceSchemaForTests("")
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&dbtemplate.Template{}))
 	svc := NewTemplateService(db)

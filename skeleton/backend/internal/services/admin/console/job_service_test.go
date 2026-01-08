@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
 	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
@@ -44,7 +44,7 @@ func (s *stubLocker) Unlock(_ context.Context, key string) error {
 func setupJobService(t *testing.T) (*consolesvc.JobService, *gorm.DB, *stubLocker) {
 	t.Helper()
 	dsn := fmt.Sprintf("file:admin_console_job_%d?mode=memory&cache=shared", time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	db, err := gorm.Open(dbx.SQLiteDialector(dsn), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	require.NoError(t, err)
 	models.ForceSchemaForTests("")
 

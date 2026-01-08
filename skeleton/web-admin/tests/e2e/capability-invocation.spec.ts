@@ -1,9 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { gotoWithFallback, seedAuthStorage } from './_utils';
 
 const capabilityEndpoint = '**/integration/capabilities/invoke';
 const localEndpoint = '**/tests/local-api*';
 
 test.describe('Capability invocation playground', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedAuthStorage(page);
+  });
+
   test('surfaces success toast and trace id', async ({ page }) => {
     await page.route(capabilityEndpoint, async (route) => {
       const body = route.request().postDataJSON() as Record<string, any>;
@@ -25,11 +30,11 @@ test.describe('Capability invocation playground', () => {
       });
     });
 
-    await page.goto('/tests/capability');
+    await gotoWithFallback(page, '/tests/capability', page.getByTestId('trigger-success'));
     await page.getByTestId('trigger-success').click();
 
     await expect(page.getByTestId('trace-output')).toHaveText(/trace-cli-success/);
-    await expect(page.getByText('能力调用成功')).toBeVisible();
+    await expect(page.getByText('能力调用成功', { exact: true })).toBeVisible();
   });
 
   test('handles failure toast and error indicator', async ({ page }) => {
@@ -50,12 +55,12 @@ test.describe('Capability invocation playground', () => {
       });
     });
 
-    await page.goto('/tests/capability');
+    await gotoWithFallback(page, '/tests/capability', page.getByTestId('trigger-fail'));
     await page.getByTestId('trigger-fail').click();
 
     await expect(page.getByTestId('status-indicator')).toHaveText(/error/);
     await expect(page.getByTestId('error-indicator')).toHaveText('error');
-    await expect(page.getByText('能力调用失败')).toBeVisible();
+    await expect(page.getByText('能力调用失败', { exact: true })).toBeVisible();
   });
 
   test('shows mock banner when mock response returned', async ({ page }) => {
@@ -78,15 +83,16 @@ test.describe('Capability invocation playground', () => {
       });
     });
 
-    await page.goto('/tests/capability');
+    await gotoWithFallback(page, '/tests/capability', page.getByTestId('trigger-mock'));
     await page.getByTestId('trigger-mock').click();
 
     await expect(page.getByTestId('trace-output')).toHaveText(/trace-cli-mock/);
-    await expect(page.getByText('已启用 Mock 模式')).toBeVisible();
+    await expect(page.getByText('已启用 Mock 模式', { exact: true })).toBeVisible();
   });
 });
 
 test('invokes local capability endpoint directly via Capability Lab', async ({ page }) => {
+  await seedAuthStorage(page);
   await page.route(localEndpoint, async (route) => {
     const request = route.request();
     expect(request.method()).toBe('POST');
@@ -114,7 +120,7 @@ test('invokes local capability endpoint directly via Capability Lab', async ({ p
     });
   });
 
-  await page.goto('/tests/capability');
+  await gotoWithFallback(page, '/tests/capability', page.getByTestId('trigger-local-debug'));
   await page.getByTestId('trigger-local-debug').click();
 
   await expect(page.getByTestId('local-trace')).toHaveText(/trace-local-debug/);

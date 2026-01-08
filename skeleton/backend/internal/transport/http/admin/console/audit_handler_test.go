@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
 	consolerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/admin_console"
@@ -18,7 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -26,7 +26,7 @@ import (
 func setupAuditHandler(t *testing.T) (*consoletransport.AuditHandler, *consolerepo.AuditRepository, *gorm.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(sqlite.Open("file:admin_console_audit?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:admin_console_audit?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	require.NoError(t, err)
 	models.ForceSchemaForTests("")
 	require.NoError(t, db.Exec(`CREATE TABLE IF NOT EXISTS admin_console_audit_events (

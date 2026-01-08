@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	"github.com/sirupsen/logrus"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -22,7 +22,7 @@ func newTestLogger() *logrus.Entry {
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	models.ForceSchemaForTests("")
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{
+	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {

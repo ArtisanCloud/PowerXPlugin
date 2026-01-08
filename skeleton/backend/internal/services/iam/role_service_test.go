@@ -2,17 +2,13 @@ package iam
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
-	"sync"
 	"testing"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
-	"github.com/google/uuid"
-	sqlite3 "github.com/mattn/go-sqlite3"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -130,30 +126,10 @@ func TestRoleService_AssignMembers(t *testing.T) {
 	}
 }
 
-const testSQLiteDriver = "iam_role_service_sqlite"
-
-var registerSQLiteOnce sync.Once
-
-func registerSQLiteDriver() {
-	registerSQLiteOnce.Do(func() {
-		sql.Register(testSQLiteDriver, &sqlite3.SQLiteDriver{
-			ConnectHook: func(conn *sqlite3.SQLiteConn) error {
-				return conn.RegisterFunc("gen_random_uuid", func() string {
-					return strings.ToLower(uuid.NewString())
-				}, true)
-			},
-		})
-	})
-}
-
 func newRoleServiceTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	registerSQLiteDriver()
 	basemodels.ForceSchemaForTests("")
-	db, err := gorm.Open(sqlite.Dialector{
-		DriverName: testSQLiteDriver,
-		DSN:        "file::memory:?cache=shared",
-	}, &gorm.Config{
+	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {

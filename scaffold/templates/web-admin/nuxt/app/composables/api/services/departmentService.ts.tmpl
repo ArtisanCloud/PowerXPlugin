@@ -1,4 +1,5 @@
-import { useApiClient, getTenantUuid } from "../index";
+import { useApiClient } from "../_client";
+import { getTenantUuid } from "../_base";
 import type { ApiResponse } from "../types/types";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 

@@ -1,4 +1,4 @@
-import { useApiClient } from "../index";
+import { useApiClient } from "../_client";
 import type { ApiResponse } from "../types/types";
 import { useIAMService, type TenantSummary } from "./iamService";
 

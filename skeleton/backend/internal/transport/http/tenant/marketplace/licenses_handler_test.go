@@ -11,6 +11,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
@@ -20,14 +21,13 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func setupLicenseHandlerDeps(t *testing.T) (*app.Deps, *gorm.DB) {
 	t.Helper()
 	models.ForceSchemaForTests("")
-	db, err := gorm.Open(sqlite.Open("file:tenant_license_handler?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:tenant_license_handler?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 
 	statements := []string{

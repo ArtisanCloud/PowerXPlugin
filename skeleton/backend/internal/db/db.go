@@ -13,7 +13,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
 )
@@ -70,7 +69,7 @@ func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		// SQLite 内存模式：禁用外键自动迁移，保留事务默认值
 		gormConfig.SkipDefaultTransaction = cfg.SkipDefaultTx
 		gormConfig.DisableForeignKeyConstraintWhenMigrating = true
-		dialector = sqlite.Open(cfg.DSN)
+		dialector = SQLiteDialector(cfg.DSN)
 	case "postgres":
 		gormConfig.SkipDefaultTransaction = cfg.SkipDefaultTx
 		dialector = postgres.New(postgres.Config{

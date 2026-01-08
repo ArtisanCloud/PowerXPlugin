@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	opmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
 	oprepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/operations"
 	opmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	operationsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/operations"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +25,7 @@ func (r *recordingIncidentDispatcher) DispatchIncidentEvent(ctx context.Context,
 }
 
 func TestIncidentService_Lifecycle(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:incident_service?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:incident_service?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	require.NoError(t, err)
 	basemodels.ForceSchemaForTests("")
 	require.NoError(t, db.AutoMigrate(

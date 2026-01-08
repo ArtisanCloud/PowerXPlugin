@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +26,7 @@ func (s stubProvider) FetchSignals(ctx context.Context, tenantID string) ([]reco
 func setupListingRepoForJob(t *testing.T) *mrepo.ListingRepository {
 	t.Helper()
 	models.ForceSchemaForTests("")
-	db, err := gorm.Open(sqlite.Open("file:recommendation_job?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:recommendation_job?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(`DROP TABLE IF EXISTS marketplace_listings`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE marketplace_listings (

@@ -14,6 +14,37 @@ const router = useRouter();
 const auth = useAuth();
 const { setAuth, consumeAuthError } = auth;
 const isDelegatedMode = computed(() => auth.delegatedIAM?.value ?? false);
+const runtimeConfig = useRuntimeConfig();
+const insidePowerX = computed(
+  () =>
+    runtimeConfig.public?.insidePowerX === true ||
+    runtimeConfig.public?.insidePowerX === "true"
+);
+
+const sanitizeRedirectTo = (raw: unknown) => {
+  if (typeof raw !== "string" || !raw.trim()) return "/";
+  const redirect = raw.trim();
+
+  // Avoid open redirects / malformed input
+  if (/^https?:\/\//i.test(redirect)) return "/";
+
+  const pathOnly = redirect.startsWith("/") ? redirect : "/";
+
+  // Never redirect back to login (prevents loops)
+  if (/\/users\/login(?:$|[?#/])/i.test(pathOnly)) return "/";
+
+  // In standalone preview, strip the PowerX plugin admin base prefix.
+  if (!insidePowerX.value) {
+    const match = pathOnly.match(/^\/_p\/[^/]+\/admin(\/.*)?$/);
+    if (match) {
+      const stripped = match[1] || "/";
+      if (/\/users\/login(?:$|[?#/])/i.test(stripped)) return "/";
+      return stripped;
+    }
+  }
+
+  return pathOnly;
+};
 
 // 导入认证服务
 const { login } = useAuthService();
@@ -58,14 +89,14 @@ const handleLogin = async () => {
       setAuth(response.data);
 
       // 获取重定向URL
-      const redirectTo = (route.query.redirect as string) || "/";
+      const redirectTo = sanitizeRedirectTo(route.query.redirect);
 
       // 登录成功后跳转
-    await navigateTo(redirectTo);
-  } else {
-    error.value = response.message || t("auth.loginFailed");
-  }
-} catch (err: any) {
+      await navigateTo(redirectTo);
+    } else {
+      error.value = response.message || t("auth.loginFailed");
+    }
+  } catch (err: any) {
     console.error("登录错误:", err);
     error.value = err.response?.data?.message || t("auth.loginFailed");
   } finally {
@@ -139,20 +170,21 @@ onMounted(() => {
         <div class="px-6 pb-6">
           <form @submit.prevent="handleLogin" class="space-y-5">
             <!-- 错误提示 -->
-            <UAlert
-              v-if="error"
-              color="error"
-              variant="soft"
-              :title="error"
-              :close-button="{
-                icon: 'i-heroicons-x-mark-20-solid',
-                color: 'gray',
-                variant: 'link',
-                padded: false,
-              }"
-              @close="error = ''"
-              class="mb-1"
-            />
+            <div v-if="error" role="alert">
+              <UAlert
+                color="error"
+                variant="soft"
+                :title="error"
+                :close-button="{
+                  icon: 'i-heroicons-x-mark-20-solid',
+                  color: 'gray',
+                  variant: 'link',
+                  padded: false,
+                }"
+                @close="error = ''"
+                class="mb-1"
+              />
+            </div>
 
             <UAlert
               v-if="isDelegatedMode"

@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	opmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
@@ -15,12 +16,11 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func TestSLARecomputeJobWritesAudit(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:sla_audit?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:sla_audit?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	require.NoError(t, err)
 	basemodels.ForceSchemaForTests("")
 	require.NoError(t, db.AutoMigrate(

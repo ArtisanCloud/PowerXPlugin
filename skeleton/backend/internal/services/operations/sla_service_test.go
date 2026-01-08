@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	opmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
@@ -11,12 +12,11 @@ import (
 	opmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	operationsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/operations"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func setupSLAService(t *testing.T) (*operationsvc.SLAService, *oprepo.SLARepository) {
-	db, err := gorm.Open(sqlite.Open("file:sla_service?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:sla_service?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	require.NoError(t, err)
 	basemodels.ForceSchemaForTests("")
 	require.NoError(t, db.AutoMigrate(

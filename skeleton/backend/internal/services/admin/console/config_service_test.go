@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/stretchr/testify/require"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
@@ -18,7 +18,7 @@ import (
 
 func setupConfigService(t *testing.T) (*consolesvc.ConfigService, *gorm.DB) {
 	t.Helper()
-	ginDB, err := gorm.Open(sqlite.Open("file:admin_console_config?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
+	ginDB, err := gorm.Open(dbx.SQLiteDialector("file:admin_console_config?mode=memory&cache=shared"), &gorm.Config{DisableForeignKeyConstraintWhenMigrating: true})
 	require.NoError(t, err)
 	models.ForceSchemaForTests("")
 	require.NoError(t, ginDB.Exec(`CREATE TABLE IF NOT EXISTS admin_console_audit_events (

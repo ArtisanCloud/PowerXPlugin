@@ -2,8 +2,6 @@
 package models
 
 import (
-	"time"
-
 	"gorm.io/datatypes"
 )
 
@@ -14,8 +12,8 @@ type PluginTenantExt struct {
 	Flags             datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"flags"`
 	Config            datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"config"`
 	Region            string         `gorm:"type:varchar(32)" json:"region"`
-	ExpireAt          *time.Time     `gorm:"type:timestamptz" json:"expire_at"`
-	LastSyncAt        *time.Time     `gorm:"type:timestamptz" json:"last_sync_at"`
+	ExpireAt          *DBTime        `gorm:"type:timestamptz" json:"expire_at"`
+	LastSyncAt        *DBTime        `gorm:"type:timestamptz" json:"last_sync_at"`
 	LastError         string         `gorm:"type:text" json:"last_error"`
 }
 

@@ -61,7 +61,7 @@ func (s *MCPSessionService) Register(ctx context.Context, session *model.MCPSess
 	session.CapabilitiesHash = strings.TrimSpace(session.CapabilitiesHash)
 	session.MissedHeartbeats = 0
 	now := time.Now().UTC()
-	session.LastPingAt = &now
+	session.LastPingAt = &model.DBTime{Time: now}
 	stored, err := s.repo.Create(ctx, session)
 	if err != nil {
 		return nil, err

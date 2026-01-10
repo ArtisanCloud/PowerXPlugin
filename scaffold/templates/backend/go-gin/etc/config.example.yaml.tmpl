@@ -30,22 +30,27 @@ grpc_upstream:
 gateway:
   # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN / PX_TENANT_UUID。
   # 若留空则默认关闭 Gateway 调用，`PX_USE_MOCK` 可指定 media,eventfabric 等模块名称以启用内存 Mock。
-  base_url: "http://127.0.0.1:8077/api/v1"
+  # 注意：只要 base_url/tool_token/tenant_uuid 任一不为空，就会触发 Gateway 配置校验（必须三者齐全）。
+  # 因此默认将 base_url 与 tenant_uuid 留空，避免在未登录/未配置 Token 时阻塞本地启动。
+  base_url: ""
   tool_token: ""
   refresh_token: ""
-  tenant_uuid: "00000000-0000-0000-0000-000000000001"
+  tenant_uuid: ""
   timeout: "10s"
   user_agent: "powerx-plugin-skeleton/dev"
   use_mock: []
 
 database:
-  # driver 可选 memory / sqlite / postgres。缺省值为 memory（内存 SQLite）。
-  driver: "sqlite"
-  dsn: "file:../../.cache/powerxplugin.db?cache=shared&_fk=1"
-  schema: ""
-  # driver: "postgres"
-  # dsn: "postgres://user:pwd@localhost:5432/com_powerx_plugin_base?sslmode=disable"
-  # schema: "public"
+  # 开发建议：默认使用 Postgres（更接近生产；SQLite 仅保留最小可跑通子集，且不保证所有表/约束/时间字段行为一致）。
+  driver: "postgres"
+  # 你可以复用本机 Postgres，但务必使用独立 schema，避免与宿主/其它插件冲突。
+  # 先确保数据库存在（例如 com_powerx_plugin_base），schema 会由程序自动创建。
+  dsn: "postgres://powerx:powerx@localhost:5432/com_powerx_plugin_base?sslmode=disable"
+  schema: "public"
+  # 如需快速本地试跑（最小能力集）可切到 SQLite：
+  # driver: "sqlite"
+  # dsn: "file:../../.cache/powerxplugin.db?cache=shared&_fk=1"
+  # schema: ""
   maxIdleConns: 10
   maxOpenConns: 100
   connMaxLifetime: 1h
@@ -208,5 +213,5 @@ operations:
 # 如需切换到 Postgres，可以将 driver 设置为 postgres 并提供 dsn，例如：
 # database:
 #   driver: "postgres"
-#   dsn: "postgres://powerx:powerx@localhost:5432/powerx?sslmode=disable"
-#   schema: "px_plugin_base"
+#   dsn: "postgres://powerx:powerx@localhost:5432/com_powerx_plugin_base?sslmode=disable"
+#   schema: "public"

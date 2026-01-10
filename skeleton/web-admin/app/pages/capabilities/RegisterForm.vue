@@ -58,18 +58,18 @@
           <section
             v-for="group in groupedCatalog"
             :key="group.module"
-            class="rounded-2xl border border-white/5 bg-[#0f192a]/80 px-1 py-1 shadow-inner shadow-black/40 transition"
+            class="rounded-2xl border border-gray-200 bg-white px-1 py-1 shadow-sm transition dark:border-white/5 dark:bg-[#0f192a]/80 dark:shadow-inner dark:shadow-black/40"
           >
             <button
               type="button"
-              class="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left transition hover:border-primary-500/40 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+              class="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 dark:hover:border-primary-500/40 dark:hover:bg-white/5"
               @click="toggleModule(group.module)"
             >
               <div>
-                <p class="text-lg font-semibold text-white">
+                <p class="text-lg font-semibold text-gray-900 dark:text-white">
                   {{ group.displayName }}
                 </p>
-                <p class="text-xs text-[#93c5fd]">
+                <p class="text-xs text-blue-600 dark:text-[#93c5fd]">
                   {{ group.module }} · {{ group.items.length }} 个能力
                 </p>
               </div>
@@ -80,15 +80,15 @@
                   :label="badge.label"
                   :color="badge.color"
                   variant="soft"
-                  class="bg-white/10 text-white backdrop-blur"
+                  class="bg-gray-100 text-gray-700 backdrop-blur dark:bg-white/10 dark:text-white"
                 />
                 <UIcon
                   :name="isModuleExpanded(group.module) ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
-                  class="h-5 w-5 text-white/70"
+                  class="h-5 w-5 text-gray-500 dark:text-white/70"
                 />
               </div>
             </button>
-            <div v-if="isModuleExpanded(group.module)" class="border-t border-white/5 bg-black/10">
+            <div v-if="isModuleExpanded(group.module)" class="border-t border-gray-200 bg-gray-50 dark:border-white/5 dark:bg-black/10">
               <UTable
                 :data="group.items"
                 :columns="tableColumns"
@@ -549,13 +549,13 @@
           {{ $t("capabilities.form.debug.docLink") }}
         </NuxtLink>
       </template>
-      <template #body>
-        <div class="flex flex-1 flex-col gap-6 overflow-hidden">
-          <div class="grid flex-1 gap-6 overflow-hidden lg:grid-cols-[1.1fr_0.9fr]">
-            <UCard
-              class="h-full border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30"
-              :ui="{ body: 'p-0 h-full' }"
-            >
+	      <template #body>
+	        <div class="flex flex-1 flex-col gap-6 overflow-hidden">
+	          <div class="grid flex-1 gap-6 overflow-hidden lg:grid-cols-[1.1fr_0.9fr]">
+	            <UCard
+	              class="h-full border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-white/5 dark:bg-[#0f192a]/80 dark:text-white/80 dark:shadow-inner dark:shadow-black/30"
+	              :ui="{ body: 'p-0 h-full' }"
+	            >
               <div class="flex h-full flex-col">
                 <div class="flex-1 overflow-y-auto px-5 py-5 text-sm">
                   <div class="grid gap-5 lg:grid-cols-12">
@@ -589,15 +589,15 @@
                       <UInput v-model="debugForm.apiBase" placeholder="http://127.0.0.1:8078" />
                     </UFormField>
                     <div class="lg:col-span-12 space-y-3">
-                      <label class="text-sm font-medium text-white">
-                        {{ $t("capabilities.form.debug.payload") }}
-                      </label>
+	                      <label class="text-sm font-medium text-gray-900 dark:text-white">
+	                        {{ $t("capabilities.form.debug.payload") }}
+	                      </label>
                       <UTextarea
                         v-model="debugForm.payloadText"
                         :rows="14"
                         class="w-full min-h-[320px] font-mono text-xs"
                       />
-                      <div class="flex flex-wrap items-center justify-between text-xs text-gray-300">
+	                      <div class="flex flex-wrap items-center justify-between text-xs text-gray-600 dark:text-gray-300">
                         <span>
                           {{ debugPayloadValid ? "JSON OK" : $t("capabilities.form.debug.payloadInvalid") }}
                         </span>
@@ -638,9 +638,9 @@
                     </UFormField>
                     <div class="lg:col-span-12 space-y-2">
                       <div class="flex items-center justify-between">
-                        <p class="text-sm font-medium text-white">
-                          {{ $t("capabilities.form.debug.requestPreview") }}
-                        </p>
+	                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+	                          {{ $t("capabilities.form.debug.requestPreview") }}
+	                        </p>
                         <UButton
                           color="gray"
                           variant="ghost"
@@ -649,23 +649,23 @@
                           @click="debugShowRequestPreview = !debugShowRequestPreview"
                         />
                       </div>
-                      <pre
-                        v-if="debugShowRequestPreview"
-                        class="rounded bg-black/40 p-4 text-xs text-white/80"
-                      >
+	                      <pre
+	                        v-if="debugShowRequestPreview"
+	                        class="rounded bg-gray-100 p-4 text-xs text-gray-800 dark:bg-black/40 dark:text-white/80"
+	                      >
 {{ debugRequestPreviewText }}
-                      </pre>
-                      <p v-else class="text-xs text-gray-300">
-                        {{ $t("capabilities.form.debug.collapsedPreview") }}
-                      </p>
+	                      </pre>
+	                      <p v-else class="text-xs text-gray-600 dark:text-gray-300">
+	                        {{ $t("capabilities.form.debug.collapsedPreview") }}
+	                      </p>
                     </div>
                   </div>
                 </div>
-                <div class="border-t border-white/10 px-5 py-4">
-                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-xs text-white/60">
-                      {{ $t("capabilities.form.debug.payloadHint") }}
-                    </p>
+	                <div class="border-t border-gray-200 px-5 py-4 dark:border-white/10">
+	                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+	                    <p class="text-xs text-gray-500 dark:text-white/60">
+	                      {{ $t("capabilities.form.debug.payloadHint") }}
+	                    </p>
                     <UButton
                       color="primary"
                       :loading="debugInvokeLoading"
@@ -677,12 +677,12 @@
                   </div>
                 </div>
               </div>
-            </UCard>
+	            </UCard>
 
-            <UCard
-              class="h-full border border-white/5 bg-[#0d1828]/90 text-white/80 shadow-inner shadow-black/30"
-              :ui="{ body: 'p-0 h-full' }"
-            >
+	            <UCard
+	              class="h-full border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-white/5 dark:bg-[#0d1828]/90 dark:text-white/80 dark:shadow-inner dark:shadow-black/30"
+	              :ui="{ body: 'p-0 h-full' }"
+	            >
               <div class="flex h-full flex-col">
                 <div class="flex-1 space-y-4 overflow-y-auto px-5 py-5 text-sm">
                   <div class="flex flex-wrap gap-3">
@@ -724,40 +724,40 @@
                     <p class="text-xs uppercase tracking-wide text-rose-300">
                       {{ $t("capabilities.form.debug.errors") }}
                     </p>
-                    <p class="rounded bg-rose-500/10 p-3 text-sm text-rose-100">
-                      {{ debugErrorMessage }}
-                    </p>
-                    <pre
-                      v-if="debugErrorDetails"
-                      class="rounded bg-black/30 p-3 text-xs text-white/80"
-                    >
+	                    <p class="rounded bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-100">
+	                      {{ debugErrorMessage }}
+	                    </p>
+	                    <pre
+	                      v-if="debugErrorDetails"
+	                      class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80"
+	                    >
 {{ JSON.stringify(debugErrorDetails, null, 2) }}
-                    </pre>
+	                    </pre>
                   </div>
 
                   <div v-if="debugResult?.data" class="space-y-2">
-                    <p class="text-xs uppercase tracking-wide text-primary-200">
-                      {{ $t("capabilities.form.debug.responseData") }}
-                    </p>
-                    <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+	                    <p class="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-200">
+	                      {{ $t("capabilities.form.debug.responseData") }}
+	                    </p>
+	                    <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
 {{ JSON.stringify(debugResult.data, null, 2) }}
-                    </pre>
+	                    </pre>
                   </div>
 
                   <div v-if="debugResult?.raw" class="space-y-2">
-                    <p class="text-xs uppercase tracking-wide text-gray-200">
-                      {{ $t("capabilities.form.debug.rawResponse") }}
-                    </p>
-                    <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+	                    <p class="text-xs uppercase tracking-wide text-gray-700 dark:text-gray-200">
+	                      {{ $t("capabilities.form.debug.rawResponse") }}
+	                    </p>
+	                    <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
 {{ JSON.stringify(debugResult.raw, null, 2) }}
-                    </pre>
+	                    </pre>
                   </div>
 
                   <div class="space-y-2">
                     <div class="flex items-center justify-between">
-                      <p class="text-sm font-medium text-white">
-                        {{ $t("capabilities.form.debug.history") }}
-                      </p>
+	                      <p class="text-sm font-medium text-gray-900 dark:text-white">
+	                        {{ $t("capabilities.form.debug.history") }}
+	                      </p>
                       <UButton
                         size="xs"
                         variant="ghost"
@@ -768,11 +768,11 @@
                       </UButton>
                     </div>
                     <div v-if="debugHistoryEntries.length" class="space-y-3">
-                      <UCard
-                        v-for="entry in debugHistoryEntries"
-                        :key="entry.id"
-                        class="bg-black/30 text-xs text-white/80"
-                      >
+	                      <UCard
+	                        v-for="entry in debugHistoryEntries"
+	                        :key="entry.id"
+	                        class="border border-gray-200 bg-gray-50 text-xs text-gray-800 dark:border-white/5 dark:bg-black/30 dark:text-white/80"
+	                      >
                         <template #header>
                           <div class="flex flex-wrap items-center gap-2">
                             <span class="text-sm font-semibold">
@@ -786,19 +786,19 @@
                               }}
                             </UBadge>
                           </div>
-                          <p class="text-[11px] text-white/60">
-                            {{ $t("capabilities.form.debug.duration") }}：{{ entry.duration.toFixed(1) }} ms ·
-                            {{ $t("capabilities.form.debug.traceId") }}：{{ entry.traceId || "—" }}
-                          </p>
+	                          <p class="text-[11px] text-gray-500 dark:text-white/60">
+	                            {{ $t("capabilities.form.debug.duration") }}：{{ entry.duration.toFixed(1) }} ms ·
+	                            {{ $t("capabilities.form.debug.traceId") }}：{{ entry.traceId || "—" }}
+	                          </p>
                         </template>
                         <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
 {{ entry.rawText }}
                         </pre>
                       </UCard>
                     </div>
-                    <p v-else class="text-xs text-gray-400">
-                      {{ $t("capabilities.form.debug.noHistory") }}
-                    </p>
+	                    <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+	                      {{ $t("capabilities.form.debug.noHistory") }}
+	                    </p>
                   </div>
                 </div>
               </div>
@@ -825,19 +825,19 @@
           {{ $t("capabilities.mcp.docLink") }}
         </NuxtLink>
       </template>
-      <template #body>
-        <div class="space-y-6">
-          <UCard class="border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30">
-            <template #header>
-              <div>
-                <h2 class="text-lg font-semibold text-white">
-                  {{ $t("capabilities.mcp.session.title") }}
-                </h2>
-                <p class="text-sm text-white/70">
-                  {{ $t("capabilities.mcp.session.description") }}
-                </p>
-              </div>
-            </template>
+	      <template #body>
+	        <div class="space-y-6">
+	          <UCard class="border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-white/5 dark:bg-[#0f192a]/80 dark:text-white/80 dark:shadow-inner dark:shadow-black/30">
+	            <template #header>
+	              <div>
+	                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+	                  {{ $t("capabilities.mcp.session.title") }}
+	                </h2>
+	                <p class="text-sm text-gray-600 dark:text-white/70">
+	                  {{ $t("capabilities.mcp.session.description") }}
+	                </p>
+	              </div>
+	            </template>
             <div class="space-y-6 text-sm">
               <div class="grid gap-4 md:grid-cols-2">
                 <UFormField :label="$t('capabilities.mcp.fields.runtimeAssignment')">
@@ -922,47 +922,47 @@
                   </UButton>
                 </div>
               </div>
-              <div
-                v-if="mcpSession"
-                class="rounded-2xl border border-white/10 bg-black/20 p-4 text-xs text-white/80"
-              >
+	              <div
+	                v-if="mcpSession"
+	                class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-white/80"
+	              >
                 <div class="flex flex-wrap items-center gap-2 text-sm">
                   <span class="font-semibold">ID：{{ mcpSession.id }}</span>
                   <UBadge :label="mcpSession.state" :color="mcpSession.state === 'ready' ? 'green' : 'gray'" />
                 </div>
-                <dl class="mt-3 grid gap-2 md:grid-cols-2">
-                  <div>
-                    <dt class="text-white/60">{{ $t("capabilities.mcp.fields.tenantUuid") }}</dt>
-                    <dd>{{ mcpSession.tenant_uuid }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-white/60">{{ $t("capabilities.mcp.fields.lastPing") }}</dt>
-                    <dd>{{ mcpSession.last_ping_at || "—" }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-white/60">{{ $t("capabilities.mcp.fields.createdAt") }}</dt>
-                    <dd>{{ mcpSession.created_at }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-white/60">{{ $t("capabilities.mcp.fields.updatedAt") }}</dt>
-                    <dd>{{ mcpSession.updated_at }}</dd>
-                  </div>
-                </dl>
-              </div>
+	                <dl class="mt-3 grid gap-2 md:grid-cols-2">
+	                  <div>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ $t("capabilities.mcp.fields.tenantUuid") }}</dt>
+	                    <dd>{{ mcpSession.tenant_uuid }}</dd>
+	                  </div>
+	                  <div>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ $t("capabilities.mcp.fields.lastPing") }}</dt>
+	                    <dd>{{ mcpSession.last_ping_at || "—" }}</dd>
+	                  </div>
+	                  <div>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ $t("capabilities.mcp.fields.createdAt") }}</dt>
+	                    <dd>{{ mcpSession.created_at }}</dd>
+	                  </div>
+	                  <div>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ $t("capabilities.mcp.fields.updatedAt") }}</dt>
+	                    <dd>{{ mcpSession.updated_at }}</dd>
+	                  </div>
+	                </dl>
+	              </div>
             </div>
           </UCard>
 
-          <UCard class="border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30">
-            <template #header>
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-lg font-semibold text-white">
-                    {{ $t("capabilities.mcp.invoke.title") }}
-                  </h2>
-                  <p class="text-sm text-white/70">
-                    {{ $t("capabilities.mcp.invoke.description") }}
-                  </p>
-                </div>
+	          <UCard class="border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-white/5 dark:bg-[#0f192a]/80 dark:text-white/80 dark:shadow-inner dark:shadow-black/30">
+	            <template #header>
+	              <div class="flex items-center justify-between">
+	                <div>
+	                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+	                    {{ $t("capabilities.mcp.invoke.title") }}
+	                  </h2>
+	                  <p class="text-sm text-gray-600 dark:text-white/70">
+	                    {{ $t("capabilities.mcp.invoke.description") }}
+	                  </p>
+	                </div>
                 <UButton
                   size="xs"
                   variant="ghost"
@@ -1031,21 +1031,21 @@
                   </div>
                 </UFormField>
               </div>
-              <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label class="text-xs font-medium text-white/80">
-                    {{ $t("capabilities.mcp.fields.payload") }}
-                  </label>
+	              <div class="grid gap-4 md:grid-cols-2">
+	                <div>
+	                  <label class="text-xs font-medium text-gray-700 dark:text-white/80">
+	                    {{ $t("capabilities.mcp.fields.payload") }}
+	                  </label>
                   <UTextarea
                     v-model="mcpInvokeForm.payloadText"
                     :rows="10"
                     class="mt-1 font-mono text-xs"
                   />
-                </div>
-                <div>
-                  <label class="text-xs font-medium text-white/80">
-                    {{ $t("capabilities.mcp.fields.metadata") }}
-                  </label>
+	                </div>
+	                <div>
+	                  <label class="text-xs font-medium text-gray-700 dark:text-white/80">
+	                    {{ $t("capabilities.mcp.fields.metadata") }}
+	                  </label>
                   <UTextarea
                     v-model="mcpInvokeForm.metadataText"
                     :rows="10"
@@ -1080,42 +1080,42 @@
                     Correlation：{{ mcpInvokeResult?.correlation_id || "—" }}
                   </span>
                 </div>
-                <div v-if="mcpInvokeResult?.payload" class="space-y-1">
-                  <p class="text-xs uppercase tracking-wide text-primary-200">
-                    {{ $t("capabilities.mcp.fields.payload") }}
-                  </p>
-                  <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+	                <div v-if="mcpInvokeResult?.payload" class="space-y-1">
+	                  <p class="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-200">
+	                    {{ $t("capabilities.mcp.fields.payload") }}
+	                  </p>
+	                  <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
 {{ JSON.stringify(mcpInvokeResult.payload, null, 2) }}
-                  </pre>
-                </div>
-                <div v-if="mcpInvokeResult?.metadata" class="space-y-1">
-                  <p class="text-xs uppercase tracking-wide text-primary-200">
-                    {{ $t("capabilities.mcp.fields.metadata") }}
-                  </p>
-                  <pre class="rounded bg-black/30 p-3 text-xs text-white/80">
+	                  </pre>
+	                </div>
+	                <div v-if="mcpInvokeResult?.metadata" class="space-y-1">
+	                  <p class="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-200">
+	                    {{ $t("capabilities.mcp.fields.metadata") }}
+	                  </p>
+	                  <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
 {{ JSON.stringify(mcpInvokeResult.metadata, null, 2) }}
-                  </pre>
-                </div>
-                <div v-if="mcpInvokeErrorMessage" class="space-y-1">
-                  <p class="text-xs uppercase tracking-wide text-rose-300">
-                    {{ $t("capabilities.mcp.invoke.failed") }}
-                  </p>
-                  <p class="rounded bg-rose-500/10 p-3 text-xs text-rose-100">
-                    {{ mcpInvokeErrorMessage }}
-                  </p>
-                  <pre
-                    v-if="mcpInvokeErrorDetails"
-                    class="rounded bg-black/30 p-3 text-xs text-white/80"
-                  >
+	                  </pre>
+	                </div>
+	                <div v-if="mcpInvokeErrorMessage" class="space-y-1">
+	                  <p class="text-xs uppercase tracking-wide text-rose-300">
+	                    {{ $t("capabilities.mcp.invoke.failed") }}
+	                  </p>
+	                  <p class="rounded bg-rose-50 p-3 text-xs text-rose-700 dark:bg-rose-500/10 dark:text-rose-100">
+	                    {{ mcpInvokeErrorMessage }}
+	                  </p>
+	                  <pre
+	                    v-if="mcpInvokeErrorDetails"
+	                    class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80"
+	                  >
 {{ JSON.stringify(mcpInvokeErrorDetails, null, 2) }}
-                  </pre>
-                </div>
+	                  </pre>
+	                </div>
               </div>
-              <div class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <p class="text-sm font-medium text-white">
-                    {{ $t("capabilities.mcp.invoke.history") }}
-                  </p>
+	              <div class="space-y-2">
+	                <div class="flex items-center justify-between">
+	                  <p class="text-sm font-medium text-gray-900 dark:text-white">
+	                    {{ $t("capabilities.mcp.invoke.history") }}
+	                  </p>
                   <UButton
                     size="xs"
                     variant="ghost"
@@ -1125,12 +1125,12 @@
                     {{ $t("capabilities.mcp.actions.clearHistory") }}
                   </UButton>
                 </div>
-                <div v-if="mcpInvokeHistory.length" class="space-y-3">
-                  <UCard
-                    v-for="entry in mcpInvokeHistory"
-                    :key="entry.id"
-                    class="bg-black/30 text-xs text-white/80"
-                  >
+	                <div v-if="mcpInvokeHistory.length" class="space-y-3">
+	                  <UCard
+	                    v-for="entry in mcpInvokeHistory"
+	                    :key="entry.id"
+	                    class="border border-gray-200 bg-gray-50 text-xs text-gray-800 dark:border-white/5 dark:bg-black/30 dark:text-white/80"
+	                  >
                     <template #header>
                       <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-semibold">
@@ -1141,35 +1141,35 @@
                           variant="soft"
                           :label="entry.success ? $t('capabilities.mcp.invoke.historySuccess') : $t('capabilities.mcp.invoke.historyFail')"
                         />
-                        <span class="text-white/60">{{ entry.timestamp }}</span>
-                      </div>
-                      <p class="text-white/60">
-                        Trace：{{ entry.traceId || "—" }} · Correlation：{{ entry.correlationId || "—" }}
-                      </p>
+	                        <span class="text-gray-500 dark:text-white/60">{{ entry.timestamp }}</span>
+	                      </div>
+	                      <p class="text-gray-500 dark:text-white/60">
+	                        Trace：{{ entry.traceId || "—" }} · Correlation：{{ entry.correlationId || "—" }}
+	                      </p>
                     </template>
                     <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
 {{ entry.payload ? JSON.stringify(entry.payload, null, 2) : entry.error }}
                     </pre>
                   </UCard>
                 </div>
-                <p v-else class="text-xs text-white/60">
-                  {{ $t("capabilities.mcp.invoke.noHistory") }}
-                </p>
-              </div>
+	                <p v-else class="text-xs text-gray-500 dark:text-white/60">
+	                  {{ $t("capabilities.mcp.invoke.noHistory") }}
+	                </p>
+	              </div>
             </div>
           </UCard>
 
-          <UCard class="border border-white/5 bg-[#0f192a]/80 text-white/80 shadow-inner shadow-black/30">
-            <template #header>
-              <div class="flex items-center justify-between">
-                <div>
-                  <h2 class="text-lg font-semibold text-white">
-                    {{ $t("capabilities.mcp.stream.title") }}
-                  </h2>
-                  <p class="text-sm text-white/70">
-                    {{ $t("capabilities.mcp.stream.description") }}
-                  </p>
-                </div>
+	          <UCard class="border border-gray-200 bg-white text-gray-900 shadow-sm dark:border-white/5 dark:bg-[#0f192a]/80 dark:text-white/80 dark:shadow-inner dark:shadow-black/30">
+	            <template #header>
+	              <div class="flex items-center justify-between">
+	                <div>
+	                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+	                    {{ $t("capabilities.mcp.stream.title") }}
+	                  </h2>
+	                  <p class="text-sm text-gray-600 dark:text-white/70">
+	                    {{ $t("capabilities.mcp.stream.description") }}
+	                  </p>
+	                </div>
                 <div class="flex items-center gap-2">
                   <UBadge
                     :label="mcpStreamConnected ? $t('capabilities.mcp.stream.connected') : $t('capabilities.mcp.stream.disconnected')"
@@ -1199,26 +1199,26 @@
               <p v-if="mcpStreamError" class="text-rose-300">
                 {{ mcpStreamError }}
               </p>
-              <div v-if="mcpEvents.length" class="space-y-3">
-                <UCard
-                  v-for="event in mcpEvents"
-                  :key="`${event.type}-${event.timestamp}`"
-                  class="bg-black/30 text-white/80"
-                >
+	              <div v-if="mcpEvents.length" class="space-y-3">
+	                <UCard
+	                  v-for="event in mcpEvents"
+	                  :key="`${event.type}-${event.timestamp}`"
+	                  class="border border-gray-200 bg-gray-50 text-gray-800 dark:border-white/5 dark:bg-black/30 dark:text-white/80"
+	                >
                   <template #header>
                     <div class="flex items-center justify-between">
                       <span class="font-semibold">{{ event.type }}</span>
-                      <span class="text-white/60">{{ event.timestamp }}</span>
-                    </div>
-                  </template>
+	                      <span class="text-gray-500 dark:text-white/60">{{ event.timestamp }}</span>
+	                    </div>
+	                  </template>
                   <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
 {{ JSON.stringify(event.payload, null, 2) }}
                   </pre>
                 </UCard>
               </div>
-              <p v-else class="text-white/60">
-                {{ $t("capabilities.mcp.stream.empty") }}
-              </p>
+	              <p v-else class="text-gray-500 dark:text-white/60">
+	                {{ $t("capabilities.mcp.stream.empty") }}
+	              </p>
             </div>
           </UCard>
         </div>

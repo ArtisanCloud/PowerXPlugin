@@ -1,9 +1,11 @@
 package iam
 
 import (
+	"strings"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -20,7 +22,7 @@ const (
 
 type Tenant struct {
 	ID        uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
-	UUID      string         `gorm:"type:uuid;not null;default:gen_random_uuid();uniqueIndex:idx_iam_tenants_uuid" json:"uuid"`
+	UUID      string         `gorm:"type:uuid;not null;uniqueIndex:idx_iam_tenants_uuid" json:"uuid"`
 	Key       string         `gorm:"size:64;not null;uniqueIndex:idx_iam_tenants_key" json:"key"`
 	Name      string         `gorm:"size:128;not null" json:"name"`
 	Status    string         `gorm:"size:32;not null;default:'active'" json:"status"`
@@ -31,6 +33,13 @@ type Tenant struct {
 }
 
 func (Tenant) TableName() string { return models.S(models.TableIAMTenants) }
+
+func (t *Tenant) BeforeCreate(tx *gorm.DB) error {
+	if strings.TrimSpace(t.UUID) == "" {
+		t.UUID = uuid.NewString()
+	}
+	return nil
+}
 
 type User struct {
 	ID           uint64            `gorm:"primaryKey;autoIncrement" json:"id"`

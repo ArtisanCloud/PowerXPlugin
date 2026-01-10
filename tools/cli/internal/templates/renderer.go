@@ -70,6 +70,7 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 			targetRel = strings.TrimSuffix(rel, ".tmpl")
 		}
 		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugin.base", data.PluginID)
+		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugins.base", data.PluginID)
 		targetRel = strings.ReplaceAll(targetRel, "__plugin__", data.PluginID)
 		targetRel = normalizeTargetPath(targetRel, data.BackendType, data.FrontendType)
 

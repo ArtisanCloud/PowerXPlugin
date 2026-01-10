@@ -10,9 +10,11 @@ mappings:
       - "app/**/*"
       - "public/**/*"
       - ".env.example"
+      - ".npmrc"
       - "i18n/**/*"
       - "nuxt.config.ts"
       - "package.json"
+      - "scripts/**/*"
     exclude:
       - "**/__tests__/**"
       - "tests/**"
@@ -112,3 +114,19 @@ mappings:
         suffix: .tmpl
       - path: tools/cli/internal/templates/data
         suffix: .tmpl
+  - name: contracts
+    source: contracts
+    targets:
+      - path: scaffold/templates/contracts
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/contracts
+        suffix: .tmpl
+    include:
+      - "capabilities/**/*"
+      - "schema/**/*"
+    exclude:
+      - "**/.DS_Store"
+    replacements:
+      - globs: ["**/*"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"

@@ -33,9 +33,21 @@
 | 项目 | 说明 |
 | ---- | ---- |
 | PowerX 版本 | 启用了 `backend/internal/transport/http/admin/plugin` 路由；`config/config.yaml` 里的 `server.apiPrefix` 默认为 `/api`，如改成 `/api/v1`，下面的示例 URL 也要同步。 |
-| CLI & Toolchain | `px-plugin`（Go 1.24+ 编译的 CLI）、Node.js 18+/npm 9+、Go 1.24+、GNU Make。 |
+| CLI & Toolchain | `px-plugin`（Go 1.24+ 编译的 CLI，且**内置模板需与 skeleton 同步**）、Node.js 18+/npm 9+、Go 1.24+、GNU Make。 |
 | 权限 | 调用 Admin API 的 Token 需要 `platform_ops` / `plugin_admin` 权限，能访问 `/admin/plugins/**`。 |
 | 服务器目录 | PowerX 需要能够读取你提供的 `src_dir`。通常把产物放在 `/srv/powerx/plugins/<id>/dist` 或 `/opt/powerx/uploads/<version>/`。 |
+
+> ⚠️ 模板同步检查（避免 `npm install` 报 `MODULE_NOT_FOUND`）
+>
+> `px-plugin init` 生成的 Nuxt 管理端模板包含 `web-admin/package.json` 的 `postinstall: node ./scripts/postinstall-lightningcss.mjs`。
+> 如果你使用的 `px-plugin` 二进制内置模板仍是旧版本（未包含 `web-admin/scripts/postinstall-lightningcss.mjs`），那么在新项目里执行 `npm install` 会直接报错：
+>
+> - `Error: Cannot find module './scripts/postinstall-lightningcss.mjs'`
+>
+> 这不是你的插件项目写错了，而是**CLI 内嵌模板与 skeleton 发生过一次不同步**导致的回归。解决方式是：确保你使用的 `px-plugin` 已包含该脚本的模板文件后再执行 `px-plugin init`。
+>
+> - 从 PowerXPlugin 源码编译：`go build -o ./bin/px-plugin ./tools/cli/cmd/px-plugin`（参考 `tools/cli/README.md`）
+> - 或升级你机器上的 `px-plugin` 到包含该模板修复的版本，然后重新生成项目
 
 环境变量示例：
 
@@ -46,6 +58,31 @@ export ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ---
+
+## （可选）从零创建并启动一个插件项目
+
+如果你还没有插件项目，或需要从头创建一个“可按本文构建 dist 并 local install”的项目，可以按以下最小流程生成并验证模板可用：
+
+```bash
+# 1) 确认 px-plugin 可用（示例：从 PowerXPlugin 源码构建）
+cd /path/to/PowerXPlugin/tools/cli
+go build -o ./bin/px-plugin ./cmd/px-plugin
+./bin/px-plugin --version
+
+# 2) 生成插件项目
+./bin/px-plugin init --force com.example.helloworld
+cd com.example.helloworld
+
+# 3) 启动后端（开发）
+make dev
+
+# 4) 启动 Web Admin（开发）
+cd web-admin
+npm install
+npm run dev
+```
+
+完成以上步骤后，再继续本文的 “方案 A / 方案 B” 构建 `dist/` 并执行安装即可。
 
 ## 方案 A：dist 直装（推荐）
 

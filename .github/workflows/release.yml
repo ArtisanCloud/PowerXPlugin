@@ -43,8 +43,11 @@ jobs:
           mkdir -p dist
           go build -o dist/px-plugin ./tools/cli/cmd/px-plugin
 
+      - name: Prepare release workspace
+        run: mkdir -p examples
+
       - name: Generate release starter snapshot
-        run: go run ../tools/cli/cmd/px-plugin init com.powerx.release --force
+        run: go run ../tools/cli/cmd/px-plugin init --force com.powerx.release
         working-directory: examples
 
       - name: Run px-plugin package (experimental)

@@ -139,13 +139,19 @@ agents:
       - {{ .PluginID }}.template.create
 
 capabilities:
-  provides:
-    - id: {{ .PluginID }}.template.create
-      version: 1.0.0
-      descriptor: contracts/capabilities/{{ .PluginID }}.template.create.yaml
-      schemas:
-        input: contracts/schema/input/{{ .PluginID }}.template.create.json
-        output: contracts/schema/output/{{ .PluginID }}.template.create.json
+  imports:
+    - contracts/capabilities/{{ .PluginID }}.template.list.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.read.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.create.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.update.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.delete.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.review.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.publish.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.compose.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.audit.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.batch_clone.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.validate.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.quality_distribute.yaml
 
 agent_tools:
   - id: {{ .PluginID }}.template.create

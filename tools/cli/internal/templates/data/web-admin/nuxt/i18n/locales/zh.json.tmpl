@@ -588,8 +588,8 @@
   "capabilities": {
     "catalogSync": {
       "title": "能力目录未刷新？",
-      "desc": "修改 skeleton/plugin.yaml 或 contracts/capabilities/*.yaml 后，请在仓库根目录执行 catalog 命令以生成最新的 capabilities/catalog.json。",
-      "command": "npm --prefix scripts/capabilities run catalog -- --manifest \"$(pwd)/skeleton/plugin.yaml\""
+      "desc": "能力目录默认从 plugin.yaml 的 capabilities.imports/provides 解析，无需额外生成 catalog.json。若你要生成 capabilities/catalog.json 用于发布/校验，请使用 PowerXPlugin 仓库内的 catalog 工具。",
+      "command": ""
     },
     "list": {
       "title": "能力目录",

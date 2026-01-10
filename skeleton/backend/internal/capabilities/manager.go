@@ -2,6 +2,7 @@ package capabilities
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -183,8 +185,13 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	data, err := os.ReadFile(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			log.WithError(err).Warn("capability catalog not found, returning empty snapshot")
-			return &CatalogSnapshot{GeneratedAt: time.Now().UTC().Format(time.RFC3339), Entries: []CatalogEntry{}}, nil
+			log.WithError(err).Warn("capability catalog not found, falling back to plugin.yaml capabilities")
+			snapshot, fallbackErr := loadCatalogFromManifest(log)
+			if fallbackErr != nil {
+				log.WithError(fallbackErr).Warn("failed to load capability catalog from plugin.yaml, returning empty snapshot")
+				return &CatalogSnapshot{GeneratedAt: time.Now().UTC().Format(time.RFC3339), Entries: []CatalogEntry{}}, nil
+			}
+			return snapshot, nil
 		}
 		log.WithError(err).Error("failed to read capability catalog")
 		return nil, fmt.Errorf("capabilities: failed to read catalog %s: %w", p, err)
@@ -208,6 +215,197 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 		"manifest_ver": snapshot.ManifestVersion,
 	}).Info("capability catalog loaded")
 	return &snapshot, nil
+}
+
+type manifestCapability struct {
+	ID         string            `yaml:"id"`
+	Version    string            `yaml:"version"`
+	Descriptor string            `yaml:"descriptor"`
+	Schemas    map[string]string `yaml:"schemas"`
+	Protocols  map[string]any    `yaml:"protocols"`
+	Tags       []string          `yaml:"tags"`
+	Execution  struct {
+		Mode           string `yaml:"mode"`
+		CallbackURL    string `yaml:"callback_url"`
+		SSEChannel     string `yaml:"sse_channel"`
+		StatusEndpoint string `yaml:"status_endpoint"`
+		TimeoutSeconds int    `yaml:"timeout_seconds"`
+	} `yaml:"execution"`
+}
+
+type manifestDoc struct {
+	ID           string `yaml:"id"`
+	Version      string `yaml:"version"`
+	Capabilities struct {
+		Imports  []string            `yaml:"imports"`
+		Provides []manifestCapability `yaml:"provides"`
+	} `yaml:"capabilities"`
+}
+
+func loadCatalogFromManifest(log *logrus.Entry) (*CatalogSnapshot, error) {
+	manifestPath := resolveManifestPath()
+	if manifestPath == "" {
+		return nil, errors.New("manifest path not found")
+	}
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("read manifest %s: %w", manifestPath, err)
+	}
+	var doc manifestDoc
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("parse manifest %s: %w", manifestPath, err)
+	}
+	manifestDir := filepath.Dir(manifestPath)
+	now := time.Now().UTC().Format(time.RFC3339)
+	snapshot := &CatalogSnapshot{
+		PluginID:        strings.TrimSpace(doc.ID),
+		ManifestVersion: strings.TrimSpace(doc.Version),
+		GeneratedAt:     now,
+		Imports:         doc.Capabilities.Imports,
+		Entries:         []CatalogEntry{},
+	}
+
+	// Prefer manifest.capabilities.provides for out-of-the-box dev experience.
+	for _, cap := range doc.Capabilities.Provides {
+		if strings.TrimSpace(cap.ID) == "" {
+			continue
+		}
+		version := strings.TrimSpace(cap.Version)
+		if version == "" {
+			version = snapshot.ManifestVersion
+		}
+		execMode := strings.ToLower(strings.TrimSpace(cap.Execution.Mode))
+		if execMode == "" {
+			execMode = "sync"
+		}
+
+		payload, _ := yaml.Marshal(cap)
+		checksum := fmt.Sprintf("%x", sha256.Sum256(payload))
+
+		entry := CatalogEntry{
+			ID:         cap.ID,
+			Version:    version,
+			Descriptor: strings.TrimSpace(cap.Descriptor),
+			Schemas:    cap.Schemas,
+			Protocols:  cap.Protocols,
+			Tags:       cap.Tags,
+			Execution: ExecutionConfig{
+				Mode:           execMode,
+				CallbackURL:    cap.Execution.CallbackURL,
+				SSEChannel:     cap.Execution.SSEChannel,
+				StatusEndpoint: cap.Execution.StatusEndpoint,
+				TimeoutSeconds: cap.Execution.TimeoutSeconds,
+			},
+			Checksum: checksum,
+		}
+		if entry.Schemas == nil {
+			entry.Schemas = map[string]string{}
+		}
+		if entry.Protocols == nil {
+			entry.Protocols = map[string]any{}
+		}
+		if entry.Tags == nil {
+			entry.Tags = []string{}
+		}
+		snapshot.Entries = append(snapshot.Entries, entry)
+	}
+
+	// If provides are empty but imports exist, load descriptors from the filesystem like scripts/capabilities/catalog-parser.ts.
+	if len(snapshot.Entries) == 0 && len(snapshot.Imports) > 0 {
+		for _, importPath := range snapshot.Imports {
+			rel := strings.TrimSpace(importPath)
+			if rel == "" {
+				continue
+			}
+			abs := rel
+			if !filepath.IsAbs(abs) {
+				abs = filepath.Join(manifestDir, filepath.FromSlash(rel))
+			}
+			rawDesc, err := os.ReadFile(abs)
+			if err != nil {
+				if log != nil {
+					log.WithError(err).Warnf("capability import missing: %s", rel)
+				}
+				continue
+			}
+			var desc manifestCapability
+			if err := yaml.Unmarshal(rawDesc, &desc); err != nil {
+				if log != nil {
+					log.WithError(err).Warnf("capability import invalid yaml: %s", rel)
+				}
+				continue
+			}
+			if strings.TrimSpace(desc.ID) == "" {
+				continue
+			}
+			version := strings.TrimSpace(desc.Version)
+			if version == "" {
+				version = snapshot.ManifestVersion
+			}
+			execMode := strings.ToLower(strings.TrimSpace(desc.Execution.Mode))
+			if execMode == "" {
+				execMode = "sync"
+			}
+			checksum := fmt.Sprintf("%x", sha256.Sum256(rawDesc))
+			entry := CatalogEntry{
+				ID:         desc.ID,
+				Version:    version,
+				Descriptor: rel,
+				Schemas:    desc.Schemas,
+				Protocols:  desc.Protocols,
+				Tags:       desc.Tags,
+				Execution: ExecutionConfig{
+					Mode:           execMode,
+					CallbackURL:    desc.Execution.CallbackURL,
+					SSEChannel:     desc.Execution.SSEChannel,
+					StatusEndpoint: desc.Execution.StatusEndpoint,
+					TimeoutSeconds: desc.Execution.TimeoutSeconds,
+				},
+				Checksum: checksum,
+			}
+			if entry.Schemas == nil {
+				entry.Schemas = map[string]string{}
+			}
+			if entry.Protocols == nil {
+				entry.Protocols = map[string]any{}
+			}
+			if entry.Tags == nil {
+				entry.Tags = []string{}
+			}
+			snapshot.Entries = append(snapshot.Entries, entry)
+		}
+	}
+
+	if log != nil {
+		log.WithFields(logrus.Fields{
+			"manifest_path": manifestPath,
+			"entry_count":   len(snapshot.Entries),
+			"plugin_id":     snapshot.PluginID,
+			"manifest_ver":  snapshot.ManifestVersion,
+		}).Info("capability catalog loaded from plugin.yaml fallback")
+	}
+	return snapshot, nil
+}
+
+func resolveManifestPath() string {
+	if p := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_MANIFEST")); p != "" {
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			return p
+		}
+	}
+	cwd, _ := os.Getwd()
+	candidates := []string{
+		filepath.Join(cwd, "plugin.yaml"),
+		filepath.Join(cwd, "skeleton", "plugin.yaml"),
+		filepath.Join(cwd, "..", "plugin.yaml"),
+		filepath.Join(cwd, "..", "..", "plugin.yaml"),
+	}
+	for _, cand := range candidates {
+		if info, err := os.Stat(cand); err == nil && !info.IsDir() {
+			return cand
+		}
+	}
+	return ""
 }
 
 // fileSystemAssetExporter walks known roots and emits protocol assets.

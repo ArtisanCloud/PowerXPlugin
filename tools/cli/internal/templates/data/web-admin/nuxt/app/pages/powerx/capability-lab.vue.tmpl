@@ -22,6 +22,28 @@
       description="请使用拥有 IsRoot 权限的账号访问，以避免普通用户误用 PowerX 能力调用入口。"
     />
 
+    <UAlert
+      v-else-if="showPowerXAccessHint"
+      icon="i-heroicons-exclamation-triangle"
+      color="blue"
+      variant="soft"
+      title="未配置 PowerX 底座访问（CoreX 能力列表可能为空）"
+    >
+      <template #description>
+        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <p>
+            当前会以 <code class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-800 dark:bg-gray-800 dark:text-gray-100">{{ `{{ powerxCoreBase }}` }}</code>
+            作为 PowerX Core 访问基址；若你本机未启动 Core，或未配置 Dev Gateway 凭证，则 `source=corex` 能力列表会返回空。
+          </p>
+          <ol class="list-decimal space-y-1 pl-5">
+            <li>启动 PowerX Core（或设置 `NUXT_PUBLIC_POWERX_CORE_BASE` / `POWERX_CORE_ENDPOINT` 指向可访问的 Core）。</li>
+            <li>在 Skeleton/插件项目执行 `px-plugin login` 获取 Dev Gateway 的 Token，并写入后端 `.env.local`（`PX_GATEWAY_BASE_URL` / `PX_TOOL_TOKEN` / `PX_TENANT_UUID`）。</li>
+            <li>重启插件后端后再刷新本页面。</li>
+          </ol>
+        </div>
+      </template>
+    </UAlert>
+
     <div v-else class="grid gap-6 lg:grid-cols-2">
       <div class="space-y-6">
         <UCard>
@@ -459,6 +481,15 @@ const defaultApiBase =
   (runtimeConfig.public?.powerx?.apiBase as string | undefined) ??
   (runtimeConfig.public?.apiBase as string | undefined) ??
   ''
+
+const powerxCoreBase = computed(() => String(runtimeConfig.public?.powerxCoreBase || ''))
+const showPowerXAccessHint = computed(() => {
+  if (!isAuthorized.value) return false
+  if (capabilityListLoading.value) return false
+  if (capabilityLoadError.value.includes('source=corex')) return true
+  // No explicit error yet, but we're still on the default core base in standalone mode.
+  return powerxCoreBase.value === 'http://localhost:8077' && !Boolean(runtimeConfig.public?.insidePowerX)
+})
 
 const DEFAULT_PAYLOAD_TEXT = '{\n  \n}'
 const payloadTouched = ref(false)

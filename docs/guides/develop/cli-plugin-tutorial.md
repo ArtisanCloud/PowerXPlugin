@@ -26,6 +26,8 @@ npm run sync:templates -- --verbose  # 同步模板并输出写入文件
 # go work sync                       # 让 go.work 中的本地模块依赖立即生效
 ```
 
+> 重要：不要只执行 `--check` 就直接去 `go install`。`px-plugin` 的 Go CLI 会把 `tools/cli/internal/templates/data/**` 作为内嵌模板打进二进制；如果你没有先执行同步（或同步后没有重新编译 CLI），就可能出现 “CLI 内嵌模板与 skeleton 不一致” 的问题（典型表现是新项目 `npm install` 直接 `MODULE_NOT_FOUND`）。
+
 > 说明：只有在需要直接引用仓库内的前端框架源码时，才执行 `npm install --workspaces`。若使用发布版本，可跳过此命令，并在生成后的项目中将 `@artisan-cloud/plugin-framework-*` 调整为目标版本号。
 
 执行 `go work sync` 能确保 `framework/` 模块使用最新的 `module github.com/ArtisanCloud/PowerXPlugin/framework` 声明，避免由于缓存旧模块路径而导致的 `module declares its path` 报错。如果你使用全新 GOPROXY 版本或外部仓库发布版，可视情况省略。
@@ -66,7 +68,18 @@ px-plugin --version  # 验证可执行文件已安装并输出版本信息
 > go install -ldflags "-X main.version=v0.3.0" ./cmd/px-plugin
 > ```
 >
-> 这样再次运行 `px-plugin --version` 时就会显示 `px-plugin version v0.3.0 (commit 1a2b3c4)`。
+> 这样再次运行 `px-plugin --version` 时就会显示 `px-plugin version v0.3.0 (commit 1a2b3c4)`。注意该版本号仅用于展示，不代表模板一定已同步；模板是否生效以 “生成项目后文件是否存在” 为准。
+
+### Step 2.1（推荐）CLI 模板 Smoke Check
+
+在继续生成正式项目之前，先做一次最小验证，确保内嵌模板包含 Nuxt Web Admin 的脚本文件：
+
+```bash
+TMP_DIR="$(mktemp -d)"
+px-plugin init --force --directory "$TMP_DIR" com.powerx.smoke.template
+test -f "$TMP_DIR/web-admin/scripts/postinstall-lightningcss.mjs"
+echo "OK: CLI templates look good"
+```
 
 ## Step 2.5  获取 Skeleton Gateway 凭证（可选）
 
@@ -101,22 +114,21 @@ EOF
 cd {your}/{customer}/{path}
 mkdir -p plugins
 cd plugins
-px-plugin init com.powerx.helloworld \
-  --template fullstack-go-nuxt \
+px-plugin init --force \
+  --backend go-gin \
+  --admin nuxt \
   --module github.com/demo/acme-plugin \
-  --org demo-team
+  com.powerx.helloworld
 ```
 
 命令执行期间会触发：
 
 1. 模板渲染：复制 `scaffold/templates` 中的 backend/frontend/manifest 模板。
-2. Bootstrap 校验：调用 `POST /internal/plugins/bootstrap/validate`（`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`）生成 Git 注册建议、`publish.yml`、`reports/sbom.json`。
-3. 合规扫描：产出 `publish.yml`、`reports/sbom.json` 并记录 `validationId`，CLI 会在输出中显示。
+2. 写入 `docs/contracts/`、`publish.yml`、`reports/sbom.json` 等基础产物。
 
 > 模板选择：
-> - `--template fullstack-go-nuxt`（默认）包含 Gin + Nuxt Web Admin。
-> - `--template backend-go-lite` 仅生成后端骨架，适合纯 API 插件。
-> - 可在 `packages/template-registry/index.yaml` 查看最小运行时和 Hook 列表。
+> - `--backend go-gin` + `--admin nuxt`（默认）包含 Gin + Nuxt Web Admin。
+> - `--install-deps` 可选：自动执行 `go mod tidy` 与 `npm install`（联网环境下更方便，离线/内网请手动安装）。
 
 CLI 会在 `plugins/com.powerx.helloworld` 下生成完整项目，并输出创建的文件列表。常见目录包括：
 
@@ -164,17 +176,27 @@ cd ..
 
 ### 4.4 数据库配置
 
-- 默认使用内存 SQLite，无需额外配置。
-- 若要使用文件 SQLite 或 Postgres：
-  1. `cp backend/etc/config.example.yaml backend/etc/config.yaml`
-  2. 修改 `database.driver`（`sqlite` 或 `postgres`）与 `dsn/schema`
-  3. 初始化表结构：
+- 默认开发建议使用 Postgres（更接近生产；SQLite 仅保留最小可跑通子集）。
+- 若要使用 Postgres（推荐）或 SQLite：
+  1. 复制配置文件（注意路径取决于你当前所在目录）：
+     - 在插件项目根目录执行：`cp backend/etc/config.example.yaml backend/etc/config.yaml`
+     - 若你已 `cd backend`：`cp etc/config.example.yaml etc/config.yaml`
+  2. 修改 `database.driver` 与 `dsn/schema`
+     - **Postgres（推荐）**：确保 DSN 对应的数据库存在（例如 `com_powerx_plugin_base`）；`schema` 会自动创建（常用 `public`）。
+     - **SQLite（仅最小能力集）**：可用于快速验证启动/IAM/MCP，但不保证 marketplace/ops 等全量表结构可用。
+     - 若你尚未配置 Dev Gateway（`px-plugin login` / `PX_*` Token），请保持 `gateway.base_url` / `gateway.tool_token` / `gateway.tenant_uuid` 为空（否则会触发配置校验并阻塞启动）。
+  3. 初始化本地开发所需数据（推荐，包含 migrate + seed 本地管理员账号）：
      ```bash
      cd backend
-     go run ./cmd/database/main.go migrate
+     go run ./cmd/database/main.go setup
      cd ..
      ```
-  4. 如需重置或灌入示例数据，可执行 `go run ./cmd/database/main.go setup` / `seed` / `refresh`。
+     默认本地管理员账号（可用环境变量覆盖）：
+     - Email：`admin@local.test`
+     - Password：`S3cret!!`
+     - 覆盖：`PLUGIN_IAM_ADMIN_EMAIL` / `PLUGIN_IAM_ADMIN_PASSWORD`
+  4. 仅初始化表结构（不灌入默认管理员/权限）时，再使用 `go run ./cmd/database/main.go migrate`。
+  5. 其它常用命令：`seed`（灌入示例数据）、`refresh`（重置并重建）。
 
 脚手架会在 `backend/` 下生成 `etc/` 与 `.gitignore`，默认忽略本地配置文件。
 ## Step 5. 启动生成项目的后端

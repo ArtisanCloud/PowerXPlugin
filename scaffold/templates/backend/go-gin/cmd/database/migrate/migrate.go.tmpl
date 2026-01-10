@@ -130,7 +130,7 @@ func migrateWithTolerance(ctx context.Context, db *gorm.DB, table interface{}) e
 					log.Printf("[migrate] duplicate constraint (post-handle) for %T, skipping: %v", table, err)
 					return nil
 				}
-				return err
+				return fmt.Errorf("auto migrate %T failed: %w", table, err)
 			}
 			if handleErr != nil {
 				return handleErr
@@ -233,7 +233,8 @@ func isSQLiteSafeTable(tbl interface{}) bool {
 	switch tbl.(type) {
 	case *models.PluginCredential,
 		*models.PluginTenantExt,
-		*templateModel.Template:
+		*templateModel.Template,
+		*runtimeOpsModel.MCPSession:
 		return true
 	default:
 		return false
@@ -251,15 +252,27 @@ func ensureIAMConstraints(ctx context.Context, db *gorm.DB) error {
 	rolePerms := models.S(models.TableIAMRolePermissions)
 	memberRoles := models.S(models.TableIAMMemberRoles)
 
+	isSqlite := isSQLite(db)
+	// SQLite 对表达式索引（lower(col)）在部分环境/驱动下会报 `near "(": syntax error`。
+	// 这里用 COLLATE NOCASE 兼容本地开发，达到大小写不敏感的唯一性约束效果。
+	deptCodeExpr := "lower(code)"
+	memberUsernameExpr := "lower(username)"
+	roleCodeExpr := "lower(code)"
+	if isSqlite {
+		deptCodeExpr = "code COLLATE NOCASE"
+		memberUsernameExpr = "username COLLATE NOCASE"
+		roleCodeExpr = "code COLLATE NOCASE"
+	}
+
 	statements := []string{
-		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_departments_tenant_code ON %s (tenant_uuid, lower(code))`, departments),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_departments_tenant_code ON %s (tenant_uuid, %s)`, departments, deptCodeExpr),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_departments_tenant_parent ON %s (tenant_uuid, parent_id)`, departments),
 		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_tenant_account ON %s (tenant_uuid, user_id)`, users),
-		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_tenant_username ON %s (tenant_uuid, lower(username))`, users),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_tenant_username ON %s (tenant_uuid, %s)`, users, memberUsernameExpr),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_users_tenant_status ON %s (tenant_uuid, status)`, users),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_audit_logs_tenant_created ON %s (tenant_uuid, created_at DESC)`, audits),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_audit_logs_actor_created ON %s (actor_member_id, created_at DESC)`, audits),
-		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_roles_tenant_code ON %s (tenant_uuid, lower(code))`, roles),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_roles_tenant_code ON %s (tenant_uuid, %s)`, roles, roleCodeExpr),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_roles_scope ON %s (tenant_uuid, scope_type)`, roles),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_role_permissions_version ON %s (role_id, policy_version)`, rolePerms),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_role_permissions_tenant_uuid ON %s (tenant_uuid)`, rolePerms),
@@ -283,7 +296,7 @@ func execIgnoreExists(ctx context.Context, db *gorm.DB, stmt string) error {
 			log.Printf("[migrate] index exists, skip: %s", stmt)
 			return nil
 		}
-		return err
+		return fmt.Errorf("exec stmt failed: %s: %w", stmt, err)
 	}
 	return nil
 }

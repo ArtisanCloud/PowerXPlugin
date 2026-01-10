@@ -29,6 +29,12 @@ const (
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
 
 func runInit(args []string) error {
+	// Go stdlib flag parsing stops at the first non-flag argument.
+	// Many users naturally put plugin id first (e.g. `px-plugin init com.xxx --force`),
+	// which would cause trailing flags to be ignored. Normalize that common shape so
+	// flags work regardless of position.
+	args = normalizeInitArgs(args)
+
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	var (
 		module              = fs.String("module", "", "override backend module import path (default derives from plugin id)")
@@ -184,6 +190,24 @@ func runInit(args []string) error {
 	fmt.Fprintln(os.Stdout, "  - Review plugin.yaml and README for TODO items.")
 
 	return nil
+}
+
+func normalizeInitArgs(args []string) []string {
+	if len(args) < 2 {
+		return args
+	}
+	if strings.HasPrefix(args[0], "-") {
+		return args
+	}
+	for _, token := range args[1:] {
+		if strings.HasPrefix(token, "-") {
+			normalized := make([]string, 0, len(args))
+			normalized = append(normalized, args[1:]...)
+			normalized = append(normalized, args[0])
+			return normalized
+		}
+	}
+	return args
 }
 
 func ensureTargetDir(path string, force bool) error {

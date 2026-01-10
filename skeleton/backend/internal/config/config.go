@@ -978,6 +978,35 @@ func normalizeConfig(cfg *Config) {
 		cfg.Server.BindAddr = resolveConfigValue(cfg.Server.BindAddr)
 		cfg.Server.LogLevel = strings.ToLower(resolveConfigValue(cfg.Server.LogLevel))
 	}
+	if cfg.Gateway != nil {
+		cfg.Gateway.BaseURL = resolveConfigValue(cfg.Gateway.BaseURL)
+		cfg.Gateway.ToolToken = resolveConfigValue(cfg.Gateway.ToolToken)
+		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
+		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
+
+		// Dev 模式下：Gateway 配置不完整时不阻塞启动，改为打印提示并自动关闭 Gateway。
+		// 生产/非 Dev 场景仍保持严格校验（见 Validate）。
+		if cfg.Server != nil && cfg.Server.DevMode {
+			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
+			toolToken := strings.TrimSpace(cfg.Gateway.ToolToken)
+			tenantUUID := strings.TrimSpace(cfg.Gateway.TenantUUID)
+
+			hasAny := baseURL != "" || toolToken != "" || tenantUUID != ""
+			incomplete := baseURL == "" || toolToken == "" || tenantUUID == ""
+
+			if hasAny && incomplete {
+				logrus.WithFields(logrus.Fields{
+					"gateway.base_url":    baseURL,
+					"gateway.tool_token":  toolToken != "",
+					"gateway.tenant_uuid": tenantUUID,
+				}).Warn("Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url/tool_token/tenant_uuid to enable)")
+
+				cfg.Gateway.BaseURL = ""
+				cfg.Gateway.ToolToken = ""
+				cfg.Gateway.TenantUUID = ""
+			}
+		}
+	}
 	if cfg.Logging != nil {
 		cfg.Logging.Level = strings.ToLower(resolveConfigValue(cfg.Logging.Level))
 		cfg.Logging.Format = strings.ToLower(resolveConfigValue(cfg.Logging.Format))

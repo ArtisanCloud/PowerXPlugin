@@ -37,8 +37,8 @@ description: 规范化梳理与排查 PowerXPlugin 仓库的 GitHub Actions CI/R
 4) 追加测试用例（遵循准入标准）
    - 新用例必须满足：可重复、无隐式外部依赖（或通过容器/服务 mock 明确声明）、失败信息清晰。
    - 落点选择：
-     - Go 单测：放进对应模块并在 `ci.yml` 的相应 job 覆盖（framework / skeleton/backend / tools/cli）。
-     - 前端 lint/build：放在 `skeleton/web-admin`（或对应 workspace）并由 `frontend` job 覆盖。
+     - Go 单测：放进对应模块并在 `ci.yml` 的相应 job 覆盖（framework / skeleton/backend/go-gin / tools/cli）。
+     - 前端 lint/build：放在 `skeleton/web-admin/nuxt`（或对应 workspace）并由 `frontend` job 覆盖。
      - “生成物完整性”（模板/脚手架）：增加到 `template-sync` 或 `cli` job 的 smoke（`px-plugin init` + 关键文件存在性）。
      - E2E/回归：放进 `tests/`（Playwright）并由 `regression` job 覆盖。
 

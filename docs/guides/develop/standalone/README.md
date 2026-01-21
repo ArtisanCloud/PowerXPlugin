@@ -1,7 +1,16 @@
 
-# 运行模式指南（Standalone / Delegated）
+# Standalone / Delegated 总览
 
-本指南统筹说明 PowerX 插件在 **独立运行（Standalone）** 与 **宿主委派（Delegated）** 场景下的配置、启动顺序与常见排障。前半部分聚焦本地独立运行，后半部分整合原《delegated-mode》文档，帮助你在宿主内核中调试 iframe/代理相关问题。
+本目录提供 Standalone / Delegated 的统一说明与各技术栈的启动入口。
+
+## 快速入口
+
+- Go Gin 后端：`docs/guides/develop/standalone/gin.md`
+- Python FastAPI 后端：`docs/guides/develop/standalone/fastapi.md`
+- Nuxt 前端：`docs/guides/develop/standalone/nuxt.md`
+- NextJS 前端：`docs/guides/develop/standalone/next.md`
+
+下文保留原 Standalone / Delegated 说明（包含宿主模式、代理与排障）。
 
 ## 1. Standalone 模式
 
@@ -14,25 +23,46 @@
 | Go | 1.24+ | `go version`（期望输出 go1.24.x） |
 | Node.js | 20.x | `node -v` |
 | npm | 9.x+ | `npm -v` |
-| Playwright 依赖 | 由 `npm install` 自动安装 | `npm --prefix skeleton/web-admin run test:e2e -- --help` |
+| Playwright 依赖 | 由 `npm install` 自动安装 | `npm --prefix skeleton/web-admin/nuxt run test:e2e -- --help` |
 
 ```bash
 # 验证 backend 可以迁移 + 运行
-cd skeleton/backend
+cd skeleton/backend/go-gin
 go run ./cmd/database/main.go setup
 go run ./cmd/plugin &
 PID=$!
 curl -sSf http://127.0.0.1:8078/healthz && kill $PID
 
-# 验证 web-admin 可以启动
-cd ../web-admin
+# 验证 web-admin 可以启动（Nuxt）
+cd ../../web-admin/nuxt
 npm install
 npm run dev -- --help >/dev/null
 ```
 
 若任一命令失败（例如 Go 版本过低或 npm 依赖缺失），请先升级本地环境再继续下面的步骤。
 
-### 1.1 目录结构与分层
+### 1.1 Skeleton 多栈目录结构
+
+```
+skeleton/
+  backend/
+    go-gin/
+    python-fastapi/
+  web-admin/
+    nuxt/
+    next/
+  Makefile
+  plugin.yaml
+  make-files/
+```
+
+说明：
+
+- 默认完整实现仍为 `backend/go-gin` + `web-admin/nuxt`。
+- `python-fastapi` 与 `next` 当前为可运行最小空壳，用于技术栈接入与组合验证。
+- 不同后端/前端可以自由组合，但功能对齐以 Go+Nuxt 为基准逐步迁移。
+
+### 1.2 目录结构与分层
 
 ```
 backend/
@@ -62,7 +92,7 @@ backend/
 
 Manifest 通过 `internal/manifestx/manifest.go` 暴露插件 ID、菜单、权限，供宿主读取。
 
-### 1.2 启动流程
+### 1.3 启动流程
 
 Skeleton 入口位于 `cmd/plugin/main.go`，关键步骤如下：
 
@@ -80,16 +110,16 @@ Skeleton 入口位于 `cmd/plugin/main.go`，关键步骤如下：
 5. 注册 Manifest：`manifest.Register(app, manifestx.Plugin())`。
 6. 启动 HTTP/gRPC、周期任务等，并监听退出信号安全关闭。
 
-### 1.3 本地运行
+### 1.4 本地运行
 
 ```bash
 # 1. （可选）复制示例配置
-cp skeleton/backend/etc/config.example.yaml skeleton/backend/etc/config.yaml
+cp skeleton/backend/go-gin/etc/config.example.yaml skeleton/backend/go-gin/etc/config.yaml
 #    指向默认的 skeleton/.cache/powerxplugin.db（需提前创建目录）
 #    若放在其他目录，请通过 CONFIG_PATH 指向该目录
 
 # 2. 初始化数据库（setup = migrate + seed）
-cd skeleton/backend
+cd skeleton/backend/go-gin
 export POWERX_PROXY=0
 export POWERX_RBAC_DELEGATE=false
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
@@ -110,10 +140,10 @@ go run ./cmd/plugin
 curl http://127.0.0.1:8078/healthz
 
 # 5. 启动前端管理端（使用本地管理员登录）
-cd ../web-admin && npm install && npm run dev
+cd ../../web-admin/nuxt && npm install && npm run dev
 
 # 6. （可选）运行本地 IAM E2E
-cd ../web-admin
+cd ../../web-admin/nuxt
 PLAYWRIGHT_LOCAL_IAM=1 \\
 PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \\
 PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \\
@@ -124,14 +154,37 @@ npm run test:e2e -- auth-local
 
 - 后端 HTTP: `8078`（可通过 `PORT` 环境变量覆盖）
 - 后端 gRPC: `8079`（通过 `POWERX_GRPC_PORT` 覆盖）
-- 管理端 Nuxt: 默认 `3031`（冲突时自动寻找可用端口）
+- 管理端 Nuxt: 默认 `3131`（冲突时自动寻找可用端口）
+- FastAPI 后端: 默认 `8277`（`bash skeleton/backend/python-fastapi/scripts/dev.sh`）
+- Next 管理端: 默认 `3231`（`npm --prefix skeleton/web-admin/next run dev`）
 
-#### 1.3.1 模拟 `_p/<plugin-id>/admin` 访问
+#### 1.3.1 FastAPI / NextJS 占位骨架
+
+如果需要验证 FastAPI 或 NextJS 的最小骨架，可按下列方式启动：
+
+```bash
+# FastAPI backend
+cd skeleton/backend/python-fastapi
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -U pip
+pip install -r requirements.txt
+bash scripts/dev.sh
+
+# NextJS admin
+cd ../../web-admin/next
+npm install
+npm run dev
+```
+
+> FastAPI 默认 `8277`，NextJS 默认 `3231`。二者目前为最小空壳，用于技术栈接入与组合验证。
+
+#### 1.4.1 模拟 `_p/<plugin-id>/admin` 访问
 
 要在本地复刻宿主 iframe（`/_p/<plugin-id>/admin/**`），目前推荐直接让 Nuxt 以 `_p` 为基准运行。Skeleton 的 Go 进程不会自动把 `/_p/**` 代理到前端，因此如果没有外部反代，就必须在 Nuxt 启动参数里切换到“宿主模式”。
 
 1. **前端开启宿主模式**：启动 dev server 前设置 `POWERX_PROXY=1`（或 `NUXT_PUBLIC_INSIDE_POWERX=1`）。Nuxt 会将 `app.baseURL` 与 `runtimeConfig.public.pluginAdminBase` 设为 `/_p/<plugin-id>/admin/`。为了避免本地 Dev Server 将 `_p/<plugin-id>/api` 当成静态路由，`runtimeConfig.public.apiBaseUrl` 会在开发模式下自动退回到 `/_p/<plugin-id>/api/v1`，从而始终命中 Vite 的代理。
-2. **补齐 Vite 代理（已在 `skeleton/web-admin/nuxt.config.ts` 内置）**：配置依赖以下环境变量，便于在需要时修改目标地址：
+2. **补齐 Vite 代理（已在 `skeleton/web-admin/nuxt/nuxt.config.ts` 内置）**：配置依赖以下环境变量，便于在需要时修改目标地址：
    - `NUXT_DEV_API_PROXY`：HTTP 代理目标（默认 `http://localhost:8078`）
    - `NUXT_DEV_WS_PROXY`：WebSocket 代理目标（默认 `ws://127.0.0.1:4000`）
 
@@ -150,13 +203,13 @@ npm run test:e2e -- auth-local
      devProxy[`/_p/${pluginId}/api`] = { target: devApiProxyTarget, changeOrigin: true }
    }
    ```
-   如此前端直接访问 `http://localhost:3031/_p/com.powerx.plugin.base/admin/templates/crud` 时，所有 API 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
+   如此前端直接访问 `http://localhost:3131/_p/com.powerx.plugin.base/admin/templates/crud` 时，所有 API 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
    同时在宿主模式下会自动关闭 Nuxt `appManifest`，避免 `manifest-route-rule` 在 `_p` 前缀下无法匹配路由而抛错。
 3. **后端保持默认**：`POWERX_PROXY=0 go run ./cmd/plugin`，只需暴露 `/api/v1/**`。由于前端代理会把 `/_p/...` 请求映射回本地接口，后端无需额外改动。
 
-配置完上述环境后，直接访问 `http://localhost:3031/_p/<plugin-id>/admin/...` 即可模拟宿主 iframe，Bridge/CTX/主题等行为与宿主一致。
+配置完上述环境后，直接访问 `http://localhost:3131/_p/<plugin-id>/admin/...` 即可模拟宿主 iframe，Bridge/CTX/主题等行为与宿主一致。
 
-#### 1.3.2 Standalone / Delegated 环境变量速查
+#### 1.4.2 Standalone / Delegated 环境变量速查
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -173,7 +226,7 @@ npm run test:e2e -- auth-local
 
 > ⚠️ 只有当 `POWERX_PROXY=0` **且** `POWERX_RBAC_DELEGATE` 未开启时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
 
-> `skeleton/backend/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
+> `skeleton/backend/go-gin/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend/go-gin` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
 >
 > Loader 在解析 SQLite DSN 时会自动创建目标目录，无需手动 `mkdir`。如果路径中包含 `../.cache`，会基于配置文件目录进行展开。
 >
@@ -183,7 +236,7 @@ npm run test:e2e -- auth-local
 
 > 默认导航栏左上角引用 `public/images/logo-s.png`。如果要替换 Logo，可在生成项目的 `public/images` 目录中用同名文件覆盖，或调整 `app/components/AppNavbar.vue` 中的 `<img>` 引用。
 
-### 1.4 扩展点示例：新增模板审批接口
+### 1.5 扩展点示例：新增模板审批接口
 
 1. **领域模型**：在 `internal/entity/models/template` 新增 `approval.go`，描述审批状态。
 2. **仓储接口**：在 `internal/entity/repository/template` 添加 `approval_repository.go`，定义 `FindPending`、`Approve` 等方法，并提供最小内存实现。
@@ -195,13 +248,13 @@ npm run test:e2e -- auth-local
 
 > **模板权限提示**：自 005-plugin-auth Phase 8 起，模板 CRUD 路由会声明 `base.templates.read` / `base.templates.manage` 两个 RBAC 资源。Standalone 模式可在本地 IAM 中分配这两项权限；Delegated 模式下宿主会读取该映射并控制实际写权限，插件前端会在无权限时自动切换为只读并提示“宿主控制模板权限”。
 
-### 1.5 常见问题
+### 1.6 常见问题
 
 - **403 或 401**：确认 `POWERX_SECURITY_*` 安全上下文配置正确；独立模式下可在配置中关闭严格模式。
 - **CORS 报错**：`internal/middleware/common.go` 中的 CORS 中间件需要加入前端 origin。
 - **模板漂移**：忘记执行 `npm run sync:templates` 会导致脚手架与 Skeleton 不一致；CI 会在 PR 中执行 `npm run sync:templates -- --check` 给出提示。
 
-### 1.6 相关文档
+### 1.7 相关文档
 
 - [架构设计总览](../plan/001-init-project.md)
 - [从 Base 插件迁移指南](migration/base-to-skeleton.md)

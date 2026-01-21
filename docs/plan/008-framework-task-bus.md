@@ -27,16 +27,16 @@
 
 - **事件模型（Framework 对外包）**：`framework/event/*`
 - **事件出口（Framework 对外包）**：`framework/eventbridge/*`
-- **业务侧适配器（示例：Channel）**：`skeleton/backend/internal/observability/channel/event_emitter.go`
+- **业务侧适配器（示例：Channel）**：`skeleton/backend/go-gin/internal/observability/channel/event_emitter.go`
 - **Consumer/Dispatcher（Framework）**：`framework/eventbridge/consumer.go`
-- **权限与运行时边界**：`skeleton/backend/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 publish/subscribe 并执行 deny + log）
+- **权限与运行时边界**：`skeleton/backend/go-gin/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 publish/subscribe 并执行 deny + log）
 
 说明：
 - 本仓库以“本地 emitter + 可注入 TaskBus provider”的方式完成切换与灰度；真实 TaskBus SDK 由宿主/框架提供后再实现 provider。
 
 ## 4. 框架接入步骤
 
-1. **依赖注入**：在 `skeleton/backend/cmd/plugin/main.go` 初始化 `event_bridge.Factory` 并注入到 `app.Deps.EventEmitter`。
+1. **依赖注入**：在 `skeleton/backend/go-gin/cmd/plugin/main.go` 初始化 `event_bridge.Factory` 并注入到 `app.Deps.EventEmitter`。
 2. **声明 Topic 权限（开发态）**：在 `skeleton/plugin.yaml` 增加：
    ```yaml
    events:
@@ -47,7 +47,7 @@
      subscribe: []
    ```
    - Manifest 路径可通过环境变量覆盖：`POWERX_PLUGIN_MANIFEST_PATH`
-3. **配置开关**：在 `skeleton/backend/internal/config/config.go` 使用 `event_bridge` 配置：
+3. **配置开关**：在 `skeleton/backend/go-gin/internal/config/config.go` 使用 `event_bridge` 配置：
    - `event_bridge.enabled`：开启/关闭 TaskBus 模式
    - `event_bridge.mode`：`local|taskbus|dual`
    - `event_bridge.fallback_to_local`：TaskBus 不可用时是否自动降级
@@ -70,7 +70,7 @@
 
 ## 7. 运维与监控
 
-- 指标：本仓库提供最小 metrics hooks（Prometheus exposition），见 `skeleton/backend/internal/observability/event_bridge/metrics.go`。
+- 指标：本仓库提供最小 metrics hooks（Prometheus exposition），见 `skeleton/backend/go-gin/internal/observability/event_bridge/metrics.go`。
 - 指标抓取（本仓库 Skeleton Admin）：`GET /api/v1/admin/runtime/metrics`
 - 建议关注：
   - `plugin_event_bridge_emit_total` / `plugin_event_bridge_consume_total`（按 topic/tenant_uuid/result）

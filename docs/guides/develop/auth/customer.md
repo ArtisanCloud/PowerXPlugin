@@ -13,7 +13,7 @@
 
 ### 配置入口（Skeleton / Delegated 共用）
 
-Skeleton 后端配置文件示例位于 `skeleton/backend/etc/config.example.yaml`，其中新增 `customer_auth` 段落用于切换模式：
+Skeleton 后端配置文件示例位于 `skeleton/backend/go-gin/etc/config.example.yaml`，其中新增 `customer_auth` 段落用于切换模式：
 
 - `customer_auth.mode: local`：启用本地 Customer（Skeleton）注册/登录与 JWT 签发；
 - `customer_auth.mode: delegate`：启用宿主委托校验（Delegated），需要配置 `customer_auth.delegate_endpoint`。
@@ -22,7 +22,7 @@ Skeleton 后端配置文件示例位于 `skeleton/backend/etc/config.example.yam
 
 1. **租户隔离**：受保护的 `/mini-app/*` 继续要求存在 tenant 上下文；该上下文可来自 `X-Tenant-UUID`/query，也可由 customer token 的 `tenant_uuid` 注入。若请求已显式携带 tenant 且与 token tenant 不一致，返回 `TENANT_MISMATCH`。
 2. **统一上下文**：定义 `CustomerContext`（`customer_uuid/customer_id/roles/attributes`），通过 `authx.SetTenantContext` 或新的 `SetCustomerContext` 挂入 `gin.Context`，Service 层可通过 `customer.ContextFrom(ctx)` 获取。
-3. **统一返回**：所有 mini-app handler 使用 `contracts.Response*` 封装（参考 `skeleton/backend/internal/transport/http/mini-app/template_handler.go`），以满足 `.specify/memory/rulesets/crud/api_rest.yaml` envelope 约定。
+3. **统一返回**：所有 mini-app handler 使用 `contracts.Response*` 封装（参考 `skeleton/backend/go-gin/internal/transport/http/mini-app/template_handler.go`），以满足 `.specify/memory/rulesets/crud/api_rest.yaml` envelope 约定。
 
 ## tenant_uuid 的来源与规则（对齐现有实现）
 
@@ -96,7 +96,7 @@ group := rg.Group("/mini-app",
 
 ### Skeleton 模式数据流
 
-1. **注册/登录 API**：在 `skeleton/backend/internal/transport/http/mini-app` 下提供 `/mini-app/auth/register`、`/mini-app/auth/login`，操作 `customer_accounts`（`CustomerAccount`）表。
+1. **注册/登录 API**：在 `skeleton/backend/go-gin/internal/transport/http/mini-app` 下提供 `/mini-app/auth/register`、`/mini-app/auth/login`，操作 `customer_accounts`（`CustomerAccount`）表。
 2. **密码存储**：务必使用 `bcrypt`/`argon2`；不存明文密码。
 3. **Token 颁发**：在登录成功后使用 `middleware.JWTAuth` 的 helper：
 
@@ -143,7 +143,7 @@ Issuer 可以使用 `POWERX_SECURITY_JWT_ISSUER` 或单独的 `POWERX_CUSTOMER_J
 
 ### Skeleton（local）模式：注册 → 登录 → 调用受保护接口
 
-1. 配置 `customer_auth`（示例见 `skeleton/backend/etc/config.example.yaml`）：
+1. 配置 `customer_auth`（示例见 `skeleton/backend/go-gin/etc/config.example.yaml`）：
    - `customer_auth.mode: local`
    - 开发态可复用 `context.hmac_secret`；生产态必须配置 `customer_auth.jwt_secret`
 2. 调用注册接口（必须明确目标租户：优先使用 `X-Tenant-UUID`；若 header 不可用，可在 body 里传 `tenant_uuid`；两者同时存在时必须一致）：

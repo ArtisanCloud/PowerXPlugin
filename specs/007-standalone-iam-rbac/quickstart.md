@@ -2,7 +2,7 @@
 
 ## 1. 初始化本地 IAM
 ```bash
-cd skeleton/backend
+cd skeleton/backend/go-gin
 export POWERX_PROXY=0
 export POWERX_RBAC_DELEGATE=false
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
@@ -21,7 +21,7 @@ go run ./cmd/database/main.go setup
 ## 2. 启动后端与前端
 ```bash
 # Backend
-cd skeleton/backend
+cd skeleton/backend/go-gin
 go run ./cmd/plugin
 
 # Frontend admin
@@ -45,19 +45,19 @@ npm run dev
 ## 3. Playwright 验证
 ```bash
 # Delegated 登录（需宿主）
-npm --prefix skeleton/web-admin run test:e2e -- auth-delegated
+npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-delegated
 
 # Local IAM 流程
 PLAYWRIGHT_LOCAL_IAM=1 \
 PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \
 PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \
-npm --prefix skeleton/web-admin run test:e2e -- auth-local
+npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local
 
 # IAM 管理新增用例（完成后）
-PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- iam-local
+PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin/nuxt run test:e2e -- iam-local
 
 # Delegated 提示（验证本地入口隐藏）
-PLAYWRIGHT_LOCAL_IAM=0 npm --prefix skeleton/web-admin run test:e2e -- auth-local
+PLAYWRIGHT_LOCAL_IAM=0 npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local
 ```
 
 ## 4. CLI 工具

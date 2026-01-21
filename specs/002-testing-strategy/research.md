@@ -15,7 +15,7 @@
   - Using Node-based runners — rejected; shell provides lowest dependency surface for Go/Node workflows.
 
 ## Decision 3: Artifact Locations & Naming
-- **Decision**: Standardise generated artifacts to `tmp/` (coverage, reports) and reuse `skeleton/web-admin/test-results/` for Playwright outputs.
+- **Decision**: Standardise generated artifacts to `tmp/` (coverage, reports) and reuse `skeleton/web-admin/nuxt/test-results/` for Playwright outputs.
 - **Rationale**: Matches current docs, keeps git tree clean, and simplifies clean-up operations inside scripts.
 - **Alternatives Considered**:
   - Storing outputs alongside source directories — rejected to avoid accidental commits and clutter.

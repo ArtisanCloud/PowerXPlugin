@@ -6,7 +6,7 @@
 - 严格遵守《docs/init-project.md》中 Phase 2~4 的约束（Go + Nuxt、无持久层、Skeleton/框架分离、模板可渲染）。
 
 ## 2. 可直接迁移的能力（✅ 高度可行）
-- **后端分层模式**：`routes/handler/service/repo/model` 的切分与当前 Skeleton 规划一致，目录可一一映射到 `skeleton/backend/internal/**`。
+- **后端分层模式**：`routes/handler/service/repo/model` 的切分与当前 Skeleton 规划一致，目录可一一映射到 `skeleton/backend/go-gin/internal/**`。
 - **目录约定**：沿用 `internal/transport/http`（Handler）、`internal/services`（业务编排）、`internal/entity/repository`（仓储）、`internal/entity/models`（数据模型）等路径，保持与 Base 插件一致的分层命名，便于 CLI 与文档互相校验。
 - **前端页面与组件**：`intro.vue`、`templates/*.vue`、`TemplateFormModal.vue`、`ConfirmDialog.vue` 均可直接复用，路由结构与 Layer 预期保持一致。
 - **API 客户端**：`useTemplateApi` 及 `_client.ts` 的职责与 `@artisan-cloud/plugin-framework-client` 相符，可迁移并扩展现有客户端能力。
@@ -28,14 +28,14 @@
 - 为 `@artisan-cloud/plugin-framework-client` 补充 `put/delete` 等基础方法并支持透传 Tenant header，确保包内仅包含通用 HTTP 基础设施；同步在 `framework-admin` Layer 内引入 Starter 配置开关。
 
 ### 阶段 2：Skeleton 后端模板
-- 在 `skeleton/backend/internal/templates` 实现内存版本的 `model/service/repository/handler`，Repository 必须内嵌 `repository.BaseRepository[Template]`、提供 `NewTemplateRepository` 构造函数，并在 `BeginTenantTx` 中显式执行 `SET LOCAL app.tenant_uuid`（内存实现可通过上下文记录/校验该值，保持接口与调用顺序与数据库版本完全一致）。
-- 更新 `skeleton/backend/internal/routes/routes.go`，新增 `/templates` CRUD，保留 `ping`。
+- 在 `skeleton/backend/go-gin/internal/templates` 实现内存版本的 `model/service/repository/handler`，Repository 必须内嵌 `repository.BaseRepository[Template]`、提供 `NewTemplateRepository` 构造函数，并在 `BeginTenantTx` 中显式执行 `SET LOCAL app.tenant_uuid`（内存实现可通过上下文记录/校验该值，保持接口与调用顺序与数据库版本完全一致）。
+- 更新 `skeleton/backend/go-gin/internal/routes/routes.go`，新增 `/templates` CRUD，保留 `ping`。
 - Service 层保持原先职责：HTTP Handler 只负责校验/鉴权/序列化，所有业务编排封装在 `internal/services/templates`，并为未来的 HTTP/gRPC 复用保留同一 Service 实例。
 - 在 `manifestx/manifest.go` 声明菜单与 `base:template:*` 权限，添加示例租户。
-- 更新 `skeleton/backend/README.md`，解释内存存储、环境变量及未来持久层扩展路径。
+- 更新 `skeleton/backend/go-gin/README.md`，解释内存存储、环境变量及未来持久层扩展路径。
 
 ### 阶段 3：前端迁移与框架提炼
-- 将 `intro.vue`、`templates/index.vue`、`templates/crud.vue` 及组件迁移到 `skeleton/web-admin/app`，去除仅针对宿主的桥接逻辑。
+- 将 `intro.vue`、`templates/index.vue`、`templates/crud.vue` 及组件迁移到 `skeleton/web-admin/nuxt/app`，去除仅针对宿主的桥接逻辑。
 - Skeleton 在 `app/composables/api/useTemplateApi.ts` 中提供示例封装，内部调用 `usePluginApi`，作为业务层如何复用 framework-client 的参考；该文件仅做样例，CLI 生成项目可按需改写。
 - 保持 `@artisan-cloud/plugin-framework-client` 仅输出通用 HTTP 封装（`get/post/put/delete`），不承载任何业务 API；框架更新后 Skeleton 与插件项目基于此自行封装。
 - 在 `framework-admin` Layer 提供 `starterPages` 选项，自动注册 Starter 菜单、页面与必要的全局组件；Skeleton 默认启用。
@@ -53,8 +53,8 @@
 
 ## 6. 验证清单
 - `go test ./skeleton/...`、`go test ./framework/backend/go/...`
-- `npm install && npm run lint`（`skeleton/web-admin` 与 `framework/frontend/nuxt/framework-admin`）
-- Standalone 自测：`go run ./skeleton/backend/cmd/plugin` + `npm run dev`，浏览器验证 `/intro`、`/templates/crud` CRUD 流程。
+- `npm install && npm run lint`（`skeleton/web-admin/nuxt` 与 `framework/frontend/nuxt/framework-admin`）
+- Standalone 自测：`go run ./skeleton/backend/go-gin/cmd/plugin` + `npm run dev`，浏览器验证 `/intro`、`/templates/crud` CRUD 流程。
 - CLI 输出验证（准备就绪后）：`px-plugin init com.powerx.demo --ui=starter`，确保产物可直接运行。
 
 ## 7. 结论与优先级建议
@@ -112,9 +112,9 @@
 ## 11. 验证清单（更新）
 
 1. `go test ./framework/backend/go/... -coverprofile=coverage.out`（≥90%，SC-001）
-2. `go test ./skeleton/backend/... -v` + `curl` 多租户 CRUD（SC-002）
+2. `go test ./skeleton/backend/go-gin/... -v` + `curl` 多租户 CRUD（SC-002）
 3. `curl -w 'time_total:%{time_total}'` 记录延迟；数据写入 `research.md`
-4. `npm run lint --silent` / `npm run build`（skeleton/web-admin、workspace layer）
+4. `npm run lint --silent` / `npm run build`（skeleton/web-admin/nuxt、workspace layer）
 5. Skeleton 前端手动验证 `/`、`/_p/{pluginId}/admin/templates/crud`；`POWERX_PROXY=1` 场景验证 baseURL/代理
 6. `./bin/px-plugin init <plugin-id>` 后执行 `go test ./...`、`npm run lint --silent`，手动验证页面
 7. 文档（Quickstart、Standalone、Plan、Spec、Tasks）同步更新

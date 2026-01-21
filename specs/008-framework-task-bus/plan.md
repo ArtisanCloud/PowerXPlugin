@@ -83,7 +83,7 @@ specs/008-framework-task-bus/
 ### Source Code (repository root)
 
 ```text
-skeleton/backend/
+skeleton/backend/go-gin/
 ├── internal/observability/channel/
 ├── internal/jobs/channel/
 └── internal/services/admin/

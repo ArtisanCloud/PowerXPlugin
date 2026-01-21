@@ -41,7 +41,7 @@ jobs:
       - name: Go test (framework)
         run: cd framework && go test ./...
       - name: Go test (skeleton backend)
-        run: cd skeleton/backend && go test ./... -count=1
+        run: cd skeleton/backend/go-gin && go test ./... -count=1
 
   frontend:
     runs-on: ubuntu-latest
@@ -56,13 +56,13 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          (cd skeleton/web-admin && npm install)
+          (cd skeleton/web-admin/nuxt && npm install)
           # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
-          (cd skeleton/web-admin && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
+          (cd skeleton/web-admin/nuxt && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
       - name: Lint
-        run: cd skeleton/web-admin && npm run lint
+        run: cd skeleton/web-admin/nuxt && npm run lint
       - name: Build
-        run: cd skeleton/web-admin && npm run build
+        run: cd skeleton/web-admin/nuxt && npm run build
 
   contracts:
     runs-on: ubuntu-latest
@@ -179,9 +179,9 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          (cd skeleton/web-admin && npm install)
+          (cd skeleton/web-admin/nuxt && npm install)
           # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
-          (cd skeleton/web-admin && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
+          (cd skeleton/web-admin/nuxt && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
       - name: Run regression workflow
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
@@ -199,4 +199,4 @@ jobs:
             tmp/regression-backend.log
             tmp/regression-frontend.log
             tmp/coverage.html
-            skeleton/web-admin/test-results/
+            skeleton/web-admin/nuxt/test-results/

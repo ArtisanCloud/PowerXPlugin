@@ -20,10 +20,10 @@
   - `npm run sync:templates -- --check` 必须在 CI 里跑（避免 skeleton/scaffold/CLI 内嵌模板不同步）。
 - Go 单测：
   - `framework`: `go test ./...`
-  - `skeleton/backend`: `go test ./... -count=1`
+  - `skeleton/backend/go-gin`: `go test ./... -count=1`
   - `tools/cli`: 至少覆盖 `internal/devwatch/devapi/watch` + `go test ./...`（视耗时）。
 - 前端：
-  - `skeleton/web-admin` 至少 `npm run lint` + `npm run build`。
+  - `skeleton/web-admin/nuxt` 至少 `npm run lint` + `npm run build`。
 - CLI 生成物 smoke：
   - `px-plugin init` 在临时目录生成工程并检查关键文件存在（`plugin.yaml`、web-admin scripts、contracts 等）。
 

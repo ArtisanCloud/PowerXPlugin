@@ -6,9 +6,9 @@
 
 ## Phase 1 — Setup
 
-- [x] T001 Verify `customer_auth` config section exists in `skeleton/backend/etc/config.example.yaml` and add `mode`, `delegate_endpoint`, `jwt_*`, `cache_ttl_seconds` defaults
-- [x] T002 Ensure `skeleton/backend/internal/domain/customer/models.go` includes `CustomerContext` and `CustomerAuthConfig` structs per data-model.md
-- [x] T003 Update `skeleton/backend/cmd/database/migrate/migrate.go` to include `customer_accounts` table for Skeleton mode usage
+- [x] T001 Verify `customer_auth` config section exists in `skeleton/backend/go-gin/etc/config.example.yaml` and add `mode`, `delegate_endpoint`, `jwt_*`, `cache_ttl_seconds` defaults
+- [x] T002 Ensure `skeleton/backend/go-gin/internal/domain/customer/models.go` includes `CustomerContext` and `CustomerAuthConfig` structs per data-model.md
+- [x] T003 Update `skeleton/backend/go-gin/cmd/database/migrate/migrate.go` to include `customer_accounts` table for Skeleton mode usage
 - [x] T004 Document mode selection in `docs/guides/develop/auth/customer.md` referencing the new `customer_auth` config keys
 
 ## Phase 2 — Foundational Infrastructure

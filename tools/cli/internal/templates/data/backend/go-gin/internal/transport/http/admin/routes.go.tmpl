@@ -1,17 +1,17 @@
 package admin
 
 import (
-	iamservice "{{ .BackendModulePath }}/internal/services/iam"
-	"{{ .BackendModulePath }}/internal/shared/app"
-	admincapability "{{ .BackendModulePath }}/internal/transport/http/admin/capability"
-	adminconsole "{{ .BackendModulePath }}/internal/transport/http/admin/console"
-	adminiam "{{ .BackendModulePath }}/internal/transport/http/admin/iam"
-	adminintegration "{{ .BackendModulePath }}/internal/transport/http/admin/integration"
-	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
-	adminoperations "{{ .BackendModulePath }}/internal/transport/http/admin/operations"
-	adminruntime "{{ .BackendModulePath }}/internal/transport/http/admin/runtime_ops"
-	adminsecurity "{{ .BackendModulePath }}/internal/transport/http/admin/security"
-	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincapability "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/capability"
+	adminconsole "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/console"
+	adminiam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/iam"
+	adminintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/integration"
+	adminmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/marketplace"
+	adminoperations "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/operations"
+	adminruntime "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/runtime_ops"
+	adminsecurity "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/security"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 

@@ -8,13 +8,13 @@ import (
 	"log"
 	"os"
 
-	"{{ .BackendModulePath }}/cmd/database/migrate"
-	"{{ .BackendModulePath }}/cmd/database/seed"
-	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
-	"{{ .BackendModulePath }}/internal/config"
-	"{{ .BackendModulePath }}/internal/db"
-	"{{ .BackendModulePath }}/internal/entity/models"
-	iamservice "{{ .BackendModulePath }}/internal/services/iam"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/database/migrate"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/database/seed"
+	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 )
 
 func main() {

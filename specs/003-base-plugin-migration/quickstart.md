@@ -20,7 +20,7 @@ go tool cover -func=coverage.out | grep total
 ## 步骤 2：启动 Skeleton 后端并执行 CRUD (US2)
 
 ```bash
-go run ./skeleton/backend/cmd/plugin &
+go run ./skeleton/backend/go-gin/cmd/plugin &
 ```
 
 在另一终端执行：
@@ -48,7 +48,7 @@ curl -w 'TOTAL_TIME=%{time_total}\n' -o /dev/null -s \
 ## 步骤 3：前端 Skeleton 联调 (US3/US4)
 
 ```bash
-cd skeleton/web-admin
+cd skeleton/web-admin/nuxt
 npm install
 npm run dev
 ```

@@ -82,7 +82,7 @@ npm dist-tag ls @artisan-cloud/plugin-framework-client
 1. `framework/frontend/nuxt/framework-admin/package.json` → `version`
 2. `framework/frontend/nuxt/framework-client/package.json` → `version`
 3. `tools/cli/cmd/init.go` → `defaultAdminVersion` / `defaultClientVersion`
-4. `skeleton/web-admin/package.json` 与 `examples/**/web-admin/package.json`
+4. `skeleton/web-admin/nuxt/package.json` 与 `examples/**/web-admin/package.json`
 5. 文档示例（如 `docs/guides/develop/cli-plugin-tutorial.md`、`README.md`）
 6. 外部仓库或脚本中若有固定版本号，也需更新
 

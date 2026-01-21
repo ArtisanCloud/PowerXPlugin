@@ -5,8 +5,8 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [x] T001 准备 `skeleton/backend` 与 `skeleton/web-admin` 的本地运行环境，验证 `go run ./cmd/database/main.go setup` 与 `npm run dev` 可启动。
-- [x] T002 更新 `skeleton/backend/etc/config.example.yaml`、`docs/guides/develop/standalone-mode.md` 记录 Standalone/Delegated 环境变量、菜单显隐说明。
+- [x] T001 准备 `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt` 的本地运行环境，验证 `go run ./cmd/database/main.go setup` 与 `npm run dev` 可启动。
+- [x] T002 更新 `skeleton/backend/go-gin/etc/config.example.yaml`、`docs/guides/develop/standalone-mode.md` 记录 Standalone/Delegated 环境变量、菜单显隐说明。
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
@@ -26,7 +26,7 @@
   - [x] T006a 提炼 `SeedOptions` 加载/校验模块，输出警告日志并在 Delegated 模式跳过种子。
   - [x] T006b 为 LocalDirectory 注入 `plugin_id`、`policy_version` 配置，扩展 `AuthTokens`/`UserContext` 与 JWT Claims。
   - [x] T006c 编写单测覆盖空 env、弱密码、Delegated 下跳过等边界场景。
-- [x] T007 [US1] 在 `skeleton/backend/internal/transport/http/public/auth_handler.go` 与 `/auth/login|refresh|logout|me/context` 路由中注入 Standalone 模式分支，并记录 `plugin_id`、`policy_version`。
+- [x] T007 [US1] 在 `skeleton/backend/go-gin/internal/transport/http/public/auth_handler.go` 与 `/auth/login|refresh|logout|me/context` 路由中注入 Standalone 模式分支，并记录 `plugin_id`、`policy_version`。
   - [x] T007a 统一 `/auth/login|refresh|logout|me/context` Handler 的模式分支与错误提示，补充 `plugin_id/policy_version` 响应字段。
   - [x] T007b 更新路由/中间件注册，确保 Standalone 模式默认启用本地目录，Delegated 模式保持回退，同时扩展 auth metrics 标签。
 - [x] T008 [US1] 修改 `web-admin/app/plugins/auth.client.ts`、`app/middleware/auth.global.ts`，确保 Standalone 模式展示登录页与“组织与权限”菜单，Delegated 模式隐藏。
@@ -94,12 +94,12 @@
 - [x] T024 [US4] 实现 `internal/services/iam/sts_service.go`，提供 `MintSTS(ctx)` 与审计记录，支持 `plugin_id`、`policy_version`。
 - [x] T025 [US4] 在 `internal/transport/http/admin/iam/audit_handler.go` 与 `audit/logs` API 中注入过滤规则（系统管理员全局、租户管理员仅自身）。
 - [x] T026 [US4] 更新 `docs/contracts/rbac.schema.json`、`internal/manifestx/manifest.go`，声明所有新资源/动作映射。
-- [x] T027 [P] [US4] 在 `skeleton/web-admin/app/composables/api/_client.ts`、`app/components/AppNavbar.vue` 增加 Delegated/Standalone 模式提示与 STS 失效提示，配合 Playwright 覆盖。
+- [x] T027 [P] [US4] 在 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`、`app/components/AppNavbar.vue` 增加 Delegated/Standalone 模式提示与 STS 失效提示，配合 Playwright 覆盖。
 
 ## Phase 7: Polish & Cross-Cutting
 
 - [x] T028 整理 CLI `px-plugin iam export/seed` 命令、文档示例与错误处理，确保 10 秒内完成导出。
-- [x] T029 执行回归脚本：`go test ./...`、`npm run lint`、`npm --prefix skeleton/web-admin run test:unit`、Playwright `auth-local` & `iam-local`、`px-plugin iam export` 冒烟。
+- [x] T029 执行回归脚本：`go test ./...`、`npm run lint`、`npm --prefix skeleton/web-admin/nuxt run test:unit`、Playwright `auth-local` & `iam-local`、`px-plugin iam export` 冒烟。
 - [x] T030 更新 `CHANGELOG.md`、Manifest、RBAC schema、Quickstart、Runbook，确保交付 artifacts 一致。
 
 ## Dependencies & Parallelization

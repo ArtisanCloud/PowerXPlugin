@@ -103,12 +103,12 @@ EOF
 
 1. **宿主模式**无需执行 `login`，运维会在部署清单中注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`。
 2. `px-plugin login` 会根据 manifest 中的插件 ID、所需能力向 Dev Gateway 发起 STS 交换，请确保你拥有对应环境的 Token/Key（若需要，请联系平台团队）。
-3. `.env.local` 会被 `skeleton/web-admin` 与 `skeleton/backend` 自动载入，你也可以使用 `scripts/capabilities/run-from-package.mjs --mode skeleton`，它会优先读取 `.env.local` 的 `PX_*` 变量。
+3. `.env.local` 会被 `skeleton/web-admin/nuxt` 与 `skeleton/backend/go-gin` 自动载入；若切换到其他栈（如 `python-fastapi` / `next`），需要在对应目录内确保加载逻辑一致。你也可以使用 `scripts/capabilities/run-from-package.mjs --mode skeleton`，它会优先读取 `.env.local` 的 `PX_*` 变量。
 4. 当 Token 即将过期或失效时，重新执行 `px-plugin login` 并覆盖 `.env.local` 即可。
 
 ## Step 3. 生成插件骨架
 
-选择一个新的插件 ID（推荐反向域名），并指定模板/组织信息。以下示例使用 `com.powerx.helloworld`，同时通过 `--template` 选择 `fullstack-go-nuxt`，CLI 会读取 `packages/template-registry/index.yaml`，验证模板版本、运行时要求与依赖锁定：
+选择一个新的插件 ID（推荐反向域名），并指定模板/组织信息。以下示例使用 `com.powerx.helloworld`，CLI 会读取 `packages/template-registry/index.yaml`，验证模板版本、运行时要求与依赖锁定：
 
 ```bash
 cd {your}/{customer}/{path}
@@ -128,7 +128,14 @@ px-plugin init --force \
 
 > 模板选择：
 > - `--backend go-gin` + `--admin nuxt`（默认）包含 Gin + Nuxt Web Admin。
+> - `--backend python-fastapi` + `--admin nuxt`：FastAPI + Nuxt（后端为最小空壳，前端为完整 Nuxt 管理端）。
+> - `--backend go-gin` + `--admin next`：Gin + Next（当前为占位模板，功能不完整）。
+> - `--backend python-fastapi` + `--admin next`：FastAPI + Next（当前为占位模板，功能不完整）。
 > - `--install-deps` 可选：自动执行 `go mod tidy` 与 `npm install`（联网环境下更方便，离线/内网请手动安装）。
+
+> 说明：
+> - 当前 CLI `--admin` 支持 `nuxt` 与 `next`，其中 `next` 为占位模板；`react` 尚未对外开放。
+> - 如果你希望默认栈变为 **Gin + Next**，需要同步调整 CLI 默认值与模板注册表，而不仅是文档。
 
 CLI 会在 `plugins/com.powerx.helloworld` 下生成完整项目，并输出创建的文件列表。常见目录包括：
 
@@ -222,12 +229,12 @@ cd {your}/{customer}/{path}/plugins/com.powerx.helloworld/web-admin
 npm run dev
 ```
 
-生成的 `nuxt.config.ts` 同样默认使用 `port: 3031`（HMR 显式设为 `ws://localhost:24731`），无须额外参数即可与 Skeleton 对齐。若本地端口被占用，可通过 `npm run dev -- --port <custom> --hmr-port <custom-hmr>` 覆盖。
+生成的 `nuxt.config.ts` 同样默认使用 `port: 3131`（HMR 显式设为 `ws://localhost:24731`），无须额外参数即可与 Skeleton 对齐。若本地端口被占用，可通过 `npm run dev -- --port <custom> --hmr-port <custom-hmr>` 覆盖。
 
 访问：
 
 ```
-http://localhost:3031/_p/com.powerx.helloworld/admin/
+http://localhost:3131/_p/com.powerx.helloworld/admin/
 ```
 
 应看到 Starter 页面，标题会根据你的插件 ID 自动生成，例如 “Powerx Helloworld Plugin”。

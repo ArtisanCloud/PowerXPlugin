@@ -24,7 +24,7 @@ As a framework maintainer, I can expose Router, response helper, and middleware 
 
 ### User Story 2 - Skeleton backend CRUD sample (Priority: P2)
 
-As a skeleton maintainer, I can run `go run ./skeleton/backend/cmd/plugin` and interact with an in-memory Templates CRUD implementation that respects tenant isolation conventions so developers have a reference backend.
+As a skeleton maintainer, I can run `go run ./skeleton/backend/go-gin/cmd/plugin` and interact with an in-memory Templates CRUD implementation that respects tenant isolation conventions so developers have a reference backend.
 
 **Why this priority**: Provides the minimum viable example proving the migration is successful for backend consumers and unblocks front-end + CLI work.
 

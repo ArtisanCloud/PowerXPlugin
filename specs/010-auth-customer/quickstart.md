@@ -36,8 +36,8 @@
 
 6. **Testing**
    ```bash
-   mkdir -p skeleton/backend/.cache/go-build
-   GOCACHE=$(pwd)/skeleton/backend/.cache/go-build go test ./skeleton/backend/tests/unit ./skeleton/backend/tests/integration/... -count=1
+   mkdir -p skeleton/backend/go-gin/.cache/go-build
+   GOCACHE=$(pwd)/skeleton/backend/go-gin/.cache/go-build go test ./skeleton/backend/go-gin/tests/unit ./skeleton/backend/go-gin/tests/integration/... -count=1
    npm test -- mini-app-auth
    ```
 

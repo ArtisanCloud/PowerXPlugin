@@ -122,7 +122,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 ## 延迟观测（T035）
 
-- 2025-11-02：通过脚本启动 `go run ./skeleton/backend/cmd/plugin` 并在 0.5s 间隔内轮询 `/api/v1/ping` 直至服务就绪；随后使用 `curl -w 'time_total:%{time_total}'` 观测多租户请求。  
+- 2025-11-02：通过脚本启动 `go run ./skeleton/backend/go-gin/cmd/plugin` 并在 0.5s 间隔内轮询 `/api/v1/ping` 直至服务就绪；随后使用 `curl -w 'time_total:%{time_total}'` 观测多租户请求。  
   - `tenant=1` → `0.001355s`  
   - `tenant=2` → `0.001451s`  
 - 结果均远低于 1s SLA，命令执行后立即终止服务并保存原始响应到 `/tmp/tenant{1,2}.json` 供复核。

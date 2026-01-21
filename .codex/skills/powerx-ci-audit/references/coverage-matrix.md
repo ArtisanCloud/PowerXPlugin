@@ -14,11 +14,11 @@
   - 适合新增：runtime/bootstrap/contract validators 的单测
 
 - Go（插件 skeleton 后端）
-  - 覆盖：`skeleton/backend` 的 `go test`
+  - 覆盖：`skeleton/backend/go-gin` 的 `go test`
   - 适合新增：配置加载、迁移/seed、SQLite/Postgres 分支兼容、API handler 单测
 
 - Node/Nuxt（插件 skeleton 前端）
-  - 覆盖：`skeleton/web-admin` 的 `lint/build`
+  - 覆盖：`skeleton/web-admin/nuxt` 的 `lint/build`
   - 适合新增：组件逻辑/样式回归、关键页面提示、构建产物可用性
 
 - CLI（px-plugin）

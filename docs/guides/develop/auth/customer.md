@@ -22,7 +22,7 @@ Skeleton 后端配置文件示例位于 `skeleton/backend/go-gin/etc/config.exam
 
 1. **租户隔离**：受保护的 `/mini-app/*` 继续要求存在 tenant 上下文；该上下文可来自 `X-Tenant-UUID`/query，也可由 customer token 的 `tenant_uuid` 注入。若请求已显式携带 tenant 且与 token tenant 不一致，返回 `TENANT_MISMATCH`。
 2. **统一上下文**：定义 `CustomerContext`（`customer_uuid/customer_id/roles/attributes`），通过 `authx.SetTenantContext` 或新的 `SetCustomerContext` 挂入 `gin.Context`，Service 层可通过 `customer.ContextFrom(ctx)` 获取。
-3. **统一返回**：所有 mini-app handler 使用 `contracts.Response*` 封装（参考 `skeleton/backend/go-gin/internal/transport/http/mini-app/template_handler.go`），以满足 `.specify/memory/rulesets/crud/api_rest.yaml` envelope 约定。
+3. **统一返回**：所有 mini-app handler 使用 `contracts.Response*` 封装（参考 `skeleton/backend/go-gin/internal/transport/http/mini-app/template_handler.go`），以满足 `.codex/skills/crud/api-rest/SKILL.md` 内嵌规则的 envelope 约定。
 
 ## tenant_uuid 的来源与规则（对齐现有实现）
 

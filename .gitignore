@@ -58,3 +58,6 @@ skeleton/web-admin/next/.next/
 skeleton/web-admin/next/next-env.d.ts
 skeleton/web-admin/next/package-lock.json
 skeleton/web-admin/next/tsconfig.json
+skeleton/backend/python-fastapi/__pycache__/
+skeleton/backend/python-fastapi/*.pyc
+skeleton/backend/python-fastapi/venv/

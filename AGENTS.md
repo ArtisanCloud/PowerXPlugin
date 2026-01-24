@@ -15,6 +15,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-29
 - PostgreSQL（生产）/SQLite（本地），schema `powerx_plugin_base` 启用 IAM 表 (007-standalone-iam-rbac)
 - Go 1.24 + Gin/Gorm（插件侧既有）；framework runtime 组件（用于 TaskBus 适配，细节见 research） (008-framework-task-bus)
 - N/A（本 feature 目标是事件机制与迁移路径；consumer 落地结果时复用既有 DB） (008-framework-task-bus)
+- Python 3.11 + FastAPI, SQLAlchemy 2.0, Alembic (011-fastapi-gin-align)
+- PostgreSQL（schema: `powerx_plugin_base`） (011-fastapi-gin-align)
 
 ## Project Structure
 
@@ -32,9 +34,9 @@ npm test && npm run lint
 Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 
 ## Recent Changes
+- 011-fastapi-gin-align: Added Python 3.11 + FastAPI, SQLAlchemy 2.0, Alembic
 - 008-framework-task-bus: Added Go 1.24 + Gin/Gorm（插件侧既有）；framework runtime 组件（用于 TaskBus 适配，细节见 research）
 - 010-auth-customer: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
-- 007-standalone-iam-rbac: Added Go 1.24（后端），TypeScript 5 + Nuxt 4.2（前端），Node.js 20 + Gin、Gorm、Pinia、`@nuxt/ui`、PowerX 插件框架、px-plugin CLI
 
 ## Manifest 迁移公告（2025-12-08）
 - 开发态唯一清单移动到 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。

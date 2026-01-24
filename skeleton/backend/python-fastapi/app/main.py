@@ -1,8 +1,14 @@
 from fastapi import FastAPI
 
-app = FastAPI()
+from app.config.settings import get_settings
+from app.router.api import register_routes
 
 
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
+def create_app() -> FastAPI:
+    settings = get_settings()
+    app = FastAPI(title=settings.app_name)
+    register_routes(app, settings)
+    return app
+
+
+app = create_app()

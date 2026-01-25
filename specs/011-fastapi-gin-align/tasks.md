@@ -25,14 +25,14 @@
 
 **Purpose**: 所有用户故事依赖的基础设施
 
-- [ ] T006 初始化数据库会话与基础仓储于 `skeleton/backend/python-fastapi/app/entity/repository/db.py`
-- [ ] T007 初始化 Alembic 配置与迁移入口于 `skeleton/backend/python-fastapi/alembic.ini`
-- [ ] T008 初始化迁移环境与版本目录于 `skeleton/backend/python-fastapi/migrations/env.py`
-- [ ] T009 [P] 增加租户上下文中间件于 `skeleton/backend/python-fastapi/app/middleware/tenant_context.py`
-- [ ] T010 [P] 增加鉴权与权限校验中间件于 `skeleton/backend/python-fastapi/app/middleware/auth_guard.py`
-- [ ] T011 [P] 增加日志与请求链路基础实现于 `skeleton/backend/python-fastapi/app/observability/logging.py`
-- [ ] T012 初始化路由聚合与前缀配置于 `skeleton/backend/python-fastapi/app/router/api.py`
-- [ ] T013 增加健康检查端点于 `skeleton/backend/python-fastapi/app/transport/http/health.py`
+- [x] T006 初始化数据库会话与基础仓储于 `skeleton/backend/python-fastapi/app/entity/repository/db.py`
+- [x] T007 初始化 Alembic 配置与迁移入口于 `skeleton/backend/python-fastapi/alembic.ini`
+- [x] T008 初始化迁移环境与版本目录于 `skeleton/backend/python-fastapi/migrations/env.py`
+- [x] T009 [P] 增加租户上下文中间件于 `skeleton/backend/python-fastapi/app/middleware/tenant_context.py`
+- [x] T010 [P] 增加鉴权与权限校验中间件于 `skeleton/backend/python-fastapi/app/middleware/auth_guard.py`
+- [x] T011 [P] 增加日志与请求链路基础实现于 `skeleton/backend/python-fastapi/app/observability/logging.py`
+- [x] T012 初始化路由聚合与前缀配置于 `skeleton/backend/python-fastapi/app/router/api.py`
+- [x] T013 增加健康检查端点于 `skeleton/backend/python-fastapi/app/transport/http/health.py`
 
 **Checkpoint**: 基础设施完成，可开始用户故事实现
 

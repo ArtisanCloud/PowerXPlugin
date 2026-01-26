@@ -7,6 +7,7 @@ from app.transport.http.admin.iam import router as admin_iam_router
 from app.transport.http.admin.templates import router as admin_templates_router
 from app.transport.http.admin.capabilities import router as admin_capabilities_router
 from app.transport.http.admin.runtime_sessions import router as admin_runtime_router
+from app.transport.http.admin.manifest import router as admin_manifest_router
 
 
 def register_routes(app: FastAPI, settings: Settings) -> None:
@@ -16,3 +17,4 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
     app.include_router(admin_templates_router, prefix=settings.api_prefix)
     app.include_router(admin_capabilities_router, prefix=settings.api_prefix)
     app.include_router(admin_runtime_router, prefix=settings.api_prefix)
+    app.include_router(admin_manifest_router, prefix=settings.api_prefix)

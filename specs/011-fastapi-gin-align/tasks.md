@@ -79,9 +79,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] 实现管理端 manifest/rbac 端点于 `skeleton/backend/python-fastapi/app/transport/http/admin/manifest.py`
-- [ ] T035 [US2] 统一宿主反代路径映射与前缀解析于 `skeleton/backend/python-fastapi/app/router/api.py`
-- [ ] T036 [US2] 记录宿主模式请求上下文于 `skeleton/backend/python-fastapi/app/observability/host_context.py`
+- [x] T034 [US2] 实现管理端 manifest/rbac 端点于 `skeleton/backend/python-fastapi/app/transport/http/admin/manifest.py`
+- [x] T035 [US2] 统一宿主反代路径映射与前缀解析于 `skeleton/backend/python-fastapi/app/router/api.py`
+- [x] T036 [US2] 记录宿主模式请求上下文于 `skeleton/backend/python-fastapi/app/observability/host_context.py`
 
 **Checkpoint**: 宿主模式路径规范与 Gin 一致
 

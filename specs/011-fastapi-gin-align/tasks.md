@@ -46,26 +46,26 @@
 
 ### Implementation for User Story 1
 
-- [ ] T014 [P] 创建 Tenant 模型于 `skeleton/backend/python-fastapi/app/entity/models/tenant.py`
-- [ ] T015 [P] 创建 User 模型于 `skeleton/backend/python-fastapi/app/entity/models/user.py`
-- [ ] T016 [P] 创建 Member 模型于 `skeleton/backend/python-fastapi/app/entity/models/member.py`
-- [ ] T017 [P] 创建 Role 模型于 `skeleton/backend/python-fastapi/app/entity/models/role.py`
-- [ ] T018 [P] 创建 Permission 模型于 `skeleton/backend/python-fastapi/app/entity/models/permission.py`
-- [ ] T019 [P] 创建 Department 模型于 `skeleton/backend/python-fastapi/app/entity/models/department.py`
-- [ ] T020 [P] 创建 Template 模型于 `skeleton/backend/python-fastapi/app/entity/models/template.py`
-- [ ] T021 [P] 创建 Capability 模型于 `skeleton/backend/python-fastapi/app/entity/models/capability.py`
-- [ ] T022 [P] 创建 RuntimeSession 模型于 `skeleton/backend/python-fastapi/app/entity/models/runtime_session.py`
-- [ ] T023 [US1] 实现认证服务于 `skeleton/backend/python-fastapi/app/services/auth_service.py`
-- [ ] T024 [US1] 实现 IAM 服务于 `skeleton/backend/python-fastapi/app/services/iam_service.py`
-- [ ] T025 [US1] 实现模板服务于 `skeleton/backend/python-fastapi/app/services/template_service.py`
-- [ ] T026 [US1] 实现能力管理服务于 `skeleton/backend/python-fastapi/app/services/capability_service.py`
-- [ ] T027 [US1] 实现运行时会话服务于 `skeleton/backend/python-fastapi/app/services/runtime_session_service.py`
-- [ ] T028 [US1] 实现认证路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/auth.py`
-- [ ] T029 [US1] 实现 IAM 路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/iam.py`
-- [ ] T030 [US1] 实现模板 CRUD 路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/templates.py`
-- [ ] T031 [US1] 实现能力管理路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/capabilities.py`
-- [ ] T032 [US1] 实现运行时会话路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/runtime_sessions.py`
-- [ ] T033 [US1] 挂载管理端路由至 API 前缀于 `skeleton/backend/python-fastapi/app/router/api.py`
+- [x] T014 [P] 创建 Tenant 模型于 `skeleton/backend/python-fastapi/app/entity/models/tenant.py`
+- [x] T015 [P] 创建 User 模型于 `skeleton/backend/python-fastapi/app/entity/models/user.py`
+- [x] T016 [P] 创建 Member 模型于 `skeleton/backend/python-fastapi/app/entity/models/member.py`
+- [x] T017 [P] 创建 Role 模型于 `skeleton/backend/python-fastapi/app/entity/models/role.py`
+- [x] T018 [P] 创建 Permission 模型于 `skeleton/backend/python-fastapi/app/entity/models/permission.py`
+- [x] T019 [P] 创建 Department 模型于 `skeleton/backend/python-fastapi/app/entity/models/department.py`
+- [x] T020 [P] 创建 Template 模型于 `skeleton/backend/python-fastapi/app/entity/models/template.py`
+- [x] T021 [P] 创建 Capability 模型于 `skeleton/backend/python-fastapi/app/entity/models/capability.py`
+- [x] T022 [P] 创建 RuntimeSession 模型于 `skeleton/backend/python-fastapi/app/entity/models/runtime_session.py`
+- [x] T023 [US1] 实现认证服务于 `skeleton/backend/python-fastapi/app/services/auth_service.py`
+- [x] T024 [US1] 实现 IAM 服务于 `skeleton/backend/python-fastapi/app/services/iam_service.py`
+- [x] T025 [US1] 实现模板服务于 `skeleton/backend/python-fastapi/app/services/template_service.py`
+- [x] T026 [US1] 实现能力管理服务于 `skeleton/backend/python-fastapi/app/services/capability_service.py`
+- [x] T027 [US1] 实现运行时会话服务于 `skeleton/backend/python-fastapi/app/services/runtime_session_service.py`
+- [x] T028 [US1] 实现认证路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/auth.py`
+- [x] T029 [US1] 实现 IAM 路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/iam.py`
+- [x] T030 [US1] 实现模板 CRUD 路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/templates.py`
+- [x] T031 [US1] 实现能力管理路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/capabilities.py`
+- [x] T032 [US1] 实现运行时会话路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/runtime_sessions.py`
+- [x] T033 [US1] 挂载管理端路由至 API 前缀于 `skeleton/backend/python-fastapi/app/router/api.py`
 
 **Checkpoint**: P1 管理端联调范围可用
 

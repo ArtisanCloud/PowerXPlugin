@@ -237,3 +237,11 @@ skeleton/backend/python-fastapi/
 - FastAPI 必须自行适配既有契约与路径，否则联调将失败。
 - 若 Nuxt 依赖未公开的私有接口，需要从 Go Gin 路由与合同中明确清单。
 - FastAPI 仅作为新增实现，不替换现有 Go Gin 流程。
+
+## 实施状态（FastAPI 对齐）
+
+- Phase 1（Setup）：已完成
+- Phase 2（Foundational）：已完成
+- Phase 3（US1 / MVP）：已完成
+- Phase 4（US2 / 宿主模式）：已完成
+- Phase 5（US3 / 数据结构）：已完成

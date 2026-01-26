@@ -7,7 +7,7 @@ servers:
 paths:
   /admin/capabilities:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -23,7 +23,7 @@ paths:
           description: Not Found
   /admin/capabilities/exposure/template:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -39,7 +39,7 @@ paths:
           description: Not Found
   /admin/capabilities/exposure/{capability_id}:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: capability_id
           in: path
@@ -60,7 +60,7 @@ paths:
         "404":
           description: Not Found
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: capability_id
           in: path
@@ -88,7 +88,7 @@ paths:
           description: Not Found
   /admin/capabilities/lifecycle:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -103,7 +103,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -125,7 +125,7 @@ paths:
           description: Not Found
   /admin/capabilities/lifecycle/template:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -141,7 +141,7 @@ paths:
           description: Not Found
   /admin/capabilities/lifecycle/{plan_id}/status:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: plan_id
           in: path
@@ -169,7 +169,7 @@ paths:
           description: Not Found
   /admin/capabilities/quotas/{capability_id}:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: capability_id
           in: path
@@ -190,7 +190,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: capability_id
           in: path
@@ -218,7 +218,7 @@ paths:
           description: Not Found
   /admin/capabilities/register:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -240,7 +240,7 @@ paths:
           description: Not Found
   /admin/capabilities/register/template:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -256,7 +256,7 @@ paths:
           description: Not Found
   /admin/capabilities/register/validate:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -278,7 +278,7 @@ paths:
           description: Not Found
   /admin/departments:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -293,7 +293,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -315,7 +315,7 @@ paths:
           description: Not Found
   /admin/departments/tree:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -331,7 +331,7 @@ paths:
           description: Not Found
   /admin/departments/{id}:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -352,7 +352,7 @@ paths:
         "404":
           description: Not Found
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -373,7 +373,7 @@ paths:
         "404":
           description: Not Found
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -401,7 +401,7 @@ paths:
           description: Not Found
   /admin/iam/departments:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -416,7 +416,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -438,7 +438,7 @@ paths:
           description: Not Found
   /admin/iam/departments/tree:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -454,7 +454,7 @@ paths:
           description: Not Found
   /admin/iam/departments/{id}:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -475,7 +475,7 @@ paths:
         "404":
           description: Not Found
     patch:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -503,7 +503,7 @@ paths:
           description: Not Found
   /admin/iam/departments?tenant_uuid={tenant_uuid}:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: tenant_uuid
           in: path
@@ -525,7 +525,7 @@ paths:
           description: Not Found
   /admin/iam/members:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -540,7 +540,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -562,7 +562,7 @@ paths:
           description: Not Found
   /admin/iam/members/import:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -584,7 +584,7 @@ paths:
           description: Not Found
   /admin/iam/members/{id}:
     patch:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -612,7 +612,7 @@ paths:
           description: Not Found
   /admin/iam/permissions:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -627,7 +627,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -649,7 +649,7 @@ paths:
           description: Not Found
   /admin/iam/permissions/catalog:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -665,7 +665,7 @@ paths:
           description: Not Found
   /admin/iam/permissions/sync:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -687,7 +687,7 @@ paths:
           description: Not Found
   /admin/iam/permissions/{id}:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -708,7 +708,7 @@ paths:
         "404":
           description: Not Found
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -736,7 +736,7 @@ paths:
           description: Not Found
   /admin/iam/roles:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -751,7 +751,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -773,7 +773,7 @@ paths:
           description: Not Found
   /admin/iam/roles/{id}:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -794,7 +794,7 @@ paths:
         "404":
           description: Not Found
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -815,7 +815,7 @@ paths:
         "404":
           description: Not Found
     patch:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -843,7 +843,7 @@ paths:
           description: Not Found
   /admin/iam/roles/{id}/members:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -864,7 +864,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -892,7 +892,7 @@ paths:
           description: Not Found
   /admin/iam/roles/{id}/permissions:
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -920,7 +920,7 @@ paths:
           description: Not Found
   /admin/iam/tenants:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -935,7 +935,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -957,7 +957,7 @@ paths:
           description: Not Found
   /admin/iam/tenants/{id}:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -978,7 +978,7 @@ paths:
         "404":
           description: Not Found
     patch:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1006,7 +1006,7 @@ paths:
           description: Not Found
   /admin/permissions:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1022,7 +1022,7 @@ paths:
           description: Not Found
   /admin/permissions/groups:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1038,7 +1038,7 @@ paths:
           description: Not Found
   /admin/roles:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1053,7 +1053,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1075,7 +1075,7 @@ paths:
           description: Not Found
   /admin/roles/{id}:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1096,7 +1096,7 @@ paths:
         "404":
           description: Not Found
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1117,7 +1117,7 @@ paths:
         "404":
           description: Not Found
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1145,7 +1145,7 @@ paths:
           description: Not Found
   /admin/roles/{role_id}/permissions:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: role_id
           in: path
@@ -1173,7 +1173,7 @@ paths:
           description: Not Found
   /admin/runtime/sessions/register:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1195,7 +1195,7 @@ paths:
           description: Not Found
   /admin/runtime/sessions/{session_id}/ack:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: session_id
           in: path
@@ -1223,7 +1223,7 @@ paths:
           description: Not Found
   /admin/runtime/sessions/{session_id}/close:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: session_id
           in: path
@@ -1251,7 +1251,7 @@ paths:
           description: Not Found
   /admin/runtime/sessions/{session_id}/heartbeat:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: session_id
           in: path
@@ -1279,7 +1279,7 @@ paths:
           description: Not Found
   /admin/runtime/sessions/{session_id}/invoke:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: session_id
           in: path
@@ -1307,7 +1307,7 @@ paths:
           description: Not Found
   /admin/user/auth/change-password:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1329,7 +1329,7 @@ paths:
           description: Not Found
   /admin/user/auth/login:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1351,7 +1351,7 @@ paths:
           description: Not Found
   /admin/user/auth/logout:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1373,7 +1373,7 @@ paths:
           description: Not Found
   /admin/user/auth/me:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1389,7 +1389,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/avatar:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1411,7 +1411,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/check-permission:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1433,7 +1433,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/context:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1449,7 +1449,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/departments:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1465,7 +1465,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/profile:
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1487,7 +1487,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/roles:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1503,7 +1503,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/switch-tenant:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1525,7 +1525,7 @@ paths:
           description: Not Found
   /admin/user/auth/me/tenants:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1541,7 +1541,7 @@ paths:
           description: Not Found
   /admin/user/auth/permissions:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1557,7 +1557,7 @@ paths:
           description: Not Found
   /admin/user/auth/profile:
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1579,7 +1579,7 @@ paths:
           description: Not Found
   /admin/user/auth/refresh:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1601,7 +1601,7 @@ paths:
           description: Not Found
   /admin/user/auth/register:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1623,7 +1623,7 @@ paths:
           description: Not Found
   /admin/user/auth/reset-password:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1645,7 +1645,7 @@ paths:
           description: Not Found
   /admin/user/auth/reset-password/confirm:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1667,7 +1667,7 @@ paths:
           description: Not Found
   /admin/user/auth/validate:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1683,7 +1683,7 @@ paths:
           description: Not Found
   /admin/users:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1698,7 +1698,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1720,7 +1720,7 @@ paths:
           description: Not Found
   /admin/users/batch-delete:
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1742,7 +1742,7 @@ paths:
           description: Not Found
   /admin/users/{id}:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1763,7 +1763,7 @@ paths:
         "404":
           description: Not Found
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1784,7 +1784,7 @@ paths:
         "404":
           description: Not Found
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1812,7 +1812,7 @@ paths:
           description: Not Found
   /admin/users/{id}/status:
     patch:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1840,7 +1840,7 @@ paths:
           description: Not Found
   /templates:
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       responses:
         "200":
           description: OK
@@ -1855,7 +1855,7 @@ paths:
         "404":
           description: Not Found
     post:
-      summary: TODO
+      summary: TODO (sync with Gin)
       requestBody:
         required: false
         content:
@@ -1877,7 +1877,7 @@ paths:
           description: Not Found
   /templates/{id}:
     delete:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1898,7 +1898,7 @@ paths:
         "404":
           description: Not Found
     get:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path
@@ -1919,7 +1919,7 @@ paths:
         "404":
           description: Not Found
     put:
-      summary: TODO
+      summary: TODO (sync with Gin)
       parameters:
         - name: id
           in: path

@@ -107,9 +107,9 @@
 
 **Purpose**: 跨故事统一项与交付准备
 
-- [ ] T040 [P] 同步 OpenAPI 合同说明于 `specs/011-fastapi-gin-align/contracts/openapi.yaml`
-- [ ] T041 [P] 更新对齐说明于 `docs/plan/fastapi/plan.md`
-- [ ] T042 运行 quickstart 验证并记录结果于 `specs/011-fastapi-gin-align/quickstart.md`
+- [x] T040 [P] 同步 OpenAPI 合同说明于 `specs/011-fastapi-gin-align/contracts/openapi.yaml`
+- [x] T041 [P] 更新对齐说明于 `docs/plan/fastapi/plan.md`
+- [x] T042 运行 quickstart 验证并记录结果于 `specs/011-fastapi-gin-align/quickstart.md`
 
 ---
 

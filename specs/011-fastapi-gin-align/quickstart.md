@@ -30,3 +30,9 @@ cd skeleton/backend/python-fastapi
 # 配置数据库连接后
 alembic upgrade head
 ```
+
+## 验证记录
+
+- [ ] 本地启动 /healthz 通过
+- [ ] Nuxt 管理端基础流程联调通过
+- [ ] 迁移脚本可执行

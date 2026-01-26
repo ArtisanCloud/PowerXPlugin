@@ -22,3 +22,11 @@ bash scripts/dev.sh
 
 - API 前缀以 `etc/config.yaml` 的 `server.api_prefix` 为准（默认 `/api/v1`）。
 - 宿主模式通过 `/_p/<plugin-id>/api/*` 进行反代。
+
+## 迁移
+
+```bash
+cd skeleton/backend/python-fastapi
+# 配置数据库连接后
+alembic upgrade head
+```

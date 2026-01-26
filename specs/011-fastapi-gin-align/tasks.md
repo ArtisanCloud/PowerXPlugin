@@ -95,9 +95,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T037 [US3] 对齐关键实体字段与表名于 `skeleton/backend/python-fastapi/app/entity/models/*.py`
-- [ ] T038 [US3] 生成首阶段迁移脚本于 `skeleton/backend/python-fastapi/migrations/versions/`
-- [ ] T039 [US3] 补齐迁移执行入口文档于 `specs/011-fastapi-gin-align/quickstart.md`
+- [x] T037 [US3] 对齐关键实体字段与表名于 `skeleton/backend/python-fastapi/app/entity/models/*.py`
+- [x] T038 [US3] 生成首阶段迁移脚本于 `skeleton/backend/python-fastapi/migrations/versions/`
+- [x] T039 [US3] 补齐迁移执行入口文档于 `specs/011-fastapi-gin-align/quickstart.md`
 
 **Checkpoint**: 关键实体结构对齐完成
 

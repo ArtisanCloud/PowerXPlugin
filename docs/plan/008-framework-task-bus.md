@@ -53,6 +53,71 @@
    - `event_bridge.fallback_to_local`：TaskBus 不可用时是否自动降级
 4. **消费侧绑定（示例）**：本仓库提供本地 `Dispatcher` + `IdempotencyFilter` 的示例实现；真实 TaskBus 订阅由宿主/框架接入后完成。
 
+## 4.5 Scheduler Bridge（统一调度入口）
+**接口优先级：**
+- HTTP 为第一优先。
+- gRPC 与 SDK 作为后续扩展（与宿主能力保持一致）。
+
+**幂等与重试：**
+- Scheduler 触发事件为至少一次投递，插件 handler 必须幂等。
+- 建议使用 `event_id` 或 `job_id + scheduled_at` 做去重。
+- 失败返回 nack，将由底座按 retry_policy 重试。
+
+**请求头约定（调用底座）：**
+- `Authorization: Bearer <TOKEN>`
+- `x-tenant-uuid: <TENANT_UUID>`
+- `Idempotency-Key: <uuid>`（可选）
+
+**Handler 示例（Go 伪代码）：**
+```go
+func (h *EventHandler) Handle(ctx context.Context, evt Event) error {
+  if evt.Topic != "scheduler.job.triggered" {
+    return nil
+  }
+  action := evt.Payload["plugin_action"].(string)
+  params := evt.Payload["params"].(map[string]any)
+  switch action {
+  case "knowledge.sync":
+    return h.KnowledgeSync(ctx, params)
+  default:
+    return nil
+  }
+}
+```
+
+
+- **目标**：让插件用统一接口注册/更新计划任务，并可切换到底座 Scheduler 或本地实现。
+- **模式**：
+  - `local`：仅本地调度
+  - `corex`：调用 PowerX Scheduler（HTTP/gRPC/SDK）
+  - `dual`：双写/双读，便于灰度与回滚
+- **降级**：底座不可用时自动降级到本地实现（不影响主流程）。
+
+**配置示例（plugin config）：**
+```yaml
+scheduler_bridge:
+  enabled: true
+  mode: corex
+  fallback_to_local: true
+```
+
+**Manifest 示例：**
+```yaml
+scheduler:
+  jobs:
+    - name: "sync-knowledge"
+      schedule_type: "cron"
+      schedule_expr: "0 * * * *"
+      payload:
+        plugin_action: "knowledge.sync"
+        params:
+          space_id: "..."
+```
+
+**消费约定：**
+- Scheduler 触发事件 `scheduler.job.triggered`。
+- 插件按 Manifest 声明订阅，并由统一 handler 处理。
+
 ## 5. 代码迁移策略
 
 | 步骤 | 动作 | 说明 |

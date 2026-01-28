@@ -1,4 +1,4 @@
-from app.entity.models.base import Base
+from app.entity.models.base import Base, BaseModel
 from app.entity.models.tenant import Tenant
 from app.entity.models.user import User
 from app.entity.models.member import Member
@@ -11,6 +11,7 @@ from app.entity.models.runtime_session import RuntimeSession
 
 __all__ = [
     "Base",
+    "BaseModel",
     "Tenant",
     "User",
     "Member",

@@ -54,7 +54,12 @@ go build -o /tmp/px-plugin ./tools/cli/cmd/px-plugin
 
 # 推荐：使用聚合入口自动完成上述步骤
 make test-smoke         # 等价于 scripts/testing/smoke.sh，带超时与日志
+make BACKEND=fastapi test-smoke # FastAPI 后端 smoke 校验
 ```
+
+说明：
+- 默认使用 Go Gin 后端（不传 `BACKEND`）。
+- FastAPI 后端需显式指定：`BACKEND=fastapi`。
 
 通过以上命令或脚本可初步确认后端逻辑、契约文件与 CLI 构建无异常（示例输出末尾会打印 `=== Smoke workflow complete in Ns ===`，可直接记录耗时）。任何一步失败请参考第 7 节排查。
 
@@ -107,6 +112,7 @@ PLAYWRIGHT_BASE_URL=http://localhost:3131 npx playwright test
 
 # 推荐：使用聚合入口自动完成构建与 E2E
 make test-regression    # 等价于 scripts/testing/regression.sh，含启动/清理
+make BACKEND=fastapi test-regression # FastAPI 后端回归校验
 ```
 
 5. 停止服务（Ctrl+C），若失败可在 `skeleton/web-admin/nuxt/test-results/` 查看报告。脚本模式会输出 `=== Regression workflow complete in Ns ===` 并保留 `tmp/regression-backend.log` / `tmp/regression-frontend.log`。
@@ -170,7 +176,7 @@ rm -rf "$TMP_DIR"
 | 契约变更验证 | 参考 4.3 | 修改 `docs/contracts/**` 后必跑 |
 | CLI 模块改动 | 参考 4.4 | 确保 `px-plugin init` 无回归 |
 | 测试采纳率审计 | `./scripts/testing/audit-test-adoption.sh` | 统计最近提交是否新增测试 |
-| 综合回归 | `make test-regression` | 启动后端/前端并执行 Playwright 与覆盖率 |
+| 综合回归 | `make test-regression` / `make BACKEND=fastapi test-regression` | 启动后端/前端并执行 Playwright 与覆盖率 |
 | CI (act) | `make ci-all` | 依赖 [act](https://github.com/nektos/act)，在本地模拟 `.github/workflows/ci.yml` |
 
 > 详细脚本说明参见 `scripts/testing/README.md`，可了解超时或端口覆盖的环境变量。
@@ -372,7 +378,7 @@ rm -rf "$TMP_DIR"
 
 当前仓库已经提供 `scripts/testing/` 与按模块划分的 `make-files/`，后续仍有以下提升方向：
 
-- 将 `make test-smoke` / `make test-regression` 纳入 CI/CD，并在流水线中上传 Playwright 报告与覆盖率。
+- 将 `make test-smoke` / `make BACKEND=fastapi test-smoke` / `make test-regression` / `make BACKEND=fastapi test-regression` 纳入 CI/CD，并在流水线中上传 Playwright 报告与覆盖率。
 - 为关键契约（Manifest / RBAC / OpenAPI）增加差异报警，接入 PR Gate。
 - 规划性能基准与长期指标可视化（如构建时长、测试通过率等），构建基础仪表板。
 

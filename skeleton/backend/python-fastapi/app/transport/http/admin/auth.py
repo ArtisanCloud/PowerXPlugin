@@ -1,99 +1,315 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
-from app.contracts.response import ok
+from app.contracts.response import (
+    ERR_CODE_INVALID_REQUEST,
+    ERR_CODE_UNAUTHORIZED,
+    ok,
+    fail,
+)
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/admin")
 service = AuthService()
 
 
+def _request_id(request: Request) -> str | None:
+    return request.headers.get("X-Request-ID") or request.headers.get("Request-ID")
+
+
+def _bearer_token(request: Request) -> str:
+    raw = (request.headers.get("Authorization") or "").strip()
+    if not raw:
+        return ""
+    if raw.lower().startswith("bearer "):
+        return raw[7:].strip()
+    return raw
+
+
 @router.post("/user/auth/login")
-async def login(payload: dict):
-    return ok(service.login(payload))
+async def login(request: Request, payload: dict):
+    request_id = _request_id(request)
+    identifier = (payload or {}).get("identifier")
+    password = (payload or {}).get("password")
+    if not identifier or not password:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "identifier/password 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    result = service.login(payload or {})
+    if not result or not result.get("access_token"):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "认证失败，请重新登录",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok(result, request_id=request_id)
 
 
 @router.post("/user/auth/register")
-async def register(payload: dict):
-    return ok(service.register(payload))
+async def register(request: Request, payload: dict):
+    request_id = _request_id(request)
+    identifier = (payload or {}).get("username") or (payload or {}).get("email")
+    if not identifier or not (payload or {}).get("password"):
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "username/email/password 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(service.register(payload or {}), request_id=request_id)
 
 
 @router.post("/user/auth/logout")
-async def logout(payload: dict):
-    return ok(service.logout(payload))
+async def logout(request: Request, payload: dict):
+    request_id = _request_id(request)
+    refresh_token = (payload or {}).get("refresh_token") or (payload or {}).get("refreshToken")
+    if not refresh_token:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "refresh_token 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(service.logout(payload or {}), request_id=request_id)
 
 
 @router.post("/user/auth/refresh")
-async def refresh(payload: dict):
-    return ok(service.refresh(payload))
+async def refresh(request: Request, payload: dict):
+    request_id = _request_id(request)
+    refresh_token = (payload or {}).get("refresh_token") or (payload or {}).get("refreshToken")
+    if not refresh_token:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "refresh_token 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(service.refresh(payload or {}), request_id=request_id)
 
 
 @router.get("/user/auth/me")
-async def me():
-    return ok(service.me())
+async def me(request: Request):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok(service.me(), request_id=request_id)
 
 
 @router.put("/user/auth/profile")
-async def profile(payload: dict):
-    return ok(service.profile(payload))
+async def profile(request: Request, payload: dict):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    if not payload:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "请求体不能为空",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(service.profile(payload), request_id=request_id)
 
 
 @router.post("/user/auth/change-password")
-async def change_password(payload: dict):
-    return ok(service.change_password(payload))
+async def change_password(request: Request, payload: dict):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    old_password = (payload or {}).get("oldPassword") or (payload or {}).get("old_password")
+    new_password = (payload or {}).get("newPassword") or (payload or {}).get("new_password")
+    confirm_password = (payload or {}).get("confirmPassword") or (payload or {}).get("confirm_password")
+    if not old_password or not new_password or not confirm_password:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "oldPassword/newPassword/confirmPassword 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(service.change_password(payload or {}), request_id=request_id)
 
 
 @router.post("/user/auth/reset-password")
-async def reset_password(payload: dict):
-    return ok(service.reset_password(payload))
+async def reset_password(request: Request, payload: dict):
+    request_id = _request_id(request)
+    if not (payload or {}).get("email"):
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "email 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(service.reset_password(payload or {}), request_id=request_id)
 
 
 @router.post("/user/auth/reset-password/confirm")
-async def reset_password_confirm(payload: dict):
-    return ok(service.reset_password_confirm(payload))
+async def reset_password_confirm(request: Request, payload: dict):
+    request_id = _request_id(request)
+    token = (payload or {}).get("token")
+    new_password = (payload or {}).get("newPassword") or (payload or {}).get("new_password")
+    confirm_password = (payload or {}).get("confirmPassword") or (payload or {}).get("confirm_password")
+    if not token or not new_password or not confirm_password:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "token/newPassword/confirmPassword 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(service.reset_password_confirm(payload or {}), request_id=request_id)
 
 
 @router.get("/user/auth/validate")
-async def validate():
-    return ok(service.validate())
+async def validate(request: Request):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok(service.validate(), request_id=request_id)
 
 
 @router.get("/user/auth/permissions")
-async def permissions():
-    return ok(service.permissions())
+async def permissions(request: Request):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok(service.permissions(), request_id=request_id)
 
 @router.get("/user/auth/me/context")
-async def me_context():
-    return ok({})
+async def me_context(request: Request):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok({}, request_id=request_id)
 
 
 @router.get("/user/auth/me/tenants")
-async def me_tenants():
-    return ok([])
+async def me_tenants(request: Request):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok([], request_id=request_id)
 
 
 @router.post("/user/auth/me/switch-tenant")
-async def switch_tenant(payload: dict):
-    return ok(payload)
+async def switch_tenant(request: Request, payload: dict):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    if not payload:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "请求体不能为空",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(payload, request_id=request_id)
 
 
 @router.get("/user/auth/me/roles")
-async def me_roles():
-    return ok([])
+async def me_roles(request: Request):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok([], request_id=request_id)
 
 
 @router.get("/user/auth/me/departments")
-async def me_departments():
-    return ok([])
+async def me_departments(request: Request):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    return ok([], request_id=request_id)
 
 
 @router.post("/user/auth/me/avatar")
-async def me_avatar(payload: dict):
-    return ok(payload)
+async def me_avatar(request: Request, payload: dict):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    if not payload:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "请求体不能为空",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok(payload, request_id=request_id)
 
 
 @router.post("/user/auth/me/check-permission")
-async def check_permission(payload: dict):
-    return ok({"has_permission": True})
+async def check_permission(request: Request, payload: dict):
+    request_id = _request_id(request)
+    if not _bearer_token(request):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "缺少 Authorization Bearer token",
+            request_id=request_id,
+            status_code=401,
+        )
+    if not payload:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "请求体不能为空",
+            request_id=request_id,
+            status_code=400,
+        )
+    return ok({"has_permission": True}, request_id=request_id)
 
 
 @router.get("/users")

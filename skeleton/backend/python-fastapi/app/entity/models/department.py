@@ -1,19 +1,14 @@
-from datetime import datetime
+from sqlalchemy import BigInteger, Column, String
 
-from sqlalchemy import Column, DateTime, Integer, String
-
-from app.entity.models.base import Base
+from app.entity.models.base import BaseModel
 
 
-class Department(Base):
-    __tablename__ = "departments"
+class Department(BaseModel):
+    __tablename__ = "iam_departments"
 
-    id = Column(String, primary_key=True)
-    tenant_uuid = Column(String, nullable=False)
     name = Column(String, nullable=False)
     code = Column(String, nullable=False)
-    parent_id = Column(Integer, nullable=True)
+    parent_id = Column(BigInteger, nullable=True)
     description = Column(String, nullable=True)
-    sort_order = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    path = Column(String, nullable=False, default="")
+    sort_order = Column(BigInteger, nullable=False, default=0)

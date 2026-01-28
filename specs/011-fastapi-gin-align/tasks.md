@@ -9,6 +9,15 @@
 
 ## Format: `[ID] [P?] [Story] Description`
 
+## 执行顺序（最小可联通 → 可用）
+
+1) 认证链路（AuthService + `/admin/user/auth/*`）
+2) IAM 核心（tenants/roles/permissions/departments/members）
+3) 模板 CRUD（TemplateService + `/admin/templates/*`）
+4) 能力管理（CapabilityService + `/admin/capabilities/*`）
+5) 运行时会话（RuntimeSessionService + `/admin/runtime/sessions/*`）
+6) 数据库落地（模型字段对齐 + Alembic 迁移）
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: 项目初始化与基础结构落地
@@ -153,3 +162,19 @@ T028 & T029 & T030 & T031 & T032
 - 先完成基础设施，再完成 US1 作为 MVP。
 - US2/US3 并行推进，避免阻塞联调。
 - 以 Go Gin 契约为权威基线，任何不一致均以 Gin 为准。
+
+
+## 联通实现任务清单（按顺序执行）
+
+- [x] T043 对齐认证链路：实现 AuthService 实际逻辑（登录/注册/刷新/获取当前用户）在 `skeleton/backend/python-fastapi/app/services/auth_service.py`
+- [x] T044 对齐认证链路：补齐 /admin/user/auth/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/auth.py`
+- [x] T045 对齐 IAM 核心：实现 tenants/roles/permissions/departments/members 读写逻辑在 `skeleton/backend/python-fastapi/app/services/iam_service.py`
+- [x] T046 对齐 IAM 核心：补齐 /admin/iam/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/iam.py`
+- [x] T047 对齐模板 CRUD：实现模板读写逻辑在 `skeleton/backend/python-fastapi/app/services/template_service.py`
+- [x] T048 对齐模板 CRUD：补齐 /admin/templates/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/templates.py`
+- [x] T049 对齐能力管理：实现 capabilities register/lifecycle/exposure/quotas 逻辑在 `skeleton/backend/python-fastapi/app/services/capability_service.py`
+- [x] T050 对齐能力管理：补齐 /admin/capabilities/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/capabilities.py`
+- [x] T051 对齐运行时会话：实现 register/ack/heartbeat/close/invoke 逻辑在 `skeleton/backend/python-fastapi/app/services/runtime_session_service.py`
+- [x] T052 对齐运行时会话：补齐 /admin/runtime/sessions/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/runtime_sessions.py`
+- [x] T053 对齐数据库结构：校对模型字段/类型与 Gin 一致并更新 `skeleton/backend/python-fastapi/app/entity/models/*.py`
+- [x] T054 对齐数据库迁移：更新 Alembic 迁移脚本以匹配字段在 `skeleton/backend/python-fastapi/migrations/versions/0001_init.py`

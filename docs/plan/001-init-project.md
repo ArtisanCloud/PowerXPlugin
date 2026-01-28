@@ -19,6 +19,23 @@
 - （待完成）输出对应的 OpenAPI/JSON Schema，通过 `docs/contracts/openapi.yaml` 统一描述 `/api/v1/**`、`/healthz`、环境变量要求，并由 CI 生成可阅读文档。
 - （待接入）在 `framework/` 与 `sdk/` 中以代码生成或运行时校验的方式消费这些 Schema，保证契约与实现的映射关系可追踪。
 
+#### Cache 配置统一规范（宿主 / Standalone 共用）
+- 插件侧统一读取 `cache` 配置块（结构与 PowerX Core 相同）：`driver/host/port/password/db` 或 `redis_url`。
+- 宿主模式：由 PowerX 注入 `host-values.yaml` / `config.yaml` 的 `cache` 块（插件无需自带）。
+- Standalone 模式：插件自身 `backend/etc/config.yaml` 提供 `cache` 块。
+- 统一访问入口：后端通过 `config.Config.CacheRedisURL()` 获取可用的 Redis 连接串。
+- 允许兜底：`cache` 未配置时，可回落 `integration.idempotency.redis_url` 或环境变量 `REDIS_URL/POWERX_REDIS_URL`（兼容场景）。
+
+示例：
+```yaml
+cache:
+  driver: redis
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+```
+
 ### Phase 2 · Skeleton 抽取（当前 Go + Nuxt 实现）
 
 

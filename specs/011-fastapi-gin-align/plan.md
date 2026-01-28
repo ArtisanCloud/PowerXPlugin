@@ -103,6 +103,15 @@ skeleton/
 - 按接口优先级制定任务切片
 - 安排单测/集成测与联调验证步骤
 
+## 实施顺序（最小可联通 → 可用）
+
+1) 认证链路（AuthService + `/admin/user/auth/*`）
+2) IAM 核心（tenants/roles/permissions/departments/members）
+3) 模板 CRUD（TemplateService + `/admin/templates/*`）
+4) 能力管理（CapabilityService + `/admin/capabilities/*`）
+5) 运行时会话（RuntimeSessionService + `/admin/runtime/sessions/*`）
+6) 数据库落地（模型字段对齐 + Alembic 迁移）
+
 ## Post-Design Constitution Check
 
 - 目录结构、契约与租户隔离策略与宪章一致，未发现违规项。

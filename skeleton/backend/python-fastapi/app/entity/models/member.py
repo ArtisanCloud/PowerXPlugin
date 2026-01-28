@@ -1,18 +1,16 @@
-from datetime import datetime
+from sqlalchemy import BigInteger, Column, DateTime, JSON, String
 
-from sqlalchemy import Column, DateTime, String
-
-from app.entity.models.base import Base
+from app.entity.models.base import BaseModel
 
 
-class Member(Base):
-    __tablename__ = "members"
+class Member(BaseModel):
+    __tablename__ = "iam_members"
 
-    id = Column(String, primary_key=True)
-    tenant_uuid = Column(String, nullable=False)
-    user_id = Column(String, nullable=False)
+    user_id = Column(BigInteger, nullable=False)
     username = Column(String, nullable=False)
     display_name = Column(String, nullable=True)
-    status = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    avatar_url = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="active")
+    department_id = Column(BigInteger, nullable=True)
+    meta = Column(JSON, nullable=True)
+    last_login_at = Column(DateTime, nullable=True)

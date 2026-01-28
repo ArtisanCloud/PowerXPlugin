@@ -2,6 +2,15 @@
 
 SMOKE_TIMEOUT ?= 300
 REGRESSION_TIMEOUT ?= 3600
+BACKEND ?= gin
+
+SMOKE_SCRIPT := ./scripts/testing/smoke.sh
+REGRESSION_SCRIPT := ./scripts/testing/regression.sh
+
+ifneq (,$(filter $(BACKEND),fastapi python))
+SMOKE_SCRIPT := ./scripts/testing/smoke-python.sh
+REGRESSION_SCRIPT := ./scripts/testing/regression-python.sh
+endif
 
 .PHONY: test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend
 
@@ -11,12 +20,12 @@ test: test-smoke ## Run default smoke test suite
 
 test-smoke: ## Run smoke checks (Go/unit/contract/CLI) with timeout
 	@echo "=== Smoke Tests Start ==="
-	@python3 scripts/testing/run_with_timeout.py --timeout $(SMOKE_TIMEOUT) ./scripts/testing/smoke.sh
+	@python3 scripts/testing/run_with_timeout.py --timeout $(SMOKE_TIMEOUT) $(SMOKE_SCRIPT)
 	@echo "=== Smoke Tests Finished ==="
 
 test-regression: ## Run full regression suite (smoke + Go + frontend + Playwright)
 	@echo "=== Regression Tests Start ==="
-	@python3 scripts/testing/run_with_timeout.py --timeout $(REGRESSION_TIMEOUT) ./scripts/testing/regression.sh
+	@python3 scripts/testing/run_with_timeout.py --timeout $(REGRESSION_TIMEOUT) $(REGRESSION_SCRIPT)
 	@echo "=== Regression Tests Finished ==="
 
 test-cli-devwatch: ## Run CLI dev watch stack go tests (devwatch/devapi/watch)

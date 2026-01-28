@@ -377,6 +377,7 @@ docs/contracts/
 ./scripts/testing/smoke.sh
 # 或使用 Makefile 包装（含 300s 超时与错误回显）
 make test-smoke
+make BACKEND=fastapi test-smoke
 ```
 
 脚本会输出耗时统计并默认清理临时 scaffolding 目录；设置 `KEEP_TEMP_DIR=1` 可保留排查现场。
@@ -397,6 +398,7 @@ make test-smoke
 ```bash
 ./scripts/testing/regression.sh
 # make test-regression  # 含 3600s 超时、错误回显
+# make BACKEND=fastapi test-regression
 ```
 
 > **Playwright 稳定性**：网络/渲染波动可能导致偶发失败。建议：

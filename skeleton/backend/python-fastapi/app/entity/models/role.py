@@ -1,18 +1,13 @@
-from datetime import datetime
+from sqlalchemy import Column, String
 
-from sqlalchemy import Column, DateTime, String
-
-from app.entity.models.base import Base
+from app.entity.models.base import BaseModel
 
 
-class Role(Base):
-    __tablename__ = "roles"
+class Role(BaseModel):
+    __tablename__ = "iam_roles"
 
-    id = Column(String, primary_key=True)
-    tenant_uuid = Column(String, nullable=False)
     code = Column(String, nullable=False)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
-    scope_type = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    scope_type = Column(String, nullable=False, default="tenant")
+    policy_version = Column(String, nullable=False, default="v1")

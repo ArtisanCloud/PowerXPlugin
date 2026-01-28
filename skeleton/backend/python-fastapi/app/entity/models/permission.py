@@ -1,18 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import BigInteger, Column, DateTime, String
 
 from app.entity.models.base import Base
 
 
 class Permission(Base):
-    __tablename__ = "permissions"
+    __tablename__ = "iam_permissions"
 
-    id = Column(String, primary_key=True)
-    plugin = Column(String, nullable=False)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     resource = Column(String, nullable=False)
     action = Column(String, nullable=False)
-    effect = Column(String, nullable=False)
-    status = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)

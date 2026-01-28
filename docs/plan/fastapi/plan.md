@@ -227,6 +227,7 @@ skeleton/backend/python-fastapi/
 ## 验证清单
 
 - FastAPI 本地启动：`bash scripts/dev.sh` 后 `/healthz` 返回 200。
+- Makefile 验证：默认 `BACKEND=gin`，FastAPI 需 `BACKEND=fastapi`；`make BACKEND=fastapi test-smoke` 可通过。
 - 与 Nuxt 联调：Nuxt 不修改的前提下可调用 FastAPI 目标接口。
 - 目录与分层结构与 Go Gin 对齐，且文档明确。
 - routes/DTO/envelope 与 Go Gin 一致（字段与分页结构）。

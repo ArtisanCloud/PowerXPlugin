@@ -737,12 +737,13 @@ func resolveConfigCandidates() []string {
 		"./config/host-values.yaml",
 		"./config/config.yaml",
 		"./config.yaml",
-		"./etc/config.yaml",
 		"./backend/etc/config.yaml",
 		"./skeleton/backend/etc/config.yaml",
+		"./etc/config.yaml",
 		"../config/host-values.yaml",
 		"../config/config.yaml",
 		"../etc/config.yaml",
+		"../backend/etc/config.yaml",
 	)
 
 	return uniqueNonEmptyStrings(candidates)

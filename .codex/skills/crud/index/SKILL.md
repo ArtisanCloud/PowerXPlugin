@@ -11,6 +11,11 @@ description: PowerXPlugin CRUD 规范总入口技能，用于在实现/修改 CR
 2) 调用对应子技能并遵循其规则文件。
 3) 需要跨层时可并行使用多个子技能，但避免把所有规则一次性加载。
 
+## 后端框架分流
+
+- FastAPI 后端规范：`backend-fastapi` -> `.codex/skills/backend/fastapi/SKILL.md`
+- Gin 后端规范：`backend-gin` -> `.codex/skills/backend/gin/SKILL.md`
+
 ## 子技能路由（按需选择）
 
 - CRUD over HTTP：`crud-http` -> `.codex/skills/crud/http/SKILL.md`

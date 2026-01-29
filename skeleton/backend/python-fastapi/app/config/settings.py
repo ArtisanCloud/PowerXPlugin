@@ -68,11 +68,19 @@ def _apply_schema(dsn: str, schema: str | None) -> str:
     return f"{dsn}{sep}options=-csearch_path={schema}"
 
 
+def _normalize_postgres_dsn(dsn: str) -> str:
+    if not dsn:
+        return dsn
+    if dsn.startswith("postgres://"):
+        return "postgresql+psycopg2://" + dsn[len("postgres://") :]
+    return dsn
+
+
 def _database_url_from_config(cfg: dict[str, Any]) -> str:
     db_cfg = cfg.get("database") or {}
     if not isinstance(db_cfg, dict):
         return ""
-    dsn = db_cfg.get("dsn") or ""
+    dsn = _normalize_postgres_dsn(db_cfg.get("dsn") or "")
     schema = db_cfg.get("schema")
     return _apply_schema(dsn, schema)
 
@@ -90,7 +98,7 @@ def get_settings() -> Settings:
     db_schema = db_cfg.get("schema") if isinstance(db_cfg, dict) else None
     env_db = os.getenv("POWERX_DB_URL") or os.getenv("DATABASE_URL")
     if env_db:
-        database_url = env_db
+        database_url = _normalize_postgres_dsn(env_db)
     if not database_url:
         database_url = "sqlite:///./dev.db"
     return Settings(

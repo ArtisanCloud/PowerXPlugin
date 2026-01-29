@@ -38,7 +38,7 @@ reset-db: ## 重置数据库（危险操作）
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		echo "重置数据库..."; \
 		if [ "$(BACKEND)" = "fastapi" ]; then \
-			cd $(BACKEND_DIR) && python scripts/reset_db.py; \
+			cd $(BACKEND_DIR) && python scripts/reset_db.py && alembic upgrade head; \
 		else \
 			cd $(BACKEND_DIR) && go run ./cmd/database/main.go refresh; \
 		fi; \

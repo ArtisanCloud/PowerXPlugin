@@ -1,5 +1,6 @@
-fastapi
-uvicorn
-SQLAlchemy>=2.0
-alembic
-pyyaml
+fastapi~=0.128
+uvicorn~=0.40
+SQLAlchemy~=2.0
+alembic~=1.18
+pyyaml~=6.0
+psycopg2-binary~=2.9

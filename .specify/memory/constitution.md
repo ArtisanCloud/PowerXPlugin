@@ -5,6 +5,8 @@ skills:
   - .codex/skills/crud/http/SKILL.md
   - .codex/skills/crud/grpc/SKILL.md
   - .codex/skills/sts/SKILL.md
+  - .codex/skills/backend/fastapi/SKILL.md
+  - .codex/skills/backend/gin/SKILL.md
 
   # 前端顶层
   - .codex/skills/frontend/nuxt/admin/SKILL.md
@@ -21,6 +23,9 @@ skills:
   - .codex/skills/crud/di/SKILL.md
   - .codex/skills/crud/test/SKILL.md
   - .codex/skills/crud/sdk-go/SKILL.md
+  - .codex/skills/backend/fastapi/config/SKILL.md
+  - .codex/skills/backend/fastapi/db/SKILL.md
+  - .codex/skills/backend/gin/config/SKILL.md
 
   # 前端细分
   - .codex/skills/frontend/nuxt/api-client/SKILL.md

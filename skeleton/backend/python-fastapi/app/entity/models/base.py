@@ -1,6 +1,5 @@
-from datetime import datetime
-
-from sqlalchemy import BigInteger, Column, DateTime, String
+from sqlalchemy import BigInteger, Column, DateTime, text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
@@ -10,16 +9,16 @@ class BaseModel(Base):
     __abstract__ = True
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    tenant_uuid = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)
+    tenant_uuid = Column(UUID(as_uuid=False), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False, onupdate=text("now()"))
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class BaseNoTenantModel(Base):
     __abstract__ = True
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False, onupdate=text("now()"))
+    deleted_at = Column(DateTime(timezone=True), nullable=True)

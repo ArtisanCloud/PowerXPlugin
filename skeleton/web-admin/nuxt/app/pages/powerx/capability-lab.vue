@@ -171,7 +171,7 @@
                 <span>自定义 Tenant UUID</span>
                 <UInput
                   v-model="form.tenantUuid"
-                  placeholder="可选：覆盖 X-Tenant-UUID"
+                  placeholder="可选：覆盖 X-PowerX-Tenant"
                 />
               </label>
               <label class="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -950,7 +950,7 @@ const requestPreview = computed(() => {
     'Content-Type': 'application/json'
   }
   if (form.tenantUuid) {
-    headers['X-Tenant-UUID'] = form.tenantUuid.trim()
+    headers['X-PowerX-Tenant'] = form.tenantUuid.trim()
   }
   if (form.mockModule) {
     headers['X-PX-Use-Mock'] = form.mockModule.trim()
@@ -997,7 +997,7 @@ async function handleInvoke() {
   }
   const headers: Record<string, string> = {}
   if (form.tenantUuid?.trim()) {
-    headers['X-Tenant-UUID'] = form.tenantUuid.trim()
+    headers['X-PowerX-Tenant'] = form.tenantUuid.trim()
   }
   if (form.mockModule?.trim()) {
     headers['X-PX-Use-Mock'] = form.mockModule.trim()

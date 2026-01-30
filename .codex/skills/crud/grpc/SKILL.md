@@ -44,7 +44,7 @@ description: 基于内嵌规则 的 CRUD over gRPC 规范。用于校对 gRPC �
 
 ## 3. Metadata 与多租户
 
-- 入站拦截器从 `metadata` 读取并验证：`authorization`（JWT/HMAC）、`x-tenant-uuid`、`x-request-id` 等  
+- 入站拦截器从 `metadata` 读取并验证：`authorization`（JWT/HMAC）、`x-powerx-tenant`、`x-request-id` 等  
 - 通过拦截器把 `tenant_uuid` 注入 DB 会话（RLS）：`SET LOCAL app.tenant_uuid = ?`  
 - 与 HTTP 一致（PG-CTX-001）
 

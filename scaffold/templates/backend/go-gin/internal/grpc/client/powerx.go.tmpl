@@ -224,7 +224,7 @@ func (p *PowerXServiceClient) Outgoing(ctx context.Context) context.Context {
 	}
 
 	if p.tenantUUID != "" {
-		md.Set("x-powerx-tenant-uuid", p.tenantUUID)
+		md.Set("x-powerx-tenant", p.tenantUUID)
 	}
 	return metadata.NewOutgoingContext(ctx, md)
 }

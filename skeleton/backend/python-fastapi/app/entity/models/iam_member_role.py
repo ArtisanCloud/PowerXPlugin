@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from sqlalchemy import BigInteger, Column, DateTime
+from sqlalchemy import BigInteger, Column, DateTime, text
 
 from app.entity.models.base import Base
 
@@ -10,4 +8,4 @@ class IAMMemberRole(Base):
 
     member_id = Column(BigInteger, primary_key=True)
     role_id = Column(BigInteger, primary_key=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)

@@ -1,6 +1,5 @@
-from datetime import datetime
-
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, JSON, String
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, String, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.entity.models.base import Base
 
@@ -9,14 +8,14 @@ class User(Base):
     __tablename__ = "iam_users"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    email = Column(String, unique=True, nullable=True)
-    phone = Column(String, nullable=True)
-    display_name = Column(String, nullable=True)
-    avatar_url = Column(String, nullable=True)
-    status = Column(String, nullable=False, default="active")
-    is_root = Column(Boolean, nullable=False, default=False)
-    password_hash = Column(String, nullable=False, default="")
-    meta = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
-    deleted_at = Column(DateTime, nullable=True)
+    email = Column(String(255), unique=True, nullable=True)
+    phone = Column(String(32), nullable=True, index=True)
+    display_name = Column(String(128), nullable=True)
+    avatar_url = Column(String(255), nullable=True)
+    status = Column(String(32), nullable=False, server_default=text("'active'"))
+    is_root = Column(Boolean, nullable=False, server_default=text("false"), index=True)
+    password_hash = Column(String(255), nullable=False, server_default=text("''"))
+    meta = Column(JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False, onupdate=text("now()"))
+    deleted_at = Column(DateTime(timezone=True), nullable=True)

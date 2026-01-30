@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 
 from app.contracts.response import (
     ERR_CODE_INVALID_REQUEST,
+    ERR_CODE_SERVICE_UNAVAILABLE,
     ERR_CODE_UNAUTHORIZED,
     fail,
     ok,
@@ -35,6 +36,24 @@ def _require_auth(request: Request):
             status_code=401,
         )
     return None
+
+
+def _page(value: str | None) -> int:
+    try:
+        page = int(value or 1)
+    except ValueError:
+        return 1
+    return page if page > 0 else 1
+
+
+def _page_size(value: str | None) -> int:
+    try:
+        size = int(value or 20)
+    except ValueError:
+        return 20
+    if size <= 0:
+        return 20
+    return min(size, 100)
 
 
 @router.get("/iam/tenants")
@@ -96,9 +115,7 @@ async def list_roles(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get(
-        "tenantUuid"
-    )
+    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
     if not tenant_uuid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -106,10 +123,8 @@ async def list_roles(request: Request):
             request_id=request_id,
             status_code=400,
         )
-    return ok(
-        service.list_roles(dict(request.query_params)),
-        request_id=request_id,
-    )
+    result = service.list_roles(dict(request.query_params))
+    return ok({"items": result.get("items", [])}, request_id=request_id)
 
 
 @router.get("/iam/roles/{role_id}")
@@ -160,16 +175,8 @@ async def delete_role(request: Request, role_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok(service.delete_role(role_id), request_id=request_id)
-
-
-@router.get("/iam/roles/{role_id}/permissions")
-async def list_role_permissions(request: Request, role_id: str):
-    request_id = _request_id(request)
-    auth = _require_auth(request)
-    if auth:
-        return auth
-    return ok([], request_id=request_id)
+    service.delete_role(role_id)
+    return ok({"role_id": role_id}, message="deleted", request_id=request_id)
 
 
 @router.put("/iam/roles/{role_id}/permissions")
@@ -186,16 +193,7 @@ async def update_role_permissions(request: Request, role_id: str, payload: dict)
             request_id=request_id,
             status_code=400,
         )
-    return ok(payload, request_id=request_id)
-
-
-@router.get("/iam/roles/{role_id}/members")
-async def list_role_members(request: Request, role_id: str):
-    request_id = _request_id(request)
-    auth = _require_auth(request)
-    if auth:
-        return auth
-    return ok([], request_id=request_id)
+    return ok({"role_id": role_id, "permission_ids": payload.get("permission_ids")}, request_id=request_id)
 
 
 @router.post("/iam/roles/{role_id}/members")
@@ -212,7 +210,7 @@ async def add_role_members(request: Request, role_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok(payload, request_id=request_id)
+    return ok({"role_id": role_id, "member_ids": payload.get("member_ids")}, message="added", request_id=request_id)
 
 
 @router.delete("/iam/roles/{role_id}/members")
@@ -229,7 +227,7 @@ async def remove_role_members(request: Request, role_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok({"deleted": True}, request_id=request_id)
+    return ok({"role_id": role_id, "member_ids": payload.get("member_ids")}, message="removed", request_id=request_id)
 
 
 @router.get("/iam/permissions")
@@ -241,63 +239,27 @@ async def list_permissions(request: Request):
     return ok(service.list_permissions(), request_id=request_id)
 
 
-@router.get("/iam/permissions/catalog")
-async def list_permission_catalog(request: Request):
+@router.get("/iam/audit/logs")
+async def list_audit_logs(request: Request):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({}, request_id=request_id)
+    return ok({"items": []}, request_id=request_id)
 
 
-@router.post("/iam/permissions")
-async def create_permission(request: Request, payload: dict):
+@router.post("/iam/auth/local/sts")
+async def mint_sts(request: Request):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    if not (payload or {}).get("resource") or not (payload or {}).get("action"):
-        return fail(
-            ERR_CODE_INVALID_REQUEST,
-            "resource/action 必填",
-            request_id=request_id,
-            status_code=400,
-        )
-    return ok(service.create_permission(payload), request_id=request_id, status_code=201)
-
-
-@router.put("/iam/permissions/{permission_id}")
-async def update_permission(request: Request, permission_id: str, payload: dict):
-    request_id = _request_id(request)
-    auth = _require_auth(request)
-    if auth:
-        return auth
-    if not payload:
-        return fail(
-            ERR_CODE_INVALID_REQUEST,
-            "请求体不能为空",
-            request_id=request_id,
-            status_code=400,
-        )
-    return ok(service.update_permission(permission_id, payload), request_id=request_id)
-
-
-@router.delete("/iam/permissions/{permission_id}")
-async def delete_permission(request: Request, permission_id: str):
-    request_id = _request_id(request)
-    auth = _require_auth(request)
-    if auth:
-        return auth
-    return ok(service.delete_permission(permission_id), request_id=request_id)
-
-
-@router.post("/iam/permissions/sync")
-async def sync_permissions(request: Request):
-    request_id = _request_id(request)
-    auth = _require_auth(request)
-    if auth:
-        return auth
-    return ok({"ok": True}, request_id=request_id)
+    return fail(
+        ERR_CODE_SERVICE_UNAVAILABLE,
+        "当前路由仅在 Standalone 模式生效",
+        request_id=request_id,
+        status_code=503,
+    )
 
 
 @router.get("/iam/departments")
@@ -306,9 +268,7 @@ async def list_departments(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get(
-        "tenantUuid"
-    )
+    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
     if not tenant_uuid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -328,7 +288,24 @@ async def list_department_tree(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok([], request_id=request_id)
+    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    if not tenant_uuid:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "tenant_uuid 必填",
+            request_id=request_id,
+            status_code=400,
+        )
+    items = service.list_departments({"tenant_uuid": tenant_uuid}).get("items", [])
+    nodes = {item.get("id"): {**item, "children": []} for item in items if item.get("id") is not None}
+    roots = []
+    for node in nodes.values():
+        parent_id = node.get("parent_id")
+        if parent_id and parent_id in nodes:
+            nodes[parent_id]["children"].append(node)
+        else:
+            roots.append(node)
+    return ok(roots, request_id=request_id)
 
 
 @router.post("/iam/departments")
@@ -378,9 +355,7 @@ async def list_members(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get(
-        "tenantUuid"
-    )
+    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
     if not tenant_uuid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -388,10 +363,10 @@ async def list_members(request: Request):
             request_id=request_id,
             status_code=400,
         )
-    return ok(
-        service.list_members(dict(request.query_params)),
-        request_id=request_id,
-    )
+    page = _page(request.query_params.get("page"))
+    page_size = _page_size(request.query_params.get("page_size") or request.query_params.get("pageSize"))
+    result = service.list_members(dict(request.query_params))
+    return ok({"items": result.get("items", []), "page": page, "page_size": page_size}, request_id=request_id)
 
 
 @router.post("/iam/members")
@@ -442,3 +417,24 @@ async def import_members(request: Request, payload: dict):
             status_code=400,
         )
     return ok(payload, request_id=request_id)
+
+
+# Legacy alias routes for compatibility
+@router.get("/iam/users")
+async def list_users(request: Request):
+    return await list_members(request)
+
+
+@router.post("/iam/users")
+async def create_user(request: Request, payload: dict):
+    return await create_member(request, payload)
+
+
+@router.patch("/iam/users/{member_id}")
+async def update_user(request: Request, member_id: str, payload: dict):
+    return await update_member(request, member_id, payload)
+
+
+@router.post("/iam/users/import")
+async def import_users(request: Request, payload: dict):
+    return await import_members(request, payload)

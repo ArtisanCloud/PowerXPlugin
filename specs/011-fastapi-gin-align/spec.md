@@ -2,7 +2,7 @@
 
 **Feature Branch**: `011-fastapi-gin-align`  
 **Created**: 2026-01-24  
-**Status**: Draft  
+**Status**: In Progress (Handlers/DDD aligned)  
 **Input**: User description: "FastAPI 对齐 Go Gin（以 Nuxt 联调为第一目标）"
 
 ## Clarifications
@@ -29,6 +29,8 @@
 
 1. **Given** Nuxt 管理端不做修改，**When** 用户完成登录、权限查询与基础数据浏览，**Then** 页面正常工作且无契约错误。
 2. **Given** Python 后端启动，**When** 触发模板与权限相关的 CRUD 流程，**Then** 返回结构与现有后端一致。
+
+**Current State**: Handler 已按 Gin 行为对齐（Auth/IAM/Templates/Capabilities/Runtime Sessions/Manifest/RBAC），可进入联调验收阶段。
 
 ---
 

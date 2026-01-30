@@ -4,10 +4,8 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
-
 from app.entity.models import RuntimeSession
-from app.entity.repository.db import get_db
+from app.entity.repository.runtime_ops_repository import RuntimeOpsRepository
 
 _MCP_SESSIONS: dict[str, dict[str, Any]] = {}
 
@@ -17,6 +15,9 @@ def _now_iso() -> str:
 
 
 class RuntimeSessionService:
+    def __init__(self, repo: RuntimeOpsRepository | None = None) -> None:
+        self._repo = repo or RuntimeOpsRepository()
+
     def register(self, payload: dict):
         session_id = payload.get("session_id") or uuid4().hex
         record = {
@@ -33,26 +34,20 @@ class RuntimeSessionService:
             "updated_at": _now_iso(),
         }
         _MCP_SESSIONS[session_id] = record
-        db = get_db().session()
-        try:
-            db.add(
-                RuntimeSession(
-                    id=record["id"],
-                    runtime_assignment_id=record["runtime_assignment_id"],
-                    tenant_uuid=record["tenant_uuid"],
-                    state=record["state"],
-                    jwt_id=record["jwt_id"],
-                    capabilities_hash=record["capabilities_hash"],
-                    missed_heartbeats=record["missed_heartbeats"],
-                    last_ping_at=None,
-                    closed_at=None,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-            )
-            db.commit()
-        finally:
-            db.close()
+        entity = RuntimeSession(
+            id=record["id"],
+            runtime_assignment_id=record["runtime_assignment_id"],
+            tenant_uuid=record["tenant_uuid"],
+            state=record["state"],
+            jwt_id=record["jwt_id"],
+            capabilities_hash=record["capabilities_hash"],
+            missed_heartbeats=record["missed_heartbeats"],
+            last_ping_at=None,
+            closed_at=None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        self._repo.create(entity)
         return record
 
     def ack(self, session_id: str, payload: dict):
@@ -70,7 +65,7 @@ class RuntimeSessionService:
             record["capabilities_hash"] = payload["capabilities_hash"]
         record["updated_at"] = _now_iso()
         _MCP_SESSIONS[session_id] = record
-        self._update_status(session_id, record.get("state"))
+        self._update_status(session_id, record.get("state"), record.get("capabilities_hash"))
         return record
 
     def heartbeat(self, session_id: str, payload: dict):
@@ -92,7 +87,7 @@ class RuntimeSessionService:
         record["updated_at"] = _now_iso()
         record["close_reason"] = payload.get("reason")
         _MCP_SESSIONS[session_id] = record
-        self._update_status(session_id, "closed")
+        self._update_status(session_id, "closed", record.get("capabilities_hash"))
         return record
 
     def invoke(self, session_id: str, payload: dict):
@@ -106,17 +101,7 @@ class RuntimeSessionService:
             "metadata": {},
         }
 
-    def _update_status(self, session_id: str, status: str | None) -> None:
-        if not status:
+    def _update_status(self, session_id: str, status: str | None, capabilities_hash: str | None = None) -> None:
+        if not status and not capabilities_hash:
             return
-        db = get_db().session()
-        try:
-            row = db.execute(
-                select(RuntimeSession).where(RuntimeSession.id == session_id)
-            ).scalar_one_or_none()
-            if row:
-                row.state = status
-                row.updated_at = datetime.utcnow()
-                db.commit()
-        finally:
-            db.close()
+        self._repo.update_state(session_id, status, capabilities_hash)

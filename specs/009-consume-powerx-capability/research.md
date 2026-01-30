@@ -1,7 +1,7 @@
 # Research Log - PowerX 通用能力插件消费
 
 ## 决策 1：统一 Gateway Client 形态
-- **Decision**: Go backend 与 Nuxt 前端均提供框架层 `InvokeCapability(capabilityId, action, payload)` 封装，内部自动注入 Tool Token、`X-Tenant-UUID`、`X-Request-ID`，并以 `/tenant/invocations` 为唯一 HTTP 入口（gRPC 走 `IntegrationGatewayTenantService`）。
+- **Decision**: Go backend 与 Nuxt 前端均提供框架层 `InvokeCapability(capabilityId, action, payload)` 封装，内部自动注入 Tool Token、`X-PowerX-Tenant`、`X-Request-ID`，并以 `/tenant/invocations` 为唯一 HTTP 入口（gRPC 走 `IntegrationGatewayTenantService`）。
 - **Rationale**: 消除插件自行拼装请求导致的安全/兼容性问题，使升级 Gateway 契约时只需更新框架层。
 - **Alternatives considered**: 允许各业务直接调用 Gateway（风险高，无法统一治理）；由 CoreX 下发 SDK（会与插件框架重复，放弃）。
 

@@ -35,7 +35,7 @@ scheduler:
 ```http
 POST /api/v1/admin/scheduler/jobs
 Authorization: Bearer <TOKEN>
-x-tenant-uuid: <TENANT_UUID>
+x-powerx-tenant: <TENANT_UUID>
 
 {
   "tenant_uuid": "...",

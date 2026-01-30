@@ -37,6 +37,34 @@ def _require_auth(request: Request):
     return None
 
 
+def _require_payload(request_id: str | None, payload: dict | None, message: str = "payload 必填"):
+    if not payload:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            message,
+            request_id=request_id,
+            status_code=400,
+        )
+    return None
+
+
+def _validate_invoke(payload: dict) -> str | None:
+    required = [
+        "message_id",
+        "trace_id",
+        "correlation_id",
+        "tenant_uuid",
+        "tool_scope",
+        "issued_at",
+        "payload_ref",
+        "signature",
+    ]
+    missing = [key for key in required if not payload.get(key)]
+    if missing:
+        return "missing required fields: " + ",".join(missing)
+    return None
+
+
 @router.post("/runtime/sessions/register")
 async def register(request: Request, payload: dict):
     request_id = _request_id(request)
@@ -46,7 +74,7 @@ async def register(request: Request, payload: dict):
     if not (payload or {}).get("runtime_assignment_id"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
-            "runtime_assignment_id 必填",
+            "invalid register request",
             request_id=request_id,
             status_code=400,
         )
@@ -59,18 +87,14 @@ async def ack(request: Request, session_id: str, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    if not payload:
-        return fail(
-            ERR_CODE_INVALID_REQUEST,
-            "payload 必填",
-            request_id=request_id,
-            status_code=400,
-        )
+    missing = _require_payload(request_id, payload, message="invalid ack payload")
+    if missing:
+        return missing
     return ok(service.ack(session_id, payload), request_id=request_id)
 
 
 @router.post("/runtime/sessions/{session_id}/heartbeat")
-async def heartbeat(request: Request, session_id: str, payload: dict):
+async def heartbeat(request: Request, session_id: str, payload: dict | None = None):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
@@ -79,7 +103,7 @@ async def heartbeat(request: Request, session_id: str, payload: dict):
 
 
 @router.post("/runtime/sessions/{session_id}/close")
-async def close(request: Request, session_id: str, payload: dict):
+async def close(request: Request, session_id: str, payload: dict | None = None):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
@@ -93,10 +117,21 @@ async def invoke(request: Request, session_id: str, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    if not payload:
+    missing = _require_payload(request_id, payload, message="invalid invoke payload")
+    if missing:
+        return missing
+    invalid = _validate_invoke(payload)
+    if invalid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
-            "payload 必填",
+            invalid,
+            request_id=request_id,
+            status_code=400,
+        )
+    if payload.get("session_id") and payload.get("session_id") != session_id:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "session_id mismatch",
             request_id=request_id,
             status_code=400,
         )

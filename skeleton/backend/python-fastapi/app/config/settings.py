@@ -12,6 +12,12 @@ class Settings:
     database_url: str = "sqlite:///./dev.db"
     db_schema: str | None = None
     db_echo: bool = os.getenv("POWERX_DB_ECHO", "0") == "1"
+    dev_mode: bool = False
+    server_dev_mode: bool = False
+    context_issuer: str = ""
+    context_audience: str = ""
+    context_hmac_secret: str = ""
+    grpc_upstream_tenant_uuid: str = ""
 
 
 def _resolve_config_candidates() -> list[str]:
@@ -96,6 +102,14 @@ def get_settings() -> Settings:
     database_url = _database_url_from_config(cfg)
     db_cfg = cfg.get("database") or {}
     db_schema = db_cfg.get("schema") if isinstance(db_cfg, dict) else None
+    dev_mode = bool(cfg.get("dev_mode") or cfg.get("devMode"))
+    server_dev_mode = bool(server_cfg.get("dev_mode")) if isinstance(server_cfg, dict) else False
+    ctx_cfg = cfg.get("context") or {}
+    context_issuer = ctx_cfg.get("issuer") if isinstance(ctx_cfg, dict) else ""
+    context_audience = ctx_cfg.get("audience") if isinstance(ctx_cfg, dict) else ""
+    context_hmac_secret = ctx_cfg.get("hmac_secret") if isinstance(ctx_cfg, dict) else ""
+    grpc_cfg = cfg.get("grpc_upstream") or {}
+    grpc_tenant_uuid = grpc_cfg.get("tenant_uuid") if isinstance(grpc_cfg, dict) else ""
     env_db = os.getenv("POWERX_DB_URL") or os.getenv("DATABASE_URL")
     if env_db:
         database_url = _normalize_postgres_dsn(env_db)
@@ -105,4 +119,10 @@ def get_settings() -> Settings:
         api_prefix=api_prefix,
         database_url=database_url,
         db_schema=db_schema,
+        dev_mode=dev_mode,
+        server_dev_mode=server_dev_mode,
+        context_issuer=context_issuer or "",
+        context_audience=context_audience or "",
+        context_hmac_secret=context_hmac_secret or "",
+        grpc_upstream_tenant_uuid=grpc_tenant_uuid or "",
     )

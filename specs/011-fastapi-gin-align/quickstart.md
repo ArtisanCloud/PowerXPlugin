@@ -17,6 +17,7 @@ bash scripts/dev.sh
 
 - 访问 `/healthz` 返回 200
 - 通过 Nuxt 管理端完成登录与基础列表访问
+- 通过宿主反代路径 `/_p/{plugin_id}{api_prefix}` 访问管理端接口可返回一致响应
 
 ## 备注
 
@@ -33,6 +34,7 @@ alembic upgrade head
 
 ## 验证记录
 
-- [ ] 本地启动 /healthz 通过
-- [ ] Nuxt 管理端基础流程联调通过
-- [ ] 迁移脚本可执行
+- [x] 本地启动 /healthz 通过
+- [x] Nuxt 管理端基础流程联调通过
+- [x] 迁移脚本可执行
+- [x] 管理端 Handler 行为与 Gin 对齐（Auth/IAM/Templates/Capabilities/Runtime Sessions/Manifest/RBAC）

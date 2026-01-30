@@ -7,6 +7,12 @@
 
 在不修改现有 Gin 与 Nuxt 的前提下，补齐 FastAPI 的目录结构、契约与最小联调接口，使其可在宿主反代与独立运行模式下完成核心管理端联调，并保证数据库结构与契约一致性。
 
+## Current Status (2026-01-29)
+
+- Model/Repository/Service 分层已对齐 Gin（含 Privacy/Security/Marketplace/Operations/Plugin 等域）。
+- Admin Handler 已对齐 Gin（Auth/IAM/Templates/Capabilities/Runtime Sessions/Manifest/RBAC）。
+- 宿主反代路径已支持 `/_p/{plugin_id}{api_prefix}` 与 `api_prefix` 同步挂载。
+
 ## Technical Context
 
 **Language/Version**: Python 3.11

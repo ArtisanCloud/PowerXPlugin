@@ -65,7 +65,7 @@
 
 **请求头约定（调用底座）：**
 - `Authorization: Bearer <TOKEN>`
-- `x-tenant-uuid: <TENANT_UUID>`
+- `x-powerx-tenant: <TENANT_UUID>`
 - `Idempotency-Key: <uuid>`（可选）
 
 **Handler 示例（Go 伪代码）：**

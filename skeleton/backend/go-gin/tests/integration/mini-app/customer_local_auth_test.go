@@ -343,7 +343,7 @@ func doJSON(t *testing.T, engine *gin.Engine, method, path, tenantUUID string, b
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if tenantUUID != "" {
-		req.Header.Set("X-Tenant-UUID", tenantUUID)
+		req.Header.Set("X-PowerX-Tenant", tenantUUID)
 	}
 	for k, v := range headers {
 		req.Header.Set(k, v)

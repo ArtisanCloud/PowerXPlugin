@@ -16,6 +16,12 @@ Go Gin + Nuxt 已是当前仓库的完整实现与事实标准。FastAPI 目前�
 - FastAPI 对外接口最少实现一组可被 Nuxt 调用的基础 API（以 Go Gin 为准）。
 - FastAPI 可在 Standalone 下独立启动，并保持与 Nuxt 的联调流程清晰可复用。
 
+## 当前对齐进度（2026-01-29）
+
+- DDD 分层：`models/repository/services/transport/router` 已按 Gin 结构落地。
+- Handler 对齐：Admin Auth / IAM / Templates / Capabilities / Runtime Sessions / Manifest / RBAC 已按 Gin 行为对齐。
+- 宿主反代：已支持 `/_p/{plugin_id}{api_prefix}` 与 `api_prefix` 同步挂载。
+
 ## 非目标
 
 - 不重写 Go Gin 现有业务逻辑。
@@ -63,6 +69,7 @@ skeleton/backend/python-fastapi/
 ### 2) 接口契约
 
 - **路径前缀**：以 `etc/config.yaml` 的 `server.api_prefix` 为准，默认 `/api/v1`，与 Go Gin 保持一致。
+- **宿主反代**：同时挂载 `/_p/{plugin_id}{api_prefix}`，与 Gin 反代路径一致。
 - **健康检查**：保留 `/healthz` 并与 Go Gin 输出结构一致。
 - **响应 Envelope**：遵循现有 CRUD/REST 约定（保持字段名与分页结构一致）。
 - **鉴权/租户**：沿用 tenant_uuid 注入与最小权限策略（由中间件注入上下文）。
@@ -196,6 +203,15 @@ skeleton/backend/python-fastapi/
 - `DELETE /templates/${id}`
 - `GET /templates/${id}`
 - `PUT /templates/${id}`
+
+### 已对齐（FastAPI）
+
+- Admin Auth：`/admin/user/auth/*`（含 me/context、login/refresh/logout）已对齐 Gin 响应字段与错误码。
+- Admin IAM：`/admin/iam/*`（含 tenants/roles/permissions/departments/members/audit/sts 入口）已对齐 Gin 行为与分页字段。
+- Templates：`/templates/*` + `/admin/templates/*` 已补齐 batch-clone/validate 与 Gin 行为。
+- Capabilities：`/admin/capabilities/*` 已补齐 reviews 占位与 Gin 路由一致。
+- Runtime Sessions：`/admin/runtime/sessions/*` 校验字段与错误信息对齐 Gin。
+- Manifest/RBAC：`/admin/manifest` 与 `/admin/rbac` 返回结构与 Gin 对齐。
 
 1) 从 `web-admin` API 调用点清单化（已完成初次扫描）：  
    - 目标：人工校对路径、方法、字段、错误码与权限码映射。

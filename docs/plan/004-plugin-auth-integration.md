@@ -50,7 +50,7 @@
   - `logout`：调用 `authService.logout() → clearAuth → navigateTo('/users/login')`。
 - **HTTP 拦截器**：拓展 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`：  
   - 在 `onResponseError` 中捕捉 401 → 自动尝试 `refreshToken`（若 `refresh_token` 存在）→ 成功则重播原请求，失败则 `clearAuth()` 并跳转登录。  
-  - 请求头继续沿用 `Authorization: Bearer <token>` 与 `X-Tenant-UUID`。
+  - 请求头继续沿用 `Authorization: Bearer <token>` 与 `X-PowerX-Tenant`。
 - **路由保护**：新增 `middleware/auth.global.ts`：  
   - 对除 `users/login|register|forgot-password` 外的页面强制检测 `useAuth().token`；  
   - 若缺失则重定向登录并附带 `redirect` query。  

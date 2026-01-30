@@ -14,6 +14,16 @@ test: ## 执行 Go 单元测试
 		cd $(BACKEND_DIR) && go test ./...; \
 	fi
 
+.PHONY: test-smoke
+test-smoke: ## 运行 smoke（对齐根目录 test-smoke）
+	@echo "=== Smoke Tests Start ==="
+	@if [ "$(BACKEND)" = "fastapi" ]; then \
+		cd .. && BACKEND=$(BACKEND) python3 scripts/testing/run_with_timeout.py --timeout 300 ./scripts/testing/smoke-python.sh; \
+	else \
+		cd .. && BACKEND=$(BACKEND) python3 scripts/testing/run_with_timeout.py --timeout 300 ./scripts/testing/smoke.sh; \
+	fi
+	@echo "=== Smoke Tests Finished ==="
+
 .PHONY: test-admin
 test-admin: ## 运行 web-admin 测试
 	@echo "运行 Web Admin 测试..."

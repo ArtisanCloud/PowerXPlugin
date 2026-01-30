@@ -205,9 +205,9 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 	if tenantOverride != "" {
-		httpReq.Header.Set("X-Tenant-UUID", tenantOverride)
+		httpReq.Header.Set("X-PowerX-Tenant", tenantOverride)
 	} else {
-		httpReq.Header.Set("X-Tenant-UUID", c.tenantUUID)
+		httpReq.Header.Set("X-PowerX-Tenant", c.tenantUUID)
 	}
 	httpReq.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
@@ -289,7 +289,7 @@ func (c *Client) InvokeGRPC(ctx context.Context, req InvokeRequest) (*Response, 
 
 	md := metadata.New(map[string]string{
 		"authorization": fmt.Sprintf("Bearer %s", c.token),
-		"x-tenant-uuid": c.tenantUUID,
+		"x-powerx-tenant": c.tenantUUID,
 		"x-request-id":  requestID,
 	})
 	ctxCall, cancel := context.WithTimeout(ctx, c.requestTimeout)

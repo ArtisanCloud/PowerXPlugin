@@ -52,7 +52,7 @@ func TestMiniAppDelegateAuth_TenantMismatchForbidden(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/ping", nil)
-	req.Header.Set("X-Tenant-UUID", "00000000-0000-0000-0000-000000000001")
+	req.Header.Set("X-PowerX-Tenant", "00000000-0000-0000-0000-000000000001")
 	req.Header.Set("Authorization", "Bearer token-1")
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
@@ -91,7 +91,7 @@ func TestMiniAppDelegateAuth_UpstreamUnavailable503(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/ping", nil)
-	req.Header.Set("X-Tenant-UUID", "00000000-0000-0000-0000-000000000001")
+	req.Header.Set("X-PowerX-Tenant", "00000000-0000-0000-0000-000000000001")
 	req.Header.Set("Authorization", "Bearer token-1")
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)

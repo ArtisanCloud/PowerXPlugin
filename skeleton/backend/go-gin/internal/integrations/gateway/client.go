@@ -243,7 +243,7 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-Tenant-UUID", tenant)
+	req.Header.Set("X-PowerX-Tenant", tenant)
 	req.Header.Set("X-Request-ID", uuid.NewString())
 
 	client := &http.Client{Timeout: timeout}

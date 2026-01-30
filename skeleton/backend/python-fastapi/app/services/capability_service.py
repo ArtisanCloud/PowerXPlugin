@@ -4,10 +4,8 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
-
 from app.entity.models import Capability
-from app.entity.repository.db import get_db
+from app.entity.repository.capability_repository import CapabilityRepository
 
 _CAPABILITY_REGISTRY: list[dict[str, Any]] = []
 _CAPABILITY_LIFECYCLES: dict[str, dict[str, Any]] = {}
@@ -19,34 +17,26 @@ def _now_iso() -> str:
     return datetime.utcnow().isoformat() + "Z"
 
 
-def _to_dict(obj: Any) -> dict:
-    data = {}
-    for key in obj.__table__.columns.keys():
-        data[key] = getattr(obj, key)
-    return data
-
-
 class CapabilityService:
+    def __init__(self, repo: CapabilityRepository | None = None) -> None:
+        self._repo = repo or CapabilityRepository()
+
     def list_capabilities(self):
-        db = get_db().session()
-        try:
-            items = db.execute(select(Capability)).scalars().all()
-            return [
-                {
-                    "id": item.id,
-                    "version": item.version or "v1",
-                    "descriptor": item.name,
-                    "module": None,
-                    "kind": None,
-                    "tags": [],
-                    "checksum": "",
-                    "execution": {"mode": "sync"},
-                    "protocols": {},
-                }
-                for item in items
-            ]
-        finally:
-            db.close()
+        items = self._repo.list_capabilities()
+        return [
+            {
+                "id": item.id,
+                "version": item.version or "v1",
+                "descriptor": item.name,
+                "module": None,
+                "kind": None,
+                "tags": [],
+                "checksum": "",
+                "execution": {"mode": "sync"},
+                "protocols": {},
+            }
+            for item in items
+        ]
 
     def register_template(self):
         return {
@@ -72,20 +62,15 @@ class CapabilityService:
             "updated_at": _now_iso(),
         }
         _CAPABILITY_REGISTRY.append(record)
-        db = get_db().session()
-        try:
-            cap = Capability(
-                id=capability_id,
-                name=display_name,
-                status=record["status"],
-                version=payload.get("metadata", {}).get("version") if payload.get("metadata") else None,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            db.add(cap)
-            db.commit()
-        finally:
-            db.close()
+        cap = Capability(
+            id=capability_id,
+            name=display_name,
+            status=record["status"],
+            version=payload.get("metadata", {}).get("version") if payload.get("metadata") else None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        self._repo.create(cap)
         return record
 
     def validate(self, payload: dict):

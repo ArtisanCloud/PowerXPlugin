@@ -1864,7 +1864,7 @@ const debugRequestPreview = computed(() => {
     "Content-Type": "application/json",
   };
   if (debugForm.tenantUuid.trim()) {
-    headers["X-Tenant-UUID"] = debugForm.tenantUuid.trim();
+    headers["X-PowerX-Tenant"] = debugForm.tenantUuid.trim();
   }
   if (debugForm.mockModule.trim()) {
     headers["X-PX-Use-Mock"] = debugForm.mockModule.trim();
@@ -3467,7 +3467,7 @@ async function handleDebugInvoke() {
   }
   const headers: Record<string, string> = {};
   if (debugForm.tenantUuid.trim()) {
-    headers["X-Tenant-UUID"] = debugForm.tenantUuid.trim();
+    headers["X-PowerX-Tenant"] = debugForm.tenantUuid.trim();
   }
   if (debugForm.mockModule.trim()) {
     headers["X-PX-Use-Mock"] = debugForm.mockModule.trim();

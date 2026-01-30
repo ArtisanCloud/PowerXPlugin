@@ -178,3 +178,55 @@ T028 & T029 & T030 & T031 & T032
 - [x] T052 对齐运行时会话：补齐 /admin/runtime/sessions/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/runtime_sessions.py`
 - [x] T053 对齐数据库结构：校对模型字段/类型与 Gin 一致并更新 `skeleton/backend/python-fastapi/app/entity/models/*.py`
 - [x] T054 对齐数据库迁移：更新 Alembic 迁移脚本以匹配字段在 `skeleton/backend/python-fastapi/migrations/versions/0001_init.py`
+
+## DDD 基础层对齐任务清单（先 Model → Repository → Service）
+
+> 约束：遵循 Constitution 的 DDD 分层（Model/Repository/Service），先补齐领域模型，再补齐 Repository，再补齐 Service，最后再回到 Handler/API。
+
+- [x] T055 对齐 Model（Privacy/Security/ToolGrant/Integration/Marketplace/Operations/AdminConsole/Customer）：按 Gin 字段与表名补齐 `skeleton/backend/python-fastapi/app/entity/models/*.py`
+- [x] T056 对齐 Repository（Privacy/Security/ToolGrant/Integration/Marketplace/Operations/AdminConsole/Customer）：补齐 `skeleton/backend/python-fastapi/app/entity/repository/*` 的数据访问骨架与查询入口
+- [x] T057 对齐 Service（Privacy/Security/ToolGrant/Integration/Marketplace/Operations/AdminConsole/Customer）：补齐 `skeleton/backend/python-fastapi/app/services/*` 的领域服务骨架与关键方法
+
+- [x] T058 对齐 Model（Capability/RuntimeOps 细节字段）：按 Gin 字段补齐 `skeleton/backend/python-fastapi/app/entity/models/capability.py` 与 `runtime_session.py`
+- [x] T059 对齐 Repository（Capability/RuntimeOps）：补齐 `skeleton/backend/python-fastapi/app/entity/repository/*` 能力/运行时查询入口
+- [x] T060 对齐 Service（Capability/RuntimeOps）：补齐 `skeleton/backend/python-fastapi/app/services/*` 能力/运行时核心逻辑骨架
+
+- [x] T061 对齐 Model（Plugin/Tenant 扩展）：补齐 `plugin_tenant_ext`、`plugin_credentials` 相关字段
+- [x] T062 对齐 Repository（Plugin/Tenant 扩展）：补齐 `skeleton/backend/python-fastapi/app/entity/repository/*` 扩展表访问入口
+- [x] T063 对齐 Service（Plugin/Tenant 扩展）：补齐 `skeleton/backend/python-fastapi/app/services/*` 扩展表服务层
+
+## Handler 对齐任务清单（按 Gin 行为）
+
+> 目标：HTTP Handler 行为/响应与 Gin 对齐，保持路径、参数、分页、错误码与 envelope 一致。
+
+- [x] T064 对齐 Handler（Admin Auth）：/admin/user/auth/* 请求参数与响应字段一致
+- [x] T065 对齐 Handler（Admin IAM）：/admin/iam/* 列表/详情/创建/更新/删除与 Gin 一致
+- [x] T066 对齐 Handler（Admin Templates）：/admin/templates/* CRUD 与 Gin 一致
+- [x] T067 对齐 Handler（Admin Capabilities）：/admin/capabilities/*（register/lifecycle/exposure/quotas）与 Gin 一致
+- [x] T068 对齐 Handler（Admin Runtime Sessions）：/admin/runtime/sessions/*（register/ack/heartbeat/close/invoke）与 Gin 一致
+- [x] T069 对齐 Handler（Admin Manifest/RBAC）：/admin/manifest & /admin/rbac 与 Gin 一致
+- [x] T070 对齐 Handler（Host 反代路径）：宿主前缀解析与 Gin 路由映射一致
+
+## 业务模块对齐任务清单（Gin 现有模块补齐）
+
+> 目标：补齐 Gin 已实现模块在 FastAPI 的 Handler + Service 逻辑，实现可联调与可用。
+
+- [x] T071 对齐 Integration 模块：/admin/integration/* + /integration/* Handler 与 Service 逻辑
+- [x] T072 对齐 Operations 模块：/admin/operations/* Handler 与 Service 逻辑
+- [x] T073 对齐 Marketplace 模块：/admin/marketplace/* + public marketplace Handler 与 Service 逻辑
+- [x] T074 对齐 Security 模块：/admin/security/* Handler 与 Service 逻辑
+- [x] T075 对齐 Privacy 模块：/admin/privacy/* Handler 与 Service 逻辑
+- [x] T076 对齐 ToolGrant 模块：/admin/tool-grant/* Handler 与 Service 逻辑
+
+## 运行时与中间件一致性任务
+
+- [x] T077 对齐 RBAC 中间件逻辑（权限判定、默认拒绝策略）与 Gin
+- [x] T078 对齐 Tenant Context 注入与校验（tenant_uuid/roles/permissions）
+
+## 补齐项：中间件与注册机制缺口
+
+- [x] T079 对齐 RequestTrace 中间件（request_id 生成/透传）与 Gin
+- [x] T080 对齐 Host Context 注入（x-powerx-proxy / x-plugin-id）与 Gin
+- [x] T081 对齐 DevSwitch 开发态注入（非生产 & 非代理时注入超管上下文）
+- [x] T082 对齐 RBAC 路由权限注册机制（Registry → RoutePermissions 注入）
+- [x] T083 对齐 TenantGuard（强制 tenant_uuid 校验与注入）

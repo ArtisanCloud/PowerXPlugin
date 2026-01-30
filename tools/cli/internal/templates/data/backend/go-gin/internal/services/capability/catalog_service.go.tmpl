@@ -129,7 +129,7 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	if tenant != "" {
-		req.Header.Set("X-Tenant-UUID", tenant)
+		req.Header.Set("X-PowerX-Tenant", tenant)
 	}
 	req.Header.Set("X-Request-ID", fmt.Sprintf("cap-catalog-%d", time.Now().UnixNano()))
 

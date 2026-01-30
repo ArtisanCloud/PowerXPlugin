@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, text
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.entity.models.base import Base
@@ -20,7 +20,7 @@ class AdminConsoleAuditEvent(Base):
     summary = Column(String, nullable=True)
     diff = Column(JSONB, nullable=True)
     occurred_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
 
 
 class AdminConsoleConfigChange(Base):
@@ -62,5 +62,5 @@ class AdminConsoleJobRun(Base):
     retry_of = Column(UUID(as_uuid=False), nullable=True)
     audit_event_id = Column(UUID(as_uuid=False), nullable=True)
     created_by = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)

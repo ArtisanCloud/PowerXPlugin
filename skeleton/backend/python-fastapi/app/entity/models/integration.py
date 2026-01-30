@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, text
+from sqlalchemy import Column, DateTime, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.entity.models.base import Base
@@ -15,8 +15,8 @@ class IntegrationWebhookSubscription(Base):
     retry_policy = Column(JSONB, nullable=True)
     status = Column(String, server_default=text("'ACTIVE'"), nullable=False)
     metadata_ = Column("metadata", JSONB, server_default=text("'{}'::jsonb"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class IntegrationWebhookAttempt(Base):
@@ -30,8 +30,8 @@ class IntegrationWebhookAttempt(Base):
     last_error = Column(String, nullable=True)
     next_delivery_at = Column(DateTime(timezone=True), nullable=True)
     payload_snapshot = Column(JSONB, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class IntegrationSecret(Base):
@@ -48,8 +48,8 @@ class IntegrationSecret(Base):
     status = Column(String, server_default=text("'ACTIVE'"), nullable=False)
     audit_log = Column(JSONB, server_default=text("'[]'::jsonb"), nullable=True)
     metadata_ = Column("metadata", JSONB, server_default=text("'{}'::jsonb"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class IntegrationGrantMatrixOverride(Base):
@@ -65,5 +65,5 @@ class IntegrationGrantMatrixOverride(Base):
     version = Column(Integer, nullable=False)
     approved_by = Column(String, nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False)
-    updated_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)

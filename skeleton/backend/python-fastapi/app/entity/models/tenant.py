@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, DateTime, String, text
+from sqlalchemy import BigInteger, Column, DateTime, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.entity.models.base import Base
@@ -13,6 +13,6 @@ class Tenant(Base):
     name = Column(String(128), nullable=False)
     status = Column(String(32), nullable=False, server_default=text("'active'"))
     plan = Column(String(64), nullable=False, server_default=text("'free'"))
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False, onupdate=text("now()"))
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)

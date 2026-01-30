@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, String, text
+from sqlalchemy import Column, DateTime, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.entity.models.base import Base
@@ -10,7 +10,7 @@ class SecurityBaselineChecklist(Base):
     id = Column(UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()"))
     version = Column(String, nullable=False)
     controls = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     retired_at = Column(DateTime(timezone=True), nullable=True)
 
 
@@ -26,7 +26,7 @@ class SecurityAuditReport(Base):
     sarif_path = Column(String, nullable=True)
     report_hash = Column(String, nullable=True)
     checklist_version = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
 
 
 class SecurityVulnerabilityAdvisory(Base):
@@ -44,8 +44,8 @@ class SecurityVulnerabilityAdvisory(Base):
     patched_at = Column(DateTime(timezone=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
     sla_deadline = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class SecurityAdvisoryDistribution(Base):
@@ -58,5 +58,5 @@ class SecurityAdvisoryDistribution(Base):
     delivered_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String, nullable=False)
     metadata_ = Column("metadata", JSONB, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)

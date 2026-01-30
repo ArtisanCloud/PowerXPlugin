@@ -6,7 +6,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
-    text,
+    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
@@ -25,8 +25,8 @@ class OperationsSupportChannel(Base):
     escalation_path = Column(JSONB, nullable=True)
     metadata_ = Column("metadata", JSONB, nullable=True)
     version = Column(Integer, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class OperationsSupportTicket(Base):
@@ -50,8 +50,8 @@ class OperationsSupportTicket(Base):
     csat_score = Column(Float, nullable=True)
     resolution_code = Column(String, nullable=True)
     reopen_count = Column(Integer, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class OperationsIncident(Base):
@@ -75,8 +75,8 @@ class OperationsIncident(Base):
     mitigated_at = Column(DateTime(timezone=True), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class OperationsIncidentUpdate(Base):
@@ -90,7 +90,7 @@ class OperationsIncidentUpdate(Base):
     author_role = Column(String, nullable=True)
     posted_at = Column(DateTime(timezone=True), nullable=True)
     metadata_ = Column("metadata", JSONB, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
 
 
 class OperationsIncidentChecklist(Base):
@@ -102,8 +102,8 @@ class OperationsIncidentChecklist(Base):
     description = Column(String, nullable=True)
     status = Column(String, nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class OperationsSupportTicketEvent(Base):
@@ -116,7 +116,7 @@ class OperationsSupportTicketEvent(Base):
     emitted_at = Column(DateTime(timezone=True), nullable=True)
     webhook_status = Column(String, nullable=True)
     retry_count = Column(Integer, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
 
 
 class OperationsReadinessChecklistItem(Base):
@@ -132,8 +132,8 @@ class OperationsReadinessChecklistItem(Base):
     due_date = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class OperationsSLAProfile(Base):
@@ -155,8 +155,8 @@ class OperationsSLAProfile(Base):
     penalty_applied_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(String, nullable=True)
     computed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class OperationsSLAAdjustment(Base):
@@ -172,4 +172,4 @@ class OperationsSLAAdjustment(Base):
     action = Column(String, nullable=True)
     details = Column(String, nullable=True)
     applied_by = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)

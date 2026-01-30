@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, String, text
+from sqlalchemy import Column, DateTime, Integer, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.entity.models.base import Base
@@ -16,5 +16,5 @@ class RuntimeSession(Base):
     missed_heartbeats = Column(Integer, server_default=text("0"), nullable=False)
     last_ping_at = Column(DateTime(timezone=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False)
-    updated_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)

@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Column, DateTime, String, text
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.entity.models.base import Base
@@ -16,6 +16,6 @@ class User(Base):
     is_root = Column(Boolean, nullable=False, server_default=text("false"), index=True)
     password_hash = Column(String(255), nullable=False, server_default=text("''"))
     meta = Column(JSONB, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False, onupdate=text("now()"))
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)

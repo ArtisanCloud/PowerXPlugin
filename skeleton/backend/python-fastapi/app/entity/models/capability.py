@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, String, text
+from sqlalchemy import Column, DateTime, String, func, text
 
 from app.entity.models.base import Base
 
@@ -10,5 +10,5 @@ class Capability(Base):
     name = Column(String, nullable=False)
     status = Column(String, nullable=False)
     version = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)

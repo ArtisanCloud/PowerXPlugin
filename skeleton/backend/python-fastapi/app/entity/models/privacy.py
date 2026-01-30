@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, String, text
+from sqlalchemy import Column, DateTime, String, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.entity.models.base import Base
@@ -14,8 +14,8 @@ class PrivacyDataClassification(Base):
     lawful_basis = Column(String, nullable=False)
     retention_policy = Column(JSONB, nullable=True)
     purpose = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class PrivacyConsentToken(Base):
@@ -31,8 +31,8 @@ class PrivacyConsentToken(Base):
     status = Column(String, server_default=text("'ACTIVE'"), nullable=False)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     revoked_reason = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
 
 class PrivacyLifecycleEvent(Base):
@@ -46,4 +46,4 @@ class PrivacyLifecycleEvent(Base):
     occurred_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     recorded_by = Column(String, nullable=False)
     status = Column(String, server_default=text("'PENDING'"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)

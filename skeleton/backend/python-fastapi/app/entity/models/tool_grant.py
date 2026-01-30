@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, String
+from sqlalchemy import Column, DateTime, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import text
 
@@ -15,7 +15,7 @@ class ToolGrantRevocation(Base):
     revoked_by = Column(String, nullable=False)
     reason = Column(String, nullable=True)
     ttl_expiry = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
 
 
 class ToolGrantUsageEvent(Base):

@@ -2,6 +2,19 @@ package wsbus
 
 import "context"
 
+const (
+	ErrorCodeTopicRequired           = "TOPIC_REQUIRED"
+	ErrorCodeTopicNotAllowed         = "TOPIC_NOT_ALLOWED"
+	ErrorCodePayloadRequired         = "PAYLOAD_REQUIRED"
+	ErrorCodeTenantRequired          = "TENANT_REQUIRED"
+	ErrorCodePublisherNotConfigured  = "PUBLISHER_NOT_CONFIGURED"
+	ErrorCodeHostPublishFailed       = "HOST_PUBLISH_FAILED"
+	ErrorCodeLocalPublishFailed      = "LOCAL_PUBLISH_FAILED"
+	ErrorCodePublishRequestInvalid   = "PUBLISH_REQUEST_INVALID"
+	ErrorCodePublishResponseInvalid  = "PUBLISH_RESPONSE_INVALID"
+	ErrorCodePublishUpstreamRejected = "PUBLISH_UPSTREAM_REJECTED"
+)
+
 type PublishOptions struct {
 	TenantUUID string `json:"tenant_uuid"`
 	TraceID    string `json:"trace_id"`

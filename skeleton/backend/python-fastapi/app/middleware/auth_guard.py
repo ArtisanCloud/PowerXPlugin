@@ -59,7 +59,7 @@ def build_jwt_config(settings: Settings) -> JWTAuthConfig:
 
     issuer = settings.context_issuer.strip() if settings.context_issuer else "powerx-local"
     audiences = _split_audiences(settings.context_audience.strip()) if settings.context_audience else ["powerx:plugin"]
-    hmac_secret = settings.context_hmac_secret.strip() if settings.context_hmac_secret else ""
+    hmac_secret = settings.context_hmac_secret.strip() if settings.context_hmac_secret else "powerx-plugin-dev"
     return JWTAuthConfig(
         issuer=issuer or "powerx-local",
         accept_audiences=audiences,
@@ -88,12 +88,15 @@ async def auth_guard_middleware(request: Request, call_next: Callable):
         return await call_next(request)
 
     raw_auth = request.headers.get("authorization", "")
-    if raw_auth.lower().startswith("bearer ") and cfg.hmac_secret:
+    if raw_auth.lower().startswith("bearer "):
         token = raw_auth[7:].strip()
-        if _verify_hs256(token, cfg, strict=False):
-            set_tenant_context(request, TenantContext())
-            request.state.raw_bearer_token = token
-            return await call_next(request)
+        if token and cfg.hmac_secret:
+            tc = _parse_hs256(token, cfg)
+            if tc is not None:
+                set_tenant_context(request, tc)
+                request.state.raw_bearer_token = token
+                return await call_next(request)
+        return JSONResponse(status_code=401, content={"error": "jwt Unauthorized"})
 
     if cfg.optional:
         return await call_next(request)
@@ -271,5 +274,7 @@ def _is_health_endpoint(path: str, api_prefix: str) -> bool:
     if lowered.startswith("/healthz") or lowered.startswith(f"{prefix}/healthz"):
         return True
     if lowered.startswith(f"{prefix}/admin/runtime/metrics"):
+        return True
+    if lowered.startswith("/assets/builds/meta") or lowered.startswith(f"{prefix}/assets/builds/meta"):
         return True
     return False

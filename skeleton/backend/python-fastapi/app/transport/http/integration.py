@@ -6,8 +6,10 @@ from app.contracts.response import (
     fail,
     ok,
 )
+from app.services.integration_service import IntegrationService
 
 router = APIRouter()
+service = IntegrationService()
 
 
 def _request_id(request: Request) -> str | None:
@@ -43,7 +45,7 @@ async def dispatch(request: Request, payload: dict):
         return auth
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
-    return ok({"status": "ok"}, request_id=request_id)
+    return ok(service.dispatch(payload), request_id=request_id)
 
 
 @router.post("/integration/capabilities/invoke")
@@ -54,7 +56,7 @@ async def invoke_capability(request: Request, payload: dict):
         return auth
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
-    return ok({"status": "ok", "payload": {}, "metadata": {}}, request_id=request_id)
+    return ok(service.invoke_capability(payload), request_id=request_id)
 
 
 @router.get("/integration/grant-matrix")
@@ -63,7 +65,7 @@ async def list_grant_matrix(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"items": []}, request_id=request_id)
+    return ok({"items": service.list_grant_matrix_overrides()}, request_id=request_id)
 
 
 @router.post("/integration/grant-matrix")
@@ -74,7 +76,7 @@ async def submit_grant_matrix(request: Request, payload: dict):
         return auth
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
-    return ok({"ok": True}, request_id=request_id)
+    return ok(service.submit_grant_matrix(payload), request_id=request_id)
 
 
 @router.post("/integration/webhooks/subscriptions")
@@ -90,7 +92,7 @@ async def create_subscription(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok(payload, request_id=request_id)
+    return ok(service.create_subscription(payload), request_id=request_id)
 
 
 @router.get("/integration/webhooks/subscriptions")
@@ -99,7 +101,7 @@ async def list_subscriptions(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"items": []}, request_id=request_id)
+    return ok({"items": service.list_subscriptions(None)}, request_id=request_id)
 
 
 @router.post("/integration/webhooks/dlq/{attempt_id}/replay")
@@ -108,7 +110,7 @@ async def replay_dlq(request: Request, attempt_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"ok": True, "attempt_id": attempt_id}, request_id=request_id)
+    return ok(service.replay_attempt(attempt_id), request_id=request_id)
 
 
 @router.post("/integration/secrets")
@@ -119,7 +121,7 @@ async def create_secret(request: Request, payload: dict):
         return auth
     if not (payload or {}).get("integration_type"):
         return fail(ERR_CODE_INVALID_REQUEST, "integration_type 必填", request_id=request_id, status_code=400)
-    return ok(payload, request_id=request_id)
+    return ok(service.create_secret(payload), request_id=request_id)
 
 
 @router.post("/integration/secrets/{secret_id}/rotate")
@@ -128,4 +130,4 @@ async def rotate_secret(request: Request, secret_id: str, payload: dict | None =
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"id": secret_id, "status": "rotating"}, request_id=request_id)
+    return ok(service.rotate_secret(secret_id, payload), request_id=request_id)

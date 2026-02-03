@@ -5,3 +5,5 @@ alembic~=1.18
 pyyaml~=6.0
 psycopg2-binary~=2.9
 bcrypt~=4.2
+cryptography~=42.0
+PyJWT~=2.9

@@ -102,7 +102,11 @@ async def list_lifecycle(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok(service.list_lifecycle(), request_id=request_id)
+    capability_id = request.query_params.get("capability_id")
+    plans = service.list_lifecycle()
+    if capability_id:
+        plans = [plan for plan in plans if plan.get("capability_id") == capability_id]
+    return ok({"capability_id": capability_id, "plans": plans}, request_id=request_id)
 
 
 @router.post("/capabilities/lifecycle")
@@ -152,7 +156,7 @@ async def exposure_detail(request: Request, capability_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok(service.exposure_detail(capability_id), request_id=request_id)
+    return ok({"capability_id": capability_id, "package": service.exposure_detail(capability_id)}, request_id=request_id)
 
 
 @router.put("/capabilities/exposure/{capability_id}")
@@ -177,7 +181,7 @@ async def list_quotas(request: Request, capability_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok(service.list_quotas(capability_id), request_id=request_id)
+    return ok({"capability_id": capability_id, "quotas": service.list_quotas(capability_id)}, request_id=request_id)
 
 
 @router.post("/capabilities/quotas/{capability_id}")
@@ -201,7 +205,7 @@ async def review_list(request: Request, capability_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"capability_id": capability_id, "items": []}, request_id=request_id)
+    return ok({"capability_id": capability_id, "tasks": service.list_reviews(capability_id)}, request_id=request_id)
 
 
 @router.post("/capabilities/reviews/{capability_id}/resubmit")
@@ -210,7 +214,7 @@ async def review_resubmit(request: Request, capability_id: str, payload: dict | 
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"capability_id": capability_id, "status": "resubmitted"}, request_id=request_id)
+    return ok({"capability_id": capability_id, "tasks": service.resubmit_review(capability_id, payload)}, request_id=request_id)
 
 
 @router.post("/capabilities/reviews/tasks/{task_id}/comments")
@@ -219,7 +223,7 @@ async def review_add_comment(request: Request, task_id: str, payload: dict | Non
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"task_id": task_id, "ok": True}, request_id=request_id)
+    return ok(service.add_review_comment(task_id, payload), request_id=request_id)
 
 
 @router.post("/capabilities/reviews/tasks/{task_id}/decision")
@@ -228,6 +232,4 @@ async def review_decide(request: Request, task_id: str, payload: dict | None = N
     auth = _require_auth(request)
     if auth:
         return auth
-    decision = (payload or {}).get("decision") if payload else None
-    return ok({"task_id": task_id, "decision": decision}, request_id=request_id)
-
+    return ok(service.decide_review(task_id, payload), request_id=request_id)

@@ -230,3 +230,18 @@ T028 & T029 & T030 & T031 & T032
 - [x] T081 对齐 DevSwitch 开发态注入（非生产 & 非代理时注入超管上下文）
 - [x] T082 对齐 RBAC 路由权限注册机制（Registry → RoutePermissions 注入）
 - [x] T083 对齐 TenantGuard（强制 tenant_uuid 校验与注入）
+
+## 补齐项：其它路由与能力对齐
+
+- [x] T084 对齐 Dev Console 路由（/admin/dev-console/*）与 Gin
+- [x] T085 对齐 Runtime Ops 扩展路由（bootstrap/quota/metrics/event-bridge）与 Gin
+- [x] T086 对齐 Agent 路由（credentials/STS/security）与 Gin
+- [x] T087 对齐 Mini-App 路由（auth/ping/templates）与 Gin
+- [x] T088 对齐 Dev Assets 路由（/assets/builds/meta）与 Gin
+- [x] T089 对齐 Agent 凭证加密（AES-GCM + AAD + server.secret_key）与 Gin
+- [x] T090 对齐 Agent 安全端点（privacy/toolgrant）逻辑与 Gin
+- [x] T091 对齐 Agent STS Exchange 错误语义（未配置时返回内部错误）
+- [x] T092 对齐 Agent STS Exchange 实现（HTTP STS endpoint + client_id/secret）
+- [x] T093 对齐 Admin ToolGrant 行为（204 返回/limit/toolgrant_id/usage 记录）
+- [x] T094 对齐 Admin Security/Privacy 过滤与响应（status/event_type/limit/204/格式）
+- [x] T095 对齐 STS TokenManager（缓存/刷新/单例管理）

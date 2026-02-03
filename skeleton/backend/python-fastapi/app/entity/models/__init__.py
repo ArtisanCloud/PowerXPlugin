@@ -12,6 +12,7 @@ from app.entity.models.iam_audit_log import IAMAuditLog
 from app.entity.models.template import Template
 from app.entity.models.capability import Capability
 from app.entity.models.runtime_session import RuntimeSession
+from app.entity.models.runtime_ops import RuntimeAuditEvent, MarketplaceOverage, QuotaLedger
 from app.entity.models.plugin_tenant_ext import PluginTenantExt
 from app.entity.models.plugin_credentials import PluginCredentials
 from app.entity.models.privacy import (
@@ -31,6 +32,8 @@ from app.entity.models.integration import (
     IntegrationWebhookAttempt,
     IntegrationSecret,
     IntegrationGrantMatrixOverride,
+    IntegrationChangeApproval,
+    IntegrationIdempotencyRecord,
 )
 from app.entity.models.marketplace import (
     MarketplaceListing,
@@ -83,6 +86,9 @@ __all__ = [
     "Template",
     "Capability",
     "RuntimeSession",
+    "RuntimeAuditEvent",
+    "MarketplaceOverage",
+    "QuotaLedger",
     "PluginTenantExt",
     "PluginCredentials",
     "PrivacyDataClassification",
@@ -98,6 +104,8 @@ __all__ = [
     "IntegrationWebhookAttempt",
     "IntegrationSecret",
     "IntegrationGrantMatrixOverride",
+    "IntegrationChangeApproval",
+    "IntegrationIdempotencyRecord",
     "MarketplaceListing",
     "MarketplaceListingAsset",
     "MarketplaceListingVersion",

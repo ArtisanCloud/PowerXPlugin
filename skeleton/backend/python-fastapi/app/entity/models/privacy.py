@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, String, func, text
+from sqlalchemy import Column, DateTime, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.entity.models.base import Base
@@ -9,11 +9,11 @@ class PrivacyDataClassification(Base):
 
     id = Column(UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()"))
     tenant_uuid = Column(UUID(as_uuid=False), nullable=False)
-    asset_key = Column(String, nullable=False)
-    category = Column(String, nullable=False)
-    lawful_basis = Column(String, nullable=False)
+    asset_key = Column(Text, nullable=False)
+    category = Column(Text, nullable=False)
+    lawful_basis = Column(Text, nullable=False)
     retention_policy = Column(JSONB, nullable=True)
-    purpose = Column(String, nullable=False)
+    purpose = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -23,14 +23,14 @@ class PrivacyConsentToken(Base):
 
     id = Column(UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()"))
     tenant_uuid = Column(UUID(as_uuid=False), nullable=False)
-    consent_token = Column(String, nullable=False)
+    consent_token = Column(Text, nullable=False)
     scope = Column(JSONB, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     issued_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    issued_by = Column(String, nullable=False)
-    status = Column(String, server_default=text("'ACTIVE'"), nullable=False)
+    issued_by = Column(Text, nullable=False)
+    status = Column(Text, server_default=text("'ACTIVE'"), nullable=False)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
-    revoked_reason = Column(String, nullable=True)
+    revoked_reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -40,10 +40,10 @@ class PrivacyLifecycleEvent(Base):
 
     id = Column(UUID(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()"))
     tenant_uuid = Column(UUID(as_uuid=False), nullable=False)
-    event_type = Column(String, nullable=False)
-    asset_key = Column(String, nullable=False)
+    event_type = Column(Text, nullable=False)
+    asset_key = Column(Text, nullable=False)
     payload = Column(JSONB, nullable=True)
     occurred_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
-    recorded_by = Column(String, nullable=False)
-    status = Column(String, server_default=text("'PENDING'"), nullable=False)
+    recorded_by = Column(Text, nullable=False)
+    status = Column(Text, server_default=text("'PENDING'"), nullable=False)
     created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)

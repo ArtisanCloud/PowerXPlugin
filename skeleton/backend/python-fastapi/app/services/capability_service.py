@@ -11,6 +11,7 @@ _CAPABILITY_REGISTRY: list[dict[str, Any]] = []
 _CAPABILITY_LIFECYCLES: dict[str, dict[str, Any]] = {}
 _CAPABILITY_EXPOSURES: dict[str, dict[str, Any]] = {}
 _CAPABILITY_QUOTAS: dict[str, list[dict[str, Any]]] = {}
+_CAPABILITY_REVIEWS: dict[str, list[dict[str, Any]]] = {}
 
 
 def _now_iso() -> str:
@@ -126,3 +127,39 @@ class CapabilityService:
         quotas = payload.get("quotas") or []
         _CAPABILITY_QUOTAS[capability_id] = quotas
         return {"capability_id": capability_id, "quotas": quotas}
+
+    def list_reviews(self, capability_id: str):
+        return _CAPABILITY_REVIEWS.get(capability_id, [])
+
+    def resubmit_review(self, capability_id: str, payload: dict | None = None):
+        tasks = _CAPABILITY_REVIEWS.get(capability_id, [])
+        record = {
+            "task_id": uuid4().hex,
+            "status": "resubmitted",
+            "actor": (payload or {}).get("actor"),
+            "note": (payload or {}).get("note"),
+            "attachments": (payload or {}).get("attachments") or [],
+            "created_at": _now_iso(),
+        }
+        tasks.append(record)
+        _CAPABILITY_REVIEWS[capability_id] = tasks
+        return tasks
+
+    def add_review_comment(self, task_id: str, payload: dict | None = None):
+        return {
+            "task_id": task_id,
+            "author": (payload or {}).get("author"),
+            "message": (payload or {}).get("message"),
+            "attachments": (payload or {}).get("attachments") or [],
+            "created_at": _now_iso(),
+        }
+
+    def decide_review(self, task_id: str, payload: dict | None = None):
+        return {
+            "task_id": task_id,
+            "actor": (payload or {}).get("actor"),
+            "decision": (payload or {}).get("decision"),
+            "note": (payload or {}).get("note"),
+            "attachments": (payload or {}).get("attachments") or [],
+            "updated_at": _now_iso(),
+        }

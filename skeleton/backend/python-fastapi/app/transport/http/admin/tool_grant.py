@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 
 from app.contracts.response import (
     ERR_CODE_INVALID_REQUEST,
@@ -45,7 +45,8 @@ async def revoke_toolgrant(request: Request, payload: dict):
         return auth
     if not (payload or {}).get("tenant_uuid") or not (payload or {}).get("toolgrant_id"):
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid/toolgrant_id 必填", request_id=request_id, status_code=400)
-    return ok({"ok": True}, request_id=request_id)
+    service.revoke(payload)
+    return Response(status_code=204)
 
 
 @router.get("/tool-grant/revocations")
@@ -57,7 +58,9 @@ async def list_revocations(request: Request):
     tenant_uuid = request.query_params.get("tenant_uuid")
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
-    items = service.list_revocations(tenant_uuid)
+    limit = request.query_params.get("limit")
+    limit_val = int(limit) if limit and limit.isdigit() else 0
+    items = service.list_revocations(tenant_uuid, limit_val)
     return ok({"data": items}, request_id=request_id)
 
 
@@ -70,5 +73,8 @@ async def list_usage(request: Request):
     tenant_uuid = request.query_params.get("tenant_uuid")
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
-    items = service.list_usage_events(tenant_uuid)
+    toolgrant_id = request.query_params.get("toolgrant_id")
+    limit = request.query_params.get("limit")
+    limit_val = int(limit) if limit and limit.isdigit() else 0
+    items = service.list_usage_events(tenant_uuid, toolgrant_id, limit_val)
     return ok({"data": items}, request_id=request_id)

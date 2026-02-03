@@ -43,25 +43,25 @@ async def list_approvals(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"message": "approval workflow not implemented yet"}, request_id=request_id)
+    return ok({"items": service.list_approvals()}, request_id=request_id)
 
 
 @router.post("/integration/approvals/{approval_id}/approve")
-async def approve(request: Request, approval_id: str):
+async def approve(request: Request, approval_id: str, payload: dict | None = None):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"ok": True, "id": approval_id}, request_id=request_id)
+    return ok(service.approve(approval_id, payload or {}), request_id=request_id)
 
 
 @router.post("/integration/approvals/{approval_id}/reject")
-async def reject(request: Request, approval_id: str):
+async def reject(request: Request, approval_id: str, payload: dict | None = None):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"ok": True, "id": approval_id}, request_id=request_id)
+    return ok(service.reject(approval_id, payload or {}), request_id=request_id)
 
 
 @router.get("/integration/grant-matrix")
@@ -70,7 +70,7 @@ async def list_grant_matrix(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"message": "grant matrix admin view not implemented"}, request_id=request_id)
+    return ok({"items": service.list_grant_matrix_overrides()}, request_id=request_id)
 
 
 @router.get("/integration/webhooks")
@@ -97,7 +97,7 @@ async def create_webhook(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok(payload, request_id=request_id)
+    return ok(service.create_subscription(payload), request_id=request_id)
 
 
 @router.put("/integration/webhooks/{webhook_id}")
@@ -108,7 +108,7 @@ async def update_webhook(request: Request, webhook_id: str, payload: dict):
         return auth
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
-    return ok({"id": webhook_id, **payload}, request_id=request_id)
+    return ok(service.update_subscription(webhook_id, payload), request_id=request_id)
 
 
 @router.delete("/integration/webhooks/{webhook_id}")
@@ -117,7 +117,7 @@ async def delete_webhook(request: Request, webhook_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"ok": True, "id": webhook_id}, request_id=request_id)
+    return ok(service.delete_subscription(webhook_id), request_id=request_id)
 
 
 @router.get("/integration/webhooks/{webhook_id}/attempts")
@@ -136,7 +136,7 @@ async def replay_attempt(request: Request, attempt_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"ok": True, "attempt_id": attempt_id}, request_id=request_id)
+    return ok(service.replay_attempt(attempt_id), request_id=request_id)
 
 
 @router.get("/integration/secrets")
@@ -163,7 +163,7 @@ async def create_secret(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok(payload, request_id=request_id)
+    return ok(service.create_secret(payload), request_id=request_id)
 
 
 @router.post("/integration/secrets/{secret_id}/rotate")
@@ -172,7 +172,7 @@ async def rotate_secret(request: Request, secret_id: str, payload: dict | None =
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"id": secret_id, "status": "rotating"}, request_id=request_id)
+    return ok(service.rotate_secret(secret_id, payload), request_id=request_id)
 
 
 @router.post("/integration/secrets/{secret_id}/rotate/complete")
@@ -181,7 +181,7 @@ async def complete_rotation(request: Request, secret_id: str, payload: dict | No
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"id": secret_id, "status": "active"}, request_id=request_id)
+    return ok(service.complete_rotation(secret_id, payload), request_id=request_id)
 
 
 @router.post("/integration/secrets/{secret_id}/revoke")
@@ -190,7 +190,7 @@ async def revoke_secret(request: Request, secret_id: str, payload: dict | None =
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"id": secret_id, "status": "revoked"}, request_id=request_id)
+    return ok(service.revoke_secret(secret_id, payload), request_id=request_id)
 
 
 @router.get("/integration/secrets/{secret_id}/audit")
@@ -199,4 +199,4 @@ async def get_secret_audit(request: Request, secret_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"id": secret_id, "items": []}, request_id=request_id)
+    return ok(service.get_secret_audit(secret_id), request_id=request_id)

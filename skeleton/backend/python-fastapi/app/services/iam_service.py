@@ -6,7 +6,17 @@ from uuid import uuid4
 
 from sqlalchemy import or_, select
 
-from app.entity.models import Department, Member, Permission, Role, Tenant, User
+from app.entity.models import (
+    Department,
+    IAMAuditLog,
+    IAMMemberRole,
+    IAMRolePermission,
+    Member,
+    Permission,
+    Role,
+    Tenant,
+    User,
+)
 from app.entity.repository.db import get_db
 
 
@@ -362,6 +372,14 @@ class IAMService:
                     )
                 )
             items = db.execute(query).all()
+            member_ids = [member.id for member, _ in items]
+            role_map: dict[int, list[int]] = {}
+            if member_ids:
+                roles = db.execute(
+                    select(IAMMemberRole).where(IAMMemberRole.member_id.in_(member_ids))
+                ).scalars().all()
+                for rel in roles:
+                    role_map.setdefault(rel.member_id, []).append(rel.role_id)
             result = []
             for member, user in items:
                 result.append(
@@ -377,7 +395,7 @@ class IAMService:
                         "department_id": member.department_id,
                         "created_at": member.created_at,
                         "last_login_at": member.last_login_at,
-                        "roles": [],
+                        "roles": role_map.get(member.id, []),
                     }
                 )
             return {"items": result}
@@ -477,3 +495,97 @@ class IAMService:
             }
         finally:
             db.close()
+
+    def bulk_import_members(self, tenant_uuid: str, users: list[dict]):
+        if not tenant_uuid or not users:
+            return {"items": []}
+        created = []
+        for payload in users:
+            payload["tenant_uuid"] = tenant_uuid
+            created.append(self.create_member(payload))
+        return {"items": created}
+
+    def update_role_permissions(self, role_id: str, permission_ids: list[int], tenant_uuid: str):
+        db = get_db().session()
+        try:
+            role_id_val = _parse_int(role_id)
+            if role_id_val is None:
+                return {"role_id": role_id, "permission_ids": []}
+            db.query(IAMRolePermission).filter(IAMRolePermission.role_id == role_id_val).delete()
+            for pid in permission_ids or []:
+                db.add(
+                    IAMRolePermission(
+                        role_id=role_id_val,
+                        permission_id=int(pid),
+                        tenant_uuid=tenant_uuid,
+                        policy_version="v1",
+                        created_at=_now(),
+                    )
+                )
+            db.commit()
+            return {"role_id": role_id_val, "permission_ids": permission_ids, "tenant_uuid": tenant_uuid}
+        finally:
+            db.close()
+
+    def add_role_members(self, role_id: str, member_ids: list[int], tenant_uuid: str):
+        db = get_db().session()
+        try:
+            role_id_val = _parse_int(role_id)
+            if role_id_val is None:
+                return {"role_id": role_id, "member_ids": []}
+            for mid in member_ids or []:
+                db.add(IAMMemberRole(member_id=int(mid), role_id=role_id_val, created_at=_now()))
+            db.commit()
+            return {"role_id": role_id_val, "member_ids": member_ids, "tenant_uuid": tenant_uuid}
+        finally:
+            db.close()
+
+    def remove_role_members(self, role_id: str, member_ids: list[int], tenant_uuid: str):
+        db = get_db().session()
+        try:
+            role_id_val = _parse_int(role_id)
+            if role_id_val is None:
+                return {"role_id": role_id, "member_ids": []}
+            if member_ids:
+                db.query(IAMMemberRole).filter(
+                    IAMMemberRole.role_id == role_id_val,
+                    IAMMemberRole.member_id.in_([int(mid) for mid in member_ids]),
+                ).delete(synchronize_session=False)
+            db.commit()
+            return {"role_id": role_id_val, "member_ids": member_ids, "tenant_uuid": tenant_uuid}
+        finally:
+            db.close()
+
+    def list_audit_logs(self, params: dict | None = None):
+        params = params or {}
+        db = get_db().session()
+        try:
+            query = select(IAMAuditLog)
+            tenant_uuid = params.get("tenant_uuid") or params.get("tenantUuid")
+            resource = params.get("resource")
+            action = params.get("action")
+            limit = params.get("limit")
+            after_id = params.get("after_id") or params.get("afterId")
+            if tenant_uuid:
+                query = query.where(IAMAuditLog.tenant_uuid == tenant_uuid)
+            if resource:
+                query = query.where(IAMAuditLog.resource == resource)
+            if action:
+                query = query.where(IAMAuditLog.action == action)
+            if after_id:
+                try:
+                    query = query.where(IAMAuditLog.id > int(after_id))
+                except (TypeError, ValueError):
+                    pass
+            if limit:
+                try:
+                    query = query.limit(min(int(limit), 200))
+                except (TypeError, ValueError):
+                    query = query.limit(50)
+            records = db.execute(query).scalars().all()
+            return {"items": [_to_dict(item) for item in records]}
+        finally:
+            db.close()
+
+    def mint_sts(self, payload: dict):
+        return {"token": "", "expires_in": 0, "issued_at": _now().isoformat() + "Z"}

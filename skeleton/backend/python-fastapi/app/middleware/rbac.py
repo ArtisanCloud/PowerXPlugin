@@ -63,7 +63,12 @@ async def rbac_middleware(request: Request, call_next: Callable):
     match_path = _strip_plugin_prefix(template_path) if template_path else path
     api_prefix = getattr(request.app.state, "settings", None).api_prefix if getattr(request.app.state, "settings", None) else "/api/v1"
     prefix = api_prefix.rstrip("/")
-    if path.startswith(f"{prefix}/internal/") or path.startswith(f"{prefix}/agent/") or _is_health_endpoint(path, prefix):
+    if (
+        path.startswith(f"{prefix}/internal/")
+        or path.startswith(f"{prefix}/agent/")
+        or _is_health_endpoint(path, prefix)
+        or _is_public_auth(path, prefix)
+    ):
         return await call_next(request)
 
     if cfg.delegate_to_powerx:
@@ -291,4 +296,12 @@ def _is_health_endpoint(path: str, api_prefix: str) -> bool:
         return True
     if lowered.startswith(f"{api_prefix}/admin/runtime/metrics"):
         return True
+    if lowered.startswith("/assets/builds/meta") or lowered.startswith(f"{api_prefix}/assets/builds/meta"):
+        return True
     return False
+
+
+def _is_public_auth(path: str, api_prefix: str) -> bool:
+    lowered = path.lower().strip()
+    prefix = api_prefix.rstrip("/")
+    return lowered.startswith(f"{prefix}/admin/user/auth")

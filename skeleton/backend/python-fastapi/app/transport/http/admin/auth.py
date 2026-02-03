@@ -173,6 +173,13 @@ async def refresh(request: Request, payload: dict):
             status_code=400,
         )
     result = service.refresh(payload or {})
+    if not result or not result.get("access_token"):
+        return fail(
+            ERR_CODE_UNAUTHORIZED,
+            "refresh_token 无效或已失效",
+            request_id=request_id,
+            status_code=401,
+        )
     return ok(_map_tokens(result), request_id=request_id)
 
 

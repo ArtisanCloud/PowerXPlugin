@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
+
+from datetime import datetime
 
 from app.contracts.response import (
     ERR_CODE_INVALID_REQUEST,
+    ERR_CODE_NOT_FOUND,
     ERR_CODE_UNAUTHORIZED,
     fail,
     ok,
@@ -55,8 +58,9 @@ async def list_consent_tokens(request: Request):
             request_id=request_id,
             status_code=400,
         )
-    items = privacy_service.list_consent_tokens(tenant_uuid)
-    return ok({"items": items}, request_id=request_id)
+    statuses = request.query_params.getlist("status")
+    items = privacy_service.list_consent_tokens(tenant_uuid, statuses)
+    return ok({"data": items}, request_id=request_id)
 
 
 @router.post("/security/consent-tokens/{token_id}/revoke")
@@ -73,7 +77,8 @@ async def revoke_consent_token(request: Request, token_id: str, payload: dict | 
             request_id=request_id,
             status_code=400,
         )
-    return ok({"ok": True, "token_id": token_id}, request_id=request_id)
+    privacy_service.revoke_consent_token(tenant_uuid, token_id, payload or {})
+    return Response(status_code=204)
 
 
 @router.get("/security/lifecycle-events")
@@ -90,8 +95,11 @@ async def list_lifecycle_events(request: Request):
             request_id=request_id,
             status_code=400,
         )
-    items = privacy_service.list_lifecycle_events(tenant_uuid)
-    return ok({"items": items}, request_id=request_id)
+    event_types = request.query_params.getlist("event_type")
+    limit = request.query_params.get("limit")
+    limit_val = int(limit) if limit and limit.isdigit() else 0
+    items = privacy_service.list_lifecycle_events(tenant_uuid, event_types, limit_val)
+    return ok({"data": items}, request_id=request_id)
 
 
 @router.get("/security/audit-reports")
@@ -100,7 +108,9 @@ async def list_audit_reports(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    reports = security_service.list_audit_reports()
+    limit = request.query_params.get("limit")
+    limit_val = int(limit) if limit and limit.isdigit() else 0
+    reports = security_service.list_audit_reports(limit_val)
     return ok({"data": reports}, request_id=request_id)
 
 
@@ -117,7 +127,18 @@ async def create_advisory(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok(payload, request_id=request_id)
+    sla_deadline = payload.get("sla_deadline")
+    if sla_deadline:
+        try:
+            payload["sla_deadline"] = datetime.fromisoformat(sla_deadline.replace("Z", "+00:00"))
+        except ValueError:
+            return fail(
+                ERR_CODE_INVALID_REQUEST,
+                "sla_deadline must be RFC3339",
+                request_id=request_id,
+                status_code=400,
+            )
+    return ok(security_service.create_advisory(payload), request_id=request_id, status_code=201)
 
 
 @router.get("/security/advisories")
@@ -126,8 +147,20 @@ async def list_advisories(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    items = security_service.list_advisories()
-    return ok({"items": items}, request_id=request_id)
+    severity = request.query_params.getlist("severity")
+    if not severity:
+        raw = request.query_params.get("severity")
+        if raw:
+            severity = [raw]
+    status = request.query_params.getlist("status")
+    if not status:
+        raw = request.query_params.get("status")
+        if raw:
+            status = [raw]
+    limit = request.query_params.get("limit")
+    limit_val = int(limit) if limit and limit.isdigit() else 0
+    items = security_service.list_advisories(severity, status, limit_val)
+    return ok({"data": items}, request_id=request_id)
 
 
 @router.post("/security/advisories/{advisory_id}/publish")
@@ -143,7 +176,15 @@ async def publish_advisory(request: Request, advisory_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok({"id": advisory_id, "status": "published"}, request_id=request_id)
+    advisory = security_service.publish_advisory(advisory_id, payload)
+    if not advisory:
+        return fail(
+            ERR_CODE_NOT_FOUND,
+            "advisory not found",
+            request_id=request_id,
+            status_code=404,
+        )
+    return ok(advisory, request_id=request_id)
 
 
 @router.post("/security/toolgrants/revoke")
@@ -159,7 +200,8 @@ async def revoke_toolgrant(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok({"ok": True}, request_id=request_id)
+    tool_grant_service.revoke(payload)
+    return Response(status_code=204)
 
 
 @router.get("/security/toolgrants/revocations")
@@ -171,7 +213,9 @@ async def list_toolgrant_revocations(request: Request):
     tenant_uuid = request.query_params.get("tenant_uuid")
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
-    items = tool_grant_service.list_revocations(tenant_uuid)
+    limit = request.query_params.get("limit")
+    limit_val = int(limit) if limit and limit.isdigit() else 0
+    items = tool_grant_service.list_revocations(tenant_uuid, limit_val)
     return ok({"data": items}, request_id=request_id)
 
 
@@ -184,5 +228,8 @@ async def list_toolgrant_usage(request: Request):
     tenant_uuid = request.query_params.get("tenant_uuid")
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
-    items = tool_grant_service.list_usage_events(tenant_uuid)
+    toolgrant_id = request.query_params.get("toolgrant_id")
+    limit = request.query_params.get("limit")
+    limit_val = int(limit) if limit and limit.isdigit() else 0
+    items = tool_grant_service.list_usage_events(tenant_uuid, toolgrant_id, limit_val)
     return ok({"data": items}, request_id=request_id)

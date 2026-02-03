@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, DateTime, SmallInteger, String, func, text
+from sqlalchemy import BigInteger, Column, DateTime, SmallInteger, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.entity.models.base import Base
@@ -15,7 +15,7 @@ class PluginTenantExt(Base):
     region = Column(String(32), nullable=True)
     expire_at = Column(DateTime(timezone=True), nullable=True)
     last_sync_at = Column(DateTime(timezone=True), nullable=True)
-    last_error = Column(String, nullable=True)
+    last_error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True)

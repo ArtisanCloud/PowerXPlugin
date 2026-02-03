@@ -91,6 +91,65 @@ async def manifest():
                 "required_permissions": ["base:template:read"],
             }
         ],
+        "tools": [
+            {
+                "id": "base.template.create",
+                "plugin_id": "com.powerx.plugins.base",
+                "name": "创建模板",
+                "description": "创建一个新的模板记录",
+                "transport": "http",
+                "endpoint": "/api/v1/templates",
+                "method": "POST",
+                "rbac_resource": "base:template",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "模板名称"},
+                        "description": {"type": "string", "description": "模板描述"},
+                        "content": {"type": "string", "description": "模板内容"},
+                    },
+                    "required": ["name", "description", "content"],
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "description": "模板ID"},
+                        "name": {"type": "string", "description": "模板名称"},
+                        "description": {"type": "string", "description": "模板描述"},
+                        "content": {"type": "string", "description": "模板内容"},
+                    },
+                },
+                "timeout": 30,
+            },
+            {
+                "id": "base.template.query",
+                "plugin_id": "com.powerx.plugins.base",
+                "name": "查询模板",
+                "description": "查询模板列表",
+                "transport": "http",
+                "endpoint": "/api/v1/templates",
+                "method": "GET",
+                "rbac_resource": "base:template",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "q": {"type": "string", "description": "按名称或描述搜索"},
+                        "page": {"type": "integer", "default": 1, "description": "页码"},
+                        "limit": {"type": "integer", "default": 20, "description": "每页数量"},
+                    },
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "list": {"type": "array", "description": "模板列表"},
+                        "total": {"type": "integer", "description": "总数"},
+                        "page": {"type": "integer", "description": "页码"},
+                        "limit": {"type": "integer", "description": "每页数量"},
+                    },
+                },
+                "timeout": 30,
+            },
+        ],
     }
     return ok(payload)
 

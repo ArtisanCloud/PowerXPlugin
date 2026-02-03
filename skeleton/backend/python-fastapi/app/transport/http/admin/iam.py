@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request
 
 from app.contracts.response import (
     ERR_CODE_INVALID_REQUEST,
-    ERR_CODE_SERVICE_UNAVAILABLE,
     ERR_CODE_UNAUTHORIZED,
     fail,
     ok,
@@ -193,7 +192,10 @@ async def update_role_permissions(request: Request, role_id: str, payload: dict)
             request_id=request_id,
             status_code=400,
         )
-    return ok({"role_id": role_id, "permission_ids": payload.get("permission_ids")}, request_id=request_id)
+    return ok(
+        service.update_role_permissions(role_id, payload.get("permission_ids"), tenant_uuid),
+        request_id=request_id,
+    )
 
 
 @router.post("/iam/roles/{role_id}/members")
@@ -210,7 +212,11 @@ async def add_role_members(request: Request, role_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok({"role_id": role_id, "member_ids": payload.get("member_ids")}, message="added", request_id=request_id)
+    return ok(
+        service.add_role_members(role_id, payload.get("member_ids"), tenant_uuid),
+        message="added",
+        request_id=request_id,
+    )
 
 
 @router.delete("/iam/roles/{role_id}/members")
@@ -227,7 +233,11 @@ async def remove_role_members(request: Request, role_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok({"role_id": role_id, "member_ids": payload.get("member_ids")}, message="removed", request_id=request_id)
+    return ok(
+        service.remove_role_members(role_id, payload.get("member_ids"), tenant_uuid),
+        message="removed",
+        request_id=request_id,
+    )
 
 
 @router.get("/iam/permissions")
@@ -245,7 +255,7 @@ async def list_audit_logs(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"items": []}, request_id=request_id)
+    return ok(service.list_audit_logs(dict(request.query_params)), request_id=request_id)
 
 
 @router.post("/iam/auth/local/sts")
@@ -254,12 +264,7 @@ async def mint_sts(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return fail(
-        ERR_CODE_SERVICE_UNAVAILABLE,
-        "当前路由仅在 Standalone 模式生效",
-        request_id=request_id,
-        status_code=503,
-    )
+    return ok(service.mint_sts({}), request_id=request_id)
 
 
 @router.get("/iam/departments")
@@ -416,7 +421,7 @@ async def import_members(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok(payload, request_id=request_id)
+    return ok(service.bulk_import_members(tenant_uuid, users), request_id=request_id)
 
 
 # Legacy alias routes for compatibility

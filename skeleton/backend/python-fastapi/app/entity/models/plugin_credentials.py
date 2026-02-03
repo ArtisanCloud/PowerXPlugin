@@ -7,7 +7,7 @@ from app.entity.models.base import Base
 class PluginCredentials(Base):
     __tablename__ = "plugin_credentials"
     __table_args__ = (
-        UniqueConstraint("tenant_uuid", "plugin_id", name="uq_plugin_credentials_tenant_plugin"),
+        UniqueConstraint("tenant_uuid", "plugin_id", name="idx_pc_tenant_plugin"),
     )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)

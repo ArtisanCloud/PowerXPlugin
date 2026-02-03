@@ -136,3 +136,52 @@ async def invoke(request: Request, session_id: str, payload: dict):
             status_code=400,
         )
     return ok(service.invoke(session_id, payload), request_id=request_id)
+
+
+@router.post("/runtime/bootstrap")
+async def bootstrap(request: Request, payload: dict | None = None):
+    request_id = _request_id(request)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    return ok({"ok": True}, request_id=request_id)
+
+
+@router.get("/runtime/metrics")
+async def runtime_metrics(request: Request):
+    request_id = _request_id(request)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    return ok({"metrics": []}, request_id=request_id)
+
+
+@router.get("/runtime/quota/status")
+async def quota_status(request: Request):
+    request_id = _request_id(request)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    return ok({"status": "ok"}, request_id=request_id)
+
+
+@router.post("/runtime/quota/overrides")
+async def quota_override(request: Request, payload: dict):
+    request_id = _request_id(request)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    if not payload:
+        return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
+    return ok({"ok": True, "override": payload}, request_id=request_id)
+
+
+@router.post("/runtime/event-bridge/emit")
+async def emit_event_bridge(request: Request, payload: dict):
+    request_id = _request_id(request)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    if not payload:
+        return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
+    return ok({"ok": True, "event": payload}, request_id=request_id)

@@ -29,6 +29,30 @@ class MarketplaceRepository(BaseRepository):
     def get_listing(self, listing_id: str):
         return self.get_by_id(MarketplaceListing, listing_id)
 
+    def create_listing(self, entity: MarketplaceListing):
+        return self.add(entity)
+
+    def update_listing(self, listing_id: str, updates: dict):
+        return self.update_by_id(MarketplaceListing, listing_id, updates)
+
+    def create_listing_versions(self, entities: list[MarketplaceListingVersion]):
+        return self.add_all(entities)
+
+    def create_listing_assets(self, entities: list[MarketplaceListingAsset]):
+        return self.add_all(entities)
+
+    def create_pricing_plans(self, entities: list[MarketplacePricingPlan]):
+        return self.add_all(entities)
+
+    def create_plan_tiers(self, entities: list[MarketplacePlanTier]):
+        return self.add_all(entities)
+
+    def create_checklist_runs(self, entities: list[MarketplaceChecklistRun]):
+        return self.add_all(entities)
+
+    def create_checklist_items(self, entities: list[MarketplaceChecklistItem]):
+        return self.add_all(entities)
+
     def list_listing_versions(self, listing_id: str | None = None):
         filters = []
         if listing_id:
@@ -106,6 +130,18 @@ class MarketplaceRepository(BaseRepository):
         if tenant_uuid:
             filters.append(MarketplaceNotification.tenant_uuid == tenant_uuid)
         return self.list(MarketplaceNotification, filters)
+
+    def create_usage_envelope(self, entity: MarketplaceUsageEnvelope):
+        return self.add(entity)
+
+    def create_license(self, entity: MarketplaceLicense):
+        return self.add(entity)
+
+    def update_license(self, license_id: str, updates: dict):
+        return self.update_by_id(MarketplaceLicense, license_id, updates)
+
+    def create_license_event(self, entity: MarketplaceLicenseEvent):
+        return self.add(entity)
 
     def create(self, entity):
         return self.add(entity)

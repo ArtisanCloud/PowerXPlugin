@@ -6,8 +6,8 @@
 
 ## Phase 2: Foundational
 
-- [ ] T002 定义 topic 白名单与别名映射常量（`framework/backend/go/runtime/wsbus/whitelist.go`）
-- [ ] T003 定义统一发布接口与结果结构（`framework/backend/go/runtime/wsbus/publisher.go`）
+- [x] T002 定义 topic 白名单与别名映射常量（`framework/backend/go/runtime/wsbus/whitelist.go`）
+- [x] T003 定义统一发布接口与结果结构（`framework/backend/go/runtime/wsbus/publisher.go`）
 
 ## Phase 3: User Story 1 (P1) — Unified Progress Publish
 

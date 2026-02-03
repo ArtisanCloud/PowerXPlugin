@@ -56,6 +56,11 @@ disconnect()
 
 > 目标：插件业务层只调用 **统一发布 API**，宿主/standalone 差异由 framework 内部处理。
 
+### 7.0 本次实现范围
+
+- 本仓库仅覆盖 **PowerXPlugin framework 与插件侧适配**。
+- PowerX 底座发布入口由 PowerX 项目实现（接口契约已在此文档约定）。
+
 ### 7.1 Framework SDK 约定
 
 插件后端统一使用：

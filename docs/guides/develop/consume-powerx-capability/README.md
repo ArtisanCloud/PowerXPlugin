@@ -13,8 +13,8 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 
 | 角色 | 默认端口（本地开发） | 说明 |
 | --- | --- | --- |
-| Web Admin (Vite/Nuxt Dev) | `3131` | 运行 `npm --prefix skeleton/web-admin run dev` 后的本地调试端口 |
-| 插件后端 Skeleton | `8078` | `go run ./skeleton/backend/cmd/plugin` 启动后监听，前端所有 API（含 Capability Lab）都只打到这里 |
+| Web Admin (Vite/Nuxt Dev) | `3131` | 运行 `npm --prefix skeleton/web-admin/nuxt run dev` 后的本地调试端口 |
+| 插件后端 Skeleton | `8078` | `go run ./skeleton/backend/go-gin/cmd/plugin` 启动后监听，前端所有 API（含 Capability Lab）都只打到这里 |
 | PowerX Integration Gateway | `8077` | PowerX 底座 Dev API 端口，插件后端通过 `PX_GATEWAY_BASE_URL` 调用 `/tenant/invocations`；若宿主端口不同请自行覆盖 |
 
 ### /tenant/invocations 调用语义
@@ -55,7 +55,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
   - `PX_PLUGIN_TOOL_TOKEN`（宿主）/`PX_TOOL_TOKEN`（Skeleton）
   - `PX_TENANT_UUID`
   - `PX_GATEWAY_CONTRACT_VERSION`（可选，配合 `dist/capability-contracts.json` 校验契约版本）
-- **Gateway Client** 负责注入 `Authorization`、`X-Tenant-UUID`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据。
+- **Gateway Client** 负责注入 `Authorization`、`X-PowerX-Tenant`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据。
 
 ## 2. 前提条件
 
@@ -86,16 +86,16 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 
 1. **环境准备**：
    - `px-plugin login --manifest ./skeleton/plugin.yaml`（或根据 Plan 中的 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN/PX_TENANT_UUID`）。
-   - `skeleton/backend/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN/PX_TENANT_UUID`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
+   - `skeleton/backend/go-gin/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN/PX_TENANT_UUID`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
    - 如果设置了 `PX_TOOL_REFRESH_TOKEN`，Skeleton 在启动时会在 Token 过期或 24h 内到期时自动调用 `POST /admin/user/auth/refresh` 刷新 `PX_TOOL_TOKEN`，刷新结果会写回进程环境（仍需你手动同步到 `.env.local` 保证下次启动可用）。
    - 可选：`PX_USE_MOCK=<module>` 用于 Dev Gateway 不可达时的 Mock。
 2. **后端配置**：
-   - `skeleton/backend/internal/integrations/gateway` 包装框架 Gateway Client，支持 Mock/离线提示。
-   - `skeleton/backend/cmd/server/main.go` 在启动时检测 Token 过期、输出提示。
+   - `skeleton/backend/go-gin/internal/integrations/gateway` 包装框架 Gateway Client，支持 Mock/离线提示。
+   - `skeleton/backend/go-gin/cmd/server/main.go` 在启动时检测 Token 过期、输出提示。
 3. **前端**：
-   - `skeleton/web-admin` 复用和宿主一致的 `powerx-capability` 插件，只不过 `runtimeConfig.public.powerx.apiBase` 默认为本地 `http://127.0.0.1:8078/api/v1`。
+   - `skeleton/web-admin/nuxt` 复用和宿主一致的 `powerx-capability` 插件，只不过 `runtimeConfig.public.powerx.apiBase` 默认为本地 `http://127.0.0.1:8078/api/v1`。
 4. **调试**：
-   - `npm --prefix skeleton/web-admin run dev -- --use-mock=media` 可在前端快速切 Mock。
+   - `npm --prefix skeleton/web-admin/nuxt run dev -- --use-mock=media` 可在前端快速切 Mock。
    - `scripts/capabilities/run-from-package.mjs --mode skeleton --manifest ./skeleton/plugin.yaml --cap <capabilityId>` 自动读取 `.env.local` 并打印请求/响应日志。（当前版本 `--use-mock` 选项存在 “mock is not defined” Bug，需后续修复。）
 5. **观测**：
    - Skeleton 后端同样会记录 `traceId`/限流事件，便于复现宿主场景。
@@ -129,16 +129,16 @@ Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“�
 
 **使用步骤**
 
-1. 启动 `skeleton/backend` 与 `skeleton/web-admin`，使用 Root 账户登录后点击“开放能力调试”。
+1. 启动 `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt`，使用 Root 账户登录后点击“开放能力调试”。
 2. 在“调用配置”卡片填写 `capabilityId`、`action` 和 JSON `payload`。选择 REST Action 后，Payload 区域会展示模板（含 `method`、`endpoint`、`headers`、`query`、`body`），并允许你一键插入；gRPC/Other Action 会提示协议类型与必填字段。可选参数包括：
-   - **自定义 Tenant UUID**：写入 `X-Tenant-UUID`，用于跨租户复现问题。
+   - **自定义 Tenant UUID**：写入 `X-PowerX-Tenant`，用于跨租户复现问题。
    - **Mock 模块**：在输入框填写模块名（如 `media`），页面会透传 `X-PX-Use-Mock: <module>` 到后端/Gateway；响应 `warnings` 中会标记“通过 X-PX-Use-Mock 请求 Mock 模块”，方便确认 Mock 是否生效。
    - **Request ID / API Base**：用于调试自定义 `X-Request-ID` 或手动切换代理地址。
 3. “请求预览”实时展示最终 URL、Headers、Body，可一键复制到 curl / `.http` 文件。
 4. 调用完成后，“调用结果”显示状态、TraceId、耗时与 JSON 响应；若契约版本过期、Mock 被启用或 Gateway 返回提示，都会出现在 `warnings` 中。“最近记录”会缓存最近 5 条请求，便于回放。
 5. Gateway 不可达时，可在页面中指定 Mock 模块，或结合 `.env.local` 中的 `PX_USE_MOCK`，以验证前后端封装是否正常。
 
-> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理，headers 仅包含 `X-Tenant-UUID` / `X-PX-Use-Mock` / `X-Request-ID` 等调试信息。
+> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理，headers 仅包含 `X-PowerX-Tenant` / `X-PX-Use-Mock` / `X-Request-ID` 等调试信息。
 
 ## 7. 常见问题 & 排障
 

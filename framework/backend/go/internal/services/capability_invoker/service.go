@@ -103,8 +103,8 @@ func (s *Service) Invoke(ctx context.Context, params InvokeParams) (*InvokeResul
 		if headers == nil {
 			headers = make(map[string]string, 1)
 		}
-		if strings.TrimSpace(headers["X-Tenant-UUID"]) == "" {
-			headers["X-Tenant-UUID"] = tenant
+		if strings.TrimSpace(headers["X-PowerX-Tenant"]) == "" {
+			headers["X-PowerX-Tenant"] = tenant
 		}
 	}
 	resp, err := s.gateway.Invoke(ctx, gateway.InvokeRequest{

@@ -237,7 +237,7 @@ POST /api/v1/support/ticket
 
 PowerX Admin Portal 会将租户管理员角色注入：
 
-- 通过 `x-tenant-uuid` 与 JWT 权限字段；
+- 通过 `x-powerx-tenant` 与 JWT 权限字段；
 - 插件侧需验证角色（`tenant_admin`, `support_agent` 等）；
 - 前端隐藏无权限菜单项；
 - 操作按钮需二次确认（ConfirmDialog）。

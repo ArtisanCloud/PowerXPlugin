@@ -47,20 +47,20 @@
 ## Phase 4: User Story 2 - Skeleton 模式复用同一封装 (Priority: P2)
 
 **Goal**: Skeleton 本地环境可登录获取 Tool Token，透过相同封装调用 Gateway，并在离线时显式切换 Mock。
-**Independent Test**: `skeleton/backend` 与 `skeleton/web-admin` 通过 `.env.local` 配置在 Dev Gateway 下成功列出媒资；`scripts/capabilities/run-from-package.mjs --mode skeleton` 自动读取 Token 并可切换 `--use-mock`。
+**Independent Test**: `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt` 通过 `.env.local` 配置在 Dev Gateway 下成功列出媒资；`scripts/capabilities/run-from-package.mjs --mode skeleton` 自动读取 Token 并可切换 `--use-mock`。
 
 ### Implementation
 
-- [x] T014 [US2] 在 `skeleton/backend/internal/config/config.go` 添加 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`、`PX_TENANT_UUID` 读取，并写入新的 `skeleton/backend/etc/config.example.yaml` 注释。
-- [x] T015 [US2] 新建 `skeleton/backend/internal/integrations/gateway/client.go`，包装框架 Gateway Client，支持 `PX_USE_MOCK` 与离线提示。
-- [x] T016 [US2] 更新 `skeleton/backend/cmd/server/main.go`，将 Gateway Client 注入到业务 service 并在启动时检测 Tool Token 过期。
-- [x] T017 [US2] 在 `skeleton/web-admin` 中提供调用插件后端能力 API 的封装（不直接携带 Tool Token），并处理调用态提示/错误。
-- [x] T018 [US2] 修改 `skeleton/web-admin/nuxt.config.ts` 和 `skeleton/web-admin/.env.example`，仅暴露插件后端 API Base、Mock 配置等前端所需字段，移除 `PX_*` 凭证。
-- [x] T019 [US2] 在 `skeleton/web-admin/tests/e2e` 新增 `capability-invocation.spec.ts`，验证 UI 通过 Gateway 成功/失败提示并在 Mock 模式展示 Banner。
+- [x] T014 [US2] 在 `skeleton/backend/go-gin/internal/config/config.go` 添加 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`、`PX_TENANT_UUID` 读取，并写入新的 `skeleton/backend/go-gin/etc/config.example.yaml` 注释。
+- [x] T015 [US2] 新建 `skeleton/backend/go-gin/internal/integrations/gateway/client.go`，包装框架 Gateway Client，支持 `PX_USE_MOCK` 与离线提示。
+- [x] T016 [US2] 更新 `skeleton/backend/go-gin/cmd/server/main.go`，将 Gateway Client 注入到业务 service 并在启动时检测 Tool Token 过期。
+- [x] T017 [US2] 在 `skeleton/web-admin/nuxt` 中提供调用插件后端能力 API 的封装（不直接携带 Tool Token），并处理调用态提示/错误。
+- [x] T018 [US2] 修改 `skeleton/web-admin/nuxt.config.ts` 和 `skeleton/web-admin/nuxt/.env.example`，仅暴露插件后端 API Base、Mock 配置等前端所需字段，移除 `PX_*` 凭证。
+- [x] T019 [US2] 在 `skeleton/web-admin/nuxt/tests/e2e` 新增 `capability-invocation.spec.ts`，验证 UI 通过 Gateway 成功/失败提示并在 Mock 模式展示 Banner。
 - [x] T020 [US2] 扩展 `scripts/capabilities/run-from-package.mjs` skeleton 分支，自动读取 `skeleton/.env.local`、支持 `--use-mock=<module>` 并输出请求/响应日志。
 - [x] T021 [US2] 在 `docs/plan/009-consume-powerx-capability.md` Skeleton 小节补充 `.env.local` 样例与 `px-plugin login` 步骤截图。
-- [x] T033 [US2] 在 `skeleton/web-admin/app/pages/powerx/capability-lab.vue` 实现调试页面：提供 capability/action/payload 配置、请求预览、调用按钮、响应/Trace/耗时展示，并支持 Mock/租户切换与最近记录。
-- [x] T034 [US2] 新增 `skeleton/web-admin/app/composables/useCapabilityLab.ts`（或扩展现有 `powerx-capability` 插件），封装调用逻辑、处理 `warnings`/TraceId、暴露状态给页面；同时在菜单/权限中添加“开放能力调试”入口。
+- [x] T033 [US2] 在 `skeleton/web-admin/nuxt/app/pages/powerx/capability-lab.vue` 实现调试页面：提供 capability/action/payload 配置、请求预览、调用按钮、响应/Trace/耗时展示，并支持 Mock/租户切换与最近记录。
+- [x] T034 [US2] 新增 `skeleton/web-admin/nuxt/app/composables/useCapabilityLab.ts`（或扩展现有 `powerx-capability` 插件），封装调用逻辑、处理 `warnings`/TraceId、暴露状态给页面；同时在菜单/权限中添加“开放能力调试”入口。
 - [x] T035 [US2] 如有需要在后端补充调试支持（如记录结果或扩展 `/integration/capabilities/invoke` headers），同步更新 `docs/guides/develop/consume-powerx-capability/README.md` 与 Quickstart，指导开发者使用 Capability Lab。
 - [x] T036 [US2] 将 Skeleton `/api/v1/admin/capabilities` 改为实时代理 PowerX 能力目录：后端通过 Gateway/Dev API 拉取 `source=corex` 能力并透传到前端，Capability Lab 只渲染真实的 `platform-capabilities` 数据，移除现有模板 Mock。
 
@@ -102,7 +102,7 @@
 
 - **Setup → Foundational → User Stories**：Phase 1 与 Phase 2 必须完成后，宿主与 Skeleton 开发才可开始。
 - **User Stories**：US1 与 US2 均依赖 Gateway Client（T007～T010）。US3 依赖 US1/US2 产出的调用埋点。
-- **Tests**：`tests/capabilities/*.go` 与 `skeleton/web-admin/tests/e2e/*.ts` 需在对应实现完成后运行。
+- **Tests**：`tests/capabilities/*.go` 与 `skeleton/web-admin/nuxt/tests/e2e/*.ts` 需在对应实现完成后运行。
 
 ## Parallel Opportunities
 

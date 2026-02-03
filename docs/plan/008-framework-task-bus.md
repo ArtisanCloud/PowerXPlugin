@@ -27,16 +27,16 @@
 
 - **事件模型（Framework 对外包）**：`framework/event/*`
 - **事件出口（Framework 对外包）**：`framework/eventbridge/*`
-- **业务侧适配器（示例：Channel）**：`skeleton/backend/internal/observability/channel/event_emitter.go`
+- **业务侧适配器（示例：Channel）**：`skeleton/backend/go-gin/internal/observability/channel/event_emitter.go`
 - **Consumer/Dispatcher（Framework）**：`framework/eventbridge/consumer.go`
-- **权限与运行时边界**：`skeleton/backend/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 publish/subscribe 并执行 deny + log）
+- **权限与运行时边界**：`skeleton/backend/go-gin/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 publish/subscribe 并执行 deny + log）
 
 说明：
 - 本仓库以“本地 emitter + 可注入 TaskBus provider”的方式完成切换与灰度；真实 TaskBus SDK 由宿主/框架提供后再实现 provider。
 
 ## 4. 框架接入步骤
 
-1. **依赖注入**：在 `skeleton/backend/cmd/plugin/main.go` 初始化 `event_bridge.Factory` 并注入到 `app.Deps.EventEmitter`。
+1. **依赖注入**：在 `skeleton/backend/go-gin/cmd/plugin/main.go` 初始化 `event_bridge.Factory` 并注入到 `app.Deps.EventEmitter`。
 2. **声明 Topic 权限（开发态）**：在 `skeleton/plugin.yaml` 增加：
    ```yaml
    events:
@@ -47,11 +47,76 @@
      subscribe: []
    ```
    - Manifest 路径可通过环境变量覆盖：`POWERX_PLUGIN_MANIFEST_PATH`
-3. **配置开关**：在 `skeleton/backend/internal/config/config.go` 使用 `event_bridge` 配置：
+3. **配置开关**：在 `skeleton/backend/go-gin/internal/config/config.go` 使用 `event_bridge` 配置：
    - `event_bridge.enabled`：开启/关闭 TaskBus 模式
    - `event_bridge.mode`：`local|taskbus|dual`
    - `event_bridge.fallback_to_local`：TaskBus 不可用时是否自动降级
 4. **消费侧绑定（示例）**：本仓库提供本地 `Dispatcher` + `IdempotencyFilter` 的示例实现；真实 TaskBus 订阅由宿主/框架接入后完成。
+
+## 4.5 Scheduler Bridge（统一调度入口）
+**接口优先级：**
+- HTTP 为第一优先。
+- gRPC 与 SDK 作为后续扩展（与宿主能力保持一致）。
+
+**幂等与重试：**
+- Scheduler 触发事件为至少一次投递，插件 handler 必须幂等。
+- 建议使用 `event_id` 或 `job_id + scheduled_at` 做去重。
+- 失败返回 nack，将由底座按 retry_policy 重试。
+
+**请求头约定（调用底座）：**
+- `Authorization: Bearer <TOKEN>`
+- `x-powerx-tenant: <TENANT_UUID>`
+- `Idempotency-Key: <uuid>`（可选）
+
+**Handler 示例（Go 伪代码）：**
+```go
+func (h *EventHandler) Handle(ctx context.Context, evt Event) error {
+  if evt.Topic != "scheduler.job.triggered" {
+    return nil
+  }
+  action := evt.Payload["plugin_action"].(string)
+  params := evt.Payload["params"].(map[string]any)
+  switch action {
+  case "knowledge.sync":
+    return h.KnowledgeSync(ctx, params)
+  default:
+    return nil
+  }
+}
+```
+
+
+- **目标**：让插件用统一接口注册/更新计划任务，并可切换到底座 Scheduler 或本地实现。
+- **模式**：
+  - `local`：仅本地调度
+  - `corex`：调用 PowerX Scheduler（HTTP/gRPC/SDK）
+  - `dual`：双写/双读，便于灰度与回滚
+- **降级**：底座不可用时自动降级到本地实现（不影响主流程）。
+
+**配置示例（plugin config）：**
+```yaml
+scheduler_bridge:
+  enabled: true
+  mode: corex
+  fallback_to_local: true
+```
+
+**Manifest 示例：**
+```yaml
+scheduler:
+  jobs:
+    - name: "sync-knowledge"
+      schedule_type: "cron"
+      schedule_expr: "0 * * * *"
+      payload:
+        plugin_action: "knowledge.sync"
+        params:
+          space_id: "..."
+```
+
+**消费约定：**
+- Scheduler 触发事件 `scheduler.job.triggered`。
+- 插件按 Manifest 声明订阅，并由统一 handler 处理。
 
 ## 5. 代码迁移策略
 
@@ -70,7 +135,7 @@
 
 ## 7. 运维与监控
 
-- 指标：本仓库提供最小 metrics hooks（Prometheus exposition），见 `skeleton/backend/internal/observability/event_bridge/metrics.go`。
+- 指标：本仓库提供最小 metrics hooks（Prometheus exposition），见 `skeleton/backend/go-gin/internal/observability/event_bridge/metrics.go`。
 - 指标抓取（本仓库 Skeleton Admin）：`GET /api/v1/admin/runtime/metrics`
 - 建议关注：
   - `plugin_event_bridge_emit_total` / `plugin_event_bridge_consume_total`（按 topic/tenant_uuid/result）

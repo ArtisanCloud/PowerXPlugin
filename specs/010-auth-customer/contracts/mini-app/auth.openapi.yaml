@@ -16,7 +16,7 @@ paths:
       tags: [MiniAppAuth]
       parameters:
         - in: header
-          name: X-Tenant-UUID
+          name: X-PowerX-Tenant
           required: false
           schema:
             type: string
@@ -50,7 +50,7 @@ paths:
       tags: [MiniAppAuth]
       parameters:
         - in: header
-          name: X-Tenant-UUID
+          name: X-PowerX-Tenant
           required: false
           schema:
             type: string
@@ -98,7 +98,7 @@ components:
         tenant_uuid:
           type: string
           format: uuid
-          description: Optional when X-Tenant-UUID header is provided.
+          description: Optional when X-PowerX-Tenant header is provided.
         email:
           type: string
           format: email
@@ -129,7 +129,7 @@ components:
         tenant_uuid:
           type: string
           format: uuid
-          description: Optional. If omitted (and no X-Tenant-UUID), backend may require tenant selection.
+          description: Optional. If omitted (and no X-PowerX-Tenant), backend may require tenant selection.
         login:
           description: Email or phone
           type: string

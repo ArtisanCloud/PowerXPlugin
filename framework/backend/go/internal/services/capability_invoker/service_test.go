@@ -64,8 +64,8 @@ func TestServiceInvokeSuccess(t *testing.T) {
 	if val, ok := result.Data["ok"].(bool); !ok || !val {
 		t.Fatalf("expected data map with ok=true, got %#v", result.Data)
 	}
-	if stub.lastReq.Headers["X-Tenant-UUID"] != "tenant-success" {
-		t.Fatalf("tenant header not forwarded, got %s", stub.lastReq.Headers["X-Tenant-UUID"])
+	if stub.lastReq.Headers["X-PowerX-Tenant"] != "tenant-success" {
+		t.Fatalf("tenant header not forwarded, got %s", stub.lastReq.Headers["X-PowerX-Tenant"])
 	}
 	if !strings.Contains(logBuf.String(), "capability.invoke.success") {
 		t.Fatalf("success log missing, got %s", logBuf.String())

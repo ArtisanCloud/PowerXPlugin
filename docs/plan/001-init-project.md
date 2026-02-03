@@ -37,7 +37,7 @@
 - 路由挂载顺序固定为 `RegisterFrameworkRoutes(app)` → `RegisterPluginRoutes(app, routes.Register)`，前者提供健康检查、系统端点，后者承载业务接口。
 - 新增聚合时需同时补齐实体/仓储/服务/传输四层，并在 `services/{domain}` 内调度业务流程。
 
-- 以现有 Base 插件为蓝本，筛出最小可运行逻辑搬运到仓库内的 `skeleton/backend/` 与 `skeleton/web-admin/`，要求：`go run ./cmd/plugin` 以及 `npm run dev` 可直接启动。
+- 以现有 Base 插件为蓝本，筛出最小可运行逻辑搬运到仓库内的 `skeleton/backend/go-gin/` 与 `skeleton/web-admin/nuxt/`，要求：`go run ./cmd/plugin` 以及 `npm run dev` 可直接启动。
 - 调整 skeleton 后，务必执行 `npm run sync:templates`（读取 `scripts/template-sync-config.yaml`）同步至 `scaffold/templates` 与 CLI 模板。
 - 在此基础上整理 `{plugin-skeleton}/backend/`、`{plugin-skeleton}/web-admin/` 模板（脚手架输出目录），默认生成 `GET /api/v1/ping` 等示例 API。
 - 模板内不强制业务分层，只保留 routes/handler/service/repo 示例，鼓励团队按 DDD 自行划分。

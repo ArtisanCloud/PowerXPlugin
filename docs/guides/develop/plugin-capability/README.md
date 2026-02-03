@@ -6,7 +6,7 @@
 
 | 场景 | 说明 |
 | --- | --- |
-| 插件独立运行 | 通过 `make dev` 启动 `skeleton/web-admin` 与 `skeleton/backend`，仅依赖插件本身的接口（端口 `8078`/`8080` 等）。 |
+| 插件独立运行 | 通过 `make dev` 启动 `skeleton/web-admin/nuxt` 与 `skeleton/backend/go-gin`，仅依赖插件本身的接口（端口 `8078`/`8080` 等）。 |
 | 能力建模 | 在表单里填写 `capability_id`、协议矩阵、示例与描述，生成 `capabilities/catalog.json` 条目。 |
 | 即时调试 | 在右侧调试面板中读取当前协议，直接向插件后端暴露的 REST/gRPC/Workflow endpoint 发送请求，验证业务实现。 |
 
@@ -101,7 +101,7 @@
    因为插件独立运行时并没有宿主的授权/Registry；调试面板直接命中插件自己的 HTTP/gRPC 端口即可。
 
 2. **出现 4xx/5xx？**  
-   - 检查 `API Base`、path 或 gRPC service 是否与 `skeleton/backend` 中的路由一致。  
+   - 检查 `API Base`、path 或 gRPC service 是否与 `skeleton/backend/go-gin` 中的路由一致。  
    - 若接口需要额外 Header/Token，可在 Payload 或 Header 区域补充。
 
 3. **Workflow/Agent 如何调试？**  

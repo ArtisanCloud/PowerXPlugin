@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"{{ .BackendModulePath }}/internal/capabilities"
-	"{{ .BackendModulePath }}/internal/config"
-	"{{ .BackendModulePath }}/internal/integrations/gateway"
-	"{{ .BackendModulePath }}/internal/logger"
-	"{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"gopkg.in/yaml.v3"
 )
 
@@ -129,7 +129,7 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	if tenant != "" {
-		req.Header.Set("X-Tenant-UUID", tenant)
+		req.Header.Set("X-PowerX-Tenant", tenant)
 	}
 	req.Header.Set("X-Request-ID", fmt.Sprintf("cap-catalog-%d", time.Now().UnixNano()))
 

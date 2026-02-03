@@ -2,7 +2,7 @@ go 1.24.0
 
 use ./framework
 
-use ./skeleton/backend
+use ./skeleton/backend/go-gin
 
 use ./tools/cli
 

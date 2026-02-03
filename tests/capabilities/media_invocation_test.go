@@ -22,7 +22,7 @@ func TestCapabilityProxySuccess(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
 			t.Fatalf("unexpected authorization header: %s", got)
 		}
-		if got := r.Header.Get("X-Tenant-UUID"); got != "tenant-123" {
+		if got := r.Header.Get("X-PowerX-Tenant"); got != "tenant-123" {
 			t.Fatalf("unexpected tenant header: %s", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -53,7 +53,7 @@ func TestCapabilityProxySuccess(t *testing.T) {
 		"payload":      map[string]any{"folder": "inbox"},
 	})
 	ctx := newMockContext(body)
-	ctx.reqHeaders["X-Tenant-UUID"] = "tenant-123"
+	ctx.reqHeaders["X-PowerX-Tenant"] = "tenant-123"
 	ctx.reqHeaders["X-Request-ID"] = "req-success-1"
 
 	handler(ctx)
@@ -111,7 +111,7 @@ func TestCapabilityProxyRateLimited(t *testing.T) {
 		"payload":      map[string]any{"assetName": "demo.pdf"},
 	})
 	ctx := newMockContext(body)
-	ctx.reqHeaders["X-Tenant-UUID"] = "tenant-123"
+	ctx.reqHeaders["X-PowerX-Tenant"] = "tenant-123"
 
 	handler(ctx)
 

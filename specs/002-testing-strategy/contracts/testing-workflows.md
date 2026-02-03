@@ -10,7 +10,7 @@ This document standardises the entry points and expected behaviours for the smok
   - `PX_PLUGIN_BIN` optional override; otherwise script builds `bin/px-plugin`.
 - **Steps (must execute sequentially)**:
   1. `go test ./framework/backend/go/bootstrap/...` with `-coverprofile=tmp/coverage.out`.
-  2. `go test ./skeleton/backend/internal/routes/...`.
+  2. `go test ./skeleton/backend/go-gin/internal/routes/...`.
   3. `python3 -m json.tool docs/contracts/manifest.json` and `docs/contracts/rbac.json`.
   4. Build CLI `go build -o bin/px-plugin ./tools/cli/cmd/px-plugin`.
   5. Scaffold temp project and verify `plugin.yaml` presence.
@@ -27,12 +27,12 @@ This document standardises the entry points and expected behaviours for the smok
   - `KEEP_TEMP_DIR=1` to retain generated CLI project for inspection.
 - **Prerequisites**: All smoke workflow prerequisites plus Playwright browsers installed (`npx playwright install`).
 - **Steps** (in addition to smoke tasks):
-  1. `go test ./framework/... ./skeleton/backend/... -coverprofile=tmp/coverage.out`.
-  2. `npx playwright test` from `skeleton/web-admin` (with service wait loop).
+  1. `go test ./framework/... ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage.out`.
+  2. `npx playwright test` from `skeleton/web-admin/nuxt` (with service wait loop).
   3. Archive Playwright report to `tmp/playwright-report/` if `npx` emits HTML report.
 - **Outputs**:
   - Updated `tmp/coverage.out` and `tmp/coverage.html`.
-  - Playwright artifacts under `skeleton/web-admin/test-results/` and optionally `tmp/playwright-report/`.
+  - Playwright artifacts under `skeleton/web-admin/nuxt/test-results/` and optionally `tmp/playwright-report/`.
 - **Exit Codes**:
   - `0` only if all layers pass.
   - Non-zero if any layer fails; script should print failing command.

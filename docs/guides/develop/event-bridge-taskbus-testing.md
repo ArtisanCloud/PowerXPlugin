@@ -44,7 +44,7 @@ flowchart LR
 
 路径对照（便于你在外部插件仓库里找文件）：
 
-- 本仓库：`skeleton/backend/...` + `skeleton/plugin.yaml`
+- 本仓库：`skeleton/backend/go-gin/...` + `skeleton/plugin.yaml`
 - 外部插件仓库（由模板生成的典型形态）：`backend/...` + `plugin.yaml`
 
 ## 1) 契约校验（必做）
@@ -77,14 +77,14 @@ make validate-taskbus-contracts
 
 ```bash
 mkdir -p tmp/gocache
-GOCACHE="$PWD/tmp/gocache" go test ./skeleton/backend/...
+GOCACHE="$PWD/tmp/gocache" go test ./skeleton/backend/go-gin/...
 ```
 
 ### 2.2 仅跑 EventBridge 相关测试（快速）
 
 ```bash
 mkdir -p tmp/gocache
-GOCACHE="$PWD/tmp/gocache" go test ./skeleton/backend/... -run 'EventBridge|event_bridge' -v
+GOCACHE="$PWD/tmp/gocache" go test ./skeleton/backend/go-gin/... -run 'EventBridge|event_bridge' -v
 ```
 
 其中会覆盖：
@@ -97,7 +97,7 @@ GOCACHE="$PWD/tmp/gocache" go test ./skeleton/backend/... -run 'EventBridge|even
 ### 3.1 启动 Skeleton 后端
 
 ```bash
-cd skeleton/backend
+cd skeleton/backend/go-gin
 # 如只是本地联调/排障，可临时关闭鉴权以便 curl 调试（仅限本地/开发环境）
 export POWERX_AUTH_OPTIONAL=true
 go run ./cmd/plugin
@@ -186,15 +186,15 @@ events:
 对应实现参照：
 
 - `framework/eventbridge/emitter.go`（Factory + dual/fallback + metrics）
-- `skeleton/backend/internal/security/event_permissions.go`（manifest 权限 enforcement）
+- `skeleton/backend/go-gin/internal/security/event_permissions.go`（manifest 权限 enforcement）
 
 如果你是在“外部插件独立仓库”里做接入：
 
-- 若是由本仓库模板生成：通常会有同名代码目录（只是路径从 `skeleton/backend/...` 变为 `backend/...`）。
+- 若是由本仓库模板生成：通常会有同名代码目录（只是路径从 `skeleton/backend/go-gin/...` 变为 `backend/...`）。
 - 若不是模板生成：建议优先直接依赖 framework（避免复制代码造成漂移）：
   - `github.com/ArtisanCloud/PowerXPlugin/framework/event`
   - `github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge`
-  - 权限 enforcement 可参考：`skeleton/backend/internal/security/event_permissions.go`
+  - 权限 enforcement 可参考：`skeleton/backend/go-gin/internal/security/event_permissions.go`
 
 当 Framework TaskBus SDK 就绪后，实现一个 adapter（示意）：
 
@@ -226,7 +226,7 @@ factory.WithTaskBusProvider(func() (eventbridge.Emitter, error) {
 
 业务层建议只依赖“领域 emitter”（例如本仓库的 `ChannelEventEmitter`），不要在 handler 里拼 topic/拼 meta：
 
-- 示例 emitter：`skeleton/backend/internal/observability/channel/event_emitter.go`
+- 示例 emitter：`skeleton/backend/go-gin/internal/observability/channel/event_emitter.go`
 - 示例 topic：`powerx.channel.master.credential_inspection.v1`
 
 ## 6) 常见问题（FAQ）
@@ -240,5 +240,5 @@ factory.WithTaskBusProvider(func() (eventbridge.Emitter, error) {
 确保开发态 manifest `skeleton/plugin.yaml` 中 `events.publish` / `events.subscribe` 声明了对应 topic（精确到版本号）。也可以用环境变量指定 manifest 路径：
 
 ```bash
-POWERX_PLUGIN_MANIFEST_PATH=./skeleton/plugin.yaml go run ./skeleton/backend/cmd/plugin
+POWERX_PLUGIN_MANIFEST_PATH=./skeleton/plugin.yaml go run ./skeleton/backend/go-gin/cmd/plugin
 ```

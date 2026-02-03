@@ -6,6 +6,7 @@ package templates
 const (
 	// Backend template types
 	BackendGoGin      = "go-gin"
+	BackendPythonFast = "python-fastapi"
 	BackendGoFiber    = "go-fiber" // Future support
 	BackendGoEcho     = "go-echo"  // Future support
 	BackendGoChi      = "go-chi"   // Future support
@@ -22,6 +23,7 @@ const (
 func SupportedBackends() []string {
 	return []string{
 		BackendGoGin,
+		BackendPythonFast,
 		// BackendGoFiber,
 		// BackendGoEcho,
 		// BackendGoChi,
@@ -32,7 +34,7 @@ func SupportedBackends() []string {
 func SupportedFrontends() []string {
 	return []string{
 		FrontendNuxt,
-		// FrontendNext,
+		FrontendNext,
 		// FrontendVue,
 		// FrontendReact,
 		// FrontendSvelte,

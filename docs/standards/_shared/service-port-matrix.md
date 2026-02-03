@@ -12,8 +12,10 @@
 | | MinIO（若使用本地对象存储） | HTTP | `9000` | `storage.s3.endpoint` | 示例配置指向 `http://127.0.0.1:9000`，用于媒体、插件制品等对象存储。 |
 | | Redis（事件总线/缓存） | TCP | `6379` | `cache.port` / `event_bus.redis_addr` | 作为缓存、事件去重与 License key 缓存用途。 |
 | **PowerX Plugin Skeleton** (`Core/Plugins/PowerXPlugin`) | Backend HTTP | HTTP | `8078` | `config/config.yaml.example` → `server.listen` | 插件后端服务，监听健康检查 `/healthz` 与业务接口；默认与 Core MCP (`8086`) 分离，仍可通过 `PORT` 覆盖以适配本地环境。 |
-| | Backend gRPC | gRPC | `8079` | `docs/guides/develop/standalone-mode.md` | 插件服务暴露的 gRPC 端口，环境变量 `POWERX_GRPC_PORT` 可覆盖。 |
-| | Nuxt 管理端 | Vite/Nuxi Dev | `3031` | `docs/guides/develop/standalone-mode.md` | 插件独立运行时的 Web 控制台，冲突时自动寻找空闲端口；可通过 `npm run dev -- --port` 指定。 |
+| | Backend gRPC | gRPC | `8079` | `docs/guides/develop/standalone/README.md` | 插件服务暴露的 gRPC 端口，环境变量 `POWERX_GRPC_PORT` 可覆盖。 |
+| | Nuxt 管理端 | Vite/Nuxi Dev | `3131` | `docs/guides/develop/standalone/README.md` | 插件独立运行时的 Web 控制台，冲突时自动寻找空闲端口；可通过 `npm run dev -- --port` 指定。 |
+| | FastAPI 后端 | HTTP | `8277` | `docs/guides/develop/standalone/fastapi.md` | Python FastAPI 占位骨架的默认端口，使用 `bash scripts/dev.sh` 启动。 |
+| | Next 管理端 | Next Dev | `3231` | `docs/guides/develop/standalone/next.md` | React NextJS 占位骨架的默认端口。 |
 | | Test Preview 前端 | Node Preview | 动态（默认 `REGRESSION_FRONTEND_PORT`） | `docs/test/testing_usage.md` | E2E / 回归测试中可通过环境变量固定端口。 |
 | **PowerX Plugin Marketplace** (`Core/PowerXPluginMarket`) | HTTP API | HTTP | `8080` | `backend/etc/config.yaml` → `http.addr` | 提供插件上架、审核、制品发放等接口。 |
 | | Storage (MinIO 示例) | HTTP | `9001` | `storage.endpoint` | 默认指向 `http://localhost:9001`，用于 Marketplace 制品、许可证等对象。 |

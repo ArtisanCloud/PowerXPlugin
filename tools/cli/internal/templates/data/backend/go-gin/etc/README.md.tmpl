@@ -5,7 +5,7 @@
 Skeleton 默认在未提供任何 YAML 的情况下使用 **内存 SQLite** 运行，因此你可以直接：
 
 ```bash
-cd skeleton/backend
+cd skeleton/backend/go-gin
 go run ./cmd/plugin
 ```
 

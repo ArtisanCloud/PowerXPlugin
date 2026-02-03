@@ -10,7 +10,7 @@
   cd skeleton
   npm install
   ```
-- 进入 `skeleton/backend` 并根据需要设置数据库：
+- 进入 `skeleton/backend/go-gin` 并根据需要设置数据库：
   ```bash
   export POWERX_PROXY=0
   export IAM_MODE=local
@@ -24,7 +24,7 @@
 ## 2. 启动本地服务
 
 ```bash
-cd skeleton/backend
+cd skeleton/backend/go-gin
 POWERX_PROXY=0 IAM_MODE=local go run ./cmd/plugin
 ```
 

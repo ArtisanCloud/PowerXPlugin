@@ -13,7 +13,7 @@ import (
 type tenantContextKey string
 
 const (
-	tenantHeaderName                   = "X-Tenant-UUID"
+	tenantHeaderName                   = "X-PowerX-Tenant"
 	defaultTenantUUID                  = "00000000-0000-0000-0000-000000000001"
 	tenantKey         tenantContextKey = "framework.tenant_uuid"
 )

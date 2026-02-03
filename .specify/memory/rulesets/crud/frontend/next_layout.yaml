@@ -1,0 +1,11 @@
+# Next.js Layout Ruleset
+kind: ruleset
+id: next_layout
+version: 1.0.0
+summary: "Next.js Layout 规范"
+checks:
+  - id: next-layout
+    desc: 必须具备 app/layout.tsx
+    assert:
+      type: file
+      target: web-admin/next/app/layout.tsx

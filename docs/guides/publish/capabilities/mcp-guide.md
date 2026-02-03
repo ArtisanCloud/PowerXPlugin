@@ -55,7 +55,7 @@ curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/register \
   shasum -a 256 contracts/exposure/mcp-tools.json | cut -d' ' -f1
   ```
 
-> 提示：`skeleton/backend/etc/integration/grant_matrix.yaml` 仅声明 tool scope 与通道授权，不会包含 runtime assignment ID；本地调试时直接使用手动生成的 UUID 即可。
+> 提示：`skeleton/backend/go-gin/etc/integration/grant_matrix.yaml` 仅声明 tool scope 与通道授权，不会包含 runtime assignment ID；本地调试时直接使用手动生成的 UUID 即可。
 
 返回示例：
 
@@ -127,7 +127,7 @@ curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ### 3.1 本地 skeleton（独立插件）
 
-1. `cd skeleton/backend && POWERX_PROXY=0 go run ./cmd/plugin`，并按《agent-rest-grpc-guide.md》获取本地 token。
+1. `cd skeleton/backend/go-gin && POWERX_PROXY=0 go run ./cmd/plugin`，并按《agent-rest-grpc-guide.md》获取本地 token。
 2. 依序调用 2.1~2.3 中的 Register/Ack/Heartbeat/Invoke，`tool_scope`、`metadata.intent`、`capability_id` 直接引用 `contracts/exposure/*` 的声明。
 3. 使用第 4 节中的 SSE/WS 订阅接口（`/api/v1/mcp/*`）观察事件；必要时结合日志确认 handler 是否执行。
 4. 调试完成后调用 Close 释放会话。
@@ -314,13 +314,13 @@ curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/inv
 }
 ```
 
-> 模板模型已新增 `status`、`review_status`、`published_at`、`publish_channel`、`cleanup_reason`、`cleaned_at` 等字段（定义见 `skeleton/backend/internal/entity/models/template/template.go`），每次 Workflow/CRUD 都会按阶段更新这些字段，便于直接在数据库里还原生命周期。
+> 模板模型已新增 `status`、`review_status`、`published_at`、`publish_channel`、`cleanup_reason`、`cleaned_at` 等字段（定义见 `skeleton/backend/go-gin/internal/entity/models/template/template.go`），每次 Workflow/CRUD 都会按阶段更新这些字段，便于直接在数据库里还原生命周期。
 
 ### 三个场景分别会产生哪些记录？
 
 | 场景 | 落库 / 事件 | 说明 |
 |------|-------------|------|
-| template.compose | 1) `template` 表新增一条记录，字段 `status` → `archived`、`review_status` → `approved`、`publish_channel`/`published_at`/`cleaned_at` 均会被写入（详见 `skeleton/backend/internal/entity/models/template/template.go`）；<br>2) SSE 依次推送 `draft.created` → `template.review.completed` → `publish.status` → `template.publish.completed` → `template.cleanup.completed`，可在事件 payload 中看到三阶段的状态。 | `handleTemplateCompose` 先写入草稿，再调用 `TemplateService.MarkReviewed/Publish/Cleanup` 贯穿草稿→审核→清理流程。最终你可以在同一条模板记录上看到完整生命周期痕迹（草稿时间、审核信息、发布时间以及清理原因），同时 SSE 事件便于 Agent 端同步每个阶段的结果。 |
+| template.compose | 1) `template` 表新增一条记录，字段 `status` → `archived`、`review_status` → `approved`、`publish_channel`/`published_at`/`cleaned_at` 均会被写入（详见 `skeleton/backend/go-gin/internal/entity/models/template/template.go`）；<br>2) SSE 依次推送 `draft.created` → `template.review.completed` → `publish.status` → `template.publish.completed` → `template.cleanup.completed`，可在事件 payload 中看到三阶段的状态。 | `handleTemplateCompose` 先写入草稿，再调用 `TemplateService.MarkReviewed/Publish/Cleanup` 贯穿草稿→审核→清理流程。最终你可以在同一条模板记录上看到完整生命周期痕迹（草稿时间、审核信息、发布时间以及清理原因），同时 SSE 事件便于 Agent 端同步每个阶段的结果。 |
 | template.audit | 1) `template` 表中命中的第一条记录被 `TemplateService.Update` 覆盖描述/内容；<br>2) SSE 推送 `audit.template.updated`，payload 包含最新描述与模板 ID。 | `handleTemplateAudit` 会按分页配置 (`filters.page/page_size`) 查询，并在找到模板后执行修复，响应体里的 `selected_template_id` 与事件 payload 可用来比对。 |
 | template.quality_distribute | 1) `TemplateService.List`、`Validate` 仅读取数据，不写库；<br>2) `TemplateService.BatchClone` 按 `clone.copies` 写入 N 条副本（`template` 表增加多条记录）；<br>3) `TemplateService.Update` 再次修改目标模板/副本内容；<br>4) SSE 依次推送 `template.validate.completed`、`template.batch_clone.completed`、`template.update.completed`（事件定义见 `contracts/exposure/agent-streams/template-quality-distribute.yaml`）。 | 该 Workflow 串联了 `list → validate → batch_clone → update`（参考 `contracts/exposure/workflow/template-quality-distribute.json`）。执行完成后可通过 `template` 表新增的副本 ID 与 SSE 事件序列验证巡检、克隆与更新各阶段。 |
 
@@ -334,7 +334,7 @@ curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/inv
 
 ### MCP 单节点 CRUD 能力（list/read/create/update/delete）
 
-除了三条 Workflow，`com.powerx.plugins.base.template.*` 还暴露了 CRUD 原子能力，每个能力都在 `contracts/capabilities/com.powerx.plugins.base.template.<name>.yaml` 中定义了 `metadata.protocols.agent_tool.scope`，并在 `skeleton/backend/etc/integration/grant_matrix.yaml` 注册了 `agent.template.<name>`。下面示例同样补齐了所有字段，可直接粘贴运行（把 `<sessionID>`、`<token>`、`<templateID>` 替换成实际值）：
+除了三条 Workflow，`com.powerx.plugins.base.template.*` 还暴露了 CRUD 原子能力，每个能力都在 `contracts/capabilities/com.powerx.plugins.base.template.<name>.yaml` 中定义了 `metadata.protocols.agent_tool.scope`，并在 `skeleton/backend/go-gin/etc/integration/grant_matrix.yaml` 注册了 `agent.template.<name>`。下面示例同样补齐了所有字段，可直接粘贴运行（把 `<sessionID>`、`<token>`、`<templateID>` 替换成实际值）：
 
 > `/invoke` 的 HTTP 响应统一返回 `{"success":true,"data":{...}}` 包装体，现在 `data.payload` 会直接嵌入 JSON 对象，不再是字符串。如果你在命令行想立即查看返回值，可像 list 示例那样追加 `| jq '.data.payload'`；在 Insomnia/Postman 里则直接展开 `data.payload` 即可。
 
@@ -461,7 +461,7 @@ curl -X POST http://127.0.0.1:8078/api/v1/admin/runtime/sessions/<sessionID>/inv
 想快速确认 compose / audit / quality 三个场景是否会按预期写入模板数据库，可直接运行随仓库提供的 Go 测试：
 
 ```bash
-cd skeleton/backend
+cd skeleton/backend/go-gin
 go test ./internal/services/integration/...
 ```
 
@@ -515,4 +515,4 @@ PowerX 宿主会把插件整体挂载到 `/api/v1` 前缀之下，因此本地�
 | Invoke 403 | Grant Matrix 未授权 | 更新 `capabilities/catalog.json` 中 `metadata.protocols.agent_tool.scope`，或在数据库覆盖 `grant_matrix_overrides` |
 | SSE 无事件 | 会话未完成 ACK 或 Invoke 失败 | 查看 `/api/v1/admin/runtime/sessions/<id>` 日志；必要时开启 `POWERX_LOG_LEVEL=debug` |
 
-> 建议：在 CI 中加入 `go test ./internal/services/admin/runtime_ops` 以及 `skeleton/backend/tests/integration/mcp_agent_mode_test.go`，保证 MCP 与 REST Agent 可以同时调度同一能力。
+> 建议：在 CI 中加入 `go test ./internal/services/admin/runtime_ops` 以及 `skeleton/backend/go-gin/tests/integration/mcp_agent_mode_test.go`，保证 MCP 与 REST Agent 可以同时调度同一能力。

@@ -45,3 +45,23 @@ skeleton/web-admin/test-results/
 skeleton/web-admin/playwright-report/
 skeleton/backend/etc/config.yaml
 skeleton/backend/etc/host-values.yaml
+
+# Python
+__pycache__/
+*.pyc
+
+# Python FastAPI scaffolds
+skeleton/backend/python-fastapi/.venv/
+skeleton/backend/python-fastapi/app/__pycache__/
+skeleton/backend/python-fastapi/scripts/
+scaffold/templates/backend/python-fastapi/scripts/
+internal/templates/data/backend/python-fastapi/scripts/
+
+# Next.js scaffold artifacts
+skeleton/web-admin/next/.next/
+skeleton/web-admin/next/next-env.d.ts
+skeleton/web-admin/next/package-lock.json
+skeleton/web-admin/next/tsconfig.json
+skeleton/backend/python-fastapi/__pycache__/
+skeleton/backend/python-fastapi/*.pyc
+skeleton/backend/python-fastapi/venv/

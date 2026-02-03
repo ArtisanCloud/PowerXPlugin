@@ -19,6 +19,8 @@ rulesets:
   # --------------------------------------
   # Backend Rulesets (CRUD / STS)
   # --------------------------------------
+  - rulesets/backend/common/ddd.yaml
+  - rulesets/backend/fastapi/http.yaml
   - rulesets/crud_http.yaml
   - rulesets/crud_grpc.yaml
   - rulesets/sts.yaml
@@ -27,6 +29,7 @@ rulesets:
   # Frontend Rulesets (Nuxt / Admin UI)
   # --------------------------------------
   - rulesets/frontend_admin.yaml
+  - rulesets/frontend_admin_next.yaml
 
   # --------------------------------------
   # CRUD细分规则
@@ -52,3 +55,14 @@ rulesets:
   - rulesets/crud/frontend/nuxt_i18n.yaml
   - rulesets/crud/frontend/nuxt_layout.yaml
   - rulesets/crud/frontend/nuxt_tests.yaml
+
+  # --------------------------------------
+  # Frontend细分规则（Next.js，占位）
+  # --------------------------------------
+  - rulesets/crud/frontend/next_pages.yaml
+  - rulesets/crud/frontend/next_components.yaml
+  - rulesets/crud/frontend/next_api_client.yaml
+  - rulesets/crud/frontend/next_stores.yaml
+  - rulesets/crud/frontend/next_i18n.yaml
+  - rulesets/crud/frontend/next_layout.yaml
+  - rulesets/crud/frontend/next_tests.yaml

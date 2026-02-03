@@ -20,7 +20,7 @@ go tool cover -func=coverage.out | grep total
 ## 步骤 2：启动 Skeleton 后端并执行 CRUD (US2)
 
 ```bash
-go run ./skeleton/backend/cmd/plugin &
+go run ./skeleton/backend/go-gin/cmd/plugin &
 ```
 
 在另一终端执行：
@@ -29,18 +29,18 @@ go run ./skeleton/backend/cmd/plugin &
 # 创建模板
 curl -X POST http://localhost:8078/api/v1/templates \
   -H 'Content-Type: application/json' \
-  -H 'X-Tenant-UUID: 100' \
+  -H 'X-PowerX-Tenant: 100' \
   -d '{"name":"Demo","description":"From Quickstart","content":"Hello"}'
 
 # 查询当前租户列表
-curl -H 'X-Tenant-UUID: 100' http://localhost:8078/api/v1/templates
+curl -H 'X-PowerX-Tenant: 100' http://localhost:8078/api/v1/templates
 
 # 访问其他租户资源应返回 404
-curl -H 'X-Tenant-UUID: 200' http://localhost:8078/api/v1/templates/1
+curl -H 'X-PowerX-Tenant: 200' http://localhost:8078/api/v1/templates/1
 
 # 测量延迟（多次执行，确认 ≤1s）
 curl -w 'TOTAL_TIME=%{time_total}\n' -o /dev/null -s \
-  -H 'X-Tenant-UUID: 100' http://localhost:8078/api/v1/templates
+  -H 'X-PowerX-Tenant: 100' http://localhost:8078/api/v1/templates
 ```
 
 结束后停止后端进程。
@@ -48,7 +48,7 @@ curl -w 'TOTAL_TIME=%{time_total}\n' -o /dev/null -s \
 ## 步骤 3：前端 Skeleton 联调 (US3/US4)
 
 ```bash
-cd skeleton/web-admin
+cd skeleton/web-admin/nuxt
 npm install
 npm run dev
 ```

@@ -7,10 +7,10 @@
 
 ### 后端
 
-- [ ] 复制 `backend/internal/entity/models/**` → `skeleton/backend/internal/entity/models/`
-- [ ] 复制 `backend/internal/entity/repository/**` → `skeleton/backend/internal/entity/repository/`
-- [ ] 复制 `backend/internal/services/**` → `skeleton/backend/internal/services/`
-- [ ] 复制 `backend/internal/transport/http/**`、`transport/grpc/**` → `skeleton/backend/internal/transport/`
+- [ ] 复制 `backend/internal/entity/models/**` → `skeleton/backend/go-gin/internal/entity/models/`
+- [ ] 复制 `backend/internal/entity/repository/**` → `skeleton/backend/go-gin/internal/entity/repository/`
+- [ ] 复制 `backend/internal/services/**` → `skeleton/backend/go-gin/internal/services/`
+- [ ] 复制 `backend/internal/transport/http/**`、`transport/grpc/**` → `skeleton/backend/go-gin/internal/transport/`
 
 #### 关键决策：选择迁移路径
 
@@ -31,10 +31,10 @@
 
 ### 前端
 
-- [ ] 复制 `web-admin/app/components/**` → `skeleton/web-admin/app/components/`
-- [ ] 复制 `web-admin/app/pages/**` → `skeleton/web-admin/app/pages/`
+- [ ] 复制 `web-admin/app/components/**` → `skeleton/web-admin/nuxt/app/components/`
+- [ ] 复制 `web-admin/app/pages/**` → `skeleton/web-admin/nuxt/app/pages/`
 - [ ] 调整 API 调用逻辑，使用 `~/app/composables/api/_client.ts` 暴露的统一客户端
-- [ ] 同步 i18n 文案至 `skeleton/web-admin/i18n/locales/`
+- [ ] 同步 i18n 文案至 `skeleton/web-admin/nuxt/i18n/locales/`
 - [ ] 更新 `nuxt.config.ts` 中的插件 ID 与标题信息
 
 ### 模板同步
@@ -61,7 +61,7 @@
    router.RegisterPluginRoutes(app, routes.Register)
    ```
 6. 更新 `internal/manifestx/manifest.go` 以反映新的菜单、权限项。
-7. `cd skeleton/backend && go test ./...`，验证改动不会破坏现有测试。
+7. `cd skeleton/backend/go-gin && go test ./...`，验证改动不会破坏现有测试。
 
 ## 3. 迁移步骤（前端）
 
@@ -95,7 +95,7 @@
 ## 6. 参考资源
 
 - [架构设计总览](../plan/001-init-project.md)
-- [Standalone 运行指南](../develop/standalone-mode.md)
+- [Standalone 运行指南](../develop/standalone/README.md)
 - [模板同步脚本配置](../../scripts/template-sync-config.yaml)
 
 ## 7. 当前 Skeleton 的选择

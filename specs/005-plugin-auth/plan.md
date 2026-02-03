@@ -70,7 +70,7 @@ backend/
 │   └── manifestx/             # 菜单/RBAC 元数据
 └── tests/                     # Go 单测
 
-frontend/ (skeleton/web-admin)
+frontend/ (skeleton/web-admin/nuxt)
 ├── app/
 │   ├── composables/
 │   │   ├── useAuth.ts         # 新增
@@ -85,7 +85,7 @@ frontend/ (skeleton/web-admin)
 scaffold/templates/** + tools/cli/** mirror skeleton
 ```
 
-**Structure Decision**: 采用仓库现有 “backend + frontend + scaffold/cli” 结构；Auth 能力主要落在 `skeleton/backend` 与 `skeleton/web-admin`，再通过 `npm run sync:templates` 复制到 `scaffold/templates` 与 `tools/cli`.
+**Structure Decision**: 采用仓库现有 “backend + frontend + scaffold/cli” 结构；Auth 能力主要落在 `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt`，再通过 `npm run sync:templates` 复制到 `scaffold/templates` 与 `tools/cli`.
 
 ## Complexity Tracking
 

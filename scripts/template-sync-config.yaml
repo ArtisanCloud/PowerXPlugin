@@ -1,6 +1,6 @@
 mappings:
   - name: web-admin
-    source: skeleton/web-admin
+    source: skeleton/web-admin/nuxt
     targets:
       - path: scaffold/templates/web-admin/nuxt
         suffix: .tmpl
@@ -47,8 +47,28 @@ mappings:
       - globs: ["app/pages/_p/__plugin__/admin/index.vue"]
         literal: "欢迎使用 PowerX Sample Plugin 插件脚手架示例页面。"
         replace: "欢迎使用 {{ `{{ .PluginName }}` }} 插件脚手架示例页面。"
+  - name: web-admin-next
+    source: skeleton/web-admin/next
+    targets:
+      - path: scaffold/templates/web-admin/next
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/web-admin/next
+        suffix: .tmpl
+    include:
+      - "app/**/*"
+      - "next.config.js"
+      - "package.json"
+      - "README.md"
+    exclude:
+      - "node_modules/**"
+      - ".next/**"
+      - "**/.DS_Store"
+    replacements:
+      - globs: ["package.json"]
+        literal: "\"name\": \"powerxplugin-skeleton-web-admin-next\""
+        replace: "\"name\": \"{{ .PluginSlug }}-web-admin\""
   - name: backend
-    source: skeleton/backend
+    source: skeleton/backend/go-gin
     targets:
       - path: scaffold/templates/backend/go-gin
         suffix: .tmpl
@@ -68,11 +88,11 @@ mappings:
       - "etc/config.yaml"
     replacements:
       - globs: ["**/*.go", "go.mod", "go.sum"]
-        regex: "github\\.com/ArtisanCloud/PowerXPlugin/skeleton/backend"
+        regex: "github\\.com/ArtisanCloud/PowerXPlugin/skeleton/backend/go-gin"
         flags: "g"
         replace: "{{ .BackendModulePath }}"
       - globs: ["go.mod"]
-        literal: "module github.com/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/backend"
+        literal: "module github.com/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/backend/go-gin"
         replace: "module {{ .BackendModulePath }}"
       - globs: ["go.mod"]
         literal: "go 1.24"
@@ -101,6 +121,20 @@ mappings:
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Version: "0.1.0"'
         replace: 'Version: "{{ .Version }}"'
+  - name: backend-fastapi
+    source: skeleton/backend/python-fastapi
+    targets:
+      - path: scaffold/templates/backend/python-fastapi
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/backend/python-fastapi
+        suffix: .tmpl
+    include:
+      - "app/**/*.py"
+      - "requirements.txt"
+      - "README.md"
+    exclude:
+      - "**/__pycache__/**"
+      - "**/*.pyc"
   - name: root-makefiles
     source: skeleton
     include:

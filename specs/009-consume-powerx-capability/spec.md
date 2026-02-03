@@ -54,7 +54,7 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 ### Edge Cases
 
 - 当 manifest 未声明任何 `source=corex` 能力却尝试调用 Gateway 时，框架必须阻止请求并提示缺失的能力 ID。
-- 当 Tool Token 已过期或缺失 `X-Tenant-UUID`，系统需阻止调用并提供刷新指引，避免出现匿名请求。
+- 当 Tool Token 已过期或缺失 `X-PowerX-Tenant`，系统需阻止调用并提供刷新指引，避免出现匿名请求。
 - 当 Gateway 网络不可达时，应在 2 秒内超时并回落至 Mock（若已开启），否则向用户明确提示“无法连接底座”。
 - 当同一能力在 Skeleton 与宿主使用不同的 `PX_GATEWAY_BASE_URL` 时，配置对比工具需提示差异以避免环境偏差。
 - 当插件调用结果体积过大（>50MB）或媒资路径受限时，框架需要自动启用分片或预签名路径，并提示开发者后续处理方式。
@@ -64,7 +64,7 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 ### Functional Requirements
 
 - **FR-001**: 插件 manifest 与 `skeleton/plugin.yaml` 必须支持声明 `requiredCapabilities`，并在 CI 中通过 `px-plugin capabilities plan|apply --manifest ./skeleton/plugin.yaml` 进行校验，未声明即调用时需阻断。
-- **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK），默认读取 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`X-Tenant-UUID` 等环境变量，并通过插件后端对前端暴露统一 API（禁止前端直连 Gateway）。
+- **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK），默认读取 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`X-PowerX-Tenant` 等环境变量，并通过插件后端对前端暴露统一 API（禁止前端直连 Gateway）。
 - **FR-003**: 在宿主模式，部署系统需自动注入 Tool Token；在 Skeleton 模式，开发者通过 `px-plugin login` 与脚本生成本地凭证，并由框架自动刷新或提醒即将过期。
 - **FR-004**: 所有调用必须由插件后端统一走 `/tenant/invocations` REST 或 `IntegrationGatewayTenantService.InvokeCapability` gRPC，框架不得允许前端或其他组件直接访问底座内部 API。
 - **FR-005**: Gateway Client 需对每次调用自动附带 `capabilityId`、`action`、`payload`、`X-Request-ID`，并把 Gateway 返回的 `traceId` 注入日志与指标。

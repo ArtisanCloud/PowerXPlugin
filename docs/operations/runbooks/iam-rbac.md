@@ -4,8 +4,8 @@
 
 ## 0. 前置条件
 
-1. 已执行 `go run ./cmd/database/main.go setup` 并确认本地管理员可登录 `skeleton/web-admin`。
-2. 后端 `skeleton/backend` 正在运行且监听默认 `http://localhost:8077`。
+1. 已执行 `go run ./cmd/database/main.go setup` 并确认本地管理员可登录 `skeleton/web-admin/nuxt`。
+2. 后端 `skeleton/backend/go-gin` 正在运行且监听默认 `http://localhost:8077`。
 3. 已获取管理员 Token，可通过登录 Web Admin 后复制 `localStorage.access_token`，或直接使用 `useAuth` 的刷新 Token。
 
 下文 `API_BASE` 默认指向 `http://localhost:8077/api/v1`.
@@ -165,7 +165,7 @@
 | 成员解锁后无法登录 | 确认密码是否正确，或重新执行 `px-plugin iam seed` 重置管理员/成员密码。 |
 | 审计日志查询为空 | 确认 `includeIAM=true` 运行了最新迁移；在 PostgreSQL 中检查 `iam_audit_logs` 表是否有数据。 |
 
-> 建议在每次操作后运行 `npm --prefix skeleton/web-admin run test:e2e -- iam-local` 做冒烟验证，确保 UI + API 流程完整。
+> 建议在每次操作后运行 `npm --prefix skeleton/web-admin/nuxt run test:e2e -- iam-local` 做冒烟验证，确保 UI + API 流程完整。
 
 ## 6. CLI 备份与管理员重置
 
@@ -197,4 +197,4 @@
    - 建议在本地回归时修改 `--admin-email/--admin-password`，并记录在安全存储。
    - 如果 `POWERX_PROXY=1` 或 `POWERX_RBAC_DELEGATE=true`，命令会拒绝执行并提示加入 `--force`，避免误操作宿主环境。
 
-3. **验证 CLI 结果**：执行完上述命令后，使用 `px-plugin iam export --tenant ...` 进行快速比对，或者直接运行 `npm --prefix skeleton/web-admin run test:e2e -- auth-local` 验证登录流程。
+3. **验证 CLI 结果**：执行完上述命令后，使用 `px-plugin iam export --tenant ...` 进行快速比对，或者直接运行 `npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local` 验证登录流程。

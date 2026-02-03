@@ -5,19 +5,19 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [X] T001 Update `skeleton/backend/etc/config.example.yaml` & `skeleton/backend/etc/README.md` 记录 `POWERX_CORE_ENDPOINT`、`POWERX_AUTH_TOKEN`、`POWERX_RBAC_DELEGATE`、`PLUGIN_IAM_ADMIN_*` 等环境变量及使用建议。
+- [X] T001 Update `skeleton/backend/go-gin/etc/config.example.yaml` & `skeleton/backend/go-gin/etc/README.md` 记录 `POWERX_CORE_ENDPOINT`、`POWERX_AUTH_TOKEN`、`POWERX_RBAC_DELEGATE`、`PLUGIN_IAM_ADMIN_*` 等环境变量及使用建议。
 - [X] T002 将 `powerxCoreBase` 暴露到 Nuxt runtime：在 `skeleton/web-admin/nuxt.config.ts`（或等效配置）中读取 `POWERX_CORE_ENDPOINT` 并注入 `useRuntimeConfig().public.powerxCoreBase`。
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [X] T003 创建 `skeleton/backend/internal/services/iam/directory.go`，定义 `IAMDirectory` 接口、`IAMMode` 枚举、Token DTO 与通用错误类型。
-- [X] T004 在 `skeleton/backend/internal/bootstrap/iam_resolver.go` 实现 IAM 模式解析逻辑，依序读取 `context.iam_mode`、`POWERX_RBAC_DELEGATE`、`POWERX_PROXY` 并缓存在依赖容器。
-- [X] T005 新增 IAM 实体（`Tenant`/`User`/`Member`/`Role`/`Permission`/`Department`）到 `skeleton/backend/internal/entity/models/iam/`，含 Gorm 标签与关系定义。
-- [X] T006 拆分 `skeleton/backend/cmd/database/migrate/migrate.go` 的 AutoMigrate 流程，使 IAM 表仅在 Local 模式执行；更新 `cmd/database/main.go` 以读取 resolver 结果。
-- [X] T007 在 `skeleton/backend/internal/services/iam/seeder.go` 实现本地管理员种子（依赖 `PLUGIN_IAM_ADMIN_*`），并在 `cmd/database/main.go setup` 中强制校验/失败。
-- [X] T008 实现/更新 `skeleton/backend/internal/transport/http/middleware/auth_jwt.go`（及签名上下文相关文件），确保所有受保护路由同时支持 Bearer Token 与 `X-PowerX-CTX`，并添加 Go 测试覆盖 JWT 与 Signed-Context 流程。
+- [X] T003 创建 `skeleton/backend/go-gin/internal/services/iam/directory.go`，定义 `IAMDirectory` 接口、`IAMMode` 枚举、Token DTO 与通用错误类型。
+- [X] T004 在 `skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go` 实现 IAM 模式解析逻辑，依序读取 `context.iam_mode`、`POWERX_RBAC_DELEGATE`、`POWERX_PROXY` 并缓存在依赖容器。
+- [X] T005 新增 IAM 实体（`Tenant`/`User`/`Member`/`Role`/`Permission`/`Department`）到 `skeleton/backend/go-gin/internal/entity/models/iam/`，含 Gorm 标签与关系定义。
+- [X] T006 拆分 `skeleton/backend/go-gin/cmd/database/migrate/migrate.go` 的 AutoMigrate 流程，使 IAM 表仅在 Local 模式执行；更新 `cmd/database/main.go` 以读取 resolver 结果。
+- [X] T007 在 `skeleton/backend/go-gin/internal/services/iam/seeder.go` 实现本地管理员种子（依赖 `PLUGIN_IAM_ADMIN_*`），并在 `cmd/database/main.go setup` 中强制校验/失败。
+- [X] T008 实现/更新 `skeleton/backend/go-gin/internal/transport/http/middleware/auth_jwt.go`（及签名上下文相关文件），确保所有受保护路由同时支持 Bearer Token 与 `X-PowerX-CTX`，并添加 Go 测试覆盖 JWT 与 Signed-Context 流程。
 
 **Checkpoint**：IAM 接口 + Resolver + 中间件栈就绪。
 
@@ -31,19 +31,19 @@
 
 ### Implementation
 
-- [X] T009 [US1] 在 `skeleton/web-admin/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
-- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/app/composables/api/_client.ts`，注入 `Authorization` / `X-Tenant-UUID`，在 401 时自动调 `authService.refreshToken` 并重放请求。
-- [X] T011 [P] [US1] 新建 `skeleton/web-admin/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
-- [X] T012 [US1] 添加 `skeleton/web-admin/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
-- [X] T013 [US1] 完成 `skeleton/web-admin/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。
-- [X] T014 [P] [US1] 注册 `skeleton/web-admin/app/plugins/auth.client.ts` 在客户端初始化 `initAuth`，并在全局导航（如 `app/components/AppNavbar.vue`）加入 Logout。
-- [X] T015 [P] [US1] 为 `useAuth` 新增单元/组件测试（`skeleton/web-admin/tests/unit/useAuth.fallback.spec.ts` + `vitest.config.ts`），覆盖 localStorage 回退与强制登录行为。
-- [X] T016 [US1] 在 `skeleton/backend/internal/services/authproxy/delegated_client.go` 实现对宿主 `/admin/user/auth/*` 的代理并附带 `POWERX_AUTH_TOKEN`。
-- [X] T017 [US1] 新增 `skeleton/backend/internal/transport/http/public/auth_handler.go` 与公共路由 `/api/v1/auth/login|refresh|logout|me/context`，完成 fail-closed 代理。
-- [X] T018 [US1] 更新 `skeleton/backend/internal/router/router.go`，挂载 public auth 路由并沿用 Phase2 中间件；`shared/app/deps.go`、`cmd/plugin/main.go` 注入依赖。
-- [X] T019 [US1] 更新 `skeleton/backend/internal/manifestx/manifest.go`、`docs/contracts/manifest.yaml`、`docs/contracts/rbac.schema.json` 及模板/CLI，声明所需 IAM scope。
-- [X] T020 [P] [US1] 编写 Playwright E2E `skeleton/web-admin/tests/e2e/auth-delegated.spec.ts`，覆盖登录成功与 Core 不可用提示。
-- [X] T021 [US1] 在 `skeleton/backend/internal/transport/http/public/auth_handler_test.go` 添加 Go 测试，mock Delegated client 覆盖成功/401/503 分支。
+- [X] T009 [US1] 在 `skeleton/web-admin/nuxt/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
+- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`，注入 `Authorization` / `X-PowerX-Tenant`，在 401 时自动调 `authService.refreshToken` 并重放请求。
+- [X] T011 [P] [US1] 新建 `skeleton/web-admin/nuxt/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
+- [X] T012 [US1] 添加 `skeleton/web-admin/nuxt/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
+- [X] T013 [US1] 完成 `skeleton/web-admin/nuxt/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。
+- [X] T014 [P] [US1] 注册 `skeleton/web-admin/nuxt/app/plugins/auth.client.ts` 在客户端初始化 `initAuth`，并在全局导航（如 `app/components/AppNavbar.vue`）加入 Logout。
+- [X] T015 [P] [US1] 为 `useAuth` 新增单元/组件测试（`skeleton/web-admin/nuxt/tests/unit/useAuth.fallback.spec.ts` + `vitest.config.ts`），覆盖 localStorage 回退与强制登录行为。
+- [X] T016 [US1] 在 `skeleton/backend/go-gin/internal/services/authproxy/delegated_client.go` 实现对宿主 `/admin/user/auth/*` 的代理并附带 `POWERX_AUTH_TOKEN`。
+- [X] T017 [US1] 新增 `skeleton/backend/go-gin/internal/transport/http/public/auth_handler.go` 与公共路由 `/api/v1/auth/login|refresh|logout|me/context`，完成 fail-closed 代理。
+- [X] T018 [US1] 更新 `skeleton/backend/go-gin/internal/router/router.go`，挂载 public auth 路由并沿用 Phase2 中间件；`shared/app/deps.go`、`cmd/plugin/main.go` 注入依赖。
+- [X] T019 [US1] 更新 `skeleton/backend/go-gin/internal/manifestx/manifest.go`、`docs/contracts/manifest.yaml`、`docs/contracts/rbac.schema.json` 及模板/CLI，声明所需 IAM scope。
+- [X] T020 [P] [US1] 编写 Playwright E2E `skeleton/web-admin/nuxt/tests/e2e/auth-delegated.spec.ts`，覆盖登录成功与 Core 不可用提示。
+- [X] T021 [US1] 在 `skeleton/backend/go-gin/internal/transport/http/public/auth_handler_test.go` 添加 Go 测试，mock Delegated client 覆盖成功/401/503 分支。
 - [X] T022 [US1] 执行 `npm run sync:templates`，同步 Skeleton → `scaffold/templates/**` → CLI，并在 `CHANGELOG.md` 记录。
 
 **Checkpoint**：Delegated 模式可独立演示 + manifest 权限齐备。
@@ -58,10 +58,10 @@
 
 ### Implementation
 
-- [X] T023 [US2] 实现 `skeleton/backend/internal/services/iam/local_store.go`，涵盖 Login/Refresh/Logout、JWT 签发、RefreshToken 存储、角色/权限查询与 `UserContextFromToken`。
+- [X] T023 [US2] 实现 `skeleton/backend/go-gin/internal/services/iam/local_store.go`，涵盖 Login/Refresh/Logout、JWT 签发、RefreshToken 存储、角色/权限查询与 `UserContextFromToken`。
 - [X] T024 [US2] Resolver 注入 Local store（`cmd/plugin/main.go` + `internal/shared/app/deps.go`），`public/auth_handler.go` 根据 IAM Mode 切换 Delegated/Local，并复用新 store。
 - [X] T025 [P] [US2] 扩展 `internal/services/iam/seeder.go` 新增默认部门、权限与 role-permission 绑定。
-- [X] T026 [US2] 新增 Playwright E2E `skeleton/web-admin/tests/e2e/auth-local.spec.ts`（可通过 `PLAYWRIGHT_LOCAL_IAM=1` 驱动本地管理员登录）。
+- [X] T026 [US2] 新增 Playwright E2E `skeleton/web-admin/nuxt/tests/e2e/auth-local.spec.ts`（可通过 `PLAYWRIGHT_LOCAL_IAM=1` 驱动本地管理员登录）。
 - [X] T027 [US2] 更新 `specs/005-plugin-auth/quickstart.md` 与 `docs/guides/develop/standalone-mode.md`，记录 Local IAM 环境变量、登录步骤及 E2E 验证方式。
 - [X] T028 [US2] 在 `docs/plan/004-plugin-auth-integration.md` 补充 Local 模式说明，并新增 `docs/operations/runbooks/auth-troubleshooting.md` 记录 Delegated/Local 排障步骤。
 
@@ -91,7 +91,7 @@
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [X] T036 [P] 执行 `npm run lint`、`cd skeleton/backend && go test ./...`、`npm --prefix skeleton/web-admin run test:unit`、`npm run sync:templates -- --check`，并在 `CHANGELOG.md` “Added/Changed” 项中记录观测增强。
+- [X] T036 [P] 执行 `npm run lint`、`cd skeleton/backend/go-gin && go test ./...`、`npm --prefix skeleton/web-admin/nuxt run test:unit`、`npm run sync:templates -- --check`，并在 `CHANGELOG.md` “Added/Changed” 项中记录观测增强。
 - [X] T037 新增 `docs/guides/develop/auth.md`，覆盖 Delegated/Local 流程、Token 行为、指标与排障步骤。
 - [X] T038 [P] 按照 Quickstart 重新梳理 Delegated/Local 验证，并在 `specs/005-plugin-auth/quickstart.md` 补充验收命令、Playwright 步骤与性能参考。
 - [X] T039 记录 Delegated 登录性能及刷新成功率（基于 Playwright Script），结果写入 `docs/guides/develop/auth.md#6` / Quickstart 末尾。
@@ -130,9 +130,9 @@
 
 ## Phase 8: Delegated UX & Template RBAC Hardening
 
-- [X] **T048 [US1 Extension] Delegated token 失效 UX**：更新 `skeleton/web-admin/app/middleware/auth.global.ts`、`app/composables/useAuth.ts` 并新增 `app/components/DelegatedAuthBanner.vue` + 布局挂载逻辑；当 `runtimeConfig.public.insidePowerX === true` 且 token 缺失/刷新失败时，不再跳 `/users/login`，而是展示 Banner，点击“重试”会向宿主 `postMessage` 请求新的 token，同时新增 Vitest（`tests/unit/useAuth.fallback.spec.ts`）与 Playwright（`tests/e2e/auth-delegated.spec.ts`）覆盖。
+- [X] **T048 [US1 Extension] Delegated token 失效 UX**：更新 `skeleton/web-admin/nuxt/app/middleware/auth.global.ts`、`app/composables/useAuth.ts` 并新增 `app/components/DelegatedAuthBanner.vue` + 布局挂载逻辑；当 `runtimeConfig.public.insidePowerX === true` 且 token 缺失/刷新失败时，不再跳 `/users/login`，而是展示 Banner，点击“重试”会向宿主 `postMessage` 请求新的 token，同时新增 Vitest（`tests/unit/useAuth.fallback.spec.ts`）与 Playwright（`tests/e2e/auth-delegated.spec.ts`）覆盖。
 - [X] **T049 [Docs] 记录宿主模式差异**：在 `docs/guides/develop/standalone-mode.md`、`docs/guides/develop/auth.md`、`specs/005-plugin-auth/quickstart.md` 添加 Banner 行为、手动触发方式与排障提示，并同步 `CHANGELOG.md`（如需）。
-- [X] **T050 [RBAC] 模板 CRUD 权限**：新增 `skeleton/backend/internal/transport/http/admin/templates/rbac.go` + `registry.go`/manifest 权限声明，确保 `/templates` 路由映射到 `base.templates.read/manage`；前端 CRUD 页面根据 Delegated 模式自动只读并展示提示，模板/CLI 对应文件同步；相关单元/Go 测试、Playwright 验证也更新完成。
+- [X] **T050 [RBAC] 模板 CRUD 权限**：新增 `skeleton/backend/go-gin/internal/transport/http/admin/templates/rbac.go` + `registry.go`/manifest 权限声明，确保 `/templates` 路由映射到 `base.templates.read/manage`；前端 CRUD 页面根据 Delegated 模式自动只读并展示提示，模板/CLI 对应文件同步；相关单元/Go 测试、Playwright 验证也更新完成。
 
 **Checkpoint**：Delegated 模式 token 失效体验、模板 RBAC 对齐并通过 Standalone/Delegated 双模式验证。
 

@@ -387,12 +387,12 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 		if module := proxyMockModule(headers); module != "" {
 			warnings = append(warnings, "通过 X-PX-Use-Mock 请求 Mock 模块: "+module)
 		}
-		tenantUUID := strings.TrimSpace(ctx.Header("X-Tenant-UUID"))
+		tenantUUID := strings.TrimSpace(ctx.Header("X-PowerX-Tenant"))
 		if tenantUUID != "" {
 			if headers == nil {
 				headers = make(map[string]string, 1)
 			}
-			headers["X-Tenant-UUID"] = tenantUUID
+			headers["X-PowerX-Tenant"] = tenantUUID
 		}
 		result, err := service.Invoke(ctx.Context(), capabilityinvoker.InvokeParams{
 			CapabilityID: req.CapabilityID,

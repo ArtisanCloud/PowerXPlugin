@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	authmetrics "{{ .BackendModulePath }}/internal/observability/auth"
-	customermetrics "{{ .BackendModulePath }}/internal/observability/customer"
-	ebmetrics "{{ .BackendModulePath }}/internal/observability/event_bridge"
-	secmetrics "{{ .BackendModulePath }}/internal/observability/security"
+	authmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
+	customermetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/customer"
+	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
+	secmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 )
 
 const (

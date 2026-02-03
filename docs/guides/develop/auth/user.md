@@ -10,7 +10,7 @@
 
 > **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。本地模式默认同样强制校验 Authorization Header，如需临时跳过，可设置 `POWERX_AUTH_OPTIONAL=true`。
 >
-> **运行模式**：关于 Standalone 与 Delegated 的端到端流程（`/_p/<pluginId>/admin`、Vite 代理、打包注意事项等）已整合到《docs/guides/develop/standalone-mode.md》。下文仅聚焦 IAM 组件与测试矩阵，涉及运行/部署的细节请参阅该文档。
+> **运行模式**：关于 Standalone 与 Delegated 的端到端流程（`/_p/<pluginId>/admin`、Vite 代理、打包注意事项等）已整合到《docs/guides/develop/standalone/README.md》。下文仅聚焦 IAM 组件与测试矩阵，涉及运行/部署的细节请参阅该文档。
 
 ## 2. 前端 Token 生命周期
 - `useAuth` 将 `access_token`、`refresh_token`、`expires_at` 保存在 localStorage + `token` Cookie。刷新失败或宿主 503 时会调用 `failClosed()`：在 Standalone 模式下清空状态并重定向到 `/users/login`；在 Delegated 模式下保持当前 iframe、不再跳转，而是在全局顶部展示“PowerX 会话已失效，请回到宿主重新登录”的 Banner，并等待宿主重新注入 Token。
@@ -54,17 +54,17 @@
 ## 5. 验证矩阵
 | 步骤 | 命令 |
 |------|------|
-| Go 单测（包含 Local IAM store、Auth Handler、观测指标） | `cd skeleton/backend && go test ./...` |
-| 前端单测（`useAuth`逻辑） | `npm --prefix skeleton/web-admin run test:unit` |
+| Go 单测（包含 Local IAM store、Auth Handler、观测指标） | `cd skeleton/backend/go-gin && go test ./...` |
+| 前端单测（`useAuth`逻辑） | `npm --prefix skeleton/web-admin/nuxt run test:unit` |
 | Lint/Snapshot | `npm run lint` |
 | 模板同步 | `npm run sync:templates` |
-| Delegated E2E（需先启动后端/前端，见 5.1） | `npm --prefix skeleton/web-admin run test:e2e -- auth-delegated` |
-| Local E2E（需先启动后端/前端，见 5.2） | `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local` |
+| Delegated E2E（需先启动后端/前端，见 5.1） | `npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-delegated` |
+| Local E2E（需先启动后端/前端，见 5.2） | `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local` |
 
 ### 5.1 Delegated Playwright 步骤
 1. **启动后端（宿主代理）**
    ```bash
-   cd skeleton/backend
+   cd skeleton/backend/go-gin
    POWERX_PROXY=1 POWERX_RBAC_DELEGATE=true \
    POWERX_CORE_ENDPOINT="http://localhost:8077" \
    POWERX_AUTH_TOKEN="dev-token" \
@@ -73,19 +73,19 @@
    替换为实际宿主 Endpoint/Token；若依赖 PowerX Core，请确认 Core Dev 环境已启动。
 2. **启动前端开发服务器**
    ```bash
-   cd skeleton/web-admin
+   cd skeleton/web-admin/nuxt
    npm install
-   npm run dev   # 默认 http://localhost:3031
+   npm run dev   # 默认 http://localhost:3131
    ```
 3. **运行 Playwright**（另开终端）
    ```bash
-   npm --prefix skeleton/web-admin run test:e2e -- auth-delegated
+   npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-delegated
    ```
 
 ### 5.2 Local Playwright 步骤
 1. **迁移 + 启动 Local IAM**
    ```bash
-   cd skeleton/backend
+   cd skeleton/backend/go-gin
    export POWERX_PROXY=0
    export POWERX_RBAC_DELEGATE=false
    export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
@@ -102,13 +102,13 @@
    PLAYWRIGHT_LOCAL_IAM=1 \
    PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \
    PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \
-   npm --prefix skeleton/web-admin run test:e2e -- auth-local
+   npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local
    ```
 
 ## 6. 性能与耗时
 | 指标 | 测量方法 | 结果（Apple M3 Pro，本地 Chromium Headless） |
 |------|-----------|-----------------------------------------------|
-| Delegated 登录 p90 | 在运行 `npm --prefix skeleton/web-admin run dev` 后执行 `time PLAYWRIGHT_TEST_BASE_URL=http://localhost:3031 npm --prefix skeleton/web-admin run test:e2e -- auth-delegated`，读取 `Test finished` 时长 | ~1.8s/次（3 轮平均） |
+| Delegated 登录 p90 | 在运行 `npm --prefix skeleton/web-admin/nuxt run dev` 后执行 `time PLAYWRIGHT_TEST_BASE_URL=http://localhost:3131 npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-delegated`，读取 `Test finished` 时长 | ~1.8s/次（3 轮平均） |
 | Token 轮询成功率 | 观察 `plugin_auth_refresh_total{mode,result}` 与 `plugin_auth_delegate_errors_total` 的 ratio | 3 次刷新全部成功（0 错误） |
 | Local `go run ./cmd/database/main.go setup` | 针对 Postgres 15：`time POWERX_DB_DSN=postgres://... go run ./cmd/database/main.go setup` | ~4.6s（migrate+seed，本地容器） |
 

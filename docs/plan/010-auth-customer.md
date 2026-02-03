@@ -9,7 +9,7 @@ PowerX 插件需要在 Mini-App / 2C 场景下识别租户 + Customer 身份。`
 1. **租户隔离**：受保护的 `/mini-app/*` 必须能解析到 `tenant_uuid`；tenant 可来自请求显式注入（网关/header/query）或来自 customer token（推荐）。若请求显式 tenant 与 token tenant 不一致，返回 `TENANT_MISMATCH`。
 2. **统一上下文**：实现 `CustomerContext` + getter/setter，中间件写入 `gin.Context` 和 `request.Context`，Service 层可直接读取。
 3. **双模支持**：Skeleton 模式使用本地 `customer_accounts`（`CustomerAccount`）和 JWT；Delegated 模式全部委托 PowerX 底座校验，不在插件中落库。
-4. **统一响应**：mini-app handler 统一使用 `contracts.Response*`，符合 `.specify/memory/rulesets/crud/api_rest.yaml` envelope。
+4. **统一响应**：mini-app handler 统一使用 `contracts.Response*`，符合 `.codex/skills/crud/api-rest/SKILL.md` 内嵌规则的 envelope。
 
 ## 范围与模式
 
@@ -24,7 +24,7 @@ PowerX 插件需要在 Mini-App / 2C 场景下识别租户 + Customer 身份。`
 
 ### 背景：多租户 + “token 穿刺”
 
-- 宿主模式：网关通常会注入 `X-Tenant-UUID`；插件仍会校验 token 中 tenant 是否一致。
+- 宿主模式：网关通常会注入 `X-PowerX-Tenant`；插件仍会校验 token 中 tenant 是否一致。
 - Standalone 模式：同一手机号/邮箱可能在多个租户注册，因此登录阶段允许“未指定租户”，并在 token 内携带 tenant，后续请求可仅带 token。
 
 ### 规则汇总
@@ -34,8 +34,8 @@ PowerX 插件需要在 Mini-App / 2C 场景下识别租户 + Customer 身份。`
   - 未指定 tenant 且 login 只命中 1 个租户：自动选租户并签发 token（claims 含 `tenant_uuid`）。
   - 未指定 tenant 且命中多个租户：返回 `409 TENANT_SELECTION_REQUIRED` + `error.details.tenants[]`。
 - `/mini-app/*` 受保护接口：
-  - 允许不带 `X-Tenant-UUID`，由 token 注入 tenant。
-  - 若显式携带 `X-Tenant-UUID`/query tenant 且与 token tenant 不一致：`403 TENANT_MISMATCH`。
+  - 允许不带 `X-PowerX-Tenant`，由 token 注入 tenant。
+  - 若显式携带 `X-PowerX-Tenant`/query tenant 且与 token tenant 不一致：`403 TENANT_MISMATCH`。
 
 ## 架构与组件
 

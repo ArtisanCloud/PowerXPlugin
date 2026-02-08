@@ -30,21 +30,20 @@ func resolveGatewayBearerToken(c *gin.Context, deps *app.Deps) string {
 
 // resolveGatewayTenantUUID 统一 ws-bus 出站 tenant 选择规则：
 // 1) 请求体显式 tenant_uuid 优先；
-// 2) Delegated/宿主模式可使用请求上下文租户；
-// 3) Local/Standalone 模式优先使用 PX_TOOL_TOKEN.tid。
+// 2) 入站请求 token/上下文租户（两种 IAM 模式都可用）；
+// 3) Local/Standalone 模式回退 PX_TOOL_TOKEN.tid；
+// 4) 最后回退 gateway.tenant_uuid（兼容旧配置）。
 func resolveGatewayTenantUUID(c *gin.Context, deps *app.Deps, requested string) string {
 	tenantUUID := strings.TrimSpace(requested)
 	if tenantUUID != "" {
 		return tenantUUID
 	}
 
-	if deps != nil && deps.IAMMode == iamservice.IAMModeDelegated {
-		if c != nil {
-			if tc, ok := middleware.GetTenantContext(c); ok {
-				tenantUUID = strings.TrimSpace(tc.TenantUUID)
-				if tenantUUID != "" {
-					return tenantUUID
-				}
+	if c != nil {
+		if tc, ok := middleware.GetTenantContext(c); ok {
+			tenantUUID = strings.TrimSpace(tc.TenantUUID)
+			if tenantUUID != "" {
+				return tenantUUID
 			}
 		}
 	}

@@ -2,6 +2,7 @@ package wsbus
 
 import (
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 
@@ -39,13 +40,22 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func RegisterRoutes(r *gin.Engine, deps *app.Deps, jwtCfg middleware.JWTAuthConfig) {
+func RegisterRoutes(r *gin.Engine, deps *app.Deps, jwtCfg middleware.JWTAuthConfig, prefixes ...string) {
 	if r == nil {
 		return
 	}
 	handler := Handler(deps, jwtCfg)
-	r.GET("/ws", handler)
-	r.GET("/api/ws", handler)
+	prefix := "/api/v1"
+	if len(prefixes) > 0 {
+		p := strings.TrimSpace(prefixes[0])
+		if p != "" {
+			if !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			prefix = strings.TrimSuffix(p, "/")
+		}
+	}
+	r.GET(path.Join(prefix, "ws"), handler)
 }
 
 func Handler(deps *app.Deps, jwtCfg middleware.JWTAuthConfig) gin.HandlerFunc {
@@ -85,8 +95,10 @@ func Handler(deps *app.Deps, jwtCfg middleware.JWTAuthConfig) gin.HandlerFunc {
 			switch strings.ToLower(strings.TrimSpace(req.Type)) {
 			case "subscribe":
 				ws.subscribe(subscriber, req.Topics)
+				ws.send(wsResponse{Type: "ack", Message: "subscribed", Payload: gin.H{"topics": req.Topics}})
 			case "unsubscribe":
 				ws.unsubscribe(req.Topics)
+				ws.send(wsResponse{Type: "ack", Message: "unsubscribed", Payload: gin.H{"topics": req.Topics}})
 			default:
 				ws.send(wsResponse{Type: "error", Message: "unknown message type"})
 			}

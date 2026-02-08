@@ -186,24 +186,23 @@ npm run dev
 1. **前端开启宿主模式**：启动 dev server 前设置 `POWERX_PROXY=1`（或 `NUXT_PUBLIC_INSIDE_POWERX=1`）。Nuxt 会将 `app.baseURL` 与 `runtimeConfig.public.pluginAdminBase` 设为 `/_p/<plugin-id>/admin/`。为了避免本地 Dev Server 将 `_p/<plugin-id>/api` 当成静态路由，`runtimeConfig.public.apiBaseUrl` 会在开发模式下自动退回到 `/_p/<plugin-id>/api/v1`，从而始终命中 Vite 的代理。
 2. **补齐 Vite 代理（已在 `skeleton/web-admin/nuxt/nuxt.config.ts` 内置）**：配置依赖以下环境变量，便于在需要时修改目标地址：
    - `NUXT_DEV_API_PROXY`：HTTP 代理目标（默认 `http://localhost:8078`）
-   - `NUXT_DEV_WS_PROXY`：WebSocket 代理目标（默认 `ws://127.0.0.1:4000`）
+   - `NUXT_DEV_WS_PROXY`：WebSocket 代理目标（默认 `ws://127.0.0.1:8078`）
 
    对应配置代码如下，`/_p/${pluginId}/api` 的条目仅在 `POWERX_PROXY=1` 时注入：
    ```ts
    const pluginId = 'com.powerx.plugin.base'
    const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
-   const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:4000'
+   const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'
 
    const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
    const devProxy: Record<string, any> = {
-     '/api': { target: devApiProxyTarget, changeOrigin: true, ws: true },
-     '/ws': { target: devWsProxyTarget, changeOrigin: true, ws: true }
+     '/api': { target: devApiProxyTarget, changeOrigin: true, ws: true }
    }
    if (INSIDE_POWERX) {
      devProxy[`/_p/${pluginId}/api`] = { target: devApiProxyTarget, changeOrigin: true }
    }
    ```
-   如此前端直接访问 `http://localhost:3131/_p/com.powerx.plugin.base/admin/templates/crud` 时，所有 API 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
+   如此前端直接访问 `http://localhost:3131/_p/com.powerx.plugin.base/admin/templates/crud` 时，所有 API/WS 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
    同时在宿主模式下会自动关闭 Nuxt `appManifest`，避免 `manifest-route-rule` 在 `_p` 前缀下无法匹配路由而抛错。
 3. **后端保持默认**：`POWERX_PROXY=0 go run ./cmd/plugin`，只需暴露 `/api/v1/**`。由于前端代理会把 `/_p/...` 请求映射回本地接口，后端无需额外改动。
 
@@ -222,13 +221,15 @@ npm run dev
 | `PLUGIN_IAM_ADMIN_EMAIL` / `PASSWORD` | `admin@local.test` / `S3cret!!` | 本地管理员初始凭据，`setup` 会读取并写入数据库。 |
 | `NUXT_PUBLIC_INSIDE_POWERX` | `0` | 前端 runtime 判定宿主模式用，`1` 时 baseURL 调整为 `/_p/<pluginId>/admin/`。 |
 | `NUXT_PUBLIC_POWERX_PROXY` | `0` | 与上类似，供前端组件/Bridge 判断当前运行模式。 |
-| `NUXT_DEV_API_PROXY` / `NUXT_DEV_WS_PROXY` | `http://localhost:8078` / `ws://127.0.0.1:4000` | Vite 代理目标，宿主模式下会额外注入 `/_p/<pluginId>/api`。 |
+| `NUXT_DEV_API_PROXY` / `NUXT_DEV_WS_PROXY` | `http://localhost:8078` / `ws://127.0.0.1:8078` | Vite 代理目标，宿主模式下会额外注入 `/_p/<pluginId>/api`。 |
 
 > 后端运行模式与配置加载说明：
 >
 > - **配置文件位置**：统一使用 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。Go Gin 与 FastAPI 都会自动读取该文件。
 > - **环境变量覆盖**：`.env` 会覆盖进程环境变量与 `config.yaml`，因此建议将 `POWERX_PROXY`、`IAMMode`、`PX_GATEWAY_*` 统一写在这里，避免 GoLand Run Config 里残留旧值。
-> - **宿主模式（PowerX Core）**：必须同时设置 `POWERX_PROXY=1` **且** `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`。租户统一从 `PX_TOOL_TOKEN.tid` 推导；若无 `tid`，WS Bus/Capability 调用会失败。
+> - **宿主模式（PowerX Core）**：必须同时设置 `POWERX_PROXY=1` **且** `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`。
+>   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若未携带，再回退 `PX_TOOL_TOKEN.tid`。
+>   - 若两者都缺失 `tid`，WS Bus/Capability 调用会失败。
 >
 > **IAMMode / POWERX_PROXY / POWERX_RBAC_DELEGATE 优先级规则（从高到低）**：
 >
@@ -273,6 +274,144 @@ npm run dev
 
 - `gin_mode=release` 不会自动关闭 `logging.http_access`。
 - 是否能访问 `/runtime/internal/*`，由 `runtime.internal_routes_enabled` 决定，而不是 `logging.debug_mode`。
+
+### 1.4.4 WebSocket 联调步骤（本地 / 宿主）
+
+#### A) Standalone（`local + POWERX_PROXY=0`）
+
+1. 启动插件后端（确保 `runtime.internal_routes_enabled=true`，用于调试 publish）：
+
+```bash
+cd skeleton/backend/go-gin
+POWERX_PROXY=0 IAMMode=local go run ./cmd/plugin
+```
+
+2. 准备本地管理员 token（示例变量名）：
+
+```bash
+export USER_TOKEN="<your-local-jwt>"
+```
+
+3. 连接插件 WS（唯一入口）：
+
+```bash
+wscat -c "ws://127.0.0.1:8078/api/v1/ws?authorization=Bearer $USER_TOKEN"
+```
+
+4. 在 wscat 内订阅 topic：
+
+```json
+{"type":"subscribe","topics":["template.update"]}
+```
+
+预期先收到 `ack`，随后触发 publish 时收到 `event`。
+
+5. 通过 runtime 调试接口发布事件：
+
+```bash
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"template.update","payload":{"id":"demo","status":"running","progress":25}}'
+```
+
+> standalone 下 `register` 为 no-op，不是订阅前置条件。
+
+#### B) 宿主联调（`local + POWERX_PROXY=1`）
+
+1. 启动插件后端（需配置 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`）：
+
+```bash
+cd skeleton/backend/go-gin
+POWERX_PROXY=1 IAMMode=local go run ./cmd/plugin
+```
+
+2. 连接 PowerX 底座 WS：
+
+```bash
+wscat -c "ws://127.0.0.1:8077/api/ws?authorization=Bearer $USER_TOKEN"
+```
+
+3. 订阅：
+
+```json
+{"type":"subscribe","topics":["template.update"]}
+```
+
+4. 调插件 runtime 接口触发 register/publish（插件会转发到底座）：
+
+```bash
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/register" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"topics":["template.update"]}'
+
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"template.update","payload":{"id":"demo","status":"running","progress":25}}'
+```
+
+预期：底座 `wscat` 收到 `event`。
+
+### 1.4.5 WebSocket 联调失败排查速查
+
+| 现象 | 常见原因 | 快速检查 |
+|---|---|---|
+| `wscat` 连接 `404` | 路径写错（插件仅支持 `/api/v1/ws`）或路由未加载 | 检查是否访问 `ws://127.0.0.1:8078/api/v1/ws`；确认后端启动日志包含 WS 路由注册 |
+| 订阅后只有 `ack`，没有 `event` | `publish` 与 `subscribe` 租户不一致（`tid` 不同） | 打开 `logging.debug_mode=true`，确认日志中的 `resolved_gateway_tenant` 与 WS token `tid` 一致 |
+| `permission_denied` / `topic not allowed` | 当前 token 无该 topic 的订阅权限 | 更换具备权限的 token，或先用管理员 token 验证链路 |
+| `publish` 返回 200，但客户端无事件 | 发到了错误实例或错误模式链路（本地/宿主混用） | `POWERX_PROXY=0` 时应订阅 `8078 /api/v1/ws`；`POWERX_PROXY=1` 时应在底座 `8077 /api/ws` 订阅 |
+| `response.Write on hijacked connection` | WS 握手被 HTTP timeout 中间件干扰 | 确认已包含“Upgrade 请求跳过 Timeout”实现（见 10 节说明） |
+
+补充建议：
+
+- 每次联调前先打印运行模式三元组：`IAMMode / POWERX_PROXY / POWERX_RBAC_DELEGATE`。
+- 在宿主联调场景，优先验证 `register -> publish -> event` 的完整链路，再排查业务 topic 权限。
+
+### 1.4.6 标准联调记录模板（提单/群沟通统一格式）
+
+当出现 “连上了但收不到事件” 或 “宿主/本地结果不一致” 时，建议按下面模板提供信息，减少来回沟通：
+
+```md
+## WebSocket 联调记录
+
+- 日期：YYYY-MM-DD HH:mm（时区）
+- 环境：local / staging / prod
+- 代码分支与提交：<branch> / <commit>
+
+### 1) 运行模式
+- IAMMode: local | delegated
+- POWERX_PROXY: 0 | 1
+- POWERX_RBAC_DELEGATE: true | false
+- runtime.internal_routes_enabled: true | false
+
+### 2) Token 与租户
+- USER_TOKEN.tid: <uuid>
+- PX_TOOL_TOKEN.tid: <uuid or empty>
+- publish 请求体 tenant_uuid: <value or empty>
+
+### 3) 连接与操作
+- WS URL: ws://127.0.0.1:8078/api/v1/ws 或 ws://127.0.0.1:8077/api/ws
+- subscribe payload: {"type":"subscribe","topics":["template.update"]}
+- register 请求（如有）: <curl or screenshot>
+- publish 请求: <curl or screenshot>
+
+### 4) 实际结果
+- subscribe 回包: ack / error（贴原文）
+- 是否收到 event: yes / no（贴原文）
+- HTTP 返回码: register=<code>, publish=<code>
+
+### 5) 关键日志片段
+- 插件日志：`WS bus gateway auth resolved` + `HTTP request completed`
+- 底座日志（宿主模式）：`[ws-bus] register` / `[ws-bus] publish`
+- 异常日志（如有）：`response.Write on hijacked connection` / `permission_denied`
+
+### 6) 结论
+- 预期：<一句话>
+- 实际：<一句话>
+- 初步判断：路径问题 / 权限问题 / 租户不一致 / 模式配置不一致
+```
 
 > ⚠️ 只有当 `POWERX_PROXY=0` **且** `POWERX_RBAC_DELEGATE` 未开启时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
 

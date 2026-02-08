@@ -1,6 +1,6 @@
 # 插件 WS Bus 适配规范（宿主/standalone 统一接口）
 
-> 目标：**业务层不感知模式**。任何 PowerX 插件在宿主模式下必须挂钩 PowerX 底座 WS；standalone 模式下使用插件自建 WS；两者对业务代码接口一致。
+> 目标：**业务层不感知模式**。任何 PowerX 插件在宿主模式下挂钩 PowerX 底座 WS；standalone 模式下使用插件内置 WS Hub；对业务层保持统一订阅/发布语义。
 
 ## 1. 统一接口（前端）
 
@@ -18,20 +18,21 @@ disconnect()
 ## 2. 运行模式切换（底层）
 
 - **宿主模式**：连接 PowerX 底座 `/api/ws`
-- **standalone 模式**：连接插件自身 `/ws`
+- **standalone 模式**：连接插件自身 `/api/v1/ws`
 - **协议统一**：与 `PowerX/docs/plan/wx/WS-NOTIFY.md` 完全一致
 
 ## 3. 连接地址规范
 
-- PowerX 底座 WS Bus：`/api/ws`（兼容 `/ws`）
-- 插件 standalone WS：`/ws`（可选兼容 `/api/ws`）
-- **不使用** `/api/v1/ws`
+- PowerX 底座 WS Bus：`/api/ws`
+- 插件 standalone WS（唯一入口）：`/api/v1/ws`
+- 插件侧不再暴露 `/ws`、`/api/ws` 兼容入口
 
 ## 4. 鉴权与租户透传
 
 - `?authorization=Bearer <token>`
 - 或子协议：`Sec-WebSocket-Protocol: bearer.<b64url(jwt)>`
-- 可选 `tenant_uuid` query 兜底
+- 可选 `tenant_uuid` query/body 兜底
+- `POST /api/v1/admin/runtime/internal/ws-bus/publish` 的 tenant 解析优先级：请求体 `tenant_uuid` > 入站 token/上下文 `tid` > `PX_TOOL_TOKEN.tid`（local） > `gateway.tenant_uuid`（兼容）
 
 ## 5. 协议（简版提醒）
 
@@ -91,7 +92,7 @@ publish(topic: string, payload: Record<string, any>, options?: {
 
 ### 7.3 Standalone 模式
 
-- 直接发布到插件本地 WS Bus（`/ws` 对应的 hub）
+- 直接发布到插件本地 WS Bus（`/api/v1/ws` 对应的 hub）
 - 与宿主模式使用 **同一套 topic + payload** 结构
 
 ### 7.4 Topic 白名单
@@ -102,17 +103,37 @@ publish(topic: string, payload: Record<string, any>, options?: {
 ## 8. 验收点（发布链路）
 
 - 宿主模式：插件发布 → 底座 WS Bus → 前端 `/api/ws` 订阅可收到
-- standalone：插件发布 → 插件 `/ws` → 前端订阅可收到
+- standalone：插件发布 → 插件 `/api/v1/ws` → 前端订阅可收到
 - 断线重连后仍能继续接收进度
+
+### 8.1 最小联调命令（便于回归）
+
+- standalone（`POWERX_PROXY=0`）
+  - 订阅：`wscat -c "ws://127.0.0.1:8078/api/v1/ws?authorization=Bearer $USER_TOKEN"`
+  - 发布：`POST /api/v1/admin/runtime/internal/ws-bus/publish`
+  - 预期：收到 `ack` + `event`
+
+- 宿主联调（`POWERX_PROXY=1`）
+  - 订阅：`wscat -c "ws://127.0.0.1:8077/api/ws?authorization=Bearer $USER_TOKEN"`
+  - 注册：`POST /api/v1/admin/runtime/internal/ws-bus/register`（调插件 8078，转发到底座）
+  - 发布：`POST /api/v1/admin/runtime/internal/ws-bus/publish`（调插件 8078，转发到底座）
+  - 预期：底座订阅端收到 `event`
 
 ## 9. 本地调试发布端点（standalone）
 
-> 仅用于开发调试。Gin 与 FastAPI 均提供，需 `server.dev_mode: true`。
+> 仅用于开发调试。Gin 与 FastAPI 均提供，需开启 `runtime.internal_routes_enabled: true`（或 `POWERX_INTERNAL_ROUTES=1`）。
 
 - `POST /api/v1/admin/runtime/internal/ws-bus/publish`
   - 宿主模式下该端点会转发到 PowerX 底座 publish 接口，便于手动联调
 - `POST /api/v1/admin/runtime/internal/ws-bus/register`
   - 宿主模式下该端点会转发到 PowerX 底座 register 接口
+  - standalone 模式下该端点为 no-op（返回规范化后的 topics），不作为订阅前置条件
+- WebSocket 订阅端点（standalone）：`GET /api/v1/ws`
+
+## 10. 中间件注意事项
+
+- WebSocket 握手请求是长连接升级，不应套用普通 HTTP 超时中间件。
+- 当前实现已对 `Upgrade: websocket` 请求跳过 `Timeout(30s)`，避免 `response.Write on hijacked connection`。
 - Body 示例：
 ```json
 {

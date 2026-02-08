@@ -126,6 +126,11 @@ func Recovery() gin.HandlerFunc {
 // Timeout 超时中间件
 func Timeout(timeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if isWebSocketUpgrade(c.Request) {
+			c.Next()
+			return
+		}
+
 		// 简单的超时处理，实际使用中可能需要更复杂的实现
 		finish := make(chan struct{})
 		panicChan := make(chan interface{}, 1)
@@ -152,6 +157,18 @@ func Timeout(timeout time.Duration) gin.HandlerFunc {
 			c.Abort()
 		}
 	}
+}
+
+func isWebSocketUpgrade(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	upgrade := strings.ToLower(strings.TrimSpace(req.Header.Get("Upgrade")))
+	if upgrade != "websocket" {
+		return false
+	}
+	connection := strings.ToLower(req.Header.Get("Connection"))
+	return strings.Contains(connection, "upgrade")
 }
 
 // RateLimiter 简单的速率限制中间件（基于 IP）

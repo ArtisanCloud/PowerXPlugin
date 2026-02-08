@@ -148,7 +148,7 @@ func (r *Router) setupRoutes() {
 	r.inferRBACFromRoutes(rbacCfg, prefix)
 
 	mcptransport.RegisterRoutes(r.engine, prefix)
-	wsbustransport.RegisterRoutes(r.engine, r.deps, jwtCfg)
+	wsbustransport.RegisterRoutes(r.engine, r.deps, jwtCfg, prefix)
 	if rbacCfg != nil && !rbacCfg.DelegateToPowerX {
 		base := strings.TrimRight(prefix, "/") + "/admin/runtime/internal"
 		rbacCfg.RoutePermissions["POST:"+base+"/ws-bus/publish"] = rbacCfg.NormalizePermission(middleware.Permission{

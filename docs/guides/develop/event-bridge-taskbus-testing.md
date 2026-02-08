@@ -242,3 +242,45 @@ factory.WithTaskBusProvider(func() (eventbridge.Emitter, error) {
 ```bash
 POWERX_PLUGIN_MANIFEST_PATH=./skeleton/plugin.yaml go run ./skeleton/backend/go-gin/cmd/plugin
 ```
+
+## 8) 外部插件迁移清单（一次性对齐）
+
+> 适用于从“自定义 taskbus.Event”迁移到 framework `event.Event` 的插件项目。
+
+### 8.1 依赖与版本
+
+- [ ] 升级到包含 Host Provider 的 framework 版本（建议 `v0.0.3-alpha+`）。
+- [ ] 清理旧 taskbus 私有 SDK 直接依赖（保留 adapter 层）。
+
+### 8.2 代码接入
+
+- [ ] 在 bootstrap 里统一通过 `eventbridge.NewFactory(...)` 创建 emitter。
+- [ ] 注入 `WithTaskBusProvider(...)`（由宿主/runtime 提供真实 provider）。
+- [ ] 业务层统一调用领域 emitter，避免在 handler 中手拼 topic/meta。
+
+### 8.3 契约与权限
+
+- [ ] 在 manifest 声明最小权限 `events.publish/subscribe`（精确到 topic + version）。
+- [ ] 确认 payload 不含敏感字段（通过 contracts validator）。
+
+### 8.4 回归验证
+
+- [ ] `mode=local`：本地路径正常，emit/consume 指标增长。
+- [ ] `mode=taskbus`：宿主链路成功。
+- [ ] `mode=dual`：主成功后写本地；主失败短路。
+- [ ] `fallback_to_local=true`：provider 异常时自动回落，不影响主流程。
+
+## 9) 发布检查清单（Framework / 插件）
+
+### 9.1 Framework 发布
+
+- [ ] 变更说明（breaking/non-breaking）已写入 release notes。
+- [ ] 对外 API（event/eventbridge）兼容策略明确（至少保留 1 个小版本）。
+- [ ] 提供最小示例（provider 注入 + emit + consume）。
+
+### 9.2 插件发布
+
+- [ ] `go test ./...` 通过（允许排除明确的非本功能 flaky 用例）。
+- [ ] 契约校验通过：`./scripts/contracts/validate-taskbus-contracts.sh`。
+- [ ] 观测就绪：`plugin_event_bridge_emit_total/consume_total/latency_ms` 可见。
+- [ ] 回滚方案明确：可切 `event_bridge.enabled=false` 回本地实现。

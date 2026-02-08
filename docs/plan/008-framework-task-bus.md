@@ -4,6 +4,7 @@
 
 本仓库对应的落地实现与 Spec/Tasks 位于：`specs/008-framework-task-bus/`。
 快速上手与验证步骤见：`specs/008-framework-task-bus/quickstart.md`。
+开发前准备与缺口清单见：`specs/008-framework-task-bus/readiness.md`。
 
 ## 1. 目标与范围
 

@@ -15,6 +15,7 @@ import (
 	middleware2 "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/mini-app"
 	publicauth "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/public"
+	wsbustransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/wsbus"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,10 +38,23 @@ func NewRouter(cfg *config.Config, deps *app.Deps) *Router {
 // Setup 设置路由
 func (r *Router) Setup() *gin.Engine {
 	// 设置 Gin 模式
-	if r.cfg.IsProduction() {
+	ginMode := ""
+	if r.cfg != nil && r.cfg.Logging != nil {
+		ginMode = strings.ToLower(strings.TrimSpace(r.cfg.Logging.GinMode))
+	}
+	switch ginMode {
+	case "release":
 		gin.SetMode(gin.ReleaseMode)
-	} else {
+	case "debug":
 		gin.SetMode(gin.DebugMode)
+	case "test":
+		gin.SetMode(gin.TestMode)
+	default:
+		if r.cfg.IsProduction() {
+			gin.SetMode(gin.ReleaseMode)
+		} else {
+			gin.SetMode(gin.DebugMode)
+		}
 	}
 
 	// 创建 Gin 引擎
@@ -134,6 +148,18 @@ func (r *Router) setupRoutes() {
 	r.inferRBACFromRoutes(rbacCfg, prefix)
 
 	mcptransport.RegisterRoutes(r.engine, prefix)
+	wsbustransport.RegisterRoutes(r.engine, r.deps, jwtCfg, prefix)
+	if rbacCfg != nil && !rbacCfg.DelegateToPowerX {
+		base := strings.TrimRight(prefix, "/") + "/admin/runtime/internal"
+		rbacCfg.RoutePermissions["POST:"+base+"/ws-bus/publish"] = rbacCfg.NormalizePermission(middleware.Permission{
+			Resource: "runtime.ops",
+			Action:   "invoke",
+		})
+		rbacCfg.RoutePermissions["POST:"+base+"/ws-bus/register"] = rbacCfg.NormalizePermission(middleware.Permission{
+			Resource: "runtime.ops",
+			Action:   "invoke",
+		})
+	}
 
 	// 如需调试：打印已注册路由
 	// apiRegistry.PrintRegisteredRoutes()
@@ -197,8 +223,7 @@ func (r *Router) RegisterMiddleware(m gin.HandlerFunc) {
 
 // —— 从配置构造 JWT 配置（自动区分 PowerX 宿主/本地直连） —— //
 func (r *Router) buildJWT() middleware.JWTAuthConfig {
-	inPX := os.Getenv("POWERX_PROXY") == "1"
-	if inPX {
+	if shouldUseDelegatedIAM(r.cfg) {
 		// PowerX 网关严格模式：使用宿主注入的安全参数
 		pid := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID"))
 		aud := strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_AUDIENCE"))
@@ -279,7 +304,7 @@ func splitAudiences(raw string) []string {
 
 // —— 从配置构造 RBAC 配置 —— //
 func (r *Router) buildRBAC() *middleware.RBACConfig {
-	delegate := shouldDelegateToPowerX()
+	delegate := shouldUseDelegatedIAM(r.cfg)
 	issuer := strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_ISSUER"))
 	aud := strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_AUDIENCE"))
 	if aud == "" {
@@ -299,13 +324,35 @@ func (r *Router) buildRBAC() *middleware.RBACConfig {
 	}
 }
 
-func shouldDelegateToPowerX() bool {
-	v := strings.ToLower(strings.TrimSpace(os.Getenv("POWERX_RBAC_DELEGATE")))
+func shouldUseDelegatedIAM(cfg *config.Config) bool {
+	if cfg != nil && cfg.Context != nil {
+		v := strings.ToLower(strings.TrimSpace(cfg.Context.IAMMode))
+		switch v {
+		case "delegated":
+			return true
+		case "local":
+			return false
+		}
+	}
+
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("IAMMode")))
+	if v == "" {
+		v = strings.ToLower(strings.TrimSpace(os.Getenv("IAM_MODE")))
+	}
 	switch v {
+	case "delegated":
+		return true
+	case "local":
+		return false
+	}
+
+	rbacDelegate := strings.ToLower(strings.TrimSpace(os.Getenv("POWERX_RBAC_DELEGATE")))
+	switch rbacDelegate {
 	case "1", "true", "yes", "on":
 		return true
 	case "0", "false", "no", "off":
 		return false
 	}
+
 	return os.Getenv("POWERX_PROXY") == "1"
 }

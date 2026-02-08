@@ -28,7 +28,7 @@ grpc_upstream:
   optional: true
 
 gateway:
-  # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN / PX_TENANT_UUID。
+  # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN。
   # 若留空则默认关闭 Gateway 调用，`PX_USE_MOCK` 可指定 media,eventfabric 等模块名称以启用内存 Mock。
   # 注意：只要 base_url/tool_token/tenant_uuid 任一不为空，就会触发 Gateway 配置校验（必须三者齐全）。
   # 因此默认将 base_url 与 tenant_uuid 留空，避免在未登录/未配置 Token 时阻塞本地启动。

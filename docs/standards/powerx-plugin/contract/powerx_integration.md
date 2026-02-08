@@ -273,7 +273,7 @@ plugin.api_version == powerx.api_version
 ✅ **数据库角色隔离**：每个插件分配独立角色与 schema。
 ✅ **限制外网访问**：插件默认禁止出站网络。
 ✅ **STS 最小权限原则**：Token Scope 仅覆盖必要资源。
-✅ **开发模式标识**：`POWERX_DEV_MODE=1` 时跳过 JWT 验签，仅限本地。
+✅ **开发模式标识**：`POWERX_DEV_MODE=1` 仅表示开发环境语义；如需临时放宽鉴权，请显式使用 `POWERX_AUTH_OPTIONAL=true`（仅限本地）。
 ✅ **插件审计日志**：所有调用会被宿主记录 request_id 与签名指纹。
 
 ---

@@ -30,11 +30,11 @@ npm run sync:templates -- --verbose  # 同步模板并输出写入文件
 
 > 说明：只有在需要直接引用仓库内的前端框架源码时，才执行 `npm install --workspaces`。若使用发布版本，可跳过此命令，并在生成后的项目中将 `@artisan-cloud/plugin-framework-*` 调整为目标版本号。
 
-执行 `go work sync` 能确保 `framework/` 模块使用最新的 `module github.com/ArtisanCloud/PowerXPlugin/framework` 声明，避免由于缓存旧模块路径而导致的 `module declares its path` 报错。如果你使用全新 GOPROXY 版本或外部仓库发布版，可视情况省略。
+执行 `go work sync` 能确保 `framework/backend/go` 模块使用最新的 `module github.com/ArtisanCloud/PowerXPlugin/framework/backend/go` 声明，避免由于缓存旧模块路径而导致的 `module declares its path` 报错。如果你使用全新 GOPROXY 版本或外部仓库发布版，可视情况省略。
 
 完成同步后再继续构建 CLI／生成插件，可确保 Skeleton、scaffold 与 CLI 模板保持一致。
 
-> 如果你计划发布或复用 Go 框架模块，请使用 `git tag framework/v0.0.1-alpha && git push origin framework/v0.0.1-alpha`（或更高版本号）在仓库根目录打 tag，供外部 `go get github.com/ArtisanCloud/PowerXPlugin/framework@v0.0.1-alpha` 直接引用。
+> 如果你计划发布或复用 Go 框架模块，请使用 `git tag framework/backend/go/v0.0.1-alpha && git push origin framework/backend/go/v0.0.1-alpha`（或更高版本号）在仓库根目录打 tag，供外部 `go get github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.1-alpha` 直接引用。
 
 ### 发布 `@artisan-cloud/plugin-framework-*` 到 npm
 
@@ -95,13 +95,12 @@ px-plugin login --manifest ./plugin.yaml \
 cat <<'EOF' > .env.local
 PX_GATEWAY_BASE_URL=https://gateway.powerx.dev/_tenant
 PX_TOOL_TOKEN=$(jq -r '.credentials.toolToken' ~/.powerx/credentials)
-PX_TENANT_UUID=$(jq -r '.credentials.tenantUuid' ~/.powerx/credentials)
 EOF
 ```
 
 说明：
 
-1. **宿主模式**无需执行 `login`，运维会在部署清单中注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`。
+1. **宿主模式**无需执行 `login`，运维会在部署清单中注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`；租户由 token `tid` 自动推导。
 2. `px-plugin login` 会根据 manifest 中的插件 ID、所需能力向 Dev Gateway 发起 STS 交换，请确保你拥有对应环境的 Token/Key（若需要，请联系平台团队）。
 3. `.env.local` 会被 `skeleton/web-admin/nuxt` 与 `skeleton/backend/go-gin` 自动载入；若切换到其他栈（如 `python-fastapi` / `next`），需要在对应目录内确保加载逻辑一致。你也可以使用 `scripts/capabilities/run-from-package.mjs --mode skeleton`，它会优先读取 `.env.local` 的 `PX_*` 变量。
 4. 当 Token 即将过期或失效时，重新执行 `px-plugin login` 并覆盖 `.env.local` 即可。
@@ -139,7 +138,7 @@ px-plugin init --force \
 
 CLI 会在 `plugins/com.powerx.helloworld` 下生成完整项目，并输出创建的文件列表。常见目录包括：
 
-- `backend/`：Go 后端骨架，引用 `github.com/ArtisanCloud/PowerXPlugin/framework`
+- `backend/`：Go 后端骨架，引用 `github.com/ArtisanCloud/PowerXPlugin/framework/backend/go`
 - `web-admin/`：Nuxt 管理端骨架，引用 `@artisan-cloud/plugin-framework-admin`
 - `public/images/logo-s.png`：导航左上角默认 Logo，`AppNavbar` 会引用此文件
 - `docs/contracts/`：嵌入的 Manifest/RBAC/OpenAPI 契约
@@ -161,10 +160,10 @@ cd ..
 
 ### 4.2 框架依赖（可选）
 
-默认依赖 `github.com/ArtisanCloud/PowerXPlugin/framework {{ .FrameworkVersion }}`（当前为 `v0.0.1-alpha`）。如需直接引用本仓库源码，可在 `backend/go.mod` 添加：
+默认依赖 `github.com/ArtisanCloud/PowerXPlugin/framework/backend/go {{ .FrameworkVersion }}`（当前为 `v0.0.1-alpha`）。如需直接引用本仓库源码，可在 `backend/go.mod` 添加：
 
 ```
-replace github.com/ArtisanCloud/PowerXPlugin/framework => /path/to/PowerXPlugin/framework
+replace github.com/ArtisanCloud/PowerXPlugin/framework/backend/go => /path/to/PowerXPlugin/framework/backend/go
 ```
 
 将路径替换为你本地 `framework/` 的绝对目录，再执行 `go mod tidy`。

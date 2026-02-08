@@ -14,7 +14,7 @@
    - 插件在 `skeleton/plugin.yaml` 与宿主部署清单中声明依赖的 Capability ID（如 `com.corex.media.assets.manage`），CI 使用 `px-plugin capabilities plan|apply --manifest ./skeleton/plugin.yaml` 做静态校验。
 2. **鉴权与凭证**
    - 统一利用 Tool Grant + STS。宿主模式由 Admin 控台自动注入 `PX_PLUGIN_TOOL_TOKEN`，Skeleton 模式通过 `px-plugin login` 获取 `~/.powerx/credentials` 并在本地代理 `PX_TOOL_TOKEN`。
-   - 调用 Integration Gateway HTTP 接口时：`Authorization: Bearer <tool-grant-token>` + `X-PowerX-Tenant`; gRPC 场景通过 Gateway 颁发的 mTLS 证书或互斥 Token。
+   - 调用 Integration Gateway HTTP 接口时使用 `Authorization: Bearer <tool-grant-token>`；租户优先从 token `tid` 推导（必要时可显式传 `X-PowerX-Tenant` 覆盖）。gRPC 场景通过 Gateway 颁发的 mTLS 证书或互斥 Token。
 3. **调用入口**
    - REST：`POST {GatewayOrigin}/tenant/invocations`，Body 必须包含 `capabilityId/action/preferred_protocol` 与 **完整的协议描述**（`payload.method`、`payload.endpoint`、`payload.query/body/headers`），Gateway 才能根据 `capability_id + method + endpoint` 匹配对应 Adapter；缺少字段会直接在插件后端被拒绝。
    - gRPC：`IntegrationGatewayTenantService.InvokeCapability`，或直接指向模块契约（如 `powerx.media.v1.MediaAssetAdminService`），同样需在 payload 中指明 `preferred_protocol="grpc"` 以及服务/方法名称。
@@ -59,7 +59,6 @@ if err != nil { /* 记录 traceId & 错误 */ }
      ```ini
      PX_GATEWAY_BASE_URL=https://gateway.powerx.dev/_tenant
      PX_TOOL_TOKEN=sts-dev-xxxxxx
-     PX_TENANT_UUID=9f43e9b1-1f7a-4f4e-b964-5a1b55d4a12d
      PX_USE_MOCK=media # Dev Gateway 不可达时可选
      POWERX_PROXY=0
      ```

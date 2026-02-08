@@ -16,6 +16,7 @@ import (
 	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
 	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -149,6 +150,13 @@ func (h *SessionsHandler) Invoke(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid invoke payload")
 		return
 	}
+	if strings.TrimSpace(req.TenantUuid) == "" {
+		req.TenantUuid = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUuid) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
 	envelope, err := req.toDomain()
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
@@ -240,7 +248,7 @@ type invokeRequest struct {
 	MessageID      string         `json:"message_id" binding:"required"`
 	TraceID        string         `json:"trace_id" binding:"required"`
 	CorrelationID  string         `json:"correlation_id" binding:"required"`
-	TenantUuid     string         `json:"tenant_uuid" binding:"required"`
+	TenantUuid     string         `json:"tenant_uuid"`
 	ToolScope      string         `json:"tool_scope" binding:"required"`
 	IssuedAt       string         `json:"issued_at" binding:"required"`
 	IdempotencyKey string         `json:"idempotency_key"`

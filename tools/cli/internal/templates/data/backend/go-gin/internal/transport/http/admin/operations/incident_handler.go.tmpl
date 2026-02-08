@@ -8,6 +8,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	operationsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/operations"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -68,6 +69,14 @@ func (h *IncidentHandler) CreateIncident(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
+	}
+	if req.TenantUuid == nil || strings.TrimSpace(*req.TenantUuid) == "" {
+		tenantID := admincommon.ResolveTenantUUID(c)
+		if tenantID == "" {
+			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+			return
+		}
+		req.TenantUuid = &tenantID
 	}
 	payload, err := h.svc.CreateIncident(c.Request.Context(), operationsvc.CreateIncidentRequest{
 		TenantUuid:      req.TenantUuid,

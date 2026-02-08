@@ -8,6 +8,7 @@ import (
 	operationsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/operations"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,11 +42,15 @@ func (h *SupportHandler) GetPlaybook(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query parameters: "+err.Error())
 		return
 	}
-	var tenantID *string
-	if strings.TrimSpace(query.TenantUuid) != "" {
-		clean := strings.TrimSpace(query.TenantUuid)
-		tenantID = &clean
+	tenant := strings.TrimSpace(query.TenantUuid)
+	if tenant == "" {
+		tenant = admincommon.ResolveTenantUUID(c)
 	}
+	if tenant == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	tenantID := &tenant
 	payload, err := h.svc.GetPlaybook(c.Request.Context(), tenantID)
 	if err != nil {
 		contracts.ResponseInternalError(c, err)

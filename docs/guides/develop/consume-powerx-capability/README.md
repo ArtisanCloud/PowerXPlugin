@@ -53,9 +53,15 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 - **后端** 读取统一环境变量：
   - `PX_GATEWAY_BASE_URL`
   - `PX_PLUGIN_TOOL_TOKEN`（宿主）/`PX_TOOL_TOKEN`（Skeleton）
-  - `PX_TENANT_UUID`
+  - 租户从 Tool Token 的 `tid` claim 自动推导（不再单独维护额外 tenant 变量）
   - `PX_GATEWAY_CONTRACT_VERSION`（可选，配合 `dist/capability-contracts.json` 校验契约版本）
 - **Gateway Client** 负责注入 `Authorization`、`X-PowerX-Tenant`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据。
+
+> **环境加载与模式说明**：
+>
+> - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`），并覆盖 `config.yaml` 中同名配置。
+> - 宿主模式要求 `POWERX_PROXY=1`，且必须配置 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`；租户统一从 token `tid` 推导，否则会返回 503。
+> - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`IAM_MODE=local`），会覆盖 `.env` 的值，请先清理。
 
 ## 2. 前提条件
 
@@ -63,7 +69,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 | --- | --- |
 | Manifest | `skeleton/plugin.yaml` 中声明 `capabilities.required`（需要调用的 `source=corex` 能力）与 `capabilities.provides`（插件自身提供的能力）。提交前运行 `node scripts/capabilities/validate-capabilities.mjs --manifest ./skeleton/plugin.yaml`。 |
 | 底座能力参考 | 查阅 PowerX 底座文档 `PowerX/docs/guides/develop/open_capability`，了解 Media/Event/Workflow/Knowledge 模块的 `capability_id`、REST/gRPC 协议、示例命令。 |
-| 凭证 | 宿主：平台在部署时注入 `PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_TENANT_UUID`。Skeleton：执行 `px-plugin login --manifest ./skeleton/plugin.yaml`（待 CLI 提供），或手动写入 `skeleton/.env.local`。 |
+| 凭证 | 宿主：平台在部署时注入 `PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN`（租户由 token `tid` 推导）。Skeleton：执行 `px-plugin login --manifest ./skeleton/plugin.yaml`（待 CLI 提供），或手动写入 `skeleton/.env.local`。 |
 | CLI & 工具 | `scripts/capabilities/run-from-package.mjs`（手动触发能力调用）、`px-plugin capabilities quota --manifest ...`（为租户配置配额/限流样例）。 |
 
 ## 3. 宿主（Delegated）模式
@@ -85,8 +91,8 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 ## 4. Skeleton（Standalone）模式
 
 1. **环境准备**：
-   - `px-plugin login --manifest ./skeleton/plugin.yaml`（或根据 Plan 中的 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN/PX_TENANT_UUID`）。
-   - `skeleton/backend/go-gin/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN/PX_TENANT_UUID`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
+   - `px-plugin login --manifest ./skeleton/plugin.yaml`（或根据 Plan 中的 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`）。
+   - `skeleton/backend/go-gin/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
    - 如果设置了 `PX_TOOL_REFRESH_TOKEN`，Skeleton 在启动时会在 Token 过期或 24h 内到期时自动调用 `POST /admin/user/auth/refresh` 刷新 `PX_TOOL_TOKEN`，刷新结果会写回进程环境（仍需你手动同步到 `.env.local` 保证下次启动可用）。
    - 可选：`PX_USE_MOCK=<module>` 用于 Dev Gateway 不可达时的 Mock。
 2. **后端配置**：
@@ -151,4 +157,4 @@ Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“�
 
 ---
 
-通过上述手册，开发者可在宿主与 Skeleton 两种模式下快速配置凭证、调用 PowerX 能力、调试 Mock/实链路，并结合 PowerX 底座文档验证接口定义。后续若 CLI 增加 `capabilities plan/login` 等命令，可在本文对应章节补充示例。*** End Patch
+通过上述手册，开发者可在宿主与 Skeleton 两种模式下快速配置凭证、调用 PowerX 能力、调试 Mock/实链路，并结合 PowerX 底座文档验证接口定义。后续若 CLI 增加 `capabilities plan/login` 等命令，可在本文对应章节补充示例。

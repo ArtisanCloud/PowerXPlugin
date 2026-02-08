@@ -12,8 +12,8 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 func TestLoadEventPermissionsFromManifest_EnforcedWhenEventsPresent(t *testing.T) {

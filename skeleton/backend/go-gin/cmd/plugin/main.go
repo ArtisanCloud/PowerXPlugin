@@ -12,6 +12,7 @@ import (
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	runtimecap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin/runtime"
 	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
@@ -43,7 +44,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 type bridgeRecorder struct{}
@@ -119,11 +120,27 @@ func main() {
 	}
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
-	logger.WithFields(logger.Fields{
-		"mode":   iamResolver.Mode(),
-		"source": iamResolver.Source(),
-	}).Info("IAM mode resolved")
+	logRuntimeModeMatrix(cfg, iamResolver)
 	auth.ObserveMode(iamResolver.Mode().String())
+	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
+		gatewayMode := "local"
+		if os.Getenv("POWERX_PROXY") == "1" && cfg != nil && cfg.Gateway != nil {
+			if strings.TrimSpace(cfg.Gateway.BaseURL) != "" &&
+				strings.TrimSpace(cfg.Gateway.ToolToken) != "" {
+				gatewayMode = "host"
+			}
+		}
+		logger.WithFields(logger.Fields{
+			"iam_mode":             iamResolver.Mode(),
+			"iam_source":           iamResolver.Source(),
+			"gateway_mode":         gatewayMode,
+			"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
+			"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
+			"IAMMode":              os.Getenv("IAMMode"),
+			"IAM_MODE":             os.Getenv("IAM_MODE"),
+			"PX_GATEWAY_BASE_URL":  strings.TrimSpace(cfg.Gateway.BaseURL),
+		}).Info("Mode decision")
+	}
 
 	var authClient *authproxy.DelegatedClient
 	var localIAM iamservice.IAMDirectory
@@ -214,6 +231,30 @@ func main() {
 		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
 	}
 
+	// 初始化 WS Bus Hub（standalone 可选 Redis，默认内存）
+	wsLogger := logger.WithField("component", "ws_bus")
+	var wsHub fwwsbus.LocalHub
+	if cfg != nil && cfg.WSBus != nil && strings.EqualFold(cfg.WSBus.Provider, "redis") {
+		hub, err := fwwsbus.NewRedisHub(fwwsbus.RedisHubConfig{
+			RedisURL: cfg.WSBus.RedisURL,
+			Channel:  cfg.WSBus.Channel,
+			Logger:   nil,
+		})
+		if err != nil {
+			wsLogger.WithError(err).Warn("Failed to initialize redis ws bus; falling back to memory")
+			wsHub = fwwsbus.NewMemoryHub()
+		} else {
+			if err := hub.Start(ctx); err != nil {
+				wsLogger.WithError(err).Warn("Failed to start redis ws bus; falling back to memory")
+				wsHub = fwwsbus.NewMemoryHub()
+			} else {
+				wsHub = hub
+			}
+		}
+	} else {
+		wsHub = fwwsbus.NewMemoryHub()
+	}
+
 	deps := &app.Deps{
 		DB:                  queryDB,
 		Ctx:                 rootCtx,
@@ -229,6 +270,7 @@ func main() {
 		OperationsMetrics:   opsmetrics.NewMetrics(),
 		AdminConsoleMetrics: adminmetrics.NewMetrics(),
 		EventEmitter:        bridgeEmitter,
+		WSBusHub:            wsHub,
 		IAMMode:             iamResolver.Mode(),
 		IAMModeSource:       iamResolver.Source(),
 		AuthProxy:           authClient,
@@ -261,7 +303,14 @@ func main() {
 	appCfg := &fwbootstrap.Config{
 		Listen:     cfg.Server.BindAddr,
 		Env:        cfg.Server.Mode,
-		Standalone: true,
+		Standalone: os.Getenv("POWERX_PROXY") != "1",
+		Gateway: fwbootstrap.GatewayConfig{
+			BaseURL:   strings.TrimSpace(cfg.Gateway.BaseURL),
+			ToolToken: strings.TrimSpace(cfg.Gateway.ToolToken),
+			TenantID:  strings.TrimSpace(cfg.Gateway.TenantUUID),
+			Timeout:   cfg.Gateway.Timeout,
+			UserAgent: strings.TrimSpace(cfg.Gateway.UserAgent),
+		},
 	}
 	fwApp := fwbootstrap.NewApp(appCfg)
 
@@ -275,6 +324,18 @@ func main() {
 
 	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
 		logger.WithError(err).Fatal("Failed to register manifest")
+	}
+	// 宿主模式下注册 WS Bus topic（standalone 不触发）
+	wsRegisterTopics := []string{
+		fwwsbus.TopicOrgSyncProgress,
+		fwwsbus.TopicOrgSyncProgressV1,
+	}
+	registerResult := fwwsbus.RegisterTopics(fwApp, wsRegisterTopics, fwwsbus.PublishOptions{}, nil)
+	if !registerResult.OK {
+		logger.WithFields(logger.Fields{
+			"code":    registerResult.ErrorCode,
+			"message": registerResult.ErrorMessage,
+		}).Warn("WS bus topic registration failed")
 	}
 
 	// 使用 errgroup 并发启动服务器
@@ -399,4 +460,169 @@ func logTokenExpiryStatus(log *logrus.Entry, now, expiry time.Time, fields logge
 		return
 	}
 	log.WithFields(fields).Info("PX_TOOL_TOKEN 有效")
+}
+
+func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMResolver) {
+	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
+	if mode == "" {
+		mode = string(iamservice.IAMModeLocal)
+	}
+
+	proxyRaw := strings.TrimSpace(os.Getenv("POWERX_PROXY"))
+	rbacDelegateRaw := strings.TrimSpace(os.Getenv("POWERX_RBAC_DELEGATE"))
+	proxyEnabled := proxyRaw == "1"
+	rbacDelegateEnabled := envTruthy(rbacDelegateRaw)
+
+	gatewayBaseURL := ""
+	gatewayToken := ""
+	if cfg != nil && cfg.Gateway != nil {
+		gatewayBaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
+		gatewayToken = strings.TrimSpace(cfg.Gateway.ToolToken)
+	}
+
+	missingGateway := make([]string, 0, 2)
+	if gatewayBaseURL == "" {
+		missingGateway = append(missingGateway, "PX_GATEWAY_BASE_URL")
+	}
+	if gatewayToken == "" {
+		missingGateway = append(missingGateway, "PX_TOOL_TOKEN")
+	}
+	gatewayReady := len(missingGateway) == 0
+
+	wsTarget := "local"
+	wsDisplay := "本地"
+	if proxyEnabled {
+		wsTarget = "host"
+		wsDisplay = "宿主（需 PX_GATEWAY_*）"
+	}
+
+	fields := logger.Fields{
+		"matrix_row":              fmt.Sprintf("%s | %s | %s", mode, normalizedProxy(proxyRaw), normalizedBool(rbacDelegateEnabled)),
+		"iam_mode":                mode,
+		"iam_source":              iamResolver.Source(),
+		"POWERX_PROXY":            normalizedProxy(proxyRaw),
+		"POWERX_RBAC_DELEGATE":    normalizedBool(rbacDelegateEnabled),
+		"iam_result":              iamResultLabel(mode),
+		"ws_capability_target":    wsTarget,
+		"ws_capability_target_zh": wsDisplay,
+		"scenario":                modeScenarioLabel(mode, proxyEnabled, rbacDelegateEnabled),
+		"priority_note":           modePriorityNote(iamResolver.Source(), mode, proxyEnabled, rbacDelegateEnabled),
+	}
+
+	if proxyEnabled {
+		fields["gateway_ready"] = gatewayReady
+		if !gatewayReady {
+			fields["gateway_missing"] = strings.Join(missingGateway, ",")
+		}
+	}
+
+	logger.WithFields(logger.Fields{
+		"matrix_row": fields["matrix_row"],
+	}).Info("Runtime mode resolved (2x2x2)")
+	logger.WithFields(logger.Fields{
+		"iam_mode":   fields["iam_mode"],
+		"iam_source": fields["iam_source"],
+		"iam_result": fields["iam_result"],
+	}).Info("IAM decision")
+	logger.WithFields(logger.Fields{
+		"POWERX_PROXY":         fields["POWERX_PROXY"],
+		"POWERX_RBAC_DELEGATE": fields["POWERX_RBAC_DELEGATE"],
+		"priority_note":        fields["priority_note"],
+	}).Info("Decision inputs")
+	logger.WithFields(logger.Fields{
+		"ws_capability_target":    fields["ws_capability_target"],
+		"ws_capability_target_zh": fields["ws_capability_target_zh"],
+		"scenario":                fields["scenario"],
+	}).Info("WS/Capability routing")
+
+	if proxyEnabled {
+		gatewayFields := logger.Fields{
+			"gateway_ready": fields["gateway_ready"],
+		}
+		if !gatewayReady {
+			gatewayFields["gateway_missing"] = fields["gateway_missing"]
+		}
+		logger.WithFields(gatewayFields).Info("Gateway readiness")
+	}
+
+	if proxyEnabled && !gatewayReady {
+		logger.WithFields(logger.Fields{
+			"missing": strings.Join(missingGateway, ","),
+		}).Warn("宿主链路已启用，但 PX_GATEWAY_* 不完整；WS/能力注册可能失败")
+	}
+}
+
+func normalizedProxy(value string) string {
+	if strings.TrimSpace(value) == "1" {
+		return "1"
+	}
+	return "0"
+}
+
+func normalizedBool(value bool) string {
+	if value {
+		return "true"
+	}
+	return "false"
+}
+
+func envTruthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func iamResultLabel(mode string) string {
+	if mode == string(iamservice.IAMModeDelegated) {
+		return "委派 IAM"
+	}
+	return "本地 IAM"
+}
+
+func modeScenarioLabel(mode string, proxyEnabled, rbacDelegateEnabled bool) string {
+	switch {
+	case mode == string(iamservice.IAMModeLocal) && !proxyEnabled && !rbacDelegateEnabled:
+		return "纯 Standalone"
+	case mode == string(iamservice.IAMModeLocal) && proxyEnabled && !rbacDelegateEnabled:
+		return "本地 IAM + 宿主联调"
+	case mode == string(iamservice.IAMModeLocal) && !proxyEnabled && rbacDelegateEnabled:
+		return "仍本地（IAMMode 覆盖）"
+	case mode == string(iamservice.IAMModeLocal) && proxyEnabled && rbacDelegateEnabled:
+		return "IAMMode 覆盖 RBAC_DELEGATE"
+	case mode == string(iamservice.IAMModeDelegated) && !proxyEnabled && !rbacDelegateEnabled:
+		return "仅 IAM 委派"
+	case mode == string(iamservice.IAMModeDelegated) && proxyEnabled && !rbacDelegateEnabled:
+		return "宿主模式（标准）"
+	case mode == string(iamservice.IAMModeDelegated) && !proxyEnabled && rbacDelegateEnabled:
+		return "IAMMode=delegated（显式）"
+	case mode == string(iamservice.IAMModeDelegated) && proxyEnabled && rbacDelegateEnabled:
+		return "宿主模式（显式）"
+	default:
+		return "自定义组合"
+	}
+}
+
+func modePriorityNote(source, mode string, proxyEnabled, rbacDelegateEnabled bool) string {
+	switch source {
+	case "config":
+		if mode == string(iamservice.IAMModeLocal) && rbacDelegateEnabled {
+			return "IAMMode=local 显式配置，覆盖 POWERX_RBAC_DELEGATE"
+		}
+		if mode == string(iamservice.IAMModeLocal) && proxyEnabled {
+			return "IAMMode=local 显式配置，覆盖 POWERX_PROXY"
+		}
+		if mode == string(iamservice.IAMModeDelegated) && !proxyEnabled {
+			return "IAMMode=delegated 显式配置，覆盖 POWERX_PROXY"
+		}
+		return "IAMMode 显式配置优先级最高"
+	case "env:POWERX_RBAC_DELEGATE":
+		return "POWERX_RBAC_DELEGATE=true 生效（高于 POWERX_PROXY）"
+	case "env:POWERX_PROXY":
+		return "POWERX_PROXY=1 生效（未设置 IAMMode/RBAC_DELEGATE）"
+	default:
+		return "未显式配置，使用默认 local"
+	}
 }

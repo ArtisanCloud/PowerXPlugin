@@ -1,6 +1,6 @@
 go 1.24.0
 
-use ./framework
+use ./framework/backend/go
 
 use ./skeleton/backend/go-gin
 

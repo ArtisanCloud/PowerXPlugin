@@ -52,7 +52,7 @@
 - **维护成本**：未来需同时维护框架 Stub 与真实实现，建议在 CHANGELOG/ADR 中持续同步差异。
 
 ## 6. 验证清单
-- `go test ./skeleton/...`、`go test ./framework/backend/go/...`
+- `go test ./skeleton/...`、`cd framework/backend/go && go test ./...`
 - `npm install && npm run lint`（`skeleton/web-admin/nuxt` 与 `framework/frontend/nuxt/framework-admin`）
 - Standalone 自测：`go run ./skeleton/backend/go-gin/cmd/plugin` + `npm run dev`，浏览器验证 `/intro`、`/templates/crud` CRUD 流程。
 - CLI 输出验证（准备就绪后）：`px-plugin init com.powerx.demo --ui=starter`，确保产物可直接运行。
@@ -101,7 +101,7 @@
 
 | 风险 | 描述 | 应对策略 |
 | --- | --- | --- |
-| 框架回归 | Router/Middleware 变更影响现有用户 | 全量单测 + `go test ./framework/backend/go/...` 作为必跑检查 |
+| 框架回归 | Router/Middleware 变更影响现有用户 | 全量单测 + `cd framework/backend/go && go test ./...` 作为必跑检查 |
 | Nuxt 配置偏差 | Skeleton/CLI 与 Base 差异导致路由/i18n 异常 | 维护 `research.md` 差异记录，完成 Phase 7 T039/T040 |
 | CLI 模板偏离 | Skeleton 与模板不同步 | `px-plugin init` smoke + diff，必要时在 CI 加自动对比 |
 | 文档滞后 | 新能力未在 Quickstart/Standalone 体现 | 将文档更新纳入任务检查清单 |
@@ -111,7 +111,7 @@
 
 ## 11. 验证清单（更新）
 
-1. `go test ./framework/backend/go/... -coverprofile=coverage.out`（≥90%，SC-001）
+1. `cd framework/backend/go && go test ./... -coverprofile=coverage.out`（≥90%，SC-001）
 2. `go test ./skeleton/backend/go-gin/... -v` + `curl` 多租户 CRUD（SC-002）
 3. `curl -w 'time_total:%{time_total}'` 记录延迟；数据写入 `research.md`
 4. `npm run lint --silent` / `npm run build`（skeleton/web-admin/nuxt、workspace layer）

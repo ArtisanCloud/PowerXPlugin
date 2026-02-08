@@ -40,7 +40,7 @@ flowchart LR
 1. 复用同一套抽象（`event.Event` + `event_bridge.Emitter` + `event.MetaBuilder` 的形态不变）。
 2. 在 bootstrap 时注入一个 `TaskBusProvider`（当 Framework/宿主提供 SDK 后实现；未就绪时可先走 local/dual + stub）。
 
-关键调用点在 `framework/eventbridge/emitter.go` 的 `Factory.WithTaskBusProvider(...)`：外部插件项目需要实现的就是一个“把 Framework TaskBus SDK 包装成 `eventbridge.Emitter` 的适配器”。
+关键调用点在 `framework/backend/go/eventbridge/emitter.go` 的 `Factory.WithTaskBusProvider(...)`：外部插件项目需要实现的就是一个“把 Framework TaskBus SDK 包装成 `eventbridge.Emitter` 的适配器”。
 
 路径对照（便于你在外部插件仓库里找文件）：
 
@@ -123,7 +123,7 @@ curl -sSf http://127.0.0.1:8078/api/v1/admin/runtime/metrics | rg 'plugin_event_
 
 ## 4) REST 接口测试：触发一次 emit（推荐）
 
-EventBridge 的“发事件”通常发生在 service/job 内部。本仓库为了便于验证，提供了一个 **仅在 `server.dev_mode=true` 时注册** 的调试端点：
+EventBridge 的“发事件”通常发生在 service/job 内部。本仓库为了便于验证，提供了一个 **仅在 `runtime.internal_routes_enabled=true` 时注册** 的调试端点：
 
 - `POST /api/v1/admin/runtime/event-bridge/emit`
 
@@ -185,15 +185,15 @@ events:
 
 对应实现参照：
 
-- `framework/eventbridge/emitter.go`（Factory + dual/fallback + metrics）
+- `framework/backend/go/eventbridge/emitter.go`（Factory + dual/fallback + metrics）
 - `skeleton/backend/go-gin/internal/security/event_permissions.go`（manifest 权限 enforcement）
 
 如果你是在“外部插件独立仓库”里做接入：
 
 - 若是由本仓库模板生成：通常会有同名代码目录（只是路径从 `skeleton/backend/go-gin/...` 变为 `backend/...`）。
 - 若不是模板生成：建议优先直接依赖 framework（避免复制代码造成漂移）：
-  - `github.com/ArtisanCloud/PowerXPlugin/framework/event`
-  - `github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge`
+  - `github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event`
+  - `github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge`
   - 权限 enforcement 可参考：`skeleton/backend/go-gin/internal/security/event_permissions.go`
 
 当 Framework TaskBus SDK 就绪后，实现一个 adapter（示意）：

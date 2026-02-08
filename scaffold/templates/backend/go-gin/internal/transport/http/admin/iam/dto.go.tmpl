@@ -21,11 +21,11 @@ type UpdateTenantRequest struct {
 }
 
 type DepartmentListQuery struct {
-	TenantUUID string `form:"tenant_uuid" binding:"required"`
+	TenantUUID string `form:"tenant_uuid"`
 }
 
 type CreateDepartmentRequest struct {
-	TenantUUID  string  `json:"tenant_uuid" binding:"required"`
+	TenantUUID  string  `json:"tenant_uuid"`
 	Name        string  `json:"name" binding:"required"`
 	Code        string  `json:"code"`
 	ParentID    *uint64 `json:"parent_id"`
@@ -41,7 +41,7 @@ type UpdateDepartmentRequest struct {
 }
 
 type MemberListQuery struct {
-	TenantUUID string `form:"tenant_uuid" binding:"required"`
+	TenantUUID string `form:"tenant_uuid"`
 	Status     string `form:"status"`
 	Query      string `form:"q"`
 	Page       int    `form:"page"`
@@ -49,7 +49,7 @@ type MemberListQuery struct {
 }
 
 type CreateMemberRequest struct {
-	TenantUUID   string   `json:"tenant_uuid" binding:"required"`
+	TenantUUID   string   `json:"tenant_uuid"`
 	Email        string   `json:"email" binding:"required"`
 	DisplayName  string   `json:"display_name"`
 	Username     string   `json:"username"`
@@ -78,18 +78,18 @@ type BulkImportMemberEntry struct {
 }
 
 type BulkImportMembersRequest struct {
-	TenantUUID string                  `json:"tenant_uuid" binding:"required"`
+	TenantUUID string                  `json:"tenant_uuid"`
 	Users      []BulkImportMemberEntry `json:"users" binding:"required,min=1"`
 }
 
 type RoleListQuery struct {
-	TenantUUID string `form:"tenant_uuid" binding:"required"`
+	TenantUUID string `form:"tenant_uuid"`
 	Query      string `form:"q"`
 	ScopeType  string `form:"scope_type"`
 }
 
 type CreateRoleRequest struct {
-	TenantUUID    string   `json:"tenant_uuid" binding:"required"`
+	TenantUUID    string   `json:"tenant_uuid"`
 	Code          string   `json:"code" binding:"required"`
 	Name          string   `json:"name" binding:"required"`
 	Description   string   `json:"description"`
@@ -106,11 +106,11 @@ type UpdateRoleRequest struct {
 }
 
 type ReplaceRolePermissionsRequest struct {
-	TenantUUID    string   `json:"tenant_uuid" binding:"required"`
+	TenantUUID    string   `json:"tenant_uuid"`
 	PermissionIDs []uint64 `json:"permission_ids"`
 }
 
 type RoleMembersRequest struct {
-	TenantUUID string   `json:"tenant_uuid" binding:"required"`
+	TenantUUID string   `json:"tenant_uuid"`
 	MemberIDs  []uint64 `json:"member_ids"`
 }

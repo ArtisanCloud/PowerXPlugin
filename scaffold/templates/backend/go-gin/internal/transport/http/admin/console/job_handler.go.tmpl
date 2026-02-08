@@ -9,6 +9,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -59,11 +60,15 @@ func (h *JobHandler) ListRuns(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query parameters: "+err.Error())
 		return
 	}
-	var tenantPtr *string
-	if strings.TrimSpace(query.TenantUuid) != "" {
-		clean := strings.TrimSpace(query.TenantUuid)
-		tenantPtr = &clean
+	tenantID := strings.TrimSpace(query.TenantUuid)
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
 	}
+	if tenantID == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	tenantPtr := &tenantID
 	runs, next, err := h.jobs.ListRuns(
 		c.Request.Context(),
 		tenantPtr,
@@ -106,11 +111,15 @@ func (h *JobHandler) RetryRun(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query parameters: "+err.Error())
 		return
 	}
-	var tenantPtr *string
-	if strings.TrimSpace(query.TenantUuid) != "" {
-		clean := strings.TrimSpace(query.TenantUuid)
-		tenantPtr = &clean
+	tenantID := strings.TrimSpace(query.TenantUuid)
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
 	}
+	if tenantID == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	tenantPtr := &tenantID
 	actor := resolveActor(c)
 	actor.PermissionCode = "operations.plugin.ops"
 	result, err := h.jobs.RetryRun(c.Request.Context(), consolesvc.RetryRunInput{
@@ -164,11 +173,15 @@ func (h *JobHandler) ExecuteSafeOp(c *gin.Context) {
 	}
 	actor := resolveActor(c)
 	actor.PermissionCode = "operations.plugin.ops"
-	var tenantPtr *string
-	if strings.TrimSpace(body.TenantUuid) != "" {
-		clean := strings.TrimSpace(body.TenantUuid)
-		tenantPtr = &clean
+	tenantID := strings.TrimSpace(body.TenantUuid)
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
 	}
+	if tenantID == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	tenantPtr := &tenantID
 	request := consolesvc.SafeOpRequest{
 		TenantUuid:  tenantPtr,
 		Environment: strings.TrimSpace(body.Environment),

@@ -75,7 +75,9 @@ publish(topic: string, payload: Record<string, any>, options?: {
 
 ### 7.2 宿主模式（Host）
 
-- 通过底座发布入口转发：`POST /api/v1/admin/runtime/ws-bus/publish`
+- 通过底座发布入口转发：`POST /api/v1/admin/runtime/internal/ws-bus/publish`
+  - 启动时注册 topic：`POST /api/v1/admin/runtime/internal/ws-bus/register`
+  - 注册失败不会阻塞插件启动，仅记录日志
 - 请求体示例：
 ```json
 {
@@ -102,3 +104,21 @@ publish(topic: string, payload: Record<string, any>, options?: {
 - 宿主模式：插件发布 → 底座 WS Bus → 前端 `/api/ws` 订阅可收到
 - standalone：插件发布 → 插件 `/ws` → 前端订阅可收到
 - 断线重连后仍能继续接收进度
+
+## 9. 本地调试发布端点（standalone）
+
+> 仅用于开发调试。Gin 与 FastAPI 均提供，需 `server.dev_mode: true`。
+
+- `POST /api/v1/admin/runtime/internal/ws-bus/publish`
+  - 宿主模式下该端点会转发到 PowerX 底座 publish 接口，便于手动联调
+- `POST /api/v1/admin/runtime/internal/ws-bus/register`
+  - 宿主模式下该端点会转发到 PowerX 底座 register 接口
+- Body 示例：
+```json
+{
+  "topic": "org_sync.progress",
+  "payload": { "percent": 20, "message": "syncing" },
+  "tenant_uuid": "00000000-0000-0000-0000-000000000001",
+  "trace_id": "trace-123"
+}
+```

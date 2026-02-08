@@ -120,7 +120,7 @@ Gin Request → TenantContext Middleware
 * `TenantContext` 从 JWT/HMAC 上下文中提取 `tenant_uuid`；
 * 每个请求开启事务，执行 `SET LOCAL app.tenant_uuid=?`；
 * RLS 保证即使查询未带 where 也不会跨租户；
-* Dev 模式（`POWERX_DEV_MODE=1`）下允许旁路调试。
+* `POWERX_DEV_MODE=1` 表示开发环境语义；如需临时旁路鉴权，请显式设置 `POWERX_AUTH_OPTIONAL=true`（仅本地）。
 
 ---
 

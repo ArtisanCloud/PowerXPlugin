@@ -40,6 +40,10 @@ func CORS() gin.HandlerFunc {
 // RequestLogger 请求日志中间件
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !logger.HTTPAccessEnabled() {
+			c.Next()
+			return
+		}
 		start := time.Now()
 		path := c.Request.URL.Path
 		raw := c.Request.URL.RawQuery

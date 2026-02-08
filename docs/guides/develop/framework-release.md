@@ -5,7 +5,7 @@
 ---
 
 ## 目标受众与适用场景
-- 需要对外发布新的 `github.com/ArtisanCloud/PowerXPlugin/framework` Go 模块版本。
+- 需要对外发布新的 `github.com/ArtisanCloud/PowerXPlugin/framework/backend/go` Go 模块版本。
 - 需要发布 `@artisan-cloud/plugin-framework-admin` / `@artisan-cloud/plugin-framework-client` 到 npm。
 - 需要同时调整 CLI / Skeleton 模板中的版本号。
 - 需要撤回、回滚或重新发布前后端框架版本。
@@ -15,7 +15,7 @@
 ## 发布前通用检查
 1. **代码状态**：所有相关改动已合并到目标分支，工作树干净（`git status` 无未提交变更）。
 2. **测试通过**：
-   - Go 框架：`cd framework && go test ./...`
+   - Go 框架：`cd framework/backend/go && go test ./...`
    - Nuxt 框架：`cd framework/frontend/nuxt && npm run lint`（必要时进入各包执行 `npm run build`）
 3. **依赖一致**：Skeleton、示例、CLI 模板中的版本占位符已准备好（见后文）。
 4. **账号与权限**：
@@ -35,21 +35,21 @@
    - 更新 `CHANGELOG` 或发布记录。
 
 2. **同步代码引用**
-   - `framework/go.mod` 已更新 module 声明（若必要）。
+   - `framework/backend/go/go.mod` 已更新 module 声明（若必要）。
    - 其他模块中引用的新版本需对应更新或通过 replace 指向。
 
 3. **打 Tag & 推送**
    ```bash
-   cd framework
-   git tag framework/v0.0.1-alpha
-   git push origin framework/v0.0.1-alpha
+   cd /path/to/PowerXPlugin
+   git tag framework/backend/go/v0.0.1-alpha
+   git push origin framework/backend/go/v0.0.1-alpha
    ```
-   > 若需重发同名版本，先执行 `git tag -d framework/v0.0.1-alpha && git push origin :refs/tags/framework/v0.0.1-alpha`，再创建新的 tag。
+   > 若需重发同名版本，先执行 `git tag -d framework/backend/go/v0.0.1-alpha && git push origin :refs/tags/framework/backend/go/v0.0.1-alpha`，再创建新的 tag。
 
 4. **验证可用性**
    ```bash
    # 任意目录
-   go list -m github.com/ArtisanCloud/PowerXPlugin/framework@v0.0.1-alpha
+   go list -m github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.1-alpha
    ```
    确保 Go proxy 能获取到最新版本。
 
@@ -187,7 +187,7 @@ npm dist-tag add @artisan-cloud/plugin-framework-client@$CLIENT_VERSION latest
 按以上流程执行即可完成 PowerX 框架前后端组件的发布。若需进一步自动化（如 CI/CD 发布 npm 包或创建 GitHub Release），请在项目规划中补充。 
 | 步骤 | 目录 | 操作示例 | 产出 |
 | --- | --- | --- | --- |
-| 1 | `framework` | `go test ./...`、`git tag framework/vX.Y.Z`、`git push origin framework/vX.Y.Z` | Go 模块版本可用 |
+| 1 | `framework/backend/go` | `go test ./...`、`git tag framework/backend/go/vX.Y.Z`、`git push origin framework/backend/go/vX.Y.Z` | Go 模块版本可用 |
 | 2 | `framework/frontend/nuxt/framework-admin` | `npm version $ADMIN_VERSION --no-git-tag-version`、`npm publish --access public --tag alpha` | Admin Layer 已发布 |
 | 3 | `framework/frontend/nuxt/framework-client` | 同上 | Client 包已发布 |
 | 4 | `skeleton` / `examples` / `tools/cli` | 更新依赖版本、`npm install --workspaces --package-lock-only` | 脚手架与示例同步版本 |

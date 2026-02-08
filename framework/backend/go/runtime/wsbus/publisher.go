@@ -13,11 +13,15 @@ const (
 	ErrorCodePublishRequestInvalid   = "PUBLISH_REQUEST_INVALID"
 	ErrorCodePublishResponseInvalid  = "PUBLISH_RESPONSE_INVALID"
 	ErrorCodePublishUpstreamRejected = "PUBLISH_UPSTREAM_REJECTED"
+	ErrorCodeRegisterRequestInvalid  = "REGISTER_REQUEST_INVALID"
+	ErrorCodeRegisterResponseInvalid = "REGISTER_RESPONSE_INVALID"
+	ErrorCodeRegisterUpstreamFailed  = "REGISTER_UPSTREAM_FAILED"
 )
 
 type PublishOptions struct {
-	TenantUUID string `json:"tenant_uuid"`
-	TraceID    string `json:"trace_id"`
+	TenantUUID  string `json:"tenant_uuid"`
+	TraceID     string `json:"trace_id"`
+	BearerToken string `json:"bearer_token"`
 }
 
 type PublishResult struct {

@@ -224,6 +224,56 @@ npm run dev
 | `NUXT_PUBLIC_POWERX_PROXY` | `0` | 与上类似，供前端组件/Bridge 判断当前运行模式。 |
 | `NUXT_DEV_API_PROXY` / `NUXT_DEV_WS_PROXY` | `http://localhost:8078` / `ws://127.0.0.1:4000` | Vite 代理目标，宿主模式下会额外注入 `/_p/<pluginId>/api`。 |
 
+> 后端运行模式与配置加载说明：
+>
+> - **配置文件位置**：统一使用 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。Go Gin 与 FastAPI 都会自动读取该文件。
+> - **环境变量覆盖**：`.env` 会覆盖进程环境变量与 `config.yaml`，因此建议将 `POWERX_PROXY`、`IAMMode`、`PX_GATEWAY_*` 统一写在这里，避免 GoLand Run Config 里残留旧值。
+> - **宿主模式（PowerX Core）**：必须同时设置 `POWERX_PROXY=1` **且** `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`。租户统一从 `PX_TOOL_TOKEN.tid` 推导；若无 `tid`，WS Bus/Capability 调用会失败。
+>
+> **IAMMode / POWERX_PROXY / POWERX_RBAC_DELEGATE 优先级规则（从高到低）**：
+>
+> 1. `IAMMode` / `IAM_MODE`（显式指定 `delegated` 或 `local`）
+> 2. `POWERX_RBAC_DELEGATE=true`（强制走宿主委派）
+> 3. `POWERX_PROXY=1`（默认宿主模式）
+>
+> 结论：
+> - 如果 `IAMMode=local`，即使 `POWERX_PROXY=1` 也会**强制本地 IAM**。
+> - 如果 `IAMMode=delegated`，即使 `POWERX_PROXY=0` 也会**强制委派 IAM**。
+> - 未设置 `IAMMode` 时，`POWERX_RBAC_DELEGATE=true` 会覆盖 `POWERX_PROXY`。
+
+**完整组合速查（2x2x2）**
+
+> 规则：`IAMMode` 的显式值优先级最高，其次 `POWERX_RBAC_DELEGATE`，最后 `POWERX_PROXY`。
+
+| IAMMode | POWERX_PROXY | POWERX_RBAC_DELEGATE | IAM 结果 | WS/能力走向 | 典型场景 |
+|---|---|---|---|---|---|
+| local | 0 | false | 本地 IAM | 本地 | 纯 Standalone |
+| local | 1 | false | 本地 IAM | 宿主（需 `PX_GATEWAY_*`） | **本地 IAM + 宿主联调** |
+| local | 0 | true  | 本地 IAM | 本地 | 仍本地（IAMMode 覆盖） |
+| local | 1 | true  | 本地 IAM | 宿主（需 `PX_GATEWAY_*`） | IAMMode 覆盖 RBAC_DELEGATE |
+| delegated | 0 | false | 委派 IAM | 本地 | 仅 IAM 委派 |
+| delegated | 1 | false | 委派 IAM | 宿主（需 `PX_GATEWAY_*`） | 宿主模式（标准） |
+| delegated | 0 | true  | 委派 IAM | 本地 | IAMMode=delegated（显式） |
+| delegated | 1 | true  | 委派 IAM | 宿主（需 `PX_GATEWAY_*`） | 宿主模式（显式） |
+
+> 说明：WS/能力是否走宿主只由 `POWERX_PROXY=1` + `PX_GATEWAY_*` 是否完整决定，与 IAMMode 无关。
+
+### 1.4.3 日志与内部调试路由开关（避免混淆）
+
+为避免 `dev_mode` / `debug_mode` 混淆，建议按下面语义理解与配置：
+
+| 配置项 | 作用 | 典型用途 |
+|---|---|---|
+| `logging.http_access`（或 `POWERX_HTTP_LOG`） | 是否输出 HTTP 访问日志（每个请求一条） | 看接口请求路径/状态码/耗时 |
+| `logging.debug_mode`（或 `POWERX_DEBUG_MODE`） | 是否输出业务调试日志（例如 ws-bus 出站 token 来源） | 排查 token/tenant/模式决策 |
+| `runtime.internal_routes_enabled`（或 `POWERX_INTERNAL_ROUTES`） | 是否注册内部调试路由（如 `/api/v1/admin/runtime/internal/ws-bus/*`） | 允许/禁止调试接口暴露 |
+| `server.dev_mode`（或 `POWERX_DEV_MODE`） | 运行环境语义（开发/生产行为） | 生产安全校验、默认策略切换 |
+
+说明：
+
+- `gin_mode=release` 不会自动关闭 `logging.http_access`。
+- 是否能访问 `/runtime/internal/*`，由 `runtime.internal_routes_enabled` 决定，而不是 `logging.debug_mode`。
+
 > ⚠️ 只有当 `POWERX_PROXY=0` **且** `POWERX_RBAC_DELEGATE` 未开启时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
 
 > `skeleton/backend/go-gin/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend/go-gin` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
@@ -361,7 +411,7 @@ iframe.contentWindow?.postMessage(
 
 从 009 consume-capability 版本开始，**宿主模式的能力调用必须经过插件后端代理**，所有 `PX_*` 凭证仅注入给 Go 进程，前端永远通过插件自有 API 转发。这么做可以：
 
-1. 统一注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`，由 `bootstrap.NewAppFromEnv` 填入 Gateway Client；避免在浏览器暴露 Tool Token。
+1. 统一注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`，由 `bootstrap.NewAppFromEnv` 填入 Gateway Client；租户从 token `tid` 自动推导，避免额外维护 tenant 变量与浏览器暴露 Tool Token。
 2. 通过 `framework/backend/go/router` 中的 `POST /api/v1/integration/capabilities/invoke` 统一做 action/payload 校验、traceId 记录与错误整形。
 3. 让 Admin/Skeleton 前端和 CLI 共用一套 `usePowerXCapability()` 封装，既能获得 `traceId` 也能透传限流/鉴权提示。
 

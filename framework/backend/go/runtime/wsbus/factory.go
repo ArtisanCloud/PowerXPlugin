@@ -98,3 +98,21 @@ func (p FailurePublisher) Publish(_ context.Context, _ string, _ any, _ PublishO
 	}
 	return FailureResult(ErrorCodePublisherNotConfigured, msg)
 }
+
+func RegisterTopics(app *bootstrap.App, topics []string, opts PublishOptions, logger *slog.Logger) PublishResult {
+	if app == nil || app.Config == nil {
+		return FailureResult(ErrorCodePublisherNotConfigured, "app config is not configured")
+	}
+	if app.Config.Standalone {
+		return SuccessResult()
+	}
+	if logger == nil {
+		logger = slog.Default()
+	}
+	publisher := NewHostPublisher(app, logger)
+	client, ok := publisher.(*HostClient)
+	if !ok {
+		return FailureResult(ErrorCodePublisherNotConfigured, "host client is not configured")
+	}
+	return client.RegisterTopics(context.Background(), topics, opts)
+}

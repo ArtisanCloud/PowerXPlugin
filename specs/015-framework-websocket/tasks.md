@@ -28,7 +28,7 @@
 
 - [x] T008 [US2] 校验 topic 白名单与别名（`framework/backend/go/runtime/wsbus/validator.go`）
 - [x] T009 [US2] 统一注入 tenant_uuid/trace_id 并映射旧 topic → 新规范 topic（`framework/backend/go/runtime/wsbus/adapter.go`）
-- [ ] T010 [US2] 宿主模式发布请求注入 STS 鉴权（`framework/backend/go/runtime/wsbus/host_client.go`）
+- [x] T010 [US2] 宿主模式发布请求注入 STS/JWT 鉴权（`framework/backend/go/runtime/wsbus/host_client.go` + `framework/backend/go/middleware/bearer_token.go`）
 
 ## Phase 5: User Story 3 (P3) — WS 不可用兜底
 
@@ -43,6 +43,7 @@
 - [ ] T012 更新本次功能快速验证步骤（`specs/015-framework-websocket/quickstart.md`）
 - [ ] T013 补充验收说明与 topic 兼容策略（`specs/015-framework-websocket/research.md`）
 - [x] T014 补充发布失败的统一错误结构与示例（`framework/backend/go/runtime/wsbus/publisher.go`）
+- [x] T015 [Polish] 补齐调试发布端点与 RBAC 对齐（Gin/FastAPI）
 
 ## Dependencies
 

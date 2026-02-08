@@ -98,8 +98,8 @@ mappings:
         literal: "go 1.24"
         replace: "go {{ .GoVersion }}"
       - globs: ["go.mod"]
-        literal: "github.com/ArtisanCloud/PowerXPlugin/framework v0.0.0"
-        replace: "github.com/ArtisanCloud/PowerXPlugin/framework {{ .FrameworkVersion }}"
+        literal: "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.0"
+        replace: "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go {{ .FrameworkVersion }}"
       - globs: ["internal/manifestx/manifest.go"]
         literal: 'Name: "PowerX Base Plugin"'
         replace: 'Name: "{{ .PluginName }}"'

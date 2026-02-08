@@ -64,7 +64,7 @@
 ### 2.1 Layer 1: Go 单元测试
 
 **目标**: 验证框架层核心逻辑正确性  
-**命令**: `go test ./framework/... -v -coverprofile=coverage.out`  
+**命令**: `cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out`  
 **当前状态**: ✅ 已实现 (8/8 通过, 62.3% 覆盖率)
 
 #### 覆盖范围
@@ -366,7 +366,7 @@ docs/contracts/
 
 `scripts/testing/smoke.sh` 将“后端基础测试 → 契约校验 → CLI 验证”串成单一入口，默认 5 分钟内完成：
 
-1. 运行 `go test ./framework/backend/go/bootstrap/...`（生成 `tmp/coverage.out`）及 `go test ./skeleton/backend/go-gin/internal/routes/...`；
+1. 运行 `cd framework/backend/go && go test ./bootstrap/...`（生成 `tmp/coverage.out`）及 `go test ./skeleton/backend/go-gin/internal/routes/...`；
 2. 调用 `go tool cover -html=tmp/coverage.out -o tmp/coverage.html` 生成可视化报告；
 3. 执行 `./scripts/testing/validate-contracts.sh` 复用契约校验逻辑；
 4. 必要时编译 `bin/px-plugin` 并在临时目录执行 `px-plugin init` 验证 CLI scaffolding。
@@ -386,12 +386,13 @@ make BACKEND=fastapi test-smoke
 
 `scripts/testing/regression.sh` 在执行 Smoke 工作流后继续完成：
 
-1. `go test ./framework/... ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage-regression.out`（覆盖更广的包）；
-2. 启动 `go run ./skeleton/backend/go-gin/cmd/plugin`（输出写入 `tmp/regression-backend.log`）；
-3. 启动 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`（未显式设置时脚本会自动选择空闲端口；输出写入 `tmp/regression-frontend.log`）；
-4. 轮询 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认为 `http://127.0.0.1:<port>`）；
-5. 调用 `PLAYWRIGHT_BASE_URL=… npx playwright test`，失败时保留 `skeleton/web-admin/nuxt/test-results/` 供排查；
-6. 结束后生成 `tmp/coverage.html` 并输出总耗时。
+1. `cd framework/backend/go && go test ./... -coverprofile=../../tmp/coverage-regression.out`（覆盖更广的包）；
+2. `go test ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage-regression.out`；
+3. 启动 `go run ./skeleton/backend/go-gin/cmd/plugin`（输出写入 `tmp/regression-backend.log`）；
+4. 启动 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`（未显式设置时脚本会自动选择空闲端口；输出写入 `tmp/regression-frontend.log`）；
+5. 轮询 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认为 `http://127.0.0.1:<port>`）；
+6. 调用 `PLAYWRIGHT_BASE_URL=… npx playwright test`，失败时保留 `skeleton/web-admin/nuxt/test-results/` 供排查；
+7. 结束后生成 `tmp/coverage.html` 并输出总耗时。
 
 运行方式：
 
@@ -461,7 +462,7 @@ echo "契约校验通过"
 if git diff --name-only HEAD~1 | grep -q "docs/contracts/"; then
     echo "检测到契约文件变更，运行契约守护测试..."
     scripts/validate-contracts.sh
-    go test ./framework/backend/go/... -run ".*[Mm]anifest.*|.*[Rr]bac.*"
+    cd framework/backend/go && go test ./... -run ".*[Mm]anifest.*|.*[Rr]bac.*"
 fi
 ```
 
@@ -485,7 +486,7 @@ test: test-backend test-contracts test-cli
 # Layer 1: 后端单元测试
 test-backend:
 	@echo "=== 运行后端单元测试 ==="
-	go test ./framework/... -v -coverprofile=coverage.out
+	cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out
 	go test ./skeleton/backend/go-gin/... -v
 	@echo "✅ 后端测试通过"
 
@@ -567,7 +568,7 @@ echo ""
 
 # 1. 后端测试
 echo "1. 后端单元测试..."
-go test ./framework/backend/go/bootstrap/... -v > /tmp/test-backend.log 2>&1
+cd framework/backend/go && go test ./bootstrap/... -v > /tmp/test-backend.log 2>&1
 if [ $? -eq 0 ]; then
     echo "   ✅ 后端测试通过"
 else
@@ -727,7 +728,7 @@ echo "=== 影响分析完成 ==="
 echo "=== 生成覆盖率报告 ==="
 
 # 运行测试并生成覆盖率
-go test ./framework/... -coverprofile=coverage.out
+cd framework/backend/go && go test ./... -coverprofile=../../coverage.out
 mkdir -p tmp
 go tool cover -html=coverage.out -o tmp/coverage.html
 
@@ -805,7 +806,7 @@ jobs:
       - name: Run Go tests
         run: |
           go work sync
-          go test ./framework/... -v -coverprofile=coverage.out
+          cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out
           
       - name: Upload coverage
         uses: codecov/codecov-action@v3

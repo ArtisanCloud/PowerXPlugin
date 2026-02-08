@@ -8,6 +8,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -43,6 +44,13 @@ func NewQuotaHandler(deps *app.Deps, defaults *config.RuntimeOpsDefaults) *Quota
 func (h *QuotaHandler) GetStatus(c *gin.Context) {
 	pluginID := c.DefaultQuery("plugin_id", app.PluginID)
 	tenantID := c.Query("tenant_uuid")
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
+	if tenantID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
+		return
+	}
 
 	defaults := h.svc.Defaults()
 	window := 5 * time.Minute
@@ -97,6 +105,13 @@ func (h *QuotaHandler) SetOverride(c *gin.Context) {
 		return
 	}
 
+	if req.TenantUuid == "" {
+		req.TenantUuid = admincommon.ResolveTenantUUID(c)
+	}
+	if req.TenantUuid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
+		return
+	}
 	h.svc.HandleBreach(c.Request.Context(), req.PluginID, req.TenantUuid, req.Capability, req.Action)
 	h.log(c, logrus.InfoLevel, "manual quota override accepted", logger.Fields{
 		"plugin_id":   req.PluginID,

@@ -11,8 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 var ErrEventPermissionDenied = errors.New("event permission denied")
@@ -102,13 +102,26 @@ func defaultManifestPath() string {
 	if p := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_MANIFEST_PATH")); p != "" {
 		return p
 	}
-	if _, err := os.Stat("plugin.yaml"); err == nil {
-		return "plugin.yaml"
+	cwd, _ := os.Getwd()
+	candidates := []string{
+		"plugin.yaml",
+		filepath.Join("skeleton", "plugin.yaml"),
 	}
-	if _, err := os.Stat(filepath.Join("skeleton", "plugin.yaml")); err == nil {
-		return filepath.Join("skeleton", "plugin.yaml")
+	if cwd != "" {
+		candidates = append(candidates,
+			filepath.Join(cwd, "plugin.yaml"),
+			filepath.Join(cwd, "skeleton", "plugin.yaml"),
+			filepath.Join(cwd, "..", "plugin.yaml"),
+			filepath.Join(cwd, "..", "..", "plugin.yaml"),
+			filepath.Join(cwd, "..", "..", "..", "plugin.yaml"),
+		)
 	}
-	return "plugin.yaml"
+	for _, cand := range candidates {
+		if info, err := os.Stat(cand); err == nil && !info.IsDir() {
+			return cand
+		}
+	}
+	return filepath.Join("skeleton", "plugin.yaml")
 }
 
 type PermissionedEmitter struct {

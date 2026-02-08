@@ -54,10 +54,15 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 	if traceID == "" {
 		traceID = strings.TrimSpace(middleware.RequestIDFromContext(ctx))
 	}
+	bearer := strings.TrimSpace(opts.BearerToken)
+	if bearer == "" {
+		bearer = strings.TrimSpace(middleware.BearerTokenFromContext(ctx))
+	}
 
 	result = a.inner.Publish(ctx, normalized, payload, PublishOptions{
-		TenantUUID: tenantUUID,
-		TraceID:    traceID,
+		TenantUUID:  tenantUUID,
+		TraceID:     traceID,
+		BearerToken: bearer,
 	})
 	if !result.OK && a.logger != nil {
 		a.logger.Warn("wsbus publish failed",

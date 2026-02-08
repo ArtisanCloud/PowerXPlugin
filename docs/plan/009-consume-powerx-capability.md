@@ -59,7 +59,6 @@ if err != nil { /* 记录 traceId & 错误 */ }
      ```ini
      PX_GATEWAY_BASE_URL=https://gateway.powerx.dev/_tenant
      PX_TOOL_TOKEN=sts-dev-xxxxxx
-     PX_TENANT_UUID=9f43e9b1-1f7a-4f4e-b964-5a1b55d4a12d
      PX_USE_MOCK=media # Dev Gateway 不可达时可选
      POWERX_PROXY=0
      ```

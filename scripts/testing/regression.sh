@@ -22,7 +22,7 @@ echo "=== Regression workflow start ==="
 ./scripts/testing/smoke.sh
 
 echo "[R-1] Running full Go test suite"
-go test ./framework/... ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage-regression.out
+go test ./framework/backend/go/... ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage-regression.out
 go tool cover -html=tmp/coverage-regression.out -o tmp/coverage.html
 
 BACKEND_HOST="${REGRESSION_BACKEND_HOST:-127.0.0.1}"

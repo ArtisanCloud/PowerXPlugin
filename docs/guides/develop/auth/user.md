@@ -20,7 +20,7 @@
 >
 > 说明：`IAMMode=local` 会强制本地 IAM，`IAMMode=delegated` 会强制委派 IAM；未设置 IAMMode 时才按 `POWERX_RBAC_DELEGATE`/`POWERX_PROXY` 推断。
 
-> **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。本地模式默认同样强制校验 Authorization Header，如需临时跳过，可设置 `POWERX_AUTH_OPTIONAL=true`。
+> **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。本地模式默认同样强制校验 Authorization Header。
 >
 > **运行模式**：关于 Standalone 与 Delegated 的端到端流程（`/_p/<pluginId>/admin`、Vite 代理、打包注意事项等）已整合到《docs/guides/develop/standalone/README.md》。下文仅聚焦 IAM 组件与测试矩阵，涉及运行/部署的细节请参阅该文档。
 

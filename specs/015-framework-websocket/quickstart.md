@@ -9,7 +9,7 @@
 1) 在插件后端调用 framework SDK：
 
 ```ts
-publish("org_sync.progress", { percent: 20, message: "syncing" }, { tenant_uuid, trace_id })
+publish("_topic.template.update", { percent: 20, message: "syncing" }, { tenant_uuid, trace_id })
 ```
 
 2) 宿主模式：framework 自动转发至底座发布入口：
@@ -21,7 +21,7 @@ POST /api/v1/admin/runtime/internal/ws-bus/publish
 同时在启动时注册 topic：
 
 ```
-POST /api/v1/admin/runtime/internal/ws-bus/register
+POST /api/v1/admin/runtime/internal/ws-bus/grant
 ```
 
 注册失败不会阻塞插件启动，仅记录日志。
@@ -35,16 +35,16 @@ POST /api/v1/admin/runtime/internal/ws-bus/register
 ```
 POST /api/v1/admin/runtime/internal/ws-bus/publish
 {
-  "topic": "org_sync.progress",
+  "topic": "_topic.template.update",
   "payload": { "percent": 20, "message": "syncing" },
   "tenant_uuid": "00000000-0000-0000-0000-000000000001"
 }
 ```
 
 ```
-POST /api/v1/admin/runtime/internal/ws-bus/register
+POST /api/v1/admin/runtime/internal/ws-bus/grant
 {
-  "topics": ["org_sync.progress", "powerx.org_sync.progress.v1"],
+  "topics": ["_topic.template.update", "_topic.audit.template.updated"],
   "tenant_uuid": "00000000-0000-0000-0000-000000000001"
 }
 ```
@@ -52,5 +52,5 @@ POST /api/v1/admin/runtime/internal/ws-bus/register
 ## 验收
 
 - 宿主模式前端通过 `/api/ws` 订阅可收到消息
-- standalone 模式前端通过 `/ws` 订阅可收到消息
-- WS 不可用时仍可轮询兜底
+- standalone 模式前端通过 `/api/ws` 订阅可收到消息
+- 任务执行链路由 Task 机制驱动，页面仅消费 WS 事件

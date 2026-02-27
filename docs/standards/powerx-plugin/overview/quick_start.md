@@ -82,7 +82,7 @@ go -C backend run ./cmd/database/seed
 ```bash
 export POWERX_BIND_ADDR=":8078"
 export POWERX_LOG_LEVEL="debug"
-export POWERX_DEV_MODE=1   # 仅开发期启用，线上务必关闭
+export POWERX_DEBUG_MODE=1   # 仅开发期启用，线上务必关闭（兼容入口：POWERX_DEV_MODE）
 
 go -C backend run ./cmd/plugin
 
@@ -95,7 +95,7 @@ curl :8078/v1/ping
 
 > 说明
 >
-> - 生产环境**不要**设置 `POWERX_DEV_MODE=1`。
+> - 生产环境**不要**设置 `POWERX_DEBUG_MODE=1`（`POWERX_DEV_MODE` 仅兼容保留）。
 > - 非旁路模式下，业务接口需要来自 PowerX 的上下文（HMAC/JWT）头部，用于注入 `tenant_uuid`、`permissions` 等。
 
 ---
@@ -147,6 +147,20 @@ npm run build
 >
 > - 前端 `baseURL` 必须以 `/_p/<plugin-id>/admin/` 开头，以适配宿主反代。
 > - 所有 API 调用使用 `/_p/<plugin-id>/api/v1/...`。
+
+---
+
+## 事件联调最短路径
+
+1. 在 `plugin.yaml` 声明 `events.topics[]`。
+2. 在插件包提供 `config/event_fabric.yaml`（执行层）。
+3. 安装并启用插件后，确认 topic 已进入 PowerX `event_topics`。
+4. 为 API Key 选择通用动作权限（`publish`/`subscribe`/`replay`）。
+5. 轮换/新建 API Key 后再执行 `ws-bus/grant` 与 `publish`。
+
+注意：
+
+- topic 是否存在，与 API Key 是否有权限，是两段校验，缺一不可。
 
 ---
 

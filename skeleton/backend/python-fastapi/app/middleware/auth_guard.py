@@ -49,14 +49,6 @@ def build_jwt_config(settings: Settings) -> JWTAuthConfig:
             max_ctx_age_seconds=300,
         )
 
-    optional = False
-    env_optional = os.getenv("POWERX_AUTH_OPTIONAL", "").strip()
-    if env_optional:
-        optional = env_optional in {"1", "true", "TRUE", "yes", "on"}
-    else:
-        is_production = not settings.dev_mode and not settings.server_dev_mode
-        optional = not is_production
-
     issuer = settings.context_issuer.strip() if settings.context_issuer else "powerx-local"
     audiences = _split_audiences(settings.context_audience.strip()) if settings.context_audience else ["powerx:plugin"]
     hmac_secret = settings.context_hmac_secret.strip() if settings.context_hmac_secret else "powerx-plugin-dev"
@@ -65,7 +57,7 @@ def build_jwt_config(settings: Settings) -> JWTAuthConfig:
         accept_audiences=audiences,
         hmac_secret=hmac_secret,
         clock_skew_seconds=60,
-        optional=optional,
+        optional=False,
         allow_signed_context=False,
         context_hmac_secret=hmac_secret,
         max_ctx_age_seconds=300,

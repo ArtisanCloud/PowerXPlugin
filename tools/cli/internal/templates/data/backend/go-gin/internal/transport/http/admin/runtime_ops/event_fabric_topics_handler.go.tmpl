@@ -1,0 +1,272 @@
+package runtime_ops
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+type createEventTopicRequest struct {
+	TenantUUID        string `json:"tenant_uuid,omitempty"`
+	Namespace         string `json:"namespace"`
+	Name              string `json:"name"`
+	PayloadFormat     string `json:"payload_format,omitempty"`
+	VersioningMode    string `json:"versioning_mode,omitempty"`
+	MaxRetry          int    `json:"max_retry,omitempty"`
+	AckTimeoutSeconds int    `json:"ack_timeout_seconds,omitempty"`
+}
+
+type upstreamEnvelope struct {
+	Success bool `json:"success"`
+	Code    int  `json:"code"`
+	Error   *struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+	Message string `json:"message"`
+}
+
+// EventFabricCreateTopicHandler 提供 standalone+proxy 调试入口：
+// 插件接收请求后，代理到底座 /api/v1/admin/event-fabric/topics。
+func EventFabricCreateTopicHandler(deps *app.Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if deps == nil || deps.Config == nil || deps.Config.Gateway == nil {
+			contracts.ResponseServiceUnavailable(c, "gateway is not configured", nil)
+			return
+		}
+		if os.Getenv("POWERX_PROXY") != "1" {
+			contracts.ResponseError(c, http.StatusBadRequest, "TOPIC_PROXY_DISABLED", "topic proxy is only available when POWERX_PROXY=1")
+			return
+		}
+
+		var req createEventTopicRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			contracts.ResponseBadRequest(c, "invalid payload")
+			return
+		}
+
+		if strings.TrimSpace(req.Namespace) == "" || strings.TrimSpace(req.Name) == "" {
+			contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, "namespace and name are required")
+			return
+		}
+
+		tenantUUID, tenantMismatch := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
+		if tenantMismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
+			return
+		}
+		req.TenantUUID = tenantUUID
+
+		outboundBearer := resolveGatewayBearerToken(c, deps)
+		logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
+
+		bodyBytes, err := json.Marshal(req)
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, "failed to encode payload")
+			return
+		}
+
+		baseURL := strings.TrimSpace(deps.Config.Gateway.BaseURL)
+		if strings.HasSuffix(baseURL, "/api/v1") {
+			baseURL = strings.TrimSuffix(baseURL, "/api/v1")
+		}
+		endpoint := strings.TrimRight(baseURL, "/") + "/api/v1/admin/event-fabric/topics"
+		requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		if requestID == "" {
+			requestID = uuid.NewString()
+		}
+
+		ctx := c.Request.Context()
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		reqUpstream, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, "failed to build upstream request")
+			return
+		}
+		reqUpstream.Header.Set("Content-Type", "application/json")
+		reqUpstream.Header.Set("Accept", "application/json")
+		reqUpstream.Header.Set("X-Request-ID", requestID)
+		if userAgent := strings.TrimSpace(deps.Config.Gateway.UserAgent); userAgent != "" {
+			reqUpstream.Header.Set("User-Agent", userAgent)
+		}
+		authHeader, setAuthErr := resolveGatewayAuthHeader(deps, outboundBearer)
+		if setAuthErr != nil {
+			contracts.ResponseError(c, http.StatusBadRequest, "TOPIC_PROXY_AUTH_INVALID", setAuthErr.Error())
+			return
+		}
+		reqUpstream.Header.Set("Authorization", authHeader)
+
+		client := &http.Client{Timeout: deps.Config.Gateway.Timeout}
+		resp, err := client.Do(reqUpstream)
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadRequest, "TOPIC_UPSTREAM_FAILED", err.Error())
+			return
+		}
+		defer resp.Body.Close()
+		payload, err := io.ReadAll(resp.Body)
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadRequest, "TOPIC_UPSTREAM_FAILED", "failed to read upstream response")
+			return
+		}
+
+		if resp.StatusCode >= http.StatusBadRequest {
+			message := fmt.Sprintf("topic create rejected with status %d", resp.StatusCode)
+			if detail := extractUpstreamError(payload); detail != "" {
+				message = detail
+			}
+			contracts.ResponseError(c, http.StatusBadRequest, "TOPIC_UPSTREAM_FAILED", message)
+			return
+		}
+		if len(payload) == 0 {
+			contracts.ResponseSuccess(c, gin.H{"ok": true})
+			return
+		}
+
+		if !isUpstreamTopicCreateSuccess(payload) {
+			code := extractUpstreamErrorCode(payload)
+			if code == "" {
+				code = "TOPIC_UPSTREAM_FAILED"
+			}
+			message := extractUpstreamError(payload)
+			if message == "" {
+				message = "topic create rejected by host"
+			}
+			contracts.ResponseError(c, http.StatusBadRequest, code, message)
+			return
+		}
+
+		contracts.ResponseSuccess(c, gin.H{"ok": true})
+	}
+}
+
+func extractUpstreamError(payload []byte) string {
+	if len(payload) == 0 {
+		return ""
+	}
+	fallbackMessage := ""
+	var envelope upstreamEnvelope
+	if err := json.Unmarshal(payload, &envelope); err == nil {
+		if envelope.Error != nil && strings.TrimSpace(envelope.Error.Message) != "" {
+			return strings.TrimSpace(envelope.Error.Message)
+		}
+		if strings.TrimSpace(envelope.Message) != "" {
+			fallbackMessage = strings.TrimSpace(envelope.Message)
+		}
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(payload, &generic); err != nil {
+		return fallbackMessage
+	}
+	if errorMessage, ok := generic["error"].(string); ok && strings.TrimSpace(errorMessage) != "" {
+		return strings.TrimSpace(errorMessage)
+	}
+	if message, ok := generic["message"].(string); ok && strings.TrimSpace(message) != "" {
+		return strings.TrimSpace(message)
+	}
+	if errorObj, ok := generic["error"].(map[string]any); ok {
+		if message, ok := errorObj["message"].(string); ok && strings.TrimSpace(message) != "" {
+			return strings.TrimSpace(message)
+		}
+	}
+	return fallbackMessage
+}
+
+func extractUpstreamErrorCode(payload []byte) string {
+	if len(payload) == 0 {
+		return ""
+	}
+	var envelope upstreamEnvelope
+	if err := json.Unmarshal(payload, &envelope); err == nil {
+		if envelope.Error != nil && strings.TrimSpace(envelope.Error.Code) != "" {
+			return strings.TrimSpace(envelope.Error.Code)
+		}
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(payload, &generic); err != nil {
+		return ""
+	}
+	if errorObj, ok := generic["error"].(map[string]any); ok {
+		if code, ok := errorObj["code"].(string); ok && strings.TrimSpace(code) != "" {
+			return strings.TrimSpace(code)
+		}
+	}
+	return ""
+}
+
+func isUpstreamTopicCreateSuccess(payload []byte) bool {
+	if len(payload) == 0 {
+		return true
+	}
+	var envelope upstreamEnvelope
+	if err := json.Unmarshal(payload, &envelope); err == nil {
+		if envelope.Success {
+			return true
+		}
+		if envelope.Code >= 200 && envelope.Code < 300 {
+			return true
+		}
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(payload, &generic); err != nil {
+		return true
+	}
+	if success, ok := generic["success"].(bool); ok {
+		return success
+	}
+	if code, ok := generic["code"].(float64); ok {
+		return code >= 200 && code < 300
+	}
+	return false
+}
+
+func resolveGatewayAuthHeader(deps *app.Deps, outboundBearer string) (string, error) {
+	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil {
+		return "", fmt.Errorf("gateway config is required")
+	}
+	authScheme := strings.ToLower(strings.TrimSpace(deps.Config.Gateway.AuthScheme))
+	apiKey := strings.TrimSpace(deps.Config.Gateway.APIKey)
+	toolToken := strings.TrimSpace(deps.Config.Gateway.ToolToken)
+	switch authScheme {
+	case "apikey", "api_key", "api-key":
+		if apiKey == "" {
+			return "", fmt.Errorf("PX_GATEWAY_API_KEY is required for apikey mode")
+		}
+		return "ApiKey " + apiKey, nil
+	case "", "bearer":
+		if outboundBearer != "" {
+			return "Bearer " + outboundBearer, nil
+		}
+		if toolToken == "" {
+			return "", fmt.Errorf("PX_TOOL_TOKEN is required for bearer mode")
+		}
+		return "Bearer " + toolToken, nil
+	default:
+		return "", fmt.Errorf("unsupported gateway auth scheme: %s", authScheme)
+	}
+}
+
+func isGatewayAPIKeyMode(deps *app.Deps) bool {
+	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil {
+		return false
+	}
+	authScheme := strings.ToLower(strings.TrimSpace(deps.Config.Gateway.AuthScheme))
+	if authScheme == "apikey" || authScheme == "api_key" || authScheme == "api-key" {
+		return true
+	}
+	if authScheme == "" && strings.TrimSpace(deps.Config.Gateway.APIKey) != "" {
+		return true
+	}
+	return false
+}

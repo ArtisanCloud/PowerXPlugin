@@ -206,7 +206,7 @@ func (t *Template) TableName() string { return models.S(models.TableTemplate) }
 
 * **本地开发**
 
-  * 后端：`POWERX_DEV_MODE=1 go run ./backend/cmd/plugin`
+  * 后端：`POWERX_DEBUG_MODE=1 go run ./backend/cmd/plugin`（`POWERX_DEV_MODE=1` 仅兼容保留）
   * 前端：`npm run dev`（默认直连 `:8078/v1`）
 * **发布打包**
 

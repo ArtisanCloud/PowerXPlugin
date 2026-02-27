@@ -75,7 +75,9 @@ func NewHostPublisher(app *bootstrap.App, logger *slog.Logger) Publisher {
 	gatewayCfg := app.Config.Gateway
 	client, err := NewHostClient(HostClientConfig{
 		BaseURL:    gatewayCfg.BaseURL,
+		AuthScheme: gatewayCfg.AuthScheme,
 		Token:      gatewayCfg.ToolToken,
+		APIKey:     gatewayCfg.APIKey,
 		TenantUUID: gatewayCfg.TenantID,
 		UserAgent:  gatewayCfg.UserAgent,
 		Timeout:    gatewayCfg.Timeout,

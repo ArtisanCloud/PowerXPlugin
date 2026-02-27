@@ -123,11 +123,14 @@ func (r *Registry) apiPrefix() string {
 }
 
 func isDevEnvironment(deps *app.Deps) bool {
-	if deps == nil || deps.Config == nil || deps.Config.Server == nil {
+	if deps == nil || deps.Config == nil {
+		return true
+	}
+	if deps.Config.Logging != nil && deps.Config.Logging.DebugMode {
 		return true
 	}
 	server := deps.Config.Server
-	if server.DevMode {
+	if server == nil {
 		return true
 	}
 	mode := strings.TrimSpace(strings.ToLower(server.Mode))

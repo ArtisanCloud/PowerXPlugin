@@ -41,8 +41,13 @@ func (f *Factory) NewEmitter() (Emitter, error) {
 		return nil, ErrNotConfigured
 	}
 
-	local := NewLocalEmitter(f.cfg.LocalQueueSize)
+	opts := make([]LocalEmitterOption, 0, 1)
 	metrics := f.metrics
+	if dropRecorder, ok := metrics.(DropRecorder); ok && dropRecorder != nil {
+		opts = append(opts, WithDropRecorder(dropRecorder))
+	}
+
+	local := NewLocalEmitter(f.cfg.LocalQueueSize, opts...)
 
 	if !f.cfg.Enabled || f.cfg.Mode == "local" {
 		return newInstrumentedEmitter(local, metrics), nil

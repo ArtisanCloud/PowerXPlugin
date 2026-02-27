@@ -11,14 +11,15 @@
 - 本地 emitter（队列）与 dual/fallback 基础能力：`framework/backend/go/eventbridge/local_emitter.go`
 - Dispatcher + 幂等过滤：`framework/backend/go/eventbridge/consumer.go`、`framework/backend/go/eventbridge/idempotency.go`
 - TaskBus Provider 抽象 + Stub：`framework/backend/go/eventbridge/taskbus_provider.go`、`framework/backend/go/eventbridge/taskbus_stub.go`
-- Skeleton 配置项：`event_bridge.enabled|mode|fallback_to_local|local_queue_size`
+- Skeleton 配置项：`event_bridge.enabled|mode|fallback_to_local|local_queue_size|taskbus_provider`
+- Provider 解析优先级：`config.yaml(event_bridge.taskbus_provider)` > `POWERX_EVENT_BRIDGE_TASKBUS_PROVIDER`（仅本地兜底） > `host`
 - 指标：`emit_total` / `consume_total` / `latency_ms`
 
 ### 1.2 未完成（本次开发重点）
 
 - **真实宿主 TaskBus Provider 未落地**（当前仅接口与 stub）
-- `cmd/plugin` 尚未注入真实 `WithTaskBusProvider(...)`
-- LocalEmitter 队列满仅静默返回，缺少“drop 计数/日志”
+- `cmd/plugin` 已注入 `WithTaskBusProvider(...)`（当前为 host/stub 选择与兜底，真实 host provider 待落地）
+- LocalEmitter 队列满已记录 drop 指标（下一步补充告警阈值与运行手册）
 - 版本发布与迁移节奏（`v0.0.3-alpha+`）未形成固定流程
 
 ## 2) 设计口径（必须统一）
@@ -34,7 +35,7 @@
 - [ ] 确认 `skeleton/backend/go-gin/go.mod` 使用本地 replace 或升级到目标 framework 版本。
 - [ ] 确认 `event_bridge` 配置已加载且通过校验。
 - [ ] 确认 `events.publish/subscribe` 在 `skeleton/plugin.yaml` 已按最小权限声明。
-- [ ] 确认 `runtime.internal_routes_enabled=true`（便于联调 `event-bridge/emit`）。
+- [ ] 确认 runtime 调试路由可访问（默认注册 `event-bridge/emit`）。
 - [ ] 本地回归：`go test ./skeleton/backend/go-gin/... -run 'EventBridge|event_bridge' -v`。
 
 ## 4) 下一阶段实施顺序（建议）
@@ -60,6 +61,7 @@
 ```bash
 # 1) 契约校验
 ./scripts/contracts/validate-taskbus-contracts.sh
+#    备用：make -f make-files/validate.mk validate-taskbus-contracts
 
 # 2) EventBridge 相关快速回归
 mkdir -p tmp/gocache
@@ -72,7 +74,7 @@ go test ./skeleton/backend/go-gin/...
 ### 6.2 本地联调（event-bridge debug endpoint）
 
 ```bash
-# 终端 A：启动后端（确保 runtime.internal_routes_enabled=true）
+# 终端 A：启动后端（runtime 调试路由默认开启）
 cd skeleton/backend/go-gin
 go run ./cmd/plugin
 
@@ -100,4 +102,4 @@ curl -sSf http://127.0.0.1:8078/api/v1/admin/runtime/metrics | rg 'plugin_event_
 - [ ] provider 连通性测试记录（taskbus 可用/不可用）
 - [ ] fallback 验证记录（`fallback_to_local=true`）
 - [ ] 指标截图（emit/consume/latency + error）
-- [ ] 外部插件迁移清单（见 docs/guides/develop/event-bridge-taskbus-testing.md）
+- [ ] 外部插件迁移清单（见 docs/guides/async_runtime/event_fabric/integration_playbook.md）

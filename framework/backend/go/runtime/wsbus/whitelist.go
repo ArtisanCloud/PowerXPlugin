@@ -3,18 +3,22 @@ package wsbus
 import "strings"
 
 const (
-	TopicOrgSyncProgress   = "org_sync.progress"
-	TopicOrgSyncProgressV1 = "powerx.org_sync.progress.v1"
+	TopicTemplateUpdate            = "_topic.template.update"
+	TopicAuditTemplateUpdated      = "_topic.audit.template.updated"
+	TopicTemplateValidateCompleted = "_topic.template.validate.completed"
+	TopicTemplateBatchCloneDone    = "_topic.template.batch_clone.completed"
+	TopicTemplateUpdateCompleted   = "_topic.template.update.completed"
 )
 
 var allowedTopics = map[string]struct{}{
-	TopicOrgSyncProgress:   {},
-	TopicOrgSyncProgressV1: {},
+	TopicTemplateUpdate:            {},
+	TopicAuditTemplateUpdated:      {},
+	TopicTemplateValidateCompleted: {},
+	TopicTemplateBatchCloneDone:    {},
+	TopicTemplateUpdateCompleted:   {},
 }
 
-var topicAliases = map[string]string{
-	TopicOrgSyncProgress: TopicOrgSyncProgressV1,
-}
+var topicAliases = map[string]string{}
 
 func IsTopicAllowed(topic string) bool {
 	if topic == "" {

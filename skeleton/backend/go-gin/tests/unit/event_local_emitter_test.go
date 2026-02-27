@@ -16,7 +16,7 @@ func TestLocalEmitter_Emit_DoesNotPanicWhenQueueFull(t *testing.T) {
 	emitter := fweventbridge.NewLocalEmitter(1)
 
 	ev := event.Event{
-		Topic: "powerx.channel.master.credential_inspection.v1",
+		Topic: "_topic.template.update",
 		Meta: event.Meta{
 			TenantUUID:     "00000000-0000-0000-0000-000000000001",
 			RequestID:      "req-1",

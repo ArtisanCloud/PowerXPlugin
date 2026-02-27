@@ -7,7 +7,7 @@
 
 **Purpose**: 对齐文档与环境基线，确保所有团队理解凭证、CLI 与入口。
 
-- [x] T001 更新 `docs/standards/powerx-plugin/deploy/env_vars.md`，补充 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`、`PX_TOOL_TOKEN` 的含义与注入位置。
+- [x] T001 更新 `docs/standards/powerx-plugin/deploy/env_vars.md`，补充 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TOOL_TOKEN` 的含义与注入位置（租户由 token `tid` 推导）。
 - [x] T002 扩写 `docs/guides/develop/cli-plugin-tutorial.md`，加入 `px-plugin login --manifest ./skeleton/plugin.yaml` 与 `.env.local` 写入流程。
 - [x] T003 在根 `README.md` 与 `docs/plan/009-consume-powerx-capability.md` 互相添加 quickstart 链接，方便新人找到调用指南。
 
@@ -33,7 +33,7 @@
 ### Implementation
 
 - [x] T007 [US1] 在 `framework/backend/go/internal/integration/gateway/client.go` 新建 Gateway Client，封装 `/tenant/invocations` REST 与 gRPC `InvokeCapability` 调用。
-- [x] T008 [US1] 将 Gateway Client 注入 `framework/backend/go/bootstrap/app.go` 与相关 DI（如 `framework/backend/go/runtime/bootstrap`），读取 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`。
+- [x] T008 [US1] 将 Gateway Client 注入 `framework/backend/go/bootstrap/app.go` 与相关 DI（如 `framework/backend/go/runtime/bootstrap`），读取 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`（租户由 token `tid` 推导）。
 - [x] T009 [US1] 在 `framework/backend/go/internal/services` 下新增 `capabilityinvoker` 服务，统一 action/payload 校验、错误映射与 trace logging。
 - [x] T010 [US1] 在 `framework/backend/go/router/router.go` 暴露受控的能力调用 API（复用 `capabilityinvoker`），供 Admin/Skeleton 前端通过插件后端代理 PowerX Gateway。
 - [x] T011 [US1] 更新 Admin/Skeleton 前端配置，仅需注入插件后端 API Base（不暴露 `PX_*` 凭证），并提供调用该后端 API 的封装。
@@ -51,7 +51,7 @@
 
 ### Implementation
 
-- [x] T014 [US2] 在 `skeleton/backend/go-gin/internal/config/config.go` 添加 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`、`PX_TENANT_UUID` 读取，并写入新的 `skeleton/backend/go-gin/etc/config.example.yaml` 注释。
+- [x] T014 [US2] 在 `skeleton/backend/go-gin/internal/config/config.go` 添加 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN` 读取，并写入新的 `skeleton/backend/go-gin/etc/config.example.yaml` 注释（租户由 token `tid` 推导）。
 - [x] T015 [US2] 新建 `skeleton/backend/go-gin/internal/integrations/gateway/client.go`，包装框架 Gateway Client，支持 `PX_USE_MOCK` 与离线提示。
 - [x] T016 [US2] 更新 `skeleton/backend/go-gin/cmd/server/main.go`，将 Gateway Client 注入到业务 service 并在启动时检测 Tool Token 过期。
 - [x] T017 [US2] 在 `skeleton/web-admin/nuxt` 中提供调用插件后端能力 API 的封装（不直接携带 Tool Token），并处理调用态提示/错误。

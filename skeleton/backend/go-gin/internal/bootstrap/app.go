@@ -16,7 +16,7 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 	if logCfg == nil {
 		logCfg = &config.LoggingConfig{}
 	}
-	logger.Init(cfg.LogLevel, logCfg.Format, logCfg.Output, logCfg.FilePath, logCfg.HTTPAccess)
+	logger.Init(logCfg.Level, logCfg.Format, logCfg.Output, logCfg.FilePath, logCfg.HTTPAccess)
 	logger.Info("Starting PowerX Plugin...")
 
 	// 初始化 schema

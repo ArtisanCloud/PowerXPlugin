@@ -128,7 +128,7 @@ export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
 export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'
 go run ./cmd/database/main.go setup
 #    上述环境变量可选；若未设置，系统会使用 admin@local.test / S3cret!! 等默认值（仅限本地环境，生产务必覆盖）
-#    本地接口也会强制校验 Authorization。若要临时跳过，可设置 POWERX_AUTH_OPTIONAL=true（仅限调试）。
+#    本地接口默认强制校验 Authorization。
 #    如果需要单独执行，可替换为：
 #    go run ./cmd/database/main.go migrate
 #    go run ./cmd/database/main.go seed
@@ -216,7 +216,6 @@ npm run dev
 | `POWERX_RBAC_DELEGATE` | `false` | 强制委托宿主 IAM；即使 `POWERX_PROXY=0` 也会禁用本地 IAM API。 |
 | `POWERX_CORE_ENDPOINT` | `http://localhost:8077` | Delegated 模式访问宿主 Core API 的地址。 |
 | `POWERX_AUTH_TOKEN` | N/A | 插件后端调用宿主 `/admin/user/auth/*` 时使用的服务 Token。 |
-| `POWERX_AUTH_OPTIONAL` | `false` | 仅限调试。设为 `true` 时可跳过后端 Token 校验，不可用于生产。 |
 | `PLUGIN_IAM_TENANT_KEY` / `NAME` | 示例值见 Quickstart | Standalone 运行时默认租户唯一键与名称。 |
 | `PLUGIN_IAM_ADMIN_EMAIL` / `PASSWORD` | `admin@local.test` / `S3cret!!` | 本地管理员初始凭据，`setup` 会读取并写入数据库。 |
 | `NUXT_PUBLIC_INSIDE_POWERX` | `0` | 前端 runtime 判定宿主模式用，`1` 时 baseURL 调整为 `/_p/<pluginId>/admin/`。 |
@@ -261,25 +260,29 @@ npm run dev
 
 ### 1.4.3 日志与内部调试路由开关（避免混淆）
 
-为避免 `dev_mode` / `debug_mode` 混淆，建议按下面语义理解与配置：
+为避免“运行模式/日志调试开关”混淆，建议按下面语义理解与配置：
 
 | 配置项 | 作用 | 典型用途 |
 |---|---|---|
 | `logging.http_access`（或 `POWERX_HTTP_LOG`） | 是否输出 HTTP 访问日志（每个请求一条） | 看接口请求路径/状态码/耗时 |
-| `logging.debug_mode`（或 `POWERX_DEBUG_MODE`） | 是否输出业务调试日志（例如 ws-bus 出站 token 来源） | 排查 token/tenant/模式决策 |
-| `runtime.internal_routes_enabled`（或 `POWERX_INTERNAL_ROUTES`） | 是否注册内部调试路由（如 `/api/v1/admin/runtime/internal/ws-bus/*`） | 允许/禁止调试接口暴露 |
-| `server.dev_mode`（或 `POWERX_DEV_MODE`） | 运行环境语义（开发/生产行为） | 生产安全校验、默认策略切换 |
+| `logging.debug_mode`（或 `POWERX_DEBUG_MODE`） | 开发语义与调试细节开关 | 排查 token/tenant/模式决策、生产安全校验、默认策略切换 |
+| （固定行为）runtime internal 调试路由 | 注册 `/api/v1/admin/runtime/internal/ws-bus/*` 与 `/api/v1/admin/runtime/event-bridge/emit` | 默认开启（无开关） |
 
 说明：
 
 - `gin_mode=release` 不会自动关闭 `logging.http_access`。
-- 是否能访问 `/runtime/internal/*`，由 `runtime.internal_routes_enabled` 决定，而不是 `logging.debug_mode`。
+- `/runtime/internal/*` 调试路由默认可访问（受鉴权控制），与 `logging.debug_mode` 无关。
 
 ### 1.4.4 WebSocket 联调步骤（本地 / 宿主）
 
+本节仅保留最小命令。完整验收、失败排查与宿主联调细节统一以 async_runtime 文档为准：
+
+- `docs/guides/async_runtime/websocket/debug_playbook.md`
+- `docs/guides/async_runtime/event_fabric/integration_playbook.md`
+
 #### A) Standalone（`local + POWERX_PROXY=0`）
 
-1. 启动插件后端（确保 `runtime.internal_routes_enabled=true`，用于调试 publish）：
+1. 启动插件后端（runtime 调试路由默认开启，可直接用于调试 publish）：
 
 ```bash
 cd skeleton/backend/go-gin
@@ -295,13 +298,13 @@ export USER_TOKEN="<your-local-jwt>"
 3. 连接插件 WS（唯一入口）：
 
 ```bash
-wscat -c "ws://127.0.0.1:8078/api/v1/ws?authorization=Bearer $USER_TOKEN"
+wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer $USER_TOKEN"
 ```
 
 4. 在 wscat 内订阅 topic：
 
 ```json
-{"type":"subscribe","topics":["template.update"]}
+{"type":"subscribe","topics":["_topic.template.update"]}
 ```
 
 预期先收到 `ack`，随后触发 publish 时收到 `event`。
@@ -312,7 +315,7 @@ wscat -c "ws://127.0.0.1:8078/api/v1/ws?authorization=Bearer $USER_TOKEN"
 curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"topic":"template.update","payload":{"id":"demo","status":"running","progress":25}}'
+  -d '{"topic":"_topic.template.update","payload":{"id":"demo","status":"running","progress":25}}'
 ```
 
 > standalone 下 `register` 为 no-op，不是订阅前置条件。
@@ -335,21 +338,21 @@ wscat -c "ws://127.0.0.1:8077/api/ws?authorization=Bearer $USER_TOKEN"
 3. 订阅：
 
 ```json
-{"type":"subscribe","topics":["template.update"]}
+{"type":"subscribe","topics":["_topic.template.update"]}
 ```
 
 4. 调插件 runtime 接口触发 register/publish（插件会转发到底座）：
 
 ```bash
-curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/register" \
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/grant" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"topics":["template.update"]}'
+  -d '{"topics":["_topic.template.update"]}'
 
 curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"topic":"template.update","payload":{"id":"demo","status":"running","progress":25}}'
+  -d '{"topic":"_topic.template.update","payload":{"id":"demo","status":"running","progress":25}}'
 ```
 
 预期：底座 `wscat` 收到 `event`。
@@ -358,10 +361,10 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 
 | 现象 | 常见原因 | 快速检查 |
 |---|---|---|
-| `wscat` 连接 `404` | 路径写错（插件仅支持 `/api/v1/ws`）或路由未加载 | 检查是否访问 `ws://127.0.0.1:8078/api/v1/ws`；确认后端启动日志包含 WS 路由注册 |
+| `wscat` 连接 `404` | 路径写错（插件仅支持 `/api/ws`）或路由未加载 | 检查是否访问 `ws://127.0.0.1:8078/api/ws`；确认后端启动日志包含 WS 路由注册 |
 | 订阅后只有 `ack`，没有 `event` | `publish` 与 `subscribe` 租户不一致（`tid` 不同） | 打开 `logging.debug_mode=true`，确认日志中的 `resolved_gateway_tenant` 与 WS token `tid` 一致 |
 | `permission_denied` / `topic not allowed` | 当前 token 无该 topic 的订阅权限 | 更换具备权限的 token，或先用管理员 token 验证链路 |
-| `publish` 返回 200，但客户端无事件 | 发到了错误实例或错误模式链路（本地/宿主混用） | `POWERX_PROXY=0` 时应订阅 `8078 /api/v1/ws`；`POWERX_PROXY=1` 时应在底座 `8077 /api/ws` 订阅 |
+| `publish` 返回 200，但客户端无事件 | 发到了错误实例或错误模式链路（本地/宿主混用） | `POWERX_PROXY=0` 时应订阅 `8078 /api/ws`；`POWERX_PROXY=1` 时应在底座 `8077 /api/ws` 订阅 |
 | `response.Write on hijacked connection` | WS 握手被 HTTP timeout 中间件干扰 | 确认已包含“Upgrade 请求跳过 Timeout”实现（见 10 节说明） |
 
 补充建议：
@@ -384,7 +387,6 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 - IAMMode: local | delegated
 - POWERX_PROXY: 0 | 1
 - POWERX_RBAC_DELEGATE: true | false
-- runtime.internal_routes_enabled: true | false
 
 ### 2) Token 与租户
 - USER_TOKEN.tid: <uuid>
@@ -392,8 +394,8 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 - publish 请求体 tenant_uuid: <value or empty>
 
 ### 3) 连接与操作
-- WS URL: ws://127.0.0.1:8078/api/v1/ws 或 ws://127.0.0.1:8077/api/ws
-- subscribe payload: {"type":"subscribe","topics":["template.update"]}
+- WS URL: ws://127.0.0.1:8078/api/ws 或 ws://127.0.0.1:8077/api/ws
+- subscribe payload: {"type":"subscribe","topics":["_topic.template.update"]}
 - register 请求（如有）: <curl or screenshot>
 - publish 请求: <curl or screenshot>
 

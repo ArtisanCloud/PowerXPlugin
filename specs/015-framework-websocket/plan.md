@@ -27,7 +27,7 @@
 
 - Host Contract First: 必须走宿主 /api/ws 与宿主发布入口（OK）
 - Tenant Isolation & Zero Trust: 发布需租户校验与授权（OK）
-- Event Contracts & TaskBus Readiness: topic 命名需符合 powerx.<domain>.<action>.v1 规则（保留 org_sync.progress 作为别名，同时发布规范化 topic）
+- Event Contracts & TaskBus Readiness: topic 命名统一采用 `_topic.*` 规范，并与插件 manifest 白名单保持一致
 
 ## Project Structure
 
@@ -60,4 +60,4 @@ web-admin/
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Topic 命名兼容（org_sync.progress → powerx.org_sync.progress.v1） | 需兼容现有前端订阅与业务约定 | 直接强制改名会导致存量订阅断裂，需迁移期支持别名 |
+| Topic 命名统一（`_topic.*`） | 与 async_runtime 命名约束一致，减少多套语义并行 | 保留历史 topic 会增加联调与权限治理成本 |

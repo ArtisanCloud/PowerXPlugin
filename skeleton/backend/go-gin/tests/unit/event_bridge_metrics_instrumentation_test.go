@@ -36,7 +36,7 @@ func TestEventBridge_MetricsInstrumentation_EmitAndConsume(t *testing.T) {
 	require.NoError(t, err)
 
 	ev := event.Event{
-		Topic:   "powerx.channel.master.credential_inspection.v1",
+		Topic:   "_topic.template.update",
 		Meta:    meta,
 		Payload: json.RawMessage(`{"channel_id":"c1","credential_type":"api_key","status":"ok"}`),
 	}

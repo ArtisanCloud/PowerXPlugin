@@ -59,3 +59,42 @@ func parseTenantFromJWT(raw string) string {
 	}
 	return ""
 }
+
+// ResolveTenantUUIDStrict enforces tenant isolation:
+// - if authenticated tenant exists, it is always used;
+// - if request tenant is provided but mismatches authenticated tenant, returns mismatch=true.
+func ResolveTenantUUIDStrict(c *gin.Context, requested string) (tenantUUID string, mismatch bool) {
+	requested = strings.TrimSpace(requested)
+	authenticatedTenant := resolveAuthenticatedTenantUUID(c)
+	if authenticatedTenant != "" {
+		if requested != "" && requested != authenticatedTenant {
+			return authenticatedTenant, true
+		}
+		return authenticatedTenant, false
+	}
+
+	if requested != "" {
+		return requested, false
+	}
+	return ResolveTenantUUID(c), false
+}
+
+func resolveAuthenticatedTenantUUID(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	if id, ok := authmw.TenantUUIDFromContext(c.Request.Context()); ok && strings.TrimSpace(id) != "" {
+		return strings.TrimSpace(id)
+	}
+	if tc, ok := authmw.GetTenantContext(c); ok {
+		if id := strings.TrimSpace(tc.TenantUUID); id != "" {
+			return id
+		}
+	}
+	if raw, ok := authmw.GetRawBearerToken(c); ok && strings.TrimSpace(raw) != "" {
+		if tid := parseTenantFromJWT(raw); tid != "" {
+			return tid
+		}
+	}
+	return ""
+}

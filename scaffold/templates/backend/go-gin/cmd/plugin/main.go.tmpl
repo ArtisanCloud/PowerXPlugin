@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -55,6 +57,10 @@ func (bridgeRecorder) RecordEmit(pluginID, tenantUUID, topic, result string) {
 
 func (bridgeRecorder) RecordConsume(pluginID, tenantUUID, topic, result string) {
 	ebmetrics.RecordConsume(pluginID, tenantUUID, topic, result)
+}
+
+func (bridgeRecorder) RecordDrop(pluginID, tenantUUID, topic, reason string) {
+	ebmetrics.RecordDrop(pluginID, tenantUUID, topic, reason)
 }
 
 func (bridgeRecorder) ObserveLatencyMs(pluginID, tenantUUID, topic, op string, ms float64) {
@@ -193,44 +199,6 @@ func main() {
 		capabilityGateway = capgateway.NewClient(cfg, logger.WithField("component", "capability_gateway_client"))
 	}
 
-	// 初始化 EventBridge Emitter（本地/TaskBus/双写；TaskBus SDK 未就绪时可自动降级到本地 emitter）
-	eventLogger := logger.WithField("component", "event_bridge")
-	eventCfg := cfg.EventBridge
-	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
-		eventCfg.SourcePlugin = app.PluginID
-	}
-
-	var bridgeEmitter fweventbridge.Emitter
-	if eventCfg == nil {
-		bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
-	} else {
-		factory, err := fweventbridge.NewFactory(fweventbridge.Config{
-			Enabled:         eventCfg.Enabled,
-			Mode:            eventCfg.Mode,
-			FallbackToLocal: eventCfg.FallbackToLocal,
-			LocalQueueSize:  eventCfg.LocalQueueSize,
-		})
-		if err != nil {
-			eventLogger.WithError(err).Warn("Invalid event bridge config; falling back to local emitter")
-			bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
-		} else {
-			factory.WithMetrics(bridgeRecorder{})
-			bridgeEmitter, err = factory.NewEmitter()
-			if err != nil {
-				eventLogger.WithError(err).Warn("Failed to initialize event bridge emitter; falling back to local emitter")
-				bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
-			}
-		}
-	}
-
-	// 运行时事件权限：从 plugin.yaml 解析 publish/subscribe（若未声明则默认不强制）
-	perms, err := security.LoadEventPermissionsFromManifest("", eventLogger)
-	if err != nil {
-		eventLogger.WithError(err).Warn("Failed to load event permissions; permissions enforcement disabled")
-	} else if perms.Enforced() {
-		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
-	}
-
 	// 初始化 WS Bus Hub（standalone 可选 Redis，默认内存）
 	wsLogger := logger.WithField("component", "ws_bus")
 	var wsHub fwwsbus.LocalHub
@@ -253,6 +221,46 @@ func main() {
 		}
 	} else {
 		wsHub = fwwsbus.NewMemoryHub()
+	}
+
+	// 初始化 EventBridge Emitter（本地/TaskBus/双写；TaskBus SDK 未就绪时可自动降级到本地 emitter）
+	eventLogger := logger.WithField("component", "event_bridge")
+	eventCfg := cfg.EventBridge
+	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
+		eventCfg.SourcePlugin = app.PluginID
+	}
+	taskBusRuntime := resolveTaskBusRuntime(cfg, wsHub, eventLogger)
+
+	var bridgeEmitter fweventbridge.Emitter
+	if eventCfg == nil {
+		bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
+	} else {
+		factory, err := fweventbridge.NewFactory(fweventbridge.Config{
+			Enabled:         eventCfg.Enabled,
+			Mode:            eventCfg.Mode,
+			FallbackToLocal: eventCfg.FallbackToLocal,
+			LocalQueueSize:  eventCfg.LocalQueueSize,
+		})
+		if err != nil {
+			eventLogger.WithError(err).Warn("Invalid event bridge config; falling back to local emitter")
+			bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
+		} else {
+			factory.WithMetrics(bridgeRecorder{})
+			factory.WithTaskBusProvider(fweventbridge.NewTaskBusEmitterAdapter(taskBusRuntime.Provider))
+			bridgeEmitter, err = factory.NewEmitter()
+			if err != nil {
+				eventLogger.WithError(err).Warn("Failed to initialize event bridge emitter; falling back to local emitter")
+				bridgeEmitter = fweventbridge.NewLocalEmitter(1024)
+			}
+		}
+	}
+
+	// 运行时事件权限：从 plugin.yaml 解析 publish/subscribe（若未声明则默认不强制）
+	perms, err := security.LoadEventPermissionsFromManifest("", eventLogger)
+	if err != nil {
+		eventLogger.WithError(err).Warn("Failed to load event permissions; permissions enforcement disabled")
+	} else if perms.Enforced() {
+		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
 	}
 
 	deps := &app.Deps{
@@ -305,11 +313,13 @@ func main() {
 		Env:        cfg.Server.Mode,
 		Standalone: os.Getenv("POWERX_PROXY") != "1",
 		Gateway: fwbootstrap.GatewayConfig{
-			BaseURL:   strings.TrimSpace(cfg.Gateway.BaseURL),
-			ToolToken: strings.TrimSpace(cfg.Gateway.ToolToken),
-			TenantID:  strings.TrimSpace(cfg.Gateway.TenantUUID),
-			Timeout:   cfg.Gateway.Timeout,
-			UserAgent: strings.TrimSpace(cfg.Gateway.UserAgent),
+			BaseURL:    strings.TrimSpace(cfg.Gateway.BaseURL),
+			AuthScheme: strings.TrimSpace(cfg.Gateway.AuthScheme),
+			ToolToken:  strings.TrimSpace(cfg.Gateway.ToolToken),
+			APIKey:     strings.TrimSpace(cfg.Gateway.APIKey),
+			TenantID:   strings.TrimSpace(cfg.Gateway.TenantUUID),
+			Timeout:    cfg.Gateway.Timeout,
+			UserAgent:  strings.TrimSpace(cfg.Gateway.UserAgent),
 		},
 	}
 	fwApp := fwbootstrap.NewApp(appCfg)
@@ -321,14 +331,21 @@ func main() {
 	fwrouter.RegisterPluginRoutes(fwApp, func(r fwbootstrap.Router) {
 		httpserver.RegisterGinRoutes(r, engine)
 	})
+	registerWSRoute(fwApp, engine)
 
 	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
 		logger.WithError(err).Fatal("Failed to register manifest")
 	}
 	// 宿主模式下注册 WS Bus topic（standalone 不触发）
-	wsRegisterTopics := []string{
-		fwwsbus.TopicOrgSyncProgress,
-		fwwsbus.TopicOrgSyncProgressV1,
+	wsRegisterTopics, err := security.LoadEventFabricTopics(eventLogger)
+	if err != nil {
+		eventLogger.WithError(err).Warn("failed to load event_fabric topics; fallback to manifest events")
+	}
+	if len(wsRegisterTopics) == 0 && perms.Enforced() {
+		wsRegisterTopics = perms.Topics()
+	}
+	if len(wsRegisterTopics) == 0 {
+		wsRegisterTopics = fwwsbus.AllowedTopics()
 	}
 	registerResult := fwwsbus.RegisterTopics(fwApp, wsRegisterTopics, fwwsbus.PublishOptions{}, nil)
 	if !registerResult.OK {
@@ -350,6 +367,12 @@ func main() {
 	if renewalJob != nil {
 		g.Go(func() error {
 			renewalJob.Run(groupCtx)
+			return nil
+		})
+	}
+	if taskBusRuntime.StartConsumer != nil {
+		g.Go(func() error {
+			taskBusRuntime.StartConsumer(groupCtx)
 			return nil
 		})
 	}
@@ -409,8 +432,51 @@ func main() {
 	logger.Info("All servers shutdown completed")
 }
 
+func registerWSRoute(app *fwbootstrap.App, handler http.Handler) {
+	if app == nil || app.Router == nil || handler == nil {
+		return
+	}
+
+	targetPath := path.Join("/api", "ws")
+
+	type httpBridge interface {
+		HTTPResponseWriter() http.ResponseWriter
+		HTTPRequest() *http.Request
+	}
+
+	rewriteToTarget := func(ctx fwbootstrap.Context) {
+		bridge, ok := ctx.(httpBridge)
+		if !ok {
+			ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "http bridge unavailable"})
+			return
+		}
+		req := bridge.HTTPRequest()
+		writer := bridge.HTTPResponseWriter()
+		if req == nil || writer == nil {
+			ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "invalid http bridge request"})
+			return
+		}
+
+		cloned := req.Clone(req.Context())
+		urlCopy := *cloned.URL
+		cloned.URL = &urlCopy
+		cloned.URL.Path = targetPath
+		cloned.RequestURI = targetPath
+		if raw := strings.TrimSpace(cloned.URL.RawQuery); raw != "" {
+			cloned.RequestURI += "?" + raw
+		}
+		handler.ServeHTTP(writer, cloned)
+	}
+
+	app.Router.Handle(http.MethodGet, targetPath, rewriteToTarget)
+}
+
 func ensureToolTokenFresh(ctx context.Context, cfg *config.Config) {
 	if cfg == nil || cfg.Gateway == nil {
+		return
+	}
+	authScheme := strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
+	if authScheme == "apikey" || authScheme == "api_key" || authScheme == "api-key" {
 		return
 	}
 	token := strings.TrimSpace(cfg.Gateway.ToolToken)
@@ -475,17 +541,28 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 
 	gatewayBaseURL := ""
 	gatewayToken := ""
+	gatewayAPIKey := ""
+	gatewayAuthScheme := ""
 	if cfg != nil && cfg.Gateway != nil {
 		gatewayBaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
 		gatewayToken = strings.TrimSpace(cfg.Gateway.ToolToken)
+		gatewayAPIKey = strings.TrimSpace(cfg.Gateway.APIKey)
+		gatewayAuthScheme = strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
 	}
 
 	missingGateway := make([]string, 0, 2)
 	if gatewayBaseURL == "" {
 		missingGateway = append(missingGateway, "PX_GATEWAY_BASE_URL")
 	}
-	if gatewayToken == "" {
-		missingGateway = append(missingGateway, "PX_TOOL_TOKEN")
+	switch gatewayAuthScheme {
+	case "apikey", "api_key", "api-key":
+		if gatewayAPIKey == "" {
+			missingGateway = append(missingGateway, "PX_GATEWAY_API_KEY")
+		}
+	default:
+		if gatewayToken == "" && gatewayAPIKey == "" {
+			missingGateway = append(missingGateway, "PX_TOOL_TOKEN/PX_GATEWAY_API_KEY")
+		}
 	}
 	gatewayReady := len(missingGateway) == 0
 

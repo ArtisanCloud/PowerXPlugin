@@ -106,13 +106,13 @@
 
 **Independent Test**: 在 `mode=taskbus` 且 provider 可用时，事件经宿主链路成功投递；provider 不可用且 `fallback_to_local=true` 时可自动回落。
 
-- [ ] T041 [US4] Implement a real host taskbus provider in `framework/backend/go/runtime/taskbus/provider.go` (or equivalent runtime package).
-- [ ] T042 [US4] Inject provider via `Factory.WithTaskBusProvider(...)` in `skeleton/backend/go-gin/cmd/plugin/main.go`.
-- [ ] T043 [P] [US4] Add integration test for "taskbus mode with real provider wiring" in `skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_provider_test.go`.
-- [ ] T044 [US4] Add drop metrics/log fields for local queue full in `framework/backend/go/eventbridge/local_emitter.go` and `skeleton/backend/go-gin/internal/observability/event_bridge/metrics.go`.
-- [ ] T045 [P] [US4] Add tests for local-queue-full behavior and metrics update in `skeleton/backend/go-gin/tests/unit/event_local_queue_full_test.go`.
+- [x] T041 [US4] Implement a real host taskbus provider in `framework/backend/go/runtime/taskbus/provider.go` (or equivalent runtime package).
+- [x] T042 [US4] Inject provider via `Factory.WithTaskBusProvider(...)` in `skeleton/backend/go-gin/cmd/plugin/main.go`.
+- [x] T043 [P] [US4] Add integration test for "taskbus mode with real provider wiring" in `skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_provider_test.go`.
+- [x] T044 [US4] Add drop metrics/log fields for local queue full in `framework/backend/go/eventbridge/local_emitter.go` and `skeleton/backend/go-gin/internal/observability/event_bridge/metrics.go`.
+- [x] T045 [P] [US4] Add tests for local-queue-full behavior and metrics update in `skeleton/backend/go-gin/tests/unit/event_local_queue_full_test.go`.
 - [ ] T046 [US4] Publish framework prerelease (`v0.0.3-alpha` or newer) and update dependency notes in `docs/plan/008-framework-task-bus.md`.
-- [ ] T047 [US4] Add migration guide for external plugins (adapter mapping checklist) in `docs/guides/develop/event-bridge-taskbus-testing.md`.
+- [ ] T047 [US4] Add migration guide for external plugins (adapter mapping checklist) in `docs/guides/async_runtime/event_fabric/integration_playbook.md`.
 
 **Checkpoint**: Host provider wired + fallback verified + release/migration docs ready.
 

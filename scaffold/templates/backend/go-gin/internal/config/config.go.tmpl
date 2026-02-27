@@ -95,6 +95,12 @@ type EventBridgeConfig struct {
 	Mode            string `yaml:"mode" json:"mode"` // local|taskbus|dual（为空时按 enabled 推断）
 	FallbackToLocal bool   `yaml:"fallback_to_local" json:"fallback_to_local"`
 	LocalQueueSize  int    `yaml:"local_queue_size" json:"local_queue_size"`
+	TaskBusProvider string `yaml:"taskbus_provider" json:"taskbus_provider"` // host|redis
+	RedisURL        string `yaml:"redis_url" json:"redis_url"`
+	RedisStream     string `yaml:"redis_stream" json:"redis_stream"`
+	RedisGroup      string `yaml:"redis_group" json:"redis_group"`
+	RedisConsumer   string `yaml:"redis_consumer" json:"redis_consumer"`
+	RedisMaxLen     int64  `yaml:"redis_max_len" json:"redis_max_len"`
 	SourcePlugin    string `yaml:"source_plugin" json:"source_plugin"`
 	PayloadVersion  string `yaml:"payload_version" json:"payload_version"`
 }
@@ -120,8 +126,6 @@ type CustomerAuthConfig struct {
 // ServerConfig 服务配置
 type ServerConfig struct {
 	BindAddr            string `yaml:"bind_addr" json:"bind_addr"`
-	LogLevel            string `yaml:"log_level" json:"log_level"`
-	DevMode             bool   `yaml:"dev_mode" json:"dev_mode"`
 	Port                int    `yaml:"port"`                  // HTTP 端口
 	ReadTimeoutSeconds  int    `yaml:"read_timeout_seconds"`  // 读取超时
 	WriteTimeoutSeconds int    `yaml:"write_timeout_seconds"` // 写入超时
@@ -133,8 +137,59 @@ type ServerConfig struct {
 
 // RuntimeConfig 运行时配置
 type RuntimeConfig struct {
-	RunMigrate            bool `yaml:"run_migrate" json:"run_migrate"`
-	InternalRoutesEnabled bool `yaml:"internal_routes_enabled" json:"internal_routes_enabled"`
+	RunMigrate  bool                `yaml:"run_migrate" json:"run_migrate"`
+	Logging     *LoggingConfig      `yaml:"logging" json:"logging"`
+	Monitoring  *MonitoringConfig   `yaml:"monitoring" json:"monitoring"`
+	RuntimeOps  *RuntimeOpsDefaults `yaml:"runtime_ops" json:"runtime_ops"`
+	EventBridge *EventBridgeConfig  `yaml:"event_bridge" json:"event_bridge"`
+	WSBus       *WSBusConfig        `yaml:"ws_bus" json:"ws_bus"`
+	Integration *IntegrationConfig  `yaml:"integration" json:"integration"`
+	Cache       *RuntimeCacheConfig `yaml:"cache" json:"cache"`
+}
+
+type RuntimeCacheConfig struct {
+	Provider string `yaml:"provider" json:"provider"`
+	RedisURL string `yaml:"redis_url" json:"redis_url"`
+}
+
+func applyRuntimeNamespacesToLegacy(cfg *Config) {
+	if cfg == nil || cfg.Runtime == nil {
+		return
+	}
+	if cfg.Runtime.Logging != nil {
+		cfg.Logging = cfg.Runtime.Logging
+	}
+	if cfg.Runtime.Monitoring != nil {
+		cfg.Monitoring = *cfg.Runtime.Monitoring
+	}
+	if cfg.Runtime.RuntimeOps != nil {
+		cfg.RuntimeOps = cfg.Runtime.RuntimeOps
+	}
+	if cfg.Runtime.EventBridge != nil {
+		cfg.EventBridge = cfg.Runtime.EventBridge
+	}
+	if cfg.Runtime.WSBus != nil {
+		cfg.WSBus = cfg.Runtime.WSBus
+	}
+	if cfg.Runtime.Integration != nil {
+		cfg.Integration = cfg.Runtime.Integration
+	}
+}
+
+func syncLegacyNamespacesToRuntime(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	if cfg.Runtime == nil {
+		cfg.Runtime = &RuntimeConfig{}
+	}
+	cfg.Runtime.Logging = cfg.Logging
+	monitoring := cfg.Monitoring
+	cfg.Runtime.Monitoring = &monitoring
+	cfg.Runtime.RuntimeOps = cfg.RuntimeOps
+	cfg.Runtime.EventBridge = cfg.EventBridge
+	cfg.Runtime.WSBus = cfg.WSBus
+	cfg.Runtime.Integration = cfg.Integration
 }
 
 // RuntimeOpsDefaults 定义 runtime ops 所需的默认限值与窗口
@@ -210,7 +265,9 @@ type SecurityConfig struct {
 // GatewayConfig 描述 Integration Gateway 所需配置。
 type GatewayConfig struct {
 	BaseURL      string        `yaml:"base_url" json:"base_url"`
+	AuthScheme   string        `yaml:"auth_scheme" json:"auth_scheme"`
 	ToolToken    string        `yaml:"tool_token" json:"tool_token"`
+	APIKey       string        `yaml:"api_key" json:"api_key"`
 	TenantUUID   string        `yaml:"tenant_uuid" json:"tenant_uuid"`
 	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
 	UserAgent    string        `yaml:"user_agent" json:"user_agent"`
@@ -362,6 +419,7 @@ func Load() (*Config, error) {
 	if strings.TrimSpace(configDir) != "" {
 		loadEnvFiles(configDir, filepath.Dir(configDir))
 	}
+	applyRuntimeNamespacesToLegacy(cfg)
 
 	loadSecurityBaselineConfig(cfg)
 
@@ -370,6 +428,7 @@ func Load() (*Config, error) {
 
 	// 统一归一化配置值，避免大小写/空白差异导致校验失败
 	normalizeConfig(cfg)
+	syncLegacyNamespacesToRuntime(cfg)
 
 	if cfg.Database != nil {
 		cfg.Database.ApplyDefaults()
@@ -423,8 +482,6 @@ func getDefaultConfig() *Config {
 		DevMode: true,
 		Server: &ServerConfig{
 			BindAddr: ":8078",
-			LogLevel: "info",
-			DevMode:  true,
 		},
 		Integration: &IntegrationConfig{
 			Idempotency: IntegrationIdempotencyConfig{
@@ -470,8 +527,7 @@ func getDefaultConfig() *Config {
 			Schema: "px_plugin_base",
 		},
 		Runtime: &RuntimeConfig{
-			RunMigrate:            false,
-			InternalRoutesEnabled: true,
+			RunMigrate: false,
 		},
 		RuntimeOps: &RuntimeOpsDefaults{
 			HeartbeatSeconds:           15,
@@ -531,7 +587,7 @@ func getDefaultConfig() *Config {
 			MaxAge:     28,
 			HTTPAccess: true,
 			GinMode:    "",
-			DebugMode:  false,
+			DebugMode:  true,
 		},
 		GRPCUpstream: &GRPCUpstream{
 			Address:     "localhost:9001",
@@ -797,7 +853,6 @@ func loadEnvConfig(cfg *Config) {
 	}
 	if level := resolveConfigValue(os.Getenv("POWERX_LOG_LEVEL")); level != "" {
 		normalized := strings.ToLower(level)
-		cfg.Server.LogLevel = normalized
 		cfg.Logging.Level = normalized
 	}
 	if format := resolveConfigValue(os.Getenv("POWERX_LOG_FORMAT")); format != "" {
@@ -819,10 +874,7 @@ func loadEnvConfig(cfg *Config) {
 		cfg.Logging.DebugMode = (debugMode == "1" || strings.EqualFold(debugMode, "true"))
 	}
 	if devMode := resolveConfigValue(os.Getenv("POWERX_DEV_MODE")); devMode != "" {
-		cfg.Server.DevMode = (devMode == "1" || strings.EqualFold(devMode, "true"))
-	}
-	if internalRoutes := resolveConfigValue(os.Getenv("POWERX_INTERNAL_ROUTES")); internalRoutes != "" {
-		cfg.Runtime.InternalRoutesEnabled = (internalRoutes == "1" || strings.EqualFold(internalRoutes, "true"))
+		cfg.Logging.DebugMode = (devMode == "1" || strings.EqualFold(devMode, "true"))
 	}
 	if sec := resolveConfigValue(os.Getenv("POWERX_SERVER_SECRET_KEY")); sec != "" {
 		cfg.Server.SecretKey = sec
@@ -944,12 +996,22 @@ func loadEnvConfig(cfg *Config) {
 	if baseURL := resolveConfigValue(os.Getenv("PX_GATEWAY_BASE_URL")); baseURL != "" {
 		cfg.Gateway.BaseURL = baseURL
 	}
+	if authScheme := resolveConfigValue(os.Getenv("PX_GATEWAY_AUTH_SCHEME")); authScheme != "" {
+		cfg.Gateway.AuthScheme = authScheme
+	}
 	token := firstNonEmpty(
 		resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN")),
 		resolveConfigValue(os.Getenv("PX_TOOL_TOKEN")),
 	)
 	if token != "" {
 		cfg.Gateway.ToolToken = token
+	}
+	apiKey := firstNonEmpty(
+		resolveConfigValue(os.Getenv("PX_GATEWAY_API_KEY")),
+		resolveConfigValue(os.Getenv("PX_PLUGIN_API_KEY")),
+	)
+	if apiKey != "" {
+		cfg.Gateway.APIKey = apiKey
 	}
 	if timeout := resolveConfigValue(os.Getenv("PX_GATEWAY_TIMEOUT")); timeout != "" {
 		if d, err := time.ParseDuration(timeout); err == nil {
@@ -973,8 +1035,8 @@ func loadEnvConfig(cfg *Config) {
 // syncBackwardCompatibility 同步向后兼容字段
 func syncBackwardCompatibility(cfg *Config) {
 	cfg.BindAddr = cfg.Server.BindAddr
-	cfg.LogLevel = cfg.Server.LogLevel
-	cfg.DevMode = cfg.Server.DevMode
+	cfg.LogLevel = cfg.Logging.Level
+	cfg.DevMode = cfg.Logging.DebugMode
 	cfg.DBDSN = cfg.Database.DSN
 	cfg.DBSchema = cfg.Database.Schema
 	cfg.RunMigrate = cfg.Runtime.RunMigrate
@@ -1019,47 +1081,61 @@ func normalizeConfig(cfg *Config) {
 	}
 	if cfg.Server != nil {
 		cfg.Server.BindAddr = resolveConfigValue(cfg.Server.BindAddr)
-		cfg.Server.LogLevel = strings.ToLower(resolveConfigValue(cfg.Server.LogLevel))
 	}
 	if cfg.Runtime == nil {
-		cfg.Runtime = &RuntimeConfig{InternalRoutesEnabled: true}
+		cfg.Runtime = &RuntimeConfig{}
 	}
 	if cfg.Gateway != nil {
 		cfg.Gateway.BaseURL = resolveConfigValue(cfg.Gateway.BaseURL)
+		cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(resolveConfigValue(cfg.Gateway.AuthScheme))
 		cfg.Gateway.ToolToken = resolveConfigValue(cfg.Gateway.ToolToken)
+		cfg.Gateway.APIKey = resolveConfigValue(cfg.Gateway.APIKey)
 		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
 		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
 
-		if tokenTenant := tenantUUIDFromJWT(cfg.Gateway.ToolToken); tokenTenant != "" {
-			if cfg.Gateway.TenantUUID != "" && cfg.Gateway.TenantUUID != tokenTenant {
-				logrus.WithFields(logrus.Fields{
-					"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
-					"gateway.token_tid":         tokenTenant,
-					"gateway.tenant_from_token": true,
-				}).Warn("gateway.tenant_uuid differs from PX_TOOL_TOKEN tid; overriding with token tid")
+		if os.Getenv("POWERX_PROXY") == "1" && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
+			cfg.Gateway.AuthScheme = "apikey"
+		} else if cfg.Gateway.AuthScheme == "" {
+			cfg.Gateway.AuthScheme = inferGatewayAuthScheme(cfg.Gateway.ToolToken, cfg.Gateway.APIKey)
+		}
+
+		if cfg.Gateway.AuthScheme == "bearer" {
+			if tokenTenant := tenantUUIDFromJWT(cfg.Gateway.ToolToken); tokenTenant != "" {
+				if cfg.Gateway.TenantUUID != "" && cfg.Gateway.TenantUUID != tokenTenant {
+					logrus.WithFields(logrus.Fields{
+						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
+						"gateway.token_tid":         tokenTenant,
+						"gateway.tenant_from_token": true,
+					}).Warn("gateway.tenant_uuid differs from PX_TOOL_TOKEN tid; overriding with token tid")
+				}
+				cfg.Gateway.TenantUUID = tokenTenant
 			}
-			cfg.Gateway.TenantUUID = tokenTenant
 		}
 
 		// Dev 模式下：Gateway 配置不完整时不阻塞启动，改为打印提示并自动关闭 Gateway。
 		// 生产/非 Dev 场景仍保持严格校验（见 Validate）。
-		if cfg.Server != nil && cfg.Server.DevMode {
+		if cfg.Logging != nil && cfg.Logging.DebugMode {
 			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
 			toolToken := strings.TrimSpace(cfg.Gateway.ToolToken)
+			apiKey := strings.TrimSpace(cfg.Gateway.APIKey)
 			tenantUUID := strings.TrimSpace(cfg.Gateway.TenantUUID)
 
-			hasAny := baseURL != "" || toolToken != ""
-			incomplete := baseURL == "" || toolToken == ""
+			hasAny := baseURL != "" || toolToken != "" || apiKey != ""
+			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
 
 			if hasAny && incomplete {
 				logrus.WithFields(logrus.Fields{
 					"gateway.base_url":    baseURL,
+					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.tool_token":  toolToken != "",
+					"gateway.api_key":     apiKey != "",
 					"gateway.tenant_uuid": tenantUUID,
-				}).Warn("Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url/tool_token to enable)")
+				}).Warn("Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
 
 				cfg.Gateway.BaseURL = ""
+				cfg.Gateway.AuthScheme = ""
 				cfg.Gateway.ToolToken = ""
+				cfg.Gateway.APIKey = ""
 				cfg.Gateway.TenantUUID = ""
 			}
 		}
@@ -1206,6 +1282,38 @@ func splitCSV(input string) []string {
 	return result
 }
 
+func normalizeGatewayAuthScheme(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "apikey", "api_key", "api-key":
+		return "apikey"
+	case "bearer":
+		return "bearer"
+	default:
+		return ""
+	}
+}
+
+func inferGatewayAuthScheme(toolToken, apiKey string) string {
+	if strings.TrimSpace(apiKey) != "" && strings.TrimSpace(toolToken) == "" {
+		return "apikey"
+	}
+	return "bearer"
+}
+
+func hasGatewayCredential(cfg *GatewayConfig) bool {
+	if cfg == nil {
+		return false
+	}
+	switch normalizeGatewayAuthScheme(cfg.AuthScheme) {
+	case "apikey":
+		return strings.TrimSpace(cfg.APIKey) != ""
+	case "bearer":
+		return strings.TrimSpace(cfg.ToolToken) != ""
+	default:
+		return strings.TrimSpace(cfg.ToolToken) != "" || strings.TrimSpace(cfg.APIKey) != ""
+	}
+}
+
 // GetString 获取字符串配置，支持默认值
 func GetString(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
@@ -1248,7 +1356,10 @@ func GetDuration(key string, defaultValue time.Duration) time.Duration {
 
 // IsProduction 判断是否为生产环境
 func (c *Config) IsProduction() bool {
-	return !c.Server.DevMode && !c.DevMode
+	if c == nil || c.Logging == nil {
+		return !c.DevMode
+	}
+	return !c.Logging.DebugMode
 }
 
 // IsHMACMode 判断是否使用 HMAC 模式
@@ -1273,7 +1384,7 @@ func (c *Config) Validate() error {
 	}
 
 	// 认证模式验证
-	if !c.Server.DevMode && !c.IsHMACMode() && !c.IsJWTMode() {
+	if c.IsProduction() && !c.IsHMACMode() && !c.IsJWTMode() {
 		return NewConfigError("either HMAC or JWT mode must be configured in production")
 	}
 
@@ -1326,6 +1437,12 @@ func (c *Config) Validate() error {
 			Mode:            "",
 			FallbackToLocal: true,
 			LocalQueueSize:  1024,
+			TaskBusProvider: "redis",
+			RedisURL:        "redis://localhost:6379",
+			RedisStream:     "powerx.taskbus.events",
+			RedisGroup:      "powerx.plugin",
+			RedisConsumer:   "",
+			RedisMaxLen:     10000,
 			SourcePlugin:    "",
 			PayloadVersion:  "v1",
 		}
@@ -1335,6 +1452,29 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.EventBridge.PayloadVersion) == "" {
 		c.EventBridge.PayloadVersion = "v1"
+	}
+	providerMode := strings.ToLower(strings.TrimSpace(c.EventBridge.TaskBusProvider))
+	if providerMode == "" {
+		c.EventBridge.TaskBusProvider = "redis"
+	} else {
+		switch providerMode {
+		case "host", "redis":
+			c.EventBridge.TaskBusProvider = providerMode
+		default:
+			return NewConfigError("event_bridge.taskbus_provider must be one of: host, redis")
+		}
+	}
+	if strings.TrimSpace(c.EventBridge.RedisURL) == "" {
+		c.EventBridge.RedisURL = "redis://localhost:6379"
+	}
+	if strings.TrimSpace(c.EventBridge.RedisStream) == "" {
+		c.EventBridge.RedisStream = "powerx.taskbus.events"
+	}
+	if strings.TrimSpace(c.EventBridge.RedisGroup) == "" {
+		c.EventBridge.RedisGroup = "powerx.plugin"
+	}
+	if c.EventBridge.RedisMaxLen <= 0 {
+		c.EventBridge.RedisMaxLen = 10000
 	}
 	mode := strings.ToLower(strings.TrimSpace(c.EventBridge.Mode))
 	if mode == "" {
@@ -1441,25 +1581,30 @@ func (c *Config) Validate() error {
 
 	if c.Gateway != nil {
 		hasGatewayFields := strings.TrimSpace(c.Gateway.BaseURL) != "" ||
-			strings.TrimSpace(c.Gateway.ToolToken) != ""
+			strings.TrimSpace(c.Gateway.ToolToken) != "" ||
+			strings.TrimSpace(c.Gateway.APIKey) != ""
 		if hasGatewayFields {
-			if strings.TrimSpace(c.Gateway.BaseURL) == "" ||
-				strings.TrimSpace(c.Gateway.ToolToken) == "" {
-				return NewConfigError("gateway config requires base_url and tool_token when enabled")
+			c.Gateway.AuthScheme = normalizeGatewayAuthScheme(c.Gateway.AuthScheme)
+			if c.Gateway.AuthScheme == "" {
+				c.Gateway.AuthScheme = inferGatewayAuthScheme(c.Gateway.ToolToken, c.Gateway.APIKey)
+			}
+			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
+				return NewConfigError("gateway config requires base_url and matching credential (bearer: tool_token, apikey: api_key)")
 			}
 
-			tenantUUID := strings.TrimSpace(c.Gateway.TenantUUID)
-			if tenantUUID == "" {
-				tenantUUID = tenantUUIDFromJWT(c.Gateway.ToolToken)
-				if tenantUUID != "" {
-					c.Gateway.TenantUUID = tenantUUID
+			if c.Gateway.AuthScheme == "bearer" {
+				tenantUUID := strings.TrimSpace(c.Gateway.TenantUUID)
+				if tenantUUID == "" {
+					tenantUUID = tenantUUIDFromJWT(c.Gateway.ToolToken)
+					if tenantUUID != "" {
+						c.Gateway.TenantUUID = tenantUUID
+					}
 				}
-			}
-			if tenantUUID == "" {
-				return NewConfigError("gateway.tool_token must contain tid (tenant UUID) claim")
-			}
-			if _, err := uuid.Parse(tenantUUID); err != nil {
-				return NewConfigError("gateway.tenant_uuid must be a valid UUID string")
+				if tenantUUID != "" {
+					if _, err := uuid.Parse(tenantUUID); err != nil {
+						return NewConfigError("gateway.tenant_uuid must be a valid UUID string")
+					}
+				}
 			}
 		}
 	}

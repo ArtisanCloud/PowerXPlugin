@@ -34,6 +34,8 @@ type Config struct {
 	BaseURL            string
 	TenantUUID         string
 	ToolToken          string
+	APIKey             string
+	AuthScheme         string
 	HTTPClient         *http.Client
 	RequestTimeout     time.Duration
 	UserAgent          string
@@ -102,7 +104,8 @@ func (e *InvocationError) Error() string {
 type Client struct {
 	baseURL        string
 	tenantUUID     string
-	token          string
+	authScheme     string
+	credential     string
 	userAgent      string
 	requestTimeout time.Duration
 
@@ -128,14 +131,11 @@ func NewClient(cfg Config) (*Client, error) {
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
 	}
-	token := strings.TrimSpace(cfg.ToolToken)
-	if token == "" {
-		return nil, errors.New("gateway: tool token is required")
+	authScheme, credential, err := resolveAuth(cfg.AuthScheme, cfg.ToolToken, cfg.APIKey)
+	if err != nil {
+		return nil, err
 	}
 	tenant := strings.TrimSpace(cfg.TenantUUID)
-	if tenant == "" {
-		return nil, errors.New("gateway: tenant UUID is required")
-	}
 	timeout := cfg.RequestTimeout
 	if timeout <= 0 {
 		timeout = defaultTimeout
@@ -151,7 +151,8 @@ func NewClient(cfg Config) (*Client, error) {
 	client := &Client{
 		baseURL:         strings.TrimRight(baseURL, "/"),
 		tenantUUID:      tenant,
-		token:           token,
+		authScheme:      authScheme,
+		credential:      credential,
 		userAgent:       ua,
 		requestTimeout:  timeout,
 		httpClient:      httpClient,
@@ -203,10 +204,10 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
-	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	httpReq.Header.Set("Authorization", buildAuthHeader(c.authScheme, c.credential))
 	if tenantOverride != "" {
 		httpReq.Header.Set("X-PowerX-Tenant", tenantOverride)
-	} else {
+	} else if c.tenantUUID != "" {
 		httpReq.Header.Set("X-PowerX-Tenant", c.tenantUUID)
 	}
 	httpReq.Header.Set("X-Request-ID", requestID)
@@ -288,10 +289,12 @@ func (c *Client) InvokeGRPC(ctx context.Context, req InvokeRequest) (*Response, 
 	}
 
 	md := metadata.New(map[string]string{
-		"authorization": fmt.Sprintf("Bearer %s", c.token),
-		"x-powerx-tenant": c.tenantUUID,
+		"authorization": buildAuthHeader(c.authScheme, c.credential),
 		"x-request-id":  requestID,
 	})
+	if c.tenantUUID != "" {
+		md.Set("x-powerx-tenant", c.tenantUUID)
+	}
 	ctxCall, cancel := context.WithTimeout(ctx, c.requestTimeout)
 	defer cancel()
 	ctxCall = metadata.NewOutgoingContext(ctxCall, md)
@@ -409,6 +412,51 @@ func parseEnvelope(body []byte) restEnvelope {
 		return restEnvelope{}
 	}
 	return env
+}
+
+func resolveAuth(rawScheme, toolToken, apiKey string) (scheme string, credential string, err error) {
+	scheme = normalizeAuthScheme(rawScheme)
+	bearer := strings.TrimSpace(toolToken)
+	key := strings.TrimSpace(apiKey)
+
+	switch scheme {
+	case "apikey":
+		if key == "" {
+			return "", "", errors.New("gateway: api key is required when auth_scheme=apikey")
+		}
+		return scheme, key, nil
+	case "bearer":
+		if bearer == "" {
+			return "", "", errors.New("gateway: tool token is required when auth_scheme=bearer")
+		}
+		return scheme, bearer, nil
+	default:
+		if key != "" {
+			return "apikey", key, nil
+		}
+		if bearer != "" {
+			return "bearer", bearer, nil
+		}
+		return "", "", errors.New("gateway: missing credential (tool token/api key)")
+	}
+}
+
+func normalizeAuthScheme(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "apikey", "api_key", "api-key":
+		return "apikey"
+	case "bearer":
+		return "bearer"
+	default:
+		return ""
+	}
+}
+
+func buildAuthHeader(scheme, credential string) string {
+	if normalizeAuthScheme(scheme) == "apikey" {
+		return "ApiKey " + strings.TrimSpace(credential)
+	}
+	return "Bearer " + strings.TrimSpace(credential)
 }
 
 func (c *Client) inspectContractVersion(expectedVersion, digestPath string) {

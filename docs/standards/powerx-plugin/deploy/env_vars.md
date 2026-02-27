@@ -38,7 +38,7 @@ process.env.POWERX_PLUGIN_ID
 | 🔐 签名上下文配置   | `POWERX_CTX_` / `PLUGIN_CTX_` | JWT / HMAC 校验 |
 | 🗄️ 数据库配置    | `POWERX_DB_`                  | 连接与 Schema    |
 | 🏷️ 插件信息     | `POWERX_PLUGIN_`              | 唯一标识与版本       |
-| ⚙️ 调试与开发     | `POWERX_DEV_MODE` / `POWERX_AUTH_OPTIONAL` / `POWERX_INTERNAL_ROUTES` | 开发语义、鉴权放宽（仅本地）、内部调试路由开关 |
+| ⚙️ 调试与开发     | `POWERX_DEBUG_MODE` | 开发语义、内部调试路由开关 |
 | 🧩 STS 与宿主通信 | `POWERX_STS_`                 | 短期凭据授权        |
 | 🧾 日志与监控     | `POWERX_LOG_`                 | 统一日志级别、格式     |
 
@@ -52,9 +52,8 @@ process.env.POWERX_PLUGIN_ID
 | `POWERX_PLUGIN_VERSION` | `0.1.0`                             | 插件版本号        |
 | `POWERX_BIND_ADDR`      | `:8078`                             | 插件监听地址       |
 | `POWERX_ENV`            | `dev` / `prod`                      | 当前运行环境       |
-| `POWERX_DEV_MODE`       | `1` / `0`                           | 开发环境语义（不直接等同跳过验签） |
-| `POWERX_AUTH_OPTIONAL`  | `true` / `false`                    | 仅本地调试可用；`true` 时临时放宽鉴权 |
-| `POWERX_INTERNAL_ROUTES`| `1` / `0`                           | 是否暴露 `/api/v1/admin/runtime/internal/*` 调试路由 |
+| `POWERX_DEBUG_MODE`     | `1` / `0`                           | 开发环境语义（不直接等同跳过验签） |
+| `POWERX_DEV_MODE`       | `1` / `0`                           | 兼容入口（映射到 `logging.debug_mode`） |
 | `POWERX_LOG_LEVEL`      | `info` / `debug` / `warn` / `error` | 日志级别         |
 | `POWERX_TIMEZONE`       | `Asia/Shanghai`                     | 时区设置         |
 | `POWERX_LOCALE`         | `zh-CN`                             | 默认语言环境       |
@@ -224,9 +223,8 @@ const api = config.public.apiBaseUrl
 
 | 变量                                         | 说明                |
 | ------------------------------------------ | ----------------- |
-| `POWERX_DEV_MODE=1`                        | 启用开发环境语义（默认策略偏开发） |
-| `POWERX_AUTH_OPTIONAL=true`                | 临时放宽 JWT/HMAC 鉴权（仅本地） |
-| `POWERX_INTERNAL_ROUTES=1`                 | 打开内部调试路由（ws-bus/event-bridge） |
+| `POWERX_DEBUG_MODE=1`                      | 启用开发环境语义（默认策略偏开发） |
+| `POWERX_DEV_MODE=1`                        | 兼容入口（等价于 `POWERX_DEBUG_MODE=1`） |
 | `POWERX_LOG_LEVEL=debug`                   | 打印详细日志            |
 | `POWERX_DB_LOG_SQL=1`                      | 打印 SQL 查询         |
 | `POWERX_DEFAULT_TENANT_ID=1`               | 强制使用默认租户 ID       |
@@ -236,7 +234,7 @@ const api = config.public.apiBaseUrl
 本地启动命令：
 
 ```bash
-POWERX_DEV_MODE=1 POWERX_AUTH_OPTIONAL=true POWERX_INTERNAL_ROUTES=1 go -C backend run ./cmd/plugin
+POWERX_DEBUG_MODE=1 go -C backend run ./cmd/plugin
 ```
 
 ---
@@ -266,7 +264,7 @@ POWERX_CTX_JWKS_URL=http://powerx/_p/_internal/jwks
 POWERX_CTX_ISSUER=powerx-auth
 POWERX_CTX_AUDIENCE=powerx-plugin
 POWERX_LOG_LEVEL=info
-POWERX_DEV_MODE=0
+POWERX_DEBUG_MODE=0
 POWERX_STS_ENDPOINT=http://powerx/_p/_internal/sts/exchange
 PX_GATEWAY_BASE_URL=https://gateway.powerx.dev/_tenant
 PX_PLUGIN_TOOL_TOKEN=sts-prod-xxxxxxxx
@@ -293,7 +291,7 @@ psql "$POWERX_DB_DSN" -c "SELECT current_schema()"
 
 ## 十五、变量优先级规则
 
-1️⃣ CLI 参数（如 `make run POWERX_DEV_MODE=1`）
+1️⃣ CLI 参数（如 `make run POWERX_DEBUG_MODE=1`）
 2️⃣ `.env` 文件加载的变量
 3️⃣ 系统环境变量（`export`）
 4️⃣ 默认配置（代码内硬编码）

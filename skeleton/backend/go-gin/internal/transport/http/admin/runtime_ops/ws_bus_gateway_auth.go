@@ -1,14 +1,14 @@
 package runtime_ops
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"os"
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,6 +18,16 @@ import (
 func resolveGatewayBearerToken(c *gin.Context, deps *app.Deps) string {
 	if c == nil || deps == nil {
 		return ""
+	}
+	if deps.Config != nil && deps.Config.Gateway != nil {
+		authScheme := strings.ToLower(strings.TrimSpace(deps.Config.Gateway.AuthScheme))
+		apiKey := strings.TrimSpace(deps.Config.Gateway.APIKey)
+		if authScheme == "apikey" || authScheme == "api_key" || authScheme == "api-key" {
+			return ""
+		}
+		if authScheme == "" && apiKey != "" {
+			return ""
+		}
 	}
 	if deps.IAMMode != iamservice.IAMModeDelegated {
 		return ""
@@ -29,65 +39,26 @@ func resolveGatewayBearerToken(c *gin.Context, deps *app.Deps) string {
 }
 
 // resolveGatewayTenantUUID 统一 ws-bus 出站 tenant 选择规则：
-// 1) 请求体显式 tenant_uuid 优先；
-// 2) 入站请求 token/上下文租户（两种 IAM 模式都可用）；
-// 3) Local/Standalone 模式回退 PX_TOOL_TOKEN.tid；
-// 4) 最后回退 gateway.tenant_uuid（兼容旧配置）。
-func resolveGatewayTenantUUID(c *gin.Context, deps *app.Deps, requested string) string {
-	tenantUUID := strings.TrimSpace(requested)
+// 1) proxy 模式：tenant 由宿主按凭证解析，插件侧不透传 tenant_uuid；
+// 2) 非 proxy 模式：入站请求 token/上下文租户优先；
+// 3) 若请求体 tenant_uuid 与入站租户不一致，返回 mismatch=true；
+// 4) 不再使用 gateway 配置或工具 token 推导 tenant，避免插件侧越权注入。
+func resolveGatewayTenantUUID(c *gin.Context, deps *app.Deps, requested string) (tenantUUID string, mismatch bool) {
+	// proxy 场景下 tenant 由宿主依据凭证（Bearer/API Key）解析，
+	// 插件侧不做 tenant 推导/校验，也不强制透传 tenant_uuid。
+	if os.Getenv("POWERX_PROXY") == "1" {
+		return "", false
+	}
+
+	resolvedTenantUUID, tenantMismatch := admincommon.ResolveTenantUUIDStrict(c, requested)
+	if tenantMismatch {
+		return "", true
+	}
+	tenantUUID = strings.TrimSpace(resolvedTenantUUID)
 	if tenantUUID != "" {
-		return tenantUUID
+		return tenantUUID, false
 	}
-
-	if c != nil {
-		if tc, ok := middleware.GetTenantContext(c); ok {
-			tenantUUID = strings.TrimSpace(tc.TenantUUID)
-			if tenantUUID != "" {
-				return tenantUUID
-			}
-		}
-	}
-
-	if deps != nil && deps.Config != nil && deps.Config.Gateway != nil {
-		configuredTenant := strings.TrimSpace(deps.Config.Gateway.TenantUUID)
-		if deps.IAMMode == iamservice.IAMModeLocal {
-			if tokenTenant := tenantUUIDFromJWT(strings.TrimSpace(deps.Config.Gateway.ToolToken)); tokenTenant != "" {
-				if configuredTenant != "" && configuredTenant != tokenTenant {
-					logger.WithFields(logger.Fields{
-						"component":         "ws_bus_gateway_auth",
-						"iam_mode":          deps.IAMMode,
-						"configured_tenant": configuredTenant,
-						"token_tenant":      tokenTenant,
-					}).Warn("gateway.tenant_uuid 与 PX_TOOL_TOKEN.tid 不一致，已优先使用 token 租户")
-				}
-				return tokenTenant
-			}
-		}
-		return configuredTenant
-	}
-
-	return ""
-}
-
-func tenantUUIDFromJWT(token string) string {
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return ""
-	}
-	parts := strings.Split(token, ".")
-	if len(parts) < 2 {
-		return ""
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return ""
-	}
-	var claims map[string]any
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return ""
-	}
-	tid, _ := claims["tid"].(string)
-	return strings.TrimSpace(tid)
+	return "", false
 }
 
 // logGatewayAuthSelection 输出 ws-bus 出站鉴权选择，便于联调观察 token 来源。
@@ -109,11 +80,18 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 	}
 
 	pxToolToken := ""
+	apiKey := ""
+	authScheme := ""
 	if deps.Config.Gateway != nil {
 		pxToolToken = strings.TrimSpace(deps.Config.Gateway.ToolToken)
+		apiKey = strings.TrimSpace(deps.Config.Gateway.APIKey)
+		authScheme = strings.TrimSpace(deps.Config.Gateway.AuthScheme)
 	}
 
 	outboundSource := "PX_TOOL_TOKEN"
+	if strings.EqualFold(authScheme, "apikey") || strings.EqualFold(authScheme, "api_key") || strings.EqualFold(authScheme, "api-key") {
+		outboundSource = "PX_GATEWAY_API_KEY"
+	}
 	if strings.TrimSpace(outboundBearer) != "" {
 		outboundSource = "request_bearer_passthrough"
 	}
@@ -127,6 +105,8 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 		"outbound_bearer_prefix":  tokenPrefix(outboundBearer),
 		"px_tool_token_present":   pxToolToken != "",
 		"px_tool_token_prefix":    tokenPrefix(pxToolToken),
+		"px_gateway_api_key_set":  apiKey != "",
+		"gateway_auth_scheme":     authScheme,
 		"resolved_gateway_tenant": strings.TrimSpace(tenantUUID),
 	}).Info("WS bus gateway auth resolved")
 }

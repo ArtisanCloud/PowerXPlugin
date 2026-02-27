@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -41,10 +42,45 @@ func (p EventPermissions) CanSubscribe(topic string) bool {
 	return ok
 }
 
+func (p EventPermissions) Topics() []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(p.publish)+len(p.subscribe))
+	for topic := range p.publish {
+		topic = strings.TrimSpace(topic)
+		if topic == "" {
+			continue
+		}
+		if _, ok := seen[topic]; ok {
+			continue
+		}
+		seen[topic] = struct{}{}
+		out = append(out, topic)
+	}
+	for topic := range p.subscribe {
+		topic = strings.TrimSpace(topic)
+		if topic == "" {
+			continue
+		}
+		if _, ok := seen[topic]; ok {
+			continue
+		}
+		seen[topic] = struct{}{}
+		out = append(out, topic)
+	}
+	slices.Sort(out)
+	return out
+}
+
 type pluginManifest struct {
 	Events *struct {
 		Publish   []string `yaml:"publish"`
 		Subscribe []string `yaml:"subscribe"`
+		Topics    []struct {
+			Key         string   `yaml:"key"`
+			Topic       string   `yaml:"topic"`
+			Actions     []string `yaml:"actions"`
+			Description string   `yaml:"description"`
+		} `yaml:"topics"`
 	} `yaml:"events"`
 }
 
@@ -93,6 +129,24 @@ func LoadEventPermissionsFromManifest(manifestPath string, logger *logrus.Entry)
 			continue
 		}
 		perms.subscribe[t] = struct{}{}
+	}
+
+	for _, item := range m.Events.Topics {
+		topic := strings.TrimSpace(item.Key)
+		if topic == "" {
+			topic = strings.TrimSpace(item.Topic)
+		}
+		if topic == "" {
+			continue
+		}
+		for _, action := range item.Actions {
+			switch strings.ToLower(strings.TrimSpace(action)) {
+			case "publish":
+				perms.publish[topic] = struct{}{}
+			case "subscribe":
+				perms.subscribe[topic] = struct{}{}
+			}
+		}
 	}
 
 	return perms, nil

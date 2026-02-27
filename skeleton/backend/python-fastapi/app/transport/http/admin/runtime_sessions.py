@@ -206,7 +206,14 @@ async def ws_bus_publish(request: Request, payload: dict):
     topic = str(payload.get("topic") or "").strip()
     if not topic:
         return fail(ERR_CODE_INVALID_REQUEST, "topic 必填", request_id=request_id, status_code=400)
-    if topic not in {"org_sync.progress", "powerx.org_sync.progress.v1"}:
+    allowed = {
+        "_topic.template.update",
+        "_topic.audit.template.updated",
+        "_topic.template.validate.completed",
+        "_topic.template.batch_clone.completed",
+        "_topic.template.update.completed",
+    }
+    if topic not in allowed:
         return fail(ERR_CODE_INVALID_REQUEST, "topic not allowed", request_id=request_id, status_code=400)
     tenant_uuid = str(payload.get("tenant_uuid") or "").strip()
     if not tenant_uuid:
@@ -242,8 +249,8 @@ async def ws_bus_publish(request: Request, payload: dict):
     return ok({"ok": True}, request_id=request_id)
 
 
-@router.post("/runtime/internal/ws-bus/register")
-async def ws_bus_register(request: Request, payload: dict):
+@router.post("/runtime/internal/ws-bus/grant")
+async def ws_bus_grant(request: Request, payload: dict):
     request_id = _request_id(request)
     settings = getattr(request.app.state, "settings", None)
     if settings is not None and not (settings.dev_mode or settings.server_dev_mode):
@@ -255,7 +262,13 @@ async def ws_bus_register(request: Request, payload: dict):
         return fail(ERR_CODE_INVALID_REQUEST, "topics 必填", request_id=request_id, status_code=400)
     topics = [str(t or "").strip() for t in payload.get("topics") or []]
     topics = [t for t in topics if t]
-    allowed = {"org_sync.progress", "powerx.org_sync.progress.v1"}
+    allowed = {
+        "_topic.template.update",
+        "_topic.audit.template.updated",
+        "_topic.template.validate.completed",
+        "_topic.template.batch_clone.completed",
+        "_topic.template.update.completed",
+    }
     for t in topics:
         if t not in allowed:
             return fail(ERR_CODE_INVALID_REQUEST, "topic not allowed", request_id=request_id, status_code=400)
@@ -263,7 +276,7 @@ async def ws_bus_register(request: Request, payload: dict):
         base = settings.gateway_base_url.rstrip("/")
         if base.endswith("/api/v1"):
             base = base[: -len("/api/v1")]
-        endpoint = f"{base}/api/v1/admin/runtime/internal/ws-bus/register"
+        endpoint = f"{base}/api/v1/admin/runtime/internal/ws-bus/grant"
         body = json.dumps({"topics": topics, "tenant_uuid": payload.get("tenant_uuid"), "trace_id": payload.get("trace_id")}).encode(
             "utf-8"
         )

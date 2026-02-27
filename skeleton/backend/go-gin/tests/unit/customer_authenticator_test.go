@@ -12,7 +12,8 @@ import (
 
 func TestCustomerAuthenticator_LocalJWT_Success(t *testing.T) {
 	cfg := &config.Config{
-		Server: &config.ServerConfig{DevMode: true},
+		Server:  &config.ServerConfig{},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:      "local",
 			JWTSecret: "test-secret",
@@ -41,7 +42,8 @@ func TestCustomerAuthenticator_LocalJWT_Success(t *testing.T) {
 
 func TestCustomerAuthenticator_LocalJWT_InvalidToken(t *testing.T) {
 	cfg := &config.Config{
-		Server: &config.ServerConfig{DevMode: true},
+		Server:  &config.ServerConfig{},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:      "local",
 			JWTSecret: "test-secret",
@@ -57,7 +59,8 @@ func TestCustomerAuthenticator_LocalJWT_InvalidToken(t *testing.T) {
 
 func TestCustomerAuthenticator_LocalJWT_NoSecret(t *testing.T) {
 	cfg := &config.Config{
-		Server: &config.ServerConfig{DevMode: true},
+		Server:  &config.ServerConfig{},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:      "local",
 			JWTSecret: "",

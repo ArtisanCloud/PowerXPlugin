@@ -35,7 +35,7 @@ jobs:
 
       - name: Run Go unit tests
         run: |
-          (cd framework && go test ./...)
+          (cd framework/backend/go && go test ./...)
           (cd tools/cli && go test ./...)
 
       - name: Build CLI binary

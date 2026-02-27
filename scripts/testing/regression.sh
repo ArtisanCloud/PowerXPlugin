@@ -99,13 +99,13 @@ wait_for() {
   local status=""
   for ((attempt=0; attempt<retries; attempt++)); do
     status="$(curl --noproxy '*' -s -o /dev/null -w "%{http_code}" "$url" || echo "000")"
-    if [[ "$status" =~ ^(200|204|301|302|404)$ ]]; then
+    if [[ "$status" =~ ^([23][0-9][0-9]|404)$ ]]; then
       echo "${name} ready (HTTP $status): $url"
       return 0
     fi
     sleep "$wait"
   done
-  echo "Error: ${name} not ready after $((retries*wait)) seconds (see logs)" >&2
+  echo "Error: ${name} not ready after $((retries*wait)) seconds (last HTTP ${status}, see logs)" >&2
   return 1
 }
 

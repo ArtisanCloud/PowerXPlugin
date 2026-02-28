@@ -45,17 +45,7 @@ func RegisterRoutes(r *gin.Engine, deps *app.Deps, jwtCfg middleware.JWTAuthConf
 		return
 	}
 	handler := Handler(deps, jwtCfg)
-	prefix := "/api/v1"
-	if len(prefixes) > 0 {
-		p := strings.TrimSpace(prefixes[0])
-		if p != "" {
-			if !strings.HasPrefix(p, "/") {
-				p = "/" + p
-			}
-			prefix = strings.TrimSuffix(p, "/")
-		}
-	}
-	r.GET(path.Join(prefix, "ws"), handler)
+	r.GET(path.Join("/api", "ws"), handler)
 }
 
 func Handler(deps *app.Deps, jwtCfg middleware.JWTAuthConfig) gin.HandlerFunc {

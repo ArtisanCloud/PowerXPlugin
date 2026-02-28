@@ -2,11 +2,11 @@
 
 ## Decision 1: Topic 命名与兼容策略
 
-- **Decision**: 支持 `org_sync.progress` 作为兼容别名，同时引入规范化 topic `powerx.org_sync.progress.v1` 作为推荐新值。
-- **Rationale**: 现有前端/业务已使用 `org_sync.progress`，强制替换会破坏宿主/standalone 的对齐与验收。
+- **Decision**: 统一采用 `_topic.*` 命名，不再维护历史双轨兼容。
+- **Rationale**: 插件侧已按 async_runtime 收敛到单一命名体系，减少权限白名单、联调脚本和订阅端实现复杂度。
 - **Alternatives considered**:
-  - 仅保留规范化 topic：会导致存量订阅失效。
-  - 仅保留旧 topic：违反宪章的事件命名规范，影响长期治理。
+  - 保留历史 topic 兼容：会导致多套命名并行，增加治理与迁移成本。
+  - 继续使用旧 topic：不符合当前 async_runtime 命名基线。
 
 ## Decision 2: 宿主发布入口调用方式
 
@@ -18,7 +18,7 @@
 
 ## Decision 3: Topic 注册机制
 
-- **Decision**: 宿主模式启动后调用 `POST /api/v1/admin/runtime/internal/ws-bus/register` 注册 topic。
+- **Decision**: 宿主模式启动后调用 `POST /api/v1/admin/runtime/internal/ws-bus/grant` 注册 topic。
 - **Rationale**: 底座可维护动态注册表并明确可订阅范围。
 - **Alternatives considered**:
   - 不注册：需要底座全量放行，难以治理。
@@ -33,6 +33,6 @@
 ## Decision 5: Standalone 调试入口
 
 - **Decision**: standalone 提供 `POST /api/v1/admin/runtime/internal/ws-bus/publish` 作为调试入口（仅 dev mode）。
-- **Rationale**: 便于本地联调 `/ws` 订阅，避免业务端尚未接入时无发布通道。
+- **Rationale**: 便于本地联调 `/api/ws` 订阅，避免业务端尚未接入时无发布通道。
 - **Alternatives considered**:
   - 不提供调试入口：本地验证成本高。

@@ -155,7 +155,11 @@ func (r *Router) setupRoutes() {
 			Resource: "runtime.ops",
 			Action:   "invoke",
 		})
-		rbacCfg.RoutePermissions["POST:"+base+"/ws-bus/register"] = rbacCfg.NormalizePermission(middleware.Permission{
+		rbacCfg.RoutePermissions["POST:"+base+"/ws-bus/grant"] = rbacCfg.NormalizePermission(middleware.Permission{
+			Resource: "runtime.ops",
+			Action:   "invoke",
+		})
+		rbacCfg.RoutePermissions["POST:"+base+"/event-fabric/topics"] = rbacCfg.NormalizePermission(middleware.Permission{
 			Resource: "runtime.ops",
 			Action:   "invoke",
 		})
@@ -242,14 +246,8 @@ func (r *Router) buildJWT() middleware.JWTAuthConfig {
 		}
 	}
 
-	// 本地直连开发：默认也严格验证，可通过 POWERX_AUTH_OPTIONAL 手动放宽
-	prod := r.cfg.IsProduction()
+	// 本地直连开发也保持严格鉴权，避免与宿主链路行为不一致。
 	optional := false
-	if v := strings.TrimSpace(os.Getenv("POWERX_AUTH_OPTIONAL")); v != "" {
-		optional = v == "1" || strings.EqualFold(v, "true")
-	} else if !prod {
-		optional = true
-	}
 
 	issuer := "powerx-local"
 	audiences := []string{"powerx:plugin"}

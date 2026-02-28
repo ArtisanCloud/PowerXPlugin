@@ -92,7 +92,8 @@ func setupMiniAppAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 	g := engine.Group("/api/v1")
 
 	cfg := &config.Config{
-		Server: &config.ServerConfig{APIPrefix: "/api/v1", DevMode: true},
+		Server:  &config.ServerConfig{APIPrefix: "/api/v1"},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:      "local",
 			JWTSecret: "test-secret",

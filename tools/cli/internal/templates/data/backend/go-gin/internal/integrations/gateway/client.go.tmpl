@@ -117,11 +117,11 @@ func NewClient(cfg *config.Config, log *logrus.Entry) *Client {
 
 	gcfg := cfg.Gateway
 	baseURL := strings.TrimSpace(gcfg.BaseURL)
-	toolToken := strings.TrimSpace(gcfg.ToolToken)
-	tenantUUID := effectiveGatewayTenant(gcfg)
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	credential := gatewayCredential(gcfg, authScheme)
 
-	if baseURL == "" || toolToken == "" || tenantUUID == "" {
-		c.offlineReason = "PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN 未配置，或 PX_TOOL_TOKEN 缺少 tid，请执行 `px-plugin login`"
+	if baseURL == "" || credential == "" {
+		c.offlineReason = "PX_GATEWAY_BASE_URL 与 Gateway 凭证未配置，请执行 `px-plugin login` 或补齐 gateway.auth_scheme + 凭证"
 		return c
 	}
 
@@ -201,14 +201,12 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 	if baseURL == "" {
 		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
 	}
-	token := strings.TrimSpace(gcfg.ToolToken)
-	if token == "" {
-		return nil, fmt.Errorf("PX_TOOL_TOKEN 未配置")
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	credential := gatewayCredential(gcfg, authScheme)
+	if credential == "" {
+		return nil, fmt.Errorf("Gateway 凭证未配置（auth_scheme=%s）", authScheme)
 	}
 	tenant := effectiveGatewayTenant(gcfg)
-	if tenant == "" {
-		return nil, fmt.Errorf("PX_TOOL_TOKEN 缺少 tid，无法确定租户")
-	}
 
 	timeout := gcfg.Timeout
 	if timeout <= 0 {
@@ -243,8 +241,10 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-PowerX-Tenant", tenant)
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("X-PowerX-Tenant", tenant)
+	}
 	req.Header.Set("X-Request-ID", uuid.NewString())
 
 	client := &http.Client{Timeout: timeout}
@@ -408,10 +408,10 @@ func ValidateConfig(cfg *config.Config) error {
 		return errors.New("gateway config missing")
 	}
 	base := strings.TrimSpace(cfg.Gateway.BaseURL)
-	token := strings.TrimSpace(cfg.Gateway.ToolToken)
-	tenant := effectiveGatewayTenant(cfg.Gateway)
-	if base == "" || token == "" || tenant == "" {
-		return errors.New("PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN 未配置，或 PX_TOOL_TOKEN 缺少 tid")
+	authScheme := effectiveGatewayAuthScheme(cfg.Gateway)
+	credential := gatewayCredential(cfg.Gateway, authScheme)
+	if base == "" || credential == "" {
+		return errors.New("PX_GATEWAY_BASE_URL 与 Gateway 凭证未配置")
 	}
 	return nil
 }
@@ -422,6 +422,9 @@ func (c *Client) refreshCredentials(ctx context.Context) (bool, error) {
 
 	if c.cfg == nil || c.cfg.Gateway == nil {
 		return false, fmt.Errorf("gateway config missing")
+	}
+	if effectiveGatewayAuthScheme(c.cfg.Gateway) != "bearer" {
+		return false, fmt.Errorf("gateway auth_scheme=%s 不支持自动刷新", effectiveGatewayAuthScheme(c.cfg.Gateway))
 	}
 	if strings.TrimSpace(c.cfg.Gateway.RefreshToken) == "" {
 		return false, fmt.Errorf("PX_TOOL_REFRESH_TOKEN 未配置")
@@ -443,11 +446,14 @@ func (c *Client) reconnectTransport() error {
 	}
 	gcfg := c.cfg.Gateway
 	baseURL := strings.TrimSpace(gcfg.BaseURL)
+	authScheme := effectiveGatewayAuthScheme(gcfg)
 	toolToken := strings.TrimSpace(gcfg.ToolToken)
+	apiKey := strings.TrimSpace(gcfg.APIKey)
 	tenantUUID := effectiveGatewayTenant(gcfg)
+	credential := gatewayCredential(gcfg, authScheme)
 
-	if baseURL == "" || toolToken == "" || tenantUUID == "" {
-		return fmt.Errorf("PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN 未配置，或 PX_TOOL_TOKEN 缺少 tid")
+	if baseURL == "" || credential == "" {
+		return fmt.Errorf("PX_GATEWAY_BASE_URL 与 Gateway 凭证未配置（auth_scheme=%s）", authScheme)
 	}
 
 	timeout := gcfg.Timeout
@@ -457,7 +463,9 @@ func (c *Client) reconnectTransport() error {
 
 	client, err := frameworkgateway.NewClient(frameworkgateway.Config{
 		BaseURL:        baseURL,
+		AuthScheme:     authScheme,
 		ToolToken:      toolToken,
+		APIKey:         apiKey,
 		TenantUUID:     tenantUUID,
 		RequestTimeout: timeout,
 		UserAgent:      strings.TrimSpace(gcfg.UserAgent),
@@ -484,10 +492,47 @@ func effectiveGatewayTenant(gcfg *config.GatewayConfig) string {
 	if gcfg == nil {
 		return ""
 	}
+	if effectiveGatewayAuthScheme(gcfg) != "bearer" {
+		return ""
+	}
 	if tokenTenant := tenantUUIDFromJWT(strings.TrimSpace(gcfg.ToolToken)); tokenTenant != "" {
 		return tokenTenant
 	}
 	return strings.TrimSpace(gcfg.TenantUUID)
+}
+
+func effectiveGatewayAuthScheme(gcfg *config.GatewayConfig) string {
+	if gcfg == nil {
+		return "bearer"
+	}
+	switch strings.ToLower(strings.TrimSpace(gcfg.AuthScheme)) {
+	case "apikey", "api_key", "api-key":
+		return "apikey"
+	case "bearer":
+		return "bearer"
+	default:
+		if strings.TrimSpace(gcfg.APIKey) != "" && strings.TrimSpace(gcfg.ToolToken) == "" {
+			return "apikey"
+		}
+		return "bearer"
+	}
+}
+
+func gatewayCredential(gcfg *config.GatewayConfig, authScheme string) string {
+	if gcfg == nil {
+		return ""
+	}
+	if authScheme == "apikey" {
+		return strings.TrimSpace(gcfg.APIKey)
+	}
+	return strings.TrimSpace(gcfg.ToolToken)
+}
+
+func buildGatewayAuthHeader(authScheme, credential string) string {
+	if authScheme == "apikey" {
+		return "ApiKey " + strings.TrimSpace(credential)
+	}
+	return "Bearer " + strings.TrimSpace(credential)
 }
 
 func tenantUUIDFromJWT(token string) string {

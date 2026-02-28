@@ -190,7 +190,7 @@ cd ..
   2. 修改 `database.driver` 与 `dsn/schema`
      - **Postgres（推荐）**：确保 DSN 对应的数据库存在（例如 `com_powerx_plugin_base`）；`schema` 会自动创建（常用 `public`）。
      - **SQLite（仅最小能力集）**：可用于快速验证启动/IAM/MCP，但不保证 marketplace/ops 等全量表结构可用。
-     - 若你尚未配置 Dev Gateway（`px-plugin login` / `PX_*` Token），请保持 `gateway.base_url` / `gateway.tool_token` / `gateway.tenant_uuid` 为空（否则会触发配置校验并阻塞启动）。
+    - 若你尚未配置 Dev Gateway（`px-plugin login` / `PX_*` Token），请保持 `gateway.base_url` / `gateway.tool_token` 为空（否则会触发配置校验并阻塞启动）。
   3. 初始化本地开发所需数据（推荐，包含 migrate + seed 本地管理员账号）：
      ```bash
      cd backend

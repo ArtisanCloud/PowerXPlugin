@@ -16,12 +16,14 @@ import (
 
 const (
 	hostPublishPath  = "/api/v1/internal/ws-bus/publish"
-	hostRegisterPath = "/api/v1/internal/ws-bus/register"
+	hostRegisterPath = "/api/v1/internal/ws-bus/grant"
 )
 
 type HostClientConfig struct {
 	BaseURL    string
+	AuthScheme string
 	Token      string
+	APIKey     string
 	TenantUUID string
 	UserAgent  string
 	Timeout    time.Duration
@@ -30,7 +32,8 @@ type HostClientConfig struct {
 
 type HostClient struct {
 	baseURL    string
-	token      string
+	authScheme string
+	credential string
 	tenantUUID string
 	userAgent  string
 	timeout    time.Duration
@@ -58,9 +61,9 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
 	}
-	token := strings.TrimSpace(cfg.Token)
-	if token == "" {
-		return nil, errors.New("wsbus host: token is required")
+	authScheme, credential, err := resolveAuth(cfg.AuthScheme, cfg.Token, cfg.APIKey)
+	if err != nil {
+		return nil, err
 	}
 	timeout := cfg.Timeout
 	if timeout <= 0 {
@@ -72,7 +75,8 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 	}
 	return &HostClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
-		token:      token,
+		authScheme: authScheme,
+		credential: credential,
 		tenantUUID: strings.TrimSpace(cfg.TenantUUID),
 		userAgent:  strings.TrimSpace(cfg.UserAgent),
 		timeout:    timeout,
@@ -94,14 +98,13 @@ func (c *HostClient) Publish(ctx context.Context, topic string, payload any, opt
 	if tenantUUID == "" {
 		tenantUUID = c.tenantUUID
 	}
-	if tenantUUID == "" {
-		return FailureResult(ErrorCodeTenantRequired, "tenant_uuid is required")
-	}
 
 	body := map[string]any{
-		"topic":       topic,
-		"payload":     payload,
-		"tenant_uuid": tenantUUID,
+		"topic":   topic,
+		"payload": payload,
+	}
+	if tenantUUID != "" {
+		body["tenant_uuid"] = tenantUUID
 	}
 	if strings.TrimSpace(opts.TraceID) != "" {
 		body["trace_id"] = strings.TrimSpace(opts.TraceID)
@@ -132,13 +135,12 @@ func (c *HostClient) RegisterTopics(ctx context.Context, topics []string, opts P
 	if tenantUUID == "" {
 		tenantUUID = c.tenantUUID
 	}
-	if tenantUUID == "" {
-		return FailureResult(ErrorCodeTenantRequired, "tenant_uuid is required")
-	}
 
 	body := map[string]any{
-		"topics":      expanded,
-		"tenant_uuid": tenantUUID,
+		"topics": expanded,
+	}
+	if tenantUUID != "" {
+		body["tenant_uuid"] = tenantUUID
 	}
 	if strings.TrimSpace(opts.TraceID) != "" {
 		body["trace_id"] = strings.TrimSpace(opts.TraceID)
@@ -152,7 +154,7 @@ func (c *HostClient) RegisterTopics(ctx context.Context, topics []string, opts P
 	if requestID == "" {
 		requestID = uuid.NewString()
 	}
-	return c.registerTopicsToEndpoint(ctx, c.baseURL+hostRegisterPath, bodyBytes, tenantUUID, requestID, opts, "register request")
+	return c.registerTopicsToEndpoint(ctx, c.baseURL+hostRegisterPath, bodyBytes, tenantUUID, requestID, opts, "grant request")
 }
 
 func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint string, bodyBytes []byte, tenantUUID, requestID string, opts PublishOptions, label string) PublishResult {
@@ -168,12 +170,7 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	token := strings.TrimSpace(opts.BearerToken)
-	if token == "" {
-		token = c.token
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	req.Header.Set("X-PowerX-Tenant", tenantUUID)
+	req.Header.Set("Authorization", c.resolveAuthHeader(opts))
 	req.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
@@ -190,7 +187,7 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 		return FailureResult(ErrorCodeRegisterResponseInvalid, fmt.Sprintf("failed to read %s response", label))
 	}
 	if resp.StatusCode >= http.StatusBadRequest {
-		message := fmt.Sprintf("register rejected with status %d", resp.StatusCode)
+		message := fmt.Sprintf("grant rejected with status %d", resp.StatusCode)
 		if detail := extractHostErrorMessage(payloadBytes); detail != "" {
 			message = detail
 		}
@@ -218,14 +215,14 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 			}
 		}
 		if strings.TrimSpace(message) == "" {
-			message = "register rejected by host"
+			message = "grant rejected by host"
 		}
 		return FailureResult(code, message)
 	}
 	if envelope.Data.OK {
 		return SuccessResult()
 	}
-	return FailureResult(ErrorCodeRegisterUpstreamFailed, "register rejected by host")
+	return FailureResult(ErrorCodeRegisterUpstreamFailed, "grant rejected by host")
 }
 
 func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bodyBytes []byte, tenantUUID, requestID string, opts PublishOptions, label string) PublishResult {
@@ -241,12 +238,7 @@ func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bod
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	token := strings.TrimSpace(opts.BearerToken)
-	if token == "" {
-		token = c.token
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	req.Header.Set("X-PowerX-Tenant", tenantUUID)
+	req.Header.Set("Authorization", c.resolveAuthHeader(opts))
 	req.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
@@ -336,4 +328,51 @@ func extractHostErrorMessage(payload []byte) string {
 		return envelope.Message
 	}
 	return ""
+}
+
+func (c *HostClient) resolveAuthHeader(opts PublishOptions) string {
+	if token := strings.TrimSpace(opts.BearerToken); token != "" {
+		return fmt.Sprintf("Bearer %s", token)
+	}
+	if c.authScheme == "apikey" {
+		return fmt.Sprintf("ApiKey %s", c.credential)
+	}
+	return fmt.Sprintf("Bearer %s", c.credential)
+}
+
+func resolveAuth(rawScheme, bearerToken, apiKey string) (scheme string, credential string, err error) {
+	scheme = normalizeAuthScheme(rawScheme)
+	bearer := strings.TrimSpace(bearerToken)
+	key := strings.TrimSpace(apiKey)
+	switch scheme {
+	case "apikey":
+		if key == "" {
+			return "", "", errors.New("wsbus host: api key is required when auth_scheme=apikey")
+		}
+		return scheme, key, nil
+	case "bearer":
+		if bearer == "" {
+			return "", "", errors.New("wsbus host: token is required when auth_scheme=bearer")
+		}
+		return scheme, bearer, nil
+	default:
+		if key != "" {
+			return "apikey", key, nil
+		}
+		if bearer != "" {
+			return "bearer", bearer, nil
+		}
+		return "", "", errors.New("wsbus host: missing credential (token/api key)")
+	}
+}
+
+func normalizeAuthScheme(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "apikey", "api_key", "api-key":
+		return "apikey"
+	case "bearer":
+		return "bearer"
+	default:
+		return ""
+	}
 }

@@ -106,4 +106,4 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 ## Manifest / Docs Consistency（2025-12-22）
 
 - `skeleton/plugin.yaml` → `capabilities.required` 默认示例保持与 Quickstart/Plan 中一致的 CoreX 能力（`com.corex.media.assets.manage`、`com.corex.eventfabric.publish`），`capabilities.provides` 指向 `contracts/capabilities/com.powerx.plugins.base.template.*`，方便 docs/plan/009 引用。
-- `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_TENANT_UUID/NUXT_PUBLIC_POWERX_*`），并对应 manifest 注释，确保读者可在三个入口间互相对照。
+- `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/NUXT_PUBLIC_POWERX_*`），租户统一由 token `tid` 推导，并对应 manifest 注释，确保读者可在三个入口间互相对照。

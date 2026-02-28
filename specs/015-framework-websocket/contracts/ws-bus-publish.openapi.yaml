@@ -41,7 +41,7 @@ paths:
                     type: string
                   error:
                     nullable: true
-  /api/v1/admin/runtime/internal/ws-bus/register:
+  /api/v1/admin/runtime/internal/ws-bus/grant:
     post:
       summary: Register WS Bus topics
       requestBody:

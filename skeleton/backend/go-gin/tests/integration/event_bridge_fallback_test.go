@@ -30,7 +30,7 @@ func TestEventBridge_FallbackToLocalWhenTaskBusUnavailable(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, emitter.Emit(context.Background(), event.Event{
-		Topic: "powerx.channel.master.credential_inspection.v1",
+		Topic: "_topic.template.update",
 		Meta:  evtMeta,
 		Payload: json.RawMessage(`{
   "channel_id": "c1",

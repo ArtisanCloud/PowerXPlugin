@@ -94,7 +94,8 @@ PowerX 会将插件注册进 Gin/Echo 的动态路由表中。
 | `POWERX_TENANT_MODE` | 租户运行模式（multi / single） |
 | `POWERX_STS_ENDPOINT` | STS 短期凭据服务地址 |
 | `POWERX_LOG_LEVEL` | 日志级别 |
-| `POWERX_DEV_MODE` | 是否处于开发模式 |
+| `POWERX_DEBUG_MODE` | 是否处于开发模式 |
+| `POWERX_DEV_MODE` | 兼容入口（映射到 `logging.debug_mode`） |
 
 插件启动时应从这些环境变量加载配置。
 
@@ -273,7 +274,7 @@ plugin.api_version == powerx.api_version
 ✅ **数据库角色隔离**：每个插件分配独立角色与 schema。
 ✅ **限制外网访问**：插件默认禁止出站网络。
 ✅ **STS 最小权限原则**：Token Scope 仅覆盖必要资源。
-✅ **开发模式标识**：`POWERX_DEV_MODE=1` 仅表示开发环境语义；如需临时放宽鉴权，请显式使用 `POWERX_AUTH_OPTIONAL=true`（仅限本地）。
+✅ **开发模式标识**：建议使用 `POWERX_DEBUG_MODE=1`；`POWERX_DEV_MODE=1` 仅兼容保留。鉴权默认保持严格模式。
 ✅ **插件审计日志**：所有调用会被宿主记录 request_id 与签名指纹。
 
 ---

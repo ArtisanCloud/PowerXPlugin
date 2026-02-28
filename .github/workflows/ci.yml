@@ -39,7 +39,7 @@ jobs:
       - name: Go work sync
         run: go work sync
       - name: Go test (framework)
-        run: cd framework && go test ./...
+        run: cd framework/backend/go && go test ./...
       - name: Go test (skeleton backend)
         run: cd skeleton/backend/go-gin && go test ./... -count=1
 

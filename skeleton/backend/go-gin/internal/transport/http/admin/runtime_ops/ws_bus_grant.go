@@ -12,20 +12,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type wsBusRegisterRequest struct {
+type wsBusGrantRequest struct {
 	Topics     []string `json:"topics"`
 	TenantUUID string   `json:"tenant_uuid"`
 	TraceID    string   `json:"trace_id"`
 }
 
-// WSBusRegisterHandler provides a debug register endpoint for standalone/host.
-func WSBusRegisterHandler(deps *app.Deps) gin.HandlerFunc {
+// WSBusGrantHandler provides a debug grant endpoint for standalone/host.
+func WSBusGrantHandler(deps *app.Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if deps == nil {
 			contracts.ResponseServiceUnavailable(c, "ws bus is not configured", nil)
 			return
 		}
-		var req wsBusRegisterRequest
+		var req wsBusGrantRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			contracts.ResponseBadRequest(c, "invalid payload")
 			return
@@ -36,7 +36,11 @@ func WSBusRegisterHandler(deps *app.Deps) gin.HandlerFunc {
 			return
 		}
 
-		tenantUUID := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
+		tenantUUID, tenantMismatch := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
+		if tenantMismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
+			return
+		}
 		traceID := strings.TrimSpace(req.TraceID)
 		if traceID == "" {
 			traceID = strings.TrimSpace(c.GetHeader("X-Request-ID"))
@@ -52,8 +56,10 @@ func WSBusRegisterHandler(deps *app.Deps) gin.HandlerFunc {
 			}
 			hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
 				BaseURL:    baseURL,
+				AuthScheme: strings.TrimSpace(deps.Config.Gateway.AuthScheme),
 				Token:      strings.TrimSpace(deps.Config.Gateway.ToolToken),
-				TenantUUID: strings.TrimSpace(deps.Config.Gateway.TenantUUID),
+				APIKey:     strings.TrimSpace(deps.Config.Gateway.APIKey),
+				TenantUUID: "",
 				UserAgent:  strings.TrimSpace(deps.Config.Gateway.UserAgent),
 				Timeout:    deps.Config.Gateway.Timeout,
 			})
@@ -72,7 +78,7 @@ func WSBusRegisterHandler(deps *app.Deps) gin.HandlerFunc {
 			}
 		}
 
-		// standalone: no-op register, just return expanded topics
+		// standalone: no-op grant, just return expanded topics
 		contracts.ResponseSuccess(c, gin.H{"ok": true, "topics": topics})
 	}
 }

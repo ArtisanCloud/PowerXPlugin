@@ -31,7 +31,7 @@ trap cleanup EXIT
 
 # 1. Core Go checks
 echo "[1/5] Running framework bootstrap tests"
-(cd framework/backend/go && go test ./bootstrap/... -coverprofile=../../tmp/coverage.out)
+(cd framework/backend/go && go test ./bootstrap/... -coverprofile=../../../tmp/coverage.out)
 
 echo "[2/5] Running skeleton router tests"
 go test ./skeleton/backend/go-gin/internal/router/... -v

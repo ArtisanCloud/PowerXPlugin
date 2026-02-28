@@ -162,7 +162,7 @@ PowerX 提供 `<AgentWidget />` 微前端组件，
 2. 在 PowerX 平台 Agent Hub 页面手动触发同步注册；
 3. 查看 PowerX 日志确认是否注册成功；
 4. 发送测试指令（如 “帮我创建一个任务”）验证 Tool 调用链；
-5. 若 JWT 验签失败，可临时开启 `POWERX_AUTH_OPTIONAL=true` 旁路（仅本地调试），`POWERX_DEV_MODE` 仅表示开发环境语义。
+5. 若 JWT 验签失败，请修正 token/issuer/audience/HMAC 配置；开发语义请使用 `logging.debug_mode`（环境变量入口为 `POWERX_DEBUG_MODE`，`POWERX_DEV_MODE` 仅兼容保留）。
 
 ---
 

@@ -146,14 +146,13 @@ func BeginTenantTx(ctx context.Context, db *gorm.DB, tenantID int64) (*gorm.DB, 
 开发阶段可以开启：
 
 ```bash
-export POWERX_DEV_MODE=1
-export POWERX_AUTH_OPTIONAL=true
+export POWERX_DEBUG_MODE=1
 ```
 
 作用：
 
 * 以开发环境语义运行；
-* 如启用 `POWERX_AUTH_OPTIONAL=true`，可临时放宽 JWT/HMAC 鉴权（仅限本地）；
+* 鉴权默认保持严格模式，请始终使用有效凭证；
 * 使用默认租户 ID（例如 `tenant_uuid = 1`）；
 * 允许本地直连后端测试。
 
@@ -223,7 +222,7 @@ WHERE tenant_uuid = current_setting('app.tenant_uuid', true)
 | 中间件  | `middleware/tenant.go` | 提取租户上下文          |
 | 事务封装 | `db/tenant_tx.go`      | 注入 app.tenant_uuid |
 | 数据层  | `Postgres RLS`         | 强制行级隔离           |
-| 调试模式 | `POWERX_DEV_MODE` + `POWERX_AUTH_OPTIONAL` | 开发语义 + 临时放宽鉴权（仅本地） |
+| 调试模式 | `POWERX_DEBUG_MODE` | 开发语义（鉴权保持严格） |
 | 安全兜底 | 双层隔离机制                 | 防止跨租户访问          |
 
 ---

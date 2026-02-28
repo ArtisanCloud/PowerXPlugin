@@ -12,6 +12,7 @@ const (
 	metricEmitTotal      = "plugin_event_bridge_emit_total"
 	metricConsumeTotal   = "plugin_event_bridge_consume_total"
 	metricLatencyGaugeMs = "plugin_event_bridge_latency_ms"
+	metricDropTotal      = "plugin_event_bridge_drop_total"
 )
 
 var (
@@ -111,6 +112,18 @@ func ObserveLatencyMs(pluginID, tenantUUID, topic, op string, ms float64) {
 		"op":          normalizedValue(op),
 	}
 	ensureGauge(metricLatencyGaugeMs)[labelKey(labels)] = ms
+}
+
+func RecordDrop(pluginID, tenantUUID, topic, reason string) {
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+	labels := map[string]string{
+		"plugin_id":   normalizedPluginID(pluginID),
+		"tenant_uuid": normalizedTenantUUID(tenantUUID),
+		"topic":       strings.TrimSpace(topic),
+		"reason":      normalizedValue(reason),
+	}
+	ensureCounter(metricDropTotal)[labelKey(labels)]++
 }
 
 func RenderPrometheus(w io.Writer) {

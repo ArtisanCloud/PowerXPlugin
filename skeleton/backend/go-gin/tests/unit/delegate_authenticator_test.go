@@ -29,7 +29,8 @@ func TestDelegateAuthenticator_SuccessAndCache(t *testing.T) {
 	})
 
 	cfg := &config.Config{
-		Server: &config.ServerConfig{DevMode: true},
+		Server:  &config.ServerConfig{},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:             "delegate",
 			DelegateEndpoint: "http://powerx.local/api/v1/customer/auth/validate",
@@ -73,7 +74,8 @@ func TestDelegateAuthenticator_UpstreamUnauthorized(t *testing.T) {
 		}, nil
 	})
 	cfg := &config.Config{
-		Server: &config.ServerConfig{DevMode: true},
+		Server:  &config.ServerConfig{},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:             "delegate",
 			DelegateEndpoint: "http://powerx.local/api/v1/customer/auth/validate",

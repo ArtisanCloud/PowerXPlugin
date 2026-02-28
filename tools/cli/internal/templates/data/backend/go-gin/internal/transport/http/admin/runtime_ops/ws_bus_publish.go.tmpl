@@ -32,17 +32,21 @@ func WSBusPublishHandler(deps *app.Deps) gin.HandlerFunc {
 			return
 		}
 
-		tenantUUID := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
+		tenantUUID, tenantMismatch := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
+		if tenantMismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
+			return
+		}
 		traceID := strings.TrimSpace(req.TraceID)
 		if traceID == "" {
 			traceID = strings.TrimSpace(c.GetHeader("X-Request-ID"))
 		}
 
-		publisher := fwwsbus.NewAdapter(
+		publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
 			fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
 			"",
 			nil,
-		)
+		))
 		outboundBearer := ""
 		if os.Getenv("POWERX_PROXY") == "1" && deps.Config != nil && deps.Config.Gateway != nil {
 			outboundBearer = resolveGatewayBearerToken(c, deps)
@@ -54,13 +58,15 @@ func WSBusPublishHandler(deps *app.Deps) gin.HandlerFunc {
 			}
 			hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
 				BaseURL:    baseURL,
+				AuthScheme: strings.TrimSpace(deps.Config.Gateway.AuthScheme),
 				Token:      strings.TrimSpace(deps.Config.Gateway.ToolToken),
-				TenantUUID: strings.TrimSpace(deps.Config.Gateway.TenantUUID),
+				APIKey:     strings.TrimSpace(deps.Config.Gateway.APIKey),
+				TenantUUID: "",
 				UserAgent:  strings.TrimSpace(deps.Config.Gateway.UserAgent),
 				Timeout:    deps.Config.Gateway.Timeout,
 			})
 			if err == nil {
-				publisher = fwwsbus.NewAdapter(hostClient, "", nil)
+				publisher = hostClient
 			}
 		}
 		result := publisher.Publish(context.Background(), req.Topic, req.Payload, fwwsbus.PublishOptions{

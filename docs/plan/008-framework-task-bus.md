@@ -4,6 +4,7 @@
 
 本仓库对应的落地实现与 Spec/Tasks 位于：`specs/008-framework-task-bus/`。
 快速上手与验证步骤见：`specs/008-framework-task-bus/quickstart.md`。
+开发前准备与缺口清单见：`specs/008-framework-task-bus/readiness.md`。
 
 ## 1. 目标与范围
 
@@ -20,7 +21,8 @@
    - `tenant_uuid`、`request_id`、`source_plugin`、`trace_id`。
    - `occurred_at`（RFC3339），`payload_version`。
 3. **契约文件（仓库内治理）**：事件契约集中在 `specs/008-framework-task-bus/contracts/channel-events.yaml`，并由 CI 校验（topic 唯一、meta.required 必填字段、敏感字段名 lint）。
-   - 本地校验入口：`./scripts/contracts/validate-taskbus-contracts.sh`
+   - 本地校验入口（仓库根目录）：`./scripts/contracts/validate-taskbus-contracts.sh`
+   - 等价命令：`make -f make-files/validate.mk validate-taskbus-contracts`
    - 校验实现：`tools/contracts/validate-taskbus-contracts.go`
 
 ## 3. 抽象接口
@@ -29,7 +31,7 @@
 - **事件出口（Framework 对外包）**：`framework/backend/go/eventbridge/*`
 - **业务侧适配器（示例：Channel）**：`skeleton/backend/go-gin/internal/observability/channel/event_emitter.go`
 - **Consumer/Dispatcher（Framework）**：`framework/backend/go/eventbridge/consumer.go`
-- **权限与运行时边界**：`skeleton/backend/go-gin/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 publish/subscribe 并执行 deny + log）
+- **权限与运行时边界**：`skeleton/backend/go-gin/internal/security/event_permissions.go`（从 `skeleton/plugin.yaml` 读取 `events.topics[].actions` 并执行 deny + log，兼容旧版 publish/subscribe）
 
 说明：
 - 本仓库以“本地 emitter + 可注入 TaskBus provider”的方式完成切换与灰度；真实 TaskBus SDK 由宿主/框架提供后再实现 provider。
@@ -40,13 +42,16 @@
 2. **声明 Topic 权限（开发态）**：在 `skeleton/plugin.yaml` 增加：
    ```yaml
    events:
-     publish:
-       - powerx.channel.master.credential_inspection.v1
-       - powerx.channel.master.kpi_refreshed.v1
-       - powerx.channel.product.publish_task.v1
-     subscribe: []
+     topics:
+       - key: powerx.channel.master.credential_inspection.v1
+         actions: [publish]
+       - key: powerx.channel.master.kpi_refreshed.v1
+         actions: [publish]
+       - key: powerx.channel.product.publish_task.v1
+         actions: [publish]
    ```
    - Manifest 路径可通过环境变量覆盖：`POWERX_PLUGIN_MANIFEST_PATH`
+   - 过渡期执行层文件：`config/event_fabric.yaml`（扫描优先级：`config/event_fabric.yaml` → `platform_capabilities/event_fabric.yaml` → `event_fabric.yaml`）
 3. **配置开关**：在 `skeleton/backend/go-gin/internal/config/config.go` 使用 `event_bridge` 配置：
    - `event_bridge.enabled`：开启/关闭 TaskBus 模式
    - `event_bridge.mode`：`local|taskbus|dual`
@@ -144,7 +149,7 @@ scheduler:
 
 ## 8. Checklist
 
-1. [ ] 契约变更走 PR + CI 校验（`./scripts/contracts/validate-taskbus-contracts.sh`）。
+1. [ ] 契约变更走 PR + CI 校验（仓库根目录执行 `./scripts/contracts/validate-taskbus-contracts.sh`，或 `make -f make-files/validate.mk validate-taskbus-contracts`）。
 2. [ ] 确认 manifest 事件权限（`skeleton/plugin.yaml`）满足最小权限，并在运行时 enforcement 生效。
 3. [ ] 在 `app.Deps` 注入 emitter，并完成 TaskBus provider 对接（若宿主 SDK 已就绪）。
 4. [ ] 业务路径完成至少一个 job → consumer 的迁移示例，并保留双写/回滚路径。

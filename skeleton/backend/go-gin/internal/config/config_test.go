@@ -26,8 +26,8 @@ func TestLoadFallsBackToMemoryDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("加载默认配置失败: %v", err)
 	}
-	if cfg.Server == nil || !cfg.Server.DevMode {
-		t.Fatalf("默认配置应启用 dev_mode 便于本地启动")
+	if cfg.Logging == nil || !cfg.Logging.DebugMode {
+		t.Fatalf("默认配置应启用 logging.debug_mode 便于本地启动")
 	}
 	if cfg.Database == nil {
 		t.Fatal("默认数据库配置缺失")
@@ -95,8 +95,8 @@ func TestLoadAppliesEnvOverrides(t *testing.T) {
 	if cfg.Database.Schema != schema {
 		t.Fatalf("POWERX_DB_SCHEMA 未生效，期望 %q 实际 %q", schema, cfg.Database.Schema)
 	}
-	if cfg.Logging.Level != "info" || cfg.Server.LogLevel != "info" {
-		t.Fatalf("POWERX_LOG_LEVEL 未归一化为小写 info, server=%q logging=%q", cfg.Server.LogLevel, cfg.Logging.Level)
+	if cfg.Logging.Level != "info" {
+		t.Fatalf("POWERX_LOG_LEVEL 未归一化为小写 info, logging=%q", cfg.Logging.Level)
 	}
 	if cfg.Logging.Format != "text" || cfg.Logging.Output != "stdout" {
 		t.Fatalf("日志配置未归一化: format=%q output=%q", cfg.Logging.Format, cfg.Logging.Output)
@@ -157,7 +157,7 @@ func TestLoadUsesConfigPathPlaceholder(t *testing.T) {
 	if err := os.Mkdir(configDir, 0o755); err != nil {
 		t.Fatalf("创建配置目录失败: %v", err)
 	}
-	configContent := "server:\n  bind_addr: \":0\"\n  log_level: \"INFO\"\n  dev_mode: true\ndatabase:\n  dsn: \"postgres://user:pass@127.0.0.1:5432/test?sslmode=disable\"\n  schema: \"px_test\"\nlogging:\n  level: \"INFO\"\n  format: \"JSON\"\n  output: \"STDOUT\"\n"
+	configContent := "server:\n  bind_addr: \":0\"\ndatabase:\n  dsn: \"postgres://user:pass@127.0.0.1:5432/test?sslmode=disable\"\n  schema: \"px_test\"\nlogging:\n  level: \"INFO\"\n  format: \"JSON\"\n  output: \"STDOUT\"\n  debug_mode: true\n"
 	configFile := filepath.Join(configDir, "config.yaml")
 	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 		t.Fatalf("写入 host-values 配置失败: %v", err)
@@ -173,7 +173,61 @@ func TestLoadUsesConfigPathPlaceholder(t *testing.T) {
 	if cfg.Database == nil || cfg.Database.DSN == "" {
 		t.Fatal("未从 CONFIG_PATH 提供的 YAML 中读取到数据库 DSN")
 	}
-	if cfg.Server.LogLevel != "info" {
-		t.Fatalf("CONFIG_PATH 配置未生效，log level=%q", cfg.Server.LogLevel)
+	if cfg.Logging.Level != "info" {
+		t.Fatalf("CONFIG_PATH 配置未生效，log level=%q", cfg.Logging.Level)
+	}
+}
+
+func TestLoadSupportsRuntimeNamespacedLogging(t *testing.T) {
+	tempDir := t.TempDir()
+	configContent := "runtime:\n  logging:\n    level: WARN\n    format: JSON\n    output: STDERR\n  run_migrate: true\n"
+	configFile := filepath.Join(tempDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+	t.Setenv("CONFIG_PATH", tempDir)
+	t.Setenv("POWERX_DEV_MODE", "true")
+	t.Setenv("POWERX_DB_DSN", "postgres://user:pass@127.0.0.1:5432/test?sslmode=disable")
+	t.Setenv("POWERX_DB_SCHEMA", "px_test")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.Logging == nil || cfg.Runtime == nil || cfg.Runtime.Logging == nil {
+		t.Fatal("runtime.logging 映射失败")
+	}
+	if cfg.Logging.Level != "warn" || cfg.Logging.Format != "json" || cfg.Logging.Output != "stderr" {
+		t.Fatalf("runtime.logging 未生效: level=%q format=%q output=%q", cfg.Logging.Level, cfg.Logging.Format, cfg.Logging.Output)
+	}
+	if !cfg.Runtime.RunMigrate {
+		t.Fatal("runtime.run_migrate 未生效")
+	}
+}
+
+func TestLoadSupportsRuntimeNamespacedEventBridge(t *testing.T) {
+	tempDir := t.TempDir()
+	configContent := "runtime:\n  event_bridge:\n    enabled: true\n    mode: taskbus\n    taskbus_provider: redis\n    redis_url: redis://127.0.0.1:6379\n    redis_stream: px.test.stream\n"
+	configFile := filepath.Join(tempDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+	t.Setenv("CONFIG_PATH", tempDir)
+	t.Setenv("POWERX_DEV_MODE", "true")
+	t.Setenv("POWERX_DB_DSN", "postgres://user:pass@127.0.0.1:5432/test?sslmode=disable")
+	t.Setenv("POWERX_DB_SCHEMA", "px_test")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.EventBridge == nil || cfg.Runtime == nil || cfg.Runtime.EventBridge == nil {
+		t.Fatal("runtime.event_bridge 映射失败")
+	}
+	if cfg.EventBridge.TaskBusProvider != "redis" {
+		t.Fatalf("runtime.event_bridge.taskbus_provider 未生效: %q", cfg.EventBridge.TaskBusProvider)
+	}
+	if cfg.EventBridge.RedisStream != "px.test.stream" {
+		t.Fatalf("runtime.event_bridge.redis_stream 未生效: %q", cfg.EventBridge.RedisStream)
 	}
 }

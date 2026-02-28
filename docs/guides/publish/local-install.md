@@ -86,7 +86,28 @@ npm run dev
 
 ## 方案 A：dist 直装（推荐）
 
-Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：包含后端二进制、Nuxt 构建结果、`plugin.yaml`、`publish.yml`、`manifest.json` 等。**这一部分是所有流程都必须完成的基础**，可以用 Makefile 或手动方式完成。
+Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：包含后端二进制、Nuxt 构建结果、`plugin.yaml`、`config/event_fabric.yaml`、`publish.yml`、`manifest.json` 等。**这一部分是所有流程都必须完成的基础**，可以用 Makefile 或手动方式完成。
+
+## 本地安装时的 Topic 对齐要求
+
+安装包必须同时满足两层：
+
+1. 规范声明层：`plugin.yaml.events.topics[]`
+2. 执行层：`config/event_fabric.yaml`（供 PowerX 底座启用插件时扫描播种）
+
+底座行为说明：
+
+- 底座启用插件时会扫描插件安装目录内的 `event_fabric.yaml` 并播种 topic/ACL。
+- Topic 真相源是 `event_topics`。
+- `POST /api/v1/internal/ws-bus/grant` 只做授权绑定，不创建 topic。
+
+联调顺序（Standalone + Proxy）：
+
+1. ensure topic 已注册到 `event_topics`
+2. 配置 API Key Profile 权限并保存
+3. 轮换/新建 API Key
+4. 调用 `ws-bus/grant`
+5. 调用 `publish/subscribe`
 
 ### 步骤 1：准备依赖
 
@@ -143,11 +164,13 @@ npm install
 npm run build
 popd
 
-# 3) 整理 dist 目录（包含 plugin.yaml、publish.yml、manifest.json 等）
+# 3) 整理 dist 目录（包含 plugin.yaml、config/event_fabric.yaml、publish.yml、manifest.json 等）
 mkdir -p dist/web-admin dist/backend
 cp -R backend/dist/* dist/backend/
 cp -R web-admin/.output/public dist/web-admin/
 cp plugin.yaml dist/
+mkdir -p dist/config
+cp config/event_fabric.yaml dist/config/
 cp publish.yml dist/
 ```
 
@@ -282,7 +305,7 @@ curl -X POST "$API_BASE/admin/plugins/install/local" \
       }'
 ```
 
-- `src_dir`：PowerX 服务器可读的绝对路径。应包含 `backend/`, `web-admin/`, `plugin.yaml`, `publish.yml` 等文件。
+- `src_dir`：PowerX 服务器可读的绝对路径。应包含 `backend/`, `web-admin/`, `plugin.yaml`, `config/event_fabric.yaml`, `publish.yml` 等文件。
 - `enable`：安装完成后是否立即启用并切换成当前版本。
 - `force`：若已有相同版本，是否强制覆盖。
 

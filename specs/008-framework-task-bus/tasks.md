@@ -97,3 +97,36 @@
 - T002 + T003 + T004 can be parallel once T001 confirms scope.
 - T011 + T012 can be parallel.
 - Validator tasks (T009/T010/T021/T022) can be parallel with emitter tasks (T007/T008) as long as file paths do not overlap.
+
+---
+
+## Phase 7: Host Provider 落地与版本发布（Next）
+
+**Goal**: 将 `TaskBusProvider` 从“接口占位”升级为“宿主可用实现”，并完成 framework 新版本发布与插件迁移闭环。
+
+**Independent Test**: 在 `mode=taskbus` 且 provider 可用时，事件经宿主链路成功投递；provider 不可用且 `fallback_to_local=true` 时可自动回落。
+
+- [x] T041 [US4] Implement a real host taskbus provider in `framework/backend/go/runtime/taskbus/provider.go` (or equivalent runtime package).
+- [x] T042 [US4] Inject provider via `Factory.WithTaskBusProvider(...)` in `skeleton/backend/go-gin/cmd/plugin/main.go`.
+- [x] T043 [P] [US4] Add integration test for "taskbus mode with real provider wiring" in `skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_provider_test.go`.
+- [x] T044 [US4] Add drop metrics/log fields for local queue full in `framework/backend/go/eventbridge/local_emitter.go` and `skeleton/backend/go-gin/internal/observability/event_bridge/metrics.go`.
+- [x] T045 [P] [US4] Add tests for local-queue-full behavior and metrics update in `skeleton/backend/go-gin/tests/unit/event_local_queue_full_test.go`.
+- [ ] T046 [US4] Publish framework prerelease (`v0.0.3-alpha` or newer) and update dependency notes in `docs/plan/008-framework-task-bus.md`.
+- [ ] T047 [US4] Add migration guide for external plugins (adapter mapping checklist) in `docs/guides/async_runtime/event_fabric/integration_playbook.md`.
+
+**Checkpoint**: Host provider wired + fallback verified + release/migration docs ready.
+
+---
+
+## Updated Dependencies & Execution Order (with Phase 7)
+
+- Phase 1 → Phase 2 → US1 (MVP) → US2 → US3 → Polish → **Phase 7 (Host Provider & Release)**
+- Phase 7 depends on stable contracts + emitter factory + integration baseline from earlier phases.
+- Release/migration tasks (T046/T047) should run after provider wiring and integration validation (T041~T045).
+
+## Phase 7 Entry Gate（进入 Host Provider 开发前）
+
+- [ ] G1 已阅读并确认 `specs/008-framework-task-bus/readiness.md` 的未完成项。
+- [ ] G2 已完成 Day-0 校验命令并保留执行记录。
+- [ ] G3 目标 topic 权限已在 `skeleton/plugin.yaml` 明确声明。
+- [ ] G4 已确认迁移目标插件的当前 framework 版本与升级路径。

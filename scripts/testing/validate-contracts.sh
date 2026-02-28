@@ -34,10 +34,8 @@ else
 fi
 
 PX_PLUGIN_BIN="${PX_PLUGIN_BIN:-$ROOT_DIR/bin/px-plugin}"
-if [ ! -x "$PX_PLUGIN_BIN" ]; then
-  echo "Building px-plugin CLI at $PX_PLUGIN_BIN"
-  go build -o "$PX_PLUGIN_BIN" ./tools/cli/cmd/px-plugin
-fi
+echo "Building px-plugin CLI at $PX_PLUGIN_BIN"
+go build -o "$PX_PLUGIN_BIN" ./tools/cli/cmd/px-plugin
 
 pushd "$TEMP_DIR" > /dev/null
 "$PX_PLUGIN_BIN" init com.powerx.validation --force --module github.com/example/powerxvalidation > /dev/null

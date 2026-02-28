@@ -11,5 +11,8 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 
 cd "$ROOT_DIR"
 
-make validate-taskbus-contracts TASKBUS_CONTRACTS="$TASKBUS_CONTRACTS"
-
+if [ -f "$ROOT_DIR/make-files/validate.mk" ]; then
+	make -f "$ROOT_DIR/make-files/validate.mk" validate-taskbus-contracts TASKBUS_CONTRACTS="$TASKBUS_CONTRACTS"
+else
+	make validate-taskbus-contracts TASKBUS_CONTRACTS="$TASKBUS_CONTRACTS"
+fi

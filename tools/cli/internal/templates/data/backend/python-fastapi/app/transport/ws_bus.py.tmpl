@@ -10,7 +10,13 @@ from app.middleware.auth_guard import JWTAuthConfig
 from app.middleware import auth_guard
 from app.services.ws_bus import Event
 
-ALLOWED_TOPICS = {"org_sync.progress", "powerx.org_sync.progress.v1"}
+ALLOWED_TOPICS = {
+    "_topic.template.update",
+    "_topic.audit.template.updated",
+    "_topic.template.validate.completed",
+    "_topic.template.batch_clone.completed",
+    "_topic.template.update.completed",
+}
 
 
 class _Subscriber:
@@ -21,10 +27,6 @@ class _Subscriber:
 async def register_ws_routes(app: FastAPI) -> None:
     if app is None:
         return
-
-    @app.websocket("/ws")
-    async def ws_endpoint(websocket: WebSocket):
-        await _handle_ws(websocket, app)
 
     @app.websocket("/api/ws")
     async def api_ws_endpoint(websocket: WebSocket):

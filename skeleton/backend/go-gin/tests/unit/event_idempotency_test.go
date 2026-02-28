@@ -18,13 +18,13 @@ func TestIdempotencyFilter_SkipsDuplicatesByTopicTenantTrace(t *testing.T) {
 	dispatcher := fweventbridge.NewDispatcher(filter)
 
 	var handled int32
-	dispatcher.Register("powerx.channel.master.credential_inspection.v1", func(ctx context.Context, ev event.Event) error {
+	dispatcher.Register("_topic.template.update", func(ctx context.Context, ev event.Event) error {
 		atomic.AddInt32(&handled, 1)
 		return nil
 	})
 
 	ev := event.Event{
-		Topic: "powerx.channel.master.credential_inspection.v1",
+		Topic: "_topic.template.update",
 		Meta: event.Meta{
 			TenantUUID:     "00000000-0000-0000-0000-000000000001",
 			RequestID:      "req-1",
@@ -46,13 +46,13 @@ func TestIdempotencyFilter_AllowsWhenTraceIDMissing(t *testing.T) {
 	dispatcher := fweventbridge.NewDispatcher(filter)
 
 	var handled int32
-	dispatcher.Register("powerx.channel.master.credential_inspection.v1", func(ctx context.Context, ev event.Event) error {
+	dispatcher.Register("_topic.template.update", func(ctx context.Context, ev event.Event) error {
 		atomic.AddInt32(&handled, 1)
 		return nil
 	})
 
 	ev := event.Event{
-		Topic: "powerx.channel.master.credential_inspection.v1",
+		Topic: "_topic.template.update",
 		Meta: event.Meta{
 			TenantUUID:     "00000000-0000-0000-0000-000000000001",
 			RequestID:      "req-1",

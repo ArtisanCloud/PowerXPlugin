@@ -160,6 +160,10 @@ dist: build frontend-build
 	@mkdir -p $(DIST_BACKEND_BIN) $(DIST_WEBADMIN_OUTPUT)
 	@echo "写入插件清单 -> $(DIST_DIR)/plugin.yaml (version=$(VERSION))"
 	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' plugin.yaml > $(DIST_DIR)/plugin.yaml
+	@if [ -f "config/event_fabric.yaml" ]; then \
+	  mkdir -p $(DIST_DIR)/config; \
+	  cp config/event_fabric.yaml $(DIST_DIR)/config/event_fabric.yaml; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(DIST_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(DIST_BACKEND_BIN)/; fi
 	@if [ -d "$(FRONTEND_OUTPUT)" ] && [ -n "$$(ls -A $(FRONTEND_OUTPUT) 2>/dev/null)" ]; then \
@@ -182,6 +186,10 @@ release: build frontend-build
 	@mkdir -p $(RELEASE_BACKEND_BIN) $(RELEASE_WEBADMIN_OUTPUT)
 	@echo "写入插件清单 -> $(RELEASE_DIR)/plugin.yaml (version=$(VERSION))"
 	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' plugin.yaml > $(RELEASE_DIR)/plugin.yaml
+	@if [ -f "config/event_fabric.yaml" ]; then \
+	  mkdir -p $(RELEASE_DIR)/config; \
+	  cp config/event_fabric.yaml $(RELEASE_DIR)/config/event_fabric.yaml; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(RELEASE_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(RELEASE_BACKEND_BIN)/; fi
 	@cp -R $(FRONTEND_OUTPUT)/. $(RELEASE_WEBADMIN_OUTPUT)/

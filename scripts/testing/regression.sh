@@ -306,7 +306,8 @@ start_frontend() {
     NUXT_PUBLIC_API_BASE="$API_BASE_URL" NUXT_PUBLIC_API_PREFIX="$API_PREFIX" \
       NITRO_HOST="$FRONTEND_HOST" HOST="$FRONTEND_HOST" \
       NITRO_PORT="$FRONTEND_PORT" PORT="$FRONTEND_PORT" \
-      node ./node_modules/nuxi/bin/nuxi.mjs preview --hostname "$FRONTEND_HOST" --port "$FRONTEND_PORT" >"$FRONTEND_LOG" 2>&1 &
+      NUXT_TELEMETRY_DISABLED=1 \
+      node .output/server/index.mjs >"$FRONTEND_LOG" 2>&1 &
     frontend_pid=$!
 
     sleep 1
@@ -326,6 +327,7 @@ start_frontend() {
 
     if [ "$frontend_port_forced" -eq 1 ] || [ -n "${PLAYWRIGHT_BASE_URL:-}" ]; then
       echo "Frontend failed to become ready on port ${FRONTEND_PORT}; see ${FRONTEND_LOG}" >&2
+      tail -n 80 "$FRONTEND_LOG" >&2 || true
       return 1
     fi
 

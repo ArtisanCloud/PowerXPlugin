@@ -481,7 +481,7 @@ func getDefaultConfig() *Config {
 	return &Config{
 		DevMode: true,
 		Server: &ServerConfig{
-			BindAddr: ":8078",
+			BindAddr: ":{{ .BackendPort }}",
 		},
 		Integration: &IntegrationConfig{
 			Idempotency: IntegrationIdempotencyConfig{
@@ -818,7 +818,6 @@ func resolveConfigCandidates() []string {
 		"./config/config.yaml",
 		"./config.yaml",
 		"./backend/etc/config.yaml",
-		"./skeleton/backend/etc/config.yaml",
 		"./etc/config.yaml",
 		"../config/host-values.yaml",
 		"../config/config.yaml",

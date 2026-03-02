@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
-	marketobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/marketplace"
+	"{{ .BackendModulePath }}/internal/config"
+	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
+	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 	"github.com/sirupsen/logrus"
 )
 

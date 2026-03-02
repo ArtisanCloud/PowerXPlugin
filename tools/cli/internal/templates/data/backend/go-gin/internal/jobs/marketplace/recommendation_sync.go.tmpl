@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
+	"{{ .BackendModulePath }}/internal/config"
+	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
+	"{{ .BackendModulePath }}/internal/services/recommendation"
 	"github.com/sirupsen/logrus"
 )
 

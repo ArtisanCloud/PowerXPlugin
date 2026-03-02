@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	toolgrantservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent/tool_grant"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	toolgrantservice "{{ .BackendModulePath }}/internal/services/agent/tool_grant"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 

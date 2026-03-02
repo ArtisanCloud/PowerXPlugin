@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
-	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
-	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	capgateway "{{ .BackendModulePath }}/internal/integrations/gateway"
+	integrationService "{{ .BackendModulePath }}/internal/services/integration"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )

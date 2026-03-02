@@ -1,14 +1,47 @@
 # PowerX Publish Hub · 本地安装（Local Install）指南
 
-本指南梳理「直接向 PowerX 部署插件」的本地安装流程，覆盖三种常见产物：
+本指南聚焦一件事：把**已经构建好的插件产物**安装到 PowerX 环境。
+
+先区分几个常见命令（避免混淆）：
+
+- `px-plugin init`：初始化插件工程（生成代码骨架）。  
+  适用场景：新项目起步、需要快速拉起标准目录。  
+  不适用场景：已有项目发布安装。
+- `px-plugin dev --watch`：本地开发热更新（不做部署安装）。  
+  适用场景：高频改代码、秒级验证页面/接口改动。  
+  不适用场景：提测验收、模拟真实部署。
+- `make dist` / 手动构建：生成可安装产物目录。  
+  适用场景：准备提测包、要交给 PowerX 安装。  
+  不适用场景：只做本地热更新调试。
+- `px-plugin pack`：在 `dist` 基础上生成 `.pxp` 元数据包（校验/签名用途）。  
+  适用场景：需要签名、审计留痕、离线传输规范化。  
+  不适用场景：只追求最快安装验证。
+- `POST /admin/plugins/install/local`：把产物真正安装到 PowerX（本文核心）。  
+  适用场景：联调环境/测试环境/预发布环境安装验证。  
+  不适用场景：仅在开发机本地跑服务。
+
+本文覆盖三种可用于安装的输入形态：
 
 1. 构建后的 `dist/` 目录（解压即可运行）。
 2. 手工压缩包（`.zip/.tar.gz` 等）。
 3. `px-plugin pack` 生成的 `.pxp` 元数据包。
 
-> ⚠️ 与 `px-plugin dev --watch` 不同，本地安装依赖 PowerX 的 Admin API 将产物写入插件运行目录。它不会帮你热重载代码，而是一次性部署一个可运行版本。
+## 先选模式：你现在处于哪种场景
+
+| 场景 | 推荐方式 | 为什么 |
+| ---- | ---- | ---- |
+| 日常开发联调（频繁改代码） | `px-plugin dev --watch` | 重点是“快速反馈”，不是部署；改代码后自动重载更高效。 |
+| 提测/联调环境验证（要模拟真实安装） | `make dist` + `/admin/plugins/install/local` | 重点是“验证可安装产物”；与线上安装路径一致，能提前暴露打包问题。 |
+| 内网/隔离网络交付 | 手工压缩包或拷贝 `dist/` | 重点是“可传输、可落地”；不依赖外网拉取。 |
+| 需要审计/签名留痕 | `dist` + `.pxp`（`px-plugin pack`） | 重点是“可追溯”；`.pxp` 提供额外校验元数据。 |
+
+一句话区分：
+- `dev --watch`：开发模式（改代码快）。
+- `local install`：部署模式（验安装真）。
+
+> ⚠️ 与 `px-plugin dev --watch` 不同，本地安装是“部署动作”，依赖 PowerX Admin API 写入插件运行目录，不会热重载源码。
 >
-> 🚧 当前 `px-plugin dist/pack` 仍会打印 “experimental” 提示。本文描述的是 Phase 14「Local install fast path」落地后的目标流程，便于提前评审。如果你使用现有 CLI，请按照“手动构建”小节执行。
+> 🚧 当前 `px-plugin dist/pack` 仍会打印 “experimental” 提示；如果你使用现有 CLI，请优先按本文的 `make dist` 或“手动构建”步骤执行。
 
 ---
 
@@ -33,21 +66,12 @@
 | 项目 | 说明 |
 | ---- | ---- |
 | PowerX 版本 | 启用了 `backend/internal/transport/http/admin/plugin` 路由；`config/config.yaml` 里的 `server.apiPrefix` 默认为 `/api`，如改成 `/api/v1`，下面的示例 URL 也要同步。 |
-| CLI & Toolchain | `px-plugin`（Go 1.24+ 编译的 CLI，且**内置模板需与 skeleton 同步**）、Node.js 18+/npm 9+、Go 1.24+、GNU Make。 |
+| CLI & Toolchain | `px-plugin`、Node.js 18+/npm 9+、Go 1.24+、GNU Make。 |
 | 权限 | 调用 Admin API 的 Token 需要 `platform_ops` / `plugin_admin` 权限，能访问 `/admin/plugins/**`。 |
 | 服务器目录 | PowerX 需要能够读取你提供的 `src_dir`。通常把产物放在 `/srv/powerx/plugins/<id>/dist` 或 `/opt/powerx/uploads/<version>/`。 |
 
-> ⚠️ 模板同步检查（避免 `npm install` 报 `MODULE_NOT_FOUND`）
->
-> `px-plugin init` 生成的 Nuxt 管理端模板包含 `web-admin/package.json` 的 `postinstall: node ./scripts/postinstall-lightningcss.mjs`。
-> 如果你使用的 `px-plugin` 二进制内置模板仍是旧版本（未包含 `web-admin/scripts/postinstall-lightningcss.mjs`），那么在新项目里执行 `npm install` 会直接报错：
->
-> - `Error: Cannot find module './scripts/postinstall-lightningcss.mjs'`
->
-> 这不是你的插件项目写错了，而是**CLI 内嵌模板与 skeleton 发生过一次不同步**导致的回归。解决方式是：确保你使用的 `px-plugin` 已包含该脚本的模板文件后再执行 `px-plugin init`。
->
-> - 从 PowerXPlugin 源码编译：`go build -o ./bin/px-plugin ./tools/cli/cmd/px-plugin`（参考 `tools/cli/README.md`）
-> - 或升级你机器上的 `px-plugin` 到包含该模板修复的版本，然后重新生成项目
+> 本文不负责 `px-plugin` 的构建/安装/初始化步骤。请先完成：
+> - `docs/guides/develop/cli-plugin-tutorial.md`
 
 环境变量示例：
 
@@ -58,31 +82,6 @@ export ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 ---
-
-## （可选）从零创建并启动一个插件项目
-
-如果你还没有插件项目，或需要从头创建一个“可按本文构建 dist 并 local install”的项目，可以按以下最小流程生成并验证模板可用：
-
-```bash
-# 1) 确认 px-plugin 可用（示例：从 PowerXPlugin 源码构建）
-cd /path/to/PowerXPlugin/tools/cli
-go build -o ./bin/px-plugin ./cmd/px-plugin
-./bin/px-plugin --version
-
-# 2) 生成插件项目
-./bin/px-plugin init --force com.example.helloworld
-cd com.example.helloworld
-
-# 3) 启动后端（开发）
-make dev
-
-# 4) 启动 Web Admin（开发）
-cd web-admin
-npm install
-npm run dev
-```
-
-完成以上步骤后，再继续本文的 “方案 A / 方案 B” 构建 `dist/` 并执行安装即可。
 
 ## 方案 A：dist 直装（推荐）
 

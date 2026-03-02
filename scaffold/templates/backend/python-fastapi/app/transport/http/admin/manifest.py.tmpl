@@ -19,7 +19,7 @@ async def manifest():
         "tags": ["base", "template", "starter"],
         "backend": {
             "entry": "backend/bin/plugin",
-            "port": 8078,
+            "port": {{ .BackendPort }},
             "health": "/healthz",
         },
         "frontend": {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
-	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/capabilities"
+	"{{ .BackendModulePath }}/internal/logger"
+	capmetrics "{{ .BackendModulePath }}/internal/observability/capability"
+	"{{ .BackendModulePath }}/internal/shared/app"
 )
 
 // SyncCapabilities validates capability catalog and optionally registers it with host runtime.

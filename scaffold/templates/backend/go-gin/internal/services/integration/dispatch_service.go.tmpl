@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
-	idrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
-	obsintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
+	"{{ .BackendModulePath }}/internal/config"
+	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
+	idrepo "{{ .BackendModulePath }}/internal/entity/repository/integration"
+	obsintegration "{{ .BackendModulePath }}/internal/observability/integration"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 )

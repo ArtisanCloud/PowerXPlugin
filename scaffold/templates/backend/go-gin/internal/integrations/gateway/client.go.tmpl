@@ -14,8 +14,8 @@ import (
 	"time"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	skelLogger "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"{{ .BackendModulePath }}/internal/config"
+	skelLogger "{{ .BackendModulePath }}/internal/logger"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -105,7 +105,7 @@ func NewClient(cfg *config.Config, log *logrus.Entry) *Client {
 	c.logger = c.logger.WithField("component", "skeleton.gateway.client")
 
 	if cfg == nil || cfg.Gateway == nil {
-		c.offlineReason = "未找到 gateway 配置，请执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 或在 .env.local 写入 PX_GATEWAY_*"
+		c.offlineReason = "未找到 gateway 配置，请执行 `px-plugin login --manifest ./plugin.yaml` 或在 .env.local 写入 PX_GATEWAY_*"
 		return c
 	}
 

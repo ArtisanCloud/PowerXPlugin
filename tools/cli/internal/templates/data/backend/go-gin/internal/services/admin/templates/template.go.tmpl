@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	entmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
-	trepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/template"
+	entmodels "{{ .BackendModulePath }}/internal/entity/models"
+	dbm "{{ .BackendModulePath }}/internal/entity/models/template"
+	"{{ .BackendModulePath }}/internal/entity/repository"
+	trepo "{{ .BackendModulePath }}/internal/entity/repository/template"
 	"gorm.io/gorm"
 )
 

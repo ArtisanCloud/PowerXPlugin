@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
+	model "{{ .BackendModulePath }}/internal/entity/models/integration"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"gorm.io/datatypes"
@@ -337,8 +337,6 @@ func resolveGrantMatrixBaseDir() string {
 	candidates := []string{
 		"backend/etc",
 		"etc",
-		"skeleton/backend/etc",
-		"skeleton/etc",
 	}
 	for _, path := range candidates {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {

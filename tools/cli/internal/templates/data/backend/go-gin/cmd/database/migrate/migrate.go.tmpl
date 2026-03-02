@@ -7,18 +7,18 @@ import (
 	"log"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	adminconsoleModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
-	customerModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/customer"
-	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
-	integrationModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
-	marketplaceModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
-	operationsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
-	runtimeOpsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
-	securityModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
-	templateModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
-	toolgrantModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/tool_grant"
+	"{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	adminconsoleModel "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	customerModel "{{ .BackendModulePath }}/internal/entity/models/customer"
+	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
+	integrationModel "{{ .BackendModulePath }}/internal/entity/models/integration"
+	marketplaceModel "{{ .BackendModulePath }}/internal/entity/models/marketplace"
+	operationsModel "{{ .BackendModulePath }}/internal/entity/models/operations"
+	runtimeOpsModel "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
+	securityModel "{{ .BackendModulePath }}/internal/entity/models/security"
+	templateModel "{{ .BackendModulePath }}/internal/entity/models/template"
+	toolgrantModel "{{ .BackendModulePath }}/internal/entity/models/tool_grant"
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 )
@@ -150,6 +150,13 @@ func tryHandleAutoMigrateError(ctx context.Context, db *gorm.DB, table interface
 	if !errors.As(migrateErr, &pgErr) {
 		return false, nil
 	}
+	if pgErr.Code == datatypeMismatchCode {
+		handled, healErr := tryHealAdminConsoleForeignKeyTypeMismatch(ctx, db, migrateErr)
+		if !handled {
+			return false, nil
+		}
+		return true, healErr
+	}
 	if pgErr.Code != duplicateObjectCode {
 		return false, nil
 	}
@@ -171,7 +178,31 @@ func tryHandleAutoMigrateError(ctx context.Context, db *gorm.DB, table interface
 	return true, nil
 }
 
-const duplicateObjectCode = "42710"
+const (
+	duplicateObjectCode  = "42710"
+	datatypeMismatchCode = "42804"
+)
+
+func tryHealAdminConsoleForeignKeyTypeMismatch(ctx context.Context, db *gorm.DB, migrateErr error) (bool, error) {
+	msg := strings.ToLower(migrateErr.Error())
+	if !strings.Contains(msg, "admin_console_audit_events") {
+		return false, nil
+	}
+
+	statements := []string{
+		fmt.Sprintf(`ALTER TABLE %s ALTER COLUMN audit_event_id TYPE text USING audit_event_id::text`, models.S(models.TableAdminConsoleConfigChanges)),
+		fmt.Sprintf(`ALTER TABLE %s ALTER COLUMN audit_event_id TYPE text USING audit_event_id::text`, models.S(models.TableAdminConsoleJobRuns)),
+		fmt.Sprintf(`ALTER TABLE %s ALTER COLUMN retry_of TYPE text USING retry_of::text`, models.S(models.TableAdminConsoleJobRuns)),
+	}
+
+	for _, statement := range statements {
+		if err := db.WithContext(ctx).Exec(statement).Error; err != nil {
+			return true, fmt.Errorf("heal admin_console foreign key type mismatch failed: %w", err)
+		}
+	}
+	log.Printf("[migrate] healed admin_console FK type mismatch, retrying AutoMigrate")
+	return true, nil
+}
 
 func dropConstraintIfExists(ctx context.Context, db *gorm.DB, tableName, constraintName string) error {
 	clean := sanitizeConstraintName(constraintName)

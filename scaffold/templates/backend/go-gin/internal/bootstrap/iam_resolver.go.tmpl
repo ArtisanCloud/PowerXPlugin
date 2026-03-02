@@ -4,9 +4,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
-	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	"{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/logger"
+	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 )
 
 // IAMResolver determines whether the plugin should rely on delegated (PowerX Core)

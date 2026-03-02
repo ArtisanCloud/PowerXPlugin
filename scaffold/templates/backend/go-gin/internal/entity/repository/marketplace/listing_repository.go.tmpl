@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
-	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
+	repository "{{ .BackendModulePath }}/internal/entity/repository"
 	"gorm.io/gorm"
 )
 

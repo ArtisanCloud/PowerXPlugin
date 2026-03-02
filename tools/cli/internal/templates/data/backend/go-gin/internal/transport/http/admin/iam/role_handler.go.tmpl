@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
-	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	"{{ .BackendModulePath }}/internal/contracts"
+	authmw "{{ .BackendModulePath }}/internal/middleware"
+	srviam "{{ .BackendModulePath }}/internal/services/iam"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 

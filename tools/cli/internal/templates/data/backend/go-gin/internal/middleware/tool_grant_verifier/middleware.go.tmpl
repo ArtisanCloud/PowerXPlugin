@@ -3,8 +3,8 @@ package tool_grant_verifier
 import (
 	"net/http"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	toolgrantservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent/tool_grant"
+	"{{ .BackendModulePath }}/internal/middleware"
+	toolgrantservice "{{ .BackendModulePath }}/internal/services/agent/tool_grant"
 	"github.com/gin-gonic/gin"
 )
 

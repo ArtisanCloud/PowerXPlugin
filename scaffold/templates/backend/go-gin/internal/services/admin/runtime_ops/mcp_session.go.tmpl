@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
-	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
-	runtimeRepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/runtime_ops"
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
+	repository "{{ .BackendModulePath }}/internal/entity/repository"
+	runtimeRepo "{{ .BackendModulePath }}/internal/entity/repository/runtime_ops"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

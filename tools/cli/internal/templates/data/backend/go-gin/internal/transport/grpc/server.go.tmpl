@@ -1,9 +1,9 @@
 package grpc
 
 import (
-	integrationtransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/integration"
-	marketplacegrpc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/marketplace"
-	templategrpc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/template"
+	integrationtransport "{{ .BackendModulePath }}/internal/transport/grpc/integration"
+	marketplacegrpc "{{ .BackendModulePath }}/internal/transport/grpc/marketplace"
+	templategrpc "{{ .BackendModulePath }}/internal/transport/grpc/template"
 	"google.golang.org/grpc"
 )
 

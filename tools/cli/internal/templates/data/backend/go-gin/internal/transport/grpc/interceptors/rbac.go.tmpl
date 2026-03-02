@@ -3,7 +3,7 @@ package interceptors
 import (
 	"context"
 
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	authx "{{ .BackendModulePath }}/internal/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

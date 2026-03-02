@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	authobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	authobs "{{ .BackendModulePath }}/internal/observability/auth"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
 

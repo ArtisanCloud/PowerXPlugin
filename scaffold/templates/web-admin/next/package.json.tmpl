@@ -2,9 +2,9 @@
   "name": "{{ .PluginSlug }}-web-admin",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3231",
+    "dev": "next dev -p {{ .FrontendPort }}",
     "build": "next build",
-    "start": "next start -p 3231",
+    "start": "next start -p {{ .FrontendPort }}",
     "lint": "next lint"
   },
   "dependencies": {

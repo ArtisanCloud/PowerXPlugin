@@ -13,7 +13,7 @@
 #   NUXT_PUBLIC_POWERX_PROXY    - 与上类似，供 runtimeConfig 判断 API Base
 
 server:
-  bind_addr: ":8078"
+  bind_addr: ":{{ .BackendPort }}"
   api_prefix: "/api/v1"
 
 # gRPC 上游（可选，默认关闭）

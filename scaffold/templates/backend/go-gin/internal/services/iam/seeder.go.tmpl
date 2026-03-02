@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	"{{ .BackendModulePath }}/internal/config"
+	basemodels "{{ .BackendModulePath }}/internal/entity/models"
+	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"

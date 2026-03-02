@@ -63,6 +63,30 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 > - 宿主模式要求 `POWERX_PROXY=1`，且必须配置 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`；租户统一从 token `tid` 推导，否则会返回 503。
 > - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`IAM_MODE=local`），会覆盖 `.env` 的值，请先清理。
 
+### 鉴权规范（重点：API Key 在什么模式下使用）
+
+为避免各插件实现不一致，统一按下列规则使用 Gateway 鉴权：
+
+| 运行形态 | 是否使用 `PX_GATEWAY_AUTH_SCHEME` | 推荐凭证 | 说明 |
+| --- | --- | --- | --- |
+| 宿主 Delegated（平台注入凭证） | 否（通常忽略） | `PX_PLUGIN_TOOL_TOKEN`（Bearer） | 这是默认与推荐路径；平台负责凭证注入与轮换，插件不应自行切到 API Key。 |
+| Standalone（本地/独立运行） | 是 | `PX_TOOL_TOKEN`（Bearer）优先，必要时 `PX_GATEWAY_API_KEY` | 仅在自管凭证时才需要显式设置 `PX_GATEWAY_AUTH_SCHEME`。 |
+| Standalone + Proxy（`POWERX_PROXY=1` 但非平台托管） | 是 | `PX_TOOL_TOKEN`（Bearer）优先，必要时 `PX_GATEWAY_API_KEY` | 这是你当前提到的场景：可选 `bearer/apikey`，由插件侧环境变量决定。 |
+
+实现判定规则（与当前代码一致）：
+
+1. 若 `PX_GATEWAY_AUTH_SCHEME=apikey`，则发送 `Authorization: ApiKey <key>`；
+2. 若 `PX_GATEWAY_AUTH_SCHEME=bearer`，则发送 `Authorization: Bearer <token>`；
+3. 若未显式设置 `PX_GATEWAY_AUTH_SCHEME`：
+   - 有 `PX_GATEWAY_API_KEY` 且无 token -> 自动按 `apikey`；
+   - 其他情况 -> 默认 `bearer`。
+
+建议：
+
+- 多数插件保持 `bearer`（与宿主一致），减少环境差异；
+- 只有在明确要求 API Key 的网关环境下，才启用 `PX_GATEWAY_AUTH_SCHEME=apikey` 并配置 `PX_GATEWAY_API_KEY`；
+- 不要同时混用多套来源，优先保证一套凭证可追踪（推荐优先 `PX_PLUGIN_TOOL_TOKEN`/`PX_TOOL_TOKEN`）。
+
 ## 2. 前提条件
 
 | 项目 | 说明 |

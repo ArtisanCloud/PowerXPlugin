@@ -3,10 +3,10 @@ package capability
 import (
 	"net/http"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/capability"
-	reviewsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/capability_review"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/contracts"
+	"{{ .BackendModulePath }}/internal/services/capability"
+	reviewsvc "{{ .BackendModulePath }}/internal/services/capability_review"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
 

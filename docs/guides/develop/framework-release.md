@@ -35,16 +35,28 @@
 
 ## 2. 发布 Go 模块
 
-1. 选择版本（示例）：`v0.0.3-alpha`
+1. 选择版本并设置变量（示例）：
+   ```bash
+   export FRAMEWORK_GO_VERSION=v0.0.1-alpha
+   export FRAMEWORK_GO_TAG=framework/backend/go/${FRAMEWORK_GO_VERSION}
+   ```
 2. 打 tag 并推送（在**仓库根目录**执行）：
    ```bash
    cd /private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin
-   git tag framework/backend/go/v0.0.3-alpha
-   git push origin framework/backend/go/v0.0.3-alpha
+   git tag "${FRAMEWORK_GO_TAG}"
+   git push origin "${FRAMEWORK_GO_TAG}"
    ```
 3. 验证 Go proxy 可见（在**任意目录**执行）：
    ```bash
-   go list -m github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.3-alpha
+   go list -m github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@${FRAMEWORK_GO_VERSION}
+   ```
+4. 一键对齐仓库引用（推荐）：
+   ```bash
+   # 仅修改文件（不打 tag）
+   bash scripts/release/bump-framework-go-version.sh "${FRAMEWORK_GO_VERSION}"
+
+   # 修改文件 + 打 tag + 推送
+   bash scripts/release/bump-framework-go-version.sh "${FRAMEWORK_GO_VERSION}" --tag --push
    ```
 
 ## 3. 发布 npm 包

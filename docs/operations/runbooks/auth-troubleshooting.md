@@ -28,7 +28,7 @@
    PLAYWRIGHT_LOCAL_IAM=1 \
    PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \
    PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \
-   npm --prefix skeleton/web-admin run test:e2e -- auth-local
+   npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local
    ```
 7. 多 Tab 同步：任一浏览器 Tab 清除 token（storage event）后，其他 Tab 会自动跳转登入页，可在控制台执行 `localStorage.removeItem('access_token')` 验证。
 

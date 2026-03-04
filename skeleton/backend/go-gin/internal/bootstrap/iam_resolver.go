@@ -1,0 +1,105 @@
+package bootstrap
+
+import (
+	"os"
+	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+)
+
+// IAMResolver determines whether the plugin should rely on delegated (PowerX Core)
+// or local IAM. Priority: config.context.iam_mode > POWERX_RBAC_DELEGATE > POWERX_PROXY.
+type IAMResolver struct {
+	mode   iamservice.IAMMode
+	source string
+}
+
+func NewIAMResolver(cfg *config.Config) *IAMResolver {
+	mode := iamservice.IAMModeLocal
+	source := "auto"
+
+	if cfg != nil && cfg.Context != nil {
+		if parsed, ok := parseIAMMode(cfg.Context.IAMMode); ok {
+			if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
+				logger.WithFields(logger.Fields{
+					"iam_mode":             cfg.Context.IAMMode,
+					"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
+					"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
+				}).Info("IAM mode resolved from config")
+			}
+			return &IAMResolver{mode: parsed, source: "config"}
+		}
+	}
+
+	if truthy(os.Getenv("POWERX_RBAC_DELEGATE")) {
+		if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
+			logger.WithFields(logger.Fields{
+				"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
+				"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
+			}).Info("IAM mode resolved from POWERX_RBAC_DELEGATE")
+		}
+		return &IAMResolver{mode: iamservice.IAMModeDelegated, source: "env:POWERX_RBAC_DELEGATE"}
+	}
+
+	if os.Getenv("POWERX_PROXY") == "1" {
+		mode = iamservice.IAMModeDelegated
+		source = "env:POWERX_PROXY"
+	}
+
+	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
+		logger.WithFields(logger.Fields{
+			"iam_mode":             mode,
+			"source":               source,
+			"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
+			"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
+			"IAMMode":              os.Getenv("IAMMode"),
+			"IAM_MODE":             os.Getenv("IAM_MODE"),
+		}).Info("IAM mode resolved")
+	}
+	return &IAMResolver{mode: mode, source: source}
+}
+
+func (r *IAMResolver) Mode() iamservice.IAMMode {
+	if r == nil {
+		return iamservice.IAMModeLocal
+	}
+	return r.mode
+}
+
+func (r *IAMResolver) Source() string {
+	if r == nil {
+		return "auto"
+	}
+	return r.source
+}
+
+func (r *IAMResolver) IsLocal() bool {
+	return r != nil && r.mode == iamservice.IAMModeLocal
+}
+
+func (r *IAMResolver) IsDelegated() bool {
+	return r != nil && r.mode == iamservice.IAMModeDelegated
+}
+
+func parseIAMMode(val string) (iamservice.IAMMode, bool) {
+	v := strings.ToLower(strings.TrimSpace(val))
+	switch v {
+	case "delegated":
+		return iamservice.IAMModeDelegated, true
+	case "local":
+		return iamservice.IAMModeLocal, true
+	default:
+		return iamservice.IAMMode(""), false
+	}
+}
+
+func truthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}

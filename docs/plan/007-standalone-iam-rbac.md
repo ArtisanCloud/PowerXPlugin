@@ -20,7 +20,7 @@
 
 1. 给出 Standalone 模式的组织实体、层级、权限域定义，确保任何插件项目都能即插即用。
 2. 在 Skeleton/Web Admin/CLI 中固化 Local IAM 的创建、登录、RBAC 管控与审计流程。
-3. 对齐 `docs/guides/develop/standalone-mode.md` 的运行指引，补充 IAM/RBAC 运维、观测与测试矩阵。
+3. 对齐 `docs/guides/develop/standalone/README.md` 的运行指引，补充 IAM/RBAC 运维、观测与测试矩阵。
 4. 兼容 Delegated 模式：本地角色/权限需映射到 Manifest `rbac.schema.json`，便于宿主读取。
 
 ## 3. 范围与非目标
@@ -104,7 +104,7 @@
 
 1. **安装/初始化**
    - 运行 `go run ./cmd/database/main.go setup`：迁移 `iam_*` + 插件业务表、写入默认租户/角色/权限。
-   - 管理员凭 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD` 登录 `skeleton/web-admin`。
+   - 管理员凭 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD` 登录 `skeleton/web-admin/nuxt`。
 2. **租户管理**
    - API：`POST /api/v1/admin/iam/tenants`（仅 `system.admin`）创建租户；`PATCH /.../{id}` 更改状态。
    - UI：Web Admin `Settings → Organization` 提供租户信息查看、删除确认。
@@ -136,7 +136,7 @@
 | F5 | 权限配置 UI | 基于 `docs/contracts/rbac.schema.json` 自动渲染权限树，支持搜索/批量勾选 | P1 |
 | F6 | 审计日志 | `internal/services/audit/logger.go` + `app/pages/admin/audit/logs.vue` | P1 |
 | F7 | CLI 支持 | `px-plugin iam export` 输出本地租户/角色/权限用于备份，`px-plugin iam seed` 重置管理员 | P2 |
-| F8 | 文档与 Runbook | `docs/guides/develop/standalone-mode.md`、`docs/operations/runbooks/iam-rbac.md`、`specs/005-plugin-auth/quickstart.md` 更新 Standalone IAM 步骤 | P0 |
+| F8 | 文档与 Runbook | `docs/guides/develop/standalone/README.md`、`docs/operations/runbooks/iam-rbac.md`、`specs/005-plugin-auth/quickstart.md` 更新 Standalone IAM 步骤 | P0 |
 
 ## 9. 系统设计概览
 
@@ -201,7 +201,7 @@
 | 阶段 | 里程碑 | 验收方式 |
 |------|--------|----------|
 | Phase A：模型与 API (1 sprint) | 完成 F1/F2/F3，Go 单测覆盖率 ≥80% | `go test ./...`、`Postman collection` 自测、`PLAYWRIGHT_LOCAL_IAM=1` 登录。 |
-| Phase B：前端体验 (1 sprint) | 完成 F4/F5，E2E 覆盖成员 CRUD + 角色分配 | `npm --prefix skeleton/web-admin run test:e2e -- iam-local`（新增用例）。 |
+| Phase B：前端体验 (1 sprint) | 完成 F4/F5，E2E 覆盖成员 CRUD + 角色分配 | `npm --prefix skeleton/web-admin/nuxt run test:e2e -- iam-local`（新增用例）。 |
 | Phase C：审计与 CLI (0.5 sprint) | 完成 F6/F7 + 文档 | Review `docs/plan/007`、`docs/guides` 更新；执行 `px-plugin iam export`. |
 
 ## 13. 风险与缓解

@@ -4,10 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"{{ .BackendModulePath }}/internal/contracts"
 	authmw "{{ .BackendModulePath }}/internal/middleware"
 	srviam "{{ .BackendModulePath }}/internal/services/iam"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -33,9 +35,21 @@ func (h *RoleHandler) Get(c *gin.Context) {
 }
 
 func (h *RoleHandler) List(c *gin.Context) {
-	var query RoleListQuery
+	type roleListQueryInput struct {
+		TenantUUID string `form:"tenant_uuid"`
+		Query      string `form:"q"`
+		ScopeType  string `form:"scope_type"`
+	}
+	var query roleListQueryInput
 	if err := c.ShouldBindQuery(&query); err != nil {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		query.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	roles, err := h.service.List(c.Request.Context(), srviam.RoleFilter{
@@ -53,6 +67,13 @@ func (h *RoleHandler) Create(c *gin.Context) {
 	var req CreateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	actorID := currentActorID(c)
@@ -127,6 +148,13 @@ func (h *RolePermissionsHandler) Replace(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
 	role, err := h.service.ReplacePermissions(c.Request.Context(), srviam.ReplaceRolePermissionsInput{
 		RoleID:        id,
 		TenantUUID:    req.TenantUUID,
@@ -164,6 +192,13 @@ func (h *RoleMembersHandler) mutateMembers(c *gin.Context, add bool) {
 	var req RoleMembersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	input := srviam.RoleMembersInput{

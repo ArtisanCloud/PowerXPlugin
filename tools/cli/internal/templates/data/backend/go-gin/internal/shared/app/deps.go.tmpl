@@ -18,7 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 type DelegatedAuthProxy interface {
@@ -44,6 +45,7 @@ type Deps struct {
 	OperationsMetrics   *opsmetrics.Metrics
 	AdminConsoleMetrics *adminmetrics.Metrics
 	EventEmitter        fweventbridge.Emitter
+	WSBusHub            fwwsbus.LocalHub
 	IAMMode             iamservice.IAMMode
 	IAMModeSource       string
 	AuthProxy           DelegatedAuthProxy

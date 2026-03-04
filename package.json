@@ -6,8 +6,8 @@
     "framework/frontend/nuxt/framework-client"
   ],
   "scripts": {
-    "lint": "npm --workspaces --if-present run lint && npm --prefix skeleton/web-admin run lint",
-    "build": "npm --workspaces --if-present run build && npm --prefix skeleton/web-admin run build",
+    "lint": "npm --workspaces --if-present run lint && npm --prefix skeleton/web-admin/nuxt run lint",
+    "build": "npm --workspaces --if-present run build && npm --prefix skeleton/web-admin/nuxt run build",
     "sync:templates": "node scripts/sync-templates.mjs",
     "test": "node scripts/capabilities/run-from-package.mjs"
   },

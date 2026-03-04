@@ -120,7 +120,7 @@ Gin Request → TenantContext Middleware
 * `TenantContext` 从 JWT/HMAC 上下文中提取 `tenant_uuid`；
 * 每个请求开启事务，执行 `SET LOCAL app.tenant_uuid=?`；
 * RLS 保证即使查询未带 where 也不会跨租户；
-* Dev 模式（`POWERX_DEV_MODE=1`）下允许旁路调试。
+* 建议使用 `POWERX_DEBUG_MODE=1` 表示开发环境语义；`POWERX_DEV_MODE=1` 仅兼容保留。鉴权默认保持严格模式。
 
 ---
 
@@ -178,7 +178,7 @@ func New(app *App) *gin.Engine {
 ### 本地运行（开发模式）
 
 ```bash
-POWERX_DEV_MODE=1 POWERX_BIND_ADDR=":8078" go -C backend run ./cmd/plugin
+POWERX_DEBUG_MODE=1 POWERX_BIND_ADDR=":8078" go -C backend run ./cmd/plugin
 curl :8078/healthz
 ```
 
@@ -206,7 +206,7 @@ curl :8078/healthz
 优先使用环境变量覆盖 YAML，例如：
 
 ```
-POWERX_DB_DSN, POWERX_LOG_LEVEL, POWERX_DEV_MODE
+POWERX_DB_DSN, POWERX_LOG_LEVEL, POWERX_DEBUG_MODE
 ```
 
 ---

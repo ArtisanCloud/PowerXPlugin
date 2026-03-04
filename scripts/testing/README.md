@@ -6,7 +6,7 @@ This directory hosts automation used by the PowerXPlugin testing strategy.
 
 - `smoke.sh`: orchestrates minimal Go/unit/contract/CLI checks and produces coverage artifacts.
 - `regression.sh`: runs the full regression workflow (includes smoke, full Go suite, Playwright E2E).
-  - 该脚本会先运行 `smoke.sh`，随后执行全量 `go test ./framework/... ./skeleton/backend/...`，并对 Nuxt 前端执行 `npm run lint`、`npm run build` 以及 Playwright E2E。
+  - 该脚本会先运行 `smoke.sh`，随后执行全量 `go test ./framework/... ./skeleton/backend/go-gin/...`，并对 Nuxt 前端执行 `npm run lint`、`npm run build` 以及 Playwright E2E。
 - `validate-contracts.sh`: shared validator for manifest/RBAC/OpenAPI consistency。
 - `audit-test-adoption.sh`: reserved for Phase 6，用于统计测试采纳率（即将实现）。
 
@@ -15,8 +15,8 @@ See `specs/002-testing-strategy/plan.md` 与 `docs/test/testing_usage.md` 获取
 ## Hooking New Tests
 
 - **Go/CLI**：新增 `*_test.go` 文件后，确保 `smoke.sh` / `regression.sh` 涵盖对应包；必要时在脚本中追加命令。
-- **Playwright**：将新 spec 放入 `skeleton/web-admin/tests/e2e/`，脚本会自动检测；如需额外环境变量，在运行 `make test-regression` 前导出即可。
-- **Artifacts**：所有脚本产物统一存储在 `tmp/` 与 `skeleton/web-admin/test-results/`，并由 CI 上传。
+- **Playwright**：将新 spec 放入 `skeleton/web-admin/nuxt/tests/e2e/`，脚本会自动检测；如需额外环境变量，在运行 `make test-regression` 前导出即可。
+- **Artifacts**：所有脚本产物统一存储在 `tmp/` 与 `skeleton/web-admin/nuxt/test-results/`，并由 CI 上传。
 
 ## Environment Variables
 

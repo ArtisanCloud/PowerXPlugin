@@ -360,6 +360,7 @@ type capabilityInvokeRequest struct {
 
 func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider func() *gateway.ContractStatus) bootstrap.Handler {
 	return func(ctx bootstrap.Context) {
+		ensureCapabilityProxyCORS(ctx)
 		if service == nil {
 			ctx.JSON(http.StatusServiceUnavailable, map[string]string{"error": "capability service unavailable"})
 			return
@@ -387,12 +388,12 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 		if module := proxyMockModule(headers); module != "" {
 			warnings = append(warnings, "通过 X-PX-Use-Mock 请求 Mock 模块: "+module)
 		}
-		tenantUUID := strings.TrimSpace(ctx.Header("X-Tenant-UUID"))
+		tenantUUID := strings.TrimSpace(ctx.Header("tenant_uuid"))
 		if tenantUUID != "" {
 			if headers == nil {
 				headers = make(map[string]string, 1)
 			}
-			headers["X-Tenant-UUID"] = tenantUUID
+			headers["tenant_uuid"] = tenantUUID
 		}
 		result, err := service.Invoke(ctx.Context(), capabilityinvoker.InvokeParams{
 			CapabilityID: req.CapabilityID,
@@ -425,6 +426,7 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 }
 
 func writeCapabilityError(ctx bootstrap.Context, err error, warnings []string) {
+	ensureCapabilityProxyCORS(ctx)
 	invokeErr := &capabilityinvoker.InvokeError{}
 	if !errors.As(err, &invokeErr) {
 		ctx.JSON(http.StatusBadGateway, map[string]any{
@@ -461,6 +463,25 @@ func writeCapabilityError(ctx bootstrap.Context, err error, warnings []string) {
 		payload["warnings"] = warnings
 	}
 	ctx.JSON(status, payload)
+}
+
+func ensureCapabilityProxyCORS(ctx bootstrap.Context) {
+	if ctx == nil {
+		return
+	}
+	origin := strings.TrimSpace(ctx.Header("Origin"))
+	allowOrigin := origin
+	allowCredentials := "true"
+	if allowOrigin == "" {
+		allowOrigin = "*"
+		allowCredentials = "false"
+	}
+	ctx.SetHeader("Access-Control-Allow-Origin", allowOrigin)
+	ctx.SetHeader("Vary", "Origin")
+	ctx.SetHeader("Access-Control-Allow-Credentials", allowCredentials)
+	ctx.SetHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
+	ctx.SetHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+	ctx.SetHeader("Access-Control-Expose-Headers", "X-Trace-Id, X-Correlation-Id, X-Request-Id")
 }
 
 func collectCapabilityProxyHeaders(ctx bootstrap.Context) map[string]string {

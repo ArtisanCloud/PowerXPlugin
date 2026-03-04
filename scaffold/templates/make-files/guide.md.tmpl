@@ -57,6 +57,7 @@ make help
    ```
 3. 调用 PowerX 的安装接口时，`src_dir` 指向 `$(pwd)/dist/$(VERSION)` 即可，目录内至少包含：
    - `plugin.yaml`
+   - `config/event_fabric.yaml`（事件 topic 执行层映射）
    - `backend/bin/plugin`
    - （可选）`web-admin/.output` 前端静态资源
 
@@ -96,4 +97,4 @@ make package-release
 - 如果不打算包含前端产物，可以跳过 `make frontend-build`；此时 `make dist` 会提示 `.output` 不存在。
 - 发布前建议执行 `make check`（lint + test）确保质量，并在必要时运行 `make test-coverage`。
 
-如需进一步自动化（例如 CI/CD），可参考以上变量，结合环境注入版本号或发布路径。EOF
+如需进一步自动化（例如 CI/CD），可参考以上变量，结合环境注入版本号或发布路径。

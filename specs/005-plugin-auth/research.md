@@ -22,7 +22,7 @@
   - *仅依赖 POWERX_PROXY* ➜ 无法在宿主环境下临时启用本地模式；被拒。
 
 ## 4. Local IAM 数据存储
-- **Decision**: 在 `skeleton/backend/internal/entity/models/iam` 下新增 `Tenant`, `User`, `Role`, `Department`, `RolePermission` 等模型，沿用 Gorm + plugin schema；AutoMigrate 仅在 Resolver=local 时运行。
+- **Decision**: 在 `skeleton/backend/go-gin/internal/entity/models/iam` 下新增 `Tenant`, `User`, `Role`, `Department`, `RolePermission` 等模型，沿用 Gorm + plugin schema；AutoMigrate 仅在 Resolver=local 时运行。
 - **Rationale**: 与现有骨架风格一致，可通过 SQLite/PG 切换；保持与 Delegated 结构兼容。
 - **Alternatives considered**: 
   - *使用内存/JSON 存储* ➜ 无法支持 CI、示例测试；被拒。

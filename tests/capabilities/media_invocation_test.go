@@ -22,7 +22,7 @@ func TestCapabilityProxySuccess(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer test-token" {
 			t.Fatalf("unexpected authorization header: %s", got)
 		}
-		if got := r.Header.Get("X-Tenant-UUID"); got != "tenant-123" {
+		if got := r.Header.Get("tenant_uuid"); got != "tenant-123" {
 			t.Fatalf("unexpected tenant header: %s", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -53,7 +53,7 @@ func TestCapabilityProxySuccess(t *testing.T) {
 		"payload":      map[string]any{"folder": "inbox"},
 	})
 	ctx := newMockContext(body)
-	ctx.reqHeaders["X-Tenant-UUID"] = "tenant-123"
+	ctx.reqHeaders["tenant_uuid"] = "tenant-123"
 	ctx.reqHeaders["X-Request-ID"] = "req-success-1"
 
 	handler(ctx)
@@ -111,7 +111,7 @@ func TestCapabilityProxyRateLimited(t *testing.T) {
 		"payload":      map[string]any{"assetName": "demo.pdf"},
 	})
 	ctx := newMockContext(body)
-	ctx.reqHeaders["X-Tenant-UUID"] = "tenant-123"
+	ctx.reqHeaders["tenant_uuid"] = "tenant-123"
 
 	handler(ctx)
 
@@ -188,13 +188,13 @@ func joinRoute(base, rel string) string {
 }
 
 type mockContext struct {
-	body         []byte
-	status       int
-	payload      any
-	reqHeaders   map[string]string
-	respHeaders  map[string]string
-	method       string
-	currentCtx   context.Context
+	body        []byte
+	status      int
+	payload     any
+	reqHeaders  map[string]string
+	respHeaders map[string]string
+	method      string
+	currentCtx  context.Context
 }
 
 func newMockContext(body []byte) *mockContext {

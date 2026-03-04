@@ -22,7 +22,7 @@ echo "=== Regression workflow start ==="
 ./scripts/testing/smoke.sh
 
 echo "[R-1] Running full Go test suite"
-go test ./framework/... ./skeleton/backend/... -coverprofile=tmp/coverage-regression.out
+go test ./framework/backend/go/... ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage-regression.out
 go tool cover -html=tmp/coverage-regression.out -o tmp/coverage.html
 
 BACKEND_HOST="${REGRESSION_BACKEND_HOST:-127.0.0.1}"
@@ -99,13 +99,13 @@ wait_for() {
   local status=""
   for ((attempt=0; attempt<retries; attempt++)); do
     status="$(curl --noproxy '*' -s -o /dev/null -w "%{http_code}" "$url" || echo "000")"
-    if [[ "$status" =~ ^(200|204|301|302|404)$ ]]; then
+    if [[ "$status" =~ ^([23][0-9][0-9]|404)$ ]]; then
       echo "${name} ready (HTTP $status): $url"
       return 0
     fi
     sleep "$wait"
   done
-  echo "Error: ${name} not ready after $((retries*wait)) seconds (see logs)" >&2
+  echo "Error: ${name} not ready after $((retries*wait)) seconds (last HTTP ${status}, see logs)" >&2
   return 1
 }
 
@@ -114,7 +114,7 @@ if [ -n "${REGRESSION_BACKEND_PORT:-}" ]; then
   backend_port_forced=1
 else
   # Avoid common dev ports by default; use stable fallback ports first.
-  BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "18078,18079,18080" "8078,8086,3031,3000")"
+  BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "18078,18079,18080" "8078,8086,3131,3231,3000")"
 fi
 BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
 API_BASE_URL="${BACKEND_BASE_URL}"
@@ -147,7 +147,7 @@ PY
   )"
 else
   FRONTEND_HOST="${REGRESSION_FRONTEND_HOST:-127.0.0.1}"
-  FRONTEND_PORT="$(pick_free_port "$FRONTEND_HOST" "13031,13032,13033" "3031,3000,8078,8086")"
+  FRONTEND_PORT="$(pick_free_port "$FRONTEND_HOST" "13031,13032,13033" "3131,3231,3000,8078,8086")"
 fi
 echo "[info] Frontend port: $FRONTEND_PORT"
 mkdir -p "${ROOT_DIR}/tmp"
@@ -200,7 +200,7 @@ gateway:
 YAML
 
     CONFIG_PATH="$backend_cfg" POWERX_BIND_ADDR=":${BACKEND_PORT}" PORT="${BACKEND_PORT}" \
-      go run ./skeleton/backend/cmd/plugin >"$BACKEND_LOG" 2>&1 &
+      go run ./skeleton/backend/go-gin/cmd/plugin >"$BACKEND_LOG" 2>&1 &
     backend_pid=$!
     sleep 1
     if kill -0 "$backend_pid" 2>/dev/null; then
@@ -220,7 +220,7 @@ YAML
       wait "$backend_pid" 2>/dev/null || true
     fi
 
-    BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "" "8078,8086,3031,3000,${BACKEND_PORT}")"
+    BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "" "8078,8086,3131,3231,3000,${BACKEND_PORT}")"
     BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
     API_BASE_URL="${BACKEND_BASE_URL}"
     echo "[warn] Backend port occupied; retrying with ${BACKEND_PORT} (attempt ${attempt}/${attempts})"
@@ -232,7 +232,7 @@ YAML
 start_backend
 
 echo "[R-3] Preparing frontend dependencies"
-pushd skeleton/web-admin > /dev/null
+pushd skeleton/web-admin/nuxt > /dev/null
 # act 会把宿主工作区整个拷贝进容器，可能包含不同平台的 node_modules（例如 macOS）。
 # 为避免原生依赖（如 lightningcss）在 Linux 容器内加载失败，强制清理并用 lockfile 做干净安装。
 rm -rf node_modules .nuxt .output
@@ -306,7 +306,8 @@ start_frontend() {
     NUXT_PUBLIC_API_BASE="$API_BASE_URL" NUXT_PUBLIC_API_PREFIX="$API_PREFIX" \
       NITRO_HOST="$FRONTEND_HOST" HOST="$FRONTEND_HOST" \
       NITRO_PORT="$FRONTEND_PORT" PORT="$FRONTEND_PORT" \
-      node ./node_modules/nuxi/bin/nuxi.mjs preview --hostname "$FRONTEND_HOST" --port "$FRONTEND_PORT" >"$FRONTEND_LOG" 2>&1 &
+      NUXT_TELEMETRY_DISABLED=1 \
+      node .output/server/index.mjs >"$FRONTEND_LOG" 2>&1 &
     frontend_pid=$!
 
     sleep 1
@@ -315,7 +316,7 @@ start_frontend() {
         echo "Frontend failed to start on port ${FRONTEND_PORT}; see ${FRONTEND_LOG}" >&2
         return 1
       fi
-      FRONTEND_PORT="$(pick_free_port "$FRONTEND_HOST" "" "3031,3000,8078,8086,${FRONTEND_PORT}")"
+      FRONTEND_PORT="$(pick_free_port "$FRONTEND_HOST" "" "3131,3231,3000,8078,8086,${FRONTEND_PORT}")"
       echo "[warn] Frontend port occupied; retrying with ${FRONTEND_PORT} (attempt ${attempt}/${attempts})"
       continue
     fi
@@ -326,12 +327,13 @@ start_frontend() {
 
     if [ "$frontend_port_forced" -eq 1 ] || [ -n "${PLAYWRIGHT_BASE_URL:-}" ]; then
       echo "Frontend failed to become ready on port ${FRONTEND_PORT}; see ${FRONTEND_LOG}" >&2
+      tail -n 80 "$FRONTEND_LOG" >&2 || true
       return 1
     fi
 
     kill "$frontend_pid" >/dev/null 2>&1 || true
     wait "$frontend_pid" 2>/dev/null || true
-    FRONTEND_PORT="$(pick_free_port "$FRONTEND_HOST" "" "3031,3000,8078,8086,${FRONTEND_PORT}")"
+    FRONTEND_PORT="$(pick_free_port "$FRONTEND_HOST" "" "3131,3231,3000,8078,8086,${FRONTEND_PORT}")"
     echo "[warn] Frontend not ready; retrying with ${FRONTEND_PORT} (attempt ${attempt}/${attempts})"
   done
   echo "Frontend failed to start after retries; see ${FRONTEND_LOG}" >&2
@@ -371,13 +373,13 @@ wait_for "$PLAYWRIGHT_BASE_URL" "Frontend"
 
 echo "[R-4] Running Playwright tests against $PLAYWRIGHT_BASE_URL"
 (
-  cd skeleton/web-admin
+  cd skeleton/web-admin/nuxt
   PLAYWRIGHT_BASE_URL="$PLAYWRIGHT_BASE_URL" \
     NUXT_PUBLIC_API_BASE="$API_BASE_URL" NUXT_PUBLIC_API_PREFIX="$API_PREFIX" \
     node ./node_modules/@playwright/test/cli.js test "$@"
 )
 
-echo "Playwright report directory: skeleton/web-admin/test-results/"
+echo "Playwright report directory: skeleton/web-admin/nuxt/test-results/"
 echo "Logs stored at ${BACKEND_LOG} and ${FRONTEND_LOG}"
 
 end_ts=$(date +%s)

@@ -15,13 +15,18 @@ Thumbs.db
 reports/
 
 # Generic artefacts
-dist/
+dist/*
+!dist/agent-sdk/
+dist/agent-sdk/*
+!dist/agent-sdk/manifest.json
 coverage/
 coverage.out
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 .cache
+.gocache
+.gomodcache
 tmp
 
 # Web admin (Nuxt)

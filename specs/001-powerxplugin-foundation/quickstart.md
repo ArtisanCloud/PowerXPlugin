@@ -31,10 +31,10 @@ npm install
 
 ```bash
 # 后端（Standalone 模式）
-go run ./skeleton/backend/cmd/plugin
+go run ./skeleton/backend/go-gin/cmd/plugin
 
 # 另开终端启动管理端
-cd skeleton/web-admin
+cd skeleton/web-admin/nuxt
 npm run dev
 ```
 

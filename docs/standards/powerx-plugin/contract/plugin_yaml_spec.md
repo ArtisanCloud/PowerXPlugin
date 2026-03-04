@@ -153,8 +153,9 @@ tools:
     rbac_resource: base:template
 
 events:
-  produces:
-    - topic: marketplace.license.renewal.due
+  topics:
+    - key: _topic.marketplace.license.renewal.due
+      actions: [publish]
       description: "License 续费任务触发事件"
 
 migrations:
@@ -294,13 +295,35 @@ permissions:
 
 ```yaml
 events:
-  produces:
-    - topic: marketplace.license.renewal.due
+  topics:
+    - key: _topic.marketplace.license.renewal.due
+      actions: [publish]
       description: "License 续费任务触发事件"
 ```
 
-- `produces`：插件将投递的事件主题，用于订阅/审计。
-- 预留 `consumes` 字段，可在未来版本声明依赖的事件源。
+- `topics[].key`：Topic 标识（建议 `_topic.*` 命名）。
+- `topics[].actions`：声明行为（`publish` / `subscribe`）。
+- `topics[].description`：用于审核、文档和可观测上下文。
+- 过渡期执行层映射文件为 `config/event_fabric.yaml`（供底座当前实现扫描）。
+
+#### 事件 Topic 声明规范（强制）
+
+插件必须在 `plugin.yaml` 中声明事件主题，建议使用 `events.topics[]`：
+
+```yaml
+events:
+  topics:
+    - key: orders.created
+      actions: [publish, subscribe]
+      description: 订单创建事件
+```
+
+约束：
+
+1. `key` 表示语义主题（`namespace.name`），不包含 tenant 前缀。
+2. `actions` 仅允许：`publish` / `subscribe` / `replay`。
+3. 插件代码中禁止“未声明 topic 直接调用”。
+4. `plugin.yaml` 是规范声明层；执行层由插件包中的 `config/event_fabric.yaml` 提供给底座播种。
 
 ### 1️⃣1 Agents / Capabilities / Tools / Workflows
 

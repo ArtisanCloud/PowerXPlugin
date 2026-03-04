@@ -1,7 +1,7 @@
 # 004 - 插件侧 Auth 机制对齐计划
 
 ## 背景
-- 当前 `PowerXPlugin` Skeleton/Web Admin 仅提供 `useApiClient` 的 Token 读取占位实现（参见 `skeleton/web-admin/app/composables/api/_base.ts#getAuthToken`），缺少登录页、`useAuth` 状态管理、Refresh/Logout 处理，也没有与宿主 PowerX `web-admin` 的认证契约对齐。
+- 当前 `PowerXPlugin` Skeleton/Web Admin 仅提供 `useApiClient` 的 Token 读取占位实现（参见 `skeleton/web-admin/nuxt/app/composables/api/_base.ts#getAuthToken`），缺少登录页、`useAuth` 状态管理、Refresh/Logout 处理，也没有与宿主 PowerX `web-admin` 的认证契约对齐。
 - 宿主 `PowerX` 已在 `web-admin/app/composables/useAuth.ts`、`web-admin/app/pages/users/login.vue` 以及 `backend/internal/transport/http/admin/auth` 中实现 JWT + Refresh Token 的成体系流程，并在 `docs/use_cases/_from_hub/SCN-IAM-USER-ROLE-001` 中定义了 IAM 场景对安全的一致性要求。
 - 需求：插件需在「独立运行/子系统」与「嵌入 PowerX Admin」两种模式下复用同一套登录、登出、Token 存储与会话续期策略，为后续 Marketplace 分发与工具化打下基础。
 
@@ -12,8 +12,8 @@
 4. 补充文档与测试，覆盖开发、部署、运行阶段的配置指引与验收准则。
 
 ## 范围
-- ✅ `skeleton/web-admin`: composables、middleware、stores、pages、runtime config。
-- ✅ `skeleton/backend`: JWT 中间件配置、auth proxy service、公共 handler、配置文件。
+- ✅ `skeleton/web-admin/nuxt`: composables、middleware、stores、pages、runtime config。
+- ✅ `skeleton/backend/go-gin`: JWT 中间件配置、auth proxy service、公共 handler、配置文件。
 - ✅ `framework` 与 `scaffold/templates`: 同步 Skeleton 变更，便于二次生成。
 - ✅ docs/guides + docs/standards: Auth 集成说明、配置样例、Troubleshooting。
 - ❌ 不改动宿主 PowerX Core 代码，仅引用其契约/接口。
@@ -27,16 +27,16 @@
 - `SCN-IAM-USER-ROLE-001`：IAM 守护场景，对一致性、审计与回收的要求。
 
 ## 交付物
-1. `skeleton/web-admin/app/composables/useAuth.ts` 及配套 `api/services/authService.ts`、`middleware/auth.ts`、`stores/user.ts`。
-2. `skeleton/web-admin/app/pages/users/login.vue`（+ register/forgot-password 轻量版）以及 Layout 入口的登出入口。
-3. `skeleton/backend/internal/services/authproxy`、`internal/transport/http/public/auth_handler.go`、`RegisterRoutes` 中的公共登录代理与受保护登出路由。
+1. `skeleton/web-admin/nuxt/app/composables/useAuth.ts` 及配套 `api/services/authService.ts`、`middleware/auth.ts`、`stores/user.ts`。
+2. `skeleton/web-admin/nuxt/app/pages/users/login.vue`（+ register/forgot-password 轻量版）以及 Layout 入口的登出入口。
+3. `skeleton/backend/go-gin/internal/services/authproxy`、`internal/transport/http/public/auth_handler.go`、`RegisterRoutes` 中的公共登录代理与受保护登出路由。
 4. `docs/guides/develop/auth.md`（新增）与 `docs/standards/powerx-plugin/contract/*.md` 的配置更新。
 5. Playwright 场景（登录成功、过期刷新、登出清理）与 Go `auth_jwt` 中间件单测。
 
 ## 技术方案概述
 
 ### 1. Nuxt 4 前端认证基座
-- **Auth 服务抽象**：在 `skeleton/web-admin/app/composables/api/services/authService.ts` 中复刻宿主 DTO，Base URL 允许同时调用 Plugin API（默认）与宿主 Core API：  
+- **Auth 服务抽象**：在 `skeleton/web-admin/nuxt/app/composables/api/services/authService.ts` 中复刻宿主 DTO，Base URL 允许同时调用 Plugin API（默认）与宿主 Core API：  
 - 通过 `useRuntimeConfig().public.powerxCoreBase`（新增配置）决定 Core Auth API 域名；独立模式缺省为 `.env` 中的 `POWERX_CORE_ENDPOINT`。  
 - Local 模式新增 `LocalDirectory`，依赖 `PLUGIN_IAM_TENANT_*` 与 `PLUGIN_IAM_ADMIN_*` 在迁移/种子阶段初始化默认租户、部门、角色和权限，`/api/v1/auth/*` 会在 `POWERX_PROXY=0` 时走本地实现。
 - Token 生命周期增强：`useAuth` 监听 `storage` 事件并在 Token 丢失时强制跳转登录页，Delegated 模式 503 时前端提示“宿主认证不可用”。
@@ -48,19 +48,19 @@
   - `initAuth`：在 `plugins/auth.client.ts` 内于应用启动时执行，复用宿主逻辑。  
   - `getToken`/`isTokenExpired`：供 `useApiClient` 与拦截器复用。  
   - `logout`：调用 `authService.logout() → clearAuth → navigateTo('/users/login')`。
-- **HTTP 拦截器**：拓展 `skeleton/web-admin/app/composables/api/_client.ts`：  
+- **HTTP 拦截器**：拓展 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`：  
   - 在 `onResponseError` 中捕捉 401 → 自动尝试 `refreshToken`（若 `refresh_token` 存在）→ 成功则重播原请求，失败则 `clearAuth()` 并跳转登录。  
-  - 请求头继续沿用 `Authorization: Bearer <token>` 与 `X-Tenant-UUID`。
+  - 请求头继续沿用 `Authorization: Bearer <token>` 与 `tenant_uuid`。
 - **路由保护**：新增 `middleware/auth.global.ts`：  
   - 对除 `users/login|register|forgot-password` 外的页面强制检测 `useAuth().token`；  
   - 若缺失则重定向登录并附带 `redirect` query。  
   - 兼容 `/_p/<plugin>/bridge-dev` 等调试页面（通过白名单）。
-- **UI**：在 `skeleton/web-admin/app/pages/users/` 下创建 `login.vue`、`forgot-password.vue`、`register.vue` 的压缩版，复用宿主组件/样式但删减企业 branding；  
+- **UI**：在 `skeleton/web-admin/nuxt/app/pages/users/` 下创建 `login.vue`、`forgot-password.vue`、`register.vue` 的压缩版，复用宿主组件/样式但删减企业 branding；  
   - 页面对接 `useAuthService`，交互一致（错误提示、Remember Me、redirect）。  
   - 在导航/用户菜单中提供 `登出` 触发器，调用 `useAuth().logout()`.
 
 ### 2. Go Backend & Token 验证
-- **JWT 中间件配置**：在 `skeleton/backend/internal/router/router.go` 中确保 `POWERX_SECURITY_*` 默认为宿主同款；新增配置校验（启动时报错）。  
+- **JWT 中间件配置**：在 `skeleton/backend/go-gin/internal/router/router.go` 中确保 `POWERX_SECURITY_*` 默认为宿主同款；新增配置校验（启动时报错）。  
 - **Auth Proxy Service**：新增 `internal/services/authproxy`：  
   - 封装调用宿主 `/admin/user/auth/login|refresh|logout|me/context` 的逻辑；  
   - 读取 `POWERX_CORE_ENDPOINT`、`POWERX_AUTH_TOKEN`（宿主注入的服务间鉴权 Token）。  
@@ -119,7 +119,7 @@
 
 ### 5. 文档、观测与回归
 - 新增 `docs/guides/develop/auth.md`，内容包括：配置环境变量、与宿主 Core 通信流程、Token 调试方法。  
-- 更新 `docs/guides/develop/standalone-mode.md`，加入「如何在本地运行 login」章节。  
+- 更新 `docs/guides/develop/standalone/README.md`，加入「如何在本地运行 login」章节。  
 - 在 `docs/operations/runbooks` 下补充 `auth-troubleshooting.md`（常见错误码、排查步骤）。  
 - 指标：前端记录登录成功率、Token 刷新次数；后端暴露 `plugin_auth_login_total`、`plugin_auth_failed_total`。
 

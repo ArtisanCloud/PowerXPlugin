@@ -79,7 +79,7 @@ tmp/
 └── coverage.html                    # Generated coverage artifacts (ignored by VCS)
 
 docs/contracts/                      # Existing schemas, consumed by scripts
-skeleton/web-admin/tests/e2e/        # Playwright suite extended per guidance
+skeleton/web-admin/nuxt/tests/e2e/        # Playwright suite extended per guidance
 ```
 
 **Structure Decision**: Formalise testing assets under `docs/test/` for documentation and `scripts/testing/` plus Makefile targets for automation. Existing framework/skeleton directories remain unchanged; new scripts will orchestrate commands across `framework/`, `skeleton/`, `tools/cli/`, and `docs/contracts/`.

@@ -586,7 +586,7 @@
                       />
                     </UFormField>
                     <UFormField class="lg:col-span-4" :label="$t('capabilities.form.debug.apiBase')">
-                      <UInput v-model="debugForm.apiBase" placeholder="http://127.0.0.1:8078" />
+                      <UInput v-model="debugForm.apiBase" placeholder="http://127.0.0.1:{{ .BackendPort }}" />
                     </UFormField>
                     <div class="lg:col-span-12 space-y-3">
 	                      <label class="text-sm font-medium text-gray-900 dark:text-white">
@@ -1860,7 +1860,7 @@ const debugRequestPreview = computed(() => {
     "Content-Type": "application/json",
   };
   if (debugForm.tenantUuid.trim()) {
-    headers["X-Tenant-UUID"] = debugForm.tenantUuid.trim();
+    headers["tenant_uuid"] = debugForm.tenantUuid.trim();
   }
   if (debugForm.mockModule.trim()) {
     headers["X-PX-Use-Mock"] = debugForm.mockModule.trim();
@@ -3463,7 +3463,7 @@ async function handleDebugInvoke() {
   }
   const headers: Record<string, string> = {};
   if (debugForm.tenantUuid.trim()) {
-    headers["X-Tenant-UUID"] = debugForm.tenantUuid.trim();
+    headers["tenant_uuid"] = debugForm.tenantUuid.trim();
   }
   if (debugForm.mockModule.trim()) {
     headers["X-PX-Use-Mock"] = debugForm.mockModule.trim();

@@ -33,17 +33,17 @@
 |------|----------|----------|
 | `reload failed: tls handshake timeout` | 检查 `px auth configure` 产出的证书是否过期；可在 `docs/guides/publish/go-cli-dev-watch.md#health-checks` 找到证书更新流程 | `docs/guides/publish/go-cli-dev-watch.md` |
 | `session register failed: 401` | `PX_DEV_API_BASE` 指向生产但未配置 `PX_MTLS_*`；在 `~/.px-plugin/config.json` 补上 mTLS | `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` |
-| `fsnotify watcher failed` | macOS 需允许终端“完全磁盘访问”，Windows 建议排除杀毒对 `px-plugin` 的阻断；跨平台脚本可用于验证差异 | `scripts/test/cross-platform-test.sh` |
+| `fsnotify watcher failed` | macOS 需允许终端“完全磁盘访问”，Windows 建议排除杀毒对 `px-plugin` 的阻断；跨平台脚本可用于验证差异 | `scripts/testing/cross-platform-test.sh` |
 | `watch limit exceeded (10000)` | 使用 `--max-watch-files` 或 `PX_MAX_WATCH_FILES` 放宽限制；也可在 `~/.px-plugin/config.json` 的 `watch.maxFiles` 中配置 | `docs/guides/publish/go-cli-dev-watch.md` |
 | `rollback missing bundle` | 表示首次 reload 尚未成功；可运行 `px-plugin dev --watch` 再触发一次构建，使回滚缓存就绪 | `docs/guides/publish/go-cli-dev-watch.md#error-recovery--rollback` |
 
 ## 3. 跨平台自检脚本
 
-`bash scripts/test/cross-platform-test.sh` 将针对 `linux/amd64`、`darwin/amd64`、`darwin/arm64`、`windows/amd64` 执行交叉构建与基本命令检测：
+`bash scripts/testing/cross-platform-test.sh` 将针对 `linux/amd64`、`darwin/amd64`、`darwin/arm64`、`windows/amd64` 执行交叉构建与基本命令检测：
 
 ```bash
 cd tools/cli
-bash ../scripts/test/cross-platform-test.sh
+bash ../scripts/testing/cross-platform-test.sh
 ```
 
 输出会写入 `tmp/cross-platform-test/cross-platform-report.md`，并依据宿主平台自动跳过不可执行的二进制（标记为 `BUILD_ONLY`）。建议在 CI 中分别于 Linux/Windows 运行，以覆盖路径分隔符、证书路径等差异。
@@ -71,4 +71,4 @@ bash ../scripts/test/cross-platform-test.sh
 - `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断`
 - `docs/guides/publish/go-cli-dev-watch.md`
 - `docs/development/t095-cross-platform-summary.md`
-- `scripts/test/cross-platform-test.sh`
+- `scripts/testing/cross-platform-test.sh`

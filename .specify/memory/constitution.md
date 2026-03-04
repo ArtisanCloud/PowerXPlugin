@@ -1,51 +1,40 @@
 ---
-# ① Manifest Path（manifest 解析声明）
-manifest: .specify/memory/manifest.yaml
-
-# ② 别名启用（插件侧）
-use:
-  - "@plugin-crud-http"
-  - "@plugin-crud-grpc"
-  - "@plugin-frontend-admin"   # 前端（web-admin）聚合别名
-
-# ③ 指南文件（用于 /plan 语义扩展）
-include:
-  - dev_crud_http_guides.md
-  - dev_crud_grpc_guides.md
-  - dev_sts_guides.md
-  - dev_frontend_guides.md      # 前端开发约定（Nuxt 4 + Nuxt UI 3.3.x）
-
-# ④ Ruleset Paths（显式暴露以便 Runner 能读取）
-rulesets:
+# ① Skills Paths（显式暴露以便 Runner 能读取）
+skills:
   # 后端顶层
-  - rulesets/crud_http.yaml
-  - rulesets/crud_grpc.yaml
-  - rulesets/sts.yaml
+  - .codex/skills/crud/http/SKILL.md
+  - .codex/skills/crud/grpc/SKILL.md
+  - .codex/skills/sts/SKILL.md
+  - .codex/skills/backend/fastapi/SKILL.md
+  - .codex/skills/backend/gin/SKILL.md
 
   # 前端顶层
-  - rulesets/frontend_admin.yaml
+  - .codex/skills/frontend/nuxt/admin/SKILL.md
 
   # 后端细分
-  - rulesets/crud/api_rest.yaml
-  - rulesets/crud/handler_http.yaml
-  - rulesets/crud/dto.yaml
-  - rulesets/crud/service.yaml
-  - rulesets/crud/repository.yaml
-  - rulesets/crud/model.yaml
-  - rulesets/crud/migration.yaml
-  - rulesets/crud/transport_grpc.yaml
-  - rulesets/crud/proto_gen.yaml
-  - rulesets/crud/di.yaml
-  - rulesets/crud/test.yaml
+  - .codex/skills/crud/api-rest/SKILL.md
+  - .codex/skills/crud/handler-http/SKILL.md
+  - .codex/skills/crud/dto/SKILL.md
+  - .codex/skills/crud/service/SKILL.md
+  - .codex/skills/crud/repository/SKILL.md
+  - .codex/skills/crud/model/SKILL.md
+  - .codex/skills/crud/migration/SKILL.md
+  - .codex/skills/crud/transport-grpc/SKILL.md
+  - .codex/skills/crud/di/SKILL.md
+  - .codex/skills/crud/test/SKILL.md
+  - .codex/skills/crud/sdk-go/SKILL.md
+  - .codex/skills/backend/fastapi/config/SKILL.md
+  - .codex/skills/backend/fastapi/db/SKILL.md
+  - .codex/skills/backend/gin/config/SKILL.md
 
   # 前端细分
-  - rulesets/crud/frontend/nuxt_api_client.yaml
-  - rulesets/crud/frontend/nuxt_pages.yaml
-  - rulesets/crud/frontend/nuxt_components.yaml
-  - rulesets/crud/frontend/nuxt_stores.yaml
-  - rulesets/crud/frontend/nuxt_i18n.yaml
-  - rulesets/crud/frontend/nuxt_layout.yaml
-  - rulesets/crud/frontend/nuxt_tests.yaml
+  - .codex/skills/frontend/nuxt/api-client/SKILL.md
+  - .codex/skills/frontend/nuxt/pages/SKILL.md
+  - .codex/skills/frontend/nuxt/components/SKILL.md
+  - .codex/skills/frontend/nuxt/stores/SKILL.md
+  - .codex/skills/frontend/nuxt/i18n/SKILL.md
+  - .codex/skills/frontend/nuxt/layout/SKILL.md
+  - .codex/skills/frontend/nuxt/tests/SKILL.md
 ---
 
 # PowerXPlugin Constitution (Plugins Only)

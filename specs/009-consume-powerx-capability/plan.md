@@ -26,7 +26,7 @@
 | Target Platform | PowerX 插件 backend（Linux 宿主）+ web-admin（Nuxt SSR/static）+ Skeleton 本地环境 |
 | Project Type | 全栈插件（backend + web-admin + scripts + skeleton） |
 | Performance Goals | Gateway 调用 P95 < 2s；降级检测 < 5s；Trace 覆盖 ≥99%；能力申领失败率 <2% |
-| Constraints | 仅允许通过 Integration Gateway；强制 Tool Token + `X-Tenant-UUID`；Skeleton Mock 必须提示；禁止访问宿主内部 API；契约升级需保留兼容窗口并发布提示 |
+| Constraints | 仅允许通过 Integration Gateway；强制 Tool Token + `tenant_uuid`；Skeleton Mock 必须提示；禁止访问宿主内部 API；契约升级需保留兼容窗口并发布提示 |
 | Scale/Scope | 需覆盖 >50 CoreX 能力 ID、百 TPS 调用，支持多租户/多插件部署 |
 
 ## Constitution Check

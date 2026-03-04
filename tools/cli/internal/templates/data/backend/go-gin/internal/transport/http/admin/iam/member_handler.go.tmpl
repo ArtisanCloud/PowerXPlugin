@@ -3,10 +3,12 @@ package iam
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"{{ .BackendModulePath }}/internal/contracts"
 	authmw "{{ .BackendModulePath }}/internal/middleware"
 	srviam "{{ .BackendModulePath }}/internal/services/iam"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,6 +24,13 @@ func (h *MemberHandler) List(c *gin.Context) {
 	var query MemberListQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		query.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	items, err := h.service.List(c.Request.Context(), srviam.UserFilter{
@@ -44,6 +53,13 @@ func (h *MemberHandler) Create(c *gin.Context) {
 	var req CreateMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	tc, _ := authmw.GetTenantContext(c)
@@ -106,6 +122,13 @@ func (h *MemberHandler) BulkImport(c *gin.Context) {
 	var req BulkImportMembersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	if len(req.Users) == 0 {

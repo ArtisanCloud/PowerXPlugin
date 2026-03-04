@@ -82,7 +82,7 @@ As a feature developer, I want guidance for adding new unit, integration, or E2E
 - **SC-001**: Contributors can complete the documented smoke workflow in ≤5 minutes on a clean environment with zero manual debugging.
 - **SC-002**: Release engineers can execute the full regression workflow and produce the listed artifacts (coverage summary, Playwright report, CLI scaffold output) in ≤60 minutes.
 - **SC-003**: ≥90% of new features merged to main include at least one additional automated test aligned to the described layering guidance.
-- **SC-004**: All testing artifacts (coverage reports, E2E reports) are stored in the documented locations (`tmp/`, `skeleton/web-admin/test-results/`) and referenced in release notes or audit logs as required.
+- **SC-004**: All testing artifacts (coverage reports, E2E reports) are stored in the documented locations (`tmp/`, `skeleton/web-admin/nuxt/test-results/`) and referenced in release notes or audit logs as required.
 
 ## Clarifications
 

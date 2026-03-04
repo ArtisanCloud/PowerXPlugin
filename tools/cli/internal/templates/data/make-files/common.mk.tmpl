@@ -20,7 +20,20 @@ endif
 PLUGIN_SLUG := $(shell echo $(PLUGIN_ID) | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
 APP_NAME ?= $(PLUGIN_SLUG)
 
+BACKEND ?= gin
+ifeq ($(BACKEND),fastapi)
+BACKEND_DIR := backend/python-fastapi
+BACKEND_KIND := python
+else
+ifneq ($(wildcard backend/go.mod),)
 BACKEND_DIR := backend
+else
+BACKEND_DIR := backend/go-gin
+endif
+BACKEND_KIND := gin
+endif
+
+ifeq ($(BACKEND_KIND),gin)
 BACKEND_MODULE_FILE := $(BACKEND_DIR)/go.mod
 _GO_MODULE := $(strip $(shell awk '/^module[[:space:]]+/ {print $$2; exit}' $(BACKEND_MODULE_FILE) 2>/dev/null))
 ifeq ($(_GO_MODULE),)
@@ -28,9 +41,16 @@ GO_MODULE ?= github.com/ArtisanCloud/PowerXPlugin/skeleton/backend
 else
 GO_MODULE ?= $(_GO_MODULE)
 endif
+else
+GO_MODULE ?=
+endif
 
 BUILD_DIR := $(BACKEND_DIR)/bin
+ifeq ($(BACKEND_KIND),python)
+MAIN_FILE := $(BACKEND_DIR)/app/main.py
+else
 MAIN_FILE := $(BACKEND_DIR)/cmd/plugin/main.go
+endif
 
 DOCKER_IMAGE := $(APP_NAME):$(VERSION)
 DOCKER_REGISTRY ?=

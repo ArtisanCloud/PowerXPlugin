@@ -46,14 +46,14 @@ const joinApiBase = (base?: string | null, prefix?: string | null) => {
 }
 const envApiBase = joinApiBase(process.env.NUXT_PUBLIC_API_BASE, process.env.NUXT_PUBLIC_API_PREFIX)
 const defaultPluginApiBase = `/_p/${pluginId}/api/v1`
-const defaultLocalApiBase = 'http://localhost:8078/api/v1'
+const defaultLocalApiBase = 'http://localhost:{{ .BackendPort }}/api/v1'
 // Host API fallback: when处于宿主模式时始终走插件 API，其他场景才退回宿主 /api/v1
 const fallbackHostApiBase =
   process.env.POWERX_PROXY === '1' ? defaultPluginApiBase : '/api/v1'
 const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase
-const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
+const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'
 const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:4000'
 const imgSources = ["'self'", "data:", "https://avatars.githubusercontent.com"]
 const extraConnectHosts = new Set<string>()
@@ -138,7 +138,7 @@ if (INSIDE_POWERX) {
 const devServerPort = Number(
   process.env.NUXT_DEV_PORT ||
     process.env.PORT ||
-    3031
+    {{ .FrontendPort }}
 )
 
 const buildConnectSources = () => {
@@ -310,7 +310,7 @@ export default defineNuxtConfig({
   },
   devServer: {
     host: '0.0.0.0',
-    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : 3031
+    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : {{ .FrontendPort }}
   },
   ui: {
     fonts: false

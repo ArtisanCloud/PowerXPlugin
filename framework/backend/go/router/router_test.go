@@ -119,8 +119,9 @@ func TestAttachAndFrameworkRoute(t *testing.T) {
 }
 
 func TestCapabilityProxyRoute(t *testing.T) {
+	expectedInvokePath := strings.TrimRight(APIPrefix, "/") + "/tenant/invocations"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/tenant/invocations" {
+		if r.URL.Path != expectedInvokePath {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")

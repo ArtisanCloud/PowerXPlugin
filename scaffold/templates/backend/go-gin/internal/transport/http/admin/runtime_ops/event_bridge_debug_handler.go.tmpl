@@ -7,12 +7,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	"{{ .BackendModulePath }}/internal/shared/app"
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 )
 
 type eventBridgeEmitRequest struct {
-	TenantUUID string          `json:"tenant_uuid" binding:"required"`
+	TenantUUID string          `json:"tenant_uuid"`
 	Topic      string          `json:"topic" binding:"required"`
 	Payload    json.RawMessage `json:"payload"`
 	RequestID  string          `json:"request_id"`
@@ -29,6 +30,16 @@ func EventBridgeEmitHandler(deps *app.Deps) gin.HandlerFunc {
 		var req eventBridgeEmitRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		resolvedTenantUUID, tenantMismatch := admincommon.ResolveTenantUUIDStrict(c, req.TenantUUID)
+		if tenantMismatch {
+			c.JSON(http.StatusForbidden, gin.H{"error": "tenant mismatch"})
+			return
+		}
+		req.TenantUUID = strings.TrimSpace(resolvedTenantUUID)
+		if req.TenantUUID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 			return
 		}
 

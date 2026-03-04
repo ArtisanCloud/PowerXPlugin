@@ -8,6 +8,7 @@ import (
 	secobs "{{ .BackendModulePath }}/internal/observability/security"
 	adminsec "{{ .BackendModulePath }}/internal/services/admin/security"
 	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,6 +26,9 @@ func NewConsentHandler(deps *app.Deps, audit *secobs.AuditWriter) *ConsentHandle
 func (h *ConsentHandler) ListConsentTokens(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
 	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
@@ -39,6 +43,9 @@ func (h *ConsentHandler) ListConsentTokens(c *gin.Context) {
 
 func (h *ConsentHandler) RevokeConsentToken(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
@@ -66,6 +73,9 @@ func (h *ConsentHandler) RevokeConsentToken(c *gin.Context) {
 
 func (h *ConsentHandler) ListLifecycleEvents(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return

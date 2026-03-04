@@ -194,7 +194,22 @@ migrations:
   timeout: 60s
 
 events:
-  produces: []
+  topics:
+    - key: _topic.template.update
+      actions: [publish, subscribe]
+      description: 模板状态更新事件
+    - key: _topic.audit.template.updated
+      actions: [publish]
+      description: 模板审计更新事件
+    - key: _topic.template.validate.completed
+      actions: [publish]
+      description: 模板校验完成事件
+    - key: _topic.template.batch_clone.completed
+      actions: [publish]
+      description: 模板批量克隆完成事件
+    - key: _topic.template.update.completed
+      actions: [publish]
+      description: 模板更新完成事件
 
 assets:
   public_dir: ./web-admin/public

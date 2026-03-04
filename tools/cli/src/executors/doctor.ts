@@ -311,16 +311,9 @@ export class DoctorExecutor {
       envFile.values,
       envLabel,
     );
-    const tenantUUID = this.resolveConfigValue(
-      ["PX_TENANT_UUID"],
-      envFile.values,
-      envLabel,
-    );
-
     const missing: string[] = [];
     if (!gatewayBase.value) missing.push("PX_GATEWAY_BASE_URL");
     if (!toolToken.value) missing.push("PX_TOOL_TOKEN/PX_PLUGIN_TOOL_TOKEN");
-    if (!tenantUUID.value) missing.push("PX_TENANT_UUID");
 
     if (missing.length > 0) {
       return {
@@ -335,7 +328,7 @@ export class DoctorExecutor {
 
     const detailParts = [
       `Base=${gatewayBase.value} (${gatewayBase.source})`,
-      `Tenant=${tenantUUID.value} (${tenantUUID.source})`,
+      "Tenant=from PX_TOOL_TOKEN.tid",
     ];
     let status: CheckStatus = "pass";
     let remediation: string | undefined;
@@ -367,7 +360,7 @@ export class DoctorExecutor {
       status = "warn";
       detailParts.push("skeleton/.env.local 未找到");
       remediation =
-        "建议创建 skeleton/.env.local 并写入 PX_GATEWAY_BASE_URL、PX_TOOL_TOKEN、PX_TENANT_UUID 以便团队共享配置。";
+        "建议创建 skeleton/.env.local 并写入 PX_GATEWAY_BASE_URL、PX_TOOL_TOKEN 以便团队共享配置。";
     }
 
     return {

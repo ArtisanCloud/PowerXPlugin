@@ -106,7 +106,7 @@
 4. **租户/配置联动**  
    - 参考 `settings/config` 页面快速设置区块，Standalone 的租户配置页应提供基础属性（Key/Name/Status/Plan）与功能开关（注册、邮件、维护模式等）表单，操作按钮（保存/重置）布局、描述文本风格与宿主保持一致。
 
-> **Implementation note**：上述 UI 规格要求我们在 `skeleton/web-admin` 内提供对应的组件与样式，并在 CLI scaffold 中输出同样的结构，确保插件模板延续宿主体验。
+> **Implementation note**：上述 UI 规格要求我们在 `skeleton/web-admin/nuxt` 内提供对应的组件与样式，并在 CLI scaffold 中输出同样的结构，确保插件模板延续宿主体验。
 
 ### Key Entities
 

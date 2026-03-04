@@ -45,7 +45,7 @@ specs/006-plugin-capability/
 ```
 
 ```text
-skeleton/backend/
+skeleton/backend/go-gin/
 ├── internal/
 │   ├── transport/
 │   │   ├── http/
@@ -65,7 +65,7 @@ skeleton/backend/
 skeleton/scripts/
 └── capabilities/** (lint/export/compose)
 
-skeleton/web-admin/
+skeleton/web-admin/nuxt/
 ├── app/
 │   ├── pages/capabilities/**
 │   ├── components/capabilities/**
@@ -80,7 +80,7 @@ contracts/
 └── exposure/mcp-tools.json
 ```
 
-**Structure Decision**: 采用「后端（Go）+ CLI（Node）+ Web-admin（Nuxt）」三层结构，全部落在 `skeleton/` 目录树：`skeleton/backend/internal/{transport,services,domain}`、`skeleton/scripts/capabilities`、`skeleton/web-admin/app/**`，并结合仓库根下的 `contracts/` 与 `capabilities/` 目录用于声明、生成与同步。
+**Structure Decision**: 采用「后端（Go）+ CLI（Node）+ Web-admin（Nuxt）」三层结构，全部落在 `skeleton/` 目录树：`skeleton/backend/go-gin/internal/{transport,services,domain}`、`skeleton/scripts/capabilities`、`skeleton/web-admin/nuxt/app/**`，并结合仓库根下的 `contracts/` 与 `capabilities/` 目录用于声明、生成与同步。
 
 ## Complexity Tracking
 
@@ -94,7 +94,7 @@ contracts/
 
 1. **模板批量克隆/导入（`com.powerx.plugins.base.template.batch_clone`）**
    - HTTP（能力出口）：`POST /api/v1/templates/batch-clone`，Body 包含源模板 ID 列表、克隆数量、目标标签/租户；返回 `created_ids`、`failed` 列表。
-   - HTTP（Admin 业务面）：在 `skeleton/backend/internal/transport/http/admin/templates` 下新增 `/admin/api/templates/batch-clone`（或同等路径）供 Web Admin 调用，协议字段可更丰富（含草稿备注/审批人），但内部仍委托 `TemplateService.BatchClone`。
+   - HTTP（Admin 业务面）：在 `skeleton/backend/go-gin/internal/transport/http/admin/templates` 下新增 `/admin/api/templates/batch-clone`（或同等路径）供 Web Admin 调用，协议字段可更丰富（含草稿备注/审批人），但内部仍委托 `TemplateService.BatchClone`。
    - gRPC：`TemplateService/BatchCloneTemplates`，复用相同请求/响应结构。
    - Handler 位置：
      - 能力接口 handler：`.../transport/http/admin/templates/template_capability_handler.go`（新增文件）或同目录下新增方法，通过 `contracts/exposure/openapi.yaml` 暴露。

@@ -50,7 +50,7 @@ powerx-plugin-base/
 
 ```bash
 cd backend
-POWERX_DEV_MODE=1 \
+POWERX_DEBUG_MODE=1 \
 POWERX_PLUGIN_ID=com.powerx.plugins.base \
 POWERX_DB_DSN="postgres://user:pwd@localhost:5432/powerx?sslmode=disable" \
 POWERX_DB_SCHEMA=px_com_powerx_plugins_base \
@@ -277,7 +277,8 @@ SET search_path TO px_com_powerx_plugins_base;
 | `POWERX_LOG_LEVEL=debug`    | 输出所有调试日志         |
 | `POWERX_LOG_ENABLE_TRACE=1` | 打印 trace span id |
 | `POWERX_DB_LOG_SQL=1`       | 打印 SQL 语句        |
-| `POWERX_DEV_MODE=1`         | 跳过签名验证（仅限本地）     |
+| `POWERX_DEBUG_MODE=1`       | 开发环境语义（仅限本地）     |
+| `POWERX_DEV_MODE=1`         | 兼容入口（映射到 debug_mode） |
 
 示例输出：
 

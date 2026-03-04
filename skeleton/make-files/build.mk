@@ -22,6 +22,11 @@ GO_BUILD_CACHE     ?= $(abspath $(BACKEND_DIR)/.cache/go-build)
 FRONTEND_DIR        ?= web-admin
 FRONTEND_OUTPUT     ?= $(FRONTEND_DIR)/.output
 
+CLI_ROOT_DIR        ?= ..
+CLI_BUILD_CACHE     ?= $(abspath $(CLI_ROOT_DIR)/.cache/go-build)
+PX_PLUGIN_CLI_VERSION ?=
+GO_BIN_DIR          ?= $(shell sh -c 'if [ -n "$$GOBIN" ]; then printf "%s" "$$GOBIN"; else GOPATH="$$(go env GOPATH 2>/dev/null)"; printf "%s/bin" "$$GOPATH"; fi')
+
 # Dist（install/local 用）
 DIST_ROOT           ?= dist
 DIST_DIR            ?= $(DIST_ROOT)/$(VERSION)
@@ -46,27 +51,59 @@ CHECK_PORT          ?= 4999                       # 临时检查端口（不要�
 .PHONY: build
 build: ## 构建后端（本机平台）
 	@echo "==> 构建后端二进制（本机平台）..."
-	@mkdir -p $(ABS_BUILD_DIR)
-	@mkdir -p $(GO_BUILD_CACHE)
-	GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin
-	@if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
-	  echo "   构建 migrate（如存在）..."; \
-	  GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	@if [ "$(BACKEND)" = "fastapi" ]; then \
+	  echo "跳过 Go 构建（python backend）"; \
 	else \
-	  echo "   跳过 migrate（未找到 cmd/database）"; \
+	  mkdir -p $(ABS_BUILD_DIR); \
+	  mkdir -p $(GO_BUILD_CACHE); \
+	  GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
+	    echo "   构建 migrate（如存在）..."; \
+	    GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	  else \
+	    echo "   跳过 migrate（未找到 cmd/database）"; \
+	  fi; \
 	fi
+
+.PHONY: build-px-plugin
+build-px-plugin: ## 在仓库根目录构建 bin/px-plugin
+	@echo "==> 构建 px-plugin CLI -> $(CLI_ROOT_DIR)/bin/px-plugin"
+	@mkdir -p $(CLI_ROOT_DIR)/bin
+	@mkdir -p $(CLI_BUILD_CACHE)
+	@if [ -n "$(PX_PLUGIN_CLI_VERSION)" ]; then \
+	  echo "   使用版本号: $(PX_PLUGIN_CLI_VERSION)"; \
+	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -ldflags "-X main.version=$(PX_PLUGIN_CLI_VERSION)" -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	else \
+	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	fi
+	@$(CLI_ROOT_DIR)/bin/px-plugin --version
+
+.PHONY: install-px-plugin
+install-px-plugin: build-px-plugin ## 构建并安装到 GOBIN/GOPATH/bin，保持 `px-plugin` 直接可用
+	@echo "==> 安装 px-plugin 到 $(GO_BIN_DIR)/px-plugin"
+	@mkdir -p $(GO_BIN_DIR)
+	@cp $(CLI_ROOT_DIR)/bin/px-plugin $(GO_BIN_DIR)/px-plugin
+	@echo "已安装: $(GO_BIN_DIR)/px-plugin"
+	@$(GO_BIN_DIR)/px-plugin --version || { \
+	  echo "⚠️ 已安装，但无法直接执行 $(GO_BIN_DIR)/px-plugin --version（可能被系统策略拦截或终端缓存影响）"; \
+	  echo "   请手动执行: hash -r && px-plugin --version"; \
+	}
 
 .PHONY: build-linux
 build-linux: ## 构建后端（Linux amd64）
 	@echo "==> 构建后端二进制（Linux/amd64）..."
-	@mkdir -p $(ABS_BUILD_DIR)
-	@mkdir -p $(GO_BUILD_CACHE)
-	GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin
-	@if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
-	  echo "   构建 migrate（Linux/amd64）..."; \
-	  GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	@if [ "$(BACKEND)" = "fastapi" ]; then \
+	  echo "跳过 Go 构建（python backend）"; \
 	else \
-	  echo "   跳过 migrate（未找到 cmd/database）"; \
+	  mkdir -p $(ABS_BUILD_DIR); \
+	  mkdir -p $(GO_BUILD_CACHE); \
+	  GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
+	    echo "   构建 migrate（Linux/amd64）..."; \
+	    GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	  else \
+	    echo "   跳过 migrate（未找到 cmd/database）"; \
+	  fi; \
 	fi
 
 # ===== 前端构建（Host / 被 PowerX 反代）=====
@@ -152,6 +189,10 @@ dist: build frontend-build
 	@mkdir -p $(DIST_BACKEND_BIN) $(DIST_WEBADMIN_OUTPUT)
 	@echo "写入插件清单 -> $(DIST_DIR)/plugin.yaml (version=$(VERSION))"
 	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' plugin.yaml > $(DIST_DIR)/plugin.yaml
+	@if [ -f "config/event_fabric.yaml" ]; then \
+	  mkdir -p $(DIST_DIR)/config; \
+	  cp config/event_fabric.yaml $(DIST_DIR)/config/event_fabric.yaml; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(DIST_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(DIST_BACKEND_BIN)/; fi
 	@if [ -d "$(FRONTEND_OUTPUT)" ] && [ -n "$$(ls -A $(FRONTEND_OUTPUT) 2>/dev/null)" ]; then \
@@ -174,6 +215,10 @@ release: build frontend-build
 	@mkdir -p $(RELEASE_BACKEND_BIN) $(RELEASE_WEBADMIN_OUTPUT)
 	@echo "写入插件清单 -> $(RELEASE_DIR)/plugin.yaml (version=$(VERSION))"
 	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' plugin.yaml > $(RELEASE_DIR)/plugin.yaml
+	@if [ -f "config/event_fabric.yaml" ]; then \
+	  mkdir -p $(RELEASE_DIR)/config; \
+	  cp config/event_fabric.yaml $(RELEASE_DIR)/config/event_fabric.yaml; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(RELEASE_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(RELEASE_BACKEND_BIN)/; fi
 	@cp -R $(FRONTEND_OUTPUT)/. $(RELEASE_WEBADMIN_OUTPUT)/

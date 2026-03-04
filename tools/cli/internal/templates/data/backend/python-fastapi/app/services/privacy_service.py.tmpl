@@ -1,0 +1,188 @@
+from __future__ import annotations
+
+import json
+import os
+from datetime import datetime, timezone
+from typing import Any, Iterable
+
+import yaml
+
+from app.entity.models import PrivacyLifecycleEvent
+from app.entity.repository.privacy_repository import PrivacyRepository
+from app.services._utils import to_dict, to_list
+
+
+def _now() -> datetime:
+    return datetime.utcnow()
+
+
+class PrivacyService:
+    def __init__(self, repo: PrivacyRepository | None = None) -> None:
+        self._repo = repo or PrivacyRepository()
+        self._masking_rules = _load_masking_rules()
+
+    def list_classifications(self, tenant_uuid: str | None = None) -> list:
+        return to_list(self._repo.list_classifications(tenant_uuid))
+
+    def list_consent_tokens(self, tenant_uuid: str | None = None, statuses: Iterable[str] | None = None) -> list:
+        tokens = self._repo.list_consent_tokens(tenant_uuid, list(statuses) if statuses else None)
+        return [_consent_token_payload(token) for token in tokens]
+
+    def list_lifecycle_events(
+        self,
+        tenant_uuid: str | None = None,
+        event_types: Iterable[str] | None = None,
+        limit: int = 0,
+    ) -> list:
+        events = self._repo.list_lifecycle_events(tenant_uuid, list(event_types) if event_types else None, limit)
+        return [_lifecycle_event_payload(evt) for evt in events]
+
+    def active_consent_assets(self, tenant_uuid: str) -> dict:
+        tokens = self._repo.active_consent_tokens(tenant_uuid, _now())
+        scope: set[str] = set()
+        for token in tokens:
+            values = _parse_scope_values(token.scope)
+            for asset in values:
+                scope.add(asset)
+        return {"tenant_uuid": tenant_uuid, "assets": sorted(scope)}
+
+    def record_lifecycle_event(
+        self,
+        tenant_uuid: str,
+        event_type: str,
+        asset_key: str,
+        metadata: dict | None = None,
+        recorded_by: str = "agent",
+    ) -> dict:
+        payload = self.filter_ai_data(metadata or {})
+        entity = PrivacyLifecycleEvent(
+            tenant_uuid=tenant_uuid,
+            event_type=event_type,
+            asset_key=asset_key,
+            payload=payload or None,
+            occurred_at=_now(),
+            recorded_by=recorded_by,
+            status="SUCCEEDED",
+        )
+        entity = self._repo.create_lifecycle_event(entity)
+        return to_dict(entity)
+
+    def filter_ai_data(self, data: dict) -> dict:
+        if not data or not self._masking_rules:
+            return data
+        pii_fields = self._masking_rules.get("pii_fields") or []
+        placeholder = self._masking_rules.get("placeholder") or "[REDACTED]"
+        pii_set = {str(k).lower(): True for k in pii_fields}
+        out: dict[str, Any] = {}
+        for key, value in data.items():
+            if str(key).lower() in pii_set:
+                out[key] = placeholder
+            else:
+                out[key] = value
+        return out
+
+    def revoke_consent_token(self, tenant_uuid: str, token_id: str, payload: dict | None = None) -> dict:
+        updates = {
+            "status": "REVOKED",
+            "revoked_at": (payload or {}).get("revoked_at") or _now(),
+            "revoked_reason": (payload or {}).get("reason") or (payload or {}).get("revoked_reason"),
+            "updated_at": _now(),
+        }
+        token = self._repo.revoke_consent_token(tenant_uuid, token_id, updates)
+        return _consent_token_payload(token) if token else {}
+
+
+_MASKING_RULES_CACHE: dict | None = None
+
+
+def _load_masking_rules() -> dict:
+    global _MASKING_RULES_CACHE
+    if _MASKING_RULES_CACHE is not None:
+        return _MASKING_RULES_CACHE
+    candidates = []
+    raw = os.getenv("SECURITY_BASELINE_PATH", "").strip()
+    if raw:
+        candidates.append(os.path.expanduser(raw))
+    candidates.extend(
+        [
+            "./backend/etc/security_baseline.yaml",
+            "./skeleton/backend/etc/security_baseline.yaml",
+            "./etc/security_baseline.yaml",
+            "../backend/etc/security_baseline.yaml",
+        ]
+    )
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = yaml.safe_load(fh) or {}
+            rules = (data or {}).get("masking_rules") or {}
+            pii_fields = rules.get("pii_fields") or []
+            placeholder = (rules.get("log_redaction") or {}).get("placeholder") or "[REDACTED]"
+            _MASKING_RULES_CACHE = {
+                "pii_fields": pii_fields,
+                "placeholder": placeholder,
+            }
+            return _MASKING_RULES_CACHE
+        except OSError:
+            continue
+    _MASKING_RULES_CACHE = {}
+    return _MASKING_RULES_CACHE
+
+
+def _parse_scope_values(scope: Any) -> list[str]:
+    if not scope:
+        return []
+    if isinstance(scope, list):
+        return [str(item) for item in scope if item]
+    if isinstance(scope, str):
+        try:
+            parsed = json.loads(scope)
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed if item]
+        except json.JSONDecodeError:
+            return []
+    return []
+
+
+def _fmt(dt: datetime | None) -> str:
+    if not dt:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _consent_token_payload(token) -> dict:
+    if not token:
+        return {}
+    return {
+        "id": token.id,
+        "tenant_uuid": token.tenant_uuid,
+        "token": token.consent_token,
+        "scope": _parse_scope_values(token.scope),
+        "status": token.status,
+        "expires_at": _fmt(token.expires_at),
+        "issued_at": _fmt(token.issued_at),
+        "issued_by": token.issued_by,
+        "revoked_at": _fmt(token.revoked_at),
+        "revoked_reason": token.revoked_reason,
+    }
+
+
+def _lifecycle_event_payload(evt) -> dict:
+    if not evt:
+        return {}
+    payload = {
+        "id": evt.id,
+        "tenant_uuid": evt.tenant_uuid,
+        "event_type": evt.event_type,
+        "asset_key": evt.asset_key,
+        "status": evt.status,
+        "occurred_at": _fmt(evt.occurred_at),
+        "recorded_by": evt.recorded_by,
+    }
+    if evt.payload:
+        payload["payload"] = evt.payload
+    return payload

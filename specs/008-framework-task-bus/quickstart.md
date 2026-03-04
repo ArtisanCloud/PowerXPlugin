@@ -1,5 +1,7 @@
 # Quickstart — Framework TaskBus Event Bridge
 
+> 开发前请先阅读：`specs/008-framework-task-bus/readiness.md`（当前实现边界、未完成项、开工顺序）。
+
 ## 1) 本地模式（EventBridge 关闭）
 
 适用于本地/离线/未接入宿主 TaskBus 的场景：

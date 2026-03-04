@@ -24,6 +24,8 @@ rbac:
   resources:
     - resource: base:template
       actions: [read, create, update, delete]
+    - resource: runtime:ops
+      actions: [read, observe, manage, invoke]
 capabilities:
   required:
     # 所有将通过 Gateway 调用的 Core 能力必须列在此处，提交前请运行
@@ -37,98 +39,74 @@ capabilities:
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.list.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.list.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.list.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.list.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.list.json
     - id: com.powerx.plugins.base.template.read
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.read.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.read.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.read.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.read.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.read.json
     - id: com.powerx.plugins.base.template.create
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.create.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.create.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.create.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.create.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.create.json
     - id: com.powerx.plugins.base.template.update
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.update.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.update.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.update.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.update.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.update.json
     - id: com.powerx.plugins.base.template.delete
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.delete.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.delete.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.delete.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.delete.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.delete.json
     - id: com.powerx.plugins.base.template.review
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.review.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.review.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.review.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.review.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.review.json
     - id: com.powerx.plugins.base.template.publish
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.publish.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.publish.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.publish.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.publish.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.publish.json
     - id: com.powerx.plugins.base.template.compose
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.compose.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.compose.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.compose.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.compose.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.compose.json
     - id: com.powerx.plugins.base.template.audit
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.audit.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.audit.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.audit.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.audit.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.audit.json
     - id: com.powerx.plugins.base.template.batch_clone
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.batch_clone.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.batch_clone.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.batch_clone.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.batch_clone.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.batch_clone.json
     - id: com.powerx.plugins.base.template.validate
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.validate.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.validate.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.validate.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.validate.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.validate.json
     - id: com.powerx.plugins.base.template.quality_distribute
       version: 1.0.0
       descriptor: contracts/capabilities/com.powerx.plugins.base.template.quality_distribute.yaml
       schemas:
-        input:
-          - contracts/schema/input/com.powerx.plugins.base.template.quality_distribute.json
-        output:
-          - contracts/schema/output/com.powerx.plugins.base.template.quality_distribute.json
+        input: contracts/schema/input/com.powerx.plugins.base.template.quality_distribute.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.quality_distribute.json
   imports:
     - contracts/capabilities/com.powerx.plugins.base.template.list.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.read.yaml
@@ -241,8 +219,19 @@ exposure:
       auth: workflow
 
 events:
-  publish:
-    - powerx.channel.master.credential_inspection.v1
-    - powerx.channel.master.kpi_refreshed.v1
-    - powerx.channel.product.publish_task.v1
-  subscribe: []
+  topics:
+    - key: _topic.template.update
+      actions: [publish, subscribe]
+      description: 模板状态更新事件
+    - key: _topic.audit.template.updated
+      actions: [publish]
+      description: 模板审计更新事件
+    - key: _topic.template.validate.completed
+      actions: [publish]
+      description: 模板校验完成事件
+    - key: _topic.template.batch_clone.completed
+      actions: [publish]
+      description: 模板批量克隆完成事件
+    - key: _topic.template.update.completed
+      actions: [publish]
+      description: 模板更新完成事件

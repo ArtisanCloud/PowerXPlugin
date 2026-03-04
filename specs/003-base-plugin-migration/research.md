@@ -34,7 +34,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 ## 租户上下文与数据类型
 
-- `X-Tenant-UUID` Header 为主要租户来源，类型为 **UUID string**。
+- `tenant_uuid` Header 为主要租户来源，类型为 **UUID string**。
 - Repository 层要求：
   - 内嵌 `repository.BaseRepository[T]`
   - 在查询/更新时追加 `tenant_uuid = ?` 条件
@@ -83,7 +83,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 - `GET /api/v1/templates/abc` → HTTP 400 + `INVALID_REQUEST`（编号解析失败）
 - `GET /api/v1/templates/1` 且非本租户 → HTTP 404 + `NOT_FOUND`
-- 缺少 `X-Tenant-UUID` → HTTP 401 + `"tenant context missing"`
+- 缺少 `tenant_uuid` → HTTP 401 + `"tenant context missing"`
 - 未处理异常 → HTTP 500 + `INTERNAL_ERROR`
 
 > 以上示例基于 handler 与 repository 行为推导；实现阶段应在测试中复现并记录实际响应。
@@ -92,7 +92,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 - 前端页面：`intro.vue`、`templates/index.vue`、`templates/crud.vue`
 - 公共组件：`TemplateFormModal.vue`、`ConfirmDialog.vue`、`ToastAlert.vue`
-- Composable：`useTemplateApi`（主要引用 `$fetch` 和 `X-Tenant-UUID` 逻辑）
+- Composable：`useTemplateApi`（主要引用 `$fetch` 和 `tenant_uuid` 逻辑）
 
 ## 未决事项 / 待确认
 
@@ -122,7 +122,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 ## 延迟观测（T035）
 
-- 2025-11-02：通过脚本启动 `go run ./skeleton/backend/cmd/plugin` 并在 0.5s 间隔内轮询 `/api/v1/ping` 直至服务就绪；随后使用 `curl -w 'time_total:%{time_total}'` 观测多租户请求。  
+- 2025-11-02：通过脚本启动 `go run ./skeleton/backend/go-gin/cmd/plugin` 并在 0.5s 间隔内轮询 `/api/v1/ping` 直至服务就绪；随后使用 `curl -w 'time_total:%{time_total}'` 观测多租户请求。  
   - `tenant=1` → `0.001355s`  
   - `tenant=2` → `0.001451s`  
 - 结果均远低于 1s SLA，命令执行后立即终止服务并保存原始响应到 `/tmp/tenant{1,2}.json` 供复核。

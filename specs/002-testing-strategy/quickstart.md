@@ -8,8 +8,8 @@
 
 ## 2. 安装依赖
 ```bash
-npm install --prefix skeleton/web-admin
-npx playwright install --prefix skeleton/web-admin
+npm install --prefix skeleton/web-admin/nuxt
+npx playwright install --prefix skeleton/web-admin/nuxt
 ```
 
 ## 3. 运行冒烟测试
@@ -28,16 +28,16 @@ make test-smoke
 make test-regression
 ```
 
-> 实测同环境：约 12 秒完成，Playwright 报告与后端/前端日志可在 `tmp/` 与 `skeleton/web-admin/test-results/` 中查看。
+> 实测同环境：约 12 秒完成，Playwright 报告与后端/前端日志可在 `tmp/` 与 `skeleton/web-admin/nuxt/test-results/` 中查看。
 
 ## 5. 查看产物
 - 覆盖率：`tmp/coverage.html`
-- Playwright 报告：`skeleton/web-admin/test-results/`
+- Playwright 报告：`skeleton/web-admin/nuxt/test-results/`
 - 临时 CLI 项目：`/tmp/powerx-*`（脚本默认清理）
 
 ## 6. 添加新测试
 - Go：在对应目录创建 `*_test.go` 并使用 `go test ./path/to/pkg`
-- Playwright：在 `skeleton/web-admin/tests/e2e/` 增加 `*.spec.ts`
+- Playwright：在 `skeleton/web-admin/nuxt/tests/e2e/` 增加 `*.spec.ts`
 - CLI：扩展 `scripts/testing` 中的脚本并更新文档
 
 更多细节请阅读 `docs/test/testing_strategy.md` 与 `docs/test/testing_usage.md`。

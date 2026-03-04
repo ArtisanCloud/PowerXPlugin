@@ -28,6 +28,8 @@ type Data struct {
 	BackendModulePath  string
 	BackendType        string
 	FrontendType       string
+	BackendPort        int
+	FrontendPort       int
 	FrameworkVersion   string
 	FrameworkReplace   string
 	SchemaDependency   string

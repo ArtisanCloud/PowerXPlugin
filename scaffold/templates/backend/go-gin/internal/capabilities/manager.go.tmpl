@@ -176,9 +176,14 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if p == "" {
 		p = defaultCatalogPath
 	}
-	if !filepath.IsAbs(p) {
-		cwd, _ := os.Getwd()
-		p = filepath.Join(cwd, p)
+	originalPath := p
+	p, resolvedBy := resolveCatalogFilePath(p)
+	if resolvedBy != "" {
+		log.WithFields(logrus.Fields{
+			"catalog_path_from": originalPath,
+			"catalog_path_to":   p,
+			"resolved_by":       resolvedBy,
+		}).Info("capability catalog path auto-resolved")
 	}
 	log = log.WithField("catalog_path", p)
 	log.Debug("loading capability catalog from disk")
@@ -186,6 +191,9 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			log.WithError(err).Warn("capability catalog not found, falling back to plugin.yaml capabilities")
+			log.WithFields(logrus.Fields{
+				"advice": "开发态可忽略；若需消除告警，请生成 capabilities/catalog.json 或保持 plugin.yaml capabilities 与代码同步",
+			}).Info("capability catalog fallback hint")
 			snapshot, fallbackErr := loadCatalogFromManifest(log)
 			if fallbackErr != nil {
 				log.WithError(fallbackErr).Warn("failed to load capability catalog from plugin.yaml, returning empty snapshot")
@@ -237,7 +245,7 @@ type manifestDoc struct {
 	ID           string `yaml:"id"`
 	Version      string `yaml:"version"`
 	Capabilities struct {
-		Imports  []string            `yaml:"imports"`
+		Imports  []string             `yaml:"imports"`
 		Provides []manifestCapability `yaml:"provides"`
 	} `yaml:"capabilities"`
 }
@@ -533,4 +541,66 @@ func resolveCatalogPath(raw string) string {
 	}
 	trimmed = os.ExpandEnv(trimmed)
 	return strings.TrimSpace(trimmed)
+}
+
+func resolveCatalogFilePath(pathValue string) (string, string) {
+	trimmed := strings.TrimSpace(pathValue)
+	if trimmed == "" {
+		trimmed = defaultCatalogPath
+	}
+
+	cwd, _ := os.Getwd()
+	if filepath.IsAbs(trimmed) {
+		return trimmed, ""
+	}
+
+	base := trimmed
+	if cwd != "" {
+		base = filepath.Join(cwd, trimmed)
+	}
+	if existsFile(base) {
+		return base, ""
+	}
+
+	candidates := make([]string, 0, 8)
+	if manifestPath := resolveManifestPath(); manifestPath != "" {
+		manifestDir := filepath.Dir(manifestPath)
+		candidates = append(candidates,
+			filepath.Join(manifestDir, "capabilities", "catalog.json"),
+			filepath.Join(manifestDir, "..", "capabilities", "catalog.json"),
+		)
+	}
+	if cwd != "" {
+		candidates = append(candidates,
+			filepath.Join(cwd, "skeleton", "capabilities", "catalog.json"),
+			filepath.Join(cwd, "..", "capabilities", "catalog.json"),
+			filepath.Join(cwd, "..", "..", "capabilities", "catalog.json"),
+			filepath.Join(cwd, "..", "..", "..", "capabilities", "catalog.json"),
+		)
+	}
+
+	seen := map[string]struct{}{}
+	for _, cand := range candidates {
+		clean := filepath.Clean(cand)
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+		seen[clean] = struct{}{}
+		if existsFile(clean) {
+			return clean, "manifest/cwd fallback"
+		}
+	}
+
+	return base, ""
+}
+
+func existsFile(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }

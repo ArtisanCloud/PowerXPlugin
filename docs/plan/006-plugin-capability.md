@@ -17,7 +17,7 @@
 
 | 层级 | 目录/位置 | 作用 | 说明 |
 |------|-----------|------|------|
-| **原子能力层 (Atomic Service Layer)** | `backend/internal/handlers/capabilities/<domain>/<action>_handler.go` | 绑定唯一能力 ID 的 Handler，是最小可调用单元。 | Handler 仅负责输入校验、调用 `skeleton/backend/internal/services/**` 里的业务逻辑、输出转换与审计。 |
+| **原子能力层 (Atomic Service Layer)** | `backend/internal/handlers/capabilities/<domain>/<action>_handler.go` | 绑定唯一能力 ID 的 Handler，是最小可调用单元。 | Handler 仅负责输入校验、调用 `skeleton/backend/go-gin/internal/services/**` 里的业务逻辑、输出转换与审计。 |
 | **能力目录层 (Capability Registry Layer)** | `capabilities/*.yaml` + `plugin.yaml` (`capabilities.imports`) | 记录全部原子能力与复合任务的元数据（ID、描述、协议、标签、复合关系）。 | 与 `contracts/capabilities/*.yaml`、`contracts/schema/**` 链接，方便 CLI/运行时解析。 |
 | **能力管理器层 (Capabilities Manager Layer)** | CLI + 运行时共享模块（`px-plugin capabilities *`、框架 `framework/capabilities/manager`） | 解析能力目录、生成协议产物、向 PowerX 注册能力。 | 暴露 `ListCapabilities()`、`ExportProtocols()`、`RegisterWithHost()` 等接口，供 PowerX 底座在插件加载时调用。 |
 
@@ -78,7 +78,7 @@ tags: [integration, atomic]
 - **目录规范**：`backend/internal/handlers/capabilities/<domain>/<action>_handler.go`。使用 `*_handler.go` 命名，导出 `Handle` 或 `Execute` 函数，方便框架自动注册。
 - **职责**：
   - 解析输入（引用 `contracts/schema/input/<domain>.<action>.json`）。
-  - 调用 `skeleton/backend/internal/services/**` 的业务方法。
+  - 调用 `skeleton/backend/go-gin/internal/services/**` 的业务方法。
   - 返回输出（引用 `contracts/schema/output/<...>.json`）。
   - 记录审计事件（例如 `audit.capability.template.create`）。
 - **CLI 支撑**：`px-plugin capabilities new` 基于 Handler 路径生成能力文件与 Schema stub；`lint` 确保 Handler/Schema/协议引用一致。

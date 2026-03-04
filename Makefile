@@ -1,12 +1,21 @@
 # Root Makefile: include modular task definitions from make-files/
 
 MAKEFILES_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-
-include make-files/test.mk
-include make-files/validate.mk
-include make-files/capabilities.mk
+SKELETON_DIR := skeleton
 
 .PHONY: help
 help: ## Show available make targets
-	@echo "Available targets:"
-	@grep -hE '^[[:alnum:]_.-]+:.*##' make-files/*.mk | awk 'BEGIN {FS = ":.*##"}; {printf "  %-24s %s\n", $$1, $$2}'
+	@$(MAKE) -C $(SKELETON_DIR) help
+
+# Proxy common targets to skeleton/Makefile to unify entrypoints.
+.PHONY: test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend \
+        build-px-plugin \
+        install-px-plugin \
+        migrate migrate-cmd seed setup-db reset-db \
+        test-admin lint-admin build-admin test-coverage lint fmt mod-tidy test-all integration-smoke check
+test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend \
+build-px-plugin \
+install-px-plugin \
+migrate migrate-cmd seed setup-db reset-db \
+test-admin lint-admin build-admin test-coverage lint fmt mod-tidy test-all integration-smoke check:
+	@$(MAKE) -C $(SKELETON_DIR) $@ BACKEND=$(BACKEND)

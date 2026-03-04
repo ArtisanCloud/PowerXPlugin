@@ -3,7 +3,7 @@
 ## TemplateRecord
 
 - **id** (uint64) — 自增主键，对应 `models.BaseModel.ID`
-- **tenant_uuid** (uuid) — 必填，来自 `X-Tenant-UUID`，用于多租户隔离
+- **tenant_uuid** (uuid) — 必填，来自 `tenant_uuid`，用于多租户隔离
 - **name** (string, ≤255) — 模板名称
 - **description** (string, text) — 模板描述
 - **content** (string, text) — 模板内容

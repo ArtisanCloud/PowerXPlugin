@@ -2,11 +2,13 @@ package iam
 
 import (
 	"strconv"
+	"strings"
 
 	"{{ .BackendModulePath }}/internal/contracts"
 	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
 	authmw "{{ .BackendModulePath }}/internal/middleware"
 	srviam "{{ .BackendModulePath }}/internal/services/iam"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,6 +31,13 @@ func (h *DepartmentHandler) List(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
 		return
 	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		query.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
 	deps, err := h.service.List(c.Request.Context(), srviam.DepartmentFilter{TenantUUID: query.TenantUUID})
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -41,6 +50,13 @@ func (h *DepartmentHandler) Tree(c *gin.Context) {
 	var query DepartmentListQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		query.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(query.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	deps, err := h.service.List(c.Request.Context(), srviam.DepartmentFilter{TenantUUID: query.TenantUUID})
@@ -70,6 +86,13 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 	var req CreateDepartmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	tc, _ := authmw.GetTenantContext(c)

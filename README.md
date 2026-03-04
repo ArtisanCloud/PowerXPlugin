@@ -17,7 +17,7 @@
 - **迁移实践**：[docs/guide/migration/base-to-skeleton.md](./docs/guide/migration/base-to-skeleton.md)
 - **框架发布指南**：[docs/guides/develop/framework-release.md](./docs/guides/develop/framework-release.md)
 - **Mini-App Customer 鉴权**：[docs/guides/develop/auth/customer.md](./docs/guides/develop/auth/customer.md)（含 Skeleton/Delegated 与观测指标）
-- **EventBridge / TaskBus 测试指南**：[docs/guides/develop/event-bridge-taskbus-testing.md](./docs/guides/develop/event-bridge-taskbus-testing.md)
+- **EventBridge / TaskBus 测试指南**：[docs/guides/async_runtime/event_fabric/integration_playbook.md](./docs/guides/async_runtime/event_fabric/integration_playbook.md)
 
 ## 快速开始
 
@@ -26,11 +26,12 @@
 3. 初始化能力工具链：如需 CLI 校验/导出，请运行 `npm --prefix scripts/capabilities install`（若尚未安装依赖），并使用 `make capabilities-lint`、`make capabilities-export` 驱动 `scripts/capabilities` 工具。
 4. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
 5. 体验 Go CLI 热加载：请按照 `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 构建 `px-plugin`、运行 `px-plugin dev --watch` / `dev --logs`，并通过 `px-plugin doctor` 生成 `.doctor/report.json` 以验证 Toolchain、mTLS、Dev API、Watcher 状态。
-6. 验证 Standalone IAM：按照 `specs/007-standalone-iam-rbac/quickstart.md` 导出 `PLUGIN_IAM_*` 环境变量运行 `go run ./cmd/database/main.go setup`，再使用 `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local` 验证本地管理员登录；若要确认 Delegated 模式入口隐藏，可设置 `PLAYWRIGHT_LOCAL_IAM=0`。
+6. 验证 Standalone IAM：按照 `specs/007-standalone-iam-rbac/quickstart.md` 导出 `PLUGIN_IAM_*` 环境变量运行 `go run ./cmd/database/main.go setup`，再使用 `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local` 验证本地管理员登录；若要确认 Delegated 模式入口隐藏，可设置 `PLAYWRIGHT_LOCAL_IAM=0`。
 
 ## Manifest 位置说明
 
 - 仓库真实的开发态 manifest 存放在 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅是一个指向它的符号链接，方便旧脚本兼容。
+- 事件声明规范源为 `skeleton/plugin.yaml` 的 `events.topics[]`；过渡期执行层文件为 `skeleton/config/event_fabric.yaml`（供底座扫描 topic/ACL）。
 - 运行 `npm test`、`make validate`、`px-plugin capabilities ...` 等命令时，请在 `skeleton/` 目录中执行（或显式传入 `--manifest skeleton/plugin.yaml` / `CAP_MANIFEST=./skeleton/plugin.yaml`），以免引用到不存在的文件。
 - 当你使用 `px-plugin init` 生成独立插件仓库时，`plugin.yaml` 位于其根目录，命令可继续按常规相对路径执行。
 

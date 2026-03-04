@@ -103,8 +103,11 @@ func (s *RoleService) List(ctx context.Context, filter RoleFilter) ([]RoleView, 
 		like := "%" + strings.ToLower(q) + "%"
 		query = query.Where("(lower(name) LIKE ? OR lower(code) LIKE ?)", like, like)
 	}
-	if scope := normalizeScopeType(filter.ScopeType); scope != "" {
-		query = query.Where("scope_type = ?", scope)
+	scopeRaw := strings.TrimSpace(filter.ScopeType)
+	if scopeRaw != "" {
+		if scope := normalizeScopeType(scopeRaw); scope != "" {
+			query = query.Where("scope_type = ?", scope)
+		}
 	}
 	var roles []iamm.Role
 	if err := query.Order("created_at DESC").Find(&roles).Error; err != nil {

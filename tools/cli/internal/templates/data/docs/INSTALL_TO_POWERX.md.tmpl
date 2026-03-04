@@ -108,6 +108,69 @@ Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：�
 4. 调用 `ws-bus/grant`
 5. 调用 `publish/subscribe`
 
+### 最小配置示例（必须两层都写）
+
+`plugin.yaml`（声明层，给审核/注册与能力语义使用）：
+
+```yaml
+events:
+  topics:
+    - name: plugin.demo.order.created
+      direction: publish
+      desc: order created event
+    - name: plugin.demo.order.status
+      direction: subscribe
+      desc: order status updates
+```
+
+`config/event_fabric.yaml`（执行层，给底座启用时播种使用）：
+
+```yaml
+topics:
+  - key: plugin.demo.order.created
+    mode: publish
+    description: order created event
+  - key: plugin.demo.order.status
+    mode: subscribe
+    description: order status updates
+```
+
+建议：两层 topic 名称保持一一对应（`name`/`key` 一致），避免“声明里有、执行层没有”导致安装后链路不通。
+
+### 联调动作拆解（可直接照做）
+
+1) **确认 topic 已存在于底座**
+
+- 通过底座管理接口或后台确认 `event_topics` 中已有目标 topic。
+- 若不存在，先创建 topic，再做后续授权。
+
+2) **配置 API Key Profile 权限**
+
+- 在底座将调用方主体（API Key 对应 profile）授权到目标 topic（publish/subscribe）。
+- 保存后轮换或新建 API Key，确保权限快照生效。
+
+3) **调用 grant（只绑定，不创建）**
+
+```bash
+curl -X POST "$API_BASE/internal/ws-bus/grant" \
+  -H "Authorization: ApiKey $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topics": ["plugin.demo.order.created", "plugin.demo.order.status"]
+  }'
+```
+
+4) **验证 publish / subscribe**
+
+- publish 端发送消息到 `plugin.demo.order.created`
+- subscribe 端订阅 `plugin.demo.order.status` 并检查是否收到
+
+### 典型误区
+
+- 只配 `plugin.yaml.events.topics[]`，没配 `config/event_fabric.yaml`：安装后底座不会播种执行层 topic。
+- 只调 `ws-bus/grant` 就以为会自动建 topic：不会，grant 仅做授权绑定。
+- topic 名称两层不一致：表现为授权成功但消息链路不通。
+
 ### 步骤 1：准备依赖
 
 在执行 `make dist` 之前，请先在插件项目根目录安装好后端与前端依赖，否则 Nuxt 构建阶段会尝试下载临时包，导致版本不一致或出现 “Cannot find module 'nuxt/config'” 之类的错误。

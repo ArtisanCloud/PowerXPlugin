@@ -60,7 +60,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 ### 标准流程（插件侧入口）
 
 1. 插件入站调试都打 `:8078`（Bearer）。
-2. 插件出站到底座按 `gateway.auth_scheme` 选择凭证（推荐 ApiKey）。
+2. 插件出站到底座按 `gateway.auth_scheme` 选择凭证（Bearer 或 ApiKey）。
 3. 先通过插件接口创建 topic（插件代理到底座 `admin/event-fabric/topics`）。
 4. 再执行 `grant`（插件代理到底座 `internal/ws-bus/grant`，仅绑定 ACL）。
 5. 最后执行 `publish`，并在 WS 连接上验证收到 `event`。
@@ -68,10 +68,15 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 ### Step 0：准备 proxy 凭证
 
 1. 在 PowerX 准备好带目标 topic 权限的 profile（`permission_ids`）。
-2. 基于该 profile 创建/轮换 API Key（权限为快照，profile 变更后必须换 key）。
-3. 配置插件出站凭证：
+2. 如果走 ApiKey，基于该 profile 创建/轮换 API Key（权限为快照，profile 变更后必须换 key）。
+3. 配置插件出站凭证（任选其一）：
 
 ```bash
+# 方案 A：Bearer
+export PX_GATEWAY_AUTH_SCHEME=bearer
+export PX_TOOL_TOKEN=<your_tool_token>
+
+# 方案 B：ApiKey
 export PX_GATEWAY_AUTH_SCHEME=apikey
 export PX_GATEWAY_API_KEY=<your_api_key>
 ```
@@ -125,15 +130,15 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 ### Step 5：验收
 
 1. 插件日志应看到：
-   - `gateway_auth_scheme=apikey`
-   - `outbound_token_source=PX_GATEWAY_API_KEY`
+   - `gateway_auth_scheme` 与你的配置一致（`bearer` / `apikey`）
+   - `outbound_token_source` 与凭证来源一致（如 `PX_TOOL_TOKEN` / `PX_GATEWAY_API_KEY`）
 2. 订阅端先收到 `ack`
 3. 执行 Step 4 后收到 `event`
 
 ## 7. 快速排障
 
 1. `404`：路径不是 `/api/ws`
-2. `401`：凭证无效或插件出站仍在走 Bearer
+2. `401`：凭证无效，或 `PX_GATEWAY_AUTH_SCHEME` 与实际提供的凭证不匹配
 3. `403 topic not allowed`：profile/ACL 未授权该 topic
 4. 只有 `ack` 无 `event`：topic 不一致、未先 `grant`，或权限快照未轮换
 5. `grant/publish` 失败且提示 topic 不存在：先走 `internal/event-fabric/topics` 创建 topic

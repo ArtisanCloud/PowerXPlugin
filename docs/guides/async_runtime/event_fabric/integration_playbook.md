@@ -10,18 +10,18 @@ export USER_TOKEN="<plugin-user-token>"
 并确保：
 
 1. `skeleton/plugin.yaml` 已声明目标 `_topic.*`
-2. 过渡期执行层文件 `skeleton/config/event_fabric.yaml` 已同步（底座当前扫描该文件）
+2. 执行层文件 `config/event_fabric.yaml` 已同步（框架会按多路径兼容扫描）
 3. 后端默认强鉴权
-4. proxy 场景已准备 API Key，并配置到插件：
-   - `PX_GATEWAY_AUTH_SCHEME=apikey`
-   - `PX_GATEWAY_API_KEY=<key>`
+4. proxy 场景已准备可用出站凭证，并配置到插件：
+   - Bearer：`PX_GATEWAY_AUTH_SCHEME=bearer` + `PX_TOOL_TOKEN=<token>`
+   - ApiKey：`PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY=<key>`
 
 ## 1.1 Standalone+Proxy 标准流程（对齐 PowerX）
 
 1. 插件声明所需 `topics + actions`。
 2. 通过插件接口创建 topic：`POST /admin/runtime/internal/event-fabric/topics`。
 3. Proxy 绑定 profile 的 topic 权限（permission_ids）。
-4. Proxy 轮换/新建 API Key（权限快照生效）。
+4. 若走 ApiKey，轮换/新建 API Key（权限快照生效）。
 5. 插件再代理调 `POST /api/v1/internal/ws-bus/grant`。
 6. 最后再执行 `publish` 与 WS `subscribe` 联调。
 
@@ -103,14 +103,14 @@ curl -sS "$PLUGIN_BASE_URL/admin/runtime/metrics" | rg 'plugin_event_bridge_(emi
 1. standalone：所有联调均在插件本地闭环
 2. standalone + proxy：
    - 入站请求仍打插件 `:8078`（Bearer）
-   - 插件出站到底座走 ApiKey
+   - 插件出站到底座按 `gateway.auth_scheme` 走 Bearer 或 ApiKey
    - 租户由底座按凭证解析
    - topic 与 key 权限准备由 Proxy 负责，不由插件业务逻辑直接处理
 
 ## 8. 常见故障最短定位
 
 1. `event permission denied`：`plugin.yaml` 未授权该 topic
-2. `401`：出站凭证错误（应确认 `gateway_auth_scheme=apikey`）
+2. `401`：出站凭证错误（确认 `gateway_auth_scheme` 与对应凭证是否匹配）
 3. `403 topic not allowed`：底座 ACL / profile 权限不足
 4. `ack` 无 `event`：topic 不一致或未完成 grant
 

@@ -62,7 +62,7 @@ npm run cli -- doctor --project-dir skeleton \
 | --- | --- |
 | 调用返回 429 且 `capability_rate_limit_events_total` 激增 | 观察 `capability.invoke.rate_limit` 日志获取 `traceId`、`tenantUUID`，检查是否存在突发流量；必要时调整限流或启用 Mock。 |
 | CLI doctor 提示 Token 过期 | 执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 刷新凭证，并将输出写入 `skeleton/.env.local`。 |
-| 指标缺失 `tenant` 标签 | 确认前端/调用方携带 `X-PowerX-Tenant`，Skeleton API 会自动传入 `InvokeParams.TenantUUID`。 |
+| 指标缺失 `tenant` 标签 | 确认前端/调用方携带 `tenant_uuid`，Skeleton API 会自动传入 `InvokeParams.TenantUUID`。 |
 | 日志缺失 `traceId` | 检查 Gateway 响应头是否返回 `X-Trace-Id`，若无可联系 PowerX 核心团队确认链路配置。 |
 
 ## 5. 参考文件

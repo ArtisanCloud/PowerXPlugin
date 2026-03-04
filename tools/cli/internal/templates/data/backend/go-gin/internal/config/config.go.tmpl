@@ -265,6 +265,7 @@ type SecurityConfig struct {
 // GatewayConfig 描述 Integration Gateway 所需配置。
 type GatewayConfig struct {
 	BaseURL      string        `yaml:"base_url" json:"base_url"`
+	APIPrefix    string        `yaml:"api_prefix" json:"api_prefix"`
 	AuthScheme   string        `yaml:"auth_scheme" json:"auth_scheme"`
 	ToolToken    string        `yaml:"tool_token" json:"tool_token"`
 	APIKey       string        `yaml:"api_key" json:"api_key"`
@@ -612,7 +613,8 @@ func getDefaultConfig() *Config {
 		},
 		SecurityBaseline: defaultSecurityBaselineConfig(),
 		Gateway: &GatewayConfig{
-			UseMock: []string{},
+			APIPrefix: "/api/v1",
+			UseMock:   []string{},
 		},
 		CustomerAuth: &CustomerAuthConfig{
 			Mode:             "local",
@@ -818,6 +820,7 @@ func resolveConfigCandidates() []string {
 		"./config/config.yaml",
 		"./config.yaml",
 		"./backend/etc/config.yaml",
+		"./skeleton/backend/etc/config.yaml",
 		"./etc/config.yaml",
 		"../config/host-values.yaml",
 		"../config/config.yaml",
@@ -995,6 +998,9 @@ func loadEnvConfig(cfg *Config) {
 	if baseURL := resolveConfigValue(os.Getenv("PX_GATEWAY_BASE_URL")); baseURL != "" {
 		cfg.Gateway.BaseURL = baseURL
 	}
+	if apiPrefix := resolveConfigValue(os.Getenv("PX_GATEWAY_API_PREFIX")); apiPrefix != "" {
+		cfg.Gateway.APIPrefix = apiPrefix
+	}
 	if authScheme := resolveConfigValue(os.Getenv("PX_GATEWAY_AUTH_SCHEME")); authScheme != "" {
 		cfg.Gateway.AuthScheme = authScheme
 	}
@@ -1086,6 +1092,7 @@ func normalizeConfig(cfg *Config) {
 	}
 	if cfg.Gateway != nil {
 		cfg.Gateway.BaseURL = resolveConfigValue(cfg.Gateway.BaseURL)
+		cfg.Gateway.APIPrefix = normalizeGatewayAPIPrefix(resolveConfigValue(cfg.Gateway.APIPrefix))
 		cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(resolveConfigValue(cfg.Gateway.AuthScheme))
 		cfg.Gateway.ToolToken = resolveConfigValue(cfg.Gateway.ToolToken)
 		cfg.Gateway.APIKey = resolveConfigValue(cfg.Gateway.APIKey)
@@ -1290,6 +1297,21 @@ func normalizeGatewayAuthScheme(raw string) string {
 	default:
 		return ""
 	}
+}
+
+func normalizeGatewayAPIPrefix(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "/api/v1"
+	}
+	if !strings.HasPrefix(value, "/") {
+		value = "/" + value
+	}
+	value = "/" + strings.Trim(strings.TrimSpace(value), "/")
+	if value == "/" {
+		return "/api/v1"
+	}
+	return value
 }
 
 func inferGatewayAuthScheme(toolToken, apiKey string) string {

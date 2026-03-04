@@ -98,19 +98,21 @@ func (s *Service) Invoke(ctx context.Context, params InvokeParams) (*InvokeResul
 		return nil, &InvokeError{Category: ErrorCategoryUpstream, Message: "gateway client not configured"}
 	}
 	start := time.Now()
+	normalizedProtocol := normalizePreferredProtocol(params.PreferredProtocol, params.Payload)
+	normalizedAction := normalizeAction(params.Action, normalizedProtocol, params.Payload)
 	headers := copyHeaders(params.Headers)
 	if tenant := strings.TrimSpace(params.TenantUUID); tenant != "" {
 		if headers == nil {
 			headers = make(map[string]string, 1)
 		}
-		if strings.TrimSpace(headers["X-PowerX-Tenant"]) == "" {
-			headers["X-PowerX-Tenant"] = tenant
+		if strings.TrimSpace(headers["tenant_uuid"]) == "" {
+			headers["tenant_uuid"] = tenant
 		}
 	}
 	resp, err := s.gateway.Invoke(ctx, gateway.InvokeRequest{
 		CapabilityID:      params.CapabilityID,
-		Action:            params.Action,
-		PreferredProtocol: params.PreferredProtocol,
+		Action:            normalizedAction,
+		PreferredProtocol: normalizedProtocol,
 		Payload:           params.Payload,
 		Headers:           headers,
 		RequestID:         params.RequestID,
@@ -124,7 +126,10 @@ func (s *Service) Invoke(ctx context.Context, params InvokeParams) (*InvokeResul
 		if invErr.Category == ErrorCategoryRateLimited {
 			observability.IncrementCapabilityRateLimit(params.CapabilityID, params.TenantUUID)
 		}
-		s.logFailure(params, invErr, duration)
+		paramsForLog := params
+		paramsForLog.Action = normalizedAction
+		paramsForLog.PreferredProtocol = normalizedProtocol
+		s.logFailure(paramsForLog, invErr, duration)
 		return nil, invErr
 	}
 	result := &InvokeResult{
@@ -137,7 +142,10 @@ func (s *Service) Invoke(ctx context.Context, params InvokeParams) (*InvokeResul
 	}
 	duration := time.Since(start)
 	observability.ObserveCapabilityInvocation(params.CapabilityID, params.TenantUUID, observability.CapabilityInvocationResultSuccess, duration)
-	s.logSuccess(params, result.TraceID, result.Status, duration)
+	paramsForLog := params
+	paramsForLog.Action = normalizedAction
+	paramsForLog.PreferredProtocol = normalizedProtocol
+	s.logSuccess(paramsForLog, result.TraceID, result.Status, duration)
 	return result, nil
 }
 
@@ -194,17 +202,20 @@ func categorizeStatus(status int) ErrorCategory {
 }
 
 func (s *Service) logSuccess(params InvokeParams, traceID, status string, duration time.Duration) {
+	payloadMethod, payloadEndpoint := payloadRouteSummary(params.Payload)
 	observability.EmitCapabilityTrace(observability.CapabilityInvocationTrace{
-		Logger:             s.logger,
-		CapabilityID:       params.CapabilityID,
-		TenantUUID:         params.TenantUUID,
-		Action:             params.Action,
-		PreferredProtocol:  params.PreferredProtocol,
-		Status:             status,
-		TraceID:            traceID,
-		RequestID:          params.RequestID,
-		Result:             observability.CapabilityInvocationResultSuccess,
-		Duration:           duration,
+		Logger:            s.logger,
+		CapabilityID:      params.CapabilityID,
+		TenantUUID:        params.TenantUUID,
+		Action:            params.Action,
+		PreferredProtocol: params.PreferredProtocol,
+		PayloadMethod:     payloadMethod,
+		PayloadEndpoint:   payloadEndpoint,
+		Status:            status,
+		TraceID:           traceID,
+		RequestID:         params.RequestID,
+		Result:            observability.CapabilityInvocationResultSuccess,
+		Duration:          duration,
 	})
 }
 
@@ -213,24 +224,74 @@ func (s *Service) logFailure(params InvokeParams, err *InvokeError, duration tim
 		return
 	}
 	result := invocationResultFromCategory(err.Category)
+	payloadMethod, payloadEndpoint := payloadRouteSummary(params.Payload)
 	observability.EmitCapabilityTrace(observability.CapabilityInvocationTrace{
-		Logger:             s.logger,
-		CapabilityID:       params.CapabilityID,
-		TenantUUID:         params.TenantUUID,
-		Action:             params.Action,
-		PreferredProtocol:  params.PreferredProtocol,
-		TraceID:            err.TraceID,
-		RequestID:          params.RequestID,
-		Result:             result,
-		Duration:           duration,
-		ErrorCode:          err.Code,
-		ErrorMessage:       err.Message,
-		StatusCode:         err.Status,
+		Logger:            s.logger,
+		CapabilityID:      params.CapabilityID,
+		TenantUUID:        params.TenantUUID,
+		Action:            params.Action,
+		PreferredProtocol: params.PreferredProtocol,
+		PayloadMethod:     payloadMethod,
+		PayloadEndpoint:   payloadEndpoint,
+		TraceID:           err.TraceID,
+		RequestID:         params.RequestID,
+		Result:            result,
+		Duration:          duration,
+		ErrorCode:         err.Code,
+		ErrorMessage:      err.Message,
+		StatusCode:        err.Status,
 	})
 
 	if err.Category == ErrorCategoryRateLimited || err.Category == ErrorCategoryUnauthorized {
 		s.logAuditDenial(params, err)
 	}
+}
+
+func payloadRouteSummary(payload any) (string, string) {
+	p, ok := payload.(map[string]any)
+	if !ok || p == nil {
+		return "", ""
+	}
+	method := strings.TrimSpace(strings.ToUpper(fmt.Sprint(p["method"])))
+	endpoint := strings.TrimSpace(fmt.Sprint(p["endpoint"]))
+	return method, endpoint
+}
+
+func normalizePreferredProtocol(preferred string, payload any) string {
+	if hasRESTRoutePayload(payload) {
+		return "rest"
+	}
+	if hasGRPCRoutePayload(payload) {
+		return "grpc"
+	}
+	return strings.TrimSpace(preferred)
+}
+
+func normalizeAction(action, preferred string, payload any) string {
+	if strings.EqualFold(strings.TrimSpace(preferred), "rest") && hasRESTRoutePayload(payload) {
+		return ""
+	}
+	return strings.TrimSpace(action)
+}
+
+func hasRESTRoutePayload(payload any) bool {
+	p, ok := payload.(map[string]any)
+	if !ok || p == nil {
+		return false
+	}
+	method := strings.TrimSpace(strings.ToUpper(fmt.Sprint(p["method"])))
+	endpoint := strings.TrimSpace(fmt.Sprint(p["endpoint"]))
+	return method != "" && endpoint != ""
+}
+
+func hasGRPCRoutePayload(payload any) bool {
+	p, ok := payload.(map[string]any)
+	if !ok || p == nil {
+		return false
+	}
+	endpoint := strings.TrimSpace(fmt.Sprint(p["endpoint"]))
+	rpc := strings.TrimSpace(fmt.Sprint(p["rpc"]))
+	return endpoint != "" && rpc != ""
 }
 
 func (s *Service) logAuditDenial(params InvokeParams, err *InvokeError) {

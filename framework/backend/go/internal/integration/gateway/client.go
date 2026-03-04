@@ -32,6 +32,7 @@ const (
 // Config 描述构造 Gateway Client 所需的参数。
 type Config struct {
 	BaseURL            string
+	APIPrefix          string
 	TenantUUID         string
 	ToolToken          string
 	APIKey             string
@@ -103,6 +104,7 @@ func (e *InvocationError) Error() string {
 // Client 负责 REST/gRPC 能力调用封装。
 type Client struct {
 	baseURL        string
+	apiPrefix      string
 	tenantUUID     string
 	authScheme     string
 	credential     string
@@ -150,6 +152,7 @@ func NewClient(cfg Config) (*Client, error) {
 	}
 	client := &Client{
 		baseURL:         strings.TrimRight(baseURL, "/"),
+		apiPrefix:       normalizeAPIPrefix(cfg.APIPrefix),
 		tenantUUID:      tenant,
 		authScheme:      authScheme,
 		credential:      credential,
@@ -178,13 +181,6 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	if value := strings.TrimSpace(req.PreferredProtocol); value != "" {
 		body["preferred_protocol"] = value
 	}
-	tenantOverride := strings.TrimSpace(req.TenantUUID)
-	if tenantOverride == "" {
-		tenantOverride = c.tenantUUID
-	}
-	if tenantOverride != "" {
-		body["tenant_uuid"] = tenantOverride
-	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("gateway: encode payload: %w", err)
@@ -193,7 +189,15 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	if requestID == "" {
 		requestID = uuid.NewString()
 	}
-	endpoint := c.baseURL + invokePath
+	endpoint := buildGatewayEndpoint(c.baseURL, c.apiPrefix, invokePath)
+	slog.Default().Info("gateway.invoke.request",
+		slog.String("endpoint", endpoint),
+		slog.String("capability_id", req.CapabilityID),
+		slog.String("preferred_protocol", strings.TrimSpace(req.PreferredProtocol)),
+		slog.String("action", strings.TrimSpace(req.Action)),
+		slog.String("auth_scheme", c.authScheme),
+		slog.String("request_body", string(bodyBytes)),
+	)
 
 	ctxReq, cancel := context.WithTimeout(ctx, c.requestTimeout)
 	defer cancel()
@@ -205,11 +209,6 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("Authorization", buildAuthHeader(c.authScheme, c.credential))
-	if tenantOverride != "" {
-		httpReq.Header.Set("X-PowerX-Tenant", tenantOverride)
-	} else if c.tenantUUID != "" {
-		httpReq.Header.Set("X-PowerX-Tenant", c.tenantUUID)
-	}
 	httpReq.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
 		httpReq.Header.Set("User-Agent", c.userAgent)
@@ -220,6 +219,10 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 		}
 		httpReq.Header.Set(k, v)
 	}
+	slog.Default().Info("gateway.invoke.auth",
+		slog.String("request_id", requestID),
+		slog.String("authorization_scheme", extractAuthScheme(httpReq.Header.Get("Authorization"))),
+	)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -292,9 +295,6 @@ func (c *Client) InvokeGRPC(ctx context.Context, req InvokeRequest) (*Response, 
 		"authorization": buildAuthHeader(c.authScheme, c.credential),
 		"x-request-id":  requestID,
 	})
-	if c.tenantUUID != "" {
-		md.Set("x-powerx-tenant", c.tenantUUID)
-	}
 	ctxCall, cancel := context.WithTimeout(ctx, c.requestTimeout)
 	defer cancel()
 	ctxCall = metadata.NewOutgoingContext(ctxCall, md)
@@ -452,11 +452,55 @@ func normalizeAuthScheme(raw string) string {
 	}
 }
 
+func normalizeAPIPrefix(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "/api/v1"
+	}
+	if !strings.HasPrefix(value, "/") {
+		value = "/" + value
+	}
+	value = "/" + strings.Trim(strings.TrimSpace(value), "/")
+	if value == "/" {
+		return "/api/v1"
+	}
+	return value
+}
+
+func buildGatewayEndpoint(baseURL, apiPrefix, routePath string) string {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	route := "/" + strings.TrimLeft(strings.TrimSpace(routePath), "/")
+	prefix := normalizeAPIPrefix(apiPrefix)
+	if prefix == "" {
+		return base + route
+	}
+	if strings.HasSuffix(base, prefix) {
+		return base + route
+	}
+	return base + prefix + route
+}
+
 func buildAuthHeader(scheme, credential string) string {
 	if normalizeAuthScheme(scheme) == "apikey" {
 		return "ApiKey " + strings.TrimSpace(credential)
 	}
 	return "Bearer " + strings.TrimSpace(credential)
+}
+
+func extractAuthScheme(authHeader string) string {
+	auth := strings.TrimSpace(authHeader)
+	if auth == "" {
+		return "none"
+	}
+	lowered := strings.ToLower(auth)
+	switch {
+	case strings.HasPrefix(lowered, "bearer "):
+		return "bearer"
+	case strings.HasPrefix(lowered, "apikey "), strings.HasPrefix(lowered, "api_key "), strings.HasPrefix(lowered, "api-key "):
+		return "apikey"
+	default:
+		return "unknown"
+	}
 }
 
 func (c *Client) inspectContractVersion(expectedVersion, digestPath string) {

@@ -28,7 +28,7 @@
 | payload | object | 业务参数。 |
 | tenant_uuid | string | 从上下文注入。 |
 | request_id | string | 生成的 `X-Request-ID`。 |
-| headers | map | 额外上下文：`Authorization`, `X-PowerX-Tenant`, `traceparent`。 |
+| headers | map | 额外上下文：`Authorization`, `tenant_uuid`, `traceparent`。 |
 
 ## InvocationResponseTelemetry
 | 字段 | 类型 | 说明 |

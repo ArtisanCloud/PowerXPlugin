@@ -22,6 +22,11 @@ GO_BUILD_CACHE     ?= $(abspath $(BACKEND_DIR)/.cache/go-build)
 FRONTEND_DIR        ?= web-admin
 FRONTEND_OUTPUT     ?= $(FRONTEND_DIR)/.output
 
+CLI_ROOT_DIR        ?= ..
+CLI_BUILD_CACHE     ?= $(abspath $(CLI_ROOT_DIR)/.cache/go-build)
+PX_PLUGIN_CLI_VERSION ?=
+GO_BIN_DIR          ?= $(shell sh -c 'if [ -n "$$GOBIN" ]; then printf "%s" "$$GOBIN"; else GOPATH="$$(go env GOPATH 2>/dev/null)"; printf "%s/bin" "$$GOPATH"; fi')
+
 # Dist（install/local 用）
 DIST_ROOT           ?= dist
 DIST_DIR            ?= $(DIST_ROOT)/$(VERSION)
@@ -59,6 +64,30 @@ build: ## 构建后端（本机平台）
 	    echo "   跳过 migrate（未找到 cmd/database）"; \
 	  fi; \
 	fi
+
+.PHONY: build-px-plugin
+build-px-plugin: ## 在仓库根目录构建 bin/px-plugin
+	@echo "==> 构建 px-plugin CLI -> $(CLI_ROOT_DIR)/bin/px-plugin"
+	@mkdir -p $(CLI_ROOT_DIR)/bin
+	@mkdir -p $(CLI_BUILD_CACHE)
+	@if [ -n "$(PX_PLUGIN_CLI_VERSION)" ]; then \
+	  echo "   使用版本号: $(PX_PLUGIN_CLI_VERSION)"; \
+	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -ldflags "-X main.version=$(PX_PLUGIN_CLI_VERSION)" -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	else \
+	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	fi
+	@$(CLI_ROOT_DIR)/bin/px-plugin --version
+
+.PHONY: install-px-plugin
+install-px-plugin: build-px-plugin ## 构建并安装到 GOBIN/GOPATH/bin，保持 `px-plugin` 直接可用
+	@echo "==> 安装 px-plugin 到 $(GO_BIN_DIR)/px-plugin"
+	@mkdir -p $(GO_BIN_DIR)
+	@cp $(CLI_ROOT_DIR)/bin/px-plugin $(GO_BIN_DIR)/px-plugin
+	@echo "已安装: $(GO_BIN_DIR)/px-plugin"
+	@$(GO_BIN_DIR)/px-plugin --version || { \
+	  echo "⚠️ 已安装，但无法直接执行 $(GO_BIN_DIR)/px-plugin --version（可能被系统策略拦截或终端缓存影响）"; \
+	  echo "   请手动执行: hash -r && px-plugin --version"; \
+	}
 
 .PHONY: build-linux
 build-linux: ## 构建后端（Linux amd64）

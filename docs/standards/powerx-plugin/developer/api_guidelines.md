@@ -183,7 +183,7 @@ func CreateTemplate(c *gin.Context) {
 | `X-PowerX-CTX`     | HMAC 模式签名    | `base64(hmac(payload))`          |
 | `X-PowerX-CTX-JWT` | JWT 模式签名     | `Bearer eyJhbGciOiJSUzI1NiIs...` |
 | `X-Request-ID`     | 请求唯一标识       | 自动生成                             |
-| `X-PowerX-Tenant`    | （仅开发模式）显式传租户 | `00000000-0000-0000-0000-000000000001` |
+| `tenant_uuid`    | （仅开发模式）显式传租户 | `00000000-0000-0000-0000-000000000001` |
 
 ---
 

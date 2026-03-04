@@ -10,11 +10,11 @@
 
 2. **Standalone 骨架演练**  
    - 按照《[PowerXPlugin Standalone 启动教程](./develop/standalone/README.md)》同步依赖并启动 Skeleton 后端与管理端。  
-   - 使用多租户 Header 验证 Templates CRUD 示例（默认租户为 `X-PowerX-Tenant: 1`）：  
+   - 使用多租户 Header 验证 Templates CRUD 示例（默认租户为 `tenant_uuid: 1`）：  
      ```bash
      # 列表/创建/更新/删除示例
-     curl -s -H 'X-PowerX-Tenant: 1' http://localhost:8080/api/v1/templates | jq
-     curl -s -X POST -H 'X-PowerX-Tenant: 1' -H 'Content-Type: application/json' \
+     curl -s -H 'tenant_uuid: 1' http://localhost:8080/api/v1/templates | jq
+     curl -s -X POST -H 'tenant_uuid: 1' -H 'Content-Type: application/json' \
        -d '{"name":"Demo","description":"From Quickstart","content":"Hello"}' \
        http://localhost:8080/api/v1/templates | jq
      ```  

@@ -39,7 +39,8 @@ gateway:
   # tenant_uuid 仅用于 Bearer 本地兼容场景，proxy 场景由宿主按凭证解析租户。
   # 因此默认将 base_url 留空，避免在未登录/未配置 Token 时阻塞本地启动。
   base_url: ""
-  auth_scheme: "bearer" # bearer | apikey
+  api_prefix: "/api/v1"
+  auth_scheme: "apikey" # bearer | apikey
   tool_token: ""
   api_key: ""
   refresh_token: ""

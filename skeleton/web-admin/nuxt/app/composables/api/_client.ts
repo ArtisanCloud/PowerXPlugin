@@ -252,10 +252,10 @@ export function useApiClient() {
       });
     }
 
-    if (!headers.has("X-PowerX-Tenant")) {
+    if (!headers.has("tenant_uuid")) {
       const tenant = (next as any).tenantUuid || getTenantUuid();
       if (tenant) {
-        headers.set("X-PowerX-Tenant", String(tenant));
+        headers.set("tenant_uuid", String(tenant));
       }
     }
 

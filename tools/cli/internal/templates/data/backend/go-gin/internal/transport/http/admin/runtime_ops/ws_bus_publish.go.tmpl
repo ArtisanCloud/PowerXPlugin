@@ -52,12 +52,8 @@ func WSBusPublishHandler(deps *app.Deps) gin.HandlerFunc {
 			outboundBearer = resolveGatewayBearerToken(c, deps)
 			logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
 
-			baseURL := strings.TrimSpace(deps.Config.Gateway.BaseURL)
-			if strings.HasSuffix(baseURL, "/api/v1") {
-				baseURL = strings.TrimSuffix(baseURL, "/api/v1")
-			}
 			hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
-				BaseURL:    baseURL,
+				BaseURL:    strings.TrimSpace(deps.Config.Gateway.BaseURL),
 				AuthScheme: strings.TrimSpace(deps.Config.Gateway.AuthScheme),
 				Token:      strings.TrimSpace(deps.Config.Gateway.ToolToken),
 				APIKey:     strings.TrimSpace(deps.Config.Gateway.APIKey),

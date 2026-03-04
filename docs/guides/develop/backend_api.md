@@ -23,7 +23,7 @@ export TOOLGRANT_TOKEN=YOUR_TOOLGRANT_TOKEN
 - 根路径白名单（与 Gin 对齐）：仅 `/healthz`、`/assets/builds/meta`、`/assets/builds/meta/{build_id}` 支持不带 `api_prefix`
 - 请求头：
   - `Authorization: Bearer <token>`
-  - `X-Tenant-UUID: <tenant_uuid>`（部分路由强制）
+  - `tenant_uuid: <tenant_uuid>`（部分路由强制）
   - `X-Request-ID`（可选；若不传会自动生成）
 - 响应包裹：统一 `success/message/data/error/timestamp/request_id`
 
@@ -837,15 +837,15 @@ Public:
   - 示例: `curl -s -X POST "${BASE}/agent/sts/exchange" -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' -d '{}'`
   - 响应示例: `{"success":true,"data":{"ok":true},"message":"","error":null,"timestamp":"2025-01-01T00:00:00Z","request_id":"req"}`
 - [ ] `GET /agent/security/privacy/consent`
-  - 参数: Header: Authorization Bearer; tenant_uuid 由 x-powerx-tenant 或 query tenant_uuid 提供
+  - 参数: Header: Authorization Bearer; tenant_uuid 由 tenant_uuid 或 query tenant_uuid 提供
   - 示例: `curl -s -X GET "${BASE}/agent/security/privacy/consent" -H 'Authorization: Bearer ${TOKEN}'`
   - 响应示例: `{"success":true,"data":{},"message":"","error":null,"timestamp":"2025-01-01T00:00:00Z","request_id":"req"}`
 - [ ] `POST /agent/security/privacy/lifecycle`
-  - 参数: Header: Authorization Bearer; Body: {event_type, asset_key, metadata?}; tenant_uuid 由 x-powerx-tenant 或 query tenant_uuid 提供
+  - 参数: Header: Authorization Bearer; Body: {event_type, asset_key, metadata?}; tenant_uuid 由 tenant_uuid 或 query tenant_uuid 提供
   - 示例: `curl -s -X POST "${BASE}/agent/security/privacy/lifecycle" -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' -d '{"event_type":"consent","asset_key":"asset-1"}'`
   - 响应示例: `{"success":true,"data":{"ok":true},"message":"","error":null,"timestamp":"2025-01-01T00:00:00Z","request_id":"req"}`
 - [ ] `POST /agent/security/toolgrants/verify`
-  - 参数: Header: Authorization Bearer; Body: {token}; tenant_uuid 由 x-powerx-tenant 或 query tenant_uuid 提供
+  - 参数: Header: Authorization Bearer; Body: {token}; tenant_uuid 由 tenant_uuid 或 query tenant_uuid 提供
   - 示例: `curl -s -X POST "${BASE}/agent/security/toolgrants/verify" -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' -d '{"token":"${TOOLGRANT_TOKEN}"}'`
   - 响应示例: `{"success":true,"data":{"ok":true},"message":"","error":null,"timestamp":"2025-01-01T00:00:00Z","request_id":"req"}`
 

@@ -27,19 +27,21 @@ const (
 
 // CapabilityInvocationTrace 记录能力调用的追踪字段。
 type CapabilityInvocationTrace struct {
-	Logger       *slog.Logger
-	CapabilityID string
-	TenantUUID   string
-	Action       string
+	Logger            *slog.Logger
+	CapabilityID      string
+	TenantUUID        string
+	Action            string
 	PreferredProtocol string
-	Status       string
-	TraceID      string
-	RequestID    string
-	Result       CapabilityInvocationResult
-	Duration     time.Duration
-	ErrorCode    string
-	ErrorMessage string
-	StatusCode   int
+	PayloadMethod     string
+	PayloadEndpoint   string
+	Status            string
+	TraceID           string
+	RequestID         string
+	Result            CapabilityInvocationResult
+	Duration          time.Duration
+	ErrorCode         string
+	ErrorMessage      string
+	StatusCode        int
 }
 
 // EmitCapabilityTrace 输出标准化的能力调用日志事件。
@@ -59,6 +61,12 @@ func EmitCapabilityTrace(trace CapabilityInvocationTrace) {
 	}
 	if trace.PreferredProtocol != "" {
 		fields = append(fields, slog.String("preferredProtocol", trace.PreferredProtocol))
+	}
+	if trace.PayloadMethod != "" {
+		fields = append(fields, slog.String("payloadMethod", trace.PayloadMethod))
+	}
+	if trace.PayloadEndpoint != "" {
+		fields = append(fields, slog.String("payloadEndpoint", trace.PayloadEndpoint))
 	}
 	if trace.Status != "" {
 		fields = append(fields, slog.String("status", trace.Status))

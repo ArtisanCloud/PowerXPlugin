@@ -1,6 +1,12 @@
 # Skeleton 插件示例配置
 # 将本文件复制为 backend/etc/config.yaml 即可覆盖默认配置。
 #
+# 完整配置字段说明：
+#   docs/guides/config-reference.md
+# 约定：
+#   运行时能力统一写在 runtime.*（event_bridge/ws_bus/runtime_ops/monitoring/logging/integration/cache）
+#   历史顶层字段仍兼容读取，但不建议继续新增。
+#
 # Auth / IAM / 运行模式环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
 #   POWERX_PROXY                - 设为 1 时表示运行在宿主 iframe/代理下（Delegated 模式）
 #   POWERX_RBAC_DELEGATE        - true/1/on 时强制委托宿主 IAM（即使 POWERX_PROXY=0），只读本地数据
@@ -33,7 +39,8 @@ gateway:
   # tenant_uuid 仅用于 Bearer 本地兼容场景，proxy 场景由宿主按凭证解析租户。
   # 因此默认将 base_url 留空，避免在未登录/未配置 Token 时阻塞本地启动。
   base_url: ""
-  auth_scheme: "bearer" # bearer | apikey
+  api_prefix: "/api/v1"
+  auth_scheme: "apikey" # bearer | apikey
   tool_token: ""
   api_key: ""
   refresh_token: ""

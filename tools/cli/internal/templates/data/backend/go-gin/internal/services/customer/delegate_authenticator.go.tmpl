@@ -153,7 +153,7 @@ func (a *DelegateAuthenticator) validate(ctx context.Context, requestTenantUUID 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
 		if requestTenantUUID != "" {
-			req.Header.Set("X-PowerX-Tenant", requestTenantUUID)
+			req.Header.Set("tenant_uuid", requestTenantUUID)
 		}
 
 		resp, err := a.client.Do(req)

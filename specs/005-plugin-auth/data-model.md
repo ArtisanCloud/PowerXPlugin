@@ -61,6 +61,6 @@ AuthTokens ↔ TenantContext (runtime only)
 ## Validation Rules
 - 登录 identifier 必须匹配 email/phone/username 中之一，全部标准化为 lower-case。
 - Local 模式管理员凭证必须由 env/config 提供，否则 migrate 失败。
-- Delegated 模式 API 请求必须携带 `X-PowerX-Tenant`（来自 cookie/localStorage），并自动附带 `Authorization: Bearer <token>`。
+- Delegated 模式 API 请求必须携带 `tenant_uuid`（来自 cookie/localStorage），并自动附带 `Authorization: Bearer <token>`。
 - 所有刷新请求若 token 已过期则先清理本地缓存再提示登录。
 - `plugin_iam_mode` 指标需在服务启动和模式切换时更新。

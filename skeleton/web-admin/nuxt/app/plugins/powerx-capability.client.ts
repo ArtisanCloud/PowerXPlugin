@@ -63,6 +63,50 @@ const combineURL = (base?: string, endpoint?: string) => {
   return `${normalizedBase}${normalizedEndpoint}`
 }
 
+const pickStatus = (payload: Record<string, any>) => {
+  const topLevel = typeof payload.status === 'string' ? payload.status.trim() : ''
+  if (topLevel) {
+    return topLevel
+  }
+  const dataStatus = typeof payload?.data?.status === 'string' ? payload.data.status.trim() : ''
+  if (dataStatus) {
+    return dataStatus
+  }
+  const rawStatus = typeof payload?.raw?.status === 'string' ? payload.raw.status.trim() : ''
+  if (rawStatus) {
+    return rawStatus
+  }
+  return ''
+}
+
+const pickRaw = (payload: Record<string, any>) => {
+  if (payload.raw !== undefined && payload.raw !== null) {
+    return payload.raw
+  }
+  if (payload.data !== undefined && payload.data !== null) {
+    return payload.data
+  }
+  return null
+}
+
+const pickData = (payload: Record<string, any>) => {
+  const data = payload?.data
+  if (data && typeof data === 'object') {
+    if (data.payload !== undefined && data.payload !== null) {
+      return data.payload
+    }
+    return data
+  }
+  const raw = payload?.raw
+  if (raw && typeof raw === 'object') {
+    if (raw.payload !== undefined && raw.payload !== null) {
+      return raw.payload
+    }
+    return raw
+  }
+  return null
+}
+
 const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
   const fetcher = options.fetcher ?? ofetch
   const endpoint = options.endpoint || DEFAULT_ENDPOINT
@@ -124,11 +168,11 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
 
       return {
         traceId,
-        status: payload.status,
-        data: payload.data ?? null,
+        status: pickStatus(payload),
+        data: pickData(payload),
         errors: payload.errors ?? null,
         warnings,
-        raw: payload.raw ?? null
+        raw: pickRaw(payload)
       }
     }
   }

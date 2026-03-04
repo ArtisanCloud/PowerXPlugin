@@ -337,6 +337,8 @@ func resolveGrantMatrixBaseDir() string {
 	candidates := []string{
 		"backend/etc",
 		"etc",
+		"skeleton/backend/etc",
+		"skeleton/etc",
 	}
 	for _, path := range candidates {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {

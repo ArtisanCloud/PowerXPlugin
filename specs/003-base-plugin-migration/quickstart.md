@@ -29,18 +29,18 @@ go run ./skeleton/backend/go-gin/cmd/plugin &
 # 创建模板
 curl -X POST http://localhost:8078/api/v1/templates \
   -H 'Content-Type: application/json' \
-  -H 'X-PowerX-Tenant: 100' \
+  -H 'tenant_uuid: 100' \
   -d '{"name":"Demo","description":"From Quickstart","content":"Hello"}'
 
 # 查询当前租户列表
-curl -H 'X-PowerX-Tenant: 100' http://localhost:8078/api/v1/templates
+curl -H 'tenant_uuid: 100' http://localhost:8078/api/v1/templates
 
 # 访问其他租户资源应返回 404
-curl -H 'X-PowerX-Tenant: 200' http://localhost:8078/api/v1/templates/1
+curl -H 'tenant_uuid: 200' http://localhost:8078/api/v1/templates/1
 
 # 测量延迟（多次执行，确认 ≤1s）
 curl -w 'TOTAL_TIME=%{time_total}\n' -o /dev/null -s \
-  -H 'X-PowerX-Tenant: 100' http://localhost:8078/api/v1/templates
+  -H 'tenant_uuid: 100' http://localhost:8078/api/v1/templates
 ```
 
 结束后停止后端进程。

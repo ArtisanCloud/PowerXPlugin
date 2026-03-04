@@ -8,7 +8,7 @@ import (
 	common "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/middleware"
 )
 
-const tenantHeader = "X-Powerx-Tenant"
+const tenantHeader = "tenant_uuid"
 
 // TenantAdminGuard enforces tenant admin role + optional permissions and ensures tenant header present.
 func TenantAdminGuard(requiredPerms ...string) bootstrap.Middleware {

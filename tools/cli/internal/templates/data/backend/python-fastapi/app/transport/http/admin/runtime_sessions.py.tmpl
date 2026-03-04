@@ -1,3 +1,8 @@
+import json
+import os
+from urllib import request as urlrequest
+from urllib.error import URLError
+
 from fastapi import APIRouter, Request
 
 from app.contracts.response import (
@@ -7,14 +12,21 @@ from app.contracts.response import (
     ok,
 )
 from app.services.runtime_session_service import RuntimeSessionService
-import os
-from urllib import request as urlrequest
-from urllib.error import URLError
 
 from app.middleware.tenant_context import resolve_tenant_uuid
 
 router = APIRouter(prefix="/admin")
 service = RuntimeSessionService()
+
+
+def _gateway_endpoint(base_url: str, api_prefix: str, route_path: str) -> str:
+    base = (base_url or "").rstrip("/")
+    prefix = (api_prefix or "").strip() or "/api/v1"
+    if not prefix.startswith("/"):
+        prefix = f"/{prefix}"
+    prefix = prefix.rstrip("/") or "/"
+    route = route_path if route_path.startswith("/") else f"/{route_path}"
+    return f"{base}{prefix}{route}"
 
 
 def _request_id(request: Request) -> str | None:
@@ -220,10 +232,11 @@ async def ws_bus_publish(request: Request, payload: dict):
         tenant_uuid = resolve_tenant_uuid(request) or ""
     trace_id = str(payload.get("trace_id") or "").strip()
     if os.getenv("POWERX_PROXY") == "1" and settings and settings.gateway_base_url:
-        base = settings.gateway_base_url.rstrip("/")
-        if base.endswith("/api/v1"):
-            base = base[: -len("/api/v1")]
-        endpoint = f"{base}/api/v1/admin/runtime/internal/ws-bus/publish"
+        endpoint = _gateway_endpoint(
+            settings.gateway_base_url,
+            getattr(settings, "gateway_api_prefix", "/api/v1"),
+            "/admin/runtime/internal/ws-bus/publish",
+        )
         body = json.dumps(
             {"topic": topic, "payload": payload.get("payload"), "tenant_uuid": tenant_uuid, "trace_id": trace_id}
         ).encode("utf-8")
@@ -233,7 +246,7 @@ async def ws_bus_publish(request: Request, payload: dict):
         if raw_auth:
             req.add_header("Authorization", raw_auth)
         if tenant_uuid:
-            req.add_header("X-PowerX-Tenant", tenant_uuid)
+            req.add_header("tenant_uuid", tenant_uuid)
         try:
             with urlrequest.urlopen(req, timeout=5) as resp:
                 if resp.status >= 400:
@@ -273,10 +286,11 @@ async def ws_bus_grant(request: Request, payload: dict):
         if t not in allowed:
             return fail(ERR_CODE_INVALID_REQUEST, "topic not allowed", request_id=request_id, status_code=400)
     if os.getenv("POWERX_PROXY") == "1" and settings and settings.gateway_base_url:
-        base = settings.gateway_base_url.rstrip("/")
-        if base.endswith("/api/v1"):
-            base = base[: -len("/api/v1")]
-        endpoint = f"{base}/api/v1/admin/runtime/internal/ws-bus/grant"
+        endpoint = _gateway_endpoint(
+            settings.gateway_base_url,
+            getattr(settings, "gateway_api_prefix", "/api/v1"),
+            "/admin/runtime/internal/ws-bus/grant",
+        )
         body = json.dumps({"topics": topics, "tenant_uuid": payload.get("tenant_uuid"), "trace_id": payload.get("trace_id")}).encode(
             "utf-8"
         )
@@ -287,7 +301,7 @@ async def ws_bus_grant(request: Request, payload: dict):
             req.add_header("Authorization", raw_auth)
         tenant_uuid = str(payload.get("tenant_uuid") or "").strip()
         if tenant_uuid:
-            req.add_header("X-PowerX-Tenant", tenant_uuid)
+            req.add_header("tenant_uuid", tenant_uuid)
         try:
             with urlrequest.urlopen(req, timeout=5) as resp:
                 if resp.status >= 400:

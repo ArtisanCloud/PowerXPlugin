@@ -55,13 +55,22 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
   - `PX_PLUGIN_TOOL_TOKEN`（宿主）/`PX_TOOL_TOKEN`（Skeleton）
   - 租户从 Tool Token 的 `tid` claim 自动推导（不再单独维护额外 tenant 变量）
   - `PX_GATEWAY_CONTRACT_VERSION`（可选，配合 `dist/capability-contracts.json` 校验契约版本）
-- **Gateway Client** 负责注入 `Authorization`、`X-PowerX-Tenant`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据。
+- **Gateway Client** 负责注入 `Authorization`、`tenant_uuid`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据。
 
 > **环境加载与模式说明**：
 >
 > - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`），并覆盖 `config.yaml` 中同名配置。
 > - 宿主模式要求 `POWERX_PROXY=1`，且必须配置 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`；租户统一从 token `tid` 推导，否则会返回 503。
 > - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`IAM_MODE=local`），会覆盖 `.env` 的值，请先清理。
+
+### Gateway API 前缀规范（含 WS-Bus）
+
+- 统一新增 `PX_GATEWAY_API_PREFIX`，默认值为 `/api/v1`（对应 `config.yaml` 的 `gateway.api_prefix`）。
+- 绝大多数 Gateway 能力调用（如 `/tenant/invocations`）跟随该前缀拼接请求地址。
+- **WS-Bus 在不同环境可能不一致**：有的网关走 `/api/v1/...`，有的只走 `/api/...`。  
+  因此不要写死路径，统一通过 `PX_GATEWAY_API_PREFIX` 控制：
+  - 若你的网关是 `/api/v1`：`PX_GATEWAY_API_PREFIX=/api/v1`
+  - 若你的网关是 `/api`：`PX_GATEWAY_API_PREFIX=/api`
 
 ### 鉴权规范（重点：API Key 在什么模式下使用）
 
@@ -161,14 +170,14 @@ Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“�
 
 1. 启动 `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt`，使用 Root 账户登录后点击“开放能力调试”。
 2. 在“调用配置”卡片填写 `capabilityId`、`action` 和 JSON `payload`。选择 REST Action 后，Payload 区域会展示模板（含 `method`、`endpoint`、`headers`、`query`、`body`），并允许你一键插入；gRPC/Other Action 会提示协议类型与必填字段。可选参数包括：
-   - **自定义 Tenant UUID**：写入 `X-PowerX-Tenant`，用于跨租户复现问题。
+   - **自定义 Tenant UUID**：写入 `tenant_uuid`，用于跨租户复现问题。
    - **Mock 模块**：在输入框填写模块名（如 `media`），页面会透传 `X-PX-Use-Mock: <module>` 到后端/Gateway；响应 `warnings` 中会标记“通过 X-PX-Use-Mock 请求 Mock 模块”，方便确认 Mock 是否生效。
    - **Request ID / API Base**：用于调试自定义 `X-Request-ID` 或手动切换代理地址。
 3. “请求预览”实时展示最终 URL、Headers、Body，可一键复制到 curl / `.http` 文件。
 4. 调用完成后，“调用结果”显示状态、TraceId、耗时与 JSON 响应；若契约版本过期、Mock 被启用或 Gateway 返回提示，都会出现在 `warnings` 中。“最近记录”会缓存最近 5 条请求，便于回放。
 5. Gateway 不可达时，可在页面中指定 Mock 模块，或结合 `.env.local` 中的 `PX_USE_MOCK`，以验证前后端封装是否正常。
 
-> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理，headers 仅包含 `X-PowerX-Tenant` / `X-PX-Use-Mock` / `X-Request-ID` 等调试信息。
+> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理，headers 仅包含 `tenant_uuid` / `X-PX-Use-Mock` / `X-Request-ID` 等调试信息。
 
 ## 7. 常见问题 & 排障
 

@@ -40,7 +40,7 @@ func resolveTenantUUID(c *gin.Context) (string, bool) {
 		return strings.TrimSpace(tc.TenantUUID), true
 	}
 
-	if id, ok := parseTenantUUID(c.GetHeader("X-PowerX-Tenant")); ok {
+	if id, ok := parseTenantUUID(c.GetHeader("tenant_uuid")); ok {
 		return id, true
 	}
 

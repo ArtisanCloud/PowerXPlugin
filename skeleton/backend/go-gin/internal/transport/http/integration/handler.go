@@ -138,9 +138,6 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 		}
 	}
 	actionForInvoke := action
-	if shouldOmitActionForREST(preferredProtocol, payload) {
-		actionForInvoke = ""
-	}
 
 	headers := collectCapabilityHeaders(c)
 	warnings := collectCapabilityWarnings(headers)

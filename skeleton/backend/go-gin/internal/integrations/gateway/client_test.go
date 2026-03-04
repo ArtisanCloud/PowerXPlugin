@@ -90,7 +90,7 @@ func (s *stubTransport) Close() error { return nil }
 
 func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/tenant/capabilities" {
+		if r.URL.Path != "/api/v1/tenant/capabilities" {
 			http.NotFound(w, r)
 			return
 		}

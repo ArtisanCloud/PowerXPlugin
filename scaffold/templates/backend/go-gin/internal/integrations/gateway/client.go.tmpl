@@ -475,8 +475,7 @@ func (c *Client) reconnectTransport() error {
 		return fmt.Errorf("gateway config missing")
 	}
 	gcfg := c.cfg.Gateway
-	baseURL := strings.TrimRight(strings.TrimSpace(gcfg.BaseURL), "/")
-	apiPrefix := normalizeAPIPrefix(gcfg.APIPrefix)
+	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
 	authScheme := effectiveGatewayAuthScheme(gcfg)
 	toolToken := strings.TrimSpace(gcfg.ToolToken)
 	apiKey := strings.TrimSpace(gcfg.APIKey)
@@ -494,7 +493,6 @@ func (c *Client) reconnectTransport() error {
 
 	client, err := frameworkgateway.NewClient(frameworkgateway.Config{
 		BaseURL:        baseURL,
-		APIPrefix:      apiPrefix,
 		AuthScheme:     authScheme,
 		ToolToken:      toolToken,
 		APIKey:         apiKey,

@@ -25,7 +25,11 @@ ifeq ($(BACKEND),fastapi)
 BACKEND_DIR := backend/python-fastapi
 BACKEND_KIND := python
 else
+ifneq ($(wildcard backend/go.mod),)
+BACKEND_DIR := backend
+else
 BACKEND_DIR := backend/go-gin
+endif
 BACKEND_KIND := gin
 endif
 

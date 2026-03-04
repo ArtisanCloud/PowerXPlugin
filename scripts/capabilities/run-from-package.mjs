@@ -185,7 +185,7 @@ async function invokeCapability(options) {
     "X-Request-ID": requestId,
   };
   if (options.tenantUUID) {
-    headers["X-PowerX-Tenant"] = options.tenantUUID;
+    headers["tenant_uuid"] = options.tenantUUID;
   }
   if (options.toolToken) {
     headers.Authorization = `Bearer ${options.toolToken}`;

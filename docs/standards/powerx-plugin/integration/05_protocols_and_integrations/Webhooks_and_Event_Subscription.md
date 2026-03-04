@@ -95,7 +95,7 @@ events:
 ```
 X-PowerX-Signature: t=1739400000,v1=e1b9c13c6e2...
 X-PowerX-Event-ID: evt_01F8ZK8D
-X-PowerX-Tenant: tenant_abc
+tenant_uuid: tenant_abc
 ```
 
 插件需通过宿主下发的 `WEBHOOK_SECRET` 验证：

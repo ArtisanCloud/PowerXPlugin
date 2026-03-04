@@ -134,3 +134,36 @@ func TestInvokeCapabilityGatewayError(t *testing.T) {
 	require.Equal(t, "RATE_LIMIT", errObj["code"])
 	require.Equal(t, "rate_limited", errObj["type"])
 }
+
+func TestInvokeCapabilityForwardsBearerWithoutTenantHeader(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	fake := &fakeCapabilityGateway{
+		result: &capgateway.InvokeResult{
+			TraceID: "trace-tenant",
+			Status:  "accepted",
+			Data:    map[string]any{"ok": true},
+		},
+	}
+
+	handler := &Handler{
+		deps: &app.Deps{
+			CapabilityGateway: fake,
+		},
+	}
+
+	body := `{"capabilityId":"com.corex.media.assets.read","action":"List","payload":{"method":"GET","endpoint":"/api/v1/media/assets"}}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integration/capabilities/invoke", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("tenant_uuid", "aeffc79f-e72a-4fd9-b908-5c150bce3741")
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+
+	handler.InvokeCapability(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "Bearer test-token", fake.lastParams.Headers["Authorization"])
+	require.NotContains(t, fake.lastParams.Headers, "tenant_uuid")
+}

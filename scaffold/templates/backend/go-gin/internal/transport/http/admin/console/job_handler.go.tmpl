@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	"{{ .BackendModulePath }}/internal/contracts"
+	consolesvc "{{ .BackendModulePath }}/internal/services/admin/console"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 

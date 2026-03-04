@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	opmodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
-	oprepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/operations"
-	opmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
-	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/config"
+	opmodels "{{ .BackendModulePath }}/internal/entity/models/operations"
+	oprepo "{{ .BackendModulePath }}/internal/entity/repository/operations"
+	opmetrics "{{ .BackendModulePath }}/internal/observability/operations"
+	runtimeops "{{ .BackendModulePath }}/internal/services/admin/runtime_ops"
+	"{{ .BackendModulePath }}/internal/shared/app"
 )
 
 const (

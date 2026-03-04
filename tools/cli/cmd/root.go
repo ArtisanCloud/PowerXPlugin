@@ -77,6 +77,8 @@ Init command flags:
   --go-version <version>           Go version (default: 1.24)
   --force                          Overwrite existing files
   --install-deps                   Automatically install dependencies
+  --init-config                    Create local config files from *.example templates
+  --git-init                       Initialize git repository in target directory (default: true)
   --sbom-path <path>               Path to write SBOM file
   --publish-manifest-path <path>   Path to write publish manifest
 

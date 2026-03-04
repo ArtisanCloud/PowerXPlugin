@@ -7,14 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	authmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	middleware "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	"{{ .BackendModulePath }}/internal/contracts"
+	authmetrics "{{ .BackendModulePath }}/internal/observability/auth"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	middleware "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
-	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	"{{ .BackendModulePath }}/internal/services/authproxy"
+	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 )
 
 // authProxy captures the delegated client surface the handler needs.

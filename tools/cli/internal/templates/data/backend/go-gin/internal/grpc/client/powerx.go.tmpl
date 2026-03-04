@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	cfgpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	cfgpkg "{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/logger"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -224,7 +224,7 @@ func (p *PowerXServiceClient) Outgoing(ctx context.Context) context.Context {
 	}
 
 	if p.tenantUUID != "" {
-		md.Set("x-powerx-tenant", p.tenantUUID)
+		md.Set("tenant_uuid", p.tenantUUID)
 	}
 	return metadata.NewOutgoingContext(ctx, md)
 }

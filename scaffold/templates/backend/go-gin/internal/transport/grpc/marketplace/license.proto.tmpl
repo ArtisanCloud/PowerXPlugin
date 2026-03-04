@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package marketplace;
 
-option go_package = "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/grpc/marketplace";
+option go_package = "{{ .BackendModulePath }}/internal/transport/grpc/marketplace";
 
 message IssueLicenseRequest {
   string tenant_uuid = 1;

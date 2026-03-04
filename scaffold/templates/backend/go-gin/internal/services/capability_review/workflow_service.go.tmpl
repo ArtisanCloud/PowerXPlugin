@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
-	capobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
-	capsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/capability"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/logger"
+	capobs "{{ .BackendModulePath }}/internal/observability/capability"
+	capsvc "{{ .BackendModulePath }}/internal/services/capability"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )

@@ -73,7 +73,9 @@ func (s *CatalogService) List(ctx context.Context, opts ListOptions) ([]capabili
 		return nil, fmt.Errorf("capability catalog service not configured")
 	}
 
-	if strings.EqualFold(strings.TrimSpace(opts.Source), "corex") {
+	source := normalizeCatalogSource(opts.Source)
+
+	if source == "corex" {
 		if entries, err := s.listPlatformCatalog(ctx, opts); err == nil {
 			return entries, nil
 		} else {
@@ -82,7 +84,60 @@ func (s *CatalogService) List(ctx context.Context, opts ListOptions) ([]capabili
 		}
 	}
 
+	if source == "all" {
+		platformEntries, platformErr := s.listPlatformCatalog(ctx, ListOptions{Source: "corex"})
+		if platformErr != nil {
+			logger.WithError(platformErr).WithField("component", "capability_catalog_service").
+				Warn("failed to load platform capability catalog for source=all, falling back to local manifest")
+		}
+		localEntries, localErr := s.listLocalCatalog(ctx)
+		if localErr != nil {
+			return nil, localErr
+		}
+		return mergeCatalogEntries(platformEntries, localEntries), nil
+	}
+
 	return s.listLocalCatalog(ctx)
+}
+
+func normalizeCatalogSource(source string) string {
+	normalized := strings.ToLower(strings.TrimSpace(source))
+	switch normalized {
+	case "", "all", "any":
+		return "all"
+	case "platform":
+		return "corex"
+	default:
+		return normalized
+	}
+}
+
+func mergeCatalogEntries(platformEntries, localEntries []capabilities.CatalogEntry) []capabilities.CatalogEntry {
+	if len(platformEntries) == 0 {
+		return localEntries
+	}
+	if len(localEntries) == 0 {
+		return platformEntries
+	}
+
+	merged := make([]capabilities.CatalogEntry, 0, len(platformEntries)+len(localEntries))
+	seen := make(map[string]struct{}, len(platformEntries)+len(localEntries))
+	appendUnique := func(entries []capabilities.CatalogEntry) {
+		for _, entry := range entries {
+			id := strings.TrimSpace(entry.ID)
+			if id == "" {
+				continue
+			}
+			if _, exists := seen[id]; exists {
+				continue
+			}
+			seen[id] = struct{}{}
+			merged = append(merged, entry)
+		}
+	}
+	appendUnique(platformEntries)
+	appendUnique(localEntries)
+	return merged
 }
 
 func (s *CatalogService) listLocalCatalog(ctx context.Context) ([]capabilities.CatalogEntry, error) {
@@ -129,7 +184,7 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	if tenant != "" {
-		req.Header.Set("X-PowerX-Tenant", tenant)
+		req.Header.Set("tenant_uuid", tenant)
 	}
 	req.Header.Set("X-Request-ID", fmt.Sprintf("cap-catalog-%d", time.Now().UnixNano()))
 

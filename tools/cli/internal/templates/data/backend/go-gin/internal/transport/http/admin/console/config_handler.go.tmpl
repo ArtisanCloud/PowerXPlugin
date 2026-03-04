@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	"{{ .BackendModulePath }}/internal/contracts"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	consolesvc "{{ .BackendModulePath }}/internal/services/admin/console"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 

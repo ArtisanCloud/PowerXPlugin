@@ -12,6 +12,8 @@ export interface PowerXCapabilityRequest {
   signal?: AbortSignal
   apiBase?: string
   endpoint?: string
+  preferredProtocol?: string
+  metadata?: Record<string, any>
 }
 
 export interface PowerXCapabilityResponse {
@@ -19,19 +21,26 @@ export interface PowerXCapabilityResponse {
   status?: string
   data?: Record<string, any> | null
   errors?: Record<string, any> | Record<string, any>[] | null
+  warnings?: string[] | null
+  raw?: Record<string, any> | Record<string, any>[] | string | null
 }
 
 export class PowerXCapabilityBridgeError extends Error {
   status?: number
   traceId?: string
   details?: any
+  warnings?: string[]
 
-  constructor(message: string, opts: { status?: number; traceId?: string; details?: any } = {}) {
+  constructor(
+    message: string,
+    opts: { status?: number; traceId?: string; details?: any; warnings?: string[] } = {}
+  ) {
     super(message)
     this.name = 'PowerXCapabilityBridgeError'
     this.status = opts.status
     this.traceId = opts.traceId
     this.details = opts.details
+    this.warnings = opts.warnings
   }
 }
 
@@ -52,6 +61,50 @@ const combineURL = (base?: string, endpoint?: string) => {
     return normalizedEndpoint
   }
   return `${normalizedBase}${normalizedEndpoint}`
+}
+
+const pickStatus = (payload: Record<string, any>) => {
+  const topLevel = typeof payload.status === 'string' ? payload.status.trim() : ''
+  if (topLevel) {
+    return topLevel
+  }
+  const dataStatus = typeof payload?.data?.status === 'string' ? payload.data.status.trim() : ''
+  if (dataStatus) {
+    return dataStatus
+  }
+  const rawStatus = typeof payload?.raw?.status === 'string' ? payload.raw.status.trim() : ''
+  if (rawStatus) {
+    return rawStatus
+  }
+  return ''
+}
+
+const pickRaw = (payload: Record<string, any>) => {
+  if (payload.raw !== undefined && payload.raw !== null) {
+    return payload.raw
+  }
+  if (payload.data !== undefined && payload.data !== null) {
+    return payload.data
+  }
+  return null
+}
+
+const pickData = (payload: Record<string, any>) => {
+  const data = payload?.data
+  if (data && typeof data === 'object') {
+    if (data.payload !== undefined && data.payload !== null) {
+      return data.payload
+    }
+    return data
+  }
+  const raw = payload?.raw
+  if (raw && typeof raw === 'object') {
+    if (raw.payload !== undefined && raw.payload !== null) {
+      return raw.payload
+    }
+    return raw
+  }
+  return null
 }
 
 const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
@@ -77,35 +130,48 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
       }
       let response: FetchResponse<Record<string, any>>
       try {
+        const body: Record<string, any> = {
+          capabilityId,
+          action,
+          payload: request.payload ?? {}
+        }
+        if (request.preferredProtocol) {
+          body.preferredProtocol = request.preferredProtocol
+        }
+        if (request.metadata) {
+          body.metadata = request.metadata
+        }
         response = await fetcher.raw(url, {
           method: 'POST',
           headers,
-          body: {
-            capabilityId,
-            action,
-            payload: request.payload ?? {}
-          },
+          body,
           signal: request.signal
         })
       } catch (error) {
-        throw new PowerXCapabilityBridgeError(error instanceof Error ? error.message : 'capability invoke failed')
+        throw new PowerXCapabilityBridgeError(
+          error instanceof Error ? error.message : 'capability invoke failed'
+        )
       }
 
       const payload = response._data ?? {}
       const traceId = payload.traceId || response.headers.get('x-trace-id') || undefined
+      const warnings = Array.isArray(payload.warnings) ? payload.warnings : undefined
       if (response.status >= 400 || payload.error) {
         throw new PowerXCapabilityBridgeError(payload.error?.message || 'capability invoke failed', {
           status: response.status,
           traceId,
-          details: payload.error || payload.errors
+          details: payload.error || payload.errors,
+          warnings
         })
       }
 
       return {
         traceId,
-        status: payload.status,
-        data: payload.data ?? null,
-        errors: payload.errors ?? null
+        status: pickStatus(payload),
+        data: pickData(payload),
+        errors: payload.errors ?? null,
+        warnings,
+        raw: pickRaw(payload)
       }
     }
   }

@@ -52,7 +52,7 @@ def resolve_tenant_uuid(request: Request) -> Optional[str]:
     tc = get_tenant_context(request)
     if tc and tc.tenant_uuid.strip():
         return tc.tenant_uuid.strip()
-    header_uuid = _normalize_uuid(request.headers.get("x-powerx-tenant", ""))
+    header_uuid = _normalize_uuid(request.headers.get("tenant_uuid", ""))
     if header_uuid:
         return header_uuid
     query_uuid = _normalize_uuid(request.query_params.get("tenant_uuid", ""))

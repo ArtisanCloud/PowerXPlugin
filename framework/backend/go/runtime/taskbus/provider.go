@@ -19,6 +19,7 @@ import (
 
 type HostProviderConfig struct {
 	BaseURL        string
+	APIPrefix      string
 	AuthScheme     string
 	Token          string
 	APIKey         string
@@ -52,6 +53,7 @@ func NewHostProviderFromApp(app *bootstrap.App, sourcePlugin, payloadVersion str
 
 	return NewHostProvider(HostProviderConfig{
 		BaseURL:        strings.TrimSpace(app.Config.Gateway.BaseURL),
+		APIPrefix:      strings.TrimSpace(app.Config.Gateway.APIPrefix),
 		AuthScheme:     strings.TrimSpace(app.Config.Gateway.AuthScheme),
 		Token:          strings.TrimSpace(app.Config.Gateway.ToolToken),
 		APIKey:         strings.TrimSpace(app.Config.Gateway.APIKey),
@@ -70,6 +72,7 @@ func (p *HostProvider) NewEmitter() (eventbridge.Emitter, error) {
 
 	client, err := wsbus.NewHostClient(wsbus.HostClientConfig{
 		BaseURL:    p.cfg.BaseURL,
+		APIPrefix:  p.cfg.APIPrefix,
 		AuthScheme: p.cfg.AuthScheme,
 		Token:      p.cfg.Token,
 		APIKey:     p.cfg.APIKey,

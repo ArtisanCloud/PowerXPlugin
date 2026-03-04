@@ -1,6 +1,12 @@
 # Skeleton 插件示例配置
 # 将本文件复制为 backend/etc/config.yaml 即可覆盖默认配置。
 #
+# 完整配置字段说明：
+#   docs/guides/config-reference.md
+# 约定：
+#   运行时能力统一写在 runtime.*（event_bridge/ws_bus/runtime_ops/monitoring/logging/integration/cache）
+#   历史顶层字段仍兼容读取，但不建议继续新增。
+#
 # Auth / IAM / 运行模式环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
 #   POWERX_PROXY                - 设为 1 时表示运行在宿主 iframe/代理下（Delegated 模式）
 #   POWERX_RBAC_DELEGATE        - true/1/on 时强制委托宿主 IAM（即使 POWERX_PROXY=0），只读本地数据
@@ -13,7 +19,7 @@
 #   NUXT_PUBLIC_POWERX_PROXY    - 与上类似，供 runtimeConfig 判断 API Base
 
 server:
-  bind_addr: ":8078"
+  bind_addr: ":{{ .BackendPort }}"
   api_prefix: "/api/v1"
 
 # gRPC 上游（可选，默认关闭）
@@ -26,14 +32,15 @@ grpc_upstream:
 
 gateway:
   # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN。
-  # 若留空则默认关闭 Gateway 调用，`PX_USE_MOCK` 可指定 media,eventfabric 等模块名称以启用内存 Mock。
+  # 默认指向本机 PowerX Core（8077）；可由 .env.local 的 PX_GATEWAY_BASE_URL 覆盖。
+  # 未配置有效凭证时可通过 `PX_USE_MOCK` 指定 media,eventfabric 等模块名称启用内存 Mock。
   # 凭证分流：
   # - auth_scheme=bearer（Host/宿主模式）使用 tool_token
   # - auth_scheme=apikey（Standalone+Proxy）使用 api_key
   # tenant_uuid 仅用于 Bearer 本地兼容场景，proxy 场景由宿主按凭证解析租户。
-  # 因此默认将 base_url 留空，避免在未登录/未配置 Token 时阻塞本地启动。
-  base_url: ""
-  auth_scheme: "bearer" # bearer | apikey
+  base_url: "http://127.0.0.1:8077"
+  api_prefix: "/api/v1"
+  auth_scheme: "apikey" # bearer | apikey
   tool_token: ""
   api_key: ""
   refresh_token: ""

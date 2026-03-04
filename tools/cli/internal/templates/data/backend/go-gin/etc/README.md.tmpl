@@ -2,10 +2,10 @@
 
 ## 快速开始
 
-Skeleton 默认在未提供任何 YAML 的情况下使用 **内存 SQLite** 运行，因此你可以直接：
+默认在未提供任何 YAML 的情况下使用 **内存 SQLite** 运行，因此你可以直接：
 
 ```bash
-cd skeleton/backend/go-gin
+cd backend
 go run ./cmd/plugin
 ```
 

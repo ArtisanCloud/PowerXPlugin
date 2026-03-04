@@ -11,7 +11,7 @@ import (
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"{{ .BackendModulePath }}/internal/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -81,7 +81,9 @@ func newHostTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {
 	}
 	return fwtaskbus.NewHostProvider(fwtaskbus.HostProviderConfig{
 		BaseURL:        strings.TrimSpace(gateway.BaseURL),
+		AuthScheme:     strings.TrimSpace(gateway.AuthScheme),
 		Token:          strings.TrimSpace(gateway.ToolToken),
+		APIKey:         strings.TrimSpace(gateway.APIKey),
 		TenantUUID:     strings.TrimSpace(gateway.TenantUUID),
 		UserAgent:      strings.TrimSpace(gateway.UserAgent),
 		Timeout:        gateway.Timeout,

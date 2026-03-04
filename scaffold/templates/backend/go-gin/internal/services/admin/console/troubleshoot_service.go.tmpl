@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/config"
+	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"gorm.io/gorm"
 )
 

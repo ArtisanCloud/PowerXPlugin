@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
-	authobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
+	basemodels "{{ .BackendModulePath }}/internal/entity/models"
+	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
+	authobs "{{ .BackendModulePath }}/internal/observability/auth"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

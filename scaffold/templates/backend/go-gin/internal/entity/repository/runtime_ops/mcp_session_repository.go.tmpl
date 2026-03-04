@@ -3,9 +3,9 @@ package runtime_ops
 import (
 	"context"
 
-	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
+	"{{ .BackendModulePath }}/internal/entity/repository"
+	authx "{{ .BackendModulePath }}/internal/middleware"
 	"gorm.io/gorm"
 )
 

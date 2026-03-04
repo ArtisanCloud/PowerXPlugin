@@ -17,7 +17,7 @@
 1. **Router Path Param 支持**：`framework/backend/go/router/router.go:140` 的 `Context.Param` 目前返回空，需实现路径参数解析，否则 `/templates/:id` 无法工作。
 2. **数据存储层替换**：Base 插件依赖 GORM + 数据库；需改造成符合 `.specify/memory/constitution.md` 的内存仓储（map 或 `sync.Map`），同时保持 Repository 结构内嵌 `BaseRepository[T]` 并完整实现租户隔离规范。
 3. **统一响应格式**：Base 使用 `{success, data, message, error, timestamp, request_id}`；框架需提供同结构的 JSON 响应助手，供 Skeleton 与未来模板共享。
-4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `X-PowerX-Tenant` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
+4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `tenant_uuid` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
 
 ## 4. 实施里程碑
 
@@ -135,6 +135,6 @@
 ## 13. 依赖检查清单
 
 - [ ] `framework-admin` Layer 可用，StarterPages toggle 生效
-- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `X-PowerX-Tenant`
+- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `tenant_uuid`
 - [ ] Skeleton 后端可独立运行并完成 CRUD Smoke（Phase 2 验证）
 - [ ] Skeleton 前端（含 `POWERX_PROXY=1` 场景）可访问首页与 Admin CRUD 页面

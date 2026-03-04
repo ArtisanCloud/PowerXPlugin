@@ -116,7 +116,7 @@ func NewClient(cfg *config.Config, log *logrus.Entry) *Client {
 	}
 
 	gcfg := cfg.Gateway
-	baseURL := strings.TrimSpace(gcfg.BaseURL)
+	baseURL := effectiveGatewayBaseURL(gcfg)
 	authScheme := effectiveGatewayAuthScheme(gcfg)
 	credential := gatewayCredential(gcfg, authScheme)
 
@@ -173,6 +173,28 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		Headers:           copyHeaders(params.Headers),
 		TenantUUID:        params.TenantUUID,
 	}
+	if c.logger != nil {
+		baseURL := ""
+		apiPrefix := ""
+		authScheme := ""
+		if c.cfg != nil && c.cfg.Gateway != nil {
+			baseURL = strings.TrimSpace(c.cfg.Gateway.BaseURL)
+			apiPrefix = strings.TrimSpace(c.cfg.Gateway.APIPrefix)
+			authScheme = effectiveGatewayAuthScheme(c.cfg.Gateway)
+		}
+		c.logger.WithFields(logrus.Fields{
+			"capability":             params.CapabilityID,
+			"action":                 params.Action,
+			"preferred_protocol":     params.PreferredProtocol,
+			"request_id":             params.RequestID,
+			"payload_method":         strings.TrimSpace(strings.ToUpper(fmt.Sprint(extractMapValue(params.Payload, "method")))),
+			"payload_endpoint":       strings.TrimSpace(fmt.Sprint(extractMapValue(params.Payload, "endpoint"))),
+			"gateway_base_url":       baseURL,
+			"gateway_api_prefix":     apiPrefix,
+			"gateway_effective_base": effectiveGatewayBaseURL(c.cfg.Gateway),
+			"gateway_auth_scheme":    authScheme,
+		}).Info("gateway invoke dispatch")
+	}
 	resp, err := c.transport.Invoke(ctx, req)
 	if err != nil {
 		if retryResp, retryErr := c.handleInvokeError(ctx, req, params.CapabilityID, params.Action, err); retryErr == nil && retryResp != nil {
@@ -191,13 +213,21 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 	}, nil
 }
 
+func extractMapValue(payload any, key string) any {
+	valueMap, ok := payload.(map[string]any)
+	if !ok || valueMap == nil {
+		return nil
+	}
+	return valueMap[key]
+}
+
 // ListPlatformCapabilities retrieves platform capability metadata via tenant API.
 func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatformCapabilitiesOptions) ([]PlatformCapabilityRecord, error) {
 	if c.cfg == nil || c.cfg.Gateway == nil {
 		return nil, fmt.Errorf("gateway config missing")
 	}
 	gcfg := c.cfg.Gateway
-	baseURL := strings.TrimRight(strings.TrimSpace(gcfg.BaseURL), "/")
+	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
 	if baseURL == "" {
 		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
 	}
@@ -243,7 +273,7 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
 	if tenant != "" {
-		req.Header.Set("X-PowerX-Tenant", tenant)
+		req.Header.Set("tenant_uuid", tenant)
 	}
 	req.Header.Set("X-Request-ID", uuid.NewString())
 
@@ -407,7 +437,7 @@ func ValidateConfig(cfg *config.Config) error {
 	if cfg == nil || cfg.Gateway == nil {
 		return errors.New("gateway config missing")
 	}
-	base := strings.TrimSpace(cfg.Gateway.BaseURL)
+	base := effectiveGatewayBaseURL(cfg.Gateway)
 	authScheme := effectiveGatewayAuthScheme(cfg.Gateway)
 	credential := gatewayCredential(cfg.Gateway, authScheme)
 	if base == "" || credential == "" {
@@ -445,7 +475,7 @@ func (c *Client) reconnectTransport() error {
 		return fmt.Errorf("gateway config missing")
 	}
 	gcfg := c.cfg.Gateway
-	baseURL := strings.TrimSpace(gcfg.BaseURL)
+	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
 	authScheme := effectiveGatewayAuthScheme(gcfg)
 	toolToken := strings.TrimSpace(gcfg.ToolToken)
 	apiKey := strings.TrimSpace(gcfg.APIKey)
@@ -478,6 +508,39 @@ func (c *Client) reconnectTransport() error {
 	}
 	c.transport = client
 	return nil
+}
+
+func effectiveGatewayBaseURL(gcfg *config.GatewayConfig) string {
+	if gcfg == nil {
+		return ""
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(gcfg.BaseURL), "/")
+	if baseURL == "" {
+		return ""
+	}
+	apiPrefix := normalizeAPIPrefix(gcfg.APIPrefix)
+	if apiPrefix == "" {
+		return baseURL
+	}
+	if strings.HasSuffix(baseURL, apiPrefix) {
+		return baseURL
+	}
+	return baseURL + apiPrefix
+}
+
+func normalizeAPIPrefix(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "/api/v1"
+	}
+	if !strings.HasPrefix(value, "/") {
+		value = "/" + value
+	}
+	value = "/" + strings.Trim(strings.TrimSpace(value), "/")
+	if value == "/" {
+		return "/api/v1"
+	}
+	return value
 }
 
 type platformCapabilityResponse struct {

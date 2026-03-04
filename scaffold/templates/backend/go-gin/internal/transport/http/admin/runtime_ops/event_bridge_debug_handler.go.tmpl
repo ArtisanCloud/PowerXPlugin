@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 )
 
 type eventBridgeEmitRequest struct {

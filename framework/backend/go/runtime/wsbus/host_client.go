@@ -15,12 +15,14 @@ import (
 )
 
 const (
-	hostPublishPath  = "/api/v1/internal/ws-bus/publish"
-	hostRegisterPath = "/api/v1/internal/ws-bus/grant"
+	defaultAPIPrefix = "/api/v1"
+	hostPublishPath  = "/internal/ws-bus/publish"
+	hostRegisterPath = "/internal/ws-bus/grant"
 )
 
 type HostClientConfig struct {
 	BaseURL    string
+	APIPrefix  string
 	AuthScheme string
 	Token      string
 	APIKey     string
@@ -32,6 +34,7 @@ type HostClientConfig struct {
 
 type HostClient struct {
 	baseURL    string
+	apiPrefix  string
 	authScheme string
 	credential string
 	tenantUUID string
@@ -75,6 +78,7 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 	}
 	return &HostClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
+		apiPrefix:  normalizeAPIPrefix(cfg.APIPrefix),
 		authScheme: authScheme,
 		credential: credential,
 		tenantUUID: strings.TrimSpace(cfg.TenantUUID),
@@ -119,7 +123,7 @@ func (c *HostClient) Publish(ctx context.Context, topic string, payload any, opt
 		requestID = uuid.NewString()
 	}
 
-	return c.publishToEndpoint(ctx, c.baseURL+hostPublishPath, bodyBytes, tenantUUID, requestID, opts, "publish request")
+	return c.publishToEndpoint(ctx, c.buildEndpoint(hostPublishPath), bodyBytes, tenantUUID, requestID, opts, "publish request")
 }
 
 func (c *HostClient) RegisterTopics(ctx context.Context, topics []string, opts PublishOptions) PublishResult {
@@ -154,7 +158,7 @@ func (c *HostClient) RegisterTopics(ctx context.Context, topics []string, opts P
 	if requestID == "" {
 		requestID = uuid.NewString()
 	}
-	return c.registerTopicsToEndpoint(ctx, c.baseURL+hostRegisterPath, bodyBytes, tenantUUID, requestID, opts, "grant request")
+	return c.registerTopicsToEndpoint(ctx, c.buildEndpoint(hostRegisterPath), bodyBytes, tenantUUID, requestID, opts, "grant request")
 }
 
 func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint string, bodyBytes []byte, tenantUUID, requestID string, opts PublishOptions, label string) PublishResult {
@@ -375,4 +379,31 @@ func normalizeAuthScheme(raw string) string {
 	default:
 		return ""
 	}
+}
+
+func normalizeAPIPrefix(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return defaultAPIPrefix
+	}
+	if !strings.HasPrefix(value, "/") {
+		value = "/" + value
+	}
+	value = "/" + strings.Trim(strings.TrimSpace(value), "/")
+	if value == "/" {
+		return ""
+	}
+	return value
+}
+
+func (c *HostClient) buildEndpoint(routePath string) string {
+	base := strings.TrimRight(strings.TrimSpace(c.baseURL), "/")
+	route := "/" + strings.TrimLeft(strings.TrimSpace(routePath), "/")
+	if c.apiPrefix == "" {
+		return base + route
+	}
+	if strings.HasSuffix(base, c.apiPrefix) {
+		return base + route
+	}
+	return base + c.apiPrefix + route
 }

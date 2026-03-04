@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	authmw "{{ .BackendModulePath }}/internal/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -32,7 +32,7 @@ func ResolveTenantUUID(c *gin.Context) string {
 			}
 		}
 	}
-	if v := strings.TrimSpace(c.GetHeader("X-PowerX-Tenant")); v != "" {
+	if v := strings.TrimSpace(c.GetHeader("tenant_uuid")); v != "" {
 		return v
 	}
 	if v := strings.TrimSpace(c.Query("tenant_uuid")); v != "" {

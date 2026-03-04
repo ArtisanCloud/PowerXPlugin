@@ -580,7 +580,7 @@ sequenceDiagram
   })
   ```
 
-- **后端**：`capabilityinvoker.Service` 会将 `X-PowerX-Tenant`、`X-Request-ID` 透传到 Gateway（有则转发），成功时在响应体与 `X-Trace-Id` Header 写回 traceId。返回 JSON 结构：
+- **后端**：`capabilityinvoker.Service` 会将 `tenant_uuid`、`X-Request-ID` 透传到 Gateway（有则转发），成功时在响应体与 `X-Trace-Id` Header 写回 traceId。返回 JSON 结构：
 
   ```json
   {
@@ -597,7 +597,7 @@ sequenceDiagram
 | 错误类型 (`error.type`) | HTTP | 典型原因 | 排查步骤 |
 | --- | --- | --- | --- |
 | `validation` | `400` | `capabilityId`/`action` 为空、payload 缺字段 | 检查入参是否符合能力契约；`tests/capabilities/media_invocation_test.go` 展示了最小 payload；必要时查看 router 打印的校验日志。 |
-| `unauthorized` | `401/403` | `PX_PLUGIN_TOOL_TOKEN` 已过期或租户 UUID 不匹配 | 使用 `px-plugin login` 重新申请 Grant，或在宿主部署脚本中刷新环境变量；确认请求头 `X-PowerX-Tenant` 是否与运维配置一致。 |
+| `unauthorized` | `401/403` | `PX_PLUGIN_TOOL_TOKEN` 已过期或租户 UUID 不匹配 | 使用 `px-plugin login` 重新申请 Grant，或在宿主部署脚本中刷新环境变量；确认请求头 `tenant_uuid` 是否与运维配置一致。 |
 | `rate_limited` | `429` | 能力 QPS 超限 | 响应会包含 `traceId` 与 `error.code=RATE_LIMIT`；先查看宿主 Gateway 仪表板或联系平台扩容，再在前端提示用户稍后重试。 |
 | `upstream` | `502/504` | Gateway 不可达、action 未发布 | 查看插件后端日志 `capability.invoke.failure`，确认 `statusCode` 与 `message`；必要时将结果写入告警或切换 `PX_USE_MOCK`。 |
 

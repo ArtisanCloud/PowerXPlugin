@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
-	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
-	runtimeRepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/runtime_ops"
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"{{ .BackendModulePath }}/internal/config"
+	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
+	repo "{{ .BackendModulePath }}/internal/entity/repository"
+	runtimeRepo "{{ .BackendModulePath }}/internal/entity/repository/runtime_ops"
+	authx "{{ .BackendModulePath }}/internal/middleware"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

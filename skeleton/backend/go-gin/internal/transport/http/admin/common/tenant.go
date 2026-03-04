@@ -32,7 +32,7 @@ func ResolveTenantUUID(c *gin.Context) string {
 			}
 		}
 	}
-	if v := strings.TrimSpace(c.GetHeader("X-PowerX-Tenant")); v != "" {
+	if v := strings.TrimSpace(c.GetHeader("tenant_uuid")); v != "" {
 		return v
 	}
 	if v := strings.TrimSpace(c.Query("tenant_uuid")); v != "" {

@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"{{ .BackendModulePath }}/internal/config"
 )
 
 // RefreshToolToken 调用 PowerX Auth 接口刷新 Tool Token。
@@ -31,7 +31,7 @@ func RefreshToolToken(ctx context.Context, cfg *config.Config) (string, string, 
 	if base == "" {
 		return "", "", fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
 	}
-	endpoints := buildRefreshEndpoints(base)
+	endpoints := buildRefreshEndpoints(base, cfg.Gateway.APIPrefix)
 	if len(endpoints) == 0 {
 		return "", "", fmt.Errorf("refresh endpoint 未配置")
 	}
@@ -144,19 +144,30 @@ func parseRefreshResponse(endpoint string, statusCode int, bodyBytes []byte, fal
 	return newToken, newRefresh, nil
 }
 
-func buildRefreshEndpoints(base string) []string {
+func buildRefreshEndpoints(base, apiPrefix string) []string {
 	trimmedBase := strings.TrimRight(strings.TrimSpace(base), "/")
 	if trimmedBase == "" {
 		return nil
 	}
-	baseWithoutAPIV1 := strings.TrimSuffix(trimmedBase, "/api/v1")
-	if baseWithoutAPIV1 == "" {
-		baseWithoutAPIV1 = trimmedBase
+	normalizedPrefix := normalizeAPIPrefix(apiPrefix)
+	baseWithoutPrefix := strings.TrimSuffix(trimmedBase, normalizedPrefix)
+	if baseWithoutPrefix == "" {
+		baseWithoutPrefix = trimmedBase
+	}
+	legacyBaseWithoutAPIV1 := strings.TrimSuffix(trimmedBase, "/api/v1")
+	if legacyBaseWithoutAPIV1 == "" {
+		legacyBaseWithoutAPIV1 = trimmedBase
+	}
+
+	prefixPath := normalizedPrefix
+	if prefixPath == "" {
+		prefixPath = "/api/v1"
 	}
 	candidates := []string{
-		baseWithoutAPIV1 + "/api/v1/admin/user/auth/refresh",
+		baseWithoutPrefix + prefixPath + "/admin/user/auth/refresh",
 		trimmedBase + "/admin/user/auth/refresh",
-		baseWithoutAPIV1 + "/admin/user/auth/refresh",
+		baseWithoutPrefix + "/admin/user/auth/refresh",
+		legacyBaseWithoutAPIV1 + "/api/v1/admin/user/auth/refresh",
 	}
 	seen := map[string]struct{}{}
 	result := make([]string, 0, len(candidates))

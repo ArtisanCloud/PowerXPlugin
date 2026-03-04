@@ -46,6 +46,7 @@ type Config struct {
 // GatewayConfig 描述 Integration Gateway 所需的凭证。
 type GatewayConfig struct {
 	BaseURL            string
+	APIPrefix          string
 	AuthScheme         string
 	ToolToken          string
 	APIKey             string
@@ -126,6 +127,7 @@ func NewAppFromEnv(opts ...Option) *App {
 	}
 	cfg.Gateway = GatewayConfig{
 		BaseURL:         getEnvOrDefault("PX_GATEWAY_BASE_URL", ""),
+		APIPrefix:       getEnvOrDefault("PX_GATEWAY_API_PREFIX", "/api/v1"),
 		AuthScheme:      strings.TrimSpace(os.Getenv("PX_GATEWAY_AUTH_SCHEME")),
 		ToolToken:       firstNonEmpty(strings.TrimSpace(os.Getenv("PX_PLUGIN_TOOL_TOKEN")), strings.TrimSpace(os.Getenv("PX_TOOL_TOKEN"))),
 		APIKey:          firstNonEmpty(strings.TrimSpace(os.Getenv("PX_GATEWAY_API_KEY")), strings.TrimSpace(os.Getenv("PX_PLUGIN_API_KEY"))),
@@ -220,6 +222,7 @@ func (a *App) initGatewayClient() {
 	}
 	gcfg := gateway.Config{
 		BaseURL:    a.Config.Gateway.BaseURL,
+		APIPrefix:  a.Config.Gateway.APIPrefix,
 		AuthScheme: a.Config.Gateway.AuthScheme,
 		ToolToken:  a.Config.Gateway.ToolToken,
 		APIKey:     a.Config.Gateway.APIKey,

@@ -3,9 +3,9 @@ package admin
 import (
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/contracts"
+	"{{ .BackendModulePath }}/internal/logger"
+	"{{ .BackendModulePath }}/internal/shared/app"
 
 	"github.com/gin-gonic/gin"
 )
@@ -39,7 +39,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 
 		Backend: contracts.BackendConfig{
 			Entry:  "backend/bin/plugin",
-			Port:   8078,
+			Port:   {{ .BackendPort }},
 			Health: "/healthz",
 		},
 

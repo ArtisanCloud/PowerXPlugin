@@ -24,6 +24,10 @@ dist/agent-sdk/*
 build/
 !tools/cli/internal/build/
 tools/cli/cmd/px-plugin
+tools/cli/.gocache
+tools/cli/.gomodcache
+.gocache
+.gomodcache
 
 # Dependency locks generated per workspace
 

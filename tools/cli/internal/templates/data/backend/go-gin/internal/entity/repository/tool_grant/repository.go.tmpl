@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/tool_grant"
-	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	model "{{ .BackendModulePath }}/internal/entity/models/tool_grant"
+	repository "{{ .BackendModulePath }}/internal/entity/repository"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

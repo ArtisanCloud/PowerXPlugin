@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
-	svc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	"{{ .BackendModulePath }}/internal/contracts"
+	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
+	svc "{{ .BackendModulePath }}/internal/services/marketplace"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )

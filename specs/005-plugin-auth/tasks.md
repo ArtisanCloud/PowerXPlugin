@@ -32,7 +32,7 @@
 ### Implementation
 
 - [X] T009 [US1] 在 `skeleton/web-admin/nuxt/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
-- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`，注入 `Authorization` / `X-PowerX-Tenant`，在 401 时自动调 `authService.refreshToken` 并重放请求。
+- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`，注入 `Authorization` / `tenant_uuid`，在 401 时自动调 `authService.refreshToken` 并重放请求。
 - [X] T011 [P] [US1] 新建 `skeleton/web-admin/nuxt/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
 - [X] T012 [US1] 添加 `skeleton/web-admin/nuxt/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
 - [X] T013 [US1] 完成 `skeleton/web-admin/nuxt/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。

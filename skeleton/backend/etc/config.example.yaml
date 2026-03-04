@@ -32,14 +32,15 @@ grpc_upstream:
 
 gateway:
   # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN。
-  # 若留空则默认关闭 Gateway 调用，`PX_USE_MOCK` 可指定 media,eventfabric 等模块名称以启用内存 Mock。
+  # 默认指向本机 PowerX Core（8077）；可由 .env.local 的 PX_GATEWAY_BASE_URL 覆盖。
+  # 未配置有效凭证时可通过 `PX_USE_MOCK` 指定 media,eventfabric 等模块名称启用内存 Mock。
   # 凭证分流：
   # - auth_scheme=bearer（Host/宿主模式）使用 tool_token
   # - auth_scheme=apikey（Standalone+Proxy）使用 api_key
   # tenant_uuid 仅用于 Bearer 本地兼容场景，proxy 场景由宿主按凭证解析租户。
-  # 因此默认将 base_url 留空，避免在未登录/未配置 Token 时阻塞本地启动。
-  base_url: ""
-  auth_scheme: "bearer" # bearer | apikey
+  base_url: "http://127.0.0.1:8077"
+  api_prefix: "/api/v1"
+  auth_scheme: "apikey" # bearer | apikey
   tool_token: ""
   api_key: ""
   refresh_token: ""

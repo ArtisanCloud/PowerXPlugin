@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"{{ .BackendModulePath }}/internal/config"
+	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
+	authx "{{ .BackendModulePath }}/internal/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"

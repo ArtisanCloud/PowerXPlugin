@@ -613,6 +613,7 @@ func getDefaultConfig() *Config {
 		},
 		SecurityBaseline: defaultSecurityBaselineConfig(),
 		Gateway: &GatewayConfig{
+			BaseURL:   "http://127.0.0.1:8077",
 			APIPrefix: "/api/v1",
 			UseMock:   []string{},
 		},

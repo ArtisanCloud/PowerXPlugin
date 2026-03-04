@@ -268,9 +268,6 @@ func normalizePreferredProtocol(preferred string, payload any) string {
 }
 
 func normalizeAction(action, preferred string, payload any) string {
-	if strings.EqualFold(strings.TrimSpace(preferred), "rest") && hasRESTRoutePayload(payload) {
-		return ""
-	}
 	return strings.TrimSpace(action)
 }
 

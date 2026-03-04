@@ -471,13 +471,15 @@ func buildGatewayEndpoint(baseURL, apiPrefix, routePath string) string {
 	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	route := "/" + strings.TrimLeft(strings.TrimSpace(routePath), "/")
 	prefix := normalizeAPIPrefix(apiPrefix)
+	endpoint := ""
 	if prefix == "" {
-		return base + route
+		endpoint = base + route
+	} else if strings.HasSuffix(base, prefix) {
+		endpoint = base + route
+	} else {
+		endpoint = base + prefix + route
 	}
-	if strings.HasSuffix(base, prefix) {
-		return base + route
-	}
-	return base + prefix + route
+	return endpoint
 }
 
 func buildAuthHeader(scheme, credential string) string {

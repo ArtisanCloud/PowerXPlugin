@@ -593,9 +593,9 @@ const form = reactive({
 const defaultActionSuggestions = ['List', 'Get', 'Create', 'Update', 'Delete', 'Publish', 'Trigger', 'Execute']
 const showRequestPreview = ref(true)
 const codeBlockClass =
-  'font-mono text-[13px] leading-relaxed text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-slate-900/70 border border-gray-200 dark:border-gray-700 rounded shadow-inner shadow-black/5'
+  'font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-all overflow-x-auto text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-slate-900/70 border border-gray-200 dark:border-gray-700 rounded shadow-inner shadow-black/5'
 const miniCodeBlockClass =
-  'font-mono text-xs leading-relaxed text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-slate-900/70 border border-gray-200 dark:border-gray-700 rounded'
+  'font-mono text-xs leading-relaxed whitespace-pre-wrap break-all overflow-x-auto text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-slate-900/70 border border-gray-200 dark:border-gray-700 rounded'
 const headerIconClass = 'text-primary dark:text-[#93c5fd]'
 const headerTitleClass = 'font-medium text-gray-900 dark:text-[#fdfcff]'
 const manualPayloadOverride = ref(false)

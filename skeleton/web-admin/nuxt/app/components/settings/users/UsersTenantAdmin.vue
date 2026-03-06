@@ -250,6 +250,7 @@ async function saveUser() {
     } else {
       // 创建系统用户
       const createPayload = {
+        tenant_uuid: props.tenantUuid,
         display_name: userForm.name,
         email: userForm.email,
         phone: userForm.phone,
@@ -496,6 +497,7 @@ async function loadUsers() {
   try {
     loading.value = true;
     const params: any = {
+      tenant_uuid: props.tenantUuid,
       page: pagination.page,
       page_size: pagination.pageSize,
       status: filters.status

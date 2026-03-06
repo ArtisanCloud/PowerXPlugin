@@ -87,29 +87,29 @@
   ```
   由 `auth_handler`、`authproxy`、RBAC 中间件与未来 CLI 共用。
 - **DelegatedIAMClient**（默认模式）：  
-  - 生效条件：`POWERX_PROXY=1`（宿主注入）或显式设置 `POWERX_RBAC_DELEGATE=true`。  
+  - 生效条件：`POWERX_PROXY=1`（宿主注入）或显式设置 `POWERX_PROXY=1`。  
   - 依赖 `POWERX_CORE_ENDPOINT`（Core API 基址）、`POWERX_AUTH_TOKEN`（服务 Token）、`POWERX_TENANT_ID`（如宿主按租户注入）拼装 HTTP/gRPC 请求；必要时读取 `POWERX_PLUGIN_ID` 作为 `aud`.  
   - 失败时抛出带追踪信息的错误，供上层统一处理/重试。
 - **LocalIAMStore**（开发/离线）：  
-  - 生效条件：`POWERX_PROXY!=1` 且未开启 `POWERX_RBAC_DELEGATE`。  
+  - 生效条件：`POWERX_PROXY!=1` 且未开启 `POWERX_PROXY`。  
   - 使用插件自己的数据库 Schema（`POWERX_PLUGIN_SCHEMA`/SQLite DSN），新增 `internal/entity/models/iam` 及仓储实现保留用户、角色、部门等最小集合。  
   - 提供基础 Seed（默认租户、管理员账号），并通过 `go run ./cmd/database/main.go seed` 可选开启。  
   - 仅用于开发/自动化测试，文档中标注“不可在生产持久化宿主 IAM 数据”。
 - **AutoMigrate 策略**：  
   - `migrate.MigratePluginModels` 拆分 `pluginTables`（业务表）与 `iamTables`（新建）；  
-  - 当 `POWERX_PROXY=1` 或 `POWERX_RBAC_DELEGATE` 为 true 时仅迁业务表；否则迁两者；  
+  - 当 `POWERX_PROXY=1` 或 `POWERX_PROXY` 为 true 时仅迁业务表；否则迁两者；  
   - 继续尊重 `POWERX_RUN_MIGRATE`（或 `runtime.run_migrate`），并在日志打印当前模式。  
   - CLI 输出友好提醒：“delegated 模式下跳过 IAM 表，如需本地模型请 unset POWERX_PROXY”。
 - **模式决策**：  
-  - 在 `bootstrap` 层新增 `IAMResolver`，将 `Config.Context.IAMMode`（YAML 可选字段）、`POWERX_PROXY`、`POWERX_RBAC_DELEGATE` 按优先级组合，返回 `delegated`/`local`。  
+  - 在 `bootstrap` 层新增 `IAMResolver`，将 `Config.Context.IAMMode`（YAML 可选字段）、`POWERX_PROXY`、`POWERX_PROXY` 按优先级组合，返回 `delegated`/`local`。  
   - 前端 `useAuthService` 继续指向插件 API；后端 `auth_handler` 根据 Resolver 选择实现。  
-  - 文档记录如何通过 `POWERX_RBAC_DELEGATE=false` 在宿主环境短暂启用 Local 模式（仅供诊断）。
+  - 文档记录如何通过 `POWERX_PROXY=false` 在宿主环境短暂启用 Local 模式（仅供诊断）。
 - **遥测与告警**：  
   - 新增 `plugin_iam_mode{mode="delegated|local"}` Gauge；  
   - `plugin_iam_delegate_errors_total`、`plugin_iam_local_sync_seconds` 等指标帮助定位问题；  
   - 日志中统一输出 `mode=delegated`/`mode=local` 及主要环境变量值（遮蔽 Token）。
 
-> **模式切换环境变量速记**：`POWERX_PROXY=1` 默认启用 Delegated IAM；若 `POWERX_RBAC_DELEGATE` 显式设为 truthy（`1/true/on`）也强制委托；反之在 `POWERX_PROXY!=1` 且未设置 Delegate 的场景会落入 Local IAM。`context.iam_mode`（YAML 配置）可作为最终 override。
+> **模式切换环境变量速记**：`POWERX_PROXY=1` 默认启用 Delegated IAM；若 `POWERX_PROXY` 显式设为 truthy（`1/true/on`）也强制委托；反之在 `POWERX_PROXY!=1` 且未设置 Delegate 的场景会落入 Local IAM。`context.iam_mode`（YAML 配置）可作为最终 override。
 
 ### 4. Scaffold & CLI 同步
 - 执行 `npm run sync:templates` 将新文件同步到：  
@@ -128,7 +128,7 @@
 |------|------|----------|
 | Phase 0：对齐契约 (1d) | 验证宿主 API & DTO | ① 梳理 `PowerX` Auth API 与响应字段；② 明确环境变量、租户获取方式；③ 输出对齐备忘录（docs/plan 附录）。 |
 | Phase 1：前端基座 (3d) | 完成 `useAuth` + Service + Middleware | ① 新增 `useAuth`、`authService`、`auth.client.ts`；② 改造 `_client.ts` 刷新逻辑；③ 补充页面/导航 UI。 |
-| Phase 2：后端代理 & IAM Resolver (3d) | 提供 Proxy API + 双模式 IAM 抽象 | ① 实现 `authproxy` service 与 Handler；② 注入 `IAMDirectory` 接口 + Delegated/Local 实现与 Resolver；③ 拆分 migrate 表集并联动 `POWERX_PROXY`/`POWERX_RBAC_DELEGATE`；④ 单测 JWT/IAM 组合路径。 |
+| Phase 2：后端代理 & IAM Resolver (3d) | 提供 Proxy API + 双模式 IAM 抽象 | ① 实现 `authproxy` service 与 Handler；② 注入 `IAMDirectory` 接口 + Delegated/Local 实现与 Resolver；③ 拆分 migrate 表集并联动 `POWERX_PROXY`/`POWERX_PROXY`；④ 单测 JWT/IAM 组合路径。 |
 | Phase 3：模板 & CLI (1d) | 能通过 `px-plugin init` 生成带 Auth 的脚手架 | ① 执行同步脚本；② 更新 CLI 模板 & Example config；③ 自测脚手架新工程运行登录流程。 |
 | Phase 4：测试 & 文档 (2d) | Playwright + Go Tests + 指南 | ① 添加登录/登出 E2E；② 后端 proxy 单测；③ 编写 `docs/guides/develop/auth.md` & Runbook；④ 验收 checklist。 |
 

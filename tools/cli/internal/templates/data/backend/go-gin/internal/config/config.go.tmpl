@@ -1100,9 +1100,7 @@ func normalizeConfig(cfg *Config) {
 		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
 		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
 
-		if os.Getenv("POWERX_PROXY") == "1" && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
-			cfg.Gateway.AuthScheme = "apikey"
-		} else if cfg.Gateway.AuthScheme == "" {
+		if cfg.Gateway.AuthScheme == "" {
 			cfg.Gateway.AuthScheme = inferGatewayAuthScheme(cfg.Gateway.ToolToken, cfg.Gateway.APIKey)
 		}
 
@@ -1316,7 +1314,7 @@ func normalizeGatewayAPIPrefix(raw string) string {
 }
 
 func inferGatewayAuthScheme(toolToken, apiKey string) string {
-	if strings.TrimSpace(apiKey) != "" && strings.TrimSpace(toolToken) == "" {
+	if strings.TrimSpace(apiKey) != "" {
 		return "apikey"
 	}
 	return "bearer"

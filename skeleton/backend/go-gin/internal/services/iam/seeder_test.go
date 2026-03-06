@@ -8,7 +8,7 @@ import (
 )
 
 func TestSeedLocalAdminSkipsInDelegatedMode(t *testing.T) {
-	t.Setenv("POWERX_RBAC_DELEGATE", "1")
+	t.Setenv("POWERX_PROXY", "1")
 	if err := SeedLocalAdmin(context.Background(), nil, &config.Config{}, IAMModeLocal); err != nil {
 		t.Fatalf("expected skip without error, got %v", err)
 	}

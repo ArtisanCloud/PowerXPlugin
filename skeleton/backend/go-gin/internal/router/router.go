@@ -344,13 +344,5 @@ func shouldUseDelegatedIAM(cfg *config.Config) bool {
 		return false
 	}
 
-	rbacDelegate := strings.ToLower(strings.TrimSpace(os.Getenv("POWERX_RBAC_DELEGATE")))
-	switch rbacDelegate {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	}
-
 	return os.Getenv("POWERX_PROXY") == "1"
 }

@@ -11,14 +11,14 @@
 | `/auth/me/context` 返回空 | 请求缺少 `Authorization` header 或本地 JWT Secret 与配置不一致 | 确认前端 `localStorage` 存在 `access_token`；检查 `context.hmac_secret` |
 
 ## Delegated 模式检查清单
-1. `POWERX_PROXY=1` 且 `POWERX_RBAC_DELEGATE` 为 truthy。
+1. `IAMMode=delegated`（宿主标准场景通常同时 `POWERX_PROXY=1`）。
 2. `POWERX_CORE_ENDPOINT` 可从插件容器访问（`curl $POWERX_CORE_ENDPOINT/_health`）。
 3. `POWERX_AUTH_TOKEN` 在宿主侧仍有效（查看宿主日志 `service-token` 相关提示）。
 4. 插件日志需出现 `IAM mode resolved` 且 `mode=delegated`。
 5. 如需模拟宿主故障，可停止 Core，前端应提示 fail-closed。
 
 ## Local 模式检查清单
-1. `POWERX_PROXY=0` 且 `PLUGIN_IAM_ADMIN_*`、`PLUGIN_IAM_TENANT_*` 均已设置。
+1. `IAMMode=local` 且 `PLUGIN_IAM_ADMIN_*`、`PLUGIN_IAM_TENANT_*` 均已设置。
 2. 运行 `go run ./cmd/database/main.go setup` 以创建 `iam_*` 表和管理员账户。
 3. 默认管理员：`PLUGIN_IAM_ADMIN_EMAIL` / `PLUGIN_IAM_ADMIN_PASSWORD`。
 4. 本地 JWT 依赖 `context.hmac_secret`、`context.issuer`、`context.audience`；需要与前端/中间件一致。

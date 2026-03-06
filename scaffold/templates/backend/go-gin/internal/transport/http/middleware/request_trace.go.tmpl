@@ -96,7 +96,7 @@ func detectAuth(c *gin.Context) (mode, preview string) {
 }
 
 func iamModeFromEnv() string {
-	if truthy(os.Getenv("POWERX_RBAC_DELEGATE")) || strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
+	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
 		return "delegated"
 	}
 	return "local"

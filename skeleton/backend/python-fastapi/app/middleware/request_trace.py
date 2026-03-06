@@ -28,8 +28,7 @@ def _request_mode() -> str:
 
 
 def _iam_mode() -> str:
-    delegate = os.getenv("POWERX_RBAC_DELEGATE", "").strip().lower() in {"1", "true", "yes", "on"}
-    if delegate or os.getenv("POWERX_PROXY") == "1":
+    if os.getenv("POWERX_PROXY") == "1":
         return "delegated"
     return "local"
 

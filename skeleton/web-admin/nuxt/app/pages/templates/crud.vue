@@ -132,6 +132,8 @@ import type { Template } from "~/composables/api/useTemplate"
 import TemplateFormModal from "~/components/templates/TemplateFormModal.vue"
 import { nextTick } from "vue"
 import { useI18n } from "vue-i18n"
+import { storeToRefs } from "pinia"
+import { useUserStore } from "~/stores/user"
 
 type TemplateFormState = {
   name: string
@@ -168,7 +170,15 @@ const toast = reactive({
 const { t } = useI18n()
 
 const auth = useAuth()
-const isDelegatedReadOnly = computed(() => auth.delegatedIAM?.value ?? false)
+const userStore = useUserStore()
+const { isRoot, isCurrentTenantAdmin } = storeToRefs(userStore)
+const isDelegatedReadOnly = computed(() => {
+  const delegated = auth.delegatedIAM?.value ?? false
+  if (!delegated) {
+    return false
+  }
+  return !(Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value))
+})
 
 const tableColumns = computed(() => [
   { accessorKey: 'name', header: t('templates.crud.fields.name') },
@@ -446,6 +456,11 @@ const showToast = ({
 }
 
 onMounted(() => {
+  if (!userStore.context && !userStore.isLoading) {
+    userStore.fetchUserContext().catch(() => {
+      // ignore user context fetch errors
+    })
+  }
   fetchTemplates()
 })
 </script>

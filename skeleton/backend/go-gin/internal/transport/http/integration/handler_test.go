@@ -69,7 +69,10 @@ func TestInvokeCapabilitySuccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	require.Equal(t, "trace-123", resp["traceId"])
+	require.Equal(t, true, resp["success"])
+	data, ok := resp["data"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "trace-123", data["traceId"])
 	require.Equal(t, "List", fake.lastParams.Action)
 	require.Equal(t, "media", fake.lastParams.Headers["X-PX-Use-Mock"])
 	require.Equal(t, "com.corex.media.assets.manage", fake.lastParams.CapabilityID)
@@ -128,11 +131,16 @@ func TestInvokeCapabilityGatewayError(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	require.Equal(t, "gw-trace", resp["traceId"])
+	require.Equal(t, false, resp["success"])
 	errObj, ok := resp["error"].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "RATE_LIMIT", errObj["code"])
-	require.Equal(t, "rate_limited", errObj["type"])
+	details, ok := errObj["details"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "gw-trace", details["traceId"])
+	upstreamError, ok := details["error"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "rate_limited", upstreamError["type"])
 }
 
 func TestInvokeCapabilityForwardsBearerWithoutTenantHeader(t *testing.T) {

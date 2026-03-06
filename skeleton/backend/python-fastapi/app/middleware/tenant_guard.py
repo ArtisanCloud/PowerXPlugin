@@ -10,11 +10,6 @@ from app.middleware.tenant_context import TenantContext, get_tenant_context, res
 
 
 def _is_delegated_mode() -> bool:
-    value = os.getenv("POWERX_RBAC_DELEGATE", "").strip().lower()
-    if value in {"1", "true", "yes", "on"}:
-        return True
-    if value in {"0", "false", "no", "off"}:
-        return False
     return os.getenv("POWERX_PROXY") == "1"
 
 

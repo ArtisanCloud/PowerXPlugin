@@ -10,7 +10,7 @@ import (
 )
 
 // IAMResolver determines whether the plugin should rely on delegated (PowerX Core)
-// or local IAM. Priority: config.context.iam_mode > POWERX_RBAC_DELEGATE > POWERX_PROXY.
+// or local IAM. Priority: config.context.iam_mode > POWERX_PROXY.
 type IAMResolver struct {
 	mode   iamservice.IAMMode
 	source string
@@ -24,23 +24,12 @@ func NewIAMResolver(cfg *config.Config) *IAMResolver {
 		if parsed, ok := parseIAMMode(cfg.Context.IAMMode); ok {
 			if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
 				logger.WithFields(logger.Fields{
-					"iam_mode":             cfg.Context.IAMMode,
-					"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
-					"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
+					"iam_mode":     cfg.Context.IAMMode,
+					"POWERX_PROXY": os.Getenv("POWERX_PROXY"),
 				}).Info("IAM mode resolved from config")
 			}
 			return &IAMResolver{mode: parsed, source: "config"}
 		}
-	}
-
-	if truthy(os.Getenv("POWERX_RBAC_DELEGATE")) {
-		if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
-			logger.WithFields(logger.Fields{
-				"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
-				"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
-			}).Info("IAM mode resolved from POWERX_RBAC_DELEGATE")
-		}
-		return &IAMResolver{mode: iamservice.IAMModeDelegated, source: "env:POWERX_RBAC_DELEGATE"}
 	}
 
 	if os.Getenv("POWERX_PROXY") == "1" {
@@ -50,12 +39,11 @@ func NewIAMResolver(cfg *config.Config) *IAMResolver {
 
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
 		logger.WithFields(logger.Fields{
-			"iam_mode":             mode,
-			"source":               source,
-			"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
-			"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
-			"IAMMode":              os.Getenv("IAMMode"),
-			"IAM_MODE":             os.Getenv("IAM_MODE"),
+			"iam_mode":     mode,
+			"source":       source,
+			"POWERX_PROXY": os.Getenv("POWERX_PROXY"),
+			"IAMMode":      os.Getenv("IAMMode"),
+			"IAM_MODE":     os.Getenv("IAM_MODE"),
 		}).Info("IAM mode resolved")
 	}
 	return &IAMResolver{mode: mode, source: source}
@@ -92,14 +80,5 @@ func parseIAMMode(val string) (iamservice.IAMMode, bool) {
 		return iamservice.IAMModeLocal, true
 	default:
 		return iamservice.IAMMode(""), false
-	}
-}
-
-func truthy(value string) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
 	}
 }

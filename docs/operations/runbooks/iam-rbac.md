@@ -195,6 +195,6 @@
    ```
 
    - 建议在本地回归时修改 `--admin-email/--admin-password`，并记录在安全存储。
-   - 如果 `POWERX_PROXY=1` 或 `POWERX_RBAC_DELEGATE=true`，命令会拒绝执行并提示加入 `--force`，避免误操作宿主环境。
+   - 如果 `POWERX_PROXY=1`，命令会拒绝执行并提示加入 `--force`，避免误操作宿主环境。
 
 3. **验证 CLI 结果**：执行完上述命令后，使用 `px-plugin iam export --tenant ...` 进行快速比对，或者直接运行 `npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local` 验证登录流程。

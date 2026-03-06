@@ -207,7 +207,13 @@ VERSION=0.2.0 make dist
 
 如需额外生成 `.pxp`，请跳转到「方案 B · 步骤 2」使用 `make pack`。
 
-`make dist` 默认依次执行 `go build`, `npm install`, `npm run build` 并将产物归档到 `dist/`。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
+`make dist` 当前默认执行 `go build`（本机平台）+ `nuxi build`，并将产物归档到 `dist/`；不会自动执行 `npm install`。若依赖未安装，请先按“步骤 1：准备依赖”完成安装。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
+
+如果你的 PowerX 底座运行在 Linux，而你在 macOS/Windows 本地打包，请显式指定后端目标平台后再执行 `make dist`：
+
+```bash
+GOOS=linux GOARCH=amd64 make dist
+```
 
 ### 步骤 3：手动构建（可选）
 

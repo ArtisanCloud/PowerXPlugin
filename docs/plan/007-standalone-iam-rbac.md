@@ -78,7 +78,7 @@
 3. **作用域字段**：`Role`/`Permission` 增加 `scope_type`（`system` or `tenant`），`system.admin` 可跨租户管理；其它角色默认只在所属租户生效。
 4. **策略来源追踪**：`iam_permissions.source` 标记 `local_seed`、`manifest_sync` 等，便于 CLI/脚本与宿主的权限同步器保持一致。
 
-> 通过沿用宿主的三元模型，可复用其自动推导策略、OpenAPI 同步工具与 STS 策略缓存，减少自定义实现带来的割裂。所有组织/RBAC 菜单仅在 Standalone（`POWERX_PROXY=0` 且 `POWERX_RBAC_DELEGATE=false`）时展示；Delegated 模式读取宿主 IAM，因此需隐藏相关入口以免混淆。
+> 通过沿用宿主的三元模型，可复用其自动推导策略、OpenAPI 同步工具与 STS 策略缓存，减少自定义实现带来的割裂。所有组织/RBAC 菜单仅在 Standalone（`POWERX_PROXY=0` 且 `POWERX_PROXY=false`）时展示；Delegated 模式读取宿主 IAM，因此需隐藏相关入口以免混淆。
 
 ## 6. 权限模型与资源域
 
@@ -181,7 +181,7 @@
 - 审计日志至少保留 180 天，可导出 CSV。
 - 所有敏感 API 需开启速率限制：默认 `100 req/min`/IP。
 - 环境变量：
-  - `POWERX_RBAC_DELEGATE=false`（Standalone）
+  - `POWERX_PROXY=false`（Standalone）
   - `PLUGIN_IAM_PASSWORD_POLICY_JSON`（可选）
   - `PLUGIN_IAM_LOGIN_THROTTLE=5/300s`。
 

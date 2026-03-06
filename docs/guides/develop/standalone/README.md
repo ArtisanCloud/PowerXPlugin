@@ -121,7 +121,6 @@ cp skeleton/backend/go-gin/etc/config.example.yaml skeleton/backend/go-gin/etc/c
 # 2. 初始化数据库（setup = migrate + seed）
 cd skeleton/backend/go-gin
 export POWERX_PROXY=0
-export POWERX_RBAC_DELEGATE=false
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
@@ -213,7 +212,6 @@ npm run dev
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `POWERX_PROXY` | `0` | `1` 表示运行在宿主 iframe 下；本地 Standalone 必须为 `0`，否则“组织与权限”菜单会隐藏。 |
-| `POWERX_RBAC_DELEGATE` | `false` | 强制委托宿主 IAM；即使 `POWERX_PROXY=0` 也会禁用本地 IAM API。 |
 | `POWERX_CORE_ENDPOINT` | `http://localhost:8077` | Delegated 模式访问宿主 Core API 的地址。 |
 | `POWERX_AUTH_TOKEN` | N/A | 插件后端调用宿主 `/admin/user/auth/*` 时使用的服务 Token。 |
 | `PLUGIN_IAM_TENANT_KEY` / `NAME` | 示例值见 Quickstart | Standalone 运行时默认租户唯一键与名称。 |
@@ -230,33 +228,22 @@ npm run dev
 >   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若未携带，再回退 `PX_TOOL_TOKEN.tid`。
 >   - 若两者都缺失 `tid`，WS Bus/Capability 调用会失败。
 >
-> **IAMMode / POWERX_PROXY / POWERX_RBAC_DELEGATE 优先级规则（从高到低）**：
+> **模式判定主口径（推荐）**：
 >
-> 1. `IAMMode` / `IAM_MODE`（显式指定 `delegated` 或 `local`）
-> 2. `POWERX_RBAC_DELEGATE=true`（强制走宿主委派）
-> 3. `POWERX_PROXY=1`（默认宿主模式）
+> - `IAMMode` / `IAM_MODE`：项目启动模式（`local` / `delegated`）
+> - `POWERX_PROXY`：runtime 链路开关（`0` 本地驱动，`1` 底座 gateway/宿主链路）
 >
-> 结论：
-> - 如果 `IAMMode=local`，即使 `POWERX_PROXY=1` 也会**强制本地 IAM**。
-> - 如果 `IAMMode=delegated`，即使 `POWERX_PROXY=0` 也会**强制委派 IAM**。
-> - 未设置 `IAMMode` 时，`POWERX_RBAC_DELEGATE=true` 会覆盖 `POWERX_PROXY`。
 
-**完整组合速查（2x2x2）**
+**组合速查（2x2）**
 
-> 规则：`IAMMode` 的显式值优先级最高，其次 `POWERX_RBAC_DELEGATE`，最后 `POWERX_PROXY`。
+| IAMMode | POWERX_PROXY | 结果 | 典型场景 |
+|---|---|---|---|
+| local | 0 | standalone_local（本地 IAM + 本地链路） | 纯本地开发 |
+| delegated | 0 | standalone_mock_delegated（委派语义 + 本地链路） | standalone 模拟 delegated 联调 |
+| delegated | 1 | host_delegated（委派语义 + 宿主链路） | PowerX 宿主标准部署 |
+| local | 1 | local + proxy（保留调试态，非推荐） | 本地 IAM + 宿主链路联调 |
 
-| IAMMode | POWERX_PROXY | POWERX_RBAC_DELEGATE | IAM 结果 | WS/能力走向 | 典型场景 |
-|---|---|---|---|---|---|
-| local | 0 | false | 本地 IAM | 本地 | 纯 Standalone |
-| local | 1 | false | 本地 IAM | 宿主（需 `PX_GATEWAY_*`） | **本地 IAM + 宿主联调** |
-| local | 0 | true  | 本地 IAM | 本地 | 仍本地（IAMMode 覆盖） |
-| local | 1 | true  | 本地 IAM | 宿主（需 `PX_GATEWAY_*`） | IAMMode 覆盖 RBAC_DELEGATE |
-| delegated | 0 | false | 委派 IAM | 本地 | 仅 IAM 委派 |
-| delegated | 1 | false | 委派 IAM | 宿主（需 `PX_GATEWAY_*`） | 宿主模式（标准） |
-| delegated | 0 | true  | 委派 IAM | 本地 | IAMMode=delegated（显式） |
-| delegated | 1 | true  | 委派 IAM | 宿主（需 `PX_GATEWAY_*`） | 宿主模式（显式） |
-
-> 说明：WS/能力是否走宿主只由 `POWERX_PROXY=1` + `PX_GATEWAY_*` 是否完整决定，与 IAMMode 无关。
+> 说明：是否走宿主链路只由 `POWERX_PROXY` 决定；是否使用委派 IAM 只由 `IAMMode` 决定。
 
 ### 1.4.3 日志与内部调试路由开关（避免混淆）
 
@@ -369,7 +356,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 
 补充建议：
 
-- 每次联调前先打印运行模式三元组：`IAMMode / POWERX_PROXY / POWERX_RBAC_DELEGATE`。
+- 每次联调前先打印运行模式二元组：`IAMMode / POWERX_PROXY`。
 - 在宿主联调场景，优先验证 `register -> publish -> event` 的完整链路，再排查业务 topic 权限。
 
 ### 1.4.6 标准联调记录模板（提单/群沟通统一格式）
@@ -386,7 +373,6 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 ### 1) 运行模式
 - IAMMode: local | delegated
 - POWERX_PROXY: 0 | 1
-- POWERX_RBAC_DELEGATE: true | false
 
 ### 2) Token 与租户
 - USER_TOKEN.tid: <uuid>
@@ -415,7 +401,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 - 初步判断：路径问题 / 权限问题 / 租户不一致 / 模式配置不一致
 ```
 
-> ⚠️ 只有当 `POWERX_PROXY=0` **且** `POWERX_RBAC_DELEGATE` 未开启时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
+> ⚠️ 只有当 `POWERX_PROXY=0` 且 `IAMMode=local` 时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
 
 > `skeleton/backend/go-gin/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend/go-gin` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
 >

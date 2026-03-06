@@ -81,6 +81,22 @@ const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
+const resolveIAMMode = () => {
+  const raw = (
+    process.env.NUXT_PUBLIC_IAM_MODE ??
+    process.env.IAMMode ??
+    process.env.IAM_MODE ??
+    ''
+  )
+    .trim()
+    .toLowerCase()
+  if (raw === 'local' || raw === 'delegated') {
+    return raw
+  }
+  return INSIDE_POWERX ? 'delegated' : 'local'
+}
+const IAM_MODE = resolveIAMMode()
+const DELEGATED_MODE = IAM_MODE === 'delegated'
 const capabilityInvokeEndpoint = '/integration/capabilities/invoke'
 const capabilityApiBase = INSIDE_POWERX ? hostApiBase : localApiBase
 // 在宿主代理模式下指定 api base，即“模拟 standalone” 场景
@@ -100,6 +116,8 @@ if (!INSIDE_POWERX || simulateStandalone) {
 if (!process.env.QUIET_START) {
   console.info('[web-admin] resolved config →')
   console.info(`  insidePowerX=${INSIDE_POWERX}`)
+  console.info(`  iamMode=${IAM_MODE}`)
+  console.info(`  delegatedMode=${DELEGATED_MODE}`)
   console.info(`  runtime apiBase=${INSIDE_POWERX ? hostApiBase : localApiBase}`)
   console.info(`  devApiProxyTarget=${devApiProxyTarget}`)
   console.info(`  devWsProxyTarget=${devWsProxyTarget}`)
@@ -252,6 +270,8 @@ export default defineNuxtConfig({
       apiBaseUrl: INSIDE_POWERX ? hostApiBase : localApiBase,
       pluginApiBase,
       insidePowerX: INSIDE_POWERX,
+      iamMode: IAM_MODE,
+      delegatedMode: DELEGATED_MODE,
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,
       powerxCoreBase,

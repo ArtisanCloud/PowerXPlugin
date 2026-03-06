@@ -167,15 +167,8 @@ const toast = reactive({
 
 const { t } = useI18n()
 
-const runtimeConfig = useRuntimeConfig()
-const isDelegatedReadOnly = computed(() => {
-  const value = runtimeConfig.public?.insidePowerX
-  if (value === true) return true
-  if (typeof value === "string") {
-    return value === "true" || value === "1"
-  }
-  return false
-})
+const auth = useAuth()
+const isDelegatedReadOnly = computed(() => auth.delegatedIAM?.value ?? false)
 
 const tableColumns = computed(() => [
   { accessorKey: 'name', header: t('templates.crud.fields.name') },

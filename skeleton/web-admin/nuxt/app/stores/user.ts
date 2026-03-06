@@ -142,9 +142,29 @@ export const useUserStore = defineStore("user", {
         this.lastFetchedAt = Date.now();
         this.persistCurrentTenantUUID();
       } catch (error: any) {
+        if (isNotFoundError(error)) {
+          this.applyLocalTenantSwitch(tenantUuid, targetTenant || null);
+          return;
+        }
         console.error("切换租户失败:", error);
         throw new Error(error?.message || "切换租户失败");
       }
+    },
+
+    applyLocalTenantSwitch(
+      tenantUuid: string,
+      targetTenant: ContextMember | null
+    ) {
+      if (!this.context) {
+        throw new Error("用户上下文未加载，无法切换租户");
+      }
+      this.context = {
+        ...this.context,
+        current_tenant_uuid: tenantUuid,
+        current_member_id: targetTenant?.member_id ?? this.context.current_member_id,
+      };
+      this.lastFetchedAt = Date.now();
+      this.persistCurrentTenantUUID();
     },
 
     // 更新用户信息（本地更新，不调用API）
@@ -181,3 +201,12 @@ export const useUserStore = defineStore("user", {
 
 // 导出类型供其他地方使用
 export type UserStoreState = ReturnType<typeof useUserStore>;
+
+function isNotFoundError(error: any): boolean {
+  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
+  if (status === 404) {
+    return true;
+  }
+  const text = String(error?.message || "").toLowerCase();
+  return text.includes("404") || text.includes("not found");
+}

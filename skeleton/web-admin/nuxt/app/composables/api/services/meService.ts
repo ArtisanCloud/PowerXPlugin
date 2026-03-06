@@ -10,6 +10,17 @@ export interface UserContextData {
   current_member_id?: number | null;
   user: ContextUser;
   members: ContextMember[];
+  roles?: string[];
+  permissions?: string[];
+  capabilities?: UserContextCapabilities;
+}
+
+export interface UserContextCapabilities {
+  templates?: {
+    can_create?: boolean;
+    can_update?: boolean;
+    can_delete?: boolean;
+  };
 }
 
 export interface ContextUser {

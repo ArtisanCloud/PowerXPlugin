@@ -316,6 +316,9 @@ type MeContext struct {
 	CurrentMemberID   *uint64         `json:"current_member_id,omitempty"`
 	User              *MeUserBrief    `json:"user,omitempty"`
 	Members           []MeMemberBrief `json:"members"`
+	Roles             []string        `json:"roles,omitempty"`
+	Permissions       []string        `json:"permissions,omitempty"`
+	Capabilities      any             `json:"capabilities,omitempty"`
 }
 
 type MeUserBrief struct {

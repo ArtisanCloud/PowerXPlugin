@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"{{ .BackendModulePath }}/internal/contracts"
 	capgateway "{{ .BackendModulePath }}/internal/integrations/gateway"
 	integrationService "{{ .BackendModulePath }}/internal/services/integration"
 	"{{ .BackendModulePath }}/internal/shared/app"
@@ -100,20 +101,20 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	ensureInvokeCORS(c)
 
 	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "capability gateway unavailable"})
+		contracts.ResponseServiceUnavailable(c, "capability gateway unavailable", nil)
 		return
 	}
 
 	var req capabilityInvokeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid capability payload"})
+		contracts.ResponseBadRequest(c, "invalid capability payload")
 		return
 	}
 
 	capabilityID := strings.TrimSpace(req.CapabilityID)
 	action := strings.TrimSpace(req.Action)
 	if capabilityID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "capabilityId is required"})
+		contracts.ResponseBadRequest(c, "capabilityId is required")
 		return
 	}
 
@@ -133,7 +134,7 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	}
 	if strings.EqualFold(preferredProtocol, "rest") {
 		if err := validateRestPayload(payload); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			contracts.ResponseBadRequest(c, err.Error())
 			return
 		}
 	}
@@ -159,7 +160,7 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	}
 
 	if result == nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "capability invoke returned no result"})
+		contracts.ResponseError(c, http.StatusBadGateway, contracts.ErrCodeInternalError, "capability invoke returned no result")
 		return
 	}
 
@@ -188,7 +189,7 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	h.logCapabilityInvokeSuccess(capabilityID, action, preferredProtocol, requestID, result)
 	h.logInvokeCORSHeaders(c)
 
-	c.JSON(http.StatusOK, response)
+	contracts.ResponseSuccess(c, response)
 }
 
 func ensureInvokeCORS(c *gin.Context) {
@@ -314,10 +315,12 @@ func isGRPCPayload(payload map[string]any) bool {
 
 func respondPlaceholder(c *gin.Context, status int, message string) {
 	ensureInvokeCORS(c)
-	c.JSON(status, gin.H{
-		"status":  "pending",
-		"message": message,
-	})
+	switch status {
+	case http.StatusCreated:
+		contracts.ResponseCreated(c, gin.H{"status": "pending", "message": message})
+	default:
+		contracts.ResponseSuccess(c, gin.H{"status": "pending", "message": message})
+	}
 }
 
 func collectCapabilityHeaders(c *gin.Context) map[string]string {
@@ -398,15 +401,12 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 
 	var unavailable *capgateway.UnavailableError
 	if errors.As(err, &unavailable) {
-		payload := gin.H{
-			"error":   unavailable.Error(),
-			"traceId": "",
-		}
+		details := gin.H{"traceId": ""}
 		if len(warnings) > 0 {
-			payload["warnings"] = warnings
+			details["warnings"] = warnings
 		}
 		h.logInvokeCORSHeaders(c)
-		c.JSON(http.StatusServiceUnavailable, payload)
+		contracts.ResponseErrorWithDetails(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", unavailable.Error(), details)
 		return
 	}
 
@@ -427,27 +427,24 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 		if body := parseGatewayBody(invocationErr.Body); body != nil {
 			errPayload["details"] = body
 		}
-		payload := gin.H{
-			"error":   errPayload,
+		details := gin.H{
 			"traceId": invocationErr.TraceID,
+			"error":   errPayload,
 		}
 		if len(warnings) > 0 {
-			payload["warnings"] = warnings
+			details["warnings"] = warnings
 		}
 		h.logInvokeCORSHeaders(c)
-		c.JSON(status, payload)
+		contracts.ResponseErrorWithDetails(c, status, firstGatewayCode(invocationErr), firstGatewayMessage(invocationErr), details)
 		return
 	}
 
-	payload := gin.H{
-		"error":   err.Error(),
-		"traceId": "",
-	}
+	details := gin.H{"traceId": ""}
 	if len(warnings) > 0 {
-		payload["warnings"] = warnings
+		details["warnings"] = warnings
 	}
 	h.logInvokeCORSHeaders(c)
-	c.JSON(http.StatusBadGateway, payload)
+	contracts.ResponseErrorWithDetails(c, http.StatusBadGateway, contracts.ErrCodeInternalError, err.Error(), details)
 }
 
 func (h *Handler) logInvokeCORSHeaders(c *gin.Context) {

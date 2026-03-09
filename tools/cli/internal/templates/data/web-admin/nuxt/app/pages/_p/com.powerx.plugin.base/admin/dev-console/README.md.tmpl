@@ -1,7 +1,7 @@
 # Dev Console Admin Pages
 
 Nuxt pages under this directory power the plugin operator experience at
-`/_p/com.powerx.plugin.base/admin/dev-console`. Split the console into tabs:
+`/_p/com.powerx.plugins.base/admin/dev-console`. Split the console into tabs:
 
 - configuration management
 - audit & activity history

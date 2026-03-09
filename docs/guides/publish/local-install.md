@@ -59,6 +59,67 @@
 - **方案 B（可选）**：在 dist 基础上额外生成 `.pxp` → 传输 `.pxp` → 在 PowerX 上解包成 dist 目录 → 再按方案 A 调用 Admin API。
 - URL 模式（`/install/url`）和 `apiPrefix` 说明对两种方案都适用。
 
+### PowerXPlugin 仓库内联调（推荐）
+
+如果你正在 `PowerXPlugin` 主仓库里调 framework/skeleton，不必先 `px-plugin init` 新项目：
+
+```bash
+export POWERX_ROOT=/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerX
+export PLUGIN_ROOT=/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin
+export DIST_DIR=$PLUGIN_ROOT/skeleton/dist/0.7.1
+
+cd $PLUGIN_ROOT
+
+# 自动同步 plugin.d（capabilities/exposure/rbac）并校验映射
+make manifest-align-fix
+
+# 严格校验 plugin.yaml（ID + capabilities + events topics）
+make plugin-yaml-check
+
+# 输出 skeleton 可安装包
+make skeleton-dist
+
+# 安装到 PowerX 宿主（会先构建 dist）
+make skeleton-install \
+  API_BASE=http://127.0.0.1:8077/api/v1 \
+  TOKEN=<ADMIN_BEARER_TOKEN> \
+  ENABLE=true \
+  FORCE=true
+
+# 一键重装并切换版本（disable -> force install -> switch_version enable）
+make skeleton-reinstall \
+  VERSION=0.7.1 \
+  API_BASE=http://127.0.0.1:8077/api/v1 \
+  TOKEN=<ADMIN_BEARER_TOKEN>
+```
+
+说明：
+- `make manifest-align-fix` 会先同步 `skeleton/plugin.d/*.yaml`，再校验 capability→exposure/rbac 映射
+- `make skeleton-dist` = `make -C skeleton dist`
+- `make skeleton-install` = `make -C skeleton local-install ...`
+- `make skeleton-reinstall` = `make -C skeleton local-reinstall ...`
+- skeleton 默认插件标识来自 `skeleton/plugin.yaml`（当前示例：`id: com.powerx.plugins.base`）
+- `ENABLE=true` 表示安装后立即启用；`FORCE=true` 表示同版本强制覆盖/重装
+
+若你已经有现成的 dist 目录（不想重复构建），可直接走 `local-install-run`：
+
+```bash
+export POWERX_ROOT=/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerX
+export PLUGIN_ROOT=/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin
+export DIST_DIR=$PLUGIN_ROOT/skeleton/dist/0.7.1
+
+cd $PLUGIN_ROOT/skeleton
+
+make local-install-run \
+  LOCAL_INSTALL_SRC=$DIST_DIR \
+  API_BASE=http://127.0.0.1:8077/api/v1 \
+  TOKEN=<ADMIN_BEARER_TOKEN> \
+  FORCE=true
+```
+
+说明：`local-install` 会先执行 `dist`；`local-install-run` 只安装指定目录。
+注意：仅“安装成功”不等于“插件一定重启为新进程”；请同时观察返回体里的启用状态与宿主 lifecycle 日志。
+
 ---
 
 ## 前置条件
@@ -85,13 +146,13 @@ export ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 ## 方案 A：dist 直装（推荐）
 
-Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：包含后端二进制、Nuxt 构建结果、`plugin.yaml`、`config/event_fabric.yaml`、`publish.yml`、`manifest.json` 等。**这一部分是所有流程都必须完成的基础**，可以用 Makefile 或手动方式完成。
+Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：包含后端二进制、Nuxt 构建结果、`plugin.yaml`、`plugin.d/*.yaml`、`config/event_fabric.yaml`、`publish.yml`、`manifest.json` 等。**这一部分是所有流程都必须完成的基础**，可以用 Makefile 或手动方式完成。
 
 ## 本地安装时的 Topic 对齐要求
 
 安装包必须同时满足两层：
 
-1. 规范声明层：`plugin.yaml.events.topics[]`
+1. 规范声明层：`plugin.d/events.yaml` 的 `events.topics[]`（由 `plugin.yaml.catalogs.events` 引用）
 2. 执行层：`config/event_fabric.yaml`（供 PowerX 底座启用插件时扫描播种）
 
 底座行为说明：
@@ -107,6 +168,69 @@ Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：�
 3. 轮换/新建 API Key
 4. 调用 `ws-bus/grant`
 5. 调用 `publish/subscribe`
+
+### 最小配置示例（必须两层都写）
+
+`plugin.yaml`（声明层，给审核/注册与能力语义使用）：
+
+```yaml
+events:
+  topics:
+    - name: plugin.demo.order.created
+      direction: publish
+      desc: order created event
+    - name: plugin.demo.order.status
+      direction: subscribe
+      desc: order status updates
+```
+
+`config/event_fabric.yaml`（执行层，给底座启用时播种使用）：
+
+```yaml
+topics:
+  - key: plugin.demo.order.created
+    mode: publish
+    description: order created event
+  - key: plugin.demo.order.status
+    mode: subscribe
+    description: order status updates
+```
+
+建议：两层 topic 名称保持一一对应（`name`/`key` 一致），避免“声明里有、执行层没有”导致安装后链路不通。
+
+### 联调动作拆解（可直接照做）
+
+1) **确认 topic 已存在于底座**
+
+- 通过底座管理接口或后台确认 `event_topics` 中已有目标 topic。
+- 若不存在，先创建 topic，再做后续授权。
+
+2) **配置 API Key Profile 权限**
+
+- 在底座将调用方主体（API Key 对应 profile）授权到目标 topic（publish/subscribe）。
+- 保存后轮换或新建 API Key，确保权限快照生效。
+
+3) **调用 grant（只绑定，不创建）**
+
+```bash
+curl -X POST "$API_BASE/internal/ws-bus/grant" \
+  -H "Authorization: ApiKey $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topics": ["plugin.demo.order.created", "plugin.demo.order.status"]
+  }'
+```
+
+4) **验证 publish / subscribe**
+
+- publish 端发送消息到 `plugin.demo.order.created`
+- subscribe 端订阅 `plugin.demo.order.status` 并检查是否收到
+
+### 典型误区
+
+- 只配 `plugin.yaml.events.topics[]`，没配 `config/event_fabric.yaml`：安装后底座不会播种执行层 topic。
+- 只调 `ws-bus/grant` 就以为会自动建 topic：不会，grant 仅做授权绑定。
+- topic 名称两层不一致：表现为授权成功但消息链路不通。
 
 ### 步骤 1：准备依赖
 
@@ -144,7 +268,13 @@ VERSION=0.2.0 make dist
 
 如需额外生成 `.pxp`，请跳转到「方案 B · 步骤 2」使用 `make pack`。
 
-`make dist` 默认依次执行 `go build`, `npm install`, `npm run build` 并将产物归档到 `dist/`。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
+`make dist` 当前默认执行 `go build`（本机平台）+ `nuxi build`，并将产物归档到 `dist/`；不会自动执行 `npm install`。若依赖未安装，请先按“步骤 1：准备依赖”完成安装。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
+
+如果你的 PowerX 底座运行在 Linux，而你在 macOS/Windows 本地打包，请显式指定后端目标平台后再执行 `make dist`：
+
+```bash
+GOOS=linux GOARCH=amd64 make dist
+```
 
 ### 步骤 3：手动构建（可选）
 
@@ -308,6 +438,8 @@ curl -X POST "$API_BASE/admin/plugins/install/local" \
 - `enable`：安装完成后是否立即启用并切换成当前版本。
 - `force`：若已有相同版本，是否强制覆盖。
 
+> 关键语义：`install/local` 的核心是“安装产物”。若需要立即切换运行态，请显式传 `enable=true`；若要覆盖同版本并触发重装，请再加 `force=true`。
+
 成功响应示例：
 
 ```json
@@ -413,6 +545,8 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 | `install/local` 返回 404 | 检查 `server.apiPrefix` 是否与请求一致；确认 Admin API 路由已注册。 |
 | `src_dir` 找不到 | 目标目录必须存在于 PowerX 服务器本地磁盘；如果你在开发机上执行 curl，需要通过 `ssh` 或 CI 让命令运行在服务器上。 |
 | 版本已存在 | 若只是想覆盖当前版本，传 `force=true`；否则建议 bump `plugin.yaml` 里的 `version`。 |
+| `lifecycle_error: enable: already_enabled` | 说明旧版本仍是 enabled。先用 `ENABLE=false FORCE=true` 覆盖安装，再调用版本切换/启用接口。 |
+| 想“一条命令重装并启用新版本” | 使用 `make skeleton-reinstall VERSION=<target>`（内部执行 disable -> force install(enable=false) -> switch_version(enable=true)）。 |
 | `.pxp` 无法直接运行 | 目前 `.pxp` 只包含 manifest/integrity/audit 信息，仍需解包后把 dist 目录传给 `install/local`。后续计划由 PowerX 直接解析 `.pxp`。 |
 | 与 `px-plugin dev --watch` 混淆 | `dev --watch` 通过 Dev API 注册临时会话，关闭终端即销毁。Local install 则写入正式的插件版本，需显式卸载或切换版本。 |
 

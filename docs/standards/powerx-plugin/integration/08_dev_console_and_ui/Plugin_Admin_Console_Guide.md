@@ -109,7 +109,7 @@ GET /api/v1/admin/plugin/status
 
 ```json
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "version": "1.2.4",
   "uptime": 99.92,
   "license_status": "active",
@@ -225,7 +225,7 @@ GET /api/v1/admin/plugin/audit
 ```bash
 POST /api/v1/support/ticket
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "title": "功能异常",
   "description": "同步客户数据时报错 500。"
 }

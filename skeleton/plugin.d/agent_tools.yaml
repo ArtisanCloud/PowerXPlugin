@@ -1,0 +1,25 @@
+agent_tools:
+  - id: base.template.create
+    capability: com.powerx.plugins.base.template.create
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#CreateTemplate
+    description: "以 REST/API 形式创建模板，并为 Agent 暴露工具。"
+  - id: base.template.compose
+    capability: com.powerx.plugins.base.template.compose
+    handler: contracts/exposure/workflow/template-compose.json
+    description: "复合 Workflow，串联草稿、审核与发布步骤。"
+  - id: base.template.audit
+    capability: com.powerx.plugins.base.template.audit
+    handler: contracts/exposure/workflow/template-audit.json
+    description: "巡检模板库并在检测到异常时自动修复+发布。"
+  - id: base.template.batch_clone
+    capability: com.powerx.plugins.base.template.batch_clone
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#BatchCloneTemplates
+    description: "批量克隆模板的 REST/API 工具。"
+  - id: base.template.validate
+    capability: com.powerx.plugins.base.template.validate
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#ValidateTemplateCapability
+    description: "模板质量巡检工具，返回违规项供 Agent 决策。"
+  - id: base.template.quality_distribute
+    capability: com.powerx.plugins.base.template.quality_distribute
+    handler: contracts/exposure/workflow/template-quality-distribute.json
+    description: "巡检 + 克隆 + 发布的复合 Workflow。"

@@ -136,16 +136,15 @@ func main() {
 				gatewayMode = "host"
 			}
 		}
-		logger.WithFields(logger.Fields{
-			"iam_mode":             iamResolver.Mode(),
-			"iam_source":           iamResolver.Source(),
-			"gateway_mode":         gatewayMode,
-			"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
-			"POWERX_RBAC_DELEGATE": os.Getenv("POWERX_RBAC_DELEGATE"),
-			"IAMMode":              os.Getenv("IAMMode"),
-			"IAM_MODE":             os.Getenv("IAM_MODE"),
-			"PX_GATEWAY_BASE_URL":  strings.TrimSpace(cfg.Gateway.BaseURL),
-		}).Info("Mode decision")
+			logger.WithFields(logger.Fields{
+				"iam_mode":             iamResolver.Mode(),
+				"iam_source":           iamResolver.Source(),
+				"gateway_mode":         gatewayMode,
+				"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
+				"IAMMode":              os.Getenv("IAMMode"),
+				"IAM_MODE":             os.Getenv("IAM_MODE"),
+				"PX_GATEWAY_BASE_URL":  strings.TrimSpace(cfg.Gateway.BaseURL),
+			}).Info("Mode decision")
 	}
 
 	var authClient *authproxy.DelegatedClient
@@ -535,9 +534,7 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 	}
 
 	proxyRaw := strings.TrimSpace(os.Getenv("POWERX_PROXY"))
-	rbacDelegateRaw := strings.TrimSpace(os.Getenv("POWERX_RBAC_DELEGATE"))
 	proxyEnabled := proxyRaw == "1"
-	rbacDelegateEnabled := envTruthy(rbacDelegateRaw)
 
 	gatewayBaseURL := ""
 	gatewayToken := ""
@@ -574,16 +571,15 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 	}
 
 	fields := logger.Fields{
-		"matrix_row":              fmt.Sprintf("%s | %s | %s", mode, normalizedProxy(proxyRaw), normalizedBool(rbacDelegateEnabled)),
+		"matrix_row":              fmt.Sprintf("%s | %s", mode, normalizedProxy(proxyRaw)),
 		"iam_mode":                mode,
 		"iam_source":              iamResolver.Source(),
 		"POWERX_PROXY":            normalizedProxy(proxyRaw),
-		"POWERX_RBAC_DELEGATE":    normalizedBool(rbacDelegateEnabled),
 		"iam_result":              iamResultLabel(mode),
 		"ws_capability_target":    wsTarget,
 		"ws_capability_target_zh": wsDisplay,
-		"scenario":                modeScenarioLabel(mode, proxyEnabled, rbacDelegateEnabled),
-		"priority_note":           modePriorityNote(iamResolver.Source(), mode, proxyEnabled, rbacDelegateEnabled),
+		"scenario":                modeScenarioLabel(mode, proxyEnabled),
+		"priority_note":           modePriorityNote(iamResolver.Source(), mode, proxyEnabled),
 	}
 
 	if proxyEnabled {
@@ -595,16 +591,15 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 
 	logger.WithFields(logger.Fields{
 		"matrix_row": fields["matrix_row"],
-	}).Info("Runtime mode resolved (2x2x2)")
+	}).Info("Runtime mode resolved (2x2)")
 	logger.WithFields(logger.Fields{
 		"iam_mode":   fields["iam_mode"],
 		"iam_source": fields["iam_source"],
 		"iam_result": fields["iam_result"],
 	}).Info("IAM decision")
 	logger.WithFields(logger.Fields{
-		"POWERX_PROXY":         fields["POWERX_PROXY"],
-		"POWERX_RBAC_DELEGATE": fields["POWERX_RBAC_DELEGATE"],
-		"priority_note":        fields["priority_note"],
+		"POWERX_PROXY":  fields["POWERX_PROXY"],
+		"priority_note": fields["priority_note"],
 	}).Info("Decision inputs")
 	logger.WithFields(logger.Fields{
 		"ws_capability_target":    fields["ws_capability_target"],
@@ -636,22 +631,6 @@ func normalizedProxy(value string) string {
 	return "0"
 }
 
-func normalizedBool(value bool) string {
-	if value {
-		return "true"
-	}
-	return "false"
-}
-
-func envTruthy(value string) bool {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
-}
-
 func iamResultLabel(mode string) string {
 	if mode == string(iamservice.IAMModeDelegated) {
 		return "委派 IAM"
@@ -659,35 +638,24 @@ func iamResultLabel(mode string) string {
 	return "本地 IAM"
 }
 
-func modeScenarioLabel(mode string, proxyEnabled, rbacDelegateEnabled bool) string {
+func modeScenarioLabel(mode string, proxyEnabled bool) string {
 	switch {
-	case mode == string(iamservice.IAMModeLocal) && !proxyEnabled && !rbacDelegateEnabled:
-		return "纯 Standalone"
-	case mode == string(iamservice.IAMModeLocal) && proxyEnabled && !rbacDelegateEnabled:
-		return "本地 IAM + 宿主联调"
-	case mode == string(iamservice.IAMModeLocal) && !proxyEnabled && rbacDelegateEnabled:
-		return "仍本地（IAMMode 覆盖）"
-	case mode == string(iamservice.IAMModeLocal) && proxyEnabled && rbacDelegateEnabled:
-		return "IAMMode 覆盖 RBAC_DELEGATE"
-	case mode == string(iamservice.IAMModeDelegated) && !proxyEnabled && !rbacDelegateEnabled:
-		return "仅 IAM 委派"
-	case mode == string(iamservice.IAMModeDelegated) && proxyEnabled && !rbacDelegateEnabled:
-		return "宿主模式（标准）"
-	case mode == string(iamservice.IAMModeDelegated) && !proxyEnabled && rbacDelegateEnabled:
-		return "IAMMode=delegated（显式）"
-	case mode == string(iamservice.IAMModeDelegated) && proxyEnabled && rbacDelegateEnabled:
-		return "宿主模式（显式）"
+	case mode == string(iamservice.IAMModeLocal) && !proxyEnabled:
+		return "standalone_local"
+	case mode == string(iamservice.IAMModeLocal) && proxyEnabled:
+		return "local + proxy（调试态）"
+	case mode == string(iamservice.IAMModeDelegated) && !proxyEnabled:
+		return "standalone_mock_delegated"
+	case mode == string(iamservice.IAMModeDelegated) && proxyEnabled:
+		return "host_delegated"
 	default:
 		return "自定义组合"
 	}
 }
 
-func modePriorityNote(source, mode string, proxyEnabled, rbacDelegateEnabled bool) string {
+func modePriorityNote(source, mode string, proxyEnabled bool) string {
 	switch source {
 	case "config":
-		if mode == string(iamservice.IAMModeLocal) && rbacDelegateEnabled {
-			return "IAMMode=local 显式配置，覆盖 POWERX_RBAC_DELEGATE"
-		}
 		if mode == string(iamservice.IAMModeLocal) && proxyEnabled {
 			return "IAMMode=local 显式配置，覆盖 POWERX_PROXY"
 		}
@@ -695,10 +663,8 @@ func modePriorityNote(source, mode string, proxyEnabled, rbacDelegateEnabled boo
 			return "IAMMode=delegated 显式配置，覆盖 POWERX_PROXY"
 		}
 		return "IAMMode 显式配置优先级最高"
-	case "env:POWERX_RBAC_DELEGATE":
-		return "POWERX_RBAC_DELEGATE=true 生效（高于 POWERX_PROXY）"
 	case "env:POWERX_PROXY":
-		return "POWERX_PROXY=1 生效（未设置 IAMMode/RBAC_DELEGATE）"
+		return "POWERX_PROXY=1 生效（未设置 IAMMode）"
 	default:
 		return "未显式配置，使用默认 local"
 	}

@@ -1,7 +1,7 @@
 # Implementation Plan: Base Plugin Migration
 
 **Branch**: `003-base-plugin-migration` · **Date**: 2025-11-01 · **Spec**: `specs/003-base-plugin-migration/spec.md`  
-**Input**: Feature specification for migrating `com.powerx.plugin.base` CRUD capabilities into the PowerXPlugin skeleton/framework stack.
+**Input**: Feature specification for migrating `com.powerx.plugins.base` CRUD capabilities into the PowerXPlugin skeleton/framework stack.
 
 ## Summary
 

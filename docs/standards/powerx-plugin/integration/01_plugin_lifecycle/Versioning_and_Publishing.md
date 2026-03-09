@@ -78,17 +78,17 @@ cp plugin.yaml build/pxp/manifest.yaml
 yq eval -i '.build.built_at = env(BUILD_TIME)' build/pxp/manifest.yaml
 
 # 4️⃣ 打包
-cd build/pxp && zip -r ../com.powerx.plugin.crm-1.3.0-linux-amd64.pxp .
+cd build/pxp && zip -r ../com.powerx.plugins.crm-1.3.0-linux-amd64.pxp .
 
 # 5️⃣ 签名
-openssl dgst -sha256 -sign ./keys/private.pem build/com.powerx.plugin.crm-1.3.0-linux-amd64.pxp > SIGNATURE
+openssl dgst -sha256 -sign ./keys/private.pem build/com.powerx.plugins.crm-1.3.0-linux-amd64.pxp > SIGNATURE
 ```
 
 输出目录：
 
 ```
 dist/
- └── com.powerx.plugin.crm-1.3.0-linux-amd64.pxp
+ └── com.powerx.plugins.crm-1.3.0-linux-amd64.pxp
 ```
 
 > `.pxp` 包是最终交付物：包含 manifest.yaml、后端二进制、前端产物、迁移、契约与签名文件。
@@ -102,16 +102,16 @@ dist/
 
 ```bash
 # 伪流程：上传至 Marketplace
-curl -X POST https://market/api/v1/dev/uploads -d '{ "plugin_id": "com.powerx.plugin.crm" }'
+curl -X POST https://market/api/v1/dev/uploads -d '{ "plugin_id": "com.powerx.plugins.crm" }'
 
 # PUT 上传 .pxp
-curl -X PUT $SIGNED_URL --upload-file ./dist/com.powerx.plugin.crm-1.3.0-linux-amd64.pxp
+curl -X PUT $SIGNED_URL --upload-file ./dist/com.powerx.plugins.crm-1.3.0-linux-amd64.pxp
 ```
 
 ### 2️⃣ 登记版本元数据
 
 ```bash
-curl -X POST https://market/api/v1/dev/plugins/com.powerx.plugin.crm/versions \
+curl -X POST https://market/api/v1/dev/plugins/com.powerx.plugins.crm/versions \
   -H "Content-Type: application/json" \
   -d '{
     "version": "1.3.0",
@@ -172,9 +172,9 @@ manifest 中可声明插件依赖关系：
 
 ```yaml
 dependencies:
-  - id: com.powerx.plugin.base
+  - id: com.powerx.plugins.base
     version: ">=1.0.0"
-  - id: com.powerx.plugin.crm
+  - id: com.powerx.plugins.crm
     version: "<2.0.0"
 ```
 

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AuthMeContextOutput",
+  "type": "object",
+  "properties": {
+    "is_root": {
+      "type": "boolean"
+    },
+    "current_tenant_uuid": {
+      "type": "string"
+    },
+    "user": {
+      "type": "object"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

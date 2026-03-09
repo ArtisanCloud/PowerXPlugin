@@ -1,0 +1,97 @@
+capabilities:
+  imports:
+    - contracts/capabilities/com.powerx.plugins.base.auth.me_context.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.audit.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.batch_clone.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.compose.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.create.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.delete.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.list.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.publish.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.quality_distribute.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.read.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.review.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.update.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.validate.yaml
+  provides:
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.auth.me_context.yaml
+      id: com.powerx.plugins.base.auth.me_context
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.auth.me_context.json
+        output: contracts/schema/output/com.powerx.plugins.base.auth.me_context.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.audit.yaml
+      id: com.powerx.plugins.base.template.audit
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.audit.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.audit.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.batch_clone.yaml
+      id: com.powerx.plugins.base.template.batch_clone
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.batch_clone.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.batch_clone.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.compose.yaml
+      id: com.powerx.plugins.base.template.compose
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.compose.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.compose.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.create.yaml
+      id: com.powerx.plugins.base.template.create
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.create.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.create.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.delete.yaml
+      id: com.powerx.plugins.base.template.delete
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.delete.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.delete.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.list.yaml
+      id: com.powerx.plugins.base.template.list
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.list.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.list.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.publish.yaml
+      id: com.powerx.plugins.base.template.publish
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.publish.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.publish.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.quality_distribute.yaml
+      id: com.powerx.plugins.base.template.quality_distribute
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.quality_distribute.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.quality_distribute.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.read.yaml
+      id: com.powerx.plugins.base.template.read
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.read.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.read.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.review.yaml
+      id: com.powerx.plugins.base.template.review
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.review.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.review.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.update.yaml
+      id: com.powerx.plugins.base.template.update
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.update.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.update.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.validate.yaml
+      id: com.powerx.plugins.base.template.validate
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.validate.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.validate.json
+      version: 1.0.0
+  required:
+    - com.corex.eventfabric.publish
+    - com.corex.media.assets.manage

@@ -3,7 +3,7 @@ type: API
 version: 1.0.0
 description: "对指定模板执行规则校验并返回违规项，支持 Agent 巡检。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [read]
 provides:
   - id: schema/input/{{ .PluginID }}.template.validate.v1

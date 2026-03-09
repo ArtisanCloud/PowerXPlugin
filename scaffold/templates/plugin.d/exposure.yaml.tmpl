@@ -1,0 +1,23 @@
+exposure:
+  channels:
+    - type: rest
+      capability: {{ .PluginID }}.template.create
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/resources
+      method: POST
+      auth: jwt
+      rbac: {{ .PluginID }}:template
+    - type: agent_tool
+      capability: {{ .PluginID }}.template.create
+      agent_tool_id: {{ .PluginID }}.template.create
+    - type: rest
+      capability: {{ .PluginID }}.auth.me_context
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/admin/user/auth/me/context
+      method: GET
+      auth: jwt
+      rbac: {{ .PluginID }}:template
+    - type: rest
+      capability: {{ .PluginID }}.auth.me_context
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/auth/me/context
+      method: GET
+      auth: jwt
+      rbac: {{ .PluginID }}:template

@@ -109,7 +109,7 @@ License 是插件合法运行的核心凭证。
 | 字段           | 说明                           |
 | ------------ | ---------------------------- |
 | `license_id` | 唯一标识符（UUID）                  |
-| `plugin_id`  | 插件标识（com.powerx.plugin.crm）  |
+| `plugin_id`  | 插件标识（com.powerx.plugins.crm）  |
 | `tenant_uuid`  | 授权租户                         |
 | `plan_id`    | 对应价格计划                       |
 | `status`     | active / expired / suspended |
@@ -146,7 +146,7 @@ LicenseServer-->>Plugin: Valid / Invalid
 ```json
 {
   "license_id": "lic_12345",
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "tenant_uuid": "tenant_abc",
   "plan_id": "pro",
   "issued_at": "2025-10-13T12:00:00Z",
@@ -174,7 +174,7 @@ LicenseServer-->>Plugin: Valid / Invalid
 ```bash
 POST /api/v1/license/verify
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "license_key": "<base64-encoded>"
 }
 ```

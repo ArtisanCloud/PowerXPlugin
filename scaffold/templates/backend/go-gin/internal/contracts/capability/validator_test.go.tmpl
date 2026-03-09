@@ -28,7 +28,7 @@ func TestValidate_Success(t *testing.T) {
 		"rbac": map[string]interface{}{
 			"resources": []interface{}{
 				map[string]interface{}{
-					"resource": "base:template",
+					"resource": "base.templates",
 					"actions":  []interface{}{"create"},
 				},
 			},
@@ -81,7 +81,7 @@ func TestValidate_MissingSchema(t *testing.T) {
 		"rbac": map[string]interface{}{
 			"resources": []interface{}{
 				map[string]interface{}{
-					"resource": "base:template",
+					"resource": "base.templates",
 					"actions":  []interface{}{"create"},
 				},
 			},
@@ -116,7 +116,7 @@ func TestValidate_RBACMismatch(t *testing.T) {
 		"rbac": map[string]interface{}{
 			"resources": []interface{}{
 				map[string]interface{}{
-					"resource": "base:template",
+					"resource": "base.templates",
 					"actions":  []interface{}{"read"},
 				},
 			},
@@ -153,7 +153,7 @@ type: Tool
 version: 1.0.0
 status: active
 rbac:
-  resource: base:template
+  resource: base.templates
   actions: [create]
 provides:
   - id: schema/output/base.template.create.v1.json

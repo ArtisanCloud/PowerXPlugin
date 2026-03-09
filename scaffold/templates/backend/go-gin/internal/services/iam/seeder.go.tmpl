@@ -213,9 +213,6 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 }
 
 func delegatedModeOverride() (string, bool) {
-	if truthy(os.Getenv("POWERX_RBAC_DELEGATE")) {
-		return "POWERX_RBAC_DELEGATE", true
-	}
 	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
 		return "POWERX_PROXY", true
 	}

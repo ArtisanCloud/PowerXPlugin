@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 test.describe('Tenant install flow', () => {
   test.beforeEach(async ({ page }) => {
     // Navigate to the plugin management page
-    await page.goto('/_p/com.powerx.plugin.base/admin#/plugins/manage')
+    await page.goto('/_p/com.powerx.plugins.base/admin#/plugins/manage')
   })
 
   test('loads the plugin management page', async ({ page }) => {
@@ -178,7 +178,7 @@ test.describe('Tenant install flow', () => {
 test.describe('SSE Log Integration', () => {
   test('displays SSE log panel when available', async ({ page }) => {
     // Navigate to the page
-    await page.goto('/_p/com.powerx.plugin.base/admin#/plugins/manage')
+    await page.goto('/_p/com.powerx.plugins.base/admin#/plugins/manage')
 
     // Check if there's a log panel (in a real implementation)
     // For now, the test verifies the main page loads
@@ -192,7 +192,7 @@ test.describe('SSE Log Integration', () => {
     // 3. Success/failure status appears
 
     // For now, just verify the page loads
-    await page.goto('/_p/com.powerx.plugin.base/admin#/plugins/manage')
+    await page.goto('/_p/com.powerx.plugins.base/admin#/plugins/manage')
     await expect(page.getByRole('heading', { name: '插件版本管理' })).toBeVisible()
   })
 })
@@ -205,7 +205,7 @@ test.describe('Error Handling', () => {
     // 3. Verify status remains unchanged
 
     // For now, just verify the page loads
-    await page.goto('/_p/com.powerx.plugin.base/admin#/plugins/manage')
+    await page.goto('/_p/com.powerx.plugins.base/admin#/plugins/manage')
     await expect(page.getByRole('heading', { name: '插件版本管理' })).toBeVisible()
   })
 
@@ -216,7 +216,7 @@ test.describe('Error Handling', () => {
     // 3. Verify the state is rolled back
 
     // For now, just verify the page loads
-    await page.goto('/_p/com.powerx.plugin.base/admin#/plugins/manage')
+    await page.goto('/_p/com.powerx.plugins.base/admin#/plugins/manage')
     await expect(page.getByRole('heading', { name: '插件版本管理' })).toBeVisible()
   })
 })

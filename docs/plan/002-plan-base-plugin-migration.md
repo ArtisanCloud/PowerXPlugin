@@ -1,4 +1,4 @@
-# com.powerx.plugin.base 迁移方案（2025-Q4 调整版）
+# com.powerx.plugins.base 迁移方案（2025-Q4 调整版）
 
 ## 1. 目标
 - 在 `PowerXPlugin` 仓库沉淀一套可直接运行的 Base 模板：后端 CRUD、前端 Starter 页面、`plugin.yaml`/菜单/RBAC 清单。

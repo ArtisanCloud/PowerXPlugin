@@ -56,7 +56,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 作为模板维护者，我需要 Skeleton 与 CLI 输出的 Nuxt 工程复刻 Base 插件的关键配置（`baseURL`、`runtimeConfig`、Nitro headers、HMR 代理、`@nuxt/icon`、`@pinia/nuxt` 等），以便开发者能够在 Standalone 与宿主双场景下开箱运行。
 
-**Independent Test**: 对比 `com.powerx.plugin.base/web-admin/nuxt.config.ts` 与 Skeleton/CLI 模板的 Diff；手动/脚本验证 Standalone 下 `/`、`/_p/{pluginId}/admin` 访问路径、语言包加载、HMR、代理行为。
+**Independent Test**: 对比 `com.powerx.plugins.base/web-admin/nuxt.config.ts` 与 Skeleton/CLI 模板的 Diff；手动/脚本验证 Standalone 下 `/`、`/_p/{pluginId}/admin` 访问路径、语言包加载、HMR、代理行为。
 
 **Acceptance Scenarios**：
 

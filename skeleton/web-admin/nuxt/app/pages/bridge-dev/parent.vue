@@ -25,7 +25,7 @@ const sendSync   = () => post({
   source: 'powerx', type: 'sync',
   locale: locale.value, theme: theme.value,
   hostOrigin: window.location.origin,
-  pluginId: 'com.powerx.plugin.base', instanceId: 'dev-bridge'
+  pluginId: 'com.powerx.plugins.base', instanceId: 'dev-bridge'
 })
 
 onMounted(() => {

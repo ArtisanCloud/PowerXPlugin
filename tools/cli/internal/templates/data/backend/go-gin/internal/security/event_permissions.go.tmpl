@@ -98,9 +98,20 @@ func LoadEventPermissionsFromManifest(manifestPath string, logger *logrus.Entry)
 		return EventPermissions{enforced: false}, nil
 	}
 
-	var m pluginManifest
-	if err := yaml.Unmarshal(content, &m); err != nil {
+	var root map[string]any
+	if err := yaml.Unmarshal(content, &root); err != nil {
 		return EventPermissions{}, fmt.Errorf("parse manifest yaml failed: %w", err)
+	}
+	if err := mergeCatalogReferences(manifestPath, root); err != nil {
+		return EventPermissions{}, fmt.Errorf("merge manifest catalogs failed: %w", err)
+	}
+	merged, err := yaml.Marshal(root)
+	if err != nil {
+		return EventPermissions{}, fmt.Errorf("marshal merged manifest failed: %w", err)
+	}
+	var m pluginManifest
+	if err := yaml.Unmarshal(merged, &m); err != nil {
+		return EventPermissions{}, fmt.Errorf("decode merged manifest failed: %w", err)
 	}
 
 	if m.Events == nil {
@@ -150,6 +161,48 @@ func LoadEventPermissionsFromManifest(manifestPath string, logger *logrus.Entry)
 	}
 
 	return perms, nil
+}
+
+func mergeCatalogReferences(manifestPath string, root map[string]any) error {
+	catalogsValue, ok := root["catalogs"]
+	if !ok || catalogsValue == nil {
+		return nil
+	}
+	catalogs, ok := catalogsValue.(map[string]any)
+	if !ok {
+		return errors.New("catalogs must be an object")
+	}
+
+	manifestDir := filepath.Dir(manifestPath)
+	loadCatalog := func(name string) (map[string]any, error) {
+		rawPath, _ := catalogs[name].(string)
+		rawPath = strings.TrimSpace(rawPath)
+		if rawPath == "" {
+			return nil, nil
+		}
+		filePath := rawPath
+		if !filepath.IsAbs(filePath) {
+			filePath = filepath.Join(manifestDir, filepath.FromSlash(rawPath))
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("read catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		var doc map[string]any
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return nil, fmt.Errorf("parse catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		return doc, nil
+	}
+
+	if doc, err := loadCatalog("events"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["events"]; ok {
+			root["events"] = section
+		}
+	}
+	return nil
 }
 
 func defaultManifestPath() string {

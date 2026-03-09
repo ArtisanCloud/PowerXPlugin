@@ -3,6 +3,7 @@ package public
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -138,7 +139,23 @@ func (h *AuthHandler) handleProxyErr(c *gin.Context, err error) {
 		var perr *authproxy.ProxyError
 		if errors.As(err, &perr) {
 			authmetrics.RecordDelegateError(app.PluginID, "proxy")
-			contracts.ResponseError(c, perr.Status, contracts.ErrCodeInternalError, perr.Message)
+			upstreamMethod := strings.TrimSpace(perr.UpstreamMethod)
+			upstreamPath := strings.TrimSpace(perr.UpstreamPath)
+			msg := perr.Message
+			if upstreamMethod != "" || upstreamPath != "" {
+				msg = fmt.Sprintf(
+					"delegated upstream request failed: %s %s returned %d (PowerX host IAM)",
+					upstreamMethod,
+					upstreamPath,
+					perr.Status,
+				)
+			}
+			contracts.ResponseErrorWithDetails(c, perr.Status, contracts.ErrCodeInternalError, msg, gin.H{
+				"upstream_method":  upstreamMethod,
+				"upstream_path":    upstreamPath,
+				"upstream_status":  perr.Status,
+				"upstream_message": perr.Message,
+			})
 		} else {
 			authmetrics.RecordDelegateError(app.PluginID, "other")
 			contracts.ResponseInternalError(c, err)
@@ -216,12 +233,48 @@ func (h *AuthHandler) handleDelegatedMeContext(c *gin.Context) {
 		contracts.ResponseUnauthorized(c, "缺少 Authorization Bearer token")
 		return
 	}
-	ctx, err := h.proxy.MeContext(c.Request.Context(), token)
+	ctxResp, err := h.proxy.MeContext(c.Request.Context(), token)
 	if err != nil {
 		h.handleProxyErr(c, err)
 		return
 	}
-	contracts.ResponseSuccess(c, ctx)
+	contracts.ResponseSuccess(c, mapDelegatedMeContext(ctxResp))
+}
+
+func mapDelegatedMeContext(ctx *authproxy.MeContext) gin.H {
+	if ctx == nil {
+		return gin.H{}
+	}
+	currentTenantUUID := strings.TrimSpace(ctx.CurrentTenantUUID)
+	memberAdmin := false
+	for _, member := range ctx.Members {
+		if strings.TrimSpace(member.TenantUUID) == currentTenantUUID && member.IsAdmin {
+			memberAdmin = true
+			break
+		}
+	}
+	manageByPermission := hasPermission(ctx.Permissions, "base.templates.manage")
+	manageAllowed := ctx.IsRoot || memberAdmin || manageByPermission
+	capabilities := gin.H{
+		"templates": gin.H{
+			"can_create": manageAllowed,
+			"can_update": manageAllowed,
+			"can_delete": manageAllowed,
+		},
+	}
+	if ext, ok := ctx.Capabilities.(map[string]any); ok && len(ext) > 0 {
+		capabilities = mergeCapabilities(ext, capabilities)
+	}
+	return gin.H{
+		"is_root":             ctx.IsRoot,
+		"current_tenant_uuid": currentTenantUUID,
+		"current_member_id":   ctx.CurrentMemberID,
+		"user":                ctx.User,
+		"members":             ctx.Members,
+		"roles":               ctx.Roles,
+		"permissions":         ctx.Permissions,
+		"capabilities":        capabilities,
+	}
 }
 
 func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
@@ -342,6 +395,13 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 		"roles":          uc.Roles,
 		"permissions":    uc.Permissions,
 		"policy_version": uc.PolicyVersion,
+		"capabilities": gin.H{
+			"templates": gin.H{
+				"can_create": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "base.templates.manage"),
+				"can_update": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "base.templates.manage"),
+				"can_delete": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "base.templates.manage"),
+			},
+		},
 	}
 	members := make([]gin.H, 0, 1)
 	if tenantUUID != "" {
@@ -367,6 +427,33 @@ func hasAdminRole(roles []string) bool {
 		}
 	}
 	return false
+}
+
+func hasPermission(permissions []string, target string) bool {
+	target = strings.ToLower(strings.TrimSpace(target))
+	if target == "" {
+		return false
+	}
+	for _, permission := range permissions {
+		if strings.ToLower(strings.TrimSpace(permission)) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func mergeCapabilities(primary map[string]any, fallback map[string]any) gin.H {
+	merged := gin.H{}
+	for key, value := range fallback {
+		merged[key] = value
+	}
+	for key, value := range primary {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		merged[key] = value
+	}
+	return merged
 }
 
 func mapTokens(tokens *iamservice.AuthTokens) gin.H {

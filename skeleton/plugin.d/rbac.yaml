@@ -1,0 +1,37 @@
+permissions:
+  - actions:
+      - read
+    resource: admin
+  - actions:
+      - create
+      - delete
+      - read
+      - update
+    resource: base.templates
+  - actions:
+      - create
+      - delete
+      - read
+      - update
+    resource: template
+rbac:
+  resources:
+    - actions:
+        - read
+      resource: admin
+    - actions:
+        - create
+        - delete
+        - read
+        - update
+      resource: base.templates
+    - actions:
+        - create
+        - delete
+        - read
+        - update
+      resource: template
+routes:
+  adminManifest: /api/v1/admin/manifest
+  basePath: /api/v1
+  rbac: /api/v1/admin/rbac

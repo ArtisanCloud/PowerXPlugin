@@ -27,7 +27,7 @@ func CORS() gin.HandlerFunc {
 			c.Header("Access-Control-Allow-Headers",
 				"Content-Type, Content-Length, Accept-Encoding, "+
 					"X-CSRF-Token, Authorization, accept, origin, Cache-Control, "+
-					"X-Requested-With, tenant_uuid, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT, X-Request-ID",
+					"X-Requested-With, tenant_uuid, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT, X-Request-ID, X-Trace-Id",
 			)
 			c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 			c.Header("Access-Control-Expose-Headers", "X-Trace-Id, X-Correlation-Id, X-Request-Id")
@@ -87,6 +87,13 @@ func RequestLogger() gin.HandlerFunc {
 		if strings.TrimSpace(tenantUUID) != "" {
 			fields["tenant_uuid"] = tenantUUID
 		}
+		if requestID := strings.TrimSpace(c.GetString("request_id")); requestID != "" {
+			fields["request_id"] = requestID
+		}
+		if traceID := strings.TrimSpace(c.GetString("trace_id")); traceID != "" {
+			fields["trace_id"] = traceID
+		}
+		fields["plugin_id"] = pluginIDForLog()
 
 		// 根据状态码选择日志级别
 		entry := logger.HTTPMiddleware().WithFields(fields)
@@ -262,15 +269,31 @@ func HealthCheck(endpoint string) gin.HandlerFunc {
 // RequestID 请求 ID 中间件
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		requestID := c.GetHeader("X-Request-ID")
+		requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		if requestID == "" {
+			requestID = strings.TrimSpace(c.GetHeader("Request-ID"))
+		}
 		if requestID == "" {
 			// 生成简单的请求 ID
 			requestID = fmt.Sprintf("%d", time.Now().UnixNano())
 		}
+		traceID := strings.TrimSpace(c.GetHeader("X-Trace-Id"))
+		if traceID == "" {
+			traceID = requestID
+		}
 
 		c.Header("X-Request-ID", requestID)
+		c.Header("X-Trace-Id", traceID)
 		c.Set("request_id", requestID)
+		c.Set("trace_id", traceID)
 
 		c.Next()
 	}
+}
+
+func pluginIDForLog() string {
+	if pluginID := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")); pluginID != "" {
+		return pluginID
+	}
+	return "com.powerx.plugins.base"
 }

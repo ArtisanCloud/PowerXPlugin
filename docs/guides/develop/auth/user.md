@@ -5,20 +5,17 @@
 ## 1. 模式切换速查
 | 模式 | 关键环境变量 | 说明 |
 |------|--------------|------|
-| Delegated (宿主) | `POWERX_PROXY=1` 或 `POWERX_RBAC_DELEGATE=true`<br>`POWERX_CORE_ENDPOINT`<br>`POWERX_AUTH_TOKEN` | 所有 `/api/v1/auth` 请求代理到宿主 `/admin/user/auth/*`，Token/组织信息完全复用 PowerX Core。宿主故障时 fail-closed。|
-| Local (Standalone) | `POWERX_PROXY=0`<br>`PLUGIN_IAM_TENANT_*`<br>`PLUGIN_IAM_ADMIN_*` | 插件自持 IAM 表（`iam_*`），`go run ./cmd/database/main.go setup` 会创建默认租户/管理员，前端通过同一 `/users/login` 页面登录。若插件还需要对 mini-app/2C 客户做鉴权，请参考下文“Customer Auth”，额外启用 `customer_accounts` 表保存客户登录凭证。|
+| Delegated | `IAMMode=delegated`<br>`POWERX_CORE_ENDPOINT`<br>`POWERX_AUTH_TOKEN` | 所有 `/api/v1/auth` 请求代理到宿主 `/admin/user/auth/*`，Token/组织信息完全复用 PowerX Core。宿主故障时 fail-closed。|
+| Local (Standalone) | `IAMMode=local`<br>`PLUGIN_IAM_TENANT_*`<br>`PLUGIN_IAM_ADMIN_*` | 插件自持 IAM 表（`iam_*`），`go run ./cmd/database/main.go setup` 会创建默认租户/管理员，前端通过同一 `/users/login` 页面登录。若插件还需要对 mini-app/2C 客户做鉴权，请参考下文“Customer Auth”，额外启用 `customer_accounts` 表保存客户登录凭证。|
 
 > 环境加载说明：
 > - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。
 > - `.env` 会覆盖 `config.yaml` 与进程已有环境变量；如 GoLand Run Config 仍残留 `POWERX_PROXY=0`/`IAM_MODE=local`，请先清理。
 > - Delegated 场景除 `POWERX_PROXY=1` 外，还需配置 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`；租户从 token `tid` 自动推导。
 >
-> **IAMMode / POWERX_PROXY / POWERX_RBAC_DELEGATE 优先级（从高到低）**：
-> 1) `IAMMode` / `IAM_MODE`  
-> 2) `POWERX_RBAC_DELEGATE=true`  
-> 3) `POWERX_PROXY=1`
->
-> 说明：`IAMMode=local` 会强制本地 IAM，`IAMMode=delegated` 会强制委派 IAM；未设置 IAMMode 时才按 `POWERX_RBAC_DELEGATE`/`POWERX_PROXY` 推断。
+> **主口径**：
+> - `IAMMode` 决定 IAM 语义（`local` / `delegated`）
+> - `POWERX_PROXY` 决定 runtime 链路（本地驱动 / 宿主链路）
 
 > **提示**：`models.InitSchemaFrom` 会根据配置清空 schema 前缀，SQLite/内存模式无需额外设置；PostgreSQL 场景可设置 `POWERX_DB_SCHEMA=px_com_powerx_plugins_base` 避免冲突。若未显式设置 `PLUGIN_IAM_ADMIN_EMAIL/PASSWORD`，seeder 会默认注入 `admin@local.test` / `S3cret!!`（仅用于本地调试，生产环境务必覆盖）。本地模式默认同样强制校验 Authorization Header。
 >
@@ -28,6 +25,15 @@
 - `useAuth` 将 `access_token`、`refresh_token`、`expires_at` 保存在 localStorage + `token` Cookie。刷新失败或宿主 503 时会调用 `failClosed()`：在 Standalone 模式下清空状态并重定向到 `/users/login`；在 Delegated 模式下保持当前 iframe、不再跳转，而是在全局顶部展示“PowerX 会话已失效，请回到宿主重新登录”的 Banner，并等待宿主重新注入 Token。
 - `storage` 事件会同步跨 Tab 的登录/登出：Standalone 场景仍会强制跳回登录；Delegated 场景则转为只读提示（Banner）并保留当前路由，方便宿主统一处理登录。
 - `auth.global.ts` 中间件会在首屏调用 `ensureFreshToken()`。若 token 丢失，Standalone 模式下依旧携带 `redirect` 参数跳转登录；Delegated 模式下只设置提示文案，并通过 `window.parent.postMessage({type: 'auth-token:request'})` 请求宿主重发凭证。
+
+## 2.1 宿主 `/api` 与插件 `/_p` 的鉴权边界（必须遵守）
+- `/_p/:plugin_id/api/*` 仅用于访问插件 API，网关可能改写 `Authorization` 为插件短期 Token（`aud=plugin:<plugin_id>`）。
+- `/api/v1/admin/{identity}/auth/*`（如 `/api/v1/admin/user/auth/me/context`）属于宿主用户认证接口，必须使用宿主用户 Token（`aud=user`）。
+- 插件前端/后端不要通过 `/_p/:plugin_id/api/*` 去访问宿主用户认证接口，否则容易出现 `401 Unauthorized`（audience 不匹配）。
+- Delegated 模式推荐流程：
+  1) 会话检查走宿主 `/api/v1/admin/user/auth/me/context`
+  2) 插件业务接口走 `/_p/:plugin_id/api/v1/...`
+  3) 若插件需要回调宿主用户接口，走宿主 `/api/v1/...`，不要复用插件入口 `/_p`
 
 ## 3. 后端组件
 | 文件 | 责任 |
@@ -77,7 +83,7 @@
 1. **启动后端（宿主代理）**
    ```bash
    cd skeleton/backend/go-gin
-   POWERX_PROXY=1 POWERX_RBAC_DELEGATE=true \
+   POWERX_PROXY=1 \
    POWERX_CORE_ENDPOINT="http://localhost:8077" \
    POWERX_AUTH_TOKEN="dev-token" \
    go run ./cmd/plugin
@@ -99,7 +105,6 @@
    ```bash
    cd skeleton/backend/go-gin
    export POWERX_PROXY=0
-   export POWERX_RBAC_DELEGATE=false
    export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
    export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
    export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'

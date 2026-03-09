@@ -11,7 +11,7 @@ This guide shows how to run the Skeleton in both Delegated (PowerX host) and Loc
 | Variable | Purpose | Delegated Example | Local Example |
 |----------|---------|------------------|---------------|
 | `POWERX_PROXY` | 注入来源，宿主=1 | `1` | `0`
-| `POWERX_RBAC_DELEGATE` | 强制委托 | `true` | unset / `false`
+| `IAMMode` | 启动模式 | `delegated` | `local`
 | `POWERX_CORE_ENDPOINT` | 宿主 API | `http://powerx-core:8077` | optional
 | `POWERX_AUTH_TOKEN` | 插件→宿主鉴权 | `eyJ...` | optional
 | `POWERX_TENANT_ID` | 当前租户 | `tenant_123` | optional
@@ -23,7 +23,7 @@ This guide shows how to run the Skeleton in both Delegated (PowerX host) and Loc
 ```bash
 # 后端
 cd skeleton/backend/go-gin
-POWERX_PROXY=1 POWERX_RBAC_DELEGATE=true \
+IAMMode=delegated POWERX_PROXY=1 \
 POWERX_CORE_ENDPOINT="http://localhost:8077" \
 POWERX_AUTH_TOKEN="dev-token" \
 go run ./cmd/plugin
@@ -41,7 +41,7 @@ npm run dev
 ```bash
 cd skeleton/backend/go-gin
 export POWERX_PROXY=0
-export POWERX_RBAC_DELEGATE=false
+export IAMMode=local
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test

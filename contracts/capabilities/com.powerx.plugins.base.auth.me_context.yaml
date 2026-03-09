@@ -1,0 +1,22 @@
+id: com.powerx.plugins.base.auth.me_context
+type: API
+version: 1.0.0
+description: "读取当前登录用户上下文（Delegated/Local IAM 统一入口）。"
+rbac:
+  resource: admin
+  actions: [read]
+provides:
+  - id: schema/input/com.powerx.plugins.base.auth.me_context.v1
+    path: schema/input/com.powerx.plugins.base.auth.me_context.json
+    kind: input
+    version: 1.0.0
+  - id: schema/output/com.powerx.plugins.base.auth.me_context.v1
+    path: schema/output/com.powerx.plugins.base.auth.me_context.json
+    kind: output
+    version: 1.0.0
+metadata:
+  protocols:
+    rest:
+      method: GET
+      path: /api/v1/admin/user/auth/me/context
+      description: "宿主模式读取用户上下文"

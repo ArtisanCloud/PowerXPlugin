@@ -190,7 +190,7 @@ GET /api/v1/marketplace/sla/{plugin_id}
 
 ```json
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "period": "2025-09",
   "uptime_percent": 99.92,
   "response_time_avg": 710,

@@ -114,11 +114,6 @@ async def rbac_middleware(request: Request, call_next: Callable):
 
 
 def _should_delegate_to_powerx() -> bool:
-    value = os.getenv("POWERX_RBAC_DELEGATE", "").strip().lower()
-    if value in {"1", "true", "yes", "on"}:
-        return True
-    if value in {"0", "false", "no", "off"}:
-        return False
     return os.getenv("POWERX_PROXY") == "1"
 
 

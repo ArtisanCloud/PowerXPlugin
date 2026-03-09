@@ -1,7 +1,7 @@
 
-# 从 com.powerx.plugin.base 迁移到 Skeleton + Scaffold
+# 从 com.powerx.plugins.base 迁移到 Skeleton + Scaffold
 
-本文提供一份操作手册，指导如何将现有的 `com.powerx.plugin.base` 插件拆分为 PowerXPlugin 仓库内的 Skeleton（可运行示例）与 Scaffold/CLI 模板。
+本文提供一份操作手册，指导如何将现有的 `com.powerx.plugins.base` 插件拆分为 PowerXPlugin 仓库内的 Skeleton（可运行示例）与 Scaffold/CLI 模板。
 
 ## 1. 迁移 Checklist
 
@@ -23,7 +23,7 @@
 **路径 B：独立可运行示例**（适用于无 Core 环境的开发）
 - ❌ 替换 `github.com/ArtisanCloud/...` → `github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/...`
 - ❌ 将数据库仓储改为内存实现（map + mutex）
-- ❌ 使用通用 Plugin ID（如 `com.powerx.plugin.demo`）
+- ❌ 使用通用 Plugin ID（如 `com.powerx.plugins.demo`）
 
 - [ ] 迁移 `internal/router` 中的路由装配逻辑，与 Skeleton 现有结构对齐
 - [ ] 更新 `internal/manifestx/manifest.go` 的 ID、名称、菜单、权限
@@ -52,7 +52,7 @@
 2. 将 Base 项目的核心业务文件复制到 Skeleton 对应目录，保持 `entity → services → transport` 命名一致。
 3. 使用 `rg`/`sed` 批量替换 import：
    ```bash
-   rg --files -g'*.go' 'github.com/ArtisanCloud/PowerX' com.powerx.plugin.base/backend |      xargs sed -i '' 's#github.com/ArtisanCloud/PowerX#github.com/ArtisanCloud/PowerXPlugin/framework/backend/go#g'
+   rg --files -g'*.go' 'github.com/ArtisanCloud/PowerX' com.powerx.plugins.base/backend |      xargs sed -i '' 's#github.com/ArtisanCloud/PowerX#github.com/ArtisanCloud/PowerXPlugin/framework/backend/go#g'
    ```
 4. 为 Skeleton 提供最小运行实现：如原仓储依赖数据库，则编写内存版本（map + mutex），并在文档中标注生产实现需要自行接入。
 5. 调整 `internal/router` 与 `cmd/plugin/main.go`，确保遵循框架路由顺序：

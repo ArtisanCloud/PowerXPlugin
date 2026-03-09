@@ -227,9 +227,9 @@ const loadTokens = async () => {
 };
 
 const exportAudit = async () => {
-  const path =
-    runtimeConfig.public.apiBaseUrl.replace("/api/v1", "") +
-    "/admin/security/lifecycle-events";
+  const apiBase = String(runtimeConfig.public.apiBaseUrl || "").replace(/\/+$/, "");
+  const adminBase = apiBase.replace(/\/api(?:\/v\d+)?$/, "");
+  const path = `${adminBase}/admin/security/lifecycle-events`;
   await navigator.clipboard.writeText(
     `${path}?tenant_uuid=${encodeURIComponent(tenantUuid.value || "")}`
   );

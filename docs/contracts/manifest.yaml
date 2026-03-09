@@ -1,10 +1,10 @@
-id: com.powerx.plugin.base
+id: com.powerx.plugins.base
 name: PowerX Base Plugin
 version: 0.1.0
 menus:
-  - path: /_p/com.powerx.plugin.base/admin/templates/intro
+  - path: /_p/com.powerx.plugins.base/admin/templates/intro
     title: 模板介绍
-  - path: /_p/com.powerx.plugin.base/admin/templates/crud
+  - path: /_p/com.powerx.plugins.base/admin/templates/crud
     title: 模板管理
 permissions:
   - iam.user.read

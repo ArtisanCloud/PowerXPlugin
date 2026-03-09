@@ -36,13 +36,6 @@ export type CapabilitySourcesResponse = {
   aliases?: Record<string, string>;
 };
 
-export type GatewayMeta = {
-  base_url?: string;
-  api_prefix?: string;
-  auth_schemes?: string[];
-  examples?: Record<string, string>;
-};
-
 export function useCapabilityCatalogApi() {
   const list = (query?: Record<string, any>) =>
     apiGet<ApiResponse<CapabilityCatalogEntry[]>>(
@@ -55,14 +48,8 @@ export function useCapabilityCatalogApi() {
       "admin/capabilities/sources",
     ).then((res) => res.data);
 
-  const getGatewayMeta = () =>
-    apiGet<ApiResponse<GatewayMeta>>(
-      "admin/gateway/meta",
-    ).then((res) => res.data);
-
   return {
     list,
     listSources,
-    getGatewayMeta,
   };
 }

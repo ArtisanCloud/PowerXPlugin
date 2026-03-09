@@ -55,7 +55,7 @@
 
 ```json
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "tenant_uuid": "tenant_abc",
   "license_id": "lic_123",
   "version": "1.3.2",
@@ -292,7 +292,7 @@ Authorization: Bearer <Vendor-Token>
 
 ```json
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "period": "2025-09",
   "metrics": {
     "api.calls": 12342,

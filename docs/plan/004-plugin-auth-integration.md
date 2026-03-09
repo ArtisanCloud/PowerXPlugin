@@ -2,7 +2,7 @@
 
 ## 背景
 - 当前 `PowerXPlugin` Skeleton/Web Admin 仅提供 `useApiClient` 的 Token 读取占位实现（参见 `skeleton/web-admin/nuxt/app/composables/api/_base.ts#getAuthToken`），缺少登录页、`useAuth` 状态管理、Refresh/Logout 处理，也没有与宿主 PowerX `web-admin` 的认证契约对齐。
-- 宿主 `PowerX` 已在 `web-admin/app/composables/useAuth.ts`、`web-admin/app/pages/users/login.vue` 以及 `backend/internal/transport/http/admin/auth` 中实现 JWT + Refresh Token 的成体系流程，并在 `docs/use_cases/_from_hub/SCN-IAM-USER-ROLE-001` 中定义了 IAM 场景对安全的一致性要求。
+- 宿主 `PowerX` 已在 `web-admin/app/composables/useAuth.ts`、`web-admin/app/pages/users/login.vue` 以及 `backend/internal/transport/http/admin/user/auth` 中实现 JWT + Refresh Token 的成体系流程，并在 `docs/use_cases/_from_hub/SCN-IAM-USER-ROLE-001` 中定义了 IAM 场景对安全的一致性要求。
 - 需求：插件需在「独立运行/子系统」与「嵌入 PowerX Admin」两种模式下复用同一套登录、登出、Token 存储与会话续期策略，为后续 Marketplace 分发与工具化打下基础。
 
 ## 目标
@@ -23,7 +23,7 @@
 - `PowerX/web-admin/app/composables/useAuth.ts`：Token 生命周期处理。
 - `PowerX/web-admin/app/pages/users`：登录/Register/忘记密码场景布局与文案。
 - `PowerX/web-admin/app/composables/api/services/authService.ts`：API DTO 定义。
-- `PowerX/backend/internal/transport/http/admin/auth`：`/admin/user/auth` 端点协议。
+- `PowerX/backend/internal/transport/http/admin/user/auth`：`/admin/user/auth` 端点协议。
 - `SCN-IAM-USER-ROLE-001`：IAM 守护场景，对一致性、审计与回收的要求。
 
 ## 交付物
@@ -68,7 +68,7 @@
 - **Public 路由**：在 `internal/transport/http/public` 下新增 `auth_handler.go`：  
   - `POST /api/v1/auth/login` → 代理到 Core，返回宿主响应；  
   - `POST /api/v1/auth/refresh`、`POST /api/v1/auth/logout` 同理；  
-  - 可选：`GET /api/v1/auth/me/context` 调用 Core `/admin/auth/me/context`。
+  - 可选：`GET /api/v1/auth/me/context` 调用 Core `/admin/user/auth/me/context`。
 - **Protected 路由**：所有业务路由追加 `JWTAuth` 中间件，统一读取 `Authorization` 或 `X-PowerX-CTX`。  
 - **Manifest / RBAC**：在 `internal/manifestx/manifest.go` 中声明所需的 IAM Scopes（例如 `iam.user.read`），确保宿主在安装时知晓依赖。
 

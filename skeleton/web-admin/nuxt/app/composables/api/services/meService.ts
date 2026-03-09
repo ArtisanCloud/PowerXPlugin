@@ -44,7 +44,49 @@ export interface ContextMember {
  */
 export const useMeService = () => {
   const apiClient = useApiClient();
-  const baseUrl = "/admin/user/auth";
+  const runtimeConfig = useRuntimeConfig();
+  const delegatedMode = (() => {
+    const raw = String(runtimeConfig.public?.iamMode || "").trim().toLowerCase();
+    if (raw) return raw === "delegated";
+    return Boolean(runtimeConfig.public?.delegatedMode || runtimeConfig.public?.insidePowerX);
+  })();
+  const contextBaseCandidates = delegatedMode
+    ? ["/admin/user/auth"]
+    : ["/admin/user/auth"];
+
+  const requestWithFallback = async <T>(
+    method: "get" | "post" | "put",
+    suffix: string,
+    body?: any
+  ): Promise<T> => {
+    let lastError: any = null;
+    for (const base of contextBaseCandidates) {
+      try {
+        if (method === "get") {
+          return await apiClient.get<T>(`${base}${suffix}`);
+        }
+        if (method === "post") {
+          return await apiClient.post<T>(`${base}${suffix}`, body);
+        }
+        return await apiClient.put<T>(`${base}${suffix}`, body);
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(
+          error?.statusCode || error?.status || error?.response?.status || 0
+        );
+        if (
+          status === 404 ||
+          (delegatedMode && suffix === "/me/context" && status === 403)
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError || new Error(`未找到可用的上下文接口: ${suffix}`);
+  };
+
+  const adminBaseUrl = "/admin/user/auth";
 
   return {
     /**
@@ -52,8 +94,9 @@ export const useMeService = () => {
      * 包含用户基本信息、当前租户、所属成员信息等
      */
     getMyContext: () => {
-      return apiClient.get<ApiResponse<UserContextData>>(
-        `${baseUrl}/me/context`
+      return requestWithFallback<ApiResponse<UserContextData>>(
+        "get",
+        "/me/context"
       );
     },
 
@@ -62,11 +105,10 @@ export const useMeService = () => {
      * @param tenantUuid 要切换到的租户 UUID
      */
     switchTenant: (tenantUuid: string) => {
-      return apiClient.post<ApiResponse<UserContextData>>(
-        `${baseUrl}/me/switch-tenant`,
-        {
-          tenant_uuid: tenantUuid,
-        }
+      return requestWithFallback<ApiResponse<UserContextData>>(
+        "post",
+        "/me/switch-tenant",
+        { tenant_uuid: tenantUuid }
       );
     },
 
@@ -74,8 +116,9 @@ export const useMeService = () => {
      * 获取我的租户列表（简化版，只返回基本信息）
      */
     getMyTenants: () => {
-      return apiClient.get<ApiResponse<ContextMember[]>>(
-        `${baseUrl}/me/tenants`
+      return requestWithFallback<ApiResponse<ContextMember[]>>(
+        "get",
+        "/me/tenants"
       );
     },
 
@@ -85,7 +128,7 @@ export const useMeService = () => {
      */
     updateMyProfile: (data: Partial<Omit<ContextUser, "id" | "status">>) => {
       return apiClient.put<ApiResponse<ContextUser>>(
-        `${baseUrl}/me/profile`,
+        `${adminBaseUrl}/me/profile`,
         data
       );
     },
@@ -99,7 +142,7 @@ export const useMeService = () => {
       formData.append("avatar", file);
 
       return apiClient.post<ApiResponse<{ avatar_url: string }>>(
-        `${baseUrl}/me/avatar`,
+        `${adminBaseUrl}/me/avatar`,
         formData,
         {
           headers: {
@@ -116,7 +159,7 @@ export const useMeService = () => {
      */
     checkPermission: (permission: string, resource?: string) => {
       return apiClient.post<ApiResponse<{ has_permission: boolean }>>(
-        `${baseUrl}/me/check-permission`,
+        `${adminBaseUrl}/me/check-permission`,
         {
           permission,
           resource,
@@ -137,7 +180,7 @@ export const useMeService = () => {
             permissions: string[];
           }>
         >
-      >(`${baseUrl}/me/roles`);
+      >(`${adminBaseUrl}/me/roles`);
     },
 
     /**
@@ -153,7 +196,7 @@ export const useMeService = () => {
             parent_id?: number;
           }>
         >
-      >(`${baseUrl}/me/departments`);
+      >(`${adminBaseUrl}/me/departments`);
     },
   };
 };

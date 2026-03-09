@@ -222,6 +222,17 @@ export const useAuth = () => {
     return Date.now() > stored - 5_000;
   };
 
+  const readAuthCookieToken = () => {
+    const cookieCandidates = ["px_ctx_jwt"];
+    for (const name of cookieCandidates) {
+      const value = readCookie(name);
+      if (value) {
+        return value;
+      }
+    }
+    return null;
+  };
+
   const getStoredToken = () => {
     if (!process.client) return null;
     const tryLocalStorageGet = (key: string): string | null | undefined => {
@@ -235,7 +246,7 @@ export const useAuth = () => {
 
     const stored = tryLocalStorageGet("access_token");
     // If localStorage is blocked (throws), fall back to cookie token.
-    if (stored === undefined) return readCookie("token");
+    if (stored === undefined) return readAuthCookieToken();
     if (stored) return stored;
 
     // If localStorage still contains auth footprint but access_token is gone,
@@ -249,7 +260,7 @@ export const useAuth = () => {
     );
     if (hasFootprint) return null;
 
-    return readCookie("token");
+    return readAuthCookieToken();
   };
 
   const getToken = () => {

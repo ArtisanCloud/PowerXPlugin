@@ -3,6 +3,7 @@ package public
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -138,7 +139,23 @@ func (h *AuthHandler) handleProxyErr(c *gin.Context, err error) {
 		var perr *authproxy.ProxyError
 		if errors.As(err, &perr) {
 			authmetrics.RecordDelegateError(app.PluginID, "proxy")
-			contracts.ResponseError(c, perr.Status, contracts.ErrCodeInternalError, perr.Message)
+			upstreamMethod := strings.TrimSpace(perr.UpstreamMethod)
+			upstreamPath := strings.TrimSpace(perr.UpstreamPath)
+			msg := perr.Message
+			if upstreamMethod != "" || upstreamPath != "" {
+				msg = fmt.Sprintf(
+					"delegated upstream request failed: %s %s returned %d (PowerX host IAM)",
+					upstreamMethod,
+					upstreamPath,
+					perr.Status,
+				)
+			}
+			contracts.ResponseErrorWithDetails(c, perr.Status, contracts.ErrCodeInternalError, msg, gin.H{
+				"upstream_method":  upstreamMethod,
+				"upstream_path":    upstreamPath,
+				"upstream_status":  perr.Status,
+				"upstream_message": perr.Message,
+			})
 		} else {
 			authmetrics.RecordDelegateError(app.PluginID, "other")
 			contracts.ResponseInternalError(c, err)

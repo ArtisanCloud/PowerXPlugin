@@ -2,8 +2,8 @@
 
 ## Phase 0 Discovery Summary
 
-- 目标：梳理 `com.powerx.plugin.base` 中与 Templates CRUD 相关的响应结构、错误码、租户上下文约定，为 Phase 1/2 的框架与 Skeleton 实现提供基准。
-- 资料来源：`com.powerx.plugin.base/backend/internal/transport/http/admin/templates/**`、`internal/services/admin/templates/**`、`internal/entity/repository/template/**`、`plugin.yaml`、`web-admin/app/composables/api/useTemplate.ts`。
+- 目标：梳理 `com.powerx.plugins.base` 中与 Templates CRUD 相关的响应结构、错误码、租户上下文约定，为 Phase 1/2 的框架与 Skeleton 实现提供基准。
+- 资料来源：`com.powerx.plugins.base/backend/internal/transport/http/admin/templates/**`、`internal/services/admin/templates/**`、`internal/entity/repository/template/**`、`plugin.yaml`、`web-admin/app/composables/api/useTemplate.ts`。
 
 ## Response Envelope 观测
 

@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"os"
+	"strings"
 	"time"
 
 	"{{ .BackendModulePath }}/internal/contracts"
@@ -9,6 +11,16 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func runtimePluginVersion() string {
+	if v := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_VERSION")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(os.Getenv("NUXT_PUBLIC_POWERX_PLUGIN_VERSION")); v != "" {
+		return v
+	}
+	return "0.8.0"
+}
 
 // AdminHandler 管理端处理器
 type AdminHandler struct {
@@ -28,8 +40,8 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 
 	manifest := &contracts.PluginManifest{
 		ID:          "com.powerx.plugins.base",
-		Name:        "Base Template Plugin",
-		Version:     "0.1.0",
+		Name:        "PowerX Base Plugin",
+		Version:     runtimePluginVersion(),
 		Description: "A starter plugin that showcases template management capabilities for PowerX",
 		Author:      "PowerX Team",
 		Homepage:    "https://powerx.dev/plugins/base",
@@ -90,13 +102,13 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 						},
 					},
 				},
-				RequiredPermissions: []string{"base:template:read"},
+				RequiredPermissions: []string{"base.templates:read"},
 			},
 		},
 
 		Permissions: []contracts.PermissionConfig{
 			{
-				Resource:    "base:template",
+				Resource:    "base.templates",
 				Actions:     []string{"read", "create", "update", "delete"},
 				Description: "Template management permissions",
 			},
@@ -114,7 +126,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 					"base.template.create",
 					"base.template.query",
 				},
-				RequiredPermissions: []string{"base:template:read"},
+				RequiredPermissions: []string{"base.templates:read"},
 			},
 		},
 
@@ -127,7 +139,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 				Transport:    "http",
 				Endpoint:     "/api/v1/templates",
 				Method:       "POST",
-				RBACResource: "base:template",
+				RBACResource: "base.templates",
 				InputSchema: &contracts.JSONSchema{
 					Type: "object",
 					Properties: map[string]*contracts.JSONSchemaProperty{
@@ -177,7 +189,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 				Transport:    "http",
 				Endpoint:     "/api/v1/templates",
 				Method:       "GET",
-				RBACResource: "base:template",
+				RBACResource: "base.templates",
 				InputSchema: &contracts.JSONSchema{
 					Type: "object",
 					Properties: map[string]*contracts.JSONSchemaProperty{
@@ -272,7 +284,7 @@ func (h *AdminHandler) GetRBACInfo(c *gin.Context) {
 	rbacInfo := &contracts.RBACInfo{
 		Resources: []contracts.Resource{
 			{
-				Name:        "base:template",
+				Name:        "base.templates",
 				Description: "Base 模板管理",
 				Actions: []contracts.Action{
 					{Name: "read", Description: "查看模板"},
@@ -287,31 +299,31 @@ func (h *AdminHandler) GetRBACInfo(c *gin.Context) {
 				Name:        "base_master",
 				Description: "Base Master 角色",
 				Permissions: []string{
-					"base:template:*",
+					"base.templates:*",
 				},
 			},
 			{
 				Name:        "template_editor",
 				Description: "模板编辑角色",
 				Permissions: []string{
-					"base:template:read",
-					"base:template:create",
-					"base:template:update",
+					"base.templates:read",
+					"base.templates:create",
+					"base.templates:update",
 				},
 			},
 			{
 				Name:        "template_viewer",
 				Description: "模板查看角色",
 				Permissions: []string{
-					"base:template:read",
+					"base.templates:read",
 				},
 			},
 		},
 		Permissions: []contracts.Permission{
-			{Resource: "base:template", Action: "read"},
-			{Resource: "base:template", Action: "create"},
-			{Resource: "base:template", Action: "update"},
-			{Resource: "base:template", Action: "delete"},
+			{Resource: "base.templates", Action: "read"},
+			{Resource: "base.templates", Action: "create"},
+			{Resource: "base.templates", Action: "update"},
+			{Resource: "base.templates", Action: "delete"},
 		},
 	}
 

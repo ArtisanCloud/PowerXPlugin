@@ -124,7 +124,7 @@ No constitution violations identified — 不需要额外复杂度豁免。
 - **Timeline**: 8 周（Week 1-2 基础设施，Week 3-4 核心功能，Week 5-6 高级特性，Week 7-8 测试优化）
 
 ### Workstream E – Local install fast path (Makefile + Docs)
-- **Deliverables**: 将原 `/com.powerx.plugin.base` 中的 `Makefile` 与 `make-files/*.mk` 搬运到 `skeleton/` 并同步到模板/CLI embed，使 `px-plugin init` 输出的工程默认具备 `make dist`, `make pack`, `make local-install`、`make local-install-pxp` 等目标；补充 `docs/guides/publish/local-install.md` 描述 dist/zip/`.pxp` 安装方式、`/admin/plugins/install/local` 调用示例及故障排查，并在 Quickstart/Publish 文档加引用。
+- **Deliverables**: 将原 `/com.powerx.plugins.base` 中的 `Makefile` 与 `make-files/*.mk` 搬运到 `skeleton/` 并同步到模板/CLI embed，使 `px-plugin init` 输出的工程默认具备 `make dist`, `make pack`, `make local-install`、`make local-install-pxp` 等目标；补充 `docs/guides/publish/local-install.md` 描述 dist/zip/`.pxp` 安装方式、`/admin/plugins/install/local` 调用示例及故障排查，并在 Quickstart/Publish 文档加引用。
 - **Acceptance**: 运行 `make dist` 能在 60 秒内完成 go+npm 构建并输出标准 artefact；`make local-install API_BASE=… TOKEN=…` 成功调用 Admin API（含 Force/Enable 参数），日志清晰；`make local-install-pxp PACKAGE=./artifacts/demo.pxp` 先解包/校验再调用 local install 并在文档中声明约束；`docs/guides/publish/local-install.md` 覆盖 dist/zip/`.pxp` 三种路径。
 - **Testing**: CI 增加 `make dist` smoke；在示例 helloworld 工程执行 `make local-install` 指向 sandbox Admin API；文档经 DevRel/QA 校验。
 

@@ -11,9 +11,18 @@
             </span>
 
             <div class="space-y-4">
-              <h1 class="text-4xl font-semibold text-gray-900 lg:text-5xl dark:text-white">
-                {{ $t("landing.hero.title") }}
-              </h1>
+              <div class="flex flex-wrap items-center gap-3">
+                <h1 class="text-4xl font-semibold text-gray-900 lg:text-5xl dark:text-white">
+                  {{ $t("landing.hero.title") }}
+                </h1>
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                  class="text-xs font-medium"
+                >
+                  v{{ pluginVersion }}
+                </UBadge>
+              </div>
               <p class="text-lg text-gray-600 lg:text-xl dark:text-gray-300">
                 {{ $t("landing.hero.description") }}
               </p>
@@ -112,7 +121,11 @@
 
 <script setup lang="ts">
 const { t } = useI18n();
+const runtimeConfig = useRuntimeConfig();
 const currentYear = new Date().getFullYear();
+const pluginVersion = computed(
+  () => String(runtimeConfig.public?.powerxPluginVersion || "dev")
+);
 const heroStats = computed(() => [
   { title: t("landing.hero.stats.adminShell"), value: "Nuxt 4.2" },
   { title: t("landing.hero.stats.backend"), value: "Go 1.24" },

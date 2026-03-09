@@ -73,7 +73,7 @@
 
 参考宿主仓库的《docs/standards/powerx/backend/rbac/readme.md》，PowerX 的权限抽象统一为 `plugin/resource/action` 三元组（Triple），配以系统级与租户级作用域。Standalone 模式需要：
 
-1. **资源/动作命名规范对齐**：本地 `iam_permissions` 表分别记录 `plugin`（固定 `com.powerx.plugin.base`）、`resource`（如 `templates`、`iam.roles`）、`action`（`read|manage|assign|audit`），并保持唯一索引 `(plugin, resource, action)`，方便与宿主 `permission_repo.Sync` 或 Manifest 进行数据对接。
+1. **资源/动作命名规范对齐**：本地 `iam_permissions` 表分别记录 `plugin`（固定 `com.powerx.plugins.base`）、`resource`（如 `templates`、`iam.roles`）、`action`（`read|manage|assign|audit`），并保持唯一索引 `(plugin, resource, action)`，方便与宿主 `permission_repo.Sync` 或 Manifest 进行数据对接。
 2. **主体与 Claims**：JWT Payload 中注入 `tenant_id/uuid`、`member_id`、`roles`、`scope` 等声明，与宿主 `pkg/corex/iam/reqctx` 可读取的字段同构，确保未来切换 Delegated 模式时，RBAC 中间件只需替换 Token 解析器。
 3. **作用域字段**：`Role`/`Permission` 增加 `scope_type`（`system` or `tenant`），`system.admin` 可跨租户管理；其它角色默认只在所属租户生效。
 4. **策略来源追踪**：`iam_permissions.source` 标记 `local_seed`、`manifest_sync` 等，便于 CLI/脚本与宿主的权限同步器保持一致。

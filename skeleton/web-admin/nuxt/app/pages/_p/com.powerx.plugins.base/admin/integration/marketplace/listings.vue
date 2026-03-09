@@ -230,7 +230,7 @@
         <form class="space-y-4" @submit.prevent="submitCreate">
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField label="插件 ID" required>
-              <UInput v-model="createForm.plugin_id" placeholder="com.powerx.plugin.base" />
+              <UInput v-model="createForm.plugin_id" placeholder="com.powerx.plugins.base" />
             </UFormField>
             <UFormField label="Vendor ID" required>
               <UInput v-model="createForm.vendor_id" placeholder="vendor-001" />
@@ -419,7 +419,7 @@ function selectListing(row: MarketplaceListing | null) {
 const createOpen = ref(false)
 
 const createForm = reactive({
-  plugin_id: "com.powerx.plugin.base",
+  plugin_id: "com.powerx.plugins.base",
   vendor_id: "",
   title: "",
   slug: "",

@@ -37,7 +37,7 @@
 
 ```yaml
 # --- 基础信息 ---
-id: com.powerx.plugin.example           # 插件唯一标识（反向域名）
+id: com.powerx.plugins.example           # 插件唯一标识（反向域名）
 name: Example Plugin                    # 插件显示名
 version: 1.0.0                          # 版本号 (SemVer)
 channel: stable                         # stable | beta | alpha
@@ -59,10 +59,10 @@ runtime:
 # --- 前端定义 ---
 frontends:
   admin:
-    base_path: /plugins/com.powerx.plugin.example/admin
+    base_path: /plugins/com.powerx.plugins.example/admin
     dir: ./frontend/admin
   web:
-    base_path: /plugins/com.powerx.plugin.example/web
+    base_path: /plugins/com.powerx.plugins.example/web
     dir: ./frontend/web
 
 # --- 数据迁移 ---

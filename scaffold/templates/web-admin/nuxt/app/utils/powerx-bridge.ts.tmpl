@@ -1,4 +1,15 @@
-export const PLUGIN_ID = "{{ .PluginID }}";
+const resolvePluginId = () => {
+  const processEnvPluginId =
+    typeof process !== "undefined"
+      ? (process.env.POWERX_PLUGIN_ID ||
+          process.env.NUXT_PUBLIC_POWERX_PLUGIN_ID ||
+          "")
+      : "";
+  const viteEnvPluginId = (import.meta as any)?.env?.NUXT_PUBLIC_POWERX_PLUGIN_ID || "";
+  return String(processEnvPluginId || viteEnvPluginId || "{{ .PluginID }}").trim();
+};
+
+export const PLUGIN_ID = resolvePluginId();
 export const PLUGIN_ADMIN_PREFIX = `/_p/${PLUGIN_ID}/admin`;
 const PLUGIN_SLUG = PLUGIN_ID.split(".").pop() || PLUGIN_ID;
 const LEGACY_EMBEDDED_PREFIX = `${PLUGIN_ADMIN_PREFIX}/plugins/${PLUGIN_SLUG}`;

@@ -10,7 +10,7 @@
 | 字段 | 内容 |
 |------|------|
 | **工单编号** | PX-SUP-YYYYMMDD-XXXX |
-| **插件名称** | com.powerx.plugin.xxx |
+| **插件名称** | com.powerx.plugins.xxx |
 | **版本号** | 1.2.3 |
 | **提交人** | <user@tenant.com> |
 | **角色** | Tenant Admin / Vendor Dev / Marketplace Operator |

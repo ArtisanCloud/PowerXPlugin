@@ -127,7 +127,7 @@ Issuer 可以使用 `POWERX_SECURITY_JWT_ISSUER` 或单独的 `POWERX_CUSTOMER_J
    - 错误统一用 `contracts.ResponseUnauthorized` 或 `ResponseBadRequest`。
 6. **配置**：
    - `backend/etc/config.*.yaml` 新增 `customerAuth` 段落（`mode: delegate|local`, `delegateEndpoint`, `jwtIssuer`, `jwtSecret`）。
-   - `plugin.yaml` 可声明 mini-app 接口需要的 scopes（如 `com.powerx.plugin.ecommerce:miniapp.product`）。
+   - `plugin.yaml` 可声明 mini-app 接口需要的 scopes（如 `com.powerx.plugins.ecommerce:miniapp.product`）。
 
 ## 注意事项
 

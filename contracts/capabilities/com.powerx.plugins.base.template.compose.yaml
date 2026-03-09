@@ -3,7 +3,7 @@ type: Tool
 version: 1.0.0
 description: "复合 Workflow，串联草稿、审核、发布节点，供 Workflow Builder 与 Agent Hub 复用。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [create]
 provides:
   - id: schema/input/com.powerx.plugins.base.template.compose.v1

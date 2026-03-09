@@ -3,7 +3,7 @@ type: Tool
 version: 1.0.0
 description: "巡检既有模板并自动修复的 Workflow 场景。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [read]
 provides:
   - id: schema/input/{{ .PluginID }}.template.audit.v1

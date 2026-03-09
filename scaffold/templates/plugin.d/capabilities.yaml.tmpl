@@ -1,0 +1,17 @@
+capabilities:
+  imports:
+    - contracts/capabilities/{{ .PluginID }}.template.create.yaml
+    - contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
+  provides:
+    - id: {{ .PluginID }}.template.create
+      version: 1.0.0
+      descriptor: contracts/capabilities/{{ .PluginID }}.template.create.yaml
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.create.json
+        output: contracts/schema/output/{{ .PluginID }}.template.create.json
+    - id: {{ .PluginID }}.auth.me_context
+      version: 1.0.0
+      descriptor: contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.auth.me_context.json
+        output: contracts/schema/output/{{ .PluginID }}.auth.me_context.json

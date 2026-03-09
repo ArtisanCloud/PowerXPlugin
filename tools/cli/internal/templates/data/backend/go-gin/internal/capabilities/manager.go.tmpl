@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"{{ .BackendModulePath }}/internal/config"
-	"{{ .BackendModulePath }}/internal/logger"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
+	"{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/logger"
 )
 
 const (
@@ -259,9 +259,20 @@ func loadCatalogFromManifest(log *logrus.Entry) (*CatalogSnapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read manifest %s: %w", manifestPath, err)
 	}
-	var doc manifestDoc
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
+	var root map[string]any
+	if err := yaml.Unmarshal(raw, &root); err != nil {
 		return nil, fmt.Errorf("parse manifest %s: %w", manifestPath, err)
+	}
+	if err := mergeCatalogReferences(manifestPath, root); err != nil {
+		return nil, fmt.Errorf("merge manifest catalogs: %w", err)
+	}
+	buf, err := yaml.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged manifest: %w", err)
+	}
+	var doc manifestDoc
+	if err := yaml.Unmarshal(buf, &doc); err != nil {
+		return nil, fmt.Errorf("decode merged manifest: %w", err)
 	}
 	manifestDir := filepath.Dir(manifestPath)
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -393,6 +404,83 @@ func loadCatalogFromManifest(log *logrus.Entry) (*CatalogSnapshot, error) {
 		}).Info("capability catalog loaded from plugin.yaml fallback")
 	}
 	return snapshot, nil
+}
+
+func mergeCatalogReferences(manifestPath string, root map[string]any) error {
+	catalogsValue, ok := root["catalogs"]
+	if !ok || catalogsValue == nil {
+		return nil
+	}
+	catalogs, ok := catalogsValue.(map[string]any)
+	if !ok {
+		return errors.New("catalogs must be an object")
+	}
+	manifestDir := filepath.Dir(manifestPath)
+
+	loadCatalog := func(name string) (map[string]any, error) {
+		rawPath, _ := catalogs[name].(string)
+		rawPath = strings.TrimSpace(rawPath)
+		if rawPath == "" {
+			return nil, nil
+		}
+		filePath := rawPath
+		if !filepath.IsAbs(filePath) {
+			filePath = filepath.Join(manifestDir, filepath.FromSlash(rawPath))
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("read catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		var doc map[string]any
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return nil, fmt.Errorf("parse catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		return doc, nil
+	}
+
+	if doc, err := loadCatalog("capabilities"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["capabilities"]; ok {
+			root["capabilities"] = section
+		}
+	}
+	if doc, err := loadCatalog("events"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["events"]; ok {
+			root["events"] = section
+		}
+	}
+	if doc, err := loadCatalog("agent_tools"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["agent_tools"]; ok {
+			root["agent_tools"] = section
+		}
+	}
+	if doc, err := loadCatalog("exposure"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["exposure"]; ok {
+			root["exposure"] = section
+		}
+	}
+	if doc, err := loadCatalog("rbac"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["rbac"]; ok {
+			root["rbac"] = section
+		}
+		if section, ok := doc["permissions"]; ok {
+			root["permissions"] = section
+		}
+		if section, ok := doc["routes"]; ok {
+			root["routes"] = section
+		}
+	}
+
+	return nil
 }
 
 func resolveManifestPath() string {

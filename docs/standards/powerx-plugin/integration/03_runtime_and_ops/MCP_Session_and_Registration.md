@@ -88,7 +88,7 @@ MCP 支持两种连接模式：
 {
   "type": "REGISTER",
   "payload": {
-    "plugin_id": "com.powerx.plugin.crm",
+    "plugin_id": "com.powerx.plugins.crm",
     "version": "1.3.0",
     "runtime_type": "exec",
     "capabilities": ["crm.contact.create", "crm.contact.list"],
@@ -314,7 +314,7 @@ export POWERX_MCP_ENDPOINT="ws://localhost:8077/mcp/debug"
 宿主日志：
 
 ```
-[INFO] Plugin com.powerx.plugin.crm registered (pid=31245, port=8088)
+[INFO] Plugin com.powerx.plugins.crm registered (pid=31245, port=8088)
 ```
 
 ---

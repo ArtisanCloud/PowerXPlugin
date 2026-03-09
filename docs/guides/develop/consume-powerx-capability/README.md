@@ -17,6 +17,41 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 | 插件后端 Skeleton | `8078` | `go run ./skeleton/backend/go-gin/cmd/plugin` 启动后监听，前端所有 API（含 Capability Lab）都只打到这里 |
 | PowerX Integration Gateway | `8077` | PowerX 底座 Dev API 端口，插件后端通过 `PX_GATEWAY_BASE_URL` 调用 `/tenant/invocations`；若宿主端口不同请自行覆盖 |
 
+## 1.1 宿主与插件 Trace 日志统一契约（已落地）
+
+为实现 PowerX 宿主与插件日志在同一日志源聚合检索，统一采用以下字段契约：
+
+- 必填字段：`trace_id`、`request_id`、`plugin_id`、`tenant_uuid`、`path`、`status`、`latency`
+- 头部约定：`X-Trace-Id`、`X-Request-ID`（`Request-ID` 作为兼容输入）
+- 字段命名：统一使用下划线风格（不要混用 `traceId` / `requestId`）
+
+透传规则（插件侧）：
+
+1. 优先使用宿主透传的 `X-Trace-Id` / `X-Request-ID`
+2. 若 `X-Trace-Id` 缺失，则回退为 `request_id`
+3. 若 `X-Request-ID` 也缺失，插件生成 `request_id`，并同步设置 `trace_id`
+4. 所有 HTTP access 日志必须带 `trace_id + request_id + plugin_id`
+
+代码落点（Skeleton）：
+
+- `skeleton/backend/go-gin/internal/middleware/common.go`
+  - `RequestID()`：实现 trace/request 透传优先与回填
+  - `RequestLogger()`：统一输出 `trace_id/request_id/plugin_id/tenant_uuid`
+- `skeleton/backend/go-gin/internal/transport/http/middleware/request_trace.go`
+  - 调试日志字段改为 `trace_id/request_id/plugin_id`
+
+宿主侧职责（PowerX）：
+
+- 在入口与 `/_p` 代理链路生成/透传 `trace_id`、`request_id`
+- 代理日志输出统一字段（含 `plugin_id/tenant_uuid/path/status/latency/trace_id`）
+- 采集层（Fluent Bit/Vector/OTel Collector）按 `trace_id + plugin_id + tenant_uuid` 聚合检索
+
+排障顺序（推荐）：
+
+1. 先看宿主日志是否有同一 `trace_id` 的入口和 `/_p` 转发记录
+2. 再看插件 `HTTP request completed` 是否带同一 `trace_id`
+3. 若 trace 断裂，优先检查代理是否透传 `X-Trace-Id/X-Request-ID`
+
 ### /tenant/invocations 调用语义
 
 - `/tenant/invocations` 是“能力调度器”而非 HTTP 代理，**`action` 只是能力语义标签**；要让 Gateway 正确路由，必须在 `payload` 中给出完整的协议描述。

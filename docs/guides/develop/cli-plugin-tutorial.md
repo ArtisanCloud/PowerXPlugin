@@ -36,7 +36,7 @@ make build-px-plugin
 
 ```bash
 cd /private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins
-px-plugin init com.powerx.plugin.hello-world
+px-plugin init com.powerx.plugins.hello-world
 ```
 
 交互向导会确认：

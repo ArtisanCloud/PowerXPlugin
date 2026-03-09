@@ -77,7 +77,7 @@
 
 ```yaml
 incident_id: "INC-20251013-001"
-plugin_id: "com.powerx.plugin.crm"
+plugin_id: "com.powerx.plugins.crm"
 severity: SEV-1
 detected_at: "2025-10-13T09:12:00Z"
 status: ongoing

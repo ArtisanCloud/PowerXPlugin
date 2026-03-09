@@ -64,6 +64,50 @@ export const useUserStore = defineStore("user", {
       return currentTenant?.is_admin || false;
     },
 
+    // delegated 场景下的模板写权限（优先使用宿主返回的能力/权限）
+    canReadTemplates: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allow = new Set([
+        "base.templates.manage",
+        "base.templates.read",
+        "base.templates:read",
+        "template:read",
+      ]);
+      return perms.some((perm) => allow.has(perm));
+    },
+
+    // delegated 场景下的模板写权限（优先使用宿主返回的能力/权限）
+    canWriteTemplates: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const tplCaps = state.context?.capabilities?.templates;
+      if (
+        Boolean(tplCaps?.can_create) ||
+        Boolean(tplCaps?.can_update) ||
+        Boolean(tplCaps?.can_delete)
+      ) {
+        return true;
+      }
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allow = new Set([
+        "base.templates.manage",
+        "base.templates:create",
+        "base.templates:update",
+        "base.templates:delete",
+        "template:create",
+        "template:update",
+        "template:delete",
+      ]);
+      return perms.some((perm) => allow.has(perm));
+    },
+
     // 用户显示名称
     displayName: (state): string => {
       return (

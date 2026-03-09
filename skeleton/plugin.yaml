@@ -1,6 +1,6 @@
 id: com.powerx.plugins.base
 name: PowerX Base Plugin
-version: 0.8.0
+version: 0.1.0
 description: "PowerX 基础模板插件，提供模板 CRUD、能力注册与多协议暴露示例。"
 runtime:
   kind: process

@@ -183,10 +183,10 @@ func VerifyToolGrant(token string) error {
 
 | Plugin                      | Capability                | Scope         | TTL   | Status    | 说明                 |
 | --------------------------- | ------------------------- | ------------- | ----- | --------- | ------------------ |
-| com.powerx.plugin.crm       | crm.contact.create        | crm.contact.* | 3600s | active    | CRM 主 Agent 授权     |
-| com.powerx.plugin.ai.email  | ai.email.send             | ai.email.*    | 1800s | active    | A2A 调用 AI 邮件 Agent |
-| com.powerx.plugin.erp       | finance.invoice.read      | finance.*     | 7200s | suspended | 被撤销                |
-| com.powerx.plugin.analytics | analytics.report.generate | analytics.*   | 600s  | expired   | 过期未刷新              |
+| com.powerx.plugins.crm       | crm.contact.create        | crm.contact.* | 3600s | active    | CRM 主 Agent 授权     |
+| com.powerx.plugins.ai.email  | ai.email.send             | ai.email.*    | 1800s | active    | A2A 调用 AI 邮件 Agent |
+| com.powerx.plugins.erp       | finance.invoice.read      | finance.*     | 7200s | suspended | 被撤销                |
+| com.powerx.plugins.analytics | analytics.report.generate | analytics.*   | 600s  | expired   | 过期未刷新              |
 
 ---
 

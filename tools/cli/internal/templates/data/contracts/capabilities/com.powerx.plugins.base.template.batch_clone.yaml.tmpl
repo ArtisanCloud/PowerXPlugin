@@ -3,7 +3,7 @@ type: API
 version: 1.0.0
 description: "批量克隆模板，生成多份带前缀的草稿，供后续流程批量处理。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [create]
 provides:
   - id: schema/input/{{ .PluginID }}.template.batch_clone.v1

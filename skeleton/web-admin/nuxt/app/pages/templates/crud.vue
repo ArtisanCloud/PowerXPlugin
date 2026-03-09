@@ -171,13 +171,23 @@ const { t } = useI18n()
 
 const auth = useAuth()
 const userStore = useUserStore()
-const { isRoot, isCurrentTenantAdmin } = storeToRefs(userStore)
+const { isRoot, isCurrentTenantAdmin, canReadTemplates, canWriteTemplates } = storeToRefs(userStore)
 const isDelegatedReadOnly = computed(() => {
   const delegated = auth.delegatedIAM?.value ?? false
   if (!delegated) {
     return false
   }
+  if (Boolean(canWriteTemplates.value)) {
+    return false
+  }
   return !(Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value))
+})
+const canReadTemplateList = computed(() => {
+  const delegated = auth.delegatedIAM?.value ?? false
+  if (!delegated) {
+    return true
+  }
+  return Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value) || Boolean(canReadTemplates.value)
 })
 
 const tableColumns = computed(() => [
@@ -455,13 +465,17 @@ const showToast = ({
   })
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (!userStore.context && !userStore.isLoading) {
-    userStore.fetchUserContext().catch(() => {
+    try {
+      await userStore.fetchUserContext()
+    } catch {
       // ignore user context fetch errors
-    })
+    }
   }
-  fetchTemplates()
+  if (canReadTemplateList.value) {
+    await fetchTemplates()
+  }
 })
 </script>
 

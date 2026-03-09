@@ -32,6 +32,10 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
     typeof runtimeConfig.public?.bridgeDebug === "boolean"
       ? runtimeConfig.public.bridgeDebug
       : import.meta.dev;
+  const resolvedPluginId =
+    opts.pluginId ||
+    String(runtimeConfig.public?.powerxPluginId || "").trim() ||
+    "com.powerx.plugins.base";
   const shouldLog =
     typeof opts.debug === "boolean" ? opts.debug : defaultDebug;
 
@@ -41,18 +45,40 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
 
   const applyAuthToken = (payload: {
     accessToken?: string;
+    access_token?: string;
     refreshToken?: string;
+    refresh_token?: string;
     tokenType?: string;
+    token_type?: string;
     expiresIn?: number;
+    expires_in?: number;
     expiresAt?: number;
+    expires_at?: number;
     scope?: string;
     pluginId?: string;
+    plugin_id?: string;
     ctx?: string;
+    ctx_sig?: string;
     ctxSig?: string;
     ctxJwt?: string;
+    ctx_jwt?: string;
     hostOrigin?: string;
+    host_origin?: string;
   }) => {
-    if (!payload?.accessToken) {
+    const accessToken =
+      payload?.accessToken ||
+      payload?.access_token ||
+      payload?.ctxJwt ||
+      payload?.ctx_jwt;
+    const refreshToken = payload?.refreshToken || payload?.refresh_token;
+    const tokenType = payload?.tokenType || payload?.token_type || "Bearer";
+    const payloadPluginID = payload?.pluginId || payload?.plugin_id;
+    const payloadCtxSig = payload?.ctxSig || payload?.ctx_sig;
+    const payloadCtxJwt = payload?.ctxJwt || payload?.ctx_jwt;
+    const payloadHostOrigin = payload?.hostOrigin || payload?.host_origin;
+    const payloadExpiresAt = payload?.expiresAt || payload?.expires_at;
+    let payloadExpiresIn = payload?.expiresIn || payload?.expires_in;
+    if (!accessToken) {
       console.warn(
         "[Bridge][Plugin] 收到 auth-token 但 accessToken 为空，已忽略",
       );
@@ -60,11 +86,11 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
     }
 
     // 优先使用 expiresIn；若缺失则尝试用 expiresAt 推导，保证有最小有效期
-    let expiresIn = payload.expiresIn;
-    if ((!expiresIn || expiresIn <= 0) && payload.expiresAt) {
+    let expiresIn = payloadExpiresIn;
+    if ((!expiresIn || expiresIn <= 0) && payloadExpiresAt) {
       expiresIn = Math.max(
         1,
-        Math.floor((payload.expiresAt - Date.now()) / 1000),
+        Math.floor((payloadExpiresAt - Date.now()) / 1000),
       );
     }
     if (!expiresIn || expiresIn <= 0) {
@@ -74,42 +100,42 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
     const pluginOrigin =
       typeof window !== "undefined" ? window.location.origin : "plugin";
     const storePluginId =
-      payload.pluginId || opts.pluginId || "com.powerx.plugin.base";
+      payloadPluginID || resolvedPluginId;
     const ctxKey = `${pluginOrigin}::${storePluginId}`;
     if (shouldLog) {
       console.info("[Bridge][Plugin] applyAuthToken storing ctx", {
         key: ctxKey,
         hasCtx: Boolean(payload.ctx),
-        hasCtxSig: Boolean(payload.ctxSig),
-        hasCtxJwt: Boolean(payload.ctxJwt),
+        hasCtxSig: Boolean(payloadCtxSig),
+        hasCtxJwt: Boolean(payloadCtxJwt),
       });
     }
     hostCtxStore.setCtx(ctxKey, {
-      token: payload.accessToken,
-      refreshToken: payload.refreshToken,
-      tokenType: payload.tokenType,
+      token: accessToken,
+      refreshToken,
+      tokenType,
       tenantUuid: undefined,
       ctx: payload.ctx,
-      ctxSig: payload.ctxSig,
-      ctxJwt: payload.ctxJwt,
-      hostOrigin: payload.hostOrigin,
-      expiresAt: payload.expiresAt,
-      expiresIn: payload.expiresIn,
+      ctxSig: payloadCtxSig,
+      ctxJwt: payloadCtxJwt,
+      hostOrigin: payloadHostOrigin,
+      expiresAt: payloadExpiresAt,
+      expiresIn: payloadExpiresIn,
       scope: payload.scope,
     });
 
     const authPayload: LoginResponse = {
-      access_token: payload.accessToken,
-      refresh_token: payload.refreshToken || "",
-      token_type: payload.tokenType || "Bearer",
+      access_token: accessToken,
+      refresh_token: refreshToken || "",
+      token_type: tokenType,
       expires_in: expiresIn,
       scope: payload.scope || "powerx",
     };
     if (shouldLog) {
       console.info("[Bridge][Plugin] applyAuthToken -> setAuth", {
-        pluginId: payload.pluginId,
+        pluginId: payloadPluginID,
         expiresIn,
-        token: `${payload.accessToken.slice(0, 4)}...${payload.accessToken.slice(-4)}`,
+        token: `${accessToken.slice(0, 4)}...${accessToken.slice(-4)}`,
       });
     }
     auth.setAuth(authPayload);
@@ -130,7 +156,7 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
 
   const bridge = initPowerXBridge({
     debug: shouldLog,
-    pluginId: opts.pluginId ?? "com.powerx.plugin.base",
+    pluginId: resolvedPluginId,
     instanceId: opts.instanceId ?? "dev-bridge",
     allowedOrigins: ["*"],
     // allowedOrigins: import.meta.env.DEV ? ['*'] : ['https://admin.powerx.cloud'],

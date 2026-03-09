@@ -20,17 +20,20 @@ func RequestTrace() gin.HandlerFunc {
 
 	mode := requestMode()
 	iamMode := iamModeFromEnv()
+	pluginID := pluginIdentifier()
 	return func(c *gin.Context) {
 		start := time.Now()
 
 		authMode, authPreview := detectAuth(c)
 		userAgent := shorten(c.GetHeader("User-Agent"), 80)
 		traceID := traceIdentifier(c)
+		requestID := requestIdentifier(c)
 		tenantCtx, _ := authx.GetTenantContext(c)
 
-		log.Printf("[PLUGIN-REQ-TRACE] stage=begin mode=%s iam_mode=%s method=%s path=%s auth=%s auth.head=%s tenant_uuid=%s user_id=%d trace=%s ip=%s ua=%s",
+		log.Printf("[PLUGIN-REQ-TRACE] stage=begin mode=%s iam_mode=%s plugin_id=%s method=%s path=%s auth=%s auth.head=%s tenant_uuid=%s user_id=%d trace_id=%s request_id=%s ip=%s ua=%s",
 			mode,
 			iamMode,
+			pluginID,
 			c.Request.Method,
 			c.Request.URL.Path,
 			authMode,
@@ -38,6 +41,7 @@ func RequestTrace() gin.HandlerFunc {
 			tenantCtx.TenantUUID,
 			tenantCtx.UserID,
 			traceID,
+			requestID,
 			c.ClientIP(),
 			userAgent,
 		)
@@ -51,9 +55,10 @@ func RequestTrace() gin.HandlerFunc {
 			authMode = "bearer(validated)"
 		}
 
-		log.Printf("[PLUGIN-REQ-TRACE] stage=end mode=%s iam_mode=%s status=%d latency=%s auth=%s auth.head=%s tenant_uuid=%s user_id=%d trace=%s",
+		log.Printf("[PLUGIN-REQ-TRACE] stage=end mode=%s iam_mode=%s plugin_id=%s status=%d latency=%s auth=%s auth.head=%s tenant_uuid=%s user_id=%d trace_id=%s request_id=%s",
 			mode,
 			iamMode,
+			pluginID,
 			status,
 			latency,
 			authMode,
@@ -61,6 +66,7 @@ func RequestTrace() gin.HandlerFunc {
 			tenantCtx.TenantUUID,
 			tenantCtx.UserID,
 			traceID,
+			requestID,
 		)
 	}
 }
@@ -103,6 +109,9 @@ func iamModeFromEnv() string {
 }
 
 func traceIdentifier(c *gin.Context) string {
+	if id := strings.TrimSpace(c.GetHeader("X-Trace-Id")); id != "" {
+		return id
+	}
 	if id := strings.TrimSpace(c.GetHeader("X-Request-ID")); id != "" {
 		return id
 	}
@@ -113,6 +122,26 @@ func traceIdentifier(c *gin.Context) string {
 		return v
 	}
 	return ""
+}
+
+func requestIdentifier(c *gin.Context) string {
+	if id := strings.TrimSpace(c.GetHeader("X-Request-ID")); id != "" {
+		return id
+	}
+	if id := strings.TrimSpace(c.GetHeader("Request-ID")); id != "" {
+		return id
+	}
+	if v := strings.TrimSpace(c.GetString("request_id")); v != "" {
+		return v
+	}
+	return ""
+}
+
+func pluginIdentifier() string {
+	if pluginID := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")); pluginID != "" {
+		return pluginID
+	}
+	return "com.powerx.plugins.base"
 }
 
 func truthy(value string) bool {

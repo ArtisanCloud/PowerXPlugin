@@ -66,12 +66,12 @@ async def manifest():
                         ],
                     },
                 ],
-                "required_permissions": ["base:template:read"],
+                "required_permissions": ["base.templates:read"],
             }
         ],
         "permissions": [
             {
-                "resource": "base:template",
+                "resource": "base.templates",
                 "actions": ["read", "create", "update", "delete"],
                 "description": "Template management permissions",
             }
@@ -88,7 +88,7 @@ async def manifest():
                     "base.template.create",
                     "base.template.query",
                 ],
-                "required_permissions": ["base:template:read"],
+                "required_permissions": ["base.templates:read"],
             }
         ],
         "tools": [
@@ -100,7 +100,7 @@ async def manifest():
                 "transport": "http",
                 "endpoint": "/api/v1/templates",
                 "method": "POST",
-                "rbac_resource": "base:template",
+                "rbac_resource": "base.templates",
                 "input_schema": {
                     "type": "object",
                     "properties": {
@@ -129,7 +129,7 @@ async def manifest():
                 "transport": "http",
                 "endpoint": "/api/v1/templates",
                 "method": "GET",
-                "rbac_resource": "base:template",
+                "rbac_resource": "base.templates",
                 "input_schema": {
                     "type": "object",
                     "properties": {
@@ -159,7 +159,7 @@ async def rbac():
     payload = {
         "resources": [
             {
-                "name": "base:template",
+                "name": "base.templates",
                 "description": "Base 模板管理",
                 "actions": [
                     {"name": "read", "description": "查看模板"},
@@ -173,28 +173,28 @@ async def rbac():
             {
                 "name": "base_master",
                 "description": "Base Master 角色",
-                "permissions": ["base:template:*"],
+                "permissions": ["base.templates:*"],
             },
             {
                 "name": "template_editor",
                 "description": "模板编辑角色",
                 "permissions": [
-                    "base:template:read",
-                    "base:template:create",
-                    "base:template:update",
+                    "base.templates:read",
+                    "base.templates:create",
+                    "base.templates:update",
                 ],
             },
             {
                 "name": "template_viewer",
                 "description": "模板查看角色",
-                "permissions": ["base:template:read"],
+                "permissions": ["base.templates:read"],
             },
         ],
         "permissions": [
-            {"resource": "base:template", "action": "read"},
-            {"resource": "base:template", "action": "create"},
-            {"resource": "base:template", "action": "update"},
-            {"resource": "base:template", "action": "delete"},
+            {"resource": "base.templates", "action": "read"},
+            {"resource": "base.templates", "action": "create"},
+            {"resource": "base.templates", "action": "update"},
+            {"resource": "base.templates", "action": "delete"},
         ],
     }
     return ok(payload)

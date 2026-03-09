@@ -20,6 +20,7 @@ import (
 
 func TestRunner_FullLifecycle(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("PX_RESOURCE_CPU_THRESHOLD", "101")
 
 	entryDir := filepath.Join(t.TempDir(), "plugin-entry")
 	if err := os.MkdirAll(entryDir, 0o755); err != nil {
@@ -119,6 +120,7 @@ func TestRunner_FullLifecycle(t *testing.T) {
 
 func TestRunner_BackoffAndRollbackOnReloadFailure(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("PX_RESOURCE_CPU_THRESHOLD", "101")
 
 	entryDir := filepath.Join(t.TempDir(), "plugin-entry")
 	if err := os.MkdirAll(entryDir, 0o755); err != nil {

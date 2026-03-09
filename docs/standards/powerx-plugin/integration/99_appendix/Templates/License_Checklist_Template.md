@@ -8,7 +8,7 @@
 
 | 字段 | 内容 |
 |------|------|
-| **插件 ID** | com.powerx.plugin.xxx |
+| **插件 ID** | com.powerx.plugins.xxx |
 | **插件名称** | CRM Plus |
 | **版本号** | 1.2.0 |
 | **Vendor 名称** | ArtisanCloud |

@@ -27,10 +27,10 @@ mappings:
         flags: "gs"
         replace: "{{ `{{ $1 }}` }}"
       - globs: ["nuxt.config.ts", "app/**/*.ts", "i18n/**/*.json", "package.json"]
-        literal: "'com.powerx.plugin.base'"
+        literal: "'com.powerx.plugins.base'"
         replace: "'{{ .PluginID }}'"
       - globs: ["nuxt.config.ts", "app/**/*.ts", "package.json"]
-        literal: '"com.powerx.plugin.base"'
+        literal: '"com.powerx.plugins.base"'
         replace: '"{{ .PluginID }}"'
       - globs: ["**/*"]
         literal: "PowerX Base Plugin"
@@ -161,19 +161,19 @@ mappings:
         literal: 'Name: "PowerX Base Plugin"'
         replace: 'Name: "{{ .PluginName }}"'
       - globs: ["internal/manifestx/manifest.go"]
-        literal: 'ID: "com.powerx.plugin.base"'
+        literal: 'ID: "com.powerx.plugins.base"'
         replace: 'ID: "{{ .PluginID }}"'
       - globs: ["internal/manifestx/manifest.go"]
-        literal: 'Path:  "/_p/com.powerx.plugin.base/admin/templates/intro"'
+        literal: 'Path:  "/_p/com.powerx.plugins.base/admin/templates/intro"'
         replace: 'Path:  "/_p/{{ .PluginID }}/admin/templates/intro"'
       - globs: ["internal/manifestx/manifest.go"]
-        literal: 'Path:  "/_p/com.powerx.plugin.base/admin/templates/crud"'
+        literal: 'Path:  "/_p/com.powerx.plugins.base/admin/templates/crud"'
         replace: 'Path:  "/_p/{{ .PluginID }}/admin/templates/crud"'
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Name: "PowerX Base Plugin"'
         replace: 'Name: "{{ .PluginName }}"'
       - globs: ["internal/manifestx/manifest.go.tmpl"]
-        literal: 'ID: "com.powerx.plugin.base"'
+        literal: 'ID: "com.powerx.plugins.base"'
         replace: 'ID: "{{ .PluginID }}"'
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Version: "0.1.0"'

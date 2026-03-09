@@ -75,7 +75,7 @@ PowerX Marketplace 自动解析以下字段：
 |------|------|
 | 主名称 | 简短（≤30 字符），必须唯一 |
 | 副标题 | 可选，用于描述功能定位 |
-| 前缀 | 推荐：`com.powerx.plugin.<domain>` |
+| 前缀 | 推荐：`com.powerx.plugins.<domain>` |
 | 禁止 | 使用 PowerX 官方保留字（core, admin, system） |
 
 ### 2️⃣ 图标与封面规范

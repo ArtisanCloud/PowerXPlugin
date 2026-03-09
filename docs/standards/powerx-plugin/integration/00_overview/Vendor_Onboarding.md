@@ -33,7 +33,7 @@ PowerX 插件生态通过「Marketplace → Core → PluginBase」三层体系�
 ### plugin.yaml（开发阶段）
 
 ```yaml
-id: com.powerx.plugin.crm
+id: com.powerx.plugins.crm
 name: CRM Plugin
 version: 1.2.0
 vendor:
@@ -75,7 +75,7 @@ vendor:
 
    ```bash
    # 生成签名
-   powerx plugin sign ./dist/com.powerx.plugin.crm-1.2.0-linux-amd64.pxp \
+   powerx plugin sign ./dist/com.powerx.plugins.crm-1.2.0-linux-amd64.pxp \
        --key ./private.pem --algo ed25519
    ```
 
@@ -153,14 +153,14 @@ powerx plugin package \
   --sign-key ./private.pem
 
 # 3. 上传到 Marketplace
-powerx marketplace upload ./dist/com.powerx.plugin.crm-1.2.0-linux-amd64.pxp
+powerx marketplace upload ./dist/com.powerx.plugins.crm-1.2.0-linux-amd64.pxp
 ```
 
 输出：
 
 ```
 dist/
- └── com.powerx.plugin.crm-1.2.0-linux-amd64.pxp
+ └── com.powerx.plugins.crm-1.2.0-linux-amd64.pxp
 ```
 
 ---

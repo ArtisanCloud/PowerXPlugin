@@ -189,7 +189,7 @@ npm run dev
 
    对应配置代码如下，`/_p/${pluginId}/api` 的条目仅在 `POWERX_PROXY=1` 时注入：
    ```ts
-   const pluginId = 'com.powerx.plugin.base'
+   const pluginId = 'com.powerx.plugins.base'
    const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
    const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'
 
@@ -201,7 +201,7 @@ npm run dev
      devProxy[`/_p/${pluginId}/api`] = { target: devApiProxyTarget, changeOrigin: true }
    }
    ```
-   如此前端直接访问 `http://localhost:3131/_p/com.powerx.plugin.base/admin/templates/crud` 时，所有 API/WS 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
+   如此前端直接访问 `http://localhost:3131/_p/com.powerx.plugins.base/admin/templates/crud` 时，所有 API/WS 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
    同时在宿主模式下会自动关闭 Nuxt `appManifest`，避免 `manifest-route-rule` 在 `_p` 前缀下无法匹配路由而抛错。
 3. **后端保持默认**：`POWERX_PROXY=0 go run ./cmd/plugin`，只需暴露 `/api/v1/**`。由于前端代理会把 `/_p/...` 请求映射回本地接口，后端无需额外改动。
 
@@ -469,7 +469,7 @@ Delegated 模式指插件被 PowerX 宿主拉起后运行在 iframe + process �
 3. 宿主拉起插件后端进程，并在 Admin Router 中加载插件前端。
 4. 前端初次访问会请求：
    - 静态资源：`/_p/<pluginId>/admin/assets/...`
-   - 会话检测：`/api/v1/admin/auth/me/context`（复用宿主 token）
+   - 会话检测：`/api/v1/admin/user/auth/me/context`（复用宿主 token）
    - 业务接口：依据实现决定走 `/api/v1/**`（宿主）或 `/_p/<pluginId>/api/v1/**`（插件自带）
 
 ### 2.4 常见症状与排查
@@ -478,6 +478,26 @@ Delegated 模式指插件被 PowerX 宿主拉起后运行在 iframe + process �
 - **静态资源 404**：核对包内 `web-admin/.output/public/assets/*` 是否存在，并确保 baseURL 以 `/_p/<pluginId>/admin` 开头。
 - **i18n baseDir not found**：构建时未包含 `web-admin/i18n/locales`，需要重新 `npm run build`。
 - **插件接口返回 404**：记得区分宿主与插件 API。需要访问插件自有 API 时，请求 `/_p/<pluginId>/api/v1/**`。
+
+### 2.4.1 `401/403` 快速判定（`/_p` 与 `/api` 边界）
+
+当出现 `/_p/<pluginId>/api/v1/admin/user/auth/me/context` 报错时，先用下面两条命令判定阶段：
+
+```bash
+curl -i "http://127.0.0.1:8077/api/v1/admin/user/auth/me/context" \
+  -H "Authorization: Bearer $ADMIN_BEARER_TOKEN"
+
+curl -i "http://127.0.0.1:8077/_p/com.powerx.plugins.base/api/v1/admin/user/auth/me/context" \
+  -H "Authorization: Bearer $ADMIN_BEARER_TOKEN"
+```
+
+- 第一条 `200`、第二条 `403 no permission rule`：插件 `rbac/exposure` 未覆盖 `admin:read`。
+- 第一条 `200`、第二条 `401`：网关转发/Token 边界问题（通常是 `/_p` 链路 token 类型不匹配）。
+- 第一条 `401`：宿主会话本身无效或 token 过期。
+
+硬规则：
+- `/_p/:plugin_id/api/*` 只用于插件接口。
+- 宿主用户认证接口（`/api/v1/admin/{identity}/auth/*`）必须走宿主 `/api/v1/...`，不要走 `/_p`。
 
 ### 2.5 构建/打包要点
 
@@ -494,7 +514,7 @@ Delegated 模式指插件被 PowerX 宿主拉起后运行在 iframe + process �
 
 ### 2.7 快速自检清单
 
-- 浏览器 Network：`/api/v1/admin/auth/me/context` 200 且携带宿主 token。
+- 浏览器 Network：`/api/v1/admin/user/auth/me/context` 200 且携带宿主 token。
 - 静态资源请求形如 `/_p/<pluginId>/admin/assets/...`。
 - `nitro.mjs` 中 `insidePowerX=true`、`apiBaseUrl=/api/v1`。
 - 宿主日志出现 `/_p/:id/admin/*filepath` 命中记录。
@@ -520,7 +540,7 @@ iframe.contentWindow?.postMessage(
 )
 ```
 
-插件前端只接受来自可信 `origin` 且 `source === 'powerx'` 的消息，并把 token 写入自身 localStorage，再调用 `/api/v1/admin/auth/me/context` 即可共享登录态。
+插件前端只接受来自可信 `origin` 且 `source === 'powerx'` 的消息，并把 token 写入自身 localStorage，再调用 `/api/v1/admin/user/auth/me/context` 即可共享登录态。
 
 ### 2.9 常见参考链接
 

@@ -12,7 +12,7 @@ endif
 
 _MANIFEST_ID := $(strip $(shell awk -F': *' '/^id:/ {print $$2; exit}' $(PLUGIN_MANIFEST) 2>/dev/null))
 ifeq ($(_MANIFEST_ID),)
-PLUGIN_ID ?= com.powerx.plugin.sample
+PLUGIN_ID ?= com.powerx.plugins.sample
 else
 PLUGIN_ID ?= $(_MANIFEST_ID)
 endif
@@ -61,7 +61,11 @@ DIST_BACKEND_BIN := $(DIST_DIR)/backend/bin
 DIST_WEBADMIN_DIR := $(DIST_DIR)/web-admin
 DIST_WEBADMIN_OUTPUT := $(DIST_WEBADMIN_DIR)/.output
 
+ifneq ($(wildcard web-admin/nuxt/package.json),)
+FRONTEND_DIR := web-admin/nuxt
+else
 FRONTEND_DIR := web-admin
+endif
 FRONTEND_OUTPUT := $(FRONTEND_DIR)/.output
 FRONTEND_BUILD_CMD ?= npm --prefix $(FRONTEND_DIR) run build
 

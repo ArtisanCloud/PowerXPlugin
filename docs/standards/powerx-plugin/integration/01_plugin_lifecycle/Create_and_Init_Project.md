@@ -17,8 +17,8 @@
 
 ```bash
 # 1) Fork 仓库后，clone 到本地
-git clone git@github.com:your-org/PowerXPluginBase.git com.powerx.plugin.example
-cd com.powerx.plugin.example
+git clone git@github.com:your-org/PowerXPluginBase.git com.powerx.plugins.example
+cd com.powerx.plugins.example
 
 # 2) 全局替换包名/模块名/插件ID
 #    - go.mod module 名称
@@ -27,7 +27,7 @@ cd com.powerx.plugin.example
 #    - web-admin app 内的桥接/路由前缀
 ```
 
-> 约定：插件 ID 建议使用反向域名，例如 `com.powerx.plugin.example`。
+> 约定：插件 ID 建议使用反向域名，例如 `com.powerx.plugins.example`。
 
 ---
 
@@ -93,7 +93,7 @@ cd com.powerx.plugin.example
 示例（按需裁剪）：
 
 ```yaml
-id: com.powerx.plugin.example
+id: com.powerx.plugins.example
 name: Example Plugin
 version: 0.1.0
 description: 示例插件（Fork 自 PowerXPluginBase）
@@ -112,7 +112,7 @@ runtime:
 
 frontends:
   admin:
-    base_path: /plugins/com.powerx.plugin.example/admin
+    base_path: /plugins/com.powerx.plugins.example/admin
     dir: ./web-admin/.output/public   # Nuxt 产物目录（示例）
 
 migrations:
@@ -171,7 +171,7 @@ make migrate-up
 cd web-admin
 npm i   # 或 npm/yarn
 npm run dev
-# 本地预览后端代理路径：/_p/com.powerx.plugin.example/admin/ ...
+# 本地预览后端代理路径：/_p/com.powerx.plugins.example/admin/ ...
 ```
 
 ---
@@ -233,7 +233,7 @@ make manifest
 # 2) 打包为 zip（扩展名 .pxp）
 make package-pxp
 # 等价手动：
-# cd build/pxp && zip -r ../com.powerx.plugin.example-0.1.0-linux-amd64.pxp .
+# cd build/pxp && zip -r ../com.powerx.plugins.example-0.1.0-linux-amd64.pxp .
 
 # 3) 生成签名（建议 Ed25519/RSA）
 make sign-pxp PRIVATE_KEY=./keys/private.pem

@@ -1,0 +1,15 @@
+capabilities:
+  imports:
+    - contracts/capabilities/{{ .PluginID }}.template.list.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.read.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.create.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.update.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.delete.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.review.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.publish.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.compose.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.audit.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.batch_clone.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.validate.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.quality_distribute.yaml
+    - contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml

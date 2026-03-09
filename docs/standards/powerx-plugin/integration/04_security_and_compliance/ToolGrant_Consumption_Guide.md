@@ -67,7 +67,7 @@ ToolGrant 以 JWT 形式签发，包含如下字段：
 {
   "grant_id": "tg_4f93a2...",
   "issuer": "powerx.core",
-  "subject": "com.powerx.plugin.crm",
+  "subject": "com.powerx.plugins.crm",
   "tenant_uuid": "tenant_123",
   "capability": "crm.contact.create",
   "scope": ["create", "read"],
@@ -257,7 +257,7 @@ Authorization: Bearer <PLUGIN_AUTH_TOKEN>
 ```json
 {
   "timestamp": "2025-10-13T09:01:02Z",
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "tenant_uuid": "tenant_123",
   "capability": "crm.contact.create",
   "action": "consumed",

@@ -26,6 +26,15 @@
 - `storage` 事件会同步跨 Tab 的登录/登出：Standalone 场景仍会强制跳回登录；Delegated 场景则转为只读提示（Banner）并保留当前路由，方便宿主统一处理登录。
 - `auth.global.ts` 中间件会在首屏调用 `ensureFreshToken()`。若 token 丢失，Standalone 模式下依旧携带 `redirect` 参数跳转登录；Delegated 模式下只设置提示文案，并通过 `window.parent.postMessage({type: 'auth-token:request'})` 请求宿主重发凭证。
 
+## 2.1 宿主 `/api` 与插件 `/_p` 的鉴权边界（必须遵守）
+- `/_p/:plugin_id/api/*` 仅用于访问插件 API，网关可能改写 `Authorization` 为插件短期 Token（`aud=plugin:<plugin_id>`）。
+- `/api/v1/admin/{identity}/auth/*`（如 `/api/v1/admin/user/auth/me/context`）属于宿主用户认证接口，必须使用宿主用户 Token（`aud=user`）。
+- 插件前端/后端不要通过 `/_p/:plugin_id/api/*` 去访问宿主用户认证接口，否则容易出现 `401 Unauthorized`（audience 不匹配）。
+- Delegated 模式推荐流程：
+  1) 会话检查走宿主 `/api/v1/admin/user/auth/me/context`
+  2) 插件业务接口走 `/_p/:plugin_id/api/v1/...`
+  3) 若插件需要回调宿主用户接口，走宿主 `/api/v1/...`，不要复用插件入口 `/_p`
+
 ## 3. 后端组件
 | 文件 | 责任 |
 |------|------|

@@ -19,7 +19,7 @@ if (!process.env.QUIET_START) {
   })
 }
 
-const defaultPluginId = 'com.powerx.plugin.base'
+const defaultPluginId = 'com.powerx.plugins.base'
 const resolvePluginId = () => {
   const candidates = [
     process.env.POWERX_PLUGIN_ID,
@@ -194,6 +194,10 @@ const connectSources = buildConnectSources()
 if (!process.env.QUIET_START) {
   console.info('[web-admin] connect-src allow', connectSources)
 }
+const pluginVersion =
+  process.env.NUXT_PUBLIC_POWERX_PLUGIN_VERSION ||
+  process.env.POWERX_PLUGIN_VERSION ||
+  'dev'
 
 const powerx = definePowerXAdminConfig({
   pluginId,
@@ -269,6 +273,8 @@ export default defineNuxtConfig({
       // ide helpers: pluginApiBase 可用于客户端自行构造 `_p/.../api` 请求
       apiBaseUrl: INSIDE_POWERX ? hostApiBase : localApiBase,
       pluginApiBase,
+      powerxPluginId: pluginId,
+      powerxPluginVersion: pluginVersion,
       insidePowerX: INSIDE_POWERX,
       iamMode: IAM_MODE,
       delegatedMode: DELEGATED_MODE,

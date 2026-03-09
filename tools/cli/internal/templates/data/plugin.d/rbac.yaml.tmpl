@@ -1,0 +1,17 @@
+rbac:
+  resources:
+    - resource: admin
+      actions: [read]
+    - resource: {{ .PluginID }}.template
+      actions: [read, create, update, delete]
+
+permissions:
+  - resource: admin
+    actions: [read]
+  - resource: {{ .PluginID }}.template
+    actions: [read, create, update, delete]
+
+routes:
+  basePath: /api/v1
+  adminManifest: /api/v1/admin/manifest
+  rbac: /api/v1/admin/rbac

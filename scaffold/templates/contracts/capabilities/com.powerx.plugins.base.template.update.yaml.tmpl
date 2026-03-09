@@ -3,7 +3,7 @@ type: API
 version: 1.0.0
 description: "更新模板内容的原子能力，覆盖名称/描述/正文。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [update]
 provides:
   - id: schema/input/{{ .PluginID }}.template.update.v1

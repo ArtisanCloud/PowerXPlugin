@@ -69,7 +69,7 @@
 - [x] T025 [US1] 实现模板服务于 `skeleton/backend/python-fastapi/app/services/template_service.py`
 - [x] T026 [US1] 实现能力管理服务于 `skeleton/backend/python-fastapi/app/services/capability_service.py`
 - [x] T027 [US1] 实现运行时会话服务于 `skeleton/backend/python-fastapi/app/services/runtime_session_service.py`
-- [x] T028 [US1] 实现认证路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/auth.py`
+- [x] T028 [US1] 实现认证路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/user/auth.py`
 - [x] T029 [US1] 实现 IAM 路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/iam.py`
 - [x] T030 [US1] 实现模板 CRUD 路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/templates.py`
 - [x] T031 [US1] 实现能力管理路由于 `skeleton/backend/python-fastapi/app/transport/http/admin/capabilities.py`
@@ -167,7 +167,7 @@ T028 & T029 & T030 & T031 & T032
 ## 联通实现任务清单（按顺序执行）
 
 - [x] T043 对齐认证链路：实现 AuthService 实际逻辑（登录/注册/刷新/获取当前用户）在 `skeleton/backend/python-fastapi/app/services/auth_service.py`
-- [x] T044 对齐认证链路：补齐 /admin/user/auth/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/auth.py`
+- [x] T044 对齐认证链路：补齐 /admin/user/auth/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/user/auth.py`
 - [x] T045 对齐 IAM 核心：实现 tenants/roles/permissions/departments/members 读写逻辑在 `skeleton/backend/python-fastapi/app/services/iam_service.py`
 - [x] T046 对齐 IAM 核心：补齐 /admin/iam/* 路由返回字段与错误码在 `skeleton/backend/python-fastapi/app/transport/http/admin/iam.py`
 - [x] T047 对齐模板 CRUD：实现模板读写逻辑在 `skeleton/backend/python-fastapi/app/services/template_service.py`

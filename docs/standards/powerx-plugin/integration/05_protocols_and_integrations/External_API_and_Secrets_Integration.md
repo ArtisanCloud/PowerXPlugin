@@ -139,7 +139,7 @@ egress:
 ```json
 {
   "event": "secret.rotated",
-  "plugin_id": "com.powerx.plugin.ai",
+  "plugin_id": "com.powerx.plugins.ai",
   "secret_key": "OPENAI_API_KEY",
   "tenant_uuid": "tenant_abc"
 }
@@ -206,7 +206,7 @@ PowerX 提供注册接口（CLI / API）：
 
 ```bash
 powerx-cli plugin register-secret \
-  --plugin com.powerx.plugin.ai \
+  --plugin com.powerx.plugins.ai \
   --key OPENAI_API_KEY \
   --type api_key \
   --managed-by powerx \

@@ -150,7 +150,7 @@ func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*M
 		"Authorization": fmt.Sprintf("Bearer %s", accessToken),
 	}
 	var resp MeContext
-	if err := c.get(ctx, "/auth/me/context", &resp, headers); err != nil {
+	if err := c.get(ctx, "/admin/user/auth/me/context", &resp, headers); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -228,7 +228,7 @@ func (c *DelegatedClient) do(req *http.Request, out any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return parseProxyError(resp)
+		return parseProxyError(req, resp)
 	}
 
 	if out == nil {
@@ -272,15 +272,26 @@ func (h *hostSuccess) UnmarshalJSON(data []byte) error {
 
 // ProxyError captures upstream HTTP failures.
 type ProxyError struct {
-	Status  int
-	Message string
+	Status         int
+	Message        string
+	UpstreamMethod string
+	UpstreamPath   string
 }
 
 func (e *ProxyError) Error() string {
+	if strings.TrimSpace(e.UpstreamMethod) != "" || strings.TrimSpace(e.UpstreamPath) != "" {
+		return fmt.Sprintf(
+			"authproxy: upstream %s %s returned %d: %s",
+			strings.TrimSpace(e.UpstreamMethod),
+			strings.TrimSpace(e.UpstreamPath),
+			e.Status,
+			e.Message,
+		)
+	}
 	return fmt.Sprintf("authproxy: status %d: %s", e.Status, e.Message)
 }
 
-func parseProxyError(resp *http.Response) error {
+func parseProxyError(req *http.Request, resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
 	var errResp struct {
 		Code      int    `json:"code"`
@@ -306,10 +317,23 @@ func parseProxyError(resp *http.Response) error {
 	if resp.StatusCode == http.StatusUnauthorized {
 		return iamservice.ErrUnauthorized
 	}
-	return &ProxyError{Status: resp.StatusCode, Message: msg}
+	upstreamMethod := ""
+	upstreamPath := ""
+	if req != nil {
+		upstreamMethod = strings.TrimSpace(req.Method)
+		if req.URL != nil {
+			upstreamPath = strings.TrimSpace(req.URL.Path)
+		}
+	}
+	return &ProxyError{
+		Status:         resp.StatusCode,
+		Message:        msg,
+		UpstreamMethod: upstreamMethod,
+		UpstreamPath:   upstreamPath,
+	}
 }
 
-// MeContext mirrors PowerX Core /auth/me/context payload.
+// MeContext mirrors PowerX Core /admin/user/auth/me/context payload.
 type MeContext struct {
 	IsRoot            bool            `json:"is_root"`
 	CurrentTenantUUID string          `json:"current_tenant_uuid"`

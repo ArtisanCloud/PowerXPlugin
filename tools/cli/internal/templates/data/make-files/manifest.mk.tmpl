@@ -106,3 +106,11 @@ plugin-id-check: ## 检查插件 ID 命名是否符合 com.powerx.plugins.*
 		exit 1; \
 	fi; \
 	echo "✅ plugin id naming check passed"
+
+.PHONY: manifest-align-fix
+manifest-align-fix: ## 自动同步 plugin.d 并校验 capability -> exposure/rbac 映射
+	@node .codex/skills/ci/manifest-align/scripts/manifest-align-check.mjs --fix
+
+.PHONY: manifest-align-check
+manifest-align-check: ## 严格检查 plugin.d 漂移与映射（CI gate）
+	@node .codex/skills/ci/manifest-align/scripts/manifest-align-check.mjs

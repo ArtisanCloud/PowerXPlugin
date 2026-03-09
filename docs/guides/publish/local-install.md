@@ -59,6 +59,8 @@
 - **方案 B（可选）**：在 dist 基础上额外生成 `.pxp` → 传输 `.pxp` → 在 PowerX 上解包成 dist 目录 → 再按方案 A 调用 Admin API。
 - URL 模式（`/install/url`）和 `apiPrefix` 说明对两种方案都适用。
 
+> 重要：`install/local` 成功不等于插件已可用。`switch_version` 仍会执行进程启动与健康检查；若启动阶段（如 manifest 注册、权限格式、迁移）失败，最终仍会启用失败。发版前请先执行 `docs/guides/publish/preflight-checklist.md`。
+
 ### PowerXPlugin 仓库内联调（推荐）
 
 如果你正在 `PowerXPlugin` 主仓库里调 framework/skeleton，不必先 `px-plugin init` 新项目：
@@ -73,8 +75,8 @@ cd $PLUGIN_ROOT
 # 自动同步 plugin.d（capabilities/exposure/rbac）并校验映射
 make manifest-align-fix
 
-# 严格校验 plugin.yaml（ID + capabilities + events topics）
-make plugin-yaml-check
+# CI 严格门禁建议使用（本地可省略）
+make manifest-align-check
 
 # 输出 skeleton 可安装包
 make skeleton-dist
@@ -94,7 +96,7 @@ make skeleton-reinstall \
 ```
 
 说明：
-- `make manifest-align-fix` 会先同步 `skeleton/plugin.d/*.yaml`，再校验 capability→exposure/rbac 映射
+- `make manifest-align-fix` 会先同步 `skeleton/plugin.d/*.yaml`，再校验 capability→exposure/rbac 映射（内部已包含基础 plugin.yaml 校验链路）
 - `make skeleton-dist` = `make -C skeleton dist`
 - `make skeleton-install` = `make -C skeleton local-install ...`
 - `make skeleton-reinstall` = `make -C skeleton local-reinstall ...`

@@ -27,9 +27,9 @@ description: 自动检查 contracts/capabilities 与 plugin.yaml/catalog（plugi
 
 2) 检查清单漂移（支持 auto-fix）
 - 对以下文件做 `git diff` 检查：
-  - `skeleton/plugin.d/capabilities.yaml`
-  - `skeleton/plugin.d/exposure.yaml`
-  - `skeleton/plugin.d/rbac.yaml`
+  - `plugin.d/capabilities.yaml`
+  - `plugin.d/exposure.yaml`
+  - `plugin.d/rbac.yaml`
 - 若有变更：
   - 默认模式：报错并阻止继续（适合 CI）。
   - `--fix`：自动接受同步结果并继续做映射校验。
@@ -40,11 +40,11 @@ description: 自动检查 contracts/capabilities 与 plugin.yaml/catalog（plugi
   - `id`
   - `rbac.resource`
   - `rbac.actions`
-- 断言 `skeleton/plugin.d/exposure.yaml` 中存在对应 `capability` 且 `rbac=resource:firstAction`。
+- 断言 `plugin.d/exposure.yaml` 中存在对应 `capability` 且 `rbac=resource:firstAction`。
 
 4) 检查 capability -> rbac catalog 的资源动作覆盖
 - 聚合 capability 声明的 `resource/actions`。
-- 断言 `skeleton/plugin.d/rbac.yaml` 的 `rbac.resources` 覆盖全部资源与动作。
+- 断言 `plugin.d/rbac.yaml` 的 `rbac.resources` 覆盖全部资源与动作。
 
 ## 建议接入
 

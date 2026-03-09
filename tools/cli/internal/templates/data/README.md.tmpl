@@ -22,6 +22,19 @@ cd web-admin
 npm run dev
 ```
 
+## 清单对齐守卫（推荐）
+
+```bash
+# 功能迭代后先自动同步并校验 catalogs
+make manifest-align-fix
+
+# CI 使用严格模式（有漂移即失败）
+make manifest-align-check
+```
+
+- Skill 说明：`.codex/skills/ci/manifest-align/SKILL.md`
+- 该守卫会检查 `contracts/capabilities` 与 `plugin.d`（capabilities/exposure/rbac）是否一致。
+
 ## 下一步
 
 - 更新 `plugin.yaml` 中的版本与元数据。

@@ -36,6 +36,9 @@ npm run dev
 模板默认附带 `Makefile` + `make-files/`，支持以下命令：
 
 ```bash
+# 0. 功能迭代后先做清单对齐（推荐）
+make manifest-align-fix
+
 # 1. 构建 dist 目录（后端 + web-admin）
 make dist
 
@@ -57,3 +60,9 @@ make local-install-pxp \
 ```
 
 > `local-install` 依赖 PowerX 主仓的 `/admin/plugins/install/local` 接口，默认读取 `dist/<version>` 目录；如需了解 API 或离线流程，请参考 PowerXPlugin 仓库 `docs/guides/publish/local-install.md` 与 `docs/guides/publish/offline.md`。
+
+### 清单对齐守卫（建议纳入日常与 CI）
+
+- 本地自动对齐：`make manifest-align-fix`
+- CI 严格门禁：`make manifest-align-check`
+- Skill 说明：`.codex/skills/ci/manifest-align/SKILL.md`

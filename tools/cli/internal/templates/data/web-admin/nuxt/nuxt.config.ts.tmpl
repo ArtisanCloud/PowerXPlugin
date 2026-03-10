@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { resolve as resolvePath } from 'node:path'
+import fs from 'node:fs'
 import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
@@ -194,9 +195,24 @@ const connectSources = buildConnectSources()
 if (!process.env.QUIET_START) {
   console.info('[web-admin] connect-src allow', connectSources)
 }
+const resolveVersionFromPluginManifest = () => {
+  try {
+    const manifestPath = resolvePath(rootDir, '..', '..', 'plugin.yaml')
+    const content = fs.readFileSync(manifestPath, 'utf8')
+    const match = content.match(/^version:\s*([^\n#]+)\s*$/m)
+    if (!match) {
+      return ''
+    }
+    return match[1].trim().replace(/^['"]|['"]$/g, '')
+  } catch {
+    return ''
+  }
+}
+
 const pluginVersion =
   process.env.NUXT_PUBLIC_POWERX_PLUGIN_VERSION ||
   process.env.POWERX_PLUGIN_VERSION ||
+  resolveVersionFromPluginManifest() ||
   'dev'
 
 const powerx = definePowerXAdminConfig({

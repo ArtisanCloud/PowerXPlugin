@@ -69,7 +69,10 @@ func TestInvokeCapabilitySuccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	require.Equal(t, "trace-123", resp["traceId"])
+	require.Equal(t, true, resp["success"])
+	data, ok := resp["data"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "trace-123", data["traceId"])
 	require.Equal(t, "List", fake.lastParams.Action)
 	require.Equal(t, "media", fake.lastParams.Headers["X-PX-Use-Mock"])
 	require.Equal(t, "com.corex.media.assets.manage", fake.lastParams.CapabilityID)
@@ -128,9 +131,47 @@ func TestInvokeCapabilityGatewayError(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	require.Equal(t, "gw-trace", resp["traceId"])
+	require.Equal(t, false, resp["success"])
 	errObj, ok := resp["error"].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "RATE_LIMIT", errObj["code"])
-	require.Equal(t, "rate_limited", errObj["type"])
+	details, ok := errObj["details"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "gw-trace", details["traceId"])
+	upstreamError, ok := details["error"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "rate_limited", upstreamError["type"])
+}
+
+func TestInvokeCapabilityForwardsBearerWithoutTenantHeader(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	fake := &fakeCapabilityGateway{
+		result: &capgateway.InvokeResult{
+			TraceID: "trace-tenant",
+			Status:  "accepted",
+			Data:    map[string]any{"ok": true},
+		},
+	}
+
+	handler := &Handler{
+		deps: &app.Deps{
+			CapabilityGateway: fake,
+		},
+	}
+
+	body := `{"capabilityId":"com.corex.media.assets.read","action":"List","payload":{"method":"GET","endpoint":"/api/v1/media/assets"}}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integration/capabilities/invoke", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("tenant_uuid", "aeffc79f-e72a-4fd9-b908-5c150bce3741")
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+
+	handler.InvokeCapability(c)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "Bearer test-token", fake.lastParams.Headers["Authorization"])
+	require.NotContains(t, fake.lastParams.Headers, "tenant_uuid")
 }

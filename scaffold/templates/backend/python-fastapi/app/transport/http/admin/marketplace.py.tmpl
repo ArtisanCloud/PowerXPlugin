@@ -6,6 +6,7 @@ from app.contracts.response import (
     fail,
     ok,
 )
+from app.middleware.tenant_context import resolve_tenant_uuid
 from app.services.marketplace_service import MarketplaceService
 from app.services.operations_service import OperationsService
 
@@ -40,13 +41,26 @@ def _require_auth(request: Request):
     return None
 
 
+def _resolve_tenant_uuid(request: Request, payload: dict | None = None) -> str:
+    if payload:
+        candidate = payload.get("tenant_uuid") or payload.get("tenantUuid")
+        if candidate:
+            return str(candidate).strip()
+    candidate = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    if candidate:
+        return str(candidate).strip()
+    return str(resolve_tenant_uuid(request) or "").strip()
+
+
 @router.get("/marketplace/listings")
 async def list_listings(request: Request):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
+    if not tenant_uuid:
+        return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
     status = request.query_params.get("status")
     items = service.list_listings(tenant_uuid, status)
     return ok({"items": items}, request_id=request_id)
@@ -156,6 +170,10 @@ async def ingest_usage(request: Request, payload: dict):
         return auth
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    payload = dict(payload or {})
+    if tenant_uuid:
+        payload["tenant_uuid"] = tenant_uuid
     return ok(service.ingest_usage(payload), request_id=request_id)
 
 
@@ -165,6 +183,9 @@ async def get_usage_metrics(request: Request, tenant_id: str, license_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
+    tenant_uuid = _resolve_tenant_uuid(request)
+    if tenant_uuid and tenant_id and tenant_uuid != tenant_id:
+        return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid mismatch", request_id=request_id, status_code=400)
     return ok(service.list_usage_metrics(tenant_id, license_id), request_id=request_id)
 
 
@@ -174,7 +195,10 @@ async def list_revenue_reports(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok({"items": service.list_revenue_reports(request.query_params.get("tenant_uuid"))}, request_id=request_id)
+    tenant_uuid = _resolve_tenant_uuid(request)
+    if not tenant_uuid:
+        return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
+    return ok({"items": service.list_revenue_reports(tenant_uuid)}, request_id=request_id)
 
 
 # Public marketplace routes (minimal)

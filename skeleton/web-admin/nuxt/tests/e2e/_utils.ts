@@ -3,7 +3,7 @@ import type { Page, Locator } from '@playwright/test';
 const resolvePluginId = () =>
   process.env.POWERX_PLUGIN_ID ||
   process.env.NUXT_PUBLIC_POWERX_PLUGIN_ID ||
-  'com.powerx.plugin.base';
+  'com.powerx.plugins.base';
 
 const normalizePath = (path: string) => (path.startsWith('/') ? path : `/${path}`);
 

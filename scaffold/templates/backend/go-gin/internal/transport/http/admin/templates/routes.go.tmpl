@@ -1,8 +1,8 @@
 package templates
 
 import (
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 

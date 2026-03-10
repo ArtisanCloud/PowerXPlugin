@@ -1,11 +1,11 @@
 package marketplace
 
 import (
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	"{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/contracts"
+	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
+	"{{ .BackendModulePath }}/internal/services/recommendation"
+	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )

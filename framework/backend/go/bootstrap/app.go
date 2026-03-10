@@ -3,6 +3,8 @@ package bootstrap
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -44,7 +46,10 @@ type Config struct {
 // GatewayConfig 描述 Integration Gateway 所需的凭证。
 type GatewayConfig struct {
 	BaseURL            string
+	APIPrefix          string
+	AuthScheme         string
 	ToolToken          string
+	APIKey             string
 	TenantID           string
 	GRPCTarget         string
 	Timeout            time.Duration
@@ -122,10 +127,16 @@ func NewAppFromEnv(opts ...Option) *App {
 	}
 	cfg.Gateway = GatewayConfig{
 		BaseURL:         getEnvOrDefault("PX_GATEWAY_BASE_URL", ""),
+		APIPrefix:       getEnvOrDefault("PX_GATEWAY_API_PREFIX", "/api/v1"),
+		AuthScheme:      strings.TrimSpace(os.Getenv("PX_GATEWAY_AUTH_SCHEME")),
 		ToolToken:       firstNonEmpty(strings.TrimSpace(os.Getenv("PX_PLUGIN_TOOL_TOKEN")), strings.TrimSpace(os.Getenv("PX_TOOL_TOKEN"))),
-		TenantID:        getEnvOrDefault("PX_TENANT_UUID", ""),
+		APIKey:          firstNonEmpty(strings.TrimSpace(os.Getenv("PX_GATEWAY_API_KEY")), strings.TrimSpace(os.Getenv("PX_PLUGIN_API_KEY"))),
 		GRPCTarget:      strings.TrimSpace(os.Getenv("PX_GATEWAY_GRPC_TARGET")),
 		ContractVersion: strings.TrimSpace(os.Getenv("PX_GATEWAY_CONTRACT_VERSION")),
+	}
+	cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(cfg.Gateway.AuthScheme, cfg.Gateway.ToolToken, cfg.Gateway.APIKey)
+	if cfg.Gateway.AuthScheme == "bearer" {
+		cfg.Gateway.TenantID = tenantIDFromJWT(cfg.Gateway.ToolToken)
 	}
 	if timeoutStr := strings.TrimSpace(os.Getenv("PX_GATEWAY_TIMEOUT")); timeoutStr != "" {
 		if d, err := time.ParseDuration(timeoutStr); err == nil {
@@ -211,7 +222,10 @@ func (a *App) initGatewayClient() {
 	}
 	gcfg := gateway.Config{
 		BaseURL:    a.Config.Gateway.BaseURL,
+		APIPrefix:  a.Config.Gateway.APIPrefix,
+		AuthScheme: a.Config.Gateway.AuthScheme,
 		ToolToken:  a.Config.Gateway.ToolToken,
+		APIKey:     a.Config.Gateway.APIKey,
 		TenantUUID: a.Config.Gateway.TenantID,
 	}
 	if a.Config.Gateway.Timeout > 0 {
@@ -250,7 +264,14 @@ func (a *App) closeGateway() {
 }
 
 func (cfg GatewayConfig) enabled() bool {
-	return strings.TrimSpace(cfg.BaseURL) != "" && strings.TrimSpace(cfg.ToolToken) != "" && strings.TrimSpace(cfg.TenantID) != ""
+	if strings.TrimSpace(cfg.BaseURL) == "" {
+		return false
+	}
+	scheme := normalizeGatewayAuthScheme(cfg.AuthScheme, cfg.ToolToken, cfg.APIKey)
+	if scheme == "apikey" {
+		return strings.TrimSpace(cfg.APIKey) != ""
+	}
+	return strings.TrimSpace(cfg.ToolToken) != ""
 }
 
 func getEnvOrDefault(key, fallback string) string {
@@ -279,4 +300,41 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func tenantIDFromJWT(token string) string {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ""
+	}
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return ""
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return ""
+	}
+	if tid, ok := claims["tid"].(string); ok {
+		return strings.TrimSpace(tid)
+	}
+	return ""
+}
+
+func normalizeGatewayAuthScheme(raw, toolToken, apiKey string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	switch s {
+	case "apikey", "api_key", "api-key":
+		return "apikey"
+	case "bearer":
+		return "bearer"
+	}
+	if strings.TrimSpace(apiKey) != "" && strings.TrimSpace(toolToken) == "" {
+		return "apikey"
+	}
+	return "bearer"
 }

@@ -16,7 +16,6 @@ def _is_production(settings: Settings) -> bool:
 def _default_tenant_uuid(settings: Settings) -> str:
     return (
         settings.grpc_upstream_tenant_uuid
-        or os.getenv("PX_TENANT_UUID", "")
         or os.getenv("POWERX_TENANT_UUID", "")
     )
 

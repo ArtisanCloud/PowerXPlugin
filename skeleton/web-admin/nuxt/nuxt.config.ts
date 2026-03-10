@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { resolve as resolvePath } from 'node:path'
+import fs from 'node:fs'
 import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
@@ -19,7 +20,7 @@ if (!process.env.QUIET_START) {
   })
 }
 
-const defaultPluginId = 'com.powerx.plugin.base'
+const defaultPluginId = 'com.powerx.plugins.base'
 const resolvePluginId = () => {
   const candidates = [
     process.env.POWERX_PLUGIN_ID,
@@ -81,6 +82,22 @@ const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
 
 const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
+const resolveIAMMode = () => {
+  const raw = (
+    process.env.NUXT_PUBLIC_IAM_MODE ??
+    process.env.IAMMode ??
+    process.env.IAM_MODE ??
+    ''
+  )
+    .trim()
+    .toLowerCase()
+  if (raw === 'local' || raw === 'delegated') {
+    return raw
+  }
+  return INSIDE_POWERX ? 'delegated' : 'local'
+}
+const IAM_MODE = resolveIAMMode()
+const DELEGATED_MODE = IAM_MODE === 'delegated'
 const capabilityInvokeEndpoint = '/integration/capabilities/invoke'
 const capabilityApiBase = INSIDE_POWERX ? hostApiBase : localApiBase
 // 在宿主代理模式下指定 api base，即“模拟 standalone” 场景
@@ -100,6 +117,8 @@ if (!INSIDE_POWERX || simulateStandalone) {
 if (!process.env.QUIET_START) {
   console.info('[web-admin] resolved config →')
   console.info(`  insidePowerX=${INSIDE_POWERX}`)
+  console.info(`  iamMode=${IAM_MODE}`)
+  console.info(`  delegatedMode=${DELEGATED_MODE}`)
   console.info(`  runtime apiBase=${INSIDE_POWERX ? hostApiBase : localApiBase}`)
   console.info(`  devApiProxyTarget=${devApiProxyTarget}`)
   console.info(`  devWsProxyTarget=${devWsProxyTarget}`)
@@ -176,6 +195,25 @@ const connectSources = buildConnectSources()
 if (!process.env.QUIET_START) {
   console.info('[web-admin] connect-src allow', connectSources)
 }
+const resolveVersionFromPluginManifest = () => {
+  try {
+    const manifestPath = resolvePath(rootDir, '..', '..', 'plugin.yaml')
+    const content = fs.readFileSync(manifestPath, 'utf8')
+    const match = content.match(/^version:\s*([^\n#]+)\s*$/m)
+    if (!match) {
+      return ''
+    }
+    return match[1].trim().replace(/^['"]|['"]$/g, '')
+  } catch {
+    return ''
+  }
+}
+
+const pluginVersion =
+  process.env.NUXT_PUBLIC_POWERX_PLUGIN_VERSION ||
+  process.env.POWERX_PLUGIN_VERSION ||
+  resolveVersionFromPluginManifest() ||
+  'dev'
 
 const powerx = definePowerXAdminConfig({
   pluginId,
@@ -251,7 +289,11 @@ export default defineNuxtConfig({
       // ide helpers: pluginApiBase 可用于客户端自行构造 `_p/.../api` 请求
       apiBaseUrl: INSIDE_POWERX ? hostApiBase : localApiBase,
       pluginApiBase,
+      powerxPluginId: pluginId,
+      powerxPluginVersion: pluginVersion,
       insidePowerX: INSIDE_POWERX,
+      iamMode: IAM_MODE,
+      delegatedMode: DELEGATED_MODE,
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,
       powerxCoreBase,

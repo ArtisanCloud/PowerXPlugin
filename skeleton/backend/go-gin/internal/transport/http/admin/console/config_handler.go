@@ -10,6 +10,7 @@ import (
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	consolesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,11 +42,15 @@ func (h *ConfigHandler) ListSections(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query parameters: "+err.Error())
 		return
 	}
-	var tenantPtr *string
-	if strings.TrimSpace(query.TenantUuid) != "" {
-		clean := strings.TrimSpace(query.TenantUuid)
-		tenantPtr = &clean
+	tenantID := strings.TrimSpace(query.TenantUuid)
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
 	}
+	if tenantID == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	tenantPtr := &tenantID
 	sections, err := h.svc.ListSections(c.Request.Context(), tenantPtr)
 	if err != nil {
 		if errors.Is(err, consolesvc.ErrServiceUnavailable) {
@@ -79,6 +84,14 @@ func (h *ConfigHandler) UpdateSection(c *gin.Context) {
 	if err := c.ShouldBindJSON(&body); err != nil {
 		contracts.ResponseBadRequest(c, "invalid request body: "+err.Error())
 		return
+	}
+	if body.TenantUuid == nil || strings.TrimSpace(*body.TenantUuid) == "" {
+		tenantID := admincommon.ResolveTenantUUID(c)
+		if tenantID == "" {
+			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+			return
+		}
+		body.TenantUuid = &tenantID
 	}
 	actor := resolveActor(c)
 	if actor.PermissionCode == "" {

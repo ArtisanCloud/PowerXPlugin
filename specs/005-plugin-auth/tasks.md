@@ -5,7 +5,7 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [X] T001 Update `skeleton/backend/go-gin/etc/config.example.yaml` & `skeleton/backend/go-gin/etc/README.md` 记录 `POWERX_CORE_ENDPOINT`、`POWERX_AUTH_TOKEN`、`POWERX_RBAC_DELEGATE`、`PLUGIN_IAM_ADMIN_*` 等环境变量及使用建议。
+- [X] T001 Update `skeleton/backend/go-gin/etc/config.example.yaml` & `skeleton/backend/go-gin/etc/README.md` 记录 `POWERX_CORE_ENDPOINT`、`POWERX_AUTH_TOKEN`、`IAMMode`、`POWERX_PROXY`、`PLUGIN_IAM_ADMIN_*` 等配置及使用建议。
 - [X] T002 将 `powerxCoreBase` 暴露到 Nuxt runtime：在 `skeleton/web-admin/nuxt.config.ts`（或等效配置）中读取 `POWERX_CORE_ENDPOINT` 并注入 `useRuntimeConfig().public.powerxCoreBase`。
 
 ---
@@ -13,7 +13,7 @@
 ## Phase 2: Foundational (Blocking Prerequisites)
 
 - [X] T003 创建 `skeleton/backend/go-gin/internal/services/iam/directory.go`，定义 `IAMDirectory` 接口、`IAMMode` 枚举、Token DTO 与通用错误类型。
-- [X] T004 在 `skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go` 实现 IAM 模式解析逻辑，依序读取 `context.iam_mode`、`POWERX_RBAC_DELEGATE`、`POWERX_PROXY` 并缓存在依赖容器。
+- [X] T004 在 `skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go` 实现 IAM 模式解析逻辑，读取 `IAMMode` 与 `POWERX_PROXY` 并缓存在依赖容器。
 - [X] T005 新增 IAM 实体（`Tenant`/`User`/`Member`/`Role`/`Permission`/`Department`）到 `skeleton/backend/go-gin/internal/entity/models/iam/`，含 Gorm 标签与关系定义。
 - [X] T006 拆分 `skeleton/backend/go-gin/cmd/database/migrate/migrate.go` 的 AutoMigrate 流程，使 IAM 表仅在 Local 模式执行；更新 `cmd/database/main.go` 以读取 resolver 结果。
 - [X] T007 在 `skeleton/backend/go-gin/internal/services/iam/seeder.go` 实现本地管理员种子（依赖 `PLUGIN_IAM_ADMIN_*`），并在 `cmd/database/main.go setup` 中强制校验/失败。
@@ -32,7 +32,7 @@
 ### Implementation
 
 - [X] T009 [US1] 在 `skeleton/web-admin/nuxt/app/composables/useAuth.ts` 实现宿主同款的 `setAuth/clearAuth/initAuth/logout`，并加入 localStorage 失败时自动回退 cookie/强制登录的逻辑。
-- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`，注入 `Authorization` / `X-PowerX-Tenant`，在 401 时自动调 `authService.refreshToken` 并重放请求。
+- [X] T010 [P] [US1] 扩展 `skeleton/web-admin/nuxt/app/composables/api/_client.ts`，注入 `Authorization` / `tenant_uuid`，在 401 时自动调 `authService.refreshToken` 并重放请求。
 - [X] T011 [P] [US1] 新建 `skeleton/web-admin/nuxt/app/composables/api/services/authService.ts`，封装 `/auth/login|refresh|logout|me`，支持 `skipAuth` 选项。
 - [X] T012 [US1] 添加 `skeleton/web-admin/nuxt/app/middleware/auth.global.ts`，保护除 `/users/*` 外的所有路由并处理 `redirect` query。
 - [X] T013 [US1] 完成 `skeleton/web-admin/nuxt/app/pages/users/login.vue`（复用 register/forgot 布局），调用 `useAuth` + `useAuthService`。

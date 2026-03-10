@@ -86,6 +86,8 @@ def _rbac_runtime_ops(prefix: str) -> Dict[str, Permission]:
         f"POST:{base}/quota/overrides": Permission(resource="runtime.ops", action="manage"),
         f"GET:{base}/metrics": Permission(resource="runtime.ops", action="observe"),
         f"POST:{base}/event-bridge/emit": Permission(resource="runtime.ops", action="invoke"),
+        f"POST:{base}/internal/ws-bus/publish": Permission(resource="runtime.ops", action="invoke"),
+        f"POST:{base}/internal/ws-bus/grant": Permission(resource="runtime.ops", action="invoke"),
     }
 
 

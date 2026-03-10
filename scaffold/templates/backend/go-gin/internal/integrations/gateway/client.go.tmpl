@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,8 +14,8 @@ import (
 	"time"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	skelLogger "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"{{ .BackendModulePath }}/internal/config"
+	skelLogger "{{ .BackendModulePath }}/internal/logger"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -115,12 +116,12 @@ func NewClient(cfg *config.Config, log *logrus.Entry) *Client {
 	}
 
 	gcfg := cfg.Gateway
-	baseURL := strings.TrimSpace(gcfg.BaseURL)
-	toolToken := strings.TrimSpace(gcfg.ToolToken)
-	tenantUUID := strings.TrimSpace(gcfg.TenantUUID)
+	baseURL := effectiveGatewayBaseURL(gcfg)
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	credential := gatewayCredential(gcfg, authScheme)
 
-	if baseURL == "" || toolToken == "" || tenantUUID == "" {
-		c.offlineReason = "PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TENANT_UUID 未配置，请执行 `px-plugin login`"
+	if baseURL == "" || credential == "" {
+		c.offlineReason = "PX_GATEWAY_BASE_URL 与 Gateway 凭证未配置，请执行 `px-plugin login` 或补齐 gateway.auth_scheme + 凭证"
 		return c
 	}
 
@@ -172,6 +173,28 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		Headers:           copyHeaders(params.Headers),
 		TenantUUID:        params.TenantUUID,
 	}
+	if c.logger != nil {
+		baseURL := ""
+		apiPrefix := ""
+		authScheme := ""
+		if c.cfg != nil && c.cfg.Gateway != nil {
+			baseURL = strings.TrimSpace(c.cfg.Gateway.BaseURL)
+			apiPrefix = strings.TrimSpace(c.cfg.Gateway.APIPrefix)
+			authScheme = effectiveGatewayAuthScheme(c.cfg.Gateway)
+		}
+		c.logger.WithFields(logrus.Fields{
+			"capability":             params.CapabilityID,
+			"action":                 params.Action,
+			"preferred_protocol":     params.PreferredProtocol,
+			"request_id":             params.RequestID,
+			"payload_method":         strings.TrimSpace(strings.ToUpper(fmt.Sprint(extractMapValue(params.Payload, "method")))),
+			"payload_endpoint":       strings.TrimSpace(fmt.Sprint(extractMapValue(params.Payload, "endpoint"))),
+			"gateway_base_url":       baseURL,
+			"gateway_api_prefix":     apiPrefix,
+			"gateway_effective_base": effectiveGatewayBaseURL(c.cfg.Gateway),
+			"gateway_auth_scheme":    authScheme,
+		}).Info("gateway invoke dispatch")
+	}
 	resp, err := c.transport.Invoke(ctx, req)
 	if err != nil {
 		if retryResp, retryErr := c.handleInvokeError(ctx, req, params.CapabilityID, params.Action, err); retryErr == nil && retryResp != nil {
@@ -190,24 +213,30 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 	}, nil
 }
 
+func extractMapValue(payload any, key string) any {
+	valueMap, ok := payload.(map[string]any)
+	if !ok || valueMap == nil {
+		return nil
+	}
+	return valueMap[key]
+}
+
 // ListPlatformCapabilities retrieves platform capability metadata via tenant API.
 func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatformCapabilitiesOptions) ([]PlatformCapabilityRecord, error) {
 	if c.cfg == nil || c.cfg.Gateway == nil {
 		return nil, fmt.Errorf("gateway config missing")
 	}
 	gcfg := c.cfg.Gateway
-	baseURL := strings.TrimRight(strings.TrimSpace(gcfg.BaseURL), "/")
+	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
 	if baseURL == "" {
 		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
 	}
-	token := strings.TrimSpace(gcfg.ToolToken)
-	if token == "" {
-		return nil, fmt.Errorf("PX_TOOL_TOKEN 未配置")
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	credential := gatewayCredential(gcfg, authScheme)
+	if credential == "" {
+		return nil, fmt.Errorf("Gateway 凭证未配置（auth_scheme=%s）", authScheme)
 	}
-	tenant := strings.TrimSpace(gcfg.TenantUUID)
-	if tenant == "" {
-		return nil, fmt.Errorf("PX_TENANT_UUID 未配置")
-	}
+	tenant := effectiveGatewayTenant(gcfg)
 
 	timeout := gcfg.Timeout
 	if timeout <= 0 {
@@ -242,8 +271,10 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-PowerX-Tenant", tenant)
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
 	req.Header.Set("X-Request-ID", uuid.NewString())
 
 	client := &http.Client{Timeout: timeout}
@@ -406,11 +437,11 @@ func ValidateConfig(cfg *config.Config) error {
 	if cfg == nil || cfg.Gateway == nil {
 		return errors.New("gateway config missing")
 	}
-	base := strings.TrimSpace(cfg.Gateway.BaseURL)
-	token := strings.TrimSpace(cfg.Gateway.ToolToken)
-	tenant := strings.TrimSpace(cfg.Gateway.TenantUUID)
-	if base == "" || token == "" || tenant == "" {
-		return errors.New("PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TENANT_UUID 未配置")
+	base := effectiveGatewayBaseURL(cfg.Gateway)
+	authScheme := effectiveGatewayAuthScheme(cfg.Gateway)
+	credential := gatewayCredential(cfg.Gateway, authScheme)
+	if base == "" || credential == "" {
+		return errors.New("PX_GATEWAY_BASE_URL 与 Gateway 凭证未配置")
 	}
 	return nil
 }
@@ -421,6 +452,9 @@ func (c *Client) refreshCredentials(ctx context.Context) (bool, error) {
 
 	if c.cfg == nil || c.cfg.Gateway == nil {
 		return false, fmt.Errorf("gateway config missing")
+	}
+	if effectiveGatewayAuthScheme(c.cfg.Gateway) != "bearer" {
+		return false, fmt.Errorf("gateway auth_scheme=%s 不支持自动刷新", effectiveGatewayAuthScheme(c.cfg.Gateway))
 	}
 	if strings.TrimSpace(c.cfg.Gateway.RefreshToken) == "" {
 		return false, fmt.Errorf("PX_TOOL_REFRESH_TOKEN 未配置")
@@ -441,12 +475,15 @@ func (c *Client) reconnectTransport() error {
 		return fmt.Errorf("gateway config missing")
 	}
 	gcfg := c.cfg.Gateway
-	baseURL := strings.TrimSpace(gcfg.BaseURL)
+	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
+	authScheme := effectiveGatewayAuthScheme(gcfg)
 	toolToken := strings.TrimSpace(gcfg.ToolToken)
-	tenantUUID := strings.TrimSpace(gcfg.TenantUUID)
+	apiKey := strings.TrimSpace(gcfg.APIKey)
+	tenantUUID := effectiveGatewayTenant(gcfg)
+	credential := gatewayCredential(gcfg, authScheme)
 
-	if baseURL == "" || toolToken == "" || tenantUUID == "" {
-		return fmt.Errorf("PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TENANT_UUID 未配置")
+	if baseURL == "" || credential == "" {
+		return fmt.Errorf("PX_GATEWAY_BASE_URL 与 Gateway 凭证未配置（auth_scheme=%s）", authScheme)
 	}
 
 	timeout := gcfg.Timeout
@@ -456,7 +493,9 @@ func (c *Client) reconnectTransport() error {
 
 	client, err := frameworkgateway.NewClient(frameworkgateway.Config{
 		BaseURL:        baseURL,
+		AuthScheme:     authScheme,
 		ToolToken:      toolToken,
+		APIKey:         apiKey,
 		TenantUUID:     tenantUUID,
 		RequestTimeout: timeout,
 		UserAgent:      strings.TrimSpace(gcfg.UserAgent),
@@ -471,10 +510,111 @@ func (c *Client) reconnectTransport() error {
 	return nil
 }
 
+func effectiveGatewayBaseURL(gcfg *config.GatewayConfig) string {
+	if gcfg == nil {
+		return ""
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(gcfg.BaseURL), "/")
+	if baseURL == "" {
+		return ""
+	}
+	apiPrefix := normalizeAPIPrefix(gcfg.APIPrefix)
+	if apiPrefix == "" {
+		return baseURL
+	}
+	if strings.HasSuffix(baseURL, apiPrefix) {
+		return baseURL
+	}
+	return baseURL + apiPrefix
+}
+
+func normalizeAPIPrefix(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "/api/v1"
+	}
+	if !strings.HasPrefix(value, "/") {
+		value = "/" + value
+	}
+	value = "/" + strings.Trim(strings.TrimSpace(value), "/")
+	if value == "/" {
+		return "/api/v1"
+	}
+	return value
+}
+
 type platformCapabilityResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    struct {
 		Items []PlatformCapabilityRecord `json:"items"`
 	} `json:"data"`
+}
+
+func effectiveGatewayTenant(gcfg *config.GatewayConfig) string {
+	if gcfg == nil {
+		return ""
+	}
+	if effectiveGatewayAuthScheme(gcfg) != "bearer" {
+		return ""
+	}
+	if tokenTenant := tenantUUIDFromJWT(strings.TrimSpace(gcfg.ToolToken)); tokenTenant != "" {
+		return tokenTenant
+	}
+	return strings.TrimSpace(gcfg.TenantUUID)
+}
+
+func effectiveGatewayAuthScheme(gcfg *config.GatewayConfig) string {
+	if gcfg == nil {
+		return "bearer"
+	}
+	switch strings.ToLower(strings.TrimSpace(gcfg.AuthScheme)) {
+	case "apikey", "api_key", "api-key":
+		return "apikey"
+	case "bearer":
+		return "bearer"
+	default:
+		if strings.TrimSpace(gcfg.APIKey) != "" && strings.TrimSpace(gcfg.ToolToken) == "" {
+			return "apikey"
+		}
+		return "bearer"
+	}
+}
+
+func gatewayCredential(gcfg *config.GatewayConfig, authScheme string) string {
+	if gcfg == nil {
+		return ""
+	}
+	if authScheme == "apikey" {
+		return strings.TrimSpace(gcfg.APIKey)
+	}
+	return strings.TrimSpace(gcfg.ToolToken)
+}
+
+func buildGatewayAuthHeader(authScheme, credential string) string {
+	if authScheme == "apikey" {
+		return "ApiKey " + strings.TrimSpace(credential)
+	}
+	return "Bearer " + strings.TrimSpace(credential)
+}
+
+func tenantUUIDFromJWT(token string) string {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ""
+	}
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return ""
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return ""
+	}
+	tid, _ := claims["tid"].(string)
+	return strings.TrimSpace(tid)
 }

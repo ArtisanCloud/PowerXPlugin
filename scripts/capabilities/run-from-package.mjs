@@ -24,7 +24,7 @@ program
   .option("--payload <jsonOrFile>", "能力 payload JSON 或 @file 路径", "{}")
   .option("--api-base <url>", "Gateway Base 覆盖，默认读取 PX_GATEWAY_BASE_URL")
   .option("--endpoint <path>", "Gateway Endpoint 路径", DEFAULT_ENDPOINT)
-  .option("--tenant <uuid>", "Tenant UUID 覆盖，默认读取 PX_TENANT_UUID")
+  .option("--tenant <uuid>", "Tenant UUID 覆盖，默认从 PX_TOOL_TOKEN/PX_PLUGIN_TOOL_TOKEN 的 tid 推导")
   .option("--tool-token <token>", "Tool Token 覆盖，默认读取 PX_TOOL_TOKEN/PX_PLUGIN_TOOL_TOKEN")
   .option("--request-id <value>", "自定义 Request ID")
   .option("--timeout <ms>", "HTTP 超时时间 (ms)", String(DEFAULT_TIMEOUT_MS))
@@ -48,14 +48,15 @@ async function main() {
   runValidation(manifestInfo.resolved, normalizedMode, program.args);
 
   if (opts.cap) {
+    const toolToken = opts.toolToken ?? process.env.PX_TOOL_TOKEN ?? process.env.PX_PLUGIN_TOOL_TOKEN;
     await invokeCapability({
       capabilityId: opts.cap,
       action: opts.action ?? "List",
       payloadArg: opts.payload,
       gatewayBase: opts.apiBase ?? process.env.PX_GATEWAY_BASE_URL,
       endpoint: opts.endpoint ?? DEFAULT_ENDPOINT,
-      tenantUUID: opts.tenant ?? process.env.PX_TENANT_UUID,
-      toolToken: opts.toolToken ?? process.env.PX_TOOL_TOKEN ?? process.env.PX_PLUGIN_TOOL_TOKEN,
+      tenantUUID: opts.tenant ?? tenantUUIDFromToken(toolToken),
+      toolToken,
       requestId: opts.requestId,
       timeoutMs: Number(opts.timeout ?? DEFAULT_TIMEOUT_MS),
       useMockModule: opts.useMock,
@@ -184,7 +185,7 @@ async function invokeCapability(options) {
     "X-Request-ID": requestId,
   };
   if (options.tenantUUID) {
-    headers["X-PowerX-Tenant"] = options.tenantUUID;
+    headers["tenant_uuid"] = options.tenantUUID;
   }
   if (options.toolToken) {
     headers.Authorization = `Bearer ${options.toolToken}`;
@@ -291,12 +292,22 @@ function validateGatewayCredentials(options) {
   if (!options.toolToken) {
     missing.push("PX_TOOL_TOKEN/PX_PLUGIN_TOOL_TOKEN");
   }
-  if (!options.tenantUUID) {
-    missing.push("PX_TENANT_UUID");
-  }
   if (missing.length) {
     console.error(`[capabilities] 缺少 Gateway 凭证: ${missing.join(", ")}`);
     process.exit(1);
+  }
+}
+
+function tenantUUIDFromToken(token) {
+  const raw = String(token || "").trim();
+  if (!raw) return "";
+  const parts = raw.split(".");
+  if (parts.length < 2) return "";
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    return String(payload?.tid ?? "").trim();
+  } catch {
+    return "";
   }
 }
 

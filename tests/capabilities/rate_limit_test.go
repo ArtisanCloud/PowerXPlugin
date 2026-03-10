@@ -48,7 +48,7 @@ func TestCapabilityRateLimitEmitsAuditEvent(t *testing.T) {
 		"payload":      map[string]any{"assetName": "doc.pdf"},
 	})
 	ctx := newMockContext(body)
-	ctx.reqHeaders["X-PowerX-Tenant"] = "tenant-321"
+	ctx.reqHeaders["tenant_uuid"] = "tenant-321"
 	ctx.reqHeaders["X-Request-ID"] = "req-limit-1"
 
 	handler(ctx)

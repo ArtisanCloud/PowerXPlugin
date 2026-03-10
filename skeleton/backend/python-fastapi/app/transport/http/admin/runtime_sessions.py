@@ -1,3 +1,8 @@
+import json
+import os
+from urllib import request as urlrequest
+from urllib.error import URLError
+
 from fastapi import APIRouter, Request
 
 from app.contracts.response import (
@@ -8,8 +13,20 @@ from app.contracts.response import (
 )
 from app.services.runtime_session_service import RuntimeSessionService
 
+from app.middleware.tenant_context import resolve_tenant_uuid
+
 router = APIRouter(prefix="/admin")
 service = RuntimeSessionService()
+
+
+def _gateway_endpoint(base_url: str, api_prefix: str, route_path: str) -> str:
+    base = (base_url or "").rstrip("/")
+    prefix = (api_prefix or "").strip() or "/api/v1"
+    if not prefix.startswith("/"):
+        prefix = f"/{prefix}"
+    prefix = prefix.rstrip("/") or "/"
+    route = route_path if route_path.startswith("/") else f"/{route_path}"
+    return f"{base}{prefix}{route}"
 
 
 def _request_id(request: Request) -> str | None:
@@ -185,3 +202,110 @@ async def emit_event_bridge(request: Request, payload: dict):
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
     return ok({"ok": True, "event": payload}, request_id=request_id)
+
+
+@router.post("/runtime/internal/ws-bus/publish")
+async def ws_bus_publish(request: Request, payload: dict):
+    request_id = _request_id(request)
+    settings = getattr(request.app.state, "settings", None)
+    if settings is not None and not (settings.dev_mode or settings.server_dev_mode):
+        return fail("FORBIDDEN", "ws bus publish only available in dev mode", request_id=request_id, status_code=403)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    if not payload:
+        return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
+    topic = str(payload.get("topic") or "").strip()
+    if not topic:
+        return fail(ERR_CODE_INVALID_REQUEST, "topic 必填", request_id=request_id, status_code=400)
+    allowed = {
+        "_topic.template.update",
+        "_topic.audit.template.updated",
+        "_topic.template.validate.completed",
+        "_topic.template.batch_clone.completed",
+        "_topic.template.update.completed",
+    }
+    if topic not in allowed:
+        return fail(ERR_CODE_INVALID_REQUEST, "topic not allowed", request_id=request_id, status_code=400)
+    tenant_uuid = str(payload.get("tenant_uuid") or "").strip()
+    if not tenant_uuid:
+        tenant_uuid = resolve_tenant_uuid(request) or ""
+    trace_id = str(payload.get("trace_id") or "").strip()
+    if os.getenv("POWERX_PROXY") == "1" and settings and settings.gateway_base_url:
+        endpoint = _gateway_endpoint(
+            settings.gateway_base_url,
+            getattr(settings, "gateway_api_prefix", "/api/v1"),
+            "/admin/runtime/internal/ws-bus/publish",
+        )
+        body = json.dumps(
+            {"topic": topic, "payload": payload.get("payload"), "tenant_uuid": tenant_uuid, "trace_id": trace_id}
+        ).encode("utf-8")
+        req = urlrequest.Request(endpoint, data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        raw_auth = (request.headers.get("authorization") or "").strip()
+        if raw_auth:
+            req.add_header("Authorization", raw_auth)
+        if tenant_uuid:
+            req.add_header("tenant_uuid", tenant_uuid)
+        try:
+            with urlrequest.urlopen(req, timeout=5) as resp:
+                if resp.status >= 400:
+                    return fail("UPSTREAM_ERROR", f"upstream rejected: {resp.status}", request_id=request_id, status_code=502)
+        except URLError as exc:
+            return fail("UPSTREAM_ERROR", str(exc), request_id=request_id, status_code=502)
+        return ok({"ok": True}, request_id=request_id)
+
+    hub = getattr(request.app.state, "ws_bus_hub", None)
+    if hub is None:
+        return fail("SERVICE_UNAVAILABLE", "ws bus not configured", request_id=request_id, status_code=503)
+    await hub.publish(topic, payload.get("payload"), tenant_uuid=tenant_uuid, trace_id=trace_id)
+    return ok({"ok": True}, request_id=request_id)
+
+
+@router.post("/runtime/internal/ws-bus/grant")
+async def ws_bus_grant(request: Request, payload: dict):
+    request_id = _request_id(request)
+    settings = getattr(request.app.state, "settings", None)
+    if settings is not None and not (settings.dev_mode or settings.server_dev_mode):
+        return fail("FORBIDDEN", "ws bus register only available in dev mode", request_id=request_id, status_code=403)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    if not payload or not payload.get("topics"):
+        return fail(ERR_CODE_INVALID_REQUEST, "topics 必填", request_id=request_id, status_code=400)
+    topics = [str(t or "").strip() for t in payload.get("topics") or []]
+    topics = [t for t in topics if t]
+    allowed = {
+        "_topic.template.update",
+        "_topic.audit.template.updated",
+        "_topic.template.validate.completed",
+        "_topic.template.batch_clone.completed",
+        "_topic.template.update.completed",
+    }
+    for t in topics:
+        if t not in allowed:
+            return fail(ERR_CODE_INVALID_REQUEST, "topic not allowed", request_id=request_id, status_code=400)
+    if os.getenv("POWERX_PROXY") == "1" and settings and settings.gateway_base_url:
+        endpoint = _gateway_endpoint(
+            settings.gateway_base_url,
+            getattr(settings, "gateway_api_prefix", "/api/v1"),
+            "/admin/runtime/internal/ws-bus/grant",
+        )
+        body = json.dumps({"topics": topics, "tenant_uuid": payload.get("tenant_uuid"), "trace_id": payload.get("trace_id")}).encode(
+            "utf-8"
+        )
+        req = urlrequest.Request(endpoint, data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        raw_auth = (request.headers.get("authorization") or "").strip()
+        if raw_auth:
+            req.add_header("Authorization", raw_auth)
+        tenant_uuid = str(payload.get("tenant_uuid") or "").strip()
+        if tenant_uuid:
+            req.add_header("tenant_uuid", tenant_uuid)
+        try:
+            with urlrequest.urlopen(req, timeout=5) as resp:
+                if resp.status >= 400:
+                    return fail("UPSTREAM_ERROR", f"upstream rejected: {resp.status}", request_id=request_id, status_code=502)
+        except URLError as exc:
+            return fail("UPSTREAM_ERROR", str(exc), request_id=request_id, status_code=502)
+    return ok({"ok": True, "topics": topics}, request_id=request_id)

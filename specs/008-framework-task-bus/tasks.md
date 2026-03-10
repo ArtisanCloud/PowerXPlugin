@@ -14,10 +14,10 @@
 ## Phase 2: Foundational (Blocking Prerequisites)
 
 - [x] T004 Define `event_bridge` config shape and defaults in `skeleton/backend/go-gin/internal/config/config.go`
-- [x] T005 Implement `Event` meta builder helper (tenant_uuid/request_id/source_plugin/trace_id/occurred_at/payload_version) in `framework/event/meta.go`
-- [x] T006 Implement core event types (`Event`, `Topic`, `Subscription` DTOs) in `framework/event/models.go`
-- [x] T007 Implement an emitter interface and factory (local vs taskbus) in `framework/eventbridge/emitter.go`
-- [x] T008 Implement a local emitter (in-memory) with fallback semantics in `framework/eventbridge/local_emitter.go`
+- [x] T005 Implement `Event` meta builder helper (tenant_uuid/request_id/source_plugin/trace_id/occurred_at/payload_version) in `framework/backend/go/event/meta.go`
+- [x] T006 Implement core event types (`Event`, `Topic`, `Subscription` DTOs) in `framework/backend/go/event/models.go`
+- [x] T007 Implement an emitter interface and factory (local vs taskbus) in `framework/backend/go/eventbridge/emitter.go`
+- [x] T008 Implement a local emitter (in-memory) with fallback semantics in `framework/backend/go/eventbridge/local_emitter.go`
 - [x] T009 Implement a contracts validator (topic unique + required meta keys) in `tools/contracts/validate-taskbus-contracts.go`
 - [x] T010 Wire the contracts validator into CI (run on PR) in `.github/workflows/ci.yml`
 
@@ -45,15 +45,15 @@
 
 **Independent Test**: 在开启 TaskBus 模式时注入一个“模拟不可用”的 TaskBus emitter，验证会自动降级到 local 且打点/告警。
 
-- [x] T016 [US2] Implement taskbus emitter adapter skeleton (interface only; no external deps) in `framework/eventbridge/taskbus_provider.go`
-- [x] T017 [US2] Implement fallback logic: taskbus failure → local emitter in `framework/eventbridge/emitter.go`
+- [x] T016 [US2] Implement taskbus emitter adapter skeleton (interface only; no external deps) in `framework/backend/go/eventbridge/taskbus_provider.go`
+- [x] T017 [US2] Implement fallback logic: taskbus failure → local emitter in `framework/backend/go/eventbridge/emitter.go`
 - [x] T018 [P] [US2] Add integration test for fallback behavior in `skeleton/backend/go-gin/tests/integration/event_bridge_fallback_test.go`
 - [x] T019 [US2] Wire emitter into `app.Deps` and service construction in `skeleton/backend/go-gin/internal/shared/app/deps.go`
 - [x] T020 [US2] Document config + fallback in `specs/008-framework-task-bus/quickstart.md`
 - [x] T030 [P] [US2] Declare publish/subscribe permissions (least-privilege topics with versions) in `skeleton/plugin.yaml`
 - [x] T031 [US2] Enforce event publish/subscribe permissions at runtime (deny + log + metric) in `skeleton/backend/go-gin/internal/security/event_permissions.go`
 - [x] T032 [P] [US2] Add unit tests for permission enforcement in `skeleton/backend/go-gin/tests/unit/event_permissions_test.go`
-- [x] T033 [P] [US2] Implement an in-process TaskBus stub for integration tests (publish → dispatch → consumer) in `framework/eventbridge/taskbus_stub.go`
+- [x] T033 [P] [US2] Implement an in-process TaskBus stub for integration tests (publish → dispatch → consumer) in `framework/backend/go/eventbridge/taskbus_stub.go`
 - [x] T034 [P] [US2] Add an integration test for “TaskBus mode E2E” using the stub in `skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_e2e_test.go`
 - [x] T035 [US2] Add a staging validation checklist (SC-002) in `specs/008-framework-task-bus/quickstart.md`
 
@@ -66,12 +66,12 @@
 **Independent Test**: 改动 `contracts/channel-events.yaml`（例如新增 topic）会触发 CI 校验；本地可运行 validator；示例 consumer 能处理事件并具备幂等逻辑。
 - [x] T021 [US3] Add a lightweight contracts CI check script wrapper in `scripts/contracts/validate-taskbus-contracts.sh`
 - [x] T022 [US3] Ensure CI runs the wrapper and fails on invalid contracts in `.github/workflows/ci.yml`
-- [x] T023 [US3] Implement a sample consumer interface + local dispatcher (in-memory) in `framework/eventbridge/consumer.go`
-- [x] T024 [US3] Implement idempotency filter using `topic + tenant_uuid + trace_id` in `framework/eventbridge/idempotency.go`
+- [x] T023 [US3] Implement a sample consumer interface + local dispatcher (in-memory) in `framework/backend/go/eventbridge/consumer.go`
+- [x] T024 [US3] Implement idempotency filter using `topic + tenant_uuid + trace_id` in `framework/backend/go/eventbridge/idempotency.go`
 - [x] T025 [P] [US3] Add unit tests for idempotency filter in `skeleton/backend/go-gin/tests/unit/event_idempotency_test.go`
 - [x] T026 [US3] Migrate one job result write path to consumer handler (local dispatcher) in `skeleton/backend/go-gin/internal/jobs/channel/master/*`
 - [x] T036 [US3] Add dual-write config (`event_bridge.mode=local|taskbus|dual`) and defaults in `skeleton/backend/go-gin/internal/config/config.go`
-- [x] T037 [US3] Implement dual-write behavior (emit to TaskBus + local) with clear error semantics in `framework/eventbridge/emitter.go`
+- [x] T037 [US3] Implement dual-write behavior (emit to TaskBus + local) with clear error semantics in `framework/backend/go/eventbridge/emitter.go`
 - [x] T038 [US3] Extend contracts validator to fail on obvious sensitive payload fields (e.g. `password`, `secret`, `token`, `access_key`) in `tools/contracts/validate-taskbus-contracts.go`
 
 ---
@@ -97,3 +97,36 @@
 - T002 + T003 + T004 can be parallel once T001 confirms scope.
 - T011 + T012 can be parallel.
 - Validator tasks (T009/T010/T021/T022) can be parallel with emitter tasks (T007/T008) as long as file paths do not overlap.
+
+---
+
+## Phase 7: Host Provider 落地与版本发布（Next）
+
+**Goal**: 将 `TaskBusProvider` 从“接口占位”升级为“宿主可用实现”，并完成 framework 新版本发布与插件迁移闭环。
+
+**Independent Test**: 在 `mode=taskbus` 且 provider 可用时，事件经宿主链路成功投递；provider 不可用且 `fallback_to_local=true` 时可自动回落。
+
+- [x] T041 [US4] Implement a real host taskbus provider in `framework/backend/go/runtime/taskbus/provider.go` (or equivalent runtime package).
+- [x] T042 [US4] Inject provider via `Factory.WithTaskBusProvider(...)` in `skeleton/backend/go-gin/cmd/plugin/main.go`.
+- [x] T043 [P] [US4] Add integration test for "taskbus mode with real provider wiring" in `skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_provider_test.go`.
+- [x] T044 [US4] Add drop metrics/log fields for local queue full in `framework/backend/go/eventbridge/local_emitter.go` and `skeleton/backend/go-gin/internal/observability/event_bridge/metrics.go`.
+- [x] T045 [P] [US4] Add tests for local-queue-full behavior and metrics update in `skeleton/backend/go-gin/tests/unit/event_local_queue_full_test.go`.
+- [ ] T046 [US4] Publish framework prerelease (`v0.0.3-alpha` or newer) and update dependency notes in `docs/plan/008-framework-task-bus.md`.
+- [ ] T047 [US4] Add migration guide for external plugins (adapter mapping checklist) in `docs/guides/async_runtime/event_fabric/integration_playbook.md`.
+
+**Checkpoint**: Host provider wired + fallback verified + release/migration docs ready.
+
+---
+
+## Updated Dependencies & Execution Order (with Phase 7)
+
+- Phase 1 → Phase 2 → US1 (MVP) → US2 → US3 → Polish → **Phase 7 (Host Provider & Release)**
+- Phase 7 depends on stable contracts + emitter factory + integration baseline from earlier phases.
+- Release/migration tasks (T046/T047) should run after provider wiring and integration validation (T041~T045).
+
+## Phase 7 Entry Gate（进入 Host Provider 开发前）
+
+- [ ] G1 已阅读并确认 `specs/008-framework-task-bus/readiness.md` 的未完成项。
+- [ ] G2 已完成 Day-0 校验命令并保留执行记录。
+- [ ] G3 目标 topic 权限已在 `skeleton/plugin.yaml` 明确声明。
+- [ ] G4 已确认迁移目标插件的当前 framework 版本与升级路径。

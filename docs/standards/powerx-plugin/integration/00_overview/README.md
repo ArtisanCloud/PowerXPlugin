@@ -29,8 +29,8 @@ PowerX 体系通过「**CoreX（内核） + PluginBase（插件基座） + Plugi
 | 层级 | 组件 | 职责 | 示例 |
 |------|------|------|------|
 | CoreX | 内核服务 | 提供 IAM、RBAC、多租户、事件总线、媒资、Agent 等核心能力 | PowerX/Core |
-| PluginBase | 插件基座 | 定义插件生命周期、schema、runtime 与安全标准 | com.powerx.plugin.base |
-| Plugin | 业务插件 | 实现独立能力、业务逻辑或行业模块 | com.powerx.plugin.crm / com.powerx.plugin.ecommerce |
+| PluginBase | 插件基座 | 定义插件生命周期、schema、runtime 与安全标准 | com.powerx.plugins.base |
+| Plugin | 业务插件 | 实现独立能力、业务逻辑或行业模块 | com.powerx.plugins.crm / com.powerx.plugins.ecommerce |
 | Admin | 前端控制台 | 提供统一 UI（Nuxt 4 + Nuxt UI）与插件管理入口 | PowerX Web Admin |
 
 ---
@@ -72,7 +72,7 @@ PowerX 体系通过「**CoreX（内核） + PluginBase（插件基座） + Plugi
 
 ```
 
-com.powerx.plugin.example/
+com.powerx.plugins.example/
 ├── plugin.yaml                  # 插件清单（Manifest）
 ├── backend/
 │   ├── main.go                  # 插件主服务入口
@@ -114,13 +114,13 @@ com.powerx.plugin.example/
 2. **初始化插件**
 
    ```bash
-   px-plugin init com.powerx.plugin.example
+   px-plugin init com.powerx.plugins.example
    ```
 
 3. **编辑 Manifest**
 
    ```yaml
-   id: com.powerx.plugin.example
+   id: com.powerx.plugins.example
    name: Example Plugin
    version: 0.1.0
    provides:
@@ -152,6 +152,7 @@ com.powerx.plugin.example/
 * Redis / S3 访问需通过 PowerX 授权凭证 (`ToolGrant` 机制)。
 * 前端入口仅允许通过代理路径暴露，不可直接部署在宿主域名根路径。
 * 版本发布前需完成 `Plugin_Security_Checklist.md` 中所有检查项。
+* **MUST：`/_p/:plugin_id/api/*` 仅用于插件 API；宿主用户认证接口（`/api/v1/admin/{identity}/auth/*`）必须走宿主 `/api/v1/...`，禁止通过 `/_p` 调用。**
 
 ---
 

@@ -11,6 +11,7 @@ import (
 
 func TestCapabilityCatalogSyncExportsWorkflowAssets(t *testing.T) {
 	repoRoot := repoRootFromIntegration(t)
+	ensureCapabilitySyncFixtures(t, repoRoot)
 	catalogPath := filepath.Join(repoRoot, "capabilities", "catalog.json")
 	if _, err := os.Stat(catalogPath); err != nil {
 		t.Fatalf("缺少 catalog 文件，请先执行 capabilities:export: %v", err)
@@ -64,4 +65,21 @@ func TestCapabilityCatalogSyncExportsWorkflowAssets(t *testing.T) {
 	if len(client.assets) != len(assets) {
 		t.Fatalf("HostSyncClient 接收的资产数量不符，期望 %d 实际 %d", len(assets), len(client.assets))
 	}
+}
+
+func ensureCapabilitySyncFixtures(t *testing.T, repoRoot string) {
+	t.Helper()
+	manifestPath := filepath.Join(repoRoot, "dist", "agent-sdk", "manifest.json")
+	if _, err := os.Stat(manifestPath); err == nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
+		t.Fatalf("创建测试 fixture 目录失败: %v", err)
+	}
+	if err := os.WriteFile(manifestPath, []byte("{\"plugin_id\":\"com.powerx.plugins.base\",\"tools\":[]}\n"), 0o644); err != nil {
+		t.Fatalf("写入测试 fixture 失败: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Remove(manifestPath)
+	})
 }

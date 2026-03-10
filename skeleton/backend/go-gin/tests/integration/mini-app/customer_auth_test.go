@@ -20,7 +20,7 @@ func TestMiniAppCustomerAuth_MissingToken(t *testing.T) {
 	engine, deps := setupMiniAppAuthRouter(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/ping", nil)
-	req.Header.Set("X-PowerX-Tenant", "00000000-0000-0000-0000-000000000001")
+	req.Header.Set("tenant_uuid", "00000000-0000-0000-0000-000000000001")
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
 
@@ -41,7 +41,7 @@ func TestMiniAppCustomerAuth_TenantMismatch(t *testing.T) {
 	token := signCustomerJWT(t, deps.Config.CustomerAuth.JWTSecret, tokenTenant, customerUUID)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/ping", nil)
-	req.Header.Set("X-PowerX-Tenant", reqTenant)
+	req.Header.Set("tenant_uuid", reqTenant)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
@@ -61,7 +61,7 @@ func TestMiniAppCustomerAuth_Success(t *testing.T) {
 	token := signCustomerJWT(t, deps.Config.CustomerAuth.JWTSecret, tenantUUID, customerUUID)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/ping", nil)
-	req.Header.Set("X-PowerX-Tenant", tenantUUID)
+	req.Header.Set("tenant_uuid", tenantUUID)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
@@ -92,7 +92,8 @@ func setupMiniAppAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 	g := engine.Group("/api/v1")
 
 	cfg := &config.Config{
-		Server: &config.ServerConfig{APIPrefix: "/api/v1", DevMode: true},
+		Server:  &config.ServerConfig{APIPrefix: "/api/v1"},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:      "local",
 			JWTSecret: "test-secret",

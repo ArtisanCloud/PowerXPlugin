@@ -378,7 +378,7 @@
 **Goal**: 让脚手架工程内建 Makefile + 本地安装脚本，并发布 `docs/guides/publish/local-install.md`，覆盖 dist/zip/`.pxp` 三种路径和 `/admin/plugins/install/local` API 操作。
 
 - [X] **T097a [P] [US8] Skeleton/模板接入 Makefile**
-  1. 以 `../com.powerx.plugin.base/Makefile` 与 `../com.powerx.plugin.base/make-files/**` 为源，拷贝至本仓 `skeleton/`，保持目录结构一致（路径均以当前仓库根目录为相对基准）。
+  1. 以 `../com.powerx.plugins.base/Makefile` 与 `../com.powerx.plugins.base/make-files/**` 为源，拷贝至本仓 `skeleton/`，保持目录结构一致（路径均以当前仓库根目录为相对基准）。
   2. 运行 `npm run sync:templates -- --verbose`，确认 `scaffold/templates/**` 与 `tools/cli/internal/templates/data/**` 生成对应 `.tmpl`。
   3. 执行 `px-plugin init demo.local`，验证输出工程包含 Makefile/make-files，`git status` 仅显示预期变更。
 

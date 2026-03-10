@@ -10,7 +10,7 @@
 ### Q1. 我应该 fork PowerXPluginBase 还是从模板创建？
 
 **A：**  
-推荐从 PowerX 官方模板仓库创建新插件项目（`px-plugin init com.powerx.plugin.example`；命名规范参考 `docs/standards/_shared/cli-install-and-naming.md`）。  
+推荐从 PowerX 官方模板仓库创建新插件项目（`px-plugin init com.powerx.plugins.example`；命名规范参考 `docs/standards/_shared/cli-install-and-naming.md`）。  
 仅当你需要修改底层框架行为（如日志系统、启动逻辑、gRPC adapter）时，才 fork `PowerXPluginBase`。  
 模板中已包含标准目录结构、plugin.yaml、Makefile、Nuxt 前端脚手架。
 
@@ -198,7 +198,7 @@ usage.Report(map[string]int{
 **A：**
 宿主在连接时自动注入：
 
-- `x-powerx-tenant` 请求头；
+- `tenant_uuid` 请求头；
 - 租户隔离 Schema；
 - 独立的 ToolGrant Token。
   插件侧只需校验这些字段，不得自行信任前端传入的 tenant 参数。

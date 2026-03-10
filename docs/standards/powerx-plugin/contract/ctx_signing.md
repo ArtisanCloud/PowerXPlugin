@@ -287,7 +287,8 @@ curl http://localhost:8080/_p/com.powerx.plugins.base/api/v1/templates \
 | `POWERX_CTX_TTL`         | Token 有效期         |
 | `PLUGIN_CTX_HMAC_SECRET` | HMAC 签名密钥（base64） |
 | `PLUGIN_CTX_KID`         | 密钥标识              |
-| `POWERX_DEV_MODE`        | 开发模式，跳过验签         |
+| `POWERX_DEBUG_MODE`      | 开发环境语义开关（不直接控制验签旁路） |
+| `POWERX_DEV_MODE`        | 兼容入口（映射到 `logging.debug_mode`） |
 
 ---
 

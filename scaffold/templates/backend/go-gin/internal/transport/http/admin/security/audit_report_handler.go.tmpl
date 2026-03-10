@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
-	adminsec "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/security"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	secobs "{{ .BackendModulePath }}/internal/observability/security"
+	adminsec "{{ .BackendModulePath }}/internal/services/admin/security"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
 

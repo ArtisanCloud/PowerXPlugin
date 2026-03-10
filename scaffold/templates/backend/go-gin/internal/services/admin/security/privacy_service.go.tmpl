@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	privmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/privacy"
-	privrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/privacy"
-	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
+	"{{ .BackendModulePath }}/internal/config"
+	privmodel "{{ .BackendModulePath }}/internal/entity/models/privacy"
+	privrepo "{{ .BackendModulePath }}/internal/entity/repository/privacy"
+	secobs "{{ .BackendModulePath }}/internal/observability/security"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

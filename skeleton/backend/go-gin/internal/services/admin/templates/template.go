@@ -72,7 +72,11 @@ func (s *TemplateService) List(
 	cb := func(db *gorm.DB, opt interface{}) *gorm.DB {
 		if kw, _ := opt.(string); strings.TrimSpace(kw) != "" {
 			p := "%" + strings.TrimSpace(kw) + "%"
-			db = db.Where("(name ILIKE ? OR description ILIKE ?)", p, p)
+			if db != nil && db.Dialector != nil && strings.EqualFold(db.Dialector.Name(), "postgres") {
+				db = db.Where("(name ILIKE ? OR description ILIKE ?)", p, p)
+			} else {
+				db = db.Where("(LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))", p, p)
+			}
 		}
 		return db.Order("id DESC")
 	}

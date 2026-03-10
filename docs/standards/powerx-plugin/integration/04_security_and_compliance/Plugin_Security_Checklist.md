@@ -183,7 +183,7 @@ manifest.sig
 4️⃣ 验证失败则拒绝安装。
 
 ```bash
-powerx plugin verify com.powerx.plugin.crm-1.3.0.pxp
+powerx plugin verify com.powerx.plugins.crm-1.3.0.pxp
 → signature valid ✅
 ```
 
@@ -307,7 +307,7 @@ make security-scan
 或：
 
 ```bash
-powerx-cli plugin scan --id com.powerx.plugin.crm
+powerx-cli plugin scan --id com.powerx.plugins.crm
 ```
 
 输出：
@@ -320,7 +320,7 @@ powerx-cli plugin scan --id com.powerx.plugin.crm
 报告位置：
 
 ```
-/var/lib/powerx/reports/security/com.powerx.plugin.crm-2025-10-13.json
+/var/lib/powerx/reports/security/com.powerx.plugins.crm-2025-10-13.json
 ```
 
 ---

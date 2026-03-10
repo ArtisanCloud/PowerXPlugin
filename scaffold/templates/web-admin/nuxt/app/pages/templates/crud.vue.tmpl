@@ -132,6 +132,8 @@ import type { Template } from "~/composables/api/useTemplate"
 import TemplateFormModal from "~/components/templates/TemplateFormModal.vue"
 import { nextTick } from "vue"
 import { useI18n } from "vue-i18n"
+import { storeToRefs } from "pinia"
+import { useUserStore } from "~/stores/user"
 
 type TemplateFormState = {
   name: string
@@ -167,14 +169,25 @@ const toast = reactive({
 
 const { t } = useI18n()
 
-const runtimeConfig = useRuntimeConfig()
+const auth = useAuth()
+const userStore = useUserStore()
+const { isRoot, isCurrentTenantAdmin, canReadTemplates, canWriteTemplates } = storeToRefs(userStore)
 const isDelegatedReadOnly = computed(() => {
-  const value = runtimeConfig.public?.insidePowerX
-  if (value === true) return true
-  if (typeof value === "string") {
-    return value === "true" || value === "1"
+  const delegated = auth.delegatedIAM?.value ?? false
+  if (!delegated) {
+    return false
   }
-  return false
+  if (Boolean(canWriteTemplates.value)) {
+    return false
+  }
+  return !(Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value))
+})
+const canReadTemplateList = computed(() => {
+  const delegated = auth.delegatedIAM?.value ?? false
+  if (!delegated) {
+    return true
+  }
+  return Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value) || Boolean(canReadTemplates.value)
 })
 
 const tableColumns = computed(() => [
@@ -452,8 +465,17 @@ const showToast = ({
   })
 }
 
-onMounted(() => {
-  fetchTemplates()
+onMounted(async () => {
+  if (!userStore.context && !userStore.isLoading) {
+    try {
+      await userStore.fetchUserContext()
+    } catch {
+      // ignore user context fetch errors
+    }
+  }
+  if (canReadTemplateList.value) {
+    await fetchTemplates()
+  }
 })
 </script>
 

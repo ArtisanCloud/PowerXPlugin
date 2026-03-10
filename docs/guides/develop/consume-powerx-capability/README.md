@@ -17,6 +17,41 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 | 插件后端 Skeleton | `8078` | `go run ./skeleton/backend/go-gin/cmd/plugin` 启动后监听，前端所有 API（含 Capability Lab）都只打到这里 |
 | PowerX Integration Gateway | `8077` | PowerX 底座 Dev API 端口，插件后端通过 `PX_GATEWAY_BASE_URL` 调用 `/tenant/invocations`；若宿主端口不同请自行覆盖 |
 
+## 1.1 宿主与插件 Trace 日志统一契约（已落地）
+
+为实现 PowerX 宿主与插件日志在同一日志源聚合检索，统一采用以下字段契约：
+
+- 必填字段：`trace_id`、`request_id`、`plugin_id`、`tenant_uuid`、`path`、`status`、`latency`
+- 头部约定：`X-Trace-Id`、`X-Request-ID`（`Request-ID` 作为兼容输入）
+- 字段命名：统一使用下划线风格（不要混用 `traceId` / `requestId`）
+
+透传规则（插件侧）：
+
+1. 优先使用宿主透传的 `X-Trace-Id` / `X-Request-ID`
+2. 若 `X-Trace-Id` 缺失，则回退为 `request_id`
+3. 若 `X-Request-ID` 也缺失，插件生成 `request_id`，并同步设置 `trace_id`
+4. 所有 HTTP access 日志必须带 `trace_id + request_id + plugin_id`
+
+代码落点（Skeleton）：
+
+- `skeleton/backend/go-gin/internal/middleware/common.go`
+  - `RequestID()`：实现 trace/request 透传优先与回填
+  - `RequestLogger()`：统一输出 `trace_id/request_id/plugin_id/tenant_uuid`
+- `skeleton/backend/go-gin/internal/transport/http/middleware/request_trace.go`
+  - 调试日志字段改为 `trace_id/request_id/plugin_id`
+
+宿主侧职责（PowerX）：
+
+- 在入口与 `/_p` 代理链路生成/透传 `trace_id`、`request_id`
+- 代理日志输出统一字段（含 `plugin_id/tenant_uuid/path/status/latency/trace_id`）
+- 采集层（Fluent Bit/Vector/OTel Collector）按 `trace_id + plugin_id + tenant_uuid` 聚合检索
+
+排障顺序（推荐）：
+
+1. 先看宿主日志是否有同一 `trace_id` 的入口和 `/_p` 转发记录
+2. 再看插件 `HTTP request completed` 是否带同一 `trace_id`
+3. 若 trace 断裂，优先检查代理是否透传 `X-Trace-Id/X-Request-ID`
+
 ### /tenant/invocations 调用语义
 
 - `/tenant/invocations` 是“能力调度器”而非 HTTP 代理，**`action` 只是能力语义标签**；要让 Gateway 正确路由，必须在 `payload` 中给出完整的协议描述。
@@ -52,10 +87,51 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 - **前端** 永远只访问插件后端（宿主反代 `/_p/<plugin-id>/api/v1`，本地 Skeleton 为 `http://127.0.0.1:8078/api/v1`）。
 - **后端** 读取统一环境变量：
   - `PX_GATEWAY_BASE_URL`
-  - `PX_PLUGIN_TOOL_TOKEN`（宿主）/`PX_TOOL_TOKEN`（Skeleton）
-  - `PX_TENANT_UUID`
+  - `PX_GATEWAY_AUTH_SCHEME`（可选：`bearer` / `apikey`）
+  - `PX_PLUGIN_TOOL_TOKEN`（宿主）/`PX_TOOL_TOKEN`（Skeleton，Bearer 场景）
+  - `PX_GATEWAY_API_KEY`（ApiKey 场景）
+  - 租户在 proxy 场景由底座按凭证解析；Bearer 本地兼容场景才会使用 token `tid` 推导
   - `PX_GATEWAY_CONTRACT_VERSION`（可选，配合 `dist/capability-contracts.json` 校验契约版本）
-- **Gateway Client** 负责注入 `Authorization`、`X-PowerX-Tenant`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据。
+- **Gateway Client** 负责注入 `Authorization`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据；`tenant_uuid` 并非所有模式都强制透传（proxy 场景通常由底座按凭证解析）。
+
+> **环境加载与模式说明**：
+>
+> - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`），并覆盖 `config.yaml` 中同名配置。
+> - 宿主模式要求 `POWERX_PROXY=1`，并至少提供一套可用凭证（Bearer 或 ApiKey）；否则会返回 503。
+> - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`IAM_MODE=local`），会覆盖 `.env` 的值，请先清理。
+
+### Gateway API 前缀规范（含 WS-Bus）
+
+- 统一新增 `PX_GATEWAY_API_PREFIX`，默认值为 `/api/v1`（对应 `config.yaml` 的 `gateway.api_prefix`）。
+- 绝大多数 Gateway 能力调用（如 `/tenant/invocations`）跟随该前缀拼接请求地址。
+- **WS-Bus 在不同环境可能不一致**：有的网关走 `/api/v1/...`，有的只走 `/api/...`。  
+  因此不要写死路径，统一通过 `PX_GATEWAY_API_PREFIX` 控制：
+  - 若你的网关是 `/api/v1`：`PX_GATEWAY_API_PREFIX=/api/v1`
+  - 若你的网关是 `/api`：`PX_GATEWAY_API_PREFIX=/api`
+
+### 鉴权规范（重点：API Key 在什么模式下使用）
+
+为避免各插件实现不一致，统一按下列规则使用 Gateway 鉴权：
+
+| 运行形态 | 是否使用 `PX_GATEWAY_AUTH_SCHEME` | 推荐凭证 | 说明 |
+| --- | --- | --- | --- |
+| 宿主 Delegated（平台注入凭证） | 可选（通常无需手动设置） | `PX_PLUGIN_TOOL_TOKEN`（Bearer）优先，按平台要求可使用 `PX_GATEWAY_API_KEY` | 默认推荐 Bearer；若平台明确要求 ApiKey，以平台注入为准。 |
+| Standalone（本地/独立运行） | 是 | `PX_TOOL_TOKEN`（Bearer）优先，必要时 `PX_GATEWAY_API_KEY` | 仅在自管凭证时才需要显式设置 `PX_GATEWAY_AUTH_SCHEME`。 |
+| Standalone + Proxy（`POWERX_PROXY=1` 但非平台托管） | 是 | `PX_TOOL_TOKEN`（Bearer）优先，必要时 `PX_GATEWAY_API_KEY` | 这是你当前提到的场景：可选 `bearer/apikey`，由插件侧环境变量决定。 |
+
+实现判定规则（与当前代码一致）：
+
+1. 若 `PX_GATEWAY_AUTH_SCHEME=apikey`，则发送 `Authorization: ApiKey <key>`；
+2. 若 `PX_GATEWAY_AUTH_SCHEME=bearer`，则发送 `Authorization: Bearer <token>`；
+3. 若未显式设置 `PX_GATEWAY_AUTH_SCHEME`：
+   - 有 `PX_GATEWAY_API_KEY` 且无 token -> 自动按 `apikey`；
+   - 其他情况 -> 默认 `bearer`。
+
+建议：
+
+- 多数插件保持 `bearer`（与宿主一致），减少环境差异；
+- 只有在明确要求 API Key 的网关环境下，才启用 `PX_GATEWAY_AUTH_SCHEME=apikey` 并配置 `PX_GATEWAY_API_KEY`；
+- 不要同时混用多套来源，优先保证一套凭证可追踪（推荐优先 `PX_PLUGIN_TOOL_TOKEN`/`PX_TOOL_TOKEN`）。
 
 ## 2. 前提条件
 
@@ -63,7 +139,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 | --- | --- |
 | Manifest | `skeleton/plugin.yaml` 中声明 `capabilities.required`（需要调用的 `source=corex` 能力）与 `capabilities.provides`（插件自身提供的能力）。提交前运行 `node scripts/capabilities/validate-capabilities.mjs --manifest ./skeleton/plugin.yaml`。 |
 | 底座能力参考 | 查阅 PowerX 底座文档 `PowerX/docs/guides/develop/open_capability`，了解 Media/Event/Workflow/Knowledge 模块的 `capability_id`、REST/gRPC 协议、示例命令。 |
-| 凭证 | 宿主：平台在部署时注入 `PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_TENANT_UUID`。Skeleton：执行 `px-plugin login --manifest ./skeleton/plugin.yaml`（待 CLI 提供），或手动写入 `skeleton/.env.local`。 |
+| 凭证 | 宿主：平台在部署时注入 `PX_GATEWAY_BASE_URL` 与可用凭证（`PX_PLUGIN_TOOL_TOKEN` 或 `PX_GATEWAY_API_KEY`，租户由底座按凭证解析）。Skeleton：执行 `px-plugin login --manifest ./skeleton/plugin.yaml`（待 CLI 提供），或手动写入 `skeleton/.env.local`。 |
 | CLI & 工具 | `scripts/capabilities/run-from-package.mjs`（手动触发能力调用）、`px-plugin capabilities quota --manifest ...`（为租户配置配额/限流样例）。 |
 
 ## 3. 宿主（Delegated）模式
@@ -85,8 +161,8 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 ## 4. Skeleton（Standalone）模式
 
 1. **环境准备**：
-   - `px-plugin login --manifest ./skeleton/plugin.yaml`（或根据 Plan 中的 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN/PX_TENANT_UUID`）。
-   - `skeleton/backend/go-gin/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN/PX_TENANT_UUID`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
+   - `px-plugin login --manifest ./skeleton/plugin.yaml`（或根据 Plan 中的 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`）。
+   - `skeleton/backend/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
    - 如果设置了 `PX_TOOL_REFRESH_TOKEN`，Skeleton 在启动时会在 Token 过期或 24h 内到期时自动调用 `POST /admin/user/auth/refresh` 刷新 `PX_TOOL_TOKEN`，刷新结果会写回进程环境（仍需你手动同步到 `.env.local` 保证下次启动可用）。
    - 可选：`PX_USE_MOCK=<module>` 用于 Dev Gateway 不可达时的 Mock。
 2. **后端配置**：
@@ -131,24 +207,23 @@ Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“�
 
 1. 启动 `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt`，使用 Root 账户登录后点击“开放能力调试”。
 2. 在“调用配置”卡片填写 `capabilityId`、`action` 和 JSON `payload`。选择 REST Action 后，Payload 区域会展示模板（含 `method`、`endpoint`、`headers`、`query`、`body`），并允许你一键插入；gRPC/Other Action 会提示协议类型与必填字段。可选参数包括：
-   - **自定义 Tenant UUID**：写入 `X-PowerX-Tenant`，用于跨租户复现问题。
    - **Mock 模块**：在输入框填写模块名（如 `media`），页面会透传 `X-PX-Use-Mock: <module>` 到后端/Gateway；响应 `warnings` 中会标记“通过 X-PX-Use-Mock 请求 Mock 模块”，方便确认 Mock 是否生效。
    - **Request ID / API Base**：用于调试自定义 `X-Request-ID` 或手动切换代理地址。
 3. “请求预览”实时展示最终 URL、Headers、Body，可一键复制到 curl / `.http` 文件。
 4. 调用完成后，“调用结果”显示状态、TraceId、耗时与 JSON 响应；若契约版本过期、Mock 被启用或 Gateway 返回提示，都会出现在 `warnings` 中。“最近记录”会缓存最近 5 条请求，便于回放。
 5. Gateway 不可达时，可在页面中指定 Mock 模块，或结合 `.env.local` 中的 `PX_USE_MOCK`，以验证前后端封装是否正常。
 
-> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理，headers 仅包含 `X-PowerX-Tenant` / `X-PX-Use-Mock` / `X-Request-ID` 等调试信息。
+> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理；调试头主要包含 `X-PX-Use-Mock` / `X-Request-ID`，`tenant_uuid` 不作为该页面固定输入项。
 
 ## 7. 常见问题 & 排障
 
 | 问题 | 原因/排查 |
 | --- | --- |
 | `gateway: base URL is required` | 未注入 `PX_GATEWAY_BASE_URL`；检查宿主部署或 Skeleton `.env.local`。 |
-| `Authorization` 相关 401 | Tool Token 过期或未写入 `PX_PLUGIN_TOOL_TOKEN/PX_TOOL_TOKEN`；重新登录或刷新。 |
+| `Authorization` 相关 401 | 凭证缺失/过期，或 `PX_GATEWAY_AUTH_SCHEME` 与凭证不匹配；检查 `PX_PLUGIN_TOOL_TOKEN/PX_TOOL_TOKEN/PX_GATEWAY_API_KEY`。 |
 | `mock is not defined`（`run-from-package`） | 当前 CLI Bug，临时改用 `node scripts/capabilities/validate-capabilities.mjs` + Go 测试。 |
 | 契约版本警告 | `dist/capability-contracts.json` 与 `PX_GATEWAY_CONTRACT_VERSION` 不一致。运行 `npm --prefix scripts/capabilities run digest` 更新摘要并检查 `docs/plan/009...` 的契约升级流程。 |
 
 ---
 
-通过上述手册，开发者可在宿主与 Skeleton 两种模式下快速配置凭证、调用 PowerX 能力、调试 Mock/实链路，并结合 PowerX 底座文档验证接口定义。后续若 CLI 增加 `capabilities plan/login` 等命令，可在本文对应章节补充示例。*** End Patch
+通过上述手册，开发者可在宿主与 Skeleton 两种模式下快速配置凭证、调用 PowerX 能力、调试 Mock/实链路，并结合 PowerX 底座文档验证接口定义。后续若 CLI 增加 `capabilities plan/login` 等命令，可在本文对应章节补充示例。

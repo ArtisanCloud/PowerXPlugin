@@ -5,7 +5,7 @@
    - 运行 `px-plugin capabilities plan --manifest ./skeleton/plugin.yaml`，确保 Registry 中存在并已授权。
 
 2. **获取或刷新工具凭证**
-   - 宿主模式：运维在部署时注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`。
+   - 宿主模式：运维在部署时注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`（租户由 token `tid` 推导）。
    - Skeleton 模式：执行 `px-plugin login --manifest ./skeleton/plugin.yaml`，并将生成的 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN` 写入 `skeleton/.env.local`。
 
 3. **初始化 Gateway Client**

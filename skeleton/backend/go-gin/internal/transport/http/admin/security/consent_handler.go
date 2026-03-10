@@ -8,6 +8,7 @@ import (
 	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	adminsec "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/security"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,6 +26,9 @@ func NewConsentHandler(deps *app.Deps, audit *secobs.AuditWriter) *ConsentHandle
 func (h *ConsentHandler) ListConsentTokens(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
 	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
+	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
@@ -39,6 +43,9 @@ func (h *ConsentHandler) ListConsentTokens(c *gin.Context) {
 
 func (h *ConsentHandler) RevokeConsentToken(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
@@ -66,6 +73,9 @@ func (h *ConsentHandler) RevokeConsentToken(c *gin.Context) {
 
 func (h *ConsentHandler) ListLifecycleEvents(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return

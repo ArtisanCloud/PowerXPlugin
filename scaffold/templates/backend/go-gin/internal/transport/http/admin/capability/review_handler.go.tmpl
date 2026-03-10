@@ -3,9 +3,9 @@ package capability
 import (
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	reviewsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/capability_review"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/contracts"
+	reviewsvc "{{ .BackendModulePath }}/internal/services/capability_review"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
 

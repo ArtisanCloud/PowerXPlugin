@@ -1,8 +1,59 @@
 from dataclasses import dataclass, field
 import os
+from pathlib import Path
 from typing import Any, Tuple
 
 import yaml
+
+
+def _load_env_files() -> None:
+    candidates: list[Path] = []
+    cwd = Path.cwd()
+    for parent in [cwd, *cwd.parents][:6]:
+        candidates.append(parent / ".env")
+        candidates.append(parent / ".env.local")
+        candidates.append(parent / "skeleton" / "backend" / ".env")
+        candidates.append(parent / "skeleton" / "backend" / ".env.local")
+    seen: set[str] = set()
+    initial = {k for k, _ in os.environ.items()}
+    for path in candidates:
+        key = str(path.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        _load_env_file(path, initial, path.name.endswith(".env.local"))
+
+
+def _load_env_file(path: Path, initial: set[str], allow_override: bool) -> None:
+    if not path.exists():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        if key in initial:
+            continue
+        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+            value = value[1:-1]
+        if not allow_override and key in os.environ:
+            continue
+        os.environ[key] = value
+
+
+_load_env_files()
 
 
 @dataclass(frozen=True)
@@ -26,6 +77,11 @@ class Settings:
     grpc_upstream_sts_audience: str = ""
     grpc_upstream_sts_scope: str = ""
     sts_endpoint: str = ""
+    gateway_base_url: str = ""
+    gateway_api_prefix: str = "/api/v1"
+    ws_bus_provider: str = "memory"
+    ws_bus_redis_url: str = ""
+    ws_bus_channel: str = "powerx.wsbus"
 
 
 def _resolve_config_candidates() -> list[str]:
@@ -159,6 +215,28 @@ def get_settings() -> Settings:
     grpc_sts_audience = grpc_cfg.get("sts_audience") if isinstance(grpc_cfg, dict) else ""
     grpc_sts_scope = grpc_cfg.get("sts_scope") if isinstance(grpc_cfg, dict) else ""
     sts_endpoint = os.getenv("POWERX_STS_ENDPOINT", "").strip()
+    gateway_cfg = cfg.get("gateway") or {}
+    gateway_base_url = gateway_cfg.get("base_url") if isinstance(gateway_cfg, dict) else ""
+    gateway_api_prefix = gateway_cfg.get("api_prefix") if isinstance(gateway_cfg, dict) else ""
+    ws_cfg = cfg.get("ws_bus") or {}
+    ws_provider = ws_cfg.get("provider") if isinstance(ws_cfg, dict) else ""
+    ws_redis_url = ws_cfg.get("redis_url") if isinstance(ws_cfg, dict) else ""
+    ws_channel = ws_cfg.get("channel") if isinstance(ws_cfg, dict) else ""
+    env_gateway_base = os.getenv("PX_GATEWAY_BASE_URL", "").strip()
+    if env_gateway_base:
+        gateway_base_url = env_gateway_base
+    env_gateway_api_prefix = os.getenv("PX_GATEWAY_API_PREFIX", "").strip()
+    if env_gateway_api_prefix:
+        gateway_api_prefix = env_gateway_api_prefix
+    env_ws_provider = os.getenv("PX_WS_BUS_PROVIDER", "").strip()
+    if env_ws_provider:
+        ws_provider = env_ws_provider
+    env_ws_redis = os.getenv("PX_WS_BUS_REDIS_URL", "").strip()
+    if env_ws_redis:
+        ws_redis_url = env_ws_redis
+    env_ws_channel = os.getenv("PX_WS_BUS_CHANNEL", "").strip()
+    if env_ws_channel:
+        ws_channel = env_ws_channel
     env_db = os.getenv("POWERX_DB_URL") or os.getenv("DATABASE_URL")
     if env_db:
         database_url = _normalize_postgres_dsn(env_db)
@@ -182,4 +260,18 @@ def get_settings() -> Settings:
         grpc_upstream_sts_audience=grpc_sts_audience or "",
         grpc_upstream_sts_scope=grpc_sts_scope or "",
         sts_endpoint=sts_endpoint or "",
+        gateway_base_url=gateway_base_url or "",
+        gateway_api_prefix=_normalize_api_prefix(gateway_api_prefix),
+        ws_bus_provider=(ws_provider or "memory").strip().lower(),
+        ws_bus_redis_url=ws_redis_url or "",
+        ws_bus_channel=ws_channel or "powerx.wsbus",
     )
+
+
+def _normalize_api_prefix(value: str | None) -> str:
+    prefix = (value or "").strip()
+    if not prefix:
+        return "/api/v1"
+    if not prefix.startswith("/"):
+        prefix = f"/{prefix}"
+    return prefix.rstrip("/") or "/"

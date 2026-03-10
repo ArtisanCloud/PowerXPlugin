@@ -6,6 +6,7 @@ from app.contracts.response import (
     fail,
     ok,
 )
+from app.middleware.tenant_context import resolve_tenant_uuid
 from app.services.privacy_service import PrivacyService
 
 router = APIRouter(prefix="/admin")
@@ -37,13 +38,20 @@ def _require_auth(request: Request):
     return None
 
 
+def _resolve_tenant_uuid(request: Request) -> str:
+    candidate = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    if candidate:
+        return str(candidate).strip()
+    return str(resolve_tenant_uuid(request) or "").strip()
+
+
 @router.get("/privacy/consent-tokens")
 async def list_consent_tokens(request: Request):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
     items = service.list_consent_tokens(tenant_uuid)
@@ -56,7 +64,7 @@ async def list_lifecycle_events(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
     items = service.list_lifecycle_events(tenant_uuid)

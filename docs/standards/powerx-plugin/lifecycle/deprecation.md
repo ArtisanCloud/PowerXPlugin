@@ -27,7 +27,7 @@ Populate these fields before packaging：
 lifecycle:
   status: deprecated   # active | deprecated | sunset
   effective_date: "2025-12-01"  # ISO 8601 date when status takes effect
-  replacement: "com.powerx.plugin.crm.v2"  # 可选，推荐替代插件
+  replacement: "com.powerx.plugins.crm.v2"  # 可选，推荐替代插件
   sunset_at: "2026-03-01"  # 可选，进入 Sunset 的计划日期
   notes: "v2 提供 LTS 支持，请提前迁移"
 ```

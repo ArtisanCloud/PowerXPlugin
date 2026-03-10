@@ -78,8 +78,10 @@ func seedAuditEvent(t *testing.T, repo *consolerepo.AuditRepository, evt model.A
 
 func TestAuditHandler_ListEvents(t *testing.T) {
 	handler, repo, _ := setupAuditHandler(t)
+	tenantID := "00000000-0000-0000-0000-000000000001"
 	seedAuditEvent(t, repo, model.AuditEvent{
 		PluginID:       app.PluginID,
+		TenantUuid:     &tenantID,
 		ActorID:        "user:1",
 		ActorName:      stringPtr("Alice"),
 		PermissionCode: "operations.plugin.admin",
@@ -91,7 +93,7 @@ func TestAuditHandler_ListEvents(t *testing.T) {
 	})
 
 	r := gin.New()
-	req := httptest.NewRequest(http.MethodGet, "/audit/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/audit/events?tenant_uuid="+tenantID, nil)
 	resp := httptest.NewRecorder()
 	ctx := gin.CreateTestContextOnly(resp, r)
 	ctx.Request = req
@@ -104,8 +106,10 @@ func TestAuditHandler_ListEvents(t *testing.T) {
 
 func TestAuditHandler_ExportEvents(t *testing.T) {
 	handler, repo, _ := setupAuditHandler(t)
+	tenantID := "00000000-0000-0000-0000-000000000001"
 	seedAuditEvent(t, repo, model.AuditEvent{
 		PluginID:       app.PluginID,
+		TenantUuid:     &tenantID,
 		ActorID:        "user:2",
 		PermissionCode: "operations.plugin.admin",
 		Action:         "config.section.update",
@@ -114,7 +118,7 @@ func TestAuditHandler_ExportEvents(t *testing.T) {
 	})
 
 	r := gin.New()
-	req := httptest.NewRequest(http.MethodGet, "/audit/export?format=json", nil)
+	req := httptest.NewRequest(http.MethodGet, "/audit/export?format=json&tenant_uuid="+tenantID, nil)
 	resp := httptest.NewRecorder()
 	ctx := gin.CreateTestContextOnly(resp, r)
 	ctx.Request = req

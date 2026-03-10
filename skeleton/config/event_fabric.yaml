@@ -1,0 +1,22 @@
+version: v1
+topics:
+  - topic: _topic.template.update
+    description: 模板状态更新事件
+    acl:
+      - actions: [publish, subscribe]
+  - topic: _topic.audit.template.updated
+    description: 模板审计更新事件
+    acl:
+      - actions: [publish]
+  - topic: _topic.template.validate.completed
+    description: 模板校验完成事件
+    acl:
+      - actions: [publish]
+  - topic: _topic.template.batch_clone.completed
+    description: 模板批量克隆完成事件
+    acl:
+      - actions: [publish]
+  - topic: _topic.template.update.completed
+    description: 模板更新完成事件
+    acl:
+      - actions: [publish]

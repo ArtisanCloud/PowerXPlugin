@@ -1,12 +1,16 @@
 # Skeleton 插件示例配置
 # 将本文件复制为 backend/etc/config.yaml 即可覆盖默认配置。
 #
+# 完整配置字段说明：
+#   docs/guides/config-reference.md
+# 约定：
+#   运行时能力统一写在 runtime.*（event_bridge/ws_bus/runtime_ops/monitoring/logging/integration/cache）
+#   历史顶层字段仍兼容读取，但不建议继续新增。
+#
 # Auth / IAM / 运行模式环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
 #   POWERX_PROXY                - 设为 1 时表示运行在宿主 iframe/代理下（Delegated 模式）
-#   POWERX_RBAC_DELEGATE        - true/1/on 时强制委托宿主 IAM（即使 POWERX_PROXY=0），只读本地数据
 #   POWERX_CORE_ENDPOINT        - Delegated 模式访问宿主 Core API 的基址（默认 http://localhost:8077）
 #   POWERX_AUTH_TOKEN           - 插件向宿主 Core 鉴权用的服务 Token
-#   POWERX_AUTH_OPTIONAL        - 调试专用，true 时允许未携带 Token 的请求（仅限本地）
 #   PLUGIN_IAM_TENANT_KEY/NAME  - Standalone 模式默认租户唯一键与显示名
 #   PLUGIN_IAM_ADMIN_EMAIL      - Standalone 模式默认管理员邮箱（用于 migrate/seed）
 #   PLUGIN_IAM_ADMIN_PASSWORD   - Standalone 模式默认管理员密码（用于 migrate/seed）
@@ -16,8 +20,6 @@
 server:
   bind_addr: ":8078"
   api_prefix: "/api/v1"
-  log_level: "debug"
-  dev_mode: true
 
 # gRPC 上游（可选，默认关闭）
 grpc_upstream:
@@ -28,12 +30,18 @@ grpc_upstream:
   optional: true
 
 gateway:
-  # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN / PX_TENANT_UUID。
-  # 若留空则默认关闭 Gateway 调用，`PX_USE_MOCK` 可指定 media,eventfabric 等模块名称以启用内存 Mock。
-  # 注意：只要 base_url/tool_token/tenant_uuid 任一不为空，就会触发 Gateway 配置校验（必须三者齐全）。
-  # 因此默认将 base_url 与 tenant_uuid 留空，避免在未登录/未配置 Token 时阻塞本地启动。
-  base_url: ""
+  # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN。
+  # 默认指向本机 PowerX Core（8077）；可由 .env.local 的 PX_GATEWAY_BASE_URL 覆盖。
+  # 未配置有效凭证时可通过 `PX_USE_MOCK` 指定 media,eventfabric 等模块名称启用内存 Mock。
+  # 凭证分流：
+  # - auth_scheme=bearer（Host/宿主模式）使用 tool_token
+  # - auth_scheme=apikey（Standalone+Proxy）使用 api_key
+  # tenant_uuid 仅用于 Bearer 本地兼容场景，proxy 场景由宿主按凭证解析租户。
+  base_url: "http://127.0.0.1:8077"
+  api_prefix: "/api/v1"
+  auth_scheme: "apikey" # bearer | apikey
   tool_token: ""
+  api_key: ""
   refresh_token: ""
   tenant_uuid: ""
   timeout: "10s"
@@ -65,26 +73,92 @@ database:
 
 runtime:
   run_migrate: false
-
-runtime_ops:
-  heartbeat_seconds: 15
-  heartbeat_misses: 3
-  quota_window_minutes: 5
-  restart_backoff_start_seconds: 5
-  restart_backoff_max_seconds: 120
-  log_retention_days: 7
-  cpu_default: "500m"
-  memory_default: "512Mi"
-  network_profile: "standard"
-  observability:
-    loki_endpoint: ""
-    tempo_endpoint: ""
-  alerts:
-    health_failure_rate: 0.5
-    p95_latency_ms: 500
-    error_rate: 0.05
-    quota_usage: 0.9
-    billing_anomaly: 0.2
+  event_bridge:
+    enabled: true
+    mode: "taskbus" # local | taskbus | dual
+    fallback_to_local: true
+    local_queue_size: 1024
+    taskbus_provider: "redis" # standalone 推荐 redis；宿主模式改为 host
+    redis_url: "redis://localhost:6379"
+    redis_stream: "powerx.taskbus.events"
+    redis_group: "powerx.plugin"
+    redis_consumer: ""
+    redis_max_len: 10000
+    source_plugin: "com.powerx.plugins.base"
+    payload_version: "v1"
+  ws_bus:
+    provider: "redis" # memory | redis
+    redis_url: "redis://localhost:6379"
+    channel: "powerx.wsbus"
+  runtime_ops:
+    heartbeat_seconds: 15
+    heartbeat_misses: 3
+    quota_window_minutes: 5
+    restart_backoff_start_seconds: 5
+    restart_backoff_max_seconds: 120
+    log_retention_days: 7
+    cpu_default: "500m"
+    memory_default: "512Mi"
+    network_profile: "standard"
+    observability:
+      loki_endpoint: ""
+      tempo_endpoint: ""
+    alerts:
+      health_failure_rate: 0.5
+      p95_latency_ms: 500
+      error_rate: 0.05
+      quota_usage: 0.9
+      billing_anomaly: 0.2
+  monitoring:
+    metrics:
+      enabled: true
+      path: "/api/v1/admin/runtime/metrics"
+    health_check:
+      enabled: true
+      path: "/healthz"
+  logging:
+    level: "debug"
+    format: "text"
+    output: "stdout"
+    debug_mode: true
+  integration:
+    idempotency:
+      provider: redis
+      redis_url: "redis://localhost:6379"
+      ttl_hours: 24
+    envelope:
+      payload_threshold_bytes: 1048576
+    webhook:
+      retry_policy: [60, 300, 900]
+      dlq_topic: "plugin.webhook.dlq"
+    secrets:
+      rotation_days_default: 30
+    billing:
+      tax_provider: stripe_tax
+      stripe_tax:
+        api_key: "sk_test_xxx"
+        user_id: ""
+        location: "US"
+        api_base_url: "https://api.stripe.com"
+        webhook_secret: ""
+        timeout_seconds: 15
+      avalara:
+        user_id: ""
+        license_key: ""
+        company_code: ""
+        environment: "sandbox"
+        base_url: "https://sandbox-rest.avatax.com"
+        client_id: ""
+        client_secret: ""
+        timeout_seconds: 15
+      reconciliation:
+        vendor_share: 0.8
+        platform_share: 0.15
+        fee_share: 0.05
+        currency: "USD"
+      async_queue: "marketplace.billing.async"
+      http_timeout_seconds: 15
+      retry_backoff_seconds: [5, 30, 120]
 
 context:
   hmac_secret: "dev-hmac-secret"
@@ -113,58 +187,6 @@ customer_auth:
   jwt_audience: "" # local 模式可选：覆盖 audience
   jwt_secret: ""   # local 模式必填（生产环境），开发可通过 env 注入
   cache_ttl_seconds: 0 # 0=禁用；delegate 模式缓存 TTL 不得超过 token exp
-
-monitoring:
-  metrics:
-    enabled: true
-    path: "/api/v1/admin/runtime/metrics"
-  health_check:
-    enabled: true
-    path: "/healthz"
-
-logging:
-  level: "debug"
-  format: "text"
-  output: "stdout"
-
-integration:
-  idempotency:
-    provider: redis
-    redis_url: "redis://localhost:6379"
-    ttl_hours: 24
-  envelope:
-    payload_threshold_bytes: 1048576
-  webhook:
-    retry_policy: [60, 300, 900]
-    dlq_topic: "plugin.webhook.dlq"
-  secrets:
-    rotation_days_default: 30
-  billing:
-    tax_provider: stripe_tax
-    stripe_tax:
-      api_key: "sk_test_xxx"
-      user_id: ""
-      location: "US"
-      api_base_url: "https://api.stripe.com"
-      webhook_secret: ""
-      timeout_seconds: 15
-    avalara:
-      user_id: ""
-      license_key: ""
-      company_code: ""
-      environment: "sandbox"
-      base_url: "https://sandbox-rest.avatax.com"
-      client_id: ""
-      client_secret: ""
-      timeout_seconds: 15
-    reconciliation:
-      vendor_share: 0.8
-      platform_share: 0.15
-      fee_share: 0.05
-      currency: "USD"
-    async_queue: "marketplace.billing.async"
-    http_timeout_seconds: 15
-    retry_backoff_seconds: [5, 30, 120]
 
 marketplace:
   checklist:

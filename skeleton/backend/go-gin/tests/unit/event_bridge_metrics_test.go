@@ -12,8 +12,8 @@ import (
 
 	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 func TestEventBridge_Emitter_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
@@ -33,7 +33,7 @@ func TestEventBridge_Emitter_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	ev := event.Event{
-		Topic:   "powerx.channel.master.credential_inspection.v1",
+		Topic:   "_topic.template.update",
 		Meta:    meta,
 		Payload: json.RawMessage(`{"channel_id":"c1","credential_type":"api_key","status":"ok"}`),
 	}
@@ -47,9 +47,9 @@ func TestEventBridge_Emitter_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
 	ebmetrics.RenderPrometheus(&buf)
 	body := buf.String()
 
-	require.Contains(t, body, "plugin_event_bridge_emit_total{plugin_id=\"com.powerx.plugins.base\",result=\"success\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"} 1")
-	require.Contains(t, body, "plugin_event_bridge_emit_total{plugin_id=\"com.powerx.plugins.base\",result=\"error\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"} 1")
-	require.True(t, strings.Contains(body, "plugin_event_bridge_latency_ms{op=\"emit\",plugin_id=\"com.powerx.plugins.base\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"}"))
+	require.Contains(t, body, "plugin_event_bridge_emit_total{plugin_id=\"com.powerx.plugins.base\",result=\"success\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"_topic.template.update\"} 1")
+	require.Contains(t, body, "plugin_event_bridge_emit_total{plugin_id=\"com.powerx.plugins.base\",result=\"error\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"_topic.template.update\"} 1")
+	require.True(t, strings.Contains(body, "plugin_event_bridge_latency_ms{op=\"emit\",plugin_id=\"com.powerx.plugins.base\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"_topic.template.update\"}"))
 }
 
 func TestEventBridge_Dispatcher_RecordsMetricsOnSuccessAndFailure(t *testing.T) {
@@ -57,7 +57,7 @@ func TestEventBridge_Dispatcher_RecordsMetricsOnSuccessAndFailure(t *testing.T) 
 
 	dispatcher := fweventbridge.NewDispatcher(nil).WithMetrics(bridgeRecorder{})
 
-	topic := event.Topic("powerx.channel.master.credential_inspection.v1")
+	topic := event.Topic("_topic.template.update")
 	dispatcher.Register(topic, func(ctx context.Context, ev event.Event) error { return nil })
 	dispatcher.Register(topic, func(ctx context.Context, ev event.Event) error { return errors.New("boom") })
 
@@ -92,9 +92,9 @@ func TestEventBridge_Dispatcher_RecordsMetricsOnSuccessAndFailure(t *testing.T) 
 	ebmetrics.RenderPrometheus(&buf)
 	body := buf.String()
 
-	require.Contains(t, body, "plugin_event_bridge_consume_total{plugin_id=\"com.powerx.plugins.base\",result=\"error\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"} 1")
-	require.Contains(t, body, "plugin_event_bridge_consume_total{plugin_id=\"com.powerx.plugins.base\",result=\"success\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"} 1")
-	require.True(t, strings.Contains(body, "plugin_event_bridge_latency_ms{op=\"consume\",plugin_id=\"com.powerx.plugins.base\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"powerx.channel.master.credential_inspection.v1\"}"))
+	require.Contains(t, body, "plugin_event_bridge_consume_total{plugin_id=\"com.powerx.plugins.base\",result=\"error\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"_topic.template.update\"} 1")
+	require.Contains(t, body, "plugin_event_bridge_consume_total{plugin_id=\"com.powerx.plugins.base\",result=\"success\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"_topic.template.update\"} 1")
+	require.True(t, strings.Contains(body, "plugin_event_bridge_latency_ms{op=\"consume\",plugin_id=\"com.powerx.plugins.base\",tenant_uuid=\"00000000-0000-0000-0000-000000000001\",topic=\"_topic.template.update\"}"))
 }
 
 type bridgeRecorder struct{}
@@ -105,6 +105,10 @@ func (bridgeRecorder) RecordEmit(pluginID, tenantUUID, topic, result string) {
 
 func (bridgeRecorder) RecordConsume(pluginID, tenantUUID, topic, result string) {
 	ebmetrics.RecordConsume(pluginID, tenantUUID, topic, result)
+}
+
+func (bridgeRecorder) RecordDrop(pluginID, tenantUUID, topic, reason string) {
+	ebmetrics.RecordDrop(pluginID, tenantUUID, topic, reason)
 }
 
 func (bridgeRecorder) ObserveLatencyMs(pluginID, tenantUUID, topic, op string, ms float64) {

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"{{ .BackendModulePath }}/internal/config"
+	"{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
@@ -121,6 +121,11 @@ func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		if err := setDefaultSchema(cfg.Schema); err != nil {
 			return nil, fmt.Errorf("failed to set default schema: %w", err)
 		}
+		// 启动时输出当前数据库/Schema，便于排查连接错位
+		var dbName, schemaName string
+		_ = db.Raw("select current_database()").Scan(&dbName).Error
+		_ = db.Raw("select current_schema()").Scan(&schemaName).Error
+		logger.Infof("Database context resolved. database=%s schema=%s", dbName, schemaName)
 	}
 
 	logger.Infof("Database connected. schema=%s pool{idle=%d open=%d}", cfg.Schema, cfg.MaxIdleConns, cfg.MaxOpenConns)

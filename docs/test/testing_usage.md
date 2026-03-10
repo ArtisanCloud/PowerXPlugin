@@ -46,7 +46,7 @@ Version 1.56.1
 
 ```bash
 # 仓库根目录
-go test ./framework/backend/go/bootstrap/... -v
+cd framework/backend/go && go test ./bootstrap/... -v
 go test ./skeleton/backend/go-gin/internal/routes/... -v
 python3 -m json.tool docs/contracts/manifest.json > /dev/null
 python3 -m json.tool docs/contracts/rbac.json > /dev/null
@@ -70,7 +70,8 @@ make BACKEND=fastapi test-smoke # FastAPI 后端 smoke 校验
 ### 4.1 后端测试
 
 ```bash
-go test ./framework/... ./skeleton/backend/go-gin/... -v -coverprofile=coverage.out
+cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out
+go test ./skeleton/backend/go-gin/... -v -coverprofile=coverage.out
 go tool cover -func=coverage.out
 ```
 
@@ -171,7 +172,7 @@ rm -rf "$TMP_DIR"
 
 | 场景 | 命令 | 说明 |
 |------|------|------|
-| 后端快速回归 | `go test ./framework/... ./skeleton/backend/go-gin/...` | 含单元与集成测试 |
+| 后端快速回归 | `cd framework/backend/go && go test ./...; go test ./skeleton/backend/go-gin/...` | 含单元与集成测试 |
 | Playwright 单用例 | `npx playwright test tests/e2e/starter.spec.ts` | 需先设定 `PLAYWRIGHT_BASE_URL` |
 | 契约变更验证 | 参考 4.3 | 修改 `docs/contracts/**` 后必跑 |
 | CLI 模块改动 | 参考 4.4 | 确保 `px-plugin init` 无回归 |
@@ -242,7 +243,7 @@ rm -rf "$TMP_DIR"
 3. 运行指定包测试：
 
    ```bash
-   go test ./framework/backend/go/router -v
+   cd framework/backend/go && go test ./router -v
    ```
 
 ### 6.2 后端特性级（feature）回归

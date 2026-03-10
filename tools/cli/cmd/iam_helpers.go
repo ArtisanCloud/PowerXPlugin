@@ -194,9 +194,6 @@ func maskDSN(dsn string) string {
 }
 
 func detectDelegatedMode(cfg *iamConfig) string {
-	if truthy(os.Getenv("POWERX_RBAC_DELEGATE")) {
-		return "POWERX_RBAC_DELEGATE"
-	}
 	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
 		return "POWERX_PROXY"
 	}
@@ -204,13 +201,4 @@ func detectDelegatedMode(cfg *iamConfig) string {
 		return "context.iam_mode"
 	}
 	return ""
-}
-
-func truthy(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
 }

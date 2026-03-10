@@ -6,6 +6,7 @@ from app.contracts.response import (
     fail,
     ok,
 )
+from app.middleware.tenant_context import resolve_tenant_uuid
 from app.services.iam_service import IAMService
 
 router = APIRouter(prefix="/admin")
@@ -35,6 +36,17 @@ def _require_auth(request: Request):
             status_code=401,
         )
     return None
+
+
+def _resolve_tenant_uuid(request: Request, payload: dict | None = None) -> str:
+    if payload:
+        candidate = payload.get("tenant_uuid") or payload.get("tenantUuid")
+        if candidate:
+            return str(candidate).strip()
+    candidate = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    if candidate:
+        return str(candidate).strip()
+    return str(resolve_tenant_uuid(request) or "").strip()
 
 
 def _page(value: str | None) -> int:
@@ -114,7 +126,7 @@ async def list_roles(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -122,7 +134,9 @@ async def list_roles(request: Request):
             request_id=request_id,
             status_code=400,
         )
-    result = service.list_roles(dict(request.query_params))
+    params = dict(request.query_params)
+    params["tenant_uuid"] = tenant_uuid
+    result = service.list_roles(params)
     return ok({"items": result.get("items", [])}, request_id=request_id)
 
 
@@ -141,7 +155,7 @@ async def create_role(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = (payload or {}).get("tenant_uuid") or (payload or {}).get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
     if not tenant_uuid or not (payload or {}).get("code") or not (payload or {}).get("name"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -149,6 +163,8 @@ async def create_role(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     return ok(service.create_role(payload), request_id=request_id, status_code=201)
 
 
@@ -184,7 +200,7 @@ async def update_role_permissions(request: Request, role_id: str, payload: dict)
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = (payload or {}).get("tenant_uuid") or (payload or {}).get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
     if not tenant_uuid or not (payload or {}).get("permission_ids"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -192,6 +208,8 @@ async def update_role_permissions(request: Request, role_id: str, payload: dict)
             request_id=request_id,
             status_code=400,
         )
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     return ok(
         service.update_role_permissions(role_id, payload.get("permission_ids"), tenant_uuid),
         request_id=request_id,
@@ -204,7 +222,7 @@ async def add_role_members(request: Request, role_id: str, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = (payload or {}).get("tenant_uuid") or (payload or {}).get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
     if not tenant_uuid or not (payload or {}).get("member_ids"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -212,6 +230,8 @@ async def add_role_members(request: Request, role_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     return ok(
         service.add_role_members(role_id, payload.get("member_ids"), tenant_uuid),
         message="added",
@@ -225,7 +245,7 @@ async def remove_role_members(request: Request, role_id: str, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = (payload or {}).get("tenant_uuid") or (payload or {}).get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
     if not tenant_uuid or not (payload or {}).get("member_ids"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -233,6 +253,8 @@ async def remove_role_members(request: Request, role_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     return ok(
         service.remove_role_members(role_id, payload.get("member_ids"), tenant_uuid),
         message="removed",
@@ -255,7 +277,12 @@ async def list_audit_logs(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok(service.list_audit_logs(dict(request.query_params)), request_id=request_id)
+    tenant_uuid = _resolve_tenant_uuid(request)
+    if not tenant_uuid:
+        return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
+    params = dict(request.query_params)
+    params["tenant_uuid"] = tenant_uuid
+    return ok(service.list_audit_logs(params), request_id=request_id)
 
 
 @router.post("/iam/auth/local/sts")
@@ -273,7 +300,7 @@ async def list_departments(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -281,10 +308,9 @@ async def list_departments(request: Request):
             request_id=request_id,
             status_code=400,
         )
-    return ok(
-        service.list_departments(dict(request.query_params)),
-        request_id=request_id,
-    )
+    params = dict(request.query_params)
+    params["tenant_uuid"] = tenant_uuid
+    return ok(service.list_departments(params), request_id=request_id)
 
 
 @router.get("/iam/departments/tree")
@@ -293,7 +319,7 @@ async def list_department_tree(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -319,13 +345,16 @@ async def create_department(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    if not (payload or {}).get("tenant_uuid") or not (payload or {}).get("name"):
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    if not tenant_uuid or not (payload or {}).get("name"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
             "tenant_uuid/name 必填",
             request_id=request_id,
             status_code=400,
         )
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     return ok(service.create_department(payload), request_id=request_id, status_code=201)
 
 
@@ -360,7 +389,7 @@ async def list_members(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -370,7 +399,9 @@ async def list_members(request: Request):
         )
     page = _page(request.query_params.get("page"))
     page_size = _page_size(request.query_params.get("page_size") or request.query_params.get("pageSize"))
-    result = service.list_members(dict(request.query_params))
+    params = dict(request.query_params)
+    params["tenant_uuid"] = tenant_uuid
+    result = service.list_members(params)
     return ok({"items": result.get("items", []), "page": page, "page_size": page_size}, request_id=request_id)
 
 
@@ -380,13 +411,16 @@ async def create_member(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    if not (payload or {}).get("tenant_uuid") or not (payload or {}).get("email"):
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    if not tenant_uuid or not (payload or {}).get("email"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
             "tenant_uuid/email 必填",
             request_id=request_id,
             status_code=400,
         )
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     return ok(service.create_member(payload), request_id=request_id, status_code=201)
 
 
@@ -412,7 +446,7 @@ async def import_members(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = (payload or {}).get("tenant_uuid") or (payload or {}).get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
     users = (payload or {}).get("users") or (payload or {}).get("members")
     if not tenant_uuid or not users:
         return fail(

@@ -2,8 +2,8 @@
 
 ## Phase 0 Discovery Summary
 
-- 目标：梳理 `com.powerx.plugin.base` 中与 Templates CRUD 相关的响应结构、错误码、租户上下文约定，为 Phase 1/2 的框架与 Skeleton 实现提供基准。
-- 资料来源：`com.powerx.plugin.base/backend/internal/transport/http/admin/templates/**`、`internal/services/admin/templates/**`、`internal/entity/repository/template/**`、`plugin.yaml`、`web-admin/app/composables/api/useTemplate.ts`。
+- 目标：梳理 `com.powerx.plugins.base` 中与 Templates CRUD 相关的响应结构、错误码、租户上下文约定，为 Phase 1/2 的框架与 Skeleton 实现提供基准。
+- 资料来源：`com.powerx.plugins.base/backend/internal/transport/http/admin/templates/**`、`internal/services/admin/templates/**`、`internal/entity/repository/template/**`、`plugin.yaml`、`web-admin/app/composables/api/useTemplate.ts`。
 
 ## Response Envelope 观测
 
@@ -34,7 +34,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 ## 租户上下文与数据类型
 
-- `X-PowerX-Tenant` Header 为主要租户来源，类型为 **UUID string**。
+- `tenant_uuid` Header 为主要租户来源，类型为 **UUID string**。
 - Repository 层要求：
   - 内嵌 `repository.BaseRepository[T]`
   - 在查询/更新时追加 `tenant_uuid = ?` 条件
@@ -83,7 +83,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 - `GET /api/v1/templates/abc` → HTTP 400 + `INVALID_REQUEST`（编号解析失败）
 - `GET /api/v1/templates/1` 且非本租户 → HTTP 404 + `NOT_FOUND`
-- 缺少 `X-PowerX-Tenant` → HTTP 401 + `"tenant context missing"`
+- 缺少 `tenant_uuid` → HTTP 401 + `"tenant context missing"`
 - 未处理异常 → HTTP 500 + `INTERNAL_ERROR`
 
 > 以上示例基于 handler 与 repository 行为推导；实现阶段应在测试中复现并记录实际响应。
@@ -92,7 +92,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 - 前端页面：`intro.vue`、`templates/index.vue`、`templates/crud.vue`
 - 公共组件：`TemplateFormModal.vue`、`ConfirmDialog.vue`、`ToastAlert.vue`
-- Composable：`useTemplateApi`（主要引用 `$fetch` 和 `X-PowerX-Tenant` 逻辑）
+- Composable：`useTemplateApi`（主要引用 `$fetch` 和 `tenant_uuid` 逻辑）
 
 ## 未决事项 / 待确认
 

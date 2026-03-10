@@ -26,7 +26,7 @@ export function resolveApiBase(pathname?: string): string {
     }
   }
 
-  return "http://localhost:8078/api/v1";
+  return "http://localhost:{{ .BackendPort }}/api/v1";
 }
 
 export function getAuthToken(): string | undefined {
@@ -45,11 +45,16 @@ export function getAuthToken(): string | undefined {
     }
   }
 
-  // 兼容旧版：仍尝试从 cookie 获取 token（例如同域 iframe 场景）
+  // delegated 场景下从宿主会话 cookie 提取 JWT
   if (typeof document !== "undefined") {
-    const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
-    if (match) {
-      return decodeURIComponent(match[1]);
+    const cookieCandidates = ["px_ctx_jwt"];
+    for (const name of cookieCandidates) {
+      const match = document.cookie.match(
+        new RegExp(`(?:^|;\\s*)${name}=([^;]+)`, "i")
+      );
+      if (match) {
+        return decodeURIComponent(match[1]);
+      }
     }
   }
 

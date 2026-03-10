@@ -121,14 +121,13 @@ cp skeleton/backend/go-gin/etc/config.example.yaml skeleton/backend/go-gin/etc/c
 # 2. 初始化数据库（setup = migrate + seed）
 cd skeleton/backend/go-gin
 export POWERX_PROXY=0
-export POWERX_RBAC_DELEGATE=false
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
 export PLUGIN_IAM_ADMIN_PASSWORD='S3cret!!'
 go run ./cmd/database/main.go setup
 #    上述环境变量可选；若未设置，系统会使用 admin@local.test / S3cret!! 等默认值（仅限本地环境，生产务必覆盖）
-#    本地接口也会强制校验 Authorization。若要临时跳过，可设置 POWERX_AUTH_OPTIONAL=true（仅限调试）。
+#    本地接口默认强制校验 Authorization。
 #    如果需要单独执行，可替换为：
 #    go run ./cmd/database/main.go migrate
 #    go run ./cmd/database/main.go seed
@@ -186,24 +185,23 @@ npm run dev
 1. **前端开启宿主模式**：启动 dev server 前设置 `POWERX_PROXY=1`（或 `NUXT_PUBLIC_INSIDE_POWERX=1`）。Nuxt 会将 `app.baseURL` 与 `runtimeConfig.public.pluginAdminBase` 设为 `/_p/<plugin-id>/admin/`。为了避免本地 Dev Server 将 `_p/<plugin-id>/api` 当成静态路由，`runtimeConfig.public.apiBaseUrl` 会在开发模式下自动退回到 `/_p/<plugin-id>/api/v1`，从而始终命中 Vite 的代理。
 2. **补齐 Vite 代理（已在 `skeleton/web-admin/nuxt/nuxt.config.ts` 内置）**：配置依赖以下环境变量，便于在需要时修改目标地址：
    - `NUXT_DEV_API_PROXY`：HTTP 代理目标（默认 `http://localhost:8078`）
-   - `NUXT_DEV_WS_PROXY`：WebSocket 代理目标（默认 `ws://127.0.0.1:4000`）
+   - `NUXT_DEV_WS_PROXY`：WebSocket 代理目标（默认 `ws://127.0.0.1:8078`）
 
    对应配置代码如下，`/_p/${pluginId}/api` 的条目仅在 `POWERX_PROXY=1` 时注入：
    ```ts
-   const pluginId = 'com.powerx.plugin.base'
+   const pluginId = 'com.powerx.plugins.base'
    const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
-   const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:4000'
+   const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'
 
    const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
    const devProxy: Record<string, any> = {
-     '/api': { target: devApiProxyTarget, changeOrigin: true, ws: true },
-     '/ws': { target: devWsProxyTarget, changeOrigin: true, ws: true }
+     '/api': { target: devApiProxyTarget, changeOrigin: true, ws: true }
    }
    if (INSIDE_POWERX) {
      devProxy[`/_p/${pluginId}/api`] = { target: devApiProxyTarget, changeOrigin: true }
    }
    ```
-   如此前端直接访问 `http://localhost:3131/_p/com.powerx.plugin.base/admin/templates/crud` 时，所有 API 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
+   如此前端直接访问 `http://localhost:3131/_p/com.powerx.plugins.base/admin/templates/crud` 时，所有 API/WS 请求都会被转发到本地 8078 实例，不会 404 或触发 CORS。
    同时在宿主模式下会自动关闭 Nuxt `appManifest`，避免 `manifest-route-rule` 在 `_p` 前缀下无法匹配路由而抛错。
 3. **后端保持默认**：`POWERX_PROXY=0 go run ./cmd/plugin`，只需暴露 `/api/v1/**`。由于前端代理会把 `/_p/...` 请求映射回本地接口，后端无需额外改动。
 
@@ -214,17 +212,196 @@ npm run dev
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `POWERX_PROXY` | `0` | `1` 表示运行在宿主 iframe 下；本地 Standalone 必须为 `0`，否则“组织与权限”菜单会隐藏。 |
-| `POWERX_RBAC_DELEGATE` | `false` | 强制委托宿主 IAM；即使 `POWERX_PROXY=0` 也会禁用本地 IAM API。 |
 | `POWERX_CORE_ENDPOINT` | `http://localhost:8077` | Delegated 模式访问宿主 Core API 的地址。 |
 | `POWERX_AUTH_TOKEN` | N/A | 插件后端调用宿主 `/admin/user/auth/*` 时使用的服务 Token。 |
-| `POWERX_AUTH_OPTIONAL` | `false` | 仅限调试。设为 `true` 时可跳过后端 Token 校验，不可用于生产。 |
 | `PLUGIN_IAM_TENANT_KEY` / `NAME` | 示例值见 Quickstart | Standalone 运行时默认租户唯一键与名称。 |
 | `PLUGIN_IAM_ADMIN_EMAIL` / `PASSWORD` | `admin@local.test` / `S3cret!!` | 本地管理员初始凭据，`setup` 会读取并写入数据库。 |
 | `NUXT_PUBLIC_INSIDE_POWERX` | `0` | 前端 runtime 判定宿主模式用，`1` 时 baseURL 调整为 `/_p/<pluginId>/admin/`。 |
 | `NUXT_PUBLIC_POWERX_PROXY` | `0` | 与上类似，供前端组件/Bridge 判断当前运行模式。 |
-| `NUXT_DEV_API_PROXY` / `NUXT_DEV_WS_PROXY` | `http://localhost:8078` / `ws://127.0.0.1:4000` | Vite 代理目标，宿主模式下会额外注入 `/_p/<pluginId>/api`。 |
+| `NUXT_DEV_API_PROXY` / `NUXT_DEV_WS_PROXY` | `http://localhost:8078` / `ws://127.0.0.1:8078` | Vite 代理目标，宿主模式下会额外注入 `/_p/<pluginId>/api`。 |
 
-> ⚠️ 只有当 `POWERX_PROXY=0` **且** `POWERX_RBAC_DELEGATE` 未开启时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
+> 后端运行模式与配置加载说明：
+>
+> - **配置文件位置**：统一使用 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。Go Gin 与 FastAPI 都会自动读取该文件。
+> - **环境变量覆盖**：`.env` 会覆盖进程环境变量与 `config.yaml`，因此建议将 `POWERX_PROXY`、`IAMMode`、`PX_GATEWAY_*` 统一写在这里，避免 GoLand Run Config 里残留旧值。
+> - **宿主模式（PowerX Core）**：必须同时设置 `POWERX_PROXY=1` **且** `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`。
+>   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若未携带，再回退 `PX_TOOL_TOKEN.tid`。
+>   - 若两者都缺失 `tid`，WS Bus/Capability 调用会失败。
+>
+> **模式判定主口径（推荐）**：
+>
+> - `IAMMode` / `IAM_MODE`：项目启动模式（`local` / `delegated`）
+> - `POWERX_PROXY`：runtime 链路开关（`0` 本地驱动，`1` 底座 gateway/宿主链路）
+>
+
+**组合速查（2x2）**
+
+| IAMMode | POWERX_PROXY | 结果 | 典型场景 |
+|---|---|---|---|
+| local | 0 | standalone_local（本地 IAM + 本地链路） | 纯本地开发 |
+| delegated | 0 | standalone_mock_delegated（委派语义 + 本地链路） | standalone 模拟 delegated 联调 |
+| delegated | 1 | host_delegated（委派语义 + 宿主链路） | PowerX 宿主标准部署 |
+| local | 1 | local + proxy（保留调试态，非推荐） | 本地 IAM + 宿主链路联调 |
+
+> 说明：是否走宿主链路只由 `POWERX_PROXY` 决定；是否使用委派 IAM 只由 `IAMMode` 决定。
+
+### 1.4.3 日志与内部调试路由开关（避免混淆）
+
+为避免“运行模式/日志调试开关”混淆，建议按下面语义理解与配置：
+
+| 配置项 | 作用 | 典型用途 |
+|---|---|---|
+| `logging.http_access`（或 `POWERX_HTTP_LOG`） | 是否输出 HTTP 访问日志（每个请求一条） | 看接口请求路径/状态码/耗时 |
+| `logging.debug_mode`（或 `POWERX_DEBUG_MODE`） | 开发语义与调试细节开关 | 排查 token/tenant/模式决策、生产安全校验、默认策略切换 |
+| （固定行为）runtime internal 调试路由 | 注册 `/api/v1/admin/runtime/internal/ws-bus/*` 与 `/api/v1/admin/runtime/event-bridge/emit` | 默认开启（无开关） |
+
+说明：
+
+- `gin_mode=release` 不会自动关闭 `logging.http_access`。
+- `/runtime/internal/*` 调试路由默认可访问（受鉴权控制），与 `logging.debug_mode` 无关。
+
+### 1.4.4 WebSocket 联调步骤（本地 / 宿主）
+
+本节仅保留最小命令。完整验收、失败排查与宿主联调细节统一以 async_runtime 文档为准：
+
+- `docs/guides/async_runtime/websocket/debug_playbook.md`
+- `docs/guides/async_runtime/event_fabric/integration_playbook.md`
+
+#### A) Standalone（`local + POWERX_PROXY=0`）
+
+1. 启动插件后端（runtime 调试路由默认开启，可直接用于调试 publish）：
+
+```bash
+cd skeleton/backend/go-gin
+POWERX_PROXY=0 IAMMode=local go run ./cmd/plugin
+```
+
+2. 准备本地管理员 token（示例变量名）：
+
+```bash
+export USER_TOKEN="<your-local-jwt>"
+```
+
+3. 连接插件 WS（唯一入口）：
+
+```bash
+wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer $USER_TOKEN"
+```
+
+4. 在 wscat 内订阅 topic：
+
+```json
+{"type":"subscribe","topics":["_topic.template.update"]}
+```
+
+预期先收到 `ack`，随后触发 publish 时收到 `event`。
+
+5. 通过 runtime 调试接口发布事件：
+
+```bash
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"_topic.template.update","payload":{"id":"demo","status":"running","progress":25}}'
+```
+
+> standalone 下 `register` 为 no-op，不是订阅前置条件。
+
+#### B) 宿主联调（`local + POWERX_PROXY=1`）
+
+1. 启动插件后端（需配置 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`）：
+
+```bash
+cd skeleton/backend/go-gin
+POWERX_PROXY=1 IAMMode=local go run ./cmd/plugin
+```
+
+2. 连接 PowerX 底座 WS：
+
+```bash
+wscat -c "ws://127.0.0.1:8077/api/ws?authorization=Bearer $USER_TOKEN"
+```
+
+3. 订阅：
+
+```json
+{"type":"subscribe","topics":["_topic.template.update"]}
+```
+
+4. 调插件 runtime 接口触发 register/publish（插件会转发到底座）：
+
+```bash
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/grant" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"topics":["_topic.template.update"]}'
+
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"_topic.template.update","payload":{"id":"demo","status":"running","progress":25}}'
+```
+
+预期：底座 `wscat` 收到 `event`。
+
+### 1.4.5 WebSocket 联调失败排查速查
+
+| 现象 | 常见原因 | 快速检查 |
+|---|---|---|
+| `wscat` 连接 `404` | 路径写错（插件仅支持 `/api/ws`）或路由未加载 | 检查是否访问 `ws://127.0.0.1:8078/api/ws`；确认后端启动日志包含 WS 路由注册 |
+| 订阅后只有 `ack`，没有 `event` | `publish` 与 `subscribe` 租户不一致（`tid` 不同） | 打开 `logging.debug_mode=true`，确认日志中的 `resolved_gateway_tenant` 与 WS token `tid` 一致 |
+| `permission_denied` / `topic not allowed` | 当前 token 无该 topic 的订阅权限 | 更换具备权限的 token，或先用管理员 token 验证链路 |
+| `publish` 返回 200，但客户端无事件 | 发到了错误实例或错误模式链路（本地/宿主混用） | `POWERX_PROXY=0` 时应订阅 `8078 /api/ws`；`POWERX_PROXY=1` 时应在底座 `8077 /api/ws` 订阅 |
+| `response.Write on hijacked connection` | WS 握手被 HTTP timeout 中间件干扰 | 确认已包含“Upgrade 请求跳过 Timeout”实现（见 10 节说明） |
+
+补充建议：
+
+- 每次联调前先打印运行模式二元组：`IAMMode / POWERX_PROXY`。
+- 在宿主联调场景，优先验证 `register -> publish -> event` 的完整链路，再排查业务 topic 权限。
+
+### 1.4.6 标准联调记录模板（提单/群沟通统一格式）
+
+当出现 “连上了但收不到事件” 或 “宿主/本地结果不一致” 时，建议按下面模板提供信息，减少来回沟通：
+
+```md
+## WebSocket 联调记录
+
+- 日期：YYYY-MM-DD HH:mm（时区）
+- 环境：local / staging / prod
+- 代码分支与提交：<branch> / <commit>
+
+### 1) 运行模式
+- IAMMode: local | delegated
+- POWERX_PROXY: 0 | 1
+
+### 2) Token 与租户
+- USER_TOKEN.tid: <uuid>
+- PX_TOOL_TOKEN.tid: <uuid or empty>
+- publish 请求体 tenant_uuid: <value or empty>
+
+### 3) 连接与操作
+- WS URL: ws://127.0.0.1:8078/api/ws 或 ws://127.0.0.1:8077/api/ws
+- subscribe payload: {"type":"subscribe","topics":["_topic.template.update"]}
+- register 请求（如有）: <curl or screenshot>
+- publish 请求: <curl or screenshot>
+
+### 4) 实际结果
+- subscribe 回包: ack / error（贴原文）
+- 是否收到 event: yes / no（贴原文）
+- HTTP 返回码: register=<code>, publish=<code>
+
+### 5) 关键日志片段
+- 插件日志：`WS bus gateway auth resolved` + `HTTP request completed`
+- 底座日志（宿主模式）：`[ws-bus] register` / `[ws-bus] publish`
+- 异常日志（如有）：`response.Write on hijacked connection` / `permission_denied`
+
+### 6) 结论
+- 预期：<一句话>
+- 实际：<一句话>
+- 初步判断：路径问题 / 权限问题 / 租户不一致 / 模式配置不一致
+```
+
+> ⚠️ 只有当 `POWERX_PROXY=0` 且 `IAMMode=local` 时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
 
 > `skeleton/backend/go-gin/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend/go-gin` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
 >
@@ -292,7 +469,7 @@ Delegated 模式指插件被 PowerX 宿主拉起后运行在 iframe + process �
 3. 宿主拉起插件后端进程，并在 Admin Router 中加载插件前端。
 4. 前端初次访问会请求：
    - 静态资源：`/_p/<pluginId>/admin/assets/...`
-   - 会话检测：`/api/v1/admin/auth/me/context`（复用宿主 token）
+   - 会话检测：`/api/v1/admin/user/auth/me/context`（复用宿主 token）
    - 业务接口：依据实现决定走 `/api/v1/**`（宿主）或 `/_p/<pluginId>/api/v1/**`（插件自带）
 
 ### 2.4 常见症状与排查
@@ -301,6 +478,26 @@ Delegated 模式指插件被 PowerX 宿主拉起后运行在 iframe + process �
 - **静态资源 404**：核对包内 `web-admin/.output/public/assets/*` 是否存在，并确保 baseURL 以 `/_p/<pluginId>/admin` 开头。
 - **i18n baseDir not found**：构建时未包含 `web-admin/i18n/locales`，需要重新 `npm run build`。
 - **插件接口返回 404**：记得区分宿主与插件 API。需要访问插件自有 API 时，请求 `/_p/<pluginId>/api/v1/**`。
+
+### 2.4.1 `401/403` 快速判定（`/_p` 与 `/api` 边界）
+
+当出现 `/_p/<pluginId>/api/v1/admin/user/auth/me/context` 报错时，先用下面两条命令判定阶段：
+
+```bash
+curl -i "http://127.0.0.1:8077/api/v1/admin/user/auth/me/context" \
+  -H "Authorization: Bearer $ADMIN_BEARER_TOKEN"
+
+curl -i "http://127.0.0.1:8077/_p/com.powerx.plugins.base/api/v1/admin/user/auth/me/context" \
+  -H "Authorization: Bearer $ADMIN_BEARER_TOKEN"
+```
+
+- 第一条 `200`、第二条 `403 no permission rule`：插件 `rbac/exposure` 未覆盖 `admin:read`。
+- 第一条 `200`、第二条 `401`：网关转发/Token 边界问题（通常是 `/_p` 链路 token 类型不匹配）。
+- 第一条 `401`：宿主会话本身无效或 token 过期。
+
+硬规则：
+- `/_p/:plugin_id/api/*` 只用于插件接口。
+- 宿主用户认证接口（`/api/v1/admin/{identity}/auth/*`）必须走宿主 `/api/v1/...`，不要走 `/_p`。
 
 ### 2.5 构建/打包要点
 
@@ -317,7 +514,7 @@ Delegated 模式指插件被 PowerX 宿主拉起后运行在 iframe + process �
 
 ### 2.7 快速自检清单
 
-- 浏览器 Network：`/api/v1/admin/auth/me/context` 200 且携带宿主 token。
+- 浏览器 Network：`/api/v1/admin/user/auth/me/context` 200 且携带宿主 token。
 - 静态资源请求形如 `/_p/<pluginId>/admin/assets/...`。
 - `nitro.mjs` 中 `insidePowerX=true`、`apiBaseUrl=/api/v1`。
 - 宿主日志出现 `/_p/:id/admin/*filepath` 命中记录。
@@ -343,7 +540,7 @@ iframe.contentWindow?.postMessage(
 )
 ```
 
-插件前端只接受来自可信 `origin` 且 `source === 'powerx'` 的消息，并把 token 写入自身 localStorage，再调用 `/api/v1/admin/auth/me/context` 即可共享登录态。
+插件前端只接受来自可信 `origin` 且 `source === 'powerx'` 的消息，并把 token 写入自身 localStorage，再调用 `/api/v1/admin/user/auth/me/context` 即可共享登录态。
 
 ### 2.9 常见参考链接
 
@@ -361,7 +558,7 @@ iframe.contentWindow?.postMessage(
 
 从 009 consume-capability 版本开始，**宿主模式的能力调用必须经过插件后端代理**，所有 `PX_*` 凭证仅注入给 Go 进程，前端永远通过插件自有 API 转发。这么做可以：
 
-1. 统一注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TENANT_UUID`，由 `bootstrap.NewAppFromEnv` 填入 Gateway Client；避免在浏览器暴露 Tool Token。
+1. 统一注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`，由 `bootstrap.NewAppFromEnv` 填入 Gateway Client；租户从 token `tid` 自动推导，避免额外维护 tenant 变量与浏览器暴露 Tool Token。
 2. 通过 `framework/backend/go/router` 中的 `POST /api/v1/integration/capabilities/invoke` 统一做 action/payload 校验、traceId 记录与错误整形。
 3. 让 Admin/Skeleton 前端和 CLI 共用一套 `usePowerXCapability()` 封装，既能获得 `traceId` 也能透传限流/鉴权提示。
 
@@ -389,7 +586,7 @@ sequenceDiagram
   })
   ```
 
-- **后端**：`capabilityinvoker.Service` 会将 `X-PowerX-Tenant`、`X-Request-ID` 透传到 Gateway（有则转发），成功时在响应体与 `X-Trace-Id` Header 写回 traceId。返回 JSON 结构：
+- **后端**：`capabilityinvoker.Service` 会将 `tenant_uuid`、`X-Request-ID` 透传到 Gateway（有则转发），成功时在响应体与 `X-Trace-Id` Header 写回 traceId。返回 JSON 结构：
 
   ```json
   {
@@ -406,7 +603,7 @@ sequenceDiagram
 | 错误类型 (`error.type`) | HTTP | 典型原因 | 排查步骤 |
 | --- | --- | --- | --- |
 | `validation` | `400` | `capabilityId`/`action` 为空、payload 缺字段 | 检查入参是否符合能力契约；`tests/capabilities/media_invocation_test.go` 展示了最小 payload；必要时查看 router 打印的校验日志。 |
-| `unauthorized` | `401/403` | `PX_PLUGIN_TOOL_TOKEN` 已过期或租户 UUID 不匹配 | 使用 `px-plugin login` 重新申请 Grant，或在宿主部署脚本中刷新环境变量；确认请求头 `X-PowerX-Tenant` 是否与运维配置一致。 |
+| `unauthorized` | `401/403` | `PX_PLUGIN_TOOL_TOKEN` 已过期或租户 UUID 不匹配 | 使用 `px-plugin login` 重新申请 Grant，或在宿主部署脚本中刷新环境变量；确认请求头 `tenant_uuid` 是否与运维配置一致。 |
 | `rate_limited` | `429` | 能力 QPS 超限 | 响应会包含 `traceId` 与 `error.code=RATE_LIMIT`；先查看宿主 Gateway 仪表板或联系平台扩容，再在前端提示用户稍后重试。 |
 | `upstream` | `502/504` | Gateway 不可达、action 未发布 | 查看插件后端日志 `capability.invoke.failure`，确认 `statusCode` 与 `message`；必要时将结果写入告警或切换 `PX_USE_MOCK`。 |
 

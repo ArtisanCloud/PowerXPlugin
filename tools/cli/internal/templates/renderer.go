@@ -28,6 +28,8 @@ type Data struct {
 	BackendModulePath  string
 	BackendType        string
 	FrontendType       string
+	BackendPort        int
+	FrontendPort       int
 	FrameworkVersion   string
 	FrameworkReplace   string
 	SchemaDependency   string
@@ -72,7 +74,7 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		if isTemplate {
 			targetRel = strings.TrimSuffix(rel, ".tmpl")
 		}
-		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugin.base", data.PluginID)
+		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugins.base", data.PluginID)
 		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugins.base", data.PluginID)
 		targetRel = strings.ReplaceAll(targetRel, "__plugin__", data.PluginID)
 		targetRel = normalizeTargetPath(targetRel, data.BackendType, data.FrontendType)

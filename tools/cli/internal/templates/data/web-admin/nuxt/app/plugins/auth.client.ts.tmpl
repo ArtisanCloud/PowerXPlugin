@@ -3,11 +3,11 @@ import { useRuntimeConfig } from "#imports";
 export default defineNuxtPlugin(() => {
   const auth = useAuth();
   const runtimeConfig = useRuntimeConfig();
-  const insidePowerX =
-    runtimeConfig.public?.insidePowerX === true ||
-    runtimeConfig.public?.insidePowerX === "true";
+  const delegatedMode =
+    runtimeConfig.public?.delegatedMode === true ||
+    runtimeConfig.public?.delegatedMode === "true";
 
-  auth.setIAMModeFlags?.(insidePowerX);
+  auth.setIAMModeFlags?.(delegatedMode);
 
   if (process.client) {
     auth.initAuth();

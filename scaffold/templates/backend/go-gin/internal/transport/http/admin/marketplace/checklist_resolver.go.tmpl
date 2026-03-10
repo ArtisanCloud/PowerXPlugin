@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	svc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	"{{ .BackendModulePath }}/internal/contracts"
+	svc "{{ .BackendModulePath }}/internal/services/marketplace"
+	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )

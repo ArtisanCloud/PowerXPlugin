@@ -3,7 +3,7 @@ type: API
 version: 1.0.0
 description: "将审核通过的模板发布到业务租户。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [update]
 provides:
   - id: schema/input/com.powerx.plugins.base.template.publish.v1

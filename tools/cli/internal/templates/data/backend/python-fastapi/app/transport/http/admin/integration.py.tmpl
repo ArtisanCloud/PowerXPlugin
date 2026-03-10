@@ -6,6 +6,7 @@ from app.contracts.response import (
     fail,
     ok,
 )
+from app.middleware.tenant_context import resolve_tenant_uuid
 from app.services.integration_service import IntegrationService
 
 router = APIRouter(prefix="/admin")
@@ -35,6 +36,17 @@ def _require_auth(request: Request):
             status_code=401,
         )
     return None
+
+
+def _resolve_tenant_uuid(request: Request, payload: dict | None = None) -> str:
+    if payload:
+        candidate = payload.get("tenant_uuid") or payload.get("tenantUuid")
+        if candidate:
+            return str(candidate).strip()
+    candidate = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    if candidate:
+        return str(candidate).strip()
+    return str(resolve_tenant_uuid(request) or "").strip()
 
 
 @router.get("/integration/approvals")
@@ -79,7 +91,14 @@ async def list_webhooks(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
+    if not tenant_uuid:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "tenant_uuid 必填",
+            request_id=request_id,
+            status_code=400,
+        )
     items = service.list_subscriptions(tenant_uuid)
     return ok({"items": items}, request_id=request_id)
 
@@ -90,6 +109,7 @@ async def create_webhook(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
     if not (payload or {}).get("event_type") or not (payload or {}).get("target_url"):
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -97,6 +117,9 @@ async def create_webhook(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
+    payload = dict(payload or {})
+    if tenant_uuid:
+        payload["tenant_uuid"] = tenant_uuid
     return ok(service.create_subscription(payload), request_id=request_id)
 
 
@@ -108,6 +131,10 @@ async def update_webhook(request: Request, webhook_id: str, payload: dict):
         return auth
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    payload = dict(payload or {})
+    if tenant_uuid:
+        payload["tenant_uuid"] = tenant_uuid
     return ok(service.update_subscription(webhook_id, payload), request_id=request_id)
 
 
@@ -145,7 +172,14 @@ async def list_secrets(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
+    if not tenant_uuid:
+        return fail(
+            ERR_CODE_INVALID_REQUEST,
+            "tenant_uuid 必填",
+            request_id=request_id,
+            status_code=400,
+        )
     items = service.list_secrets(tenant_uuid)
     return ok({"items": items}, request_id=request_id)
 
@@ -163,6 +197,10 @@ async def create_secret(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    payload = dict(payload or {})
+    if tenant_uuid:
+        payload["tenant_uuid"] = tenant_uuid
     return ok(service.create_secret(payload), request_id=request_id)
 
 

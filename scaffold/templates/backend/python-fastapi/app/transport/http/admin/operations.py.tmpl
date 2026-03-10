@@ -10,6 +10,7 @@ from app.contracts.response import (
     fail,
     ok,
 )
+from app.middleware.tenant_context import resolve_tenant_uuid
 from app.services.operations_service import OperationsService, _as_datetime, _normalize_list
 
 router = APIRouter(prefix="/admin")
@@ -50,6 +51,17 @@ def _resolve_plugin_id(request: Request, payload: dict | None = None) -> str | N
     return request.query_params.get("plugin_id")
 
 
+def _resolve_tenant_uuid(request: Request, payload: dict | None = None) -> str:
+    if payload:
+        candidate = payload.get("tenant_uuid") or payload.get("tenantUuid")
+        if candidate:
+            return str(candidate).strip()
+    candidate = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    if candidate:
+        return str(candidate).strip()
+    return str(resolve_tenant_uuid(request) or "").strip()
+
+
 @router.get("/operations/support/playbook")
 async def get_playbook(request: Request):
     request_id = _request_id(request)
@@ -57,9 +69,11 @@ async def get_playbook(request: Request):
     if auth:
         return auth
     plugin_id = _resolve_plugin_id(request)
-    tenant_uuid = request.query_params.get("tenant_uuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not plugin_id:
         return fail(ERR_CODE_INVALID_REQUEST, "plugin_id 必填", request_id=request_id, status_code=400)
+    if not tenant_uuid:
+        return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
     payload = service.get_support_playbook(plugin_id, tenant_uuid)
     return ok(payload, request_id=request_id)
 
@@ -75,6 +89,11 @@ async def update_playbook(request: Request, payload: dict):
     plugin_id = _resolve_plugin_id(request, payload)
     if not plugin_id:
         return fail(ERR_CODE_INVALID_REQUEST, "plugin_id 必填", request_id=request_id, status_code=400)
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    if not tenant_uuid:
+        return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     updated = service.configure_support_playbook(plugin_id, payload)
     return ok(updated, request_id=request_id)
 
@@ -171,6 +190,10 @@ async def create_incident(request: Request, payload: dict):
     plugin_id = _resolve_plugin_id(request, payload)
     if not plugin_id:
         return fail(ERR_CODE_INVALID_REQUEST, "plugin_id 必填", request_id=request_id, status_code=400)
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    if tenant_uuid:
+        payload = dict(payload or {})
+        payload["tenant_uuid"] = tenant_uuid
     response = service.create_incident(plugin_id, payload)
     return ok(response, request_id=request_id, status_code=201)
 

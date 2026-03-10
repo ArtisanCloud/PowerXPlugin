@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 var ErrEventPermissionDenied = errors.New("event permission denied")
@@ -41,10 +42,45 @@ func (p EventPermissions) CanSubscribe(topic string) bool {
 	return ok
 }
 
+func (p EventPermissions) Topics() []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(p.publish)+len(p.subscribe))
+	for topic := range p.publish {
+		topic = strings.TrimSpace(topic)
+		if topic == "" {
+			continue
+		}
+		if _, ok := seen[topic]; ok {
+			continue
+		}
+		seen[topic] = struct{}{}
+		out = append(out, topic)
+	}
+	for topic := range p.subscribe {
+		topic = strings.TrimSpace(topic)
+		if topic == "" {
+			continue
+		}
+		if _, ok := seen[topic]; ok {
+			continue
+		}
+		seen[topic] = struct{}{}
+		out = append(out, topic)
+	}
+	slices.Sort(out)
+	return out
+}
+
 type pluginManifest struct {
 	Events *struct {
 		Publish   []string `yaml:"publish"`
 		Subscribe []string `yaml:"subscribe"`
+		Topics    []struct {
+			Key         string   `yaml:"key"`
+			Topic       string   `yaml:"topic"`
+			Actions     []string `yaml:"actions"`
+			Description string   `yaml:"description"`
+		} `yaml:"topics"`
 	} `yaml:"events"`
 }
 
@@ -62,9 +98,20 @@ func LoadEventPermissionsFromManifest(manifestPath string, logger *logrus.Entry)
 		return EventPermissions{enforced: false}, nil
 	}
 
-	var m pluginManifest
-	if err := yaml.Unmarshal(content, &m); err != nil {
+	var root map[string]any
+	if err := yaml.Unmarshal(content, &root); err != nil {
 		return EventPermissions{}, fmt.Errorf("parse manifest yaml failed: %w", err)
+	}
+	if err := mergeCatalogReferences(manifestPath, root); err != nil {
+		return EventPermissions{}, fmt.Errorf("merge manifest catalogs failed: %w", err)
+	}
+	merged, err := yaml.Marshal(root)
+	if err != nil {
+		return EventPermissions{}, fmt.Errorf("marshal merged manifest failed: %w", err)
+	}
+	var m pluginManifest
+	if err := yaml.Unmarshal(merged, &m); err != nil {
+		return EventPermissions{}, fmt.Errorf("decode merged manifest failed: %w", err)
 	}
 
 	if m.Events == nil {
@@ -95,20 +142,93 @@ func LoadEventPermissionsFromManifest(manifestPath string, logger *logrus.Entry)
 		perms.subscribe[t] = struct{}{}
 	}
 
+	for _, item := range m.Events.Topics {
+		topic := strings.TrimSpace(item.Key)
+		if topic == "" {
+			topic = strings.TrimSpace(item.Topic)
+		}
+		if topic == "" {
+			continue
+		}
+		for _, action := range item.Actions {
+			switch strings.ToLower(strings.TrimSpace(action)) {
+			case "publish":
+				perms.publish[topic] = struct{}{}
+			case "subscribe":
+				perms.subscribe[topic] = struct{}{}
+			}
+		}
+	}
+
 	return perms, nil
+}
+
+func mergeCatalogReferences(manifestPath string, root map[string]any) error {
+	catalogsValue, ok := root["catalogs"]
+	if !ok || catalogsValue == nil {
+		return nil
+	}
+	catalogs, ok := catalogsValue.(map[string]any)
+	if !ok {
+		return errors.New("catalogs must be an object")
+	}
+
+	manifestDir := filepath.Dir(manifestPath)
+	loadCatalog := func(name string) (map[string]any, error) {
+		rawPath, _ := catalogs[name].(string)
+		rawPath = strings.TrimSpace(rawPath)
+		if rawPath == "" {
+			return nil, nil
+		}
+		filePath := rawPath
+		if !filepath.IsAbs(filePath) {
+			filePath = filepath.Join(manifestDir, filepath.FromSlash(rawPath))
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("read catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		var doc map[string]any
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return nil, fmt.Errorf("parse catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		return doc, nil
+	}
+
+	if doc, err := loadCatalog("events"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["events"]; ok {
+			root["events"] = section
+		}
+	}
+	return nil
 }
 
 func defaultManifestPath() string {
 	if p := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_MANIFEST_PATH")); p != "" {
 		return p
 	}
-	if _, err := os.Stat("plugin.yaml"); err == nil {
-		return "plugin.yaml"
+	cwd, _ := os.Getwd()
+	candidates := []string{
+		"plugin.yaml",
+		filepath.Join("skeleton", "plugin.yaml"),
 	}
-	if _, err := os.Stat(filepath.Join("skeleton", "plugin.yaml")); err == nil {
-		return filepath.Join("skeleton", "plugin.yaml")
+	if cwd != "" {
+		candidates = append(candidates,
+			filepath.Join(cwd, "plugin.yaml"),
+			filepath.Join(cwd, "skeleton", "plugin.yaml"),
+			filepath.Join(cwd, "..", "plugin.yaml"),
+			filepath.Join(cwd, "..", "..", "plugin.yaml"),
+			filepath.Join(cwd, "..", "..", "..", "plugin.yaml"),
+		)
 	}
-	return "plugin.yaml"
+	for _, cand := range candidates {
+		if info, err := os.Stat(cand); err == nil && !info.IsDir() {
+			return cand
+		}
+	}
+	return filepath.Join("skeleton", "plugin.yaml")
 }
 
 type PermissionedEmitter struct {

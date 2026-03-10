@@ -191,6 +191,7 @@ export function useApiClient() {
       hostCtxStore && typeof window !== "undefined"
         ? `${pluginOrigin}::${requestPluginId}`
         : null;
+    const ctxPayload = ctxKey ? hostCtxStore?.getCtx(ctxKey) : null;
 
     if (!headers.has("Accept")) {
       headers.set("Accept", "application/json");
@@ -224,8 +225,9 @@ export function useApiClient() {
           : `Bearer ${authToken}`
       );
     }
-
-    const ctxPayload = ctxKey ? hostCtxStore?.getCtx(ctxKey) : null;
+    if (!headers.has("Authorization") && ctxPayload?.ctxJwt) {
+      headers.set("Authorization", `Bearer ${ctxPayload.ctxJwt}`);
+    }
     const debugCtx =
       process.env.NUXT_PUBLIC_BRIDGE_DEBUG === "true" ||
       (typeof window !== "undefined" && (window as any).__PX_DEBUG_CTX__);
@@ -252,10 +254,10 @@ export function useApiClient() {
       });
     }
 
-    if (!headers.has("X-PowerX-Tenant")) {
+    if (!headers.has("tenant_uuid")) {
       const tenant = (next as any).tenantUuid || getTenantUuid();
       if (tenant) {
-        headers.set("X-PowerX-Tenant", String(tenant));
+        headers.set("tenant_uuid", String(tenant));
       }
     }
 

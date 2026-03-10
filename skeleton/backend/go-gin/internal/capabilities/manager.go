@@ -176,9 +176,14 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if p == "" {
 		p = defaultCatalogPath
 	}
-	if !filepath.IsAbs(p) {
-		cwd, _ := os.Getwd()
-		p = filepath.Join(cwd, p)
+	originalPath := p
+	p, resolvedBy := resolveCatalogFilePath(p)
+	if resolvedBy != "" {
+		log.WithFields(logrus.Fields{
+			"catalog_path_from": originalPath,
+			"catalog_path_to":   p,
+			"resolved_by":       resolvedBy,
+		}).Info("capability catalog path auto-resolved")
 	}
 	log = log.WithField("catalog_path", p)
 	log.Debug("loading capability catalog from disk")
@@ -186,6 +191,9 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			log.WithError(err).Warn("capability catalog not found, falling back to plugin.yaml capabilities")
+			log.WithFields(logrus.Fields{
+				"advice": "开发态可忽略；若需消除告警，请生成 capabilities/catalog.json 或保持 plugin.yaml capabilities 与代码同步",
+			}).Info("capability catalog fallback hint")
 			snapshot, fallbackErr := loadCatalogFromManifest(log)
 			if fallbackErr != nil {
 				log.WithError(fallbackErr).Warn("failed to load capability catalog from plugin.yaml, returning empty snapshot")
@@ -237,7 +245,7 @@ type manifestDoc struct {
 	ID           string `yaml:"id"`
 	Version      string `yaml:"version"`
 	Capabilities struct {
-		Imports  []string            `yaml:"imports"`
+		Imports  []string             `yaml:"imports"`
 		Provides []manifestCapability `yaml:"provides"`
 	} `yaml:"capabilities"`
 }
@@ -251,9 +259,20 @@ func loadCatalogFromManifest(log *logrus.Entry) (*CatalogSnapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read manifest %s: %w", manifestPath, err)
 	}
-	var doc manifestDoc
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
+	var root map[string]any
+	if err := yaml.Unmarshal(raw, &root); err != nil {
 		return nil, fmt.Errorf("parse manifest %s: %w", manifestPath, err)
+	}
+	if err := mergeCatalogReferences(manifestPath, root); err != nil {
+		return nil, fmt.Errorf("merge manifest catalogs: %w", err)
+	}
+	buf, err := yaml.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged manifest: %w", err)
+	}
+	var doc manifestDoc
+	if err := yaml.Unmarshal(buf, &doc); err != nil {
+		return nil, fmt.Errorf("decode merged manifest: %w", err)
 	}
 	manifestDir := filepath.Dir(manifestPath)
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -385,6 +404,83 @@ func loadCatalogFromManifest(log *logrus.Entry) (*CatalogSnapshot, error) {
 		}).Info("capability catalog loaded from plugin.yaml fallback")
 	}
 	return snapshot, nil
+}
+
+func mergeCatalogReferences(manifestPath string, root map[string]any) error {
+	catalogsValue, ok := root["catalogs"]
+	if !ok || catalogsValue == nil {
+		return nil
+	}
+	catalogs, ok := catalogsValue.(map[string]any)
+	if !ok {
+		return errors.New("catalogs must be an object")
+	}
+	manifestDir := filepath.Dir(manifestPath)
+
+	loadCatalog := func(name string) (map[string]any, error) {
+		rawPath, _ := catalogs[name].(string)
+		rawPath = strings.TrimSpace(rawPath)
+		if rawPath == "" {
+			return nil, nil
+		}
+		filePath := rawPath
+		if !filepath.IsAbs(filePath) {
+			filePath = filepath.Join(manifestDir, filepath.FromSlash(rawPath))
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("read catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		var doc map[string]any
+		if err := yaml.Unmarshal(data, &doc); err != nil {
+			return nil, fmt.Errorf("parse catalogs.%s (%s): %w", name, rawPath, err)
+		}
+		return doc, nil
+	}
+
+	if doc, err := loadCatalog("capabilities"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["capabilities"]; ok {
+			root["capabilities"] = section
+		}
+	}
+	if doc, err := loadCatalog("events"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["events"]; ok {
+			root["events"] = section
+		}
+	}
+	if doc, err := loadCatalog("agent_tools"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["agent_tools"]; ok {
+			root["agent_tools"] = section
+		}
+	}
+	if doc, err := loadCatalog("exposure"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["exposure"]; ok {
+			root["exposure"] = section
+		}
+	}
+	if doc, err := loadCatalog("rbac"); err != nil {
+		return err
+	} else if doc != nil {
+		if section, ok := doc["rbac"]; ok {
+			root["rbac"] = section
+		}
+		if section, ok := doc["permissions"]; ok {
+			root["permissions"] = section
+		}
+		if section, ok := doc["routes"]; ok {
+			root["routes"] = section
+		}
+	}
+
+	return nil
 }
 
 func resolveManifestPath() string {
@@ -533,4 +629,66 @@ func resolveCatalogPath(raw string) string {
 	}
 	trimmed = os.ExpandEnv(trimmed)
 	return strings.TrimSpace(trimmed)
+}
+
+func resolveCatalogFilePath(pathValue string) (string, string) {
+	trimmed := strings.TrimSpace(pathValue)
+	if trimmed == "" {
+		trimmed = defaultCatalogPath
+	}
+
+	cwd, _ := os.Getwd()
+	if filepath.IsAbs(trimmed) {
+		return trimmed, ""
+	}
+
+	base := trimmed
+	if cwd != "" {
+		base = filepath.Join(cwd, trimmed)
+	}
+	if existsFile(base) {
+		return base, ""
+	}
+
+	candidates := make([]string, 0, 8)
+	if manifestPath := resolveManifestPath(); manifestPath != "" {
+		manifestDir := filepath.Dir(manifestPath)
+		candidates = append(candidates,
+			filepath.Join(manifestDir, "capabilities", "catalog.json"),
+			filepath.Join(manifestDir, "..", "capabilities", "catalog.json"),
+		)
+	}
+	if cwd != "" {
+		candidates = append(candidates,
+			filepath.Join(cwd, "skeleton", "capabilities", "catalog.json"),
+			filepath.Join(cwd, "..", "capabilities", "catalog.json"),
+			filepath.Join(cwd, "..", "..", "capabilities", "catalog.json"),
+			filepath.Join(cwd, "..", "..", "..", "capabilities", "catalog.json"),
+		)
+	}
+
+	seen := map[string]struct{}{}
+	for _, cand := range candidates {
+		clean := filepath.Clean(cand)
+		if _, ok := seen[clean]; ok {
+			continue
+		}
+		seen[clean] = struct{}{}
+		if existsFile(clean) {
+			return clean, "manifest/cwd fallback"
+		}
+	}
+
+	return base, ""
+}
+
+func existsFile(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }

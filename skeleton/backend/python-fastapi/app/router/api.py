@@ -27,7 +27,7 @@ def _include_router(app: FastAPI, router, prefix: str) -> None:
 
 
 def register_routes(app: FastAPI, settings: Settings) -> None:
-    host_prefix = f"/_p/{{plugin_id}}{settings.api_prefix}"
+    host_prefix = "/_p/{plugin_id}" + settings.api_prefix
     for router in (
         health_router,
         assets_router,

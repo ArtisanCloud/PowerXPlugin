@@ -8,15 +8,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 func TestLocalEmitter_Emit_DoesNotPanicWhenQueueFull(t *testing.T) {
 	emitter := fweventbridge.NewLocalEmitter(1)
 
 	ev := event.Event{
-		Topic: "powerx.channel.master.credential_inspection.v1",
+		Topic: "_topic.template.update",
 		Meta: event.Meta{
 			TenantUUID:     "00000000-0000-0000-0000-000000000001",
 			RequestID:      "req-1",

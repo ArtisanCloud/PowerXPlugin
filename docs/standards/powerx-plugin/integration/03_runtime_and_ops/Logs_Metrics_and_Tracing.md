@@ -69,7 +69,7 @@
 {
   "timestamp": "2025-10-13T10:32:21Z",
   "level": "INFO",
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "tenant_uuid": "tenant_123",
   "component": "contact_service",
   "message": "Contact created successfully",
@@ -233,7 +233,7 @@ powerx.plugin.crm.contact.create
 
 | Key                | 示例                    | 说明   |
 | ------------------ | --------------------- | ---- |
-| `plugin.id`        | com.powerx.plugin.crm | 插件标识 |
+| `plugin.id`        | com.powerx.plugins.crm | 插件标识 |
 | `tenant.id`        | tenant_123            | 租户   |
 | `capability`       | crm.contact.create    | 能力名称 |
 | `http.status_code` | 200                   | 状态码  |
@@ -299,7 +299,7 @@ func main() {
 日志示例：
 
 ```
-{"level":"info","plugin_id":"com.powerx.plugin.crm","msg":"plugin started","time":"2025-10-13T09:00:00Z"}
+{"level":"info","plugin_id":"com.powerx.plugins.crm","msg":"plugin started","time":"2025-10-13T09:00:00Z"}
 ```
 
 ---

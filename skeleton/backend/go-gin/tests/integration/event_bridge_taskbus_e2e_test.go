@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 func TestEventBridge_TaskBusMode_E2EWithStub(t *testing.T) {
@@ -23,7 +23,7 @@ func TestEventBridge_TaskBusMode_E2EWithStub(t *testing.T) {
 
 	stub := fweventbridge.NewTaskBusStub()
 	var consumed int32
-	stub.Subscribe("powerx.channel.master.credential_inspection.v1", func(ctx context.Context, e event.Event) error {
+	stub.Subscribe("_topic.template.update", func(ctx context.Context, e event.Event) error {
 		atomic.AddInt32(&consumed, 1)
 		return nil
 	})
@@ -37,7 +37,7 @@ func TestEventBridge_TaskBusMode_E2EWithStub(t *testing.T) {
 	require.NoError(t, err)
 
 	err = emitter.Emit(context.Background(), event.Event{
-		Topic:   "powerx.channel.master.credential_inspection.v1",
+		Topic:   "_topic.template.update",
 		Meta:    meta,
 		Payload: json.RawMessage(`{"channel_id":"c1","credential_type":"api_key","status":"ok"}`),
 	})

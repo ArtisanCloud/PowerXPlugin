@@ -9,8 +9,8 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/channel"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 func TestChannelEventEmitter_EmitsWithIdempotencyKeyMaterial(t *testing.T) {

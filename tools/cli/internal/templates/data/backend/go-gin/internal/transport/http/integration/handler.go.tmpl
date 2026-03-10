@@ -8,9 +8,10 @@ import (
 	"strings"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
-	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
-	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/contracts"
+	capgateway "{{ .BackendModulePath }}/internal/integrations/gateway"
+	integrationService "{{ .BackendModulePath }}/internal/services/integration"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -97,21 +98,23 @@ func (h *Handler) RotateSecret(c *gin.Context) {
 
 // InvokeCapability 代理插件侧前端对 PowerX Gateway 的能力调用。
 func (h *Handler) InvokeCapability(c *gin.Context) {
+	ensureInvokeCORS(c)
+
 	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "capability gateway unavailable"})
+		contracts.ResponseServiceUnavailable(c, "capability gateway unavailable", nil)
 		return
 	}
 
 	var req capabilityInvokeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid capability payload"})
+		contracts.ResponseBadRequest(c, "invalid capability payload")
 		return
 	}
 
 	capabilityID := strings.TrimSpace(req.CapabilityID)
 	action := strings.TrimSpace(req.Action)
 	if capabilityID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "capabilityId is required"})
+		contracts.ResponseBadRequest(c, "capabilityId is required")
 		return
 	}
 
@@ -120,35 +123,44 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	if preferredProtocol == "" {
 		preferredProtocol = inferPreferredProtocol(payload)
 	}
+	if isGRPCPayload(payload) && !isRESTPayload(payload) {
+		preferredProtocol = "grpc"
+	}
+	if isRESTPayload(payload) {
+		preferredProtocol = "rest"
+	}
 	if preferredProtocol == "" {
 		preferredProtocol = "rest"
 	}
 	if strings.EqualFold(preferredProtocol, "rest") {
 		if err := validateRestPayload(payload); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			contracts.ResponseBadRequest(c, err.Error())
 			return
 		}
 	}
+	actionForInvoke := action
 
 	headers := collectCapabilityHeaders(c)
 	warnings := collectCapabilityWarnings(headers)
 	requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+	h.logCapabilityInvokeAttempt(capabilityID, action, preferredProtocol, requestID, payload, headers)
 
 	result, err := h.deps.CapabilityGateway.Invoke(c.Request.Context(), capgateway.InvokeParams{
 		CapabilityID:      capabilityID,
-		Action:            action,
+		Action:            actionForInvoke,
 		PreferredProtocol: preferredProtocol,
 		Payload:           payload,
 		Headers:           headers,
 		RequestID:         requestID,
 	})
 	if err != nil {
+		h.logCapabilityInvokeError(capabilityID, action, preferredProtocol, requestID, err)
 		h.writeCapabilityError(c, err, warnings)
 		return
 	}
 
 	if result == nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "capability invoke returned no result"})
+		contracts.ResponseError(c, http.StatusBadGateway, contracts.ErrCodeInternalError, "capability invoke returned no result")
 		return
 	}
 
@@ -174,30 +186,160 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	if len(warnings) > 0 {
 		response["warnings"] = warnings
 	}
+	h.logCapabilityInvokeSuccess(capabilityID, action, preferredProtocol, requestID, result)
+	h.logInvokeCORSHeaders(c)
 
-	c.JSON(http.StatusOK, response)
+	contracts.ResponseSuccess(c, response)
+}
+
+func ensureInvokeCORS(c *gin.Context) {
+	if c == nil {
+		return
+	}
+	origin := strings.TrimSpace(c.GetHeader("Origin"))
+	allowOrigin := origin
+	allowCredentials := "true"
+	if allowOrigin == "" {
+		allowOrigin = "*"
+		allowCredentials = "false"
+	}
+	c.Header("Access-Control-Allow-Origin", allowOrigin)
+	c.Header("Vary", "Origin")
+	c.Header("Access-Control-Allow-Credentials", allowCredentials)
+	c.Header("Access-Control-Allow-Methods", "POST, OPTIONS")
+	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+	c.Header("Access-Control-Expose-Headers", "X-Trace-Id, X-Correlation-Id, X-Request-Id")
+}
+
+func (h *Handler) logCapabilityInvokeAttempt(capabilityID, action, preferredProtocol, requestID string, payload map[string]any, headers map[string]string) {
+	if h == nil || h.logger == nil {
+		return
+	}
+	inboundAuth := strings.TrimSpace(headers["Authorization"])
+	inboundAuthScheme := authSchemeFromHeader(inboundAuth)
+	h.logger.WithFields(logrus.Fields{
+		"capability_id":       capabilityID,
+		"action":              action,
+		"preferred_protocol":  preferredProtocol,
+		"request_id":          requestID,
+		"payload_method":      strings.TrimSpace(strings.ToUpper(fmt.Sprint(payload["method"]))),
+		"payload_endpoint":    strings.TrimSpace(fmt.Sprint(payload["endpoint"])),
+		"payload_query_count": len(extractPayloadMap(payload, "query")),
+		"headers_count":       len(headers),
+		"inbound_auth_scheme": inboundAuthScheme,
+		"forwarded_auth":      inboundAuth != "",
+	}).Info("capability invoke request accepted")
+}
+
+func (h *Handler) logCapabilityInvokeSuccess(capabilityID, action, preferredProtocol, requestID string, result *capgateway.InvokeResult) {
+	if h == nil || h.logger == nil || result == nil {
+		return
+	}
+	h.logger.WithFields(logrus.Fields{
+		"capability_id":      capabilityID,
+		"action":             action,
+		"preferred_protocol": preferredProtocol,
+		"request_id":         requestID,
+		"trace_id":           strings.TrimSpace(result.TraceID),
+		"status":             strings.TrimSpace(result.Status),
+		"mock":               result.Mock,
+	}).Info("capability invoke success")
+}
+
+func (h *Handler) logCapabilityInvokeError(capabilityID, action, preferredProtocol, requestID string, err error) {
+	if h == nil || h.logger == nil || err == nil {
+		return
+	}
+	fields := logrus.Fields{
+		"capability_id":      capabilityID,
+		"action":             action,
+		"preferred_protocol": preferredProtocol,
+		"request_id":         requestID,
+	}
+	var invocationErr *frameworkgateway.InvocationError
+	if errors.As(err, &invocationErr) {
+		fields["trace_id"] = strings.TrimSpace(invocationErr.TraceID)
+		fields["status_code"] = invocationErr.StatusCode
+	}
+	h.logger.WithFields(fields).WithError(err).Error("capability invoke failed")
+}
+
+func extractPayloadMap(payload map[string]any, key string) map[string]any {
+	if payload == nil {
+		return nil
+	}
+	raw, ok := payload[key]
+	if !ok || raw == nil {
+		return nil
+	}
+	if result, ok := raw.(map[string]any); ok {
+		return result
+	}
+	return nil
+}
+
+func authSchemeFromHeader(authHeader string) string {
+	auth := strings.TrimSpace(authHeader)
+	if auth == "" {
+		return "none"
+	}
+	lowered := strings.ToLower(auth)
+	switch {
+	case strings.HasPrefix(lowered, "bearer "):
+		return "bearer"
+	case strings.HasPrefix(lowered, "apikey "), strings.HasPrefix(lowered, "api_key "), strings.HasPrefix(lowered, "api-key "):
+		return "apikey"
+	default:
+		return "unknown"
+	}
+}
+
+func shouldOmitActionForREST(preferredProtocol string, payload map[string]any) bool {
+	if strings.EqualFold(strings.TrimSpace(preferredProtocol), "rest") {
+		return isRESTPayload(payload)
+	}
+	return isRESTPayload(payload)
+}
+
+func isRESTPayload(payload map[string]any) bool {
+	method := strings.TrimSpace(strings.ToUpper(fmt.Sprint(payload["method"])))
+	endpoint := strings.TrimSpace(fmt.Sprint(payload["endpoint"]))
+	return method != "" && endpoint != ""
+}
+
+func isGRPCPayload(payload map[string]any) bool {
+	endpoint := strings.TrimSpace(fmt.Sprint(payload["endpoint"]))
+	rpc := strings.TrimSpace(fmt.Sprint(payload["rpc"]))
+	return endpoint != "" && rpc != ""
 }
 
 func respondPlaceholder(c *gin.Context, status int, message string) {
-	c.JSON(status, gin.H{
-		"status":  "pending",
-		"message": message,
-	})
+	ensureInvokeCORS(c)
+	switch status {
+	case http.StatusCreated:
+		contracts.ResponseCreated(c, gin.H{"status": "pending", "message": message})
+	default:
+		contracts.ResponseSuccess(c, gin.H{"status": "pending", "message": message})
+	}
 }
 
 func collectCapabilityHeaders(c *gin.Context) map[string]string {
 	if c == nil {
 		return nil
 	}
-	forward := []string{"X-PX-Use-Mock"}
+	forward := []string{"X-PX-Use-Mock", "Authorization"}
 	headers := make(map[string]string)
 	for _, name := range forward {
 		if value := strings.TrimSpace(c.GetHeader(name)); value != "" {
+			if strings.EqualFold(name, "Authorization") {
+				switch authSchemeFromHeader(value) {
+				case "apikey", "bearer":
+					headers[name] = value
+				}
+				continue
+			}
 			headers[name] = value
 		}
-	}
-	if tenant := strings.TrimSpace(c.GetHeader("X-PowerX-Tenant")); tenant != "" {
-		headers["X-PowerX-Tenant"] = tenant
 	}
 	if len(headers) == 0 {
 		return nil
@@ -255,17 +397,16 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 	if c == nil {
 		return
 	}
+	ensureInvokeCORS(c)
 
 	var unavailable *capgateway.UnavailableError
 	if errors.As(err, &unavailable) {
-		payload := gin.H{
-			"error":   unavailable.Error(),
-			"traceId": "",
-		}
+		details := gin.H{"traceId": ""}
 		if len(warnings) > 0 {
-			payload["warnings"] = warnings
+			details["warnings"] = warnings
 		}
-		c.JSON(http.StatusServiceUnavailable, payload)
+		h.logInvokeCORSHeaders(c)
+		contracts.ResponseErrorWithDetails(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", unavailable.Error(), details)
 		return
 	}
 
@@ -286,25 +427,40 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 		if body := parseGatewayBody(invocationErr.Body); body != nil {
 			errPayload["details"] = body
 		}
-		payload := gin.H{
-			"error":   errPayload,
+		details := gin.H{
 			"traceId": invocationErr.TraceID,
+			"error":   errPayload,
 		}
 		if len(warnings) > 0 {
-			payload["warnings"] = warnings
+			details["warnings"] = warnings
 		}
-		c.JSON(status, payload)
+		h.logInvokeCORSHeaders(c)
+		contracts.ResponseErrorWithDetails(c, status, firstGatewayCode(invocationErr), firstGatewayMessage(invocationErr), details)
 		return
 	}
 
-	payload := gin.H{
-		"error":   err.Error(),
-		"traceId": "",
-	}
+	details := gin.H{"traceId": ""}
 	if len(warnings) > 0 {
-		payload["warnings"] = warnings
+		details["warnings"] = warnings
 	}
-	c.JSON(http.StatusBadGateway, payload)
+	h.logInvokeCORSHeaders(c)
+	contracts.ResponseErrorWithDetails(c, http.StatusBadGateway, contracts.ErrCodeInternalError, err.Error(), details)
+}
+
+func (h *Handler) logInvokeCORSHeaders(c *gin.Context) {
+	if h == nil || h.logger == nil || c == nil {
+		return
+	}
+	h.logger.WithFields(logrus.Fields{
+		"origin":                         strings.TrimSpace(c.GetHeader("Origin")),
+		"cors_allow_origin":              strings.TrimSpace(c.Writer.Header().Get("Access-Control-Allow-Origin")),
+		"cors_allow_credentials":         strings.TrimSpace(c.Writer.Header().Get("Access-Control-Allow-Credentials")),
+		"cors_expose_headers":            strings.TrimSpace(c.Writer.Header().Get("Access-Control-Expose-Headers")),
+		"cors_allow_headers":             strings.TrimSpace(c.Writer.Header().Get("Access-Control-Allow-Headers")),
+		"cors_allow_methods":             strings.TrimSpace(c.Writer.Header().Get("Access-Control-Allow-Methods")),
+		"cors_vary":                      strings.TrimSpace(c.Writer.Header().Get("Vary")),
+		"response_trace_header_prewrite": strings.TrimSpace(c.Writer.Header().Get("X-Trace-Id")),
+	}).Info("capability invoke response headers")
 }
 
 func firstGatewayCode(err *frameworkgateway.InvocationError) string {

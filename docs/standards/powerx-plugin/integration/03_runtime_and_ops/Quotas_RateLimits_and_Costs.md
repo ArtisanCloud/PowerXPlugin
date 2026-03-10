@@ -197,7 +197,7 @@ costs:
 
 ```json
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "tenant_uuid": "tenant_123",
   "capability": "crm.contact.create",
   "cost": 0.0132,
@@ -216,7 +216,7 @@ costs:
 
 | 字段        | 示例                    | 描述            |
 | --------- | --------------------- | ------------- |
-| plugin_id | com.powerx.plugin.crm | 插件标识          |
+| plugin_id | com.powerx.plugins.crm | 插件标识          |
 | tenant_uuid | tenant_123            | 租户            |
 | calls     | 2048                  | 调用次数          |
 | cost      | 20.48                 | PowerX Credit |
@@ -280,7 +280,7 @@ powerx_mcp_sessions_total{plugin_id="crm"} 3
   "type": "EVENT_PUBLISH",
   "topic": "plugin.quota.exceeded",
   "data": {
-    "plugin_id": "com.powerx.plugin.crm",
+    "plugin_id": "com.powerx.plugins.crm",
     "tenant_uuid": "tenant_123",
     "metric": "daily_calls",
     "limit": 10000
@@ -340,13 +340,13 @@ export POWERX_QUOTA_MODE=off
 或手动注入测试额度：
 
 ```bash
-powerx-cli plugin quota --set com.powerx.plugin.crm --tenant tenant_dev --calls 1000
+powerx-cli plugin quota --set com.powerx.plugins.crm --tenant tenant_dev --calls 1000
 ```
 
 查看状态：
 
 ```bash
-powerx-cli plugin quota --get com.powerx.plugin.crm
+powerx-cli plugin quota --get com.powerx.plugins.crm
 ```
 
 ---

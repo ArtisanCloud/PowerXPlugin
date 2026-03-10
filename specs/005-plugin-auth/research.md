@@ -16,7 +16,7 @@
   - *随机生成并打印* ➜ 不便复现、难以自动化；被拒。
 
 ## 3. 模式判定环境变量
-- **Decision**: 解析顺序 `context.iam_mode` (config) > `POWERX_RBAC_DELEGATE` (truthy=delegated) > `POWERX_PROXY` (1=delegated, 其他=local)。resolver 缓存结果并在日志中打印。
+- **Decision**: 解析依据收敛为 `IAMMode`（`local`/`delegated`）与 `POWERX_PROXY`（`0`/`1`）。resolver 缓存结果并在日志中打印。
 - **Rationale**: 与宿主注入模型保持一致，可在特殊调试时强制 override。
 - **Alternatives considered**:
   - *仅依赖 POWERX_PROXY* ➜ 无法在宿主环境下临时启用本地模式；被拒。

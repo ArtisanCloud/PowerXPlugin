@@ -60,7 +60,8 @@ func setupHandler(t *testing.T) (*consoletransport.ConfigHandler, *gorm.DB) {
 func TestConfigHandler_ListSections(t *testing.T) {
 	handler, _ := setupHandler(t)
 	r := gin.New()
-	req := httptest.NewRequest(http.MethodGet, "/config/sections", nil)
+	tenantID := "00000000-0000-0000-0000-000000000001"
+	req := httptest.NewRequest(http.MethodGet, "/config/sections?tenant_uuid="+tenantID, nil)
 	resp := httptest.NewRecorder()
 	ctx := gin.CreateTestContextOnly(resp, r)
 	ctx.Request = req
@@ -74,7 +75,9 @@ func TestConfigHandler_ListSections(t *testing.T) {
 func TestConfigHandler_UpdateSection(t *testing.T) {
 	handler, _ := setupHandler(t)
 	r := gin.New()
+	tenantID := "00000000-0000-0000-0000-000000000001"
 	body := map[string]any{
+		"tenant_uuid": tenantID,
 		"values": map[string]any{
 			"audit_retention_days":         210,
 			"config_change_retention_days": 90,

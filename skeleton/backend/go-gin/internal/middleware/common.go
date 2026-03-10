@@ -16,17 +16,23 @@ import (
 // CORS 跨域中间件
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		origin := c.Request.Header.Get("Origin")
-
-		// 在生产环境中应该配置具体的允许域名
-		c.Header("Access-Control-Allow-Origin", origin)
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Allow-Headers",
-			"Content-Type, Content-Length, Accept-Encoding, "+
-				"X-CSRF-Token, Authorization, accept, origin, Cache-Control, "+
-				"X-Requested-With, X-PowerX-Tenant, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT, X-Request-ID",
-		)
-		c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+		origin := strings.TrimSpace(c.Request.Header.Get("Origin"))
+		if origin == "" {
+			origin = "*"
+		}
+		setHeaders := func() {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Headers",
+				"Content-Type, Content-Length, Accept-Encoding, "+
+					"X-CSRF-Token, Authorization, accept, origin, Cache-Control, "+
+					"X-Requested-With, tenant_uuid, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT, X-Request-ID, X-Trace-Id",
+			)
+			c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+			c.Header("Access-Control-Expose-Headers", "X-Trace-Id, X-Correlation-Id, X-Request-Id")
+		}
+		setHeaders()
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -34,12 +40,17 @@ func CORS() gin.HandlerFunc {
 		}
 
 		c.Next()
+		setHeaders()
 	}
 }
 
 // RequestLogger 请求日志中间件
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !logger.HTTPAccessEnabled() {
+			c.Next()
+			return
+		}
 		start := time.Now()
 		path := c.Request.URL.Path
 		raw := c.Request.URL.RawQuery
@@ -76,6 +87,13 @@ func RequestLogger() gin.HandlerFunc {
 		if strings.TrimSpace(tenantUUID) != "" {
 			fields["tenant_uuid"] = tenantUUID
 		}
+		if requestID := strings.TrimSpace(c.GetString("request_id")); requestID != "" {
+			fields["request_id"] = requestID
+		}
+		if traceID := strings.TrimSpace(c.GetString("trace_id")); traceID != "" {
+			fields["trace_id"] = traceID
+		}
+		fields["plugin_id"] = pluginIDForLog()
 
 		// 根据状态码选择日志级别
 		entry := logger.HTTPMiddleware().WithFields(fields)
@@ -122,6 +140,11 @@ func Recovery() gin.HandlerFunc {
 // Timeout 超时中间件
 func Timeout(timeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if isWebSocketUpgrade(c.Request) {
+			c.Next()
+			return
+		}
+
 		// 简单的超时处理，实际使用中可能需要更复杂的实现
 		finish := make(chan struct{})
 		panicChan := make(chan interface{}, 1)
@@ -148,6 +171,18 @@ func Timeout(timeout time.Duration) gin.HandlerFunc {
 			c.Abort()
 		}
 	}
+}
+
+func isWebSocketUpgrade(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	upgrade := strings.ToLower(strings.TrimSpace(req.Header.Get("Upgrade")))
+	if upgrade != "websocket" {
+		return false
+	}
+	connection := strings.ToLower(req.Header.Get("Connection"))
+	return strings.Contains(connection, "upgrade")
 }
 
 // RateLimiter 简单的速率限制中间件（基于 IP）
@@ -234,15 +269,31 @@ func HealthCheck(endpoint string) gin.HandlerFunc {
 // RequestID 请求 ID 中间件
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		requestID := c.GetHeader("X-Request-ID")
+		requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		if requestID == "" {
+			requestID = strings.TrimSpace(c.GetHeader("Request-ID"))
+		}
 		if requestID == "" {
 			// 生成简单的请求 ID
 			requestID = fmt.Sprintf("%d", time.Now().UnixNano())
 		}
+		traceID := strings.TrimSpace(c.GetHeader("X-Trace-Id"))
+		if traceID == "" {
+			traceID = requestID
+		}
 
 		c.Header("X-Request-ID", requestID)
+		c.Header("X-Trace-Id", traceID)
 		c.Set("request_id", requestID)
+		c.Set("trace_id", traceID)
 
 		c.Next()
 	}
+}
+
+func pluginIDForLog() string {
+	if pluginID := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")); pluginID != "" {
+		return pluginID
+	}
+	return "com.powerx.plugins.base"
 }

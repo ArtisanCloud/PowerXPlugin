@@ -13,13 +13,15 @@ import (
 
 // Logger 全局日志实例
 var Logger *logrus.Logger
+var httpAccessEnabled = true
 
 // Fields 日志字段类型别名
 type Fields = logrus.Fields
 
 // Init 初始化日志配置
-func Init(level string) {
+func Init(level, format, output, filePath string, httpAccess bool) {
 	Logger = logrus.New()
+	httpAccessEnabled = httpAccess
 
 	// 设置日志级别
 	logLevel, err := logrus.ParseLevel(strings.ToLower(level))
@@ -29,22 +31,48 @@ func Init(level string) {
 	Logger.SetLevel(logLevel)
 
 	// 设置输出格式
-	if level == "debug" {
-		// 开发模式使用文本格式
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "text":
 		Logger.SetFormatter(&logrus.TextFormatter{
 			FullTimestamp:   true,
 			TimestampFormat: "2006-01-02 15:04:05",
 			ForceColors:     true,
 		})
-	} else {
-		// 生产模式使用 JSON 格式
+	case "json":
 		Logger.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: "2006-01-02T15:04:05.000Z07:00",
 		})
+	default:
+		if level == "debug" {
+			Logger.SetFormatter(&logrus.TextFormatter{
+				FullTimestamp:   true,
+				TimestampFormat: "2006-01-02 15:04:05",
+				ForceColors:     true,
+			})
+		} else {
+			Logger.SetFormatter(&logrus.JSONFormatter{
+				TimestampFormat: "2006-01-02T15:04:05.000Z07:00",
+			})
+		}
 	}
 
 	// 设置输出
-	Logger.SetOutput(os.Stdout)
+	switch strings.ToLower(strings.TrimSpace(output)) {
+	case "stderr":
+		Logger.SetOutput(os.Stderr)
+	case "file":
+		if strings.TrimSpace(filePath) != "" {
+			if f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+				Logger.SetOutput(f)
+			} else {
+				Logger.SetOutput(os.Stdout)
+			}
+		} else {
+			Logger.SetOutput(os.Stdout)
+		}
+	default:
+		Logger.SetOutput(os.Stdout)
+	}
 
 	// 添加调用位置信息（仅在 debug 模式）
 	if logLevel == logrus.DebugLevel || logLevel == logrus.TraceLevel {
@@ -68,6 +96,11 @@ func SetOutput(output io.Writer) {
 	if Logger != nil {
 		Logger.SetOutput(output)
 	}
+}
+
+// HTTPAccessEnabled controls request logging in middleware.
+func HTTPAccessEnabled() bool {
+	return httpAccessEnabled
 }
 
 // WithFields 创建带字段的日志条目

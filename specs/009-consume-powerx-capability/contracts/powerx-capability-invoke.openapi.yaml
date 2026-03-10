@@ -17,7 +17,7 @@ components:
       bearerFormat: JWT
   parameters:
     XTenantUUID:
-      name: X-PowerX-Tenant
+      name: tenant_uuid
       in: header
       required: true
       schema:

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
-	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
+	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
+	integrationService "{{ .BackendModulePath }}/internal/services/integration"
 	"github.com/sirupsen/logrus"
 )
 

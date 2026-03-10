@@ -22,6 +22,11 @@ GO_BUILD_CACHE     ?= $(abspath $(BACKEND_DIR)/.cache/go-build)
 FRONTEND_DIR        ?= web-admin
 FRONTEND_OUTPUT     ?= $(FRONTEND_DIR)/.output
 
+CLI_ROOT_DIR        ?= ..
+CLI_BUILD_CACHE     ?= $(abspath $(CLI_ROOT_DIR)/.cache/go-build)
+PX_PLUGIN_CLI_VERSION ?=
+GO_BIN_DIR          ?= $(shell sh -c 'if [ -n "$$GOBIN" ]; then printf "%s" "$$GOBIN"; else GOPATH="$$(go env GOPATH 2>/dev/null)"; printf "%s/bin" "$$GOPATH"; fi')
+
 # Dist（install/local 用）
 DIST_ROOT           ?= dist
 DIST_DIR            ?= $(DIST_ROOT)/$(VERSION)
@@ -37,7 +42,8 @@ RELEASE_WEBADMIN_DIR?= $(RELEASE_DIR)/web-admin
 RELEASE_WEBADMIN_OUTPUT ?= $(RELEASE_WEBADMIN_DIR)/.output
 
 # ===== URL / 端口 =====
-POWERX_ADMIN_BASE   ?= /_p/$(PLUGIN_ID)/admin/    # Host 构建时写入到前端 baseURL
+# Host 构建时写入到前端 baseURL
+POWERX_ADMIN_BASE   ?= /_p/$(PLUGIN_ID)/admin/
 HOST_PORT           ?= 4100                       # 运行 Host 产物时的本地端口
 STANDALONE_PORT     ?= 4200                       # 运行 Standalone 产物时的本地端口
 CHECK_PORT          ?= 4999                       # 临时检查端口（不要和上面冲突）
@@ -59,6 +65,30 @@ build: ## 构建后端（本机平台）
 	    echo "   跳过 migrate（未找到 cmd/database）"; \
 	  fi; \
 	fi
+
+.PHONY: build-px-plugin
+build-px-plugin: ## 在仓库根目录构建 bin/px-plugin
+	@echo "==> 构建 px-plugin CLI -> $(CLI_ROOT_DIR)/bin/px-plugin"
+	@mkdir -p $(CLI_ROOT_DIR)/bin
+	@mkdir -p $(CLI_BUILD_CACHE)
+	@if [ -n "$(PX_PLUGIN_CLI_VERSION)" ]; then \
+	  echo "   使用版本号: $(PX_PLUGIN_CLI_VERSION)"; \
+	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -ldflags "-X main.version=$(PX_PLUGIN_CLI_VERSION)" -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	else \
+	  GOCACHE=$(CLI_BUILD_CACHE) go build -C $(CLI_ROOT_DIR) -o ./bin/px-plugin ./tools/cli/cmd/px-plugin; \
+	fi
+	@$(CLI_ROOT_DIR)/bin/px-plugin --version
+
+.PHONY: install-px-plugin
+install-px-plugin: build-px-plugin ## 构建并安装到 GOBIN/GOPATH/bin，保持 `px-plugin` 直接可用
+	@echo "==> 安装 px-plugin 到 $(GO_BIN_DIR)/px-plugin"
+	@mkdir -p $(GO_BIN_DIR)
+	@cp $(CLI_ROOT_DIR)/bin/px-plugin $(GO_BIN_DIR)/px-plugin
+	@echo "已安装: $(GO_BIN_DIR)/px-plugin"
+	@$(GO_BIN_DIR)/px-plugin --version || { \
+	  echo "⚠️ 已安装，但无法直接执行 $(GO_BIN_DIR)/px-plugin --version（可能被系统策略拦截或终端缓存影响）"; \
+	  echo "   请手动执行: hash -r && px-plugin --version"; \
+	}
 
 .PHONY: build-linux
 build-linux: ## 构建后端（Linux amd64）
@@ -83,9 +113,15 @@ frontend-build: ## 构建 Host 包（POWERX_PROXY=1, baseURL=$(POWERX_ADMIN_BASE
 	@echo "==> 构建 web-admin（Host 包） POWERX_PROXY=1 baseURL=$(POWERX_ADMIN_BASE)"
 	cd $(FRONTEND_DIR) && \
 	  POWERX_PROXY=1 \
+	  POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
+	  POWERX_PLUGIN_VERSION="$(VERSION)" \
+	  NUXT_PUBLIC_POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
+	  NUXT_PUBLIC_POWERX_PLUGIN_VERSION="$(VERSION)" \
+	  NUXT_PUBLIC_API_BASE= \
+	  NUXT_PUBLIC_API_PREFIX= \
 	  POWERX_ADMIN_BASE="$(POWERX_ADMIN_BASE)" \
 	  NODE_ENV=production \
-	  npx nuxi build
+	  npm run build
 
 # ===== 前端构建（Standalone / 独立部署）=====
 .PHONY: frontend-build-standalone
@@ -93,8 +129,12 @@ frontend-build-standalone: ## 构建 Standalone 包（POWERX_PROXY=0, baseURL=/�
 	@echo "==> 构建 web-admin（Standalone 包） POWERX_PROXY=0 baseURL=/"
 	cd $(FRONTEND_DIR) && \
 	  POWERX_PROXY=0 \
+	  POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
+	  POWERX_PLUGIN_VERSION="$(VERSION)" \
+	  NUXT_PUBLIC_POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
+	  NUXT_PUBLIC_POWERX_PLUGIN_VERSION="$(VERSION)" \
 	  NODE_ENV=production \
-	  npx nuxi build
+	  npm run build
 
 # ===== 运行已编译的前端产物（Host）=====
 .PHONY: run-frontend
@@ -154,12 +194,20 @@ check-base-standalone: frontend-build-standalone
 
 # ===== 生成 dist（目录安装包，给 PowerX 的 install/local 用）=====
 .PHONY: dist
-dist: build frontend-build
+dist: plugin-yaml-check build frontend-build
 	@echo "==> 生成 dist 安装包目录：$(DIST_DIR)"
 	@rm -rf $(DIST_DIR)
 	@mkdir -p $(DIST_BACKEND_BIN) $(DIST_WEBADMIN_OUTPUT)
 	@echo "写入插件清单 -> $(DIST_DIR)/plugin.yaml (version=$(VERSION))"
 	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' plugin.yaml > $(DIST_DIR)/plugin.yaml
+	@if [ -d "plugin.d" ]; then \
+	  mkdir -p $(DIST_DIR)/plugin.d; \
+	  cp -R plugin.d/. $(DIST_DIR)/plugin.d/; \
+	fi
+	@if [ -f "config/event_fabric.yaml" ]; then \
+	  mkdir -p $(DIST_DIR)/config; \
+	  cp config/event_fabric.yaml $(DIST_DIR)/config/event_fabric.yaml; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(DIST_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(DIST_BACKEND_BIN)/; fi
 	@if [ -d "$(FRONTEND_OUTPUT)" ] && [ -n "$$(ls -A $(FRONTEND_OUTPUT) 2>/dev/null)" ]; then \
@@ -182,6 +230,14 @@ release: build frontend-build
 	@mkdir -p $(RELEASE_BACKEND_BIN) $(RELEASE_WEBADMIN_OUTPUT)
 	@echo "写入插件清单 -> $(RELEASE_DIR)/plugin.yaml (version=$(VERSION))"
 	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' plugin.yaml > $(RELEASE_DIR)/plugin.yaml
+	@if [ -d "plugin.d" ]; then \
+	  mkdir -p $(RELEASE_DIR)/plugin.d; \
+	  cp -R plugin.d/. $(RELEASE_DIR)/plugin.d/; \
+	fi
+	@if [ -f "config/event_fabric.yaml" ]; then \
+	  mkdir -p $(RELEASE_DIR)/config; \
+	  cp config/event_fabric.yaml $(RELEASE_DIR)/config/event_fabric.yaml; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(RELEASE_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(RELEASE_BACKEND_BIN)/; fi
 	@cp -R $(FRONTEND_OUTPUT)/. $(RELEASE_WEBADMIN_OUTPUT)/

@@ -1,4 +1,4 @@
-# com.powerx.plugin.base 迁移方案（2025-Q4 调整版）
+# com.powerx.plugins.base 迁移方案（2025-Q4 调整版）
 
 ## 1. 目标
 - 在 `PowerXPlugin` 仓库沉淀一套可直接运行的 Base 模板：后端 CRUD、前端 Starter 页面、`plugin.yaml`/菜单/RBAC 清单。
@@ -17,7 +17,7 @@
 1. **Router Path Param 支持**：`framework/backend/go/router/router.go:140` 的 `Context.Param` 目前返回空，需实现路径参数解析，否则 `/templates/:id` 无法工作。
 2. **数据存储层替换**：Base 插件依赖 GORM + 数据库；需改造成符合 `.specify/memory/constitution.md` 的内存仓储（map 或 `sync.Map`），同时保持 Repository 结构内嵌 `BaseRepository[T]` 并完整实现租户隔离规范。
 3. **统一响应格式**：Base 使用 `{success, data, message, error, timestamp, request_id}`；框架需提供同结构的 JSON 响应助手，供 Skeleton 与未来模板共享。
-4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `X-PowerX-Tenant` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
+4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `tenant_uuid` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
 
 ## 4. 实施里程碑
 
@@ -52,7 +52,7 @@
 - **维护成本**：未来需同时维护框架 Stub 与真实实现，建议在 CHANGELOG/ADR 中持续同步差异。
 
 ## 6. 验证清单
-- `go test ./skeleton/...`、`go test ./framework/backend/go/...`
+- `go test ./skeleton/...`、`cd framework/backend/go && go test ./...`
 - `npm install && npm run lint`（`skeleton/web-admin/nuxt` 与 `framework/frontend/nuxt/framework-admin`）
 - Standalone 自测：`go run ./skeleton/backend/go-gin/cmd/plugin` + `npm run dev`，浏览器验证 `/intro`、`/templates/crud` CRUD 流程。
 - CLI 输出验证（准备就绪后）：`px-plugin init com.powerx.demo --ui=starter`，确保产物可直接运行。
@@ -101,7 +101,7 @@
 
 | 风险 | 描述 | 应对策略 |
 | --- | --- | --- |
-| 框架回归 | Router/Middleware 变更影响现有用户 | 全量单测 + `go test ./framework/backend/go/...` 作为必跑检查 |
+| 框架回归 | Router/Middleware 变更影响现有用户 | 全量单测 + `cd framework/backend/go && go test ./...` 作为必跑检查 |
 | Nuxt 配置偏差 | Skeleton/CLI 与 Base 差异导致路由/i18n 异常 | 维护 `research.md` 差异记录，完成 Phase 7 T039/T040 |
 | CLI 模板偏离 | Skeleton 与模板不同步 | `px-plugin init` smoke + diff，必要时在 CI 加自动对比 |
 | 文档滞后 | 新能力未在 Quickstart/Standalone 体现 | 将文档更新纳入任务检查清单 |
@@ -111,7 +111,7 @@
 
 ## 11. 验证清单（更新）
 
-1. `go test ./framework/backend/go/... -coverprofile=coverage.out`（≥90%，SC-001）
+1. `cd framework/backend/go && go test ./... -coverprofile=coverage.out`（≥90%，SC-001）
 2. `go test ./skeleton/backend/go-gin/... -v` + `curl` 多租户 CRUD（SC-002）
 3. `curl -w 'time_total:%{time_total}'` 记录延迟；数据写入 `research.md`
 4. `npm run lint --silent` / `npm run build`（skeleton/web-admin/nuxt、workspace layer）
@@ -135,6 +135,6 @@
 ## 13. 依赖检查清单
 
 - [ ] `framework-admin` Layer 可用，StarterPages toggle 生效
-- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `X-PowerX-Tenant`
+- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `tenant_uuid`
 - [ ] Skeleton 后端可独立运行并完成 CRUD Smoke（Phase 2 验证）
 - [ ] Skeleton 前端（含 `POWERX_PROXY=1` 场景）可访问首页与 Admin CRUD 页面

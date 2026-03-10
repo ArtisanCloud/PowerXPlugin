@@ -64,6 +64,50 @@ export const useUserStore = defineStore("user", {
       return currentTenant?.is_admin || false;
     },
 
+    // delegated 场景下的模板写权限（优先使用宿主返回的能力/权限）
+    canReadTemplates: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allow = new Set([
+        "base.templates.manage",
+        "base.templates.read",
+        "base.templates:read",
+        "template:read",
+      ]);
+      return perms.some((perm) => allow.has(perm));
+    },
+
+    // delegated 场景下的模板写权限（优先使用宿主返回的能力/权限）
+    canWriteTemplates: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const tplCaps = state.context?.capabilities?.templates;
+      if (
+        Boolean(tplCaps?.can_create) ||
+        Boolean(tplCaps?.can_update) ||
+        Boolean(tplCaps?.can_delete)
+      ) {
+        return true;
+      }
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allow = new Set([
+        "base.templates.manage",
+        "base.templates:create",
+        "base.templates:update",
+        "base.templates:delete",
+        "template:create",
+        "template:update",
+        "template:delete",
+      ]);
+      return perms.some((perm) => allow.has(perm));
+    },
+
     // 用户显示名称
     displayName: (state): string => {
       return (
@@ -142,9 +186,29 @@ export const useUserStore = defineStore("user", {
         this.lastFetchedAt = Date.now();
         this.persistCurrentTenantUUID();
       } catch (error: any) {
+        if (isNotFoundError(error)) {
+          this.applyLocalTenantSwitch(tenantUuid, targetTenant || null);
+          return;
+        }
         console.error("切换租户失败:", error);
         throw new Error(error?.message || "切换租户失败");
       }
+    },
+
+    applyLocalTenantSwitch(
+      tenantUuid: string,
+      targetTenant: ContextMember | null
+    ) {
+      if (!this.context) {
+        throw new Error("用户上下文未加载，无法切换租户");
+      }
+      this.context = {
+        ...this.context,
+        current_tenant_uuid: tenantUuid,
+        current_member_id: targetTenant?.member_id ?? this.context.current_member_id,
+      };
+      this.lastFetchedAt = Date.now();
+      this.persistCurrentTenantUUID();
     },
 
     // 更新用户信息（本地更新，不调用API）
@@ -181,3 +245,12 @@ export const useUserStore = defineStore("user", {
 
 // 导出类型供其他地方使用
 export type UserStoreState = ReturnType<typeof useUserStore>;
+
+function isNotFoundError(error: any): boolean {
+  const status = Number(error?.statusCode || error?.status || error?.response?.status || 0);
+  if (status === 404) {
+    return true;
+  }
+  const text = String(error?.message || "").toLowerCase();
+  return text.includes("404") || text.includes("not found");
+}

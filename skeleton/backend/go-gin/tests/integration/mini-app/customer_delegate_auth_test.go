@@ -38,7 +38,8 @@ func TestMiniAppDelegateAuth_TenantMismatchForbidden(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Server: &config.ServerConfig{DevMode: true},
+		Server:  &config.ServerConfig{},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:             "delegate",
 			DelegateEndpoint: "http://powerx.local/api/v1/customer/auth/validate",
@@ -52,7 +53,7 @@ func TestMiniAppDelegateAuth_TenantMismatchForbidden(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/ping", nil)
-	req.Header.Set("X-PowerX-Tenant", "00000000-0000-0000-0000-000000000001")
+	req.Header.Set("tenant_uuid", "00000000-0000-0000-0000-000000000001")
 	req.Header.Set("Authorization", "Bearer token-1")
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
@@ -77,7 +78,8 @@ func TestMiniAppDelegateAuth_UpstreamUnavailable503(t *testing.T) {
 		}),
 	}
 	cfg := &config.Config{
-		Server: &config.ServerConfig{DevMode: true},
+		Server:  &config.ServerConfig{},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		CustomerAuth: &config.CustomerAuthConfig{
 			Mode:             "delegate",
 			DelegateEndpoint: "http://powerx.local/api/v1/customer/auth/validate",
@@ -91,7 +93,7 @@ func TestMiniAppDelegateAuth_UpstreamUnavailable503(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/mini-app/ping", nil)
-	req.Header.Set("X-PowerX-Tenant", "00000000-0000-0000-0000-000000000001")
+	req.Header.Set("tenant_uuid", "00000000-0000-0000-0000-000000000001")
 	req.Header.Set("Authorization", "Bearer token-1")
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)

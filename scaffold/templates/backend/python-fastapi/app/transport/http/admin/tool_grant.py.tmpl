@@ -6,6 +6,7 @@ from app.contracts.response import (
     fail,
     ok,
 )
+from app.middleware.tenant_context import resolve_tenant_uuid
 from app.services.tool_grant_service import ToolGrantService
 
 router = APIRouter(prefix="/admin")
@@ -37,14 +38,28 @@ def _require_auth(request: Request):
     return None
 
 
+def _resolve_tenant_uuid(request: Request, payload: dict | None = None) -> str:
+    if payload:
+        candidate = payload.get("tenant_uuid") or payload.get("tenantUuid")
+        if candidate:
+            return str(candidate).strip()
+    candidate = request.query_params.get("tenant_uuid") or request.query_params.get("tenantUuid")
+    if candidate:
+        return str(candidate).strip()
+    return str(resolve_tenant_uuid(request) or "").strip()
+
+
 @router.post("/tool-grant/revoke")
 async def revoke_toolgrant(request: Request, payload: dict):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    if not (payload or {}).get("tenant_uuid") or not (payload or {}).get("toolgrant_id"):
+    tenant_uuid = _resolve_tenant_uuid(request, payload)
+    if not tenant_uuid or not (payload or {}).get("toolgrant_id"):
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid/toolgrant_id 必填", request_id=request_id, status_code=400)
+    payload = dict(payload or {})
+    payload["tenant_uuid"] = tenant_uuid
     service.revoke(payload)
     return Response(status_code=204)
 
@@ -55,7 +70,7 @@ async def list_revocations(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
     limit = request.query_params.get("limit")
@@ -70,7 +85,7 @@ async def list_usage(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    tenant_uuid = request.query_params.get("tenant_uuid")
+    tenant_uuid = _resolve_tenant_uuid(request)
     if not tenant_uuid:
         return fail(ERR_CODE_INVALID_REQUEST, "tenant_uuid 必填", request_id=request_id, status_code=400)
     toolgrant_id = request.query_params.get("toolgrant_id")

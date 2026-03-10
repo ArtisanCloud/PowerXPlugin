@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
-	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	model "{{ .BackendModulePath }}/internal/entity/models/integration"
+	repository "{{ .BackendModulePath }}/internal/entity/repository"
+	"{{ .BackendModulePath }}/internal/logger"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

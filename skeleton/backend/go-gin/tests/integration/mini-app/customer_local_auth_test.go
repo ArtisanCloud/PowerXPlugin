@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -309,7 +309,8 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 	}
 
 	cfg := &config.Config{
-		Server: &config.ServerConfig{APIPrefix: "/api/v1", DevMode: true},
+		Server:  &config.ServerConfig{APIPrefix: "/api/v1"},
+		Logging: &config.LoggingConfig{DebugMode: true},
 		Context: &config.ContextConfig{
 			HMACSecret: "dev-hmac-secret",
 			Issuer:     "powerx-local",
@@ -343,7 +344,7 @@ func doJSON(t *testing.T, engine *gin.Engine, method, path, tenantUUID string, b
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if tenantUUID != "" {
-		req.Header.Set("X-PowerX-Tenant", tenantUUID)
+		req.Header.Set("tenant_uuid", tenantUUID)
 	}
 	for k, v := range headers {
 		req.Header.Set(k, v)

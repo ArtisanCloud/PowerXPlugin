@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
-	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
+	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
+	repository "{{ .BackendModulePath }}/internal/entity/repository"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

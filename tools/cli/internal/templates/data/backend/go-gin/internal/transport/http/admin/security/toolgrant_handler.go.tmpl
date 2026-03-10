@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	toolgrantservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent/tool_grant"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	toolgrantservice "{{ .BackendModulePath }}/internal/services/agent/tool_grant"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,13 +24,20 @@ func NewToolGrantHandler(deps *app.Deps) *ToolGrantHandler {
 
 func (h *ToolGrantHandler) Revoke(c *gin.Context) {
 	var payload struct {
-		TenantUuid  string `json:"tenant_uuid" binding:"required"`
+		TenantUuid  string `json:"tenant_uuid"`
 		ToolGrantID string `json:"toolgrant_id" binding:"required"`
 		Reason      string `json:"reason"`
 		RequestedBy string `json:"requested_by"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
+		return
+	}
+	if payload.TenantUuid == "" {
+		payload.TenantUuid = admincommon.ResolveTenantUUID(c)
+	}
+	if payload.TenantUuid == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
 	}
 	if payload.RequestedBy == "" {
@@ -45,6 +53,9 @@ func (h *ToolGrantHandler) Revoke(c *gin.Context) {
 
 func (h *ToolGrantHandler) ListRevocations(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return
@@ -65,6 +76,9 @@ func (h *ToolGrantHandler) ListRevocations(c *gin.Context) {
 
 func (h *ToolGrantHandler) ListUsageEvents(c *gin.Context) {
 	tenantID := c.Query("tenant_uuid")
+	if tenantID == "" {
+		tenantID = admincommon.ResolveTenantUUID(c)
+	}
 	if tenantID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_uuid is required"})
 		return

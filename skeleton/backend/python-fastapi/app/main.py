@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 
 from app.config.settings import get_settings
@@ -11,6 +13,8 @@ from app.middleware.request_trace import request_id_middleware, request_trace_mi
 from app.observability.host_context import host_context_middleware
 from app.router.api import register_routes
 from app.transport.http.rbac_registry import build_rbac_entries
+from app.services.ws_bus import MemoryHub, RedisHub
+from app.transport.ws_bus import register_ws_routes
 
 
 def create_app() -> FastAPI:
@@ -35,7 +39,28 @@ def create_app() -> FastAPI:
     app.middleware("http")(host_context_middleware)
     app.middleware("http")(request_id_middleware)
     register_routes(app, settings)
+    _init_ws_bus(app, settings)
+    register_ws_routes(app)
     return app
+
+
+def _init_ws_bus(app: FastAPI, settings) -> None:
+    logger = logging.getLogger("ws_bus")
+    provider = (settings.ws_bus_provider or "memory").lower()
+    if provider == "redis":
+        try:
+            hub = RedisHub(
+                redis_url=settings.ws_bus_redis_url,
+                channel=settings.ws_bus_channel,
+                logger=logger,
+            )
+            app.state.ws_bus_hub = hub
+            app.add_event_handler("startup", hub.start)
+            app.add_event_handler("shutdown", hub.close)
+            return
+        except Exception:
+            logger.exception("Failed to initialize redis ws bus; falling back to memory")
+    app.state.ws_bus_hub = MemoryHub()
 
 
 app = create_app()

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	basemodels "{{ .BackendModulePath }}/internal/entity/models"
+	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"

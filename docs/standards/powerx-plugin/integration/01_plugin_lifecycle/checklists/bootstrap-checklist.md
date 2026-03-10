@@ -2,7 +2,7 @@
 
 **Purpose**: Verify a newly initialized plugin repository conforms to the PowerX lifecycle baseline before feature work begins.
 
-- [ ] Repo has been renamed to `com.powerx.plugin.<slug>` (Go module, Nuxt metadata, CI IDs updated)
+- [ ] Repo has been renamed to `com.powerx.plugins.<slug>` (Go module, Nuxt metadata, CI IDs updated)
 - [ ] Required directories exist: `backend/`, `web-admin/`, `docs/`, `docs/lifecycle/`, `build/pxp/`
 - [ ] `backend/etc/config.yaml` copied from example and environment variables documented
 - [ ] `make dev-setup` executed successfully (Go modules + Node deps installed)

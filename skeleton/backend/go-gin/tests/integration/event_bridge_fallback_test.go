@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
-	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/eventbridge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 func TestEventBridge_FallbackToLocalWhenTaskBusUnavailable(t *testing.T) {
@@ -30,7 +30,7 @@ func TestEventBridge_FallbackToLocalWhenTaskBusUnavailable(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, emitter.Emit(context.Background(), event.Event{
-		Topic: "powerx.channel.master.credential_inspection.v1",
+		Topic: "_topic.template.update",
 		Meta:  evtMeta,
 		Payload: json.RawMessage(`{
   "channel_id": "c1",

@@ -3,9 +3,9 @@ package iam
 import (
 	"strconv"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	"{{ .BackendModulePath }}/internal/contracts"
+	authmw "{{ .BackendModulePath }}/internal/middleware"
+	srviam "{{ .BackendModulePath }}/internal/services/iam"
 	"github.com/gin-gonic/gin"
 )
 

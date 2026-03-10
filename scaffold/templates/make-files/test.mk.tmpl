@@ -24,6 +24,16 @@ test-smoke: ## 运行 smoke（对齐根目录 test-smoke）
 	fi
 	@echo "=== Smoke Tests Finished ==="
 
+.PHONY: test-regression
+test-regression: ## 运行 regression（对齐根目录 test-regression）
+	@echo "=== Regression Tests Start ==="
+	@if [ "$(BACKEND)" = "fastapi" ]; then \
+		cd .. && BACKEND=$(BACKEND) python3 scripts/testing/run_with_timeout.py --timeout 3600 ./scripts/testing/regression-python.sh; \
+	else \
+		cd .. && BACKEND=$(BACKEND) python3 scripts/testing/run_with_timeout.py --timeout 3600 ./scripts/testing/regression.sh; \
+	fi
+	@echo "=== Regression Tests Finished ==="
+
 .PHONY: test-admin
 test-admin: ## 运行 web-admin 测试
 	@echo "运行 Web Admin 测试..."

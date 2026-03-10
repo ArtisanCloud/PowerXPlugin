@@ -51,7 +51,7 @@ PowerXPlugin/
 ├─ go.work                                 # Phase 0: 管理 framework/ 与 tools/cli/ 多模块
 ├─ package.json                            # Phase 0: 根级 npm workspaces（可选）
 ├─ framework/                              # Phase 3: 共享后端框架
-│  ├─ go.mod (module github.com/ArtisanCloud/PowerXPlugin/framework)
+│  ├─ go.mod (module github.com/ArtisanCloud/PowerXPlugin/framework/backend/go)
 │  └─ backend/go/
 │     ├─ bootstrap/                        # App 初始化（参考 Base/internal/bootstrap）
 │     ├─ router/                           # RegisterFrameworkRoutes/RegisterPluginRoutes
@@ -74,7 +74,7 @@ PowerXPlugin/
 │        └─ index.ts
 ├─ skeleton/                               # Phase 2: 可运行样例
 │  ├─ backend/
-│  │  ├─ go.mod (require github.com/ArtisanCloud/PowerXPlugin/framework)
+│  │  ├─ go.mod (require github.com/ArtisanCloud/PowerXPlugin/framework/backend/go)
 │  │  ├─ cmd/plugin/main.go                # 6 步装配流程（参考 Base backend/cmd/plugin）
 │  │  └─ internal/
 │  │     ├─ routes/                        # `/api/v1/ping`
@@ -106,7 +106,7 @@ PowerXPlugin/
 └─ config/config.yaml.example              # 配置样例
 ```
 
-**Structure Decision**: 以 Base 插件实装为基准，强化多模块骨架：`framework/` 拆解 Base/internal 逻辑形成框架层，`skeleton/` 复制最小可运行流程，`scaffold/templates/` 与 skeleton 保持 100% 同步，`tools/cli/` 提供 px-plugin 命令；整体结构与 `docs/init-project.md` 及 `/com.powerx.plugin.base` 一致，确保 CLI、框架与示例互相验证。
+**Structure Decision**: 以 Base 插件实装为基准，强化多模块骨架：`framework/` 拆解 Base/internal 逻辑形成框架层，`skeleton/` 复制最小可运行流程，`scaffold/templates/` 与 skeleton 保持 100% 同步，`tools/cli/` 提供 px-plugin 命令；整体结构与 `docs/init-project.md` 及 `/com.powerx.plugins.base` 一致，确保 CLI、框架与示例互相验证。
 
 ## Complexity Tracking
 

@@ -3,7 +3,7 @@ type: API
 version: 1.0.0
 description: "审核模板草稿，附带意见与敏感字段校验。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [update]
 provides:
   - id: schema/input/{{ .PluginID }}.template.review.v1

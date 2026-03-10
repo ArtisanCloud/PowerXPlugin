@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/event"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 )
 
 func TestMetaBuilder_Build_RequiresTenantUUID(t *testing.T) {

@@ -1,0 +1,13 @@
+# Next.js Tests Ruleset
+kind: ruleset
+id: next_tests
+version: 1.0.0
+summary: "Next.js 测试规范（占位）"
+checks:
+  - id: next-test-location
+    desc: 测试目录需明确
+    assert:
+      type: text
+      target: web-admin/next
+      pattern:
+        - "test"

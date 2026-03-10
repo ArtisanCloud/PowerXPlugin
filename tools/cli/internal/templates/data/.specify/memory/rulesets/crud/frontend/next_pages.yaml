@@ -1,0 +1,18 @@
+# Next.js Pages Ruleset
+kind: ruleset
+id: next_pages
+version: 1.0.0
+summary: "Next.js 页面结构规范（需带前缀约定）"
+checks:
+  - id: next-pages-location
+    desc: 页面必须放在 web-admin/next/app 下
+    assert:
+      type: dir
+      target: web-admin/next/app
+  - id: next-prefix
+    desc: 新增 Next 规范必须携带 next_ 前缀以区分 Nuxt
+    assert:
+      type: text
+      target: .specify/memory/rulesets/crud/frontend
+      pattern:
+        - "next_"

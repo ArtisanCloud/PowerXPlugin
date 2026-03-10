@@ -7,6 +7,11 @@ SKELETON_DIR := skeleton
 help: ## Show available make targets
 	@$(MAKE) -C $(SKELETON_DIR) help
 
+.PHONY: ci-agent-assets
+ci-agent-assets: ## Check .codex/.specify path normalization
+	@npm run sync:templates -- --check
+	@npm run check:agent-paths
+
 # Proxy common targets to skeleton/Makefile to unify entrypoints.
 .PHONY: test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend \
         migrate migrate-cmd seed setup-db reset-db \

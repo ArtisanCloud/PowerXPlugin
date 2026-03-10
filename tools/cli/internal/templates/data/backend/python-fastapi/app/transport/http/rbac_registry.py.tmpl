@@ -1,0 +1,280 @@
+from __future__ import annotations
+
+from typing import Dict
+
+from app.middleware.rbac import Permission
+
+
+def build_rbac_entries(api_prefix: str, plugin_id: str | None = None) -> Dict[str, Permission]:
+    prefix = api_prefix.rstrip("/") or "/api/v1"
+    plugin = (plugin_id or "").strip() or "com.powerx.plugins.base"
+    entries: Dict[str, Permission] = {}
+
+    entries.update(_rbac_templates(prefix))
+    entries.update(_rbac_iam(prefix, plugin))
+    entries.update(_rbac_runtime_ops(prefix))
+    entries.update(_rbac_capability(prefix, plugin))
+    entries.update(_rbac_marketplace_admin(prefix))
+    entries.update(_rbac_operations(prefix))
+    entries.update(_rbac_integration_admin(prefix))
+    entries.update(_rbac_security(prefix))
+    entries.update(_rbac_console(prefix))
+    entries.update(_rbac_integration_public(prefix))
+    entries.update(_rbac_marketplace_public(prefix))
+    return entries
+
+
+def _rbac_templates(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/templates"
+    admin_base = f"{prefix}/admin/templates"
+    read = Permission(resource="base.templates", action="read")
+    manage = Permission(resource="base.templates", action="manage")
+    return {
+        f"GET:{base}": read,
+        f"GET:{base}/*": read,
+        f"POST:{base}": manage,
+        f"PUT:{base}/*": manage,
+        f"DELETE:{base}/*": manage,
+        f"POST:{base}/batch-clone": manage,
+        f"POST:{base}/*/validate": manage,
+        f"POST:{admin_base}/batch-clone": manage,
+        f"POST:{admin_base}/*/validate": manage,
+    }
+
+
+def _rbac_iam(prefix: str, plugin_id: str) -> Dict[str, Permission]:
+    base = f"{prefix}/admin/iam"
+    return {
+        f"GET:{base}/tenants": Permission(resource=f"{plugin_id}:iam.tenant", action="read"),
+        f"POST:{base}/tenants": Permission(resource=f"{plugin_id}:iam.tenant", action="write"),
+        f"PATCH:{base}/tenants/*": Permission(resource=f"{plugin_id}:iam.tenant", action="write"),
+        f"GET:{base}/departments": Permission(resource=f"{plugin_id}:iam.department", action="read"),
+        f"POST:{base}/departments": Permission(resource=f"{plugin_id}:iam.department", action="write"),
+        f"PATCH:{base}/departments/*": Permission(resource=f"{plugin_id}:iam.department", action="write"),
+        f"DELETE:{base}/departments/*": Permission(resource=f"{plugin_id}:iam.department", action="delete"),
+        f"GET:{base}/members": Permission(resource=f"{plugin_id}:iam.user", action="read"),
+        f"POST:{base}/members": Permission(resource=f"{plugin_id}:iam.user", action="write"),
+        f"PATCH:{base}/members/*": Permission(resource=f"{plugin_id}:iam.user", action="write"),
+        f"POST:{base}/members/import": Permission(resource=f"{plugin_id}:iam.user", action="write"),
+        f"GET:{base}/users": Permission(resource=f"{plugin_id}:iam.user", action="read"),
+        f"POST:{base}/users": Permission(resource=f"{plugin_id}:iam.user", action="write"),
+        f"PATCH:{base}/users/*": Permission(resource=f"{plugin_id}:iam.user", action="write"),
+        f"POST:{base}/users/import": Permission(resource=f"{plugin_id}:iam.user", action="write"),
+        f"GET:{base}/roles": Permission(resource=f"{plugin_id}:iam.role", action="read"),
+        f"POST:{base}/roles": Permission(resource=f"{plugin_id}:iam.role", action="write"),
+        f"PATCH:{base}/roles/*": Permission(resource=f"{plugin_id}:iam.role", action="write"),
+        f"DELETE:{base}/roles/*": Permission(resource=f"{plugin_id}:iam.role", action="delete"),
+        f"PUT:{base}/roles/*/permissions": Permission(resource=f"{plugin_id}:iam.role", action="write"),
+        f"POST:{base}/roles/*/members": Permission(resource=f"{plugin_id}:iam.role", action="write"),
+        f"DELETE:{base}/roles/*/members": Permission(resource=f"{plugin_id}:iam.role", action="write"),
+        f"GET:{base}/permissions": Permission(resource=f"{plugin_id}:iam.permission", action="read"),
+        f"GET:{base}/audit/logs": Permission(resource=f"{plugin_id}:iam.audit", action="read"),
+        f"POST:{base}/auth/local/sts": Permission(resource=f"{plugin_id}:iam.sts", action="mint"),
+    }
+
+
+def _rbac_runtime_ops(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/admin/runtime"
+    return {
+        f"POST:{base}/bootstrap": Permission(resource="runtime.ops", action="manage"),
+        f"POST:{base}/sessions/register": Permission(resource="runtime.ops", action="manage"),
+        f"POST:{base}/sessions/*/ack": Permission(resource="runtime.ops", action="manage"),
+        f"POST:{base}/sessions/*/heartbeat": Permission(resource="runtime.ops", action="observe"),
+        f"POST:{base}/sessions/*/close": Permission(resource="runtime.ops", action="manage"),
+        f"POST:{base}/sessions/*/invoke": Permission(resource="runtime.ops", action="invoke"),
+        f"GET:{base}/quota/status": Permission(resource="runtime.ops", action="read"),
+        f"POST:{base}/quota/overrides": Permission(resource="runtime.ops", action="manage"),
+        f"GET:{base}/metrics": Permission(resource="runtime.ops", action="observe"),
+        f"POST:{base}/event-bridge/emit": Permission(resource="runtime.ops", action="invoke"),
+    }
+
+
+def _rbac_capability(prefix: str, plugin_id: str) -> Dict[str, Permission]:
+    base = f"{prefix}/admin/capabilities/register"
+    list_base = f"{prefix}/admin/capabilities"
+    review_base = f"{prefix}/admin/capabilities/reviews"
+    exposure_base = f"{prefix}/admin/capabilities/exposure"
+    quota_base = f"{prefix}/admin/capabilities/quotas"
+    lifecycle_base = f"{prefix}/admin/capabilities/lifecycle"
+    resource = f"{plugin_id}:capability"
+    review_res = f"{plugin_id}:capability.review"
+    exposure_res = f"{plugin_id}:capability.exposure"
+    quota_res = f"{plugin_id}:capability.quota"
+    lifecycle_res = f"{plugin_id}:capability.lifecycle"
+    return {
+        f"GET:{list_base}": Permission(resource=resource, action="read"),
+        f"GET:{base}/template": Permission(resource=resource, action="read"),
+        f"POST:{base}/validate": Permission(resource=resource, action="create"),
+        f"POST:{base}": Permission(resource=resource, action="create"),
+        f"GET:{review_base}/*": Permission(resource=review_res, action="read"),
+        f"POST:{review_base}/*/resubmit": Permission(resource=review_res, action="update"),
+        f"POST:{review_base}/tasks/*/comments": Permission(resource=review_res, action="update"),
+        f"POST:{review_base}/tasks/*/decision": Permission(resource=review_res, action="review"),
+        f"GET:{exposure_base}/template": Permission(resource=exposure_res, action="read"),
+        f"GET:{exposure_base}/*": Permission(resource=exposure_res, action="read"),
+        f"PUT:{exposure_base}/*": Permission(resource=exposure_res, action="write"),
+        f"GET:{quota_base}/*": Permission(resource=quota_res, action="read"),
+        f"POST:{quota_base}/*": Permission(resource=quota_res, action="manage"),
+        f"GET:{lifecycle_base}/template": Permission(resource=lifecycle_res, action="read"),
+        f"GET:{lifecycle_base}": Permission(resource=lifecycle_res, action="read"),
+        f"POST:{lifecycle_base}": Permission(resource=lifecycle_res, action="write"),
+        f"POST:{lifecycle_base}/*/status": Permission(resource=lifecycle_res, action="manage"),
+    }
+
+
+def _rbac_marketplace_admin(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/admin/marketplace"
+    return {
+        f"GET:{base}/listings": Permission(resource="marketplace.listings", action="read"),
+        f"POST:{base}/listings": Permission(resource="marketplace.listings", action="write"),
+        f"GET:{base}/listings/:id": Permission(resource="marketplace.listings", action="read"),
+        f"PATCH:{base}/listings/:id": Permission(resource="marketplace.listings", action="write"),
+        f"POST:{base}/listings/:id/review": Permission(resource="marketplace.listings", action="review"),
+        f"POST:{base}/listings/:id/publish": Permission(resource="marketplace.listings", action="review"),
+        f"POST:{base}/listings/:id/suspend": Permission(resource="marketplace.listings", action="review"),
+        f"POST:{base}/checklist/graphql": Permission(resource="marketplace.listings", action="review"),
+        f"GET:{base}/recommendation/experiments": Permission(resource="marketplace.recommendation", action="read"),
+        f"POST:{base}/recommendation/experiments": Permission(resource="marketplace.recommendation", action="manage"),
+        f"PATCH:{base}/recommendation/experiments/:id": Permission(
+            resource="marketplace.recommendation", action="manage"
+        ),
+        f"POST:{base}/recommendation/weights/refresh": Permission(
+            resource="marketplace.recommendation", action="manage"
+        ),
+        f"POST:{base}/usage": Permission(resource="marketplace.usage", action="ingest"),
+        f"GET:{base}/usage/tenants/:tenantId/licenses/:licenseId/metrics": Permission(
+            resource="marketplace.usage", action="view"
+        ),
+        f"GET:{base}/revenue-share/reports": Permission(resource="marketplace.revenue", action="read"),
+    }
+
+
+def _rbac_operations(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/admin/operations"
+    return {
+        f"GET:{base}/support/playbook": Permission(resource="operations.support", action="read"),
+        f"PUT:{base}/support/playbook": Permission(resource="operations.support", action="manage"),
+        f"POST:{base}/support/channels/test": Permission(resource="operations.support", action="manage"),
+        f"GET:{base}/support/metrics": Permission(resource="operations.support", action="read"),
+        f"POST:{base}/incidents": Permission(resource="operations.incident", action="command"),
+        f"GET:{base}/incidents": Permission(resource="operations.incident", action="read"),
+        f"GET:{base}/incidents/:incidentId": Permission(resource="operations.incident", action="read"),
+        f"PATCH:{base}/incidents/:incidentId": Permission(resource="operations.incident", action="command"),
+        f"POST:{base}/incidents/:incidentId/timeline": Permission(
+            resource="operations.incident", action="command"
+        ),
+        f"GET:{base}/sla/profiles": Permission(resource="operations.sla", action="read"),
+        f"POST:{base}/sla/profiles": Permission(resource="operations.sla", action="manage"),
+        f"POST:{base}/sla/profiles/recompute": Permission(resource="operations.sla", action="command"),
+        f"PATCH:{base}/sla/profiles/actuals": Permission(resource="operations.sla", action="command"),
+    }
+
+
+def _rbac_integration_admin(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/admin/integration"
+    return {
+        f"GET:{base}/approvals": Permission(resource="integration.approvals", action="read"),
+        f"POST:{base}/approvals/:id/approve": Permission(resource="integration.approvals", action="manage"),
+        f"POST:{base}/approvals/:id/reject": Permission(resource="integration.approvals", action="manage"),
+        f"GET:{base}/grant-matrix": Permission(resource="integration.grant_matrix", action="read"),
+        f"GET:{base}/webhooks": Permission(resource="integration.webhooks", action="read"),
+        f"POST:{base}/webhooks": Permission(resource="integration.webhooks", action="manage"),
+        f"PUT:{base}/webhooks/:id": Permission(resource="integration.webhooks", action="manage"),
+        f"DELETE:{base}/webhooks/:id": Permission(resource="integration.webhooks", action="manage"),
+        f"GET:{base}/webhooks/:id/attempts": Permission(resource="integration.webhooks", action="read"),
+        f"POST:{base}/webhooks/attempts/:attemptId/replay": Permission(
+            resource="integration.webhooks", action="manage"
+        ),
+        f"GET:{base}/secrets": Permission(resource="integration.secrets", action="read"),
+        f"POST:{base}/secrets": Permission(resource="integration.secrets", action="manage"),
+        f"POST:{base}/secrets/:id/rotate": Permission(resource="integration.secrets", action="manage"),
+        f"POST:{base}/secrets/:id/rotate/complete": Permission(resource="integration.secrets", action="manage"),
+        f"POST:{base}/secrets/:id/revoke": Permission(resource="integration.secrets", action="manage"),
+        f"GET:{base}/secrets/:id/audit": Permission(resource="integration.secrets", action="read"),
+    }
+
+
+def _rbac_security(prefix: str) -> Dict[str, Permission]:
+    if not prefix:
+        prefix = "/api/v1"
+    return {
+        f"{prefix}/admin/security/consent-tokens": Permission(resource="admin.security.consent", action="read"),
+        f"{prefix}/admin/security/consent-tokens/:tokenId": Permission(
+            resource="admin.security.consent", action="write"
+        ),
+        f"{prefix}/admin/security/lifecycle-events": Permission(
+            resource="admin.security.lifecycle", action="read"
+        ),
+        f"{prefix}/admin/security/audit-reports": Permission(resource="admin.security.audit", action="read"),
+        f"{prefix}/admin/security/advisories": Permission(resource="admin.security.advisory", action="read"),
+        f"{prefix}/admin/security/advisories#create": Permission(
+            resource="admin.security.advisory", action="write"
+        ),
+        f"{prefix}/admin/security/advisories/:advisoryId/publish": Permission(
+            resource="admin.security.advisory", action="write"
+        ),
+        f"{prefix}/admin/security/toolgrants/revoke": Permission(
+            resource="admin.security.toolgrant", action="write"
+        ),
+        f"{prefix}/admin/security/toolgrants/revocations": Permission(
+            resource="admin.security.toolgrant", action="read"
+        ),
+        f"{prefix}/admin/security/toolgrants/usage": Permission(
+            resource="admin.security.toolgrant", action="read"
+        ),
+    }
+
+
+def _rbac_console(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/admin/dev-console"
+    return {
+        f"GET:{base}/config/sections": Permission(resource="operations.plugin.admin", action="read"),
+        f"PUT:{base}/config/sections/*": Permission(resource="operations.plugin.admin", action="manage"),
+        f"GET:{base}/audit/events": Permission(resource="operations.plugin.audit", action="read"),
+        f"GET:{base}/audit/export": Permission(resource="operations.plugin.audit", action="export"),
+        f"GET:{base}/jobs/runs": Permission(resource="operations.plugin.ops", action="read"),
+        f"POST:{base}/jobs/runs/*/retry": Permission(resource="operations.plugin.ops", action="execute"),
+        f"POST:{base}/safe-ops/actions": Permission(resource="operations.plugin.ops", action="execute"),
+        f"GET:{base}/troubleshooting/summary": Permission(resource="operations.plugin.ops", action="read"),
+        f"GET:{base}/webhooks/attempts": Permission(resource="operations.plugin.ops", action="read"),
+        f"GET:{base}/webhooks/attempts/*": Permission(resource="operations.plugin.ops", action="read"),
+    }
+
+
+def _rbac_integration_public(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/integration"
+    return {
+        f"POST:{base}/dispatch": Permission(resource="integration.dispatch", action="invoke"),
+        f"POST:{base}/capabilities/invoke": Permission(resource="integration.capabilities", action="invoke"),
+        f"GET:{base}/grant-matrix": Permission(resource="integration.grant_matrix", action="read"),
+        f"POST:{base}/grant-matrix": Permission(resource="integration.grant_matrix", action="manage"),
+        f"POST:{base}/webhooks/subscriptions": Permission(resource="integration.webhooks", action="manage"),
+        f"GET:{base}/webhooks/subscriptions": Permission(resource="integration.webhooks", action="read"),
+        f"POST:{base}/webhooks/dlq/:attemptId/replay": Permission(
+            resource="integration.webhooks", action="manage"
+        ),
+        f"POST:{base}/secrets": Permission(resource="integration.secrets", action="manage"),
+        f"POST:{base}/secrets/:secretId/rotate": Permission(resource="integration.secrets", action="manage"),
+    }
+
+
+def _rbac_marketplace_public(prefix: str) -> Dict[str, Permission]:
+    base = f"{prefix}/marketplace"
+    return {
+        f"GET:{base}/listings": Permission(resource="marketplace.listings", action="read"),
+        f"POST:{base}/listings": Permission(resource="marketplace.listings", action="write"),
+        f"GET:{base}/listings/*": Permission(resource="marketplace.listings", action="read"),
+        f"PATCH:{base}/listings/*": Permission(resource="marketplace.listings", action="write"),
+        f"POST:{base}/listings/*": Permission(resource="marketplace.listings", action="review"),
+        f"POST:{base}/listings/*/status": Permission(resource="marketplace.listings", action="review"),
+        f"POST:{base}/licenses": Permission(resource="marketplace.license", action="purchase"),
+        f"GET:{base}/licenses/*": Permission(resource="marketplace.license", action="read"),
+        f"POST:{base}/licenses/*": Permission(resource="marketplace.license", action="manage"),
+        f"POST:{base}/licenses/*/offline-extend": Permission(resource="marketplace.license", action="manage"),
+        f"POST:{base}/usage": Permission(resource="marketplace.usage", action="ingest"),
+        f"GET:{base}/usage/tenants/*/licenses/*/metrics": Permission(
+            resource="marketplace.usage", action="view"
+        ),
+        f"GET:{base}/revenue-share/reports": Permission(resource="marketplace.revenue", action="read"),
+        f"GET:{base}/sla/*": Permission(resource="marketplace.sla", action="read"),
+    }

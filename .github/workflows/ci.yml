@@ -19,6 +19,8 @@ jobs:
         run: npm install
       - name: Verify template sync
         run: npm run sync:templates -- --check
+      - name: Verify agent paths (no legacy skeleton refs)
+        run: npm run check:agent-paths
 
   backend:
     runs-on: ubuntu-latest

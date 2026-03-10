@@ -1,6 +1,9 @@
 # 顶层 Makefile：汇总各子 make 文件
 MAKEFILES_DIR := make-files
 
+# BACKEND 参数：gin（默认）| fastapi
+# 例如：make BACKEND=fastapi test-smoke
+
 include $(MAKEFILES_DIR)/common.mk
 include $(MAKEFILES_DIR)/build.mk
 include $(MAKEFILES_DIR)/test.mk

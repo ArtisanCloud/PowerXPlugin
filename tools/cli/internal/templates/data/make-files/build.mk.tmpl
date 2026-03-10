@@ -46,27 +46,35 @@ CHECK_PORT          ?= 4999                       # 临时检查端口（不要�
 .PHONY: build
 build: ## 构建后端（本机平台）
 	@echo "==> 构建后端二进制（本机平台）..."
-	@mkdir -p $(ABS_BUILD_DIR)
-	@mkdir -p $(GO_BUILD_CACHE)
-	GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin
-	@if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
-	  echo "   构建 migrate（如存在）..."; \
-	  GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	@if [ "$(BACKEND)" = "fastapi" ]; then \
+	  echo "跳过 Go 构建（python backend）"; \
 	else \
-	  echo "   跳过 migrate（未找到 cmd/database）"; \
+	  mkdir -p $(ABS_BUILD_DIR); \
+	  mkdir -p $(GO_BUILD_CACHE); \
+	  GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
+	    echo "   构建 migrate（如存在）..."; \
+	    GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	  else \
+	    echo "   跳过 migrate（未找到 cmd/database）"; \
+	  fi; \
 	fi
 
 .PHONY: build-linux
 build-linux: ## 构建后端（Linux amd64）
 	@echo "==> 构建后端二进制（Linux/amd64）..."
-	@mkdir -p $(ABS_BUILD_DIR)
-	@mkdir -p $(GO_BUILD_CACHE)
-	GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin
-	@if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
-	  echo "   构建 migrate（Linux/amd64）..."; \
-	  GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	@if [ "$(BACKEND)" = "fastapi" ]; then \
+	  echo "跳过 Go 构建（python backend）"; \
 	else \
-	  echo "   跳过 migrate（未找到 cmd/database）"; \
+	  mkdir -p $(ABS_BUILD_DIR); \
+	  mkdir -p $(GO_BUILD_CACHE); \
+	  GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
+	    echo "   构建 migrate（Linux/amd64）..."; \
+	    GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	  else \
+	    echo "   跳过 migrate（未找到 cmd/database）"; \
+	  fi; \
 	fi
 
 # ===== 前端构建（Host / 被 PowerX 反代）=====

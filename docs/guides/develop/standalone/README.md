@@ -546,7 +546,7 @@ iframe.contentWindow?.postMessage(
 
 - [Auth 集成说明](auth.md)
 - [CLI 发布/热加载指南](go-cli-dev-watch.md)
-- [CLI 入门教程](cli-plugin-tutorial.md)
+- [CLI 入门教程](../cli-plugin/cli-plugin-tutorial.md)
 
 ### 2.10 Delegated Token 失效提醒
 

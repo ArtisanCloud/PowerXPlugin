@@ -59,6 +59,9 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		if entry.IsDir() {
 			return nil
 		}
+		if strings.HasPrefix(entry.Name(), ".DS_Store") || strings.HasPrefix(entry.Name(), "Thumbs.db") {
+			return nil
+		}
 
 		rel, err := relativeTemplatePath(path)
 		if err != nil {

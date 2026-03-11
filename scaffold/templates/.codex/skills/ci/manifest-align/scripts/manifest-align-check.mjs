@@ -224,7 +224,7 @@ if (driftFiles.length > 0 && autoFix) {
     run(`git add -- ${driftFiles.join(" ")}`);
     ok("已自动 git add 同步产物");
   } else {
-    info("已写入最新产物；如需提交请执行 git add");
+    info("已写入最新产物；如需提交请执行 git add")
   }
 } else {
   ok("plugin.d 产物无漂移");
@@ -239,7 +239,7 @@ const capabilities = capabilityFiles.map((filePath) =>
 );
 
 const exposureContent = fs.readFileSync(
-  path.join(repoRoot, "plugin.d", "exposure.yaml"),
+  path.join(repoRoot, "skeleton", "plugin.d", "exposure.yaml"),
   "utf8"
 );
 const exposureChannels = parseExposure(exposureContent);
@@ -271,7 +271,7 @@ if (exposureNoRBACCount > 0) {
 }
 
 const rbacContent = fs.readFileSync(
-  path.join(repoRoot, "plugin.d", "rbac.yaml"),
+  path.join(repoRoot, "skeleton", "plugin.d", "rbac.yaml"),
   "utf8"
 );
 const rbacResources = parseRBACResources(rbacContent);

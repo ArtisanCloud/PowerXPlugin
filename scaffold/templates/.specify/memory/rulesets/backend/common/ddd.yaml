@@ -1,0 +1,30 @@
+# Backend DDD Common Ruleset (Stack-agnostic)
+kind: ruleset
+id: backend_common_ddd
+version: 1.0.0
+summary: "插件后端通用 DDD 分层约束（与技术栈无关）"
+checks:
+  - id: ddd-layering
+    desc: 项目需体现 bootstrap/config/entity/services/transport 等分层目录
+    assert:
+      type: dir
+      target: backend/internal
+      must_exist:
+        - bootstrap
+        - config
+        - entity
+        - services
+        - transport
+        - router
+        - observability
+        - middleware
+        - shared
+  - id: tenant-rls
+    desc: 强制租户隔离（tenant_uuid + RLS）
+    assert:
+      type: text
+      target: backend/internal
+      pattern:
+        - tenant_uuid
+        - rls
+        - "SET LOCAL app.tenant_uuid"

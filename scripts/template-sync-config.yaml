@@ -242,3 +242,125 @@ mappings:
       - globs: ["**/*"]
         literal: "com.powerx.plugins.base"
         replace: "{{ .PluginID }}"
+  - name: codex-assets
+    source: .codex
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: scaffold/templates/.codex
+      - path: tools/cli/internal/templates/data/.codex
+    replacements:
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["**/*"]
+        literal: "插件 skeleton 后端"
+        replace: "插件后端"
+      - globs: ["**/*"]
+        literal: "插件 skeleton 前端"
+        replace: "插件前端"
+      - globs: ["**/*"]
+        literal: "skeleton/scaffold/CLI"
+        replace: "模板源/scaffold/CLI"
+      - globs: ["**/*"]
+        literal: "只改了 `skeleton/` 或只改了 `scaffold/`"
+        replace: "只改了模板源目录"
+      - globs: ["**/*"]
+        literal: "`skeleton/backend/go-gin`"
+        replace: "`backend`"
+      - globs: ["**/*"]
+        literal: "`skeleton/web-admin/nuxt`"
+        replace: "`web-admin`"
+      - globs: ["**/*"]
+        literal: "`./skeleton/backend/etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`"
+      - globs: ["**/*"]
+        literal: "`./backend/etc/config.yaml`、`./backend/etc/config.yaml`、`./etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`、`./etc/config.yaml`"
+  - name: specify-assets
+    source: .specify
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: scaffold/templates/.specify
+      - path: tools/cli/internal/templates/data/.specify
+    replacements:
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["**/*"]
+        literal: "插件 skeleton 后端"
+        replace: "插件后端"
+      - globs: ["**/*"]
+        literal: "插件 skeleton 前端"
+        replace: "插件前端"
+      - globs: ["**/*"]
+        literal: "skeleton/scaffold/CLI"
+        replace: "模板源/scaffold/CLI"
+      - globs: ["**/*"]
+        literal: "只改了 `skeleton/` 或只改了 `scaffold/`"
+        replace: "只改了模板源目录"
+      - globs: ["**/*"]
+        literal: "`skeleton/backend/go-gin`"
+        replace: "`backend`"
+      - globs: ["**/*"]
+        literal: "`skeleton/web-admin/nuxt`"
+        replace: "`web-admin`"
+      - globs: ["**/*"]
+        literal: "`./skeleton/backend/etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`"
+      - globs: ["**/*"]
+        literal: "`./backend/etc/config.yaml`、`./backend/etc/config.yaml`、`./etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`、`./etc/config.yaml`"

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
+
 from sqlalchemy import or_, select
 
 from app.entity.models import Template
 from app.entity.repository.db import get_db
+
+_DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000001"
 
 
 def _now() -> datetime:
@@ -44,13 +48,32 @@ def _parse_int(value: Any) -> int | None:
         return None
 
 
+def _normalize_uuid(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        return str(UUID(raw)).lower()
+    except ValueError:
+        return ""
+
+
+def _resolve_tenant_uuid(payload: dict | None = None) -> str:
+    source = payload or {}
+    candidate = source.get("tenant_uuid") or source.get("tenantUuid")
+    normalized = _normalize_uuid(candidate)
+    if normalized:
+        return normalized
+    return _DEFAULT_TENANT_UUID
+
+
 class TemplateService:
     def list_templates(self, params: dict):
         db = get_db().session()
         try:
             query = select(Template)
             keyword = params.get("q") or params.get("query")
-            tenant_uuid = params.get("tenant_uuid") or params.get("tenantUuid")
+            tenant_uuid = _normalize_uuid(params.get("tenant_uuid") or params.get("tenantUuid"))
             if tenant_uuid:
                 query = query.where(Template.tenant_uuid == tenant_uuid)
             if keyword:
@@ -95,7 +118,7 @@ class TemplateService:
         db = get_db().session()
         try:
             template = Template(
-                tenant_uuid=payload.get("tenant_uuid") or payload.get("tenantUuid") or "tenant-demo",
+                tenant_uuid=_resolve_tenant_uuid(payload),
                 name=payload.get("name") or "",
                 description=payload.get("description"),
                 content=payload.get("content") or "",
@@ -113,6 +136,7 @@ class TemplateService:
             )
             db.add(template)
             db.commit()
+            db.refresh(template)
             return _to_dict(template)
         finally:
             db.close()

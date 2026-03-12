@@ -205,13 +205,28 @@ import { useUserStore } from "~/stores/user";
 
 const { t } = useI18n();
 const route = useRoute();
+const runtimeConfig = useRuntimeConfig();
 const auth = useAuth();
 
 const showTemplatesMenu = ref(true);
 const showIAMMenu = computed(() => auth.localIAMEnabled?.value ?? false);
 const userStore = useUserStore();
 const { isRoot } = storeToRefs(userStore);
-const showCapabilityLab = computed(() => Boolean(isRoot.value));
+const showCapabilityLab = computed(() => {
+  const envFlag = runtimeConfig.public?.showCapabilityLab;
+  if (envFlag === false || envFlag === "false") {
+    return false;
+  }
+  if (envFlag === true || envFlag === "true") {
+    return true;
+  }
+  const localIAM = auth.localIAMEnabled?.value ?? false;
+  const delegated = auth.delegatedIAM?.value ?? false;
+  if (localIAM && !delegated) {
+    return true;
+  }
+  return Boolean(isRoot.value);
+});
 
 onMounted(() => {
   if (!userStore.context && !userStore.isLoading) {

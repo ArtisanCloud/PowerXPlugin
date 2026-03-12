@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from app.middleware.tenant_context import TenantContext, set_tenant_context
 
 _CTX_HEADER = "x-powerx-ctx"
 _CTX_SIG_HEADER = "x-powerx-ctx-sig"
+_logger = logging.getLogger("plugin.jwt.auth")
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,14 @@ async def auth_guard_middleware(request: Request, call_next: Callable):
         return await call_next(request)
 
     raw_auth = request.headers.get("authorization", "")
+    path = request.url.path
+    api_key = _extract_api_key(raw_auth)
+    if _allow_api_key_on_integration_invoke(path, api_key):
+        _logger.info("[PLUGIN-JWT-AUTH] allow api key for integration invoke path=%s", path)
+        set_tenant_context(request, TenantContext())
+        request.state.raw_bearer_token = ""
+        return await call_next(request)
+
     if raw_auth.lower().startswith("bearer "):
         token = raw_auth[7:].strip()
         if token and cfg.hmac_secret:
@@ -88,11 +98,37 @@ async def auth_guard_middleware(request: Request, call_next: Callable):
                 set_tenant_context(request, tc)
                 request.state.raw_bearer_token = token
                 return await call_next(request)
+            _logger.warning(
+                "[PLUGIN-JWT-AUTH] bearer verify failed path=%s issuer=%s audiences=%s secret_len=%s",
+                path,
+                cfg.issuer,
+                cfg.accept_audiences,
+                len(cfg.hmac_secret or ""),
+            )
+            if os.getenv("POWERX_DEBUG_TRAFFIC") == "1":
+                claims = _decode_jwt_claims_unsafe(token)
+                _logger.warning("[PLUGIN-JWT-AUTH][TOKEN] path=%s claims=%s", path, claims)
+                verify_error = _verify_hs256_error(token, cfg)
+                _logger.warning("[PLUGIN-JWT-AUTH][VERIFY] path=%s error=%s", path, verify_error or "ok")
+        else:
+            _logger.warning(
+                "[PLUGIN-JWT-AUTH] bearer token present but HMAC secret missing path=%s issuer=%s audiences=%s",
+                path,
+                cfg.issuer,
+                cfg.accept_audiences,
+            )
         return JSONResponse(status_code=401, content={"error": "jwt Unauthorized"})
 
     if cfg.optional:
         return await call_next(request)
 
+    _logger.warning(
+        "[PLUGIN-JWT-AUTH] missing/invalid authorization path=%s issuer=%s audiences=%s optional=%s",
+        path,
+        cfg.issuer,
+        cfg.accept_audiences,
+        cfg.optional,
+    )
     return JSONResponse(status_code=401, content={"error": "jwt Unauthorized"})
 
 
@@ -169,6 +205,49 @@ def _decode_and_verify_jwt(
     if strict and not _validate_claims(claims, cfg):
         return None
     return claims
+
+
+def _verify_hs256_error(raw_token: str, cfg: JWTAuthConfig) -> str | None:
+    try:
+        header_b64, payload_b64, sig_b64 = raw_token.split(".")
+    except ValueError:
+        return "token segments invalid"
+    header = _b64url_json(header_b64)
+    if not isinstance(header, dict):
+        return "header decode failed"
+    if header.get("alg") != "HS256":
+        return "alg not HS256"
+    signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+    mac = hmac.new(cfg.hmac_secret.encode("utf-8"), signing_input, hashlib.sha256)
+    expected_sig = base64.urlsafe_b64encode(mac.digest()).rstrip(b"=").decode("utf-8")
+    if not hmac.compare_digest(expected_sig, sig_b64):
+        return "signature mismatch"
+    claims = _b64url_json(payload_b64)
+    if not isinstance(claims, dict):
+        return "payload decode failed"
+    if cfg.issuer and claims.get("iss") and claims.get("iss") != cfg.issuer:
+        return f"issuer mismatch token={claims.get('iss')} expected={cfg.issuer}"
+    if cfg.accept_audiences and claims.get("aud"):
+        if not _audience_matches(claims.get("aud"), cfg.accept_audiences):
+            return f"audience mismatch token={claims.get('aud')} expected={cfg.accept_audiences}"
+    now = time.time()
+    leeway = cfg.clock_skew_seconds or 60
+    exp = _to_int(claims.get("exp"))
+    if exp and now > (exp + leeway):
+        return "token expired"
+    nbf = _to_int(claims.get("nbf"))
+    if nbf and (now + leeway) < nbf:
+        return "token not active yet"
+    return None
+
+
+def _decode_jwt_claims_unsafe(raw_token: str) -> dict[str, Any]:
+    try:
+        _, payload_b64, _ = raw_token.split(".")
+    except ValueError:
+        return {}
+    claims = _b64url_json(payload_b64)
+    return claims if isinstance(claims, dict) else {}
 
 
 def _validate_claims(claims: dict[str, Any], cfg: JWTAuthConfig) -> bool:
@@ -253,6 +332,37 @@ def _strip_plugin_prefix(path: str) -> str:
     if len(parts) >= 4:
         return "/" + parts[3]
     return path
+
+
+def _extract_api_key(raw_auth: str) -> str:
+    value = (raw_auth or "").strip()
+    lowered = value.lower()
+    if lowered.startswith("apikey "):
+        return value[7:].strip()
+    if lowered.startswith("api-key "):
+        return value[8:].strip()
+    if lowered.startswith("api_key "):
+        return value[8:].strip()
+    return ""
+
+
+def _allow_api_key_on_integration_invoke(path: str, api_key: str) -> bool:
+    if not api_key:
+        return False
+    if not path.endswith("/integration/capabilities/invoke"):
+        return False
+    expected = _resolve_gateway_api_key()
+    if not expected:
+        return False
+    return hmac.compare_digest(api_key, expected)
+
+
+def _resolve_gateway_api_key() -> str:
+    for name in ("PX_GATEWAY_API_KEY", "PX_PLUGIN_API_KEY"):
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _is_public_auth(path: str, api_prefix: str) -> bool:

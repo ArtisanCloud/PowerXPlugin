@@ -1,5 +1,5 @@
 <template>
-  <UContainer class="py-10 space-y-6">
+  <UContainer class="capability-lab-page py-10 space-y-6">
     <div class="space-y-2">
       <UBreadcrumb :links="[{ label: 'PowerX', to: '/' }, { label: 'Capability Lab' }]" />
       <div class="flex items-center gap-3">
@@ -20,6 +20,7 @@
       variant="soft"
       title="仅限 Root / 系统管理员使用"
       description="请使用拥有 IsRoot 权限的账号访问，以避免普通用户误用 PowerX 能力调用入口。"
+      :ui="{ title: 'text-gray-900 dark:text-gray-100', description: 'text-gray-700 dark:text-gray-200' }"
     />
 
     <UAlert
@@ -28,6 +29,7 @@
       color="blue"
       variant="soft"
       title="未配置 PowerX 底座访问（CoreX 能力列表可能为空）"
+      :ui="{ title: 'text-gray-900 dark:text-gray-100', description: 'text-gray-700 dark:text-gray-200' }"
     >
       <template #description>
         <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
@@ -289,8 +291,9 @@
               color="amber"
               variant="soft"
               :title="`警告 (${warnings.length})`"
+              :ui="{ title: 'text-gray-900 dark:text-gray-100', description: 'text-gray-700 dark:text-gray-200' }"
             >
-              <ul class="list-disc pl-5 space-y-1 text-sm">
+              <ul class="list-disc pl-5 space-y-1 text-sm text-gray-700 dark:text-gray-200">
                 <li v-for="warning in warnings" :key="warning">{{ warning }}</li>
               </ul>
             </UAlert>
@@ -342,6 +345,7 @@
               color="gray"
               variant="link"
               size="xs"
+              class="text-blue-700 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200"
               @click="clearHistory()"
             >
               清空
@@ -1271,3 +1275,23 @@ watch(
   }
 )
 </script>
+
+<style scoped>
+.capability-lab-page :deep(code),
+.capability-lab-page :deep(pre) {
+  color: rgb(31 41 55);
+}
+
+.dark .capability-lab-page :deep(code),
+.dark .capability-lab-page :deep(pre) {
+  color: rgb(243 244 246);
+}
+
+.capability-lab-page :deep(summary) {
+  color: rgb(37 99 235);
+}
+
+.dark .capability-lab-page :deep(summary) {
+  color: rgb(96 165 250);
+}
+</style>

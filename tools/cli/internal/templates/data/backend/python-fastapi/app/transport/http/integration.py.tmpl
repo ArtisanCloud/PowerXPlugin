@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Request
 
 from app.contracts.response import (
@@ -10,6 +12,7 @@ from app.services.integration_service import IntegrationService
 
 router = APIRouter()
 service = IntegrationService()
+logger = logging.getLogger("integration_http")
 
 
 def _request_id(request: Request) -> str | None:
@@ -37,6 +40,25 @@ def _require_auth(request: Request):
     return None
 
 
+def _auth_scheme_from_header(value: str) -> str:
+    raw = (value or "").strip().lower()
+    if raw.startswith("bearer "):
+        return "bearer"
+    if raw.startswith("apikey ") or raw.startswith("api-key ") or raw.startswith("api_key "):
+        return "apikey"
+    if raw:
+        return "unknown"
+    return "none"
+
+
+def _collect_forward_headers(request: Request) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    mock_value = (request.headers.get("X-PX-Use-Mock") or "").strip()
+    if mock_value:
+        headers["X-PX-Use-Mock"] = mock_value
+    return headers
+
+
 @router.post("/integration/dispatch")
 async def dispatch(request: Request, payload: dict):
     request_id = _request_id(request)
@@ -51,12 +73,39 @@ async def dispatch(request: Request, payload: dict):
 @router.post("/integration/capabilities/invoke")
 async def invoke_capability(request: Request, payload: dict):
     request_id = _request_id(request)
-    auth = _require_auth(request)
-    if auth:
-        return auth
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
-    return ok(service.invoke_capability(payload), request_id=request_id)
+    forward_headers = _collect_forward_headers(request)
+    logger.info(
+        "capability invoke accepted request_id=%s capability_id=%s action=%s inbound_auth=%s forwarded_auth=%s",
+        request_id,
+        (payload or {}).get("capabilityId"),
+        (payload or {}).get("action"),
+        _auth_scheme_from_header((request.headers.get("Authorization") or "").strip()),
+        "Authorization" in forward_headers,
+    )
+    try:
+        result = service.invoke_capability(payload, forward_headers=forward_headers, request_id=request_id)
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", 500)
+        trace_id = str(getattr(exc, "trace_id", "") or "").strip()
+        details = getattr(exc, "details", None)
+        warnings = getattr(exc, "warnings", None)
+        logger.error(
+            "capability invoke failed request_id=%s status=%s trace_id=%s error=%s details=%s",
+            request_id,
+            status_code,
+            trace_id,
+            str(exc),
+            details,
+        )
+        response_details = details if isinstance(details, dict) else {}
+        if warnings:
+            response_details["warnings"] = warnings
+        if trace_id:
+            response_details["trace_id"] = trace_id
+        return fail("UPSTREAM_ERROR", str(exc), details=response_details or None, request_id=request_id, status_code=status_code)
+    return ok(result, request_id=request_id)
 
 
 @router.get("/integration/grant-matrix")

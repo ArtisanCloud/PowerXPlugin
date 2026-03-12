@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Request
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.contracts.response import (
+    ERR_CODE_INTERNAL_ERROR,
     ERR_CODE_INVALID_REQUEST,
     ERR_CODE_NOT_FOUND,
     ERR_CODE_UNAUTHORIZED,
     fail,
     ok,
 )
+from app.middleware.tenant_context import resolve_tenant_uuid
 from app.services.template_service import TemplateService
 
 router = APIRouter(prefix="/admin")
@@ -52,6 +55,16 @@ def _batch_clone_response(payload: dict):
         "items": [],
     }
 
+def _inject_tenant(payload: dict | None, request: Request) -> dict:
+    body = dict(payload or {})
+    tenant_uuid = (body.get("tenant_uuid") or body.get("tenantUuid") or "").strip()
+    if tenant_uuid:
+        return body
+    resolved = resolve_tenant_uuid(request)
+    if resolved:
+        body["tenant_uuid"] = resolved
+    return body
+
 
 @public_router.get("/templates")
 async def list_templates(request: Request):
@@ -59,7 +72,21 @@ async def list_templates(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok(service.list_templates(dict(request.query_params)), request_id=request_id)
+    params = dict(request.query_params)
+    if not (params.get("tenant_uuid") or params.get("tenantUuid")):
+        resolved = resolve_tenant_uuid(request)
+        if resolved:
+            params["tenant_uuid"] = resolved
+    try:
+        return ok(service.list_templates(params), request_id=request_id)
+    except SQLAlchemyError as exc:
+        return fail(
+            ERR_CODE_INTERNAL_ERROR,
+            "templates 查询失败",
+            details={"reason": str(exc)},
+            request_id=request_id,
+            status_code=500,
+        )
 
 
 @public_router.get("/templates/{template_id}")
@@ -87,7 +114,17 @@ async def create_template(request: Request, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    return ok(service.create_template(payload), request_id=request_id)
+    payload = _inject_tenant(payload, request)
+    try:
+        return ok(service.create_template(payload), request_id=request_id)
+    except SQLAlchemyError as exc:
+        return fail(
+            ERR_CODE_INTERNAL_ERROR,
+            "templates 保存失败",
+            details={"reason": str(exc)},
+            request_id=request_id,
+            status_code=500,
+        )
 
 
 @public_router.put("/templates/{template_id}")
@@ -103,7 +140,17 @@ async def update_template(request: Request, template_id: str, payload: dict):
             request_id=request_id,
             status_code=400,
         )
-    template = service.update_template(template_id, payload)
+    payload = _inject_tenant(payload, request)
+    try:
+        template = service.update_template(template_id, payload)
+    except SQLAlchemyError as exc:
+        return fail(
+            ERR_CODE_INTERNAL_ERROR,
+            "templates 更新失败",
+            details={"reason": str(exc)},
+            request_id=request_id,
+            status_code=500,
+        )
     if not template:
         return fail(ERR_CODE_NOT_FOUND, "not found", request_id=request_id, status_code=404)
     return ok(template, request_id=request_id)

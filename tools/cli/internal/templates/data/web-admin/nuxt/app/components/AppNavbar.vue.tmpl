@@ -10,22 +10,27 @@
           alt="PowerX Plugin Logo"
           class="h-8 w-auto mr-3"
         />
-        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ $t("common.appName") }}` }}
-        </h1>
+        <div class="flex items-center gap-2">
+          <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+            {{ $t("common.appName") }}
+          </h1>
+          <UBadge color="neutral" variant="outline" class="text-[11px] font-medium">
+            v{{ pluginVersion }}
+          </UBadge>
+        </div>
       </div>
 
       <!-- 中间快捷操作 -->
       <div class="flex items-center space-x-3">
         <UBadge
           :color="iamModeBadge.color"
-          variant="subtle"
+          variant="outline"
           class="text-xs font-semibold"
         >
-          {{ `{{ iamModeBadge.label }}` }}
+          {{ iamModeBadge.label }}
         </UBadge>
-        <p class="text-xs text-gray-500 dark:text-gray-400">
-          {{ `{{ iamModeBadge.description }}` }}
+        <p class="text-xs text-gray-600 dark:text-gray-300">
+          {{ iamModeBadge.description }}
         </p>
       </div>
 
@@ -76,6 +81,10 @@ const logoSrc = computed(() => {
     : "/";
   return `${base.replace(/\/$/, "")}/images/logo-s.png`;
 });
+
+const pluginVersion = computed(
+  () => String(runtimeConfig.public?.powerxPluginVersion || "dev")
+);
 
 // 用户菜单项
 const handleLogout = async () => {

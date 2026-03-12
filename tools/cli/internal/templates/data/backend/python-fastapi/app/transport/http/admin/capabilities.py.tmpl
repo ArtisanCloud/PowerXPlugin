@@ -37,13 +37,39 @@ def _require_auth(request: Request):
     return None
 
 
+def _tenant_uuid(request: Request) -> str:
+    return (
+        request.headers.get("tenant_uuid")
+        or request.headers.get("Tenant-UUID")
+        or request.headers.get("X-Tenant-UUID")
+        or ""
+    ).strip()
+
+
 @router.get("/capabilities")
 async def list_capabilities(request: Request):
     request_id = _request_id(request)
     auth = _require_auth(request)
     if auth:
         return auth
-    return ok(service.list_capabilities(), request_id=request_id)
+    source = request.query_params.get("source")
+    return ok(
+        service.list_capabilities(
+            source=source,
+            bearer_token=_bearer_token(request),
+            tenant_uuid=_tenant_uuid(request),
+        ),
+        request_id=request_id,
+    )
+
+
+@router.get("/capabilities/sources")
+async def list_capability_sources(request: Request):
+    request_id = _request_id(request)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    return ok(service.list_sources(), request_id=request_id)
 
 
 @router.get("/capabilities/register/template")

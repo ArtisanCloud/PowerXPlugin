@@ -20,7 +20,7 @@ if (!process.env.QUIET_START) {
   })
 }
 
-const defaultPluginId = '{{ .PluginID }}'
+const defaultPluginId = 'com.powerx.plugins.base'
 const resolvePluginId = () => {
   const candidates = [
     process.env.POWERX_PLUGIN_ID,
@@ -47,14 +47,14 @@ const joinApiBase = (base?: string | null, prefix?: string | null) => {
 }
 const envApiBase = joinApiBase(process.env.NUXT_PUBLIC_API_BASE, process.env.NUXT_PUBLIC_API_PREFIX)
 const defaultPluginApiBase = `/_p/${pluginId}/api/v1`
-const defaultLocalApiBase = 'http://localhost:{{ .BackendPort }}/api/v1'
+const defaultLocalApiBase = 'http://localhost:8078/api/v1'
 // Host API fallback: when处于宿主模式时始终走插件 API，其他场景才退回宿主 /api/v1
 const fallbackHostApiBase =
   process.env.POWERX_PROXY === '1' ? defaultPluginApiBase : '/api/v1'
 const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase
-const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'
+const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
 const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:4000'
 const imgSources = ["'self'", "data:", "https://avatars.githubusercontent.com"]
 const extraConnectHosts = new Set<string>()
@@ -157,7 +157,7 @@ if (INSIDE_POWERX) {
 const devServerPort = Number(
   process.env.NUXT_DEV_PORT ||
     process.env.PORT ||
-    {{ .FrontendPort }}
+    3131
 )
 
 const buildConnectSources = () => {
@@ -185,7 +185,7 @@ const buildConnectSources = () => {
     registerCandidate("wss:")
   }
 
-  sources.add("https://api.iconify.design")
+  // icon provider 使用本地 server bundle，避免依赖外网 iconify
   extraConnectHosts.forEach((origin) => sources.add(origin))
 
   return Array.from(sources)
@@ -260,6 +260,12 @@ export default defineNuxtConfig({
     '@nuxtjs/color-mode',
     '@nuxtjs/i18n'
   ],
+  icon: {
+    provider: 'server',
+    serverBundle: {
+      collections: ['heroicons', 'lucide']
+    }
+  },
   imports: {
     dirs: ['stores']
   },
@@ -352,7 +358,7 @@ export default defineNuxtConfig({
   },
   devServer: {
     host: '0.0.0.0',
-    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : {{ .FrontendPort }}
+    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : 3131
   },
   ui: {
     fonts: false

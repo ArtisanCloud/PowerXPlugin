@@ -2,6 +2,7 @@ package capability
 
 import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,17 +21,20 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		return
 	}
 	if catalogHandler != nil {
-		rg.GET("/capabilities", catalogHandler.List)
-		rg.GET("/capabilities/sources", catalogHandler.Sources)
+		catalog := rg.Group("/capabilities", httpmw.RequireRoot())
+		{
+			catalog.GET("", catalogHandler.List)
+			catalog.GET("/sources", catalogHandler.Sources)
+		}
 	}
-	group := rg.Group("/capabilities/register")
+	group := rg.Group("/capabilities/register", httpmw.RequireRoot())
 	{
 		group.GET("/template", handler.GetTemplate)
 		group.POST("/validate", handler.ValidateDraft)
 		group.POST("", handler.Submit)
 	}
 	if reviewHandler != nil {
-		reviews := rg.Group("/capabilities/reviews")
+		reviews := rg.Group("/capabilities/reviews", httpmw.RequireRoot())
 		{
 			reviews.GET("/:capabilityID", reviewHandler.List)
 			reviews.POST("/:capabilityID/resubmit", reviewHandler.Resubmit)
@@ -39,7 +43,7 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		}
 	}
 	if exposureHandler != nil {
-		exposure := rg.Group("/capabilities/exposure")
+		exposure := rg.Group("/capabilities/exposure", httpmw.RequireRoot())
 		{
 			exposure.GET("/template", exposureHandler.GetTemplate)
 			exposure.GET("/:capabilityID", exposureHandler.Get)
@@ -47,14 +51,14 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		}
 	}
 	if quotaHandler != nil {
-		quotas := rg.Group("/capabilities/quotas")
+		quotas := rg.Group("/capabilities/quotas", httpmw.RequireRoot())
 		{
 			quotas.GET("/:capabilityID", quotaHandler.List)
 			quotas.POST("/:capabilityID", quotaHandler.Upsert)
 		}
 	}
 	if lifecycleHandler != nil {
-		lifecycle := rg.Group("/capabilities/lifecycle")
+		lifecycle := rg.Group("/capabilities/lifecycle", httpmw.RequireRoot())
 		{
 			lifecycle.GET("/template", lifecycleHandler.GetTemplate)
 			lifecycle.GET("", lifecycleHandler.List)

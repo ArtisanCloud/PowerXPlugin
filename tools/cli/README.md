@@ -31,7 +31,7 @@ px-plugin --version
 
 完整流程（init → DB 配置 → migrate/seed → 启动 → 本地安装到 PowerX）请看：
 
-- `docs/guides/develop/cli-plugin-tutorial.md`
+- `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md`
 
 ## 模板/契约改动后同步
 

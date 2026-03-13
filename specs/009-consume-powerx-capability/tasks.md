@@ -8,7 +8,7 @@
 **Purpose**: 对齐文档与环境基线，确保所有团队理解凭证、CLI 与入口。
 
 - [x] T001 更新 `docs/standards/powerx-plugin/deploy/env_vars.md`，补充 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_TOOL_TOKEN` 的含义与注入位置（租户由 token `tid` 推导）。
-- [x] T002 扩写 `docs/guides/develop/cli-plugin-tutorial.md`，加入 `px-plugin login --manifest ./skeleton/plugin.yaml` 与 `.env.local` 写入流程。
+- [x] T002 扩写 `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md`，加入 `px-plugin login --manifest ./skeleton/plugin.yaml` 与 `.env.local` 写入流程。
 - [x] T003 在根 `README.md` 与 `docs/plan/009-consume-powerx-capability.md` 互相添加 quickstart 链接，方便新人找到调用指南。
 
 ---

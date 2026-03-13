@@ -185,7 +185,7 @@ const buildConnectSources = () => {
     registerCandidate("wss:")
   }
 
-  sources.add("https://api.iconify.design")
+  // icon provider 使用本地 server bundle，避免依赖外网 iconify
   extraConnectHosts.forEach((origin) => sources.add(origin))
 
   return Array.from(sources)
@@ -260,6 +260,14 @@ export default defineNuxtConfig({
     '@nuxtjs/color-mode',
     '@nuxtjs/i18n'
   ],
+  icon: {
+    provider: 'server',
+    localApiEndpoint: '/_nuxt_icon',
+    fallbackToApi: false,
+    serverBundle: {
+      collections: ['heroicons', 'lucide']
+    }
+  },
   imports: {
     dirs: ['stores']
   },

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.contracts.response import (
+    ERR_CODE_FORBIDDEN,
     ERR_CODE_INTERNAL_ERROR,
     ERR_CODE_INVALID_REQUEST,
     ERR_CODE_NOT_FOUND,
@@ -9,7 +10,7 @@ from app.contracts.response import (
     fail,
     ok,
 )
-from app.middleware.tenant_context import resolve_tenant_uuid
+from app.middleware.tenant_context import get_tenant_context, resolve_tenant_uuid
 from app.services.template_service import TemplateService
 
 router = APIRouter(prefix="/admin")
@@ -42,6 +43,19 @@ def _require_auth(request: Request):
     return None
 
 
+def _require_root(request: Request):
+    request_id = _request_id(request)
+    context = get_tenant_context(request)
+    if context and context.is_root:
+        return None
+    return fail(
+        ERR_CODE_FORBIDDEN,
+        "仅 root 可访问",
+        request_id=request_id,
+        status_code=403,
+    )
+
+
 def _validate_template_payload(payload: dict):
     return (payload or {}).get("name") and (payload or {}).get("description") and (payload or {}).get("content")
 
@@ -72,6 +86,9 @@ async def list_templates(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     params = dict(request.query_params)
     if not (params.get("tenant_uuid") or params.get("tenantUuid")):
         resolved = resolve_tenant_uuid(request)
@@ -95,6 +112,9 @@ async def get_template(request: Request, template_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     template = service.get_template(template_id)
     if not template:
         return fail(ERR_CODE_NOT_FOUND, "not found", request_id=request_id, status_code=404)
@@ -107,6 +127,9 @@ async def create_template(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not _validate_template_payload(payload or {}):
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -133,6 +156,9 @@ async def update_template(request: Request, template_id: str, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not _validate_template_payload(payload or {}):
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -162,6 +188,9 @@ async def delete_template(request: Request, template_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     result = service.delete_template(template_id)
     if not result.get("ok"):
         return fail(ERR_CODE_NOT_FOUND, "not found", request_id=request_id, status_code=404)
@@ -174,6 +203,9 @@ async def batch_clone_templates(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     source_ids = (payload or {}).get("source_ids") or (payload or {}).get("sourceIds")
     if not source_ids:
         return fail(
@@ -191,6 +223,9 @@ async def validate_template(request: Request, template_id: str, payload: dict | 
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok({"template_id": template_id, "valid": True, "errors": []}, request_id=request_id)
 
 

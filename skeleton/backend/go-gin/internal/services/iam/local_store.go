@@ -427,6 +427,7 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 	claims := authx.PowerXClaims{
 		TenantUUID:    authx.TenantClaim(strings.TrimSpace(userCtx.TenantUUID)),
 		UserID:        int64(userCtx.UserID),
+		IsRoot:        userCtx.IsRoot,
 		Roles:         userCtx.Roles,
 		Permissions:   userCtx.Permissions,
 		PolicyVersion: userCtx.PolicyVersion,

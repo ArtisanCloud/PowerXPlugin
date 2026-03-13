@@ -262,6 +262,8 @@ export default defineNuxtConfig({
   ],
   icon: {
     provider: 'server',
+    localApiEndpoint: '/_nuxt_icon',
+    fallbackToApi: false,
     serverBundle: {
       collections: ['heroicons', 'lucide']
     }

@@ -75,7 +75,7 @@ def _map_me_context(payload: dict) -> dict:
         tenant_info["legacy_id"] = legacy_id
 
     member_id = member.get("id") or member.get("member_id")
-    is_root = bool(user.get("is_root"))
+    is_root = bool(payload.get("is_root") or user.get("is_root"))
 
     permissions = payload.get("permissions") or []
     if not isinstance(permissions, list):

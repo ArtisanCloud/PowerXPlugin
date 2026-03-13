@@ -275,6 +275,7 @@ def _claims_to_context(payload: dict[str, Any]) -> TenantContext:
     return TenantContext(
         tenant_uuid=str(tenant or "").strip(),
         user_id=user_id,
+        is_root=bool(payload.get("is_root")),
         roles=_to_list(payload.get("roles")),
         permissions=_to_list(payload.get("perms")),
         policy_version=str(payload.get("policy_version") or "").strip(),

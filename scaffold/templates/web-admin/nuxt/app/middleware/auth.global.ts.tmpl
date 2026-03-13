@@ -1,6 +1,12 @@
 import { useAuth } from "~/composables/useAuth";
+import { useUserStore } from "~/stores/user";
 
 const PUBLIC_ROUTE_PREFIXES = ["/users"];
+const ROOT_ONLY_ROUTE_PREFIXES = [
+  "/templates",
+  "/capabilities",
+  "/powerx/capability-lab",
+];
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (!process.client) return;
@@ -31,5 +37,23 @@ export default defineNuxtRouteMiddleware(async (to) => {
       path: "/users/login",
       query: { redirect: to.fullPath },
     });
+  }
+
+  const userStore = useUserStore();
+  if (!userStore.context && !userStore.isLoading) {
+    try {
+      await userStore.fetchUserContext();
+    } catch {
+      return navigateTo({
+        path: "/users/login",
+        query: { redirect: to.fullPath },
+      });
+    }
+  }
+  if (
+    ROOT_ONLY_ROUTE_PREFIXES.some((prefix) => to.path.startsWith(prefix)) &&
+    !userStore.isRoot
+  ) {
+    return navigateTo("/intro");
   }
 });

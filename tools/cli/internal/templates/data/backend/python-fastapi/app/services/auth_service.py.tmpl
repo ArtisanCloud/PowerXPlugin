@@ -197,6 +197,7 @@ class AuthService:
                 return {"token_type": "Bearer", "access_token": "", "expires_in": 0, "refresh_token": "", "scope": ""}
 
             roles, perms = self._load_role_permission_codes(db, member.id, plugin_id)
+            is_root = bool(getattr(user, "is_root", False) or getattr(member, "is_admin", False))
 
             now = _now()
             ttl_seconds = settings.context_ttl_seconds or 900
@@ -207,6 +208,7 @@ class AuthService:
             claims = {
                 "tid": tenant_rec.uuid,
                 "uid": str(user.id),
+                "is_root": is_root,
                 "roles": roles,
                 "perms": perms,
                 "policy_version": policy_version,
@@ -371,6 +373,7 @@ class AuthService:
             plugin_id = _resolve_plugin_id()
             policy_version = _resolve_policy_version()
             roles, perms = self._load_role_permission_codes(db, member.id, plugin_id)
+            is_root = bool(getattr(user, "is_root", False) or getattr(member, "is_admin", False))
             ttl_seconds = settings.context_ttl_seconds or 900
             expires_at = now + timedelta(seconds=int(ttl_seconds))
             issuer = settings.context_issuer.strip() if settings.context_issuer else "powerx-local"
@@ -379,6 +382,7 @@ class AuthService:
             claims = {
                 "tid": tenant_rec.uuid,
                 "uid": str(user.id),
+                "is_root": is_root,
                 "roles": roles,
                 "perms": perms,
                 "policy_version": policy_version,
@@ -429,6 +433,7 @@ class AuthService:
             permissions: list[str] = []
             policy_version = str(claims.get("policy_version") or _resolve_policy_version())
             plugin_id = str(claims.get("plugin_id") or _resolve_plugin_id())
+            claim_is_root = bool(claims.get("is_root"))
 
             claim_uid = claims.get("uid")
             claim_tid = str(claims.get("tid") or "").strip().lower()
@@ -453,11 +458,13 @@ class AuthService:
             if member:
                 tenant = db.execute(select(Tenant).where(Tenant.uuid == member.tenant_uuid)).scalar_one_or_none()
                 roles, permissions = self._load_role_permission_codes(db, member.id, plugin_id)
+            is_root = bool(claim_is_root or getattr(user, "is_root", False) or (member and getattr(member, "is_admin", False)))
 
             return {
                 "user": _to_dict(user),
                 "member": _to_dict(member) if member else None,
                 "tenant": _to_dict(tenant) if tenant else None,
+                "is_root": is_root,
                 "roles": roles,
                 "permissions": permissions,
                 "policy_version": policy_version,

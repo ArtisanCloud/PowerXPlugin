@@ -1,15 +1,15 @@
 package templates
 
 import (
+	"github.com/gin-gonic/gin"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	h := NewTemplateHandler(deps)
 
-	g := rg.Group("/templates", httpmw.EnsureTenant())
+	g := rg.Group("/templates", httpmw.EnsureTenant(), httpmw.RequireRoot())
 	{
 		g.GET("", h.GetTemplates)
 		g.GET("/:id", h.GetTemplate)
@@ -20,7 +20,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		g.POST("/:id/validate", h.ValidateTemplateCapability)
 	}
 
-	adminGroup := rg.Group("/admin/templates", httpmw.EnsureTenant())
+	adminGroup := rg.Group("/admin/templates", httpmw.EnsureTenant(), httpmw.RequireRoot())
 	{
 		adminGroup.POST("/batch-clone", h.BatchCloneTemplates)
 		adminGroup.POST("/:id/validate", h.ValidateTemplateCapability)

@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Request
 
 from app.contracts.response import (
+    ERR_CODE_FORBIDDEN,
     ERR_CODE_INVALID_REQUEST,
     ERR_CODE_UNAUTHORIZED,
     fail,
     ok,
 )
+from app.middleware.tenant_context import get_tenant_context
 from app.services.capability_service import CapabilityService
 
 router = APIRouter(prefix="/admin")
@@ -37,6 +39,19 @@ def _require_auth(request: Request):
     return None
 
 
+def _require_root(request: Request):
+    request_id = _request_id(request)
+    context = get_tenant_context(request)
+    if context and context.is_root:
+        return None
+    return fail(
+        ERR_CODE_FORBIDDEN,
+        "仅 root 可访问",
+        request_id=request_id,
+        status_code=403,
+    )
+
+
 def _tenant_uuid(request: Request) -> str:
     return (
         request.headers.get("tenant_uuid")
@@ -52,6 +67,9 @@ async def list_capabilities(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     source = request.query_params.get("source")
     return ok(
         service.list_capabilities(
@@ -69,6 +87,9 @@ async def list_capability_sources(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok(service.list_sources(), request_id=request_id)
 
 
@@ -78,6 +99,9 @@ async def register_template(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok(service.register_template(), request_id=request_id)
 
 
@@ -87,6 +111,9 @@ async def register(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not payload:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -103,6 +130,9 @@ async def validate(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not payload:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -119,6 +149,9 @@ async def lifecycle_template(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok(service.lifecycle_template(), request_id=request_id)
 
 
@@ -128,6 +161,9 @@ async def list_lifecycle(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     capability_id = request.query_params.get("capability_id")
     plans = service.list_lifecycle()
     if capability_id:
@@ -141,6 +177,9 @@ async def create_lifecycle(request: Request, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not payload:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -157,6 +196,9 @@ async def update_lifecycle_status(request: Request, plan_id: str, payload: dict)
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not payload:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -173,6 +215,9 @@ async def exposure_template(request: Request):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok(service.exposure_template(), request_id=request_id)
 
 
@@ -182,6 +227,9 @@ async def exposure_detail(request: Request, capability_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok({"capability_id": capability_id, "package": service.exposure_detail(capability_id)}, request_id=request_id)
 
 
@@ -191,6 +239,9 @@ async def update_exposure(request: Request, capability_id: str, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not payload:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -207,6 +258,9 @@ async def list_quotas(request: Request, capability_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok({"capability_id": capability_id, "quotas": service.list_quotas(capability_id)}, request_id=request_id)
 
 
@@ -216,6 +270,9 @@ async def update_quotas(request: Request, capability_id: str, payload: dict):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not payload:
         return fail(
             ERR_CODE_INVALID_REQUEST,
@@ -231,6 +288,9 @@ async def review_list(request: Request, capability_id: str):
     auth = _require_auth(request)
     if auth:
         return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     return ok({"capability_id": capability_id, "tasks": service.list_reviews(capability_id)}, request_id=request_id)
 
 

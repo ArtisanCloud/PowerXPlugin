@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"{{ .BackendModulePath }}/internal/config"
-	authx "{{ .BackendModulePath }}/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -89,6 +89,7 @@ func (s *STSService) Mint(ctx context.Context, tc authx.TenantContext) (*STSToke
 	claims := authx.PowerXClaims{
 		TenantUUID:    authx.TenantClaim(tenantUUID),
 		UserID:        tc.UserID,
+		IsRoot:        tc.IsRoot,
 		Roles:         tc.Roles,
 		Permissions:   tc.Permissions,
 		PolicyVersion: policyVersion,

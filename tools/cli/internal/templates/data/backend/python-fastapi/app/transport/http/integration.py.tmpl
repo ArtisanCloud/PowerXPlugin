@@ -3,11 +3,13 @@ import logging
 from fastapi import APIRouter, Request
 
 from app.contracts.response import (
+    ERR_CODE_FORBIDDEN,
     ERR_CODE_INVALID_REQUEST,
     ERR_CODE_UNAUTHORIZED,
     fail,
     ok,
 )
+from app.middleware.tenant_context import get_tenant_context
 from app.services.integration_service import IntegrationService
 
 router = APIRouter()
@@ -38,6 +40,19 @@ def _require_auth(request: Request):
             status_code=401,
         )
     return None
+
+
+def _require_root(request: Request):
+    request_id = _request_id(request)
+    context = get_tenant_context(request)
+    if context and context.is_root:
+        return None
+    return fail(
+        ERR_CODE_FORBIDDEN,
+        "仅 root 可访问",
+        request_id=request_id,
+        status_code=403,
+    )
 
 
 def _auth_scheme_from_header(value: str) -> str:
@@ -73,6 +88,12 @@ async def dispatch(request: Request, payload: dict):
 @router.post("/integration/capabilities/invoke")
 async def invoke_capability(request: Request, payload: dict):
     request_id = _request_id(request)
+    auth = _require_auth(request)
+    if auth:
+        return auth
+    root_err = _require_root(request)
+    if root_err:
+        return root_err
     if not payload:
         return fail(ERR_CODE_INVALID_REQUEST, "payload 必填", request_id=request_id, status_code=400)
     forward_headers = _collect_forward_headers(request)

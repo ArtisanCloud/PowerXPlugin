@@ -15,6 +15,7 @@ _tenant_uuid_ctx: ContextVar[Optional[str]] = ContextVar("tenant_uuid", default=
 class TenantContext:
     tenant_uuid: str = ""
     user_id: int = 0
+    is_root: bool = False
     roles: list[str] = field(default_factory=list)
     permissions: list[str] = field(default_factory=list)
     policy_version: str = ""

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"{{ .BackendModulePath }}/internal/config"
-	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
-	authx "{{ .BackendModulePath }}/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -427,6 +427,7 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 	claims := authx.PowerXClaims{
 		TenantUUID:    authx.TenantClaim(strings.TrimSpace(userCtx.TenantUUID)),
 		UserID:        int64(userCtx.UserID),
+		IsRoot:        userCtx.IsRoot,
 		Roles:         userCtx.Roles,
 		Permissions:   userCtx.Permissions,
 		PolicyVersion: userCtx.PolicyVersion,

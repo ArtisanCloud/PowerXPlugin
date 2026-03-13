@@ -17,8 +17,11 @@
 ```text
 使用 .codex/skills/docs/feature-guide，
 输入 specs/011-fastapi-gin-align/{spec.md,plan.md,tasks.md,quickstart.md}，
-输出 docs/guides/features/011-fastapi-gin-align/overview.md
+输出 docs/guides/features/011-fastapi-gin-align/guide.md
 ```
+
+> 默认约定：若输入为 `specs/<feature-id>/...` 且你未指定输出，技能会自动写入  
+> `docs/guides/features/<feature-id>/guide.md`。
 
 ## 3) 指定某个 feature 的推荐写法（以 011 为例）
 
@@ -30,31 +33,26 @@
 
 ## 4) 是否支持多 use case
 
-支持。建议“一条 use case 一份文档”，彼此独立，便于维护和评审。
+支持。并且会按输入内容自动判断是否需要拆分；不是固定拆 3 份或固定命名。
 
 推荐目录：
 
 ```text
 docs/guides/features/011-fastapi-gin-align/
-  README.md
-  usecase-auth.md
-  usecase-iam.md
-  usecase-template-crud.md
-  usecase-runtime-session.md
+  guide.md
+  usecase-<slug-a>.md
+  usecase-<slug-b>.md
+  ...
 ```
 
 ## 5) 多 use case 的调用示例
 
 ```text
-使用 $feature-guide，先生成 usecase-auth.md（登录/鉴权链路）
+使用 $feature-guide，按 specs/001-match-data-ingestion 的实际 user stories 自动拆分 usecase 文档
 ```
 
 ```text
-继续使用 $feature-guide，生成 usecase-iam.md（租户/角色/权限管理）
-```
-
-```text
-继续使用 $feature-guide，生成 usecase-template-crud.md（模板增删改查）
+如果只想输出单一场景，可指定：仅生成某个 use case 文档（例如 US2）
 ```
 
 ## 6) 每次调用建议补充的信息

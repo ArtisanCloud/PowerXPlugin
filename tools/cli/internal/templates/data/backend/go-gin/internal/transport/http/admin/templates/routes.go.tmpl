@@ -1,9 +1,9 @@
 package templates
 
 import (
-	"github.com/gin-gonic/gin"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
+	"github.com/gin-gonic/gin"
 )
 
 func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {

@@ -45,7 +45,7 @@ def _require_auth(request: Request):
 def _require_root(request: Request):
     request_id = _request_id(request)
     context = get_tenant_context(request)
-    if context and context.is_root:
+    if _is_root_context(context):
         return None
     return fail(
         ERR_CODE_FORBIDDEN,
@@ -53,6 +53,16 @@ def _require_root(request: Request):
         request_id=request_id,
         status_code=403,
     )
+
+
+def _is_root_context(context) -> bool:
+    if not context:
+        return False
+    if bool(getattr(context, "is_root", False)):
+        return True
+    roles = getattr(context, "roles", None) or []
+    normalized = {str(role).strip().lower() for role in roles if str(role).strip()}
+    return any(role in normalized for role in ("root", "superadmin", "admin"))
 
 
 def _auth_scheme_from_header(value: str) -> str:

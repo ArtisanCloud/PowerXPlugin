@@ -1,7 +1,7 @@
 import { useAuth } from "~/composables/useAuth";
 import { useUserStore } from "~/stores/user";
 
-const PUBLIC_ROUTE_PREFIXES = ["/users"];
+const PUBLIC_ROUTE_PREFIXES = ["/users", "/tests"];
 const ROOT_ONLY_ROUTE_PREFIXES = [
   "/templates",
   "/capabilities",

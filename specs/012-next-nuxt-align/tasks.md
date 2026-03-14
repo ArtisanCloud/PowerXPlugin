@@ -36,17 +36,17 @@
 
 **⚠️ CRITICAL**: 本阶段完成前不得开始 US1/US2/US3
 
-- [ ] T011 建立 API 基础客户端与 envelope 解析于 skeleton/web-admin/next/lib/api/client.ts
-- [ ] T012 [P] 实现统一 API 错误标准化于 skeleton/web-admin/next/lib/api/normalizeApiError.ts
-- [ ] T013 [P] 实现 API 基址解析（独立/宿主）于 skeleton/web-admin/next/lib/api/baseUrl.ts
-- [ ] T014 实现会话存储协议（access/refresh/expires）于 skeleton/web-admin/next/lib/auth/session.ts
-- [ ] T015 [P] 实现鉴权守卫与重定向策略于 skeleton/web-admin/next/middleware.ts
-- [ ] T016 [P] 实现 Host Bridge 适配与 insidePowerX 判定于 skeleton/web-admin/next/lib/bridge/hostBridge.ts
-- [ ] T017 实现默认与嵌入布局路由组装于 skeleton/web-admin/next/app/layout.tsx
-- [ ] T018 [P] 建立 Nuxt->Next 逐页路由对照清单（含 Integration/Ops/Security）于 specs/012-next-nuxt-align/parity-map.md
-- [ ] T019 [P] 建立联调差异记录模板于 specs/012-next-nuxt-align/parity-gap-log.md
-- [ ] T020 建立 E2E 通用工具（登录、模式切换、断言）于 skeleton/web-admin/next/tests/e2e/_utils.ts
-- [ ] T076 [P] 建立错误语义矩阵（code/message/envelope）于 specs/012-next-nuxt-align/error-semantics-matrix.md
+- [x] T011 建立 API 基础客户端与 envelope 解析于 skeleton/web-admin/next/lib/api/client.ts
+- [x] T012 [P] 实现统一 API 错误标准化于 skeleton/web-admin/next/lib/api/normalizeApiError.ts
+- [x] T013 [P] 实现 API 基址解析（独立/宿主）于 skeleton/web-admin/next/lib/api/baseUrl.ts
+- [x] T014 实现会话存储协议（access/refresh/expires）于 skeleton/web-admin/next/lib/auth/session.ts
+- [x] T015 [P] 实现鉴权守卫与重定向策略于 skeleton/web-admin/next/middleware.ts
+- [x] T016 [P] 实现 Host Bridge 适配与 insidePowerX 判定于 skeleton/web-admin/next/lib/bridge/hostBridge.ts
+- [x] T017 实现默认与嵌入布局路由组装于 skeleton/web-admin/next/app/layout.tsx
+- [x] T018 [P] 建立 Nuxt->Next 逐页路由对照清单（含 Integration/Ops/Security）于 specs/012-next-nuxt-align/parity-map.md
+- [x] T019 [P] 建立联调差异记录模板于 specs/012-next-nuxt-align/parity-gap-log.md
+- [x] T020 建立 E2E 通用工具（登录、模式切换、断言）于 skeleton/web-admin/next/tests/e2e/_utils.ts
+- [x] T076 [P] 建立错误语义矩阵（code/message/envelope）于 specs/012-next-nuxt-align/error-semantics-matrix.md
 
 **Checkpoint**: 基础设施就绪，可开始用户故事开发
 

@@ -5,7 +5,10 @@
     "dev": "next dev -p 3231",
     "build": "next build",
     "start": "next start -p 3231",
-    "lint": "next lint"
+    "lint": "next lint",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "next": "14.2.5",
@@ -13,6 +16,7 @@
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.2",
     "@types/node": "25.0.9",
     "@types/react": "19.2.8",
     "typescript": "5.9.3"

@@ -60,23 +60,23 @@
 
 ### Tests for User Story 1
 
-- [ ] T021 [P] [US1] 新增本地鉴权回归用例于 skeleton/web-admin/next/tests/e2e/auth-local.spec.ts
-- [ ] T022 [P] [US1] 新增模板 CRUD 回归用例于 skeleton/web-admin/next/tests/e2e/templates-crud.spec.ts
+- [x] T021 [P] [US1] 新增本地鉴权回归用例于 skeleton/web-admin/next/tests/e2e/auth-local.spec.ts
+- [x] T022 [P] [US1] 新增模板 CRUD 回归用例于 skeleton/web-admin/next/tests/e2e/templates-crud.spec.ts
 
 ### Implementation for User Story 1
 
-- [ ] T023 [P] [US1] 实现登录页面于 skeleton/web-admin/next/app/(public)/users/login/page.tsx
-- [ ] T024 [P] [US1] 实现注册页面于 skeleton/web-admin/next/app/(public)/users/register/page.tsx
-- [ ] T025 [P] [US1] 实现忘记密码页面于 skeleton/web-admin/next/app/(public)/users/forgot-password/page.tsx
-- [ ] T026 [US1] 实现管理首页 intro 页面于 skeleton/web-admin/next/app/(admin)/intro/page.tsx
-- [ ] T027 [P] [US1] 实现模板列表页面于 skeleton/web-admin/next/app/(admin)/templates/page.tsx
-- [ ] T028 [P] [US1] 实现模板 CRUD 页面于 skeleton/web-admin/next/app/(admin)/templates/crud/page.tsx
-- [ ] T029 [P] [US1] 实现模板 develop 页面于 skeleton/web-admin/next/app/(admin)/templates/develop/page.tsx
-- [ ] T030 [P] [US1] 实现模板 API 调用于 skeleton/web-admin/next/lib/api/template.ts
-- [ ] T031 [P] [US1] 实现 auth API 调用于 skeleton/web-admin/next/lib/api/auth.ts
-- [ ] T032 [US1] 实现模板表单弹窗组件于 skeleton/web-admin/next/components/templates/TemplateFormModal.tsx
-- [ ] T033 [US1] 实现模板与登录状态 store 于 skeleton/web-admin/next/lib/stores/templates.ts
-- [ ] T034 [US1] 对齐 US1 页面 testid 与基线映射于 specs/012-next-nuxt-align/parity-map.md
+- [x] T023 [P] [US1] 实现登录页面于 skeleton/web-admin/next/app/(public)/users/login/page.tsx
+- [x] T024 [P] [US1] 实现注册页面于 skeleton/web-admin/next/app/(public)/users/register/page.tsx
+- [x] T025 [P] [US1] 实现忘记密码页面于 skeleton/web-admin/next/app/(public)/users/forgot-password/page.tsx
+- [x] T026 [US1] 实现管理首页 intro 页面于 skeleton/web-admin/next/app/(admin)/intro/page.tsx
+- [x] T027 [P] [US1] 实现模板列表页面于 skeleton/web-admin/next/app/(admin)/templates/page.tsx
+- [x] T028 [P] [US1] 实现模板 CRUD 页面于 skeleton/web-admin/next/app/(admin)/templates/crud/page.tsx
+- [x] T029 [P] [US1] 实现模板 develop 页面于 skeleton/web-admin/next/app/(admin)/templates/develop/page.tsx
+- [x] T030 [P] [US1] 实现模板 API 调用于 skeleton/web-admin/next/lib/api/template.ts
+- [x] T031 [P] [US1] 实现 auth API 调用于 skeleton/web-admin/next/lib/api/auth.ts
+- [x] T032 [US1] 实现模板表单弹窗组件于 skeleton/web-admin/next/components/templates/TemplateFormModal.tsx
+- [x] T033 [US1] 实现模板与登录状态 store 于 skeleton/web-admin/next/lib/stores/templates.ts
+- [x] T034 [US1] 对齐 US1 页面 testid 与基线映射于 specs/012-next-nuxt-align/parity-map.md
 
 **Checkpoint**: US1 可独立联调与回归通过
 

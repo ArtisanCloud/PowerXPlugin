@@ -11,6 +11,7 @@ export function setSessionTokens(accessToken: string, refreshToken: string, expi
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
   localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
   localStorage.setItem(EXPIRES_AT_KEY, String(expiresAt))
+  document.cookie = `${ACCESS_TOKEN_KEY}=${accessToken}; Path=/; SameSite=Lax`
 }
 
 export function clearSessionTokens(): void {
@@ -18,6 +19,7 @@ export function clearSessionTokens(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY)
   localStorage.removeItem(REFRESH_TOKEN_KEY)
   localStorage.removeItem(EXPIRES_AT_KEY)
+  document.cookie = `${ACCESS_TOKEN_KEY}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
 }
 
 export function getAccessToken(): string | null {

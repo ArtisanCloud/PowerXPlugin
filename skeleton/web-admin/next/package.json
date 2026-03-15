@@ -6,6 +6,7 @@
     "build": "next build",
     "start": "next start -p 3231",
     "lint": "next lint",
+    "verify:artifacts": "node scripts/verify-artifacts.mjs",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui"
@@ -19,6 +20,8 @@
     "@playwright/test": "^1.48.2",
     "@types/node": "25.0.9",
     "@types/react": "19.2.8",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.5",
     "typescript": "5.9.3"
   }
 }

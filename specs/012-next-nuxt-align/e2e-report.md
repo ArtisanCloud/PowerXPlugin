@@ -1,25 +1,30 @@
-# E2E Report (US2)
+# E2E Report (Phase 6 Full Run)
 
-## 统计范围
-- 统计日期: 2026-03-14
-- 统计对象: IAM 与 Capabilities 在 Next 端的 US2 回归
-- 关联用例:
-  - `tests/e2e/iam-local.spec.ts`
-  - `tests/e2e/capability-invocation.spec.ts`
-  - `tests/e2e/error-semantics.spec.ts`
+## 执行信息
+- 执行日期: 2026-03-15
+- 执行命令: `cd skeleton/web-admin/next && npm run e2e`
+- 浏览器: Playwright Chromium
 
-## 一次通过率
+## 汇总
 
-| Domain | Cases | First-Pass Success | First-Pass Rate | 备注 |
-|---|---:|---:|---:|---|
-| IAM | 1 | 0 | 0% | Playwright 浏览器二进制缺失，未进入用例执行阶段 |
-| Capabilities | 2 | 0 | 0% | Playwright 浏览器二进制缺失，未进入用例执行阶段 |
-| Combined | 3 | 0 | 0% | 需执行 `npx playwright install` 后复测 |
+| Metric | Value |
+|---|---:|
+| Total | 22 |
+| Passed | 15 |
+| Failed | 2 |
+| Skipped | 5 |
+| Pass Rate (excluding skipped) | 88.24% |
 
-## 本次执行记录
-- `npx tsc --noEmit`: 通过
-- `npx playwright test tests/e2e/route-parity.spec.ts --project=chromium --reporter=list`: 启动失败（缺少 Chromium headless shell）
+## 失败用例
+
+| Case | Failure Summary |
+|---|---|
+| `tests/e2e/error-semantics.spec.ts` -> IAM endpoint returns envelope code/message and UI keeps semantics | `getByRole('alert')` 命中 2 个元素（业务 alert + Next route announcer），严格模式冲突 |
+| `tests/e2e/mode-parity-edge.spec.ts` -> standalone and host paths are both reachable | `/_p/{pluginId}/admin/integration` 未命中 `host-proxy-page` 断言 |
+
+## 跳过用例说明
+- `auth-delegated.spec.ts` / `auth-local.spec.ts` / `iam-local.spec.ts` 受环境变量门控（`PLAYWRIGHT_LOCAL_IAM`、`NEXT_PUBLIC_DELEGATED_IAM`），当前执行环境未启用对应模式。
 
 ## 结论
-- 已完成 US2 的用例实现与断言编排，统计模板可直接用于 CI/本地实跑后回填。
-- 当前阻塞点是浏览器运行时未安装，不是业务断言失败。
+- US2/US3 主体场景在当前环境已可执行，核心回归通过率较高。
+- 仍有 2 个未闭环问题，已纳入 parity 风险与发布门禁。

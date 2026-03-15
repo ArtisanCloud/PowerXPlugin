@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { login } from '@/lib/api/auth'
 import { ApiError } from '@/lib/api/normalizeApiError'
 import { setSessionTokens } from '@/lib/auth/session'
@@ -32,18 +32,23 @@ function sanitizeRedirectTo(raw: string | null, insidePowerX: boolean): string {
 export default function LoginPage() {
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [redirectRaw, setRedirectRaw] = useState<string | null>(null)
 
   const delegatedMode = process.env.NEXT_PUBLIC_DELEGATED_IAM === '1'
   const insidePowerX = pathname.startsWith('/_p/')
 
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    setRedirectRaw(url.searchParams.get('redirect'))
+  }, [])
+
   const redirectTo = useMemo(
-    () => sanitizeRedirectTo(searchParams.get('redirect'), insidePowerX),
-    [insidePowerX, searchParams]
+    () => sanitizeRedirectTo(redirectRaw, insidePowerX),
+    [insidePowerX, redirectRaw]
   )
 
   const handleSubmit = async (event: React.FormEvent) => {

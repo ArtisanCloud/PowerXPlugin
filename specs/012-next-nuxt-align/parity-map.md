@@ -49,3 +49,18 @@
 | 双模式路由一致性 | `/integration` 与 `/_p/{pluginId}/admin/integration` | `mode-parity-edge.spec.ts` |
 | 逐页路由可达性 | IAM/Capabilities/Integration/Ops/Security 各路由 | `route-parity.spec.ts` |
 | 错误语义矩阵回归 | IAM 403 与 capability 500 语义 | `error-semantics.spec.ts` |
+
+## Final Alignment Summary (T067)
+
+| Scope | Status | Evidence |
+|---|---|---|
+| US1 页面迁移（Auth/Intro/Templates） | migrated | `tasks.md` T021-T034 完成 |
+| US2 页面迁移（IAM/Capabilities/Integration/Ops/Security） | migrated | `tasks.md` T035-T055/T068/T069/T077 完成 |
+| 全量 E2E 回归 | partial | `e2e-report.md`：15 passed / 2 failed / 5 skipped |
+| 构建产物路径对齐 | verified | `verification-report.md` + `package-artifact-report.md` |
+
+## Residual Risks
+
+1. Host 模式透传断言未通过：`mode-parity-edge.spec.ts` 仍无法确认 `/_p/{pluginId}/admin/*` 对 `host-proxy-page` 的展示链路。
+2. 错误语义用例存在选择器冲突：`error-semantics.spec.ts` 的 `getByRole('alert')` 受 Next route announcer 干扰。
+3. Contract Drift 阻断：`/admin/user/auth/register` 未在 `contracts/openapi.yaml` 声明，当前不可放行发布。

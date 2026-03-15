@@ -153,15 +153,15 @@
 
 **Purpose**: 跨故事收尾、统一验收与质量固化
 
-- [ ] T063 [P] 统一补齐 API/鉴权注释与使用说明于 skeleton/web-admin/next/lib/api/README.md
-- [ ] T064 [P] 更新 Next 迁移说明文档于 skeleton/web-admin/next/README.md
-- [ ] T073 配置 Next 构建产物对齐发布路径于 skeleton/web-admin/next/next.config.js
-- [ ] T074 [P] 增加产物路径一致性校验脚本于 skeleton/web-admin/next/scripts/verify-artifacts.mjs
-- [ ] T065 执行全量 E2E 并记录结果于 specs/012-next-nuxt-align/e2e-report.md
-- [ ] T066 执行 lint/build 并记录结果于 specs/012-next-nuxt-align/verification-report.md
-- [ ] T067 汇总最终页面对齐状态与遗留风险于 specs/012-next-nuxt-align/parity-map.md
-- [ ] T075 在发布验证报告中记录产物路径校验结果于 specs/012-next-nuxt-align/verification-report.md
-- [ ] T079 执行发布包产物树校验并输出于 specs/012-next-nuxt-align/package-artifact-report.md
+- [x] T063 [P] 统一补齐 API/鉴权注释与使用说明于 skeleton/web-admin/next/lib/api/README.md
+- [x] T064 [P] 更新 Next 迁移说明文档于 skeleton/web-admin/next/README.md
+- [x] T073 配置 Next 构建产物对齐发布路径于 skeleton/web-admin/next/next.config.js
+- [x] T074 [P] 增加产物路径一致性校验脚本于 skeleton/web-admin/next/scripts/verify-artifacts.mjs
+- [x] T065 执行全量 E2E 并记录结果于 specs/012-next-nuxt-align/e2e-report.md
+- [x] T066 执行 lint/build 并记录结果于 specs/012-next-nuxt-align/verification-report.md
+- [x] T067 汇总最终页面对齐状态与遗留风险于 specs/012-next-nuxt-align/parity-map.md
+- [x] T075 在发布验证报告中记录产物路径校验结果于 specs/012-next-nuxt-align/verification-report.md
+- [x] T079 执行发布包产物树校验并输出于 specs/012-next-nuxt-align/package-artifact-report.md
 
 ---
 

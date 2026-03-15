@@ -13,6 +13,16 @@ export async function loginWithPassword(page: Page, username: string, password: 
 
 export async function seedAuthStorage(page: Page): Promise<void> {
   const expiresAt = Math.floor(Date.now() / 1000) + 3600
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3231'
+  const cookieURL = new URL(baseURL).origin
+  await page.context().addCookies([
+    {
+      name: 'access_token',
+      value: 'e2e-access-token',
+      url: cookieURL,
+    },
+  ])
+
   await page.addInitScript(({ expiresAt }) => {
     window.localStorage.setItem('access_token', 'e2e-access-token')
     window.localStorage.setItem('refresh_token', 'e2e-refresh-token')

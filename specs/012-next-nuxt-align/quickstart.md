@@ -46,6 +46,26 @@ npm run dev
 - 发布前必须满足：阻断级与高优先级问题清零。
 - 中低优先级问题需包含书面风险评估与处置计划。
 
+### 差异 SLA 执行步骤
+
+1. 发现差异后 30 分钟内写入 `parity-gap-log.md`，初始 `root_cause=unknown`。
+2. 4 小时内补齐 Nuxt/Next 证据（请求、响应、截图、日志）。
+3. 24 小时内完成初判并更新 `decision`。
+4. 48 小时内关闭条目并回填 `resolved_at`；超时需升级并冻结发布候选。
+
+### 发布门禁执行步骤
+
+1. 执行 `checklists/release-gate.md` 全量核查。
+2. 执行 contract 漂移校验：
+
+```bash
+cd /private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin
+./specs/012-next-nuxt-align/scripts/check-contract-drift.sh
+```
+
+3. 若脚本报错，必须登记差异并阻断发布，不得“带病放行”。
+4. 归档证据到 `regression-evidence-template.md` 实例，并在评审会上确认签字。
+
 ## 验证完成标准
 
 - 全部页面域主链路回归通过率 100%

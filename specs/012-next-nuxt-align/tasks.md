@@ -130,20 +130,20 @@
 
 ### Tests for User Story 3
 
-- [ ] T056 [P] [US3] 新增差异归因流程演练脚本于 specs/012-next-nuxt-align/scripts/parity-triage-drill.md
-- [ ] T057 [P] [US3] 新增发布门禁核查清单于 specs/012-next-nuxt-align/checklists/release-gate.md
+- [x] T056 [P] [US3] 新增差异归因流程演练脚本于 specs/012-next-nuxt-align/scripts/parity-triage-drill.md
+- [x] T057 [P] [US3] 新增发布门禁核查清单于 specs/012-next-nuxt-align/checklists/release-gate.md
 
 ### Implementation for User Story 3
 
-- [ ] T058 [US3] 编写联调差异归因 SOP 于 specs/012-next-nuxt-align/parity-triage-sop.md
-- [ ] T059 [US3] 编写 Gin 缺陷准入与最小修复规范于 specs/012-next-nuxt-align/gin-defect-policy.md
-- [ ] T060 [US3] 编写双端回归证据模板于 specs/012-next-nuxt-align/regression-evidence-template.md
-- [ ] T061 [US3] 在 quickstart 增补差异 SLA 与门禁执行步骤于 specs/012-next-nuxt-align/quickstart.md
-- [ ] T062 [US3] 在 plan 中补充门禁验收追踪点于 specs/012-next-nuxt-align/plan.md
-- [ ] T070 [US3] 增加联调差异 SLA 统计模板于 specs/012-next-nuxt-align/parity-gap-log.md
-- [ ] T071 [US3] 输出 2 工作日归因达成率报告于 specs/012-next-nuxt-align/sla-report.md
-- [ ] T072 [US3] 增加“禁止 Next 私有接口漂移”校验清单于 specs/012-next-nuxt-align/checklists/contract-drift.md
-- [ ] T078 [US3] 增加 contract diff 自动化校验脚本于 specs/012-next-nuxt-align/scripts/check-contract-drift.sh
+- [x] T058 [US3] 编写联调差异归因 SOP 于 specs/012-next-nuxt-align/parity-triage-sop.md
+- [x] T059 [US3] 编写 Gin 缺陷准入与最小修复规范于 specs/012-next-nuxt-align/gin-defect-policy.md
+- [x] T060 [US3] 编写双端回归证据模板于 specs/012-next-nuxt-align/regression-evidence-template.md
+- [x] T061 [US3] 在 quickstart 增补差异 SLA 与门禁执行步骤于 specs/012-next-nuxt-align/quickstart.md
+- [x] T062 [US3] 在 plan 中补充门禁验收追踪点于 specs/012-next-nuxt-align/plan.md
+- [x] T070 [US3] 增加联调差异 SLA 统计模板于 specs/012-next-nuxt-align/parity-gap-log.md
+- [x] T071 [US3] 输出 2 工作日归因达成率报告于 specs/012-next-nuxt-align/sla-report.md
+- [x] T072 [US3] 增加“禁止 Next 私有接口漂移”校验清单于 specs/012-next-nuxt-align/checklists/contract-drift.md
+- [x] T078 [US3] 增加 contract diff 自动化校验脚本于 specs/012-next-nuxt-align/scripts/check-contract-drift.sh
 
 **Checkpoint**: US3 治理流程可独立执行并用于发布评审
 

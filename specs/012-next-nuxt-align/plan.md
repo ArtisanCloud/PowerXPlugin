@@ -117,3 +117,12 @@ skeleton/
 - 任务切分保持“前端迁移优先、Gin 缺陷最小修复”，满足 Service-Centric 与 Minimal Footprint。
 - 回归与验收路径可执行，满足 Observable & Testable Delivery。
 - 已将构建产物对齐与发布校验纳入任务，满足 Frontend Artifact Gate。
+
+## Gate Acceptance Tracking
+
+| Gate | Checkpoint | Evidence | Owner | Status |
+|---|---|---|---|---|
+| 差异归因 SLA | 所有 gap 在 2 工作日内归因并结案 | `parity-gap-log.md` + `sla-report.md` | Feature Owner | In Progress |
+| Gin 缺陷准入 | 仅缺陷型最小修复，且双端回归通过 | `gin-defect-policy.md` + 回归证据模板实例 | Backend Owner | In Progress |
+| Contract Drift | Next API 路径不漂移到私有接口 | `scripts/check-contract-drift.sh` 输出 | FE Owner | In Progress |
+| Release Gate | 阻断/高优先级问题清零并签字放行 | `checklists/release-gate.md` | QA Lead | In Progress |

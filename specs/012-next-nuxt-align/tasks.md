@@ -90,33 +90,33 @@
 
 ### Tests for User Story 2
 
-- [ ] T035 [P] [US2] 新增委托鉴权回归用例于 skeleton/web-admin/next/tests/e2e/auth-delegated.spec.ts
-- [ ] T036 [P] [US2] 新增 IAM 主链路回归用例于 skeleton/web-admin/next/tests/e2e/iam-local.spec.ts
-- [ ] T037 [P] [US2] 新增能力调用回归用例于 skeleton/web-admin/next/tests/e2e/capability-invocation.spec.ts
-- [ ] T038 [P] [US2] 新增双模式异常场景回归用例于 skeleton/web-admin/next/tests/e2e/mode-parity-edge.spec.ts
-- [ ] T068 [P] [US2] 增加逐页路由可访问与入口可见性断言于 skeleton/web-admin/next/tests/e2e/route-parity.spec.ts
-- [ ] T077 [P] [US2] 增加错误语义矩阵断言回归于 skeleton/web-admin/next/tests/e2e/error-semantics.spec.ts
+- [x] T035 [P] [US2] 新增委托鉴权回归用例于 skeleton/web-admin/next/tests/e2e/auth-delegated.spec.ts
+- [x] T036 [P] [US2] 新增 IAM 主链路回归用例于 skeleton/web-admin/next/tests/e2e/iam-local.spec.ts
+- [x] T037 [P] [US2] 新增能力调用回归用例于 skeleton/web-admin/next/tests/e2e/capability-invocation.spec.ts
+- [x] T038 [P] [US2] 新增双模式异常场景回归用例于 skeleton/web-admin/next/tests/e2e/mode-parity-edge.spec.ts
+- [x] T068 [P] [US2] 增加逐页路由可访问与入口可见性断言于 skeleton/web-admin/next/tests/e2e/route-parity.spec.ts
+- [x] T077 [P] [US2] 增加错误语义矩阵断言回归于 skeleton/web-admin/next/tests/e2e/error-semantics.spec.ts
 
 ### Implementation for User Story 2
 
-- [ ] T039 [P] [US2] 实现 IAM 概览页面于 skeleton/web-admin/next/app/(admin)/admin/iam/overview/page.tsx
-- [ ] T040 [P] [US2] 实现 IAM 成员页面于 skeleton/web-admin/next/app/(admin)/admin/iam/members/page.tsx
-- [ ] T041 [P] [US2] 实现 IAM 角色页面于 skeleton/web-admin/next/app/(admin)/admin/iam/roles/page.tsx
-- [ ] T042 [P] [US2] 实现 IAM 设置页面于 skeleton/web-admin/next/app/(admin)/admin/iam/settings/page.tsx
-- [ ] T043 [P] [US2] 实现 Capabilities 生命周期页面于 skeleton/web-admin/next/app/(admin)/capabilities/lifecycle/page.tsx
-- [ ] T044 [P] [US2] 实现 Capabilities 注册页面于 skeleton/web-admin/next/app/(admin)/capabilities/register/page.tsx
-- [ ] T045 [P] [US2] 实现 Capability Lab 页面于 skeleton/web-admin/next/app/(admin)/powerx/capability-lab/page.tsx
-- [ ] T046 [P] [US2] 实现测试能力页面于 skeleton/web-admin/next/app/(admin)/tests/capability/page.tsx
-- [ ] T047 [P] [US2] 实现 Integration 页面于 skeleton/web-admin/next/app/(admin)/integration/page.tsx
-- [ ] T048 [P] [US2] 实现 Operations 页面于 skeleton/web-admin/next/app/(admin)/operations/page.tsx
-- [ ] T049 [P] [US2] 实现 Security 页面于 skeleton/web-admin/next/app/(admin)/security/page.tsx
-- [ ] T050 [P] [US2] 实现 IAM API 调用于 skeleton/web-admin/next/lib/api/iam.ts
-- [ ] T051 [P] [US2] 实现 Capability API 调用于 skeleton/web-admin/next/lib/api/capabilities.ts
-- [ ] T052 [P] [US2] 实现 Integration/Ops/Security API 调用于 skeleton/web-admin/next/lib/api/operations.ts
-- [ ] T053 [US2] 实现宿主路径透传页于 skeleton/web-admin/next/app/_p/[pluginId]/admin/[...internal]/page.tsx
-- [ ] T054 [US2] 实现双模式权限可见性规则 store 于 skeleton/web-admin/next/lib/stores/permissions.ts
-- [ ] T055 [US2] 更新 US2 页面与异常场景映射于 specs/012-next-nuxt-align/parity-map.md
-- [ ] T069 [US2] 统计 IAM/Capabilities 一次通过率并输出于 specs/012-next-nuxt-align/e2e-report.md
+- [x] T039 [P] [US2] 实现 IAM 概览页面于 skeleton/web-admin/next/app/(admin)/admin/iam/overview/page.tsx
+- [x] T040 [P] [US2] 实现 IAM 成员页面于 skeleton/web-admin/next/app/(admin)/admin/iam/members/page.tsx
+- [x] T041 [P] [US2] 实现 IAM 角色页面于 skeleton/web-admin/next/app/(admin)/admin/iam/roles/page.tsx
+- [x] T042 [P] [US2] 实现 IAM 设置页面于 skeleton/web-admin/next/app/(admin)/admin/iam/settings/page.tsx
+- [x] T043 [P] [US2] 实现 Capabilities 生命周期页面于 skeleton/web-admin/next/app/(admin)/capabilities/lifecycle/page.tsx
+- [x] T044 [P] [US2] 实现 Capabilities 注册页面于 skeleton/web-admin/next/app/(admin)/capabilities/register/page.tsx
+- [x] T045 [P] [US2] 实现 Capability Lab 页面于 skeleton/web-admin/next/app/(admin)/powerx/capability-lab/page.tsx
+- [x] T046 [P] [US2] 实现测试能力页面于 skeleton/web-admin/next/app/(admin)/tests/capability/page.tsx
+- [x] T047 [P] [US2] 实现 Integration 页面于 skeleton/web-admin/next/app/(admin)/integration/page.tsx
+- [x] T048 [P] [US2] 实现 Operations 页面于 skeleton/web-admin/next/app/(admin)/operations/page.tsx
+- [x] T049 [P] [US2] 实现 Security 页面于 skeleton/web-admin/next/app/(admin)/security/page.tsx
+- [x] T050 [P] [US2] 实现 IAM API 调用于 skeleton/web-admin/next/lib/api/iam.ts
+- [x] T051 [P] [US2] 实现 Capability API 调用于 skeleton/web-admin/next/lib/api/capabilities.ts
+- [x] T052 [P] [US2] 实现 Integration/Ops/Security API 调用于 skeleton/web-admin/next/lib/api/operations.ts
+- [x] T053 [US2] 实现宿主路径透传页于 skeleton/web-admin/next/app/_p/[pluginId]/admin/[...internal]/page.tsx
+- [x] T054 [US2] 实现双模式权限可见性规则 store 于 skeleton/web-admin/next/lib/stores/permissions.ts
+- [x] T055 [US2] 更新 US2 页面与异常场景映射于 specs/012-next-nuxt-align/parity-map.md
+- [x] T069 [US2] 统计 IAM/Capabilities 一次通过率并输出于 specs/012-next-nuxt-align/e2e-report.md
 
 **Checkpoint**: US2 双模式一致性与关键异常场景可独立验证
 

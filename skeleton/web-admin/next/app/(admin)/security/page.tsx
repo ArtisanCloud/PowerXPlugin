@@ -25,10 +25,15 @@ export default function SecurityPage() {
   }, [])
 
   return (
-    <main style={{ padding: 24 }} data-testid="security-page">
-      <h1>Security</h1>
-      {error ? <p role="alert">{error}</p> : null}
-      <pre data-testid="security-json">{JSON.stringify(data || {}, null, 2)}</pre>
+    <main className="px-admin-page" data-testid="security-page">
+      <section className="px-admin-shell">
+        <article className="px-admin-card">
+          <h1 className="px-admin-title">Security</h1>
+          <p className="px-admin-subtitle">安全概览与策略状态。</p>
+          {error ? <p role="alert" className="px-alert px-alert-danger" style={{ marginTop: 12 }}>{error}</p> : null}
+          <pre className="px-code" data-testid="security-json" style={{ marginTop: 14 }}>{JSON.stringify(data || {}, null, 2)}</pre>
+        </article>
+      </section>
     </main>
   )
 }

@@ -25,10 +25,15 @@ export default function OperationsPage() {
   }, [])
 
   return (
-    <main style={{ padding: 24 }} data-testid="operations-page">
-      <h1>Operations</h1>
-      {error ? <p role="alert">{error}</p> : null}
-      <pre data-testid="operations-json">{JSON.stringify(data || {}, null, 2)}</pre>
+    <main className="px-admin-page" data-testid="operations-page">
+      <section className="px-admin-shell">
+        <article className="px-admin-card">
+          <h1 className="px-admin-title">Operations</h1>
+          <p className="px-admin-subtitle">运营指标与运行状态。</p>
+          {error ? <p role="alert" className="px-alert px-alert-danger" style={{ marginTop: 12 }}>{error}</p> : null}
+          <pre className="px-code" data-testid="operations-json" style={{ marginTop: 14 }}>{JSON.stringify(data || {}, null, 2)}</pre>
+        </article>
+      </section>
     </main>
   )
 }

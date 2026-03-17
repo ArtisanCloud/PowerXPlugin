@@ -6,6 +6,11 @@ const PUBLIC_PATHS = ['/users/login', '/users/register', '/users/forgot-password
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
 
+  // API requests must never be redirected to login.
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
   const token = request.cookies.get('access_token')?.value
 
@@ -19,5 +24,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 }

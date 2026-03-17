@@ -1,14 +1,45 @@
-import Link from 'next/link'
+'use client'
+
+import { tAdmin } from '@/lib/i18n/admin'
+import { useLocalePreference } from '@/lib/ui/preferences'
 
 export default function TemplatesPage() {
+  const locale = useLocalePreference()
+
   return (
-    <main style={{ padding: 24, display: 'grid', gap: 12 }}>
-      <h1 data-testid="templates-overview-title" style={{ margin: 0 }}>模板管理</h1>
-      <p style={{ color: '#475569', margin: 0 }}>模板列表、CRUD 与开发指引页面。</p>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <Link data-testid="templates-to-crud" href="/templates/crud">进入 CRUD</Link>
-        <Link data-testid="templates-to-develop" href="/templates/develop">进入 Develop</Link>
-      </div>
+    <main className="px-admin-page">
+      <section className="px-admin-shell">
+        <article className="px-admin-intro-head">
+          <h1 data-testid="templates-overview-title" className="px-admin-title">{tAdmin(locale, 'templates.title')}</h1>
+          <p className="px-admin-subtitle">{tAdmin(locale, 'templates.desc')}</p>
+        </article>
+
+        <section className="px-template-grid">
+          <article className="px-template-card">
+            <header className="px-template-card-head">
+              <span className="px-template-icon" aria-hidden="true">✚</span>
+              <h3 className="px-template-card-title">{tAdmin(locale, 'templates.card.create.title')}</h3>
+            </header>
+            <p className="px-template-card-text">{tAdmin(locale, 'templates.card.create.body')}</p>
+          </article>
+
+          <article className="px-template-card">
+            <header className="px-template-card-head">
+              <span className="px-template-icon" aria-hidden="true">🚀</span>
+              <h3 className="px-template-card-title">{tAdmin(locale, 'templates.card.auto.title')}</h3>
+            </header>
+            <p className="px-template-card-text">{tAdmin(locale, 'templates.card.auto.body')}</p>
+          </article>
+
+          <article className="px-template-card">
+            <header className="px-template-card-head">
+              <span className="px-template-icon" aria-hidden="true">▥</span>
+              <h3 className="px-template-card-title">{tAdmin(locale, 'templates.card.insight.title')}</h3>
+            </header>
+            <p className="px-template-card-text">{tAdmin(locale, 'templates.card.insight.body')}</p>
+          </article>
+        </section>
+      </section>
     </main>
   )
 }

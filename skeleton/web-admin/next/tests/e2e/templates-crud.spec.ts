@@ -14,7 +14,7 @@ test.describe('Templates CRUD parity (Next)', () => {
       { id: 1, name: '欢迎模板', description: '默认欢迎语', content: 'hello world' },
     ]
 
-    await page.route('**/api/v1/admin/templates**', async (route) => {
+    await page.route('**/api/v1/templates**', async (route) => {
       const request = route.request()
       const url = new URL(request.url())
       const method = request.method()
@@ -35,7 +35,7 @@ test.describe('Templates CRUD parity (Next)', () => {
         return
       }
 
-      if (method === 'POST' && url.pathname.endsWith('/admin/templates')) {
+      if (method === 'POST' && url.pathname.endsWith('/templates')) {
         const payload = request.postDataJSON() as Partial<Template>
         const created: Template = {
           id: templates.length + 10,

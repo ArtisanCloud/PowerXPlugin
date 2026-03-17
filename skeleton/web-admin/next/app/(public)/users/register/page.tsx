@@ -67,43 +67,56 @@ export default function RegisterPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}>
-      <div style={{ width: 'min(480px, 100%)', border: '1px solid #e2e8f0', borderRadius: 16, background: '#fff', padding: 24 }}>
-        <h1 style={{ marginTop: 0 }}>注册账号</h1>
-        {error ? <p role="alert" style={{ color: '#b91c1c' }}>{error}</p> : null}
+    <main className="px-auth-page">
+      <div className="px-auth-shell">
+        <Link href="/users/login" className="px-auth-back">&lt; 返回登录</Link>
+        <div className="px-auth-card">
+          <header className="px-auth-header">
+            <h1 className="px-auth-logo">PowerX</h1>
+            <p className="px-auth-subtitle">创建账号并接入插件管理。</p>
+          </header>
 
-        {success ? (
-          <div data-testid="register-success">
-            <p>注册成功，{countdown} 秒后跳转登录页。</p>
-            <Link href="/users/login">立即前往登录</Link>
+          <div className="px-auth-body">
+            {error ? <p role="alert" className="px-alert px-alert-danger">{error}</p> : null}
+
+            {success ? (
+              <div data-testid="register-success" className="px-auth-foot" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
+                <p>注册成功，{countdown} 秒后跳转登录页。</p>
+                <Link href="/users/login">立即前往登录</Link>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="px-form">
+                <div className="px-form-row">
+                  <label className="px-form-label">用户名</label>
+                  <input className="px-input" data-testid="register-username" value={username} onChange={(event) => setUsername(event.target.value)} />
+                </div>
+                <div className="px-form-row">
+                  <label className="px-form-label">邮箱</label>
+                  <input className="px-input" data-testid="register-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+                </div>
+                <div className="px-form-row">
+                  <label className="px-form-label">密码</label>
+                  <input className="px-input" data-testid="register-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+                </div>
+                <div className="px-form-row">
+                  <label className="px-form-label">确认密码</label>
+                  <input className="px-input" data-testid="register-confirm-password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+                </div>
+                <label className="px-checkbox-row">
+                  <input data-testid="register-agree" type="checkbox" checked={agree} onChange={(event) => setAgree(event.target.checked)} />
+                  我已阅读并同意条款
+                </label>
+                <button data-testid="register-submit" className="px-auth-submit" type="submit" disabled={loading}>
+                  {loading ? '提交中...' : '注册'}
+                </button>
+              </form>
+            )}
+
+            <div className="px-auth-foot">
+              已有账号? <Link href="/users/login">立即登录</Link>
+            </div>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-            <label>
-              用户名
-              <input data-testid="register-username" value={username} onChange={(event) => setUsername(event.target.value)} style={{ display: 'block', width: '100%', marginTop: 6, padding: 10 }} />
-            </label>
-            <label>
-              邮箱
-              <input data-testid="register-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} style={{ display: 'block', width: '100%', marginTop: 6, padding: 10 }} />
-            </label>
-            <label>
-              密码
-              <input data-testid="register-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} style={{ display: 'block', width: '100%', marginTop: 6, padding: 10 }} />
-            </label>
-            <label>
-              确认密码
-              <input data-testid="register-confirm-password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} style={{ display: 'block', width: '100%', marginTop: 6, padding: 10 }} />
-            </label>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input data-testid="register-agree" type="checkbox" checked={agree} onChange={(event) => setAgree(event.target.checked)} />
-              我已阅读并同意条款
-            </label>
-            <button data-testid="register-submit" type="submit" disabled={loading} style={{ padding: '10px 14px' }}>
-              {loading ? '提交中...' : '注册'}
-            </button>
-          </form>
-        )}
+        </div>
       </div>
     </main>
   )

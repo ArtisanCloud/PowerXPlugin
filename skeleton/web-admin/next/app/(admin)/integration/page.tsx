@@ -25,10 +25,15 @@ export default function IntegrationPage() {
   }, [])
 
   return (
-    <main style={{ padding: 24 }} data-testid="integration-page">
-      <h1>Integration</h1>
-      {error ? <p role="alert">{error}</p> : null}
-      <pre data-testid="integration-json">{JSON.stringify(data || {}, null, 2)}</pre>
+    <main className="px-admin-page" data-testid="integration-page">
+      <section className="px-admin-shell">
+        <article className="px-admin-card">
+          <h1 className="px-admin-title">Integration</h1>
+          <p className="px-admin-subtitle">外部集成配置与联通状态。</p>
+          {error ? <p role="alert" className="px-alert px-alert-danger" style={{ marginTop: 12 }}>{error}</p> : null}
+          <pre className="px-code" data-testid="integration-json" style={{ marginTop: 14 }}>{JSON.stringify(data || {}, null, 2)}</pre>
+        </article>
+      </section>
     </main>
   )
 }

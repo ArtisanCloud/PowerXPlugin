@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import TemplateFormModal, { type TemplateFormValue } from '@/components/templates/TemplateFormModal'
+import { tAdmin } from '@/lib/i18n/admin'
 import {
   createTemplate,
   deleteTemplate,
@@ -17,6 +18,7 @@ import {
   upsertTemplate,
   useTemplateStore,
 } from '@/lib/stores/templates'
+import { useLocalePreference } from '@/lib/ui/preferences'
 
 function toPayload(value: TemplateFormValue) {
   return {
@@ -28,6 +30,7 @@ function toPayload(value: TemplateFormValue) {
 
 export default function TemplatesCrudPage() {
   const store = useTemplateStore()
+  const locale = useLocalePreference()
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -47,12 +50,10 @@ export default function TemplatesCrudPage() {
         if (err instanceof ApiError) {
           setError(err.message)
         } else {
-          setError('加载模板失败，请稍后重试。')
+          setError(tAdmin(locale, 'templates.crud.error.load'))
         }
       } finally {
-        if (active) {
-          setTemplateLoading(false)
-        }
+        if (active) setTemplateLoading(false)
       }
     }
 
@@ -60,20 +61,16 @@ export default function TemplatesCrudPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [locale])
 
-  const modalTitle = useMemo(() => (editing ? '编辑模板' : '创建模板'), [editing])
-  const submitLabel = useMemo(() => (editing ? '保存修改' : '创建模板'), [editing])
-
-  const startCreate = () => {
-    setEditing(null)
-    setModalOpen(true)
-  }
-
-  const startEdit = (item: Template) => {
-    setEditing(item)
-    setModalOpen(true)
-  }
+  const modalTitle = useMemo(
+    () => (editing ? tAdmin(locale, 'templates.crud.modal.editTitle') : tAdmin(locale, 'templates.crud.modal.createTitle')),
+    [editing, locale],
+  )
+  const submitLabel = useMemo(
+    () => (editing ? tAdmin(locale, 'templates.crud.modal.editSubmit') : tAdmin(locale, 'templates.crud.modal.createSubmit')),
+    [editing, locale],
+  )
 
   const handleSubmit = async (value: TemplateFormValue) => {
     setSaving(true)
@@ -90,18 +87,18 @@ export default function TemplatesCrudPage() {
       setModalOpen(false)
       setEditing(null)
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message)
-      } else {
-        setError('保存失败，请稍后重试。')
+        if (err instanceof ApiError) {
+          setError(err.message)
+        } else {
+          setError(tAdmin(locale, 'templates.crud.error.save'))
+        }
+      } finally {
+        setSaving(false)
       }
-    } finally {
-      setSaving(false)
-    }
   }
 
   const handleDelete = async (item: Template) => {
-    const ok = window.confirm(`确认删除模板「${item.name}」？`)
+    const ok = window.confirm(tAdmin(locale, 'templates.crud.confirm.delete').replace('{name}', item.name))
     if (!ok) return
 
     setError('')
@@ -109,78 +106,97 @@ export default function TemplatesCrudPage() {
       await deleteTemplate(item.id)
       removeTemplate(item.id)
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message)
-      } else {
-        setError('删除失败，请稍后重试。')
+        if (err instanceof ApiError) {
+          setError(err.message)
+        } else {
+          setError(tAdmin(locale, 'templates.crud.error.delete'))
+        }
       }
-    }
   }
 
   return (
-    <main style={{ padding: 24, display: 'grid', gap: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div>
-          <h1 data-testid="templates-crud-title" style={{ margin: 0 }}>模板 CRUD</h1>
-          <p style={{ margin: '8px 0 0', color: '#475569' }}>对齐 Nuxt 基线：创建、编辑、删除模板。</p>
-        </div>
-        <button data-testid="templates-create-btn" onClick={startCreate}>创建模板</button>
-      </div>
+    <main className="px-admin-page">
+      <section className="px-admin-shell">
+        <article className="px-admin-card">
+          <div className="px-admin-toolbar" style={{ justifyContent: 'space-between' }}>
+            <div>
+              <h1 data-testid="templates-crud-title" className="px-admin-title">{tAdmin(locale, 'templates.crud.title')}</h1>
+              <p className="px-admin-subtitle">{tAdmin(locale, 'templates.crud.subtitle')}</p>
+            </div>
+            <button className="px-btn" data-testid="templates-create-btn" onClick={() => { setEditing(null); setModalOpen(true) }}>
+              {tAdmin(locale, 'templates.crud.create')}
+            </button>
+          </div>
 
-      {error ? (
-        <p role="alert" data-testid="templates-crud-error" style={{ color: '#b91c1c' }}>{error}</p>
-      ) : null}
-
-      <div data-testid="templates-total">总数：{store.total}</div>
-
-      <table data-testid="templates-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: 'left', borderBottom: '1px solid #cbd5e1', padding: '8px 6px' }}>名称</th>
-            <th style={{ textAlign: 'left', borderBottom: '1px solid #cbd5e1', padding: '8px 6px' }}>描述</th>
-            <th style={{ textAlign: 'left', borderBottom: '1px solid #cbd5e1', padding: '8px 6px' }}>内容</th>
-            <th style={{ textAlign: 'left', borderBottom: '1px solid #cbd5e1', padding: '8px 6px' }}>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {store.loading ? (
-            <tr>
-              <td colSpan={4} style={{ padding: 12 }} data-testid="templates-loading">加载中...</td>
-            </tr>
+          {error ? (
+            <p role="alert" data-testid="templates-crud-error" className="px-alert px-alert-danger" style={{ marginTop: 12 }}>
+              {error}
+            </p>
           ) : null}
 
-          {!store.loading && store.items.length === 0 ? (
-            <tr>
-              <td colSpan={4} style={{ padding: 12 }} data-testid="templates-empty">暂无模板</td>
-            </tr>
-          ) : null}
+          <div style={{ marginTop: 12 }}>
+            <span className="px-badge" data-testid="templates-total">{tAdmin(locale, 'templates.crud.total')}：{store.total}</span>
+          </div>
 
-          {store.items.map((item) => (
-            <tr key={item.id} data-testid={`template-row-${item.id}`}>
-              <td style={{ borderBottom: '1px solid #e2e8f0', padding: '8px 6px' }}>{item.name}</td>
-              <td style={{ borderBottom: '1px solid #e2e8f0', padding: '8px 6px' }}>{item.description}</td>
-              <td style={{ borderBottom: '1px solid #e2e8f0', padding: '8px 6px' }}>{item.content}</td>
-              <td style={{ borderBottom: '1px solid #e2e8f0', padding: '8px 6px', display: 'flex', gap: 8 }}>
-                <button data-testid={`template-edit-${item.id}`} onClick={() => startEdit(item)}>编辑</button>
-                <button data-testid={`template-delete-${item.id}`} onClick={() => void handleDelete(item)}>删除</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          <div className="px-table-wrap" style={{ marginTop: 14 }}>
+            <table data-testid="templates-table" className="px-table">
+              <thead>
+                <tr>
+                  <th>{tAdmin(locale, 'templates.crud.col.name')}</th>
+                  <th>{tAdmin(locale, 'templates.crud.col.description')}</th>
+                  <th>{tAdmin(locale, 'templates.crud.col.content')}</th>
+                  <th>{tAdmin(locale, 'templates.crud.col.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {store.loading ? (
+                  <tr>
+                    <td colSpan={4} data-testid="templates-loading">{tAdmin(locale, 'templates.crud.loading')}</td>
+                  </tr>
+                ) : null}
 
-      <TemplateFormModal
-        open={modalOpen}
-        title={modalTitle}
-        submitLabel={submitLabel}
-        loading={saving}
-        initialValue={editing || undefined}
-        onClose={() => {
-          setModalOpen(false)
-          setEditing(null)
-        }}
-        onSubmit={(value) => void handleSubmit(value)}
-      />
+                {!store.loading && store.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} data-testid="templates-empty">{tAdmin(locale, 'templates.crud.empty')}</td>
+                  </tr>
+                ) : null}
+
+                {store.items.map((item) => (
+                  <tr key={item.id} data-testid={`template-row-${item.id}`}>
+                    <td>{item.name}</td>
+                    <td>{item.description}</td>
+                    <td>{item.content}</td>
+                    <td>
+                      <div className="px-row-actions">
+                        <button className="px-btn-ghost" data-testid={`template-edit-${item.id}`} onClick={() => { setEditing(item); setModalOpen(true) }}>
+                          {tAdmin(locale, 'templates.crud.edit')}
+                        </button>
+                        <button className="px-btn-danger" data-testid={`template-delete-${item.id}`} onClick={() => void handleDelete(item)}>
+                          {tAdmin(locale, 'templates.crud.delete')}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <TemplateFormModal
+            open={modalOpen}
+            title={modalTitle}
+            submitLabel={submitLabel}
+            loading={saving}
+            initialValue={editing || undefined}
+            locale={locale}
+            onClose={() => {
+              setModalOpen(false)
+              setEditing(null)
+            }}
+            onSubmit={(value) => void handleSubmit(value)}
+          />
+        </article>
+      </section>
     </main>
   )
 }

@@ -35,33 +35,47 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}>
-      <div style={{ width: 'min(460px, 100%)', border: '1px solid #e2e8f0', borderRadius: 16, background: '#fff', padding: 24 }}>
-        <h1 style={{ marginTop: 0 }}>忘记密码</h1>
+    <main className="px-auth-page">
+      <div className="px-auth-shell">
+        <Link href="/users/login" className="px-auth-back">&lt; 返回登录</Link>
+        <div className="px-auth-card">
+          <header className="px-auth-header">
+            <h1 className="px-auth-logo">PowerX</h1>
+            <p className="px-auth-subtitle">通过邮箱完成密码重置。</p>
+          </header>
 
-        {sent ? (
-          <div data-testid="forgot-success">
-            <p>重置邮件已发送至 {email}，请查收邮箱。</p>
-            <Link href="/users/login">返回登录</Link>
+          <div className="px-auth-body">
+            {sent ? (
+              <div data-testid="forgot-success" className="px-auth-foot" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
+                <p>重置邮件已发送至 {email}，请查收邮箱。</p>
+                <Link href="/users/login">返回登录</Link>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="px-form">
+                {error ? <p role="alert" className="px-alert px-alert-danger">{error}</p> : null}
+                <div className="px-form-row">
+                  <label className="px-form-label">邮箱</label>
+                  <input
+                    data-testid="forgot-email"
+                    className="px-input"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                  />
+                </div>
+                <button data-testid="forgot-submit" className="px-auth-submit" type="submit" disabled={loading}>
+                  {loading ? '发送中...' : '发送重置邮件'}
+                </button>
+              </form>
+            )}
+
+            <div className="px-auth-foot">
+              <Link href="/users/login">返回登录</Link>
+              {' · '}
+              <Link href="/users/register">创建新账号</Link>
+            </div>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-            {error ? <p role="alert" style={{ color: '#b91c1c' }}>{error}</p> : null}
-            <label>
-              邮箱
-              <input
-                data-testid="forgot-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                style={{ display: 'block', width: '100%', marginTop: 6, padding: 10 }}
-              />
-            </label>
-            <button data-testid="forgot-submit" type="submit" disabled={loading} style={{ padding: '10px 14px' }}>
-              {loading ? '发送中...' : '发送重置邮件'}
-            </button>
-          </form>
-        )}
+        </div>
       </div>
     </main>
   )

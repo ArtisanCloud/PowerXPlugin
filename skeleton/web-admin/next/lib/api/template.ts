@@ -38,26 +38,26 @@ export async function listTemplates(page = 1, pageSize = 20, q = ''): Promise<{ 
     params.set('q', q.trim())
   }
 
-  const payload = await apiRequest<Template[] | TemplateListEnvelope>(`/admin/templates?${params.toString()}`)
+  const payload = await apiRequest<Template[] | TemplateListEnvelope>(`/templates?${params.toString()}`)
   return parseListPayload(payload)
 }
 
 export async function createTemplate(payload: TemplatePayload): Promise<Template> {
-  return apiRequest<Template>('/admin/templates', {
+  return apiRequest<Template>('/templates', {
     method: 'POST',
     body: payload,
   })
 }
 
 export async function updateTemplate(id: number | string, payload: TemplatePayload): Promise<Template> {
-  return apiRequest<Template>(`/admin/templates/${id}`, {
+  return apiRequest<Template>(`/templates/${id}`, {
     method: 'PUT',
     body: payload,
   })
 }
 
 export async function deleteTemplate(id: number | string): Promise<Record<string, unknown>> {
-  return apiRequest<Record<string, unknown>>(`/admin/templates/${id}`, {
+  return apiRequest<Record<string, unknown>>(`/templates/${id}`, {
     method: 'DELETE',
   })
 }

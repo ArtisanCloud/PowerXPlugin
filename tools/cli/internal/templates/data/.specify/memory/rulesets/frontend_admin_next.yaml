@@ -1,0 +1,13 @@
+# Next.js Admin Ruleset (Top)
+kind: ruleset
+id: frontend_admin_next
+version: 1.0.0
+summary: "Next.js 管理端规范入口（与 Nuxt 并存）"
+requires:
+  - rulesets/crud/frontend/next_pages.yaml
+  - rulesets/crud/frontend/next_components.yaml
+  - rulesets/crud/frontend/next_api_client.yaml
+  - rulesets/crud/frontend/next_stores.yaml
+  - rulesets/crud/frontend/next_i18n.yaml
+  - rulesets/crud/frontend/next_layout.yaml
+  - rulesets/crud/frontend/next_tests.yaml

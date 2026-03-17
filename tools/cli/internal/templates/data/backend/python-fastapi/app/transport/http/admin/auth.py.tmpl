@@ -75,7 +75,24 @@ def _map_me_context(payload: dict) -> dict:
         tenant_info["legacy_id"] = legacy_id
 
     member_id = member.get("id") or member.get("member_id")
-    is_root = bool(user.get("is_root"))
+    is_root = bool(payload.get("is_root") or user.get("is_root"))
+
+    permissions = payload.get("permissions") or []
+    if not isinstance(permissions, list):
+        permissions = []
+    roles = payload.get("roles") or []
+    if not isinstance(roles, list):
+        roles = []
+    member_is_admin = bool(member.get("is_admin"))
+    manage_by_permission = any(str(item) == "base.templates.manage" for item in permissions)
+    manage_allowed = is_root or member_is_admin or manage_by_permission
+    capabilities = {
+        "templates": {
+            "can_create": manage_allowed,
+            "can_update": manage_allowed,
+            "can_delete": manage_allowed,
+        }
+    }
 
     context = {
         "tenant": tenant_info,
@@ -89,9 +106,10 @@ def _map_me_context(payload: dict) -> dict:
             "display_name": user.get("display_name") or member.get("display_name") or "",
             "is_root": is_root,
         },
-        "roles": [],
-        "permissions": [],
-        "policy_version": None,
+        "roles": roles,
+        "permissions": permissions,
+        "policy_version": payload.get("policy_version"),
+        "capabilities": capabilities,
     }
     members = []
     if tenant_uuid:
@@ -106,6 +124,9 @@ def _map_me_context(payload: dict) -> dict:
     context["members"] = members
     if user.get("plugin_id"):
         context["plugin_id"] = user.get("plugin_id")
+    plugin_id = payload.get("plugin_id")
+    if plugin_id:
+        context["plugin_id"] = plugin_id
     return context
 
 
@@ -193,7 +214,7 @@ async def me(request: Request):
             request_id=request_id,
             status_code=401,
         )
-    return ok(service.me(), request_id=request_id)
+    return ok(service.me(_bearer_token(request)), request_id=request_id)
 
 
 @router.put("/user/auth/profile")
@@ -304,7 +325,7 @@ async def me_context(request: Request):
             request_id=request_id,
             status_code=401,
         )
-    return ok(_map_me_context(service.me()), request_id=request_id)
+    return ok(_map_me_context(service.me(_bearer_token(request))), request_id=request_id)
 
 
 @router.get("/user/auth/me/tenants")

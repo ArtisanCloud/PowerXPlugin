@@ -186,7 +186,7 @@
 - [X] T059 [US0] Extend bootstrap + compliance services：`framework/backend/go/runtime/bootstrap/service/bootstrap_handler.go`、`framework/backend/go/internal/compliance/scanner/license_scanner.go` 支持 CLI 请求校验、Git 注册、许可证/漏洞扫描以及 `plugin-import-audit` Webhook。
 - [X] T060 [US0] Implement `px-plugin doctor`（`tools/cli/src/commands/plugin/doctor.ts` + `tools/cli/src/executors/doctor.ts`）完成环境/依赖/flag 诊断、自动修复与 `.doctor/report.json` 生成。
 - [X] T061 [US0] Add第三方源码导入守护：`tools/cli/src/commands/plugin/import.ts` + `config/compliance/external_source_policy.yaml` + `docs/standards/powerx-plugin/integration/04_security_and_compliance/Plugin_Security_Checklist.md` 更新审批/豁免流程。
-- [X] T062 [US0] Refresh developer docs `docs/guides/bootstrap-context.md`, `docs/guides/develop/cli-plugin-tutorial.md`, `quickstart.md` 加入模板选择、依赖镜像、`plugin doctor`、第三方导入与 Git 注册截图。
+- [X] T062 [US0] Refresh developer docs `docs/guides/bootstrap-context.md`, `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md`, `quickstart.md` 加入模板选择、依赖镜像、`plugin doctor`、第三方导入与 Git 注册截图。
 
 ### Parallel Opportunities
 - T057/T058 可并行（CLI vs 模板仓）；T059 依赖 CLI 协议确定；T060/T061 可在模板完成后推进；T062 收尾。
@@ -204,7 +204,7 @@
 - [X] T064 [US6] Extend SessionClient `tools/cli/src/runtime/hotreload/session.ts` 与调试配置以复用 host session、分发断点、自动重试、`debug-observability-v2` 指标。
 - [X] T065 [P] [US6] Implement Go-side controllers：`framework/backend/go/runtime/devapi/handlers/host_simulator.go`（宿主生命周期、版本守护）与 `sandbox_validation.go`（`POST /internal/sandbox/deploy` orchestration、脱敏数据加载、权限模板）。
 - [X] T066 [US6] Add error diagnostics pipeline：`framework/backend/go/runtime/devapi/telemetry/debug_reports.go`、`framework/backend/go/runtime/devapi/handlers/debug_report.go` 生成脱敏报告、推送工单、记录 `debug.report.generate_ms`。
-- [X] T067 [US6] Update docs & runbooks：`docs/guides/publish/marketplace-review.md`, `docs/guides/bootstrap-context.md`, `docs/guides/develop/cli-plugin-tutorial.md` 添加宿主模拟器、沙箱验证、故障排查与审计流程。
+- [X] T067 [US6] Update docs & runbooks：`docs/guides/publish/marketplace-review.md`, `docs/guides/bootstrap-context.md`, `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md` 添加宿主模拟器、沙箱验证、故障排查与审计流程。
 
 ### Parallel Opportunities
 - CLI (T063/T064) 与 Go handlers (T065/T066) 并行；文档 (T067) 收尾但需依赖 API 输出。

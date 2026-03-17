@@ -29,6 +29,7 @@ const userService = useUserService();
 // ===== 类型与数据 =====
 type StatusType = "active" | "inactive";
 type RoleType = "admin" | "editor" | "user";
+type UserCategory = "all" | "active" | "inactive";
 
 interface RowUser {
   id: number; // Member ID
@@ -47,6 +48,7 @@ interface RowUser {
 // 表格数据和加载状态
 const users = ref<RowUser[]>([]);
 const loading = ref(false);
+const userCategory = ref<UserCategory>("all");
 
 // ====== 过滤/分页（与你现有一致） ======
 const searchQuery = ref("");
@@ -305,11 +307,47 @@ const paginatedUsers = computed(() => {
   return users.value;
 });
 
-const hasNextPage = computed(() => pagination.page < pagination.totalPages);
+const categoryStats = computed(() => {
+  const active = users.value.filter((item) => item.status === "active").length;
+  const inactive = users.value.length - active;
+  return {
+    all: users.value.length,
+    active,
+    inactive,
+  };
+});
+
+function applyCategory(category: UserCategory) {
+  userCategory.value = category;
+  filters.status = category === "all" ? null : category;
+}
+
+const normalizedTotalPages = computed(() => {
+  if (pagination.totalPages && pagination.totalPages > 0) {
+    return pagination.totalPages;
+  }
+  const calculated = Math.ceil(pagination.total / Math.max(1, pagination.pageSize));
+  return Math.max(1, calculated);
+});
+const hasNextPage = computed(() => pagination.page < normalizedTotalPages.value);
 const hasPrevPage = computed(() => pagination.page > 1);
+const pageNumbers = computed(() => {
+  const total = normalizedTotalPages.value;
+  const current = pagination.page;
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, total];
+  }
+  if (current >= total - 3) {
+    return [1, total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, current - 1, current, current + 1, total];
+});
 
 async function changePage(p: number) {
-  if (p >= 1 && p <= pagination.totalPages) {
+  if (p >= 1 && p <= normalizedTotalPages.value) {
     pagination.page = p;
     await loadUsers();
   }
@@ -332,13 +370,18 @@ function resetFilters() {
 watch(
   [
     searchQuery,
-    () => filters.department,
-    () => filters.role,
     () => filters.status,
   ],
   () => {
     pagination.page = 1;
     loadUsers();
+  }
+);
+
+watch(
+  () => filters.status,
+  (value) => {
+    userCategory.value = value === "active" ? "active" : value === "inactive" ? "inactive" : "all";
   }
 );
 
@@ -569,6 +612,33 @@ onMounted(async () => {
     </div>
 
     <!-- 搜索与筛选（与你现有一致） -->
+    <div class="mb-4 flex flex-wrap gap-2">
+      <UButton
+        :variant="userCategory === 'all' ? 'solid' : 'soft'"
+        :color="userCategory === 'all' ? 'primary' : 'neutral'"
+        size="sm"
+        @click="applyCategory('all')"
+      >
+        全部 ({{ categoryStats.all }})
+      </UButton>
+      <UButton
+        :variant="userCategory === 'active' ? 'solid' : 'soft'"
+        :color="userCategory === 'active' ? 'primary' : 'neutral'"
+        size="sm"
+        @click="applyCategory('active')"
+      >
+        启用 ({{ categoryStats.active }})
+      </UButton>
+      <UButton
+        :variant="userCategory === 'inactive' ? 'solid' : 'soft'"
+        :color="userCategory === 'inactive' ? 'primary' : 'neutral'"
+        size="sm"
+        @click="applyCategory('inactive')"
+      >
+        停用 ({{ categoryStats.inactive }})
+      </UButton>
+    </div>
+
     <div class="mb-6 rounded-lg bg-white p-4 shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
       <div class="flex flex-wrap gap-4 items-end">
         <div class="flex-grow min-w-[200px]">
@@ -638,14 +708,25 @@ onMounted(async () => {
         }"
       />
       <div
-        v-if="pagination.totalPages > 1"
+        v-if="normalizedTotalPages > 1"
         class="px-6 py-4 border-t border-gray-200 dark:border-slate-800/60 flex justify-between items-center"
       >
-        <div class="text-sm text-gray-600 dark:text-slate-200">
-          第 {{ pagination.page }} / {{ pagination.totalPages }} 页， 共
-          {{ pagination.total }} 条
+        <div class="text-sm text-gray-600 dark:text-slate-200 flex items-center gap-3">
+          <span>
+            第 {{ pagination.page }} / {{ normalizedTotalPages }} 页，共 {{ pagination.total }} 条
+          </span>
+          <USelect
+            :model-value="String(pagination.pageSize)"
+            :items="[
+              { label: '10 / 页', value: '10' },
+              { label: '20 / 页', value: '20' },
+              { label: '50 / 页', value: '50' },
+            ]"
+            class="w-28"
+            @update:model-value="(value) => changePageSize(Number(value))"
+          />
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           <UButton
             :disabled="!hasPrevPage || loading"
             variant="outline"
@@ -654,6 +735,16 @@ onMounted(async () => {
             @click="changePage(pagination.page - 1)"
             >上一页</UButton
           >
+          <UButton
+            v-for="p in pageNumbers"
+            :key="p"
+            :variant="p === pagination.page ? 'solid' : 'outline'"
+            size="sm"
+            :disabled="loading"
+            @click="changePage(p)"
+          >
+            {{ p }}
+          </UButton>
           <UButton
             :disabled="!hasNextPage || loading"
             variant="outline"

@@ -105,7 +105,7 @@
               size="sm"
               @click="selectedPlanIndex = index"
             >
-              {{ `{{ plan.plan_code || `计划 ${index + 1}` }}` }}
+              {{ `{{ plan.plan_code || ('计划 ' + (index + 1)) }}` }}
             </UButton>
           </div>
 

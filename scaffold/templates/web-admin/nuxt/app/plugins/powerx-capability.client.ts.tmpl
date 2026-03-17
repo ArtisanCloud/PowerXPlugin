@@ -1,5 +1,6 @@
 import { defineNuxtPlugin, useRuntimeConfig } from '#imports'
 import { ofetch, type FetchResponse, type OFetch } from 'ofetch'
+import { getAuthToken } from '~/composables/api/_base'
 
 const DEFAULT_ENDPOINT = '/integration/capabilities/invoke'
 
@@ -124,6 +125,12 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...request.headers
+      }
+      if (!headers.Authorization) {
+        const token = getAuthToken()
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+        }
       }
       if (request.requestId && !headers['X-Request-ID']) {
         headers['X-Request-ID'] = request.requestId

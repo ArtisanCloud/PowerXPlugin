@@ -890,54 +890,56 @@ onMounted(async () => {
     >
       <template #header>
         <div>
-          <p class="text-sm text-gray-500">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ t("iam.roles.membersDrawer.caption") }}
           </p>
-          <h3 class="text-lg font-semibold text-gray-900">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
             {{ activeRole?.name }}
           </h3>
         </div>
       </template>
-      <div class="p-4 space-y-4">
-        <UInput
-          v-model="memberSearch"
-          icon="i-heroicons-magnifying-glass"
-          :placeholder="t('iam.roles.membersDrawer.searchPlaceholder')"
-        />
-        <div v-if="membersLoading">
-          <USkeleton v-for="i in 3" :key="i" class="h-16" />
-        </div>
-        <div
-          v-else
-          class="space-y-2 max-h-[60vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800"
-        >
-          <label
-            v-for="member in filteredMemberCandidates"
-            :key="member.member_id"
-            class="flex items-center justify-between gap-3 py-2"
+      <template #body>
+        <div class="p-4 space-y-4">
+          <UInput
+            v-model="memberSearch"
+            icon="i-heroicons-magnifying-glass"
+            :placeholder="t('iam.roles.membersDrawer.searchPlaceholder')"
+          />
+          <div v-if="membersLoading">
+            <USkeleton v-for="i in 3" :key="i" class="h-16" />
+          </div>
+          <div
+            v-else
+            class="space-y-2 max-h-[60vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800"
           >
-            <div>
-              <p class="font-medium text-sm">{{ member.display_name }}</p>
-              <p class="text-xs text-gray-500">
-                {{ member.email || member.username }}
-              </p>
-            </div>
-            <UCheckbox
-              :model-value="selectedMemberIds.includes(member.member_id)"
-              @update:model-value="() => toggleMemberSelection(member.member_id)"
-            />
-          </label>
-          <p
-            v-if="!filteredMemberCandidates.length"
-            class="text-sm text-gray-500 py-6 text-center"
-          >
-            {{ t("iam.roles.membersDrawer.empty") }}
-          </p>
+            <label
+              v-for="member in filteredMemberCandidates"
+              :key="member.member_id"
+              class="flex items-center justify-between gap-3 py-2"
+            >
+              <div>
+                <p class="font-medium text-sm text-gray-900 dark:text-white">{{ member.display_name }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ member.email || member.username }}
+                </p>
+              </div>
+              <UCheckbox
+                :model-value="selectedMemberIds.includes(member.member_id)"
+                @update:model-value="() => toggleMemberSelection(member.member_id)"
+              />
+            </label>
+            <p
+              v-if="!filteredMemberCandidates.length"
+              class="text-sm text-gray-500 dark:text-gray-400 py-6 text-center"
+            >
+              {{ t("iam.roles.membersDrawer.empty") }}
+            </p>
+          </div>
         </div>
-      </div>
+      </template>
       <template #footer>
-        <div class="flex justify-between items-center border-t border-gray-100 p-4">
-          <p class="text-sm text-gray-500">
+        <div class="flex justify-between items-center border-t border-gray-100 dark:border-gray-800 p-4">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
             {{
               t("iam.roles.membersDrawer.selectionSummary", {
                 count: selectedMemberIds.length,

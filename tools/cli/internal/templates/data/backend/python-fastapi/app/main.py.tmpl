@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from app.config.settings import get_settings
 from app.entity.repository.db import DatabaseConfig, init_db
 from app.middleware.auth_guard import build_jwt_config, auth_guard_middleware
+from app.middleware.cors import cors_middleware
 from app.middleware.dev_switch import dev_switch_middleware
 from app.middleware.rbac import build_rbac_config, rbac_middleware
 from app.middleware.tenant_context import tenant_context_middleware
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
     app.middleware("http")(request_trace_middleware)
     app.middleware("http")(host_context_middleware)
     app.middleware("http")(request_id_middleware)
+    app.middleware("http")(cors_middleware)
     register_routes(app, settings)
     _init_ws_bus(app, settings)
     register_ws_routes(app)

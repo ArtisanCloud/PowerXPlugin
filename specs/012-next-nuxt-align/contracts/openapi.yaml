@@ -1,0 +1,235 @@
+openapi: 3.0.3
+info:
+  title: Next-Nuxt Parity Admin Contract Baseline
+  version: 1.0.0
+  description: |
+    该合同用于 Next 管理端迁移阶段的联调基线说明。
+    所有接口均引用既有 Go-Gin 管理端契约，不新增 Next 私有接口。
+servers:
+  - url: /api/v1
+    description: Standalone 模式
+  - url: /_p/{pluginId}/api/v1
+    description: Host 反代模式
+    variables:
+      pluginId:
+        default: com.powerx.plugins.base
+paths:
+  /admin/user/auth/login:
+    post:
+      summary: 管理端登录
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthEnvelope'
+  /admin/templates:
+    get:
+      summary: 模板列表
+      operationId: listTemplates
+      responses:
+        '200':
+          description: 列表返回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+    post:
+      summary: 创建模板
+      operationId: createTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateUpsertRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+  /admin/templates/{id}:
+    put:
+      summary: 更新模板
+      operationId: updateTemplate
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateUpsertRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+    delete:
+      summary: 删除模板
+      operationId: deleteTemplate
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+  /admin/iam/members:
+    get:
+      summary: 成员列表
+      operationId: listMembers
+      responses:
+        '200':
+          description: 成员列表返回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+  /admin/iam/roles:
+    get:
+      summary: 角色列表
+      operationId: listRoles
+      responses:
+        '200':
+          description: 角色列表返回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+  /admin/capabilities/lifecycle:
+    get:
+      summary: 能力生命周期视图
+      operationId: getCapabilityLifecycle
+      responses:
+        '200':
+          description: 生命周期返回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+  /admin/integration/settings:
+    get:
+      summary: 集成配置读取
+      operationId: getIntegrationSettings
+      responses:
+        '200':
+          description: 配置返回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+  /admin/operations/overview:
+    get:
+      summary: 运营概览
+      operationId: getOperationsOverview
+      responses:
+        '200':
+          description: 概览返回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+  /admin/security/overview:
+    get:
+      summary: 安全概览
+      operationId: getSecurityOverview
+      responses:
+        '200':
+          description: 概览返回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataEnvelope'
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    TemplateUpsertRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+    EnvelopeBase:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+    AuthEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                expires_at:
+                  type: integer
+    DataEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: true
+    ListEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                list:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                total:
+                  type: integer

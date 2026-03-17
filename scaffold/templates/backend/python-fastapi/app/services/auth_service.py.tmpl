@@ -118,6 +118,26 @@ _RESET_TTL_SECONDS = 30 * 60
 
 
 class AuthService:
+    def _decode_access_token(self, token: str) -> dict[str, Any]:
+        raw = (token or "").strip()
+        if not raw:
+            return {}
+        settings = get_settings()
+        secret = settings.context_hmac_secret.strip() if settings.context_hmac_secret else "powerx-plugin-dev"
+        audience = settings.context_audience.strip() if settings.context_audience else "powerx:plugin"
+        issuer = settings.context_issuer.strip() if settings.context_issuer else "powerx-local"
+        try:
+            claims = jwt.decode(
+                raw,
+                secret,
+                algorithms=["HS256"],
+                audience=audience,
+                issuer=issuer,
+            )
+        except Exception:
+            return {}
+        return claims if isinstance(claims, dict) else {}
+
     def login(self, payload: dict):
         identifier = payload.get("identifier")
         tenant = payload.get("tenant")
@@ -177,6 +197,7 @@ class AuthService:
                 return {"token_type": "Bearer", "access_token": "", "expires_in": 0, "refresh_token": "", "scope": ""}
 
             roles, perms = self._load_role_permission_codes(db, member.id, plugin_id)
+            is_root = bool(getattr(user, "is_root", False) or getattr(member, "is_admin", False))
 
             now = _now()
             ttl_seconds = settings.context_ttl_seconds or 900
@@ -186,7 +207,8 @@ class AuthService:
             secret = settings.context_hmac_secret.strip() if settings.context_hmac_secret else "powerx-plugin-dev"
             claims = {
                 "tid": tenant_rec.uuid,
-                "uid": int(user.id),
+                "uid": str(user.id),
+                "is_root": is_root,
                 "roles": roles,
                 "perms": perms,
                 "policy_version": policy_version,
@@ -351,6 +373,7 @@ class AuthService:
             plugin_id = _resolve_plugin_id()
             policy_version = _resolve_policy_version()
             roles, perms = self._load_role_permission_codes(db, member.id, plugin_id)
+            is_root = bool(getattr(user, "is_root", False) or getattr(member, "is_admin", False))
             ttl_seconds = settings.context_ttl_seconds or 900
             expires_at = now + timedelta(seconds=int(ttl_seconds))
             issuer = settings.context_issuer.strip() if settings.context_issuer else "powerx-local"
@@ -358,7 +381,8 @@ class AuthService:
             secret = settings.context_hmac_secret.strip() if settings.context_hmac_secret else "powerx-plugin-dev"
             claims = {
                 "tid": tenant_rec.uuid,
-                "uid": int(user.id),
+                "uid": str(user.id),
+                "is_root": is_root,
                 "roles": roles,
                 "perms": perms,
                 "policy_version": policy_version,
@@ -398,20 +422,53 @@ class AuthService:
         finally:
             db.close()
 
-    def me(self):
+    def me(self, access_token: str = ""):
         db = get_db().session()
         try:
-            user = db.execute(select(User)).scalars().first()
-            if not user:
-                return {"user": {}, "member": None, "tenant": None}
-            member = db.execute(select(Member).where(Member.user_id == user.id)).scalar_one_or_none()
+            claims = self._decode_access_token(access_token)
+            user = None
+            member = None
             tenant = None
+            roles: list[str] = []
+            permissions: list[str] = []
+            policy_version = str(claims.get("policy_version") or _resolve_policy_version())
+            plugin_id = str(claims.get("plugin_id") or _resolve_plugin_id())
+            claim_is_root = bool(claims.get("is_root"))
+
+            claim_uid = claims.get("uid")
+            claim_tid = str(claims.get("tid") or "").strip().lower()
+
+            if isinstance(claim_uid, int):
+                user = db.execute(select(User).where(User.id == claim_uid)).scalar_one_or_none()
+            elif isinstance(claim_uid, str) and claim_uid.isdigit():
+                user = db.execute(select(User).where(User.id == int(claim_uid))).scalar_one_or_none()
+
+            if not user:
+                user = db.execute(select(User)).scalars().first()
+            if not user:
+                return {"user": {}, "member": None, "tenant": None, "roles": [], "permissions": [], "policy_version": policy_version}
+
+            member_query = select(Member).where(Member.user_id == user.id)
+            if claim_tid:
+                member = db.execute(
+                    member_query.where(func.lower(func.cast(Member.tenant_uuid, String)) == claim_tid)
+                ).scalar_one_or_none()
+            if member is None:
+                member = db.execute(member_query).scalar_one_or_none()
             if member:
                 tenant = db.execute(select(Tenant).where(Tenant.uuid == member.tenant_uuid)).scalar_one_or_none()
+                roles, permissions = self._load_role_permission_codes(db, member.id, plugin_id)
+            is_root = bool(claim_is_root or getattr(user, "is_root", False) or (member and getattr(member, "is_admin", False)))
+
             return {
                 "user": _to_dict(user),
                 "member": _to_dict(member) if member else None,
                 "tenant": _to_dict(tenant) if tenant else None,
+                "is_root": is_root,
+                "roles": roles,
+                "permissions": permissions,
+                "policy_version": policy_version,
+                "plugin_id": plugin_id,
             }
         finally:
             db.close()

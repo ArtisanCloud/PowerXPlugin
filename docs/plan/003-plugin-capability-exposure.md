@@ -46,7 +46,7 @@
    - 在 `scripts/capabilities/` 添加 `validate-capabilities.mjs`（或 Go 工具）；
    - `make dist` / `make validate` 时运行 Schema/命名冲突检测。
 3. **Docs 更新**：
-   - 在 `docs/guides/develop/cli-plugin-tutorial.md`、`docs/guides/publish/local-install.md` 补充「能力声明」步骤；
+   - 在 `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md`、`docs/guides/publish/local-install.md` 补充「能力声明」步骤；
    - 新增 FAQ：能力命名、Schema 路径、RBAC 对齐。
 
 ### Phase 2 — 能力注册与审核衔接（Week 3-4）

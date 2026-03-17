@@ -2,11 +2,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from "vue";
 import UsersTenantAdmin from "./UsersTenantAdmin.vue";
-import { useI18n } from "#imports";
+import { useI18n, useToast } from "#imports";
 import {
   useTenantService,
   type Tenant,
 } from "~/composables/api/services/tenantService";
+import { useIAMService } from "~/composables/api/services/iamService";
 
 import {
   TenantStatus,
@@ -15,9 +16,11 @@ import {
 } from "~/composables/api/types/tenant";
 
 const { t } = useI18n();
+const toast = useToast();
 
 // 依赖注入的服务
 const tenantService = useTenantService();
+const iamService = useIAMService();
 
 // 转换后的租户数据结构
 interface DisplayTenant {
@@ -35,11 +38,19 @@ interface DisplayTenant {
 const tenants = ref<DisplayTenant[]>([]);
 const selectedTenant = ref<DisplayTenant | null>(null);
 const searchQuery = ref("");
+const showCreateModal = ref(false);
+const creatingTenant = ref(false);
+const createTenantForm = reactive({
+  key: "",
+  name: "",
+  plan: "free",
+  status: "active",
+});
 
 // 分页和筛选
 const pagination = reactive({
   page: 1,
-  pageSize: 10,
+  pageSize: 5,
   total: 0,
   totalPages: 0,
 });
@@ -70,8 +81,31 @@ const planOptions = computed(() => [
   { label: t("organization.user.plan.enterprise"), value: "enterprise" },
 ]);
 
-// 计算属性 - 使用服务端分页，不需要客户端过滤
+// 计算属性 - 服务端分页优先，异常时走本地兜底
 const paginatedTenants = computed(() => tenants.value);
+const normalizedTotalPages = computed(() => {
+  if (pagination.totalPages && pagination.totalPages > 0) {
+    return pagination.totalPages;
+  }
+  return Math.max(
+    1,
+    Math.ceil(pagination.total / Math.max(1, pagination.pageSize))
+  );
+});
+const pageItems = computed(() => {
+  const total = normalizedTotalPages.value;
+  const current = pagination.page;
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, total];
+  }
+  if (current >= total - 3) {
+    return [1, total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, current - 1, current, current + 1, total];
+});
 
 // 方法
 async function loadTenants() {
@@ -105,13 +139,81 @@ async function loadTenants() {
       pagination.totalPages = response.data.pagination.pages;
     }
   } catch (error) {
+    toast.add({
+      title: "加载失败",
+      description: extractErrorMessage(error),
+      color: "red",
+    });
     console.error(t("organization.user.loadFailed"), error);
-    // 错误提示已在tenantService中处理
   }
 }
 
 async function selectTenant(tenant: DisplayTenant) {
   selectedTenant.value = tenant;
+}
+
+function openCreateTenant() {
+  showCreateModal.value = true;
+}
+
+function closeCreateTenant() {
+  showCreateModal.value = false;
+  createTenantForm.key = "";
+  createTenantForm.name = "";
+  createTenantForm.plan = "free";
+  createTenantForm.status = "active";
+}
+
+async function submitCreateTenant() {
+  const key = createTenantForm.key.trim().toLowerCase();
+  const name = createTenantForm.name.trim();
+  if (!key || !name) return;
+  if (key.length < 6) {
+    toast.add({
+      title: "创建失败",
+      description: "租户 Key 至少 6 位",
+      color: "red",
+    });
+    return;
+  }
+  creatingTenant.value = true;
+  try {
+    await iamService.createTenant({
+      key,
+      name,
+      plan: createTenantForm.plan,
+      status: createTenantForm.status,
+    });
+    toast.add({
+      title: "创建成功",
+      description: "租户已创建",
+      color: "green",
+    });
+    closeCreateTenant();
+    await loadTenants();
+  } catch (error) {
+    const description = extractErrorMessage(error);
+    toast.add({
+      title: "创建失败",
+      description,
+      color: "red",
+    });
+    console.error("创建租户失败:", error);
+  } finally {
+    creatingTenant.value = false;
+  }
+}
+
+function extractErrorMessage(error: unknown): string {
+  const err = error as any;
+  return (
+    err?.data?.error?.message ||
+    err?.response?._data?.error?.message ||
+    err?.data?.message ||
+    err?.response?._data?.message ||
+    err?.message ||
+    "请求失败"
+  );
 }
 
 function backToTenantList() {
@@ -127,10 +229,17 @@ function resetFilters() {
 }
 
 function changePage(page: number) {
-  if (page >= 1 && page <= pagination.totalPages) {
+  if (page >= 1 && page <= normalizedTotalPages.value) {
     pagination.page = page;
     loadTenants();
   }
+}
+
+function changePageSize(size: number | string) {
+  const nextSize = Number(size) || 5;
+  pagination.pageSize = nextSize;
+  pagination.page = 1;
+  loadTenants();
 }
 
 // 状态显示 - 使用导入的工具函数
@@ -187,11 +296,9 @@ onMounted(() => {
           </p>
         </div>
         <div class="flex gap-2">
-          <UTooltip :text="$t('tenant.tooltips.saasSupport')">
-            <UButton icon="i-lucide-plus" variant="outline" disabled>
-              {{ $t("tenant.add") }}
-            </UButton>
-          </UTooltip>
+          <UButton icon="i-lucide-plus" variant="outline" @click="openCreateTenant">
+            {{ $t("tenant.add") }}
+          </UButton>
           <UButton
             icon="i-heroicons-arrow-path"
             variant="outline"
@@ -322,7 +429,7 @@ onMounted(() => {
 
         <!-- 分页 -->
         <div
-          v-if="pagination.totalPages > 1"
+          v-if="normalizedTotalPages > 1"
           class="px-6 py-4 border-t border-gray-200"
         >
           <div class="flex justify-between items-center">
@@ -338,7 +445,17 @@ onMounted(() => {
                 })
               }}
             </div>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-2">
+              <USelect
+                :model-value="String(pagination.pageSize)"
+                :items="[
+                  { label: '5 / 页', value: '5' },
+                  { label: '10 / 页', value: '10' },
+                  { label: '20 / 页', value: '20' },
+                ]"
+                class="w-24"
+                @update:model-value="changePageSize"
+              />
               <UButton
                 :disabled="pagination.page <= 1"
                 variant="outline"
@@ -349,7 +466,16 @@ onMounted(() => {
                 {{ t("organization.user.pagination.previous") }}
               </UButton>
               <UButton
-                :disabled="pagination.page >= pagination.totalPages"
+                v-for="p in pageItems"
+                :key="p"
+                size="sm"
+                :variant="p === pagination.page ? 'solid' : 'outline'"
+                @click="changePage(p)"
+              >
+                {{ p }}
+              </UButton>
+              <UButton
+                :disabled="pagination.page >= normalizedTotalPages"
                 variant="outline"
                 size="sm"
                 icon="i-heroicons-chevron-right"
@@ -401,5 +527,60 @@ onMounted(() => {
 
       <UsersTenantAdmin :tenant-uuid="selectedTenant.uuid" />
     </div>
+
+    <UModal v-model:open="showCreateModal" :prevent-close="creatingTenant">
+      <template #title>新增租户</template>
+      <template #description>填写租户信息后点击保存创建。</template>
+      <template #body>
+        <UForm :state="createTenantForm" class="space-y-4 p-4 sm:p-5">
+          <UFormField label="租户 Key" required>
+            <UInput v-model="createTenantForm.key" placeholder="tenant-demo" />
+          </UFormField>
+          <UFormField label="租户名称" required>
+            <UInput v-model="createTenantForm.name" placeholder="tenant-demo" />
+          </UFormField>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <UFormField label="套餐">
+              <USelect
+                v-model="createTenantForm.plan"
+                :items="[
+                  { label: 'free', value: 'free' },
+                  { label: 'standard', value: 'standard' },
+                  { label: 'premium', value: 'premium' },
+                ]"
+                option-attribute="label"
+                value-attribute="value"
+              />
+            </UFormField>
+            <UFormField label="状态">
+              <USelect
+                v-model="createTenantForm.status"
+                :items="[
+                  { label: '启用', value: 'active' },
+                  { label: '停用', value: 'suspended' },
+                ]"
+                option-attribute="label"
+                value-attribute="value"
+              />
+            </UFormField>
+          </div>
+        </UForm>
+      </template>
+      <template #footer>
+        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <UButton color="neutral" variant="soft" :disabled="creatingTenant" @click="closeCreateTenant">
+            取消
+          </UButton>
+          <UButton
+            color="primary"
+            :loading="creatingTenant"
+            :disabled="!createTenantForm.key.trim() || !createTenantForm.name.trim()"
+            @click="submitCreateTenant"
+          >
+            保存
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

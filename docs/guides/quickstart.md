@@ -23,7 +23,7 @@
    - 验证 `GET /api/v1/ping` 与 Starter 页面，熟悉框架 App 生命周期。
 
 3. **CLI 模板生成与自测**  
-   - 参考《[使用 `px-plugin` 初始化、启动并本地安装插件](./develop/cli-plugin-tutorial.md)》完成 CLI 构建、`init`、数据库初始化与启动。  
+   - 参考《[使用 `px-plugin` 初始化、启动并本地安装插件](./develop/cli-plugin/cli-plugin-tutorial.md)》完成 CLI 构建、`init`、数据库初始化与启动。  
    - 插件 ID 命名必须使用小写字母/数字/`.`/`-`（不允许 `_`），例如 `com.powerx.plugins.hello-world`。  
    - 在新项目中运行 `go test ./...`、`npm run lint` 并复用上述 CRUD/延迟脚本，确认 CLI 输出与 Skeleton 行为一致。  
    - 检查 `plugin.yaml` 与契约文件，确认 CLI 模板与仓库保持一致。**注意**：本仓库的 manifest 真源在 `skeleton/plugin.yaml`，根目录的 `plugin.yaml` 为 symlink，运行相关命令时建议在 `skeleton/` 内执行或显式传入 `--manifest ./skeleton/plugin.yaml`。  
@@ -42,7 +42,7 @@
 
 4. **本地安装到 PowerX（dist/zip/.pxp）**  
    - 当你已经有插件项目后，安装链路请直接看《[本地安装（Local Install）指南](./publish/local-install.md)》。  
-   - 该文档只负责部署到 PowerX；`px-plugin` 的构建/安装/初始化统一在《[使用 CLI 生成并运行插件骨架](./develop/cli-plugin-tutorial.md)》中维护。  
+   - 该文档只负责部署到 PowerX；`px-plugin` 的构建/安装/初始化统一在《[使用 CLI 生成并运行插件骨架](./develop/cli-plugin/cli-plugin-tutorial.md)》中维护。  
    - 推荐先跑 `make dist` 产出安装目录，再按文档调用 `POST /admin/plugins/install/local` 完成安装验证。  
 
 5. **Dev API 热更新与 Doctor 诊断**  

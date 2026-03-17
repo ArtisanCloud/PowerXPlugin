@@ -8,6 +8,8 @@ from fastapi import Request
 from app.config.settings import Settings
 from app.middleware.tenant_context import TenantContext, get_tenant_context, set_tenant_context
 
+_DEFAULT_DEV_TENANT_UUID = "00000000-0000-0000-0000-000000000001"
+
 
 def _is_production(settings: Settings) -> bool:
     return not settings.dev_mode and not settings.server_dev_mode
@@ -16,7 +18,8 @@ def _is_production(settings: Settings) -> bool:
 def _default_tenant_uuid(settings: Settings) -> str:
     return (
         settings.grpc_upstream_tenant_uuid
-        or os.getenv("POWERX_TENANT_UUID", "")
+        or os.getenv("POWERX_TENANT_UUID", "").strip()
+        or _DEFAULT_DEV_TENANT_UUID
     )
 
 

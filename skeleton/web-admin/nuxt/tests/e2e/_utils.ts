@@ -37,6 +37,7 @@ export async function gotoWithFallback(page: Page, path: string, ready?: Locator
   await ensureZhLocale(page);
   const normalized = normalizePath(path);
   const candidates = [normalized, `${pluginAdminBasePath()}${normalized}`];
+  const failures: string[] = [];
 
   for (const candidate of candidates) {
     await page.goto(candidate);
@@ -45,25 +46,34 @@ export async function gotoWithFallback(page: Page, path: string, ready?: Locator
       await ready.first().waitFor({ state: 'visible', timeout: 10_000 });
       return;
     } catch {
+      failures.push(candidate);
       // try next candidate
     }
+  }
+
+  if (ready) {
+    throw new Error(
+      `gotoWithFallback failed: ready locator not visible after candidates: ${failures.join(', ')}`
+    );
   }
 }
 
 export async function seedAuthStorage(page: Page, opts?: { insidePowerX?: boolean }) {
   const now = Date.now();
   const expiresAt = now + 3600 * 1000;
+  const refreshToken = 'e2e-refresh-token';
 
   await page.addInitScript(
-    ({ expiresAt, insidePowerX }) => {
+    ({ expiresAt, insidePowerX, refreshToken }) => {
       window.localStorage.setItem('access_token', 'e2e-access-token');
-      window.localStorage.setItem('refresh_token', insidePowerX ? 'e2e-refresh-token' : '');
+      // delegated/insidePowerX 模式必须有 refresh_token 才会通过 auth middleware
+      window.localStorage.setItem('refresh_token', refreshToken);
       window.localStorage.setItem('token_type', 'Bearer');
       window.localStorage.setItem('expires_in', '3600');
       window.localStorage.setItem('scope', 'access');
       window.localStorage.setItem('expires_at', String(expiresAt));
       document.cookie = `token=e2e-access-token; path=/`;
     },
-    { expiresAt, insidePowerX: opts?.insidePowerX === true }
+    { expiresAt, insidePowerX: opts?.insidePowerX === true, refreshToken }
   );
 }

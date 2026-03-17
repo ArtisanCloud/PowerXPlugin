@@ -66,25 +66,27 @@
           </div>
         </div>
       </template>
-      <UTable :rows="tenantRows" :columns="columns" :loading="loading">
+      <UTable :rows="tenantRows" :data="tenantRows" :columns="columns" :loading="loading">
         <template #status-cell="{ row }">
-          <UBadge :color="row.status === 'active' ? 'green' : 'yellow'">
-            {{ `{{ formatStatus(row.status) }}` }}
+          <UBadge :color="resolveTenantRow(row).status === 'active' ? 'green' : 'yellow'">
+            {{ `{{ formatStatus(resolveTenantRow(row).status) }}` }}
           </UBadge>
         </template>
         <template #actions-cell="{ row }">
           <div class="flex items-center gap-2">
             <USelect
-              v-model="row.status"
+              :model-value="resolveTenantRow(row).status || 'active'"
               :items="statusItems"
+              option-attribute="label"
+              value-attribute="value"
               class="w-32"
-              @update:model-value="(value) => changeTenantStatus(row, value as string)"
+              @update:model-value="(value) => changeTenantStatus(resolveTenantRow(row), value as string)"
             />
             <UButton
               size="xs"
               variant="soft"
               color="neutral"
-              @click="() => openPlanDrawer(row)"
+              @click="() => openPlanDrawer(resolveTenantRow(row))"
             >
               {{ `{{ $t("iam.overview.adjustPlan") }}` }}
             </UButton>
@@ -107,11 +109,17 @@
       <template #body>
         <div class="space-y-4" v-if="selectedTenant">
           <p class="text-sm text-gray-500">
-            {{ `{{ selectedTenant?.name }}` }} · {{ `{{ selectedTenant?.key }}` }}
+            {{ `{{ selectedTenantHint }}` }}
           </p>
           <UForm :state="planForm" class="space-y-4">
             <UFormField :label="$t('iam.overview.planDrawer.planLabel')">
-              <USelect v-model="planForm.plan" :items="planItems" class="w-full" />
+              <USelect
+                v-model="planForm.plan"
+                :items="planItems"
+                option-attribute="label"
+                value-attribute="value"
+                class="w-full"
+              />
             </UFormField>
             <UFormField :label="$t('iam.overview.planDrawer.displayName')">
               <UInput v-model="planForm.name" />
@@ -155,10 +163,22 @@
           </UFormField>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <UFormField :label="$t('iam.overview.createModal.plan')">
-              <USelect v-model="createForm.plan" :items="planItems" class="w-full" />
+              <USelect
+                v-model="createForm.plan"
+                :items="planItems"
+                option-attribute="label"
+                value-attribute="value"
+                class="w-full"
+              />
             </UFormField>
             <UFormField :label="$t('iam.overview.createModal.status')">
-              <USelect v-model="createForm.status" :items="statusItems" class="w-full" />
+              <USelect
+                v-model="createForm.status"
+                :items="statusItems"
+                option-attribute="label"
+                value-attribute="value"
+                class="w-full"
+              />
             </UFormField>
           </div>
         </UForm>
@@ -268,6 +288,35 @@ const tenantRows = computed(() =>
   }))
 );
 
+const resolveTenantRow = (row: any): TenantSummary => {
+  const source = (row as any)?.original ?? row ?? {};
+  return {
+    ...source,
+    key: source?.key ?? source?.uuid ?? "",
+    name: source?.name ?? source?.key ?? source?.uuid ?? "",
+    status: source?.status ?? "active",
+    plan: source?.plan ?? "free",
+  } as TenantSummary;
+};
+
+const extractErrorMessage = (error: unknown): string => {
+  const err = error as any;
+  return (
+    err?.data?.error?.message ||
+    err?.response?._data?.error?.message ||
+    err?.data?.message ||
+    err?.response?._data?.message ||
+    err?.message ||
+    t("iam.overview.createFailed")
+  );
+};
+
+const selectedTenantHint = computed(() => {
+  const tenant = selectedTenant.value;
+  if (!tenant) return "";
+  return tenant.name || tenant.key || tenant.uuid || "-";
+});
+
 const navigateToCategory = (category: { path: string }) => {
   router.push(category.path);
 };
@@ -276,11 +325,19 @@ const fetchTenants = async () => {
   loading.value = true;
   try {
     const response = await iam.listTenants();
-    store.setTenants(response?.data?.items ?? []);
+    const envelope = response as any;
+    const items =
+      envelope?.data?.items ??
+      envelope?.items ??
+      envelope?.data?.data?.items ??
+      envelope?.data?.list ??
+      envelope?.list ??
+      [];
+    store.setTenants(Array.isArray(items) ? items : []);
   } catch (error: any) {
     toast.add({
       title: t("iam.notifications.loadTenantsFailed"),
-      description: error?.data?.message || error?.message,
+      description: extractErrorMessage(error),
       color: "red",
     });
   } finally {
@@ -303,16 +360,17 @@ const changeTenantStatus = async (tenant: TenantSummary, status: string) => {
   } catch (error: any) {
     toast.add({
       title: t("iam.overview.updateFailed"),
-      description: error?.data?.message || error?.message,
+      description: extractErrorMessage(error),
       color: "red",
     });
   }
 };
 
 const openPlanDrawer = (tenant: TenantSummary) => {
-  selectedTenant.value = tenant;
-  planForm.plan = tenant.plan ?? "free";
-  planForm.name = tenant.name;
+  const normalized = resolveTenantRow(tenant);
+  selectedTenant.value = normalized;
+  planForm.plan = normalized.plan ?? "free";
+  planForm.name = normalized.name || normalized.key || normalized.uuid || "";
   showPlanDrawer.value = true;
 };
 
@@ -344,7 +402,7 @@ const submitPlanForm = async () => {
   } catch (error: any) {
     toast.add({
       title: t("iam.overview.updateFailed"),
-      description: error?.data?.message || error?.message,
+      description: extractErrorMessage(error),
       color: "red",
     });
   } finally {
@@ -368,11 +426,20 @@ const closeCreate = () => {
 };
 
 const submitCreate = async () => {
+  const key = createForm.key.trim().toLowerCase();
+  if (key.length < 6) {
+    toast.add({
+      title: t("iam.overview.createFailed"),
+      description: "租户 Key 至少 6 位",
+      color: "red",
+    });
+    return;
+  }
   creating.value = true;
   try {
     await iam.createTenant({
-      key: createForm.key,
-      name: createForm.name,
+      key,
+      name: createForm.name.trim(),
       plan: createForm.plan,
       status: createForm.status,
     });
@@ -382,7 +449,7 @@ const submitCreate = async () => {
   } catch (error: any) {
     toast.add({
       title: t("iam.overview.createFailed"),
-      description: error?.data?.message || error?.message,
+      description: extractErrorMessage(error),
       color: "red",
     });
   } finally {

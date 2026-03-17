@@ -164,6 +164,7 @@ export function useApiClient() {
   const baseClient = $fetch.create({
     baseURL,
     timeout: 30_000,
+    credentials: "include",
   });
   const hostCtxStore = process.client ? useHostCtxStore() : null;
 

@@ -26,7 +26,7 @@ export function resolveApiBase(pathname?: string): string {
     }
   }
 
-  return "http://localhost:8078/api/v1";
+  return "/api/v1";
 }
 
 export function getAuthToken(): string | undefined {

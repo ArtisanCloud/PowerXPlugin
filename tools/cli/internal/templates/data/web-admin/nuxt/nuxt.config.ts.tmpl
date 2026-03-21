@@ -55,7 +55,7 @@ const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase
 const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'
-const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:4000'
+const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:{{ .BackendPort }}'
 const imgSources = ["'self'", "data:", "https://avatars.githubusercontent.com"]
 const extraConnectHosts = new Set<string>()
 const registerConnectOrigin = (candidate?: string | null) => {
@@ -143,7 +143,8 @@ const devProxy: Record<string, any> = {
   '/ws': {
     target: devWsProxyTarget,
     changeOrigin: true,
-    ws: true
+    ws: true,
+    rewrite: (path: string) => path.replace(/^\/ws(?=\/|$)/, '/api/ws')
   }
 }
 

@@ -9,7 +9,9 @@ import (
 // RBACEntries exposes route-to-permission mappings for runtime ops admin APIs.
 func RBACEntries(prefix string) map[string]authx.Permission {
 	base := strings.TrimRight(prefix, "/") + "/admin/runtime"
+	adminBase := strings.TrimRight(prefix, "/") + "/admin"
 	return map[string]authx.Permission{
+		"POST:" + adminBase + "/notifications/test":      {Resource: "runtime.ops", Action: "invoke"},
 		"POST:" + base + "/bootstrap":                    {Resource: "runtime.ops", Action: "manage"},
 		"POST:" + base + "/sessions/register":            {Resource: "runtime.ops", Action: "manage"},
 		"POST:" + base + "/sessions/*/ack":               {Resource: "runtime.ops", Action: "manage"},

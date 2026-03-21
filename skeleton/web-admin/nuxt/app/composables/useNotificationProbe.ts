@@ -1,0 +1,262 @@
+import { getAuthToken, getTenantUuid, resolveApiBase } from "~/composables/api/_base";
+import { useApiClient } from "~/composables/api/_client";
+
+export type NotificationWsState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "error";
+
+export interface NotificationProbeEvent {
+  id: string;
+  topic: string;
+  type: string;
+  title: string;
+  message: string;
+  payload: any;
+  receivedAt: string;
+}
+
+const MAX_EVENTS = 50;
+const RECONNECT_DELAY_MS = 1200;
+
+let wsConn: WebSocket | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let closedByClient = false;
+const subscribedTopics = new Set<string>();
+
+function normalizeBasePath(pathname: string) {
+  const clean = pathname.replace(/\/+$/, "");
+  if (!clean || clean === "/") return "/api/ws";
+  if (clean.endsWith("/api/v1")) {
+    return clean.replace(/\/api\/v1$/, "/api/ws");
+  }
+  if (clean.endsWith("/api")) {
+    return `${clean}/ws`;
+  }
+  return "/api/ws";
+}
+
+function buildWsURL() {
+  if (typeof window === "undefined") return "";
+  const apiBase = resolveApiBase();
+  const parsed = new URL(apiBase, window.location.origin);
+  const protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
+  const wsPath = normalizeBasePath(parsed.pathname || "");
+  const url = new URL(`${protocol}//${parsed.host}${wsPath}`);
+  const token = getAuthToken();
+  if (token) {
+    url.searchParams.set("authorization", /^Bearer\s/i.test(token) ? token : `Bearer ${token}`);
+  }
+  return url.toString();
+}
+
+function resolveDefaultTopic() {
+  const tenant = (getTenantUuid() || "").trim();
+  if (!tenant) return "";
+  return `plugin.notify.tenant.${tenant}`;
+}
+
+function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent {
+  const now = new Date().toISOString();
+  const eventType = String(payload?.type || payload?.event_type || "event");
+  const title = String(payload?.title || payload?.name || "WS Event");
+  const message = String(payload?.message || payload?.detail || "");
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    topic,
+    type: eventType,
+    title,
+    message,
+    payload,
+    receivedAt: now,
+  };
+}
+
+export function useNotificationProbe() {
+  const wsState = useState<NotificationWsState>("notifications.ws.state", () => "idle");
+  const wsError = useState<string>("notifications.ws.error", () => "");
+  const lastEventAt = useState<string>("notifications.lastEventAt", () => "");
+  const lastEventTopic = useState<string>("notifications.lastEventTopic", () => "");
+  const unreadCount = useState<number>("notifications.unreadCount", () => 0);
+  const events = useState<NotificationProbeEvent[]>("notifications.events", () => []);
+
+  const wsStateLabel = computed(() => {
+    switch (wsState.value) {
+      case "connected":
+        return "已连接";
+      case "connecting":
+        return "连接中";
+      case "reconnecting":
+        return "重连中";
+      case "error":
+        return "异常";
+      default:
+        return "未连接";
+    }
+  });
+
+  const wsStateColor = computed(() => {
+    switch (wsState.value) {
+      case "connected":
+        return "success";
+      case "connecting":
+      case "reconnecting":
+        return "warning";
+      case "error":
+        return "error";
+      default:
+        return "neutral";
+    }
+  });
+
+  const pushEvent = (event: NotificationProbeEvent) => {
+    const next = [event, ...events.value];
+    events.value = next.slice(0, MAX_EVENTS);
+    unreadCount.value += 1;
+    lastEventAt.value = event.receivedAt;
+    lastEventTopic.value = event.topic;
+  };
+
+  const subscribeTopic = (topic: string) => {
+    const clean = String(topic || "").trim();
+    if (!clean) return;
+    if (subscribedTopics.has(clean)) return;
+    subscribedTopics.add(clean);
+    if (wsConn && wsConn.readyState === WebSocket.OPEN) {
+      wsConn.send(JSON.stringify({ type: "subscribe", topics: [clean] }));
+    }
+  };
+
+  const connect = () => {
+    if (typeof window === "undefined") return;
+    if (wsConn && (wsConn.readyState === WebSocket.OPEN || wsConn.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    const wsURL = buildWsURL();
+    if (!wsURL) {
+      wsState.value = "error";
+      wsError.value = "无法解析 WS 地址";
+      return;
+    }
+
+    closedByClient = false;
+    wsState.value = wsState.value === "idle" ? "connecting" : "reconnecting";
+    wsError.value = "";
+
+    const socket = new WebSocket(wsURL);
+    wsConn = socket;
+
+    socket.onopen = () => {
+      wsState.value = "connected";
+      wsError.value = "";
+      const defaultTopic = resolveDefaultTopic();
+      if (defaultTopic) {
+        subscribedTopics.add(defaultTopic);
+      }
+      if (subscribedTopics.size > 0) {
+        socket.send(
+          JSON.stringify({
+            type: "subscribe",
+            topics: Array.from(subscribedTopics),
+          })
+        );
+      }
+    };
+
+    socket.onmessage = (event) => {
+      let data: any = null;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      const msgType = String(data?.type || "").toLowerCase();
+      if (msgType === "event") {
+        const topic = String(data?.topic || "");
+        const parsed = parseIncomingEvent(topic, data?.payload || {});
+        pushEvent(parsed);
+        return;
+      }
+      if (msgType === "error") {
+        wsError.value = String(data?.message || "ws error");
+      }
+    };
+
+    socket.onerror = () => {
+      wsState.value = "error";
+      wsError.value = "WebSocket 连接异常";
+    };
+
+    socket.onclose = () => {
+      wsConn = null;
+      if (closedByClient) {
+        wsState.value = "idle";
+        return;
+      }
+      wsState.value = "reconnecting";
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      reconnectTimer = setTimeout(() => {
+        connect();
+      }, RECONNECT_DELAY_MS);
+    };
+  };
+
+  const disconnect = () => {
+    closedByClient = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (wsConn) {
+      wsConn.close();
+      wsConn = null;
+    }
+    wsState.value = "idle";
+  };
+
+  const markAllRead = () => {
+    unreadCount.value = 0;
+  };
+
+  const clearEvents = () => {
+    events.value = [];
+    unreadCount.value = 0;
+    lastEventAt.value = "";
+    lastEventTopic.value = "";
+  };
+
+  const sendTestNotification = async (message?: string) => {
+    const apiClient = useApiClient();
+    const body = {
+      message: String(message || "WebSocket probe from navbar"),
+    };
+    const resp: any = await apiClient.post("/admin/notifications/test", body);
+    const topic = String(resp?.data?.topic || "");
+    if (topic) {
+      subscribeTopic(topic);
+    }
+    return resp;
+  };
+
+  return {
+    wsState: readonly(wsState),
+    wsStateLabel,
+    wsStateColor,
+    wsError: readonly(wsError),
+    lastEventAt: readonly(lastEventAt),
+    lastEventTopic: readonly(lastEventTopic),
+    unreadCount: readonly(unreadCount),
+    events: readonly(events),
+    connect,
+    disconnect,
+    subscribeTopic,
+    markAllRead,
+    clearEvents,
+    sendTestNotification,
+  };
+}

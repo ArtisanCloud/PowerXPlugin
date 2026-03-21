@@ -56,12 +56,18 @@ mappings:
       - globs: [".env.example"]
         literal: "NUXT_DEV_API_PROXY=http://127.0.0.1:8078"
         replace: "NUXT_DEV_API_PROXY=http://127.0.0.1:{{ .BackendPort }}"
+      - globs: [".env.example"]
+        literal: "NUXT_DEV_WS_PROXY=ws://127.0.0.1:8078"
+        replace: "NUXT_DEV_WS_PROXY=ws://127.0.0.1:{{ .BackendPort }}"
       - globs: ["nuxt.config.ts"]
         literal: "const defaultLocalApiBase = 'http://localhost:8078/api/v1'"
         replace: "const defaultLocalApiBase = 'http://localhost:{{ .BackendPort }}/api/v1'"
       - globs: ["nuxt.config.ts"]
         literal: "const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'"
         replace: "const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'"
+      - globs: ["nuxt.config.ts"]
+        literal: "const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'"
+        replace: "const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:{{ .BackendPort }}'"
       - globs: ["nuxt.config.ts"]
         literal: "    3131"
         replace: "    {{ .FrontendPort }}"

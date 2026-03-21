@@ -55,6 +55,19 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 
 预期：先 `ack`，再收到 `event`。
 
+### Step 3：通知探针（可选但推荐）
+
+用统一探针验证 UI 是否真的消费到事件（而不是仅靠发送后主动拉取）。
+
+```bash
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/notifications/test \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"ws probe"}'
+```
+
+预期：右上角通知铃铛未读角标增加，通知面板出现新事件。默认 topic 为 `plugin.notify.tenant.{tenant_uuid}`。
+
 ## 6. standalone + proxy（`POWERX_PROXY=1`）
 
 ### 标准流程（插件侧入口）
@@ -142,6 +155,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 3. `403 topic not allowed`：profile/ACL 未授权该 topic
 4. 只有 `ack` 无 `event`：topic 不一致、未先 `grant`，或权限快照未轮换
 5. `grant/publish` 失败且提示 topic 不存在：先走 `internal/event-fabric/topics` 创建 topic
+6. 铃铛显示“已连接”但无通知：检查是否订阅了 `plugin.notify.tenant.{tenant_uuid}`，并确认 token 中 `tid` 与 publish 租户一致
 
 ## 8. 职责边界（必须遵守）
 

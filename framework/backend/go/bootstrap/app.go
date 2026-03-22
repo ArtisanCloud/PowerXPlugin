@@ -15,6 +15,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 )
 
 // App 封装后端运行时依赖，供 skeleton 与框架层共享。
@@ -112,7 +113,7 @@ func NewApp(cfg *Config) *App {
 	app := &App{
 		Ctx:    ctx,
 		Config: cfg,
-		Logger: slog.Default(),
+		Logger: withRuntimeDefaults(slog.Default(), cfg),
 	}
 	app.initGatewayClient()
 	return app
@@ -337,4 +338,23 @@ func normalizeGatewayAuthScheme(raw, toolToken, apiKey string) string {
 		return "apikey"
 	}
 	return "bearer"
+}
+
+func withRuntimeDefaults(base *slog.Logger, cfg *Config) *slog.Logger {
+	if base == nil {
+		base = slog.Default()
+	}
+	tenantUUID := runtimelogging.FallbackUnknown
+	if cfg != nil {
+		if tid := strings.TrimSpace(cfg.Gateway.TenantID); tid != "" {
+			tenantUUID = tid
+		}
+	}
+
+	return base.With(
+		slog.String(runtimelogging.FieldTenantUUID, tenantUUID),
+		slog.String(runtimelogging.FieldTenantKey, runtimelogging.TenantKeyFromUUID(tenantUUID)),
+		slog.String(runtimelogging.FieldSubscriber, "bootstrap.app"),
+		slog.String(runtimelogging.FieldComponent, "bootstrap.app"),
+	)
 }

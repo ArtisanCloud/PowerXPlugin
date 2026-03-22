@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
@@ -154,6 +155,16 @@ func (h *SessionsHandler) Invoke(c *gin.Context) {
 		req.TenantUuid = admincommon.ResolveTenantUUID(c)
 	}
 	if strings.TrimSpace(req.TenantUuid) == "" {
+		if h.logger != nil {
+			h.logger.WithFields(logrus.Fields{
+				runtimelogging.FieldTaskID:     runtimelogging.FallbackUnknown,
+				runtimelogging.FieldSubscriber: "mcp_session_handler",
+				runtimelogging.FieldTopic:      "runtime_ops.invoke",
+				runtimelogging.FieldStatus:     runtimelogging.StatusSkipped,
+				runtimelogging.FieldReason:     runtimelogging.ReasonMissingContext,
+				"session_id":                   sessionID,
+			}).Warn("mcp invoke skipped: missing tenant context")
+		}
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}

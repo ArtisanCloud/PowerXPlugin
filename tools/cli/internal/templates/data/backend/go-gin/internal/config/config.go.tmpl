@@ -671,7 +671,6 @@ func loadYAMLConfig(cfg *Config) (string, error) {
 		return "", fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
-	logrus.WithField("config_file", configFile).Info("YAML config loaded successfully")
 	dir := filepath.Dir(configFile)
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
@@ -706,7 +705,6 @@ func loadSecurityBaselineConfig(cfg *Config) {
 	}
 
 	cfg.SecurityBaseline = baseline
-	logrus.WithField("baseline_file", baselinePath).Info("Security baseline config loaded successfully")
 }
 
 func locateSecurityBaseline() string {

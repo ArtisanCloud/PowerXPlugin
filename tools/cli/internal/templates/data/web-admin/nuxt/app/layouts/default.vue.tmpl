@@ -81,8 +81,8 @@ const showNavigation = computed(() => {
     return envShowNav === "true" || envShowNav === true;
   }
 
-  // 默认：开发环境显示，生产环境隐藏
-  return import.meta.dev;
+  // 默认：非嵌入模式显示导航。若需隐藏，显式配置 NUXT_PUBLIC_SHOW_NAVIGATION=false。
+  return true;
 });
 
 // 主内容区样式

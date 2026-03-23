@@ -118,7 +118,7 @@ runtime:
       path: "/healthz"
   logging:
     level: "debug"
-    format: "text"
+    format: "json"
     output: "stdout"
     debug_mode: true
   integration:

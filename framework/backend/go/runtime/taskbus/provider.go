@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/redis/go-redis/v9"
 )
@@ -88,12 +90,14 @@ func (p *HostProvider) NewEmitter() (eventbridge.Emitter, error) {
 	return &hostEmitter{
 		publisher:   wsbus.NewAdapter(client, p.cfg.TenantUUID, nil),
 		metaBuilder: metaBuilder,
+		logger:      runtimelogging.NewSlogAdapter(slog.Default()),
 	}, nil
 }
 
 type hostEmitter struct {
 	publisher   wsbus.Publisher
 	metaBuilder event.MetaBuilder
+	logger      runtimelogging.Logger
 }
 
 func (e *hostEmitter) Emit(ctx context.Context, ev event.Event) error {
@@ -121,10 +125,34 @@ func (e *hostEmitter) Emit(ctx context.Context, ev event.Event) error {
 		TraceID:    firstNonEmpty(meta.TraceID, meta.RequestID),
 	})
 	if !result.OK {
+		e.logEmit(topic, meta, runtimelogging.StatusFailed, result.ErrorCode)
 		return fmt.Errorf("taskbus host publish failed: %s (%s)", result.ErrorCode, result.ErrorMessage)
 	}
+	e.logEmit(topic, meta, runtimelogging.StatusSucceeded, "")
 
 	return nil
+}
+
+func (e *hostEmitter) logEmit(topic string, meta event.Meta, status, reason string) {
+	if e == nil || e.logger == nil {
+		return
+	}
+	fields := runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
+		runtimelogging.FieldTraceID:    firstNonEmpty(meta.TraceID, meta.RequestID),
+		runtimelogging.FieldTaskID:     firstNonEmpty(meta.RequestID, meta.TraceID),
+		runtimelogging.FieldTenantUUID: strings.TrimSpace(meta.TenantUUID),
+		runtimelogging.FieldTenantKey:  runtimelogging.TenantKeyFromUUID(meta.TenantUUID),
+		runtimelogging.FieldSubscriber: "taskbus.host_emitter",
+		runtimelogging.FieldTopic:      strings.TrimSpace(topic),
+		runtimelogging.FieldStatus:     status,
+		runtimelogging.FieldReason:     reason,
+	})
+	entry := e.logger.WithFields(fields)
+	if status == runtimelogging.StatusFailed {
+		entry.Error("taskbus host emit failed")
+		return
+	}
+	entry.Info("taskbus host emit completed")
 }
 
 func (e *hostEmitter) ensureMeta(meta event.Meta) (event.Meta, error) {
@@ -220,6 +248,7 @@ func (p *RedisProvider) NewEmitter() (eventbridge.Emitter, error) {
 		streamKey:    streamKey,
 		metaBuilder:  metaBuilder,
 		maxLenApprox: p.cfg.MaxLenApprox,
+		logger:       runtimelogging.NewSlogAdapter(slog.Default()),
 	}, nil
 }
 
@@ -228,6 +257,7 @@ type redisEmitter struct {
 	streamKey    string
 	metaBuilder  event.MetaBuilder
 	maxLenApprox int64
+	logger       runtimelogging.Logger
 }
 
 func (e *redisEmitter) Emit(ctx context.Context, ev event.Event) error {
@@ -268,9 +298,33 @@ func (e *redisEmitter) Emit(ctx context.Context, ev event.Event) error {
 		args.Approx = true
 	}
 	if err := e.client.XAdd(ctx, args).Err(); err != nil {
+		e.logEmit(topic, meta, runtimelogging.StatusFailed, "redis_enqueue_failed")
 		return fmt.Errorf("taskbus redis enqueue failed: %w", err)
 	}
+	e.logEmit(topic, meta, runtimelogging.StatusQueued, "")
 	return nil
+}
+
+func (e *redisEmitter) logEmit(topic string, meta event.Meta, status, reason string) {
+	if e == nil || e.logger == nil {
+		return
+	}
+	fields := runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
+		runtimelogging.FieldTraceID:    firstNonEmpty(meta.TraceID, meta.RequestID),
+		runtimelogging.FieldTaskID:     firstNonEmpty(meta.RequestID, meta.TraceID),
+		runtimelogging.FieldTenantUUID: strings.TrimSpace(meta.TenantUUID),
+		runtimelogging.FieldTenantKey:  runtimelogging.TenantKeyFromUUID(meta.TenantUUID),
+		runtimelogging.FieldSubscriber: "taskbus.redis_emitter",
+		runtimelogging.FieldTopic:      strings.TrimSpace(topic),
+		runtimelogging.FieldStatus:     status,
+		runtimelogging.FieldReason:     reason,
+	})
+	entry := e.logger.WithFields(fields)
+	if status == runtimelogging.StatusFailed {
+		entry.Error("taskbus redis emit failed")
+		return
+	}
+	entry.Info("taskbus redis emit queued")
 }
 
 type RedisConsumerConfig struct {

@@ -21,6 +21,24 @@
    - standalone：`POWERX_PROXY=0`
    - standalone + proxy：`POWERX_PROXY=1`
 
+## 2.1 日志落点（先确认再联调）
+
+1. 两种模式日志都在“插件后端进程”输出（stdout/stderr），不是默认写到底座日志。
+2. 推荐统一落盘：
+
+```bash
+export RUNTIME_LOG_FILE=./tmp/runtime-backend.log
+POWERX_PROXY=0 ./backend/cmd/plugin/plugin 2>&1 | tee "$RUNTIME_LOG_FILE"
+# 或
+POWERX_PROXY=1 PX_GATEWAY_BASE_URL=http://127.0.0.1:8077 ./backend/cmd/plugin/plugin 2>&1 | tee "$RUNTIME_LOG_FILE"
+```
+
+3. 容器场景可用：
+
+```bash
+docker logs -f <container_name> | tee "$RUNTIME_LOG_FILE"
+```
+
 ## 3. 连接地址矩阵
 
 1. Host（底座）：`ws://127.0.0.1:8077/api/ws?authorization=Bearer%20$HOST_TOKEN`

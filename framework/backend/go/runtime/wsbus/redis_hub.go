@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -36,6 +37,7 @@ type RedisHub struct {
 	instanceID string
 	local      *MemoryHub
 	logger     *slog.Logger
+	logAdapter runtimelogging.Logger
 
 	subOnce sync.Once
 	subErr  error
@@ -64,6 +66,7 @@ func NewRedisHub(cfg RedisHubConfig) (*RedisHub, error) {
 		instanceID: uuid.NewString(),
 		local:      NewMemoryHub(),
 		logger:     logger,
+		logAdapter: runtimelogging.NewSlogAdapter(logger),
 	}, nil
 }
 
@@ -80,14 +83,17 @@ func (h *RedisHub) Publish(ctx context.Context, topic string, payload any, opts 
 	}
 	body, err := json.Marshal(&env)
 	if err != nil {
+		h.logPublish(topic, opts, runtimelogging.StatusFailed, "marshal_failed")
 		return err
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if err := h.client.Publish(ctx, h.channel, body).Err(); err != nil {
+		h.logPublish(topic, opts, runtimelogging.StatusFailed, "redis_publish_failed")
 		return err
 	}
+	h.logPublish(topic, opts, runtimelogging.StatusSucceeded, "")
 	_ = h.local.Publish(ctx, topic, payload, opts)
 	return nil
 }
@@ -141,9 +147,16 @@ func (h *RedisHub) handleMessage(ctx context.Context, payload string) {
 	}
 	var env redisEnvelope
 	if err := json.Unmarshal([]byte(payload), &env); err != nil {
-		if h.logger != nil {
-			h.logger.Warn("wsbus redis: invalid payload", slog.String("error", err.Error()))
-		}
+		h.logAdapter.WithFields(runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
+			runtimelogging.FieldTraceID:    "unknown",
+			runtimelogging.FieldTaskID:     "unknown",
+			runtimelogging.FieldTenantUUID: "unknown",
+			runtimelogging.FieldTenantKey:  "unknown",
+			runtimelogging.FieldSubscriber: "wsbus.redis_hub",
+			runtimelogging.FieldTopic:      "unknown",
+			runtimelogging.FieldStatus:     runtimelogging.StatusFailed,
+			runtimelogging.FieldReason:     "invalid_payload",
+		})).Warn("wsbus redis: invalid payload")
 		return
 	}
 	if env.Origin != "" && env.Origin == h.instanceID {
@@ -154,4 +167,20 @@ func (h *RedisHub) handleMessage(ctx context.Context, payload string) {
 		TraceID:    strings.TrimSpace(env.TraceID),
 	}
 	_ = h.local.Publish(ctx, env.Topic, env.Payload, opts)
+}
+
+func (h *RedisHub) logPublish(topic string, opts PublishOptions, status, reason string) {
+	if h == nil || h.logAdapter == nil {
+		return
+	}
+	h.logAdapter.WithFields(runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
+		runtimelogging.FieldTraceID:    strings.TrimSpace(opts.TraceID),
+		runtimelogging.FieldTaskID:     strings.TrimSpace(opts.TraceID),
+		runtimelogging.FieldTenantUUID: strings.TrimSpace(opts.TenantUUID),
+		runtimelogging.FieldTenantKey:  runtimelogging.TenantKeyFromUUID(opts.TenantUUID),
+		runtimelogging.FieldSubscriber: "wsbus.redis_hub",
+		runtimelogging.FieldTopic:      strings.TrimSpace(topic),
+		runtimelogging.FieldStatus:     status,
+		runtimelogging.FieldReason:     reason,
+	})).Info("wsbus redis publish")
 }

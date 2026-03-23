@@ -47,22 +47,44 @@
 
 ## 6. 最小验证命令
 
+先明确日志文件路径（推荐统一导出）：
+
+```bash
+export RUNTIME_LOG_FILE=./tmp/runtime-backend.log
+```
+
+本地启动时建议显式落盘（stdout + 文件）：
+
+```bash
+# standalone
+POWERX_PROXY=0 ./backend/cmd/plugin/plugin 2>&1 | tee "$RUNTIME_LOG_FILE"
+
+# delegated/proxy
+POWERX_PROXY=1 PX_GATEWAY_BASE_URL=http://127.0.0.1:8077 ./backend/cmd/plugin/plugin 2>&1 | tee "$RUNTIME_LOG_FILE"
+```
+
+如果是容器化部署，不落本地文件时用容器日志替代：
+
+```bash
+docker logs -f <container_name> | tee "$RUNTIME_LOG_FILE"
+```
+
 字段契约检查：
 
 ```bash
-rg 'trace_id|task_id|tenant_uuid|tenant_key|subscriber_id|topic|status' <runtime-log-file>
+rg 'trace_id|task_id|tenant_uuid|tenant_key|subscriber_id|topic|status' "$RUNTIME_LOG_FILE"
 ```
 
 缺失上下文规则检查：
 
 ```bash
-rg 'task_id=unknown|subscriber_id=unknown|status=skipped|reason=missing_context' <runtime-log-file>
+rg 'task_id=unknown|subscriber_id=unknown|status=skipped|reason=missing_context' "$RUNTIME_LOG_FILE"
 ```
 
 扩展字段检查：
 
 ```bash
-rg 'gateway_auth_scheme|outbound_token_source|plugin_id|component' <runtime-log-file>
+rg 'gateway_auth_scheme|outbound_token_source|plugin_id|component' "$RUNTIME_LOG_FILE"
 ```
 
 指标检查：
@@ -77,3 +99,14 @@ curl -sS http://127.0.0.1:8078/api/v1/admin/runtime/metrics | rg 'plugin_event_b
 
 1. `gateway_auth_scheme=apikey`
 2. `outbound_token_source=PX_GATEWAY_API_KEY`
+
+## 8. 两种模式日志落点与触发方式
+
+1. Local Standalone（`POWERX_PROXY=0`）：
+   - 日志落点：插件后端进程 stdout（建议 `tee` 到 `"$RUNTIME_LOG_FILE"`）
+   - 触发接口：`POST /api/v1/admin/notifications/test` 或 ws-bus 调试入口
+   - 预期日志：`topic/status/tenant_uuid/tenant_key/subscriber_id` 等统一字段
+2. Delegated / Proxy（`POWERX_PROXY=1`）：
+   - 日志落点：同样在插件后端 stdout（不是底座日志）
+   - 触发接口：同 standalone，入口仍打插件 `:8078`
+   - 额外预期：出现 `component=ws_bus_gateway_auth`，并可检索 `gateway_auth_scheme/outbound_token_source`

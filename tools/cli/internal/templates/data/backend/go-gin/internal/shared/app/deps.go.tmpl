@@ -18,8 +18,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
-	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
 type DelegatedAuthProxy interface {
@@ -71,6 +72,9 @@ func (d *Deps) RuntimeDefaults() *config.RuntimeOpsDefaults {
 func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logrus.Entry {
 	if extra == nil {
 		extra = logger.Fields{}
+	}
+	if _, ok := extra[runtimelogging.FieldSubscriber]; !ok {
+		extra[runtimelogging.FieldSubscriber] = component
 	}
 	if ctx == nil && d != nil {
 		ctx = d.Ctx

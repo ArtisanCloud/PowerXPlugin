@@ -6,12 +6,13 @@ import (
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/middleware"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 )
 
 type Adapter struct {
 	inner         Publisher
 	defaultTenant string
-	logger        *slog.Logger
+	logger        runtimelogging.Logger
 }
 
 func NewAdapter(inner Publisher, defaultTenant string, logger *slog.Logger) Publisher {
@@ -21,7 +22,7 @@ func NewAdapter(inner Publisher, defaultTenant string, logger *slog.Logger) Publ
 	return &Adapter{
 		inner:         inner,
 		defaultTenant: strings.TrimSpace(defaultTenant),
-		logger:        logger,
+		logger:        runtimelogging.NewSlogAdapter(logger),
 	}
 }
 
@@ -37,6 +38,10 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		return result
 	}
 
+	traceID := strings.TrimSpace(opts.TraceID)
+	if traceID == "" {
+		traceID = strings.TrimSpace(middleware.RequestIDFromContext(ctx))
+	}
 	tenantUUID := strings.TrimSpace(opts.TenantUUID)
 	if tenantUUID == "" {
 		if t, ok := middleware.TenantUUIDFromContext(ctx); ok {
@@ -47,13 +52,10 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		tenantUUID = a.defaultTenant
 	}
 	if tenantUUID == "" {
+		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, ErrorCodeTenantRequired)
 		return FailureResult(ErrorCodeTenantRequired, "tenant_uuid is required")
 	}
 
-	traceID := strings.TrimSpace(opts.TraceID)
-	if traceID == "" {
-		traceID = strings.TrimSpace(middleware.RequestIDFromContext(ctx))
-	}
 	bearer := strings.TrimSpace(opts.BearerToken)
 	if bearer == "" {
 		bearer = strings.TrimSpace(middleware.BearerTokenFromContext(ctx))
@@ -64,13 +66,32 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		TraceID:     traceID,
 		BearerToken: bearer,
 	})
-	if !result.OK && a.logger != nil {
-		a.logger.Warn("wsbus publish failed",
-			slog.String("topic", normalized),
-			slog.String("tenant", tenantUUID),
-			slog.String("error_code", result.ErrorCode),
-			slog.String("error_message", result.ErrorMessage),
-		)
+	if !result.OK {
+		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, result.ErrorCode)
+		return result
 	}
+	a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusSucceeded, "")
 	return result
+}
+
+func (a *Adapter) logPublish(topic, tenantUUID, traceID, status, reason string) {
+	if a == nil || a.logger == nil {
+		return
+	}
+	fields := runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
+		runtimelogging.FieldTraceID:    strings.TrimSpace(traceID),
+		runtimelogging.FieldTaskID:     strings.TrimSpace(traceID),
+		runtimelogging.FieldTenantUUID: strings.TrimSpace(tenantUUID),
+		runtimelogging.FieldTenantKey:  runtimelogging.TenantKeyFromUUID(tenantUUID),
+		runtimelogging.FieldSubscriber: "wsbus.adapter",
+		runtimelogging.FieldTopic:      strings.TrimSpace(topic),
+		runtimelogging.FieldStatus:     status,
+		runtimelogging.FieldReason:     reason,
+	})
+	entry := a.logger.WithFields(fields)
+	if status == runtimelogging.StatusFailed {
+		entry.Warn("wsbus publish failed")
+		return
+	}
+	entry.Info("wsbus publish succeeded")
 }

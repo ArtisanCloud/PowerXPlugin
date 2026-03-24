@@ -155,3 +155,37 @@ wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer%20$USER_TOKEN"
 2. `403 topic not allowed`：topic 未创建/ACL 未授权/API Key 快照未轮换。
 3. 仅有 `ack` 无 `event`：topic 不一致或未先 grant。
 4. 模式错乱：检查 `POWERX_PROXY` 与 `taskbus_provider` 是否按矩阵配对。
+
+## 10. US3 失败闭环实现对齐（2026-03-24）
+
+### 10.1 管理端接口
+
+1. `POST /api/v1/admin/runtime/scheduler/dispatches/{dispatchId}/retry`
+2. `POST /api/v1/admin/runtime/scheduler/dispatches/{dispatchId}/pause`
+3. `POST /api/v1/admin/runtime/scheduler/tickets/{ticketId}/resume`
+
+### 10.2 状态机与权限口径
+
+1. 重试上限：默认 3 次（配置项 `operations.scheduler.retry_max_attempts`，范围 1-10）。
+2. 第 1~(N-1) 次重试返回 `202`；第 N 次超限返回 `409`。
+3. 超限后执行 pause，创建恢复工单（`201`），任务进入 `paused`。
+4. resume 仅允许 `ops/admin`；非授权角色返回 `403`。
+5. 恢复成功后重试窗口重置，下一次 retry 返回 `202`。
+
+### 10.3 审计与可观测字段
+
+1. 恢复操作写入审计记录：`ticket_id / dispatch_id / operator_id / operator_role / recorded_at`。
+2. 联调日志需可检索：`trace_id / topic / status / gateway_auth_scheme / outbound_token_source`。
+
+### 10.4 Phase 6 回归命令（已执行）
+
+```bash
+mkdir -p tmp/gocache tmp/gomodcache && cd skeleton/backend/go-gin && \
+GOCACHE=$PWD/../../tmp/gocache GOMODCACHE=$PWD/../../tmp/gomodcache \
+go test ./cmd/plugin ./internal/config ./internal/services/admin/runtime_ops \
+  ./internal/transport/http/admin/runtime_ops ./tests/integration \
+  -run 'Scheduler|TaskBusProvider|ValidateSchedulerRetryMaxAttemptsRange|DefaultSchedulerConfigValidation' \
+  -count=1
+```
+
+结果：5/5 包通过（`cmd/plugin`、`internal/config`、`runtime_ops service`、`runtime_ops handler`、`tests/integration`）。

@@ -150,9 +150,46 @@ rg 'trace_id|topic|status|gateway_auth_scheme|outbound_token_source' <runtime-lo
 |---|---|---:|---:|---:|---|---|
 | YYYY-MM-DD | standalone/proxy | 0 | 0 | 0% | QA |  |
 
+统计步骤：
+
+1. 统计窗口固定为发布后连续 14 天。
+2. `total_checks` = 该模式在窗口内执行的标准联调总次数。
+3. `first_pass_checks` = 首次执行即通过的次数（同一变更批次仅计首次）。
+4. `first_pass_rate = first_pass_checks / total_checks * 100%`。
+5. 每行需附带证据引用（日志、命令输出、工单号）。
+
 ## 10. SC-004 台账模板（定位时长下降）
 
 | period | ticket_count | avg_locate_minutes | baseline_compare | owner | notes |
 |---|---:|---:|---:|---|---|
 | pre_release_14d | 0 | 0 | baseline | Ops |  |
 | post_release_14d | 0 | 0 | target: -50% | Ops |  |
+
+统计步骤：
+
+1. 取发布前 14 天与发布后 14 天两段窗口，口径一致。
+2. `ticket_count` = 与模式切换相关故障工单数。
+3. `avg_locate_minutes` = 从告警/报障到根因确认的平均分钟数。
+4. `baseline_compare` 使用 `(post - pre) / pre` 计算变化比例。
+5. 目标达成条件：`post <= pre * 50%`（下降至少 50%）。
+
+## 11. Phase 6 回归命令记录（2026-03-24）
+
+执行命令：
+
+```bash
+mkdir -p tmp/gocache tmp/gomodcache && cd skeleton/backend/go-gin && \
+GOCACHE=$PWD/../../tmp/gocache GOMODCACHE=$PWD/../../tmp/gomodcache \
+go test ./cmd/plugin ./internal/config ./internal/services/admin/runtime_ops \
+  ./internal/transport/http/admin/runtime_ops ./tests/integration \
+  -run 'Scheduler|TaskBusProvider|ValidateSchedulerRetryMaxAttemptsRange|DefaultSchedulerConfigValidation' \
+  -count=1
+```
+
+结果摘要：
+
+1. `cmd/plugin`：PASS
+2. `internal/config`：PASS
+3. `internal/services/admin/runtime_ops`：PASS
+4. `internal/transport/http/admin/runtime_ops`：PASS
+5. `tests/integration`：PASS

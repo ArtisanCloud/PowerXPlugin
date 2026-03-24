@@ -41,6 +41,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetryRequest'
       responses:
         '202':
           description: Retry accepted
@@ -48,6 +54,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DispatchResult'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
         '409':
           description: Retry exhausted, ticket required
           content:
@@ -65,6 +77,12 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PauseRequest'
       responses:
         '201':
           description: Recovery ticket created and job paused
@@ -72,6 +90,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecoveryTicket'
+        '404':
+          description: Dispatch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
+        '409':
+          description: Dispatch retry attempts not exhausted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
 
   /scheduler/tickets/{ticketId}/resume:
     post:
@@ -96,8 +126,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecoveryTicket'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
         '403':
           description: Forbidden for non-ops/non-admin role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
+        '404':
+          description: Ticket not found
           content:
             application/json:
               schema:
@@ -146,6 +188,20 @@ components:
         retry_attempt:
           type: integer
         trace_id:
+          type: string
+
+    RetryRequest:
+      type: object
+      properties:
+        error_code:
+          type: string
+        error_message:
+          type: string
+
+    PauseRequest:
+      type: object
+      properties:
+        paused_job_id:
           type: string
 
     RecoveryTicket:

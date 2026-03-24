@@ -111,13 +111,13 @@
 
 **Purpose**: 跨故事收尾、回归验证与交付对齐
 
-- [ ] T038 [P] 同步开发文档到 `docs/plan/develop/async_runtime/schedule/scheduler-mode-switch-implementation.md`
-- [ ] T039 执行并记录回归测试命令到 `specs/017-async-runtime-scheduler-switch/quickstart.md`
-- [ ] T040 [P] 校对并更新 API 契约 `specs/017-async-runtime-scheduler-switch/contracts/scheduler-mode-switch.openapi.yaml`
-- [ ] T041 运行全量验收并补充结论到 `specs/017-async-runtime-scheduler-switch/spec.md` 的 Clarifications/验收说明
-- [ ] T042 [P] 新增 SC-003 台账模板与统计步骤到 `specs/017-async-runtime-scheduler-switch/quickstart.md`
-- [ ] T043 [P] 新增 SC-004 前后 14 天对比台账模板到 `specs/017-async-runtime-scheduler-switch/quickstart.md`
-- [ ] T044 生成一次基线统计示例并回填到 `specs/017-async-runtime-scheduler-switch/spec.md` 的成功指标说明
+- [x] T038 [P] 同步开发文档到 `docs/plan/develop/async_runtime/schedule/scheduler-mode-switch-implementation.md`
+- [x] T039 执行并记录回归测试命令到 `specs/017-async-runtime-scheduler-switch/quickstart.md`
+- [x] T040 [P] 校对并更新 API 契约 `specs/017-async-runtime-scheduler-switch/contracts/scheduler-mode-switch.openapi.yaml`
+- [x] T041 运行全量验收并补充结论到 `specs/017-async-runtime-scheduler-switch/spec.md` 的 Clarifications/验收说明
+- [x] T042 [P] 新增 SC-003 台账模板与统计步骤到 `specs/017-async-runtime-scheduler-switch/quickstart.md`
+- [x] T043 [P] 新增 SC-004 前后 14 天对比台账模板到 `specs/017-async-runtime-scheduler-switch/quickstart.md`
+- [x] T044 生成一次基线统计示例并回填到 `specs/017-async-runtime-scheduler-switch/spec.md` 的成功指标说明
 
 ---
 

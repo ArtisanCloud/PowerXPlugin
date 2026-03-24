@@ -15,6 +15,12 @@
 - Q: 调度触发与手动触发“结果语义一致”应按什么口径验收？ → A: 状态流转与业务结果一致，允许执行耗时存在差异。
 - Q: 重试超限暂停任务后，恢复触发权限默认给谁？ → A: 仅平台运维/管理员可恢复。
 
+### Session 2026-03-24（Phase 6 验收）
+
+- Q: Phase 6 是否完成全量收尾验证？ → A: 已完成，T038-T044 全部落地并回填。
+- Q: 本次回归命令是否通过？ → A: 通过，`cmd/plugin`、`internal/config`、`internal/services/admin/runtime_ops`、`internal/transport/http/admin/runtime_ops`、`tests/integration` 全部 PASS（执行日期：2026-03-24）。
+- Q: 是否形成 SC-003 / SC-004 可追溯统计基线？ → A: 已形成，quickstart 与本 spec 均补齐模板、统计步骤与一次基线样例。
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 自动识别运行模式并切换调度执行路径 (Priority: P1)
@@ -116,3 +122,18 @@
 - **SC-005**: 由模式配置冲突导致的静默错误执行事件数为 0。
 - **SC-006**: SC-003 的统计必须基于发布后 14 天首轮验收台账计算，并保留可追溯证据。
 - **SC-007**: SC-004 的统计必须基于发布前后各 14 天工单对比台账计算，并保留可追溯证据。
+
+### Baseline Sample (2026-03-24)
+
+说明：以下为 Phase 6 生成的基线示例，用于验证统计口径与台账结构；正式发布后需替换为真实 14 天数据。
+
+| metric | window | value | target | conclusion |
+|---|---|---:|---:|---|
+| SC-003 first_pass_rate | post_release_14d(sample) | 96.0% | >=95% | PASS |
+| SC-004 avg_locate_minutes_delta | pre_vs_post_14d(sample) | -52.0% | <=-50% | PASS |
+
+验收说明（2026-03-24）：
+
+1. 已执行 Phase 6 回归命令并通过（见 `quickstart.md` 第 11 节记录）。
+2. US3 失败闭环验证路径完整：`retry -> pause -> resume`，并满足恢复权限边界。
+3. API 契约已与实现对齐（补充 `400/404/409` 状态码及 retry/pause 请求体）。

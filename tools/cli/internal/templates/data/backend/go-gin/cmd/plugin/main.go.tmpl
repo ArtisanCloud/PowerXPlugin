@@ -25,6 +25,7 @@ import (
 	grpcserver "{{ .BackendModulePath }}/internal/grpc/server"
 	capgateway "{{ .BackendModulePath }}/internal/integrations/gateway"
 	powerxclient "{{ .BackendModulePath }}/internal/integrations/powerx"
+	integrationjobs "{{ .BackendModulePath }}/internal/jobs/integration"
 	marketplacejobs "{{ .BackendModulePath }}/internal/jobs/marketplace"
 	"{{ .BackendModulePath }}/internal/logger"
 	manifestx "{{ .BackendModulePath }}/internal/manifestx"
@@ -82,6 +83,10 @@ func main() {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
+	if err := validateTaskBusProviderConflict(cfg, os.Getenv("POWERX_PROXY")); err != nil {
+		fmt.Printf("Failed preflight mode check: %v\n", err)
+		os.Exit(1)
+	}
 	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
 		logger.WithError(err).Fatal("Failed to ensure local IAM secret")
 	}
@@ -136,15 +141,15 @@ func main() {
 				gatewayMode = "host"
 			}
 		}
-			logger.WithFields(logger.Fields{
-				"iam_mode":             iamResolver.Mode(),
-				"iam_source":           iamResolver.Source(),
-				"gateway_mode":         gatewayMode,
-				"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
-				"IAMMode":              os.Getenv("IAMMode"),
-				"IAM_MODE":             os.Getenv("IAM_MODE"),
-				"PX_GATEWAY_BASE_URL":  strings.TrimSpace(cfg.Gateway.BaseURL),
-			}).Info("Mode decision")
+		logger.WithFields(logger.Fields{
+			"iam_mode":            iamResolver.Mode(),
+			"iam_source":          iamResolver.Source(),
+			"gateway_mode":        gatewayMode,
+			"POWERX_PROXY":        os.Getenv("POWERX_PROXY"),
+			"IAMMode":             os.Getenv("IAMMode"),
+			"IAM_MODE":            os.Getenv("IAM_MODE"),
+			"PX_GATEWAY_BASE_URL": strings.TrimSpace(cfg.Gateway.BaseURL),
+		}).Info("Mode decision")
 	}
 
 	var authClient *authproxy.DelegatedClient
@@ -297,6 +302,18 @@ func main() {
 		renewalJob = marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantUuids, nil)
 	}
 
+	// 调度触发统一走 EventEmitter（与手动 event-bridge/emit 共用语义入口）。
+	var integrationScheduler *integrationjobs.Scheduler
+	if bridgeEmitter != nil {
+		schedulerLogger := logger.WithField("component", "integration.scheduler")
+		schedulerDispatcher := integrationjobs.NewSchedulerEventDispatcher(cfg, bridgeEmitter, schedulerLogger.WithField("stage", "dispatcher"))
+		integrationScheduler = integrationjobs.NewScheduler(schedulerLogger)
+		integrationScheduler.SetDispatcher(schedulerDispatcher)
+		integrationScheduler.Register(integrationjobs.NewJobFunc("runtime.scheduler.trigger", time.Minute, func(ctx context.Context) error {
+			return nil
+		}))
+	}
+
 	// 设置 gin engine 路由
 	r := pluginrouter.NewRouter(cfg, deps)
 	engine := r.Setup()
@@ -356,6 +373,17 @@ func main() {
 
 	// 使用 errgroup 并发启动服务器
 	g, groupCtx := errgroup.WithContext(ctx)
+
+	if integrationScheduler != nil {
+		g.Go(func() error {
+			integrationScheduler.Start(groupCtx)
+			<-groupCtx.Done()
+			stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelStop()
+			integrationScheduler.Stop(stopCtx)
+			return nil
+		})
+	}
 
 	if syncJob != nil {
 		g.Go(func() error {

@@ -14,9 +14,12 @@ type SchedulerModeHandler struct {
 }
 
 // NewSchedulerModeHandler constructs scheduler mode handler.
-func NewSchedulerModeHandler(deps *app.Deps) *SchedulerModeHandler {
+func NewSchedulerModeHandler(deps *app.Deps, svc *runtimeops.Service) *SchedulerModeHandler {
 	_ = deps
-	return &SchedulerModeHandler{service: runtimeops.NewSchedulerModeService()}
+	if svc == nil {
+		svc = runtimeops.NewService()
+	}
+	return &SchedulerModeHandler{service: svc.SchedulerMode}
 }
 
 // Validate validates runtime mode/provider consistency.

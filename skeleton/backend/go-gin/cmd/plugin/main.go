@@ -82,6 +82,10 @@ func main() {
 		fmt.Printf("Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
+	if err := validateTaskBusProviderConflict(cfg, os.Getenv("POWERX_PROXY")); err != nil {
+		fmt.Printf("Failed preflight mode check: %v\n", err)
+		os.Exit(1)
+	}
 	if err := pluginbootstrap.EnsureLocalIAMSecret(cfg); err != nil {
 		logger.WithError(err).Fatal("Failed to ensure local IAM secret")
 	}
@@ -136,15 +140,15 @@ func main() {
 				gatewayMode = "host"
 			}
 		}
-			logger.WithFields(logger.Fields{
-				"iam_mode":             iamResolver.Mode(),
-				"iam_source":           iamResolver.Source(),
-				"gateway_mode":         gatewayMode,
-				"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
-				"IAMMode":              os.Getenv("IAMMode"),
-				"IAM_MODE":             os.Getenv("IAM_MODE"),
-				"PX_GATEWAY_BASE_URL":  strings.TrimSpace(cfg.Gateway.BaseURL),
-			}).Info("Mode decision")
+		logger.WithFields(logger.Fields{
+			"iam_mode":            iamResolver.Mode(),
+			"iam_source":          iamResolver.Source(),
+			"gateway_mode":        gatewayMode,
+			"POWERX_PROXY":        os.Getenv("POWERX_PROXY"),
+			"IAMMode":             os.Getenv("IAMMode"),
+			"IAM_MODE":            os.Getenv("IAM_MODE"),
+			"PX_GATEWAY_BASE_URL": strings.TrimSpace(cfg.Gateway.BaseURL),
+		}).Info("Mode decision")
 	}
 
 	var authClient *authproxy.DelegatedClient

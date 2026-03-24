@@ -15,11 +15,14 @@ type SchedulerRetryHandler struct {
 }
 
 // NewSchedulerRetryHandler constructs scheduler retry handler.
-func NewSchedulerRetryHandler(deps *app.Deps) *SchedulerRetryHandler {
+func NewSchedulerRetryHandler(deps *app.Deps, svc *runtimeops.Service) *SchedulerRetryHandler {
 	_ = deps
+	if svc == nil {
+		svc = runtimeops.NewService()
+	}
 	return &SchedulerRetryHandler{
-		retryService:  runtimeops.NewSchedulerRetryService(),
-		ticketService: runtimeops.NewSchedulerTicketService(),
+		retryService:  svc.SchedulerRetry,
+		ticketService: svc.SchedulerTicket,
 	}
 }
 

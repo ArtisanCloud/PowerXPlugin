@@ -31,16 +31,16 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T006 扩展 Scheduler 配置结构（默认重试=3、范围=1-10、暂停策略/恢复角色）到 `skeleton/backend/go-gin/internal/config/operations.go`
-- [ ] T007 在 `skeleton/backend/go-gin/internal/config/config.go` 增加 Scheduler 配置默认值与合法性校验
-- [ ] T008 [P] 在 `skeleton/backend/etc/config.example.yaml` 补充 Scheduler 模式与重试闭环示例配置
-- [ ] T009 在 `skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go` 实现 `POWERX_PROXY` 与 `taskbus_provider` 冲突校验函数
-- [ ] T010 在 `skeleton/backend/go-gin/cmd/plugin/main.go` 接入 fail-fast 启动前校验（冲突即启动失败）
-- [ ] T011 [P] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/routes.go` 注册 scheduler 管理端路由
-- [ ] T012 [P] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/rbac.go` 增加 scheduler 相关权限映射
-- [ ] T013 在 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/service.go` 注入 Scheduler 相关服务依赖
-- [ ] T014 [P] 在 `skeleton/backend/go-gin/internal/config/config_test.go` 增加 Scheduler 配置校验用例（含默认值与 1-10 边界）
-- [ ] T015 [P] 新增 fail-fast 启动校验测试 `skeleton/backend/go-gin/cmd/plugin/taskbus_provider_test.go`
+- [x] T006 扩展 Scheduler 配置结构（默认重试=3、范围=1-10、暂停策略/恢复角色）到 `skeleton/backend/go-gin/internal/config/operations.go`
+- [x] T007 在 `skeleton/backend/go-gin/internal/config/config.go` 增加 Scheduler 配置默认值与合法性校验
+- [x] T008 [P] 在 `skeleton/backend/etc/config.example.yaml` 补充 Scheduler 模式与重试闭环示例配置
+- [x] T009 在 `skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go` 实现 `POWERX_PROXY` 与 `taskbus_provider` 冲突校验函数
+- [x] T010 在 `skeleton/backend/go-gin/cmd/plugin/main.go` 接入 fail-fast 启动前校验（冲突即启动失败）
+- [x] T011 [P] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/routes.go` 注册 scheduler 管理端路由
+- [x] T012 [P] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/rbac.go` 增加 scheduler 相关权限映射
+- [x] T013 在 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/service.go` 注入 Scheduler 相关服务依赖
+- [x] T014 [P] 在 `skeleton/backend/go-gin/internal/config/config_test.go` 增加 Scheduler 配置校验用例（含默认值与 1-10 边界）
+- [x] T015 [P] 新增 fail-fast 启动校验测试 `skeleton/backend/go-gin/cmd/plugin/taskbus_provider_test.go`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

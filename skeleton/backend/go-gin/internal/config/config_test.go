@@ -231,3 +231,59 @@ func TestLoadSupportsRuntimeNamespacedEventBridge(t *testing.T) {
 		t.Fatalf("runtime.event_bridge.redis_stream 未生效: %q", cfg.EventBridge.RedisStream)
 	}
 }
+
+func TestValidateSchedulerConfigDefaults(t *testing.T) {
+	cfg := getDefaultConfig()
+	cfg.Operations = &OperationsConfig{}
+	cfg.Gateway.AuthScheme = "apikey"
+	cfg.Gateway.APIKey = "test-key"
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate 失败: %v", err)
+	}
+	if cfg.Operations.Scheduler.RetryMaxAttempts != 3 {
+		t.Fatalf("scheduler.retry_max_attempts 默认值错误: %d", cfg.Operations.Scheduler.RetryMaxAttempts)
+	}
+	if cfg.Operations.Scheduler.PauseStrategy != "pause_on_retry_exhausted" {
+		t.Fatalf("scheduler.pause_strategy 默认值错误: %q", cfg.Operations.Scheduler.PauseStrategy)
+	}
+	if cfg.Operations.Scheduler.ResumeRoleRequired != "ops_admin_only" {
+		t.Fatalf("scheduler.resume_role_required 默认值错误: %q", cfg.Operations.Scheduler.ResumeRoleRequired)
+	}
+}
+
+func TestValidateSchedulerRetryMaxAttemptsRange(t *testing.T) {
+	tests := []struct {
+		name        string
+		attempts    int
+		expectError bool
+	}{
+		{name: "min boundary", attempts: 1, expectError: false},
+		{name: "max boundary", attempts: 10, expectError: false},
+		{name: "below min", attempts: -1, expectError: true},
+		{name: "above max", attempts: 11, expectError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := getDefaultConfig()
+			cfg.Operations = &OperationsConfig{
+				Scheduler: OperationsSchedulerConfig{
+					RetryMaxAttempts: tt.attempts,
+				},
+			}
+			cfg.Gateway.AuthScheme = "apikey"
+			cfg.Gateway.APIKey = "test-key"
+			err := cfg.Validate()
+			if tt.expectError && err == nil {
+				t.Fatal("期望 Validate 失败，实际成功")
+			}
+			if !tt.expectError && err != nil {
+				t.Fatalf("期望 Validate 成功，实际失败: %v", err)
+			}
+			if tt.expectError && !strings.Contains(err.Error(), "operations.scheduler.retry_max_attempts must be between 1 and 10") {
+				t.Fatalf("错误信息不符合预期: %v", err)
+			}
+		})
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -66,6 +67,19 @@ func resolveTaskBusProviderMode(cfg *config.Config) string {
 		}
 	}
 	return "redis"
+}
+
+func validateTaskBusProviderConflict(cfg *config.Config, powerXProxy string) error {
+	providerMode := resolveTaskBusProviderMode(cfg)
+	proxyEnabled := strings.TrimSpace(powerXProxy) == "1"
+
+	if proxyEnabled && providerMode != "host" {
+		return fmt.Errorf("runtime mode conflict: POWERX_PROXY=1 requires runtime.event_bridge.taskbus_provider=host (got %q)", providerMode)
+	}
+	if !proxyEnabled && providerMode != "redis" {
+		return fmt.Errorf("runtime mode conflict: POWERX_PROXY!=1 requires runtime.event_bridge.taskbus_provider=redis (got %q)", providerMode)
+	}
+	return nil
 }
 
 func newHostTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {

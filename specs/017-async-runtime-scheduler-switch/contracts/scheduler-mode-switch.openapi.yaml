@@ -1,0 +1,194 @@
+openapi: 3.0.3
+info:
+  title: Async Runtime Scheduler Mode Switch API
+  version: 0.1.0
+  description: >
+    Scheduler 模式识别、配置校验、失败闭环与人工恢复的管理端契约（规划阶段）。
+servers:
+  - url: /api/v1/admin/runtime
+paths:
+  /scheduler/mode/validate:
+    post:
+      summary: Validate runtime mode and provider consistency
+      operationId: validateSchedulerMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModeValidationRequest'
+      responses:
+        '200':
+          description: Mode is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModeValidationResult'
+        '409':
+          description: Mode conflict detected (fail-fast)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
+
+  /scheduler/dispatches/{dispatchId}/retry:
+    post:
+      summary: Retry a failed dispatch within retry policy
+      operationId: retryDispatch
+      parameters:
+        - in: path
+          name: dispatchId
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Retry accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispatchResult'
+        '409':
+          description: Retry exhausted, ticket required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
+
+  /scheduler/dispatches/{dispatchId}/pause:
+    post:
+      summary: Pause job after retry exhausted and create recovery ticket
+      operationId: pauseDispatchAndCreateTicket
+      parameters:
+        - in: path
+          name: dispatchId
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Recovery ticket created and job paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryTicket'
+
+  /scheduler/tickets/{ticketId}/resume:
+    post:
+      summary: Resume paused scheduler job by ops/admin only
+      operationId: resumePausedJob
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResumeRequest'
+      responses:
+        '200':
+          description: Job resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryTicket'
+        '403':
+          description: Forbidden for non-ops/non-admin role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResult'
+
+components:
+  schemas:
+    ModeValidationRequest:
+      type: object
+      required: [powerx_proxy, taskbus_provider]
+      properties:
+        powerx_proxy:
+          type: string
+          enum: ['0', '1']
+        taskbus_provider:
+          type: string
+          enum: [redis, host]
+        gateway_auth_scheme:
+          type: string
+          enum: [bearer, apikey]
+
+    ModeValidationResult:
+      type: object
+      required: [valid, execution_mode, taskbus_provider]
+      properties:
+        valid:
+          type: boolean
+        execution_mode:
+          type: string
+          enum: [standalone_local, delegated_proxy]
+        taskbus_provider:
+          type: string
+          enum: [redis, host]
+        message:
+          type: string
+
+    DispatchResult:
+      type: object
+      required: [dispatch_id, status]
+      properties:
+        dispatch_id:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, succeeded, failed, paused]
+        retry_attempt:
+          type: integer
+        trace_id:
+          type: string
+
+    RecoveryTicket:
+      type: object
+      required: [ticket_id, dispatch_id, ticket_status, paused_job_id, resume_role_required]
+      properties:
+        ticket_id:
+          type: string
+        dispatch_id:
+          type: string
+        ticket_status:
+          type: string
+          enum: [open, processing, resolved]
+        paused_job_id:
+          type: string
+        resume_role_required:
+          type: string
+          enum: [ops_admin_only]
+        resolved_by:
+          type: string
+        resolved_at:
+          type: string
+          format: date-time
+
+    ResumeRequest:
+      type: object
+      required: [operator_role, operator_id]
+      properties:
+        operator_role:
+          type: string
+          enum: [ops, admin]
+        operator_id:
+          type: string
+        reason:
+          type: string
+
+    ErrorResult:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        trace_id:
+          type: string

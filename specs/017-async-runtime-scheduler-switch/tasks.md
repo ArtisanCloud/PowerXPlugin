@@ -73,9 +73,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] 新增调度事件分发适配器 `skeleton/backend/go-gin/internal/jobs/integration/scheduler_event_dispatcher.go`（统一调用 EventEmitter 并透传 trace_id）
-- [ ] T023 [US2] 在 `skeleton/backend/go-gin/cmd/plugin/main.go` 完成 scheduler 注册与启动接线（进入统一事件链路）
-- [ ] T024 [US2] 在 `skeleton/backend/go-gin/internal/jobs/integration/scheduler.go` 接入统一 dispatcher（禁止直接 WS publish）
+- [x] T022 [US2] 新增调度事件分发适配器 `skeleton/backend/go-gin/internal/jobs/integration/scheduler_event_dispatcher.go`（统一调用 EventEmitter 并透传 trace_id）
+- [x] T023 [US2] 在 `skeleton/backend/go-gin/cmd/plugin/main.go` 完成 scheduler 注册与启动接线（进入统一事件链路）
+- [x] T024 [US2] 在 `skeleton/backend/go-gin/internal/jobs/integration/scheduler.go` 接入统一 dispatcher（禁止直接 WS publish）
 - [ ] T025 [P] [US2] 新增手动/调度语义一致性与 trace_id 透传测试 `skeleton/backend/go-gin/tests/integration/scheduler_manual_cron_parity_test.go`
 - [ ] T026 [P] [US2] 在 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/runtime_metrics_test.go` 增加手动/调度双触发指标一致性断言
 - [ ] T027 [US2] 更新验收说明到 `docs/guides/async_runtime/scheduler/README.md`（明确一致性判定口径与标准 topic 命名）

@@ -25,6 +25,7 @@ import (
 	grpcserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/server"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	powerxclient "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/powerx"
+	integrationjobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/jobs/integration"
 	marketplacejobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/jobs/marketplace"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	manifestx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/manifestx"
@@ -301,6 +302,18 @@ func main() {
 		renewalJob = marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantUuids, nil)
 	}
 
+	// 调度触发统一走 EventEmitter（与手动 event-bridge/emit 共用语义入口）。
+	var integrationScheduler *integrationjobs.Scheduler
+	if bridgeEmitter != nil {
+		schedulerLogger := logger.WithField("component", "integration.scheduler")
+		schedulerDispatcher := integrationjobs.NewSchedulerEventDispatcher(cfg, bridgeEmitter, schedulerLogger.WithField("stage", "dispatcher"))
+		integrationScheduler = integrationjobs.NewScheduler(schedulerLogger)
+		integrationScheduler.SetDispatcher(schedulerDispatcher)
+		integrationScheduler.Register(integrationjobs.NewJobFunc("runtime.scheduler.trigger", time.Minute, func(ctx context.Context) error {
+			return nil
+		}))
+	}
+
 	// 设置 gin engine 路由
 	r := pluginrouter.NewRouter(cfg, deps)
 	engine := r.Setup()
@@ -360,6 +373,17 @@ func main() {
 
 	// 使用 errgroup 并发启动服务器
 	g, groupCtx := errgroup.WithContext(ctx)
+
+	if integrationScheduler != nil {
+		g.Go(func() error {
+			integrationScheduler.Start(groupCtx)
+			<-groupCtx.Done()
+			stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelStop()
+			integrationScheduler.Stop(stopCtx)
+			return nil
+		})
+	}
 
 	if syncJob != nil {
 		g.Go(func() error {

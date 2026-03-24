@@ -2,6 +2,11 @@ package runtime_ops
 
 import "strings"
 
+const (
+	ExecutionModeStandaloneLocal = "standalone_local"
+	ExecutionModeDelegatedProxy  = "delegated_proxy"
+)
+
 // ModeValidationRequest describes runtime mode validation input.
 type ModeValidationRequest struct {
 	PowerXProxy       string `json:"powerx_proxy"`
@@ -27,17 +32,21 @@ func NewSchedulerModeService() *SchedulerModeService {
 
 // Validate checks POWERX_PROXY and taskbus provider pairing.
 func (s *SchedulerModeService) Validate(req ModeValidationRequest) ModeValidationResult {
-	proxy := strings.TrimSpace(req.PowerXProxy)
+	proxy := normalizePowerXProxy(req.PowerXProxy)
 	provider := strings.ToLower(strings.TrimSpace(req.TaskBusProvider))
 
 	result := ModeValidationResult{
 		Valid:           false,
+		ExecutionMode:   resolveExecutionMode(proxy),
 		TaskBusProvider: provider,
+	}
+	if provider != "host" && provider != "redis" {
+		result.Message = "invalid taskbus_provider: must be host or redis"
+		return result
 	}
 
 	switch proxy {
 	case "1":
-		result.ExecutionMode = "delegated_proxy"
 		if provider == "host" {
 			result.Valid = true
 			result.Message = "mode/provider matched"
@@ -46,7 +55,6 @@ func (s *SchedulerModeService) Validate(req ModeValidationRequest) ModeValidatio
 		result.Message = "mode conflict: delegated_proxy requires taskbus_provider=host"
 		return result
 	default:
-		result.ExecutionMode = "standalone_local"
 		if provider == "redis" {
 			result.Valid = true
 			result.Message = "mode/provider matched"
@@ -55,4 +63,18 @@ func (s *SchedulerModeService) Validate(req ModeValidationRequest) ModeValidatio
 		result.Message = "mode conflict: standalone_local requires taskbus_provider=redis"
 		return result
 	}
+}
+
+func normalizePowerXProxy(raw string) string {
+	if strings.TrimSpace(raw) == "1" {
+		return "1"
+	}
+	return "0"
+}
+
+func resolveExecutionMode(proxy string) string {
+	if normalizePowerXProxy(proxy) == "1" {
+		return ExecutionModeDelegatedProxy
+	}
+	return ExecutionModeStandaloneLocal
 }

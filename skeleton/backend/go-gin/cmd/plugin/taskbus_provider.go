@@ -13,6 +13,7 @@ import (
 	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
 	"github.com/sirupsen/logrus"
 )
 
@@ -71,13 +72,13 @@ func resolveTaskBusProviderMode(cfg *config.Config) string {
 
 func validateTaskBusProviderConflict(cfg *config.Config, powerXProxy string) error {
 	providerMode := resolveTaskBusProviderMode(cfg)
-	proxyEnabled := strings.TrimSpace(powerXProxy) == "1"
-
-	if proxyEnabled && providerMode != "host" {
-		return fmt.Errorf("runtime mode conflict: POWERX_PROXY=1 requires runtime.event_bridge.taskbus_provider=host (got %q)", providerMode)
-	}
-	if !proxyEnabled && providerMode != "redis" {
-		return fmt.Errorf("runtime mode conflict: POWERX_PROXY!=1 requires runtime.event_bridge.taskbus_provider=redis (got %q)", providerMode)
+	modeSvc := runtimeops.NewSchedulerModeService()
+	result := modeSvc.Validate(runtimeops.ModeValidationRequest{
+		PowerXProxy:     powerXProxy,
+		TaskBusProvider: providerMode,
+	})
+	if !result.Valid {
+		return fmt.Errorf("runtime mode conflict: %s (got %q)", result.Message, providerMode)
 	}
 	return nil
 }

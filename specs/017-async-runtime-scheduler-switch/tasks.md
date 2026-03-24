@@ -54,12 +54,12 @@
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] 实现模式解析与判定逻辑到 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service.go`
-- [ ] T017 [US1] 实现 `POST /api/v1/admin/runtime/scheduler/mode/validate` handler 到 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_mode_handler.go`
-- [ ] T018 [US1] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/routes.go` 绑定 mode validate 端点到具体 handler
-- [ ] T019 [P] [US1] 为模式判定服务新增单测 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service_test.go`
-- [ ] T020 [P] [US1] 为 mode validate handler 新增 HTTP 用例 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_mode_handler_test.go`
-- [ ] T021 [US1] 新增双模式 + 冲突场景集成测试 `skeleton/backend/go-gin/tests/integration/scheduler_mode_switch_test.go`
+- [x] T016 [US1] 实现模式解析与判定逻辑到 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service.go`
+- [x] T017 [US1] 实现 `POST /api/v1/admin/runtime/scheduler/mode/validate` handler 到 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_mode_handler.go`
+- [x] T018 [US1] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/routes.go` 绑定 mode validate 端点到具体 handler
+- [x] T019 [P] [US1] 为模式判定服务新增单测 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service_test.go`
+- [x] T020 [P] [US1] 为 mode validate handler 新增 HTTP 用例 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_mode_handler_test.go`
+- [x] T021 [US1] 新增双模式 + 冲突场景集成测试 `skeleton/backend/go-gin/tests/integration/scheduler_mode_switch_test.go`
 
 **Checkpoint**: User Story 1 可独立验收（模式识别成功 + 冲突 fail-fast）
 

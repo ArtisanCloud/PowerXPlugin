@@ -34,10 +34,17 @@ func (h *SchedulerModeHandler) Validate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": err.Error()})
 		return
 	}
+	if req.TaskBusProvider == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": "invalid_request", "message": "taskbus_provider is required"})
+		return
+	}
 
 	result := h.service.Validate(req)
 	if !result.Valid {
-		c.JSON(http.StatusConflict, result)
+		c.JSON(http.StatusConflict, gin.H{
+			"code":    "mode_conflict",
+			"message": result.Message,
+		})
 		return
 	}
 	c.JSON(http.StatusOK, result)

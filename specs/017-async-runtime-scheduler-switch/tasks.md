@@ -76,9 +76,9 @@
 - [x] T022 [US2] 新增调度事件分发适配器 `skeleton/backend/go-gin/internal/jobs/integration/scheduler_event_dispatcher.go`（统一调用 EventEmitter 并透传 trace_id）
 - [x] T023 [US2] 在 `skeleton/backend/go-gin/cmd/plugin/main.go` 完成 scheduler 注册与启动接线（进入统一事件链路）
 - [x] T024 [US2] 在 `skeleton/backend/go-gin/internal/jobs/integration/scheduler.go` 接入统一 dispatcher（禁止直接 WS publish）
-- [ ] T025 [P] [US2] 新增手动/调度语义一致性与 trace_id 透传测试 `skeleton/backend/go-gin/tests/integration/scheduler_manual_cron_parity_test.go`
-- [ ] T026 [P] [US2] 在 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/runtime_metrics_test.go` 增加手动/调度双触发指标一致性断言
-- [ ] T027 [US2] 更新验收说明到 `docs/guides/async_runtime/scheduler/README.md`（明确一致性判定口径与标准 topic 命名）
+- [x] T025 [P] [US2] 新增手动/调度语义一致性与 trace_id 透传测试 `skeleton/backend/go-gin/tests/integration/scheduler_manual_cron_parity_test.go`
+- [x] T026 [P] [US2] 在 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/runtime_metrics_test.go` 增加手动/调度双触发指标一致性断言
+- [x] T027 [US2] 更新验收说明到 `docs/guides/async_runtime/scheduler/README.md`（明确一致性判定口径与标准 topic 命名）
 
 **Checkpoint**: User Story 2 可独立验收（同 topic 双触发语义一致）
 
@@ -92,16 +92,16 @@
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] 实现有限重试状态机到 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_retry_service.go`
-- [ ] T029 [US3] 实现恢复工单与暂停控制到 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_ticket_service.go`
-- [ ] T030 [US3] 实现 `POST /api/v1/admin/runtime/scheduler/dispatches/{dispatchId}/retry` handler 到 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler.go`
-- [ ] T031 [US3] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler.go` 实现 `POST /scheduler/dispatches/{dispatchId}/pause`
-- [ ] T032 [US3] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler.go` 实现 `POST /scheduler/tickets/{ticketId}/resume`（仅 ops/admin）
-- [ ] T033 [US3] 在 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_ticket_service.go` 实现恢复操作审计记录写入
-- [ ] T034 [P] [US3] 新增重试超限与工单创建单测 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_retry_service_test.go`
-- [ ] T035 [P] [US3] 新增恢复权限边界与审计记录测试 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler_test.go`
-- [ ] T036 [US3] 新增失败闭环集成测试 `skeleton/backend/go-gin/tests/integration/scheduler_retry_recovery_flow_test.go`
-- [ ] T037 [US3] 更新联调手册 `docs/guides/async_runtime/websocket/debug_playbook.md` 与 `specs/017-async-runtime-scheduler-switch/quickstart.md`（补齐失败闭环步骤）
+- [x] T028 [US3] 实现有限重试状态机到 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_retry_service.go`
+- [x] T029 [US3] 实现恢复工单与暂停控制到 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_ticket_service.go`
+- [x] T030 [US3] 实现 `POST /api/v1/admin/runtime/scheduler/dispatches/{dispatchId}/retry` handler 到 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler.go`
+- [x] T031 [US3] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler.go` 实现 `POST /scheduler/dispatches/{dispatchId}/pause`
+- [x] T032 [US3] 在 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler.go` 实现 `POST /scheduler/tickets/{ticketId}/resume`（仅 ops/admin）
+- [x] T033 [US3] 在 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_ticket_service.go` 实现恢复操作审计记录写入
+- [x] T034 [P] [US3] 新增重试超限与工单创建单测 `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_retry_service_test.go`
+- [x] T035 [P] [US3] 新增恢复权限边界与审计记录测试 `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler_test.go`
+- [x] T036 [US3] 新增失败闭环集成测试 `skeleton/backend/go-gin/tests/integration/scheduler_retry_recovery_flow_test.go`
+- [x] T037 [US3] 更新联调手册 `docs/guides/async_runtime/websocket/debug_playbook.md` 与 `specs/017-async-runtime-scheduler-switch/quickstart.md`（补齐失败闭环步骤）
 
 **Checkpoint**: User Story 3 可独立验收（失败闭环完整且恢复权限正确）
 

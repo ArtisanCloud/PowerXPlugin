@@ -79,6 +79,48 @@ export PX_GATEWAY_API_KEY=<key>
 4. 非运维/管理员角色不能恢复
 5. 运维/管理员恢复后任务可重新触发
 
+最小闭环命令（示例 `dispatch_id=dispatch-us3-001`）：
+
+```bash
+# A. 连续重试直到超限（默认上限 3）
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/dispatches/dispatch-us3-001/retry \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"error_code":"AUTH_FORBIDDEN","error_message":"topic not allowed"}'
+```
+
+预期：前两次 `202`，第三次 `409(CONFLICT)`。
+
+```bash
+# B. 超限后暂停并创建工单
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/dispatches/dispatch-us3-001/pause \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"paused_job_id":"job-us3-001"}'
+```
+
+预期：返回 `201`，响应中包含 `ticket_id`。
+
+```bash
+# C. 非 ops/admin 恢复（应失败）
+curl -sS -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/tickets/$TICKET_ID/resume" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"operator_role":"viewer","operator_id":"qa-user","reason":"try-resume"}'
+```
+
+预期：`403(FORBIDDEN)`。
+
+```bash
+# D. ops/admin 恢复（应成功）
+curl -sS -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/tickets/$TICKET_ID/resume" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"operator_role":"ops","operator_id":"ops-user","reason":"permission fixed"}'
+```
+
+预期：`200` 且 `ticket_status=resolved`，随后再次执行 retry 返回 `202`。
+
 ## 6. 指标与日志检查
 
 ```bash

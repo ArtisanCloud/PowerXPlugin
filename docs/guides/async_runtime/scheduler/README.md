@@ -15,6 +15,7 @@
 2. 执行统一走 EventBridge/TaskBus 抽象，不在业务代码写 `if proxy/if standalone` 分支。
 3. 模式切换由启动环境 + framework 配置决定，不由页面或接口参数临时决定。
 4. 手动触发与 Cron 触发必须复用同一个 `emit(topic, payload)` 入口。
+5. Scheduler 标准 topic 统一为 `powerx.runtime.scheduler.triggered.v1`（遵循 `powerx.<domain>.<subdomain>.<action>.v<version>`）。
 
 ## 3. 模式识别与切换（启动期决策）
 
@@ -94,19 +95,27 @@ operations:
 curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/event-bridge/emit \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"topic":"_topic.template.update","payload":{"source":"scheduler-smoke","progress":25}}'
+  -d '{"topic":"powerx.runtime.scheduler.triggered.v1","payload":{"source":"manual","trigger_source":"manual","job_name":"runtime.scheduler.trigger","business_action":"reconcile","status":"queued","trace_id":"manual-trace-001"}}'
 ```
+
+再执行一次 Cron 触发（由 scheduler 自动发出同 topic 事件），payload 语义保持一致：
+
+- `business_action=reconcile`
+- `status=queued`
+- `trace_id` 必填，且应与事件 meta 中 `trace_id` 一致
 
 ### Step 3：验收
 
 1. WS 先收到 `ack`，后收到 `event`
-2. 指标可见：
+2. 手动触发与 Cron 触发必须同 topic（`powerx.runtime.scheduler.triggered.v1`）且语义字段一致（`business_action/status`）
+3. 每次触发均可检索 `trace_id`，并可完成“触发 -> 分发”链路关联
+4. 指标可见：
 
 ```bash
 curl -sS http://127.0.0.1:8078/api/v1/admin/runtime/metrics | rg 'plugin_event_bridge_(emit_total|latency_ms)'
 ```
 
-3. 日志可检索 `trace_id/topic/status`
+5. 日志可检索 `trace_id/topic/status`
 
 ## 6. Cron 接入约束（实施时）
 

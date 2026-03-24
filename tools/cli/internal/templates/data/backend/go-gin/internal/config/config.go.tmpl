@@ -552,6 +552,13 @@ func getDefaultConfig() *Config {
 				BillingAnomaly:    0.2,
 			},
 		},
+		Operations: &OperationsConfig{
+			Scheduler: OperationsSchedulerConfig{
+				RetryMaxAttempts:   3,
+				PauseStrategy:      "pause_on_retry_exhausted",
+				ResumeRoleRequired: "ops_admin_only",
+			},
+		},
 		Context: &ContextConfig{
 			TTL: 300 * time.Second, // 5分钟
 		},
@@ -1536,6 +1543,35 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.WSBus.Channel) == "" {
 		c.WSBus.Channel = "powerx.wsbus"
+	}
+
+	// Scheduler 配置默认值与验证
+	if c.Operations == nil {
+		c.Operations = &OperationsConfig{}
+	}
+	if c.Operations.Scheduler.RetryMaxAttempts == 0 {
+		c.Operations.Scheduler.RetryMaxAttempts = 3
+	}
+	if c.Operations.Scheduler.RetryMaxAttempts < 1 || c.Operations.Scheduler.RetryMaxAttempts > 10 {
+		return NewConfigError("operations.scheduler.retry_max_attempts must be between 1 and 10")
+	}
+	if strings.TrimSpace(c.Operations.Scheduler.PauseStrategy) == "" {
+		c.Operations.Scheduler.PauseStrategy = "pause_on_retry_exhausted"
+	}
+	switch strings.ToLower(strings.TrimSpace(c.Operations.Scheduler.PauseStrategy)) {
+	case "pause_on_retry_exhausted":
+		c.Operations.Scheduler.PauseStrategy = "pause_on_retry_exhausted"
+	default:
+		return NewConfigError("operations.scheduler.pause_strategy must be: pause_on_retry_exhausted")
+	}
+	if strings.TrimSpace(c.Operations.Scheduler.ResumeRoleRequired) == "" {
+		c.Operations.Scheduler.ResumeRoleRequired = "ops_admin_only"
+	}
+	switch strings.ToLower(strings.TrimSpace(c.Operations.Scheduler.ResumeRoleRequired)) {
+	case "ops_admin_only":
+		c.Operations.Scheduler.ResumeRoleRequired = "ops_admin_only"
+	default:
+		return NewConfigError("operations.scheduler.resume_role_required must be: ops_admin_only")
 	}
 
 	// 安全配置验证

@@ -186,3 +186,51 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 2. API Key 快照权限必须覆盖该 topic。
 3. 权限变更后必须使用轮换/新建后的新 key。
 4. `grant` 不创建 topic，只做授权绑定。
+
+## 10. Proxy 权限失败闭环（US3 验收）
+
+目标：形成“有限重试 -> 超限工单 -> 暂停 -> 运维恢复 -> 再触发”的统一流程。
+
+### Step 1：构造权限失败并触发重试
+
+```bash
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/dispatches/dispatch-us3-001/retry \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"error_code":"AUTH_FORBIDDEN","error_message":"topic not allowed"}'
+```
+
+预期：前两次返回 `202`，第三次返回 `409`。
+
+### Step 2：暂停并创建恢复工单
+
+```bash
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/dispatches/dispatch-us3-001/pause \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"paused_job_id":"job-us3-001"}'
+```
+
+预期：返回 `201`，拿到 `ticket_id`。
+
+### Step 3：校验恢复权限边界
+
+```bash
+# 非 ops/admin（应失败）
+curl -sS -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/tickets/$TICKET_ID/resume" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"operator_role":"viewer","operator_id":"qa-user","reason":"try-resume"}'
+
+# ops/admin（应成功）
+curl -sS -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/tickets/$TICKET_ID/resume" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"operator_role":"ops","operator_id":"ops-user","reason":"permission fixed"}'
+```
+
+预期：第一条 `403`，第二条 `200` 且 `ticket_status=resolved`。
+
+### Step 4：恢复后再触发
+
+恢复成功后再次执行 retry，预期回到 `202`（重试窗口被重置），并可继续按标准 WS 联调流程验证 `ack -> event`。

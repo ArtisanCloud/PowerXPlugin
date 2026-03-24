@@ -4,9 +4,10 @@ import "strings"
 
 // OperationsConfig aggregates support, incident, and SLA configuration knobs.
 type OperationsConfig struct {
-	Support  OperationsSupportConfig  `yaml:"support" json:"support"`
-	Incident OperationsIncidentConfig `yaml:"incident" json:"incident"`
-	SLA      OperationsSLAConfig      `yaml:"sla" json:"sla"`
+	Support   OperationsSupportConfig   `yaml:"support" json:"support"`
+	Incident  OperationsIncidentConfig  `yaml:"incident" json:"incident"`
+	SLA       OperationsSLAConfig       `yaml:"sla" json:"sla"`
+	Scheduler OperationsSchedulerConfig `yaml:"scheduler" json:"scheduler"`
 }
 
 // OperationsSupportConfig defines defaults for support channels and webhook signing.
@@ -35,6 +36,13 @@ type OperationsSLAConfig struct {
 	DailyCron     string `yaml:"daily_cron" json:"daily_cron"`
 	MonthlyCron   string `yaml:"monthly_cron" json:"monthly_cron"`
 	QuarterlyCron string `yaml:"quarterly_cron" json:"quarterly_cron"`
+}
+
+// OperationsSchedulerConfig defines scheduler recovery policy defaults.
+type OperationsSchedulerConfig struct {
+	RetryMaxAttempts   int    `yaml:"retry_max_attempts" json:"retry_max_attempts"`
+	PauseStrategy      string `yaml:"pause_strategy" json:"pause_strategy"`
+	ResumeRoleRequired string `yaml:"resume_role_required" json:"resume_role_required"`
 }
 
 // OperationsWebhookSecret returns the configured webhook signing secret.

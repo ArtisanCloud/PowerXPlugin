@@ -43,7 +43,8 @@ func (j JobFunc) Run(ctx context.Context) error {
 
 // Scheduler 负责调度 Integration 背景任务。
 type Scheduler struct {
-	logger *logrus.Entry
+	logger     *logrus.Entry
+	dispatcher EventDispatcher
 
 	mu      sync.Mutex
 	jobs    []Job
@@ -60,6 +61,16 @@ func NewScheduler(logger *logrus.Entry) *Scheduler {
 	return &Scheduler{
 		logger: logger,
 	}
+}
+
+// SetDispatcher injects the unified event dispatcher for cron triggers.
+func (s *Scheduler) SetDispatcher(dispatcher EventDispatcher) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.dispatcher = dispatcher
 }
 
 // Register 添加新的后台任务（需在 Start 前调用）。
@@ -156,10 +167,27 @@ func (s *Scheduler) execute(ctx context.Context, job Job, logger *logrus.Entry) 
 		}
 	}()
 
+	runCtx := ctx
+	if traceID, err := s.dispatchTrigger(ctx, job); err != nil {
+		logger.WithError(err).WithField("topic", SchedulerTriggeredTopic).Error("scheduler trigger dispatch failed")
+		return
+	} else if traceID != "" {
+		runCtx = context.WithValue(ctx, "request_id", traceID)
+	}
+
 	start := time.Now()
-	if err := job.Run(ctx); err != nil {
+	if err := job.Run(runCtx); err != nil {
 		logger.WithError(err).Error("integration job execution failed")
 		return
 	}
 	logger.WithField("elapsed", time.Since(start)).Debug("integration job executed")
+}
+
+func (s *Scheduler) dispatchTrigger(ctx context.Context, job Job) (string, error) {
+	if s == nil || s.dispatcher == nil {
+		return "", nil
+	}
+	return s.dispatcher.DispatchCronTrigger(ctx, job.Name(), map[string]any{
+		"status": "queued",
+	})
 }

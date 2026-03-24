@@ -8,7 +8,8 @@ import (
 
 // RegisterRoutes wires runtime ops endpoints behind the admin router.
 func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
-	bootstrap := NewBootstrapHandler(runtimeops.NewService())
+	runtimeService := runtimeops.NewService()
+	bootstrap := NewBootstrapHandler(runtimeService)
 	router.POST("/bootstrap", bootstrap.Bootstrap)
 
 	sessions := NewSessionsHandler(deps)
@@ -29,4 +30,12 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	router.POST("/internal/event-fabric/topics", EventFabricCreateTopicHandler(deps))
 	router.POST("/internal/ws-bus/publish", WSBusPublishHandler(deps))
 	router.POST("/internal/ws-bus/grant", WSBusGrantHandler(deps))
+
+	schedulerMode := NewSchedulerModeHandler(deps, runtimeService)
+	schedulerRetry := NewSchedulerRetryHandler(deps, runtimeService)
+	scheduler := router.Group("/scheduler")
+	scheduler.POST("/mode/validate", schedulerMode.Validate)
+	scheduler.POST("/dispatches/:dispatchId/retry", schedulerRetry.Retry)
+	scheduler.POST("/dispatches/:dispatchId/pause", schedulerRetry.Pause)
+	scheduler.POST("/tickets/:ticketId/resume", schedulerRetry.Resume)
 }

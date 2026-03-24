@@ -23,5 +23,9 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 		"GET:" + base + "/metrics":                       {Resource: "runtime.ops", Action: "observe"},
 		"POST:" + base + "/event-bridge/emit":            {Resource: "runtime.ops", Action: "invoke"},
 		"POST:" + base + "/internal/event-fabric/topics": {Resource: "runtime.ops", Action: "invoke"},
+		"POST:" + base + "/scheduler/mode/validate":      {Resource: "runtime.ops", Action: "manage"},
+		"POST:" + base + "/scheduler/dispatches/*/retry": {Resource: "runtime.ops", Action: "manage"},
+		"POST:" + base + "/scheduler/dispatches/*/pause": {Resource: "runtime.ops", Action: "manage"},
+		"POST:" + base + "/scheduler/tickets/*/resume":   {Resource: "runtime.ops", Action: "manage"},
 	}
 }

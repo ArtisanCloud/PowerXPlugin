@@ -98,6 +98,38 @@ curl -sS "$PLUGIN_BASE_URL/admin/runtime/metrics" | rg 'plugin_event_bridge_(emi
 2. `publish`：用于验证实时推送链路
 3. 详细步骤见：`docs/guides/async_runtime/websocket/debug_playbook.md`
 
+## 6.1 Step 4：任务驱动 + 事件消费验证（015 对齐）
+
+目标：验证“业务写路径触发事件”，而不是只验证 runtime 调试接口。
+
+1. 先建立 WS 订阅（推荐 `wscat` 订阅 `_topic.template.update`）。
+2. 调用真实业务接口创建模板（`POST /templates`）。
+3. 再调用真实业务接口更新模板（`PUT /templates/{id}`）。
+4. 预期每次业务写操作都会收到 `_topic.template.update` 事件，前端只消费事件，不依赖页面轮询触发执行。
+
+示例命令：
+
+```bash
+# A. 创建模板（业务入口，不是 runtime 调试端点）
+curl -sS -X POST "$PLUGIN_BASE_URL/templates" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"ws-template-demo","description":"ws bus e2e","content":"hello template"}'
+
+# B. 更新模板（将 {id} 替换为创建结果中的 data.id）
+curl -sS -X PUT "$PLUGIN_BASE_URL/templates/{id}" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"ws-template-demo","description":"ws bus e2e updated","content":"hello template updated"}'
+```
+
+验收口径：
+
+1. 两次请求 HTTP 均成功（2xx）。
+2. WS 订阅端收到 `_topic.template.update` 的 `event`。
+3. payload 至少包含：`action`（`created/updated`）、`template_id`、`tenant_uuid`、`trace_id`。
+4. 若 WS 发布失败，不影响模板 CRUD 主流程（主流程成功，日志可见告警）。
+
 ## 7. 模式差异
 
 1. standalone：所有联调均在插件本地闭环
@@ -121,3 +153,44 @@ curl -sS "$PLUGIN_BASE_URL/admin/runtime/metrics" | rg 'plugin_event_bridge_(emi
 3. `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/event_bridge_debug_handler.go`
 4. `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_grant.go`
 5. `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_publish.go`
+6. `skeleton/backend/go-gin/internal/transport/http/admin/templates/template_handler.go`
+
+## 10. 外部插件迁移清单（TaskBus Adapter Mapping / T047）
+
+目标：把外部插件从“直连本地实现”迁移到 framework `event_bridge` 统一抽象，最少 1 次迭代完成。
+
+### 10.1 版本与依赖
+
+1. 升级 framework 依赖到 `v0.0.4-alpha`（或更新）。
+2. 运行 `go mod tidy` 并确认不存在旧版 event bridge 包冲突。
+
+### 10.2 配置映射
+
+1. 新增/校验 `event_bridge`：
+   - `enabled`
+   - `mode=local|taskbus|dual`
+   - `fallback_to_local`
+   - `taskbus_provider=host|redis`
+2. 迁移旧配置到新语义：
+   - 旧“直接写 ws/queue”配置 -> `event_bridge.*`
+   - 旧“环境分支”逻辑 -> 启动期 provider 决策
+
+### 10.3 代码映射（Adapter）
+
+1. 业务发事件统一改为 `EventEmitter.Emit(...)`，禁止业务层直接写 ws publish。
+2. 在启动期注入 `Factory.WithTaskBusProvider(...)`。
+3. 保留 fallback 语义：provider 不可用时自动回落 local（按配置）。
+
+### 10.4 权限与契约
+
+1. 在 `plugin.yaml`（或 `plugin.d/events.yaml`）声明 topic + actions（最小权限）。
+2. 运行契约校验：`./scripts/contracts/validate-taskbus-contracts.sh`。
+3. 确认 topic 命名与版本后缀一致（例如 `*.v1`）。
+
+### 10.5 验收清单
+
+1. `mode=taskbus` + provider 可用：事件可投递。
+2. `mode=taskbus` + provider 异常 + `fallback_to_local=true`：可自动回落。
+3. `mode=dual`：主链路成功后本地副本写入成功。
+4. 指标可见：`emit_total` / `consume_total` / `latency_ms` / `drop_total`。
+5. 日志可检索：`topic`、`tenant_uuid`、`trace_id`、`status`。

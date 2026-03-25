@@ -38,7 +38,7 @@ func (h *TemplateHandler) GetTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.read
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	tpl, err := h.TemplateService.GetByID(c.Request.Context(), id)
@@ -61,6 +61,11 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
 	tpl, err := h.TemplateService.Create(c.Request.Context(), req.Name, req.Description, req.Content)
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -73,12 +78,17 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.update
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	var req UpdateTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
 		return
 	}
 	tpl, err := h.TemplateService.Update(c.Request.Context(), id, req.Name, req.Description, req.Content)
@@ -93,7 +103,7 @@ func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.delete
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	if err := h.TemplateService.Delete(c.Request.Context(), id); err != nil {
@@ -114,8 +124,9 @@ func (h *TemplateHandler) BatchCloneTemplates(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
-	if len(req.SourceIDs) == 0 {
-		contracts.ResponseBadRequest(c, "source_ids is required")
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
 		return
 	}
 	result, err := h.TemplateService.BatchClone(
@@ -142,7 +153,7 @@ func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
 	}
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	var req ValidateTemplateRequest
@@ -161,4 +172,20 @@ func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
 func parseUint64(s string) (uint64, error) {
 	u, err := strconv.ParseUint(s, 10, 64)
 	return uint64(u), err
+}
+
+func respondTemplateValidationError(c *gin.Context, err *TemplateValidationError) {
+	if c == nil || err == nil {
+		return
+	}
+	contracts.ResponseErrorWithDetails(
+		c,
+		400,
+		contracts.ErrCodeValidationFailed,
+		err.Message,
+		gin.H{
+			"field":         err.Field,
+			"template_code": err.Code,
+		},
+	)
 }

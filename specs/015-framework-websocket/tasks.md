@@ -18,7 +18,7 @@
 - [x] T004 [P] [US1] 实现宿主模式发布客户端（`framework/backend/go/runtime/wsbus/host_client.go`）
 - [x] T005 [P] [US1] 实现 standalone 本地 WS 发布适配（`framework/backend/go/runtime/wsbus/local_publisher.go`）
 - [x] T006 [US1] 实现模式选择与统一入口（`framework/backend/go/runtime/wsbus/factory.go`）
-- [ ] T007 [US1] 接入业务发布入口（确认模板事件发布位置后更新到真实路径）
+- [x] T007 [US1] 接入业务发布入口（确认模板事件发布位置后更新到真实路径）
 
 ## Phase 4: User Story 2 (P2) — Secure Tenant-Scoped Publishing
 
@@ -36,12 +36,12 @@
 
 **Independent test**: 不依赖页面轮询即可完成任务执行与状态推进。
 
-- [ ] T011 [US3] 记录“任务驱动 + 事件消费”验证步骤（`docs/guides/async_runtime/event_fabric/integration_playbook.md`）
+- [x] T011 [US3] 记录“任务驱动 + 事件消费”验证步骤（`docs/guides/async_runtime/event_fabric/integration_playbook.md`）
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T012 更新本次功能快速验证步骤（`specs/015-framework-websocket/quickstart.md`）
-- [ ] T013 补充验收说明与 topic 命名策略（`specs/015-framework-websocket/research.md`）
+- [x] T012 更新本次功能快速验证步骤（`specs/015-framework-websocket/quickstart.md`）
+- [x] T013 补充验收说明与 topic 命名策略（`specs/015-framework-websocket/research.md`）
 - [x] T014 补充发布失败的统一错误结构与示例（`framework/backend/go/runtime/wsbus/publisher.go`）
 - [x] T015 [Polish] 补齐调试发布端点与 RBAC 对齐（Gin/FastAPI）
 

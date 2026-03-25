@@ -36,3 +36,24 @@
 - **Rationale**: 便于本地联调 `/api/ws` 订阅，避免业务端尚未接入时无发布通道。
 - **Alternatives considered**:
   - 不提供调试入口：本地验证成本高。
+
+## Decision 6: 真实业务发布入口定位
+
+- **Decision**: 以模板业务写路径（`POST /api/v1/templates`、`PUT /api/v1/templates/{id}`）作为本特性真实发布入口，成功写入后发布 `_topic.template.update`。
+- **Rationale**: 满足“业务层不感知模式”的目标，避免仅依赖 runtime 调试端点导致验收失真。
+- **Alternatives considered**:
+  - 仅保留 runtime 调试端点发布：无法代表真实业务流，不能证明任务驱动链路。
+
+## Topic 命名策略（补充）
+
+1. 本特性统一使用 `_topic.*`，不维护旧命名别名。
+2. 业务事件基线 topic：`_topic.template.update`。
+3. 同一业务语义在宿主/standalone 必须保持同 topic。
+4. topic 必须在声明层（`plugin.yaml`）与执行层 ACL 同步。
+
+## 验收口径（补充）
+
+1. **US1（统一发布）**：在 standalone/proxy 下，业务写路径触发后均可收到 `_topic.template.update`。
+2. **US2（租户与授权）**：非白名单或租户不匹配请求必须被拒绝（4xx）。
+3. **US3（任务驱动）**：页面只消费事件，不通过轮询触发业务执行。
+4. **失败语义**：WS 发布失败不阻断模板 CRUD 主流程，但必须记录结构化告警日志。

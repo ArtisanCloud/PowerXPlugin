@@ -102,6 +102,16 @@ npm install
 npm run dev
 ```
 
+Nuxt 常用环境变量（`web-admin/.env.local`）：
+
+- `POWERX_PROXY=0|1`
+- `NUXT_PUBLIC_API_BASE`
+- `NUXT_PUBLIC_API_PREFIX=/api/v1`
+- `NUXT_DEV_API_PROXY`
+- `NUXT_DEV_WS_PROXY`
+- `NUXT_PUBLIC_POWERX_CORE_BASE`（可选）
+- `NUXT_PUBLIC_IAM_MODE=local|delegated`（可选）
+
 前端（Next）：
 
 ```bash

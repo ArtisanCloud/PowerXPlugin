@@ -3,19 +3,33 @@ package templates
 import (
 	"errors"
 	"io"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"{{ .BackendModulePath }}/internal/contracts"
+	dbm "{{ .BackendModulePath }}/internal/entity/models/template"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	srvtemplates "{{ .BackendModulePath }}/internal/services/admin/templates"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-type TemplateHandler struct{ TemplateService *srvtemplates.TemplateService }
+const templateUpdateTopic = "_topic.template.update"
+
+type TemplateHandler struct {
+	TemplateService *srvtemplates.TemplateService
+	deps            *app.Deps
+}
 
 func NewTemplateHandler(deps *app.Deps) *TemplateHandler {
-	return &TemplateHandler{TemplateService: srvtemplates.NewTemplateService(deps.DB)}
+	return &TemplateHandler{
+		TemplateService: srvtemplates.NewTemplateService(deps.DB),
+		deps:            deps,
+	}
 }
 
 func (h *TemplateHandler) GetTemplates(c *gin.Context) {
@@ -38,7 +52,7 @@ func (h *TemplateHandler) GetTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.read
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	tpl, err := h.TemplateService.GetByID(c.Request.Context(), id)
@@ -61,11 +75,17 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
 	tpl, err := h.TemplateService.Create(c.Request.Context(), req.Name, req.Description, req.Content)
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
+	h.publishTemplateUpdateEvent(c, "created", tpl)
 	contracts.ResponseSuccess(c, tpl)
 }
 
@@ -73,7 +93,7 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.update
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	var req UpdateTemplateRequest
@@ -81,11 +101,17 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
 	tpl, err := h.TemplateService.Update(c.Request.Context(), id, req.Name, req.Description, req.Content)
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
+	h.publishTemplateUpdateEvent(c, "updated", tpl)
 	contracts.ResponseSuccess(c, tpl)
 }
 
@@ -93,7 +119,7 @@ func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.delete
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	if err := h.TemplateService.Delete(c.Request.Context(), id); err != nil {
@@ -114,8 +140,9 @@ func (h *TemplateHandler) BatchCloneTemplates(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
-	if len(req.SourceIDs) == 0 {
-		contracts.ResponseBadRequest(c, "source_ids is required")
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
 		return
 	}
 	result, err := h.TemplateService.BatchClone(
@@ -142,7 +169,7 @@ func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
 	}
 	id, err := parseUint64(c.Param("id"))
 	if err != nil {
-		contracts.ResponseBadRequest(c, "invalid id")
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
 		return
 	}
 	var req ValidateTemplateRequest
@@ -161,4 +188,83 @@ func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
 func parseUint64(s string) (uint64, error) {
 	u, err := strconv.ParseUint(s, 10, 64)
 	return uint64(u), err
+}
+
+func respondTemplateValidationError(c *gin.Context, err *TemplateValidationError) {
+	if c == nil || err == nil {
+		return
+	}
+	contracts.ResponseErrorWithDetails(
+		c,
+		400,
+		contracts.ErrCodeValidationFailed,
+		err.Message,
+		gin.H{
+			"field":         err.Field,
+			"template_code": err.Code,
+		},
+	)
+}
+
+func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action string, tpl *dbm.Template) {
+	if h == nil || h.deps == nil || h.deps.WSBusHub == nil || c == nil {
+		return
+	}
+	if tpl == nil {
+		return
+	}
+
+	tenantUUID, tenantMismatch := admincommon.ResolveTenantUUIDStrict(c, tpl.TenantUuid)
+	if tenantMismatch || strings.TrimSpace(tenantUUID) == "" {
+		return
+	}
+	traceID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+
+	payload := gin.H{
+		"action":        strings.TrimSpace(action),
+		"template_id":   tpl.ID,
+		"name":          tpl.Name,
+		"status":        tpl.Status,
+		"review_status": tpl.ReviewStatus,
+		"tenant_uuid":   tenantUUID,
+		"trace_id":      traceID,
+		"occurred_at":   time.Now().UTC().Format(time.RFC3339Nano),
+	}
+
+	publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
+		fwwsbus.NewLocalPublisher(h.deps.WSBusHub, nil),
+		"",
+		nil,
+	))
+	if os.Getenv("POWERX_PROXY") == "1" && h.deps.Config != nil && h.deps.Config.Gateway != nil {
+		hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
+			BaseURL:    strings.TrimSpace(h.deps.Config.Gateway.BaseURL),
+			AuthScheme: strings.TrimSpace(h.deps.Config.Gateway.AuthScheme),
+			Token:      strings.TrimSpace(h.deps.Config.Gateway.ToolToken),
+			APIKey:     strings.TrimSpace(h.deps.Config.Gateway.APIKey),
+			TenantUUID: "",
+			UserAgent:  strings.TrimSpace(h.deps.Config.Gateway.UserAgent),
+			Timeout:    h.deps.Config.Gateway.Timeout,
+		})
+		if err == nil {
+			publisher = hostClient
+		}
+	}
+
+	result := publisher.Publish(c.Request.Context(), templateUpdateTopic, payload, fwwsbus.PublishOptions{
+		TenantUUID: tenantUUID,
+		TraceID:    traceID,
+	})
+	if result.OK {
+		return
+	}
+
+	h.deps.RuntimeLogger(c.Request.Context(), "templates.wsbus_publish", map[string]any{
+		"topic":        templateUpdateTopic,
+		"action":       strings.TrimSpace(action),
+		"template_id":  tpl.ID,
+		"tenant_uuid":  tenantUUID,
+		"error_code":   strings.TrimSpace(result.ErrorCode),
+		"error_reason": strings.TrimSpace(result.ErrorMessage),
+	}).Warn("template ws event publish failed")
 }

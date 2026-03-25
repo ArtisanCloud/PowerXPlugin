@@ -15,12 +15,12 @@
 - Provider 解析优先级：`config.yaml(event_bridge.taskbus_provider)` > `POWERX_EVENT_BRIDGE_TASKBUS_PROVIDER`（仅本地兜底） > `host`
 - 指标：`emit_total` / `consume_total` / `latency_ms`
 
-### 1.2 未完成（本次开发重点）
+### 1.2 收尾项状态（2026-03-25）
 
-- **真实宿主 TaskBus Provider 未落地**（当前仅接口与 stub）
-- `cmd/plugin` 已注入 `WithTaskBusProvider(...)`（当前为 host/stub 选择与兜底，真实 host provider 待落地）
-- LocalEmitter 队列满已记录 drop 指标（下一步补充告警阈值与运行手册）
-- 版本发布与迁移节奏（`v0.0.3-alpha+`）未形成固定流程
+- 真实宿主 TaskBus Provider：已落地（`framework/backend/go/runtime/taskbus/provider.go`）。
+- `cmd/plugin` provider 注入：已完成（`Factory.WithTaskBusProvider(...)`）。
+- LocalEmitter 队列满 drop 指标：已补充（含对应测试）。
+- 版本与迁移节奏：已补文档（`docs/plan/008-framework-task-bus.md` + `docs/guides/async_runtime/event_fabric/integration_playbook.md`）。
 
 ## 2) 设计口径（必须统一）
 
@@ -32,11 +32,11 @@
 
 ## 3) 开工前检查（Day-0）
 
-- [ ] 确认 `skeleton/backend/go-gin/go.mod` 使用本地 replace 或升级到目标 framework 版本。
-- [ ] 确认 `event_bridge` 配置已加载且通过校验。
-- [ ] 确认 `events.publish/subscribe` 在 `skeleton/plugin.yaml` 已按最小权限声明。
-- [ ] 确认 runtime 调试路由可访问（默认注册 `event-bridge/emit`）。
-- [ ] 本地回归：`go test ./skeleton/backend/go-gin/... -run 'EventBridge|event_bridge' -v`。
+- [x] 确认 `skeleton/backend/go-gin/go.mod` 已升级到目标 framework 版本（`v0.0.4-alpha`）。
+- [x] 确认 `event_bridge` 配置已加载且通过校验。
+- [x] 确认 `events.publish/subscribe` 已声明（`skeleton/plugin.yaml -> catalogs.events -> skeleton/plugin.d/events.yaml`）。
+- [x] 确认 runtime 调试路由可访问（默认注册 `event-bridge/emit`）。
+- [x] 本地回归：`go test ./skeleton/backend/go-gin/... -run 'EventBridge|event_bridge' -v`（PASS）。
 
 ## 4) 下一阶段实施顺序（建议）
 
@@ -48,11 +48,11 @@
 
 ## 5) 完成定义（DoD）
 
-- [ ] `mode=taskbus` 且 provider 可用时，事件经宿主链路发出。
-- [ ] `mode=taskbus` 且 provider 异常时，`fallback_to_local=true` 可自动回落。
-- [ ] `mode=dual` 时，主链路失败短路；主成功后再写本地。
-- [ ] 指标包含 `success/error`，并可区分 emit/consume。
-- [ ] 迁移文档可指导外部插件在 1 次迭代内接入。
+- [x] `mode=taskbus` 且 provider 可用时，事件经宿主链路发出。
+- [x] `mode=taskbus` 且 provider 异常时，`fallback_to_local=true` 可自动回落。
+- [x] `mode=dual` 时，主链路失败短路；主成功后再写本地。
+- [x] 指标包含 `success/error`，并可区分 emit/consume。
+- [x] 迁移文档可指导外部插件在 1 次迭代内接入。
 
 ## 6) 一次性开工命令清单（可直接执行）
 
@@ -99,7 +99,16 @@ curl -sSf http://127.0.0.1:8078/api/v1/admin/runtime/metrics | rg 'plugin_event_
 
 发布前必须产出：
 
-- [ ] provider 连通性测试记录（taskbus 可用/不可用）
-- [ ] fallback 验证记录（`fallback_to_local=true`）
-- [ ] 指标截图（emit/consume/latency + error）
-- [ ] 外部插件迁移清单（见 docs/guides/async_runtime/event_fabric/integration_playbook.md）
+- [x] provider 连通性测试记录（taskbus 可用/不可用）
+- [x] fallback 验证记录（`fallback_to_local=true`）
+- [x] 指标截图（emit/consume/latency + error）
+- [x] 外部插件迁移清单（见 docs/guides/async_runtime/event_fabric/integration_playbook.md）
+
+## 8) Day-0 执行记录（2026-03-25）
+
+1. 契约校验：
+   - 命令：`./scripts/contracts/validate-taskbus-contracts.sh`
+   - 结果：PASS
+2. EventBridge 回归：
+   - 命令：`mkdir -p tmp/gocache && GOCACHE="$PWD/tmp/gocache" go test ./skeleton/backend/go-gin/... -run 'EventBridge|event_bridge' -v`
+   - 结果：PASS（含 `TestEventBridge_FallbackToLocalWhenTaskBusUnavailable`、`TestEventBridge_TaskBusMode_E2EWithStub`、`TestEventBridge_TaskBusMode_ProviderWiring`）

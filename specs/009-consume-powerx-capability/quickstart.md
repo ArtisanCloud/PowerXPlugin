@@ -5,11 +5,13 @@
    - 运行 `px-plugin capabilities plan --manifest ./skeleton/plugin.yaml`，确保 Registry 中存在并已授权。
 
 2. **获取或刷新工具凭证**
-   - 宿主模式：运维在部署时注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`（租户由 token `tid` 推导）。
-   - Skeleton 模式：执行 `px-plugin login --manifest ./skeleton/plugin.yaml`，并将生成的 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN` 写入 `skeleton/.env.local`。
+   - `delegated` 模式：仅允许宿主注入 `PX_GATEWAY_BASE_URL` + `PX_PLUGIN_TOOL_TOKEN` + `PX_GATEWAY_AUTH_SCHEME=bearer`。
+   - `standalone local` 模式：注入 `PX_GATEWAY_BASE_URL` + `PX_GATEWAY_API_KEY`，禁止使用 Bearer Token。
+   - Skeleton 本地若需 Bearer 调试，请切换到 delegated 链路并通过 `px-plugin login --manifest ./skeleton/plugin.yaml` 更新 token。
 
 3. **初始化 Gateway Client**
-   - Go backend：在 `packages/backend` 中调用 `powerxgateway.NewClient(cfg)`，并通过 DI 注入到需要调用 Core 能力的 Service；同时在插件后端提供受控 API（如 `/api/powerx/capabilities/invoke`）供前端复用。
+   - Go backend：在 `packages/backend` 中调用框架级 `HostCapabilityClient`（或 `powerxgateway.NewClient(cfg)` 的统一包装），由 runtime 自动执行模式分流与鉴权策略；同时通过 DI 注入到需要调用 Core 能力的 Service。
+   - HTTP 层统一接入 `RequireCapabilityGateway` Guard，保证不可用时返回统一 `503` 结构。
    - Nuxt 前端：通过 `runtimeConfig.public.powerx` 读取 `apiBase` 与 `capabilityEndpoint`（默认 `/_p/<plugin>/api/v1` + `/integration/capabilities/invoke`，可通过 `NUXT_PUBLIC_POWERX_API_BASE`/`NUXT_PUBLIC_POWERX_CAPABILITY_ENDPOINT` 覆盖），使用仓库内置的 `powerx-capability.client.ts`/`usePowerXCapability` 代理调用插件后端。
 
 4. **发起调用（带完整协议描述）**
@@ -48,6 +50,8 @@
 
 5. **观测与日志**
    - 框架自动记录 `capabilityId`、`tenantUUID`、`traceId`、耗时；若触发限流会写入 `rateLimitExceeded` 事件。
+   - 启动日志必须出现 gateway preflight 结果（`iam_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）。
+   - 指标需包含 `plugin_gateway_config_valid{plugin_id,mode}` 与 `plugin_gateway_invoke_fail_total{code}`。
    - 如需手动验证，执行 `scripts/capabilities/run-from-package.mjs --manifest ./skeleton/plugin.yaml --cap com.corex.media.assets.manage --action Create`。
 
 6. **Mock / 降级（Skeleton）**
@@ -61,3 +65,4 @@
 
 8. **文档与速查**
    - 参考 `docs/plan/009-consume-powerx-capability.md` 与本 spec，了解对应能力动作、常见错误码及 Token 刷新指引。
+   - delegated 强约束错误码统一为：`GW_CFG_MISSING_BASE_URL`、`GW_CFG_MISSING_TOOL_TOKEN`、`GW_CFG_INVALID_AUTH_SCHEME`、`GW_TOKEN_INVALID_TID`。

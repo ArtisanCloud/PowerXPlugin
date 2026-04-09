@@ -98,6 +98,22 @@
 
 ---
 
+## Phase 7: Delegated Gateway Contract v1 (Breaking)
+
+**Purpose**: 收敛 delegated 模式到单一宿主注入契约，消除 token/config fallback。
+
+- [ ] T037 [US1] 在 `framework/backend/go/internal/integration/gateway/client.go` 实现强约束：仅允许 `auth_scheme=bearer`，且仅接受 `PX_PLUGIN_TOOL_TOKEN`；移除 delegated 下 apikey 与自动推断分支。
+- [ ] T038 [US1] 在 `skeleton/backend/go-gin/internal/config/config.go` 删除 delegated 场景 `PX_TOOL_TOKEN`/`PX_GATEWAY_API_KEY` fallback，仅保留 `PX_PLUGIN_TOOL_TOKEN` + `PX_GATEWAY_BASE_URL` + `PX_GATEWAY_AUTH_SCHEME`。
+- [ ] T039 [US1] 在 `skeleton/backend/go-gin/internal/integrations/gateway/client.go` 删除 delegated 下 `PX_TOOL_TOKEN` 与 apikey 兼容逻辑，并增加 `tid` claim 校验（失败返回 `GW_TOKEN_INVALID_TID`）。
+- [ ] T040 [US1] 在 `skeleton/backend/go-gin/cmd/plugin/main.go` 增加 delegated 启动 fail-fast；缺失 `PX_GATEWAY_BASE_URL`/`PX_PLUGIN_TOOL_TOKEN` 或 `auth_scheme!=bearer` 直接退出。
+- [ ] T041 [US1] 新增统一 Gateway Guard（`transport/http/middleware/capability_gateway.go`）并让 `/integration/*` 路由统一返回固定错误结构与错误码。
+- [ ] T042 [US1] 增加指标与日志：`plugin_gateway_config_valid{plugin_id,mode}`、`plugin_gateway_invoke_fail_total{code}`，并固定启动日志字段（`iam_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）。
+- [ ] T043 [US1] 更新文档：`specs/009-*` 与开发指南中删除 `PX_TOOL_TOKEN` delegated 口径，仅保留 `PX_PLUGIN_TOOL_TOKEN`。
+- [ ] T044 [US1] 新增 CI 规则：扫描代码/文档中 delegated 相关逻辑，若新增 `PX_TOOL_TOKEN` 作为 delegated 凭证则失败。
+- [ ] T045 [US1] 与 PowerX 主仓联动补充验收：PostEnable 凭证探活失败时插件状态应为 `enable_failed_missing_gateway_credential`。
+
+---
+
 ## Dependencies & Execution Order
 
 - **Setup → Foundational → User Stories**：Phase 1 与 Phase 2 必须完成后，宿主与 Skeleton 开发才可开始。

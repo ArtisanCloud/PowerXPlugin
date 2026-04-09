@@ -47,6 +47,9 @@ func run(pluginPath, manifestPath, schemaPath, eventFabricPath string, capabilit
 	if err != nil {
 		return fmt.Errorf("load plugin: %w", err)
 	}
+	if err := validateCatalogConflicts(pluginMap); err != nil {
+		return fmt.Errorf("invalid_manifest: %w", err)
+	}
 	if err := mergeCatalogReferences(pluginPath, pluginMap); err != nil {
 		return fmt.Errorf("merge plugin catalogs: %w", err)
 	}
@@ -171,6 +174,42 @@ func mergeCatalogReferences(pluginPath string, plugin map[string]interface{}) er
 		}
 	}
 
+	return nil
+}
+
+func validateCatalogConflicts(plugin map[string]interface{}) error {
+	catalogsValue, ok := plugin["catalogs"]
+	if !ok || catalogsValue == nil {
+		return nil
+	}
+	catalogs, ok := catalogsValue.(map[string]interface{})
+	if !ok {
+		return errors.New("catalogs must be an object")
+	}
+
+	catalogTargets := map[string][]string{
+		"capabilities": {"capabilities"},
+		"events":       {"events"},
+		"agent_tools":  {"agent_tools"},
+		"exposure":     {"exposure"},
+		"rbac":         {"rbac", "permissions", "routes"},
+	}
+
+	for catalogKey, fields := range catalogTargets {
+		rawPath := strings.TrimSpace(stringValue(catalogs, catalogKey))
+		if rawPath == "" {
+			continue
+		}
+		for _, field := range fields {
+			if value, exists := plugin[field]; exists && value != nil {
+				msg := fmt.Sprintf("catalog conflict on field %q (catalog=%s)", field, catalogKey)
+				if catalogKey == "events" && field == "events" {
+					msg += ", remove top-level events and keep plugin.d/events.yaml only"
+				}
+				return errors.New(msg)
+			}
+		}
+	}
 	return nil
 }
 

@@ -13,8 +13,10 @@
    - 通过 Capability Registry `/tenant/capabilities` 获取 `source=corex` 条目（Media/Event/Scheduler/Workflow/Knowledge 等）。
    - 插件在 `skeleton/plugin.yaml` 与宿主部署清单中声明依赖的 Capability ID（如 `com.corex.media.assets.manage`），CI 使用 `px-plugin capabilities plan|apply --manifest ./skeleton/plugin.yaml` 做静态校验。
 2. **鉴权与凭证**
-   - 统一利用 Tool Grant + STS。宿主模式由 Admin 控台自动注入 `PX_PLUGIN_TOOL_TOKEN`，Skeleton 模式通过 `px-plugin login` 获取 `~/.powerx/credentials` 并在本地代理 `PX_TOOL_TOKEN`。
-   - 调用 Integration Gateway HTTP 接口时使用 `Authorization: Bearer <tool-grant-token>`；租户优先从 token `tid` 推导（必要时可显式传 `tenant_uuid` 覆盖）。gRPC 场景通过 Gateway 颁发的 mTLS 证书或互斥 Token。
+   - 统一利用 Tool Grant + STS，但由 framework 在运行时执行模式分流：
+     - `delegated`：仅允许 Bearer（`PX_TOOL_TOKEN`/平台注入 token）
+     - `standalone local`：仅允许 ApiKey（`PX_GATEWAY_API_KEY`）
+   - 运行策略冲突（如 local 下仍使用 Bearer）必须 fail-fast，并在启动日志输出诊断信息。
 3. **调用入口**
    - REST：`POST {GatewayOrigin}/tenant/invocations`，Body 必须包含 `capabilityId/action/preferred_protocol` 与 **完整的协议描述**（`payload.method`、`payload.endpoint`、`payload.query/body/headers`），Gateway 才能根据 `capability_id + method + endpoint` 匹配对应 Adapter；缺少字段会直接在插件后端被拒绝。
    - gRPC：`IntegrationGatewayTenantService.InvokeCapability`，或直接指向模块契约（如 `powerx.media.v1.MediaAssetAdminService`），同样需在 payload 中指明 `preferred_protocol="grpc"` 以及服务/方法名称。
@@ -26,8 +28,8 @@
 | 步骤 | 说明 |
 | --- | --- |
 | 1. 能力申领 | 在 Admin 界面或 `px-plugin capabilities apply` 中勾选 `source=corex` 的能力；Pipeline 校验 Manifest 中的 `requiredCapabilities`。 |
-| 2. SDK 初始化 | 在 `packages/admin` / `packages/backend` 里通过 `@artisan-cloud/plugin-framework-client` 注入 Gateway Client，读取宿主注入的 `PX_PLUGIN_ENV`、`PX_PLUGIN_TOOL_TOKEN`。 |
-| 3. 调用封装 | 后端推荐使用 Go `powerx/integration` SDK（`integration.NewClient().Invoke(ctx, capabilityId, payload)`），并通过插件后端暴露受控 API 给前端复用；保持能力 ID 常量化，便于限流配置。 |
+| 2. SDK 初始化 | 在 `packages/admin` / `packages/backend` 里通过 `@artisan-cloud/plugin-framework-client` 注入 Gateway Client，并读取宿主注入的 `PX_PLUGIN_ENV`、`PX_TOOL_TOKEN`。 |
+| 3. 调用封装 | 后端统一使用 framework Host Capability Client（`integration.NewClient().Invoke(ctx, capabilityId, payload)`），并在 HTTP 入口统一接入 `RequireCapabilityGateway` Guard；保持能力 ID 常量化，便于限流配置。 |
 | 4. 多环境切换 | `PX_GATEWAY_BASE_URL` 在宿主部署中由运维注入；所有调用通过该域名转发，避免直接访问内部微服务。 |
 | 5. 观测回传 | 在插件日志、Metric（如 `plugin_capability_call_duration`）中使用 Gateway 返回的 `traceId`，并通过 `IntegrationGatewayHook` 上报审计事件。 |
 
@@ -123,6 +125,7 @@ export const usePowerXCapabilityBridge = () => {
 1. **Manifest 对齐**：更新 `skeleton/plugin.yaml` 模板，增加 `requiredCapabilities` 示例；`docs/guides/manifest.md` 同步说明。
 2. **Gateway Client 模块化**：
    - Go：在 `packages/backend` 提供 `pkg/powerx/gateway/client.go` 及默认 HTTP handler，封装 `Invoke`、`PresignMedia` 等常用函数并通过插件后端 API 暴露；
+   - 增加运行时策略层：`detectRuntimeGatewayMode + enforceGatewayCredentialPolicy`，并提供统一 `RequireCapabilityGateway`；
    - Nuxt：在 `packages/admin` 增加 `plugins/powerx-capability.client.ts`，仅依赖插件后端 API Base，禁止直接读取 `PX_*` 凭证。
 3. **脚手架命令**：扩展 `scripts/capabilities/run-from-package.mjs`，支持 `--mode skeleton|host`，自动拼装凭证。
 4. **观测对齐**：在 `docs/operations/observability.md` 增加 Gateway trace 采集示例；Go 端默认注入 `log.WithField("traceId", resp.TraceID)`。

@@ -174,6 +174,13 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[R-2] Starting backend service"
+BACKEND_RUNNER_BIN="${ROOT_DIR}/tmp/regression-plugin-bin"
+echo "[R-2] Building backend runner binary"
+(
+  cd "${ROOT_DIR}/skeleton/backend/go-gin"
+  go build -o "${BACKEND_RUNNER_BIN}" ./cmd/plugin
+)
+
 start_backend() {
   local attempts=8
   local attempt=0
@@ -206,7 +213,7 @@ YAML
 
     CONFIG_PATH="$backend_cfg" POWERX_BIND_ADDR=":${BACKEND_PORT}" PORT="${BACKEND_PORT}" \
       POWERX_PROXY=0 IAMMode=local IAM_MODE=local STANDALONE=1 \
-      go run ./skeleton/backend/go-gin/cmd/plugin >"$BACKEND_LOG" 2>&1 &
+      "${BACKEND_RUNNER_BIN}" >"$BACKEND_LOG" 2>&1 &
     backend_pid=$!
     sleep 1
     if kill -0 "$backend_pid" 2>/dev/null; then
@@ -244,7 +251,7 @@ pushd skeleton/web-admin/nuxt > /dev/null
 rm -rf node_modules .nuxt .output
 # 统一在工作区内缓存，避免在容器/不同用户下写入 $HOME 失败或污染宿主缓存。
 export npm_config_cache="${ROOT_DIR}/tmp/npm-cache-web-admin"
-npm ci --include=optional
+npm ci --include=optional --legacy-peer-deps
 # lightningcss 的平台二进制包可能因为 lockfile/跨平台拷贝等原因缺失，导致 Nuxt build 失败。
 # 这里按当前平台显式补齐对应的 lightningcss-<platform> 包（不改 package-lock）。
 need_lightningcss_pkg=0

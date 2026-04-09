@@ -1010,18 +1010,11 @@ func loadEnvConfig(cfg *Config) {
 	if authScheme := resolveConfigValue(os.Getenv("PX_GATEWAY_AUTH_SCHEME")); authScheme != "" {
 		cfg.Gateway.AuthScheme = authScheme
 	}
-	token := firstNonEmpty(
-		resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN")),
-		resolveConfigValue(os.Getenv("PX_TOOL_TOKEN")),
-	)
+	token := resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN"))
 	if token != "" {
 		cfg.Gateway.ToolToken = token
 	}
-	apiKey := firstNonEmpty(
-		resolveConfigValue(os.Getenv("PX_GATEWAY_API_KEY")),
-		resolveConfigValue(os.Getenv("PX_PLUGIN_API_KEY")),
-	)
-	if apiKey != "" {
+	if apiKey := resolveConfigValue(os.Getenv("PX_GATEWAY_API_KEY")); apiKey != "" {
 		cfg.Gateway.APIKey = apiKey
 	}
 	if timeout := resolveConfigValue(os.Getenv("PX_GATEWAY_TIMEOUT")); timeout != "" {
@@ -1116,7 +1109,7 @@ func normalizeConfig(cfg *Config) {
 						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
 						"gateway.token_tid":         tokenTenant,
 						"gateway.tenant_from_token": true,
-					}).Warn("gateway.tenant_uuid differs from PX_TOOL_TOKEN tid; overriding with token tid")
+					}).Warn("gateway.tenant_uuid differs from PX_PLUGIN_TOOL_TOKEN tid; overriding with token tid")
 				}
 				cfg.Gateway.TenantUUID = tokenTenant
 			}
@@ -1294,10 +1287,10 @@ func splitCSV(input string) []string {
 
 func normalizeGatewayAuthScheme(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "apikey", "api_key", "api-key":
-		return "apikey"
 	case "bearer":
 		return "bearer"
+	case "apikey", "api_key", "api-key":
+		return "apikey"
 	default:
 		return ""
 	}
@@ -1319,6 +1312,9 @@ func normalizeGatewayAPIPrefix(raw string) string {
 }
 
 func inferGatewayAuthScheme(toolToken, apiKey string) string {
+	if strings.TrimSpace(toolToken) != "" {
+		return "bearer"
+	}
 	if strings.TrimSpace(apiKey) != "" {
 		return "apikey"
 	}
@@ -1330,12 +1326,12 @@ func hasGatewayCredential(cfg *GatewayConfig) bool {
 		return false
 	}
 	switch normalizeGatewayAuthScheme(cfg.AuthScheme) {
-	case "apikey":
-		return strings.TrimSpace(cfg.APIKey) != ""
 	case "bearer":
 		return strings.TrimSpace(cfg.ToolToken) != ""
+	case "apikey":
+		return strings.TrimSpace(cfg.APIKey) != ""
 	default:
-		return strings.TrimSpace(cfg.ToolToken) != "" || strings.TrimSpace(cfg.APIKey) != ""
+		return false
 	}
 }
 
@@ -1636,14 +1632,15 @@ func (c *Config) Validate() error {
 	if c.Gateway != nil {
 		hasGatewayFields := strings.TrimSpace(c.Gateway.BaseURL) != "" ||
 			strings.TrimSpace(c.Gateway.ToolToken) != "" ||
-			strings.TrimSpace(c.Gateway.APIKey) != ""
+			strings.TrimSpace(c.Gateway.APIKey) != "" ||
+			strings.TrimSpace(c.Gateway.AuthScheme) != ""
 		if hasGatewayFields {
 			c.Gateway.AuthScheme = normalizeGatewayAuthScheme(c.Gateway.AuthScheme)
 			if c.Gateway.AuthScheme == "" {
 				c.Gateway.AuthScheme = inferGatewayAuthScheme(c.Gateway.ToolToken, c.Gateway.APIKey)
 			}
 			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
-				return NewConfigError("gateway config requires base_url and matching credential (bearer: tool_token, apikey: api_key)")
+				return NewConfigError("gateway config requires base_url + credential matching auth_scheme")
 			}
 
 			if c.Gateway.AuthScheme == "bearer" {

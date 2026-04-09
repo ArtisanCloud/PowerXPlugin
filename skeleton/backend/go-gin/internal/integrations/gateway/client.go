@@ -27,6 +27,7 @@ const (
 const (
 	ErrCodeGatewayMissingBaseURL   = "GW_CFG_MISSING_BASE_URL"
 	ErrCodeGatewayMissingToolToken = "GW_CFG_MISSING_TOOL_TOKEN"
+	ErrCodeGatewayMissingAPIKey    = "GW_CFG_MISSING_API_KEY"
 	ErrCodeGatewayInvalidScheme    = "GW_CFG_INVALID_AUTH_SCHEME"
 	ErrCodeGatewayTokenInvalidTID  = "GW_TOKEN_INVALID_TID"
 )
@@ -151,17 +152,22 @@ func NewClient(cfg *config.Config, log *logrus.Entry) *Client {
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
-	if authScheme != "bearer" {
-		cfgErr := newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"})
+	if authScheme == "" {
+		cfgErr := newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer or apikey", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_AUTH_SCHEME"})
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
-	if credential == "" {
+	if authScheme == "bearer" && credential == "" {
 		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingToolToken, "PX_PLUGIN_TOOL_TOKEN is required", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"})
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
-	if tokenTenant := tenantUUIDFromJWT(strings.TrimSpace(gcfg.ToolToken)); tokenTenant == "" {
+	if authScheme == "apikey" && credential == "" {
+		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingAPIKey, "PX_GATEWAY_API_KEY is required", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_API_KEY", "PX_GATEWAY_AUTH_SCHEME=apikey"})
+		c.offlineReason = cfgErr.Error()
+		return c
+	}
+	if authScheme == "bearer" && tenantUUIDFromJWT(strings.TrimSpace(gcfg.ToolToken)) == "" {
 		cfgErr := newGatewayConfigError(ErrCodeGatewayTokenInvalidTID, "PX_PLUGIN_TOOL_TOKEN missing tid claim", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"})
 		c.offlineReason = cfgErr.Error()
 		return c
@@ -501,8 +507,14 @@ func ValidateDelegatedConfig(cfg *config.Config) *GatewayConfigError {
 
 // ValidateConfig 快速检查 Gateway 配置是否就绪（供启动前自检使用）。
 func ValidateConfig(cfg *config.Config) error {
-	if cfgErr := ValidateDelegatedConfig(cfg); cfgErr != nil {
-		return cfgErr
+	if cfg == nil || cfg.Gateway == nil {
+		return errors.New("gateway config missing")
+	}
+	base := effectiveGatewayBaseURL(cfg.Gateway)
+	authScheme := effectiveGatewayAuthScheme(cfg.Gateway)
+	credential := gatewayCredential(cfg.Gateway, authScheme)
+	if base == "" || authScheme == "" || credential == "" {
+		return errors.New("gateway config requires base_url + credential matching auth_scheme")
 	}
 	return nil
 }
@@ -555,7 +567,7 @@ func (c *Client) reconnectTransport() error {
 		BaseURL:        baseURL,
 		AuthScheme:     authScheme,
 		ToolToken:      toolToken,
-		APIKey:         "",
+		APIKey:         strings.TrimSpace(gcfg.APIKey),
 		TenantUUID:     tenantUUID,
 		RequestTimeout: timeout,
 		UserAgent:      strings.TrimSpace(gcfg.UserAgent),
@@ -625,25 +637,37 @@ func effectiveGatewayAuthScheme(gcfg *config.GatewayConfig) string {
 	if gcfg == nil {
 		return "bearer"
 	}
-	if strings.EqualFold(strings.TrimSpace(gcfg.AuthScheme), "bearer") {
+	switch strings.ToLower(strings.TrimSpace(gcfg.AuthScheme)) {
+	case "bearer":
 		return "bearer"
+	case "apikey", "api_key", "api-key":
+		return "apikey"
+	default:
+		return ""
 	}
-	return ""
 }
 
 func gatewayCredential(gcfg *config.GatewayConfig, authScheme string) string {
 	if gcfg == nil {
 		return ""
 	}
-	if authScheme != "bearer" {
+	switch authScheme {
+	case "bearer":
+		return strings.TrimSpace(gcfg.ToolToken)
+	case "apikey":
+		return strings.TrimSpace(gcfg.APIKey)
+	default:
 		return ""
 	}
-	return strings.TrimSpace(gcfg.ToolToken)
 }
 
 func buildGatewayAuthHeader(authScheme, credential string) string {
-	_ = authScheme
-	return "Bearer " + strings.TrimSpace(credential)
+	switch authScheme {
+	case "apikey":
+		return "ApiKey " + strings.TrimSpace(credential)
+	default:
+		return "Bearer " + strings.TrimSpace(credential)
+	}
 }
 
 func gatewayIAMMode(cfg *config.Config) string {
@@ -666,8 +690,16 @@ func newGatewayConfigError(code, msg string, gcfg *config.GatewayConfig, iamMode
 		if strings.EqualFold(strings.TrimSpace(gcfg.AuthScheme), "bearer") {
 			present = append(present, "PX_GATEWAY_AUTH_SCHEME=bearer")
 		}
+		if strings.EqualFold(strings.TrimSpace(gcfg.AuthScheme), "apikey") ||
+			strings.EqualFold(strings.TrimSpace(gcfg.AuthScheme), "api_key") ||
+			strings.EqualFold(strings.TrimSpace(gcfg.AuthScheme), "api-key") {
+			present = append(present, "PX_GATEWAY_AUTH_SCHEME=apikey")
+		}
 		if strings.TrimSpace(gcfg.ToolToken) != "" {
 			present = append(present, "PX_PLUGIN_TOOL_TOKEN")
+		}
+		if strings.TrimSpace(gcfg.APIKey) != "" {
+			present = append(present, "PX_GATEWAY_API_KEY")
 		}
 	}
 	return &GatewayConfigError{

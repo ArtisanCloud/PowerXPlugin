@@ -95,3 +95,4 @@ capabilities:
   required:
     - com.corex.eventfabric.publish
     - com.corex.media.assets.manage
+    - com.corex.notifications.test

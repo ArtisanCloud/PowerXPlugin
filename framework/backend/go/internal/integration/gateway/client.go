@@ -417,21 +417,30 @@ func parseEnvelope(body []byte) restEnvelope {
 func resolveAuth(rawScheme, toolToken, apiKey string) (scheme string, credential string, err error) {
 	scheme = normalizeAuthScheme(rawScheme)
 	bearer := strings.TrimSpace(toolToken)
-	_ = strings.TrimSpace(apiKey)
+	key := strings.TrimSpace(apiKey)
 
-	if scheme != "bearer" {
-		return "", "", errors.New("gateway: auth_scheme must be bearer")
+	switch scheme {
+	case "bearer":
+		if bearer == "" {
+			return "", "", errors.New("gateway: PX_PLUGIN_TOOL_TOKEN is required when auth_scheme=bearer")
+		}
+		return scheme, bearer, nil
+	case "apikey":
+		if key == "" {
+			return "", "", errors.New("gateway: PX_GATEWAY_API_KEY is required when auth_scheme=apikey")
+		}
+		return scheme, key, nil
+	default:
+		return "", "", errors.New("gateway: auth_scheme must be bearer or apikey")
 	}
-	if bearer == "" {
-		return "", "", errors.New("gateway: PX_PLUGIN_TOOL_TOKEN is required when auth_scheme=bearer")
-	}
-	return scheme, bearer, nil
 }
 
 func normalizeAuthScheme(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "bearer":
 		return "bearer"
+	case "apikey", "api_key", "api-key":
+		return "apikey"
 	default:
 		return ""
 	}
@@ -468,7 +477,12 @@ func buildGatewayEndpoint(baseURL, apiPrefix, routePath string) string {
 }
 
 func buildAuthHeader(scheme, credential string) string {
-	return "Bearer " + strings.TrimSpace(credential)
+	switch normalizeAuthScheme(scheme) {
+	case "apikey":
+		return "ApiKey " + strings.TrimSpace(credential)
+	default:
+		return "Bearer " + strings.TrimSpace(credential)
+	}
 }
 
 func extractAuthScheme(authHeader string) string {

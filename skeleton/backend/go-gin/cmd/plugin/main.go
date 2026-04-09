@@ -585,10 +585,12 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 
 	gatewayBaseURL := ""
 	gatewayToken := ""
+	gatewayAPIKey := ""
 	gatewayAuthScheme := ""
 	if cfg != nil && cfg.Gateway != nil {
 		gatewayBaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
 		gatewayToken = strings.TrimSpace(cfg.Gateway.ToolToken)
+		gatewayAPIKey = strings.TrimSpace(cfg.Gateway.APIKey)
 		gatewayAuthScheme = strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
 	}
 
@@ -596,11 +598,18 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 	if gatewayBaseURL == "" {
 		missingGateway = append(missingGateway, "PX_GATEWAY_BASE_URL")
 	}
-	if gatewayAuthScheme != "bearer" {
-		missingGateway = append(missingGateway, "PX_GATEWAY_AUTH_SCHEME=bearer")
-	}
-	if gatewayToken == "" {
-		missingGateway = append(missingGateway, "PX_PLUGIN_TOOL_TOKEN")
+	switch gatewayAuthScheme {
+	case "apikey", "api_key", "api-key":
+		if gatewayAPIKey == "" {
+			missingGateway = append(missingGateway, "PX_GATEWAY_API_KEY")
+		}
+	default:
+		if gatewayAuthScheme != "bearer" {
+			missingGateway = append(missingGateway, "PX_GATEWAY_AUTH_SCHEME=bearer")
+		}
+		if gatewayToken == "" {
+			missingGateway = append(missingGateway, "PX_PLUGIN_TOOL_TOKEN")
+		}
 	}
 	gatewayReady := len(missingGateway) == 0
 

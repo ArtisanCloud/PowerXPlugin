@@ -637,14 +637,20 @@ func effectiveGatewayAuthScheme(gcfg *config.GatewayConfig) string {
 	if gcfg == nil {
 		return "bearer"
 	}
-	switch strings.ToLower(strings.TrimSpace(gcfg.AuthScheme)) {
+	explicit := strings.ToLower(strings.TrimSpace(gcfg.AuthScheme))
+	switch explicit {
 	case "bearer":
 		return "bearer"
 	case "apikey", "api_key", "api-key":
 		return "apikey"
-	default:
-		return ""
 	}
+	if strings.TrimSpace(gcfg.ToolToken) != "" {
+		return "bearer"
+	}
+	if strings.TrimSpace(gcfg.APIKey) != "" {
+		return "apikey"
+	}
+	return ""
 }
 
 func gatewayCredential(gcfg *config.GatewayConfig, authScheme string) string {

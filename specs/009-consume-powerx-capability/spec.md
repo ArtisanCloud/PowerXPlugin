@@ -24,7 +24,7 @@
 
 ### User Story 2 - Skeleton 模式复用同一封装 (Priority: P2)
 
-Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN` 写入 `.env.local`，并使用框架内置的 Go Client 在 Skeleton 后端发起远程调用（前端通过插件后端提供的 API 间接访问 Gateway）或在 Gateway 不可用时切换到 Mock，实现与宿主一致的行为以便预先验证调用链与权限配置。
+Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN` 写入 `.env.local`，并使用框架内置的 Go Client 在 Skeleton 后端发起远程调用（前端通过插件后端提供的 API 间接访问 Gateway）或在 Gateway 不可用时切换到 Mock，实现与宿主一致的行为以便预先验证调用链与权限配置。
 
 **Why this priority**: Skeleton 是插件开发调试的默认入口，若无法直连 PowerX 能力，将导致环境差异和额外搬运成本。
 
@@ -65,7 +65,7 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 
 - **FR-001**: 插件 manifest 与 `skeleton/plugin.yaml` 必须支持声明 `requiredCapabilities`，并在 CI 中通过 `px-plugin capabilities plan|apply --manifest ./skeleton/plugin.yaml` 进行校验，未声明即调用时需阻断。
 - **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK），并通过插件后端对前端暴露统一 API（禁止前端直连 Gateway）。
-- **FR-003**: Gateway Client 必须在运行时自动执行模式分流：`delegated` 模式仅允许 Bearer（`PX_TOOL_TOKEN`/平台注入 token），`standalone local` 模式仅允许 ApiKey（`PX_GATEWAY_API_KEY`）；策略冲突时启动即报错。
+- **FR-003**: Gateway Client 必须在运行时自动执行模式分流：`delegated` 与 `standalone local` 均仅允许 Bearer（`PX_PLUGIN_TOOL_TOKEN`/平台注入 token）；策略冲突时启动即报错。
 - **FR-004**: 所有调用必须由插件后端统一走 `/tenant/invocations` REST 或 `IntegrationGatewayTenantService.InvokeCapability` gRPC，框架不得允许前端或其他组件直接访问底座内部 API。
 - **FR-005**: Gateway Client 需对每次调用自动附带 `capabilityId`、`action`、`payload`、`X-Request-ID`，并把 Gateway 返回的 `traceId` 注入日志与指标。
 - **FR-006**: 当 Gateway 返回限流、鉴权失败或 5xx 错误时，框架需提供标准化错误对象，包含能力 ID、traceId、错误类别，方便业务捕获与重试。
@@ -127,4 +127,4 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 ## Manifest / Docs Consistency（2025-12-22）
 
 - `skeleton/plugin.yaml` → `capabilities.required` 默认示例保持与 Quickstart/Plan 中一致的 CoreX 能力（`com.corex.media.assets.manage`、`com.corex.eventfabric.publish`），`capabilities.provides` 指向 `contracts/capabilities/com.powerx.plugins.base.template.*`，方便 docs/plan/009 引用。
-- `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_GATEWAY_API_KEY/NUXT_PUBLIC_POWERX_*`），并统一说明 delegated/local 的凭证策略与诊断输出，确保读者可在三个入口间互相对照。
+- `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_GATEWAY_AUTH_SCHEME/NUXT_PUBLIC_POWERX_*`），并统一说明 delegated/local 的凭证策略与诊断输出，确保读者可在三个入口间互相对照。

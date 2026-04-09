@@ -33,6 +33,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
+	integrationmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
 	pluginrouter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/router"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
@@ -131,6 +132,24 @@ func main() {
 	}
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
+	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
+	if mode == "" {
+		mode = "unknown"
+	}
+	contractErr := validateDelegatedGatewayContract(cfg, iamResolver.Mode())
+	gatewayFields := gatewayContractLogFields(cfg, mode)
+	gatewayFields["gateway_contract_valid"] = contractErr == nil
+	logger.WithFields(gatewayFields).Info("Gateway contract status")
+	integrationmetrics.SetPluginGatewayConfigValid(app.PluginID, mode, contractErr == nil)
+	if contractErr != nil && iamResolver.Mode() == iamservice.IAMModeDelegated {
+		logger.WithFields(logger.Fields{
+			"code":     contractErr.Code,
+			"required": strings.Join(contractErr.Required, ","),
+			"present":  strings.Join(contractErr.Present, ","),
+			"iam_mode": contractErr.IAMMode,
+		}).WithError(contractErr).Fatal("Delegated gateway contract validation failed")
+	}
+
 	logRuntimeModeMatrix(cfg, iamResolver)
 	auth.ObserveMode(iamResolver.Mode().String())
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
@@ -513,7 +532,7 @@ func ensureToolTokenFresh(ctx context.Context, cfg *config.Config) {
 	expiry, err := capgateway.ParseTokenExpiry(token)
 	log := logger.WithField("component", "gateway_token_monitor")
 	if err != nil {
-		log.WithError(err).Debug("PX_TOOL_TOKEN 无法解析有效期")
+		log.WithError(err).Debug("PX_PLUGIN_TOOL_TOKEN 无法解析有效期")
 		return
 	}
 	now := time.Now().UTC()
@@ -528,16 +547,16 @@ func ensureToolTokenFresh(ctx context.Context, cfg *config.Config) {
 	}
 
 	if now.After(expiry) || expiry.Sub(now) < 24*time.Hour {
-		log.WithFields(fields).Info("PX_TOOL_TOKEN 即将过期，尝试使用 PX_TOOL_REFRESH_TOKEN 自动刷新")
+		log.WithFields(fields).Info("PX_PLUGIN_TOOL_TOKEN 即将过期，尝试使用 PX_TOOL_REFRESH_TOKEN 自动刷新")
 		newToken, _, err := capgateway.RefreshToolToken(ctx, cfg)
 		if err != nil {
-			log.WithError(err).Error("PX_TOOL_TOKEN 刷新失败，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml`")
+			log.WithError(err).Error("PX_PLUGIN_TOOL_TOKEN 刷新失败，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml`")
 			return
 		}
 		if nextExpiry, err := capgateway.ParseTokenExpiry(newToken); err == nil {
 			fields["expiresAt"] = nextExpiry.UTC().Format(time.RFC3339)
 		}
-		log.WithFields(fields).Info("PX_TOOL_TOKEN 已自动刷新，请同步更新 skeleton/.env.local 中的 PX_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN")
+		log.WithFields(fields).Info("PX_PLUGIN_TOOL_TOKEN 已自动刷新，请同步更新 skeleton/.env.local 中的 PX_PLUGIN_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN")
 		return
 	}
 	logTokenExpiryStatus(log, now, expiry, fields)
@@ -545,14 +564,14 @@ func ensureToolTokenFresh(ctx context.Context, cfg *config.Config) {
 
 func logTokenExpiryStatus(log *logrus.Entry, now, expiry time.Time, fields logger.Fields) {
 	if now.After(expiry) {
-		log.WithFields(fields).Error("PX_TOOL_TOKEN 已过期，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 刷新凭证")
+		log.WithFields(fields).Error("PX_PLUGIN_TOOL_TOKEN 已过期，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 刷新凭证")
 		return
 	}
 	if expiry.Sub(now) < 24*time.Hour {
-		log.WithFields(fields).Warn("PX_TOOL_TOKEN 将在 24 小时内过期，请尽快运行 `px-plugin login` 刷新凭证，或设置 PX_TOOL_REFRESH_TOKEN 以便自动刷新")
+		log.WithFields(fields).Warn("PX_PLUGIN_TOOL_TOKEN 将在 24 小时内过期，请尽快运行 `px-plugin login` 刷新凭证，或设置 PX_TOOL_REFRESH_TOKEN 以便自动刷新")
 		return
 	}
-	log.WithFields(fields).Info("PX_TOOL_TOKEN 有效")
+	log.WithFields(fields).Info("PX_PLUGIN_TOOL_TOKEN 有效")
 }
 
 func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMResolver) {
@@ -566,28 +585,22 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 
 	gatewayBaseURL := ""
 	gatewayToken := ""
-	gatewayAPIKey := ""
 	gatewayAuthScheme := ""
 	if cfg != nil && cfg.Gateway != nil {
 		gatewayBaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
 		gatewayToken = strings.TrimSpace(cfg.Gateway.ToolToken)
-		gatewayAPIKey = strings.TrimSpace(cfg.Gateway.APIKey)
 		gatewayAuthScheme = strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
 	}
 
-	missingGateway := make([]string, 0, 2)
+	missingGateway := make([]string, 0, 3)
 	if gatewayBaseURL == "" {
 		missingGateway = append(missingGateway, "PX_GATEWAY_BASE_URL")
 	}
-	switch gatewayAuthScheme {
-	case "apikey", "api_key", "api-key":
-		if gatewayAPIKey == "" {
-			missingGateway = append(missingGateway, "PX_GATEWAY_API_KEY")
-		}
-	default:
-		if gatewayToken == "" && gatewayAPIKey == "" {
-			missingGateway = append(missingGateway, "PX_TOOL_TOKEN/PX_GATEWAY_API_KEY")
-		}
+	if gatewayAuthScheme != "bearer" {
+		missingGateway = append(missingGateway, "PX_GATEWAY_AUTH_SCHEME=bearer")
+	}
+	if gatewayToken == "" {
+		missingGateway = append(missingGateway, "PX_PLUGIN_TOOL_TOKEN")
 	}
 	gatewayReady := len(missingGateway) == 0
 
@@ -648,7 +661,31 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 	if proxyEnabled && !gatewayReady {
 		logger.WithFields(logger.Fields{
 			"missing": strings.Join(missingGateway, ","),
-		}).Warn("宿主链路已启用，但 PX_GATEWAY_* 不完整；WS/能力注册可能失败")
+		}).Warn("宿主链路已启用，但 delegated gateway contract 未满足；WS/能力注册可能失败")
+	}
+}
+
+func validateDelegatedGatewayContract(cfg *config.Config, mode iamservice.IAMMode) *capgateway.GatewayConfigError {
+	if mode != iamservice.IAMModeDelegated {
+		return nil
+	}
+	return capgateway.ValidateDelegatedConfig(cfg)
+}
+
+func gatewayContractLogFields(cfg *config.Config, mode string) logger.Fields {
+	authScheme := ""
+	baseURLPresent := false
+	toolTokenPresent := false
+	if cfg != nil && cfg.Gateway != nil {
+		authScheme = strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
+		baseURLPresent = strings.TrimSpace(cfg.Gateway.BaseURL) != ""
+		toolTokenPresent = strings.TrimSpace(cfg.Gateway.ToolToken) != ""
+	}
+	return logger.Fields{
+		"iam_mode":                 mode,
+		"gateway_base_url_present": baseURLPresent,
+		"tool_token_present":       toolTokenPresent,
+		"auth_scheme":              authScheme,
 	}
 }
 

@@ -6,8 +6,8 @@
 
 2. **获取或刷新工具凭证**
    - `delegated` 模式：仅允许宿主注入 `PX_GATEWAY_BASE_URL` + `PX_PLUGIN_TOOL_TOKEN` + `PX_GATEWAY_AUTH_SCHEME=bearer`。
-   - `standalone local` 模式：注入 `PX_GATEWAY_BASE_URL` + `PX_GATEWAY_API_KEY`，禁止使用 Bearer Token。
-   - Skeleton 本地若需 Bearer 调试，请切换到 delegated 链路并通过 `px-plugin login --manifest ./skeleton/plugin.yaml` 更新 token。
+   - `standalone local` 模式：同样注入 `PX_GATEWAY_BASE_URL` + `PX_PLUGIN_TOOL_TOKEN` + `PX_GATEWAY_AUTH_SCHEME=bearer`，不再走 ApiKey 双轨。
+   - Skeleton 本地通过 `px-plugin login --manifest ./skeleton/plugin.yaml` 更新 token。
 
 3. **初始化 Gateway Client**
    - Go backend：在 `packages/backend` 中调用框架级 `HostCapabilityClient`（或 `powerxgateway.NewClient(cfg)` 的统一包装），由 runtime 自动执行模式分流与鉴权策略；同时通过 DI 注入到需要调用 Core 能力的 Service。
@@ -66,3 +66,4 @@
 8. **文档与速查**
    - 参考 `docs/plan/009-consume-powerx-capability.md` 与本 spec，了解对应能力动作、常见错误码及 Token 刷新指引。
    - delegated 强约束错误码统一为：`GW_CFG_MISSING_BASE_URL`、`GW_CFG_MISSING_TOOL_TOKEN`、`GW_CFG_INVALID_AUTH_SCHEME`、`GW_TOKEN_INVALID_TID`。
+   - 与 PowerX 主仓联调时，PostEnable 凭证探活失败应标记插件状态为 `enable_failed_missing_gateway_credential`。

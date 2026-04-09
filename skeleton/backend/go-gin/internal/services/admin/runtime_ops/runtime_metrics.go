@@ -11,6 +11,7 @@ import (
 	authmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	customermetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/customer"
 	ebmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/event_bridge"
+	integrationmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
 	secmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 )
 
@@ -234,6 +235,7 @@ func renderMetrics(w io.Writer) {
 	authmetrics.RenderMetrics(w)
 	secmetrics.RenderMetrics(w)
 	customermetrics.RenderMetrics(w)
+	integrationmetrics.RenderMetrics(w)
 	ebmetrics.RenderPrometheus(w)
 }
 

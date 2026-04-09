@@ -1010,19 +1010,9 @@ func loadEnvConfig(cfg *Config) {
 	if authScheme := resolveConfigValue(os.Getenv("PX_GATEWAY_AUTH_SCHEME")); authScheme != "" {
 		cfg.Gateway.AuthScheme = authScheme
 	}
-	token := firstNonEmpty(
-		resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN")),
-		resolveConfigValue(os.Getenv("PX_TOOL_TOKEN")),
-	)
+	token := resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN"))
 	if token != "" {
 		cfg.Gateway.ToolToken = token
-	}
-	apiKey := firstNonEmpty(
-		resolveConfigValue(os.Getenv("PX_GATEWAY_API_KEY")),
-		resolveConfigValue(os.Getenv("PX_PLUGIN_API_KEY")),
-	)
-	if apiKey != "" {
-		cfg.Gateway.APIKey = apiKey
 	}
 	if timeout := resolveConfigValue(os.Getenv("PX_GATEWAY_TIMEOUT")); timeout != "" {
 		if d, err := time.ParseDuration(timeout); err == nil {
@@ -1101,12 +1091,12 @@ func normalizeConfig(cfg *Config) {
 		cfg.Gateway.APIPrefix = normalizeGatewayAPIPrefix(resolveConfigValue(cfg.Gateway.APIPrefix))
 		cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(resolveConfigValue(cfg.Gateway.AuthScheme))
 		cfg.Gateway.ToolToken = resolveConfigValue(cfg.Gateway.ToolToken)
-		cfg.Gateway.APIKey = resolveConfigValue(cfg.Gateway.APIKey)
+		cfg.Gateway.APIKey = ""
 		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
 		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
 
 		if cfg.Gateway.AuthScheme == "" {
-			cfg.Gateway.AuthScheme = inferGatewayAuthScheme(cfg.Gateway.ToolToken, cfg.Gateway.APIKey)
+			cfg.Gateway.AuthScheme = "bearer"
 		}
 
 		if cfg.Gateway.AuthScheme == "bearer" {
@@ -1116,7 +1106,7 @@ func normalizeConfig(cfg *Config) {
 						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
 						"gateway.token_tid":         tokenTenant,
 						"gateway.tenant_from_token": true,
-					}).Warn("gateway.tenant_uuid differs from PX_TOOL_TOKEN tid; overriding with token tid")
+					}).Warn("gateway.tenant_uuid differs from PX_PLUGIN_TOOL_TOKEN tid; overriding with token tid")
 				}
 				cfg.Gateway.TenantUUID = tokenTenant
 			}
@@ -1127,10 +1117,9 @@ func normalizeConfig(cfg *Config) {
 		if cfg.Logging != nil && cfg.Logging.DebugMode {
 			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
 			toolToken := strings.TrimSpace(cfg.Gateway.ToolToken)
-			apiKey := strings.TrimSpace(cfg.Gateway.APIKey)
 			tenantUUID := strings.TrimSpace(cfg.Gateway.TenantUUID)
 
-			hasAny := baseURL != "" || toolToken != "" || apiKey != ""
+			hasAny := baseURL != "" || toolToken != ""
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
 
 			if hasAny && incomplete {
@@ -1138,14 +1127,12 @@ func normalizeConfig(cfg *Config) {
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.tool_token":  toolToken != "",
-					"gateway.api_key":     apiKey != "",
 					"gateway.tenant_uuid": tenantUUID,
 				}).Warn("Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
 
 				cfg.Gateway.BaseURL = ""
 				cfg.Gateway.AuthScheme = ""
 				cfg.Gateway.ToolToken = ""
-				cfg.Gateway.APIKey = ""
 				cfg.Gateway.TenantUUID = ""
 			}
 		}
@@ -1294,8 +1281,6 @@ func splitCSV(input string) []string {
 
 func normalizeGatewayAuthScheme(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "apikey", "api_key", "api-key":
-		return "apikey"
 	case "bearer":
 		return "bearer"
 	default:
@@ -1319,9 +1304,8 @@ func normalizeGatewayAPIPrefix(raw string) string {
 }
 
 func inferGatewayAuthScheme(toolToken, apiKey string) string {
-	if strings.TrimSpace(apiKey) != "" {
-		return "apikey"
-	}
+	_ = strings.TrimSpace(apiKey)
+	_ = strings.TrimSpace(toolToken)
 	return "bearer"
 }
 
@@ -1329,14 +1313,10 @@ func hasGatewayCredential(cfg *GatewayConfig) bool {
 	if cfg == nil {
 		return false
 	}
-	switch normalizeGatewayAuthScheme(cfg.AuthScheme) {
-	case "apikey":
-		return strings.TrimSpace(cfg.APIKey) != ""
-	case "bearer":
-		return strings.TrimSpace(cfg.ToolToken) != ""
-	default:
-		return strings.TrimSpace(cfg.ToolToken) != "" || strings.TrimSpace(cfg.APIKey) != ""
+	if normalizeGatewayAuthScheme(cfg.AuthScheme) != "bearer" {
+		return false
 	}
+	return strings.TrimSpace(cfg.ToolToken) != ""
 }
 
 // GetString 获取字符串配置，支持默认值
@@ -1636,14 +1616,14 @@ func (c *Config) Validate() error {
 	if c.Gateway != nil {
 		hasGatewayFields := strings.TrimSpace(c.Gateway.BaseURL) != "" ||
 			strings.TrimSpace(c.Gateway.ToolToken) != "" ||
-			strings.TrimSpace(c.Gateway.APIKey) != ""
+			strings.TrimSpace(c.Gateway.AuthScheme) != ""
 		if hasGatewayFields {
 			c.Gateway.AuthScheme = normalizeGatewayAuthScheme(c.Gateway.AuthScheme)
 			if c.Gateway.AuthScheme == "" {
 				c.Gateway.AuthScheme = inferGatewayAuthScheme(c.Gateway.ToolToken, c.Gateway.APIKey)
 			}
 			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
-				return NewConfigError("gateway config requires base_url and matching credential (bearer: tool_token, apikey: api_key)")
+				return NewConfigError("gateway config requires base_url + auth_scheme=bearer + tool_token")
 			}
 
 			if c.Gateway.AuthScheme == "bearer" {

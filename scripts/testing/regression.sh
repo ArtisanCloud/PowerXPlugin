@@ -186,11 +186,16 @@ server:
   bind_addr: ":${BACKEND_PORT}"
   log_level: "debug"
   dev_mode: true
+context:
+  iam_mode: "local"
 database:
   driver: "memory"
   dsn: "file:powerxplugin-regression?mode=memory&cache=shared"
 grpc_server:
   enable: false
+runtime:
+  event_bridge:
+    taskbus_provider: "redis"
 gateway:
   base_url: ""
   tool_token: ""
@@ -200,6 +205,7 @@ gateway:
 YAML
 
     CONFIG_PATH="$backend_cfg" POWERX_BIND_ADDR=":${BACKEND_PORT}" PORT="${BACKEND_PORT}" \
+      POWERX_PROXY=0 IAMMode=local IAM_MODE=local STANDALONE=1 \
       go run ./skeleton/backend/go-gin/cmd/plugin >"$BACKEND_LOG" 2>&1 &
     backend_pid=$!
     sleep 1

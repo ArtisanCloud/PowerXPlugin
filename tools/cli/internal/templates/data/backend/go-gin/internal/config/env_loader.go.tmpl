@@ -79,6 +79,11 @@ func loadEnvFile(path string) {
 		if !ok {
 			continue
 		}
+		// Keep process-level env as highest priority: do not override keys
+		// that were already injected by caller/runner.
+		if _, exists := os.LookupEnv(key); exists {
+			continue
+		}
 		_ = os.Setenv(key, val)
 		loaded++
 	}

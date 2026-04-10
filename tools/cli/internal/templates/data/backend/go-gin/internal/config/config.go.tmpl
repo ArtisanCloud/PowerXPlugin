@@ -1632,8 +1632,7 @@ func (c *Config) Validate() error {
 	if c.Gateway != nil {
 		hasGatewayFields := strings.TrimSpace(c.Gateway.BaseURL) != "" ||
 			strings.TrimSpace(c.Gateway.ToolToken) != "" ||
-			strings.TrimSpace(c.Gateway.APIKey) != "" ||
-			strings.TrimSpace(c.Gateway.AuthScheme) != ""
+			strings.TrimSpace(c.Gateway.APIKey) != ""
 		if hasGatewayFields {
 			c.Gateway.AuthScheme = normalizeGatewayAuthScheme(c.Gateway.AuthScheme)
 			if c.Gateway.AuthScheme == "" {

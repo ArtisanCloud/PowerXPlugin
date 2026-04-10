@@ -55,6 +55,7 @@ type InvokeRequest struct {
 	RequestID         string
 	Headers           map[string]string
 	TenantUUID        string
+	DisableAuth       bool
 }
 
 // GatewayError 映射 Gateway 返回的错误条目。
@@ -208,7 +209,9 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
-	httpReq.Header.Set("Authorization", buildAuthHeader(c.authScheme, c.credential))
+	if !req.DisableAuth {
+		httpReq.Header.Set("Authorization", buildAuthHeader(c.authScheme, c.credential))
+	}
 	httpReq.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
 		httpReq.Header.Set("User-Agent", c.userAgent)
@@ -291,10 +294,13 @@ func (c *Client) InvokeGRPC(ctx context.Context, req InvokeRequest) (*Response, 
 		RequestId:    requestID,
 	}
 
-	md := metadata.New(map[string]string{
-		"authorization": buildAuthHeader(c.authScheme, c.credential),
-		"x-request-id":  requestID,
-	})
+	mdValues := map[string]string{
+		"x-request-id": requestID,
+	}
+	if !req.DisableAuth {
+		mdValues["authorization"] = buildAuthHeader(c.authScheme, c.credential)
+	}
+	md := metadata.New(mdValues)
 	ctxCall, cancel := context.WithTimeout(ctx, c.requestTimeout)
 	defer cancel()
 	ctxCall = metadata.NewOutgoingContext(ctxCall, md)

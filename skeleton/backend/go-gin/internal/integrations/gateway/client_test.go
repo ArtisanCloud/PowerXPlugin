@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -78,11 +79,13 @@ func TestInvokeUsesRealTransport(t *testing.T) {
 }
 
 type stubTransport struct {
-	resp *frameworkgateway.Response
-	err  error
+	resp    *frameworkgateway.Response
+	err     error
+	lastReq frameworkgateway.InvokeRequest
 }
 
 func (s *stubTransport) Invoke(ctx context.Context, req frameworkgateway.InvokeRequest) (*frameworkgateway.Response, error) {
+	s.lastReq = req
 	return s.resp, s.err
 }
 
@@ -180,4 +183,108 @@ func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 
 	_, listErr := client.ListPlatformCapabilities(context.Background(), ListPlatformCapabilitiesOptions{Source: "corex"})
 	require.Error(t, listErr)
+}
+
+func TestInvokePolicyRequiresRequestAuthorization(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: &config.GatewayConfig{
+			BaseURL:   "https://gateway.dev.powerx",
+			ToolToken: "token",
+		},
+	}
+	client := NewClient(cfg, nil)
+	client.transport = &stubTransport{
+		resp: &frameworkgateway.Response{TraceID: "trace-1", Status: "ok"},
+	}
+	_, err := client.Invoke(context.Background(), InvokeParams{
+		CapabilityID: "com.corex.media.assets.manage",
+		Action:       "List",
+		AuthRequired: true,
+	})
+	var policyErr *PolicyError
+	require.Error(t, err)
+	require.True(t, errors.As(err, &policyErr))
+	require.Equal(t, "GW_POLICY_AUTH_REQUIRED", policyErr.Code)
+}
+
+func TestInvokePolicyTenantScopedRequiresTenantClaim(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: &config.GatewayConfig{
+			BaseURL:   "https://gateway.dev.powerx",
+			ToolToken: "token",
+		},
+	}
+	client := NewClient(cfg, nil)
+	client.transport = &stubTransport{
+		resp: &frameworkgateway.Response{TraceID: "trace-2", Status: "ok"},
+	}
+	_, err := client.Invoke(context.Background(), InvokeParams{
+		CapabilityID: "com.corex.media.assets.manage",
+		Action:       "List",
+		AuthRequired: true,
+		TenantScoped: true,
+		Headers: map[string]string{
+			"Authorization": "Bearer no-tenant-claim",
+		},
+	})
+	var policyErr *PolicyError
+	require.Error(t, err)
+	require.True(t, errors.As(err, &policyErr))
+	require.Equal(t, "GW_POLICY_TENANT_TOKEN_REQUIRED", policyErr.Code)
+}
+
+func TestInvokePolicyAllowsAnonymousAndDisablesDefaultAuth(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: &config.GatewayConfig{
+			BaseURL:   "https://gateway.dev.powerx",
+			ToolToken: "token",
+		},
+	}
+	client := NewClient(cfg, nil)
+	stub := &stubTransport{
+		resp: &frameworkgateway.Response{TraceID: "trace-3", Status: "ok"},
+	}
+	client.transport = stub
+	_, err := client.Invoke(context.Background(), InvokeParams{
+		CapabilityID: "com.corex.public.ping",
+		Action:       "GET",
+		AuthRequired: false,
+	})
+	require.NoError(t, err)
+	require.True(t, stub.lastReq.DisableAuth)
+}
+
+func TestInvokePolicyTenantScopedUsesTokenTid(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: &config.GatewayConfig{
+			BaseURL:   "https://gateway.dev.powerx",
+			ToolToken: "token",
+		},
+	}
+	client := NewClient(cfg, nil)
+	stub := &stubTransport{
+		resp: &frameworkgateway.Response{TraceID: "trace-4", Status: "ok"},
+	}
+	client.transport = stub
+
+	tenantID := "11111111-1111-1111-1111-111111111111"
+	jwt := buildTestJWTWithTenant(tenantID)
+	_, err := client.Invoke(context.Background(), InvokeParams{
+		CapabilityID: "com.corex.media.assets.manage",
+		Action:       "List",
+		AuthRequired: true,
+		TenantScoped: true,
+		Headers: map[string]string{
+			"Authorization": "Bearer " + jwt,
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, tenantID, stub.lastReq.TenantUUID)
+	require.False(t, stub.lastReq.DisableAuth)
+}
+
+func buildTestJWTWithTenant(tid string) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"tid":"%s"}`, tid)))
+	return header + "." + payload + "."
 }

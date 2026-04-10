@@ -87,9 +87,8 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 - **前端** 永远只访问插件后端（宿主反代 `/_p/<plugin-id>/api/v1`，本地 Skeleton 为 `http://127.0.0.1:8078/api/v1`）。
 - **后端** 读取统一环境变量：
   - `PX_GATEWAY_BASE_URL`
-  - `PX_GATEWAY_AUTH_SCHEME`（可选：`bearer` / `apikey`）
-  - `PX_PLUGIN_TOOL_TOKEN`（宿主）/`PX_TOOL_TOKEN`（Skeleton，Bearer 场景）
-  - `PX_GATEWAY_API_KEY`（ApiKey 场景）
+  - `PX_PLUGIN_TOOL_TOKEN`
+  - `PX_GATEWAY_AUTH_SCHEME`（固定 `bearer`）
   - 租户在 proxy 场景由底座按凭证解析；Bearer 本地兼容场景才会使用 token `tid` 推导
   - `PX_GATEWAY_CONTRACT_VERSION`（可选，配合 `dist/capability-contracts.json` 校验契约版本）
 - **Gateway Client** 负责注入 `Authorization`、`X-Request-ID`，并输出 TraceId、限流事件等观测数据；`tenant_uuid` 并非所有模式都强制透传（proxy 场景通常由底座按凭证解析）。
@@ -97,7 +96,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 > **环境加载与模式说明**：
 >
 > - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`），并覆盖 `config.yaml` 中同名配置。
-> - 宿主模式要求 `POWERX_PROXY=1`，并至少提供一套可用凭证（Bearer 或 ApiKey）；否则会返回 503。
+> - 宿主模式要求 `POWERX_PROXY=1`，并提供 `PX_GATEWAY_BASE_URL + PX_PLUGIN_TOOL_TOKEN + PX_GATEWAY_AUTH_SCHEME=bearer`；否则会返回 503。
 > - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`IAM_MODE=local`），会覆盖 `.env` 的值，请先清理。
 
 ### Gateway API 前缀规范（含 WS-Bus）
@@ -109,29 +108,27 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
   - 若你的网关是 `/api/v1`：`PX_GATEWAY_API_PREFIX=/api/v1`
   - 若你的网关是 `/api`：`PX_GATEWAY_API_PREFIX=/api`
 
-### 鉴权规范（重点：API Key 在什么模式下使用）
+### 鉴权规范（framework 统一策略）
 
-为避免各插件实现不一致，统一按下列规则使用 Gateway 鉴权：
+为避免各插件实现不一致，统一由 framework 执行模式分流与凭证策略：
 
-| 运行形态 | 是否使用 `PX_GATEWAY_AUTH_SCHEME` | 推荐凭证 | 说明 |
+| 运行形态 | 是否手动指定 auth scheme | 推荐凭证 | 说明 |
 | --- | --- | --- | --- |
-| 宿主 Delegated（平台注入凭证） | 可选（通常无需手动设置） | `PX_PLUGIN_TOOL_TOKEN`（Bearer）优先，按平台要求可使用 `PX_GATEWAY_API_KEY` | 默认推荐 Bearer；若平台明确要求 ApiKey，以平台注入为准。 |
-| Standalone（本地/独立运行） | 是 | `PX_TOOL_TOKEN`（Bearer）优先，必要时 `PX_GATEWAY_API_KEY` | 仅在自管凭证时才需要显式设置 `PX_GATEWAY_AUTH_SCHEME`。 |
-| Standalone + Proxy（`POWERX_PROXY=1` 但非平台托管） | 是 | `PX_TOOL_TOKEN`（Bearer）优先，必要时 `PX_GATEWAY_API_KEY` | 这是你当前提到的场景：可选 `bearer/apikey`，由插件侧环境变量决定。 |
+| Delegated（宿主/代理） | 否（由 runtime 决策） | `PX_PLUGIN_TOOL_TOKEN`（Bearer） | 必须走 Bearer；缺失任一契约变量即 fail-fast。 |
+| Standalone Local | 否（由 runtime 决策） | `PX_PLUGIN_TOOL_TOKEN`（Bearer） | 本地联调也复用 Bearer 契约，避免双轨策略。 |
 
-实现判定规则（与当前代码一致）：
+实现判定规则（framework 目标）：
 
-1. 若 `PX_GATEWAY_AUTH_SCHEME=apikey`，则发送 `Authorization: ApiKey <key>`；
-2. 若 `PX_GATEWAY_AUTH_SCHEME=bearer`，则发送 `Authorization: Bearer <token>`；
-3. 若未显式设置 `PX_GATEWAY_AUTH_SCHEME`：
-   - 有 `PX_GATEWAY_API_KEY` 且无 token -> 自动按 `apikey`；
-   - 其他情况 -> 默认 `bearer`。
+1. 先根据 runtime 模式判定 `delegated` 或 `standalone local`；
+2. `delegated` 强制 `Authorization: Bearer <token>`；
+3. `standalone local` 同样使用 `Authorization: Bearer <token>`；
+4. 模式与凭证不匹配时，启动期直接报错并给出诊断字段（mode/required_credential/base_url_configured）。
 
 建议：
 
-- 多数插件保持 `bearer`（与宿主一致），减少环境差异；
-- 只有在明确要求 API Key 的网关环境下，才启用 `PX_GATEWAY_AUTH_SCHEME=apikey` 并配置 `PX_GATEWAY_API_KEY`；
-- 不要同时混用多套来源，优先保证一套凭证可追踪（推荐优先 `PX_PLUGIN_TOOL_TOKEN`/`PX_TOOL_TOKEN`）。
+- 插件业务 Handler 不要再手写 `bearer/apikey` 分支；
+- 统一复用 framework Host Capability Client + `RequireCapabilityGateway` Guard；
+- 保持“一种模式一套凭证”，避免混用造成线上不可预测行为。
 
 ## 2. 前提条件
 
@@ -139,7 +136,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 | --- | --- |
 | Manifest | `skeleton/plugin.yaml` 中声明 `capabilities.required`（需要调用的 `source=corex` 能力）与 `capabilities.provides`（插件自身提供的能力）。提交前运行 `node scripts/capabilities/validate-capabilities.mjs --manifest ./skeleton/plugin.yaml`。 |
 | 底座能力参考 | 查阅 PowerX 底座文档 `PowerX/docs/guides/develop/open_capability`，了解 Media/Event/Workflow/Knowledge 模块的 `capability_id`、REST/gRPC 协议、示例命令。 |
-| 凭证 | 宿主：平台在部署时注入 `PX_GATEWAY_BASE_URL` 与可用凭证（`PX_PLUGIN_TOOL_TOKEN` 或 `PX_GATEWAY_API_KEY`，租户由底座按凭证解析）。Skeleton：执行 `px-plugin login --manifest ./skeleton/plugin.yaml`（待 CLI 提供），或手动写入 `skeleton/.env.local`。 |
+| 凭证 | 宿主/Delegated：注入 `PX_GATEWAY_BASE_URL + PX_PLUGIN_TOOL_TOKEN + PX_GATEWAY_AUTH_SCHEME=bearer`。Skeleton Local：通过 `px-plugin login` 获取并写入同一组变量，保证与宿主一致。 |
 | CLI & 工具 | `scripts/capabilities/run-from-package.mjs`（手动触发能力调用）、`px-plugin capabilities quota --manifest ...`（为租户配置配额/限流样例）。 |
 
 ## 3. 宿主（Delegated）模式
@@ -151,6 +148,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 3. **后端封装**：
    - `framework/backend/go/internal/services/capability_invoker` 作为唯一入口，提供 `Invoke(ctx, capabilityId, action, payload)`。
    - `framework/backend/go/router/router.go` 暴露 `/api/v1/integration/capabilities/invoke`，接入前端/CLI。
+   - HTTP handler 统一调用 `transport/http/middleware.RequireCapabilityGateway`，确保网关不可用时输出一致的 503 结构。
 4. **前端调用**：
    - 使用 `framework/frontend/nuxt/framework-admin/layer/app/plugins/powerx-capability.client.ts` 或 `usePowerXCapability` composable，调用插件后端 API。
    - 支持在 UI 中展示 Gateway TraceId、Mock 提示、警告（如契约版本过期 -> 服务端会设置 `X-PowerX-Contract-Status` header）。
@@ -161,9 +159,9 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 ## 4. Skeleton（Standalone）模式
 
 1. **环境准备**：
-   - `px-plugin login --manifest ./skeleton/plugin.yaml`（或根据 Plan 中的 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`）。
-   - `skeleton/backend/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
-   - 如果设置了 `PX_TOOL_REFRESH_TOKEN`，Skeleton 在启动时会在 Token 过期或 24h 内到期时自动调用 `POST /admin/user/auth/refresh` 刷新 `PX_TOOL_TOKEN`，刷新结果会写回进程环境（仍需你手动同步到 `.env.local` 保证下次启动可用）。
+   - `px-plugin login --manifest ./skeleton/plugin.yaml`（或根据 Plan 中的 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`）。
+   - `skeleton/backend/.env.example` 已提供模板：默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`，并给出占位的 `PX_PLUGIN_TOOL_TOKEN/PX_TOOL_REFRESH_TOKEN`。复制为 `.env.local` 后务必替换为真实值，否则 `/api/v1/integration/capabilities/invoke` 会返回 503。若暂时没有凭证，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
+   - 如果设置了 `PX_TOOL_REFRESH_TOKEN`，Skeleton 在启动时会在 Token 过期或 24h 内到期时自动调用 `POST /admin/user/auth/refresh` 刷新 `PX_PLUGIN_TOOL_TOKEN`，刷新结果会写回进程环境（仍需你手动同步到 `.env.local` 保证下次启动可用）。
    - 可选：`PX_USE_MOCK=<module>` 用于 Dev Gateway 不可达时的 Mock。
 2. **后端配置**：
    - `skeleton/backend/go-gin/internal/integrations/gateway` 包装框架 Gateway Client，支持 Mock/离线提示。
@@ -220,7 +218,7 @@ Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“�
 | 问题 | 原因/排查 |
 | --- | --- |
 | `gateway: base URL is required` | 未注入 `PX_GATEWAY_BASE_URL`；检查宿主部署或 Skeleton `.env.local`。 |
-| `Authorization` 相关 401 | 凭证缺失/过期，或 `PX_GATEWAY_AUTH_SCHEME` 与凭证不匹配；检查 `PX_PLUGIN_TOOL_TOKEN/PX_TOOL_TOKEN/PX_GATEWAY_API_KEY`。 |
+| `Authorization` 相关 401 | 凭证缺失/过期，或运行模式与凭证策略不匹配；检查 delegated 是否提供 `PX_PLUGIN_TOOL_TOKEN`、local 是否提供 `PX_PLUGIN_TOOL_TOKEN`。 |
 | `mock is not defined`（`run-from-package`） | 当前 CLI Bug，临时改用 `node scripts/capabilities/validate-capabilities.mjs` + Go 测试。 |
 | 契约版本警告 | `dist/capability-contracts.json` 与 `PX_GATEWAY_CONTRACT_VERSION` 不一致。运行 `npm --prefix scripts/capabilities run digest` 更新摘要并检查 `docs/plan/009...` 的契约升级流程。 |
 

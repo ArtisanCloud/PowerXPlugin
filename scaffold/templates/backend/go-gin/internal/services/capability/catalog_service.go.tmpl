@@ -76,12 +76,11 @@ func (s *CatalogService) List(ctx context.Context, opts ListOptions) ([]capabili
 	source := normalizeCatalogSource(opts.Source)
 
 	if source == "corex" {
-		if entries, err := s.listPlatformCatalog(ctx, opts); err == nil {
-			return entries, nil
-		} else {
-			logger.WithError(err).WithField("component", "capability_catalog_service").
-				Warn("failed to load platform capability catalog, falling back to local manifest")
+		entries, err := s.listPlatformCatalog(ctx, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load platform capability catalog for source=corex: %w", err)
 		}
+		return entries, nil
 	}
 
 	if source == "all" {
@@ -171,6 +170,8 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 		return nil, errors.New("PX_GATEWAY_BASE_URL 未配置")
 	}
 	token := strings.TrimSpace(s.cfg.Gateway.ToolToken)
+	apiKey := strings.TrimSpace(s.cfg.Gateway.APIKey)
+	authScheme := strings.ToLower(strings.TrimSpace(s.cfg.Gateway.AuthScheme))
 	tenant := strings.TrimSpace(s.cfg.Gateway.TenantUUID)
 	client := &http.Client{Timeout: 10 * time.Second}
 	url := fmt.Sprintf("%s/admin/platform-capabilities?page=1&page_size=200", base)
@@ -180,8 +181,15 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
+	switch authScheme {
+	case "apikey", "api_key", "api-key":
+		if apiKey != "" {
+			req.Header.Set("Authorization", "ApiKey "+apiKey)
+		}
+	default:
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
 	}
 	if tenant != "" {
 		req.Header.Set("tenant_uuid", tenant)

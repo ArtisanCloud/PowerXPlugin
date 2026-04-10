@@ -11,6 +11,8 @@
 
 - 关键交付：
 - Gateway Client + 后端服务封装：统一 `/tenant/invocations`/gRPC 调用、凭证注入、错误/trace 处理，并对前端暴露受控 API；
+- Runtime 策略统一：框架内置 `delegated/local` 模式分流、鉴权凭证约束、HTTP Guard 与启动期配置校验；
+- Delegated Gateway Contract v1：宿主注入 `PX_GATEWAY_BASE_URL + PX_PLUGIN_TOOL_TOKEN + PX_GATEWAY_AUTH_SCHEME=bearer`，插件按强约束 fail-fast；
 - Skeleton dev 体验：`px-plugin login`、`.env.local`、Mock 降级、CLI 辅助工具；
 - 契约升级守护：生成能力契约版本摘要、比对并提醒插件开发者在兼容窗口内升级；
 - 限流/配额治理：暴露配置入口、命令及观测指标，确保调用链尊重 Registry/租户额度。
@@ -26,7 +28,7 @@
 | Target Platform | PowerX 插件 backend（Linux 宿主）+ web-admin（Nuxt SSR/static）+ Skeleton 本地环境 |
 | Project Type | 全栈插件（backend + web-admin + scripts + skeleton） |
 | Performance Goals | Gateway 调用 P95 < 2s；降级检测 < 5s；Trace 覆盖 ≥99%；能力申领失败率 <2% |
-| Constraints | 仅允许通过 Integration Gateway；强制 Tool Token + `tenant_uuid`；Skeleton Mock 必须提示；禁止访问宿主内部 API；契约升级需保留兼容窗口并发布提示 |
+| Constraints | 仅允许通过 Integration Gateway；`delegated` 模式仅允许 `PX_PLUGIN_TOOL_TOKEN` Bearer（禁止 `PX_TOOL_TOKEN`/ApiKey fallback）；缺失宿主注入凭证即启动失败；Skeleton Mock 必须提示；禁止访问宿主内部 API；契约升级需保留兼容窗口并发布提示 |
 | Scale/Scope | 需覆盖 >50 CoreX 能力 ID、百 TPS 调用，支持多租户/多插件部署 |
 
 ## Constitution Check
@@ -97,3 +99,22 @@ docs/
    - 利用 Capability Registry 中的 `rateLimit/quota` 字段，在 Gateway Client 初始化时加载默认策略，并允许运维通过 `px-plugin capabilities quota --manifest ./skeleton/plugin.yaml`（或新增命令）为租户/插件设置额度。
    - 在 `framework/backend/go/observability` 中暴露限流/配额指标（命中率、被拒绝次数），并在限流事件时写 `audit.capability.invocation.denied`。
    - 在 docs/operations 章节说明如何配置与监控限流/配额。
+
+## Runtime Gateway Policy Alignment
+
+1. **框架级 Host Capability Client**
+   - 在 framework 层提供统一 client，内部完成 `detectRuntimeGatewayMode`、凭证策略分流、请求头注入、错误结构归一化。
+   - 插件业务侧仅调用 client 接口，不再手写 `bearer/apikey` 分支。
+
+2. **框架级 HTTP Guard**
+   - 提供 `RequireCapabilityGateway` 中间件/辅助函数，统一输出 `503` + 诊断字段（`mode`、`required_credential`、`base_url_configured`）。
+   - admin/integration 与通用 invoke 接口统一接入，避免重复判空和不一致报错。
+
+3. **启动期配置校验**
+   - 在 bootstrap 阶段执行 gateway preflight，明确打印运行模式、有效凭证来源、缺失配置。
+   - 对冲突配置（如 local 模式仍注入 bearer）直接 fail-fast，避免运行期随机失败。
+
+4. **宿主注入机制（安装/启用链路）**
+   - PowerX 在插件进程启动环境中注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_GATEWAY_AUTH_SCHEME=bearer`。
+   - PostEnable 执行“进程内凭证探活”（debug health check）；失败标记 `enable_failed_missing_gateway_credential`。
+   - 默认 stub 下发路径不再视为成功路径，必须以插件进程可观测到变量并通过探活为准。

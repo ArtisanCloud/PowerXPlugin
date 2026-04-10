@@ -24,7 +24,7 @@
 
 ### User Story 2 - Skeleton 模式复用同一封装 (Priority: P2)
 
-Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN` 写入 `.env.local`，并使用框架内置的 Go Client 在 Skeleton 后端发起远程调用（前端通过插件后端提供的 API 间接访问 Gateway）或在 Gateway 不可用时切换到 Mock，实现与宿主一致的行为以便预先验证调用链与权限配置。
+Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN` 写入 `.env.local`，并使用框架内置的 Go Client 在 Skeleton 后端发起远程调用（前端通过插件后端提供的 API 间接访问 Gateway）或在 Gateway 不可用时切换到 Mock，实现与宿主一致的行为以便预先验证调用链与权限配置。
 
 **Why this priority**: Skeleton 是插件开发调试的默认入口，若无法直连 PowerX 能力，将导致环境差异和额外搬运成本。
 
@@ -64,8 +64,8 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 ### Functional Requirements
 
 - **FR-001**: 插件 manifest 与 `skeleton/plugin.yaml` 必须支持声明 `requiredCapabilities`，并在 CI 中通过 `px-plugin capabilities plan|apply --manifest ./skeleton/plugin.yaml` 进行校验，未声明即调用时需阻断。
-- **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK），默认读取 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`tenant_uuid` 等环境变量，并通过插件后端对前端暴露统一 API（禁止前端直连 Gateway）。
-- **FR-003**: 在宿主模式，部署系统需自动注入 Tool Token；在 Skeleton 模式，开发者通过 `px-plugin login` 与脚本生成本地凭证，并由框架自动刷新或提醒即将过期。
+- **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK），并通过插件后端对前端暴露统一 API（禁止前端直连 Gateway）。
+- **FR-003**: Gateway Client 必须在运行时自动执行模式分流：`delegated` 与 `standalone local` 均仅允许 Bearer（`PX_PLUGIN_TOOL_TOKEN`/平台注入 token）；策略冲突时启动即报错。
 - **FR-004**: 所有调用必须由插件后端统一走 `/tenant/invocations` REST 或 `IntegrationGatewayTenantService.InvokeCapability` gRPC，框架不得允许前端或其他组件直接访问底座内部 API。
 - **FR-005**: Gateway Client 需对每次调用自动附带 `capabilityId`、`action`、`payload`、`X-Request-ID`，并把 Gateway 返回的 `traceId` 注入日志与指标。
 - **FR-006**: 当 Gateway 返回限流、鉴权失败或 5xx 错误时，框架需提供标准化错误对象，包含能力 ID、traceId、错误类别，方便业务捕获与重试。
@@ -78,6 +78,17 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 - **FR-013**: Skeleton web-admin 必须提供“Capability Lab” 调试页面，覆盖 Capability 选择、Action/Payload 编辑、请求预览、响应/Trace 可视化、Mock 切换与告警提示，仅 `IsRoot` 或系统管理员可访问，便于本地验证 PowerX 能力且避免普通用户误用。
 - **FR-014**: `/tenant/invocations` REST 调用需要显式传入 `preferred_protocol + method + endpoint` 等字段；插件后端在 API 层要校验并拒绝缺失字段，Capability Lab/文档需给出模板或构建器提示，防止开发者误以为 `action` 可以自动拼接 URL。
 - **FR-015**: Skeleton `/api/v1/admin/capabilities` 在未指定 `source` 时返回本地 manifest，而当 `source=corex` 时必须通过 Gateway 调用 PowerX `/tenant/capabilities` 并把底座能力转换为 CatalogEntry 数据，供 Capability Lab、CLI 与文档使用。
+- **FR-016**: 框架必须提供统一 HTTP Guard（如 `RequireCapabilityGateway`），在 Gateway 不可用或凭证缺失时返回一致的 `503` 结构与诊断字段（至少包含 `mode`、`required_credential`、`base_url_configured`）。
+- **FR-017**: 框架必须提供启动期 Gateway 配置校验器，输出当前运行模式和缺失配置，并阻止进入“看似启动成功但首个调用才失败”的状态。
+- **FR-018**: 插件侧业务 Handler/Service 不得各自实现模式与凭证分流逻辑，必须复用框架级 Host Capability Client 与 Guard。
+- **FR-019**: 在 `delegated` 模式下，Capability Gateway 鉴权策略固定为 `bearer`，且仅允许读取 `PX_PLUGIN_TOOL_TOKEN`；插件侧不得读取 `PX_TOOL_TOKEN` 或 `PX_GATEWAY_API_KEY` 作为 delegated 凭证。
+- **FR-020**: 在 `delegated` 模式下，`PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_GATEWAY_AUTH_SCHEME=bearer` 任一缺失或不合法时，插件进程必须启动失败（fail-fast），不得降级继续运行。
+- **FR-021**: `PX_PLUGIN_TOOL_TOKEN` 必须包含可解析的 `tid` claim；缺失 `tid` 时返回标准错误码 `GW_TOKEN_INVALID_TID` 并阻断调用。
+- **FR-022**: Gateway 配置错误必须统一使用错误码：`GW_CFG_MISSING_BASE_URL`、`GW_CFG_MISSING_TOOL_TOKEN`、`GW_CFG_INVALID_AUTH_SCHEME`、`GW_TOKEN_INVALID_TID`。
+- **FR-023**: 所有 `/integration/*` 入口必须复用同一 Guard，并返回固定错误结构：`code`、`message`、`details.required`、`details.present`、`details.iam_mode`、`request_id`。
+- **FR-024**: 宿主（PowerX）在插件安装/启用链路必须向插件进程注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_GATEWAY_AUTH_SCHEME=bearer`；插件不再从本地 `.env` 推断 delegated 凭证。
+- **FR-025**: 宿主（PowerX）在 PostEnable 阶段必须执行一次插件进程内凭证探活；失败时将插件状态标记为 `enable_failed_missing_gateway_credential`。
+- **FR-026**: 观测必须包含启动日志字段（`iam_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）与指标（`plugin_gateway_config_valid{plugin_id,mode}`、`plugin_gateway_invoke_fail_total{code}`）。
 
 ### Key Entities *(include if feature involves data)*
 
@@ -103,7 +114,17 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 - Skeleton 模式允许开发者访问 Dev Gateway，且 `px-plugin login` 能获取可调用核心能力的临时凭证。
 - 平台观测系统已具备聚合能力，新增指标/日志只需提供结构化字段即可接入。
 
+## Delegated Gateway Contract v1（Breaking）
+
+- 本契约仅适用于 `delegated` 模式，作为 PowerX 与插件之间的强约束接口。
+- 认证策略唯一真相：
+  - 仅支持 `bearer`
+  - 仅支持 `PX_PLUGIN_TOOL_TOKEN`
+  - 仅支持 `PX_GATEWAY_BASE_URL`
+- 插件侧禁止在 `delegated` 模式读取 `PX_TOOL_TOKEN`、`PX_GATEWAY_API_KEY`。
+- 本契约为 breaking change，不提供兼容回退路径。
+
 ## Manifest / Docs Consistency（2025-12-22）
 
 - `skeleton/plugin.yaml` → `capabilities.required` 默认示例保持与 Quickstart/Plan 中一致的 CoreX 能力（`com.corex.media.assets.manage`、`com.corex.eventfabric.publish`），`capabilities.provides` 指向 `contracts/capabilities/com.powerx.plugins.base.template.*`，方便 docs/plan/009 引用。
-- `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/NUXT_PUBLIC_POWERX_*`），租户统一由 token `tid` 推导，并对应 manifest 注释，确保读者可在三个入口间互相对照。
+- `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_GATEWAY_AUTH_SCHEME/NUXT_PUBLIC_POWERX_*`），并统一说明 delegated/local 的凭证策略与诊断输出，确保读者可在三个入口间互相对照。

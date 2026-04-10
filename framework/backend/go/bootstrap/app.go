@@ -221,13 +221,22 @@ func (a *App) initGatewayClient() {
 	if a.Config == nil || !a.Config.Gateway.enabled() {
 		return
 	}
+	authScheme := normalizeGatewayAuthScheme(
+		a.Config.Gateway.AuthScheme,
+		a.Config.Gateway.ToolToken,
+		a.Config.Gateway.APIKey,
+	)
+	tenantID := strings.TrimSpace(a.Config.Gateway.TenantID)
+	if authScheme == "bearer" && tenantID == "" {
+		tenantID = tenantIDFromJWT(a.Config.Gateway.ToolToken)
+	}
 	gcfg := gateway.Config{
 		BaseURL:    a.Config.Gateway.BaseURL,
 		APIPrefix:  a.Config.Gateway.APIPrefix,
-		AuthScheme: a.Config.Gateway.AuthScheme,
+		AuthScheme: authScheme,
 		ToolToken:  a.Config.Gateway.ToolToken,
 		APIKey:     a.Config.Gateway.APIKey,
-		TenantUUID: a.Config.Gateway.TenantID,
+		TenantUUID: tenantID,
 	}
 	if a.Config.Gateway.Timeout > 0 {
 		gcfg.RequestTimeout = a.Config.Gateway.Timeout

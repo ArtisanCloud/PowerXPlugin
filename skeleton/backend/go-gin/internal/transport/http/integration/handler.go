@@ -10,8 +10,10 @@ import (
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+	obsintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
 	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -100,8 +102,7 @@ func (h *Handler) RotateSecret(c *gin.Context) {
 func (h *Handler) InvokeCapability(c *gin.Context) {
 	ensureInvokeCORS(c)
 
-	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil {
-		contracts.ResponseServiceUnavailable(c, "capability gateway unavailable", nil)
+	if h == nil || !httpmw.RequireCapabilityGateway(c, h.deps) {
 		return
 	}
 
@@ -401,6 +402,7 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 
 	var unavailable *capgateway.UnavailableError
 	if errors.As(err, &unavailable) {
+		obsintegration.RecordPluginGatewayInvokeFailure("SERVICE_UNAVAILABLE")
 		details := gin.H{"traceId": ""}
 		if len(warnings) > 0 {
 			details["warnings"] = warnings
@@ -412,6 +414,7 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 
 	var invocationErr *frameworkgateway.InvocationError
 	if errors.As(err, &invocationErr) {
+		obsintegration.RecordPluginGatewayInvokeFailure(firstGatewayCode(invocationErr))
 		if trace := strings.TrimSpace(invocationErr.TraceID); trace != "" {
 			c.Header("X-Trace-Id", trace)
 		}
@@ -439,6 +442,7 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 		return
 	}
 
+	obsintegration.RecordPluginGatewayInvokeFailure(contracts.ErrCodeInternalError)
 	details := gin.H{"traceId": ""}
 	if len(warnings) > 0 {
 		details["warnings"] = warnings

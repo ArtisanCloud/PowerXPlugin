@@ -174,11 +174,26 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[R-2] Starting backend service"
+BACKEND_RUNNER_BIN="${ROOT_DIR}/tmp/regression-plugin-bin"
+echo "[R-2] Building backend runner binary"
+(
+  cd "${ROOT_DIR}/skeleton/backend/go-gin"
+  go build -o "${BACKEND_RUNNER_BIN}" ./cmd/plugin
+)
+
 start_backend() {
   local attempts=8
   local attempt=0
   local backend_cfg=""
   backend_cfg="${ROOT_DIR}/tmp/regression-backend.yaml"
+
+  backend_log_indicates_port_in_use() {
+    if [ ! -f "$BACKEND_LOG" ]; then
+      return 1
+    fi
+    grep -Eqi "address already in use|bind: address already in use" "$BACKEND_LOG"
+  }
+
   for ((attempt=1; attempt<=attempts; attempt++)); do
     : >"$BACKEND_LOG"
     cat >"$backend_cfg" <<YAML
@@ -186,11 +201,16 @@ server:
   bind_addr: ":${BACKEND_PORT}"
   log_level: "debug"
   dev_mode: true
+context:
+  iam_mode: "local"
 database:
   driver: "memory"
   dsn: "file:powerxplugin-regression?mode=memory&cache=shared"
 grpc_server:
   enable: false
+runtime:
+  event_bridge:
+    taskbus_provider: "redis"
 gateway:
   base_url: ""
   tool_token: ""
@@ -200,30 +220,39 @@ gateway:
 YAML
 
     CONFIG_PATH="$backend_cfg" POWERX_BIND_ADDR=":${BACKEND_PORT}" PORT="${BACKEND_PORT}" \
-      go run ./skeleton/backend/go-gin/cmd/plugin >"$BACKEND_LOG" 2>&1 &
+      POWERX_PROXY=0 IAMMode=local IAM_MODE=local STANDALONE=1 \
+      PX_GATEWAY_BASE_URL="" PX_GATEWAY_AUTH_SCHEME="" PX_GATEWAY_API_KEY="" \
+      PX_PLUGIN_TOOL_TOKEN="" PX_TOOL_REFRESH_TOKEN="" PX_USE_MOCK="" \
+      "${BACKEND_RUNNER_BIN}" >"$BACKEND_LOG" 2>&1 &
     backend_pid=$!
     sleep 1
     if kill -0 "$backend_pid" 2>/dev/null; then
       if wait_for "${BACKEND_BASE_URL}/healthz" "Backend"; then
         return 0
       fi
+      echo "Backend process is alive but health check failed; see ${BACKEND_LOG}" >&2
+      tail -n 120 "$BACKEND_LOG" >&2 || true
+      return 1
     fi
 
     # Backend exited early or never became healthy.
     if [ "$backend_port_forced" -eq 1 ]; then
       echo "Backend failed to start on forced port ${BACKEND_PORT}; see ${BACKEND_LOG}" >&2
+      tail -n 120 "$BACKEND_LOG" >&2 || true
       return 1
     fi
 
-    if kill -0 "$backend_pid" 2>/dev/null; then
-      kill "$backend_pid" >/dev/null 2>&1 || true
-      wait "$backend_pid" 2>/dev/null || true
+    if backend_log_indicates_port_in_use; then
+      BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "" "8078,8086,3131,3231,3000,${BACKEND_PORT}")"
+      BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
+      API_BASE_URL="${BACKEND_BASE_URL}"
+      echo "[warn] Backend port occupied; retrying with ${BACKEND_PORT} (attempt ${attempt}/${attempts})"
+      continue
     fi
 
-    BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "" "8078,8086,3131,3231,3000,${BACKEND_PORT}")"
-    BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
-    API_BASE_URL="${BACKEND_BASE_URL}"
-    echo "[warn] Backend port occupied; retrying with ${BACKEND_PORT} (attempt ${attempt}/${attempts})"
+    echo "Backend failed to start (non-port error); see ${BACKEND_LOG}" >&2
+    tail -n 120 "$BACKEND_LOG" >&2 || true
+    return 1
   done
   echo "Backend failed to start after retries; see ${BACKEND_LOG}" >&2
   return 1
@@ -238,7 +267,7 @@ pushd skeleton/web-admin/nuxt > /dev/null
 rm -rf node_modules .nuxt .output
 # 统一在工作区内缓存，避免在容器/不同用户下写入 $HOME 失败或污染宿主缓存。
 export npm_config_cache="${ROOT_DIR}/tmp/npm-cache-web-admin"
-npm ci --include=optional
+npm ci --include=optional --legacy-peer-deps
 # lightningcss 的平台二进制包可能因为 lockfile/跨平台拷贝等原因缺失，导致 Nuxt build 失败。
 # 这里按当前平台显式补齐对应的 lightningcss-<platform> 包（不改 package-lock）。
 need_lightningcss_pkg=0

@@ -495,7 +495,7 @@ function ensureSelectedSourceInOptions(value: string) {
   ]
 }
 
-async function fetchCapabilitySources() {
+async function fetchCapabilitySources(options?: { keepSelectedSource?: boolean }) {
   sourceListLoading.value = true
   try {
     const response = await capabilityCatalogApi.listSources()
@@ -526,7 +526,8 @@ async function fetchCapabilitySources() {
       })
       .filter((item): item is { label: string; value: string } => !!item)
     const defaultSource = normalizeSourceQuery(response?.default)
-    if (defaultSource && sourceOptions.value.some((item) => item.value === defaultSource)) {
+    const keepSelectedSource = options?.keepSelectedSource === true
+    if (!keepSelectedSource && defaultSource && sourceOptions.value.some((item) => item.value === defaultSource)) {
       selectedSource.value = defaultSource
     }
   } catch {
@@ -639,11 +640,12 @@ const {
 
 onMounted(async () => {
   const querySource = parseSourceFromRouteQuery(route.query?.source)
+  const keepSelectedSource = !!querySource
   if (querySource) {
     ensureSelectedSourceInOptions(querySource)
     selectedSource.value = querySource
   }
-  await fetchCapabilitySources()
+  await fetchCapabilitySources({ keepSelectedSource })
   ensureSelectedSourceInOptions(selectedSource.value)
   await fetchCapabilityOptions()
 })

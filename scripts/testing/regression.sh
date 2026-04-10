@@ -186,6 +186,14 @@ start_backend() {
   local attempt=0
   local backend_cfg=""
   backend_cfg="${ROOT_DIR}/tmp/regression-backend.yaml"
+
+  backend_log_indicates_port_in_use() {
+    if [ ! -f "$BACKEND_LOG" ]; then
+      return 1
+    fi
+    grep -Eqi "address already in use|bind: address already in use" "$BACKEND_LOG"
+  }
+
   for ((attempt=1; attempt<=attempts; attempt++)); do
     : >"$BACKEND_LOG"
     cat >"$backend_cfg" <<YAML
@@ -220,23 +228,29 @@ YAML
       if wait_for "${BACKEND_BASE_URL}/healthz" "Backend"; then
         return 0
       fi
+      echo "Backend process is alive but health check failed; see ${BACKEND_LOG}" >&2
+      tail -n 120 "$BACKEND_LOG" >&2 || true
+      return 1
     fi
 
     # Backend exited early or never became healthy.
     if [ "$backend_port_forced" -eq 1 ]; then
       echo "Backend failed to start on forced port ${BACKEND_PORT}; see ${BACKEND_LOG}" >&2
+      tail -n 120 "$BACKEND_LOG" >&2 || true
       return 1
     fi
 
-    if kill -0 "$backend_pid" 2>/dev/null; then
-      kill "$backend_pid" >/dev/null 2>&1 || true
-      wait "$backend_pid" 2>/dev/null || true
+    if backend_log_indicates_port_in_use; then
+      BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "" "8078,8086,3131,3231,3000,${BACKEND_PORT}")"
+      BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
+      API_BASE_URL="${BACKEND_BASE_URL}"
+      echo "[warn] Backend port occupied; retrying with ${BACKEND_PORT} (attempt ${attempt}/${attempts})"
+      continue
     fi
 
-    BACKEND_PORT="$(pick_free_port "$BACKEND_HOST" "" "8078,8086,3131,3231,3000,${BACKEND_PORT}")"
-    BACKEND_BASE_URL="http://${BACKEND_HOST}:${BACKEND_PORT}"
-    API_BASE_URL="${BACKEND_BASE_URL}"
-    echo "[warn] Backend port occupied; retrying with ${BACKEND_PORT} (attempt ${attempt}/${attempts})"
+    echo "Backend failed to start (non-port error); see ${BACKEND_LOG}" >&2
+    tail -n 120 "$BACKEND_LOG" >&2 || true
+    return 1
   done
   echo "Backend failed to start after retries; see ${BACKEND_LOG}" >&2
   return 1

@@ -79,9 +79,10 @@ make docker-build
 | 命令                     | 说明                                                   |
 | ---------------------- | ---------------------------------------------------- |
 | `make build`           | 构建本机平台后端二进制（默认输出至 `backend/bin/plugin`）              |
-| `make build-linux`     | 交叉编译 Linux/amd64 二进制                                 |
+| `make build-linux`     | 交叉编译 Linux 二进制（默认 amd64，可用 `TARGET_ARCH` 覆盖）         |
 | `make frontend-build`  | 执行 `npm --prefix web-admin run build` 构建前端 `.output` |
-| `make dist`            | 生成安装目录结构到 `dist/<version>/`                          |
+| `make dist`            | 生成安装目录结构到 `dist/<version>/`（支持 `PLATFORM=linux`）      |
+| `make dist-linux`      | `make dist PLATFORM=linux` 兼容别名                        |
 | `make release`         | 构建完整发布产物 `target/<version>/`（含前后端）                   |
 | `make package`         | 压缩 `dist/<version>` 目录为 zip                          |
 | `make package-release` | 压缩 `target/<version>` 目录为 zip                        |

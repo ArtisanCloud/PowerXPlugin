@@ -275,7 +275,13 @@ VERSION=0.2.0 make dist
 如果你的 PowerX 底座运行在 Linux，而你在 macOS/Windows 本地打包，请显式指定后端目标平台后再执行 `make dist`：
 
 ```bash
-GOOS=linux GOARCH=amd64 make dist
+make dist PLATFORM=linux TARGET_ARCH=amd64
+```
+
+也可使用兼容别名：
+
+```bash
+make dist-linux
 ```
 
 ### 步骤 3：手动构建（可选）

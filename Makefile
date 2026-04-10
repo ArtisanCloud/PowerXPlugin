@@ -18,11 +18,16 @@ help: ## Show available make targets
 	@echo "Delegated skeleton targets:"
 	@$(MAKE) -C $(SKELETON_DIR) help
 
+.PHONY: ci-agent-assets
+ci-agent-assets: ## Check .codex/.specify path normalization
+	@npm run sync:templates -- --check
+	@npm run check:agent-paths
+
 # Proxy common targets to skeleton/Makefile to unify entrypoints.
 .PHONY: test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend \
         skeleton-dist skeleton-install skeleton-reinstall \
         plugin-id-check plugin-yaml-check manifest-align-fix manifest-align-check \
-        dist package pack package-pxp local-install local-install-run local-install-pxp release package-release \
+        dist dist-linux package pack package-pxp local-install local-install-run local-install-pxp release package-release \
         build-px-plugin \
         install-px-plugin \
         migrate migrate-cmd seed setup-db reset-db \
@@ -50,7 +55,7 @@ manifest-align-check: ## Strict drift/mapping check for CI gate
 	@node .codex/skills/ci/manifest-align/scripts/manifest-align-check.mjs
 
 test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend \
-dist package pack package-pxp local-install local-install-run local-install-pxp release package-release \
+dist dist-linux package pack package-pxp local-install local-install-run local-install-pxp release package-release \
 build-px-plugin \
 install-px-plugin \
 migrate migrate-cmd seed setup-db reset-db \

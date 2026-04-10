@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { resolve as resolvePath } from 'node:path'
+import fs from 'node:fs'
 import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
@@ -46,7 +47,7 @@ const joinApiBase = (base?: string | null, prefix?: string | null) => {
 }
 const envApiBase = joinApiBase(process.env.NUXT_PUBLIC_API_BASE, process.env.NUXT_PUBLIC_API_PREFIX)
 const defaultPluginApiBase = `/_p/${pluginId}/api/v1`
-const defaultLocalApiBase = 'http://localhost:8078/api/v1'
+const defaultLocalApiBase = '/api/v1'
 // Host API fallback: when处于宿主模式时始终走插件 API，其他场景才退回宿主 /api/v1
 const fallbackHostApiBase =
   process.env.POWERX_PROXY === '1' ? defaultPluginApiBase : '/api/v1'
@@ -54,7 +55,7 @@ const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase
 const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
-const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:4000'
+const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'
 const imgSources = ["'self'", "data:", "https://avatars.githubusercontent.com"]
 const extraConnectHosts = new Set<string>()
 const registerConnectOrigin = (candidate?: string | null) => {
@@ -142,7 +143,8 @@ const devProxy: Record<string, any> = {
   '/ws': {
     target: devWsProxyTarget,
     changeOrigin: true,
-    ws: true
+    ws: true,
+    rewrite: (path: string) => path.replace(/^\/ws(?=\/|$)/, '/api/ws')
   }
 }
 
@@ -184,7 +186,7 @@ const buildConnectSources = () => {
     registerCandidate("wss:")
   }
 
-  sources.add("https://api.iconify.design")
+  // icon provider 使用本地 server bundle，避免依赖外网 iconify
   extraConnectHosts.forEach((origin) => sources.add(origin))
 
   return Array.from(sources)
@@ -194,9 +196,24 @@ const connectSources = buildConnectSources()
 if (!process.env.QUIET_START) {
   console.info('[web-admin] connect-src allow', connectSources)
 }
+const resolveVersionFromPluginManifest = () => {
+  try {
+    const manifestPath = resolvePath(rootDir, '..', '..', 'plugin.yaml')
+    const content = fs.readFileSync(manifestPath, 'utf8')
+    const match = content.match(/^version:\s*([^\n#]+)\s*$/m)
+    if (!match) {
+      return ''
+    }
+    return match[1].trim().replace(/^['"]|['"]$/g, '')
+  } catch {
+    return ''
+  }
+}
+
 const pluginVersion =
   process.env.NUXT_PUBLIC_POWERX_PLUGIN_VERSION ||
   process.env.POWERX_PLUGIN_VERSION ||
+  resolveVersionFromPluginManifest() ||
   'dev'
 
 const powerx = definePowerXAdminConfig({
@@ -244,6 +261,14 @@ export default defineNuxtConfig({
     '@nuxtjs/color-mode',
     '@nuxtjs/i18n'
   ],
+  icon: {
+    provider: 'server',
+    localApiEndpoint: '/_nuxt_icon',
+    fallbackToApi: false,
+    serverBundle: {
+      collections: ['heroicons', 'lucide']
+    }
+  },
   imports: {
     dirs: ['stores']
   },

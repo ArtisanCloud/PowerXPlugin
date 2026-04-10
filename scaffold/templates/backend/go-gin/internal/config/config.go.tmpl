@@ -552,6 +552,13 @@ func getDefaultConfig() *Config {
 				BillingAnomaly:    0.2,
 			},
 		},
+		Operations: &OperationsConfig{
+			Scheduler: OperationsSchedulerConfig{
+				RetryMaxAttempts:   3,
+				PauseStrategy:      "pause_on_retry_exhausted",
+				ResumeRoleRequired: "ops_admin_only",
+			},
+		},
 		Context: &ContextConfig{
 			TTL: 300 * time.Second, // 5分钟
 		},
@@ -671,7 +678,6 @@ func loadYAMLConfig(cfg *Config) (string, error) {
 		return "", fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
-	logrus.WithField("config_file", configFile).Info("YAML config loaded successfully")
 	dir := filepath.Dir(configFile)
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
@@ -706,7 +712,6 @@ func loadSecurityBaselineConfig(cfg *Config) {
 	}
 
 	cfg.SecurityBaseline = baseline
-	logrus.WithField("baseline_file", baselinePath).Info("Security baseline config loaded successfully")
 }
 
 func locateSecurityBaseline() string {
@@ -1005,18 +1010,11 @@ func loadEnvConfig(cfg *Config) {
 	if authScheme := resolveConfigValue(os.Getenv("PX_GATEWAY_AUTH_SCHEME")); authScheme != "" {
 		cfg.Gateway.AuthScheme = authScheme
 	}
-	token := firstNonEmpty(
-		resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN")),
-		resolveConfigValue(os.Getenv("PX_TOOL_TOKEN")),
-	)
+	token := resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN"))
 	if token != "" {
 		cfg.Gateway.ToolToken = token
 	}
-	apiKey := firstNonEmpty(
-		resolveConfigValue(os.Getenv("PX_GATEWAY_API_KEY")),
-		resolveConfigValue(os.Getenv("PX_PLUGIN_API_KEY")),
-	)
-	if apiKey != "" {
+	if apiKey := resolveConfigValue(os.Getenv("PX_GATEWAY_API_KEY")); apiKey != "" {
 		cfg.Gateway.APIKey = apiKey
 	}
 	if timeout := resolveConfigValue(os.Getenv("PX_GATEWAY_TIMEOUT")); timeout != "" {
@@ -1111,7 +1109,7 @@ func normalizeConfig(cfg *Config) {
 						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
 						"gateway.token_tid":         tokenTenant,
 						"gateway.tenant_from_token": true,
-					}).Warn("gateway.tenant_uuid differs from PX_TOOL_TOKEN tid; overriding with token tid")
+					}).Warn("gateway.tenant_uuid differs from PX_PLUGIN_TOOL_TOKEN tid; overriding with token tid")
 				}
 				cfg.Gateway.TenantUUID = tokenTenant
 			}
@@ -1289,10 +1287,10 @@ func splitCSV(input string) []string {
 
 func normalizeGatewayAuthScheme(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "apikey", "api_key", "api-key":
-		return "apikey"
 	case "bearer":
 		return "bearer"
+	case "apikey", "api_key", "api-key":
+		return "apikey"
 	default:
 		return ""
 	}
@@ -1314,6 +1312,9 @@ func normalizeGatewayAPIPrefix(raw string) string {
 }
 
 func inferGatewayAuthScheme(toolToken, apiKey string) string {
+	if strings.TrimSpace(toolToken) != "" {
+		return "bearer"
+	}
 	if strings.TrimSpace(apiKey) != "" {
 		return "apikey"
 	}
@@ -1325,12 +1326,12 @@ func hasGatewayCredential(cfg *GatewayConfig) bool {
 		return false
 	}
 	switch normalizeGatewayAuthScheme(cfg.AuthScheme) {
-	case "apikey":
-		return strings.TrimSpace(cfg.APIKey) != ""
 	case "bearer":
 		return strings.TrimSpace(cfg.ToolToken) != ""
+	case "apikey":
+		return strings.TrimSpace(cfg.APIKey) != ""
 	default:
-		return strings.TrimSpace(cfg.ToolToken) != "" || strings.TrimSpace(cfg.APIKey) != ""
+		return false
 	}
 }
 
@@ -1540,6 +1541,35 @@ func (c *Config) Validate() error {
 		c.WSBus.Channel = "powerx.wsbus"
 	}
 
+	// Scheduler 配置默认值与验证
+	if c.Operations == nil {
+		c.Operations = &OperationsConfig{}
+	}
+	if c.Operations.Scheduler.RetryMaxAttempts == 0 {
+		c.Operations.Scheduler.RetryMaxAttempts = 3
+	}
+	if c.Operations.Scheduler.RetryMaxAttempts < 1 || c.Operations.Scheduler.RetryMaxAttempts > 10 {
+		return NewConfigError("operations.scheduler.retry_max_attempts must be between 1 and 10")
+	}
+	if strings.TrimSpace(c.Operations.Scheduler.PauseStrategy) == "" {
+		c.Operations.Scheduler.PauseStrategy = "pause_on_retry_exhausted"
+	}
+	switch strings.ToLower(strings.TrimSpace(c.Operations.Scheduler.PauseStrategy)) {
+	case "pause_on_retry_exhausted":
+		c.Operations.Scheduler.PauseStrategy = "pause_on_retry_exhausted"
+	default:
+		return NewConfigError("operations.scheduler.pause_strategy must be: pause_on_retry_exhausted")
+	}
+	if strings.TrimSpace(c.Operations.Scheduler.ResumeRoleRequired) == "" {
+		c.Operations.Scheduler.ResumeRoleRequired = "ops_admin_only"
+	}
+	switch strings.ToLower(strings.TrimSpace(c.Operations.Scheduler.ResumeRoleRequired)) {
+	case "ops_admin_only":
+		c.Operations.Scheduler.ResumeRoleRequired = "ops_admin_only"
+	default:
+		return NewConfigError("operations.scheduler.resume_role_required must be: ops_admin_only")
+	}
+
 	// 安全配置验证
 	if c.Security.RateLimit.Enabled && c.Security.RateLimit.RequestsPerMinute <= 0 {
 		return NewConfigError("rate limit requests per minute must be positive when enabled")
@@ -1609,7 +1639,7 @@ func (c *Config) Validate() error {
 				c.Gateway.AuthScheme = inferGatewayAuthScheme(c.Gateway.ToolToken, c.Gateway.APIKey)
 			}
 			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
-				return NewConfigError("gateway config requires base_url and matching credential (bearer: tool_token, apikey: api_key)")
+				return NewConfigError("gateway config requires base_url + credential matching auth_scheme")
 			}
 
 			if c.Gateway.AuthScheme == "bearer" {

@@ -111,8 +111,8 @@
 - [x] T043 [P] [US4] Add integration test for "taskbus mode with real provider wiring" in `skeleton/backend/go-gin/tests/integration/event_bridge_taskbus_provider_test.go`.
 - [x] T044 [US4] Add drop metrics/log fields for local queue full in `framework/backend/go/eventbridge/local_emitter.go` and `skeleton/backend/go-gin/internal/observability/event_bridge/metrics.go`.
 - [x] T045 [P] [US4] Add tests for local-queue-full behavior and metrics update in `skeleton/backend/go-gin/tests/unit/event_local_queue_full_test.go`.
-- [ ] T046 [US4] Publish framework prerelease (`v0.0.3-alpha` or newer) and update dependency notes in `docs/plan/008-framework-task-bus.md`.
-- [ ] T047 [US4] Add migration guide for external plugins (adapter mapping checklist) in `docs/guides/async_runtime/event_fabric/integration_playbook.md`.
+- [x] T046 [US4] Publish framework prerelease (`v0.0.3-alpha` or newer) and update dependency notes in `docs/plan/008-framework-task-bus.md`.
+- [x] T047 [US4] Add migration guide for external plugins (adapter mapping checklist) in `docs/guides/async_runtime/event_fabric/integration_playbook.md`.
 
 **Checkpoint**: Host provider wired + fallback verified + release/migration docs ready.
 
@@ -126,7 +126,7 @@
 
 ## Phase 7 Entry Gate（进入 Host Provider 开发前）
 
-- [ ] G1 已阅读并确认 `specs/008-framework-task-bus/readiness.md` 的未完成项。
-- [ ] G2 已完成 Day-0 校验命令并保留执行记录。
-- [ ] G3 目标 topic 权限已在 `skeleton/plugin.yaml` 明确声明。
-- [ ] G4 已确认迁移目标插件的当前 framework 版本与升级路径。
+- [x] G1 已阅读并确认 `specs/008-framework-task-bus/readiness.md` 的未完成项。
+- [x] G2 已完成 Day-0 校验命令并保留执行记录。
+- [x] G3 目标 topic 权限已在 `skeleton/plugin.yaml` 明确声明。
+- [x] G4 已确认迁移目标插件的当前 framework 版本与升级路径。

@@ -10,6 +10,8 @@
 PLUGIN_ID           ?= com.powerx.plugins.base
 # 从 plugin.yaml 读取版本（若失败则默认 0.1.0）
 VERSION             ?= $(shell awk -F': *' '/^version:/ {print $$2; exit}' plugin.yaml 2>/dev/null || echo "0.1.0")
+PLATFORM            ?= host
+TARGET_ARCH         ?= amd64
 
 # ===== 目录结构（可按项目调整）=====
 # 后端代码在仓库根；如你的 cmd/plugin 在 repo/cmd/plugin，请保持 BACKEND_DIR = .
@@ -92,19 +94,27 @@ install-px-plugin: build-px-plugin ## 构建并安装到 GOBIN/GOPATH/bin，保�
 
 .PHONY: build-linux
 build-linux: ## 构建后端（Linux amd64）
-	@echo "==> 构建后端二进制（Linux/amd64）..."
+	@echo "==> 构建后端二进制（Linux/$(TARGET_ARCH)）..."
 	@if [ "$(BACKEND)" = "fastapi" ]; then \
 	  echo "跳过 Go 构建（python backend）"; \
 	else \
 	  mkdir -p $(ABS_BUILD_DIR); \
 	  mkdir -p $(GO_BUILD_CACHE); \
-	  GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
+	  GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
 	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
-	    echo "   构建 migrate（Linux/amd64）..."; \
-	    GOOS=linux GOARCH=amd64 GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
+	    echo "   构建 migrate（Linux/$(TARGET_ARCH)）..."; \
+	    GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/migrate ./cmd/database; \
 	  else \
 	    echo "   跳过 migrate（未找到 cmd/database）"; \
 	  fi; \
+	fi
+
+.PHONY: dist-backend
+dist-backend:
+	@if [ "$(PLATFORM)" = "linux" ]; then \
+	  $(MAKE) build-linux BACKEND=$(BACKEND) BUILD_DIR="$(BUILD_DIR)" TARGET_ARCH="$(TARGET_ARCH)" GO_BUILD_CACHE="$(GO_BUILD_CACHE)"; \
+	else \
+	  $(MAKE) build BACKEND=$(BACKEND) BUILD_DIR="$(BUILD_DIR)" GO_BUILD_CACHE="$(GO_BUILD_CACHE)"; \
 	fi
 
 # ===== 前端构建（Host / 被 PowerX 反代）=====
@@ -194,7 +204,7 @@ check-base-standalone: frontend-build-standalone
 
 # ===== 生成 dist（目录安装包，给 PowerX 的 install/local 用）=====
 .PHONY: dist
-dist: plugin-yaml-check build frontend-build
+dist: plugin-yaml-check dist-backend frontend-build
 	@echo "==> 生成 dist 安装包目录：$(DIST_DIR)"
 	@rm -rf $(DIST_DIR)
 	@mkdir -p $(DIST_BACKEND_BIN) $(DIST_WEBADMIN_OUTPUT)
@@ -221,6 +231,10 @@ dist: plugin-yaml-check build frontend-build
 	  cp -R $(FRONTEND_DIR)/i18n/. $(DIST_WEBADMIN_DIR)/i18n/; \
 	fi
 	@if [ -f README.md ]; then cp README.md $(DIST_DIR)/; fi
+
+.PHONY: dist-linux
+dist-linux: ## 兼容别名：等价于 `make dist PLATFORM=linux`
+	@$(MAKE) dist PLATFORM=linux DIST_DIR="$(DIST_DIR)" BACKEND="$(BACKEND)" BUILD_DIR="$(BUILD_DIR)" TARGET_ARCH="$(TARGET_ARCH)"
 
 # ===== 生成 release（完整发布包）=====
 .PHONY: release

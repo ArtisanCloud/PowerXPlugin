@@ -31,7 +31,7 @@ px-plugin --version
 
 完整流程（init → DB 配置 → migrate/seed → 启动 → 本地安装到 PowerX）请看：
 
-- `docs/guides/develop/cli-plugin-tutorial.md`
+- `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md`
 
 ## 模板/契约改动后同步
 
@@ -40,3 +40,20 @@ rsync -a scaffold/templates/ tools/cli/internal/templates/data/
 rsync -a docs/contracts/{manifest.json,rbac.json,openapi.yaml} tools/cli/internal/contracts/data/
 make build-px-plugin
 ```
+
+## Web Admin 关键环境变量（Nuxt）
+
+`px-plugin init` 生成的 Nuxt 工程默认支持 Standalone 与宿主代理双模式，常用变量如下：
+
+- `POWERX_PROXY`：`0`（Standalone）/`1`（宿主代理）
+- `NUXT_PUBLIC_API_BASE`：API 基址（默认 `http://localhost:<backend-port>`）
+- `NUXT_PUBLIC_API_PREFIX`：默认 `/api/v1`
+- `NUXT_DEV_API_PROXY`：开发态 HTTP 代理目标
+- `NUXT_DEV_WS_PROXY`：开发态 WS 代理目标
+- `NUXT_PUBLIC_POWERX_CORE_BASE`：PowerX Core 地址（默认 `http://localhost:8077`）
+- `NUXT_PUBLIC_IAM_MODE`：可选 `local`/`delegated`，未指定时按 `POWERX_PROXY` 自动推导
+
+建议：
+
+1. Standalone 开发：`POWERX_PROXY=0`，前端直连本地 backend。
+2. 宿主联调：`POWERX_PROXY=1`，并确认插件网关凭证（Bearer/ApiKey）与 backend 配置一致。

@@ -138,3 +138,21 @@
 - [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `tenant_uuid`
 - [ ] Skeleton 后端可独立运行并完成 CRUD Smoke（Phase 2 验证）
 - [ ] Skeleton 前端（含 `POWERX_PROXY=1` 场景）可访问首页与 Admin CRUD 页面
+
+---
+
+## 14. Phase 7 收尾（2026-03-25）
+
+### 14.1 已完成
+
+1. DTO/错误码统一：Templates Handler 使用统一校验错误输出（`VALIDATION_FAILED + details.field/template_code`）。
+2. 模板同步：同一改动已同步到 `scaffold/templates` 与 `tools/cli/internal/templates/data`。
+3. Nuxt 配置三方一致：Skeleton/CLI/scaffold 在 `runtimeConfig`、Nitro headers、HMR/代理、i18n `langDir` 上一致。
+4. CLI 文档补齐：新增 Web Admin 关键环境变量与 Standalone/Proxy 启动说明。
+
+### 14.2 未迁移能力与路线
+
+1. Bridge 完整通信链路：先落最小 stub（P2）。
+2. Pinia 业务 store 示例：补 1-2 个可复用样例（P2）。
+3. Tailwind4 深度流水线：独立评估，不阻塞 Starter（P3）。
+4. Dev Console/Operations 高阶模块：分期迁移，维持最小 starter 负担（P3）。

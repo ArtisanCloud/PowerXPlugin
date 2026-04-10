@@ -55,6 +55,7 @@ type InvokeRequest struct {
 	RequestID         string
 	Headers           map[string]string
 	TenantUUID        string
+	DisableAuth       bool
 }
 
 // GatewayError 映射 Gateway 返回的错误条目。
@@ -208,7 +209,9 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
-	httpReq.Header.Set("Authorization", buildAuthHeader(c.authScheme, c.credential))
+	if !req.DisableAuth {
+		httpReq.Header.Set("Authorization", buildAuthHeader(c.authScheme, c.credential))
+	}
 	httpReq.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
 		httpReq.Header.Set("User-Agent", c.userAgent)
@@ -291,10 +294,13 @@ func (c *Client) InvokeGRPC(ctx context.Context, req InvokeRequest) (*Response, 
 		RequestId:    requestID,
 	}
 
-	md := metadata.New(map[string]string{
-		"authorization": buildAuthHeader(c.authScheme, c.credential),
-		"x-request-id":  requestID,
-	})
+	mdValues := map[string]string{
+		"x-request-id": requestID,
+	}
+	if !req.DisableAuth {
+		mdValues["authorization"] = buildAuthHeader(c.authScheme, c.credential)
+	}
+	md := metadata.New(mdValues)
 	ctxCall, cancel := context.WithTimeout(ctx, c.requestTimeout)
 	defer cancel()
 	ctxCall = metadata.NewOutgoingContext(ctxCall, md)
@@ -420,33 +426,27 @@ func resolveAuth(rawScheme, toolToken, apiKey string) (scheme string, credential
 	key := strings.TrimSpace(apiKey)
 
 	switch scheme {
-	case "apikey":
-		if key == "" {
-			return "", "", errors.New("gateway: api key is required when auth_scheme=apikey")
-		}
-		return scheme, key, nil
 	case "bearer":
 		if bearer == "" {
-			return "", "", errors.New("gateway: tool token is required when auth_scheme=bearer")
+			return "", "", errors.New("gateway: PX_PLUGIN_TOOL_TOKEN is required when auth_scheme=bearer")
 		}
 		return scheme, bearer, nil
+	case "apikey":
+		if key == "" {
+			return "", "", errors.New("gateway: PX_GATEWAY_API_KEY is required when auth_scheme=apikey")
+		}
+		return scheme, key, nil
 	default:
-		if key != "" {
-			return "apikey", key, nil
-		}
-		if bearer != "" {
-			return "bearer", bearer, nil
-		}
-		return "", "", errors.New("gateway: missing credential (tool token/api key)")
+		return "", "", errors.New("gateway: auth_scheme must be bearer or apikey")
 	}
 }
 
 func normalizeAuthScheme(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "apikey", "api_key", "api-key":
-		return "apikey"
 	case "bearer":
 		return "bearer"
+	case "apikey", "api_key", "api-key":
+		return "apikey"
 	default:
 		return ""
 	}
@@ -483,10 +483,12 @@ func buildGatewayEndpoint(baseURL, apiPrefix, routePath string) string {
 }
 
 func buildAuthHeader(scheme, credential string) string {
-	if normalizeAuthScheme(scheme) == "apikey" {
+	switch normalizeAuthScheme(scheme) {
+	case "apikey":
 		return "ApiKey " + strings.TrimSpace(credential)
+	default:
+		return "Bearer " + strings.TrimSpace(credential)
 	}
-	return "Bearer " + strings.TrimSpace(credential)
 }
 
 func extractAuthScheme(authHeader string) string {

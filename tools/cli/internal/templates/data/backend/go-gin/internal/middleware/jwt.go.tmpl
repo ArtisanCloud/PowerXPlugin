@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ type JWTAuthConfig struct {
 type PowerXClaims struct {
 	TenantUUID    TenantClaim `json:"tid"`
 	UserID        int64       `json:"uid"`
+	IsRoot        bool        `json:"is_root"`
 	Roles         []string    `json:"roles"`
 	Permissions   []string    `json:"perms"`
 	PolicyVersion string      `json:"policy_version"`
@@ -61,6 +63,54 @@ func (t *TenantClaim) UnmarshalJSON(data []byte) error {
 
 func (t TenantClaim) String() string {
 	return string(t)
+}
+
+func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		TenantUUID    TenantClaim `json:"tid"`
+		UserID        any         `json:"uid"`
+		IsRoot        bool        `json:"is_root"`
+		Roles         []string    `json:"roles"`
+		Permissions   []string    `json:"perms"`
+		PolicyVersion string      `json:"policy_version"`
+		PluginID      string      `json:"plugin_id,omitempty"`
+		jwt.RegisteredClaims
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	userID, err := parseUserID(raw.UserID)
+	if err != nil {
+		return err
+	}
+	c.TenantUUID = raw.TenantUUID
+	c.UserID = userID
+	c.IsRoot = raw.IsRoot
+	c.Roles = raw.Roles
+	c.Permissions = raw.Permissions
+	c.PolicyVersion = raw.PolicyVersion
+	c.PluginID = raw.PluginID
+	c.RegisteredClaims = raw.RegisteredClaims
+	return nil
+}
+
+func parseUserID(value any) (int64, error) {
+	switch v := value.(type) {
+	case nil:
+		return 0, nil
+	case float64:
+		return int64(v), nil
+	case json.Number:
+		return strconv.ParseInt(strings.TrimSpace(v.String()), 10, 64)
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return 0, nil
+		}
+		return strconv.ParseInt(trimmed, 10, 64)
+	default:
+		return 0, errors.New("invalid uid claim type")
+	}
 }
 
 func ParseFromHeaders(h func(string) string, cfg JWTAuthConfig) (tc TenantContext, rawBearer string, ok bool) {
@@ -101,6 +151,7 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 	return TenantContext{
 		TenantUUID:    strings.TrimSpace(claims.TenantUUID.String()),
 		UserID:        claims.UserID,
+		IsRoot:        claims.IsRoot,
 		Roles:         claims.Roles,
 		Permissions:   claims.Permissions,
 		PolicyVersion: claims.PolicyVersion,
@@ -111,6 +162,7 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 type signedCtx struct {
 	TenantUUID    string   `json:"tid"`
 	UserID        int64    `json:"uid"`
+	IsRoot        bool     `json:"is_root"`
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"perms"`
 	PolicyVersion string   `json:"policy_version"`
@@ -143,13 +195,13 @@ func tryLoadSignedContext(h func(string) string, secret string, maxAgeSec int64)
 	if maxAgeSec > 0 && (time.Now().Unix()-sc.TS) > maxAgeSec {
 		return TenantContext{}, false
 	}
-	return TenantContext{TenantUUID: strings.TrimSpace(sc.TenantUUID), UserID: sc.UserID, Roles: sc.Roles,
+	return TenantContext{TenantUUID: strings.TrimSpace(sc.TenantUUID), UserID: sc.UserID, IsRoot: sc.IsRoot, Roles: sc.Roles,
 		Permissions: sc.Permissions, PolicyVersion: sc.PolicyVersion, PluginID: strings.TrimSpace(sc.PluginID)}, true
 }
 
 // 供客户端出站兜底：把 TenantContext 签成 X-PowerX-CTX / SIG
 func SignContext(tc TenantContext, secret string) (ctxB64, sigHex string, ts int64, err error) {
-	sc := signedCtx{TenantUUID: strings.TrimSpace(tc.TenantUUID), UserID: tc.UserID, Roles: tc.Roles,
+	sc := signedCtx{TenantUUID: strings.TrimSpace(tc.TenantUUID), UserID: tc.UserID, IsRoot: tc.IsRoot, Roles: tc.Roles,
 		Permissions: tc.Permissions, PolicyVersion: tc.PolicyVersion, PluginID: tc.PluginID, TS: time.Now().Unix()}
 	b, e := json.Marshal(&sc)
 	if e != nil {

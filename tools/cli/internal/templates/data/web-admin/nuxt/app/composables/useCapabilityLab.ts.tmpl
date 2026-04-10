@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useToast } from '#imports'
 import { usePowerXCapability } from '~/composables/usePowerXCapability'
+import { getAuthToken } from '~/composables/api/_base'
 import {
   PowerXCapabilityBridgeError,
   type PowerXCapabilityResponse
@@ -275,6 +276,13 @@ const invokeLocalCapability = async (
     'Content-Type': 'application/json',
     ...normalizeHeaderMap(payload.headers),
     ...(request.headers || {})
+  }
+  const hasAuthorization = Object.keys(headers).some((key) => key.toLowerCase() === 'authorization')
+  if (!hasAuthorization) {
+    const token = getAuthToken()
+    if (token) {
+      headers.Authorization = /^Bearer\\s/i.test(token) ? token : `Bearer ${token}`
+    }
   }
   const finalUrl = appendQuery(url, payload.query)
   const hasBody = !['GET', 'HEAD', 'OPTIONS'].includes(method)

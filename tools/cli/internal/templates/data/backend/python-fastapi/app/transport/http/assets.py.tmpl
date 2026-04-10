@@ -1,7 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Request
-
-from app.contracts.response import ok
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
@@ -21,14 +20,22 @@ def _build_payload(build_id: str) -> dict:
 
 @router.get("/assets/builds/meta")
 async def build_meta_default(request: Request):
+    payload = _build_payload("dev")
+    response = JSONResponse(status_code=200, content=payload)
     request_id = _request_id(request)
-    return ok(_build_payload("dev"), request_id=request_id)
+    if request_id:
+        response.headers["X-Request-Id"] = request_id
+    return response
 
 
 @router.get("/assets/builds/meta/{build_id}")
 async def build_meta(request: Request, build_id: str):
-    request_id = _request_id(request)
     build = (build_id or "dev").removesuffix(".json")
     if not build:
         build = "dev"
-    return ok(_build_payload(build), request_id=request_id)
+    payload = _build_payload(build)
+    response = JSONResponse(status_code=200, content=payload)
+    request_id = _request_id(request)
+    if request_id:
+        response.headers["X-Request-Id"] = request_id
+    return response

@@ -3,7 +3,7 @@ module github.com/ArtisanCloud/PowerXPlugin/skeleton/backend
 go 1.24.0
 
 require (
-	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.4-alpha
+	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.6-alpha
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
@@ -80,6 +80,7 @@ require (
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

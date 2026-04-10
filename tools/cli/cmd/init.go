@@ -20,7 +20,7 @@ import (
 const (
 	defaultVersion          = "0.1.0"
 	defaultGoVersion        = "1.24"
-	defaultFrameworkVersion = "v0.0.4-alpha"
+	defaultFrameworkVersion = "v0.0.6-alpha"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
 	defaultAdminVersion     = "^0.0.1-alpha"
 	defaultClientVersion    = "^0.0.1-alpha"

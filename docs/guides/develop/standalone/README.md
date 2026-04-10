@@ -253,7 +253,7 @@ npm run dev
 |---|---|---|
 | `logging.http_access`（或 `POWERX_HTTP_LOG`） | 是否输出 HTTP 访问日志（每个请求一条） | 看接口请求路径/状态码/耗时 |
 | `logging.debug_mode`（或 `POWERX_DEBUG_MODE`） | 开发语义与调试细节开关 | 排查 token/tenant/模式决策、生产安全校验、默认策略切换 |
-| （固定行为）runtime internal 调试路由 | 注册 `/api/v1/admin/runtime/internal/ws-bus/*` 与 `/api/v1/admin/runtime/event-bridge/emit` | 默认开启（无开关） |
+| （固定行为）runtime internal 调试路由 | 注册 `/api/v1/admin/runtime/internal/ws-bus/*`、`/api/v1/admin/runtime/event-bridge/emit` 与 `POST /api/v1/admin/notifications/test` | 默认开启（无开关） |
 
 说明：
 
@@ -343,6 +343,29 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 ```
 
 预期：底座 `wscat` 收到 `event`。
+
+#### C) 通知探针闭环（推荐先跑）
+
+用于确认“前端连对 WS + 订阅对 topic + 能收到事件”三件事同时成立。
+
+1. 打开 Web Admin 右上角铃铛，确认状态为“已连接”。
+2. 点击“发送测试通知”按钮（调用 `POST /api/v1/admin/notifications/test`）。
+3. 预期未读角标增加，抽屉内出现新事件。
+
+接口请求体可选字段如下：
+
+```json
+{
+  "tenant_uuid": "00000000-0000-0000-0000-000000000001",
+  "topic": "plugin.notify.tenant.00000000-0000-0000-0000-000000000001",
+  "title": "WS Test Notification",
+  "message": "websocket probe event",
+  "trace_id": "trace-xxx"
+}
+```
+
+- `topic` 为空时，后端默认发布到 `plugin.notify.tenant.{tenant_uuid}`。
+- `tenant_uuid` 可从请求头/上下文解析；若无法解析会返回 `tenant_uuid is required`。
 
 ### 1.4.5 WebSocket 联调失败排查速查
 
@@ -546,7 +569,7 @@ iframe.contentWindow?.postMessage(
 
 - [Auth 集成说明](auth.md)
 - [CLI 发布/热加载指南](go-cli-dev-watch.md)
-- [CLI 入门教程](cli-plugin-tutorial.md)
+- [CLI 入门教程](../cli-plugin/cli-plugin-tutorial.md)
 
 ### 2.10 Delegated Token 失效提醒
 

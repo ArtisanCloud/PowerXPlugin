@@ -22,8 +22,8 @@ description: 自动检查 contracts/capabilities 与 plugin.yaml/catalog（plugi
 
 ## 检查内容
 
-1) 自动执行 `make -C skeleton plugin-yaml-check`
-- 触发 `manifestcheck --sync-catalogs`，重建 `plugin.d` 产物。
+1) 脚本内部自动执行基础清单校验
+- 内部会调用 `plugin-yaml-check`（包含 `manifestcheck --sync-catalogs`），重建 `plugin.d` 产物。
 
 2) 检查清单漂移（支持 auto-fix）
 - 对以下文件做 `git diff` 检查：

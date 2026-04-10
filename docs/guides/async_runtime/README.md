@@ -49,3 +49,35 @@
 2. `websocket/debug_playbook.md`（再验证 `create topic -> grant -> publish/subscribe`）
 3. `task/README.md`（确认任务主链路）
 4. `scheduler/README.md`（确认调度进入同一链路）
+
+## 6. Runtime 日志统一口径（与实现对齐）
+
+最小字段（必须可检索）：
+
+1. `trace_id`
+2. `task_id`
+3. `tenant_uuid`
+4. `tenant_key`（`tenant_uuid` 镜像）
+5. `subscriber_id`
+6. `topic`
+7. `status`
+
+状态枚举固定：
+
+1. `queued`
+2. `processing`
+3. `succeeded`
+4. `failed`
+5. `skipped`
+
+缺失上下文规则：
+
+1. `task_id/subscriber_id` 缺失时写入 `unknown`
+2. 同时写入 `status=skipped` 与 `reason=missing_context`
+
+扩展字段（插件侧保留）：
+
+1. `gateway_auth_scheme`
+2. `outbound_token_source`
+3. `plugin_id`
+4. `component`

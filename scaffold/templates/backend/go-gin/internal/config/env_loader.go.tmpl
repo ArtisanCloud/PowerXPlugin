@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 func loadEnvFiles(extraDirs ...string) {
@@ -81,15 +79,15 @@ func loadEnvFile(path string) {
 		if !ok {
 			continue
 		}
+		// Keep process-level env as highest priority: do not override keys
+		// that were already injected by caller/runner.
+		if _, exists := os.LookupEnv(key); exists {
+			continue
+		}
 		_ = os.Setenv(key, val)
 		loaded++
 	}
-	if loaded > 0 {
-		logrus.WithFields(logrus.Fields{
-			"env_file":       path,
-			"loaded_entries": loaded,
-		}).Info("ENV file loaded")
-	}
+	_ = loaded
 }
 
 func parseEnvLine(line string) (string, string, bool) {

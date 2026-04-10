@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -96,19 +97,28 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 		outboundSource = "request_bearer_passthrough"
 	}
 
-	logger.WithFields(logger.Fields{
-		"component":               "ws_bus_gateway_auth",
-		"iam_mode":                deps.IAMMode,
-		"inbound_bearer_present":  inboundBearerPresent,
-		"inbound_bearer_prefix":   inboundBearerPrefix,
-		"outbound_token_source":   outboundSource,
-		"outbound_bearer_prefix":  tokenPrefix(outboundBearer),
-		"px_tool_token_present":   pxToolToken != "",
-		"px_tool_token_prefix":    tokenPrefix(pxToolToken),
-		"px_gateway_api_key_set":  apiKey != "",
-		"gateway_auth_scheme":     authScheme,
-		"resolved_gateway_tenant": strings.TrimSpace(tenantUUID),
-	}).Info("WS bus gateway auth resolved")
+	taskID := strings.TrimSpace(inboundBearerPrefix)
+	if taskID == "" {
+		taskID = runtimelogging.FallbackUnknown
+	}
+
+	extraFields := logger.Fields{
+		runtimelogging.FieldTaskID:      taskID,
+		runtimelogging.FieldTopic:       "runtime_ops.ws_bus.gateway_auth",
+		runtimelogging.FieldStatus:      runtimelogging.StatusProcessing,
+		runtimelogging.FieldTenantUUID:  strings.TrimSpace(tenantUUID),
+		runtimelogging.FieldGatewayAuth: authScheme,
+		runtimelogging.FieldTokenSource: outboundSource,
+		"iam_mode":                      deps.IAMMode,
+		"inbound_bearer_present":        inboundBearerPresent,
+		"inbound_bearer_prefix":         inboundBearerPrefix,
+		"outbound_bearer_prefix":        tokenPrefix(outboundBearer),
+		"px_tool_token_present":         pxToolToken != "",
+		"px_tool_token_prefix":          tokenPrefix(pxToolToken),
+		"px_gateway_api_key_set":        apiKey != "",
+		"resolved_gateway_tenant":       strings.TrimSpace(tenantUUID),
+	}
+	deps.RuntimeLogger(c.Request.Context(), "ws_bus_gateway_auth", extraFields).Info("WS bus gateway auth resolved")
 }
 
 func tokenPrefix(token string) string {

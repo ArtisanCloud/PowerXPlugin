@@ -73,7 +73,7 @@ func RefreshToolToken(ctx context.Context, cfg *config.Config) (string, string, 
 
 		cfg.Gateway.ToolToken = newToken
 		cfg.Gateway.RefreshToken = newRefresh
-		os.Setenv("PX_TOOL_TOKEN", newToken)
+		os.Setenv("PX_PLUGIN_TOOL_TOKEN", newToken)
 		os.Setenv("PX_TOOL_REFRESH_TOKEN", newRefresh)
 
 		return newToken, newRefresh, nil

@@ -71,7 +71,7 @@
 | 服务器目录 | PowerX 需要能够读取你提供的 `src_dir`。通常把产物放在 `/srv/powerx/plugins/<id>/dist` 或 `/opt/powerx/uploads/<version>/`。 |
 
 > 本文不负责 `px-plugin` 的构建/安装/初始化步骤。请先完成：
-> - `docs/guides/develop/cli-plugin-tutorial.md`
+> - `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md`
 
 环境变量示例：
 
@@ -192,6 +192,26 @@ cd ..
 ```
 
 若之前在 web-admin 目录执行过 `npm install` 但后来清理了 `node_modules/`，请重新安装，确保 `web-admin/node_modules/.bin/nuxi` 与 `nuxt/config` 均来自模板声明的 Nuxt 4.2.x。
+
+### 步骤 1.5：先做清单对齐（强烈建议）
+
+功能迭代涉及 `contracts/capabilities/*.yaml` 时，先执行：
+
+```bash
+make manifest-align-fix
+```
+
+该命令会自动同步并校验：
+
+- `plugin.d/capabilities.yaml`
+- `plugin.d/exposure.yaml`
+- `plugin.d/rbac.yaml`
+
+CI 建议使用严格模式（有漂移即失败）：
+
+```bash
+make manifest-align-check
+```
 
 ### 步骤 2：使用脚手架 Makefile 构建 dist
 

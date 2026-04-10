@@ -56,12 +56,18 @@ mappings:
       - globs: [".env.example"]
         literal: "NUXT_DEV_API_PROXY=http://127.0.0.1:8078"
         replace: "NUXT_DEV_API_PROXY=http://127.0.0.1:{{ .BackendPort }}"
+      - globs: [".env.example"]
+        literal: "NUXT_DEV_WS_PROXY=ws://127.0.0.1:8078"
+        replace: "NUXT_DEV_WS_PROXY=ws://127.0.0.1:{{ .BackendPort }}"
       - globs: ["nuxt.config.ts"]
         literal: "const defaultLocalApiBase = 'http://localhost:8078/api/v1'"
         replace: "const defaultLocalApiBase = 'http://localhost:{{ .BackendPort }}/api/v1'"
       - globs: ["nuxt.config.ts"]
         literal: "const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'"
         replace: "const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'"
+      - globs: ["nuxt.config.ts"]
+        literal: "const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'"
+        replace: "const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:{{ .BackendPort }}'"
       - globs: ["nuxt.config.ts"]
         literal: "    3131"
         replace: "    {{ .FrontendPort }}"
@@ -242,3 +248,125 @@ mappings:
       - globs: ["**/*"]
         literal: "com.powerx.plugins.base"
         replace: "{{ .PluginID }}"
+  - name: codex-assets
+    source: .codex
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: scaffold/templates/.codex
+      - path: tools/cli/internal/templates/data/.codex
+    replacements:
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["**/*"]
+        literal: "插件 skeleton 后端"
+        replace: "插件后端"
+      - globs: ["**/*"]
+        literal: "插件 skeleton 前端"
+        replace: "插件前端"
+      - globs: ["**/*"]
+        literal: "skeleton/scaffold/CLI"
+        replace: "模板源/scaffold/CLI"
+      - globs: ["**/*"]
+        literal: "只改了 `skeleton/` 或只改了 `scaffold/`"
+        replace: "只改了模板源目录"
+      - globs: ["**/*"]
+        literal: "`skeleton/backend/go-gin`"
+        replace: "`backend`"
+      - globs: ["**/*"]
+        literal: "`skeleton/web-admin/nuxt`"
+        replace: "`web-admin`"
+      - globs: ["**/*"]
+        literal: "`./skeleton/backend/etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`"
+      - globs: ["**/*"]
+        literal: "`./backend/etc/config.yaml`、`./backend/etc/config.yaml`、`./etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`、`./etc/config.yaml`"
+  - name: specify-assets
+    source: .specify
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: scaffold/templates/.specify
+      - path: tools/cli/internal/templates/data/.specify
+    replacements:
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["**/*"]
+        literal: "插件 skeleton 后端"
+        replace: "插件后端"
+      - globs: ["**/*"]
+        literal: "插件 skeleton 前端"
+        replace: "插件前端"
+      - globs: ["**/*"]
+        literal: "skeleton/scaffold/CLI"
+        replace: "模板源/scaffold/CLI"
+      - globs: ["**/*"]
+        literal: "只改了 `skeleton/` 或只改了 `scaffold/`"
+        replace: "只改了模板源目录"
+      - globs: ["**/*"]
+        literal: "`skeleton/backend/go-gin`"
+        replace: "`backend`"
+      - globs: ["**/*"]
+        literal: "`skeleton/web-admin/nuxt`"
+        replace: "`web-admin`"
+      - globs: ["**/*"]
+        literal: "`./skeleton/backend/etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`"
+      - globs: ["**/*"]
+        literal: "`./backend/etc/config.yaml`、`./backend/etc/config.yaml`、`./etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`、`./etc/config.yaml`"

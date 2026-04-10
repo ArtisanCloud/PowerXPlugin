@@ -132,9 +132,10 @@ func TestCapabilityProxyRoute(t *testing.T) {
 	app := bootstrap.NewApp(&bootstrap.Config{
 		Listen: ":0",
 		Gateway: bootstrap.GatewayConfig{
-			BaseURL:   server.URL,
-			ToolToken: "demo-token",
-			TenantID:  "tenant-123",
+			BaseURL:    server.URL,
+			AuthScheme: "bearer",
+			ToolToken:  "demo-token",
+			TenantID:   "tenant-123",
 		},
 	})
 	if err := AttachHTTPServer(app); err != nil {

@@ -10,24 +10,28 @@ import (
 )
 
 const (
-	metricEnvelopesTotal     = "powerx_integration_envelopes_total"
-	metricIdempotencyTotal   = "powerx_integration_idempotency_events_total"
-	metricWebhookAttempts    = "powerx_integration_webhook_attempts_total"
-	metricWebhookLatency     = "powerx_integration_webhook_delivery_seconds"
-	metricSecretsRotationDue = "powerx_integration_secrets_rotations_due"
+	metricEnvelopesTotal         = "powerx_integration_envelopes_total"
+	metricIdempotencyTotal       = "powerx_integration_idempotency_events_total"
+	metricWebhookAttempts        = "powerx_integration_webhook_attempts_total"
+	metricWebhookLatency         = "powerx_integration_webhook_delivery_seconds"
+	metricSecretsRotationDue     = "powerx_integration_secrets_rotations_due"
+	metricGatewayConfigValid     = "plugin_gateway_config_valid"
+	metricGatewayInvokeFailTotal = "plugin_gateway_invoke_fail_total"
 )
 
 var (
 	mtx sync.RWMutex
 
 	counters = map[string]map[string]float64{
-		metricEnvelopesTotal:   {},
-		metricIdempotencyTotal: {},
-		metricWebhookAttempts:  {},
+		metricEnvelopesTotal:         {},
+		metricIdempotencyTotal:       {},
+		metricWebhookAttempts:        {},
+		metricGatewayInvokeFailTotal: {},
 	}
 
 	gauges = map[string]map[string]float64{
 		metricSecretsRotationDue: {},
+		metricGatewayConfigValid: {},
 	}
 
 	histBuckets = []float64{0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10}
@@ -36,11 +40,13 @@ var (
 	}
 
 	metricHelp = map[string]string{
-		metricEnvelopesTotal:     "Total envelopes processed grouped by channel and result",
-		metricIdempotencyTotal:   "Idempotency outcomes grouped by result",
-		metricWebhookAttempts:    "Webhook delivery attempts grouped by status and tenant",
-		metricWebhookLatency:     "Webhook delivery latency seconds histogram grouped by status",
-		metricSecretsRotationDue: "Secrets pending rotation grouped by urgency window",
+		metricEnvelopesTotal:         "Total envelopes processed grouped by channel and result",
+		metricIdempotencyTotal:       "Idempotency outcomes grouped by result",
+		metricWebhookAttempts:        "Webhook delivery attempts grouped by status and tenant",
+		metricWebhookLatency:         "Webhook delivery latency seconds histogram grouped by status",
+		metricSecretsRotationDue:     "Secrets pending rotation grouped by urgency window",
+		metricGatewayConfigValid:     "Gateway contract readiness by plugin_id and mode (1=valid,0=invalid)",
+		metricGatewayInvokeFailTotal: "Gateway invoke failures grouped by code",
 	}
 )
 
@@ -64,7 +70,7 @@ func RecordIdempotency(outcome string) {
 // RecordWebhookAttempt tracks webhook attempts.
 func RecordWebhookAttempt(status, tenantID string) {
 	labels := labelKey(map[string]string{
-		"status":    normalize(status),
+		"status":      normalize(status),
 		"tenant_uuid": normalize(tenantID),
 	})
 	increment(metricWebhookAttempts, labels, 1)
@@ -89,6 +95,29 @@ func SetSecretsDue(window string, count float64) {
 		"window": normalize(window),
 	})
 	gaugeFor(metricSecretsRotationDue)[key] = count
+}
+
+// SetPluginGatewayConfigValid stores startup gateway contract readiness.
+func SetPluginGatewayConfigValid(pluginID, mode string, valid bool) {
+	value := 0.0
+	if valid {
+		value = 1
+	}
+	mtx.Lock()
+	defer mtx.Unlock()
+	key := labelKey(map[string]string{
+		"plugin_id": normalize(pluginID),
+		"mode":      normalize(mode),
+	})
+	gaugeFor(metricGatewayConfigValid)[key] = value
+}
+
+// RecordPluginGatewayInvokeFailure increments invoke failure totals by code.
+func RecordPluginGatewayInvokeFailure(code string) {
+	labels := labelKey(map[string]string{
+		"code": normalize(code),
+	})
+	increment(metricGatewayInvokeFailTotal, labels, 1)
 }
 
 // RenderMetrics outputs metrics using Prometheus exposition format.

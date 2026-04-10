@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
 	"github.com/sirupsen/logrus"
 )
 
@@ -66,6 +68,19 @@ func resolveTaskBusProviderMode(cfg *config.Config) string {
 		}
 	}
 	return "redis"
+}
+
+func validateTaskBusProviderConflict(cfg *config.Config, powerXProxy string) error {
+	providerMode := resolveTaskBusProviderMode(cfg)
+	modeSvc := runtimeops.NewSchedulerModeService()
+	result := modeSvc.Validate(runtimeops.ModeValidationRequest{
+		PowerXProxy:     powerXProxy,
+		TaskBusProvider: providerMode,
+	})
+	if !result.Valid {
+		return fmt.Errorf("runtime mode conflict: %s (got %q)", result.Message, providerMode)
+	}
+	return nil
 }
 
 func newHostTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {

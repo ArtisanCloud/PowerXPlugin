@@ -8,7 +8,7 @@
 > 命令默认在仓库根目录执行：`/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin`
 >
 > 本文只负责 framework 发布与版本同步。若你只是构建/安装 `px-plugin` 并初始化项目，请使用：
-> `docs/guides/develop/cli-plugin-tutorial.md`
+> `docs/guides/develop/cli-plugin/cli-plugin-tutorial.md`
 
 ## 1. 发布前检查
 

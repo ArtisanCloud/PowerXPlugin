@@ -6,6 +6,19 @@
 快速上手与验证步骤见：`specs/008-framework-task-bus/quickstart.md`。
 开发前准备与缺口清单见：`specs/008-framework-task-bus/readiness.md`。
 
+## 0. 预发布与依赖说明（Phase 7 / T046）
+
+1. 预发布基线版本：`github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.4-alpha`（满足 `v0.0.3-alpha+` 要求）。
+2. Skeleton 当前依赖：
+   - `skeleton/backend/go-gin/go.mod` 已锁定 `framework/backend/go v0.0.4-alpha`。
+3. 外部插件升级建议：
+   - 升级命令：`go get github.com/ArtisanCloud/PowerXPlugin/framework/backend/go@v0.0.4-alpha`
+   - 执行：`go mod tidy`
+   - 校验：`go test ./... -run 'EventBridge|event_bridge|TaskBusProvider' -count=1`
+4. 兼容性口径：
+   - `event_bridge.mode=local|taskbus|dual`
+   - `fallback_to_local=true` 时，taskbus provider 异常可自动降级到 local。
+
 ## 1. 目标与范围
 
 - **目标**：把“直接写日志/直接触发 job/直接写 DB”的副作用收敛到统一事件出口；业务侧只负责“发事件/处理事件”。

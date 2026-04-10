@@ -118,7 +118,7 @@ runtime:
       path: "/healthz"
   logging:
     level: "debug"
-    format: "text"
+    format: "json"
     output: "stdout"
     debug_mode: true
   integration:
@@ -212,6 +212,11 @@ marketplace:
       channels: []
 
 operations:
+  scheduler:
+    # 调度重试闭环：权限失败后最多重试 3 次（允许范围 1-10），超限后进入暂停与工单恢复
+    retry_max_attempts: 3
+    pause_strategy: "pause_on_retry_exhausted"
+    resume_role_required: "ops_admin_only"
   support:
     webhook_secret: "replace-me"
     default_channels:

@@ -108,6 +108,12 @@ select column_name from information_schema.columns
 
 - 自动对齐（本地）：`make manifest-align-fix`
 - 严格校验（CI）：`make manifest-align-check`
-- 清单校验：`make plugin-yaml-check`
 - 重装插件：`make skeleton-reinstall VERSION=<v> API_BASE=... TOKEN=...`
 
+---
+
+## 7. 必检清单入口
+
+请在每次发版前阅读并勾选：
+
+- `docs/guides/publish/preflight-checklist.md`

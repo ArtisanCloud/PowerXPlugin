@@ -1,0 +1,82 @@
+schema_version: "1.0.0"
+title: Runtime Log Contract
+description: >
+  Runtime 关键链路日志字段契约。用于校验 Task/WS 链路日志输出是否满足统一语义。
+
+required_fields:
+  - trace_id
+  - task_id
+  - tenant_uuid
+  - tenant_key
+  - subscriber_id
+  - topic
+  - status
+
+status_enum:
+  - queued
+  - processing
+  - succeeded
+  - failed
+  - skipped
+
+extension_fields:
+  - gateway_auth_scheme
+  - outbound_token_source
+  - plugin_id
+  - component
+
+field_rules:
+  trace_id:
+    type: string
+    required: true
+  task_id:
+    type: string
+    required: true
+    fallback: unknown
+  tenant_uuid:
+    type: string
+    required: true
+  tenant_key:
+    type: string
+    required: true
+    notes:
+      - "tenant_key MUST be derived from tenant_uuid for cross-system compatibility"
+  subscriber_id:
+    type: string
+    required: true
+    fallback: unknown
+  topic:
+    type: string
+    required: true
+  status:
+    type: enum
+    required: true
+    allowed_values:
+      - queued
+      - processing
+      - succeeded
+      - failed
+      - skipped
+  reason:
+    type: string
+    required_when:
+      status: skipped
+    expected_value_when_missing_context: missing_context
+
+compatibility_policy:
+  tenant_uuid_as_primary: true
+  tenant_key_mirror_required: true
+  migration_guide_required: true
+  rollback_window_days: 7
+
+verification_scope:
+  critical_paths:
+    - task.enqueue
+    - task.consume
+    - task.ack
+    - task.fail
+    - ws.publish
+    - ws.dispatch
+  min_events_per_path: 20
+  required_field_completeness_rate: 1.0
+  sampling_rule: "all critical paths, no down-sampling"

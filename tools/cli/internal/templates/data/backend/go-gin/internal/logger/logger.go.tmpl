@@ -1,25 +1,33 @@
 package logger
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
-	"runtime"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Logger 全局日志实例
 var Logger *logrus.Logger
 var httpAccessEnabled = true
+var (
+	backendMu sync.RWMutex
+	backend   *slog.Logger
+)
 
 // Fields 日志字段类型别名
 type Fields = logrus.Fields
 
-// Init 初始化日志配置
-func Init(level, format, output, filePath string, httpAccess bool) {
+// Init initializes unified logging backend and compatibility bridge.
+func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge int, httpAccess bool) {
 	Logger = logrus.New()
 	httpAccessEnabled = httpAccess
 
@@ -30,65 +38,169 @@ func Init(level, format, output, filePath string, httpAccess bool) {
 	}
 	Logger.SetLevel(logLevel)
 
-	// 设置输出格式
-	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "text":
-		Logger.SetFormatter(&logrus.TextFormatter{
-			FullTimestamp:   true,
-			TimestampFormat: "2006-01-02 15:04:05",
-			ForceColors:     true,
-		})
-	case "json":
-		Logger.SetFormatter(&logrus.JSONFormatter{
-			TimestampFormat: "2006-01-02T15:04:05.000Z07:00",
-		})
-	default:
-		if level == "debug" {
-			Logger.SetFormatter(&logrus.TextFormatter{
-				FullTimestamp:   true,
-				TimestampFormat: "2006-01-02 15:04:05",
-				ForceColors:     true,
-			})
-		} else {
-			Logger.SetFormatter(&logrus.JSONFormatter{
-				TimestampFormat: "2006-01-02T15:04:05.000Z07:00",
-			})
-		}
+	logWriter, warnMsg := resolveLogWriter(
+		strings.ToLower(strings.TrimSpace(output)),
+		strings.TrimSpace(filePath),
+		maxSize,
+		maxBackups,
+		maxAge,
+	)
+	if warnMsg != "" {
+		_, _ = fmt.Fprintln(os.Stderr, warnMsg)
 	}
 
-	// 设置输出
-	switch strings.ToLower(strings.TrimSpace(output)) {
-	case "stderr":
-		Logger.SetOutput(os.Stderr)
-	case "file":
-		if strings.TrimSpace(filePath) != "" {
-			if f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
-				Logger.SetOutput(f)
-			} else {
-				Logger.SetOutput(os.Stdout)
-			}
-		} else {
-			Logger.SetOutput(os.Stdout)
-		}
-	default:
-		Logger.SetOutput(os.Stdout)
+	handlerOpts := &slog.HandlerOptions{
+		Level: mapLogrusLevel(logLevel),
 	}
+	logFormat := strings.ToLower(strings.TrimSpace(format))
+	if logFormat == "" {
+		logFormat = "json"
+	}
+	var handler slog.Handler
+	if logFormat == "text" {
+		handler = slog.NewTextHandler(logWriter, handlerOpts)
+	} else {
+		handler = slog.NewJSONHandler(logWriter, handlerOpts)
+	}
+	setBackendLogger(slog.New(handler))
+	slog.SetDefault(Slog())
+
+	// logrus 仅作为兼容层，统一转发到 slog backend
+	Logger.SetOutput(io.Discard)
+	Logger.SetFormatter(&logrus.JSONFormatter{})
+	Logger.ReplaceHooks(make(logrus.LevelHooks))
+	Logger.AddHook(&slogForwardHook{backend: Slog()})
 
 	// 添加调用位置信息（仅在 debug 模式）
 	if logLevel == logrus.DebugLevel || logLevel == logrus.TraceLevel {
-		tf := &logrus.TextFormatter{
-			FullTimestamp:   true,
-			TimestampFormat: "2006-01-02 15:04:05",
-			ForceColors:     true,
-			CallerPrettyfier: func(f *runtime.Frame) (function string, file string) {
-				funcName := path.Base(f.Function)
-				fileName := path.Base(f.File)
-				return funcName, fmt.Sprintf("%s:%d", fileName, f.Line)
-			},
-		}
-		Logger.SetFormatter(tf)
 		Logger.SetReportCaller(true)
 	}
+
+	// 标准 logrus 也走同一转发路径，覆盖遗留 logrus.WithField 直调调用点
+	std := logrus.StandardLogger()
+	std.SetLevel(logLevel)
+	std.SetOutput(io.Discard)
+	std.SetReportCaller(Logger.ReportCaller)
+	std.ReplaceHooks(make(logrus.LevelHooks))
+	std.AddHook(&slogForwardHook{backend: Slog()})
+}
+
+func ensureLogParentDir(filePath string) error {
+	parent := strings.TrimSpace(filepath.Dir(strings.TrimSpace(filePath)))
+	if parent == "" || parent == "." {
+		return nil
+	}
+	return os.MkdirAll(parent, 0o755)
+}
+
+func resolveLogWriter(output, filePath string, maxSize, maxBackups, maxAge int) (io.Writer, string) {
+	switch output {
+	case "stderr":
+		return os.Stderr, ""
+	case "file":
+		if filePath == "" {
+			return os.Stdout, "logger output=file but file_path is empty, fallback to stdout"
+		}
+		if err := ensureLogParentDir(filePath); err != nil {
+			return os.Stdout, fmt.Sprintf("logger output=file fallback to stdout: mkdir failed file_path=%s err=%v", filePath, err)
+		}
+		writer := &lumberjack.Logger{
+			Filename:   filePath,
+			MaxSize:    normalizeRotateValue(maxSize, 100),
+			MaxBackups: normalizeRotateValue(maxBackups, 3),
+			MaxAge:     normalizeRotateValue(maxAge, 28),
+			Compress:   false,
+			LocalTime:  true,
+		}
+		return writer, ""
+	default:
+		return os.Stdout, ""
+	}
+}
+
+func normalizeRotateValue(v, fallback int) int {
+	if v <= 0 {
+		return fallback
+	}
+	return v
+}
+
+func mapLogrusLevel(level logrus.Level) slog.Leveler {
+	switch level {
+	case logrus.TraceLevel:
+		return slog.LevelDebug - 4
+	case logrus.DebugLevel:
+		return slog.LevelDebug
+	case logrus.InfoLevel:
+		return slog.LevelInfo
+	case logrus.WarnLevel:
+		return slog.LevelWarn
+	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+func mapEntryLevel(level logrus.Level) slog.Level {
+	switch level {
+	case logrus.TraceLevel:
+		return slog.LevelDebug - 4
+	case logrus.DebugLevel:
+		return slog.LevelDebug
+	case logrus.InfoLevel:
+		return slog.LevelInfo
+	case logrus.WarnLevel:
+		return slog.LevelWarn
+	default:
+		return slog.LevelError
+	}
+}
+
+type slogForwardHook struct {
+	backend *slog.Logger
+}
+
+func (h *slogForwardHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (h *slogForwardHook) Fire(entry *logrus.Entry) error {
+	logger := h.backend
+	if logger == nil {
+		logger = Slog()
+	}
+	attrs := make([]slog.Attr, 0, len(entry.Data)+1)
+	for k, v := range entry.Data {
+		attrs = append(attrs, slog.Any(k, v))
+	}
+	if entry.Caller != nil {
+		attrs = append(attrs, slog.String("caller", fmt.Sprintf("%s:%d", path.Base(entry.Caller.File), entry.Caller.Line)))
+		attrs = append(attrs, slog.String("func", path.Base(entry.Caller.Function)))
+	}
+
+	ctx := entry.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	logger.LogAttrs(ctx, mapEntryLevel(entry.Level), entry.Message, attrs...)
+	return nil
+}
+
+func setBackendLogger(l *slog.Logger) {
+	backendMu.Lock()
+	defer backendMu.Unlock()
+	backend = l
+}
+
+// Slog returns the unified backend logger used by both slog and logrus compatibility path.
+func Slog() *slog.Logger {
+	backendMu.RLock()
+	defer backendMu.RUnlock()
+	if backend == nil {
+		return slog.Default()
+	}
+	return backend
 }
 
 // SetOutput 设置日志输出

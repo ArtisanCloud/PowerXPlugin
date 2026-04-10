@@ -9,14 +9,31 @@
           {{ `{{ $t("templates.crud.description") }}` }}
         </p>
       </div>
-      <UButton
-        icon="i-heroicons-plus"
-        color="primary"
-        :disabled="isDelegatedReadOnly"
-        @click="startCreate"
-      >
-        {{ `{{ $t("templates.crud.create") }}` }}
-      </UButton>
+      <div class="flex items-center gap-2">
+        <UInput
+          v-model="notificationMemberUUID"
+          size="sm"
+          class="w-[280px]"
+          placeholder="member_uuid（自动识别，失败可手填）"
+        />
+        <UButton
+          size="sm"
+          color="info"
+          icon="i-heroicons-bell-alert"
+          :loading="notifying"
+          @click="sendTestNotification"
+        >
+          发送测试通知
+        </UButton>
+        <UButton
+          icon="i-heroicons-plus"
+          color="primary"
+          :disabled="isDelegatedReadOnly"
+          @click="startCreate"
+        >
+          {{ `{{ $t("templates.crud.create") }}` }}
+        </UButton>
+      </div>
     </div>
 
     <UAlert
@@ -44,7 +61,7 @@
     <UCard>
       <template #header>
         <div class="flex items-center justify-between">
-          <span class="font-medium">{{ `{{ $t("templates.crud.listTitle") }}` }}</span>
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ `{{ $t("templates.crud.listTitle") }}` }}</span>
           <UBadge variant="soft" color="primary">{{ `{{ templates.length }}` }}</UBadge>
         </div>
       </template>
@@ -134,6 +151,7 @@ import { nextTick } from "vue"
 import { useI18n } from "vue-i18n"
 import { storeToRefs } from "pinia"
 import { useUserStore } from "~/stores/user"
+import { usePowerXCapability } from "~/composables/usePowerXCapability"
 
 type TemplateFormState = {
   name: string
@@ -156,6 +174,8 @@ const showFormModal = ref(false)
 const deleteDialog = ref(false)
 const deleting = ref(false)
 const selectedTemplate = ref<Template | null>(null)
+const notifying = ref(false)
+const notificationMemberUUID = ref("")
 
 type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
 
@@ -170,6 +190,7 @@ const toast = reactive({
 const { t } = useI18n()
 
 const auth = useAuth()
+const { invoke: invokeCapability } = usePowerXCapability()
 const userStore = useUserStore()
 const { isRoot, isCurrentTenantAdmin, canReadTemplates, canWriteTemplates } = storeToRefs(userStore)
 const isDelegatedReadOnly = computed(() => {
@@ -465,6 +486,118 @@ const showToast = ({
   })
 }
 
+const parseTokenClaims = (token?: string | null): Record<string, any> | null => {
+  if (!token) return null
+  const parts = token.split(".")
+  if (parts.length < 2) return null
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4)
+    const decoded = typeof atob === "function" ? atob(padded) : ""
+    if (!decoded) return null
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+const pickFirstNonEmpty = (values: unknown[]) => {
+  for (const raw of values) {
+    const value = typeof raw === "string" ? raw.trim() : String(raw ?? "").trim()
+    if (value) {
+      return value
+    }
+  }
+  return ""
+}
+
+const guessMemberUUID = () => {
+  const claims = parseTokenClaims(auth.getToken?.() ?? null) || {}
+  const context = (userStore.context || {}) as Record<string, any>
+  const contextUser = (context.user || {}) as Record<string, any>
+  const candidates = [
+    context.member_uuid,
+    context.memberUuid,
+    context.current_member_uuid,
+    context.currentMemberUUID,
+    contextUser.member_uuid,
+    contextUser.memberUuid,
+    contextUser.user_uuid,
+    contextUser.userUuid,
+    claims.member_uuid,
+    claims.memberUuid,
+    claims.user_uuid,
+    claims.userUuid,
+    claims.uid,
+    claims.sub,
+    context.current_member_id,
+  ]
+  return pickFirstNonEmpty(candidates)
+}
+
+const sendTestNotification = async () => {
+  const inputMemberUUID = String(notificationMemberUUID.value || "").trim()
+  if (!inputMemberUUID) {
+    const guessed = guessMemberUUID()
+    if (guessed) {
+      notificationMemberUUID.value = guessed
+    }
+  }
+
+  const memberUUID = String(notificationMemberUUID.value || "").trim()
+  if (!memberUUID) {
+    showToast({
+      title: "发送失败",
+      message: "member_uuid 必填（请先输入或切换到已登录用户）",
+      color: "warning",
+      duration: 4500,
+    })
+    return
+  }
+
+  notifying.value = true
+  try {
+    await invokeCapability(
+      "com.corex.notifications.test",
+      "Send",
+      {
+        method: "POST",
+        endpoint: "/api/v1/notifications/test",
+        body: {
+          member_uuid: memberUUID,
+          title: "Plugin 测试通知",
+          content: "这是一条来自模板页按钮的测试消息",
+          type: "info",
+          category: "system",
+          is_important: false,
+          metadata: {
+            source: "plugin-template-crud",
+          },
+        },
+      },
+      {
+        preferredProtocol: "rest",
+        notifyOnSuccess: false,
+      }
+    )
+    showToast({
+      title: "发送成功",
+      message: "测试通知已提交，请查看右上角小铃铛",
+      color: "success",
+      duration: 3500,
+    })
+  } catch (error: any) {
+    showToast({
+      title: "发送失败",
+      message: error?.message || "能力调用失败",
+      color: "error",
+      duration: 5000,
+    })
+  } finally {
+    notifying.value = false
+  }
+}
+
 onMounted(async () => {
   if (!userStore.context && !userStore.isLoading) {
     try {
@@ -472,6 +605,9 @@ onMounted(async () => {
     } catch {
       // ignore user context fetch errors
     }
+  }
+  if (!notificationMemberUUID.value) {
+    notificationMemberUUID.value = guessMemberUUID()
   }
   if (canReadTemplateList.value) {
     await fetchTemplates()

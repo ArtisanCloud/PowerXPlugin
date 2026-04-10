@@ -10,17 +10,22 @@ import (
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	obsintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 // Handler 提供 integration HTTP API 的入口。
 type Handler struct {
-	deps     *app.Deps
-	dispatch *integrationService.DispatchService
-	logger   *logrus.Entry
+	deps       *app.Deps
+	dispatch   *integrationService.DispatchService
+	logger     *logrus.Entry
+	stsService *iamservice.STSService
 }
 
 type capabilityInvokeRequest struct {
@@ -29,6 +34,11 @@ type capabilityInvokeRequest struct {
 	PreferredProtocol string                 `json:"preferredProtocol"`
 	Payload           map[string]any         `json:"payload"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type gatewayAuthPolicy struct {
+	AuthRequired bool
+	TenantScoped bool
 }
 
 // NewHandler 构造新的 Handler。
@@ -40,6 +50,9 @@ func NewHandler(deps *app.Deps) *Handler {
 	h := &Handler{
 		deps:   deps,
 		logger: logger,
+	}
+	if deps != nil {
+		h.stsService = iamservice.NewSTSService(deps.Config, nil, app.PluginID, "")
 	}
 	h.dispatch = h.buildDispatchService()
 	return h
@@ -100,8 +113,7 @@ func (h *Handler) RotateSecret(c *gin.Context) {
 func (h *Handler) InvokeCapability(c *gin.Context) {
 	ensureInvokeCORS(c)
 
-	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil {
-		contracts.ResponseServiceUnavailable(c, "capability gateway unavailable", nil)
+	if h == nil || !httpmw.RequireCapabilityGateway(c, h.deps) {
 		return
 	}
 
@@ -141,6 +153,12 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	actionForInvoke := action
 
 	headers := collectCapabilityHeaders(c)
+	policy := resolveGatewayAuthPolicy(req.Metadata, payload)
+	headers, err := h.resolveGatewayAuthHeaders(c, headers, policy)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "GATEWAY_AUTH_REQUIRED", err.Error())
+		return
+	}
 	warnings := collectCapabilityWarnings(headers)
 	requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
 	h.logCapabilityInvokeAttempt(capabilityID, action, preferredProtocol, requestID, payload, headers)
@@ -152,6 +170,8 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 		Payload:           payload,
 		Headers:           headers,
 		RequestID:         requestID,
+		AuthRequired:      policy.AuthRequired,
+		TenantScoped:      policy.TenantScoped,
 	})
 	if err != nil {
 		h.logCapabilityInvokeError(capabilityID, action, preferredProtocol, requestID, err)
@@ -190,6 +210,54 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	h.logInvokeCORSHeaders(c)
 
 	contracts.ResponseSuccess(c, response)
+}
+
+func (h *Handler) resolveGatewayAuthHeaders(c *gin.Context, headers map[string]string, policy gatewayAuthPolicy) (map[string]string, error) {
+	if !policy.AuthRequired {
+		if headers != nil {
+			delete(headers, "Authorization")
+		}
+		return headers, nil
+	}
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	raw, _ := authx.GetRawBearerToken(c)
+	tc, hasTC := authx.GetTenantContext(c)
+	if strings.TrimSpace(raw) != "" && hasTC && strings.TrimSpace(tc.TenantUUID) != "" {
+		token, err := h.mintRequestSTSToken(c, tc)
+		if err != nil {
+			return nil, fmt.Errorf("请求态 STS exchange 失败: %w", err)
+		}
+		headers["Authorization"] = "Bearer " + token
+		return headers, nil
+	}
+	if policy.TenantScoped {
+		return nil, errors.New("tenant_scoped=true 需要有效请求上下文（tenant/user）用于 STS exchange")
+	}
+	if strings.TrimSpace(headers["Authorization"]) == "" {
+		return nil, errors.New("该接口需要请求态 Authorization")
+	}
+	return headers, nil
+}
+
+func (h *Handler) mintRequestSTSToken(c *gin.Context, tc authx.TenantContext) (string, error) {
+	if h == nil {
+		return "", errors.New("handler is nil")
+	}
+	sts := h.stsService
+	if sts == nil {
+		if h.deps == nil {
+			return "", errors.New("STS service unavailable")
+		}
+		sts = iamservice.NewSTSService(h.deps.Config, nil, app.PluginID, "")
+		h.stsService = sts
+	}
+	token, err := sts.Mint(c.Request.Context(), tc)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(token.AccessToken), nil
 }
 
 func ensureInvokeCORS(c *gin.Context) {
@@ -381,6 +449,59 @@ func inferPreferredProtocol(payload map[string]any) string {
 	return ""
 }
 
+func resolveGatewayAuthPolicy(metadata map[string]interface{}, payload map[string]any) gatewayAuthPolicy {
+	// 默认按“需要鉴权 + 租户域”处理；调用方可显式声明 auth_required/tenant_scoped 覆盖。
+	policy := gatewayAuthPolicy{
+		AuthRequired: true,
+		TenantScoped: true,
+	}
+	if value, ok := readBool(metadata, "auth_required"); ok {
+		policy.AuthRequired = value
+	}
+	if value, ok := readBool(payload, "auth_required"); ok {
+		policy.AuthRequired = value
+	}
+	if value, ok := readBool(metadata, "tenant_scoped"); ok {
+		policy.TenantScoped = value
+	}
+	if value, ok := readBool(payload, "tenant_scoped"); ok {
+		policy.TenantScoped = value
+	}
+	if !policy.AuthRequired {
+		policy.TenantScoped = false
+	}
+	return policy
+}
+
+func readBool(source map[string]interface{}, key string) (bool, bool) {
+	if len(source) == 0 {
+		return false, false
+	}
+	raw, ok := source[key]
+	if !ok || raw == nil {
+		return false, false
+	}
+	switch typed := raw.(type) {
+	case bool:
+		return typed, true
+	case string:
+		v := strings.TrimSpace(strings.ToLower(typed))
+		switch v {
+		case "1", "true", "yes", "on":
+			return true, true
+		case "0", "false", "no", "off":
+			return false, true
+		}
+	case float64:
+		return typed != 0, true
+	case int:
+		return typed != 0, true
+	case int64:
+		return typed != 0, true
+	}
+	return false, false
+}
+
 func validateRestPayload(payload map[string]any) error {
 	method := strings.TrimSpace(strings.ToUpper(fmt.Sprint(payload["method"])))
 	endpoint := strings.TrimSpace(fmt.Sprint(payload["endpoint"]))
@@ -401,6 +522,7 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 
 	var unavailable *capgateway.UnavailableError
 	if errors.As(err, &unavailable) {
+		obsintegration.RecordPluginGatewayInvokeFailure("SERVICE_UNAVAILABLE")
 		details := gin.H{"traceId": ""}
 		if len(warnings) > 0 {
 			details["warnings"] = warnings
@@ -410,8 +532,20 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 		return
 	}
 
+	var policyErr *capgateway.PolicyError
+	if errors.As(err, &policyErr) {
+		details := gin.H{"traceId": ""}
+		if len(warnings) > 0 {
+			details["warnings"] = warnings
+		}
+		h.logInvokeCORSHeaders(c)
+		contracts.ResponseErrorWithDetails(c, http.StatusBadRequest, strings.TrimSpace(policyErr.Code), strings.TrimSpace(policyErr.Message), details)
+		return
+	}
+
 	var invocationErr *frameworkgateway.InvocationError
 	if errors.As(err, &invocationErr) {
+		obsintegration.RecordPluginGatewayInvokeFailure(firstGatewayCode(invocationErr))
 		if trace := strings.TrimSpace(invocationErr.TraceID); trace != "" {
 			c.Header("X-Trace-Id", trace)
 		}
@@ -439,6 +573,7 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 		return
 	}
 
+	obsintegration.RecordPluginGatewayInvokeFailure(contracts.ErrCodeInternalError)
 	details := gin.H{"traceId": ""}
 	if len(warnings) > 0 {
 		details["warnings"] = warnings

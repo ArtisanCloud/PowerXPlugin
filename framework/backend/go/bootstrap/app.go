@@ -15,6 +15,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 )
 
 // App 封装后端运行时依赖，供 skeleton 与框架层共享。
@@ -112,7 +113,7 @@ func NewApp(cfg *Config) *App {
 	app := &App{
 		Ctx:    ctx,
 		Config: cfg,
-		Logger: slog.Default(),
+		Logger: withRuntimeDefaults(slog.Default(), cfg),
 	}
 	app.initGatewayClient()
 	return app
@@ -220,13 +221,22 @@ func (a *App) initGatewayClient() {
 	if a.Config == nil || !a.Config.Gateway.enabled() {
 		return
 	}
+	authScheme := normalizeGatewayAuthScheme(
+		a.Config.Gateway.AuthScheme,
+		a.Config.Gateway.ToolToken,
+		a.Config.Gateway.APIKey,
+	)
+	tenantID := strings.TrimSpace(a.Config.Gateway.TenantID)
+	if authScheme == "bearer" && tenantID == "" {
+		tenantID = tenantIDFromJWT(a.Config.Gateway.ToolToken)
+	}
 	gcfg := gateway.Config{
 		BaseURL:    a.Config.Gateway.BaseURL,
 		APIPrefix:  a.Config.Gateway.APIPrefix,
-		AuthScheme: a.Config.Gateway.AuthScheme,
+		AuthScheme: authScheme,
 		ToolToken:  a.Config.Gateway.ToolToken,
 		APIKey:     a.Config.Gateway.APIKey,
-		TenantUUID: a.Config.Gateway.TenantID,
+		TenantUUID: tenantID,
 	}
 	if a.Config.Gateway.Timeout > 0 {
 		gcfg.RequestTimeout = a.Config.Gateway.Timeout
@@ -337,4 +347,23 @@ func normalizeGatewayAuthScheme(raw, toolToken, apiKey string) string {
 		return "apikey"
 	}
 	return "bearer"
+}
+
+func withRuntimeDefaults(base *slog.Logger, cfg *Config) *slog.Logger {
+	if base == nil {
+		base = slog.Default()
+	}
+	tenantUUID := runtimelogging.FallbackUnknown
+	if cfg != nil {
+		if tid := strings.TrimSpace(cfg.Gateway.TenantID); tid != "" {
+			tenantUUID = tid
+		}
+	}
+
+	return base.With(
+		slog.String(runtimelogging.FieldTenantUUID, tenantUUID),
+		slog.String(runtimelogging.FieldTenantKey, runtimelogging.TenantKeyFromUUID(tenantUUID)),
+		slog.String(runtimelogging.FieldSubscriber, "bootstrap.app"),
+		slog.String(runtimelogging.FieldComponent, "bootstrap.app"),
+	)
 }

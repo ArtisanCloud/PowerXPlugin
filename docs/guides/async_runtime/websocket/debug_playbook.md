@@ -21,6 +21,24 @@
    - standalone：`POWERX_PROXY=0`
    - standalone + proxy：`POWERX_PROXY=1`
 
+## 2.1 日志落点（先确认再联调）
+
+1. 两种模式日志都在“插件后端进程”输出（stdout/stderr），不是默认写到底座日志。
+2. 推荐统一落盘：
+
+```bash
+export RUNTIME_LOG_FILE=./tmp/runtime-backend.log
+POWERX_PROXY=0 ./backend/cmd/plugin/plugin 2>&1 | tee "$RUNTIME_LOG_FILE"
+# 或
+POWERX_PROXY=1 PX_GATEWAY_BASE_URL=http://127.0.0.1:8077 ./backend/cmd/plugin/plugin 2>&1 | tee "$RUNTIME_LOG_FILE"
+```
+
+3. 容器场景可用：
+
+```bash
+docker logs -f <container_name> | tee "$RUNTIME_LOG_FILE"
+```
+
 ## 3. 连接地址矩阵
 
 1. Host（底座）：`ws://127.0.0.1:8077/api/ws?authorization=Bearer%20$HOST_TOKEN`
@@ -54,6 +72,19 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 ```
 
 预期：先 `ack`，再收到 `event`。
+
+### Step 3：通知探针（可选但推荐）
+
+用统一探针验证 UI 是否真的消费到事件（而不是仅靠发送后主动拉取）。
+
+```bash
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/notifications/test \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"ws probe"}'
+```
+
+预期：右上角通知铃铛未读角标增加，通知面板出现新事件。默认 topic 为 `plugin.notify.tenant.{tenant_uuid}`。
 
 ## 6. standalone + proxy（`POWERX_PROXY=1`）
 
@@ -142,6 +173,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 3. `403 topic not allowed`：profile/ACL 未授权该 topic
 4. 只有 `ack` 无 `event`：topic 不一致、未先 `grant`，或权限快照未轮换
 5. `grant/publish` 失败且提示 topic 不存在：先走 `internal/event-fabric/topics` 创建 topic
+6. 铃铛显示“已连接”但无通知：检查是否订阅了 `plugin.notify.tenant.{tenant_uuid}`，并确认 token 中 `tid` 与 publish 租户一致
 
 ## 8. 职责边界（必须遵守）
 
@@ -154,3 +186,51 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 2. API Key 快照权限必须覆盖该 topic。
 3. 权限变更后必须使用轮换/新建后的新 key。
 4. `grant` 不创建 topic，只做授权绑定。
+
+## 10. Proxy 权限失败闭环（US3 验收）
+
+目标：形成“有限重试 -> 超限工单 -> 暂停 -> 运维恢复 -> 再触发”的统一流程。
+
+### Step 1：构造权限失败并触发重试
+
+```bash
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/dispatches/dispatch-us3-001/retry \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"error_code":"AUTH_FORBIDDEN","error_message":"topic not allowed"}'
+```
+
+预期：前两次返回 `202`，第三次返回 `409`。
+
+### Step 2：暂停并创建恢复工单
+
+```bash
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/dispatches/dispatch-us3-001/pause \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"paused_job_id":"job-us3-001"}'
+```
+
+预期：返回 `201`，拿到 `ticket_id`。
+
+### Step 3：校验恢复权限边界
+
+```bash
+# 非 ops/admin（应失败）
+curl -sS -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/tickets/$TICKET_ID/resume" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"operator_role":"viewer","operator_id":"qa-user","reason":"try-resume"}'
+
+# ops/admin（应成功）
+curl -sS -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/tickets/$TICKET_ID/resume" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"operator_role":"ops","operator_id":"ops-user","reason":"permission fixed"}'
+```
+
+预期：第一条 `403`，第二条 `200` 且 `ticket_status=resolved`。
+
+### Step 4：恢复后再触发
+
+恢复成功后再次执行 retry，预期回到 `202`（重试窗口被重置），并可继续按标准 WS 联调流程验证 `ack -> event`。

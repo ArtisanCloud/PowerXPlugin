@@ -1,8 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
+import logging
+import os
+from urllib import parse as urlparse
+from urllib import request as urlrequest
+from urllib.error import HTTPError, URLError
 from uuid import uuid4
 
+from app.config.settings import get_settings
 from app.entity.models import (
     IntegrationChangeApproval,
     IntegrationGrantMatrixOverride,
@@ -19,9 +26,59 @@ def _now() -> datetime:
     return datetime.utcnow()
 
 
+def _normalize_api_prefix(raw: str | None) -> str:
+    value = str(raw or "").strip()
+    if not value:
+        return "/api/v1"
+    if not value.startswith("/"):
+        value = "/" + value
+    value = "/" + value.strip("/")
+    if value == "/":
+        return "/api/v1"
+    return value
+
+
+def _auth_scheme_from_header(value: str) -> str:
+    raw = (value or "").strip().lower()
+    if raw.startswith("bearer "):
+        return "bearer"
+    if raw.startswith("apikey ") or raw.startswith("api-key ") or raw.startswith("api_key "):
+        return "apikey"
+    if raw:
+        return "unknown"
+    return "none"
+
+
+def _first_nonempty(*items: str) -> str:
+    for item in items:
+        value = str(item or "").strip()
+        if value:
+            return value
+    return ""
+
+
+class IntegrationInvokeError(Exception):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int = 502,
+        trace_id: str = "",
+        details: dict | None = None,
+        warnings: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.trace_id = trace_id
+        self.details = details or {}
+        self.warnings = warnings or []
+
+
 class IntegrationService:
     def __init__(self, repo: IntegrationRepository | None = None) -> None:
         self._repo = repo or IntegrationRepository()
+        self._settings = get_settings()
+        self._logger = logging.getLogger("integration_http")
 
     def list_subscriptions(self, tenant_uuid: str | None = None) -> list:
         return to_list(self._repo.list_subscriptions(tenant_uuid))
@@ -167,5 +224,152 @@ class IntegrationService:
         self._repo.create_idempotency_record(record)
         return {"status": "ok"}
 
-    def invoke_capability(self, payload: dict) -> dict:
-        return {"status": "ok", "payload": {}, "metadata": {}}
+    def invoke_capability(
+        self,
+        payload: dict,
+        *,
+        forward_headers: dict[str, str] | None = None,
+        request_id: str | None = None,
+    ) -> dict:
+        capability_id = str(payload.get("capabilityId") or "").strip()
+        action = str(payload.get("action") or "").strip()
+        preferred_protocol = str(payload.get("preferredProtocol") or "").strip()
+        invoke_payload = payload.get("payload") if isinstance(payload.get("payload"), dict) else {}
+
+        if not capability_id:
+            raise IntegrationInvokeError("capabilityId is required", status_code=400)
+
+        gateway_base = self._effective_gateway_base_url()
+        if not gateway_base:
+            raise IntegrationInvokeError("capability gateway unavailable", status_code=503)
+
+        auth_scheme = self._resolve_gateway_auth_scheme()
+        gateway_credential = self._resolve_gateway_credential(auth_scheme)
+        if not gateway_credential:
+            raise IntegrationInvokeError(f"gateway credential missing (auth_scheme={auth_scheme})", status_code=503)
+
+        endpoint = f"{gateway_base}/tenant/invocations"
+        body = {
+            "capability_id": capability_id,
+            "payload": invoke_payload,
+        }
+        if action:
+            body["action"] = action
+        if preferred_protocol:
+            body["preferred_protocol"] = preferred_protocol
+        body_bytes = json.dumps(body).encode("utf-8")
+        req = urlrequest.Request(endpoint, data=body_bytes, method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("Accept", "application/json")
+        req.add_header("Authorization", self._build_auth_header(auth_scheme, gateway_credential))
+        rid = str(request_id or "").strip() or uuid4().hex
+        req.add_header("X-Request-ID", rid)
+
+        for key, value in (forward_headers or {}).items():
+            if str(value).strip():
+                req.add_header(key, str(value).strip())
+
+        self._logger.info(
+            "capability invoke dispatch capability_id=%s action=%s preferred_protocol=%s endpoint=%s auth_scheme=%s forwarded_auth=%s",
+            capability_id,
+            action,
+            preferred_protocol,
+            endpoint,
+            auth_scheme,
+            "Authorization" in (forward_headers or {}),
+        )
+
+        try:
+            with urlrequest.urlopen(req, timeout=10) as resp:
+                status_code = resp.status
+                raw_bytes = resp.read()
+                trace_id = str(resp.headers.get("X-Trace-Id") or "").strip()
+        except HTTPError as exc:
+            raw_bytes = exc.read() if hasattr(exc, "read") else b""
+            details = self._safe_json(raw_bytes)
+            trace_id = str(exc.headers.get("X-Trace-Id") if getattr(exc, "headers", None) else "") or ""
+            self._logger.error(
+                "capability invoke upstream http error status=%s trace_id=%s body=%s",
+                exc.code,
+                trace_id,
+                details,
+            )
+            raise IntegrationInvokeError(
+                "capability invoke failed",
+                status_code=exc.code or 502,
+                trace_id=trace_id.strip(),
+                details=details if isinstance(details, dict) else {"raw": details},
+            ) from exc
+        except URLError as exc:
+            self._logger.error("capability invoke upstream transport error: %s", exc)
+            raise IntegrationInvokeError("capability invoke failed", status_code=502, details={"error": str(exc)}) from exc
+
+        envelope = self._safe_json(raw_bytes)
+        if not isinstance(envelope, dict):
+            envelope = {"raw": envelope}
+
+        response_data = envelope.get("data") if isinstance(envelope.get("data"), dict) else {}
+        if not trace_id:
+            trace_id = str(envelope.get("trace_id") or response_data.get("trace_id") or "").strip()
+        status = str(response_data.get("status") or envelope.get("status") or "").strip() or "ok"
+        warnings = response_data.get("warnings") if isinstance(response_data.get("warnings"), list) else []
+        payload_data = (
+            response_data.get("payload")
+            if response_data.get("payload") is not None
+            else response_data
+        )
+        result = {
+            "traceId": trace_id or None,
+            "status": status,
+            "data": payload_data,
+            "raw": envelope,
+        }
+        if warnings:
+            result["warnings"] = warnings
+
+        self._logger.info(
+            "capability invoke success status_code=%s trace_id=%s status=%s",
+            status_code,
+            trace_id,
+            status,
+        )
+        return result
+
+    def _effective_gateway_base_url(self) -> str:
+        base_url = str(getattr(self._settings, "gateway_base_url", "") or "").strip().rstrip("/")
+        if not base_url:
+            return ""
+        api_prefix = _normalize_api_prefix(getattr(self._settings, "gateway_api_prefix", "/api/v1"))
+        if base_url.endswith(api_prefix):
+            return base_url
+        return f"{base_url}{api_prefix}"
+
+    def _resolve_gateway_auth_scheme(self) -> str:
+        raw = os.getenv("PX_GATEWAY_AUTH_SCHEME", "").strip().lower()
+        if raw in {"apikey", "api_key", "api-key"}:
+            return "apikey"
+        if raw == "bearer":
+            return "bearer"
+        api_key = _first_nonempty(os.getenv("PX_GATEWAY_API_KEY", ""), os.getenv("PX_PLUGIN_API_KEY", ""))
+        tool_token = _first_nonempty(os.getenv("PX_PLUGIN_TOOL_TOKEN", ""), os.getenv("PX_TOOL_TOKEN", ""))
+        if api_key and not tool_token:
+            return "apikey"
+        return "bearer"
+
+    def _resolve_gateway_credential(self, auth_scheme: str) -> str:
+        if auth_scheme == "apikey":
+            return _first_nonempty(os.getenv("PX_GATEWAY_API_KEY", ""), os.getenv("PX_PLUGIN_API_KEY", ""))
+        return _first_nonempty(os.getenv("PX_PLUGIN_TOOL_TOKEN", ""), os.getenv("PX_TOOL_TOKEN", ""))
+
+    def _build_auth_header(self, auth_scheme: str, credential: str) -> str:
+        if auth_scheme == "apikey":
+            return f"ApiKey {credential.strip()}"
+        return f"Bearer {credential.strip()}"
+
+    def _safe_json(self, raw_bytes: bytes):
+        if not raw_bytes:
+            return {}
+        try:
+            return json.loads(raw_bytes.decode("utf-8"))
+        except Exception:
+            return raw_bytes.decode("utf-8", errors="ignore")

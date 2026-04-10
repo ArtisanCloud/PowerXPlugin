@@ -33,6 +33,11 @@ type capabilityInvokeRequest struct {
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 }
 
+type gatewayAuthPolicy struct {
+	AuthRequired bool
+	TenantScoped bool
+}
+
 // NewHandler 构造新的 Handler。
 func NewHandler(deps *app.Deps) *Handler {
 	var logger *logrus.Entry
@@ -142,6 +147,14 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	actionForInvoke := action
 
 	headers := collectCapabilityHeaders(c)
+	policy := resolveGatewayAuthPolicy(req.Metadata, payload)
+	if policy.AuthRequired && strings.TrimSpace(headers["Authorization"]) == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "GATEWAY_AUTH_REQUIRED", "该接口需要请求态 Authorization（Bearer STS token）")
+		return
+	}
+	if !policy.AuthRequired && headers != nil {
+		delete(headers, "Authorization")
+	}
 	warnings := collectCapabilityWarnings(headers)
 	requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
 	h.logCapabilityInvokeAttempt(capabilityID, action, preferredProtocol, requestID, payload, headers)
@@ -153,6 +166,8 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 		Payload:           payload,
 		Headers:           headers,
 		RequestID:         requestID,
+		AuthRequired:      policy.AuthRequired,
+		TenantScoped:      policy.TenantScoped,
 	})
 	if err != nil {
 		h.logCapabilityInvokeError(capabilityID, action, preferredProtocol, requestID, err)
@@ -382,6 +397,59 @@ func inferPreferredProtocol(payload map[string]any) string {
 	return ""
 }
 
+func resolveGatewayAuthPolicy(metadata map[string]interface{}, payload map[string]any) gatewayAuthPolicy {
+	// 默认按“需要鉴权 + 租户域”处理；调用方可显式声明 auth_required/tenant_scoped 覆盖。
+	policy := gatewayAuthPolicy{
+		AuthRequired: true,
+		TenantScoped: true,
+	}
+	if value, ok := readBool(metadata, "auth_required"); ok {
+		policy.AuthRequired = value
+	}
+	if value, ok := readBool(payload, "auth_required"); ok {
+		policy.AuthRequired = value
+	}
+	if value, ok := readBool(metadata, "tenant_scoped"); ok {
+		policy.TenantScoped = value
+	}
+	if value, ok := readBool(payload, "tenant_scoped"); ok {
+		policy.TenantScoped = value
+	}
+	if !policy.AuthRequired {
+		policy.TenantScoped = false
+	}
+	return policy
+}
+
+func readBool(source map[string]interface{}, key string) (bool, bool) {
+	if len(source) == 0 {
+		return false, false
+	}
+	raw, ok := source[key]
+	if !ok || raw == nil {
+		return false, false
+	}
+	switch typed := raw.(type) {
+	case bool:
+		return typed, true
+	case string:
+		v := strings.TrimSpace(strings.ToLower(typed))
+		switch v {
+		case "1", "true", "yes", "on":
+			return true, true
+		case "0", "false", "no", "off":
+			return false, true
+		}
+	case float64:
+		return typed != 0, true
+	case int:
+		return typed != 0, true
+	case int64:
+		return typed != 0, true
+	}
+	return false, false
+}
+
 func validateRestPayload(payload map[string]any) error {
 	method := strings.TrimSpace(strings.ToUpper(fmt.Sprint(payload["method"])))
 	endpoint := strings.TrimSpace(fmt.Sprint(payload["endpoint"]))
@@ -409,6 +477,17 @@ func (h *Handler) writeCapabilityError(c *gin.Context, err error, warnings []str
 		}
 		h.logInvokeCORSHeaders(c)
 		contracts.ResponseErrorWithDetails(c, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", unavailable.Error(), details)
+		return
+	}
+
+	var policyErr *capgateway.PolicyError
+	if errors.As(err, &policyErr) {
+		details := gin.H{"traceId": ""}
+		if len(warnings) > 0 {
+			details["warnings"] = warnings
+		}
+		h.logInvokeCORSHeaders(c)
+		contracts.ResponseErrorWithDetails(c, http.StatusBadRequest, strings.TrimSpace(policyErr.Code), strings.TrimSpace(policyErr.Message), details)
 		return
 	}
 

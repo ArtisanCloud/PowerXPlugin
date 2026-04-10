@@ -59,6 +59,8 @@ type InvokeParams struct {
 	Headers           map[string]string
 	RequestID         string
 	TenantUUID        string
+	AuthRequired      bool
+	TenantScoped      bool
 }
 
 // InvokeResult 描述能力调用的输出。
@@ -212,6 +214,30 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		return nil, c.unavailableError(params.CapabilityID)
 	}
 
+	requestAuthHeader := headerValue(params.Headers, "Authorization")
+	if params.AuthRequired && strings.TrimSpace(requestAuthHeader) == "" {
+		return nil, &PolicyError{
+			Code:    "GW_POLICY_AUTH_REQUIRED",
+			Message: "auth_required=true 时必须提供请求态 Authorization（Bearer STS token）",
+		}
+	}
+	if params.TenantScoped {
+		tid, ok := tenantUUIDFromAuthHeader(requestAuthHeader)
+		if !ok || strings.TrimSpace(tid) == "" {
+			return nil, &PolicyError{
+				Code:    "GW_POLICY_TENANT_TOKEN_REQUIRED",
+				Message: "tenant_scoped=true 时 Authorization 必须为包含 tid claim 的 Bearer token",
+			}
+		}
+		if wanted := strings.TrimSpace(params.TenantUUID); wanted != "" && !strings.EqualFold(wanted, tid) {
+			return nil, &PolicyError{
+				Code:    "GW_POLICY_TENANT_MISMATCH",
+				Message: fmt.Sprintf("tenant token tid(%s) 与请求 tenant_uuid(%s) 不一致", tid, wanted),
+			}
+		}
+		params.TenantUUID = tid
+	}
+
 	req := frameworkgateway.InvokeRequest{
 		CapabilityID:      params.CapabilityID,
 		Action:            params.Action,
@@ -220,6 +246,7 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		RequestID:         params.RequestID,
 		Headers:           copyHeaders(params.Headers),
 		TenantUUID:        params.TenantUUID,
+		DisableAuth:       !params.AuthRequired,
 	}
 	if c.logger != nil {
 		baseURL := ""
@@ -385,6 +412,22 @@ func (e *UnavailableError) Error() string {
 	return "gateway 不可用: " + e.Reason
 }
 
+// PolicyError 表示调用策略不满足（例如缺少请求态鉴权信息）。
+type PolicyError struct {
+	Code    string
+	Message string
+}
+
+func (e *PolicyError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if strings.TrimSpace(e.Code) == "" {
+		return strings.TrimSpace(e.Message)
+	}
+	return strings.TrimSpace(e.Code) + ": " + strings.TrimSpace(e.Message)
+}
+
 func (c *Client) unavailableError(capabilityID string) error {
 	reason := c.offlineReason
 	if reason == "" {
@@ -471,6 +514,35 @@ func copyHeaders(src map[string]string) map[string]string {
 		dest[k] = v
 	}
 	return dest
+}
+
+func headerValue(headers map[string]string, key string) string {
+	if len(headers) == 0 || strings.TrimSpace(key) == "" {
+		return ""
+	}
+	for k, v := range headers {
+		if strings.EqualFold(strings.TrimSpace(k), key) {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+func tenantUUIDFromAuthHeader(header string) (string, bool) {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return "", false
+	}
+	lowered := strings.ToLower(header)
+	if !strings.HasPrefix(lowered, "bearer ") {
+		return "", false
+	}
+	token := strings.TrimSpace(header[len("Bearer "):])
+	tid := strings.TrimSpace(tenantUUIDFromJWT(token))
+	if tid == "" {
+		return "", false
+	}
+	return tid, true
 }
 
 func ensureLogger(entry *logrus.Entry) *logrus.Entry {

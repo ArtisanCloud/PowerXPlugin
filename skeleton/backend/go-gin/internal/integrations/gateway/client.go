@@ -215,6 +215,11 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 	}
 
 	requestAuthHeader := headerValue(params.Headers, "Authorization")
+	tokenSource := "none"
+	if strings.TrimSpace(requestAuthHeader) != "" {
+		tokenSource = "request"
+	}
+	tokenTID := ""
 	if params.AuthRequired && strings.TrimSpace(requestAuthHeader) == "" {
 		return nil, &PolicyError{
 			Code:    "GW_POLICY_AUTH_REQUIRED",
@@ -229,6 +234,12 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 				Message: "tenant_scoped=true 时 Authorization 必须为包含 tid claim 的 Bearer token",
 			}
 		}
+		if isZeroTenantUUID(tid) {
+			return nil, &PolicyError{
+				Code:    "GW_POLICY_ZERO_TENANT_FORBIDDEN",
+				Message: "tenant_scoped=true 时不允许使用零租户 token（tid=00000000-...）",
+			}
+		}
 		if wanted := strings.TrimSpace(params.TenantUUID); wanted != "" && !strings.EqualFold(wanted, tid) {
 			return nil, &PolicyError{
 				Code:    "GW_POLICY_TENANT_MISMATCH",
@@ -236,6 +247,7 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 			}
 		}
 		params.TenantUUID = tid
+		tokenTID = tid
 	}
 
 	req := frameworkgateway.InvokeRequest{
@@ -262,6 +274,10 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 			"action":                 params.Action,
 			"preferred_protocol":     params.PreferredProtocol,
 			"request_id":             params.RequestID,
+			"auth_required":          params.AuthRequired,
+			"tenant_scoped":          params.TenantScoped,
+			"token_source":           tokenSource,
+			"token_tid":              maskTenantUUID(tokenTID),
 			"payload_method":         strings.TrimSpace(strings.ToUpper(fmt.Sprint(extractMapValue(params.Payload, "method")))),
 			"payload_endpoint":       strings.TrimSpace(fmt.Sprint(extractMapValue(params.Payload, "endpoint"))),
 			"gateway_base_url":       baseURL,
@@ -543,6 +559,22 @@ func tenantUUIDFromAuthHeader(header string) (string, bool) {
 		return "", false
 	}
 	return tid, true
+}
+
+func isZeroTenantUUID(tid string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(tid))
+	return normalized == "00000000-0000-0000-0000-000000000000"
+}
+
+func maskTenantUUID(tid string) string {
+	tid = strings.TrimSpace(tid)
+	if tid == "" {
+		return ""
+	}
+	if len(tid) <= 8 {
+		return tid
+	}
+	return tid[:8] + "***"
 }
 
 func ensureLogger(entry *logrus.Entry) *logrus.Entry {

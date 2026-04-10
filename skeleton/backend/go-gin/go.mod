@@ -3,7 +3,7 @@ module github.com/ArtisanCloud/PowerXPlugin/skeleton/backend
 go 1.24.0
 
 require (
-	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.4-alpha
+	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.6-alpha
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0

@@ -48,6 +48,12 @@ make skeleton-reinstall VERSION=0.7.1 API_BASE=http://127.0.0.1:8077/api/v1 TOKE
 
 等价命令分别是 `make -C skeleton dist` 和 `make -C skeleton local-install ...`；`make dist` 在仓库根目录也已透传到 `skeleton`。
 
+如需输出 Linux 安装包（例如在 macOS 上打包部署到 Linux）：
+
+```bash
+make dist PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/0.1.1-linux
+```
+
 ## Manifest 位置说明
 
 - 仓库真实的开发态 manifest 仅存放在 `skeleton/plugin.yaml`。

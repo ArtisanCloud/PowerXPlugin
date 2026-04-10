@@ -10,7 +10,9 @@ import (
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	obsintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
@@ -20,9 +22,10 @@ import (
 
 // Handler 提供 integration HTTP API 的入口。
 type Handler struct {
-	deps     *app.Deps
-	dispatch *integrationService.DispatchService
-	logger   *logrus.Entry
+	deps       *app.Deps
+	dispatch   *integrationService.DispatchService
+	logger     *logrus.Entry
+	stsService *iamservice.STSService
 }
 
 type capabilityInvokeRequest struct {
@@ -47,6 +50,9 @@ func NewHandler(deps *app.Deps) *Handler {
 	h := &Handler{
 		deps:   deps,
 		logger: logger,
+	}
+	if deps != nil {
+		h.stsService = iamservice.NewSTSService(deps.Config, nil, app.PluginID, "")
 	}
 	h.dispatch = h.buildDispatchService()
 	return h
@@ -148,12 +154,10 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 
 	headers := collectCapabilityHeaders(c)
 	policy := resolveGatewayAuthPolicy(req.Metadata, payload)
-	if policy.AuthRequired && strings.TrimSpace(headers["Authorization"]) == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "GATEWAY_AUTH_REQUIRED", "该接口需要请求态 Authorization（Bearer STS token）")
+	headers, err := h.resolveGatewayAuthHeaders(c, headers, policy)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "GATEWAY_AUTH_REQUIRED", err.Error())
 		return
-	}
-	if !policy.AuthRequired && headers != nil {
-		delete(headers, "Authorization")
 	}
 	warnings := collectCapabilityWarnings(headers)
 	requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
@@ -206,6 +210,54 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	h.logInvokeCORSHeaders(c)
 
 	contracts.ResponseSuccess(c, response)
+}
+
+func (h *Handler) resolveGatewayAuthHeaders(c *gin.Context, headers map[string]string, policy gatewayAuthPolicy) (map[string]string, error) {
+	if !policy.AuthRequired {
+		if headers != nil {
+			delete(headers, "Authorization")
+		}
+		return headers, nil
+	}
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	raw, _ := authx.GetRawBearerToken(c)
+	tc, hasTC := authx.GetTenantContext(c)
+	if strings.TrimSpace(raw) != "" && hasTC && strings.TrimSpace(tc.TenantUUID) != "" {
+		token, err := h.mintRequestSTSToken(c, tc)
+		if err != nil {
+			return nil, fmt.Errorf("请求态 STS exchange 失败: %w", err)
+		}
+		headers["Authorization"] = "Bearer " + token
+		return headers, nil
+	}
+	if policy.TenantScoped {
+		return nil, errors.New("tenant_scoped=true 需要有效请求上下文（tenant/user）用于 STS exchange")
+	}
+	if strings.TrimSpace(headers["Authorization"]) == "" {
+		return nil, errors.New("该接口需要请求态 Authorization")
+	}
+	return headers, nil
+}
+
+func (h *Handler) mintRequestSTSToken(c *gin.Context, tc authx.TenantContext) (string, error) {
+	if h == nil {
+		return "", errors.New("handler is nil")
+	}
+	sts := h.stsService
+	if sts == nil {
+		if h.deps == nil {
+			return "", errors.New("STS service unavailable")
+		}
+		sts = iamservice.NewSTSService(h.deps.Config, nil, app.PluginID, "")
+		h.stsService = sts
+	}
+	token, err := sts.Mint(c.Request.Context(), tc)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(token.AccessToken), nil
 }
 
 func ensureInvokeCORS(c *gin.Context) {

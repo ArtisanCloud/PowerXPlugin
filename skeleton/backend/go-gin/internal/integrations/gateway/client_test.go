@@ -283,6 +283,35 @@ func TestInvokePolicyTenantScopedUsesTokenTid(t *testing.T) {
 	require.False(t, stub.lastReq.DisableAuth)
 }
 
+func TestInvokePolicyTenantScopedRejectsZeroTenantToken(t *testing.T) {
+	cfg := &config.Config{
+		Gateway: &config.GatewayConfig{
+			BaseURL:   "https://gateway.dev.powerx",
+			ToolToken: "token",
+		},
+	}
+	client := NewClient(cfg, nil)
+	client.transport = &stubTransport{
+		resp: &frameworkgateway.Response{TraceID: "trace-5", Status: "ok"},
+	}
+
+	zeroTenant := "00000000-0000-0000-0000-000000000000"
+	jwt := buildTestJWTWithTenant(zeroTenant)
+	_, err := client.Invoke(context.Background(), InvokeParams{
+		CapabilityID: "com.corex.media.assets.manage",
+		Action:       "List",
+		AuthRequired: true,
+		TenantScoped: true,
+		Headers: map[string]string{
+			"Authorization": "Bearer " + jwt,
+		},
+	})
+	var policyErr *PolicyError
+	require.Error(t, err)
+	require.True(t, errors.As(err, &policyErr))
+	require.Equal(t, "GW_POLICY_ZERO_TENANT_FORBIDDEN", policyErr.Code)
+}
+
 func buildTestJWTWithTenant(tid string) string {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
 	payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"tid":"%s"}`, tid)))

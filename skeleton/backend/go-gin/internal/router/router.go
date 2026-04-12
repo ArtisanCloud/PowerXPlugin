@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	fwiamcontext "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/context"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
@@ -323,26 +325,28 @@ func (r *Router) buildRBAC() *middleware.RBACConfig {
 }
 
 func shouldUseDelegatedIAM(cfg *config.Config) bool {
+	mode := resolveIAMMode(cfg)
+	return mode == fwiamcontracts.IAMModeDelegated
+}
+
+func resolveIAMMode(cfg *config.Config) fwiamcontracts.IAMMode {
+	var configMode string
 	if cfg != nil && cfg.Context != nil {
-		v := strings.ToLower(strings.TrimSpace(cfg.Context.IAMMode))
-		switch v {
-		case "delegated":
-			return true
-		case "local":
-			return false
-		}
+		configMode = cfg.Context.IAMMode
 	}
 
-	v := strings.ToLower(strings.TrimSpace(os.Getenv("IAMMode")))
-	if v == "" {
-		v = strings.ToLower(strings.TrimSpace(os.Getenv("IAM_MODE")))
+	envMode := strings.TrimSpace(os.Getenv("IAM_MODE"))
+	if envMode == "" {
+		envMode = strings.TrimSpace(os.Getenv("IAMMode"))
 	}
-	switch v {
-	case "delegated":
-		return true
-	case "local":
-		return false
+	resolver := fwiamcontext.ModeResolver{}
+	mode, _, err := resolver.Resolve(fwiamcontext.ResolveInput{
+		ConfigMode:  configMode,
+		EnvMode:     envMode,
+		PowerXProxy: strings.TrimSpace(os.Getenv("POWERX_PROXY")),
+	})
+	if err != nil {
+		return fwiamcontracts.IAMModeLocal
 	}
-
-	return os.Getenv("POWERX_PROXY") == "1"
+	return mode
 }

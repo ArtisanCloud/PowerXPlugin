@@ -132,6 +132,17 @@ func main() {
 	}
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
+	if err := iamResolver.Err(); err != nil {
+		logger.WithFields(logger.Fields{
+			"iam_mode":       iamResolver.Mode(),
+			"iam_source":     iamResolver.Source(),
+			"conflict":       iamResolver.Record().ConflictDetected,
+			"decision":       iamResolver.Record().DecisionReason,
+			"config_mode":    iamResolver.Record().ConfigMode,
+			"env_mode":       iamResolver.Record().EnvMode,
+			"effective_mode": iamResolver.Record().EffectiveMode,
+		}).WithError(err).Fatal("IAM mode resolution failed")
+	}
 	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
 	if mode == "" {
 		mode = "unknown"
@@ -358,6 +369,12 @@ func main() {
 		},
 	}
 	fwApp := fwbootstrap.NewApp(appCfg)
+	if err := pluginbootstrap.BindFrameworkIAM(deps, fwApp.IAMRegistry()); err != nil {
+		logger.WithFields(logger.Fields{
+			"iam_mode":        deps.IAMMode,
+			"iam_mode_source": deps.IAMModeSource,
+		}).WithError(err).Fatal("Failed to bind framework IAM registry")
+	}
 
 	if err := fwrouter.AttachHTTPServer(fwApp); err != nil {
 		logger.WithError(err).Fatal("Failed to attach HTTP server")

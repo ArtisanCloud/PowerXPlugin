@@ -8,11 +8,11 @@
 
 **Purpose**: 建立 framework/skeleton 双层基础骨架与可读目录说明，确保后续任务可并行推进。
 
-- [ ] T001 创建 framework federated 模块说明与边界文档 in framework/backend/go/iam/federated/README.md
-- [ ] T002 [P] 创建 framework challenge/risk 子模块说明 in framework/backend/go/iam/federated/challenge/README.md
-- [ ] T003 [P] 创建 framework providers 注册约定说明 in framework/backend/go/iam/federated/providers/README.md
-- [ ] T004 [P] 创建 skeleton federated 装配模块说明 in skeleton/backend/go-gin/internal/services/iam/federated/README.md
-- [ ] T005 创建 019 回归记录模板 in tmp/019-iam-federated-channel-login-regression.md
+- [x] T001 创建 framework federated 模块说明与边界文档 in framework/backend/go/iam/federated/README.md
+- [x] T002 [P] 创建 framework challenge/risk 子模块说明 in framework/backend/go/iam/federated/challenge/README.md
+- [x] T003 [P] 创建 framework providers 注册约定说明 in framework/backend/go/iam/federated/providers/README.md
+- [x] T004 [P] 创建 skeleton federated 装配模块说明 in skeleton/backend/go-gin/internal/services/iam/federated/README.md
+- [x] T005 创建 019 回归记录模板 in tmp/019-iam-federated-channel-login-regression.md
 
 ---
 

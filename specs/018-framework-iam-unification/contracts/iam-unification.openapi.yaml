@@ -1,108 +1,211 @@
 openapi: 3.0.3
 info:
   title: Framework IAM Unification Contract
-  version: 0.1.0
+  version: 0.2.0
   description: >
-    Unified IAM contract for standalone(local) and delegated modes.
+    Unified IAM contract for local and delegated modes.
+    Includes unified error semantics and delegated read-only boundaries.
 servers:
   - url: /api/v1
 paths:
   /admin/iam/mode:
     get:
-      summary: Get effective IAM mode and resolution source.
+      summary: Get effective IAM mode and source.
       responses:
         "200":
-          description: Effective mode.
+          description: Effective IAM mode.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModeResponse"
   /admin/iam/context/me:
     get:
-      summary: Get unified identity context for current request.
+      summary: Resolve unified identity context for current request.
       responses:
         "200":
           description: Identity context resolved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityContextResponse"
         "401":
-          description: Unauthorized or context missing.
+          $ref: "#/components/responses/IAMUnauthorized"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
   /admin/iam/tenants:
     get:
-      summary: List tenants (local mode) or delegated projection.
+      summary: List tenants (local) or delegated projection.
       responses:
         "200":
           description: Tenant list.
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
     post:
-      summary: Create tenant (local mode only).
+      summary: Create tenant (local only).
       responses:
         "201":
           description: Created.
         "405":
-          description: Not allowed in delegated mode.
+          $ref: "#/components/responses/IAMDelegatedReadOnly"
   /admin/iam/departments:
     get:
       summary: List departments by tenant.
       responses:
         "200":
           description: Department list.
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
     post:
-      summary: Create department (local mode only).
+      summary: Create department (local only).
       responses:
         "201":
           description: Created.
         "405":
-          description: Not allowed in delegated mode.
+          $ref: "#/components/responses/IAMDelegatedReadOnly"
   /admin/iam/members:
     get:
       summary: List members by tenant.
       responses:
         "200":
           description: Member list.
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
     post:
-      summary: Create member (local mode only).
+      summary: Create member (local only).
       responses:
         "201":
           description: Created.
         "405":
-          description: Not allowed in delegated mode.
+          $ref: "#/components/responses/IAMDelegatedReadOnly"
   /admin/iam/roles:
     get:
       summary: List roles by tenant.
       responses:
         "200":
           description: Role list.
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
     post:
-      summary: Create role (local mode only).
+      summary: Create role (local only).
       responses:
         "201":
           description: Created.
         "405":
-          description: Not allowed in delegated mode.
+          $ref: "#/components/responses/IAMDelegatedReadOnly"
   /admin/iam/permissions:
     get:
       summary: List permission catalog and role bindings.
       responses:
         "200":
           description: Permission list.
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
+
 components:
+  responses:
+    IAMUnauthorized:
+      description: Missing/invalid token or tenant context.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: IAM_UNAUTHORIZED
+              message: tenant context missing
+    IAMForbidden:
+      description: Authenticated but not authorized.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: IAM_FORBIDDEN
+              message: permission denied
+    IAMUpstreamDependency:
+      description: Adapter is not bound or delegated upstream unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: IAM_UPSTREAM_DEPENDENCY
+              message: upstream unavailable
+    IAMDelegatedReadOnly:
+      description: Delegated mode forbids write operations on plugin side.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: IAM_DELEGATED_READ_ONLY
+              message: write operations are not allowed in delegated mode
+
   schemas:
-    IAMMode:
+    ModeResponse:
       type: object
       properties:
-        mode:
-          type: string
-          enum: [local, delegated]
-        source:
-          type: string
-        readOnly:
+        success:
           type: boolean
+        data:
+          type: object
+          properties:
+            mode:
+              type: string
+              enum: [local, delegated]
+            source:
+              type: string
+            read_only:
+              type: boolean
+            registry_bound:
+              type: boolean
+
+    IdentityContextResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/IdentityContext"
+
     IdentityContext:
       type: object
-      required: [tenant_uuid, roles, permissions]
+      required: [tenant_uuid]
       properties:
         tenant_uuid:
           type: string
+          format: uuid
         user_id:
-          type: integer
-          format: int64
+          type: string
         member_id:
-          type: integer
-          format: int64
+          type: string
         roles:
           type: array
           items:
@@ -113,12 +216,33 @@ components:
             type: string
         policy_version:
           type: string
+        trace_id:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: "#/components/schemas/Error"
+
     Error:
       type: object
       properties:
         code:
           type: string
+          enum:
+            - IAM_UNAUTHORIZED
+            - IAM_FORBIDDEN
+            - IAM_UPSTREAM_DEPENDENCY
+            - IAM_ADAPTER_NOT_BOUND
+            - IAM_DELEGATED_READ_ONLY
+            - INVALID_TENANT_UUID
+            - TENANT_CONTEXT_CONFLICT
         message:
           type: string
-        trace_id:
-          type: string
+        details:
+          type: object
+          additionalProperties: true

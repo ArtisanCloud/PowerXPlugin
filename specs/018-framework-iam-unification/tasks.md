@@ -109,10 +109,10 @@
 
 **Purpose**: 收口迁移说明、契约文档和全量验证。
 
-- [ ] T039 [P] 更新 IAM 统一契约 OpenAPI 细节（错误码与只读边界）in specs/018-framework-iam-unification/contracts/iam-unification.openapi.yaml
-- [ ] T040 [P] 更新迁移说明与对插件开发者接入指引 in specs/018-framework-iam-unification/quickstart.md
-- [ ] T041 更新实施计划中的结构描述与术语一致性 in specs/018-framework-iam-unification/plan.md
-- [ ] T042 执行并记录 018 回归结果 in tmp/018-framework-iam-unification-regression.md
+- [X] T039 [P] 更新 IAM 统一契约 OpenAPI 细节（错误码与只读边界）in specs/018-framework-iam-unification/contracts/iam-unification.openapi.yaml
+- [X] T040 [P] 更新迁移说明与对插件开发者接入指引 in specs/018-framework-iam-unification/quickstart.md
+- [X] T041 更新实施计划中的结构描述与术语一致性 in specs/018-framework-iam-unification/plan.md
+- [X] T042 执行并记录 018 回归结果 in tmp/018-framework-iam-unification-regression.md
 
 ---
 

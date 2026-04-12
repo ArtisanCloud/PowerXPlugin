@@ -14,6 +14,13 @@
 3. delegated 写边界：组织/成员/角色/权限写操作只允许宿主侧执行，插件侧只读。
 4. local 最小集：租户、部门、成员、角色、权限五类实体完整可用。
 
+## Terminology Alignment
+
+- `standalone(local)`：实现层统一称为 `local`。
+- `delegated(host)`：实现层统一称为 `delegated`。
+- `Identity Context`：统一指 `tenant_uuid/user_id/member_id/roles/permissions/policy_version/trace_id`。
+- `Unified Error Semantics`：统一使用 `401/403/424/405` 与 IAM 域错误码映射（认证失败/权限不足/上游依赖/只读边界）。
+
 ## Technical Context
 
 **Language/Version**: Go 1.24  
@@ -102,6 +109,14 @@ skeleton/backend/go-gin/internal/
 1. [data-model.md](./data-model.md)（核心实体、关系、约束、状态）
 2. [contracts/iam-unification.openapi.yaml](./contracts/iam-unification.openapi.yaml)（统一 API 契约骨架）
 3. [quickstart.md](./quickstart.md)（双模式接入与回归步骤）
+
+## Implementation Status (2026-04-12)
+
+1. Phase 1-2：已完成（契约、模式解析、错误语义、registry 绑定）。
+2. US1：已完成（插件无感切换 local/delegated）。
+3. US2：已完成（组织与权限能力统一暴露，delegated 写拒绝）。
+4. US3：已完成（token/context 解析统一、auth_guard 统一判定、mode/tenant/user/permission/trace 审计字段补齐）。
+5. Phase 6：进行中（文档与回归收口）。
 
 ## Complexity Tracking
 

@@ -2,8 +2,6 @@ package delegated
 
 import (
 	"context"
-	"strconv"
-	"strings"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
@@ -13,6 +11,10 @@ import (
 
 type delegatedProxy interface {
 	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+}
+
+type identityResolver interface {
+	ResolveIdentityContext(ctx context.Context, accessToken string) (*fwiamcontracts.IdentityContext, error)
 }
 
 // Adapter 将 delegated proxy 能力映射到 framework IAM 契约。
@@ -47,20 +49,12 @@ func (a *Adapter) Authorize(_ context.Context, req fwiamcontracts.AuthorizationR
 }
 
 func (a *Adapter) ResolveIdentity(ctx context.Context, bearerToken string) (*fwiamcontracts.IdentityContext, error) {
+	if resolver, ok := a.proxy.(identityResolver); ok {
+		return resolver.ResolveIdentityContext(ctx, bearerToken)
+	}
 	me, err := a.proxy.MeContext(ctx, bearerToken)
 	if err != nil {
 		return nil, err
 	}
-	if me == nil {
-		return nil, fwiamerrors.New(fwiamerrors.CodeUnauthorized, "empty delegated identity context")
-	}
-	identity := &fwiamcontracts.IdentityContext{
-		TenantUUID: strings.TrimSpace(me.CurrentTenantUUID),
-		TraceID:    "",
-	}
-	if len(me.Members) > 0 {
-		member := me.Members[0]
-		identity.MemberID = strconv.FormatUint(member.MemberID, 10)
-	}
-	return identity, nil
+	return authproxy.IdentityContextFromMeContext(me)
 }

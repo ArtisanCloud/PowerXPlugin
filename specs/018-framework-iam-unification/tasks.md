@@ -89,17 +89,17 @@
 
 ### Tests for User Story 3
 
-- [ ] T031 [P] [US3] 增加 identity context 解析测试（tenant/user/roles/permissions）in framework/backend/go/iam/context/identity_context_test.go
-- [ ] T032 [P] [US3] 增加多来源 tenant 冲突优先级测试 in framework/backend/go/middleware/tenant_context_test.go
-- [ ] T033 [P] [US3] 增加统一错误语义回归测试（401/403/424）in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler_test.go
+- [X] T031 [P] [US3] 增加 identity context 解析测试（tenant/user/roles/permissions）in framework/backend/go/iam/context/identity_context_test.go
+- [X] T032 [P] [US3] 增加多来源 tenant 冲突优先级测试 in framework/backend/go/middleware/tenant_context_test.go
+- [X] T033 [P] [US3] 增加统一错误语义回归测试（401/403/424）in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler_test.go
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] 实现 framework identity context 解析器 in framework/backend/go/iam/context/identity_context.go
-- [ ] T035 [US3] 在 framework auth_guard 接入统一 IAM 授权判定输出 in framework/backend/go/middleware/auth_guard.go
-- [ ] T036 [US3] 在 skeleton delegated 鉴权链路接入统一 context 转换 in skeleton/backend/go-gin/internal/services/authproxy/delegated_client.go
-- [ ] T037 [US3] 在 skeleton gateway 集成层接入统一 token 来源与审计字段 in skeleton/backend/go-gin/internal/integrations/gateway/client.go
-- [ ] T038 [US3] 在 runtime 日志中补充 mode/tenant/user/permission/trace 字段 in skeleton/backend/go-gin/internal/logger/runtime.go
+- [X] T034 [US3] 实现 framework identity context 解析器 in framework/backend/go/iam/context/identity_context.go
+- [X] T035 [US3] 在 framework auth_guard 接入统一 IAM 授权判定输出 in framework/backend/go/middleware/auth_guard.go
+- [X] T036 [US3] 在 skeleton delegated 鉴权链路接入统一 context 转换 in skeleton/backend/go-gin/internal/services/authproxy/delegated_client.go
+- [X] T037 [US3] 在 skeleton gateway 集成层接入统一 token 来源与审计字段 in skeleton/backend/go-gin/internal/integrations/gateway/client.go
+- [X] T038 [US3] 在 runtime 日志中补充 mode/tenant/user/permission/trace 字段 in skeleton/backend/go-gin/internal/logger/runtime.go
 
 **Checkpoint**: US3 完成后，身份上下文与鉴权判定语义在 framework 层统一闭环。
 

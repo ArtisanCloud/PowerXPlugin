@@ -13,6 +13,7 @@ const (
 	ErrorCodeInvalidProvider     ErrorCode = "FEDERATED_INVALID_PROVIDER"
 	ErrorCodeProviderRegistered  ErrorCode = "FEDERATED_PROVIDER_ALREADY_REGISTERED"
 	ErrorCodeProviderNotFound    ErrorCode = "FEDERATED_PROVIDER_NOT_FOUND"
+	ErrorCodeUnauthorized        ErrorCode = "FEDERATED_UNAUTHORIZED"
 	ErrorCodeInvalidChallenge    ErrorCode = "FEDERATED_INVALID_CHALLENGE"
 	ErrorCodeChallengeExpired    ErrorCode = "FEDERATED_CHALLENGE_EXPIRED"
 	ErrorCodeChallengeReplay     ErrorCode = "FEDERATED_CHALLENGE_REPLAY"

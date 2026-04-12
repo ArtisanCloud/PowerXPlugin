@@ -43,18 +43,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T016 [P] [US1] 增加扫码 challenge 主链路测试 in framework/backend/go/iam/federated/challenge/flow_test.go
-- [ ] T017 [P] [US1] 增加 federated callback handler 集成测试 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_callback_test.go
+- [x] T016 [P] [US1] 增加扫码 challenge 主链路测试 in framework/backend/go/iam/federated/challenge/flow_test.go
+- [x] T017 [P] [US1] 增加 federated callback handler 集成测试 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_callback_test.go
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] 实现 framework wecom provider 默认流程 in framework/backend/go/iam/federated/providers/wecom/provider.go
-- [ ] T019 [US1] 实现 framework dingtalk provider 默认流程 in framework/backend/go/iam/federated/providers/dingtalk/provider.go
-- [ ] T020 [US1] 实现 framework lark provider 默认流程 in framework/backend/go/iam/federated/providers/lark/provider.go
-- [ ] T021 [US1] 在 skeleton 启动流程装配 framework federated factory in skeleton/backend/go-gin/internal/bootstrap/app.go
-- [ ] T022 [US1] 实现 public federated challenge/callback 路由 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_handler.go
-- [ ] T023 [US1] 实现登录成功后统一身份上下文输出 in skeleton/backend/go-gin/internal/services/iam/federated/login_service.go
-- [ ] T024 [US1] 实现密码/扫码并存控制面（模式开关、故障切换优先级）in skeleton/backend/go-gin/internal/services/iam/federated/auth_mode_service.go
+- [x] T018 [US1] 实现 framework wecom provider 默认流程 in framework/backend/go/iam/federated/providers/wecom/provider.go
+- [x] T019 [US1] 实现 framework dingtalk provider 默认流程 in framework/backend/go/iam/federated/providers/dingtalk/provider.go
+- [x] T020 [US1] 实现 framework lark provider 默认流程 in framework/backend/go/iam/federated/providers/lark/provider.go
+- [x] T021 [US1] 在 skeleton 启动流程装配 framework federated factory in skeleton/backend/go-gin/internal/bootstrap/app.go
+- [x] T022 [US1] 实现 public federated challenge/callback 路由 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_handler.go
+- [x] T023 [US1] 实现登录成功后统一身份上下文输出 in skeleton/backend/go-gin/internal/services/iam/federated/login_service.go
+- [x] T024 [US1] 实现密码/扫码并存控制面（模式开关、故障切换优先级）in skeleton/backend/go-gin/internal/services/iam/federated/auth_mode_service.go
 
 **Checkpoint**: US1 完成后，扫码登录 MVP 可独立演示与验收。
 

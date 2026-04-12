@@ -2,12 +2,31 @@ package bootstrap
 
 import (
 	"context"
+	"sync"
 
+	federatedChallenge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/challenge"
+	federatedContracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/contracts"
+	federatedProviders "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers"
+	providerDingTalk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/dingtalk"
+	providerLark "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/lark"
+	providerWeCom "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/wecom"
+	federatedRisk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/risk"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/gorm"
+)
+
+type FederatedRuntime struct {
+	Factory   federatedContracts.ProviderFactory
+	Challenge federatedContracts.ChallengeManager
+	Risk      federatedContracts.RiskEvaluator
+}
+
+var (
+	federatedRuntimeMu sync.RWMutex
+	federatedRuntime   *FederatedRuntime
 )
 
 func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
@@ -37,5 +56,35 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 		logger.WithError(err).Fatal("Failed to connect to database")
 	}
 
+	initFederatedRuntime()
+
 	return queryDB, nil
+}
+
+func initFederatedRuntime() {
+	registry := federatedProviders.NewRegistry()
+	_ = registry.Register(providerWeCom.New("default-wecom"))
+	_ = registry.Register(providerDingTalk.New("default-dingtalk"))
+	_ = registry.Register(providerLark.New("default-lark"))
+
+	federatedRuntimeMu.Lock()
+	federatedRuntime = &FederatedRuntime{
+		Factory:   registry,
+		Challenge: federatedChallenge.NewManager(),
+		Risk:      federatedRisk.NewEvaluator(0),
+	}
+	federatedRuntimeMu.Unlock()
+}
+
+func Federated() *FederatedRuntime {
+	federatedRuntimeMu.RLock()
+	defer federatedRuntimeMu.RUnlock()
+	return federatedRuntime
+}
+
+// SetFederatedForTests 允许测试覆盖联邦运行时依赖。
+func SetFederatedForTests(rt *FederatedRuntime) {
+	federatedRuntimeMu.Lock()
+	federatedRuntime = rt
+	federatedRuntimeMu.Unlock()
 }

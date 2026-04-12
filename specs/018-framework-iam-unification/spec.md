@@ -5,6 +5,15 @@
 **Status**: Draft  
 **Input**: User description: "把 local/delegated 的 IAM 统一接口上提到 framework（组织、成员、角色、权限、token、上下文解析），输出 framework iam 契约 + adapter 机制；skeleton 只做实现适配。"
 
+## Clarifications
+
+### Session 2026-04-11
+
+- Q: Framework IAM 的模式判定优先级如何定义？ → A: `config.context.iam_mode` 最高优先，其次环境变量；冲突即启动失败（fail-fast）。
+- Q: Delegated 模式下组织架构写操作边界如何定义？ → A: Delegated 下插件只读组织数据，所有写操作走宿主接口，插件不本地落库。
+- Q: Standalone(local) 模式下组织架构的最小必备范围是什么？ → A: 租户、部门、成员、角色、权限为完整最小集。
+- Q: Framework IAM adapter 切换策略如何定义？ → A: 启动期一次性绑定单一 adapter，运行中不自动切换。
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 插件无感切换 IAM 模式 (Priority: P1)
@@ -66,17 +75,25 @@
 - **FR-001**: 系统 MUST 在 framework 层提供统一 IAM 契约，覆盖 tenant、department、member、role、permission、token、context 相关能力。
 - **FR-002**: 系统 MUST 支持 adapter 机制以接入至少两种实现：`standalone(local)` 与 `delegated`。
 - **FR-003**: 插件业务层 MUST 可仅依赖 framework IAM 契约完成鉴权与用户上下文访问，不直接依赖 skeleton 私有实现。
-- **FR-004**: 系统 MUST 定义统一模式解析与优先级规则，并在冲突时 fail-fast。
+- **FR-004**: 系统 MUST 定义统一模式解析与优先级规则：`config.context.iam_mode` 高于环境变量信号（如 `IAM_MODE`、`POWERX_PROXY`），并在冲突时 fail-fast。
 - **FR-005**: 系统 MUST 定义统一错误语义（认证失败、权限不足、上下文缺失、上游不可用）并跨模式保持一致。
 - **FR-006**: 系统 MUST 提供统一审计与观测字段，至少包含 tenant、user、role、permission、mode、trace。
 - **FR-007**: skeleton MUST 作为 framework IAM 契约的适配实现存在，不再承担契约定义职责。
 - **FR-008**: 系统 MUST 提供向后兼容迁移路径，使现有插件可分阶段迁移到 framework IAM 接口。
+- **FR-009**: 在 delegated 模式下，组织/成员/角色/权限等写操作 MUST 由宿主接口承载；插件侧只读，不本地持久化写入。
+- **FR-010**: 在 standalone(local) 模式下，系统 MUST 至少提供租户、部门、成员、角色、权限五类实体能力，作为可运行最小集。
+- **FR-011**: 系统 MUST 在启动阶段完成 IAM adapter 单选绑定（local 或 delegated），运行期不得自动切换 adapter。
 
 ### Key Entities *(include if feature involves data)*
 
 - **IAM Adapter**: framework 约束的模式实现单元（local/delegated）。
 - **Identity Context**: 统一身份上下文（tenant/user/roles/permissions/policy_version）。
 - **Organization Node**: 组织结构节点（tenant、department、member 的层级关系）。
+- **Tenant**: 本地 IAM 租户主体，作为组织与权限边界。
+- **Department**: 租户内部门层级节点，承载组织树关系。
+- **Member**: 租户内成员主体，关联用户标识与组织归属。
+- **Role**: 权限集合载体，定义可授予能力范围。
+- **Permission**: 原子权限项（resource/action），用于统一鉴权判定。
 - **Authorization Decision**: 权限判定结果，包含结果、原因和审计信息。
 - **Mode Resolution Record**: 模式解析输出，记录来源、优先级与冲突信息。
 
@@ -88,4 +105,3 @@
 - **SC-002**: 组织/成员/角色/权限核心接口在两种模式下契约一致性测试通过率 100%。
 - **SC-003**: 身份上下文解析相关线上故障（模式不一致、上下文缺失）较改造前 30 天下降至少 60%。
 - **SC-004**: 新插件接入 IAM 的开发步骤较现状减少至少 40%（以模板接入 checklist 统计）。
-

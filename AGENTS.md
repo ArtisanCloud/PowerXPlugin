@@ -25,6 +25,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-29
 - N/A（本特性不新增持久化模型） (016-runtime-log-unification)
 - Go 1.24（backend runtime），TypeScript 5.x（文档与联调脚本） + Gin skeleton、framework eventbridge/taskbus/wsbus 抽象、runtime ops 管理端点、logrus/slog 结构化日志 (017-async-runtime-scheduler-switch)
 - 复用现有插件数据库（PostgreSQL/SQLite），本特性不新增业务持久化模型 (017-async-runtime-scheduler-switch)
+- Go 1.24 + framework middleware/context/rbac；skeleton IAM local store；delegated auth proxy (018-framework-iam-unification)
+- PostgreSQL/SQLite（local 模式复用现有 IAM 表）；delegated 模式不新增插件侧组织写入 (018-framework-iam-unification)
 
 ## Project Structure
 
@@ -42,9 +44,9 @@ npm test && npm run lint
 Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 
 ## Recent Changes
+- 018-framework-iam-unification: Added Go 1.24 + framework middleware/context/rbac；skeleton IAM local store；delegated auth proxy
 - 017-async-runtime-scheduler-switch: Added Go 1.24（backend runtime），TypeScript 5.x（文档与联调脚本） + Gin skeleton、framework eventbridge/taskbus/wsbus 抽象、runtime ops 管理端点、logrus/slog 结构化日志
 - 016-runtime-log-unification: Added Go 1.24（backend runtime），TypeScript 5.x（文档/工具链侧验证） + framework runtime（taskbus/wsbus/common middleware）、Gin skeleton、`log/slog`、`logrus`
-- 012-next-nuxt-align: Added TypeScript 5.x, React 18, Next.js 14.2.5, Go 1.24（联调基线） + Next App Router, Playwright（E2E）, 既有 Go-Gin 管理端 API 契约
 
 ## Manifest 迁移公告（2025-12-08）
 - 开发态唯一清单移动到 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。

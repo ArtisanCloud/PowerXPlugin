@@ -21,16 +21,16 @@
 **Purpose**: 实现所有用户故事共享的 framework 联邦登录基础能力。  
 **⚠️ CRITICAL**: 此阶段完成前，不进入任何用户故事任务。
 
-- [ ] T006 定义 federated provider 接口与统一错误语义 in framework/backend/go/iam/federated/contracts/interfaces.go
-- [ ] T007 定义 challenge/binding/mapping/risk 核心类型 in framework/backend/go/iam/federated/contracts/types.go
-- [ ] T008 实现 provider registry/factory（framework 复用入口）in framework/backend/go/iam/federated/providers/registry.go
-- [ ] T009 [P] 实现 challenge manager（state/nonce/ttl）in framework/backend/go/iam/federated/challenge/manager.go
-- [ ] T010 [P] 实现 risk evaluator（expired/replay/cross-tenant/signature）in framework/backend/go/iam/federated/risk/evaluator.go
-- [ ] T011 在 framework bootstrap 注入 federated factory 初始化 in framework/backend/go/bootstrap/app.go
-- [ ] T012 [P] 增加 registry/challenge 单元测试 in framework/backend/go/iam/federated/providers/registry_test.go
-- [ ] T013 [P] 增加风险错误码语义测试矩阵（仅校验 code 与 message contract）in framework/backend/go/iam/federated/contracts/errors_test.go
-- [ ] T014 [P] 定义 federated 模型表名常量与 TableName 规范 in skeleton/backend/go-gin/internal/domain/models/model.go
-- [ ] T015 [P] 在 migrate 注册 federated 持久化模型并补迁移冒烟测试 in skeleton/backend/go-gin/cmd/database/migrate/migrate.go
+- [x] T006 定义 federated provider 接口与统一错误语义 in framework/backend/go/iam/federated/contracts/interfaces.go
+- [x] T007 定义 challenge/binding/mapping/risk 核心类型 in framework/backend/go/iam/federated/contracts/types.go
+- [x] T008 实现 provider registry/factory（framework 复用入口）in framework/backend/go/iam/federated/providers/registry.go
+- [x] T009 [P] 实现 challenge manager（state/nonce/ttl）in framework/backend/go/iam/federated/challenge/manager.go
+- [x] T010 [P] 实现 risk evaluator（expired/replay/cross-tenant/signature）in framework/backend/go/iam/federated/risk/evaluator.go
+- [x] T011 在 framework bootstrap 注入 federated factory 初始化 in framework/backend/go/bootstrap/app.go
+- [x] T012 [P] 增加 registry/challenge 单元测试 in framework/backend/go/iam/federated/providers/registry_test.go
+- [x] T013 [P] 增加风险错误码语义测试矩阵（仅校验 code 与 message contract）in framework/backend/go/iam/federated/contracts/errors_test.go
+- [x] T014 [P] 定义 federated 模型表名常量与 TableName 规范 in skeleton/backend/go-gin/internal/domain/models/model.go
+- [x] T015 [P] 在 migrate 注册 federated 持久化模型并补迁移冒烟测试 in skeleton/backend/go-gin/cmd/database/migrate/migrate.go
 
 **Checkpoint**: framework 已具备可版本化复用的联邦登录基础，skeleton 可直接装配调用。
 

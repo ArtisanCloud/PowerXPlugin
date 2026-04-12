@@ -94,6 +94,13 @@ func TestShutdownWithoutServer(t *testing.T) {
 	}
 }
 
+func TestNewAppInitializesFederatedFactory(t *testing.T) {
+	app := NewApp(nil)
+	if app.FederatedProviderFactory() == nil {
+		t.Fatalf("FederatedProviderFactory() = nil, want initialized registry")
+	}
+}
+
 func TestParseBoolEnv(t *testing.T) {
 	t.Setenv("TEST_BOOL", "true")
 	if !parseBoolEnv("TEST_BOOL", false) {

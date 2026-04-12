@@ -72,6 +72,10 @@ var iamTables = []interface{}{
 	&iammodel.RolePermission{},
 	&iammodel.RefreshToken{},
 	&iammodel.AuditLog{},
+	&iammodel.FederatedExternalIdentity{},
+	&iammodel.FederatedBinding{},
+	&iammodel.FederatedLoginChallenge{},
+	&iammodel.FederatedRiskEvent{},
 }
 
 // MigratePluginModels 只做 AutoMigrate（最小实现）

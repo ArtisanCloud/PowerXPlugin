@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/contracts"
+	federatedProviders "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
@@ -30,7 +32,8 @@ type App struct {
 	shutdown func(context.Context) error
 	closeFn  func() error
 
-	gatewayClient *gateway.Client
+	gatewayClient    *gateway.Client
+	federatedFactory contracts.ProviderFactory
 
 	mu       sync.RWMutex
 	manifest *manifest.Plugin
@@ -116,6 +119,7 @@ func NewApp(cfg *Config) *App {
 		Logger: withRuntimeDefaults(slog.Default(), cfg),
 	}
 	app.initGatewayClient()
+	app.initFederatedFactory()
 	return app
 }
 
@@ -217,6 +221,11 @@ func (a *App) GatewayClient() *gateway.Client {
 	return a.gatewayClient
 }
 
+// FederatedProviderFactory 返回联邦登录 provider factory。
+func (a *App) FederatedProviderFactory() contracts.ProviderFactory {
+	return a.federatedFactory
+}
+
 func (a *App) initGatewayClient() {
 	if a.Config == nil || !a.Config.Gateway.enabled() {
 		return
@@ -271,6 +280,10 @@ func (a *App) closeGateway() {
 		a.Logger.Warn("failed to close gateway client", slog.String("error", err.Error()))
 	}
 	a.gatewayClient = nil
+}
+
+func (a *App) initFederatedFactory() {
+	a.federatedFactory = federatedProviders.NewRegistry()
 }
 
 func (cfg GatewayConfig) enabled() bool {

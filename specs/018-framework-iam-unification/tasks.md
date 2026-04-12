@@ -22,15 +22,15 @@
 **Purpose**: 实现所有用户故事共用的基础能力。  
 **⚠️ CRITICAL**: 此阶段完成前，不进入任何用户故事任务。
 
-- [ ] T006 定义 IAM 统一契约接口（Directory/Authz/Context）in framework/backend/go/iam/contracts/interfaces.go
-- [ ] T007 定义统一数据结构（Tenant/Department/Member/Role/Permission/Decision）in framework/backend/go/iam/contracts/types.go
-- [ ] T008 实现模式解析器（config 优先、冲突 fail-fast）in framework/backend/go/iam/context/mode_resolver.go
-- [ ] T009 [P] 定义模式解析记录结构与审计字段 in framework/backend/go/iam/context/mode_resolution_record.go
-- [ ] T010 [P] 定义统一 IAM 错误码与错误映射 in framework/backend/go/iam/errors/errors.go
-- [ ] T011 实现 adapter 注册中心与启动期单选绑定 in framework/backend/go/iam/adapters/registry.go
-- [ ] T012 在 framework bootstrap 注入 IAM registry 初始化 in framework/backend/go/bootstrap/app.go
-- [ ] T013 [P] 补充模式解析与错误语义单元测试 in framework/backend/go/iam/context/mode_resolver_test.go
-- [ ] T014 [P] 补充 adapter 注册与单选绑定测试 in framework/backend/go/iam/adapters/registry_test.go
+- [X] T006 定义 IAM 统一契约接口（Directory/Authz/Context）in framework/backend/go/iam/contracts/interfaces.go
+- [X] T007 定义统一数据结构（Tenant/Department/Member/Role/Permission/Decision）in framework/backend/go/iam/contracts/types.go
+- [X] T008 实现模式解析器（config 优先、冲突 fail-fast）in framework/backend/go/iam/context/mode_resolver.go
+- [X] T009 [P] 定义模式解析记录结构与审计字段 in framework/backend/go/iam/context/mode_resolution_record.go
+- [X] T010 [P] 定义统一 IAM 错误码与错误映射 in framework/backend/go/iam/errors/errors.go
+- [X] T011 实现 adapter 注册中心与启动期单选绑定 in framework/backend/go/iam/adapters/registry.go
+- [X] T012 在 framework bootstrap 注入 IAM registry 初始化 in framework/backend/go/bootstrap/app.go
+- [X] T013 [P] 补充模式解析与错误语义单元测试 in framework/backend/go/iam/context/mode_resolver_test.go
+- [X] T014 [P] 补充 adapter 注册与单选绑定测试 in framework/backend/go/iam/adapters/registry_test.go
 
 **Checkpoint**: Framework IAM 基础契约、模式解析、错误语义、adapter 注册机制已可用。
 

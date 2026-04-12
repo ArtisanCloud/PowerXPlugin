@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	iamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
@@ -31,6 +32,7 @@ type App struct {
 	closeFn  func() error
 
 	gatewayClient *gateway.Client
+	iamRegistry   *iamadapters.Registry
 
 	mu       sync.RWMutex
 	manifest *manifest.Plugin
@@ -116,6 +118,7 @@ func NewApp(cfg *Config) *App {
 		Logger: withRuntimeDefaults(slog.Default(), cfg),
 	}
 	app.initGatewayClient()
+	app.initIAMRegistry()
 	return app
 }
 
@@ -217,6 +220,11 @@ func (a *App) GatewayClient() *gateway.Client {
 	return a.gatewayClient
 }
 
+// IAMRegistry 返回 framework IAM 注册中心。
+func (a *App) IAMRegistry() *iamadapters.Registry {
+	return a.iamRegistry
+}
+
 func (a *App) initGatewayClient() {
 	if a.Config == nil || !a.Config.Gateway.enabled() {
 		return
@@ -271,6 +279,13 @@ func (a *App) closeGateway() {
 		a.Logger.Warn("failed to close gateway client", slog.String("error", err.Error()))
 	}
 	a.gatewayClient = nil
+}
+
+func (a *App) initIAMRegistry() {
+	if a == nil {
+		return
+	}
+	a.iamRegistry = iamadapters.NewRegistry()
 }
 
 func (cfg GatewayConfig) enabled() bool {

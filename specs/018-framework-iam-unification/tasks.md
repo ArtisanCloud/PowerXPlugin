@@ -43,17 +43,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] 增加双模式切换集成测试 in skeleton/backend/go-gin/internal/bootstrap/iam_resolver_test.go
-- [ ] T016 [P] [US1] 增加管理端模式查询接口测试 in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes_test.go
+- [X] T015 [P] [US1] 增加双模式切换集成测试 in skeleton/backend/go-gin/internal/bootstrap/iam_resolver_test.go
+- [X] T016 [P] [US1] 增加管理端模式查询接口测试 in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes_test.go
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] 实现 local adapter 对 framework 契约的绑定 in skeleton/backend/go-gin/internal/services/iam/adapters/local/adapter.go
-- [ ] T018 [US1] 实现 delegated adapter 对 framework 契约的绑定 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/adapter.go
-- [ ] T019 [US1] 在 skeleton 启动流程接入 framework IAM registry 绑定 in skeleton/backend/go-gin/internal/bootstrap/app.go
-- [ ] T020 [US1] 改造 IAM 模式解析入口使用 framework resolver in skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go
-- [ ] T021 [US1] 改造 admin IAM 路由以读取统一 mode/context 能力 in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes.go
-- [ ] T022 [US1] 在 router 装配中替换业务侧 IAM 依赖为 framework contracts in skeleton/backend/go-gin/internal/router/router.go
+- [X] T017 [US1] 实现 local adapter 对 framework 契约的绑定 in skeleton/backend/go-gin/internal/services/iam/adapters/local/adapter.go
+- [X] T018 [US1] 实现 delegated adapter 对 framework 契约的绑定 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/adapter.go
+- [X] T019 [US1] 在 skeleton 启动流程接入 framework IAM registry 绑定 in skeleton/backend/go-gin/internal/bootstrap/app.go
+- [X] T020 [US1] 改造 IAM 模式解析入口使用 framework resolver in skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go
+- [X] T021 [US1] 改造 admin IAM 路由以读取统一 mode/context 能力 in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes.go
+- [X] T022 [US1] 在 router 装配中替换业务侧 IAM 依赖为 framework contracts in skeleton/backend/go-gin/internal/router/router.go
 
 **Checkpoint**: US1 完成后，插件可无改业务 handler 在 local/delegated 间切换。
 

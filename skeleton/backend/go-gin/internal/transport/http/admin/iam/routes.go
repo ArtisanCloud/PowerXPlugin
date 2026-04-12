@@ -1,16 +1,24 @@
 package iam
 
 import (
+	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
-	if admin == nil || deps == nil || deps.DB == nil {
+	if admin == nil || deps == nil {
 		return
 	}
 	group := admin.Group("/iam")
+	group.GET("/mode", modeHandler(deps))
+
+	if deps.DB == nil {
+		return
+	}
 
 	audit := srviam.NewAuditService(deps.DB)
 	stsSvc := srviam.NewSTSService(deps.Config, audit, app.PluginID, "")
@@ -59,4 +67,22 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.POST("/users", memberHandler.Create)
 	group.PATCH("/users/:id", memberHandler.Update)
 	group.POST("/users/import", memberHandler.BulkImport)
+}
+
+func modeHandler(deps *app.Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		mode := strings.TrimSpace(deps.IAMMode.String())
+		if mode == "" {
+			mode = "local"
+		}
+		registryBound := deps.IAMRegistry != nil && deps.IAMRegistry.IsBound()
+		contracts.ResponseSuccess(c, gin.H{
+			"mode":                mode,
+			"source":              strings.TrimSpace(deps.IAMModeSource),
+			"registry_bound":      registryBound,
+			"directory_available": deps.IAMDirectoryService != nil,
+			"authz_available":     deps.IAMAuthzService != nil,
+			"context_available":   deps.IAMContextService != nil,
+		})
+	}
 }

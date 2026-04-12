@@ -10,6 +10,7 @@ import (
 func RBACEntries(prefix string) map[string]authx.Permission {
 	base := strings.TrimRight(prefix, "/") + "/admin/iam"
 	return map[string]authx.Permission{
+		"GET:" + base + "/mode":                {Resource: app.PluginID + ":iam.mode", Action: "read"},
 		"GET:" + base + "/tenants":             {Resource: app.PluginID + ":iam.tenant", Action: "read"},
 		"POST:" + base + "/tenants":            {Resource: app.PluginID + ":iam.tenant", Action: "write"},
 		"PATCH:" + base + "/tenants/*":         {Resource: app.PluginID + ":iam.tenant", Action: "write"},

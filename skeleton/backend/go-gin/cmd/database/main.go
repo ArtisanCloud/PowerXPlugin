@@ -35,6 +35,9 @@ func main() {
 	models.InitSchemaFrom(cfg.Database.Schema) // 必须在所有 DB 操作之前
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
+	if err := iamResolver.Err(); err != nil {
+		log.Fatalf("[iam] mode resolution failed: %v", err)
+	}
 	includeIAM := iamResolver.Mode() == iamservice.IAMModeLocal
 	log.Printf("[iam] mode=%s source=%s includeIAM=%v", iamResolver.Mode(), iamResolver.Source(), includeIAM)
 

@@ -33,30 +33,6 @@ func NewBundle(proxy delegatedProxy) (fwiamadapters.Bundle, error) {
 	}, nil
 }
 
-func (a *Adapter) GetTenant(_ context.Context, tenantUUID string) (*fwiamcontracts.Tenant, error) {
-	tenantUUID = strings.TrimSpace(tenantUUID)
-	if tenantUUID == "" {
-		return nil, fwiamerrors.New(fwiamerrors.CodeModeInvalid, "tenant uuid is required")
-	}
-	return &fwiamcontracts.Tenant{TenantUUID: tenantUUID}, nil
-}
-
-func (a *Adapter) ListDepartments(_ context.Context, _ string) ([]fwiamcontracts.Department, error) {
-	return []fwiamcontracts.Department{}, nil
-}
-
-func (a *Adapter) ListMembers(_ context.Context, _ string) ([]fwiamcontracts.Member, error) {
-	return []fwiamcontracts.Member{}, nil
-}
-
-func (a *Adapter) ListRoles(_ context.Context, _ string) ([]fwiamcontracts.Role, error) {
-	return []fwiamcontracts.Role{}, nil
-}
-
-func (a *Adapter) ListPermissions(_ context.Context, _ string) ([]fwiamcontracts.Permission, error) {
-	return []fwiamcontracts.Permission{}, nil
-}
-
 func (a *Adapter) Authorize(_ context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
 	return &fwiamcontracts.AuthorizationDecision{
 		Allowed:    false,

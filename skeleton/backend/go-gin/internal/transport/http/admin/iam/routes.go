@@ -24,8 +24,13 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	stsSvc := srviam.NewSTSService(deps.Config, audit, app.PluginID, "")
 	roleSvc := srviam.NewRoleService(deps.DB, audit, app.PluginID)
 
-	tenantHandler := NewTenantHandler(srviam.NewTenantService(deps.DB, audit))
-	departmentHandler := NewDepartmentHandler(srviam.NewDepartmentService(deps.DB, audit))
+	tenantHandler := NewTenantHandler(
+		srviam.NewTenantService(deps.DB, audit),
+		deps.IAMDirectoryService,
+		deps.IAMAuthzService,
+		deps.IAMMode,
+	)
+	departmentHandler := NewDepartmentHandler(srviam.NewDepartmentService(deps.DB, audit), deps.IAMMode)
 	memberHandler := NewMemberHandler(srviam.NewUserService(deps.DB, audit))
 	roleHandler := NewRoleHandler(roleSvc)
 	rolePermissionsHandler := NewRolePermissionsHandler(roleSvc)

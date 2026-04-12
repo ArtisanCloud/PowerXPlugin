@@ -66,17 +66,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] 增加 IAM 契约一致性测试（组织查询）in framework/backend/go/iam/contracts/directory_contract_test.go
-- [ ] T024 [P] [US2] 增加 delegated 写操作拒绝测试（405）in skeleton/backend/go-gin/internal/transport/http/admin/iam/department_handler_test.go
-- [ ] T025 [P] [US2] 增加角色授权与成员绑定语义测试 in skeleton/backend/go-gin/internal/services/iam/role_service_test.go
+- [X] T023 [P] [US2] 增加 IAM 契约一致性测试（组织查询）in framework/backend/go/iam/contracts/directory_contract_test.go
+- [X] T024 [P] [US2] 增加 delegated 写操作拒绝测试（405）in skeleton/backend/go-gin/internal/transport/http/admin/iam/department_handler_test.go
+- [X] T025 [P] [US2] 增加角色授权与成员绑定语义测试 in skeleton/backend/go-gin/internal/services/iam/role_service_test.go
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] 补齐 framework DirectoryService 契约实现入口 in framework/backend/go/iam/contracts/directory_service.go
-- [ ] T027 [US2] 在 local adapter 映射 tenant/department/member/role/permission 查询能力 in skeleton/backend/go-gin/internal/services/iam/adapters/local/directory_adapter.go
-- [ ] T028 [US2] 在 delegated adapter 映射组织只读与写拒绝策略 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/directory_adapter.go
-- [ ] T029 [US2] 统一 admin IAM handlers 使用 framework Directory/Authz 契约 in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler.go
-- [ ] T030 [US2] 统一 RBAC 资源动作映射与错误输出 in skeleton/backend/go-gin/internal/transport/http/admin/iam/rbac.go
+- [X] T026 [US2] 补齐 framework DirectoryService 契约实现入口 in framework/backend/go/iam/contracts/directory_service.go
+- [X] T027 [US2] 在 local adapter 映射 tenant/department/member/role/permission 查询能力 in skeleton/backend/go-gin/internal/services/iam/adapters/local/directory_adapter.go
+- [X] T028 [US2] 在 delegated adapter 映射组织只读与写拒绝策略 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/directory_adapter.go
+- [X] T029 [US2] 统一 admin IAM handlers 使用 framework Directory/Authz 契约 in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler.go
+- [X] T030 [US2] 统一 RBAC 资源动作映射与错误输出 in skeleton/backend/go-gin/internal/transport/http/admin/iam/rbac.go
 
 **Checkpoint**: US2 完成后，组织与权限能力在双模式下具备一致契约与可审计行为。
 

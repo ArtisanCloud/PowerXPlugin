@@ -6,6 +6,26 @@ on:
   pull_request:
 
 jobs:
+  delegated-contract-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce delegated token contract (no PX_TOOL_TOKEN fallback)
+        run: |
+          set -euo pipefail
+          TARGETS=(
+            framework/backend/go/internal/integration/gateway
+            skeleton/backend/go-gin/internal/config
+            skeleton/backend/go-gin/internal/integrations/gateway
+            skeleton/backend/go-gin/internal/transport/http/middleware
+            skeleton/backend/go-gin/internal/transport/http/integration
+            docs/guides/develop/consume-powerx-capability/README.md
+          )
+          if rg -n "PX_TOOL_TOKEN" "${TARGETS[@]}"; then
+            echo "delegated gateway contract violated: use PX_PLUGIN_TOOL_TOKEN only"
+            exit 1
+          fi
+
   template-sync:
     runs-on: ubuntu-latest
     env:
@@ -14,11 +34,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       - name: Install dependencies
         run: npm install
       - name: Verify template sync
         run: npm run sync:templates -- --check
+      - name: Verify agent paths (no legacy skeleton refs)
+        run: npm run check:agent-paths
 
   backend:
     runs-on: ubuntu-latest
@@ -39,27 +61,30 @@ jobs:
       - name: Go work sync
         run: go work sync
       - name: Go test (framework)
-        run: cd framework && go test ./...
+        run: cd framework/backend/go && go test ./...
       - name: Go test (skeleton backend)
-        run: cd skeleton/backend && go test ./... -count=1
+        run: cd skeleton/backend/go-gin && go test ./... -count=1
 
   frontend:
     runs-on: ubuntu-latest
     env:
       GOTOOLCHAIN: local
+      LIGHTNINGCSS_FORCE_WASM: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install
+          (cd skeleton/web-admin/nuxt && npm install)
+          # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
+          (cd skeleton/web-admin/nuxt && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
       - name: Lint
-        run: cd skeleton/web-admin && npx nuxi lint || true
+        run: cd skeleton/web-admin/nuxt && npm run lint
       - name: Build
-        run: cd skeleton/web-admin && npm run build
+        run: cd skeleton/web-admin/nuxt && npm run build
 
   contracts:
     runs-on: ubuntu-latest
@@ -83,6 +108,8 @@ jobs:
         run: |
           cd framework
           go test ./backend/go/manifest ./backend/go/rbac
+      - name: Run TaskBus contracts validator (optional)
+        run: scripts/contracts/validate-taskbus-contracts.sh
 
   cli:
     runs-on: ubuntu-latest
@@ -117,7 +144,7 @@ jobs:
 
   smoke:
     runs-on: ubuntu-latest
-    needs: [backend, contracts, cli]
+    needs: [delegated-contract-guard, backend, contracts, cli]
     env:
       GOTOOLCHAIN: local
       GOPROXY: https://goproxy.cn,direct
@@ -133,7 +160,7 @@ jobs:
           go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
       - name: Run smoke workflow
         run: |
           make test-smoke 2>&1 | tee smoke.log
@@ -146,13 +173,21 @@ jobs:
 
   regression:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.57.0-noble
     needs: [smoke]
     env:
       GOTOOLCHAIN: local
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: sum.golang.org
+      LIGHTNINGCSS_FORCE_WASM: "1"
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     steps:
       - uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y make
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -162,25 +197,19 @@ jobs:
           go env -w GOSUMDB=$GOSUMDB
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json', 'skeleton/web-admin/package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
+          node-version: '20.19.0'
       - name: Install dependencies
         run: |
           npm install
-          cd skeleton/web-admin && npm install
-      - name: Install Playwright browsers
-        working-directory: skeleton/web-admin
-        run: npx playwright install --with-deps
+          (cd skeleton/web-admin/nuxt && npm install)
+          # workaround: npm optionalDependencies 有概率漏装平台原生包（rollup/oxc/lightningcss/tailwind oxide），导致构建阶段找不到 native binding
+          (cd skeleton/web-admin/nuxt && ARCH=$(node -p "process.arch") && ROLLUP_VERSION=$(node -p "require('./node_modules/rollup/package.json').version") && OXC_VERSION=$(node -p "require('./node_modules/oxc-parser/package.json').version") && npm install --no-save "@rollup/rollup-linux-${ARCH}-gnu@${ROLLUP_VERSION}" "@oxc-parser/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-transform/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "@oxc-minify/binding-linux-${ARCH}-gnu@${OXC_VERSION}" "lightningcss-linux-${ARCH}-gnu@1.30.2" "@tailwindcss/oxide-linux-${ARCH}-gnu")
       - name: Run regression workflow
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        shell: bash
         run: |
+          set -o pipefail
           make test-regression 2>&1 | tee regression.log
       - name: Upload regression artifacts
         if: ${{ always() && env.ACTIONS_RUNTIME_TOKEN != '' }}
@@ -192,4 +221,4 @@ jobs:
             tmp/regression-backend.log
             tmp/regression-frontend.log
             tmp/coverage.html
-            skeleton/web-admin/test-results/
+            skeleton/web-admin/nuxt/test-results/

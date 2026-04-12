@@ -24,7 +24,7 @@ As a framework maintainer, I can expose Router, response helper, and middleware 
 
 ### User Story 2 - Skeleton backend CRUD sample (Priority: P2)
 
-As a skeleton maintainer, I can run `go run ./skeleton/backend/cmd/plugin` and interact with an in-memory Templates CRUD implementation that respects tenant isolation conventions so developers have a reference backend.
+As a skeleton maintainer, I can run `go run ./skeleton/backend/go-gin/cmd/plugin` and interact with an in-memory Templates CRUD implementation that respects tenant isolation conventions so developers have a reference backend.
 
 **Why this priority**: Provides the minimum viable example proving the migration is successful for backend consumers and unblocks front-end + CLI work.
 
@@ -32,7 +32,7 @@ As a skeleton maintainer, I can run `go run ./skeleton/backend/cmd/plugin` and i
 
 **Acceptance Scenarios**:
 
-1. **Given** the skeleton backend running, **When** a POST to `/api/v1/templates` is made with JSON payload and header `X-Tenant-UUID: 100`, **Then** the resource is stored in-memory, tagged with tenant 100, and GET `/api/v1/templates` scoped to tenant 100 returns it.
+1. **Given** the skeleton backend running, **When** a POST to `/api/v1/templates` is made with JSON payload and header `tenant_uuid: 100`, **Then** the resource is stored in-memory, tagged with tenant 100, and GET `/api/v1/templates` scoped to tenant 100 returns it.
 2. **Given** two tenants create templates, **When** tenant 100 requests tenant 200's template ID, **Then** the repository enforces `.specify/memory/constitution.md` rules and returns a 404 Not Found without leaking the record.
 
 ---
@@ -56,7 +56,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 作为模板维护者，我需要 Skeleton 与 CLI 输出的 Nuxt 工程复刻 Base 插件的关键配置（`baseURL`、`runtimeConfig`、Nitro headers、HMR 代理、`@nuxt/icon`、`@pinia/nuxt` 等），以便开发者能够在 Standalone 与宿主双场景下开箱运行。
 
-**Independent Test**: 对比 `com.powerx.plugin.base/web-admin/nuxt.config.ts` 与 Skeleton/CLI 模板的 Diff；手动/脚本验证 Standalone 下 `/`、`/_p/{pluginId}/admin` 访问路径、语言包加载、HMR、代理行为。
+**Independent Test**: 对比 `com.powerx.plugins.base/web-admin/nuxt.config.ts` 与 Skeleton/CLI 模板的 Diff；手动/脚本验证 Standalone 下 `/`、`/_p/{pluginId}/admin` 访问路径、语言包加载、HMR、代理行为。
 
 **Acceptance Scenarios**：
 
@@ -67,7 +67,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 ### Edge Cases
 
-- Missing or malformed `X-Tenant-UUID` header triggers middleware to apply Standalone defaults (tenant `1`) while logging a warning.
+- Missing or malformed `tenant_uuid` header triggers middleware to apply Standalone defaults (tenant `1`) while logging a warning.
 - Path parameters containing non-numeric template IDs return a structured error envelope with `success=false` and HTTP 400.
 - Response helper handles handlers returning `nil` data or explicit errors without panicking and always produces the full envelope.
 - CLI template rendering fails fast with a descriptive error if required placeholders (plugin ID, menus, permissions) are absent.
@@ -78,7 +78,7 @@ As a front-end/CLI maintainer, I can use the framework Layer starter pages and C
 
 - **FR-001**: Framework Router MUST support path parameters, query strings, and JSON body binding through `bootstrap.Context`.
 - **FR-002**: Framework Router MUST expose a response helper that emits envelopes containing `success`, `data`, `error`, `timestamp`, and `request_id`.
-- **FR-003**: Framework middleware MUST populate request IDs and tenant context (`X-Tenant-UUID` header or Standalone default) for every request.
+- **FR-003**: Framework middleware MUST populate request IDs and tenant context (`tenant_uuid` header or Standalone default) for every request.
 - **FR-004**: `@artisan-cloud/plugin-framework-client` MUST expose `get`, `post`, `put`, and `delete` helpers that forward tenant headers automatically.
 - **FR-005**: Skeleton backend MUST implement a Templates repository/service pair embedding `repository.BaseRepository[Template]`, providing `NewTemplateRepository`, and honoring tenant isolation per `.specify/memory/constitution.md`.
 - **FR-006**: Skeleton backend MUST expose `/api/v1/templates` CRUD endpoints with in-memory storage and seed data for demo purposes.

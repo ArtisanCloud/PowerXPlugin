@@ -26,30 +26,41 @@ export function resolveApiBase(pathname?: string): string {
     }
   }
 
-  return "http://localhost:8078/api/v1";
+  return "/api/v1";
 }
 
 export function getAuthToken(): string | undefined {
-  // 优先读取 localStorage，保持与宿主 Web Admin 的 useAuth 逻辑一致
+  // 优先读取 localStorage，保持与 useAuth/Bridge 注入兼容
   if (typeof window !== "undefined") {
     try {
-      const storedToken = window.localStorage?.getItem("access_token");
-      if (storedToken) {
-        return storedToken;
+      const localStorageCandidates = [
+        "access_token",
+        "token",
+        "px_token",
+        "auth_token",
+        "auth-token",
+      ];
+      for (const key of localStorageCandidates) {
+        const storedToken = window.localStorage?.getItem(key);
+        if (storedToken) {
+          return storedToken;
+        }
       }
     } catch (error) {
-      console.warn(
-        "[PowerXPlugin] failed to read localStorage access_token",
-        error
-      );
+      console.warn("[PowerXPlugin] failed to read localStorage auth token", error);
     }
   }
 
-  // 兼容旧版：仍尝试从 cookie 获取 token（例如同域 iframe 场景）
+  // delegated / bridge 场景下从 cookie 提取 JWT
   if (typeof document !== "undefined") {
-    const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
-    if (match) {
-      return decodeURIComponent(match[1]);
+    const cookieCandidates = ["px_ctx_jwt", "token", "px_token", "auth_token", "auth-token"];
+    for (const name of cookieCandidates) {
+      const match = document.cookie.match(
+        new RegExp(`(?:^|;\\s*)${name}=([^;]+)`, "i")
+      );
+      if (match) {
+        return decodeURIComponent(match[1]);
+      }
     }
   }
 

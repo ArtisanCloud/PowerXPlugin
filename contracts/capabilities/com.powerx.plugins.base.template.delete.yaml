@@ -3,7 +3,7 @@ type: API
 version: 1.0.0
 description: "删除模板的原子能力，供 REST/gRPC 使用。"
 rbac:
-  resource: base:template
+  resource: template
   actions: [delete]
 provides:
   - id: schema/input/com.powerx.plugins.base.template.delete.v1

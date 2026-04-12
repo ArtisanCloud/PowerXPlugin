@@ -1,7 +1,7 @@
 # Implementation Plan: Base Plugin Migration
 
 **Branch**: `003-base-plugin-migration` · **Date**: 2025-11-01 · **Spec**: `specs/003-base-plugin-migration/spec.md`  
-**Input**: Feature specification for migrating `com.powerx.plugin.base` CRUD capabilities into the PowerXPlugin skeleton/framework stack.
+**Input**: Feature specification for migrating `com.powerx.plugins.base` CRUD capabilities into the PowerXPlugin skeleton/framework stack.
 
 ## Summary
 
@@ -11,7 +11,7 @@ Deliver end-to-end parity between the existing Base plugin example and the Power
 
 - **Languages & Tooling**: Go 1.24+, Gin-compatible router abstractions, Node.js 18+, Nuxt 4.2, npm 9+.  
 - **Framework Packages**: `framework/backend/go/router`, `bootstrap`, `middleware`, `manifest`, `@artisan-cloud/plugin-framework-client`, `@artisan-cloud/plugin-framework-admin`.  
-- **Skeleton Targets**: `skeleton/backend` (Go module), `skeleton/web-admin` (Nuxt app).  
+- **Skeleton Targets**: `skeleton/backend/go-gin` (Go module), `skeleton/web-admin/nuxt` (Nuxt app).  
 - **CLI & Templates**: `scaffold/templates/backend/go-gin`, `scaffold/templates/web-admin/nuxt`, `tools/cli`.  
 - **Docs & Contracts**: `docs/plan/001-init-project.md`, `docs/plan/002-plan-base-plugin-migration.md`, `docs/guide/quickstart.md`, `.specify/memory/constitution.md`.  
 - **Testing Stack**: `go test`, integration curl suites, Nuxt lint/build, Playwright (optional smoke), CLI generation diff checks.
@@ -33,12 +33,12 @@ framework/backend/go/
 framework/frontend/nuxt/
   framework-client/       # add put/delete helpers
   framework-admin/        # starter page toggle, layout wiring
-skeleton/backend/
+skeleton/backend/go-gin/
   cmd/plugin/
   internal/
     templates/            # model, repository, service, handler (in-memory)
     routes/               # register CRUD routes (+ ping)
-skeleton/web-admin/
+skeleton/web-admin/nuxt/
   app/pages/              # intro.vue, templates/*
   app/components/         # TemplateFormModal, ConfirmDialog, Toast
   app/composables/        # useTemplateApi example
@@ -89,7 +89,7 @@ docs/
 ## Testing & Validation
 
 - `go test ./framework/backend/go/... -coverprofile` with coverage ≥90% (Phase 1 completion gate).  
-- `go test ./skeleton/backend/...` with coverage of repository/service (Phase 2 gate).  
+- `go test ./skeleton/backend/go-gin/...` with coverage of repository/service (Phase 2 gate).  
 - `curl` or Postman collection hitting `/api/v1/templates` for two tenant IDs (Phase 2 gate).  
 - `curl -w` latency check confirming Standalone CRUD ≤1s 平均时延（SC-002）。  
 - `npm run lint` / `npm run build` for skeleton web-admin and framework workspace (Phase 3).  

@@ -1,16 +1,16 @@
 
-# 从 com.powerx.plugin.base 迁移到 Skeleton + Scaffold
+# 从 com.powerx.plugins.base 迁移到 Skeleton + Scaffold
 
-本文提供一份操作手册，指导如何将现有的 `com.powerx.plugin.base` 插件拆分为 PowerXPlugin 仓库内的 Skeleton（可运行示例）与 Scaffold/CLI 模板。
+本文提供一份操作手册，指导如何将现有的 `com.powerx.plugins.base` 插件拆分为 PowerXPlugin 仓库内的 Skeleton（可运行示例）与 Scaffold/CLI 模板。
 
 ## 1. 迁移 Checklist
 
 ### 后端
 
-- [ ] 复制 `backend/internal/entity/models/**` → `skeleton/backend/internal/entity/models/`
-- [ ] 复制 `backend/internal/entity/repository/**` → `skeleton/backend/internal/entity/repository/`
-- [ ] 复制 `backend/internal/services/**` → `skeleton/backend/internal/services/`
-- [ ] 复制 `backend/internal/transport/http/**`、`transport/grpc/**` → `skeleton/backend/internal/transport/`
+- [ ] 复制 `backend/internal/entity/models/**` → `skeleton/backend/go-gin/internal/entity/models/`
+- [ ] 复制 `backend/internal/entity/repository/**` → `skeleton/backend/go-gin/internal/entity/repository/`
+- [ ] 复制 `backend/internal/services/**` → `skeleton/backend/go-gin/internal/services/`
+- [ ] 复制 `backend/internal/transport/http/**`、`transport/grpc/**` → `skeleton/backend/go-gin/internal/transport/`
 
 #### 关键决策：选择迁移路径
 
@@ -21,9 +21,9 @@
 - ✅ 在 `go.mod` 添加 replace 指向本地 PowerX 源码
 
 **路径 B：独立可运行示例**（适用于无 Core 环境的开发）
-- ❌ 替换 `github.com/ArtisanCloud/...` → `github.com/ArtisanCloud/PowerXPlugin/framework/...`
+- ❌ 替换 `github.com/ArtisanCloud/...` → `github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/...`
 - ❌ 将数据库仓储改为内存实现（map + mutex）
-- ❌ 使用通用 Plugin ID（如 `com.powerx.plugin.demo`）
+- ❌ 使用通用 Plugin ID（如 `com.powerx.plugins.demo`）
 
 - [ ] 迁移 `internal/router` 中的路由装配逻辑，与 Skeleton 现有结构对齐
 - [ ] 更新 `internal/manifestx/manifest.go` 的 ID、名称、菜单、权限
@@ -31,10 +31,10 @@
 
 ### 前端
 
-- [ ] 复制 `web-admin/app/components/**` → `skeleton/web-admin/app/components/`
-- [ ] 复制 `web-admin/app/pages/**` → `skeleton/web-admin/app/pages/`
+- [ ] 复制 `web-admin/app/components/**` → `skeleton/web-admin/nuxt/app/components/`
+- [ ] 复制 `web-admin/app/pages/**` → `skeleton/web-admin/nuxt/app/pages/`
 - [ ] 调整 API 调用逻辑，使用 `~/app/composables/api/_client.ts` 暴露的统一客户端
-- [ ] 同步 i18n 文案至 `skeleton/web-admin/i18n/locales/`
+- [ ] 同步 i18n 文案至 `skeleton/web-admin/nuxt/i18n/locales/`
 - [ ] 更新 `nuxt.config.ts` 中的插件 ID 与标题信息
 
 ### 模板同步
@@ -52,7 +52,7 @@
 2. 将 Base 项目的核心业务文件复制到 Skeleton 对应目录，保持 `entity → services → transport` 命名一致。
 3. 使用 `rg`/`sed` 批量替换 import：
    ```bash
-   rg --files -g'*.go' 'github.com/ArtisanCloud/PowerX' com.powerx.plugin.base/backend |      xargs sed -i '' 's#github.com/ArtisanCloud/PowerX#github.com/ArtisanCloud/PowerXPlugin/framework#g'
+   rg --files -g'*.go' 'github.com/ArtisanCloud/PowerX' com.powerx.plugins.base/backend |      xargs sed -i '' 's#github.com/ArtisanCloud/PowerX#github.com/ArtisanCloud/PowerXPlugin/framework/backend/go#g'
    ```
 4. 为 Skeleton 提供最小运行实现：如原仓储依赖数据库，则编写内存版本（map + mutex），并在文档中标注生产实现需要自行接入。
 5. 调整 `internal/router` 与 `cmd/plugin/main.go`，确保遵循框架路由顺序：
@@ -61,7 +61,7 @@
    router.RegisterPluginRoutes(app, routes.Register)
    ```
 6. 更新 `internal/manifestx/manifest.go` 以反映新的菜单、权限项。
-7. `cd skeleton/backend && go test ./...`，验证改动不会破坏现有测试。
+7. `cd skeleton/backend/go-gin && go test ./...`，验证改动不会破坏现有测试。
 
 ## 3. 迁移步骤（前端）
 
@@ -95,7 +95,7 @@
 ## 6. 参考资源
 
 - [架构设计总览](../plan/001-init-project.md)
-- [Standalone 运行指南](../develop/standalone-mode.md)
+- [Standalone 运行指南](../develop/standalone/README.md)
 - [模板同步脚本配置](../../scripts/template-sync-config.yaml)
 
 ## 7. 当前 Skeleton 的选择

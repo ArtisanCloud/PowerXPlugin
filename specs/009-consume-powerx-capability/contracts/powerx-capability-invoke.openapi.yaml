@@ -1,0 +1,155 @@
+openapi: 3.1.0
+info:
+  title: PowerX Capability Invocation Proxy
+  version: 0.1.0
+  description: |
+    插件通过 Integration Gateway 访问 PowerX 核心能力时需遵循的 HTTP 契约。
+servers:
+  - url: https://gateway.powerx.dev
+    description: Dev Gateway
+  - url: https://gateway.powerx.prod
+    description: Production Gateway
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    XTenantUUID:
+      name: tenant_uuid
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: 插件上下文中的租户 UUID。
+  schemas:
+    CapabilityRecord:
+      type: object
+      properties:
+        capabilityId:
+          type: string
+        source:
+          type: string
+          enum: [corex, plugin]
+        description:
+          type: string
+        protocols:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum: [rest, grpc]
+              method:
+                type: string
+              path:
+                type: string
+              version:
+                type: string
+        rateLimit:
+          type: object
+          properties:
+            limit:
+              type: integer
+            burst:
+              type: integer
+        quota:
+          type: object
+          properties:
+            daily:
+              type: integer
+            monthly:
+              type: integer
+      required: [capabilityId, source]
+    CapabilityInvocationRequest:
+      type: object
+      properties:
+        capabilityId:
+          type: string
+        action:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+      required: [capabilityId, action, payload]
+    CapabilityInvocationResponse:
+      type: object
+      properties:
+        traceId:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+      required: [traceId]
+paths:
+  /tenant/capabilities:
+    get:
+      summary: 列出授权能力
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XTenantUUID'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CapabilityRecord'
+        '401':
+          description: 凭证无效
+        '403':
+          description: 未获授权
+  /tenant/invocations:
+    post:
+      summary: 调用指定能力
+      description: 请求由 Gateway 路由至 PowerX 核心能力。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XTenantUUID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilityInvocationRequest'
+      responses:
+        '200':
+          description: 调用完成
+          headers:
+            X-Trace-Id:
+              schema:
+                type: string
+              description: Gateway 返回的 traceId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityInvocationResponse'
+        '400':
+          description: 缺少字段或 action 不合法
+        '401':
+          description: 凭证无效或过期
+        '403':
+          description: 未被授权的 capabilityId/action
+        '429':
+          description: 触发限流或额度耗尽
+        '500':
+          description: 底座服务异常

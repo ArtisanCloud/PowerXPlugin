@@ -1,6 +1,6 @@
 {
   "name": "@artisan-cloud/plugin-framework-admin",
-  "version": "0.0.1-alpha",
+  "version": "0.0.2",
   "type": "module",
   "exports": {
     ".": "./index.ts",

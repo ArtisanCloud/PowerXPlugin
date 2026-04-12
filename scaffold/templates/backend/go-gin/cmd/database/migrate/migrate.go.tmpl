@@ -10,6 +10,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/entity/models"
 	adminconsoleModel "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	customerModel "{{ .BackendModulePath }}/internal/entity/models/customer"
 	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
 	integrationModel "{{ .BackendModulePath }}/internal/entity/models/integration"
 	marketplaceModel "{{ .BackendModulePath }}/internal/entity/models/marketplace"
@@ -36,6 +37,7 @@ var businessTables = []interface{}{
 	&marketplaceModel.License{},
 	&marketplaceModel.LicenseEvent{},
 	&marketplaceModel.TaxTransaction{},
+	&customerModel.CustomerAccount{},
 	&runtimeOpsModel.MCPSession{},
 	&runtimeOpsModel.RuntimeAuditEvent{},
 	&runtimeOpsModel.QuotaLedger{},
@@ -69,6 +71,7 @@ var iamTables = []interface{}{
 	&iammodel.MemberRole{},
 	&iammodel.RolePermission{},
 	&iammodel.RefreshToken{},
+	&iammodel.AuditLog{},
 }
 
 // MigratePluginModels 只做 AutoMigrate（最小实现）
@@ -86,7 +89,15 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 	if len(tables) == 0 {
 		return nil
 	}
-	return safeAutoMigrate(ctx, db, tables)
+	if err := safeAutoMigrate(ctx, db, tables); err != nil {
+		return err
+	}
+	if includeIAM {
+		if err := ensureIAMConstraints(ctx, db); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func safeAutoMigrate(ctx context.Context, db *gorm.DB, tables []interface{}) error {
@@ -119,7 +130,7 @@ func migrateWithTolerance(ctx context.Context, db *gorm.DB, table interface{}) e
 					log.Printf("[migrate] duplicate constraint (post-handle) for %T, skipping: %v", table, err)
 					return nil
 				}
-				return err
+				return fmt.Errorf("auto migrate %T failed: %w", table, err)
 			}
 			if handleErr != nil {
 				return handleErr
@@ -222,11 +233,98 @@ func isSQLiteSafeTable(tbl interface{}) bool {
 	switch tbl.(type) {
 	case *models.PluginCredential,
 		*models.PluginTenantExt,
-		*templateModel.Template:
+		*templateModel.Template,
+		*runtimeOpsModel.MCPSession:
 		return true
 	default:
 		return false
 	}
+}
+
+func ensureIAMConstraints(ctx context.Context, db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	departments := models.S(models.TableIAMDepartments)
+	users := models.S(models.TableIAMMembers)
+	audits := models.S(models.TableIAMAuditLogs)
+	roles := models.S(models.TableIAMRoles)
+	rolePerms := models.S(models.TableIAMRolePermissions)
+	memberRoles := models.S(models.TableIAMMemberRoles)
+
+	isSqlite := isSQLite(db)
+	// SQLite 对表达式索引（lower(col)）在部分环境/驱动下会报 `near "(": syntax error`。
+	// 这里用 COLLATE NOCASE 兼容本地开发，达到大小写不敏感的唯一性约束效果。
+	deptCodeExpr := "lower(code)"
+	memberUsernameExpr := "lower(username)"
+	roleCodeExpr := "lower(code)"
+	if isSqlite {
+		deptCodeExpr = "code COLLATE NOCASE"
+		memberUsernameExpr = "username COLLATE NOCASE"
+		roleCodeExpr = "code COLLATE NOCASE"
+	}
+
+	statements := []string{
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_departments_tenant_code ON %s (tenant_uuid, %s)`, departments, deptCodeExpr),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_departments_tenant_parent ON %s (tenant_uuid, parent_id)`, departments),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_tenant_account ON %s (tenant_uuid, user_id)`, users),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_tenant_username ON %s (tenant_uuid, %s)`, users, memberUsernameExpr),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_users_tenant_status ON %s (tenant_uuid, status)`, users),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_audit_logs_tenant_created ON %s (tenant_uuid, created_at DESC)`, audits),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_audit_logs_actor_created ON %s (actor_member_id, created_at DESC)`, audits),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_roles_tenant_code ON %s (tenant_uuid, %s)`, roles, roleCodeExpr),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_roles_scope ON %s (tenant_uuid, scope_type)`, roles),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_role_permissions_version ON %s (role_id, policy_version)`, rolePerms),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_role_permissions_tenant_uuid ON %s (tenant_uuid)`, rolePerms),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_iam_member_roles_role ON %s (role_id)`, memberRoles),
+	}
+
+	for _, stmt := range statements {
+		if strings.TrimSpace(stmt) == "" {
+			continue
+		}
+		if err := execIgnoreExists(ctx, db, stmt); err != nil {
+			return err
+		}
+	}
+	return backfillRolePermissionTenant(ctx, db)
+}
+
+func execIgnoreExists(ctx context.Context, db *gorm.DB, stmt string) error {
+	if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "already exists") {
+			log.Printf("[migrate] index exists, skip: %s", stmt)
+			return nil
+		}
+		return fmt.Errorf("exec stmt failed: %s: %w", stmt, err)
+	}
+	return nil
+}
+
+func backfillRolePermissionTenant(ctx context.Context, db *gorm.DB) error {
+	rolePerms := models.S(models.TableIAMRolePermissions)
+	roles := models.S(models.TableIAMRoles)
+	var query string
+	if strings.EqualFold(db.Dialector.Name(), "sqlite") {
+		query = fmt.Sprintf(
+			`UPDATE %[1]s SET tenant_uuid = (SELECT tenant_uuid FROM %[2]s WHERE %[2]s.id = %[1]s.role_id) WHERE tenant_uuid IS NULL OR trim(tenant_uuid) = ''`,
+			rolePerms, roles,
+		)
+	} else {
+		query = fmt.Sprintf(
+			`UPDATE %s rp SET tenant_uuid = r.tenant_uuid FROM %s r WHERE rp.role_id = r.id AND (rp.tenant_uuid IS NULL OR rp.tenant_uuid::text = '')`,
+			rolePerms, roles,
+		)
+	}
+	if err := db.WithContext(ctx).Exec(query).Error; err != nil {
+		lower := strings.ToLower(err.Error())
+		if strings.Contains(lower, "tenant_uuid") && strings.Contains(lower, "column") {
+			log.Printf("[migrate] tenant_uuid column missing on %s, skip backfill: %v", rolePerms, err)
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func ResetDatabase(ctx context.Context, db *gorm.DB, cfg *config.DatabaseConfig) error {

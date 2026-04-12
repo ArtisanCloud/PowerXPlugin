@@ -1,4 +1,5 @@
-import { useApiClient, getTenantUuid } from "../index";
+import { useApiClient } from "../_client";
+import { getTenantUuid } from "../_base";
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -119,6 +120,8 @@ export interface LoginResponse {
   expires_in: number;
   refresh_token: string;
   scope: string;
+  plugin_id?: string;
+  policy_version?: string;
 }
 
 // 用户信息响应接口（用于获取用户详情）

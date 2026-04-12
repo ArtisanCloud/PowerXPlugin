@@ -2,10 +2,10 @@
 
 ## 快速开始
 
-Skeleton 默认在未提供任何 YAML 的情况下使用 **内存 SQLite** 运行，因此你可以直接：
+默认在未提供任何 YAML 的情况下使用 **内存 SQLite** 运行，因此你可以直接：
 
 ```bash
-cd skeleton/backend
+cd backend
 go run ./cmd/plugin
 ```
 
@@ -57,7 +57,6 @@ Skeleton 与 Base 插件保持相同的字段结构，可直接复用宿主侧�
 | `POWERX_LOG_LEVEL` | 覆盖日志级别（debug/info/warn/error） |
 | `POWERX_CORE_ENDPOINT` | Delegated 模式访问宿主 Core API 的基址（如 `http://localhost:8077`） |
 | `POWERX_AUTH_TOKEN` | 插件 → 宿主 Core 调用时使用的服务 Token |
-| `POWERX_RBAC_DELEGATE` | 设为 `true/1/on` 时强制使用宿主 IAM；`false` 时可落到本地 IAM |
 | `PLUGIN_IAM_ADMIN_EMAIL` | Local 模式默认管理员邮箱，`go run ./cmd/database/main.go setup` 时必填 |
 | `PLUGIN_IAM_ADMIN_PASSWORD` | Local 模式默认管理员密码，配合上方邮箱使用 |
 

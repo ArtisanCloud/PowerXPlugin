@@ -4,8 +4,8 @@ This guide walks plugin engineers through standing up a PowerX plugin workspace 
 
 ## 1. Fork & Rename
 
-1. Fork the template repository (`com.powerx.plugin.base`) or copy the latest release tag.
-2. Rename the folder and module paths to the target plugin namespace (`com.powerx.plugin.<slug>`).
+1. Fork the template repository (`com.powerx.plugins.base`) or copy the latest release tag.
+2. Rename the folder and module paths to the target plugin namespace (`com.powerx.plugins.<slug>`).
 3. Update `go.mod`, Nuxt package metadata, and CI identifiers to reflect the new plugin ID.
 
 ## 2. Enforce Directory Layout

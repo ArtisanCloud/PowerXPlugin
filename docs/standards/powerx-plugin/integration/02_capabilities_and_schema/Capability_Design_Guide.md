@@ -116,7 +116,7 @@ capabilities:
 | ---------------------- | ---------------------------------------------- |
 | 使用小写字母与 `.` 分隔         | `crm.contact.create`                           |
 | 动词使用动词原形               | `create`, `sync`, `import`                     |
-| 领域名建议与插件 ID 保持一致前缀     | `com.powerx.plugin.crm` → `crm.*`              |
+| 领域名建议与插件 ID 保持一致前缀     | `com.powerx.plugins.crm` → `crm.*`              |
 | 避免歧义动作名                | 不推荐：`do`, `process`, 推荐：`analyze`, `transform` |
 | AI 工具能力应使用 `agent.` 前缀 | `agent.email.generate_copy`                    |
 
@@ -269,7 +269,7 @@ Marketplace 端会为每个插件生成能力索引，用于：
 
 ```json
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "capability": "crm.contact.create",
   "type": "api",
   "input_schema": "object",

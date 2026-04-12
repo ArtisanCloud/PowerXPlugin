@@ -113,6 +113,42 @@ local-install-run:
 			echo "$$RESPONSE"; \
 		fi
 
+.PHONY: local-reinstall
+local-reinstall: dist ## 禁用当前版本 -> 强制安装 -> 切换并启用目标版本
+	@if [ -z "$(API_BASE)" ]; then \
+		echo "❌ 需要提供 API_BASE=https://dev-api.powerx.local/api/v1"; \
+		exit 1; \
+	fi
+	@if [ -z "$(TOKEN)" ]; then \
+		echo "❌ 需要提供 TOKEN=<admin bearer token>"; \
+		exit 1; \
+	fi
+	@echo "==> [reinstall] disable current plugin: $(PLUGIN_ID)"
+	@curl -sS -X POST "$(API_BASE)/admin/plugins/$(PLUGIN_ID)/disable" \
+		-H "Authorization: Bearer $(TOKEN)" \
+		-H "Content-Type: application/json" >/tmp/powerx-plugin-disable.json || true
+	@if [ -s /tmp/powerx-plugin-disable.json ]; then \
+		if command -v jq >/dev/null 2>&1; then jq . /tmp/powerx-plugin-disable.json; else cat /tmp/powerx-plugin-disable.json; fi; \
+	fi
+	@echo "==> [reinstall] force install version=$(VERSION) enable=false"
+	@$(MAKE) --no-print-directory local-install-run \
+		LOCAL_INSTALL_SRC=$(abspath $(DIST_DIR)) \
+		API_BASE="$(API_BASE)" \
+		TOKEN="$(TOKEN)" \
+		ENABLE=false \
+		FORCE=true
+	@echo "==> [reinstall] switch_version $(PLUGIN_ID) -> $(VERSION) (enable=true)"
+	@PAYLOAD=$$(printf '{"version":"%s","enable":true}' "$(VERSION)"); \
+		RESPONSE=$$(curl -sS -X POST "$(API_BASE)/admin/plugins/$(PLUGIN_ID)/switch_version" \
+			-H "Authorization: Bearer $(TOKEN)" \
+			-H "Content-Type: application/json" \
+			-d "$$PAYLOAD"); \
+		if command -v jq >/dev/null 2>&1; then \
+			echo "$$RESPONSE" | jq; \
+		else \
+			echo "$$RESPONSE"; \
+		fi
+
 .PHONY: local-install-pxp
 local-install-pxp: ## 先解包 PACKAGE 再调用 local install（当前 .pxp 仍需包含 dist 内容）
 	@if [ -z "$(PACKAGE)" ]; then \

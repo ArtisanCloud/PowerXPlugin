@@ -196,7 +196,7 @@ DELETE FROM contacts WHERE updated_at < now() - interval '30 days'
 插件可通过 PowerX 提供的日志代理统一输出：
 
 ```bash
-powerx logs --plugin com.powerx.plugin.crm --filter privacy
+powerx logs --plugin com.powerx.plugins.crm --filter privacy
 ```
 
 ---

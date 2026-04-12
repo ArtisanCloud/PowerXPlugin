@@ -89,7 +89,7 @@
         </div>
 
         <UTable v-else :columns="usageColumns" :rows="usageRows" :sort="{ column: 'timestamp', direction: 'desc' }">
-          <template #quota_remaining-data="{ row }">
+          <template #quota_remaining-cell="{ row }">
             <span v-if="row.quota_remaining !== null">{{ `{{ row.quota_remaining }}` }}</span>
             <span v-else class="text-gray-400">—</span>
           </template>
@@ -125,6 +125,7 @@ import { useToast } from "#imports"
 import { storeToRefs } from "pinia"
 import { useUsageMetrics } from "~/composables/useUsageMetrics"
 import { useMarketplaceAnalyticsStore } from "~/stores/marketplaceAnalytics"
+import { useNormalizedColumns } from "~/utils/table"
 
 const route = useRoute()
 const toast = useToast()
@@ -140,22 +141,22 @@ const vendorId = ref<string>((route.query.vendor as string) || "")
 const periodStart = ref<string>(new Date().toISOString().slice(0, 10))
 const periodEnd = ref<string>(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
 
-const usageColumns = [
+const usageColumns = useNormalizedColumns([
   { key: "timestamp", label: "时间" },
   { key: "metric", label: "指标" },
   { key: "value", label: "累计值" },
   { key: "quota_remaining", label: "剩余额度" },
   { key: "revenue", label: "收入" },
-]
+])
 
-const reportColumns = [
+const reportColumns = useNormalizedColumns([
   { key: "period", label: "结算区间" },
   { key: "gross_amount", label: "总收入" },
   { key: "vendor_share", label: "Vendor" },
   { key: "platform_share", label: "Platform" },
   { key: "fees", label: "费用" },
   { key: "status", label: "状态" },
-]
+])
 
 const windowOptions = [
   { value: "hour", label: "小时" },

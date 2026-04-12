@@ -150,7 +150,7 @@ func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*M
 		"Authorization": fmt.Sprintf("Bearer %s", accessToken),
 	}
 	var resp MeContext
-	if err := c.get(ctx, "/auth/me/context", &resp, headers); err != nil {
+	if err := c.get(ctx, "/admin/user/auth/me/context", &resp, headers); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -159,22 +159,26 @@ func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*M
 // ----- HTTP helpers -----
 
 type loginResponse struct {
-	TokenType    string `json:"token_type"`
-	AccessToken  string `json:"access_token"`
-	ExpiresIn    int    `json:"expires_in"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	Scope        string `json:"scope"`
+	TokenType     string `json:"token_type"`
+	AccessToken   string `json:"access_token"`
+	ExpiresIn     int    `json:"expires_in"`
+	RefreshToken  string `json:"refresh_token,omitempty"`
+	Scope         string `json:"scope"`
+	PluginID      string `json:"plugin_id,omitempty"`
+	PolicyVersion string `json:"policy_version,omitempty"`
 }
 
 func (lr loginResponse) toTokens(refresh string) *iamservice.AuthTokens {
 	expires := time.Now().Add(time.Duration(lr.ExpiresIn) * time.Second)
 	return &iamservice.AuthTokens{
-		TokenType:    lr.TokenType,
-		AccessToken:  lr.AccessToken,
-		RefreshToken: refresh,
-		ExpiresIn:    int64(lr.ExpiresIn),
-		Scope:        lr.Scope,
-		ExpiresAt:    expires,
+		TokenType:     lr.TokenType,
+		AccessToken:   lr.AccessToken,
+		RefreshToken:  refresh,
+		ExpiresIn:     int64(lr.ExpiresIn),
+		Scope:         lr.Scope,
+		ExpiresAt:     expires,
+		PluginID:      lr.PluginID,
+		PolicyVersion: lr.PolicyVersion,
 	}
 }
 
@@ -224,7 +228,7 @@ func (c *DelegatedClient) do(req *http.Request, out any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return parseProxyError(resp)
+		return parseProxyError(req, resp)
 	}
 
 	if out == nil {
@@ -268,15 +272,26 @@ func (h *hostSuccess) UnmarshalJSON(data []byte) error {
 
 // ProxyError captures upstream HTTP failures.
 type ProxyError struct {
-	Status  int
-	Message string
+	Status         int
+	Message        string
+	UpstreamMethod string
+	UpstreamPath   string
 }
 
 func (e *ProxyError) Error() string {
+	if strings.TrimSpace(e.UpstreamMethod) != "" || strings.TrimSpace(e.UpstreamPath) != "" {
+		return fmt.Sprintf(
+			"authproxy: upstream %s %s returned %d: %s",
+			strings.TrimSpace(e.UpstreamMethod),
+			strings.TrimSpace(e.UpstreamPath),
+			e.Status,
+			e.Message,
+		)
+	}
 	return fmt.Sprintf("authproxy: status %d: %s", e.Status, e.Message)
 }
 
-func parseProxyError(resp *http.Response) error {
+func parseProxyError(req *http.Request, resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
 	var errResp struct {
 		Code      int    `json:"code"`
@@ -302,16 +317,32 @@ func parseProxyError(resp *http.Response) error {
 	if resp.StatusCode == http.StatusUnauthorized {
 		return iamservice.ErrUnauthorized
 	}
-	return &ProxyError{Status: resp.StatusCode, Message: msg}
+	upstreamMethod := ""
+	upstreamPath := ""
+	if req != nil {
+		upstreamMethod = strings.TrimSpace(req.Method)
+		if req.URL != nil {
+			upstreamPath = strings.TrimSpace(req.URL.Path)
+		}
+	}
+	return &ProxyError{
+		Status:         resp.StatusCode,
+		Message:        msg,
+		UpstreamMethod: upstreamMethod,
+		UpstreamPath:   upstreamPath,
+	}
 }
 
-// MeContext mirrors PowerX Core /auth/me/context payload.
+// MeContext mirrors PowerX Core /admin/user/auth/me/context payload.
 type MeContext struct {
 	IsRoot            bool            `json:"is_root"`
 	CurrentTenantUUID string          `json:"current_tenant_uuid"`
 	CurrentMemberID   *uint64         `json:"current_member_id,omitempty"`
 	User              *MeUserBrief    `json:"user,omitempty"`
 	Members           []MeMemberBrief `json:"members"`
+	Roles             []string        `json:"roles,omitempty"`
+	Permissions       []string        `json:"permissions,omitempty"`
+	Capabilities      any             `json:"capabilities,omitempty"`
 }
 
 type MeUserBrief struct {

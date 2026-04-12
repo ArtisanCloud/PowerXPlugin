@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
 cd "$ROOT_DIR"
 
+source "$ROOT_DIR/scripts/testing/go_env.sh"
+
 start_ts=$(date +%s)
 echo "=== Smoke workflow start ==="
 
@@ -29,10 +31,10 @@ trap cleanup EXIT
 
 # 1. Core Go checks
 echo "[1/5] Running framework bootstrap tests"
-go test ./framework/backend/go/bootstrap/... -coverprofile=tmp/coverage.out
+(cd framework/backend/go && go test ./bootstrap/... -coverprofile=../../../tmp/coverage.out)
 
 echo "[2/5] Running skeleton router tests"
-go test ./skeleton/backend/internal/router/... -v
+go test ./skeleton/backend/go-gin/internal/router/... -v
 
 echo "Generating coverage report tmp/coverage.html"
 go tool cover -html=tmp/coverage.out -o tmp/coverage.html

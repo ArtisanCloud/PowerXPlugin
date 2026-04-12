@@ -9,6 +9,9 @@ import (
 	"time"
 
 	authmetrics "{{ .BackendModulePath }}/internal/observability/auth"
+	customermetrics "{{ .BackendModulePath }}/internal/observability/customer"
+	ebmetrics "{{ .BackendModulePath }}/internal/observability/event_bridge"
+	integrationmetrics "{{ .BackendModulePath }}/internal/observability/integration"
 	secmetrics "{{ .BackendModulePath }}/internal/observability/security"
 )
 
@@ -231,6 +234,9 @@ func renderMetrics(w io.Writer) {
 
 	authmetrics.RenderMetrics(w)
 	secmetrics.RenderMetrics(w)
+	customermetrics.RenderMetrics(w)
+	integrationmetrics.RenderMetrics(w)
+	ebmetrics.RenderPrometheus(w)
 }
 
 func sortedKeys(m map[string]float64) []string {

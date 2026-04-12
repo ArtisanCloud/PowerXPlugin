@@ -1,0 +1,586 @@
+<!-- /components/settings/users/UsersRoot.vue -->
+<script setup lang="ts">
+import { ref, reactive, computed, watch, onMounted } from "vue";
+import UsersTenantAdmin from "./UsersTenantAdmin.vue";
+import { useI18n, useToast } from "#imports";
+import {
+  useTenantService,
+  type Tenant,
+} from "~/composables/api/services/tenantService";
+import { useIAMService } from "~/composables/api/services/iamService";
+
+import {
+  TenantStatus,
+  getTenantStatusColor,
+  getTenantStatusDisplayKey,
+} from "~/composables/api/types/tenant";
+
+const { t } = useI18n();
+const toast = useToast();
+
+// 依赖注入的服务
+const tenantService = useTenantService();
+const iamService = useIAMService();
+
+// 转换后的租户数据结构
+interface DisplayTenant {
+  id: number;
+  uuid: string;
+  name: string;
+  domain: string;
+  status: TenantStatus;
+  userCount: number;
+  createdAt: string;
+  plan: string;
+}
+
+// 状态管理
+const tenants = ref<DisplayTenant[]>([]);
+const selectedTenant = ref<DisplayTenant | null>(null);
+const searchQuery = ref("");
+const showCreateModal = ref(false);
+const creatingTenant = ref(false);
+const createTenantForm = reactive({
+  key: "",
+  name: "",
+  plan: "free",
+  status: "active",
+});
+
+// 分页和筛选
+const pagination = reactive({
+  page: 1,
+  pageSize: 5,
+  total: 0,
+  totalPages: 0,
+});
+
+const filters = reactive({
+  status: null as TenantStatus | null,
+  plan: null as string | null,
+});
+
+// 筛选选项
+const statusOptions = computed(() => [
+  { label: t("organization.user.filter.allStatus"), value: null },
+  { label: t("organization.user.status.active"), value: TenantStatus.Active },
+  {
+    label: t("organization.user.status.inactive"),
+    value: TenantStatus.Inactive,
+  },
+  {
+    label: t("organization.user.status.suspended"),
+    value: TenantStatus.Suspended,
+  },
+]);
+
+const planOptions = computed(() => [
+  { label: t("organization.user.filter.allPlans"), value: null },
+  { label: t("organization.user.plan.free"), value: "free" },
+  { label: t("organization.user.plan.pro"), value: "pro" },
+  { label: t("organization.user.plan.enterprise"), value: "enterprise" },
+]);
+
+// 计算属性 - 服务端分页优先，异常时走本地兜底
+const paginatedTenants = computed(() => tenants.value);
+const normalizedTotalPages = computed(() => {
+  if (pagination.totalPages && pagination.totalPages > 0) {
+    return pagination.totalPages;
+  }
+  return Math.max(
+    1,
+    Math.ceil(pagination.total / Math.max(1, pagination.pageSize))
+  );
+});
+const pageItems = computed(() => {
+  const total = normalizedTotalPages.value;
+  const current = pagination.page;
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, total];
+  }
+  if (current >= total - 3) {
+    return [1, total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, current - 1, current, current + 1, total];
+});
+
+// 方法
+async function loadTenants() {
+  const params = {
+    page: pagination.page,
+    page_size: pagination.pageSize,
+    status: filters.status ?? undefined,
+    plan: filters.plan ?? undefined,
+    search: searchQuery.value.trim() || undefined,
+  };
+
+  try {
+    const response = await tenantService.getTenants(params);
+    if (response.code === 200) {
+      // 转换API数据为显示格式
+      tenants.value = response.data.items.map(
+        (tenant: Tenant): DisplayTenant => ({
+          id: tenant.id,
+          uuid: tenant.uuid,
+          name: tenant.name,
+          domain: tenant.domain,
+          status: tenant.status as TenantStatus,
+          userCount: tenant.user_count,
+          createdAt: new Date(tenant.createdAt).toLocaleDateString("zh-CN"),
+          plan: tenant.plan,
+        })
+      );
+
+      // 更新分页信息
+      pagination.total = response.data.pagination.total;
+      pagination.totalPages = response.data.pagination.pages;
+    }
+  } catch (error) {
+    toast.add({
+      title: "加载失败",
+      description: extractErrorMessage(error),
+      color: "red",
+    });
+    console.error(t("organization.user.loadFailed"), error);
+  }
+}
+
+async function selectTenant(tenant: DisplayTenant) {
+  selectedTenant.value = tenant;
+}
+
+function openCreateTenant() {
+  showCreateModal.value = true;
+}
+
+function closeCreateTenant() {
+  showCreateModal.value = false;
+  createTenantForm.key = "";
+  createTenantForm.name = "";
+  createTenantForm.plan = "free";
+  createTenantForm.status = "active";
+}
+
+async function submitCreateTenant() {
+  const key = createTenantForm.key.trim().toLowerCase();
+  const name = createTenantForm.name.trim();
+  if (!key || !name) return;
+  if (key.length < 6) {
+    toast.add({
+      title: "创建失败",
+      description: "租户 Key 至少 6 位",
+      color: "red",
+    });
+    return;
+  }
+  creatingTenant.value = true;
+  try {
+    await iamService.createTenant({
+      key,
+      name,
+      plan: createTenantForm.plan,
+      status: createTenantForm.status,
+    });
+    toast.add({
+      title: "创建成功",
+      description: "租户已创建",
+      color: "green",
+    });
+    closeCreateTenant();
+    await loadTenants();
+  } catch (error) {
+    const description = extractErrorMessage(error);
+    toast.add({
+      title: "创建失败",
+      description,
+      color: "red",
+    });
+    console.error("创建租户失败:", error);
+  } finally {
+    creatingTenant.value = false;
+  }
+}
+
+function extractErrorMessage(error: unknown): string {
+  const err = error as any;
+  return (
+    err?.data?.error?.message ||
+    err?.response?._data?.error?.message ||
+    err?.data?.message ||
+    err?.response?._data?.message ||
+    err?.message ||
+    "请求失败"
+  );
+}
+
+function backToTenantList() {
+  selectedTenant.value = null;
+}
+
+function resetFilters() {
+  searchQuery.value = "";
+  filters.status = null;
+  filters.plan = null;
+  pagination.page = 1;
+  loadTenants();
+}
+
+function changePage(page: number) {
+  if (page >= 1 && page <= normalizedTotalPages.value) {
+    pagination.page = page;
+    loadTenants();
+  }
+}
+
+function changePageSize(size: number | string) {
+  const nextSize = Number(size) || 5;
+  pagination.pageSize = nextSize;
+  pagination.page = 1;
+  loadTenants();
+}
+
+// 状态显示 - 使用导入的工具函数
+// getStatusColor 已从 user.ts 导入
+
+const getStatusText = (status: TenantStatus) => {
+  const statusKey = getTenantStatusDisplayKey(status);
+  const translationStatus = `organization.user.status.${statusKey}`;
+  return t(translationStatus);
+};
+
+const getPlanText = (plan: string) => {
+  return t(`organization.user.plan.${plan}`);
+};
+
+// 防抖定时器
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+// 监听筛选变化，立即触发重新加载
+watch([() => filters.status, () => filters.plan], () => {
+  pagination.page = 1;
+  loadTenants();
+});
+
+// 监听搜索变化，使用防抖延迟触发
+watch(searchQuery, () => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+  }
+
+  searchDebounceTimer = setTimeout(() => {
+    pagination.page = 1;
+    loadTenants();
+  }, 800);
+});
+
+onMounted(() => {
+  loadTenants();
+});
+</script>
+
+<template>
+  <div>
+    <!-- 租户选择界面 -->
+    <div v-if="!selectedTenant">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+            {{ t("organization.user.title") }} ·
+            {{ t("organization.user.rootManagement") }}
+          </h2>
+          <p class="text-sm text-gray-500 dark:text-gray-300">
+            {{ t("organization.user.selectTenantDesc") }}
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <UButton icon="i-lucide-plus" variant="outline" @click="openCreateTenant">
+            {{ $t("tenant.add") }}
+          </UButton>
+          <UButton
+            icon="i-heroicons-arrow-path"
+            variant="outline"
+            @click="loadTenants"
+          >
+            {{ t("common.reload") }}
+          </UButton>
+        </div>
+      </div>
+
+      <!-- 搜索和筛选 -->
+      <div class="mb-6 rounded-lg bg-white p-4 shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
+        <div class="flex flex-wrap gap-4 items-end">
+          <div class="flex-grow min-w-[300px]">
+            <UInput
+              v-model="searchQuery"
+              icon="i-heroicons-magnifying-glass"
+              :placeholder="t('organization.user.searchTenants')"
+            />
+          </div>
+          <UFormField :label="t('organization.user.filter.status')">
+            <USelect
+              v-model="filters.status"
+              :items="statusOptions"
+              :placeholder="t('organization.user.filter.allStatus')"
+              class="w-32"
+            />
+          </UFormField>
+          <UFormField :label="t('organization.user.filter.plan')">
+            <USelect
+              v-model="filters.plan"
+              :items="planOptions"
+              :placeholder="t('organization.user.filter.allPlans')"
+              class="w-32"
+            />
+          </UFormField>
+          <UButton
+            icon="i-heroicons-arrow-path"
+            variant="ghost"
+            @click="resetFilters"
+          >
+            {{ t("organization.common.reset") }}
+          </UButton>
+        </div>
+      </div>
+
+      <!-- 租户列表 -->
+      <div class="rounded-lg bg-white shadow-sm dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
+        <div
+          v-if="paginatedTenants.length === 0"
+          class="p-8 text-center text-gray-500 dark:text-slate-200"
+        >
+          <UIcon
+            name="i-heroicons-building-office"
+            class="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-slate-700"
+          />
+          <p>{{ t("organization.user.noTenantsFound") }}</p>
+        </div>
+
+        <div v-else class="divide-y divide-gray-200 dark:divide-slate-800/50">
+          <div
+            v-for="tenant in paginatedTenants"
+            :key="tenant.id"
+            class="p-4 rounded-xl cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-slate-900/60 dark:bg-transparent"
+            @click="selectTenant(tenant)"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center dark:bg-blue-500/20"
+                  >
+                    <UIcon
+                      name="i-heroicons-building-office"
+                      class="h-5 w-5 text-blue-600 dark:text-blue-200"
+                    />
+                  </div>
+                  <div>
+                    <h3 class="font-medium text-gray-900 dark:text-white">
+                      {{ tenant.name }}
+                    </h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-300">
+                      {{ tenant.domain || t("organization.user.noDomain") }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-4 text-sm">
+                <div class="text-center">
+                  <p class="font-medium text-gray-900 dark:text-white">
+                    {{ tenant.userCount }}
+                  </p>
+                  <p class="text-gray-500 dark:text-gray-300">
+                    {{ t("organization.user.userCount") }}
+                  </p>
+                </div>
+
+                <div class="text-center">
+                  <UBadge
+                    :color="getTenantStatusColor(tenant.status)"
+                    variant="subtle"
+                  >
+                    {{ getStatusText(tenant.status) }}
+                  </UBadge>
+                  <p class="text-gray-500 mt-1">
+                    {{ getPlanText(tenant.plan) }}
+                  </p>
+                </div>
+
+                <div class="text-center">
+                  <p class="text-gray-500 dark:text-gray-300">
+                    {{ tenant.createdAt }}
+                  </p>
+                  <p class="text-gray-400 text-xs dark:text-gray-400">
+                    {{ t("organization.user.createdAt") }}
+                  </p>
+                </div>
+
+                <UIcon
+                  name="i-heroicons-chevron-right"
+                  class="h-5 w-5 text-gray-400 dark:text-gray-300"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分页 -->
+        <div
+          v-if="normalizedTotalPages > 1"
+          class="px-6 py-4 border-t border-gray-200"
+        >
+          <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-600 dark:text-gray-300">
+              {{
+                t("organization.user.pagination.showing", {
+                  start: (pagination.page - 1) * pagination.pageSize + 1,
+                  end: Math.min(
+                    pagination.page * pagination.pageSize,
+                    pagination.total
+                  ),
+                  total: pagination.total,
+                })
+              }}
+            </div>
+            <div class="flex items-center gap-2">
+              <USelect
+                :model-value="String(pagination.pageSize)"
+                :items="[
+                  { label: '5 / 页', value: '5' },
+                  { label: '10 / 页', value: '10' },
+                  { label: '20 / 页', value: '20' },
+                ]"
+                class="w-24"
+                @update:model-value="changePageSize"
+              />
+              <UButton
+                :disabled="pagination.page <= 1"
+                variant="outline"
+                size="sm"
+                icon="i-heroicons-chevron-left"
+                @click="changePage(pagination.page - 1)"
+              >
+                {{ t("organization.user.pagination.previous") }}
+              </UButton>
+              <UButton
+                v-for="p in pageItems"
+                :key="p"
+                size="sm"
+                :variant="p === pagination.page ? 'solid' : 'outline'"
+                @click="changePage(p)"
+              >
+                {{ p }}
+              </UButton>
+              <UButton
+                :disabled="pagination.page >= normalizedTotalPages"
+                variant="outline"
+                size="sm"
+                icon="i-heroicons-chevron-right"
+                @click="changePage(pagination.page + 1)"
+              >
+                {{ t("organization.user.pagination.next") }}
+              </UButton>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 选中租户后的用户管理界面 -->
+    <div v-else>
+      <div class="flex items-center gap-3 mb-6">
+        <UButton
+          icon="i-heroicons-arrow-left"
+          variant="ghost"
+          @click="backToTenantList"
+        >
+          {{ t("organization.user.backToTenantList") }}
+        </UButton>
+        <div class="h-6 w-px bg-gray-300"></div>
+        <div class="flex items-center gap-3">
+          <div
+            class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center dark:bg-blue-500/20"
+          >
+            <UIcon
+              name="i-heroicons-building-office"
+              class="h-4 w-4 text-blue-600 dark:text-blue-300"
+            />
+          </div>
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+              {{ selectedTenant.name }}
+            </h2>
+            <p class="text-sm text-gray-500 dark:text-gray-300">
+              {{ selectedTenant.domain || t("organization.user.noDomain") }} ·
+              {{
+                t("organization.user.userCountText", {
+                  count: selectedTenant.userCount,
+                })
+              }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <UsersTenantAdmin :tenant-uuid="selectedTenant.uuid" />
+    </div>
+
+    <UModal v-model:open="showCreateModal" :prevent-close="creatingTenant">
+      <template #title>新增租户</template>
+      <template #description>填写租户信息后点击保存创建。</template>
+      <template #body>
+        <UForm :state="createTenantForm" class="space-y-4 p-4 sm:p-5">
+          <UFormField label="租户 Key" required>
+            <UInput v-model="createTenantForm.key" placeholder="tenant-demo" />
+          </UFormField>
+          <UFormField label="租户名称" required>
+            <UInput v-model="createTenantForm.name" placeholder="tenant-demo" />
+          </UFormField>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <UFormField label="套餐">
+              <USelect
+                v-model="createTenantForm.plan"
+                :items="[
+                  { label: 'free', value: 'free' },
+                  { label: 'standard', value: 'standard' },
+                  { label: 'premium', value: 'premium' },
+                ]"
+                option-attribute="label"
+                value-attribute="value"
+              />
+            </UFormField>
+            <UFormField label="状态">
+              <USelect
+                v-model="createTenantForm.status"
+                :items="[
+                  { label: '启用', value: 'active' },
+                  { label: '停用', value: 'suspended' },
+                ]"
+                option-attribute="label"
+                value-attribute="value"
+              />
+            </UFormField>
+          </div>
+        </UForm>
+      </template>
+      <template #footer>
+        <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <UButton color="neutral" variant="soft" :disabled="creatingTenant" @click="closeCreateTenant">
+            取消
+          </UButton>
+          <UButton
+            color="primary"
+            :loading="creatingTenant"
+            :disabled="!createTenantForm.key.trim() || !createTenantForm.name.trim()"
+            @click="submitCreateTenant"
+          >
+            保存
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+  </div>
+</template>

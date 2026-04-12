@@ -329,7 +329,17 @@ func decodeJSONMap(data datatypes.JSON) (map[string]any, error) {
 }
 
 func resolveGrantMatrixBaseDir() string {
-	candidates := []string{"backend/etc", "etc"}
+	if custom := strings.TrimSpace(os.Getenv("POWERX_GRANT_MATRIX_DIR")); custom != "" {
+		if info, err := os.Stat(custom); err == nil && info.IsDir() {
+			return custom
+		}
+	}
+	candidates := []string{
+		"backend/etc",
+		"etc",
+		"skeleton/backend/etc",
+		"skeleton/etc",
+	}
 	for _, path := range candidates {
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
 			return path

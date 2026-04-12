@@ -10,7 +10,7 @@
   cd skeleton
   npm install
   ```
-- 进入 `skeleton/backend` 并根据需要设置数据库：
+- 进入 `skeleton/backend/go-gin` 并根据需要设置数据库：
   ```bash
   export POWERX_PROXY=0
   export IAM_MODE=local
@@ -24,18 +24,18 @@
 ## 2. 启动本地服务
 
 ```bash
-cd skeleton/backend
+cd skeleton/backend/go-gin
 POWERX_PROXY=0 IAM_MODE=local go run ./cmd/plugin
 ```
 
-- 默认 HTTP 监听 `:8178`，gRPC 监听 `:9101`（若端口被占用会自动递增）。
+- 默认 HTTP 监听 `:8078`，gRPC 监听 `:9101`（若端口被占用会自动递增）。
 - DevSwitch 会自动注入示例租户 `00000000-0000-0000-0000-000000000001`，若需要自定义，覆盖 `PLUGIN_IAM_TENANT_KEY` 后重新 `setup`。
 
 ## 3. 获取 Access Token
 
 1. 登录：
    ```bash
-   curl -X POST http://127.0.0.1:8178/api/v1/admin/user/auth/login \
+   curl -X POST http://127.0.0.1:8078/api/v1/admin/user/auth/login \
      -H 'Content-Type: application/json' \
      -d '{
            "tenant": "Local Tenant",
@@ -53,11 +53,11 @@ POWERX_PROXY=0 IAM_MODE=local go run ./cmd/plugin
 
   ```bash
   # 查询模板列表
-  curl http://127.0.0.1:8178/api/v1/templates \
+  curl http://127.0.0.1:8078/api/v1/templates \
     -H 'Authorization: Bearer <token>'
 
   # 创建模板
-  curl -X POST http://127.0.0.1:8178/api/v1/templates \
+  curl -X POST http://127.0.0.1:8078/api/v1/templates \
     -H 'Authorization: Bearer <token>' \
     -H 'Content-Type: application/json' \
     -d '{
@@ -67,7 +67,7 @@ POWERX_PROXY=0 IAM_MODE=local go run ./cmd/plugin
         }'
 
   # 批量克隆模板
-  curl -X POST http://127.0.0.1:8178/api/v1/templates/batch-clone \
+  curl -X POST http://127.0.0.1:8078/api/v1/templates/batch-clone \
     -H 'Authorization: Bearer <token>' \
     -H 'Content-Type: application/json' \
     -d '{
@@ -77,7 +77,7 @@ POWERX_PROXY=0 IAM_MODE=local go run ./cmd/plugin
         }'
 
   # 校验模板
-  curl -X POST http://127.0.0.1:8178/api/v1/templates/1/validate \
+  curl -X POST http://127.0.0.1:8078/api/v1/templates/1/validate \
     -H 'Authorization: Bearer <token>' \
     -H 'Content-Type: application/json' \
     -d '{

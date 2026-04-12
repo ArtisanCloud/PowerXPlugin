@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"bytes"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -111,5 +113,38 @@ func TestGetEnvOrDefault(t *testing.T) {
 	t.Setenv("TEST_VALUE", " value ")
 	if got := getEnvOrDefault("TEST_VALUE", "fallback"); got != "value" {
 		t.Fatalf("getEnvOrDefault returned %q, want value", got)
+	}
+}
+
+func TestWithRuntimeDefaultsInjectsTenantMirrorFields(t *testing.T) {
+	var buf bytes.Buffer
+	base := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger := withRuntimeDefaults(base, &Config{
+		Gateway: GatewayConfig{TenantID: "tenant-a"},
+	})
+	logger.Info("probe")
+
+	out := buf.String()
+	if !strings.Contains(out, `"tenant_uuid":"tenant-a"`) {
+		t.Fatalf("expected tenant_uuid in output, got %s", out)
+	}
+	if !strings.Contains(out, `"tenant_key":"tenant-a"`) {
+		t.Fatalf("expected tenant_key mirror in output, got %s", out)
+	}
+	if !strings.Contains(out, `"subscriber_id":"bootstrap.app"`) {
+		t.Fatalf("expected subscriber_id in output, got %s", out)
+	}
+	if !strings.Contains(out, `"component":"bootstrap.app"`) {
+		t.Fatalf("expected component in output, got %s", out)
+	}
+}
+
+func TestNewAppInitializesIAMRegistry(t *testing.T) {
+	app := NewApp(nil)
+	if app.IAMRegistry() == nil {
+		t.Fatalf("expected IAM registry to be initialized")
+	}
+	if app.IAMRegistry().IsBound() {
+		t.Fatalf("expected IAM registry to be unbound by default")
 	}
 }

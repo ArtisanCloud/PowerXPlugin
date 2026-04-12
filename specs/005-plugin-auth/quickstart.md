@@ -11,7 +11,7 @@ This guide shows how to run the Skeleton in both Delegated (PowerX host) and Loc
 | Variable | Purpose | Delegated Example | Local Example |
 |----------|---------|------------------|---------------|
 | `POWERX_PROXY` | 注入来源，宿主=1 | `1` | `0`
-| `POWERX_RBAC_DELEGATE` | 强制委托 | `true` | unset / `false`
+| `IAMMode` | 启动模式 | `delegated` | `local`
 | `POWERX_CORE_ENDPOINT` | 宿主 API | `http://powerx-core:8077` | optional
 | `POWERX_AUTH_TOKEN` | 插件→宿主鉴权 | `eyJ...` | optional
 | `POWERX_TENANT_ID` | 当前租户 | `tenant_123` | optional
@@ -22,8 +22,8 @@ This guide shows how to run the Skeleton in both Delegated (PowerX host) and Loc
 ## 3. Delegated Mode (PowerX Host)
 ```bash
 # 后端
-cd skeleton/backend
-POWERX_PROXY=1 POWERX_RBAC_DELEGATE=true \
+cd skeleton/backend/go-gin
+IAMMode=delegated POWERX_PROXY=1 \
 POWERX_CORE_ENDPOINT="http://localhost:8077" \
 POWERX_AUTH_TOKEN="dev-token" \
 go run ./cmd/plugin
@@ -39,9 +39,9 @@ npm run dev
 
 ## 4. Local Mode (Standalone)
 ```bash
-cd skeleton/backend
+cd skeleton/backend/go-gin
 export POWERX_PROXY=0
-export POWERX_RBAC_DELEGATE=false
+export IAMMode=local
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
@@ -51,13 +51,13 @@ POWERX_RUN_MIGRATE=true go run ./cmd/plugin
 ```
 - 登录凭证：`PLUGIN_IAM_ADMIN_EMAIL` / `PLUGIN_IAM_ADMIN_PASSWORD`。
 - 默认会生成 `iam_departments` 与 `iam_permissions` 示例数据，并把管理员绑定到 `system.admin` 角色。
-- 运行 `cd skeleton/web-admin && npm install && npm run dev` 后，即可在 `/users/login` 输入本地管理员完成登录。
+- 运行 `cd skeleton/web-admin/nuxt && npm install && npm run dev` 后，即可在 `/users/login` 输入本地管理员完成登录。
 - 自动化校验：
-  - `cd skeleton/backend && go test ./...`（覆盖 Local IAM store 行为）。
-  - `cd skeleton/web-admin && npm run test:unit`（`useAuth` fallback 行为）。
+  - `cd skeleton/backend/go-gin && go test ./...`（覆盖 Local IAM store 行为）。
+  - `cd skeleton/web-admin/nuxt && npm run test:unit`（`useAuth` fallback 行为）。
   - Playwright Local 测试：
     ```bash
-    cd skeleton/web-admin
+    cd skeleton/web-admin/nuxt
     PLAYWRIGHT_LOCAL_IAM=1 \
     PLAYWRIGHT_LOCAL_EMAIL=admin@local.test \
     PLAYWRIGHT_LOCAL_PASSWORD='S3cret!!' \
@@ -82,12 +82,12 @@ cd tools/cli && go run ./cmd/px-plugin init dev.plugin.test
 - 验证命令：
   ```bash
   npm run lint
-  cd skeleton/backend && go test ./...
-  npm --prefix skeleton/web-admin run test:unit
+  cd skeleton/backend/go-gin && go test ./...
+  npm --prefix skeleton/web-admin/nuxt run test:unit
   npm run sync:templates -- --check
   ```
-- Delegated E2E（需另启 `npm --prefix skeleton/web-admin run dev`）：`npm --prefix skeleton/web-admin run test:e2e -- auth-delegated`
-- Local E2E：`PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin run test:e2e -- auth-local`
+- Delegated E2E（需另启 `npm --prefix skeleton/web-admin/nuxt run dev`）：`npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-delegated`
+- Local E2E：`PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local`
 - 性能参考：在 Apple M3 Pro + Chromium Headless 上，Delegated 登录单次 ~1.8s；Postgres 15 中执行 `go run ./cmd/database/main.go setup` 约 4.6s（包含 IAM migrate+seed）。详细说明见 `docs/guides/develop/auth.md#6-性能与耗时`。
 
 ## 8. CLI Package / Publish 快速演练

@@ -1,0 +1,23 @@
+id: {{ .PluginID }}.template.publish
+type: API
+version: 1.0.0
+description: "将审核通过的模板发布到业务租户。"
+rbac:
+  resource: template
+  actions: [update]
+provides:
+  - id: schema/input/{{ .PluginID }}.template.publish.v1
+    path: schema/input/{{ .PluginID }}.template.publish.json
+    kind: input
+    version: 1.0.0
+  - id: schema/output/{{ .PluginID }}.template.publish.v1
+    path: schema/output/{{ .PluginID }}.template.publish.json
+    kind: output
+    version: 1.0.0
+metadata:
+  protocols:
+    rest:
+      method: POST
+      path: /api/v1/templates/{id}/publish
+    workflow:
+      template: contracts/exposure/workflow/template-compose.json

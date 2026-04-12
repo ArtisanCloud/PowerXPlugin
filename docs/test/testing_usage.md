@@ -46,15 +46,20 @@ Version 1.56.1
 
 ```bash
 # 仓库根目录
-go test ./framework/backend/go/bootstrap/... -v
-go test ./skeleton/backend/internal/routes/... -v
+cd framework/backend/go && go test ./bootstrap/... -v
+go test ./skeleton/backend/go-gin/internal/routes/... -v
 python3 -m json.tool docs/contracts/manifest.json > /dev/null
 python3 -m json.tool docs/contracts/rbac.json > /dev/null
 go build -o /tmp/px-plugin ./tools/cli/cmd/px-plugin
 
 # 推荐：使用聚合入口自动完成上述步骤
 make test-smoke         # 等价于 scripts/testing/smoke.sh，带超时与日志
+make BACKEND=fastapi test-smoke # FastAPI 后端 smoke 校验
 ```
+
+说明：
+- 默认使用 Go Gin 后端（不传 `BACKEND`）。
+- FastAPI 后端需显式指定：`BACKEND=fastapi`。
 
 通过以上命令或脚本可初步确认后端逻辑、契约文件与 CLI 构建无异常（示例输出末尾会打印 `=== Smoke workflow complete in Ns ===`，可直接记录耗时）。任何一步失败请参考第 7 节排查。
 
@@ -65,7 +70,8 @@ make test-smoke         # 等价于 scripts/testing/smoke.sh，带超时与日�
 ### 4.1 后端测试
 
 ```bash
-go test ./framework/... ./skeleton/backend/... -v -coverprofile=coverage.out
+cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out
+go test ./skeleton/backend/go-gin/... -v -coverprofile=coverage.out
 go tool cover -func=coverage.out
 ```
 
@@ -81,7 +87,7 @@ go tool cover -func=coverage.out
 1. 安装依赖与浏览器
 
    ```bash
-   cd skeleton/web-admin
+   cd skeleton/web-admin/nuxt
    npm install
    npx playwright install
    ```
@@ -90,26 +96,27 @@ go tool cover -func=coverage.out
 
    ```bash
    cd /path/to/PowerXPlugin
-   go run ./skeleton/backend/cmd/plugin
+   go run ./skeleton/backend/go-gin/cmd/plugin
    ```
 
 3. 启动前端（再开一终端）
 
    ```bash
-   cd /path/to/PowerXPlugin/skeleton/web-admin
+   cd /path/to/PowerXPlugin/skeleton/web-admin/nuxt
    npm run dev
    ```
 
 4. 运行测试
 
 ```bash
-PLAYWRIGHT_BASE_URL=http://localhost:3031 npx playwright test
+PLAYWRIGHT_BASE_URL=http://localhost:3131 npx playwright test
 
 # 推荐：使用聚合入口自动完成构建与 E2E
 make test-regression    # 等价于 scripts/testing/regression.sh，含启动/清理
+make BACKEND=fastapi test-regression # FastAPI 后端回归校验
 ```
 
-5. 停止服务（Ctrl+C），若失败可在 `skeleton/web-admin/test-results/` 查看报告。脚本模式会输出 `=== Regression workflow complete in Ns ===` 并保留 `tmp/regression-backend.log` / `tmp/regression-frontend.log`。
+5. 停止服务（Ctrl+C），若失败可在 `skeleton/web-admin/nuxt/test-results/` 查看报告。脚本模式会输出 `=== Regression workflow complete in Ns ===` 并保留 `tmp/regression-backend.log` / `tmp/regression-frontend.log`。
 
 > 稳定性建议：确保 dev server 输出无 `PXAdminLayout` 等组件解析警告，再执行 Playwright。  
 > 回归脚本/Make 目标会自动：
@@ -117,7 +124,7 @@ make test-regression    # 等价于 scripts/testing/regression.sh，含启动/�
 > 2. 启动样例后端（默认 `127.0.0.1:8078`，可用 `REGRESSION_BACKEND_HOST/PORT` 覆盖）
 > 3. 对 Nuxt 前端执行 `npm run lint`、`npm run build`，随后以 `npx nuxi preview` 启动预览服务（端口默认随机或取 `REGRESSION_FRONTEND_PORT`）
 > 4. 设置 `NUXT_PUBLIC_API_BASE` 指向上述后端并运行 Playwright（可用 `PLAYWRIGHT_BASE_URL` 覆盖）
-> 5. 将日志落地 `tmp/regression-backend.log` / `tmp/regression-frontend.log`，测试报告位于 `skeleton/web-admin/test-results/`
+> 5. 将日志落地 `tmp/regression-backend.log` / `tmp/regression-frontend.log`，测试报告位于 `skeleton/web-admin/nuxt/test-results/`
 >
 > 当前 `npm run lint` 仍输出 “Lint checks pending configuration”，配置 ESLint 规则后即可在聚合流程内自动执行真实 lint。
 
@@ -165,12 +172,12 @@ rm -rf "$TMP_DIR"
 
 | 场景 | 命令 | 说明 |
 |------|------|------|
-| 后端快速回归 | `go test ./framework/... ./skeleton/backend/...` | 含单元与集成测试 |
+| 后端快速回归 | `cd framework/backend/go && go test ./...; go test ./skeleton/backend/go-gin/...` | 含单元与集成测试 |
 | Playwright 单用例 | `npx playwright test tests/e2e/starter.spec.ts` | 需先设定 `PLAYWRIGHT_BASE_URL` |
 | 契约变更验证 | 参考 4.3 | 修改 `docs/contracts/**` 后必跑 |
 | CLI 模块改动 | 参考 4.4 | 确保 `px-plugin init` 无回归 |
 | 测试采纳率审计 | `./scripts/testing/audit-test-adoption.sh` | 统计最近提交是否新增测试 |
-| 综合回归 | `make test-regression` | 启动后端/前端并执行 Playwright 与覆盖率 |
+| 综合回归 | `make test-regression` / `make BACKEND=fastapi test-regression` | 启动后端/前端并执行 Playwright 与覆盖率 |
 | CI (act) | `make ci-all` | 依赖 [act](https://github.com/nektos/act)，在本地模拟 `.github/workflows/ci.yml` |
 
 > 详细脚本说明参见 `scripts/testing/README.md`，可了解超时或端口覆盖的环境变量。
@@ -185,15 +192,15 @@ rm -rf "$TMP_DIR"
 
 | 类型 | 目录示例 | 说明 |
 |------|----------|------|
-| Go 单元测试 | `framework/backend/go/<pkg>/*_test.go`<br>`skeleton/backend/internal/<pkg>/*_test.go` | 与被测文件同目录，命名为 `*_test.go`，可被 `go test ./...` 自动发现 |
-| Playwright E2E | `skeleton/web-admin/tests/e2e/*.spec.ts` | 放在 `tests/e2e/` 下，命名 `*.spec.ts`，可被 `npx playwright test` 扫描 |
+| Go 单元测试 | `framework/backend/go/<pkg>/*_test.go`<br>`skeleton/backend/go-gin/internal/<pkg>/*_test.go` | 与被测文件同目录，命名为 `*_test.go`，可被 `go test ./...` 自动发现 |
+| Playwright E2E | `skeleton/web-admin/nuxt/tests/e2e/*.spec.ts` | 放在 `tests/e2e/` 下，命名 `*.spec.ts`，可被 `npx playwright test` 扫描 |
 | CLI 示例 | `tools/cli/cmd` + `scripts/testing/*.sh` | CLI 新增命令时需同步脚本调用与文档 |
 
 下面列举各层常见场景与最小示例，方便快速复制扩展。
 
 > **目录约定提醒**  
 > - Go 测试文件与实现同目录，命名为 `*_test.go`，便于 `go test ./...` 自动发现。  
-> - 前端 E2E 用例统一放在 `skeleton/web-admin/tests/e2e/`，后续若加入 component/unit 测试，可在该目录下增设子目录。  
+> - 前端 E2E 用例统一放在 `skeleton/web-admin/nuxt/tests/e2e/`，后续若加入 component/unit 测试，可在该目录下增设子目录。  
 > - CLI 相关验证建议放在 `tools/cli` 同仓或 `scripts/` 目录，确保逻辑与脚手架输出一一对应。
 
 ### 6.1 Go 单元测试（framework / skeleton）
@@ -236,7 +243,7 @@ rm -rf "$TMP_DIR"
 3. 运行指定包测试：
 
    ```bash
-   go test ./framework/backend/go/router -v
+   cd framework/backend/go && go test ./router -v
    ```
 
 ### 6.2 后端特性级（feature）回归
@@ -254,8 +261,8 @@ import (
   "testing"
 
   "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
-  "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/handler"
-  "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/service"
+  "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/go-gin/internal/handler"
+  "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/go-gin/internal/service"
 )
 
 func TestPingHandler_ReturnsOK(t *testing.T) {
@@ -298,14 +305,14 @@ func (c *stubContext) Status(code int) {
 执行局部用例：
 
 ```bash
-go test ./skeleton/backend/internal/... -run TestPingHandler_ReturnsOK -v
+go test ./skeleton/backend/go-gin/internal/... -run TestPingHandler_ReturnsOK -v
 ```
 
 > 样例中的 `stubContext` 仅实现必要方法，实际项目可根据需要扩展。
 
 ### 6.3 前端 E2E 用例
 
-1. 在 `skeleton/web-admin/tests/e2e/` 添加新的 `*.spec.ts`：
+1. 在 `skeleton/web-admin/nuxt/tests/e2e/` 添加新的 `*.spec.ts`：
 
    ```ts
    import { test, expect } from '@playwright/test';
@@ -321,8 +328,8 @@ go test ./skeleton/backend/internal/... -run TestPingHandler_ReturnsOK -v
 2. 启动后端与前端 dev server 后，仅运行该文件：
 
    ```bash
-   cd skeleton/web-admin
-   PLAYWRIGHT_BASE_URL=http://localhost:3031 npx playwright test tests/e2e/settings.spec.ts
+   cd skeleton/web-admin/nuxt
+   PLAYWRIGHT_BASE_URL=http://localhost:3131 npx playwright test tests/e2e/settings.spec.ts
    ```
 
 > 建议在 `test.beforeEach` 内准备登录态或初始化数据，保证测试可重复。
@@ -360,7 +367,7 @@ rm -rf "$TMP_DIR"
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
 | Playwright 报 “Failed to resolve component: PXAdminLayout” | 未安装 `@artisan-cloud/plugin-framework-admin` 依赖或 dev server 启动前 node_modules 残缺 | 重新执行 `npm install`，删除 `node_modules`/`package-lock.json` 后再装 |
-| E2E 测试访问超时 | 前端/后端端口未就绪 | 启动测试前手动访问 `http://localhost:3031/_p/...` 与 `http://localhost:8078/api/v1/ping`，或实现等待函数 |
+| E2E 测试访问超时 | 前端/后端端口未就绪 | 启动测试前手动访问 `http://localhost:3131/_p/...` 与 `http://localhost:8078/api/v1/ping`，或实现等待函数 |
 | CLI 生成命令失败 | 未 `go build` px-plugin 或 GOPATH 权限问题 | 先在仓库根执行 `go build -o bin/px-plugin ./tools/cli/cmd/px-plugin` |
 | 契约校验报语法错误 | JSON 文件格式化异常 | 使用 `python3 -m json.tool <file>` 定位具体报错行 |
 | 覆盖率下降 | 新增代码无测试 | 参考 `docs/test/testing_strategy.md` 中的改进建议，补充相应测试用例 |
@@ -372,7 +379,7 @@ rm -rf "$TMP_DIR"
 
 当前仓库已经提供 `scripts/testing/` 与按模块划分的 `make-files/`，后续仍有以下提升方向：
 
-- 将 `make test-smoke` / `make test-regression` 纳入 CI/CD，并在流水线中上传 Playwright 报告与覆盖率。
+- 将 `make test-smoke` / `make BACKEND=fastapi test-smoke` / `make test-regression` / `make BACKEND=fastapi test-regression` 纳入 CI/CD，并在流水线中上传 Playwright 报告与覆盖率。
 - 为关键契约（Manifest / RBAC / OpenAPI）增加差异报警，接入 PR Gate。
 - 规划性能基准与长期指标可视化（如构建时长、测试通过率等），构建基础仪表板。
 

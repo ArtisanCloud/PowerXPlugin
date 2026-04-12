@@ -28,6 +28,8 @@ type Data struct {
 	BackendModulePath  string
 	BackendType        string
 	FrontendType       string
+	BackendPort        int
+	FrontendPort       int
 	FrameworkVersion   string
 	FrameworkReplace   string
 	SchemaDependency   string
@@ -57,6 +59,9 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		if entry.IsDir() {
 			return nil
 		}
+		if strings.HasPrefix(entry.Name(), ".DS_Store") || strings.HasPrefix(entry.Name(), "Thumbs.db") {
+			return nil
+		}
 
 		rel, err := relativeTemplatePath(path)
 		if err != nil {
@@ -69,9 +74,13 @@ func RenderAll(baseDir string, data Data, opts Options) (Result, error) {
 		if isTemplate {
 			targetRel = strings.TrimSuffix(rel, ".tmpl")
 		}
-		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugin.base", data.PluginID)
+		targetRel = strings.ReplaceAll(targetRel, "com.powerx.plugins.base", data.PluginID)
 		targetRel = strings.ReplaceAll(targetRel, "__plugin__", data.PluginID)
-		targetRel = normalizeTargetPath(targetRel, data.BackendType, data.FrontendType)
+		var keep bool
+		targetRel, keep = normalizeTargetPath(targetRel, data.BackendType, data.FrontendType)
+		if !keep {
+			return nil
+		}
 
 		targetPath := filepath.Join(baseDir, filepath.FromSlash(targetRel))
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
@@ -136,16 +145,33 @@ func executeTemplate(name string, raw []byte, data Data) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func normalizeTargetPath(rel, backendType, frontendType string) string {
-	// Dynamic mapping based on backend and frontend types
-	switch {
-	case strings.HasPrefix(rel, "backend/"+backendType+"/"):
-		return "backend/" + strings.TrimPrefix(rel, "backend/"+backendType+"/")
-	case strings.HasPrefix(rel, "web-admin/"+frontendType+"/"):
-		return "web-admin/" + strings.TrimPrefix(rel, "web-admin/"+frontendType+"/")
-	default:
-		return rel
+func normalizeTargetPath(rel, backendType, frontendType string) (string, bool) {
+	if mapped, keep, matched := mapVariantPath(rel, "backend/", backendType, IsValidBackend); matched {
+		return mapped, keep
 	}
+	if mapped, keep, matched := mapVariantPath(rel, "web-admin/", frontendType, IsValidFrontend); matched {
+		return mapped, keep
+	}
+	return rel, true
+}
+
+func mapVariantPath(rel, prefix, selected string, isKnown func(string) bool) (string, bool, bool) {
+	if !strings.HasPrefix(rel, prefix) {
+		return rel, true, false
+	}
+	rest := strings.TrimPrefix(rel, prefix)
+	separator := strings.Index(rest, "/")
+	if separator < 0 {
+		return rel, true, true
+	}
+	variant := rest[:separator]
+	if !isKnown(variant) {
+		return rel, true, true
+	}
+	if variant != selected {
+		return "", false, true
+	}
+	return prefix + rest[separator+1:], true, true
 }
 
 func isBinaryTemplate(rel string) bool {

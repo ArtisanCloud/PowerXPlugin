@@ -6,6 +6,7 @@ import (
 	"{{ .BackendModulePath }}/internal/capabilities"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/grpc/client"
+	"{{ .BackendModulePath }}/internal/integrations/gateway"
 	"{{ .BackendModulePath }}/internal/logger"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
@@ -16,6 +17,10 @@ import (
 	marketplacesvc "{{ .BackendModulePath }}/internal/services/marketplace"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
 type DelegatedAuthProxy interface {
@@ -30,6 +35,7 @@ type Deps struct {
 	DB                  *gorm.DB
 	Ctx                 context.Context
 	PowerXClient        *client.PowerXServiceClient
+	CapabilityGateway   gatewayClient
 	Config              *config.Config
 	CapabilitiesManager capabilities.Manager
 	CapabilityMetrics   *capmetrics.Metrics
@@ -39,10 +45,19 @@ type Deps struct {
 	LicenseCache        marketplacesvc.LicenseCache
 	OperationsMetrics   *opsmetrics.Metrics
 	AdminConsoleMetrics *adminmetrics.Metrics
+	EventEmitter        fweventbridge.Emitter
+	WSBusHub            fwwsbus.LocalHub
 	IAMMode             iamservice.IAMMode
 	IAMModeSource       string
 	AuthProxy           DelegatedAuthProxy
 	IAMDirectory        iamservice.IAMDirectory
+}
+
+type gatewayClient interface {
+	Enabled() bool
+	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
+	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	Close() error
 }
 
 // RuntimeDefaults returns the configured runtime ops defaults (if any).
@@ -57,6 +72,9 @@ func (d *Deps) RuntimeDefaults() *config.RuntimeOpsDefaults {
 func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logrus.Entry {
 	if extra == nil {
 		extra = logger.Fields{}
+	}
+	if _, ok := extra[runtimelogging.FieldSubscriber]; !ok {
+		extra[runtimelogging.FieldSubscriber] = component
 	}
 	if ctx == nil && d != nil {
 		ctx = d.Ctx
@@ -77,4 +95,26 @@ func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger
 	}
 
 	return logger.WithRuntimeFields(PluginID, tenantID, traceID, component, extra)
+}
+
+func (d *Deps) LocalIAMEnabled() bool {
+	return d != nil && d.IAMMode == iamservice.IAMModeLocal && d.IAMDirectory != nil
+}
+
+func (d *Deps) DelegatedIAMEnabled() bool {
+	return d != nil && d.IAMMode == iamservice.IAMModeDelegated && d.AuthProxy != nil
+}
+
+func (d *Deps) LocalDirectory() iamservice.IAMDirectory {
+	if d.LocalIAMEnabled() {
+		return d.IAMDirectory
+	}
+	return nil
+}
+
+func (d *Deps) DelegatedProxy() DelegatedAuthProxy {
+	if d.DelegatedIAMEnabled() {
+		return d.AuthProxy
+	}
+	return nil
 }

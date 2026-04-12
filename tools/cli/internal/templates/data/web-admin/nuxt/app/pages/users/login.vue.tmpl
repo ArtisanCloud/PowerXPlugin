@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useAuthService } from "~/composables/api/services/authService";
 
 definePageMeta({
@@ -12,6 +13,38 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
 const { setAuth, consumeAuthError } = auth;
+const isDelegatedMode = computed(() => auth.delegatedIAM?.value ?? false);
+const runtimeConfig = useRuntimeConfig();
+const insidePowerX = computed(
+  () =>
+    runtimeConfig.public?.insidePowerX === true ||
+    runtimeConfig.public?.insidePowerX === "true"
+);
+
+const sanitizeRedirectTo = (raw: unknown) => {
+  if (typeof raw !== "string" || !raw.trim()) return "/";
+  const redirect = raw.trim();
+
+  // Avoid open redirects / malformed input
+  if (/^https?:\/\//i.test(redirect)) return "/";
+
+  const pathOnly = redirect.startsWith("/") ? redirect : "/";
+
+  // Never redirect back to login (prevents loops)
+  if (/\/users\/login(?:$|[?#/])/i.test(pathOnly)) return "/";
+
+  // In standalone preview, strip the PowerX plugin admin base prefix.
+  if (!insidePowerX.value) {
+    const match = pathOnly.match(/^\/_p\/[^/]+\/admin(\/.*)?$/);
+    if (match) {
+      const stripped = match[1] || "/";
+      if (/\/users\/login(?:$|[?#/])/i.test(stripped)) return "/";
+      return stripped;
+    }
+  }
+
+  return pathOnly;
+};
 
 // 导入认证服务
 const { login } = useAuthService();
@@ -29,6 +62,10 @@ const error = ref("");
 
 // 登录处理
 const handleLogin = async () => {
+  if (isDelegatedMode.value) {
+    error.value = t("auth.delegated.loginDisabled");
+    return;
+  }
   if (!form.identifier || !form.password) {
     error.value = t("auth.required");
     return;
@@ -52,7 +89,7 @@ const handleLogin = async () => {
       setAuth(response.data);
 
       // 获取重定向URL
-      const redirectTo = (route.query.redirect as string) || "/";
+      const redirectTo = sanitizeRedirectTo(route.query.redirect);
 
       // 登录成功后跳转
       await navigateTo(redirectTo);
@@ -133,18 +170,28 @@ onMounted(() => {
         <div class="px-6 pb-6">
           <form @submit.prevent="handleLogin" class="space-y-5">
             <!-- 错误提示 -->
+            <div v-if="error" role="alert">
+              <UAlert
+                color="error"
+                variant="soft"
+                :title="error"
+                :close-button="{
+                  icon: 'i-heroicons-x-mark-20-solid',
+                  color: 'gray',
+                  variant: 'link',
+                  padded: false,
+                }"
+                @close="error = ''"
+                class="mb-1"
+              />
+            </div>
+
             <UAlert
-              v-if="error"
-              color="error"
+              v-if="isDelegatedMode"
+              color="warning"
               variant="soft"
-              :title="error"
-              :close-button="{
-                icon: 'i-heroicons-x-mark-20-solid',
-                color: 'gray',
-                variant: 'link',
-                padded: false,
-              }"
-              @close="error = ''"
+              :title="$t('auth.delegated.bannerTitle')"
+              :description="$t('auth.delegated.loginDisabled')"
               class="mb-1"
             />
 
@@ -163,7 +210,7 @@ onMounted(() => {
                 type="text"
                 :placeholder="$t('auth.identifier')"
                 size="lg"
-                :disabled="loading"
+                :disabled="loading || isDelegatedMode"
                 class="w-full"
               />
             </div>
@@ -183,7 +230,7 @@ onMounted(() => {
                 type="password"
                 :placeholder="$t('auth.password')"
                 size="lg"
-                :disabled="loading"
+                :disabled="loading || isDelegatedMode"
                 class="w-full"
               />
             </div>
@@ -192,7 +239,7 @@ onMounted(() => {
             <div class="flex items-center justify-between mb-6">
               <UCheckbox
                 v-model="form.remember"
-                :disabled="loading"
+                :disabled="loading || isDelegatedMode"
                 :label="$t('auth.remember')"
               />
               <NuxtLink
@@ -210,6 +257,7 @@ onMounted(() => {
                 block
                 size="lg"
                 :loading="loading"
+                :disabled="isDelegatedMode"
                 class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
                 {{ `{{ loading ? $t("auth.signingIn") : $t("auth.loginButton") }}` }}

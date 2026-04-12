@@ -109,7 +109,7 @@ GET /api/v1/admin/plugin/status
 
 ```json
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "version": "1.2.4",
   "uptime": 99.92,
   "license_status": "active",
@@ -225,7 +225,7 @@ GET /api/v1/admin/plugin/audit
 ```bash
 POST /api/v1/support/ticket
 {
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "title": "功能异常",
   "description": "同步客户数据时报错 500。"
 }
@@ -237,7 +237,7 @@ POST /api/v1/support/ticket
 
 PowerX Admin Portal 会将租户管理员角色注入：
 
-- 通过 `x-tenant-uuid` 与 JWT 权限字段；
+- 通过 `tenant_uuid` 与 JWT 权限字段；
 - 插件侧需验证角色（`tenant_admin`, `support_agent` 等）；
 - 前端隐藏无权限菜单项；
 - 操作按钮需二次确认（ConfirmDialog）。

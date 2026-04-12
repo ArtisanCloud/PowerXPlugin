@@ -1,4 +1,4 @@
-# com.powerx.plugin.base 迁移方案（2025-Q4 调整版）
+# com.powerx.plugins.base 迁移方案（2025-Q4 调整版）
 
 ## 1. 目标
 - 在 `PowerXPlugin` 仓库沉淀一套可直接运行的 Base 模板：后端 CRUD、前端 Starter 页面、`plugin.yaml`/菜单/RBAC 清单。
@@ -6,7 +6,7 @@
 - 严格遵守《docs/init-project.md》中 Phase 2~4 的约束（Go + Nuxt、无持久层、Skeleton/框架分离、模板可渲染）。
 
 ## 2. 可直接迁移的能力（✅ 高度可行）
-- **后端分层模式**：`routes/handler/service/repo/model` 的切分与当前 Skeleton 规划一致，目录可一一映射到 `skeleton/backend/internal/**`。
+- **后端分层模式**：`routes/handler/service/repo/model` 的切分与当前 Skeleton 规划一致，目录可一一映射到 `skeleton/backend/go-gin/internal/**`。
 - **目录约定**：沿用 `internal/transport/http`（Handler）、`internal/services`（业务编排）、`internal/entity/repository`（仓储）、`internal/entity/models`（数据模型）等路径，保持与 Base 插件一致的分层命名，便于 CLI 与文档互相校验。
 - **前端页面与组件**：`intro.vue`、`templates/*.vue`、`TemplateFormModal.vue`、`ConfirmDialog.vue` 均可直接复用，路由结构与 Layer 预期保持一致。
 - **API 客户端**：`useTemplateApi` 及 `_client.ts` 的职责与 `@artisan-cloud/plugin-framework-client` 相符，可迁移并扩展现有客户端能力。
@@ -17,7 +17,7 @@
 1. **Router Path Param 支持**：`framework/backend/go/router/router.go:140` 的 `Context.Param` 目前返回空，需实现路径参数解析，否则 `/templates/:id` 无法工作。
 2. **数据存储层替换**：Base 插件依赖 GORM + 数据库；需改造成符合 `.specify/memory/constitution.md` 的内存仓储（map 或 `sync.Map`），同时保持 Repository 结构内嵌 `BaseRepository[T]` 并完整实现租户隔离规范。
 3. **统一响应格式**：Base 使用 `{success, data, message, error, timestamp, request_id}`；框架需提供同结构的 JSON 响应助手，供 Skeleton 与未来模板共享。
-4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `X-Tenant-UUID` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
+4. **中间件简化**：`EnsureTenant`、`RequestID` 等中间件需要 Stub 化（读取 `tenant_uuid` 或 Standalone 默认 1），同时记录鉴权仍为 501 的限制。
 
 ## 4. 实施里程碑
 
@@ -28,14 +28,14 @@
 - 为 `@artisan-cloud/plugin-framework-client` 补充 `put/delete` 等基础方法并支持透传 Tenant header，确保包内仅包含通用 HTTP 基础设施；同步在 `framework-admin` Layer 内引入 Starter 配置开关。
 
 ### 阶段 2：Skeleton 后端模板
-- 在 `skeleton/backend/internal/templates` 实现内存版本的 `model/service/repository/handler`，Repository 必须内嵌 `repository.BaseRepository[Template]`、提供 `NewTemplateRepository` 构造函数，并在 `BeginTenantTx` 中显式执行 `SET LOCAL app.tenant_uuid`（内存实现可通过上下文记录/校验该值，保持接口与调用顺序与数据库版本完全一致）。
-- 更新 `skeleton/backend/internal/routes/routes.go`，新增 `/templates` CRUD，保留 `ping`。
+- 在 `skeleton/backend/go-gin/internal/templates` 实现内存版本的 `model/service/repository/handler`，Repository 必须内嵌 `repository.BaseRepository[Template]`、提供 `NewTemplateRepository` 构造函数，并在 `BeginTenantTx` 中显式执行 `SET LOCAL app.tenant_uuid`（内存实现可通过上下文记录/校验该值，保持接口与调用顺序与数据库版本完全一致）。
+- 更新 `skeleton/backend/go-gin/internal/routes/routes.go`，新增 `/templates` CRUD，保留 `ping`。
 - Service 层保持原先职责：HTTP Handler 只负责校验/鉴权/序列化，所有业务编排封装在 `internal/services/templates`，并为未来的 HTTP/gRPC 复用保留同一 Service 实例。
 - 在 `manifestx/manifest.go` 声明菜单与 `base:template:*` 权限，添加示例租户。
-- 更新 `skeleton/backend/README.md`，解释内存存储、环境变量及未来持久层扩展路径。
+- 更新 `skeleton/backend/go-gin/README.md`，解释内存存储、环境变量及未来持久层扩展路径。
 
 ### 阶段 3：前端迁移与框架提炼
-- 将 `intro.vue`、`templates/index.vue`、`templates/crud.vue` 及组件迁移到 `skeleton/web-admin/app`，去除仅针对宿主的桥接逻辑。
+- 将 `intro.vue`、`templates/index.vue`、`templates/crud.vue` 及组件迁移到 `skeleton/web-admin/nuxt/app`，去除仅针对宿主的桥接逻辑。
 - Skeleton 在 `app/composables/api/useTemplateApi.ts` 中提供示例封装，内部调用 `usePluginApi`，作为业务层如何复用 framework-client 的参考；该文件仅做样例，CLI 生成项目可按需改写。
 - 保持 `@artisan-cloud/plugin-framework-client` 仅输出通用 HTTP 封装（`get/post/put/delete`），不承载任何业务 API；框架更新后 Skeleton 与插件项目基于此自行封装。
 - 在 `framework-admin` Layer 提供 `starterPages` 选项，自动注册 Starter 菜单、页面与必要的全局组件；Skeleton 默认启用。
@@ -52,9 +52,9 @@
 - **维护成本**：未来需同时维护框架 Stub 与真实实现，建议在 CHANGELOG/ADR 中持续同步差异。
 
 ## 6. 验证清单
-- `go test ./skeleton/...`、`go test ./framework/backend/go/...`
-- `npm install && npm run lint`（`skeleton/web-admin` 与 `framework/frontend/nuxt/framework-admin`）
-- Standalone 自测：`go run ./skeleton/backend/cmd/plugin` + `npm run dev`，浏览器验证 `/intro`、`/templates/crud` CRUD 流程。
+- `go test ./skeleton/...`、`cd framework/backend/go && go test ./...`
+- `npm install && npm run lint`（`skeleton/web-admin/nuxt` 与 `framework/frontend/nuxt/framework-admin`）
+- Standalone 自测：`go run ./skeleton/backend/go-gin/cmd/plugin` + `npm run dev`，浏览器验证 `/intro`、`/templates/crud` CRUD 流程。
 - CLI 输出验证（准备就绪后）：`px-plugin init com.powerx.demo --ui=starter`，确保产物可直接运行。
 
 ## 7. 结论与优先级建议
@@ -101,7 +101,7 @@
 
 | 风险 | 描述 | 应对策略 |
 | --- | --- | --- |
-| 框架回归 | Router/Middleware 变更影响现有用户 | 全量单测 + `go test ./framework/backend/go/...` 作为必跑检查 |
+| 框架回归 | Router/Middleware 变更影响现有用户 | 全量单测 + `cd framework/backend/go && go test ./...` 作为必跑检查 |
 | Nuxt 配置偏差 | Skeleton/CLI 与 Base 差异导致路由/i18n 异常 | 维护 `research.md` 差异记录，完成 Phase 7 T039/T040 |
 | CLI 模板偏离 | Skeleton 与模板不同步 | `px-plugin init` smoke + diff，必要时在 CI 加自动对比 |
 | 文档滞后 | 新能力未在 Quickstart/Standalone 体现 | 将文档更新纳入任务检查清单 |
@@ -111,10 +111,10 @@
 
 ## 11. 验证清单（更新）
 
-1. `go test ./framework/backend/go/... -coverprofile=coverage.out`（≥90%，SC-001）
-2. `go test ./skeleton/backend/... -v` + `curl` 多租户 CRUD（SC-002）
+1. `cd framework/backend/go && go test ./... -coverprofile=coverage.out`（≥90%，SC-001）
+2. `go test ./skeleton/backend/go-gin/... -v` + `curl` 多租户 CRUD（SC-002）
 3. `curl -w 'time_total:%{time_total}'` 记录延迟；数据写入 `research.md`
-4. `npm run lint --silent` / `npm run build`（skeleton/web-admin、workspace layer）
+4. `npm run lint --silent` / `npm run build`（skeleton/web-admin/nuxt、workspace layer）
 5. Skeleton 前端手动验证 `/`、`/_p/{pluginId}/admin/templates/crud`；`POWERX_PROXY=1` 场景验证 baseURL/代理
 6. `./bin/px-plugin init <plugin-id>` 后执行 `go test ./...`、`npm run lint --silent`，手动验证页面
 7. 文档（Quickstart、Standalone、Plan、Spec、Tasks）同步更新
@@ -135,6 +135,24 @@
 ## 13. 依赖检查清单
 
 - [ ] `framework-admin` Layer 可用，StarterPages toggle 生效
-- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `X-Tenant-UUID`
+- [ ] `@artisan-cloud/plugin-framework-client` 暴露 `get/post/put/delete` 并透传 `tenant_uuid`
 - [ ] Skeleton 后端可独立运行并完成 CRUD Smoke（Phase 2 验证）
 - [ ] Skeleton 前端（含 `POWERX_PROXY=1` 场景）可访问首页与 Admin CRUD 页面
+
+---
+
+## 14. Phase 7 收尾（2026-03-25）
+
+### 14.1 已完成
+
+1. DTO/错误码统一：Templates Handler 使用统一校验错误输出（`VALIDATION_FAILED + details.field/template_code`）。
+2. 模板同步：同一改动已同步到 `scaffold/templates` 与 `tools/cli/internal/templates/data`。
+3. Nuxt 配置三方一致：Skeleton/CLI/scaffold 在 `runtimeConfig`、Nitro headers、HMR/代理、i18n `langDir` 上一致。
+4. CLI 文档补齐：新增 Web Admin 关键环境变量与 Standalone/Proxy 启动说明。
+
+### 14.2 未迁移能力与路线
+
+1. Bridge 完整通信链路：先落最小 stub（P2）。
+2. Pinia 业务 store 示例：补 1-2 个可复用样例（P2）。
+3. Tailwind4 深度流水线：独立评估，不阻塞 Starter（P3）。
+4. Dev Console/Operations 高阶模块：分期迁移，维持最小 starter 负担（P3）。

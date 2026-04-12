@@ -58,7 +58,7 @@
 ```json
 {
   "id": "audit_20251013_0001",
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "tenant_uuid": "tenant_abc",
   "actor": {
     "type": "user",

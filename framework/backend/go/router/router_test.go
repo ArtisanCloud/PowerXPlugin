@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/services/capability_invoker"
 )
 
 func TestRoutePathParam(t *testing.T) {
@@ -116,6 +118,136 @@ func TestAttachAndFrameworkRoute(t *testing.T) {
 	}
 }
 
+func TestCapabilityProxyRoute(t *testing.T) {
+	expectedInvokePath := strings.TrimRight(APIPrefix, "/") + "/tenant/invocations"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != expectedInvokePath {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"traceId":"trace-1","status":"ok","data":{"ok":true}}`))
+	}))
+	defer server.Close()
+
+	app := bootstrap.NewApp(&bootstrap.Config{
+		Listen: ":0",
+		Gateway: bootstrap.GatewayConfig{
+			BaseURL:    server.URL,
+			AuthScheme: "bearer",
+			ToolToken:  "demo-token",
+			TenantID:   "tenant-123",
+		},
+	})
+	if err := AttachHTTPServer(app); err != nil {
+		t.Fatalf("attach http server: %v", err)
+	}
+	RegisterFrameworkRoutes(app)
+	httpRouter, _ := app.Router.(*httpRouter)
+
+	body := `{"capabilityId":"com.corex.demo","action":"List","payload":{"pageSize":10}}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integration/capabilities/invoke", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	httpRouter.root.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from capability proxy, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode proxy response: %v", err)
+	}
+	if payload["traceId"] != "trace-1" {
+		t.Fatalf("expected traceId trace-1, got %v", payload["traceId"])
+	}
+}
+
+func TestCapabilityInvokeHandlerEmitsWarnings(t *testing.T) {
+	fake := &fakeGatewayInvoker{
+		response: &gateway.Response{
+			TraceID: "trace-99",
+			Status:  "ok",
+			Data:    map[string]any{"ok": true},
+		},
+	}
+	service := capabilityinvoker.NewService(fake, nil)
+	handler := capabilityInvokeHandler(service, func() *gateway.ContractStatus {
+		return &gateway.ContractStatus{
+			Outdated: true,
+			Message:  "契约需升级",
+		}
+	})
+
+	root := newHTTPRouterRoot()
+	r := &httpRouter{root: root}
+	r.Handle(http.MethodPost, "/capabilities", handler)
+
+	body := `{"capabilityId":"com.demo","action":"List","payload":{}}`
+	req := httptest.NewRequest(http.MethodPost, "/capabilities", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	root.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get(contractStatusHeader); got != "契约需升级" {
+		t.Fatalf("expected warning header, got %s", got)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	warnings, ok := payload["warnings"].([]any)
+	if !ok || len(warnings) != 1 {
+		t.Fatalf("expected warnings array, got %v", payload["warnings"])
+	}
+	if warnings[0] != "契约需升级" {
+		t.Fatalf("unexpected warning payload: %v", warnings[0])
+	}
+}
+
+func TestCapabilityInvokeHandlerForwardsMockHeader(t *testing.T) {
+	fake := &fakeGatewayInvoker{
+		response: &gateway.Response{
+			TraceID: "trace-mock",
+			Status:  "mock",
+			Data:    map[string]any{"mock": true},
+		},
+	}
+	service := capabilityinvoker.NewService(fake, nil)
+	handler := capabilityInvokeHandler(service, nil)
+
+	root := newHTTPRouterRoot()
+	r := &httpRouter{root: root}
+	r.Handle(http.MethodPost, "/capabilities", handler)
+
+	body := `{"capabilityId":"com.demo.media.asset","action":"List","payload":{}}`
+	req := httptest.NewRequest(http.MethodPost, "/capabilities", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-PX-Use-Mock", "media")
+	rec := httptest.NewRecorder()
+	root.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (%s)", rec.Code, rec.Body.String())
+	}
+	if fake.lastRequest.Headers == nil || fake.lastRequest.Headers["X-PX-Use-Mock"] != "media" {
+		t.Fatalf("expected mock header to be forwarded, got %+v", fake.lastRequest.Headers)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	rawWarnings, ok := payload["warnings"].([]any)
+	if !ok || len(rawWarnings) == 0 {
+		t.Fatalf("expected warnings array, got %v", payload["warnings"])
+	}
+	if !strings.Contains(rawWarnings[0].(string), "X-PX-Use-Mock") {
+		t.Fatalf("expected warning mentioning mock header, got %v", rawWarnings[0])
+	}
+}
+
 func TestRegisterHelpersNil(t *testing.T) {
 	RegisterFrameworkRoutes(nil)
 	RegisterPluginRoutes(nil, nil)
@@ -202,6 +334,20 @@ func TestUseMiddlewareOrder(t *testing.T) {
 			t.Fatalf("expected %v, got %v", expected, sequence)
 		}
 	}
+}
+
+type fakeGatewayInvoker struct {
+	response    *gateway.Response
+	err         error
+	lastRequest gateway.InvokeRequest
+}
+
+func (f *fakeGatewayInvoker) Invoke(ctx context.Context, req gateway.InvokeRequest) (*gateway.Response, error) {
+	f.lastRequest = req
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.response, nil
 }
 
 func TestMatchSegments(t *testing.T) {

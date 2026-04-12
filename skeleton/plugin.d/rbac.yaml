@@ -1,0 +1,51 @@
+permissions:
+  - actions:
+      - read
+    resource: admin
+  - actions:
+      - create
+      - delete
+      - read
+      - update
+    resource: base.templates
+  - actions:
+      - create
+      - read
+    resource: integration
+  - actions:
+      - create
+      - delete
+      - read
+      - update
+    resource: template
+rbac:
+  resources:
+    - actions:
+        - read
+      resource: admin
+    - actions:
+        - create
+        - delete
+        - read
+        - update
+      resource: base.templates
+    - actions:
+        - create
+        - read
+      resource: integration
+    - actions:
+        - create
+        - delete
+        - read
+        - update
+      resource: template
+routes:
+  adminManifest: /api/v1/admin/manifest
+  basePath: /api/v1
+  permissions:
+    - method: POST
+      path: /api/v1/integration/capabilities/invoke
+      permission:
+        action: create
+        resource: integration
+  rbac: /api/v1/admin/rbac

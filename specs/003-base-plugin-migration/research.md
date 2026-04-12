@@ -2,8 +2,8 @@
 
 ## Phase 0 Discovery Summary
 
-- 目标：梳理 `com.powerx.plugin.base` 中与 Templates CRUD 相关的响应结构、错误码、租户上下文约定，为 Phase 1/2 的框架与 Skeleton 实现提供基准。
-- 资料来源：`com.powerx.plugin.base/backend/internal/transport/http/admin/templates/**`、`internal/services/admin/templates/**`、`internal/entity/repository/template/**`、`plugin.yaml`、`web-admin/app/composables/api/useTemplate.ts`。
+- 目标：梳理 `com.powerx.plugins.base` 中与 Templates CRUD 相关的响应结构、错误码、租户上下文约定，为 Phase 1/2 的框架与 Skeleton 实现提供基准。
+- 资料来源：`com.powerx.plugins.base/backend/internal/transport/http/admin/templates/**`、`internal/services/admin/templates/**`、`internal/entity/repository/template/**`、`plugin.yaml`、`web-admin/app/composables/api/useTemplate.ts`。
 
 ## Response Envelope 观测
 
@@ -34,7 +34,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 ## 租户上下文与数据类型
 
-- `X-Tenant-UUID` Header 为主要租户来源，类型为 **UUID string**。
+- `tenant_uuid` Header 为主要租户来源，类型为 **UUID string**。
 - Repository 层要求：
   - 内嵌 `repository.BaseRepository[T]`
   - 在查询/更新时追加 `tenant_uuid = ?` 条件
@@ -83,7 +83,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 - `GET /api/v1/templates/abc` → HTTP 400 + `INVALID_REQUEST`（编号解析失败）
 - `GET /api/v1/templates/1` 且非本租户 → HTTP 404 + `NOT_FOUND`
-- 缺少 `X-Tenant-UUID` → HTTP 401 + `"tenant context missing"`
+- 缺少 `tenant_uuid` → HTTP 401 + `"tenant context missing"`
 - 未处理异常 → HTTP 500 + `INTERNAL_ERROR`
 
 > 以上示例基于 handler 与 repository 行为推导；实现阶段应在测试中复现并记录实际响应。
@@ -92,7 +92,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 - 前端页面：`intro.vue`、`templates/index.vue`、`templates/crud.vue`
 - 公共组件：`TemplateFormModal.vue`、`ConfirmDialog.vue`、`ToastAlert.vue`
-- Composable：`useTemplateApi`（主要引用 `$fetch` 和 `X-Tenant-UUID` 逻辑）
+- Composable：`useTemplateApi`（主要引用 `$fetch` 和 `tenant_uuid` 逻辑）
 
 ## 未决事项 / 待确认
 
@@ -122,7 +122,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 
 ## 延迟观测（T035）
 
-- 2025-11-02：通过脚本启动 `go run ./skeleton/backend/cmd/plugin` 并在 0.5s 间隔内轮询 `/api/v1/ping` 直至服务就绪；随后使用 `curl -w 'time_total:%{time_total}'` 观测多租户请求。  
+- 2025-11-02：通过脚本启动 `go run ./skeleton/backend/go-gin/cmd/plugin` 并在 0.5s 间隔内轮询 `/api/v1/ping` 直至服务就绪；随后使用 `curl -w 'time_total:%{time_total}'` 观测多租户请求。  
   - `tenant=1` → `0.001355s`  
   - `tenant=2` → `0.001451s`  
 - 结果均远低于 1s SLA，命令执行后立即终止服务并保存原始响应到 `/tmp/tenant{1,2}.json` 供复核。
@@ -133,3 +133,43 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 - 语言包目录统一调整为 `i18n/locales`（`langDir: '../i18n/locales'` / `i18n/locales`），Skeleton、CLI、Scaffold 模板已同步。  
 - 默认布局、导航栏、侧边菜单、主题/语言切换组件已迁移至 Skeleton，并复制到 CLI/scaffold 模板；当前实现保留简化版 Bridge（仅保留主题初始化，无宿主通信）。  
 - 待确认：桥接、store、Tailwind pipeline 是否需要 Stub；若不迁移，将在 Phase 7 输出差异说明。
+
+## Phase 7 收敛结果（2026-03-25）
+
+### T039：Nuxt 配置对齐 Diff（Base 对照项）
+
+对照项来源：`spec.md` 中 FR-009 约束与 `docs/plan/002-plan-base-plugin-migration.md` 差异清单。  
+结论：Skeleton/CLI/scaffold 三套模板均已对齐核心项，未发现结构性偏差。
+
+| 对照项 | Skeleton | CLI 模板 | Scaffold 模板 | 结论 |
+| --- | --- | --- | --- | --- |
+| `compatibilityDate` | ✅ `2025-11-02` | ✅ | ✅ | 对齐 |
+| `ssr` | ✅ `false` | ✅ | ✅ | 对齐 |
+| `runtimeConfig.public`（`apiBaseUrl/pluginApiBase/insidePowerX/iamMode`） | ✅ | ✅ | ✅ | 对齐 |
+| Nitro `routeRules` headers | ✅ | ✅ | ✅ | 对齐 |
+| Dev HMR / 代理（`/api`、`/ws`、`/_p/{pluginId}/api`） | ✅ | ✅ | ✅ | 对齐 |
+| `@nuxt/icon` / `@pinia/nuxt` / `@nuxtjs/color-mode` | ✅ | ✅ | ✅ | 对齐 |
+| devtools 开关（宿主模式禁用） | ✅ | ✅ | ✅ | 对齐 |
+
+### T040：语言包路径与加载策略
+
+1. 语言包目录统一：`i18n/locales/{zh,en}.json`。
+2. Nuxt i18n 配置统一：`langDir: '../i18n/locales'`（`srcDir: 'app'` 前提下兼容 Skeleton/CLI/scaffold）。
+3. 两种运行模式策略：
+   - Standalone：启用浏览器语言探测（cookie `px_lang`）。
+   - 宿主代理（`POWERX_PROXY=1`）：关闭浏览器探测，避免宿主与插件双重重定向冲突。
+4. 历史兼容：`i18n/{zh-CN,en}/menus.json` 仍保留用于菜单文案回退，不影响新 `locales` 主链路。
+
+### T042：未迁移能力与后续 Roadmap
+
+| 能力 | 当前状态 | 影响 | 建议 |
+| --- | --- | --- | --- |
+| Bridge 完整通信（`app/bridge`） | 部分迁移（仅保留最小主题初始化） | 宿主高级交互能力未示例化 | P2：补最小可运行 bridge stub |
+| Pinia 业务 Stores（operations/dev-console） | 未迁移 | Starter 页面状态管理示例较少 | P2：提供 1-2 个 store 示例 |
+| Tailwind v4 pipeline 深度定制 | 未迁移 | 主题扩展能力受限 | P3：单独评估升级成本 |
+| Dev Console/Operations 扩展模块 | 未迁移 | 与 Base 高阶模块存在差距 | P3：以可插拔子模块形式分期 |
+
+执行建议：
+
+1. 下一迭代优先补 `Bridge Stub + Store 示例`（低风险高收益）。
+2. Tailwind4 与 Dev Console 放入后续里程碑，不阻塞当前 CRUD Starter 交付。

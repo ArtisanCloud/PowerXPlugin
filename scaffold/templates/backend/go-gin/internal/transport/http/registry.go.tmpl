@@ -11,6 +11,7 @@ import (
 	"{{ .BackendModulePath }}/internal/transport/http/admin"
 	admincapability "{{ .BackendModulePath }}/internal/transport/http/admin/capability"
 	adminconsole "{{ .BackendModulePath }}/internal/transport/http/admin/console"
+	adminiam "{{ .BackendModulePath }}/internal/transport/http/admin/iam"
 	adminintegration "{{ .BackendModulePath }}/internal/transport/http/admin/integration"
 	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
 	adminoperations "{{ .BackendModulePath }}/internal/transport/http/admin/operations"
@@ -59,6 +60,7 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	r.mergeRBAC(adminconsole.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminmarketplace.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(admincapability.RBACEntries(r.apiPrefix()))
+	r.mergeRBAC(adminiam.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(templates.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(integrationRBACEntries(r.apiPrefix()))
 	r.mergeRBAC(marketplacePublicRBACEntries(r.apiPrefix()))
@@ -121,11 +123,14 @@ func (r *Registry) apiPrefix() string {
 }
 
 func isDevEnvironment(deps *app.Deps) bool {
-	if deps == nil || deps.Config == nil || deps.Config.Server == nil {
+	if deps == nil || deps.Config == nil {
+		return true
+	}
+	if deps.Config.Logging != nil && deps.Config.Logging.DebugMode {
 		return true
 	}
 	server := deps.Config.Server
-	if server.DevMode {
+	if server == nil {
 		return true
 	}
 	mode := strings.TrimSpace(strings.ToLower(server.Mode))
@@ -136,14 +141,14 @@ func (r *Registry) registerDevAssetsRoute() {
 	if r.engine == nil {
 		return
 	}
-	paths := []string{"/assets/builds/meta/dev.json"}
+	paths := []string{"/assets/builds/meta"}
 	apiPref := strings.TrimRight(r.apiPrefix(), "/")
 	if apiPref != "" && apiPref != "-" {
-		paths = append(paths, apiPref+"/assets/builds/meta/dev.json")
+		paths = append(paths, apiPref+"/assets/builds/meta")
 	}
 
 	for _, p := range paths {
-		publicassets.RegisterDevRoute(r.engine, p)
+		publicassets.RegisterBuildMetaRoutes(r.engine, p)
 	}
 }
 

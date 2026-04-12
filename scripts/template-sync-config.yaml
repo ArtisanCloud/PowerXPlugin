@@ -1,6 +1,6 @@
 mappings:
   - name: web-admin
-    source: skeleton/web-admin
+    source: skeleton/web-admin/nuxt
     targets:
       - path: scaffold/templates/web-admin/nuxt
         suffix: .tmpl
@@ -10,9 +10,11 @@ mappings:
       - "app/**/*"
       - "public/**/*"
       - ".env.example"
+      - ".npmrc"
       - "i18n/**/*"
       - "nuxt.config.ts"
       - "package.json"
+      - "scripts/**/*"
     exclude:
       - "**/__tests__/**"
       - "tests/**"
@@ -25,10 +27,10 @@ mappings:
         flags: "gs"
         replace: "{{ `{{ $1 }}` }}"
       - globs: ["nuxt.config.ts", "app/**/*.ts", "i18n/**/*.json", "package.json"]
-        literal: "'com.powerx.plugin.base'"
+        literal: "'com.powerx.plugins.base'"
         replace: "'{{ .PluginID }}'"
       - globs: ["nuxt.config.ts", "app/**/*.ts", "package.json"]
-        literal: '"com.powerx.plugin.base"'
+        literal: '"com.powerx.plugins.base"'
         replace: '"{{ .PluginID }}"'
       - globs: ["**/*"]
         literal: "PowerX Base Plugin"
@@ -45,8 +47,80 @@ mappings:
       - globs: ["app/pages/_p/__plugin__/admin/index.vue"]
         literal: "欢迎使用 PowerX Sample Plugin 插件脚手架示例页面。"
         replace: "欢迎使用 {{ `{{ .PluginName }}` }} 插件脚手架示例页面。"
+      - globs: [".env.example"]
+        literal: "NUXT_DEV_PORT=3131"
+        replace: "NUXT_DEV_PORT={{ .FrontendPort }}"
+      - globs: [".env.example"]
+        literal: "NUXT_PUBLIC_API_BASE=http://localhost:8078"
+        replace: "NUXT_PUBLIC_API_BASE=http://localhost:{{ .BackendPort }}"
+      - globs: [".env.example"]
+        literal: "NUXT_DEV_API_PROXY=http://127.0.0.1:8078"
+        replace: "NUXT_DEV_API_PROXY=http://127.0.0.1:{{ .BackendPort }}"
+      - globs: [".env.example"]
+        literal: "NUXT_DEV_WS_PROXY=ws://127.0.0.1:8078"
+        replace: "NUXT_DEV_WS_PROXY=ws://127.0.0.1:{{ .BackendPort }}"
+      - globs: ["nuxt.config.ts"]
+        literal: "const defaultLocalApiBase = 'http://localhost:8078/api/v1'"
+        replace: "const defaultLocalApiBase = 'http://localhost:{{ .BackendPort }}/api/v1'"
+      - globs: ["nuxt.config.ts"]
+        literal: "const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'"
+        replace: "const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'"
+      - globs: ["nuxt.config.ts"]
+        literal: "const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'"
+        replace: "const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:{{ .BackendPort }}'"
+      - globs: ["nuxt.config.ts"]
+        literal: "    3131"
+        replace: "    {{ .FrontendPort }}"
+      - globs: ["nuxt.config.ts"]
+        literal: "    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : 3131"
+        replace: "    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : {{ .FrontendPort }}"
+      - globs: ["app/composables/api/_base.ts"]
+        literal: "http://localhost:8078/api/v1"
+        replace: "http://localhost:{{ .BackendPort }}/api/v1"
+      - globs: ["app/pages/capabilities/RegisterForm.vue"]
+        literal: "http://127.0.0.1:8078"
+        replace: "http://127.0.0.1:{{ .BackendPort }}"
+  - name: web-admin-next
+    source: skeleton/web-admin/next
+    targets:
+      - path: scaffold/templates/web-admin/next
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/web-admin/next
+        suffix: .tmpl
+    include:
+      - "app/**/*"
+      - ".env.example"
+      - "next.config.js"
+      - "package.json"
+      - "README.md"
+    exclude:
+      - "node_modules/**"
+      - ".next/**"
+      - "**/.DS_Store"
+    replacements:
+      - globs: ["package.json"]
+        literal: "\"name\": \"powerxplugin-skeleton-web-admin-next\""
+        replace: "\"name\": \"{{ .PluginSlug }}-web-admin\""
+      - globs: ["package.json"]
+        literal: "\"dev\": \"next dev -p 3231\""
+        replace: "\"dev\": \"next dev -p {{ .FrontendPort }}\""
+      - globs: ["package.json"]
+        literal: "\"start\": \"next start -p 3231\""
+        replace: "\"start\": \"next start -p {{ .FrontendPort }}\""
+      - globs: [".env.example"]
+        literal: "NEXT_DEV_PORT=3231"
+        replace: "NEXT_DEV_PORT={{ .FrontendPort }}"
+      - globs: [".env.example"]
+        literal: "NEXT_PUBLIC_API_BASE=http://localhost:8078"
+        replace: "NEXT_PUBLIC_API_BASE=http://localhost:{{ .BackendPort }}"
+      - globs: [".env.example"]
+        literal: "NEXT_DEV_API_PROXY=http://127.0.0.1:8078"
+        replace: "NEXT_DEV_API_PROXY=http://127.0.0.1:{{ .BackendPort }}"
+      - globs: ["README.md"]
+        literal: "Default dev URL: `http://localhost:3231`."
+        replace: "Default dev URL: `http://localhost:{{ .FrontendPort }}`."
   - name: backend
-    source: skeleton/backend
+    source: skeleton/backend/go-gin
     targets:
       - path: scaffold/templates/backend/go-gin
         suffix: .tmpl
@@ -65,40 +139,86 @@ mappings:
       - "internal/**/README.md"
       - "etc/config.yaml"
     replacements:
-      - globs: ["**/*.go", "go.mod", "go.sum"]
+      - globs: ["**/*.go", "**/*.proto", "go.mod", "go.sum"]
+        regex: "github\\.com/ArtisanCloud/PowerXPlugin/skeleton/backend/go-gin"
+        flags: "g"
+        replace: "{{ .BackendModulePath }}"
+      - globs: ["**/*.go", "**/*.proto", "go.mod", "go.sum"]
         regex: "github\\.com/ArtisanCloud/PowerXPlugin/skeleton/backend"
         flags: "g"
         replace: "{{ .BackendModulePath }}"
       - globs: ["go.mod"]
-        literal: "module github.com/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/backend"
+        literal: "module github.com/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/skeleton/backend/go-gin"
         replace: "module {{ .BackendModulePath }}"
       - globs: ["go.mod"]
         literal: "go 1.24"
         replace: "go {{ .GoVersion }}"
       - globs: ["go.mod"]
-        literal: "github.com/ArtisanCloud/PowerXPlugin/framework v0.0.0"
-        replace: "github.com/ArtisanCloud/PowerXPlugin/framework {{ .FrameworkVersion }}"
+        regex: "github\\.com/ArtisanCloud/PowerXPlugin/framework/backend/go\\s+v[0-9A-Za-z._-]+"
+        flags: "g"
+        replace: "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go {{ .FrameworkVersion }}"
+      - globs: ["internal/config/config.go"]
+        literal: "BindAddr: \":8078\","
+        replace: "BindAddr: \":{{ .BackendPort }}\","
+      - globs: ["internal/transport/http/admin/admin_handler.go"]
+        literal: "Port:   8078,"
+        replace: "Port:   {{ .BackendPort }},"
       - globs: ["internal/manifestx/manifest.go"]
         literal: 'Name: "PowerX Base Plugin"'
         replace: 'Name: "{{ .PluginName }}"'
       - globs: ["internal/manifestx/manifest.go"]
-        literal: 'ID: "com.powerx.plugin.base"'
+        literal: 'ID: "com.powerx.plugins.base"'
         replace: 'ID: "{{ .PluginID }}"'
       - globs: ["internal/manifestx/manifest.go"]
-        literal: 'Path:  "/_p/com.powerx.plugin.base/admin/templates/intro"'
+        literal: 'Path:  "/_p/com.powerx.plugins.base/admin/templates/intro"'
         replace: 'Path:  "/_p/{{ .PluginID }}/admin/templates/intro"'
       - globs: ["internal/manifestx/manifest.go"]
-        literal: 'Path:  "/_p/com.powerx.plugin.base/admin/templates/crud"'
+        literal: 'Path:  "/_p/com.powerx.plugins.base/admin/templates/crud"'
         replace: 'Path:  "/_p/{{ .PluginID }}/admin/templates/crud"'
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Name: "PowerX Base Plugin"'
         replace: 'Name: "{{ .PluginName }}"'
       - globs: ["internal/manifestx/manifest.go.tmpl"]
-        literal: 'ID: "com.powerx.plugin.base"'
+        literal: 'ID: "com.powerx.plugins.base"'
         replace: 'ID: "{{ .PluginID }}"'
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Version: "0.1.0"'
         replace: 'Version: "{{ .Version }}"'
+  - name: backend-fastapi
+    source: skeleton/backend/python-fastapi
+    targets:
+      - path: scaffold/templates/backend/python-fastapi
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/backend/python-fastapi
+        suffix: .tmpl
+    include:
+      - ".env.example"
+      - "app/**/*.py"
+      - "requirements.txt"
+      - "README.md"
+    replacements:
+      - globs: [".env.example"]
+        literal: "PORT=8078"
+        replace: "PORT={{ .BackendPort }}"
+    exclude:
+      - "**/__pycache__/**"
+      - "**/*.pyc"
+  - name: backend-shared-etc
+    source: skeleton/backend/etc
+    targets:
+      - path: scaffold/templates/backend/go-gin/etc
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/backend/go-gin/etc
+        suffix: .tmpl
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+      - "config.yaml"
+    replacements:
+      - globs: ["config.example.yaml"]
+        literal: "bind_addr: \":8078\""
+        replace: "bind_addr: \":{{ .BackendPort }}\""
   - name: root-makefiles
     source: skeleton
     include:
@@ -112,3 +232,141 @@ mappings:
         suffix: .tmpl
       - path: tools/cli/internal/templates/data
         suffix: .tmpl
+  - name: contracts
+    source: contracts
+    targets:
+      - path: scaffold/templates/contracts
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data/contracts
+        suffix: .tmpl
+    include:
+      - "capabilities/**/*"
+      - "schema/**/*"
+    exclude:
+      - "**/.DS_Store"
+    replacements:
+      - globs: ["**/*"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
+  - name: codex-assets
+    source: .codex
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: scaffold/templates/.codex
+      - path: tools/cli/internal/templates/data/.codex
+    replacements:
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["**/*"]
+        literal: "插件 skeleton 后端"
+        replace: "插件后端"
+      - globs: ["**/*"]
+        literal: "插件 skeleton 前端"
+        replace: "插件前端"
+      - globs: ["**/*"]
+        literal: "skeleton/scaffold/CLI"
+        replace: "模板源/scaffold/CLI"
+      - globs: ["**/*"]
+        literal: "只改了 `skeleton/` 或只改了 `scaffold/`"
+        replace: "只改了模板源目录"
+      - globs: ["**/*"]
+        literal: "`skeleton/backend/go-gin`"
+        replace: "`backend`"
+      - globs: ["**/*"]
+        literal: "`skeleton/web-admin/nuxt`"
+        replace: "`web-admin`"
+      - globs: ["**/*"]
+        literal: "`./skeleton/backend/etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`"
+      - globs: ["**/*"]
+        literal: "`./backend/etc/config.yaml`、`./backend/etc/config.yaml`、`./etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`、`./etc/config.yaml`"
+  - name: specify-assets
+    source: .specify
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: scaffold/templates/.specify
+      - path: tools/cli/internal/templates/data/.specify
+    replacements:
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["**/*"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["**/*"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["**/*"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["**/*"]
+        literal: "插件 skeleton 后端"
+        replace: "插件后端"
+      - globs: ["**/*"]
+        literal: "插件 skeleton 前端"
+        replace: "插件前端"
+      - globs: ["**/*"]
+        literal: "skeleton/scaffold/CLI"
+        replace: "模板源/scaffold/CLI"
+      - globs: ["**/*"]
+        literal: "只改了 `skeleton/` 或只改了 `scaffold/`"
+        replace: "只改了模板源目录"
+      - globs: ["**/*"]
+        literal: "`skeleton/backend/go-gin`"
+        replace: "`backend`"
+      - globs: ["**/*"]
+        literal: "`skeleton/web-admin/nuxt`"
+        replace: "`web-admin`"
+      - globs: ["**/*"]
+        literal: "`./skeleton/backend/etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`"
+      - globs: ["**/*"]
+        literal: "`./backend/etc/config.yaml`、`./backend/etc/config.yaml`、`./etc/config.yaml`"
+        replace: "`./backend/etc/config.yaml`、`./etc/config.yaml`"

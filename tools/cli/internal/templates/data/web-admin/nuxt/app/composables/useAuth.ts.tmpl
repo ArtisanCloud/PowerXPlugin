@@ -113,11 +113,30 @@ const resolveInsidePowerX = (value: unknown) => {
   return false;
 };
 
+const resolveDelegatedMode = (value: unknown, fallback: boolean) => {
+  if (value === true) return true;
+  if (value === false) return false;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "yes") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "0" || normalized === "no") {
+      return false;
+    }
+  }
+  return fallback;
+};
+
 export const useAuth = () => {
   const runtimeConfig = useRuntimeConfig();
   const insidePowerX = resolveInsidePowerX(runtimeConfig.public?.insidePowerX);
+  const delegatedMode = resolveDelegatedMode(
+    runtimeConfig.public?.delegatedMode,
+    insidePowerX
+  );
   // Standalone 模式下宿主/脚手架可能只广播 access token（无 refresh token），允许继续维持会话。
-  const allowRefreshlessSession = !insidePowerX;
+  const allowRefreshlessSession = !delegatedMode;
 
   const isAuthenticated = useState("auth.isAuthenticated", () => false);
   const user = useState("auth.user", () => null);
@@ -127,6 +146,8 @@ export const useAuth = () => {
   const lastError = useState<string>("auth.lastError", () => "");
   const hasAuthenticated = useState("auth.hasAuthenticated", () => false);
   const delegatedAuthError = useState<string>("auth.delegatedError", () => "");
+  const localIAMEnabled = useState("auth.localIAMEnabled", () => !delegatedMode);
+  const delegatedIAM = useState("auth.delegatedIAM", () => delegatedMode);
 
   const { refreshToken: refresh, logout: apiLogout } = useAuthService();
 
@@ -201,9 +222,45 @@ export const useAuth = () => {
     return Date.now() > stored - 5_000;
   };
 
+  const readAuthCookieToken = () => {
+    const cookieCandidates = ["px_ctx_jwt"];
+    for (const name of cookieCandidates) {
+      const value = readCookie(name);
+      if (value) {
+        return value;
+      }
+    }
+    return null;
+  };
+
   const getStoredToken = () => {
     if (!process.client) return null;
-    return safeLocalStorage.getItem("access_token") ?? readCookie("token");
+    const tryLocalStorageGet = (key: string): string | null | undefined => {
+      if (typeof window === "undefined") return null;
+      try {
+        return window.localStorage?.getItem(key) ?? null;
+      } catch {
+        return undefined;
+      }
+    };
+
+    const stored = tryLocalStorageGet("access_token");
+    // If localStorage is blocked (throws), fall back to cookie token.
+    if (stored === undefined) return readAuthCookieToken();
+    if (stored) return stored;
+
+    // If localStorage still contains auth footprint but access_token is gone,
+    // treat it as a logout/invalid session and do NOT fall back to cookies.
+    // This makes cross-tab logout (storage event) consistent.
+    const hasFootprint = Boolean(
+      safeLocalStorage.getItem("expires_at") ||
+        safeLocalStorage.getItem("refresh_token") ||
+        safeLocalStorage.getItem("token_type") ||
+        safeLocalStorage.getItem("scope")
+    );
+    if (hasFootprint) return null;
+
+    return readAuthCookieToken();
   };
 
   const getToken = () => {
@@ -232,13 +289,22 @@ export const useAuth = () => {
       refreshToken.value = hasRefresh ? storedRefresh : null;
       expiresAt.value = Number(storedExpires);
       isAuthenticated.value = !isTokenExpired();
-    } else {
-      if (insidePowerX && !hasAuthenticated.value) {
-        clearAuth();
-        return;
-      }
-      failClosed();
+      return;
     }
+
+    // 没有任何会话数据（首次访问/手动清除），无需提示“会话失效”。
+    const hasAnySessionData = Boolean(storedToken || storedRefresh || storedExpires);
+    if (!hasAnySessionData) {
+      clearAuth();
+      hasAuthenticated.value = false;
+      return;
+    }
+
+    if (delegatedMode && !hasAuthenticated.value) {
+      clearAuth();
+      return;
+    }
+    failClosed();
   };
 
   const ensureFreshToken = async () => {
@@ -280,7 +346,9 @@ export const useAuth = () => {
     if (!process.client) return;
     syncFromStorage();
     const handler = (event: StorageEvent) => {
-      if (!event.key || !STORAGE_KEYS.includes(event.key)) return;
+      // `storage` event may fire with `key === null` (e.g. clear()) or when
+      // simulated in tests; in that case we still want to reconcile auth state.
+      if (event.key && !STORAGE_KEYS.includes(event.key)) return;
       syncFromStorage();
     };
     window.addEventListener("storage", handler);
@@ -289,6 +357,11 @@ export const useAuth = () => {
         window.removeEventListener("storage", handler);
       });
     }
+  };
+
+  const setIAMModeFlags = (isDelegated: boolean) => {
+    delegatedIAM.value = isDelegated;
+    localIAMEnabled.value = !isDelegated;
   };
 
   const logout = async () => {
@@ -327,7 +400,7 @@ export const useAuth = () => {
     } catch (err) {
       console.warn("[useAuth] failed to persist auth error", err);
     }
-    if (insidePowerX) {
+    if (delegatedMode) {
       delegatedAuthError.value = message;
     }
   };
@@ -351,13 +424,13 @@ export const useAuth = () => {
     clearAuth();
     const fallbackMessage =
       message ||
-      (insidePowerX
+      (delegatedMode
         ? "PowerX 会话已失效，请回到宿主重新登录"
         : "会话已失效，请重新登录");
     if (fallbackMessage) {
       rememberAuthError(fallbackMessage);
     }
-    if (insidePowerX) {
+    if (delegatedMode) {
       return;
     }
     if (
@@ -400,5 +473,8 @@ export const useAuth = () => {
     delegatedError: readonly(delegatedAuthError),
     clearDelegatedError,
     restoreFromStorage: syncFromStorage,
+    localIAMEnabled: readonly(localIAMEnabled),
+    delegatedIAM: readonly(delegatedIAM),
+    setIAMModeFlags,
   };
 };

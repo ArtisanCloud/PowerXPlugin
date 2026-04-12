@@ -36,7 +36,7 @@
 ```
 
 /var/lib/powerx/plugins/
-└── com.powerx.plugin.crm/
+└── com.powerx.plugins.crm/
 ├── manifest.yaml
 ├── backend/
 │   └── exec/plugin-crm
@@ -61,7 +61,7 @@ PowerX 会在启动时自动注入一组环境变量：
 
 | 变量名 | 示例 | 说明 |
 |--------|--------|------|
-| `POWERX_PLUGIN_ID` | `com.powerx.plugin.crm` | 插件唯一标识 |
+| `POWERX_PLUGIN_ID` | `com.powerx.plugins.crm` | 插件唯一标识 |
 | `POWERX_PLUGIN_VERSION` | `1.3.0` | 当前版本 |
 | `POWERX_PLUGIN_SCHEMA` | `tenant_123_crm` | 该租户的数据库 Schema |
 | `POWERX_PLUGIN_PORT` | `8088` | 宿主分配的监听端口 |
@@ -107,7 +107,7 @@ PowerX 宿主会维护一个 **Port Registry** 表，用于记录分配情况：
 
 | plugin_id | version | tenant | port | pid | status |
 |------------|----------|--------|------|------|--------|
-| com.powerx.plugin.crm | 1.3.0 | tenant_123 | 8088 | 31245 | running |
+| com.powerx.plugins.crm | 1.3.0 | tenant_123 | 8088 | 31245 | running |
 
 > 每个插件实例拥有独立端口，不得监听宿主系统全局端口（如 80/443）。
 
@@ -255,7 +255,7 @@ db:
 在开发阶段，可通过环境变量直接启动插件：
 
 ```bash
-export POWERX_PLUGIN_ID=com.powerx.plugin.example
+export POWERX_PLUGIN_ID=com.powerx.plugins.example
 export POWERX_PLUGIN_PORT=8088
 go run ./backend/cmd/plugin
 ```
@@ -263,7 +263,7 @@ go run ./backend/cmd/plugin
 本地代理模式：
 
 ```
-http://localhost:8088/_p/com.powerx.plugin.example/api/
+http://localhost:8088/_p/com.powerx.plugins.example/api/
 ```
 
 或使用 Makefile：

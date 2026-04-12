@@ -1,0 +1,49 @@
+package iam
+
+import (
+	"strings"
+
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+)
+
+func RBACEntries(prefix string) map[string]authx.Permission {
+	base := strings.TrimRight(prefix, "/") + "/admin/iam"
+	tenantResource := app.PluginID + ":iam.tenant"
+	departmentResource := app.PluginID + ":iam.department"
+	memberResource := app.PluginID + ":iam.member"
+	roleResource := app.PluginID + ":iam.role"
+	permissionResource := app.PluginID + ":iam.permission"
+	auditResource := app.PluginID + ":iam.audit"
+	modeResource := app.PluginID + ":iam.mode"
+	stsResource := app.PluginID + ":iam.sts"
+	return map[string]authx.Permission{
+		"GET:" + base + "/mode":                {Resource: modeResource, Action: "read"},
+		"GET:" + base + "/tenants":             {Resource: tenantResource, Action: "read"},
+		"POST:" + base + "/tenants":            {Resource: tenantResource, Action: "write"},
+		"PATCH:" + base + "/tenants/*":         {Resource: tenantResource, Action: "write"},
+		"GET:" + base + "/departments":         {Resource: departmentResource, Action: "read"},
+		"GET:" + base + "/departments/tree":    {Resource: departmentResource, Action: "read"},
+		"POST:" + base + "/departments":        {Resource: departmentResource, Action: "write"},
+		"PATCH:" + base + "/departments/*":     {Resource: departmentResource, Action: "write"},
+		"DELETE:" + base + "/departments/*":    {Resource: departmentResource, Action: "delete"},
+		"GET:" + base + "/members":             {Resource: memberResource, Action: "read"},
+		"POST:" + base + "/members":            {Resource: memberResource, Action: "write"},
+		"PATCH:" + base + "/members/*":         {Resource: memberResource, Action: "write"},
+		"POST:" + base + "/members/import":     {Resource: memberResource, Action: "write"},
+		"GET:" + base + "/users":               {Resource: memberResource, Action: "read"},
+		"POST:" + base + "/users":              {Resource: memberResource, Action: "write"},
+		"PATCH:" + base + "/users/*":           {Resource: memberResource, Action: "write"},
+		"POST:" + base + "/users/import":       {Resource: memberResource, Action: "write"},
+		"GET:" + base + "/roles":               {Resource: roleResource, Action: "read"},
+		"POST:" + base + "/roles":              {Resource: roleResource, Action: "write"},
+		"PATCH:" + base + "/roles/*":           {Resource: roleResource, Action: "write"},
+		"DELETE:" + base + "/roles/*":          {Resource: roleResource, Action: "delete"},
+		"PUT:" + base + "/roles/*/permissions": {Resource: roleResource, Action: "write"},
+		"POST:" + base + "/roles/*/members":    {Resource: roleResource, Action: "write"},
+		"DELETE:" + base + "/roles/*/members":  {Resource: roleResource, Action: "write"},
+		"GET:" + base + "/permissions":         {Resource: permissionResource, Action: "read"},
+		"GET:" + base + "/audit/logs":          {Resource: auditResource, Action: "read"},
+		"POST:" + base + "/auth/local/sts":     {Resource: stsResource, Action: "mint"},
+	}
+}

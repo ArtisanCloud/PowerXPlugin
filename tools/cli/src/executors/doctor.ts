@@ -67,6 +67,7 @@ export class DoctorExecutor {
     checks.push(await this.checkGoVersion());
     checks.push(await this.checkBackendModule());
     checks.push(await this.checkWebAdminDependencies());
+    checks.push(await this.checkGatewayCredentials());
     checks.push(this.checkFeatureFlags());
 
     const summary = this.buildSummary(checks);
@@ -294,6 +295,144 @@ export class DoctorExecutor {
       console.log(`${icon} ${check.title} — ${check.details}`);
     });
   }
+
+  private async checkGatewayCredentials(): Promise<DoctorCheck> {
+    const skeletonEnvPath = path.join(this.options.projectDir, "skeleton", ".env.local");
+    const envFile = await this.loadEnvFile(skeletonEnvPath);
+    const envLabel = envFile.exists ? skeletonEnvPath : undefined;
+
+    const gatewayBase = this.resolveConfigValue(
+      ["PX_GATEWAY_BASE_URL"],
+      envFile.values,
+      envLabel,
+    );
+    const toolToken = this.resolveConfigValue(
+      ["PX_TOOL_TOKEN", "PX_PLUGIN_TOOL_TOKEN"],
+      envFile.values,
+      envLabel,
+    );
+    const missing: string[] = [];
+    if (!gatewayBase.value) missing.push("PX_GATEWAY_BASE_URL");
+    if (!toolToken.value) missing.push("PX_TOOL_TOKEN/PX_PLUGIN_TOOL_TOKEN");
+
+    if (missing.length > 0) {
+      return {
+        id: "gateway-credentials",
+        title: "Gateway credentials",
+        status: "fail",
+        details: `缺少以下变量：${missing.join(", ")}`,
+        remediation:
+          "运行 `px-plugin login --manifest ./skeleton/plugin.yaml` 并将输出写入 skeleton/.env.local，或在宿主部署中注入对应环境变量。",
+      };
+    }
+
+    const detailParts = [
+      `Base=${gatewayBase.value} (${gatewayBase.source})`,
+      "Tenant=from PX_TOOL_TOKEN.tid",
+    ];
+    let status: CheckStatus = "pass";
+    let remediation: string | undefined;
+
+    const expiry = parseTokenExpiry(toolToken.value);
+    if (!expiry) {
+      status = "warn";
+      detailParts.push("无法解析 Token 过期时间");
+      remediation = "确认当前 PX_TOOL_TOKEN 为 JWT，并重新执行 `px-plugin login` 获取最新凭证。";
+    } else {
+      const now = Date.now();
+      const expiresAt = expiry.getTime();
+      const hoursLeft = (expiresAt - now) / (1000 * 60 * 60);
+      detailParts.push(`TokenExpires=${expiry.toISOString()}`);
+      if (expiresAt <= now) {
+        status = "fail";
+        detailParts.push("Token 已过期");
+        remediation =
+          "重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 刷新 PX_TOOL_TOKEN，并更新 skeleton/.env.local。";
+      } else if (hoursLeft < 24 && status !== "fail") {
+        status = "warn";
+        detailParts.push("Token <24h 将过期");
+        remediation =
+          "PX_TOOL_TOKEN 将在 24 小时内过期，建议提前运行 `px-plugin login` 刷新凭证。";
+      }
+    }
+
+    if (!envFile.exists && status === "pass") {
+      status = "warn";
+      detailParts.push("skeleton/.env.local 未找到");
+      remediation =
+        "建议创建 skeleton/.env.local 并写入 PX_GATEWAY_BASE_URL、PX_TOOL_TOKEN 以便团队共享配置。";
+    }
+
+    return {
+      id: "gateway-credentials",
+      title: "Gateway credentials",
+      status,
+      details: detailParts.join("; "),
+      remediation,
+    };
+  }
+
+  private async loadEnvFile(
+    filePath: string,
+  ): Promise<{ exists: boolean; values: Record<string, string> }> {
+    if (!(await pathExists(filePath))) {
+      return { exists: false, values: {} };
+    }
+    const content = await fs.readFile(filePath, "utf-8");
+    const values: Record<string, string> = {};
+    for (const rawLine of content.split(/\r?\n/)) {
+      let line = rawLine.trim();
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+      if (line.startsWith("export ")) {
+        line = line.slice(7).trim();
+      }
+      const idx = line.indexOf("=");
+      if (idx === -1) {
+        continue;
+      }
+      const key = line.slice(0, idx).trim();
+      if (!key) {
+        continue;
+      }
+      let value = line.slice(idx + 1).trim();
+      if (!value) {
+        values[key] = "";
+        continue;
+      }
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      values[key] = value;
+    }
+    return { exists: true, values };
+  }
+
+  private resolveConfigValue(
+    keys: string[],
+    envFileValues: Record<string, string>,
+    envFileLabel?: string,
+  ): { value: string; source: string } {
+    for (const key of keys) {
+      const raw = process.env[key];
+      if (typeof raw === "string" && raw.trim() !== "") {
+        return { value: raw.trim(), source: `env:${key}` };
+      }
+    }
+    if (envFileLabel) {
+      for (const key of keys) {
+        const raw = envFileValues[key];
+        if (typeof raw === "string" && raw.trim() !== "") {
+          return { value: raw.trim(), source: `${envFileLabel}:${key}` };
+        }
+      }
+    }
+    return { value: "", source: "unset" };
+  }
 }
 
 async function pathExists(target: string): Promise<boolean> {
@@ -303,4 +442,67 @@ async function pathExists(target: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function parseTokenExpiry(token: string | undefined): Date | null {
+  if (!token) {
+    return null;
+  }
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    const payload = Buffer.from(parts[1], "base64url").toString("utf-8");
+    const data = JSON.parse(payload) as Record<string, unknown>;
+    const fromNumeric = parseNumericTimestamp(data["exp"] ?? data["expires"]);
+    if (fromNumeric) {
+      return fromNumeric;
+    }
+    const fromString =
+      parseStringTimestamp(data["expires_at"]) ?? parseStringTimestamp(data["expiresAt"]);
+    if (fromString) {
+      return fromString;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function parseNumericTimestamp(value: unknown): Date | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  let num: number | null = null;
+  if (typeof value === "number") {
+    num = value;
+  } else if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isNaN(parsed)) {
+      num = parsed;
+    }
+  }
+  if (num === null || Number.isNaN(num)) {
+    return null;
+  }
+  if (num > 1_000_000_000_000) {
+    return new Date(num);
+  }
+  return new Date(num * 1000);
+}
+
+function parseStringTimestamp(value: unknown): Date | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const iso = Date.parse(trimmed);
+  if (!Number.isNaN(iso)) {
+    return new Date(iso);
+  }
+  return parseNumericTimestamp(trimmed);
 }

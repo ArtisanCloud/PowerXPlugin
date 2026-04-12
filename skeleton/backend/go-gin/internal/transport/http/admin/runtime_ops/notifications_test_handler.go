@@ -1,0 +1,120 @@
+package runtime_ops
+
+import (
+	"context"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
+)
+
+type notificationTestRequest struct {
+	TenantUUID string `json:"tenant_uuid"`
+	Topic      string `json:"topic"`
+	Title      string `json:"title"`
+	Message    string `json:"message"`
+	TraceID    string `json:"trace_id"`
+}
+
+func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if deps == nil || deps.WSBusHub == nil {
+			contracts.ResponseServiceUnavailable(c, "ws bus is not configured", nil)
+			return
+		}
+
+		var req notificationTestRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			contracts.ResponseBadRequest(c, "invalid payload")
+			return
+		}
+
+		resolvedTenantUUID, tenantMismatch := admincommon.ResolveTenantUUIDStrict(c, req.TenantUUID)
+		if tenantMismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
+			return
+		}
+		tenantUUID := strings.TrimSpace(resolvedTenantUUID)
+		if tenantUUID == "" {
+			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+			return
+		}
+
+		topic := strings.TrimSpace(req.Topic)
+		if topic == "" {
+			topic = "plugin.notify.tenant." + tenantUUID
+		}
+
+		title := strings.TrimSpace(req.Title)
+		if title == "" {
+			title = "WS Test Notification"
+		}
+		message := strings.TrimSpace(req.Message)
+		if message == "" {
+			message = "websocket probe event"
+		}
+		traceID := strings.TrimSpace(req.TraceID)
+		if traceID == "" {
+			traceID = strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		}
+		if traceID == "" {
+			traceID = "ws-notify-" + time.Now().UTC().Format("20060102T150405.000Z")
+		}
+
+		payload := gin.H{
+			"type":        "notification.test",
+			"title":       title,
+			"message":     message,
+			"tenant_uuid": tenantUUID,
+			"trace_id":    traceID,
+			"created_at":  time.Now().UTC().Format(time.RFC3339Nano),
+		}
+
+		publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
+			fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
+			"",
+			nil,
+		))
+		outboundBearer := ""
+		if os.Getenv("POWERX_PROXY") == "1" && deps.Config != nil && deps.Config.Gateway != nil {
+			outboundBearer = resolveGatewayBearerToken(c, deps)
+			logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
+
+			hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
+				BaseURL:    strings.TrimSpace(deps.Config.Gateway.BaseURL),
+				AuthScheme: strings.TrimSpace(deps.Config.Gateway.AuthScheme),
+				Token:      strings.TrimSpace(deps.Config.Gateway.ToolToken),
+				APIKey:     strings.TrimSpace(deps.Config.Gateway.APIKey),
+				TenantUUID: "",
+				UserAgent:  strings.TrimSpace(deps.Config.Gateway.UserAgent),
+				Timeout:    deps.Config.Gateway.Timeout,
+			})
+			if err == nil {
+				publisher = hostClient
+			}
+		}
+
+		result := publisher.Publish(context.Background(), topic, payload, fwwsbus.PublishOptions{
+			TenantUUID:  tenantUUID,
+			TraceID:     traceID,
+			BearerToken: outboundBearer,
+		})
+		if !result.OK {
+			contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
+			return
+		}
+
+		contracts.ResponseSuccess(c, gin.H{
+			"ok":          true,
+			"topic":       topic,
+			"tenant_uuid": tenantUUID,
+			"trace_id":    traceID,
+		})
+	}
+}

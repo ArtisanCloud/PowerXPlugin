@@ -44,12 +44,17 @@ func (r *MCPSessionRepository) UpdateFields(ctx context.Context, id string, fiel
 		return nil, err
 	}
 
-	updated, err := r.BaseRepository.Patch(ctx, map[string]interface{}{
+	if _, err := r.BaseRepository.Patch(ctx, map[string]interface{}{
 		"id":          id,
 		"tenant_uuid": tenantID,
-	}, fields)
-	if err != nil {
+	}, fields); err != nil {
 		return nil, err
 	}
-	return updated, nil
+	var session model.MCPSession
+	if err := r.DB.WithContext(ctx).
+		Where("id = ? AND tenant_uuid = ?", id, tenantID).
+		First(&session).Error; err != nil {
+		return nil, err
+	}
+	return &session, nil
 }

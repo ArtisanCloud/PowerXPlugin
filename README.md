@@ -6,6 +6,7 @@
 - 实现计划：`specs/001-powerxplugin-foundation/plan.md`
 - 快速上手：`docs/quickstart.md`
 - 技术设计：`docs/init-project.md`
+- PowerX 通用能力消费方案：[docs/plan/009-consume-powerx-capability.md](./docs/plan/009-consume-powerx-capability.md)（含 Skeleton/宿主示例与观测策略）
 
 
 
@@ -15,6 +16,8 @@
 - **Standalone 运行指南**：[docs/guides/develop/standalone-mode.md](./docs/guides/develop/standalone-mode.md)
 - **迁移实践**：[docs/guide/migration/base-to-skeleton.md](./docs/guide/migration/base-to-skeleton.md)
 - **框架发布指南**：[docs/guides/develop/framework-release.md](./docs/guides/develop/framework-release.md)
+- **Mini-App Customer 鉴权**：[docs/guides/develop/auth/customer.md](./docs/guides/develop/auth/customer.md)（含 Skeleton/Delegated 与观测指标）
+- **EventBridge / TaskBus 测试指南**：[docs/guides/async_runtime/event_fabric/integration_playbook.md](./docs/guides/async_runtime/event_fabric/integration_playbook.md)
 
 ## 快速开始
 
@@ -23,10 +26,40 @@
 3. 初始化能力工具链：如需 CLI 校验/导出，请运行 `npm --prefix scripts/capabilities install`（若尚未安装依赖），并使用 `make capabilities-lint`、`make capabilities-export` 驱动 `scripts/capabilities` 工具。
 4. 参照 `specs/001-powerxplugin-foundation/quickstart.md` 启动 skeleton 后端与管理端。
 5. 体验 Go CLI 热加载：请按照 `docs/guides/quickstart.md#dev-api-热更新与-doctor-诊断` 构建 `px-plugin`、运行 `px-plugin dev --watch` / `dev --logs`，并通过 `px-plugin doctor` 生成 `.doctor/report.json` 以验证 Toolchain、mTLS、Dev API、Watcher 状态。
+6. 验证 Standalone IAM：按照 `specs/007-standalone-iam-rbac/quickstart.md` 导出 `PLUGIN_IAM_*` 环境变量运行 `go run ./cmd/database/main.go setup`，再使用 `PLAYWRIGHT_LOCAL_IAM=1 npm --prefix skeleton/web-admin/nuxt run test:e2e -- auth-local` 验证本地管理员登录；若要确认 Delegated 模式入口隐藏，可设置 `PLAYWRIGHT_LOCAL_IAM=0`。
+
+### 在本仓库直接输出可安装包（无需先 `px-plugin init`）
+
+当你要联调 PowerX 宿主安装链路时，可直接在本仓库根目录执行：
+
+```bash
+# 一条命令校验 plugin.yaml（ID + capabilities + events topics）
+make plugin-yaml-check
+
+# 生成 skeleton 安装产物（输出到 skeleton/dist/<version>）
+make skeleton-dist
+
+# 直接调用 PowerX 本地安装接口（会先执行 dist）
+make skeleton-install API_BASE=http://127.0.0.1:8077/api/v1 TOKEN=<ADMIN_BEARER_TOKEN>
+
+# 一键重装并切换版本（disable -> force install -> switch_version enable）
+make skeleton-reinstall VERSION=0.7.1 API_BASE=http://127.0.0.1:8077/api/v1 TOKEN=<ADMIN_BEARER_TOKEN>
+```
+
+等价命令分别是 `make -C skeleton dist` 和 `make -C skeleton local-install ...`；`make dist` 在仓库根目录也已透传到 `skeleton`。
+
+如需输出 Linux 安装包（例如在 macOS 上打包部署到 Linux）：
+
+```bash
+make dist PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/0.1.1-linux
+```
 
 ## Manifest 位置说明
 
-- 仓库真实的开发态 manifest 存放在 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅是一个指向它的符号链接，方便旧脚本兼容。
+- 仓库真实的开发态 manifest 仅存放在 `skeleton/plugin.yaml`。
+- 当前 skeleton 默认使用「索引清单」：`skeleton/plugin.yaml` 仅保留基础元信息，能力/暴露/事件/RBAC 映射统一放在 `skeleton/plugin.d/*.yaml`。
+- 支持 `catalogs` 引用模式：`skeleton/plugin.yaml` 通过 `catalogs.*` 指向同级 `skeleton/plugin.d/*.yaml`（capabilities / exposure / agent_tools / events / rbac）。
+- 事件声明规范源为 `skeleton/plugin.d/events.yaml` 的 `events.topics[]`；过渡期执行层文件为 `skeleton/config/event_fabric.yaml`（供底座扫描 topic/ACL）。
 - 运行 `npm test`、`make validate`、`px-plugin capabilities ...` 等命令时，请在 `skeleton/` 目录中执行（或显式传入 `--manifest skeleton/plugin.yaml` / `CAP_MANIFEST=./skeleton/plugin.yaml`），以免引用到不存在的文件。
 - 当你使用 `px-plugin init` 生成独立插件仓库时，`plugin.yaml` 位于其根目录，命令可继续按常规相对路径执行。
 

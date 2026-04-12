@@ -1,0 +1,46 @@
+version: 1
+topics:
+  - key: _topic.template.update
+    namespace: _topic.template
+    name: update
+    description: 模板状态更新事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]
+
+  - key: _topic.audit.template.updated
+    namespace: _topic.audit.template
+    name: updated
+    description: 模板审计更新事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish]
+
+  - key: _topic.template.validate.completed
+    namespace: _topic.template.validate
+    name: completed
+    description: 模板校验完成事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish]
+
+  - key: _topic.template.batch_clone.completed
+    namespace: _topic.template.batch_clone
+    name: completed
+    description: 模板批量克隆完成事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish]
+
+  - key: _topic.template.update.completed
+    namespace: _topic.template.update
+    name: completed
+    description: 模板更新完成事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish]

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"{{ .BackendModulePath }}/internal/contracts"
 	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
 	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
@@ -16,6 +17,7 @@ import (
 	runtimeops "{{ .BackendModulePath }}/internal/services/admin/runtime_ops"
 	integrationService "{{ .BackendModulePath }}/internal/services/integration"
 	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -149,6 +151,23 @@ func (h *SessionsHandler) Invoke(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid invoke payload")
 		return
 	}
+	if strings.TrimSpace(req.TenantUuid) == "" {
+		req.TenantUuid = admincommon.ResolveTenantUUID(c)
+	}
+	if strings.TrimSpace(req.TenantUuid) == "" {
+		if h.logger != nil {
+			h.logger.WithFields(logrus.Fields{
+				runtimelogging.FieldTaskID:     runtimelogging.FallbackUnknown,
+				runtimelogging.FieldSubscriber: "mcp_session_handler",
+				runtimelogging.FieldTopic:      "runtime_ops.invoke",
+				runtimelogging.FieldStatus:     runtimelogging.StatusSkipped,
+				runtimelogging.FieldReason:     runtimelogging.ReasonMissingContext,
+				"session_id":                   sessionID,
+			}).Warn("mcp invoke skipped: missing tenant context")
+		}
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
 	envelope, err := req.toDomain()
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
@@ -240,7 +259,7 @@ type invokeRequest struct {
 	MessageID      string         `json:"message_id" binding:"required"`
 	TraceID        string         `json:"trace_id" binding:"required"`
 	CorrelationID  string         `json:"correlation_id" binding:"required"`
-	TenantUuid     string         `json:"tenant_uuid" binding:"required"`
+	TenantUuid     string         `json:"tenant_uuid"`
 	ToolScope      string         `json:"tool_scope" binding:"required"`
 	IssuedAt       string         `json:"issued_at" binding:"required"`
 	IdempotencyKey string         `json:"idempotency_key"`

@@ -92,7 +92,7 @@
 ```yaml
 ticket_id: "PX-TKT-20251013-001"
 tenant_uuid: "tenant_abc"
-plugin_id: "com.powerx.plugin.crm"
+plugin_id: "com.powerx.plugins.crm"
 priority: P1
 status: in_progress
 title: "CRM 插件无法加载客户数据"
@@ -114,7 +114,7 @@ POST /api/v1/support/webhook
 {
   "event": "ticket.created",
   "ticket_id": "PX-TKT-20251013-001",
-  "plugin_id": "com.powerx.plugin.crm",
+  "plugin_id": "com.powerx.plugins.crm",
   "severity": "P1",
   "tenant_uuid": "tenant_abc"
 }

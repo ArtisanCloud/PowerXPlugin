@@ -14,6 +14,8 @@ const (
 	metricLogoutTotal         = "plugin_auth_logout_total"
 	metricDelegateErrorsTotal = "plugin_iam_delegate_errors_total"
 	metricIAMModeGauge        = "plugin_iam_mode"
+	metricIAMRoleChangeTotal  = "plugin_iam_role_change_total"
+	metricRBACDeniedTotal     = "plugin_rbac_denied_total"
 )
 
 var (
@@ -60,42 +62,99 @@ func normalizedMode(mode string) string {
 	return mode
 }
 
+func normalizedPluginID(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return "unknown"
+	}
+	return id
+}
+
+func normalizedTenantUUID(id string) string {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" {
+		return "unknown"
+	}
+	return id
+}
+
+func normalizedValue(value string) string {
+	v := strings.ToLower(strings.TrimSpace(value))
+	if v == "" {
+		return "unknown"
+	}
+	return v
+}
+
 // RecordLogin increments login counters grouped by IAM mode and result.
-func RecordLogin(mode, result string) {
+func RecordLogin(pluginID, mode, result string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
 	labels := map[string]string{
-		"mode":   normalizedMode(mode),
-		"result": strings.ToLower(strings.TrimSpace(result)),
+		"mode":      normalizedMode(mode),
+		"result":    strings.ToLower(strings.TrimSpace(result)),
+		"plugin_id": normalizedPluginID(pluginID),
 	}
 	ensureCounter(metricLoginTotal)[labelKey(labels)]++
 }
 
 // RecordRefresh increments refresh counters grouped by IAM mode and result.
-func RecordRefresh(mode, result string) {
+func RecordRefresh(pluginID, mode, result string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
 	labels := map[string]string{
-		"mode":   normalizedMode(mode),
-		"result": strings.ToLower(strings.TrimSpace(result)),
+		"mode":      normalizedMode(mode),
+		"result":    strings.ToLower(strings.TrimSpace(result)),
+		"plugin_id": normalizedPluginID(pluginID),
 	}
 	ensureCounter(metricRefreshTotal)[labelKey(labels)]++
 }
 
 // RecordLogout increments logout counters grouped by IAM mode.
-func RecordLogout(mode string) {
+func RecordLogout(pluginID, mode string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
-	labels := map[string]string{"mode": normalizedMode(mode)}
+	labels := map[string]string{
+		"mode":      normalizedMode(mode),
+		"plugin_id": normalizedPluginID(pluginID),
+	}
 	ensureCounter(metricLogoutTotal)[labelKey(labels)]++
 }
 
 // RecordDelegateError tracks delegated auth errors grouped by category.
-func RecordDelegateError(category string) {
+func RecordDelegateError(pluginID, category string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
-	labels := map[string]string{"type": strings.ToLower(strings.TrimSpace(category))}
+	labels := map[string]string{
+		"type":      strings.ToLower(strings.TrimSpace(category)),
+		"plugin_id": normalizedPluginID(pluginID),
+	}
 	ensureCounter(metricDelegateErrorsTotal)[labelKey(labels)]++
+}
+
+// RecordRoleChange increments counters for IAM role mutations.
+func RecordRoleChange(pluginID, tenantUUID, event, scope string) {
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+	labels := map[string]string{
+		"plugin_id":   normalizedPluginID(pluginID),
+		"tenant_uuid": normalizedTenantUUID(tenantUUID),
+		"event":       normalizedValue(event),
+		"scope":       normalizedValue(scope),
+	}
+	ensureCounter(metricIAMRoleChangeTotal)[labelKey(labels)]++
+}
+
+// RecordRBACDenied tracks RBAC deny events grouped by resource/action.
+func RecordRBACDenied(pluginID, resource, action string) {
+	metricsMu.Lock()
+	defer metricsMu.Unlock()
+	labels := map[string]string{
+		"plugin_id": normalizedPluginID(pluginID),
+		"resource":  normalizedValue(resource),
+		"action":    normalizedValue(action),
+	}
+	ensureCounter(metricRBACDeniedTotal)[labelKey(labels)]++
 }
 
 // ObserveMode sets the IAM mode gauge (1 for selected mode, 0 for the opposite).

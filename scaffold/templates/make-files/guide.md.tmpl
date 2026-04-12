@@ -22,6 +22,8 @@ BUILD_DIR=backend/out VERSION=0.1.1 make build
 | 变量名 | 默认值 | 作用 |
 | --- | --- | --- |
 | `VERSION` | `0.1.0` | 当前插件版本号，影响产物目录与包名 |
+| `PLATFORM` | `host` | `dist` 后端目标平台：`host`（本机）或 `linux` |
+| `TARGET_ARCH` | `amd64` | 目标架构（当 `PLATFORM=linux` 时生效） |
 | `BUILD_DIR` | `backend/bin` | Go 二进制输出目录 |
 | `FRONTEND_BUILD_CMD` | `npm --prefix web-admin run build` | 前端构建命令，可结合 CI 需求调整 |
 | `DIST_ROOT` | `dist` | 提供给 PowerX `install/local` 的目录根 |
@@ -33,9 +35,10 @@ BUILD_DIR=backend/out VERSION=0.1.1 make build
 | 命令 | 说明 |
 | --- | --- |
 | `make build` | 构建本机平台的后端二进制到 `$(BUILD_DIR)` |
-| `make build-linux` | 交叉编译 Linux/amd64 二进制 |
+| `make build-linux` | 交叉编译 Linux/`$(TARGET_ARCH)` 二进制 |
 | `make frontend-build` | 构建 `web-admin/.output` 前端产物 |
-| `make dist` | 生成 `$(DIST_ROOT)/$(VERSION)`，用于本地目录模式安装 |
+| `make dist` | 生成 `$(DIST_ROOT)/$(VERSION)`，可通过 `PLATFORM=linux` 输出 Linux 后端二进制 |
+| `make dist-linux` | `make dist PLATFORM=linux` 的兼容别名 |
 | `make release` | 生成 `$(RELEASE_ROOT)/$(VERSION)`，包含前后端完整发布产物 |
 | `make package` | 打包 `dist/<version>` 为 zip（适合远程安装接口） |
 | `make package-release` | 打包 `target/<version>` 为 zip（对外发布文件） |
@@ -55,8 +58,13 @@ make help
    ```bash
    make dist
    ```
+   Linux 目标（常用于在 macOS 上构建可部署到 Linux 的后端）：
+   ```bash
+   make dist PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/0.1.1-linux
+   ```
 3. 调用 PowerX 的安装接口时，`src_dir` 指向 `$(pwd)/dist/$(VERSION)` 即可，目录内至少包含：
    - `plugin.yaml`
+   - `config/event_fabric.yaml`（事件 topic 执行层映射）
    - `backend/bin/plugin`
    - （可选）`web-admin/.output` 前端静态资源
 
@@ -84,7 +92,7 @@ make package-release
   ```
 - 选择不同二进制平台：
   ```bash
-  GOOS=darwin GOARCH=arm64 BUILD_DIR=backend/bin/darwin make build
+  make dist PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/0.1.1-linux
   ```
 - 更换发布目录根位置：
   ```bash
@@ -96,4 +104,4 @@ make package-release
 - 如果不打算包含前端产物，可以跳过 `make frontend-build`；此时 `make dist` 会提示 `.output` 不存在。
 - 发布前建议执行 `make check`（lint + test）确保质量，并在必要时运行 `make test-coverage`。
 
-如需进一步自动化（例如 CI/CD），可参考以上变量，结合环境注入版本号或发布路径。EOF
+如需进一步自动化（例如 CI/CD），可参考以上变量，结合环境注入版本号或发布路径。

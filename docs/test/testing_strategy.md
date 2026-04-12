@@ -57,14 +57,14 @@
 
 > **测试文件布局约定**  
 > - Go 代码的测试文件与实现同目录存放，使用 `*_test.go` 命名（例如 `framework/backend/go/bootstrap/app_test.go`）。  
-> - 前端 Playwright 用例集中在 `skeleton/web-admin/tests/e2e/`。  
+> - 前端 Playwright 用例集中在 `skeleton/web-admin/nuxt/tests/e2e/`。  
 > - CLI/脚本级验证可在 `scripts/` 目录或独立测试包中实现，但保持与被测模块一一对应。  
 > 这样可以让 `go test ./...`、`npx playwright test` 等框架原生命令自动发现全部用例。
 
 ### 2.1 Layer 1: Go 单元测试
 
 **目标**: 验证框架层核心逻辑正确性  
-**命令**: `go test ./framework/... -v -coverprofile=coverage.out`  
+**命令**: `cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out`  
 **当前状态**: ✅ 已实现 (8/8 通过, 62.3% 覆盖率)
 
 #### 覆盖范围
@@ -119,13 +119,13 @@ func TestRegisterFrameworkRoutes(t *testing.T) {
 ### 2.2 Layer 2: Skeleton 集成测试
 
 **目标**: 验证端到端业务流  
-**命令**: `go test ./skeleton/backend/... -v`  
+**命令**: `go test ./skeleton/backend/go-gin/... -v`  
 **当前状态**: ✅ 已实现 (1/1 通过)
 
 #### 覆盖范围
 
 ```
-skeleton/backend/internal/
+skeleton/backend/go-gin/internal/
 ├── routes/
 │   ├── routes.go           ✅ TestRegisterAddsPingRoute
 │   └── routes_test.go
@@ -174,7 +174,7 @@ func TestPingHandler_Success(t *testing.T) {
 ### 2.3 Layer 3: 前端 E2E 测试
 
 **目标**: 验证真实用户场景  
-**命令**: `cd skeleton/web-admin && npx playwright test`  
+**命令**: `cd skeleton/web-admin/nuxt && npx playwright test`  
 **当前状态**: ⚠️ 已配置但需修复（需先安装依赖并修正断言）
 
 #### 现状问题
@@ -186,7 +186,7 @@ func TestPingHandler_Success(t *testing.T) {
 
 1. **确保依赖安装与 layer 就绪**
    ```bash
-   cd skeleton/web-admin
+   cd skeleton/web-admin/nuxt
    npm install
    npx playwright install
    npm run dev
@@ -310,7 +310,7 @@ echo "=== CLI 验证测试通过 ==="
 | Workflow | 包含 TestLayer | 代表性代码片段 |
 |----------|----------------|------------------|
 | Smoke (`scripts/testing/smoke.sh`) | `unit`、`cli` | ```go
-// skeleton/backend/internal/routes/routes_test.go
+// skeleton/backend/go-gin/internal/routes/routes_test.go
 func TestRegisterAddsPingRoute(t *testing.T) {
     app := bootstrap.NewApp(nil)
     if err := router.AttachHTTPServer(app); err != nil {
@@ -323,7 +323,7 @@ func TestRegisterAddsPingRoute(t *testing.T) {
 }
 ``` |
 | Regression (`scripts/testing/regression.sh`) | `unit`、`integration`、`e2e`、`cli` | ```ts
-// skeleton/web-admin/tests/e2e/starter.spec.ts
+// skeleton/web-admin/nuxt/tests/e2e/starter.spec.ts
 test('starter page renders welcome message', async ({ page }) => {
   await page.goto('/_p/com.powerx.sample/admin');
   await expect(page.getByRole('heading', { name: 'PowerX Sample' })).toBeVisible();
@@ -366,7 +366,7 @@ docs/contracts/
 
 `scripts/testing/smoke.sh` 将“后端基础测试 → 契约校验 → CLI 验证”串成单一入口，默认 5 分钟内完成：
 
-1. 运行 `go test ./framework/backend/go/bootstrap/...`（生成 `tmp/coverage.out`）及 `go test ./skeleton/backend/internal/routes/...`；
+1. 运行 `cd framework/backend/go && go test ./bootstrap/...`（生成 `tmp/coverage.out`）及 `go test ./skeleton/backend/go-gin/internal/routes/...`；
 2. 调用 `go tool cover -html=tmp/coverage.out -o tmp/coverage.html` 生成可视化报告；
 3. 执行 `./scripts/testing/validate-contracts.sh` 复用契约校验逻辑；
 4. 必要时编译 `bin/px-plugin` 并在临时目录执行 `px-plugin init` 验证 CLI scaffolding。
@@ -377,6 +377,7 @@ docs/contracts/
 ./scripts/testing/smoke.sh
 # 或使用 Makefile 包装（含 300s 超时与错误回显）
 make test-smoke
+make BACKEND=fastapi test-smoke
 ```
 
 脚本会输出耗时统计并默认清理临时 scaffolding 目录；设置 `KEEP_TEMP_DIR=1` 可保留排查现场。
@@ -385,18 +386,20 @@ make test-smoke
 
 `scripts/testing/regression.sh` 在执行 Smoke 工作流后继续完成：
 
-1. `go test ./framework/... ./skeleton/backend/... -coverprofile=tmp/coverage-regression.out`（覆盖更广的包）；
-2. 启动 `go run ./skeleton/backend/cmd/plugin`（输出写入 `tmp/regression-backend.log`）；
-3. 启动 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`（未显式设置时脚本会自动选择空闲端口；输出写入 `tmp/regression-frontend.log`）；
-4. 轮询 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认为 `http://127.0.0.1:<port>`）；
-5. 调用 `PLAYWRIGHT_BASE_URL=… npx playwright test`，失败时保留 `skeleton/web-admin/test-results/` 供排查；
-6. 结束后生成 `tmp/coverage.html` 并输出总耗时。
+1. `cd framework/backend/go && go test ./... -coverprofile=../../tmp/coverage-regression.out`（覆盖更广的包）；
+2. `go test ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage-regression.out`；
+3. 启动 `go run ./skeleton/backend/go-gin/cmd/plugin`（输出写入 `tmp/regression-backend.log`）；
+4. 启动 `npx nuxi preview --hostname 127.0.0.1 --port ${REGRESSION_FRONTEND_PORT}`（未显式设置时脚本会自动选择空闲端口；输出写入 `tmp/regression-frontend.log`）；
+5. 轮询 `http://127.0.0.1:8077/healthz` 与 `PLAYWRIGHT_BASE_URL`（默认为 `http://127.0.0.1:<port>`）；
+6. 调用 `PLAYWRIGHT_BASE_URL=… npx playwright test`，失败时保留 `skeleton/web-admin/nuxt/test-results/` 供排查；
+7. 结束后生成 `tmp/coverage.html` 并输出总耗时。
 
 运行方式：
 
 ```bash
 ./scripts/testing/regression.sh
 # make test-regression  # 含 3600s 超时、错误回显
+# make BACKEND=fastapi test-regression
 ```
 
 > **Playwright 稳定性**：网络/渲染波动可能导致偶发失败。建议：
@@ -459,7 +462,7 @@ echo "契约校验通过"
 if git diff --name-only HEAD~1 | grep -q "docs/contracts/"; then
     echo "检测到契约文件变更，运行契约守护测试..."
     scripts/validate-contracts.sh
-    go test ./framework/backend/go/... -run ".*[Mm]anifest.*|.*[Rr]bac.*"
+    cd framework/backend/go && go test ./... -run ".*[Mm]anifest.*|.*[Rr]bac.*"
 fi
 ```
 
@@ -483,8 +486,8 @@ test: test-backend test-contracts test-cli
 # Layer 1: 后端单元测试
 test-backend:
 	@echo "=== 运行后端单元测试 ==="
-	go test ./framework/... -v -coverprofile=coverage.out
-	go test ./skeleton/backend/... -v
+	cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out
+	go test ./skeleton/backend/go-gin/... -v
 	@echo "✅ 后端测试通过"
 
 # Layer 2: 契约校验
@@ -497,15 +500,15 @@ test-contracts:
 test-e2e:
 	@echo "=== 运行 E2E 测试 ==="
 	@echo "启动后端服务..."
-	go run ./skeleton/backend/cmd/plugin &
+	go run ./skeleton/backend/go-gin/cmd/plugin &
 	@echo "$$!" > /tmp/test-backend.pid
 	sleep 3
 	@echo "启动前端服务..."
-	cd skeleton/web-admin && npm run dev &
+	cd skeleton/web-admin/nuxt && npm run dev &
 	@echo "$$!" > /tmp/test-frontend.pid
 	sleep 8
 	@echo "运行 Playwright 测试..."
-	cd skeleton/web-admin && npx playwright test --reporter=html
+	cd skeleton/web-admin/nuxt && npx playwright test --reporter=html
 	@echo "✅ E2E 测试完成"
 	@kill $(cat /tmp/test-backend.pid) 2>/dev/null || true
 	@kill $(cat /tmp/test-frontend.pid) 2>/dev/null || true
@@ -565,7 +568,7 @@ echo ""
 
 # 1. 后端测试
 echo "1. 后端单元测试..."
-go test ./framework/backend/go/bootstrap/... -v > /tmp/test-backend.log 2>&1
+cd framework/backend/go && go test ./bootstrap/... -v > /tmp/test-backend.log 2>&1
 if [ $? -eq 0 ]; then
     echo "   ✅ 后端测试通过"
 else
@@ -648,7 +651,7 @@ test.describe('Ping API 回归测试', () => {
 // tests/regression/manifest_consistency_test.go
 func TestManifestConsistency(t *testing.T) {
     // 读取骨架 manifest
-    skeletonManifest := readManifest("skeleton/backend/internal/manifestx")
+    skeletonManifest := readManifest("skeleton/backend/go-gin/internal/manifestx")
     
     // 读取示例 manifest
     exampleManifest := readManifest("examples/starter/docs/contracts")
@@ -683,7 +686,7 @@ if echo "$CHANGED_FILES" | grep -q "^framework/"; then
 fi
 
 # 前端变更 → 运行 E2E 测试
-if echo "$CHANGED_FILES" | grep -q "^skeleton/web-admin/"; then
+if echo "$CHANGED_FILES" | grep -q "^skeleton/web-admin/nuxt/"; then
     echo "检测到前端变更，运行 E2E 测试..."
     make test-e2e
 fi
@@ -713,7 +716,7 @@ echo "=== 影响分析完成 ==="
 |------|------------|------------|----------|
 | framework/backend/go/bootstrap | 62.3% | 80% | 新增 router 测试 |
 | framework/backend/go/router | 0% | 70% | 新增单元测试 |
-| skeleton/backend | 50% | 70% | 新增 handler/service 测试 |
+| skeleton/backend/go-gin | 50% | 70% | 新增 handler/service 测试 |
 | **整体目标** | **~50%** | **75%** | **持续改进** |
 
 ### 6.2 覆盖率报告生成
@@ -725,7 +728,7 @@ echo "=== 影响分析完成 ==="
 echo "=== 生成覆盖率报告 ==="
 
 # 运行测试并生成覆盖率
-go test ./framework/... -coverprofile=coverage.out
+cd framework/backend/go && go test ./... -coverprofile=../../coverage.out
 mkdir -p tmp
 go tool cover -html=coverage.out -o tmp/coverage.html
 
@@ -803,7 +806,7 @@ jobs:
       - name: Run Go tests
         run: |
           go work sync
-          go test ./framework/... -v -coverprofile=coverage.out
+          cd framework/backend/go && go test ./... -v -coverprofile=../../coverage.out
           
       - name: Upload coverage
         uses: codecov/codecov-action@v3
@@ -849,8 +852,8 @@ jobs:
         
       - name: Run E2E tests
         run: |
-          go run ./skeleton/backend/cmd/plugin &
-          cd skeleton/web-admin && npm install && npm run dev &
+          go run ./skeleton/backend/go-gin/cmd/plugin &
+          cd skeleton/web-admin/nuxt && npm install && npm run dev &
           sleep 10
           npx playwright test
           
@@ -859,7 +862,7 @@ jobs:
         if: always()
         with:
           name: playwright-report
-          path: skeleton/web-admin/test-results/
+          path: skeleton/web-admin/nuxt/test-results/
 ```
 
 ### 7.2 并行执行策略
@@ -933,7 +936,7 @@ cd web-admin && npm run dev &
 curl http://localhost:8077/api/v1/ping
 
 # 4. 运行 E2E 测试
-cd skeleton/web-admin
+cd skeleton/web-admin/nuxt
 npx playwright test --reporter=html
 
 # 5. 清理

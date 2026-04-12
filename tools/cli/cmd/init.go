@@ -20,7 +20,7 @@ import (
 const (
 	defaultVersion          = "0.1.0"
 	defaultGoVersion        = "1.24"
-	defaultFrameworkVersion = "v0.0.1-alpha"
+	defaultFrameworkVersion = "v0.0.6-alpha"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
 	defaultAdminVersion     = "^0.0.1-alpha"
 	defaultClientVersion    = "^0.0.1-alpha"
@@ -29,17 +29,27 @@ const (
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
 
 func runInit(args []string) error {
+	// Go stdlib flag parsing stops at the first non-flag argument.
+	// Many users naturally put plugin id first (e.g. `px-plugin init com.xxx --force`),
+	// which would cause trailing flags to be ignored. Normalize that common shape so
+	// flags work regardless of position.
+	args = normalizeInitArgs(args)
+
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	var (
 		module              = fs.String("module", "", "override backend module import path (default derives from plugin id)")
 		backend             = fs.String("backend", templates.BackendGoGin, fmt.Sprintf("backend framework (supported: %v)", templates.SupportedBackends()))
 		adminFrontend       = fs.String("admin", templates.FrontendNuxt, fmt.Sprintf("admin frontend framework (supported: %v)", templates.SupportedFrontends()))
 		appFrontend         = fs.String("app", "", "app frontend framework (optional)")
+		backendPort         = fs.Int("backend-port", 8078, "backend service port")
+		frontendPort        = fs.Int("frontend-port", 3131, "frontend dev server port")
 		force               = fs.Bool("force", false, "overwrite existing files")
 		directory           = fs.String("directory", "", "target directory (default: ./<plugin-id>)")
 		version             = fs.String("version", defaultVersion, "plugin version")
 		goVersion           = fs.String("go-version", defaultGoVersion, "Go version to use")
 		installDeps         = fs.Bool("install-deps", false, "automatically install dependencies (go mod tidy & npm install)")
+		initConfig          = fs.Bool("init-config", true, "create local config files from *.example templates")
+		gitInit             = fs.Bool("git-init", true, "initialize git repository in target directory")
 		sbomPath            = fs.String("sbom-path", "", "path to write SBOM file (default: <target>/reports/sbom.json)")
 		publishManifestPath = fs.String("publish-manifest-path", "", "path to write publish manifest (default: <target>/publish.yml)")
 	)
@@ -48,15 +58,22 @@ func runInit(args []string) error {
 		return err
 	}
 
+	if fs.NArg() < 1 {
+		return errors.New("plugin id is required")
+	}
+	pluginID := fs.Arg(0)
+
+	if shouldRunInitGuide(fs) {
+		if err := runInitGuide(&pluginID, module, backend, adminFrontend, appFrontend, backendPort, frontendPort, directory, installDeps, initConfig, gitInit); err != nil {
+			return err
+		}
+	}
+
 	// Handle optional app frontend
 	if *appFrontend == "" {
 		*appFrontend = *adminFrontend // Default to same as admin if not specified
 	}
 
-	if fs.NArg() < 1 {
-		return errors.New("plugin id is required")
-	}
-	pluginID := fs.Arg(0)
 	if !pluginIDPattern.MatchString(pluginID) {
 		return fmt.Errorf("invalid plugin id %q: must match %s", pluginID, pluginIDPattern.String())
 	}
@@ -65,6 +82,12 @@ func runInit(args []string) error {
 		return err
 	}
 	if err := templates.ValidateTemplateTypes(*backend, *appFrontend); err != nil {
+		return err
+	}
+	if err := validatePort(*backendPort, "backend-port"); err != nil {
+		return err
+	}
+	if err := validatePort(*frontendPort, "frontend-port"); err != nil {
 		return err
 	}
 
@@ -76,10 +99,7 @@ func runInit(args []string) error {
 	pluginName := derivePluginName(pluginID)
 	pluginSlug := derivePluginSlug(pluginID)
 
-	moduleRoot := *module
-	if moduleRoot == "" {
-		moduleRoot = fmt.Sprintf("github.com/ArtisanCloud/PowerXPlugin/plugins/%s", pluginSlug)
-	}
+	moduleRoot := normalizeModuleRoot(*module, pluginID)
 
 	backendModule := moduleRoot + "/backend"
 
@@ -112,6 +132,8 @@ func runInit(args []string) error {
 		BackendType:        *backend,
 		FrontendType:       *adminFrontend,
 		AppFrontendType:    *appFrontend,
+		BackendPort:        *backendPort,
+		FrontendPort:       *frontendPort,
 		FrameworkVersion:   defaultFrameworkVersion,
 		FrameworkReplace:   frameworkReplace,
 		SchemaDependency:   schemaDependency,
@@ -153,6 +175,24 @@ func runInit(args []string) error {
 		return err
 	}
 
+	createdConfigFiles := make([]string, 0, 3)
+	if *initConfig {
+		configFiles, err := materializeLocalConfigs(targetRoot, *backend, *adminFrontend, *force)
+		if err != nil {
+			return err
+		}
+		createdConfigFiles = append(createdConfigFiles, configFiles...)
+	}
+	gitInitialized := false
+	if *gitInit {
+		ok, err := ensureGitRepository(targetRoot)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to initialize git repository: %v\n", err)
+		} else {
+			gitInitialized = ok
+		}
+	}
+
 	// Install dependencies if requested
 	if *installDeps {
 		if err := installDependencies(backendDir, webDir); err != nil {
@@ -175,6 +215,12 @@ func runInit(args []string) error {
 	if *publishManifestPath != "" {
 		fmt.Fprintf(os.Stdout, "  created %s\n", strings.TrimPrefix(*publishManifestPath, targetRoot+string(os.PathSeparator)))
 	}
+	for _, path := range createdConfigFiles {
+		fmt.Fprintf(os.Stdout, "  created %s\n", strings.TrimPrefix(path, targetRoot+string(os.PathSeparator)))
+	}
+	if gitInitialized {
+		fmt.Fprintln(os.Stdout, "  initialized .git repository")
+	}
 	fmt.Fprintln(os.Stdout, "  governance .specify/ & .codex copied from CLI repo for Speckit/Codex automation (safe to remove or relocate if not needed).")
 	fmt.Fprintln(os.Stdout, "Next steps:")
 	fmt.Fprintln(os.Stdout, "  - Update go.mod module path if necessary.")
@@ -184,6 +230,317 @@ func runInit(args []string) error {
 	fmt.Fprintln(os.Stdout, "  - Review plugin.yaml and README for TODO items.")
 
 	return nil
+}
+
+func shouldRunInitGuide(fs *flag.FlagSet) bool {
+	stat, err := os.Stdin.Stat()
+	if err != nil || (stat.Mode()&os.ModeCharDevice) == 0 {
+		return false
+	}
+	hasConfigFlag := false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "backend", "admin", "app", "module", "directory", "install-deps", "init-config", "git-init":
+			hasConfigFlag = true
+		case "backend-port", "frontend-port":
+			hasConfigFlag = true
+		}
+	})
+	return fs.NArg() >= 1 && !hasConfigFlag
+}
+
+func runInitGuide(
+	pluginID *string,
+	module *string,
+	backend *string,
+	adminFrontend *string,
+	appFrontend *string,
+	backendPort *int,
+	frontendPort *int,
+	directory *string,
+	installDeps *bool,
+	initConfig *bool,
+	gitInit *bool,
+) error {
+	fmt.Fprintln(os.Stdout, "Entering init guide (interactive mode).")
+
+	candidateID := *pluginID
+	if !pluginIDPattern.MatchString(candidateID) {
+		if suggested := sanitizePluginID(candidateID); suggested != "" && pluginIDPattern.MatchString(suggested) {
+			fmt.Fprintf(os.Stdout, "Plugin ID %q is invalid, suggested: %q\n", candidateID, suggested)
+			candidateID = suggested
+		}
+	}
+	for {
+		value, err := promptString("Plugin ID", candidateID)
+		if err != nil {
+			return err
+		}
+		if pluginIDPattern.MatchString(value) {
+			*pluginID = value
+			break
+		}
+		fmt.Fprintf(os.Stdout, "Invalid plugin id %q, expected pattern: %s\n", value, pluginIDPattern.String())
+		if suggested := sanitizePluginID(value); suggested != "" && pluginIDPattern.MatchString(suggested) {
+			fmt.Fprintf(os.Stdout, "Try: %s\n", suggested)
+			candidateID = suggested
+		}
+	}
+
+	selectedBackend, err := promptSelect("Backend", templates.SupportedBackends(), *backend)
+	if err != nil {
+		return err
+	}
+	*backend = selectedBackend
+
+	selectedAdmin, err := promptSelect("Admin frontend", templates.SupportedFrontends(), *adminFrontend)
+	if err != nil {
+		return err
+	}
+	*adminFrontend = selectedAdmin
+	*appFrontend = selectedAdmin
+
+	defaultBackendPort := *backendPort
+	if defaultBackendPort <= 0 {
+		defaultBackendPort = 8078
+	}
+	selectedBackendPort, err := promptPort("Backend port", defaultBackendPort)
+	if err != nil {
+		return err
+	}
+	*backendPort = selectedBackendPort
+
+	defaultFrontendPort := *frontendPort
+	if defaultFrontendPort == 3131 && *adminFrontend == templates.FrontendNext {
+		defaultFrontendPort = 3231
+	}
+	if defaultFrontendPort <= 0 {
+		defaultFrontendPort = defaultFrontendPortByType(*adminFrontend)
+	}
+	selectedFrontendPort, err := promptPort("Frontend port", defaultFrontendPort)
+	if err != nil {
+		return err
+	}
+	*frontendPort = selectedFrontendPort
+
+	defaultModule := *module
+	if defaultModule == "" {
+		orgOrUser, err := promptString("GitHub org/user", "your-org")
+		if err != nil {
+			return err
+		}
+		orgOrUser = strings.Trim(orgOrUser, "/ ")
+		orgOrUser = strings.TrimPrefix(orgOrUser, "https://github.com/")
+		orgOrUser = strings.TrimPrefix(orgOrUser, "http://github.com/")
+		orgOrUser = strings.TrimPrefix(orgOrUser, "github.com/")
+		if orgOrUser == "" {
+			orgOrUser = "your-org"
+		}
+		defaultModule = fmt.Sprintf("github.com/%s/%s", orgOrUser, *pluginID)
+	}
+	selectedModule, err := promptString("Module root", defaultModule)
+	if err != nil {
+		return err
+	}
+	*module = normalizeModuleRoot(selectedModule, *pluginID)
+
+	defaultDirectory := *directory
+	if defaultDirectory == "" {
+		defaultDirectory = *pluginID
+	}
+	selectedDirectory, err := promptString("Target directory", defaultDirectory)
+	if err != nil {
+		return err
+	}
+	*directory = strings.TrimSpace(selectedDirectory)
+
+	selectedInstallDeps, err := promptBool("Install dependencies now (go mod tidy + npm install)", true)
+	if err != nil {
+		return err
+	}
+	*installDeps = selectedInstallDeps
+
+	selectedInitConfig, err := promptBool("Create local config files from *.example", true)
+	if err != nil {
+		return err
+	}
+	*initConfig = selectedInitConfig
+
+	selectedGitInit, err := promptBool("Initialize git repository (git init)", true)
+	if err != nil {
+		return err
+	}
+	*gitInit = selectedGitInit
+
+	return nil
+}
+
+func promptString(label, defaultValue string) (string, error) {
+	reader := io.Reader(os.Stdin)
+	buf := make([]byte, 0, 128)
+	fmt.Fprintf(os.Stdout, "%s [%s]: ", label, defaultValue)
+	for {
+		b := make([]byte, 1)
+		n, err := reader.Read(b)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if len(buf) == 0 {
+					return defaultValue, nil
+				}
+				return strings.TrimSpace(string(buf)), nil
+			}
+			return "", err
+		}
+		if n == 0 {
+			continue
+		}
+		ch := b[0]
+		if ch == '\n' {
+			value := strings.TrimSpace(string(buf))
+			if value == "" {
+				return defaultValue, nil
+			}
+			return value, nil
+		}
+		buf = append(buf, ch)
+	}
+}
+
+func promptSelect(label string, options []string, defaultValue string) (string, error) {
+	defaultIndex := 0
+	for idx, option := range options {
+		if option == defaultValue {
+			defaultIndex = idx
+			break
+		}
+	}
+	fmt.Fprintf(os.Stdout, "%s:\n", label)
+	for idx, option := range options {
+		marker := ""
+		if idx == defaultIndex {
+			marker = " (default)"
+		}
+		fmt.Fprintf(os.Stdout, "  %d) %s%s\n", idx+1, option, marker)
+	}
+	for {
+		raw, err := promptString("Choose number", fmt.Sprintf("%d", defaultIndex+1))
+		if err != nil {
+			return "", err
+		}
+		choice := strings.TrimSpace(raw)
+		var selected int
+		if _, err := fmt.Sscanf(choice, "%d", &selected); err != nil || selected < 1 || selected > len(options) {
+			fmt.Fprintf(os.Stdout, "Invalid choice %q, please input 1-%d\n", choice, len(options))
+			continue
+		}
+		return options[selected-1], nil
+	}
+}
+
+func promptBool(label string, defaultValue bool) (bool, error) {
+	defaultHint := "y"
+	if !defaultValue {
+		defaultHint = "n"
+	}
+	for {
+		raw, err := promptString(label+" [y/n]", defaultHint)
+		if err != nil {
+			return false, err
+		}
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		default:
+			fmt.Fprintf(os.Stdout, "Invalid choice %q, please input y or n\n", raw)
+		}
+	}
+}
+
+func promptPort(label string, defaultValue int) (int, error) {
+	if defaultValue <= 0 {
+		defaultValue = 1
+	}
+	for {
+		raw, err := promptString(label, fmt.Sprintf("%d", defaultValue))
+		if err != nil {
+			return 0, err
+		}
+		value := strings.TrimSpace(raw)
+		var port int
+		if _, err := fmt.Sscanf(value, "%d", &port); err != nil || port < 1 || port > 65535 {
+			fmt.Fprintf(os.Stdout, "Invalid port %q, please input 1-65535\n", value)
+			continue
+		}
+		return port, nil
+	}
+}
+
+func defaultFrontendPortByType(frontendType string) int {
+	switch frontendType {
+	case templates.FrontendNext:
+		return 3231
+	default:
+		return 3131
+	}
+}
+
+func validatePort(port int, label string) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("invalid %s %d: expected 1-65535", label, port)
+	}
+	return nil
+}
+
+func sanitizePluginID(input string) string {
+	value := strings.ToLower(strings.TrimSpace(input))
+	replacer := strings.NewReplacer("_", "-", " ", "-", "/", "-", ":", "-", "@", "-")
+	value = replacer.Replace(value)
+	value = strings.Trim(value, ".-")
+	for strings.Contains(value, "--") {
+		value = strings.ReplaceAll(value, "--", "-")
+	}
+	for strings.Contains(value, "..") {
+		value = strings.ReplaceAll(value, "..", ".")
+	}
+	return value
+}
+
+func normalizeModuleRoot(input, pluginID string) string {
+	value := strings.TrimSpace(input)
+	if value == "" {
+		return fmt.Sprintf("github.com/your-org/%s", pluginID)
+	}
+	value = strings.TrimPrefix(value, "https://")
+	value = strings.TrimPrefix(value, "http://")
+	value = strings.TrimPrefix(value, "github.com/")
+	value = strings.Trim(value, "/")
+	if value == "" {
+		return fmt.Sprintf("github.com/your-org/%s", pluginID)
+	}
+	if strings.Count(value, "/") == 0 {
+		value = value + "/" + pluginID
+	}
+	return "github.com/" + value
+}
+
+func normalizeInitArgs(args []string) []string {
+	if len(args) < 2 {
+		return args
+	}
+	if strings.HasPrefix(args[0], "-") {
+		return args
+	}
+	for _, token := range args[1:] {
+		if strings.HasPrefix(token, "-") {
+			normalized := make([]string, 0, len(args))
+			normalized = append(normalized, args[1:]...)
+			normalized = append(normalized, args[0])
+			return normalized
+		}
+	}
+	return args
 }
 
 func ensureTargetDir(path string, force bool) error {
@@ -411,23 +768,25 @@ func writePublishManifest(publishPath, pluginID string) error {
 func installDependencies(backendDir, webDir string) error {
 	// Install Go dependencies
 	if info, err := os.Stat(filepath.Join(backendDir, "go.mod")); err == nil && !info.IsDir() {
+		fmt.Fprintf(os.Stdout, "Installing backend dependencies: go mod tidy (dir=%s)\n", backendDir)
 		cmd := exec.Command("go", "mod", "tidy")
 		cmd.Dir = backendDir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("go mod tidy failed: %w", err)
+			return fmt.Errorf("go mod tidy failed (dir=%s): %w", backendDir, err)
 		}
 	}
 
 	// Install npm dependencies
 	if info, err := os.Stat(filepath.Join(webDir, "package.json")); err == nil && !info.IsDir() {
+		fmt.Fprintf(os.Stdout, "Installing frontend dependencies: npm install (dir=%s)\n", webDir)
 		cmd := exec.Command("npm", "install")
 		cmd.Dir = webDir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("npm install failed: %w", err)
+			return fmt.Errorf("npm install failed (dir=%s): %w", webDir, err)
 		}
 	}
 
@@ -455,6 +814,68 @@ func copyGovernanceDirs(targetRoot string, force bool) error {
 		}
 	}
 	return nil
+}
+
+func materializeLocalConfigs(targetRoot, backendType, adminFrontendType string, force bool) ([]string, error) {
+	type configPair struct {
+		source string
+		target string
+	}
+	pairs := []configPair{
+		{source: "backend/etc/config.example.yaml", target: "backend/etc/config.yaml"},
+	}
+	switch backendType {
+	case templates.BackendPythonFast:
+		pairs = append(pairs, configPair{source: "backend/python-fastapi/.env.example", target: "backend/python-fastapi/.env.local"})
+	default:
+		pairs = append(pairs, configPair{source: "backend/.env.example", target: "backend/.env.local"})
+	}
+	switch adminFrontendType {
+	case templates.FrontendNext:
+		pairs = append(pairs, configPair{source: "web-admin/next/.env.example", target: "web-admin/next/.env.local"})
+	default:
+		pairs = append(pairs, configPair{source: "web-admin/.env.example", target: "web-admin/.env.local"})
+	}
+	created := make([]string, 0, len(pairs))
+	for _, pair := range pairs {
+		src := filepath.Join(targetRoot, pair.source)
+		dst := filepath.Join(targetRoot, pair.target)
+
+		info, err := os.Stat(src)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		if _, err := os.Stat(dst); err == nil && !force {
+			continue
+		}
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", src, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return nil, fmt.Errorf("create dir for %s: %w", dst, err)
+		}
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return nil, fmt.Errorf("write %s: %w", dst, err)
+		}
+		created = append(created, dst)
+	}
+	return created, nil
+}
+
+func ensureGitRepository(targetRoot string) (bool, error) {
+	gitDir := filepath.Join(targetRoot, ".git")
+	if info, err := os.Stat(gitDir); err == nil && info.IsDir() {
+		return false, nil
+	}
+	cmd := exec.Command("git", "init")
+	cmd.Dir = targetRoot
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func copyDirFiltered(src, dst string) error {

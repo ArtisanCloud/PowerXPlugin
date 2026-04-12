@@ -38,6 +38,8 @@ func Execute(args []string) error {
 		return runDev(args[1:])
 	case "doctor":
 		return runDoctor(args[1:])
+	case "iam":
+		return runIAM(args[1:])
 	default:
 		return fmt.Errorf("unknown command: %s\nRun 'px-plugin help' to see available commands.", args[0])
 	}
@@ -61,6 +63,7 @@ Commands:
   publish    Upload packaged plugin artefacts to a PowerX registry
   dev        Development mode with file watching and hot reload
   doctor     Run toolchain/mTLS/Dev API diagnostics
+  iam        Export or seed local IAM data for Standalone mode
   version    Print CLI version information
   help       Show this help message
 
@@ -74,6 +77,8 @@ Init command flags:
   --go-version <version>           Go version (default: 1.24)
   --force                          Overwrite existing files
   --install-deps                   Automatically install dependencies
+  --init-config                    Create local config files from *.example templates
+  --git-init                       Initialize git repository in target directory (default: true)
   --sbom-path <path>               Path to write SBOM file
   --publish-manifest-path <path>   Path to write publish manifest
 

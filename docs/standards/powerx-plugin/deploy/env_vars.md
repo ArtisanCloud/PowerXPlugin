@@ -38,7 +38,7 @@ process.env.POWERX_PLUGIN_ID
 | 🔐 签名上下文配置   | `POWERX_CTX_` / `PLUGIN_CTX_` | JWT / HMAC 校验 |
 | 🗄️ 数据库配置    | `POWERX_DB_`                  | 连接与 Schema    |
 | 🏷️ 插件信息     | `POWERX_PLUGIN_`              | 唯一标识与版本       |
-| ⚙️ 调试与开发     | `POWERX_DEV_MODE`             | 启用开发模式        |
+| ⚙️ 调试与开发     | `POWERX_DEBUG_MODE` | 开发语义、内部调试路由开关 |
 | 🧩 STS 与宿主通信 | `POWERX_STS_`                 | 短期凭据授权        |
 | 🧾 日志与监控     | `POWERX_LOG_`                 | 统一日志级别、格式     |
 
@@ -52,7 +52,8 @@ process.env.POWERX_PLUGIN_ID
 | `POWERX_PLUGIN_VERSION` | `0.1.0`                             | 插件版本号        |
 | `POWERX_BIND_ADDR`      | `:8078`                             | 插件监听地址       |
 | `POWERX_ENV`            | `dev` / `prod`                      | 当前运行环境       |
-| `POWERX_DEV_MODE`       | `1` / `0`                           | 开发模式（跳过签名验证） |
+| `POWERX_DEBUG_MODE`     | `1` / `0`                           | 开发环境语义（不直接等同跳过验签） |
+| `POWERX_DEV_MODE`       | `1` / `0`                           | 兼容入口（映射到 `logging.debug_mode`） |
 | `POWERX_LOG_LEVEL`      | `info` / `debug` / `warn` / `error` | 日志级别         |
 | `POWERX_TIMEZONE`       | `Asia/Shanghai`                     | 时区设置         |
 | `POWERX_LOCALE`         | `zh-CN`                             | 默认语言环境       |
@@ -156,7 +157,47 @@ httpRequest.Header.Set("Authorization", "Bearer "+token)
 
 ---
 
-## 九、前端（web-admin）运行环境
+## 九、能力 Gateway 调用配置
+
+PowerX 通用能力统一通过 Integration Gateway 调用，需要为宿主与 Skeleton 模式注入以下变量：
+
+| 变量名 | 示例值 | 说明 |
+| --- | --- | --- |
+| `PX_GATEWAY_BASE_URL` | `https://gateway.powerx.dev/_tenant` / `http://localhost:8080` | Gateway HTTP 入口，宿主由运维注入，Skeleton `.env.local` 指向 Dev 环境。 |
+| `PX_PLUGIN_TOOL_TOKEN` | `sts-1u8c5e...` | 宿主模式下由 Admin/部署系统注入的 Tool Grant，供后端/前端调用 Gateway。 |
+| `PX_TOOL_TOKEN` | `sts-dev-9ad3...` | Skeleton 本地通过 `px-plugin login --manifest ./skeleton/plugin.yaml` 生成的临时 Token，写入 `.env.local`。 |
+| `PX_TOOL_REFRESH_TOKEN` | `sts-dev-refresh-xxxx` | 配套 refresh token，Skeleton 可在 Token 过期或 24 小时内到期时自动调用 `/admin/user/auth/refresh` 获取新的 Tool Token。 |
+| `PX_USE_MOCK` | `media,eventfabric` | Skeleton 可选，指定需要走内存 Mock 的能力模块。 |
+
+使用建议：
+
+1. **宿主模式**：在部署 YAML 或环境注入脚本中设置 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`，后端读取后写入 Gateway Client，并通过插件自有 API 暴露调用入口；租户从 token 的 `tid` claim 自动推导。
+2. **Skeleton 模式**：执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 后会在 `~/.powerx/credentials` 生成 Token，使用脚本写入 `skeleton/.env.local` 中的 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`。
+3. **Mock/降级**：当 Dev Gateway 不可达时，将 `PX_USE_MOCK` 设置为能力模块名（如 `media`），框架会自动切换内存实现并在日志中提示。
+4. **安全性**：Token 属于短期凭证，建议在启动时检测其过期时间；自动刷新失败时应阻断调用并提示开发者重新登录或联系宿主运维。
+
+后端调用示例：
+
+```go
+client := gateway.NewClient(gateway.Config{
+    BaseURL:   os.Getenv("PX_GATEWAY_BASE_URL"),
+    ToolToken: os.Getenv("PX_PLUGIN_TOOL_TOKEN"),
+})
+```
+
+前端调用示例：
+
+```ts
+const config = useRuntimeConfig()
+await $fetch(config.public.powerx.apiBase + config.public.powerx.capabilityEndpoint, {
+  method: 'POST',
+  body: { capabilityId: 'com.corex.media.assets.read', action: 'List', payload: {} },
+})
+```
+
+---
+
+## 十、前端（web-admin）运行环境
 
 前端在构建时可通过 Nuxt `runtimeConfig` 动态注入：
 
@@ -166,6 +207,8 @@ httpRequest.Header.Set("Authorization", "Bearer "+token)
 | `NUXT_PUBLIC_PLUGIN_ID`    | `com.powerx.plugins.base`            | 插件标识       |
 | `NUXT_PUBLIC_POWERX_PROXY` | `1`                                  | 是否处于宿主反代模式 |
 | `NUXT_PUBLIC_LANG_DEFAULT` | `zh`                                 | 默认语言       |
+| `NUXT_PUBLIC_POWERX_API_BASE` | `/_p/com.powerx.plugins.base/api/v1` 或 `http://localhost:8078/api/v1` | 前端访问插件后端时的 API Base，默认指向插件自身 `_p/<plugin>/api/v1` |
+| `NUXT_PUBLIC_POWERX_CAPABILITY_ENDPOINT` | `/integration/capabilities/invoke` | 插件后端提供的能力调用端点（相对 `NUXT_PUBLIC_POWERX_API_BASE`） |
 
 前端通过 `useRuntimeConfig()` 获取：
 
@@ -176,11 +219,12 @@ const api = config.public.apiBaseUrl
 
 ---
 
-## 十、调试与开发模式
+## 十一、调试与开发模式
 
 | 变量                                         | 说明                |
 | ------------------------------------------ | ----------------- |
-| `POWERX_DEV_MODE=1`                        | 启动后跳过 JWT/HMAC 校验 |
+| `POWERX_DEBUG_MODE=1`                      | 启用开发环境语义（默认策略偏开发） |
+| `POWERX_DEV_MODE=1`                        | 兼容入口（等价于 `POWERX_DEBUG_MODE=1`） |
 | `POWERX_LOG_LEVEL=debug`                   | 打印详细日志            |
 | `POWERX_DB_LOG_SQL=1`                      | 打印 SQL 查询         |
 | `POWERX_DEFAULT_TENANT_ID=1`               | 强制使用默认租户 ID       |
@@ -190,12 +234,12 @@ const api = config.public.apiBaseUrl
 本地启动命令：
 
 ```bash
-POWERX_DEV_MODE=1 go -C backend run ./cmd/plugin
+POWERX_DEBUG_MODE=1 go -C backend run ./cmd/plugin
 ```
 
 ---
 
-## 十一、部署环境推荐配置（生产）
+## 十二、部署环境推荐配置（生产）
 
 | 类别      | 推荐值      | 说明           |
 | ------- | -------- | ------------ |
@@ -208,7 +252,7 @@ POWERX_DEV_MODE=1 go -C backend run ./cmd/plugin
 
 ---
 
-## 十二、示例 `.env` 文件
+## 十三、示例 `.env` 文件
 
 ```
 POWERX_PLUGIN_ID=com.powerx.plugins.base
@@ -220,8 +264,11 @@ POWERX_CTX_JWKS_URL=http://powerx/_p/_internal/jwks
 POWERX_CTX_ISSUER=powerx-auth
 POWERX_CTX_AUDIENCE=powerx-plugin
 POWERX_LOG_LEVEL=info
-POWERX_DEV_MODE=0
+POWERX_DEBUG_MODE=0
 POWERX_STS_ENDPOINT=http://powerx/_p/_internal/sts/exchange
+PX_GATEWAY_BASE_URL=https://gateway.powerx.dev/_tenant
+PX_PLUGIN_TOOL_TOKEN=sts-prod-xxxxxxxx
+PX_USE_MOCK=
 ```
 
 加载方式：
@@ -232,7 +279,7 @@ source .env
 
 ---
 
-## 十三、验证命令
+## 十四、验证命令
 
 ```bash
 echo $POWERX_PLUGIN_ID
@@ -242,16 +289,16 @@ psql "$POWERX_DB_DSN" -c "SELECT current_schema()"
 
 ---
 
-## 十四、变量优先级规则
+## 十五、变量优先级规则
 
-1️⃣ CLI 参数（如 `make run POWERX_DEV_MODE=1`）
+1️⃣ CLI 参数（如 `make run POWERX_DEBUG_MODE=1`）
 2️⃣ `.env` 文件加载的变量
 3️⃣ 系统环境变量（`export`）
 4️⃣ 默认配置（代码内硬编码）
 
 ---
 
-## 十五、配置检查命令（建议实现）
+## 十六、配置检查命令（建议实现）
 
 插件可提供 `/api/v1/admin/config-check` 端点，输出运行配置摘要：
 
@@ -268,7 +315,7 @@ psql "$POWERX_DB_DSN" -c "SELECT current_schema()"
 
 ---
 
-## 十六、总结
+## 十七、总结
 
 * 所有插件配置通过环境变量注入，支持 Docker、K8s、系统级运行；
 * 开发与生产环境仅差异在签名模式与日志级别；
@@ -277,7 +324,7 @@ psql "$POWERX_DB_DSN" -c "SELECT current_schema()"
 
 ---
 
-## 十七、关联文档
+## 十八、关联文档
 
 | 模块          | 文档                                                                     |
 | ----------- | ---------------------------------------------------------------------- |
@@ -289,7 +336,7 @@ psql "$POWERX_DB_DSN" -c "SELECT current_schema()"
 
 ---
 
-## 十八、下一步阅读
+## 十九、下一步阅读
 
 * 🧩 [本地调试与联调指南](./local_debug.md)
 * 🧱 [部署与运行检查清单](./security_hardening.md)

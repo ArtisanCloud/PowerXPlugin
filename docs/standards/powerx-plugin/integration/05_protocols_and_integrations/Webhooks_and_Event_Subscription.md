@@ -26,7 +26,7 @@ PowerX 所有事件都采用统一的 Envelope 格式：
   "event_id": "evt_01F8ZK8D",
   "event_type": "crm.contact.created",
   "source": "powerx.crm",
-  "target": "com.powerx.plugin.analytics",
+  "target": "com.powerx.plugins.analytics",
   "tenant_uuid": "tenant_abc",
   "timestamp": "2025-10-13T12:30:00Z",
   "context": {
@@ -95,7 +95,7 @@ events:
 ```
 X-PowerX-Signature: t=1739400000,v1=e1b9c13c6e2...
 X-PowerX-Event-ID: evt_01F8ZK8D
-X-PowerX-Tenant: tenant_abc
+tenant_uuid: tenant_abc
 ```
 
 插件需通过宿主下发的 `WEBHOOK_SECRET` 验证：
@@ -189,7 +189,7 @@ processEvent(event)
 插件可以主动推送事件回宿主或其他插件：
 
 ```bash
-POST /_p/com.powerx.plugin.crm/events
+POST /_p/com.powerx.plugins.crm/events
 Content-Type: application/json
 Authorization: Bearer <ToolGrant>
 
@@ -243,7 +243,7 @@ Authorization: Bearer <ToolGrant>
 插件可以通过宿主事件中心查询：
 
 ```
-GET /api/v1/events?plugin_id=com.powerx.plugin.crm
+GET /api/v1/events?plugin_id=com.powerx.plugins.crm
 ```
 
 ---

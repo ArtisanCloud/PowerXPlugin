@@ -5,6 +5,7 @@ import (
 	"{{ .BackendModulePath }}/internal/shared/app"
 	admincapability "{{ .BackendModulePath }}/internal/transport/http/admin/capability"
 	adminconsole "{{ .BackendModulePath }}/internal/transport/http/admin/console"
+	adminiam "{{ .BackendModulePath }}/internal/transport/http/admin/iam"
 	adminintegration "{{ .BackendModulePath }}/internal/transport/http/admin/integration"
 	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
 	adminoperations "{{ .BackendModulePath }}/internal/transport/http/admin/operations"
@@ -22,6 +23,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		// 基础管理功能
 		admin.GET("/manifest", adminHandler.GetManifest) // 获取插件清单
 		admin.GET("/rbac", adminHandler.GetRBACInfo)     // 获取权限信息
+		admin.POST("/notifications/test", httpmw.EnsureTenant(), adminruntime.NotificationTestHandler(deps))
 
 		runtimeOps := admin.Group("/runtime", httpmw.EnsureTenant())
 		adminruntime.RegisterRoutes(runtimeOps, deps)
@@ -32,6 +34,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		admincapability.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminintegration.RegisterRoutes(admin, deps)
 		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminiam.RegisterRoutes(admin, deps)
 	}
 }
 

@@ -1,0 +1,270 @@
+package templates
+
+import (
+	"errors"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+const templateUpdateTopic = "_topic.template.update"
+
+type TemplateHandler struct {
+	TemplateService *srvtemplates.TemplateService
+	deps            *app.Deps
+}
+
+func NewTemplateHandler(deps *app.Deps) *TemplateHandler {
+	return &TemplateHandler{
+		TemplateService: srvtemplates.NewTemplateService(deps.DB),
+		deps:            deps,
+	}
+}
+
+func (h *TemplateHandler) GetTemplates(c *gin.Context) {
+	// capability: com.powerx.plugins.base.template.list
+	var q TemplateListRequest
+	if err := c.ShouldBindQuery(&q); err != nil {
+		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
+		return
+	}
+
+	res, err := h.TemplateService.List(c.Request.Context(), q.Q, q.Page, q.PageSize)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, res)
+}
+
+func (h *TemplateHandler) GetTemplate(c *gin.Context) {
+	// capability: com.powerx.plugins.base.template.read
+	id, err := parseUint64(c.Param("id"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		return
+	}
+	tpl, err := h.TemplateService.GetByID(c.Request.Context(), id)
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			contracts.ResponseNotFound(c, "not found: "+err.Error())
+		default:
+			contracts.ResponseInternalError(c, err)
+		}
+		return
+	}
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
+	// capability: com.powerx.plugins.base.template.create
+	var req CreateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
+	tpl, err := h.TemplateService.Create(c.Request.Context(), req.Name, req.Description, req.Content)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	h.publishTemplateUpdateEvent(c, "created", tpl)
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
+	// capability: com.powerx.plugins.base.template.update
+	id, err := parseUint64(c.Param("id"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		return
+	}
+	var req UpdateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
+	tpl, err := h.TemplateService.Update(c.Request.Context(), id, req.Name, req.Description, req.Content)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	h.publishTemplateUpdateEvent(c, "updated", tpl)
+	contracts.ResponseSuccess(c, tpl)
+}
+
+func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
+	// capability: com.powerx.plugins.base.template.delete
+	id, err := parseUint64(c.Param("id"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		return
+	}
+	if err := h.TemplateService.Delete(c.Request.Context(), id); err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func (h *TemplateHandler) BatchCloneTemplates(c *gin.Context) {
+	// capability: com.powerx.plugins.base.template.batch_clone
+	if h == nil || h.TemplateService == nil {
+		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
+		return
+	}
+	var req BatchCloneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	req.Normalize()
+	if err := req.Validate(); err != nil {
+		respondTemplateValidationError(c, err)
+		return
+	}
+	result, err := h.TemplateService.BatchClone(
+		c.Request.Context(),
+		req.SourceIDs,
+		req.Copies,
+		srvtemplates.BatchCloneOptions{
+			NamePrefix:        req.NamePrefix,
+			DescriptionPrefix: req.DescriptionPrefix,
+		},
+	)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, result)
+}
+
+func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
+	// capability: com.powerx.plugins.base.template.validate
+	if h == nil || h.TemplateService == nil {
+		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
+		return
+	}
+	id, err := parseUint64(c.Param("id"))
+	if err != nil {
+		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		return
+	}
+	var req ValidateTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	res, err := h.TemplateService.Validate(c.Request.Context(), id, req.Rules, req.Strict)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, res)
+}
+
+func parseUint64(s string) (uint64, error) {
+	u, err := strconv.ParseUint(s, 10, 64)
+	return uint64(u), err
+}
+
+func respondTemplateValidationError(c *gin.Context, err *TemplateValidationError) {
+	if c == nil || err == nil {
+		return
+	}
+	contracts.ResponseErrorWithDetails(
+		c,
+		400,
+		contracts.ErrCodeValidationFailed,
+		err.Message,
+		gin.H{
+			"field":         err.Field,
+			"template_code": err.Code,
+		},
+	)
+}
+
+func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action string, tpl *dbm.Template) {
+	if h == nil || h.deps == nil || h.deps.WSBusHub == nil || c == nil {
+		return
+	}
+	if tpl == nil {
+		return
+	}
+
+	tenantUUID, tenantMismatch := admincommon.ResolveTenantUUIDStrict(c, tpl.TenantUuid)
+	if tenantMismatch || strings.TrimSpace(tenantUUID) == "" {
+		return
+	}
+	traceID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+
+	payload := gin.H{
+		"action":        strings.TrimSpace(action),
+		"template_id":   tpl.ID,
+		"name":          tpl.Name,
+		"status":        tpl.Status,
+		"review_status": tpl.ReviewStatus,
+		"tenant_uuid":   tenantUUID,
+		"trace_id":      traceID,
+		"occurred_at":   time.Now().UTC().Format(time.RFC3339Nano),
+	}
+
+	publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
+		fwwsbus.NewLocalPublisher(h.deps.WSBusHub, nil),
+		"",
+		nil,
+	))
+	if os.Getenv("POWERX_PROXY") == "1" && h.deps.Config != nil && h.deps.Config.Gateway != nil {
+		hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
+			BaseURL:    strings.TrimSpace(h.deps.Config.Gateway.BaseURL),
+			AuthScheme: strings.TrimSpace(h.deps.Config.Gateway.AuthScheme),
+			Token:      strings.TrimSpace(h.deps.Config.Gateway.ToolToken),
+			APIKey:     strings.TrimSpace(h.deps.Config.Gateway.APIKey),
+			TenantUUID: "",
+			UserAgent:  strings.TrimSpace(h.deps.Config.Gateway.UserAgent),
+			Timeout:    h.deps.Config.Gateway.Timeout,
+		})
+		if err == nil {
+			publisher = hostClient
+		}
+	}
+
+	result := publisher.Publish(c.Request.Context(), templateUpdateTopic, payload, fwwsbus.PublishOptions{
+		TenantUUID: tenantUUID,
+		TraceID:    traceID,
+	})
+	if result.OK {
+		return
+	}
+
+	h.deps.RuntimeLogger(c.Request.Context(), "templates.wsbus_publish", map[string]any{
+		"topic":        templateUpdateTopic,
+		"action":       strings.TrimSpace(action),
+		"template_id":  tpl.ID,
+		"tenant_uuid":  tenantUUID,
+		"error_code":   strings.TrimSpace(result.ErrorCode),
+		"error_reason": strings.TrimSpace(result.ErrorMessage),
+	}).Warn("template ws event publish failed")
+}

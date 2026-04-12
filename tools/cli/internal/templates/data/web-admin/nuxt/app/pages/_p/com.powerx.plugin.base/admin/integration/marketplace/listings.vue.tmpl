@@ -48,10 +48,10 @@
           @select="selectListing"
           :sort="{ column: 'updated_at', direction: 'desc' }"
         >
-          <template #status-data="{ row }">
+          <template #status-cell="{ row }">
             <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ `{{ row.status }}` }}</UBadge>
           </template>
-          <template #title-data="{ row }">
+          <template #title-cell="{ row }">
             <div class="space-y-0.5">
               <span class="font-medium">{{ `{{ row.title }}` }}</span>
               <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -59,7 +59,7 @@
               </p>
             </div>
           </template>
-          <template #ready_checklist_score-data="{ row }">
+          <template #ready_checklist_score-cell="{ row }">
             <div class="flex items-center gap-2">
               <UProgress :value="row.ready_checklist_score" :max="100" size="xs" />
               <span class="text-xs text-gray-500">{{ `{{ row.ready_checklist_score }}` }}%</span>
@@ -123,40 +123,40 @@
 
           <form class="space-y-4" @submit.prevent="saveListing">
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormGroup label="标题" required>
+              <UFormField label="标题" required>
                 <UInput v-model="editForm.title" />
-              </UFormGroup>
-              <UFormGroup label="Slug" required>
+              </UFormField>
+              <UFormField label="Slug" required>
                 <UInput v-model="editForm.slug" />
-              </UFormGroup>
-              <UFormGroup label="Locale">
+              </UFormField>
+              <UFormField label="Locale">
                 <USelect v-model="editForm.locale" :options="localeOptions" />
-              </UFormGroup>
-              <UFormGroup label="Checklist 得分">
+              </UFormField>
+              <UFormField label="Checklist 得分">
                 <UInput v-model="editForm.ready_checklist_score" type="number" min="0" max="100" />
-              </UFormGroup>
+              </UFormField>
             </div>
 
-            <UFormGroup label="摘要">
+            <UFormField label="摘要">
               <UTextarea v-model="editForm.summary" />
-            </UFormGroup>
+            </UFormField>
 
-            <UFormGroup label="描述">
+            <UFormField label="描述">
               <UTextarea v-model="editForm.description" :rows="6" />
-            </UFormGroup>
+            </UFormField>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormGroup label="Categories (逗号分隔)">
+              <UFormField label="Categories (逗号分隔)">
                 <UInput v-model="editForm.categories" />
-              </UFormGroup>
-              <UFormGroup label="Tags (逗号分隔)">
+              </UFormField>
+              <UFormField label="Tags (逗号分隔)">
                 <UInput v-model="editForm.tags" />
-              </UFormGroup>
+              </UFormField>
             </div>
 
-            <UFormGroup label="Branding Theme (JSON)">
+            <UFormField label="Branding Theme (JSON)">
               <UTextarea v-model="editForm.branding_theme" :rows="4" />
-            </UFormGroup>
+            </UFormField>
 
             <div>
               <div class="flex items-center justify-between">
@@ -175,20 +175,20 @@
                   class="rounded border border-gray-200 p-3 dark:border-gray-700"
                 >
                   <div class="grid gap-3 md:grid-cols-2">
-                    <UFormGroup label="类型 (logo/cover/screenshot/video)" required>
+                    <UFormField label="类型 (logo/cover/screenshot/video)" required>
                       <UInput v-model="asset.asset_type" />
-                    </UFormGroup>
-                    <UFormGroup label="存储地址" required>
+                    </UFormField>
+                    <UFormField label="存储地址" required>
                       <UInput v-model="asset.storage_uri" />
-                    </UFormGroup>
-                    <UFormGroup label="语言">
+                    </UFormField>
+                    <UFormField label="语言">
                       <UInput v-model="asset.locale" placeholder="en" />
-                    </UFormGroup>
-                    <UFormGroup label="权重">
+                    </UFormField>
+                    <UFormField label="权重">
                       <UInput type="number" v-model="asset.weight" />
-                    </UFormGroup>
+                    </UFormField>
                     <div class="flex items-center gap-2">
-                      <UToggle v-model="asset.is_primary" />
+                      <USwitch v-model="asset.is_primary" />
                       <span class="text-sm text-gray-600 dark:text-gray-300">主展示</span>
                     </div>
                   </div>
@@ -229,41 +229,41 @@
 
         <form class="space-y-4" @submit.prevent="submitCreate">
           <div class="grid gap-4 md:grid-cols-2">
-            <UFormGroup label="插件 ID" required>
-              <UInput v-model="createForm.plugin_id" placeholder="com.powerx.plugin.base" />
-            </UFormGroup>
-            <UFormGroup label="Vendor ID" required>
+            <UFormField label="插件 ID" required>
+              <UInput v-model="createForm.plugin_id" placeholder="com.powerx.plugins.base" />
+            </UFormField>
+            <UFormField label="Vendor ID" required>
               <UInput v-model="createForm.vendor_id" placeholder="vendor-001" />
-            </UFormGroup>
-            <UFormGroup label="标题" required>
+            </UFormField>
+            <UFormField label="标题" required>
               <UInput v-model="createForm.title" />
-            </UFormGroup>
-            <UFormGroup label="Slug" required>
+            </UFormField>
+            <UFormField label="Slug" required>
               <UInput v-model="createForm.slug" />
-            </UFormGroup>
-            <UFormGroup label="Locale">
+            </UFormField>
+            <UFormField label="Locale">
               <USelect v-model="createForm.locale" :options="localeOptions" />
-            </UFormGroup>
-            <UFormGroup label="Checklist 总结 (可选)">
+            </UFormField>
+            <UFormField label="Checklist 总结 (可选)">
               <UInput v-model="createForm.checklist_summary" placeholder="CI 自动触发" />
-            </UFormGroup>
+            </UFormField>
           </div>
 
-          <UFormGroup label="摘要">
+          <UFormField label="摘要">
             <UTextarea v-model="createForm.summary" />
-          </UFormGroup>
+          </UFormField>
 
-          <UFormGroup label="描述">
+          <UFormField label="描述">
             <UTextarea v-model="createForm.description" :rows="6" />
-          </UFormGroup>
+          </UFormField>
 
           <div class="grid gap-4 md:grid-cols-2">
-            <UFormGroup label="Categories (逗号分隔)">
+            <UFormField label="Categories (逗号分隔)">
               <UInput v-model="createForm.categories" />
-            </UFormGroup>
-            <UFormGroup label="Tags (逗号分隔)">
+            </UFormField>
+            <UFormField label="Tags (逗号分隔)">
               <UInput v-model="createForm.tags" />
-            </UFormGroup>
+            </UFormField>
           </div>
 
           <div>
@@ -283,20 +283,20 @@
                 class="rounded border border-gray-200 p-3 dark:border-gray-700"
               >
                 <div class="grid gap-3 md:grid-cols-2">
-                  <UFormGroup label="类型" required>
+                  <UFormField label="类型" required>
                     <UInput v-model="asset.asset_type" placeholder="logo" />
-                  </UFormGroup>
-                  <UFormGroup label="存储地址" required>
+                  </UFormField>
+                  <UFormField label="存储地址" required>
                     <UInput v-model="asset.storage_uri" placeholder="https://cdn.example/logo.png" />
-                  </UFormGroup>
-                  <UFormGroup label="语言">
+                  </UFormField>
+                  <UFormField label="语言">
                     <UInput v-model="asset.locale" placeholder="en" />
-                  </UFormGroup>
-                  <UFormGroup label="权重">
+                  </UFormField>
+                  <UFormField label="权重">
                     <UInput type="number" v-model="asset.weight" />
-                  </UFormGroup>
+                  </UFormField>
                   <div class="flex items-center gap-2">
-                    <UToggle v-model="asset.is_primary" />
+                    <USwitch v-model="asset.is_primary" />
                     <span class="text-sm text-gray-600 dark:text-gray-300">主展示</span>
                   </div>
                 </div>
@@ -321,6 +321,7 @@
 import { computed, reactive, ref, watch, onMounted } from "vue"
 import { useToast } from "#imports"
 import type { MarketplaceListing, MarketplaceListingStatus } from "~/types/integration"
+import { useNormalizedColumns } from "~/utils/table"
 
 definePageMeta({
   middleware: ["layout.global"],
@@ -342,13 +343,13 @@ const filters = reactive<{ status: MarketplaceListingStatus[]; search: string }>
   search: "",
 })
 
-const columns = [
+const columns = useNormalizedColumns([
   { key: "title", label: "Listing" },
   { key: "status", label: "状态" },
   { key: "locale", label: "语言" },
   { key: "ready_checklist_score", label: "Checklist" },
   { key: "updated_at", label: "更新时间" },
-]
+])
 
 const statusOptions = [
   { label: "草稿", value: "draft" },
@@ -418,7 +419,7 @@ function selectListing(row: MarketplaceListing | null) {
 const createOpen = ref(false)
 
 const createForm = reactive({
-  plugin_id: "com.powerx.plugin.base",
+  plugin_id: "com.powerx.plugins.base",
   vendor_id: "",
   title: "",
   slug: "",

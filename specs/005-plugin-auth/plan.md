@@ -70,7 +70,7 @@ backend/
 │   └── manifestx/             # 菜单/RBAC 元数据
 └── tests/                     # Go 单测
 
-frontend/ (skeleton/web-admin)
+frontend/ (skeleton/web-admin/nuxt)
 ├── app/
 │   ├── composables/
 │   │   ├── useAuth.ts         # 新增
@@ -85,7 +85,7 @@ frontend/ (skeleton/web-admin)
 scaffold/templates/** + tools/cli/** mirror skeleton
 ```
 
-**Structure Decision**: 采用仓库现有 “backend + frontend + scaffold/cli” 结构；Auth 能力主要落在 `skeleton/backend` 与 `skeleton/web-admin`，再通过 `npm run sync:templates` 复制到 `scaffold/templates` 与 `tools/cli`.
+**Structure Decision**: 采用仓库现有 “backend + frontend + scaffold/cli” 结构；Auth 能力主要落在 `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt`，再通过 `npm run sync:templates` 复制到 `scaffold/templates` 与 `tools/cli`.
 
 ## Complexity Tracking
 
@@ -101,7 +101,7 @@ scaffold/templates/** + tools/cli/** mirror skeleton
 |------|-------|-------|
 | 明确 Delegated 模式下 Core 故障策略（fail-closed vs fallback） | Backend | 参考 PowerX IAM 要求 → fail-closed |
 | 确认 Local 模式管理员凭证注入方式 | Backend | 使用 `PLUGIN_IAM_ADMIN_*` env / config，缺失则报错 |
-| 统一模式切换环境变量（`POWERX_PROXY` + `POWERX_RBAC_DELEGATE` + `context.iam_mode`） | Backend | 记录速记表，供 Resolver 使用 |
+| 统一模式切换环境变量（`IAMMode` + `POWERX_PROXY`） | Backend | 记录速记表，供 Resolver 使用 |
 | Token 存储 & 同步策略 | Frontend | 沿用宿主 localStorage + cookie + storage event |
 | Observability 指标与日志字段 | Backend | `plugin_iam_mode`、`plugin_auth_login_total` 等 |
 

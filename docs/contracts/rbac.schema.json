@@ -1,13 +1,23 @@
 {
-  "pluginId": "com.powerx.plugin.base",
+  "pluginId": "com.powerx.plugins.base",
   "roles": [
     {
-      "name": "powerx.plugin.base.admin",
+      "name": "powerx.plugins.base.admin",
       "description": "Plugin administrators inherit host IAM context",
       "permissions": [
+        "iam.tenant.read",
+        "iam.tenant.write",
+        "iam.department.read",
+        "iam.department.write",
+        "iam.department.delete",
         "iam.user.read",
+        "iam.user.write",
         "iam.role.read",
-        "iam.department.read"
+        "iam.role.write",
+        "iam.role.delete",
+        "iam.permission.read",
+        "iam.audit.read",
+        "iam.sts.mint"
       ]
     }
   ],

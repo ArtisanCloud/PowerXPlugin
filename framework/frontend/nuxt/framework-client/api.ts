@@ -15,7 +15,7 @@ export interface PluginApi {
   delete<T>(path: string, init?: RequestInit): Promise<T>;
 }
 
-const tenantHeaderName = "X-Tenant-UUID";
+const tenantHeaderName = "tenant_uuid";
 
 export function usePluginApi(options: PluginApiOptions): PluginApi {
   const prefix = (options.baseURL ?? `/_p/${options.pluginId}/api/v1`).replace(

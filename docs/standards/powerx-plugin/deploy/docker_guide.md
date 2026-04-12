@@ -75,7 +75,7 @@ COPY --from=builder /app/plugin /app/plugin
 EXPOSE 8078
 
 # 环境变量
-ENV POWERX_DEV_MODE=0
+ENV POWERX_DEBUG_MODE=0
 ENV POWERX_BIND_ADDR=":8078"
 
 CMD ["./plugin"]
@@ -246,7 +246,8 @@ http://localhost:8080/_p/com.powerx.plugins.base/api/v1/ping
 | `POWERX_CTX_MODE`        | `jwt`   | 上下文模式（jwt / hmac） |
 | `POWERX_CTX_JWKS_URL`    | -       | 宿主公钥分发地址          |
 | `PLUGIN_CTX_HMAC_SECRET` | -       | HMAC 模式密钥         |
-| `POWERX_DEV_MODE`        | `0`     | 开发模式（1 表示绕过验证）    |
+| `POWERX_DEBUG_MODE`      | `0`     | 开发环境语义（1 表示开发环境） |
+| `POWERX_DEV_MODE`        | `0`     | 兼容入口（映射到 `logging.debug_mode`） |
 | `POWERX_LOG_LEVEL`       | `info`  | 日志级别              |
 
 ---

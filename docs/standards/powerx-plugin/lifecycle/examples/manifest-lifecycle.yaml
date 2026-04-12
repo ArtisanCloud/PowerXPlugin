@@ -36,7 +36,7 @@ lifecycle:
   status: deprecated
   effective_date: 2025-12-01
   sunset_at: 2026-03-01
-  replacement: com.powerx.plugin.base.v2
+  replacement: com.powerx.plugins.base.v2
   notes: "v1 将在 2026-03-01 退役，请升级到 v2"
 signature:
   hashes:

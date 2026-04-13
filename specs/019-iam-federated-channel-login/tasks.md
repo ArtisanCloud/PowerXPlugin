@@ -113,13 +113,13 @@
 
 **Purpose**: 收口文档、联调指引、性能与业务指标验收、全量回归记录。
 
-- [ ] T044 [P] 更新联邦登录契约文档与错误语义说明 in specs/019-iam-federated-channel-login/spec.md
-- [ ] T045 [P] 更新接入与排障手册 in specs/019-iam-federated-channel-login/quickstart.md
-- [ ] T046 更新实施计划术语一致性与里程碑状态 in specs/019-iam-federated-channel-login/plan.md
-- [ ] T047 执行并记录联邦回调性能基准（p95 < 200ms） in tmp/019-iam-federated-channel-login-regression.md
-- [ ] T048 增加 SC-004 口径埋点与统计说明（密码登录占比） in skeleton/backend/go-gin/internal/observability/auth/federated_metrics.go
-- [ ] T049 增加 SC-005 接入效率度量清单（framework 复用步骤对比） in specs/019-iam-federated-channel-login/quickstart.md
-- [ ] T050 执行并记录 019 全量回归 in tmp/019-iam-federated-channel-login-regression.md
+- [x] T044 [P] 更新联邦登录契约文档与错误语义说明 in specs/019-iam-federated-channel-login/spec.md
+- [x] T045 [P] 更新接入与排障手册 in specs/019-iam-federated-channel-login/quickstart.md
+- [x] T046 更新实施计划术语一致性与里程碑状态 in specs/019-iam-federated-channel-login/plan.md
+- [x] T047 执行并记录联邦回调性能基准（p95 < 200ms） in tmp/019-iam-federated-channel-login-regression.md
+- [x] T048 增加 SC-004 口径埋点与统计说明（密码登录占比） in skeleton/backend/go-gin/internal/observability/auth/federated_metrics.go
+- [x] T049 增加 SC-005 接入效率度量清单（framework 复用步骤对比） in specs/019-iam-federated-channel-login/quickstart.md
+- [x] T050 执行并记录 019 全量回归 in tmp/019-iam-federated-channel-login-regression.md
 
 ---
 

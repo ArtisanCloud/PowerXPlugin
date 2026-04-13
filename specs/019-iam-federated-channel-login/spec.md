@@ -2,7 +2,7 @@
 
 **Feature Branch**: `019-iam-federated-channel-login`  
 **Created**: 2026-04-11  
-**Updated**: 2026-04-12  
+**Updated**: 2026-04-13  
 **Status**: Draft  
 **Input**: User description: "支持 SCRM 渠道账号同步员工并扫码登录（企业微信/钉钉/飞书），输出 provider 抽象、扫码授权回调、账号绑定/映射、JIT 入库、角色映射策略、审计与风控。"
 
@@ -114,3 +114,10 @@
 - **SC-003**: 重放、过期、跨租户、签名异常等高风险回调拦截率达到 100%。
 - **SC-004**: 接入扫码登录后，目标租户员工密码登录占比在 30 天内下降至少 50%。
 - **SC-005**: 新插件接入联邦登录时，复用 framework factory 的接入步骤较自研实现减少至少 40%。
+
+## Error Semantics（Polish）
+
+- 风控拒绝统一使用可区分错误码（如 `FEDERATED_RISK_SIGNATURE_INVALID`、`FEDERATED_RISK_REPLAY`、`FEDERATED_RISK_TENANT_BOUNDARY`）。
+- 回调 challenge 无效统一使用 `FEDERATED_INVALID_CHALLENGE`。
+- provider 兑换/解析失败统一对外返回通用失败文案“登录失败，请稍后重试”，内部审计记录原因码。
+- delegated 上游不可用与 standalone 本地不可用统一归一为 `FEDERATED_AUTH_UNAVAILABLE` 语义。

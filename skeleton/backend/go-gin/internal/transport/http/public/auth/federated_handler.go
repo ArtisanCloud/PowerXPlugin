@@ -224,6 +224,7 @@ func (h *FederatedHandler) Callback(c *gin.Context) {
 	}
 	result := h.loginService.Build(identity, challenge.TenantUUID)
 	result.Context = h.contextSvc.NormalizeContext(resolveIAMMode(h.deps), result.Context)
+	authobs.RecordFederatedLoginSuccess(app.PluginID, challenge.TenantUUID)
 	h.auditSvc.Record(authobs.FederatedAuditEvent{
 		Provider:         provider.Key(),
 		TenantUUID:       challenge.TenantUUID,

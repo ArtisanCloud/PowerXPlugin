@@ -61,3 +61,18 @@ cd skeleton/backend/go-gin && \
 4. **SC-005 基线定义**：以该插件“未复用 framework factory 的历史接入记录”作为自研基线步骤数。  
 5. **SC-005 对比定义**：以当前文档标准接入步骤作为复用方案步骤数，按 `减少比例 = (自研步骤 - 复用步骤) / 自研步骤` 计算。  
 6. **采样留痕要求**：SC-004 与 SC-005 的原始统计数据、计算过程与结论统一写入 `tmp/019-iam-federated-channel-login-regression.md`。
+
+## 9. SC-005 接入效率度量清单
+
+1. 记录“自研方案”步骤数（含 provider 接口定义、风险校验、callback 接线、上下文输出）。
+2. 记录“framework 复用方案”步骤数（仅装配、配置、路由对接）。
+3. 逐项对比并标注是否被 framework 复用覆盖。
+4. 计算步骤减少比例并附原始计数表。
+5. 将对比结论写入回归记录，作为 SC-005 验收依据。
+
+## 10. 常见排障
+
+1. `FEDERATED_PROVIDER_NOT_FOUND`：检查 provider key 是否为 `wecom`/`dingtalk`/`lark`，并确认 bootstrap 已注册。
+2. `FEDERATED_INVALID_CHALLENGE`：检查 callback 的 `state/nonce/tenant_uuid` 是否和 challenge 响应一致。
+3. `FEDERATED_RISK_*`：前端展示统一失败文案，详细原因通过审计事件与 `reason_code` 排查。
+4. delegated 模式失败：优先确认宿主会话可用，再检查插件日志中的 `FEDERATED_AUTH_UNAVAILABLE`。

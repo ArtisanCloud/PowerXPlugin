@@ -194,6 +194,7 @@ func (h *AuthHandler) handleDelegatedLogin(c *gin.Context) {
 		return
 	}
 	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
+	authmetrics.RecordPasswordLoginSuccess(app.PluginID, h.modeLabel())
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -299,6 +300,7 @@ func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
 		return
 	}
 	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
+	authmetrics.RecordPasswordLoginSuccess(app.PluginID, h.modeLabel())
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 

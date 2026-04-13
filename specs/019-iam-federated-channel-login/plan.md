@@ -106,3 +106,14 @@ skeleton/backend/go-gin/internal/
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | 规格中包含架构约束（framework vs skeleton） | 该边界是业务方明确冻结要求 | 仅写业务需求会导致实现走偏，无法保障复用目标 |
+
+## Milestone Status
+
+| Phase | Status | Notes |
+|------|--------|-------|
+| Phase 1 Setup | Completed | framework/skeleton 联邦模块基础说明已落地 |
+| Phase 2 Foundational | Completed | contracts/registry/challenge/risk + migrate 注册完成 |
+| Phase 3 US1 MVP | Completed | challenge/callback/context 主链路与并存控制面完成 |
+| Phase 4 US2 | Completed | 绑定治理、JIT 策略、映射版本化与会话失效完成 |
+| Phase 5 US3 | Completed | 风控回归、审计上报、双模式语义对齐完成 |
+| Phase 6 Polish | Completed | 文档收口、指标口径、性能基准与全量回归记录 |

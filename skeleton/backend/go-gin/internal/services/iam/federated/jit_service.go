@@ -1,0 +1,92 @@
+package federated
+
+import (
+	"context"
+	"strings"
+
+	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	"gorm.io/gorm"
+)
+
+type JITRequest struct {
+	TenantUUID     string
+	Provider       string
+	ExternalUserID string
+	Email          string
+	Phone          string
+}
+
+type JITResult struct {
+	Bound      bool   `json:"bound"`
+	NeedAdmin  bool   `json:"need_admin"`
+	MemberID   uint64 `json:"member_id,omitempty"`
+	ReasonCode string `json:"reason_code,omitempty"`
+}
+
+// JITService 处理首次扫码自动绑定策略。
+type JITService struct {
+	db       *gorm.DB
+	bindings *BindingService
+	policy   *JITPolicyService
+}
+
+func NewJITService(db *gorm.DB, bindings *BindingService, policy *JITPolicyService) *JITService {
+	return &JITService{db: db, bindings: bindings, policy: policy}
+}
+
+func (s *JITService) Handle(ctx context.Context, req JITRequest) (JITResult, error) {
+	if !s.policy.AllowAutoBind(req.TenantUUID) {
+		return JITResult{NeedAdmin: true, ReasonCode: "jit_policy_disabled"}, nil
+	}
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	phone := strings.TrimSpace(req.Phone)
+	if email == "" && phone == "" {
+		return JITResult{NeedAdmin: true, ReasonCode: "identity_field_missing"}, nil
+	}
+
+	members, err := s.findCandidates(ctx, req.TenantUUID, email, phone)
+	if err != nil {
+		return JITResult{}, err
+	}
+	if len(members) != 1 {
+		return JITResult{NeedAdmin: true, ReasonCode: "candidate_not_unique"}, nil
+	}
+	binding, err := s.bindings.Bind(ctx, BindInput{
+		TenantUUID:     req.TenantUUID,
+		Provider:       req.Provider,
+		ExternalUserID: req.ExternalUserID,
+		MemberID:       members[0].ID,
+		Source:         "jit",
+	})
+	if err != nil {
+		return JITResult{}, err
+	}
+	return JITResult{Bound: true, MemberID: binding.MemberID}, nil
+}
+
+func (s *JITService) findCandidates(ctx context.Context, tenantUUID, email, phone string) ([]iammodel.Member, error) {
+	userQuery := s.db.WithContext(ctx).Model(&iammodel.User{})
+	if email != "" && phone != "" {
+		userQuery = userQuery.Where("lower(email) = ? OR phone = ?", email, phone)
+	} else if email != "" {
+		userQuery = userQuery.Where("lower(email) = ?", email)
+	} else {
+		userQuery = userQuery.Where("phone = ?", phone)
+	}
+	var userIDs []uint64
+	if err := userQuery.Pluck("id", &userIDs).Error; err != nil {
+		return nil, err
+	}
+	if len(userIDs) == 0 {
+		return []iammodel.Member{}, nil
+	}
+
+	query := s.db.WithContext(ctx).Model(&iammodel.Member{}).
+		Where("tenant_uuid = ?", strings.TrimSpace(tenantUUID)).
+		Where("user_id IN ?", userIDs)
+	rows := make([]iammodel.Member, 0)
+	if err := query.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}

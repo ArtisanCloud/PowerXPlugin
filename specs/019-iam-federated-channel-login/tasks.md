@@ -67,21 +67,21 @@
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] 增加 identity binding CRUD 与租户隔离测试 in skeleton/backend/go-gin/internal/services/iam/federated/binding_service_test.go
-- [ ] T026 [P] [US2] 增加映射策略“版本变化才重算”测试 in skeleton/backend/go-gin/internal/services/iam/federated/mapping_policy_test.go
-- [ ] T027 [P] [US2] 增加租户级 JIT 策略开关/策略选择测试 in skeleton/backend/go-gin/internal/services/iam/federated/jit_policy_service_test.go
-- [ ] T028 [P] [US2] 增加解绑后历史会话失效测试 in skeleton/backend/go-gin/internal/services/iam/federated/session_invalidate_test.go
+- [x] T025 [P] [US2] 增加 identity binding CRUD 与租户隔离测试 in skeleton/backend/go-gin/internal/services/iam/federated/binding_service_test.go
+- [x] T026 [P] [US2] 增加映射策略“版本变化才重算”测试 in skeleton/backend/go-gin/internal/services/iam/federated/mapping_policy_test.go
+- [x] T027 [P] [US2] 增加租户级 JIT 策略开关/策略选择测试 in skeleton/backend/go-gin/internal/services/iam/federated/jit_policy_service_test.go
+- [x] T028 [P] [US2] 增加解绑后历史会话失效测试 in skeleton/backend/go-gin/internal/services/iam/federated/session_invalidate_test.go
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] 实现 external identity / binding 模型 in skeleton/backend/go-gin/internal/domain/models/iam/federated_binding.go
-- [ ] T030 [US2] 实现 binding 仓储与租户边界校验 in skeleton/backend/go-gin/internal/domain/repository/iam/federated_binding_repository.go
-- [ ] T031 [US2] 实现管理员绑定/解绑/查询 API in skeleton/backend/go-gin/internal/transport/http/admin/iam/federated_binding_handler.go
-- [ ] T032 [US2] 实现 JIT 服务并落地默认策略（唯一匹配自动绑定）in skeleton/backend/go-gin/internal/services/iam/federated/jit_service.go
-- [ ] T033 [US2] 实现租户级 JIT 开关与策略选择服务 in skeleton/backend/go-gin/internal/services/iam/federated/jit_policy_service.go
-- [ ] T034 [US2] 实现字段缺失身份的管理员处理与审计原因码 in skeleton/backend/go-gin/internal/services/iam/federated/jit_service.go
-- [ ] T035 [US2] 实现解绑触发会话失效机制 in skeleton/backend/go-gin/internal/services/iam/federated/session_service.go
-- [ ] T036 [US2] 实现角色/部门映射服务与版本化应用 in skeleton/backend/go-gin/internal/services/iam/federated/mapping_service.go
+- [x] T029 [US2] 实现 external identity / binding 模型 in skeleton/backend/go-gin/internal/entity/models/iam/federated_binding.go
+- [x] T030 [US2] 实现 binding 仓储与租户边界校验 in skeleton/backend/go-gin/internal/domain/repository/iam/federated_binding_repository.go
+- [x] T031 [US2] 实现管理员绑定/解绑/查询 API in skeleton/backend/go-gin/internal/transport/http/admin/iam/federated_binding_handler.go
+- [x] T032 [US2] 实现 JIT 服务并落地默认策略（唯一匹配自动绑定）in skeleton/backend/go-gin/internal/services/iam/federated/jit_service.go
+- [x] T033 [US2] 实现租户级 JIT 开关与策略选择服务 in skeleton/backend/go-gin/internal/services/iam/federated/jit_policy_service.go
+- [x] T034 [US2] 实现字段缺失身份的管理员处理与审计原因码 in skeleton/backend/go-gin/internal/services/iam/federated/jit_service.go
+- [x] T035 [US2] 实现解绑触发会话失效机制 in skeleton/backend/go-gin/internal/services/iam/federated/session_service.go
+- [x] T036 [US2] 实现角色/部门映射服务与版本化应用 in skeleton/backend/go-gin/internal/services/iam/federated/mapping_service.go
 
 **Checkpoint**: US2 完成后，绑定治理和映射策略能力可独立验收。
 

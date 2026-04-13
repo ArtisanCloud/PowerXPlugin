@@ -8,6 +8,7 @@ import (
 	federatedContracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/contracts"
 	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	authobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	federatedService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	middleware "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
@@ -19,6 +20,8 @@ type FederatedHandler struct {
 	deps          *app.Deps
 	loginService  *federatedService.LoginService
 	authMode      *federatedService.AuthModeService
+	contextSvc    *federatedService.ContextService
+	auditSvc      *authobs.FederatedAuditService
 	defaultTenant string
 }
 
@@ -31,6 +34,8 @@ func NewFederatedHandler(deps *app.Deps) *FederatedHandler {
 		deps:          deps,
 		loginService:  federatedService.NewLoginService(),
 		authMode:      federatedService.NewAuthModeService(os.Getenv("POWERX_FEDERATED_AUTH_MODE")),
+		contextSvc:    federatedService.NewContextService(),
+		auditSvc:      authobs.NewFederatedAuditService(app.PluginID),
 		defaultTenant: defaultTenant,
 	}
 }
@@ -154,6 +159,14 @@ func (h *FederatedHandler) Callback(c *gin.Context) {
 		Provider:   provider.Key(),
 	})
 	if err != nil {
+		h.auditSvc.Record(authobs.FederatedAuditEvent{
+			Provider:       provider.Key(),
+			TenantUUID:     tenantUUID,
+			BindingOutcome: "challenge_rejected",
+			RiskDecision:   "reject",
+			ReasonCode:     string(federatedContracts.ErrorCodeInvalidChallenge),
+			TraceID:        c.GetString("request_id"),
+		})
 		contracts.ResponseErrorWithDetails(c, http.StatusUnauthorized, string(federatedContracts.ErrorCodeInvalidChallenge), "登录失败，请稍后重试", gin.H{"error_code": err.Error()})
 		return
 	}
@@ -170,19 +183,66 @@ func (h *FederatedHandler) Callback(c *gin.Context) {
 		SignatureValid: signatureValid,
 	})
 	if !decision.Allowed {
+		h.auditSvc.Record(authobs.FederatedAuditEvent{
+			Provider:       provider.Key(),
+			TenantUUID:     challenge.TenantUUID,
+			BindingOutcome: "risk_rejected",
+			RiskDecision:   "reject",
+			ReasonCode:     string(decision.Code),
+			TraceID:        challenge.TraceID,
+			Evidence:       decision.Evidence,
+		})
 		contracts.ResponseErrorWithDetails(c, http.StatusUnauthorized, string(decision.Code), "登录失败，请稍后重试", gin.H{"risk_code": decision.Code})
 		return
 	}
 	token, err := provider.ExchangeCode(c.Request.Context(), federatedContracts.ExchangeCodeRequest{Code: req.Code})
 	if err != nil {
+		n := h.contextSvc.NormalizeUnavailableError(resolveIAMMode(h.deps), err)
+		h.auditSvc.Record(authobs.FederatedAuditEvent{
+			Provider:       provider.Key(),
+			TenantUUID:     challenge.TenantUUID,
+			BindingOutcome: "provider_exchange_failed",
+			RiskDecision:   "reject",
+			ReasonCode:     n.Code,
+			TraceID:        challenge.TraceID,
+		})
 		contracts.ResponseErrorWithDetails(c, http.StatusUnauthorized, string(federatedContracts.ErrorCodeUnauthorized), "登录失败，请稍后重试", nil)
 		return
 	}
 	identity, err := provider.ResolveIdentity(c.Request.Context(), federatedContracts.ResolveIdentityRequest{Token: token})
 	if err != nil {
+		h.auditSvc.Record(authobs.FederatedAuditEvent{
+			Provider:       provider.Key(),
+			TenantUUID:     challenge.TenantUUID,
+			BindingOutcome: "identity_resolve_failed",
+			RiskDecision:   "reject",
+			ReasonCode:     string(federatedContracts.ErrorCodeUnauthorized),
+			TraceID:        challenge.TraceID,
+		})
 		contracts.ResponseErrorWithDetails(c, http.StatusUnauthorized, string(federatedContracts.ErrorCodeUnauthorized), "登录失败，请稍后重试", nil)
 		return
 	}
 	result := h.loginService.Build(identity, challenge.TenantUUID)
+	result.Context = h.contextSvc.NormalizeContext(resolveIAMMode(h.deps), result.Context)
+	h.auditSvc.Record(authobs.FederatedAuditEvent{
+		Provider:         provider.Key(),
+		TenantUUID:       challenge.TenantUUID,
+		ExternalIdentity: identity.ExternalUserID,
+		BindingOutcome:   "login_success",
+		RiskDecision:     "allow",
+		ReasonCode:       "ok",
+		TraceID:          challenge.TraceID,
+	})
 	contracts.ResponseSuccess(c, gin.H{"tokens": result, "context": result.Context})
+}
+
+func resolveIAMMode(deps *app.Deps) string {
+	if deps == nil {
+		return "standalone"
+	}
+	mode := strings.TrimSpace(deps.IAMMode.String())
+	if mode == "" {
+		return "standalone"
+	}
+	return mode
 }

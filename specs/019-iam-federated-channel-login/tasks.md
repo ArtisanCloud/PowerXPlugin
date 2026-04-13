@@ -94,16 +94,16 @@
 
 ### Tests for User Story 3
 
-- [ ] T037 [P] [US3] 增加风险拦截场景回归测试（expired/replay/cross-tenant/signature）in framework/backend/go/iam/federated/risk/evaluator_test.go
-- [ ] T038 [P] [US3] 增加审计事件字段完整性测试 in skeleton/backend/go-gin/internal/observability/auth/federated_audit_test.go
-- [ ] T039 [P] [US3] 增加渠道故障降级与密码登录并存测试 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_fallback_test.go
-- [ ] T040 [P] [US3] 增加 delegated 上游不可用错误语义一致性测试 in skeleton/backend/go-gin/internal/services/iam/federated/context_service_test.go
+- [x] T037 [P] [US3] 增加风险拦截场景回归测试（expired/replay/cross-tenant/signature）in framework/backend/go/iam/federated/risk/evaluator_test.go
+- [x] T038 [P] [US3] 增加审计事件字段完整性测试 in skeleton/backend/go-gin/internal/observability/auth/federated_audit_test.go
+- [x] T039 [P] [US3] 增加渠道故障降级与密码登录并存测试 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_fallback_test.go
+- [x] T040 [P] [US3] 增加 delegated 上游不可用错误语义一致性测试 in skeleton/backend/go-gin/internal/services/iam/federated/context_service_test.go
 
 ### Implementation for User Story 3
 
-- [ ] T041 [US3] 实现 federated 审计日志与风险事件上报 in skeleton/backend/go-gin/internal/observability/auth/federated_audit.go
-- [ ] T042 [US3] 在 callback 链路接入统一风险判定与错误码输出 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_handler.go
-- [ ] T043 [US3] 对齐 standalone/delegated 上下文语义（delegated 宿主权威）in skeleton/backend/go-gin/internal/services/iam/federated/context_service.go
+- [x] T041 [US3] 实现 federated 审计日志与风险事件上报 in skeleton/backend/go-gin/internal/observability/auth/federated_audit.go
+- [x] T042 [US3] 在 callback 链路接入统一风险判定与错误码输出 in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_handler.go
+- [x] T043 [US3] 对齐 standalone/delegated 上下文语义（delegated 宿主权威）in skeleton/backend/go-gin/internal/services/iam/federated/context_service.go
 
 **Checkpoint**: US3 完成后，安全场景闭环且可审计。
 

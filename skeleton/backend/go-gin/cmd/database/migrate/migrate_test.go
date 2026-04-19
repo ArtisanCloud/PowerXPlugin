@@ -8,6 +8,7 @@ import (
 	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	_ "modernc.org/sqlite"
 )
 
 func TestMigratePluginModelsIncludesFederatedIAMTables(t *testing.T) {
@@ -16,7 +17,10 @@ func TestMigratePluginModelsIncludesFederatedIAMTables(t *testing.T) {
 		EntityModels.ForceSchemaForTests("public")
 	})
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Dialector{
+		DriverName: "sqlite",
+		DSN:        "file::memory:?cache=shared",
+	}, &gorm.Config{})
 	if err != nil {
 		t.Fatalf("gorm.Open() error = %v", err)
 	}

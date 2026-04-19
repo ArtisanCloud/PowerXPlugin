@@ -36,6 +36,7 @@ const clearErrors = () => {
 /** ================== UI ================== */
 const { t, locale } = useI18n();
 const UButton = resolveComponent("UButton");
+const props = withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false });
 
 /** ================== 状态 ================== */
 const deptService = useDepartmentService();
@@ -357,7 +358,9 @@ const columns = computed(() => {
         return h("span", String(leaderName));
       },
     },
-    {
+    ...(props.readonly
+      ? []
+      : [{
       id: "actions",
       header: t("organization.department.table.actions"),
       enableSorting: false,
@@ -415,7 +418,7 @@ const columns = computed(() => {
           ),
         ]);
       },
-    },
+    }]),
   ];
 });
 
@@ -584,9 +587,10 @@ function buildUpdatePayload(): DepartmentUpdateParams {
         </h2>
         <p class="text-sm text-gray-500 mt-1 dark:text-gray-300">
           {{ `{{ $t("organization.department.description") }}` }}
+          <span v-if="props.readonly" class="block text-xs text-amber-600 mt-1 dark:text-amber-300">当前为只读视图，仅可浏览组织架构</span>
         </p>
       </div>
-      <UButton color="primary" icon="i-heroicons-plus" @click="openAddForm">
+      <UButton v-if="!props.readonly" color="primary" icon="i-heroicons-plus" @click="openAddForm">
         {{ `{{ $t("organization.department.add") }}` }}
       </UButton>
     </div>
@@ -608,6 +612,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
               {{ `{{ $t("organization.department.title") }}` }}
             </h3>
             <UButton
+              v-if="!props.readonly"
               icon="i-heroicons-plus-circle"
               size="sm"
               color="gray"
@@ -663,7 +668,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
               <span>{{ `{{ item.label }}` }}</span>
             </template>
 
-            <template #item-trailing="{ item }">
+            <template v-if="!props.readonly" #item-trailing="{ item }">
               <div class="flex space-x-1">
                 <UButton
                   icon="i-heroicons-pencil"
@@ -783,6 +788,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
 
     <!-- 表单 -->
     <UModal
+      v-if="!props.readonly"
       v-model:open="showForm"
       title="department - title"
       description="department - description"

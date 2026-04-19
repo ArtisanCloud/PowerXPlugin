@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 
+	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	"{{ .BackendModulePath }}/internal/capabilities"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/grpc/client"
@@ -51,6 +53,10 @@ type Deps struct {
 	IAMModeSource       string
 	AuthProxy           DelegatedAuthProxy
 	IAMDirectory        iamservice.IAMDirectory
+	IAMRegistry         *fwiamadapters.Registry
+	IAMDirectoryService fwiamcontracts.DirectoryService
+	IAMAuthzService     fwiamcontracts.AuthzService
+	IAMContextService   fwiamcontracts.IdentityContextService
 }
 
 type gatewayClient interface {

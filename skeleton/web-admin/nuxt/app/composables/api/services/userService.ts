@@ -32,6 +32,7 @@ export interface MemberWithProfile {
   Member: Member;
   User: User;
   DeptIDs: number[] | null;
+  RoleCodes: string[];
 }
 
 export interface UserListParams {
@@ -57,12 +58,15 @@ type MemberListResponse = {
 };
 
 const toMemberWithProfile = (record: MemberRecord): MemberWithProfile => {
+  const memberID = (record as any).member_id ?? (record as any).id ?? 0;
+  const createdAt = (record as any).created_at || (record as any).createdAt || "";
+  const updatedAt = (record as any).updated_at || (record as any).updatedAt || createdAt;
   const status =
     record.status === "disabled" || record.status === "locked" ? 0 : 1;
   return {
     Member: {
-      id: record.member_id,
-      uuid: `${record.member_id}`,
+      id: Number(memberID),
+      uuid: `${memberID}`,
       tenant_uuid: record.tenant_uuid,
       user_id: record.user_id,
       username: record.username,
@@ -73,14 +77,14 @@ const toMemberWithProfile = (record: MemberRecord): MemberWithProfile => {
         department: record.department_id,
         phone: record.phone,
       },
-      createdAt: record.created_at,
-      updatedAt: (record as any).updated_at || record.created_at,
+      createdAt,
+      updatedAt,
     },
     User: {
       id: record.user_id,
       uuid: `${record.user_id}`,
-      createdAt: record.created_at,
-      updatedAt: (record as any).updated_at || record.created_at,
+      createdAt,
+      updatedAt,
       email: record.email,
       phone: record.phone,
       display_name: record.display_name || record.email || record.username,
@@ -88,7 +92,12 @@ const toMemberWithProfile = (record: MemberRecord): MemberWithProfile => {
       status,
       meta: {},
     },
-    DeptIDs: record.department_id ? [record.department_id] : [],
+    DeptIDs: Array.isArray((record as any).department_ids)
+      ? ((record as any).department_ids as any[])
+          .map((item) => Number(item || 0))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      : (record.department_id ? [record.department_id] : []),
+    RoleCodes: Array.isArray(record.roles) ? record.roles : [],
   };
 };
 
@@ -104,7 +113,12 @@ export const useUserService = () => {
     const response = await iamService.listMembers({
       tenantUuid: params.tenant_uuid,
       query: params.q,
-      status: typeof params.status === "number" ? `${params.status}` : params.status,
+      status:
+        typeof params.status === "number"
+          ? params.status === 1
+            ? "active"
+            : "disabled"
+          : params.status,
       page: params.page,
       pageSize: params.page_size,
     });
@@ -159,7 +173,9 @@ export const useUserService = () => {
       username: data.username,
       phone: data.phone,
       department_id: data.departmentId ?? data.department_id,
-      status: data.status,
+      department_ids: data.departmentIds ?? data.department_ids,
+      roles: data.roles ?? data.roleIds ?? [],
+      status: typeof data.status === "number" ? (data.status === 1 ? "active" : "disabled") : data.status,
     };
     const response = await iamService.createMember(payload);
     return (response as any)?.data ?? response;
@@ -172,7 +188,10 @@ export const useUserService = () => {
       username: data.username,
       phone: data.phone,
       department_id: data.departmentId ?? data.department_id,
-      status: data.status,
+      department_ids: data.departmentIds ?? data.department_ids,
+      roles: data.roles ?? data.roleIds,
+      replace_roles: data.replaceRoles ?? true,
+      status: typeof data.status === "number" ? (data.status === 1 ? "active" : "disabled") : data.status,
     };
     const response = await iamService.updateMember(memberId, payload);
     return (response as any)?.data ?? response;

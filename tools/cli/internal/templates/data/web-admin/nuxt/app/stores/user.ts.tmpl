@@ -71,13 +71,18 @@ export const useUserStore = defineStore("user", {
       const perms = (state.context?.permissions || []).map((item) =>
         String(item || "").trim()
       );
-      const allow = new Set([
+      const allowExact = new Set([
         "base.templates.manage",
         "base.templates.read",
         "base.templates:read",
         "template:read",
+        "*:*",
       ]);
-      return perms.some((perm) => allow.has(perm));
+      const allowSuffix = [":base.templates:manage", ":base.templates:read"];
+      return perms.some((perm) => {
+        if (allowExact.has(perm)) return true;
+        return allowSuffix.some((suffix) => perm.endsWith(suffix));
+      });
     },
 
     // delegated 场景下的模板写权限（优先使用宿主返回的能力/权限）
@@ -96,7 +101,7 @@ export const useUserStore = defineStore("user", {
       const perms = (state.context?.permissions || []).map((item) =>
         String(item || "").trim()
       );
-      const allow = new Set([
+      const allowExact = new Set([
         "base.templates.manage",
         "base.templates:create",
         "base.templates:update",
@@ -104,8 +109,18 @@ export const useUserStore = defineStore("user", {
         "template:create",
         "template:update",
         "template:delete",
+        "*:*",
       ]);
-      return perms.some((perm) => allow.has(perm));
+      const allowSuffix = [
+        ":base.templates:manage",
+        ":base.templates:create",
+        ":base.templates:update",
+        ":base.templates:delete",
+      ];
+      return perms.some((perm) => {
+        if (allowExact.has(perm)) return true;
+        return allowSuffix.some((suffix) => perm.endsWith(suffix));
+      });
     },
 
     // 用户显示名称

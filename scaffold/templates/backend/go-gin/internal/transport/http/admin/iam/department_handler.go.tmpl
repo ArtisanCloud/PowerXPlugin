@@ -1,6 +1,7 @@
 package iam
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 
 type DepartmentHandler struct {
 	service *srviam.DepartmentService
+	mode    srviam.IAMMode
 }
 
 type departmentNode struct {
@@ -21,8 +23,8 @@ type departmentNode struct {
 	Children []*departmentNode `json:"children,omitempty"`
 }
 
-func NewDepartmentHandler(svc *srviam.DepartmentService) *DepartmentHandler {
-	return &DepartmentHandler{service: svc}
+func NewDepartmentHandler(svc *srviam.DepartmentService, mode srviam.IAMMode) *DepartmentHandler {
+	return &DepartmentHandler{service: svc, mode: mode}
 }
 
 func (h *DepartmentHandler) List(c *gin.Context) {
@@ -83,6 +85,10 @@ func (h *DepartmentHandler) Tree(c *gin.Context) {
 }
 
 func (h *DepartmentHandler) Create(c *gin.Context) {
+	if h.mode == srviam.IAMModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "department write operations are not allowed in delegated mode")
+		return
+	}
 	var req CreateDepartmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
@@ -118,6 +124,10 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 }
 
 func (h *DepartmentHandler) Update(c *gin.Context) {
+	if h.mode == srviam.IAMModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "department write operations are not allowed in delegated mode")
+		return
+	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
 		contracts.ResponseBadRequest(c, "invalid department id")
@@ -149,6 +159,10 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 }
 
 func (h *DepartmentHandler) Delete(c *gin.Context) {
+	if h.mode == srviam.IAMModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "department write operations are not allowed in delegated mode")
+		return
+	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
 		contracts.ResponseBadRequest(c, "invalid department id")

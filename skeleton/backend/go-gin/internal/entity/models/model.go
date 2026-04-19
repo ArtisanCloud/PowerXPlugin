@@ -78,4 +78,5 @@ const (
 	TableIAMRolePermissions              = "iam_role_permissions"
 	TableIAMRefreshTokens                = "iam_refresh_tokens"
 	TableIAMAuditLogs                    = "iam_audit_logs"
+	TableIAMChannelSyncTasks             = "iam_channel_sync_tasks"
 )

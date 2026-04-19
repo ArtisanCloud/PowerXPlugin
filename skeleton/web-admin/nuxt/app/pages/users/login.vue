@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useAuthService } from "~/composables/api/services/authService";
+import { getTenantUuid } from "~/composables/api/_base";
+import { useApiClient } from "~/composables/api/_client";
 
 definePageMeta({
   layout: "default",
@@ -14,6 +16,7 @@ const router = useRouter();
 const auth = useAuth();
 const { setAuth, consumeAuthError } = auth;
 const isDelegatedMode = computed(() => auth.delegatedIAM?.value ?? false);
+const { get, post } = useApiClient();
 const runtimeConfig = useRuntimeConfig();
 const insidePowerX = computed(
   () =>
@@ -48,6 +51,36 @@ const sanitizeRedirectTo = (raw: unknown) => {
 
 // 导入认证服务
 const { login } = useAuthService();
+type LoginTab = "password" | "federated";
+type ProviderKey = "wecom" | "lark" | "dingtalk";
+type FederatedChallengeResponse = {
+  provider: ProviderKey;
+  tenant_uuid: string;
+  state: string;
+  nonce: string;
+  authorize_url: string;
+};
+type TenantResolveResponse = {
+  tenant_uuid: string;
+  tenant_key: string;
+  tenant_name: string;
+};
+
+const activeTab = ref<LoginTab>("password");
+const federatedLoading = ref(false);
+const processingCallback = ref(false);
+const federatedProviders: Array<{ key: ProviderKey; label: string }> = [
+  { key: "wecom", label: "企业微信" },
+  { key: "lark", label: "飞书" },
+  { key: "dingtalk", label: "钉钉" },
+];
+const challengeKey = (state: string) => `federated_challenge:${state}`;
+
+const resolveTenantUUID = () =>
+  getTenantUuid() ||
+  runtimeConfig.public?.defaultTenantUuid ||
+  runtimeConfig.public?.defaultTenantId ||
+  "";
 
 // 表单数据
 const form = reactive({
@@ -55,10 +88,326 @@ const form = reactive({
   password: "",
   remember: false,
 });
+const tenantForm = reactive({
+  identifier: "",
+});
+const resolvedTenant = ref<TenantResolveResponse | null>(null);
+const tenantCandidates = ref<TenantResolveResponse[]>([]);
+const tenantSearching = ref(false);
+const tenantDropdownOpen = ref(false);
+let tenantSearchTimer: ReturnType<typeof setTimeout> | null = null;
+const tenantQueryUUID = computed(() =>
+  String(route.query.tenant_uuid || route.query.tenant || "").trim()
+);
+const scanModeEnabled = computed(() => tenantQueryUUID.value.length > 0);
 
 // 表单验证状态
 const loading = ref(false);
 const error = ref("");
+
+const normalizeFederatedPayload = (raw: any, fallbackProvider: string) => {
+  const accessToken = String(raw?.access_token || "").trim();
+  const refreshToken = String(raw?.refresh_token || "").trim();
+  const expiresIn = Number(raw?.expires_in || 3600);
+  const tokenType = String(raw?.token_type || "Bearer").trim() || "Bearer";
+  const scope = String(raw?.scope || fallbackProvider || "federated").trim();
+  return {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_in: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600,
+    token_type: tokenType,
+    scope,
+  };
+};
+
+const cacheTenantContext = (tenant: TenantResolveResponse) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem("tenant_key", tenant.tenant_key);
+    window.localStorage.setItem("tenant_name", tenant.tenant_name);
+    window.localStorage.setItem("tenant_uuid", tenant.tenant_uuid);
+  } catch {
+    // ignore storage error
+  }
+  document.cookie = `tenant_uuid=${encodeURIComponent(tenant.tenant_uuid)}; path=/; max-age=2592000; SameSite=Lax`;
+};
+
+const loadTenantFromCache = () => {
+  if (typeof window === "undefined") return;
+  const key = window.localStorage.getItem("tenant_key") || "";
+  const name = window.localStorage.getItem("tenant_name") || "";
+  const uuid = window.localStorage.getItem("tenant_uuid") || getTenantUuid() || "";
+  if (key) {
+    tenantForm.identifier = name ? `${name} (${key})` : key;
+  }
+  if (uuid || key || name) {
+    resolvedTenant.value = {
+      tenant_uuid: uuid,
+      tenant_key: key,
+      tenant_name: name,
+    };
+  }
+};
+
+const searchTenants = async (keyword: string) => {
+  const q = String(keyword || "").trim();
+  if (q.length > 0 && q.length < 2) {
+    tenantCandidates.value = [];
+    return;
+  }
+  tenantSearching.value = true;
+  try {
+    const response = await get<any>("/admin/user/auth/tenants/search", {
+      params: { q, limit: 10 },
+      skipAuth: true,
+    });
+    const payload = response?.data || response;
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    tenantCandidates.value = items.map((item: any) => ({
+      tenant_uuid: String(item?.tenant_uuid || "").trim(),
+      tenant_key: String(item?.tenant_key || "").trim(),
+      tenant_name: String(item?.tenant_name || "").trim(),
+    })).filter((item: TenantResolveResponse) => item.tenant_uuid && item.tenant_key);
+  } catch {
+    tenantCandidates.value = [];
+  } finally {
+    tenantSearching.value = false;
+  }
+};
+
+const onTenantInput = (value: string) => {
+  tenantForm.identifier = value;
+  resolvedTenant.value = null;
+  tenantDropdownOpen.value = true;
+  if (tenantSearchTimer) {
+    clearTimeout(tenantSearchTimer);
+  }
+  tenantSearchTimer = setTimeout(() => {
+    void searchTenants(value);
+  }, 220);
+};
+
+const onTenantFocus = () => {
+  tenantDropdownOpen.value = true;
+  if (tenantCandidates.value.length === 0) {
+    void searchTenants("");
+  }
+};
+
+const selectTenant = (tenant: TenantResolveResponse) => {
+  resolvedTenant.value = tenant;
+  cacheTenantContext(tenant);
+  tenantForm.identifier = tenant.tenant_name
+    ? `${tenant.tenant_name} (${tenant.tenant_key})`
+    : tenant.tenant_key;
+  tenantCandidates.value = [];
+  tenantDropdownOpen.value = false;
+};
+
+const resolveTenant = async (rawIdentifier?: string): Promise<TenantResolveResponse | null> => {
+  if (resolvedTenant.value?.tenant_uuid) {
+    return resolvedTenant.value;
+  }
+  const identifier = String(rawIdentifier ?? tenantForm.identifier ?? "").trim();
+  if (!identifier) {
+    resolvedTenant.value = null;
+    return null;
+  }
+  const response = await get<any>("/admin/user/auth/tenants/resolve", {
+    params: { identifier },
+    skipAuth: true,
+  });
+  const payload = (response?.data || response) as TenantResolveResponse;
+  if (!payload?.tenant_uuid) {
+    throw new Error(t("auth.tenant.resolveFailed"));
+  }
+  resolvedTenant.value = payload;
+  cacheTenantContext(payload);
+  return payload;
+};
+
+const ensureTenant = async () => {
+  if (resolvedTenant.value?.tenant_uuid) {
+    return resolvedTenant.value;
+  }
+  const identifier = String(tenantForm.identifier || "").trim();
+  if (!identifier) {
+    throw new Error(t("auth.tenant.required"));
+  }
+  const resolved = await resolveTenant(identifier);
+  if (!resolved?.tenant_uuid) {
+    throw new Error(t("auth.tenant.resolveFailed"));
+  }
+  selectTenant(resolved);
+  return resolved;
+};
+
+const handleFederatedLogin = async (provider: ProviderKey) => {
+  let tenantUUID = String(tenantQueryUUID.value || "").trim() || resolveTenantUUID();
+  if (!tenantUUID) {
+    const selected = await ensureTenant().catch((err: any) => {
+      error.value = err?.message || t("auth.tenant.required");
+      return null;
+    });
+    tenantUUID = String(selected?.tenant_uuid || "").trim() || String(resolvedTenant.value?.tenant_uuid || "").trim();
+  }
+  if (!tenantUUID) {
+    error.value = t("auth.tenant.required");
+    return;
+  }
+  federatedLoading.value = true;
+  error.value = "";
+  try {
+    const callbackURL = new URL(window.location.href);
+    callbackURL.searchParams.set("login_tab", "federated");
+    callbackURL.searchParams.set("provider", provider);
+    const redirect = String(route.query.redirect || "").trim();
+    if (redirect) {
+      callbackURL.searchParams.set("redirect", redirect);
+    }
+    const response = await post<any>("/auth/federated/challenge", {
+      provider,
+      tenant_uuid: tenantUUID,
+      redirect_uri: callbackURL.toString(),
+    }, { skipAuth: true });
+    const payload = (response?.data || response) as FederatedChallengeResponse;
+    const state = String(payload?.state || "").trim();
+    const authorizeURL = String(payload?.authorize_url || "").trim();
+    if (!state || !authorizeURL) {
+      throw new Error(t("auth.login.qrStartFailed"));
+    }
+    sessionStorage.setItem(
+      challengeKey(state),
+      JSON.stringify({
+        provider,
+        tenant_uuid: tenantUUID,
+        nonce: payload.nonce,
+        redirect: redirect || "/",
+      })
+    );
+    window.location.href = authorizeURL;
+  } catch (err: any) {
+    error.value = err?.response?.data?.message || err?.message || t("auth.login.qrStartFailed");
+  } finally {
+    federatedLoading.value = false;
+  }
+};
+
+const tryConsumeFederatedQueryResult = async () => {
+  const accessToken = String(route.query.fed_access_token || "").trim();
+  if (!accessToken) return false;
+
+  const refreshToken = String(route.query.fed_refresh_token || "").trim();
+  const tokenType = String(route.query.fed_token_type || "Bearer").trim() || "Bearer";
+  const expiresInRaw = Number(route.query.fed_expires_in || "3600");
+  const expiresIn = Number.isFinite(expiresInRaw) && expiresInRaw > 0 ? expiresInRaw : 3600;
+  const scope = String(route.query.fed_scope || route.query.provider || "federated").trim();
+
+  setAuth({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_type: tokenType,
+    expires_in: expiresIn,
+    scope,
+  } as any);
+
+  await router.replace({
+    path: route.path,
+    query: {
+      ...route.query,
+      fed_ok: undefined,
+      fed_access_token: undefined,
+      fed_refresh_token: undefined,
+      fed_token_type: undefined,
+      fed_expires_in: undefined,
+      fed_scope: undefined,
+    },
+    hash: undefined,
+  });
+  const redirectTo = sanitizeRedirectTo(route.query.redirect);
+  await navigateTo(redirectTo);
+  return true;
+};
+
+const tryConsumeFederatedHashResult = async () => {
+  if (typeof window === "undefined") return false;
+  const hash = String(window.location.hash || "").replace(/^#/, "").trim();
+  if (!hash) return false;
+  const params = new URLSearchParams(hash);
+  const accessToken = String(params.get("access_token") || "").trim();
+  if (!accessToken) return false;
+
+  const refreshToken = String(params.get("refresh_token") || "").trim();
+  const tokenType = String(params.get("token_type") || "Bearer").trim() || "Bearer";
+  const expiresInRaw = Number(params.get("expires_in") || "3600");
+  const expiresIn = Number.isFinite(expiresInRaw) && expiresInRaw > 0 ? expiresInRaw : 3600;
+  const scope = String(params.get("scope") || route.query.provider || "federated").trim();
+
+  setAuth({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_type: tokenType,
+    expires_in: expiresIn,
+    scope,
+  } as any);
+
+  await router.replace({
+    path: route.path,
+    query: { ...route.query, fed_ok: undefined },
+    hash: undefined,
+  });
+  const redirectTo = sanitizeRedirectTo(route.query.redirect);
+  await navigateTo(redirectTo);
+  return true;
+};
+const tryConsumeFederatedCallback = async () => {
+  const code = String(route.query.code || "").trim();
+  const state = String(route.query.state || "").trim();
+  if (!code || !state || processingCallback.value) return;
+
+  processingCallback.value = true;
+  activeTab.value = "federated";
+  federatedLoading.value = true;
+  error.value = "";
+
+  try {
+    const cached = sessionStorage.getItem(challengeKey(state));
+    if (!cached) {
+      throw new Error(t("auth.login.qrSessionExpired"));
+    }
+    const challenge = JSON.parse(cached) as {
+      provider: ProviderKey;
+      tenant_uuid: string;
+      nonce: string;
+      redirect?: string;
+    };
+    const callbackResp = await post<any>("/auth/federated/callback", {
+      provider: challenge.provider,
+      tenant_uuid: challenge.tenant_uuid,
+      state,
+      nonce: challenge.nonce,
+      code,
+    }, { skipAuth: true });
+    const payload = callbackResp?.data || callbackResp;
+    const normalized = normalizeFederatedPayload(payload?.tokens || payload, challenge.provider);
+    if (!normalized.access_token) {
+      throw new Error(t("auth.login.qrCallbackFailed"));
+    }
+    setAuth(normalized as any);
+    sessionStorage.removeItem(challengeKey(state));
+    const redirectTo = sanitizeRedirectTo(challenge.redirect || route.query.redirect);
+    await router.replace({
+      path: route.path,
+      query: { ...route.query, code: undefined, state: undefined, provider: undefined },
+    });
+    await navigateTo(redirectTo);
+  } catch (err: any) {
+    error.value = err?.response?.data?.message || err?.message || t("auth.login.qrCallbackFailed");
+  } finally {
+    federatedLoading.value = false;
+    processingCallback.value = false;
+  }
+};
 
 // 登录处理
 const handleLogin = async () => {
@@ -110,7 +459,21 @@ const handleForgotPassword = () => {
   console.log("忘记密码");
 };
 
-onMounted(() => {
+onMounted(async () => {
+  loadTenantFromCache();
+  if (tenantQueryUUID.value) {
+    tenantForm.identifier = tenantQueryUUID.value;
+    void resolveTenant(tenantQueryUUID.value).catch(() => {
+      // ignore; UI will show login error when scanning is attempted
+    });
+  }
+  if (!scanModeEnabled.value) {
+    activeTab.value = "password";
+  }
+  const tab = String(route.query.login_tab || "").toLowerCase();
+  if (tab === "federated" && scanModeEnabled.value) {
+    activeTab.value = "federated";
+  }
   const stored = consumeAuthError?.();
   if (stored) {
     error.value = stored;
@@ -119,19 +482,33 @@ onMounted(() => {
     error.value = route.query.error;
     router.replace({ path: route.path, query: { ...route.query, error: undefined } });
   }
+  if (await tryConsumeFederatedQueryResult()) {
+    return;
+  }
+  if (await tryConsumeFederatedHashResult()) {
+    return;
+  }
+  void tryConsumeFederatedCallback();
+});
+
+onBeforeUnmount(() => {
+  if (tenantSearchTimer) {
+    clearTimeout(tenantSearchTimer);
+    tenantSearchTimer = null;
+  }
 });
 </script>
 
 <template>
   <div
-    class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4"
+    class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center p-4"
   >
     <div class="max-w-md w-full">
       <!-- 返回首页链接 -->
       <div class="mb-6 flex justify-between items-center">
         <NuxtLink
           :to="$localePath('/')"
-          class="inline-flex items-center text-gray-600 hover:text-blue-600 transition-colors text-sm"
+          class="inline-flex items-center text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors text-sm"
         >
           <svg
             class="w-4 h-4 mr-2"
@@ -151,24 +528,94 @@ onMounted(() => {
       </div>
 
       <!-- 登录卡片 -->
-      <UCard class="shadow-xl border-0">
+      <UCard class="shadow-xl border border-slate-200/70 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur">
         <template #header>
           <div class="text-center py-6">
             <!-- Logo -->
             <h1
-              class="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3"
+              class="text-3xl font-bold bg-gradient-to-r from-primary-500 to-primary-700 bg-clip-text text-transparent mb-3"
             >
               PowerX
             </h1>
-            <h2 class="text-xl font-semibold text-gray-900 mb-2">
+            <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
               {{ $t("auth.welcomeBack") }}
             </h2>
-            <p class="text-gray-600 text-sm">{{ $t("auth.loginSubtitle") }}</p>
+            <p class="text-slate-600 dark:text-slate-400 text-sm">{{ $t("auth.loginSubtitle") }}</p>
           </div>
         </template>
 
         <div class="px-6 pb-6">
-          <form @submit.prevent="handleLogin" class="space-y-5">
+          <div class="mb-5 flex rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
+            <button
+              type="button"
+              class="rounded-md py-2 text-sm transition-colors"
+              :class="[
+                scanModeEnabled ? 'w-1/2' : 'w-full',
+                activeTab === 'password'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'
+              ]"
+              @click="activeTab = 'password'"
+            >
+              {{ $t("auth.login.tabPassword") }}
+            </button>
+            <button
+              v-if="scanModeEnabled"
+              type="button"
+              class="w-1/2 rounded-md py-2 text-sm transition-colors"
+              :class="activeTab === 'federated' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'"
+              @click="activeTab = 'federated'"
+            >
+              {{ $t("auth.login.tabScan") }}
+            </button>
+          </div>
+          <div v-if="scanModeEnabled && activeTab === 'federated'" class="mb-5">
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              {{ $t("auth.tenant.label") }}
+            </label>
+            <UInput
+              v-model="tenantForm.identifier"
+              :placeholder="$t('auth.tenant.placeholder')"
+              size="lg"
+              :disabled="loading || federatedLoading"
+              class="w-full"
+              @update:model-value="onTenantInput"
+              @focus="onTenantFocus"
+              @blur="setTimeout(() => { tenantDropdownOpen = false; }, 120)"
+            />
+            <div
+              v-if="tenantDropdownOpen"
+              class="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 max-h-56 overflow-auto"
+            >
+              <div
+                v-if="tenantSearching"
+                class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400"
+              >
+                {{ $t("auth.tenant.searching") }}
+              </div>
+              <div
+                v-else-if="tenantCandidates.length === 0"
+                class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400"
+              >
+                {{ $t("auth.tenant.emptyHint") }}
+              </div>
+              <button
+                v-for="item in tenantCandidates"
+                :key="`${item.tenant_uuid}:${item.tenant_key}`"
+                type="button"
+                class="w-full px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 border-b border-slate-100 dark:border-slate-800 last:border-b-0"
+                @mousedown.prevent="selectTenant(item)"
+              >
+                <div class="text-sm text-slate-800 dark:text-slate-100">{{ item.tenant_name || item.tenant_key }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ item.tenant_key }}</div>
+              </button>
+            </div>
+            <p v-if="resolvedTenant?.tenant_name" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              {{ $t("auth.tenant.resolvedAs", { name: resolvedTenant.tenant_name, key: resolvedTenant.tenant_key }) }}
+            </p>
+          </div>
+
+          <form v-if="activeTab === 'password'" @submit.prevent="handleLogin" class="space-y-5">
             <!-- 错误提示 -->
             <div v-if="error" role="alert">
               <UAlert
@@ -199,7 +646,7 @@ onMounted(() => {
             <div class="mb-6">
               <label
                 for="identifier"
-                class="block text-sm font-medium text-gray-700 mb-3"
+                class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3"
               >
                 {{ $t("auth.identifier") }} <span class="text-red-500">*</span>
               </label>
@@ -219,7 +666,7 @@ onMounted(() => {
             <div class="mb-6">
               <label
                 for="password"
-                class="block text-sm font-medium text-gray-700 mb-3"
+                class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3"
               >
                 {{ $t("auth.password") }} <span class="text-red-500">*</span>
               </label>
@@ -244,7 +691,7 @@ onMounted(() => {
               />
               <NuxtLink
                 :to="$localePath('/users/forgot-password')"
-                class="text-sm text-blue-600 hover:text-blue-700"
+                class="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
               >
                 {{ $t("auth.login.forgotPassword") }}
               </NuxtLink>
@@ -258,20 +705,61 @@ onMounted(() => {
                 size="lg"
                 :loading="loading"
                 :disabled="isDelegatedMode"
-                class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                color="primary"
               >
                 {{ loading ? $t("auth.signingIn") : $t("auth.loginButton") }}
               </UButton>
             </div>
           </form>
 
+          <div v-else class="space-y-4">
+            <div v-if="error" role="alert">
+              <UAlert
+                color="error"
+                variant="soft"
+                :title="error"
+                :close-button="{
+                  icon: 'i-heroicons-x-mark-20-solid',
+                  color: 'gray',
+                  variant: 'link',
+                  padded: false,
+                }"
+                @close="error = ''"
+                class="mb-1"
+              />
+            </div>
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+              {{ $t("auth.login.scanDesc") }}
+            </p>
+            <UButton
+              v-for="item in federatedProviders"
+              :key="item.key"
+              type="button"
+              block
+              size="lg"
+              variant="outline"
+              color="neutral"
+              :loading="federatedLoading"
+              :disabled="federatedLoading"
+              @click="handleFederatedLogin(item.key)"
+            >
+              {{ $t("auth.login.scanWith", { provider: item.label }) }}
+            </UButton>
+            <UAlert
+              v-if="processingCallback"
+              color="primary"
+              variant="soft"
+              :title="$t('auth.login.scanProcessing')"
+            />
+          </div>
+
           <!-- 注册链接 -->
-          <div class="text-center mt-6 pt-4 border-t border-gray-200">
-            <p class="text-gray-600 text-sm">
+          <div class="text-center mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <p class="text-slate-600 dark:text-slate-400 text-sm">
               {{ $t("auth.login.noAccount") }}
               <NuxtLink
                 :to="$localePath('/users/register')"
-                class="text-blue-600 hover:text-blue-700 font-medium"
+                class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
               >
                 {{ $t("auth.signUpNow") }}
               </NuxtLink>

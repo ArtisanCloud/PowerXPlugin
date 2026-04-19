@@ -51,6 +51,7 @@ var businessTables = []interface{}{
 	&operationsModel.Incident{},
 	&operationsModel.IncidentTimelineEntry{},
 	&operationsModel.IncidentChecklistItem{},
+	&integrationModel.SecretCredential{},
 	&integrationModel.GrantMatrixOverride{},
 	&securityModel.BaselineChecklist{},
 	&securityModel.AuditReport{},
@@ -72,6 +73,11 @@ var iamTables = []interface{}{
 	&iammodel.RolePermission{},
 	&iammodel.RefreshToken{},
 	&iammodel.AuditLog{},
+	&iammodel.FederatedExternalIdentity{},
+	&iammodel.FederatedBinding{},
+	&iammodel.FederatedLoginChallenge{},
+	&iammodel.FederatedRiskEvent{},
+	&iammodel.ChannelSyncTask{},
 }
 
 // MigratePluginModels 只做 AutoMigrate（最小实现）
@@ -287,7 +293,67 @@ func ensureIAMConstraints(ctx context.Context, db *gorm.DB) error {
 			return err
 		}
 	}
+	if err := ensureChannelSyncTaskPayloadJSONB(ctx, db); err != nil {
+		return err
+	}
 	return backfillRolePermissionTenant(ctx, db)
+}
+
+func ensureChannelSyncTaskPayloadJSONB(ctx context.Context, db *gorm.DB) error {
+	if db == nil || isSQLite(db) {
+		return nil
+	}
+	tableName := models.S(models.TableIAMChannelSyncTasks)
+	columns := []string{"request_payload", "result_payload"}
+	for _, column := range columns {
+		colType, err := queryColumnDataType(ctx, db, tableName, column)
+		if err != nil {
+			return err
+		}
+		if strings.EqualFold(colType, "jsonb") {
+			continue
+		}
+		stmt := fmt.Sprintf(
+			`ALTER TABLE %s ALTER COLUMN %s TYPE jsonb USING CASE WHEN %s IS NULL OR btrim(%s::text) = '' THEN '{}'::jsonb ELSE %s::jsonb END`,
+			tableName, quoteIdentifier(column), quoteIdentifier(column), quoteIdentifier(column), quoteIdentifier(column),
+		)
+		if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "does not exist") {
+				log.Printf("[migrate] column missing, skip payload jsonb migration: %v", err)
+				continue
+			}
+			return fmt.Errorf("ensure channel sync payload jsonb failed: %w", err)
+		}
+	}
+	return nil
+}
+
+func queryColumnDataType(ctx context.Context, db *gorm.DB, tableName, columnName string) (string, error) {
+	parts := strings.Split(strings.TrimSpace(tableName), ".")
+	schema := "public"
+	table := strings.TrimSpace(tableName)
+	if len(parts) == 2 {
+		schema = strings.Trim(parts[0], `"`)
+		table = strings.Trim(parts[1], `"`)
+	} else {
+		table = strings.Trim(tableName, `"`)
+	}
+	var dataType string
+	err := db.WithContext(ctx).
+		Raw(`
+SELECT data_type
+FROM information_schema.columns
+WHERE table_schema = ? AND table_name = ? AND column_name = ?
+LIMIT 1
+`, schema, table, strings.TrimSpace(columnName)).
+		Scan(&dataType).Error
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(dataType) == "" {
+		return "", fmt.Errorf("column not found: %s.%s", tableName, columnName)
+	}
+	return strings.TrimSpace(dataType), nil
 }
 
 func execIgnoreExists(ctx context.Context, db *gorm.DB, stmt string) error {

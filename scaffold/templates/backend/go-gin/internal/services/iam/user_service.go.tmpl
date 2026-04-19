@@ -32,18 +32,20 @@ type UserFilter struct {
 }
 
 type UserView struct {
-	ID           uint64     `json:"id"`
-	UserID       uint64     `json:"user_id"`
-	TenantUUID   string     `json:"tenant_uuid"`
-	Email        string     `json:"email"`
-	Phone        string     `json:"phone"`
-	DisplayName  string     `json:"display_name"`
-	Username     string     `json:"username"`
-	Status       string     `json:"status"`
-	DepartmentID *uint64    `json:"department_id"`
-	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	Roles        []string   `json:"roles"`
+	ID            uint64            `json:"id"`
+	UserID        uint64            `json:"user_id"`
+	TenantUUID    string            `json:"tenant_uuid"`
+	Email         string            `json:"email"`
+	Phone         string            `json:"phone"`
+	DisplayName   string            `json:"display_name"`
+	Username      string            `json:"username"`
+	Status        string            `json:"status"`
+	DepartmentID  *uint64           `json:"department_id"`
+	DepartmentIDs []uint64          `json:"department_ids,omitempty" gorm:"-"`
+	Meta          datatypes.JSONMap `json:"-"`
+	LastLoginAt   *time.Time        `json:"last_login_at,omitempty"`
+	CreatedAt     time.Time         `json:"created_at"`
+	Roles         []string          `json:"roles" gorm:"-"`
 }
 
 type UserBulkImportResult struct {
@@ -69,7 +71,7 @@ func (s *UserService) List(ctx context.Context, filter UserFilter) ([]UserView, 
 	query := s.db.WithContext(ctx).
 		Table(iamm.Member{}.TableName()+" u").
 		Select(`u.id AS id, u.user_id AS user_id, u.tenant_uuid, u.username, u.status, u.department_id,
-            u.last_login_at, u.created_at, COALESCE(u.display_name, a.display_name) AS display_name,
+            u.meta, u.last_login_at, u.created_at, COALESCE(u.display_name, a.display_name) AS display_name,
             a.email, a.phone`).
 		Joins("JOIN "+iamm.User{}.TableName()+" a ON a.id = u.user_id").
 		Where("u.tenant_uuid = ?", tenantUUID)
@@ -109,6 +111,7 @@ func (s *UserService) List(ctx context.Context, filter UserFilter) ([]UserView, 
 		if roles, ok := roleMap[result[i].ID]; ok {
 			result[i].Roles = roles
 		}
+		result[i].DepartmentIDs = extractDepartmentIDs(result[i].Meta, result[i].DepartmentID)
 	}
 	return result, nil
 }
@@ -182,15 +185,16 @@ func (s *UserService) assignRoles(ctx context.Context, tx *gorm.DB, tenantUUID s
 }
 
 type CreateUserInput struct {
-	TenantUUID   string
-	Email        string
-	DisplayName  string
-	Username     string
-	Phone        string
-	DepartmentID *uint64
-	Status       string
-	ActorID      *uint64
-	Roles        []uint64
+	TenantUUID    string
+	Email         string
+	DisplayName   string
+	Username      string
+	Phone         string
+	DepartmentID  *uint64
+	DepartmentIDs []uint64
+	Status        string
+	ActorID       *uint64
+	Roles         []uint64
 }
 
 func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserView, error) {
@@ -214,10 +218,12 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 		status = iamm.StatusActive
 	}
 
-	var dept *iamm.Department
-	if input.DepartmentID != nil {
-		dept = &iamm.Department{}
-		if err := s.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", *input.DepartmentID, tenantUUID).First(dept).Error; err != nil {
+	departmentIDs := normalizeDepartmentIDs(input.DepartmentIDs)
+	if len(departmentIDs) == 0 && input.DepartmentID != nil && *input.DepartmentID > 0 {
+		departmentIDs = []uint64{*input.DepartmentID}
+	}
+	if len(departmentIDs) > 0 {
+		if _, err := s.resolveDepartments(ctx, tenantUUID, departmentIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -244,16 +250,21 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 		if usernameExists > 0 {
 			return fmt.Errorf("username already exists")
 		}
+		memberMeta := datatypes.JSONMap{}
+		if len(departmentIDs) > 0 {
+			memberMeta["department_ids"] = departmentIDs
+		}
 		record := &iamm.Member{
 			BaseModel:   basemodels.BaseModel{TenantUuid: tenantUUID},
 			UserID:      account.ID,
 			Username:    username,
 			DisplayName: strings.TrimSpace(input.DisplayName),
 			Status:      status,
-			Meta:        datatypes.JSONMap{},
+			Meta:        memberMeta,
 		}
-		if dept != nil {
-			record.DepartmentID = &dept.ID
+		if len(departmentIDs) > 0 {
+			primaryDeptID := departmentIDs[0]
+			record.DepartmentID = &primaryDeptID
 		}
 		if err := tx.Create(record).Error; err != nil {
 			return err
@@ -264,16 +275,17 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 			}
 		}
 		created = &UserView{
-			ID:           record.ID,
-			UserID:       account.ID,
-			TenantUUID:   tenantUUID,
-			Email:        account.Email,
-			Phone:        account.Phone,
-			DisplayName:  firstNonEmpty(record.DisplayName, account.DisplayName),
-			Username:     record.Username,
-			Status:       record.Status,
-			DepartmentID: record.DepartmentID,
-			CreatedAt:    record.CreatedAt,
+			ID:            record.ID,
+			UserID:        account.ID,
+			TenantUUID:    tenantUUID,
+			Email:         account.Email,
+			Phone:         account.Phone,
+			DisplayName:   firstNonEmpty(record.DisplayName, account.DisplayName),
+			Username:      record.Username,
+			Status:        record.Status,
+			DepartmentID:  record.DepartmentID,
+			DepartmentIDs: extractDepartmentIDs(record.Meta, record.DepartmentID),
+			CreatedAt:     record.CreatedAt,
 		}
 		return nil
 	})
@@ -308,12 +320,14 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 }
 
 type UpdateUserInput struct {
-	DisplayName  string
-	Status       string
-	DepartmentID *uint64
-	ActorID      *uint64
-	Roles        []uint64
-	ReplaceRoles bool
+	TenantUUID    string
+	DisplayName   string
+	Status        string
+	DepartmentID  *uint64
+	DepartmentIDs []uint64
+	ActorID       *uint64
+	Roles         []uint64
+	ReplaceRoles  bool
 }
 
 func (s *UserService) BulkImport(ctx context.Context, inputs []CreateUserInput) (*UserBulkImportResult, error) {
@@ -345,14 +359,22 @@ func (s *UserService) Update(ctx context.Context, id uint64, input UpdateUserInp
 	if s == nil || s.db == nil {
 		return nil, errors.New("iam: user service unavailable")
 	}
+	tenantUUID := strings.TrimSpace(input.TenantUUID)
+	if tenantUUID == "" {
+		return nil, errors.New("tenant_uuid required")
+	}
 	var user iamm.Member
-	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&user).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", id, tenantUUID).First(&user).Error; err != nil {
 		return nil, err
 	}
-	var dept *iamm.Department
-	if input.DepartmentID != nil && *input.DepartmentID != 0 {
-		dept = &iamm.Department{}
-		if err := s.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", *input.DepartmentID, user.TenantUuid).First(dept).Error; err != nil {
+	departmentIDs := normalizeDepartmentIDs(input.DepartmentIDs)
+	if len(departmentIDs) == 0 && input.DepartmentID != nil {
+		if *input.DepartmentID > 0 {
+			departmentIDs = []uint64{*input.DepartmentID}
+		}
+	}
+	if len(departmentIDs) > 0 {
+		if _, err := s.resolveDepartments(ctx, user.TenantUuid, departmentIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -366,11 +388,24 @@ func (s *UserService) Update(ctx context.Context, id uint64, input UpdateUserInp
 		updates["status"] = status
 		statusChanged = true
 	}
-	if input.DepartmentID != nil {
+	if input.DepartmentIDs != nil {
+		if len(departmentIDs) == 0 {
+			updates["department_id"] = nil
+			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, nil)
+		} else {
+			primary := departmentIDs[0]
+			if user.DepartmentID == nil || *user.DepartmentID != primary {
+				updates["department_id"] = primary
+			}
+			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, departmentIDs)
+		}
+	} else if input.DepartmentID != nil {
 		if *input.DepartmentID == 0 {
 			updates["department_id"] = nil
+			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, nil)
 		} else if user.DepartmentID == nil || *user.DepartmentID != *input.DepartmentID {
-			updates["department_id"] = dept.ID
+			updates["department_id"] = *input.DepartmentID
+			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, []uint64{*input.DepartmentID})
 		}
 	}
 
@@ -402,18 +437,19 @@ func (s *UserService) Update(ctx context.Context, id uint64, input UpdateUserInp
 		return nil, err
 	}
 	view := &UserView{
-		ID:           user.ID,
-		UserID:       account.ID,
-		TenantUUID:   user.TenantUuid,
-		Email:        account.Email,
-		Phone:        account.Phone,
-		DisplayName:  firstNonEmpty(user.DisplayName, account.DisplayName),
-		Username:     user.Username,
-		Status:       user.Status,
-		DepartmentID: user.DepartmentID,
-		LastLoginAt:  user.LastLoginAt,
-		CreatedAt:    user.CreatedAt,
-		Roles:        roleMap[user.ID],
+		ID:            user.ID,
+		UserID:        account.ID,
+		TenantUUID:    user.TenantUuid,
+		Email:         account.Email,
+		Phone:         account.Phone,
+		DisplayName:   firstNonEmpty(user.DisplayName, account.DisplayName),
+		Username:      user.Username,
+		Status:        user.Status,
+		DepartmentID:  user.DepartmentID,
+		DepartmentIDs: extractDepartmentIDs(user.Meta, user.DepartmentID),
+		LastLoginAt:   user.LastLoginAt,
+		CreatedAt:     user.CreatedAt,
+		Roles:         roleMap[user.ID],
 	}
 	if s.audit != nil && (len(updates) > 0 || rolesChanged) {
 		diff := make(map[string]any, len(updates))
@@ -509,6 +545,89 @@ func slugify(value string) string {
 	value = strings.ReplaceAll(value, "/", "-")
 	value = strings.ReplaceAll(value, "\\", "-")
 	return value
+}
+
+func (s *UserService) resolveDepartments(ctx context.Context, tenantUUID string, deptIDs []uint64) ([]iamm.Department, error) {
+	cleaned := uniqueUint64(deptIDs)
+	if len(cleaned) == 0 {
+		return nil, nil
+	}
+	rows := make([]iamm.Department, 0, len(cleaned))
+	if err := s.db.WithContext(ctx).
+		Where("tenant_uuid = ?", strings.TrimSpace(tenantUUID)).
+		Where("id IN ?", cleaned).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) != len(cleaned) {
+		return nil, fmt.Errorf("department ids do not belong to tenant")
+	}
+	return rows, nil
+}
+
+func normalizeDepartmentIDs(values []uint64) []uint64 {
+	return uniqueUint64(values)
+}
+
+func mergeDepartmentIDsMeta(meta datatypes.JSONMap, departmentIDs []uint64) datatypes.JSONMap {
+	next := datatypes.JSONMap{}
+	for k, v := range meta {
+		next[k] = v
+	}
+	if len(departmentIDs) == 0 {
+		delete(next, "department_ids")
+		return next
+	}
+	next["department_ids"] = departmentIDs
+	return next
+}
+
+func extractDepartmentIDs(meta datatypes.JSONMap, primary *uint64) []uint64 {
+	ids := make([]uint64, 0, 4)
+	appendID := func(v uint64) {
+		if v == 0 {
+			return
+		}
+		for _, existing := range ids {
+			if existing == v {
+				return
+			}
+		}
+		ids = append(ids, v)
+	}
+	if raw, ok := meta["department_ids"]; ok {
+		switch arr := raw.(type) {
+		case []uint64:
+			for _, v := range arr {
+				appendID(v)
+			}
+		case []any:
+			for _, item := range arr {
+				switch n := item.(type) {
+				case uint64:
+					appendID(n)
+				case uint32:
+					appendID(uint64(n))
+				case int:
+					if n > 0 {
+						appendID(uint64(n))
+					}
+				case int64:
+					if n > 0 {
+						appendID(uint64(n))
+					}
+				case float64:
+					if n > 0 {
+						appendID(uint64(n))
+					}
+				}
+			}
+		}
+	}
+	if primary != nil {
+		appendID(*primary)
+	}
+	return ids
 }
 
 func uniqueUint64(values []uint64) []uint64 {

@@ -11,7 +11,7 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 	base := strings.TrimRight(prefix, "/") + "/admin/iam"
 	tenantResource := app.PluginID + ":iam.tenant"
 	departmentResource := app.PluginID + ":iam.department"
-	memberResource := app.PluginID + ":iam.member"
+	memberResource := app.PluginID + ":iam.user"
 	roleResource := app.PluginID + ":iam.role"
 	permissionResource := app.PluginID + ":iam.permission"
 	auditResource := app.PluginID + ":iam.audit"

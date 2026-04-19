@@ -8,9 +8,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 )
 
@@ -154,6 +157,15 @@ func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*M
 		return nil, err
 	}
 	return &resp, nil
+}
+
+// ResolveIdentityContext resolves framework identity context from delegated /me/context payload.
+func (c *DelegatedClient) ResolveIdentityContext(ctx context.Context, accessToken string) (*fwiamcontracts.IdentityContext, error) {
+	me, err := c.MeContext(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+	return IdentityContextFromMeContext(me)
 }
 
 // ----- HTTP helpers -----
@@ -361,4 +373,51 @@ type MeMemberBrief struct {
 	TenantName string `json:"tenant_name"`
 	MemberID   uint64 `json:"member_id"`
 	IsAdmin    bool   `json:"is_admin"`
+}
+
+// IdentityContextFromMeContext maps delegated me-context payload into framework identity context.
+func IdentityContextFromMeContext(me *MeContext) (*fwiamcontracts.IdentityContext, error) {
+	if me == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUnauthorized, "empty delegated identity context")
+	}
+
+	tenantUUID := strings.TrimSpace(me.CurrentTenantUUID)
+	if tenantUUID == "" && len(me.Members) > 0 {
+		tenantUUID = strings.TrimSpace(me.Members[0].TenantUUID)
+	}
+	if tenantUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUnauthorized, "delegated tenant context missing")
+	}
+
+	identity := &fwiamcontracts.IdentityContext{
+		TenantUUID:  tenantUUID,
+		Roles:       normalizeStringSlice(me.Roles),
+		Permissions: normalizeStringSlice(me.Permissions),
+	}
+	if me.User != nil && me.User.ID > 0 {
+		identity.UserID = strconv.FormatUint(me.User.ID, 10)
+	}
+	if me.CurrentMemberID != nil && *me.CurrentMemberID > 0 {
+		identity.MemberID = strconv.FormatUint(*me.CurrentMemberID, 10)
+	} else if len(me.Members) > 0 && me.Members[0].MemberID > 0 {
+		identity.MemberID = strconv.FormatUint(me.Members[0].MemberID, 10)
+	}
+	return identity, nil
+}
+
+func normalizeStringSlice(values []string) []string {
+	result := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		normalized := strings.TrimSpace(value)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+	return result
 }

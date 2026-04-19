@@ -32,6 +32,7 @@ export interface Department {
 }
 
 export interface MemberRecord {
+  id?: number;
   member_id: number;
   tenant_uuid: string;
   user_id: number;
@@ -41,6 +42,7 @@ export interface MemberRecord {
   username: string;
   status: string;
   department_id?: number;
+  department_ids?: number[];
   created_at: string;
   last_login_at?: string;
   roles: string[];
@@ -191,6 +193,14 @@ export const useIAMService = () => {
       client<ApiResponse<RoleRecord>>(`${base}/roles/${id}`, {
         method: "GET",
       }),
+    listFederatedBindings: (params: { tenantUuid: string; provider?: string }) =>
+      client<ApiResponse<{ items: FederatedBindingRecord[] }>>(
+        `${base}/federated/bindings?${buildQuery({
+          tenant_uuid: params.tenantUuid,
+          provider: params.provider,
+        })}`,
+        { method: "GET" }
+      ),
     listPermissions: () =>
       client<ApiResponse<{ items: PermissionRecord[] }>>(`${base}/permissions`, {
         method: "GET",
@@ -250,4 +260,14 @@ export interface ReplaceRolePermissionsPayload {
 export interface RoleMembersPayload {
   tenant_uuid: string;
   member_ids: number[];
+}
+
+export interface FederatedBindingRecord {
+  id: number;
+  tenant_uuid: string;
+  provider: string;
+  tenant_scope?: string;
+  external_user_id: string;
+  member_id: number;
+  status: string;
 }

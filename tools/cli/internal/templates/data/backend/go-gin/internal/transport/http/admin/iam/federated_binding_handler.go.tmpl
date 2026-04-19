@@ -1,0 +1,133 @@
+package iam
+
+import (
+	"strings"
+
+	"{{ .BackendModulePath }}/internal/contracts"
+	federatedsvc "{{ .BackendModulePath }}/internal/services/iam/federated"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
+)
+
+type FederatedBindingHandler struct {
+	bindingSvc *federatedsvc.BindingService
+	jitPolicy  *federatedsvc.JITPolicyService
+	mappingSvc *federatedsvc.MappingService
+}
+
+func NewFederatedBindingHandler(bindingSvc *federatedsvc.BindingService, jitPolicy *federatedsvc.JITPolicyService, mappingSvc *federatedsvc.MappingService) *FederatedBindingHandler {
+	return &FederatedBindingHandler{bindingSvc: bindingSvc, jitPolicy: jitPolicy, mappingSvc: mappingSvc}
+}
+
+type createBindingRequest struct {
+	TenantUUID     string `json:"tenant_uuid"`
+	Provider       string `json:"provider"`
+	TenantScope    string `json:"tenant_scope"`
+	ExternalUserID string `json:"external_user_id"`
+	MemberID       uint64 `json:"member_id"`
+	Source         string `json:"source"`
+}
+
+type deleteBindingRequest struct {
+	TenantUUID     string `json:"tenant_uuid"`
+	Provider       string `json:"provider"`
+	TenantScope    string `json:"tenant_scope"`
+	ExternalUserID string `json:"external_user_id"`
+}
+
+type updateJITPolicyRequest struct {
+	TenantUUID string `json:"tenant_uuid"`
+	Enabled    bool   `json:"enabled"`
+	Mode       string `json:"mode"`
+}
+
+type updateMappingPolicyRequest struct {
+	TenantUUID  string   `json:"tenant_uuid"`
+	Version     string   `json:"version"`
+	Roles       []string `json:"roles"`
+	Departments []string `json:"departments"`
+}
+
+func (h *FederatedBindingHandler) List(c *gin.Context) {
+	tenantUUID := strings.TrimSpace(c.Query("tenant_uuid"))
+	if tenantUUID == "" {
+		tenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	provider := c.Query("provider")
+	rows, err := h.bindingSvc.List(c.Request.Context(), tenantUUID, provider)
+	if err != nil {
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": rows})
+}
+
+func (h *FederatedBindingHandler) Create(c *gin.Context) {
+	var req createBindingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	created, err := h.bindingSvc.Bind(c.Request.Context(), federatedsvc.BindInput{
+		TenantUUID:     req.TenantUUID,
+		Provider:       req.Provider,
+		TenantScope:    req.TenantScope,
+		ExternalUserID: req.ExternalUserID,
+		MemberID:       req.MemberID,
+		Source:         req.Source,
+	})
+	if err != nil {
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, created)
+}
+
+func (h *FederatedBindingHandler) Delete(c *gin.Context) {
+	var req deleteBindingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	deleted, err := h.bindingSvc.UnbindScoped(c.Request.Context(), req.TenantUUID, req.Provider, req.TenantScope, req.ExternalUserID)
+	if err != nil {
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, deleted)
+}
+
+func (h *FederatedBindingHandler) UpdateJITPolicy(c *gin.Context) {
+	var req updateJITPolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	contracts.ResponseSuccess(c, h.jitPolicy.Set(federatedsvc.JITPolicy{TenantUUID: req.TenantUUID, Enabled: req.Enabled, Mode: req.Mode}))
+}
+
+func (h *FederatedBindingHandler) UpdateMappingPolicy(c *gin.Context) {
+	var req updateMappingPolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = admincommon.ResolveTenantUUID(c)
+	}
+	contracts.ResponseSuccess(c, h.mappingSvc.Upsert(federatedsvc.MappingPolicy{
+		TenantUUID:  req.TenantUUID,
+		Version:     req.Version,
+		Roles:       req.Roles,
+		Departments: req.Departments,
+	}))
+}

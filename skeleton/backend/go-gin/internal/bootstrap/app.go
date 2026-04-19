@@ -2,9 +2,17 @@ package bootstrap
 
 import (
 	"context"
+	"sync"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	federatedChallenge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/challenge"
+	federatedContracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/contracts"
+	federatedProviders "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers"
+	providerDingTalk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/dingtalk"
+	providerLark "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/lark"
+	providerWeCom "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/wecom"
+	federatedRisk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/risk"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
@@ -12,8 +20,20 @@ import (
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	delegatedadapter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/adapters/delegated"
 	localadapter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/adapters/local"
+	federatedService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
 	sharedapp "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"gorm.io/gorm"
+)
+
+type FederatedRuntime struct {
+	Factory   federatedContracts.ProviderFactory
+	Challenge federatedContracts.ChallengeManager
+	Risk      federatedContracts.RiskEvaluator
+}
+
+var (
+	federatedRuntimeMu sync.RWMutex
+	federatedRuntime   *FederatedRuntime
 )
 
 func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
@@ -43,7 +63,40 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 		logger.WithError(err).Fatal("Failed to connect to database")
 	}
 
+	initFederatedRuntime(queryDB)
+
 	return queryDB, nil
+}
+
+func initFederatedRuntime(queryDB *gorm.DB) {
+	registry := federatedProviders.NewRegistry()
+	wecomConfigSvc := federatedService.NewWeComConfigService(queryDB)
+	_ = registry.Register(providerWeCom.NewWithResolver(func(ctx context.Context, tenantUUID string) (providerWeCom.Config, error) {
+		return wecomConfigSvc.ResolveProviderConfig(ctx, tenantUUID)
+	}))
+	_ = registry.Register(providerDingTalk.New("default-dingtalk"))
+	_ = registry.Register(providerLark.New("default-lark"))
+
+	federatedRuntimeMu.Lock()
+	federatedRuntime = &FederatedRuntime{
+		Factory:   registry,
+		Challenge: federatedChallenge.NewManager(),
+		Risk:      federatedRisk.NewEvaluator(0),
+	}
+	federatedRuntimeMu.Unlock()
+}
+
+func Federated() *FederatedRuntime {
+	federatedRuntimeMu.RLock()
+	defer federatedRuntimeMu.RUnlock()
+	return federatedRuntime
+}
+
+// SetFederatedForTests 允许测试覆盖联邦运行时依赖。
+func SetFederatedForTests(rt *FederatedRuntime) {
+	federatedRuntimeMu.Lock()
+	federatedRuntime = rt
+	federatedRuntimeMu.Unlock()
 }
 
 // BindFrameworkIAM 在启动期将 skeleton IAM 能力绑定到 framework registry。

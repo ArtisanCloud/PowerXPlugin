@@ -4,7 +4,9 @@ import (
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	federatedrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	federatedsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
@@ -38,6 +40,13 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	permissionHandler := NewPermissionHandler(roleSvc)
 	auditHandler := NewAuditHandler(audit)
 	stsHandler := NewSTSHandler(deps.IAMMode, stsSvc)
+	sessionSvc := federatedsvc.NewSessionService()
+	fedRepo := federatedrepo.NewFederatedBindingRepository(deps.DB)
+	bindingSvc := federatedsvc.NewBindingService(fedRepo, deps.DB, sessionSvc)
+	jitPolicySvc := federatedsvc.NewJITPolicyService()
+	mappingSvc := federatedsvc.NewMappingService()
+	federatedBindingHandler := NewFederatedBindingHandler(bindingSvc, jitPolicySvc, mappingSvc)
+	wecomChannelHandler := NewChannelWeComHandlerWithDeps(deps)
 
 	group.GET("/tenants", tenantHandler.List)
 	group.POST("/tenants", tenantHandler.Create)
@@ -66,6 +75,16 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.GET("/permissions", permissionHandler.List)
 	group.GET("/audit/logs", auditHandler.List)
 	group.POST("/auth/local/sts", stsHandler.Mint)
+	group.GET("/federated/bindings", federatedBindingHandler.List)
+	group.POST("/federated/bindings", federatedBindingHandler.Create)
+	group.DELETE("/federated/bindings", federatedBindingHandler.Delete)
+	group.PUT("/federated/jit-policy", federatedBindingHandler.UpdateJITPolicy)
+	group.PUT("/federated/mapping-policy", federatedBindingHandler.UpdateMappingPolicy)
+	group.GET("/channels/wecom/config", wecomChannelHandler.GetConfig)
+	group.PUT("/channels/wecom/config", wecomChannelHandler.SaveConfig)
+	group.GET("/channels/wecom/sync-tasks", wecomChannelHandler.ListSyncTasks)
+	group.POST("/channels/wecom/sync-tasks", wecomChannelHandler.TriggerSyncTask)
+	group.DELETE("/channels/wecom/sync-tasks", wecomChannelHandler.ClearSyncTasks)
 
 	// Legacy aliases for compatibility (deprecated)
 	group.GET("/users", memberHandler.List)

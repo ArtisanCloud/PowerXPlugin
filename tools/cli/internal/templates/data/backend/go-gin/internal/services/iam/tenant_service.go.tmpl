@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
@@ -14,6 +15,42 @@ import (
 type TenantService struct {
 	db    *gorm.DB
 	audit *AuditService
+}
+
+func (s *TenantService) ResolveByIdentifier(ctx context.Context, identifier string) (*iamm.Tenant, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("iam: tenant service unavailable")
+	}
+	search := strings.TrimSpace(identifier)
+	if search == "" {
+		return nil, errors.New("tenant identifier required")
+	}
+	var tenant iamm.Tenant
+	base := s.db.WithContext(ctx).Model(&iamm.Tenant{}).Where("status = ?", iamm.StatusActive)
+	if err := base.Where("lower(key) = ? OR lower(uuid) = ?", strings.ToLower(search), strings.ToLower(search)).First(&tenant).Error; err == nil {
+		return &tenant, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if id, err := strconv.ParseUint(search, 10, 64); err == nil && id > 0 {
+		if err := s.db.WithContext(ctx).
+			Model(&iamm.Tenant{}).
+			Where("id = ? AND status = ?", id, iamm.StatusActive).
+			First(&tenant).Error; err == nil {
+			return &tenant, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	like := "%" + strings.ToLower(search) + "%"
+	if err := s.db.WithContext(ctx).
+		Model(&iamm.Tenant{}).
+		Where("status = ? AND lower(name) LIKE ?", iamm.StatusActive, like).
+		Order("created_at ASC").
+		First(&tenant).Error; err != nil {
+		return nil, err
+	}
+	return &tenant, nil
 }
 
 func NewTenantService(db *gorm.DB, audit *AuditService) *TenantService {
@@ -28,8 +65,9 @@ type TenantListFilter struct {
 }
 
 type TenantListResult struct {
-	Items []iamm.Tenant
-	Total int64
+	Items       []iamm.Tenant
+	Total       int64
+	MemberCount map[string]int64
 }
 
 func (s *TenantService) List(ctx context.Context) ([]iamm.Tenant, error) {
@@ -75,7 +113,49 @@ func (s *TenantService) ListWithFilter(ctx context.Context, filter TenantListFil
 		Find(&tenants).Error; err != nil {
 		return nil, err
 	}
-	return &TenantListResult{Items: tenants, Total: total}, nil
+	memberCount, err := s.loadTenantMemberCount(ctx, tenants)
+	if err != nil {
+		return nil, err
+	}
+	return &TenantListResult{Items: tenants, Total: total, MemberCount: memberCount}, nil
+}
+
+func (s *TenantService) loadTenantMemberCount(ctx context.Context, tenants []iamm.Tenant) (map[string]int64, error) {
+	result := map[string]int64{}
+	if s == nil || s.db == nil || len(tenants) == 0 {
+		return result, nil
+	}
+	uuids := make([]string, 0, len(tenants))
+	for _, tenant := range tenants {
+		uuid := strings.TrimSpace(strings.ToLower(tenant.UUID))
+		if uuid == "" {
+			continue
+		}
+		uuids = append(uuids, uuid)
+	}
+	if len(uuids) == 0 {
+		return result, nil
+	}
+	rows := []struct {
+		TenantUUID string
+		Total      int64
+	}{}
+	if err := s.db.WithContext(ctx).
+		Model(&iamm.Member{}).
+		Select("tenant_uuid, COUNT(*) AS total").
+		Where("tenant_uuid IN ?", uuids).
+		Group("tenant_uuid").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		uuid := strings.TrimSpace(strings.ToLower(row.TenantUUID))
+		if uuid == "" {
+			continue
+		}
+		result[uuid] = row.Total
+	}
+	return result, nil
 }
 
 type CreateTenantInput struct {

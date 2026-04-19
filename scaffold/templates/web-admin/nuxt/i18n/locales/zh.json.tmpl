@@ -81,6 +81,12 @@
     "iamMembers": "成员管理",
     "iamRoles": "角色权限",
     "iamSettings": "租户配置",
+    "channelConfig": "渠道配置",
+    "channelWecom": "企业微信配置",
+    "channelWecomConfig": "基础配置",
+    "channelWecomSync": "同步中心",
+    "channelDingtalk": "钉钉配置",
+    "channelLark": "飞书配置",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
@@ -572,7 +578,18 @@
     },
     "login": {
       "forgotPassword": "忘记密码？",
-      "noAccount": "还没有账号？"
+      "noAccount": "还没有账号？",
+      "tabPassword": "账号密码",
+      "tabScan": "渠道扫码",
+      "scanDisabledTitle": "扫码登录未启用",
+      "scanDisabledDesc": "请通过带 tenant_uuid 参数的登录链接进入后再使用扫码登录。",
+      "scanDesc": "选择渠道后将跳转到对应授权页，完成扫码即可登录。",
+      "scanWith": "使用 {provider} 扫码登录",
+      "scanProcessing": "正在处理扫码回调，请稍候...",
+      "tenantRequired": "缺少 tenant_uuid，无法发起扫码登录。",
+      "qrStartFailed": "发起扫码登录失败，请检查渠道配置。",
+      "qrCallbackFailed": "扫码回调处理失败，请重试。",
+      "qrSessionExpired": "扫码会话已失效，请重新发起扫码登录。"
     },
     "register": {
       "username": "用户名",
@@ -624,6 +641,15 @@
       "bannerDescription": "宿主登录态不可用，请返回 PowerX 重新登录或等待管理员重新注入凭证。",
       "retry": "重试请求",
       "loginDisabled": "当前运行于宿主 Delegated 模式，本地登录入口已禁用，请回到 PowerX 宿主完成登录。"
+    },
+    "tenant": {
+      "label": "组织",
+      "placeholder": "请输入 tenant_uuid（例如 00000000-0000-0000-0000-000000000001）",
+      "required": "请先填写组织后再登录或扫码。",
+      "resolveFailed": "组织解析失败，请检查组织标识是否正确。",
+      "resolvedAs": "当前组织：{name}（{key}）",
+      "searching": "正在搜索组织...",
+      "emptyHint": "可先直接选择下方组织，或输入至少 2 个字符搜索。"
     }
   },
   "termsOfService": "服务条款",

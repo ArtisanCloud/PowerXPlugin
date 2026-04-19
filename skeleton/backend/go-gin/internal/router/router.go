@@ -17,6 +17,7 @@ import (
 	middleware2 "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/mini-app"
 	publicauth "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/public"
+	publicfedauth "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/public/auth"
 	wsbustransport "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/wsbus"
 
 	"github.com/gin-gonic/gin"
@@ -131,6 +132,7 @@ func (r *Router) setupRoutes() {
 	rbacCfg := r.buildRBAC()
 
 	publicauth.RegisterAuthRoutes(r.engine.Group(prefix), r.deps)
+	publicfedauth.RegisterRoutes(r.engine.Group(prefix), r.deps)
 
 	// Mini-app routes use customer auth and should not be guarded by admin JWT/RBAC middleware.
 	gMiniApp := r.engine.Group(prefix)

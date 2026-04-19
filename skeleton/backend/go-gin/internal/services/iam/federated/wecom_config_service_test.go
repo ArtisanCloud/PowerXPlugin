@@ -7,15 +7,13 @@ import (
 	basemodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	"gorm.io/datatypes"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 func TestWeComConfigServiceGetByTenant(t *testing.T) {
 	basemodel.ForceSchemaForTests("")
 	t.Cleanup(func() { basemodel.ForceSchemaForTests("public") })
 
-	db, err := gorm.Open(sqlite.Open("file:wecom-config-a?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := openTestSQLite("file:wecom-config-a?mode=memory&cache=shared")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
@@ -68,7 +66,7 @@ func TestWeComConfigServiceUpsertAndResolveCallback(t *testing.T) {
 	basemodel.ForceSchemaForTests("")
 	t.Cleanup(func() { basemodel.ForceSchemaForTests("public") })
 
-	db, err := gorm.Open(sqlite.Open("file:wecom-config-b?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := openTestSQLite("file:wecom-config-b?mode=memory&cache=shared")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

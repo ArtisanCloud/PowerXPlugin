@@ -8,7 +8,6 @@ import (
 	iamrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
 	EntityModels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +15,7 @@ func TestBindingServiceCRUDAndTenantIsolation(t *testing.T) {
 	EntityModels.ForceSchemaForTests("")
 	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := openTestSQLite("file:binding-service-a?mode=memory&cache=shared")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
@@ -76,7 +75,7 @@ func TestBindingServiceTenantScopeIsolation(t *testing.T) {
 	EntityModels.ForceSchemaForTests("")
 	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := openTestSQLite("file:binding-service-b?mode=memory&cache=shared")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
@@ -126,7 +125,7 @@ func TestJITServiceUniqueMatchAutoBind(t *testing.T) {
 	EntityModels.ForceSchemaForTests("")
 	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
 
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := openTestSQLite("file:binding-service-c?mode=memory&cache=shared")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

@@ -26,9 +26,7 @@ func (h *MemberHandler) List(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(query.TenantUUID) == "" {
-		query.TenantUUID = admincommon.ResolveTenantUUID(c)
-	}
+	query.TenantUUID = admincommon.ResolveTenantUUID(c)
 	if strings.TrimSpace(query.TenantUUID) == "" {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
@@ -55,9 +53,7 @@ func (h *MemberHandler) Create(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(req.TenantUUID) == "" {
-		req.TenantUUID = admincommon.ResolveTenantUUID(c)
-	}
+	req.TenantUUID = admincommon.ResolveTenantUUID(c)
 	if strings.TrimSpace(req.TenantUUID) == "" {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
@@ -69,15 +65,16 @@ func (h *MemberHandler) Create(c *gin.Context) {
 		actorID = &uid
 	}
 	member, err := h.service.Create(c.Request.Context(), srviam.CreateUserInput{
-		TenantUUID:   req.TenantUUID,
-		Email:        req.Email,
-		DisplayName:  req.DisplayName,
-		Username:     req.Username,
-		Phone:        req.Phone,
-		DepartmentID: req.DepartmentID,
-		Status:       req.Status,
-		Roles:        req.Roles,
-		ActorID:      actorID,
+		TenantUUID:    req.TenantUUID,
+		Email:         req.Email,
+		DisplayName:   req.DisplayName,
+		Username:      req.Username,
+		Phone:         req.Phone,
+		DepartmentID:  req.DepartmentID,
+		DepartmentIDs: req.DepartmentIDs,
+		Status:        req.Status,
+		Roles:         req.Roles,
+		ActorID:       actorID,
 	})
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -97,6 +94,11 @@ func (h *MemberHandler) Update(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
+	tenantUUID := admincommon.ResolveTenantUUID(c)
+	if strings.TrimSpace(tenantUUID) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
 	tc, _ := authmw.GetTenantContext(c)
 	var actorID *uint64
 	if tc.UserID > 0 {
@@ -104,12 +106,14 @@ func (h *MemberHandler) Update(c *gin.Context) {
 		actorID = &uid
 	}
 	member, err := h.service.Update(c.Request.Context(), id, srviam.UpdateUserInput{
-		DisplayName:  req.DisplayName,
-		Status:       req.Status,
-		DepartmentID: req.DepartmentID,
-		Roles:        req.Roles,
-		ReplaceRoles: req.ReplaceRoles,
-		ActorID:      actorID,
+		TenantUUID:    tenantUUID,
+		DisplayName:   req.DisplayName,
+		Status:        req.Status,
+		DepartmentID:  req.DepartmentID,
+		DepartmentIDs: req.DepartmentIDs,
+		Roles:         req.Roles,
+		ReplaceRoles:  req.ReplaceRoles,
+		ActorID:       actorID,
 	})
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -124,9 +128,7 @@ func (h *MemberHandler) BulkImport(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
-	if strings.TrimSpace(req.TenantUUID) == "" {
-		req.TenantUUID = admincommon.ResolveTenantUUID(c)
-	}
+	req.TenantUUID = admincommon.ResolveTenantUUID(c)
 	if strings.TrimSpace(req.TenantUUID) == "" {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return

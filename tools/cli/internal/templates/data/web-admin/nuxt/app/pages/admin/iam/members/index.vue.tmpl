@@ -19,6 +19,7 @@ const activeTab = ref("departments");
 const userStore = useUserStore();
 const { isRoot, isCurrentTenantAdmin, isLoading, error } =
   storeToRefs(userStore);
+const canManageIAM = computed(() => Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value));
 
 // 根据用户角色动态生成选项卡
 const tabs = computed(() => {
@@ -90,8 +91,8 @@ onMounted(async () => {
       </div>
 
       <div class="mt-8 space-y-8 text-gray-900 dark:text-gray-100">
-        <DepartmentManager v-if="activeTab === 'departments'" />
-        <UserShell v-else-if="activeTab === 'users'" />
+        <DepartmentManager v-if="activeTab === 'departments'" :readonly="!canManageIAM" />
+        <UserShell v-else-if="activeTab === 'users'" :readonly="!canManageIAM" />
         <PermissionShell v-else-if="activeTab === 'permissions'" />
       </div>
     </section>

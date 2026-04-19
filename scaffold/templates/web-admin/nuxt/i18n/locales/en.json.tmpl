@@ -81,6 +81,12 @@
     "iamMembers": "Members",
     "iamRoles": "Roles",
     "iamSettings": "IAM Settings",
+    "channelConfig": "Channel Config",
+    "channelWecom": "WeCom Config",
+    "channelWecomConfig": "Base Config",
+    "channelWecomSync": "Sync Center",
+    "channelDingtalk": "DingTalk Config",
+    "channelLark": "Lark Config",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
@@ -939,7 +945,18 @@
     },
     "login": {
       "forgotPassword": "Forgot password?",
-      "noAccount": "Don’t have an account?"
+      "noAccount": "Don’t have an account?",
+      "tabPassword": "Password",
+      "tabScan": "Channel QR",
+      "scanDisabledTitle": "QR sign-in is disabled",
+      "scanDisabledDesc": "Use a login URL with tenant_uuid parameter to enable QR sign-in.",
+      "scanDesc": "Choose a channel and you will be redirected to its authorization page for QR login.",
+      "scanWith": "Sign in with {provider}",
+      "scanProcessing": "Processing QR callback, please wait...",
+      "tenantRequired": "Missing tenant_uuid, unable to start QR login.",
+      "qrStartFailed": "Failed to start QR login. Please check channel config.",
+      "qrCallbackFailed": "Failed to process QR callback. Please retry.",
+      "qrSessionExpired": "QR session expired. Please start again."
     },
     "register": {
       "username": "Username",
@@ -989,6 +1006,15 @@
       "bannerDescription": "The host login is no longer valid. Please return to PowerX or wait for the administrator to reinject the credential.",
       "retry": "Request token",
       "loginDisabled": "Running in delegated mode. Please return to the PowerX host console to authenticate."
+    },
+    "tenant": {
+      "label": "Organization",
+      "placeholder": "Enter tenant_uuid (e.g. 00000000-0000-0000-0000-000000000001)",
+      "required": "Please fill organization first before password or QR login.",
+      "resolveFailed": "Failed to resolve organization. Please check the identifier.",
+      "resolvedAs": "Current organization: {name} ({key})",
+      "searching": "Searching organizations...",
+      "emptyHint": "Pick from default organizations below, or type at least 2 characters to search."
     }
   },
   "landing": {

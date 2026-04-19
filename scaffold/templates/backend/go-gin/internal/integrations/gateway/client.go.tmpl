@@ -215,10 +215,8 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 	}
 
 	requestAuthHeader := headerValue(params.Headers, "Authorization")
-	tokenSource := "none"
-	if strings.TrimSpace(requestAuthHeader) != "" {
-		tokenSource = "request"
-	}
+	tokenSource := resolveTokenSource(c.cfg, requestAuthHeader)
+	tokenClaims := parseAuthIdentityClaims(requestAuthHeader)
 	tokenTID := ""
 	if params.AuthRequired && strings.TrimSpace(requestAuthHeader) == "" {
 		return nil, &PolicyError{
@@ -249,6 +247,9 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		params.TenantUUID = tid
 		tokenTID = tid
 	}
+	if tokenTID == "" {
+		tokenTID = tokenClaims.TenantUUID
+	}
 
 	req := frameworkgateway.InvokeRequest{
 		CapabilityID:      params.CapabilityID,
@@ -264,10 +265,17 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		baseURL := ""
 		apiPrefix := ""
 		authScheme := ""
+		effectiveBase := ""
 		if c.cfg != nil && c.cfg.Gateway != nil {
 			baseURL = strings.TrimSpace(c.cfg.Gateway.BaseURL)
 			apiPrefix = strings.TrimSpace(c.cfg.Gateway.APIPrefix)
 			authScheme = effectiveGatewayAuthScheme(c.cfg.Gateway)
+			effectiveBase = effectiveGatewayBaseURL(c.cfg.Gateway)
+		}
+		permissionAudit := strings.TrimSpace(params.CapabilityID + ":" + params.Action)
+		tenantAudit := strings.TrimSpace(params.TenantUUID)
+		if tenantAudit == "" {
+			tenantAudit = tokenTID
 		}
 		c.logger.WithFields(logrus.Fields{
 			"capability":             params.CapabilityID,
@@ -282,8 +290,15 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 			"payload_endpoint":       strings.TrimSpace(fmt.Sprint(extractMapValue(params.Payload, "endpoint"))),
 			"gateway_base_url":       baseURL,
 			"gateway_api_prefix":     apiPrefix,
-			"gateway_effective_base": effectiveGatewayBaseURL(c.cfg.Gateway),
+			"gateway_effective_base": effectiveBase,
 			"gateway_auth_scheme":    authScheme,
+			"mode":                   gatewayIAMMode(c.cfg),
+			"tenant_uuid":            maskTenantUUID(tenantAudit),
+			"user_id":                tokenClaims.UserID,
+			"permission":             permissionAudit,
+			"trace_id":               strings.TrimSpace(params.RequestID),
+			"token_roles":            tokenClaims.Roles,
+			"token_permissions":      tokenClaims.Permissions,
 		}).Info("gateway invoke dispatch")
 	}
 	resp, err := c.transport.Invoke(ctx, req)
@@ -544,16 +559,132 @@ func headerValue(headers map[string]string, key string) string {
 	return ""
 }
 
-func tenantUUIDFromAuthHeader(header string) (string, bool) {
-	header = strings.TrimSpace(header)
-	if header == "" {
-		return "", false
+type authIdentityClaims struct {
+	TenantUUID  string
+	UserID      string
+	Roles       []string
+	Permissions []string
+}
+
+func resolveTokenSource(cfg *config.Config, requestAuthHeader string) string {
+	if strings.TrimSpace(requestAuthHeader) != "" {
+		return "request"
 	}
-	lowered := strings.ToLower(header)
-	if !strings.HasPrefix(lowered, "bearer ") {
+	if cfg == nil || cfg.Gateway == nil {
+		return "none"
+	}
+	authScheme := effectiveGatewayAuthScheme(cfg.Gateway)
+	if authScheme == "apikey" && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
+		return "gateway_apikey"
+	}
+	if strings.TrimSpace(cfg.Gateway.ToolToken) != "" {
+		return "gateway_tool"
+	}
+	return "none"
+}
+
+func parseAuthIdentityClaims(header string) authIdentityClaims {
+	claims := authIdentityClaims{}
+	token, ok := bearerTokenFromHeader(header)
+	if !ok {
+		return claims
+	}
+	decoded := decodeJWTClaims(token)
+	if decoded == nil {
+		return claims
+	}
+	claims.TenantUUID = strings.TrimSpace(firstClaimString(decoded, "tid", "tenant_uuid"))
+	claims.UserID = strings.TrimSpace(firstClaimString(decoded, "sub", "uid", "user_id"))
+	claims.Roles = parseSliceClaim(decoded["roles"])
+	claims.Permissions = parseSliceClaim(decoded["permissions"])
+	return claims
+}
+
+func bearerTokenFromHeader(header string) (string, bool) {
+	header = strings.TrimSpace(header)
+	if header == "" || !strings.HasPrefix(strings.ToLower(header), "bearer ") {
 		return "", false
 	}
 	token := strings.TrimSpace(header[len("Bearer "):])
+	if token == "" {
+		return "", false
+	}
+	return token, true
+}
+
+func decodeJWTClaims(token string) map[string]any {
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	if len(parts) < 2 {
+		return nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil
+	}
+	return claims
+}
+
+func firstClaimString(claims map[string]any, keys ...string) string {
+	if claims == nil {
+		return ""
+	}
+	for _, key := range keys {
+		raw, ok := claims[key]
+		if !ok || raw == nil {
+			continue
+		}
+		if value := strings.TrimSpace(fmt.Sprint(raw)); value != "" && value != "<nil>" {
+			return value
+		}
+	}
+	return ""
+}
+
+func parseSliceClaim(raw any) []string {
+	result := make([]string, 0)
+	seen := map[string]struct{}{}
+	push := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		if _, ok := seen[value]; ok {
+			return
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+
+	switch value := raw.(type) {
+	case []string:
+		for _, item := range value {
+			push(item)
+		}
+	case []any:
+		for _, item := range value {
+			push(fmt.Sprint(item))
+		}
+	case string:
+		if strings.Contains(value, ",") {
+			for _, item := range strings.Split(value, ",") {
+				push(item)
+			}
+		} else {
+			push(value)
+		}
+	}
+	return result
+}
+
+func tenantUUIDFromAuthHeader(header string) (string, bool) {
+	token, ok := bearerTokenFromHeader(header)
+	if !ok {
+		return "", false
+	}
 	tid := strings.TrimSpace(tenantUUIDFromJWT(token))
 	if tid == "" {
 		return "", false
@@ -822,22 +953,9 @@ func newGatewayConfigError(code, msg string, gcfg *config.GatewayConfig, iamMode
 }
 
 func tenantUUIDFromJWT(token string) string {
-	token = strings.TrimSpace(token)
-	if token == "" {
+	claims := decodeJWTClaims(token)
+	if claims == nil {
 		return ""
 	}
-	parts := strings.Split(token, ".")
-	if len(parts) < 2 {
-		return ""
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return ""
-	}
-	var claims map[string]any
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return ""
-	}
-	tid, _ := claims["tid"].(string)
-	return strings.TrimSpace(tid)
+	return strings.TrimSpace(firstClaimString(claims, "tid", "tenant_uuid"))
 }

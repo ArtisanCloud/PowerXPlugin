@@ -29,6 +29,13 @@ type LoginRequest struct {
 	Remember   bool
 }
 
+type FederatedLoginRequest struct {
+	TenantUUID     string
+	MemberID       uint64
+	Provider       string
+	ExternalUserID string
+}
+
 type AuthTokens struct {
 	TokenType     string
 	AccessToken   string

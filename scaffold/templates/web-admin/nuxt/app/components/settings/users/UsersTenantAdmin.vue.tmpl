@@ -16,30 +16,35 @@ import {
   useUserService,
   type MemberWithProfile,
 } from "~/composables/api/services/userService";
+import { useIAMService } from "~/composables/api/services/iamService";
 import type { Department } from "~/composables/api/services/departmentService";
 
 // ==== 输入属性（Root 复用时传入 tenantUuid） ====
-const props = defineProps<{ tenantUuid: string }>();
+const props = withDefaults(defineProps<{ tenantUuid: string; readonly?: boolean }>(), {
+  readonly: false,
+});
 const { t, locale } = useI18n();
 
 // ==== 部门store ====
 const departmentStore = useDepartmentStore();
 const userService = useUserService();
+const iamService = useIAMService();
 
 // ===== 类型与数据 =====
 type StatusType = "active" | "inactive";
-type RoleType = "admin" | "editor" | "user";
 type UserCategory = "all" | "active" | "inactive";
 
 interface RowUser {
   id: number; // Member ID
   userId?: number; // User ID
+  sourceType: "federated" | "local";
   name: string;
   username?: string;
   email?: string;
   phone?: string;
   department?: string;
-  roles?: RoleType[] | null;
+  departmentIds: number[];
+  roles: string[];
   status: StatusType | string;
   avatar: string;
   meta?: Record<string, any> | null;
@@ -49,6 +54,7 @@ interface RowUser {
 const users = ref<RowUser[]>([]);
 const loading = ref(false);
 const userCategory = ref<UserCategory>("all");
+const federatedMemberSource = ref<Record<number, string>>({});
 
 // ====== 过滤/分页（与你现有一致） ======
 const searchQuery = ref("");
@@ -72,12 +78,60 @@ const departmentTreeItems = computed(() => {
 
   return departmentStore.tree.map(convertDepartmentToTreeNode);
 });
-const roles = ref([
-  { label: t("organization.user.form.selectRole"), value: null },
-  { label: t("organization.user.role.admin"), value: "admin" },
-  { label: t("organization.user.role.editor"), value: "editor" },
-  { label: t("organization.user.role.user"), value: "user" },
-]);
+const roleOptions = ref<Array<{ label: string; value: number; code: string }>>([]);
+
+const departmentFlatOptions = computed(() => {
+  const out: Array<{ label: string; value: number }> = [];
+  const walk = (nodes: Department[], prefix = "") => {
+    for (const node of nodes) {
+      const label = prefix ? `${prefix} / ${node.name}` : node.name;
+      out.push({ label, value: Number(node.id) });
+      if (Array.isArray(node.children) && node.children.length > 0) {
+        walk(node.children as Department[], label);
+      }
+    }
+  };
+  walk(departmentStore.tree || []);
+  return out;
+});
+
+const departmentNameMap = computed(() => {
+  const map = new Map<number, string>();
+  for (const item of departmentFlatOptions.value) {
+    map.set(item.value, item.label);
+  }
+  return map;
+});
+
+const roleCodeToIDMap = computed(() => {
+  const map = new Map<string, number>();
+  for (const item of roleOptions.value) {
+    if (item.code) {
+      map.set(String(item.code).toLowerCase(), Number(item.value));
+    }
+  }
+  return map;
+});
+
+const roleCodeToLabelMap = computed(() => {
+  const map = new Map<string, string>();
+  for (const item of roleOptions.value) {
+    if (item.code) {
+      map.set(String(item.code).toLowerCase(), String(item.label || item.code));
+    }
+  }
+  return map;
+});
+
+const roleFilterOptions = computed(() => {
+  const items: Array<{ label: string; value: string | null }> = [
+    { label: t("organization.user.form.selectRole"), value: null },
+  ];
+  for (const item of roleOptions.value) {
+    items.push({ label: item.label, value: item.code });
+  }
+  return items;
+});
 
 // ====== 导入导出 ======
 type ExportFormat = "csv" | "json";
@@ -92,6 +146,8 @@ async function exportUsers(format: ExportFormat) {
       const { default: Papa } = await import("papaparse");
       content = Papa.unparse(
         users.value.map((u) => ({
+          用户ID: u.userId || "",
+          类型: u.sourceType === "federated" ? "渠道同步" : "本地",
           姓名: u.name,
           用户名: u.username,
           邮箱: u.email,
@@ -181,6 +237,7 @@ const userForm = reactive({
   email: "",
   phone: "",
   departmentId: null as number | null,
+  departmentIds: [] as number[],
   roleIds: [] as number[],
   avatarUrl: "",
   password: "",
@@ -195,6 +252,7 @@ function resetForm() {
   userForm.email = "";
   userForm.phone = "";
   userForm.departmentId = null;
+  userForm.departmentIds = [];
   userForm.roleIds = [];
   userForm.avatarUrl = "";
   userForm.password = "";
@@ -223,6 +281,11 @@ function openEditForm(row: RowUser) {
   userForm.avatarUrl = row.avatar;
   userForm.status = row.status === "active" ? "active" : "disabled";
   userForm.meta = row.meta || {};
+  userForm.departmentIds = Array.isArray(row.departmentIds) ? [...row.departmentIds] : [];
+  userForm.departmentId = userForm.departmentIds.length > 0 ? userForm.departmentIds[0] : null;
+  userForm.roleIds = (row.roles || [])
+    .map((code) => roleCodeToIDMap.value.get(String(code || "").toLowerCase()) || 0)
+    .filter((id) => id > 0);
   showForm.value = true;
 }
 
@@ -246,7 +309,11 @@ async function saveUser() {
         email: userForm.email,
         phone: userForm.phone,
         avatar_url: userForm.avatarUrl,
-        status: userForm.status === "active" ? 1 : 0,
+        status: userForm.status === "active" ? "active" : "disabled",
+        department_id: userForm.departmentIds?.[0] || null,
+        department_ids: userForm.departmentIds || [],
+        roleIds: userForm.roleIds || [],
+        replaceRoles: true,
       };
       await userService.updateUser(editingId.value, updatePayload);
     } else {
@@ -257,11 +324,13 @@ async function saveUser() {
         email: userForm.email,
         phone: userForm.phone,
         avatar_url: userForm.avatarUrl,
-        status: userForm.status === "active" ? 1 : 0,
+        status: userForm.status === "active" ? "active" : "disabled",
         meta: userForm.meta ?? {},
         username: userForm.username || userForm.email.split("@")[0],
         initial_password: userForm.password,
-        dept_ids: userForm.departmentId ? [userForm.departmentId] : [],
+        department_id: userForm.departmentIds?.[0] || null,
+        department_ids: userForm.departmentIds || [],
+        roleIds: userForm.roleIds || [],
       };
       await userService.createSystemUser(createPayload);
     }
@@ -298,14 +367,24 @@ async function toggleUserStatus(row: RowUser) {
 
 // ===== 过滤/分页逻辑 =====
 const filteredUsers = computed(() => {
-  // 由于使用API分页，直接返回当前用户数据
-  return users.value;
+  return users.value.filter((item) => {
+    if (filters.department) {
+      const departmentID = Number(filters.department);
+      if (!item.departmentIds.includes(departmentID)) {
+        return false;
+      }
+    }
+    if (filters.role) {
+      const roleCode = String(filters.role).toLowerCase();
+      if (!(item.roles || []).some((code) => String(code || "").toLowerCase() === roleCode)) {
+        return false;
+      }
+    }
+    return true;
+  });
 });
 
-const paginatedUsers = computed(() => {
-  // API已经返回分页数据，直接使用
-  return users.value;
-});
+const paginatedUsers = computed(() => filteredUsers.value);
 
 const categoryStats = computed(() => {
   const active = users.value.filter((item) => item.status === "active").length;
@@ -371,6 +450,8 @@ watch(
   [
     searchQuery,
     () => filters.status,
+    () => filters.department,
+    () => filters.role,
   ],
   () => {
     pagination.page = 1;
@@ -387,9 +468,10 @@ watch(
 
 watch(
   () => props.tenantUuid,
-  () => {
+  async () => {
     pagination.page = 1;
-    loadUsers();
+    await loadRoleOptions();
+    await loadUsers();
   }
 );
 
@@ -411,6 +493,20 @@ const columns = computed(() => {
       },
     },
     {
+      id: "userId",
+      accessorKey: "userId",
+      header: "用户ID",
+    },
+    {
+      id: "sourceType",
+      accessorKey: "sourceType",
+      header: "类型",
+      cell: ({ row }: any) => {
+        const u = row.original as RowUser;
+        return u.sourceType === "federated" ? "渠道同步" : "本地";
+      },
+    },
+    {
       id: "name",
       accessorKey: "name",
       header: t("organization.user.table.name").toString(),
@@ -420,12 +516,20 @@ const columns = computed(() => {
       accessorKey: "username",
       header: t("organization.user.table.username").toString(),
     },
-    {
+    ...(props.readonly
+      ? []
+      : [{
       id: "email",
       accessorKey: "email",
       header: t("organization.user.table.email").toString(),
-    },
-    {
+      cell: ({ row }: any) => {
+        const u = row.original as RowUser;
+        return u.email || "-";
+      },
+    }]),
+    ...(props.readonly
+      ? []
+      : [{
       id: "phone",
       accessorKey: "phone",
       header: t("organization.user.table.phone").toString(),
@@ -433,7 +537,30 @@ const columns = computed(() => {
         const u = row.original as RowUser;
         return maskPhone(u.phone || "");
       },
+    }]),
+    {
+      id: "department",
+      accessorKey: "department",
+      header: t("organization.user.form.department").toString(),
+      cell: ({ row }: any) => {
+        const u = row.original as RowUser;
+        return u.department || "-";
+      },
     },
+    ...(props.readonly
+      ? []
+      : [{
+      id: "roles",
+      accessorKey: "roles",
+      header: t("organization.user.form.role").toString(),
+      cell: ({ row }: any) => {
+        const u = row.original as RowUser;
+        const labels = (u.roles || [])
+          .map((code) => roleCodeToLabelMap.value.get(String(code || "").toLowerCase()) || code)
+          .filter(Boolean);
+        return labels.length > 0 ? labels.join(" / ") : "-";
+      },
+    }]),
     {
       id: "status",
       accessorKey: "status",
@@ -454,7 +581,9 @@ const columns = computed(() => {
         );
       },
     },
-    {
+    ...(props.readonly
+      ? []
+      : [{
       id: "actions",
       header: t("organization.user.table.actions").toString(),
       cell: ({ row }: any) => {
@@ -466,6 +595,7 @@ const columns = computed(() => {
               size: "xs",
               variant: "ghost",
               icon: "i-heroicons-pencil-square",
+              disabled: props.readonly,
               onClick: () => openEditForm(u),
             },
             () => t("organization.common.edit")
@@ -480,6 +610,7 @@ const columns = computed(() => {
                 u.status === "active"
                   ? "i-heroicons-lock-closed"
                   : "i-heroicons-lock-open",
+              disabled: props.readonly,
               onClick: () => toggleUserStatus(u),
             },
             () =>
@@ -494,13 +625,14 @@ const columns = computed(() => {
               color: "error",
               variant: "ghost",
               icon: "i-heroicons-trash",
+              disabled: props.readonly,
               onClick: () => deleteUser(u.id),
             },
             () => t("organization.common.delete")
           ),
         ]);
       },
-    },
+    }]),
   ];
 });
 
@@ -511,25 +643,65 @@ function maskPhone(phone: string): string {
   return phone.slice(0, 3) + "****" + phone.slice(-4);
 }
 
+function isSyntheticWecomEmail(email?: string): boolean {
+  const value = String(email || "").trim().toLowerCase();
+  return value.endsWith(".wecom.local");
+}
+
 // 转换API数据为组件需要的格式
 function transformUserData(memberWithProfile: MemberWithProfile): RowUser {
-  const { Member, User } = memberWithProfile;
+  const { Member, User, DeptIDs, RoleCodes } = memberWithProfile;
+  const mergedMeta = { ...User.meta, ...Member.meta } as Record<string, any>;
+  const rawEmail = String(User.email || "").trim();
+  const provider = String(federatedMemberSource.value[Member.id] || "").toLowerCase();
+  const departmentIDs = Array.isArray(DeptIDs)
+    ? DeptIDs.map((id) => Number(id || 0)).filter((id) => Number.isFinite(id) && id > 0)
+    : [];
+  const departmentLabels = departmentIDs
+    .map((id) => departmentNameMap.value.get(id) || `#${id}`)
+    .filter(Boolean);
   return {
     id: Member.id, // 使用Member的ID作为主要ID
     userId: User.id, // 保存User的ID以备后用
+    sourceType: provider ? "federated" : "local",
     name: Member.display_name || User.display_name,
     username: Member.username,
-    email: User.email || "",
-    phone: User.phone || "",
-    department: Member.meta?.title || Member.meta?.department || "",
-    roles: null,
+    email: props.readonly ? "" : (isSyntheticWecomEmail(rawEmail) ? "" : rawEmail),
+    phone: props.readonly ? "" : (User.phone || ""),
+    department: departmentLabels.join(" / "),
+    departmentIds: departmentIDs,
+    roles: props.readonly ? [] : (Array.isArray(RoleCodes) ? RoleCodes : []),
     status: Member.status === 1 ? "active" : "inactive",
     avatar:
       Member.avatar_url ||
       User.avatar_url ||
       `https://i.pravatar.cc/150?u=${encodeURIComponent(User.email || Member.display_name)}`,
-    meta: { ...User.meta, ...Member.meta }, // 合并User和Member的meta
+    meta: mergedMeta, // 合并User和Member的meta
   };
+}
+
+async function loadRoleOptions() {
+  if (!props.tenantUuid) {
+    roleOptions.value = [];
+    return;
+  }
+  try {
+    const response = await iamService.listRoles({ tenantUuid: props.tenantUuid });
+    const payload = (response as any)?.data ?? response ?? {};
+    const items = payload?.data?.items ?? payload?.items ?? payload?.data ?? [];
+    roleOptions.value = Array.isArray(items)
+      ? items
+          .map((item: any) => ({
+            label: String(item?.name || item?.code || "").trim(),
+            value: Number(item?.id || 0),
+            code: String(item?.code || "").trim(),
+          }))
+          .filter((item: any) => item.value > 0 && item.code)
+      : [];
+  } catch (error) {
+    console.error("加载角色数据失败:", error);
+    roleOptions.value = [];
+  }
 }
 
 // 加载用户数据
@@ -555,7 +727,30 @@ async function loadUsers() {
       params.q = searchQuery.value.trim(); // 后端使用q参数
     }
 
-    const response = await userService.getUsers(params);
+    const [response, bindingResp] = await Promise.all([
+      userService.getUsers(params),
+      iamService.listFederatedBindings({
+        tenantUuid: props.tenantUuid,
+      }),
+    ]);
+
+    const bindingPayload = (bindingResp as any)?.data ?? bindingResp ?? {};
+    const bindingItems =
+      bindingPayload?.data?.items ??
+      bindingPayload?.items ??
+      bindingPayload?.data ??
+      [];
+    const sourceMap: Record<number, string> = {};
+    if (Array.isArray(bindingItems)) {
+      for (const item of bindingItems) {
+        const memberID = Number((item as any)?.member_id || 0);
+        const provider = String((item as any)?.provider || "").trim();
+        if (memberID > 0 && provider) {
+          sourceMap[memberID] = provider;
+        }
+      }
+    }
+    federatedMemberSource.value = sourceMap;
 
     if (response.data) {
       users.value = response.data.items.map(transformUserData);
@@ -578,7 +773,8 @@ onMounted(async () => {
     console.error("加载部门数据失败:", error);
   }
 
-  // 加载用户数据
+  // 加载角色和用户数据
+  await loadRoleOptions();
   await loadUsers();
 });
 </script>
@@ -594,6 +790,7 @@ onMounted(async () => {
         <p class="text-sm text-gray-500 mt-1 dark:text-slate-200">
           {{ `{{ $t("organization.user.description") }}` }}
         </p>
+        <p v-if="props.readonly" class="text-xs text-amber-600 mt-1 dark:text-amber-300">当前为只读视图，隐藏联系方式与角色详情</p>
       </div>
       <div class="flex space-x-2">
         <UDropdownMenu :items="importExportItems">
@@ -605,7 +802,7 @@ onMounted(async () => {
             {{ `{{ $t("organization.user.importExport") }}` }}
           </UButton>
         </UDropdownMenu>
-        <UButton color="primary" icon="i-heroicons-plus" @click="openAddForm">
+        <UButton v-if="!props.readonly" color="primary" icon="i-heroicons-plus" @click="openAddForm">
           {{ `{{ $t("organization.user.add") }}` }}
         </UButton>
       </div>
@@ -658,10 +855,10 @@ onMounted(async () => {
             class="w-full sm:min-w-[12rem]"
           />
         </UFormField>
-        <UFormField :label="$t('organization.user.form.role')">
+        <UFormField v-if="!props.readonly" :label="$t('organization.user.form.role')">
           <USelect
             v-model="filters.role"
-            :items="roles"
+            :items="roleFilterOptions"
             class="w-full sm:min-w-[12rem]"
             :placeholder="$t('organization.user.form.selectRole')"
             option-attribute="label"
@@ -759,6 +956,7 @@ onMounted(async () => {
 
     <!-- 表单弹窗（新增/编辑） -->
     <UModal
+      v-if="!props.readonly"
       v-model:open="showForm"
       :title="
         isEditing
@@ -801,6 +999,30 @@ onMounted(async () => {
                 v-model="userForm.phone"
                 type="tel"
                 :placeholder="$t('organization.user.form.phonePlaceholder')"
+              />
+            </UFormField>
+            <UFormField :label="$t('organization.user.form.department')" class="md:col-span-2">
+              <USelectMenu
+                v-model="userForm.departmentIds"
+                :items="departmentFlatOptions"
+                value-key="value"
+                searchable
+                multiple
+                class="w-full"
+                :placeholder="$t('organization.user.form.selectDepartment')"
+                @update:model-value="(values:any) => { userForm.departmentIds = (values || []).map((v:any) => Number(v)); userForm.departmentId = userForm.departmentIds[0] || null; }"
+              />
+            </UFormField>
+            <UFormField :label="$t('organization.user.form.role')" class="md:col-span-2">
+              <USelectMenu
+                v-model="userForm.roleIds"
+                :items="roleOptions"
+                value-key="value"
+                searchable
+                multiple
+                class="w-full"
+                :placeholder="$t('organization.user.form.selectRole')"
+                @update:model-value="(values:any) => { userForm.roleIds = (values || []).map((v:any) => Number(v)); }"
               />
             </UFormField>
             <UFormField

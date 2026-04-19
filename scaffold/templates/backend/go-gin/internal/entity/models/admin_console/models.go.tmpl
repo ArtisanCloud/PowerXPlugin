@@ -42,7 +42,7 @@ type ConfigChange struct {
 	PreviousSnapshot  datatypes.JSON `gorm:"column:previous_snapshot;type:jsonb" json:"previous_snapshot,omitempty"`
 	NextSnapshot      datatypes.JSON `gorm:"column:next_snapshot;type:jsonb" json:"next_snapshot,omitempty"`
 	ValidationSummary datatypes.JSON `gorm:"column:validation_summary;type:jsonb" json:"validation_summary,omitempty"`
-	AuditEventID      string         `gorm:"column:audit_event_id;type:uuid;not null" json:"audit_event_id"`
+	AuditEventID      string         `gorm:"column:audit_event_id;type:text;not null" json:"audit_event_id"`
 	AppliedAt         time.Time      `gorm:"column:applied_at;not null;default:now()" json:"applied_at"`
 	AuditEvent        *AuditEvent    `gorm:"foreignKey:AuditEventID" json:"audit_event,omitempty"`
 }
@@ -72,8 +72,8 @@ type JobRun struct {
 	FinishedAt     *time.Time     `gorm:"column:finished_at" json:"finished_at,omitempty"`
 	DurationMillis int64          `gorm:"column:duration_ms;type:bigint;->" json:"duration_ms"`
 	Message        *string        `gorm:"column:message;type:text" json:"message,omitempty"`
-	RetryOf        *string        `gorm:"column:retry_of;type:uuid" json:"retry_of,omitempty"`
-	AuditEventID   *string        `gorm:"column:audit_event_id;type:uuid" json:"audit_event_id,omitempty"`
+	RetryOf        *string        `gorm:"column:retry_of;type:text" json:"retry_of,omitempty"`
+	AuditEventID   *string        `gorm:"column:audit_event_id;type:text" json:"audit_event_id,omitempty"`
 	CreatedBy      string         `gorm:"column:created_by;type:text;not null" json:"created_by"`
 	CreatedAt      time.Time      `gorm:"column:created_at;not null;default:now()" json:"created_at"`
 	UpdatedAt      time.Time      `gorm:"column:updated_at;not null;default:now()" json:"updated_at"`

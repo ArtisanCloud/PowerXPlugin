@@ -60,17 +60,19 @@ func (h *TenantHandler) List(c *gin.Context) {
 			respondIAMError(c, err)
 			return
 		}
-		contracts.ResponseSuccess(c, gin.H{
-			"items": []gin.H{{
-				"uuid":   tenant.TenantUUID,
-				"key":    tenant.TenantKey,
-				"name":   tenant.Name,
-				"status": tenant.Status,
-			}},
-			"total":     1,
-			"page":      1,
-			"page_size": 20,
-		})
+			contracts.ResponseSuccess(c, gin.H{
+				"items": []gin.H{
+					{
+						"uuid":   tenant.TenantUUID,
+						"key":    tenant.TenantKey,
+						"name":   tenant.Name,
+						"status": tenant.Status,
+					},
+				},
+				"total":     1,
+				"page":      1,
+				"page_size": 20,
+			})
 		return
 	}
 

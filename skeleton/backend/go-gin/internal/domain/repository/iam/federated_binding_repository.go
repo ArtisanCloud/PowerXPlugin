@@ -34,10 +34,18 @@ func (r *FederatedBindingRepository) List(ctx context.Context, tenantUUID, provi
 }
 
 func (r *FederatedBindingRepository) GetActiveByExternal(ctx context.Context, tenantUUID, provider, externalUserID string) (*iammodel.FederatedBinding, error) {
+	return r.GetActiveByExternalScoped(ctx, tenantUUID, provider, "", externalUserID)
+}
+
+func (r *FederatedBindingRepository) GetActiveByExternalScoped(ctx context.Context, tenantUUID, provider, tenantScope, externalUserID string) (*iammodel.FederatedBinding, error) {
 	var row iammodel.FederatedBinding
-	err := r.DB.WithContext(ctx).Model(&iammodel.FederatedBinding{}).
-		Where("tenant_uuid = ? AND provider = ? AND external_user_id = ? AND status = ?", strings.TrimSpace(tenantUUID), strings.TrimSpace(provider), strings.TrimSpace(externalUserID), "active").
-		First(&row).Error
+	query := r.DB.WithContext(ctx).Model(&iammodel.FederatedBinding{}).
+		Where("tenant_uuid = ? AND provider = ? AND external_user_id = ? AND status = ?", strings.TrimSpace(tenantUUID), strings.TrimSpace(provider), strings.TrimSpace(externalUserID), "active")
+	tenantScope = strings.TrimSpace(tenantScope)
+	if tenantScope != "" {
+		query = query.Where("tenant_scope = ?", tenantScope)
+	}
+	err := query.First(&row).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -62,6 +70,18 @@ func (r *FederatedBindingRepository) Unbind(ctx context.Context, tenantUUID, pro
 	if err != nil || current == nil {
 		return current, err
 	}
+	return r.unbindAndSave(ctx, current)
+}
+
+func (r *FederatedBindingRepository) UnbindScoped(ctx context.Context, tenantUUID, provider, tenantScope, externalUserID string) (*iammodel.FederatedBinding, error) {
+	current, err := r.GetActiveByExternalScoped(ctx, tenantUUID, provider, tenantScope, externalUserID)
+	if err != nil || current == nil {
+		return current, err
+	}
+	return r.unbindAndSave(ctx, current)
+}
+
+func (r *FederatedBindingRepository) unbindAndSave(ctx context.Context, current *iammodel.FederatedBinding) (*iammodel.FederatedBinding, error) {
 	now := time.Now()
 	current.Status = "unbound"
 	current.UnboundAt = &now

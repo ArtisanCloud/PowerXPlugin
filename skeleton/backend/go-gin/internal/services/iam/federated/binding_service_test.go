@@ -72,6 +72,56 @@ func TestBindingServiceCRUDAndTenantIsolation(t *testing.T) {
 	}
 }
 
+func TestBindingServiceTenantScopeIsolation(t *testing.T) {
+	EntityModels.ForceSchemaForTests("")
+	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
+
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&iammodel.User{}, &iammodel.Member{}, &iammodel.FederatedBinding{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	seedUser := &iammodel.User{Email: "scope@example.com", PasswordHash: "x", Status: iammodel.StatusActive}
+	if err := db.Create(seedUser).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	member := &iammodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-a"}, UserID: seedUser.ID, Username: "scope-u", Status: iammodel.StatusActive}
+	if err := db.Create(member).Error; err != nil {
+		t.Fatalf("seed member: %v", err)
+	}
+
+	repo := iamrepo.NewFederatedBindingRepository(db)
+	svc := NewBindingService(repo, db, nil)
+
+	first, err := svc.Bind(context.Background(), BindInput{
+		TenantUUID:     "tenant-a",
+		Provider:       "wecom",
+		TenantScope:    "corp-a",
+		ExternalUserID: "wx-1",
+		MemberID:       member.ID,
+		Source:         "sync",
+	})
+	if err != nil {
+		t.Fatalf("bind first err: %v", err)
+	}
+	second, err := svc.Bind(context.Background(), BindInput{
+		TenantUUID:     "tenant-a",
+		Provider:       "wecom",
+		TenantScope:    "corp-b",
+		ExternalUserID: "wx-1",
+		MemberID:       member.ID,
+		Source:         "sync",
+	})
+	if err != nil {
+		t.Fatalf("bind second err: %v", err)
+	}
+	if first.ID == second.ID {
+		t.Fatalf("expected different binding rows for different tenant_scope, got same id=%d", first.ID)
+	}
+}
+
 func TestJITServiceUniqueMatchAutoBind(t *testing.T) {
 	EntityModels.ForceSchemaForTests("")
 	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })

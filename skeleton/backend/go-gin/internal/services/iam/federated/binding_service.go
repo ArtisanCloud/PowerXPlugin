@@ -29,6 +29,7 @@ type BindingService struct {
 type BindInput struct {
 	TenantUUID     string
 	Provider       string
+	TenantScope    string
 	ExternalUserID string
 	MemberID       uint64
 	Source         string
@@ -48,6 +49,7 @@ func (s *BindingService) List(ctx context.Context, tenantUUID, provider string) 
 func (s *BindingService) Bind(ctx context.Context, in BindInput) (*iammodel.FederatedBinding, error) {
 	tenantUUID := strings.TrimSpace(in.TenantUUID)
 	provider := strings.ToLower(strings.TrimSpace(in.Provider))
+	tenantScope := strings.TrimSpace(in.TenantScope)
 	externalUserID := strings.TrimSpace(in.ExternalUserID)
 	if tenantUUID == "" {
 		return nil, ErrTenantUUIDRequired
@@ -62,13 +64,14 @@ func (s *BindingService) Bind(ctx context.Context, in BindInput) (*iammodel.Fede
 		return nil, ErrMemberInvalid
 	}
 
-	existing, err := s.repo.GetActiveByExternal(ctx, tenantUUID, provider, externalUserID)
+	existing, err := s.repo.GetActiveByExternalScoped(ctx, tenantUUID, provider, tenantScope, externalUserID)
 	if err != nil {
 		return nil, err
 	}
 	now := time.Now()
 	if existing != nil {
 		existing.MemberID = in.MemberID
+		existing.TenantScope = tenantScope
 		existing.Source = normalizeSource(in.Source)
 		existing.BoundAt = now
 		existing.Status = "active"
@@ -79,6 +82,7 @@ func (s *BindingService) Bind(ctx context.Context, in BindInput) (*iammodel.Fede
 	binding := &iammodel.FederatedBinding{
 		BaseModel:      BaseModels(tenantUUID),
 		Provider:       provider,
+		TenantScope:    tenantScope,
 		ExternalUserID: externalUserID,
 		MemberID:       in.MemberID,
 		Status:         "active",
@@ -90,6 +94,10 @@ func (s *BindingService) Bind(ctx context.Context, in BindInput) (*iammodel.Fede
 }
 
 func (s *BindingService) Unbind(ctx context.Context, tenantUUID, provider, externalUserID string) (*iammodel.FederatedBinding, error) {
+	return s.UnbindScoped(ctx, tenantUUID, provider, "", externalUserID)
+}
+
+func (s *BindingService) UnbindScoped(ctx context.Context, tenantUUID, provider, tenantScope, externalUserID string) (*iammodel.FederatedBinding, error) {
 	if strings.TrimSpace(tenantUUID) == "" {
 		return nil, ErrTenantUUIDRequired
 	}
@@ -99,7 +107,7 @@ func (s *BindingService) Unbind(ctx context.Context, tenantUUID, provider, exter
 	if strings.TrimSpace(externalUserID) == "" {
 		return nil, ErrExternalUserRequired
 	}
-	binding, err := s.repo.Unbind(ctx, tenantUUID, provider, externalUserID)
+	binding, err := s.repo.UnbindScoped(ctx, tenantUUID, provider, strings.TrimSpace(tenantScope), externalUserID)
 	if err != nil || binding == nil {
 		return binding, err
 	}

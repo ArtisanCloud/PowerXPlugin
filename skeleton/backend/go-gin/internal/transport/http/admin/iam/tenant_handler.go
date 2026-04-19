@@ -2,6 +2,7 @@ package iam
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
@@ -33,8 +34,28 @@ func (h *TenantHandler) List(c *gin.Context) {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
+	items := make([]gin.H, 0, len(result.Items))
+	for _, tenant := range result.Items {
+		uuid := strings.TrimSpace(strings.ToLower(tenant.UUID))
+		memberCount := int64(0)
+		if result.MemberCount != nil {
+			memberCount = result.MemberCount[uuid]
+		}
+		items = append(items, gin.H{
+			"id":           tenant.ID,
+			"uuid":         tenant.UUID,
+			"key":          tenant.Key,
+			"name":         tenant.Name,
+			"status":       tenant.Status,
+			"plan":         tenant.Plan,
+			"created_at":   tenant.CreatedAt,
+			"updated_at":   tenant.UpdatedAt,
+			"member_count": memberCount,
+			"user_count":   memberCount,
+		})
+	}
 	contracts.ResponseSuccess(c, gin.H{
-		"items":     result.Items,
+		"items":     items,
 		"total":     result.Total,
 		"page":      resultPage(query.Page),
 		"page_size": resultPageSize(query.PageSize),

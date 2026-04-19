@@ -9,15 +9,19 @@ import (
 func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	h := NewTemplateHandler(deps)
 
-	g := rg.Group("/templates", httpmw.EnsureTenant(), httpmw.RequireRoot())
+	g := rg.Group("/templates", httpmw.EnsureTenant())
 	{
 		g.GET("", h.GetTemplates)
 		g.GET("/:id", h.GetTemplate)
-		g.POST("", h.CreateTemplate)
-		g.PUT("/:id", h.UpdateTemplate)
-		g.DELETE("/:id", h.DeleteTemplate)
-		g.POST("/batch-clone", h.BatchCloneTemplates)
-		g.POST("/:id/validate", h.ValidateTemplateCapability)
+	}
+
+	manage := rg.Group("/templates", httpmw.EnsureTenant(), httpmw.RequireRoot())
+	{
+		manage.POST("", h.CreateTemplate)
+		manage.PUT("/:id", h.UpdateTemplate)
+		manage.DELETE("/:id", h.DeleteTemplate)
+		manage.POST("/batch-clone", h.BatchCloneTemplates)
+		manage.POST("/:id/validate", h.ValidateTemplateCapability)
 	}
 
 	adminGroup := rg.Group("/admin/templates", httpmw.EnsureTenant(), httpmw.RequireRoot())

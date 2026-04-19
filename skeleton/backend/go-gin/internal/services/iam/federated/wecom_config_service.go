@@ -1,0 +1,254 @@
+package federated
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+
+	providerWeCom "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/wecom"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const IntegrationTypeIAMFederatedWeCom = "iam_federated_wecom"
+
+type WeComConfig struct {
+	TenantUUID   string `json:"tenant_uuid"`
+	CorpID       string `json:"corp_id"`
+	AgentID      int    `json:"agent_id"`
+	Secret       string `json:"secret"`
+	Token        string `json:"token"`
+	AESKey       string `json:"aes_key"`
+	CallbackHost string `json:"callback_host"`
+	Status       string `json:"status"`
+	SecretID     string `json:"secret_id"`
+	RotationDays int    `json:"rotation_days"`
+	HttpDebug    bool   `json:"http_debug"`
+}
+
+type WeComConfigService struct {
+	repo *repo.SecretRepository
+}
+
+func NewWeComConfigService(db *gorm.DB) *WeComConfigService {
+	if db == nil {
+		return &WeComConfigService{}
+	}
+	return &WeComConfigService{repo: repo.NewSecretRepository(db)}
+}
+
+func (s *WeComConfigService) ResolveProviderConfig(ctx context.Context, tenantUUID string) (providerWeCom.Config, error) {
+	cfg, err := s.GetByTenant(ctx, tenantUUID)
+	if err != nil {
+		return providerWeCom.Config{}, err
+	}
+	return providerWeCom.Config{
+		CorpID:      cfg.CorpID,
+		AgentID:     cfg.AgentID,
+		Secret:      cfg.Secret,
+		Token:       cfg.Token,
+		AESKey:      cfg.AESKey,
+		CallbackURL: cfg.CallbackHost,
+		HttpDebug:   cfg.HttpDebug,
+	}, nil
+}
+
+func (s *WeComConfigService) GetByTenant(ctx context.Context, tenantUUID string) (WeComConfig, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return WeComConfig{}, fmt.Errorf("tenant_uuid is required")
+	}
+	if s.repo == nil {
+		return WeComConfig{}, fmt.Errorf("wecom config repository not initialized")
+	}
+	secret, err := s.repo.GetByIntegrationType(ctx, tenantUUID, IntegrationTypeIAMFederatedWeCom)
+	if err != nil {
+		return WeComConfig{}, err
+	}
+	if secret == nil {
+		return WeComConfig{}, fmt.Errorf("wecom config not found")
+	}
+	status := strings.ToUpper(strings.TrimSpace(secret.Status))
+	if status == "REVOKED" {
+		return WeComConfig{}, fmt.Errorf("wecom config is revoked")
+	}
+	cfg := WeComConfig{
+		TenantUUID:   tenantUUID,
+		SecretID:     secret.ID,
+		Status:       status,
+		RotationDays: secret.RotationInterval,
+		CorpID:       asString(secret.Metadata["corp_id"]),
+		AgentID:      asInt(secret.Metadata["agent_id"]),
+		Secret:       firstNonEmpty(asString(secret.Metadata["app_secret"]), asString(secret.Metadata["secret"])),
+		Token:        asString(secret.Metadata["token"]),
+		AESKey:       firstNonEmpty(asString(secret.Metadata["encoding_aes_key"]), asString(secret.Metadata["aes_key"])),
+		HttpDebug:    asBoolDefault(secret.Metadata["http_debug"], true),
+	}
+	cfg.CallbackHost = firstNonEmpty(asString(secret.Metadata["callback_host"]), asString(secret.Metadata["callback_url"]))
+	if cfg.CorpID == "" || cfg.AgentID <= 0 || cfg.Secret == "" {
+		return WeComConfig{}, fmt.Errorf("wecom config metadata incomplete")
+	}
+	return cfg, nil
+}
+
+func (s *WeComConfigService) UpsertTenantConfig(ctx context.Context, cfg WeComConfig) (WeComConfig, error) {
+	cfg.TenantUUID = strings.TrimSpace(cfg.TenantUUID)
+	cfg.CorpID = strings.TrimSpace(cfg.CorpID)
+	cfg.Secret = strings.TrimSpace(cfg.Secret)
+	cfg.Token = strings.TrimSpace(cfg.Token)
+	cfg.AESKey = strings.TrimSpace(cfg.AESKey)
+	cfg.CallbackHost = strings.TrimSpace(cfg.CallbackHost)
+	if cfg.TenantUUID == "" || cfg.CorpID == "" || cfg.AgentID <= 0 || cfg.Secret == "" {
+		return WeComConfig{}, fmt.Errorf("tenant/corp/agent/secret is required")
+	}
+	if cfg.RotationDays <= 0 {
+		cfg.RotationDays = 30
+	}
+	if s.repo == nil {
+		return WeComConfig{}, fmt.Errorf("wecom config repository not initialized")
+	}
+	existing, err := s.repo.GetByIntegrationType(ctx, cfg.TenantUUID, IntegrationTypeIAMFederatedWeCom)
+	if err != nil {
+		return WeComConfig{}, err
+	}
+	status := normalizeStatus(cfg.Status)
+	meta := datatypes.JSONMap{
+		"corp_id":          cfg.CorpID,
+		"agent_id":         cfg.AgentID,
+		"app_secret":       cfg.Secret,
+		"token":            cfg.Token,
+		"encoding_aes_key": cfg.AESKey,
+		"callback_host":    cfg.CallbackHost,
+		"http_debug":       cfg.HttpDebug,
+	}
+	if existing == nil {
+		created, createErr := s.repo.Create(ctx, &model.SecretCredential{
+			ID:               uuid.NewString(),
+			TenantUuid:       cfg.TenantUUID,
+			IntegrationType:  IntegrationTypeIAMFederatedWeCom,
+			RotationInterval: cfg.RotationDays,
+			Status:           status,
+			Metadata:         meta,
+		})
+		if createErr != nil {
+			return WeComConfig{}, createErr
+		}
+		cfg.SecretID = created.ID
+		cfg.Status = created.Status
+		cfg.RotationDays = created.RotationInterval
+		return cfg, nil
+	}
+	existing.RotationInterval = cfg.RotationDays
+	existing.Status = status
+	existing.Metadata = meta
+	if err := s.repo.Update(ctx, existing); err != nil {
+		return WeComConfig{}, err
+	}
+	cfg.SecretID = existing.ID
+	cfg.Status = existing.Status
+	return cfg, nil
+}
+
+func (s *WeComConfigService) ResolveCallbackConfig(ctx context.Context, tenantUUID, corpID, appID string) (WeComConfig, error) {
+	cfg, err := s.GetByTenant(ctx, tenantUUID)
+	if err != nil {
+		return WeComConfig{}, err
+	}
+	corpID = strings.TrimSpace(corpID)
+	appID = strings.TrimSpace(appID)
+	if corpID != "" && !strings.EqualFold(cfg.CorpID, corpID) {
+		return WeComConfig{}, fmt.Errorf("wecom corp_id not matched")
+	}
+	if appID != "" && appID != strconv.Itoa(cfg.AgentID) {
+		return WeComConfig{}, fmt.Errorf("wecom app_id not matched")
+	}
+	if strings.TrimSpace(cfg.Token) == "" || strings.TrimSpace(cfg.AESKey) == "" {
+		return WeComConfig{}, fmt.Errorf("wecom callback token/aes_key not configured")
+	}
+	return cfg, nil
+}
+
+func asString(v any) string {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case fmt.Stringer:
+		return strings.TrimSpace(t.String())
+	case int:
+		return strconv.Itoa(t)
+	case int64:
+		return strconv.FormatInt(t, 10)
+	case float64:
+		return strconv.FormatInt(int64(t), 10)
+	default:
+		return strings.TrimSpace(fmt.Sprintf("%v", t))
+	}
+}
+
+func asInt(v any) int {
+	switch t := v.(type) {
+	case int:
+		return t
+	case int64:
+		return int(t)
+	case float64:
+		return int(t)
+	case string:
+		i, _ := strconv.Atoi(strings.TrimSpace(t))
+		return i
+	default:
+		s := strings.TrimSpace(fmt.Sprintf("%v", t))
+		i, _ := strconv.Atoi(s)
+		return i
+	}
+}
+
+func asBoolDefault(v any, def bool) bool {
+	if v == nil {
+		return def
+	}
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		raw := strings.TrimSpace(strings.ToLower(t))
+		if raw == "" {
+			return def
+		}
+		return raw == "1" || raw == "true" || raw == "yes" || raw == "on"
+	case int:
+		return t != 0
+	case int64:
+		return t != 0
+	case float64:
+		return t != 0
+	default:
+		raw := strings.TrimSpace(strings.ToLower(fmt.Sprintf("%v", t)))
+		if raw == "" {
+			return def
+		}
+		return raw == "1" || raw == "true" || raw == "yes" || raw == "on"
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func normalizeStatus(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "inactive", "disabled", "revoked":
+		return model.SecretStatusRevoked
+	default:
+		return model.SecretStatusActive
+	}
+}

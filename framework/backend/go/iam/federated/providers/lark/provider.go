@@ -41,7 +41,13 @@ func (p *Provider) ExchangeCode(_ context.Context, req contracts.ExchangeCodeReq
 	if code == "" {
 		return contracts.ProviderToken{}, contracts.NewError(contracts.ErrorCodeInvalidChallenge, "code is required")
 	}
-	return contracts.ProviderToken{AccessToken: "lark-token-" + code, Raw: map[string]any{"code": code}}, nil
+	return contracts.ProviderToken{
+		AccessToken: "lark-token-" + code,
+		Raw: map[string]any{
+			"code":   code,
+			"app_id": strings.TrimSpace(p.appID),
+		},
+	}, nil
 }
 
 func (p *Provider) ResolveIdentity(_ context.Context, req contracts.ResolveIdentityRequest) (contracts.ExternalIdentity, error) {
@@ -50,7 +56,30 @@ func (p *Provider) ResolveIdentity(_ context.Context, req contracts.ResolveIdent
 		return contracts.ExternalIdentity{}, contracts.NewError(contracts.ErrorCodeUnauthorized, "missing access token")
 	}
 	uid := fmt.Sprintf("lark:%s", token)
-	return contracts.ExternalIdentity{Provider: p.Key(), ExternalUserID: uid, Raw: req.Token.Raw}, nil
+	tenantScope := strings.TrimSpace(p.appID)
+	if req.Token.Raw != nil {
+		tenantScope = firstNonEmpty(
+			asString(req.Token.Raw["tenant_key"]),
+			asString(req.Token.Raw["enterprise_id"]),
+			asString(req.Token.Raw["app_id"]),
+			tenantScope,
+		)
+	}
+	return contracts.ExternalIdentity{
+		Provider:       p.Key(),
+		ExternalUserID: uid,
+		TenantScope:    tenantScope,
+		Raw:            req.Token.Raw,
+	}, nil
+}
+
+func asString(v any) string {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	default:
+		return strings.TrimSpace(fmt.Sprintf("%v", t))
+	}
 }
 
 func firstNonEmpty(values ...string) string {

@@ -12,12 +12,12 @@ import (
 type FederatedExternalIdentity struct {
 	BaseModels.BaseModel
 	Provider       string            `gorm:"size:32;not null;index:idx_fed_ext_provider_user,priority:1" json:"provider"`
-	ExternalUserID string            `gorm:"size:128;not null;index:idx_fed_ext_provider_user,priority:2" json:"external_user_id"`
+	TenantScope    string            `gorm:"size:64;index:idx_fed_ext_provider_user,priority:2" json:"tenant_scope"`
+	ExternalUserID string            `gorm:"size:128;not null;index:idx_fed_ext_provider_user,priority:3" json:"external_user_id"`
 	UnionID        string            `gorm:"size:128;index" json:"union_id"`
 	OpenID         string            `gorm:"size:128;index" json:"open_id"`
 	Email          string            `gorm:"size:255" json:"email"`
 	Phone          string            `gorm:"size:32" json:"phone"`
-	TenantScope    string            `gorm:"size:64" json:"tenant_scope"`
 	Raw            datatypes.JSONMap `gorm:"type:jsonb" json:"raw"`
 }
 
@@ -29,7 +29,8 @@ func (FederatedExternalIdentity) TableName() string {
 type FederatedBinding struct {
 	BaseModels.BaseModel
 	Provider       string     `gorm:"size:32;not null;index:idx_fed_bind_provider_user,priority:1" json:"provider"`
-	ExternalUserID string     `gorm:"size:128;not null;index:idx_fed_bind_provider_user,priority:2" json:"external_user_id"`
+	TenantScope    string     `gorm:"size:64;index:idx_fed_bind_provider_user,priority:2" json:"tenant_scope"`
+	ExternalUserID string     `gorm:"size:128;not null;index:idx_fed_bind_provider_user,priority:3" json:"external_user_id"`
 	MemberID       uint64     `gorm:"column:member_id;not null;index" json:"member_id"`
 	Status         string     `gorm:"size:32;not null;default:'active';index" json:"status"`
 	BoundAt        time.Time  `gorm:"not null;index" json:"bound_at"`

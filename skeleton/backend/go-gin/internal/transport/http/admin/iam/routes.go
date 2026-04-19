@@ -33,6 +33,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	jitPolicySvc := federatedsvc.NewJITPolicyService()
 	mappingSvc := federatedsvc.NewMappingService()
 	federatedBindingHandler := NewFederatedBindingHandler(bindingSvc, jitPolicySvc, mappingSvc)
+	wecomChannelHandler := NewChannelWeComHandlerWithDeps(deps)
 
 	group.GET("/tenants", tenantHandler.List)
 	group.POST("/tenants", tenantHandler.Create)
@@ -66,6 +67,11 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.DELETE("/federated/bindings", federatedBindingHandler.Delete)
 	group.PUT("/federated/jit-policy", federatedBindingHandler.UpdateJITPolicy)
 	group.PUT("/federated/mapping-policy", federatedBindingHandler.UpdateMappingPolicy)
+	group.GET("/channels/wecom/config", wecomChannelHandler.GetConfig)
+	group.PUT("/channels/wecom/config", wecomChannelHandler.SaveConfig)
+	group.GET("/channels/wecom/sync-tasks", wecomChannelHandler.ListSyncTasks)
+	group.POST("/channels/wecom/sync-tasks", wecomChannelHandler.TriggerSyncTask)
+	group.DELETE("/channels/wecom/sync-tasks", wecomChannelHandler.ClearSyncTasks)
 
 	// Legacy aliases for compatibility (deprecated)
 	group.GET("/users", memberHandler.List)

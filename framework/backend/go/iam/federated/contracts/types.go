@@ -18,7 +18,8 @@ type AuthorizeResponse struct {
 
 // ExchangeCodeRequest 描述 code 兑换请求。
 type ExchangeCodeRequest struct {
-	Code string
+	Code       string
+	TenantUUID string
 }
 
 // ProviderToken 描述 provider 兑换后的令牌。

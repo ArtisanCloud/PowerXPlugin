@@ -22,6 +22,7 @@ func NewFederatedBindingHandler(bindingSvc *federatedsvc.BindingService, jitPoli
 type createBindingRequest struct {
 	TenantUUID     string `json:"tenant_uuid"`
 	Provider       string `json:"provider"`
+	TenantScope    string `json:"tenant_scope"`
 	ExternalUserID string `json:"external_user_id"`
 	MemberID       uint64 `json:"member_id"`
 	Source         string `json:"source"`
@@ -30,6 +31,7 @@ type createBindingRequest struct {
 type deleteBindingRequest struct {
 	TenantUUID     string `json:"tenant_uuid"`
 	Provider       string `json:"provider"`
+	TenantScope    string `json:"tenant_scope"`
 	ExternalUserID string `json:"external_user_id"`
 }
 
@@ -72,6 +74,7 @@ func (h *FederatedBindingHandler) Create(c *gin.Context) {
 	created, err := h.bindingSvc.Bind(c.Request.Context(), federatedsvc.BindInput{
 		TenantUUID:     req.TenantUUID,
 		Provider:       req.Provider,
+		TenantScope:    req.TenantScope,
 		ExternalUserID: req.ExternalUserID,
 		MemberID:       req.MemberID,
 		Source:         req.Source,
@@ -92,7 +95,7 @@ func (h *FederatedBindingHandler) Delete(c *gin.Context) {
 	if strings.TrimSpace(req.TenantUUID) == "" {
 		req.TenantUUID = admincommon.ResolveTenantUUID(c)
 	}
-	deleted, err := h.bindingSvc.Unbind(c.Request.Context(), req.TenantUUID, req.Provider, req.ExternalUserID)
+	deleted, err := h.bindingSvc.UnbindScoped(c.Request.Context(), req.TenantUUID, req.Provider, req.TenantScope, req.ExternalUserID)
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
 		return

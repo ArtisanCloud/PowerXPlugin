@@ -14,6 +14,7 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 		"POST:" + base + "/tenants":            {Resource: app.PluginID + ":iam.tenant", Action: "write"},
 		"PATCH:" + base + "/tenants/*":         {Resource: app.PluginID + ":iam.tenant", Action: "write"},
 		"GET:" + base + "/departments":         {Resource: app.PluginID + ":iam.department", Action: "read"},
+		"GET:" + base + "/departments/tree":    {Resource: app.PluginID + ":iam.department", Action: "read"},
 		"POST:" + base + "/departments":        {Resource: app.PluginID + ":iam.department", Action: "write"},
 		"PATCH:" + base + "/departments/*":     {Resource: app.PluginID + ":iam.department", Action: "write"},
 		"DELETE:" + base + "/departments/*":    {Resource: app.PluginID + ":iam.department", Action: "delete"},

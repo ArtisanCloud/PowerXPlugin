@@ -11,6 +11,7 @@ import (
 type JITRequest struct {
 	TenantUUID     string
 	Provider       string
+	TenantScope    string
 	ExternalUserID string
 	Email          string
 	Phone          string
@@ -54,6 +55,7 @@ func (s *JITService) Handle(ctx context.Context, req JITRequest) (JITResult, err
 	binding, err := s.bindings.Bind(ctx, BindInput{
 		TenantUUID:     req.TenantUUID,
 		Provider:       req.Provider,
+		TenantScope:    req.TenantScope,
 		ExternalUserID: req.ExternalUserID,
 		MemberID:       members[0].ID,
 		Source:         "jit",

@@ -19,7 +19,7 @@
         </UButton>
       </div>
 
-      <div v-if="isRoot">
+      <div v-if="canReadTemplates">
         <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {{ t('navigation.templates') }}
         </div>
@@ -141,6 +141,7 @@
         </div>
         <div class="space-y-1">
           <UButton
+            v-if="canManageIAM"
             to="/admin/iam/overview"
             variant="ghost"
             color="neutral"
@@ -167,6 +168,7 @@
             {{ t('navigation.iamMembers') }}
           </UButton>
           <UButton
+            v-if="canManageIAM"
             to="/admin/iam/roles"
             variant="ghost"
             color="neutral"
@@ -193,6 +195,85 @@
             {{ t('navigation.iamSettings') }}
           </UButton>
         </div>
+
+        <div v-if="canManageIAM" class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.channelConfig') }}
+        </div>
+        <div v-if="canManageIAM" class="space-y-1">
+          <UButton
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            @click="toggleWecomMenu"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isGroupActive(['/admin/iam/channels/wecom', '/admin/iam/channels/wecom-sync']),
+            }"
+          >
+            <UIcon name="i-lucide-building-2" class="w-4 h-4 mr-3" />
+            {{ t('navigation.channelWecom') }}
+            <UIcon
+              :name="showWecomMenu ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+              class="w-4 h-4 ml-auto"
+            />
+          </UButton>
+          <div v-show="showWecomMenu" class="ml-6 mt-1 space-y-1">
+            <UButton
+              to="/admin/iam/channels/wecom"
+              variant="ghost"
+              color="neutral"
+              size="sm"
+              class="w-full justify-start text-sm"
+              :class="{
+                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                  isExactActive('/admin/iam/channels/wecom'),
+              }"
+            >
+              <UIcon name="i-lucide-settings-2" class="w-3 h-3 mr-2" />
+              {{ t('navigation.channelWecomConfig') }}
+            </UButton>
+            <UButton
+              to="/admin/iam/channels/wecom-sync"
+              variant="ghost"
+              color="neutral"
+              size="sm"
+              class="w-full justify-start text-sm"
+              :class="{
+                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                  isExactActive('/admin/iam/channels/wecom-sync'),
+              }"
+            >
+              <UIcon name="i-lucide-refresh-cw" class="w-3 h-3 mr-2" />
+              {{ t('navigation.channelWecomSync') }}
+            </UButton>
+          </div>
+          <UButton
+            to="/admin/iam/channels/dingtalk"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/channels/dingtalk'),
+            }"
+          >
+            <UIcon name="i-lucide-message-square-diff" class="w-4 h-4 mr-3" />
+            {{ t('navigation.channelDingtalk') }}
+          </UButton>
+          <UButton
+            to="/admin/iam/channels/lark"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive('/admin/iam/channels/lark'),
+            }"
+          >
+            <UIcon name="i-lucide-bird" class="w-4 h-4 mr-3" />
+            {{ t('navigation.channelLark') }}
+          </UButton>
+        </div>
       </div>
     </nav>
   </aside>
@@ -209,9 +290,14 @@ const runtimeConfig = useRuntimeConfig();
 const auth = useAuth();
 
 const showTemplatesMenu = ref(true);
-const showIAMMenu = computed(() => auth.localIAMEnabled?.value ?? false);
+const showWecomMenu = ref(true);
+const showIAMMenu = computed(() => {
+  const localIAM = auth.localIAMEnabled?.value ?? false;
+  return localIAM && (canManageIAM.value || isLoggedIn.value);
+});
 const userStore = useUserStore();
-const { isRoot } = storeToRefs(userStore);
+const { isRoot, isCurrentTenantAdmin, canReadTemplates, isLoggedIn } = storeToRefs(userStore);
+const canManageIAM = computed(() => Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value));
 const showCapabilityLab = computed(() => {
   const envFlag = runtimeConfig.public?.showCapabilityLab;
   if (envFlag === false || envFlag === "false") {
@@ -273,11 +359,18 @@ const toggleTemplatesMenu = () => {
   showTemplatesMenu.value = !showTemplatesMenu.value;
 };
 
+const toggleWecomMenu = () => {
+  showWecomMenu.value = !showWecomMenu.value;
+};
+
 watch(
   () => route.path,
   (newPath) => {
     if (newPath.startsWith("/templates")) {
       showTemplatesMenu.value = true;
+    }
+    if (newPath.startsWith("/admin/iam/channels/wecom")) {
+      showWecomMenu.value = true;
     }
   }
 );

@@ -15,6 +15,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	federatedService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
 	"gorm.io/gorm"
 )
 
@@ -56,14 +57,17 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 		logger.WithError(err).Fatal("Failed to connect to database")
 	}
 
-	initFederatedRuntime()
+	initFederatedRuntime(queryDB)
 
 	return queryDB, nil
 }
 
-func initFederatedRuntime() {
+func initFederatedRuntime(queryDB *gorm.DB) {
 	registry := federatedProviders.NewRegistry()
-	_ = registry.Register(providerWeCom.New("default-wecom"))
+	wecomConfigSvc := federatedService.NewWeComConfigService(queryDB)
+	_ = registry.Register(providerWeCom.NewWithResolver(func(ctx context.Context, tenantUUID string) (providerWeCom.Config, error) {
+		return wecomConfigSvc.ResolveProviderConfig(ctx, tenantUUID)
+	}))
 	_ = registry.Register(providerDingTalk.New("default-dingtalk"))
 	_ = registry.Register(providerLark.New("default-lark"))
 

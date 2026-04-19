@@ -1,6 +1,9 @@
 package iam
 
 import (
+	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	federatedrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	federatedsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
@@ -9,17 +12,27 @@ import (
 )
 
 func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
-	if admin == nil || deps == nil || deps.DB == nil {
+	if admin == nil || deps == nil {
 		return
 	}
 	group := admin.Group("/iam")
+	group.GET("/mode", modeHandler(deps))
+
+	if deps.DB == nil {
+		return
+	}
 
 	audit := srviam.NewAuditService(deps.DB)
 	stsSvc := srviam.NewSTSService(deps.Config, audit, app.PluginID, "")
 	roleSvc := srviam.NewRoleService(deps.DB, audit, app.PluginID)
 
-	tenantHandler := NewTenantHandler(srviam.NewTenantService(deps.DB, audit))
-	departmentHandler := NewDepartmentHandler(srviam.NewDepartmentService(deps.DB, audit))
+	tenantHandler := NewTenantHandler(
+		srviam.NewTenantService(deps.DB, audit),
+		deps.IAMDirectoryService,
+		deps.IAMAuthzService,
+		deps.IAMMode,
+	)
+	departmentHandler := NewDepartmentHandler(srviam.NewDepartmentService(deps.DB, audit), deps.IAMMode)
 	memberHandler := NewMemberHandler(srviam.NewUserService(deps.DB, audit))
 	roleHandler := NewRoleHandler(roleSvc)
 	rolePermissionsHandler := NewRolePermissionsHandler(roleSvc)
@@ -78,4 +91,22 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.POST("/users", memberHandler.Create)
 	group.PATCH("/users/:id", memberHandler.Update)
 	group.POST("/users/import", memberHandler.BulkImport)
+}
+
+func modeHandler(deps *app.Deps) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		mode := strings.TrimSpace(deps.IAMMode.String())
+		if mode == "" {
+			mode = "local"
+		}
+		registryBound := deps.IAMRegistry != nil && deps.IAMRegistry.IsBound()
+		contracts.ResponseSuccess(c, gin.H{
+			"mode":                mode,
+			"source":              strings.TrimSpace(deps.IAMModeSource),
+			"registry_bound":      registryBound,
+			"directory_available": deps.IAMDirectoryService != nil,
+			"authz_available":     deps.IAMAuthzService != nil,
+			"context_available":   deps.IAMContextService != nil,
+		})
+	}
 }

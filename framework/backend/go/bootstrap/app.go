@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	iamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/contracts"
 	federatedProviders "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/internal/integration/gateway"
@@ -34,6 +35,7 @@ type App struct {
 
 	gatewayClient    *gateway.Client
 	federatedFactory contracts.ProviderFactory
+	iamRegistry      *iamadapters.Registry
 
 	mu       sync.RWMutex
 	manifest *manifest.Plugin
@@ -120,6 +122,7 @@ func NewApp(cfg *Config) *App {
 	}
 	app.initGatewayClient()
 	app.initFederatedFactory()
+	app.initIAMRegistry()
 	return app
 }
 
@@ -226,6 +229,11 @@ func (a *App) FederatedProviderFactory() contracts.ProviderFactory {
 	return a.federatedFactory
 }
 
+// IAMRegistry 返回 framework IAM 注册中心。
+func (a *App) IAMRegistry() *iamadapters.Registry {
+	return a.iamRegistry
+}
+
 func (a *App) initGatewayClient() {
 	if a.Config == nil || !a.Config.Gateway.enabled() {
 		return
@@ -284,6 +292,13 @@ func (a *App) closeGateway() {
 
 func (a *App) initFederatedFactory() {
 	a.federatedFactory = federatedProviders.NewRegistry()
+}
+
+func (a *App) initIAMRegistry() {
+	if a == nil {
+		return
+	}
+	a.iamRegistry = iamadapters.NewRegistry()
 }
 
 func (cfg GatewayConfig) enabled() bool {

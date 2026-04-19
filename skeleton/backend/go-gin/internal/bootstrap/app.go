@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	federatedChallenge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/challenge"
 	federatedContracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/contracts"
 	federatedProviders "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers"
@@ -15,7 +17,11 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	delegatedadapter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/adapters/delegated"
+	localadapter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/adapters/local"
 	federatedService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
+	sharedapp "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"gorm.io/gorm"
 )
 
@@ -91,4 +97,38 @@ func SetFederatedForTests(rt *FederatedRuntime) {
 	federatedRuntimeMu.Lock()
 	federatedRuntime = rt
 	federatedRuntimeMu.Unlock()
+}
+
+// BindFrameworkIAM 在启动期将 skeleton IAM 能力绑定到 framework registry。
+func BindFrameworkIAM(deps *sharedapp.Deps, registry *fwiamadapters.Registry) error {
+	if deps == nil || registry == nil {
+		return nil
+	}
+
+	var (
+		mode   fwiamcontracts.IAMMode
+		bundle fwiamadapters.Bundle
+		err    error
+	)
+
+	switch deps.IAMMode {
+	case iamservice.IAMModeDelegated:
+		mode = fwiamcontracts.IAMModeDelegated
+		bundle, err = delegatedadapter.NewBundle(deps.AuthProxy)
+	default:
+		mode = fwiamcontracts.IAMModeLocal
+		bundle, err = localadapter.NewBundle(deps.IAMDirectory)
+	}
+	if err != nil {
+		return err
+	}
+	if err := registry.Bind(mode, bundle); err != nil {
+		return err
+	}
+
+	deps.IAMRegistry = registry
+	deps.IAMDirectoryService, _ = registry.Directory()
+	deps.IAMAuthzService, _ = registry.Authz()
+	deps.IAMContextService, _ = registry.IdentityContext()
+	return nil
 }

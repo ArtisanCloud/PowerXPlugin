@@ -23,6 +23,9 @@ func WithRuntimeFields(pluginID, tenantID, traceID, component string, extra Fiel
 		runtimelogging.FieldTenantKey:  runtimelogging.TenantKeyFromUUID(tenantID),
 		runtimelogging.FieldTraceID:    strings.TrimSpace(traceID),
 		runtimelogging.FieldComponent:  strings.TrimSpace(component),
+		"mode":                         "unknown",
+		"user_id":                      "",
+		"permission":                   "",
 	}
 	for k, v := range extra {
 		fields[k] = v

@@ -145,3 +145,13 @@ func TestWithRuntimeDefaultsInjectsTenantMirrorFields(t *testing.T) {
 		t.Fatalf("expected component in output, got %s", out)
 	}
 }
+
+func TestNewAppInitializesIAMRegistry(t *testing.T) {
+	app := NewApp(nil)
+	if app.IAMRegistry() == nil {
+		t.Fatalf("expected IAM registry to be initialized")
+	}
+	if app.IAMRegistry().IsBound() {
+		t.Fatalf("expected IAM registry to be unbound by default")
+	}
+}

@@ -25,6 +25,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-29
 - N/A（本特性不新增持久化模型） (016-runtime-log-unification)
 - Go 1.24（backend runtime），TypeScript 5.x（文档与联调脚本） + Gin skeleton、framework eventbridge/taskbus/wsbus 抽象、runtime ops 管理端点、logrus/slog 结构化日志 (017-async-runtime-scheduler-switch)
 - 复用现有插件数据库（PostgreSQL/SQLite），本特性不新增业务持久化模型 (017-async-runtime-scheduler-switch)
+- Go 1.24 + framework middleware/context/rbac；skeleton IAM local store；delegated auth proxy (018-framework-iam-unification)
+- PostgreSQL/SQLite（local 模式复用现有 IAM 表）；delegated 模式不新增插件侧组织写入 (018-framework-iam-unification)
 - Go 1.24, TypeScript 5.x (Nuxt 4.2) + framework IAM contracts/context/errors, skeleton IAM/auth service, RBAC, observability/audi (019-iam-federated-channel-login)
 - PostgreSQL/SQLite（复用 IAM 表并新增 external_identity/binding/challenge/risk_event） (019-iam-federated-channel-login)
 
@@ -45,6 +47,7 @@ Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 
 ## Recent Changes
 - 019-iam-federated-channel-login: Added Go 1.24, TypeScript 5.x (Nuxt 4.2) + framework IAM contracts/context/errors, skeleton IAM/auth service, RBAC, observability/audi
+- 018-framework-iam-unification: Added Go 1.24 + framework middleware/context/rbac；skeleton IAM local store；delegated auth proxy
 - 017-async-runtime-scheduler-switch: Added Go 1.24（backend runtime），TypeScript 5.x（文档与联调脚本） + Gin skeleton、framework eventbridge/taskbus/wsbus 抽象、runtime ops 管理端点、logrus/slog 结构化日志
 - 016-runtime-log-unification: Added Go 1.24（backend runtime），TypeScript 5.x（文档/工具链侧验证） + framework runtime（taskbus/wsbus/common middleware）、Gin skeleton、`log/slog`、`logrus`
 

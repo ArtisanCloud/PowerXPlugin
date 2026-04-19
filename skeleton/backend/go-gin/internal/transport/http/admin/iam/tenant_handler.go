@@ -1,24 +1,79 @@
 package iam
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
 type TenantHandler struct {
-	service *srviam.TenantService
+	service   *srviam.TenantService
+	directory fwiamcontracts.DirectoryService
+	authz     fwiamcontracts.AuthzService
+	mode      srviam.IAMMode
 }
 
-func NewTenantHandler(svc *srviam.TenantService) *TenantHandler {
-	return &TenantHandler{service: svc}
+func NewTenantHandler(
+	svc *srviam.TenantService,
+	directory fwiamcontracts.DirectoryService,
+	authz fwiamcontracts.AuthzService,
+	mode srviam.IAMMode,
+) *TenantHandler {
+	return &TenantHandler{service: svc, directory: directory, authz: authz, mode: mode}
 }
 
 func (h *TenantHandler) List(c *gin.Context) {
+	if h.mode == srviam.IAMModeDelegated && h.directory != nil {
+		tenantUUID := strings.TrimSpace(c.Query("tenant_uuid"))
+		if tenantUUID == "" {
+			tenantUUID = admincommon.ResolveTenantUUID(c)
+		}
+		if tenantUUID == "" {
+			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+			return
+		}
+		if h.authz != nil {
+			decision, err := h.authz.Authorize(c.Request.Context(), fwiamcontracts.AuthorizationRequest{
+				TenantUUID: tenantUUID,
+				Resource:   "iam.tenant",
+				Action:     "read",
+			})
+			if err != nil {
+				respondIAMError(c, err)
+				return
+			}
+			if decision != nil && !decision.Allowed {
+				contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeForbidden, "permission denied")
+				return
+			}
+		}
+		tenant, err := h.directory.GetTenant(c.Request.Context(), tenantUUID)
+		if err != nil {
+			respondIAMError(c, err)
+			return
+		}
+		contracts.ResponseSuccess(c, gin.H{
+			"items": []gin.H{{
+				"uuid":   tenant.TenantUUID,
+				"key":    tenant.TenantKey,
+				"name":   tenant.Name,
+				"status": tenant.Status,
+			}},
+			"total":     1,
+			"page":      1,
+			"page_size": 20,
+		})
+		return
+	}
+
 	var query TenantListQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
@@ -63,6 +118,10 @@ func (h *TenantHandler) List(c *gin.Context) {
 }
 
 func (h *TenantHandler) Create(c *gin.Context) {
+	if h.mode == srviam.IAMModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "tenant write operations are not allowed in delegated mode")
+		return
+	}
 	if h == nil || h.service == nil {
 		contracts.ResponseServiceUnavailable(c, "tenant service unavailable", nil)
 		return
@@ -93,6 +152,10 @@ func (h *TenantHandler) Create(c *gin.Context) {
 }
 
 func (h *TenantHandler) Update(c *gin.Context) {
+	if h.mode == srviam.IAMModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "tenant write operations are not allowed in delegated mode")
+		return
+	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
 		contracts.ResponseBadRequest(c, "invalid tenant id")
@@ -120,6 +183,18 @@ func (h *TenantHandler) Update(c *gin.Context) {
 		return
 	}
 	contracts.ResponseSuccess(c, tenant)
+}
+
+func respondIAMError(c *gin.Context, err error) {
+	status := fwiamerrors.StatusCode(err)
+	code := fwiamerrors.CodeOf(err)
+	if code == "" {
+		code = contracts.ErrCodeInternalError
+	}
+	if status == 0 {
+		status = http.StatusInternalServerError
+	}
+	contracts.ResponseError(c, status, code, err.Error())
 }
 
 func resultPage(page int) int {

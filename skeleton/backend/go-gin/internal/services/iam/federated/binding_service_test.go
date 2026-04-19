@@ -8,7 +8,6 @@ import (
 	iamrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
 	EntityModels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
-	"gorm.io/gorm"
 )
 
 func TestBindingServiceCRUDAndTenantIsolation(t *testing.T) {

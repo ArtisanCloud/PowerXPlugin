@@ -71,11 +71,17 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 func initFederatedRuntime(queryDB *gorm.DB) {
 	registry := federatedProviders.NewRegistry()
 	wecomConfigSvc := federatedService.NewWeComConfigService(queryDB)
+	dingtalkConfigSvc := federatedService.NewDingTalkConfigService(queryDB)
+	larkConfigSvc := federatedService.NewLarkConfigService(queryDB)
 	_ = registry.Register(providerWeCom.NewWithResolver(func(ctx context.Context, tenantUUID string) (providerWeCom.Config, error) {
 		return wecomConfigSvc.ResolveProviderConfig(ctx, tenantUUID)
 	}))
-	_ = registry.Register(providerDingTalk.New("default-dingtalk"))
-	_ = registry.Register(providerLark.New("default-lark"))
+	_ = registry.Register(providerDingTalk.NewWithResolver(func(ctx context.Context, tenantUUID string) (providerDingTalk.Config, error) {
+		return dingtalkConfigSvc.ResolveProviderConfig(ctx, tenantUUID)
+	}))
+	_ = registry.Register(providerLark.NewWithResolver(func(ctx context.Context, tenantUUID string) (providerLark.Config, error) {
+		return larkConfigSvc.ResolveProviderConfig(ctx, tenantUUID)
+	}))
 
 	federatedRuntimeMu.Lock()
 	federatedRuntime = &FederatedRuntime{

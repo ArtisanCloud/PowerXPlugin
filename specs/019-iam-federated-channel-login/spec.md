@@ -16,6 +16,12 @@
 - Q: 风控拦截后的对外反馈默认策略？ → A: 返回可区分错误码，前端统一展示通用失败文案，详细原因只进审计。
 - Q: delegated 模式联邦登录结果由谁作为权威？ → A: 宿主会话/令牌为权威，插件仅做上下文适配与最小缓存。
 
+### Session 2026-04-20
+
+- Q: 在现有企微链路已可用后，钉钉/飞书应先做什么层级？ → A: 先做“配置与登录主链路对齐（P1）”，组织同步（P2）随后补齐。
+- Q: 钉钉与飞书谁优先？ → A: 钉钉优先（组织模型更接近企微），飞书紧随其后。
+- Q: 本阶段是否强制引入第三方 SDK？ → A: 不强制；以 provider 抽象为主，SDK 作为可替换实现细节。
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 员工扫码登录插件系统 (Priority: P1)
@@ -94,6 +100,11 @@
 - **FR-012**: 当渠道返回身份字段不完整（手机号/邮箱/union_id 缺失）时，系统 MUST 禁止自动创建新成员，并转入管理员处理路径且记录审计原因码。
 - **FR-013**: 当绑定关系被管理员解除时，系统 MUST 使该绑定对应的历史会话失效，并要求下一次访问重新认证。
 - **FR-014**: delegated 模式上游身份不可用时，系统 MUST 保持与 standalone 一致的错误码语义，并允许密码登录链路继续可用。
+- **FR-015**: 系统 MUST 为 `dingtalk` 与 `lark` 提供与 `wecom` 对齐的租户级配置读取/保存能力（Admin API），并支持 challenge 阶段按租户配置动态解析 provider 参数。
+- **FR-016**: 系统 MUST 在浏览器扫码登录回调链路中，对 `wecom|dingtalk|lark` 统一支持 callback host 重写策略（通过租户配置注入 host）。
+- **FR-017**: 系统 MUST 为 `dingtalk` 与 `lark` 提供与 `wecom` 一致的渠道同步任务能力（触发、列表、清空、进度事件），并保证任务状态在刷新后不回退。
+- **FR-018**: 系统 MUST 在渠道同步落库时复用统一幂等键：`tenant_uuid + provider + tenant_scope + external_user_id`，并用于后续再次同步 upsert。
+- **FR-019**: 系统 MUST 在 Web Admin 为 `dingtalk` 与 `lark` 提供可操作配置页（非占位页），字段、校验、主题适配与错误提示遵循现有 `wecom` UX 基线。
 
 ### Key Entities *(include if feature involves data)*
 

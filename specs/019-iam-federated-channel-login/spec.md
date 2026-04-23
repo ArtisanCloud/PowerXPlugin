@@ -2,7 +2,7 @@
 
 **Feature Branch**: `019-iam-federated-channel-login`  
 **Created**: 2026-04-11  
-**Updated**: 2026-04-13  
+**Updated**: 2026-04-20  
 **Status**: Draft  
 **Input**: User description: "支持 SCRM 渠道账号同步员工并扫码登录（企业微信/钉钉/飞书），输出 provider 抽象、扫码授权回调、账号绑定/映射、JIT 入库、角色映射策略、审计与风控。"
 
@@ -21,6 +21,11 @@
 - Q: 在现有企微链路已可用后，钉钉/飞书应先做什么层级？ → A: 先做“配置与登录主链路对齐（P1）”，组织同步（P2）随后补齐。
 - Q: 钉钉与飞书谁优先？ → A: 钉钉优先（组织模型更接近企微），飞书紧随其后。
 - Q: 本阶段是否强制引入第三方 SDK？ → A: 不强制；以 provider 抽象为主，SDK 作为可替换实现细节。
+
+### Session 2026-04-20 (Feishu First)
+
+- Q: 受钉钉服务商入驻/费用约束，短期应如何排期？ → A: 改为飞书优先落地（配置、扫码主链路、同步任务、前端配置页）；钉钉保留接口抽象并延后联调。
+- Q: 本 feature 是否继续保留钉钉能力定义？ → A: 保留（避免后续再开新 feature），但钉钉对外验收从“必选项”调整为“可选项/延期项”。
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -105,6 +110,8 @@
 - **FR-017**: 系统 MUST 为 `dingtalk` 与 `lark` 提供与 `wecom` 一致的渠道同步任务能力（触发、列表、清空、进度事件），并保证任务状态在刷新后不回退。
 - **FR-018**: 系统 MUST 在渠道同步落库时复用统一幂等键：`tenant_uuid + provider + tenant_scope + external_user_id`，并用于后续再次同步 upsert。
 - **FR-019**: 系统 MUST 在 Web Admin 为 `dingtalk` 与 `lark` 提供可操作配置页（非占位页），字段、校验、主题适配与错误提示遵循现有 `wecom` UX 基线。
+- **FR-020**: 当前迭代 MUST 以 `lark` 作为外部渠道优先验收对象，需完成“配置 -> challenge/callback -> 任务触发/查询 -> 页面可操作”的闭环。
+- **FR-021**: `dingtalk` 在当前迭代 MAY 仅保持接口与数据模型兼容，不作为阻塞发布的强制联调项。
 
 ### Key Entities *(include if feature involves data)*
 
@@ -125,6 +132,7 @@
 - **SC-003**: 重放、过期、跨租户、签名异常等高风险回调拦截率达到 100%。
 - **SC-004**: 接入扫码登录后，目标租户员工密码登录占比在 30 天内下降至少 50%。
 - **SC-005**: 新插件接入联邦登录时，复用 framework factory 的接入步骤较自研实现减少至少 40%。
+- **SC-006**: 飞书渠道最小闭环（配置保存、扫码挑战回调、任务触发与列表）在本地联调环境通过率达到 100%（按 `tmp/019-iam-federated-channel-login-regression.md` 记录）。
 
 ## Error Semantics（Polish）
 

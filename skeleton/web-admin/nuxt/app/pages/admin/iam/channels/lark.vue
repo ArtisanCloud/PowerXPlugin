@@ -17,6 +17,11 @@
         <h3 class="text-lg font-semibold">飞书 OAuth 参数</h3>
       </template>
 
+      <div class="mb-4 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+        <p>联调建议：优先使用可公网访问的 HTTPS 域名作为回调 Host，避免 `localhost/127.0.0.1` 导致授权回调失败。</p>
+        <p class="mt-1 text-cyan-200/90">字段映射：`Tenant Key -> tenant_key`，`App ID -> app_id`，`App Secret -> app_secret`。</p>
+      </div>
+
       <UForm :state="form" class="space-y-4">
         <div class="grid gap-4 md:grid-cols-2">
           <UFormField label="配置状态">
@@ -27,7 +32,7 @@
           </UFormField>
         </div>
 
-        <UFormField label="Host:Port（接收回调）" required>
+        <UFormField label="Host:Port（接收回调）" required description="示例：https://debug.artisan-cloud.com">
           <UInput v-model="form.callbackHost" placeholder="https://plugin.example.com" />
         </UFormField>
 
@@ -156,7 +161,10 @@ const applyServerConfig = (data?: LarkConfigResponse | null) => {
 
 const validateRequired = () => {
   if (!tenantUUID.value.trim()) return "tenant_uuid 为空，请先切换租户";
-  if (!form.callbackHost.trim()) return "Host:Port 必填";
+  const host = form.callbackHost.trim();
+  if (!host) return "Host:Port 必填";
+  if (!/^https:\/\//i.test(host)) return "Host:Port 必须以 https:// 开头";
+  if (/localhost|127\.0\.0\.1/i.test(host)) return "Host:Port 不建议使用 localhost/127.0.0.1";
   if (!form.tenantKey.trim()) return "Tenant Key 必填";
   if (!form.appId.trim()) return "App ID 必填";
   if (!form.appSecret.trim()) return "App Secret 必填";

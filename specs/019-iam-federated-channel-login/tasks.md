@@ -125,7 +125,8 @@
 
 ## Phase 7: Multi-Channel Parity（DingTalk/Lark）扩展
 
-**Purpose**: 在不改变既有 wecom 稳定链路前提下，按同一抽象补齐钉钉/飞书的配置、登录回调与组织同步能力。
+**Purpose**: 在不改变既有 wecom 稳定链路前提下，按同一抽象补齐钉钉/飞书的配置、登录回调与组织同步能力。  
+**Note**: 受钉钉服务商入驻/费用限制，当前迭代以飞书为优先验收对象；钉钉保留兼容实现。
 
 ### Tests for Phase 7
 
@@ -147,6 +148,25 @@
 - [x] T063 前端落地 dingtalk 配置页（由占位页升级为可配置页面）in skeleton/web-admin/nuxt/app/pages/admin/iam/channels/dingtalk.vue
 - [x] T064 前端落地 lark 配置页（由占位页升级为可配置页面）in skeleton/web-admin/nuxt/app/pages/admin/iam/channels/lark.vue
 - [x] T065 执行并记录多渠道联调回归 in tmp/019-iam-federated-channel-login-regression.md
+
+---
+
+## Phase 8: Feishu First Rollout（当前迭代验收）
+
+**Purpose**: 聚焦飞书渠道完成“可配置、可登录、可同步、可观测”的发布前闭环。
+
+### Tests for Phase 8
+
+- [x] T066 [P] 增加 lark challenge/callback e2e 回归（含 tenant_key 与 callback_host）in skeleton/backend/go-gin/internal/transport/http/public/auth/federated_callback_test.go
+- [x] T067 [P] 增加 lark sync-tasks API 回归（trigger/list/clear）in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes_test.go
+
+### Implementation for Phase 8
+
+- [x] T068 完善飞书配置页联调提示文案（字段说明/域名约束）in skeleton/web-admin/nuxt/app/pages/admin/iam/channels/lark.vue
+- [x] T069 在回归文档新增飞书平台配置截图与参数映射清单 in tmp/019-iam-federated-channel-login-regression.md
+- [x] T070 执行飞书联调冒烟并记录结果（challenge/callback/sync-task）in tmp/019-iam-federated-channel-login-regression.md
+- [x] T071 更新 quickstart 的飞书最小配置 SOP in specs/019-iam-federated-channel-login/quickstart.md
+- [x] T072 标记钉钉联调延期项（非阻塞）并记录前置条件 in tmp/019-iam-federated-channel-login-regression.md
 
 ---
 

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -286,6 +287,11 @@ func RequestID() gin.HandlerFunc {
 		c.Header("X-Trace-Id", traceID)
 		c.Set("request_id", requestID)
 		c.Set("trace_id", traceID)
+		c.Request = c.Request.WithContext(runtimelogging.WithRuntime(c.Request.Context(), runtimelogging.Fields{
+			runtimelogging.FieldTraceID:  traceID,
+			"request_id":                 requestID,
+			runtimelogging.FieldPluginID: pluginIDForLog(),
+		}))
 
 		c.Next()
 	}

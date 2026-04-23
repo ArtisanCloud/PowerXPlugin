@@ -39,18 +39,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] 增加宿主模式默认 stdout/json 回归测试 in skeleton/backend/go-gin/internal/logger/logger_output_test.go
-- [ ] T013 [P] [US1] 增加统一字段注入测试（plugin_id/tenant_uuid/component/level/trace_id）in skeleton/backend/go-gin/internal/logger/runtime_test.go
-- [ ] T014 [P] [US1] 增加 trace 缺失自动补齐测试 in framework/backend/go/runtime/common/logging/facade_test.go
+- [x] T012 [P] [US1] 增加宿主模式默认 stdout/json 回归测试 in skeleton/backend/go-gin/internal/logger/logger_output_test.go
+- [x] T013 [P] [US1] 增加统一字段注入测试（plugin_id/tenant_uuid/component/level/trace_id）in skeleton/backend/go-gin/internal/logger/runtime_test.go
+- [x] T014 [P] [US1] 增加 trace 缺失自动补齐测试 in framework/backend/go/runtime/common/logging/facade_test.go
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] 实现 framework 门面的上下文字段归并逻辑 in framework/backend/go/runtime/common/logging/context_fields.go
-- [ ] T016 [US1] 在 skeleton `Deps.RuntimeLogger` 对齐 framework 门面字段模型 in skeleton/backend/go-gin/internal/shared/app/deps.go
-- [ ] T017 [US1] 在 HTTP 中间件接入统一 trace 字段透传 in skeleton/backend/go-gin/internal/middleware/common.go
-- [ ] T018 [US1] 实现宿主模式下 file/loki 未授权拒绝与告警 in framework/backend/go/runtime/common/logging/router.go
-- [ ] T019 [US1] 补充宿主模式策略文档与示例配置 in skeleton/backend/etc/config.example.yaml
-- [ ] T020 [US1] 记录 US1 验收结果 in tmp/020-framework-logger-regression.md
+- [x] T015 [US1] 实现 framework 门面的上下文字段归并逻辑 in framework/backend/go/runtime/common/logging/context_fields.go
+- [x] T016 [US1] 在 skeleton `Deps.RuntimeLogger` 对齐 framework 门面字段模型 in skeleton/backend/go-gin/internal/shared/app/deps.go
+- [x] T017 [US1] 在 HTTP 中间件接入统一 trace 字段透传 in skeleton/backend/go-gin/internal/middleware/common.go
+- [x] T018 [US1] 实现宿主模式下 file/loki 未授权拒绝与告警 in framework/backend/go/runtime/common/logging/router.go
+- [x] T019 [US1] 补充宿主模式策略文档与示例配置 in skeleton/backend/etc/config.example.yaml
+- [x] T020 [US1] 记录 US1 验收结果 in tmp/020-framework-logger-regression.md
 
 **Checkpoint**: US1 完成后，宿主模式统一采集能力可独立演示。
 

@@ -32,4 +32,7 @@ func TestWithRuntimeFields(t *testing.T) {
 	if fields["foo"] != "bar" {
 		t.Fatalf("extra field missing")
 	}
+	if _, ok := fields["level"]; ok {
+		t.Fatalf("level should be set by logger backend, not runtime fields")
+	}
 }

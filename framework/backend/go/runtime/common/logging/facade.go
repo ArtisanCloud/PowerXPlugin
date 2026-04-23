@@ -41,7 +41,7 @@ func (f *Facade) Emit(level, message string, extra Fields) {
 	if msg == "" {
 		msg = "log event"
 	}
-	fields := NormalizeRuntimeFields(MergeFields(f.fields, extra))
+	fields := NormalizeContextFields(f.fields, extra)
 	fields["event_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 	entry := f.logger.WithFields(fields)
 	switch strings.ToLower(strings.TrimSpace(level)) {

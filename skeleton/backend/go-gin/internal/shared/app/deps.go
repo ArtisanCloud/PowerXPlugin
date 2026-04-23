@@ -99,6 +99,15 @@ func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger
 			}
 		}
 	}
+	baseFields := runtimelogging.Fields{
+		runtimelogging.FieldPluginID:   PluginID,
+		runtimelogging.FieldTenantUUID: tenantID,
+		runtimelogging.FieldTraceID:    traceID,
+		runtimelogging.FieldComponent:  component,
+		"request_id":                   traceID,
+	}
+	normalized := runtimelogging.NormalizeContextFields(baseFields, runtimelogging.Fields(extra))
+	extra = logger.Fields(normalized)
 
 	return logger.WithRuntimeFields(PluginID, tenantID, traceID, component, extra)
 }

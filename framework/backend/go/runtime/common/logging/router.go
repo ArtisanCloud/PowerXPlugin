@@ -7,23 +7,6 @@ import (
 	"time"
 )
 
-type OutcomeStatus string
-
-const (
-	OutcomeSuccess  OutcomeStatus = "success"
-	OutcomeFailed   OutcomeStatus = "failed"
-	OutcomeRetrying OutcomeStatus = "retrying"
-	OutcomeDropped  OutcomeStatus = "dropped"
-)
-
-type SinkOutcome struct {
-	Sink      SinkType
-	Status    OutcomeStatus
-	Attempt   int
-	ErrorCode string
-	Error     string
-}
-
 type Router struct {
 	registry *SinkRegistry
 	policy   Policy
@@ -83,19 +66,9 @@ func (r *Router) Route(ctx context.Context, event Event) []SinkOutcome {
 			outcomes = append(outcomes, SinkOutcome{Sink: sinkName, Status: OutcomeDropped, Attempt: 1, ErrorCode: "sink_not_registered", Error: "sink is not registered"})
 			continue
 		}
-		attempts := max(1, r.policy.Retry.MaxAttempts)
-		for i := 1; i <= attempts; i++ {
-			err := sink.Emit(ctx, event)
-			if err == nil {
-				outcomes = append(outcomes, SinkOutcome{Sink: sinkName, Status: OutcomeSuccess, Attempt: i})
-				break
-			}
-			if i < attempts && r.policy.Retry.Enabled {
-				outcomes = append(outcomes, SinkOutcome{Sink: sinkName, Status: OutcomeRetrying, Attempt: i, ErrorCode: "sink_emit_failed", Error: err.Error()})
-				continue
-			}
-			outcomes = append(outcomes, SinkOutcome{Sink: sinkName, Status: OutcomeFailed, Attempt: i, ErrorCode: "sink_emit_failed", Error: err.Error()})
-		}
+		outcomes = append(outcomes, executeWithRetry(ctx, sinkName, r.policy.Retry, func() error {
+			return sink.Emit(ctx, event)
+		})...)
 	}
 	return outcomes
 }

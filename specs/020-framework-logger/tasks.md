@@ -63,17 +63,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T021 [P] [US2] 增加多 sink fan-out 成功路径测试 in framework/backend/go/runtime/common/logging/router_test.go
-- [ ] T022 [P] [US2] 增加单 sink 故障降级与重试测试 in framework/backend/go/runtime/common/logging/retry_test.go
-- [ ] T023 [P] [US2] 增加 probe 契约测试 in skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/logging_probe_handler_test.go
+- [x] T021 [P] [US2] 增加多 sink fan-out 成功路径测试 in framework/backend/go/runtime/common/logging/router_test.go
+- [x] T022 [P] [US2] 增加单 sink 故障降级与重试测试 in framework/backend/go/runtime/common/logging/retry_test.go
+- [x] T023 [P] [US2] 增加 probe 契约测试 in skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/logging_probe_handler_test.go
 
 ### Implementation for User Story 2
 
-- [ ] T024 [US2] 实现 sink 级重试策略与退避参数应用 in framework/backend/go/runtime/common/logging/retry.go
-- [ ] T025 [US2] 实现路由结果结构化输出（success/failed/retrying/dropped）in framework/backend/go/runtime/common/logging/outcome.go
-- [ ] T026 [US2] 实现策略查询/应用管理端接口 in skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/logging_policy_handler.go
-- [ ] T027 [US2] 实现 probe 接口并输出 sink outcomes in skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/logging_probe_handler.go
-- [ ] T028 [US2] 记录 US2 多 sink 回归结果 in tmp/020-framework-logger-regression.md
+- [x] T024 [US2] 实现 sink 级重试策略与退避参数应用 in framework/backend/go/runtime/common/logging/retry.go
+- [x] T025 [US2] 实现路由结果结构化输出（success/failed/retrying/dropped）in framework/backend/go/runtime/common/logging/outcome.go
+- [x] T026 [US2] 实现策略查询/应用管理端接口 in skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/logging_policy_handler.go
+- [x] T027 [US2] 实现 probe 接口并输出 sink outcomes in skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/logging_probe_handler.go
+- [x] T028 [US2] 记录 US2 多 sink 回归结果 in tmp/020-framework-logger-regression.md
 
 **Checkpoint**: US2 完成后，多 sink 并行与故障隔离能力可独立验收。
 

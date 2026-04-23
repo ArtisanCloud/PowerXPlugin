@@ -86,17 +86,17 @@
 
 ### Tests for User Story 3
 
-- [ ] T029 [P] [US3] 增加 standalone 策略切换回归测试 in skeleton/backend/go-gin/internal/config/config_test.go
-- [ ] T030 [P] [US3] 增加直写日志违规扫描规则测试 in scripts/testing/framework_logger_guard_test.sh
-- [ ] T031 [P] [US3] 增加治理截止版本阻断测试 in skeleton/backend/go-gin/internal/logger/governance_test.go
+- [x] T029 [P] [US3] 增加 standalone 策略切换回归测试 in skeleton/backend/go-gin/internal/config/config_test.go
+- [x] T030 [P] [US3] 增加直写日志违规扫描规则测试 in scripts/testing/framework_logger_guard_test.sh
+- [x] T031 [P] [US3] 增加治理截止版本阻断测试 in skeleton/backend/go-gin/internal/logger/governance_test.go
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] 实现直写日志违规扫描脚本与状态输出 in scripts/testing/framework-logger-guard.sh
-- [ ] T033 [US3] 实现治理状态模型（detected/warned/blocked/resolved）in skeleton/backend/go-gin/internal/logger/governance.go
-- [ ] T034 [US3] 实现截止版本规则读取与阻断逻辑 in skeleton/backend/go-gin/internal/config/config.go
-- [ ] T035 [US3] 在 CI 脚本接入违规扫描步骤 in scripts/testing/regression.sh
-- [ ] T036 [US3] 记录 US3 治理回归结果 in tmp/020-framework-logger-regression.md
+- [x] T032 [US3] 实现直写日志违规扫描脚本与状态输出 in scripts/testing/framework-logger-guard.sh
+- [x] T033 [US3] 实现治理状态模型（detected/warned/blocked/resolved）in skeleton/backend/go-gin/internal/logger/governance.go
+- [x] T034 [US3] 实现截止版本规则读取与阻断逻辑 in skeleton/backend/go-gin/internal/config/config.go
+- [x] T035 [US3] 在 CI 脚本接入违规扫描步骤 in scripts/testing/regression.sh
+- [x] T036 [US3] 记录 US3 治理回归结果 in tmp/020-framework-logger-regression.md
 
 **Checkpoint**: US3 完成后，治理闭环与独立模式切换可独立验收。
 

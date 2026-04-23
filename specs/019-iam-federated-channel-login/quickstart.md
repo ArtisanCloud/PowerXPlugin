@@ -7,7 +7,7 @@
 ## 2. 前置条件
 
 1. 当前分支为 `019-iam-federated-channel-login`。  
-2. 已配置至少一个渠道（推荐企业微信）测试租户参数。  
+2. 已配置至少一个渠道（推荐企业微信或飞书）测试租户参数。  
 3. 插件后端与 web-admin 可正常启动。  
 4. delegated 场景下可访问宿主鉴权链路。
 
@@ -76,3 +76,26 @@ cd skeleton/backend/go-gin && \
 2. `FEDERATED_INVALID_CHALLENGE`：检查 callback 的 `state/nonce/tenant_uuid` 是否和 challenge 响应一致。
 3. `FEDERATED_RISK_*`：前端展示统一失败文案，详细原因通过审计事件与 `reason_code` 排查。
 4. delegated 模式失败：优先确认宿主会话可用，再检查插件日志中的 `FEDERATED_AUTH_UNAVAILABLE`。
+
+## 11. 飞书优先联调（当前迭代）
+
+1. 飞书开放平台创建自建应用并获取 `App ID`、`App Secret`、`Tenant Key`。
+2. 在飞书开放平台配置回调域名（建议公网 HTTPS，避免 `localhost/127.0.0.1`）。
+3. 在管理端填写 `/admin/iam/channels/lark`：
+   - `Host:Port`
+   - `Tenant Key`
+   - `App ID`
+   - `App Secret`
+4. 字段映射确认（后端保存 key）：
+   - `Tenant Key -> tenant_key`
+   - `App ID -> app_id`
+   - `App Secret -> app_secret`
+   - `Host:Port -> callback_host`
+5. 发起同步任务验证 API：
+   - `POST /api/v1/admin/iam/channels/lark/sync-tasks`（`{"action":"full_sync"}`）
+   - `GET /api/v1/admin/iam/channels/lark/sync-tasks?limit=20`
+   - `DELETE /api/v1/admin/iam/channels/lark/sync-tasks`
+6. 扫码登录验证：
+   - `provider=lark` challenge
+   - callback 返回统一 tokens/context
+7. 回归记录写入 `tmp/019-iam-federated-channel-login-regression.md`，作为 SC-006 验收依据。

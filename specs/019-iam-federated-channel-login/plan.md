@@ -117,3 +117,4 @@ skeleton/backend/go-gin/internal/
 | Phase 4 US2 | Completed | 绑定治理、JIT 策略、映射版本化与会话失效完成 |
 | Phase 5 US3 | Completed | 风控回归、审计上报、双模式语义对齐完成 |
 | Phase 6 Polish | Completed | 文档收口、指标口径、性能基准与全量回归记录 |
+| Phase 7 Multi-Channel Parity | In Progress | 飞书优先完成可验收闭环；钉钉维持兼容实现并延后外部联调 |

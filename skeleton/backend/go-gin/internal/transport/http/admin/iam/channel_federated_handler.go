@@ -1,0 +1,348 @@
+package iam
+
+import (
+	"strconv"
+	"strings"
+
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
+	federatedsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+type ChannelDingTalkHandler struct {
+	configSvc *federatedsvc.DingTalkConfigService
+	syncSvc   *federatedsvc.DingTalkSyncTaskService
+}
+
+func NewChannelDingTalkHandler(configSvc *federatedsvc.DingTalkConfigService) *ChannelDingTalkHandler {
+	return &ChannelDingTalkHandler{configSvc: configSvc}
+}
+
+func NewChannelDingTalkHandlerWithDeps(deps *app.Deps) *ChannelDingTalkHandler {
+	if deps == nil || deps.DB == nil {
+		return &ChannelDingTalkHandler{}
+	}
+	configSvc := federatedsvc.NewDingTalkConfigService(deps.DB)
+	syncRepo := repo.NewChannelSyncTaskRepository(deps.DB)
+	publisher := fwwsbus.NewAdapter(
+		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
+		"",
+		nil,
+	)
+	return &ChannelDingTalkHandler{
+		configSvc: configSvc,
+		syncSvc:   federatedsvc.NewDingTalkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),
+	}
+}
+
+type dingtalkConfigRequest struct {
+	Status       string `json:"status"`
+	RotationDays int    `json:"rotation_days"`
+	CallbackHost string `json:"callback_host"`
+	CorpID       string `json:"corp_id" binding:"required"`
+	AppKey       string `json:"app_key" binding:"required"`
+	AppSecret    string `json:"app_secret" binding:"required"`
+	HttpDebug    bool   `json:"http_debug"`
+}
+
+func (h *ChannelDingTalkHandler) GetConfig(c *gin.Context) {
+	if h.configSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "dingtalk config service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	cfg, err := h.configSvc.GetByTenant(c.Request.Context(), tenantUUID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			contracts.ResponseNotFound(c, "dingtalk config not found")
+			return
+		}
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, cfg)
+}
+
+func (h *ChannelDingTalkHandler) SaveConfig(c *gin.Context) {
+	if h.configSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "dingtalk config service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	var req dingtalkConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	cfg, err := h.configSvc.UpsertTenantConfig(c.Request.Context(), federatedsvc.DingTalkConfig{
+		TenantUUID:   tenantUUID,
+		Status:       req.Status,
+		RotationDays: req.RotationDays,
+		CallbackHost: req.CallbackHost,
+		CorpID:       req.CorpID,
+		AppKey:       req.AppKey,
+		AppSecret:    req.AppSecret,
+		HttpDebug:    req.HttpDebug,
+	})
+	if err != nil {
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, cfg)
+}
+
+func (h *ChannelDingTalkHandler) TriggerSyncTask(c *gin.Context) {
+	if h.syncSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "dingtalk sync task service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	var req syncTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	task, err := h.syncSvc.Trigger(c.Request.Context(), tenantUUID, req.Action)
+	if err != nil {
+		if isMissingSyncTaskTable(err) {
+			contracts.ResponseBadRequest(c, "同步任务表未初始化，请先执行数据库迁移（cd skeleton/backend/go-gin && go run ./cmd/database migrate --include-iam）")
+			return
+		}
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, task)
+}
+
+func (h *ChannelDingTalkHandler) ListSyncTasks(c *gin.Context) {
+	if h.syncSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "dingtalk sync task service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	limit := 20
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	tasks, err := h.syncSvc.List(c.Request.Context(), tenantUUID, limit)
+	if err != nil {
+		if isMissingSyncTaskTable(err) {
+			contracts.ResponseSuccess(c, gin.H{"items": []any{}, "warning": "同步任务表未初始化，请先执行数据库迁移"})
+			return
+		}
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": tasks})
+}
+
+func (h *ChannelDingTalkHandler) ClearSyncTasks(c *gin.Context) {
+	if h.syncSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "dingtalk sync task service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	affected, err := h.syncSvc.Clear(c.Request.Context(), tenantUUID)
+	if err != nil {
+		if isMissingSyncTaskTable(err) {
+			contracts.ResponseSuccess(c, gin.H{"deleted": 0, "warning": "同步任务表未初始化"})
+			return
+		}
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"deleted": affected})
+}
+
+type ChannelLarkHandler struct {
+	configSvc *federatedsvc.LarkConfigService
+	syncSvc   *federatedsvc.LarkSyncTaskService
+}
+
+func NewChannelLarkHandler(configSvc *federatedsvc.LarkConfigService) *ChannelLarkHandler {
+	return &ChannelLarkHandler{configSvc: configSvc}
+}
+
+func NewChannelLarkHandlerWithDeps(deps *app.Deps) *ChannelLarkHandler {
+	if deps == nil || deps.DB == nil {
+		return &ChannelLarkHandler{}
+	}
+	configSvc := federatedsvc.NewLarkConfigService(deps.DB)
+	syncRepo := repo.NewChannelSyncTaskRepository(deps.DB)
+	publisher := fwwsbus.NewAdapter(
+		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
+		"",
+		nil,
+	)
+	return &ChannelLarkHandler{
+		configSvc: configSvc,
+		syncSvc:   federatedsvc.NewLarkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),
+	}
+}
+
+type larkConfigRequest struct {
+	Status       string `json:"status"`
+	RotationDays int    `json:"rotation_days"`
+	CallbackHost string `json:"callback_host"`
+	TenantKey    string `json:"tenant_key" binding:"required"`
+	AppID        string `json:"app_id" binding:"required"`
+	AppSecret    string `json:"app_secret" binding:"required"`
+	HttpDebug    bool   `json:"http_debug"`
+}
+
+func (h *ChannelLarkHandler) GetConfig(c *gin.Context) {
+	if h.configSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "lark config service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	cfg, err := h.configSvc.GetByTenant(c.Request.Context(), tenantUUID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			contracts.ResponseNotFound(c, "lark config not found")
+			return
+		}
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, cfg)
+}
+
+func (h *ChannelLarkHandler) SaveConfig(c *gin.Context) {
+	if h.configSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "lark config service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	var req larkConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	cfg, err := h.configSvc.UpsertTenantConfig(c.Request.Context(), federatedsvc.LarkConfig{
+		TenantUUID:   tenantUUID,
+		Status:       req.Status,
+		RotationDays: req.RotationDays,
+		CallbackHost: req.CallbackHost,
+		TenantKey:    req.TenantKey,
+		AppID:        req.AppID,
+		AppSecret:    req.AppSecret,
+		HttpDebug:    req.HttpDebug,
+	})
+	if err != nil {
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, cfg)
+}
+
+func (h *ChannelLarkHandler) TriggerSyncTask(c *gin.Context) {
+	if h.syncSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "lark sync task service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	var req syncTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	task, err := h.syncSvc.Trigger(c.Request.Context(), tenantUUID, req.Action)
+	if err != nil {
+		if isMissingSyncTaskTable(err) {
+			contracts.ResponseBadRequest(c, "同步任务表未初始化，请先执行数据库迁移（cd skeleton/backend/go-gin && go run ./cmd/database migrate --include-iam）")
+			return
+		}
+		contracts.ResponseBadRequest(c, err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, task)
+}
+
+func (h *ChannelLarkHandler) ListSyncTasks(c *gin.Context) {
+	if h.syncSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "lark sync task service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	limit := 20
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	tasks, err := h.syncSvc.List(c.Request.Context(), tenantUUID, limit)
+	if err != nil {
+		if isMissingSyncTaskTable(err) {
+			contracts.ResponseSuccess(c, gin.H{"items": []any{}, "warning": "同步任务表未初始化，请先执行数据库迁移"})
+			return
+		}
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": tasks})
+}
+
+func (h *ChannelLarkHandler) ClearSyncTasks(c *gin.Context) {
+	if h.syncSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "lark sync task service not available", nil)
+		return
+	}
+	tenantUUID, ok := httpmw.TenantUuidString(c)
+	if !ok {
+		contracts.ResponseUnauthorized(c, "tenant context missing")
+		return
+	}
+	affected, err := h.syncSvc.Clear(c.Request.Context(), tenantUUID)
+	if err != nil {
+		if isMissingSyncTaskTable(err) {
+			contracts.ResponseSuccess(c, gin.H{"deleted": 0, "warning": "同步任务表未初始化"})
+			return
+		}
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"deleted": affected})
+}

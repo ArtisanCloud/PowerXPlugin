@@ -106,11 +106,11 @@
 
 **Purpose**: 文档收口、指标验收与全量回归。
 
-- [ ] T037 [P] 更新特性文档中的日志策略与治理说明 in specs/020-framework-logger/spec.md
-- [ ] T038 [P] 更新 quickstart 执行与排障说明 in specs/020-framework-logger/quickstart.md
-- [ ] T039 [P] 对齐 OpenAPI 合同与实现字段命名 in specs/020-framework-logger/contracts/framework-logger.openapi.yaml
-- [ ] T040 执行并记录全量回归（US1+US2+US3）in tmp/020-framework-logger-regression.md
-- [ ] T041 执行 Go 回归测试并记录结果 in tmp/020-framework-logger-regression.md
+- [x] T037 [P] 更新特性文档中的日志策略与治理说明 in specs/020-framework-logger/spec.md
+- [x] T038 [P] 更新 quickstart 执行与排障说明 in specs/020-framework-logger/quickstart.md
+- [x] T039 [P] 对齐 OpenAPI 合同与实现字段命名 in specs/020-framework-logger/contracts/framework-logger.openapi.yaml
+- [x] T040 执行并记录全量回归（US1+US2+US3）in tmp/020-framework-logger-regression.md
+- [x] T041 执行 Go 回归测试并记录结果 in tmp/020-framework-logger-regression.md
 
 ---
 

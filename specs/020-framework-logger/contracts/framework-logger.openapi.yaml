@@ -18,7 +18,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LogPolicyResponse'
+                $ref: '#/components/schemas/APIResponseLogPolicy'
     put:
       summary: Apply logging policy
       operationId: applyLoggingPolicy
@@ -35,9 +35,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PolicyApplyResponse'
+                $ref: '#/components/schemas/APIResponsePolicyApply'
         '400':
           description: Invalid policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIErrorResponse'
   /admin/runtime/logging/probe:
     post:
       summary: Emit probe log event to configured sinks
@@ -55,7 +59,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProbeResponse'
+                $ref: '#/components/schemas/APIResponseProbe'
+        '400':
+          description: Invalid probe request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIErrorResponse'
   /admin/runtime/logging/violations:
     get:
       summary: List legacy direct-logging violations
@@ -86,12 +96,112 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ViolationListResponse'
+                $ref: '#/components/schemas/APIResponseViolationList'
 components:
   schemas:
+    APIError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          nullable: true
+    APIErrorResponse:
+      type: object
+      required: [success, error, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: '#/components/schemas/APIError'
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+    APIResponseLogPolicy:
+      type: object
+      required: [success, data, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          required: [policy]
+          properties:
+            policy:
+              $ref: '#/components/schemas/LogPolicy'
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+    APIResponsePolicyApply:
+      type: object
+      required: [success, data, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          required: [accepted, policy, effective_at]
+          properties:
+            accepted:
+              type: boolean
+            policy:
+              $ref: '#/components/schemas/LogPolicy'
+            effective_at:
+              type: string
+              format: date-time
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+    APIResponseProbe:
+      type: object
+      required: [success, data, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/ProbeResponse'
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+    APIResponseViolationList:
+      type: object
+      required: [success, data, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/ViolationListResponse'
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
     LogPolicyRequest:
       type: object
-      required: [policy_version, mode, sinks, format, level, retry]
       properties:
         policy_version:
           type: string
@@ -117,9 +227,11 @@ components:
             enum: [file, loki]
         retry:
           $ref: '#/components/schemas/RetryPolicy'
+    LogPolicy:
+      allOf:
+        - $ref: '#/components/schemas/LogPolicyRequest'
     RetryPolicy:
       type: object
-      required: [enabled, max_attempts, backoff_ms]
       properties:
         enabled:
           type: boolean
@@ -129,23 +241,8 @@ components:
           maximum: 10
         backoff_ms:
           type: integer
-          minimum: 10
+          minimum: 1
           maximum: 60000
-    LogPolicyResponse:
-      type: object
-      required: [policy]
-      properties:
-        policy:
-          $ref: '#/components/schemas/LogPolicyRequest'
-    PolicyApplyResponse:
-      type: object
-      required: [accepted, effective_at]
-      properties:
-        accepted:
-          type: boolean
-        effective_at:
-          type: string
-          format: date-time
     ProbeRequest:
       type: object
       required: [message, level, component]

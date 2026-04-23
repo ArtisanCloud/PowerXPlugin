@@ -84,6 +84,34 @@
 - **FR-011**: 系统必须支持按平台策略附加标准时间戳（UTC）与业务日期字段，并携带业务时区信息，保证跨时区统计口径一致。
 - **FR-012**: 系统必须确保日志能力切换不会引入业务接口行为回归。
 
+## Implementation Notes (2026-04-23)
+
+- 已落地 framework 统一日志门面与路由结果模型：`success/failed/retrying/dropped`。
+- 宿主模式策略默认 `stdout + json`，`file/loki` 需进入 `authorized_extra_sinks`。
+- 管理端已提供：
+  - `GET /admin/runtime/logging/policy`
+  - `PUT /admin/runtime/logging/policy`
+  - `POST /admin/runtime/logging/probe`
+- 统一响应采用 skeleton `APIResponse` envelope（`success/data/error/timestamp/request_id`）。
+- 治理策略支持：
+  - `governance_mode=detect|warn|block`
+  - `governance_deadline_version`
+  - `plugin_version`
+  - 截止版本到达后可触发阻断判定（即使模式为 `warn`）。
+- CI 回归脚本已接入治理扫描：`scripts/testing/framework-logger-guard.sh`。
+
+## Governance Policy (P3)
+
+- 扫描对象：framework/skeleton Go 代码中的遗留直写日志模式（direct logrus/zap/file）。
+- 状态机：
+  - `detected`：仅检测
+  - `warned`：检测并告警（默认）
+  - `blocked`：检测即阻断（非零退出）
+  - `resolved`：无违规
+- 阶段化治理：
+  - 截止版本前：`detect/warn` 可继续交付但必须跟踪整改
+  - 截止版本后：未整改违规进入 `blocked`
+
 ### Key Entities *(include if feature involves data)*
 
 - **日志策略 (Log Policy)**: 由平台下发并被 framework 消费的配置对象，定义目标列表、格式、级别、模式与回退规则。

@@ -51,17 +51,35 @@
 ## 7. 回归建议命令
 
 ```bash
-cd framework/backend/go && go test ./...
+mkdir -p tmp/gocache tmp/gomodcache
+GOCACHE=$PWD/tmp/gocache GOMODCACHE=$PWD/tmp/gomodcache \
+  go test ./framework/backend/go/runtime/common/logging -count=1
 ```
 
 ```bash
-cd skeleton/backend/go-gin && \
-  GOCACHE=$PWD/../../tmp/gocache \
-  GOMODCACHE=$PWD/../../tmp/gomodcache \
-  go test ./...
+mkdir -p tmp/gocache tmp/gomodcache
+GOCACHE=$PWD/tmp/gocache GOMODCACHE=$PWD/tmp/gomodcache \
+  go test ./skeleton/backend/go-gin/internal/config \
+          ./skeleton/backend/go-gin/internal/logger \
+          ./skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops \
+          -count=1
 ```
 
-## 8. 验收映射（对应 Success Criteria）
+```bash
+# 治理扫描（默认 warn；mode=block 或触发截止版本时返回非 0）
+FRAMEWORK_LOGGER_GUARD_MODE=warn \
+  ./scripts/testing/framework-logger-guard.sh ./skeleton/backend/go-gin ./framework/backend/go
+```
+
+## 8. 执行与排障说明
+
+1. `POWERX_PROXY=1` 但 `file/loki` 未生效：检查 `authorized_extra_sinks` 是否授权，宿主默认只允许 `stdout`。
+2. `PUT /admin/runtime/logging/policy` 返回 400：检查 `mode/format/level/sinks/retry` 是否满足校验（host 必须 `stdout+json`）。
+3. `probe` outcomes 出现 `dropped`：先检查 sink 注册状态，再检查请求超时导致的重试中断。
+4. CI 中治理扫描失败：若 `status=blocked`，根据输出清单整改直写日志，或核对 `plugin_version` 与 `governance_deadline_version`。
+5. Go 测试缓存权限错误：固定使用 `GOCACHE=$PWD/tmp/gocache` 与 `GOMODCACHE=$PWD/tmp/gomodcache`。
+
+## 9. 验收映射（对应 Success Criteria）
 
 1. **SC-001**: 新增代码无直写日志；截止版本后违规数为 0。  
 2. **SC-002**: 抽样日志可用 `trace_id` 串联查询。  

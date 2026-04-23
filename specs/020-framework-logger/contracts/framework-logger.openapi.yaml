@@ -1,0 +1,232 @@
+openapi: 3.0.3
+info:
+  title: Framework Logger Governance API
+  version: 0.1.0
+  description: |
+    Contracts for PowerX-driven logging policy, multi-sink probe, and legacy logging governance.
+servers:
+  - url: /api/v1
+paths:
+  /admin/runtime/logging/policy:
+    get:
+      summary: Get effective logging policy
+      operationId: getLoggingPolicy
+      tags: [logging]
+      responses:
+        '200':
+          description: Effective policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogPolicyResponse'
+    put:
+      summary: Apply logging policy
+      operationId: applyLoggingPolicy
+      tags: [logging]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogPolicyRequest'
+      responses:
+        '202':
+          description: Policy accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyApplyResponse'
+        '400':
+          description: Invalid policy
+  /admin/runtime/logging/probe:
+    post:
+      summary: Emit probe log event to configured sinks
+      operationId: emitLoggingProbe
+      tags: [logging]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProbeRequest'
+      responses:
+        '200':
+          description: Probe completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeResponse'
+  /admin/runtime/logging/violations:
+    get:
+      summary: List legacy direct-logging violations
+      operationId: listLoggingViolations
+      tags: [logging-governance]
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [detected, warned, blocked, resolved]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+      responses:
+        '200':
+          description: Violation list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViolationListResponse'
+components:
+  schemas:
+    LogPolicyRequest:
+      type: object
+      required: [policy_version, mode, sinks, format, level, retry]
+      properties:
+        policy_version:
+          type: string
+        mode:
+          type: string
+          enum: [host, standalone]
+        sinks:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [stdout, file, loki]
+        format:
+          type: string
+          enum: [json, text]
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        authorized_extra_sinks:
+          type: array
+          items:
+            type: string
+            enum: [file, loki]
+        retry:
+          $ref: '#/components/schemas/RetryPolicy'
+    RetryPolicy:
+      type: object
+      required: [enabled, max_attempts, backoff_ms]
+      properties:
+        enabled:
+          type: boolean
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 10
+        backoff_ms:
+          type: integer
+          minimum: 10
+          maximum: 60000
+    LogPolicyResponse:
+      type: object
+      required: [policy]
+      properties:
+        policy:
+          $ref: '#/components/schemas/LogPolicyRequest'
+    PolicyApplyResponse:
+      type: object
+      required: [accepted, effective_at]
+      properties:
+        accepted:
+          type: boolean
+        effective_at:
+          type: string
+          format: date-time
+    ProbeRequest:
+      type: object
+      required: [message, level, component]
+      properties:
+        message:
+          type: string
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        component:
+          type: string
+        trace_id:
+          type: string
+        tenant_uuid:
+          type: string
+        event:
+          type: string
+        fields:
+          type: object
+          additionalProperties: true
+    ProbeResponse:
+      type: object
+      required: [trace_id, outcomes]
+      properties:
+        trace_id:
+          type: string
+        outcomes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SinkOutcome'
+    SinkOutcome:
+      type: object
+      required: [sink, status, attempt]
+      properties:
+        sink:
+          type: string
+          enum: [stdout, file, loki]
+        status:
+          type: string
+          enum: [success, failed, retrying, dropped]
+        attempt:
+          type: integer
+        error_code:
+          type: string
+        error_message:
+          type: string
+    ViolationRecord:
+      type: object
+      required: [violation_id, module_path, violation_type, status, detected_at]
+      properties:
+        violation_id:
+          type: string
+        module_path:
+          type: string
+        symbol:
+          type: string
+        violation_type:
+          type: string
+          enum: [direct_logrus, direct_zap, direct_file]
+        status:
+          type: string
+          enum: [detected, warned, blocked, resolved]
+        deadline_version:
+          type: string
+        detected_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ViolationListResponse:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViolationRecord'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer

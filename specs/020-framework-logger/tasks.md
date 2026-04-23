@@ -20,13 +20,13 @@
 **Purpose**: 实现所有用户故事共享的日志门面、策略加载与路由基础能力。  
 **⚠️ CRITICAL**: 此阶段完成前，不进入任何用户故事实现。
 
-- [ ] T005 实现 framework 日志门面接口（FromContext/With/Emit）in framework/backend/go/runtime/common/logging/facade.go
-- [ ] T006 [P] 实现日志策略模型与校验规则 in framework/backend/go/runtime/common/logging/policy.go
-- [ ] T007 [P] 实现 sink 路由器与 fan-out 执行器 in framework/backend/go/runtime/common/logging/router.go
-- [ ] T008 [P] 实现 stdout/file/loki sink 抽象与注册机制 in framework/backend/go/runtime/common/logging/sinks.go
-- [ ] T009 实现宿主模式默认策略决议（`POWERX_PROXY=1 -> stdout+json`）in framework/backend/go/runtime/common/logging/host_mode.go
-- [ ] T010 [P] 将 skeleton logger 初始化接入 framework 策略决议 in skeleton/backend/go-gin/internal/bootstrap/app.go
-- [ ] T011 [P] 增加 foundational 单元测试（策略校验、默认决议、sink 注册）in framework/backend/go/runtime/common/logging/policy_test.go
+- [x] T005 实现 framework 日志门面接口（FromContext/With/Emit）in framework/backend/go/runtime/common/logging/facade.go
+- [x] T006 [P] 实现日志策略模型与校验规则 in framework/backend/go/runtime/common/logging/policy.go
+- [x] T007 [P] 实现 sink 路由器与 fan-out 执行器 in framework/backend/go/runtime/common/logging/router.go
+- [x] T008 [P] 实现 stdout/file/loki sink 抽象与注册机制 in framework/backend/go/runtime/common/logging/sinks.go
+- [x] T009 实现宿主模式默认策略决议（`POWERX_PROXY=1 -> stdout+json`）in framework/backend/go/runtime/common/logging/host_mode.go
+- [x] T010 [P] 将 skeleton logger 初始化接入 framework 策略决议 in skeleton/backend/go-gin/internal/bootstrap/app.go
+- [x] T011 [P] 增加 foundational 单元测试（策略校验、默认决议、sink 注册）in framework/backend/go/runtime/common/logging/policy_test.go
 
 **Checkpoint**: framework 日志基础可用，插件可通过统一门面写日志并按策略路由。
 

@@ -1,0 +1,102 @@
+package logging
+
+import (
+	"context"
+	"errors"
+	"testing"
+)
+
+type stubSink struct {
+	name SinkType
+	err  error
+}
+
+func (s *stubSink) Name() SinkType { return s.name }
+func (s *stubSink) Emit(_ context.Context, _ Event) error {
+	return s.err
+}
+
+func TestValidatePolicyHostRequiresAuthorizedExtraSink(t *testing.T) {
+	p := ResolvePolicy(Policy{
+		Mode:  ModeHost,
+		Sinks: []SinkType{SinkStdout, SinkLoki},
+		Retry: RetryPolicy{Enabled: true, MaxAttempts: 1, BackoffMS: 1},
+	})
+	if err := ValidatePolicy(p); err == nil {
+		t.Fatalf("expected validation error for unauthorized sink")
+	}
+
+	p.AuthorizedExtraSinks = []SinkType{SinkLoki}
+	if err := ValidatePolicy(p); err != nil {
+		t.Fatalf("expected host policy to be valid, got: %v", err)
+	}
+}
+
+func TestResolveWithHostDefaultsForcesStdoutJSON(t *testing.T) {
+	t.Setenv("POWERX_PROXY", "1")
+	p := ResolveWithHostDefaults(Policy{
+		Sinks: []SinkType{SinkFile},
+		Retry: RetryPolicy{Enabled: true, MaxAttempts: 2, BackoffMS: 100},
+	})
+	if p.Mode != ModeHost {
+		t.Fatalf("expected host mode, got %s", p.Mode)
+	}
+	if p.Format != "json" {
+		t.Fatalf("expected json format, got %s", p.Format)
+	}
+	foundStdout := false
+	for _, sink := range p.Sinks {
+		if sink == SinkStdout {
+			foundStdout = true
+			break
+		}
+	}
+	if !foundStdout {
+		t.Fatalf("expected stdout sink in host mode")
+	}
+}
+
+func TestSinkRegistryAndRouter(t *testing.T) {
+	reg := NewSinkRegistry()
+	if err := reg.Register(&stubSink{name: SinkStdout}); err != nil {
+		t.Fatalf("register sink: %v", err)
+	}
+	if _, ok := reg.Resolve(SinkStdout); !ok {
+		t.Fatalf("expected stdout sink to be resolved")
+	}
+
+	router, err := NewRouter(Policy{
+		Mode:  ModeStandalone,
+		Sinks: []SinkType{SinkStdout},
+		Retry: RetryPolicy{Enabled: true, MaxAttempts: 1, BackoffMS: 100},
+	}, reg)
+	if err != nil {
+		t.Fatalf("new router: %v", err)
+	}
+	outcomes := router.Route(context.Background(), Event{Message: "test", Level: "info"})
+	if len(outcomes) != 1 || outcomes[0].Status != OutcomeSuccess {
+		t.Fatalf("unexpected outcomes: %+v", outcomes)
+	}
+}
+
+func TestRouterRetryOutcome(t *testing.T) {
+	reg := NewSinkRegistry()
+	if err := reg.Register(&stubSink{name: SinkStdout, err: errors.New("boom")}); err != nil {
+		t.Fatalf("register sink: %v", err)
+	}
+	router, err := NewRouter(Policy{
+		Mode:  ModeStandalone,
+		Sinks: []SinkType{SinkStdout},
+		Retry: RetryPolicy{Enabled: true, MaxAttempts: 2, BackoffMS: 100},
+	}, reg)
+	if err != nil {
+		t.Fatalf("new router: %v", err)
+	}
+	outcomes := router.Route(context.Background(), Event{Message: "test", Level: "info"})
+	if len(outcomes) != 2 {
+		t.Fatalf("expected 2 outcomes (retry + failed), got %+v", outcomes)
+	}
+	if outcomes[0].Status != OutcomeRetrying || outcomes[1].Status != OutcomeFailed {
+		t.Fatalf("unexpected retry outcomes: %+v", outcomes)
+	}
+}

@@ -17,7 +17,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	obs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/crypto"
-	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -28,7 +27,7 @@ type WebhookService struct {
 	subscriptions *repo.WebhookSubscriptionRepository
 	attempts      *repo.DeliveryAttemptRepository
 	approvalSvc   *ApprovalService
-	log           *logrus.Entry
+	log           *logger.Entry
 	now           func() time.Time
 }
 

@@ -14,7 +14,7 @@ import (
 	"{{ .BackendModulePath }}/internal/mcp/stream"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	srvtemplates "{{ .BackendModulePath }}/internal/services/admin/templates"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 const (
@@ -73,11 +73,11 @@ func (r *HandlerRegistry) CapabilityByScope(scope string) string {
 type CapabilityInvoker struct {
 	registry *HandlerRegistry
 	fallback HostInvoker
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 }
 
 // NewCapabilityInvoker wires business handlers with HostInvoker contract.
-func NewCapabilityInvoker(templateService *srvtemplates.TemplateService, broker *stream.Broker, logger *logrus.Entry, fallback HostInvoker) HostInvoker {
+func NewCapabilityInvoker(templateService *srvtemplates.TemplateService, broker *stream.Broker, logger *pxlog.Entry, fallback HostInvoker) HostInvoker {
 	registry := NewHandlerRegistry()
 	registry.Register(&templateListHandler{svc: templateService}, "agent.template.list")
 	registry.Register(&templateReadHandler{svc: templateService}, "agent.template.read")
@@ -306,7 +306,7 @@ func (h *templateDeleteHandler) CapabilityID() string {
 type templateComposeHandler struct {
 	svc    *srvtemplates.TemplateService
 	broker *stream.Broker
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
 func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
@@ -434,7 +434,7 @@ func (h *templateComposeHandler) CapabilityID() string {
 type templateAuditHandler struct {
 	svc    *srvtemplates.TemplateService
 	broker *stream.Broker
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
 func (h *templateAuditHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
@@ -507,7 +507,7 @@ func (h *templateAuditHandler) CapabilityID() string { return "com.powerx.plugin
 type templateQualityHandler struct {
 	svc    *srvtemplates.TemplateService
 	broker *stream.Broker
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
 func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {

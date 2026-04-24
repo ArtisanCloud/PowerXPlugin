@@ -7,7 +7,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
 	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // ExpiringLicenseLister defines repository capability for fetching expiring licenses.
@@ -26,15 +26,15 @@ type RenewalNotifier struct {
 	repo       ExpiringLicenseLister
 	tenants    func(context.Context) ([]string, error)
 	dispatcher RenewalDispatcher
-	logger     *logrus.Entry
+	logger     *pxlog.Entry
 	interval   time.Duration
 	clock      func() time.Time
 }
 
 // NewLicenseRenewalNotifier constructs the reminder job.
-func NewLicenseRenewalNotifier(cfg *config.Config, repo ExpiringLicenseLister, logger *logrus.Entry, tenantResolver func(context.Context) ([]string, error), dispatcher RenewalDispatcher) *RenewalNotifier {
+func NewLicenseRenewalNotifier(cfg *config.Config, repo ExpiringLicenseLister, logger *pxlog.Entry, tenantResolver func(context.Context) ([]string, error), dispatcher RenewalDispatcher) *RenewalNotifier {
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_license_renewal_notifier")
+		logger = pxlog.New().WithField("component", "marketplace_license_renewal_notifier")
 	}
 	if tenantResolver == nil {
 		tenantResolver = func(context.Context) ([]string, error) { return []string{"default"}, nil }
@@ -113,7 +113,7 @@ func (n *RenewalNotifier) execute(ctx context.Context) {
 			marketobs.EmitLicenseRenewalDue(n.logger, license, scheduled, channels)
 			if n.dispatcher != nil {
 				if err := n.dispatcher.DispatchRenewalReminder(ctx, license, channels); err != nil {
-					n.logger.WithError(err).WithFields(logrus.Fields{
+					n.logger.WithError(err).WithFields(pxlog.Fields{
 						"tenant_uuid":  tenantID,
 						"license_id": license.ID,
 					}).Warn("failed to dispatch renewal reminder")

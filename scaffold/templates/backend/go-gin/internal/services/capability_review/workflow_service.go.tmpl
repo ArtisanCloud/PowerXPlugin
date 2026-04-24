@@ -14,7 +14,6 @@ import (
 	capsvc "{{ .BackendModulePath }}/internal/services/capability"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -48,7 +47,7 @@ type reviewPolicy struct {
 
 // WorkflowService coordinates review task generation and lifecycle management.
 type WorkflowService struct {
-	logger  *logrus.Entry
+	logger  *logger.Entry
 	metrics *capobs.Metrics
 
 	mu            sync.RWMutex
@@ -139,7 +138,7 @@ type Escalation struct {
 
 // NewWorkflowService builds a service instance with default policies.
 func NewWorkflowService(deps *app.Deps) *WorkflowService {
-	var log *logrus.Entry
+	var log *logger.Entry
 	var metrics *capobs.Metrics
 	if deps != nil {
 		log = deps.RuntimeLogger(deps.Ctx, "capability_review_service", nil)

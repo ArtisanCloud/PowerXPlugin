@@ -14,7 +14,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 const defaultExposureFile = "../../contracts/exposure/exposure-packages.json"
@@ -26,7 +25,7 @@ var (
 
 // ExposureService stores channel configuration and tenant quotas for capabilities.
 type ExposureService struct {
-	logger      *logrus.Entry
+	logger      *logger.Entry
 	mu          sync.RWMutex
 	packages    map[string]*ExposurePackage
 	storagePath string
@@ -104,7 +103,7 @@ type ExposureInput struct {
 
 // NewExposureService builds a service instance backed by JSON storage.
 func NewExposureService(deps *app.Deps) *ExposureService {
-	var log *logrus.Entry
+	var log *logger.Entry
 	if deps != nil {
 		log = deps.RuntimeLogger(deps.Ctx, "capability_exposure_service", nil)
 	}
@@ -167,7 +166,7 @@ func (s *ExposureService) Upsert(ctx context.Context, input *ExposureInput) (*Ex
 		return nil, err
 	}
 
-	s.logger.WithFields(logrus.Fields{
+	s.logger.WithFields(logger.Fields{
 		"capability_id": pkg.CapabilityID,
 		"channels":      len(pkg.Channels),
 	}).Info("capability exposure package updated")
@@ -222,7 +221,7 @@ func (s *ExposureService) UpdateQuota(ctx context.Context, capabilityID string, 
 		return nil, err
 	}
 
-	s.logger.WithFields(logrus.Fields{
+	s.logger.WithFields(logger.Fields{
 		"capability_id": capabilityID,
 		"tenant_id":     quota.ID,
 		"quota":         quota.Quota,

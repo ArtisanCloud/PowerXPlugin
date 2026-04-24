@@ -1,0 +1,101 @@
+package iam
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	model "{{ .BackendModulePath }}/internal/entity/models/iam"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+type ChannelSyncTaskRepository struct {
+	db *gorm.DB
+}
+
+func NewChannelSyncTaskRepository(db *gorm.DB) *ChannelSyncTaskRepository {
+	return &ChannelSyncTaskRepository{db: db}
+}
+
+func (r *ChannelSyncTaskRepository) Create(ctx context.Context, task *model.ChannelSyncTask) error {
+	if r == nil || r.db == nil {
+		return errors.New("channel sync task repository not configured")
+	}
+	if task == nil {
+		return errors.New("channel sync task is nil")
+	}
+	return r.db.WithContext(ctx).Create(task).Error
+}
+
+func (r *ChannelSyncTaskRepository) UpdateStatus(ctx context.Context, id string, status string, summary string, errMsg string, result map[string]any, startedAt *time.Time, finishedAt *time.Time) error {
+	if r == nil || r.db == nil {
+		return errors.New("channel sync task repository not configured")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("task id is required")
+	}
+	updates := map[string]any{
+		"status":        strings.TrimSpace(status),
+		"summary":       strings.TrimSpace(summary),
+		"error_message": strings.TrimSpace(errMsg),
+		"updated_at":    time.Now().UTC(),
+	}
+	if result != nil {
+		updates["result_payload"] = datatypes.JSONMap(result)
+	}
+	if startedAt != nil {
+		updates["started_at"] = startedAt.UTC()
+	}
+	if finishedAt != nil {
+		updates["finished_at"] = finishedAt.UTC()
+	}
+	return r.db.WithContext(ctx).Model(&model.ChannelSyncTask{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func (r *ChannelSyncTaskRepository) List(ctx context.Context, tenantUUID, provider string, limit int) ([]model.ChannelSyncTask, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("channel sync task repository not configured")
+	}
+	query := r.db.WithContext(ctx).Model(&model.ChannelSyncTask{}).
+		Where("tenant_uuid = ? AND provider = ?", strings.TrimSpace(tenantUUID), strings.TrimSpace(provider)).
+		Order("created_at DESC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	var tasks []model.ChannelSyncTask
+	if err := query.Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
+func (r *ChannelSyncTaskRepository) GetByID(ctx context.Context, tenantUUID, provider, id string) (*model.ChannelSyncTask, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("channel sync task repository not configured")
+	}
+	var task model.ChannelSyncTask
+	err := r.db.WithContext(ctx).Where("tenant_uuid = ? AND provider = ? AND id = ?", strings.TrimSpace(tenantUUID), strings.TrimSpace(provider), strings.TrimSpace(id)).First(&task).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &task, nil
+}
+
+func (r *ChannelSyncTaskRepository) DeleteByTenantProvider(ctx context.Context, tenantUUID, provider string) (int64, error) {
+	if r == nil || r.db == nil {
+		return 0, errors.New("channel sync task repository not configured")
+	}
+	result := r.db.WithContext(ctx).
+		Where("tenant_uuid = ? AND provider = ?", strings.TrimSpace(tenantUUID), strings.TrimSpace(provider)).
+		Delete(&model.ChannelSyncTask{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}

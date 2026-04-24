@@ -4,18 +4,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // AuditLogger 负责输出 customer 鉴权关键链路的结构化日志。
 // 约束：字段必须包含 tenant_uuid/customer_uuid/request_id（如可得）。
 type AuditLogger struct {
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
-func NewAuditLogger(logger *logrus.Entry) *AuditLogger {
+func NewAuditLogger(logger *pxlog.Entry) *AuditLogger {
 	if logger == nil {
-		logger = logrus.WithField("component", "customer.audit_logger")
+		logger = pxlog.WithField("component", "customer.audit_logger")
 	}
 	return &AuditLogger{logger: logger}
 }
@@ -26,7 +26,7 @@ func (l *AuditLogger) WithRequest(requestID string) *AuditLogger {
 	}
 	entry := l.logger
 	if entry == nil {
-		entry = logrus.WithField("component", "customer.audit_logger")
+		entry = pxlog.WithField("component", "customer.audit_logger")
 	}
 	requestID = strings.TrimSpace(requestID)
 	if requestID != "" {
@@ -39,7 +39,7 @@ func (l *AuditLogger) LogValidation(tenantUUID, customerUUID, mode string, ok bo
 	if l == nil || l.logger == nil {
 		return
 	}
-	entry := l.logger.WithFields(logrus.Fields{
+	entry := l.logger.WithFields(pxlog.Fields{
 		"event":         "customer.auth.validation",
 		"tenant_uuid":   strings.ToLower(strings.TrimSpace(tenantUUID)),
 		"customer_uuid": strings.ToLower(strings.TrimSpace(customerUUID)),
@@ -59,7 +59,7 @@ func (l *AuditLogger) LogLogin(tenantUUID, customerUUID string, ok bool, latency
 	if l == nil || l.logger == nil {
 		return
 	}
-	entry := l.logger.WithFields(logrus.Fields{
+	entry := l.logger.WithFields(pxlog.Fields{
 		"event":         "customer.auth.login",
 		"tenant_uuid":   strings.ToLower(strings.TrimSpace(tenantUUID)),
 		"customer_uuid": strings.ToLower(strings.TrimSpace(customerUUID)),
@@ -78,7 +78,7 @@ func (l *AuditLogger) LogRegister(tenantUUID, customerUUID string, ok bool, late
 	if l == nil || l.logger == nil {
 		return
 	}
-	entry := l.logger.WithFields(logrus.Fields{
+	entry := l.logger.WithFields(pxlog.Fields{
 		"event":         "customer.auth.register",
 		"tenant_uuid":   strings.ToLower(strings.TrimSpace(tenantUUID)),
 		"customer_uuid": strings.ToLower(strings.TrimSpace(customerUUID)),

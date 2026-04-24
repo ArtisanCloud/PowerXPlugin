@@ -7,19 +7,19 @@ import (
 
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // SessionAdapter 为 MCP 会话提供 DispatchService 适配。
 type SessionAdapter struct {
 	dispatch *integrationService.DispatchService
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 }
 
 // NewSessionAdapter 构造 MCP 适配器。
-func NewSessionAdapter(dispatch *integrationService.DispatchService, logger *logrus.Entry) *SessionAdapter {
+func NewSessionAdapter(dispatch *integrationService.DispatchService, logger *pxlog.Entry) *SessionAdapter {
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.mcp.adapter")
+		logger = pxlog.WithField("component", "integration.mcp.adapter")
 	}
 	return &SessionAdapter{
 		dispatch: dispatch,

@@ -1,0 +1,230 @@
+<template>
+  <div class="dingtalk-config-page p-6 space-y-6">
+    <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <p class="text-sm uppercase tracking-wide text-gray-500 dark:text-slate-300">Channel Configuration</p>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">钉钉配置</h1>
+        <p class="text-sm text-gray-600 dark:text-slate-300">配置完成后可用于扫码挑战重写与同步任务鉴权。</p>
+      </div>
+      <div class="flex gap-2">
+        <UButton variant="outline" :loading="refreshing" @click="reloadConfig">刷新</UButton>
+        <UButton color="primary" :loading="saving" @click="saveForm">保存配置</UButton>
+      </div>
+    </div>
+
+    <UCard>
+      <template #header>
+        <h3 class="text-lg font-semibold">钉钉 OAuth 参数</h3>
+      </template>
+
+      <UForm :state="form" class="space-y-4">
+        <div class="grid gap-4 md:grid-cols-2">
+          <UFormField label="配置状态">
+            <USelect v-model="form.status" :items="statusOptions" />
+          </UFormField>
+          <UFormField label="轮换周期（天）">
+            <UInput v-model="form.rotationDays" type="number" min="1" max="365" />
+          </UFormField>
+        </div>
+
+        <UFormField label="Host:Port（接收回调）" required>
+          <UInput v-model="form.callbackHost" placeholder="https://plugin.example.com" />
+        </UFormField>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <UFormField label="Corp ID" required>
+            <UInput v-model="form.corpId" placeholder="dingxxxxxxxxxx" />
+          </UFormField>
+          <UFormField label="App Key" required>
+            <UInput v-model="form.appKey" placeholder="dingappkeyxxx" />
+          </UFormField>
+        </div>
+
+        <UFormField label="App Secret" required>
+          <UInput v-model="form.appSecret" :type="showSecret ? 'text' : 'password'" placeholder="钉钉应用 App Secret">
+            <template #trailing>
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                :label="showSecret ? '隐藏' : '显示'"
+                @click="showSecret = !showSecret"
+              />
+            </template>
+          </UInput>
+        </UFormField>
+
+        <UFormField label="SDK HttpDebug">
+          <div class="flex items-center justify-between rounded-md border border-slate-700/60 px-3 py-2">
+            <span class="text-xs text-slate-300">启用后输出渠道 SDK 调试日志</span>
+            <USwitch v-model="form.httpDebug" />
+          </div>
+        </UFormField>
+      </UForm>
+    </UCard>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from "vue";
+import { useToast } from "#imports";
+import { storeToRefs } from "pinia";
+import { useApiClient } from "~/composables/api/_client";
+import { useUserStore } from "~/stores/user";
+import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
+
+definePageMeta({
+  title: "钉钉配置",
+  icon: "i-lucide-message-square-diff",
+  order: 13,
+});
+
+type DingTalkConfig = {
+  status: string;
+  rotationDays: number;
+  callbackHost: string;
+  corpId: string;
+  appKey: string;
+  appSecret: string;
+  httpDebug: boolean;
+};
+
+type DingTalkConfigResponse = {
+  status?: string;
+  rotationDays?: number;
+  rotation_days?: number;
+  callbackHost?: string;
+  callback_host?: string;
+  corpId?: string;
+  corp_id?: string;
+  appKey?: string;
+  app_key?: string;
+  appSecret?: string;
+  app_secret?: string;
+  httpDebug?: boolean;
+  http_debug?: boolean;
+};
+
+const toast = useToast();
+const { get, put } = useApiClient();
+const showSecret = ref(false);
+const saving = ref(false);
+const refreshing = ref(false);
+
+const statusOptions = [
+  { label: "active", value: "active" },
+  { label: "inactive", value: "inactive" },
+];
+
+const defaultForm = (): DingTalkConfig => ({
+  status: "active",
+  rotationDays: 30,
+  callbackHost: "",
+  corpId: "",
+  appKey: "",
+  appSecret: "",
+  httpDebug: false,
+});
+
+const form = reactive(defaultForm());
+const userStore = useUserStore();
+const { currentTenantUuid } = storeToRefs(userStore);
+
+const tenantUUID = computed(() => {
+  const fromStore = currentTenantUuid.value?.trim();
+  if (fromStore) return fromStore;
+  return resolveTenantUUIDForRequest() || "00000000-0000-0000-0000-000000000001";
+});
+
+const normalizeStatus = (raw?: string) => ((raw || "").trim().toUpperCase() === "REVOKED" ? "inactive" : "active");
+
+const applyServerConfig = (data?: DingTalkConfigResponse | null) => {
+  if (!data) {
+    Object.assign(form, defaultForm());
+    return;
+  }
+  Object.assign(form, defaultForm(), {
+    status: normalizeStatus(data.status),
+    rotationDays: Number(data.rotation_days ?? data.rotationDays ?? 30) || 30,
+    callbackHost: String(data.callback_host ?? data.callbackHost ?? ""),
+    corpId: String(data.corp_id ?? data.corpId ?? ""),
+    appKey: String(data.app_key ?? data.appKey ?? ""),
+    appSecret: String(data.app_secret ?? data.appSecret ?? ""),
+    httpDebug: Boolean(data.http_debug ?? data.httpDebug ?? false),
+  });
+};
+
+const validateRequired = () => {
+  if (!tenantUUID.value.trim()) return "tenant_uuid 为空，请先切换租户";
+  if (!form.callbackHost.trim()) return "Host:Port 必填";
+  if (!form.corpId.trim()) return "Corp ID 必填";
+  if (!form.appKey.trim()) return "App Key 必填";
+  if (!form.appSecret.trim()) return "App Secret 必填";
+  return "";
+};
+
+const saveForm = async () => {
+  const error = validateRequired();
+  if (error) {
+    toast.add({ title: "保存失败", description: error, color: "error" });
+    return;
+  }
+  saving.value = true;
+  try {
+    const response = await put<any>("/admin/iam/channels/dingtalk/config", {
+      status: form.status,
+      rotation_days: Number(form.rotationDays) || 30,
+      callback_host: form.callbackHost.trim(),
+      corp_id: form.corpId.trim(),
+      app_key: form.appKey.trim(),
+      app_secret: form.appSecret.trim(),
+      http_debug: form.httpDebug,
+    });
+    applyServerConfig((response?.data || response) as DingTalkConfigResponse);
+    toast.add({ title: "配置已保存", description: "已保存到租户数据库配置。", color: "success" });
+  } catch (err: any) {
+    toast.add({
+      title: "保存失败",
+      description: err?.data?.error?.message || err?.message || "请求失败",
+      color: "error",
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
+const reloadConfig = async () => {
+  refreshing.value = true;
+  try {
+    const response = await get<any>("/admin/iam/channels/dingtalk/config");
+    applyServerConfig((response?.data || response) as DingTalkConfigResponse);
+  } catch (err: any) {
+    Object.assign(form, defaultForm());
+    const statusCode = Number(err?.status || err?.response?.status || 0);
+    if (statusCode !== 404) {
+      toast.add({
+        title: "加载失败",
+        description: err?.data?.error?.message || err?.message || "请求失败",
+        color: "error",
+      });
+    }
+  } finally {
+    refreshing.value = false;
+  }
+};
+
+onMounted(() => {
+  reloadConfig();
+});
+</script>
+
+<style scoped>
+.dark .dingtalk-config-page :deep(label) {
+  color: #e2e8f0;
+}
+
+.dark .dingtalk-config-page :deep(input::placeholder),
+.dark .dingtalk-config-page :deep(textarea::placeholder) {
+  color: #94a3b8;
+}
+</style>

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // ErrGrantMatrixNotLoaded 表示无法读取配置。
@@ -18,13 +18,13 @@ var ErrGrantMatrixDenied = errors.New("tool scope not permitted for requested re
 // GrantMatrixService 提供策略查询与校验能力。
 type GrantMatrixService struct {
 	loader *GrantMatrixLoader
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
 // NewGrantMatrixService 构造服务。
-func NewGrantMatrixService(loader *GrantMatrixLoader, logger *logrus.Entry) *GrantMatrixService {
+func NewGrantMatrixService(loader *GrantMatrixLoader, logger *pxlog.Entry) *GrantMatrixService {
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.grant_matrix_service")
+		logger = pxlog.WithField("component", "integration.grant_matrix_service")
 	}
 	return &GrantMatrixService{
 		loader: loader,

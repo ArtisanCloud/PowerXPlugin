@@ -5,7 +5,7 @@ import (
 	"time"
 
 	secmodel "{{ .BackendModulePath }}/internal/entity/models/security"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 const (
@@ -14,17 +14,17 @@ const (
 )
 
 // EmitAdvisoryDetected records advisory intake events for SLA tracking.
-func EmitAdvisoryDetected(logger *logrus.Entry, advisory *secmodel.Advisory, metadata map[string]interface{}) {
+func EmitAdvisoryDetected(logger *pxlog.Entry, advisory *secmodel.Advisory, metadata map[string]interface{}) {
 	emitAdvisoryEvent(logger, eventVulnerabilityDetected, advisory, metadata)
 }
 
 // EmitAdvisoryRemediated records remediation completion for observability sinks.
-func EmitAdvisoryRemediated(logger *logrus.Entry, advisory *secmodel.Advisory, metadata map[string]interface{}) {
+func EmitAdvisoryRemediated(logger *pxlog.Entry, advisory *secmodel.Advisory, metadata map[string]interface{}) {
 	emitAdvisoryEvent(logger, eventVulnerabilityRemediated, advisory, metadata)
 }
 
 // QueueAdvisoryNotification simulates queuing outbound notifications (marketplace/webhook/email).
-func QueueAdvisoryNotification(logger *logrus.Entry, advisory *secmodel.Advisory, channel string, payload map[string]interface{}) {
+func QueueAdvisoryNotification(logger *pxlog.Entry, advisory *secmodel.Advisory, channel string, payload map[string]interface{}) {
 	if logger == nil || advisory == nil {
 		return
 	}
@@ -44,7 +44,7 @@ func QueueAdvisoryNotification(logger *logrus.Entry, advisory *secmodel.Advisory
 	logger.WithField("advisory_notification", string(raw)).Info("queued vulnerability advisory notification")
 }
 
-func emitAdvisoryEvent(logger *logrus.Entry, event string, advisory *secmodel.Advisory, metadata map[string]interface{}) {
+func emitAdvisoryEvent(logger *pxlog.Entry, event string, advisory *secmodel.Advisory, metadata map[string]interface{}) {
 	if logger == nil || advisory == nil {
 		return
 	}

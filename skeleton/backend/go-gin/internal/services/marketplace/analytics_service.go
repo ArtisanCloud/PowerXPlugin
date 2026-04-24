@@ -11,7 +11,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	marketobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/marketplace"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -63,7 +63,7 @@ type AnalyticsService struct {
 	licenseRepo      LicenseRepositoryReader
 	pricingRepo      PricingRepositoryReader
 	listingRepo      ListingRepositoryReader
-	logger           *logrus.Entry
+	logger           *pxlog.Entry
 	spikeMultiplier  float64
 	quotaThreshold   float64
 }
@@ -109,10 +109,10 @@ func NewAnalyticsService(
 	licenseRepo LicenseRepositoryReader,
 	pricingRepo PricingRepositoryReader,
 	listingRepo ListingRepositoryReader,
-	logger *logrus.Entry,
+	logger *pxlog.Entry,
 ) *AnalyticsService {
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_analytics_service")
+		logger = pxlog.New().WithField("component", "marketplace_analytics_service")
 	}
 	svc := &AnalyticsService{
 		cfg:              cfg,

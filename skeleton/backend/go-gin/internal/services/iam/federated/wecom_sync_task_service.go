@@ -1,0 +1,1042 @@
+package federated
+
+import (
+	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"log"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ArtisanCloud/PowerWeChat/v3/src/work"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
+	basemodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+type WeComSyncTaskService struct {
+	repo      *repo.ChannelSyncTaskRepository
+	configSvc *WeComConfigService
+	publisher fwwsbus.Publisher
+	db        *gorm.DB
+}
+
+const wecomSyncTaskTimeout = 2 * time.Minute
+const topicWeComSyncProgress = "wecom.sync.progress"
+
+type weComSyncProgressEvent struct {
+	TenantUUID   string `json:"tenant_uuid"`
+	TaskID       string `json:"task_id"`
+	Action       string `json:"action"`
+	Status       string `json:"status"`
+	Stage        string `json:"stage"`
+	Message      string `json:"message,omitempty"`
+	Progress     int    `json:"progress_percent"`
+	DurationMS   int64  `json:"duration_ms,omitempty"`
+	SDKHttpDebug bool   `json:"sdk_http_debug"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+type weComUserProfile struct {
+	UserID         string
+	Name           string
+	Mobile         string
+	Email          string
+	Status         int
+	MainDepartment int
+	Departments    []int
+}
+
+type weComDepartment struct {
+	ID       int
+	ParentID int
+	Name     string
+	Order    int
+}
+
+func NewWeComSyncTaskService(repository *repo.ChannelSyncTaskRepository, configSvc *WeComConfigService, publisher fwwsbus.Publisher, db *gorm.DB) *WeComSyncTaskService {
+	return &WeComSyncTaskService{
+		repo:      repository,
+		configSvc: configSvc,
+		publisher: publisher,
+		db:        db,
+	}
+}
+
+func (s *WeComSyncTaskService) Trigger(ctx context.Context, tenantUUID string, action string) (*model.ChannelSyncTask, error) {
+	if s == nil || s.repo == nil {
+		return nil, errors.New("wecom sync task service not configured")
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	action = strings.TrimSpace(action)
+	if tenantUUID == "" || action == "" {
+		return nil, errors.New("tenant_uuid/action is required")
+	}
+	switch action {
+	case model.ChannelSyncActionRefreshStatus, model.ChannelSyncActionPullDepartments, model.ChannelSyncActionPullMembers, model.ChannelSyncActionFullSync:
+	default:
+		return nil, errors.New("unsupported sync action")
+	}
+
+	task := &model.ChannelSyncTask{
+		ID:         uuid.NewString(),
+		TenantUuid: tenantUUID,
+		Provider:   model.ChannelSyncProviderWeCom,
+		Action:     action,
+		Status:     model.ChannelSyncStatusQueued,
+		RequestPayload: map[string]any{
+			"action":       action,
+			"requested_at": time.Now().UTC().Format(time.RFC3339Nano),
+		},
+	}
+	if err := s.repo.Create(ctx, task); err != nil {
+		return nil, err
+	}
+	go s.run(context.Background(), task.ID, tenantUUID, action)
+	return task, nil
+}
+
+func (s *WeComSyncTaskService) List(ctx context.Context, tenantUUID string, limit int) ([]model.ChannelSyncTask, error) {
+	if s == nil || s.repo == nil {
+		return nil, errors.New("wecom sync task service not configured")
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	tasks, err := s.repo.List(ctx, tenantUUID, model.ChannelSyncProviderWeCom, limit)
+	if err != nil {
+		return nil, err
+	}
+	if s.recoverStaleTasks(ctx, tasks) {
+		return s.repo.List(ctx, tenantUUID, model.ChannelSyncProviderWeCom, limit)
+	}
+	return tasks, nil
+}
+
+func (s *WeComSyncTaskService) Clear(ctx context.Context, tenantUUID string) (int64, error) {
+	if s == nil || s.repo == nil {
+		return 0, errors.New("wecom sync task service not configured")
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return 0, errors.New("tenant_uuid is required")
+	}
+	return s.repo.DeleteByTenantProvider(ctx, tenantUUID, model.ChannelSyncProviderWeCom)
+}
+
+func (s *WeComSyncTaskService) run(ctx context.Context, taskID, tenantUUID, action string) {
+	started := time.Now().UTC()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			s.finishFailed(ctx, taskID, tenantUUID, action, started, "同步执行异常", fmt.Errorf("panic: %v", recovered), false)
+		}
+	}()
+	log.Printf("[wecom-sync] task started: task_id=%s tenant=%s action=%s", taskID, tenantUUID, action)
+	if err := s.repo.UpdateStatus(ctx, taskID, model.ChannelSyncStatusRunning, "任务执行中", "", nil, &started, nil); err != nil {
+		log.Printf("[wecom-sync] update running status failed: task_id=%s err=%v", taskID, err)
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "init", "任务执行中", 5, 0, false)
+
+	taskCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	cfg, err := s.configSvc.GetByTenant(taskCtx, tenantUUID)
+	if err != nil {
+		s.finishFailed(ctx, taskID, tenantUUID, action, started, "配置校验失败", err, false)
+		return
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "config", "配置校验通过", 12, 0, cfg.HttpDebug)
+
+	app, err := s.newWorkApp(cfg, tenantUUID)
+	if err != nil {
+		s.finishFailed(ctx, taskID, tenantUUID, action, started, "SDK 初始化失败", err, cfg.HttpDebug)
+		return
+	}
+
+	result, execErr := s.executeAction(taskCtx, app, cfg, tenantUUID, action, taskID)
+	if execErr != nil {
+		s.finishFailed(ctx, taskID, tenantUUID, action, started, "同步执行失败", execErr, cfg.HttpDebug)
+		return
+	}
+
+	finished := time.Now().UTC()
+	summary := asString(result["summary"])
+	if summary == "" {
+		summary = "同步执行完成"
+	}
+	if err := s.repo.UpdateStatus(ctx, taskID, model.ChannelSyncStatusSuccess, summary, "", result, &started, &finished); err != nil {
+		log.Printf("[wecom-sync] update success status failed: task_id=%s err=%v", taskID, err)
+		s.finishFailed(ctx, taskID, tenantUUID, action, started, "同步结果写入失败", err, cfg.HttpDebug)
+		return
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusSuccess, "done", summary, 100, finished.Sub(started).Milliseconds(), cfg.HttpDebug)
+	log.Printf("[wecom-sync] task success: task_id=%s action=%s summary=%s", taskID, action, summary)
+}
+
+func (s *WeComSyncTaskService) executeAction(ctx context.Context, app *work.Work, cfg WeComConfig, tenantUUID, action, taskID string) (map[string]any, error) {
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "sdk_ping", "正在验证企业微信连通性", 20, 0, cfg.HttpDebug)
+	ipResp, err := app.Base.GetCallbackIP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if ipResp == nil {
+		return nil, errors.New("empty callback ip response")
+	}
+	if ipResp.ErrCode != 0 {
+		return nil, fmt.Errorf("wecom callback ip failed: %d %s", ipResp.ErrCode, ipResp.ErrMsg)
+	}
+
+	result := map[string]any{
+		"tenant_uuid": tenantUUID,
+		"corp_id":     cfg.CorpID,
+		"agent_id":    cfg.AgentID,
+		"action":      action,
+		"http_debug":  cfg.HttpDebug,
+		"ip_count":    len(ipResp.IPList),
+	}
+
+	switch action {
+	case model.ChannelSyncActionRefreshStatus:
+		result["summary"] = "状态刷新完成（连通性正常）"
+		return result, nil
+	case model.ChannelSyncActionPullDepartments:
+		depts, err := s.fetchDepartments(ctx, app, tenantUUID, taskID, action, cfg.HttpDebug)
+		if err != nil {
+			return nil, err
+		}
+		s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "persist_departments", "正在写入部门数据", 85, 0, cfg.HttpDebug)
+		deptMap, err := s.upsertDepartments(ctx, tenantUUID, depts)
+		if err != nil {
+			return nil, err
+		}
+		result["departments_synced"] = len(deptMap)
+		result["summary"] = fmt.Sprintf("部门同步完成（%d 条）", len(deptMap))
+		return result, nil
+	case model.ChannelSyncActionPullMembers, model.ChannelSyncActionFullSync:
+		depts, err := s.fetchDepartments(ctx, app, tenantUUID, taskID, action, cfg.HttpDebug)
+		if err != nil {
+			return nil, err
+		}
+		s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "persist_departments", "正在写入部门数据", 55, 0, cfg.HttpDebug)
+		deptMap, err := s.upsertDepartments(ctx, tenantUUID, depts)
+		if err != nil {
+			return nil, err
+		}
+		profiles, err := s.fetchMembers(ctx, app, taskID, action, tenantUUID, cfg.HttpDebug)
+		if err != nil {
+			return nil, err
+		}
+		s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "persist_members", "正在写入成员数据", 90, 0, cfg.HttpDebug)
+		memberCount, err := s.upsertMembers(ctx, tenantUUID, cfg.CorpID, profiles, deptMap)
+		if err != nil {
+			return nil, err
+		}
+		result["departments_synced"] = len(deptMap)
+		result["members_synced"] = memberCount
+		result["summary"] = fmt.Sprintf("组织同步完成（部门 %d，成员 %d）", len(deptMap), memberCount)
+		return result, nil
+	default:
+		return nil, errors.New("unsupported sync action")
+	}
+}
+
+func (s *WeComSyncTaskService) fetchDepartments(ctx context.Context, app *work.Work, tenantUUID, taskID, action string, httpDebug bool) ([]weComDepartment, error) {
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "fetch_departments", "正在拉取部门列表", 35, 0, httpDebug)
+	resp, err := app.Department.List(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, errors.New("empty department list response")
+	}
+	if resp.ErrCode != 0 {
+		return nil, fmt.Errorf("wecom department list failed: %d %s", resp.ErrCode, resp.ErrMsg)
+	}
+	out := make([]weComDepartment, 0, len(resp.Departments))
+	for _, d := range resp.Departments {
+		if d == nil || d.ID <= 0 {
+			continue
+		}
+		out = append(out, weComDepartment{
+			ID:       d.ID,
+			ParentID: d.ParentID,
+			Name:     strings.TrimSpace(d.Name),
+			Order:    d.Order,
+		})
+	}
+	return out, nil
+}
+
+func (s *WeComSyncTaskService) upsertDepartments(ctx context.Context, tenantUUID string, departments []weComDepartment) (map[int]uint64, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("wecom sync db not configured")
+	}
+	deptByExternal := map[int]weComDepartment{}
+	for _, d := range departments {
+		if d.ID <= 0 {
+			continue
+		}
+		deptByExternal[d.ID] = d
+	}
+	if len(deptByExternal) == 0 {
+		return map[int]uint64{}, nil
+	}
+
+	idMap := map[int]uint64{}
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		pending := map[int]weComDepartment{}
+		for k, v := range deptByExternal {
+			pending[k] = v
+		}
+		for pass := 0; pass < len(pending)+2; pass++ {
+			if len(pending) == 0 {
+				break
+			}
+			progressed := false
+			for extID, dept := range pending {
+				parentExt := dept.ParentID
+				var parentID *uint64
+				if parentExt > 0 {
+					if mapped, ok := idMap[parentExt]; ok {
+						parentID = &mapped
+					} else {
+						continue
+					}
+				}
+				code := wecomDeptCode(extID)
+				var record model.Department
+				err := tx.Where("tenant_uuid = ? AND code = ?", tenantUUID, code).First(&record).Error
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				path := code
+				if parentID != nil {
+					var parent model.Department
+					if err := tx.Where("id = ? AND tenant_uuid = ?", *parentID, tenantUUID).First(&parent).Error; err != nil {
+						return err
+					}
+					path = parent.Path + "." + code
+				}
+				name := strings.TrimSpace(dept.Name)
+				if name == "" {
+					name = code
+				}
+				sortOrder := dept.Order
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					record = model.Department{
+						BaseModel: basemodel.BaseModel{TenantUuid: tenantUUID},
+						Name:      name,
+						Code:      code,
+						ParentID:  parentID,
+						Path:      path,
+						SortOrder: sortOrder,
+					}
+					if err := tx.Create(&record).Error; err != nil {
+						return err
+					}
+				} else {
+					updates := map[string]any{
+						"name":       name,
+						"parent_id":  parentID,
+						"path":       path,
+						"sort_order": sortOrder,
+						"updated_at": time.Now().UTC(),
+					}
+					if err := tx.Model(&record).Updates(updates).Error; err != nil {
+						return err
+					}
+				}
+				idMap[extID] = record.ID
+				delete(pending, extID)
+				progressed = true
+			}
+			if !progressed {
+				for extID, dept := range pending {
+					code := wecomDeptCode(extID)
+					name := strings.TrimSpace(dept.Name)
+					if name == "" {
+						name = code
+					}
+					var record model.Department
+					err := tx.Where("tenant_uuid = ? AND code = ?", tenantUUID, code).First(&record).Error
+					if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+						return err
+					}
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						record = model.Department{
+							BaseModel: basemodel.BaseModel{TenantUuid: tenantUUID},
+							Name:      name,
+							Code:      code,
+							Path:      code,
+							SortOrder: dept.Order,
+						}
+						if err := tx.Create(&record).Error; err != nil {
+							return err
+						}
+					}
+					idMap[extID] = record.ID
+					delete(pending, extID)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return idMap, nil
+}
+
+func (s *WeComSyncTaskService) fetchMembers(ctx context.Context, app *work.Work, taskID, action, tenantUUID string, httpDebug bool) ([]weComUserProfile, error) {
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "fetch_members", "正在拉取成员列表", 70, 0, httpDebug)
+	deptResp, err := app.Department.List(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
+	if deptResp == nil || deptResp.ErrCode != 0 {
+		if deptResp == nil {
+			return nil, errors.New("empty department response")
+		}
+		return nil, fmt.Errorf("wecom department list failed: %d %s", deptResp.ErrCode, deptResp.ErrMsg)
+	}
+
+	seenDept := map[int]struct{}{}
+	profiles := map[string]*weComUserProfile{}
+	for _, d := range deptResp.Departments {
+		if d == nil || d.ID <= 0 {
+			continue
+		}
+		if _, ok := seenDept[d.ID]; ok {
+			continue
+		}
+		seenDept[d.ID] = struct{}{}
+		usersResp, err := app.User.GetDetailedDepartmentUsers(ctx, d.ID, 0)
+		if err != nil {
+			return nil, err
+		}
+		if usersResp == nil {
+			return nil, errors.New("empty user list response")
+		}
+		if usersResp.ErrCode != 0 {
+			return nil, fmt.Errorf("wecom user list failed: %d %s", usersResp.ErrCode, usersResp.ErrMsg)
+		}
+		for _, u := range usersResp.UserList {
+			if u == nil {
+				continue
+			}
+			userID := strings.TrimSpace(u.UserID)
+			if userID == "" {
+				continue
+			}
+			item, ok := profiles[userID]
+			if !ok {
+				item = &weComUserProfile{UserID: userID}
+				profiles[userID] = item
+			}
+			if item.Name == "" && strings.TrimSpace(u.Name) != "" {
+				item.Name = strings.TrimSpace(u.Name)
+			}
+			if item.Mobile == "" && strings.TrimSpace(u.Mobile) != "" {
+				item.Mobile = strings.TrimSpace(u.Mobile)
+			}
+			if item.Email == "" && strings.TrimSpace(u.Email) != "" {
+				item.Email = strings.TrimSpace(u.Email)
+			}
+			item.Status = u.Status
+			if item.MainDepartment == 0 && u.MainDepartment > 0 {
+				item.MainDepartment = u.MainDepartment
+			}
+			item.Departments = mergeIntSlice(item.Departments, u.Department)
+		}
+	}
+
+	out := make([]weComUserProfile, 0, len(profiles))
+	for _, v := range profiles {
+		if len(v.Departments) == 0 && v.MainDepartment > 0 {
+			v.Departments = []int{v.MainDepartment}
+		}
+		out = append(out, *v)
+	}
+	return out, nil
+}
+
+func (s *WeComSyncTaskService) upsertMembers(ctx context.Context, tenantUUID, corpID string, profiles []weComUserProfile, deptMap map[int]uint64) (int, error) {
+	if s == nil || s.db == nil {
+		return 0, errors.New("wecom sync db not configured")
+	}
+	count := 0
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, p := range profiles {
+			user, err := s.ensureIAMUser(tx, tenantUUID, corpID, p)
+			if err != nil {
+				return err
+			}
+			var departmentID *uint64
+			if p.MainDepartment > 0 {
+				if depID, ok := deptMap[p.MainDepartment]; ok {
+					departmentID = &depID
+				}
+			}
+			if departmentID == nil {
+				for _, extDep := range p.Departments {
+					if depID, ok := deptMap[extDep]; ok {
+						departmentID = &depID
+						break
+					}
+				}
+			}
+
+			var member model.Member
+			err = tx.Where("tenant_uuid = ? AND user_id = ?", tenantUUID, user.ID).First(&member).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			meta := datatypes.JSONMap{
+				"provider":         "wecom",
+				"external_user_id": p.UserID,
+				"corp_id":          corpID,
+				"departments":      intsToStrings(p.Departments),
+			}
+			username := strings.TrimSpace(p.UserID)
+			if username == "" {
+				username = fmt.Sprintf("wecom-%d", user.ID)
+			}
+			displayName := strings.TrimSpace(p.Name)
+			if displayName == "" {
+				displayName = username
+			}
+			status := memberStatusFromWeCom(p.Status)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				member = model.Member{
+					BaseModel:    basemodel.BaseModel{TenantUuid: tenantUUID},
+					UserID:       user.ID,
+					Username:     username,
+					DisplayName:  displayName,
+					Status:       status,
+					DepartmentID: departmentID,
+					Meta:         meta,
+				}
+				if err := tx.Create(&member).Error; err != nil {
+					return err
+				}
+			} else {
+				updates := map[string]any{
+					"username":      username,
+					"display_name":  displayName,
+					"status":        status,
+					"department_id": departmentID,
+					"meta":          meta,
+					"updated_at":    time.Now().UTC(),
+				}
+				if err := tx.Model(&member).Updates(updates).Error; err != nil {
+					return err
+				}
+			}
+			count++
+			if err := s.upsertFederatedIdentityAndBinding(tx, tenantUUID, corpID, p, member.ID); err != nil {
+				return err
+			}
+			if err := s.ensureDefaultMemberRole(tx, tenantUUID, member.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (s *WeComSyncTaskService) ensureIAMUser(tx *gorm.DB, tenantUUID, corpID string, p weComUserProfile) (*model.User, error) {
+	if user, err := s.findBoundUserByExternal(tx, tenantUUID, corpID, p.UserID); err != nil {
+		return nil, err
+	} else if user != nil {
+		return s.updateIAMUserByProfile(tx, user, corpID, p)
+	}
+
+	email := strings.ToLower(strings.TrimSpace(p.Email))
+	if email == "" {
+		email = fmt.Sprintf("%s@%s.wecom.local", sanitizeEmailLocalPart(p.UserID), sanitizeEmailLocalPart(corpID))
+	}
+	var user model.User
+	err := tx.Where("email = ?", email).First(&user).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		displayName := strings.TrimSpace(p.Name)
+		if displayName == "" {
+			displayName = strings.TrimSpace(p.UserID)
+		}
+		if displayName == "" {
+			displayName = "wecom-user"
+		}
+		status := memberStatusFromWeCom(p.Status)
+		meta := datatypes.JSONMap{
+			"provider":         "wecom",
+			"external_user_id": p.UserID,
+			"corp_id":          corpID,
+		}
+		user = model.User{
+			Email:        email,
+			Phone:        strings.TrimSpace(p.Mobile),
+			DisplayName:  displayName,
+			Status:       status,
+			PasswordHash: "wecom-synced",
+			Meta:         meta,
+		}
+		if err := tx.Create(&user).Error; err != nil {
+			return nil, err
+		}
+		return &user, nil
+	}
+	return s.updateIAMUserByProfile(tx, &user, corpID, p)
+}
+
+func (s *WeComSyncTaskService) findBoundUserByExternal(tx *gorm.DB, tenantUUID, corpID, externalUserID string) (*model.User, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	corpID = strings.TrimSpace(corpID)
+	externalUserID = strings.TrimSpace(externalUserID)
+	if tenantUUID == "" || corpID == "" || externalUserID == "" {
+		return nil, nil
+	}
+	var binding model.FederatedBinding
+	err := tx.
+		Where("tenant_uuid = ? AND provider = ? AND tenant_scope = ? AND external_user_id = ? AND status = ?", tenantUUID, model.ChannelSyncProviderWeCom, corpID, externalUserID, "active").
+		First(&binding).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var member model.Member
+	if err := tx.Where("id = ? AND tenant_uuid = ?", binding.MemberID, tenantUUID).First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var user model.User
+	if err := tx.Where("id = ?", member.UserID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *WeComSyncTaskService) updateIAMUserByProfile(tx *gorm.DB, user *model.User, corpID string, p weComUserProfile) (*model.User, error) {
+	if user == nil {
+		return nil, errors.New("user is nil")
+	}
+	displayName := strings.TrimSpace(p.Name)
+	if displayName == "" {
+		displayName = strings.TrimSpace(p.UserID)
+	}
+	if displayName == "" {
+		displayName = "wecom-user"
+	}
+	status := memberStatusFromWeCom(p.Status)
+	meta := datatypes.JSONMap{
+		"provider":         "wecom",
+		"external_user_id": p.UserID,
+		"corp_id":          corpID,
+	}
+	updates := map[string]any{
+		"display_name": displayName,
+		"phone":        strings.TrimSpace(p.Mobile),
+		"status":       status,
+		"meta":         meta,
+		"updated_at":   time.Now().UTC(),
+	}
+	if email := strings.ToLower(strings.TrimSpace(p.Email)); email != "" {
+		updates["email"] = email
+	}
+	if err := tx.Model(user).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Where("id = ?", user.ID).First(user).Error; err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *WeComSyncTaskService) upsertFederatedIdentityAndBinding(tx *gorm.DB, tenantUUID, corpID string, p weComUserProfile, memberID uint64) error {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	corpID = strings.TrimSpace(corpID)
+	externalUserID := strings.TrimSpace(p.UserID)
+	if tenantUUID == "" || corpID == "" || externalUserID == "" || memberID == 0 {
+		return nil
+	}
+	now := time.Now().UTC()
+	raw := datatypes.JSONMap{
+		"user_id":         externalUserID,
+		"name":            strings.TrimSpace(p.Name),
+		"mobile":          strings.TrimSpace(p.Mobile),
+		"email":           strings.TrimSpace(p.Email),
+		"status":          p.Status,
+		"main_department": p.MainDepartment,
+		"departments":     intsToStrings(p.Departments),
+	}
+
+	var external model.FederatedExternalIdentity
+	err := tx.Where("tenant_uuid = ? AND provider = ? AND tenant_scope = ? AND external_user_id = ?", tenantUUID, model.ChannelSyncProviderWeCom, corpID, externalUserID).First(&external).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		external = model.FederatedExternalIdentity{
+			BaseModel:      basemodel.BaseModel{TenantUuid: tenantUUID},
+			Provider:       model.ChannelSyncProviderWeCom,
+			TenantScope:    corpID,
+			ExternalUserID: externalUserID,
+			Email:          strings.ToLower(strings.TrimSpace(p.Email)),
+			Phone:          strings.TrimSpace(p.Mobile),
+			Raw:            raw,
+		}
+		if err := tx.Create(&external).Error; err != nil {
+			return err
+		}
+	} else {
+		updates := map[string]any{
+			"email":      strings.ToLower(strings.TrimSpace(p.Email)),
+			"phone":      strings.TrimSpace(p.Mobile),
+			"raw":        raw,
+			"updated_at": now,
+		}
+		if err := tx.Model(&external).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+
+	var binding model.FederatedBinding
+	err = tx.Where("tenant_uuid = ? AND provider = ? AND tenant_scope = ? AND external_user_id = ?", tenantUUID, model.ChannelSyncProviderWeCom, corpID, externalUserID).First(&binding).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		binding = model.FederatedBinding{
+			BaseModel:      basemodel.BaseModel{TenantUuid: tenantUUID},
+			Provider:       model.ChannelSyncProviderWeCom,
+			TenantScope:    corpID,
+			ExternalUserID: externalUserID,
+			MemberID:       memberID,
+			Status:         "active",
+			BoundAt:        now,
+			Source:         "sync",
+			MappingVersion: "v1",
+		}
+		return tx.Create(&binding).Error
+	}
+	updates := map[string]any{
+		"member_id":        memberID,
+		"status":           "active",
+		"bound_at":         now,
+		"unbound_at":       nil,
+		"source":           "sync",
+		"mapping_version":  "v1",
+		"tenant_scope":     corpID,
+		"external_user_id": externalUserID,
+		"updated_at":       now,
+	}
+	return tx.Model(&binding).Updates(updates).Error
+}
+
+func (s *WeComSyncTaskService) finishFailed(ctx context.Context, taskID, tenantUUID, action string, started time.Time, summary string, original error, httpDebug bool) {
+	finished := time.Now().UTC()
+	errMsg := ""
+	if original != nil {
+		errMsg = original.Error()
+	}
+	if err := s.repo.UpdateStatus(ctx, taskID, model.ChannelSyncStatusFailed, summary, errMsg, nil, &started, &finished); err != nil {
+		log.Printf("[wecom-sync] update failed status failed: task_id=%s err=%v original=%v", taskID, err, original)
+	}
+	message := summary
+	if errMsg != "" {
+		message = summary + ": " + errMsg
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusFailed, "failed", message, 100, finished.Sub(started).Milliseconds(), httpDebug)
+	log.Printf("[wecom-sync] task failed: task_id=%s err=%v", taskID, original)
+}
+
+func (s *WeComSyncTaskService) recoverStaleTasks(ctx context.Context, tasks []model.ChannelSyncTask) bool {
+	now := time.Now().UTC()
+	updated := false
+	for _, task := range tasks {
+		if task.Status != model.ChannelSyncStatusQueued && task.Status != model.ChannelSyncStatusRunning {
+			continue
+		}
+		base := task.CreatedAt
+		if task.StartedAt != nil {
+			base = task.StartedAt.UTC()
+		}
+		if now.Sub(base) < wecomSyncTaskTimeout {
+			continue
+		}
+		finished := now
+		msg := "任务超时未完成，已自动标记失败"
+		errMsg := "sync task stale timeout"
+		if err := s.repo.UpdateStatus(ctx, task.ID, model.ChannelSyncStatusFailed, msg, errMsg, nil, task.StartedAt, &finished); err != nil {
+			log.Printf("[wecom-sync] recover stale task failed: task_id=%s err=%v", task.ID, err)
+			continue
+		}
+		s.publishProgress(ctx, task.TenantUuid, task.ID, task.Action, model.ChannelSyncStatusFailed, "timeout", msg, 100, 0, false)
+		updated = true
+	}
+	return updated
+}
+
+func (s *WeComSyncTaskService) newWorkApp(cfg WeComConfig, tenantUUID string) (*work.Work, error) {
+	callback := buildWeComOAuthCallback(cfg, tenantUUID)
+	log.Printf("[wecom-sync] sdk callback resolved: callback=%s tenant=%s corp=%s agent=%d", callback, tenantUUID, cfg.CorpID, cfg.AgentID)
+	return work.NewWork(&work.UserConfig{
+		CorpID:      strings.TrimSpace(cfg.CorpID),
+		AgentID:     cfg.AgentID,
+		Secret:      strings.TrimSpace(cfg.Secret),
+		Token:       strings.TrimSpace(cfg.Token),
+		AESKey:      strings.TrimSpace(cfg.AESKey),
+		CallbackURL: callback,
+		Log: work.Log{
+			Level:  "debug",
+			Stdout: true,
+		},
+		HttpDebug: cfg.HttpDebug,
+		OAuth: work.OAuth{
+			Callback: callback,
+			Scopes:   []string{"snsapi_base"},
+		},
+	})
+}
+
+func (s *WeComSyncTaskService) publishProgress(ctx context.Context, tenantUUID, taskID, action, status, stage, message string, progress int, durationMS int64, sdkHttpDebug bool) {
+	if s == nil || s.publisher == nil {
+		return
+	}
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 100 {
+		progress = 100
+	}
+	result := s.publisher.Publish(ctx, topicWeComSyncProgress, weComSyncProgressEvent{
+		TenantUUID:   strings.TrimSpace(tenantUUID),
+		TaskID:       strings.TrimSpace(taskID),
+		Action:       strings.TrimSpace(action),
+		Status:       strings.TrimSpace(status),
+		Stage:        strings.TrimSpace(stage),
+		Message:      strings.TrimSpace(message),
+		Progress:     progress,
+		DurationMS:   durationMS,
+		SDKHttpDebug: sdkHttpDebug,
+		UpdatedAt:    time.Now().UTC().Format(time.RFC3339Nano),
+	}, fwwsbus.PublishOptions{TenantUUID: strings.TrimSpace(tenantUUID)})
+	if !result.OK {
+		log.Printf("[wecom-sync] ws publish failed: task_id=%s code=%s message=%s", taskID, result.ErrorCode, result.ErrorMessage)
+	}
+}
+
+func wecomDeptCode(externalID int) string {
+	return "wecom-dept-" + strconv.Itoa(externalID)
+}
+
+func mergeIntSlice(existing []int, incoming []int) []int {
+	seen := map[int]struct{}{}
+	out := make([]int, 0, len(existing)+len(incoming))
+	for _, v := range existing {
+		if v <= 0 {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	for _, v := range incoming {
+		if v <= 0 {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func intsToStrings(values []int) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if v <= 0 {
+			continue
+		}
+		out = append(out, strconv.Itoa(v))
+	}
+	return out
+}
+
+func memberStatusFromWeCom(status int) string {
+	switch status {
+	case 2:
+		return model.StatusDisabled
+	case 4, 5:
+		return model.StatusSuspended
+	default:
+		return model.StatusActive
+	}
+}
+
+func sanitizeEmailLocalPart(raw string) string {
+	raw = strings.ToLower(strings.TrimSpace(raw))
+	if raw == "" {
+		return "wecom"
+	}
+	builder := strings.Builder{}
+	for _, ch := range raw {
+		if (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '.' || ch == '-' || ch == '_' {
+			builder.WriteRune(ch)
+			continue
+		}
+		builder.WriteRune('-')
+	}
+	out := strings.Trim(builder.String(), "-._")
+	if out == "" {
+		return "wecom"
+	}
+	return out
+}
+
+func normalizeWeComCallback(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "http://localhost"
+	}
+	if strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
+		return value
+	}
+	return "http://" + value
+}
+
+func buildWeComOAuthCallback(cfg WeComConfig, tenantUUID string) string {
+	host := normalizeWeComCallback(cfg.CallbackHost)
+	host = strings.TrimRight(host, "/")
+	tenant := strings.TrimSpace(tenantUUID)
+	if tenant == "" {
+		tenant = "00000000-0000-0000-0000-000000000001"
+	}
+	corp := strings.TrimSpace(cfg.CorpID)
+	if corp == "" {
+		corp = "corp_id"
+	}
+	agent := strconv.Itoa(cfg.AgentID)
+	if strings.TrimSpace(agent) == "" || cfg.AgentID <= 0 {
+		agent = "agent_id"
+	}
+	// 这里必须是完整 URL，PowerWechat 在 OAuth provider 初始化阶段会强校验 schema。
+	return fmt.Sprintf(
+		"%s/api/v1/webhooks/wecom/tenant/%s/corp/%s/app/%s?sync=1&state=%s",
+		host,
+		tenant,
+		corp,
+		agent,
+		base64.RawURLEncoding.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano))),
+	)
+}
+
+func (s *WeComSyncTaskService) ensureDefaultMemberRole(tx *gorm.DB, tenantUUID string, memberID uint64) error {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" || memberID == 0 {
+		return nil
+	}
+	role, err := s.ensureTenantUserRole(tx, tenantUUID)
+	if err != nil {
+		return err
+	}
+	if role == nil || role.ID == 0 {
+		return nil
+	}
+	rel := model.MemberRole{UserID: memberID, RoleID: role.ID}
+	return tx.Where("member_id = ? AND role_id = ?", memberID, role.ID).FirstOrCreate(&rel).Error
+}
+
+func (s *WeComSyncTaskService) ensureTenantUserRole(tx *gorm.DB, tenantUUID string) (*model.Role, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, nil
+	}
+
+	var role model.Role
+	err := tx.Where("tenant_uuid = ? AND code = ?", tenantUUID, "tenant.user").First(&role).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		role = model.Role{
+			BaseModel:     basemodel.BaseModel{TenantUuid: tenantUUID},
+			Code:          "tenant.user",
+			Name:          "Tenant User",
+			Description:   "Default tenant user role",
+			ScopeType:     model.RoleScopeTenant,
+			PolicyVersion: "local.v1",
+		}
+		if err := tx.Create(&role).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		updates := map[string]any{}
+		if strings.TrimSpace(role.ScopeType) == "" {
+			updates["scope_type"] = model.RoleScopeTenant
+		}
+		if strings.TrimSpace(role.PolicyVersion) == "" {
+			updates["policy_version"] = "local.v1"
+		}
+		if len(updates) > 0 {
+			if err := tx.Model(&role).Updates(updates).Error; err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	permissions := []model.Permission{
+		{Resource: "base.templates", Action: "read", Description: "Read templates"},
+		{Resource: "iam.department", Action: "read", Description: "Read IAM departments"},
+		{Resource: "iam.user", Action: "read", Description: "Read IAM users"},
+	}
+	for _, item := range permissions {
+		perm := item
+		if err := tx.Where("resource = ? AND action = ?", perm.Resource, perm.Action).First(&perm).Error; err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, err
+			}
+			perm = model.Permission{
+				Resource:    item.Resource,
+				Action:      item.Action,
+				Description: item.Description,
+			}
+			if err := tx.Create(&perm).Error; err != nil {
+				return nil, err
+			}
+		}
+
+		rp := model.RolePermission{
+			RoleID:        role.ID,
+			PermissionID:  perm.ID,
+			TenantUuid:    strings.ToLower(strings.TrimSpace(tenantUUID)),
+			PolicyVersion: "local.v1",
+		}
+		if err := tx.Where("role_id = ? AND permission_id = ?", role.ID, perm.ID).FirstOrCreate(&rp).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	return &role, nil
+}

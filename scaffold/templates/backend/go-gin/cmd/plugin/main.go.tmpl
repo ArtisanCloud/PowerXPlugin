@@ -45,7 +45,6 @@ import (
 	recommendation "{{ .BackendModulePath }}/internal/services/recommendation"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"{{ .BackendModulePath }}/internal/shared/utils"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -132,6 +131,17 @@ func main() {
 	}
 
 	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
+	if err := iamResolver.Err(); err != nil {
+		logger.WithFields(logger.Fields{
+			"iam_mode":       iamResolver.Mode(),
+			"iam_source":     iamResolver.Source(),
+			"conflict":       iamResolver.Record().ConflictDetected,
+			"decision":       iamResolver.Record().DecisionReason,
+			"config_mode":    iamResolver.Record().ConfigMode,
+			"env_mode":       iamResolver.Record().EnvMode,
+			"effective_mode": iamResolver.Record().EffectiveMode,
+		}).WithError(err).Fatal("IAM mode resolution failed")
+	}
 	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
 	if mode == "" {
 		mode = "unknown"
@@ -358,6 +368,12 @@ func main() {
 		},
 	}
 	fwApp := fwbootstrap.NewApp(appCfg)
+	if err := pluginbootstrap.BindFrameworkIAM(deps, fwApp.IAMRegistry()); err != nil {
+		logger.WithFields(logger.Fields{
+			"iam_mode":        deps.IAMMode,
+			"iam_mode_source": deps.IAMModeSource,
+		}).WithError(err).Fatal("Failed to bind framework IAM registry")
+	}
 
 	if err := fwrouter.AttachHTTPServer(fwApp); err != nil {
 		logger.WithError(err).Fatal("Failed to attach HTTP server")
@@ -562,7 +578,7 @@ func ensureToolTokenFresh(ctx context.Context, cfg *config.Config) {
 	logTokenExpiryStatus(log, now, expiry, fields)
 }
 
-func logTokenExpiryStatus(log *logrus.Entry, now, expiry time.Time, fields logger.Fields) {
+func logTokenExpiryStatus(log *logger.Entry, now, expiry time.Time, fields logger.Fields) {
 	if now.After(expiry) {
 		log.WithFields(fields).Error("PX_PLUGIN_TOOL_TOKEN 已过期，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 刷新凭证")
 		return

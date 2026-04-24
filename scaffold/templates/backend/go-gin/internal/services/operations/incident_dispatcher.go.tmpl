@@ -4,16 +4,16 @@ import (
 	"context"
 
 	opmodels "{{ .BackendModulePath }}/internal/entity/models/operations"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // loggingIncidentDispatcher emits incident events to structured logs for auditability.
 type loggingIncidentDispatcher struct {
-	log *logrus.Entry
+	log *pxlog.Entry
 }
 
 // NewLoggingIncidentDispatcher builds a dispatcher backed by the provided logger.
-func NewLoggingIncidentDispatcher(log *logrus.Entry) IncidentDispatcher {
+func NewLoggingIncidentDispatcher(log *pxlog.Entry) IncidentDispatcher {
 	if log == nil {
 		return noopIncidentDispatcher{}
 	}
@@ -25,7 +25,7 @@ func (d *loggingIncidentDispatcher) DispatchIncidentEvent(ctx context.Context, e
 	if d == nil || d.log == nil || incident == nil {
 		return nil
 	}
-	fields := logrus.Fields{
+	fields := pxlog.Fields{
 		"incident_id": incident.ID,
 		"event_type":  eventType,
 		"severity":    incident.Severity,

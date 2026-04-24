@@ -13,6 +13,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	middleware "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -28,9 +29,10 @@ type authProxy interface {
 
 // AuthHandler exposes /api/v1/auth public endpoints.
 type AuthHandler struct {
-	mode  iamservice.IAMMode
-	proxy authProxy
-	local iamservice.IAMDirectory
+	mode      iamservice.IAMMode
+	proxy     authProxy
+	local     iamservice.IAMDirectory
+	tenantSvc *iamservice.TenantService
 }
 
 // NewAuthHandler builds a handler for the given IAM mode.
@@ -38,7 +40,11 @@ func NewAuthHandler(deps *app.Deps) *AuthHandler {
 	if deps == nil {
 		return &AuthHandler{}
 	}
-	return &AuthHandler{mode: deps.IAMMode, proxy: deps.AuthProxy, local: deps.IAMDirectory}
+	var tenantSvc *iamservice.TenantService
+	if deps.DB != nil {
+		tenantSvc = iamservice.NewTenantService(deps.DB, nil)
+	}
+	return &AuthHandler{mode: deps.IAMMode, proxy: deps.AuthProxy, local: deps.IAMDirectory, tenantSvc: tenantSvc}
 }
 
 // RegisterAuthRoutes wires /auth routes beneath the API prefix.
@@ -53,6 +59,8 @@ func RegisterAuthRoutes(group *gin.RouterGroup, deps *app.Deps) {
 	adminAuth.POST("/refresh", handler.Refresh)
 	adminAuth.POST("/logout", handler.Logout)
 	adminAuth.GET("/me/context", handler.MeContext)
+	adminAuth.GET("/tenants/search", handler.SearchTenants)
+	adminAuth.GET("/tenants/resolve", handler.ResolveTenant)
 }
 
 // Login proxies login requests to PowerX Core.
@@ -113,6 +121,72 @@ func (h *AuthHandler) MeContext(c *gin.Context) {
 	default:
 		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
 	}
+}
+
+func (h *AuthHandler) ResolveTenant(c *gin.Context) {
+	if h == nil || h.tenantSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "租户服务不可用", nil)
+		return
+	}
+	identifier := strings.TrimSpace(c.Query("identifier"))
+	if identifier == "" {
+		identifier = strings.TrimSpace(c.Query("tenant"))
+	}
+	if identifier == "" {
+		contracts.ResponseBadRequest(c, "identifier 必填")
+		return
+	}
+	tenant, err := h.tenantSvc.ResolveByIdentifier(c.Request.Context(), identifier)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			contracts.ResponseBadRequest(c, "组织不存在或未启用")
+			return
+		}
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{
+		"tenant_uuid": tenant.UUID,
+		"tenant_key":  tenant.Key,
+		"tenant_name": tenant.Name,
+		"status":      tenant.Status,
+	})
+}
+
+func (h *AuthHandler) SearchTenants(c *gin.Context) {
+	if h == nil || h.tenantSvc == nil {
+		contracts.ResponseServiceUnavailable(c, "租户服务不可用", nil)
+		return
+	}
+	query := strings.TrimSpace(c.Query("q"))
+	limit := 10
+	if v, err := strconv.Atoi(strings.TrimSpace(c.Query("limit"))); err == nil && v > 0 && v <= 50 {
+		limit = v
+	}
+	if query != "" && len([]rune(query)) < 2 {
+		contracts.ResponseSuccess(c, gin.H{"items": []gin.H{}})
+		return
+	}
+	result, err := h.tenantSvc.ListWithFilter(c.Request.Context(), iamservice.TenantListFilter{
+		Status:   "active",
+		Query:    query,
+		Page:     1,
+		PageSize: limit,
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(result.Items))
+	for _, tenant := range result.Items {
+		items = append(items, gin.H{
+			"tenant_uuid": tenant.UUID,
+			"tenant_key":  tenant.Key,
+			"tenant_name": tenant.Name,
+			"status":      tenant.Status,
+		})
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
 }
 
 func (h *AuthHandler) ensureDelegated(c *gin.Context) bool {
@@ -194,6 +268,7 @@ func (h *AuthHandler) handleDelegatedLogin(c *gin.Context) {
 		return
 	}
 	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
+	authmetrics.RecordPasswordLoginSuccess(app.PluginID, h.modeLabel())
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 
@@ -299,6 +374,7 @@ func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
 		return
 	}
 	authmetrics.RecordLogin(app.PluginID, h.modeLabel(), "success")
+	authmetrics.RecordPasswordLoginSuccess(app.PluginID, h.modeLabel())
 	contracts.ResponseSuccess(c, mapTokens(tokens))
 }
 

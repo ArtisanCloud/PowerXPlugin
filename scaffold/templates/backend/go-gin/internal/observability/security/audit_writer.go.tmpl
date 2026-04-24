@@ -10,7 +10,11 @@ import (
 	"time"
 )
 
-const DefaultAuditLogPath = "logs/audit.log"
+const (
+	DefaultAuditLogPath = "stdout"
+	auditChannelStdout  = "stdout"
+	auditChannelStderr  = "stderr"
+)
 
 // AuditWriter appends structured audit events to a designated writer.
 type AuditWriter struct {
@@ -22,6 +26,12 @@ type AuditWriter struct {
 func NewFileAuditWriter(path string) (*AuditWriter, error) {
 	if path == "" {
 		path = DefaultAuditLogPath
+	}
+	switch filepath.Clean(path) {
+	case auditChannelStdout:
+		return &AuditWriter{writer: os.Stdout}, nil
+	case auditChannelStderr:
+		return &AuditWriter{writer: os.Stderr}, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("create audit log directory: %w", err)

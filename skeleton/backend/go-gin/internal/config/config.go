@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -344,16 +344,19 @@ type HealthCheckConfig struct {
 
 // LoggingConfig 日志配置
 type LoggingConfig struct {
-	Level      string `yaml:"level" json:"level"`
-	Format     string `yaml:"format" json:"format"`
-	Output     string `yaml:"output" json:"output"`
-	FilePath   string `yaml:"file_path" json:"file_path"`
-	MaxSize    int    `yaml:"max_size" json:"max_size"`
-	MaxBackups int    `yaml:"max_backups" json:"max_backups"`
-	MaxAge     int    `yaml:"max_age" json:"max_age"`
-	HTTPAccess bool   `yaml:"http_access" json:"http_access"`
-	GinMode    string `yaml:"gin_mode" json:"gin_mode"`
-	DebugMode  bool   `yaml:"debug_mode" json:"debug_mode"`
+	Level                     string `yaml:"level" json:"level"`
+	Format                    string `yaml:"format" json:"format"`
+	Output                    string `yaml:"output" json:"output"`
+	FilePath                  string `yaml:"file_path" json:"file_path"`
+	MaxSize                   int    `yaml:"max_size" json:"max_size"`
+	MaxBackups                int    `yaml:"max_backups" json:"max_backups"`
+	MaxAge                    int    `yaml:"max_age" json:"max_age"`
+	HTTPAccess                bool   `yaml:"http_access" json:"http_access"`
+	GinMode                   string `yaml:"gin_mode" json:"gin_mode"`
+	DebugMode                 bool   `yaml:"debug_mode" json:"debug_mode"`
+	GovernanceMode            string `yaml:"governance_mode" json:"governance_mode"`
+	GovernanceDeadlineVersion string `yaml:"governance_deadline_version" json:"governance_deadline_version"`
+	PluginVersion             string `yaml:"plugin_version" json:"plugin_version"`
 }
 
 // GRPCUpstream PowerX gRPC 上游配置
@@ -415,7 +418,7 @@ func Load() (*Config, error) {
 	// 尝试加载 YAML 配置文件
 	configDir, err := loadYAMLConfig(cfg)
 	if err != nil {
-		logrus.WithError(err).Warn("Failed to load YAML config, using defaults only")
+		pxlog.WithError(err).Warn("Failed to load YAML config, using defaults only")
 	}
 	if strings.TrimSpace(configDir) != "" {
 		loadEnvFiles(configDir, filepath.Dir(configDir))
@@ -472,7 +475,7 @@ func defaultSecurityBaselineConfig() *SecurityBaselineConfig {
 		},
 		ConsentDefaults: ConsentDefaultsConfig{
 			RetentionDays: 90,
-			AuditChannel:  "logs/audit.log",
+			AuditChannel:  "stdout",
 			ExportBucket:  "",
 		},
 	}
@@ -587,15 +590,18 @@ func getDefaultConfig() *Config {
 			},
 		},
 		Logging: &LoggingConfig{
-			Level:      "info",
-			Format:     "json",
-			Output:     "stdout",
-			MaxSize:    100,
-			MaxBackups: 3,
-			MaxAge:     28,
-			HTTPAccess: true,
-			GinMode:    "",
-			DebugMode:  true,
+			Level:                     "info",
+			Format:                    "json",
+			Output:                    "stdout",
+			MaxSize:                   100,
+			MaxBackups:                3,
+			MaxAge:                    28,
+			HTTPAccess:                true,
+			GinMode:                   "",
+			DebugMode:                 true,
+			GovernanceMode:            "warn",
+			GovernanceDeadlineVersion: "",
+			PluginVersion:             "",
 		},
 		GRPCUpstream: &GRPCUpstream{
 			Address:     "localhost:9001",
@@ -701,13 +707,13 @@ func loadSecurityBaselineConfig(cfg *Config) {
 
 	data, err := os.ReadFile(baselinePath)
 	if err != nil {
-		logrus.WithError(err).Warnf("Failed to read security baseline config %s", baselinePath)
+		pxlog.WithError(err).Warnf("Failed to read security baseline config %s", baselinePath)
 		return
 	}
 
 	baseline := defaultSecurityBaselineConfig()
 	if err := yaml.Unmarshal(data, baseline); err != nil {
-		logrus.WithError(err).Warnf("Failed to parse security baseline config %s", baselinePath)
+		pxlog.WithError(err).Warnf("Failed to parse security baseline config %s", baselinePath)
 		return
 	}
 
@@ -880,6 +886,15 @@ func loadEnvConfig(cfg *Config) {
 	}
 	if debugMode := resolveConfigValue(os.Getenv("POWERX_DEBUG_MODE")); debugMode != "" {
 		cfg.Logging.DebugMode = (debugMode == "1" || strings.EqualFold(debugMode, "true"))
+	}
+	if governanceMode := resolveConfigValue(os.Getenv("POWERX_LOG_GOVERNANCE_MODE")); governanceMode != "" {
+		cfg.Logging.GovernanceMode = strings.ToLower(strings.TrimSpace(governanceMode))
+	}
+	if deadlineVersion := resolveConfigValue(os.Getenv("POWERX_LOG_GOVERNANCE_DEADLINE_VERSION")); deadlineVersion != "" {
+		cfg.Logging.GovernanceDeadlineVersion = strings.TrimSpace(deadlineVersion)
+	}
+	if pluginVersion := resolveConfigValue(os.Getenv("POWERX_PLUGIN_VERSION")); pluginVersion != "" {
+		cfg.Logging.PluginVersion = strings.TrimSpace(pluginVersion)
 	}
 	if devMode := resolveConfigValue(os.Getenv("POWERX_DEV_MODE")); devMode != "" {
 		cfg.Logging.DebugMode = (devMode == "1" || strings.EqualFold(devMode, "true"))
@@ -1105,7 +1120,7 @@ func normalizeConfig(cfg *Config) {
 		if cfg.Gateway.AuthScheme == "bearer" {
 			if tokenTenant := tenantUUIDFromJWT(cfg.Gateway.ToolToken); tokenTenant != "" {
 				if cfg.Gateway.TenantUUID != "" && cfg.Gateway.TenantUUID != tokenTenant {
-					logrus.WithFields(logrus.Fields{
+					pxlog.WithFields(pxlog.Fields{
 						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
 						"gateway.token_tid":         tokenTenant,
 						"gateway.tenant_from_token": true,
@@ -1127,7 +1142,7 @@ func normalizeConfig(cfg *Config) {
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
 
 			if hasAny && incomplete {
-				logrus.WithFields(logrus.Fields{
+				pxlog.WithFields(pxlog.Fields{
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.tool_token":  toolToken != "",
@@ -1147,6 +1162,9 @@ func normalizeConfig(cfg *Config) {
 		cfg.Logging.Level = strings.ToLower(resolveConfigValue(cfg.Logging.Level))
 		cfg.Logging.Format = strings.ToLower(resolveConfigValue(cfg.Logging.Format))
 		cfg.Logging.Output = strings.ToLower(resolveConfigValue(cfg.Logging.Output))
+		cfg.Logging.GovernanceMode = strings.ToLower(strings.TrimSpace(resolveConfigValue(cfg.Logging.GovernanceMode)))
+		cfg.Logging.GovernanceDeadlineVersion = strings.TrimSpace(resolveConfigValue(cfg.Logging.GovernanceDeadlineVersion))
+		cfg.Logging.PluginVersion = strings.TrimSpace(resolveConfigValue(cfg.Logging.PluginVersion))
 	}
 	if cfg.GRPCUpstream != nil {
 		cfg.GRPCUpstream.Address = resolveConfigValue(cfg.GRPCUpstream.Address)
@@ -1611,6 +1629,14 @@ func (c *Config) Validate() error {
 	if c.Logging.Output == "file" && c.Logging.FilePath == "" {
 		return NewConfigError("logging file path must be specified when output is 'file'")
 	}
+	if c.Logging.GovernanceMode == "" {
+		c.Logging.GovernanceMode = "warn"
+	}
+	switch c.Logging.GovernanceMode {
+	case "detect", "warn", "block":
+	default:
+		return NewConfigError("logging governance_mode must be one of: detect, warn, block")
+	}
 
 	if c.GRPCUpstream != nil {
 		if tenantUUID := strings.TrimSpace(c.GRPCUpstream.TenantUUID); tenantUUID != "" {
@@ -1660,6 +1686,95 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// ShouldBlockLegacyLogging reports whether direct legacy logging must be blocked
+// under current governance policy.
+func (c *Config) ShouldBlockLegacyLogging() (bool, string) {
+	if c == nil || c.Logging == nil {
+		return false, ""
+	}
+	mode := strings.ToLower(strings.TrimSpace(c.Logging.GovernanceMode))
+	switch mode {
+	case "block":
+		return true, "governance_mode=block"
+	case "detect", "warn":
+	default:
+		mode = "warn"
+	}
+
+	deadline := strings.TrimSpace(c.Logging.GovernanceDeadlineVersion)
+	current := strings.TrimSpace(c.Logging.PluginVersion)
+	if deadline == "" || current == "" {
+		return false, ""
+	}
+	if compareVersion(current, deadline) >= 0 {
+		return true, fmt.Sprintf("plugin_version(%s) reached governance_deadline_version(%s)", current, deadline)
+	}
+	return false, ""
+}
+
+func compareVersion(current, target string) int {
+	curParts := normalizeVersionParts(current)
+	tgtParts := normalizeVersionParts(target)
+	maxLen := len(curParts)
+	if len(tgtParts) > maxLen {
+		maxLen = len(tgtParts)
+	}
+	for i := 0; i < maxLen; i++ {
+		curVal := 0
+		if i < len(curParts) {
+			curVal = curParts[i]
+		}
+		tgtVal := 0
+		if i < len(tgtParts) {
+			tgtVal = tgtParts[i]
+		}
+		if curVal > tgtVal {
+			return 1
+		}
+		if curVal < tgtVal {
+			return -1
+		}
+	}
+	return 0
+}
+
+func normalizeVersionParts(raw string) []int {
+	trimmed := strings.TrimSpace(strings.TrimPrefix(strings.ToLower(raw), "v"))
+	if trimmed == "" {
+		return []int{0}
+	}
+	segments := strings.FieldsFunc(trimmed, func(r rune) bool {
+		return r == '.' || r == '-' || r == '_'
+	})
+	parts := make([]int, 0, len(segments))
+	for _, seg := range segments {
+		if seg == "" {
+			continue
+		}
+		numericPrefix := seg
+		for i, ch := range seg {
+			if ch < '0' || ch > '9' {
+				numericPrefix = seg[:i]
+				break
+			}
+		}
+		if numericPrefix == "" {
+			parts = append(parts, 0)
+			continue
+		}
+		value, err := strconv.Atoi(numericPrefix)
+		if err != nil {
+			parts = append(parts, 0)
+			continue
+		}
+		parts = append(parts, value)
+	}
+	if len(parts) == 0 {
+		return []int{0}
+	}
+	return parts
 }
 
 // ConfigError 配置错误类型

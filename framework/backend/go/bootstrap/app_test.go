@@ -94,6 +94,13 @@ func TestShutdownWithoutServer(t *testing.T) {
 	}
 }
 
+func TestNewAppInitializesFederatedFactory(t *testing.T) {
+	app := NewApp(nil)
+	if app.FederatedProviderFactory() == nil {
+		t.Fatalf("FederatedProviderFactory() = nil, want initialized registry")
+	}
+}
+
 func TestParseBoolEnv(t *testing.T) {
 	t.Setenv("TEST_BOOL", "true")
 	if !parseBoolEnv("TEST_BOOL", false) {
@@ -136,5 +143,15 @@ func TestWithRuntimeDefaultsInjectsTenantMirrorFields(t *testing.T) {
 	}
 	if !strings.Contains(out, `"component":"bootstrap.app"`) {
 		t.Fatalf("expected component in output, got %s", out)
+	}
+}
+
+func TestNewAppInitializesIAMRegistry(t *testing.T) {
+	app := NewApp(nil)
+	if app.IAMRegistry() == nil {
+		t.Fatalf("expected IAM registry to be initialized")
+	}
+	if app.IAMRegistry().IsBound() {
+		t.Fatalf("expected IAM registry to be unbound by default")
 	}
 }

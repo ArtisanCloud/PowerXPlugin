@@ -14,6 +14,13 @@
       </div>
     </div>
 
+    <UAlert
+      v-if="readonlyMode"
+      color="warning"
+      variant="soft"
+      title="当前账号为只读模式，可查看设置但不可修改。"
+    />
+
     <div class="grid gap-6 lg:grid-cols-4">
       <div class="lg:col-span-1">
         <UCard>
@@ -76,14 +83,14 @@
                 <UButton variant="outline" @click="resetSettings">
                   {{ $t("common.reset") }}
                 </UButton>
-                <UButton color="primary" @click="saveSettings">
+                <UButton color="primary" @click="saveSettings" :disabled="readonlyMode">
                   {{ $t("common.save") }}
                 </UButton>
               </div>
             </div>
           </template>
 
-          <UForm :state="settings" class="space-y-4">
+          <UForm :state="settings" class="space-y-4" :disabled="readonlyMode">
             <UFormField label="站点名称">
               <UInput v-model="settings.siteName" />
             </UFormField>
@@ -123,14 +130,14 @@
                 <UButton variant="outline" @click="resetSettings">
                   {{ $t("common.reset") }}
                 </UButton>
-                <UButton color="primary" @click="saveSettings">
+                <UButton color="primary" @click="saveSettings" :disabled="readonlyMode">
                   {{ $t("common.save") }}
                 </UButton>
               </div>
             </div>
           </template>
 
-          <UForm :state="settings" class="space-y-4">
+          <UForm :state="settings" class="space-y-4" :disabled="readonlyMode">
             <UFormField label="强制 HTTPS">
               <USwitch v-model="settings.forceHttps" />
             </UFormField>
@@ -169,14 +176,14 @@
                 <UButton variant="outline" @click="resetSettings">
                   {{ $t("common.reset") }}
                 </UButton>
-                <UButton color="primary" @click="saveSettings">
+                <UButton color="primary" @click="saveSettings" :disabled="readonlyMode">
                   {{ $t("common.save") }}
                 </UButton>
               </div>
             </div>
           </template>
 
-          <UForm :state="settings" class="space-y-4">
+          <UForm :state="settings" class="space-y-4" :disabled="readonlyMode">
             <UFormField label="启用邮件通知">
               <USwitch v-model="settings.emailNotifications" />
             </UFormField>
@@ -210,14 +217,14 @@
                 <UButton variant="outline" @click="resetSettings">
                   {{ $t("common.reset") }}
                 </UButton>
-                <UButton color="primary" @click="saveSettings">
+                <UButton color="primary" @click="saveSettings" :disabled="readonlyMode">
                   {{ $t("common.save") }}
                 </UButton>
               </div>
             </div>
           </template>
 
-          <UForm :state="settings" class="space-y-4">
+          <UForm :state="settings" class="space-y-4" :disabled="readonlyMode">
             <UFormField label="对象存储提供方">
               <USelect v-model="settings.storageProvider" :items="storageProviders" />
             </UFormField>
@@ -243,14 +250,14 @@
                 <UButton variant="outline" @click="resetSettings">
                   {{ $t("common.reset") }}
                 </UButton>
-                <UButton color="primary" @click="saveSettings">
+                <UButton color="primary" @click="saveSettings" :disabled="readonlyMode">
                   {{ $t("common.save") }}
                 </UButton>
               </div>
             </div>
           </template>
 
-          <UForm :state="settings" class="space-y-4">
+          <UForm :state="settings" class="space-y-4" :disabled="readonlyMode">
             <UFormField label="Webhook Endpoint">
               <UInput v-model="settings.integrationWebhook" placeholder="https://..." />
             </UFormField>
@@ -276,14 +283,14 @@
                 <UButton variant="outline" @click="resetSettings">
                   {{ $t("common.reset") }}
                 </UButton>
-                <UButton color="primary" @click="saveSettings">
+                <UButton color="primary" @click="saveSettings" :disabled="readonlyMode">
                   {{ $t("common.save") }}
                 </UButton>
               </div>
             </div>
           </template>
 
-          <UForm :state="settings" class="space-y-4">
+          <UForm :state="settings" class="space-y-4" :disabled="readonlyMode">
             <UFormField label="维护模式">
               <USwitch v-model="settings.maintenanceMode" />
             </UFormField>
@@ -301,8 +308,10 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useToast } from "#imports";
+import { storeToRefs } from "pinia";
+import { useUserStore } from "~/stores/user";
 
 definePageMeta({
   title: "租户配置",
@@ -311,6 +320,9 @@ definePageMeta({
 });
 
 const toast = useToast();
+const userStore = useUserStore();
+const { isRoot, isCurrentTenantAdmin } = storeToRefs(userStore);
+const readonlyMode = computed(() => !(Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value)));
 
 const defaultSettings = () => ({
   siteName: "PowerX Plugin IAM",
@@ -417,6 +429,14 @@ const configCategories = [
 const activeCategory = ref("basic");
 
 const saveSettings = () => {
+  if (readonlyMode.value) {
+    toast.add({
+      title: "只读模式",
+      description: "当前账号无编辑权限，请联系租户管理员。",
+      color: "warning",
+    });
+    return;
+  }
   toast.add({
     title: "设置已保存",
     description: "此操作目前仅保存到本地，以便在接入 API 前调试 UI。",

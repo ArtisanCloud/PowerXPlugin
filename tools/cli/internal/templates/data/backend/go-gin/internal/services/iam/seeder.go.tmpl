@@ -208,7 +208,10 @@ func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode I
 				return err
 			}
 		}
-		return seedDefaultPermissions(tx, role.ID, tenantUUID)
+		if err := seedDefaultPermissions(tx, role.ID, tenantUUID); err != nil {
+			return err
+		}
+		return seedDefaultTenantUserRole(tx, tenantUUID)
 	})
 }
 
@@ -335,5 +338,78 @@ func seedDefaultPermissions(tx *gorm.DB, roleID uint64, tenantUUID string) error
 			return err
 		}
 	}
+	return nil
+}
+
+func seedDefaultTenantUserRole(tx *gorm.DB, tenantUUID string) error {
+	tenantUUID = strings.ToLower(strings.TrimSpace(tenantUUID))
+	if tenantUUID == "" {
+		return nil
+	}
+
+	var role iamm.Role
+	err := tx.Where("tenant_uuid = ? AND code = ?", tenantUUID, "tenant.user").First(&role).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		role = iamm.Role{
+			BaseModel:     basemodels.BaseModel{TenantUuid: tenantUUID},
+			Code:          "tenant.user",
+			Name:          "Tenant User",
+			Description:   "Default tenant user role",
+			ScopeType:     iamm.RoleScopeTenant,
+			PolicyVersion: defaultPolicyVersion,
+		}
+		if err := tx.Create(&role).Error; err != nil {
+			return err
+		}
+	} else {
+		update := map[string]any{}
+		if strings.TrimSpace(role.ScopeType) == "" {
+			update["scope_type"] = iamm.RoleScopeTenant
+		}
+		if strings.TrimSpace(role.PolicyVersion) == "" {
+			update["policy_version"] = defaultPolicyVersion
+		}
+		if len(update) > 0 {
+			if err := tx.Model(&role).Updates(update).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	permissions := []iamm.Permission{
+		{Resource: "base.templates", Action: "read", Description: "Read templates"},
+		{Resource: "iam.department", Action: "read", Description: "Read IAM departments"},
+		{Resource: "iam.user", Action: "read", Description: "Read IAM users"},
+	}
+	for _, item := range permissions {
+		perm := item
+		if err := tx.Where("resource = ? AND action = ?", perm.Resource, perm.Action).First(&perm).Error; err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			perm = iamm.Permission{
+				Resource:    item.Resource,
+				Action:      item.Action,
+				Description: item.Description,
+			}
+			if err := tx.Create(&perm).Error; err != nil {
+				return err
+			}
+		}
+
+		rp := iamm.RolePermission{
+			RoleID:        role.ID,
+			PermissionID:  perm.ID,
+			TenantUuid:    tenantUUID,
+			PolicyVersion: defaultPolicyVersion,
+		}
+		if err := tx.Where("role_id = ? AND permission_id = ?", role.ID, perm.ID).FirstOrCreate(&rp).Error; err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

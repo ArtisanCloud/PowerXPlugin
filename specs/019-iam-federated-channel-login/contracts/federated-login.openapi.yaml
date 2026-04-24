@@ -1,0 +1,170 @@
+openapi: 3.0.3
+info:
+  title: IAM Federated Channel Login Contract
+  version: 0.1.0
+  description: >
+    Federated QR login contract for WeCom, DingTalk and Lark.
+servers:
+  - url: /api/v1
+paths:
+  /public/auth/federated/challenge:
+    post:
+      summary: Create login challenge for provider.
+      responses:
+        "200":
+          description: Challenge generated.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "424":
+          $ref: "#/components/responses/UpstreamDependency"
+
+  /public/auth/federated/callback/{provider}:
+    get:
+      summary: Handle provider callback and establish session.
+      parameters:
+        - in: path
+          name: provider
+          required: true
+          schema:
+            type: string
+            enum: [wecom, dingtalk, lark]
+      responses:
+        "200":
+          description: Login succeeded.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/RiskRejected"
+        "424":
+          $ref: "#/components/responses/UpstreamDependency"
+
+  /admin/iam/federated/bindings:
+    get:
+      summary: List bindings for current tenant.
+      responses:
+        "200":
+          description: Binding list.
+    post:
+      summary: Create or update binding.
+      responses:
+        "200":
+          description: Binding saved.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/iam/federated/bindings/{binding_id}:
+    delete:
+      summary: Unbind external identity from member.
+      parameters:
+        - in: path
+          name: binding_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Binding removed.
+        "404":
+          description: Binding not found.
+
+components:
+  responses:
+    BadRequest:
+      description: Invalid input.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unauthorized:
+      description: Missing or invalid auth context.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: Authenticated but not allowed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RiskRejected:
+      description: Risk policy rejected callback.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            replay:
+              value:
+                success: false
+                error:
+                  code: FEDERATED_REPLAY_DETECTED
+                  message: login failed
+    UpstreamDependency:
+      description: Provider or delegated upstream unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+
+  schemas:
+    ChallengeResponse:
+      type: object
+      properties:
+        challenge_id:
+          type: string
+        provider:
+          type: string
+        state:
+          type: string
+        nonce:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        authorize_url:
+          type: string
+    IdentityContext:
+      type: object
+      required: [tenant_uuid]
+      properties:
+        tenant_uuid:
+          type: string
+        user_id:
+          type: string
+        member_id:
+          type: string
+        roles:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+        provider:
+          type: string
+        trace_id:
+          type: string
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+                - FEDERATED_STATE_EXPIRED
+                - FEDERATED_REPLAY_DETECTED
+                - FEDERATED_CROSS_TENANT_REJECTED
+                - FEDERATED_SIGNATURE_INVALID
+                - FEDERATED_UNAUTHORIZED
+                - FEDERATED_FORBIDDEN
+                - FEDERATED_UPSTREAM_DEPENDENCY
+            message:
+              type: string

@@ -1,0 +1,306 @@
+openapi: 3.0.3
+info:
+  title: Framework Logger Governance API
+  version: 0.1.0
+  description: |
+    Contracts for PowerX-driven logging policy, multi-sink probe, and legacy logging governance.
+servers:
+  - url: /api/v1
+paths:
+  /admin/runtime/logging/policy:
+    get:
+      summary: Get effective logging policy
+      operationId: getLoggingPolicy
+      tags: [logging]
+      responses:
+        '200':
+          description: Effective policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponseLogPolicy'
+    put:
+      summary: Apply logging policy
+      operationId: applyLoggingPolicy
+      tags: [logging]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogPolicyRequest'
+      responses:
+        '200':
+          description: Policy applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponsePolicyApply'
+        '400':
+          description: Invalid policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIErrorResponse'
+  /admin/runtime/logging/probe:
+    post:
+      summary: Emit probe log event to configured sinks
+      operationId: emitLoggingProbe
+      tags: [logging]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProbeRequest'
+      responses:
+        '200':
+          description: Probe completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponseProbe'
+        '400':
+          description: Invalid probe request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIErrorResponse'
+  /admin/runtime/logging/violations:
+    get:
+      summary: List legacy direct-logging violations
+      operationId: listLoggingViolations
+      tags: [logging-governance]
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [detected, warned, blocked, resolved]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+      responses:
+        '200':
+          description: Violation list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponseViolationList'
+components:
+  schemas:
+    APIError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          nullable: true
+    APIErrorResponse:
+      type: object
+      required: [success, error, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: '#/components/schemas/APIError'
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+    APIResponseLogPolicy:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        message:
+          type: string
+          enum: [ok]
+        data:
+          $ref: '#/components/schemas/LogPolicy'
+    APIResponsePolicyApply:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        message:
+          type: string
+          enum: [ok]
+        data:
+          $ref: '#/components/schemas/LogPolicy'
+    APIResponseProbe:
+      type: object
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        message:
+          type: string
+          enum: [ok]
+        data:
+          $ref: '#/components/schemas/ProbeResponse'
+    APIResponseViolationList:
+      type: object
+      required: [success, data, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/ViolationListResponse'
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+    LogPolicyRequest:
+      type: object
+      properties:
+        tenant_uuid:
+          type: string
+        policy_version:
+          type: string
+        mode:
+          type: string
+          enum: [host, standalone]
+        sinks:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [stdout, file, loki]
+        format:
+          type: string
+          enum: [json, text]
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        authorized_extra_sinks:
+          type: array
+          items:
+            type: string
+            enum: [file, loki]
+        retry:
+          $ref: '#/components/schemas/RetryPolicy'
+    LogPolicy:
+      allOf:
+        - $ref: '#/components/schemas/LogPolicyRequest'
+    RetryPolicy:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 10
+        backoff_ms:
+          type: integer
+          minimum: 1
+          maximum: 60000
+    ProbeRequest:
+      type: object
+      required: [message, level, component]
+      properties:
+        message:
+          type: string
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        component:
+          type: string
+        trace_id:
+          type: string
+        tenant_uuid:
+          type: string
+        event:
+          type: string
+        fields:
+          type: object
+          additionalProperties: true
+    ProbeResponse:
+      type: object
+      required: [trace_id, outcomes]
+      properties:
+        trace_id:
+          type: string
+        outcomes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SinkOutcome'
+    SinkOutcome:
+      type: object
+      required: [sink, status, attempt]
+      properties:
+        sink:
+          type: string
+          enum: [stdout, file, loki]
+        status:
+          type: string
+          enum: [success, failed, retrying, dropped]
+        attempt:
+          type: integer
+        error_code:
+          type: string
+        error_message:
+          type: string
+    ViolationRecord:
+      type: object
+      required: [violation_id, module_path, violation_type, status, detected_at]
+      properties:
+        violation_id:
+          type: string
+        module_path:
+          type: string
+        symbol:
+          type: string
+        violation_type:
+          type: string
+          enum: [direct_logrus, direct_zap, direct_file]
+        status:
+          type: string
+          enum: [detected, warned, blocked, resolved]
+        deadline_version:
+          type: string
+        detected_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ViolationListResponse:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ViolationRecord'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer

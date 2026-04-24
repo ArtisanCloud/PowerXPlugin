@@ -8,7 +8,7 @@ import (
 
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
 	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +17,7 @@ type LicenseRecoveryService struct {
 	licenseService *LicenseService
 	licenseRepo    *mrepo.LicenseRepository
 	pricingRepo    *mrepo.PricingRepository
-	logger         *logrus.Entry
+	logger         *pxlog.Entry
 	defaultActor   string
 }
 
@@ -32,9 +32,9 @@ type RecoveryRequest struct {
 }
 
 // NewLicenseRecoveryService constructs a recovery coordinator.
-func NewLicenseRecoveryService(licenseService *LicenseService, licenseRepo *mrepo.LicenseRepository, pricingRepo *mrepo.PricingRepository, logger *logrus.Entry) *LicenseRecoveryService {
+func NewLicenseRecoveryService(licenseService *LicenseService, licenseRepo *mrepo.LicenseRepository, pricingRepo *mrepo.PricingRepository, logger *pxlog.Entry) *LicenseRecoveryService {
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_license_recovery")
+		logger = pxlog.New().WithField("component", "marketplace_license_recovery")
 	}
 	return &LicenseRecoveryService{
 		licenseService: licenseService,
@@ -98,7 +98,7 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	})
 	if err != nil {
 		if s.logger != nil {
-			s.logger.WithError(err).WithFields(logrus.Fields{
+			s.logger.WithError(err).WithFields(pxlog.Fields{
 				"tenant_uuid": req.TenantUuid,
 				"listing_id":  req.ListingID,
 				"plan_id":     req.PlanID,
@@ -109,7 +109,7 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	}
 
 	if s.logger != nil {
-		s.logger.WithFields(logrus.Fields{
+		s.logger.WithFields(pxlog.Fields{
 			"tenant_uuid": req.TenantUuid,
 			"listing_id":  req.ListingID,
 			"plan_id":     req.PlanID,

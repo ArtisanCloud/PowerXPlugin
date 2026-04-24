@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 
+	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
@@ -15,7 +17,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -51,6 +52,10 @@ type Deps struct {
 	IAMModeSource       string
 	AuthProxy           DelegatedAuthProxy
 	IAMDirectory        iamservice.IAMDirectory
+	IAMRegistry         *fwiamadapters.Registry
+	IAMDirectoryService fwiamcontracts.DirectoryService
+	IAMAuthzService     fwiamcontracts.AuthzService
+	IAMContextService   fwiamcontracts.IdentityContextService
 }
 
 type gatewayClient interface {
@@ -69,7 +74,7 @@ func (d *Deps) RuntimeDefaults() *config.RuntimeOpsDefaults {
 }
 
 // RuntimeLogger provides a structured logger enriched with runtime metadata.
-func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logrus.Entry {
+func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logger.Entry {
 	if extra == nil {
 		extra = logger.Fields{}
 	}
@@ -93,6 +98,15 @@ func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger
 			}
 		}
 	}
+	baseFields := runtimelogging.Fields{
+		runtimelogging.FieldPluginID:   PluginID,
+		runtimelogging.FieldTenantUUID: tenantID,
+		runtimelogging.FieldTraceID:    traceID,
+		runtimelogging.FieldComponent:  component,
+		"request_id":                   traceID,
+	}
+	normalized := runtimelogging.NormalizeContextFields(baseFields, runtimelogging.Fields(extra))
+	extra = logger.Fields(normalized)
 
 	return logger.WithRuntimeFields(PluginID, tenantID, traceID, component, extra)
 }

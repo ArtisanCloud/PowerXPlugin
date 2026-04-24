@@ -8,7 +8,7 @@ import (
 	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
 	obs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
 	service "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // WebhookRetryWorker implements background retry logic for webhook deliveries.
@@ -17,7 +17,7 @@ type WebhookRetryWorker struct {
 	subscriptions *repo.WebhookSubscriptionRepository
 	attempts      *repo.DeliveryAttemptRepository
 	interval      time.Duration
-	logger        *logrus.Entry
+	logger        *pxlog.Entry
 }
 
 // NewWebhookRetryWorker constructs a retry worker.
@@ -26,13 +26,13 @@ func NewWebhookRetryWorker(
 	subRepo *repo.WebhookSubscriptionRepository,
 	attemptRepo *repo.DeliveryAttemptRepository,
 	interval time.Duration,
-	logger *logrus.Entry,
+	logger *pxlog.Entry,
 ) *WebhookRetryWorker {
 	if interval <= 0 {
 		interval = time.Minute
 	}
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.webhook_retry_worker")
+		logger = pxlog.WithField("component", "integration.webhook_retry_worker")
 	}
 	return &WebhookRetryWorker{
 		service:       svc,

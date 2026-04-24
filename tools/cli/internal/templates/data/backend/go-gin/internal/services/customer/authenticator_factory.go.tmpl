@@ -9,7 +9,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	customerdomain "{{ .BackendModulePath }}/internal/domain/customer"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 var ErrCustomerAuthNotImplemented = errors.New("customer authentication not implemented")
@@ -23,12 +23,12 @@ type Authenticator interface {
 
 type Factory struct {
 	cfg    *config.Config
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
-func NewAuthenticatorFactory(cfg *config.Config, logger *logrus.Entry) *Factory {
+func NewAuthenticatorFactory(cfg *config.Config, logger *pxlog.Entry) *Factory {
 	if logger == nil {
-		logger = logrus.WithField("component", "customer.authenticator_factory")
+		logger = pxlog.WithField("component", "customer.authenticator_factory")
 	}
 	return &Factory{cfg: cfg, logger: logger}
 }
@@ -52,7 +52,7 @@ type localJWTAuthenticator struct {
 	secret   []byte
 	issuer   string
 	audience string
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 }
 
 type customerTokenClaims struct {
@@ -62,7 +62,7 @@ type customerTokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-func newLocalJWTAuthenticator(cfg *config.Config, logger *logrus.Entry) Authenticator {
+func newLocalJWTAuthenticator(cfg *config.Config, logger *pxlog.Entry) Authenticator {
 	secret := ""
 	issuer := ""
 	audience := ""

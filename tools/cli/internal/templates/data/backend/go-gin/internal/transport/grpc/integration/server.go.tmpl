@@ -2,18 +2,18 @@ package integration
 
 import (
 	integrationService "{{ .BackendModulePath }}/internal/services/integration"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"google.golang.org/grpc"
 )
 
 // Server 提供 integration gRPC 服务注册入口。
 type Server struct {
 	dispatch *integrationService.DispatchService
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 }
 
 // NewServer 构造 integration gRPC 服务。
-func NewServer(dispatch *integrationService.DispatchService, logger *logrus.Entry) *Server {
+func NewServer(dispatch *integrationService.DispatchService, logger *pxlog.Entry) *Server {
 	return &Server{
 		dispatch: dispatch,
 		logger:   logger,
@@ -33,9 +33,9 @@ func (s *Server) Register(registrar grpc.ServiceRegistrar) {
 	s.log().Info("integration gRPC dispatch server registered (placeholder)")
 }
 
-func (s *Server) log() *logrus.Entry {
+func (s *Server) log() *pxlog.Entry {
 	if s.logger != nil {
 		return s.logger
 	}
-	return logrus.WithField("component", "integration.grpc")
+	return pxlog.WithField("component", "integration.grpc")
 }

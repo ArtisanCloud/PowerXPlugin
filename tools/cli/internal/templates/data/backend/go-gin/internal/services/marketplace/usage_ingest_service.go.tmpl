@@ -10,7 +10,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
 	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // UsageMetricInput captures a single metric within an ingest request.
@@ -44,15 +44,15 @@ type UsageIngestService struct {
 	usageRepo        UsageDataRepository
 	licenseRepo      LicenseRepositoryReader
 	analytics        *AnalyticsService
-	logger           *logrus.Entry
+	logger           *pxlog.Entry
 	payloadThreshold int64
 }
 
 // NewUsageIngestService constructs usage ingest service.
-func NewUsageIngestService(cfg *config.Config, usageRepo UsageDataRepository, licenseRepo LicenseRepositoryReader, listingRepo ListingRepositoryReader, analytics *AnalyticsService, logger *logrus.Entry) *UsageIngestService {
+func NewUsageIngestService(cfg *config.Config, usageRepo UsageDataRepository, licenseRepo LicenseRepositoryReader, listingRepo ListingRepositoryReader, analytics *AnalyticsService, logger *pxlog.Entry) *UsageIngestService {
 	_ = listingRepo
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_usage_ingest_service")
+		logger = pxlog.New().WithField("component", "marketplace_usage_ingest_service")
 	}
 	threshold := int64(1 << 20)
 	if cfg != nil {

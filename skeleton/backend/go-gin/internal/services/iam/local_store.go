@@ -149,6 +149,66 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 	return tokens, userCtx, nil
 }
 
+func (d *LocalDirectory) LoginByFederated(ctx context.Context, req FederatedLoginRequest) (*AuthTokens, *UserContext, error) {
+	tenantUUID := strings.TrimSpace(req.TenantUUID)
+	if tenantUUID == "" || req.MemberID == 0 {
+		return nil, nil, ErrInvalidArguments
+	}
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, nil, err
+	}
+	resolvedTenant := tenantIdentifier(tenant)
+	var member iamm.Member
+	if err := d.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", req.MemberID, resolvedTenant).First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrUnauthorized
+		}
+		return nil, nil, err
+	}
+	var user iamm.User
+	if err := d.db.WithContext(ctx).Where("id = ?", member.UserID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, ErrUnauthorized
+		}
+		return nil, nil, err
+	}
+	roles, perms, err := d.loadRolePermissionCodes(ctx, member.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("iam: load roles: %w", err)
+	}
+	deptIDs := []uint64{}
+	if member.DepartmentID != nil {
+		deptIDs = append(deptIDs, *member.DepartmentID)
+	}
+	userCtx := &UserContext{
+		TenantUUID:    resolvedTenant,
+		TenantUuid:    resolvedTenant,
+		TenantKey:     tenant.Key,
+		TenantName:    tenant.Name,
+		IsRoot:        user.IsRoot,
+		MemberID:      member.ID,
+		UserID:        user.ID,
+		Username:      member.Username,
+		Email:         user.Email,
+		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
+		Roles:         roles,
+		Permissions:   perms,
+		DepartmentIDs: deptIDs,
+		PolicyVersion: d.policyVersion,
+		PluginID:      d.pluginID,
+		IssuedAt:      time.Now(),
+	}
+	tokens, err := d.issueTokens(userCtx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := d.persistRefreshToken(ctx, userCtx, tokens.RefreshToken); err != nil {
+		return nil, nil, err
+	}
+	return tokens, userCtx, nil
+}
+
 func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*AuthTokens, error) {
 	if strings.TrimSpace(refreshToken) == "" {
 		return nil, ErrInvalidArguments
@@ -346,7 +406,12 @@ func (d *LocalDirectory) resolveTenant(ctx context.Context, key string) (*iamm.T
 		search = d.defaultTenantKey
 	}
 	var tenant iamm.Tenant
-	if err := d.db.WithContext(ctx).Where("lower(key) = ?", search).First(&tenant).Error; err != nil {
+	query := d.db.WithContext(ctx).Model(&iamm.Tenant{}).
+		Where("lower(key) = ? OR uuid = ?", search, search)
+	if id, err := strconv.ParseUint(search, 10, 64); err == nil && id > 0 {
+		query = query.Or("id = ?", id)
+	}
+	if err := query.First(&tenant).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUnauthorized
 		}

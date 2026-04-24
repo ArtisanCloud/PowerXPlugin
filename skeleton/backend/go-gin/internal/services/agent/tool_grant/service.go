@@ -11,7 +11,7 @@ import (
 	tgrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/tool_grant"
 	seclog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -20,11 +20,11 @@ import (
 type Service struct {
 	repo       *tgrepo.Repository
 	cfg        *config.Config
-	logger     *logrus.Entry
+	logger     *pxlog.Entry
 	signingKey []byte
 }
 
-func NewService(db *gorm.DB, cfg *config.Config, logger *logrus.Entry, signingKey []byte) *Service {
+func NewService(db *gorm.DB, cfg *config.Config, logger *pxlog.Entry, signingKey []byte) *Service {
 	return &Service{
 		repo:       tgrepo.NewRepository(db),
 		cfg:        cfg,

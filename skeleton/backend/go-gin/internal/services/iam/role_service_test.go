@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -123,6 +124,66 @@ func TestRoleService_AssignMembers(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected 1 role member after removal, got %d", count)
+	}
+}
+
+func TestRoleService_AddMembersTenantMismatch(t *testing.T) {
+	db := newRoleServiceTestDB(t)
+	ctx := context.Background()
+	svc := NewRoleService(db, NewAuditService(db), "test.plugin")
+	tenant := seedTestTenant(t, db, "tenant-mismatch")
+	members := seedTestMembers(t, db, tenant, 1)
+
+	role := &iamm.Role{
+		BaseModel:     basemodels.BaseModel{TenantUuid: tenant.UUID},
+		Code:          "mismatch.role",
+		Name:          "Mismatch Role",
+		ScopeType:     iamm.RoleScopeTenant,
+		PolicyVersion: "pv-init",
+	}
+	if err := db.Create(role).Error; err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+
+	err := svc.AddMembers(ctx, RoleMembersInput{
+		RoleID:     role.ID,
+		TenantUUID: "another-tenant",
+		MemberIDs:  []uint64{members[0].ID},
+	})
+	if !errors.Is(err, ErrPermissionDenied) {
+		t.Fatalf("expected ErrPermissionDenied, got %v", err)
+	}
+}
+
+func TestRoleService_AddMembersRejectCrossTenantMember(t *testing.T) {
+	db := newRoleServiceTestDB(t)
+	ctx := context.Background()
+	svc := NewRoleService(db, NewAuditService(db), "test.plugin")
+	tenantA := seedTestTenant(t, db, "tenant-a")
+	tenantB := seedTestTenant(t, db, "tenant-b")
+
+	role := &iamm.Role{
+		BaseModel:     basemodels.BaseModel{TenantUuid: tenantA.UUID},
+		Code:          "cross.role",
+		Name:          "Cross Role",
+		ScopeType:     iamm.RoleScopeTenant,
+		PolicyVersion: "pv-init",
+	}
+	if err := db.Create(role).Error; err != nil {
+		t.Fatalf("create role: %v", err)
+	}
+
+	memberB := seedTestMembers(t, db, tenantB, 1)[0]
+	err := svc.AddMembers(ctx, RoleMembersInput{
+		RoleID:     role.ID,
+		TenantUUID: tenantA.UUID,
+		MemberIDs:  []uint64{memberB.ID},
+	})
+	if err == nil {
+		t.Fatalf("expected error for cross-tenant member bind")
+	}
+	if !strings.Contains(err.Error(), "do not belong to tenant") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

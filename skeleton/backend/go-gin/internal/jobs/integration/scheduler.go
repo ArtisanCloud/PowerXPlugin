@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // Job 描述一个可周期执行的后台任务。
@@ -43,7 +43,7 @@ func (j JobFunc) Run(ctx context.Context) error {
 
 // Scheduler 负责调度 Integration 背景任务。
 type Scheduler struct {
-	logger     *logrus.Entry
+	logger     *pxlog.Entry
 	dispatcher EventDispatcher
 
 	mu      sync.Mutex
@@ -54,9 +54,9 @@ type Scheduler struct {
 }
 
 // NewScheduler 构造 Scheduler。
-func NewScheduler(logger *logrus.Entry) *Scheduler {
+func NewScheduler(logger *pxlog.Entry) *Scheduler {
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.scheduler")
+		logger = pxlog.WithField("component", "integration.scheduler")
 	}
 	return &Scheduler{
 		logger: logger,
@@ -160,7 +160,7 @@ func (s *Scheduler) runJob(ctx context.Context, job Job) {
 	}
 }
 
-func (s *Scheduler) execute(ctx context.Context, job Job, logger *logrus.Entry) {
+func (s *Scheduler) execute(ctx context.Context, job Job, logger *pxlog.Entry) {
 	defer func() {
 		if r := recover(); r != nil {
 			logger.WithField("panic", r).Error("integration job panicked")

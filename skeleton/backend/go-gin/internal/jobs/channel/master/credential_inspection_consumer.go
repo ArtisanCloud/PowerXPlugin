@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/channel"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
@@ -12,9 +12,9 @@ import (
 
 // HandleCredentialInspectionEvent is a minimal "job -> consumer" migration example:
 // instead of the job writing DB/log directly, the dispatcher calls this consumer handler.
-func HandleCredentialInspectionEvent(logger *logrus.Entry) func(context.Context, event.Event) error {
+func HandleCredentialInspectionEvent(logger *pxlog.Entry) func(context.Context, event.Event) error {
 	if logger == nil {
-		logger = logrus.NewEntry(logrus.StandardLogger())
+		logger = pxlog.NewEntry(pxlog.StandardLogger())
 	}
 
 	return func(ctx context.Context, ev event.Event) error {
@@ -23,7 +23,7 @@ func HandleCredentialInspectionEvent(logger *logrus.Entry) func(context.Context,
 			return err
 		}
 
-		logger.WithFields(logrus.Fields{
+		logger.WithFields(pxlog.Fields{
 			"topic":          string(ev.Topic),
 			"tenant_uuid":    ev.Meta.TenantUUID,
 			"trace_id":       ev.Meta.TraceID,

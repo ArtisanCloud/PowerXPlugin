@@ -1,11 +1,12 @@
 <!-- /components/settings/users/UsersShell.vue -->
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted } from "vue";
 import { storeToRefs } from "pinia";
 import UsersRoot from "./UsersRoot.vue";
 import UsersTenantAdmin from "./UsersTenantAdmin.vue";
-import UsersTenantMember from "./UsersTenantMember.vue";
 import { useUserStore } from "~/stores/user";
+
+const props = withDefaults(defineProps<{ readonly?: boolean }>(), { readonly: false });
 
 // 使用用户状态 Store
 const userStore = useUserStore();
@@ -15,13 +16,13 @@ const {
   currentTenantUuid,
   isLoading,
   error,
-  displayName,
-  avatarUrl,
 } = storeToRefs(userStore);
 
 // 计算当前视图类型
 const view = computed(() => {
-  if (isRoot.value) return "root";
+  if (isRoot.value) {
+    return currentTenantUuid.value ? "admin" : "root";
+  }
   if (isCurrentTenantAdmin.value) return "admin";
   return "member";
 });
@@ -82,8 +83,9 @@ onMounted(async () => {
       <UsersTenantAdmin
         v-else-if="view === 'admin'"
         :tenant-uuid="currentTenantUuid!"
+        :readonly="props.readonly"
       />
-      <UsersTenantMember v-else />
+      <UsersTenantAdmin v-else :tenant-uuid="currentTenantUuid!" :readonly="true" />
     </div>
   </div>
 </template>

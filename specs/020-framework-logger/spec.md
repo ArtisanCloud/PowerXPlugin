@@ -1,0 +1,136 @@
+# Feature Specification: Framework 统一日志适配
+
+**Feature Branch**: `020-framework-logger`  
+**Created**: 2026-04-23  
+**Status**: Draft  
+**Input**: User description: "统一 framework 日志门面，对接 PowerX 多日志源策略（stdout/file/loki 并行），宿主模式默认 stdout+json 并保持 trace_id/tenant_uuid 等字段一致性"
+
+## Clarifications
+
+### Session 2026-04-23
+
+- Q: 宿主模式下的日志出站边界采用哪种策略？ → A: 宿主模式默认仅 stdout（交给 PowerX 汇聚），file/loki 需显式白名单或特批。
+- Q: 低基数标签的平台统一基线采用哪种策略？ → A: 固定标签仅 plugin_id、tenant_uuid、component、level，其余字段全部放日志内容。
+- Q: 业务日期字段口径采用哪种策略？ → A: 记录标准时间戳（UTC）+ biz_date + biz_tz（业务时区）。
+- Q: 日志目标故障时的主链路保障级别采用哪种策略？ → A: 目标独立降级，业务不中断；失败目标记录告警并重试。
+- Q: 遗留直写日志的治理时限采用哪种策略？ → A: 分阶段治理，先告警与审计，设定截止版本后强制阻断。
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - 宿主模式统一采集 (Priority: P1)
+
+作为插件开发者，我希望插件只调用 framework 的统一日志能力，并在宿主模式下自动遵循 PowerX 下发的日志策略，使插件日志能够与宿主日志按同一上下文字段联查。
+
+**Why this priority**: 这是跨插件一致性与运维可观测性的基础能力，直接影响线上问题定位效率与平台治理能力。
+
+**Independent Test**: 在宿主模式下部署任意插件，触发多类业务日志并在集中日志平台检索，可验证日志字段统一、链路可追踪、无需插件自定义日志实现。
+
+**Acceptance Scenarios**:
+
+1. **Given** 插件运行在宿主模式，且 PowerX 下发日志策略，**When** 插件记录业务日志，**Then** 日志必须通过 framework 统一输出并符合策略指定的输出目标与格式。
+2. **Given** 请求携带追踪上下文，**When** 插件在同一业务流程中记录多条日志，**Then** 日志必须可通过同一追踪标识完成端到端关联查询。
+
+---
+
+### User Story 2 - 多日志源并行路由 (Priority: P2)
+
+作为平台运维人员，我希望 PowerX 可以为插件配置多个日志目标并行输出，以满足不同审计、归档与检索场景，而不需要改插件代码。
+
+**Why this priority**: 多目标并行是平台级日志治理能力，可降低日志链路单点风险并满足不同团队的消费需求。
+
+**Independent Test**: 配置多个日志目标后触发日志事件，验证各目标均收到同一结构化日志；单一目标异常时其余目标持续可用。
+
+**Acceptance Scenarios**:
+
+1. **Given** 平台为插件配置多个日志目标，**When** 插件产生日志，**Then** framework 必须将同一日志事件并行输出到所有已启用目标。
+2. **Given** 多目标中的一个目标暂时不可用，**When** 插件持续记录日志，**Then** 其余目标输出不得中断，且失败目标需产生可观测的失败记录。
+
+---
+
+### User Story 3 - 本地调试与迁移治理 (Priority: P3)
+
+作为插件维护者，我希望在独立开发场景中可按平台策略切换日志行为，并通过统一规范逐步替换历史直写日志代码。
+
+**Why this priority**: 能降低历史插件迁移成本，避免一次性重构风险，同时保证最终规范一致。
+
+**Independent Test**: 在不修改业务逻辑的前提下切换运行模式或日志策略，验证日志输出行为按策略变化；对遗留插件进行兼容接入后行为一致。
+
+**Acceptance Scenarios**:
+
+1. **Given** 插件使用 framework 统一日志接口，**When** 运行模式或日志策略发生变化，**Then** 插件代码无需修改即可生效。
+2. **Given** 插件仍存在直写日志行为，**When** 执行规范检查，**Then** 能识别违规点并给出迁移提示。
+
+### Edge Cases
+
+- 当平台下发的日志策略缺失或无效时，系统必须回退到可用且可观测的默认策略，避免日志静默丢失。
+- 当请求缺少追踪上下文字段时，系统必须补齐可追踪的替代标识并标注来源状态。
+- 当日志字段包含高基数标识或敏感信息时，系统必须按统一规则进行字段降维、脱敏或禁止作为索引标签。
+- 当日志吞吐突增时，系统必须避免日志链路阻塞主业务流程。
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: 系统必须提供 framework 级统一日志入口，插件业务代码通过该入口记录日志。
+- **FR-002**: 系统必须支持由 PowerX 下发日志策略并在运行时生效，插件无需改代码。
+- **FR-003**: 系统必须支持多个日志目标并行输出，同一日志事件在各目标保持统一语义。
+- **FR-004**: 系统必须在宿主模式下默认采用平台统一采集友好的结构化标准输出策略，其他直连日志目标仅可在显式授权条件下启用。
+- **FR-005**: 系统必须支持独立开发场景下的可配置日志输出策略，满足本地排障需要。
+- **FR-006**: 系统必须在日志中自动注入统一上下文字段，至少包含插件标识、租户标识、追踪标识、组件标识、事件标识与时间字段。
+- **FR-007**: 系统必须保证日志字段规范在不同插件间一致，支持跨插件联查。
+- **FR-008**: 系统必须定义低基数字段与高基数字段的使用边界，且平台固定标签仅包含 plugin_id、tenant_uuid、component、level，其余字段作为日志内容字段存储。
+- **FR-009**: 系统必须保证任一日志目标失败时不会阻断其他目标输出，并对失败目标执行告警记录与重试策略。
+- **FR-010**: 系统必须提供对遗留直写日志行为的识别与治理机制，并采用分阶段治理策略：先告警与审计，达到截止版本后执行强制阻断。
+- **FR-011**: 系统必须支持按平台策略附加标准时间戳（UTC）与业务日期字段，并携带业务时区信息，保证跨时区统计口径一致。
+- **FR-012**: 系统必须确保日志能力切换不会引入业务接口行为回归。
+
+## Implementation Notes (2026-04-23)
+
+- 已落地 framework 统一日志门面与路由结果模型：`success/failed/retrying/dropped`。
+- 宿主模式策略默认 `stdout + json`，`file/loki` 需进入 `authorized_extra_sinks`。
+- 管理端已提供：
+  - `GET /api/v1/admin/runtime/logging/policy`
+  - `PUT /api/v1/admin/runtime/logging/policy`
+  - `POST /api/v1/admin/runtime/logging/probe`
+- runtime logging 成功响应采用 PowerX 监控契约：`code/message/data`（`code=0` 表示成功）。
+- 治理策略支持：
+  - `governance_mode=detect|warn|block`
+  - `governance_deadline_version`
+  - `plugin_version`
+  - 截止版本到达后可触发阻断判定（即使模式为 `warn`）。
+- CI 回归脚本已接入治理扫描：`scripts/testing/framework-logger-guard.sh`。
+
+## Governance Policy (P3)
+
+- 扫描对象：framework/skeleton Go 代码中的遗留直写日志模式（direct logrus/zap/file）。
+- 状态机：
+  - `detected`：仅检测
+  - `warned`：检测并告警（默认）
+  - `blocked`：检测即阻断（非零退出）
+  - `resolved`：无违规
+- 阶段化治理：
+  - 截止版本前：`detect/warn` 可继续交付但必须跟踪整改
+  - 截止版本后：未整改违规进入 `blocked`
+
+### Key Entities *(include if feature involves data)*
+
+- **日志策略 (Log Policy)**: 由平台下发并被 framework 消费的配置对象，定义目标列表、格式、级别、模式与回退规则。
+- **日志事件 (Log Event)**: 插件在业务流程中产生的标准化记录单元，包含消息、级别、上下文字段、标准时间戳与业务日期/业务时区字段，以及扩展业务字段。
+- **日志目标 (Log Sink)**: 日志事件输出的目的端抽象，支持并行路由与独立失败处理。
+- **路由结果 (Route Outcome)**: 单条日志在多目标输出后的执行结果，用于可观测性与故障诊断。
+
+### Assumptions & Dependencies
+
+- PowerX 能以统一方式向插件运行时注入日志策略。
+- 宿主侧已有稳定日志采集链路，插件日志可与宿主日志进入同一检索体系。
+- 插件团队接受“统一日志入口优先”的治理要求，并分阶段迁移历史代码。
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: 100% 新增插件日志调用通过 framework 统一日志入口，不再新增直写日志通道，且在治理截止版本后直写日志违规数为 0。
+- **SC-002**: 在宿主模式下，95% 以上抽样日志可在统一检索体系中通过追踪标识完成跨组件关联。
+- **SC-003**: 在启用多目标并行输出时，单目标故障不影响其余目标的日志可见性，且主业务请求成功率不因日志链路异常下降；失败目标可被告警并进入重试流程。
+- **SC-004**: 完成首批迁移后，跨插件日志字段一致性检查通过率达到 100%。
+- **SC-005**: 运维侧定位“插件与宿主联动问题”的平均排障时间较现状下降至少 30%。

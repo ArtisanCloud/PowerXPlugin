@@ -15,7 +15,6 @@ import (
 
 	"{{ .BackendModulePath }}/internal/capabilities"
 	"{{ .BackendModulePath }}/internal/logger"
-	"github.com/sirupsen/logrus"
 )
 
 // CapabilityClient implements capabilities.HostSyncClient against PowerX REST endpoints.
@@ -23,11 +22,11 @@ type CapabilityClient struct {
 	baseURL    string
 	token      string
 	httpClient *http.Client
-	logger     *logrus.Entry
+	logger     *logger.Entry
 }
 
 // NewCapabilityClient creates a client with explicit base URL/token.
-func NewCapabilityClient(baseURL, token string, log *logrus.Entry) capabilities.HostSyncClient {
+func NewCapabilityClient(baseURL, token string, log *logger.Entry) capabilities.HostSyncClient {
 	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if base == "" {
 		return nil
@@ -48,7 +47,7 @@ func NewCapabilityClient(baseURL, token string, log *logrus.Entry) capabilities.
 }
 
 // NewCapabilityClientFromEnv builds a client using standard environment variables.
-func NewCapabilityClientFromEnv(log *logrus.Entry) capabilities.HostSyncClient {
+func NewCapabilityClientFromEnv(log *logger.Entry) capabilities.HostSyncClient {
 	base := fallbackEnv(
 		"POWERX_CAPABILITY_SYNC_ENDPOINT",
 		"PX_DEV_API_BASEURL",
@@ -112,7 +111,7 @@ func (c *CapabilityClient) RegisterCatalog(ctx context.Context, catalog *capabil
 		c.logger.WithError(err).Warn("capability sync response decode failed")
 	}
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(logger.Fields{
 		"plugin_id": catalog.PluginID,
 		"duration":  elapsed,
 		"assets":    len(payload.Assets),

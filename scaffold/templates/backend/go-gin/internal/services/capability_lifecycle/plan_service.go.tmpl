@@ -15,7 +15,6 @@ import (
 	"{{ .BackendModulePath }}/internal/observability/capability"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 const lifecycleStorage = "../../contracts/exposure/capability-lifecycle.json"
@@ -33,7 +32,7 @@ var allowedStatuses = []string{"draft", "pending", "approved", "paused", "comple
 
 // PlanService manages lifecycle plans for capability changes.
 type PlanService struct {
-	logger      *logrus.Entry
+	logger      *logger.Entry
 	notifier    capability.Notifier
 	mu          sync.RWMutex
 	plans       map[string]*LifecyclePlan
@@ -98,7 +97,7 @@ type StatusInput struct {
 
 // NewPlanService returns an instance backed by JSON storage.
 func NewPlanService(deps *app.Deps) *PlanService {
-	var log *logrus.Entry
+	var log *logger.Entry
 	if deps != nil {
 		log = deps.RuntimeLogger(deps.Ctx, "capability_lifecycle_service", nil)
 	}

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -33,11 +33,11 @@ type SchedulerEventDispatcher struct {
 	emitter    fweventbridge.Emitter
 	meta       event.MetaBuilder
 	tenantUUID string
-	logger     *logrus.Entry
+	logger     *pxlog.Entry
 }
 
 // NewSchedulerEventDispatcher constructs a dispatcher backed by EventEmitter.
-func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitter, logger *logrus.Entry) *SchedulerEventDispatcher {
+func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitter, logger *pxlog.Entry) *SchedulerEventDispatcher {
 	sourcePlugin := app.PluginID
 	payloadVersion := "v1"
 	tenantUUID := defaultSchedulerTenantUUID
@@ -62,7 +62,7 @@ func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitt
 	}
 
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.scheduler_dispatcher")
+		logger = pxlog.WithField("component", "integration.scheduler_dispatcher")
 	}
 
 	return &SchedulerEventDispatcher{
@@ -107,7 +107,7 @@ func (d *SchedulerEventDispatcher) DispatchCronTrigger(ctx context.Context, jobN
 	})
 	if err != nil {
 		if d.logger != nil {
-			d.logger.WithError(err).WithFields(logrus.Fields{
+			d.logger.WithError(err).WithFields(pxlog.Fields{
 				"topic":    SchedulerTriggeredTopic,
 				"trace_id": traceID,
 				"job_name": jobName,

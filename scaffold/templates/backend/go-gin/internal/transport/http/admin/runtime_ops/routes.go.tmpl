@@ -38,4 +38,10 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	scheduler.POST("/dispatches/:dispatchId/retry", schedulerRetry.Retry)
 	scheduler.POST("/dispatches/:dispatchId/pause", schedulerRetry.Pause)
 	scheduler.POST("/tickets/:ticketId/resume", schedulerRetry.Resume)
+
+	loggingPolicyHandler := NewLoggingPolicyHandler()
+	logging := router.Group("/logging")
+	logging.GET("/policy", loggingPolicyHandler.Get)
+	logging.PUT("/policy", loggingPolicyHandler.Put)
+	logging.POST("/probe", LoggingProbeHandler())
 }

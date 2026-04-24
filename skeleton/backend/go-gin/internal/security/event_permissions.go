@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gopkg.in/yaml.v3"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
@@ -84,7 +84,7 @@ type pluginManifest struct {
 	} `yaml:"events"`
 }
 
-func LoadEventPermissionsFromManifest(manifestPath string, logger *logrus.Entry) (EventPermissions, error) {
+func LoadEventPermissionsFromManifest(manifestPath string, logger *pxlog.Entry) (EventPermissions, error) {
 	manifestPath = strings.TrimSpace(manifestPath)
 	if manifestPath == "" {
 		manifestPath = defaultManifestPath()
@@ -234,15 +234,15 @@ func defaultManifestPath() string {
 type PermissionedEmitter struct {
 	inner  fweventbridge.Emitter
 	perms  EventPermissions
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
-func NewPermissionedEmitter(inner fweventbridge.Emitter, perms EventPermissions, logger *logrus.Entry) fweventbridge.Emitter {
+func NewPermissionedEmitter(inner fweventbridge.Emitter, perms EventPermissions, logger *pxlog.Entry) fweventbridge.Emitter {
 	if inner == nil {
 		return nil
 	}
 	if logger == nil {
-		logger = logrus.NewEntry(logrus.StandardLogger())
+		logger = pxlog.NewEntry(pxlog.StandardLogger())
 	}
 	return &PermissionedEmitter{
 		inner:  inner,
@@ -257,7 +257,7 @@ func (e *PermissionedEmitter) Emit(ctx context.Context, ev event.Event) error {
 	}
 	topic := strings.TrimSpace(string(ev.Topic))
 	if !e.perms.CanPublish(topic) {
-		e.logger.WithFields(logrus.Fields{
+		e.logger.WithFields(pxlog.Fields{
 			"topic":       topic,
 			"tenant_uuid": ev.Meta.TenantUUID,
 			"trace_id":    ev.Meta.TraceID,

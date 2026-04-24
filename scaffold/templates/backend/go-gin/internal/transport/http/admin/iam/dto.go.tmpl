@@ -49,22 +49,24 @@ type MemberListQuery struct {
 }
 
 type CreateMemberRequest struct {
-	TenantUUID   string   `json:"tenant_uuid"`
-	Email        string   `json:"email" binding:"required"`
-	DisplayName  string   `json:"display_name"`
-	Username     string   `json:"username"`
-	Phone        string   `json:"phone"`
-	DepartmentID *uint64  `json:"department_id"`
-	Status       string   `json:"status"`
-	Roles        []uint64 `json:"roles"`
+	TenantUUID    string   `json:"tenant_uuid"`
+	Email         string   `json:"email" binding:"required"`
+	DisplayName   string   `json:"display_name"`
+	Username      string   `json:"username"`
+	Phone         string   `json:"phone"`
+	DepartmentID  *uint64  `json:"department_id"`
+	DepartmentIDs []uint64 `json:"department_ids"`
+	Status        string   `json:"status"`
+	Roles         []uint64 `json:"roles"`
 }
 
 type UpdateMemberRequest struct {
-	DisplayName  string   `json:"display_name"`
-	Status       string   `json:"status"`
-	DepartmentID *uint64  `json:"department_id"`
-	Roles        []uint64 `json:"roles"`
-	ReplaceRoles bool     `json:"replace_roles"`
+	DisplayName   string   `json:"display_name"`
+	Status        string   `json:"status"`
+	DepartmentID  *uint64  `json:"department_id"`
+	DepartmentIDs []uint64 `json:"department_ids"`
+	Roles         []uint64 `json:"roles"`
+	ReplaceRoles  bool     `json:"replace_roles"`
 }
 
 type BulkImportMemberEntry struct {

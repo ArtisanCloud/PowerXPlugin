@@ -1,0 +1,44 @@
+package iam
+
+import (
+	"time"
+
+	models "{{ .BackendModulePath }}/internal/entity/models"
+	"gorm.io/datatypes"
+)
+
+const (
+	ChannelSyncProviderWeCom    = "wecom"
+	ChannelSyncProviderDingTalk = "dingtalk"
+	ChannelSyncProviderLark     = "lark"
+
+	ChannelSyncActionRefreshStatus   = "refresh_status"
+	ChannelSyncActionPullDepartments = "pull_departments"
+	ChannelSyncActionPullMembers     = "pull_members"
+	ChannelSyncActionFullSync        = "full_sync"
+
+	ChannelSyncStatusQueued  = "queued"
+	ChannelSyncStatusRunning = "running"
+	ChannelSyncStatusSuccess = "success"
+	ChannelSyncStatusFailed  = "failed"
+)
+
+type ChannelSyncTask struct {
+	ID             string            `gorm:"column:id;type:text;primaryKey" json:"id"`
+	TenantUuid     string            `gorm:"column:tenant_uuid;type:text;not null;index:idx_sync_task_tenant_provider_created,priority:1" json:"tenant_uuid"`
+	Provider       string            `gorm:"column:provider;type:text;not null;index:idx_sync_task_tenant_provider_created,priority:2" json:"provider"`
+	Action         string            `gorm:"column:action;type:text;not null" json:"action"`
+	Status         string            `gorm:"column:status;type:text;not null;index" json:"status"`
+	Summary        string            `gorm:"column:summary;type:text" json:"summary,omitempty"`
+	ErrorMessage   string            `gorm:"column:error_message;type:text" json:"error_message,omitempty"`
+	RequestPayload datatypes.JSONMap `gorm:"column:request_payload;type:jsonb" json:"request_payload,omitempty"`
+	ResultPayload  datatypes.JSONMap `gorm:"column:result_payload;type:jsonb" json:"result_payload,omitempty"`
+	StartedAt      *time.Time        `gorm:"column:started_at" json:"started_at,omitempty"`
+	FinishedAt     *time.Time        `gorm:"column:finished_at" json:"finished_at,omitempty"`
+	CreatedAt      time.Time         `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time         `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+}
+
+func (ChannelSyncTask) TableName() string {
+	return models.S(models.TableIAMChannelSyncTasks)
+}

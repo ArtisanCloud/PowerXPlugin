@@ -1,0 +1,15 @@
+package models
+
+import EntityModels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+
+const (
+	TableIAMFederatedExternalIdentities = "iam_federated_external_identities"
+	TableIAMFederatedBindings           = "iam_federated_bindings"
+	TableIAMFederatedChallenges         = "iam_federated_challenges"
+	TableIAMFederatedRiskEvents         = "iam_federated_risk_events"
+)
+
+// S 复用统一 schema 包装函数，保证表名前缀一致。
+func S(table string) string {
+	return EntityModels.S(table)
+}

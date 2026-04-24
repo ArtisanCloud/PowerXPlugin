@@ -2,19 +2,21 @@ package runtime_ops
 
 import (
 	"net/http"
+	"strings"
 	"sync"
-	"time"
 
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"{{ .BackendModulePath }}/internal/contracts"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
 type LoggingPolicyHandler struct{}
 
 var (
-	loggingPolicyMu sync.RWMutex
-	loggingPolicy   = runtimelogging.ResolveWithHostDefaults(runtimelogging.DefaultPolicy())
+	loggingPolicyMu       sync.RWMutex
+	loggingDefaultPolicy  = runtimelogging.ResolveWithHostDefaults(runtimelogging.DefaultPolicy())
+	loggingPolicyByTenant = map[string]runtimelogging.Policy{}
 )
 
 func NewLoggingPolicyHandler() *LoggingPolicyHandler {
@@ -22,6 +24,7 @@ func NewLoggingPolicyHandler() *LoggingPolicyHandler {
 }
 
 type loggingPolicyRequest struct {
+	TenantUUID           string   `json:"tenant_uuid"`
 	PolicyVersion        string   `json:"policy_version"`
 	Mode                 string   `json:"mode"`
 	Sinks                []string `json:"sinks"`
@@ -35,17 +38,67 @@ type loggingPolicyRequest struct {
 	} `json:"retry"`
 }
 
-func (h *LoggingPolicyHandler) Get(c *gin.Context) {
+func policyKey(tenantUUID string) string {
+	key := strings.TrimSpace(tenantUUID)
+	if key == "" {
+		return "__global__"
+	}
+	return key
+}
+
+func currentLoggingPolicyForTenant(tenantUUID string) runtimelogging.Policy {
 	loggingPolicyMu.RLock()
-	policy := loggingPolicy
-	loggingPolicyMu.RUnlock()
-	contracts.ResponseSuccess(c, gin.H{"policy": policy})
+	defer loggingPolicyMu.RUnlock()
+	if policy, ok := loggingPolicyByTenant[policyKey(tenantUUID)]; ok {
+		return policy
+	}
+	return loggingDefaultPolicy
+}
+
+func setLoggingPolicyForTenant(tenantUUID string, policy runtimelogging.Policy) {
+	loggingPolicyMu.Lock()
+	defer loggingPolicyMu.Unlock()
+	loggingPolicyByTenant[policyKey(tenantUUID)] = policy
+}
+
+func resolvePolicyTenant(c *gin.Context, requested string) (tenantUUID string, mismatch bool) {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		if headerTenant := strings.TrimSpace(c.GetHeader("tenant_uuid")); headerTenant != "" {
+			requested = headerTenant
+		} else if queryTenant := strings.TrimSpace(c.Query("tenant_uuid")); queryTenant != "" {
+			requested = queryTenant
+		}
+	}
+	return admincommon.ResolveTenantUUIDStrict(c, requested)
+}
+
+func loggingPolicySuccess(c *gin.Context, data any) {
+	c.JSON(http.StatusOK, gin.H{
+		"code":    0,
+		"message": "ok",
+		"data":    data,
+	})
+}
+
+func (h *LoggingPolicyHandler) Get(c *gin.Context) {
+	tenantUUID, mismatch := resolvePolicyTenant(c, "")
+	if mismatch {
+		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
+		return
+	}
+	loggingPolicySuccess(c, currentLoggingPolicyForTenant(tenantUUID))
 }
 
 func (h *LoggingPolicyHandler) Put(c *gin.Context) {
 	var req loggingPolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid payload")
+		return
+	}
+	tenantUUID, mismatch := resolvePolicyTenant(c, req.TenantUUID)
+	if mismatch {
+		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
 		return
 	}
 	p := runtimelogging.Policy{
@@ -71,12 +124,6 @@ func (h *LoggingPolicyHandler) Put(c *gin.Context) {
 		return
 	}
 
-	loggingPolicyMu.Lock()
-	loggingPolicy = p
-	loggingPolicyMu.Unlock()
-	c.JSON(http.StatusAccepted, contracts.MakeSuccess(gin.H{
-		"accepted":     true,
-		"policy":       p,
-		"effective_at": time.Now().UTC(),
-	}, "", c.GetString("request_id")))
+	setLoggingPolicyForTenant(tenantUUID, p)
+	loggingPolicySuccess(c, p)
 }

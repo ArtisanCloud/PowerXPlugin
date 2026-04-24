@@ -2,6 +2,7 @@ package runtime_ops
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
 
@@ -35,9 +36,12 @@ func LoggingProbeHandler() gin.HandlerFunc {
 			contracts.ResponseBadRequest(c, "invalid payload")
 			return
 		}
-		loggingPolicyMu.RLock()
-		policy := loggingPolicy
-		loggingPolicyMu.RUnlock()
+		tenantUUID, mismatch := resolvePolicyTenant(c, req.TenantUUID)
+		if mismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
+			return
+		}
+		policy := currentLoggingPolicyForTenant(tenantUUID)
 
 		registry := runtimelogging.NewSinkRegistry()
 		_ = registry.Register(&probeSink{name: runtimelogging.SinkStdout})
@@ -58,7 +62,7 @@ func LoggingProbeHandler() gin.HandlerFunc {
 			fields = runtimelogging.Fields{}
 		}
 		fields[runtimelogging.FieldTraceID] = traceID
-		fields[runtimelogging.FieldTenantUUID] = strings.TrimSpace(req.TenantUUID)
+		fields[runtimelogging.FieldTenantUUID] = tenantUUID
 		fields[runtimelogging.FieldComponent] = strings.TrimSpace(req.Component)
 		fields[runtimelogging.FieldPluginID] = app.PluginID
 		if req.Event != "" {
@@ -71,6 +75,6 @@ func LoggingProbeHandler() gin.HandlerFunc {
 			Fields:    fields,
 			Timestamp: time.Now().UTC(),
 		})
-		contracts.ResponseSuccess(c, gin.H{"trace_id": traceID, "outcomes": outcomes})
+		loggingPolicySuccess(c, gin.H{"trace_id": traceID, "outcomes": outcomes})
 	}
 }

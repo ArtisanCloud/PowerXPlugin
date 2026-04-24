@@ -287,3 +287,65 @@ func TestValidateSchedulerRetryMaxAttemptsRange(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadSupportsStandaloneLoggingPolicySwitch(t *testing.T) {
+	tempDir := t.TempDir()
+	configContent := "logging:\n  level: INFO\n  format: JSON\n  output: FILE\n  file_path: ./tmp/plugin.log\n"
+	configFile := filepath.Join(tempDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+
+	t.Setenv("CONFIG_PATH", tempDir)
+	t.Setenv("POWERX_PROXY", "0")
+	t.Setenv("POWERX_DEV_MODE", "true")
+	t.Setenv("POWERX_DB_DSN", "postgres://user:pass@127.0.0.1:5432/test?sslmode=disable")
+	t.Setenv("POWERX_DB_SCHEMA", "px_test")
+	t.Setenv("POWERX_LOG_OUTPUT", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.Logging.Output != "file" {
+		t.Fatalf("standalone 默认策略应保留 file 输出，实际 %q", cfg.Logging.Output)
+	}
+	if cfg.Logging.FilePath == "" {
+		t.Fatal("file 输出下 file_path 不应为空")
+	}
+
+	t.Setenv("POWERX_LOG_OUTPUT", "STDOUT")
+	cfg2, err := Load()
+	if err != nil {
+		t.Fatalf("再次加载配置失败: %v", err)
+	}
+	if cfg2.Logging.Output != "stdout" {
+		t.Fatalf("切换策略后 output 应为 stdout，实际 %q", cfg2.Logging.Output)
+	}
+}
+
+func TestShouldBlockLegacyLoggingByDeadline(t *testing.T) {
+	cfg := getDefaultConfig()
+	cfg.Logging.GovernanceMode = "warn"
+	cfg.Logging.GovernanceDeadlineVersion = "1.2.0"
+	cfg.Logging.PluginVersion = "1.1.9"
+	blocked, reason := cfg.ShouldBlockLegacyLogging()
+	if blocked {
+		t.Fatalf("截止版本前不应阻断，reason=%s", reason)
+	}
+
+	cfg.Logging.PluginVersion = "1.2.0"
+	blocked, reason = cfg.ShouldBlockLegacyLogging()
+	if !blocked {
+		t.Fatal("达到截止版本后应触发阻断")
+	}
+	if reason == "" {
+		t.Fatal("阻断原因不应为空")
+	}
+
+	cfg.Logging.GovernanceMode = "block"
+	blocked, _ = cfg.ShouldBlockLegacyLogging()
+	if !blocked {
+		t.Fatal("治理模式 block 应始终阻断")
+	}
+}

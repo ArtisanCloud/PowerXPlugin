@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // PrivacyService handles GDPR deletion workflows for marketplace usage data.
 type PrivacyService struct {
 	usageRepo UsageDataRepository
-	logger    *logrus.Entry
+	logger    *pxlog.Entry
 }
 
 // PurgeResult summarises deletion counts for usage data purge.
@@ -22,9 +22,9 @@ type PurgeResult struct {
 }
 
 // NewPrivacyService constructs the service.
-func NewPrivacyService(usageRepo UsageDataRepository, logger *logrus.Entry) *PrivacyService {
+func NewPrivacyService(usageRepo UsageDataRepository, logger *pxlog.Entry) *PrivacyService {
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_privacy_service")
+		logger = pxlog.New().WithField("component", "marketplace_privacy_service")
 	}
 	return &PrivacyService{
 		usageRepo: usageRepo,
@@ -52,7 +52,7 @@ func (s *PrivacyService) PurgeUsageData(ctx context.Context, tenantID, licenseID
 		return nil, err
 	}
 	if s.logger != nil {
-		s.logger.WithFields(logrus.Fields{
+		s.logger.WithFields(pxlog.Fields{
 			"tenant_uuid":          tenantID,
 			"license_id":         licenseID,
 			"cutoff":             cutoff.Format(time.RFC3339),

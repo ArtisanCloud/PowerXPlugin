@@ -21,6 +21,9 @@ echo "=== Regression workflow start ==="
 # Run smoke workflow first
 ./scripts/testing/smoke.sh
 
+echo "[R-0] Running framework logger governance guard"
+./scripts/testing/framework-logger-guard.sh ./skeleton/backend/go-gin ./framework/backend/go
+
 echo "[R-1] Running full Go test suite"
 go test ./framework/backend/go/... ./skeleton/backend/go-gin/... -coverprofile=tmp/coverage-regression.out
 go tool cover -html=tmp/coverage-regression.out -o tmp/coverage.html

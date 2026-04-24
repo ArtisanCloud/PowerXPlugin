@@ -14,7 +14,7 @@ import (
 	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
 	idrepo "{{ .BackendModulePath }}/internal/entity/repository/integration"
 	obsintegration "{{ .BackendModulePath }}/internal/observability/integration"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/datatypes"
 )
 
@@ -47,7 +47,7 @@ type DispatchService struct {
 	grants         *GrantMatrixService
 	idempotency    *idrepo.IdempotencyRepository
 	invoker        HostInvoker
-	logger         *logrus.Entry
+	logger         *pxlog.Entry
 	now            func() time.Time
 	payloadLimiter int64
 }
@@ -58,10 +58,10 @@ func NewDispatchService(
 	grants *GrantMatrixService,
 	idempotency *idrepo.IdempotencyRepository,
 	invoker HostInvoker,
-	logger *logrus.Entry,
+	logger *pxlog.Entry,
 ) *DispatchService {
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.dispatch_service")
+		logger = pxlog.WithField("component", "integration.dispatch_service")
 	}
 	payloadThreshold := int64(1 << 20) // default 1 MB
 	if cfg != nil {
@@ -202,7 +202,7 @@ func (s *DispatchService) handleIdempotencyClaim(
 		if latency := getStoredLatency(res.Record.Response); latency > 0 {
 			outcome.Latency = latency
 		}
-		s.logger.WithFields(logrus.Fields{
+		s.logger.WithFields(pxlog.Fields{
 			"idempotency_key": envelope.IdempotencyKey,
 			"tenant_uuid":     envelope.TenantUuid,
 			"tool_scope":      envelope.ToolScope,

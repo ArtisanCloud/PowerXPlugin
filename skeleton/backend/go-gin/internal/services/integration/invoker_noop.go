@@ -4,21 +4,21 @@ import (
 	"context"
 
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 type noopInvoker struct {
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
 // NewNoopInvoker 返回默认的宿主调用占位实现。
-func NewNoopInvoker(logger *logrus.Entry) HostInvoker {
+func NewNoopInvoker(logger *pxlog.Entry) HostInvoker {
 	return &noopInvoker{logger: logger}
 }
 
 func (n *noopInvoker) Invoke(_ context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
 	if n.logger != nil && envelope != nil {
-		n.logger.WithFields(logrus.Fields{
+		n.logger.WithFields(pxlog.Fields{
 			"tenant_uuid": envelope.TenantUuid,
 			"tool_scope":  envelope.ToolScope,
 		}).Debug("noop host invoker executed")

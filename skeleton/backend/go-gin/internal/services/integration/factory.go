@@ -7,16 +7,16 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
 	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // BuildDispatchService 根据应用依赖构造 DispatchService。
-func BuildDispatchService(deps *app.Deps, logger *logrus.Entry) *DispatchService {
+func BuildDispatchService(deps *app.Deps, logger *pxlog.Entry) *DispatchService {
 	if deps == nil {
 		return nil
 	}
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.dispatch_factory")
+		logger = pxlog.WithField("component", "integration.dispatch_factory")
 	}
 
 	loader := NewGrantMatrixLoader(

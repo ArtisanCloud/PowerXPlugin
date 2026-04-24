@@ -7,7 +7,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // RecommendationHandler exposes recommendation configuration and manual controls for admins.
@@ -15,13 +15,13 @@ type RecommendationHandler struct {
 	cfg      *config.Config
 	repo     *mrepo.ListingRepository
 	provider recommendation.MetricsProvider
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 }
 
 // NewRecommendationHandler constructs a handler instance.
-func NewRecommendationHandler(cfg *config.Config, repo *mrepo.ListingRepository, provider recommendation.MetricsProvider, logger *logrus.Entry) *RecommendationHandler {
+func NewRecommendationHandler(cfg *config.Config, repo *mrepo.ListingRepository, provider recommendation.MetricsProvider, logger *pxlog.Entry) *RecommendationHandler {
 	if logger == nil {
-		logger = logrus.New().WithField("component", "admin_marketplace_recommendation")
+		logger = pxlog.New().WithField("component", "admin_marketplace_recommendation")
 	}
 	return &RecommendationHandler{
 		cfg:      cfg,

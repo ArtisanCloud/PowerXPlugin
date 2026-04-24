@@ -13,7 +13,7 @@ import (
 	"time"
 
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gopkg.in/yaml.v3"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -49,7 +49,7 @@ type LoaderOptions struct {
 // GrantMatrixLoader 负责合并静态配置与数据库覆盖。
 type GrantMatrixLoader struct {
 	db        *gorm.DB
-	logger    *logrus.Entry
+	logger    *pxlog.Entry
 	staticFS  fs.FS
 	staticKey string
 	cacheTTL  time.Duration
@@ -60,7 +60,7 @@ type GrantMatrixLoader struct {
 }
 
 // NewGrantMatrixLoader 构造一个带缓存的 GrantMatrix 加载器。
-func NewGrantMatrixLoader(db *gorm.DB, logger *logrus.Entry, opts LoaderOptions) *GrantMatrixLoader {
+func NewGrantMatrixLoader(db *gorm.DB, logger *pxlog.Entry, opts LoaderOptions) *GrantMatrixLoader {
 	staticFS := opts.StaticFS
 	if staticFS == nil {
 		basePath := resolveGrantMatrixBaseDir()
@@ -216,7 +216,7 @@ func (l *GrantMatrixLoader) loadOverrideEntries(ctx context.Context) ([]GrantMat
 			if constraints, err := decodeJSONMap(row.Constraints); err == nil {
 				entry.Constraints = constraints
 			} else if l.logger != nil {
-				l.logger.WithError(err).WithFields(logrus.Fields{
+				l.logger.WithError(err).WithFields(pxlog.Fields{
 					"scope":    row.Scope,
 					"channel":  row.Channel,
 					"resource": row.Resource,

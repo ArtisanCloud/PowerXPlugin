@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/logger"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,11 +29,11 @@ type Event struct {
 }
 
 // EmitReviewEvent sends the event to the shared logger for downstream sinks.
-func EmitReviewEvent(ctx context.Context, log *logrus.Entry, evt Event) {
+func EmitReviewEvent(ctx context.Context, log *logger.Entry, evt Event) {
 	if log == nil {
 		log = logger.WithField("component", "capability_review_events")
 	}
-	fields := logrus.Fields{
+	fields := logger.Fields{
 		"event":         evt.Type,
 		"capability_id": evt.CapabilityID,
 		"task_id":       evt.TaskID,

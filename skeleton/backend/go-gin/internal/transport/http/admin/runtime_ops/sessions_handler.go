@@ -20,7 +20,7 @@ import (
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -29,14 +29,14 @@ type SessionsHandler struct {
 	svc     *runtimeops.MCPSessionService
 	adapter *mcpintegration.SessionAdapter
 	broker  *stream.Broker
-	logger  *logrus.Entry
+	logger  *pxlog.Entry
 }
 
 // NewSessionsHandler constructs handler with dependencies.
 func NewSessionsHandler(deps *app.Deps) *SessionsHandler {
 	var (
 		db     *gorm.DB
-		logger *logrus.Entry
+		logger *pxlog.Entry
 	)
 	if deps != nil {
 		db = deps.DB
@@ -156,7 +156,7 @@ func (h *SessionsHandler) Invoke(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.TenantUuid) == "" {
 		if h.logger != nil {
-			h.logger.WithFields(logrus.Fields{
+			h.logger.WithFields(pxlog.Fields{
 				runtimelogging.FieldTaskID:     runtimelogging.FallbackUnknown,
 				runtimelogging.FieldSubscriber: "mcp_session_handler",
 				runtimelogging.FieldTopic:      "runtime_ops.invoke",

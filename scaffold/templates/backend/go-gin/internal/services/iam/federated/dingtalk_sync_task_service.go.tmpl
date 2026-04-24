@@ -1,0 +1,49 @@
+package federated
+
+import (
+	"context"
+	"strings"
+
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	repo "{{ .BackendModulePath }}/internal/domain/repository/iam"
+	model "{{ .BackendModulePath }}/internal/entity/models/iam"
+	"gorm.io/gorm"
+)
+
+const topicDingTalkSyncProgress = "dingtalk.sync.progress"
+
+type DingTalkSyncTaskService struct {
+	base *ChannelSyncTaskService
+}
+
+func NewDingTalkSyncTaskService(repository *repo.ChannelSyncTaskRepository, configSvc *DingTalkConfigService, publisher fwwsbus.Publisher, db *gorm.DB) *DingTalkSyncTaskService {
+	exec := newSimpleDirectorySyncExecutor(model.ChannelSyncProviderDingTalk, db, func(ctx context.Context, tenantUUID string) (channelSyncConfig, error) {
+		cfg, err := configSvc.GetByTenant(ctx, tenantUUID)
+		if err != nil {
+			return channelSyncConfig{}, err
+		}
+		return channelSyncConfig{
+			TenantScope: strings.TrimSpace(cfg.CorpID),
+			HttpDebug:   cfg.HttpDebug,
+			Meta: map[string]any{
+				"corp_id": cfg.CorpID,
+				"app_key": cfg.AppKey,
+			},
+		}, nil
+	})
+	return &DingTalkSyncTaskService{
+		base: newChannelSyncTaskService(repository, publisher, model.ChannelSyncProviderDingTalk, topicDingTalkSyncProgress, exec),
+	}
+}
+
+func (s *DingTalkSyncTaskService) Trigger(ctx context.Context, tenantUUID string, action string) (*model.ChannelSyncTask, error) {
+	return s.base.Trigger(ctx, tenantUUID, action)
+}
+
+func (s *DingTalkSyncTaskService) List(ctx context.Context, tenantUUID string, limit int) ([]model.ChannelSyncTask, error) {
+	return s.base.List(ctx, tenantUUID, limit)
+}
+
+func (s *DingTalkSyncTaskService) Clear(ctx context.Context, tenantUUID string) (int64, error) {
+	return s.base.Clear(ctx, tenantUUID)
+}

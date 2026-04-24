@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"sync"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
@@ -13,6 +15,7 @@ import (
 	providerLark "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/lark"
 	providerWeCom "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/wecom"
 	federatedRisk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/risk"
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
@@ -42,10 +45,29 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 	if logCfg == nil {
 		logCfg = &config.LoggingConfig{}
 	}
+	policy := runtimelogging.ResolveWithHostDefaults(runtimelogging.Policy{
+		Mode:   runtimelogging.ModeStandalone,
+		Sinks:  []runtimelogging.SinkType{runtimelogging.SinkType(logCfg.Output)},
+		Format: logCfg.Format,
+		Level:  logCfg.Level,
+		Retry: runtimelogging.RetryPolicy{
+			Enabled:     true,
+			MaxAttempts: 3,
+			BackoffMS:   200,
+		},
+	})
+	if runtimelogging.IsHostProxyMode() {
+		policy.Mode = runtimelogging.ModeHost
+	}
+	if err := runtimelogging.ValidatePolicy(policy); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "logging policy validation failed, fallback to default: %v\n", err)
+		policy = runtimelogging.ResolveWithHostDefaults(runtimelogging.DefaultPolicy())
+	}
+
 	logger.Init(
-		logCfg.Level,
-		logCfg.Format,
-		logCfg.Output,
+		policy.Level,
+		policy.Format,
+		runtimelogging.PrimaryOutput(policy),
 		logCfg.FilePath,
 		logCfg.MaxSize,
 		logCfg.MaxBackups,

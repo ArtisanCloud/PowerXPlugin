@@ -10,7 +10,7 @@ import (
 	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	secrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/security"
 	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -22,12 +22,12 @@ const DefaultAuditTarget = "security-audit"
 type BaselineService struct {
 	repo   *secrepo.Repository
 	cfg    *config.Config
-	logger *logrus.Entry
+	logger *pxlog.Entry
 	runner func(ctx context.Context) error
 }
 
 // NewBaselineService constructs the service with the provided dependencies.
-func NewBaselineService(db *gorm.DB, cfg *config.Config, logger *logrus.Entry) *BaselineService {
+func NewBaselineService(db *gorm.DB, cfg *config.Config, logger *pxlog.Entry) *BaselineService {
 	svc := &BaselineService{
 		repo:   secrepo.NewRepository(db),
 		cfg:    cfg,

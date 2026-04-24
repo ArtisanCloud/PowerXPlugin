@@ -6,7 +6,7 @@ import (
 	"time"
 
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 const (
@@ -16,17 +16,17 @@ const (
 )
 
 // EmitLicenseRenewalScheduled records when a renewal reminder is queued.
-func EmitLicenseRenewalScheduled(logger *logrus.Entry, license *dbm.License, scheduledAt time.Time, channels []string) {
+func EmitLicenseRenewalScheduled(logger *pxlog.Entry, license *dbm.License, scheduledAt time.Time, channels []string) {
 	emitLicenseReminderEvent(logger, eventLicenseRenewalScheduled, license, scheduledAt, channels)
 }
 
 // EmitLicenseRenewalDue emits that a renewal reminder is executing.
-func EmitLicenseRenewalDue(logger *logrus.Entry, license *dbm.License, scheduledAt time.Time, channels []string) {
+func EmitLicenseRenewalDue(logger *pxlog.Entry, license *dbm.License, scheduledAt time.Time, channels []string) {
 	emitLicenseReminderEvent(logger, eventLicenseRenewalDue, license, scheduledAt, channels)
 }
 
 // EmitUsageSpikeDetected records a usage spike event for observability.
-func EmitUsageSpikeDetected(logger *logrus.Entry, tenantID, licenseID, metric string, delta float64) {
+func EmitUsageSpikeDetected(logger *pxlog.Entry, tenantID, licenseID, metric string, delta float64) {
 	if logger == nil {
 		return
 	}
@@ -46,7 +46,7 @@ func EmitUsageSpikeDetected(logger *logrus.Entry, tenantID, licenseID, metric st
 	logger.WithField("usage_event", string(raw)).Info("usage spike detected")
 }
 
-func emitLicenseReminderEvent(logger *logrus.Entry, event string, license *dbm.License, scheduledAt time.Time, channels []string) {
+func emitLicenseReminderEvent(logger *pxlog.Entry, event string, license *dbm.License, scheduledAt time.Time, channels []string) {
 	if logger == nil || license == nil {
 		return
 	}

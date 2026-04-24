@@ -10,7 +10,7 @@ import (
 
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
 	"github.com/redis/go-redis/v9"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/datatypes"
 )
 
@@ -20,11 +20,11 @@ const defaultLicenseCachePrefix = "powerx:marketplace:licenses"
 type RedisLicenseCache struct {
 	client *redis.Client
 	prefix string
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
 // NewRedisLicenseCache connects to redisURL and returns a LicenseCache implementation.
-func NewRedisLicenseCache(redisURL, keyPrefix string, logger *logrus.Entry) (*RedisLicenseCache, error) {
+func NewRedisLicenseCache(redisURL, keyPrefix string, logger *pxlog.Entry) (*RedisLicenseCache, error) {
 	redisURL = strings.TrimSpace(redisURL)
 	if redisURL == "" {
 		return nil, errors.New("redis url is required")
@@ -43,7 +43,7 @@ func NewRedisLicenseCache(redisURL, keyPrefix string, logger *logrus.Entry) (*Re
 		keyPrefix = defaultLicenseCachePrefix
 	}
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace.license_cache")
+		logger = pxlog.New().WithField("component", "marketplace.license_cache")
 	}
 	return &RedisLicenseCache{
 		client: client,

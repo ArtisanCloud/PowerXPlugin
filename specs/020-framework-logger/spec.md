@@ -89,10 +89,10 @@
 - 已落地 framework 统一日志门面与路由结果模型：`success/failed/retrying/dropped`。
 - 宿主模式策略默认 `stdout + json`，`file/loki` 需进入 `authorized_extra_sinks`。
 - 管理端已提供：
-  - `GET /admin/runtime/logging/policy`
-  - `PUT /admin/runtime/logging/policy`
-  - `POST /admin/runtime/logging/probe`
-- 统一响应采用 skeleton `APIResponse` envelope（`success/data/error/timestamp/request_id`）。
+  - `GET /api/v1/admin/runtime/logging/policy`
+  - `PUT /api/v1/admin/runtime/logging/policy`
+  - `POST /api/v1/admin/runtime/logging/probe`
+- runtime logging 成功响应采用 PowerX 监控契约：`code/message/data`（`code=0` 表示成功）。
 - 治理策略支持：
   - `governance_mode=detect|warn|block`
   - `governance_deadline_version`

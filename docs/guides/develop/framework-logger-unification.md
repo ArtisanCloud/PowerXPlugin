@@ -3,6 +3,10 @@
 适用范围：所有基于 PowerXPlugin framework/skeleton 的插件。  
 目标：插件统一使用同一套日志机制，支持宿主模式与独立模式一致治理，并对接 PowerX 多日志源采集。
 
+跨项目落地请配合使用：
+
+- `/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/docs/guides/develop/framework-logger-alignment-instruction.md`
+
 ## 1. 背景与本次调整目的
 
 过去插件侧存在三类分散问题：
@@ -175,4 +179,3 @@ make dist DIST_DIR=dist/0.1.1
 2. `PUT policy` 成功返回最终策略。
 3. `POST probe` 返回 `outcomes`。
 4. 使用 `trace_id` 可在 PowerX 监控日志检索到 probe 日志。
-

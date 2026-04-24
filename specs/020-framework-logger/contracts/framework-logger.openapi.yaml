@@ -30,8 +30,8 @@ paths:
             schema:
               $ref: '#/components/schemas/LogPolicyRequest'
       responses:
-        '202':
-          description: Policy accepted
+        '200':
+          description: Policy applied
           content:
             application/json:
               schema:
@@ -125,65 +125,40 @@ components:
           type: string
     APIResponseLogPolicy:
       type: object
-      required: [success, data, timestamp]
+      required: [code, message, data]
       properties:
-        success:
-          type: boolean
-          enum: [true]
-        data:
-          type: object
-          required: [policy]
-          properties:
-            policy:
-              $ref: '#/components/schemas/LogPolicy'
+        code:
+          type: integer
+          enum: [0]
         message:
           type: string
-        timestamp:
-          type: string
-          format: date-time
-        request_id:
-          type: string
+          enum: [ok]
+        data:
+          $ref: '#/components/schemas/LogPolicy'
     APIResponsePolicyApply:
       type: object
-      required: [success, data, timestamp]
+      required: [code, message, data]
       properties:
-        success:
-          type: boolean
-          enum: [true]
-        data:
-          type: object
-          required: [accepted, policy, effective_at]
-          properties:
-            accepted:
-              type: boolean
-            policy:
-              $ref: '#/components/schemas/LogPolicy'
-            effective_at:
-              type: string
-              format: date-time
+        code:
+          type: integer
+          enum: [0]
         message:
           type: string
-        timestamp:
-          type: string
-          format: date-time
-        request_id:
-          type: string
+          enum: [ok]
+        data:
+          $ref: '#/components/schemas/LogPolicy'
     APIResponseProbe:
       type: object
-      required: [success, data, timestamp]
+      required: [code, message, data]
       properties:
-        success:
-          type: boolean
-          enum: [true]
-        data:
-          $ref: '#/components/schemas/ProbeResponse'
+        code:
+          type: integer
+          enum: [0]
         message:
           type: string
-        timestamp:
-          type: string
-          format: date-time
-        request_id:
-          type: string
+          enum: [ok]
+        data:
+          $ref: '#/components/schemas/ProbeResponse'
     APIResponseViolationList:
       type: object
       required: [success, data, timestamp]
@@ -203,6 +178,8 @@ components:
     LogPolicyRequest:
       type: object
       properties:
+        tenant_uuid:
+          type: string
         policy_version:
           type: string
         mode:

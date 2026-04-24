@@ -2,12 +2,14 @@ package logging
 
 func ResolveWithHostDefaults(policy Policy) Policy {
 	resolved := ResolvePolicy(policy)
-	if resolved.Mode != ModeHost {
+	if !IsHostProxyMode() {
 		return resolved
 	}
+	// Host proxy mode is enforced by PowerX runtime:
+	// mode=host, sinks=[stdout], format=json
+	resolved.Mode = ModeHost
 	resolved.Format = "json"
-	if len(resolved.Sinks) == 0 {
-		resolved.Sinks = []SinkType{SinkStdout}
-	}
+	resolved.Sinks = []SinkType{SinkStdout}
+	resolved.AuthorizedExtraSinks = nil
 	return resolved
 }

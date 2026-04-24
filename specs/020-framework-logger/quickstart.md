@@ -74,12 +74,17 @@ FRAMEWORK_LOGGER_GUARD_MODE=warn \
 ## 8. 执行与排障说明
 
 1. `POWERX_PROXY=1` 但 `file/loki` 未生效：检查 `authorized_extra_sinks` 是否授权，宿主默认只允许 `stdout`。
-2. `PUT /admin/runtime/logging/policy` 返回 400：检查 `mode/format/level/sinks/retry` 是否满足校验（host 必须 `stdout+json`）。
+2. `PUT /api/v1/admin/runtime/logging/policy` 返回 400：检查 `mode/format/level/sinks/retry` 是否满足校验（host 必须 `stdout+json`）。
 3. `probe` outcomes 出现 `dropped`：先检查 sink 注册状态，再检查请求超时导致的重试中断。
 4. CI 中治理扫描失败：若 `status=blocked`，根据输出清单整改直写日志，或核对 `plugin_version` 与 `governance_deadline_version`。
 5. Go 测试缓存权限错误：固定使用 `GOCACHE=$PWD/tmp/gocache` 与 `GOMODCACHE=$PWD/tmp/gomodcache`。
 
-## 9. 验收映射（对应 Success Criteria）
+## 9. 契约联调最小检查
+
+1. `GET /api/v1/admin/runtime/logging/policy` 成功返回 `code=0`，`data` 直接为策略对象。  
+2. `PUT /api/v1/admin/runtime/logging/policy` 成功返回 `code=0`，HTTP 200，`data` 为最终生效策略。  
+3. `POST /api/v1/admin/runtime/logging/probe` 成功返回 `code=0`，`data.outcomes[*].status` 枚举为 `success|failed|retrying|dropped`。
+## 10. 验收映射（对应 Success Criteria）
 
 1. **SC-001**: 新增代码无直写日志；截止版本后违规数为 0。  
 2. **SC-002**: 抽样日志可用 `trace_id` 串联查询。  

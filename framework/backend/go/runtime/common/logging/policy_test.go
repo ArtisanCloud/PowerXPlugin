@@ -44,15 +44,11 @@ func TestResolveWithHostDefaultsForcesStdoutJSON(t *testing.T) {
 	if p.Format != "json" {
 		t.Fatalf("expected json format, got %s", p.Format)
 	}
-	foundStdout := false
-	for _, sink := range p.Sinks {
-		if sink == SinkStdout {
-			foundStdout = true
-			break
-		}
+	if len(p.Sinks) != 1 || p.Sinks[0] != SinkStdout {
+		t.Fatalf("expected sinks=[stdout], got=%v", p.Sinks)
 	}
-	if !foundStdout {
-		t.Fatalf("expected stdout sink in host mode")
+	if len(p.AuthorizedExtraSinks) != 0 {
+		t.Fatalf("expected authorized_extra_sinks to be cleared in host mode, got=%v", p.AuthorizedExtraSinks)
 	}
 }
 

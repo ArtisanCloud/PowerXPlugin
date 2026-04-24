@@ -17,14 +17,14 @@ import (
 	"{{ .BackendModulePath }}/internal/shared/app"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // Handler 提供 integration HTTP API 的入口。
 type Handler struct {
 	deps       *app.Deps
 	dispatch   *integrationService.DispatchService
-	logger     *logrus.Entry
+	logger     *pxlog.Entry
 	stsService *iamservice.STSService
 }
 
@@ -43,7 +43,7 @@ type gatewayAuthPolicy struct {
 
 // NewHandler 构造新的 Handler。
 func NewHandler(deps *app.Deps) *Handler {
-	var logger *logrus.Entry
+	var logger *pxlog.Entry
 	if deps != nil {
 		logger = deps.RuntimeLogger(deps.Ctx, "integration_http", nil)
 	}
@@ -65,7 +65,7 @@ func (h *Handler) buildDispatchService() *integrationService.DispatchService {
 
 	logger := h.logger
 	if logger == nil {
-		logger = logrus.WithField("component", "integration_http")
+		logger = pxlog.WithField("component", "integration_http")
 	}
 	service := integrationService.BuildDispatchService(h.deps, logger)
 	if service == nil {
@@ -285,7 +285,7 @@ func (h *Handler) logCapabilityInvokeAttempt(capabilityID, action, preferredProt
 	}
 	inboundAuth := strings.TrimSpace(headers["Authorization"])
 	inboundAuthScheme := authSchemeFromHeader(inboundAuth)
-	h.logger.WithFields(logrus.Fields{
+	h.logger.WithFields(pxlog.Fields{
 		"capability_id":       capabilityID,
 		"action":              action,
 		"preferred_protocol":  preferredProtocol,
@@ -303,7 +303,7 @@ func (h *Handler) logCapabilityInvokeSuccess(capabilityID, action, preferredProt
 	if h == nil || h.logger == nil || result == nil {
 		return
 	}
-	h.logger.WithFields(logrus.Fields{
+	h.logger.WithFields(pxlog.Fields{
 		"capability_id":      capabilityID,
 		"action":             action,
 		"preferred_protocol": preferredProtocol,
@@ -318,7 +318,7 @@ func (h *Handler) logCapabilityInvokeError(capabilityID, action, preferredProtoc
 	if h == nil || h.logger == nil || err == nil {
 		return
 	}
-	fields := logrus.Fields{
+	fields := pxlog.Fields{
 		"capability_id":      capabilityID,
 		"action":             action,
 		"preferred_protocol": preferredProtocol,
@@ -586,7 +586,7 @@ func (h *Handler) logInvokeCORSHeaders(c *gin.Context) {
 	if h == nil || h.logger == nil || c == nil {
 		return
 	}
-	h.logger.WithFields(logrus.Fields{
+	h.logger.WithFields(pxlog.Fields{
 		"origin":                         strings.TrimSpace(c.GetHeader("Origin")),
 		"cors_allow_origin":              strings.TrimSpace(c.Writer.Header().Get("Access-Control-Allow-Origin")),
 		"cors_allow_credentials":         strings.TrimSpace(c.Writer.Header().Get("Access-Control-Allow-Credentials")),

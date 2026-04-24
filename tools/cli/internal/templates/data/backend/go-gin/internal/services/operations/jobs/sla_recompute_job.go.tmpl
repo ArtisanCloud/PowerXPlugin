@@ -5,19 +5,19 @@ import (
 	"time"
 
 	operationsvc "{{ .BackendModulePath }}/internal/services/operations"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // SLARecomputeJob triggers SLA score recomputation across profiles.
 type SLARecomputeJob struct {
 	service *operationsvc.SLAService
-	log     *logrus.Entry
+	log     *pxlog.Entry
 }
 
 // NewSLARecomputeJob constructs a job instance.
-func NewSLARecomputeJob(service *operationsvc.SLAService, log *logrus.Entry) *SLARecomputeJob {
+func NewSLARecomputeJob(service *operationsvc.SLAService, log *pxlog.Entry) *SLARecomputeJob {
 	if log == nil {
-		log = logrus.New().WithField("component", "operations.sla_recompute_job")
+		log = pxlog.New().WithField("component", "operations.sla_recompute_job")
 	}
 	return &SLARecomputeJob{service: service, log: log}
 }
@@ -32,7 +32,7 @@ func (j *SLARecomputeJob) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	j.log.WithContext(ctx).WithFields(logrus.Fields{
+	j.log.WithContext(ctx).WithFields(pxlog.Fields{
 		"profiles": len(profiles),
 		"duration": time.Since(start).String(),
 	}).Info("recomputed SLA profiles")

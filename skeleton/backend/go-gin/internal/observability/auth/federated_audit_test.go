@@ -17,7 +17,7 @@ func TestFederatedAuditEventFieldsCompleteness(t *testing.T) {
 	SetFederatedAuditSinkForTests(sink)
 	t.Cleanup(func() { SetFederatedAuditSinkForTests(nil) })
 
-	svc := NewFederatedAuditService("com.powerx.plugin.test")
+	svc := NewFederatedAuditService("com.powerx.plugins.test")
 	svc.Record(FederatedAuditEvent{
 		Provider:         "wecom",
 		TenantUUID:       "tenant-a",

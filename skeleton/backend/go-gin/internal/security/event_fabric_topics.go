@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,7 +19,7 @@ type eventFabricTopicsManifest struct {
 	} `yaml:"topics"`
 }
 
-func LoadEventFabricTopics(logger *logrus.Entry) ([]string, error) {
+func LoadEventFabricTopics(logger *pxlog.Entry) ([]string, error) {
 	paths := eventFabricPathCandidates()
 	for _, candidate := range paths {
 		content, err := os.ReadFile(candidate)

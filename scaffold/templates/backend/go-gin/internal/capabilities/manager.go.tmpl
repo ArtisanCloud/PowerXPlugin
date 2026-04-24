@@ -14,7 +14,6 @@ import (
 
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/logger"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -92,13 +91,13 @@ type ProtocolAsset struct {
 
 type manager struct {
 	cfg           *config.Config
-	logger        *logrus.Entry
+	logger        *logger.Entry
 	catalogLoader CatalogLoader
 	assetExporter AssetExporter
 }
 
 // NewManager builds a filesystem-based manager using repo defaults.
-func NewManager(cfg *config.Config, log *logrus.Entry) Manager {
+func NewManager(cfg *config.Config, log *logger.Entry) Manager {
 	catalogPath := resolveCatalogPath(os.Getenv(catalogEnvKey))
 	if strings.TrimSpace(catalogPath) == "" {
 		catalogPath = defaultCatalogPath
@@ -179,7 +178,7 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	originalPath := p
 	p, resolvedBy := resolveCatalogFilePath(p)
 	if resolvedBy != "" {
-		log.WithFields(logrus.Fields{
+		log.WithFields(logger.Fields{
 			"catalog_path_from": originalPath,
 			"catalog_path_to":   p,
 			"resolved_by":       resolvedBy,
@@ -191,7 +190,7 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			log.WithError(err).Warn("capability catalog not found, falling back to plugin.yaml capabilities")
-			log.WithFields(logrus.Fields{
+			log.WithFields(logger.Fields{
 				"advice": "开发态可忽略；若需消除告警，请生成 capabilities/catalog.json 或保持 plugin.yaml capabilities 与代码同步",
 			}).Info("capability catalog fallback hint")
 			snapshot, fallbackErr := loadCatalogFromManifest(log)
@@ -215,7 +214,7 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if snapshot.Entries == nil {
 		snapshot.Entries = []CatalogEntry{}
 	}
-	log.WithFields(logrus.Fields{
+	log.WithFields(logger.Fields{
 		"entry_count":  len(snapshot.Entries),
 		"import_count": len(snapshot.Imports),
 		"generated_at": snapshot.GeneratedAt,
@@ -250,7 +249,7 @@ type manifestDoc struct {
 	} `yaml:"capabilities"`
 }
 
-func loadCatalogFromManifest(log *logrus.Entry) (*CatalogSnapshot, error) {
+func loadCatalogFromManifest(log *logger.Entry) (*CatalogSnapshot, error) {
 	manifestPath := resolveManifestPath()
 	if manifestPath == "" {
 		return nil, errors.New("manifest path not found")
@@ -396,7 +395,7 @@ func loadCatalogFromManifest(log *logrus.Entry) (*CatalogSnapshot, error) {
 	}
 
 	if log != nil {
-		log.WithFields(logrus.Fields{
+		log.WithFields(logger.Fields{
 			"manifest_path": manifestPath,
 			"entry_count":   len(snapshot.Entries),
 			"plugin_id":     snapshot.PluginID,
@@ -597,7 +596,7 @@ func normalizeEntries(entries []CatalogEntry) error {
 }
 
 // EnsureManager warms up capability catalog during startup and logs the result.
-func EnsureManager(ctx context.Context, mgr Manager, log *logrus.Entry) error {
+func EnsureManager(ctx context.Context, mgr Manager, log *logger.Entry) error {
 	if mgr == nil {
 		return nil
 	}
@@ -613,7 +612,7 @@ func EnsureManager(ctx context.Context, mgr Manager, log *logrus.Entry) error {
 	return nil
 }
 
-func managerLogger(component string) *logrus.Entry {
+func managerLogger(component string) *logger.Entry {
 	return logger.WithField("component", component)
 }
 

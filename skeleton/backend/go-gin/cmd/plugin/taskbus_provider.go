@@ -14,7 +14,7 @@ import (
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 type notConfiguredTaskBusProvider struct {
@@ -34,7 +34,7 @@ type taskBusRuntime struct {
 	StartConsumer func(ctx context.Context)
 }
 
-func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *logrus.Entry) taskBusRuntime {
+func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry) taskBusRuntime {
 	mode := resolveTaskBusProviderMode(cfg)
 	switch mode {
 	case "host":
@@ -56,7 +56,7 @@ func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *logr
 	}
 }
 
-func resolveTaskBusProvider(cfg *config.Config, log *logrus.Entry) fweventbridge.TaskBusProvider {
+func resolveTaskBusProvider(cfg *config.Config, log *pxlog.Entry) fweventbridge.TaskBusProvider {
 	return resolveTaskBusRuntime(cfg, nil, log).Provider
 }
 
@@ -121,7 +121,7 @@ func newRedisTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {
 	})
 }
 
-func newRedisConsumerStarter(cfg *config.Config, wsHub fwwsbus.LocalHub, log *logrus.Entry) func(ctx context.Context) {
+func newRedisConsumerStarter(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry) func(ctx context.Context) {
 	if cfg == nil || cfg.EventBridge == nil || wsHub == nil {
 		return nil
 	}

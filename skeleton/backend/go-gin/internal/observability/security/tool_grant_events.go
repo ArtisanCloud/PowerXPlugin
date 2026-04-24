@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // EmitToolGrantEvent writes lifecycle events to structured log.
-func EmitToolGrantEvent(logger *logrus.Entry, event string, tenantID string, metadata map[string]interface{}) {
+func EmitToolGrantEvent(logger *pxlog.Entry, event string, tenantID string, metadata map[string]interface{}) {
 	if logger == nil {
 		return
 	}

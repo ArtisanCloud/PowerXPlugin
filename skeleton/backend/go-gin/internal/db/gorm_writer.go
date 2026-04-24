@@ -14,7 +14,7 @@ type gormWriter struct{}
 
 func (w *gormWriter) Printf(format string, args ...interface{}) {
 	// 优先走你项目里的全局 logger
-	// - 如果是 logrus.Logger：它有 Printf，等价于 Info 级别
+	// - 如果是 logger.Logger：它有 Printf，等价于 Info 级别
 	// - 如果你的 logger 暴露了 Infof/Debugf，也可以换成 appLogger.Infof(...)
 	if logger.Logger != nil {
 		logger.Logger.Printf(format, args...)

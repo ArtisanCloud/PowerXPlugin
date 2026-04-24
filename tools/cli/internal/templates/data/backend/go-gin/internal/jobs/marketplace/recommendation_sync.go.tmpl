@@ -7,7 +7,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
 	"{{ .BackendModulePath }}/internal/services/recommendation"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // MetricsProvider defines the interface to fetch signals for recommendation scoring.
@@ -21,14 +21,14 @@ type SyncJob struct {
 	repo     *mrepo.ListingRepository
 	provider MetricsProvider
 	interval time.Duration
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 	tenants  func(context.Context) ([]string, error)
 }
 
 // NewSyncJob constructs a new recommendation synchronization job.
-func NewSyncJob(cfg *config.Config, repo *mrepo.ListingRepository, provider MetricsProvider, logger *logrus.Entry, tenantResolver func(context.Context) ([]string, error)) *SyncJob {
+func NewSyncJob(cfg *config.Config, repo *mrepo.ListingRepository, provider MetricsProvider, logger *pxlog.Entry, tenantResolver func(context.Context) ([]string, error)) *SyncJob {
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_recommendation_sync")
+		logger = pxlog.New().WithField("component", "marketplace_recommendation_sync")
 	}
 	interval := time.Hour
 	if cfg != nil {
@@ -79,7 +79,7 @@ func (j *SyncJob) execute(ctx context.Context) {
 			j.logger.WithError(err).WithField("tenant_uuid", tenantID).Error("recommendation sync failed")
 			continue
 		}
-		j.logger.WithFields(logrus.Fields{
+		j.logger.WithFields(pxlog.Fields{
 			"tenant_uuid":         tenantID,
 			"updated":           result.UpdatedCount,
 			"average_weight":    result.AverageWeight,

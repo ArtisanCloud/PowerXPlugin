@@ -13,7 +13,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	customerdomain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/customer"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 var (
@@ -25,7 +25,7 @@ type DelegateAuthenticator struct {
 	timeout  time.Duration
 	ttl      time.Duration
 	client   *http.Client
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 
 	now func() time.Time
 
@@ -38,7 +38,7 @@ type delegateCacheEntry struct {
 	exp time.Time
 }
 
-func NewDelegateAuthenticator(cfg *config.Config, client *http.Client, logger *logrus.Entry) *DelegateAuthenticator {
+func NewDelegateAuthenticator(cfg *config.Config, client *http.Client, logger *pxlog.Entry) *DelegateAuthenticator {
 	endpoint := ""
 	timeout := 3 * time.Second
 	ttl := time.Duration(0)
@@ -59,7 +59,7 @@ func NewDelegateAuthenticator(cfg *config.Config, client *http.Client, logger *l
 		client = &http.Client{Timeout: timeout + 500*time.Millisecond}
 	}
 	if logger == nil {
-		logger = logrus.WithField("component", "customer.delegate_authenticator")
+		logger = pxlog.WithField("component", "customer.delegate_authenticator")
 	}
 
 	return &DelegateAuthenticator{
@@ -209,7 +209,7 @@ func (a *DelegateAuthenticator) validate(ctx context.Context, requestTenantUUID 
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return nil, time.Time{}, ErrCustomerTokenInvalid
 	default:
-		a.logger.WithFields(logrus.Fields{
+		a.logger.WithFields(pxlog.Fields{
 			"status":  resp.StatusCode,
 			"payload": string(body),
 		}).Warn("delegate validation failed")

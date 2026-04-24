@@ -14,7 +14,6 @@ import (
 	"{{ .BackendModulePath }}/internal/logger"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -35,7 +34,7 @@ var (
 
 // RegisterService governs capability registration, validation, and draft storage.
 type RegisterService struct {
-	logger  *logrus.Entry
+	logger  *logger.Entry
 	manager capabilities.Manager
 
 	mu      sync.RWMutex
@@ -167,7 +166,7 @@ type FieldError struct {
 
 // NewRegisterService builds a new service instance.
 func NewRegisterService(deps *app.Deps) *RegisterService {
-	var log *logrus.Entry
+	var log *logger.Entry
 	if deps != nil {
 		log = deps.RuntimeLogger(deps.Ctx, "capability_register_service", nil)
 	}
@@ -342,7 +341,7 @@ func (s *RegisterService) Submit(ctx context.Context, input *RegisterInput) (*Ca
 	s.mu.Unlock()
 
 	if s.logger != nil {
-		s.logger.WithFields(logrus.Fields{
+		s.logger.WithFields(logger.Fields{
 			"capability_id": record.ID,
 			"draft":         record.Draft,
 			"status":        record.Status,

@@ -4,8 +4,8 @@ import "testing"
 
 func TestLoginMethodMetricsSnapshot(t *testing.T) {
 	resetFederatedLoginMetricsForTests()
-	RecordFederatedLoginSuccess("com.powerx.plugin.demo", "tenant-a")
-	RecordPasswordLoginSuccess("com.powerx.plugin.demo", "local")
+	RecordFederatedLoginSuccess("com.powerx.plugins.demo", "tenant-a")
+	RecordPasswordLoginSuccess("com.powerx.plugins.demo", "local")
 
 	snapshot := LoginMethodSnapshot()
 	if len(snapshot[metricFederatedLoginSuccess]) != 1 {

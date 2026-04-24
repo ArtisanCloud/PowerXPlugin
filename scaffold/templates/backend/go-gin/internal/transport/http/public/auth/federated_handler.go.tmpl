@@ -22,7 +22,7 @@ import (
 	"{{ .BackendModulePath }}/internal/shared/app"
 	middleware "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -460,7 +460,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 	corpID := strings.TrimSpace(c.Param("corp_id"))
 	appID := strings.TrimSpace(c.Param("app_id"))
 	if tenantUUID == "" || corpID == "" || appID == "" {
-		logrus.WithFields(logrus.Fields{
+		pxlog.WithFields(pxlog.Fields{
 			"component":   "iam.wecom_callback",
 			"request_id":  c.GetString("request_id"),
 			"tenant_uuid": tenantUUID,
@@ -472,7 +472,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 	}
 	wecomCfg, err := h.wecomConfig.ResolveCallbackConfig(c.Request.Context(), tenantUUID, corpID, appID)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		pxlog.WithFields(pxlog.Fields{
 			"component":   "iam.wecom_callback",
 			"request_id":  c.GetString("request_id"),
 			"tenant_uuid": tenantUUID,
@@ -485,7 +485,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 	}
 
 	callbackURL := resolveWeComCallbackURL(c, wecomCfg.CallbackHost)
-	logrus.WithFields(logrus.Fields{
+	pxlog.WithFields(pxlog.Fields{
 		"component":         "iam.wecom_callback",
 		"request_id":        c.GetString("request_id"),
 		"tenant_uuid":       tenantUUID,
@@ -513,7 +513,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 		HttpDebug: wecomCfg.HttpDebug,
 	})
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		pxlog.WithFields(pxlog.Fields{
 			"component":         "iam.wecom_callback",
 			"request_id":        c.GetString("request_id"),
 			"tenant_uuid":       tenantUUID,
@@ -533,7 +533,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 	if c.Request.Method == http.MethodGet {
 		resp, err := appSDK.Server.VerifyURL(c.Request)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
+			pxlog.WithFields(pxlog.Fields{
 				"component":      "iam.wecom_callback",
 				"request_id":     c.GetString("request_id"),
 				"tenant_uuid":    tenantUUID,
@@ -570,7 +570,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 		return kernel.SUCCESS_EMPTY_RESPONSE
 	})
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		pxlog.WithFields(pxlog.Fields{
 			"component":      "iam.wecom_callback",
 			"request_id":     c.GetString("request_id"),
 			"tenant_uuid":    tenantUUID,
@@ -608,7 +608,7 @@ func (h *FederatedHandler) resolveChallengeRedirectURI(c *gin.Context, providerK
 	}
 	callbackHost, err := h.resolveProviderCallbackHost(c, strings.TrimSpace(providerKey), tenantUUID)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		pxlog.WithFields(pxlog.Fields{
 			"component":   "iam.federated_challenge",
 			"request_id":  c.GetString("request_id"),
 			"tenant_uuid": tenantUUID,

@@ -10,7 +10,7 @@ import (
 	privmodel "{{ .BackendModulePath }}/internal/entity/models/privacy"
 	privrepo "{{ .BackendModulePath }}/internal/entity/repository/privacy"
 	secobs "{{ .BackendModulePath }}/internal/observability/security"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -18,12 +18,12 @@ import (
 type PrivacyService struct {
 	repo   *privrepo.Repository
 	cfg    *config.Config
-	logger *logrus.Entry
+	logger *pxlog.Entry
 	audit  *secobs.AuditWriter
 }
 
 // NewPrivacyService constructs the admin privacy service.
-func NewPrivacyService(db *gorm.DB, cfg *config.Config, logger *logrus.Entry, audit *secobs.AuditWriter) *PrivacyService {
+func NewPrivacyService(db *gorm.DB, cfg *config.Config, logger *pxlog.Entry, audit *secobs.AuditWriter) *PrivacyService {
 	return &PrivacyService{
 		repo:   privrepo.NewRepository(db),
 		cfg:    cfg,

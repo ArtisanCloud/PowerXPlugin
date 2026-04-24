@@ -7,7 +7,7 @@ import (
 
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -20,11 +20,11 @@ type IdempotencyRepository struct {
 	*repository.BaseRepository[model.IdempotencyRecord]
 	primary  IdempotencyProvider
 	fallback IdempotencyProvider
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 }
 
 // NewIdempotencyRepository 构造仓储实例。
-func NewIdempotencyRepository(db *gorm.DB, primary, fallback IdempotencyProvider, logger *logrus.Entry) *IdempotencyRepository {
+func NewIdempotencyRepository(db *gorm.DB, primary, fallback IdempotencyProvider, logger *pxlog.Entry) *IdempotencyRepository {
 	return &IdempotencyRepository{
 		BaseRepository: repository.NewBaseRepository[model.IdempotencyRecord](db),
 		primary:        primary,

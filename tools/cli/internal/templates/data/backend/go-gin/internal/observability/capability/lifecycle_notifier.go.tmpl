@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/logger"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -21,13 +20,13 @@ type Notifier interface {
 
 // loggerNotifier 使用日志模拟多通道通知并带有简单的重试机制。
 type loggerNotifier struct {
-	log        *logrus.Entry
+	log        *logger.Entry
 	maxRetries int
 	delay      time.Duration
 }
 
 // NewNotifier 返回具备重试能力的 Notifier。
-func NewNotifier(log *logrus.Entry) Notifier {
+func NewNotifier(log *logger.Entry) Notifier {
 	if log == nil {
 		log = logger.WithField("component", "capability_notifier")
 	} else {
@@ -57,7 +56,7 @@ func (n *loggerNotifier) Emit(ctx context.Context, evt Event) {
 func (n *loggerNotifier) dispatch(ctx context.Context, channel string, evt Event) {
 	for attempt := 1; attempt <= n.maxRetries; attempt++ {
 		if err := n.deliver(ctx, channel, evt); err != nil {
-			n.log.WithFields(logrus.Fields{
+			n.log.WithFields(logger.Fields{
 				"event":    evt.Type,
 				"channel":  channel,
 				"attempt":  attempt,
@@ -72,7 +71,7 @@ func (n *loggerNotifier) dispatch(ctx context.Context, channel string, evt Event
 }
 
 func (n *loggerNotifier) deliver(ctx context.Context, channel string, evt Event) error {
-	fields := logrus.Fields{
+	fields := logger.Fields{
 		"event":         evt.Type,
 		"capability_id": evt.CapabilityID,
 		"status":        evt.Status,

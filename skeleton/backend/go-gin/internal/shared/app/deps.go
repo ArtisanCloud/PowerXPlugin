@@ -17,7 +17,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -75,7 +74,7 @@ func (d *Deps) RuntimeDefaults() *config.RuntimeOpsDefaults {
 }
 
 // RuntimeLogger provides a structured logger enriched with runtime metadata.
-func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logrus.Entry {
+func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger.Fields) *logger.Entry {
 	if extra == nil {
 		extra = logger.Fields{}
 	}

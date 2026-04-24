@@ -10,7 +10,7 @@ import (
 	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	secrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/security"
 	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -38,12 +38,12 @@ type AdvisoryService struct {
 	db            *gorm.DB
 	advisories    *secrepo.AdvisoryRepository
 	distributions *secrepo.DistributionRepository
-	logger        *logrus.Entry
+	logger        *pxlog.Entry
 	now           func() time.Time
 }
 
 // NewAdvisoryService constructs the advisory service.
-func NewAdvisoryService(db *gorm.DB, logger *logrus.Entry) *AdvisoryService {
+func NewAdvisoryService(db *gorm.DB, logger *pxlog.Entry) *AdvisoryService {
 	svc := &AdvisoryService{
 		db:            db,
 		advisories:    secrepo.NewAdvisoryRepository(db),

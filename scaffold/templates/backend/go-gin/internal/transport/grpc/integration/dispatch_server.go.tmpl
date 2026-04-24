@@ -4,7 +4,7 @@ import (
 	"context"
 
 	integrationService "{{ .BackendModulePath }}/internal/services/integration"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -12,13 +12,13 @@ import (
 // DispatchGRPCServer 预留的 gRPC Dispatch 服务。
 type DispatchGRPCServer struct {
 	service *integrationService.DispatchService
-	logger  *logrus.Entry
+	logger  *pxlog.Entry
 }
 
 // NewDispatchGRPCServer 构造 gRPC 服务适配器。
-func NewDispatchGRPCServer(service *integrationService.DispatchService, logger *logrus.Entry) *DispatchGRPCServer {
+func NewDispatchGRPCServer(service *integrationService.DispatchService, logger *pxlog.Entry) *DispatchGRPCServer {
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.grpc.dispatch")
+		logger = pxlog.WithField("component", "integration.grpc.dispatch")
 	}
 	return &DispatchGRPCServer{
 		service: service,

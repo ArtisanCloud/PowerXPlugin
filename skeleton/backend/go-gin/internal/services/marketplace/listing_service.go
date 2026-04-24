@@ -13,7 +13,7 @@ import (
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	obs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/marketplace"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // ListingService coordinates marketplace listing workflows.
@@ -21,10 +21,10 @@ type ListingService struct {
 	listings    *mrepo.ListingRepository
 	checklists  *mrepo.ChecklistRepository
 	vendorGuard VendorGuard
-	logger      *logrus.Entry
+	logger      *pxlog.Entry
 }
 
-func NewListingService(listingRepo *mrepo.ListingRepository, checklistRepo *mrepo.ChecklistRepository, logger *logrus.Entry) *ListingService {
+func NewListingService(listingRepo *mrepo.ListingRepository, checklistRepo *mrepo.ChecklistRepository, logger *pxlog.Entry) *ListingService {
 	return &ListingService{
 		listings:   listingRepo,
 		checklists: checklistRepo,

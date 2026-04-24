@@ -14,7 +14,7 @@ import (
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	marketobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/marketplace"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -100,13 +100,13 @@ type LicenseService struct {
 	billingClient BillingClient
 	authority     LicenseAuthority
 	cache         LicenseCache
-	logger        *logrus.Entry
+	logger        *pxlog.Entry
 }
 
 // NewLicenseService constructs the service with dependencies.
-func NewLicenseService(cfg *config.Config, pricingRepo *mrepo.PricingRepository, licenseRepo *mrepo.LicenseRepository, taxClient *TaxProviderClient, billing BillingClient, authority LicenseAuthority, cache LicenseCache, logger *logrus.Entry) *LicenseService {
+func NewLicenseService(cfg *config.Config, pricingRepo *mrepo.PricingRepository, licenseRepo *mrepo.LicenseRepository, taxClient *TaxProviderClient, billing BillingClient, authority LicenseAuthority, cache LicenseCache, logger *pxlog.Entry) *LicenseService {
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_license_service")
+		logger = pxlog.New().WithField("component", "marketplace_license_service")
 	}
 	return &LicenseService{
 		cfg:           cfg,

@@ -45,7 +45,6 @@ import (
 	recommendation "{{ .BackendModulePath }}/internal/services/recommendation"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"{{ .BackendModulePath }}/internal/shared/utils"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -579,7 +578,7 @@ func ensureToolTokenFresh(ctx context.Context, cfg *config.Config) {
 	logTokenExpiryStatus(log, now, expiry, fields)
 }
 
-func logTokenExpiryStatus(log *logrus.Entry, now, expiry time.Time, fields logger.Fields) {
+func logTokenExpiryStatus(log *logger.Entry, now, expiry time.Time, fields logger.Fields) {
 	if now.After(expiry) {
 		log.WithFields(fields).Error("PX_PLUGIN_TOOL_TOKEN 已过期，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 刷新凭证")
 		return

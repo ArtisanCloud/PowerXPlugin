@@ -17,7 +17,6 @@ import (
 	"{{ .BackendModulePath }}/internal/logger"
 	obs "{{ .BackendModulePath }}/internal/observability/integration"
 	"{{ .BackendModulePath }}/internal/shared/crypto"
-	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -28,7 +27,7 @@ type WebhookService struct {
 	subscriptions *repo.WebhookSubscriptionRepository
 	attempts      *repo.DeliveryAttemptRepository
 	approvalSvc   *ApprovalService
-	log           *logrus.Entry
+	log           *logger.Entry
 	now           func() time.Time
 }
 

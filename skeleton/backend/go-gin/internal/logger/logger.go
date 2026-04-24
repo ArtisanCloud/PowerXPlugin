@@ -25,6 +25,19 @@ var (
 
 // Fields 日志字段类型别名
 type Fields = logrus.Fields
+type Entry = logrus.Entry
+type LoggerType = logrus.Logger
+type Level = logrus.Level
+
+const (
+	PanicLevel Level = logrus.PanicLevel
+	FatalLevel Level = logrus.FatalLevel
+	ErrorLevel Level = logrus.ErrorLevel
+	WarnLevel  Level = logrus.WarnLevel
+	InfoLevel  Level = logrus.InfoLevel
+	DebugLevel Level = logrus.DebugLevel
+	TraceLevel Level = logrus.TraceLevel
+)
 
 // Init initializes unified logging backend and compatibility bridge.
 func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge int, httpAccess bool) {
@@ -237,6 +250,30 @@ func WithError(err error) *logrus.Entry {
 		return logrus.WithError(err)
 	}
 	return Logger.WithError(err)
+}
+
+// New returns a logrus-compatible logger from skeleton logger package.
+func New() *logrus.Logger {
+	if Logger != nil {
+		return Logger
+	}
+	return logrus.New()
+}
+
+// StandardLogger returns the global standard logger.
+func StandardLogger() *logrus.Logger {
+	if Logger != nil {
+		return Logger
+	}
+	return logrus.StandardLogger()
+}
+
+// NewEntry creates a new log entry with a target logger.
+func NewEntry(l *logrus.Logger) *logrus.Entry {
+	if l == nil {
+		l = StandardLogger()
+	}
+	return logrus.NewEntry(l)
 }
 
 // Debug 调试日志

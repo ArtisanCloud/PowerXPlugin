@@ -15,9 +15,8 @@ import (
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	skelLogger "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	logger "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -116,7 +115,7 @@ type gatewayInvoker interface {
 // Client 封装 Skeleton 环境的 Gateway 调用能力，支持 PX_USE_MOCK 与离线提示。
 type Client struct {
 	transport     gatewayInvoker
-	logger        *logrus.Entry
+	logger        *logger.Entry
 	useMock       map[string]struct{}
 	offlineReason string
 	cfg           *config.Config
@@ -124,7 +123,7 @@ type Client struct {
 }
 
 // NewClient 构造 Gateway Client；若凭证缺失，则进入离线模式。
-func NewClient(cfg *config.Config, log *logrus.Entry) *Client {
+func NewClient(cfg *config.Config, log *logger.Entry) *Client {
 	c := &Client{
 		logger:  ensureLogger(log),
 		useMock: make(map[string]struct{}),
@@ -186,7 +185,7 @@ func NewClient(cfg *config.Config, log *logrus.Entry) *Client {
 		return c
 	}
 
-	c.logger.WithFields(logrus.Fields{
+	c.logger.WithFields(logger.Fields{
 		"mockModules": c.mockModules(),
 		"baseURL":     baseURL,
 	}).Info("Gateway Client 初始化完成")
@@ -202,7 +201,7 @@ func (c *Client) Enabled() bool {
 func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult, error) {
 	module, mocked := c.shouldMock(params.CapabilityID)
 	if mocked {
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(logger.Fields{
 			"capability": params.CapabilityID,
 			"action":     params.Action,
 			"module":     module,
@@ -277,7 +276,7 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		if tenantAudit == "" {
 			tenantAudit = tokenTID
 		}
-		c.logger.WithFields(logrus.Fields{
+		c.logger.WithFields(logger.Fields{
 			"capability":             params.CapabilityID,
 			"action":                 params.Action,
 			"preferred_protocol":     params.PreferredProtocol,
@@ -708,11 +707,11 @@ func maskTenantUUID(tid string) string {
 	return tid[:8] + "***"
 }
 
-func ensureLogger(entry *logrus.Entry) *logrus.Entry {
+func ensureLogger(entry *logger.Entry) *logger.Entry {
 	if entry != nil {
 		return entry
 	}
-	return skelLogger.WithField("component", "skeleton.gateway.client")
+	return logger.WithField("component", "skeleton.gateway.client")
 }
 
 // ValidateDelegatedConfig validates delegated gateway contract v1.

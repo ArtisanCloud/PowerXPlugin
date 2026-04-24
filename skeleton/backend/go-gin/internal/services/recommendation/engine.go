@@ -7,7 +7,7 @@ import (
 
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // Signal captures marketplace listing metrics used for recommendation scoring.
@@ -84,18 +84,18 @@ type EngineResult struct {
 type Engine struct {
 	listings *mrepo.ListingRepository
 	provider MetricsProvider
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 	config   Config
 }
 
 // NewEngine constructs a recommendation engine with optional configuration overrides.
-func NewEngine(repo *mrepo.ListingRepository, provider MetricsProvider, logger *logrus.Entry, opts ...Option) *Engine {
+func NewEngine(repo *mrepo.ListingRepository, provider MetricsProvider, logger *pxlog.Entry, opts ...Option) *Engine {
 	cfg := DefaultConfig
 	for _, opt := range opts {
 		opt(&cfg)
 	}
 	if logger == nil {
-		logger = logrus.New().WithField("component", "marketplace_recommendation_engine")
+		logger = pxlog.New().WithField("component", "marketplace_recommendation_engine")
 	}
 	return &Engine{
 		listings: repo,

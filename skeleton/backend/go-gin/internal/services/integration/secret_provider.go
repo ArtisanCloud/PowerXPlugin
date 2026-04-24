@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // SecretMaterial represents the issued secret result.
@@ -26,13 +26,13 @@ type SecretProvider interface {
 
 // RandomSecretProvider issues random secrets for development/testing.
 type RandomSecretProvider struct {
-	logger *logrus.Entry
+	logger *pxlog.Entry
 }
 
 // NewRandomSecretProvider constructs a default provider.
-func NewRandomSecretProvider(logger *logrus.Entry) *RandomSecretProvider {
+func NewRandomSecretProvider(logger *pxlog.Entry) *RandomSecretProvider {
 	if logger == nil {
-		logger = logrus.WithField("component", "integration.secret_provider.random")
+		logger = pxlog.WithField("component", "integration.secret_provider.random")
 	}
 	return &RandomSecretProvider{logger: logger}
 }
@@ -44,7 +44,7 @@ func (p *RandomSecretProvider) Issue(ctx context.Context, tenantID, integrationT
 	if err != nil {
 		return nil, err
 	}
-	p.logger.WithFields(logrus.Fields{
+	p.logger.WithFields(pxlog.Fields{
 		"tenant_uuid":        tenantID,
 		"integration_type": integrationType,
 	}).Debug("issued random secret material")
@@ -56,7 +56,7 @@ func (p *RandomSecretProvider) Issue(ctx context.Context, tenantID, integrationT
 
 // Revoke logs the revocation request—it is a no-op for local provider.
 func (p *RandomSecretProvider) Revoke(ctx context.Context, tenantID, reference string) error {
-	p.logger.WithFields(logrus.Fields{
+	p.logger.WithFields(pxlog.Fields{
 		"tenant_uuid": tenantID,
 		"reference": reference,
 	}).Debug("revoked secret reference")

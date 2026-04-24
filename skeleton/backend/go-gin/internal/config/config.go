@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gopkg.in/yaml.v3"
 )
 
@@ -418,7 +418,7 @@ func Load() (*Config, error) {
 	// 尝试加载 YAML 配置文件
 	configDir, err := loadYAMLConfig(cfg)
 	if err != nil {
-		logrus.WithError(err).Warn("Failed to load YAML config, using defaults only")
+		pxlog.WithError(err).Warn("Failed to load YAML config, using defaults only")
 	}
 	if strings.TrimSpace(configDir) != "" {
 		loadEnvFiles(configDir, filepath.Dir(configDir))
@@ -475,7 +475,7 @@ func defaultSecurityBaselineConfig() *SecurityBaselineConfig {
 		},
 		ConsentDefaults: ConsentDefaultsConfig{
 			RetentionDays: 90,
-			AuditChannel:  "logs/audit.log",
+			AuditChannel:  "stdout",
 			ExportBucket:  "",
 		},
 	}
@@ -707,13 +707,13 @@ func loadSecurityBaselineConfig(cfg *Config) {
 
 	data, err := os.ReadFile(baselinePath)
 	if err != nil {
-		logrus.WithError(err).Warnf("Failed to read security baseline config %s", baselinePath)
+		pxlog.WithError(err).Warnf("Failed to read security baseline config %s", baselinePath)
 		return
 	}
 
 	baseline := defaultSecurityBaselineConfig()
 	if err := yaml.Unmarshal(data, baseline); err != nil {
-		logrus.WithError(err).Warnf("Failed to parse security baseline config %s", baselinePath)
+		pxlog.WithError(err).Warnf("Failed to parse security baseline config %s", baselinePath)
 		return
 	}
 
@@ -1120,7 +1120,7 @@ func normalizeConfig(cfg *Config) {
 		if cfg.Gateway.AuthScheme == "bearer" {
 			if tokenTenant := tenantUUIDFromJWT(cfg.Gateway.ToolToken); tokenTenant != "" {
 				if cfg.Gateway.TenantUUID != "" && cfg.Gateway.TenantUUID != tokenTenant {
-					logrus.WithFields(logrus.Fields{
+					pxlog.WithFields(pxlog.Fields{
 						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
 						"gateway.token_tid":         tokenTenant,
 						"gateway.tenant_from_token": true,
@@ -1142,7 +1142,7 @@ func normalizeConfig(cfg *Config) {
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
 
 			if hasAny && incomplete {
-				logrus.WithFields(logrus.Fields{
+				pxlog.WithFields(pxlog.Fields{
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.tool_token":  toolToken != "",

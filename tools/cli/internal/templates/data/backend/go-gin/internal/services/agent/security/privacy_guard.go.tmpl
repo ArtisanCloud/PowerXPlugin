@@ -11,7 +11,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	privmodel "{{ .BackendModulePath }}/internal/entity/models/privacy"
 	privrepo "{{ .BackendModulePath }}/internal/entity/repository/privacy"
-	"github.com/sirupsen/logrus"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -19,13 +19,13 @@ import (
 type PrivacyGuard struct {
 	repo     *privrepo.Repository
 	cfg      *config.Config
-	logger   *logrus.Entry
+	logger   *pxlog.Entry
 	allowset map[string]struct{}
 	filter   *AIFilter
 }
 
 // NewPrivacyGuard constructs the agent privacy guard using the provided DB handle.
-func NewPrivacyGuard(db *gorm.DB, cfg *config.Config, logger *logrus.Entry) *PrivacyGuard {
+func NewPrivacyGuard(db *gorm.DB, cfg *config.Config, logger *pxlog.Entry) *PrivacyGuard {
 	allow := make(map[string]struct{})
 	if cfg != nil && cfg.Security != nil {
 		for _, host := range cfg.Security.GatewayAllowlist {

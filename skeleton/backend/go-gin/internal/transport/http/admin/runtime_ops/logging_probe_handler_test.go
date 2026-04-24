@@ -13,11 +13,11 @@ import (
 
 func TestLoggingProbeHandlerContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	originalPolicy := currentLoggingPolicy()
+	originalPolicy := currentLoggingPolicyForTenant("tenant-001")
 	t.Cleanup(func() {
-		setLoggingPolicy(originalPolicy)
+		setLoggingPolicyForTenant("tenant-001", originalPolicy)
 	})
-	setLoggingPolicy(runtimelogging.Policy{
+	setLoggingPolicyForTenant("tenant-001", runtimelogging.Policy{
 		Mode:   runtimelogging.ModeStandalone,
 		Sinks:  []runtimelogging.SinkType{runtimelogging.SinkStdout, runtimelogging.SinkFile},
 		Format: "json",
@@ -52,8 +52,8 @@ func TestLoggingProbeHandlerContract(t *testing.T) {
 		t.Fatalf("status mismatch, got=%d body=%s", rec.Code, rec.Body.String())
 	}
 	var envelope struct {
-		Success bool `json:"success"`
-		Data    struct {
+		Code int    `json:"code"`
+		Data struct {
 			TraceID  string                       `json:"trace_id"`
 			Outcomes []runtimelogging.SinkOutcome `json:"outcomes"`
 		} `json:"data"`
@@ -61,8 +61,8 @@ func TestLoggingProbeHandlerContract(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
 		t.Fatalf("unmarshal response failed: %v", err)
 	}
-	if !envelope.Success {
-		t.Fatalf("expected success envelope: %s", rec.Body.String())
+	if envelope.Code != 0 {
+		t.Fatalf("expected code=0 envelope: %s", rec.Body.String())
 	}
 	if envelope.Data.TraceID != "trace-us2-001" {
 		t.Fatalf("trace_id mismatch, got=%s", envelope.Data.TraceID)
@@ -90,16 +90,4 @@ func TestLoggingProbeHandlerInvalidPayload(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status mismatch, got=%d body=%s", rec.Code, rec.Body.String())
 	}
-}
-
-func currentLoggingPolicy() runtimelogging.Policy {
-	loggingPolicyMu.RLock()
-	defer loggingPolicyMu.RUnlock()
-	return loggingPolicy
-}
-
-func setLoggingPolicy(policy runtimelogging.Policy) {
-	loggingPolicyMu.Lock()
-	defer loggingPolicyMu.Unlock()
-	loggingPolicy = policy
 }

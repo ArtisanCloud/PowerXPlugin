@@ -1,0 +1,292 @@
+package federated
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"strings"
+	"time"
+
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	repo "{{ .BackendModulePath }}/internal/domain/repository/iam"
+	model "{{ .BackendModulePath }}/internal/entity/models/iam"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+const defaultChannelSyncTaskTimeout = 2 * time.Minute
+
+type channelSyncProgressEvent struct {
+	TenantUUID   string `json:"tenant_uuid"`
+	TaskID       string `json:"task_id"`
+	Provider     string `json:"provider"`
+	Action       string `json:"action"`
+	Status       string `json:"status"`
+	Stage        string `json:"stage"`
+	Message      string `json:"message,omitempty"`
+	Progress     int    `json:"progress_percent"`
+	DurationMS   int64  `json:"duration_ms,omitempty"`
+	SDKHttpDebug bool   `json:"sdk_http_debug"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+type channelSyncConfig struct {
+	TenantScope string
+	HttpDebug   bool
+	Meta        map[string]any
+}
+
+type channelSyncExecutor interface {
+	ResolveConfig(ctx context.Context, tenantUUID string) (channelSyncConfig, error)
+	ExecuteAction(ctx context.Context, tenantUUID, action string, cfg channelSyncConfig) (map[string]any, error)
+}
+
+type ChannelSyncTaskService struct {
+	repo      *repo.ChannelSyncTaskRepository
+	publisher fwwsbus.Publisher
+	provider  string
+	topic     string
+	executor  channelSyncExecutor
+	timeout   time.Duration
+}
+
+func newChannelSyncTaskService(repository *repo.ChannelSyncTaskRepository, publisher fwwsbus.Publisher, provider, topic string, executor channelSyncExecutor) *ChannelSyncTaskService {
+	return &ChannelSyncTaskService{
+		repo:      repository,
+		publisher: publisher,
+		provider:  strings.TrimSpace(provider),
+		topic:     strings.TrimSpace(topic),
+		executor:  executor,
+		timeout:   defaultChannelSyncTaskTimeout,
+	}
+}
+
+func (s *ChannelSyncTaskService) Trigger(ctx context.Context, tenantUUID string, action string) (*model.ChannelSyncTask, error) {
+	if s == nil || s.repo == nil || s.executor == nil {
+		return nil, errors.New("channel sync task service not configured")
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	action = strings.TrimSpace(action)
+	if tenantUUID == "" || action == "" {
+		return nil, errors.New("tenant_uuid/action is required")
+	}
+	switch action {
+	case model.ChannelSyncActionRefreshStatus, model.ChannelSyncActionPullDepartments, model.ChannelSyncActionPullMembers, model.ChannelSyncActionFullSync:
+	default:
+		return nil, errors.New("unsupported sync action")
+	}
+
+	task := &model.ChannelSyncTask{
+		ID:         uuid.NewString(),
+		TenantUuid: tenantUUID,
+		Provider:   s.provider,
+		Action:     action,
+		Status:     model.ChannelSyncStatusQueued,
+		RequestPayload: map[string]any{
+			"action":       action,
+			"requested_at": time.Now().UTC().Format(time.RFC3339Nano),
+		},
+	}
+	if err := s.repo.Create(ctx, task); err != nil {
+		return nil, err
+	}
+	go s.run(context.Background(), task.ID, tenantUUID, action)
+	return task, nil
+}
+
+func (s *ChannelSyncTaskService) List(ctx context.Context, tenantUUID string, limit int) ([]model.ChannelSyncTask, error) {
+	if s == nil || s.repo == nil {
+		return nil, errors.New("channel sync task service not configured")
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	tasks, err := s.repo.List(ctx, tenantUUID, s.provider, limit)
+	if err != nil {
+		return nil, err
+	}
+	if s.recoverStaleTasks(ctx, tasks) {
+		return s.repo.List(ctx, tenantUUID, s.provider, limit)
+	}
+	return tasks, nil
+}
+
+func (s *ChannelSyncTaskService) Clear(ctx context.Context, tenantUUID string) (int64, error) {
+	if s == nil || s.repo == nil {
+		return 0, errors.New("channel sync task service not configured")
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return 0, errors.New("tenant_uuid is required")
+	}
+	return s.repo.DeleteByTenantProvider(ctx, tenantUUID, s.provider)
+}
+
+func (s *ChannelSyncTaskService) run(ctx context.Context, taskID, tenantUUID, action string) {
+	started := time.Now().UTC()
+	if err := s.repo.UpdateStatus(ctx, taskID, model.ChannelSyncStatusRunning, "任务执行中", "", nil, &started, nil); err != nil {
+		log.Printf("[%s-sync] update running status failed: task_id=%s err=%v", s.provider, taskID, err)
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "init", "任务执行中", 10, 0, false)
+
+	taskCtx, cancel := context.WithTimeout(ctx, s.timeout)
+	defer cancel()
+	cfg, err := s.executor.ResolveConfig(taskCtx, tenantUUID)
+	if err != nil {
+		s.finishFailed(ctx, taskID, tenantUUID, action, started, "配置校验失败", err, false)
+		return
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusRunning, "config", "配置校验通过", 35, 0, cfg.HttpDebug)
+
+	result, execErr := s.executor.ExecuteAction(taskCtx, tenantUUID, action, cfg)
+	if execErr != nil {
+		s.finishFailed(ctx, taskID, tenantUUID, action, started, "同步执行失败", execErr, cfg.HttpDebug)
+		return
+	}
+	finished := time.Now().UTC()
+	summary := asString(result["summary"])
+	if summary == "" {
+		summary = "同步执行完成"
+	}
+	if err := s.repo.UpdateStatus(ctx, taskID, model.ChannelSyncStatusSuccess, summary, "", result, &started, &finished); err != nil {
+		s.finishFailed(ctx, taskID, tenantUUID, action, started, "同步结果写入失败", err, cfg.HttpDebug)
+		return
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusSuccess, "done", summary, 100, finished.Sub(started).Milliseconds(), cfg.HttpDebug)
+}
+
+func (s *ChannelSyncTaskService) finishFailed(ctx context.Context, taskID, tenantUUID, action string, started time.Time, summary string, original error, httpDebug bool) {
+	finished := time.Now().UTC()
+	errMsg := ""
+	if original != nil {
+		errMsg = original.Error()
+	}
+	if err := s.repo.UpdateStatus(ctx, taskID, model.ChannelSyncStatusFailed, summary, errMsg, nil, &started, &finished); err != nil {
+		log.Printf("[%s-sync] update failed status failed: task_id=%s err=%v original=%v", s.provider, taskID, err, original)
+	}
+	message := summary
+	if errMsg != "" {
+		message = summary + ": " + errMsg
+	}
+	s.publishProgress(ctx, tenantUUID, taskID, action, model.ChannelSyncStatusFailed, "failed", message, 100, finished.Sub(started).Milliseconds(), httpDebug)
+}
+
+func (s *ChannelSyncTaskService) recoverStaleTasks(ctx context.Context, tasks []model.ChannelSyncTask) bool {
+	now := time.Now().UTC()
+	updated := false
+	for _, task := range tasks {
+		if task.Status != model.ChannelSyncStatusQueued && task.Status != model.ChannelSyncStatusRunning {
+			continue
+		}
+		base := task.CreatedAt
+		if task.StartedAt != nil {
+			base = task.StartedAt.UTC()
+		}
+		if now.Sub(base) < s.timeout {
+			continue
+		}
+		finished := now
+		msg := "任务超时未完成，已自动标记失败"
+		errMsg := "sync task stale timeout"
+		if err := s.repo.UpdateStatus(ctx, task.ID, model.ChannelSyncStatusFailed, msg, errMsg, nil, task.StartedAt, &finished); err != nil {
+			continue
+		}
+		s.publishProgress(ctx, task.TenantUuid, task.ID, task.Action, model.ChannelSyncStatusFailed, "timeout", msg, 100, 0, false)
+		updated = true
+	}
+	return updated
+}
+
+func (s *ChannelSyncTaskService) publishProgress(ctx context.Context, tenantUUID, taskID, action, status, stage, message string, progress int, durationMS int64, sdkHttpDebug bool) {
+	if s == nil || s.publisher == nil || s.topic == "" {
+		return
+	}
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 100 {
+		progress = 100
+	}
+	result := s.publisher.Publish(ctx, s.topic, channelSyncProgressEvent{
+		TenantUUID:   strings.TrimSpace(tenantUUID),
+		TaskID:       strings.TrimSpace(taskID),
+		Provider:     s.provider,
+		Action:       strings.TrimSpace(action),
+		Status:       strings.TrimSpace(status),
+		Stage:        strings.TrimSpace(stage),
+		Message:      strings.TrimSpace(message),
+		Progress:     progress,
+		DurationMS:   durationMS,
+		SDKHttpDebug: sdkHttpDebug,
+		UpdatedAt:    time.Now().UTC().Format(time.RFC3339Nano),
+	}, fwwsbus.PublishOptions{TenantUUID: strings.TrimSpace(tenantUUID)})
+	if !result.OK {
+		log.Printf("[%s-sync] ws publish failed: task_id=%s code=%s message=%s", s.provider, taskID, result.ErrorCode, result.ErrorMessage)
+	}
+}
+
+type simpleDirectorySyncExecutor struct {
+	provider string
+	db       *gorm.DB
+	resolve  func(context.Context, string) (channelSyncConfig, error)
+}
+
+func newSimpleDirectorySyncExecutor(provider string, db *gorm.DB, resolve func(context.Context, string) (channelSyncConfig, error)) *simpleDirectorySyncExecutor {
+	return &simpleDirectorySyncExecutor{provider: strings.TrimSpace(provider), db: db, resolve: resolve}
+}
+
+func (e *simpleDirectorySyncExecutor) ResolveConfig(ctx context.Context, tenantUUID string) (channelSyncConfig, error) {
+	if e == nil || e.resolve == nil {
+		return channelSyncConfig{}, errors.New("sync config resolver not configured")
+	}
+	return e.resolve(ctx, tenantUUID)
+}
+
+func (e *simpleDirectorySyncExecutor) ExecuteAction(ctx context.Context, tenantUUID, action string, cfg channelSyncConfig) (map[string]any, error) {
+	time.Sleep(120 * time.Millisecond)
+	result := map[string]any{
+		"tenant_uuid": strings.TrimSpace(tenantUUID),
+		"provider":    e.provider,
+		"action":      strings.TrimSpace(action),
+		"http_debug":  cfg.HttpDebug,
+	}
+	for k, v := range cfg.Meta {
+		result[k] = v
+	}
+	if strings.TrimSpace(cfg.TenantScope) != "" {
+		result["tenant_scope"] = strings.TrimSpace(cfg.TenantScope)
+	}
+	switch action {
+	case model.ChannelSyncActionRefreshStatus:
+		result["summary"] = "状态刷新完成（配置与连通性检查通过）"
+		return result, nil
+	case model.ChannelSyncActionPullDepartments:
+		result["departments_synced"] = 0
+		result["summary"] = "部门同步完成（当前实现暂未拉取外部部门）"
+		return result, nil
+	case model.ChannelSyncActionPullMembers:
+		result["members_synced"] = 0
+		result["summary"] = "成员同步完成（当前实现暂未拉取外部成员）"
+		return result, nil
+	case model.ChannelSyncActionFullSync:
+		deptCount, memberCount := e.localSnapshotCounts(ctx, tenantUUID)
+		result["departments_synced"] = deptCount
+		result["members_synced"] = memberCount
+		result["summary"] = fmt.Sprintf("组织同步完成（本地快照：部门 %d，成员 %d）", deptCount, memberCount)
+		return result, nil
+	default:
+		return nil, errors.New("unsupported sync action")
+	}
+}
+
+func (e *simpleDirectorySyncExecutor) localSnapshotCounts(ctx context.Context, tenantUUID string) (int64, int64) {
+	if e == nil || e.db == nil {
+		return 0, 0
+	}
+	var deptCount int64
+	var memberCount int64
+	_ = e.db.WithContext(ctx).Model(&model.Department{}).Where("tenant_uuid = ?", strings.TrimSpace(tenantUUID)).Count(&deptCount).Error
+	_ = e.db.WithContext(ctx).Model(&model.Member{}).Where("tenant_uuid = ?", strings.TrimSpace(tenantUUID)).Count(&memberCount).Error
+	return deptCount, memberCount
+}

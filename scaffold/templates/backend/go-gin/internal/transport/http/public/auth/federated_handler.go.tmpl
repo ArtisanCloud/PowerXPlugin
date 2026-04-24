@@ -33,6 +33,8 @@ type FederatedHandler struct {
 	authMode      *federatedService.AuthModeService
 	contextSvc    *federatedService.ContextService
 	wecomConfig   *federatedService.WeComConfigService
+	dingtalkCfg   *federatedService.DingTalkConfigService
+	larkCfg       *federatedService.LarkConfigService
 	auditSvc      *authobs.FederatedAuditService
 	defaultTenant string
 }
@@ -48,6 +50,8 @@ func NewFederatedHandler(deps *app.Deps) *FederatedHandler {
 		authMode:      federatedService.NewAuthModeService(os.Getenv("POWERX_FEDERATED_AUTH_MODE")),
 		contextSvc:    federatedService.NewContextService(),
 		wecomConfig:   federatedService.NewWeComConfigService(defaultDB(deps)),
+		dingtalkCfg:   federatedService.NewDingTalkConfigService(defaultDB(deps)),
+		larkCfg:       federatedService.NewLarkConfigService(defaultDB(deps)),
 		auditSvc:      authobs.NewFederatedAuditService(app.PluginID),
 		defaultTenant: defaultTenant,
 	}
@@ -599,24 +603,50 @@ func defaultDB(deps *app.Deps) *gorm.DB {
 
 func (h *FederatedHandler) resolveChallengeRedirectURI(c *gin.Context, providerKey, tenantUUID, state, nonce, rawRedirectURI string) string {
 	redirectURI := strings.TrimSpace(rawRedirectURI)
-	if !strings.EqualFold(strings.TrimSpace(providerKey), "wecom") || redirectURI == "" {
+	if redirectURI == "" {
 		return redirectURI
 	}
-	cfg, err := h.wecomConfig.GetByTenant(c.Request.Context(), tenantUUID)
+	callbackHost, err := h.resolveProviderCallbackHost(c, strings.TrimSpace(providerKey), tenantUUID)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
-			"component":   "iam.wecom_challenge",
+			"component":   "iam.federated_challenge",
 			"request_id":  c.GetString("request_id"),
 			"tenant_uuid": tenantUUID,
+			"provider":    strings.TrimSpace(providerKey),
 			"error":       err.Error(),
-		}).Warn("wecom challenge resolve config failed, fallback to original redirect_uri")
+		}).Warn("federated challenge resolve config failed, fallback to original redirect_uri")
 		return redirectURI
 	}
-	rewritten, ok := buildBrowserCallbackRedirectURI(redirectURI, cfg.CallbackHost, providerKey, tenantUUID, state, nonce)
+	rewritten, ok := buildBrowserCallbackRedirectURI(redirectURI, callbackHost, providerKey, tenantUUID, state, nonce)
 	if !ok {
 		return redirectURI
 	}
 	return rewritten
+}
+
+func (h *FederatedHandler) resolveProviderCallbackHost(c *gin.Context, providerKey, tenantUUID string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(providerKey)) {
+	case "wecom":
+		cfg, err := h.wecomConfig.GetByTenant(c.Request.Context(), tenantUUID)
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(cfg.CallbackHost), nil
+	case "dingtalk":
+		cfg, err := h.dingtalkCfg.GetByTenant(c.Request.Context(), tenantUUID)
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(cfg.CallbackHost), nil
+	case "lark":
+		cfg, err := h.larkCfg.GetByTenant(c.Request.Context(), tenantUUID)
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(cfg.CallbackHost), nil
+	default:
+		return "", fmt.Errorf("provider not supported")
+	}
 }
 
 func buildBrowserCallbackRedirectURI(rawRedirect, callbackHost, providerKey, tenantUUID, state, nonce string) (string, bool) {

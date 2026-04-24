@@ -117,6 +117,9 @@ runtime:
       enabled: true
       path: "/healthz"
   logging:
+    # 当 POWERX_PROXY=1 时，framework 将默认强制 stdout + json，
+    # 并由 PowerX 宿主统一采集转发到日志后端。
+    # file/loki 等扩展输出仅在平台显式授权时允许。
     level: "debug"
     format: "json"
     output: "stdout"

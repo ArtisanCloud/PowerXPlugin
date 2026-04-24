@@ -1,0 +1,76 @@
+package runtime_ops
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	"{{ .BackendModulePath }}/internal/contracts"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/gin-gonic/gin"
+)
+
+type probeSink struct {
+	name runtimelogging.SinkType
+}
+
+func (s *probeSink) Name() runtimelogging.SinkType                        { return s.name }
+func (s *probeSink) Emit(_ context.Context, _ runtimelogging.Event) error { return nil }
+
+type probeRequest struct {
+	Message    string         `json:"message"`
+	Level      string         `json:"level"`
+	Component  string         `json:"component"`
+	TraceID    string         `json:"trace_id"`
+	TenantUUID string         `json:"tenant_uuid"`
+	Event      string         `json:"event"`
+	Fields     map[string]any `json:"fields"`
+}
+
+func LoggingProbeHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req probeRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			contracts.ResponseBadRequest(c, "invalid payload")
+			return
+		}
+		loggingPolicyMu.RLock()
+		policy := loggingPolicy
+		loggingPolicyMu.RUnlock()
+
+		registry := runtimelogging.NewSinkRegistry()
+		_ = registry.Register(&probeSink{name: runtimelogging.SinkStdout})
+		_ = registry.Register(&probeSink{name: runtimelogging.SinkFile})
+		_ = registry.Register(&probeSink{name: runtimelogging.SinkLoki})
+		router, err := runtimelogging.NewRouter(policy, registry)
+		if err != nil {
+			contracts.ResponseBadRequest(c, err.Error())
+			return
+		}
+
+		traceID := strings.TrimSpace(req.TraceID)
+		if traceID == "" {
+			traceID = strings.TrimSpace(c.GetString("request_id"))
+		}
+		fields := runtimelogging.Fields(req.Fields)
+		if fields == nil {
+			fields = runtimelogging.Fields{}
+		}
+		fields[runtimelogging.FieldTraceID] = traceID
+		fields[runtimelogging.FieldTenantUUID] = strings.TrimSpace(req.TenantUUID)
+		fields[runtimelogging.FieldComponent] = strings.TrimSpace(req.Component)
+		fields[runtimelogging.FieldPluginID] = app.PluginID
+		if req.Event != "" {
+			fields["event"] = req.Event
+		}
+
+		outcomes := router.Route(c.Request.Context(), runtimelogging.Event{
+			Message:   strings.TrimSpace(req.Message),
+			Level:     strings.TrimSpace(req.Level),
+			Fields:    fields,
+			Timestamp: time.Now().UTC(),
+		})
+		contracts.ResponseSuccess(c, gin.H{"trace_id": traceID, "outcomes": outcomes})
+	}
+}

@@ -8,7 +8,9 @@ import (
 )
 
 const (
-	ChannelSyncProviderWeCom = "wecom"
+	ChannelSyncProviderWeCom    = "wecom"
+	ChannelSyncProviderDingTalk = "dingtalk"
+	ChannelSyncProviderLark     = "lark"
 
 	ChannelSyncActionRefreshStatus   = "refresh_status"
 	ChannelSyncActionPullDepartments = "pull_departments"

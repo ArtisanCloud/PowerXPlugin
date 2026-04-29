@@ -56,7 +56,7 @@ type Scheduler struct {
 // NewScheduler 构造 Scheduler。
 func NewScheduler(logger *pxlog.Entry) *Scheduler {
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.scheduler")
+		logger = pxlog.WithComponent("integration.scheduler")
 	}
 	return &Scheduler{
 		logger: logger,
@@ -81,9 +81,13 @@ func (s *Scheduler) Register(job Job) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.started {
-		s.logger.
-			WithField("job", job.Name()).
-			Warn("attempted to register job after scheduler start; ignoring")
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "scheduler_register",
+			"biz_domain": "integration",
+			"component":  "integration.scheduler",
+			"job":        job.Name(),
+		}), "attempted to register job after scheduler start; ignoring")
 		return
 	}
 	s.jobs = append(s.jobs, job)
@@ -129,7 +133,13 @@ func (s *Scheduler) Stop(ctx context.Context) {
 	select {
 	case <-done:
 	case <-ctx.Done():
-		s.logger.WithError(ctx.Err()).Warn("integration scheduler stop timed out")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "scheduler_stop",
+			"biz_domain": "integration",
+			"component":  "integration.scheduler",
+			"error":      ctx.Err().Error(),
+		}), "integration scheduler stop timed out")
 	}
 }
 
@@ -140,36 +150,63 @@ func (s *Scheduler) runJob(ctx context.Context, job Job) {
 		interval = time.Minute
 	}
 
-	logger := s.logger.WithField("job", job.Name())
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	s.execute(ctx, job, logger) // immediate run on start
+	s.execute(ctx, job) // immediate run on start
 
 	for {
 		select {
 		case <-ticker.C:
-			s.execute(ctx, job, logger)
+			s.execute(ctx, job)
 		case <-s.stopCh:
-			logger.Debug("scheduler stop signal received")
+			pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "integration",
+				"biz_scene":  "scheduler_run",
+				"biz_domain": "integration",
+				"component":  "integration.scheduler",
+				"job":        job.Name(),
+			}), "scheduler stop signal received")
 			return
 		case <-ctx.Done():
-			logger.WithError(ctx.Err()).Debug("scheduler context cancelled")
+			pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "integration",
+				"biz_scene":  "scheduler_run",
+				"biz_domain": "integration",
+				"component":  "integration.scheduler",
+				"job":        job.Name(),
+				"error":      ctx.Err().Error(),
+			}), "scheduler context cancelled")
 			return
 		}
 	}
 }
 
-func (s *Scheduler) execute(ctx context.Context, job Job, logger *pxlog.Entry) {
+func (s *Scheduler) execute(ctx context.Context, job Job) {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.WithField("panic", r).Error("integration job panicked")
+			pxlog.ErrorCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "integration",
+				"biz_scene":  "scheduler_execute",
+				"biz_domain": "integration",
+				"component":  "integration.scheduler",
+				"job":        job.Name(),
+				"panic":      r,
+			}), "integration job panicked")
 		}
 	}()
 
 	runCtx := ctx
 	if traceID, err := s.dispatchTrigger(ctx, job); err != nil {
-		logger.WithError(err).WithField("topic", SchedulerTriggeredTopic).Error("scheduler trigger dispatch failed")
+		pxlog.ErrorCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "scheduler_trigger_dispatch",
+			"biz_domain": "integration",
+			"component":  "integration.scheduler",
+			"job":        job.Name(),
+			"topic":      SchedulerTriggeredTopic,
+			"error":      err.Error(),
+		}), "scheduler trigger dispatch failed")
 		return
 	} else if traceID != "" {
 		runCtx = context.WithValue(ctx, "request_id", traceID)
@@ -177,10 +214,24 @@ func (s *Scheduler) execute(ctx context.Context, job Job, logger *pxlog.Entry) {
 
 	start := time.Now()
 	if err := job.Run(runCtx); err != nil {
-		logger.WithError(err).Error("integration job execution failed")
+		pxlog.ErrorCtx(pxlog.WithLogFields(runCtx, map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "scheduler_execute",
+			"biz_domain": "integration",
+			"component":  "integration.scheduler",
+			"job":        job.Name(),
+			"error":      err.Error(),
+		}), "integration job execution failed")
 		return
 	}
-	logger.WithField("elapsed", time.Since(start)).Debug("integration job executed")
+	pxlog.DebugCtx(pxlog.WithLogFields(runCtx, map[string]interface{}{
+		"module":     "integration",
+		"biz_scene":  "scheduler_execute",
+		"biz_domain": "integration",
+		"component":  "integration.scheduler",
+		"job":        job.Name(),
+		"elapsed":    time.Since(start),
+	}), "integration job executed")
 }
 
 func (s *Scheduler) dispatchTrigger(ctx context.Context, job Job) (string, error) {

@@ -32,7 +32,7 @@ type RandomSecretProvider struct {
 // NewRandomSecretProvider constructs a default provider.
 func NewRandomSecretProvider(logger *pxlog.Entry) *RandomSecretProvider {
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.secret_provider.random")
+		logger = pxlog.WithComponent("integration.secret_provider.random")
 	}
 	return &RandomSecretProvider{logger: logger}
 }
@@ -44,10 +44,14 @@ func (p *RandomSecretProvider) Issue(ctx context.Context, tenantID, integrationT
 	if err != nil {
 		return nil, err
 	}
-	p.logger.WithFields(pxlog.Fields{
-		"tenant_uuid":        tenantID,
+	pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+		"module":           "integration",
+		"biz_scene":        "secret_provider_issue",
+		"biz_domain":       "integration",
+		"component":        "integration.secret_provider.random",
+		"tenant_uuid":      tenantID,
 		"integration_type": integrationType,
-	}).Debug("issued random secret material")
+	}), "issued random secret material")
 	return &SecretMaterial{
 		Reference: ref,
 		Secret:    secret,
@@ -56,10 +60,14 @@ func (p *RandomSecretProvider) Issue(ctx context.Context, tenantID, integrationT
 
 // Revoke logs the revocation request—it is a no-op for local provider.
 func (p *RandomSecretProvider) Revoke(ctx context.Context, tenantID, reference string) error {
-	p.logger.WithFields(pxlog.Fields{
+	pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+		"module":      "integration",
+		"biz_scene":   "secret_provider_revoke",
+		"biz_domain":  "integration",
+		"component":   "integration.secret_provider.random",
 		"tenant_uuid": tenantID,
-		"reference": reference,
-	}).Debug("revoked secret reference")
+		"reference":   reference,
+	}), "revoked secret reference")
 	return nil
 }
 

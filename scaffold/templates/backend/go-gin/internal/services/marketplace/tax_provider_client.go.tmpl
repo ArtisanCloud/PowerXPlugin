@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/config"
-	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 )
 
 var (
@@ -151,10 +151,15 @@ func (c *TaxProviderClient) CreateTransaction(ctx context.Context, req *TaxCharg
 		}
 
 		if c.logger != nil {
-			c.logger.WithError(err).WithFields(pxlog.Fields{
-				"provider": c.provider,
-				"attempt":  i + 1,
-			}).Warn("tax provider dispatch failed, retrying")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "marketplace",
+				"provider":   c.provider,
+				"attempt":    i + 1,
+				"biz_scene":  "tax_provider_dispatch",
+				"biz_domain": "marketplace",
+				"component":  "marketplace.tax_provider_client",
+				"error":      err.Error(),
+			}), "tax provider dispatch failed, retrying")
 		}
 	}
 
@@ -194,10 +199,15 @@ func (c *TaxProviderClient) ReplayTransaction(ctx context.Context, externalTrans
 		}
 
 		if c.logger != nil {
-			c.logger.WithError(err).WithFields(pxlog.Fields{
-				"provider": c.provider,
-				"attempt":  i + 1,
-			}).Warn("tax provider replay failed, retrying")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "marketplace",
+				"provider":   c.provider,
+				"attempt":    i + 1,
+				"biz_scene":  "tax_provider_replay",
+				"biz_domain": "marketplace",
+				"component":  "marketplace.tax_provider_client",
+				"error":      err.Error(),
+			}), "tax provider replay failed, retrying")
 		}
 	}
 

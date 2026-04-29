@@ -57,9 +57,14 @@ func (g *PrivacyGuard) EnsureConsent(ctx context.Context, tenantID string, requi
 		values, parseErr := token.ScopeValues()
 		if parseErr != nil {
 			if g.logger != nil {
-				g.logger.WithError(parseErr).
-					WithField("token_id", token.ID).
-					Warn("failed to parse consent scope")
+				pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+					"module":     "agent",
+					"biz_scene":  "privacy_consent_scope",
+					"biz_domain": "security",
+					"component":  "agent.privacy_guard",
+					"token_id":   token.ID,
+					"error":      parseErr.Error(),
+				}), "failed to parse consent scope")
 			}
 			continue
 		}

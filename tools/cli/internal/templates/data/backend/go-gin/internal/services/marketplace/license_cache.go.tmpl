@@ -9,8 +9,8 @@ import (
 	"time"
 
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
-	"github.com/redis/go-redis/v9"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/datatypes"
 )
 
@@ -43,7 +43,7 @@ func NewRedisLicenseCache(redisURL, keyPrefix string, logger *pxlog.Entry) (*Red
 		keyPrefix = defaultLicenseCachePrefix
 	}
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace.license_cache")
+		logger = pxlog.WithComponent("marketplace.license_cache")
 	}
 	return &RedisLicenseCache{
 		client: client,
@@ -66,14 +66,28 @@ func (c *RedisLicenseCache) Get(ctx context.Context, tenantID, listingID string)
 	raw, err := c.client.Get(ctx, key).Bytes()
 	if err != nil {
 		if !errors.Is(err, redis.Nil) && c.logger != nil {
-			c.logger.WithError(err).WithField("key", key).Debug("license cache get failed")
+			pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "marketplace",
+				"key":        key,
+				"biz_scene":  "license_cache_get",
+				"biz_domain": "marketplace",
+				"component":  "marketplace.license_cache",
+				"error":      err.Error(),
+			}), "license cache get failed")
 		}
 		return nil, false
 	}
 	var payload licenseCacheEntry
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		if c.logger != nil {
-			c.logger.WithError(err).WithField("key", key).Warn("failed to decode license cache payload, deleting")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "marketplace",
+				"key":        key,
+				"biz_scene":  "license_cache_decode",
+				"biz_domain": "marketplace",
+				"component":  "marketplace.license_cache",
+				"error":      err.Error(),
+			}), "failed to decode license cache payload, deleting")
 		}
 		_, _ = c.client.Del(ctx, key).Result()
 		return nil, false
@@ -98,12 +112,28 @@ func (c *RedisLicenseCache) Set(ctx context.Context, tenantID, listingID string,
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		if c.logger != nil {
-			c.logger.WithError(err).WithField("license_id", license.ID).Warn("failed to marshal license cache payload")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "marketplace",
+				"license_id": license.ID,
+				"biz_scene":  "license_cache_set",
+				"biz_domain": "marketplace",
+				"component":  "marketplace.license_cache",
+				"error":      err.Error(),
+			}), "failed to marshal license cache payload")
 		}
 		return
 	}
 	if err := c.client.Set(ctx, c.cacheKey(tenantID, listingID), raw, ttl).Err(); err != nil && c.logger != nil {
-		c.logger.WithError(err).WithField("license_id", license.ID).Warn("failed to set license cache entry")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "marketplace",
+			"license_id":  license.ID,
+			"tenant_uuid": tenantID,
+			"listing_id":  listingID,
+			"biz_scene":   "license_cache_set",
+			"biz_domain":  "marketplace",
+			"component":   "marketplace.license_cache",
+			"error":       err.Error(),
+		}), "failed to set license cache entry")
 	}
 }
 
@@ -118,7 +148,15 @@ func (c *RedisLicenseCache) Delete(ctx context.Context, tenantID, listingID stri
 		return
 	}
 	if err := c.client.Del(ctx, c.cacheKey(tenantID, listingID)).Err(); err != nil && c.logger != nil && !errors.Is(err, redis.Nil) {
-		c.logger.WithError(err).WithField("tenant_uuid", tenantID).WithField("listing_id", listingID).Debug("failed to delete license cache entry")
+		pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "marketplace",
+			"tenant_uuid": tenantID,
+			"listing_id":  listingID,
+			"biz_scene":   "license_cache_delete",
+			"biz_domain":  "marketplace",
+			"component":   "marketplace.license_cache",
+			"error":       err.Error(),
+		}), "failed to delete license cache entry")
 	}
 }
 

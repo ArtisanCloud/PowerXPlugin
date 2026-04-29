@@ -12,9 +12,9 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
 	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 	"github.com/google/uuid"
-	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -106,7 +106,7 @@ type LicenseService struct {
 // NewLicenseService constructs the service with dependencies.
 func NewLicenseService(cfg *config.Config, pricingRepo *mrepo.PricingRepository, licenseRepo *mrepo.LicenseRepository, taxClient *TaxProviderClient, billing BillingClient, authority LicenseAuthority, cache LicenseCache, logger *pxlog.Entry) *LicenseService {
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_license_service")
+		logger = pxlog.WithComponent("marketplace_license_service")
 	}
 	return &LicenseService{
 		cfg:           cfg,
@@ -210,7 +210,17 @@ func (s *LicenseService) IssueLicense(ctx context.Context, params IssueLicensePa
 		} else {
 			taxErr = err
 			marketobs.IncrementTaxProviderError(s.taxClient.Provider(), "dispatch_error")
-			s.logger.WithError(err).Warn("tax transaction failed")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "marketplace",
+				"tenant_uuid": params.TenantUuid,
+				"listing_id":  params.ListingID,
+				"plan_id":     params.PlanID,
+				"billing_id":  billingID,
+				"biz_scene":   "tax_transaction_create",
+				"biz_domain":  "marketplace",
+				"component":   "marketplace_license_service",
+				"error":       err.Error(),
+			}), "tax transaction failed")
 		}
 	}
 

@@ -6,8 +6,8 @@ import (
 
 	"{{ .BackendModulePath }}/internal/config"
 	mrepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
-	"{{ .BackendModulePath }}/internal/services/recommendation"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	"{{ .BackendModulePath }}/internal/services/recommendation"
 )
 
 // MetricsProvider defines the interface to fetch signals for recommendation scoring.
@@ -28,7 +28,7 @@ type SyncJob struct {
 // NewSyncJob constructs a new recommendation synchronization job.
 func NewSyncJob(cfg *config.Config, repo *mrepo.ListingRepository, provider MetricsProvider, logger *pxlog.Entry, tenantResolver func(context.Context) ([]string, error)) *SyncJob {
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_recommendation_sync")
+		logger = pxlog.WithComponent("marketplace_recommendation_sync")
 	}
 	interval := time.Hour
 	if cfg != nil {
@@ -69,21 +69,38 @@ func (j *SyncJob) execute(ctx context.Context) {
 	}
 	tenants, err := j.tenants(ctx)
 	if err != nil {
-		j.logger.WithError(err).Warn("failed to enumerate tenants for recommendation sync")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "marketplace",
+			"biz_scene":  "marketplace_recommendation_sync",
+			"biz_domain": "marketplace",
+			"component":  "marketplace_recommendation_sync",
+			"error":      err.Error(),
+		}), "failed to enumerate tenants for recommendation sync")
 		return
 	}
 	engine := recommendation.NewEngine(j.repo, j.provider, j.logger)
 	for _, tenantID := range tenants {
 		result, err := engine.RefreshRecommendations(ctx, tenantID)
 		if err != nil {
-			j.logger.WithError(err).WithField("tenant_uuid", tenantID).Error("recommendation sync failed")
+			pxlog.ErrorCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "marketplace",
+				"biz_scene":   "marketplace_recommendation_sync",
+				"biz_domain":  "marketplace",
+				"component":   "marketplace_recommendation_sync",
+				"tenant_uuid": tenantID,
+				"error":       err.Error(),
+			}), "recommendation sync failed")
 			continue
 		}
-		j.logger.WithFields(pxlog.Fields{
-			"tenant_uuid":         tenantID,
+		pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":            "marketplace",
+			"biz_scene":         "marketplace_recommendation_sync",
+			"biz_domain":        "marketplace",
+			"component":         "marketplace_recommendation_sync",
+			"tenant_uuid":       tenantID,
 			"updated":           result.UpdatedCount,
 			"average_weight":    result.AverageWeight,
 			"exploration_share": result.ExplorationShare,
-		}).Info("recommendation weights refreshed")
+		}), "recommendation weights refreshed")
 	}
 }

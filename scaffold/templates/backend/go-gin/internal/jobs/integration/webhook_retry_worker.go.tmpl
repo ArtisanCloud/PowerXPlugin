@@ -6,9 +6,9 @@ import (
 
 	model "{{ .BackendModulePath }}/internal/entity/models/integration"
 	repo "{{ .BackendModulePath }}/internal/entity/repository/integration"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	obs "{{ .BackendModulePath }}/internal/observability/integration"
 	service "{{ .BackendModulePath }}/internal/services/integration"
-	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 // WebhookRetryWorker implements background retry logic for webhook deliveries.
@@ -32,7 +32,7 @@ func NewWebhookRetryWorker(
 		interval = time.Minute
 	}
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.webhook_retry_worker")
+		logger = pxlog.WithComponent("integration.webhook_retry_worker")
 	}
 	return &WebhookRetryWorker{
 		service:       svc,
@@ -56,7 +56,12 @@ func (w *WebhookRetryWorker) Interval() time.Duration {
 // Run scans due attempts and schedules next retries or DLQ transitions.
 func (w *WebhookRetryWorker) Run(ctx context.Context) error {
 	if w.service == nil || w.attempts == nil || w.subscriptions == nil {
-		w.logger.Warn("webhook retry worker dependencies not configured; skipping run")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "webhook_retry_run",
+			"biz_domain": "integration",
+			"component":  "integration.webhook_retry_worker",
+		}), "webhook retry worker dependencies not configured; skipping run")
 		return nil
 	}
 
@@ -78,7 +83,14 @@ func (w *WebhookRetryWorker) Run(ctx context.Context) error {
 
 		sub, err := w.subscriptions.GetBySubscriptionID(ctx, attempt.SubscriptionID)
 		if err != nil {
-			w.logger.WithError(err).WithField("attempt_id", attempt.ID).Warn("failed to load subscription for retry")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "integration",
+				"biz_scene":  "webhook_retry_run",
+				"biz_domain": "integration",
+				"component":  "integration.webhook_retry_worker",
+				"attempt_id": attempt.ID,
+				"error":      err.Error(),
+			}), "failed to load subscription for retry")
 			continue
 		}
 		if sub == nil {
@@ -89,7 +101,14 @@ func (w *WebhookRetryWorker) Run(ctx context.Context) error {
 		next, moveToDLQ := w.service.NextRetry(sub, attempt.RetryCount)
 		if moveToDLQ {
 			if err := w.service.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusDLQ, attempt.RetryCount, nil, attempt.LastError, sub.TenantUuid); err != nil {
-				w.logger.WithError(err).WithField("attempt_id", attempt.ID).Warn("failed to mark attempt as DLQ")
+				pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+					"module":     "integration",
+					"biz_scene":  "webhook_retry_mark_dlq",
+					"biz_domain": "integration",
+					"component":  "integration.webhook_retry_worker",
+					"attempt_id": attempt.ID,
+					"error":      err.Error(),
+				}), "failed to mark attempt as DLQ")
 				continue
 			}
 			obs.RecordWebhookAttempt("dlq", sub.TenantUuid)
@@ -98,7 +117,14 @@ func (w *WebhookRetryWorker) Run(ctx context.Context) error {
 
 		err = w.service.UpdateAttemptStatus(ctx, attempt.ID, model.AttemptStatusRetrying, attempt.RetryCount+1, &next, attempt.LastError, sub.TenantUuid)
 		if err != nil {
-			w.logger.WithError(err).WithField("attempt_id", attempt.ID).Warn("failed to schedule next retry")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "integration",
+				"biz_scene":  "webhook_retry_schedule",
+				"biz_domain": "integration",
+				"component":  "integration.webhook_retry_worker",
+				"attempt_id": attempt.ID,
+				"error":      err.Error(),
+			}), "failed to schedule next retry")
 			continue
 		}
 		obs.RecordWebhookAttempt("retrying", sub.TenantUuid)

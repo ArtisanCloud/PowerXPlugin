@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	"github.com/google/uuid"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -62,7 +62,7 @@ func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitt
 	}
 
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.scheduler_dispatcher")
+		logger = pxlog.WithComponent("integration.scheduler_dispatcher")
 	}
 
 	return &SchedulerEventDispatcher{
@@ -107,11 +107,16 @@ func (d *SchedulerEventDispatcher) DispatchCronTrigger(ctx context.Context, jobN
 	})
 	if err != nil {
 		if d.logger != nil {
-			d.logger.WithError(err).WithFields(pxlog.Fields{
-				"topic":    SchedulerTriggeredTopic,
-				"trace_id": traceID,
-				"job_name": jobName,
-			}).Warn("failed to emit scheduler trigger event")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "integration",
+				"topic":      SchedulerTriggeredTopic,
+				"trace_id":   traceID,
+				"job_name":   jobName,
+				"biz_scene":  "scheduler_trigger_emit",
+				"biz_domain": "integration",
+				"component":  "integration.scheduler_dispatcher",
+				"error":      err.Error(),
+			}), "failed to emit scheduler trigger event")
 		}
 		return "", err
 	}

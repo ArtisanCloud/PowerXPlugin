@@ -97,14 +97,12 @@ func RequestLogger() gin.HandlerFunc {
 		fields["plugin_id"] = pluginIDForLog()
 
 		// 根据状态码选择日志级别
-		entry := logger.HTTPMiddleware().WithFields(fields)
-
 		if c.Writer.Status() >= 500 {
-			entry.Error("HTTP request completed with server error")
+			logger.ErrorWith(logger.HTTPMiddleware(), c.Request.Context(), "HTTP request completed with server error", fields)
 		} else if c.Writer.Status() >= 400 {
-			entry.Warn("HTTP request completed with client error")
+			logger.WarnWith(logger.HTTPMiddleware(), c.Request.Context(), "HTTP request completed with client error", fields)
 		} else {
-			entry.Info("HTTP request completed")
+			logger.InfoWith(logger.HTTPMiddleware(), c.Request.Context(), "HTTP request completed", fields)
 		}
 	}
 }
@@ -117,12 +115,12 @@ func Recovery() gin.HandlerFunc {
 				// 记录错误堆栈
 				stack := string(debug.Stack())
 
-				logger.HTTPMiddleware().WithFields(logger.Fields{
+				logger.ErrorWith(logger.HTTPMiddleware(), c.Request.Context(), "Panic recovered", logger.Fields{
 					"error":  err,
 					"stack":  stack,
 					"path":   c.Request.URL.Path,
 					"method": c.Request.Method,
-				}).Error("Panic recovered")
+				})
 
 				// 返回错误响应
 				c.JSON(http.StatusInternalServerError, gin.H{

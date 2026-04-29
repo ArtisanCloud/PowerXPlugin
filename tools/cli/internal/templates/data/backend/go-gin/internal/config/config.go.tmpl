@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -13,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
 
@@ -418,7 +419,13 @@ func Load() (*Config, error) {
 	// 尝试加载 YAML 配置文件
 	configDir, err := loadYAMLConfig(cfg)
 	if err != nil {
-		pxlog.WithError(err).Warn("Failed to load YAML config, using defaults only")
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "config",
+			"biz_scene":  "config_load",
+			"biz_domain": "runtime_ops",
+			"component":  "config.loader",
+			"error":      err.Error(),
+		}), "Failed to load YAML config, using defaults only")
 	}
 	if strings.TrimSpace(configDir) != "" {
 		loadEnvFiles(configDir, filepath.Dir(configDir))
@@ -707,13 +714,27 @@ func loadSecurityBaselineConfig(cfg *Config) {
 
 	data, err := os.ReadFile(baselinePath)
 	if err != nil {
-		pxlog.WithError(err).Warnf("Failed to read security baseline config %s", baselinePath)
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "config",
+			"biz_scene":  "security_baseline_load",
+			"biz_domain": "security",
+			"component":  "config.loader",
+			"path":       baselinePath,
+			"error":      err.Error(),
+		}), "Failed to read security baseline config")
 		return
 	}
 
 	baseline := defaultSecurityBaselineConfig()
 	if err := yaml.Unmarshal(data, baseline); err != nil {
-		pxlog.WithError(err).Warnf("Failed to parse security baseline config %s", baselinePath)
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "config",
+			"biz_scene":  "security_baseline_load",
+			"biz_domain": "security",
+			"component":  "config.loader",
+			"path":       baselinePath,
+			"error":      err.Error(),
+		}), "Failed to parse security baseline config")
 		return
 	}
 
@@ -1120,11 +1141,15 @@ func normalizeConfig(cfg *Config) {
 		if cfg.Gateway.AuthScheme == "bearer" {
 			if tokenTenant := tenantUUIDFromJWT(cfg.Gateway.ToolToken); tokenTenant != "" {
 				if cfg.Gateway.TenantUUID != "" && cfg.Gateway.TenantUUID != tokenTenant {
-					pxlog.WithFields(pxlog.Fields{
+					pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+						"module":                   "config",
+						"biz_scene":                "gateway_normalize",
+						"biz_domain":               "integration",
+						"component":                "config.loader",
 						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
 						"gateway.token_tid":         tokenTenant,
 						"gateway.tenant_from_token": true,
-					}).Warn("gateway.tenant_uuid differs from PX_PLUGIN_TOOL_TOKEN tid; overriding with token tid")
+					}), "gateway.tenant_uuid differs from PX_PLUGIN_TOOL_TOKEN tid; overriding with token tid")
 				}
 				cfg.Gateway.TenantUUID = tokenTenant
 			}
@@ -1142,13 +1167,17 @@ func normalizeConfig(cfg *Config) {
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
 
 			if hasAny && incomplete {
-				pxlog.WithFields(pxlog.Fields{
+				pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+					"module":              "config",
+					"biz_scene":           "gateway_normalize",
+					"biz_domain":          "integration",
+					"component":           "config.loader",
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.tool_token":  toolToken != "",
 					"gateway.api_key":     apiKey != "",
 					"gateway.tenant_uuid": tenantUUID,
-				}).Warn("Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
+				}), "Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
 
 				cfg.Gateway.BaseURL = ""
 				cfg.Gateway.AuthScheme = ""

@@ -24,7 +24,7 @@ type PurgeResult struct {
 // NewPrivacyService constructs the service.
 func NewPrivacyService(usageRepo UsageDataRepository, logger *pxlog.Entry) *PrivacyService {
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_privacy_service")
+		logger = pxlog.WithComponent("marketplace_privacy_service")
 	}
 	return &PrivacyService{
 		usageRepo: usageRepo,
@@ -52,13 +52,17 @@ func (s *PrivacyService) PurgeUsageData(ctx context.Context, tenantID, licenseID
 		return nil, err
 	}
 	if s.logger != nil {
-		s.logger.WithFields(pxlog.Fields{
-			"tenant_uuid":          tenantID,
+		pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":             "marketplace",
+			"biz_scene":          "marketplace_usage_purge",
+			"biz_domain":         "marketplace",
+			"component":          "marketplace_privacy_service",
+			"tenant_uuid":        tenantID,
 			"license_id":         licenseID,
 			"cutoff":             cutoff.Format(time.RFC3339),
 			"envelopes_deleted":  envDeleted,
 			"aggregates_deleted": aggDeleted,
-		}).Info("purged marketplace usage data")
+		}), "purged marketplace usage data")
 	}
 	return &PurgeResult{EnvelopesDeleted: envDeleted, AggregatesDeleted: aggDeleted}, nil
 }

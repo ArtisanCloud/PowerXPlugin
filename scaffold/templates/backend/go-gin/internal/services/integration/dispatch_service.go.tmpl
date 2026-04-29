@@ -13,8 +13,8 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
 	idrepo "{{ .BackendModulePath }}/internal/entity/repository/integration"
-	obsintegration "{{ .BackendModulePath }}/internal/observability/integration"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	obsintegration "{{ .BackendModulePath }}/internal/observability/integration"
 	"gorm.io/datatypes"
 )
 
@@ -61,7 +61,7 @@ func NewDispatchService(
 	logger *pxlog.Entry,
 ) *DispatchService {
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.dispatch_service")
+		logger = pxlog.WithComponent("integration.dispatch_service")
 	}
 	payloadThreshold := int64(1 << 20) // default 1 MB
 	if cfg != nil {
@@ -149,10 +149,15 @@ func (s *DispatchService) Dispatch(ctx context.Context, channel, resource, actio
 	}
 
 	if err := s.persistIdempotentResponse(ctx, channel, envelope, outcome, result); err != nil {
-		s.logger.WithError(err).
-			WithField("tenant_uuid", envelope.TenantUuid).
-			WithField("tool_scope", envelope.ToolScope).
-			Warn("failed to persist idempotent response")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "integration",
+			"biz_scene":   "dispatch_envelope",
+			"biz_domain":  "integration",
+			"component":   "integration.dispatch_service",
+			"tenant_uuid": envelope.TenantUuid,
+			"tool_scope":  envelope.ToolScope,
+			"error":       err.Error(),
+		}), "failed to persist idempotent response")
 	}
 
 	obsintegration.RecordEnvelope(channel, "accepted")
@@ -202,12 +207,16 @@ func (s *DispatchService) handleIdempotencyClaim(
 		if latency := getStoredLatency(res.Record.Response); latency > 0 {
 			outcome.Latency = latency
 		}
-		s.logger.WithFields(pxlog.Fields{
+		pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":          "integration",
+			"biz_scene":       "dispatch_idempotency_replay",
+			"biz_domain":      "integration",
+			"component":       "integration.dispatch_service",
 			"idempotency_key": envelope.IdempotencyKey,
 			"tenant_uuid":     envelope.TenantUuid,
 			"tool_scope":      envelope.ToolScope,
 			"channel":         channel,
-		}).Info("integration dispatch replayed from idempotency record")
+		}), "integration dispatch replayed from idempotency record")
 		return true, nil
 	}
 

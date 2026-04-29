@@ -129,7 +129,7 @@ func NewClient(cfg *config.Config, log *logger.Entry) *Client {
 		useMock: make(map[string]struct{}),
 		cfg:     cfg,
 	}
-	c.logger = c.logger.WithField("component", "skeleton.gateway.client")
+	c.logger = logger.WithComponent("skeleton.gateway.client")
 
 	if cfg == nil || cfg.Gateway == nil {
 		c.offlineReason = "未找到 gateway 配置，请执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 或在 .env.local 写入 PX_GATEWAY_*"
@@ -181,14 +181,22 @@ func NewClient(cfg *config.Config, log *logger.Entry) *Client {
 
 	if err := c.reconnectTransport(); err != nil {
 		c.offlineReason = fmt.Sprintf("初始化 Gateway Client 失败: %v", err)
-		c.logger.WithError(err).Warn("无法初始化 Gateway Client，Skeleton 将保持离线状态")
+		logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+			"component":  "skeleton.gateway.client",
+			"biz_scene":  "gateway_init",
+			"biz_domain": "integration",
+			"error":      err.Error(),
+		}), "无法初始化 Gateway Client，Skeleton 将保持离线状态")
 		return c
 	}
 
-	c.logger.WithFields(logger.Fields{
+	logger.InfoCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+		"component":   "skeleton.gateway.client",
 		"mockModules": c.mockModules(),
 		"baseURL":     baseURL,
-	}).Info("Gateway Client 初始化完成")
+		"biz_scene":   "gateway_init",
+		"biz_domain":  "integration",
+	}), "Gateway Client 初始化完成")
 	return c
 }
 
@@ -201,11 +209,14 @@ func (c *Client) Enabled() bool {
 func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult, error) {
 	module, mocked := c.shouldMock(params.CapabilityID)
 	if mocked {
-		c.logger.WithFields(logger.Fields{
+		logger.InfoWith(c.logger, ctx, "PX_USE_MOCK 生效，返回 Mock 数据", map[string]interface{}{
 			"capability": params.CapabilityID,
 			"action":     params.Action,
 			"module":     module,
-		}).Info("PX_USE_MOCK 生效，返回 Mock 数据")
+			"biz_scene":  "gateway_invoke",
+			"biz_domain": "integration",
+			"component":  "skeleton.gateway.client",
+		})
 		return c.mockResult(module, params, "PX_USE_MOCK"), nil
 	}
 
@@ -276,7 +287,8 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		if tenantAudit == "" {
 			tenantAudit = tokenTID
 		}
-		c.logger.WithFields(logger.Fields{
+		logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"component":              "skeleton.gateway.client",
 			"capability":             params.CapabilityID,
 			"action":                 params.Action,
 			"preferred_protocol":     params.PreferredProtocol,
@@ -298,7 +310,9 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 			"trace_id":               strings.TrimSpace(params.RequestID),
 			"token_roles":            tokenClaims.Roles,
 			"token_permissions":      tokenClaims.Permissions,
-		}).Info("gateway invoke dispatch")
+			"biz_scene":              "gateway_invoke",
+			"biz_domain":             "integration",
+		}), "gateway invoke dispatch")
 	}
 	resp, err := c.transport.Invoke(ctx, req)
 	if err != nil {
@@ -409,7 +423,12 @@ func (c *Client) handleInvokeError(ctx context.Context, req frameworkgateway.Inv
 	}
 	refreshed, err := c.refreshCredentials(ctx)
 	if err != nil {
-		c.logger.WithError(err).Warn("PX_PLUGIN_TOOL_TOKEN 自动刷新失败")
+		logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"component":  "skeleton.gateway.client",
+			"biz_scene":  "gateway_token_refresh",
+			"biz_domain": "integration",
+			"error":      err.Error(),
+		}), "PX_PLUGIN_TOOL_TOKEN 自动刷新失败")
 		return nil, invokeErr
 	}
 	if !refreshed {
@@ -711,7 +730,7 @@ func ensureLogger(entry *logger.Entry) *logger.Entry {
 	if entry != nil {
 		return entry
 	}
-	return logger.WithField("component", "skeleton.gateway.client")
+	return logger.WithComponent("skeleton.gateway.client")
 }
 
 // ValidateDelegatedConfig validates delegated gateway contract v1.
@@ -766,14 +785,22 @@ func (c *Client) refreshCredentials(ctx context.Context) (bool, error) {
 	if strings.TrimSpace(c.cfg.Gateway.RefreshToken) == "" {
 		return false, fmt.Errorf("PX_TOOL_REFRESH_TOKEN 未配置")
 	}
-	c.logger.Info("检测到 Gateway 凭证失败，尝试自动刷新 PX_PLUGIN_TOOL_TOKEN")
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"component":  "skeleton.gateway.client",
+		"biz_scene":  "gateway_token_refresh",
+		"biz_domain": "integration",
+	}), "检测到 Gateway 凭证失败，尝试自动刷新 PX_PLUGIN_TOOL_TOKEN")
 	if _, _, err := RefreshToolToken(ctx, c.cfg); err != nil {
 		return false, err
 	}
 	if err := c.reconnectTransport(); err != nil {
 		return false, err
 	}
-	c.logger.Info("PX_PLUGIN_TOOL_TOKEN 已刷新，准备重试 Gateway 调用")
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"component":  "skeleton.gateway.client",
+		"biz_scene":  "gateway_token_refresh",
+		"biz_domain": "integration",
+	}), "PX_PLUGIN_TOOL_TOKEN 已刷新，准备重试 Gateway 调用")
 	return true, nil
 }
 

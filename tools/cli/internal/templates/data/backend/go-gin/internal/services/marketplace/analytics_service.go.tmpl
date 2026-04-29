@@ -10,8 +10,8 @@ import (
 
 	"{{ .BackendModulePath }}/internal/config"
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
-	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -112,7 +112,7 @@ func NewAnalyticsService(
 	logger *pxlog.Entry,
 ) *AnalyticsService {
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_analytics_service")
+		logger = pxlog.WithComponent("marketplace_analytics_service")
 	}
 	svc := &AnalyticsService{
 		cfg:              cfg,
@@ -234,7 +234,16 @@ func (s *AnalyticsService) RecordEnvelope(ctx context.Context, tenantID string, 
 					Status: dbm.NotificationStatusPending,
 				}
 				if err := s.notificationRepo.QueueNotification(ctx, &payload); err != nil {
-					s.logger.WithError(err).Warn("failed to queue usage alert notification")
+					pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+						"module":      "marketplace",
+						"tenant_uuid": tenantID,
+						"license_id":  license.ID,
+						"metric":      dayAfter.Metric,
+						"biz_scene":   "usage_alert_queue",
+						"biz_domain":  "marketplace",
+						"component":   "marketplace_analytics_service",
+						"error":       err.Error(),
+					}), "failed to queue usage alert notification")
 				}
 			}
 			if alert.Code == "usage_spike" {
@@ -246,7 +255,15 @@ func (s *AnalyticsService) RecordEnvelope(ctx context.Context, tenantID string, 
 	if listing != nil && strings.TrimSpace(listing.VendorID) != "" && totalGross > 0 {
 		periodStart, periodEnd := monthPeriod(envelope.TimestampEnd)
 		if report, err := s.EnsureRevenueReport(ctx, tenantID, listing.VendorID, periodStart, periodEnd, totalGross, currency); err != nil {
-			s.logger.WithError(err).Warn("failed to upsert revenue report")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "marketplace",
+				"tenant_uuid": tenantID,
+				"vendor_id":   listing.VendorID,
+				"biz_scene":   "revenue_report_upsert",
+				"biz_domain":  "marketplace",
+				"component":   "marketplace_analytics_service",
+				"error":       err.Error(),
+			}), "failed to upsert revenue report")
 		} else {
 			marketobs.RecordRevenueGenerated(tenantID, report.Currency, report.GrossAmount)
 		}

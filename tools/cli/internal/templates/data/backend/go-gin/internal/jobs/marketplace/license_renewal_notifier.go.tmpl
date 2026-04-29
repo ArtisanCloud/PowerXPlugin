@@ -6,8 +6,8 @@ import (
 
 	"{{ .BackendModulePath }}/internal/config"
 	dbm "{{ .BackendModulePath }}/internal/entity/models/marketplace"
-	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	marketobs "{{ .BackendModulePath }}/internal/observability/marketplace"
 )
 
 // ExpiringLicenseLister defines repository capability for fetching expiring licenses.
@@ -34,7 +34,7 @@ type RenewalNotifier struct {
 // NewLicenseRenewalNotifier constructs the reminder job.
 func NewLicenseRenewalNotifier(cfg *config.Config, repo ExpiringLicenseLister, logger *pxlog.Entry, tenantResolver func(context.Context) ([]string, error), dispatcher RenewalDispatcher) *RenewalNotifier {
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_license_renewal_notifier")
+		logger = pxlog.WithComponent("marketplace_license_renewal_notifier")
 	}
 	if tenantResolver == nil {
 		tenantResolver = func(context.Context) ([]string, error) { return []string{"default"}, nil }
@@ -82,7 +82,13 @@ func (n *RenewalNotifier) execute(ctx context.Context) {
 
 	tenants, err := n.tenants(ctx)
 	if err != nil {
-		n.logger.WithError(err).Warn("failed to enumerate tenants for renewal notifier")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "marketplace",
+			"biz_scene":  "marketplace_license_renewal_notifier",
+			"biz_domain": "marketplace",
+			"component":  "marketplace_license_renewal_notifier",
+			"error":      err.Error(),
+		}), "failed to enumerate tenants for renewal notifier")
 		return
 	}
 
@@ -95,7 +101,14 @@ func (n *RenewalNotifier) execute(ctx context.Context) {
 	for _, tenantID := range tenants {
 		licenses, err := n.repo.ListExpiringWithin(ctx, tenantID, window)
 		if err != nil {
-			n.logger.WithError(err).WithField("tenant_uuid", tenantID).Warn("failed to query expiring licenses")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "marketplace",
+				"biz_scene":   "marketplace_license_renewal_notifier",
+				"biz_domain":  "marketplace",
+				"component":   "marketplace_license_renewal_notifier",
+				"tenant_uuid": tenantID,
+				"error":       err.Error(),
+			}), "failed to query expiring licenses")
 			continue
 		}
 		for _, license := range licenses {
@@ -113,10 +126,15 @@ func (n *RenewalNotifier) execute(ctx context.Context) {
 			marketobs.EmitLicenseRenewalDue(n.logger, license, scheduled, channels)
 			if n.dispatcher != nil {
 				if err := n.dispatcher.DispatchRenewalReminder(ctx, license, channels); err != nil {
-					n.logger.WithError(err).WithFields(pxlog.Fields{
-						"tenant_uuid":  tenantID,
-						"license_id": license.ID,
-					}).Warn("failed to dispatch renewal reminder")
+					pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+						"module":      "marketplace",
+						"biz_scene":   "marketplace_license_renewal_notifier",
+						"biz_domain":  "marketplace",
+						"component":   "marketplace_license_renewal_notifier",
+						"tenant_uuid": tenantID,
+						"license_id":  license.ID,
+						"error":       err.Error(),
+					}), "failed to dispatch renewal reminder")
 				}
 			}
 		}

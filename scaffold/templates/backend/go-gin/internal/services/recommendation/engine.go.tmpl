@@ -95,7 +95,7 @@ func NewEngine(repo *mrepo.ListingRepository, provider MetricsProvider, logger *
 		opt(&cfg)
 	}
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_recommendation_engine")
+		logger = pxlog.WithComponent("marketplace_recommendation_engine")
 	}
 	return &Engine{
 		listings: repo,
@@ -124,7 +124,15 @@ func (e *Engine) RefreshRecommendations(ctx context.Context, tenantID string) (E
 	for _, signal := range signals {
 		weight := e.calculateWeight(signal)
 		if err := e.listings.UpdateRecommendedWeight(ctx, tenantID, signal.ListingID, weight); err != nil {
-			e.logger.WithError(err).WithField("listing_id", signal.ListingID).Warn("failed to update recommended weight")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "marketplace",
+				"listing_id":  signal.ListingID,
+				"tenant_uuid": tenantID,
+				"biz_scene":   "recommendation_refresh",
+				"biz_domain":  "marketplace",
+				"component":   "marketplace_recommendation_engine",
+				"error":       err.Error(),
+			}), "failed to update recommended weight")
 			continue
 		}
 		result.UpdatedCount++

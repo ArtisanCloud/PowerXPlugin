@@ -12,6 +12,7 @@ import (
 	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
 	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
 	idrepo "{{ .BackendModulePath }}/internal/entity/repository/integration"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	mcpintegration "{{ .BackendModulePath }}/internal/mcp/integration"
 	"{{ .BackendModulePath }}/internal/mcp/stream"
 	runtimeops "{{ .BackendModulePath }}/internal/services/admin/runtime_ops"
@@ -20,7 +21,6 @@ import (
 	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -156,14 +156,18 @@ func (h *SessionsHandler) Invoke(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.TenantUuid) == "" {
 		if h.logger != nil {
-			h.logger.WithFields(pxlog.Fields{
+			pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
+				"module":                       "runtime_ops",
 				runtimelogging.FieldTaskID:     runtimelogging.FallbackUnknown,
 				runtimelogging.FieldSubscriber: "mcp_session_handler",
 				runtimelogging.FieldTopic:      "runtime_ops.invoke",
 				runtimelogging.FieldStatus:     runtimelogging.StatusSkipped,
 				runtimelogging.FieldReason:     runtimelogging.ReasonMissingContext,
+				"biz_scene":                    "mcp_invoke",
+				"biz_domain":                   "runtime_ops",
+				"component":                    "runtime_ops.sessions_handler",
 				"session_id":                   sessionID,
-			}).Warn("mcp invoke skipped: missing tenant context")
+			}), "mcp invoke skipped: missing tenant context")
 		}
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
@@ -217,7 +221,13 @@ func (h *SessionsHandler) handleDispatchError(c *gin.Context, err error) {
 		contracts.ResponseServiceUnavailable(c, "idempotency backend unavailable", nil)
 	default:
 		if h.logger != nil {
-			h.logger.WithError(err).Warn("mcp invoke failed")
+			pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
+				"module":     "runtime_ops",
+				"biz_scene":  "mcp_invoke",
+				"biz_domain": "runtime_ops",
+				"component":  "runtime_ops.sessions_handler",
+				"error":      err.Error(),
+			}), "mcp invoke failed")
 		}
 		contracts.ResponseInternalError(c, err)
 	}

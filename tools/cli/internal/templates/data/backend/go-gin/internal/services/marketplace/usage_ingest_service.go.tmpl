@@ -52,7 +52,7 @@ type UsageIngestService struct {
 func NewUsageIngestService(cfg *config.Config, usageRepo UsageDataRepository, licenseRepo LicenseRepositoryReader, listingRepo ListingRepositoryReader, analytics *AnalyticsService, logger *pxlog.Entry) *UsageIngestService {
 	_ = listingRepo
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_usage_ingest_service")
+		logger = pxlog.WithComponent("marketplace_usage_ingest_service")
 	}
 	threshold := int64(1 << 20)
 	if cfg != nil {

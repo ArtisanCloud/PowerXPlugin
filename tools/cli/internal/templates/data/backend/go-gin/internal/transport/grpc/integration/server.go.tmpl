@@ -37,5 +37,5 @@ func (s *Server) log() *pxlog.Entry {
 	if s.logger != nil {
 		return s.logger
 	}
-	return pxlog.WithField("component", "integration.grpc")
+	return pxlog.WithComponent("integration.grpc")
 }

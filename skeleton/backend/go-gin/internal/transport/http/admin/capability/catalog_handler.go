@@ -36,9 +36,13 @@ func (h *CatalogHandler) List(c *gin.Context) {
 	source := strings.TrimSpace(c.Query("source"))
 	entries, err := h.service.List(c.Request.Context(), capservice.ListOptions{Source: source})
 	if err != nil {
-		logger.WithError(err).
-			WithField("component", "capability_catalog_handler").
-			Error("failed to load capability catalog")
+		logger.ErrorCtx(logger.WithLogFields(c.Request.Context(), map[string]interface{}{
+			"module":     "capability",
+			"biz_scene":  "capability_catalog_list",
+			"biz_domain": "capability",
+			"component":  "capability_catalog_handler",
+			"error":      err.Error(),
+		}), "failed to load capability catalog")
 		contracts.ResponseErrorWithDetails(
 			c,
 			http.StatusInternalServerError,
@@ -48,11 +52,14 @@ func (h *CatalogHandler) List(c *gin.Context) {
 		)
 		return
 	}
-	logger.WithFields(logger.Fields{
+	logger.InfoCtx(logger.WithLogFields(c.Request.Context(), map[string]interface{}{
 		"component":    "capability_catalog_handler",
 		"entry_count":  len(entries),
 		"request_path": c.FullPath(),
-	}).Info("capability catalog request handled")
+		"module":       "capability",
+		"biz_scene":    "capability_catalog_list",
+		"biz_domain":   "capability",
+	}), "capability catalog request handled")
 	contracts.ResponseSuccess(c, entries)
 }
 

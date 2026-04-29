@@ -11,10 +11,10 @@ import (
 
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	dbtemplate "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 const (
@@ -110,7 +110,13 @@ func (i *CapabilityInvoker) Invoke(ctx context.Context, envelope *domain.Integra
 		return handler.Handle(ctx, envelope)
 	}
 	if i.logger != nil {
-		i.logger.WithField("capability_id", capabilityID).Debug("delegating capability to fallback invoker")
+		pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":        "integration",
+			"biz_scene":     "capability_invoke_fallback",
+			"biz_domain":    "integration",
+			"component":     "integration.capability_invoker",
+			"capability_id": capabilityID,
+		}), "delegating capability to fallback invoker")
 	}
 	if i.fallback != nil {
 		return i.fallback.Invoke(ctx, envelope)

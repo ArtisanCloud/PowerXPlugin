@@ -154,9 +154,14 @@ func (r *WebhookSubscriptionRepository) DebugLogSubscription(sub *model.WebhookS
 	if sub == nil {
 		return
 	}
-	logger.WithField("subscription_id", sub.ID).
-		WithField("tenant_uuid", sub.TenantUuid).
-		WithField("event_type", sub.EventType).
-		WithField("status", sub.Status).
-		Debug("webhook subscription persisted")
+	logger.DebugCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+		"module":          "integration",
+		"biz_scene":       "webhook_subscription_persisted",
+		"biz_domain":      "integration",
+		"component":       "integration.webhook_subscription_repository",
+		"subscription_id": sub.ID,
+		"tenant_uuid":     sub.TenantUuid,
+		"event_type":      sub.EventType,
+		"status":          sub.Status,
+	}), "webhook subscription persisted")
 }

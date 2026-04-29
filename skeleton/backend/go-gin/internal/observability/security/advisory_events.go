@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -38,10 +39,22 @@ func QueueAdvisoryNotification(logger *pxlog.Entry, advisory *secmodel.Advisory,
 
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		logger.WithError(err).Warn("failed to marshal advisory notification payload")
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "security",
+			"biz_scene":  "advisory_notification",
+			"biz_domain": "security",
+			"component":  "observability.security.advisory_events",
+			"error":      err.Error(),
+		}), "failed to marshal advisory notification payload")
 		return
 	}
-	logger.WithField("advisory_notification", string(raw)).Info("queued vulnerability advisory notification")
+	pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+		"module":                "security",
+		"biz_scene":             "advisory_notification",
+		"biz_domain":            "security",
+		"component":             "observability.security.advisory_events",
+		"advisory_notification": string(raw),
+	}), "queued vulnerability advisory notification")
 }
 
 func emitAdvisoryEvent(logger *pxlog.Entry, event string, advisory *secmodel.Advisory, metadata map[string]interface{}) {
@@ -68,8 +81,20 @@ func emitAdvisoryEvent(logger *pxlog.Entry, event string, advisory *secmodel.Adv
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		logger.WithError(err).Warn("failed to marshal advisory event payload")
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "security",
+			"biz_scene":  "advisory_event",
+			"biz_domain": "security",
+			"component":  "observability.security.advisory_events",
+			"error":      err.Error(),
+		}), "failed to marshal advisory event payload")
 		return
 	}
-	logger.WithField("advisory_event", string(raw)).Info("vulnerability advisory event")
+	pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+		"module":         "security",
+		"biz_scene":      "advisory_event",
+		"biz_domain":     "security",
+		"component":      "observability.security.advisory_events",
+		"advisory_event": string(raw),
+	}), "vulnerability advisory event")
 }

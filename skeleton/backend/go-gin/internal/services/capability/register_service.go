@@ -341,11 +341,15 @@ func (s *RegisterService) Submit(ctx context.Context, input *RegisterInput) (*Ca
 	s.mu.Unlock()
 
 	if s.logger != nil {
-		s.logger.WithFields(logger.Fields{
+		logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"module":        "capability",
+			"biz_scene":     "capability_register_submit",
+			"biz_domain":    "capability",
+			"component":     "capability_register_service",
 			"capability_id": record.ID,
 			"draft":         record.Draft,
 			"status":        record.Status,
-		}).Info("capability registry submission stored")
+		}), "capability registry submission stored")
 	}
 
 	return record, result, nil
@@ -365,7 +369,13 @@ func (s *RegisterService) idExistsInCatalog(ctx context.Context, id string) bool
 	entries, err := s.manager.ListCapabilities(ctx)
 	if err != nil {
 		if s.logger != nil {
-			s.logger.WithError(err).Warn("failed to list capabilities when checking duplicates")
+			logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "capability_register_check_duplicate",
+				"biz_domain": "capability",
+				"component":  "capability_register_service",
+				"error":      err.Error(),
+			}), "failed to list capabilities when checking duplicates")
 		}
 		return false
 	}

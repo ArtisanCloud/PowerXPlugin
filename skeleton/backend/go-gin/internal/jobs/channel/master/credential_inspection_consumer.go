@@ -6,8 +6,8 @@ import (
 
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/channel"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/channel"
 )
 
 // HandleCredentialInspectionEvent is a minimal "job -> consumer" migration example:
@@ -23,14 +23,18 @@ func HandleCredentialInspectionEvent(logger *pxlog.Entry) func(context.Context, 
 			return err
 		}
 
-		logger.WithFields(pxlog.Fields{
+		pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":         "channel",
+			"biz_scene":      "credential_inspection_consume",
+			"biz_domain":     "channel",
+			"component":      "jobs.channel.master.credential_inspection_consumer",
 			"topic":          string(ev.Topic),
 			"tenant_uuid":    ev.Meta.TenantUUID,
 			"trace_id":       ev.Meta.TraceID,
 			"channel_id":     payload.ChannelID,
 			"status":         payload.Status,
 			"credentialType": payload.CredentialType,
-		}).Info("credential inspection event consumed")
+		}), "credential inspection event consumed")
 
 		return nil
 	}

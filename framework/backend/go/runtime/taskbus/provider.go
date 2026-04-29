@@ -147,12 +147,28 @@ func (e *hostEmitter) logEmit(topic string, meta event.Meta, status, reason stri
 		runtimelogging.FieldStatus:     status,
 		runtimelogging.FieldReason:     reason,
 	})
-	entry := e.logger.WithFields(fields)
+	facade := runtimelogging.NewFacade(nil, e.logger)
 	if status == runtimelogging.StatusFailed {
-		entry.Error("taskbus host emit failed")
+		facade.Error("taskbus host emit failed", runtimelogging.Entry{
+			Fields: fields,
+			Context: runtimelogging.Fields{
+				"module":     "taskbus.host_emitter",
+				"plugin_id":  strings.TrimSpace(meta.SourcePlugin),
+				"biz_scene":  "event_emit",
+				"biz_domain": "runtime",
+			},
+		})
 		return
 	}
-	entry.Info("taskbus host emit completed")
+	facade.Info("taskbus host emit completed", runtimelogging.Entry{
+		Fields: fields,
+		Context: runtimelogging.Fields{
+			"module":     "taskbus.host_emitter",
+			"plugin_id":  strings.TrimSpace(meta.SourcePlugin),
+			"biz_scene":  "event_emit",
+			"biz_domain": "runtime",
+		},
+	})
 }
 
 func (e *hostEmitter) ensureMeta(meta event.Meta) (event.Meta, error) {
@@ -319,12 +335,26 @@ func (e *redisEmitter) logEmit(topic string, meta event.Meta, status, reason str
 		runtimelogging.FieldStatus:     status,
 		runtimelogging.FieldReason:     reason,
 	})
-	entry := e.logger.WithFields(fields)
+	facade := runtimelogging.NewFacade(nil, e.logger)
 	if status == runtimelogging.StatusFailed {
-		entry.Error("taskbus redis emit failed")
+		facade.Error("taskbus redis emit failed", runtimelogging.Entry{
+			Fields: fields,
+			Context: runtimelogging.Fields{
+				"module":     "taskbus.redis_emitter",
+				"biz_scene":  "event_emit",
+				"biz_domain": "runtime",
+			},
+		})
 		return
 	}
-	entry.Info("taskbus redis emit queued")
+	facade.Info("taskbus redis emit queued", runtimelogging.Entry{
+		Fields: fields,
+		Context: runtimelogging.Fields{
+			"module":     "taskbus.redis_emitter",
+			"biz_scene":  "event_emit",
+			"biz_domain": "runtime",
+		},
+	})
 }
 
 type RedisConsumerConfig struct {

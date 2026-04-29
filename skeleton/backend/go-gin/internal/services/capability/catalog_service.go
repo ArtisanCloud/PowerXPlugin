@@ -53,7 +53,7 @@ func NewCatalogService(deps *app.Deps) *CatalogService {
 	}
 	mgr := deps.CapabilitiesManager
 	if mgr == nil {
-		log := logger.WithField("component", "capability_catalog_service")
+		log := logger.WithComponent("capability_catalog_service")
 		mgr = capabilities.NewManager(deps.Config, log)
 	}
 	if mgr == nil {
@@ -86,8 +86,14 @@ func (s *CatalogService) List(ctx context.Context, opts ListOptions) ([]capabili
 	if source == "all" {
 		platformEntries, platformErr := s.listPlatformCatalog(ctx, ListOptions{Source: "corex"})
 		if platformErr != nil {
-			logger.WithError(platformErr).WithField("component", "capability_catalog_service").
-				Warn("failed to load platform capability catalog for source=all, falling back to local manifest")
+			logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "capability_catalog_list",
+				"biz_domain": "capability",
+				"component":  "capability_catalog_service",
+				"source":     "all",
+				"error":      platformErr.Error(),
+			}), "failed to load platform capability catalog for source=all, falling back to local manifest")
 		}
 		localEntries, localErr := s.listLocalCatalog(ctx)
 		if localErr != nil {
@@ -427,13 +433,26 @@ func (s *CatalogService) lookupDescriptorMeta(path string) *descriptorMetadata {
 
 	resolved := resolveDescriptorPath(normalized)
 	if resolved == "" {
-		logger.WithField("descriptor", normalized).Debug("capability descriptor not found for metadata inference")
+		logger.DebugCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "capability",
+			"biz_scene":  "capability_descriptor_infer",
+			"biz_domain": "capability",
+			"component":  "capability_catalog_service",
+			"descriptor": normalized,
+		}), "capability descriptor not found for metadata inference")
 		return nil
 	}
 
 	data, err := os.ReadFile(resolved)
 	if err != nil {
-		logger.WithError(err).WithField("descriptor", resolved).Debug("failed to read capability descriptor for metadata inference")
+		logger.DebugCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "capability",
+			"biz_scene":  "capability_descriptor_infer",
+			"biz_domain": "capability",
+			"component":  "capability_catalog_service",
+			"descriptor": resolved,
+			"error":      err.Error(),
+		}), "failed to read capability descriptor for metadata inference")
 		return nil
 	}
 	var manifest struct {
@@ -443,7 +462,14 @@ func (s *CatalogService) lookupDescriptorMeta(path string) *descriptorMetadata {
 		} `yaml:"metadata"`
 	}
 	if err := yaml.Unmarshal(data, &manifest); err != nil {
-		logger.WithError(err).WithField("descriptor", resolved).Debug("failed to parse capability descriptor for metadata inference")
+		logger.DebugCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "capability",
+			"biz_scene":  "capability_descriptor_infer",
+			"biz_domain": "capability",
+			"component":  "capability_catalog_service",
+			"descriptor": resolved,
+			"error":      err.Error(),
+		}), "failed to parse capability descriptor for metadata inference")
 		return nil
 	}
 

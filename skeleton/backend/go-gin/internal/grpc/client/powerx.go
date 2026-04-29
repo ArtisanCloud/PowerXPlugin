@@ -75,7 +75,14 @@ func NewPowerXServiceClient(ctx context.Context, c *cfgpkg.GRPCUpstream) (*Power
 	if c.ConnectMode == "" || c.ConnectMode == "eager" {
 		if err := p.ensureConn(ctx); err != nil {
 			if c.Optional {
-				logger.WithError(err).Warn("gRPC upstream not available; continue in optional mode")
+				logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+					"module":     "grpc.client",
+					"biz_scene":  "grpc_upstream_connect",
+					"biz_domain": "integration",
+					"component":  "powerx.grpc.client",
+					"error":      err.Error(),
+					"address":    c.Address,
+				}), "gRPC upstream not available; continue in optional mode")
 			} else {
 				return nil, err
 			}
@@ -162,7 +169,14 @@ func (p *PowerXServiceClient) ensureConn(ctx context.Context) error {
 	// 非阻塞 + 短超时拨号（尝试立即建立；失败返回错误）
 	ctxDial, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	logger.WithField("address", p.cfg.Address).Info("Dialing PowerX gRPC (on-demand)")
+	logCtx := logger.WithLogFields(ctx, map[string]interface{}{
+		"address":    p.cfg.Address,
+		"service":    "powerx.grpc",
+		"module":     "grpc.client",
+		"biz_scene":  "grpc_dial",
+		"biz_domain": "integration",
+	})
+	logger.InfoCtx(logCtx, "Dialing PowerX gRPC (on-demand)")
 	//nolint:staticcheck // grpc.DialContext remains necessary until upstream migrates to the new API.
 	conn, err := grpc.DialContext(ctxDial, p.cfg.Address, dialOpts...)
 	if err != nil {
@@ -281,7 +295,14 @@ func (p *PowerXServiceClient) InvokeGRPC(ctx context.Context, service, method st
 		ctx = p.Outgoing(ctx)
 	}
 
-	logger.WithField("service", service).WithField("method", method).Info("Calling PowerX gRPC service via reflection")
+	logCtx := logger.WithLogFields(ctx, map[string]interface{}{
+		"service":    service,
+		"method":     method,
+		"module":     "grpc.client",
+		"biz_scene":  "grpc_invoke_reflection",
+		"biz_domain": "integration",
+	})
+	logger.InfoCtx(logCtx, "Calling PowerX gRPC service via reflection")
 
 	// 1) 通过反射拉取包含该符号的文件描述
 	refClient := v1alpha.NewServerReflectionClient(p.conn)

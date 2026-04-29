@@ -134,6 +134,12 @@ func (h *QuotaHandler) log(c *gin.Context, level logger.Level, msg string, field
 			fields["request_id"] = reqID
 		}
 	}
+	if _, ok := fields["biz_scene"]; !ok {
+		fields["biz_scene"] = "quota_management"
+	}
+	if _, ok := fields["biz_domain"]; !ok {
+		fields["biz_domain"] = "runtime_ops"
+	}
 	entry := h.deps.RuntimeLogger(c.Request.Context(), "admin.runtime.quota", fields)
 	switch level {
 	case logger.ErrorLevel:

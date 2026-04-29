@@ -166,10 +166,14 @@ func (s *ExposureService) Upsert(ctx context.Context, input *ExposureInput) (*Ex
 		return nil, err
 	}
 
-	s.logger.WithFields(logger.Fields{
+	logger.InfoCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+		"module":        "capability",
+		"biz_scene":     "capability_exposure_update",
+		"biz_domain":    "capability",
+		"component":     "capability_exposure_service",
 		"capability_id": pkg.CapabilityID,
 		"channels":      len(pkg.Channels),
-	}).Info("capability exposure package updated")
+	}), "capability exposure package updated")
 
 	return cloneExposure(pkg), nil
 }
@@ -221,11 +225,15 @@ func (s *ExposureService) UpdateQuota(ctx context.Context, capabilityID string, 
 		return nil, err
 	}
 
-	s.logger.WithFields(logger.Fields{
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"module":        "capability",
+		"biz_scene":     "capability_quota_update",
+		"biz_domain":    "capability",
+		"component":     "capability_exposure_service",
 		"capability_id": capabilityID,
 		"tenant_id":     quota.ID,
 		"quota":         quota.Quota,
-	}).Info("capability quota updated")
+	}), "capability quota updated")
 
 	return cloneExposure(pkg), nil
 }
@@ -247,13 +255,25 @@ func (s *ExposureService) loadFromDisk() {
 	data, err := os.ReadFile(s.storagePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			s.logger.WithError(err).Warn("failed to read exposure packages")
+			logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "capability_exposure_load",
+				"biz_domain": "capability",
+				"component":  "capability_exposure_service",
+				"error":      err.Error(),
+			}), "failed to read exposure packages")
 		}
 		return
 	}
 	var snapshot exposureSnapshot
 	if err := json.Unmarshal(data, &snapshot); err != nil {
-		s.logger.WithError(err).Warn("failed to parse exposure packages")
+		logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "capability",
+			"biz_scene":  "capability_exposure_load",
+			"biz_domain": "capability",
+			"component":  "capability_exposure_service",
+			"error":      err.Error(),
+		}), "failed to parse exposure packages")
 		return
 	}
 	for _, pkg := range snapshot.Packages {

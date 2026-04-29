@@ -11,9 +11,9 @@ import (
 
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	obs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/marketplace"
 	"github.com/google/uuid"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // ListingService coordinates marketplace listing workflows.
@@ -453,7 +453,15 @@ func (s *ListingService) RecordChecklistRun(ctx context.Context, tenantID, listi
 	}
 
 	if err := s.updateReadyScoreFromRun(ctx, tenantID, listingID, &run); err != nil && s.logger != nil {
-		s.logger.WithError(err).Warn("failed to update listing checklist score")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "marketplace",
+			"tenant_uuid": tenantID,
+			"listing_id":  listingID,
+			"biz_scene":   "checklist_score_update",
+			"biz_domain":  "marketplace",
+			"component":   "marketplace.listing_service",
+			"error":       err.Error(),
+		}), "failed to update listing checklist score")
 	}
 	return &run, nil
 }

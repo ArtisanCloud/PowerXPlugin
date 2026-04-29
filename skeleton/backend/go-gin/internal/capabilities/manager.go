@@ -170,7 +170,12 @@ type fileSystemCatalogLoader struct {
 }
 
 func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnapshot, error) {
-	log := logger.WithField("component", "capability_catalog_loader")
+	logCtx := logger.WithLogFields(ctx, map[string]interface{}{
+		"module":     "capability",
+		"biz_scene":  "capability_catalog_load",
+		"biz_domain": "capability",
+		"component":  "capability_catalog_loader",
+	})
 	p := strings.TrimSpace(l.path)
 	if p == "" {
 		p = defaultCatalogPath
@@ -178,34 +183,46 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	originalPath := p
 	p, resolvedBy := resolveCatalogFilePath(p)
 	if resolvedBy != "" {
-		log.WithFields(logger.Fields{
+		logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
 			"catalog_path_from": originalPath,
 			"catalog_path_to":   p,
 			"resolved_by":       resolvedBy,
-		}).Info("capability catalog path auto-resolved")
+		}), "capability catalog path auto-resolved")
 	}
-	log = log.WithField("catalog_path", p)
-	log.Debug("loading capability catalog from disk")
+	logger.DebugCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+		"catalog_path": p,
+	}), "loading capability catalog from disk")
 	data, err := os.ReadFile(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			log.WithError(err).Warn("capability catalog not found, falling back to plugin.yaml capabilities")
-			log.WithFields(logger.Fields{
+			logger.WarnCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+				"catalog_path": p,
+				"error":        err.Error(),
+			}), "capability catalog not found, falling back to plugin.yaml capabilities")
+			logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
 				"advice": "开发态可忽略；若需消除告警，请生成 capabilities/catalog.json 或保持 plugin.yaml capabilities 与代码同步",
-			}).Info("capability catalog fallback hint")
-			snapshot, fallbackErr := loadCatalogFromManifest(log)
+			}), "capability catalog fallback hint")
+			snapshot, fallbackErr := loadCatalogFromManifest(logCtx)
 			if fallbackErr != nil {
-				log.WithError(fallbackErr).Warn("failed to load capability catalog from plugin.yaml, returning empty snapshot")
+				logger.WarnCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+					"error": fallbackErr.Error(),
+				}), "failed to load capability catalog from plugin.yaml, returning empty snapshot")
 				return &CatalogSnapshot{GeneratedAt: time.Now().UTC().Format(time.RFC3339), Entries: []CatalogEntry{}}, nil
 			}
 			return snapshot, nil
 		}
-		log.WithError(err).Error("failed to read capability catalog")
+		logger.ErrorCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+			"catalog_path": p,
+			"error":        err.Error(),
+		}), "failed to read capability catalog")
 		return nil, fmt.Errorf("capabilities: failed to read catalog %s: %w", p, err)
 	}
 	var snapshot CatalogSnapshot
 	if err := json.Unmarshal(data, &snapshot); err != nil {
-		log.WithError(err).Error("failed to parse capability catalog JSON")
+		logger.ErrorCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+			"catalog_path": p,
+			"error":        err.Error(),
+		}), "failed to parse capability catalog JSON")
 		return nil, fmt.Errorf("capabilities: invalid catalog JSON %s: %w", p, err)
 	}
 	if strings.TrimSpace(snapshot.GeneratedAt) == "" {
@@ -214,13 +231,13 @@ func (l *fileSystemCatalogLoader) LoadCatalog(ctx context.Context) (*CatalogSnap
 	if snapshot.Entries == nil {
 		snapshot.Entries = []CatalogEntry{}
 	}
-	log.WithFields(logger.Fields{
+	logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
 		"entry_count":  len(snapshot.Entries),
 		"import_count": len(snapshot.Imports),
 		"generated_at": snapshot.GeneratedAt,
 		"plugin_id":    snapshot.PluginID,
 		"manifest_ver": snapshot.ManifestVersion,
-	}).Info("capability catalog loaded")
+	}), "capability catalog loaded")
 	return &snapshot, nil
 }
 
@@ -249,7 +266,7 @@ type manifestDoc struct {
 	} `yaml:"capabilities"`
 }
 
-func loadCatalogFromManifest(log *logger.Entry) (*CatalogSnapshot, error) {
+func loadCatalogFromManifest(ctx context.Context) (*CatalogSnapshot, error) {
 	manifestPath := resolveManifestPath()
 	if manifestPath == "" {
 		return nil, errors.New("manifest path not found")
@@ -341,16 +358,18 @@ func loadCatalogFromManifest(log *logger.Entry) (*CatalogSnapshot, error) {
 			}
 			rawDesc, err := os.ReadFile(abs)
 			if err != nil {
-				if log != nil {
-					log.WithError(err).Warnf("capability import missing: %s", rel)
-				}
+				logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+					"error":       err.Error(),
+					"import_path": rel,
+				}), "capability import missing")
 				continue
 			}
 			var desc manifestCapability
 			if err := yaml.Unmarshal(rawDesc, &desc); err != nil {
-				if log != nil {
-					log.WithError(err).Warnf("capability import invalid yaml: %s", rel)
-				}
+				logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+					"error":       err.Error(),
+					"import_path": rel,
+				}), "capability import invalid yaml")
 				continue
 			}
 			if strings.TrimSpace(desc.ID) == "" {
@@ -394,14 +413,12 @@ func loadCatalogFromManifest(log *logger.Entry) (*CatalogSnapshot, error) {
 		}
 	}
 
-	if log != nil {
-		log.WithFields(logger.Fields{
-			"manifest_path": manifestPath,
-			"entry_count":   len(snapshot.Entries),
-			"plugin_id":     snapshot.PluginID,
-			"manifest_ver":  snapshot.ManifestVersion,
-		}).Info("capability catalog loaded from plugin.yaml fallback")
-	}
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"manifest_path": manifestPath,
+		"entry_count":   len(snapshot.Entries),
+		"plugin_id":     snapshot.PluginID,
+		"manifest_ver":  snapshot.ManifestVersion,
+	}), "capability catalog loaded from plugin.yaml fallback")
 	return snapshot, nil
 }
 
@@ -613,7 +630,7 @@ func EnsureManager(ctx context.Context, mgr Manager, log *logger.Entry) error {
 }
 
 func managerLogger(component string) *logger.Entry {
-	return logger.WithField("component", component)
+	return logger.WithComponent(component)
 }
 
 func resolveCatalogPath(raw string) string {

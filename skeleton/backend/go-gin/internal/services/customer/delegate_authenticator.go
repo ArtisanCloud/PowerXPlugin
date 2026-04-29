@@ -59,7 +59,7 @@ func NewDelegateAuthenticator(cfg *config.Config, client *http.Client, logger *p
 		client = &http.Client{Timeout: timeout + 500*time.Millisecond}
 	}
 	if logger == nil {
-		logger = pxlog.WithField("component", "customer.delegate_authenticator")
+		logger = pxlog.WithComponent("customer.delegate_authenticator")
 	}
 
 	return &DelegateAuthenticator{
@@ -200,7 +200,14 @@ func (a *DelegateAuthenticator) validate(ctx context.Context, requestTenantUUID 
 	case http.StatusOK:
 		cc, exp, err := parseDelegateResponse(body, a.now())
 		if err != nil {
-			a.logger.WithError(err).WithField("status", resp.StatusCode).Debug("delegate response parse failed")
+			logCtx := pxlog.WithLogFields(ctx, map[string]interface{}{
+				"status":      resp.StatusCode,
+				"biz_scene":   "delegate_validate",
+				"biz_domain":  "customer",
+				"tenant_uuid": requestTenantUUID,
+				"error":       err.Error(),
+			})
+			pxlog.DebugCtx(logCtx, "delegate response parse failed")
 			return nil, time.Time{}, ErrCustomerTokenInvalid
 		}
 		cc.SourceMode = customerdomain.CustomerAuthModeDelegate
@@ -209,10 +216,14 @@ func (a *DelegateAuthenticator) validate(ctx context.Context, requestTenantUUID 
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return nil, time.Time{}, ErrCustomerTokenInvalid
 	default:
-		a.logger.WithFields(pxlog.Fields{
-			"status":  resp.StatusCode,
-			"payload": string(body),
-		}).Warn("delegate validation failed")
+		logCtx := pxlog.WithLogFields(ctx, map[string]interface{}{
+			"status":      resp.StatusCode,
+			"payload":     string(body),
+			"biz_scene":   "delegate_validate",
+			"biz_domain":  "customer",
+			"tenant_uuid": requestTenantUUID,
+		})
+		pxlog.WarnCtx(logCtx, "delegate validation failed")
 		return nil, time.Time{}, ErrCustomerDelegateUnavailable
 	}
 }

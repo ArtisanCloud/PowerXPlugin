@@ -56,7 +56,14 @@ func (r *IdempotencyRepository) Claim(ctx context.Context, record *model.Idempot
 
 	if r.fallback != nil && res != nil && res.Status == ClaimStatusCreated && res.Record != nil {
 		if _, ferr := r.fallback.Claim(ctx, cloneModelRecord(res.Record)); ferr != nil && r.logger != nil {
-			r.logger.WithError(ferr).WithField("idempotency_key", res.Record.Key).Warn("failed to sync idempotency claim to fallback store")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":          "integration",
+				"biz_scene":       "idempotency_claim_sync",
+				"biz_domain":      "integration",
+				"component":       "integration.idempotency_repository",
+				"idempotency_key": res.Record.Key,
+				"error":           ferr.Error(),
+			}), "failed to sync idempotency claim to fallback store")
 		}
 	}
 
@@ -87,7 +94,14 @@ func (r *IdempotencyRepository) SaveResponse(ctx context.Context, key string, re
 
 	if r.fallback != nil {
 		if _, ferr := r.fallback.SaveResponse(ctx, key, response, metadata); ferr != nil && r.logger != nil && !errors.Is(ferr, ErrIdempotencyNotFound) {
-			r.logger.WithError(ferr).WithField("idempotency_key", key).Warn("failed to propagate idempotency response to fallback store")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":          "integration",
+				"biz_scene":       "idempotency_response_sync",
+				"biz_domain":      "integration",
+				"component":       "integration.idempotency_repository",
+				"idempotency_key": key,
+				"error":           ferr.Error(),
+			}), "failed to propagate idempotency response to fallback store")
 		}
 	}
 	return record, nil

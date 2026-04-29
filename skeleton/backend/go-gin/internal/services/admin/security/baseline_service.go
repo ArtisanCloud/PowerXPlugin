@@ -9,8 +9,8 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	secrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/security"
-	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -89,7 +89,13 @@ func (s *BaselineService) RunAudit(ctx context.Context, initiatedBy, checklistVe
 		status = "FAILED"
 		findings["error"] = runErr.Error()
 		if s.logger != nil {
-			s.logger.WithError(runErr).Warn("security audit command failed")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "security",
+				"biz_scene":  "security_audit_run",
+				"biz_domain": "security",
+				"component":  "admin.security.baseline_service",
+				"error":      runErr.Error(),
+			}), "security audit command failed")
 		}
 	}
 	if err := s.repo.UpdateAuditReportStatus(ctx, report.ID, status, findings); err != nil {

@@ -147,7 +147,7 @@ func (h *RedisHub) handleMessage(ctx context.Context, payload string) {
 	}
 	var env redisEnvelope
 	if err := json.Unmarshal([]byte(payload), &env); err != nil {
-		h.logAdapter.WithFields(runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
+		fields := runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
 			runtimelogging.FieldTraceID:    "unknown",
 			runtimelogging.FieldTaskID:     "unknown",
 			runtimelogging.FieldTenantUUID: "unknown",
@@ -156,7 +156,15 @@ func (h *RedisHub) handleMessage(ctx context.Context, payload string) {
 			runtimelogging.FieldTopic:      "unknown",
 			runtimelogging.FieldStatus:     runtimelogging.StatusFailed,
 			runtimelogging.FieldReason:     "invalid_payload",
-		})).Warn("wsbus redis: invalid payload")
+		})
+		runtimelogging.NewFacade(nil, h.logAdapter).Warn("wsbus redis: invalid payload", runtimelogging.Entry{
+			Fields: fields,
+			Context: runtimelogging.Fields{
+				"module":     "wsbus.redis_hub",
+				"biz_scene":  "ws_publish",
+				"biz_domain": "runtime",
+			},
+		})
 		return
 	}
 	if env.Origin != "" && env.Origin == h.instanceID {
@@ -173,7 +181,7 @@ func (h *RedisHub) logPublish(topic string, opts PublishOptions, status, reason 
 	if h == nil || h.logAdapter == nil {
 		return
 	}
-	h.logAdapter.WithFields(runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
+	fields := runtimelogging.NormalizeRuntimeFields(runtimelogging.Fields{
 		runtimelogging.FieldTraceID:    strings.TrimSpace(opts.TraceID),
 		runtimelogging.FieldTaskID:     strings.TrimSpace(opts.TraceID),
 		runtimelogging.FieldTenantUUID: strings.TrimSpace(opts.TenantUUID),
@@ -182,5 +190,13 @@ func (h *RedisHub) logPublish(topic string, opts PublishOptions, status, reason 
 		runtimelogging.FieldTopic:      strings.TrimSpace(topic),
 		runtimelogging.FieldStatus:     status,
 		runtimelogging.FieldReason:     reason,
-	})).Info("wsbus redis publish")
+	})
+	runtimelogging.NewFacade(nil, h.logAdapter).Info("wsbus redis publish", runtimelogging.Entry{
+		Fields: fields,
+		Context: runtimelogging.Fields{
+			"module":     "wsbus.redis_hub",
+			"biz_scene":  "ws_publish",
+			"biz_domain": "runtime",
+		},
+	})
 }

@@ -18,7 +18,7 @@ type DispatchGRPCServer struct {
 // NewDispatchGRPCServer 构造 gRPC 服务适配器。
 func NewDispatchGRPCServer(service *integrationService.DispatchService, logger *pxlog.Entry) *DispatchGRPCServer {
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.grpc.dispatch")
+		logger = pxlog.WithComponent("integration.grpc.dispatch")
 	}
 	return &DispatchGRPCServer{
 		service: service,

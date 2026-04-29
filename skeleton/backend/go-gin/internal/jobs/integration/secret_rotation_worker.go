@@ -5,9 +5,9 @@ import (
 	"time"
 
 	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	obs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
 	service "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // SecretRotationWorker scans for secrets nearing rotation and schedules reminders.
@@ -24,7 +24,7 @@ func NewSecretRotationWorker(secretSvc *service.SecretService, secretRepo *repo.
 		interval = time.Hour
 	}
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.secret_rotation_worker")
+		logger = pxlog.WithComponent("integration.secret_rotation_worker")
 	}
 	return &SecretRotationWorker{
 		service:  secretSvc,
@@ -47,7 +47,12 @@ func (w *SecretRotationWorker) Interval() time.Duration {
 // Run fetches due secrets and schedules rotation reminders.
 func (w *SecretRotationWorker) Run(ctx context.Context) error {
 	if w.repo == nil || w.service == nil {
-		w.logger.Warn("secret rotation worker dependencies not configured")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "secret_rotation_run",
+			"biz_domain": "integration",
+			"component":  "integration.secret_rotation_worker",
+		}), "secret rotation worker dependencies not configured")
 		return w.service.RefreshRotationMetrics(ctx)
 	}
 
@@ -80,10 +85,15 @@ func (w *SecretRotationWorker) Run(ctx context.Context) error {
 			Actor:      "system-rotation-worker",
 		})
 		if err != nil {
-			w.logger.WithError(err).WithFields(pxlog.Fields{
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "integration",
 				"tenant_uuid": secret.TenantUuid,
 				"secret_id":   secret.ID,
-			}).Warn("failed to schedule automatic rotation")
+				"biz_scene":   "secret_rotation_schedule",
+				"biz_domain":  "integration",
+				"component":   "integration.secret_rotation_worker",
+				"error":       err.Error(),
+			}), "failed to schedule automatic rotation")
 			continue
 		}
 	}

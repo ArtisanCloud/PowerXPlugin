@@ -139,6 +139,9 @@ type ServerConfig struct {
 // RuntimeConfig 运行时配置
 type RuntimeConfig struct {
 	RunMigrate  bool                `yaml:"run_migrate" json:"run_migrate"`
+	GinMode     string              `yaml:"gin_mode" json:"gin_mode"`
+	HTTPLog     *bool               `yaml:"http_log" json:"http_log"`
+	RouteLog    *bool               `yaml:"route_log" json:"route_log"`
 	Logging     *LoggingConfig      `yaml:"logging" json:"logging"`
 	Monitoring  *MonitoringConfig   `yaml:"monitoring" json:"monitoring"`
 	RuntimeOps  *RuntimeOpsDefaults `yaml:"runtime_ops" json:"runtime_ops"`
@@ -175,6 +178,17 @@ func applyRuntimeNamespacesToLegacy(cfg *Config) {
 	if cfg.Runtime.Integration != nil {
 		cfg.Integration = cfg.Runtime.Integration
 	}
+	if cfg.Logging != nil {
+		if ginMode := strings.TrimSpace(cfg.Runtime.GinMode); ginMode != "" {
+			cfg.Logging.GinMode = strings.ToLower(ginMode)
+		}
+		if cfg.Runtime.HTTPLog != nil {
+			cfg.Logging.HTTPAccess = *cfg.Runtime.HTTPLog
+		}
+		if cfg.Runtime.RouteLog != nil {
+			cfg.Logging.RouteLog = *cfg.Runtime.RouteLog
+		}
+	}
 }
 
 func syncLegacyNamespacesToRuntime(cfg *Config) {
@@ -191,6 +205,13 @@ func syncLegacyNamespacesToRuntime(cfg *Config) {
 	cfg.Runtime.EventBridge = cfg.EventBridge
 	cfg.Runtime.WSBus = cfg.WSBus
 	cfg.Runtime.Integration = cfg.Integration
+	if cfg.Logging != nil {
+		cfg.Runtime.GinMode = cfg.Logging.GinMode
+		httpLog := cfg.Logging.HTTPAccess
+		routeLog := cfg.Logging.RouteLog
+		cfg.Runtime.HTTPLog = &httpLog
+		cfg.Runtime.RouteLog = &routeLog
+	}
 }
 
 // RuntimeOpsDefaults 定义 runtime ops 所需的默认限值与窗口
@@ -354,6 +375,7 @@ type LoggingConfig struct {
 	MaxAge                    int    `yaml:"max_age" json:"max_age"`
 	HTTPAccess                bool   `yaml:"http_access" json:"http_access"`
 	GinMode                   string `yaml:"gin_mode" json:"gin_mode"`
+	RouteLog                  bool   `yaml:"route_log" json:"route_log"`
 	DebugMode                 bool   `yaml:"debug_mode" json:"debug_mode"`
 	GovernanceMode            string `yaml:"governance_mode" json:"governance_mode"`
 	GovernanceDeadlineVersion string `yaml:"governance_deadline_version" json:"governance_deadline_version"`
@@ -605,6 +627,7 @@ func getDefaultConfig() *Config {
 			MaxAge:                    28,
 			HTTPAccess:                true,
 			GinMode:                   "",
+			RouteLog:                  false,
 			DebugMode:                 true,
 			GovernanceMode:            "warn",
 			GovernanceDeadlineVersion: "",
@@ -880,6 +903,27 @@ func uniqueNonEmptyStrings(values []string) []string {
 	return result
 }
 
+func firstEnvValue(keys ...string) string {
+	for _, key := range keys {
+		if v := resolveConfigValue(os.Getenv(key)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func parseBoolEnvValue(raw string) (bool, bool) {
+	v := strings.TrimSpace(strings.ToLower(raw))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true, true
+	case "0", "false", "no", "off":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
 // loadEnvConfig 从环境变量加载配置，作为 YAML 的覆盖层
 func loadEnvConfig(cfg *Config) {
 	// 服务配置
@@ -899,10 +943,17 @@ func loadEnvConfig(cfg *Config) {
 	if filePath := resolveConfigValue(os.Getenv("POWERX_LOG_FILE")); filePath != "" {
 		cfg.Logging.FilePath = filePath
 	}
-	if httpLog := resolveConfigValue(os.Getenv("POWERX_HTTP_LOG")); httpLog != "" {
-		cfg.Logging.HTTPAccess = (httpLog == "1" || strings.EqualFold(httpLog, "true"))
+	if httpLog := firstEnvValue("POWERX_PLUGIN_HTTP_LOG", "POWERX_HTTP_LOG"); httpLog != "" {
+		if parsed, ok := parseBoolEnvValue(httpLog); ok {
+			cfg.Logging.HTTPAccess = parsed
+		}
 	}
-	if ginMode := resolveConfigValue(os.Getenv("POWERX_GIN_MODE")); ginMode != "" {
+	if routeLog := firstEnvValue("POWERX_PLUGIN_ROUTE_LOG", "POWERX_ROUTE_LOG"); routeLog != "" {
+		if parsed, ok := parseBoolEnvValue(routeLog); ok {
+			cfg.Logging.RouteLog = parsed
+		}
+	}
+	if ginMode := firstEnvValue("POWERX_PLUGIN_GIN_MODE", "POWERX_GIN_MODE", "GIN_MODE"); ginMode != "" {
 		cfg.Logging.GinMode = strings.ToLower(ginMode)
 	}
 	if debugMode := resolveConfigValue(os.Getenv("POWERX_DEBUG_MODE")); debugMode != "" {
@@ -1142,10 +1193,10 @@ func normalizeConfig(cfg *Config) {
 			if tokenTenant := tenantUUIDFromJWT(cfg.Gateway.ToolToken); tokenTenant != "" {
 				if cfg.Gateway.TenantUUID != "" && cfg.Gateway.TenantUUID != tokenTenant {
 					pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
-						"module":                   "config",
-						"biz_scene":                "gateway_normalize",
-						"biz_domain":               "integration",
-						"component":                "config.loader",
+						"module":                    "config",
+						"biz_scene":                 "gateway_normalize",
+						"biz_domain":                "integration",
+						"component":                 "config.loader",
 						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
 						"gateway.token_tid":         tokenTenant,
 						"gateway.tenant_from_token": true,

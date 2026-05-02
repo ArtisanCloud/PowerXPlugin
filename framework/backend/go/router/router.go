@@ -547,7 +547,7 @@ func logProxyEvent(event, requestID, traceID, pluginID, tenantUUID, method, path
 	for k, v := range extra {
 		attrs = append(attrs, slog.Any(k, v))
 	}
-	slog.Default().Info(event, attrs...)
+	slog.Default().LogAttrs(context.Background(), slog.LevelInfo, event, attrs...)
 }
 
 func elapsedMS(startAt time.Time) int64 {

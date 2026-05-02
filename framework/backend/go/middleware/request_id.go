@@ -30,7 +30,7 @@ func RequestID() bootstrap.Middleware {
 			if reqID == "" {
 				reqID = generateRequestID()
 			}
-			traceID := resolveTraceID(ctx, reqID)
+			traceID := resolveTraceIDFromHeaders(ctx, reqID)
 			ctx.SetHeader(requestIDHeader, reqID)
 			ctx.SetHeader(traceIDHeader, traceID)
 
@@ -71,7 +71,7 @@ func TraceIDFromContext(ctx context.Context) string {
 	return ""
 }
 
-func resolveTraceID(ctx bootstrap.Context, requestID string) string {
+func resolveTraceIDFromHeaders(ctx bootstrap.Context, requestID string) string {
 	if ctx == nil {
 		return requestID
 	}

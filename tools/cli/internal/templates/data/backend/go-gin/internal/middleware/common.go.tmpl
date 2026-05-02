@@ -123,9 +123,17 @@ func Recovery() gin.HandlerFunc {
 				})
 
 				// 返回错误响应
+				requestID := strings.TrimSpace(c.GetString("request_id"))
+				if requestID != "" {
+					c.Header("X-Request-ID", requestID)
+				}
 				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "Internal server error",
-					"message": "An unexpected error occurred",
+					"request_id": requestID,
+					"timestamp":  time.Now().UTC(),
+					"error": gin.H{
+						"code":    "INTERNAL_SERVER_ERROR",
+						"message": "An unexpected error occurred",
+					},
 				})
 
 				c.Abort()
@@ -164,8 +172,17 @@ func Timeout(timeout time.Duration) gin.HandlerFunc {
 		case <-finish:
 			// 请求正常完成
 		case <-time.After(timeout):
+			requestID := strings.TrimSpace(c.GetString("request_id"))
+			if requestID != "" {
+				c.Header("X-Request-ID", requestID)
+			}
 			c.JSON(http.StatusRequestTimeout, gin.H{
-				"error": "Request timeout",
+				"request_id": requestID,
+				"timestamp":  time.Now().UTC(),
+				"error": gin.H{
+					"code":    "REQUEST_TIMEOUT",
+					"message": "Request timeout",
+				},
 			})
 			c.Abort()
 		}
@@ -276,10 +293,7 @@ func RequestID() gin.HandlerFunc {
 			// 生成简单的请求 ID
 			requestID = fmt.Sprintf("%d", time.Now().UnixNano())
 		}
-		traceID := strings.TrimSpace(c.GetHeader("X-Trace-Id"))
-		if traceID == "" {
-			traceID = requestID
-		}
+		traceID := resolveTraceID(c, requestID)
 
 		c.Header("X-Request-ID", requestID)
 		c.Header("X-Trace-Id", traceID)
@@ -293,6 +307,33 @@ func RequestID() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func resolveTraceID(c *gin.Context, requestID string) string {
+	if c == nil {
+		return requestID
+	}
+	if traceparent := strings.TrimSpace(c.GetHeader("traceparent")); traceparent != "" {
+		if traceID := extractTraceIDFromTraceparent(traceparent); traceID != "" {
+			return traceID
+		}
+	}
+	if traceID := strings.TrimSpace(c.GetHeader("X-Trace-Id")); traceID != "" {
+		return traceID
+	}
+	return requestID
+}
+
+func extractTraceIDFromTraceparent(value string) string {
+	parts := strings.Split(strings.TrimSpace(value), "-")
+	if len(parts) != 4 {
+		return ""
+	}
+	traceID := strings.TrimSpace(parts[1])
+	if len(traceID) != 32 {
+		return ""
+	}
+	return traceID
 }
 
 func pluginIDForLog() string {

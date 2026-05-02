@@ -66,11 +66,12 @@ type GatewayError struct {
 
 // Response 封装标准响应数据。
 type Response struct {
-	TraceID string
-	Status  string
-	Data    map[string]any
-	RawData json.RawMessage
-	Errors  []GatewayError
+	TraceID           string
+	Status            string
+	UpstreamRequestID string
+	Data              map[string]any
+	RawData           json.RawMessage
+	Errors            []GatewayError
 }
 
 // ContractStatus 描述当前契约摘要与期望版本的比对状态。
@@ -86,10 +87,11 @@ type ContractStatus struct {
 
 // InvocationError 提供标准化错误对象。
 type InvocationError struct {
-	TraceID    string
-	StatusCode int
-	Errors     []GatewayError
-	Body       []byte
+	TraceID           string
+	UpstreamRequestID string
+	StatusCode        int
+	Errors            []GatewayError
+	Body              []byte
 }
 
 func (e *InvocationError) Error() string {
@@ -245,10 +247,11 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	}
 
 	result := &Response{
-		TraceID: traceID,
-		Status:  envelope.Status,
-		RawData: envelope.Data,
-		Errors:  envelope.Errors,
+		TraceID:           traceID,
+		Status:            envelope.Status,
+		UpstreamRequestID: firstNonEmpty(strings.TrimSpace(resp.Header.Get("X-Request-ID")), strings.TrimSpace(envelope.RequestID)),
+		RawData:           envelope.Data,
+		Errors:            envelope.Errors,
 	}
 	if len(envelope.Data) > 0 && string(envelope.Data) != "null" {
 		var data map[string]any
@@ -259,10 +262,11 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 
 	if resp.StatusCode >= http.StatusBadRequest || len(envelope.Errors) > 0 {
 		return result, &InvocationError{
-			TraceID:    traceID,
-			StatusCode: resp.StatusCode,
-			Errors:     envelope.Errors,
-			Body:       respBody,
+			TraceID:           traceID,
+			UpstreamRequestID: result.UpstreamRequestID,
+			StatusCode:        resp.StatusCode,
+			Errors:            envelope.Errors,
+			Body:              respBody,
 		}
 	}
 
@@ -403,10 +407,11 @@ func convertErrors(src []*gatewaypb.GatewayError) []GatewayError {
 }
 
 type restEnvelope struct {
-	TraceID string          `json:"traceId"`
-	Status  string          `json:"status"`
-	Data    json.RawMessage `json:"data"`
-	Errors  []GatewayError  `json:"errors"`
+	TraceID   string          `json:"traceId"`
+	RequestID string          `json:"request_id"`
+	Status    string          `json:"status"`
+	Data      json.RawMessage `json:"data"`
+	Errors    []GatewayError  `json:"errors"`
 }
 
 func parseEnvelope(body []byte) restEnvelope {
@@ -465,6 +470,15 @@ func normalizeAPIPrefix(raw string) string {
 		return "/api/v1"
 	}
 	return value
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func buildGatewayEndpoint(baseURL, apiPrefix, routePath string) string {

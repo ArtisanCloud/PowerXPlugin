@@ -120,12 +120,17 @@ func TestAttachAndFrameworkRoute(t *testing.T) {
 
 func TestCapabilityProxyRoute(t *testing.T) {
 	expectedInvokePath := strings.TrimRight(APIPrefix, "/") + "/tenant/invocations"
+	var capturedRequestID string
+	var capturedTraceparent string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != expectedInvokePath {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
+		capturedRequestID = r.Header.Get("X-Request-ID")
+		capturedTraceparent = r.Header.Get("traceparent")
+		w.Header().Set("X-Request-ID", "up-req-1")
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"traceId":"trace-1","status":"ok","data":{"ok":true}}`))
+		_, _ = w.Write([]byte(`{"traceId":"trace-1","request_id":"up-req-body","status":"ok","data":{"ok":true}}`))
 	}))
 	defer server.Close()
 
@@ -147,6 +152,8 @@ func TestCapabilityProxyRoute(t *testing.T) {
 	body := `{"capabilityId":"com.corex.demo","action":"List","payload":{"pageSize":10}}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/integration/capabilities/invoke", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Request-ID", "req-test-1")
+	req.Header.Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 	rec := httptest.NewRecorder()
 	httpRouter.root.ServeHTTP(rec, req)
 
@@ -159,6 +166,18 @@ func TestCapabilityProxyRoute(t *testing.T) {
 	}
 	if payload["traceId"] != "trace-1" {
 		t.Fatalf("expected traceId trace-1, got %v", payload["traceId"])
+	}
+	if payload["upstream_request_id"] != "up-req-1" {
+		t.Fatalf("expected upstream_request_id up-req-1, got %v", payload["upstream_request_id"])
+	}
+	if rec.Header().Get("X-Upstream-Request-ID") != "up-req-1" {
+		t.Fatalf("expected X-Upstream-Request-ID header")
+	}
+	if capturedRequestID != "req-test-1" {
+		t.Fatalf("expected forwarded request id req-test-1, got %s", capturedRequestID)
+	}
+	if capturedTraceparent != "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01" {
+		t.Fatalf("expected traceparent forwarded, got %s", capturedTraceparent)
 	}
 }
 

@@ -40,14 +40,14 @@ func NewWebhookService(
 ) *WebhookService {
 	var approvalSvc *ApprovalService
 	if approvalRepo != nil {
-		approvalSvc = NewApprovalService(approvalRepo, logger.WithField("component", "integration.webhook_approval"))
+		approvalSvc = NewApprovalService(approvalRepo, logger.WithComponent("integration.webhook_approval"))
 	}
 	return &WebhookService{
 		cfg:           cfg,
 		subscriptions: subRepo,
 		attempts:      attemptRepo,
 		approvalSvc:   approvalSvc,
-		log:           logger.WithField("component", "integration.webhook_service"),
+		log:           logger.WithComponent("integration.webhook_service"),
 		now:           time.Now,
 	}
 }
@@ -326,7 +326,14 @@ func (s *WebhookService) submitApproval(ctx context.Context, tenantID, targetID,
 		SubmittedBy: fmt.Sprintf("system:%s", tenantID),
 	})
 	if err != nil {
-		s.log.WithError(err).WithField("target_id", targetID).Warn("failed to record webhook subscription approval")
+		logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "webhook_submit_approval",
+			"biz_domain": "integration",
+			"component":  "integration.webhook_service",
+			"target_id":  targetID,
+			"error":      err.Error(),
+		}), "failed to record webhook subscription approval")
 	}
 }
 

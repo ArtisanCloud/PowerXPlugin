@@ -16,12 +16,16 @@ func NewNoopInvoker(logger *pxlog.Entry) HostInvoker {
 	return &noopInvoker{logger: logger}
 }
 
-func (n *noopInvoker) Invoke(_ context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
+func (n *noopInvoker) Invoke(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
 	if n.logger != nil && envelope != nil {
-		n.logger.WithFields(pxlog.Fields{
+		pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "integration",
+			"biz_scene":   "noop_invoker",
+			"biz_domain":  "integration",
+			"component":   "integration.noop_invoker",
 			"tenant_uuid": envelope.TenantUuid,
 			"tool_scope":  envelope.ToolScope,
-		}).Debug("noop host invoker executed")
+		}), "noop host invoker executed")
 	}
 	return &HostInvocationResult{
 		Status: "accepted",

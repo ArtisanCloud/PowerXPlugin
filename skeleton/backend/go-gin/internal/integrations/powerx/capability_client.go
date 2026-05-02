@@ -32,9 +32,7 @@ func NewCapabilityClient(baseURL, token string, log *logger.Entry) capabilities.
 		return nil
 	}
 	if log == nil {
-		log = logger.WithField("component", "capability_client")
-	} else {
-		log = log.WithField("component", "capability_client")
+		log = logger.WithComponent("capability_client")
 	}
 	return &CapabilityClient{
 		baseURL: base,
@@ -108,14 +106,24 @@ func (c *CapabilityClient) RegisterCatalog(ctx context.Context, catalog *capabil
 
 	result := map[string]any{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		c.logger.WithError(err).Warn("capability sync response decode failed")
+		logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"module":     "capability",
+			"biz_scene":  "capability_catalog_sync",
+			"biz_domain": "capability",
+			"component":  "capability_client",
+			"error":      err.Error(),
+		}), "capability sync response decode failed")
 	}
 
-	c.logger.WithFields(logger.Fields{
-		"plugin_id": catalog.PluginID,
-		"duration":  elapsed,
-		"assets":    len(payload.Assets),
-	}).Info("capability catalog synchronized with host")
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"module":     "capability",
+		"biz_scene":  "capability_catalog_sync",
+		"biz_domain": "capability",
+		"component":  "capability_client",
+		"plugin_id":  catalog.PluginID,
+		"duration":   elapsed,
+		"assets":     len(payload.Assets),
+	}), "capability catalog synchronized with host")
 
 	return nil
 }
@@ -131,12 +139,26 @@ func (c *CapabilityClient) buildRequestPayload(catalog *capabilities.CatalogSnap
 		}
 		content, err := os.ReadFile(asset.Path)
 		if err != nil {
-			c.logger.WithError(err).Warnf("skip asset %s: unable to read file", asset.Path)
+			logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "capability_catalog_asset_read",
+				"biz_domain": "capability",
+				"component":  "capability_client",
+				"asset_path": asset.Path,
+				"error":      err.Error(),
+			}), "skip asset: unable to read file")
 			continue
 		}
 		info, err := os.Stat(asset.Path)
 		if err != nil {
-			c.logger.WithError(err).Warnf("skip asset %s: stat failed", asset.Path)
+			logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "capability_catalog_asset_stat",
+				"biz_domain": "capability",
+				"component":  "capability_client",
+				"asset_path": asset.Path,
+				"error":      err.Error(),
+			}), "skip asset: stat failed")
 			continue
 		}
 		checksum := sha256.Sum256(content)

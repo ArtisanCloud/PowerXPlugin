@@ -93,7 +93,13 @@ func LoadEventPermissionsFromManifest(manifestPath string, logger *pxlog.Entry) 
 	content, err := os.ReadFile(manifestPath)
 	if err != nil {
 		if logger != nil {
-			logger.WithError(err).Warn("event permissions manifest not found; permissions enforcement disabled")
+			pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+				"module":     "security",
+				"biz_scene":  "event_permissions_load",
+				"biz_domain": "security",
+				"component":  "security.event_permissions",
+				"error":      err.Error(),
+			}), "event permissions manifest not found; permissions enforcement disabled")
 		}
 		return EventPermissions{enforced: false}, nil
 	}
@@ -116,7 +122,12 @@ func LoadEventPermissionsFromManifest(manifestPath string, logger *pxlog.Entry) 
 
 	if m.Events == nil {
 		if logger != nil {
-			logger.Warn("manifest.events not found; permissions enforcement disabled")
+			pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+				"module":     "security",
+				"biz_scene":  "event_permissions_load",
+				"biz_domain": "security",
+				"component":  "security.event_permissions",
+			}), "manifest.events not found; permissions enforcement disabled")
 		}
 		return EventPermissions{enforced: false}, nil
 	}
@@ -257,11 +268,15 @@ func (e *PermissionedEmitter) Emit(ctx context.Context, ev event.Event) error {
 	}
 	topic := strings.TrimSpace(string(ev.Topic))
 	if !e.perms.CanPublish(topic) {
-		e.logger.WithFields(pxlog.Fields{
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "security",
+			"biz_scene":   "event_publish_permission",
+			"biz_domain":  "security",
+			"component":   "security.event_permissions",
 			"topic":       topic,
 			"tenant_uuid": ev.Meta.TenantUUID,
 			"trace_id":    ev.Meta.TraceID,
-		}).Warn("event publish denied by manifest permissions")
+		}), "event publish denied by manifest permissions")
 		return ErrEventPermissionDenied
 	}
 	return e.inner.Emit(ctx, ev)

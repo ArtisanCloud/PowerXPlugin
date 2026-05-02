@@ -240,13 +240,25 @@ func (s *PlanService) loadFromDisk() {
 	data, err := os.ReadFile(s.storagePath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			s.logger.WithError(err).Warn("failed to read lifecycle plans")
+			logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "lifecycle_plan_load",
+				"biz_domain": "capability",
+				"component":  "capability_lifecycle_plan_service",
+				"error":      err.Error(),
+			}), "failed to read lifecycle plans")
 		}
 		return
 	}
 	var snapshot lifecycleSnapshot
 	if err := json.Unmarshal(data, &snapshot); err != nil {
-		s.logger.WithError(err).Warn("failed to parse lifecycle plans")
+		logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "capability",
+			"biz_scene":  "lifecycle_plan_load",
+			"biz_domain": "capability",
+			"component":  "capability_lifecycle_plan_service",
+			"error":      err.Error(),
+		}), "failed to parse lifecycle plans")
 		return
 	}
 	for _, plan := range snapshot.Plans {

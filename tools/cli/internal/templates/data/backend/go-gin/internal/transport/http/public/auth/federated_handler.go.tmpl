@@ -16,13 +16,13 @@ import (
 	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
 	"{{ .BackendModulePath }}/internal/contracts"
 	iamrepo "{{ .BackendModulePath }}/internal/domain/repository/iam"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	authobs "{{ .BackendModulePath }}/internal/observability/auth"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	federatedService "{{ .BackendModulePath }}/internal/services/iam/federated"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	middleware "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -460,32 +460,36 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 	corpID := strings.TrimSpace(c.Param("corp_id"))
 	appID := strings.TrimSpace(c.Param("app_id"))
 	if tenantUUID == "" || corpID == "" || appID == "" {
-		pxlog.WithFields(pxlog.Fields{
+		pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
 			"component":   "iam.wecom_callback",
 			"request_id":  c.GetString("request_id"),
 			"tenant_uuid": tenantUUID,
 			"corp_id":     corpID,
 			"app_id":      appID,
-		}).Warn("wecom callback path params missing")
+			"biz_scene":   "wecom_callback_validate",
+			"biz_domain":  "iam",
+		}), "wecom callback path params missing")
 		contracts.ResponseBadRequest(c, "wecom callback params missing: tenant_uuid/corp_id/app_id")
 		return
 	}
 	wecomCfg, err := h.wecomConfig.ResolveCallbackConfig(c.Request.Context(), tenantUUID, corpID, appID)
 	if err != nil {
-		pxlog.WithFields(pxlog.Fields{
+		pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
 			"component":   "iam.wecom_callback",
 			"request_id":  c.GetString("request_id"),
 			"tenant_uuid": tenantUUID,
 			"corp_id":     corpID,
 			"app_id":      appID,
 			"error":       err.Error(),
-		}).Warn("wecom callback config resolve failed")
+			"biz_scene":   "wecom_callback_config_resolve",
+			"biz_domain":  "iam",
+		}), "wecom callback config resolve failed")
 		contracts.ResponseBadRequest(c, "load wecom config failed: "+err.Error())
 		return
 	}
 
 	callbackURL := resolveWeComCallbackURL(c, wecomCfg.CallbackHost)
-	pxlog.WithFields(pxlog.Fields{
+	pxlog.InfoCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
 		"component":         "iam.wecom_callback",
 		"request_id":        c.GetString("request_id"),
 		"tenant_uuid":       tenantUUID,
@@ -498,7 +502,9 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 		"x_forwarded_proto": strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")),
 		"x_forwarded_for":   strings.TrimSpace(c.GetHeader("X-Forwarded-For")),
 		"user_agent":        strings.TrimSpace(c.GetHeader("User-Agent")),
-	}).Info("wecom callback url resolved")
+		"biz_scene":         "wecom_callback_url_resolve",
+		"biz_domain":        "iam",
+	}), "wecom callback url resolved")
 	appSDK, err := work.NewWork(&work.UserConfig{
 		CorpID:      wecomCfg.CorpID,
 		AgentID:     wecomCfg.AgentID,
@@ -513,7 +519,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 		HttpDebug: wecomCfg.HttpDebug,
 	})
 	if err != nil {
-		pxlog.WithFields(pxlog.Fields{
+		pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
 			"component":         "iam.wecom_callback",
 			"request_id":        c.GetString("request_id"),
 			"tenant_uuid":       tenantUUID,
@@ -525,7 +531,9 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 			"x_forwarded_host":  strings.TrimSpace(c.GetHeader("X-Forwarded-Host")),
 			"x_forwarded_proto": strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")),
 			"error":             err.Error(),
-		}).Warn("wecom callback sdk init failed")
+			"biz_scene":         "wecom_callback_sdk_init",
+			"biz_domain":        "iam",
+		}), "wecom callback sdk init failed")
 		contracts.ResponseBadRequest(c, "init wecom sdk failed: "+err.Error())
 		return
 	}
@@ -533,7 +541,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 	if c.Request.Method == http.MethodGet {
 		resp, err := appSDK.Server.VerifyURL(c.Request)
 		if err != nil {
-			pxlog.WithFields(pxlog.Fields{
+			pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
 				"component":      "iam.wecom_callback",
 				"request_id":     c.GetString("request_id"),
 				"tenant_uuid":    tenantUUID,
@@ -544,7 +552,9 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 				"nonce":          strings.TrimSpace(c.Query("nonce")),
 				"error":          err.Error(),
 				"callback_route": c.Request.URL.Path,
-			}).Warn("wecom callback verify url failed")
+				"biz_scene":      "wecom_callback_verify",
+				"biz_domain":     "iam",
+			}), "wecom callback verify url failed")
 			contracts.ResponseBadRequest(c, "verify callback url failed: "+err.Error())
 			return
 		}
@@ -570,7 +580,7 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 		return kernel.SUCCESS_EMPTY_RESPONSE
 	})
 	if err != nil {
-		pxlog.WithFields(pxlog.Fields{
+		pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
 			"component":      "iam.wecom_callback",
 			"request_id":     c.GetString("request_id"),
 			"tenant_uuid":    tenantUUID,
@@ -581,7 +591,9 @@ func (h *FederatedHandler) WeComServerCallback(c *gin.Context) {
 			"nonce":          strings.TrimSpace(c.Query("nonce")),
 			"error":          err.Error(),
 			"callback_route": c.Request.URL.Path,
-		}).Warn("wecom callback notify failed")
+			"biz_scene":      "wecom_callback_notify",
+			"biz_domain":     "iam",
+		}), "wecom callback notify failed")
 		contracts.ResponseBadRequest(c, "notify callback failed: "+err.Error())
 		return
 	}
@@ -608,13 +620,15 @@ func (h *FederatedHandler) resolveChallengeRedirectURI(c *gin.Context, providerK
 	}
 	callbackHost, err := h.resolveProviderCallbackHost(c, strings.TrimSpace(providerKey), tenantUUID)
 	if err != nil {
-		pxlog.WithFields(pxlog.Fields{
+		pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
 			"component":   "iam.federated_challenge",
 			"request_id":  c.GetString("request_id"),
 			"tenant_uuid": tenantUUID,
 			"provider":    strings.TrimSpace(providerKey),
 			"error":       err.Error(),
-		}).Warn("federated challenge resolve config failed, fallback to original redirect_uri")
+			"biz_scene":   "federated_challenge_resolve_redirect",
+			"biz_domain":  "iam",
+		}), "federated challenge resolve config failed, fallback to original redirect_uri")
 		return redirectURI
 	}
 	rewritten, ok := buildBrowserCallbackRedirectURI(redirectURI, callbackHost, providerKey, tenantUUID, state, nonce)

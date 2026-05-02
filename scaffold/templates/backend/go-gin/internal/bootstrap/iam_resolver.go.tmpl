@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -60,7 +61,11 @@ func NewIAMResolver(cfg *config.Config) *IAMResolver {
 	}
 
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
-		logger.WithFields(logger.Fields{
+		logger.InfoCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
+			"module":       "iam",
+			"biz_scene":    "iam_mode_resolve",
+			"biz_domain":   "iam",
+			"component":    "bootstrap.iam_resolver",
 			"iam_mode":     legacyMode,
 			"source":       source,
 			"POWERX_PROXY": os.Getenv("POWERX_PROXY"),
@@ -69,7 +74,7 @@ func NewIAMResolver(cfg *config.Config) *IAMResolver {
 			"config_mode":  configMode,
 			"conflict":     record.ConflictDetected,
 			"decision":     record.DecisionReason,
-		}).Info("IAM mode resolved")
+		}), "IAM mode resolved")
 	}
 	return result
 }

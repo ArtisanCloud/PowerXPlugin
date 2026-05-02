@@ -4,10 +4,10 @@ import (
 	"time"
 
 	idrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
 	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // BuildDispatchService 根据应用依赖构造 DispatchService。
@@ -16,15 +16,15 @@ func BuildDispatchService(deps *app.Deps, logger *pxlog.Entry) *DispatchService 
 		return nil
 	}
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.dispatch_factory")
+		logger = pxlog.WithComponent("integration.dispatch_factory")
 	}
 
 	loader := NewGrantMatrixLoader(
 		deps.DB,
-		logger.WithField("component", "integration.grant_matrix_loader"),
+		pxlog.WithComponent("integration.grant_matrix_loader"),
 		LoaderOptions{},
 	)
-	grantService := NewGrantMatrixService(loader, logger.WithField("component", "integration.grant_matrix_service"))
+	grantService := NewGrantMatrixService(loader, pxlog.WithComponent("integration.grant_matrix_service"))
 
 	var fallbackStore idrepo.IdempotencyProvider
 	if deps.DB != nil {
@@ -34,12 +34,12 @@ func BuildDispatchService(deps *app.Deps, logger *pxlog.Entry) *DispatchService 
 		}
 		fallbackStore = idrepo.NewPostgresIdempotencyProvider(deps.DB, ttl)
 	}
-	repository := idrepo.NewIdempotencyRepository(deps.DB, nil, fallbackStore, logger.WithField("component", "integration.idempotency_repository"))
+	repository := idrepo.NewIdempotencyRepository(deps.DB, nil, fallbackStore, pxlog.WithComponent("integration.idempotency_repository"))
 
 	templateService := srvtemplates.NewTemplateService(deps.DB)
-	hostLogger := logger.WithField("component", "integration.host_invoker")
+	hostLogger := pxlog.WithComponent("integration.host_invoker")
 	noopInvoker := NewNoopInvoker(hostLogger)
 	invoker := NewCapabilityInvoker(templateService, stream.DefaultBroker(), hostLogger, noopInvoker)
 
-	return NewDispatchService(deps.Config, grantService, repository, invoker, logger.WithField("component", "integration.dispatch_service"))
+	return NewDispatchService(deps.Config, grantService, repository, invoker, pxlog.WithComponent("integration.dispatch_service"))
 }

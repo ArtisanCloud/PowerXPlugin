@@ -30,10 +30,11 @@ type Event struct {
 
 // EmitReviewEvent sends the event to the shared logger for downstream sinks.
 func EmitReviewEvent(ctx context.Context, log *logger.Entry, evt Event) {
-	if log == nil {
-		log = logger.WithField("component", "capability_review_events")
-	}
-	fields := logger.Fields{
+	fields := map[string]interface{}{
+		"module":        "capability",
+		"biz_scene":     "capability_review_event",
+		"biz_domain":    "capability",
+		"component":     "capability_review_events",
 		"event":         evt.Type,
 		"capability_id": evt.CapabilityID,
 		"task_id":       evt.TaskID,
@@ -57,5 +58,5 @@ func EmitReviewEvent(ctx context.Context, log *logger.Entry, evt Event) {
 			fields["trace_id"] = reqID
 		}
 	}
-	log.WithFields(fields).Info("capability review event")
+	logger.InfoCtx(logger.WithLogFields(ctx, fields), "capability review event")
 }

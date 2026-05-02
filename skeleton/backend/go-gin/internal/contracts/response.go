@@ -127,10 +127,12 @@ func getRequestID(c *gin.Context) string {
 	}
 	// 然后从 context 获取
 	if requestID := c.GetString("request_id"); requestID != "" {
+		c.Header("X-Request-ID", requestID)
 		return requestID
 	}
 	// 最后从中间件设置的字段获取
 	if requestID := c.GetHeader("Request-ID"); requestID != "" {
+		c.Header("X-Request-ID", requestID)
 		return requestID
 	}
 	return ""

@@ -37,10 +37,11 @@ type InvokeParams struct {
 
 // InvokeResult 返回 traceId 与解析后的数据。
 type InvokeResult struct {
-	TraceID string
-	Status  string
-	Data    map[string]any
-	Raw     []byte
+	TraceID           string
+	Status            string
+	UpstreamRequestID string
+	Data              map[string]any
+	Raw               []byte
 }
 
 // ErrorCategory 用于标识错误类型，方便上层处理。
@@ -55,12 +56,13 @@ const (
 
 // InvokeError 提供标准化错误对象。
 type InvokeError struct {
-	Category ErrorCategory
-	TraceID  string
-	Status   int
-	Code     string
-	Message  string
-	Cause    error
+	Category          ErrorCategory
+	TraceID           string
+	UpstreamRequestID string
+	Status            int
+	Code              string
+	Message           string
+	Cause             error
 }
 
 func (e *InvokeError) Error() string {
@@ -133,9 +135,10 @@ func (s *Service) Invoke(ctx context.Context, params InvokeParams) (*InvokeResul
 		return nil, invErr
 	}
 	result := &InvokeResult{
-		TraceID: resp.TraceID,
-		Status:  resp.Status,
-		Data:    resp.Data,
+		TraceID:           resp.TraceID,
+		Status:            resp.Status,
+		UpstreamRequestID: resp.UpstreamRequestID,
+		Data:              resp.Data,
 	}
 	if resp.RawData != nil {
 		result.Raw = resp.RawData
@@ -173,12 +176,13 @@ func (s *Service) toInvokeError(err error) *InvokeError {
 			msg = err.Error()
 		}
 		return &InvokeError{
-			Category: category,
-			TraceID:  invErr.TraceID,
-			Status:   invErr.StatusCode,
-			Code:     code,
-			Message:  msg,
-			Cause:    err,
+			Category:          category,
+			TraceID:           invErr.TraceID,
+			UpstreamRequestID: invErr.UpstreamRequestID,
+			Status:            invErr.StatusCode,
+			Code:              code,
+			Message:           msg,
+			Cause:             err,
 		}
 	}
 	return &InvokeError{

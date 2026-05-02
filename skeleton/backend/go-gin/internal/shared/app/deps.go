@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"os"
+	"strings"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
@@ -106,9 +108,77 @@ func (d *Deps) RuntimeLogger(ctx context.Context, component string, extra logger
 		"request_id":                   traceID,
 	}
 	normalized := runtimelogging.NormalizeContextFields(baseFields, runtimelogging.Fields(extra))
+	if trimAny(normalized["biz_scene"]) == "" && strings.TrimSpace(component) != "" {
+		normalized["biz_scene"] = strings.TrimSpace(component)
+	}
+	if trimAny(normalized["biz_domain"]) == "" {
+		normalized["biz_domain"] = inferBizDomain(component)
+	}
+	labels := buildRuntimeLabels(component, normalized)
+	normalized["labels"] = labels
+	for k, v := range labels {
+		if _, exists := normalized[k]; !exists {
+			normalized[k] = v
+		}
+	}
 	extra = logger.Fields(normalized)
 
 	return logger.WithRuntimeFields(PluginID, tenantID, traceID, component, extra)
+}
+
+func buildRuntimeLabels(component string, fields runtimelogging.Fields) map[string]string {
+	labels := map[string]string{
+		"system":   firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_LOG_SYSTEM")), "powerx"),
+		"service":  firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_LOG_SERVICE")), "backend"),
+		"env":      firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_ENV")), strings.TrimSpace(os.Getenv("POWERX_SERVER_MODE")), "dev"),
+		"instance": firstNonEmpty(strings.TrimSpace(os.Getenv("HOSTNAME")), "local"),
+	}
+	if module := firstNonEmpty(trimAny(fields["module"]), strings.TrimSpace(component)); module != "" {
+		labels["module"] = module
+	}
+	return labels
+}
+
+func trimAny(v any) string {
+	if s, ok := v.(string); ok {
+		return strings.TrimSpace(s)
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if t := strings.TrimSpace(v); t != "" {
+			return t
+		}
+	}
+	return ""
+}
+
+func inferBizDomain(component string) string {
+	c := strings.ToLower(strings.TrimSpace(component))
+	switch {
+	case c == "":
+		return "backend"
+	case strings.Contains(c, "runtime") || strings.Contains(c, "mcp") || strings.Contains(c, "wsbus"):
+		return "runtime_ops"
+	case strings.Contains(c, "capability"):
+		return "capability"
+	case strings.Contains(c, "integration"):
+		return "integration"
+	case strings.Contains(c, "marketplace"):
+		return "marketplace"
+	case strings.Contains(c, "iam") || strings.Contains(c, "auth"):
+		return "iam"
+	case strings.Contains(c, "security") || strings.Contains(c, "consent") || strings.Contains(c, "toolgrant"):
+		return "security"
+	case strings.Contains(c, "operations") || strings.Contains(c, "incident") || strings.Contains(c, "sla"):
+		return "operations"
+	case strings.Contains(c, "agent"):
+		return "agent"
+	default:
+		return "backend"
+	}
 }
 
 func (d *Deps) LocalIAMEnabled() bool {

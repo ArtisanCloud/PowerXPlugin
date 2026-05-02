@@ -9,8 +9,8 @@ import (
 
 	secmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	secrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/security"
-	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -303,7 +303,13 @@ func (s *AdvisoryService) refreshOpenGauge(ctx context.Context) {
 	})
 	if err != nil {
 		if s.logger != nil {
-			s.logger.WithError(err).Debug("failed to refresh advisory open gauge")
+			pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":     "security",
+				"biz_scene":  "advisory_refresh_open_gauge",
+				"biz_domain": "security",
+				"component":  "admin.security.advisory_service",
+				"error":      err.Error(),
+			}), "failed to refresh advisory open gauge")
 		}
 		return
 	}

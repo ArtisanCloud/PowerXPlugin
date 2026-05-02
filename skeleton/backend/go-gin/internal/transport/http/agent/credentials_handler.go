@@ -47,7 +47,15 @@ func (h *CredentialHandler) Upsert(c *gin.Context) {
 
 	svc := agent.NewCredentialService(h.deps.Config, repo.NewCredentialsRepository(h.deps.DB))
 	if err := svc.SavePlainCredentials(c.Request.Context(), tenantUUID, req.PluginID, req.ClientID, req.ClientSecret); err != nil {
-		logger.WithError(err).Warn("save credentials failed")
+		logger.WarnCtx(logger.WithLogFields(c.Request.Context(), map[string]interface{}{
+			"module":      "agent",
+			"biz_scene":   "agent_credentials_upsert",
+			"biz_domain":  "agent",
+			"component":   "agent.credentials_handler",
+			"tenant_uuid": tenantUUID,
+			"plugin_id":   req.PluginID,
+			"error":       err.Error(),
+		}), "save credentials failed")
 		contracts.ResponseInternalError(c, err)
 		return
 	}

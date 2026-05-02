@@ -30,6 +30,8 @@ type Router struct {
 	deps   *app.Deps
 }
 
+var defaultGinDebugPrintRouteFunc = gin.DebugPrintRouteFunc
+
 // New 创建新的路由器
 func NewRouter(cfg *config.Config, deps *app.Deps) *Router {
 	return &Router{
@@ -59,6 +61,7 @@ func (r *Router) Setup() *gin.Engine {
 			gin.SetMode(gin.DebugMode)
 		}
 	}
+	r.configureRouteLog()
 
 	// 创建 Gin 引擎
 	r.engine = gin.New()
@@ -83,7 +86,9 @@ func (r *Router) setupGlobalMiddleware() {
 	r.engine.Use(middleware.Recovery())
 
 	// 请求日志
-	r.engine.Use(middleware.RequestLogger())
+	if r.cfg != nil && r.cfg.Logging != nil && r.cfg.Logging.HTTPAccess {
+		r.engine.Use(middleware.RequestLogger())
+	}
 
 	// 安全头
 	r.engine.Use(middleware.SecurityHeaders())
@@ -113,6 +118,48 @@ func (r *Router) setupGlobalMiddleware() {
 			Roles:       []string{"superadmin"},
 			Permissions: []string{"*"},
 		}))
+	}
+}
+
+func (r *Router) configureRouteLog() {
+	enabled := r.resolveRouteLogEnabled()
+	if enabled {
+		gin.DebugPrintRouteFunc = defaultGinDebugPrintRouteFunc
+		return
+	}
+	gin.DebugPrintRouteFunc = func(string, string, string, int) {}
+}
+
+func (r *Router) resolveRouteLogEnabled() bool {
+	if v, ok := parseBoolEnv(os.Getenv("POWERX_PLUGIN_ROUTE_LOG")); ok {
+		return v
+	}
+	if v, ok := parseBoolEnv(os.Getenv("POWERX_ROUTE_LOG")); ok {
+		return v
+	}
+	if r != nil && r.cfg != nil {
+		if r.cfg.Runtime != nil && r.cfg.Runtime.RouteLog != nil {
+			return *r.cfg.Runtime.RouteLog
+		}
+		if r.cfg.Logging != nil && r.cfg.Logging.RouteLog {
+			return true
+		}
+		if r.cfg.Server != nil {
+			return strings.EqualFold(strings.TrimSpace(r.cfg.Server.Mode), "debug")
+		}
+	}
+	return false
+}
+
+func parseBoolEnv(raw string) (bool, bool) {
+	v := strings.TrimSpace(strings.ToLower(raw))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true, true
+	case "0", "false", "no", "off":
+		return false, true
+	default:
+		return false, false
 	}
 }
 

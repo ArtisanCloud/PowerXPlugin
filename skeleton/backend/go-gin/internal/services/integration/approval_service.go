@@ -9,8 +9,8 @@ import (
 
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
-	"github.com/google/uuid"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 
@@ -95,11 +95,15 @@ func (s *ApprovalService) SubmitChange(ctx context.Context, req SubmitChangeRequ
 		return nil, err
 	}
 
-	s.log().WithFields(pxlog.Fields{
+	pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+		"module":      "integration",
+		"biz_scene":   "approval_submit",
+		"biz_domain":  "integration",
+		"component":   "integration.approval_service",
 		"approval_id": created.ID,
 		"target_type": created.TargetType,
 		"target_id":   created.TargetID,
-	}).Info("integration change submitted for approval")
+	}), "integration change submitted for approval")
 
 	return created, nil
 }
@@ -126,7 +130,7 @@ func (s *ApprovalService) Approve(ctx context.Context, req DecisionRequest) (*mo
 		return nil, err
 	}
 
-	s.logDecision("approved", approval, req.Reviewer)
+	s.logDecision(ctx, "approved", approval, req.Reviewer)
 	s.fireHooks(ctx, approval)
 	return approval, nil
 }
@@ -146,7 +150,7 @@ func (s *ApprovalService) Reject(ctx context.Context, req DecisionRequest) (*mod
 		return nil, err
 	}
 
-	s.logDecision("rejected", approval, req.Reviewer)
+	s.logDecision(ctx, "rejected", approval, req.Reviewer)
 	s.fireHooks(ctx, approval)
 	return approval, nil
 }
@@ -166,7 +170,13 @@ func (s *ApprovalService) fireHooks(ctx context.Context, approval *model.ChangeA
 		func(h ApprovalHook) {
 			defer func() {
 				if r := recover(); r != nil && s.logger != nil {
-					s.logger.WithField("panic", r).Warn("approval hook panicked")
+					pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+						"module":     "integration",
+						"biz_scene":  "approval_hook",
+						"biz_domain": "integration",
+						"component":  "integration.approval_service",
+						"panic":      r,
+					}), "approval hook panicked")
 				}
 			}()
 			h(ctx, approval)
@@ -184,18 +194,23 @@ func validateDecision(req DecisionRequest) error {
 	return nil
 }
 
-func (s *ApprovalService) logDecision(action string, approval *model.ChangeApproval, reviewer string) {
-	s.log().WithFields(pxlog.Fields{
+func (s *ApprovalService) logDecision(ctx context.Context, action string, approval *model.ChangeApproval, reviewer string) {
+	pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+		"module":      "integration",
+		"biz_scene":   "approval_decision",
+		"biz_domain":  "integration",
+		"component":   "integration.approval_service",
 		"approval_id": approval.ID,
 		"target_type": approval.TargetType,
 		"target_id":   approval.TargetID,
 		"reviewer":    reviewer,
-	}).Infof("integration change %s", action)
+		"action":      action,
+	}), "integration change decision")
 }
 
 func (s *ApprovalService) log() *pxlog.Entry {
 	if s.logger != nil {
 		return s.logger
 	}
-	return pxlog.WithField("component", "integration.approval_service")
+	return pxlog.WithComponent("integration.approval_service")
 }

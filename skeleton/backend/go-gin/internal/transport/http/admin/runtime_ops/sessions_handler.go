@@ -12,6 +12,7 @@ import (
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
 	idrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	mcpintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
 	runtimeops "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/runtime_ops"
@@ -20,7 +21,6 @@ import (
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -156,14 +156,18 @@ func (h *SessionsHandler) Invoke(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.TenantUuid) == "" {
 		if h.logger != nil {
-			h.logger.WithFields(pxlog.Fields{
+			pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
+				"module":                       "runtime_ops",
 				runtimelogging.FieldTaskID:     runtimelogging.FallbackUnknown,
 				runtimelogging.FieldSubscriber: "mcp_session_handler",
 				runtimelogging.FieldTopic:      "runtime_ops.invoke",
 				runtimelogging.FieldStatus:     runtimelogging.StatusSkipped,
 				runtimelogging.FieldReason:     runtimelogging.ReasonMissingContext,
+				"biz_scene":                    "mcp_invoke",
+				"biz_domain":                   "runtime_ops",
+				"component":                    "runtime_ops.sessions_handler",
 				"session_id":                   sessionID,
-			}).Warn("mcp invoke skipped: missing tenant context")
+			}), "mcp invoke skipped: missing tenant context")
 		}
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
@@ -217,7 +221,13 @@ func (h *SessionsHandler) handleDispatchError(c *gin.Context, err error) {
 		contracts.ResponseServiceUnavailable(c, "idempotency backend unavailable", nil)
 	default:
 		if h.logger != nil {
-			h.logger.WithError(err).Warn("mcp invoke failed")
+			pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
+				"module":     "runtime_ops",
+				"biz_scene":  "mcp_invoke",
+				"biz_domain": "runtime_ops",
+				"component":  "runtime_ops.sessions_handler",
+				"error":      err.Error(),
+			}), "mcp invoke failed")
 		}
 		contracts.ResponseInternalError(c, err)
 	}

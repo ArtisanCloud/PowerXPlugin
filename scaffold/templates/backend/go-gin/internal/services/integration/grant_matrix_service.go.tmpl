@@ -24,7 +24,7 @@ type GrantMatrixService struct {
 // NewGrantMatrixService 构造服务。
 func NewGrantMatrixService(loader *GrantMatrixLoader, logger *pxlog.Entry) *GrantMatrixService {
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.grant_matrix_service")
+		logger = pxlog.WithComponent("integration.grant_matrix_service")
 	}
 	return &GrantMatrixService{
 		loader: loader,

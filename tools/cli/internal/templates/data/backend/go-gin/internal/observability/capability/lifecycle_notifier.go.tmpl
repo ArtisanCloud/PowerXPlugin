@@ -20,27 +20,20 @@ type Notifier interface {
 
 // loggerNotifier 使用日志模拟多通道通知并带有简单的重试机制。
 type loggerNotifier struct {
-	log        *logger.Entry
 	maxRetries int
 	delay      time.Duration
 }
 
 // NewNotifier 返回具备重试能力的 Notifier。
-func NewNotifier(log *logger.Entry) Notifier {
-	if log == nil {
-		log = logger.WithField("component", "capability_notifier")
-	} else {
-		log = log.WithField("component", "capability_notifier")
-	}
+func NewNotifier(_ *logger.Entry) Notifier {
 	return &loggerNotifier{
-		log:        log,
 		maxRetries: 3,
 		delay:      200 * time.Millisecond,
 	}
 }
 
 func (n *loggerNotifier) Emit(ctx context.Context, evt Event) {
-	if n == nil || n.log == nil {
+	if n == nil {
 		return
 	}
 	channels := evt.Channels
@@ -56,13 +49,17 @@ func (n *loggerNotifier) Emit(ctx context.Context, evt Event) {
 func (n *loggerNotifier) dispatch(ctx context.Context, channel string, evt Event) {
 	for attempt := 1; attempt <= n.maxRetries; attempt++ {
 		if err := n.deliver(ctx, channel, evt); err != nil {
-			n.log.WithFields(logger.Fields{
-				"event":    evt.Type,
-				"channel":  channel,
-				"attempt":  attempt,
-				"error":    err.Error(),
-				"metadata": evt.Metadata,
-			}).Warn("capability lifecycle notification failed, retrying")
+			logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
+				"module":     "capability",
+				"biz_scene":  "capability_lifecycle_notify",
+				"biz_domain": "capability",
+				"component":  "capability_notifier",
+				"event":      evt.Type,
+				"channel":    channel,
+				"attempt":    attempt,
+				"error":      err.Error(),
+				"metadata":   evt.Metadata,
+			}), "capability lifecycle notification failed, retrying")
 			time.Sleep(n.delay)
 			continue
 		}
@@ -71,7 +68,11 @@ func (n *loggerNotifier) dispatch(ctx context.Context, channel string, evt Event
 }
 
 func (n *loggerNotifier) deliver(ctx context.Context, channel string, evt Event) error {
-	fields := logger.Fields{
+	fields := map[string]interface{}{
+		"module":        "capability",
+		"biz_scene":     "capability_lifecycle_notify",
+		"biz_domain":    "capability",
+		"component":     "capability_notifier",
 		"event":         evt.Type,
 		"capability_id": evt.CapabilityID,
 		"status":        evt.Status,
@@ -86,6 +87,6 @@ func (n *loggerNotifier) deliver(ctx context.Context, channel string, evt Event)
 			fields["trace_id"] = reqID
 		}
 	}
-	n.log.WithFields(fields).Info("capability lifecycle notification emitted")
+	logger.InfoCtx(logger.WithLogFields(ctx, fields), "capability lifecycle notification emitted")
 	return nil
 }

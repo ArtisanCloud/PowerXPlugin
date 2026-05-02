@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +50,13 @@ func LoadEventFabricTopics(logger *pxlog.Entry) ([]string, error) {
 		if len(topics) > 0 {
 			slices.Sort(topics)
 			if logger != nil {
-				logger.WithField("path", candidate).Info("loaded event fabric topics for bootstrap")
+				pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+					"module":     "security",
+					"biz_scene":  "event_fabric_topics_load",
+					"biz_domain": "security",
+					"component":  "security.event_fabric_topics",
+					"path":       candidate,
+				}), "loaded event fabric topics for bootstrap")
 			}
 			return topics, nil
 		}

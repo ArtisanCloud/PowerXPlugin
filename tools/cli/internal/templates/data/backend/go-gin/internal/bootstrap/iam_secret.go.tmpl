@@ -34,7 +34,14 @@ func EnsureLocalIAMSecret(cfg *config.Config) error {
 	secret, err := os.ReadFile(secretFile)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			logger.WithError(err).Warn("failed to read local IAM secret file")
+			logger.WarnCtx(logger.WithLogFields(nil, map[string]interface{}{
+				"module":     "iam",
+				"biz_scene":  "local_iam_secret",
+				"biz_domain": "iam",
+				"component":  "bootstrap.iam_secret",
+				"path":       secretFile,
+				"error":      err.Error(),
+			}), "failed to read local IAM secret file")
 		}
 	}
 	trimmed := strings.TrimSpace(string(secret))
@@ -46,7 +53,13 @@ func EnsureLocalIAMSecret(cfg *config.Config) error {
 		if writeErr := writeLocalIAMSecret(secretFile, trimmed); writeErr != nil {
 			return writeErr
 		}
-		logger.WithField("path", secretFile).Info("generated local IAM HMAC secret")
+		logger.InfoCtx(logger.WithLogFields(nil, map[string]interface{}{
+			"module":     "iam",
+			"biz_scene":  "local_iam_secret",
+			"biz_domain": "iam",
+			"component":  "bootstrap.iam_secret",
+			"path":       secretFile,
+		}), "generated local IAM HMAC secret")
 	}
 	cfg.Context.HMACSecret = trimmed
 	return nil

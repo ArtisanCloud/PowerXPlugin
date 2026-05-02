@@ -37,6 +37,6 @@ func (d *loggingIncidentDispatcher) DispatchIncidentEvent(ctx context.Context, e
 		}
 		fields[k] = v
 	}
-	d.log.WithContext(ctx).WithFields(fields).Info("operations incident event")
+	pxlog.InfoWith(d.log, ctx, "operations incident event", fields)
 	return nil
 }

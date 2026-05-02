@@ -1,6 +1,7 @@
 package security
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -13,17 +14,29 @@ func EmitToolGrantEvent(logger *pxlog.Entry, event string, tenantID string, meta
 		return
 	}
 	payload := map[string]interface{}{
-		"event":     event,
+		"event":       event,
 		"tenant_uuid": tenantID,
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"timestamp":   time.Now().UTC().Format(time.RFC3339),
 	}
 	for k, v := range metadata {
 		payload[k] = v
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		logger.WithError(err).Warn("failed to marshal toolgrant event metadata")
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "security",
+			"biz_scene":  "toolgrant_event",
+			"biz_domain": "security",
+			"component":  "observability.security.toolgrant_events",
+			"error":      err.Error(),
+		}), "failed to marshal toolgrant event metadata")
 		return
 	}
-	logger.WithField("toolgrant_event", string(raw)).Info("toolgrant lifecycle event")
+	pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+		"module":          "security",
+		"biz_scene":       "toolgrant_event",
+		"biz_domain":      "security",
+		"component":       "observability.security.toolgrant_events",
+		"toolgrant_event": string(raw),
+	}), "toolgrant lifecycle event")
 }

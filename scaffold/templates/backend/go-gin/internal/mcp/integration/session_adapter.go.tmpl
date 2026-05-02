@@ -19,7 +19,7 @@ type SessionAdapter struct {
 // NewSessionAdapter 构造 MCP 适配器。
 func NewSessionAdapter(dispatch *integrationService.DispatchService, logger *pxlog.Entry) *SessionAdapter {
 	if logger == nil {
-		logger = pxlog.WithField("component", "integration.mcp.adapter")
+		logger = pxlog.WithComponent("integration.mcp.adapter")
 	}
 	return &SessionAdapter{
 		dispatch: dispatch,

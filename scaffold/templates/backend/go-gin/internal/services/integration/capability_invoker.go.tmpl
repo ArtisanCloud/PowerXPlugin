@@ -11,10 +11,10 @@ import (
 
 	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
 	dbtemplate "{{ .BackendModulePath }}/internal/entity/models/template"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"{{ .BackendModulePath }}/internal/mcp/stream"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	srvtemplates "{{ .BackendModulePath }}/internal/services/admin/templates"
-	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 const (
@@ -110,7 +110,13 @@ func (i *CapabilityInvoker) Invoke(ctx context.Context, envelope *domain.Integra
 		return handler.Handle(ctx, envelope)
 	}
 	if i.logger != nil {
-		i.logger.WithField("capability_id", capabilityID).Debug("delegating capability to fallback invoker")
+		pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":        "integration",
+			"biz_scene":     "capability_invoke_fallback",
+			"biz_domain":    "integration",
+			"component":     "integration.capability_invoker",
+			"capability_id": capabilityID,
+		}), "delegating capability to fallback invoker")
 	}
 	if i.fallback != nil {
 		return i.fallback.Invoke(ctx, envelope)

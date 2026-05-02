@@ -82,7 +82,13 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 	// 连接数据库（在进程生命周期内保持打开；在优雅退出时关闭）
 	queryDB, err := db.Connect(cfg.Database)
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to connect to database")
+		logger.FatalWith(nil, context.Background(), "Failed to connect to database", logger.Fields{
+			"module":     "db",
+			"biz_scene":  "db_connect",
+			"biz_domain": "runtime_ops",
+			"component":  "bootstrap.app",
+			"error":      err.Error(),
+		})
 	}
 
 	initFederatedRuntime(queryDB)

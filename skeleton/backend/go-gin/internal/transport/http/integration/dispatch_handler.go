@@ -6,6 +6,7 @@ import (
 
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	idrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	integrationService "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	"github.com/gin-gonic/gin"
 )
@@ -46,7 +47,14 @@ func (h *Handler) Dispatch(c *gin.Context) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "idempotency backend unavailable"})
 		default:
 			if h.logger != nil {
-				h.logger.WithError(err).WithField("path", c.FullPath()).Warn("integration dispatch failed")
+				pxlog.WarnWith(h.logger, c.Request.Context(), "integration dispatch failed", map[string]interface{}{
+					"module":     "integration",
+					"biz_scene":  "integration_dispatch_http",
+					"biz_domain": "integration",
+					"path":       c.FullPath(),
+					"error":      err.Error(),
+					"component":  "integration_http",
+				})
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}

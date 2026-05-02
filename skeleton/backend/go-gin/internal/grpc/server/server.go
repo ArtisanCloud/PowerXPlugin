@@ -43,12 +43,18 @@ type Server struct {
 
 // NewGRPCServer 创建新的插件 gRPC 服务器
 func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*Server, error) {
+	logCtx := logger.WithLogFields(ctx, map[string]interface{}{
+		"module":     "grpc",
+		"biz_scene":  "grpc_server_bootstrap",
+		"biz_domain": "integration",
+		"component":  "grpc.server",
+	})
 	if c == nil {
-		logger.Info("gRPC server config not provided; skipping")
+		logger.InfoCtx(logCtx, "gRPC server config not provided; skipping")
 		return nil, nil
 	}
 	if !c.Enable {
-		logger.Info("gRPC server is disabled")
+		logger.InfoCtx(logCtx, "gRPC server is disabled")
 		return nil, nil
 	}
 
@@ -68,10 +74,10 @@ func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*
 			return nil, fmt.Errorf("failed to load TLS credentials: %w", err)
 		}
 		opts = append(opts, grpc.Creds(creds))
-		logger.Info("gRPC server TLS enabled")
+		logger.InfoCtx(logCtx, "gRPC server TLS enabled")
 	} else {
 		// 明确声明：开发期不加 TLS
-		logger.Warn("gRPC server running without TLS (development mode)")
+		logger.WarnCtx(logCtx, "gRPC server running without TLS (development mode)")
 		_ = insecure.NewCredentials()
 	}
 
@@ -88,13 +94,13 @@ func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*
 	// 注册反射服务（开发和调试用）
 	reflection.Register(s)
 
-	dispatchService := integrationService.BuildDispatchService(deps, logger.WithField("component", "integration.dispatch_factory"))
+	dispatchService := integrationService.BuildDispatchService(deps, logger.WithComponent("integration.dispatch_factory"))
 
 	var marketplaceServer marketplaceTransport.LicenseServiceServer
 	if deps != nil && deps.DB != nil {
 		pricingRepo := marketplacerepo.NewPricingRepository(deps.DB)
 		licenseRepo := marketplacerepo.NewLicenseRepository(deps.DB)
-		licenseLogger := logger.WithField("component", "marketplace.grpc.license")
+		licenseLogger := logger.WithComponent("marketplace.grpc.license")
 		licenseService := marketplacesvc.NewLicenseService(
 			deps.Config,
 			pricingRepo,
@@ -114,12 +120,14 @@ func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*
 	}
 
 	grpcTransport.Register(s, grpcTransport.Registrar{
-		Integration: integrationTransport.NewServer(dispatchService, logger.WithField("component", "integration.grpc")),
+		Integration: integrationTransport.NewServer(dispatchService, logger.WithComponent("integration.grpc")),
 		Marketplace: marketplaceServer,
 		Template:    templateServer,
 	})
 
-	logger.WithField("address", lis.Addr().String()).Info("gRPC server configured")
+	logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+		"address": lis.Addr().String(),
+	}), "gRPC server configured")
 
 	return &Server{
 		Server: s,
@@ -129,6 +137,12 @@ func NewGRPCServer(ctx context.Context, deps *app.Deps, c *cfgpkg.GRPCServer) (*
 }
 
 func acquireListener(c *cfgpkg.GRPCServer) (net.Listener, error) {
+	logCtx := logger.WithLogFields(context.Background(), map[string]interface{}{
+		"module":     "grpc",
+		"biz_scene":  "grpc_acquire_listener",
+		"biz_domain": "integration",
+		"component":  "grpc.server",
+	})
 	envSources := []string{"POWERX_GRPC_ADDR", "GRPC_ADDR"}
 	for _, key := range envSources {
 		if addr := strings.TrimSpace(os.Getenv(key)); addr != "" {
@@ -140,10 +154,10 @@ func acquireListener(c *cfgpkg.GRPCServer) (net.Listener, error) {
 			if port := extractPort(addr); port > 0 {
 				c.Port = port
 			}
-			logger.WithFields(logger.Fields{
+			logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
 				"address": addr,
 				"source":  key,
-			}).Info("gRPC server address resolved from environment")
+			}), "gRPC server address resolved from environment")
 			return lis, nil
 		}
 	}
@@ -162,15 +176,20 @@ func acquireListener(c *cfgpkg.GRPCServer) (net.Listener, error) {
 			c.Addr = addr
 			c.Port = candidatePort
 			if i > 0 {
-				logger.WithFields(logger.Fields{
+				logger.InfoCtx(logger.WithLogFields(logCtx, map[string]interface{}{
 					"address":  addr,
 					"attempts": i + 1,
-				}).Info("gRPC server port auto-incremented to avoid conflicts")
+				}), "gRPC server port auto-incremented to avoid conflicts")
 			}
 			return lis, nil
 		}
 		lastErr = err
-		logger.WithError(err).Warnf("Failed to bind gRPC address %s (attempt %d/%d)", addr, i+1, attempts)
+		logger.WarnCtx(logger.WithLogFields(logCtx, map[string]interface{}{
+			"error":    err.Error(),
+			"address":  addr,
+			"attempt":  i + 1,
+			"attempts": attempts,
+		}), "failed to bind gRPC address")
 	}
 
 	return nil, fmt.Errorf("failed to bind gRPC port starting at %d after %d attempts: %w", basePort, attempts, lastErr)
@@ -213,12 +232,19 @@ func extractPort(addr string) int {
 
 // Serve 启动 gRPC 服务器
 func (s *Server) Serve(ctx context.Context) error {
-	logger.WithField("address", s.lis.Addr().String()).Info("Starting gRPC server")
+	logCtx := logger.WithLogFields(ctx, map[string]interface{}{
+		"module":     "grpc",
+		"biz_scene":  "grpc_server_serve",
+		"biz_domain": "integration",
+		"component":  "grpc.server",
+		"address":    s.lis.Addr().String(),
+	})
+	logger.InfoCtx(logCtx, "starting gRPC server")
 
 	// 在单独的 goroutine 中监听上下文取消
 	go func() {
 		<-ctx.Done()
-		logger.Info("Shutting down gRPC server...")
+		logger.InfoCtx(logCtx, "shutting down gRPC server")
 		s.GracefulStop()
 	}()
 

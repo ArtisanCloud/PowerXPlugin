@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	operationsvc "{{ .BackendModulePath }}/internal/services/operations"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	operationsvc "{{ .BackendModulePath }}/internal/services/operations"
 )
 
 // SLARecomputeJob triggers SLA score recomputation across profiles.
@@ -17,7 +17,7 @@ type SLARecomputeJob struct {
 // NewSLARecomputeJob constructs a job instance.
 func NewSLARecomputeJob(service *operationsvc.SLAService, log *pxlog.Entry) *SLARecomputeJob {
 	if log == nil {
-		log = pxlog.New().WithField("component", "operations.sla_recompute_job")
+		log = pxlog.WithComponent("operations.sla_recompute_job")
 	}
 	return &SLARecomputeJob{service: service, log: log}
 }
@@ -32,9 +32,13 @@ func (j *SLARecomputeJob) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	j.log.WithContext(ctx).WithFields(pxlog.Fields{
-		"profiles": len(profiles),
-		"duration": time.Since(start).String(),
-	}).Info("recomputed SLA profiles")
+	pxlog.InfoWith(j.log, ctx, "recomputed SLA profiles", pxlog.Fields{
+		"module":     "operations",
+		"biz_scene":  "sla_recompute",
+		"biz_domain": "operations",
+		"component":  "operations.sla_recompute_job",
+		"profiles":   len(profiles),
+		"duration":   time.Since(start).String(),
+	})
 	return nil
 }

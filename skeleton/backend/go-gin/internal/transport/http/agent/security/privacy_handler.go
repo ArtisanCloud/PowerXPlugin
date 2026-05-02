@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/privacy"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	agentsec "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent/security"
@@ -82,9 +83,15 @@ func (h *PrivacyHandler) AcknowledgeLifecycleEvent(c *gin.Context) {
 	if h.audit != nil {
 		if err := h.audit.EmitLifecycleSuccess(tenantID, payload.EventType, "agent", payload.Metadata); err != nil {
 			if h.deps != nil {
-				if logger := h.deps.RuntimeLogger(c.Request.Context(), "agent_privacy_handler", nil); logger != nil {
-					logger.WithError(err).Warn("failed to emit lifecycle success audit event")
-				}
+				pxlog.WarnCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
+					"module":      "agent",
+					"biz_scene":   "agent_privacy_lifecycle_ack",
+					"biz_domain":  "security",
+					"component":   "agent_privacy_handler",
+					"tenant_uuid": tenantID,
+					"event_type":  payload.EventType,
+					"error":       err.Error(),
+				}), "failed to emit lifecycle success audit event")
 			}
 		}
 	}

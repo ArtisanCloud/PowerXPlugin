@@ -1,6 +1,7 @@
 package marketplace
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -40,10 +41,22 @@ func EmitUsageSpikeDetected(logger *pxlog.Entry, tenantID, licenseID, metric str
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		logger.WithError(err).Warn("failed to marshal usage spike event payload")
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "marketplace",
+			"biz_scene":  "usage_spike_event",
+			"biz_domain": "marketplace",
+			"component":  "observability.marketplace.events",
+			"error":      err.Error(),
+		}), "failed to marshal usage spike event payload")
 		return
 	}
-	logger.WithField("usage_event", string(raw)).Info("usage spike detected")
+	pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+		"module":      "marketplace",
+		"biz_scene":   "usage_spike_event",
+		"biz_domain":  "marketplace",
+		"component":   "observability.marketplace.events",
+		"usage_event": string(raw),
+	}), "usage spike detected")
 }
 
 func emitLicenseReminderEvent(logger *pxlog.Entry, event string, license *dbm.License, scheduledAt time.Time, channels []string) {
@@ -70,8 +83,20 @@ func emitLicenseReminderEvent(logger *pxlog.Entry, event string, license *dbm.Li
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		logger.WithError(err).Warn("failed to marshal license renewal event payload")
+		pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"module":     "marketplace",
+			"biz_scene":  "license_renewal_event",
+			"biz_domain": "marketplace",
+			"component":  "observability.marketplace.events",
+			"error":      err.Error(),
+		}), "failed to marshal license renewal event payload")
 		return
 	}
-	logger.WithField("license_event", string(raw)).Info("license renewal reminder event")
+	pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+		"module":        "marketplace",
+		"biz_scene":     "license_renewal_event",
+		"biz_domain":    "marketplace",
+		"component":     "observability.marketplace.events",
+		"license_event": string(raw),
+	}), "license renewal reminder event")
 }

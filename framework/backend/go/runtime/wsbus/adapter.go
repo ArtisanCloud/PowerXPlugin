@@ -88,10 +88,24 @@ func (a *Adapter) logPublish(topic, tenantUUID, traceID, status, reason string) 
 		runtimelogging.FieldStatus:     status,
 		runtimelogging.FieldReason:     reason,
 	})
-	entry := a.logger.WithFields(fields)
+	facade := runtimelogging.NewFacade(nil, a.logger)
 	if status == runtimelogging.StatusFailed {
-		entry.Warn("wsbus publish failed")
+		facade.Warn("wsbus publish failed", runtimelogging.Entry{
+			Fields: fields,
+			Context: runtimelogging.Fields{
+				"module":     "wsbus.adapter",
+				"biz_scene":  "ws_publish",
+				"biz_domain": "runtime",
+			},
+		})
 		return
 	}
-	entry.Info("wsbus publish succeeded")
+	facade.Info("wsbus publish succeeded", runtimelogging.Entry{
+		Fields: fields,
+		Context: runtimelogging.Fields{
+			"module":     "wsbus.adapter",
+			"biz_scene":  "ws_publish",
+			"biz_domain": "runtime",
+		},
+	})
 }

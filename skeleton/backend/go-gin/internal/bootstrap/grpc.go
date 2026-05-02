@@ -12,7 +12,13 @@ func BootstrapGRPCClient(ctx context.Context, cfg *config.GRPCUpstream) *client.
 
 	pxc, err := client.NewPowerXServiceClient(ctx, cfg)
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to initialize PowerX gRPC client")
+		logger.FatalWith(nil, ctx, "Failed to initialize PowerX gRPC client", logger.Fields{
+			"module":     "grpc",
+			"biz_scene":  "grpc_client_bootstrap",
+			"biz_domain": "integration",
+			"component":  "bootstrap.grpc",
+			"error":      err.Error(),
+		})
 	}
 
 	logger.Info("PowerX gRPC client initialized successfully")

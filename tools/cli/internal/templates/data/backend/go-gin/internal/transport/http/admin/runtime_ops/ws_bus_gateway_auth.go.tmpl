@@ -109,6 +109,8 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 		runtimelogging.FieldTenantUUID:  strings.TrimSpace(tenantUUID),
 		runtimelogging.FieldGatewayAuth: authScheme,
 		runtimelogging.FieldTokenSource: outboundSource,
+		"biz_scene":                     "wsbus_gateway_auth",
+		"biz_domain":                    "runtime_ops",
 		"iam_mode":                      deps.IAMMode,
 		"inbound_bearer_present":        inboundBearerPresent,
 		"inbound_bearer_prefix":         inboundBearerPrefix,

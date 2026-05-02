@@ -12,8 +12,11 @@ import (
 type contextKey string
 
 const (
-	requestIDHeader            = "X-Request-ID"
-	requestIDKey    contextKey = "framework.request_id"
+	requestIDHeader              = "X-Request-ID"
+	traceIDHeader                = "X-Trace-Id"
+	traceparentHeader            = "traceparent"
+	requestIDKey      contextKey = "framework.request_id"
+	traceIDKey        contextKey = "framework.trace_id"
 )
 
 // RequestID 确保每个请求拥有请求 ID，并写回上下文/响应头。
@@ -27,13 +30,17 @@ func RequestID() bootstrap.Middleware {
 			if reqID == "" {
 				reqID = generateRequestID()
 			}
+			traceID := resolveTraceIDFromHeaders(ctx, reqID)
 			ctx.SetHeader(requestIDHeader, reqID)
+			ctx.SetHeader(traceIDHeader, traceID)
 
 			current := ctx.Context()
 			if current == nil {
 				current = context.Background()
 			}
-			ctx.SetContext(context.WithValue(current, requestIDKey, reqID))
+			current = context.WithValue(current, requestIDKey, reqID)
+			current = context.WithValue(current, traceIDKey, traceID)
+			ctx.SetContext(current)
 
 			if next != nil {
 				next(ctx)
@@ -51,6 +58,44 @@ func RequestIDFromContext(ctx context.Context) string {
 		return v
 	}
 	return ""
+}
+
+// TraceIDFromContext 从上下文中读取 trace ID。
+func TraceIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if v, ok := ctx.Value(traceIDKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
+func resolveTraceIDFromHeaders(ctx bootstrap.Context, requestID string) string {
+	if ctx == nil {
+		return requestID
+	}
+	if traceparent := strings.TrimSpace(ctx.Header(traceparentHeader)); traceparent != "" {
+		if traceID := extractTraceIDFromTraceparent(traceparent); traceID != "" {
+			return traceID
+		}
+	}
+	if traceID := strings.TrimSpace(ctx.Header(traceIDHeader)); traceID != "" {
+		return traceID
+	}
+	return requestID
+}
+
+func extractTraceIDFromTraceparent(value string) string {
+	parts := strings.Split(strings.TrimSpace(value), "-")
+	if len(parts) != 4 {
+		return ""
+	}
+	traceID := strings.TrimSpace(parts[1])
+	if len(traceID) != 32 {
+		return ""
+	}
+	return traceID
 }
 
 func generateRequestID() string {

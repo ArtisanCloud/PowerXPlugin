@@ -181,22 +181,28 @@ PowerX 会：
 
 ## 八、日志与监控注入
 
-PowerX 会通过环境变量或 STDOUT 流注入日志上下文：
+PowerX 会通过环境变量或 STDOUT 流注入日志上下文。链路主键统一为 `request_id` 与 `trace_id`：
 
 | 字段           | 说明       |
 | ------------ | -------- |
 | `tenant_uuid`  | 当前租户     |
 | `request_id` | 请求 ID    |
+| `trace_id`   | 链路追踪 ID  |
 | `plugin_id`  | 插件标识     |
-| `span_id`    | 分布式追踪 ID |
+| `upstream_request_id` | 上游服务返回的请求 ID（可选） |
 
 建议插件标准输出 JSON 格式日志：
 
 ```json
-{"level":"info","msg":"request handled","tenant_uuid":1024,"plugin_id":"com.powerx.plugins.base"}
+{"level":"info","msg":"request handled","tenant_uuid":"...","plugin_id":"com.powerx.plugins.base","request_id":"req-...","trace_id":"trace-..."}
 ```
 
 宿主会统一采集、聚合并输出到 Loki / ELK。
+
+请求头透传约束：
+
+- 宿主转发到插件必须透传 `X-Request-ID` 与 `traceparent`。
+- 插件响应必须回写 `X-Request-ID`（4xx/5xx 也必须带）。
 
 ---
 

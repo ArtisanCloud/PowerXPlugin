@@ -9,8 +9,8 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	privmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/privacy"
 	privrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/privacy"
-	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	secobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	"gorm.io/gorm"
 )
 
@@ -69,7 +69,14 @@ func (s *PrivacyService) RevokeConsentToken(ctx context.Context, tenantID, token
 			"reason":   reason,
 		})
 		if logErr != nil && s.logger != nil {
-			s.logger.WithError(logErr).Warn("failed to emit consent revocation audit log")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "security",
+				"biz_scene":   "consent_revoke",
+				"biz_domain":  "security",
+				"component":   "admin.security.privacy_service",
+				"tenant_uuid": tenantID,
+				"error":       logErr.Error(),
+			}), "failed to emit consent revocation audit log")
 		}
 	}
 	return err
@@ -110,9 +117,14 @@ func (s *PrivacyService) IssueConsentToken(ctx context.Context, token *privmodel
 		Status:     privmodel.LifecycleStatusSucceeded,
 	})
 	if logErr != nil && s.logger != nil {
-		s.logger.WithError(logErr).
-			WithField("tenant_uuid", token.TenantUuid).
-			Warn("failed to record consent issuance lifecycle event")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "security",
+			"biz_scene":   "consent_issue",
+			"biz_domain":  "security",
+			"component":   "admin.security.privacy_service",
+			"tenant_uuid": token.TenantUuid,
+			"error":       logErr.Error(),
+		}), "failed to record consent issuance lifecycle event")
 	}
 	if s.audit != nil {
 		meta := map[string]interface{}{
@@ -120,9 +132,14 @@ func (s *PrivacyService) IssueConsentToken(ctx context.Context, token *privmodel
 			"issued_by": out.IssuedBy,
 		}
 		if err := s.audit.EmitLifecycleSuccess(out.TenantUuid, privmodel.LifecycleEventConsentRenew, out.IssuedBy, meta); err != nil && s.logger != nil {
-			s.logger.WithError(err).
-				WithField("tenant_uuid", out.TenantUuid).
-				Warn("failed to emit audit log for consent issuance")
+			pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "security",
+				"biz_scene":   "consent_issue",
+				"biz_domain":  "security",
+				"component":   "admin.security.privacy_service",
+				"tenant_uuid": out.TenantUuid,
+				"error":       err.Error(),
+			}), "failed to emit audit log for consent issuance")
 		}
 	}
 	return out, nil
@@ -161,9 +178,14 @@ func (s *PrivacyService) ActiveConsentScope(ctx context.Context, tenantID string
 		entries, e := token.ScopeValues()
 		if e != nil {
 			if s.logger != nil {
-				s.logger.WithError(e).
-					WithField("token_id", token.ID).
-					Warn("failed to decode consent scope")
+				pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+					"module":     "security",
+					"biz_scene":  "consent_scope",
+					"biz_domain": "security",
+					"component":  "admin.security.privacy_service",
+					"token_id":   token.ID,
+					"error":      e.Error(),
+				}), "failed to decode consent scope")
 			}
 			continue
 		}

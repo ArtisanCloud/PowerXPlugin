@@ -149,6 +149,13 @@ httpRequest.Header.Set("Authorization", "Bearer "+token)
 | `POWERX_LOG_REQUEST_ID`   | 自动注入                         | 全局唯一请求 ID             |
 | `POWERX_METRICS_PORT`     | `9101`                       | Prometheus 指标端口（可选）   |
 
+请求链路头约定（插件与宿主统一）：
+
+| 头名 | 方向 | 规则 |
+| --- | --- | --- |
+| `X-Request-ID` | Host -> Plugin -> Client | 入站优先继承；缺失时生成；响应头必须回写 |
+| `traceparent` | Host -> Plugin | 入站优先继承；缺失时生成 `trace_id` 并写入日志字段 |
+
 示例输出：
 
 ```json
@@ -216,6 +223,11 @@ await $fetch(config.public.powerx.apiBase + config.public.powerx.capabilityEndpo
 const config = useRuntimeConfig()
 const api = config.public.apiBaseUrl
 ```
+
+宿主模式约束（`POWERX_PROXY=1`）：
+
+- 不要注入绝对地址的 `NUXT_PUBLIC_API_BASE`（如 `http://127.0.0.1:8078`）。
+- 前端请求应统一走 `/_p/<pluginId>/api/v1/...`，避免 iframe 页面误打到本地开发地址。
 
 ---
 

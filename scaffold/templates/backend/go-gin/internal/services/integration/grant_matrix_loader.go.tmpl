@@ -113,7 +113,13 @@ func (l *GrantMatrixLoader) Invalidate() {
 // Warm 预热缓存，忽略错误仅记录日志。
 func (l *GrantMatrixLoader) Warm(ctx context.Context) {
 	if _, err := l.reload(ctx); err != nil && l.logger != nil {
-		l.logger.WithError(err).Warn("failed to warm grant matrix cache")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "integration",
+			"biz_scene":  "grant_matrix_warm",
+			"biz_domain": "integration",
+			"component":  "integration.grant_matrix_loader",
+			"error":      err.Error(),
+		}), "failed to warm grant matrix cache")
 	}
 }
 
@@ -216,12 +222,17 @@ func (l *GrantMatrixLoader) loadOverrideEntries(ctx context.Context) ([]GrantMat
 			if constraints, err := decodeJSONMap(row.Constraints); err == nil {
 				entry.Constraints = constraints
 			} else if l.logger != nil {
-				l.logger.WithError(err).WithFields(pxlog.Fields{
-					"scope":    row.Scope,
-					"channel":  row.Channel,
-					"resource": row.Resource,
-					"action":   row.Action,
-				}).Warn("invalid constraints payload on grant matrix override")
+				pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+					"module":     "integration",
+					"biz_scene":  "grant_matrix_load_override",
+					"biz_domain": "integration",
+					"component":  "integration.grant_matrix_loader",
+					"scope":      row.Scope,
+					"channel":    row.Channel,
+					"resource":   row.Resource,
+					"action":     row.Action,
+					"error":      err.Error(),
+				}), "invalid constraints payload on grant matrix override")
 			}
 		}
 

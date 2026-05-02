@@ -9,9 +9,9 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	tgmodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/tool_grant"
 	tgrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/tool_grant"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	seclog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/security"
 	"github.com/golang-jwt/jwt/v5"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -77,7 +77,13 @@ func (s *Service) Issue(ctx context.Context, tenantID, toolID, agentID string, c
 		AgentID:     agentID,
 	}, datatypes.JSONMap{"initiated_by": initiatedBy})
 	if recErr != nil && s.logger != nil {
-		s.logger.WithError(recErr).Warn("failed to record issuance event")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "agent",
+			"biz_scene":  "toolgrant_issue",
+			"biz_domain": "security",
+			"component":  "agent.tool_grant_service",
+			"error":      recErr.Error(),
+		}), "failed to record issuance event")
 	}
 	seclog.EmitToolGrantEvent(s.logger, "toolgrant.issued", tenantID, map[string]interface{}{
 		"tool_id":      toolID,
@@ -115,7 +121,13 @@ func (s *Service) Revoke(ctx context.Context, tenantID, toolGrantID, reason, act
 		AgentID:     actor,
 	}, datatypes.JSONMap{"reason": reason})
 	if recErr != nil && s.logger != nil {
-		s.logger.WithError(recErr).Warn("failed to record revocation event")
+		pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":     "agent",
+			"biz_scene":  "toolgrant_revoke",
+			"biz_domain": "security",
+			"component":  "agent.tool_grant_service",
+			"error":      recErr.Error(),
+		}), "failed to record revocation event")
 	}
 	seclog.EmitToolGrantEvent(s.logger, "toolgrant.revoked", tenantID, map[string]interface{}{
 		"toolgrant_id": toolGrantID,

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -26,6 +28,7 @@ const (
 
 var capabilityProxyForwardHeaders = []string{
 	"X-PX-Use-Mock",
+	"traceparent",
 }
 
 // AttachHTTPServer 构造基础 HTTP 服务器并与 App 绑定。
@@ -360,9 +363,33 @@ type capabilityInvokeRequest struct {
 
 func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider func() *gateway.ContractStatus) bootstrap.Handler {
 	return func(ctx bootstrap.Context) {
+		startAt := time.Now()
 		ensureCapabilityProxyCORS(ctx)
+		requestID := strings.TrimSpace(ctx.Header("X-Request-ID"))
+		traceID := strings.TrimSpace(ctx.Header("X-Trace-Id"))
+		if requestID != "" {
+			ctx.SetHeader("X-Request-ID", requestID)
+		}
+		if traceID != "" {
+			ctx.SetHeader("X-Trace-Id", traceID)
+		}
+		pluginID := firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")), "unknown")
+		tenantUUID := strings.TrimSpace(ctx.Header("tenant_uuid"))
+		method := ctx.Method()
+		clientPath := "/integration/capabilities/invoke"
+		logProxyEvent("API-IN", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, 0, map[string]any{
+			"gate_decision": "pending",
+		})
 		if service == nil {
-			ctx.JSON(http.StatusServiceUnavailable, map[string]string{"error": "capability service unavailable"})
+			logProxyEvent("PROXY-TRANSPORT-ERR", requestID, traceID, pluginID, tenantUUID, method, clientPath, http.StatusServiceUnavailable, elapsedMS(startAt), map[string]any{
+				"gate_decision": "deny",
+				"deny_reason":   "capability service unavailable",
+				"error_message": "capability service unavailable",
+			})
+			ctx.JSON(http.StatusServiceUnavailable, map[string]string{
+				"error":      "capability service unavailable",
+				"request_id": requestID,
+			})
 			return
 		}
 		var warnings []string
@@ -378,17 +405,28 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 		}
 		var req capabilityInvokeRequest
 		if err := ctx.BindJSON(&req); err != nil {
-			ctx.JSON(http.StatusBadRequest, map[string]string{"error": "invalid capability payload"})
+			logProxyEvent("GATE-DENY", requestID, traceID, pluginID, tenantUUID, method, clientPath, http.StatusBadRequest, elapsedMS(startAt), map[string]any{
+				"gate_decision": "deny",
+				"deny_reason":   "invalid capability payload",
+				"error_message": truncate(err.Error(), 512),
+			})
+			ctx.JSON(http.StatusBadRequest, map[string]string{
+				"error":      "invalid capability payload",
+				"request_id": requestID,
+			})
 			return
 		}
 		if req.Payload == nil {
 			req.Payload = map[string]any{}
 		}
+		logProxyEvent("GATE-ALLOW", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, elapsedMS(startAt), map[string]any{
+			"gate_decision": "allow",
+		})
+		logProxyEvent("PROXY-OUT", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, elapsedMS(startAt), nil)
 		headers := collectCapabilityProxyHeaders(ctx)
 		if module := proxyMockModule(headers); module != "" {
 			warnings = append(warnings, "通过 X-PX-Use-Mock 请求 Mock 模块: "+module)
 		}
-		tenantUUID := strings.TrimSpace(ctx.Header("tenant_uuid"))
 		if tenantUUID != "" {
 			if headers == nil {
 				headers = make(map[string]string, 1)
@@ -400,17 +438,29 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 			Action:       req.Action,
 			Payload:      req.Payload,
 			Headers:      headers,
-			RequestID:    ctx.Header("X-Request-ID"),
+			RequestID:    requestID,
 			TenantUUID:   tenantUUID,
 		})
 		if err != nil {
+			event := "PROXY-TRANSPORT-ERR"
+			extra := map[string]any{
+				"error_message": truncate(err.Error(), 512),
+			}
+			if invokeErr := (&capabilityinvoker.InvokeError{}); errors.As(err, &invokeErr) {
+				event = "PROXY-BACKEND-ERR"
+				extra["upstream_status"] = invokeErr.Status
+				extra["upstream_request_id"] = invokeErr.UpstreamRequestID
+				extra["error_code"] = invokeErr.Code
+			}
+			logProxyEvent(event, requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, elapsedMS(startAt), extra)
 			writeCapabilityError(ctx, err, warnings)
 			return
 		}
 		response := map[string]any{
-			"traceId": result.TraceID,
-			"status":  result.Status,
-			"data":    result.Data,
+			"traceId":             result.TraceID,
+			"status":              result.Status,
+			"data":                result.Data,
+			"upstream_request_id": result.UpstreamRequestID,
 		}
 		if len(warnings) > 0 {
 			response["warnings"] = warnings
@@ -421,6 +471,16 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 		if result.TraceID != "" {
 			ctx.SetHeader("X-Trace-Id", result.TraceID)
 		}
+		if requestID := strings.TrimSpace(ctx.Header("X-Request-ID")); requestID != "" {
+			ctx.SetHeader("X-Request-ID", requestID)
+		}
+		if upstreamRequestID := strings.TrimSpace(result.UpstreamRequestID); upstreamRequestID != "" {
+			ctx.SetHeader("X-Upstream-Request-ID", upstreamRequestID)
+		}
+		logProxyEvent("PROXY-RESP", requestID, firstNonEmpty(result.TraceID, traceID), pluginID, tenantUUID, method, clientPath, http.StatusOK, elapsedMS(startAt), map[string]any{
+			"upstream_request_id": result.UpstreamRequestID,
+			"upstream_status":     result.Status,
+		})
 		ctx.JSON(http.StatusOK, response)
 	}
 }
@@ -451,18 +511,66 @@ func writeCapabilityError(ctx bootstrap.Context, err error, warnings []string) {
 	if invokeErr.TraceID != "" {
 		ctx.SetHeader("X-Trace-Id", invokeErr.TraceID)
 	}
+	if requestID := strings.TrimSpace(ctx.Header("X-Request-ID")); requestID != "" {
+		ctx.SetHeader("X-Request-ID", requestID)
+	}
+	if upstreamRequestID := strings.TrimSpace(invokeErr.UpstreamRequestID); upstreamRequestID != "" {
+		ctx.SetHeader("X-Upstream-Request-ID", upstreamRequestID)
+	}
 	payload := map[string]any{
 		"error": map[string]any{
 			"code":    invokeErr.Code,
 			"message": invokeErr.Message,
 			"type":    invokeErr.Category,
 		},
-		"traceId": invokeErr.TraceID,
+		"traceId":             invokeErr.TraceID,
+		"upstream_request_id": invokeErr.UpstreamRequestID,
 	}
 	if len(warnings) > 0 {
 		payload["warnings"] = warnings
 	}
 	ctx.JSON(status, payload)
+}
+
+func logProxyEvent(event, requestID, traceID, pluginID, tenantUUID, method, path string, status int, latencyMS int64, extra map[string]any) {
+	attrs := []slog.Attr{
+		slog.String("event", event),
+		slog.String("request_id", requestID),
+		slog.String("trace_id", traceID),
+		slog.String("plugin_id", pluginID),
+		slog.String("tenant_uuid", tenantUUID),
+		slog.String("method", method),
+		slog.String("path", path),
+		slog.Int("status", status),
+		slog.Int64("latency_ms", latencyMS),
+	}
+	for k, v := range extra {
+		attrs = append(attrs, slog.Any(k, v))
+	}
+	slog.Default().LogAttrs(context.Background(), slog.LevelInfo, event, attrs...)
+}
+
+func elapsedMS(startAt time.Time) int64 {
+	if startAt.IsZero() {
+		return 0
+	}
+	return time.Since(startAt).Milliseconds()
+}
+
+func truncate(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	return s[:max]
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func ensureCapabilityProxyCORS(ctx bootstrap.Context) {

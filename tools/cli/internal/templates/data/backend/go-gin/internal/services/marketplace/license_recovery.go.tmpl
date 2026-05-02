@@ -34,7 +34,7 @@ type RecoveryRequest struct {
 // NewLicenseRecoveryService constructs a recovery coordinator.
 func NewLicenseRecoveryService(licenseService *LicenseService, licenseRepo *mrepo.LicenseRepository, pricingRepo *mrepo.PricingRepository, logger *pxlog.Entry) *LicenseRecoveryService {
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "marketplace_license_recovery")
+		logger = pxlog.WithComponent("marketplace_license_recovery")
 	}
 	return &LicenseRecoveryService{
 		licenseService: licenseService,
@@ -98,24 +98,33 @@ func (s *LicenseRecoveryService) RecoverIssuance(ctx context.Context, req Recove
 	})
 	if err != nil {
 		if s.logger != nil {
-			s.logger.WithError(err).WithFields(pxlog.Fields{
+			pxlog.ErrorCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+				"module":      "marketplace",
 				"tenant_uuid": req.TenantUuid,
 				"listing_id":  req.ListingID,
 				"plan_id":     req.PlanID,
 				"billing_id":  req.BillingID,
-			}).Error("license recovery failed")
+				"biz_scene":   "license_recovery",
+				"biz_domain":  "marketplace",
+				"component":   "marketplace_license_recovery",
+				"error":       err.Error(),
+			}), "license recovery failed")
 		}
 		return nil, false, err
 	}
 
 	if s.logger != nil {
-		s.logger.WithFields(pxlog.Fields{
+		pxlog.InfoCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":      "marketplace",
 			"tenant_uuid": req.TenantUuid,
 			"listing_id":  req.ListingID,
 			"plan_id":     req.PlanID,
 			"license_id":  license.ID,
 			"billing_id":  req.BillingID,
-		}).Info("license recovered after billing delay")
+			"biz_scene":   "license_recovery",
+			"biz_domain":  "marketplace",
+			"component":   "marketplace_license_recovery",
+		}), "license recovered after billing delay")
 	}
 	return license, true, nil
 }

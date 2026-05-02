@@ -28,7 +28,7 @@ type Factory struct {
 
 func NewAuthenticatorFactory(cfg *config.Config, logger *pxlog.Entry) *Factory {
 	if logger == nil {
-		logger = pxlog.WithField("component", "customer.authenticator_factory")
+		logger = pxlog.WithComponent("customer.authenticator_factory")
 	}
 	return &Factory{cfg: cfg, logger: logger}
 }

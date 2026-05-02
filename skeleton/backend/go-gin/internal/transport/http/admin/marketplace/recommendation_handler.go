@@ -4,10 +4,10 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	mrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 // RecommendationHandler exposes recommendation configuration and manual controls for admins.
@@ -21,7 +21,7 @@ type RecommendationHandler struct {
 // NewRecommendationHandler constructs a handler instance.
 func NewRecommendationHandler(cfg *config.Config, repo *mrepo.ListingRepository, provider recommendation.MetricsProvider, logger *pxlog.Entry) *RecommendationHandler {
 	if logger == nil {
-		logger = pxlog.New().WithField("component", "admin_marketplace_recommendation")
+		logger = pxlog.WithComponent("admin_marketplace_recommendation")
 	}
 	return &RecommendationHandler{
 		cfg:      cfg,
@@ -41,7 +41,14 @@ func (h *RecommendationHandler) GetConfig(c *gin.Context) {
 
 	topListings, err := h.repo.TopRecommended(c.Request.Context(), tenantID, 10)
 	if err != nil {
-		h.logger.WithError(err).WithField("tenant_uuid", tenantID).Error("failed to load recommended listings")
+		pxlog.ErrorCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
+			"module":      "marketplace",
+			"biz_scene":   "admin_recommendation_get",
+			"biz_domain":  "marketplace",
+			"component":   "admin_marketplace_recommendation",
+			"tenant_uuid": tenantID,
+			"error":       err.Error(),
+		}), "failed to load recommended listings")
 		contracts.ResponseInternalError(c, err)
 		return
 	}
@@ -82,7 +89,14 @@ func (h *RecommendationHandler) TriggerSync(c *gin.Context) {
 	engine := recommendation.NewEngine(h.repo, h.provider, h.logger)
 	result, err := engine.RefreshRecommendations(c.Request.Context(), tenantID)
 	if err != nil {
-		h.logger.WithError(err).WithField("tenant_uuid", tenantID).Error("manual recommendation sync failed")
+		pxlog.ErrorCtx(pxlog.WithLogFields(c.Request.Context(), map[string]interface{}{
+			"module":      "marketplace",
+			"biz_scene":   "admin_recommendation_sync",
+			"biz_domain":  "marketplace",
+			"component":   "admin_marketplace_recommendation",
+			"tenant_uuid": tenantID,
+			"error":       err.Error(),
+		}), "manual recommendation sync failed")
 		contracts.ResponseInternalError(c, err)
 		return
 	}

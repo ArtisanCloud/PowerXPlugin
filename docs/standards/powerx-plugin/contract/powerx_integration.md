@@ -204,6 +204,12 @@ PowerX 会通过环境变量或 STDOUT 流注入日志上下文。链路主键�
 - 宿主转发到插件必须透传 `X-Request-ID` 与 `traceparent`。
 - 插件响应必须回写 `X-Request-ID`（4xx/5xx 也必须带）。
 
+日志字段分层约束（强制）：
+
+- `plugin_id/request_id/trace_id/tenant_uuid/path/status/component` 必须作为 JSON 顶层字段输出。
+- `meta` 字段仅承载扩展信息，不得作为以上关键字段的唯一载体。
+- 别名必须在封装层归一化后再输出（例如 `requestId -> request_id`、`traceId -> trace_id`）。
+
 ---
 
 ## 九、反向调用（插件 → PowerX）

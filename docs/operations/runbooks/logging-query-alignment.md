@@ -52,6 +52,29 @@
   - 仅使用 `request_id` / `trace_id`
   - 禁止使用 `reqId`、`trace` 等别名
 
+## 2.1 顶层字段与 meta 分层（强制）
+
+- 以下关键字段必须输出为日志 JSON 顶层字段（不可仅放在 `meta` 字符串中）：
+  - `plugin_id`
+  - `request_id`
+  - `trace_id`
+  - `tenant_uuid`
+  - `path`
+  - `status`
+  - `component`
+- `meta` 只允许承载扩展信息（调试补充、非关键业务上下文）。
+- 查询基线：
+  - 优先 `| json | request_id="..."`、`| json | plugin_id="..."`
+  - 不允许把关键排障链路长期依赖 `|= "meta contains ..."`。
+
+## 2.2 别名标准化映射（强制）
+
+- 入口封装层必须做字段别名归一化，统一映射到标准键：
+  - `requestId` / `reqId` -> `request_id`
+  - `trace` / `traceId` -> `trace_id`
+  - `tid` / `tenantId` -> `tenant_uuid`
+  - `plugin` / `pluginId` -> `plugin_id`
+
 ## 3. 推荐查询方式
 
 先用低基数 labels 缩小范围，再按正文字段精确过滤。

@@ -2,6 +2,8 @@ package wsbus
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"strings"
 
@@ -39,8 +41,13 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 	}
 
 	traceID := strings.TrimSpace(opts.TraceID)
+	missingContext := false
 	if traceID == "" {
 		traceID = strings.TrimSpace(middleware.RequestIDFromContext(ctx))
+	}
+	if traceID == "" {
+		traceID = generateTraceID()
+		missingContext = true
 	}
 	tenantUUID := strings.TrimSpace(opts.TenantUUID)
 	if tenantUUID == "" {
@@ -67,10 +74,18 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		BearerToken: bearer,
 	})
 	if !result.OK {
-		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, result.ErrorCode)
+		reason := result.ErrorCode
+		if missingContext {
+			reason = runtimelogging.ReasonMissingContext
+		}
+		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, reason)
 		return result
 	}
-	a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusSucceeded, "")
+	reason := ""
+	if missingContext {
+		reason = runtimelogging.ReasonMissingContext
+	}
+	a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusSucceeded, reason)
 	return result
 }
 
@@ -108,4 +123,12 @@ func (a *Adapter) logPublish(topic, tenantUUID, traceID, status, reason string) 
 			"biz_domain": "runtime",
 		},
 	})
+}
+
+func generateTraceID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err == nil {
+		return hex.EncodeToString(b[:])
+	}
+	return runtimelogging.FallbackUnknown
 }

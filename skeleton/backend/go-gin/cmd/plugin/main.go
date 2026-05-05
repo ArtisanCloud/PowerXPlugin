@@ -99,8 +99,28 @@ func main() {
 	}
 
 	// ★ 在这里把 HTTP/GRPC 的占位符先解析掉（一定要在起服务之前）
-	//   - HTTP 用 PORT（由 PowerX 的 supervisor 注入）
-	cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
+	//   - 宿主模式（POWERX_PROXY=1）：只认 POWERX_HTTP_ADDR（强契约）
+	//   - 本地模式：允许 PORT/配置回退
+	hostMode := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
+	if hostMode {
+		httpBindAddr := strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR"))
+		if httpBindAddr == "" {
+			logger.WithFields(logger.Fields{
+				"POWERX_PROXY":     strings.TrimSpace(os.Getenv("POWERX_PROXY")),
+				"POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
+				"PORT":             strings.TrimSpace(os.Getenv("PORT")),
+			}).Fatal("POWERX_HTTP_ADDR is required when POWERX_PROXY=1")
+		}
+		cfg.Server.BindAddr = httpBindAddr
+	} else {
+		cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
+	}
+	logger.WithFields(logger.Fields{
+		"bind_addr":               cfg.Server.BindAddr,
+		"host_mode":               hostMode,
+		"env_POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
+		"env_PORT":               strings.TrimSpace(os.Getenv("PORT")),
+	}).Info("Resolved HTTP bind address")
 
 	//   - gRPC 用 POWERX_GRPC_PORT（由 PowerX 的 Enable 阶段注入）
 	if cfg.GRPCServer != nil {
@@ -408,9 +428,35 @@ func main() {
 
 	// 使用 errgroup 并发启动服务器
 	g, groupCtx := errgroup.WithContext(ctx)
+	safeGo := func(name string, fn func() error) {
+		g.Go(func() (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.WithFields(logger.Fields{
+						"component": "main.goroutine",
+						"task":      name,
+						"panic":     r,
+					}).Error("goroutine panicked")
+					err = fmt.Errorf("goroutine panic: %s", name)
+				}
+			}()
+			return fn()
+		})
+	}
+
+	// 先启动核心 HTTP/gRPC 服务，避免后台任务异常影响 healthz 探活。
+	safeGo("http_server", func() error {
+		logger.WithField("addr", cfg.Server.BindAddr).Info("Starting HTTP server...")
+		return fwApp.Run()
+	})
+	if gs != nil {
+		safeGo("grpc_server", func() error {
+			return gs.Serve(groupCtx)
+		})
+	}
 
 	if integrationScheduler != nil {
-		g.Go(func() error {
+		safeGo("integration_scheduler", func() error {
 			integrationScheduler.Start(groupCtx)
 			<-groupCtx.Done()
 			stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
@@ -421,32 +467,21 @@ func main() {
 	}
 
 	if syncJob != nil {
-		g.Go(func() error {
+		safeGo("marketplace_sync_job", func() error {
 			syncJob.Run(groupCtx)
 			return nil
 		})
 	}
 	if renewalJob != nil {
-		g.Go(func() error {
+		safeGo("license_renewal_job", func() error {
 			renewalJob.Run(groupCtx)
 			return nil
 		})
 	}
 	if taskBusRuntime.StartConsumer != nil {
-		g.Go(func() error {
+		safeGo("taskbus_consumer", func() error {
 			taskBusRuntime.StartConsumer(groupCtx)
 			return nil
-		})
-	}
-
-	g.Go(func() error {
-		logger.WithField("addr", cfg.Server.BindAddr).Info("Starting HTTP server...")
-		return fwApp.Run()
-	})
-
-	if gs != nil {
-		g.Go(func() error {
-			return gs.Serve(groupCtx)
 		})
 	}
 

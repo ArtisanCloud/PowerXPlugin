@@ -159,6 +159,10 @@ export function useApiClient() {
 
   const baseURL = resolveApiBase();
   const router = useRouter();
+  const runtimeConfig = useRuntimeConfig();
+  const insidePowerX =
+    runtimeConfig.public?.insidePowerX === true ||
+    runtimeConfig.public?.insidePowerX === "true";
   _baseURL = baseURL;
 
   const baseClient = $fetch.create({
@@ -221,12 +225,13 @@ export function useApiClient() {
     if (authToken && !headers.has("Authorization")) {
       headers.set(
         "Authorization",
-        /^Bearer\\s/i.test(String(authToken))
+        /^Bearer\s/i.test(String(authToken))
           ? String(authToken)
           : `Bearer ${authToken}`
       );
     }
-    if (!headers.has("Authorization") && ctxPayload?.ctxJwt) {
+    // Only allow host-bridge token fallback when explicitly inside PowerX.
+    if (insidePowerX && !headers.has("Authorization") && ctxPayload?.ctxJwt) {
       headers.set("Authorization", `Bearer ${ctxPayload.ctxJwt}`);
     }
     const debugCtx =

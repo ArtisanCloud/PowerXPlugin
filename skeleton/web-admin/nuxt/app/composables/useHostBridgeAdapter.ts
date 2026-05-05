@@ -38,6 +38,9 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
     "com.powerx.plugins.base";
   const shouldLog =
     typeof opts.debug === "boolean" ? opts.debug : defaultDebug;
+  const insidePowerX =
+    runtimeConfig.public?.insidePowerX === true ||
+    runtimeConfig.public?.insidePowerX === "true";
 
   if (shouldLog) {
     console.info("[Bridge][Plugin] debug mode enabled");
@@ -65,6 +68,13 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
     hostOrigin?: string;
     host_origin?: string;
   }) => {
+    if (!insidePowerX) {
+      if (shouldLog) {
+        console.info("[Bridge][Plugin] ignore auth-token because insidePowerX=false");
+      }
+      return;
+    }
+
     const accessToken =
       payload?.accessToken ||
       payload?.access_token ||

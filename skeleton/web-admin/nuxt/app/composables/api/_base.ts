@@ -30,6 +30,13 @@ export function resolveApiBase(pathname?: string): string {
 }
 
 export function getAuthToken(): string | undefined {
+  const runtimePublic =
+    (typeof useRuntimeConfig === "function"
+      ? (useRuntimeConfig() as any)?.public
+      : undefined) ?? (globalThis as any).__NUXT__?.config?.public;
+  const insidePowerX =
+    runtimePublic?.insidePowerX === true || runtimePublic?.insidePowerX === "true";
+
   // 优先读取 localStorage，保持与 useAuth/Bridge 注入兼容
   if (typeof window !== "undefined") {
     try {
@@ -52,7 +59,7 @@ export function getAuthToken(): string | undefined {
   }
 
   // delegated / bridge 场景下从 cookie 提取 JWT
-  if (typeof document !== "undefined") {
+  if (insidePowerX && typeof document !== "undefined") {
     const cookieCandidates = ["px_ctx_jwt", "token", "px_token", "auth_token", "auth-token"];
     for (const name of cookieCandidates) {
       const match = document.cookie.match(

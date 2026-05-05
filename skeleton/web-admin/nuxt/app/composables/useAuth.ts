@@ -196,6 +196,7 @@ export const useAuth = () => {
         console.warn("[useAuth] sessionStorage.clear failed", err);
       }
       const legacyCookies = [
+        "px_ctx_jwt",
         "px_token",
         "auth_token",
         "auth-token",
@@ -223,6 +224,9 @@ export const useAuth = () => {
   };
 
   const readAuthCookieToken = () => {
+    if (!insidePowerX) {
+      return null;
+    }
     const cookieCandidates = ["px_ctx_jwt"];
     for (const name of cookieCandidates) {
       const value = readCookie(name);

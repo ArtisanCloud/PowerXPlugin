@@ -61,10 +61,9 @@ const insidePowerX = computed(() => {
 });
 
 const isEmbeddedInPowerX = computed(() => {
-  if (insidePowerX.value) {
-    return true;
-  }
-  return isPluginAdminPath(route.path);
+  // Only mount host bridge when runtime explicitly declares insidePowerX.
+  // Path-based `_p/...` detection is not enough in standalone/local mode.
+  return insidePowerX.value;
 });
 
 // 控制导航显示的环境变量

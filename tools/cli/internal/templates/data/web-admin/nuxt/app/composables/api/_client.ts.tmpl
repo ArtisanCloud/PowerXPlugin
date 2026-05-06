@@ -212,10 +212,14 @@ export function useApiClient() {
       const auth = await resolveAuth();
       authToken = (next as any).authToken || (next as any).token;
       if (!authToken) {
+        authToken = auth?.getToken?.() || null;
+      }
+      if (!authToken) {
         authToken =
           (await auth?.ensureFreshToken?.()) ||
           getAuthToken();
       }
+      dumpAuthSource("afterResolve", authToken, headers);
     }
 
     if (authToken && !headers.has("Authorization")) {
@@ -262,12 +266,89 @@ export function useApiClient() {
       }
     }
 
+    if (!skipAuth && !headers.has("Authorization")) {
+      dumpAuthSource("missingAuthorization", authToken, headers);
+      const err: any = new Error("缺少 Authorization，已阻止受保护请求");
+      err.status = 403;
+      err.statusCode = 403;
+      err.code = "AUTH_HEADER_MISSING";
+      err._skipClearAuth = true;
+      throw err;
+    }
+
     return next;
   };
 
   const toast = process.client ? useToast() : null;
+  const authDebugEnabled = () => {
+    if (typeof window === "undefined") return false;
+    const runtimeFlag =
+      String(useRuntimeConfig().public?.authDebug || "").trim().toLowerCase() === "true";
+    let storageFlag = false;
+    try {
+      storageFlag =
+        String(window.localStorage?.getItem("powerx-auth-debug") || "")
+          .trim()
+          .toLowerCase() === "true";
+    } catch {
+      storageFlag = false;
+    }
+    return runtimeFlag || storageFlag;
+  };
+  const authDebug = (event: string, extra?: Record<string, any>) => {
+    if (!authDebugEnabled()) return;
+    console.info(`[api/_client] ${event}`, extra || {});
+  };
+  const dumpAuthSource = (phase: string, authToken: string | null, headers: Headers) => {
+    if (!authDebugEnabled()) return;
+    let lsAccess = "";
+    let lsBackup = "";
+    let lsRefresh = "";
+    try {
+      lsAccess = String(window.localStorage?.getItem("access_token") || "").slice(0, 24);
+      lsBackup = String(window.localStorage?.getItem("__px_access_token") || "").slice(0, 24);
+      lsRefresh = String(window.localStorage?.getItem("refresh_token") || "").slice(0, 16);
+    } catch {}
+    authDebug(`authSource.${phase}`, {
+      tokenPrefix: String(authToken || "").slice(0, 24),
+      hasAuthorizationHeader: Boolean(headers.get("Authorization")),
+      lsAccessPrefix: lsAccess,
+      lsBackupPrefix: lsBackup,
+      lsRefreshPrefix: lsRefresh,
+    });
+  };
 
-  const handleAuthError = async (response?: { status?: number; _data?: any }) => {
+  const isMissingAuthorizationError = (response?: { _data?: any }) => {
+    const data = response?._data as any;
+    const code = String(data?.code || data?.error?.code || "").toUpperCase();
+    const message = String(data?.message || data?.error?.message || data?.error || "");
+    if (code === "AUTH_HEADER_MISSING") return true;
+    return (
+      message.includes("缺少 Authorization") ||
+      /missing\s+authorization/i.test(message)
+    );
+  };
+
+  const shouldClearAuthOn401 = (response?: { _data?: any }) => {
+    const data = response?._data as any;
+    const code = String(data?.code || data?.error?.code || "").toUpperCase();
+    const message = String(data?.message || data?.error?.message || data?.error || "").toLowerCase();
+    if (code === "UNAUTHORIZED" || code === "JWT_UNAUTHORIZED" || code === "TOKEN_INVALID" || code === "TOKEN_EXPIRED") {
+      return true;
+    }
+    return (
+      message.includes("jwt unauthorized") ||
+      message.includes("token expired") ||
+      message.includes("invalid token") ||
+      message.includes("signature is invalid") ||
+      message.includes("unauthorized")
+    );
+  };
+
+  const handleAuthError = async (
+    response?: { status?: number; _data?: any },
+    prepared?: Record<string, any>
+  ) => {
     if (!response) return;
     const auth = await resolveAuth();
     if (!auth) return;
@@ -283,7 +364,31 @@ export function useApiClient() {
     }
     if (response.status === 401) {
       console.error("API error:", response.status, response._data);
-      const stsExpired = auth.localIAMEnabled?.value;
+      const hasAuthHeader = Boolean(
+        prepared?.headers instanceof Headers
+          ? prepared.headers.get("Authorization")
+          : (prepared?.headers as any)?.Authorization
+      );
+      const missingAuth = isMissingAuthorizationError(response);
+      authDebug("401", {
+        hasAuthHeader,
+        missingAuth,
+        status: response.status,
+      });
+      // 区分两类 401：
+      // 1) 缺少 Authorization（匿名请求）=> 不清 token
+      // 2) 携带 Authorization 但 token 无效 => 清 token
+      if (!hasAuthHeader || missingAuth) {
+        authDebug("401.skipClearAuth", {
+          reason: !hasAuthHeader ? "no_auth_header" : "missing_auth_error",
+        });
+        return;
+      }
+      if (!shouldClearAuthOn401(response)) {
+        authDebug("401.skipClearAuth", { reason: "non_token_401" });
+        return;
+      }
+      const stsExpired = auth.delegatedIAM?.value;
       if (stsExpired && process.client) {
         toast?.add?.({
           title: "会话已过期",
@@ -291,7 +396,8 @@ export function useApiClient() {
           color: "orange",
         });
       }
-      auth.clearAuth();
+      auth.clearAuth?.("token_invalid", true);
+      authDebug("401.clearAuth", { reason: "token_invalid" });
       if (process.client) {
         toast?.add?.({
           title: stsExpired ? "STS 令牌已过期" : "登录状态已失效",
@@ -314,7 +420,7 @@ export function useApiClient() {
         ? baseClient.raw(request, prepared)
         : baseClient(request, prepared));
     } catch (error: any) {
-      await handleAuthError(error?.response);
+      await handleAuthError(error?.response, prepared);
       throw error;
     }
   };

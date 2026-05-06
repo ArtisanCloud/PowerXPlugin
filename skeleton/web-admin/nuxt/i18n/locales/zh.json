@@ -71,6 +71,7 @@
     "templates": "模板管理",
     "templatesCrud": "模板 CRUD",
     "templatesDevelop": "开发指南",
+    "frameworkLab": "framework功能测试",
     "capabilities": "插件能力注册",
     "capabilitiesExposure": "能力暴露配置",
     "capabilitiesLifecycle": "生命周期治理",
@@ -90,6 +91,17 @@
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
+  },
+  "frameworkLab": {
+    "title": "framework功能测试",
+    "description": "用于联调两条通知链路：发送测试通知（能力网关链路）和 WS测试通知（framework wsbus 直达 /api/ws）。WS 默认 topic 使用 _topic.system.notification，与 PowerX 当前联调口径保持一致。",
+    "cardTitle": "通知调试",
+    "memberUuidLabel": "Member UUID",
+    "memberUuidPlaceholder": "请输入 member_uuid / member_id（默认可用 1）",
+    "hint": "发送测试通知使用 member_uuid/member_id 定位接收人；WS测试通知用于验证 framework WS 主通道是否可达。",
+    "flowTitle": "WS Bus 流程结果",
+    "sendCapabilityButton": "发送测试通知",
+    "sendWsButton": "WS测试通知"
   },
   "iam": {
     "notifications": {

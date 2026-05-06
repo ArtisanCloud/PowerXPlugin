@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"{{ .BackendModulePath }}/internal/config"
-	runtimeops "{{ .BackendModulePath }}/internal/services/admin/runtime_ops"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
@@ -61,6 +59,13 @@ func resolveTaskBusProvider(cfg *config.Config, log *pxlog.Entry) fweventbridge.
 }
 
 func resolveTaskBusProviderMode(cfg *config.Config) string {
+	return resolveTaskBusProviderModeByProxy(cfg, "")
+}
+
+func resolveTaskBusProviderModeByProxy(cfg *config.Config, powerXProxy string) string {
+	if strings.TrimSpace(powerXProxy) == "1" {
+		return "host"
+	}
 	if cfg != nil && cfg.EventBridge != nil {
 		providerMode := strings.ToLower(strings.TrimSpace(cfg.EventBridge.TaskBusProvider))
 		if providerMode != "" {
@@ -71,14 +76,12 @@ func resolveTaskBusProviderMode(cfg *config.Config) string {
 }
 
 func validateTaskBusProviderConflict(cfg *config.Config, powerXProxy string) error {
-	providerMode := resolveTaskBusProviderMode(cfg)
-	modeSvc := runtimeops.NewSchedulerModeService()
-	result := modeSvc.Validate(runtimeops.ModeValidationRequest{
-		PowerXProxy:     powerXProxy,
-		TaskBusProvider: providerMode,
-	})
-	if !result.Valid {
-		return fmt.Errorf("runtime mode conflict: %s (got %q)", result.Message, providerMode)
+	if cfg == nil || cfg.EventBridge == nil {
+		return nil
+	}
+	resolved := resolveTaskBusProviderModeByProxy(cfg, powerXProxy)
+	if strings.TrimSpace(cfg.EventBridge.TaskBusProvider) != resolved {
+		cfg.EventBridge.TaskBusProvider = resolved
 	}
 	return nil
 }

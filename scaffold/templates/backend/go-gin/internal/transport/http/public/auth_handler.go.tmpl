@@ -2,6 +2,8 @@ package public
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"{{ .BackendModulePath }}/internal/contracts"
+	"{{ .BackendModulePath }}/internal/logger"
 	authmetrics "{{ .BackendModulePath }}/internal/observability/auth"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	middleware "{{ .BackendModulePath }}/internal/transport/http/middleware"
@@ -421,7 +424,8 @@ func (h *AuthHandler) handleLocalMeContext(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "本地 IAM 未初始化", nil)
 		return
 	}
-	token := extractBearer(c.GetHeader("Authorization"))
+	rawAuth := c.GetHeader("Authorization")
+	token := extractBearer(rawAuth)
 	if token == "" {
 		contracts.ResponseUnauthorized(c, "缺少 Authorization Bearer token")
 		return
@@ -435,6 +439,14 @@ func (h *AuthHandler) handleLocalMeContext(c *gin.Context) {
 	}
 	uc, err := decoder.UserContextFromToken(c.Request.Context(), token)
 	if err != nil {
+		claims := inspectJWTClaims(token)
+		logger.WarnWith(logger.WithComponent("auth.local.me_context"), c.Request.Context(), "local me/context token verify failed", logger.Fields{
+			"path": c.Request.URL.Path,
+			"iss":  claims["iss"],
+			"aud":  claims["aud"],
+			"tid":  claims["tid"],
+			"uid":  claims["uid"],
+		})
 		h.handleLocalErr(c, err)
 		return
 	}
@@ -557,10 +569,14 @@ func extractBearer(header string) string {
 	if header == "" {
 		return ""
 	}
-	if strings.HasPrefix(strings.ToLower(header), "bearer ") {
-		return strings.TrimSpace(header[len("Bearer "):])
+	// Be tolerant to duplicated prefixes from frontend middleware (e.g. "Bearer Bearer <jwt>").
+	for strings.HasPrefix(strings.ToLower(header), "bearer ") {
+		header = strings.TrimSpace(header[len("Bearer "):])
+		if header == "" {
+			return ""
+		}
 	}
-	return ""
+	return header
 }
 
 func (h *AuthHandler) modeLabel() string {
@@ -568,6 +584,32 @@ func (h *AuthHandler) modeLabel() string {
 		return ""
 	}
 	return string(h.mode)
+}
+
+func inspectJWTClaims(token string) map[string]any {
+	out := map[string]any{}
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	if len(parts) < 2 {
+		return out
+	}
+	payload := parts[1]
+	if payload == "" {
+		return out
+	}
+	payload = strings.ReplaceAll(payload, "-", "+")
+	payload = strings.ReplaceAll(payload, "_", "/")
+	for len(payload)%4 != 0 {
+		payload += "="
+	}
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		return out
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		return out
+	}
+	return claims
 }
 
 type loginRequest struct {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -99,8 +100,31 @@ func main() {
 	}
 
 	// ★ 在这里把 HTTP/GRPC 的占位符先解析掉（一定要在起服务之前）
-	//   - HTTP 用 PORT（由 PowerX 的 supervisor 注入）
-	cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
+	//   - 宿主模式（POWERX_PROXY=1）：优先 POWERX_HTTP_ADDR，缺失则回退 config/PORT（并告警）
+	//   - 本地模式：允许 PORT/配置回退
+	hostMode := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
+	if hostMode {
+		httpBindAddr := strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR"))
+		if httpBindAddr != "" {
+			cfg.Server.BindAddr = httpBindAddr
+		} else {
+			cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
+			logger.WithFields(logger.Fields{
+				"POWERX_PROXY":     strings.TrimSpace(os.Getenv("POWERX_PROXY")),
+				"POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
+				"PORT":             strings.TrimSpace(os.Getenv("PORT")),
+				"bind_addr":        cfg.Server.BindAddr,
+			}).Warn("POWERX_HTTP_ADDR is empty when POWERX_PROXY=1, fallback to config/PORT bind address")
+		}
+	} else {
+		cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
+	}
+	logger.WithFields(logger.Fields{
+		"bind_addr":               cfg.Server.BindAddr,
+		"host_mode":               hostMode,
+		"env_POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
+		"env_PORT":               strings.TrimSpace(os.Getenv("PORT")),
+	}).Info("Resolved HTTP bind address")
 
 	//   - gRPC 用 POWERX_GRPC_PORT（由 PowerX 的 Enable 阶段注入）
 	if cfg.GRPCServer != nil {
@@ -145,6 +169,15 @@ func main() {
 	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
 	if mode == "" {
 		mode = "unknown"
+	}
+	if err := validateHostDelegatedEnvContract(iamResolver); err != nil {
+		logger.WithError(err).WithFields(logger.Fields{
+			"iam_mode":     iamResolver.Mode(),
+			"iam_source":   iamResolver.Source(),
+			"POWERX_PROXY": normalizedProxy(strings.TrimSpace(os.Getenv("POWERX_PROXY"))),
+			"IAM_MODE":     strings.TrimSpace(os.Getenv("IAM_MODE")),
+			"IAMMode":      strings.TrimSpace(os.Getenv("IAMMode")),
+		}).Fatal("Host delegated env contract validation failed")
 	}
 	contractErr := validateDelegatedGatewayContract(cfg, iamResolver.Mode())
 	gatewayFields := gatewayContractLogFields(cfg, mode)
@@ -408,9 +441,35 @@ func main() {
 
 	// 使用 errgroup 并发启动服务器
 	g, groupCtx := errgroup.WithContext(ctx)
+	safeGo := func(name string, fn func() error) {
+		g.Go(func() (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.WithFields(logger.Fields{
+						"component": "main.goroutine",
+						"task":      name,
+						"panic":     r,
+					}).Error("goroutine panicked")
+					err = fmt.Errorf("goroutine panic: %s", name)
+				}
+			}()
+			return fn()
+		})
+	}
+
+	// 先启动核心 HTTP/gRPC 服务，避免后台任务异常影响 healthz 探活。
+	safeGo("http_server", func() error {
+		logger.WithField("addr", cfg.Server.BindAddr).Info("Starting HTTP server...")
+		return fwApp.Run()
+	})
+	if gs != nil {
+		safeGo("grpc_server", func() error {
+			return gs.Serve(groupCtx)
+		})
+	}
 
 	if integrationScheduler != nil {
-		g.Go(func() error {
+		safeGo("integration_scheduler", func() error {
 			integrationScheduler.Start(groupCtx)
 			<-groupCtx.Done()
 			stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
@@ -421,32 +480,21 @@ func main() {
 	}
 
 	if syncJob != nil {
-		g.Go(func() error {
+		safeGo("marketplace_sync_job", func() error {
 			syncJob.Run(groupCtx)
 			return nil
 		})
 	}
 	if renewalJob != nil {
-		g.Go(func() error {
+		safeGo("license_renewal_job", func() error {
 			renewalJob.Run(groupCtx)
 			return nil
 		})
 	}
 	if taskBusRuntime.StartConsumer != nil {
-		g.Go(func() error {
+		safeGo("taskbus_consumer", func() error {
 			taskBusRuntime.StartConsumer(groupCtx)
 			return nil
-		})
-	}
-
-	g.Go(func() error {
-		logger.WithField("addr", cfg.Server.BindAddr).Info("Starting HTTP server...")
-		return fwApp.Run()
-	})
-
-	if gs != nil {
-		g.Go(func() error {
-			return gs.Serve(groupCtx)
 		})
 	}
 
@@ -695,6 +743,50 @@ func validateDelegatedGatewayContract(cfg *config.Config, mode iamservice.IAMMod
 		return nil
 	}
 	return capgateway.ValidateDelegatedConfig(cfg)
+}
+
+func validateHostDelegatedEnvContract(iamResolver *pluginbootstrap.IAMResolver) error {
+	if iamResolver == nil {
+		return nil
+	}
+	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
+	if mode != string(iamservice.IAMModeDelegated) {
+		return nil
+	}
+	// 仅宿主 delegated 场景做 fail-fast；允许 standalone_mock_delegated 本地联调。
+	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
+		return nil
+	}
+
+	missing := make([]string, 0, 2)
+	invalid := make([]string, 0, 1)
+	iamModeEnv := strings.ToLower(strings.TrimSpace(os.Getenv("IAM_MODE")))
+	iamModeLegacy := strings.ToLower(strings.TrimSpace(os.Getenv("IAMMode")))
+	if iamModeEnv == "" && iamModeLegacy == "" {
+		missing = append(missing, "IAM_MODE=delegated")
+	} else if iamModeEnv != "delegated" && iamModeLegacy != "delegated" {
+		invalid = append(invalid, fmt.Sprintf("IAM_MODE=%s IAMMode=%s", iamModeEnv, iamModeLegacy))
+	}
+
+	scheme := strings.ToLower(strings.TrimSpace(os.Getenv("PX_GATEWAY_AUTH_SCHEME")))
+	if scheme == "" {
+		missing = append(missing, "PX_GATEWAY_AUTH_SCHEME=bearer")
+	} else if scheme != "bearer" {
+		invalid = append(invalid, "PX_GATEWAY_AUTH_SCHEME must be bearer")
+	}
+
+	if len(missing) == 0 && len(invalid) == 0 {
+		return nil
+	}
+
+	parts := make([]string, 0, 2)
+	if len(missing) > 0 {
+		parts = append(parts, "missing: "+strings.Join(missing, ", "))
+	}
+	if len(invalid) > 0 {
+		parts = append(parts, "invalid: "+strings.Join(invalid, ", "))
+	}
+	return errors.New(strings.Join(parts, "; "))
 }
 
 func gatewayContractLogFields(cfg *config.Config, mode string) logger.Fields {

@@ -15,17 +15,35 @@ type Adapter struct {
 	inner         Publisher
 	defaultTenant string
 	logger        runtimelogging.Logger
+	hubBridge     LocalHub
+	bridgeTopics  map[string]struct{}
 }
 
-func NewAdapter(inner Publisher, defaultTenant string, logger *slog.Logger) Publisher {
+func NewAdapter(inner Publisher, defaultTenant string, logger *slog.Logger, bridgeTopics ...string) Publisher {
 	if logger == nil {
 		logger = slog.Default()
+	}
+	normalizedBridgeTopics := map[string]struct{}{}
+	for _, topic := range bridgeTopics {
+		normalized, result := NormalizeAndValidateTopic(topic)
+		if !result.OK {
+			continue
+		}
+		normalizedBridgeTopics[normalized] = struct{}{}
 	}
 	return &Adapter{
 		inner:         inner,
 		defaultTenant: strings.TrimSpace(defaultTenant),
 		logger:        runtimelogging.NewSlogAdapter(logger),
+		bridgeTopics:  normalizedBridgeTopics,
 	}
+}
+
+func (a *Adapter) EnableHubBridge(hub LocalHub) {
+	if a == nil {
+		return
+	}
+	a.hubBridge = hub
 }
 
 func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts PublishOptions) PublishResult {
@@ -80,6 +98,18 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		}
 		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, reason)
 		return result
+	}
+	if a.hubBridge != nil {
+		if _, ok := a.bridgeTopics[normalized]; ok {
+			if err := a.hubBridge.Publish(ctx, normalized, payload, PublishOptions{
+				TenantUUID:  tenantUUID,
+				TraceID:     traceID,
+				BearerToken: bearer,
+			}); err != nil {
+				a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, ErrorCodeLocalPublishFailed)
+				return FailureResult(ErrorCodeLocalPublishFailed, err.Error())
+			}
+		}
 	}
 	reason := ""
 	if missingContext {

@@ -100,19 +100,22 @@ func main() {
 	}
 
 	// ★ 在这里把 HTTP/GRPC 的占位符先解析掉（一定要在起服务之前）
-	//   - 宿主模式（POWERX_PROXY=1）：只认 POWERX_HTTP_ADDR（强契约）
+	//   - 宿主模式（POWERX_PROXY=1）：优先 POWERX_HTTP_ADDR，缺失则回退 config/PORT（并告警）
 	//   - 本地模式：允许 PORT/配置回退
 	hostMode := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
 	if hostMode {
 		httpBindAddr := strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR"))
-		if httpBindAddr == "" {
+		if httpBindAddr != "" {
+			cfg.Server.BindAddr = httpBindAddr
+		} else {
+			cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
 			logger.WithFields(logger.Fields{
 				"POWERX_PROXY":     strings.TrimSpace(os.Getenv("POWERX_PROXY")),
 				"POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
 				"PORT":             strings.TrimSpace(os.Getenv("PORT")),
-			}).Fatal("POWERX_HTTP_ADDR is required when POWERX_PROXY=1")
+				"bind_addr":        cfg.Server.BindAddr,
+			}).Warn("POWERX_HTTP_ADDR is empty when POWERX_PROXY=1, fallback to config/PORT bind address")
 		}
-		cfg.Server.BindAddr = httpBindAddr
 	} else {
 		cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
 	}

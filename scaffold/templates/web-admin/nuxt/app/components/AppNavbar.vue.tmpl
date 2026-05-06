@@ -170,7 +170,7 @@ const iamModeBadge = computed(() => {
   return {
     label: standalone ? "本地 IAM" : "Delegated IAM",
     description: standalone
-      ? "当前使用本地目录与 STS"
+      ? "当前使用本地目录鉴权"
       : "通过宿主 PowerX 鉴权",
     color: standalone ? "green" : "yellow",
   };

@@ -231,7 +231,7 @@ export default defineNuxtConfig({
   },
   srcDir: 'app',
   devtools: {
-    enabled: !INSIDE_POWERX
+    enabled: process.env.NUXT_ENABLE_DEVTOOLS === 'true'
   },
   app: {
     baseURL: INSIDE_POWERX ? pluginAdminBase : '/',
@@ -354,7 +354,8 @@ export default defineNuxtConfig({
       hmr: {
         protocol: 'ws',
         host: 'localhost',
-        port: 24731
+        port: 24731,
+        overlay: process.env.NUXT_ENABLE_HMR_OVERLAY === 'true'
       },
       proxy: devProxy
     }

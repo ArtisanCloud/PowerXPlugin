@@ -46,3 +46,24 @@ func TestAdapterFailureLogContainsRequiredFields(t *testing.T) {
 		}
 	}
 }
+
+func TestAdapterSuccessLogFallbackTraceWhenContextMissing(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	pub := NewAdapter(&fakeInnerPublisher{result: SuccessResult()}, "", logger)
+
+	res := pub.Publish(context.Background(), "powerx.channel.master.credential_inspection.v1", map[string]any{"k": "v"}, PublishOptions{
+		TenantUUID: "tenant-1",
+	})
+	if !res.OK {
+		t.Fatalf("expected success result")
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, `"reason":"missing_context"`) {
+		t.Fatalf("expected missing_context reason, got %s", out)
+	}
+	if strings.Contains(out, `"trace_id":""`) {
+		t.Fatalf("expected non-empty trace_id, got %s", out)
+	}
+}

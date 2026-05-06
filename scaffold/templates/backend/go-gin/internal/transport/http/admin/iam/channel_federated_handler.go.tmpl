@@ -32,7 +32,11 @@ func NewChannelDingTalkHandlerWithDeps(deps *app.Deps) *ChannelDingTalkHandler {
 		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
 		"",
 		nil,
+		"dingtalk.sync.progress",
 	)
+	if adapter, ok := publisher.(*fwwsbus.Adapter); ok {
+		adapter.EnableHubBridge(deps.WSBusHub)
+	}
 	return &ChannelDingTalkHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewDingTalkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),
@@ -199,7 +203,11 @@ func NewChannelLarkHandlerWithDeps(deps *app.Deps) *ChannelLarkHandler {
 		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
 		"",
 		nil,
+		"lark.sync.progress",
 	)
+	if adapter, ok := publisher.(*fwwsbus.Adapter); ok {
+		adapter.EnableHubBridge(deps.WSBusHub)
+	}
 	return &ChannelLarkHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewLarkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),

@@ -1,5 +1,6 @@
 import { useApiClient } from "../_client";
 import type { ApiResponse } from "../types/types";
+import { useAuth } from "~/composables/useAuth";
 
 /**
  * 用户上下文相关类型定义
@@ -44,6 +45,7 @@ export interface ContextMember {
  */
 export const useMeService = () => {
   const apiClient = useApiClient();
+  const auth = useAuth();
   const runtimeConfig = useRuntimeConfig();
   const delegatedMode = (() => {
     const raw = String(runtimeConfig.public?.iamMode || "").trim().toLowerCase();
@@ -54,6 +56,22 @@ export const useMeService = () => {
     ? ["/admin/user/auth"]
     : ["/admin/user/auth"];
 
+  const withAuthToken = async (options: Record<string, any> = {}) => {
+    if (!process.client) return options;
+    const refreshed = await auth.ensureFreshToken?.();
+    const token = String(refreshed || auth.getToken?.() || "").trim();
+    if (!token) {
+      const err: any = new Error("登录状态缺失，请重新登录");
+      err.status = 401;
+      err.statusCode = 401;
+      throw err;
+    }
+    return {
+      ...options,
+      token,
+    };
+  };
+
   const requestWithFallback = async <T>(
     method: "get" | "post" | "put",
     suffix: string,
@@ -63,12 +81,12 @@ export const useMeService = () => {
     for (const base of contextBaseCandidates) {
       try {
         if (method === "get") {
-          return await apiClient.get<T>(`${base}${suffix}`);
+          return await apiClient.get<T>(`${base}${suffix}`, await withAuthToken());
         }
         if (method === "post") {
-          return await apiClient.post<T>(`${base}${suffix}`, body);
+          return await apiClient.post<T>(`${base}${suffix}`, body, await withAuthToken());
         }
-        return await apiClient.put<T>(`${base}${suffix}`, body);
+        return await apiClient.put<T>(`${base}${suffix}`, body, await withAuthToken());
       } catch (error: any) {
         lastError = error;
         const status = Number(

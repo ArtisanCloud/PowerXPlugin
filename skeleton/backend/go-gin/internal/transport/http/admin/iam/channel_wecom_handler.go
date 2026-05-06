@@ -32,7 +32,11 @@ func NewChannelWeComHandlerWithDeps(deps *app.Deps) *ChannelWeComHandler {
 		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
 		"",
 		nil,
+		"wecom.sync.progress",
 	)
+	if adapter, ok := publisher.(*fwwsbus.Adapter); ok {
+		adapter.EnableHubBridge(deps.WSBusHub)
+	}
 	return &ChannelWeComHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewWeComSyncTaskService(syncRepo, configSvc, publisher, deps.DB),

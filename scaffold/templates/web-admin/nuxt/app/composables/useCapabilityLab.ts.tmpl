@@ -281,7 +281,7 @@ const invokeLocalCapability = async (
   if (!hasAuthorization) {
     const token = getAuthToken()
     if (token) {
-      headers.Authorization = /^Bearer\\s/i.test(token) ? token : `Bearer ${token}`
+      headers.Authorization = /^Bearer\s/i.test(token) ? token : `Bearer ${token}`
     }
   }
   const finalUrl = appendQuery(url, payload.query)

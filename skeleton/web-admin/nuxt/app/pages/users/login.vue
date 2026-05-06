@@ -430,16 +430,13 @@ const handleLogin = async () => {
       identifier: form.identifier,
       password: form.password,
     });
-
     // console.log("登录结果:", response);
 
     if (response.success) {
       // 保存认证信息
       setAuth(response.data);
-
       // 获取重定向URL
       const redirectTo = sanitizeRedirectTo(route.query.redirect);
-
       // 登录成功后跳转
       await navigateTo(redirectTo);
     } else {

@@ -9,7 +9,8 @@
 - 统一日志调用入口（context + fields + message）。
 - 统一策略模型（mode/sinks/format/level/retry）。
 - 统一 sink 路由与失败结果结构。
-- 固定低基数标签基线：`plugin_id`, `tenant_uuid`, `component`, `level`。
+- 固定低基数标签基线：`system`, `service`, `env`, `instance`, `module`, `level`（可选）。
+- 高基数字段（如 `plugin_id`, `tenant_uuid`, `request_id`, `trace_id`）仅放日志正文顶层字段，不放 labels。
 
 ## 约束
 

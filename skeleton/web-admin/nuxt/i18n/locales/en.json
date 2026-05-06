@@ -71,6 +71,7 @@
     "templates": "Templates",
     "templatesCrud": "Template CRUD",
     "templatesDevelop": "Templates Develop Guide",
+    "frameworkLab": "Framework Function Test",
     "capabilities": "Plugin Capability Registry",
     "capabilitiesExposure": "Exposure & Quotas",
     "capabilitiesLifecycle": "Lifecycle Governance",
@@ -90,6 +91,17 @@
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
+  },
+  "frameworkLab": {
+    "title": "Framework Function Test",
+    "description": "Use this page to validate two notification paths: capability test notification (gateway path) and WS test notification (framework wsbus to /api/ws). The WS flow uses _topic.system.notification by default to align with current PowerX integration.",
+    "cardTitle": "Notification Debug",
+    "memberUuidLabel": "Member UUID",
+    "memberUuidPlaceholder": "Enter member_uuid / member_id (default: 1)",
+    "hint": "Capability notification depends on gateway availability; WS test notification validates the framework WS main channel.",
+    "flowTitle": "WS Bus Flow Result",
+    "sendCapabilityButton": "Send Test Notification",
+    "sendWsButton": "WS Test Notification"
   },
   "iam": {
     "notifications": {

@@ -1,0 +1,359 @@
+<template>
+  <UContainer class="py-10 space-y-8">
+    <div class="flex items-start justify-between gap-4">
+      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+        {{ `{{ $t("frameworkLab.title") }}` }}
+      </h1>
+      <p class="max-w-3xl text-gray-600 dark:text-gray-300">
+        {{ `{{ $t("frameworkLab.description") }}` }}
+      </p>
+    </div>
+
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ `{{ $t("frameworkLab.cardTitle") }}` }}</span>
+        </div>
+      </template>
+
+      <div class="flex items-end gap-3 flex-wrap">
+        <UInput
+          v-model="memberUUID"
+          size="sm"
+          class="w-[360px]"
+          :placeholder="$t('frameworkLab.memberUuidPlaceholder')"
+        />
+        <div class="flex items-center gap-3">
+          <UButton
+            size="sm"
+            color="info"
+            icon="i-heroicons-bell-alert"
+            :loading="capabilityNotifying"
+            @click="sendCapabilityNotification"
+          >
+            {{ `{{ $t("frameworkLab.sendCapabilityButton") }}` }}
+          </UButton>
+          <UButton
+            size="sm"
+            color="primary"
+            icon="i-heroicons-signal"
+            :loading="wsNotifying"
+            @click="runWSBusFlow"
+          >
+            {{ `{{ $t("frameworkLab.sendWsButton") }}` }}
+          </UButton>
+        </div>
+        <p class="w-full text-xs text-gray-500 dark:text-gray-400">
+          {{ `{{ $t("frameworkLab.hint") }}` }}
+        </p>
+      </div>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ `{{ $t("frameworkLab.flowTitle") }}` }}</span>
+        </div>
+      </template>
+      <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+        <p>Topic: <span class="font-mono">{{ `{{ wsFlowTopic || "-" }}` }}</span></p>
+        <p>Trace ID: <span class="font-mono">{{ `{{ wsFlowTraceID || "-" }}` }}</span></p>
+        <p>Grant: <span>{{ `{{ wsFlowGrantStatus }}` }}</span></p>
+        <p>Publish: <span>{{ `{{ wsFlowPublishStatus }}` }}</span></p>
+        <p>Last Event Topic: <span class="font-mono">{{ `{{ lastEventTopicValue || "-" }}` }}</span></p>
+        <p>Last Event At: <span>{{ `{{ lastEventAtValue || "-" }}` }}</span></p>
+      </div>
+    </UCard>
+
+    <ToastAlert
+      v-model="toast.visible"
+      :title="toast.title"
+      :message="toast.message"
+      :color="toast.color"
+      :duration="toast.duration"
+    />
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+import { nextTick } from "vue"
+import ToastAlert from "~/components/ToastAlert.vue"
+import { usePowerXCapability } from "~/composables/usePowerXCapability"
+import { useNotificationProbe } from "~/composables/useNotificationProbe"
+import { useUserStore } from "~/stores/user"
+import { useApiClient } from "~/composables/api/_client"
+import { getTenantUuid } from "~/composables/api/_base"
+
+type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
+
+const memberUUID = ref("")
+const capabilityNotifying = ref(false)
+const wsNotifying = ref(false)
+const wsFlowTopic = ref("")
+const wsFlowTraceID = ref("")
+const wsFlowGrantStatus = ref("idle")
+const wsFlowPublishStatus = ref("idle")
+
+const toast = reactive({
+  visible: false,
+  title: "",
+  message: "",
+  color: "primary" as ToastColor,
+  duration: 3000,
+})
+
+const { invoke: invokeCapability } = usePowerXCapability()
+const { sendTestNotification, subscribeTopic, connect, lastEventTopic, lastEventAt } = useNotificationProbe()
+const apiClient = useApiClient()
+const userStore = useUserStore()
+const auth = useAuth()
+const lastEventTopicValue = computed(() => String(lastEventTopic.value || ""))
+const lastEventAtValue = computed(() => String(lastEventAt.value || ""))
+
+const normalizeToString = (value: unknown) => {
+  if (typeof value === "string") return value
+  if (typeof value === "number") return String(value)
+  return ""
+}
+
+const showToast = ({
+  title,
+  message,
+  color = "primary",
+  duration = 3000,
+}: {
+  title?: string
+  message: string | number
+  color?: ToastColor
+  duration?: number
+}) => {
+  toast.title = normalizeToString(title)
+  toast.message = normalizeToString(message)
+  toast.color = color
+  toast.duration = duration
+  toast.visible = false
+  nextTick(() => {
+    toast.visible = true
+  })
+}
+
+const parseTokenClaims = (token?: string | null): Record<string, any> | null => {
+  if (!token) return null
+  const parts = token.split(".")
+  if (parts.length < 2) return null
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4)
+    const decoded = typeof atob === "function" ? atob(padded) : ""
+    if (!decoded) return null
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+const pickFirstNonEmpty = (values: unknown[]) => {
+  for (const raw of values) {
+    const value = typeof raw === "string" ? raw.trim() : String(raw ?? "").trim()
+    if (value) return value
+  }
+  return ""
+}
+
+const guessMemberUUID = () => {
+  const claims = parseTokenClaims(auth.getToken?.() ?? null) || {}
+  const context = (userStore.context || {}) as Record<string, any>
+  const contextUser = (context.user || {}) as Record<string, any>
+  const candidates = [
+    context.member_uuid,
+    context.memberUuid,
+    context.current_member_uuid,
+    context.currentMemberUUID,
+    contextUser.member_uuid,
+    contextUser.memberUuid,
+    contextUser.user_uuid,
+    contextUser.userUuid,
+    claims.member_uuid,
+    claims.memberUuid,
+    claims.user_uuid,
+    claims.userUuid,
+    claims.uid,
+    claims.sub,
+    context.current_member_id,
+  ]
+  return pickFirstNonEmpty(candidates)
+}
+
+const ensureMemberUUID = () => {
+  const current = String(memberUUID.value || "").trim()
+  if (current) return current
+  const guessed = guessMemberUUID()
+  if (guessed) memberUUID.value = guessed
+  return String(memberUUID.value || "").trim()
+}
+
+const sendCapabilityNotification = async () => {
+  const targetMemberUUID = ensureMemberUUID()
+  if (!targetMemberUUID) {
+    showToast({
+      title: "发送失败",
+      message: "member_uuid 必填（请先输入或切换到已登录用户）",
+      color: "warning",
+      duration: 4500,
+    })
+    return
+  }
+
+  capabilityNotifying.value = true
+  try {
+    await invokeCapability(
+      "com.corex.notifications.test",
+      "Send",
+      {
+        method: "POST",
+        endpoint: "/api/v1/notifications/test",
+        body: {
+          member_uuid: targetMemberUUID,
+          title: "Plugin 测试通知",
+          content: "这是一条来自 framework 功能测试页的能力通知",
+          type: "info",
+          category: "system",
+          is_important: false,
+          metadata: {
+            source: "plugin-framework-lab",
+          },
+        },
+      },
+      {
+        preferredProtocol: "rest",
+        notifyOnSuccess: false,
+      }
+    )
+    showToast({
+      title: "发送成功",
+      message: "能力通知已提交",
+      color: "success",
+      duration: 3500,
+    })
+  } catch (error: any) {
+    showToast({
+      title: "发送失败",
+      message: error?.message || "能力调用失败",
+      color: "error",
+      duration: 5000,
+    })
+  } finally {
+    capabilityNotifying.value = false
+  }
+}
+
+const sendWSNotification = async () => {
+  wsNotifying.value = true
+  try {
+    await sendTestNotification("Framework WS probe from templates/framework-lab")
+    showToast({
+      title: "发送成功",
+      message: "WS 测试通知已提交",
+      color: "success",
+      duration: 3500,
+    })
+  } catch (error: any) {
+    showToast({
+      title: "发送失败",
+      message: error?.message || "WS 测试通知发送失败",
+      color: "error",
+      duration: 5000,
+    })
+  } finally {
+    wsNotifying.value = false
+  }
+}
+
+const makeTraceID = () => {
+  const rand = Math.random().toString(36).slice(2, 10)
+  return `fw-lab-${Date.now()}-${rand}`
+}
+
+const makeFlowTopic = () => {
+  return "_topic.system.notification"
+}
+
+const runWSBusFlow = async () => {
+  wsNotifying.value = true
+  wsFlowGrantStatus.value = "pending"
+  wsFlowPublishStatus.value = "idle"
+  wsFlowTopic.value = makeFlowTopic()
+  wsFlowTraceID.value = makeTraceID()
+
+  if (!wsFlowTopic.value) {
+    wsFlowGrantStatus.value = "failed: tenant_uuid missing"
+    wsNotifying.value = false
+    return
+  }
+
+  try {
+    const tenantUUID = String(getTenantUuid() || "").trim()
+    const traceID = wsFlowTraceID.value
+
+    const grantResp: any = await apiClient.post("/admin/runtime/internal/ws-bus/grant", {
+      topics: [wsFlowTopic.value],
+      tenant_uuid: tenantUUID,
+      trace_id: traceID,
+    })
+    wsFlowGrantStatus.value = grantResp?.success === false ? "failed" : "ok"
+
+    connect()
+    subscribeTopic(wsFlowTopic.value)
+
+    const publishResp: any = await apiClient.post("/admin/runtime/internal/ws-bus/publish", {
+      topic: wsFlowTopic.value,
+      tenant_uuid: tenantUUID,
+      trace_id: traceID,
+      payload: {
+        type: "framework.wsbus.test",
+        title: "WS Bus Flow Test",
+        message: "grant->publish flow from framework lab",
+        tenant_uuid: tenantUUID,
+        trace_id: traceID,
+        created_at: new Date().toISOString(),
+      },
+    })
+    wsFlowPublishStatus.value = publishResp?.success === false ? "failed" : "ok"
+
+    showToast({
+      title: "发送成功",
+      message: "WS Bus grant + publish 已提交",
+      color: "success",
+      duration: 3500,
+    })
+  } catch (error: any) {
+    const msg = String(error?.message || "ws bus flow failed")
+    if (wsFlowGrantStatus.value === "pending") {
+      wsFlowGrantStatus.value = `failed: ${msg}`
+    } else {
+      wsFlowPublishStatus.value = `failed: ${msg}`
+    }
+    showToast({
+      title: "发送失败",
+      message: msg,
+      color: "error",
+      duration: 5000,
+    })
+  } finally {
+    wsNotifying.value = false
+  }
+}
+
+onMounted(async () => {
+  if (!userStore.context && !userStore.isLoading) {
+    try {
+      await userStore.fetchUserContext()
+    } catch {
+      // ignore
+    }
+  }
+  if (!memberUUID.value) {
+    memberUUID.value = guessMemberUUID()
+  }
+})
+</script>

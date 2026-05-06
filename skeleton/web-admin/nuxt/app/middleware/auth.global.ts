@@ -43,11 +43,17 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (!userStore.context && !userStore.isLoading) {
     try {
       await userStore.fetchUserContext();
+      // Context 拉取后若被外部通道误清空，立即自愈回填，避免后续页面 API 缺 Authorization。
+      await auth.ensureFreshToken();
     } catch {
-      return navigateTo({
-        path: "/users/login",
-        query: { redirect: to.fullPath },
-      });
+      // If token still exists, do not force-redirect to login on transient context fetch failures.
+      if (!auth.token.value) {
+        return navigateTo({
+          path: "/users/login",
+          query: { redirect: to.fullPath },
+        });
+      }
+      return;
     }
   }
   if (

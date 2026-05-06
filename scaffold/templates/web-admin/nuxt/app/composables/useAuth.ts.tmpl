@@ -5,6 +5,7 @@ import { useAuthService } from "~/composables/api/services/authService";
 
 const STORAGE_KEYS = [
   "access_token",
+  "__px_access_token",
   "refresh_token",
   "token_type",
   "expires_in",
@@ -13,6 +14,24 @@ const STORAGE_KEYS = [
 ];
 
 const AUTH_ERROR_KEY = "powerx-auth-error";
+const REFRESH_COOKIE_KEY = "px_refresh_token";
+const EXPIRES_AT_COOKIE_KEY = "px_expires_at";
+let RUNTIME_TOKEN_CACHE: string | null = null;
+let RUNTIME_REFRESH_CACHE: string | null = null;
+
+const getStableLocalStorage = (): Storage | null => {
+  if (typeof window === "undefined") return null;
+  const w = window as any;
+  if (w.__PX_STABLE_LOCAL_STORAGE__) return w.__PX_STABLE_LOCAL_STORAGE__ as Storage;
+  try {
+    const ls = window.localStorage;
+    if (ls) {
+      w.__PX_STABLE_LOCAL_STORAGE__ = ls;
+      return ls;
+    }
+  } catch {}
+  return null;
+};
 
 type Nullable<T> = T | null;
 
@@ -50,6 +69,17 @@ const decodeBase64Url = (input: string) => {
   return "";
 };
 
+const decodeJwtPayload = (token?: string | null): Record<string, any> | null => {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    return JSON.parse(decodeBase64Url(parts[1]));
+  } catch {
+    return null;
+  }
+};
+
 const extractTenantUuidFromToken = (token?: string | null) => {
   if (!token) return null;
   const parts = token.split(".");
@@ -80,7 +110,8 @@ const safeLocalStorage = {
   getItem(key: string) {
     if (typeof window === "undefined") return null;
     try {
-      return window.localStorage?.getItem(key);
+      const ls = getStableLocalStorage();
+      return ls?.getItem(key) ?? null;
     } catch (err) {
       console.warn("[useAuth] localStorage.getItem failed", err);
       return null;
@@ -89,7 +120,8 @@ const safeLocalStorage = {
   setItem(key: string, value: string) {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage?.setItem(key, value);
+      const ls = getStableLocalStorage();
+      ls?.setItem(key, value);
     } catch (err) {
       console.warn("[useAuth] localStorage.setItem failed", err);
     }
@@ -97,7 +129,8 @@ const safeLocalStorage = {
   removeItem(key: string) {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage?.removeItem(key);
+      const ls = getStableLocalStorage();
+      ls?.removeItem(key);
     } catch (err) {
       console.warn("[useAuth] localStorage.removeItem failed", err);
     }
@@ -150,20 +183,65 @@ export const useAuth = () => {
   const delegatedIAM = useState("auth.delegatedIAM", () => delegatedMode);
 
   const { refreshToken: refresh, logout: apiLogout } = useAuthService();
+  const setTokenState = (
+    nextToken: Nullable<string>,
+    nextRefresh: Nullable<string>,
+    nextExpiresAt: Nullable<number>,
+    _from: string
+  ) => {
+    token.value = nextToken;
+    refreshToken.value = nextRefresh;
+    expiresAt.value = nextExpiresAt;
+    if (nextToken) RUNTIME_TOKEN_CACHE = nextToken;
+    if (nextRefresh) RUNTIME_REFRESH_CACHE = nextRefresh;
+  };
+  const ensureStorageConsistency = (_from: string) => {
+    if (!process.client) return;
+    const access = String(token.value || RUNTIME_TOKEN_CACHE || "").trim();
+    if (!access) return;
+    try {
+      const hasAccess = Boolean(safeLocalStorage.getItem("access_token"));
+      const hasBackup = Boolean(safeLocalStorage.getItem("__px_access_token"));
+      if (!hasAccess || !hasBackup) {
+        safeLocalStorage.setItem("access_token", access);
+        safeLocalStorage.setItem("__px_access_token", access);
+        if (refreshToken.value || RUNTIME_REFRESH_CACHE) {
+          safeLocalStorage.setItem("refresh_token", String(refreshToken.value || RUNTIME_REFRESH_CACHE));
+        }
+        if (expiresAt.value) {
+          safeLocalStorage.setItem("expires_at", String(expiresAt.value));
+        }
+      }
+    } catch {}
+  };
 
   const persist = (data: LoginResponse) => {
-    const expires = Date.now() + data.expires_in * 1000;
-    safeLocalStorage.setItem("access_token", data.access_token);
-    safeLocalStorage.setItem("refresh_token", data.refresh_token);
+    const access = String(data.access_token || "").trim();
+    if (!access) {
+      throw new Error("setAuth 失败：access_token 为空");
+    }
+    const nextRefresh = String(data.refresh_token || "").trim();
+    const prevRefresh =
+      String(refreshToken.value || safeLocalStorage.getItem("refresh_token") || "").trim();
+    const finalRefresh = nextRefresh || prevRefresh;
+    const expiresIn = Number(data.expires_in || 0);
+    const expires = Date.now() + (expiresIn > 0 ? expiresIn : 3600) * 1000;
+    safeLocalStorage.setItem("access_token", access);
+    safeLocalStorage.setItem("__px_access_token", access);
+    if (finalRefresh) {
+      safeLocalStorage.setItem("refresh_token", finalRefresh);
+    } else {
+      safeLocalStorage.removeItem("refresh_token");
+    }
     safeLocalStorage.setItem("token_type", data.token_type);
-    safeLocalStorage.setItem("expires_in", data.expires_in.toString());
+    safeLocalStorage.setItem("expires_in", String(expiresIn > 0 ? expiresIn : 3600));
     safeLocalStorage.setItem("scope", data.scope);
     safeLocalStorage.setItem("expires_at", expires.toString());
-    writeCookie("token", data.access_token);
-    storeTenantUuidFromToken(data.access_token);
-    token.value = data.access_token;
-    refreshToken.value = data.refresh_token;
-    expiresAt.value = expires;
+    writeCookie("token", access);
+    writeCookie(REFRESH_COOKIE_KEY, finalRefresh || null);
+    writeCookie(EXPIRES_AT_COOKIE_KEY, String(expires));
+    storeTenantUuidFromToken(access);
+    setTokenState(access, finalRefresh || null, expires, "persist");
     isAuthenticated.value = true;
     hasAuthenticated.value = true;
   };
@@ -181,10 +259,25 @@ export const useAuth = () => {
     }
   };
 
-  const clearAuth = () => {
-    if (process.client) {
-      STORAGE_KEYS.forEach((key) => safeLocalStorage.removeItem(key));
+  type ClearAuthReason =
+    | "logout"
+    | "token_invalid"
+    | "missing_auth"
+    | "expired"
+    | "system";
+
+  const clearAuth = (
+    reason: ClearAuthReason = "system",
+    purgeStorage = reason === "logout" || reason === "token_invalid" || reason === "expired"
+  ) => {
+    // system/fail-closed 只重置运行态；只有显式退出或明确 token 无效才清持久化。
+    if (process.client && purgeStorage) {
+      if (purgeStorage) {
+        STORAGE_KEYS.forEach((key) => safeLocalStorage.removeItem(key));
+      }
       writeCookie("token", null);
+      writeCookie(REFRESH_COOKIE_KEY, null);
+      writeCookie(EXPIRES_AT_COOKIE_KEY, null);
       writeCookie("tenant_uuid", null);
       try {
         const preserved = sessionStorage?.getItem(AUTH_ERROR_KEY);
@@ -196,34 +289,39 @@ export const useAuth = () => {
         console.warn("[useAuth] sessionStorage.clear failed", err);
       }
       const legacyCookies = [
-        "px_token",
-        "auth_token",
-        "auth-token",
         "i18n_redirected",
       ];
       legacyCookies.forEach((key) => writeCookie(key, null));
-      Object.keys(localStorage ?? {}).forEach((key) => {
-        if (key.includes("auth") || key.includes("token") || key.includes("px_")) {
-          safeLocalStorage.removeItem(key);
-        }
-      });
     }
-    token.value = null;
-    refreshToken.value = null;
-    expiresAt.value = null;
+    setTokenState(null, null, null, `clearAuth:${reason}`);
+    if (purgeStorage) {
+      RUNTIME_TOKEN_CACHE = null;
+      RUNTIME_REFRESH_CACHE = null;
+    }
     isAuthenticated.value = false;
     user.value = null;
   };
 
   const isTokenExpired = () => {
     if (!process.client) return true;
-    const stored = expiresAt.value ?? Number(safeLocalStorage.getItem("expires_at"));
-    if (!stored || Number.isNaN(stored)) return true;
+    let stored =
+      expiresAt.value ??
+      Number(safeLocalStorage.getItem("expires_at")) ??
+      Number(readCookie(EXPIRES_AT_COOKIE_KEY));
+    if (!stored || Number.isNaN(stored)) {
+      const tokenCandidate = token.value || getStoredToken();
+      const payload = decodeJwtPayload(tokenCandidate);
+      const exp = Number(payload?.exp || 0);
+      if (exp > 0) {
+        stored = exp * 1000;
+      }
+    }
+    if (!stored || Number.isNaN(stored)) return false;
     return Date.now() > stored - 5_000;
   };
 
   const readAuthCookieToken = () => {
-    const cookieCandidates = ["px_ctx_jwt"];
+    const cookieCandidates = insidePowerX ? ["px_ctx_jwt", "token"] : ["token"];
     for (const name of cookieCandidates) {
       const value = readCookie(name);
       if (value) {
@@ -238,7 +336,7 @@ export const useAuth = () => {
     const tryLocalStorageGet = (key: string): string | null | undefined => {
       if (typeof window === "undefined") return null;
       try {
-        return window.localStorage?.getItem(key) ?? null;
+        return safeLocalStorage.getItem(key);
       } catch {
         return undefined;
       }
@@ -248,6 +346,12 @@ export const useAuth = () => {
     // If localStorage is blocked (throws), fall back to cookie token.
     if (stored === undefined) return readAuthCookieToken();
     if (stored) return stored;
+    if (RUNTIME_TOKEN_CACHE) return RUNTIME_TOKEN_CACHE;
+    const backup = tryLocalStorageGet("__px_access_token");
+    if (backup) {
+      safeLocalStorage.setItem("access_token", backup);
+      return backup;
+    }
 
     // If localStorage still contains auth footprint but access_token is gone,
     // treat it as a logout/invalid session and do NOT fall back to cookies.
@@ -263,31 +367,67 @@ export const useAuth = () => {
     return readAuthCookieToken();
   };
 
+  const getStoredRefreshToken = () => {
+    const fromLs = safeLocalStorage.getItem("refresh_token");
+    if (fromLs) return fromLs;
+    const fromCookie = readCookie(REFRESH_COOKIE_KEY);
+    if (fromCookie) {
+      safeLocalStorage.setItem("refresh_token", fromCookie);
+      return fromCookie;
+    }
+    return RUNTIME_REFRESH_CACHE;
+  };
+
   const getToken = () => {
+    ensureStorageConsistency("getToken");
     if (isTokenExpired()) {
-      clearAuth();
       return null;
     }
     if (!token.value) {
-      token.value = getStoredToken();
+      setTokenState(getStoredToken(), refreshToken.value, expiresAt.value, "getToken.restore");
     }
     return token.value;
   };
 
   const syncFromStorage = () => {
     if (!process.client) return;
+    // 在 standalone 下，内存态 token 代表当前会话真值，不允许被一次存储空窗覆盖。
+    if (token.value) {
+      const storedRefresh = safeLocalStorage.getItem("refresh_token");
+      const storedExpires = safeLocalStorage.getItem("expires_at");
+      if ((!refreshToken.value && storedRefresh) || (!expiresAt.value && storedExpires)) {
+        setTokenState(
+          token.value,
+          refreshToken.value || storedRefresh || null,
+          expiresAt.value || Number(storedExpires) || null,
+          "syncFromStorage.backfillFromStorage"
+        );
+      } else {
+      }
+      return;
+    }
+
     const storedToken = getStoredToken();
-    const storedRefresh = safeLocalStorage.getItem("refresh_token");
-    const storedExpires = safeLocalStorage.getItem("expires_at");
-    const hasTokenAndExpiry = Boolean(storedToken && storedExpires);
+    const storedRefresh = getStoredRefreshToken();
+    const storedExpires = safeLocalStorage.getItem("expires_at") || readCookie(EXPIRES_AT_COOKIE_KEY);
+    const derivedExpFromToken = (() => {
+      if (storedExpires) return Number(storedExpires);
+      const payload = decodeJwtPayload(storedToken);
+      const exp = Number(payload?.exp || 0);
+      return exp > 0 ? exp * 1000 : null;
+    })();
+    const hasTokenAndExpiry = Boolean(storedToken && derivedExpFromToken);
     const hasRefresh = Boolean(storedRefresh);
     const canRestoreSession =
       hasTokenAndExpiry && (hasRefresh || allowRefreshlessSession);
 
     if (canRestoreSession) {
-      token.value = storedToken!;
-      refreshToken.value = hasRefresh ? storedRefresh : null;
-      expiresAt.value = Number(storedExpires);
+      setTokenState(
+        storedToken!,
+        hasRefresh ? storedRefresh : null,
+        Number(derivedExpFromToken),
+        "syncFromStorage.restoreSession"
+      );
       isAuthenticated.value = !isTokenExpired();
       return;
     }
@@ -295,13 +435,31 @@ export const useAuth = () => {
     // 没有任何会话数据（首次访问/手动清除），无需提示“会话失效”。
     const hasAnySessionData = Boolean(storedToken || storedRefresh || storedExpires);
     if (!hasAnySessionData) {
-      clearAuth();
+      if (RUNTIME_TOKEN_CACHE) {
+        const payload = decodeJwtPayload(RUNTIME_TOKEN_CACHE);
+        const exp = Number(payload?.exp || 0);
+        const runtimeExpires = exp > 0 ? exp * 1000 : null;
+        setTokenState(
+          RUNTIME_TOKEN_CACHE,
+          RUNTIME_REFRESH_CACHE,
+          runtimeExpires,
+          "syncFromStorage.restoreFromRuntimeCache"
+        );
+        ensureStorageConsistency("syncFromStorage.restoreFromRuntimeCache");
+        isAuthenticated.value = !isTokenExpired();
+        return;
+      }
+      setTokenState(null, null, null, "syncFromStorage.noSessionData");
+      isAuthenticated.value = false;
+      user.value = null;
       hasAuthenticated.value = false;
       return;
     }
 
     if (delegatedMode && !hasAuthenticated.value) {
-      clearAuth();
+      setTokenState(null, null, null, "syncFromStorage.delegatedNoAuthHistory");
+      isAuthenticated.value = false;
+      user.value = null;
       return;
     }
     failClosed();
@@ -309,20 +467,29 @@ export const useAuth = () => {
 
   const ensureFreshToken = async () => {
     if (!process.client) return token.value;
-    if (!token.value || !refreshToken.value) {
+    ensureStorageConsistency("ensureFreshToken.begin");
+    // 仅在缺少 access token 时才从存储恢复，避免被 refresh token 抖动误伤。
+    if (!token.value) {
       syncFromStorage();
     }
     if (!token.value) {
-      token.value = getStoredToken();
+      setTokenState(getStoredToken(), refreshToken.value, expiresAt.value, "ensureFreshToken.restore");
     }
     if (!refreshToken.value) {
+      const restoredRefresh = getStoredRefreshToken();
+      if (restoredRefresh) {
+        setTokenState(token.value, restoredRefresh, expiresAt.value, "ensureFreshToken.restoreRefresh");
+      }
       return token.value;
     }
     if (!isTokenExpired()) {
       if (!token.value) {
-        token.value = getStoredToken();
+        setTokenState(getStoredToken(), refreshToken.value, expiresAt.value, "ensureFreshToken.restoreWhenValid");
       }
       return token.value;
+    }
+    if (token.value && !refreshToken.value) {
+      return null;
     }
     try {
       const resp = await refresh({ refreshToken: refreshToken.value });
@@ -345,6 +512,7 @@ export const useAuth = () => {
   const initAuth = () => {
     if (!process.client) return;
     syncFromStorage();
+    ensureStorageConsistency("initAuth.afterSync");
     const handler = (event: StorageEvent) => {
       // `storage` event may fire with `key === null` (e.g. clear()) or when
       // simulated in tests; in that case we still want to reconcile auth state.
@@ -372,7 +540,7 @@ export const useAuth = () => {
     } catch (error) {
       console.error("logout API failed", error);
     } finally {
-      clearAuth();
+      clearAuth("logout", true);
       delegatedAuthError.value = "";
       lastError.value = "";
       hasAuthenticated.value = false;
@@ -421,7 +589,7 @@ export const useAuth = () => {
   };
 
   const failClosed = (message?: string) => {
-    clearAuth();
+    clearAuth("system", false);
     const fallbackMessage =
       message ||
       (delegatedMode

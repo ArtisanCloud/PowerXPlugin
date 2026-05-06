@@ -42,14 +42,19 @@ export function getAuthToken(): string | undefined {
     try {
       const localStorageCandidates = [
         "access_token",
+        "__px_access_token",
         "token",
-        "px_token",
-        "auth_token",
-        "auth-token",
       ];
       for (const key of localStorageCandidates) {
         const storedToken = window.localStorage?.getItem(key);
         if (storedToken) {
+          if ((window as any).__PX_AUTH_DEBUG__) {
+            console.info("[api/_base] getAuthToken from localStorage", {
+              key,
+              prefix: String(storedToken).slice(0, 24),
+              insidePowerX,
+            });
+          }
           return storedToken;
         }
       }
@@ -58,15 +63,27 @@ export function getAuthToken(): string | undefined {
     }
   }
 
-  // delegated / bridge 场景下从 cookie 提取 JWT
-  if (insidePowerX && typeof document !== "undefined") {
-    const cookieCandidates = ["px_ctx_jwt", "token", "px_token", "auth_token", "auth-token"];
+  // cookie 回退：
+  // - insidePowerX: 允许宿主上下文 cookie
+  // - standalone: 仅使用本地 token cookie（由 useAuth.setAuth 写入）
+  if (typeof document !== "undefined") {
+    const cookieCandidates = insidePowerX
+      ? ["px_ctx_jwt", "token"]
+      : ["token"];
     for (const name of cookieCandidates) {
       const match = document.cookie.match(
         new RegExp(`(?:^|;\\s*)${name}=([^;]+)`, "i")
       );
       if (match) {
-        return decodeURIComponent(match[1]);
+        const token = decodeURIComponent(match[1]);
+        if (typeof window !== "undefined" && (window as any).__PX_AUTH_DEBUG__) {
+          console.info("[api/_base] getAuthToken from cookie", {
+            key: name,
+            prefix: String(token).slice(0, 24),
+            insidePowerX,
+          });
+        }
+        return token;
       }
     }
   }

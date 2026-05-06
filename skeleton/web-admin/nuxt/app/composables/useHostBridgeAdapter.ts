@@ -136,7 +136,7 @@ export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
 
     const authPayload: LoginResponse = {
       access_token: accessToken,
-      refresh_token: refreshToken || "",
+      refresh_token: refreshToken || undefined as any,
       token_type: tokenType,
       expires_in: expiresIn,
       scope: payload.scope || "powerx",

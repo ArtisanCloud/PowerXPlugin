@@ -314,7 +314,9 @@ func (r *Router) buildJWT() middleware.JWTAuthConfig {
 	cfg := middleware.JWTAuthConfig{
 		Issuer:             issuer,
 		AcceptAudiences:    audiences,
-		HMACSecret:         "", // 如需本地校验 HS256，可在 config.Context.HMACSecret 配置
+		// HMAC secret is sourced from cfg.Context.HMACSecret.
+		// In local mode, cmd/plugin bootstrap ensures this value is prepared via EnsureLocalIAMSecret.
+		HMACSecret:         "",
 		ClockSkewSeconds:   60,
 		Optional:           optional,
 		AllowSignedContext: false, // 本地通常不走签名上下文；如要测试，置 true 并填 ContextHMACSecret

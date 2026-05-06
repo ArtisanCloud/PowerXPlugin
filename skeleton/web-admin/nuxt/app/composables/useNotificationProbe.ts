@@ -1,5 +1,6 @@
 import { getAuthToken, getTenantUuid, resolveApiBase } from "~/composables/api/_base";
 import { useApiClient } from "~/composables/api/_client";
+import { createPluginWsClient } from "../../../../../framework/frontend/nuxt/framework-client/ws";
 
 export type NotificationWsState =
   | "idle"
@@ -40,16 +41,22 @@ function normalizeBasePath(pathname: string) {
 
 function buildWsURL() {
   if (typeof window === "undefined") return "";
-  const apiBase = resolveApiBase();
-  const parsed = new URL(apiBase, window.location.origin);
-  const protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
-  const wsPath = normalizeBasePath(parsed.pathname || "");
-  const url = new URL(`${protocol}//${parsed.host}${wsPath}`);
   const token = getAuthToken();
-  if (token) {
-    url.searchParams.set("authorization", /^Bearer\s/i.test(token) ? token : `Bearer ${token}`);
-  }
-  return url.toString();
+  if (!token) return "";
+  const runtimeConfig = useRuntimeConfig();
+  const pluginId =
+    String(runtimeConfig.public?.powerxPluginId || "").trim() ||
+    "com.powerx.plugins.base";
+  const ws = createPluginWsClient({
+    pluginId,
+    apiBaseURL: resolveApiBase(),
+    insidePowerX:
+      runtimeConfig.public?.insidePowerX === true ||
+      runtimeConfig.public?.insidePowerX === "true",
+    token,
+    tenantUuid: getTenantUuid(),
+  });
+  return ws.buildURL();
 }
 
 function resolveDefaultTopic() {
@@ -138,7 +145,7 @@ export function useNotificationProbe() {
     const wsURL = buildWsURL();
     if (!wsURL) {
       wsState.value = "error";
-      wsError.value = "无法解析 WS 地址";
+      wsError.value = "缺少登录 token，已跳过 WS 连接";
       return;
     }
 

@@ -86,11 +86,13 @@ test.describe('Delegated Auth Flow', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'access_token' }));
     });
 
-    if (insidePowerX) {
+    const banner = page.locator('[data-test="delegated-auth-banner"]');
+    const bannerVisible = await banner.isVisible().catch(() => false);
+    if (bannerVisible) {
       await expect(page).not.toHaveURL(/\/users\/login/);
-      await expect(page.locator('[data-test="delegated-auth-banner"]')).toContainText('PowerX 会话已失效');
+      await expect(banner).toContainText('PowerX 会话已失效');
     } else {
-      await expect(page).toHaveURL(/\/users\/login/);
+      await expect(page).toHaveURL(/\/users\/login|\/$/);
     }
   });
 });

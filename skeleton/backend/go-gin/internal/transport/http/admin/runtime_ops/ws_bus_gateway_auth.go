@@ -14,10 +14,13 @@ import (
 )
 
 // resolveGatewayBearerToken 统一 ws-bus 出站 token 选择规则：
-// - Delegated/宿主模式：透传入站 Bearer（与宿主请求链路保持一致）
-// - Local/Standalone 模式：不透传，交由 HostClient 使用 PX_TOOL_TOKEN
+// - Proxy/宿主模式：不透传入站 Bearer，统一交由 HostClient 使用 PX_PLUGIN_TOOL_TOKEN / API Key
+// - Local/Standalone 模式：默认不透传；仅在 delegated 且非 proxy 时透传入站 Bearer
 func resolveGatewayBearerToken(c *gin.Context, deps *app.Deps) string {
 	if c == nil || deps == nil {
+		return ""
+	}
+	if os.Getenv("POWERX_PROXY") == "1" {
 		return ""
 	}
 	if deps.Config != nil && deps.Config.Gateway != nil {

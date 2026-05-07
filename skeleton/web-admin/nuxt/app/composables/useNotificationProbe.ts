@@ -19,6 +19,17 @@ export interface NotificationProbeEvent {
   receivedAt: string;
 }
 
+export interface NotificationWsDiag {
+  subSent: boolean;
+  ackOK: boolean;
+  eventOK: boolean;
+  welcomeOK: boolean;
+  connectedOK: boolean;
+  lastAckReqID: string;
+  lastEventTopic: string;
+  lastEventTraceID: string;
+}
+
 const MAX_EVENTS = 50;
 const RECONNECT_DELAY_MS = 1200;
 
@@ -26,18 +37,6 @@ let wsConn: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let closedByClient = false;
 const subscribedTopics = new Set<string>();
-
-function normalizeBasePath(pathname: string) {
-  const clean = pathname.replace(/\/+$/, "");
-  if (!clean || clean === "/") return "/api/ws";
-  if (clean.endsWith("/api/v1")) {
-    return clean.replace(/\/api\/v1$/, "/api/ws");
-  }
-  if (clean.endsWith("/api")) {
-    return `${clean}/ws`;
-  }
-  return "/api/ws";
-}
 
 function buildWsURL() {
   if (typeof window === "undefined") return "";
@@ -47,9 +46,13 @@ function buildWsURL() {
   const pluginId =
     String(runtimeConfig.public?.powerxPluginId || "").trim() ||
     "com.powerx.plugins.base";
+  const wsBaseURL = String(runtimeConfig.public?.pxWsBaseUrl || "").trim();
+  const wsPath = String(runtimeConfig.public?.wsUrl || "/api/ws").trim();
   const ws = createPluginWsClient({
     pluginId,
     apiBaseURL: resolveApiBase(),
+    wsBaseURL,
+    wsPath,
     insidePowerX:
       runtimeConfig.public?.insidePowerX === true ||
       runtimeConfig.public?.insidePowerX === "true",
@@ -60,9 +63,7 @@ function buildWsURL() {
 }
 
 function resolveDefaultTopic() {
-  const tenant = (getTenantUuid() || "").trim();
-  if (!tenant) return "";
-  return `plugin.notify.tenant.${tenant}`;
+  return "_topic.system.notification";
 }
 
 function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent {
@@ -88,6 +89,27 @@ export function useNotificationProbe() {
   const lastEventTopic = useState<string>("notifications.lastEventTopic", () => "");
   const unreadCount = useState<number>("notifications.unreadCount", () => 0);
   const events = useState<NotificationProbeEvent[]>("notifications.events", () => []);
+  const wsDiag = useState<NotificationWsDiag>("notifications.ws.diag", () => ({
+    subSent: false,
+    ackOK: false,
+    eventOK: false,
+    welcomeOK: false,
+    connectedOK: false,
+    lastAckReqID: "",
+    lastEventTopic: "",
+    lastEventTraceID: "",
+  }));
+
+  const resetDiag = () => {
+    wsDiag.value.subSent = false;
+    wsDiag.value.ackOK = false;
+    wsDiag.value.eventOK = false;
+    wsDiag.value.welcomeOK = false;
+    wsDiag.value.connectedOK = false;
+    wsDiag.value.lastAckReqID = "";
+    wsDiag.value.lastEventTopic = "";
+    wsDiag.value.lastEventTraceID = "";
+  };
 
   const wsStateLabel = computed(() => {
     switch (wsState.value) {
@@ -124,6 +146,11 @@ export function useNotificationProbe() {
     unreadCount.value += 1;
     lastEventAt.value = event.receivedAt;
     lastEventTopic.value = event.topic;
+    wsDiag.value.eventOK = true;
+    wsDiag.value.lastEventTopic = event.topic;
+    wsDiag.value.lastEventTraceID = String(
+      event?.payload?.trace_id || event?.payload?.traceID || ""
+    );
   };
 
   const subscribeTopic = (topic: string) => {
@@ -132,6 +159,7 @@ export function useNotificationProbe() {
     if (subscribedTopics.has(clean)) return;
     subscribedTopics.add(clean);
     if (wsConn && wsConn.readyState === WebSocket.OPEN) {
+      wsDiag.value.subSent = true;
       wsConn.send(JSON.stringify({ type: "subscribe", topics: [clean] }));
     }
   };
@@ -152,6 +180,7 @@ export function useNotificationProbe() {
     closedByClient = false;
     wsState.value = wsState.value === "idle" ? "connecting" : "reconnecting";
     wsError.value = "";
+    resetDiag();
 
     const socket = new WebSocket(wsURL);
     wsConn = socket;
@@ -159,11 +188,13 @@ export function useNotificationProbe() {
     socket.onopen = () => {
       wsState.value = "connected";
       wsError.value = "";
+      wsDiag.value.connectedOK = true;
       const defaultTopic = resolveDefaultTopic();
       if (defaultTopic) {
         subscribedTopics.add(defaultTopic);
       }
       if (subscribedTopics.size > 0) {
+        wsDiag.value.subSent = true;
         socket.send(
           JSON.stringify({
             type: "subscribe",
@@ -181,6 +212,17 @@ export function useNotificationProbe() {
         return;
       }
       const msgType = String(data?.type || "").toLowerCase();
+      if (msgType === "welcome") {
+        wsDiag.value.welcomeOK = true;
+        return;
+      }
+      if (msgType === "ack") {
+        wsDiag.value.ackOK = true;
+        wsDiag.value.lastAckReqID = String(
+          data?.req_id || data?.request_id || data?.payload?.req_id || ""
+        );
+        return;
+      }
       if (msgType === "event") {
         const topic = String(data?.topic || "");
         const parsed = parseIncomingEvent(topic, data?.payload || {});
@@ -201,9 +243,11 @@ export function useNotificationProbe() {
       wsConn = null;
       if (closedByClient) {
         wsState.value = "idle";
+        resetDiag();
         return;
       }
       wsState.value = "reconnecting";
+      resetDiag();
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }
@@ -224,6 +268,7 @@ export function useNotificationProbe() {
       wsConn = null;
     }
     wsState.value = "idle";
+    resetDiag();
   };
 
   const markAllRead = () => {
@@ -235,6 +280,9 @@ export function useNotificationProbe() {
     unreadCount.value = 0;
     lastEventAt.value = "";
     lastEventTopic.value = "";
+    wsDiag.value.eventOK = false;
+    wsDiag.value.lastEventTopic = "";
+    wsDiag.value.lastEventTraceID = "";
   };
 
   const sendTestNotification = async (message?: string) => {
@@ -255,6 +303,7 @@ export function useNotificationProbe() {
     wsStateLabel,
     wsStateColor,
     wsError: readonly(wsError),
+    wsDiag: readonly(wsDiag),
     lastEventAt: readonly(lastEventAt),
     lastEventTopic: readonly(lastEventTopic),
     unreadCount: readonly(unreadCount),

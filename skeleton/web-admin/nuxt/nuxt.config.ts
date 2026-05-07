@@ -4,21 +4,6 @@ import fs from 'node:fs'
 import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
-// Print key env vars to aid debugging
-if (!process.env.QUIET_START) {
-  const inspectEnv = [
-    'POWERX_PROXY',
-    'NUXT_PUBLIC_API_BASE',
-    'NUXT_PUBLIC_API_PREFIX',
-    'NUXT_DEV_API_PROXY',
-    'NUXT_DEV_WS_PROXY',
-    'NUXT_PUBLIC_POWERX_CORE_BASE'
-  ]
-  console.info('[web-admin] dev env →')
-  inspectEnv.forEach((key) => {
-    console.info(`  ${key}=${process.env[key] ?? '<unset>'}`)
-  })
-}
 
 const defaultPluginId = 'com.powerx.plugins.base'
 const resolvePluginId = () => {
@@ -77,6 +62,9 @@ const powerxCoreBase =
   process.env.NUXT_PUBLIC_POWERX_CORE_BASE ||
   process.env.POWERX_CORE_ENDPOINT ||
   'http://localhost:8077'
+const pxGatewayBaseURL = process.env.PX_GATEWAY_BASE_URL || ''
+const pxWsBaseURL = process.env.PX_WS_BASE_URL || ''
+const publicWsURL = process.env.NUXT_PUBLIC_WS_URL || '/api/ws'
 const rootDir = fileURLToPath(new URL('./', import.meta.url))
 const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
@@ -114,19 +102,6 @@ if (!INSIDE_POWERX || simulateStandalone) {
   apiOrigins.forEach(registerConnectOrigin)
 }
 
-if (!process.env.QUIET_START) {
-  console.info('[web-admin] resolved config →')
-  console.info(`  insidePowerX=${INSIDE_POWERX}`)
-  console.info(`  iamMode=${IAM_MODE}`)
-  console.info(`  delegatedMode=${DELEGATED_MODE}`)
-  console.info(`  runtime apiBase=${INSIDE_POWERX ? hostApiBase : localApiBase}`)
-  console.info(`  devApiProxyTarget=${devApiProxyTarget}`)
-  console.info(`  devWsProxyTarget=${devWsProxyTarget}`)
-  console.info(`  pluginAdminBase=${pluginAdminBase}`)
-  if (simulateStandalone) {
-    console.info('  simulateStandalone=true (env api base override detected)')
-  }
-}
 
 const rawBridgeDebug = process.env.NUXT_PUBLIC_BRIDGE_DEBUG ?? process.env.BRIDGE_DEBUG
 const BRIDGE_DEBUG = rawBridgeDebug !== undefined
@@ -193,9 +168,6 @@ const buildConnectSources = () => {
 }
 
 const connectSources = buildConnectSources()
-if (!process.env.QUIET_START) {
-  console.info('[web-admin] connect-src allow', connectSources)
-}
 const resolveVersionFromPluginManifest = () => {
   try {
     const manifestPath = resolvePath(rootDir, '..', '..', 'plugin.yaml')
@@ -306,6 +278,9 @@ export default defineNuxtConfig({
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,
       powerxCoreBase,
+      pxGatewayBaseUrl: pxGatewayBaseURL,
+      pxWsBaseUrl: pxWsBaseURL,
+      wsUrl: publicWsURL,
       powerx: {
         apiBase: capabilityApiBase,
         capabilityEndpoint: capabilityInvokeEndpoint

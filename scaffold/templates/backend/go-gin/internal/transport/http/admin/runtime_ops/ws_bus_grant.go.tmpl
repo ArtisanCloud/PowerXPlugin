@@ -3,7 +3,6 @@ package runtime_ops
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
@@ -46,31 +45,27 @@ func WSBusGrantHandler(deps *app.Deps) gin.HandlerFunc {
 			traceID = strings.TrimSpace(c.GetHeader("X-Request-ID"))
 		}
 
-		if os.Getenv("POWERX_PROXY") == "1" && deps.Config != nil && deps.Config.Gateway != nil {
+		hostCfg, useHost := resolveWSBusHostClientConfig(deps)
+		if useHost {
 			outboundBearer := resolveGatewayBearerToken(c, deps)
 			logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
 
-				hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
-					BaseURL:    strings.TrimSpace(deps.Config.Gateway.BaseURL),
-					APIPrefix:  strings.TrimSpace(deps.Config.Gateway.APIPrefix),
-					Token:      strings.TrimSpace(deps.Config.Gateway.ToolToken),
-					TenantUUID: "",
-					UserAgent:  strings.TrimSpace(deps.Config.Gateway.UserAgent),
-					Timeout:    deps.Config.Gateway.Timeout,
-				})
-			if err == nil {
-				result = hostClient.RegisterTopics(context.Background(), topics, fwwsbus.PublishOptions{
-					TenantUUID:  tenantUUID,
-					TraceID:     traceID,
-					BearerToken: outboundBearer,
-				})
-				if !result.OK {
-					contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
-					return
-				}
-				contracts.ResponseSuccess(c, gin.H{"ok": true, "topics": topics})
+			hostClient, err := fwwsbus.NewHostClient(hostCfg)
+			if err != nil {
+				contracts.ResponseError(c, http.StatusBadGateway, contracts.ErrCodeInternalError, "host ws bus client init failed")
 				return
 			}
+			result = hostClient.RegisterTopics(context.Background(), topics, fwwsbus.PublishOptions{
+				TenantUUID:  tenantUUID,
+				TraceID:     traceID,
+				BearerToken: outboundBearer,
+			})
+			if !result.OK {
+				contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
+				return
+			}
+			contracts.ResponseSuccess(c, gin.H{"ok": true, "topics": topics})
+			return
 		}
 
 		// standalone: no-op grant, just return expanded topics

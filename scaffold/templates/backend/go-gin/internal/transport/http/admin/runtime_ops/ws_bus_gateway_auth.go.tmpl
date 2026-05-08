@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"{{ .BackendModulePath }}/internal/logger"
 	"{{ .BackendModulePath }}/internal/middleware"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
@@ -48,12 +49,6 @@ func resolveGatewayBearerToken(c *gin.Context, deps *app.Deps) string {
 // 3) 若请求体 tenant_uuid 与入站租户不一致，返回 mismatch=true；
 // 4) 不再使用 gateway 配置或工具 token 推导 tenant，避免插件侧越权注入。
 func resolveGatewayTenantUUID(c *gin.Context, deps *app.Deps, requested string) (tenantUUID string, mismatch bool) {
-	// proxy 场景下 tenant 由宿主依据凭证（Bearer/API Key）解析，
-	// 插件侧不做 tenant 推导/校验，也不强制透传 tenant_uuid。
-	if os.Getenv("POWERX_PROXY") == "1" {
-		return "", false
-	}
-
 	resolvedTenantUUID, tenantMismatch := admincommon.ResolveTenantUUIDStrict(c, requested)
 	if tenantMismatch {
 		return "", true
@@ -135,4 +130,35 @@ func tokenPrefix(token string) string {
 		return token
 	}
 	return token[:16] + "..."
+}
+
+// resolveWSBusHostClientConfig 统一 WSBus HostClient 模式与凭证决策：
+// 1) host(POWERX_PROXY=1 + IAM delegated): 仅 bearer(PX_PLUGIN_TOOL_TOKEN)；
+// 2) local+proxy(POWERX_PROXY=1 + IAM local): 按 PX_GATEWAY_AUTH_SCHEME 选择 bearer/apikey；
+// 3) local(POWERX_PROXY!=1): 不走 host client。
+func resolveWSBusHostClientConfig(deps *app.Deps) (cfg fwwsbus.HostClientConfig, useHost bool) {
+	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil || strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
+		return fwwsbus.HostClientConfig{}, false
+	}
+	gw := deps.Config.Gateway
+	cfg = fwwsbus.HostClientConfig{
+		BaseURL:    strings.TrimSpace(gw.BaseURL),
+		APIPrefix:  strings.TrimSpace(gw.APIPrefix),
+		TenantUUID: "",
+		UserAgent:  strings.TrimSpace(gw.UserAgent),
+		Timeout:    gw.Timeout,
+	}
+
+	if deps.IAMMode == iamservice.IAMModeDelegated {
+		// 真宿主模式：强制 bearer + tool token
+		cfg.AuthScheme = "bearer"
+		cfg.Token = strings.TrimSpace(gw.ToolToken)
+		return cfg, true
+	}
+
+	// local+proxy 模式：按网关配置分流
+	cfg.AuthScheme = strings.ToLower(strings.TrimSpace(gw.AuthScheme))
+	cfg.Token = strings.TrimSpace(gw.ToolToken)
+	cfg.APIKey = strings.TrimSpace(gw.APIKey)
+	return cfg, true
 }

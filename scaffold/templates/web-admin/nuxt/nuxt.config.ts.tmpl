@@ -60,11 +60,10 @@ const registerConnectOrigin = (candidate?: string | null) => {
 }
 const powerxCoreBase =
   process.env.NUXT_PUBLIC_POWERX_CORE_BASE ||
-  process.env.POWERX_CORE_ENDPOINT ||
   'http://localhost:8077'
 const pxGatewayBaseURL = process.env.PX_GATEWAY_BASE_URL || ''
-const pxWsBaseURL = process.env.PX_WS_BASE_URL || ''
-const publicWsURL = process.env.NUXT_PUBLIC_WS_URL || '/api/ws'
+const wsOrigin = process.env.NUXT_PUBLIC_WS_ORIGIN || ''
+const wsPath = process.env.NUXT_PUBLIC_WS_PATH || '/api/ws'
 const rootDir = fileURLToPath(new URL('./', import.meta.url))
 const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
@@ -274,13 +273,15 @@ export default defineNuxtConfig({
       powerxPluginVersion: pluginVersion,
       insidePowerX: INSIDE_POWERX,
       iamMode: IAM_MODE,
+      powerxProxy: INSIDE_POWERX ? '1' : '0',
+      gatewayAuthScheme: String(process.env.PX_GATEWAY_AUTH_SCHEME || '').trim().toLowerCase(),
       delegatedMode: DELEGATED_MODE,
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,
       powerxCoreBase,
       pxGatewayBaseUrl: pxGatewayBaseURL,
-      pxWsBaseUrl: pxWsBaseURL,
-      wsUrl: publicWsURL,
+      wsOrigin,
+      wsPath,
       powerx: {
         apiBase: capabilityApiBase,
         capabilityEndpoint: capabilityInvokeEndpoint

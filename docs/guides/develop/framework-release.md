@@ -32,6 +32,20 @@
    说明：
    - `npm whoami`：确认当前登录账号（防止发到错误账号）。
    - `npm dist-tag ls <pkg>`：查看远端 `latest/alpha` 指向版本，避免误覆盖。
+5. npm 发布安全策略检查（避免 `E403`）：
+   - 若组织/package 开启“发布必须 2FA”，发布前需先完成 npm 账号 2FA 绑定。
+   - 常见报错：
+     - `403 Forbidden ... Two-factor authentication or granular access token with bypass 2fa enabled is required to publish packages.`
+   - 排查命令（任意目录）：
+     ```bash
+     npm whoami
+     npm access ls-packages <your-npm-username>
+     npm profile get "two-factor auth"
+     ```
+   - 说明：
+     - 若是 **Security key / Passkey** 模式：发布时通常不需要 `--otp`，按浏览器/系统提示确认即可。
+     - 若是 **Authenticator(TOTP)** 模式：发布时需要 `--otp=<6位验证码>`。
+     - 若使用 CI/自动化 token：需确保 token 具备 publish 权限且允许 `bypass 2fa`（按组织策略）。
 
 ## 2. 发布 Go 模块
 
@@ -78,12 +92,29 @@
    npm version $CLIENT_VERSION --no-git-tag-version
    npm publish --access public --tag alpha
    ```
+   若账号为 TOTP 模式，改为：
+   ```bash
+   npm publish --access public --tag alpha --otp=<6位验证码>
+   ```
 4. 验证 dist-tag：
    ```bash
    # 在任意目录执行即可
    npm dist-tag ls @artisan-cloud/plugin-framework-admin
    npm dist-tag ls @artisan-cloud/plugin-framework-client
    ```
+5. 如需将本次版本作为默认安装版本，手动提升 `latest`（`publish --tag alpha` 不会自动改 `latest`）：
+   ```bash
+   # 示例：把 0.0.3 提升为 latest
+   npm dist-tag add @artisan-cloud/plugin-framework-admin@0.0.3 latest
+   npm dist-tag add @artisan-cloud/plugin-framework-client@0.0.3 latest
+
+   # 再次确认
+   npm dist-tag ls @artisan-cloud/plugin-framework-admin
+   npm dist-tag ls @artisan-cloud/plugin-framework-client
+   ```
+   说明：
+   - `alpha`：预发布/灰度渠道
+   - `latest`：默认安装渠道（`npm i <pkg>` 不带 tag 时使用）
 
 ## 4. 同步仓库引用（必须）
 
@@ -100,6 +131,19 @@
 ```bash
 npm run sync:templates -- --check
 ```
+
+补充（WS/模式相关变更发布时）：
+
+1. 若本次包含 `framework-client/ws.ts` 或 runtime mode helper 变更，必须同步：
+   - `skeleton/web-admin/nuxt/app/utils/runtime-mode.ts`
+   - `scaffold/templates/web-admin/nuxt/app/utils/runtime-mode.ts.tmpl`
+   - `tools/cli/internal/templates/data/web-admin/nuxt/app/utils/runtime-mode.ts.tmpl`
+2. 若本次包含 ws-bus host 鉴权/地址策略变更，必须同步：
+   - `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_gateway_auth.go`
+   - 及对应 `scaffold/templates/...`、`tools/cli/internal/templates/data/...` 模板
+3. 发布前至少验证一次联调按钮：
+   - `POST /api/v1/admin/runtime/ws-bus/test-flow`
+   - 页面应可见 `flow_mode` 与 `host_*` 字段，且 WS 至少有请求发出（不得再出现 `hostBaseURL is required ...` 级别前置报错）
 
 ## 5. 验证脚手架输出
 

@@ -1,5 +1,6 @@
 import { getAuthToken, getTenantUuid, resolveApiBase } from "~/composables/api/_base";
 import { useApiClient } from "~/composables/api/_client";
+import { resolveFrontendRuntimeMode } from "~/utils/runtime-mode";
 import { createPluginWsClient } from "../../../../../framework/frontend/nuxt/framework-client/ws";
 
 export type NotificationWsState =
@@ -43,19 +44,25 @@ function buildWsURL() {
   const token = getAuthToken();
   if (!token) return "";
   const runtimeConfig = useRuntimeConfig();
+  const runtimeMode = resolveFrontendRuntimeMode();
   const pluginId =
     String(runtimeConfig.public?.powerxPluginId || "").trim() ||
     "com.powerx.plugins.base";
-  const wsBaseURL = String(runtimeConfig.public?.pxWsBaseUrl || "").trim();
-  const wsPath = String(runtimeConfig.public?.wsUrl || "/api/ws").trim();
+  const wsBaseURL = String(
+    runtimeConfig.public?.pxWsBaseUrl ||
+      runtimeConfig.public?.wsOrigin ||
+      runtimeConfig.public?.powerxCoreBase ||
+      (typeof window !== "undefined" ? window.location.origin : "")
+  ).trim();
+  const wsPath = String(
+    runtimeConfig.public?.wsUrl || runtimeConfig.public?.wsPath || "/api/ws"
+  ).trim();
   const ws = createPluginWsClient({
     pluginId,
     apiBaseURL: resolveApiBase(),
     wsBaseURL,
     wsPath,
-    insidePowerX:
-      runtimeConfig.public?.insidePowerX === true ||
-      runtimeConfig.public?.insidePowerX === "true",
+    insidePowerX: runtimeMode.insidePowerX,
     token,
     tenantUuid: getTenantUuid(),
   });

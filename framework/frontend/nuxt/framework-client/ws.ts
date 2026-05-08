@@ -2,6 +2,7 @@ export interface PluginWsOptions {
   pluginId: string;
   apiBaseURL?: string;
   wsBaseURL?: string;
+  hostBaseURL?: string;
   wsPath?: string;
   insidePowerX?: boolean;
   token?: string;
@@ -24,6 +25,7 @@ function normalizeWsPath(pathname: string) {
 export function createPluginWsClient(options: PluginWsOptions): PluginWsClient {
   const base = (options.apiBaseURL || `/_p/${options.pluginId}/api/v1`).trim();
   const wsBase = String(options.wsBaseURL || "").trim();
+  const hostBase = String(options.hostBaseURL || "").trim();
   const wsPathRaw = String(options.wsPath || "/api/ws").trim() || "/api/ws";
 
   const buildURL = () => {
@@ -34,9 +36,11 @@ export function createPluginWsClient(options: PluginWsOptions): PluginWsClient {
       const wsProtocol = parsedBase.protocol === "https:" ? "wss:" : parsedBase.protocol;
       url = new URL(`${wsProtocol}//${parsedBase.host}${wsPathRaw}`);
     } else if (options.insidePowerX) {
-      // Embedded mode must target host ws gateway instead of plugin /_p/... path.
-      const parsedHost = new URL(window.location.origin);
-      const wsProtocol = parsedHost.protocol === "https:" ? "wss:" : "ws:";
+      // Embedded mode prefers explicit hostBaseURL, but falls back to current origin
+      // to avoid hard-fail when page-level runtime options are missing.
+      const resolvedHostBase = hostBase || window.location.origin;
+      const parsedHost = new URL(resolvedHostBase, window.location.origin);
+      const wsProtocol = parsedHost.protocol === "https:" ? "wss:" : parsedHost.protocol;
       url = new URL(`${wsProtocol}//${parsedHost.host}${wsPathRaw}`);
     } else {
       const parsed = new URL(base, window.location.origin);

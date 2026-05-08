@@ -16,33 +16,36 @@ import (
 )
 
 const (
-	defaultAPIPrefix = "/api/v1"
+	defaultAPIPrefix    = "/api/v1"
 	defaultPublishPath  = "/admin/runtime/ws-bus/publish"
 	defaultRegisterPath = "/admin/runtime/ws-bus/grant"
 )
 
 type HostClientConfig struct {
-	BaseURL    string
-	APIPrefix  string
-	Token      string
-	TenantUUID string
-	UserAgent  string
-	PublishPath string
+	BaseURL      string
+	APIPrefix    string
+	AuthScheme   string
+	Token        string
+	APIKey       string
+	TenantUUID   string
+	UserAgent    string
+	PublishPath  string
 	RegisterPath string
-	Timeout    time.Duration
-	HTTPClient *http.Client
+	Timeout      time.Duration
+	HTTPClient   *http.Client
 }
 
 type HostClient struct {
-	baseURL    string
-	apiPrefix  string
-	credential string
-	tenantUUID string
-	userAgent  string
-	publishPath string
+	baseURL      string
+	apiPrefix    string
+	authScheme   string
+	credential   string
+	tenantUUID   string
+	userAgent    string
+	publishPath  string
 	registerPath string
-	timeout    time.Duration
-	httpClient *http.Client
+	timeout      time.Duration
+	httpClient   *http.Client
 }
 
 type hostPublishEnvelope struct {
@@ -66,7 +69,7 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
 	}
-	credential, err := resolveToken(cfg.Token)
+	authScheme, credential, err := resolveCredential(cfg.AuthScheme, cfg.Token, cfg.APIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -79,15 +82,16 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 		client = &http.Client{Timeout: timeout}
 	}
 	return &HostClient{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		apiPrefix:  normalizeAPIPrefix(cfg.APIPrefix),
-		credential: credential,
-		tenantUUID: strings.TrimSpace(cfg.TenantUUID),
-		userAgent:  strings.TrimSpace(cfg.UserAgent),
-		publishPath: normalizeWSBusPath(cfg.PublishPath, defaultPublishPath),
+		baseURL:      strings.TrimRight(baseURL, "/"),
+		apiPrefix:    normalizeAPIPrefix(cfg.APIPrefix),
+		authScheme:   authScheme,
+		credential:   credential,
+		tenantUUID:   strings.TrimSpace(cfg.TenantUUID),
+		userAgent:    strings.TrimSpace(cfg.UserAgent),
+		publishPath:  normalizeWSBusPath(cfg.PublishPath, defaultPublishPath),
 		registerPath: normalizeWSBusPath(cfg.RegisterPath, defaultRegisterPath),
-		timeout:    timeout,
-		httpClient: client,
+		timeout:      timeout,
+		httpClient:   client,
 	}, nil
 }
 
@@ -470,6 +474,9 @@ func extractHostErrorMessage(payload []byte) string {
 }
 
 func (c *HostClient) resolveAuthHeader(opts PublishOptions) string {
+	if strings.EqualFold(strings.TrimSpace(c.authScheme), "apikey") {
+		return fmt.Sprintf("ApiKey %s", c.credential)
+	}
 	return fmt.Sprintf("Bearer %s", c.credential)
 }
 
@@ -488,12 +495,31 @@ func authHeaderKind(value string) string {
 	}
 }
 
-func resolveToken(token string) (string, error) {
-	bearer := strings.TrimSpace(token)
-	if bearer == "" {
-		return "", errors.New("wsbus host: token is required (PX_PLUGIN_TOOL_TOKEN)")
+func resolveCredential(authScheme, token, apiKey string) (string, string, error) {
+	scheme := strings.ToLower(strings.TrimSpace(authScheme))
+	if scheme == "" {
+		if strings.TrimSpace(apiKey) != "" {
+			scheme = "apikey"
+		} else {
+			scheme = "bearer"
+		}
 	}
-	return bearer, nil
+	switch scheme {
+	case "apikey", "api_key", "api-key":
+		key := strings.TrimSpace(apiKey)
+		if key == "" {
+			return "", "", errors.New("wsbus host: api key is required (PX_GATEWAY_API_KEY)")
+		}
+		return "apikey", key, nil
+	case "bearer":
+		bearer := strings.TrimSpace(token)
+		if bearer == "" {
+			return "", "", errors.New("wsbus host: token is required (PX_PLUGIN_TOOL_TOKEN)")
+		}
+		return "bearer", bearer, nil
+	default:
+		return "", "", fmt.Errorf("wsbus host: unsupported auth scheme: %s", scheme)
+	}
 }
 
 func normalizeWSBusPath(path string, fallback string) string {

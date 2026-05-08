@@ -44,7 +44,7 @@ function buildWsURL(scope: string) {
   const runtimeMode = resolveFrontendRuntimeMode();
   const pluginId =
     String(runtimeConfig.public?.powerxPluginId || "").trim() ||
-    "com.powerx.plugins.base";
+    "{{ .PluginID }}";
   const isGatewayScope = scope === "gateway";
   const wsBaseURL = String(
     isGatewayScope

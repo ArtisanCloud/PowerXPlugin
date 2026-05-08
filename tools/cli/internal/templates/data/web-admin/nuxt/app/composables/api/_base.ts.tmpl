@@ -1,4 +1,7 @@
 // 解析 API 基址 + 获取 Token/Tenant 的小工具
+import { createFrameworkLogger } from "../../../../../../framework/frontend/nuxt/framework-client/logger";
+
+const logger = createFrameworkLogger("api.base");
 
 export function resolveApiBase(pathname?: string): string {
   const runtimePublic =
@@ -49,7 +52,7 @@ export function getAuthToken(): string | undefined {
         const storedToken = window.localStorage?.getItem(key);
         if (storedToken) {
           if ((window as any).__PX_AUTH_DEBUG__) {
-            console.info("[api/_base] getAuthToken from localStorage", {
+            logger.info("getAuthToken from localStorage", {
               key,
               prefix: String(storedToken).slice(0, 24),
               insidePowerX,
@@ -59,7 +62,7 @@ export function getAuthToken(): string | undefined {
         }
       }
     } catch (error) {
-      console.warn("[PowerXPlugin] failed to read localStorage auth token", error);
+      logger.warn("failed to read localStorage auth token", { error: String(error) });
     }
   }
 
@@ -77,7 +80,7 @@ export function getAuthToken(): string | undefined {
       if (match) {
         const token = decodeURIComponent(match[1]);
         if (typeof window !== "undefined" && (window as any).__PX_AUTH_DEBUG__) {
-          console.info("[api/_base] getAuthToken from cookie", {
+          logger.info("getAuthToken from cookie", {
             key: name,
             prefix: String(token).slice(0, 24),
             insidePowerX,

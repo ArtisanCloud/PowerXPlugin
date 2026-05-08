@@ -40,12 +40,14 @@ import { useTheme } from "~/composables/useTheme";
 import { PLUGIN_ID, isPluginAdminPath } from "~/utils/powerx-bridge";
 import { useAuth } from "~/composables/useAuth";
 import DelegatedAuthBanner from "~/components/DelegatedAuthBanner.vue";
+import { createFrameworkLogger } from "../../../../../framework/frontend/nuxt/framework-client/logger";
 
 // 获取运行时配置
 const runtimeConfig = useRuntimeConfig();
 const route = useRoute();
 const theme = useTheme();
 const auth = useAuth();
+const logger = createFrameworkLogger("layout.default");
 
 const disableShell = computed(() => {
   if (route.meta?.fullBleed === true) {
@@ -115,7 +117,7 @@ const requestHostToken = () => {
       "*"
     );
   } catch (error) {
-    console.warn("[Bridge][Plugin] failed to request auth token", error);
+    logger.warn("failed to request auth token", { error: String(error) });
   }
 };
 
@@ -155,10 +157,7 @@ const mountBridgeIfNeeded = () => {
   const adapterKey = `${pluginId}::${instanceId}`;
 
   if (registry[adapterKey]) {
-    console.info("[Bridge][Plugin] adapter already mounted, reuse existing instance.", {
-      pluginId,
-      instanceId,
-    });
+    logger.info("adapter already mounted, reuse existing instance", { pluginId, instanceId });
     return;
   }
 
@@ -168,11 +167,11 @@ const mountBridgeIfNeeded = () => {
   });
 
   bridge.start?.();
-  console.info("[Bridge][Plugin] adapter mounted.");
+  logger.info("adapter mounted", { pluginId, instanceId });
   registry[adapterKey] = { bridge };
   win.__PX_ADAPTER_BOUND__ = true;
   win.__PX_ADAPTER__ = registry[adapterKey];
-  console.info("[embedded] Host bridge adapter mounted.", { pluginId, instanceId });
+  logger.info("host bridge adapter mounted", { pluginId, instanceId });
 };
 
 if (import.meta.client) {

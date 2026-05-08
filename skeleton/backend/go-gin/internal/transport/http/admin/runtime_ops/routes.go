@@ -27,9 +27,10 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	router.GET("/metrics", MetricsHandler)
 
 	router.POST("/event-bridge/emit", EventBridgeEmitHandler(deps))
-	router.POST("/internal/event-fabric/topics", EventFabricCreateTopicHandler(deps))
-	router.POST("/internal/ws-bus/publish", WSBusPublishHandler(deps))
-	router.POST("/internal/ws-bus/grant", WSBusGrantHandler(deps))
+	router.POST("/event-fabric/topics", EventFabricCreateTopicHandler(deps))
+	router.POST("/ws-bus/publish", WSBusPublishHandler(deps))
+	router.POST("/ws-bus/grant", WSBusGrantHandler(deps))
+	router.POST("/ws-bus/test-flow", WSBusTestFlowHandler(deps))
 
 	schedulerMode := NewSchedulerModeHandler(deps, runtimeService)
 	schedulerRetry := NewSchedulerRetryHandler(deps, runtimeService)

@@ -44,6 +44,26 @@ routes:
   basePath: /api/v1
   permissions:
     - method: POST
+      path: /admin/runtime/ws-bus/test-flow
+      permission:
+        action: create
+        resource: integration
+    - method: POST
+      path: /admin/runtime/ws-bus/grant
+      permission:
+        action: create
+        resource: integration
+    - method: POST
+      path: /admin/runtime/ws-bus/publish
+      permission:
+        action: create
+        resource: integration
+    - method: POST
+      path: /admin/runtime/event-fabric/topics
+      permission:
+        action: create
+        resource: integration
+    - method: POST
       path: /integration/capabilities/invoke
       permission:
         action: create

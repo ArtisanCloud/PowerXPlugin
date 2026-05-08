@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -16,18 +17,18 @@ import (
 
 const (
 	defaultAPIPrefix = "/api/v1"
-	hostPublishPath  = "/internal/ws-bus/publish"
-	hostRegisterPath = "/internal/ws-bus/grant"
+	defaultPublishPath  = "/admin/runtime/ws-bus/publish"
+	defaultRegisterPath = "/admin/runtime/ws-bus/grant"
 )
 
 type HostClientConfig struct {
 	BaseURL    string
 	APIPrefix  string
-	AuthScheme string
 	Token      string
-	APIKey     string
 	TenantUUID string
 	UserAgent  string
+	PublishPath string
+	RegisterPath string
 	Timeout    time.Duration
 	HTTPClient *http.Client
 }
@@ -35,10 +36,11 @@ type HostClientConfig struct {
 type HostClient struct {
 	baseURL    string
 	apiPrefix  string
-	authScheme string
 	credential string
 	tenantUUID string
 	userAgent  string
+	publishPath string
+	registerPath string
 	timeout    time.Duration
 	httpClient *http.Client
 }
@@ -64,7 +66,7 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
 	}
-	authScheme, credential, err := resolveAuth(cfg.AuthScheme, cfg.Token, cfg.APIKey)
+	credential, err := resolveToken(cfg.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -79,10 +81,11 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 	return &HostClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		apiPrefix:  normalizeAPIPrefix(cfg.APIPrefix),
-		authScheme: authScheme,
 		credential: credential,
 		tenantUUID: strings.TrimSpace(cfg.TenantUUID),
 		userAgent:  strings.TrimSpace(cfg.UserAgent),
+		publishPath: normalizeWSBusPath(cfg.PublishPath, defaultPublishPath),
+		registerPath: normalizeWSBusPath(cfg.RegisterPath, defaultRegisterPath),
 		timeout:    timeout,
 		httpClient: client,
 	}, nil
@@ -123,7 +126,7 @@ func (c *HostClient) Publish(ctx context.Context, topic string, payload any, opt
 		requestID = uuid.NewString()
 	}
 
-	return c.publishToEndpoint(ctx, c.buildEndpoint(hostPublishPath), bodyBytes, tenantUUID, requestID, opts, "publish request")
+	return c.publishToEndpoint(ctx, c.buildEndpoint(c.publishPath), bodyBytes, tenantUUID, requestID, opts, "publish request")
 }
 
 func (c *HostClient) RegisterTopics(ctx context.Context, topics []string, opts PublishOptions) PublishResult {
@@ -158,7 +161,7 @@ func (c *HostClient) RegisterTopics(ctx context.Context, topics []string, opts P
 	if requestID == "" {
 		requestID = uuid.NewString()
 	}
-	return c.registerTopicsToEndpoint(ctx, c.buildEndpoint(hostRegisterPath), bodyBytes, tenantUUID, requestID, opts, "grant request")
+	return c.registerTopicsToEndpoint(ctx, c.buildEndpoint(c.registerPath), bodyBytes, tenantUUID, requestID, opts, "grant request")
 }
 
 func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint string, bodyBytes []byte, tenantUUID, requestID string, opts PublishOptions, label string) PublishResult {
@@ -179,33 +182,85 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
 	}
+	slog.Info("wsbus host register start",
+		"endpoint", endpoint,
+		"label", label,
+		"request_id", requestID,
+		"tenant_uuid", tenantUUID,
+		"auth_header_kind", authHeaderKind(req.Header.Get("Authorization")),
+		"payload_size", len(bodyBytes),
+	)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return FailureResult(ErrorCodeRegisterUpstreamFailed, err.Error())
+		slog.Warn("wsbus host register http error",
+			"endpoint", endpoint,
+			"label", label,
+			"request_id", requestID,
+			"tenant_uuid", tenantUUID,
+			"error", err.Error(),
+		)
+		result := FailureResult(ErrorCodeRegisterUpstreamFailed, err.Error())
+		result.OutboundURL = endpoint
+		return result
 	}
 	defer resp.Body.Close()
 
 	payloadBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return FailureResult(ErrorCodeRegisterResponseInvalid, fmt.Sprintf("failed to read %s response", label))
+		slog.Warn("wsbus host register read error",
+			"endpoint", endpoint,
+			"label", label,
+			"request_id", requestID,
+			"tenant_uuid", tenantUUID,
+			"http_status", resp.StatusCode,
+			"error", err.Error(),
+		)
+		result := FailureResult(ErrorCodeRegisterResponseInvalid, fmt.Sprintf("failed to read %s response", label))
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		return result
 	}
+	responseBody := strings.TrimSpace(string(payloadBytes))
+	slog.Info("wsbus host register response",
+		"endpoint", endpoint,
+		"label", label,
+		"request_id", requestID,
+		"tenant_uuid", tenantUUID,
+		"http_status", resp.StatusCode,
+		"response_size", len(responseBody),
+	)
 	if resp.StatusCode >= http.StatusBadRequest {
 		message := fmt.Sprintf("grant rejected with status %d", resp.StatusCode)
 		if detail := extractHostErrorMessage(payloadBytes); detail != "" {
 			message = detail
 		}
-		return FailureResult(ErrorCodeRegisterUpstreamFailed, message)
+		result := FailureResult(ErrorCodeRegisterUpstreamFailed, message)
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 	if len(payloadBytes) == 0 {
-		return SuccessResult()
+		result := SuccessResult()
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		return result
 	}
 	var envelope hostPublishEnvelope
 	if err := json.Unmarshal(payloadBytes, &envelope); err != nil {
-		return FailureResult(ErrorCodeRegisterResponseInvalid, fmt.Sprintf("failed to decode %s response", label))
+		result := FailureResult(ErrorCodeRegisterResponseInvalid, fmt.Sprintf("failed to decode %s response", label))
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 	if isLegacyHostSuccess(payloadBytes) {
-		return SuccessResult()
+		result := SuccessResult()
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 	if !envelope.Success {
 		code := ErrorCodeRegisterUpstreamFailed
@@ -221,12 +276,24 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 		if strings.TrimSpace(message) == "" {
 			message = "grant rejected by host"
 		}
-		return FailureResult(code, message)
+		result := FailureResult(code, message)
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 	if envelope.Data.OK {
-		return SuccessResult()
+		result := SuccessResult()
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
-	return FailureResult(ErrorCodeRegisterUpstreamFailed, "grant rejected by host")
+	result := FailureResult(ErrorCodeRegisterUpstreamFailed, "grant rejected by host")
+	result.OutboundURL = endpoint
+	result.HTTPStatus = resp.StatusCode
+	result.ResponseBody = responseBody
+	return result
 }
 
 func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bodyBytes []byte, tenantUUID, requestID string, opts PublishOptions, label string) PublishResult {
@@ -247,35 +314,91 @@ func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bod
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
 	}
+	slog.Info("wsbus host publish start",
+		"endpoint", endpoint,
+		"label", label,
+		"request_id", requestID,
+		"tenant_uuid", tenantUUID,
+		"trace_id", strings.TrimSpace(opts.TraceID),
+		"auth_header_kind", authHeaderKind(req.Header.Get("Authorization")),
+		"payload_size", len(bodyBytes),
+	)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return FailureResult(ErrorCodeHostPublishFailed, err.Error())
+		slog.Warn("wsbus host publish http error",
+			"endpoint", endpoint,
+			"label", label,
+			"request_id", requestID,
+			"tenant_uuid", tenantUUID,
+			"trace_id", strings.TrimSpace(opts.TraceID),
+			"error", err.Error(),
+		)
+		result := FailureResult(ErrorCodeHostPublishFailed, err.Error())
+		result.OutboundURL = endpoint
+		return result
 	}
 	defer resp.Body.Close()
 
 	payloadBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return FailureResult(ErrorCodePublishResponseInvalid, fmt.Sprintf("failed to read %s response", label))
+		slog.Warn("wsbus host publish read error",
+			"endpoint", endpoint,
+			"label", label,
+			"request_id", requestID,
+			"tenant_uuid", tenantUUID,
+			"trace_id", strings.TrimSpace(opts.TraceID),
+			"http_status", resp.StatusCode,
+			"error", err.Error(),
+		)
+		result := FailureResult(ErrorCodePublishResponseInvalid, fmt.Sprintf("failed to read %s response", label))
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		return result
 	}
+	responseBody := strings.TrimSpace(string(payloadBytes))
+	slog.Info("wsbus host publish response",
+		"endpoint", endpoint,
+		"label", label,
+		"request_id", requestID,
+		"tenant_uuid", tenantUUID,
+		"trace_id", strings.TrimSpace(opts.TraceID),
+		"http_status", resp.StatusCode,
+		"response_size", len(responseBody),
+	)
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		message := fmt.Sprintf("publish rejected with status %d", resp.StatusCode)
 		if detail := extractHostErrorMessage(payloadBytes); detail != "" {
 			message = detail
 		}
-		return FailureResult(ErrorCodePublishUpstreamRejected, message)
+		result := FailureResult(ErrorCodePublishUpstreamRejected, message)
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 
 	if len(payloadBytes) == 0 {
-		return SuccessResult()
+		result := SuccessResult()
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		return result
 	}
 	var envelope hostPublishEnvelope
 	if err := json.Unmarshal(payloadBytes, &envelope); err != nil {
-		return FailureResult(ErrorCodePublishResponseInvalid, fmt.Sprintf("failed to decode %s response", label))
+		result := FailureResult(ErrorCodePublishResponseInvalid, fmt.Sprintf("failed to decode %s response", label))
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 	if isLegacyHostSuccess(payloadBytes) {
-		return SuccessResult()
+		result := SuccessResult()
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 	if !envelope.Success {
 		code := ErrorCodePublishUpstreamRejected
@@ -291,12 +414,24 @@ func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bod
 		if strings.TrimSpace(message) == "" {
 			message = "publish rejected by host"
 		}
-		return FailureResult(code, message)
+		result := FailureResult(code, message)
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
 	if envelope.Data.OK {
-		return SuccessResult()
+		result := SuccessResult()
+		result.OutboundURL = endpoint
+		result.HTTPStatus = resp.StatusCode
+		result.ResponseBody = responseBody
+		return result
 	}
-	return FailureResult(ErrorCodePublishUpstreamRejected, "publish rejected by host")
+	result := FailureResult(ErrorCodePublishUpstreamRejected, "publish rejected by host")
+	result.OutboundURL = endpoint
+	result.HTTPStatus = resp.StatusCode
+	result.ResponseBody = responseBody
+	return result
 }
 
 func isLegacyHostSuccess(payload []byte) bool {
@@ -335,50 +470,41 @@ func extractHostErrorMessage(payload []byte) string {
 }
 
 func (c *HostClient) resolveAuthHeader(opts PublishOptions) string {
-	if token := strings.TrimSpace(opts.BearerToken); token != "" {
-		return fmt.Sprintf("Bearer %s", token)
-	}
-	if c.authScheme == "apikey" {
-		return fmt.Sprintf("ApiKey %s", c.credential)
-	}
 	return fmt.Sprintf("Bearer %s", c.credential)
 }
 
-func resolveAuth(rawScheme, bearerToken, apiKey string) (scheme string, credential string, err error) {
-	scheme = normalizeAuthScheme(rawScheme)
-	bearer := strings.TrimSpace(bearerToken)
-	key := strings.TrimSpace(apiKey)
-	switch scheme {
-	case "apikey":
-		if key == "" {
-			return "", "", errors.New("wsbus host: api key is required when auth_scheme=apikey")
-		}
-		return scheme, key, nil
-	case "bearer":
-		if bearer == "" {
-			return "", "", errors.New("wsbus host: token is required when auth_scheme=bearer")
-		}
-		return scheme, bearer, nil
+func authHeaderKind(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "empty"
+	}
+	switch {
+	case strings.HasPrefix(strings.ToLower(trimmed), "bearer "):
+		return "bearer"
+	case strings.HasPrefix(strings.ToLower(trimmed), "apikey "):
+		return "apikey"
 	default:
-		if key != "" {
-			return "apikey", key, nil
-		}
-		if bearer != "" {
-			return "bearer", bearer, nil
-		}
-		return "", "", errors.New("wsbus host: missing credential (token/api key)")
+		return "unknown"
 	}
 }
 
-func normalizeAuthScheme(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "apikey", "api_key", "api-key":
-		return "apikey"
-	case "bearer":
-		return "bearer"
-	default:
-		return ""
+func resolveToken(token string) (string, error) {
+	bearer := strings.TrimSpace(token)
+	if bearer == "" {
+		return "", errors.New("wsbus host: token is required (PX_PLUGIN_TOOL_TOKEN)")
 	}
+	return bearer, nil
+}
+
+func normalizeWSBusPath(path string, fallback string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		trimmed = fallback
+	}
+	if !strings.HasPrefix(trimmed, "/") {
+		trimmed = "/" + trimmed
+	}
+	return strings.TrimRight(trimmed, "/")
 }
 
 func normalizeAPIPrefix(raw string) string {

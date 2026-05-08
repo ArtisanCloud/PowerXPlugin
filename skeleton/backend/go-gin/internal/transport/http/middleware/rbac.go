@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 
@@ -91,7 +90,6 @@ func allowPowerXDelegate(c *gin.Context, cfg *authx.RBACConfig) bool {
 	if cfg == nil {
 		return false
 	}
-	log.Printf("[PLUGIN-RBAC] delegate check: need{iss=%s aud=%s}", cfg.PowerXIssuer, cfg.PowerXAudience)
 	if _, ok := authx.GetTenantContext(c); !ok {
 		return false
 	}
@@ -103,7 +101,6 @@ func allowPowerXDelegate(c *gin.Context, cfg *authx.RBACConfig) bool {
 	if err != nil {
 		return false
 	}
-	log.Printf("[PLUGIN-RBAC] delegate token: iss=%v aud=%v", claims["iss"], claims["aud"])
 
 	if cfg.PowerXIssuer != "" {
 		if iss, _ := claims["iss"].(string); iss != cfg.PowerXIssuer {

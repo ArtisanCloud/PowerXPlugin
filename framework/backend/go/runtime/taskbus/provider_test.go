@@ -24,7 +24,7 @@ func TestHostProvider_NewEmitterAndPublish(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/internal/ws-bus/publish", r.URL.Path)
+		require.Equal(t, "/api/v1/admin/runtime/ws-bus/publish", r.URL.Path)
 
 		defer r.Body.Close()
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&received))

@@ -60,8 +60,18 @@
         <p>Trace ID: <span class="font-mono">{{ wsFlowTraceID || "-" }}</span></p>
         <p>Grant: <span>{{ wsFlowGrantStatus }}</span></p>
         <p>Publish: <span>{{ wsFlowPublishStatus }}</span></p>
+        <p>Flow Mode: <span>{{ wsFlowMode }}</span></p>
+        <p>Echo: <span>{{ wsFlowEchoStatus }}</span></p>
         <p>Last Event Topic: <span class="font-mono">{{ lastEventTopicValue || "-" }}</span></p>
         <p>Last Event At: <span>{{ lastEventAtValue || "-" }}</span></p>
+        <p>diag.connected_ok: <span>{{ wsDiagView.connectedOK }}</span></p>
+        <p>diag.welcome_ok: <span>{{ wsDiagView.welcomeOK }}</span></p>
+        <p>diag.sub_sent: <span>{{ wsDiagView.subSent }}</span></p>
+        <p>diag.ack_ok: <span>{{ wsDiagView.ackOK }}</span></p>
+        <p>diag.event_ok: <span>{{ wsDiagView.eventOK }}</span></p>
+        <p>diag.last_ack.req_id: <span class="font-mono">{{ wsDiagView.lastAckReqID || "-" }}</span></p>
+        <p>diag.last_event.topic: <span class="font-mono">{{ wsDiagView.lastEventTopic || "-" }}</span></p>
+        <p>diag.last_event.trace_id: <span class="font-mono">{{ wsDiagView.lastEventTraceID || "-" }}</span></p>
       </div>
     </UCard>
 
@@ -93,6 +103,8 @@ const wsFlowTopic = ref("")
 const wsFlowTraceID = ref("")
 const wsFlowGrantStatus = ref("idle")
 const wsFlowPublishStatus = ref("idle")
+const wsFlowMode = ref("-")
+const wsFlowEchoStatus = ref("-")
 
 const toast = reactive({
   visible: false,
@@ -103,12 +115,13 @@ const toast = reactive({
 })
 
 const { invoke: invokeCapability } = usePowerXCapability()
-const { sendTestNotification, subscribeTopic, connect, lastEventTopic, lastEventAt } = useNotificationProbe()
+const { sendTestNotification, subscribeTopic, connect, lastEventTopic, lastEventAt, wsDiag } = useNotificationProbe()
 const apiClient = useApiClient()
 const userStore = useUserStore()
 const auth = useAuth()
 const lastEventTopicValue = computed(() => String(lastEventTopic.value || ""))
 const lastEventAtValue = computed(() => String(lastEventAt.value || ""))
+const wsDiagView = computed(() => wsDiag.value)
 
 const normalizeToString = (value: unknown) => {
   if (typeof value === "string") return value
@@ -282,30 +295,24 @@ const runWSBusFlow = async () => {
   wsNotifying.value = true
   wsFlowGrantStatus.value = "pending"
   wsFlowPublishStatus.value = "idle"
+  wsFlowMode.value = "-"
+  wsFlowEchoStatus.value = "-"
   wsFlowTopic.value = makeFlowTopic()
   wsFlowTraceID.value = makeTraceID()
+  const tenantUUID = String(getTenantUuid() || "").trim()
 
-  if (!wsFlowTopic.value) {
+  if (!tenantUUID) {
     wsFlowGrantStatus.value = "failed: tenant_uuid missing"
     wsNotifying.value = false
     return
   }
 
   try {
-    const tenantUUID = String(getTenantUuid() || "").trim()
     const traceID = wsFlowTraceID.value
-
-    const grantResp: any = await apiClient.post("/admin/runtime/internal/ws-bus/grant", {
-      topics: [wsFlowTopic.value],
-      tenant_uuid: tenantUUID,
-      trace_id: traceID,
-    })
-    wsFlowGrantStatus.value = grantResp?.success === false ? "failed" : "ok"
-
     connect()
     subscribeTopic(wsFlowTopic.value)
 
-    const publishResp: any = await apiClient.post("/admin/runtime/internal/ws-bus/publish", {
+    const flowResp: any = await apiClient.post("/admin/runtime/ws-bus/test-flow", {
       topic: wsFlowTopic.value,
       tenant_uuid: tenantUUID,
       trace_id: traceID,
@@ -318,11 +325,14 @@ const runWSBusFlow = async () => {
         created_at: new Date().toISOString(),
       },
     })
-    wsFlowPublishStatus.value = publishResp?.success === false ? "failed" : "ok"
+    wsFlowGrantStatus.value = flowResp?.success === false ? "failed" : "ok"
+    wsFlowPublishStatus.value = flowResp?.success === false ? "failed" : "ok"
+    wsFlowMode.value = String(flowResp?.data?.flow_mode || "-")
+    wsFlowEchoStatus.value = flowResp?.data?.echo_ok ? "ok" : "failed"
 
     showToast({
       title: "发送成功",
-      message: "WS Bus grant + publish 已提交",
+      message: "WS Bus test flow 已提交",
       color: "success",
       duration: 3500,
     })

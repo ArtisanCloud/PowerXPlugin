@@ -1,6 +1,8 @@
 export interface PluginWsOptions {
   pluginId: string;
   apiBaseURL?: string;
+  wsBaseURL?: string;
+  wsPath?: string;
   insidePowerX?: boolean;
   token?: string;
   tenantUuid?: string;
@@ -21,20 +23,32 @@ function normalizeWsPath(pathname: string) {
 
 export function createPluginWsClient(options: PluginWsOptions): PluginWsClient {
   const base = (options.apiBaseURL || `/_p/${options.pluginId}/api/v1`).trim();
+  const wsBase = String(options.wsBaseURL || "").trim();
+  const wsPathRaw = String(options.wsPath || "/api/ws").trim() || "/api/ws";
 
   const buildURL = () => {
     if (typeof window === "undefined") return "";
-    const parsed = new URL(base, window.location.origin);
-    const protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
-    const wsPath = normalizeWsPath(parsed.pathname || "");
-    const url = new URL(`${protocol}//${parsed.host}${wsPath}`);
+    let url: URL;
+    if (wsBase) {
+      const parsedBase = new URL(wsBase, window.location.origin);
+      const wsProtocol = parsedBase.protocol === "https:" ? "wss:" : parsedBase.protocol;
+      url = new URL(`${wsProtocol}//${parsedBase.host}${wsPathRaw}`);
+    } else if (options.insidePowerX) {
+      // Embedded mode must target host ws gateway instead of plugin /_p/... path.
+      const parsedHost = new URL(window.location.origin);
+      const wsProtocol = parsedHost.protocol === "https:" ? "wss:" : "ws:";
+      url = new URL(`${wsProtocol}//${parsedHost.host}${wsPathRaw}`);
+    } else {
+      const parsed = new URL(base, window.location.origin);
+      const protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
+      const wsPath = normalizeWsPath(parsed.pathname || "");
+      url = new URL(`${protocol}//${parsed.host}${wsPath}`);
+    }
     const token = String(options.token || "").trim();
     const tenant = String(options.tenantUuid || "").trim();
     if (token) {
-      url.searchParams.set(
-        "authorization",
-        /^Bearer\s/i.test(token) ? token : `Bearer ${token}`
-      );
+      const authValue = /^Bearer\s/i.test(token) ? token : `Bearer ${token}`;
+      url.searchParams.set("authorization", authValue);
     }
     if (tenant) {
       url.searchParams.set("tenant_uuid", tenant);
@@ -47,4 +61,3 @@ export function createPluginWsClient(options: PluginWsOptions): PluginWsClient {
     connect: () => new WebSocket(buildURL()),
   };
 }
-

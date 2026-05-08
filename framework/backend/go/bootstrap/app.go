@@ -137,7 +137,7 @@ func NewAppFromEnv(opts ...Option) *App {
 		BaseURL:         getEnvOrDefault("PX_GATEWAY_BASE_URL", ""),
 		APIPrefix:       getEnvOrDefault("PX_GATEWAY_API_PREFIX", "/api/v1"),
 		AuthScheme:      strings.TrimSpace(os.Getenv("PX_GATEWAY_AUTH_SCHEME")),
-		ToolToken:       firstNonEmpty(strings.TrimSpace(os.Getenv("PX_PLUGIN_TOOL_TOKEN")), strings.TrimSpace(os.Getenv("PX_TOOL_TOKEN"))),
+		ToolToken:       resolveGatewayToolTokenByMode(),
 		APIKey:          firstNonEmpty(strings.TrimSpace(os.Getenv("PX_GATEWAY_API_KEY")), strings.TrimSpace(os.Getenv("PX_PLUGIN_API_KEY"))),
 		GRPCTarget:      strings.TrimSpace(os.Getenv("PX_GATEWAY_GRPC_TARGET")),
 		ContractVersion: strings.TrimSpace(os.Getenv("PX_GATEWAY_CONTRACT_VERSION")),
@@ -338,6 +338,53 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func resolveGatewayToolTokenByMode() string {
+	pluginToken := strings.TrimSpace(os.Getenv("PX_PLUGIN_TOOL_TOKEN"))
+	if pluginToken != "" {
+		return pluginToken
+	}
+	legacyToken := strings.TrimSpace(os.Getenv("PX_TOOL_TOKEN"))
+	if legacyToken == "" {
+		return ""
+	}
+
+	mode := resolveIAMModeFromEnv()
+	proxyEnabled := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
+
+	// delegated + host 场景严格收敛：禁止 PX_TOOL_TOKEN fallback。
+	if mode == "delegated" && proxyEnabled {
+		slog.Warn("gateway token fallback denied",
+			"mode", "delegated",
+			"host_proxy", true,
+			"required_env", "PX_PLUGIN_TOOL_TOKEN",
+			"legacy_env", "PX_TOOL_TOKEN",
+		)
+		return ""
+	}
+
+	// local + proxy 保留短期兼容，并给出迁移告警。
+	if mode == "local" && proxyEnabled {
+		slog.Warn("gateway token fallback is deprecated",
+			"mode", "local",
+			"host_proxy", true,
+			"preferred_env", "PX_PLUGIN_TOOL_TOKEN",
+			"legacy_env", "PX_TOOL_TOKEN",
+		)
+	}
+	return legacyToken
+}
+
+func resolveIAMModeFromEnv() string {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("IAM_MODE")))
+	if mode == "" {
+		mode = strings.ToLower(strings.TrimSpace(os.Getenv("IAMMode")))
+	}
+	if mode == "delegated" {
+		return "delegated"
+	}
+	return "local"
 }
 
 func tenantIDFromJWT(token string) string {

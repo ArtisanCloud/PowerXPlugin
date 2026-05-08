@@ -43,7 +43,7 @@
 `px-plugin doctor` 已在 `tools/cli/src/executors/doctor.ts` 中新增 Gateway 凭证检查：
 
 1. 默认读取环境变量，若存在 `skeleton/.env.local` 会一并解析。
-2. 校验 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`（或 `PX_PLUGIN_TOOL_TOKEN`）是否配置，并确认 token 内含 `tid` claim。
+2. 校验 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN` 是否配置，并确认 token 内含 `tid` claim。
 3. 对 Token 进行 JWT 解析获取过期时间：
    - 已过期：`status=fail`，提示重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml`。
    - 24 小时内过期：`status=warn`，提醒提前刷新。

@@ -102,6 +102,16 @@ frontend:
                 path: /templates/crud
                 route: templates/crud
                 order: 2
+              - id: plugins.com.powerx.plugins.base.templates.framework_lab
+                title: framework功能测试
+                title_i18n:
+                  namespace: menus
+                  key: menu.com.powerx.plugins.base.templates.framework_lab
+                  default: Framework Function Test
+                icon: i-heroicons-beaker
+                path: /templates/framework-lab
+                route: templates/framework-lab
+                order: 3
 
 assets:
   public_dir: ./web-admin/public

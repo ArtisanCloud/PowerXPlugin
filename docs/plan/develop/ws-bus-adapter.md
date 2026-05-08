@@ -36,7 +36,7 @@ disconnect()
 - `?authorization=Bearer <token>`
 - 或子协议：`Sec-WebSocket-Protocol: bearer.<b64url(jwt)>`
 - 可选 `tenant_uuid` query/body 兜底
-- `POST /api/v1/admin/runtime/internal/ws-bus/publish` 的 tenant 解析优先级：入站 token/上下文 `tid` > 请求体 `tenant_uuid`（仅无入站租户时） > `PX_TOOL_TOKEN.tid`（local） > `gateway.tenant_uuid`（兼容）
+- `POST /api/v1/admin/runtime/ws-bus/publish` 的 tenant 解析优先级：入站 token/上下文 `tid` > 请求体 `tenant_uuid`（仅无入站租户时） > `PX_PLUGIN_TOOL_TOKEN.tid`（local） > `gateway.tenant_uuid`（兼容）
 - 若请求体 `tenant_uuid` 与入站 token `tid` 不一致，返回 `tenant mismatch`（403）
 
 ## 5. 协议（简版提醒）
@@ -81,8 +81,8 @@ publish(topic: string, payload: Record<string, any>, options?: {
 
 ### 7.2 宿主模式（Host）
 
-- 通过底座发布入口转发：`POST /api/v1/admin/runtime/internal/ws-bus/publish`
-  - 启动时注册 topic：`POST /api/v1/admin/runtime/internal/ws-bus/grant`
+- 通过底座发布入口转发：`POST /api/v1/admin/runtime/ws-bus/publish`
+  - 启动时注册 topic：`POST /api/v1/admin/runtime/ws-bus/grant`
   - 注册失败不会阻塞插件启动，仅记录日志
 - 请求体示例：
 ```json
@@ -115,22 +115,22 @@ publish(topic: string, payload: Record<string, any>, options?: {
 
 - standalone（`POWERX_PROXY=0`）
   - 订阅：`wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer $USER_TOKEN"`
-  - 发布：`POST /api/v1/admin/runtime/internal/ws-bus/publish`
+  - 发布：`POST /api/v1/admin/runtime/ws-bus/publish`
   - 预期：收到 `ack` + `event`
 
 - 宿主联调（`POWERX_PROXY=1`）
   - 订阅：`wscat -c "ws://127.0.0.1:8077/api/ws?authorization=Bearer $USER_TOKEN"`
-  - 注册：`POST /api/v1/admin/runtime/internal/ws-bus/grant`（调插件 8078，转发到底座）
-  - 发布：`POST /api/v1/admin/runtime/internal/ws-bus/publish`（调插件 8078，转发到底座）
+  - 注册：`POST /api/v1/admin/runtime/ws-bus/grant`（调插件 8078，转发到底座）
+  - 发布：`POST /api/v1/admin/runtime/ws-bus/publish`（调插件 8078，转发到底座）
   - 预期：底座订阅端收到 `event`
 
 ## 9. 本地调试发布端点（standalone）
 
 > 仅用于开发调试。Gin 与 FastAPI 均提供，调试路由默认注册。
 
-- `POST /api/v1/admin/runtime/internal/ws-bus/publish`
+- `POST /api/v1/admin/runtime/ws-bus/publish`
   - 宿主模式下该端点会转发到 PowerX 底座 publish 接口，便于手动联调
-- `POST /api/v1/admin/runtime/internal/ws-bus/grant`
+- `POST /api/v1/admin/runtime/ws-bus/grant`
   - 宿主模式下该端点会转发到 PowerX 底座 register 接口
   - standalone 模式下该端点为 no-op（返回规范化后的 topics），不作为订阅前置条件
 - WebSocket 订阅端点（standalone）：`GET /api/ws`

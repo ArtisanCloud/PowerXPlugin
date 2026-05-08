@@ -14,8 +14,14 @@ export USER_TOKEN="<plugin-user-token>"
 并准备：
 
 1. Standalone：`POWERX_PROXY=0`
-2. Proxy：`POWERX_PROXY=1` + 可用网关凭证（Bearer 或 ApiKey）
+2. Proxy：`POWERX_PROXY=1` + 可用网关契约凭证（默认 Bearer）
 3. 已在 `plugin.yaml` 声明 `_topic.template.update` 的 publish 权限
+
+Proxy 凭证要求：
+
+1. 标准与默认：`PX_GATEWAY_AUTH_SCHEME=bearer` + `PX_PLUGIN_TOOL_TOKEN`
+2. `PX_GATEWAY_API_KEY` 仅本地 `local+proxy` 联调可选
+3. `grant/publish` 默认不透传当前 delegated/user bearer
 
 ## 3. 验证步骤
 
@@ -46,7 +52,7 @@ curl -sS -X PUT "$PLUGIN_BASE_URL/templates/{id}" \
 ### 3.3 Proxy 模式下 ACL 准备（如需）
 
 ```bash
-curl -sS -X POST "$PLUGIN_BASE_URL/admin/runtime/internal/ws-bus/grant" \
+curl -sS -X POST "$PLUGIN_BASE_URL/admin/runtime/ws-bus/grant" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topics":["_topic.template.update"]}'
@@ -64,5 +70,16 @@ curl -sS -X POST "$PLUGIN_BASE_URL/admin/runtime/internal/ws-bus/grant" \
 
 以下端点保留用于链路诊断，不作为业务事件主入口：
 
-1. `POST /api/v1/admin/runtime/internal/ws-bus/publish`
-2. `POST /api/v1/admin/runtime/internal/ws-bus/grant`
+1. `POST /api/v1/admin/runtime/ws-bus/publish`
+2. `POST /api/v1/admin/runtime/ws-bus/grant`
+3. `POST /api/v1/admin/runtime/ws-bus/test-flow`（页面统一入口）
+
+## 6. 宿主内嵌模式补充
+
+1. 前端 WS 连接应命中宿主 `/api/ws`，不应命中 `/_p/<plugin>/api/ws`
+2. 页面 `framework-lab` 使用统一 `test-flow` 接口执行 `grant->publish`
+3. 验收建议：
+   - `Grant=ok`
+   - `Publish=ok`
+   - `ack_ok=true`
+   - `event_ok=true`

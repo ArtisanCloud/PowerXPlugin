@@ -43,7 +43,9 @@ docker logs -f <container_name> | tee "$RUNTIME_LOG_FILE"
 
 1. Host（底座）：`ws://127.0.0.1:8077/api/ws?authorization=Bearer%20$HOST_TOKEN`
 2. Standalone（插件）：`ws://127.0.0.1:8078/api/ws?authorization=Bearer%20$USER_TOKEN`
-3. Standalone Proxy（插件入口）：`ws://127.0.0.1:8078/api/ws?authorization=Bearer%20$USER_TOKEN`
+3. Standalone Proxy（宿主内嵌）：`ws://127.0.0.1:3030/api/ws?authorization=Bearer%20$USER_TOKEN`
+
+> 注意：宿主内嵌调试必须连接宿主 `/api/ws`，不要连接 `/_p/<plugin>/api/ws`。
 
 ## 4. 协议消息
 
@@ -65,7 +67,7 @@ wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer%20$USER_TOKEN"
 ### Step 2：插件 publish
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topic":"_topic.template.update","payload":{"id":"demo","progress":25}}'
@@ -90,10 +92,10 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/notifications/test \
 
 ### 标准流程（插件侧入口）
 
-1. 插件入站调试都打 `:8078`（Bearer）。
-2. 插件出站到底座按 `gateway.auth_scheme` 选择凭证（Bearer 或 ApiKey）。
+1. 插件入站调试都打插件 API（Bearer）。
+2. 插件出站到底座按 `gateway.auth_scheme` 选择契约凭证（Bearer 或 ApiKey）。
 3. 先通过插件接口创建 topic（插件代理到底座 `admin/event-fabric/topics`）。
-4. 再执行 `grant`（插件代理到底座 `internal/ws-bus/grant`，仅绑定 ACL）。
+4. 再执行 `grant`（插件代理到底座 `admin/runtime/ws-bus/grant`，仅绑定 ACL）。
 5. 最后执行 `publish`，并在 WS 连接上验证收到 `event`。
 
 ### Step 0：准备 proxy 凭证
@@ -103,9 +105,9 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/notifications/test \
 3. 配置插件出站凭证（任选其一）：
 
 ```bash
-# 方案 A：Bearer
+# 方案 A：Bearer（推荐）
 export PX_GATEWAY_AUTH_SCHEME=bearer
-export PX_TOOL_TOKEN=<your_tool_token>
+export PX_PLUGIN_TOOL_TOKEN=<your_tool_token>
 
 # 方案 B：ApiKey
 export PX_GATEWAY_AUTH_SCHEME=apikey
@@ -115,7 +117,7 @@ export PX_GATEWAY_API_KEY=<your_api_key>
 ### Step 1：通过插件接口创建 topic（打 8078）
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/event-fabric/topics \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/event-fabric/topics \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -133,7 +135,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/event-fabri
 ### Step 2：插件 grant（打 8078）
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/grant \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/grant \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topics":["_topic.template.update"]}'
@@ -152,7 +154,7 @@ wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer%20$USER_TOKEN"
 ### Step 4：插件 publish（打 8078）
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topic":"_topic.template.update","payload":{"id":"demo","progress":25}}'
@@ -162,7 +164,8 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 
 1. 插件日志应看到：
    - `gateway_auth_scheme` 与你的配置一致（`bearer` / `apikey`）
-   - `outbound_token_source` 与凭证来源一致（如 `PX_TOOL_TOKEN` / `PX_GATEWAY_API_KEY`）
+   - `outbound_token_source` 与凭证来源一致（如 `px_plugin_tool_token` / `PX_GATEWAY_API_KEY`）
+   - 不再出现 `outbound_token_source=request_bearer_passthrough`
 2. 订阅端先收到 `ack`
 3. 执行 Step 4 后收到 `event`
 
@@ -172,7 +175,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 2. `401`：凭证无效，或 `PX_GATEWAY_AUTH_SCHEME` 与实际提供的凭证不匹配
 3. `403 topic not allowed`：profile/ACL 未授权该 topic
 4. 只有 `ack` 无 `event`：topic 不一致、未先 `grant`，或权限快照未轮换
-5. `grant/publish` 失败且提示 topic 不存在：先走 `internal/event-fabric/topics` 创建 topic
+5. `grant/publish` 失败且提示 topic 不存在：先走 `event-fabric/topics` 创建 topic
 6. 铃铛显示“已连接”但无通知：检查是否订阅了 `plugin.notify.tenant.{tenant_uuid}`，并确认 token 中 `tid` 与 publish 租户一致
 
 ## 8. 职责边界（必须遵守）
@@ -186,6 +189,20 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 2. API Key 快照权限必须覆盖该 topic。
 3. 权限变更后必须使用轮换/新建后的新 key。
 4. `grant` 不创建 topic，只做授权绑定。
+
+## 11. 页面统一联调（framework 功能测试页）
+
+1. 页面按钮统一调用：`POST /api/v1/admin/runtime/ws-bus/test-flow`
+2. 页面诊断关键字段：
+   - `Grant/Publish`
+   - `flow_mode`（如 `host_plus_local_echo`）
+   - `echo_ok`
+   - `diag.sub_sent / ack_ok / event_ok`
+3. 判断打通标准：
+   - `Grant=ok`
+   - `Publish=ok`
+   - `ack_ok=true`
+   - `event_ok=true`
 
 ## 10. Proxy 权限失败闭环（US3 验收）
 

@@ -77,7 +77,7 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		tenantUUID = a.defaultTenant
 	}
 	if tenantUUID == "" {
-		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, ErrorCodeTenantRequired)
+		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, ErrorCodeTenantRequired, PublishResult{})
 		return FailureResult(ErrorCodeTenantRequired, "tenant_uuid is required")
 	}
 
@@ -96,7 +96,7 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		if missingContext {
 			reason = runtimelogging.ReasonMissingContext
 		}
-		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, reason)
+		a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, reason, result)
 		return result
 	}
 	if a.hubBridge != nil {
@@ -106,7 +106,7 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 				TraceID:     traceID,
 				BearerToken: bearer,
 			}); err != nil {
-				a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, ErrorCodeLocalPublishFailed)
+				a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusFailed, ErrorCodeLocalPublishFailed, result)
 				return FailureResult(ErrorCodeLocalPublishFailed, err.Error())
 			}
 		}
@@ -115,11 +115,11 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 	if missingContext {
 		reason = runtimelogging.ReasonMissingContext
 	}
-	a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusSucceeded, reason)
+	a.logPublish(normalized, tenantUUID, traceID, runtimelogging.StatusSucceeded, reason, result)
 	return result
 }
 
-func (a *Adapter) logPublish(topic, tenantUUID, traceID, status, reason string) {
+func (a *Adapter) logPublish(topic, tenantUUID, traceID, status, reason string, result PublishResult) {
 	if a == nil || a.logger == nil {
 		return
 	}
@@ -132,6 +132,11 @@ func (a *Adapter) logPublish(topic, tenantUUID, traceID, status, reason string) 
 		runtimelogging.FieldTopic:      strings.TrimSpace(topic),
 		runtimelogging.FieldStatus:     status,
 		runtimelogging.FieldReason:     reason,
+		"outbound_url":                 strings.TrimSpace(result.OutboundURL),
+		"http_status":                  result.HTTPStatus,
+		"response_body":                strings.TrimSpace(result.ResponseBody),
+		"upstream_error_code":          strings.TrimSpace(result.ErrorCode),
+		"upstream_error_message":       strings.TrimSpace(result.ErrorMessage),
 	})
 	facade := runtimelogging.NewFacade(nil, a.logger)
 	if status == runtimelogging.StatusFailed {

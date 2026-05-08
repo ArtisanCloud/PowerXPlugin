@@ -88,9 +88,8 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 
 			hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
 				BaseURL:    strings.TrimSpace(deps.Config.Gateway.BaseURL),
-				AuthScheme: strings.TrimSpace(deps.Config.Gateway.AuthScheme),
+				APIPrefix:  strings.TrimSpace(deps.Config.Gateway.APIPrefix),
 				Token:      strings.TrimSpace(deps.Config.Gateway.ToolToken),
-				APIKey:     strings.TrimSpace(deps.Config.Gateway.APIKey),
 				TenantUUID: "",
 				UserAgent:  strings.TrimSpace(deps.Config.Gateway.UserAgent),
 				Timeout:    deps.Config.Gateway.Timeout,

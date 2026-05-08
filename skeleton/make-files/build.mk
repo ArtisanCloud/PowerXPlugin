@@ -35,6 +35,7 @@ DIST_DIR            ?= $(DIST_ROOT)/$(VERSION)
 DIST_BACKEND_BIN    ?= $(DIST_DIR)/bin
 DIST_WEBADMIN_DIR   ?= $(DIST_DIR)/web-admin
 DIST_WEBADMIN_OUTPUT?= $(DIST_WEBADMIN_DIR)/.output
+DIST_VERIFY         ?= 1
 
 # Release（完整发布包）
 RELEASE_ROOT        ?= target
@@ -59,6 +60,7 @@ build: ## 构建后端（本机平台）
 	else \
 	  mkdir -p $(ABS_BUILD_DIR); \
 	  mkdir -p $(GO_BUILD_CACHE); \
+	  rm -f $(ABS_BUILD_DIR)/plugin $(ABS_BUILD_DIR)/migrate; \
 	  GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
 	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
 	    echo "   构建 migrate（如存在）..."; \
@@ -100,6 +102,7 @@ build-linux: ## 构建后端（Linux amd64）
 	else \
 	  mkdir -p $(ABS_BUILD_DIR); \
 	  mkdir -p $(GO_BUILD_CACHE); \
+	  rm -f $(ABS_BUILD_DIR)/plugin $(ABS_BUILD_DIR)/migrate; \
 	  GOOS=linux GOARCH=$(TARGET_ARCH) GOCACHE=$(GO_BUILD_CACHE) go build -C $(ABS_BACKEND_DIR) -o $(ABS_BUILD_DIR)/plugin ./cmd/plugin; \
 	  if [ -d "$(ABS_BACKEND_DIR)/cmd/database" ]; then \
 	    echo "   构建 migrate（Linux/$(TARGET_ARCH)）..."; \
@@ -115,6 +118,12 @@ dist-backend:
 	  $(MAKE) build-linux BACKEND=$(BACKEND) BUILD_DIR="$(BUILD_DIR)" TARGET_ARCH="$(TARGET_ARCH)" GO_BUILD_CACHE="$(GO_BUILD_CACHE)"; \
 	else \
 	  $(MAKE) build BACKEND=$(BACKEND) BUILD_DIR="$(BUILD_DIR)" GO_BUILD_CACHE="$(GO_BUILD_CACHE)"; \
+	fi
+	@if [ "$(BACKEND)" != "fastapi" ]; then \
+	  if [ ! -s "$(BUILD_DIR)/plugin" ]; then \
+	    echo "❌ dist-backend 失败：未生成有效的后端二进制 $(BUILD_DIR)/plugin"; \
+	    exit 1; \
+	  fi; \
 	fi
 
 # ===== 前端构建（Host / 被 PowerX 反代）=====
@@ -231,6 +240,25 @@ dist: plugin-yaml-check dist-backend frontend-build
 	  cp -R $(FRONTEND_DIR)/i18n/. $(DIST_WEBADMIN_DIR)/i18n/; \
 	fi
 	@if [ -f README.md ]; then cp README.md $(DIST_DIR)/; fi
+	@if [ "$(DIST_VERIFY)" = "1" ]; then \
+	  echo "==> dist 验证（内建）"; \
+	  if [ "$(BACKEND)" != "fastapi" ]; then \
+	    test -s "$(DIST_BACKEND_BIN)/plugin" || { echo "❌ dist 验证失败：缺少后端二进制 $(DIST_BACKEND_BIN)/plugin"; exit 1; }; \
+	    strings "$(DIST_BACKEND_BIN)/plugin" | rg -q "/ws-bus/test-flow" || { echo "❌ dist 验证失败：binary 缺少 /ws-bus/test-flow"; exit 1; }; \
+	    strings "$(DIST_BACKEND_BIN)/plugin" | rg -q "/admin/runtime/ws-bus/grant|/ws-bus/grant" || { echo "❌ dist 验证失败：binary 缺少 ws-bus grant 路由片段"; exit 1; }; \
+	    strings "$(DIST_BACKEND_BIN)/plugin" | rg -q "/admin/runtime/ws-bus/publish|/ws-bus/publish" || { echo "❌ dist 验证失败：binary 缺少 ws-bus publish 路由片段"; exit 1; }; \
+	    echo "binary check: ok"; \
+	  fi; \
+	  if [ -f "$(DIST_DIR)/plugin.d/rbac.yaml" ]; then \
+	    rg -q "/admin/runtime/ws-bus/test-flow" "$(DIST_DIR)/plugin.d/rbac.yaml" || { echo "❌ dist 验证失败：rbac 缺少 test-flow"; exit 1; }; \
+	    rg -q "/admin/runtime/ws-bus/grant" "$(DIST_DIR)/plugin.d/rbac.yaml" || { echo "❌ dist 验证失败：rbac 缺少 grant"; exit 1; }; \
+	    rg -q "/admin/runtime/ws-bus/publish" "$(DIST_DIR)/plugin.d/rbac.yaml" || { echo "❌ dist 验证失败：rbac 缺少 publish"; exit 1; }; \
+	    rg -q "/admin/runtime/event-fabric/topics" "$(DIST_DIR)/plugin.d/rbac.yaml" || { echo "❌ dist 验证失败：rbac 缺少 event-fabric/topics"; exit 1; }; \
+	    echo "rbac check: ok"; \
+	  else \
+	    echo "❌ dist 验证失败：缺少 $(DIST_DIR)/plugin.d/rbac.yaml"; exit 1; \
+	  fi; \
+	fi
 
 .PHONY: dist-linux
 dist-linux: ## 兼容别名：等价于 `make dist PLATFORM=linux`

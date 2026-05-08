@@ -7,10 +7,12 @@ import { useTheme } from '~/composables/useTheme'
 import { PLUGIN_ID } from '~/utils/powerx-bridge'
 import { useAuth } from '~/composables/useAuth'
 import DelegatedAuthBanner from '~/components/DelegatedAuthBanner.vue'
+import { createFrameworkLogger } from '../../../../../framework/frontend/nuxt/framework-client/logger'
 
 const route = useRoute()
 const runtimeConfig = useRuntimeConfig()
 const auth = useAuth()
+const logger = createFrameworkLogger('layout.embedded')
 const insidePowerX = computed(() => {
   const value = runtimeConfig.public.insidePowerX
   if (value === true) return true
@@ -39,17 +41,14 @@ onMounted(() => {
   const adapterKey = `${pluginId}::${instanceId}`
 
   if (registry[adapterKey]) {
-    console.info('[Bridge][Plugin] adapter already mounted, reuse existing instance.', {
-      pluginId,
-      instanceId
-    })
+    logger.info('adapter already mounted, reuse existing instance', { pluginId, instanceId })
     return
   }
 
   // 可选：先把当前主题同步一遍（避免首次渲染颜色不一致）
   try { useTheme().initTheme?.() } catch {}
 
-  console.info('[Bridge][Plugin] layout mounting.', {
+  logger.info('layout mounting', {
     fullPath: route.fullPath,
     baseURL: runtimeConfig.app.baseURL,
     insidePowerX: runtimeConfig.public.insidePowerX,
@@ -66,14 +65,14 @@ onMounted(() => {
     })
 
     bridge.start?.()
-    console.info('[Bridge][Plugin] adapter mounted.')
+    logger.info('adapter mounted', { pluginId, instanceId })
 
     registry[adapterKey] = { bridge }
     win.__PX_ADAPTER_BOUND__ = true
     win.__PX_ADAPTER__ = registry[adapterKey]
-    console.info('[embedded] Host bridge adapter mounted.', { pluginId, instanceId })
+    logger.info('host bridge adapter mounted', { pluginId, instanceId })
   } catch (error) {
-    console.error('[Bridge][Plugin] adapter failed to mount.', error)
+    logger.error('adapter failed to mount', { error: String(error) })
   }
 })
 
@@ -90,7 +89,7 @@ const requestHostToken = () => {
       '*'
     )
   } catch (error) {
-    console.warn('[Bridge][Plugin] failed to request auth token', error)
+    logger.warn('failed to request auth token', { error: String(error) })
   }
 }
 

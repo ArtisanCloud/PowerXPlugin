@@ -128,6 +128,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useAuth } from "~/composables/useAuth";
+import { getTenantUuid } from "~/composables/api/_base";
+import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 import { useNotificationProbe } from "~/composables/useNotificationProbe";
 
 const { t } = useI18n();
@@ -144,6 +146,7 @@ const {
   events,
   connect,
   disconnect,
+  subscribeTopic,
   markAllRead,
   clearEvents,
   sendTestNotification,
@@ -213,6 +216,7 @@ const toggleNotifications = () => {
 const reconnectWS = () => {
   disconnect();
   connect();
+  subscribeNotificationTopics();
 };
 
 const sendProbe = async () => {
@@ -230,8 +234,17 @@ const formatTime = (value?: string) => {
   return date.toLocaleString();
 };
 
+const subscribeNotificationTopics = () => {
+  subscribeTopic("_topic.system.notification");
+  const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim();
+  if (tenantUUID) {
+    subscribeTopic(`plugin.notify.tenant.${tenantUUID}`);
+  }
+};
+
 onMounted(() => {
   connect();
+  subscribeNotificationTopics();
 });
 
 onUnmounted(() => {

@@ -1,12 +1,8 @@
 <template>
   <UContainer class="py-10 space-y-8">
     <div class="flex items-start justify-between gap-4">
-      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-        {{ $t("frameworkLab.title") }}
-      </h1>
-      <p class="max-w-3xl text-gray-600 dark:text-gray-300">
-        {{ $t("frameworkLab.description") }}
-      </p>
+      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $t("frameworkLab.title") }}</h1>
+      <p class="max-w-3xl text-gray-600 dark:text-gray-300">{{ $t("frameworkLab.description") }}</p>
     </div>
 
     <UCard>
@@ -16,70 +12,73 @@
         </div>
       </template>
 
-      <div class="flex items-end gap-3 flex-wrap">
-        <div class="flex items-center gap-3">
-          <UButton
-            size="sm"
-            color="info"
-            icon="i-heroicons-bell-alert"
-            :loading="capabilityNotifying"
-            @click="sendCapabilityNotification"
-          >
-            {{ $t("frameworkLab.sendCapabilityButton") }}
-          </UButton>
-          <UButton
-            size="sm"
-            color="primary"
-            icon="i-heroicons-signal"
-            :loading="wsNotifying"
-            @click="runWSBusFlow"
-          >
-            {{ $t("frameworkLab.sendWsButton") }}
-          </UButton>
+      <div class="flex items-center gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
+        <UButton size="xs" :variant="activeTab === 'gateway' ? 'solid' : 'soft'" color="primary" @click="activeTab = 'gateway'">网关WS测试</UButton>
+        <UButton size="xs" :variant="activeTab === 'local' ? 'solid' : 'soft'" color="success" @click="activeTab = 'local'">本地WS测试</UButton>
+      </div>
+
+      <div v-if="activeTab === 'gateway'" class="space-y-6 pt-4">
+        <div class="flex items-end gap-3 flex-wrap">
+          <div class="flex items-center gap-3">
+            <UButton size="sm" color="info" icon="i-heroicons-bell-alert" :loading="capabilityNotifying" @click="sendCapabilityNotification">{{ $t("frameworkLab.sendCapabilityButton") }}</UButton>
+            <UButton size="sm" color="primary" icon="i-heroicons-signal" :loading="gatewayWsNotifying" @click="runWSBusFlow">网关WS测试通知</UButton>
+          </div>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.hint") }}</p>
         </div>
-        <p class="w-full text-xs text-gray-500 dark:text-gray-400">
-          {{ $t("frameworkLab.hint") }}
-        </p>
+
+        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <p>Topic: <span class="font-mono">{{ wsFlowTopic || "-" }}</span></p>
+          <p>Trace ID: <span class="font-mono">{{ wsFlowTraceID || "-" }}</span></p>
+          <p>Grant: <span>{{ wsFlowGrantStatus }}</span></p>
+          <p>Publish: <span>{{ wsFlowPublishStatus }}</span></p>
+          <p>Flow Mode: <span>{{ wsFlowMode }}</span></p>
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Echo: <span>{{ wsFlowEchoStatus }}</span></p>
+          <p>Host Reachable: <span>{{ wsFlowHostReachable }}</span></p>
+          <p>Host Grant: <span>{{ wsFlowHostGrantStatus }}</span></p>
+          <p>Host Publish: <span>{{ wsFlowHostPublishStatus }}</span></p>
+          <p>Last Event Topic: <span class="font-mono">{{ gatewayLastEventTopic || "-" }}</span></p>
+          <p>Last Event At: <span>{{ gatewayLastEventAt || "-" }}</span></p>
+          <p>diag.connected_ok: <span>{{ gatewayWsDiag.connectedOK }}</span></p>
+          <p>diag.welcome_ok: <span>{{ gatewayWsDiag.welcomeOK }}</span></p>
+          <p>diag.sub_sent: <span>{{ gatewayWsDiag.subSent }}</span></p>
+          <p>diag.ack_ok: <span>{{ gatewayWsDiag.ackOK }}</span></p>
+          <p>diag.event_ok: <span>{{ gatewayWsDiag.eventOK }}</span></p>
+          <p>diag.last_ack.req_id: <span class="font-mono">{{ gatewayWsDiag.lastAckReqID || "-" }}</span></p>
+          <p>diag.last_event.topic: <span class="font-mono">{{ gatewayWsDiag.lastEventTopic || "-" }}</span></p>
+          <p>diag.last_event.trace_id: <span class="font-mono">{{ gatewayWsDiag.lastEventTraceID || "-" }}</span></p>
+        </div>
+      </div>
+
+      <div v-else class="space-y-6 pt-4">
+        <div class="flex items-end gap-3 flex-wrap">
+          <div class="flex items-center gap-3">
+            <UButton size="sm" color="success" icon="i-heroicons-bolt" :loading="localWsNotifying" @click="runLocalWSFlow">本地WS测试通知</UButton>
+          </div>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">本地 WS 测试会调用插件本地通知接口，并在本地 WS 通道验证订阅事件。</p>
+        </div>
+
+        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <p>Topic: <span class="font-mono">{{ localWsTopic || "-" }}</span></p>
+          <p>Submit: <span>{{ localWsSubmitStatus }}</span></p>
+          <p>WS Tenant: <span class="font-mono">{{ localWsTenantFromConnection || "-" }}</span></p>
+          <p>Publish Tenant: <span class="font-mono">{{ localWsTenantFromPublish || "-" }}</span></p>
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Last Event Topic: <span class="font-mono">{{ localLastEventTopic || "-" }}</span></p>
+          <p>Last Event At: <span>{{ localLastEventAt || "-" }}</span></p>
+          <p>diag.connected_ok: <span>{{ localWsDiag.connectedOK }}</span></p>
+          <p>diag.welcome_ok: <span>{{ localWsDiag.welcomeOK }}</span></p>
+          <p>diag.sub_sent: <span>{{ localWsDiag.subSent }}</span></p>
+          <p>diag.ack_ok: <span>{{ localWsDiag.ackOK }}</span></p>
+          <p>diag.event_ok: <span>{{ localWsDiag.eventOK }}</span></p>
+          <p>diag.last_ack.req_id: <span class="font-mono">{{ localWsDiag.lastAckReqID || "-" }}</span></p>
+          <p>diag.last_event.topic: <span class="font-mono">{{ localWsDiag.lastEventTopic || "-" }}</span></p>
+          <p>diag.last_event.trace_id: <span class="font-mono">{{ localWsDiag.lastEventTraceID || "-" }}</span></p>
+        </div>
       </div>
     </UCard>
 
-    <UCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <span class="font-medium text-gray-900 dark:text-gray-100">{{ $t("frameworkLab.flowTitle") }}</span>
-        </div>
-      </template>
-      <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-        <p>Topic: <span class="font-mono">{{ wsFlowTopic || "-" }}</span></p>
-        <p>Trace ID: <span class="font-mono">{{ wsFlowTraceID || "-" }}</span></p>
-        <p>Grant: <span>{{ wsFlowGrantStatus }}</span></p>
-        <p>Publish: <span>{{ wsFlowPublishStatus }}</span></p>
-        <p>Flow Mode: <span>{{ wsFlowMode }}</span></p>
-        <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
-        <p>Echo: <span>{{ wsFlowEchoStatus }}</span></p>
-        <p>Host Reachable: <span>{{ wsFlowHostReachable }}</span></p>
-        <p>Host Grant: <span>{{ wsFlowHostGrantStatus }}</span></p>
-        <p>Host Publish: <span>{{ wsFlowHostPublishStatus }}</span></p>
-        <p>Last Event Topic: <span class="font-mono">{{ lastEventTopicValue || "-" }}</span></p>
-        <p>Last Event At: <span>{{ lastEventAtValue || "-" }}</span></p>
-        <p>diag.connected_ok: <span>{{ wsDiagView.connectedOK }}</span></p>
-        <p>diag.welcome_ok: <span>{{ wsDiagView.welcomeOK }}</span></p>
-        <p>diag.sub_sent: <span>{{ wsDiagView.subSent }}</span></p>
-        <p>diag.ack_ok: <span>{{ wsDiagView.ackOK }}</span></p>
-        <p>diag.event_ok: <span>{{ wsDiagView.eventOK }}</span></p>
-        <p>diag.last_ack.req_id: <span class="font-mono">{{ wsDiagView.lastAckReqID || "-" }}</span></p>
-        <p>diag.last_event.topic: <span class="font-mono">{{ wsDiagView.lastEventTopic || "-" }}</span></p>
-        <p>diag.last_event.trace_id: <span class="font-mono">{{ wsDiagView.lastEventTraceID || "-" }}</span></p>
-      </div>
-    </UCard>
-
-    <ToastAlert
-      v-model="toast.visible"
-      :title="toast.title"
-      :message="toast.message"
-      :color="toast.color"
-      :duration="toast.duration"
-    />
+    <ToastAlert v-model="toast.visible" :title="toast.title" :message="toast.message" :color="toast.color" :duration="toast.duration" />
   </UContainer>
 </template>
 
@@ -88,14 +87,17 @@ import { nextTick } from "vue"
 import ToastAlert from "~/components/ToastAlert.vue"
 import { usePowerXCapability } from "~/composables/usePowerXCapability"
 import { useNotificationProbe } from "~/composables/useNotificationProbe"
+import { getTenantUuid } from "~/composables/api/_base"
 import { resolveFrontendRuntimeMode } from "~/utils/runtime-mode"
+import { resolveTenantUUIDForRequest } from "~/utils/tenant-context"
 import { useUserStore } from "~/stores/user"
 import { useApiClient } from "~/composables/api/_client"
 
 type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
 
 const capabilityNotifying = ref(false)
-const wsNotifying = ref(false)
+const gatewayWsNotifying = ref(false)
+const localWsNotifying = ref(false)
 const wsFlowTopic = ref("")
 const wsFlowTraceID = ref("")
 const wsFlowGrantStatus = ref("idle")
@@ -105,42 +107,31 @@ const wsFlowEchoStatus = ref("-")
 const wsFlowHostReachable = ref("-")
 const wsFlowHostGrantStatus = ref("-")
 const wsFlowHostPublishStatus = ref("-")
+const localWsTopic = ref("")
+const localWsSubmitStatus = ref("idle")
+const localWsTenantFromConnection = ref("")
+const localWsTenantFromPublish = ref("")
+const activeTab = ref<"gateway" | "local">("gateway")
 const runtimeModeView = computed(() => resolveFrontendRuntimeMode().mode)
 
-const toast = reactive({
-  visible: false,
-  title: "",
-  message: "",
-  color: "primary" as ToastColor,
-  duration: 3000,
-})
+const toast = reactive({ visible: false, title: "", message: "", color: "primary" as ToastColor, duration: 3000 })
 
 const { invoke: invokeCapability } = usePowerXCapability()
-const { sendTestNotification, subscribeTopic, connect, lastEventTopic, lastEventAt, wsDiag } = useNotificationProbe()
+const gatewayProbe = useNotificationProbe("gateway", "_topic.system.notification")
+const localProbe = useNotificationProbe("local", "plugin.notify.tenant.00000000-0000-0000-0000-000000000001")
 const apiClient = useApiClient()
 const userStore = useUserStore()
 const auth = useAuth()
-const lastEventTopicValue = computed(() => String(lastEventTopic.value || ""))
-const lastEventAtValue = computed(() => String(lastEventAt.value || ""))
-const wsDiagView = computed(() => wsDiag.value)
+const gatewayLastEventTopic = computed(() => String(gatewayProbe.lastEventTopic.value || ""))
+const gatewayLastEventAt = computed(() => String(gatewayProbe.lastEventAt.value || ""))
+const gatewayWsDiag = computed(() => gatewayProbe.wsDiag.value)
+const localLastEventTopic = computed(() => String(localProbe.lastEventTopic.value || ""))
+const localLastEventAt = computed(() => String(localProbe.lastEventAt.value || ""))
+const localWsDiag = computed(() => localProbe.wsDiag.value)
 
-const normalizeToString = (value: unknown) => {
-  if (typeof value === "string") return value
-  if (typeof value === "number") return String(value)
-  return ""
-}
+const normalizeToString = (value: unknown) => (typeof value === "string" ? value : typeof value === "number" ? String(value) : "")
 
-const showToast = ({
-  title,
-  message,
-  color = "primary",
-  duration = 3000,
-}: {
-  title?: string
-  message: string | number
-  color?: ToastColor
-  duration?: number
-}) => {
+const showToast = ({ title, message, color = "primary", duration = 3000 }: { title?: string; message: string | number; color?: ToastColor; duration?: number }) => {
   toast.title = normalizeToString(title)
   toast.message = normalizeToString(message)
   toast.color = color
@@ -178,119 +169,46 @@ const guessMemberUUID = () => {
   const claims = parseTokenClaims(auth.getToken?.() ?? null) || {}
   const context = (userStore.context || {}) as Record<string, any>
   const contextUser = (context.user || {}) as Record<string, any>
-  const candidates = [
-    context.member_uuid,
-    context.memberUuid,
-    context.current_member_uuid,
-    context.currentMemberUUID,
-    contextUser.member_uuid,
-    contextUser.memberUuid,
-    contextUser.user_uuid,
-    contextUser.userUuid,
-    claims.member_uuid,
-    claims.memberUuid,
-    claims.user_uuid,
-    claims.userUuid,
-    claims.uid,
-    claims.sub,
-    context.current_member_id,
-  ]
+  const candidates = [context.member_uuid, context.memberUuid, context.current_member_uuid, context.currentMemberUUID, contextUser.member_uuid, contextUser.memberUuid, contextUser.user_uuid, contextUser.userUuid, claims.member_uuid, claims.memberUuid, claims.user_uuid, claims.userUuid, claims.uid, claims.sub, context.current_member_id]
   return pickFirstNonEmpty(candidates)
 }
 
-const ensureMemberUUID = () => {
-  const guessed = guessMemberUUID()
-  return String(guessed || "").trim()
-}
+const ensureMemberUUID = () => String(guessMemberUUID() || "").trim()
 
 const sendCapabilityNotification = async () => {
   const targetMemberUUID = ensureMemberUUID()
   if (!targetMemberUUID) {
-    showToast({
-      title: "发送失败",
-      message: "member_uuid 必填（请先输入或切换到已登录用户）",
-      color: "warning",
-      duration: 4500,
-    })
+    showToast({ title: "发送失败", message: "member_uuid 必填（请先输入或切换到已登录用户）", color: "warning", duration: 4500 })
     return
   }
-
   capabilityNotifying.value = true
   try {
-    await invokeCapability(
-      "com.corex.notifications.test",
-      "Send",
-      {
-        method: "POST",
-        endpoint: "/api/v1/notifications/test",
-        body: {
-          member_uuid: targetMemberUUID,
-          title: "Plugin 测试通知",
-          content: "这是一条来自 framework 功能测试页的能力通知",
-          type: "info",
-          category: "system",
-          is_important: false,
-          metadata: {
-            source: "plugin-framework-lab",
-          },
-        },
+    await invokeCapability("com.corex.notifications.test", "Send", {
+      method: "POST",
+      endpoint: "/api/v1/notifications/test",
+      body: {
+        member_uuid: targetMemberUUID,
+        title: "Plugin 测试通知",
+        content: "这是一条来自 framework 功能测试页的能力通知",
+        type: "info",
+        category: "system",
+        is_important: false,
+        metadata: { source: "plugin-framework-lab" },
       },
-      {
-        preferredProtocol: "rest",
-        notifyOnSuccess: false,
-      }
-    )
-    showToast({
-      title: "发送成功",
-      message: "能力通知已提交",
-      color: "success",
-      duration: 3500,
-    })
+    }, { preferredProtocol: "rest", notifyOnSuccess: false })
+    showToast({ title: "发送成功", message: "能力通知已提交", color: "success", duration: 3500 })
   } catch (error: any) {
-    showToast({
-      title: "发送失败",
-      message: error?.message || "能力调用失败",
-      color: "error",
-      duration: 5000,
-    })
+    showToast({ title: "发送失败", message: error?.message || "能力调用失败", color: "error", duration: 5000 })
   } finally {
     capabilityNotifying.value = false
   }
 }
 
-const sendWSNotification = async () => {
-  wsNotifying.value = true
-  try {
-    await sendTestNotification("Framework WS probe from templates/framework-lab")
-    showToast({
-      title: "发送成功",
-      message: "WS 测试通知已提交",
-      color: "success",
-      duration: 3500,
-    })
-  } catch (error: any) {
-    showToast({
-      title: "发送失败",
-      message: error?.message || "WS 测试通知发送失败",
-      color: "error",
-      duration: 5000,
-    })
-  } finally {
-    wsNotifying.value = false
-  }
-}
-
-const makeTraceID = () => {
-  const rand = Math.random().toString(36).slice(2, 10)
-  return `fw-lab-${Date.now()}-${rand}`
-}
-
-const makeFlowTopic = () => {
-  return "_topic.system.notification"
-}
+const makeTraceID = () => `fw-lab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+const makeFlowTopic = () => "_topic.system.notification"
 
 const runWSBusFlow = async () => {
-  wsNotifying.value = true
+  gatewayWsNotifying.value = true
   wsFlowGrantStatus.value = "pending"
   wsFlowPublishStatus.value = "idle"
   wsFlowMode.value = "-"
@@ -302,9 +220,8 @@ const runWSBusFlow = async () => {
   wsFlowTraceID.value = makeTraceID()
   try {
     const traceID = wsFlowTraceID.value
-    connect()
-    subscribeTopic(wsFlowTopic.value)
-
+    gatewayProbe.connect()
+    gatewayProbe.subscribeTopic(wsFlowTopic.value)
     const flowResp: any = await apiClient.post("/admin/runtime/ws-bus/test-flow", {
       topic: wsFlowTopic.value,
       trace_id: traceID,
@@ -323,28 +240,55 @@ const runWSBusFlow = async () => {
     wsFlowHostReachable.value = flowResp?.data?.host_reachable ? "yes" : "no"
     wsFlowHostGrantStatus.value = flowResp?.data?.host_grant_ok ? "ok" : "failed"
     wsFlowHostPublishStatus.value = flowResp?.data?.host_publish_ok ? "ok" : "failed"
-
-    showToast({
-      title: "发送成功",
-      message: "WS Bus test flow 已提交",
-      color: "success",
-      duration: 3500,
-    })
+    showToast({ title: "发送成功", message: "WS Bus test flow 已提交", color: "success", duration: 3500 })
   } catch (error: any) {
     const msg = String(error?.message || "ws bus flow failed")
-    if (wsFlowGrantStatus.value === "pending") {
-      wsFlowGrantStatus.value = `failed: ${msg}`
-    } else {
-      wsFlowPublishStatus.value = `failed: ${msg}`
-    }
-    showToast({
-      title: "发送失败",
-      message: msg,
-      color: "error",
-      duration: 5000,
-    })
+    if (wsFlowGrantStatus.value === "pending") wsFlowGrantStatus.value = `failed: ${msg}`
+    else wsFlowPublishStatus.value = `failed: ${msg}`
+    showToast({ title: "发送失败", message: msg, color: "error", duration: 5000 })
   } finally {
-    wsNotifying.value = false
+    gatewayWsNotifying.value = false
+  }
+}
+
+const runLocalWSFlow = async () => {
+  localWsNotifying.value = true
+  localWsSubmitStatus.value = "pending"
+  const tenantFromConnection = String(getTenantUuid() || "").trim()
+  const tenantUUID = String(
+    tenantFromConnection || resolveTenantUUIDForRequest() || ""
+  ).trim()
+  localWsTenantFromConnection.value = tenantFromConnection
+  localWsTenantFromPublish.value = tenantUUID
+  localWsTopic.value = tenantUUID
+    ? `plugin.notify.tenant.${tenantUUID}`
+    : "plugin.notify.tenant.00000000-0000-0000-0000-000000000001"
+  try {
+    localProbe.connect()
+    localProbe.subscribeTopic(localWsTopic.value)
+    const traceID = makeTraceID()
+    const resp: any = await apiClient.post("/admin/runtime/ws-bus/test-flow", {
+      topic: localWsTopic.value,
+      force_local: true,
+      trace_id: traceID,
+      payload: {
+        type: "framework.local.wsbus.test",
+        title: "Local WS Bus Flow Test",
+        message: "local ws test flow from templates/framework-lab",
+        trace_id: traceID,
+        created_at: new Date().toISOString(),
+      },
+    })
+    const topic = String(resp?.data?.topic || localWsTopic.value).trim()
+    localWsTopic.value = topic
+    localProbe.subscribeTopic(topic)
+    localWsSubmitStatus.value = "ok"
+    showToast({ title: "发送成功", message: "本地 WS 测试通知已提交", color: "success", duration: 3500 })
+  } catch (error: any) {
+    localWsSubmitStatus.value = `failed: ${String(error?.message || "local ws failed")}`
+    showToast({ title: "发送失败", message: error?.message || "本地 WS 测试通知发送失败", color: "error", duration: 5000 })
+  } finally {
+    localWsNotifying.value = false
   }
 }
 

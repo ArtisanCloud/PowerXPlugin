@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/google/uuid"
 )
 
@@ -186,24 +186,24 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
 	}
-	slog.Info("wsbus host register start",
-		"endpoint", endpoint,
-		"label", label,
-		"request_id", requestID,
-		"tenant_uuid", tenantUUID,
-		"auth_header_kind", authHeaderKind(req.Header.Get("Authorization")),
-		"payload_size", len(bodyBytes),
-	)
+	logWSBusHost(ctxReq, "info", "wsbus host register start", map[string]any{
+		"endpoint":         endpoint,
+		"label":            label,
+		"request_id":       requestID,
+		"tenant_uuid":      tenantUUID,
+		"auth_header_kind": authHeaderKind(req.Header.Get("Authorization")),
+		"payload_size":     len(bodyBytes),
+	})
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		slog.Warn("wsbus host register http error",
-			"endpoint", endpoint,
-			"label", label,
-			"request_id", requestID,
-			"tenant_uuid", tenantUUID,
-			"error", err.Error(),
-		)
+		logWSBusHost(ctxReq, "warn", "wsbus host register http error", map[string]any{
+			"endpoint":    endpoint,
+			"label":       label,
+			"request_id":  requestID,
+			"tenant_uuid": tenantUUID,
+			"error":       err.Error(),
+		})
 		result := FailureResult(ErrorCodeRegisterUpstreamFailed, err.Error())
 		result.OutboundURL = endpoint
 		return result
@@ -212,28 +212,28 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 
 	payloadBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Warn("wsbus host register read error",
-			"endpoint", endpoint,
-			"label", label,
-			"request_id", requestID,
-			"tenant_uuid", tenantUUID,
-			"http_status", resp.StatusCode,
-			"error", err.Error(),
-		)
+		logWSBusHost(ctxReq, "warn", "wsbus host register read error", map[string]any{
+			"endpoint":    endpoint,
+			"label":       label,
+			"request_id":  requestID,
+			"tenant_uuid": tenantUUID,
+			"http_status": resp.StatusCode,
+			"error":       err.Error(),
+		})
 		result := FailureResult(ErrorCodeRegisterResponseInvalid, fmt.Sprintf("failed to read %s response", label))
 		result.OutboundURL = endpoint
 		result.HTTPStatus = resp.StatusCode
 		return result
 	}
 	responseBody := strings.TrimSpace(string(payloadBytes))
-	slog.Info("wsbus host register response",
-		"endpoint", endpoint,
-		"label", label,
-		"request_id", requestID,
-		"tenant_uuid", tenantUUID,
-		"http_status", resp.StatusCode,
-		"response_size", len(responseBody),
-	)
+	logWSBusHost(ctxReq, "info", "wsbus host register response", map[string]any{
+		"endpoint":      endpoint,
+		"label":         label,
+		"request_id":    requestID,
+		"tenant_uuid":   tenantUUID,
+		"http_status":   resp.StatusCode,
+		"response_size": len(responseBody),
+	})
 	if resp.StatusCode >= http.StatusBadRequest {
 		message := fmt.Sprintf("grant rejected with status %d", resp.StatusCode)
 		if detail := extractHostErrorMessage(payloadBytes); detail != "" {
@@ -318,26 +318,26 @@ func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bod
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
 	}
-	slog.Info("wsbus host publish start",
-		"endpoint", endpoint,
-		"label", label,
-		"request_id", requestID,
-		"tenant_uuid", tenantUUID,
-		"trace_id", strings.TrimSpace(opts.TraceID),
-		"auth_header_kind", authHeaderKind(req.Header.Get("Authorization")),
-		"payload_size", len(bodyBytes),
-	)
+	logWSBusHost(ctxReq, "info", "wsbus host publish start", map[string]any{
+		"endpoint":         endpoint,
+		"label":            label,
+		"request_id":       requestID,
+		"tenant_uuid":      tenantUUID,
+		"trace_id":         strings.TrimSpace(opts.TraceID),
+		"auth_header_kind": authHeaderKind(req.Header.Get("Authorization")),
+		"payload_size":     len(bodyBytes),
+	})
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		slog.Warn("wsbus host publish http error",
-			"endpoint", endpoint,
-			"label", label,
-			"request_id", requestID,
-			"tenant_uuid", tenantUUID,
-			"trace_id", strings.TrimSpace(opts.TraceID),
-			"error", err.Error(),
-		)
+		logWSBusHost(ctxReq, "warn", "wsbus host publish http error", map[string]any{
+			"endpoint":    endpoint,
+			"label":       label,
+			"request_id":  requestID,
+			"tenant_uuid": tenantUUID,
+			"trace_id":    strings.TrimSpace(opts.TraceID),
+			"error":       err.Error(),
+		})
 		result := FailureResult(ErrorCodeHostPublishFailed, err.Error())
 		result.OutboundURL = endpoint
 		return result
@@ -346,30 +346,30 @@ func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bod
 
 	payloadBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Warn("wsbus host publish read error",
-			"endpoint", endpoint,
-			"label", label,
-			"request_id", requestID,
-			"tenant_uuid", tenantUUID,
-			"trace_id", strings.TrimSpace(opts.TraceID),
-			"http_status", resp.StatusCode,
-			"error", err.Error(),
-		)
+		logWSBusHost(ctxReq, "warn", "wsbus host publish read error", map[string]any{
+			"endpoint":    endpoint,
+			"label":       label,
+			"request_id":  requestID,
+			"tenant_uuid": tenantUUID,
+			"trace_id":    strings.TrimSpace(opts.TraceID),
+			"http_status": resp.StatusCode,
+			"error":       err.Error(),
+		})
 		result := FailureResult(ErrorCodePublishResponseInvalid, fmt.Sprintf("failed to read %s response", label))
 		result.OutboundURL = endpoint
 		result.HTTPStatus = resp.StatusCode
 		return result
 	}
 	responseBody := strings.TrimSpace(string(payloadBytes))
-	slog.Info("wsbus host publish response",
-		"endpoint", endpoint,
-		"label", label,
-		"request_id", requestID,
-		"tenant_uuid", tenantUUID,
-		"trace_id", strings.TrimSpace(opts.TraceID),
-		"http_status", resp.StatusCode,
-		"response_size", len(responseBody),
-	)
+	logWSBusHost(ctxReq, "info", "wsbus host publish response", map[string]any{
+		"endpoint":      endpoint,
+		"label":         label,
+		"request_id":    requestID,
+		"tenant_uuid":   tenantUUID,
+		"trace_id":      strings.TrimSpace(opts.TraceID),
+		"http_status":   resp.StatusCode,
+		"response_size": len(responseBody),
+	})
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		message := fmt.Sprintf("publish rejected with status %d", resp.StatusCode)
@@ -519,6 +519,23 @@ func resolveCredential(authScheme, token, apiKey string) (string, string, error)
 		return "bearer", bearer, nil
 	default:
 		return "", "", fmt.Errorf("wsbus host: unsupported auth scheme: %s", scheme)
+	}
+}
+
+func logWSBusHost(ctx context.Context, level, message string, fields map[string]any) {
+	facade := runtimelogging.NewFacade(ctx, nil).With(runtimelogging.Fields{
+		runtimelogging.FieldComponent:  "wsbus.host_client",
+		runtimelogging.FieldSubscriber: "wsbus.host_client",
+		runtimelogging.FieldTopic:      "runtime_ops.ws_bus.host_client",
+	})
+	entry := runtimelogging.Entry{Fields: runtimelogging.Fields(fields)}
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "warn", "warning":
+		facade.Warn(message, entry)
+	case "error":
+		facade.Error(message, entry)
+	default:
+		facade.Info(message, entry)
 	}
 }
 

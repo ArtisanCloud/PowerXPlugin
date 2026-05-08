@@ -3,21 +3,19 @@ package runtime_ops
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/gin-gonic/gin"
 	"{{ .BackendModulePath }}/internal/contracts"
 	"{{ .BackendModulePath }}/internal/shared/app"
-	"github.com/gin-gonic/gin"
 )
 
 type wsBusTestFlowRequest struct {
-	Topic      string `json:"topic"`
-	TenantUUID string `json:"tenant_uuid"`
-	TraceID    string `json:"trace_id"`
-	Payload    any    `json:"payload"`
+	Topic   string `json:"topic"`
+	TraceID string `json:"trace_id"`
+	Payload any    `json:"payload"`
 }
 
 // WSBusTestFlowHandler runs grant -> publish in one unified backend entry.
@@ -34,13 +32,9 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 			return
 		}
 
-		tenantUUID, tenantMismatch := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
-		if tenantMismatch {
-			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "tenant mismatch")
-			return
-		}
-		if strings.TrimSpace(tenantUUID) == "" && os.Getenv("POWERX_PROXY") != "1" {
-			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		tenantUUID, _ := resolveGatewayTenantUUID(c, deps, "")
+		if strings.TrimSpace(tenantUUID) == "" {
+			contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeTenantRequired, "tenant required")
 			return
 		}
 
@@ -58,12 +52,16 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 		}
 
 		outboundBearer := ""
-		if os.Getenv("POWERX_PROXY") == "1" && deps.Config != nil && deps.Config.Gateway != nil {
+		hostCfg, useHost := resolveWSBusHostClientConfig(deps)
+		if useHost {
 			outboundBearer = resolveGatewayBearerToken(c, deps)
 			logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
 		}
 
 		grantResult := fwwsbus.PublishResult{OK: true}
+		hostGrantOK := false
+		hostPublishOK := false
+		hostReachable := false
 		topics, expand := fwwsbus.ExpandTopicsForRegister([]string{topic})
 		if !expand.OK {
 			contracts.ResponseError(c, http.StatusBadRequest, expand.ErrorCode, expand.ErrorMessage)
@@ -76,27 +74,24 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 			nil,
 		))
 
-		if os.Getenv("POWERX_PROXY") == "1" && deps.Config != nil && deps.Config.Gateway != nil {
-			hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
-				BaseURL:    strings.TrimSpace(deps.Config.Gateway.BaseURL),
-				APIPrefix:  strings.TrimSpace(deps.Config.Gateway.APIPrefix),
-				Token:      strings.TrimSpace(deps.Config.Gateway.ToolToken),
-				TenantUUID: "",
-				UserAgent:  strings.TrimSpace(deps.Config.Gateway.UserAgent),
-				Timeout:    deps.Config.Gateway.Timeout,
-			})
-			if err == nil {
-				grantResult = hostClient.RegisterTopics(context.Background(), topics, fwwsbus.PublishOptions{
-					TenantUUID:  tenantUUID,
-					TraceID:     traceID,
-					BearerToken: outboundBearer,
-				})
-				if !grantResult.OK {
-					contracts.ResponseError(c, http.StatusBadRequest, grantResult.ErrorCode, grantResult.ErrorMessage)
-					return
-				}
-				publisher = hostClient
+		if useHost {
+			hostClient, err := fwwsbus.NewHostClient(hostCfg)
+			if err != nil {
+				contracts.ResponseError(c, http.StatusBadGateway, contracts.ErrCodeInternalError, "host ws bus client init failed")
+				return
 			}
+			hostReachable = true
+			grantResult = hostClient.RegisterTopics(context.Background(), topics, fwwsbus.PublishOptions{
+				TenantUUID:  tenantUUID,
+				TraceID:     traceID,
+				BearerToken: outboundBearer,
+			})
+			if !grantResult.OK {
+				contracts.ResponseError(c, http.StatusBadRequest, grantResult.ErrorCode, grantResult.ErrorMessage)
+				return
+			}
+			hostGrantOK = true
+			publisher = hostClient
 		}
 
 		payload := req.Payload
@@ -120,6 +115,9 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 			contracts.ResponseError(c, http.StatusBadRequest, publishResult.ErrorCode, publishResult.ErrorMessage)
 			return
 		}
+		if hostReachable {
+			hostPublishOK = true
+		}
 
 		// Ensure UI probe can always observe an event frame on current plugin WS session.
 		// In proxy mode this acts as local echo while host publish still executes above.
@@ -138,19 +136,25 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 		}
 
 		flowMode := "local_only"
-		if os.Getenv("POWERX_PROXY") == "1" {
-			flowMode = "host_plus_local_echo"
+		if useHost {
+			flowMode = "host_fallback_local_only"
+			if hostReachable && hostGrantOK && hostPublishOK {
+				flowMode = "host_strict_ok"
+			}
 		}
 
 		contracts.ResponseSuccess(c, gin.H{
-			"ok":          true,
-			"topic":       topic,
-			"tenant_uuid": tenantUUID,
-			"trace_id":    traceID,
-			"grant_ok":    grantResult.OK,
-			"publish_ok":  publishResult.OK,
-			"echo_ok":     echoResult.OK,
-			"flow_mode":   flowMode,
+			"ok":              true,
+			"topic":           topic,
+			"tenant_uuid":     tenantUUID,
+			"trace_id":        traceID,
+			"grant_ok":        grantResult.OK,
+			"publish_ok":      publishResult.OK,
+			"echo_ok":         echoResult.OK,
+			"flow_mode":       flowMode,
+			"host_reachable":  hostReachable,
+			"host_grant_ok":   hostGrantOK,
+			"host_publish_ok": hostPublishOK,
 		})
 	}
 }

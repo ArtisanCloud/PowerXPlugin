@@ -5,7 +5,7 @@ import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
 
-const defaultPluginId = '{{ .PluginID }}'
+const defaultPluginId = 'com.powerx.plugins.base'
 const resolvePluginId = () => {
   const candidates = [
     process.env.POWERX_PLUGIN_ID,
@@ -39,8 +39,8 @@ const fallbackHostApiBase =
 const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase
-const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'
-const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:{{ .BackendPort }}'
+const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
+const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'
 const imgSources = ["'self'", "data:", "https://avatars.githubusercontent.com"]
 const extraConnectHosts = new Set<string>()
 const registerConnectOrigin = (candidate?: string | null) => {
@@ -60,11 +60,10 @@ const registerConnectOrigin = (candidate?: string | null) => {
 }
 const powerxCoreBase =
   process.env.NUXT_PUBLIC_POWERX_CORE_BASE ||
-  process.env.POWERX_CORE_ENDPOINT ||
   'http://localhost:8077'
 const pxGatewayBaseURL = process.env.PX_GATEWAY_BASE_URL || ''
-const pxWsBaseURL = process.env.PX_WS_BASE_URL || ''
-const publicWsURL = process.env.NUXT_PUBLIC_WS_URL || '/api/ws'
+const wsOrigin = process.env.NUXT_PUBLIC_WS_ORIGIN || ''
+const wsPath = process.env.NUXT_PUBLIC_WS_PATH || '/api/ws'
 const rootDir = fileURLToPath(new URL('./', import.meta.url))
 const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
@@ -133,7 +132,7 @@ if (INSIDE_POWERX) {
 const devServerPort = Number(
   process.env.NUXT_DEV_PORT ||
     process.env.PORT ||
-    {{ .FrontendPort }}
+    3131
 )
 
 const buildConnectSources = () => {
@@ -274,13 +273,15 @@ export default defineNuxtConfig({
       powerxPluginVersion: pluginVersion,
       insidePowerX: INSIDE_POWERX,
       iamMode: IAM_MODE,
+      powerxProxy: INSIDE_POWERX ? '1' : '0',
+      gatewayAuthScheme: String(process.env.PX_GATEWAY_AUTH_SCHEME || '').trim().toLowerCase(),
       delegatedMode: DELEGATED_MODE,
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,
       powerxCoreBase,
       pxGatewayBaseUrl: pxGatewayBaseURL,
-      pxWsBaseUrl: pxWsBaseURL,
-      wsUrl: publicWsURL,
+      wsOrigin,
+      wsPath,
       powerx: {
         apiBase: capabilityApiBase,
         capabilityEndpoint: capabilityInvokeEndpoint
@@ -337,7 +338,7 @@ export default defineNuxtConfig({
   },
   devServer: {
     host: '0.0.0.0',
-    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : {{ .FrontendPort }}
+    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : 3131
   },
   ui: {
     fonts: false

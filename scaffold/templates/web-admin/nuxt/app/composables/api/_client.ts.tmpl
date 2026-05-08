@@ -1,6 +1,7 @@
 // 统一创建 $fetch 实例（单例）+ 便捷方法
 
 import { resolveApiBase, getAuthToken, getTenantUuid } from "./_base";
+import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 import { useRouter, useToast } from "#imports";
 import { useHostCtxStore } from "~/stores/hostCtx";
 import { PLUGIN_ID } from "~/utils/powerx-bridge";
@@ -260,7 +261,10 @@ export function useApiClient() {
     }
 
     if (!headers.has("tenant_uuid")) {
-      const tenant = (next as any).tenantUuid || getTenantUuid();
+      const tenant =
+        (next as any).tenantUuid ||
+        resolveTenantUUIDForRequest() ||
+        getTenantUuid();
       if (tenant) {
         headers.set("tenant_uuid", String(tenant));
       }

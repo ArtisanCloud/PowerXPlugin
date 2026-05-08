@@ -50,8 +50,8 @@
 
 1. 地址契约由宿主注入：
    - `PX_GATEWAY_BASE_URL`（HTTP）
-   - `PX_WS_BASE_URL`（WS）
-   - `NUXT_PUBLIC_WS_URL`（建议固定 `/api/ws`）
+   - `NUXT_PUBLIC_WS_ORIGIN`（WS origin）
+   - `NUXT_PUBLIC_WS_PATH`（建议固定 `/api/ws`）
 2. 插件只消费契约，不猜端口，不拼 `/_p/.../api/ws`。
 3. 标准调试接口仅使用：
    - `POST /api/v1/admin/runtime/ws-bus/grant`
@@ -74,15 +74,23 @@
 5. skeleton 侧鉴权观测日志（用于排查 token 来源）：
    - `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_gateway_auth.go`
 
-## 8. Framework 封装建议（下一步开发基线）
+## 8. Framework 统一封装（当前基线）
 
-为避免业务页面重复判断模式，建议前后端都收敛到 framework helper：
+为避免业务页面重复判断模式，前后端都已收敛到统一 helper：
 
-1. 后端：`ResolveRuntimeMode(ctx/config)`
-   - 输出：`iam_mode`、`effective_proxy`、`gateway_auth_scheme`、`token_source`
-2. 前端：`useRuntimeMode()`
-   - 输出：`insidePowerX`、`apiBase`、`wsBase`、`wsPath`
-3. 业务代码只消费 helper 结果，不直接读取散落 env。
+1. 后端模式与 host client 解析：
+   - `resolveWSBusHostClientConfig(...)`
+   - 位置：`skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_gateway_auth.go`
+   - 输出：`host_delegated / local_proxy / standalone_local` 对应的 host client 配置（`baseURL/apiPrefix/authScheme/token|apiKey`）
+2. 前端模式解析：
+   - `resolveFrontendRuntimeMode()`
+   - 位置：`skeleton/web-admin/nuxt/app/utils/runtime-mode.ts`
+   - 输出：`mode`、`insidePowerX`、`powerxProxy`、`iamMode`、`gatewayAuthScheme`
+3. framework WS URL 统一构造：
+   - `createPluginWsClient(...).buildURL()`
+   - 位置：`framework/frontend/nuxt/framework-client/ws.ts`
+   - 规则：优先 `wsBaseURL`，其次 `hostBaseURL`，最终兜底 `window.location.origin + wsPath`（避免因页面漏传参数直接抛错）
+4. 业务页面只消费 helper 结果，不再自行拼接 WS/API 地址。
 
 ## 9. 最小自检清单
 

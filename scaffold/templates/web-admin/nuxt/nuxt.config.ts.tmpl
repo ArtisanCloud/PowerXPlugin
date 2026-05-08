@@ -5,7 +5,7 @@ import { defineNuxtConfig } from 'nuxt/config'
 import { definePowerXAdminConfig } from '@artisan-cloud/plugin-framework-admin'
 
 
-const defaultPluginId = 'com.powerx.plugins.base'
+const defaultPluginId = '{{ .PluginID }}'
 const resolvePluginId = () => {
   const candidates = [
     process.env.POWERX_PLUGIN_ID,
@@ -39,8 +39,8 @@ const fallbackHostApiBase =
 const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase
-const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:8078'
-const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:8078'
+const devApiProxyTarget = process.env.NUXT_DEV_API_PROXY || 'http://localhost:{{ .BackendPort }}'
+const devWsProxyTarget = process.env.NUXT_DEV_WS_PROXY || 'ws://127.0.0.1:{{ .BackendPort }}'
 const imgSources = ["'self'", "data:", "https://avatars.githubusercontent.com"]
 const extraConnectHosts = new Set<string>()
 const registerConnectOrigin = (candidate?: string | null) => {
@@ -132,7 +132,7 @@ if (INSIDE_POWERX) {
 const devServerPort = Number(
   process.env.NUXT_DEV_PORT ||
     process.env.PORT ||
-    3131
+    {{ .FrontendPort }}
 )
 
 const buildConnectSources = () => {
@@ -338,7 +338,7 @@ export default defineNuxtConfig({
   },
   devServer: {
     host: '0.0.0.0',
-    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : 3131
+    port: Number.isFinite(devServerPort) && devServerPort > 0 ? devServerPort : {{ .FrontendPort }}
   },
   ui: {
     fonts: false

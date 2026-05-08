@@ -6,12 +6,12 @@ import (
 
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
-	"github.com/gin-gonic/gin"
 	"{{ .BackendModulePath }}/internal/logger"
 	"{{ .BackendModulePath }}/internal/middleware"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
 )
 
 // resolveGatewayBearerToken 统一 ws-bus 出站 token 选择规则：

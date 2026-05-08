@@ -47,7 +47,7 @@ function buildWsURL() {
   const runtimeMode = resolveFrontendRuntimeMode();
   const pluginId =
     String(runtimeConfig.public?.powerxPluginId || "").trim() ||
-    "com.powerx.plugins.base";
+    "{{ .PluginID }}";
   const wsBaseURL = String(
     runtimeConfig.public?.pxWsBaseUrl ||
       runtimeConfig.public?.wsOrigin ||

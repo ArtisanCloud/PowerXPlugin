@@ -92,7 +92,7 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 		authScheme = strings.TrimSpace(deps.Config.Gateway.AuthScheme)
 	}
 
-	outboundSource := "PX_TOOL_TOKEN"
+	outboundSource := "PX_PLUGIN_TOOL_TOKEN"
 	if strings.EqualFold(authScheme, "apikey") || strings.EqualFold(authScheme, "api_key") || strings.EqualFold(authScheme, "api-key") {
 		outboundSource = "PX_GATEWAY_API_KEY"
 	}

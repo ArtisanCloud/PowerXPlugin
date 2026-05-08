@@ -10,29 +10,29 @@
 
 ## Decision 2: 宿主发布入口调用方式
 
-- **Decision**: 宿主模式通过框架 SDK 调用底座发布入口 `POST /api/v1/admin/runtime/internal/ws-bus/publish`。
-- **Rationale**: 与现有 WS-NOTIFY 文档契约一致，且便于宿主统一鉴权与 topic 白名单治理。
+- **Decision**: 宿主模式通过框架 SDK 调用底座标准发布入口 `POST /api/v1/admin/runtime/ws-bus/publish`。
+- **Rationale**: 与当前标准 runtime 路径一致，便于宿主统一鉴权与 topic 白名单治理。
 - **Alternatives considered**:
   - 直接访问宿主 WS Hub 内部方法：跨进程不可行且破坏契约。
   - 直接写宿主 Redis：绕过授权/审计，不符合规范。
 
-## Decision 3: Topic 注册机制
+## Decision 3: Topic 授权机制
 
-- **Decision**: 宿主模式启动后调用 `POST /api/v1/admin/runtime/internal/ws-bus/grant` 注册 topic。
+- **Decision**: 宿主模式启动后调用 `POST /api/v1/admin/runtime/ws-bus/grant` 绑定 topic ACL。
 - **Rationale**: 底座可维护动态注册表并明确可订阅范围。
 - **Alternatives considered**:
   - 不注册：需要底座全量放行，难以治理。
 
 ## Decision 4: 鉴权方式
 
-- **Decision**: 通过 STS 获取短期凭证调用宿主发布入口。
-- **Rationale**: 宿主模式对外调用必须走 STS 短期凭证，符合宪章要求。
+- **Decision**: 宿主模式默认使用 `PX_PLUGIN_TOOL_TOKEN`（Bearer）调用宿主发布入口。
+- **Rationale**: 与当前 Host Contract 与插件 framework 实现一致，便于统一治理与排障。
 - **Alternatives considered**:
-  - 长期凭证或匿名调用：违反安全要求。
+  - 透传入站 delegated/user bearer：会产生 audience 不匹配风险。
 
 ## Decision 5: Standalone 调试入口
 
-- **Decision**: standalone 提供 `POST /api/v1/admin/runtime/internal/ws-bus/publish` 作为调试入口（仅 dev mode）。
+- **Decision**: standalone 提供 `POST /api/v1/admin/runtime/ws-bus/publish` 作为调试入口（仅 dev mode）。
 - **Rationale**: 便于本地联调 `/api/ws` 订阅，避免业务端尚未接入时无发布通道。
 - **Alternatives considered**:
   - 不提供调试入口：本地验证成本高。

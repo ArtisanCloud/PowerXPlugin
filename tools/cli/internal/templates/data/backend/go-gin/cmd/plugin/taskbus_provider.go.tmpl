@@ -99,9 +99,8 @@ func newHostTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {
 	}
 	return fwtaskbus.NewHostProvider(fwtaskbus.HostProviderConfig{
 		BaseURL:        strings.TrimSpace(gateway.BaseURL),
-		AuthScheme:     strings.TrimSpace(gateway.AuthScheme),
+		APIPrefix:      strings.TrimSpace(gateway.APIPrefix),
 		Token:          strings.TrimSpace(gateway.ToolToken),
-		APIKey:         strings.TrimSpace(gateway.APIKey),
 		TenantUUID:     strings.TrimSpace(gateway.TenantUUID),
 		UserAgent:      strings.TrimSpace(gateway.UserAgent),
 		Timeout:        gateway.Timeout,

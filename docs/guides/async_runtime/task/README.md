@@ -40,7 +40,7 @@
 ### Step 3：验证实时可见（WS）
 
 1. 先订阅目标 topic
-2. 再触发 `emit` 或 `internal/ws-bus/publish`
+2. 再触发 `emit` 或 `ws-bus/publish`
 3. 预期先 `ack` 后 `event`
 
 ## 4. 模式差异

@@ -10,7 +10,7 @@
 - Nuxt 前端：`docs/guides/develop/standalone/nuxt.md`
 - NextJS 前端：`docs/guides/develop/standalone/next.md`
 
-下文保留原 Standalone / Delegated 说明（包含宿主模式、代理与排障）。
+下文为当前统一规范（包含宿主模式、代理与排障）。
 
 ## 1. Standalone 模式
 
@@ -211,9 +211,12 @@ npm run dev
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `POWERX_PROXY` | `0` | `1` 表示运行在宿主 iframe 下；本地 Standalone 必须为 `0`，否则“组织与权限”菜单会隐藏。 |
-| `POWERX_CORE_ENDPOINT` | `http://localhost:8077` | Delegated 模式访问宿主 Core API 的地址。 |
-| `POWERX_AUTH_TOKEN` | N/A | 插件后端调用宿主 `/admin/user/auth/*` 时使用的服务 Token。 |
+| `IAMMode` / `IAM_MODE` | `local` | IAM 语义模式（`local` / `delegated`）。`delegated` 视为宿主模式语义。 |
+| `POWERX_PROXY` | `0` | 链路开关：`0` 本地链路，`1` 宿主链路。`IAMMode=delegated` 时按宿主链路处理。 |
+| `PX_GATEWAY_BASE_URL` | N/A | 宿主链路目标地址（PowerX 网关基址）。仅在宿主链路生效。 |
+| `PX_GATEWAY_AUTH_SCHEME` | `bearer` | 鉴权模式开关；宿主发布默认 `bearer`。 |
+| `PX_PLUGIN_TOOL_TOKEN` | N/A | 宿主链路标准凭证（默认与推荐）。 |
+| `PX_GATEWAY_API_KEY` | N/A | 仅本地 `IAMMode=local + POWERX_PROXY=1` 联调可选。 |
 | `PLUGIN_IAM_TENANT_KEY` / `NAME` | 示例值见 Quickstart | Standalone 运行时默认租户唯一键与名称。 |
 | `PLUGIN_IAM_ADMIN_EMAIL` / `PASSWORD` | `admin@local.test` / `S3cret!!` | 本地管理员初始凭据，`setup` 会读取并写入数据库。 |
 | `NUXT_PUBLIC_INSIDE_POWERX` | `0` | 前端 runtime 判定宿主模式用，`1` 时 baseURL 调整为 `/_p/<pluginId>/admin/`。 |
@@ -224,26 +227,25 @@ npm run dev
 >
 > - **配置文件位置**：统一使用 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。Go Gin 与 FastAPI 都会自动读取该文件。
 > - **环境变量覆盖**：`.env` 会覆盖进程环境变量与 `config.yaml`，因此建议将 `POWERX_PROXY`、`IAMMode`、`PX_GATEWAY_*` 统一写在这里，避免 GoLand Run Config 里残留旧值。
-> - **宿主模式（PowerX Core）**：必须同时设置 `POWERX_PROXY=1` **且** `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`。
->   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若未携带，再回退 `PX_TOOL_TOKEN.tid`。
+> - **宿主模式（PowerX Core）**：需要宿主契约（`PX_GATEWAY_BASE_URL` + 鉴权凭证）。
+>   - 默认与推荐：`PX_PLUGIN_TOOL_TOKEN`（Bearer）
+>   - `PX_GATEWAY_API_KEY` 仅用于本地 `local+proxy` 联调兼容，不作为宿主发布默认口径
+>   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若未携带，再回退 `PX_PLUGIN_TOOL_TOKEN.tid`。
 >   - 若两者都缺失 `tid`，WS Bus/Capability 调用会失败。
 >
 > **模式判定主口径（推荐）**：
 >
-> - `IAMMode` / `IAM_MODE`：项目启动模式（`local` / `delegated`）
-> - `POWERX_PROXY`：runtime 链路开关（`0` 本地驱动，`1` 底座 gateway/宿主链路）
+> - 先看 `IAMMode`：`local` / `delegated`
+> - `delegated` 统一按宿主链路处理
+> - `local` 再看 `POWERX_PROXY` 决定本地链路或宿主链路
+> - 仅宿主链路下判断出站凭证，默认 `PX_PLUGIN_TOOL_TOKEN`（`PX_GATEWAY_API_KEY` 仅本地联调可选）
 >
-
-**组合速查（2x2）**
-
-| IAMMode | POWERX_PROXY | 结果 | 典型场景 |
-|---|---|---|---|
-| local | 0 | standalone_local（本地 IAM + 本地链路） | 纯本地开发 |
-| delegated | 0 | standalone_mock_delegated（委派语义 + 本地链路） | standalone 模拟 delegated 联调 |
-| delegated | 1 | host_delegated（委派语义 + 宿主链路） | PowerX 宿主标准部署 |
-| local | 1 | local + proxy（保留调试态，非推荐） | 本地 IAM + 宿主链路联调 |
-
-> 说明：是否走宿主链路只由 `POWERX_PROXY` 决定；是否使用委派 IAM 只由 `IAMMode` 决定。
+> 详细判定顺序、三种有效组合、代码入口与日志验收见：
+> - `docs/guides/develop/standalone/mode-resolution.md`
+>
+> **升级提醒（breaking）**：
+> - `delegated + POWERX_PROXY=1` 场景不再接受 `PX_TOOL_TOKEN` fallback，必须改为 `PX_PLUGIN_TOOL_TOKEN`。
+> - `local + POWERX_PROXY=1` 仍可短期兼容 `PX_TOOL_TOKEN`，但会输出 deprecate 告警，建议尽快迁移。
 
 ### 1.4.3 日志与内部调试路由开关（避免混淆）
 
@@ -253,12 +255,12 @@ npm run dev
 |---|---|---|
 | `logging.http_access`（或 `POWERX_HTTP_LOG`） | 是否输出 HTTP 访问日志（每个请求一条） | 看接口请求路径/状态码/耗时 |
 | `logging.debug_mode`（或 `POWERX_DEBUG_MODE`） | 开发语义与调试细节开关 | 排查 token/tenant/模式决策、生产安全校验、默认策略切换 |
-| （固定行为）runtime internal 调试路由 | 注册 `/api/v1/admin/runtime/internal/ws-bus/*`、`/api/v1/admin/runtime/event-bridge/emit` 与 `POST /api/v1/admin/notifications/test` | 默认开启（无开关） |
+| （当前版本实现）runtime 标准调试路由 | 注册 `/api/v1/admin/runtime/ws-bus/*`、`/api/v1/admin/event-fabric/topics` 与 `POST /api/v1/admin/notifications/test` | 当前版本默认开启，受鉴权约束 |
 
 说明：
 
 - `gin_mode=release` 不会自动关闭 `logging.http_access`。
-- `/runtime/internal/*` 调试路由默认可访问（受鉴权控制），与 `logging.debug_mode` 无关。
+- `/runtime/ws-bus/*` 与 `/event-fabric/topics` 调试路由默认可访问（受鉴权控制），与 `logging.debug_mode` 无关。
 
 ### 1.4.4 WebSocket 联调步骤（本地 / 宿主）
 
@@ -299,21 +301,33 @@ wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer $USER_TOKEN"
 5. 通过 runtime 调试接口发布事件：
 
 ```bash
-curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topic":"_topic.template.update","payload":{"id":"demo","status":"running","progress":25}}'
 ```
 
-> standalone 下 `register` 为 no-op，不是订阅前置条件。
+> standalone 下 `grant` 为 no-op，不是订阅前置条件。
 
 #### B) 宿主联调（`local + POWERX_PROXY=1`）
 
-1. 启动插件后端（需配置 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`）：
+1. 启动插件后端（需配置 `PX_GATEWAY_BASE_URL` 与宿主鉴权凭证）：
 
 ```bash
 cd skeleton/backend/go-gin
 POWERX_PROXY=1 IAMMode=local go run ./cmd/plugin
+```
+
+鉴权示例：
+
+```bash
+# Bearer
+export PX_GATEWAY_AUTH_SCHEME=bearer
+export PX_PLUGIN_TOOL_TOKEN="<tool-token>"
+
+# 本地联调可选（非宿主发布默认）
+export PX_GATEWAY_AUTH_SCHEME=apikey
+export PX_GATEWAY_API_KEY="<api-key>"
 ```
 
 2. 连接 PowerX 底座 WS：
@@ -328,15 +342,15 @@ wscat -c "ws://127.0.0.1:8077/api/ws?authorization=Bearer $USER_TOKEN"
 {"type":"subscribe","topics":["_topic.template.update"]}
 ```
 
-4. 调插件 runtime 接口触发 register/publish（插件会转发到底座）：
+4. 调插件 runtime 接口触发 grant/publish（插件会转发到底座）：
 
 ```bash
-curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/grant" \
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/grant" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topics":["_topic.template.update"]}'
 
-curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish" \
+curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topic":"_topic.template.update","payload":{"id":"demo","status":"running","progress":25}}'
@@ -380,7 +394,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 补充建议：
 
 - 每次联调前先打印运行模式二元组：`IAMMode / POWERX_PROXY`。
-- 在宿主联调场景，优先验证 `register -> publish -> event` 的完整链路，再排查业务 topic 权限。
+- 在宿主联调场景，优先验证 `grant -> publish -> event` 的完整链路，再排查业务 topic 权限。
 
 ### 1.4.6 标准联调记录模板（提单/群沟通统一格式）
 
@@ -399,23 +413,23 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish
 
 ### 2) Token 与租户
 - USER_TOKEN.tid: <uuid>
-- PX_TOOL_TOKEN.tid: <uuid or empty>
+- PX_PLUGIN_TOOL_TOKEN.tid: <uuid or empty>
 - publish 请求体 tenant_uuid: <value or empty>
 
 ### 3) 连接与操作
 - WS URL: ws://127.0.0.1:8078/api/ws 或 ws://127.0.0.1:8077/api/ws
 - subscribe payload: {"type":"subscribe","topics":["_topic.template.update"]}
-- register 请求（如有）: <curl or screenshot>
+- grant 请求（如有）: <curl or screenshot>
 - publish 请求: <curl or screenshot>
 
 ### 4) 实际结果
 - subscribe 回包: ack / error（贴原文）
 - 是否收到 event: yes / no（贴原文）
-- HTTP 返回码: register=<code>, publish=<code>
+- HTTP 返回码: grant=<code>, publish=<code>
 
 ### 5) 关键日志片段
 - 插件日志：`WS bus gateway auth resolved` + `HTTP request completed`
-- 底座日志（宿主模式）：`[ws-bus] register` / `[ws-bus] publish`
+- 底座日志（宿主模式）：`[ws-bus] grant` / `[ws-bus] publish`
 - 异常日志（如有）：`response.Write on hijacked connection` / `permission_denied`
 
 ### 6) 结论

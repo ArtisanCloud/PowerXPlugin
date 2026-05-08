@@ -67,7 +67,7 @@ wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer%20$USER_TOKEN"
 ### Step 2：插件 publish
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topic":"_topic.template.update","payload":{"id":"demo","progress":25}}'
@@ -95,7 +95,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/notifications/test \
 1. 插件入站调试都打插件 API（Bearer）。
 2. 插件出站到底座按 `gateway.auth_scheme` 选择契约凭证（Bearer 或 ApiKey）。
 3. 先通过插件接口创建 topic（插件代理到底座 `admin/event-fabric/topics`）。
-4. 再执行 `grant`（插件代理到底座 `internal/ws-bus/grant`，仅绑定 ACL）。
+4. 再执行 `grant`（插件代理到底座 `admin/runtime/ws-bus/grant`，仅绑定 ACL）。
 5. 最后执行 `publish`，并在 WS 连接上验证收到 `event`。
 
 ### Step 0：准备 proxy 凭证
@@ -117,7 +117,7 @@ export PX_GATEWAY_API_KEY=<your_api_key>
 ### Step 1：通过插件接口创建 topic（打 8078）
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/event-fabric/topics \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/event-fabric/topics \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -135,7 +135,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/event-fabri
 ### Step 2：插件 grant（打 8078）
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/grant \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/grant \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topics":["_topic.template.update"]}'
@@ -154,7 +154,7 @@ wscat -c "ws://127.0.0.1:8078/api/ws?authorization=Bearer%20$USER_TOKEN"
 ### Step 4：插件 publish（打 8078）
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publish \
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish \
   -H "Authorization: Bearer $USER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"topic":"_topic.template.update","payload":{"id":"demo","progress":25}}'
@@ -175,7 +175,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/internal/ws-bus/publ
 2. `401`：凭证无效，或 `PX_GATEWAY_AUTH_SCHEME` 与实际提供的凭证不匹配
 3. `403 topic not allowed`：profile/ACL 未授权该 topic
 4. 只有 `ack` 无 `event`：topic 不一致、未先 `grant`，或权限快照未轮换
-5. `grant/publish` 失败且提示 topic 不存在：先走 `internal/event-fabric/topics` 创建 topic
+5. `grant/publish` 失败且提示 topic 不存在：先走 `event-fabric/topics` 创建 topic
 6. 铃铛显示“已连接”但无通知：检查是否订阅了 `plugin.notify.tenant.{tenant_uuid}`，并确认 token 中 `tid` 与 publish 租户一致
 
 ## 8. 职责边界（必须遵守）

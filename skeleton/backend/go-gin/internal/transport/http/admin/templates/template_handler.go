@@ -239,9 +239,8 @@ func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action stri
 	if os.Getenv("POWERX_PROXY") == "1" && h.deps.Config != nil && h.deps.Config.Gateway != nil {
 		hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
 			BaseURL:    strings.TrimSpace(h.deps.Config.Gateway.BaseURL),
-			AuthScheme: strings.TrimSpace(h.deps.Config.Gateway.AuthScheme),
+			APIPrefix:  strings.TrimSpace(h.deps.Config.Gateway.APIPrefix),
 			Token:      strings.TrimSpace(h.deps.Config.Gateway.ToolToken),
-			APIKey:     strings.TrimSpace(h.deps.Config.Gateway.APIKey),
 			TenantUUID: "",
 			UserAgent:  strings.TrimSpace(h.deps.Config.Gateway.UserAgent),
 			Timeout:    h.deps.Config.Gateway.Timeout,

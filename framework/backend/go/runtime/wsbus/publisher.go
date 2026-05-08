@@ -28,6 +28,9 @@ type PublishResult struct {
 	OK           bool   `json:"ok"`
 	ErrorCode    string `json:"error_code,omitempty"`
 	ErrorMessage string `json:"error_message,omitempty"`
+	OutboundURL  string `json:"outbound_url,omitempty"`
+	HTTPStatus   int    `json:"http_status,omitempty"`
+	ResponseBody string `json:"response_body,omitempty"`
 }
 
 type Publisher interface {

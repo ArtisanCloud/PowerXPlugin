@@ -13,23 +13,23 @@ export USER_TOKEN="<plugin-user-token>"
 2. 执行层文件 `config/event_fabric.yaml` 已同步（框架会按多路径兼容扫描）
 3. 后端默认强鉴权
 4. proxy 场景已准备可用出站凭证，并配置到插件：
-   - Bearer：`PX_GATEWAY_AUTH_SCHEME=bearer` + `PX_TOOL_TOKEN=<token>`
-   - ApiKey：`PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY=<key>`
+   - 标准与默认：`PX_GATEWAY_AUTH_SCHEME=bearer` + `PX_PLUGIN_TOOL_TOKEN=<token>`
+   - ApiKey（仅 local+proxy 联调可选）：`PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY=<key>`
 
 ## 1.1 Standalone+Proxy 标准流程（对齐 PowerX）
 
 1. 插件声明所需 `topics + actions`。
-2. 通过插件接口创建 topic：`POST /admin/runtime/internal/event-fabric/topics`。
+2. 通过插件接口创建 topic：`POST /admin/runtime/event-fabric/topics`。
 3. Proxy 绑定 profile 的 topic 权限（permission_ids）。
 4. 若走 ApiKey，轮换/新建 API Key（权限快照生效）。
-5. 插件再代理调 `POST /api/v1/internal/ws-bus/grant`。
+5. 插件再代理调 `POST /api/v1/admin/runtime/ws-bus/grant`。
 6. 最后再执行 `publish` 与 WS `subscribe` 联调。
 
 ## 1.2 最终规则（必须遵守）
 
 1. Topic 真相源是底座 `event_topics`。
-2. `POST /admin/runtime/internal/event-fabric/topics` 只做 topic 创建/登记（插件代理到底座）。
-3. `POST /admin/runtime/internal/ws-bus/grant` 只做 ACL 绑定，不创建 topic。
+2. `POST /admin/runtime/event-fabric/topics` 只做 topic 创建/登记（插件代理到底座）。
+3. `POST /admin/runtime/ws-bus/grant` 只做 ACL 绑定，不创建 topic。
 4. 运行时必须二段校验：topic 存在 + 主体有权限，缺一不可。
 5. 禁止隐式创建 topic。
 
@@ -45,13 +45,13 @@ export USER_TOKEN="<plugin-user-token>"
 ## 2. 核心接口（插件）
 
 1. `POST /admin/runtime/event-bridge/emit`
-2. `POST /admin/runtime/internal/event-fabric/topics`
-3. `POST /admin/runtime/internal/ws-bus/grant`
-4. `POST /admin/runtime/internal/ws-bus/publish`
+2. `POST /admin/runtime/event-fabric/topics`
+3. `POST /admin/runtime/ws-bus/grant`
+4. `POST /admin/runtime/ws-bus/publish`
 5. `GET /admin/runtime/metrics`
 
 > 注意：`ws-bus/grant` 只做授权绑定，不创建 topic。  
-> 新 topic 必须先通过插件接口创建资源：`POST /admin/runtime/internal/event-fabric/topics`（由插件代理到底座）。
+> 新 topic 必须先通过插件接口创建资源：`POST /admin/runtime/event-fabric/topics`（由插件代理到底座）。
 
 ## 3. 先讲清楚：`emit` / `grant` / `publish` 分工
 

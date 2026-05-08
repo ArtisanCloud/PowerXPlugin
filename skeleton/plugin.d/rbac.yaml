@@ -49,12 +49,17 @@ routes:
         action: create
         resource: integration
     - method: POST
-      path: /admin/runtime/internal/ws-bus/grant
+      path: /admin/runtime/ws-bus/grant
       permission:
         action: create
         resource: integration
     - method: POST
-      path: /admin/runtime/internal/ws-bus/publish
+      path: /admin/runtime/ws-bus/publish
+      permission:
+        action: create
+        resource: integration
+    - method: POST
+      path: /admin/runtime/event-fabric/topics
       permission:
         action: create
         resource: integration

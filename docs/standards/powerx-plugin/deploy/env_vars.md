@@ -172,14 +172,14 @@ PowerX 通用能力统一通过 Integration Gateway 调用，需要为宿主与 
 | --- | --- | --- |
 | `PX_GATEWAY_BASE_URL` | `https://gateway.powerx.dev/_tenant` / `http://localhost:8080` | Gateway HTTP 入口，宿主由运维注入，Skeleton `.env.local` 指向 Dev 环境。 |
 | `PX_PLUGIN_TOOL_TOKEN` | `sts-1u8c5e...` | 宿主模式下由 Admin/部署系统注入的 Tool Grant，供后端/前端调用 Gateway。 |
-| `PX_TOOL_TOKEN` | `sts-dev-9ad3...` | Skeleton 本地通过 `px-plugin login --manifest ./skeleton/plugin.yaml` 生成的临时 Token，写入 `.env.local`。 |
+| `PX_PLUGIN_TOOL_TOKEN` | `sts-dev-9ad3...` | Skeleton 本地通过 `px-plugin login --manifest ./skeleton/plugin.yaml` 生成的临时 Token，写入 `.env.local`。 |
 | `PX_TOOL_REFRESH_TOKEN` | `sts-dev-refresh-xxxx` | 配套 refresh token，Skeleton 可在 Token 过期或 24 小时内到期时自动调用 `/admin/user/auth/refresh` 获取新的 Tool Token。 |
 | `PX_USE_MOCK` | `media,eventfabric` | Skeleton 可选，指定需要走内存 Mock 的能力模块。 |
 
 使用建议：
 
 1. **宿主模式**：在部署 YAML 或环境注入脚本中设置 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`，后端读取后写入 Gateway Client，并通过插件自有 API 暴露调用入口；租户从 token 的 `tid` claim 自动推导。
-2. **Skeleton 模式**：执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 后会在 `~/.powerx/credentials` 生成 Token，使用脚本写入 `skeleton/.env.local` 中的 `PX_GATEWAY_BASE_URL`、`PX_TOOL_TOKEN`。
+2. **Skeleton 模式**：执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 后会在 `~/.powerx/credentials` 生成 Token，使用脚本写入 `skeleton/.env.local` 中的 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`。
 3. **Mock/降级**：当 Dev Gateway 不可达时，将 `PX_USE_MOCK` 设置为能力模块名（如 `media`），框架会自动切换内存实现并在日志中提示。
 4. **安全性**：Token 属于短期凭证，建议在启动时检测其过期时间；自动刷新失败时应阻断调用并提示开发者重新登录或联系宿主运维。
 

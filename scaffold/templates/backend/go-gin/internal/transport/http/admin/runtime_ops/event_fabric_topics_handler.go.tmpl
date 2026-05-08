@@ -249,7 +249,7 @@ func resolveGatewayAuthHeader(deps *app.Deps, outboundBearer string) (string, er
 			return "Bearer " + outboundBearer, nil
 		}
 		if toolToken == "" {
-			return "", fmt.Errorf("PX_TOOL_TOKEN is required for bearer mode")
+			return "", fmt.Errorf("PX_PLUGIN_TOOL_TOKEN is required for bearer mode")
 		}
 		return "Bearer " + toolToken, nil
 	default:

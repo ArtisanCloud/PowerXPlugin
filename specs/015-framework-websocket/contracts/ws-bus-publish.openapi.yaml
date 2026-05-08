@@ -3,7 +3,7 @@ info:
   title: WS Bus Publish (Host)
   version: 1.0.0
 paths:
-  /api/v1/admin/runtime/internal/ws-bus/publish:
+  /api/v1/admin/runtime/ws-bus/publish:
     post:
       summary: Publish WS Bus event
       requestBody:
@@ -41,7 +41,7 @@ paths:
                     type: string
                   error:
                     nullable: true
-  /api/v1/admin/runtime/internal/ws-bus/grant:
+  /api/v1/admin/runtime/ws-bus/grant:
     post:
       summary: Register WS Bus topics
       requestBody:

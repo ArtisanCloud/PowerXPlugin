@@ -161,7 +161,7 @@ Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：�
 
 - 底座启用插件时会扫描插件安装目录内的 `event_fabric.yaml` 并播种 topic/ACL。
 - Topic 真相源是 `event_topics`。
-- `POST /api/v1/internal/ws-bus/grant` 只做授权绑定，不创建 topic。
+- `POST /api/v1/admin/runtime/ws-bus/grant` 只做授权绑定，不创建 topic。
 
 联调顺序（Standalone + Proxy）：
 

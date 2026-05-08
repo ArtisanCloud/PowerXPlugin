@@ -11,7 +11,7 @@
 > 环境加载说明：
 > - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。
 > - `.env` 会覆盖 `config.yaml` 与进程已有环境变量；如 GoLand Run Config 仍残留 `POWERX_PROXY=0`/`IAM_MODE=local`，请先清理。
-> - Delegated 场景除 `POWERX_PROXY=1` 外，还需配置 `PX_GATEWAY_BASE_URL/PX_TOOL_TOKEN`；租户从 token `tid` 自动推导。
+> - Delegated 场景除 `POWERX_PROXY=1` 外，还需配置 `PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN`；租户从 token `tid` 自动推导。
 >
 > **主口径**：
 > - `IAMMode` 决定 IAM 语义（`local` / `delegated`）

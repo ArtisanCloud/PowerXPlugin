@@ -13,9 +13,10 @@ import (
 )
 
 type wsBusTestFlowRequest struct {
-	Topic   string `json:"topic"`
-	TraceID string `json:"trace_id"`
-	Payload any    `json:"payload"`
+	Topic      string `json:"topic"`
+	TraceID    string `json:"trace_id"`
+	ForceLocal bool   `json:"force_local"`
+	Payload    any    `json:"payload"`
 }
 
 // WSBusTestFlowHandler runs grant -> publish in one unified backend entry.
@@ -53,6 +54,9 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 
 		outboundBearer := ""
 		hostCfg, useHost := resolveWSBusHostClientConfig(deps)
+		if req.ForceLocal {
+			useHost = false
+		}
 		if useHost {
 			outboundBearer = resolveGatewayBearerToken(c, deps)
 			logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
@@ -120,22 +124,28 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 		}
 
 		// Ensure UI probe can always observe an event frame on current plugin WS session.
-		// In proxy mode this acts as local echo while host publish still executes above.
-		echoResult := fwwsbus.NewLocalPublisher(deps.WSBusHub, nil).Publish(
-			context.Background(),
-			topic,
-			payload,
-			fwwsbus.PublishOptions{
-				TenantUUID: tenantUUID,
-				TraceID:    traceID,
-			},
-		)
-		if !echoResult.OK {
-			contracts.ResponseError(c, http.StatusBadRequest, echoResult.ErrorCode, echoResult.ErrorMessage)
-			return
+		// Only host flow needs local echo; local flow already publishes directly to local hub.
+		echoResult := fwwsbus.PublishResult{OK: true}
+		if useHost {
+			echoResult = fwwsbus.NewLocalPublisher(deps.WSBusHub, nil).Publish(
+				context.Background(),
+				topic,
+				payload,
+				fwwsbus.PublishOptions{
+					TenantUUID: tenantUUID,
+					TraceID:    traceID,
+				},
+			)
+			if !echoResult.OK {
+				contracts.ResponseError(c, http.StatusBadRequest, echoResult.ErrorCode, echoResult.ErrorMessage)
+				return
+			}
 		}
 
 		flowMode := "local_only"
+		if req.ForceLocal {
+			flowMode = "local_forced"
+		}
 		if useHost {
 			flowMode = "host_fallback_local_only"
 			if hostReachable && hostGrantOK && hostPublishOK {

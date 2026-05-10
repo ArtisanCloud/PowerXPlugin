@@ -5,6 +5,7 @@ import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 import { useRouter, useToast } from "#imports";
 import { useHostCtxStore } from "~/stores/hostCtx";
 import { PLUGIN_ID } from "~/utils/powerx-bridge";
+import { createFrameworkLogger } from "../../../../../../framework/frontend/nuxt/framework-client/logger";
 
 type Json = Record<string, any>;
 
@@ -142,6 +143,7 @@ function applyHttpShortcuts(client: ApiClientInstance) {
 let _client: ApiClientInstance | null = null;
 let _baseURL: string | null = null;
 let _clientEnv: "client" | "server" | null = null;
+const logger = createFrameworkLogger("api.client");
 
 export function useApiClient() {
   const env = typeof window === "undefined" ? "server" : "client";
@@ -247,7 +249,7 @@ export function useApiClient() {
       headers.set("X-PowerX-CTX-JWT", ctxPayload.ctxJwt);
     }
     if (debugCtx && ctxKey) {
-      console.info("[Plugin][api] ctx headers", {
+      logger.info("ctx headers", {
         key: ctxKey,
         hasCtx: Boolean(ctxPayload?.ctx),
         hasCtxSig: Boolean(ctxPayload?.ctxSig),
@@ -301,7 +303,7 @@ export function useApiClient() {
   };
   const authDebug = (event: string, extra?: Record<string, any>) => {
     if (!authDebugEnabled()) return;
-    console.info(`[api/_client] ${event}`, extra || {});
+    logger.info(`auth debug: ${event}`, extra || {});
   };
   const dumpAuthSource = (phase: string, authToken: string | null, headers: Headers) => {
     if (!authDebugEnabled()) return;
@@ -357,7 +359,7 @@ export function useApiClient() {
     const auth = await resolveAuth();
     if (!auth) return;
     if (response.status === 503) {
-      console.error("API error:", response.status, response._data);
+      logger.error("api error", { status: response.status, data: response._data });
       const message = response._data?.message || "宿主认证不可用，请稍后重试";
       auth.failClosed?.(message);
       if (process.client) {
@@ -367,7 +369,7 @@ export function useApiClient() {
       return;
     }
     if (response.status === 401) {
-      console.error("API error:", response.status, response._data);
+      logger.error("api error", { status: response.status, data: response._data });
       const hasAuthHeader = Boolean(
         prepared?.headers instanceof Headers
           ? prepared.headers.get("Authorization")

@@ -2,6 +2,7 @@ import { getAuthToken, getTenantUuid, resolveApiBase } from "~/composables/api/_
 import { useApiClient } from "~/composables/api/_client";
 import { resolveFrontendRuntimeMode } from "~/utils/runtime-mode";
 import { createPluginWsClient } from "../../../../../framework/frontend/nuxt/framework-client/ws";
+import { createFrameworkLogger } from "../../../../../framework/frontend/nuxt/framework-client/logger";
 
 export type NotificationWsState =
   | "idle"
@@ -33,13 +34,9 @@ export interface NotificationWsDiag {
 
 const MAX_EVENTS = 50;
 const RECONNECT_DELAY_MS = 1200;
+const logger = createFrameworkLogger("notification-probe");
 
-let wsConn: WebSocket | null = null;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let closedByClient = false;
-const subscribedTopics = new Set<string>();
-
-function buildWsURL() {
+function buildWsURL(scope: string) {
   if (typeof window === "undefined") return "";
   const token = getAuthToken();
   if (!token) return "";
@@ -48,11 +45,16 @@ function buildWsURL() {
   const pluginId =
     String(runtimeConfig.public?.powerxPluginId || "").trim() ||
     "{{ .PluginID }}";
+  const isGatewayScope = scope === "gateway";
   const wsBaseURL = String(
-    runtimeConfig.public?.pxWsBaseUrl ||
-      runtimeConfig.public?.wsOrigin ||
-      runtimeConfig.public?.powerxCoreBase ||
-      (typeof window !== "undefined" ? window.location.origin : "")
+    isGatewayScope
+      ? runtimeConfig.public?.pxWsBaseUrl ||
+          runtimeConfig.public?.wsOrigin ||
+          runtimeConfig.public?.powerxCoreBase ||
+          (typeof window !== "undefined" ? window.location.origin : "")
+      : runtimeConfig.public?.wsOrigin ||
+          resolveApiBase() ||
+          (typeof window !== "undefined" ? window.location.origin : "")
   ).trim();
   const wsPath = String(
     runtimeConfig.public?.wsUrl || runtimeConfig.public?.wsPath || "/api/ws"
@@ -62,15 +64,25 @@ function buildWsURL() {
     apiBaseURL: resolveApiBase(),
     wsBaseURL,
     wsPath,
-    insidePowerX: runtimeMode.insidePowerX,
+    insidePowerX: isGatewayScope ? true : runtimeMode.insidePowerX,
     token,
     tenantUuid: getTenantUuid(),
   });
-  return ws.buildURL();
+  const url = ws.buildURL();
+  logger.debug("ws url built", {
+    mode: runtimeMode.mode,
+    scope,
+    insidePowerX: runtimeMode.insidePowerX,
+    wsBaseURL,
+    wsPath,
+    wsURL: url,
+    tenantUuid: getTenantUuid(),
+  });
+  return url;
 }
 
-function resolveDefaultTopic() {
-  return "_topic.system.notification";
+function resolveDefaultTopic(fallback?: string) {
+  return String(fallback || "_topic.system.notification").trim();
 }
 
 function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent {
@@ -89,14 +101,20 @@ function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent
   };
 }
 
-export function useNotificationProbe() {
-  const wsState = useState<NotificationWsState>("notifications.ws.state", () => "idle");
-  const wsError = useState<string>("notifications.ws.error", () => "");
-  const lastEventAt = useState<string>("notifications.lastEventAt", () => "");
-  const lastEventTopic = useState<string>("notifications.lastEventTopic", () => "");
-  const unreadCount = useState<number>("notifications.unreadCount", () => 0);
-  const events = useState<NotificationProbeEvent[]>("notifications.events", () => []);
-  const wsDiag = useState<NotificationWsDiag>("notifications.ws.diag", () => ({
+export function useNotificationProbe(scope = "default", defaultTopic = "_topic.system.notification") {
+  let wsConn: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let closedByClient = false;
+  const subscribedTopics = new Set<string>();
+
+  const statePrefix = `notifications.${scope}`;
+  const wsState = useState<NotificationWsState>(`${statePrefix}.ws.state`, () => "idle");
+  const wsError = useState<string>(`${statePrefix}.ws.error`, () => "");
+  const lastEventAt = useState<string>(`${statePrefix}.lastEventAt`, () => "");
+  const lastEventTopic = useState<string>(`${statePrefix}.lastEventTopic`, () => "");
+  const unreadCount = useState<number>(`${statePrefix}.unreadCount`, () => 0);
+  const events = useState<NotificationProbeEvent[]>(`${statePrefix}.events`, () => []);
+  const wsDiag = useState<NotificationWsDiag>(`${statePrefix}.ws.diag`, () => ({
     subSent: false,
     ackOK: false,
     eventOK: false,
@@ -177,10 +195,11 @@ export function useNotificationProbe() {
       return;
     }
 
-    const wsURL = buildWsURL();
+    const wsURL = buildWsURL(scope);
     if (!wsURL) {
       wsState.value = "error";
       wsError.value = "缺少登录 token，已跳过 WS 连接";
+      logger.warn("ws connect skipped: missing token");
       return;
     }
 
@@ -191,17 +210,19 @@ export function useNotificationProbe() {
 
     const socket = new WebSocket(wsURL);
     wsConn = socket;
+    logger.info("ws connecting", { mode: resolveFrontendRuntimeMode().mode, tenantUuid: getTenantUuid(), wsURL });
 
     socket.onopen = () => {
       wsState.value = "connected";
       wsError.value = "";
       wsDiag.value.connectedOK = true;
-      const defaultTopic = resolveDefaultTopic();
-      if (defaultTopic) {
-        subscribedTopics.add(defaultTopic);
+      const topic = resolveDefaultTopic(defaultTopic);
+      if (topic) {
+        subscribedTopics.add(topic);
       }
       if (subscribedTopics.size > 0) {
         wsDiag.value.subSent = true;
+        logger.info("ws subscribe sent", { topic: Array.from(subscribedTopics).join(",") });
         socket.send(
           JSON.stringify({
             type: "subscribe",
@@ -221,6 +242,7 @@ export function useNotificationProbe() {
       const msgType = String(data?.type || "").toLowerCase();
       if (msgType === "welcome") {
         wsDiag.value.welcomeOK = true;
+        logger.info("ws welcome received");
         return;
       }
       if (msgType === "ack") {
@@ -228,22 +250,29 @@ export function useNotificationProbe() {
         wsDiag.value.lastAckReqID = String(
           data?.req_id || data?.request_id || data?.payload?.req_id || ""
         );
+        logger.info("ws ack received", { requestId: wsDiag.value.lastAckReqID });
         return;
       }
       if (msgType === "event") {
         const topic = String(data?.topic || "");
         const parsed = parseIncomingEvent(topic, data?.payload || {});
         pushEvent(parsed);
+        logger.info("ws event received", {
+          topic,
+          traceId: String(data?.payload?.trace_id || data?.payload?.traceID || ""),
+        });
         return;
       }
       if (msgType === "error") {
         wsError.value = String(data?.message || "ws error");
+        logger.warn("ws error message", { detail: wsError.value });
       }
     };
 
     socket.onerror = () => {
       wsState.value = "error";
       wsError.value = "WebSocket 连接异常";
+      logger.error("ws connection error", { wsURL });
     };
 
     socket.onclose = () => {
@@ -251,10 +280,12 @@ export function useNotificationProbe() {
       if (closedByClient) {
         wsState.value = "idle";
         resetDiag();
+        logger.info("ws closed by client");
         return;
       }
       wsState.value = "reconnecting";
       resetDiag();
+      logger.warn("ws closed, scheduling reconnect", { wsURL });
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }
@@ -292,15 +323,22 @@ export function useNotificationProbe() {
     wsDiag.value.lastEventTraceID = "";
   };
 
-  const sendTestNotification = async (message?: string) => {
+  const sendTestNotification = async (
+    message?: string,
+    options?: { topic?: string; tenantUUID?: string }
+  ) => {
     const apiClient = useApiClient();
+    const topic = String(options?.topic || "").trim();
+    const tenantUUID = String(options?.tenantUUID || "").trim();
     const body = {
       message: String(message || "WebSocket probe from navbar"),
+      ...(topic ? { topic } : {}),
+      ...(tenantUUID ? { tenant_uuid: tenantUUID } : {}),
     };
     const resp: any = await apiClient.post("/admin/notifications/test", body);
-    const topic = String(resp?.data?.topic || "");
-    if (topic) {
-      subscribeTopic(topic);
+    const resolvedTopic = String(resp?.data?.topic || "").trim();
+    if (resolvedTopic) {
+      subscribeTopic(resolvedTopic);
     }
     return resp;
   };

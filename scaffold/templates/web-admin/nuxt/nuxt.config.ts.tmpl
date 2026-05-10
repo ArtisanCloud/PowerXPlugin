@@ -22,6 +22,13 @@ const resolvePluginId = () => {
 }
 const pluginId = resolvePluginId()
 const pluginAdminBase = `/_p/${pluginId}/admin/`
+const resolveInsidePowerX = () => {
+  const raw = String(process.env.NUXT_PUBLIC_INSIDE_POWERX ?? '').trim().toLowerCase()
+  if (raw === '1' || raw === 'true') return true
+  if (raw === '0' || raw === 'false') return false
+  return false
+}
+const INSIDE_POWERX = resolveInsidePowerX()
 // Allow NUXT_PUBLIC_API_BASE + PREFIX override for both standalone & proxy mode
 const joinApiBase = (base?: string | null, prefix?: string | null) => {
   if (!base) return undefined
@@ -34,8 +41,7 @@ const envApiBase = joinApiBase(process.env.NUXT_PUBLIC_API_BASE, process.env.NUX
 const defaultPluginApiBase = `/_p/${pluginId}/api/v1`
 const defaultLocalApiBase = '/api/v1'
 // Host API fallback: when处于宿主模式时始终走插件 API，其他场景才退回宿主 /api/v1
-const fallbackHostApiBase =
-  process.env.POWERX_PROXY === '1' ? defaultPluginApiBase : '/api/v1'
+const fallbackHostApiBase = INSIDE_POWERX ? defaultPluginApiBase : '/api/v1'
 const pluginApiBase = envApiBase ?? defaultPluginApiBase
 const hostApiBase = envApiBase ?? fallbackHostApiBase
 const localApiBase = envApiBase ?? defaultLocalApiBase
@@ -60,15 +66,15 @@ const registerConnectOrigin = (candidate?: string | null) => {
 }
 const powerxCoreBase =
   process.env.NUXT_PUBLIC_POWERX_CORE_BASE ||
-  'http://localhost:8077'
+  'http://127.0.0.1:8077'
 const pxGatewayBaseURL = process.env.PX_GATEWAY_BASE_URL || ''
+const pxWsBaseURL = process.env.PX_WS_BASE_URL || process.env.NUXT_PUBLIC_PX_WS_BASE_URL || ''
 const wsOrigin = process.env.NUXT_PUBLIC_WS_ORIGIN || ''
 const wsPath = process.env.NUXT_PUBLIC_WS_PATH || '/api/ws'
 const rootDir = fileURLToPath(new URL('./', import.meta.url))
 const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
 
-const INSIDE_POWERX = process.env.POWERX_PROXY === '1'
 const resolveIAMMode = () => {
   const raw = (
     process.env.NUXT_PUBLIC_IAM_MODE ??
@@ -106,6 +112,8 @@ const rawBridgeDebug = process.env.NUXT_PUBLIC_BRIDGE_DEBUG ?? process.env.BRIDG
 const BRIDGE_DEBUG = rawBridgeDebug !== undefined
   ? /^(1|true)$/i.test(String(rawBridgeDebug))
   : !INSIDE_POWERX
+const frameworkLogEnabled = process.env.NUXT_PUBLIC_FRAMEWORK_LOG_ENABLED ?? (BRIDGE_DEBUG ? 'true' : 'false')
+const frameworkLogLevel = process.env.NUXT_PUBLIC_FRAMEWORK_LOG_LEVEL || (BRIDGE_DEBUG ? 'debug' : 'warn')
 
 // Dev-time proxy: always forward /api + ws; add /_p/.../api only in proxy mode
 const devProxy: Record<string, any> = {
@@ -278,8 +286,11 @@ export default defineNuxtConfig({
       delegatedMode: DELEGATED_MODE,
       pluginAdminBase,
       bridgeDebug: BRIDGE_DEBUG,
+      frameworkLogEnabled,
+      frameworkLogLevel,
       powerxCoreBase,
       pxGatewayBaseUrl: pxGatewayBaseURL,
+      pxWsBaseUrl: pxWsBaseURL,
       wsOrigin,
       wsPath,
       powerx: {

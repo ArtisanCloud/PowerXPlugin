@@ -39,10 +39,9 @@ admin_console:
 ### 2.3 `gateway`
 - `base_url`
 - `auth_scheme`：`bearer | apikey`
-- `tool_token`：`auth_scheme=bearer` 时必填
-- `api_key`：`auth_scheme=apikey` 时必填
-- `refresh_token`：仅 Bearer 刷新链路使用
-- `tenant_uuid`：仅 Bearer 本地兼容场景可选，proxy 场景由宿主按凭证解析租户
+- 宿主 delegated + `bearer`：通过 STS token provider 获取 `aud=powerx:api` 的短期 token
+- `api_key`：`auth_scheme=apikey` 时必填，仅 standalone 本地联调使用
+- `tenant_uuid`：显式租户上下文字段；不再从静态 bearer token 推导
 - `timeout/user_agent`
 - `use_mock`
 

@@ -17,7 +17,7 @@ func TestContractStatusLoadsDigest(t *testing.T) {
 	client, err := NewClient(Config{
 		BaseURL:            "https://example.com",
 		AuthScheme:         "bearer",
-		ToolToken:          "token",
+		BearerToken:        "token",
 		TenantUUID:         "tenant",
 		ContractDigestPath: digestPath,
 	})
@@ -52,7 +52,7 @@ func TestContractStatusDetectsMismatch(t *testing.T) {
 	client, err := NewClient(Config{
 		BaseURL:            "https://example.com",
 		AuthScheme:         "bearer",
-		ToolToken:          "token",
+		BearerToken:        "token",
 		TenantUUID:         "tenant",
 		ContractVersion:    "hash-remote",
 		ContractDigestPath: digestPath,

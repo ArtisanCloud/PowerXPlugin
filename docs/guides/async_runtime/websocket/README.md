@@ -20,9 +20,9 @@
 
 1. Standalone 模式可连接插件 WS：`ws://<plugin-host>/api/ws`。
 2. 宿主内嵌模式（`POWERX_PROXY=1`）前端必须连接宿主 WS：`ws://<host>/api/ws`（Contract v2：`NUXT_PUBLIC_WS_ORIGIN + NUXT_PUBLIC_WS_PATH`）。
-3. proxy 场景下插件调用宿主 `grant/publish` 的出站鉴权优先使用宿主契约凭证：
-   - 标准与默认：`PX_GATEWAY_AUTH_SCHEME=bearer` + `PX_PLUGIN_TOOL_TOKEN`
-   - `PX_GATEWAY_API_KEY` 仅本地 `local+proxy` 联调可选
+3. proxy 场景下插件调用宿主 `grant/publish` 的出站鉴权统一使用 STS access token（`aud=powerx:api`）。
+   - 宿主模式由 `POWERX_STS_CLIENT_ID` / `POWERX_STS_CLIENT_SECRET` / `POWERX_GRPC_UPSTREAM_*` 注入。
+   - `PX_GATEWAY_API_KEY` 仅 standalone 本地联调可选。
 4. `grant/publish` 不再默认透传入站 delegated/user bearer（避免 `invalid audience`）。
 
 ## 4. 统一联调入口（新增）

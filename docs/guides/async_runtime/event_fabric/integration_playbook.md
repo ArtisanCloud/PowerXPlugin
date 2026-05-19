@@ -13,7 +13,7 @@ export USER_TOKEN="<plugin-user-token>"
 2. 执行层文件 `config/event_fabric.yaml` 已同步（框架会按多路径兼容扫描）
 3. 后端默认强鉴权
 4. proxy 场景已准备可用出站凭证，并配置到插件：
-   - 标准与默认：`PX_GATEWAY_AUTH_SCHEME=bearer` + `PX_PLUGIN_TOOL_TOKEN=<token>`
+   - 宿主模式标准：STS access token（由 `POWERX_STS_CLIENT_ID` / `POWERX_STS_CLIENT_SECRET` 交换）
    - ApiKey（仅 local+proxy 联调可选）：`PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY=<key>`
 
 ## 1.1 Standalone+Proxy 标准流程（对齐 PowerX）

@@ -3,8 +3,6 @@ package bootstrap
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -54,7 +52,6 @@ type GatewayConfig struct {
 	BaseURL            string
 	APIPrefix          string
 	AuthScheme         string
-	ToolToken          string
 	APIKey             string
 	TenantID           string
 	GRPCTarget         string
@@ -137,15 +134,11 @@ func NewAppFromEnv(opts ...Option) *App {
 		BaseURL:         getEnvOrDefault("PX_GATEWAY_BASE_URL", ""),
 		APIPrefix:       getEnvOrDefault("PX_GATEWAY_API_PREFIX", "/api/v1"),
 		AuthScheme:      strings.TrimSpace(os.Getenv("PX_GATEWAY_AUTH_SCHEME")),
-		ToolToken:       resolveGatewayToolTokenByMode(),
 		APIKey:          firstNonEmpty(strings.TrimSpace(os.Getenv("PX_GATEWAY_API_KEY")), strings.TrimSpace(os.Getenv("PX_PLUGIN_API_KEY"))),
 		GRPCTarget:      strings.TrimSpace(os.Getenv("PX_GATEWAY_GRPC_TARGET")),
 		ContractVersion: strings.TrimSpace(os.Getenv("PX_GATEWAY_CONTRACT_VERSION")),
 	}
-	cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(cfg.Gateway.AuthScheme, cfg.Gateway.ToolToken, cfg.Gateway.APIKey)
-	if cfg.Gateway.AuthScheme == "bearer" {
-		cfg.Gateway.TenantID = tenantIDFromJWT(cfg.Gateway.ToolToken)
-	}
+	cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(cfg.Gateway.AuthScheme, cfg.Gateway.APIKey)
 	if timeoutStr := strings.TrimSpace(os.Getenv("PX_GATEWAY_TIMEOUT")); timeoutStr != "" {
 		if d, err := time.ParseDuration(timeoutStr); err == nil {
 			cfg.Gateway.Timeout = d
@@ -240,18 +233,13 @@ func (a *App) initGatewayClient() {
 	}
 	authScheme := normalizeGatewayAuthScheme(
 		a.Config.Gateway.AuthScheme,
-		a.Config.Gateway.ToolToken,
 		a.Config.Gateway.APIKey,
 	)
 	tenantID := strings.TrimSpace(a.Config.Gateway.TenantID)
-	if authScheme == "bearer" && tenantID == "" {
-		tenantID = tenantIDFromJWT(a.Config.Gateway.ToolToken)
-	}
 	gcfg := gateway.Config{
 		BaseURL:    a.Config.Gateway.BaseURL,
 		APIPrefix:  a.Config.Gateway.APIPrefix,
 		AuthScheme: authScheme,
-		ToolToken:  a.Config.Gateway.ToolToken,
 		APIKey:     a.Config.Gateway.APIKey,
 		TenantUUID: tenantID,
 	}
@@ -305,11 +293,11 @@ func (cfg GatewayConfig) enabled() bool {
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return false
 	}
-	scheme := normalizeGatewayAuthScheme(cfg.AuthScheme, cfg.ToolToken, cfg.APIKey)
+	scheme := normalizeGatewayAuthScheme(cfg.AuthScheme, cfg.APIKey)
 	if scheme == "apikey" {
 		return strings.TrimSpace(cfg.APIKey) != ""
 	}
-	return strings.TrimSpace(cfg.ToolToken) != ""
+	return false
 }
 
 func getEnvOrDefault(key, fallback string) string {
@@ -340,77 +328,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func resolveGatewayToolTokenByMode() string {
-	pluginToken := strings.TrimSpace(os.Getenv("PX_PLUGIN_TOOL_TOKEN"))
-	if pluginToken != "" {
-		return pluginToken
-	}
-	legacyToken := strings.TrimSpace(os.Getenv("PX_TOOL_TOKEN"))
-	if legacyToken == "" {
-		return ""
-	}
-
-	mode := resolveIAMModeFromEnv()
-	proxyEnabled := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
-
-	// delegated + host 场景严格收敛：禁止 PX_TOOL_TOKEN fallback。
-	if mode == "delegated" && proxyEnabled {
-		slog.Warn("gateway token fallback denied",
-			"mode", "delegated",
-			"host_proxy", true,
-			"required_env", "PX_PLUGIN_TOOL_TOKEN",
-			"legacy_env", "PX_TOOL_TOKEN",
-		)
-		return ""
-	}
-
-	// local + proxy 保留短期兼容，并给出迁移告警。
-	if mode == "local" && proxyEnabled {
-		slog.Warn("gateway token fallback is deprecated",
-			"mode", "local",
-			"host_proxy", true,
-			"preferred_env", "PX_PLUGIN_TOOL_TOKEN",
-			"legacy_env", "PX_TOOL_TOKEN",
-		)
-	}
-	return legacyToken
-}
-
-func resolveIAMModeFromEnv() string {
-	mode := strings.ToLower(strings.TrimSpace(os.Getenv("IAM_MODE")))
-	if mode == "" {
-		mode = strings.ToLower(strings.TrimSpace(os.Getenv("IAMMode")))
-	}
-	if mode == "delegated" {
-		return "delegated"
-	}
-	return "local"
-}
-
-func tenantIDFromJWT(token string) string {
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return ""
-	}
-	parts := strings.Split(token, ".")
-	if len(parts) < 2 {
-		return ""
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return ""
-	}
-	var claims map[string]any
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return ""
-	}
-	if tid, ok := claims["tid"].(string); ok {
-		return strings.TrimSpace(tid)
-	}
-	return ""
-}
-
-func normalizeGatewayAuthScheme(raw, toolToken, apiKey string) string {
+func normalizeGatewayAuthScheme(raw, apiKey string) string {
 	s := strings.ToLower(strings.TrimSpace(raw))
 	switch s {
 	case "apikey", "api_key", "api-key":
@@ -418,7 +336,7 @@ func normalizeGatewayAuthScheme(raw, toolToken, apiKey string) string {
 	case "bearer":
 		return "bearer"
 	}
-	if strings.TrimSpace(apiKey) != "" && strings.TrimSpace(toolToken) == "" {
+	if strings.TrimSpace(apiKey) != "" {
 		return "apikey"
 	}
 	return "bearer"

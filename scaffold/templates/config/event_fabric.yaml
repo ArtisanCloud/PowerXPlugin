@@ -20,3 +20,7 @@ topics:
     description: 模板更新完成事件
     acl:
       - actions: [publish]
+  - topic: powerx.runtime.scheduler.triggered.v1
+    description: Scheduler 标准触发事件
+    acl:
+      - actions: [publish, subscribe]

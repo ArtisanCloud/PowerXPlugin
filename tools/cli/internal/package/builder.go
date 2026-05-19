@@ -650,10 +650,37 @@ func detectGitCommit(entry string) string {
 }
 
 func defaultFrontendBuild(ctx context.Context, opts *Options) error {
+	if err := ensureFrontendDeps(ctx, opts.FrontendDir); err != nil {
+		return err
+	}
 	cmd := exec.CommandContext(ctx, "npm", "--prefix", opts.FrontendDir, "run", "build")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func ensureFrontendDeps(ctx context.Context, frontendDir string) error {
+	nuxiPath := filepath.Join(frontendDir, "node_modules", "nuxi", "bin", "nuxi.mjs")
+	if _, err := os.Stat(nuxiPath); err == nil {
+		return nil
+	}
+
+	lockfile := filepath.Join(frontendDir, "package-lock.json")
+	installArgs := []string{"--prefix", frontendDir, "install"}
+	if _, err := os.Stat(lockfile); err == nil {
+		installArgs = []string{"--prefix", frontendDir, "ci"}
+	}
+
+	cmd := exec.CommandContext(ctx, "npm", installArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("frontend deps install failed: %w", err)
+	}
+	if _, err := os.Stat(nuxiPath); err != nil {
+		return fmt.Errorf("frontend deps installed but nuxi still missing at %s: %w", nuxiPath, err)
+	}
+	return nil
 }
 
 func defaultBackendBuild(ctx context.Context, opts *Options, outputPath string) error {

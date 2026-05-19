@@ -36,7 +36,7 @@ disconnect()
 - `?authorization=Bearer <token>`
 - 或子协议：`Sec-WebSocket-Protocol: bearer.<b64url(jwt)>`
 - 可选 `tenant_uuid` query/body 兜底
-- `POST /api/v1/admin/runtime/ws-bus/publish` 的 tenant 解析优先级：入站 token/上下文 `tid` > 请求体 `tenant_uuid`（仅无入站租户时） > `PX_PLUGIN_TOOL_TOKEN.tid`（local） > `gateway.tenant_uuid`（兼容）
+- `POST /api/v1/admin/runtime/ws-bus/publish` 的 tenant 解析优先级：入站 token/上下文 `tid` > 请求体 `tenant_uuid`（仅无入站租户时） > `gateway.tenant_uuid`
 - 若请求体 `tenant_uuid` 与入站 token `tid` 不一致，返回 `tenant mismatch`（403）
 
 ## 5. 协议（简版提醒）

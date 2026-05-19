@@ -13,17 +13,28 @@
       </template>
 
       <div class="flex items-center gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
+        <UButton size="xs" :variant="activeTab === 'notification' ? 'solid' : 'soft'" color="info" @click="activeTab = 'notification'">通知测试</UButton>
         <UButton size="xs" :variant="activeTab === 'gateway' ? 'solid' : 'soft'" color="primary" @click="activeTab = 'gateway'">网关WS测试</UButton>
         <UButton size="xs" :variant="activeTab === 'local' ? 'solid' : 'soft'" color="success" @click="activeTab = 'local'">本地WS测试</UButton>
+        <UButton size="xs" :variant="activeTab === 'scheduler-local' ? 'solid' : 'soft'" color="warning" @click="activeTab = 'scheduler-local'">本地 Scheduler</UButton>
+        <UButton size="xs" :variant="activeTab === 'scheduler-host' ? 'solid' : 'soft'" color="primary" @click="activeTab = 'scheduler-host'">网关 Scheduler</UButton>
       </div>
 
-      <div v-if="activeTab === 'gateway'" class="space-y-6 pt-4">
+      <div v-if="activeTab === 'notification'" class="space-y-6 pt-4">
         <div class="flex items-end gap-3 flex-wrap">
           <div class="flex items-center gap-3">
             <UButton size="sm" color="info" icon="i-heroicons-bell-alert" :loading="capabilityNotifying" @click="sendCapabilityNotification">{{ $t("frameworkLab.sendCapabilityButton") }}</UButton>
+          </div>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">通知测试只验证 capability 调用链路；WS Bus 和 Scheduler 调试在各自 tab 内执行。</p>
+        </div>
+      </div>
+
+      <div v-else-if="activeTab === 'gateway'" class="space-y-6 pt-4">
+        <div class="flex items-end gap-3 flex-wrap">
+          <div class="flex items-center gap-3">
             <UButton size="sm" color="primary" icon="i-heroicons-signal" :loading="gatewayWsNotifying" @click="runWSBusFlow">网关WS测试通知</UButton>
           </div>
-          <p class="w-full text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.hint") }}</p>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">网关 WS 测试会显式请求 host/proxy 流程，并在本地 WS 会话回显诊断事件。</p>
         </div>
 
         <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
@@ -50,7 +61,7 @@
         </div>
       </div>
 
-      <div v-else class="space-y-6 pt-4">
+      <div v-else-if="activeTab === 'local'" class="space-y-6 pt-4">
         <div class="flex items-end gap-3 flex-wrap">
           <div class="flex items-center gap-3">
             <UButton size="sm" color="success" icon="i-heroicons-bolt" :loading="localWsNotifying" @click="runLocalWSFlow">本地WS测试通知</UButton>
@@ -76,6 +87,69 @@
           <p>diag.last_event.trace_id: <span class="font-mono">{{ localWsDiag.lastEventTraceID || "-" }}</span></p>
         </div>
       </div>
+
+      <div v-else class="space-y-6 pt-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <UButton size="sm" :color="schedulerMode === 'host' ? 'primary' : 'warning'" icon="i-heroicons-clock" :loading="schedulerCreating" @click="createSchedulerSample">创建 Scheduler 样例</UButton>
+          <UButton size="sm" color="primary" variant="soft" icon="i-heroicons-arrow-path" :loading="schedulerListing" @click="refreshSchedulerJobs">刷新列表</UButton>
+          <UButton size="sm" color="success" icon="i-heroicons-play" :disabled="!selectedSchedulerJobID" :loading="schedulerTriggering" @click="triggerSelectedSchedulerJob">立即触发</UButton>
+          <UButton size="sm" color="neutral" variant="soft" icon="i-heroicons-pause" :disabled="!selectedSchedulerJobID" :loading="schedulerPausing" @click="pauseSelectedSchedulerJob">暂停</UButton>
+          <UButton size="sm" color="success" variant="soft" icon="i-heroicons-play-circle" :disabled="!selectedSchedulerJobID" :loading="schedulerResuming" @click="resumeSelectedSchedulerJob">恢复</UButton>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400">当前 Scheduler 模式：{{ schedulerMode === "host" ? "网关测试，会显式走 HostProvider/proxy 调试入口" : "本地测试，会在插件进程内创建并触发事件" }}。</p>
+
+        <div class="grid gap-2 text-sm text-gray-600 dark:text-gray-300 md:grid-cols-2">
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Scheduler Provider: <span>{{ schedulerMode }}</span></p>
+          <p>Tenant UUID: <span class="font-mono">{{ schedulerTenantUUID || "-" }}</span></p>
+          <p>Selected Job: <span class="font-mono">{{ selectedSchedulerJobID || "-" }}</span></p>
+          <p>Last Action: <span>{{ schedulerLastAction || "idle" }}</span></p>
+          <p>Last Topic: <span class="font-mono">{{ schedulerLastTopic || "-" }}</span></p>
+          <p>Next Run At: <span>{{ selectedSchedulerNextRunAt || "-" }}</span></p>
+          <p>Last Error: <span>{{ schedulerLastError || "-" }}</span></p>
+          <p>Notify Topic: <span class="font-mono">{{ schedulerNotifyTopic || "-" }}</span></p>
+          <p>Last Notify At: <span>{{ schedulerLastNotifyAt || "-" }}</span></p>
+          <p>Last Notify Title: <span>{{ schedulerLastNotifyTitle || "-" }}</span></p>
+          <p>Last Notify Message: <span>{{ schedulerLastNotifyMessage || "-" }}</span></p>
+        </div>
+
+        <div class="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
+          <table class="min-w-full text-left text-sm">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+              <tr>
+                <th class="px-3 py-2">任务</th>
+                <th class="px-3 py-2">类型</th>
+                <th class="px-3 py-2">状态</th>
+                <th class="px-3 py-2">表达式</th>
+                <th class="px-3 py-2">Action</th>
+                <th class="px-3 py-2">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="job in schedulerJobs" :key="job.job_id" class="border-t border-gray-200 dark:border-gray-800">
+                <td class="px-3 py-2">
+                  <button class="text-left font-medium text-primary-500 hover:underline" @click="selectedSchedulerJobID = job.job_id">{{ job.name }}</button>
+                  <div class="font-mono text-xs text-gray-500">{{ job.job_id }}</div>
+                </td>
+                <td class="px-3 py-2">{{ job.schedule_type }}</td>
+                <td class="px-3 py-2">{{ job.status }}</td>
+                <td class="px-3 py-2 font-mono">{{ job.schedule_expr }}</td>
+                <td class="px-3 py-2 font-mono">{{ job.payload?.business_action || "-" }}</td>
+                <td class="px-3 py-2">
+                  <div class="flex gap-2">
+                    <UButton size="xs" color="success" variant="soft" @click="triggerSchedulerJobByID(job.job_id)">触发</UButton>
+                    <UButton size="xs" color="neutral" variant="soft" :disabled="job.status === 'completed'" @click="pauseSchedulerJobByID(job.job_id)">暂停</UButton>
+                    <UButton size="xs" color="success" variant="soft" :disabled="job.status === 'completed'" @click="resumeSchedulerJobByID(job.job_id)">恢复</UButton>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="schedulerJobs.length === 0">
+                <td colspan="6" class="px-3 py-6 text-center text-gray-500">暂无 Scheduler Job</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </UCard>
 
     <ToastAlert v-model="toast.visible" :title="toast.title" :message="toast.message" :color="toast.color" :duration="toast.duration" />
@@ -92,12 +166,23 @@ import { resolveFrontendRuntimeMode } from "~/utils/runtime-mode"
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context"
 import { useUserStore } from "~/stores/user"
 import { useApiClient } from "~/composables/api/_client"
+import { useSchedulerApi, type SchedulerJob } from "~/composables/api/useScheduler"
 
 type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
 
 const capabilityNotifying = ref(false)
 const gatewayWsNotifying = ref(false)
 const localWsNotifying = ref(false)
+const schedulerCreating = ref(false)
+const schedulerListing = ref(false)
+const schedulerTriggering = ref(false)
+const schedulerPausing = ref(false)
+const schedulerResuming = ref(false)
+const schedulerJobs = ref<SchedulerJob[]>([])
+const selectedSchedulerJobID = ref("")
+const schedulerLastAction = ref("")
+const schedulerLastTopic = ref("")
+const schedulerLastError = ref("")
 const wsFlowTopic = ref("")
 const wsFlowTraceID = ref("")
 const wsFlowGrantStatus = ref("idle")
@@ -111,15 +196,25 @@ const localWsTopic = ref("")
 const localWsSubmitStatus = ref("idle")
 const localWsTenantFromConnection = ref("")
 const localWsTenantFromPublish = ref("")
-const activeTab = ref<"gateway" | "local">("gateway")
+const activeTab = ref<"notification" | "gateway" | "local" | "scheduler-local" | "scheduler-host">("notification")
+const schedulerMode = computed<"local" | "host">(() => activeTab.value === "scheduler-host" ? "host" : "local")
 const runtimeModeView = computed(() => resolveFrontendRuntimeMode().mode)
+const schedulerTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "00000000-0000-0000-0000-000000000001").trim())
+const schedulerRequestOptions = computed(() => ({
+  tenant_uuid: schedulerTenantUUID.value,
+  provider_mode: schedulerMode.value,
+  force_local: schedulerMode.value === "local",
+  force_host: schedulerMode.value === "host",
+}))
 
 const toast = reactive({ visible: false, title: "", message: "", color: "primary" as ToastColor, duration: 3000 })
 
 const { invoke: invokeCapability } = usePowerXCapability()
 const gatewayProbe = useNotificationProbe("gateway", "_topic.system.notification")
 const localProbe = useNotificationProbe("local", "plugin.notify.tenant.00000000-0000-0000-0000-000000000001")
+const schedulerProbe = useNotificationProbe("scheduler", "plugin.notify.tenant.00000000-0000-0000-0000-000000000001")
 const apiClient = useApiClient()
+const schedulerApi = useSchedulerApi()
 const userStore = useUserStore()
 const auth = useAuth()
 const gatewayLastEventTopic = computed(() => String(gatewayProbe.lastEventTopic.value || ""))
@@ -128,6 +223,14 @@ const gatewayWsDiag = computed(() => gatewayProbe.wsDiag.value)
 const localLastEventTopic = computed(() => String(localProbe.lastEventTopic.value || ""))
 const localLastEventAt = computed(() => String(localProbe.lastEventAt.value || ""))
 const localWsDiag = computed(() => localProbe.wsDiag.value)
+const schedulerNotifyTopic = computed(() => `plugin.notify.tenant.${schedulerTenantUUID.value}`)
+const schedulerLastNotifyAt = computed(() => String(schedulerProbe.lastEventAt.value || ""))
+const schedulerLastNotifyEvent = computed(() => schedulerProbe.events.value[0] || null)
+const schedulerLastNotifyTitle = computed(() => String(schedulerLastNotifyEvent.value?.title || ""))
+const schedulerLastNotifyMessage = computed(() => String(schedulerLastNotifyEvent.value?.message || ""))
+const selectedSchedulerJob = computed(() => schedulerJobs.value.find((job) => job.job_id === selectedSchedulerJobID.value) || null)
+const selectedSchedulerNextRunAt = computed(() => String(selectedSchedulerJob.value?.schedule_expr || selectedSchedulerJob.value?.next_run_at || ""))
+let schedulerPollTimer: ReturnType<typeof setInterval> | null = null
 
 const normalizeToString = (value: unknown) => (typeof value === "string" ? value : typeof value === "number" ? String(value) : "")
 
@@ -292,6 +395,149 @@ const runLocalWSFlow = async () => {
   }
 }
 
+const refreshSchedulerJobs = async () => {
+  schedulerListing.value = true
+  schedulerLastError.value = ""
+  try {
+    const result = await schedulerApi.listJobs({ tenant_uuid: schedulerTenantUUID.value, provider_mode: schedulerMode.value })
+    schedulerJobs.value = result.items || []
+    if (!selectedSchedulerJobID.value && schedulerJobs.value[0]?.job_id) {
+      selectedSchedulerJobID.value = schedulerJobs.value[0].job_id
+    }
+    schedulerLastAction.value = `${schedulerMode.value} list ok: jobs=${schedulerJobs.value.length}`
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "list scheduler jobs failed")
+    showToast({ title: "Scheduler 列表失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerListing.value = false
+  }
+}
+
+const startSchedulerPolling = () => {
+  if (schedulerPollTimer) {
+    clearInterval(schedulerPollTimer)
+  }
+  let rounds = 0
+  schedulerPollTimer = setInterval(async () => {
+    rounds += 1
+    await refreshSchedulerJobs()
+    if (selectedSchedulerJob.value?.status === "completed" || rounds >= 30) {
+      if (schedulerPollTimer) {
+        clearInterval(schedulerPollTimer)
+        schedulerPollTimer = null
+      }
+    }
+  }, 3000)
+}
+
+const createSchedulerSample = async () => {
+  schedulerCreating.value = true
+  schedulerLastError.value = ""
+  try {
+    const now = new Date()
+    const runAt = new Date(now.getTime() + 60_000).toISOString()
+    const traceID = makeTraceID()
+    if (schedulerMode.value === "local") {
+      schedulerProbe.connect()
+      schedulerProbe.subscribeTopic(schedulerNotifyTopic.value)
+    }
+    const job = await schedulerApi.createJob({
+      provider_mode: schedulerMode.value,
+      force_local: schedulerMode.value === "local",
+      force_host: schedulerMode.value === "host",
+      tenant_uuid: schedulerTenantUUID.value,
+      owner_type: "plugin",
+      owner_id: "com.powerx.plugins.base",
+      name: `framework_lab_once_${now.getTime()}`,
+      schedule_type: "once",
+      schedule_expr: runAt,
+      topic: "powerx.runtime.scheduler.triggered.v1",
+      idempotency_key: `framework-lab:${traceID}`,
+      payload: {
+        business_action: "framework_lab_scheduler_probe",
+        source: "framework-lab",
+        trace_id: traceID,
+        created_at: now.toISOString(),
+      },
+    })
+    selectedSchedulerJobID.value = job.job_id
+    schedulerLastTopic.value = job.topic || "powerx.runtime.scheduler.triggered.v1"
+    schedulerLastAction.value = `${schedulerMode.value} create ok: ${job.job_id}; next run at ${runAt}`
+    await refreshSchedulerJobs()
+    if (schedulerMode.value === "local") {
+      startSchedulerPolling()
+    }
+    showToast({ title: "Scheduler 创建成功", message: job.job_id, color: "success", duration: 3500 })
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "create scheduler job failed")
+    showToast({ title: "Scheduler 创建失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerCreating.value = false
+  }
+}
+
+const triggerSchedulerJobByID = async (jobID: string) => {
+  if (!jobID) return
+  schedulerTriggering.value = true
+  schedulerLastError.value = ""
+  try {
+    if (schedulerMode.value === "local") {
+      schedulerProbe.connect()
+      schedulerProbe.subscribeTopic(schedulerNotifyTopic.value)
+    }
+    const result: any = await schedulerApi.triggerJob(jobID, schedulerRequestOptions.value)
+    schedulerLastAction.value = `${schedulerMode.value} trigger ok: ${jobID}`
+    const notifyTopic = String(result?.notification?.topic || "").trim()
+    if (notifyTopic) {
+      schedulerLastTopic.value = notifyTopic
+      schedulerProbe.subscribeTopic(notifyTopic)
+    }
+    showToast({ title: "Scheduler 触发成功", message: schedulerMode.value === "local" ? "已发送本地通知" : jobID, color: "success", duration: 3500 })
+    await refreshSchedulerJobs()
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "trigger scheduler job failed")
+    showToast({ title: "Scheduler 触发失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerTriggering.value = false
+  }
+}
+
+const pauseSchedulerJobByID = async (jobID: string) => {
+  if (!jobID) return
+  schedulerPausing.value = true
+  schedulerLastError.value = ""
+  try {
+    await schedulerApi.pauseJob(jobID, schedulerRequestOptions.value)
+    schedulerLastAction.value = `${schedulerMode.value} pause ok: ${jobID}`
+    await refreshSchedulerJobs()
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "pause scheduler job failed")
+    showToast({ title: "Scheduler 暂停失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerPausing.value = false
+  }
+}
+
+const resumeSchedulerJobByID = async (jobID: string) => {
+  if (!jobID) return
+  schedulerResuming.value = true
+  schedulerLastError.value = ""
+  try {
+    await schedulerApi.resumeJob(jobID, schedulerRequestOptions.value)
+    schedulerLastAction.value = `${schedulerMode.value} resume ok: ${jobID}`
+    await refreshSchedulerJobs()
+  } catch (error: any) {
+    schedulerLastError.value = String(error?.message || "resume scheduler job failed")
+    showToast({ title: "Scheduler 恢复失败", message: schedulerLastError.value, color: "error", duration: 5000 })
+  } finally {
+    schedulerResuming.value = false
+  }
+}
+
+const triggerSelectedSchedulerJob = () => triggerSchedulerJobByID(selectedSchedulerJobID.value)
+const pauseSelectedSchedulerJob = () => pauseSchedulerJobByID(selectedSchedulerJobID.value)
+const resumeSelectedSchedulerJob = () => resumeSchedulerJobByID(selectedSchedulerJobID.value)
+
 onMounted(async () => {
   if (!userStore.context && !userStore.isLoading) {
     try {
@@ -299,6 +545,13 @@ onMounted(async () => {
     } catch {
       // ignore
     }
+  }
+})
+
+onBeforeUnmount(() => {
+  if (schedulerPollTimer) {
+    clearInterval(schedulerPollTimer)
+    schedulerPollTimer = null
   }
 })
 </script>

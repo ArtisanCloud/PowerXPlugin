@@ -490,24 +490,24 @@ func (c *HostClient) resolveAuthHeader(ctx context.Context, opts PublishOptions)
 	if strings.EqualFold(strings.TrimSpace(c.authScheme), "apikey") {
 		return fmt.Sprintf("ApiKey %s", c.credential), nil
 	}
+	if c.tokenProvider != nil {
+		token, err := c.tokenProvider(ctx)
+		if err != nil {
+			return "", fmt.Errorf("wsbus host: STS token exchange failed: %w", err)
+		}
+		token = strings.TrimSpace(token)
+		if token == "" {
+			return "", errors.New("wsbus host: STS token is empty")
+		}
+		return fmt.Sprintf("Bearer %s", token), nil
+	}
 	if token := strings.TrimSpace(opts.BearerToken); token != "" {
 		return fmt.Sprintf("Bearer %s", token), nil
 	}
 	if token := strings.TrimSpace(c.credential); token != "" {
 		return fmt.Sprintf("Bearer %s", token), nil
 	}
-	if c.tokenProvider == nil {
-		return "", errors.New("wsbus host: STS token provider is required for bearer mode")
-	}
-	token, err := c.tokenProvider(ctx)
-	if err != nil {
-		return "", fmt.Errorf("wsbus host: STS token exchange failed: %w", err)
-	}
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return "", errors.New("wsbus host: STS token is empty")
-	}
-	return fmt.Sprintf("Bearer %s", token), nil
+	return "", errors.New("wsbus host: STS token provider is required for bearer mode")
 }
 
 func authHeaderKind(value string) string {

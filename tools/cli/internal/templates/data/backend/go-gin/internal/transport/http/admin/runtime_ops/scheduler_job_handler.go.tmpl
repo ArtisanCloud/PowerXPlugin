@@ -1,0 +1,495 @@
+package runtime_ops
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+
+	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwscheduler "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"{{ .BackendModulePath }}/internal/contracts"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/gin-gonic/gin"
+)
+
+var (
+	schedulerJobStoreMu  sync.Mutex
+	schedulerJobStore    fwscheduler.Scheduler
+	schedulerJobTimerMu  sync.Mutex
+	schedulerJobTimers   = map[string]*time.Timer{}
+	schedulerJobNotifyMu sync.Mutex
+	schedulerJobNotified = map[string]bool{}
+)
+
+// SchedulerJobHandler exposes framework scheduler job management APIs for admin UI.
+type SchedulerJobHandler struct {
+	localScheduler fwscheduler.Scheduler
+	hostScheduler  fwscheduler.Scheduler
+	defaultTenant  string
+	deps           *app.Deps
+}
+
+type schedulerDebugRequest struct {
+	ProviderMode string `json:"provider_mode"`
+	ForceLocal   bool   `json:"force_local"`
+	ForceHost    bool   `json:"force_host"`
+}
+
+type schedulerJobSpecRequest struct {
+	fwscheduler.JobSpec
+	ProviderMode string `json:"provider_mode,omitempty"`
+	ForceLocal   bool   `json:"force_local,omitempty"`
+	ForceHost    bool   `json:"force_host,omitempty"`
+}
+
+// NewSchedulerJobHandler constructs scheduler job handler.
+func NewSchedulerJobHandler(deps *app.Deps) *SchedulerJobHandler {
+	defaultTenant := ""
+	if deps != nil && deps.Config != nil && deps.Config.Gateway != nil {
+		defaultTenant = strings.TrimSpace(deps.Config.Gateway.TenantUUID)
+	}
+	return &SchedulerJobHandler{
+		localScheduler: resolveSchedulerFacade(deps),
+		hostScheduler:  resolveHostSchedulerFacade(deps),
+		defaultTenant:  defaultTenant,
+		deps:           deps,
+	}
+}
+
+func resolveSchedulerFacade(deps *app.Deps) fwscheduler.Scheduler {
+	schedulerJobStoreMu.Lock()
+	defer schedulerJobStoreMu.Unlock()
+	if schedulerJobStore != nil {
+		return schedulerJobStore
+	}
+
+	sourcePlugin := app.PluginID
+	if deps != nil && deps.Config != nil {
+		if deps.Config.EventBridge != nil && strings.TrimSpace(deps.Config.EventBridge.SourcePlugin) != "" {
+			sourcePlugin = strings.TrimSpace(deps.Config.EventBridge.SourcePlugin)
+		}
+	}
+
+	var emitter fweventbridge.Emitter
+	if deps != nil {
+		emitter = deps.EventEmitter
+	}
+	schedulerJobStore = fwscheduler.NewLocalProvider(fwscheduler.LocalProviderConfig{
+		Emitter:        emitter,
+		SourcePlugin:   sourcePlugin,
+		PayloadVersion: "v1",
+	})
+	return schedulerJobStore
+}
+
+func resolveHostSchedulerFacade(deps *app.Deps) fwscheduler.Scheduler {
+	tenantUUID := ""
+	if deps != nil && deps.Config != nil && deps.Config.Gateway != nil {
+		tenantUUID = strings.TrimSpace(deps.Config.Gateway.TenantUUID)
+	}
+	return fwscheduler.NewHostProvider(fwscheduler.HostProviderConfig{
+		TenantUUID: tenantUUID,
+	}, nil)
+}
+
+// Create creates a scheduler job through the framework facade.
+func (h *SchedulerJobHandler) Create(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	var req schedulerJobSpecRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid scheduler job payload")
+		return
+	}
+	mode := schedulerProviderModeFromRequest(c, req.schedulerDebugRequest())
+	scheduler := h.schedulerForMode(c, req.schedulerDebugRequest())
+	if scheduler == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	spec := req.JobSpec
+	h.applyJobDefaults(c, &spec)
+	job, err := scheduler.CreateJob(c.Request.Context(), spec)
+	if err != nil {
+		respondSchedulerError(c, err)
+		return
+	}
+	if mode == fwscheduler.ModeLocal {
+		h.scheduleLocalDebugTrigger(job)
+	}
+	contracts.ResponseCreated(c, job)
+}
+
+// Update updates a scheduler job through the framework facade.
+func (h *SchedulerJobHandler) Update(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	var req schedulerJobSpecRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid scheduler job payload")
+		return
+	}
+	scheduler := h.schedulerForMode(c, req.schedulerDebugRequest())
+	if scheduler == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	spec := req.JobSpec
+	spec.JobID = strings.TrimSpace(c.Param("jobId"))
+	h.applyJobDefaults(c, &spec)
+	job, err := scheduler.UpdateJob(c.Request.Context(), spec)
+	if err != nil {
+		respondSchedulerError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, job)
+}
+
+// List lists scheduler jobs.
+func (h *SchedulerJobHandler) List(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	scheduler := h.schedulerForMode(c, schedulerDebugRequest{ProviderMode: c.Query("provider_mode")})
+	if scheduler == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	jobs, err := scheduler.ListJobs(c.Request.Context(), fwscheduler.ListJobsInput{
+		TenantUUID: h.tenantUUID(c),
+		OwnerType:  c.Query("owner_type"),
+		OwnerID:    c.Query("owner_id"),
+		Status:     c.Query("status"),
+	})
+	if err != nil {
+		respondSchedulerError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": jobs, "total": len(jobs)})
+}
+
+// Get returns a scheduler job.
+func (h *SchedulerJobHandler) Get(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	scheduler := h.schedulerForMode(c, schedulerDebugRequest{ProviderMode: c.Query("provider_mode")})
+	if scheduler == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	job, err := scheduler.GetJob(c.Request.Context(), strings.TrimSpace(c.Param("jobId")), h.tenantUUID(c))
+	if err != nil {
+		respondSchedulerError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, job)
+}
+
+// Pause pauses a scheduler job.
+func (h *SchedulerJobHandler) Pause(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	scheduler := h.schedulerForAction(c)
+	if scheduler == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	if err := scheduler.PauseJob(c.Request.Context(), strings.TrimSpace(c.Param("jobId")), h.tenantUUID(c)); err != nil {
+		respondSchedulerError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"job_id": strings.TrimSpace(c.Param("jobId")), "status": "paused"})
+}
+
+// Resume resumes a scheduler job.
+func (h *SchedulerJobHandler) Resume(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	scheduler := h.schedulerForAction(c)
+	if scheduler == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	if err := scheduler.ResumeJob(c.Request.Context(), strings.TrimSpace(c.Param("jobId")), h.tenantUUID(c)); err != nil {
+		respondSchedulerError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"job_id": strings.TrimSpace(c.Param("jobId")), "status": "active"})
+}
+
+// Trigger triggers a scheduler job immediately.
+func (h *SchedulerJobHandler) Trigger(c *gin.Context) {
+	if h == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	var req schedulerDebugRequest
+	if c != nil && c.Request != nil && c.Request.Body != nil {
+		_ = c.ShouldBindJSON(&req)
+	}
+	mode := schedulerProviderModeFromRequest(c, req)
+	scheduler := h.schedulerForMode(c, req)
+	if scheduler == nil {
+		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
+		return
+	}
+	jobID := strings.TrimSpace(c.Param("jobId"))
+	tenantUUID := h.tenantUUID(c)
+	var job *fwscheduler.Job
+	if mode == fwscheduler.ModeLocal {
+		job, _ = scheduler.GetJob(c.Request.Context(), jobID, tenantUUID)
+	}
+	if err := h.triggerSchedulerForAction(c.Request.Context(), scheduler, jobID, tenantUUID, mode); err != nil {
+		respondSchedulerError(c, err)
+		return
+	}
+	notification := gin.H{"ok": false, "reason": "not local scheduler"}
+	if mode == fwscheduler.ModeLocal {
+		notification = h.publishLocalSchedulerNotification(c.Request.Context(), strings.TrimSpace(c.GetHeader("X-Request-ID")), job, tenantUUID)
+	}
+	contracts.ResponseSuccess(c, gin.H{
+		"job_id":       jobID,
+		"status":       "triggered",
+		"notification": notification,
+	})
+}
+
+func (h *SchedulerJobHandler) triggerSchedulerForAction(ctx context.Context, scheduler fwscheduler.Scheduler, jobID string, tenantUUID string, mode string) error {
+	if mode == fwscheduler.ModeLocal {
+		if local, ok := scheduler.(interface {
+			TriggerJobPreview(context.Context, string, string) error
+		}); ok {
+			return local.TriggerJobPreview(ctx, jobID, tenantUUID)
+		}
+	}
+	return scheduler.TriggerJob(ctx, jobID, tenantUUID)
+}
+
+func (h *SchedulerJobHandler) scheduleLocalDebugTrigger(job *fwscheduler.Job) {
+	if h == nil || job == nil || h.localScheduler == nil {
+		return
+	}
+	if strings.TrimSpace(job.ScheduleType) != fwscheduler.ScheduleTypeOnce {
+		return
+	}
+	runAt, err := time.Parse(time.RFC3339, strings.TrimSpace(job.ScheduleExpr))
+	if err != nil {
+		return
+	}
+	delay := time.Until(runAt)
+	if delay < 0 {
+		delay = 0
+	}
+
+	schedulerJobTimerMu.Lock()
+	if existing := schedulerJobTimers[job.JobID]; existing != nil {
+		existing.Stop()
+	}
+	schedulerJobTimers[job.JobID] = time.AfterFunc(delay, func() {
+		ctx := context.Background()
+		current, err := h.localScheduler.GetJob(ctx, job.JobID, job.TenantUUID)
+		if err != nil || current == nil || current.Status == "paused" {
+			return
+		}
+		if err := h.localScheduler.TriggerJob(ctx, current.JobID, current.TenantUUID); err != nil {
+			return
+		}
+		_ = h.publishLocalSchedulerNotificationOnce(ctx, "", current, current.TenantUUID)
+	})
+	schedulerJobTimerMu.Unlock()
+}
+
+func (h *SchedulerJobHandler) publishLocalSchedulerNotificationOnce(ctx context.Context, requestID string, job *fwscheduler.Job, tenantUUID string) gin.H {
+	if job == nil {
+		return gin.H{"ok": false, "reason": "job unavailable"}
+	}
+	schedulerJobNotifyMu.Lock()
+	if schedulerJobNotified[job.JobID] {
+		schedulerJobNotifyMu.Unlock()
+		return gin.H{"ok": false, "reason": "already notified"}
+	}
+	schedulerJobNotified[job.JobID] = true
+	schedulerJobNotifyMu.Unlock()
+	return h.publishLocalSchedulerNotification(ctx, requestID, job, tenantUUID)
+}
+
+func (r schedulerJobSpecRequest) schedulerDebugRequest() schedulerDebugRequest {
+	return schedulerDebugRequest{
+		ProviderMode: r.ProviderMode,
+		ForceLocal:   r.ForceLocal,
+		ForceHost:    r.ForceHost,
+	}
+}
+
+func (h *SchedulerJobHandler) schedulerForAction(c *gin.Context) fwscheduler.Scheduler {
+	var req schedulerDebugRequest
+	if c != nil && c.Request != nil && c.Request.Body != nil {
+		_ = c.ShouldBindJSON(&req)
+	}
+	return h.schedulerForMode(c, req)
+}
+
+func (h *SchedulerJobHandler) schedulerForMode(c *gin.Context, req schedulerDebugRequest) fwscheduler.Scheduler {
+	mode := schedulerProviderModeFromRequest(c, req)
+	if mode == fwscheduler.ModeHost {
+		return h.hostScheduler
+	}
+	return h.localScheduler
+}
+
+func schedulerProviderModeFromRequest(c *gin.Context, req schedulerDebugRequest) string {
+	if req.ForceLocal {
+		return fwscheduler.ModeLocal
+	}
+	if req.ForceHost {
+		return fwscheduler.ModeHost
+	}
+	mode := strings.ToLower(strings.TrimSpace(req.ProviderMode))
+	if mode == "" && c != nil {
+		mode = strings.ToLower(strings.TrimSpace(c.GetHeader("X-Scheduler-Provider-Mode")))
+	}
+	switch mode {
+	case "host", "proxy", "gateway":
+		return fwscheduler.ModeHost
+	case "dual":
+		return fwscheduler.ModeDual
+	default:
+		return fwscheduler.ModeLocal
+	}
+}
+
+func (h *SchedulerJobHandler) publishLocalSchedulerNotification(ctx context.Context, requestID string, job *fwscheduler.Job, tenantUUID string) gin.H {
+	if h == nil || h.deps == nil || h.deps.WSBusHub == nil || job == nil {
+		return gin.H{"ok": false, "reason": "local notification unavailable"}
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		tenantUUID = strings.TrimSpace(job.TenantUUID)
+	}
+	if tenantUUID == "" {
+		return gin.H{"ok": false, "reason": "tenant_uuid required"}
+	}
+	topic := "plugin.notify.tenant." + tenantUUID
+	traceID := schedulerPayloadString(job.Payload, "trace_id")
+	if traceID == "" {
+		traceID = strings.TrimSpace(requestID)
+	}
+	title := "Scheduler Job Triggered"
+	message := strings.TrimSpace(job.Name)
+	if message == "" {
+		message = strings.TrimSpace(job.JobID)
+	}
+	businessAction := schedulerPayloadString(job.Payload, "business_action")
+	payload := gin.H{
+		"type":            "scheduler.job.triggered.notification",
+		"title":           title,
+		"message":         message,
+		"tenant_uuid":     tenantUUID,
+		"trace_id":        traceID,
+		"job_id":          job.JobID,
+		"job_name":        job.Name,
+		"schedule_type":   job.ScheduleType,
+		"schedule_expr":   job.ScheduleExpr,
+		"business_action": businessAction,
+		"created_at":      time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	result := fwwsbus.NewLocalPublisher(h.deps.WSBusHub, nil).Publish(ctx, topic, payload, fwwsbus.PublishOptions{
+		TenantUUID: tenantUUID,
+		TraceID:    traceID,
+	})
+	if !result.OK {
+		return gin.H{"ok": false, "topic": topic, "error_code": result.ErrorCode, "error_message": result.ErrorMessage}
+	}
+	return gin.H{"ok": true, "topic": topic, "trace_id": traceID}
+}
+
+func schedulerPayloadString(payload map[string]any, key string) string {
+	if payload == nil {
+		return ""
+	}
+	value, _ := payload[key].(string)
+	return strings.TrimSpace(value)
+}
+
+func (h *SchedulerJobHandler) applyJobDefaults(c *gin.Context, req *fwscheduler.JobSpec) {
+	if req == nil {
+		return
+	}
+	if strings.TrimSpace(req.TenantUUID) == "" {
+		req.TenantUUID = h.tenantUUID(c)
+	}
+	if strings.TrimSpace(req.OwnerType) == "" {
+		req.OwnerType = fwscheduler.OwnerTypePlugin
+	}
+	if strings.TrimSpace(req.OwnerID) == "" {
+		req.OwnerID = app.PluginID
+	}
+	if strings.TrimSpace(req.Topic) == "" {
+		req.Topic = fwscheduler.TriggeredTopic
+	}
+}
+
+func (h *SchedulerJobHandler) tenantUUID(c *gin.Context) string {
+	if v := tenantUUIDFromRequest(c); v != "" {
+		return v
+	}
+	if h != nil {
+		return strings.TrimSpace(h.defaultTenant)
+	}
+	return ""
+}
+
+func tenantUUIDFromRequest(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	if v := strings.TrimSpace(c.Query("tenant_uuid")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(c.GetHeader("tenant_uuid")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(c.GetHeader("X-Tenant-UUID")); v != "" {
+		return v
+	}
+	return ""
+}
+
+func respondSchedulerError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, fwscheduler.ErrJobNotFound):
+		contracts.ResponseNotFound(c, err.Error())
+	case errors.Is(err, fwscheduler.ErrJobIDRequired),
+		errors.Is(err, fwscheduler.ErrJobNameRequired),
+		errors.Is(err, fwscheduler.ErrTenantUUIDRequired),
+		errors.Is(err, fwscheduler.ErrOwnerTypeRequired),
+		errors.Is(err, fwscheduler.ErrOwnerIDRequired),
+		errors.Is(err, fwscheduler.ErrScheduleTypeRequired),
+		errors.Is(err, fwscheduler.ErrScheduleExprRequired),
+		errors.Is(err, fwscheduler.ErrUnsupportedSchedule),
+		errors.Is(err, fwscheduler.ErrInvalidScheduleExpr):
+		contracts.ResponseBadRequest(c, err.Error())
+	case errors.Is(err, fwscheduler.ErrProviderNotConfigured), errors.Is(err, fwscheduler.ErrHostProviderUnavailable):
+		contracts.ResponseServiceUnavailable(c, err.Error(), nil)
+	default:
+		contracts.ResponseError(c, http.StatusInternalServerError, contracts.ErrCodeInternalError, err.Error())
+	}
+}

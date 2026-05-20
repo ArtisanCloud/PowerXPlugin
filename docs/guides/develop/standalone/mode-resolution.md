@@ -42,9 +42,9 @@
 
 ## 5. 宿主链路鉴权规则（effective_proxy=1）
 
-1. 标准宿主链路统一使用 `PX_PLUGIN_TOOL_TOKEN`（Bearer）。
+1. 标准宿主链路统一使用 STS access token（Bearer，`aud=powerx:api`）。
 2. 不默认透传入站 delegated/user bearer 到宿主 ws-bus 接口。
-3. `PX_GATEWAY_API_KEY` 仅作为本地 `IAMMode=local + POWERX_PROXY=1` 联调的可选兼容方案，不作为宿主发布默认口径。
+3. `PX_GATEWAY_API_KEY` 仅用于 standalone 本地联调，不作为宿主发布默认口径。
 
 ## 6. WS / Capability Contract v2 对齐
 
@@ -108,19 +108,19 @@
 
 ## 10. Breaking Change（Token 收敛）
 
-从当前版本开始，`PX_TOOL_TOKEN` 的 fallback 按模式收紧：
+从当前版本开始，旧静态 Tool Token 链路已废弃：
 
 1. `IAMMode=delegated` 且 `POWERX_PROXY=1`：
-   - 必须使用 `PX_PLUGIN_TOOL_TOKEN`
-   - 仅设置 `PX_TOOL_TOKEN` 会被拒绝（fail-fast）
+   - 必须使用 STS access token（`aud=powerx:api`）
+   - 缺少 `POWERX_STS_CLIENT_ID` / `POWERX_STS_CLIENT_SECRET` / `POWERX_GRPC_UPSTREAM_*` 会被拒绝（fail-fast）
 2. `IAMMode=local` 且 `POWERX_PROXY=1`：
-   - 仍优先 `PX_PLUGIN_TOOL_TOKEN`
-   - `PX_TOOL_TOKEN` 仅临时兼容，并输出 deprecate 告警
+   - 本地联调使用 `PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY`
+   - 不再读取静态 bearer tool token
 3. `POWERX_PROXY=0`：
-   - 不依赖宿主 gateway token，本规则不生效
+   - 不依赖宿主 STS 凭证
 
 迁移建议：
 
-1. 统一把部署/本地联调脚本中的 `PX_TOOL_TOKEN` 改为 `PX_PLUGIN_TOOL_TOKEN`
-2. 保留 `PX_GATEWAY_AUTH_SCHEME=bearer` 作为宿主发布默认
-3. 若必须保留旧变量，仅允许在 `local+proxy` 短期过渡
+1. 宿主部署脚本只注入 `PX_GATEWAY_BASE_URL` 与 STS/gRPC 契约变量
+2. 本地联调脚本只注入 ApiKey 契约变量
+3. 旧静态 Tool Token 环境变量应直接删除

@@ -23,6 +23,7 @@ type HostProviderConfig struct {
 	BaseURL        string
 	APIPrefix      string
 	Token          string
+	TokenProvider  wsbus.TokenProvider
 	TenantUUID     string
 	UserAgent      string
 	PublishPath    string
@@ -56,7 +57,6 @@ func NewHostProviderFromApp(app *bootstrap.App, sourcePlugin, payloadVersion str
 	return NewHostProvider(HostProviderConfig{
 		BaseURL:        strings.TrimSpace(app.Config.Gateway.BaseURL),
 		APIPrefix:      strings.TrimSpace(app.Config.Gateway.APIPrefix),
-		Token:          strings.TrimSpace(app.Config.Gateway.ToolToken),
 		TenantUUID:     strings.TrimSpace(app.Config.Gateway.TenantID),
 		UserAgent:      strings.TrimSpace(app.Config.Gateway.UserAgent),
 		Timeout:        timeout,
@@ -71,14 +71,15 @@ func (p *HostProvider) NewEmitter() (eventbridge.Emitter, error) {
 	}
 
 	client, err := wsbus.NewHostClient(wsbus.HostClientConfig{
-		BaseURL:    p.cfg.BaseURL,
-		APIPrefix:  p.cfg.APIPrefix,
-		Token:      p.cfg.Token,
-		TenantUUID: p.cfg.TenantUUID,
-		UserAgent:  p.cfg.UserAgent,
-		PublishPath: p.cfg.PublishPath,
-		RegisterPath: p.cfg.RegisterPath,
-		Timeout:    p.cfg.Timeout,
+		BaseURL:       p.cfg.BaseURL,
+		APIPrefix:     p.cfg.APIPrefix,
+		Token:         p.cfg.Token,
+		TokenProvider: p.cfg.TokenProvider,
+		TenantUUID:    p.cfg.TenantUUID,
+		UserAgent:     p.cfg.UserAgent,
+		PublishPath:   p.cfg.PublishPath,
+		RegisterPath:  p.cfg.RegisterPath,
+		Timeout:       p.cfg.Timeout,
 	})
 	if err != nil {
 		return nil, err

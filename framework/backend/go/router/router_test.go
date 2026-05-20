@@ -138,8 +138,8 @@ func TestCapabilityProxyRoute(t *testing.T) {
 		Listen: ":0",
 		Gateway: bootstrap.GatewayConfig{
 			BaseURL:    server.URL,
-			AuthScheme: "bearer",
-			ToolToken:  "demo-token",
+			AuthScheme: "apikey",
+			APIKey:     "demo-key",
 			TenantID:   "tenant-123",
 		},
 	})

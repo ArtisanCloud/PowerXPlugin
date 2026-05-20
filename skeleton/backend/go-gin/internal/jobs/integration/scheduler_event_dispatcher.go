@@ -12,13 +12,14 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwscheduler "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 )
 
 const (
 	// SchedulerTriggeredTopic is the canonical scheduler trigger topic.
-	SchedulerTriggeredTopic = "powerx.runtime.scheduler.triggered.v1"
+	SchedulerTriggeredTopic = fwscheduler.TriggeredTopic
 
 	defaultSchedulerTenantUUID = "00000000-0000-0000-0000-000000000001"
 )
@@ -32,7 +33,9 @@ type EventDispatcher interface {
 type SchedulerEventDispatcher struct {
 	emitter    fweventbridge.Emitter
 	meta       event.MetaBuilder
+	scheduler  *fwscheduler.LocalProvider
 	tenantUUID string
+	ownerID    string
 	logger     *pxlog.Entry
 }
 
@@ -65,10 +68,18 @@ func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitt
 		logger = pxlog.WithComponent("integration.scheduler_dispatcher")
 	}
 
+	localScheduler := fwscheduler.NewLocalProvider(fwscheduler.LocalProviderConfig{
+		Emitter:        emitter,
+		SourcePlugin:   sourcePlugin,
+		PayloadVersion: payloadVersion,
+	})
+
 	return &SchedulerEventDispatcher{
 		emitter:    emitter,
 		meta:       event.NewMetaBuilder(sourcePlugin, payloadVersion),
+		scheduler:  localScheduler,
 		tenantUUID: tenantUUID,
+		ownerID:    sourcePlugin,
 		logger:     logger,
 	}
 }
@@ -77,6 +88,49 @@ func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitt
 func (d *SchedulerEventDispatcher) DispatchCronTrigger(ctx context.Context, jobName string, payload map[string]any) (string, error) {
 	if d == nil || d.emitter == nil {
 		return "", errors.New("scheduler dispatcher emitter is not configured")
+	}
+	if d.scheduler != nil {
+		traceID := uuid.NewString()
+		body := map[string]any{
+			"source":          "scheduler",
+			"trigger_source":  "cron",
+			"job_name":        strings.TrimSpace(jobName),
+			"trace_id":        traceID,
+			"idempotency_key": strings.TrimSpace(jobName) + ":" + traceID,
+		}
+		for k, v := range payload {
+			body[k] = v
+		}
+		job, err := d.scheduler.CreateJob(ctx, fwscheduler.JobSpec{
+			TenantUUID:     d.tenantUUID,
+			OwnerType:      fwscheduler.OwnerTypePlugin,
+			OwnerID:        d.ownerID,
+			Name:           strings.TrimSpace(jobName),
+			ScheduleType:   fwscheduler.ScheduleTypeCron,
+			ScheduleExpr:   "* * * * *",
+			Topic:          SchedulerTriggeredTopic,
+			Payload:        body,
+			IdempotencyKey: strings.TrimSpace(jobName) + ":" + traceID,
+		})
+		if err != nil {
+			return "", err
+		}
+		if err := d.scheduler.EmitDueTrigger(ctx, job.JobID, d.tenantUUID, "cron"); err != nil {
+			if d.logger != nil {
+				pxlog.WarnCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+					"module":     "integration",
+					"topic":      SchedulerTriggeredTopic,
+					"trace_id":   traceID,
+					"job_name":   jobName,
+					"biz_scene":  "scheduler_trigger_emit",
+					"biz_domain": "integration",
+					"component":  "integration.scheduler_dispatcher",
+					"error":      err.Error(),
+				}), "failed to emit scheduler trigger event")
+			}
+			return "", err
+		}
+		return traceID, nil
 	}
 
 	traceID := uuid.NewString()

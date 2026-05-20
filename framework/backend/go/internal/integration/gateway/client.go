@@ -34,7 +34,7 @@ type Config struct {
 	BaseURL            string
 	APIPrefix          string
 	TenantUUID         string
-	ToolToken          string
+	BearerToken        string
 	APIKey             string
 	AuthScheme         string
 	HTTPClient         *http.Client
@@ -136,7 +136,7 @@ func NewClient(cfg Config) (*Client, error) {
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
 	}
-	authScheme, credential, err := resolveAuth(cfg.AuthScheme, cfg.ToolToken, cfg.APIKey)
+	authScheme, credential, err := resolveAuth(cfg.AuthScheme, cfg.BearerToken, cfg.APIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +433,7 @@ func resolveAuth(rawScheme, toolToken, apiKey string) (scheme string, credential
 	switch scheme {
 	case "bearer":
 		if bearer == "" {
-			return "", "", errors.New("gateway: PX_PLUGIN_TOOL_TOKEN is required when auth_scheme=bearer")
+			return "", "", errors.New("gateway: bearer credential is required when auth_scheme=bearer")
 		}
 		return scheme, bearer, nil
 	case "apikey":

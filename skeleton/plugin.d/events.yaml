@@ -15,3 +15,6 @@ events:
     - key: _topic.template.update.completed
       actions: [publish]
       description: 模板更新完成事件
+    - key: powerx.runtime.scheduler.triggered.v1
+      actions: [publish, subscribe]
+      description: Scheduler 标准触发事件

@@ -171,24 +171,29 @@ PowerX 通用能力统一通过 Integration Gateway 调用，需要为宿主与 
 | 变量名 | 示例值 | 说明 |
 | --- | --- | --- |
 | `PX_GATEWAY_BASE_URL` | `https://gateway.powerx.dev/_tenant` / `http://localhost:8080` | Gateway HTTP 入口，宿主由运维注入，Skeleton `.env.local` 指向 Dev 环境。 |
-| `PX_PLUGIN_TOOL_TOKEN` | `sts-1u8c5e...` | 宿主模式下由 Admin/部署系统注入的 Tool Grant，供后端/前端调用 Gateway。 |
-| `PX_PLUGIN_TOOL_TOKEN` | `sts-dev-9ad3...` | Skeleton 本地通过 `px-plugin login --manifest ./skeleton/plugin.yaml` 生成的临时 Token，写入 `.env.local`。 |
-| `PX_TOOL_REFRESH_TOKEN` | `sts-dev-refresh-xxxx` | 配套 refresh token，Skeleton 可在 Token 过期或 24 小时内到期时自动调用 `/admin/user/auth/refresh` 获取新的 Tool Token。 |
+| `POWERX_STS_CLIENT_ID` | `com.powerx.plugins.demo.<tenant_uuid>` | 宿主 delegated 模式下由底座注入的 STS client id。 |
+| `POWERX_STS_CLIENT_SECRET` | `secret-once` | 宿主 delegated 模式下由底座注入的 STS client secret。 |
+| `POWERX_STS_AUDIENCE` | `powerx:api` | 插件主动调用底座业务接口的 STS audience。 |
+| `POWERX_STS_SCOPE` | `access` | 插件主动调用底座业务接口的 STS scope。 |
+| `POWERX_GRPC_UPSTREAM_ADDRESS` | `127.0.0.1:8079` | STS Exchange gRPC 上游地址。 |
+| `POWERX_GRPC_UPSTREAM_TENANT_UUID` | `<tenant_uuid>` | STS 租户上下文。 |
+| `PX_GATEWAY_API_KEY` | `pxak_...` | Standalone 本地联调可选，仅 `PX_GATEWAY_AUTH_SCHEME=apikey` 时使用。 |
 | `PX_USE_MOCK` | `media,eventfabric` | Skeleton 可选，指定需要走内存 Mock 的能力模块。 |
 
 使用建议：
 
-1. **宿主模式**：在部署 YAML 或环境注入脚本中设置 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`，后端读取后写入 Gateway Client，并通过插件自有 API 暴露调用入口；租户从 token 的 `tid` claim 自动推导。
-2. **Skeleton 模式**：执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 后会在 `~/.powerx/credentials` 生成 Token，使用脚本写入 `skeleton/.env.local` 中的 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`。
+1. **宿主模式**：底座注入 `PX_GATEWAY_BASE_URL` 与 `POWERX_STS_*` / `POWERX_GRPC_UPSTREAM_*`，插件后端通过 STS Exchange 获取 `aud=powerx:api` 的短期 token 后调用 Gateway。
+2. **Skeleton 模式**：本地联调使用 `PX_GATEWAY_BASE_URL` + `PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY`。
 3. **Mock/降级**：当 Dev Gateway 不可达时，将 `PX_USE_MOCK` 设置为能力模块名（如 `media`），框架会自动切换内存实现并在日志中提示。
-4. **安全性**：Token 属于短期凭证，建议在启动时检测其过期时间；自动刷新失败时应阻断调用并提示开发者重新登录或联系宿主运维。
+4. **安全性**：STS access token 仅内存缓存，过期前刷新；STS Exchange 失败时应直接阻断调用并返回明确错误。
 
 后端调用示例：
 
 ```go
 client := gateway.NewClient(gateway.Config{
-    BaseURL:   os.Getenv("PX_GATEWAY_BASE_URL"),
-    ToolToken: os.Getenv("PX_PLUGIN_TOOL_TOKEN"),
+    BaseURL:    os.Getenv("PX_GATEWAY_BASE_URL"),
+    AuthScheme: "apikey",
+    APIKey:     os.Getenv("PX_GATEWAY_API_KEY"),
 })
 ```
 
@@ -277,9 +282,13 @@ POWERX_CTX_ISSUER=powerx-auth
 POWERX_CTX_AUDIENCE=powerx-plugin
 POWERX_LOG_LEVEL=info
 POWERX_DEBUG_MODE=0
-POWERX_STS_ENDPOINT=http://powerx/_p/_internal/sts/exchange
 PX_GATEWAY_BASE_URL=https://gateway.powerx.dev/_tenant
-PX_PLUGIN_TOOL_TOKEN=sts-prod-xxxxxxxx
+POWERX_STS_CLIENT_ID=com.powerx.plugins.base.<tenant_uuid>
+POWERX_STS_CLIENT_SECRET=replace-me
+POWERX_STS_AUDIENCE=powerx:api
+POWERX_STS_SCOPE=access
+POWERX_GRPC_UPSTREAM_ADDRESS=powerx:8079
+POWERX_GRPC_UPSTREAM_TENANT_UUID=<tenant_uuid>
 PX_USE_MOCK=
 ```
 

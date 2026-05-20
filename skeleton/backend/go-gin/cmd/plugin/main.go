@@ -120,10 +120,10 @@ func main() {
 		cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
 	}
 	logger.WithFields(logger.Fields{
-		"bind_addr":               cfg.Server.BindAddr,
-		"host_mode":               hostMode,
+		"bind_addr":            cfg.Server.BindAddr,
+		"host_mode":            hostMode,
 		"env_POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
-		"env_PORT":               strings.TrimSpace(os.Getenv("PORT")),
+		"env_PORT":             strings.TrimSpace(os.Getenv("PORT")),
 	}).Info("Resolved HTTP bind address")
 
 	//   - gRPC 用 POWERX_GRPC_PORT（由 PowerX 的 Enable 阶段注入）
@@ -393,7 +393,6 @@ func main() {
 		Gateway: fwbootstrap.GatewayConfig{
 			BaseURL:    strings.TrimSpace(cfg.Gateway.BaseURL),
 			AuthScheme: strings.TrimSpace(cfg.Gateway.AuthScheme),
-			ToolToken:  strings.TrimSpace(cfg.Gateway.ToolToken),
 			APIKey:     strings.TrimSpace(cfg.Gateway.APIKey),
 			TenantID:   strings.TrimSpace(cfg.Gateway.TenantUUID),
 			Timeout:    cfg.Gateway.Timeout,

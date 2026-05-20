@@ -11,14 +11,14 @@ import (
 
 func TestCapabilityCatalogSyncExportsWorkflowAssets(t *testing.T) {
 	repoRoot := repoRootFromIntegration(t)
-	ensureCapabilitySyncFixtures(t, repoRoot)
-	catalogPath := filepath.Join(repoRoot, "capabilities", "catalog.json")
+	workRoot := prepareCapabilitySyncWorkspace(t, repoRoot)
+	catalogPath := filepath.Join(workRoot, "capabilities", "catalog.json")
 	if _, err := os.Stat(catalogPath); err != nil {
 		t.Fatalf("缺少 catalog 文件，请先执行 capabilities:export: %v", err)
 	}
 
 	t.Setenv("POWERX_CAPABILITY_CATALOG", catalogPath)
-	chdirForTest(t, repoRoot)
+	chdirForTest(t, workRoot)
 
 	ctx := context.Background()
 	mgr := capabilities.NewManager(nil, nil)
@@ -50,7 +50,7 @@ func TestCapabilityCatalogSyncExportsWorkflowAssets(t *testing.T) {
 		if !containsAssetPath(assets, rel) {
 			t.Fatalf("协议资产缺失: %s", rel)
 		}
-		if _, err := os.Stat(filepath.Join(repoRoot, rel)); err != nil {
+		if _, err := os.Stat(filepath.Join(workRoot, rel)); err != nil {
 			t.Fatalf("目标文件不存在 %s: %v", rel, err)
 		}
 	}
@@ -67,19 +67,20 @@ func TestCapabilityCatalogSyncExportsWorkflowAssets(t *testing.T) {
 	}
 }
 
-func ensureCapabilitySyncFixtures(t *testing.T, repoRoot string) {
+func prepareCapabilitySyncWorkspace(t *testing.T, repoRoot string) string {
 	t.Helper()
-	manifestPath := filepath.Join(repoRoot, "dist", "agent-sdk", "manifest.json")
-	if _, err := os.Stat(manifestPath); err == nil {
-		return
+	workRoot := t.TempDir()
+	for _, dir := range []string{"capabilities", "contracts"} {
+		if err := os.Symlink(filepath.Join(repoRoot, dir), filepath.Join(workRoot, dir)); err != nil {
+			t.Fatalf("链接测试 fixture %s 失败: %v", dir, err)
+		}
 	}
+	manifestPath := filepath.Join(workRoot, "dist", "agent-sdk", "manifest.json")
 	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
 		t.Fatalf("创建测试 fixture 目录失败: %v", err)
 	}
 	if err := os.WriteFile(manifestPath, []byte("{\"plugin_id\":\"com.powerx.plugins.base\",\"tools\":[]}\n"), 0o644); err != nil {
 		t.Fatalf("写入测试 fixture 失败: %v", err)
 	}
-	t.Cleanup(func() {
-		_ = os.Remove(manifestPath)
-	})
+	return workRoot
 }

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
@@ -138,6 +139,9 @@ func TestCORSMiddleware_AllowsOrigin(t *testing.T) {
 	}
 	if ctx.Header("Access-Control-Allow-Methods") == "" {
 		t.Fatalf("expected allow methods header to be set")
+	}
+	if !strings.Contains(ctx.Header("Access-Control-Allow-Headers"), "X-Scheduler-Provider-Mode") {
+		t.Fatalf("expected scheduler provider mode header to be allowed, got %q", ctx.Header("Access-Control-Allow-Headers"))
 	}
 }
 

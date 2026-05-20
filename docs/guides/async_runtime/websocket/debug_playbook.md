@@ -98,18 +98,13 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/notifications/test \
 4. 再执行 `grant`（插件代理到底座 `admin/runtime/ws-bus/grant`，仅绑定 ACL）。
 5. 最后执行 `publish`，并在 WS 连接上验证收到 `event`。
 
-### Step 0：准备 proxy 凭证
+### Step 0：准备出站凭证
 
-1. 在 PowerX 准备好带目标 topic 权限的 profile（`permission_ids`）。
-2. 如果走 ApiKey，基于该 profile 创建/轮换 API Key（权限为快照，profile 变更后必须换 key）。
-3. 配置插件出站凭证（任选其一）：
+1. 宿主模式下确认 PowerX 已注入 STS client 与 gRPC upstream 环境变量。
+2. standalone 本地联调如需 ApiKey，基于带目标 topic 权限的 profile 创建/轮换 API Key。
+3. standalone ApiKey 配置：
 
 ```bash
-# 方案 A：Bearer（推荐）
-export PX_GATEWAY_AUTH_SCHEME=bearer
-export PX_PLUGIN_TOOL_TOKEN=<your_tool_token>
-
-# 方案 B：ApiKey
 export PX_GATEWAY_AUTH_SCHEME=apikey
 export PX_GATEWAY_API_KEY=<your_api_key>
 ```
@@ -164,7 +159,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish \
 
 1. 插件日志应看到：
    - `gateway_auth_scheme` 与你的配置一致（`bearer` / `apikey`）
-   - `outbound_token_source` 与凭证来源一致（如 `px_plugin_tool_token` / `PX_GATEWAY_API_KEY`）
+   - `outbound_token_source` 与凭证来源一致（如 `sts` / `PX_GATEWAY_API_KEY`）
    - 不再出现 `outbound_token_source=request_bearer_passthrough`
 2. 订阅端先收到 `ack`
 3. 执行 Step 4 后收到 `event`

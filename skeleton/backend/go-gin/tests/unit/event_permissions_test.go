@@ -57,6 +57,14 @@ events:
 	require.Equal(t, []string{"_topic.template.batch_clone.completed", "_topic.template.update"}, perms.Topics())
 }
 
+func TestLoadEventPermissionsFromManifest_AllowsSchedulerTriggeredTopic(t *testing.T) {
+	perms, err := security.LoadEventPermissionsFromManifest(filepath.Join("..", "..", "..", "..", "plugin.yaml"), logrus.NewEntry(logrus.StandardLogger()))
+	require.NoError(t, err)
+	require.True(t, perms.Enforced())
+	require.True(t, perms.CanPublish("powerx.runtime.scheduler.triggered.v1"))
+	require.True(t, perms.CanSubscribe("powerx.runtime.scheduler.triggered.v1"))
+}
+
 func TestPermissionedEmitter_DeniesWhenNotAllowed(t *testing.T) {
 	dir := t.TempDir()
 	manifestPath := filepath.Join(dir, "plugin.yaml")

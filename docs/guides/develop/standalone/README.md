@@ -215,8 +215,9 @@ npm run dev
 | `POWERX_PROXY` | `0` | 链路开关：`0` 本地链路，`1` 宿主链路。`IAMMode=delegated` 时按宿主链路处理。 |
 | `PX_GATEWAY_BASE_URL` | N/A | 宿主链路目标地址（PowerX 网关基址）。仅在宿主链路生效。 |
 | `PX_GATEWAY_AUTH_SCHEME` | `bearer` | 鉴权模式开关；宿主发布默认 `bearer`。 |
-| `PX_PLUGIN_TOOL_TOKEN` | N/A | 宿主链路标准凭证（默认与推荐）。 |
-| `PX_GATEWAY_API_KEY` | N/A | 仅本地 `IAMMode=local + POWERX_PROXY=1` 联调可选。 |
+| `POWERX_STS_CLIENT_ID` / `POWERX_STS_CLIENT_SECRET` | N/A | 宿主 delegated 出站调用底座时的 STS client 凭证。 |
+| `POWERX_GRPC_UPSTREAM_ADDRESS` / `POWERX_GRPC_UPSTREAM_TENANT_UUID` | N/A | 宿主 delegated STS Exchange 的 gRPC 上游与租户上下文。 |
+| `PX_GATEWAY_API_KEY` | N/A | Standalone 本地联调用 ApiKey。 |
 | `PLUGIN_IAM_TENANT_KEY` / `NAME` | 示例值见 Quickstart | Standalone 运行时默认租户唯一键与名称。 |
 | `PLUGIN_IAM_ADMIN_EMAIL` / `PASSWORD` | `admin@local.test` / `S3cret!!` | 本地管理员初始凭据，`setup` 会读取并写入数据库。 |
 | `NUXT_PUBLIC_INSIDE_POWERX` | `0` | 前端 runtime 判定宿主模式用，`1` 时 baseURL 调整为 `/_p/<pluginId>/admin/`。 |
@@ -228,24 +229,25 @@ npm run dev
 > - **配置文件位置**：统一使用 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。Go Gin 与 FastAPI 都会自动读取该文件。
 > - **环境变量覆盖**：`.env` 会覆盖进程环境变量与 `config.yaml`，因此建议将 `POWERX_PROXY`、`IAMMode`、`PX_GATEWAY_*` 统一写在这里，避免 GoLand Run Config 里残留旧值。
 > - **宿主模式（PowerX Core）**：需要宿主契约（`PX_GATEWAY_BASE_URL` + 鉴权凭证）。
->   - 默认与推荐：`PX_PLUGIN_TOOL_TOKEN`（Bearer）
->   - `PX_GATEWAY_API_KEY` 仅用于本地 `local+proxy` 联调兼容，不作为宿主发布默认口径
->   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若未携带，再回退 `PX_PLUGIN_TOOL_TOKEN.tid`。
->   - 若两者都缺失 `tid`，WS Bus/Capability 调用会失败。
+>   - 默认与推荐：STS access token（Bearer，`aud=powerx:api`）
+>   - `PX_GATEWAY_API_KEY` 仅用于 standalone 本地联调，不作为宿主发布默认口径
+>   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若缺失，则使用显式 `tenant_uuid`。
+>   - 若两者都缺失租户上下文，WS Bus/Capability 调用会失败。
 >
 > **模式判定主口径（推荐）**：
 >
 > - 先看 `IAMMode`：`local` / `delegated`
 > - `delegated` 统一按宿主链路处理
 > - `local` 再看 `POWERX_PROXY` 决定本地链路或宿主链路
-> - 仅宿主链路下判断出站凭证，默认 `PX_PLUGIN_TOOL_TOKEN`（`PX_GATEWAY_API_KEY` 仅本地联调可选）
+> - 宿主链路使用 STS，standalone 本地联调使用 ApiKey
 >
 > 详细判定顺序、三种有效组合、代码入口与日志验收见：
 > - `docs/guides/develop/standalone/mode-resolution.md`
 >
 > **升级提醒（breaking）**：
-> - `delegated + POWERX_PROXY=1` 场景不再接受 `PX_TOOL_TOKEN` fallback，必须改为 `PX_PLUGIN_TOOL_TOKEN`。
-> - `local + POWERX_PROXY=1` 仍可短期兼容 `PX_TOOL_TOKEN`，但会输出 deprecate 告警，建议尽快迁移。
+> - 旧静态 Tool Token 链路已废弃。
+> - `delegated + POWERX_PROXY=1` 必须配置 STS/gRPC 契约变量。
+> - `local + POWERX_PROXY=1` 本地联调必须配置 ApiKey。
 
 ### 1.4.3 日志与内部调试路由开关（避免混淆）
 
@@ -321,11 +323,7 @@ POWERX_PROXY=1 IAMMode=local go run ./cmd/plugin
 鉴权示例：
 
 ```bash
-# Bearer
-export PX_GATEWAY_AUTH_SCHEME=bearer
-export PX_PLUGIN_TOOL_TOKEN="<tool-token>"
-
-# 本地联调可选（非宿主发布默认）
+# 本地联调
 export PX_GATEWAY_AUTH_SCHEME=apikey
 export PX_GATEWAY_API_KEY="<api-key>"
 ```
@@ -413,7 +411,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
 
 ### 2) Token 与租户
 - USER_TOKEN.tid: <uuid>
-- PX_PLUGIN_TOOL_TOKEN.tid: <uuid or empty>
+- STS/access token tenant: <uuid or empty>
 - publish 请求体 tenant_uuid: <value or empty>
 
 ### 3) 连接与操作
@@ -595,7 +593,7 @@ iframe.contentWindow?.postMessage(
 
 从 009 consume-capability 版本开始，**宿主模式的能力调用必须经过插件后端代理**，所有 `PX_*` 凭证仅注入给 Go 进程，前端永远通过插件自有 API 转发。这么做可以：
 
-1. 统一注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`，由 `bootstrap.NewAppFromEnv` 填入 Gateway Client；租户从 token `tid` 自动推导，避免额外维护 tenant 变量与浏览器暴露 Tool Token。
+1. 统一注入 `PX_GATEWAY_BASE_URL` 与 STS/gRPC 契约变量，由插件后端通过 STS Exchange 获取短期 access token；避免浏览器暴露底座业务凭证。
 2. 通过 `framework/backend/go/router` 中的 `POST /api/v1/integration/capabilities/invoke` 统一做 action/payload 校验、traceId 记录与错误整形。
 3. 让 Admin/Skeleton 前端和 CLI 共用一套 `usePowerXCapability()` 封装，既能获得 `traceId` 也能透传限流/鉴权提示。
 
@@ -607,7 +605,7 @@ sequenceDiagram
     participant PluginAPI as 插件后端 /api/v1
     participant Gateway as PowerX Integration Gateway
     UI->>PluginAPI: POST /integration/capabilities/invoke\n{capabilityId, action, payload}
-    PluginAPI->>Gateway: POST /tenant/invocations\nAuthorization: Bearer <PX_PLUGIN_TOOL_TOKEN>
+    PluginAPI->>Gateway: POST /tenant/invocations\nAuthorization: Bearer <sts_access_token>
     Gateway-->>PluginAPI: 200 {"traceId":"...","status":"ok"}
     PluginAPI-->>UI: 200 {"traceId":"...","data":{...}} + X-Trace-Id
 ```
@@ -640,14 +638,14 @@ sequenceDiagram
 | 错误类型 (`error.type`) | HTTP | 典型原因 | 排查步骤 |
 | --- | --- | --- | --- |
 | `validation` | `400` | `capabilityId`/`action` 为空、payload 缺字段 | 检查入参是否符合能力契约；`tests/capabilities/media_invocation_test.go` 展示了最小 payload；必要时查看 router 打印的校验日志。 |
-| `unauthorized` | `401/403` | `PX_PLUGIN_TOOL_TOKEN` 已过期或租户 UUID 不匹配 | 使用 `px-plugin login` 重新申请 Grant，或在宿主部署脚本中刷新环境变量；确认请求头 `tenant_uuid` 是否与运维配置一致。 |
+| `unauthorized` | `401/403` | STS 凭证缺失/过期、aud/scope 不匹配或租户 UUID 不匹配 | 检查 STS client 配置、Exchange 返回 token 的 `aud=powerx:api`、请求头 `tenant_uuid` 是否与运维配置一致。 |
 | `rate_limited` | `429` | 能力 QPS 超限 | 响应会包含 `traceId` 与 `error.code=RATE_LIMIT`；先查看宿主 Gateway 仪表板或联系平台扩容，再在前端提示用户稍后重试。 |
 | `upstream` | `502/504` | Gateway 不可达、action 未发布 | 查看插件后端日志 `capability.invoke.failure`，确认 `statusCode` 与 `message`；必要时将结果写入告警或切换 `PX_USE_MOCK`。 |
 
 > ✅ 任何错误都会在响应头写入 `X-Trace-Id` 并包含 `traceId` 字段，便于与 Gateway 日志对齐。  
 > ✅ 如需脚本化验证，可运行 `go test ./tests/capabilities`，该用例会启动 stub Gateway 校验成功与限流场景。
 
-**不要**在 Nuxt `.env` 内保留 `PX_GATEWAY_BASE_URL` / `PX_PLUGIN_TOOL_TOKEN`。宿主构建 (`POWERX_PROXY=1 npm run build`) 会忽略这些变量，仅保留 `NUXT_PUBLIC_POWERX_API_BASE` 等“可公开”字段；若检测到遗留 `PX_*`，请立即移除并重新构建。
+**不要**在 Nuxt `.env` 内保留 `PX_GATEWAY_BASE_URL` / `POWERX_STS_CLIENT_SECRET` / `PX_GATEWAY_API_KEY`。宿主构建 (`POWERX_PROXY=1 npm run build`) 会忽略这些变量，仅保留 `NUXT_PUBLIC_POWERX_API_BASE` 等“可公开”字段；若检测到遗留敏感凭证，请立即移除并重新构建。
 
 ## 3. 打包与环境变量注意事项
 

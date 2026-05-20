@@ -22,30 +22,34 @@ const (
 )
 
 type HostClientConfig struct {
-	BaseURL      string
-	APIPrefix    string
-	AuthScheme   string
-	Token        string
-	APIKey       string
-	TenantUUID   string
-	UserAgent    string
-	PublishPath  string
-	RegisterPath string
-	Timeout      time.Duration
-	HTTPClient   *http.Client
+	BaseURL       string
+	APIPrefix     string
+	AuthScheme    string
+	Token         string
+	TokenProvider TokenProvider
+	APIKey        string
+	TenantUUID    string
+	UserAgent     string
+	PublishPath   string
+	RegisterPath  string
+	Timeout       time.Duration
+	HTTPClient    *http.Client
 }
 
+type TokenProvider func(ctx context.Context) (string, error)
+
 type HostClient struct {
-	baseURL      string
-	apiPrefix    string
-	authScheme   string
-	credential   string
-	tenantUUID   string
-	userAgent    string
-	publishPath  string
-	registerPath string
-	timeout      time.Duration
-	httpClient   *http.Client
+	baseURL       string
+	apiPrefix     string
+	authScheme    string
+	credential    string
+	tokenProvider TokenProvider
+	tenantUUID    string
+	userAgent     string
+	publishPath   string
+	registerPath  string
+	timeout       time.Duration
+	httpClient    *http.Client
 }
 
 type hostPublishEnvelope struct {
@@ -69,7 +73,7 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
 	}
-	authScheme, credential, err := resolveCredential(cfg.AuthScheme, cfg.Token, cfg.APIKey)
+	authScheme, credential, err := resolveCredential(cfg.AuthScheme, cfg.Token, cfg.APIKey, cfg.TokenProvider != nil)
 	if err != nil {
 		return nil, err
 	}
@@ -82,16 +86,17 @@ func NewHostClient(cfg HostClientConfig) (*HostClient, error) {
 		client = &http.Client{Timeout: timeout}
 	}
 	return &HostClient{
-		baseURL:      strings.TrimRight(baseURL, "/"),
-		apiPrefix:    normalizeAPIPrefix(cfg.APIPrefix),
-		authScheme:   authScheme,
-		credential:   credential,
-		tenantUUID:   strings.TrimSpace(cfg.TenantUUID),
-		userAgent:    strings.TrimSpace(cfg.UserAgent),
-		publishPath:  normalizeWSBusPath(cfg.PublishPath, defaultPublishPath),
-		registerPath: normalizeWSBusPath(cfg.RegisterPath, defaultRegisterPath),
-		timeout:      timeout,
-		httpClient:   client,
+		baseURL:       strings.TrimRight(baseURL, "/"),
+		apiPrefix:     normalizeAPIPrefix(cfg.APIPrefix),
+		authScheme:    authScheme,
+		credential:    credential,
+		tokenProvider: cfg.TokenProvider,
+		tenantUUID:    strings.TrimSpace(cfg.TenantUUID),
+		userAgent:     strings.TrimSpace(cfg.UserAgent),
+		publishPath:   normalizeWSBusPath(cfg.PublishPath, defaultPublishPath),
+		registerPath:  normalizeWSBusPath(cfg.RegisterPath, defaultRegisterPath),
+		timeout:       timeout,
+		httpClient:    client,
 	}, nil
 }
 
@@ -181,7 +186,11 @@ func (c *HostClient) registerTopicsToEndpoint(ctx context.Context, endpoint stri
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", c.resolveAuthHeader(opts))
+	authHeader, authErr := c.resolveAuthHeader(ctxReq, opts)
+	if authErr != nil {
+		return FailureResult(ErrorCodeRegisterRequestInvalid, authErr.Error())
+	}
+	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
@@ -313,7 +322,11 @@ func (c *HostClient) publishToEndpoint(ctx context.Context, endpoint string, bod
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", c.resolveAuthHeader(opts))
+	authHeader, authErr := c.resolveAuthHeader(ctxReq, opts)
+	if authErr != nil {
+		return FailureResult(ErrorCodePublishRequestInvalid, authErr.Error())
+	}
+	req.Header.Set("Authorization", authHeader)
 	req.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
@@ -473,11 +486,28 @@ func extractHostErrorMessage(payload []byte) string {
 	return ""
 }
 
-func (c *HostClient) resolveAuthHeader(opts PublishOptions) string {
+func (c *HostClient) resolveAuthHeader(ctx context.Context, opts PublishOptions) (string, error) {
 	if strings.EqualFold(strings.TrimSpace(c.authScheme), "apikey") {
-		return fmt.Sprintf("ApiKey %s", c.credential)
+		return fmt.Sprintf("ApiKey %s", c.credential), nil
 	}
-	return fmt.Sprintf("Bearer %s", c.credential)
+	if c.tokenProvider != nil {
+		token, err := c.tokenProvider(ctx)
+		if err != nil {
+			return "", fmt.Errorf("wsbus host: STS token exchange failed: %w", err)
+		}
+		token = strings.TrimSpace(token)
+		if token == "" {
+			return "", errors.New("wsbus host: STS token is empty")
+		}
+		return fmt.Sprintf("Bearer %s", token), nil
+	}
+	if token := strings.TrimSpace(opts.BearerToken); token != "" {
+		return fmt.Sprintf("Bearer %s", token), nil
+	}
+	if token := strings.TrimSpace(c.credential); token != "" {
+		return fmt.Sprintf("Bearer %s", token), nil
+	}
+	return "", errors.New("wsbus host: STS token provider is required for bearer mode")
 }
 
 func authHeaderKind(value string) string {
@@ -495,7 +525,7 @@ func authHeaderKind(value string) string {
 	}
 }
 
-func resolveCredential(authScheme, token, apiKey string) (string, string, error) {
+func resolveCredential(authScheme, token, apiKey string, hasTokenProvider bool) (string, string, error) {
 	scheme := strings.ToLower(strings.TrimSpace(authScheme))
 	if scheme == "" {
 		if strings.TrimSpace(apiKey) != "" {
@@ -513,8 +543,8 @@ func resolveCredential(authScheme, token, apiKey string) (string, string, error)
 		return "apikey", key, nil
 	case "bearer":
 		bearer := strings.TrimSpace(token)
-		if bearer == "" {
-			return "", "", errors.New("wsbus host: token is required (PX_PLUGIN_TOOL_TOKEN)")
+		if bearer == "" && !hasTokenProvider {
+			return "", "", errors.New("wsbus host: STS token provider is required for bearer mode")
 		}
 		return "bearer", bearer, nil
 	default:

@@ -44,3 +44,12 @@ topics:
       - principal_type: member
         principal_id: "member:system"
         actions: [publish]
+
+  - key: powerx.runtime.scheduler.triggered.v1
+    namespace: powerx.runtime.scheduler
+    name: triggered.v1
+    description: Scheduler 标准触发事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]

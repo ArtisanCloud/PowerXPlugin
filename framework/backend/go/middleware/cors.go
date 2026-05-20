@@ -10,7 +10,8 @@ import (
 const (
 	defaultAllowedHeaders = "Content-Type, Content-Length, Accept-Encoding, " +
 		"X-CSRF-Token, Authorization, accept, origin, Cache-Control, " +
-		"X-Requested-With, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT"
+		"X-Requested-With, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT, " +
+		"X-Scheduler-Provider-Mode"
 	defaultAllowedMethods = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
 )
 

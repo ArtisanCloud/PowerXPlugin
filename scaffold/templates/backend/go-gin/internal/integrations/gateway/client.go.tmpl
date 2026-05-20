@@ -827,7 +827,7 @@ func (c *Client) reconnectTransport() error {
 	client, err := frameworkgateway.NewClient(frameworkgateway.Config{
 		BaseURL:        baseURL,
 		AuthScheme:     authScheme,
-		ToolToken:      toolToken,
+		BearerToken:    toolToken,
 		APIKey:         strings.TrimSpace(gcfg.APIKey),
 		TenantUUID:     tenantUUID,
 		RequestTimeout: timeout,

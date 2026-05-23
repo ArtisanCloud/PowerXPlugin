@@ -258,6 +258,34 @@ export default defineNuxtConfig({
   imports: {
     dirs: ['stores']
   },
+  hooks: {
+    'pages:extend'(pages) {
+      const normalizeAdminRoutes = (nodes: any[]) => {
+        for (const page of nodes) {
+          const path = String(page?.path || '')
+          if (path.startsWith('/admin/')) {
+            const normalizedPath = path.replace(/^\/admin/, '')
+            const rawAlias = page?.alias
+            const aliases = Array.isArray(rawAlias)
+              ? rawAlias.filter((item: any) => typeof item === 'string' && item.trim().length > 0)
+              : typeof rawAlias === 'string' && rawAlias.trim().length > 0
+                ? [rawAlias]
+                : []
+            if (!aliases.includes(path)) {
+              aliases.push(path)
+            }
+            page.path = normalizedPath
+            page.alias = aliases
+          }
+          if (Array.isArray(page?.children) && page.children.length > 0) {
+            normalizeAdminRoutes(page.children)
+          }
+        }
+      }
+
+      normalizeAdminRoutes(pages as any[])
+    }
+  },
   colorMode: {
     preference: 'system',
     fallback: 'light',

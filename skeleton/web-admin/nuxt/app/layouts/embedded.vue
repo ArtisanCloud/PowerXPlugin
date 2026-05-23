@@ -117,20 +117,5 @@ const handleDelegatedDismiss = () => {
 </template>
 
 <style scoped>
-:global(html),
-:global(body),
-:global(#__nuxt) {
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.embedded-wrap {
-  height: 100dvh;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
+.embedded-wrap { min-height: auto; }
 </style>

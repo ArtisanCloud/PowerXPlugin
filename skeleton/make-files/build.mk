@@ -132,6 +132,7 @@ frontend-build: ## 构建 Host 包（POWERX_PROXY=1, baseURL=$(POWERX_ADMIN_BASE
 	@echo "==> 构建 web-admin（Host 包） POWERX_PROXY=1 baseURL=$(POWERX_ADMIN_BASE)"
 	cd $(FRONTEND_DIR) && \
 	  POWERX_PROXY=1 \
+	  NUXT_PUBLIC_INSIDE_POWERX=1 \
 	  POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
 	  POWERX_PLUGIN_VERSION="$(VERSION)" \
 	  NUXT_PUBLIC_POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
@@ -148,6 +149,7 @@ frontend-build-standalone: ## 构建 Standalone 包（POWERX_PROXY=0, baseURL=/�
 	@echo "==> 构建 web-admin（Standalone 包） POWERX_PROXY=0 baseURL=/"
 	cd $(FRONTEND_DIR) && \
 	  POWERX_PROXY=0 \
+	  NUXT_PUBLIC_INSIDE_POWERX=0 \
 	  POWERX_PLUGIN_ID="$(PLUGIN_ID)" \
 	  POWERX_PLUGIN_VERSION="$(VERSION)" \
 	  NUXT_PUBLIC_POWERX_PLUGIN_ID="$(PLUGIN_ID)" \

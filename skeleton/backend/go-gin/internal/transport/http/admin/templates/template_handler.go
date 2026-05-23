@@ -3,6 +3,7 @@ package templates
 import (
 	"errors"
 	"io"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -11,9 +12,9 @@ import (
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
-	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -45,7 +46,13 @@ func (h *TemplateHandler) GetTemplates(c *gin.Context) {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
-	contracts.ResponseSuccess(c, res)
+	contracts.ResponseSuccess(c, TemplateListResponse{
+		List:       NewTemplateResponses(res.List),
+		Page:       res.PageIndex,
+		PageSize:   res.PageSize,
+		Total:      res.Total,
+		TotalPages: totalPages(res.Total, res.PageSize),
+	})
 }
 
 func (h *TemplateHandler) GetTemplate(c *gin.Context) {
@@ -188,6 +195,16 @@ func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
 func parseUint64(s string) (uint64, error) {
 	u, err := strconv.ParseUint(s, 10, 64)
 	return uint64(u), err
+}
+
+func totalPages(total int64, pageSize int) int {
+	if total <= 0 {
+		return 0
+	}
+	if pageSize <= 0 {
+		return 1
+	}
+	return int(math.Ceil(float64(total) / float64(pageSize)))
 }
 
 func respondTemplateValidationError(c *gin.Context, err *TemplateValidationError) {

@@ -23,16 +23,15 @@
 
 ```mermaid
 flowchart LR
-  UI["Admin 页面/调试终端"] --> API["/api/v1/admin/runtime/*"]
-  API --> MODE["SchedulerModeService\n模式识别"]
-  API --> RETRY["SchedulerRetryService\n有限重试状态机"]
-  API --> TICKET["SchedulerTicketService\n工单与恢复审计"]
-  CRON["integration scheduler"] --> DISPATCH["SchedulerEventDispatcher"]
-  DISPATCH --> EB["EventBridge Emitter"]
-  EB --> BUS["taskbus(host/redis)"]
-  BUS --> HOST["PowerX Host / WS Bus"]
-  RETRY --> OBS["metrics/logs/trace_id"]
-  TICKET --> OBS
+  UI["Framework Lab 页面"] --> API["插件 Runtime API\n/api/v1/admin/runtime/scheduler/jobs"]
+  API --> FACADE["framework runtime/scheduler facade"]
+  FACADE --> LOCAL["LocalProvider\n插件内存/事件链路"]
+  FACADE --> HOST["HostProvider\nPowerX REST Scheduler"]
+  HOST --> PX["PowerX\n/api/v1/admin/scheduler/jobs"]
+  PX --> TOPIC["powerx.runtime.scheduler.triggered.v1"]
+  TOPIC --> BUS["EventBridge/TaskBus/WSBus"]
+  BUS --> UI
+  API --> OBS["metrics/logs/trace_id/request_id"]
 ```
 
 - 前端模块：`skeleton/web-admin/nuxt`（主要用于登录与联调入口页面）。
@@ -44,15 +43,14 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-  A["输入: POWERX_PROXY + taskbus_provider"] --> B["模式校验 /scheduler/mode/validate"]
-  B -->|通过| C["调度触发 -> SchedulerEventDispatcher"]
-  B -->|冲突| E["409 mode_conflict\n启动/校验失败"]
-  C --> D["EventBridge -> taskbus(host/redis)"]
-  D --> F["输出: ack/event + metrics/logs"]
-  D -->|权限失败| G["retry (202) -> 超限(409)"]
-  G --> H["pause(201) 创建 ticket"]
-  H --> I["resume(ops/admin) -> 恢复"]
-  I --> C
+  A["输入: IAMMode + POWERX_PROXY + provider_mode"] --> B["插件 Runtime Scheduler API"]
+  B -->|local| C["LocalProvider 创建/触发 job"]
+  B -->|host| D["HostProvider 调 PowerX REST Scheduler"]
+  D -->|ApiKey/Bearer 通过| E["PowerX 创建 job"]
+  D -->|权限/owner/tenant 失败| X["返回 4xx\n插件包装为 503 details"]
+  E --> F["到期发布\npowerx.runtime.scheduler.triggered.v1"]
+  C --> F
+  F --> G["插件 WS/通知收到 event"]
 ```
 
 ## 5. 跨角色协作流程
@@ -60,71 +58,93 @@ flowchart TD
 ```mermaid
 flowchart LR
   subgraph L1["QA / 前端入口"]
-    U1["进入 Admin 页面"]
-    U2["执行 API/WS 联调"]
-    U3["记录验收台账"]
+    U1["进入 Framework Lab"]
+    U2["选择本地/网关 Scheduler"]
+    U3["创建/触发 job 并观察通知"]
   end
 
   subgraph L2["插件后端"]
-    B1["mode validate"]
-    B2["scheduler emit"]
-    B3["retry/pause/resume"]
-    B4["输出 metrics/logs"]
+    B1["Runtime Scheduler Handler"]
+    B2["framework facade 选择 provider"]
+    B3["host 出站清空 tenant_uuid"]
+    B4["输出 metrics/logs/request_id"]
   end
 
   subgraph L3["宿主/外部系统"]
-    H1["Host taskbus/wsbus"]
-    H2["返回授权结果"]
-    H3["权限修复完成"]
+    H1["PowerX Scheduler REST"]
+    H2["API Key Profile 权限"]
+    H3["发布 scheduler triggered 事件"]
   end
 
-  U1 --> U2 --> B1 --> B2 --> H1 --> H2 --> B3 --> B4 --> U3
-  B3 -->|需要人工恢复| H3 --> B3
+  U1 --> U2 --> B1 --> B2 --> B3 --> H1
+  H2 --> H1 --> H3 --> U3
+  B4 --> U3
 ```
 
 ## 6. 前置条件与依赖
 
 - 配置：
-  - `POWERX_PROXY=0` 时建议 `taskbus_provider=redis`。
-  - `POWERX_PROXY=1` 时建议 `taskbus_provider=host`。
-  - `operations.scheduler.retry_max_attempts` 默认 3（范围 1-10）。
-- 权限：
-  - 调试接口需 admin token。
-  - 恢复接口仅 `ops/admin`。
+  - `IAMMode=local + POWERX_PROXY=0`：本地 Scheduler，tenant 由本地上下文/请求解析。
+  - `IAMMode=local + POWERX_PROXY=1`：local+proxy，host Scheduler 使用 `PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY`。
+  - `IAMMode=delegated`：宿主委派链路，host Scheduler 使用 Bearer/STS。
+- PowerX 权限：
+  - API Key Profile 需要勾选 `com.corex.scheduler.jobs` 对应 REST 权限。
+  - 权限目录应包含 `admin_scheduler_jobs`、`admin_scheduler_jobs_job_id`、`pause/resume/trigger/runs`。
 - 数据与环境：
-  - proxy 模式需可用 gateway 凭证（bearer/apikey）。
-  - 需可访问 `:8078` 及 `/api/ws`。
+  - PowerX Core 可访问：`PX_GATEWAY_BASE_URL=http://127.0.0.1:8077`。
+  - 插件后端可访问：`http://127.0.0.1:8078`。
+  - WS/通知链路可用，标准 topic 为 `powerx.runtime.scheduler.triggered.v1`。
 
 ## 7. 操作步骤（按场景拆分）
 
 ### 7.1 页面操作步骤
 
 1. 动作：打开插件后台联调入口页。  
-命令/入口：浏览器访问 `/_p/<pluginId>/admin/intro`（或本地 `http://127.0.0.1:3000/intro`）。  
-预期结果：页面可用、可继续执行 API/WS 联调。  
+命令/入口：浏览器访问 Framework Lab 页面（本地 Nuxt 通常为 `http://127.0.0.1:<port>/templates/framework-lab`，宿主内为插件后台对应路由）。  
+预期结果：可看到“本地 Scheduler”和“网关 Scheduler”两个入口。  
 失败处理：若 401/403，先检查登录态与 token。
 
-2. 动作：进入“接口联调”流程（手动执行本指南第 7.2/7.3 命令）。  
-命令/入口：按本页 curl 与 ws 命令执行。  
-预期结果：可完成 mode 校验、触发、重试与恢复。  
+2. 动作：测试本地 Scheduler。  
+命令/入口：点击“本地 Scheduler” -> “创建 Scheduler 样例”。  
+预期结果：本地列表出现 job，到期或手动触发后收到 `powerx.runtime.scheduler.triggered.v1` 通知。  
+失败处理：检查 `tenant_uuid`、本地 EventBridge/WS 订阅与插件日志。
+
+3. 动作：测试网关 Scheduler。  
+命令/入口：点击“网关 Scheduler” -> “创建 Scheduler 样例”。  
+预期结果：插件调用 PowerX `/api/v1/admin/scheduler/jobs` 创建 job，到期后插件收到 Scheduler 通知。  
 失败处理：跳转第 10 节排障矩阵。
 
 ### 7.2 接口调用步骤
 
-1. 动作：校验模式匹配。  
+1. 动作：创建 host scheduler job。  
 命令/入口：
 ```bash
-curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/mode/validate \
-  -H "Authorization: Bearer $USER_TOKEN" -H "Content-Type: application/json" \
-  -d '{"powerx_proxy":"1","taskbus_provider":"host"}'
+curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/jobs \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider_mode":"host",
+    "force_host":true,
+    "owner_type":"plugin",
+    "owner_id":"com.powerx.plugins.base",
+    "name":"framework_lab_once_manual",
+    "schedule_type":"once",
+    "schedule_expr":"2026-05-23T10:30:00Z",
+    "topic":"powerx.runtime.scheduler.triggered.v1",
+    "payload":{"business_action":"framework_lab_scheduler_probe","trace_id":"manual-trace-001"}
+  }'
 ```
-预期结果：`200` 且 `valid=true`。  
-失败处理：`409` 时修正 `POWERX_PROXY` 与 `taskbus_provider`。
+预期结果：`201`，返回 `job_id`。  
+失败处理：`503` 时查看 `error.details.status_code/body/endpoint`，再用 PowerX `request_id` 查底座日志。
 
-2. 动作：验证失败闭环。  
-命令/入口：依次执行 `retry -> pause -> resume`（详见 `usecase-us3-retry-recovery.md`）。  
-预期结果：前两次 retry `202`、超限 `409`、pause `201`、非 ops/admin resume `403`、ops/admin resume `200`。  
-失败处理：定位 `scheduler_retry_handler` 响应码与错误字段。
+2. 动作：手动触发 job。  
+命令/入口：
+```bash
+curl -sS -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/scheduler/jobs/$JOB_ID/trigger?provider_mode=host" \
+  -H "Authorization: Bearer $USER_TOKEN"
+```
+预期结果：`200`，PowerX 执行 trigger，插件侧通知链路收到事件。  
+失败处理：检查 API Key Profile 是否勾选 trigger 权限。
 
 ### 7.3 本地命令步骤
 
@@ -141,19 +161,36 @@ go test ./cmd/plugin ./internal/config ./internal/services/admin/runtime_ops \
 预期结果：5 个包全部 PASS。  
 失败处理：先看配置冲突错误，再看 gateway 依赖与权限配置。
 
+2. 动作：验证 Scheduler host client 单测。  
+命令/入口：
+```bash
+GOCACHE=$PWD/tmp/gocache go test ./framework/backend/go/runtime/scheduler \
+  ./skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops \
+  -run 'Test.*Scheduler|TestSchedulerJobHandler|TestHTTPHostClient' -count=1
+```
+预期结果：两个包 PASS。  
+失败处理：重点检查 host 出站 URL、ApiKey/Bearer 选择、`tenant_uuid` 是否被透传。
+
 ## 8. 预期结果与验收标准
 
-- 模式冲突必须 fail-fast（不可静默放行）。
-- 手动触发与调度触发的 topic 与语义一致。
-- proxy 权限失败必须进入有限重试并可形成工单闭环。
-- 恢复权限边界正确（仅 ops/admin）。
-- 日志与指标可追溯（`trace_id/topic/status` 等）。
+- host create/list/trigger/pause/resume 通过插件 runtime API 进入 framework facade。
+- host 出站调用 PowerX `/api/v1/admin/scheduler/jobs`，不传 `tenant_uuid`。
+- ApiKey 模式使用 `Authorization: ApiKey <key>`，Bearer 模式使用 `Authorization: Bearer <token>`。
+- PowerX API Key Profile 权限控制 Scheduler REST 调用。
+- 手动触发与到期触发 topic 一致：`powerx.runtime.scheduler.triggered.v1`。
+- 日志与指标可追溯（`trace_id/request_id/topic/status` 等）。
 
 ## 9. 代码实现映射
 
 | 文档步骤 | 代码位置 | 说明 |
 |---|---|---|
 | 路由入口 | `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/routes.go` | 注册 `/scheduler/*` 端点 |
+| Scheduler job handler | `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_job_handler.go` | `/runtime/scheduler/jobs` create/list/get/trigger/pause/resume |
+| framework host client | `framework/backend/go/runtime/scheduler/http_host_client.go` | 调 PowerX REST Scheduler，处理 ApiKey/Bearer 与 envelope |
+| host provider | `framework/backend/go/runtime/scheduler/host_provider.go` | host provider 不透传 tenant |
+| scheduler types | `framework/backend/go/runtime/scheduler/types.go` | host/local 校验差异与 job DTO |
+| 前端联调页 | `skeleton/web-admin/nuxt/app/pages/templates/framework-lab.vue` | 本地/网关 Scheduler 页面入口 |
+| 前端 client | `skeleton/web-admin/nuxt/app/composables/api/useScheduler.ts` | scheduler runtime API 封装 |
 | 模式校验 handler | `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_mode_handler.go` | `mode/validate` 入参与冲突返回 |
 | 重试闭环 handler | `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_retry_handler.go` | `retry/pause/resume` 状态码与权限边界 |
 | 模式服务 | `skeleton/backend/go-gin/internal/services/admin/runtime_ops/scheduler_mode_service.go` | `POWERX_PROXY` 与 provider 配对规则 |
@@ -182,6 +219,18 @@ go test ./cmd/plugin ./internal/config ./internal/services/admin/runtime_ops \
 排查：topic/grant 是否完成、proxy 权限快照是否更新。  
 修复：按 `event_fabric` + `ws debug_playbook` 顺序重建联调。
 
+5. 现象：host create 返回 `SCHEDULER_TENANT_MISMATCH`。  
+排查：host 请求不应带 `tenant_uuid`；PowerX 只从 ApiKey/Bearer 上下文解析租户。  
+修复：确认使用当前 framework host client，并重启插件后端。
+
+6. 现象：host create 返回 `SCHEDULER_PLUGIN_OWNER_MISMATCH`。  
+排查：请求已进入 PowerX Scheduler 服务内部 owner 校验，API Key REST 权限层已经不是唯一检查点。  
+修复：确认 PowerX Scheduler 已适配 API Key Profile 授权链路；用 `request_id` 查 PowerX `logs/info.log`。
+
+7. 现象：PowerX API Key 页面看不到 Scheduler 权限。  
+排查：PowerX `platform_capabilities` 是否注册 `com.corex.scheduler.jobs` 的 REST protocols。  
+修复：补注册后重新 seed/刷新权限目录，并保存 Profile。
+
 ## 11. 回滚与风险控制
 
 - 回滚方式：
@@ -197,6 +246,7 @@ go test ./cmd/plugin ./internal/config ./internal/services/admin/runtime_ops \
 | 版本 | 日期 | 责任人 | 变更内容 |
 |---|---|---|---|
 | v1.0 | 2026-03-25 | Codex | 初版总览，覆盖 US1/US2/US3 与 Phase 6 收尾口径 |
+| v1.1 | 2026-05-23 | Codex | 对齐 Runtime Scheduler host REST、ApiKey 权限、tenant 不透传与通知验收口径 |
 
 ## Use Case 文档索引
 

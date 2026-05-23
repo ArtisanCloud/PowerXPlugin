@@ -8,7 +8,7 @@
 #   历史顶层字段仍兼容读取，但不建议继续新增。
 #
 # Auth / IAM / 运行模式环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
-#   POWERX_PROXY                - 设为 1 时表示运行在宿主 iframe/代理下（Delegated 模式）
+#   POWERX_PROXY                - 设为 1 时表示本地进程接宿主能力/WS 链路；是否 Delegated 由 IAMMode 决定
 #   POWERX_CORE_ENDPOINT        - Delegated 模式访问宿主 Core API 的基址（默认 http://localhost:8077）
 #   POWERX_AUTH_TOKEN           - 插件向宿主 Core 鉴权用的服务 Token
 #   PLUGIN_IAM_TENANT_KEY/NAME  - Standalone 模式默认租户唯一键与显示名
@@ -34,9 +34,9 @@ gateway:
   # 默认指向本机 PowerX Core（8077）；可由 .env.local 的 PX_GATEWAY_BASE_URL 覆盖。
   # 未配置有效凭证时可通过 `PX_USE_MOCK` 指定 media,eventfabric 等模块名称启用内存 Mock。
   # 凭证分流：
-  # - auth_scheme=bearer（Host/宿主模式）使用 tool_token
+  # - auth_scheme=bearer（Delegated/宿主委派）使用 tool_token
   # - auth_scheme=apikey（Standalone+Proxy）使用 api_key
-  # tenant_uuid 仅用于 Bearer 本地兼容场景，proxy 场景由宿主按凭证解析租户。
+  # tenant_uuid 仅用于本地 provider 默认值；调用 PowerX Scheduler 等宿主能力时由 API key/tool token 鉴权上下文解析租户。
   base_url: "http://127.0.0.1:8077"
   api_prefix: "/api/v1"
   auth_scheme: "apikey" # bearer | apikey
@@ -117,9 +117,8 @@ runtime:
       enabled: true
       path: "/healthz"
   logging:
-    # 当 POWERX_PROXY=1 时，framework 将默认强制 stdout + json，
-    # 并由 PowerX 宿主统一采集转发到日志后端。
-    # file/loki 等扩展输出仅在平台显式授权时允许。
+    # 仅 IAMMode=delegated 的宿主委派语义会强制 stdout + json。
+    # IAMMode=local + POWERX_PROXY=1 是本地联调宿主能力，仍按本配置输出。
     level: "debug"
     format: "json"
     output: "stdout"

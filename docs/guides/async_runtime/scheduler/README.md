@@ -6,7 +6,7 @@
 ## 1. 目标与范围
 
 1. 明确“何时触发”（Scheduler）与“如何执行”（Task/EventBus）的职责边界。
-2. 明确 `standalone local` 与 `delegated proxy` 的模式识别与切换策略。
+2. 明确 `standalone local`、`local + proxy` 与 `delegated proxy` 的模式识别与切换策略。
 3. 确保手动触发与定时触发进入同一事件执行链路，避免双轨实现。
 4. 约束后续业务插件（如 AI Craft）通过 framework scheduler facade 接入，不自行实现业务本地 scheduler。
 
@@ -19,7 +19,7 @@
 5. Scheduler 标准 topic 统一为 `powerx.runtime.scheduler.triggered.v1`（遵循 `powerx.<domain>.<subdomain>.<action>.v<version>`）。
 6. 旧规划里的 `scheduler.job.triggered` 仅作为历史草案名称；新实现优先统一到 `powerx.runtime.scheduler.triggered.v1`。
 
-## 2.1 统一规划口径
+## 2.1 当前实现口径
 
 详细规划见：
 
@@ -29,21 +29,22 @@ docs/plan/014-framework-scheduler.md
 
 当前落地判断：
 
-1. backend framework 已有初版 `runtime/scheduler` facade。
-2. frontend framework 已有初版 scheduler client/composable，页面应通过统一 client 调用。
-3. skeleton 管理端已暴露 `/api/v1/admin/runtime/scheduler/jobs` 系列 API。
-4. PowerX 底座仍需要确认 `powerx.scheduler.v1.SchedulerService` 是否已经真实可调用。
+1. backend framework 已提供 `runtime/scheduler` facade，包含 `local` 与 `host` provider。
+2. host provider 已接入 PowerX 底座 REST Scheduler：`/api/v1/admin/scheduler/jobs`。
+3. skeleton 管理端暴露 `/api/v1/admin/runtime/scheduler/jobs` 系列 API，页面通过该 API 调用，不直连 PowerX。
+4. frontend framework 已有 scheduler client/composable，`framework-lab` 提供“本地 Scheduler / 网关 Scheduler”双 tab 联调入口。
 5. 插件通用 scheduler 不复用 `/admin/event-fabric/cron/jobs`，该接口偏底座内置运维 job。
 6. 业务插件应通过 framework 注册 `once`、`interval`、`cron` job。
-7. Scheduler 到点只发布事件，业务执行仍由 EventBridge/TaskBus 承接。
+7. Scheduler 到点只发布事件，业务执行仍由 EventBridge/TaskBus/WSBus 承接。
+8. 标准通知 topic 为 `powerx.runtime.scheduler.triggered.v1`，插件侧已可收到 host Scheduler 到期通知。
 
 ## 3. 模式识别与切换（启动期决策）
 
 ### 3.1 识别信号
 
-1. 主信号：`POWERX_PROXY`
+1. 主信号：`IAMMode` + `POWERX_PROXY`
 2. 执行提供者：`runtime.event_bridge.taskbus_provider`
-3. 网关鉴权：宿主 delegated 使用 STS token provider；standalone 使用 `api_key`
+3. 网关鉴权：`delegated` 使用 STS/Bearer；`local + proxy` 使用 ApiKey
 
 ### 3.2 推荐决策表
 
@@ -51,10 +52,14 @@ docs/plan/014-framework-scheduler.md
    - 运行模式：`standalone local`
    - 推荐 `taskbus_provider=redis`
    - 说明：事件在插件本地闭环，WS 走 `:8078/api/ws`
-2. `POWERX_PROXY=1`：
+2. `IAMMode=local` 且 `POWERX_PROXY=1`：
+   - 运行模式：`local + proxy`
+   - 推荐 `PX_GATEWAY_AUTH_SCHEME=apikey`
+   - 说明：本地启动插件，但 Scheduler/WS/能力出站走 PowerX 底座网关
+3. `IAMMode=delegated`：
    - 运行模式：`delegated proxy`
    - 推荐 `taskbus_provider=host`
-   - 说明：插件入口仍是 `:8078`，出站由 framework gateway 代理到底座
+   - 说明：宿主语义模式，出站由 framework gateway 代理到底座
 
 ### 3.3 封装边界（必须遵守）
 
@@ -65,6 +70,34 @@ docs/plan/014-framework-scheduler.md
 3. Scheduler 组件只注册 Job 与调度频率，参考：
    - `skeleton/backend/go-gin/internal/jobs/integration/scheduler.go`
 4. 后续 `runtime/scheduler` facade 落地后，业务代码应依赖 framework 接口，不再直接依赖 skeleton 本地 scheduler。
+
+### 3.4 Host Scheduler 标准调用规则
+
+1. 插件页面只调用插件后端：
+
+```text
+POST /api/v1/admin/runtime/scheduler/jobs
+GET  /api/v1/admin/runtime/scheduler/jobs?provider_mode=host
+POST /api/v1/admin/runtime/scheduler/jobs/{job_id}/trigger
+POST /api/v1/admin/runtime/scheduler/jobs/{job_id}/pause
+POST /api/v1/admin/runtime/scheduler/jobs/{job_id}/resume
+```
+
+2. 插件后端通过 framework host client 调 PowerX 底座：
+
+```text
+POST /api/v1/admin/scheduler/jobs
+GET  /api/v1/admin/scheduler/jobs
+GET  /api/v1/admin/scheduler/jobs/{job_id}
+PATCH /api/v1/admin/scheduler/jobs/{job_id}
+POST /api/v1/admin/scheduler/jobs/{job_id}/trigger
+POST /api/v1/admin/scheduler/jobs/{job_id}/pause
+POST /api/v1/admin/scheduler/jobs/{job_id}/resume
+```
+
+3. host Scheduler 请求不传 `tenant_uuid`。租户由 PowerX 根据 ApiKey/Bearer 鉴权上下文解析；若插件显式传入 `tenant_uuid`，framework host client 也会在出站前清空。
+4. `owner_type/owner_id` 表示调度任务归属，测试按钮默认使用当前 skeleton 插件 ID。PowerX 对 owner 的最终授权以底座实现为准。
+5. PowerX API Key Profile 必须包含 `com.corex.scheduler.jobs` 对应 REST 权限。权限目录中应能看到并勾选 `admin_scheduler_jobs`、`admin_scheduler_jobs_job_id`、`pause/resume/trigger/runs` 等资源。
 
 ## 4. 配置建议（最小可用）
 
@@ -77,7 +110,32 @@ runtime:
     taskbus_provider: "redis"
 ```
 
-2. `delegated proxy`：
+2. `local + proxy`：
+
+```yaml
+context:
+  iam_mode: "local"
+gateway:
+  base_url: "http://127.0.0.1:8077"
+  api_prefix: "/api/v1"
+  auth_scheme: "apikey"
+  api_key: "<PowerX API Key>"
+runtime:
+  event_bridge:
+    mode: "taskbus"
+    taskbus_provider: "host"
+```
+
+环境变量等价写法：
+
+```bash
+POWERX_PROXY=1
+PX_GATEWAY_BASE_URL=http://127.0.0.1:8077
+PX_GATEWAY_AUTH_SCHEME=apikey
+PX_GATEWAY_API_KEY=<PowerX API Key>
+```
+
+3. `delegated proxy`：
 
 ```yaml
 runtime:
@@ -85,10 +143,10 @@ runtime:
     mode: "taskbus"
     taskbus_provider: "host"
 gateway:
-  auth_scheme: "apikey" # 或 bearer（取决于部署策略）
+  auth_scheme: "bearer"
 ```
 
-3. SLA 调度窗口配置（业务 Cron 示例）：
+4. SLA 调度窗口配置（业务 Cron 示例）：
 
 ```yaml
 operations:
@@ -103,14 +161,39 @@ operations:
 
 说明：当前仓库已提供 Scheduler 组件与 EventBridge 主链路。业务 Cron 任务应注册到 Scheduler，并在 Job 内调用同一个 `emit` 入口。
 
-### Step 1：准备 WS 订阅
+### Step 1：准备 PowerX API Key 权限
+
+1. 在 PowerX 后台进入“设置 / API Key 管理”。
+2. 选择当前 Profile，勾选 `Runtime Scheduler` 相关 REST 权限：
+   - `admin_scheduler_jobs · create/list`
+   - `admin_scheduler_jobs_job_id · read/update`
+   - `admin_scheduler_jobs_job_id_trigger · create`
+   - `admin_scheduler_jobs_job_id_pause · create`
+   - `admin_scheduler_jobs_job_id_resume · create`
+   - `admin_scheduler_jobs_job_id_runs · list`
+3. 保存权限，确认日志出现类似 `profile permissions synced ... snapshot_permissions=...`。
+4. 使用该 Profile 下的 API Key 配置插件 `PX_GATEWAY_API_KEY`。
+
+### Step 2：准备 WS 订阅
 
 1. `standalone local`：`ws://127.0.0.1:8078/api/ws`
-2. `delegated proxy`：同样连插件 `:8078/api/ws`，按 `websocket/debug_playbook.md` 完成 topic/create/grant
+2. `local + proxy` / `delegated proxy`：同样连插件 `:8078/api/ws`，由插件后端完成 host 链路调用；按 `websocket/debug_playbook.md` 完成 topic/create/grant。
+3. 标准 topic：`powerx.runtime.scheduler.triggered.v1`。
 
-### Step 2：模拟“调度触发事件”
+### Step 3：页面创建 Host Scheduler Job
 
-先用 runtime 调试入口替代 Cron 触发，验证执行链路一致性：
+1. 打开 framework lab 页面。
+2. 选择“网关 Scheduler”。
+3. 点击“创建 Scheduler 样例”。
+4. 预期：
+   - 插件请求 `POST /api/v1/admin/runtime/scheduler/jobs`
+   - 插件转发到 PowerX `POST /api/v1/admin/scheduler/jobs`
+   - PowerX 返回创建成功，列表里出现新 job
+   - 到期后插件收到 `powerx.runtime.scheduler.triggered.v1` 通知
+
+### Step 4：模拟“调度触发事件”
+
+也可以先用 runtime 调试入口替代 Cron 触发，验证执行链路一致性：
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/event-bridge/emit \
@@ -125,7 +208,7 @@ curl -sS -X POST http://127.0.0.1:8078/api/v1/admin/runtime/event-bridge/emit \
 - `status=queued`
 - `trace_id` 必填，且应与事件 meta 中 `trace_id` 一致
 
-### Step 3：验收
+### Step 5：验收
 
 1. WS 先收到 `ack`，后收到 `event`
 2. 手动触发与 Cron 触发必须同 topic（`powerx.runtime.scheduler.triggered.v1`）且语义字段一致（`business_action/status`）
@@ -137,6 +220,7 @@ curl -sS http://127.0.0.1:8078/api/v1/admin/runtime/metrics | rg 'plugin_event_b
 ```
 
 5. 日志可检索 `trace_id/topic/status`
+6. PowerX `logs/info.log` 可检索 `POST /api/v1/admin/scheduler/jobs` 的 `status=200`，失败时可按 `request_id` 定位。
 
 ## 6. Cron 接入约束（实施时）
 
@@ -216,4 +300,26 @@ await scheduler.createJob({
 2. proxy 下 `403 topic not allowed`：检查 topic 是否已创建、profile 权限是否覆盖、API Key 是否已轮换。
 3. `401`：`gateway.auth_scheme` 与实际凭证不匹配（Bearer/ApiKey 混用）。
 4. 两种模式行为不一致：优先检查 `POWERX_PROXY` 与 `taskbus_provider` 是否按决策表配对。
-5. 底座 SchedulerService 只存在 proto/capability 但不可调用：先补底座服务实现与 framework HostProvider，再接入业务插件。
+5. API Key 权限页看不到 Scheduler：检查 PowerX `backend/config/platform_capabilities/*.yaml` 是否已为 `com.corex.scheduler.jobs` 注册 REST protocols，并重新 seed/刷新权限目录。
+6. `SCHEDULER_TENANT_MISMATCH`：host 调用不应传 `tenant_uuid`，检查插件是否已使用 framework host client，且 PowerX API key 解析出的租户是否正确。
+7. `SCHEDULER_PLUGIN_OWNER_MISMATCH`：说明请求已进入 PowerX Scheduler 服务内部 owner 校验，先确认 PowerX 已按 ApiKey REST 权限链路适配 owner 授权。
+8. 底座 SchedulerService 只存在 proto/capability 但不可调用：先补底座服务实现与 framework HostProvider，再接入业务插件。
+
+## 9. 当前代码实现映射
+
+| 能力 | 代码位置 | 说明 |
+|---|---|---|
+| framework host client | `framework/backend/go/runtime/scheduler/http_host_client.go` | 调 PowerX `/api/v1/admin/scheduler/jobs`，支持 `ApiKey`/`Bearer`，host 出站清空 `tenant_uuid` |
+| provider 封装 | `framework/backend/go/runtime/scheduler/host_provider.go` | host provider 不 fallback tenant，动作接口不透传 tenant |
+| DTO/校验 | `framework/backend/go/runtime/scheduler/types.go` | host create/update 不要求 `tenant_uuid`，local 仍要求租户 |
+| skeleton runtime API | `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_job_handler.go` | `/api/v1/admin/runtime/scheduler/jobs` 系列入口，选择 local/host provider |
+| 前端联调页 | `skeleton/web-admin/nuxt/app/pages/templates/framework-lab.vue` | “本地 Scheduler / 网关 Scheduler”创建、列表、触发、暂停、恢复 |
+| 前端 API client | `skeleton/web-admin/nuxt/app/composables/api/useScheduler.ts` | 封装 scheduler runtime API |
+| 事件声明 | `skeleton/plugin.d/events.yaml` | 声明 `powerx.runtime.scheduler.triggered.v1` |
+| 回归测试 | `framework/backend/go/runtime/scheduler/http_host_client_test.go`、`skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_job_handler_test.go` | 覆盖 host 路径、鉴权、tenant 不透传 |
+
+## 10. 变更记录
+
+| 日期 | 变更 |
+|---|---|
+| 2026-05-23 | 对齐 PowerX Runtime Scheduler REST host 链路、ApiKey 权限前置条件、host 不传 `tenant_uuid`、到期通知验收口径 |

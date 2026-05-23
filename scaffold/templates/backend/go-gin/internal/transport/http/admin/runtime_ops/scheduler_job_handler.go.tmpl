@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -11,9 +12,10 @@ import (
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 	fwscheduler "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
-	"{{ .BackendModulePath }}/internal/contracts"
-	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
+	"{{ .BackendModulePath }}/internal/contracts"
+	iamservice "{{ .BackendModulePath }}/internal/services/iam"
+	"{{ .BackendModulePath }}/internal/shared/app"
 )
 
 var (
@@ -87,13 +89,55 @@ func resolveSchedulerFacade(deps *app.Deps) fwscheduler.Scheduler {
 }
 
 func resolveHostSchedulerFacade(deps *app.Deps) fwscheduler.Scheduler {
-	tenantUUID := ""
-	if deps != nil && deps.Config != nil && deps.Config.Gateway != nil {
-		tenantUUID = strings.TrimSpace(deps.Config.Gateway.TenantUUID)
+	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil || !schedulerHostLinkEnabled(deps) {
+		return fwscheduler.NewHostProvider(fwscheduler.HostProviderConfig{}, nil)
 	}
-	return fwscheduler.NewHostProvider(fwscheduler.HostProviderConfig{
-		TenantUUID: tenantUUID,
-	}, nil)
+	cfg := resolveSchedulerHostProviderConfig(deps)
+	client, err := fwscheduler.NewHTTPHostClient(cfg)
+	if err != nil {
+		return fwscheduler.NewHostProvider(cfg, nil)
+	}
+	return fwscheduler.NewHostProvider(cfg, client)
+}
+
+func resolveSchedulerHostProviderConfig(deps *app.Deps) fwscheduler.HostProviderConfig {
+	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil {
+		return fwscheduler.HostProviderConfig{}
+	}
+	gw := deps.Config.Gateway
+	cfg := fwscheduler.HostProviderConfig{
+		BaseURL:    strings.TrimSpace(gw.BaseURL),
+		APIPrefix:  strings.TrimSpace(gw.APIPrefix),
+		AuthScheme: strings.ToLower(strings.TrimSpace(gw.AuthScheme)),
+		Token:      strings.TrimSpace(gw.ToolToken),
+		APIKey:     strings.TrimSpace(gw.APIKey),
+		UserAgent:  strings.TrimSpace(gw.UserAgent),
+		Timeout:    gw.Timeout,
+	}
+	switch cfg.AuthScheme {
+	case "apikey", "api_key", "api-key":
+		cfg.AuthScheme = "apikey"
+		cfg.Token = ""
+	case "bearer":
+		cfg.AuthScheme = "bearer"
+		cfg.APIKey = ""
+	case "":
+		if strings.TrimSpace(cfg.APIKey) != "" {
+			cfg.AuthScheme = "apikey"
+			cfg.Token = ""
+		} else {
+			cfg.AuthScheme = "bearer"
+			cfg.APIKey = ""
+		}
+	}
+	return cfg
+}
+
+func schedulerHostLinkEnabled(deps *app.Deps) bool {
+	if deps != nil && deps.IAMMode == iamservice.IAMModeDelegated {
+		return true
+	}
+	return strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
 }
 
 // Create creates a scheduler job through the framework facade.
@@ -115,6 +159,9 @@ func (h *SchedulerJobHandler) Create(c *gin.Context) {
 	}
 	spec := req.JobSpec
 	h.applyJobDefaults(c, &spec)
+	if mode == fwscheduler.ModeHost {
+		spec.TenantUUID = ""
+	}
 	job, err := scheduler.CreateJob(c.Request.Context(), spec)
 	if err != nil {
 		respondSchedulerError(c, err)
@@ -145,6 +192,9 @@ func (h *SchedulerJobHandler) Update(c *gin.Context) {
 	spec := req.JobSpec
 	spec.JobID = strings.TrimSpace(c.Param("jobId"))
 	h.applyJobDefaults(c, &spec)
+	if schedulerProviderModeFromRequest(c, req.schedulerDebugRequest()) == fwscheduler.ModeHost {
+		spec.TenantUUID = ""
+	}
 	job, err := scheduler.UpdateJob(c.Request.Context(), spec)
 	if err != nil {
 		respondSchedulerError(c, err)
@@ -361,6 +411,9 @@ func schedulerProviderModeFromRequest(c *gin.Context, req schedulerDebugRequest)
 	}
 	mode := strings.ToLower(strings.TrimSpace(req.ProviderMode))
 	if mode == "" && c != nil {
+		mode = strings.ToLower(strings.TrimSpace(c.Query("provider_mode")))
+	}
+	if mode == "" && c != nil {
 		mode = strings.ToLower(strings.TrimSpace(c.GetHeader("X-Scheduler-Provider-Mode")))
 	}
 	switch mode {
@@ -448,6 +501,9 @@ func (h *SchedulerJobHandler) applyJobDefaults(c *gin.Context, req *fwscheduler.
 }
 
 func (h *SchedulerJobHandler) tenantUUID(c *gin.Context) string {
+	if schedulerProviderModeFromRequest(c, schedulerDebugRequest{}) == fwscheduler.ModeHost {
+		return ""
+	}
 	if v := tenantUUIDFromRequest(c); v != "" {
 		return v
 	}
@@ -473,6 +529,15 @@ func tenantUUIDFromRequest(c *gin.Context) string {
 	return ""
 }
 
+func firstNonEmptySchedulerHandler(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
 func respondSchedulerError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, fwscheduler.ErrJobNotFound):
@@ -490,6 +555,15 @@ func respondSchedulerError(c *gin.Context, err error) {
 	case errors.Is(err, fwscheduler.ErrProviderNotConfigured), errors.Is(err, fwscheduler.ErrHostProviderUnavailable):
 		contracts.ResponseServiceUnavailable(c, err.Error(), nil)
 	default:
+		var hostErr *fwscheduler.HostRequestError
+		if errors.As(err, &hostErr) {
+			contracts.ResponseServiceUnavailable(c, hostErr.Error(), gin.H{
+				"status_code": hostErr.StatusCode,
+				"endpoint":    hostErr.Endpoint,
+				"body":        hostErr.Body,
+			})
+			return
+		}
 		contracts.ResponseError(c, http.StatusInternalServerError, contracts.ErrCodeInternalError, err.Error())
 	}
 }

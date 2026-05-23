@@ -151,6 +151,36 @@ func TestLoadResolvesPlaceholderDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadKeepsGatewayBaseURLInHostDelegatedSTSMode(t *testing.T) {
+	tempDir := t.TempDir()
+	configContent := "logging:\n  debug_mode: true\ncontext:\n  iam_mode: delegated\ngateway:\n  base_url: http://127.0.0.1:8077\n  auth_scheme: bearer\n"
+	configFile := filepath.Join(tempDir, "config.yaml")
+	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+	t.Setenv("CONFIG_PATH", tempDir)
+	t.Setenv("POWERX_PROXY", "1")
+	t.Setenv("IAM_MODE", "delegated")
+	t.Setenv("PX_GATEWAY_AUTH_SCHEME", "bearer")
+	t.Setenv("POWERX_STS_CLIENT_ID", "com.powerx.plugins.base.tenant")
+	t.Setenv("POWERX_STS_CLIENT_SECRET", "secret")
+	t.Setenv("POWERX_GRPC_UPSTREAM_ADDRESS", "127.0.0.1:9001")
+	t.Setenv("POWERX_GRPC_UPSTREAM_TENANT_UUID", "6b5d0240-9920-46da-b707-88200e0f51ea")
+	t.Setenv("POWERX_DB_DSN", "postgres://user:pass@127.0.0.1:5432/test?sslmode=disable")
+	t.Setenv("POWERX_DB_SCHEMA", "px_test")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.Gateway == nil || cfg.Gateway.BaseURL != "http://127.0.0.1:8077" {
+		t.Fatalf("宿主 STS 模式不应清空 gateway.base_url，实际 %#v", cfg.Gateway)
+	}
+	if cfg.Gateway.AuthScheme != "bearer" {
+		t.Fatalf("宿主 STS 模式应保留 bearer auth_scheme，实际 %q", cfg.Gateway.AuthScheme)
+	}
+}
+
 func TestLoadUsesConfigPathPlaceholder(t *testing.T) {
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, "config")

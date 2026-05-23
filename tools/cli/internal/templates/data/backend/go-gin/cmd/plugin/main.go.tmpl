@@ -16,6 +16,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"golang.org/x/sync/errgroup"
 	runtimecap "{{ .BackendModulePath }}/cmd/plugin/runtime"
 	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
 	"{{ .BackendModulePath }}/internal/capabilities"
@@ -46,12 +47,17 @@ import (
 	recommendation "{{ .BackendModulePath }}/internal/services/recommendation"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"{{ .BackendModulePath }}/internal/shared/utils"
-	"golang.org/x/sync/errgroup"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )
 
 type bridgeRecorder struct{}
+
+type startupLog struct {
+	level  string
+	msg    string
+	fields logger.Fields
+}
 
 func (bridgeRecorder) RecordEmit(pluginID, tenantUUID, topic, result string) {
 	ebmetrics.RecordEmit(pluginID, tenantUUID, topic, result)
@@ -67,6 +73,22 @@ func (bridgeRecorder) RecordDrop(pluginID, tenantUUID, topic, reason string) {
 
 func (bridgeRecorder) ObserveLatencyMs(pluginID, tenantUUID, topic, op string, ms float64) {
 	ebmetrics.ObserveLatencyMs(pluginID, tenantUUID, topic, op, ms)
+}
+
+func flushStartupLogs(logs []startupLog) {
+	for _, item := range logs {
+		entry := logger.WithFields(item.fields)
+		switch strings.ToLower(strings.TrimSpace(item.level)) {
+		case "warn", "warning":
+			entry.Warn(item.msg)
+		case "error":
+			entry.Error(item.msg)
+		case "debug":
+			entry.Debug(item.msg)
+		default:
+			entry.Info(item.msg)
+		}
+	}
 }
 
 func main() {
@@ -103,28 +125,37 @@ func main() {
 	//   - 宿主模式（POWERX_PROXY=1）：优先 POWERX_HTTP_ADDR，缺失则回退 config/PORT（并告警）
 	//   - 本地模式：允许 PORT/配置回退
 	hostMode := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
+	pendingStartupLogs := make([]startupLog, 0, 2)
 	if hostMode {
 		httpBindAddr := strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR"))
 		if httpBindAddr != "" {
 			cfg.Server.BindAddr = httpBindAddr
 		} else {
 			cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
-			logger.WithFields(logger.Fields{
-				"POWERX_PROXY":     strings.TrimSpace(os.Getenv("POWERX_PROXY")),
-				"POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
-				"PORT":             strings.TrimSpace(os.Getenv("PORT")),
-				"bind_addr":        cfg.Server.BindAddr,
-			}).Warn("POWERX_HTTP_ADDR is empty when POWERX_PROXY=1, fallback to config/PORT bind address")
+			pendingStartupLogs = append(pendingStartupLogs, startupLog{
+				level: "warn",
+				msg:   "POWERX_HTTP_ADDR is empty when POWERX_PROXY=1, fallback to config/PORT bind address",
+				fields: logger.Fields{
+					"POWERX_PROXY":     strings.TrimSpace(os.Getenv("POWERX_PROXY")),
+					"POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
+					"PORT":             strings.TrimSpace(os.Getenv("PORT")),
+					"bind_addr":        cfg.Server.BindAddr,
+				},
+			})
 		}
 	} else {
 		cfg.Server.BindAddr = utils.ResolveDynamicAddr(cfg.Server.BindAddr, "PORT")
 	}
-	logger.WithFields(logger.Fields{
-		"bind_addr":            cfg.Server.BindAddr,
-		"host_mode":            hostMode,
-		"env_POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
-		"env_PORT":             strings.TrimSpace(os.Getenv("PORT")),
-	}).Info("Resolved HTTP bind address")
+	pendingStartupLogs = append(pendingStartupLogs, startupLog{
+		level: "info",
+		msg:   "Resolved HTTP bind address",
+		fields: logger.Fields{
+			"bind_addr":            cfg.Server.BindAddr,
+			"host_mode":            hostMode,
+			"env_POWERX_HTTP_ADDR": strings.TrimSpace(os.Getenv("POWERX_HTTP_ADDR")),
+			"env_PORT":             strings.TrimSpace(os.Getenv("PORT")),
+		},
+	})
 
 	//   - gRPC 用 POWERX_GRPC_PORT（由 PowerX 的 Enable 阶段注入）
 	if cfg.GRPCServer != nil {
@@ -137,6 +168,7 @@ func main() {
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to bootstrap plugin")
 	}
+	flushStartupLogs(pendingStartupLogs)
 
 	// 在初始化 gRPC 客户端之前，尝试从本地数据库加载租户凭证（若存在），以便通过 STS 获取短期令牌
 	if cfg.GRPCUpstream != nil && strings.TrimSpace(cfg.GRPCUpstream.TenantUUID) != "" {

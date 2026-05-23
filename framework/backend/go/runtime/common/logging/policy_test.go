@@ -32,12 +32,43 @@ func TestValidatePolicyHostRequiresAuthorizedExtraSink(t *testing.T) {
 	}
 }
 
-func TestResolveWithHostDefaultsForcesStdoutJSON(t *testing.T) {
+func TestResolvePolicyDefaultsStandaloneEvenWhenPowerXProxyEnabled(t *testing.T) {
 	t.Setenv("POWERX_PROXY", "1")
-	p := ResolveWithHostDefaults(Policy{
+	p := ResolvePolicy(Policy{
 		Sinks: []SinkType{SinkFile},
 		Retry: RetryPolicy{Enabled: true, MaxAttempts: 2, BackoffMS: 100},
 	})
+	if p.Mode != ModeStandalone {
+		t.Fatalf("expected standalone mode, got %s", p.Mode)
+	}
+	if len(p.Sinks) != 1 || p.Sinks[0] != SinkFile {
+		t.Fatalf("expected sinks=[file], got=%v", p.Sinks)
+	}
+}
+
+func TestResolveWithHostModeFalsePreservesFileOutput(t *testing.T) {
+	t.Setenv("POWERX_PROXY", "1")
+	p := ResolveWithHostMode(Policy{
+		Sinks:  []SinkType{SinkFile},
+		Format: "text",
+		Retry:  RetryPolicy{Enabled: true, MaxAttempts: 2, BackoffMS: 100},
+	}, false)
+	if p.Mode != ModeStandalone {
+		t.Fatalf("expected standalone mode, got %s", p.Mode)
+	}
+	if p.Format != "text" {
+		t.Fatalf("expected text format, got %s", p.Format)
+	}
+	if len(p.Sinks) != 1 || p.Sinks[0] != SinkFile {
+		t.Fatalf("expected sinks=[file], got=%v", p.Sinks)
+	}
+}
+
+func TestResolveWithHostModeTrueForcesStdoutJSON(t *testing.T) {
+	p := ResolveWithHostMode(Policy{
+		Sinks: []SinkType{SinkFile},
+		Retry: RetryPolicy{Enabled: true, MaxAttempts: 2, BackoffMS: 100},
+	}, true)
 	if p.Mode != ModeHost {
 		t.Fatalf("expected host mode, got %s", p.Mode)
 	}

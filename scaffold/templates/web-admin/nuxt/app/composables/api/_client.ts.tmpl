@@ -335,6 +335,27 @@ export function useApiClient() {
     );
   };
 
+  const isAuthServiceUnavailable = (response?: { _data?: any }) => {
+    const data = response?._data as any;
+    const code = String(data?.code || data?.error?.code || "").toUpperCase();
+    const message = String(data?.message || data?.error?.message || data?.error || "").toLowerCase();
+    if (
+      code === "AUTH_SERVICE_UNAVAILABLE" ||
+      code === "HOST_AUTH_UNAVAILABLE" ||
+      code === "POWERX_AUTH_UNAVAILABLE" ||
+      code === "STS_UNAVAILABLE"
+    ) {
+      return true;
+    }
+    return (
+      message.includes("宿主认证不可用") ||
+      message.includes("powerx 会话") ||
+      message.includes("sts") ||
+      message.includes("auth service unavailable") ||
+      message.includes("host auth unavailable")
+    );
+  };
+
   const shouldClearAuthOn401 = (response?: { _data?: any }) => {
     const data = response?._data as any;
     const code = String(data?.code || data?.error?.code || "").toUpperCase();
@@ -358,7 +379,7 @@ export function useApiClient() {
     if (!response) return;
     const auth = await resolveAuth();
     if (!auth) return;
-    if (response.status === 503) {
+    if (response.status === 503 && isAuthServiceUnavailable(response)) {
       logger.error("api error", { status: response.status, data: response._data });
       const message = response._data?.message || "宿主认证不可用，请稍后重试";
       auth.failClosed?.(message);
@@ -366,6 +387,10 @@ export function useApiClient() {
         const redirect = window.location.pathname + window.location.search;
         router?.push({ path: "/users/login", query: { redirect } });
       }
+      return;
+    }
+    if (response.status === 503) {
+      logger.error("api service unavailable", { status: response.status, data: response._data });
       return;
     }
     if (response.status === 401) {

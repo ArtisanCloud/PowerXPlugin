@@ -61,11 +61,7 @@ func ResolvePolicy(input Policy) Policy {
 	defaults := DefaultPolicy()
 
 	if resolved.Mode == "" {
-		if IsHostProxyMode() {
-			resolved.Mode = ModeHost
-		} else {
-			resolved.Mode = defaults.Mode
-		}
+		resolved.Mode = defaults.Mode
 	}
 	if len(resolved.Sinks) == 0 {
 		resolved.Sinks = append([]SinkType{}, defaults.Sinks...)

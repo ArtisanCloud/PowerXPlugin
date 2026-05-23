@@ -1,14 +1,14 @@
 <template>
   <UContainer class="py-10 space-y-8">
     <div class="flex items-start justify-between gap-4">
-      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ `{{ $t("frameworkLab.title") }}` }}</h1>
-      <p class="max-w-3xl text-gray-600 dark:text-gray-300">{{ `{{ $t("frameworkLab.description") }}` }}</p>
+      <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ $t("frameworkLab.title") }}</h1>
+      <p class="max-w-3xl text-gray-600 dark:text-gray-300">{{ $t("frameworkLab.description") }}</p>
     </div>
 
     <UCard>
       <template #header>
         <div class="flex items-center justify-between">
-          <span class="font-medium text-gray-900 dark:text-gray-100">{{ `{{ $t("frameworkLab.cardTitle") }}` }}</span>
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ $t("frameworkLab.cardTitle") }}</span>
         </div>
       </template>
 
@@ -16,14 +16,14 @@
         <UButton size="xs" :variant="activeTab === 'notification' ? 'solid' : 'soft'" color="info" @click="activeTab = 'notification'">通知测试</UButton>
         <UButton size="xs" :variant="activeTab === 'gateway' ? 'solid' : 'soft'" color="primary" @click="activeTab = 'gateway'">网关WS测试</UButton>
         <UButton size="xs" :variant="activeTab === 'local' ? 'solid' : 'soft'" color="success" @click="activeTab = 'local'">本地WS测试</UButton>
-        <UButton size="xs" :variant="activeTab === 'scheduler-local' ? 'solid' : 'soft'" color="warning" @click="activeTab = 'scheduler-local'">本地 Scheduler</UButton>
-        <UButton size="xs" :variant="activeTab === 'scheduler-host' ? 'solid' : 'soft'" color="primary" @click="activeTab = 'scheduler-host'">网关 Scheduler</UButton>
+        <UButton size="xs" :variant="activeTab === 'scheduler-local' ? 'solid' : 'soft'" color="warning" @click="selectSchedulerLocalTab">本地 Scheduler</UButton>
+        <UButton size="xs" :variant="activeTab === 'scheduler-host' ? 'solid' : 'soft'" color="primary" :disabled="!canUseHostScheduler" @click="selectSchedulerHostTab">网关 Scheduler</UButton>
       </div>
 
       <div v-if="activeTab === 'notification'" class="space-y-6 pt-4">
         <div class="flex items-end gap-3 flex-wrap">
           <div class="flex items-center gap-3">
-            <UButton size="sm" color="info" icon="i-heroicons-bell-alert" :loading="capabilityNotifying" @click="sendCapabilityNotification">{{ `{{ $t("frameworkLab.sendCapabilityButton") }}` }}</UButton>
+            <UButton size="sm" color="info" icon="i-heroicons-bell-alert" :loading="capabilityNotifying" @click="sendCapabilityNotification">{{ $t("frameworkLab.sendCapabilityButton") }}</UButton>
           </div>
           <p class="w-full text-xs text-gray-500 dark:text-gray-400">通知测试只验证 capability 调用链路；WS Bus 和 Scheduler 调试在各自 tab 内执行。</p>
         </div>
@@ -38,26 +38,26 @@
         </div>
 
         <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-          <p>Topic: <span class="font-mono">{{ `{{ wsFlowTopic || "-" }}` }}</span></p>
-          <p>Trace ID: <span class="font-mono">{{ `{{ wsFlowTraceID || "-" }}` }}</span></p>
-          <p>Grant: <span>{{ `{{ wsFlowGrantStatus }}` }}</span></p>
-          <p>Publish: <span>{{ `{{ wsFlowPublishStatus }}` }}</span></p>
-          <p>Flow Mode: <span>{{ `{{ wsFlowMode }}` }}</span></p>
-          <p>Runtime Mode: <span>{{ `{{ runtimeModeView }}` }}</span></p>
-          <p>Echo: <span>{{ `{{ wsFlowEchoStatus }}` }}</span></p>
-          <p>Host Reachable: <span>{{ `{{ wsFlowHostReachable }}` }}</span></p>
-          <p>Host Grant: <span>{{ `{{ wsFlowHostGrantStatus }}` }}</span></p>
-          <p>Host Publish: <span>{{ `{{ wsFlowHostPublishStatus }}` }}</span></p>
-          <p>Last Event Topic: <span class="font-mono">{{ `{{ gatewayLastEventTopic || "-" }}` }}</span></p>
-          <p>Last Event At: <span>{{ `{{ gatewayLastEventAt || "-" }}` }}</span></p>
-          <p>diag.connected_ok: <span>{{ `{{ gatewayWsDiag.connectedOK }}` }}</span></p>
-          <p>diag.welcome_ok: <span>{{ `{{ gatewayWsDiag.welcomeOK }}` }}</span></p>
-          <p>diag.sub_sent: <span>{{ `{{ gatewayWsDiag.subSent }}` }}</span></p>
-          <p>diag.ack_ok: <span>{{ `{{ gatewayWsDiag.ackOK }}` }}</span></p>
-          <p>diag.event_ok: <span>{{ `{{ gatewayWsDiag.eventOK }}` }}</span></p>
-          <p>diag.last_ack.req_id: <span class="font-mono">{{ `{{ gatewayWsDiag.lastAckReqID || "-" }}` }}</span></p>
-          <p>diag.last_event.topic: <span class="font-mono">{{ `{{ gatewayWsDiag.lastEventTopic || "-" }}` }}</span></p>
-          <p>diag.last_event.trace_id: <span class="font-mono">{{ `{{ gatewayWsDiag.lastEventTraceID || "-" }}` }}</span></p>
+          <p>Topic: <span class="font-mono">{{ wsFlowTopic || "-" }}</span></p>
+          <p>Trace ID: <span class="font-mono">{{ wsFlowTraceID || "-" }}</span></p>
+          <p>Grant: <span>{{ wsFlowGrantStatus }}</span></p>
+          <p>Publish: <span>{{ wsFlowPublishStatus }}</span></p>
+          <p>Flow Mode: <span>{{ wsFlowMode }}</span></p>
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Echo: <span>{{ wsFlowEchoStatus }}</span></p>
+          <p>Host Reachable: <span>{{ wsFlowHostReachable }}</span></p>
+          <p>Host Grant: <span>{{ wsFlowHostGrantStatus }}</span></p>
+          <p>Host Publish: <span>{{ wsFlowHostPublishStatus }}</span></p>
+          <p>Last Event Topic: <span class="font-mono">{{ gatewayLastEventTopic || "-" }}</span></p>
+          <p>Last Event At: <span>{{ gatewayLastEventAt || "-" }}</span></p>
+          <p>diag.connected_ok: <span>{{ gatewayWsDiag.connectedOK }}</span></p>
+          <p>diag.welcome_ok: <span>{{ gatewayWsDiag.welcomeOK }}</span></p>
+          <p>diag.sub_sent: <span>{{ gatewayWsDiag.subSent }}</span></p>
+          <p>diag.ack_ok: <span>{{ gatewayWsDiag.ackOK }}</span></p>
+          <p>diag.event_ok: <span>{{ gatewayWsDiag.eventOK }}</span></p>
+          <p>diag.last_ack.req_id: <span class="font-mono">{{ gatewayWsDiag.lastAckReqID || "-" }}</span></p>
+          <p>diag.last_event.topic: <span class="font-mono">{{ gatewayWsDiag.lastEventTopic || "-" }}</span></p>
+          <p>diag.last_event.trace_id: <span class="font-mono">{{ gatewayWsDiag.lastEventTraceID || "-" }}</span></p>
         </div>
       </div>
 
@@ -70,73 +70,73 @@
         </div>
 
         <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-          <p>Topic: <span class="font-mono">{{ `{{ localWsTopic || "-" }}` }}</span></p>
-          <p>Submit: <span>{{ `{{ localWsSubmitStatus }}` }}</span></p>
-          <p>WS Tenant: <span class="font-mono">{{ `{{ localWsTenantFromConnection || "-" }}` }}</span></p>
-          <p>Publish Tenant: <span class="font-mono">{{ `{{ localWsTenantFromPublish || "-" }}` }}</span></p>
-          <p>Runtime Mode: <span>{{ `{{ runtimeModeView }}` }}</span></p>
-          <p>Last Event Topic: <span class="font-mono">{{ `{{ localLastEventTopic || "-" }}` }}</span></p>
-          <p>Last Event At: <span>{{ `{{ localLastEventAt || "-" }}` }}</span></p>
-          <p>diag.connected_ok: <span>{{ `{{ localWsDiag.connectedOK }}` }}</span></p>
-          <p>diag.welcome_ok: <span>{{ `{{ localWsDiag.welcomeOK }}` }}</span></p>
-          <p>diag.sub_sent: <span>{{ `{{ localWsDiag.subSent }}` }}</span></p>
-          <p>diag.ack_ok: <span>{{ `{{ localWsDiag.ackOK }}` }}</span></p>
-          <p>diag.event_ok: <span>{{ `{{ localWsDiag.eventOK }}` }}</span></p>
-          <p>diag.last_ack.req_id: <span class="font-mono">{{ `{{ localWsDiag.lastAckReqID || "-" }}` }}</span></p>
-          <p>diag.last_event.topic: <span class="font-mono">{{ `{{ localWsDiag.lastEventTopic || "-" }}` }}</span></p>
-          <p>diag.last_event.trace_id: <span class="font-mono">{{ `{{ localWsDiag.lastEventTraceID || "-" }}` }}</span></p>
+          <p>Topic: <span class="font-mono">{{ localWsTopic || "-" }}</span></p>
+          <p>Submit: <span>{{ localWsSubmitStatus }}</span></p>
+          <p>WS Tenant: <span class="font-mono">{{ localWsTenantFromConnection || "-" }}</span></p>
+          <p>Publish Tenant: <span class="font-mono">{{ localWsTenantFromPublish || "-" }}</span></p>
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Last Event Topic: <span class="font-mono">{{ localLastEventTopic || "-" }}</span></p>
+          <p>Last Event At: <span>{{ localLastEventAt || "-" }}</span></p>
+          <p>diag.connected_ok: <span>{{ localWsDiag.connectedOK }}</span></p>
+          <p>diag.welcome_ok: <span>{{ localWsDiag.welcomeOK }}</span></p>
+          <p>diag.sub_sent: <span>{{ localWsDiag.subSent }}</span></p>
+          <p>diag.ack_ok: <span>{{ localWsDiag.ackOK }}</span></p>
+          <p>diag.event_ok: <span>{{ localWsDiag.eventOK }}</span></p>
+          <p>diag.last_ack.req_id: <span class="font-mono">{{ localWsDiag.lastAckReqID || "-" }}</span></p>
+          <p>diag.last_event.topic: <span class="font-mono">{{ localWsDiag.lastEventTopic || "-" }}</span></p>
+          <p>diag.last_event.trace_id: <span class="font-mono">{{ localWsDiag.lastEventTraceID || "-" }}</span></p>
         </div>
       </div>
 
       <div v-else class="space-y-6 pt-4">
         <div class="flex items-center gap-3 flex-wrap">
-          <UButton size="sm" :color="schedulerMode === 'host' ? 'primary' : 'warning'" icon="i-heroicons-clock" :loading="schedulerCreating" @click="createSchedulerSample">创建 Scheduler 样例</UButton>
+          <UButton size="sm" :color="schedulerMode === 'host' ? 'primary' : 'warning'" icon="i-heroicons-clock" :disabled="!canCreateSchedulerSample" :loading="schedulerCreating" @click="createSchedulerSample">创建 Scheduler 样例</UButton>
           <UButton size="sm" color="primary" variant="soft" icon="i-heroicons-arrow-path" :loading="schedulerListing" @click="refreshSchedulerJobs">刷新列表</UButton>
           <UButton size="sm" color="success" icon="i-heroicons-play" :disabled="!selectedSchedulerJobID" :loading="schedulerTriggering" @click="triggerSelectedSchedulerJob">立即触发</UButton>
           <UButton size="sm" color="neutral" variant="soft" icon="i-heroicons-pause" :disabled="!selectedSchedulerJobID" :loading="schedulerPausing" @click="pauseSelectedSchedulerJob">暂停</UButton>
           <UButton size="sm" color="success" variant="soft" icon="i-heroicons-play-circle" :disabled="!selectedSchedulerJobID" :loading="schedulerResuming" @click="resumeSelectedSchedulerJob">恢复</UButton>
         </div>
-        <p class="text-xs text-gray-500 dark:text-gray-400">当前 Scheduler 模式：{{ `{{ schedulerMode === "host" ? "网关测试，会显式走 HostProvider/proxy 调试入口" : "本地测试，会在插件进程内创建并触发事件" }}` }}。</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">当前 Scheduler 模式：{{ schedulerMode === "host" ? "网关测试，会显式走 HostProvider/proxy 调试入口" : "本地测试，会在插件进程内创建并触发事件" }}。</p>
 
         <div class="grid gap-2 text-sm text-gray-600 dark:text-gray-300 md:grid-cols-2">
-          <p>Runtime Mode: <span>{{ `{{ runtimeModeView }}` }}</span></p>
-          <p>Scheduler Provider: <span>{{ `{{ schedulerMode }}` }}</span></p>
-          <p>Tenant UUID: <span class="font-mono">{{ `{{ schedulerTenantUUID || "-" }}` }}</span></p>
-          <p>Selected Job: <span class="font-mono">{{ `{{ selectedSchedulerJobID || "-" }}` }}</span></p>
-          <p>Last Action: <span>{{ `{{ schedulerLastAction || "idle" }}` }}</span></p>
-          <p>Last Topic: <span class="font-mono">{{ `{{ schedulerLastTopic || "-" }}` }}</span></p>
-          <p>Next Run At: <span>{{ `{{ selectedSchedulerNextRunAt || "-" }}` }}</span></p>
-          <p>Last Error: <span>{{ `{{ schedulerLastError || "-" }}` }}</span></p>
-          <p>Notify Topic: <span class="font-mono">{{ `{{ schedulerNotifyTopic || "-" }}` }}</span></p>
-          <p>Last Notify At: <span>{{ `{{ schedulerLastNotifyAt || "-" }}` }}</span></p>
-          <p>Last Notify Title: <span>{{ `{{ schedulerLastNotifyTitle || "-" }}` }}</span></p>
-          <p>Last Notify Message: <span>{{ `{{ schedulerLastNotifyMessage || "-" }}` }}</span></p>
+          <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
+          <p>Scheduler Provider: <span>{{ schedulerMode }}</span></p>
+          <p>Tenant UUID: <span class="font-mono">{{ schedulerTenantUUID || "-" }}</span></p>
+          <p>Selected Job: <span class="font-mono">{{ selectedSchedulerJobID || "-" }}</span></p>
+          <p>Last Action: <span>{{ schedulerLastAction || "idle" }}</span></p>
+          <p>Last Topic: <span class="font-mono">{{ schedulerLastTopic || "-" }}</span></p>
+          <p>Next Run At: <span>{{ selectedSchedulerNextRunAt || "-" }}</span></p>
+          <p>Last Error: <span>{{ schedulerLastError || "-" }}</span></p>
+          <p>Notify Topic: <span class="font-mono">{{ schedulerNotifyTopic || "-" }}</span></p>
+          <p>Last Notify At: <span>{{ schedulerLastNotifyAt || "-" }}</span></p>
+          <p>Last Notify Title: <span>{{ schedulerLastNotifyTitle || "-" }}</span></p>
+          <p>Last Notify Message: <span>{{ schedulerLastNotifyMessage || "-" }}</span></p>
         </div>
 
-        <div class="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
+        <div class="overflow-x-auto rounded border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950/30">
           <table class="min-w-full text-left text-sm">
             <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-900 dark:text-gray-400">
               <tr>
                 <th class="px-3 py-2">任务</th>
-                <th class="px-3 py-2">类型</th>
-                <th class="px-3 py-2">状态</th>
-                <th class="px-3 py-2">表达式</th>
-                <th class="px-3 py-2">Action</th>
-                <th class="px-3 py-2">操作</th>
+                <th class="px-3 py-2 text-center">类型</th>
+                <th class="px-3 py-2 text-center">状态</th>
+                <th class="px-3 py-2 text-center">表达式</th>
+                <th class="px-3 py-2 text-center">Action</th>
+                <th class="px-3 py-2 text-center">操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody class="text-gray-700 dark:text-gray-200">
               <tr v-for="job in schedulerJobs" :key="job.job_id" class="border-t border-gray-200 dark:border-gray-800">
-                <td class="px-3 py-2">
-                  <button class="text-left font-medium text-primary-500 hover:underline" @click="selectedSchedulerJobID = job.job_id">{{ `{{ job.name }}` }}</button>
-                  <div class="font-mono text-xs text-gray-500">{{ `{{ job.job_id }}` }}</div>
+                <td class="px-3 py-2 align-top">
+                  <button class="text-left font-medium text-primary-500 hover:underline" @click="selectedSchedulerJobID = job.job_id">{{ job.name }}</button>
+                  <div class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ job.job_id }}</div>
                 </td>
-                <td class="px-3 py-2">{{ `{{ job.schedule_type }}` }}</td>
-                <td class="px-3 py-2">{{ `{{ job.status }}` }}</td>
-                <td class="px-3 py-2 font-mono">{{ `{{ job.schedule_expr }}` }}</td>
-                <td class="px-3 py-2 font-mono">{{ `{{ job.payload?.business_action || "-" }}` }}</td>
-                <td class="px-3 py-2">
-                  <div class="flex gap-2">
+                <td class="px-3 py-2 align-top text-center text-gray-700 dark:text-gray-200">{{ job.schedule_type || "-" }}</td>
+                <td class="px-3 py-2 align-top text-center text-gray-700 dark:text-gray-200">{{ job.status || "-" }}</td>
+                <td class="max-w-xs px-3 py-2 align-top text-center font-mono text-gray-700 dark:text-gray-200 break-all">{{ job.schedule_expr || "-" }}</td>
+                <td class="max-w-md px-3 py-2 align-top text-center font-mono text-gray-700 dark:text-gray-200 break-all">{{ job.payload?.business_action || "-" }}</td>
+                <td class="px-3 py-2 align-top text-center">
+                  <div class="flex justify-center gap-2">
                     <UButton size="xs" color="success" variant="soft" @click="triggerSchedulerJobByID(job.job_id)">触发</UButton>
                     <UButton size="xs" color="neutral" variant="soft" :disabled="job.status === 'completed'" @click="pauseSchedulerJobByID(job.job_id)">暂停</UButton>
                     <UButton size="xs" color="success" variant="soft" :disabled="job.status === 'completed'" @click="resumeSchedulerJobByID(job.job_id)">恢复</UButton>
@@ -199,9 +199,13 @@ const localWsTenantFromPublish = ref("")
 const activeTab = ref<"notification" | "gateway" | "local" | "scheduler-local" | "scheduler-host">("notification")
 const schedulerMode = computed<"local" | "host">(() => activeTab.value === "scheduler-host" ? "host" : "local")
 const runtimeModeView = computed(() => resolveFrontendRuntimeMode().mode)
-const schedulerTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "00000000-0000-0000-0000-000000000001").trim())
+const canUseHostScheduler = computed(() => resolveFrontendRuntimeMode().mode !== "standalone_local")
+const canCreateSchedulerSample = computed(() => schedulerMode.value === "local" || canUseHostScheduler.value)
+const schedulerResolvedTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim())
+const schedulerTenantUUID = computed(() => schedulerMode.value === "local" ? (schedulerResolvedTenantUUID.value || "00000000-0000-0000-0000-000000000001") : "")
+const schedulerPluginID = "com.powerx.plugins.base"
 const schedulerRequestOptions = computed(() => ({
-  tenant_uuid: schedulerTenantUUID.value,
+  ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}),
   provider_mode: schedulerMode.value,
   force_local: schedulerMode.value === "local",
   force_host: schedulerMode.value === "host",
@@ -231,6 +235,48 @@ const schedulerLastNotifyMessage = computed(() => String(schedulerLastNotifyEven
 const selectedSchedulerJob = computed(() => schedulerJobs.value.find((job) => job.job_id === selectedSchedulerJobID.value) || null)
 const selectedSchedulerNextRunAt = computed(() => String(selectedSchedulerJob.value?.schedule_expr || selectedSchedulerJob.value?.next_run_at || ""))
 let schedulerPollTimer: ReturnType<typeof setInterval> | null = null
+
+const stopSchedulerPolling = () => {
+  if (schedulerPollTimer) {
+    clearInterval(schedulerPollTimer)
+    schedulerPollTimer = null
+  }
+}
+
+const selectSchedulerLocalTab = () => {
+  stopSchedulerPolling()
+  activeTab.value = "scheduler-local"
+}
+
+const selectSchedulerHostTab = () => {
+  if (!canUseHostScheduler.value) {
+    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
+    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
+    return
+  }
+  stopSchedulerPolling()
+  activeTab.value = "scheduler-host"
+}
+
+const shouldSkipSchedulerRequest = () => {
+  if (!auth.isAuthenticated.value) {
+    stopSchedulerPolling()
+    schedulerLastError.value = "当前未登录，已停止 Scheduler 轮询"
+    schedulerLastAction.value = "scheduler polling stopped: unauthenticated"
+    return true
+  }
+  if (activeTab.value !== "scheduler-local" && activeTab.value !== "scheduler-host") {
+    stopSchedulerPolling()
+    return true
+  }
+  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
+    stopSchedulerPolling()
+    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，已跳过网关 Scheduler 列表请求"
+    schedulerLastAction.value = "host scheduler skipped"
+    return true
+  }
+  return false
+}
 
 const normalizeToString = (value: unknown) => (typeof value === "string" ? value : typeof value === "number" ? String(value) : "")
 
@@ -396,10 +442,13 @@ const runLocalWSFlow = async () => {
 }
 
 const refreshSchedulerJobs = async () => {
+  if (shouldSkipSchedulerRequest()) {
+    return
+  }
   schedulerListing.value = true
   schedulerLastError.value = ""
   try {
-    const result = await schedulerApi.listJobs({ tenant_uuid: schedulerTenantUUID.value, provider_mode: schedulerMode.value })
+    const result = await schedulerApi.listJobs({ ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}), provider_mode: schedulerMode.value })
     schedulerJobs.value = result.items || []
     if (!selectedSchedulerJobID.value && schedulerJobs.value[0]?.job_id) {
       selectedSchedulerJobID.value = schedulerJobs.value[0].job_id
@@ -414,9 +463,7 @@ const refreshSchedulerJobs = async () => {
 }
 
 const startSchedulerPolling = () => {
-  if (schedulerPollTimer) {
-    clearInterval(schedulerPollTimer)
-  }
+  stopSchedulerPolling()
   let rounds = 0
   schedulerPollTimer = setInterval(async () => {
     rounds += 1
@@ -431,6 +478,11 @@ const startSchedulerPolling = () => {
 }
 
 const createSchedulerSample = async () => {
+  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
+    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
+    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
+    return
+  }
   schedulerCreating.value = true
   schedulerLastError.value = ""
   try {
@@ -445,9 +497,9 @@ const createSchedulerSample = async () => {
       provider_mode: schedulerMode.value,
       force_local: schedulerMode.value === "local",
       force_host: schedulerMode.value === "host",
-      tenant_uuid: schedulerTenantUUID.value,
+      ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}),
       owner_type: "plugin",
-      owner_id: "com.powerx.plugins.base",
+      owner_id: schedulerPluginID,
       name: `framework_lab_once_${now.getTime()}`,
       schedule_type: "once",
       schedule_expr: runAt,
@@ -478,6 +530,11 @@ const createSchedulerSample = async () => {
 
 const triggerSchedulerJobByID = async (jobID: string) => {
   if (!jobID) return
+  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
+    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
+    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
+    return
+  }
   schedulerTriggering.value = true
   schedulerLastError.value = ""
   try {
@@ -504,6 +561,11 @@ const triggerSchedulerJobByID = async (jobID: string) => {
 
 const pauseSchedulerJobByID = async (jobID: string) => {
   if (!jobID) return
+  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
+    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
+    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
+    return
+  }
   schedulerPausing.value = true
   schedulerLastError.value = ""
   try {
@@ -520,6 +582,11 @@ const pauseSchedulerJobByID = async (jobID: string) => {
 
 const resumeSchedulerJobByID = async (jobID: string) => {
   if (!jobID) return
+  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
+    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
+    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
+    return
+  }
   schedulerResuming.value = true
   schedulerLastError.value = ""
   try {
@@ -549,9 +616,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  if (schedulerPollTimer) {
-    clearInterval(schedulerPollTimer)
-    schedulerPollTimer = null
-  }
+  stopSchedulerPolling()
 })
 </script>

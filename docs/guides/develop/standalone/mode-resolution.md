@@ -60,6 +60,32 @@
 4. topic 必须字节级一致（grant / subscribe / publish 同值）。
 5. 验收以 `sub_sent -> ack_ok -> event_ok` 三段为准。
 
+## 6.1 Runtime Scheduler Host 调用规则
+
+`local + proxy` 下，Scheduler 调用 PowerX 底座能力的标准口径如下：
+
+1. 插件前端只调用插件后端 runtime API：
+   - `POST /api/v1/admin/runtime/scheduler/jobs`
+   - `GET /api/v1/admin/runtime/scheduler/jobs?provider_mode=host`
+   - `POST /api/v1/admin/runtime/scheduler/jobs/{job_id}/trigger`
+   - `POST /api/v1/admin/runtime/scheduler/jobs/{job_id}/pause`
+   - `POST /api/v1/admin/runtime/scheduler/jobs/{job_id}/resume`
+2. 插件后端通过 framework host provider 调 PowerX：
+   - `POST /api/v1/admin/scheduler/jobs`
+   - `GET /api/v1/admin/scheduler/jobs`
+   - `GET /api/v1/admin/scheduler/jobs/{job_id}`
+   - `PATCH /api/v1/admin/scheduler/jobs/{job_id}`
+   - `POST /api/v1/admin/scheduler/jobs/{job_id}/trigger`
+   - `POST /api/v1/admin/scheduler/jobs/{job_id}/pause`
+   - `POST /api/v1/admin/scheduler/jobs/{job_id}/resume`
+3. `IAMMode=local + POWERX_PROXY=1` 使用：
+   - `PX_GATEWAY_AUTH_SCHEME=apikey`
+   - `PX_GATEWAY_API_KEY=<PowerX API Key>`
+   - 出站 header：`Authorization: ApiKey <key>`
+4. host Scheduler 请求不传 `tenant_uuid`。PowerX 从 ApiKey 鉴权上下文解析租户；如果显式传入 tenant，会导致 `SCHEDULER_TENANT_MISMATCH`。
+5. PowerX API Key Profile 必须勾选 `com.corex.scheduler.jobs` 的 REST 权限；权限目录应包含 `admin_scheduler_jobs`、`admin_scheduler_jobs_job_id`、`pause/resume/trigger/runs`。
+6. 到期或手动触发后，标准通知 topic 为 `powerx.runtime.scheduler.triggered.v1`，插件通过既有 EventBridge/WSBus 链路接收。
+
 ## 7. 代码定位（当前实现）
 
 1. IAM 解析入口：
@@ -73,6 +99,10 @@
    - `framework/backend/go/runtime/wsbus/host_client.go`
 5. skeleton 侧鉴权观测日志（用于排查 token 来源）：
    - `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_gateway_auth.go`
+6. framework Scheduler host client：
+   - `framework/backend/go/runtime/scheduler/http_host_client.go`
+7. skeleton Scheduler runtime API：
+   - `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_job_handler.go`
 
 ## 8. Framework 统一封装（当前基线）
 

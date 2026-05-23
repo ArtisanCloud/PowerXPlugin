@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
@@ -45,7 +46,7 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 	if logCfg == nil {
 		logCfg = &config.LoggingConfig{}
 	}
-	policy := runtimelogging.ResolveWithHostDefaults(runtimelogging.Policy{
+	policy := runtimelogging.ResolveWithHostMode(runtimelogging.Policy{
 		Mode:   runtimelogging.ModeStandalone,
 		Sinks:  []runtimelogging.SinkType{runtimelogging.SinkType(logCfg.Output)},
 		Format: logCfg.Format,
@@ -55,13 +56,10 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 			MaxAttempts: 3,
 			BackoffMS:   200,
 		},
-	})
-	if runtimelogging.IsHostProxyMode() {
-		policy.Mode = runtimelogging.ModeHost
-	}
+	}, shouldForceHostLogging(cfg))
 	if err := runtimelogging.ValidatePolicy(policy); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "logging policy validation failed, fallback to default: %v\n", err)
-		policy = runtimelogging.ResolveWithHostDefaults(runtimelogging.DefaultPolicy())
+		policy = runtimelogging.ResolveWithHostMode(runtimelogging.DefaultPolicy(), shouldForceHostLogging(cfg))
 	}
 
 	logger.Init(
@@ -94,6 +92,22 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 	initFederatedRuntime(queryDB)
 
 	return queryDB, nil
+}
+
+func shouldForceHostLogging(cfg *config.Config) bool {
+	if cfg != nil && cfg.Context != nil {
+		if strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), string(iamservice.IAMModeDelegated)) {
+			return true
+		}
+		if strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), string(iamservice.IAMModeLocal)) {
+			return false
+		}
+	}
+	envMode := strings.TrimSpace(os.Getenv("IAM_MODE"))
+	if envMode == "" {
+		envMode = strings.TrimSpace(os.Getenv("IAMMode"))
+	}
+	return strings.EqualFold(envMode, string(iamservice.IAMModeDelegated))
 }
 
 func initFederatedRuntime(queryDB *gorm.DB) {

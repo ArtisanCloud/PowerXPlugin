@@ -1,21 +1,26 @@
 package templates
 
-import "strings"
+import (
+	"strings"
+	"time"
+
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
+)
 
 // Template domain HTTP DTOs.
 
 const (
-	TemplateErrCodeInvalidID          = "TEMPLATE_INVALID_ID"
-	TemplateErrCodeValidationFailed   = "TEMPLATE_VALIDATION_FAILED"
-	TemplateErrCodeSourceIDsRequired  = "TEMPLATE_SOURCE_IDS_REQUIRED"
-	templateFieldName                 = "name"
-	templateFieldDescription          = "description"
-	templateFieldContent              = "content"
-	templateFieldSourceIDs            = "source_ids"
-	templateFieldID                   = "id"
-	templateMaxNameLength             = 128
-	templateMaxDescriptionLength      = 512
-	templateMaxContentLength          = 10000
+	TemplateErrCodeInvalidID         = "TEMPLATE_INVALID_ID"
+	TemplateErrCodeValidationFailed  = "TEMPLATE_VALIDATION_FAILED"
+	TemplateErrCodeSourceIDsRequired = "TEMPLATE_SOURCE_IDS_REQUIRED"
+	templateFieldName                = "name"
+	templateFieldDescription         = "description"
+	templateFieldContent             = "content"
+	templateFieldSourceIDs           = "source_ids"
+	templateFieldID                  = "id"
+	templateMaxNameLength            = 128
+	templateMaxDescriptionLength     = 512
+	templateMaxContentLength         = 10000
 )
 
 type TemplateValidationError struct {
@@ -35,6 +40,45 @@ type TemplateListRequest struct {
 	Page     int    `form:"page,default=1"`
 	PageSize int    `form:"page_size,default=20"`
 	Q        string `form:"q"`
+}
+
+type TemplateListResponse struct {
+	List       []TemplateResponse `json:"list"`
+	Page       int                `json:"page"`
+	PageSize   int                `json:"page_size"`
+	Total      int64              `json:"total"`
+	TotalPages int                `json:"total_pages"`
+}
+
+type TemplateResponse struct {
+	ID          uint64    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Content     string    `json:"content"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func NewTemplateResponse(tpl *dbm.Template) TemplateResponse {
+	if tpl == nil {
+		return TemplateResponse{}
+	}
+	return TemplateResponse{
+		ID:          tpl.ID,
+		Name:        tpl.Name,
+		Description: tpl.Description,
+		Content:     tpl.Content,
+		CreatedAt:   tpl.CreatedAt,
+		UpdatedAt:   tpl.UpdatedAt,
+	}
+}
+
+func NewTemplateResponses(templates []*dbm.Template) []TemplateResponse {
+	out := make([]TemplateResponse, 0, len(templates))
+	for _, tpl := range templates {
+		out = append(out, NewTemplateResponse(tpl))
+	}
+	return out
 }
 
 type CreateTemplateRequest struct {

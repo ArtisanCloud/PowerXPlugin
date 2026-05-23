@@ -29,6 +29,7 @@ type JWTAuthConfig struct {
 type PowerXClaims struct {
 	TenantUUID    TenantClaim `json:"tid"`
 	UserID        int64       `json:"uid"`
+	UserIDNumeric int64       `json:"uid_n"`
 	IsRoot        bool        `json:"is_root"`
 	Roles         []string    `json:"roles"`
 	Permissions   []string    `json:"perms"`
@@ -69,6 +70,7 @@ func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		TenantUUID    TenantClaim `json:"tid"`
 		UserID        any         `json:"uid"`
+		UserIDNumeric any         `json:"uid_n"`
 		IsRoot        bool        `json:"is_root"`
 		Roles         []string    `json:"roles"`
 		Permissions   []string    `json:"perms"`
@@ -79,12 +81,19 @@ func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	userID, err := parseUserID(raw.UserID)
+	userID, err := parseUserID(raw.UserIDNumeric)
 	if err != nil {
 		return err
 	}
+	if userID == 0 {
+		userID, err = parseUserID(raw.UserID)
+		if err != nil {
+			return err
+		}
+	}
 	c.TenantUUID = raw.TenantUUID
 	c.UserID = userID
+	c.UserIDNumeric = userID
 	c.IsRoot = raw.IsRoot
 	c.Roles = raw.Roles
 	c.Permissions = raw.Permissions

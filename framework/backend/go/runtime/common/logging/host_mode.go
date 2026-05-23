@@ -1,8 +1,12 @@
 package logging
 
 func ResolveWithHostDefaults(policy Policy) Policy {
+	return ResolveWithHostMode(policy, IsHostProxyMode())
+}
+
+func ResolveWithHostMode(policy Policy, hostMode bool) Policy {
 	resolved := ResolvePolicy(policy)
-	if !IsHostProxyMode() {
+	if !hostMode {
 		return resolved
 	}
 	// Host proxy mode is enforced by PowerX runtime:

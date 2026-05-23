@@ -1208,7 +1208,7 @@ func normalizeConfig(cfg *Config) {
 
 		// Dev 模式下：Gateway 配置不完整时不阻塞启动，改为打印提示并自动关闭 Gateway。
 		// 生产/非 Dev 场景仍保持严格校验（见 Validate）。
-		if cfg.Logging != nil && cfg.Logging.DebugMode {
+		if cfg.Logging != nil && cfg.Logging.DebugMode && !isHostDelegatedMode(cfg) {
 			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
 			toolToken := strings.TrimSpace(cfg.Gateway.ToolToken)
 			apiKey := strings.TrimSpace(cfg.Gateway.APIKey)
@@ -1267,6 +1267,13 @@ func normalizeConfig(cfg *Config) {
 		cfg.CustomerAuth.JWTAudience = resolveConfigValue(cfg.CustomerAuth.JWTAudience)
 		cfg.CustomerAuth.JWTSecret = resolveConfigValue(cfg.CustomerAuth.JWTSecret)
 	}
+}
+
+func isHostDelegatedMode(cfg *Config) bool {
+	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
+		return false
+	}
+	return cfg != nil && cfg.Context != nil && strings.ToLower(strings.TrimSpace(cfg.Context.IAMMode)) == "delegated"
 }
 
 func normalizeGRPCServerConfig(server *GRPCServer) {
@@ -1743,6 +1750,12 @@ func (c *Config) Validate() error {
 			c.Gateway.AuthScheme = normalizeGatewayAuthScheme(c.Gateway.AuthScheme)
 			if c.Gateway.AuthScheme == "" {
 				c.Gateway.AuthScheme = inferGatewayAuthScheme(c.Gateway.ToolToken, c.Gateway.APIKey)
+			}
+			if isHostDelegatedMode(c) {
+				if strings.TrimSpace(c.Gateway.BaseURL) == "" || c.Gateway.AuthScheme != "bearer" {
+					return NewConfigError("host delegated gateway config requires base_url + bearer auth_scheme")
+				}
+				return nil
 			}
 			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
 				return NewConfigError("gateway config requires base_url + credential matching auth_scheme")

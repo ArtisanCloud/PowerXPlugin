@@ -69,7 +69,7 @@ func TestLoggingPolicyHandlerGetContract(t *testing.T) {
 	}
 }
 
-func TestLoggingPolicyHandlerPutEnforcesHostProxyDefaults(t *testing.T) {
+func TestLoggingPolicyHandlerPutPreservesStandalonePolicyWhenPowerXProxyEnabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("POWERX_PROXY", "1")
 
@@ -110,7 +110,7 @@ func TestLoggingPolicyHandlerPutEnforcesHostProxyDefaults(t *testing.T) {
 			Mode                 runtimelogging.PolicyMode `json:"mode"`
 			Sinks                []runtimelogging.SinkType `json:"sinks"`
 			Format               string                    `json:"format"`
-			AuthorizedExtraSinks []runtimelogging.SinkType `json:"authorized_extra_sinks"`
+			AuthorizedExtraSinks []runtimelogging.SinkType
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
@@ -119,16 +119,16 @@ func TestLoggingPolicyHandlerPutEnforcesHostProxyDefaults(t *testing.T) {
 	if envelope.Code != 0 || envelope.Message != "ok" {
 		t.Fatalf("unexpected envelope: %s", rec.Body.String())
 	}
-	if envelope.Data.Mode != runtimelogging.ModeHost {
-		t.Fatalf("expected mode=host, got=%s", envelope.Data.Mode)
+	if envelope.Data.Mode != runtimelogging.ModeStandalone {
+		t.Fatalf("expected mode=standalone, got=%s", envelope.Data.Mode)
 	}
-	if envelope.Data.Format != "json" {
-		t.Fatalf("expected format=json, got=%s", envelope.Data.Format)
+	if envelope.Data.Format != "text" {
+		t.Fatalf("expected format=text, got=%s", envelope.Data.Format)
 	}
-	if len(envelope.Data.Sinks) != 1 || envelope.Data.Sinks[0] != runtimelogging.SinkStdout {
-		t.Fatalf("expected sinks=[stdout], got=%v", envelope.Data.Sinks)
+	if len(envelope.Data.Sinks) != 2 || envelope.Data.Sinks[0] != runtimelogging.SinkFile || envelope.Data.Sinks[1] != runtimelogging.SinkLoki {
+		t.Fatalf("expected sinks=[file loki], got=%v", envelope.Data.Sinks)
 	}
-	if len(envelope.Data.AuthorizedExtraSinks) != 0 {
-		t.Fatalf("expected authorized_extra_sinks empty in host proxy mode, got=%v", envelope.Data.AuthorizedExtraSinks)
+	if len(envelope.Data.AuthorizedExtraSinks) != 1 || envelope.Data.AuthorizedExtraSinks[0] != runtimelogging.SinkLoki {
+		t.Fatalf("expected authorized_extra_sinks=[loki], got=%v", envelope.Data.AuthorizedExtraSinks)
 	}
 }

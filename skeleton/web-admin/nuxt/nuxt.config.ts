@@ -23,12 +23,19 @@ const resolvePluginId = () => {
 const pluginId = resolvePluginId()
 const pluginAdminBase = `/_p/${pluginId}/admin/`
 const resolveInsidePowerX = () => {
-  const raw = String(process.env.NUXT_PUBLIC_INSIDE_POWERX ?? '').trim().toLowerCase()
+  const raw = String(process.env.NUXT_PUBLIC_INSIDE_POWERX ?? process.env.POWERX_PROXY ?? '').trim().toLowerCase()
   if (raw === '1' || raw === 'true') return true
   if (raw === '0' || raw === 'false') return false
   return false
 }
 const INSIDE_POWERX = resolveInsidePowerX()
+const resolvePowerXProxy = () => {
+  const raw = String(process.env.NUXT_PUBLIC_POWERX_PROXY ?? process.env.POWERX_PROXY ?? '').trim().toLowerCase()
+  if (raw === '1' || raw === 'true') return '1'
+  if (raw === '0' || raw === 'false') return '0'
+  return INSIDE_POWERX ? '1' : '0'
+}
+const POWERX_PROXY_PUBLIC = resolvePowerXProxy()
 // Allow NUXT_PUBLIC_API_BASE + PREFIX override for both standalone & proxy mode
 const joinApiBase = (base?: string | null, prefix?: string | null) => {
   if (!base) return undefined
@@ -251,6 +258,34 @@ export default defineNuxtConfig({
   imports: {
     dirs: ['stores']
   },
+  hooks: {
+    'pages:extend'(pages) {
+      const normalizeAdminRoutes = (nodes: any[]) => {
+        for (const page of nodes) {
+          const path = String(page?.path || '')
+          if (path.startsWith('/admin/')) {
+            const normalizedPath = path.replace(/^\/admin/, '')
+            const rawAlias = page?.alias
+            const aliases = Array.isArray(rawAlias)
+              ? rawAlias.filter((item: any) => typeof item === 'string' && item.trim().length > 0)
+              : typeof rawAlias === 'string' && rawAlias.trim().length > 0
+                ? [rawAlias]
+                : []
+            if (!aliases.includes(path)) {
+              aliases.push(path)
+            }
+            page.path = normalizedPath
+            page.alias = aliases
+          }
+          if (Array.isArray(page?.children) && page.children.length > 0) {
+            normalizeAdminRoutes(page.children)
+          }
+        }
+      }
+
+      normalizeAdminRoutes(pages as any[])
+    }
+  },
   colorMode: {
     preference: 'system',
     fallback: 'light',
@@ -281,7 +316,7 @@ export default defineNuxtConfig({
       powerxPluginVersion: pluginVersion,
       insidePowerX: INSIDE_POWERX,
       iamMode: IAM_MODE,
-      powerxProxy: INSIDE_POWERX ? '1' : '0',
+      powerxProxy: POWERX_PROXY_PUBLIC,
       gatewayAuthScheme: String(process.env.PX_GATEWAY_AUTH_SCHEME || '').trim().toLowerCase(),
       delegatedMode: DELEGATED_MODE,
       pluginAdminBase,

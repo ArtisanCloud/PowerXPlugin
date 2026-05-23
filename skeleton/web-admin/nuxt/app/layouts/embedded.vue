@@ -117,5 +117,5 @@ const handleDelegatedDismiss = () => {
 </template>
 
 <style scoped>
-.embedded-wrap { min-height: 100dvh; }
+.embedded-wrap { min-height: auto; }
 </style>

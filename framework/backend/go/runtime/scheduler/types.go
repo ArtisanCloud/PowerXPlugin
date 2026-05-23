@@ -62,11 +62,25 @@ type JobSpec struct {
 
 type Job struct {
 	JobSpec
+	UUID      string    `json:"uuid,omitempty"`
 	Status    string    `json:"status,omitempty"`
 	NextRunAt time.Time `json:"next_run_at,omitempty"`
 	LastRunAt time.Time `json:"last_run_at,omitempty"`
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
+}
+
+func (j *Job) UnmarshalJSON(raw []byte) error {
+	type alias Job
+	var out alias
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return err
+	}
+	if out.JobID == "" {
+		out.JobID = out.UUID
+	}
+	*j = Job(out)
+	return nil
 }
 
 type ListJobsInput struct {
@@ -113,8 +127,16 @@ func (s JobSpec) normalized() JobSpec {
 }
 
 func (s JobSpec) validate() error {
+	return s.validateWithTenantRequired(true)
+}
+
+func (s JobSpec) validateForHost() error {
+	return s.validateWithTenantRequired(false)
+}
+
+func (s JobSpec) validateWithTenantRequired(requireTenant bool) error {
 	s = s.normalized()
-	if s.TenantUUID == "" {
+	if requireTenant && s.TenantUUID == "" {
 		return ErrTenantUUIDRequired
 	}
 	if s.OwnerType == "" {

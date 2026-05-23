@@ -109,13 +109,10 @@ export function getTenantUuid(): string | undefined {
 // 通用类型定义
 export interface Page<T> {
   list: T[];
-  page_index: number;
+  page: number;
   page_size: number;
   total: number;
-  // 兼容旧字段，方便前端在未调整完之前继续使用
-  items?: T[];
-  page?: number;
-  limit?: number;
+  total_pages: number;
 }
 
 export interface ApiResponse<T = any> {

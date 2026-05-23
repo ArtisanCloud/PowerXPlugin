@@ -2,6 +2,7 @@ package runtime_ops
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +10,9 @@ import (
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwscheduler "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
@@ -155,6 +158,143 @@ func TestSchedulerJobHandlerHostModeUnavailable(t *testing.T) {
 	if !bytes.Contains(resp.Body.Bytes(), []byte("scheduler host provider is not available")) {
 		t.Fatalf("expected host provider unavailable message, body=%s", resp.Body.String())
 	}
+}
+
+func TestSchedulerJobHandlerHostModeDoesNotSendRequestTenant(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewSchedulerJobHandler(&app.Deps{
+		EventEmitter: eventbridge.NewLocalEmitter(8),
+		Config: &config.Config{
+			Gateway: &config.GatewayConfig{TenantUUID: "tenant-from-gateway-config"},
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/scheduler/jobs?provider_mode=host", nil)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	if got := handler.tenantUUID(c); got != "" {
+		t.Fatalf("host tenant = %q, want empty", got)
+	}
+}
+
+func TestSchedulerJobHandlerHostModeIgnoresGlobalTenantHeader(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewSchedulerJobHandler(&app.Deps{
+		EventEmitter: eventbridge.NewLocalEmitter(8),
+	})
+	req := httptest.NewRequest(http.MethodGet, "/scheduler/jobs?provider_mode=host", nil)
+	req.Header.Set("tenant_uuid", "tenant-from-global-client")
+	req.Header.Set("X-Tenant-UUID", "tenant-from-global-client")
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	if got := handler.tenantUUID(c); got != "" {
+		t.Fatalf("host tenant from global header = %q, want empty", got)
+	}
+}
+
+func TestSchedulerJobHandlerHostCreateDoesNotForwardTenantUUID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fake := &captureSchedulerHostClient{}
+	handler := &SchedulerJobHandler{
+		localScheduler: fwscheduler.NewLocalProvider(fwscheduler.LocalProviderConfig{}),
+		hostScheduler:  fwscheduler.NewHostProvider(fwscheduler.HostProviderConfig{}, fake),
+		defaultTenant:  "tenant-from-gateway-config",
+	}
+	r := gin.New()
+	r.POST("/scheduler/jobs", handler.Create)
+
+	resp := postSchedulerJSON(t, r, "/scheduler/jobs?provider_mode=host", map[string]any{
+		"provider_mode": "host",
+		"tenant_uuid":   "tenant-from-browser",
+		"owner_type":    "plugin",
+		"owner_id":      "com.powerx.plugins.base",
+		"name":          "host-create",
+		"schedule_type": "once",
+		"schedule_expr": "2026-05-15T10:30:00Z",
+	})
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("host create status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	if fake.created.TenantUUID != "" {
+		t.Fatalf("forwarded tenant_uuid = %q, want empty", fake.created.TenantUUID)
+	}
+}
+
+func TestSchedulerJobHandlerLocalProxyUsesConfiguredAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("POWERX_PROXY", "1")
+
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/admin/scheduler/jobs" {
+			t.Fatalf("unexpected scheduler path: %s", r.URL.Path)
+		}
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":{"job_id":"job-1","owner_type":"plugin","owner_id":"com.powerx.plugins.base","name":"host-create","schedule_type":"once","schedule_expr":"2026-05-15T10:30:00Z","status":"active"}}`))
+	}))
+	defer server.Close()
+
+	handler := NewSchedulerJobHandler(&app.Deps{
+		EventEmitter: eventbridge.NewLocalEmitter(8),
+		IAMMode:      iamservice.IAMModeDelegated,
+		Config: &config.Config{
+			Gateway: &config.GatewayConfig{
+				BaseURL:    server.URL,
+				APIPrefix:  "/api/v1",
+				AuthScheme: "apikey",
+				APIKey:     "gateway-key",
+				ToolToken:  "sts-token-should-not-be-used",
+			},
+		},
+	})
+	r := gin.New()
+	r.POST("/scheduler/jobs", handler.Create)
+
+	resp := postSchedulerJSON(t, r, "/scheduler/jobs?provider_mode=host", map[string]any{
+		"provider_mode": "host",
+		"owner_type":    "plugin",
+		"owner_id":      "com.powerx.plugins.base",
+		"name":          "host-create",
+		"schedule_type": "once",
+		"schedule_expr": "2026-05-15T10:30:00Z",
+	})
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("host create status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	if gotAuth != "ApiKey gateway-key" {
+		t.Fatalf("Authorization=%q, want ApiKey gateway-key", gotAuth)
+	}
+}
+
+type captureSchedulerHostClient struct {
+	created fwscheduler.JobSpec
+}
+
+func (c *captureSchedulerHostClient) CreateJob(_ context.Context, job fwscheduler.JobSpec) (*fwscheduler.Job, error) {
+	c.created = job
+	return &fwscheduler.Job{JobSpec: job, Status: fwscheduler.StatusActive}, nil
+}
+
+func (c *captureSchedulerHostClient) UpdateJob(_ context.Context, job fwscheduler.JobSpec) (*fwscheduler.Job, error) {
+	return &fwscheduler.Job{JobSpec: job, Status: fwscheduler.StatusActive}, nil
+}
+
+func (c *captureSchedulerHostClient) PauseJob(context.Context, string, string) error { return nil }
+func (c *captureSchedulerHostClient) ResumeJob(context.Context, string, string) error {
+	return nil
+}
+func (c *captureSchedulerHostClient) TriggerJob(context.Context, string, string) error {
+	return nil
+}
+func (c *captureSchedulerHostClient) GetJob(context.Context, string, string) (*fwscheduler.Job, error) {
+	return nil, fwscheduler.ErrJobNotFound
+}
+func (c *captureSchedulerHostClient) ListJobs(context.Context, fwscheduler.ListJobsInput) ([]*fwscheduler.Job, error) {
+	return nil, nil
 }
 
 func postSchedulerJSON(t *testing.T, r *gin.Engine, path string, body map[string]any) *httptest.ResponseRecorder {

@@ -15,7 +15,7 @@ type LoggingPolicyHandler struct{}
 
 var (
 	loggingPolicyMu       sync.RWMutex
-	loggingDefaultPolicy  = runtimelogging.ResolveWithHostDefaults(runtimelogging.DefaultPolicy())
+	loggingDefaultPolicy  = runtimelogging.ResolvePolicy(runtimelogging.DefaultPolicy())
 	loggingPolicyByTenant = map[string]runtimelogging.Policy{}
 )
 
@@ -118,7 +118,7 @@ func (h *LoggingPolicyHandler) Put(c *gin.Context) {
 	for _, sink := range req.AuthorizedExtraSinks {
 		p.AuthorizedExtraSinks = append(p.AuthorizedExtraSinks, runtimelogging.SinkType(sink))
 	}
-	p = runtimelogging.ResolveWithHostDefaults(p)
+	p = runtimelogging.ResolvePolicy(p)
 	if err := runtimelogging.ValidatePolicy(p); err != nil {
 		contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, err.Error())
 		return

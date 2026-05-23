@@ -29,6 +29,8 @@ func (enabledGateway) ListPlatformCapabilities(_ context.Context, _ capgateway.L
 func (enabledGateway) Close() error { return nil }
 
 func TestRequireCapabilityGatewayDelegatedConfigMissing(t *testing.T) {
+	t.Setenv("POWERX_PROXY", "1")
+
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.POST("/invoke", func(c *gin.Context) {
@@ -57,7 +59,7 @@ func TestRequireCapabilityGatewayDelegatedConfigMissing(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	errObj, ok := body["error"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, capgateway.ErrCodeGatewayMissingToolToken, errObj["code"])
+	require.Equal(t, capgateway.ErrCodeGatewayMissingSTSClient, errObj["code"])
 }
 
 func TestRequireCapabilityGatewayDelegatedUnavailable(t *testing.T) {

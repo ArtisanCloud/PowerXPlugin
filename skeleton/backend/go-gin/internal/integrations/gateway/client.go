@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,6 +27,7 @@ const (
 const (
 	ErrCodeGatewayMissingBaseURL   = "GW_CFG_MISSING_BASE_URL"
 	ErrCodeGatewayMissingToolToken = "GW_CFG_MISSING_TOOL_TOKEN"
+	ErrCodeGatewayMissingSTSClient = "GW_CFG_MISSING_STS_CLIENT"
 	ErrCodeGatewayMissingAPIKey    = "GW_CFG_MISSING_API_KEY"
 	ErrCodeGatewayInvalidScheme    = "GW_CFG_INVALID_AUTH_SCHEME"
 	ErrCodeGatewayTokenInvalidTID  = "GW_TOKEN_INVALID_TID"
@@ -740,6 +742,9 @@ func ValidateDelegatedConfig(cfg *config.Config) *GatewayConfigError {
 	if cfg != nil {
 		gcfg = cfg.Gateway
 	}
+	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" && iamMode == "delegated" {
+		return validateHostDelegatedConfig(cfg, gcfg, iamMode)
+	}
 	required := []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"}
 
 	if effectiveGatewayBaseURL(gcfg) == "" {
@@ -754,6 +759,31 @@ func ValidateDelegatedConfig(cfg *config.Config) *GatewayConfigError {
 	}
 	if tenantUUIDFromJWT(token) == "" {
 		return newGatewayConfigError(ErrCodeGatewayTokenInvalidTID, "PX_PLUGIN_TOOL_TOKEN missing tid claim", gcfg, iamMode, required)
+	}
+	return nil
+}
+
+func validateHostDelegatedConfig(cfg *config.Config, gcfg *config.GatewayConfig, iamMode string) *GatewayConfigError {
+	required := []string{
+		"PX_GATEWAY_BASE_URL",
+		"POWERX_STS_CLIENT_ID",
+		"POWERX_STS_CLIENT_SECRET",
+		"POWERX_GRPC_UPSTREAM_ADDRESS",
+		"POWERX_GRPC_UPSTREAM_TENANT_UUID",
+		"PX_GATEWAY_AUTH_SCHEME=bearer",
+	}
+	if effectiveGatewayBaseURL(gcfg) == "" {
+		return newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, iamMode, required)
+	}
+	if effectiveGatewayAuthScheme(gcfg) != "bearer" {
+		return newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer", gcfg, iamMode, required)
+	}
+	if cfg == nil || cfg.GRPCUpstream == nil ||
+		strings.TrimSpace(cfg.GRPCUpstream.STSClientID) == "" ||
+		strings.TrimSpace(cfg.GRPCUpstream.STSClientSecret) == "" ||
+		strings.TrimSpace(cfg.GRPCUpstream.Address) == "" ||
+		strings.TrimSpace(cfg.GRPCUpstream.TenantUUID) == "" {
+		return newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "delegated host mode requires STS client env", gcfg, iamMode, required)
 	}
 	return nil
 }

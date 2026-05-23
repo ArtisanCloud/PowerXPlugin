@@ -45,9 +45,18 @@
 
     <UCard>
       <template #header>
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <span class="font-medium text-gray-900 dark:text-gray-100">{{ `{{ $t("templates.crud.listTitle") }}` }}</span>
-          <UBadge variant="soft" color="primary">{{ `{{ templates.length }}` }}</UBadge>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{ `{{ $t("templates.crud.pagination.total", { total: pagination.total }) }}` }}
+            </span>
+            <USelect
+              v-model="pagination.pageSize"
+              :items="pageSizeOptions"
+              class="w-32"
+            />
+          </div>
         </div>
       </template>
       <UTable
@@ -102,6 +111,18 @@
         </template>
       </UTable>
 
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+        <span class="text-sm text-gray-500 dark:text-gray-400">
+          {{ `{{ paginationSummary }}` }}
+        </span>
+        <UPagination
+          v-if="pagination.totalPages > 1"
+          v-model:page="pagination.page"
+          :total="pagination.total"
+          :items-per-page="pagination.pageSize"
+          show-edges
+        />
+      </div>
     </UCard>
 
     <ConfirmDialog
@@ -158,6 +179,17 @@ const showFormModal = ref(false)
 const deleteDialog = ref(false)
 const deleting = ref(false)
 const selectedTemplate = ref<Template | null>(null)
+const pageSizeOptions = [
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+  { label: "50", value: 50 },
+]
+const pagination = reactive({
+  page: 1,
+  pageSize: 10,
+  total: 0,
+  totalPages: 0,
+})
 
 type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
 
@@ -251,10 +283,25 @@ const formSnapshot = computed(() => ({
   content: form.content,
 }))
 
+const paginationSummary = computed(() => {
+  if (pagination.total <= 0) {
+    return t("templates.crud.pagination.empty")
+  }
+  const start = (pagination.page - 1) * pagination.pageSize + 1
+  const end = Math.min(pagination.page * pagination.pageSize, pagination.total)
+  return t("templates.crud.pagination.range", {
+    start,
+    end,
+    total: pagination.total,
+    page: pagination.page,
+    totalPages: Math.max(pagination.totalPages, 1),
+  })
+})
+
 const fetchTemplates = async () => {
   loading.value = true
   try {
-    const query = { page: 1, page_size: 50 }
+    const query = { page: pagination.page, page_size: pagination.pageSize }
     // console.debug('[templates/crud] fetching templates', {
     //   baseURL: templateApiBase,
     //   path: 'templates',
@@ -262,19 +309,29 @@ const fetchTemplates = async () => {
     // })
 
     const res = await listTemplates(query.page, query.page_size, "", makeLogHandlers("templates:list", { query }))
-    // console.log(res?.success , res.data , Array.isArray(res.data.list),res)
     if (res?.success && res.data && Array.isArray(res.data.list)) {
+      const total = Number(res.data.total) || 0
+      const pageSize = Number(res.data.page_size) || query.page_size
+      const totalPages = Number(res.data.total_pages) || (total > 0 ? Math.ceil(total / pageSize) : 0)
       templates.value = res.data.list
+      pagination.total = total
+      pagination.pageSize = pageSize
+      pagination.totalPages = totalPages
+      pagination.page = Math.min(Math.max(Number(res.data.page) || query.page, 1), Math.max(totalPages, 1))
       // console.debug('[templates/crud] templates loaded', {
       //   count: templates.value.length,
       // })
     } else {
       templates.value = []
+      pagination.total = 0
+      pagination.totalPages = 0
       console.warn('[templates/crud] templates response unexpected', res)
     }
   } catch (error) {
     console.error("[templates/crud] Failed to load templates", error)
     templates.value = []
+    pagination.total = 0
+    pagination.totalPages = 0
   } finally {
     loading.value = false
   }
@@ -352,6 +409,9 @@ const handleSubmit = async (payload: { name: string; description: string; conten
         throw new Error(res?.message || "Create template failed")
       }
     }
+    if (!isUpdate) {
+      pagination.page = 1
+    }
     await fetchTemplates()
     closeFormModal()
     resetForm()
@@ -394,6 +454,17 @@ const performDelete = async () => {
     if (!res?.success) {
       throw new Error(res?.message || "Delete template failed")
     }
+    const shouldMoveToPreviousPage = templates.value.length === 1 && pagination.page > 1
+    if (shouldMoveToPreviousPage) {
+      pagination.page -= 1
+      deleteDialog.value = false
+      showToast({
+        title: t("templates.crud.deleteTitle"),
+        message: t("message.deleteSuccess"),
+        color: "success",
+      })
+      return
+    }
     await fetchTemplates()
     deleteDialog.value = false
     showToast({
@@ -432,6 +503,28 @@ watch(isDelegatedReadOnly, (readonlyMode) => {
   showFormModal.value = false
   deleteDialog.value = false
 })
+
+watch(
+  () => pagination.page,
+  async () => {
+    if (canReadTemplateList.value) {
+      await fetchTemplates()
+    }
+  }
+)
+
+watch(
+  () => pagination.pageSize,
+  async () => {
+    if (pagination.page !== 1) {
+      pagination.page = 1
+      return
+    }
+    if (canReadTemplateList.value) {
+      await fetchTemplates()
+    }
+  }
+)
 
 const normalizeToString = (value?: string | number | null) => {
   if (value === null || value === undefined) {
@@ -497,4 +590,5 @@ onMounted(async () => {
 .content-cell {
   max-width: 24rem;
 }
+
 </style>

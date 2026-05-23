@@ -15,7 +15,7 @@
       <AppNavbar />
     </UContainer>
 
-    <div class="flex">
+    <div :class="shellClass">
       <!-- 左侧边栏 - 根据环境变量控制显示 -->
       <AppSidebar v-if="showNavigation" />
 
@@ -91,7 +91,12 @@ const mainContentClass = computed(() => {
   if (disableShell.value) {
     return "w-full";
   }
-  return showNavigation.value ? "flex-1 p-6" : "w-full p-6";
+  return showNavigation.value ? "min-h-0 flex-1 overflow-y-auto p-6" : "min-h-0 w-full overflow-y-auto p-6";
+});
+
+const shellClass = computed(() => {
+  const base = "flex min-h-0 overflow-hidden";
+  return showNavigation.value ? `${base} h-[calc(100vh-4rem)]` : `${base} h-dvh`;
 });
 
 const delegatedBannerMessage = computed(() => auth.delegatedError?.value || "");

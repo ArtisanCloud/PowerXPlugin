@@ -5,6 +5,9 @@ on:
     branches: ["main", "master", "develop", "001-powerxplugin-foundation"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   delegated-contract-guard:
     runs-on: ubuntu-latest

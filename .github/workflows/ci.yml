@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - name: Enforce delegated token contract (no PX_TOOL_TOKEN fallback)
         run: |
           set -euo pipefail
@@ -35,6 +38,9 @@ jobs:
       GOTOOLCHAIN: local
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'
@@ -54,6 +60,9 @@ jobs:
       GOWORK: auto
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -75,6 +84,9 @@ jobs:
       LIGHTNINGCSS_FORCE_WASM: "1"
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'
@@ -98,6 +110,9 @@ jobs:
       GO111MODULE: on
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -123,6 +138,9 @@ jobs:
       GO111MODULE: on
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -154,6 +172,9 @@ jobs:
       GOSUMDB: sum.golang.org
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
@@ -187,6 +208,9 @@ jobs:
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
       - name: Install system dependencies
         run: |
           apt-get update

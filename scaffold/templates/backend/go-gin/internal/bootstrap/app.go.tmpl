@@ -17,7 +17,6 @@ import (
 	providerWeCom "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/wecom"
 	federatedRisk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/risk"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
-	"gorm.io/gorm"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/db"
 	"{{ .BackendModulePath }}/internal/entity/models"
@@ -27,6 +26,7 @@ import (
 	localadapter "{{ .BackendModulePath }}/internal/services/iam/adapters/local"
 	federatedService "{{ .BackendModulePath }}/internal/services/iam/federated"
 	sharedapp "{{ .BackendModulePath }}/internal/shared/app"
+	"gorm.io/gorm"
 )
 
 type FederatedRuntime struct {

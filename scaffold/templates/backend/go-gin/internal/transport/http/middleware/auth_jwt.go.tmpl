@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	authx "{{ .BackendModulePath }}/internal/middleware"
+	"github.com/gin-gonic/gin"
 )
 
 func JWTAuth(cfg authx.JWTAuthConfig) gin.HandlerFunc {

@@ -16,7 +16,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
-	"golang.org/x/sync/errgroup"
 	runtimecap "{{ .BackendModulePath }}/cmd/plugin/runtime"
 	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
 	"{{ .BackendModulePath }}/internal/capabilities"
@@ -47,6 +46,7 @@ import (
 	recommendation "{{ .BackendModulePath }}/internal/services/recommendation"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"{{ .BackendModulePath }}/internal/shared/utils"
+	"golang.org/x/sync/errgroup"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 )

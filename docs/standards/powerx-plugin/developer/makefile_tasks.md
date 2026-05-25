@@ -4,6 +4,8 @@
 > 包括任务划分、变量继承、构建流程与发布模式。  
 > 读者对象：工程师 / CI 维护者 / 发布负责人。
 
+> 本文同时定义插件项目必须实现的 `make dist`、`make local-install`、`make local-reinstall` 合同，以及标准 `dist/<version>` 目录结构。
+
 ---
 
 ## 一、系统概述
@@ -59,6 +61,7 @@ make docker-build
 | `BUILD_DIR`          | `backend/bin`                      | Go 二进制输出路径                           |
 | `FRONTEND_BUILD_CMD` | `npm --prefix web-admin run build` | 前端构建命令                               |
 | `DIST_ROOT`          | `dist`                             | 本地安装目录根（PowerX `install/local` 模式使用） |
+| `DIST_DIR`           | `$(DIST_ROOT)/$(VERSION)`          | 本次 `make dist` 的最终输出目录，可显式覆盖为 `dist/mac` 等 |
 | `RELEASE_ROOT`       | `target`                           | 发布产物目录根                              |
 | `DOCKER_IMAGE`       | `powerx-plugin-base:$(VERSION)`    | Docker 镜像名称                          |
 | `PROJECT_NAME`       | `powerx-plugin-base`               | 插件名称（影响压缩包名）                         |
@@ -95,7 +98,10 @@ dist/
   0.1.0/
     plugin.yaml
     backend/bin/plugin
+    backend/bin/migrate              # 可选，存在 cmd/database 时生成
     web-admin/.output/
+    plugin.d/
+    config/event_fabric.yaml
 ```
 
 ---
@@ -216,17 +222,166 @@ jobs:
 
 ## 八、发布产物与安装方式
 
+### dist 合同（插件项目必须对齐）
+
+先区分两类项目：
+
+| 场景 | 命令执行目录 | `make dist` 输出 |
+|---|---|---|
+| PowerXPlugin 主仓库调 skeleton | PowerXPlugin 仓库根目录 | `skeleton/dist/<version>` |
+| 独立/二次插件仓库 | 插件项目根目录 | `dist/<version>` |
+
+PowerXPlugin 主仓库是 framework + skeleton 模板仓库，根目录 `make dist` 只是代理到 `skeleton`。独立/二次插件仓库不得输出到 `skeleton/dist`，必须直接在自己的插件项目根目录输出 `dist/<version>`。
+
+独立/二次插件仓库根目录必须支持：
+
+```bash
+make dist
+make dist VERSION=0.1.0 DIST_DIR=dist/mac
+make local-install API_BASE=http://127.0.0.1:8077/api/v1 TOKEN=<ADMIN_BEARER_TOKEN>
+make local-reinstall VERSION=<version> API_BASE=http://127.0.0.1:8077/api/v1 TOKEN=<ADMIN_BEARER_TOKEN>
+```
+
+语义：
+
+- `make dist`：只构建并生成 `DIST_DIR`，默认 `dist/<version>`，不调用 PowerX。
+- `make local-install`：先执行 `dist`，再调用 PowerX `/admin/plugins/install/local`。
+- `make local-reinstall`：执行 disable -> force install(enable=false) -> switch_version(enable=true)，用于本地反复验证同一插件。
+
+标准 dist 目录结构：
+
+```text
+dist/<version>/ 或显式 DIST_DIR 指向的目录
+  plugin.yaml
+  plugin.d/
+    capabilities.yaml
+    exposure.yaml
+    rbac.yaml
+    events.yaml
+  config/
+    event_fabric.yaml
+  backend/
+    bin/
+      plugin
+      migrate              # 可选，存在 cmd/database 时生成
+  web-admin/
+    .output/
+    i18n/                # 可选
+  README.md              # 可选
+```
+
+文件要求：
+
+| 路径 | 要求 |
+|---|---|
+| `plugin.yaml` | 安装目录主清单，版本号必须与当前 `VERSION` 一致 |
+| `plugin.d/capabilities.yaml` | 能力目录，必须由能力同步工具生成或校验 |
+| `plugin.d/exposure.yaml` | 路由/暴露目录，新增接口必须覆盖 |
+| `plugin.d/rbac.yaml` | RBAC 目录，新增接口必须覆盖 |
+| `plugin.d/events.yaml` | 事件声明目录，topic 必须与执行层一致 |
+| `config/event_fabric.yaml` | PowerX 启用插件时播种 topic/ACL 的执行层配置，必须包含顶层 `version: v1` |
+| `backend/bin/plugin` | 后端可执行文件，Go/Gin 插件必须存在且可执行 |
+| `backend/bin/migrate` | 可选，声明迁移或存在 `cmd/database` 时应生成 |
+| `web-admin/.output` | Nuxt 管理端生产产物，必须完整复制 `.output` |
+
+`plugin.yaml` 中入口必须与 dist 结构一致：
+
+```yaml
+runtime:
+  entry: backend/bin/plugin
+backend:
+  entry: backend/bin/plugin
+migrations:
+  - entry: backend/bin/migrate
+```
+
+`config/event_fabric.yaml` 最小合法结构：
+
+```yaml
+version: v1
+topics:
+  - topic: _topic.example.updated
+    description: example event
+    acl:
+      - actions: [publish, subscribe]
+```
+
+缺少 `version` 会在启用阶段被 PowerX 严格拒绝，典型错误为：
+
+```text
+manifest version must be positive
+```
+
+`make dist` 至少完成：
+
+1. 执行 `plugin-yaml-check`。
+2. 构建后端；Linux 部署包使用 `make dist PLATFORM=linux TARGET_ARCH=amd64`。
+3. 构建前端 Host 包：`POWERX_PROXY=1`，baseURL 使用 `/_p/<pluginId>/admin/`。
+4. 写入当前插件项目的 `DIST_DIR/plugin.yaml`，并用 `VERSION=<version>` 覆盖版本；不得回写源码根目录 `plugin.yaml`。
+5. 复制 `plugin.d/` 与 `config/event_fabric.yaml`。
+6. 复制后端二进制到 `backend/bin/plugin`。
+7. 若存在 `backend/cmd/database` 或 `plugin.yaml` 声明 migrations，则复制迁移二进制到 `backend/bin/migrate`。
+8. 复制 Nuxt 产物到 `web-admin/.output`。
+9. 执行内建 dist 验证。
+
+dist 阶段必须 fail fast，最低验证项：
+
+- `plugin.yaml` 存在。
+- `plugin.d/rbac.yaml`、`plugin.d/exposure.yaml` 存在。
+- `config/event_fabric.yaml` 存在。
+- `config/event_fabric.yaml` 顶层 `version` 存在且为正版本，例如 `v1`。
+- `backend/bin/plugin` 存在且非空、可执行。
+- 如声明 migrations，`backend/bin/migrate` 必须存在且非空、可执行。
+- `web-admin/.output` 存在。
+- `plugin.d/events.yaml` 与 `config/event_fabric.yaml` 的 topic 名称一致。
+
+### 迁移与宿主注入合同
+
+PowerX 本地安装会先把 dist 拷贝到安装目录，再执行 `backend/bin/migrate setup`。迁移进程的工作目录是安装包内的 `backend/`，并由宿主注入运行期环境变量。
+
+插件迁移入口必须遵守：
+
+- 迁移入口只加载迁移所需配置，例如 `LoadForMigration()`。
+- 迁移阶段不得强制要求 gateway STS/API Key 等运行态凭证。
+- 数据库连接以宿主注入的 `POWERX_DB_DSN` 为准。
+- 若 `POWERX_DB_SCHEMA` 缺失，但 `POWERX_DB_DSN` 包含 `search_path=<schema>`，插件必须从 DSN 推导 schema。
+- 插件迁移不得执行 `CREATE SCHEMA`。schema 生命周期由 PowerX 安装器负责，插件只在已分配 schema 内建表和写 seed。
+- `refresh` 等破坏性迁移命令必须显式开关保护，不得在安装流程默认执行。
+
+典型错误与原因：
+
+| 错误 | 原因 | 修复 |
+|---|---|---|
+| `gateway config requires base_url and matching credential` | migrate 使用普通运行态配置加载，错误要求 gateway 凭证 | 改用迁移专用加载，跳过 runtime gateway 校验 |
+| `permission denied for database powerx` | 插件迁移尝试 `CREATE SCHEMA` | 移除插件侧建 schema，改为校验宿主已创建的 schema |
+| `schema "powerx_plugin_base" does not exist` | 未读取宿主注入的 `POWERX_DB_DSN search_path`，落回本地默认 schema | 从 `POWERX_DB_DSN` 的 `search_path` 推导 schema |
+| `manifest version must be positive` | `config/event_fabric.yaml` 缺少顶层 `version` | 添加 `version: v1` |
+
+`POST /admin/plugins/install/local` 的 `src_dir` 必须指向含 `plugin.yaml` 的版本目录：
+
+```text
+/absolute/path/to/plugin/dist/<version>
+```
+
+PowerXPlugin 主仓库调 skeleton 时是：
+
+```text
+/absolute/path/to/PowerXPlugin/skeleton/dist/<version>
+```
+
+不要传插件源码根目录、`dist/` 根目录、`web-admin/` 目录、`bin/` 目录或 `.pxp` 文件路径。
+
 ### 本地目录模式
 
 ```bash
 make build frontend-build
-make dist
+make dist VERSION=0.1.0 DIST_DIR=dist/mac
 ```
 
 PowerX 可直接安装：
 
 ```
-install/local?src_dir=$(pwd)/dist/0.1.0
+install/local?src_dir=$(pwd)/dist/mac
 ```
 
 ### Release 模式（对外分发）

@@ -2,6 +2,8 @@
 
 本指南聚焦一件事：把**已经构建好的插件产物**安装到 PowerX 环境。
 
+插件项目如何实现 `make dist`、`make local-install`、`make local-reinstall`，以及 `dist/<version>` 必须长什么样，请先看实现规范：[Makefile 任务与构建说明](../../standards/powerx-plugin/developer/makefile_tasks.md)。本文只说明如何把已经构建好的 dist 安装到 PowerX。
+
 先区分几个常见命令（避免混淆）：
 
 - `px-plugin init`：初始化插件工程（生成代码骨架）。  
@@ -148,7 +150,7 @@ export ADMIN_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 ## 方案 A：dist 直装（推荐）
 
-Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/`：包含后端二进制、Nuxt 构建结果、`plugin.yaml`、`plugin.d/*.yaml`、`config/event_fabric.yaml`、`publish.yml`、`manifest.json` 等。**这一部分是所有流程都必须完成的基础**，可以用 Makefile 或手动方式完成。
+Local install 的核心是让 PowerX 读到一份可直接运行的 `dist/<version>/`：包含后端二进制、Nuxt 构建结果、`plugin.yaml`、`plugin.d/*.yaml`、`config/event_fabric.yaml` 等。**这一部分是所有流程都必须完成的基础**，可以用 Makefile 或手动方式完成。
 
 ## 本地安装时的 Topic 对齐要求
 
@@ -189,16 +191,19 @@ events:
 `config/event_fabric.yaml`（执行层，给底座启用时播种使用）：
 
 ```yaml
+version: v1
 topics:
-  - key: plugin.demo.order.created
-    mode: publish
+  - topic: plugin.demo.order.created
     description: order created event
-  - key: plugin.demo.order.status
-    mode: subscribe
+    acl:
+      - actions: [publish]
+  - topic: plugin.demo.order.status
     description: order status updates
+    acl:
+      - actions: [subscribe]
 ```
 
-建议：两层 topic 名称保持一一对应（`name`/`key` 一致），避免“声明里有、执行层没有”导致安装后链路不通。
+建议：两层 topic 名称保持一一对应（`name`/`topic` 一致），避免“声明里有、执行层没有”导致安装后链路不通。
 
 ### 联调动作拆解（可直接照做）
 
@@ -231,6 +236,7 @@ curl -X POST "$API_BASE/internal/ws-bus/grant" \
 ### 典型误区
 
 - 只配 `plugin.yaml.events.topics[]`，没配 `config/event_fabric.yaml`：安装后底座不会播种执行层 topic。
+- `config/event_fabric.yaml` 缺少顶层 `version: v1`：启用阶段会失败，错误通常是 `manifest version must be positive`。
 - 只调 `ws-bus/grant` 就以为会自动建 topic：不会，grant 仅做授权绑定。
 - topic 名称两层不一致：表现为授权成功但消息链路不通。
 
@@ -266,6 +272,9 @@ make dist
 
 # 构建特定版本
 VERSION=0.2.0 make dist
+
+# 本地 macOS 调试常用：输出到固定目录，便于 PowerX install/local 选择
+make dist VERSION=0.1.0 DIST_DIR=dist/mac
 ```
 
 如需额外生成 `.pxp`，请跳转到「方案 B · 步骤 2」使用 `make pack`。
@@ -293,6 +302,9 @@ make dist-linux
 pushd backend
 go mod tidy
 GOOS=linux GOARCH=amd64 go build -o ../dist/backend/bin/plugin ./cmd/plugin
+if [ -d cmd/database ]; then
+  GOOS=linux GOARCH=amd64 go build -o ../dist/backend/bin/migrate ./cmd/database
+fi
 popd
 
 # 2) 构建前端
@@ -301,14 +313,17 @@ npm install
 npm run build
 popd
 
-# 3) 整理 dist 目录（包含 plugin.yaml、config/event_fabric.yaml、publish.yml、manifest.json 等）
-mkdir -p dist/web-admin dist/backend
-cp -R backend/dist/* dist/backend/
-cp -R web-admin/.output/public dist/web-admin/
+# 3) 整理 dist 目录（包含 plugin.yaml、plugin.d、config/event_fabric.yaml 等）
+mkdir -p dist/web-admin/.output dist/backend/bin
+cp backend/bin/plugin dist/backend/bin/
+if [ -f backend/bin/migrate ]; then
+  cp backend/bin/migrate dist/backend/bin/
+fi
+cp -R web-admin/.output/. dist/web-admin/.output/
 cp plugin.yaml dist/
+cp -R plugin.d dist/
 mkdir -p dist/config
 cp config/event_fabric.yaml dist/config/
-cp publish.yml dist/
 ```
 
 完成后即可进入“传输与安装”步骤。
@@ -356,7 +371,7 @@ make pack KEY_ID=marketplace-dev PUBLIC_KEY=./keys/marketplace.pem
 - `dist/artifacts/manifest.signature`
 - `dist/artifacts/report.json`
 
-> `.pxp` 只是带签名/校验信息的元数据包，不要把它塞进 `dist/<version>` 的运行目录；PowerX 仍然直接读取 `dist/<version>/backend`、`dist/<version>/web-admin` 等子目录。
+> `.pxp` 只是带签名/校验信息的元数据包，不要把它塞进 `dist/<version>` 的运行目录；PowerX 仍然直接读取 `dist/<version>/backend/bin/plugin`、`dist/<version>/backend/bin/migrate`、`dist/<version>/web-admin/.output` 等运行产物。
 
 #### 准备 `./keys/marketplace.pem`
 
@@ -442,7 +457,7 @@ curl -X POST "$API_BASE/admin/plugins/install/local" \
       }'
 ```
 
-- `src_dir`：PowerX 服务器可读的绝对路径。应包含 `backend/`, `web-admin/`, `plugin.yaml`, `config/event_fabric.yaml`, `publish.yml` 等文件。
+- `src_dir`：PowerX 服务器可读的绝对路径。应包含 `backend/bin/plugin`, `web-admin/.output`, `plugin.yaml`, `plugin.d/`, `config/event_fabric.yaml` 等文件；若声明 migrations，还应包含 `backend/bin/migrate`。
 - `enable`：安装完成后是否立即启用并切换成当前版本。
 - `force`：若已有相同版本，是否强制覆盖。
 
@@ -518,7 +533,7 @@ curl -X POST "$API_BASE/admin/plugins/install/local" \
       }'
 ```
 
-> 解包后若目录结构不同，请确保 `src_dir` 指向含有 `plugin.yaml`/`backend`/`web-admin` 的根，随后重复方案 A 的验证/启用步骤。
+> 解包后若目录结构不同，请确保 `src_dir` 指向含有 `plugin.yaml`、`backend/bin/plugin`、`web-admin/.output` 的根，随后重复方案 A 的验证/启用步骤。
 
 ---
 

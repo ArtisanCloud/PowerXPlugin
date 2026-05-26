@@ -214,7 +214,9 @@ func TestInvokeCapabilityExchangesToSTSForTenantScopedRoute(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, parsed.Valid)
 	require.Equal(t, "aeffc79f-e72a-4fd9-b908-5c150bce3741", strings.TrimSpace(claims.TenantUUID.String()))
-	require.Equal(t, int64(9527), claims.UserID)
+	require.Equal(t, int64(0), claims.UserID)
+	require.Equal(t, int64(0), claims.MemberID)
+	require.Contains(t, claims.Audience, "powerx:api")
 }
 
 func TestInvokeCapabilityAuthRequiredWithoutAuthorization(t *testing.T) {

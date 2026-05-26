@@ -52,9 +52,12 @@ type UserContext struct {
 	TenantUuid    string
 	TenantKey     string
 	TenantName    string
+	TenantID      uint64
 	IsRoot        bool
 	MemberID      uint64
+	MemberUUID    string
 	UserID        uint64
+	UserUUID      string
 	Username      string
 	Email         string
 	DisplayName   string

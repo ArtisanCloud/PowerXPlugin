@@ -13,7 +13,9 @@ import (
 
 type TenantContext struct {
 	TenantUUID    string   `json:"tenant_uuid"`
+	TenantID      int64    `json:"tenant_id"`
 	UserID        int64    `json:"user_id"`
+	MemberID      int64    `json:"member_id"`
 	IsRoot        bool     `json:"is_root"`
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"permissions"`

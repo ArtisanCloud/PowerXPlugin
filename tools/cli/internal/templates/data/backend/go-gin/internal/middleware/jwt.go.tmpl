@@ -28,13 +28,18 @@ type JWTAuthConfig struct {
 
 type PowerXClaims struct {
 	TenantUUID    TenantClaim `json:"tid"`
-	UserID        int64       `json:"uid"`
-	UserIDNumeric int64       `json:"uid_n"`
+	TenantID      int64       `json:"tid_n,omitempty"`
+	UserUUID      string      `json:"uid,omitempty"`
+	UserID        int64       `json:"uid_n,omitempty"`
+	MemberUUID    string      `json:"mid,omitempty"`
+	MemberID      int64       `json:"mid_n,omitempty"`
+	MemberIDAlias int64       `json:"member_id,omitempty"`
 	IsRoot        bool        `json:"is_root"`
 	Roles         []string    `json:"roles"`
 	Permissions   []string    `json:"perms"`
 	PolicyVersion string      `json:"policy_version"`
 	PluginID      string      `json:"plugin_id,omitempty"`
+	Scope         string      `json:"scope,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -69,41 +74,65 @@ func (t TenantClaim) String() string {
 func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		TenantUUID    TenantClaim `json:"tid"`
+		TenantID      any         `json:"tid_n"`
 		UserID        any         `json:"uid"`
 		UserIDNumeric any         `json:"uid_n"`
+		MemberID      any         `json:"mid"`
+		MemberIDNum   any         `json:"mid_n"`
+		MemberIDAlias any         `json:"member_id"`
 		IsRoot        bool        `json:"is_root"`
 		Roles         []string    `json:"roles"`
 		Permissions   []string    `json:"perms"`
 		PolicyVersion string      `json:"policy_version"`
 		PluginID      string      `json:"plugin_id,omitempty"`
+		Scope         string      `json:"scope,omitempty"`
 		jwt.RegisteredClaims
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	userID, err := parseUserID(raw.UserIDNumeric)
+	tenantID, err := parseNumericClaim(raw.TenantID)
+	if err != nil {
+		return err
+	}
+	userID, err := parseNumericClaim(raw.UserIDNumeric)
 	if err != nil {
 		return err
 	}
 	if userID == 0 {
-		userID, err = parseUserID(raw.UserID)
+		userID, err = parseNumericClaim(raw.UserID)
+		if err != nil {
+			return err
+		}
+	}
+	memberID, err := parseNumericClaim(raw.MemberIDNum)
+	if err != nil {
+		return err
+	}
+	if memberID == 0 {
+		memberID, err = parseNumericClaim(raw.MemberIDAlias)
 		if err != nil {
 			return err
 		}
 	}
 	c.TenantUUID = raw.TenantUUID
+	c.TenantID = tenantID
+	c.UserUUID = stringClaim(raw.UserID)
 	c.UserID = userID
-	c.UserIDNumeric = userID
+	c.MemberUUID = stringClaim(raw.MemberID)
+	c.MemberID = memberID
+	c.MemberIDAlias = memberID
 	c.IsRoot = raw.IsRoot
 	c.Roles = raw.Roles
 	c.Permissions = raw.Permissions
 	c.PolicyVersion = raw.PolicyVersion
 	c.PluginID = raw.PluginID
+	c.Scope = raw.Scope
 	c.RegisteredClaims = raw.RegisteredClaims
 	return nil
 }
 
-func parseUserID(value any) (int64, error) {
+func parseNumericClaim(value any) (int64, error) {
 	switch v := value.(type) {
 	case nil:
 		return 0, nil
@@ -116,9 +145,29 @@ func parseUserID(value any) (int64, error) {
 		if trimmed == "" {
 			return 0, nil
 		}
-		return strconv.ParseInt(trimmed, 10, 64)
+		parsed, err := strconv.ParseInt(trimmed, 10, 64)
+		if err != nil {
+			return 0, nil
+		}
+		return parsed, nil
 	default:
-		return 0, errors.New("invalid uid claim type")
+		return 0, errors.New("invalid numeric claim type")
+	}
+}
+
+func stringClaim(value any) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case json.Number:
+		return strings.TrimSpace(v.String())
+	case float64:
+		if v == 0 {
+			return ""
+		}
+		return strconv.FormatInt(int64(v), 10)
+	default:
+		return ""
 	}
 }
 
@@ -159,7 +208,9 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 	}
 	return TenantContext{
 		TenantUUID:    strings.TrimSpace(claims.TenantUUID.String()),
+		TenantID:      claims.TenantID,
 		UserID:        claims.UserID,
+		MemberID:      claims.MemberID,
 		IsRoot:        claims.IsRoot,
 		Roles:         claims.Roles,
 		Permissions:   claims.Permissions,
@@ -170,7 +221,9 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 
 type signedCtx struct {
 	TenantUUID    string   `json:"tid"`
+	TenantID      int64    `json:"tid_n,omitempty"`
 	UserID        int64    `json:"uid"`
+	MemberID      int64    `json:"mid,omitempty"`
 	IsRoot        bool     `json:"is_root"`
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"perms"`
@@ -204,13 +257,13 @@ func tryLoadSignedContext(h func(string) string, secret string, maxAgeSec int64)
 	if maxAgeSec > 0 && (time.Now().Unix()-sc.TS) > maxAgeSec {
 		return TenantContext{}, false
 	}
-	return TenantContext{TenantUUID: strings.TrimSpace(sc.TenantUUID), UserID: sc.UserID, IsRoot: sc.IsRoot, Roles: sc.Roles,
+	return TenantContext{TenantUUID: strings.TrimSpace(sc.TenantUUID), TenantID: sc.TenantID, UserID: sc.UserID, MemberID: sc.MemberID, IsRoot: sc.IsRoot, Roles: sc.Roles,
 		Permissions: sc.Permissions, PolicyVersion: sc.PolicyVersion, PluginID: strings.TrimSpace(sc.PluginID)}, true
 }
 
 // 供客户端出站兜底：把 TenantContext 签成 X-PowerX-CTX / SIG
 func SignContext(tc TenantContext, secret string) (ctxB64, sigHex string, ts int64, err error) {
-	sc := signedCtx{TenantUUID: strings.TrimSpace(tc.TenantUUID), UserID: tc.UserID, IsRoot: tc.IsRoot, Roles: tc.Roles,
+	sc := signedCtx{TenantUUID: strings.TrimSpace(tc.TenantUUID), TenantID: tc.TenantID, UserID: tc.UserID, MemberID: tc.MemberID, IsRoot: tc.IsRoot, Roles: tc.Roles,
 		Permissions: tc.Permissions, PolicyVersion: tc.PolicyVersion, PluginID: tc.PluginID, TS: time.Now().Unix()}
 	b, e := json.Marshal(&sc)
 	if e != nil {

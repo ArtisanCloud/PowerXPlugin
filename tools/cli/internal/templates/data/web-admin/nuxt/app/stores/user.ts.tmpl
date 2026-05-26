@@ -34,9 +34,21 @@ export const useUserStore = defineStore("user", {
     currentTenantUuid: (state): string | null =>
       state.context?.current_tenant_uuid || getStoredTenantUUID() || null,
 
+    // 当前租户数值 ID
+    currentTenantId: (state): number | null =>
+      state.context?.current_tenant_id || null,
+
     // 当前成员ID
     currentMemberId: (state): number | null =>
       state.context?.current_member_id || null,
+
+    // 当前成员 UUID
+    currentMemberUuid: (state): string | null =>
+      state.context?.current_member_uuid || null,
+
+    // 全局用户 UUID
+    currentUserUuid: (state): string | null =>
+      state.context?.user?.user_uuid || state.context?.user?.uuid || null,
 
     // 用户所属的租户列表
     memberTenants: (state): ContextMember[] => state.context?.members || [],
@@ -221,6 +233,8 @@ export const useUserStore = defineStore("user", {
         ...this.context,
         current_tenant_uuid: tenantUuid,
         current_member_id: targetTenant?.member_id ?? this.context.current_member_id,
+        current_member_uuid: targetTenant?.member_uuid ?? this.context.current_member_uuid,
+        current_tenant_id: targetTenant?.tenant_id ?? this.context.current_tenant_id,
       };
       this.lastFetchedAt = Date.now();
       this.persistCurrentTenantUUID();

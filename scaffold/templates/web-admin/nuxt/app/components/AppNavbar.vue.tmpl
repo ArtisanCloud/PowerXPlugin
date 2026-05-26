@@ -131,10 +131,12 @@ import { useAuth } from "~/composables/useAuth";
 import { getTenantUuid } from "~/composables/api/_base";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 import { useNotificationProbe } from "~/composables/useNotificationProbe";
+import { useUserStore } from "~/stores/user";
 
 const { t } = useI18n();
 const runtimeConfig = useRuntimeConfig();
 const auth = useAuth();
+const userStore = useUserStore();
 const notificationsOpen = ref(false);
 const {
   wsStateLabel,
@@ -240,9 +242,16 @@ const subscribeNotificationTopics = () => {
   if (tenantUUID) {
     subscribeTopic(`plugin.notify.tenant.${tenantUUID}`);
   }
+  const memberUUID = String(userStore.currentMemberUuid || "").trim();
+  if (memberUUID) {
+    subscribeTopic(`plugin.notify.member.${memberUUID}`);
+  }
 };
 
 onMounted(() => {
+  userStore.fetchUserContext().finally(() => {
+    subscribeNotificationTopics();
+  });
   connect();
   subscribeNotificationTopics();
 });

@@ -1,8 +1,14 @@
 package runtime_ops
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -15,6 +21,7 @@ import (
 
 type notificationTestRequest struct {
 	TenantUUID string `json:"tenant_uuid"`
+	MemberUUID string `json:"member_uuid"`
 	Topic      string `json:"topic"`
 	Title      string `json:"title"`
 	Message    string `json:"message"`
@@ -71,44 +78,127 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 			"title":       title,
 			"message":     message,
 			"tenant_uuid": tenantUUID,
+			"member_uuid": strings.TrimSpace(req.MemberUUID),
 			"trace_id":    traceID,
 			"created_at":  time.Now().UTC().Format(time.RFC3339Nano),
 		}
 
-		publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
-			fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
-			"",
-			nil,
-		))
-		outboundBearer := ""
 		hostCfg, useHost := resolveWSBusHostClientConfig(deps)
+		hostPublishOK := false
+		hostReachable := false
+		powerxProxy := strings.TrimSpace(os.Getenv("POWERX_PROXY"))
 		if useHost {
-			outboundBearer = resolveGatewayBearerToken(c, deps)
-			logGatewayAuthSelection(c, deps, outboundBearer, tenantUUID)
-
-			hostClient, err := fwwsbus.NewHostClient(hostCfg)
-			if err != nil {
-				contracts.ResponseError(c, http.StatusBadGateway, contracts.ErrCodeInternalError, "host ws bus client init failed")
+			hostReachable = true
+			logGatewayAuthSelection(c, deps, "", tenantUUID)
+			if err := sendHostNotification(c.Request.Context(), hostCfg, req, title, message); err != nil {
+				contracts.ResponseError(c, http.StatusBadGateway, contracts.ErrCodeInternalError, err.Error())
 				return
 			}
-			publisher = hostClient
+			hostPublishOK = true
+			echoResult := fwwsbus.NewLocalPublisher(deps.WSBusHub, nil).Publish(context.Background(), topic, payload, fwwsbus.PublishOptions{
+				TenantUUID: tenantUUID,
+				MemberUUID: strings.TrimSpace(req.MemberUUID),
+				TraceID:    traceID,
+			})
+			if !echoResult.OK {
+				contracts.ResponseError(c, http.StatusBadRequest, echoResult.ErrorCode, echoResult.ErrorMessage)
+				return
+			}
+		} else {
+			publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
+				fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
+				"",
+				nil,
+			))
+			result := publisher.Publish(context.Background(), topic, payload, fwwsbus.PublishOptions{
+				TenantUUID:  tenantUUID,
+				MemberUUID:  strings.TrimSpace(req.MemberUUID),
+				TraceID:     traceID,
+				BearerToken: "",
+			})
+			if !result.OK {
+				contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
+				return
+			}
 		}
 
-		result := publisher.Publish(context.Background(), topic, payload, fwwsbus.PublishOptions{
-			TenantUUID:  tenantUUID,
-			TraceID:     traceID,
-			BearerToken: outboundBearer,
-		})
-		if !result.OK {
-			contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
-			return
+		flowMode := "local_only"
+		effectiveTarget := "local"
+		if useHost {
+			flowMode = "host_fallback_local_echo"
+			effectiveTarget = "host"
+			if hostReachable && hostPublishOK {
+				flowMode = "host_strict_ok"
+			}
 		}
 
 		contracts.ResponseSuccess(c, gin.H{
-			"ok":          true,
-			"topic":       topic,
-			"tenant_uuid": tenantUUID,
-			"trace_id":    traceID,
+			"ok":               true,
+			"topic":            topic,
+			"tenant_uuid":      tenantUUID,
+			"member_uuid":      strings.TrimSpace(req.MemberUUID),
+			"trace_id":         traceID,
+			"flow_mode":        flowMode,
+			"effective_target": effectiveTarget,
+			"powerx_proxy":     powerxProxy,
+			"iam_mode":         strings.TrimSpace(deps.IAMMode.String()),
+			"host_reachable":   hostReachable,
+			"host_publish_ok":  hostPublishOK,
 		})
 	}
+}
+
+func sendHostNotification(ctx context.Context, cfg fwwsbus.HostClientConfig, req notificationTestRequest, title, message string) error {
+	endpoint, err := url.JoinPath(strings.TrimRight(cfg.BaseURL, "/"), strings.Trim(strings.TrimSpace(cfg.APIPrefix), "/"), "notifications/test")
+	if err != nil {
+		return fmt.Errorf("build host notification endpoint failed: %w", err)
+	}
+	body := map[string]any{
+		"member_uuid":  strings.TrimSpace(req.MemberUUID),
+		"title":        title,
+		"content":      message,
+		"type":         "info",
+		"category":     "system",
+		"is_important": false,
+		"metadata": map[string]any{
+			"source":   "plugin-framework-runtime",
+			"trace_id": strings.TrimSpace(req.TraceID),
+		},
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal host notification request failed: %w", err)
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("create host notification request failed: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if ua := strings.TrimSpace(cfg.UserAgent); ua != "" {
+		httpReq.Header.Set("User-Agent", ua)
+	}
+	switch strings.ToLower(strings.TrimSpace(cfg.AuthScheme)) {
+	case "apikey", "api_key", "api-key":
+		if apiKey := strings.TrimSpace(cfg.APIKey); apiKey != "" {
+			httpReq.Header.Set("Authorization", "ApiKey "+apiKey)
+		}
+	default:
+		if token := strings.TrimSpace(cfg.Token); token != "" {
+			httpReq.Header.Set("Authorization", "Bearer "+token)
+		}
+	}
+	client := &http.Client{Timeout: cfg.Timeout}
+	if client.Timeout <= 0 {
+		client.Timeout = 10 * time.Second
+	}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("host notification request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("host notification request failed: status=%d endpoint=%s body=%s", resp.StatusCode, endpoint, strings.TrimSpace(string(respBody)))
+	}
+	return nil
 }

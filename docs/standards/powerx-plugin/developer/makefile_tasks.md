@@ -266,6 +266,8 @@ dist/<version>/ 或显式 DIST_DIR 指向的目录
       migrate              # 可选，存在 cmd/database 时生成
   web-admin/
     .output/
+      public/
+        icon.svg           # metadata.icon 指向的市场图标
     i18n/                # 可选
   README.md              # 可选
 ```
@@ -275,6 +277,7 @@ dist/<version>/ 或显式 DIST_DIR 指向的目录
 | 路径 | 要求 |
 |---|---|
 | `plugin.yaml` | 安装目录主清单，版本号必须与当前 `VERSION` 一致 |
+| `plugin.yaml.metadata.icon` | 市场页图标相对路径，例如 `icon.svg` |
 | `plugin.d/capabilities.yaml` | 能力目录，必须由能力同步工具生成或校验 |
 | `plugin.d/exposure.yaml` | 路由/暴露目录，新增接口必须覆盖 |
 | `plugin.d/rbac.yaml` | RBAC 目录，新增接口必须覆盖 |
@@ -283,6 +286,7 @@ dist/<version>/ 或显式 DIST_DIR 指向的目录
 | `backend/bin/plugin` | 后端可执行文件，Go/Gin 插件必须存在且可执行 |
 | `backend/bin/migrate` | 可选，声明迁移或存在 `cmd/database` 时应生成 |
 | `web-admin/.output` | Nuxt 管理端生产产物，必须完整复制 `.output` |
+| `web-admin/.output/public/<metadata.icon>` | PowerX 市场页会通过 `/_p/<plugin_id>/admin/<metadata.icon>` 读取并展示 |
 
 `plugin.yaml` 中入口必须与 dist 结构一致：
 
@@ -333,6 +337,7 @@ dist 阶段必须 fail fast，最低验证项：
 - `backend/bin/plugin` 存在且非空、可执行。
 - 如声明 migrations，`backend/bin/migrate` 必须存在且非空、可执行。
 - `web-admin/.output` 存在。
+- `plugin.yaml.metadata.icon` 配置后，`web-admin/.output/public/<metadata.icon>` 必须存在。
 - `plugin.d/events.yaml` 与 `config/event_fabric.yaml` 的 topic 名称一致。
 
 ### 迁移与宿主注入合同

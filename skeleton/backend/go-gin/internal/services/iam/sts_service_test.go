@@ -11,9 +11,9 @@ import (
 )
 
 func TestSTSServiceMint(t *testing.T) {
-	cfg := &config.Config{Context: &config.ContextConfig{HMACSecret: "secret", Issuer: "issuer", Audience: "aud"}}
+	cfg := &config.Config{Context: &config.ContextConfig{HMACSecret: "secret", Issuer: "issuer", Audience: "powerx:api"}}
 	svc := NewSTSService(cfg, nil, "com.powerx.test", "local.v1")
-	tc := authx.TenantContext{TenantUUID: "0000-tenant", UserID: 42, Roles: []string{"superadmin"}, Permissions: []string{"com.powerx.test:iam.role:read"}}
+	tc := authx.TenantContext{TenantUUID: "0000-tenant", TenantID: 7, UserID: 42, MemberID: 4201, Roles: []string{"superadmin"}, Permissions: []string{"com.powerx.test:iam.role:read"}}
 	token, err := svc.Mint(context.Background(), tc)
 	if err != nil {
 		t.Fatalf("Mint returned error: %v", err)
@@ -43,8 +43,43 @@ func TestSTSServiceMint(t *testing.T) {
 	if claims.TenantUUID.String() != "0000-tenant" {
 		t.Fatalf("claims missing tenant uuid, got %s", claims.TenantUUID.String())
 	}
+	if claims.TenantID != 7 {
+		t.Fatalf("claims missing tenant numeric id, got %d", claims.TenantID)
+	}
+	if got := claims.Audience; len(got) != 1 || got[0] != "powerx:api" {
+		t.Fatalf("unexpected sts audience: %v", got)
+	}
+	if claims.Subject != "client:com.powerx.test" {
+		t.Fatalf("unexpected sts subject: %s", claims.Subject)
+	}
+	if claims.Scope != "access" {
+		t.Fatalf("unexpected sts scope: %s", claims.Scope)
+	}
+	if claims.UserID != 0 {
+		t.Fatalf("sts token must not carry user id, got %d", claims.UserID)
+	}
+	if claims.MemberID != 0 || claims.MemberIDAlias != 0 {
+		t.Fatalf("sts token must not carry member id, got mid_n=%d member_id=%d", claims.MemberID, claims.MemberIDAlias)
+	}
 	if exp := claims.ExpiresAt.Time.Sub(claims.IssuedAt.Time); exp != defaultSTSTTL {
 		t.Fatalf("expected ttl %v got %v", defaultSTSTTL, exp)
+	}
+}
+
+func TestSTSServiceDefaultAudienceIsPowerXAPI(t *testing.T) {
+	svc := NewSTSService(&config.Config{Context: &config.ContextConfig{HMACSecret: "secret", Issuer: "issuer"}}, nil, "com.powerx.test", "local.v1")
+	token, err := svc.Mint(context.Background(), authx.TenantContext{TenantUUID: "tenant"})
+	if err != nil {
+		t.Fatalf("Mint returned error: %v", err)
+	}
+	claims := &authx.PowerXClaims{}
+	if _, err := jwt.ParseWithClaims(token.AccessToken, claims, func(tok *jwt.Token) (any, error) {
+		return []byte("secret"), nil
+	}); err != nil {
+		t.Fatalf("failed to parse token: %v", err)
+	}
+	if got := claims.Audience; len(got) != 1 || got[0] != "powerx:api" {
+		t.Fatalf("unexpected default sts audience: %v", got)
 	}
 }
 

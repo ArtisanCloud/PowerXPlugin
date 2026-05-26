@@ -20,6 +20,7 @@ const (
 
 type PublishOptions struct {
 	TenantUUID  string `json:"tenant_uuid"`
+	MemberUUID  string `json:"member_uuid,omitempty"`
 	TraceID     string `json:"trace_id"`
 	BearerToken string `json:"bearer_token"`
 }

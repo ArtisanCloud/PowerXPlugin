@@ -88,6 +88,7 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 
 	result = a.inner.Publish(ctx, normalized, payload, PublishOptions{
 		TenantUUID:  tenantUUID,
+		MemberUUID:  strings.TrimSpace(opts.MemberUUID),
 		TraceID:     traceID,
 		BearerToken: bearer,
 	})
@@ -103,6 +104,7 @@ func (a *Adapter) Publish(ctx context.Context, topic string, payload any, opts P
 		if _, ok := a.bridgeTopics[normalized]; ok {
 			if err := a.hubBridge.Publish(ctx, normalized, payload, PublishOptions{
 				TenantUUID:  tenantUUID,
+				MemberUUID:  strings.TrimSpace(opts.MemberUUID),
 				TraceID:     traceID,
 				BearerToken: bearer,
 			}); err != nil {

@@ -16,6 +16,7 @@ import (
 	iamm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -113,6 +114,9 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, nil, ErrUnauthorized
 	}
+	if err := d.ensureIdentityUUIDs(ctx, user, member); err != nil {
+		return nil, nil, err
+	}
 	roles, perms, err := d.loadRolePermissionCodes(ctx, member.ID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("iam: load roles: %w", err)
@@ -126,9 +130,12 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
 		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
 		UserID:        user.ID,
+		UserUUID:      user.UUID,
 		Username:      member.Username,
 		Email:         user.Email,
 		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
@@ -173,6 +180,9 @@ func (d *LocalDirectory) LoginByFederated(ctx context.Context, req FederatedLogi
 		}
 		return nil, nil, err
 	}
+	if err := d.ensureIdentityUUIDs(ctx, &user, &member); err != nil {
+		return nil, nil, err
+	}
 	roles, perms, err := d.loadRolePermissionCodes(ctx, member.ID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("iam: load roles: %w", err)
@@ -186,9 +196,12 @@ func (d *LocalDirectory) LoginByFederated(ctx context.Context, req FederatedLogi
 		TenantUuid:    resolvedTenant,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
 		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
 		UserID:        user.ID,
+		UserUUID:      user.UUID,
 		Username:      member.Username,
 		Email:         user.Email,
 		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
@@ -221,6 +234,9 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 	if err != nil {
 		return nil, err
 	}
+	if err := d.ensureIdentityUUIDs(ctx, user, member); err != nil {
+		return nil, err
+	}
 	roles, perms, err := d.loadRolePermissionCodes(ctx, member.ID)
 	if err != nil {
 		return nil, fmt.Errorf("iam: load roles: %w", err)
@@ -235,9 +251,12 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 		TenantUuid:    tenantUUID,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
 		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
 		UserID:        user.ID,
+		UserUUID:      user.UUID,
 		Username:      member.Username,
 		Email:         user.Email,
 		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
@@ -365,7 +384,16 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 		return nil, err
 	}
 	var member iamm.Member
-	if err := d.db.WithContext(ctx).Where("tenant_uuid = ? AND user_id = ?", resolvedTenant, userID).First(&member).Error; err != nil {
+	if claims.MemberID > 0 {
+		if err := d.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ? AND user_id = ?", uint64(claims.MemberID), resolvedTenant, userID).First(&member).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		if err := d.db.WithContext(ctx).Where("tenant_uuid = ? AND user_id = ?", resolvedTenant, userID).First(&member).Error; err != nil {
+			return nil, err
+		}
+	}
+	if err := d.ensureIdentityUUIDs(ctx, &user, &member); err != nil {
 		return nil, err
 	}
 	deptIDs := []uint64{}
@@ -385,9 +413,12 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 		TenantUuid:    resolvedTenant,
 		TenantKey:     tenant.Key,
 		TenantName:    tenant.Name,
+		TenantID:      tenant.ID,
 		IsRoot:        user.IsRoot,
 		MemberID:      member.ID,
+		MemberUUID:    member.UUID,
 		UserID:        userID,
+		UserUUID:      user.UUID,
 		Username:      member.Username,
 		Email:         user.Email,
 		DisplayName:   valueOrDefault(member.DisplayName, user.DisplayName),
@@ -491,15 +522,22 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 	expires := now.Add(d.accessTTL)
 	claims := authx.PowerXClaims{
 		TenantUUID:    authx.TenantClaim(strings.TrimSpace(userCtx.TenantUUID)),
+		TenantID:      int64(userCtx.TenantID),
+		UserUUID:      strings.TrimSpace(userCtx.UserUUID),
 		UserID:        int64(userCtx.UserID),
+		MemberUUID:    strings.TrimSpace(userCtx.MemberUUID),
+		MemberID:      int64(userCtx.MemberID),
+		MemberIDAlias: int64(userCtx.MemberID),
 		IsRoot:        userCtx.IsRoot,
 		Roles:         userCtx.Roles,
 		Permissions:   userCtx.Permissions,
 		PolicyVersion: userCtx.PolicyVersion,
 		PluginID:      d.pluginID,
+		Scope:         "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    d.issuer,
 			Audience:  jwt.ClaimStrings{d.audience},
+			Subject:   strings.TrimSpace(userCtx.MemberUUID),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expires),
 		},
@@ -523,6 +561,25 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		PluginID:      d.pluginID,
 		PolicyVersion: d.policyVersion,
 	}, nil
+}
+
+func (d *LocalDirectory) ensureIdentityUUIDs(ctx context.Context, user *iamm.User, member *iamm.Member) error {
+	if user == nil || member == nil {
+		return ErrInvalidArguments
+	}
+	if strings.TrimSpace(user.UUID) == "" {
+		user.UUID = uuid.NewString()
+		if err := d.db.WithContext(ctx).Model(user).Update("uuid", user.UUID).Error; err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(member.UUID) == "" {
+		member.UUID = uuid.NewString()
+		if err := d.db.WithContext(ctx).Model(member).Update("uuid", member.UUID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *LocalDirectory) persistRefreshToken(ctx context.Context, uc *UserContext, refreshToken string) error {

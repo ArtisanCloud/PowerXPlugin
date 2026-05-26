@@ -27,6 +27,7 @@ type redisEnvelope struct {
 	Topic      string `json:"topic"`
 	Payload    any    `json:"payload"`
 	TenantUUID string `json:"tenant_uuid"`
+	MemberUUID string `json:"member_uuid,omitempty"`
 	TraceID    string `json:"trace_id"`
 	Origin     string `json:"origin"`
 }
@@ -78,6 +79,7 @@ func (h *RedisHub) Publish(ctx context.Context, topic string, payload any, opts 
 		Topic:      topic,
 		Payload:    payload,
 		TenantUUID: opts.TenantUUID,
+		MemberUUID: opts.MemberUUID,
 		TraceID:    opts.TraceID,
 		Origin:     h.instanceID,
 	}
@@ -172,6 +174,7 @@ func (h *RedisHub) handleMessage(ctx context.Context, payload string) {
 	}
 	opts := PublishOptions{
 		TenantUUID: strings.TrimSpace(env.TenantUUID),
+		MemberUUID: strings.TrimSpace(env.MemberUUID),
 		TraceID:    strings.TrimSpace(env.TraceID),
 	}
 	_ = h.local.Publish(ctx, env.Topic, env.Payload, opts)

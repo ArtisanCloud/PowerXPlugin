@@ -10,6 +10,7 @@ type Event struct {
 	Topic      string `json:"topic"`
 	Payload    any    `json:"payload"`
 	TenantUUID string `json:"tenant_uuid"`
+	MemberUUID string `json:"member_uuid,omitempty"`
 	TraceID    string `json:"trace_id"`
 }
 
@@ -40,6 +41,7 @@ func (h *MemoryHub) Publish(_ context.Context, topic string, payload any, opts P
 		Topic:      topic,
 		Payload:    payload,
 		TenantUUID: opts.TenantUUID,
+		MemberUUID: opts.MemberUUID,
 		TraceID:    opts.TraceID,
 	}
 	for _, handler := range subs {

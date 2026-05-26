@@ -24,7 +24,7 @@ func TestJWTAuthAllowsSignedContext(t *testing.T) {
 	router.Use(httpmw.JWTAuth(cfg))
 	router.GET("/", func(c *gin.Context) { c.Status(http.StatusOK) })
 
-	tc := authx.TenantContext{TenantUUID: "00000000-0000-0000-0000-000000000001", UserID: 42, Roles: []string{"admin"}}
+	tc := authx.TenantContext{TenantUUID: "00000000-0000-0000-0000-000000000001", TenantID: 1, UserID: 42, MemberID: 4201, Roles: []string{"admin"}}
 	ctxB64, sig, _, err := authx.SignContext(tc, cfg.ContextHMACSecret)
 	if err != nil {
 		t.Fatalf("sign context: %v", err)
@@ -52,13 +52,28 @@ func TestJWTAuthAllowsBearerHS256(t *testing.T) {
 		ClockSkewSeconds: 30,
 	}
 	router.Use(httpmw.JWTAuth(cfg))
-	router.GET("/", func(c *gin.Context) { c.Status(http.StatusOK) })
+	router.GET("/", func(c *gin.Context) {
+		got, ok := authx.GetTenantContext(c)
+		if !ok {
+			t.Fatal("tenant context missing")
+		}
+		if got.MemberID != 4201 {
+			t.Fatalf("unexpected member id: %d", got.MemberID)
+		}
+		c.Status(http.StatusOK)
+	})
 
 	claims := jwt.MapClaims{
-		"iss": cfg.Issuer,
-		"aud": cfg.AcceptAudiences,
-		"exp": time.Now().Add(time.Minute).Unix(),
-		"iat": time.Now().Add(-time.Second * 30).Unix(),
+		"iss":   cfg.Issuer,
+		"aud":   cfg.AcceptAudiences,
+		"tid":   "00000000-0000-0000-0000-000000000001",
+		"uid":   "00000000-0000-0000-0000-000000000003",
+		"uid_n": 1001,
+		"mid":   "00000000-0000-0000-0000-000000000004",
+		"mid_n": 4201,
+		"sub":   "00000000-0000-0000-0000-000000000004",
+		"exp":   time.Now().Add(time.Minute).Unix(),
+		"iat":   time.Now().Add(-time.Second * 30).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString([]byte(cfg.HMACSecret))
@@ -95,8 +110,14 @@ func TestJWTAuthMapsPowerXClaimsToTenantContext(t *testing.T) {
 		if tc.TenantUUID != "00000000-0000-0000-0000-000000000001" {
 			t.Fatalf("unexpected tenant uuid: %q", tc.TenantUUID)
 		}
+		if tc.TenantID != 1 {
+			t.Fatalf("unexpected tenant id: %d", tc.TenantID)
+		}
 		if tc.UserID != 1001 {
 			t.Fatalf("unexpected user id: %d", tc.UserID)
+		}
+		if tc.MemberID != 2002 {
+			t.Fatalf("unexpected member id: %d", tc.MemberID)
 		}
 		if !tc.IsRoot {
 			t.Fatal("expected root flag from token")
@@ -109,7 +130,9 @@ func TestJWTAuthMapsPowerXClaimsToTenantContext(t *testing.T) {
 		"aud":     cfg.AcceptAudiences,
 		"sub":     "00000000-0000-0000-0000-000000000002",
 		"tid":     "00000000-0000-0000-0000-000000000001",
+		"tid_n":   1,
 		"mid":     "00000000-0000-0000-0000-000000000002",
+		"mid_n":   2002,
 		"uid":     "00000000-0000-0000-0000-000000000003",
 		"uid_n":   1001,
 		"is_root": true,
@@ -118,6 +141,53 @@ func TestJWTAuthMapsPowerXClaimsToTenantContext(t *testing.T) {
 		"exp":     time.Now().Add(time.Minute).Unix(),
 		"iat":     time.Now().Add(-time.Second * 30).Unix(),
 		"nbf":     time.Now().Add(-time.Second * 30).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString([]byte(cfg.HMACSecret))
+	if err != nil {
+		t.Fatalf("sign token: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer "+signed)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestJWTAuthMapsMemberIDAliasClaim(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	cfg := authx.JWTAuthConfig{
+		Issuer:           "powerx-plugin-gateway",
+		AcceptAudiences:  []string{"plugin:com.powerx.plugins.base"},
+		HMACSecret:       "secret",
+		Optional:         false,
+		ClockSkewSeconds: 30,
+	}
+	router.Use(httpmw.JWTAuth(cfg))
+	router.GET("/", func(c *gin.Context) {
+		tc, ok := authx.GetTenantContext(c)
+		if !ok {
+			t.Fatal("tenant context missing")
+		}
+		if tc.MemberID != 3003 {
+			t.Fatalf("unexpected member id: %d", tc.MemberID)
+		}
+		c.Status(http.StatusOK)
+	})
+
+	claims := jwt.MapClaims{
+		"iss":       cfg.Issuer,
+		"aud":       cfg.AcceptAudiences,
+		"tid":       "tenant-001",
+		"uid_n":     1001,
+		"member_id": "3003",
+		"exp":       time.Now().Add(time.Minute).Unix(),
+		"iat":       time.Now().Add(-time.Second * 30).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString([]byte(cfg.HMACSecret))

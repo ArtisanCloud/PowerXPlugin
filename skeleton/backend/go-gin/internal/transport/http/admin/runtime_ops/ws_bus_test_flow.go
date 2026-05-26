@@ -16,6 +16,7 @@ type wsBusTestFlowRequest struct {
 	Topic      string `json:"topic"`
 	TraceID    string `json:"trace_id"`
 	ForceLocal bool   `json:"force_local"`
+	MemberUUID string `json:"member_uuid"`
 	Payload    any    `json:"payload"`
 }
 
@@ -112,6 +113,7 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 
 		publishResult := publisher.Publish(context.Background(), topic, payload, fwwsbus.PublishOptions{
 			TenantUUID:  tenantUUID,
+			MemberUUID:  strings.TrimSpace(req.MemberUUID),
 			TraceID:     traceID,
 			BearerToken: outboundBearer,
 		})
@@ -133,6 +135,7 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 				payload,
 				fwwsbus.PublishOptions{
 					TenantUUID: tenantUUID,
+					MemberUUID: strings.TrimSpace(req.MemberUUID),
 					TraceID:    traceID,
 				},
 			)

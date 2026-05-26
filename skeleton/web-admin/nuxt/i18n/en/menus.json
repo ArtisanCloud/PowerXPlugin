@@ -1,21 +1,27 @@
 {
   "menu": {
-    "base": {
-      "template": "Base Plugin",
-      "intro": "Plugin Intro",
-      "templates": {
-        "title": "Templates",
-        "develop": "Develop Guide",
-        "crud": "Template CRUD",
-        "framework_lab": "Framework Function Test"
-      },
-      "integration": {
-        "title": "Integration Hub",
-        "webhooks": "Webhooks",
-        "secrets": "Secrets",
-        "marketplace": "Marketplace Listings",
-        "recommendation": "Recommendation",
-        "insights": "Insights"
+    "com": {
+      "powerx": {
+        "plugins": {
+          "base": {
+            "template": "Base Plugin",
+            "intro": "Plugin Intro",
+            "templates": {
+              "title": "Templates",
+              "develop": "Develop Guide",
+              "crud": "Template CRUD",
+              "framework_lab": "Framework Function Test"
+            },
+            "integration": {
+              "title": "Integration Hub",
+              "webhooks": "Webhooks",
+              "secrets": "Secrets",
+              "marketplace": "Marketplace Listings",
+              "recommendation": "Recommendation",
+              "insights": "Insights"
+            }
+          }
+        }
       }
     }
   }

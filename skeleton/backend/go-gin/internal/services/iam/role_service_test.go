@@ -217,6 +217,7 @@ func createIAMTablesForTest(db *gorm.DB) error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS iam_users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT,
 			email TEXT,
 			phone TEXT,
 			display_name TEXT,
@@ -232,6 +233,7 @@ func createIAMTablesForTest(db *gorm.DB) error {
 		`CREATE TABLE IF NOT EXISTS iam_members (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_uuid TEXT,
+			uuid TEXT,
 			user_id INTEGER,
 			username TEXT,
 			display_name TEXT,

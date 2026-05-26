@@ -349,7 +349,9 @@ func parseProxyError(req *http.Request, resp *http.Response) error {
 type MeContext struct {
 	IsRoot            bool            `json:"is_root"`
 	CurrentTenantUUID string          `json:"current_tenant_uuid"`
+	CurrentTenantID   *uint64         `json:"current_tenant_id,omitempty"`
 	CurrentMemberID   *uint64         `json:"current_member_id,omitempty"`
+	CurrentMemberUUID string          `json:"current_member_uuid,omitempty"`
 	User              *MeUserBrief    `json:"user,omitempty"`
 	Members           []MeMemberBrief `json:"members"`
 	Roles             []string        `json:"roles,omitempty"`
@@ -359,6 +361,8 @@ type MeContext struct {
 
 type MeUserBrief struct {
 	ID          uint64 `json:"id"`
+	UUID        string `json:"uuid,omitempty"`
+	UserUUID    string `json:"user_uuid,omitempty"`
 	Email       string `json:"email"`
 	Phone       string `json:"phone"`
 	DisplayName string `json:"display_name"`
@@ -370,8 +374,10 @@ type MeUserBrief struct {
 
 type MeMemberBrief struct {
 	TenantUUID string `json:"tenant_uuid"`
+	TenantID   uint64 `json:"tenant_id,omitempty"`
 	TenantName string `json:"tenant_name"`
 	MemberID   uint64 `json:"member_id"`
+	MemberUUID string `json:"member_uuid,omitempty"`
 	IsAdmin    bool   `json:"is_admin"`
 }
 

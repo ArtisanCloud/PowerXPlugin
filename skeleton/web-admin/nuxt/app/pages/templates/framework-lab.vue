@@ -25,7 +25,22 @@
           <div class="flex items-center gap-3">
             <UButton size="sm" color="info" icon="i-heroicons-bell-alert" :loading="capabilityNotifying" @click="sendCapabilityNotification">{{ $t("frameworkLab.sendCapabilityButton") }}</UButton>
           </div>
-          <p class="w-full text-xs text-gray-500 dark:text-gray-400">通知测试只验证 capability 调用链路；WS Bus 和 Scheduler 调试在各自 tab 内执行。</p>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">通知测试只调用 framework runtime 统一入口，由后端按当前运行模式选择本地或网关链路。</p>
+        </div>
+        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+          <p>Member UUID: <span class="font-mono">{{ capabilityNotifyMemberUUID || ensureMemberUUID() || "-" }}</span></p>
+          <p>Target: <span>{{ notificationTargetLabel }}</span></p>
+          <p>Topic: <span class="font-mono">{{ capabilityNotifyTopic || memberNotifyTopic || "-" }}</span></p>
+          <p>Flow Mode: <span>{{ notificationFlowMode || "-" }}</span></p>
+          <p>Backend POWERX_PROXY: <span>{{ notificationPowerXProxy || "-" }}</span></p>
+          <p>Backend IAMMode: <span>{{ notificationIAMMode || "-" }}</span></p>
+          <p>Host Publish: <span>{{ notificationHostPublishOK || "-" }}</span></p>
+          <p>Last Event Topic: <span class="font-mono">{{ notificationLastEventTopic || "-" }}</span></p>
+          <p>Last Event At: <span>{{ notificationLastEventAt || "-" }}</span></p>
+          <p>diag.connected_ok: <span>{{ notificationWsDiag.connectedOK }}</span></p>
+          <p>diag.sub_sent: <span>{{ notificationWsDiag.subSent }}</span></p>
+          <p>diag.ack_ok: <span>{{ notificationWsDiag.ackOK }}</span></p>
+          <p>diag.event_ok: <span>{{ notificationWsDiag.eventOK }}</span></p>
         </div>
       </div>
 
@@ -159,7 +174,6 @@
 <script setup lang="ts">
 import { nextTick } from "vue"
 import ToastAlert from "~/components/ToastAlert.vue"
-import { usePowerXCapability } from "~/composables/usePowerXCapability"
 import { useNotificationProbe } from "~/composables/useNotificationProbe"
 import { getTenantUuid } from "~/composables/api/_base"
 import { resolveFrontendRuntimeMode } from "~/utils/runtime-mode"
@@ -196,9 +210,20 @@ const localWsTopic = ref("")
 const localWsSubmitStatus = ref("idle")
 const localWsTenantFromConnection = ref("")
 const localWsTenantFromPublish = ref("")
+const capabilityNotifyTopic = ref("")
+const capabilityNotifyMemberUUID = ref("")
+const notificationTarget = ref("")
+const notificationFlowMode = ref("")
+const notificationPowerXProxy = ref("")
+const notificationIAMMode = ref("")
+const notificationHostPublishOK = ref("")
 const activeTab = ref<"notification" | "gateway" | "local" | "scheduler-local" | "scheduler-host">("notification")
 const schedulerMode = computed<"local" | "host">(() => activeTab.value === "scheduler-host" ? "host" : "local")
 const runtimeModeView = computed(() => resolveFrontendRuntimeMode().mode)
+const notificationTargetLabel = computed(() => {
+  const target = notificationTarget.value || "framework runtime 自动选择"
+  return target
+})
 const canUseHostScheduler = computed(() => resolveFrontendRuntimeMode().mode !== "standalone_local")
 const canCreateSchedulerSample = computed(() => schedulerMode.value === "local" || canUseHostScheduler.value)
 const schedulerResolvedTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim())
@@ -213,7 +238,6 @@ const schedulerRequestOptions = computed(() => ({
 
 const toast = reactive({ visible: false, title: "", message: "", color: "primary" as ToastColor, duration: 3000 })
 
-const { invoke: invokeCapability } = usePowerXCapability()
 const gatewayProbe = useNotificationProbe("gateway", "_topic.system.notification")
 const localProbe = useNotificationProbe("local", "plugin.notify.tenant.00000000-0000-0000-0000-000000000001")
 const schedulerProbe = useNotificationProbe("scheduler", "plugin.notify.tenant.00000000-0000-0000-0000-000000000001")
@@ -227,6 +251,14 @@ const gatewayWsDiag = computed(() => gatewayProbe.wsDiag.value)
 const localLastEventTopic = computed(() => String(localProbe.lastEventTopic.value || ""))
 const localLastEventAt = computed(() => String(localProbe.lastEventAt.value || ""))
 const localWsDiag = computed(() => localProbe.wsDiag.value)
+const notificationProbe = computed(() => notificationTarget.value === "PowerX 底座通知" ? gatewayProbe : localProbe)
+const notificationLastEventTopic = computed(() => String(notificationProbe.value.lastEventTopic.value || ""))
+const notificationLastEventAt = computed(() => String(notificationProbe.value.lastEventAt.value || ""))
+const notificationWsDiag = computed(() => notificationProbe.value.wsDiag.value)
+const memberNotifyTopic = computed(() => {
+  const memberUUID = ensureMemberUUID()
+  return memberUUID ? `plugin.notify.member.${memberUUID}` : ""
+})
 const schedulerNotifyTopic = computed(() => `plugin.notify.tenant.${schedulerTenantUUID.value}`)
 const schedulerLastNotifyAt = computed(() => String(schedulerProbe.lastEventAt.value || ""))
 const schedulerLastNotifyEvent = computed(() => schedulerProbe.events.value[0] || null)
@@ -291,6 +323,15 @@ const showToast = ({ title, message, color = "primary", duration = 3000 }: { tit
   })
 }
 
+const waitFor = async (predicate: () => boolean, timeoutMs = 2500, intervalMs = 50) => {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    if (predicate()) return true
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return predicate()
+}
+
 const parseTokenClaims = (token?: string | null): Record<string, any> | null => {
   if (!token) return null
   const parts = token.split(".")
@@ -314,11 +355,29 @@ const pickFirstNonEmpty = (values: unknown[]) => {
   return ""
 }
 
+const isUUIDLike = (value: unknown) => {
+  const text = String(value ?? "").trim()
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
+}
+
 const guessMemberUUID = () => {
   const claims = parseTokenClaims(auth.getToken?.() ?? null) || {}
   const context = (userStore.context || {}) as Record<string, any>
-  const contextUser = (context.user || {}) as Record<string, any>
-  const candidates = [context.member_uuid, context.memberUuid, context.current_member_uuid, context.currentMemberUUID, contextUser.member_uuid, contextUser.memberUuid, contextUser.user_uuid, contextUser.userUuid, claims.member_uuid, claims.memberUuid, claims.user_uuid, claims.userUuid, claims.uid, claims.sub, context.current_member_id]
+  const currentMember = Array.isArray(context.members)
+    ? context.members.find((item: any) => String(item?.member_id || "") === String(context.current_member_id || ""))
+    : null
+  const candidates = [
+    context.current_member_uuid,
+    context.currentMemberUUID,
+    context.member_uuid,
+    context.memberUuid,
+    currentMember?.member_uuid,
+    currentMember?.memberUuid,
+    claims.mid,
+    claims.member_uuid,
+    claims.memberUuid,
+    claims.sub,
+  ].filter(isUUIDLike)
   return pickFirstNonEmpty(candidates)
 }
 
@@ -327,25 +386,39 @@ const ensureMemberUUID = () => String(guessMemberUUID() || "").trim()
 const sendCapabilityNotification = async () => {
   const targetMemberUUID = ensureMemberUUID()
   if (!targetMemberUUID) {
-    showToast({ title: "发送失败", message: "member_uuid 必填（请先输入或切换到已登录用户）", color: "warning", duration: 4500 })
+    showToast({ title: "发送失败", message: "当前上下文缺少 member_uuid；请重新登录并确认 /me/context 返回 current_member_uuid", color: "warning", duration: 5000 })
     return
   }
   capabilityNotifying.value = true
   try {
-    await invokeCapability("com.corex.notifications.test", "Send", {
-      method: "POST",
-      endpoint: "/api/v1/notifications/test",
-      body: {
-        member_uuid: targetMemberUUID,
-        title: "Plugin 测试通知",
-        content: "这是一条来自 framework 功能测试页的能力通知",
-        type: "info",
-        category: "system",
-        is_important: false,
-        metadata: { source: "plugin-framework-lab" },
-      },
-    }, { preferredProtocol: "rest", notifyOnSuccess: false })
-    showToast({ title: "发送成功", message: "能力通知已提交", color: "success", duration: 3500 })
+    const memberTopic = `plugin.notify.member.${targetMemberUUID}`
+    capabilityNotifyMemberUUID.value = targetMemberUUID
+    notificationTarget.value = "插件本地通知"
+    capabilityNotifyTopic.value = memberTopic
+    localProbe.connect()
+    localProbe.subscribeTopic(memberTopic)
+    gatewayProbe.connect()
+    gatewayProbe.subscribeTopic("_topic.system.notification")
+    await waitFor(() => Boolean(localProbe.wsDiag.value.connectedOK || gatewayProbe.wsDiag.value.connectedOK), 3000)
+    const traceID = makeTraceID()
+    const resp: any = await apiClient.post("/admin/notifications/test", {
+      topic: memberTopic,
+      member_uuid: targetMemberUUID,
+      title: "Plugin 测试通知",
+      message: "这是一条来自 framework runtime 统一入口的 member 通知",
+      trace_id: traceID,
+    })
+    const data = resp?.data || resp || {}
+    const flowMode = String(data.flow_mode || "").trim()
+    const resolvedTopic = String(data.topic || memberTopic).trim()
+    notificationFlowMode.value = flowMode
+    notificationPowerXProxy.value = String(data.powerx_proxy || "").trim()
+    notificationIAMMode.value = String(data.iam_mode || "").trim()
+    notificationHostPublishOK.value = data.host_publish_ok === undefined ? "" : String(Boolean(data.host_publish_ok))
+    const target = flowMode.startsWith("host") ? "PowerX 底座通知" : "插件本地通知"
+    notificationTarget.value = target
+    capabilityNotifyTopic.value = target === "PowerX 底座通知" ? "_topic.system.notification" : resolvedTopic
+    showToast({ title: "发送成功", message: `${target}已提交：${resolvedTopic}`, color: "success", duration: 4500 })
   } catch (error: any) {
     showToast({ title: "发送失败", message: error?.message || "能力调用失败", color: "error", duration: 5000 })
   } finally {

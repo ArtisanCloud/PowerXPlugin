@@ -47,7 +47,7 @@ func NewSTSService(cfg *config.Config, audit *AuditService, pluginID, policyVers
 	}
 	audience := strings.TrimSpace(ctxCfg.Audience)
 	if audience == "" {
-		audience = "powerx:plugin"
+		audience = "powerx:api"
 	}
 	secret := strings.TrimSpace(ctxCfg.HMACSecret)
 	if secret == "" {
@@ -88,15 +88,14 @@ func (s *STSService) Mint(ctx context.Context, tc authx.TenantContext) (*STSToke
 	}
 	claims := authx.PowerXClaims{
 		TenantUUID:    authx.TenantClaim(tenantUUID),
-		UserID:        tc.UserID,
-		IsRoot:        tc.IsRoot,
-		Roles:         tc.Roles,
-		Permissions:   tc.Permissions,
+		TenantID:      tc.TenantID,
 		PolicyVersion: policyVersion,
 		PluginID:      s.pluginID,
+		Scope:         "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
 			Audience:  jwt.ClaimStrings{s.audience},
+			Subject:   "client:" + s.pluginID,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expires),
 		},
@@ -116,9 +115,9 @@ func (s *STSService) Mint(ctx context.Context, tc authx.TenantContext) (*STSToke
 	}
 	if s.audit != nil {
 		var actor *uint64
-		if tc.UserID > 0 {
-			uid := uint64(tc.UserID)
-			actor = &uid
+		if tc.MemberID > 0 {
+			mid := uint64(tc.MemberID)
+			actor = &mid
 		}
 		_ = s.audit.Record(ctx, AuditEntry{
 			TenantUUID:    tenantUUID,

@@ -8,7 +8,9 @@ import { useAuth } from "~/composables/useAuth";
 export interface UserContextData {
   is_root: boolean;
   current_tenant_uuid: string;
+  current_tenant_id?: number | null;
   current_member_id?: number | null;
+  current_member_uuid?: string | null;
   user: ContextUser;
   members: ContextMember[];
   roles?: string[];
@@ -26,7 +28,10 @@ export interface UserContextCapabilities {
 
 export interface ContextUser {
   id: number;
+  uuid?: string | null;
+  user_uuid?: string | null;
   email: string;
+  username?: string;
   phone: string;
   display_name: string;
   avatar_url: string;
@@ -35,8 +40,10 @@ export interface ContextUser {
 
 export interface ContextMember {
   tenant_uuid: string;
+  tenant_id?: number | null;
   tenant_name: string;
   member_id: number;
+  member_uuid?: string | null;
   is_admin: boolean;
 }
 

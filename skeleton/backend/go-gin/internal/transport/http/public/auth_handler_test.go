@@ -104,10 +104,12 @@ func TestAuthHandler_MeContextSuccess(t *testing.T) {
 	ctxResp := &authproxy.MeContext{
 		IsRoot:            true,
 		CurrentTenantUUID: "tenant-42",
+		CurrentMemberUUID: "member-uuid-7",
 		Members: []authproxy.MeMemberBrief{{
 			TenantUUID: "tenant-42",
 			TenantName: "ACME",
 			MemberID:   7,
+			MemberUUID: "member-uuid-7",
 			IsAdmin:    true,
 		}},
 	}
@@ -132,6 +134,7 @@ func TestAuthHandler_MeContextSuccess(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &payload))
 	data := payload.Data.(map[string]any)
 	require.Equal(t, "tenant-42", data["current_tenant_uuid"])
+	require.Equal(t, "member-uuid-7", data["current_member_uuid"])
 }
 
 type stubProxy struct {
@@ -209,9 +212,12 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 				TenantUuid: "9",
 				TenantKey:  "00000000-0000-0000-0000-000000000001",
 				TenantName: "Local",
+				TenantID:   9,
 				UserID:     5,
+				UserUUID:   "user-uuid-5",
 				Username:   "admin",
 				MemberID:   12,
+				MemberUUID: "member-uuid-12",
 				IsRoot:     true,
 				Roles:      []string{"system.admin"},
 			}, nil
@@ -233,13 +239,21 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 	data := payload.Data.(map[string]any)
 	require.True(t, data["is_root"].(bool))
 	require.Equal(t, "tenant-local", data["current_tenant_uuid"])
+	require.EqualValues(t, 9, data["current_tenant_id"])
 	require.EqualValues(t, 12, data["current_member_id"])
+	require.Equal(t, "member-uuid-12", data["current_member_uuid"])
+	user := data["user"].(map[string]any)
+	require.EqualValues(t, 5, user["id"])
+	require.Equal(t, "user-uuid-5", user["uuid"])
+	require.Equal(t, "user-uuid-5", user["user_uuid"])
 	tenant := data["tenant"].(map[string]any)
 	require.Equal(t, "tenant-local", tenant["uuid"])
 	members := data["members"].([]any)
 	require.Len(t, members, 1)
 	member := members[0].(map[string]any)
 	require.Equal(t, "tenant-local", member["tenant_uuid"])
+	require.EqualValues(t, 9, member["tenant_id"])
+	require.Equal(t, "member-uuid-12", member["member_uuid"])
 	require.Equal(t, true, member["is_admin"])
 }
 

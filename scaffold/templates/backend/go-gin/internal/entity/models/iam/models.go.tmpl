@@ -43,6 +43,7 @@ func (t *Tenant) BeforeCreate(tx *gorm.DB) error {
 
 type User struct {
 	ID           uint64            `gorm:"primaryKey;autoIncrement" json:"id"`
+	UUID         string            `gorm:"type:uuid;uniqueIndex:idx_iam_users_uuid" json:"uuid"`
 	Email        string            `gorm:"size:255;uniqueIndex:idx_iam_users_email" json:"email"`
 	Phone        string            `gorm:"size:32;index" json:"phone"`
 	DisplayName  string            `gorm:"size:128" json:"display_name"`
@@ -58,8 +59,16 @@ type User struct {
 
 func (User) TableName() string { return models.S(models.TableIAMUsers) }
 
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	if strings.TrimSpace(u.UUID) == "" {
+		u.UUID = uuid.NewString()
+	}
+	return nil
+}
+
 type Member struct {
 	models.BaseModel
+	UUID         string            `gorm:"type:uuid;uniqueIndex:idx_iam_members_uuid" json:"uuid"`
 	UserID       uint64            `gorm:"column:user_id;not null;index:idx_iam_users_account" json:"user_id"`
 	Username     string            `gorm:"size:64;not null;index:idx_iam_users_username" json:"username"`
 	DisplayName  string            `gorm:"size:128" json:"display_name"`
@@ -71,6 +80,13 @@ type Member struct {
 }
 
 func (Member) TableName() string { return models.S(models.TableIAMMembers) }
+
+func (m *Member) BeforeCreate(tx *gorm.DB) error {
+	if strings.TrimSpace(m.UUID) == "" {
+		m.UUID = uuid.NewString()
+	}
+	return nil
+}
 
 type Role struct {
 	models.BaseModel

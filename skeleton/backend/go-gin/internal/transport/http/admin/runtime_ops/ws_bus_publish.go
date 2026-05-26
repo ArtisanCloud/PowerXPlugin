@@ -15,6 +15,7 @@ type wsBusPublishRequest struct {
 	Topic      string `json:"topic"`
 	Payload    any    `json:"payload"`
 	TenantUUID string `json:"tenant_uuid"`
+	MemberUUID string `json:"member_uuid"`
 	TraceID    string `json:"trace_id"`
 }
 
@@ -61,6 +62,7 @@ func WSBusPublishHandler(deps *app.Deps) gin.HandlerFunc {
 		}
 		result := publisher.Publish(context.Background(), req.Topic, req.Payload, fwwsbus.PublishOptions{
 			TenantUUID:  tenantUUID,
+			MemberUUID:  strings.TrimSpace(req.MemberUUID),
 			TraceID:     traceID,
 			BearerToken: outboundBearer,
 		})

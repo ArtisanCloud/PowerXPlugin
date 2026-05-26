@@ -251,6 +251,9 @@ func ensureIAMConstraints(ctx context.Context, db *gorm.DB) error {
 	if db == nil {
 		return nil
 	}
+	if err := ensureIAMIdentityUUIDs(ctx, db); err != nil {
+		return err
+	}
 	departments := models.S(models.TableIAMDepartments)
 	users := models.S(models.TableIAMMembers)
 	audits := models.S(models.TableIAMAuditLogs)
@@ -297,6 +300,89 @@ func ensureIAMConstraints(ctx context.Context, db *gorm.DB) error {
 		return err
 	}
 	return backfillRolePermissionTenant(ctx, db)
+}
+
+func ensureIAMIdentityUUIDs(ctx context.Context, db *gorm.DB) error {
+	userTable := models.S(models.TableIAMUsers)
+	memberTable := models.S(models.TableIAMMembers)
+	if err := ensureUUIDColumn(ctx, db, userTable); err != nil {
+		return err
+	}
+	if err := ensureUUIDColumn(ctx, db, memberTable); err != nil {
+		return err
+	}
+	if err := backfillIdentityUUID(ctx, db, userTable, "iam_users"); err != nil {
+		return err
+	}
+	if err := backfillIdentityUUID(ctx, db, memberTable, "iam_members"); err != nil {
+		return err
+	}
+	statements := []string{
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_uuid ON %s (uuid) WHERE uuid IS NOT NULL`, userTable),
+		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_members_uuid ON %s (uuid) WHERE uuid IS NOT NULL`, memberTable),
+	}
+	for _, stmt := range statements {
+		if err := execIgnoreExists(ctx, db, stmt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensureUUIDColumn(ctx context.Context, db *gorm.DB, tableName string) error {
+	if db.Migrator().HasColumn(tableName, "uuid") {
+		return nil
+	}
+	columnType := "uuid"
+	if isSQLite(db) {
+		columnType = "TEXT"
+	}
+	stmt := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN uuid %s`, tableName, columnType)
+	if strings.EqualFold(db.Dialector.Name(), "postgres") {
+		stmt = fmt.Sprintf(`ALTER TABLE %s ADD COLUMN IF NOT EXISTS uuid %s`, tableName, columnType)
+	}
+	if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
+		lower := strings.ToLower(err.Error())
+		if strings.Contains(lower, "duplicate column") || strings.Contains(lower, "already exists") {
+			return nil
+		}
+		return fmt.Errorf("ensure uuid column on %s failed: %w", tableName, err)
+	}
+	return nil
+}
+
+func backfillIdentityUUID(ctx context.Context, db *gorm.DB, tableName, seed string) error {
+	if isSQLite(db) {
+		stmt := fmt.Sprintf(`
+UPDATE %s
+SET uuid =
+  substr(lower(hex(randomblob(16))), 1, 8) || '-' ||
+  substr(lower(hex(randomblob(16))), 1, 4) || '-' ||
+  substr(lower(hex(randomblob(16))), 1, 4) || '-' ||
+  substr(lower(hex(randomblob(16))), 1, 4) || '-' ||
+  substr(lower(hex(randomblob(16))), 1, 12)
+WHERE uuid IS NULL OR trim(uuid) = ''
+`, tableName)
+		if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
+			return fmt.Errorf("backfill uuid on %s failed: %w", tableName, err)
+		}
+		return nil
+	}
+	stmt := fmt.Sprintf(`
+UPDATE %s
+SET uuid = (
+  substr(md5('%s:' || id::text), 1, 8) || '-' ||
+  substr(md5('%s:' || id::text), 9, 4) || '-' ||
+  substr(md5('%s:' || id::text), 13, 4) || '-' ||
+  substr(md5('%s:' || id::text), 17, 4) || '-' ||
+  substr(md5('%s:' || id::text), 21, 12)
+)::uuid
+WHERE uuid IS NULL OR btrim(uuid::text) = ''
+`, tableName, seed, seed, seed, seed, seed)
+	if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
+		return fmt.Errorf("backfill uuid on %s failed: %w", tableName, err)
+	}
+	return nil
 }
 
 func ensureChannelSyncTaskPayloadJSONB(ctx context.Context, db *gorm.DB) error {

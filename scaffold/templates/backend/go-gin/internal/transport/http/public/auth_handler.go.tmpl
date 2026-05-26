@@ -346,7 +346,9 @@ func mapDelegatedMeContext(ctx *authproxy.MeContext) gin.H {
 	return gin.H{
 		"is_root":             ctx.IsRoot,
 		"current_tenant_uuid": currentTenantUUID,
+		"current_tenant_id":   ctx.CurrentTenantID,
 		"current_member_id":   ctx.CurrentMemberID,
+		"current_member_uuid": strings.TrimSpace(ctx.CurrentMemberUUID),
 		"user":                ctx.User,
 		"members":             ctx.Members,
 		"roles":               ctx.Roles,
@@ -472,9 +474,13 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 		"tenant":              tenant,
 		"is_root":             uc.IsRoot,
 		"current_tenant_uuid": tenantUUID,
+		"current_tenant_id":   uc.TenantID,
 		"current_member_id":   uc.MemberID,
+		"current_member_uuid": strings.TrimSpace(uc.MemberUUID),
 		"user": gin.H{
 			"id":           uc.UserID,
+			"uuid":         strings.TrimSpace(uc.UserUUID),
+			"user_uuid":    strings.TrimSpace(uc.UserUUID),
 			"username":     uc.Username,
 			"email":        uc.Email,
 			"display_name": uc.DisplayName,
@@ -495,8 +501,10 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 	if tenantUUID != "" {
 		members = append(members, gin.H{
 			"tenant_uuid": tenantUUID,
+			"tenant_id":   uc.TenantID,
 			"tenant_name": uc.TenantName,
 			"member_id":   uc.MemberID,
+			"member_uuid": strings.TrimSpace(uc.MemberUUID),
 			"is_admin":    uc.IsRoot || hasAdminRole(uc.Roles),
 		})
 	}

@@ -238,13 +238,17 @@ const schedulerRequestOptions = computed(() => ({
 
 const toast = reactive({ visible: false, title: "", message: "", color: "primary" as ToastColor, duration: 3000 })
 
-const gatewayProbe = useNotificationProbe("gateway", "_topic.system.notification")
-const localProbe = useNotificationProbe("local", "plugin.notify.tenant.00000000-0000-0000-0000-000000000001")
-const schedulerProbe = useNotificationProbe("scheduler", "plugin.notify.tenant.00000000-0000-0000-0000-000000000001")
 const apiClient = useApiClient()
 const schedulerApi = useSchedulerApi()
 const userStore = useUserStore()
 const auth = useAuth()
+const resolvedTenantNotifyTopic = computed(() => {
+  const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim()
+  return tenantUUID ? `plugin.notify.tenant.${tenantUUID}` : ""
+})
+const gatewayProbe = useNotificationProbe("gateway", "_topic.system.notification")
+const localProbe = useNotificationProbe("local", "")
+const schedulerProbe = useNotificationProbe("scheduler", "")
 const gatewayLastEventTopic = computed(() => String(gatewayProbe.lastEventTopic.value || ""))
 const gatewayLastEventAt = computed(() => String(gatewayProbe.lastEventAt.value || ""))
 const gatewayWsDiag = computed(() => gatewayProbe.wsDiag.value)
@@ -259,7 +263,7 @@ const memberNotifyTopic = computed(() => {
   const memberUUID = ensureMemberUUID()
   return memberUUID ? `plugin.notify.member.${memberUUID}` : ""
 })
-const schedulerNotifyTopic = computed(() => `plugin.notify.tenant.${schedulerTenantUUID.value}`)
+const schedulerNotifyTopic = computed(() => schedulerTenantUUID.value ? `plugin.notify.tenant.${schedulerTenantUUID.value}` : resolvedTenantNotifyTopic.value)
 const schedulerLastNotifyAt = computed(() => String(schedulerProbe.lastEventAt.value || ""))
 const schedulerLastNotifyEvent = computed(() => schedulerProbe.events.value[0] || null)
 const schedulerLastNotifyTitle = computed(() => String(schedulerLastNotifyEvent.value?.title || ""))

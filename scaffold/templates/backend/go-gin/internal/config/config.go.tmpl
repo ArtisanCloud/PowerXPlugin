@@ -513,7 +513,7 @@ func getDefaultConfig() *Config {
 	return &Config{
 		DevMode: true,
 		Server: &ServerConfig{
-			BindAddr: ":8078",
+			BindAddr: ":{{ .BackendPort }}",
 		},
 		Integration: &IntegrationConfig{
 			Idempotency: IntegrationIdempotencyConfig{
@@ -646,7 +646,7 @@ func getDefaultConfig() *Config {
 		},
 		GRPCServer: &GRPCServer{
 			Enable:         true,
-			Addr: ":{{ .BackendPort }}",
+			Addr:           ":9101",
 			Port:           9101,
 			PortMaxRetries: 10,
 			UseTLS:         false,

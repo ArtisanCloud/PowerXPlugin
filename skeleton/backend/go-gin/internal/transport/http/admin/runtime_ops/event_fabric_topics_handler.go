@@ -237,7 +237,6 @@ func resolveGatewayAuthHeader(deps *app.Deps, outboundBearer string) (string, er
 	}
 	authScheme := strings.ToLower(strings.TrimSpace(deps.Config.Gateway.AuthScheme))
 	apiKey := strings.TrimSpace(deps.Config.Gateway.APIKey)
-	toolToken := strings.TrimSpace(deps.Config.Gateway.ToolToken)
 	switch authScheme {
 	case "apikey", "api_key", "api-key":
 		if apiKey == "" {
@@ -248,10 +247,17 @@ func resolveGatewayAuthHeader(deps *app.Deps, outboundBearer string) (string, er
 		if outboundBearer != "" {
 			return "Bearer " + outboundBearer, nil
 		}
-		if toolToken == "" {
-			return "", fmt.Errorf("PX_PLUGIN_TOOL_TOKEN is required for bearer mode")
+		if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" && deps.IAMMode.String() == "delegated" {
+			token, err := newPowerXSTSTokenProvider(deps)(context.Background())
+			if err != nil {
+				return "", fmt.Errorf("STS token exchange failed: %w", err)
+			}
+			if token == "" {
+				return "", fmt.Errorf("STS token is empty")
+			}
+			return "Bearer " + token, nil
 		}
-		return "Bearer " + toolToken, nil
+		return "", fmt.Errorf("STS token provider is required for bearer mode")
 	default:
 		return "", fmt.Errorf("unsupported gateway auth scheme: %s", authScheme)
 	}

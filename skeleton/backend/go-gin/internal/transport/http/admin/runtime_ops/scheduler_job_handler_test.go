@@ -240,14 +240,13 @@ func TestSchedulerJobHandlerLocalProxyUsesConfiguredAPIKey(t *testing.T) {
 
 	handler := NewSchedulerJobHandler(&app.Deps{
 		EventEmitter: eventbridge.NewLocalEmitter(8),
-		IAMMode:      iamservice.IAMModeDelegated,
+		IAMMode:      iamservice.IAMModeLocal,
 		Config: &config.Config{
 			Gateway: &config.GatewayConfig{
 				BaseURL:    server.URL,
 				APIPrefix:  "/api/v1",
 				AuthScheme: "apikey",
 				APIKey:     "gateway-key",
-				ToolToken:  "sts-token-should-not-be-used",
 			},
 		},
 	})

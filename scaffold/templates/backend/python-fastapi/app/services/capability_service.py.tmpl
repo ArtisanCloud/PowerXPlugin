@@ -297,8 +297,8 @@ class CapabilityService:
         if raw == "bearer":
             return "bearer"
         api_key = self._read_first_nonempty_env("PX_GATEWAY_API_KEY", "PX_PLUGIN_API_KEY")
-        token = self._read_first_nonempty_env("PX_PLUGIN_TOOL_TOKEN", "PX_TOOL_TOKEN")
-        if api_key and not token:
+        sts_client = self._read_first_nonempty_env("POWERX_STS_CLIENT_ID", "PX_STS_CLIENT_ID")
+        if api_key and not sts_client:
             return "apikey"
         return "bearer"
 
@@ -308,7 +308,7 @@ class CapabilityService:
         token = str(bearer_token or "").strip()
         if token:
             return token
-        return self._read_first_nonempty_env("PX_PLUGIN_TOOL_TOKEN", "PX_TOOL_TOKEN")
+        raise RuntimeError("bearer gateway mode requires STS token provider; static bearer credentials are not supported")
 
     def _resolve_gateway_tenant(self, auth_scheme: str, credential: str, tenant_uuid: str | None = None) -> str:
         if auth_scheme != "bearer":

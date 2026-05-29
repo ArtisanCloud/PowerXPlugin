@@ -351,15 +351,15 @@ class IntegrationService:
         if raw == "bearer":
             return "bearer"
         api_key = _first_nonempty(os.getenv("PX_GATEWAY_API_KEY", ""), os.getenv("PX_PLUGIN_API_KEY", ""))
-        tool_token = _first_nonempty(os.getenv("PX_PLUGIN_TOOL_TOKEN", ""), os.getenv("PX_TOOL_TOKEN", ""))
-        if api_key and not tool_token:
+        sts_client = _first_nonempty(os.getenv("POWERX_STS_CLIENT_ID", ""), os.getenv("PX_STS_CLIENT_ID", ""))
+        if api_key and not sts_client:
             return "apikey"
         return "bearer"
 
     def _resolve_gateway_credential(self, auth_scheme: str) -> str:
         if auth_scheme == "apikey":
             return _first_nonempty(os.getenv("PX_GATEWAY_API_KEY", ""), os.getenv("PX_PLUGIN_API_KEY", ""))
-        return _first_nonempty(os.getenv("PX_PLUGIN_TOOL_TOKEN", ""), os.getenv("PX_TOOL_TOKEN", ""))
+        raise RuntimeError("bearer gateway mode requires STS token provider; static bearer credentials are not supported")
 
     def _build_auth_header(self, auth_scheme: str, credential: str) -> str:
         if auth_scheme == "apikey":

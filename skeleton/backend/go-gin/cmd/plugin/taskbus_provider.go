@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
@@ -32,12 +34,12 @@ type taskBusRuntime struct {
 	StartConsumer func(ctx context.Context)
 }
 
-func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry) taskBusRuntime {
+func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry, pxc *client.PowerXServiceClient) taskBusRuntime {
 	mode := resolveTaskBusProviderMode(cfg)
 	switch mode {
 	case "host":
 		return taskBusRuntime{
-			Provider: newHostTaskBusProvider(cfg),
+			Provider: newHostTaskBusProvider(cfg, pxc),
 		}
 	case "redis":
 		return taskBusRuntime{
@@ -55,7 +57,7 @@ func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlo
 }
 
 func resolveTaskBusProvider(cfg *config.Config, log *pxlog.Entry) fweventbridge.TaskBusProvider {
-	return resolveTaskBusRuntime(cfg, nil, log).Provider
+	return resolveTaskBusRuntime(cfg, nil, log, nil).Provider
 }
 
 func resolveTaskBusProviderMode(cfg *config.Config) string {
@@ -86,7 +88,7 @@ func validateTaskBusProviderConflict(cfg *config.Config, powerXProxy string) err
 	return nil
 }
 
-func newHostTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {
+func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient) fweventbridge.TaskBusProvider {
 	gateway := &config.GatewayConfig{}
 	eventCfg := &config.EventBridgeConfig{}
 	if cfg != nil {
@@ -97,16 +99,28 @@ func newHostTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {
 			eventCfg = cfg.EventBridge
 		}
 	}
-	return fwtaskbus.NewHostProvider(fwtaskbus.HostProviderConfig{
+	hostCfg := fwtaskbus.HostProviderConfig{
 		BaseURL:        strings.TrimSpace(gateway.BaseURL),
 		APIPrefix:      strings.TrimSpace(gateway.APIPrefix),
-		Token:          strings.TrimSpace(gateway.ToolToken),
-		TenantUUID:     strings.TrimSpace(gateway.TenantUUID),
 		UserAgent:      strings.TrimSpace(gateway.UserAgent),
 		Timeout:        gateway.Timeout,
 		SourcePlugin:   strings.TrimSpace(eventCfg.SourcePlugin),
 		PayloadVersion: strings.TrimSpace(eventCfg.PayloadVersion),
-	})
+	}
+	if cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), "delegated") {
+		hostCfg.TokenProvider = func(ctx context.Context) (string, error) {
+			if pxc == nil {
+				return "", fmt.Errorf("powerx STS client is not configured")
+			}
+			token := strings.TrimSpace(pxc.GetToken())
+			if token != "" && token != "sts" {
+				return token, nil
+			}
+			token, _, err := pxc.ExchangeSTS(ctx)
+			return strings.TrimSpace(token), err
+		}
+	}
+	return fwtaskbus.NewHostProvider(hostCfg)
 }
 
 func newRedisTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {

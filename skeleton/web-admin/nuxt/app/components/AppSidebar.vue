@@ -86,14 +86,15 @@
               {{ t('navigation.templatesCrud') }}
             </UButton>
             <UButton
-              to="/templates/framework-lab"
+              v-if="isRoot"
+              to="/admin/templates/framework-lab"
               variant="ghost"
               color="neutral"
               size="sm"
               class="w-full justify-start text-sm"
               :class="{
                 'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-                  isExactActive('/templates/framework-lab'),
+                  isExactActive('/admin/templates/framework-lab'),
               }"
             >
               <UIcon name="i-heroicons-beaker" class="w-3 h-3 mr-2" />

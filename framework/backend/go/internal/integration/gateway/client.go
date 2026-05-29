@@ -35,6 +35,7 @@ type Config struct {
 	APIPrefix          string
 	TenantUUID         string
 	BearerToken        string
+	TokenProvider      TokenProvider
 	APIKey             string
 	AuthScheme         string
 	HTTPClient         *http.Client
@@ -45,6 +46,9 @@ type Config struct {
 	ContractVersion    string
 	ContractDigestPath string
 }
+
+// TokenProvider returns a short-lived bearer token for outbound Gateway calls.
+type TokenProvider func(ctx context.Context) (string, error)
 
 // InvokeRequest 描述一次能力调用请求体。
 type InvokeRequest struct {
@@ -111,6 +115,7 @@ type Client struct {
 	tenantUUID     string
 	authScheme     string
 	credential     string
+	tokenProvider  TokenProvider
 	userAgent      string
 	requestTimeout time.Duration
 
@@ -136,7 +141,7 @@ func NewClient(cfg Config) (*Client, error) {
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
 	}
-	authScheme, credential, err := resolveAuth(cfg.AuthScheme, cfg.BearerToken, cfg.APIKey)
+	authScheme, credential, err := resolveAuth(cfg.AuthScheme, cfg.BearerToken, cfg.APIKey, cfg.TokenProvider != nil)
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +164,7 @@ func NewClient(cfg Config) (*Client, error) {
 		tenantUUID:      tenant,
 		authScheme:      authScheme,
 		credential:      credential,
+		tokenProvider:   cfg.TokenProvider,
 		userAgent:       ua,
 		requestTimeout:  timeout,
 		httpClient:      httpClient,
@@ -212,7 +218,11 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
 	if !req.DisableAuth {
-		httpReq.Header.Set("Authorization", buildAuthHeader(c.authScheme, c.credential))
+		authHeader, err := c.authHeader(ctxReq)
+		if err != nil {
+			return nil, err
+		}
+		httpReq.Header.Set("Authorization", authHeader)
 	}
 	httpReq.Header.Set("X-Request-ID", requestID)
 	if c.userAgent != "" {
@@ -301,12 +311,16 @@ func (c *Client) InvokeGRPC(ctx context.Context, req InvokeRequest) (*Response, 
 	mdValues := map[string]string{
 		"x-request-id": requestID,
 	}
-	if !req.DisableAuth {
-		mdValues["authorization"] = buildAuthHeader(c.authScheme, c.credential)
-	}
-	md := metadata.New(mdValues)
 	ctxCall, cancel := context.WithTimeout(ctx, c.requestTimeout)
 	defer cancel()
+	if !req.DisableAuth {
+		authHeader, err := c.authHeader(ctxCall)
+		if err != nil {
+			return nil, err
+		}
+		mdValues["authorization"] = authHeader
+	}
+	md := metadata.New(mdValues)
 	ctxCall = metadata.NewOutgoingContext(ctxCall, md)
 
 	resp, err := client.InvokeCapability(ctxCall, grpcReq)
@@ -425,15 +439,15 @@ func parseEnvelope(body []byte) restEnvelope {
 	return env
 }
 
-func resolveAuth(rawScheme, toolToken, apiKey string) (scheme string, credential string, err error) {
+func resolveAuth(rawScheme, toolToken, apiKey string, hasTokenProvider bool) (scheme string, credential string, err error) {
 	scheme = normalizeAuthScheme(rawScheme)
 	bearer := strings.TrimSpace(toolToken)
 	key := strings.TrimSpace(apiKey)
 
 	switch scheme {
 	case "bearer":
-		if bearer == "" {
-			return "", "", errors.New("gateway: bearer credential is required when auth_scheme=bearer")
+		if bearer == "" && !hasTokenProvider {
+			return "", "", errors.New("gateway: STS token provider is required when auth_scheme=bearer")
 		}
 		return scheme, bearer, nil
 	case "apikey":
@@ -444,6 +458,30 @@ func resolveAuth(rawScheme, toolToken, apiKey string) (scheme string, credential
 	default:
 		return "", "", errors.New("gateway: auth_scheme must be bearer or apikey")
 	}
+}
+
+func (c *Client) authHeader(ctx context.Context) (string, error) {
+	if c == nil {
+		return "", errors.New("gateway: client is nil")
+	}
+	if c.authScheme == "apikey" {
+		return buildAuthHeader(c.authScheme, c.credential), nil
+	}
+	if c.tokenProvider != nil {
+		token, err := c.tokenProvider(ctx)
+		if err != nil {
+			return "", fmt.Errorf("gateway: STS token exchange failed: %w", err)
+		}
+		token = strings.TrimSpace(token)
+		if token == "" {
+			return "", errors.New("gateway: STS token is empty")
+		}
+		return buildAuthHeader("bearer", token), nil
+	}
+	if token := strings.TrimSpace(c.credential); token != "" {
+		return buildAuthHeader("bearer", token), nil
+	}
+	return "", errors.New("gateway: STS token provider is required when auth_scheme=bearer")
 }
 
 func normalizeAuthScheme(raw string) string {

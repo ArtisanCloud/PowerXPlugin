@@ -1,6 +1,8 @@
 package runtime_ops
 
 import (
+	"context"
+	"errors"
 	"os"
 	"strings"
 
@@ -15,8 +17,8 @@ import (
 )
 
 // resolveGatewayBearerToken 统一 ws-bus 出站 token 选择规则：
-// - Proxy/宿主模式：不透传入站 Bearer，统一交由 HostClient 使用 PX_PLUGIN_TOOL_TOKEN / API Key
-// - Local/Standalone 模式：默认不透传；仅在 delegated 且非 proxy 时透传入站 Bearer
+// - proxy 模式：不透传入站 Bearer，host/delegated 由 HostClient TokenProvider 交换 STS；
+// - local/standalone 模式：默认不透传；仅在 delegated 且非 proxy 时透传入站 Bearer。
 func resolveGatewayBearerToken(c *gin.Context, deps *app.Deps) string {
 	if c == nil || deps == nil {
 		return ""
@@ -78,16 +80,14 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 		}
 	}
 
-	pxToolToken := ""
 	apiKey := ""
 	authScheme := ""
 	if deps.Config.Gateway != nil {
-		pxToolToken = strings.TrimSpace(deps.Config.Gateway.ToolToken)
 		apiKey = strings.TrimSpace(deps.Config.Gateway.APIKey)
 		authScheme = strings.TrimSpace(deps.Config.Gateway.AuthScheme)
 	}
 
-	outboundSource := "PX_PLUGIN_TOOL_TOKEN"
+	outboundSource := "sts_token_provider"
 	if strings.EqualFold(authScheme, "apikey") || strings.EqualFold(authScheme, "api_key") || strings.EqualFold(authScheme, "api-key") {
 		outboundSource = "PX_GATEWAY_API_KEY"
 	}
@@ -113,8 +113,6 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 		"inbound_bearer_present":        inboundBearerPresent,
 		"inbound_bearer_prefix":         inboundBearerPrefix,
 		"outbound_bearer_prefix":        tokenPrefix(outboundBearer),
-		"px_tool_token_present":         pxToolToken != "",
-		"px_tool_token_prefix":          tokenPrefix(pxToolToken),
 		"px_gateway_api_key_set":        apiKey != "",
 		"resolved_gateway_tenant":       strings.TrimSpace(tenantUUID),
 	}
@@ -133,7 +131,7 @@ func tokenPrefix(token string) string {
 }
 
 // resolveWSBusHostClientConfig 统一 WSBus HostClient 模式与凭证决策：
-// 1) host(POWERX_PROXY=1 + IAM delegated): 仅 bearer(PX_PLUGIN_TOOL_TOKEN)；
+// 1) host(POWERX_PROXY=1 + IAM delegated): bearer + STS TokenProvider；
 // 2) local+proxy(POWERX_PROXY=1 + IAM local): 按 PX_GATEWAY_AUTH_SCHEME 选择 bearer/apikey；
 // 3) local(POWERX_PROXY!=1): 不走 host client。
 func resolveWSBusHostClientConfig(deps *app.Deps) (cfg fwwsbus.HostClientConfig, useHost bool) {
@@ -150,15 +148,27 @@ func resolveWSBusHostClientConfig(deps *app.Deps) (cfg fwwsbus.HostClientConfig,
 	}
 
 	if deps.IAMMode == iamservice.IAMModeDelegated {
-		// 真宿主模式：强制 bearer + tool token
 		cfg.AuthScheme = "bearer"
-		cfg.Token = strings.TrimSpace(gw.ToolToken)
+		cfg.TokenProvider = newPowerXSTSTokenProvider(deps)
 		return cfg, true
 	}
 
 	// local+proxy 模式：按网关配置分流
 	cfg.AuthScheme = strings.ToLower(strings.TrimSpace(gw.AuthScheme))
-	cfg.Token = strings.TrimSpace(gw.ToolToken)
 	cfg.APIKey = strings.TrimSpace(gw.APIKey)
 	return cfg, true
+}
+
+func newPowerXSTSTokenProvider(deps *app.Deps) fwwsbus.TokenProvider {
+	return func(ctx context.Context) (string, error) {
+		if deps == nil || deps.PowerXClient == nil {
+			return "", errors.New("powerx STS client is not configured")
+		}
+		token := strings.TrimSpace(deps.PowerXClient.GetToken())
+		if token != "" && token != "sts" {
+			return token, nil
+		}
+		token, _, err := deps.PowerXClient.ExchangeSTS(ctx)
+		return strings.TrimSpace(token), err
+	}
 }

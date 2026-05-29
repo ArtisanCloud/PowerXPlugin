@@ -53,7 +53,8 @@ func TestInvokeUsesRealTransport(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
 			BaseURL:    "https://gateway.dev.powerx",
-			ToolToken:  "token",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 			TenantUUID: "11111111-1111-1111-1111-111111111111",
 		},
 	}
@@ -101,7 +102,7 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 			http.Error(w, "missing source", http.StatusBadRequest)
 			return
 		}
-		if r.Header.Get("Authorization") != "Bearer token" {
+		if r.Header.Get("Authorization") != "ApiKey token" {
 			http.Error(w, "missing token", http.StatusUnauthorized)
 			return
 		}
@@ -141,7 +142,8 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
 			BaseURL:    server.URL,
-			ToolToken:  "token",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 			TenantUUID: "00000000-0000-0000-0000-000000000001",
 			Timeout:    2 * time.Second,
 		},
@@ -175,7 +177,8 @@ func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
 			BaseURL:    server.URL,
-			ToolToken:  "token",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 			TenantUUID: "00000000-0000-0000-0000-000000000001",
 		},
 	}
@@ -188,8 +191,9 @@ func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 func TestInvokePolicyRequiresRequestAuthorization(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
-			BaseURL:   "https://gateway.dev.powerx",
-			ToolToken: "token",
+			BaseURL:    "https://gateway.dev.powerx",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 		},
 	}
 	client := NewClient(cfg, nil)
@@ -210,8 +214,9 @@ func TestInvokePolicyRequiresRequestAuthorization(t *testing.T) {
 func TestInvokePolicyTenantScopedRequiresTenantClaim(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
-			BaseURL:   "https://gateway.dev.powerx",
-			ToolToken: "token",
+			BaseURL:    "https://gateway.dev.powerx",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 		},
 	}
 	client := NewClient(cfg, nil)
@@ -236,8 +241,9 @@ func TestInvokePolicyTenantScopedRequiresTenantClaim(t *testing.T) {
 func TestInvokePolicyAllowsAnonymousAndDisablesDefaultAuth(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
-			BaseURL:   "https://gateway.dev.powerx",
-			ToolToken: "token",
+			BaseURL:    "https://gateway.dev.powerx",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 		},
 	}
 	client := NewClient(cfg, nil)
@@ -257,8 +263,9 @@ func TestInvokePolicyAllowsAnonymousAndDisablesDefaultAuth(t *testing.T) {
 func TestInvokePolicyTenantScopedUsesTokenTid(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
-			BaseURL:   "https://gateway.dev.powerx",
-			ToolToken: "token",
+			BaseURL:    "https://gateway.dev.powerx",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 		},
 	}
 	client := NewClient(cfg, nil)
@@ -286,8 +293,9 @@ func TestInvokePolicyTenantScopedUsesTokenTid(t *testing.T) {
 func TestInvokePolicyTenantScopedRejectsZeroTenantToken(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
-			BaseURL:   "https://gateway.dev.powerx",
-			ToolToken: "token",
+			BaseURL:    "https://gateway.dev.powerx",
+			AuthScheme: "apikey",
+			APIKey:     "token",
 		},
 	}
 	client := NewClient(cfg, nil)

@@ -3,7 +3,7 @@ import { useUserStore } from "~/stores/user";
 
 const PUBLIC_ROUTE_PREFIXES = ["/users", "/tests"];
 const ROOT_ONLY_ROUTE_PREFIXES = [
-  "/templates",
+  "/admin/templates/framework-lab",
   "/capabilities",
   "/powerx/capability-lab",
 ];

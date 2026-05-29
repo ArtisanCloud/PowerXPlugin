@@ -289,7 +289,6 @@ type GatewayConfig struct {
 	BaseURL      string        `yaml:"base_url" json:"base_url"`
 	APIPrefix    string        `yaml:"api_prefix" json:"api_prefix"`
 	AuthScheme   string        `yaml:"auth_scheme" json:"auth_scheme"`
-	ToolToken    string        `yaml:"tool_token" json:"tool_token"`
 	APIKey       string        `yaml:"api_key" json:"api_key"`
 	TenantUUID   string        `yaml:"tenant_uuid" json:"tenant_uuid"`
 	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
@@ -1097,10 +1096,6 @@ func loadEnvConfig(cfg *Config) {
 	if authScheme := resolveConfigValue(os.Getenv("PX_GATEWAY_AUTH_SCHEME")); authScheme != "" {
 		cfg.Gateway.AuthScheme = authScheme
 	}
-	token := resolveConfigValue(os.Getenv("PX_PLUGIN_TOOL_TOKEN"))
-	if token != "" {
-		cfg.Gateway.ToolToken = token
-	}
 	if apiKey := resolveConfigValue(os.Getenv("PX_GATEWAY_API_KEY")); apiKey != "" {
 		cfg.Gateway.APIKey = apiKey
 	}
@@ -1114,9 +1109,6 @@ func loadEnvConfig(cfg *Config) {
 	}
 	if mockModules := resolveConfigValue(os.Getenv("PX_USE_MOCK")); mockModules != "" {
 		cfg.Gateway.UseMock = splitCSV(mockModules)
-	}
-	if refreshToken := resolveConfigValue(os.Getenv("PX_TOOL_REFRESH_TOKEN")); refreshToken != "" {
-		cfg.Gateway.RefreshToken = refreshToken
 	}
 	if authBase := resolveConfigValue(os.Getenv("PX_AUTH_BASE_URL")); authBase != "" {
 		cfg.Gateway.AuthBaseURL = authBase
@@ -1180,41 +1172,23 @@ func normalizeConfig(cfg *Config) {
 		cfg.Gateway.BaseURL = resolveConfigValue(cfg.Gateway.BaseURL)
 		cfg.Gateway.APIPrefix = normalizeGatewayAPIPrefix(resolveConfigValue(cfg.Gateway.APIPrefix))
 		cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(resolveConfigValue(cfg.Gateway.AuthScheme))
-		cfg.Gateway.ToolToken = resolveConfigValue(cfg.Gateway.ToolToken)
+		cfg.Gateway.RefreshToken = ""
 		cfg.Gateway.APIKey = resolveConfigValue(cfg.Gateway.APIKey)
 		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
 		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
 
 		if cfg.Gateway.AuthScheme == "" {
-			cfg.Gateway.AuthScheme = inferGatewayAuthScheme(cfg.Gateway.ToolToken, cfg.Gateway.APIKey)
-		}
-
-		if cfg.Gateway.AuthScheme == "bearer" {
-			if tokenTenant := tenantUUIDFromJWT(cfg.Gateway.ToolToken); tokenTenant != "" {
-				if cfg.Gateway.TenantUUID != "" && cfg.Gateway.TenantUUID != tokenTenant {
-					pxlog.WarnCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
-						"module":                    "config",
-						"biz_scene":                 "gateway_normalize",
-						"biz_domain":                "integration",
-						"component":                 "config.loader",
-						"gateway.tenant_uuid":       cfg.Gateway.TenantUUID,
-						"gateway.token_tid":         tokenTenant,
-						"gateway.tenant_from_token": true,
-					}), "gateway.tenant_uuid differs from PX_PLUGIN_TOOL_TOKEN tid; overriding with token tid")
-				}
-				cfg.Gateway.TenantUUID = tokenTenant
-			}
+			cfg.Gateway.AuthScheme = inferGatewayAuthScheme(cfg)
 		}
 
 		// Dev 模式下：Gateway 配置不完整时不阻塞启动，改为打印提示并自动关闭 Gateway。
 		// 生产/非 Dev 场景仍保持严格校验（见 Validate）。
 		if cfg.Logging != nil && cfg.Logging.DebugMode && !isHostDelegatedMode(cfg) {
 			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
-			toolToken := strings.TrimSpace(cfg.Gateway.ToolToken)
 			apiKey := strings.TrimSpace(cfg.Gateway.APIKey)
 			tenantUUID := strings.TrimSpace(cfg.Gateway.TenantUUID)
 
-			hasAny := baseURL != "" || toolToken != "" || apiKey != ""
+			hasAny := baseURL != "" || apiKey != ""
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
 
 			if hasAny && incomplete {
@@ -1225,14 +1199,12 @@ func normalizeConfig(cfg *Config) {
 					"component":           "config.loader",
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
-					"gateway.tool_token":  toolToken != "",
 					"gateway.api_key":     apiKey != "",
 					"gateway.tenant_uuid": tenantUUID,
 				}), "Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
 
 				cfg.Gateway.BaseURL = ""
 				cfg.Gateway.AuthScheme = ""
-				cfg.Gateway.ToolToken = ""
 				cfg.Gateway.APIKey = ""
 				cfg.Gateway.TenantUUID = ""
 			}
@@ -1416,11 +1388,8 @@ func normalizeGatewayAPIPrefix(raw string) string {
 	return value
 }
 
-func inferGatewayAuthScheme(toolToken, apiKey string) string {
-	if strings.TrimSpace(toolToken) != "" {
-		return "bearer"
-	}
-	if strings.TrimSpace(apiKey) != "" {
+func inferGatewayAuthScheme(cfg *Config) string {
+	if cfg != nil && cfg.Gateway != nil && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
 		return "apikey"
 	}
 	return "bearer"
@@ -1432,7 +1401,7 @@ func hasGatewayCredential(cfg *GatewayConfig) bool {
 	}
 	switch normalizeGatewayAuthScheme(cfg.AuthScheme) {
 	case "bearer":
-		return strings.TrimSpace(cfg.ToolToken) != ""
+		return true
 	case "apikey":
 		return strings.TrimSpace(cfg.APIKey) != ""
 	default:
@@ -1744,16 +1713,22 @@ func (c *Config) Validate() error {
 
 	if c.Gateway != nil {
 		hasGatewayFields := strings.TrimSpace(c.Gateway.BaseURL) != "" ||
-			strings.TrimSpace(c.Gateway.ToolToken) != "" ||
 			strings.TrimSpace(c.Gateway.APIKey) != ""
 		if hasGatewayFields {
 			c.Gateway.AuthScheme = normalizeGatewayAuthScheme(c.Gateway.AuthScheme)
 			if c.Gateway.AuthScheme == "" {
-				c.Gateway.AuthScheme = inferGatewayAuthScheme(c.Gateway.ToolToken, c.Gateway.APIKey)
+				c.Gateway.AuthScheme = inferGatewayAuthScheme(c)
 			}
 			if isHostDelegatedMode(c) {
 				if strings.TrimSpace(c.Gateway.BaseURL) == "" || c.Gateway.AuthScheme != "bearer" {
 					return NewConfigError("host delegated gateway config requires base_url + bearer auth_scheme")
+				}
+				if c.GRPCUpstream == nil ||
+					strings.TrimSpace(c.GRPCUpstream.STSClientID) == "" ||
+					strings.TrimSpace(c.GRPCUpstream.STSClientSecret) == "" ||
+					strings.TrimSpace(c.GRPCUpstream.Address) == "" ||
+					strings.TrimSpace(c.GRPCUpstream.TenantUUID) == "" {
+					return NewConfigError("host delegated gateway config requires base_url + bearer auth_scheme + STS client")
 				}
 				return nil
 			}
@@ -1763,12 +1738,6 @@ func (c *Config) Validate() error {
 
 			if c.Gateway.AuthScheme == "bearer" {
 				tenantUUID := strings.TrimSpace(c.Gateway.TenantUUID)
-				if tenantUUID == "" {
-					tenantUUID = tenantUUIDFromJWT(c.Gateway.ToolToken)
-					if tenantUUID != "" {
-						c.Gateway.TenantUUID = tenantUUID
-					}
-				}
 				if tenantUUID != "" {
 					if _, err := uuid.Parse(tenantUUID); err != nil {
 						return NewConfigError("gateway.tenant_uuid must be a valid UUID string")

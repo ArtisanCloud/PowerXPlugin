@@ -2,7 +2,6 @@ package middleware_test
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -63,6 +62,8 @@ func TestRequireCapabilityGatewayDelegatedConfigMissing(t *testing.T) {
 }
 
 func TestRequireCapabilityGatewayDelegatedUnavailable(t *testing.T) {
+	t.Setenv("POWERX_PROXY", "1")
+
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.POST("/invoke", func(c *gin.Context) {
@@ -73,7 +74,12 @@ func TestRequireCapabilityGatewayDelegatedUnavailable(t *testing.T) {
 				Gateway: &config.GatewayConfig{
 					BaseURL:    "https://gateway.example.com",
 					AuthScheme: "bearer",
-					ToolToken:  delegatedToken(),
+				},
+				GRPCUpstream: &config.GRPCUpstream{
+					Address:         "127.0.0.1:9001",
+					TenantUUID:      "8d8e338c-cf38-4b82-b7a3-bfea18b41189",
+					STSClientID:     "client-id",
+					STSClientSecret: "client-secret",
 				},
 			},
 		}
@@ -93,10 +99,4 @@ func TestRequireCapabilityGatewayDelegatedUnavailable(t *testing.T) {
 	errObj, ok := body["error"].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "SERVICE_UNAVAILABLE", errObj["code"])
-}
-
-func delegatedToken() string {
-	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
-	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"tid":"8d8e338c-cf38-4b82-b7a3-bfea18b41189"}`))
-	return header + "." + payload + ".sig"
 }

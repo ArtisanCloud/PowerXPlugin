@@ -26,11 +26,9 @@ const (
 
 const (
 	ErrCodeGatewayMissingBaseURL   = "GW_CFG_MISSING_BASE_URL"
-	ErrCodeGatewayMissingToolToken = "GW_CFG_MISSING_TOOL_TOKEN"
 	ErrCodeGatewayMissingSTSClient = "GW_CFG_MISSING_STS_CLIENT"
 	ErrCodeGatewayMissingAPIKey    = "GW_CFG_MISSING_API_KEY"
 	ErrCodeGatewayInvalidScheme    = "GW_CFG_INVALID_AUTH_SCHEME"
-	ErrCodeGatewayTokenInvalidTID  = "GW_TOKEN_INVALID_TID"
 )
 
 type GatewayConfigError struct {
@@ -122,14 +120,20 @@ type Client struct {
 	offlineReason string
 	cfg           *config.Config
 	refreshMu     sync.Mutex
+	tokenProvider frameworkgateway.TokenProvider
 }
 
 // NewClient 构造 Gateway Client；若凭证缺失，则进入离线模式。
-func NewClient(cfg *config.Config, log *logger.Entry) *Client {
+func NewClient(cfg *config.Config, log *logger.Entry, opts ...ClientOption) *Client {
 	c := &Client{
 		logger:  ensureLogger(log),
 		useMock: make(map[string]struct{}),
 		cfg:     cfg,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
+		}
 	}
 	c.logger = logger.WithComponent("skeleton.gateway.client")
 
@@ -149,9 +153,10 @@ func NewClient(cfg *config.Config, log *logger.Entry) *Client {
 	authScheme := effectiveGatewayAuthScheme(gcfg)
 	credential := gatewayCredential(gcfg, authScheme)
 	iamMode := gatewayIAMMode(cfg)
+	hostDelegated := isHostDelegatedMode(cfg)
 
 	if baseURL == "" {
-		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"})
+		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, iamMode, requiredGatewayEnv(cfg, gcfg, authScheme))
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
@@ -161,17 +166,19 @@ func NewClient(cfg *config.Config, log *logger.Entry) *Client {
 		return c
 	}
 	if authScheme == "bearer" && credential == "" {
-		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingToolToken, "PX_PLUGIN_TOOL_TOKEN is required", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"})
-		c.offlineReason = cfgErr.Error()
-		return c
+		if hostDelegated {
+			if cfgErr := validateHostDelegatedConfig(cfg, gcfg, iamMode); cfgErr != nil {
+				c.offlineReason = cfgErr.Error()
+				return c
+			}
+		} else {
+			cfgErr := newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "bearer gateway requires STS token provider", gcfg, iamMode, requiredGatewayEnv(cfg, gcfg, authScheme))
+			c.offlineReason = cfgErr.Error()
+			return c
+		}
 	}
 	if authScheme == "apikey" && credential == "" {
 		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingAPIKey, "PX_GATEWAY_API_KEY is required", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_API_KEY", "PX_GATEWAY_AUTH_SCHEME=apikey"})
-		c.offlineReason = cfgErr.Error()
-		return c
-	}
-	if authScheme == "bearer" && tenantUUIDFromJWT(strings.TrimSpace(gcfg.ToolToken)) == "" {
-		cfgErr := newGatewayConfigError(ErrCodeGatewayTokenInvalidTID, "PX_PLUGIN_TOOL_TOKEN missing tid claim", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"})
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
@@ -200,6 +207,18 @@ func NewClient(cfg *config.Config, log *logger.Entry) *Client {
 		"biz_domain":  "integration",
 	}), "Gateway Client 初始化完成")
 	return c
+}
+
+// ClientOption customizes the Gateway client.
+type ClientOption func(*Client)
+
+// WithTokenProvider injects an STS-backed bearer token provider.
+func WithTokenProvider(provider frameworkgateway.TokenProvider) ClientOption {
+	return func(c *Client) {
+		if c != nil {
+			c.tokenProvider = provider
+		}
+	}
 }
 
 // Enabled 返回 Gateway Client 是否可用。
@@ -353,10 +372,6 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
 	}
 	authScheme := effectiveGatewayAuthScheme(gcfg)
-	credential := gatewayCredential(gcfg, authScheme)
-	if credential == "" {
-		return nil, fmt.Errorf("Gateway 凭证未配置（auth_scheme=%s）", authScheme)
-	}
 	tenant := effectiveGatewayTenant(gcfg)
 
 	timeout := gcfg.Timeout
@@ -386,6 +401,10 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 
 	ctxReq, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequestWithContext(ctxReq, http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -430,7 +449,7 @@ func (c *Client) handleInvokeError(ctx context.Context, req frameworkgateway.Inv
 			"biz_scene":  "gateway_token_refresh",
 			"biz_domain": "integration",
 			"error":      err.Error(),
-		}), "PX_PLUGIN_TOOL_TOKEN 自动刷新失败")
+		}), "Gateway bearer token refresh failed")
 		return nil, invokeErr
 	}
 	if !refreshed {
@@ -597,8 +616,8 @@ func resolveTokenSource(cfg *config.Config, requestAuthHeader string) string {
 	if authScheme == "apikey" && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
 		return "gateway_apikey"
 	}
-	if strings.TrimSpace(cfg.Gateway.ToolToken) != "" {
-		return "gateway_tool"
+	if isHostDelegatedMode(cfg) {
+		return "gateway_sts"
 	}
 	return "none"
 }
@@ -742,23 +761,25 @@ func ValidateDelegatedConfig(cfg *config.Config) *GatewayConfigError {
 	if cfg != nil {
 		gcfg = cfg.Gateway
 	}
-	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" && iamMode == "delegated" {
+	if isHostDelegatedMode(cfg) {
 		return validateHostDelegatedConfig(cfg, gcfg, iamMode)
 	}
-	required := []string{"PX_GATEWAY_BASE_URL", "PX_PLUGIN_TOOL_TOKEN", "PX_GATEWAY_AUTH_SCHEME=bearer"}
+	required := requiredGatewayEnv(cfg, gcfg, effectiveGatewayAuthScheme(gcfg))
 
 	if effectiveGatewayBaseURL(gcfg) == "" {
 		return newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, iamMode, required)
 	}
-	if effectiveGatewayAuthScheme(gcfg) != "bearer" {
-		return newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer", gcfg, iamMode, required)
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	if authScheme == "" {
+		return newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer or apikey", gcfg, iamMode, required)
 	}
-	token := gatewayCredential(gcfg, "bearer")
-	if token == "" {
-		return newGatewayConfigError(ErrCodeGatewayMissingToolToken, "PX_PLUGIN_TOOL_TOKEN is required", gcfg, iamMode, required)
-	}
-	if tenantUUIDFromJWT(token) == "" {
-		return newGatewayConfigError(ErrCodeGatewayTokenInvalidTID, "PX_PLUGIN_TOOL_TOKEN missing tid claim", gcfg, iamMode, required)
+	if gatewayCredential(gcfg, authScheme) == "" {
+		switch authScheme {
+		case "apikey":
+			return newGatewayConfigError(ErrCodeGatewayMissingAPIKey, "PX_GATEWAY_API_KEY is required", gcfg, iamMode, required)
+		default:
+			return newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "bearer gateway requires STS token provider", gcfg, iamMode, required)
+		}
 	}
 	return nil
 }
@@ -767,7 +788,6 @@ func validateHostDelegatedConfig(cfg *config.Config, gcfg *config.GatewayConfig,
 	required := []string{
 		"PX_GATEWAY_BASE_URL",
 		"POWERX_STS_CLIENT_ID",
-		"POWERX_STS_CLIENT_SECRET",
 		"POWERX_GRPC_UPSTREAM_ADDRESS",
 		"POWERX_GRPC_UPSTREAM_TENANT_UUID",
 		"PX_GATEWAY_AUTH_SCHEME=bearer",
@@ -796,8 +816,14 @@ func ValidateConfig(cfg *config.Config) error {
 	base := effectiveGatewayBaseURL(cfg.Gateway)
 	authScheme := effectiveGatewayAuthScheme(cfg.Gateway)
 	credential := gatewayCredential(cfg.Gateway, authScheme)
-	if base == "" || authScheme == "" || credential == "" {
+	if base == "" || authScheme == "" {
 		return errors.New("gateway config requires base_url + credential matching auth_scheme")
+	}
+	if authScheme == "apikey" && credential == "" {
+		return errors.New("gateway config requires base_url + api key")
+	}
+	if authScheme == "bearer" && credential == "" && !isHostDelegatedMode(cfg) {
+		return errors.New("gateway config requires bearer STS token provider")
 	}
 	return nil
 }
@@ -809,29 +835,24 @@ func (c *Client) refreshCredentials(ctx context.Context) (bool, error) {
 	if c.cfg == nil || c.cfg.Gateway == nil {
 		return false, fmt.Errorf("gateway config missing")
 	}
+	if isHostDelegatedMode(c.cfg) {
+		if c.tokenProvider == nil {
+			return false, fmt.Errorf("gateway STS token provider missing")
+		}
+		if token, err := c.tokenProvider(ctx); err != nil {
+			return false, err
+		} else if strings.TrimSpace(token) == "" {
+			return false, fmt.Errorf("gateway STS token is empty")
+		}
+		if err := c.reconnectTransport(); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
 	if effectiveGatewayAuthScheme(c.cfg.Gateway) != "bearer" {
 		return false, fmt.Errorf("gateway auth_scheme=%s 不支持自动刷新", effectiveGatewayAuthScheme(c.cfg.Gateway))
 	}
-	if strings.TrimSpace(c.cfg.Gateway.RefreshToken) == "" {
-		return false, fmt.Errorf("PX_TOOL_REFRESH_TOKEN 未配置")
-	}
-	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
-		"component":  "skeleton.gateway.client",
-		"biz_scene":  "gateway_token_refresh",
-		"biz_domain": "integration",
-	}), "检测到 Gateway 凭证失败，尝试自动刷新 PX_PLUGIN_TOOL_TOKEN")
-	if _, _, err := RefreshToolToken(ctx, c.cfg); err != nil {
-		return false, err
-	}
-	if err := c.reconnectTransport(); err != nil {
-		return false, err
-	}
-	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
-		"component":  "skeleton.gateway.client",
-		"biz_scene":  "gateway_token_refresh",
-		"biz_domain": "integration",
-	}), "PX_PLUGIN_TOOL_TOKEN 已刷新，准备重试 Gateway 调用")
-	return true, nil
+	return false, fmt.Errorf("gateway bearer token refresh is deprecated; configure STS instead")
 }
 
 func (c *Client) reconnectTransport() error {
@@ -841,11 +862,10 @@ func (c *Client) reconnectTransport() error {
 	gcfg := c.cfg.Gateway
 	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
 	authScheme := effectiveGatewayAuthScheme(gcfg)
-	toolToken := strings.TrimSpace(gcfg.ToolToken)
 	tenantUUID := effectiveGatewayTenant(gcfg)
 	credential := gatewayCredential(gcfg, authScheme)
 
-	if baseURL == "" || credential == "" {
+	if baseURL == "" || (authScheme == "apikey" && credential == "") || (authScheme == "bearer" && credential == "" && c.tokenProvider == nil) {
 		return fmt.Errorf("PX_GATEWAY_BASE_URL 与 Gateway 凭证未配置（auth_scheme=%s）", authScheme)
 	}
 
@@ -857,7 +877,8 @@ func (c *Client) reconnectTransport() error {
 	client, err := frameworkgateway.NewClient(frameworkgateway.Config{
 		BaseURL:        baseURL,
 		AuthScheme:     authScheme,
-		BearerToken:    toolToken,
+		BearerToken:    credential,
+		TokenProvider:  c.tokenProvider,
 		APIKey:         strings.TrimSpace(gcfg.APIKey),
 		TenantUUID:     tenantUUID,
 		RequestTimeout: timeout,
@@ -871,6 +892,35 @@ func (c *Client) reconnectTransport() error {
 	}
 	c.transport = client
 	return nil
+}
+
+func (c *Client) gatewayCredential(ctx context.Context, authScheme string) (string, error) {
+	if c == nil || c.cfg == nil || c.cfg.Gateway == nil {
+		return "", fmt.Errorf("gateway config missing")
+	}
+	switch authScheme {
+	case "apikey":
+		credential := strings.TrimSpace(c.cfg.Gateway.APIKey)
+		if credential == "" {
+			return "", fmt.Errorf("PX_GATEWAY_API_KEY is required")
+		}
+		return credential, nil
+	case "bearer":
+		if c.tokenProvider != nil {
+			token, err := c.tokenProvider(ctx)
+			if err != nil {
+				return "", fmt.Errorf("gateway STS token exchange failed: %w", err)
+			}
+			token = strings.TrimSpace(token)
+			if token == "" {
+				return "", fmt.Errorf("gateway STS token is empty")
+			}
+			return token, nil
+		}
+		return "", fmt.Errorf("gateway STS token provider is required")
+	default:
+		return "", fmt.Errorf("unsupported gateway auth scheme: %s", authScheme)
+	}
 }
 
 func effectiveGatewayBaseURL(gcfg *config.GatewayConfig) string {
@@ -918,9 +968,6 @@ func effectiveGatewayTenant(gcfg *config.GatewayConfig) string {
 	if gcfg == nil {
 		return ""
 	}
-	if tokenTenant := tenantUUIDFromJWT(strings.TrimSpace(gcfg.ToolToken)); tokenTenant != "" {
-		return tokenTenant
-	}
 	return strings.TrimSpace(gcfg.TenantUUID)
 }
 
@@ -935,13 +982,10 @@ func effectiveGatewayAuthScheme(gcfg *config.GatewayConfig) string {
 	case "apikey", "api_key", "api-key":
 		return "apikey"
 	}
-	if strings.TrimSpace(gcfg.ToolToken) != "" {
-		return "bearer"
-	}
 	if strings.TrimSpace(gcfg.APIKey) != "" {
 		return "apikey"
 	}
-	return ""
+	return "bearer"
 }
 
 func gatewayCredential(gcfg *config.GatewayConfig, authScheme string) string {
@@ -950,7 +994,7 @@ func gatewayCredential(gcfg *config.GatewayConfig, authScheme string) string {
 	}
 	switch authScheme {
 	case "bearer":
-		return strings.TrimSpace(gcfg.ToolToken)
+		return ""
 	case "apikey":
 		return strings.TrimSpace(gcfg.APIKey)
 	default:
@@ -978,6 +1022,36 @@ func gatewayIAMMode(cfg *config.Config) string {
 	return mode
 }
 
+func isHostDelegatedMode(cfg *config.Config) bool {
+	return cfg != nil &&
+		strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" &&
+		gatewayIAMMode(cfg) == "delegated"
+}
+
+func requiredGatewayEnv(cfg *config.Config, gcfg *config.GatewayConfig, authScheme string) []string {
+	if isHostDelegatedMode(cfg) {
+		return []string{
+			"PX_GATEWAY_BASE_URL",
+			"POWERX_STS_CLIENT_ID",
+			"POWERX_STS_CLIENT_SECRET",
+			"POWERX_GRPC_UPSTREAM_ADDRESS",
+			"POWERX_GRPC_UPSTREAM_TENANT_UUID",
+			"PX_GATEWAY_AUTH_SCHEME=bearer",
+		}
+	}
+	if strings.EqualFold(authScheme, "apikey") || strings.TrimSpace(gcfgValueAPIKey(gcfg)) != "" {
+		return []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_API_KEY", "PX_GATEWAY_AUTH_SCHEME=apikey"}
+	}
+	return []string{"PX_GATEWAY_BASE_URL", "POWERX_STS_CLIENT_ID", "POWERX_STS_CLIENT_SECRET", "PX_GATEWAY_AUTH_SCHEME=bearer"}
+}
+
+func gcfgValueAPIKey(gcfg *config.GatewayConfig) string {
+	if gcfg == nil {
+		return ""
+	}
+	return gcfg.APIKey
+}
+
 func newGatewayConfigError(code, msg string, gcfg *config.GatewayConfig, iamMode string, required []string) *GatewayConfigError {
 	present := make([]string, 0, 3)
 	if gcfg != nil {
@@ -992,12 +1066,15 @@ func newGatewayConfigError(code, msg string, gcfg *config.GatewayConfig, iamMode
 			strings.EqualFold(strings.TrimSpace(gcfg.AuthScheme), "api-key") {
 			present = append(present, "PX_GATEWAY_AUTH_SCHEME=apikey")
 		}
-		if strings.TrimSpace(gcfg.ToolToken) != "" {
-			present = append(present, "PX_PLUGIN_TOOL_TOKEN")
-		}
 		if strings.TrimSpace(gcfg.APIKey) != "" {
 			present = append(present, "PX_GATEWAY_API_KEY")
 		}
+	}
+	if strings.TrimSpace(os.Getenv("POWERX_STS_CLIENT_ID")) != "" {
+		present = append(present, "POWERX_STS_CLIENT_ID")
+	}
+	if strings.TrimSpace(os.Getenv("POWERX_STS_CLIENT_SECRET")) != "" {
+		present = append(present, "POWERX_STS_CLIENT_SECRET")
 	}
 	return &GatewayConfigError{
 		Code:     code,

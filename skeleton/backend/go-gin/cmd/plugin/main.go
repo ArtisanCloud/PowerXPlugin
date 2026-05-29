@@ -230,8 +230,7 @@ func main() {
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
 		gatewayMode := "local"
 		if os.Getenv("POWERX_PROXY") == "1" && cfg != nil && cfg.Gateway != nil {
-			if strings.TrimSpace(cfg.Gateway.BaseURL) != "" &&
-				strings.TrimSpace(cfg.Gateway.ToolToken) != "" {
+			if strings.TrimSpace(cfg.Gateway.BaseURL) != "" {
 				gatewayMode = "host"
 			}
 		}
@@ -293,8 +292,21 @@ func main() {
 
 	var capabilityGateway *capgateway.Client
 	if cfg != nil && cfg.Gateway != nil {
-		ensureToolTokenFresh(ctx, cfg)
-		capabilityGateway = capgateway.NewClient(cfg, logger.WithField("component", "capability_gateway_client"))
+		gatewayOpts := []capgateway.ClientOption{}
+		if iamResolver.Mode() == iamservice.IAMModeDelegated && strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
+			gatewayOpts = append(gatewayOpts, capgateway.WithTokenProvider(func(ctx context.Context) (string, error) {
+				if pxc == nil {
+					return "", fmt.Errorf("powerx STS client is not configured")
+				}
+				token := strings.TrimSpace(pxc.GetToken())
+				if token != "" && token != "sts" {
+					return token, nil
+				}
+				token, _, err := pxc.ExchangeSTS(ctx)
+				return strings.TrimSpace(token), err
+			}))
+		}
+		capabilityGateway = capgateway.NewClient(cfg, logger.WithField("component", "capability_gateway_client"), gatewayOpts...)
 	}
 
 	// 初始化 WS Bus Hub（standalone 可选 Redis，默认内存）
@@ -327,7 +339,7 @@ func main() {
 	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
 		eventCfg.SourcePlugin = app.PluginID
 	}
-	taskBusRuntime := resolveTaskBusRuntime(cfg, wsHub, eventLogger)
+	taskBusRuntime := resolveTaskBusRuntime(cfg, wsHub, eventLogger, pxc)
 
 	var bridgeEmitter fweventbridge.Emitter
 	if eventCfg == nil {
@@ -396,9 +408,11 @@ func main() {
 		renewalJob = marketplacejobs.NewLicenseRenewalNotifier(cfg, licenseRepoGlobal, logger.WithField("component", "marketplace_license_renewal_notifier"), listingRepo.ListTenantUuids, nil)
 	}
 
-	// 调度触发统一走 EventEmitter（与手动 event-bridge/emit 共用语义入口）。
+	// Standalone local mode owns the in-plugin scheduler loop. Host/proxy mode
+	// delegates scheduler ownership to PowerX Core and must not emit synthetic
+	// scheduler events from the plugin process.
 	var integrationScheduler *integrationjobs.Scheduler
-	if bridgeEmitter != nil {
+	if bridgeEmitter != nil && !hostMode {
 		schedulerLogger := logger.WithField("component", "integration.scheduler")
 		schedulerDispatcher := integrationjobs.NewSchedulerEventDispatcher(cfg, bridgeEmitter, schedulerLogger.WithField("stage", "dispatcher"))
 		integrationScheduler = integrationjobs.NewScheduler(schedulerLogger)
@@ -612,63 +626,6 @@ func registerWSRoute(app *fwbootstrap.App, handler http.Handler) {
 	app.Router.Handle(http.MethodGet, targetPath, rewriteToTarget)
 }
 
-func ensureToolTokenFresh(ctx context.Context, cfg *config.Config) {
-	if cfg == nil || cfg.Gateway == nil {
-		return
-	}
-	authScheme := strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
-	if authScheme == "apikey" || authScheme == "api_key" || authScheme == "api-key" {
-		return
-	}
-	token := strings.TrimSpace(cfg.Gateway.ToolToken)
-	if token == "" {
-		return
-	}
-	expiry, err := capgateway.ParseTokenExpiry(token)
-	log := logger.WithField("component", "gateway_token_monitor")
-	if err != nil {
-		log.WithError(err).Debug("PX_PLUGIN_TOOL_TOKEN 无法解析有效期")
-		return
-	}
-	now := time.Now().UTC()
-	fields := logger.Fields{
-		"expiresAt": expiry.UTC().Format(time.RFC3339),
-	}
-
-	refreshToken := strings.TrimSpace(cfg.Gateway.RefreshToken)
-	if refreshToken == "" || strings.TrimSpace(cfg.Gateway.BaseURL) == "" {
-		logTokenExpiryStatus(log, now, expiry, fields)
-		return
-	}
-
-	if now.After(expiry) || expiry.Sub(now) < 24*time.Hour {
-		log.WithFields(fields).Info("PX_PLUGIN_TOOL_TOKEN 即将过期，尝试使用 PX_TOOL_REFRESH_TOKEN 自动刷新")
-		newToken, _, err := capgateway.RefreshToolToken(ctx, cfg)
-		if err != nil {
-			log.WithError(err).Error("PX_PLUGIN_TOOL_TOKEN 刷新失败，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml`")
-			return
-		}
-		if nextExpiry, err := capgateway.ParseTokenExpiry(newToken); err == nil {
-			fields["expiresAt"] = nextExpiry.UTC().Format(time.RFC3339)
-		}
-		log.WithFields(fields).Info("PX_PLUGIN_TOOL_TOKEN 已自动刷新，请同步更新 skeleton/.env.local 中的 PX_PLUGIN_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN")
-		return
-	}
-	logTokenExpiryStatus(log, now, expiry, fields)
-}
-
-func logTokenExpiryStatus(log *logger.Entry, now, expiry time.Time, fields logger.Fields) {
-	if now.After(expiry) {
-		log.WithFields(fields).Error("PX_PLUGIN_TOOL_TOKEN 已过期，请重新执行 `px-plugin login --manifest ./skeleton/plugin.yaml` 刷新凭证")
-		return
-	}
-	if expiry.Sub(now) < 24*time.Hour {
-		log.WithFields(fields).Warn("PX_PLUGIN_TOOL_TOKEN 将在 24 小时内过期，请尽快运行 `px-plugin login` 刷新凭证，或设置 PX_TOOL_REFRESH_TOKEN 以便自动刷新")
-		return
-	}
-	log.WithFields(fields).Info("PX_PLUGIN_TOOL_TOKEN 有效")
-}
-
 func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMResolver) {
 	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
 	if mode == "" {
@@ -679,14 +636,19 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 	proxyEnabled := proxyRaw == "1"
 
 	gatewayBaseURL := ""
-	gatewayToken := ""
 	gatewayAPIKey := ""
 	gatewayAuthScheme := ""
+	stsReady := false
 	if cfg != nil && cfg.Gateway != nil {
 		gatewayBaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
-		gatewayToken = strings.TrimSpace(cfg.Gateway.ToolToken)
 		gatewayAPIKey = strings.TrimSpace(cfg.Gateway.APIKey)
 		gatewayAuthScheme = strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
+	}
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		stsReady = strings.TrimSpace(cfg.GRPCUpstream.STSClientID) != "" &&
+			strings.TrimSpace(cfg.GRPCUpstream.STSClientSecret) != "" &&
+			strings.TrimSpace(cfg.GRPCUpstream.Address) != "" &&
+			strings.TrimSpace(cfg.GRPCUpstream.TenantUUID) != ""
 	}
 
 	missingGateway := make([]string, 0, 3)
@@ -702,8 +664,8 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 		if gatewayAuthScheme != "bearer" {
 			missingGateway = append(missingGateway, "PX_GATEWAY_AUTH_SCHEME=bearer")
 		}
-		if gatewayToken == "" {
-			missingGateway = append(missingGateway, "PX_PLUGIN_TOOL_TOKEN")
+		if proxyEnabled && mode == string(iamservice.IAMModeDelegated) && !stsReady {
+			missingGateway = append(missingGateway, "POWERX_STS_CLIENT_ID/SECRET,POWERX_GRPC_UPSTREAM_ADDRESS/TENANT_UUID")
 		}
 	}
 	gatewayReady := len(missingGateway) == 0
@@ -823,16 +785,19 @@ func validateHostDelegatedEnvContract(iamResolver *pluginbootstrap.IAMResolver) 
 func gatewayContractLogFields(cfg *config.Config, mode string) logger.Fields {
 	authScheme := ""
 	baseURLPresent := false
-	toolTokenPresent := false
+	stsClientPresent := false
 	if cfg != nil && cfg.Gateway != nil {
 		authScheme = strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme))
 		baseURLPresent = strings.TrimSpace(cfg.Gateway.BaseURL) != ""
-		toolTokenPresent = strings.TrimSpace(cfg.Gateway.ToolToken) != ""
+	}
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		stsClientPresent = strings.TrimSpace(cfg.GRPCUpstream.STSClientID) != "" &&
+			strings.TrimSpace(cfg.GRPCUpstream.STSClientSecret) != ""
 	}
 	return logger.Fields{
 		"iam_mode":                 mode,
 		"gateway_base_url_present": baseURLPresent,
-		"tool_token_present":       toolTokenPresent,
+		"sts_client_present":       stsClientPresent,
 		"auth_scheme":              authScheme,
 	}
 }

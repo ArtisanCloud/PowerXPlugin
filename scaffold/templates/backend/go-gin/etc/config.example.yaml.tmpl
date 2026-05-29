@@ -30,17 +30,16 @@ grpc_upstream:
   optional: true
 
 gateway:
-  # Skeleton 开发通常通过 px-plugin login 写入 .env.local 中的 PX_GATEWAY_BASE_URL / PX_PLUGIN_TOOL_TOKEN / PX_TOOL_REFRESH_TOKEN。
+  # Skeleton 开发通过 PX_GATEWAY_BASE_URL 配置宿主网关；host delegated 由 POWERX_STS_CLIENT_ID/POWERX_STS_CLIENT_SECRET 交换短期 STS token。
   # 默认指向本机 PowerX Core（8077）；可由 .env.local 的 PX_GATEWAY_BASE_URL 覆盖。
   # 未配置有效凭证时可通过 `PX_USE_MOCK` 指定 media,eventfabric 等模块名称启用内存 Mock。
   # 凭证分流：
-  # - auth_scheme=bearer（Delegated/宿主委派）使用 tool_token
-  # - auth_scheme=apikey（Standalone+Proxy）使用 api_key
-  # tenant_uuid 仅用于本地 provider 默认值；调用 PowerX Scheduler 等宿主能力时由 API key/tool token 鉴权上下文解析租户。
+  # - auth_scheme=bearer（host delegated）使用 STS TokenProvider，不读取静态 Bearer 凭证。
+  # - auth_scheme=apikey（local+proxy）使用 api_key。
+  # tenant_uuid 仅用于本地 provider 默认值；调用 PowerX Scheduler 等宿主能力时由宿主鉴权上下文解析租户。
   base_url: "http://127.0.0.1:8077"
   api_prefix: "/api/v1"
   auth_scheme: "apikey" # bearer | apikey
-  tool_token: ""
   api_key: ""
   refresh_token: ""
   tenant_uuid: ""

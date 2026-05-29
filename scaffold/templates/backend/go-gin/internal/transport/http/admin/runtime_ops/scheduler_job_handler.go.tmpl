@@ -109,10 +109,17 @@ func resolveSchedulerHostProviderConfig(deps *app.Deps) fwscheduler.HostProvider
 		BaseURL:    strings.TrimSpace(gw.BaseURL),
 		APIPrefix:  strings.TrimSpace(gw.APIPrefix),
 		AuthScheme: strings.ToLower(strings.TrimSpace(gw.AuthScheme)),
-		Token:      strings.TrimSpace(gw.ToolToken),
 		APIKey:     strings.TrimSpace(gw.APIKey),
 		UserAgent:  strings.TrimSpace(gw.UserAgent),
 		Timeout:    gw.Timeout,
+	}
+	if deps.IAMMode == iamservice.IAMModeDelegated && strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
+		cfg.AuthScheme = "bearer"
+		cfg.TokenProvider = func(ctx context.Context) (string, error) {
+			return newPowerXSTSTokenProvider(deps)(ctx)
+		}
+		cfg.APIKey = ""
+		return cfg
 	}
 	switch cfg.AuthScheme {
 	case "apikey", "api_key", "api-key":

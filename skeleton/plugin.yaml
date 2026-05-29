@@ -109,9 +109,10 @@ frontend:
                   key: menu.com.powerx.plugins.base.templates.framework_lab
                   default: Framework Function Test
                 icon: i-heroicons-beaker
-                path: /templates/framework-lab
-                route: templates/framework-lab
+                path: /admin/templates/framework-lab
+                route: admin/templates/framework-lab
                 order: 3
+                required_policies: [admin:root]
 
 assets:
   public_dir: ./web-admin/public

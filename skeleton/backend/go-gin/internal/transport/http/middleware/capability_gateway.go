@@ -13,7 +13,10 @@ import (
 
 var delegatedGatewayRequired = []string{
 	"PX_GATEWAY_BASE_URL",
-	"PX_PLUGIN_TOOL_TOKEN",
+	"POWERX_STS_CLIENT_ID",
+	"POWERX_STS_CLIENT_SECRET",
+	"POWERX_GRPC_UPSTREAM_ADDRESS",
+	"POWERX_GRPC_UPSTREAM_TENANT_UUID",
 	"PX_GATEWAY_AUTH_SCHEME=bearer",
 }
 
@@ -98,8 +101,19 @@ func detectGatewayPresent(deps *app.Deps) []string {
 	if strings.EqualFold(strings.TrimSpace(gcfg.AuthScheme), "bearer") {
 		present = append(present, "PX_GATEWAY_AUTH_SCHEME=bearer")
 	}
-	if strings.TrimSpace(gcfg.ToolToken) != "" {
-		present = append(present, "PX_PLUGIN_TOOL_TOKEN")
+	if deps.Config.GRPCUpstream != nil {
+		if strings.TrimSpace(deps.Config.GRPCUpstream.STSClientID) != "" {
+			present = append(present, "POWERX_STS_CLIENT_ID")
+		}
+		if strings.TrimSpace(deps.Config.GRPCUpstream.STSClientSecret) != "" {
+			present = append(present, "POWERX_STS_CLIENT_SECRET")
+		}
+		if strings.TrimSpace(deps.Config.GRPCUpstream.Address) != "" {
+			present = append(present, "POWERX_GRPC_UPSTREAM_ADDRESS")
+		}
+		if strings.TrimSpace(deps.Config.GRPCUpstream.TenantUUID) != "" {
+			present = append(present, "POWERX_GRPC_UPSTREAM_TENANT_UUID")
+		}
 	}
 	return present
 }

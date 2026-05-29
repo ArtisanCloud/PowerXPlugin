@@ -7,6 +7,9 @@ import (
 // Config 是 Gateway Client 的公开配置。
 type Config = internal.Config
 
+// TokenProvider 返回短期 Bearer token。
+type TokenProvider = internal.TokenProvider
+
 // InvokeRequest 描述一次能力调用请求。
 type InvokeRequest = internal.InvokeRequest
 

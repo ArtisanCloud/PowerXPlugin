@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math"
@@ -254,14 +255,31 @@ func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action stri
 		nil,
 	))
 	if os.Getenv("POWERX_PROXY") == "1" && h.deps.Config != nil && h.deps.Config.Gateway != nil {
-		hostClient, err := fwwsbus.NewHostClient(fwwsbus.HostClientConfig{
+		cfg := fwwsbus.HostClientConfig{
 			BaseURL:    strings.TrimSpace(h.deps.Config.Gateway.BaseURL),
 			APIPrefix:  strings.TrimSpace(h.deps.Config.Gateway.APIPrefix),
-			Token:      strings.TrimSpace(h.deps.Config.Gateway.ToolToken),
 			TenantUUID: "",
 			UserAgent:  strings.TrimSpace(h.deps.Config.Gateway.UserAgent),
 			Timeout:    h.deps.Config.Gateway.Timeout,
-		})
+		}
+		if h.deps.IAMMode.String() == "delegated" {
+			cfg.AuthScheme = "bearer"
+			cfg.TokenProvider = func(ctx context.Context) (string, error) {
+				if h.deps == nil || h.deps.PowerXClient == nil {
+					return "", errors.New("powerx STS client is not configured")
+				}
+				token := strings.TrimSpace(h.deps.PowerXClient.GetToken())
+				if token != "" && token != "sts" {
+					return token, nil
+				}
+				token, _, err := h.deps.PowerXClient.ExchangeSTS(ctx)
+				return strings.TrimSpace(token), err
+			}
+		} else {
+			cfg.AuthScheme = strings.TrimSpace(h.deps.Config.Gateway.AuthScheme)
+			cfg.APIKey = strings.TrimSpace(h.deps.Config.Gateway.APIKey)
+		}
+		hostClient, err := fwwsbus.NewHostClient(cfg)
 		if err == nil {
 			publisher = hostClient
 		}

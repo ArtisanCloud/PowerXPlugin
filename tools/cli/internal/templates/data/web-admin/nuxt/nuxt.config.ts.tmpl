@@ -264,6 +264,9 @@ export default defineNuxtConfig({
         for (const page of nodes) {
           const path = String(page?.path || '')
           if (path.startsWith('/admin/')) {
+            if (path === '/admin/templates/framework-lab') {
+              continue
+            }
             const normalizedPath = path.replace(/^\/admin/, '')
             const rawAlias = page?.alias
             const aliases = Array.isArray(rawAlias)

@@ -183,9 +183,18 @@ func sendHostNotification(ctx context.Context, cfg fwwsbus.HostClientConfig, req
 			httpReq.Header.Set("Authorization", "ApiKey "+apiKey)
 		}
 	default:
-		if token := strings.TrimSpace(cfg.Token); token != "" {
-			httpReq.Header.Set("Authorization", "Bearer "+token)
+		token := strings.TrimSpace(cfg.Token)
+		if token == "" && cfg.TokenProvider != nil {
+			issued, err := cfg.TokenProvider(ctx)
+			if err != nil {
+				return fmt.Errorf("host notification STS token exchange failed: %w", err)
+			}
+			token = strings.TrimSpace(issued)
 		}
+		if token == "" {
+			return fmt.Errorf("host notification STS token is empty")
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+token)
 	}
 	client := &http.Client{Timeout: cfg.Timeout}
 	if client.Timeout <= 0 {

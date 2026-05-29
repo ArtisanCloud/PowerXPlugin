@@ -175,7 +175,6 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 	if base == "" {
 		return nil, errors.New("PX_GATEWAY_BASE_URL 未配置")
 	}
-	token := strings.TrimSpace(s.cfg.Gateway.ToolToken)
 	apiKey := strings.TrimSpace(s.cfg.Gateway.APIKey)
 	authScheme := strings.ToLower(strings.TrimSpace(s.cfg.Gateway.AuthScheme))
 	tenant := strings.TrimSpace(s.cfg.Gateway.TenantUUID)
@@ -191,10 +190,6 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 	case "apikey", "api_key", "api-key":
 		if apiKey != "" {
 			req.Header.Set("Authorization", "ApiKey "+apiKey)
-		}
-	default:
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
 		}
 	}
 	if tenant != "" {

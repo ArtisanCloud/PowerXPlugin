@@ -1,11 +1,37 @@
 import { ref, type Ref } from 'vue'
 import { useNuxtApp, useToast } from '#imports'
-import type {
-  PowerXCapabilityBridge,
-  PowerXCapabilityBridgeError,
-  PowerXCapabilityRequest,
-  PowerXCapabilityResponse
-} from '~/plugins/powerx-capability.client'
+
+export interface PowerXCapabilityRequest {
+  capabilityId: string
+  action: string
+  payload?: Record<string, any> | null
+  headers?: Record<string, string>
+  requestId?: string
+  signal?: AbortSignal
+  apiBase?: string
+  endpoint?: string
+  preferredProtocol?: string
+  metadata?: Record<string, any>
+}
+
+export interface PowerXCapabilityResponse {
+  traceId?: string
+  status?: string
+  data?: Record<string, any> | null
+  errors?: Record<string, any> | Record<string, any>[] | null
+  warnings?: string[] | null
+  raw?: Record<string, any> | Record<string, any>[] | string | null
+}
+
+export interface PowerXCapabilityBridge {
+  invoke(request: PowerXCapabilityRequest): Promise<PowerXCapabilityResponse>
+}
+
+interface PowerXCapabilityBridgeErrorLike extends Error {
+  traceId?: string
+  warnings?: string[]
+  details?: any
+}
 
 export interface UsePowerXCapabilityOptions
   extends Partial<
@@ -102,7 +128,7 @@ export const usePowerXCapability = (bridge?: PowerXCapabilityBridge): UsePowerXC
       return response
     } catch (err: any) {
       lastError.value = err instanceof Error ? err : new Error(String(err))
-      const bridgeError = err as PowerXCapabilityBridgeError
+      const bridgeError = err as PowerXCapabilityBridgeErrorLike
       if (notifyOnError) {
         const description =
           (bridgeError && bridgeError.traceId

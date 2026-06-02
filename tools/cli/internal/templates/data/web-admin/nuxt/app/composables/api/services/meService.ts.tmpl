@@ -65,35 +65,43 @@ export const useMeService = () => {
 
   const withAuthToken = async (options: Record<string, any> = {}) => {
     if (!process.client) return options;
-    const refreshed = await auth.ensureFreshToken?.();
-    const token = String(refreshed || auth.getToken?.() || "").trim();
+    const explicitToken = String(options.authToken || "").trim();
+    const refreshed = explicitToken ? "" : await auth.ensureFreshToken?.();
+    const token = String(explicitToken || refreshed || auth.getToken?.() || "").trim();
     if (!token) {
       const err: any = new Error("登录状态缺失，请重新登录");
       err.status = 401;
       err.statusCode = 401;
       throw err;
     }
+    const headers = new Headers((options.headers as HeadersInit) || undefined);
+    headers.set("Authorization", /^Bearer\s/i.test(token) ? token : `Bearer ${token}`);
+    if (options.tenantUuid && !headers.has("tenant_uuid")) {
+      headers.set("tenant_uuid", String(options.tenantUuid));
+    }
     return {
       ...options,
       token,
+      headers,
     };
   };
 
   const requestWithFallback = async <T>(
     method: "get" | "post" | "put",
     suffix: string,
-    body?: any
+    body?: any,
+    options: Record<string, any> = {},
   ): Promise<T> => {
     let lastError: any = null;
     for (const base of contextBaseCandidates) {
       try {
         if (method === "get") {
-          return await apiClient.get<T>(`${base}${suffix}`, await withAuthToken());
+          return await apiClient.get<T>(`${base}${suffix}`, await withAuthToken(options));
         }
         if (method === "post") {
-          return await apiClient.post<T>(`${base}${suffix}`, body, await withAuthToken());
+          return await apiClient.post<T>(`${base}${suffix}`, body, await withAuthToken(options));
         }
-        return await apiClient.put<T>(`${base}${suffix}`, body, await withAuthToken());
+        return await apiClient.put<T>(`${base}${suffix}`, body, await withAuthToken(options));
       } catch (error: any) {
         lastError = error;
         const status = Number(
@@ -118,10 +126,12 @@ export const useMeService = () => {
      * 获取当前用户的上下文信息
      * 包含用户基本信息、当前租户、所属成员信息等
      */
-    getMyContext: () => {
+    getMyContext: (options?: { authToken?: string; tenantUuid?: string }) => {
       return requestWithFallback<ApiResponse<UserContextData>>(
         "get",
-        "/me/context"
+        "/me/context",
+        undefined,
+        options || {},
       );
     },
 

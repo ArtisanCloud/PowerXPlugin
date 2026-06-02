@@ -8,6 +8,9 @@
   "files": [
     "index.ts",
     "api.ts",
+    "api-fetch.ts",
+    "bridge.ts",
+    "host-session.ts",
     "ws.ts",
     "logger.ts"
   ],

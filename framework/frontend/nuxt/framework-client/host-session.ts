@@ -42,12 +42,32 @@ export interface AppliedPowerXHostAuthToken {
   expiresIn: number;
 }
 
+type AppliedSessionCacheEntry = {
+  fingerprint: string;
+  fetchedAt: number;
+  inflight?: Promise<void>;
+};
+
 const text = (value: unknown) => String(value ?? "").trim();
 
 const numeric = (value: unknown) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const getSessionCache = () => {
+  const key = "__POWERX_PLUGIN_HOST_SESSION_CACHE__";
+  const holder = globalThis as typeof globalThis & {
+    [key]?: Map<string, AppliedSessionCacheEntry>;
+  };
+  if (!holder[key]) {
+    holder[key] = new Map();
+  }
+  return holder[key]!;
+};
+
+const sessionFingerprint = (accessToken: string, tenantUuid?: string) =>
+  `${accessToken}::${tenantUuid || ""}`;
 
 export function normalizeBearerToken(token: string) {
   const clean = text(token);
@@ -129,11 +149,35 @@ export async function applyPowerXHostAuthToken(
   });
 
   if (options.fetchUserContext) {
-    await options.fetchUserContext({
-      force: true,
-      authToken: normalized.accessToken,
-      ...(normalized.tenantUuid ? { tenantUuid: normalized.tenantUuid } : {}),
-    });
+    const cache = getSessionCache();
+    const fingerprint = sessionFingerprint(normalized.accessToken, normalized.tenantUuid || undefined);
+    const cached = cache.get(ctxKey);
+    if (cached?.fingerprint === fingerprint) {
+      if (cached.inflight) {
+        await cached.inflight;
+      }
+    } else {
+      const inflight = options.fetchUserContext({
+        force: true,
+        authToken: normalized.accessToken,
+        ...(normalized.tenantUuid ? { tenantUuid: normalized.tenantUuid } : {}),
+      });
+      cache.set(ctxKey, {
+        fingerprint,
+        fetchedAt: Date.now(),
+        inflight,
+      });
+      try {
+        await inflight;
+        cache.set(ctxKey, {
+          fingerprint,
+          fetchedAt: Date.now(),
+        });
+      } catch (error) {
+        cache.delete(ctxKey);
+        throw error;
+      }
+    }
   }
   options.validateIdentity?.();
 

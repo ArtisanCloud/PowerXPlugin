@@ -2,7 +2,7 @@ import {
   createSchedulerClient,
   type ListSchedulerJobsInput,
   type SchedulerJobSpec
-} from "../../../../../../framework/frontend/nuxt/framework-client/scheduler";
+} from "@artisan-cloud/plugin-framework-client";
 import { useApiClient } from "./_client";
 
 const unwrapApi = <T>(value: any): T => {
@@ -71,6 +71,7 @@ export type {
   SchedulerClient,
   SchedulerJob,
   SchedulerJobSpec,
-  SchedulerProviderMode,
   SchedulerScheduleType
-} from "../../../../../../framework/frontend/nuxt/framework-client/scheduler";
+} from "@artisan-cloud/plugin-framework-client";
+
+export type SchedulerProviderMode = "local" | "host" | "dual" | "proxy" | "gateway";

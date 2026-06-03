@@ -104,6 +104,8 @@ export interface PowerXBridgeOptions {
 }
 
 const BRIDGE_KEY = "__POWERX_FRAMEWORK_BRIDGE__";
+const AUTH_TOKEN_REQUEST_CACHE_KEY = "__POWERX_AUTH_TOKEN_REQUEST_CACHE__";
+const AUTH_TOKEN_REQUEST_DEDUPE_MS = 1_000;
 
 function getWindow(): Window | null {
   return typeof window === "undefined" ? null : window;
@@ -273,13 +275,25 @@ export function initPowerXBridge(options: PowerXBridgeOptions = {}) {
 export function requestPowerXHostAuthToken(pluginId: string, instanceId?: string) {
   const win = getWindow();
   if (!win?.parent) return;
+  const resolvedInstanceId =
+    instanceId ||
+    (typeof location === "undefined" ? undefined : location.pathname + location.search);
+  const requestKey = `${pluginId}::${resolvedInstanceId || ""}`;
+  const globalObject = win as any;
+  const cache: Map<string, number> =
+    globalObject[AUTH_TOKEN_REQUEST_CACHE_KEY] ||
+    (globalObject[AUTH_TOKEN_REQUEST_CACHE_KEY] = new Map<string, number>());
+  const now = Date.now();
+  const lastRequestedAt = cache.get(requestKey) || 0;
+  if (now - lastRequestedAt < AUTH_TOKEN_REQUEST_DEDUPE_MS) {
+    return;
+  }
+  cache.set(requestKey, now);
   const payload: PowerXPluginAuthTokenRequestPayload = {
     source: "powerx-plugin",
     type: "auth-token:request",
     pluginId,
-    instanceId:
-      instanceId ||
-      (typeof location === "undefined" ? undefined : location.pathname + location.search),
+    instanceId: resolvedInstanceId,
   };
   win.parent.postMessage(payload, "*");
 }

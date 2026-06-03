@@ -1,5 +1,5 @@
 // 解析 API 基址 + 获取 Token/Tenant 的小工具
-import { createFrameworkLogger } from "../../../../../../framework/frontend/nuxt/framework-client/logger";
+import { createFrameworkLogger } from "@artisan-cloud/plugin-framework-client";
 
 const logger = createFrameworkLogger("api.base");
 

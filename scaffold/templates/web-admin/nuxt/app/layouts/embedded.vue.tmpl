@@ -7,7 +7,7 @@ import { useTheme } from '~/composables/useTheme'
 import { PLUGIN_ID } from '~/utils/powerx-bridge'
 import { useAuth } from '~/composables/useAuth'
 import DelegatedAuthBanner from '~/components/DelegatedAuthBanner.vue'
-import { createFrameworkLogger } from '../../../../../framework/frontend/nuxt/framework-client/logger'
+import { createFrameworkLogger } from '@artisan-cloud/plugin-framework-client'
 
 const route = useRoute()
 const runtimeConfig = useRuntimeConfig()

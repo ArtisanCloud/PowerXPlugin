@@ -126,6 +126,21 @@ export async function applyPowerXHostAuthToken(
     options.pluginOrigin ||
     (typeof window === "undefined" ? "plugin" : window.location.origin);
   const ctxKey = `${pluginOrigin}::${pluginId}`;
+  const cache = getSessionCache();
+  const fingerprint = sessionFingerprint(normalized.accessToken, normalized.tenantUuid || undefined);
+  const cached = cache.get(ctxKey);
+  if (cached?.fingerprint === fingerprint) {
+    if (cached.inflight) {
+      await cached.inflight;
+    }
+    options.validateIdentity?.();
+    return {
+      ctxKey,
+      accessToken: normalized.accessToken,
+      tenantUuid: normalized.tenantUuid || undefined,
+      expiresIn: normalized.expiresIn,
+    };
+  }
 
   options.storeHostCtx(ctxKey, {
     token: normalized.accessToken,
@@ -149,35 +164,31 @@ export async function applyPowerXHostAuthToken(
   });
 
   if (options.fetchUserContext) {
-    const cache = getSessionCache();
-    const fingerprint = sessionFingerprint(normalized.accessToken, normalized.tenantUuid || undefined);
-    const cached = cache.get(ctxKey);
-    if (cached?.fingerprint === fingerprint) {
-      if (cached.inflight) {
-        await cached.inflight;
-      }
-    } else {
-      const inflight = options.fetchUserContext({
-        force: true,
-        authToken: normalized.accessToken,
-        ...(normalized.tenantUuid ? { tenantUuid: normalized.tenantUuid } : {}),
-      });
+    const inflight = options.fetchUserContext({
+      force: true,
+      authToken: normalized.accessToken,
+      ...(normalized.tenantUuid ? { tenantUuid: normalized.tenantUuid } : {}),
+    });
+    cache.set(ctxKey, {
+      fingerprint,
+      fetchedAt: Date.now(),
+      inflight,
+    });
+    try {
+      await inflight;
       cache.set(ctxKey, {
         fingerprint,
         fetchedAt: Date.now(),
-        inflight,
       });
-      try {
-        await inflight;
-        cache.set(ctxKey, {
-          fingerprint,
-          fetchedAt: Date.now(),
-        });
-      } catch (error) {
-        cache.delete(ctxKey);
-        throw error;
-      }
+    } catch (error) {
+      cache.delete(ctxKey);
+      throw error;
     }
+  } else {
+    cache.set(ctxKey, {
+      fingerprint,
+      fetchedAt: Date.now(),
+    });
   }
   options.validateIdentity?.();
 

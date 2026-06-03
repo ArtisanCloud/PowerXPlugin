@@ -1,8 +1,8 @@
 import { getAuthToken, getTenantUuid, resolveApiBase } from "~/composables/api/_base";
 import { useApiClient } from "~/composables/api/_client";
 import { resolveFrontendRuntimeMode } from "~/utils/runtime-mode";
-import { createPluginWsClient } from "../../../../../framework/frontend/nuxt/framework-client/ws";
-import { createFrameworkLogger } from "../../../../../framework/frontend/nuxt/framework-client/logger";
+import { createPluginWsClient } from "@artisan-cloud/plugin-framework-client";
+import { createFrameworkLogger } from "@artisan-cloud/plugin-framework-client";
 
 export type NotificationWsState =
   | "idle"

@@ -10,8 +10,8 @@ export const useMe = () => {
 
   return {
     // 从 meService 获取的方法
-    getUserContext: async () => {
-      const response = await meService.getMyContext();
+    getUserContext: async (options?: { authToken?: string; tenantUuid?: string }) => {
+      const response = await meService.getMyContext(options);
       return response.data;
     },
     switchTenant: async (tenantUuid: string) => {

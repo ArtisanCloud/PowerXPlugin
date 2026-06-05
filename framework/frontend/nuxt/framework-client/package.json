@@ -1,6 +1,6 @@
 {
   "name": "@artisan-cloud/plugin-framework-client",
-  "version": "0.0.5",
+  "version": "0.0.8",
   "type": "module",
   "exports": {
     ".": "./index.ts"
@@ -8,6 +8,10 @@
   "files": [
     "index.ts",
     "api.ts",
+    "api-fetch.ts",
+    "bridge.ts",
+    "host-session.ts",
+    "scheduler.ts",
     "ws.ts",
     "logger.ts"
   ],

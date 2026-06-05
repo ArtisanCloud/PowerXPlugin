@@ -7,7 +7,6 @@ export type HostCtx = {
   tenantUuid?: string
   ctx?: string
   ctxSig?: string
-  ctxJwt?: string
   hostOrigin?: string
   expiresAt?: number
   expiresIn?: number

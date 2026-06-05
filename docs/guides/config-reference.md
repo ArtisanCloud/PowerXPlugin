@@ -10,6 +10,7 @@ server:
 database:
 runtime:
 context:
+host:
 security:
 gateway:
 customer_auth:
@@ -54,6 +55,18 @@ admin_console:
 - `enable_cors/cors_origins`
 - `rate_limit.*`
 - `gateway_allowlist/require_tls13/toolgrant_secret`
+
+### 2.5.1 `host`
+- `web_admin_origins`：PowerX 宿主注入的 Web Admin 公开访问来源白名单，如 `https://admin.example.com`、`http://localhost:3030`、`http://127.0.0.1:3030`。
+
+`host.*` 是 PowerX 标准 Host Contract 字段。插件可以读取它并映射到自己的私有配置，例如将 `host.web_admin_origins` 合并到 `security.cors_origins`。PowerX 底座不应猜测插件私有字段。
+
+生产环境中，`web_admin_port` 和 `host.web_admin_origins` 是两个不同概念：
+
+- `web_admin_port`：PowerX Web Admin 内部监听端口，通常由 PowerX setup/install 写入。
+- `host.web_admin_origins`：浏览器真实访问 PowerX Admin 的公开 Origin；如果使用 Nginx/HTTPS/域名反代，必须由 PowerX 配置 `http_security.web_admin_origins` 或 `POWERX_WEB_ADMIN_ORIGINS` 后下发。
+
+插件宿主模式下做 CORS/Origin 校验时，必须读取 `host.web_admin_origins`；不能只根据内部端口猜测外部域名。
 
 ### 2.6 `customer_auth`
 - `mode`：`local | delegate`

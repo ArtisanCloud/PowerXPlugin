@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -78,6 +79,20 @@ type Asset struct {
 	Extra            map[string]string `json:"extra"`
 }
 
+type AssetVariant struct {
+	UUID        string            `json:"uuid"`
+	TenantUUID  string            `json:"tenant_uuid"`
+	AssetUUID   string            `json:"asset_uuid"`
+	Variant     string            `json:"variant"`
+	Name        string            `json:"name"`
+	Driver      string            `json:"driver"`
+	ObjectKey   string            `json:"object_key"`
+	SizeBytes   int64             `json:"size_bytes"`
+	MimeType    string            `json:"mime_type"`
+	DownloadURL string            `json:"download_url"`
+	Extra       map[string]string `json:"extra"`
+}
+
 type CreateAssetInput struct {
 	TenantUUID       string
 	OperatorID       string
@@ -113,6 +128,31 @@ type GetAssetInput struct {
 type PresignAssetInput struct {
 	TenantUUID       string
 	UUID             string
+	OperatorID       string
+	Action           PresignAction
+	Method           string
+	ExpiresInSeconds uint32
+	Headers          map[string]string
+	RequestID        string
+}
+
+type CreateAssetVariantInput struct {
+	TenantUUID string
+	UUID       string
+	Variant    string
+	Name       string
+	Driver     string
+	ObjectKey  string
+	SizeBytes  int64
+	MimeType   string
+	Metadata   map[string]string
+	RequestID  string
+}
+
+type PresignAssetVariantInput struct {
+	TenantUUID       string
+	UUID             string
+	Variant          string
 	OperatorID       string
 	Action           PresignAction
 	Method           string
@@ -196,6 +236,43 @@ func (c *Client) PresignAsset(ctx context.Context, input PresignAssetInput) (*Pr
 		"metadata":           copyStringMap(input.Headers),
 	}
 	result, err := c.invoke(ctx, CapabilityMediaAssetsManage, "PresignMediaAsset", payload, input.TenantUUID, input.RequestID)
+	if err != nil {
+		return nil, err
+	}
+	return decodePresign(result.Data)
+}
+
+func (c *Client) CreateAssetVariant(ctx context.Context, input CreateAssetVariantInput) (*AssetVariant, error) {
+	payload := map[string]any{
+		"tenant_uuid": strings.TrimSpace(input.TenantUUID),
+		"uuid":        strings.TrimSpace(input.UUID),
+		"variant":     strings.TrimSpace(input.Variant),
+		"name":        strings.TrimSpace(input.Name),
+		"driver":      strings.TrimSpace(input.Driver),
+		"object_key":  strings.TrimSpace(input.ObjectKey),
+		"size_bytes":  input.SizeBytes,
+		"mime_type":   strings.TrimSpace(input.MimeType),
+		"metadata":    copyStringMap(input.Metadata),
+	}
+	result, err := c.invoke(ctx, CapabilityMediaAssetsManage, "CreateMediaAssetVariant", payload, input.TenantUUID, input.RequestID)
+	if err != nil {
+		return nil, err
+	}
+	return decodeAssetVariant(result.Data)
+}
+
+func (c *Client) PresignAssetVariant(ctx context.Context, input PresignAssetVariantInput) (*PresignAssetOutput, error) {
+	payload := map[string]any{
+		"tenant_uuid":        strings.TrimSpace(input.TenantUUID),
+		"uuid":               strings.TrimSpace(input.UUID),
+		"variant":            strings.TrimSpace(input.Variant),
+		"operator_id":        strings.TrimSpace(input.OperatorID),
+		"action":             firstNonEmpty(string(input.Action), string(PresignActionDownload)),
+		"expires_in_seconds": input.ExpiresInSeconds,
+		"method":             strings.TrimSpace(input.Method),
+		"metadata":           copyStringMap(input.Headers),
+	}
+	result, err := c.invoke(ctx, CapabilityMediaAssetsManage, "PresignMediaAssetVariant", payload, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +369,38 @@ func decodeAsset(data map[string]any) (*Asset, error) {
 	return &out, nil
 }
 
+func decodeAssetVariant(data map[string]any) (*AssetVariant, error) {
+	raw := unwrapData(data)
+	if raw == nil {
+		return nil, errors.New("media asset variant response data is empty")
+	}
+	var out AssetVariant
+	if err := decodeMap(raw, &out); err != nil {
+		return nil, err
+	}
+	if rawMap, ok := raw.(map[string]any); ok {
+		if strings.TrimSpace(out.AssetUUID) == "" {
+			out.AssetUUID = firstStringFromMap(rawMap, "assetUuid", "asset_uuid", "AssetUUID")
+		}
+		if strings.TrimSpace(out.ObjectKey) == "" {
+			out.ObjectKey = firstStringFromMap(rawMap, "objectKey", "object_key", "StorageKey")
+		}
+		if strings.TrimSpace(out.DownloadURL) == "" {
+			out.DownloadURL = firstStringFromMap(rawMap, "downloadUrl", "download_url")
+		}
+	}
+	if strings.TrimSpace(out.AssetUUID) == "" {
+		return nil, errors.New("media asset variant response missing asset uuid")
+	}
+	if strings.TrimSpace(out.ObjectKey) == "" {
+		return nil, errors.New("media asset variant response missing object key")
+	}
+	if strings.TrimSpace(out.Variant) == "" {
+		return nil, errors.New("media asset variant response missing variant")
+	}
+	return &out, nil
+}
+
 func decodePresign(data map[string]any) (*PresignAssetOutput, error) {
 	raw := unwrapData(data)
 	if raw == nil {
@@ -300,6 +409,14 @@ func decodePresign(data map[string]any) (*PresignAssetOutput, error) {
 	var out PresignAssetOutput
 	if err := decodeMap(raw, &out); err != nil {
 		return nil, err
+	}
+	if rawMap, ok := raw.(map[string]any); ok {
+		if out.ExpiresInSeconds == 0 {
+			out.ExpiresInSeconds = uint32(firstNumberFromMap(rawMap, "expiresInSeconds", "expires_in_seconds"))
+		}
+		if strings.TrimSpace(out.ObjectKey) == "" {
+			out.ObjectKey = firstStringFromMap(rawMap, "objectKey", "object_key", "StorageKey")
+		}
 	}
 	if strings.TrimSpace(out.URL) == "" {
 		return nil, errors.New("media presign response missing url")
@@ -363,6 +480,46 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func firstStringFromMap(data map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value, ok := data[key]; ok {
+			text := strings.TrimSpace(fmt.Sprint(value))
+			if text != "" && text != "<nil>" {
+				return text
+			}
+		}
+	}
+	return ""
+}
+
+func firstNumberFromMap(data map[string]any, keys ...string) int64 {
+	for _, key := range keys {
+		value, ok := data[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case json.Number:
+			n, err := typed.Int64()
+			if err == nil {
+				return n
+			}
+		case int:
+			return int64(typed)
+		case int64:
+			return typed
+		case float64:
+			return int64(typed)
+		case string:
+			n, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+			if err == nil {
+				return n
+			}
+		}
+	}
+	return 0
 }
 
 func DefaultUploadTTL() uint32 {

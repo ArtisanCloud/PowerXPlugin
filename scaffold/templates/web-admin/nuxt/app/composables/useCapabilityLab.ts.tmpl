@@ -1,11 +1,24 @@
 import { ref } from 'vue'
 import { useToast } from '#imports'
-import { usePowerXCapability } from '~/composables/usePowerXCapability'
-import { getAuthToken } from '~/composables/api/_base'
 import {
-  PowerXCapabilityBridgeError,
-  type PowerXCapabilityResponse
-} from '~/plugins/powerx-capability.client'
+  type PowerXCapabilityResponse,
+  usePowerXCapability
+} from '~/composables/usePowerXCapability'
+import { getAuthToken } from '~/composables/api/_base'
+
+class CapabilityLabBridgeError extends Error {
+  traceId?: string
+  warnings?: string[]
+  details?: any
+
+  constructor(message: string, opts: { traceId?: string; warnings?: string[]; details?: any } = {}) {
+    super(message)
+    this.name = 'PowerXCapabilityBridgeError'
+    this.traceId = opts.traceId
+    this.warnings = opts.warnings
+    this.details = opts.details
+  }
+}
 
 export interface CapabilityLabHistoryEntry {
   id: string
@@ -137,7 +150,7 @@ export const useCapabilityLab = () => {
         color: 'green'
       })
     } catch (err: any) {
-      const bridgeError = err as PowerXCapabilityBridgeError
+      const bridgeError = err as CapabilityLabBridgeError
       durationMs.value = now() - started
       result.value = null
       const warningList = normalizeWarnings(bridgeError?.warnings)
@@ -265,12 +278,12 @@ const invokeLocalCapability = async (
   const payload = request.payload || {}
   const endpoint = String(payload.endpoint || '').trim()
   if (!endpoint) {
-    throw new PowerXCapabilityBridgeError('本地调试需要在 payload.endpoint 中指定接口路径')
+    throw new CapabilityLabBridgeError('本地调试需要在 payload.endpoint 中指定接口路径')
   }
   const method = String(payload.method || 'GET').toUpperCase()
   const url = buildLocalUrl(request.apiBase, endpoint)
   if (!url) {
-    throw new PowerXCapabilityBridgeError('请在调试面板中填写 API Base 或完整的 endpoint URL')
+    throw new CapabilityLabBridgeError('请在调试面板中填写 API Base 或完整的 endpoint URL')
   }
   const headers = {
     'Content-Type': 'application/json',
@@ -296,7 +309,7 @@ const invokeLocalCapability = async (
       body
     })
   } catch (error: any) {
-    throw new PowerXCapabilityBridgeError(
+    throw new CapabilityLabBridgeError(
       error instanceof Error ? error.message : '本地接口请求失败'
     )
   }
@@ -306,7 +319,7 @@ const invokeLocalCapability = async (
   const parsed = parseBodySafely(text)
 
   if (!response.ok) {
-    throw new PowerXCapabilityBridgeError(
+    throw new CapabilityLabBridgeError(
       `HTTP ${response.status} ${response.statusText || ''}`.trim(),
       {
         status: response.status,

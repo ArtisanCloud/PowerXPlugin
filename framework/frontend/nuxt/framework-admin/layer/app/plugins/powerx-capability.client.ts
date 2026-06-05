@@ -3,7 +3,7 @@ import { ofetch, type OFetch, type FetchResponse } from 'ofetch'
 
 const DEFAULT_ENDPOINT = '/integration/capabilities/invoke'
 
-export interface PowerXCapabilityRequest {
+interface PowerXCapabilityRequest {
   capabilityId: string
   action: string
   payload?: Record<string, any> | null
@@ -16,7 +16,7 @@ export interface PowerXCapabilityRequest {
   metadata?: Record<string, any>
 }
 
-export interface PowerXCapabilityResponse {
+interface PowerXCapabilityResponse {
   traceId?: string
   status?: string
   data?: Record<string, any> | null
@@ -25,26 +25,25 @@ export interface PowerXCapabilityResponse {
   raw?: Record<string, any> | Record<string, any>[] | string | null
 }
 
-export class PowerXCapabilityBridgeError extends Error {
-  status?: number
-  traceId?: string
-  details?: any
-  warnings?: string[]
-
-  constructor(
-    message: string,
-    opts: { status?: number; traceId?: string; details?: any; warnings?: string[] } = {}
-  ) {
-    super(message)
-    this.name = 'PowerXCapabilityBridgeError'
-    this.status = opts.status
-    this.traceId = opts.traceId
-    this.details = opts.details
-    this.warnings = opts.warnings
+const createCapabilityBridgeError = (
+  message: string,
+  opts: { status?: number; traceId?: string; details?: any; warnings?: string[] } = {}
+) => {
+  const error = new Error(message) as Error & {
+    status?: number
+    traceId?: string
+    details?: any
+    warnings?: string[]
   }
+  error.name = 'PowerXCapabilityBridgeError'
+  error.status = opts.status
+  error.traceId = opts.traceId
+  error.details = opts.details
+  error.warnings = opts.warnings
+  return error
 }
 
-export interface PowerXCapabilityBridge {
+interface PowerXCapabilityBridge {
   invoke(request: PowerXCapabilityRequest): Promise<PowerXCapabilityResponse>
 }
 
@@ -114,11 +113,11 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
     async invoke(request) {
       const capabilityId = request.capabilityId?.trim()
       if (!capabilityId) {
-        throw new PowerXCapabilityBridgeError('capabilityId is required')
+        throw createCapabilityBridgeError('capabilityId is required')
       }
       const action = request.action?.trim()
       if (!action) {
-        throw new PowerXCapabilityBridgeError('action is required')
+        throw createCapabilityBridgeError('action is required')
       }
       const url = combineURL(request.apiBase ?? options.apiBase, request.endpoint ?? endpoint)
       const headers: Record<string, string> = {
@@ -148,7 +147,7 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
           signal: request.signal
         })
       } catch (error) {
-        throw new PowerXCapabilityBridgeError(
+        throw createCapabilityBridgeError(
           error instanceof Error ? error.message : 'capability invoke failed'
         )
       }
@@ -157,7 +156,7 @@ const createBridge = (options: BridgeOptions): PowerXCapabilityBridge => {
       const traceId = payload.traceId || response.headers.get('x-trace-id') || undefined
       const warnings = Array.isArray(payload.warnings) ? payload.warnings : undefined
       if (response.status >= 400 || payload.error) {
-        throw new PowerXCapabilityBridgeError(payload.error?.message || 'capability invoke failed', {
+        throw createCapabilityBridgeError(payload.error?.message || 'capability invoke failed', {
           status: response.status,
           traceId,
           details: payload.error || payload.errors,

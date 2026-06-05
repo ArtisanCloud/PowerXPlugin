@@ -40,7 +40,7 @@ import { useTheme } from "~/composables/useTheme";
 import { PLUGIN_ID, isPluginAdminPath } from "~/utils/powerx-bridge";
 import { useAuth } from "~/composables/useAuth";
 import DelegatedAuthBanner from "~/components/DelegatedAuthBanner.vue";
-import { createFrameworkLogger } from "../../../../../framework/frontend/nuxt/framework-client/logger";
+import { createFrameworkLogger } from "@artisan-cloud/plugin-framework-client";
 
 // 获取运行时配置
 const runtimeConfig = useRuntimeConfig();

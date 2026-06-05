@@ -162,7 +162,11 @@ export const useUserStore = defineStore("user", {
 
   actions: {
     // 加载用户上下文
-    async fetchUserContext({ force = false }: { force?: boolean } = {}) {
+    async fetchUserContext({
+      force = false,
+      authToken,
+      tenantUuid,
+    }: { force?: boolean; authToken?: string; tenantUuid?: string } = {}) {
       // 如果正在加载，直接返回
       if (this.isLoading) return;
 
@@ -180,9 +184,12 @@ export const useUserStore = defineStore("user", {
 
       try {
         const { getUserContext } = useMe();
-        const response = await getUserContext();
+        const response = await getUserContext({
+          ...(authToken ? { authToken } : {}),
+          ...(tenantUuid ? { tenantUuid } : {}),
+        });
 
-        this.context = response;
+        this.context = this.normalizeUserContext(response);
         this.lastFetchedAt = Date.now();
         this.persistCurrentTenantUUID();
       } catch (error: any) {
@@ -238,6 +245,27 @@ export const useUserStore = defineStore("user", {
       };
       this.lastFetchedAt = Date.now();
       this.persistCurrentTenantUUID();
+    },
+
+    normalizeUserContext(input: UserContextData): UserContextData {
+      const currentTenantUuid = String(input?.current_tenant_uuid || "").trim();
+      const currentMemberUuid = String(input?.current_member_uuid || "").trim();
+      if (input?.is_root || currentMemberUuid || !Array.isArray(input?.members)) {
+        return input;
+      }
+      const currentMember =
+        input.members.find((item: ContextMember) => {
+          if (currentTenantUuid && item.tenant_uuid === currentTenantUuid) return true;
+          return Number(item.member_id || 0) === Number(input.current_member_id || 0);
+        }) || null;
+      const memberUuid = String(currentMember?.member_uuid || "").trim();
+      if (!memberUuid) {
+        return input;
+      }
+      return {
+        ...input,
+        current_member_uuid: memberUuid,
+      };
     },
 
     // 更新用户信息（本地更新，不调用API）

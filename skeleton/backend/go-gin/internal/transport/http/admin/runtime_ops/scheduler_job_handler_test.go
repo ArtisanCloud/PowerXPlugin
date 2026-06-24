@@ -26,9 +26,7 @@ func TestSchedulerJobHandlerCRUDAndActions(t *testing.T) {
 	emitter := eventbridge.NewLocalEmitter(8)
 	deps := &app.Deps{
 		EventEmitter: emitter,
-		Config: &config.Config{
-			Gateway: &config.GatewayConfig{TenantUUID: "tenant-001"},
-		},
+		Config:       &config.Config{},
 	}
 	handler := NewSchedulerJobHandler(deps)
 	r := gin.New()
@@ -42,6 +40,7 @@ func TestSchedulerJobHandlerCRUDAndActions(t *testing.T) {
 
 	createResp := postSchedulerJSON(t, r, "/scheduler/jobs", map[string]any{
 		"name":          "sample_progress_50",
+		"tenant_uuid":   "tenant-001",
 		"schedule_type": "once",
 		"schedule_expr": time.Now().UTC().Add(time.Hour).Format(time.RFC3339),
 		"payload": map[string]any{
@@ -138,9 +137,7 @@ func TestSchedulerJobHandlerHostModeUnavailable(t *testing.T) {
 
 	deps := &app.Deps{
 		EventEmitter: eventbridge.NewLocalEmitter(8),
-		Config: &config.Config{
-			Gateway: &config.GatewayConfig{TenantUUID: "tenant-001"},
-		},
+		Config:       &config.Config{},
 	}
 	handler := NewSchedulerJobHandler(deps)
 	r := gin.New()
@@ -164,9 +161,7 @@ func TestSchedulerJobHandlerHostModeDoesNotSendRequestTenant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	handler := NewSchedulerJobHandler(&app.Deps{
 		EventEmitter: eventbridge.NewLocalEmitter(8),
-		Config: &config.Config{
-			Gateway: &config.GatewayConfig{TenantUUID: "tenant-from-gateway-config"},
-		},
+		Config:       &config.Config{},
 	})
 	req := httptest.NewRequest(http.MethodGet, "/scheduler/jobs?provider_mode=host", nil)
 	rec := httptest.NewRecorder()

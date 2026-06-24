@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "required": ["action"],
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["create", "get", "update", "delete", "list"]
+    },
+    "template_id": {
+      "type": "string"
+    },
+    "q": {
+      "type": "string"
+    },
+    "page": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "page_size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "description", "content"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        }
+      }
+    }
+  }
+}

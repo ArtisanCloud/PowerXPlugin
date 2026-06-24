@@ -561,14 +561,16 @@ func mapTokens(tokens *iamservice.AuthTokens) gin.H {
 		expiresAt = time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
 	}
 	return gin.H{
-		"token_type":     tokens.TokenType,
-		"access_token":   tokens.AccessToken,
-		"refresh_token":  tokens.RefreshToken,
-		"expires_in":     tokens.ExpiresIn,
-		"expires_at":     expiresAt.UnixMilli(),
-		"scope":          tokens.Scope,
-		"policy_version": tokens.PolicyVersion,
-		"plugin_id":      tokens.PluginID,
+		"token_type":           tokens.TokenType,
+		"access_token":         tokens.AccessToken,
+		"refresh_token":        tokens.RefreshToken,
+		"expires_in":           tokens.ExpiresIn,
+		"expires_at":           expiresAt.UnixMilli(),
+		"scope":                tokens.Scope,
+		"tenant_uuid":          strings.TrimSpace(tokens.TenantUUID),
+		"current_tenant_uuid":  strings.TrimSpace(tokens.TenantUUID),
+		"policy_version":       tokens.PolicyVersion,
+		"plugin_id":            tokens.PluginID,
 	}
 }
 

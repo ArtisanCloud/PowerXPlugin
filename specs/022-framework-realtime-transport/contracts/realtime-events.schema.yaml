@@ -1,0 +1,66 @@
+schema: powerx.plugin.realtime.events.v1
+description: Realtime transport event descriptor and envelope contract.
+
+descriptor:
+  required:
+    - key
+    - protocols
+    - actions
+    - scope
+  properties:
+    key:
+      type: string
+      pattern: '^(_topic\.|_channel\.|powerx\.)[a-zA-Z0-9_.:-]+$'
+    protocols:
+      type: array
+      items:
+        enum: [ws, sse]
+    actions:
+      type: array
+      items:
+        enum: [publish, subscribe]
+    scope:
+      enum: [global, tenant, member]
+    event_types:
+      type: array
+      items:
+        type: string
+
+envelope:
+  required:
+    - protocol
+    - event_type
+    - payload
+    - plugin_id
+    - trace_id
+    - timestamp
+  properties:
+    protocol:
+      enum: [ws, sse]
+    topic:
+      type: string
+    channel:
+      type: string
+    event_type:
+      type: string
+    payload:
+      type: object
+    tenant_uuid:
+      type: string
+    member_uuid:
+      type: string
+    plugin_id:
+      type: string
+    trace_id:
+      type: string
+    request_id:
+      type: string
+    timestamp:
+      type: string
+      format: date-time
+
+stream_through:
+  preserve_event_names: true
+  metadata_events:
+    - meta
+    - error

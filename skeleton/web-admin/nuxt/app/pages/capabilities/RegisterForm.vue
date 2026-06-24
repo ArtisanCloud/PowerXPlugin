@@ -1490,6 +1490,7 @@ import {
   type McpInvokeResult,
 } from "~/composables/api/useMcpSession";
 import { resolveApiBase } from "~/composables/api/_base";
+import { createSSE } from "~/composables/api/useStream";
 import { useNormalizedColumns } from "~/utils/table";
 
 definePageMeta({
@@ -2670,10 +2671,7 @@ function connectMcpStream(sessionId: string) {
     return;
   }
   disconnectMcpStream();
-  const endpoint = buildApiUrl("mcp/sse");
-  const url = new URL(endpoint);
-  url.searchParams.set("session_id", sessionId);
-  const source = new EventSource(url.toString());
+  const source = createSSE("mcp/sse", { session_id: sessionId });
   mcpEventSource.value = source;
   source.onopen = () => {
     mcpStreamConnected.value = true;

@@ -1,14 +1,12 @@
 package mcp
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	frameworksse "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ssebus"
 	"{{ .BackendModulePath }}/internal/mcp/stream"
-	"github.com/gin-contrib/sse"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -53,27 +51,38 @@ func (h *Handler) ServeSSE(c *gin.Context) {
 	ch, cancel := h.broker.Subscribe(sessionID)
 	defer cancel()
 
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-
-	c.Stream(func(w io.Writer) bool {
-		select {
-		case <-c.Request.Context().Done():
-			return false
-		case evt, ok := <-ch:
-			if !ok {
-				return false
+	events := make(chan frameworksse.Event, 16)
+	go func() {
+		defer close(events)
+		for {
+			select {
+			case <-c.Request.Context().Done():
+				return
+			case evt, ok := <-ch:
+				if !ok {
+					return
+				}
+				events <- frameworksse.Event{
+					Channel:   sessionID,
+					EventType: evt.Type,
+					Payload:   evt,
+					Timestamp: evt.Timestamp,
+				}
 			}
-			payload, _ := json.Marshal(evt)
-			c.Render(-1, sse.Event{Event: evt.Type, Data: string(payload)})
-			return true
-		case <-time.After(25 * time.Second):
-			heartbeat := stream.Event{SessionID: sessionID, Type: "ping", Timestamp: time.Now().UTC()}
-			payload, _ := json.Marshal(heartbeat)
-			c.Render(-1, sse.Event{Event: heartbeat.Type, Data: string(payload)})
-			return true
 		}
+	}()
+
+	frameworksse.ServeStream(c.Request.Context(), c.Writer, events, frameworksse.StreamOptions{
+		HeartbeatEvery: 25 * time.Second,
+		HeartbeatEvent: "ping",
+		Heartbeat: func(now time.Time) any {
+			return frameworksse.Event{
+				Channel:   sessionID,
+				EventType: "ping",
+				Payload:   stream.Event{SessionID: sessionID, Type: "ping", Timestamp: now.UTC()},
+				Timestamp: now.UTC(),
+			}
+		},
 	})
 }
 

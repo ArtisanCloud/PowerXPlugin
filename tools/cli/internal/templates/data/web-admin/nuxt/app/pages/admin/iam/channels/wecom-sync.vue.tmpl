@@ -217,6 +217,7 @@ import { getAuthToken, resolveApiBase } from "~/composables/api/_base";
 import { useApiClient } from "~/composables/api/_client";
 import { useUserStore } from "~/stores/user";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
+import { createPluginWsClient } from "@artisan-cloud/plugin-framework-client";
 
 definePageMeta({
   title: "企业微信同步中心",
@@ -472,7 +473,14 @@ const connectWS = () => {
   const wsURL = buildWsURL();
   if (!wsURL) return;
   wsClosedByClient = false;
-  wsConn = new WebSocket(wsURL);
+  const parsedWsURL = new URL(wsURL);
+  wsConn = createPluginWsClient({
+    pluginId: String(useRuntimeConfig().public?.powerxPluginId || "com.powerx.plugins.base"),
+    wsBaseURL: `${parsedWsURL.protocol}//${parsedWsURL.host}`,
+    wsPath: parsedWsURL.pathname,
+    token: getAuthToken(),
+    tenantUuid: tenantUUID.value,
+  }).connect();
   wsConn.onopen = () => {
     wsConnected.value = true;
     stopTaskPolling();

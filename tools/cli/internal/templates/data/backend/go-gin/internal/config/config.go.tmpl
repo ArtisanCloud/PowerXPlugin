@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 const (
@@ -297,7 +297,6 @@ type GatewayConfig struct {
 	APIPrefix    string        `yaml:"api_prefix" json:"api_prefix"`
 	AuthScheme   string        `yaml:"auth_scheme" json:"auth_scheme"`
 	APIKey       string        `yaml:"api_key" json:"api_key"`
-	TenantUUID   string        `yaml:"tenant_uuid" json:"tenant_uuid"`
 	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
 	UserAgent    string        `yaml:"user_agent" json:"user_agent"`
 	UseMock      []string      `yaml:"use_mock" json:"use_mock"`
@@ -1182,7 +1181,6 @@ func normalizeConfig(cfg *Config) {
 		cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(resolveConfigValue(cfg.Gateway.AuthScheme))
 		cfg.Gateway.RefreshToken = ""
 		cfg.Gateway.APIKey = resolveConfigValue(cfg.Gateway.APIKey)
-		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
 		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
 
 		if cfg.Gateway.AuthScheme == "" {
@@ -1194,7 +1192,6 @@ func normalizeConfig(cfg *Config) {
 		if cfg.Logging != nil && cfg.Logging.DebugMode && !isHostDelegatedMode(cfg) {
 			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
 			apiKey := strings.TrimSpace(cfg.Gateway.APIKey)
-			tenantUUID := strings.TrimSpace(cfg.Gateway.TenantUUID)
 
 			hasAny := baseURL != "" || apiKey != ""
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
@@ -1208,13 +1205,11 @@ func normalizeConfig(cfg *Config) {
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.api_key":     apiKey != "",
-					"gateway.tenant_uuid": tenantUUID,
 				}), "Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
 
 				cfg.Gateway.BaseURL = ""
 				cfg.Gateway.AuthScheme = ""
 				cfg.Gateway.APIKey = ""
-				cfg.Gateway.TenantUUID = ""
 			}
 		}
 	}
@@ -1771,15 +1766,6 @@ func (c *Config) Validate() error {
 			}
 			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
 				return NewConfigError("gateway config requires base_url + credential matching auth_scheme")
-			}
-
-			if c.Gateway.AuthScheme == "bearer" {
-				tenantUUID := strings.TrimSpace(c.Gateway.TenantUUID)
-				if tenantUUID != "" {
-					if _, err := uuid.Parse(tenantUUID); err != nil {
-						return NewConfigError("gateway.tenant_uuid must be a valid UUID string")
-					}
-				}
 			}
 		}
 	}

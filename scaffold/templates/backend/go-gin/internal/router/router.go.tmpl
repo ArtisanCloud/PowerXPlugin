@@ -99,8 +99,8 @@ func (r *Router) setupGlobalMiddleware() {
 	// 请求 ID
 	r.engine.Use(middleware.RequestID())
 
-	// 超时（30 秒）
-	r.engine.Use(middleware.Timeout(30 * time.Second))
+	// 超时（默认 5 分钟）；SSE/WS 长连接在 middleware 内跳过。
+	r.engine.Use(middleware.Timeout(5 * time.Minute))
 
 	// 速率限制（每分钟最多 100 个请求）
 	r.engine.Use(middleware.RateLimiter(100, time.Minute))

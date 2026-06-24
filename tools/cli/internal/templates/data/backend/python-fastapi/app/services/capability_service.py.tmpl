@@ -313,9 +313,8 @@ class CapabilityService:
     def _resolve_gateway_tenant(self, auth_scheme: str, credential: str, tenant_uuid: str | None = None) -> str:
         if auth_scheme != "bearer":
             return ""
-        explicit = str(tenant_uuid or "").strip() or self._read_first_nonempty_env("PX_GATEWAY_TENANT_UUID")
         token_tenant = _tenant_uuid_from_jwt(credential)
-        return token_tenant or explicit
+        return token_tenant
 
     def _fetch_platform_payload(
         self,

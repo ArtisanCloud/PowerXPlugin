@@ -10,6 +10,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/entity/models"
 	adminconsoleModel "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	agentRegistryModel "{{ .BackendModulePath }}/internal/entity/models/agent_registry"
 	customerModel "{{ .BackendModulePath }}/internal/entity/models/customer"
 	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
 	integrationModel "{{ .BackendModulePath }}/internal/entity/models/integration"
@@ -26,6 +27,8 @@ import (
 var businessTables = []interface{}{
 	&models.PluginCredential{},
 	&models.PluginTenantExt{},
+	&agentRegistryModel.PluginSkill{},
+	&agentRegistryModel.PluginAgent{},
 	&templateModel.Template{},
 	&marketplaceModel.Listing{},
 	&marketplaceModel.ListingAsset{},

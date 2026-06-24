@@ -1,0 +1,14 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string"
+    },
+    "template_id": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}

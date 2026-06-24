@@ -22,7 +22,6 @@ require (
 
 require (
 	github.com/ArtisanCloud/PowerX/api/grpc/gen/go v0.1.0-alpha
-	github.com/gin-contrib/sse v1.1.0
 	github.com/jackc/pgconn v1.14.3
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.46.0

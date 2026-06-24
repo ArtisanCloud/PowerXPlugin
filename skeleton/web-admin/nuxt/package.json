@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@artisan-cloud/plugin-framework-admin": "0.0.8",
-    "@artisan-cloud/plugin-framework-client": "0.0.8",
+    "@artisan-cloud/plugin-framework-client": "file:../../../framework/frontend/nuxt/framework-client",
     "@iconify-json/heroicons": "^1.2.2",
     "@iconify-json/lucide": "^1.2.74",
     "@nuxt/icon": "^2.0.0",

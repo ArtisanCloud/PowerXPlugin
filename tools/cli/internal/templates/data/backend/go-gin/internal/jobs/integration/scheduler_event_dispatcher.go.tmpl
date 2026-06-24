@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"github.com/google/uuid"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -52,11 +52,6 @@ func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitt
 			}
 			if v := strings.TrimSpace(cfg.EventBridge.PayloadVersion); v != "" {
 				payloadVersion = v
-			}
-		}
-		if cfg.Gateway != nil {
-			if v := strings.TrimSpace(cfg.Gateway.TenantUUID); v != "" {
-				tenantUUID = v
 			}
 		}
 	}

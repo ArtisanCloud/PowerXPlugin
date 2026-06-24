@@ -1,0 +1,75 @@
+package agent_registry
+
+import (
+	"time"
+
+	"gorm.io/datatypes"
+	"{{ .BackendModulePath }}/internal/entity/models"
+)
+
+const (
+	SyncStatusDraft    = "draft"
+	SyncStatusPending  = "pending"
+	SyncStatusSynced   = "synced"
+	SyncStatusFailed   = "failed"
+	SyncStatusDrifted  = "drifted"
+	SyncStatusDisabled = "disabled"
+)
+
+type PluginSkill struct {
+	models.BaseModel
+	PluginSkillID    string         `gorm:"type:varchar(160);not null;index:idx_plugin_registry_skill,priority:1" json:"plugin_skill_id"`
+	PluginID         string         `gorm:"type:varchar(160);not null;index:idx_plugin_registry_skill,priority:2" json:"plugin_id"`
+	PowerXSkillID    string         `gorm:"column:powerx_skill_id;type:varchar(180);index" json:"powerx_skill_id"`
+	Version          string         `gorm:"type:varchar(64);not null;default:'1.0.0'" json:"version"`
+	Title            string         `gorm:"type:varchar(255);not null" json:"title"`
+	Description      string         `gorm:"type:text" json:"description"`
+	IntentExamples   datatypes.JSON `gorm:"type:jsonb" json:"intent_examples"`
+	InputSchema      datatypes.JSON `gorm:"type:jsonb" json:"input_schema"`
+	OutputSchema     datatypes.JSON `gorm:"type:jsonb" json:"output_schema"`
+	PromptSpec       datatypes.JSON `gorm:"type:jsonb" json:"prompt_spec"`
+	Executor         datatypes.JSON `gorm:"type:jsonb;not null" json:"executor"`
+	Capability       string         `gorm:"type:varchar(180);not null" json:"capability"`
+	SourceFormat     string         `gorm:"type:varchar(64);not null;default:'skill_package'" json:"source_format"`
+	PackagePath      string         `gorm:"type:text" json:"package_path"`
+	SkillMDPath      string         `gorm:"type:text" json:"skill_md_path"`
+	RawMarkdown      string         `gorm:"type:text" json:"raw_markdown"`
+	FrontmatterJSON  datatypes.JSON `gorm:"type:jsonb" json:"frontmatter_json"`
+	BodyMarkdown     string         `gorm:"type:text" json:"body_markdown"`
+	PackageChecksum  string         `gorm:"type:varchar(128)" json:"package_checksum"`
+	Checksum         string         `gorm:"type:varchar(128)" json:"checksum"`
+	SyncStatus       string         `gorm:"type:varchar(32);not null;default:'draft';index" json:"sync_status"`
+	SyncErrorCode    string         `gorm:"type:varchar(120)" json:"sync_error_code"`
+	SyncErrorMessage string         `gorm:"type:text" json:"sync_error_message"`
+	LastSyncTraceID  string         `gorm:"type:varchar(120)" json:"last_sync_trace_id"`
+	LastSyncAt       *time.Time     `json:"last_sync_at"`
+}
+
+func (PluginSkill) TableName() string {
+	return models.S(models.TablePluginSkills)
+}
+
+type PluginAgent struct {
+	models.BaseModel
+	PluginAgentID    string         `gorm:"type:varchar(160);not null;index:idx_plugin_agent_registry,priority:1" json:"plugin_agent_id"`
+	PluginID         string         `gorm:"type:varchar(160);not null;index:idx_plugin_agent_registry,priority:2" json:"plugin_id"`
+	PowerXAgentUUID  string         `gorm:"column:powerx_agent_uuid;type:varchar(80);index" json:"powerx_agent_uuid"`
+	AgentKey         string         `gorm:"type:varchar(160);not null;index" json:"agent_key"`
+	Name             string         `gorm:"type:varchar(255);not null" json:"name"`
+	Description      string         `gorm:"type:text" json:"description"`
+	ModelProfileRef  string         `gorm:"type:varchar(180)" json:"model_profile_ref"`
+	Persona          string         `gorm:"type:text" json:"persona"`
+	PromptSeed       string         `gorm:"type:text" json:"prompt_seed"`
+	PluginSkillIDs   datatypes.JSON `gorm:"type:jsonb" json:"plugin_skill_ids"`
+	PowerXSkillIDs   datatypes.JSON `gorm:"column:powerx_skill_ids;type:jsonb" json:"powerx_skill_ids"`
+	PowerXStatus     string         `gorm:"column:powerx_status;type:varchar(32)" json:"powerx_status"`
+	SyncStatus       string         `gorm:"type:varchar(32);not null;default:'draft';index" json:"sync_status"`
+	SyncErrorCode    string         `gorm:"type:varchar(120)" json:"sync_error_code"`
+	SyncErrorMessage string         `gorm:"type:text" json:"sync_error_message"`
+	LastSyncTraceID  string         `gorm:"type:varchar(120)" json:"last_sync_trace_id"`
+	LastSyncAt       *time.Time     `json:"last_sync_at"`
+}
+
+func (PluginAgent) TableName() string {
+	return models.S(models.TablePluginAgents)
+}

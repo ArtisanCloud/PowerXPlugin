@@ -188,14 +188,14 @@ const userMenuItems = [
       avatar: {
         src: "https://avatars.githubusercontent.com/u/739984?v=4",
       },
-      click: () => navigateTo("/profile"),
+      onSelect: () => navigateTo("/profile"),
     },
   ],
   [
     {
       label: t("navigation.help"),
       icon: "i-heroicons-question-mark-circle",
-      click: () => navigateTo("/help"),
+      onSelect: () => navigateTo("/help"),
     },
   ],
   [

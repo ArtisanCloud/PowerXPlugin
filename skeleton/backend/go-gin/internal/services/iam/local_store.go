@@ -558,6 +558,7 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		ExpiresIn:     int64(d.accessTTL.Seconds()),
 		Scope:         "access",
 		ExpiresAt:     expires,
+		TenantUUID:    strings.TrimSpace(userCtx.TenantUUID),
 		PluginID:      d.pluginID,
 		PolicyVersion: d.policyVersion,
 	}, nil

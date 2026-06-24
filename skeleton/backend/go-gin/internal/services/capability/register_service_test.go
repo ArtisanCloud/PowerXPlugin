@@ -24,6 +24,10 @@ func (f *fakeManager) ExportProtocols(ctx context.Context) ([]capabilities.Proto
 	return nil, nil
 }
 
+func (f *fakeManager) ExportCatalog(ctx context.Context) (*capabilities.CatalogSnapshot, error) {
+	return &capabilities.CatalogSnapshot{Entries: append([]capabilities.CatalogEntry(nil), f.entries...)}, f.err
+}
+
 func (f *fakeManager) RegisterWithHost(ctx context.Context, client capabilities.HostSyncClient) error {
 	return nil
 }

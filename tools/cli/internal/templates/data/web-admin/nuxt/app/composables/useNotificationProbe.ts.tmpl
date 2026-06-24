@@ -208,7 +208,14 @@ export function useNotificationProbe(scope = "default", defaultTopic = "_topic.s
     wsError.value = "";
     resetDiag();
 
-    const socket = new WebSocket(wsURL);
+    const parsedWsURL = new URL(wsURL);
+    const socket = createPluginWsClient({
+      pluginId: String(useRuntimeConfig().public?.powerxPluginId || "{{ .PluginID }}"),
+      wsBaseURL: `${parsedWsURL.protocol}//${parsedWsURL.host}`,
+      wsPath: parsedWsURL.pathname,
+      token: getAuthToken(),
+      tenantUuid: getTenantUuid(),
+    }).connect();
     wsConn = socket;
     logger.info("ws connecting", { mode: resolveFrontendRuntimeMode().mode, tenantUuid: getTenantUuid(), wsURL });
 

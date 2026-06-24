@@ -148,7 +148,7 @@ func Recovery() gin.HandlerFunc {
 // Timeout 超时中间件
 func Timeout(timeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if isWebSocketUpgrade(c.Request) {
+		if isRealtimeStreamRequest(c.Request) {
 			c.Next()
 			return
 		}
@@ -188,6 +188,21 @@ func Timeout(timeout time.Duration) gin.HandlerFunc {
 			c.Abort()
 		}
 	}
+}
+
+func isRealtimeStreamRequest(req *http.Request) bool {
+	if req == nil {
+		return false
+	}
+	if isWebSocketUpgrade(req) {
+		return true
+	}
+	accept := strings.ToLower(req.Header.Get("Accept"))
+	if strings.Contains(accept, "text/event-stream") {
+		return true
+	}
+	path := strings.ToLower(strings.TrimSpace(req.URL.Path))
+	return strings.HasSuffix(path, "/stream/sse") || strings.Contains(path, "/sse")
 }
 
 func isWebSocketUpgrade(req *http.Request) bool {

@@ -117,6 +117,10 @@
 2. 提供一键导出 `.http` / `curl` / `ghz`（gRPC）示例，方便 CLI 回归。
 3. 对 Workflow/Agent 提供更完整的伪执行器（含多节点 DAG 调试、SSE 模拟）。
 
+## 8. Agent Skill Bridge 边界
+
+Plugin Capability 描述插件资源、动作、配额、暴露与审核元数据；Agent Skill Bridge 描述 PowerX Agent Runtime 如何发现插件源 Skill 并调用统一 executor。Skill manifest 可以引用 capability 字符串，Framework 会在 invoke 前校验请求 capability 与 manifest executor 声明一致。本地 Chat 不应使用 Capability 调试面板替代 Agent Runtime，应走 PowerX Agent Session/Stream API。
+
 ---
 
 通过本手册，研发可以在 `/capabilities/register` 页面完成「能力建模 → 本地接口调试」的闭环，确保在提交 PR 或与宿主对接前就已经验证插件 API 的真实性能。若需要调试 PowerX 底座能力，再转到 `docs/guides/develop/consume-powerx-capability/README.md` 与 `/powerx/capability-lab`。 

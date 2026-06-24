@@ -54,11 +54,6 @@ func NewSchedulerEventDispatcher(cfg *config.Config, emitter fweventbridge.Emitt
 				payloadVersion = v
 			}
 		}
-		if cfg.Gateway != nil {
-			if v := strings.TrimSpace(cfg.Gateway.TenantUUID); v != "" {
-				tenantUUID = v
-			}
-		}
 	}
 	if v := strings.TrimSpace(os.Getenv("POWERX_TENANT_UUID")); v != "" {
 		tenantUUID = v

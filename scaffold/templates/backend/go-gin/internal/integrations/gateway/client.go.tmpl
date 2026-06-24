@@ -1,23 +1,27 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"github.com/google/uuid"
+	"{{ .BackendModulePath }}/internal/capabilities"
 	"{{ .BackendModulePath }}/internal/config"
 	logger "{{ .BackendModulePath }}/internal/logger"
-	"github.com/google/uuid"
 )
 
 const (
@@ -107,6 +111,132 @@ type PlatformCapabilityProtocol struct {
 	ToolRef   string `json:"tool_ref"`
 }
 
+type AgentRecord struct {
+	ID          any            `json:"id,omitempty"`
+	UUID        string         `json:"uuid,omitempty"`
+	Key         string         `json:"key,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Status      string         `json:"status,omitempty"`
+	Meta        map[string]any `json:"meta,omitempty"`
+}
+
+type PluginSkillSyncParams struct {
+	PluginSkillID  string
+	PowerXSkillID  string
+	Version        string
+	Title          string
+	Description    string
+	IntentExamples any
+	InputSchema    any
+	OutputSchema   any
+	PromptSpec     any
+	Executor       any
+	Capability     string
+	Checksum       string
+	Provider       string
+}
+
+type PluginSkillSyncResult struct {
+	PowerXSkillID string         `json:"powerx_skill_id"`
+	Status        string         `json:"status"`
+	TraceID       string         `json:"trace_id,omitempty"`
+	Raw           map[string]any `json:"raw,omitempty"`
+}
+
+type PluginAgentSyncParams struct {
+	PluginAgentID   string
+	PowerXAgentUUID string
+	AgentKey        string
+	Name            string
+	Description     string
+	ModelProfileRef string
+	Persona         string
+	PromptSeed      string
+	SkillIDs        []string
+	Provider        string
+	Meta            map[string]any
+}
+
+type PluginAgentSyncResult struct {
+	PowerXAgentUUID string         `json:"powerx_agent_uuid"`
+	PowerXAgentID   string         `json:"powerx_agent_id,omitempty"`
+	Status          string         `json:"status"`
+	TraceID         string         `json:"trace_id,omitempty"`
+	Raw             map[string]any `json:"raw,omitempty"`
+}
+
+type AgentSessionParams struct {
+	AgentID    string
+	AgentUUID  string
+	Title      string
+	Env        string
+	Meta       map[string]any
+	TenantUUID string
+}
+
+type AgentSessionRecord struct {
+	ID        any            `json:"id,omitempty"`
+	UUID      string         `json:"uuid,omitempty"`
+	AgentID   any            `json:"agentId,omitempty"`
+	Title     string         `json:"title,omitempty"`
+	Status    string         `json:"status,omitempty"`
+	Meta      map[string]any `json:"meta,omitempty"`
+	SessionID string         `json:"session_id,omitempty"`
+}
+
+type AgentSessionMessageRecord struct {
+	ID        any            `json:"id,omitempty"`
+	UUID      string         `json:"uuid,omitempty"`
+	SessionID any            `json:"sessionId,omitempty"`
+	AgentID   any            `json:"agentId,omitempty"`
+	Role      string         `json:"role,omitempty"`
+	Content   string         `json:"content,omitempty"`
+	Format    string         `json:"format,omitempty"`
+	Meta      map[string]any `json:"meta,omitempty"`
+	CreatedAt string         `json:"createdAt,omitempty"`
+}
+
+type AgentStreamParams struct {
+	AgentID    string
+	SessionID  string
+	TraceID    string
+	Query      string
+	Intent     string
+	Source     string
+	Env        string
+	TenantUUID string
+}
+
+type AgentSessionListOptions struct {
+	AgentID    string
+	SessionID  string
+	Env        string
+	Status     string
+	Limit      int
+	TenantUUID string
+}
+
+type AgentSessionMessageListOptions struct {
+	SessionID  string
+	Env        string
+	AfterID    string
+	Limit      int
+	TenantUUID string
+}
+
+type AgentSessionMutationOptions struct {
+	SessionID  string
+	Env        string
+	TenantUUID string
+}
+
+type AgentStream struct {
+	StatusCode int
+	Header     http.Header
+	Body       io.ReadCloser
+}
+
 type gatewayInvoker interface {
 	Invoke(ctx context.Context, req frameworkgateway.InvokeRequest) (*frameworkgateway.Response, error)
 	Close() error
@@ -121,6 +251,8 @@ type Client struct {
 	cfg           *config.Config
 	refreshMu     sync.Mutex
 	tokenProvider frameworkgateway.TokenProvider
+	tenantMu      sync.Mutex
+	tenantUUID    string
 }
 
 // NewClient 构造 Gateway Client；若凭证缺失，则进入离线模式。
@@ -367,8 +499,8 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 		return nil, fmt.Errorf("gateway config missing")
 	}
 	gcfg := c.cfg.Gateway
-	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
-	if baseURL == "" {
+	endpoint := gatewayEndpoint(gcfg, "/tenant/capabilities")
+	if endpoint == "" {
 		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
 	}
 	authScheme := effectiveGatewayAuthScheme(gcfg)
@@ -394,7 +526,6 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 	}
 	query.Set("page_size", strconv.Itoa(pageSize))
 
-	endpoint := baseURL + "/tenant/capabilities"
 	if encoded := query.Encode(); encoded != "" {
 		endpoint += "?" + encoded
 	}
@@ -432,6 +563,1017 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 		return nil, fmt.Errorf("platform capability list failed: status=%d code=%d message=%s", resp.StatusCode, payload.Code, payload.Message)
 	}
 	return payload.Data.Items, nil
+}
+
+func (c *Client) ResolveGatewayTenantUUID(ctx context.Context) (string, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return "", fmt.Errorf("gateway config missing")
+	}
+	c.tenantMu.Lock()
+	cached := strings.TrimSpace(c.tenantUUID)
+	c.tenantMu.Unlock()
+	if cached != "" {
+		return cached, nil
+	}
+
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/admin/user/auth/me/context")
+	if endpoint == "" {
+		return "", fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			CurrentTenantUUID string `json:"current_tenant_uuid"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("decode gateway tenant context: %w", err)
+	}
+	if resp.StatusCode >= 400 || payload.Code >= 400 {
+		return "", fmt.Errorf("gateway tenant context failed: status=%d code=%d message=%s", resp.StatusCode, payload.Code, payload.Message)
+	}
+	tenantUUID := strings.TrimSpace(payload.Data.CurrentTenantUUID)
+	if tenantUUID == "" {
+		return "", fmt.Errorf("gateway tenant context missing current_tenant_uuid")
+	}
+	c.tenantMu.Lock()
+	c.tenantUUID = tenantUUID
+	c.tenantMu.Unlock()
+	return tenantUUID, nil
+}
+
+func (c *Client) ListAgents(ctx context.Context, env string) ([]AgentRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/admin/agents")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	tenant := effectiveGatewayTenant(gcfg)
+
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+
+	query := url.Values{}
+	if strings.TrimSpace(env) != "" {
+		query.Set("env", strings.TrimSpace(env))
+	}
+	if encoded := query.Encode(); encoded != "" {
+		endpoint += "?" + encoded
+	}
+
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var payload platformAgentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("decode agent list: %w", err)
+	}
+	if resp.StatusCode >= 400 || payload.Code >= 400 {
+		return nil, fmt.Errorf("platform agent list failed: status=%d code=%d message=%s", resp.StatusCode, payload.Code, payload.Message)
+	}
+	return payload.Data.Items, nil
+}
+
+func (c *Client) GetAgent(ctx context.Context, agentUUID string) (*AgentRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	agentUUID = strings.TrimSpace(agentUUID)
+	if agentUUID == "" {
+		return nil, fmt.Errorf("agent uuid is required")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/admin/agents/"+url.PathEscape(agentUUID))
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	tenant := effectiveGatewayTenant(gcfg)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Success bool        `json:"success"`
+		Code    int         `json:"code"`
+		Message string      `json:"message"`
+		Data    AgentRecord `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("decode agent detail: %w", err)
+	}
+	if resp.StatusCode >= 400 || payload.Code >= 400 {
+		return nil, fmt.Errorf("platform agent detail failed: status=%d code=%d message=%s", resp.StatusCode, payload.Code, payload.Message)
+	}
+	return &payload.Data, nil
+}
+
+func (c *Client) SyncPluginSkill(ctx context.Context, params PluginSkillSyncParams) (*PluginSkillSyncResult, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	if strings.TrimSpace(params.PluginSkillID) == "" {
+		return nil, fmt.Errorf("plugin skill id is required")
+	}
+	if strings.TrimSpace(params.Title) == "" {
+		return nil, fmt.Errorf("skill title is required")
+	}
+	if strings.TrimSpace(params.Capability) == "" {
+		return nil, fmt.Errorf("skill capability is required")
+	}
+	body := map[string]any{
+		"skill_id":        firstNonEmptyString(params.PowerXSkillID, params.PluginSkillID),
+		"plugin_skill_id": params.PluginSkillID,
+		"provider":        strings.TrimSpace(params.Provider),
+		"version":         firstNonEmptyString(params.Version, "1.0.0"),
+		"title":           strings.TrimSpace(params.Title),
+		"description":     strings.TrimSpace(params.Description),
+		"intent_examples": params.IntentExamples,
+		"input_schema":    params.InputSchema,
+		"output_schema":   params.OutputSchema,
+		"prompt_spec":     params.PromptSpec,
+		"executor":        params.Executor,
+		"capability":      strings.TrimSpace(params.Capability),
+		"checksum":        normalizeSHA256Checksum(params.Checksum),
+		"source":          "plugin",
+		"sync_source":     "plugin_registry",
+	}
+	endpoint := "/admin/skills/plugin-registry/sync"
+	if strings.TrimSpace(params.PowerXSkillID) != "" {
+		endpoint = "/admin/skills/plugin-registry/" + url.PathEscape(strings.TrimSpace(params.PowerXSkillID)) + "/sync"
+	}
+	raw, traceID, err := c.doPlatformJSON(ctx, http.MethodPost, endpoint, body)
+	if err != nil {
+		return nil, err
+	}
+	return &PluginSkillSyncResult{
+		PowerXSkillID: firstNonEmptyString(stringFromMap(raw, "powerx_skill_id"), stringFromMap(raw, "skill_id"), strings.TrimSpace(params.PowerXSkillID), strings.TrimSpace(params.PluginSkillID)),
+		Status:        firstNonEmptyString(stringFromMap(raw, "status"), "synced"),
+		TraceID:       traceID,
+		Raw:           raw,
+	}, nil
+}
+
+func (c *Client) SyncPluginAgent(ctx context.Context, params PluginAgentSyncParams) (*PluginAgentSyncResult, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	if strings.TrimSpace(params.PluginAgentID) == "" {
+		return nil, fmt.Errorf("plugin agent id is required")
+	}
+	if strings.TrimSpace(params.Name) == "" {
+		return nil, fmt.Errorf("agent name is required")
+	}
+	body := map[string]any{
+		"env":               "dev",
+		"key":               strings.TrimSpace(params.AgentKey),
+		"name":              strings.TrimSpace(params.Name),
+		"description":       strings.TrimSpace(params.Description),
+		"model_profile_ref": strings.TrimSpace(params.ModelProfileRef),
+		"persona":           strings.TrimSpace(params.Persona),
+		"promptSeed":        strings.TrimSpace(params.PromptSeed),
+		"skillIds":          params.SkillIDs,
+		"status":            "active",
+		"visibility":        "tenant",
+		"scope":             "tenant",
+		"ownerPluginId":     strings.TrimSpace(params.Provider),
+		"managedByPlugin":   true,
+		"source":            "plugin:" + strings.TrimSpace(params.Provider),
+		"meta": mergeStringAnyMaps(params.Meta, map[string]any{
+			"source":          "plugin_registry",
+			"provider":        strings.TrimSpace(params.Provider),
+			"plugin_agent_id": strings.TrimSpace(params.PluginAgentID),
+			"skillIds":        params.SkillIDs,
+		}),
+	}
+	powerxAgentUUID := strings.TrimSpace(params.PowerXAgentUUID)
+	if powerxAgentUUID == "" && strings.TrimSpace(params.AgentKey) != "" {
+		if existing, err := c.findAgentByKey(ctx, params.AgentKey, "dev"); err == nil && existing != nil {
+			powerxAgentUUID = strings.TrimSpace(existing.UUID)
+		}
+	}
+
+	method := http.MethodPost
+	endpoint := "/admin/agents"
+	if powerxAgentUUID != "" {
+		method = http.MethodPatch
+		endpoint = "/admin/agents/" + url.PathEscape(powerxAgentUUID) + "?env=dev"
+	}
+	raw, traceID, err := c.doPlatformJSON(ctx, method, endpoint, body)
+	if err != nil {
+		if method == http.MethodPost && strings.Contains(strings.ToLower(err.Error()), "duplicate key") && strings.TrimSpace(params.AgentKey) != "" {
+			if existing, findErr := c.findAgentByKey(ctx, params.AgentKey, "dev"); findErr == nil && existing != nil && strings.TrimSpace(existing.UUID) != "" {
+				return &PluginAgentSyncResult{
+					PowerXAgentUUID: strings.TrimSpace(existing.UUID),
+					PowerXAgentID:   stringFromAny(existing.ID),
+					Status:          firstNonEmptyString(existing.Status, "active"),
+					TraceID:         traceID,
+					Raw: map[string]any{
+						"uuid":   strings.TrimSpace(existing.UUID),
+						"id":     existing.ID,
+						"key":    strings.TrimSpace(existing.Key),
+						"name":   strings.TrimSpace(existing.Name),
+						"status": firstNonEmptyString(existing.Status, "active"),
+					},
+				}, nil
+			}
+		}
+		return nil, err
+	}
+	return &PluginAgentSyncResult{
+		PowerXAgentUUID: firstNonEmptyString(stringFromMap(raw, "powerx_agent_uuid"), stringFromMap(raw, "uuid"), powerxAgentUUID),
+		PowerXAgentID:   firstNonEmptyString(stringFromMap(raw, "id"), stringFromMap(raw, "agent_id")),
+		Status:          firstNonEmptyString(stringFromMap(raw, "status"), "active"),
+		TraceID:         traceID,
+		Raw:             raw,
+	}, nil
+}
+
+func (c *Client) RegisterCatalog(ctx context.Context, catalog *capabilities.CatalogSnapshot, assets []capabilities.ProtocolAsset) error {
+	if catalog == nil {
+		return fmt.Errorf("capability catalog is required")
+	}
+	if strings.TrimSpace(catalog.PluginID) == "" {
+		return fmt.Errorf("capability catalog plugin_id is required")
+	}
+	if len(catalog.Entries) == 0 {
+		return fmt.Errorf("capability catalog entries are required")
+	}
+	payloadAssets := make([]map[string]any, 0, len(assets))
+	for _, asset := range assets {
+		path := strings.TrimSpace(asset.Path)
+		if path == "" {
+			continue
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read capability asset %s: %w", path, err)
+		}
+		payloadAssets = append(payloadAssets, map[string]any{
+			"type":    strings.TrimSpace(asset.Type),
+			"path":    filepath.ToSlash(path),
+			"size":    len(content),
+			"content": base64.StdEncoding.EncodeToString(content),
+		})
+	}
+	_, _, err := c.doPlatformJSON(ctx, http.MethodPost, "/internal/plugins/capabilities/catalog", map[string]any{
+		"catalog": catalog,
+		"assets":  payloadAssets,
+	})
+	if err != nil {
+		return fmt.Errorf("sync capability catalog: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) findAgentByKey(ctx context.Context, agentKey string, env string) (*AgentRecord, error) {
+	agentKey = strings.TrimSpace(agentKey)
+	if agentKey == "" {
+		return nil, fmt.Errorf("agent key is required")
+	}
+	items, err := c.ListAgents(ctx, env)
+	if err != nil {
+		return nil, err
+	}
+	for idx := range items {
+		if strings.EqualFold(strings.TrimSpace(items[idx].Key), agentKey) {
+			return &items[idx], nil
+		}
+	}
+	return nil, nil
+}
+
+func (c *Client) CreateAgentSession(ctx context.Context, params AgentSessionParams) (*AgentSessionRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	agentUUID := strings.TrimSpace(params.AgentUUID)
+	agentID := strings.TrimSpace(params.AgentID)
+	if agentUUID == "" && agentID == "" {
+		return nil, fmt.Errorf("agent_uuid or agent_id is required")
+	}
+
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/agents/sessions")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	tenant := effectiveGatewayTenantForRequest(gcfg, params.TenantUUID)
+
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+
+	body := map[string]any{
+		"title": strings.TrimSpace(params.Title),
+		"meta":  params.Meta,
+	}
+	if env := strings.TrimSpace(params.Env); env != "" {
+		body["env"] = env
+	}
+	if agentUUID != "" {
+		body["agentUuid"] = agentUUID
+	} else {
+		body["agentId"] = agentID
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var response platformAgentSessionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decode agent session: %w", err)
+	}
+	if resp.StatusCode >= 400 || response.Code >= 400 {
+		return nil, fmt.Errorf("platform agent session create failed: status=%d code=%d message=%s", resp.StatusCode, response.Code, response.Message)
+	}
+	session := response.Data
+	if strings.TrimSpace(session.SessionID) == "" {
+		session.SessionID = firstSessionIdentifier(session)
+	}
+	if strings.TrimSpace(session.SessionID) == "" {
+		return nil, fmt.Errorf("platform agent session response missing id")
+	}
+	return &session, nil
+}
+
+func (c *Client) ListAgentSessions(ctx context.Context, opts AgentSessionListOptions) ([]AgentSessionRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	agentID := strings.TrimSpace(opts.AgentID)
+	if agentID == "" {
+		return nil, fmt.Errorf("agent_id or agent_uuid is required")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/agents/sessions")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	query := url.Values{}
+	if env := strings.TrimSpace(opts.Env); env != "" {
+		query.Set("env", env)
+	}
+	if looksLikeUUID(agentID) {
+		query.Set("agent_uuid", agentID)
+	} else {
+		query.Set("agent_id", agentID)
+	}
+	if status := strings.TrimSpace(opts.Status); status != "" {
+		query.Set("status", status)
+	}
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	query.Set("limit", strconv.Itoa(limit))
+	endpoint += "?" + query.Encode()
+
+	var response platformAgentSessionListResponse
+	if err := c.doGatewayJSONWithTenant(ctx, http.MethodGet, endpoint, nil, &response, opts.TenantUUID); err != nil {
+		return nil, err
+	}
+	if response.Code >= 400 {
+		return nil, fmt.Errorf("platform agent sessions list failed: code=%d message=%s", response.Code, response.Message)
+	}
+	out := response.Data.Items
+	for i := range out {
+		if strings.TrimSpace(out[i].SessionID) == "" {
+			out[i].SessionID = firstSessionIdentifier(out[i])
+		}
+	}
+	return out, nil
+}
+
+func (c *Client) ResolveAgentSessionID(ctx context.Context, opts AgentSessionListOptions) (string, error) {
+	sessionID := strings.TrimSpace(opts.SessionID)
+	if sessionID == "" || !looksLikeUUID(sessionID) {
+		return sessionID, nil
+	}
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return sessionID, fmt.Errorf("gateway config missing")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/agents/sessions")
+	if endpoint == "" {
+		return sessionID, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	tenant := effectiveGatewayTenantForRequest(gcfg, opts.TenantUUID)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+
+	query := url.Values{}
+	if env := strings.TrimSpace(opts.Env); env != "" {
+		query.Set("env", env)
+	}
+	agentID := strings.TrimSpace(opts.AgentID)
+	if looksLikeUUID(agentID) {
+		query.Set("agent_uuid", agentID)
+	} else if agentID != "" {
+		query.Set("agent_id", agentID)
+	}
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	query.Set("limit", strconv.Itoa(limit))
+	endpoint += "?" + query.Encode()
+
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return sessionID, err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return sessionID, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return sessionID, err
+	}
+	defer resp.Body.Close()
+	var response platformAgentSessionListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return sessionID, fmt.Errorf("decode agent sessions: %w", err)
+	}
+	if resp.StatusCode >= 400 || response.Code >= 400 {
+		return sessionID, fmt.Errorf("platform agent sessions list failed: status=%d code=%d message=%s", resp.StatusCode, response.Code, response.Message)
+	}
+	for _, item := range response.Data.Items {
+		if strings.EqualFold(strings.TrimSpace(item.UUID), sessionID) {
+			if id := strings.TrimSpace(firstSessionIdentifier(AgentSessionRecord{ID: item.ID})); id != "" {
+				return id, nil
+			}
+			return sessionID, nil
+		}
+	}
+	return sessionID, nil
+}
+
+func (c *Client) ListAgentSessionMessages(ctx context.Context, opts AgentSessionMessageListOptions) ([]AgentSessionMessageRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	sessionID := strings.TrimSpace(opts.SessionID)
+	if sessionID == "" {
+		return nil, fmt.Errorf("session_id is required")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/agents/sessions/"+url.PathEscape(sessionID)+"/messages")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	query := url.Values{}
+	if env := strings.TrimSpace(opts.Env); env != "" {
+		query.Set("env", env)
+	}
+	if afterID := strings.TrimSpace(opts.AfterID); afterID != "" {
+		query.Set("after_id", afterID)
+	}
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 200
+	}
+	query.Set("limit", strconv.Itoa(limit))
+	endpoint += "?" + query.Encode()
+
+	var response platformAgentSessionMessageListResponse
+	if err := c.doGatewayJSONWithTenant(ctx, http.MethodGet, endpoint, nil, &response, opts.TenantUUID); err != nil {
+		return nil, err
+	}
+	if response.Code >= 400 {
+		return nil, fmt.Errorf("platform agent session messages failed: code=%d message=%s", response.Code, response.Message)
+	}
+	return response.Data.Items, nil
+}
+
+func (c *Client) DeleteAgentSession(ctx context.Context, opts AgentSessionMutationOptions) error {
+	return c.mutateAgentSession(ctx, http.MethodDelete, opts, "")
+}
+
+func (c *Client) ArchiveAgentSession(ctx context.Context, opts AgentSessionMutationOptions) error {
+	return c.mutateAgentSession(ctx, http.MethodPost, opts, "/archive")
+}
+
+func (c *Client) mutateAgentSession(ctx context.Context, method string, opts AgentSessionMutationOptions, suffix string) error {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return fmt.Errorf("gateway config missing")
+	}
+	sessionID := strings.TrimSpace(opts.SessionID)
+	if sessionID == "" {
+		return fmt.Errorf("session_id is required")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/agents/sessions/"+url.PathEscape(sessionID)+suffix)
+	if endpoint == "" {
+		return fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	if env := strings.TrimSpace(opts.Env); env != "" {
+		endpoint += "?env=" + url.QueryEscape(env)
+	}
+	var response platformSimpleResponse
+	if err := c.doGatewayJSONWithTenant(ctx, method, endpoint, nil, &response, opts.TenantUUID); err != nil {
+		return err
+	}
+	if response.Code >= 400 {
+		return fmt.Errorf("platform agent session mutation failed: code=%d message=%s", response.Code, response.Message)
+	}
+	return nil
+}
+
+func (c *Client) StreamAgentSSE(ctx context.Context, params AgentStreamParams) (*AgentStream, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	if strings.TrimSpace(params.AgentID) == "" {
+		return nil, fmt.Errorf("agent_id is required")
+	}
+	if strings.TrimSpace(params.SessionID) == "" {
+		return nil, fmt.Errorf("session_id is required")
+	}
+	if strings.TrimSpace(params.TraceID) == "" {
+		return nil, fmt.Errorf("trace_id is required")
+	}
+	if strings.TrimSpace(params.Query) == "" {
+		return nil, fmt.Errorf("q is required")
+	}
+
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/agents/stream/sse")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	tenant := effectiveGatewayTenantForRequest(gcfg, params.TenantUUID)
+
+	query := url.Values{}
+	agentID := strings.TrimSpace(params.AgentID)
+	sessionID := strings.TrimSpace(params.SessionID)
+	resolvedSessionID, err := c.ResolveAgentSessionID(ctx, AgentSessionListOptions{
+		AgentID:    agentID,
+		SessionID:  sessionID,
+		Env:        params.Env,
+		TenantUUID: params.TenantUUID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	sessionUUID := sessionID
+	sessionID = strings.TrimSpace(resolvedSessionID)
+	if looksLikeUUID(agentID) {
+		query.Set("agent_uuid", agentID)
+	} else {
+		query.Set("agent_id", agentID)
+	}
+	if looksLikeUUID(sessionUUID) {
+		query.Set("session_uuid", sessionUUID)
+	}
+	query.Set("session_id", sessionID)
+	query.Set("trace_id", strings.TrimSpace(params.TraceID))
+	query.Set("q", strings.TrimSpace(params.Query))
+	if intent := strings.TrimSpace(params.Intent); intent != "" {
+		query.Set("intent", intent)
+	}
+	if source := strings.TrimSpace(params.Source); source != "" {
+		query.Set("source", source)
+	}
+	if env := strings.TrimSpace(params.Env); env != "" {
+		query.Set("env", env)
+	}
+	endpoint += "?" + query.Encode()
+
+	credential, err := c.gatewayCredential(ctx, authScheme)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
+	req.Header.Set("X-Request-ID", strings.TrimSpace(params.TraceID))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, fmt.Errorf("powerx agent stream failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return &AgentStream{
+		StatusCode: resp.StatusCode,
+		Header:     resp.Header.Clone(),
+		Body:       resp.Body,
+	}, nil
+}
+
+func (c *Client) doPlatformJSON(ctx context.Context, method, path string, body map[string]any) (map[string]any, string, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, "", fmt.Errorf("gateway config missing")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, path)
+	if endpoint == "" {
+		return nil, "", fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	tenant := effectiveGatewayTenant(gcfg)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, "", err
+	}
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, "", err
+	}
+	requestID := uuid.NewString()
+	req, err := http.NewRequestWithContext(ctxReq, method, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
+	req.Header.Set("X-Request-ID", requestID)
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	rawBody, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, requestID, fmt.Errorf("read platform response: %w", readErr)
+	}
+	var envelope struct {
+		Success   bool            `json:"success"`
+		Code      int             `json:"code"`
+		Message   string          `json:"message"`
+		Data      map[string]any  `json:"data"`
+		Error     json.RawMessage `json:"error"`
+		RequestID string          `json:"request_id"`
+	}
+	if len(strings.TrimSpace(string(rawBody))) == 0 {
+		return nil, requestID, fmt.Errorf("platform request failed: status=%d empty response body", resp.StatusCode)
+	}
+	if err := json.Unmarshal(rawBody, &envelope); err != nil {
+		bodyText := strings.TrimSpace(string(rawBody))
+		if len(bodyText) > 500 {
+			bodyText = bodyText[:500] + "..."
+		}
+		return nil, requestID, fmt.Errorf("decode platform response: status=%d body=%s: %w", resp.StatusCode, bodyText, err)
+	}
+	errorCode, errorMessage := parsePlatformError(envelope.Error)
+	if resp.StatusCode >= 400 || envelope.Code >= 400 || (!envelope.Success && (errorCode != "" || errorMessage != "")) {
+		msg := firstNonEmptyString(errorMessage, envelope.Message)
+		if msg == "" {
+			msg = fmt.Sprintf("platform request failed: status=%d code=%d", resp.StatusCode, envelope.Code)
+		}
+		if errorCode != "" {
+			msg = errorCode + ": " + msg
+		}
+		return nil, firstNonEmptyString(envelope.RequestID, requestID), fmt.Errorf("%s", msg)
+	}
+	return envelope.Data, firstNonEmptyString(envelope.RequestID, requestID), nil
+}
+
+func (c *Client) doGatewayJSON(ctx context.Context, method, endpoint string, body any, out any) error {
+	return c.doGatewayJSONWithTenant(ctx, method, endpoint, body, out, "")
+}
+
+func (c *Client) doGatewayJSONWithTenant(ctx context.Context, method, endpoint string, body any, out any, tenantOverride string) error {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return fmt.Errorf("gateway config missing")
+	}
+	gcfg := c.cfg.Gateway
+	if strings.TrimSpace(endpoint) == "" {
+		return fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	tenant := effectiveGatewayTenantForRequest(gcfg, tenantOverride)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+	var reader io.Reader
+	if body != nil {
+		payload, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		reader = bytes.NewReader(payload)
+	}
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, method, endpoint, reader)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("decode platform response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		message := ""
+		switch payload := out.(type) {
+		case *platformSimpleResponse:
+			message = strings.TrimSpace(payload.Message)
+		case interface{ GetMessage() string }:
+			message = strings.TrimSpace(payload.GetMessage())
+		}
+		if message != "" {
+			return fmt.Errorf("platform request failed: status=%d message=%s", resp.StatusCode, message)
+		}
+		return fmt.Errorf("platform request failed: status=%d", resp.StatusCode)
+	}
+	return nil
+}
+
+func parsePlatformError(raw json.RawMessage) (string, string) {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return "", ""
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return "", strings.TrimSpace(text)
+	}
+	var object struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(raw, &object); err == nil {
+		return strings.TrimSpace(object.Code), strings.TrimSpace(object.Message)
+	}
+	return "", trimmed
+}
+
+func normalizeSHA256Checksum(checksum string) string {
+	value := strings.TrimSpace(checksum)
+	if value == "" {
+		return ""
+	}
+	lower := strings.ToLower(value)
+	if strings.HasPrefix(lower, "sha256:") || strings.HasPrefix(lower, "sha256-") {
+		return value
+	}
+	if len(value) == 64 {
+		for _, ch := range value {
+			if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') && (ch < 'A' || ch > 'F') {
+				return value
+			}
+		}
+		return "sha256:" + value
+	}
+	return value
+}
+
+func normalizeGatewayPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return path
+}
+
+func looksLikeUUID(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) != 36 {
+		return false
+	}
+	for i, ch := range value {
+		switch i {
+		case 8, 13, 18, 23:
+			if ch != '-' {
+				return false
+			}
+		default:
+			if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func gatewayEndpoint(gcfg *config.GatewayConfig, path string) string {
+	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
+	if baseURL == "" {
+		return ""
+	}
+	return baseURL + normalizeGatewayPath(path)
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func stringFromMap(values map[string]any, key string) string {
+	if values == nil {
+		return ""
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case json.Number:
+		return typed.String()
+	default:
+		return strings.TrimSpace(fmt.Sprint(typed))
+	}
+}
+
+func stringFromAny(value any) string {
+	if value == nil {
+		return ""
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case json.Number:
+		return typed.String()
+	default:
+		return strings.TrimSpace(fmt.Sprint(typed))
+	}
+}
+
+func mergeStringAnyMaps(base map[string]any, extra map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range base {
+		out[key] = value
+	}
+	for key, value := range extra {
+		if strings.TrimSpace(key) != "" {
+			out[key] = value
+		}
+	}
+	return out
 }
 
 func (c *Client) handleInvokeError(ctx context.Context, req frameworkgateway.InvokeRequest, capabilityID, action string, invokeErr error) (*frameworkgateway.Response, error) {
@@ -862,7 +2004,6 @@ func (c *Client) reconnectTransport() error {
 	gcfg := c.cfg.Gateway
 	baseURL := strings.TrimRight(effectiveGatewayBaseURL(gcfg), "/")
 	authScheme := effectiveGatewayAuthScheme(gcfg)
-	tenantUUID := effectiveGatewayTenant(gcfg)
 	credential := gatewayCredential(gcfg, authScheme)
 
 	if baseURL == "" || (authScheme == "apikey" && credential == "") || (authScheme == "bearer" && credential == "" && c.tokenProvider == nil) {
@@ -880,7 +2021,6 @@ func (c *Client) reconnectTransport() error {
 		BearerToken:    credential,
 		TokenProvider:  c.tokenProvider,
 		APIKey:         strings.TrimSpace(gcfg.APIKey),
-		TenantUUID:     tenantUUID,
 		RequestTimeout: timeout,
 		UserAgent:      strings.TrimSpace(gcfg.UserAgent),
 	})
@@ -964,11 +2104,75 @@ type platformCapabilityResponse struct {
 	} `json:"data"`
 }
 
+type platformAgentResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Items []AgentRecord `json:"items"`
+	} `json:"data"`
+}
+
+type platformAgentSessionResponse struct {
+	Code    int                `json:"code"`
+	Message string             `json:"message"`
+	Data    AgentSessionRecord `json:"data"`
+}
+
+type platformAgentSessionListResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Items []AgentSessionRecord `json:"items"`
+	} `json:"data"`
+}
+
+type platformAgentSessionMessageListResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Items []AgentSessionMessageRecord `json:"items"`
+	} `json:"data"`
+}
+
+type platformSimpleResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func firstSessionIdentifier(session AgentSessionRecord) string {
+	if strings.TrimSpace(session.UUID) != "" {
+		return strings.TrimSpace(session.UUID)
+	}
+	switch value := session.ID.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case float64:
+		return strconv.FormatUint(uint64(value), 10)
+	case int:
+		return strconv.Itoa(value)
+	case int64:
+		return strconv.FormatInt(value, 10)
+	case uint64:
+		return strconv.FormatUint(value, 10)
+	case json.Number:
+		return strings.TrimSpace(value.String())
+	default:
+		return strings.TrimSpace(fmt.Sprint(value))
+	}
+}
+
 func effectiveGatewayTenant(gcfg *config.GatewayConfig) string {
-	if gcfg == nil {
+	return ""
+}
+
+func effectiveGatewayTenantForRequest(gcfg *config.GatewayConfig, tenantOverride string) string {
+	if effectiveGatewayAuthScheme(gcfg) == "apikey" {
 		return ""
 	}
-	return strings.TrimSpace(gcfg.TenantUUID)
+	if tenant := strings.TrimSpace(tenantOverride); tenant != "" {
+		return tenant
+	}
+	return effectiveGatewayTenant(gcfg)
 }
 
 func effectiveGatewayAuthScheme(gcfg *config.GatewayConfig) string {

@@ -64,6 +64,18 @@ type gatewayClient interface {
 	Enabled() bool
 	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
 	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	ResolveGatewayTenantUUID(ctx context.Context) (string, error)
+	ListAgents(ctx context.Context, env string) ([]gateway.AgentRecord, error)
+	GetAgent(ctx context.Context, agentUUID string) (*gateway.AgentRecord, error)
+	SyncPluginSkill(ctx context.Context, params gateway.PluginSkillSyncParams) (*gateway.PluginSkillSyncResult, error)
+	SyncPluginAgent(ctx context.Context, params gateway.PluginAgentSyncParams) (*gateway.PluginAgentSyncResult, error)
+	RegisterCatalog(ctx context.Context, catalog *capabilities.CatalogSnapshot, assets []capabilities.ProtocolAsset) error
+	CreateAgentSession(ctx context.Context, params gateway.AgentSessionParams) (*gateway.AgentSessionRecord, error)
+	ListAgentSessions(ctx context.Context, opts gateway.AgentSessionListOptions) ([]gateway.AgentSessionRecord, error)
+	ListAgentSessionMessages(ctx context.Context, opts gateway.AgentSessionMessageListOptions) ([]gateway.AgentSessionMessageRecord, error)
+	DeleteAgentSession(ctx context.Context, opts gateway.AgentSessionMutationOptions) error
+	ArchiveAgentSession(ctx context.Context, opts gateway.AgentSessionMutationOptions) error
+	StreamAgentSSE(ctx context.Context, params gateway.AgentStreamParams) (*gateway.AgentStream, error)
 	Close() error
 }
 

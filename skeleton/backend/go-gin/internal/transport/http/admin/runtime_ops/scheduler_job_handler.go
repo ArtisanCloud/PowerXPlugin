@@ -50,14 +50,10 @@ type schedulerJobSpecRequest struct {
 
 // NewSchedulerJobHandler constructs scheduler job handler.
 func NewSchedulerJobHandler(deps *app.Deps) *SchedulerJobHandler {
-	defaultTenant := ""
-	if deps != nil && deps.Config != nil && deps.Config.Gateway != nil {
-		defaultTenant = strings.TrimSpace(deps.Config.Gateway.TenantUUID)
-	}
 	return &SchedulerJobHandler{
 		localScheduler: resolveSchedulerFacade(deps),
 		hostScheduler:  resolveHostSchedulerFacade(deps),
-		defaultTenant:  defaultTenant,
+		defaultTenant:  "",
 		deps:           deps,
 	}
 }

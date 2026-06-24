@@ -10,6 +10,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	adminconsoleModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/admin_console"
+	agentRegistryModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/agent_registry"
 	customerModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/customer"
 	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	integrationModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
@@ -26,6 +27,8 @@ import (
 var businessTables = []interface{}{
 	&models.PluginCredential{},
 	&models.PluginTenantExt{},
+	&agentRegistryModel.PluginSkill{},
+	&agentRegistryModel.PluginAgent{},
 	&templateModel.Template{},
 	&marketplaceModel.Listing{},
 	&marketplaceModel.ListingAsset{},

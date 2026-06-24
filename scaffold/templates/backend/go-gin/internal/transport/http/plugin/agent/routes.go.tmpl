@@ -1,0 +1,118 @@
+package agent
+
+import (
+	"net/http"
+	"strings"
+
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	"{{ .BackendModulePath }}/internal/contracts"
+	"{{ .BackendModulePath }}/internal/integrations/gateway"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/gin-gonic/gin"
+)
+
+type Handler struct {
+	deps *app.Deps
+}
+
+func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
+	h := &Handler{deps: deps}
+	group := rg.Group("/plugin/agent")
+	group.GET("/agents", h.ListAgents)
+	group.POST("/sessions", h.CreateSession)
+	group.GET("/stream/sse", h.StreamSSE)
+}
+
+type createSessionRequest struct {
+	AgentID   string         `json:"agent_id"`
+	AgentUUID string         `json:"agent_uuid"`
+	Title     string         `json:"title"`
+	Env       string         `json:"env"`
+	Meta      map[string]any `json:"meta"`
+}
+
+func (h *Handler) ListAgents(c *gin.Context) {
+	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+
+	env := strings.TrimSpace(c.Query("env"))
+	agents, err := h.deps.CapabilityGateway.ListAgents(c.Request.Context(), env)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_LIST_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": agents})
+}
+
+func (h *Handler) CreateSession(c *gin.Context) {
+	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+
+	var req createSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_SESSION_INVALID_REQUEST", err.Error())
+		return
+	}
+	agentUUID := strings.TrimSpace(req.AgentUUID)
+	agentID := strings.TrimSpace(req.AgentID)
+	if agentUUID == "" && agentID == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_SESSION_AGENT_REQUIRED", "agent_uuid or agent_id is required")
+		return
+	}
+
+	session, err := h.deps.CapabilityGateway.CreateAgentSession(c.Request.Context(), gateway.AgentSessionParams{
+		AgentID:   agentID,
+		AgentUUID: agentUUID,
+		Title:     strings.TrimSpace(req.Title),
+		Env:       strings.TrimSpace(req.Env),
+		Meta:      req.Meta,
+	})
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_SESSION_CREATE_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, session)
+}
+
+func (h *Handler) StreamSSE(c *gin.Context) {
+	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+
+	params := gateway.AgentStreamParams{
+		AgentID:   firstNonEmpty(c.Query("agent_uuid"), c.Query("agent_id")),
+		SessionID: firstNonEmpty(c.Query("session_uuid"), c.Query("session_id")),
+		TraceID:   strings.TrimSpace(c.Query("trace_id")),
+		Query:     strings.TrimSpace(c.Query("q")),
+		Source:    strings.TrimSpace(c.Query("source")),
+		Env:       strings.TrimSpace(c.Query("env")),
+	}
+	stream, err := h.deps.CapabilityGateway.StreamAgentSSE(c.Request.Context(), params)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_STREAM_FAILED", err.Error())
+		return
+	}
+	defer stream.Body.Close()
+
+	_ = frameworkrealtime.ProxySSEStream(c.Request.Context(), c.Writer, frameworkrealtime.StreamThroughOptions{
+		StatusCode: stream.StatusCode,
+		Header:     stream.Header,
+		Body:       stream.Body,
+		RequestID:  stream.Header.Get("X-Request-ID"),
+		TraceID:    firstNonEmpty(stream.Header.Get("X-Trace-ID"), params.TraceID),
+	})
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}

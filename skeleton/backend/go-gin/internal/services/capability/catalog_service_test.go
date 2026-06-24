@@ -136,6 +136,13 @@ func (m *fakeCatalogManager) ExportProtocols(ctx context.Context) ([]capabilitie
 	return nil, nil
 }
 
+func (m *fakeCatalogManager) ExportCatalog(ctx context.Context) (*capabilities.CatalogSnapshot, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &capabilities.CatalogSnapshot{Entries: append([]capabilities.CatalogEntry(nil), m.entries...)}, nil
+}
+
 func (m *fakeCatalogManager) RegisterWithHost(ctx context.Context, client capabilities.HostSyncClient) error {
 	return nil
 }

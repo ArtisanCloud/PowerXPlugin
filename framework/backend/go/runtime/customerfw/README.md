@@ -13,11 +13,13 @@ The package is intentionally limited to:
 
 It does not model SCRM or industry concepts such as customer profiles, tags, owners, follow-ups, timelines, players, guardians, learners, patients, fans, benefits, training plans, or reports. Those remain plugin domain models and should be exposed through plugin capabilities such as SCRM when other plugins need them.
 
+It does carry generic PowerX Core customer display attributes through `CustomerContext.Profile`: `display_name`, `nickname`, `given_name`, `family_name`, `avatar_url`, `locale`, and `timezone`. Those fields are the base customer identity shape, not an SCRM or industry domain model.
+
 Boundary rule:
 
 - Framework IAM identifies back-office members/employees.
 - `customerfw` identifies C-end external customers and their tenant membership.
-- SCRM plugins model customer business data and member-customer business relationships.
+- SCRM plugins model customer business data, tags, lifecycle, follow-up records, and member-customer business relationships.
 - Other plugins call SCRM capabilities for customer profiles, tags, owners, follow-ups, lifecycle, leads, or timelines.
 
 Typical usage:

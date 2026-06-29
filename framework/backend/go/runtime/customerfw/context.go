@@ -26,6 +26,7 @@ type CustomerContext struct {
 	TenantUUID     string             `json:"tenant_uuid,omitempty"`
 	CustomerUUID   string             `json:"customer_uuid"`
 	MembershipUUID string             `json:"membership_uuid,omitempty"`
+	Profile        CustomerAttributes `json:"profile,omitempty"`
 	Roles          []string           `json:"roles,omitempty"`
 	Scopes         []string           `json:"scopes,omitempty"`
 	Source         CustomerAuthSource `json:"source"`
@@ -33,6 +34,16 @@ type CustomerContext struct {
 	TokenExpiresAt *time.Time         `json:"token_expires_at,omitempty"`
 	Attributes     map[string]any     `json:"attributes,omitempty"`
 	RawClaims      map[string]any     `json:"raw_claims,omitempty"`
+}
+
+type CustomerAttributes struct {
+	DisplayName string `json:"display_name,omitempty"`
+	Nickname    string `json:"nickname,omitempty"`
+	GivenName   string `json:"given_name,omitempty"`
+	FamilyName  string `json:"family_name,omitempty"`
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	Locale      string `json:"locale,omitempty"`
+	Timezone    string `json:"timezone,omitempty"`
 }
 
 type customerContextKey struct{}
@@ -106,10 +117,23 @@ func NormalizeContext(cc *CustomerContext) *CustomerContext {
 	copy.TenantUUID = normalizeID(copy.TenantUUID)
 	copy.CustomerUUID = normalizeID(copy.CustomerUUID)
 	copy.MembershipUUID = normalizeID(copy.MembershipUUID)
+	copy.Profile = NormalizeAttributes(copy.Profile)
 	copy.Source = NormalizeSource(copy.Source)
 	copy.Roles = compactStrings(copy.Roles)
 	copy.Scopes = compactStrings(copy.Scopes)
 	return &copy
+}
+
+func NormalizeAttributes(profile CustomerAttributes) CustomerAttributes {
+	return CustomerAttributes{
+		DisplayName: strings.TrimSpace(profile.DisplayName),
+		Nickname:    strings.TrimSpace(profile.Nickname),
+		GivenName:   strings.TrimSpace(profile.GivenName),
+		FamilyName:  strings.TrimSpace(profile.FamilyName),
+		AvatarURL:   strings.TrimSpace(profile.AvatarURL),
+		Locale:      strings.TrimSpace(profile.Locale),
+		Timezone:    strings.TrimSpace(profile.Timezone),
+	}
 }
 
 func NormalizeSource(source CustomerAuthSource) CustomerAuthSource {

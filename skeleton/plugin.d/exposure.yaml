@@ -31,6 +31,12 @@ exposure:
       rbac: template:read
       type: rest
     - auth: jwt
+      capability: com.powerx.plugins.base.template.prepare
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:read
+      type: rest
+    - auth: jwt
       capability: com.powerx.plugins.base.template.publish
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}/publish
       method: POST

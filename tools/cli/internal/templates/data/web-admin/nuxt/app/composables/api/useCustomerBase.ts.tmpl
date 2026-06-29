@@ -1,4 +1,4 @@
-import { apiGet, apiPost, useApiClient } from "./_client";
+import { apiGet, apiPatch, apiPost, useApiClient } from "./_client";
 import type { ApiResponse } from "./_base";
 
 export interface CustomerOverview {
@@ -28,12 +28,16 @@ export interface CustomerAccount {
   email?: string;
   phone?: string;
   display_name?: string;
+  nickname?: string;
+  given_name?: string;
+  family_name?: string;
   avatar_url?: string;
   locale?: string;
   timezone?: string;
   status: string;
   email_verified: boolean;
   phone_verified: boolean;
+  metadata?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
 }
@@ -113,6 +117,12 @@ export interface CreateCustomerAccountInput {
   phone?: string;
   password: string;
   display_name?: string;
+  nickname?: string;
+  given_name?: string;
+  family_name?: string;
+  avatar_url?: string;
+  locale?: string;
+  timezone?: string;
   metadata?: Record<string, any>;
 }
 
@@ -120,6 +130,24 @@ export interface CreateCustomerAccountResult {
   customer_uuid: string;
   tenant_uuid: string;
   status: string;
+}
+
+export interface UpdateCustomerAccountInput {
+  primary_email?: string;
+  primary_phone?: string;
+  email?: string;
+  phone?: string;
+  display_name?: string;
+  nickname?: string;
+  given_name?: string;
+  family_name?: string;
+  avatar_url?: string;
+  locale?: string;
+  timezone?: string;
+  status?: string;
+  email_verified?: boolean;
+  phone_verified?: boolean;
+  metadata?: Record<string, any>;
 }
 
 const cleanQuery = (query: CustomerBaseQuery = {}) =>
@@ -139,6 +167,12 @@ export function useCustomerBaseApi() {
   const createAccount = (input: CreateCustomerAccountInput, init?: any) =>
     apiPost<ApiResponse<CreateCustomerAccountResult>>("admin/customers/accounts", input, init);
 
+  const getAccount = (customerUUID: string, query?: CustomerBaseQuery, init?: any) =>
+    apiGet<ApiResponse<CustomerAccount>>(`admin/customers/accounts/${encodeURIComponent(customerUUID)}`, cleanQuery(query), init);
+
+  const updateAccount = (customerUUID: string, input: UpdateCustomerAccountInput, init?: any) =>
+    apiPatch<ApiResponse<CustomerAccount>>(`admin/customers/accounts/${encodeURIComponent(customerUUID)}`, input, init);
+
   const listIdentities = (query?: CustomerBaseQuery, init?: any) =>
     apiGet<ApiResponse<CustomerPage<CustomerIdentity>>>("admin/customers/identities", cleanQuery(query), init);
 
@@ -156,6 +190,8 @@ export function useCustomerBaseApi() {
     overview,
     listAccounts,
     createAccount,
+    getAccount,
+    updateAccount,
     listIdentities,
     listMemberships,
     listLoginEvents,

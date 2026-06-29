@@ -12,10 +12,6 @@
               "crud": "模版 CRUD",
               "framework_lab": "framework功能测试"
             },
-            "business": {
-              "title": "业务运营",
-              "customer_base": "客户基础管理"
-            },
             "integration": {
               "title": "集成中心",
               "webhooks": "Webhooks",

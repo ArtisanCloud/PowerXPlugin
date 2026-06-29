@@ -58,15 +58,26 @@ make help
    ```bash
    make dist
    ```
+   指定产物版本/目录名：
+   ```bash
+   make dist DIST_VERSION=0.1.1
+   ```
    Linux 目标（常用于在 macOS 上构建可部署到 Linux 的后端）：
    ```bash
-   make dist PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/0.1.1-linux
+   make dist DIST_VERSION=0.1.1-linux PLATFORM=linux TARGET_ARCH=amd64
    ```
 3. 调用 PowerX 的安装接口时，`src_dir` 指向 `$(pwd)/dist/$(VERSION)` 即可，目录内至少包含：
    - `plugin.yaml`
    - `config/event_fabric.yaml`（事件 topic 执行层映射）
    - `backend/bin/plugin`
    - （可选）`web-admin/.output` 前端静态资源
+
+端口规则：
+
+- `make dist` 只生成 release artifact，不把某个环境的 PowerX 端口写死进产物。
+- `plugin.yaml` 中 `POWERX_BIND_ADDR` 使用 `:__POWERX_DYNAMIC_PORT__`，插件后端端口由 PowerX 宿主在启用时分配并注入。
+- 插件后端访问宿主网关使用运行时注入的 `PX_GATEWAY_BASE_URL`，浏览器侧 public 地址使用运行时注入的 `NUXT_PUBLIC_POWERX_CORE_BASE` / `NUXT_PUBLIC_WS_ORIGIN`。
+- dev 环境若 PowerX 后端为 `server.port: 8081`、Web Admin 为 `web_admin_port: 3001`，这些值应来自 `/etc/powerx-dev/config.yaml` 和 systemd env，而不是 dist 目录。
 
 ## Release 产物
 `make release` 会在项目根目录下创建 `target/<version>/`，目录结构示例：
@@ -92,7 +103,7 @@ make package-release
   ```
 - 选择不同二进制平台：
   ```bash
-  make dist PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/0.1.1-linux
+  make dist DIST_VERSION=0.1.1-linux PLATFORM=linux TARGET_ARCH=amd64
   ```
 - 更换发布目录根位置：
   ```bash

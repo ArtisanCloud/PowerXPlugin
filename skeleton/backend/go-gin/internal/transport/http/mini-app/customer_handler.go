@@ -39,11 +39,18 @@ func NewCustomerHandler(deps *app.Deps) *CustomerHandler {
 }
 
 type registerRequest struct {
-	TenantUUID string         `json:"tenant_uuid"`
-	Email      string         `json:"email"`
-	Phone      string         `json:"phone"`
-	Password   string         `json:"password" binding:"required"`
-	Metadata   map[string]any `json:"metadata"`
+	TenantUUID  string         `json:"tenant_uuid"`
+	Email       string         `json:"email"`
+	Phone       string         `json:"phone"`
+	Password    string         `json:"password" binding:"required"`
+	DisplayName string         `json:"display_name"`
+	Nickname    string         `json:"nickname"`
+	GivenName   string         `json:"given_name"`
+	FamilyName  string         `json:"family_name"`
+	AvatarURL   string         `json:"avatar_url"`
+	Locale      string         `json:"locale"`
+	Timezone    string         `json:"timezone"`
+	Metadata    map[string]any `json:"metadata"`
 }
 
 type loginRequest struct {
@@ -95,15 +102,31 @@ func (h *CustomerHandler) Register(c *gin.Context) {
 			TenantUUID: tenantUUID,
 			Identifier: firstNonEmpty(req.Email, req.Phone),
 			Password:   req.Password,
-			Profile:    req.Metadata,
+			Profile: customerfw.CustomerAttributes{
+				DisplayName: strings.TrimSpace(req.DisplayName),
+				Nickname:    strings.TrimSpace(req.Nickname),
+				GivenName:   strings.TrimSpace(req.GivenName),
+				FamilyName:  strings.TrimSpace(req.FamilyName),
+				AvatarURL:   strings.TrimSpace(req.AvatarURL),
+				Locale:      strings.TrimSpace(req.Locale),
+				Timezone:    strings.TrimSpace(req.Timezone),
+			},
+			Attributes: req.Metadata,
 		})
 	} else if h.svc != nil {
 		out, err = h.svc.Register(c.Request.Context(), customersvc.RegisterInput{
-			TenantUUID: tenantUUID,
-			Email:      req.Email,
-			Phone:      req.Phone,
-			Password:   req.Password,
-			Metadata:   req.Metadata,
+			TenantUUID:  tenantUUID,
+			Email:       req.Email,
+			Phone:       req.Phone,
+			Password:    req.Password,
+			DisplayName: strings.TrimSpace(req.DisplayName),
+			Nickname:    strings.TrimSpace(req.Nickname),
+			GivenName:   strings.TrimSpace(req.GivenName),
+			FamilyName:  strings.TrimSpace(req.FamilyName),
+			AvatarURL:   strings.TrimSpace(req.AvatarURL),
+			Locale:      strings.TrimSpace(req.Locale),
+			Timezone:    strings.TrimSpace(req.Timezone),
+			Metadata:    req.Metadata,
 		})
 	} else {
 		err = errors.New("customer service unavailable")

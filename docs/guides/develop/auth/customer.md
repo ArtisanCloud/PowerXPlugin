@@ -15,7 +15,9 @@ Framework 只负责这些通用能力：
 - 阻断未登录、跨租户、缺少 membership 的请求
 - 定义 delegated/core auth、bootstrap、membership resolver 合同
 
-Framework 不提供 SCRM 或行业 customer 模型。客户档案、客户标签、客户跟进、客户归属员工、销售线索、球员、家长、学员、会员权益、训练目标、成长报告等都必须留在业务插件侧。
+Framework 提供 customer identity 与基础展示属性契约。基础展示属性只包含 PowerX Core customer 主账号可通用表达的字段：`display_name`、`nickname`、`given_name`、`family_name`、`avatar_url`、`locale`、`timezone`。这些字段通过 `CustomerContext.profile` 传递，供列表、详情、登录态展示和跨插件基础识别使用。
+
+Framework 不提供 SCRM 或行业 customer 模型。客户标签、客户跟进、客户归属员工、销售线索、球员、家长、学员、会员权益、训练目标、成长报告等都必须留在业务插件侧。
 
 ## 数据权威源与 local mirror
 
@@ -23,12 +25,12 @@ PowerX Core 是 Customer Identity/Auth 的生产权威源：
 
 | 数据 | 生产权威源 | Framework 责任 | 插件责任 |
 | --- | --- | --- | --- |
-| customer 主账号 | PowerX Core `customer_accounts` | 映射为 `CustomerContext.customer_uuid` | 只引用 `customer_uuid` |
+| customer 主账号 | PowerX Core `customer_accounts` | 映射为 `CustomerContext.customer_uuid` 和 `CustomerContext.profile` 基础展示属性 | 只引用 `customer_uuid`，需要展示时读取基础属性 |
 | 登录身份/第三方绑定 | PowerX Core `customer_auth_identities` | 调用 delegated/core validator | 不保存登录密钥 |
 | customer 租户关系 | PowerX Core `customer_tenant_memberships` | 映射为 `CustomerMembership` 并阻断无效 membership | 只做业务授权补充 |
 | shared app 入口 | PowerX Core `mini_app_entries` | 通过 bootstrap client 解析 `tenant_uuid` | 不绕过合法入口 |
 | session/refresh/audit | PowerX Core `customer_sessions`、`customer_login_events` | 统一错误码与诊断 | 不记录 raw token/secret |
-| 行业档案 | 插件业务库 | 不承载 | 例如球员、家长关系、训练档案 |
+| 行业档案 | 插件业务库 | 不承载 | 例如标签、跟进、归属销售、球员、家长关系、训练档案 |
 
 插件 local 模式规则：
 
@@ -53,10 +55,11 @@ docs/plan/iam/customer-identity-auth.md
 | member token 校验 | Framework IAM | 后台员工身份，不属于 `customerfw` |
 | member context / RBAC | Framework IAM | 管理端权限与租户上下文 |
 | customer token 校验 | `customerfw` | C 端外部用户身份校验 |
-| customer context 注入 | `customerfw` | `tenant_uuid`、`customer_uuid`、`membership_uuid`、roles、scopes、source |
+| customer context 注入 | `customerfw` | `tenant_uuid`、`customer_uuid`、`membership_uuid`、`profile`、roles、scopes、source |
 | customer tenant membership 校验 | `customerfw` | 只判断 customer 是否可访问当前 tenant |
 | customer register/login/validate 委托合同 | `customerfw` | 生产权威源通常是 PowerX Core 或平台身份源 |
-| 客户档案 | SCRM 插件 | 例如姓名、画像、扩展资料、业务属性 |
+| 基础展示属性 | `customerfw` + PowerX Core | `display_name`、`nickname`、`given_name`、`family_name`、`avatar_url`、`locale`、`timezone` |
+| 客户业务档案 | SCRM 插件 | 标签、画像扩展、跟进属性、归属关系、业务属性 |
 | 客户标签/分群 | SCRM 插件 | 通过 SCRM capability/API 调用 |
 | 客户跟进/时间线 | SCRM 插件 | 不进入 framework |
 | member 与 customer 的销售/服务关系 | SCRM 插件 | 例如归属销售、服务顾问、协作人 |
@@ -67,9 +70,9 @@ SCRM 插件本身也应该使用 framework：
 
 - SCRM 管理端使用 Framework IAM 识别后台 member / employee。
 - SCRM C 端接口使用 `customerfw` 识别 customer、tenant 和 membership。
-- SCRM 内部再维护自己的 `CustomerProfile`、`CustomerTag`、`CustomerOwner`、`CustomerFollowUp`、`CustomerTimeline` 等业务模型。
+- SCRM 内部再维护自己的业务档案、标签、归属、跟进、时间线等业务模型。
 
-其他插件如果只需要知道“当前 C 端用户是谁”，直接读取 `customerfw.CustomerContext`。如果需要客户档案、客户标签、客户归属员工、客户跟进记录等业务数据，应通过 SCRM 插件暴露的 capability/API 调用，不要要求 `customerfw` 增加这些字段。
+其他插件如果只需要知道“当前 C 端用户是谁”或展示基础名称，直接读取 `customerfw.CustomerContext` 和 `CustomerContext.profile`。如果需要客户标签、客户归属员工、客户跟进记录、生命周期、线索商机等业务数据，应通过 SCRM 插件暴露的 capability/API 调用，不要要求 `customerfw` 增加这些行业字段。
 
 ## 角色与适用范围
 
@@ -103,7 +106,7 @@ flowchart LR
 | --- | --- |
 | `framework/backend/go/runtime/customerfw` | 通用 customer 身份、token、tenant、membership 合同与 middleware |
 | Framework IAM | 后台 member / employee 身份、RBAC、管理端权限 |
-| SCRM 插件 | 客户档案、标签、跟进、member-customer 业务关系 |
+| SCRM 插件 | 客户业务档案、标签、跟进、member-customer 业务关系 |
 | `skeleton/backend/go-gin/internal/services/customer/*adapter.go` | skeleton 现有 auth 实现到 framework contract 的适配 |
 | `skeleton/backend/go-gin/internal/transport/http/mini-app/routes.go` | mini-app protected group 接入 customerfw |
 | 插件业务模块 | 只读取 `CustomerContext`，实现自己的业务模型 |

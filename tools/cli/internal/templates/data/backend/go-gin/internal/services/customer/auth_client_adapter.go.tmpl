@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
-	"{{ .BackendModulePath }}/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 )
 
 type FrameworkAuthClient struct {
@@ -36,10 +36,17 @@ func (c *FrameworkAuthClient) Register(ctx context.Context, input customerfw.Reg
 		return nil, ErrCustomerAuthNotImplemented
 	}
 	out, err := c.local.Register(ctx, RegisterInput{
-		TenantUUID: input.TenantUUID,
-		Email:      input.Identifier,
-		Password:   input.Password,
-		Metadata:   input.Profile,
+		TenantUUID:  input.TenantUUID,
+		Email:       input.Identifier,
+		Password:    input.Password,
+		DisplayName: input.Profile.DisplayName,
+		Nickname:    input.Profile.Nickname,
+		GivenName:   input.Profile.GivenName,
+		FamilyName:  input.Profile.FamilyName,
+		AvatarURL:   input.Profile.AvatarURL,
+		Locale:      input.Profile.Locale,
+		Timezone:    input.Profile.Timezone,
+		Metadata:    input.Attributes,
 	})
 	if err != nil {
 		return nil, err
@@ -47,6 +54,7 @@ func (c *FrameworkAuthClient) Register(ctx context.Context, input customerfw.Reg
 	return &customerfw.AuthResult{Context: &customerfw.CustomerContext{
 		TenantUUID:    out.TenantUUID,
 		CustomerUUID:  out.CustomerUUID,
+		Profile:       customerfw.NormalizeAttributes(input.Profile),
 		Source:        customerfw.CustomerAuthSourceLocal,
 		Authenticated: true,
 	}}, nil

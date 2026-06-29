@@ -17,7 +17,9 @@ Plugin local mode may persist a local mirror for development/debugging, but that
 mirror must remain compatible with the PowerX Core customer schema and must not
 be treated as a production source of truth. Parent, player, guardian, athlete,
 student, patient, fan, membership-benefit, training-profile, and similar
-industry concepts belong to business plugins, not to customerfw.
+industry concepts belong to business plugins, not to customerfw. The framework
+contract does include the generic PowerX customer display attributes carried by
+PowerX Core `customer_accounts`.
 
 ## CustomerContext
 
@@ -26,6 +28,7 @@ Runtime C 端身份上下文，注入到受保护请求并供 handler/service �
 - `tenant_uuid` (string, optional until tenant-scoped access; required before tenant-scoped business logic)
 - `customer_uuid` (string, required)
 - `membership_uuid` (string, optional for global-only context; required after membership resolution)
+- `profile` (CustomerAttributes, optional): basic display attributes mirrored from PowerX Core `customer_accounts`
 - `roles` (array<string>, customer-side roles only)
 - `scopes` (array<string>, customer-side scopes only)
 - `source` (string, required): `platform`, `delegated`, `third_party`, `local_dev`, `mock`
@@ -40,7 +43,28 @@ Runtime C 端身份上下文，注入到受保护请求并供 handler/service �
 - `tenant_uuid` is required before tenant-scoped data access.
 - `membership_uuid` is required after membership middleware succeeds.
 - `roles` and `scopes` are customer-side only and must not reuse后台 member IAM permission semantics.
+- `profile` must contain only generic display attributes, not SCRM or industry fields.
 - `attributes` and `raw_claims` must not contain industry business model fields or secrets.
+
+## CustomerAttributes
+
+Generic customer display attributes that are safe to expose through runtime
+identity context. These fields are part of the PowerX Core customer base CRM
+shape, not plugin industry models.
+
+- `display_name` (string, optional): preferred display name for admin lists, details, and C-end greetings.
+- `nickname` (string, optional): social or channel nickname.
+- `given_name` (string, optional): personal/given name.
+- `family_name` (string, optional): family/surname.
+- `avatar_url` (string, optional): public avatar URL.
+- `locale` (string, optional): preferred locale.
+- `timezone` (string, optional): preferred timezone.
+
+Recommended display fallback:
+
+```text
+display_name -> nickname -> family_name + given_name -> email -> phone -> customer_uuid
+```
 
 ## CustomerMembership
 

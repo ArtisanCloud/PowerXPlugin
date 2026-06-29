@@ -11,11 +11,11 @@ permissions:
   - actions:
       - create
       - read
-    resource: integration
+    resource: customer
   - actions:
       - create
       - read
-    resource: customer
+    resource: integration
   - actions:
       - create
       - delete
@@ -36,11 +36,11 @@ rbac:
     - actions:
         - create
         - read
-      resource: integration
+      resource: customer
     - actions:
         - create
         - read
-      resource: customer
+      resource: integration
     - actions:
         - create
         - delete

@@ -17,7 +17,7 @@ runtime:
   kind: process
   entry: backend/bin/plugin
   env:
-    POWERX_BIND_ADDR: ${POWERX_BIND_ADDR:-:8086}
+    POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
     POWERX_PROXY: "1"
     IAMMode: "delegated"
     POWERX_PLUGIN_ID: "{{ .PluginID }}"
@@ -31,7 +31,8 @@ runtime:
 
 backend:
   entry: backend/bin/plugin
-  port: 8086
+  # 0 means the PowerX host allocates and injects the runtime port.
+  port: 0
   health: /healthz
 
 endpoints:
@@ -54,6 +55,7 @@ frontend:
         NODE_ENV: production
         NITRO_HOST: 127.0.0.1
         POWERX_PROXY: "1"
+        NUXT_PUBLIC_INSIDE_POWERX: "1"
       health:
         http: /healthz
         interval: 5s
@@ -80,7 +82,8 @@ frontend:
         route: intro
         order: 20
         slot: group.plugins
-        required_policies: [{{ .PluginID }}:template:read]
+        required_policies:
+          - "{{ .PluginID }}:template:read"
         children:
           - id: plugins.{{ .PluginID }}.intro
             title: {{ .PluginName }} Intro
@@ -123,29 +126,6 @@ frontend:
                 path: /templates/crud
                 route: templates/crud
                 order: 2
-          - id: plugins.{{ .PluginID }}.business
-            title: 业务运营
-            title_i18n:
-              namespace: menus
-              key: menu.{{ .PluginID }}.business.title
-              default: Business Operations
-            icon: i-heroicons-briefcase
-            path: /admin/business/customers
-            route: admin/business/customers
-            order: 3
-            children:
-              - id: plugins.{{ .PluginID }}.business.customer_base
-                title: 客户基础管理
-                title_i18n:
-                  namespace: menus
-                  key: menu.{{ .PluginID }}.business.customer_base
-                  default: Customer Base Management
-                icon: i-heroicons-user-group
-                path: /admin/business/customers
-                route: admin/business/customers
-                order: 1
-                required_policies: [customer:read]
-
 agents:
   - id: {{ .PluginID }}.assistant
     plugin_id: {{ .PluginID }}

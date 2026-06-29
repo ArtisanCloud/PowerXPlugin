@@ -6,11 +6,15 @@ runtime:
   kind: process
   entry: backend/bin/plugin
   env:
+    POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
     POWERX_PLUGIN_ID: com.powerx.plugins.base
+    POWERX_PROXY: "1"
+    IAMMode: delegated
     POWERX_SECURITY_JWT_AUDIENCE: plugin:com.powerx.plugins.base
 backend:
   entry: backend/bin/plugin
-  port: 8078
+  # 0 means the PowerX host allocates and injects the runtime port.
+  port: 0
   health: /healthz
 
 endpoints:
@@ -33,6 +37,7 @@ frontend:
         NODE_ENV: production
         NITRO_HOST: 127.0.0.1
         POWERX_PROXY: "1"
+        NUXT_PUBLIC_INSIDE_POWERX: "1"
       health:
         http: /healthz
         interval: 5s
@@ -59,7 +64,8 @@ frontend:
         route: intro
         order: 20
         slot: group.plugins
-        required_policies: [template:read]
+        required_policies:
+          - "template:read"
         children:
           - id: plugins.com.powerx.plugins.base.intro
             title: PowerX Base Plugin Intro
@@ -112,30 +118,8 @@ frontend:
                 path: /admin/templates/framework-lab
                 route: admin/templates/framework-lab
                 order: 3
-                required_policies: [admin:root]
-          - id: plugins.com.powerx.plugins.base.business
-            title: 业务运营
-            title_i18n:
-              namespace: menus
-              key: menu.com.powerx.plugins.base.business.title
-              default: Business Operations
-            icon: i-heroicons-briefcase
-            path: /admin/business/customers
-            route: admin/business/customers
-            order: 3
-            children:
-              - id: plugins.com.powerx.plugins.base.business.customer_base
-                title: 客户基础管理
-                title_i18n:
-                  namespace: menus
-                  key: menu.com.powerx.plugins.base.business.customer_base
-                  default: Customer Base Management
-                icon: i-heroicons-user-group
-                path: /admin/business/customers
-                route: admin/business/customers
-                order: 1
-                required_policies: [customer:read]
-
+                required_policies:
+                  - "admin:root"
 assets:
   public_dir: ./web-admin/public
   webAdminPath: ./web-admin/.output

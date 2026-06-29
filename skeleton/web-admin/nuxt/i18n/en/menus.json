@@ -12,10 +12,6 @@
               "crud": "Template CRUD",
               "framework_lab": "Framework Function Test"
             },
-            "business": {
-              "title": "Business Operations",
-              "customer_base": "Customer Base Management"
-            },
             "integration": {
               "title": "Integration Hub",
               "webhooks": "Webhooks",

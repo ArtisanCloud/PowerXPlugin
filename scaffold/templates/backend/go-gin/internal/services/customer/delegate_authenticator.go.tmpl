@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"{{ .BackendModulePath }}/internal/config"
-	customerdomain "{{ .BackendModulePath }}/internal/domain/customer"
-	pxlog "{{ .BackendModulePath }}/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	customerdomain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/customer"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 var (
@@ -279,10 +279,27 @@ func parseDelegateResponse(body []byte, now time.Time) (*customerdomain.Customer
 	return &customerdomain.CustomerContext{
 		TenantUUID:   tenantUUID,
 		CustomerUUID: customerUUID,
-		Roles:        roles,
-		Attributes:   payload,
-		RawClaims:    payload,
+		Profile: customerdomain.CustomerProfile{
+			DisplayName: stringFromPayload(payload, "display_name"),
+			Nickname:    stringFromPayload(payload, "nickname"),
+			GivenName:   stringFromPayload(payload, "given_name"),
+			FamilyName:  stringFromPayload(payload, "family_name"),
+			AvatarURL:   stringFromPayload(payload, "avatar_url"),
+			Locale:      stringFromPayload(payload, "locale"),
+			Timezone:    stringFromPayload(payload, "timezone"),
+		},
+		Roles:      roles,
+		Attributes: payload,
+		RawClaims:  payload,
 	}, exp, nil
+}
+
+func stringFromPayload(payload map[string]any, key string) string {
+	if payload == nil {
+		return ""
+	}
+	value, _ := payload[key].(string)
+	return strings.TrimSpace(value)
 }
 
 func parseExpiry(payload map[string]any, now time.Time) time.Time {

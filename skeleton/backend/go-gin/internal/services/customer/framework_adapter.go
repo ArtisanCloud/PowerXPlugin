@@ -31,8 +31,17 @@ func ToFrameworkContext(cc *customerdomain.CustomerContext) *customerfw.Customer
 		return nil
 	}
 	return &customerfw.CustomerContext{
-		TenantUUID:    cc.TenantUUID,
-		CustomerUUID:  cc.CustomerUUID,
+		TenantUUID:   cc.TenantUUID,
+		CustomerUUID: cc.CustomerUUID,
+		Profile: customerfw.CustomerAttributes{
+			DisplayName: cc.Profile.DisplayName,
+			Nickname:    cc.Profile.Nickname,
+			GivenName:   cc.Profile.GivenName,
+			FamilyName:  cc.Profile.FamilyName,
+			AvatarURL:   cc.Profile.AvatarURL,
+			Locale:      cc.Profile.Locale,
+			Timezone:    cc.Profile.Timezone,
+		},
 		Roles:         cc.Roles,
 		Source:        toFrameworkSource(cc.SourceMode),
 		Authenticated: cc.Authenticated,
@@ -46,8 +55,17 @@ func FromFrameworkContext(cc *customerfw.CustomerContext) *customerdomain.Custom
 		return nil
 	}
 	return &customerdomain.CustomerContext{
-		TenantUUID:    cc.TenantUUID,
-		CustomerUUID:  cc.CustomerUUID,
+		TenantUUID:   cc.TenantUUID,
+		CustomerUUID: cc.CustomerUUID,
+		Profile: customerdomain.CustomerProfile{
+			DisplayName: cc.Profile.DisplayName,
+			Nickname:    cc.Profile.Nickname,
+			GivenName:   cc.Profile.GivenName,
+			FamilyName:  cc.Profile.FamilyName,
+			AvatarURL:   cc.Profile.AvatarURL,
+			Locale:      cc.Profile.Locale,
+			Timezone:    cc.Profile.Timezone,
+		},
 		Roles:         cc.Roles,
 		SourceMode:    fromFrameworkSource(cc.Source),
 		Attributes:    cc.Attributes,

@@ -327,12 +327,13 @@ components:
           minLength: 8
         channel:
           type: string
-        metadata:
+        profile:
+          $ref: '#/components/schemas/CustomerAttributes'
+        attributes:
           type: object
           additionalProperties: true
     LoginRequest:
       type: object
-      required: [identifier]
       properties:
         tenant_uuid:
           type: string
@@ -341,11 +342,26 @@ components:
           type: string
         password:
           type: string
+        code:
+          type: string
         channel:
           type: string
-        metadata:
+        nickname:
+          type: string
+          deprecated: true
+          description: Prefer profile.nickname for new integrations.
+        avatar_url:
+          type: string
+          deprecated: true
+          description: Prefer profile.avatar_url for new integrations.
+        profile:
+          $ref: '#/components/schemas/CustomerAttributes'
+        attributes:
           type: object
           additionalProperties: true
+      anyOf:
+        - required: [identifier]
+        - required: [code, channel]
     AuthResult:
       type: object
       required: [access_token, expires_in, customer_context]
@@ -467,6 +483,8 @@ components:
         membership_uuid:
           type: string
           format: uuid
+        profile:
+          $ref: '#/components/schemas/CustomerAttributes'
         roles:
           type: array
           items:
@@ -487,6 +505,28 @@ components:
           type: object
           additionalProperties: true
         trace_id:
+          type: string
+    CustomerAttributes:
+      type: object
+      description: >
+        Generic PowerX customer base CRM display attributes. These fields are
+        safe to carry in framework runtime context and must not be used for
+        SCRM tags, ownership, follow-up, lifecycle, leads, or industry models.
+      additionalProperties: false
+      properties:
+        display_name:
+          type: string
+        nickname:
+          type: string
+        given_name:
+          type: string
+        family_name:
+          type: string
+        avatar_url:
+          type: string
+        locale:
+          type: string
+        timezone:
           type: string
     CustomerMembership:
       type: object

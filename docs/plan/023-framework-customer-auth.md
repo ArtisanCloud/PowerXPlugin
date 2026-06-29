@@ -1,12 +1,12 @@
 # PowerXPlugin Framework Customer Identity/Auth 统一规划
 
-本文定义 PowerXPlugin framework 中面向 C 端外部用户的通用 Customer Identity/Auth 能力。该能力只解决插件如何识别、校验、获取一个外部 customer 身份，不承载任何行业业务模型。
+本文定义 PowerXPlugin framework 中面向 C 端外部用户的通用 Customer Identity/Auth 能力。该能力解决插件如何识别、校验、获取一个外部 customer 身份，并承载 PowerX Core customer 主账号的基础展示属性；它不承载 SCRM 或行业业务模型。
 
 ## 1. 背景
 
 插件在 mini-app、mobile app、public portal 等 C 端入口中，需要识别当前访问者是谁、属于哪个租户、是否具备当前租户下的访问资格。当前 skeleton 已经存在一套 customer auth 实现，包括 CustomerContext、customer token middleware、local/delegate authenticator 与测试用例。这些能力本质上属于 framework 横切能力，不应长期留在单个插件或 skeleton 内重复维护。
 
-framework 应沉淀的是 Customer Identity/Auth 的公共契约与工具，而不是“客户、会员、学员、患者、粉丝”等行业实体。
+framework 应沉淀的是 Customer Identity/Auth 的公共契约与工具，以及 `display_name`、`nickname`、`given_name`、`family_name`、`avatar_url`、`locale`、`timezone` 这类 PowerX Core customer 基础展示属性，而不是“客户标签、跟进、会员权益、学员、患者、粉丝”等行业实体。
 
 生产数据权威源在 PowerX Core。PowerXPlugin framework 不定义生产 customer 表结构，只定义运行时 contract、middleware、adapter 和 local dev mirror 约束。插件 local 模式的 customer 表只是开发调试镜像，必须对齐 PowerX Core customer schema；如果 Core 缺表，应先补齐 Core，再同步 framework skeleton/scaffold 和插件 local mirror。
 
@@ -44,6 +44,12 @@ Framework 与 Core 的映射：
 | Framework runtime | Core 权威来源 |
 | --- | --- |
 | `CustomerContext.customer_uuid` | `customer_accounts.uuid` |
+| `CustomerContext.profile.display_name` | `customer_accounts.display_name` |
+| `CustomerContext.profile.nickname` | `customer_accounts.nickname` |
+| `CustomerContext.profile.given_name` | `customer_accounts.given_name` |
+| `CustomerContext.profile.family_name` | `customer_accounts.family_name` |
+| `CustomerContext.profile.avatar_url` | `customer_accounts.avatar_url` |
+| `CustomerContext.profile.locale/timezone` | `customer_accounts.locale/timezone` |
 | `CustomerContext.tenant_uuid` | `customer_tenant_memberships.tenant_uuid` 或 `mini_app_entries.tenant_uuid` |
 | `CustomerContext.membership_uuid` | `customer_tenant_memberships.uuid` |
 | `CustomerContext.roles/scopes` | `customer_tenant_memberships.roles/scopes` |
@@ -56,7 +62,7 @@ Framework 与 Core 的映射：
 1. 仅用于 `IAMMode=local` 的开发调试。
 2. 表结构、字段命名、状态枚举、membership 语义与 PowerX Core 保持兼容。
 3. Core schema 变更后，PowerXPlugin skeleton/scaffold 和业务插件 local mirror 同步变更。
-4. 不得把家长、球员、学员、患者、粉丝等行业概念写入 framework customer 表。
+4. 可以镜像 PowerX Core customer 基础展示字段，但不得把标签、跟进、归属销售、家长、球员、学员、患者、粉丝等行业概念写入 framework customer 表。
 
 ## 4. 与 Member IAM 的区别
 
@@ -106,9 +112,20 @@ type CustomerContext struct {
     TenantUUID     string
     CustomerUUID   string
     MembershipUUID string
+    Profile        CustomerAttributes
     Roles          []string
     Scopes         []string
     Source         string // local, core, wechat, delegate, mock
+}
+
+type CustomerAttributes struct {
+    DisplayName string
+    Nickname    string
+    GivenName   string
+    FamilyName  string
+    AvatarURL   string
+    Locale      string
+    Timezone    string
 }
 ```
 
@@ -117,9 +134,10 @@ type CustomerContext struct {
 1. `TenantUUID`：当前请求解析出的租户。
 2. `CustomerUUID`：C 端外部用户身份。
 3. `MembershipUUID`：customer 在当前 tenant 下的 membership。
-4. `Roles`：C 端身份角色，只用于 customer 侧语义。
-5. `Scopes`：C 端 token 或授权范围。
-6. `Source`：身份来源，用于审计、观测与差异化策略。
+4. `Profile`：PowerX Core customer 主账号基础展示属性，只用于通用展示与识别。
+5. `Roles`：C 端身份角色，只用于 customer 侧语义。
+6. `Scopes`：C 端 token 或授权范围。
+7. `Source`：身份来源，用于审计、观测与差异化策略。
 
 可选扩展：
 
@@ -128,6 +146,7 @@ type CustomerContext struct {
     TenantUUID     string
     CustomerUUID   string
     MembershipUUID string
+    Profile        CustomerAttributes
     Roles          []string
     Scopes         []string
     Source         string
@@ -137,7 +156,7 @@ type CustomerContext struct {
 }
 ```
 
-`Attributes` 与 `RawClaims` 只能承载通用 claim，不应放入行业业务字段。
+`Profile` 只能承载 `display_name`、`nickname`、`given_name`、`family_name`、`avatar_url`、`locale`、`timezone`。`Attributes` 与 `RawClaims` 只能承载通用 claim，不应放入行业业务字段。
 
 ### 6.2 CustomerMembership
 
@@ -322,7 +341,8 @@ type RegisterInput struct {
     Identifier string
     Password   string
     Channel    string
-    Metadata   map[string]any
+    Profile    CustomerAttributes
+    Attributes map[string]any
 }
 
 type LoginInput struct {
@@ -330,7 +350,11 @@ type LoginInput struct {
     Identifier string
     Password   string
     Channel    string
-    Metadata   map[string]any
+    Code       string
+    Nickname   string
+    AvatarURL  string
+    Profile    CustomerAttributes
+    Attributes map[string]any
 }
 
 type AuthResult struct {
@@ -341,7 +365,7 @@ type AuthResult struct {
 }
 ```
 
-`RegisterInput.Metadata` 与 `LoginInput.Metadata` 只用于通用登录通道参数，不承载插件业务档案。
+`RegisterInput.Profile` 与 `LoginInput.Profile` 只用于 PowerX Core customer 基础展示属性。`RegisterInput.Attributes` 与 `LoginInput.Attributes` 只用于通用登录通道扩展参数，不承载插件业务档案。
 
 ## 13. 错误模型
 

@@ -4,7 +4,9 @@
 PLUGIN_MANIFEST ?= plugin.yaml
 DEFAULT_VERSION := 0.4.0
 _MANIFEST_VERSION := $(strip $(shell awk -F': *' '/^version:/ {print $$2; exit}' $(PLUGIN_MANIFEST) 2>/dev/null))
-ifeq ($(_MANIFEST_VERSION),)
+ifneq ($(strip $(DIST_VERSION)),)
+VERSION ?= $(DIST_VERSION)
+else ifeq ($(_MANIFEST_VERSION),)
 VERSION ?= $(DEFAULT_VERSION)
 else
 VERSION ?= $(_MANIFEST_VERSION)

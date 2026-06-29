@@ -42,11 +42,18 @@ func NewLocalAuthService(cfg *config.Config, repo *customerrepo.Repository) *Loc
 }
 
 type RegisterInput struct {
-	TenantUUID string
-	Email      string
-	Phone      string
-	Password   string
-	Metadata   map[string]any
+	TenantUUID  string
+	Email       string
+	Phone       string
+	Password    string
+	DisplayName string
+	Nickname    string
+	GivenName   string
+	FamilyName  string
+	AvatarURL   string
+	Locale      string
+	Timezone    string
+	Metadata    map[string]any
 }
 
 type RegisterOutput struct {
@@ -106,6 +113,13 @@ func (s *LocalAuthService) Register(ctx context.Context, in RegisterInput) (*Reg
 		Email:         email,
 		Phone:         phone,
 		PasswordHash:  string(hash),
+		DisplayName:   strings.TrimSpace(in.DisplayName),
+		Nickname:      strings.TrimSpace(in.Nickname),
+		GivenName:     strings.TrimSpace(in.GivenName),
+		FamilyName:    strings.TrimSpace(in.FamilyName),
+		AvatarURL:     strings.TrimSpace(in.AvatarURL),
+		Locale:        strings.TrimSpace(in.Locale),
+		Timezone:      strings.TrimSpace(in.Timezone),
 		Status:        status,
 		Metadata:      meta,
 		EmailVerified: false,

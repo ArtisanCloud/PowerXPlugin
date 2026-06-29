@@ -3,22 +3,24 @@ package customerfw
 import "context"
 
 type RegisterInput struct {
-	TenantUUID string         `json:"tenant_uuid,omitempty"`
-	Channel    string         `json:"channel,omitempty"`
-	Identifier string         `json:"identifier,omitempty"`
-	Password   string         `json:"password,omitempty"`
-	Profile    map[string]any `json:"profile,omitempty"`
+	TenantUUID string             `json:"tenant_uuid,omitempty"`
+	Channel    string             `json:"channel,omitempty"`
+	Identifier string             `json:"identifier,omitempty"`
+	Password   string             `json:"password,omitempty"`
+	Profile    CustomerAttributes `json:"profile,omitempty"`
+	Attributes map[string]any     `json:"attributes,omitempty"`
 }
 
 type LoginInput struct {
-	TenantUUID string         `json:"tenant_uuid,omitempty"`
-	Channel    string         `json:"channel,omitempty"`
-	Identifier string         `json:"identifier,omitempty"`
-	Password   string         `json:"password,omitempty"`
-	Code       string         `json:"code,omitempty"`
-	Nickname   string         `json:"nickname,omitempty"`
-	AvatarURL  string         `json:"avatar_url,omitempty"`
-	Profile    map[string]any `json:"profile,omitempty"`
+	TenantUUID string             `json:"tenant_uuid,omitempty"`
+	Channel    string             `json:"channel,omitempty"`
+	Identifier string             `json:"identifier,omitempty"`
+	Password   string             `json:"password,omitempty"`
+	Code       string             `json:"code,omitempty"`
+	Nickname   string             `json:"nickname,omitempty"`
+	AvatarURL  string             `json:"avatar_url,omitempty"`
+	Profile    CustomerAttributes `json:"profile,omitempty"`
+	Attributes map[string]any     `json:"attributes,omitempty"`
 }
 
 type AuthResult struct {

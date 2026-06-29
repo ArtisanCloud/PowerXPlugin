@@ -56,12 +56,16 @@ type accountDTO struct {
 	Email         string    `json:"email,omitempty"`
 	Phone         string    `json:"phone,omitempty"`
 	DisplayName   string    `json:"display_name,omitempty"`
+	Nickname      string    `json:"nickname,omitempty"`
+	GivenName     string    `json:"given_name,omitempty"`
+	FamilyName    string    `json:"family_name,omitempty"`
 	AvatarURL     string    `json:"avatar_url,omitempty"`
 	Locale        string    `json:"locale,omitempty"`
 	Timezone      string    `json:"timezone,omitempty"`
 	Status        string    `json:"status"`
 	EmailVerified bool      `json:"email_verified"`
 	PhoneVerified bool      `json:"phone_verified"`
+	Metadata      any       `json:"metadata,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -72,7 +76,31 @@ type createAccountRequest struct {
 	Phone       string         `json:"phone"`
 	Password    string         `json:"password"`
 	DisplayName string         `json:"display_name"`
+	Nickname    string         `json:"nickname"`
+	GivenName   string         `json:"given_name"`
+	FamilyName  string         `json:"family_name"`
+	AvatarURL   string         `json:"avatar_url"`
+	Locale      string         `json:"locale"`
+	Timezone    string         `json:"timezone"`
 	Metadata    map[string]any `json:"metadata"`
+}
+
+type updateAccountRequest struct {
+	PrimaryEmail  *string        `json:"primary_email"`
+	PrimaryPhone  *string        `json:"primary_phone"`
+	Email         *string        `json:"email"`
+	Phone         *string        `json:"phone"`
+	DisplayName   *string        `json:"display_name"`
+	Nickname      *string        `json:"nickname"`
+	GivenName     *string        `json:"given_name"`
+	FamilyName    *string        `json:"family_name"`
+	AvatarURL     *string        `json:"avatar_url"`
+	Locale        *string        `json:"locale"`
+	Timezone      *string        `json:"timezone"`
+	Status        *string        `json:"status"`
+	EmailVerified *bool          `json:"email_verified"`
+	PhoneVerified *bool          `json:"phone_verified"`
+	Metadata      map[string]any `json:"metadata"`
 }
 
 func (h *Handler) Overview(c *gin.Context) {
@@ -113,7 +141,7 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	}
 	if query.Query != "" {
 		like := "%" + query.Query + "%"
-		db = db.Where("customer_uuid = ? OR primary_email LIKE ? OR primary_phone LIKE ? OR email LIKE ? OR phone LIKE ? OR display_name LIKE ?", query.Query, like, like, like, like, like)
+		db = db.Where("customer_uuid = ? OR primary_email LIKE ? OR primary_phone LIKE ? OR email LIKE ? OR phone LIKE ? OR display_name LIKE ? OR nickname LIKE ? OR given_name LIKE ? OR family_name LIKE ?", query.Query, like, like, like, like, like, like, like, like)
 	}
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
@@ -127,24 +155,7 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	}
 	items := make([]accountDTO, 0, len(accounts))
 	for _, item := range accounts {
-		items = append(items, accountDTO{
-			ID:            item.ID,
-			CustomerUUID:  item.CustomerUUID,
-			TenantUUID:    item.TenantUuid,
-			PrimaryEmail:  item.PrimaryEmail,
-			PrimaryPhone:  item.PrimaryPhone,
-			Email:         item.Email,
-			Phone:         item.Phone,
-			DisplayName:   item.DisplayName,
-			AvatarURL:     item.AvatarURL,
-			Locale:        item.Locale,
-			Timezone:      item.Timezone,
-			Status:        item.Status,
-			EmailVerified: item.EmailVerified,
-			PhoneVerified: item.PhoneVerified,
-			CreatedAt:     item.CreatedAt,
-			UpdatedAt:     item.UpdatedAt,
-		})
+		items = append(items, newAccountDTO(item))
 	}
 	contracts.ResponseSuccess(c, makePage(items, query, total))
 }
@@ -182,19 +193,23 @@ func (h *Handler) CreateAccount(c *gin.Context) {
 	if metadata == nil {
 		metadata = map[string]any{}
 	}
-	if displayName := strings.TrimSpace(req.DisplayName); displayName != "" {
-		metadata["display_name"] = displayName
-	}
 	service := customersvc.NewLocalAuthService(nil, customerrepo.NewRepository(h.db))
 	if h.deps != nil {
 		service = customersvc.NewLocalAuthService(h.deps.Config, customerrepo.NewRepository(h.db))
 	}
 	out, err := service.Register(c.Request.Context(), customersvc.RegisterInput{
-		TenantUUID: tenantUUID,
-		Email:      strings.TrimSpace(req.Email),
-		Phone:      strings.TrimSpace(req.Phone),
-		Password:   req.Password,
-		Metadata:   metadata,
+		TenantUUID:  tenantUUID,
+		Email:       strings.TrimSpace(req.Email),
+		Phone:       strings.TrimSpace(req.Phone),
+		Password:    req.Password,
+		DisplayName: strings.TrimSpace(req.DisplayName),
+		Nickname:    strings.TrimSpace(req.Nickname),
+		GivenName:   strings.TrimSpace(req.GivenName),
+		FamilyName:  strings.TrimSpace(req.FamilyName),
+		AvatarURL:   strings.TrimSpace(req.AvatarURL),
+		Locale:      strings.TrimSpace(req.Locale),
+		Timezone:    strings.TrimSpace(req.Timezone),
+		Metadata:    metadata,
 	})
 	if err != nil {
 		switch {
@@ -208,6 +223,99 @@ func (h *Handler) CreateAccount(c *gin.Context) {
 		return
 	}
 	contracts.ResponseCreated(c, out)
+}
+
+func (h *Handler) GetAccount(c *gin.Context) {
+	if h.db == nil {
+		contracts.ResponseServiceUnavailable(c, "customer database unavailable", nil)
+		return
+	}
+	account, ok := h.findAccount(c, strings.TrimSpace(c.Param("customerUUID")))
+	if !ok {
+		return
+	}
+	contracts.ResponseSuccess(c, newAccountDTO(account))
+}
+
+func (h *Handler) UpdateAccount(c *gin.Context) {
+	if h.db == nil {
+		contracts.ResponseServiceUnavailable(c, "customer database unavailable", nil)
+		return
+	}
+	account, ok := h.findAccount(c, strings.TrimSpace(c.Param("customerUUID")))
+	if !ok {
+		return
+	}
+	var req updateAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	updates := map[string]any{}
+	if req.PrimaryEmail != nil {
+		updates["primary_email"] = strings.TrimSpace(*req.PrimaryEmail)
+	}
+	if req.PrimaryPhone != nil {
+		updates["primary_phone"] = strings.TrimSpace(*req.PrimaryPhone)
+	}
+	if req.Email != nil {
+		updates["email"] = strings.TrimSpace(*req.Email)
+	}
+	if req.Phone != nil {
+		updates["phone"] = strings.TrimSpace(*req.Phone)
+	}
+	if req.DisplayName != nil {
+		updates["display_name"] = strings.TrimSpace(*req.DisplayName)
+	}
+	if req.Nickname != nil {
+		updates["nickname"] = strings.TrimSpace(*req.Nickname)
+	}
+	if req.GivenName != nil {
+		updates["given_name"] = strings.TrimSpace(*req.GivenName)
+	}
+	if req.FamilyName != nil {
+		updates["family_name"] = strings.TrimSpace(*req.FamilyName)
+	}
+	if req.AvatarURL != nil {
+		updates["avatar_url"] = strings.TrimSpace(*req.AvatarURL)
+	}
+	if req.Locale != nil {
+		updates["locale"] = strings.TrimSpace(*req.Locale)
+	}
+	if req.Timezone != nil {
+		updates["timezone"] = strings.TrimSpace(*req.Timezone)
+	}
+	if req.Status != nil {
+		status := strings.TrimSpace(*req.Status)
+		if !isValidCustomerStatus(status) {
+			contracts.ResponseBadRequest(c, "invalid status")
+			return
+		}
+		updates["status"] = status
+	}
+	if req.EmailVerified != nil {
+		updates["email_verified"] = *req.EmailVerified
+	}
+	if req.PhoneVerified != nil {
+		updates["phone_verified"] = *req.PhoneVerified
+	}
+	if req.Metadata != nil {
+		updates["metadata"] = req.Metadata
+	}
+	if len(updates) == 0 {
+		contracts.ResponseSuccess(c, newAccountDTO(account))
+		return
+	}
+	updates["updated_at"] = time.Now()
+	if err := h.db.Model(&account).Updates(updates).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	if err := h.db.Where("customer_uuid = ?", account.CustomerUUID).First(&account).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, newAccountDTO(account))
 }
 
 func (h *Handler) ListIdentities(c *gin.Context) {
@@ -244,6 +352,67 @@ func (h *Handler) ListIdentities(c *gin.Context) {
 		return
 	}
 	contracts.ResponseSuccess(c, makePage(items, query, total))
+}
+
+func (h *Handler) findAccount(c *gin.Context, customerUUID string) (customermodel.CustomerAccount, bool) {
+	var account customermodel.CustomerAccount
+	customerUUID = strings.ToLower(strings.TrimSpace(customerUUID))
+	if customerUUID == "" {
+		contracts.ResponseBadRequest(c, "customer_uuid is required")
+		return account, false
+	}
+	db := h.db.Where("customer_uuid = ?", customerUUID)
+	tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, c.Query("tenant_uuid"))
+	if mismatch {
+		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeForbidden, "tenant_uuid mismatch")
+		return account, false
+	}
+	if tenantUUID != "" {
+		db = db.Where("tenant_uuid = ?", tenantUUID)
+	}
+	if err := db.First(&account).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			contracts.ResponseNotFound(c, "customer account not found")
+			return account, false
+		}
+		contracts.ResponseInternalError(c, err)
+		return account, false
+	}
+	return account, true
+}
+
+func newAccountDTO(item customermodel.CustomerAccount) accountDTO {
+	return accountDTO{
+		ID:            item.ID,
+		CustomerUUID:  item.CustomerUUID,
+		TenantUUID:    item.TenantUuid,
+		PrimaryEmail:  item.PrimaryEmail,
+		PrimaryPhone:  item.PrimaryPhone,
+		Email:         item.Email,
+		Phone:         item.Phone,
+		DisplayName:   item.DisplayName,
+		Nickname:      item.Nickname,
+		GivenName:     item.GivenName,
+		FamilyName:    item.FamilyName,
+		AvatarURL:     item.AvatarURL,
+		Locale:        item.Locale,
+		Timezone:      item.Timezone,
+		Status:        item.Status,
+		EmailVerified: item.EmailVerified,
+		PhoneVerified: item.PhoneVerified,
+		Metadata:      item.Metadata,
+		CreatedAt:     item.CreatedAt,
+		UpdatedAt:     item.UpdatedAt,
+	}
+}
+
+func isValidCustomerStatus(status string) bool {
+	switch status {
+	case customermodel.StatusActive, customermodel.StatusPending, customermodel.StatusSuspended, customermodel.StatusDisabled:
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Handler) ListMemberships(c *gin.Context) {

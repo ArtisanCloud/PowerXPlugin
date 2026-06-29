@@ -37,6 +37,10 @@ package-pxp: verify-manifest build frontend-build
 	fi
 	@if [ -f "$(BUILD_DIR)/plugin" ]; then cp $(BUILD_DIR)/plugin $(PACKAGE_BACKEND_DIR)/; fi
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(PACKAGE_BACKEND_DIR)/; fi
+	@if [ -d "skills" ]; then \
+		mkdir -p $(PACKAGE_VERSION_DIR)/skills; \
+		cp -R skills/. $(PACKAGE_VERSION_DIR)/skills/; \
+	fi
 	@if [ -d "$(FRONTEND_OUTPUT)" ] && [ -n "$$\(ls -A $(FRONTEND_OUTPUT) 2>/dev/null)" ]; then \
 		cp -R $(FRONTEND_OUTPUT)/. $(PACKAGE_FRONTEND_DIR)/; \
 	else \

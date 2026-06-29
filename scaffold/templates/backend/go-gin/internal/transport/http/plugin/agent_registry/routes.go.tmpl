@@ -13,14 +13,14 @@ import (
 	"time"
 
 	runtimeskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/agent_registry"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	sampleskills "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/skills"
+	"{{ .BackendModulePath }}/internal/capabilities"
+	"{{ .BackendModulePath }}/internal/contracts"
+	basemodels "{{ .BackendModulePath }}/internal/entity/models"
+	dbm "{{ .BackendModulePath }}/internal/entity/models/agent_registry"
+	"{{ .BackendModulePath }}/internal/integrations/gateway"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	sampleskills "{{ .BackendModulePath }}/internal/skills"
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -342,8 +342,9 @@ func (h *Handler) ListAgents(c *gin.Context) {
 	if !ok {
 		return
 	}
+	identity := currentRegistrationIdentity()
 	var items []dbm.PluginAgent
-	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, pluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_LIST_FAILED", err.Error())
 		return
 	}
@@ -355,8 +356,9 @@ func (h *Handler) ListRunnableAgents(c *gin.Context) {
 	if !ok {
 		return
 	}
+	identity := currentRegistrationIdentity()
 	var items []dbm.PluginAgent
-	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND sync_status = ? AND powerx_agent_uuid <> ''", tenantUUID, pluginID, dbm.SyncStatusSynced).Order("updated_at DESC").Find(&items).Error; err != nil {
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND sync_status = ? AND powerx_agent_uuid <> ''", tenantUUID, identity.PluginID, dbm.SyncStatusSynced).Order("updated_at DESC").Find(&items).Error; err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_RUNNABLE_FAILED", err.Error())
 		return
 	}
@@ -382,8 +384,11 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 	}
 	req.PluginAgentID = strings.TrimSpace(req.PluginAgentID)
 	req.Name = strings.TrimSpace(req.Name)
+	identity := currentRegistrationIdentity()
 	req.AgentKey = firstNonEmpty(req.AgentKey, req.PluginAgentID)
 	req.PluginAgentID = firstNonEmpty(req.PluginAgentID, req.AgentKey)
+	req.PluginAgentID = identity.pluginAgentID(req.PluginAgentID)
+	req.AgentKey = identity.agentKey(req.AgentKey)
 	if req.PluginAgentID == "" || req.Name == "" || req.AgentKey == "" {
 		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_REQUIRED", "plugin_agent_id, agent_key and name are required")
 		return
@@ -396,7 +401,7 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 	}
 	status := dbm.SyncStatusDraft
 	var existing dbm.PluginAgent
-	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_agent_id = ?", tenantUUID, pluginID, req.PluginAgentID).First(&existing).Error
+	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_agent_id = ?", tenantUUID, identity.PluginID, req.PluginAgentID).First(&existing).Error
 	if err == nil {
 		if existing.SyncStatus == dbm.SyncStatusSynced {
 			status = dbm.SyncStatusDrifted
@@ -429,7 +434,7 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 	item := dbm.PluginAgent{
 		BaseModel:       baseModel(tenantUUID),
 		PluginAgentID:   req.PluginAgentID,
-		PluginID:        pluginID,
+		PluginID:        identity.PluginID,
 		PowerXAgentUUID: strings.TrimSpace(req.PowerXAgentUUID),
 		AgentKey:        req.AgentKey,
 		Name:            req.Name,

@@ -14,6 +14,8 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.GET("/overview", handler.Overview)
 	group.GET("/accounts", handler.ListAccounts)
 	group.POST("/accounts", handler.CreateAccount)
+	group.GET("/accounts/:customerUUID", handler.GetAccount)
+	group.PATCH("/accounts/:customerUUID", handler.UpdateAccount)
 	group.GET("/identities", handler.ListIdentities)
 	group.GET("/memberships", handler.ListMemberships)
 	group.GET("/login-events", handler.ListLoginEvents)

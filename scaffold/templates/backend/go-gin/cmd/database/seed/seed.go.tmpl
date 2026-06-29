@@ -6,10 +6,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	agentregistry "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/agent_registry"
-	templatemodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
-	sampleskills "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/skills"
+	"{{ .BackendModulePath }}/internal/entity/models"
+	agentregistry "{{ .BackendModulePath }}/internal/entity/models/agent_registry"
+	templatemodel "{{ .BackendModulePath }}/internal/entity/models/template"
+	sampleskills "{{ .BackendModulePath }}/internal/skills"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )

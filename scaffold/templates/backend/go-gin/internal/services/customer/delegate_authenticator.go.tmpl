@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	customerdomain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/customer"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"{{ .BackendModulePath }}/internal/config"
+	customerdomain "{{ .BackendModulePath }}/internal/domain/customer"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
 )
 
 var (

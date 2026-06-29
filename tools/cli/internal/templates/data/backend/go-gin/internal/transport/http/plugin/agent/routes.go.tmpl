@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
-	"github.com/gin-gonic/gin"
 	"{{ .BackendModulePath }}/internal/contracts"
 	"{{ .BackendModulePath }}/internal/integrations/gateway"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	"{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {

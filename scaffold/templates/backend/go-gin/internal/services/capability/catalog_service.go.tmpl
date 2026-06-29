@@ -177,7 +177,6 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 	}
 	apiKey := strings.TrimSpace(s.cfg.Gateway.APIKey)
 	authScheme := strings.ToLower(strings.TrimSpace(s.cfg.Gateway.AuthScheme))
-	tenant := strings.TrimSpace(s.cfg.Gateway.TenantUUID)
 	client := &http.Client{Timeout: 10 * time.Second}
 	url := fmt.Sprintf("%s/admin/platform-capabilities?page=1&page_size=200", base)
 
@@ -191,9 +190,6 @@ func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]
 		if apiKey != "" {
 			req.Header.Set("Authorization", "ApiKey "+apiKey)
 		}
-	}
-	if tenant != "" {
-		req.Header.Set("tenant_uuid", tenant)
 	}
 	req.Header.Set("X-Request-ID", fmt.Sprintf("cap-catalog-%d", time.Now().UnixNano()))
 

@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
-	dbtemplate "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
-	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
-	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
+	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
+	dbtemplate "{{ .BackendModulePath }}/internal/entity/models/template"
+	pxlog "{{ .BackendModulePath }}/internal/logger"
+	"{{ .BackendModulePath }}/internal/mcp/stream"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	srvtemplates "{{ .BackendModulePath }}/internal/services/admin/templates"
 )
 
 const (

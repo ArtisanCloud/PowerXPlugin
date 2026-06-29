@@ -8,8 +8,8 @@ import (
 
 	"{{ .BackendModulePath }}/internal/config"
 	customerdomain "{{ .BackendModulePath }}/internal/domain/customer"
-	"github.com/golang-jwt/jwt/v5"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var ErrCustomerAuthNotImplemented = errors.New("customer authentication not implemented")
@@ -41,7 +41,7 @@ func (f *Factory) Build() Authenticator {
 		}
 	}
 	switch mode {
-	case "delegate":
+	case "delegate", "platform", "third_party":
 		return NewDelegateAuthenticator(f.cfg, nil, f.logger)
 	default:
 		return newLocalJWTAuthenticator(f.cfg, f.logger)

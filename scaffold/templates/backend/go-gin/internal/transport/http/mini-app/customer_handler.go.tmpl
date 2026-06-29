@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
-	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
-	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
+	"{{ .BackendModulePath }}/internal/contracts"
+	customerrepo "{{ .BackendModulePath }}/internal/entity/repository/customer"
+	customersvc "{{ .BackendModulePath }}/internal/services/customer"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 

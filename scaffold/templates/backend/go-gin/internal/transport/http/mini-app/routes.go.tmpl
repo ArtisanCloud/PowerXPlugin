@@ -24,7 +24,6 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	handler := NewCustomerHandler(deps)
 	auth.POST("/register", handler.Register)
 	auth.POST("/login", handler.Login)
-	auth.POST("/wechat/login", handler.WeChatLogin)
 	auth.POST("/validate", handler.Validate)
 	base.POST("/bootstrap/resolve", handler.ResolveBootstrap)
 

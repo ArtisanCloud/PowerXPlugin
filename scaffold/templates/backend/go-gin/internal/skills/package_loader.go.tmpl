@@ -33,26 +33,27 @@ type PackageSource struct {
 }
 
 type skillFrontmatter struct {
-	ID                 string                      `yaml:"id"`
-	Name               string                      `yaml:"name"`
-	Title              string                      `yaml:"title"`
-	Provider           string                      `yaml:"provider"`
-	Version            string                      `yaml:"version"`
-	Description        string                      `yaml:"description"`
-	IntentExamples     []string                    `yaml:"intent_examples"`
-	ResponseGuidance   map[string][]string         `yaml:"response_guidance"`
-	ActionRequiredArgs map[string][]string         `yaml:"action_required_args"`
-	ActionOptionalArgs map[string][]string         `yaml:"action_optional_args"`
-	SlotMapping        map[string]runtime.SlotSpec `yaml:"slot_mapping"`
-	PendingTaskPolicy  *runtime.PendingTaskPolicy  `yaml:"pending_task_policy"`
+	ID                 string                                `yaml:"id"`
+	Name               string                                `yaml:"name"`
+	Title              string                                `yaml:"title"`
+	Provider           string                                `yaml:"provider"`
+	Version            string                                `yaml:"version"`
+	Description        string                                `yaml:"description"`
+	IntentExamples     []string                              `yaml:"intent_examples"`
+	ResponseGuidance   map[string][]string                   `yaml:"response_guidance"`
+	ActionRequiredArgs map[string][]string                   `yaml:"action_required_args"`
+	ActionOptionalArgs map[string][]string                   `yaml:"action_optional_args"`
+	SlotMapping        map[string]runtime.SlotSpec           `yaml:"slot_mapping"`
+	PendingTaskPolicy  *runtime.PendingTaskPolicy            `yaml:"pending_task_policy"`
+	StateContract      map[string]any                        `yaml:"state_contract"`
 	ResultPresentation map[string]runtime.ResultPresentation `yaml:"result_presentation"`
-	Capability         string                      `yaml:"capability"`
-	ActionCapabilities map[string]string           `yaml:"action_capabilities"`
-	Visibility         string                      `yaml:"visibility"`
-	Status             string                      `yaml:"status"`
-	Executor           runtime.PluginSkillExecutor `yaml:"executor"`
-	InputSchema        any                         `yaml:"input_schema"`
-	OutputSchema       any                         `yaml:"output_schema"`
+	Capability         string                                `yaml:"capability"`
+	ActionCapabilities map[string]string                     `yaml:"action_capabilities"`
+	Visibility         string                                `yaml:"visibility"`
+	Status             string                                `yaml:"status"`
+	Executor           runtime.PluginSkillExecutor           `yaml:"executor"`
+	InputSchema        any                                   `yaml:"input_schema"`
+	OutputSchema       any                                   `yaml:"output_schema"`
 }
 
 func LoadTemplatePackage() (PackageSource, error) {
@@ -110,6 +111,7 @@ func LoadPackageAt(packagePath string) (PackageSource, error) {
 		ActionOptionalArgs: normalizeResponseGuidance(fm.ActionOptionalArgs),
 		SlotMapping:        fm.SlotMapping,
 		PendingTaskPolicy:  fm.PendingTaskPolicy,
+		StateContract:      fm.StateContract,
 		ResultPresentation: fm.ResultPresentation,
 		InputSchema:        inputSchema,
 		OutputSchema:       outputSchema,

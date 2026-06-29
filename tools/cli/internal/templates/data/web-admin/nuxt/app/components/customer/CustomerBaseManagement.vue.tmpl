@@ -39,8 +39,8 @@
       <UCard v-for="item in stats" :key="item.label">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ item.label }}</p>
-            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ item.value }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ `{{ item.label }}` }}</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ `{{ item.value }}` }}</p>
           </div>
           <UIcon :name="item.icon" class="h-8 w-8 text-primary-600 dark:text-primary-300" />
         </div>
@@ -64,7 +64,7 @@
       >
         <div class="text-sm text-gray-600 dark:text-gray-300">
           当前仅显示客户
-          <span class="font-mono text-xs text-gray-900 dark:text-white">{{ customerFilterUUID }}</span>
+          <span class="font-mono text-xs text-gray-900 dark:text-white">{{ `{{ customerFilterUUID }}` }}</span>
           的关联记录
         </div>
         <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-x-mark" @click="clearCustomerFilter">
@@ -80,31 +80,31 @@
       >
         <template #status-cell="{ row }">
           <UBadge :color="statusColor(row.original.status)" variant="soft">
-            {{ row.original.status || "-" }}
+            {{ `{{ row.original.status || "-" }}` }}
           </UBadge>
         </template>
         <template #ok-cell="{ row }">
           <UBadge :color="row.original.ok ? 'success' : 'error'" variant="soft">
-            {{ row.original.ok ? "成功" : "失败" }}
+            {{ `{{ row.original.ok ? "成功" : "失败" }}` }}
           </UBadge>
         </template>
         <template #uuid-cell="{ row }">
           <span class="block truncate font-mono text-xs" :title="row.original.uuid || ''">
-            {{ shortUUID(row.original.uuid) }}
+            {{ `{{ shortUUID(row.original.uuid) }}` }}
           </span>
         </template>
         <template #customer-cell="{ row }">
           <span class="block truncate font-mono text-xs" :title="row.original.customer_uuid || ''">
-            {{ shortUUID(row.original.customer_uuid) }}
+            {{ `{{ shortUUID(row.original.customer_uuid) }}` }}
           </span>
         </template>
         <template #tenant-cell="{ row }">
           <span class="block truncate font-mono text-xs" :title="row.original.tenant_uuid || ''">
-            {{ shortUUID(row.original.tenant_uuid) }}
+            {{ `{{ shortUUID(row.original.tenant_uuid) }}` }}
           </span>
         </template>
         <template #updated-cell="{ row }">
-          <span class="text-sm text-gray-600 dark:text-gray-300">{{ formatDate(row.original.updated_at || row.original.created_at) }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ formatDate(row.original.updated_at || row.original.created_at) }}` }}</span>
         </template>
         <template #actions-cell="{ row }">
           <div class="flex items-center gap-2">
@@ -134,7 +134,7 @@
 
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
         <span class="text-sm text-gray-500 dark:text-gray-400">
-          共 {{ activePage.total }} 条，当前第 {{ activePage.page }} / {{ Math.max(activePage.total_pages, 1) }} 页
+          共 {{ `{{ activePage.total }}` }} 条，当前第 {{ `{{ activePage.page }}` }} / {{ `{{ Math.max(activePage.total_pages, 1) }}` }} 页
         </span>
         <UPagination
           v-if="activePage.total_pages > 1"
@@ -189,7 +189,7 @@
                     v-if="tenantTotalPages > 1"
                     class="flex items-center justify-between gap-3 border-t border-gray-200 px-2 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
                   >
-                    <span class="truncate">共 {{ tenantTotal }} 个，第 {{ tenantPage }} / {{ tenantTotalPages }} 页</span>
+                    <span class="truncate">共 {{ `{{ tenantTotal }}` }} 个，第 {{ `{{ tenantPage }}` }} / {{ `{{ tenantTotalPages }}` }} 页</span>
                     <div class="flex shrink-0 items-center gap-1">
                       <UButton
                         icon="i-heroicons-chevron-left"
@@ -259,7 +259,7 @@
             </UFormField>
           </div>
 
-          <p v-if="createError" class="text-sm text-error-600 dark:text-error-400">{{ createError }}</p>
+          <p v-if="createError" class="text-sm text-error-600 dark:text-error-400">{{ `{{ createError }}` }}</p>
 
           <div class="flex justify-end gap-2">
             <UButton variant="ghost" color="neutral" :disabled="creating" @click="showCreateModal = false">
@@ -285,11 +285,11 @@
             <div>
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">客户详情</h2>
               <p class="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">
-                {{ selectedAccount?.customer_uuid || "-" }}
+                {{ `{{ selectedAccount?.customer_uuid || "-" }}` }}
               </p>
             </div>
             <UBadge :color="statusColor(selectedAccount?.status)" variant="soft">
-              {{ selectedAccount?.status || "-" }}
+              {{ `{{ selectedAccount?.status || "-" }}` }}
             </UBadge>
           </div>
 
@@ -299,12 +299,12 @@
           <div v-else class="space-y-3">
             <UAlert v-if="detailError" color="warning" variant="soft" icon="i-heroicons-exclamation-triangle">
               <template #title>详情接口暂不可用</template>
-              <template #description>{{ detailError }}</template>
+              <template #description>{{ `{{ detailError }}` }}</template>
             </UAlert>
             <div class="grid gap-3 md:grid-cols-2">
               <div v-for="item in accountDetailRows" :key="item.label" class="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-                <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.label }}</p>
-                <p class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ item.value || "-" }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ item.label }}` }}</p>
+                <p class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ `{{ item.value || "-" }}` }}</p>
               </div>
             </div>
           </div>
@@ -338,7 +338,7 @@
           <div>
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">编辑客户资料</h2>
             <p class="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">
-              {{ editForm.customer_uuid || "-" }}
+              {{ `{{ editForm.customer_uuid || "-" }}` }}
             </p>
           </div>
 
@@ -387,7 +387,7 @@
             </UFormField>
           </div>
 
-          <p v-if="editError" class="text-sm text-error-600 dark:text-error-400">{{ editError }}</p>
+          <p v-if="editError" class="text-sm text-error-600 dark:text-error-400">{{ `{{ editError }}` }}</p>
 
           <div class="flex justify-end gap-2">
             <UButton variant="ghost" color="neutral" :disabled="updating" @click="showEditModal = false">

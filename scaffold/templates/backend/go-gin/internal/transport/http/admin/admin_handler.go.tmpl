@@ -101,6 +101,23 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 							},
 						},
 					},
+					{
+						ID:    "base.business",
+						Title: "menu.base.business.title",
+						Icon:  "i-heroicons-briefcase",
+						Path:  "/admin/business/customers",
+						Order: 3,
+						Children: []contracts.MenuConfig{
+							{
+								ID:                  "base.business.customer_base",
+								Title:               "menu.base.business.customer_base",
+								Icon:                "i-heroicons-user-group",
+								Path:                "/admin/business/customers",
+								Order:               1,
+								RequiredPermissions: []string{"customer:read"},
+							},
+						},
+					},
 				},
 				RequiredPermissions: []string{"base.templates:read"},
 			},
@@ -111,6 +128,11 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 				Resource:    "base.templates",
 				Actions:     []string{"read", "create", "update", "delete"},
 				Description: "Template management permissions",
+			},
+			{
+				Resource:    "customer",
+				Actions:     []string{"read", "create"},
+				Description: "Customer identity, authentication source and tenant membership permissions",
 			},
 		},
 

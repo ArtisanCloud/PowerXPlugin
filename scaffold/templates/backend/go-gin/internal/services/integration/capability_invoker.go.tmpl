@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
-	dbtemplate "{{ .BackendModulePath }}/internal/entity/models/template"
-	pxlog "{{ .BackendModulePath }}/internal/logger"
-	"{{ .BackendModulePath }}/internal/mcp/stream"
-	authx "{{ .BackendModulePath }}/internal/middleware"
-	srvtemplates "{{ .BackendModulePath }}/internal/services/admin/templates"
+	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
+	dbtemplate "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
 )
 
 const (
@@ -79,6 +79,7 @@ type CapabilityInvoker struct {
 // NewCapabilityInvoker wires business handlers with HostInvoker contract.
 func NewCapabilityInvoker(templateService *srvtemplates.TemplateService, broker *stream.Broker, logger *pxlog.Entry, fallback HostInvoker) HostInvoker {
 	registry := NewHandlerRegistry()
+	registry.Register(&templatePrepareHandler{}, "agent.template.prepare")
 	registry.Register(&templateListHandler{svc: templateService}, "agent.template.list")
 	registry.Register(&templateReadHandler{svc: templateService}, "agent.template.read")
 	registry.Register(&templateCreateHandler{svc: templateService}, "agent.template.create")
@@ -142,6 +143,52 @@ func (i *CapabilityInvoker) capabilityFromEnvelope(envelope *domain.IntegrationE
 }
 
 // ---- handler 实现 ----
+
+type templatePrepareHandler struct{}
+
+func (h *templatePrepareHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
+	var payload templatePreparePayload
+	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
+		return nil, err
+	}
+	state := payload.State.Collected
+	if state == nil {
+		state = map[string]any{}
+	}
+	action := strings.ToLower(strings.TrimSpace(firstNonEmptyTemplateString(payload.Action, normalizeString(state["action"]))))
+	if action == "" {
+		action = "create"
+	}
+	merged := mergeTemplatePrepareState(state, payload)
+	missing := missingTemplateFields(action, merged)
+	resp := map[string]any{
+		"status":           "awaiting_params",
+		"ready_to_execute": false,
+		"missing_fields":   missing,
+		"state_patch":      merged,
+		"message":          templatePrepareMessage(action, missing),
+	}
+	if len(missing) == 0 {
+		reqPayload, err := templateCapabilityPayload(action, merged)
+		if err != nil {
+			return nil, err
+		}
+		resp["status"] = "completed"
+		resp["ready_to_execute"] = true
+		resp["missing_fields"] = []string{}
+		resp["capability_request"] = map[string]any{
+			"capability_id": templateActionCapabilityID(action),
+			"payload":       reqPayload,
+		}
+		resp["message"] = "参数已完整，准备执行模板操作。"
+	}
+	payloadBytes, _ := json.Marshal(resp)
+	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+}
+
+func (h *templatePrepareHandler) CapabilityID() string {
+	return "com.powerx.plugins.base.template.prepare"
+}
 
 type templateListHandler struct {
 	svc *srvtemplates.TemplateService
@@ -222,7 +269,7 @@ func (h *templateCreateHandler) Handle(ctx context.Context, envelope *domain.Int
 	}
 	content := strings.TrimSpace(payload.Content)
 	if content == "" {
-		content = fmt.Sprintf("Generated at %s", time.Now().UTC().Format(time.RFC3339))
+		return nil, errors.New("content is required")
 	}
 	tpl, err := h.svc.Create(ctx, name, payload.Description, content)
 	if err != nil {
@@ -670,6 +717,23 @@ type templateListPayload struct {
 	PageSize int    `json:"page_size"`
 }
 
+type templatePreparePayload struct {
+	Action      string         `json:"action"`
+	TemplateID  uint64         `json:"template_id"`
+	Name        string         `json:"name"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Content     string         `json:"content"`
+	Template    map[string]any `json:"template"`
+	UserMessage string         `json:"user_message"`
+	State       struct {
+		StateKey      string         `json:"state_key"`
+		SchemaVersion string         `json:"schema_version"`
+		Collected     map[string]any `json:"collected"`
+		Missing       []string       `json:"missing"`
+	} `json:"state"`
+}
+
 type templateReadPayload struct {
 	TemplateID uint64 `json:"template_id"`
 }
@@ -739,4 +803,245 @@ type templateQualityPayload struct {
 		Metadata    map[string]any `json:"metadata"`
 	} `json:"update_payload"`
 	PublishChannel string `json:"publish_channel"`
+}
+
+func mergeTemplatePrepareState(state map[string]any, payload templatePreparePayload) map[string]any {
+	merged := cloneAnyMap(state)
+	if merged == nil {
+		merged = map[string]any{}
+	}
+	action := strings.ToLower(strings.TrimSpace(firstNonEmptyTemplateString(payload.Action, normalizeString(merged["action"]))))
+	if action == "" {
+		action = "create"
+	}
+	merged["action"] = action
+	if payload.TemplateID > 0 {
+		merged["template_id"] = payload.TemplateID
+	}
+	template := mapFromInterface(merged["template"])
+	if template == nil {
+		template = map[string]any{}
+	}
+	for k, v := range payload.Template {
+		if strings.TrimSpace(k) != "" && normalizeString(v) != "" {
+			template[k] = v
+		}
+	}
+	if title := firstNonEmptyTemplateString(payload.Title, payload.Name, normalizeString(template["title"]), normalizeString(template["name"])); title != "" {
+		template["title"] = title
+	}
+	if description := firstNonEmptyTemplateString(payload.Description, normalizeString(template["description"])); description != "" {
+		template["description"] = description
+	}
+	if content := firstNonEmptyTemplateString(payload.Content, normalizeString(template["content"])); content != "" {
+		template["content"] = content
+	}
+	if len(template) > 0 {
+		merged["template"] = template
+	}
+	return merged
+}
+
+func missingTemplateFields(action string, state map[string]any) []string {
+	action = strings.ToLower(strings.TrimSpace(action))
+	template := mapFromInterface(state["template"])
+	missing := make([]string, 0, 4)
+	switch action {
+	case "create":
+		if normalizeString(template["title"]) == "" && normalizeString(template["name"]) == "" {
+			missing = append(missing, "template.title")
+		}
+		if normalizeString(template["description"]) == "" {
+			missing = append(missing, "template.description")
+		}
+		if normalizeString(template["content"]) == "" {
+			missing = append(missing, "template.content")
+		}
+	case "update":
+		if uint64FromAny(state["template_id"]) == 0 {
+			missing = append(missing, "template_id")
+		}
+		if normalizeString(template["title"]) == "" && normalizeString(template["name"]) == "" {
+			missing = append(missing, "template.title")
+		}
+		if normalizeString(template["description"]) == "" {
+			missing = append(missing, "template.description")
+		}
+		if normalizeString(template["content"]) == "" {
+			missing = append(missing, "template.content")
+		}
+	case "get", "delete":
+		if uint64FromAny(state["template_id"]) == 0 {
+			missing = append(missing, "template_id")
+		}
+	case "list":
+	default:
+		missing = append(missing, "action")
+	}
+	return missing
+}
+
+func templatePrepareMessage(action string, missing []string) string {
+	if len(missing) == 0 {
+		return ""
+	}
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "create":
+		return "请补充这个模板的" + templateMissingFieldNames(missing) + "。"
+	case "update":
+		return "请补充要更新的模板 ID，以及" + templateMissingFieldNames(missing) + "。"
+	case "get":
+		return "请提供要查询的模板 ID。"
+	case "delete":
+		return "请提供要删除的模板 ID。"
+	default:
+		return "请说明要执行的模板操作。"
+	}
+}
+
+func templateMissingFieldNames(fields []string) string {
+	names := make([]string, 0, len(fields))
+	for _, field := range fields {
+		switch strings.TrimSpace(field) {
+		case "template.title":
+			names = append(names, "标题")
+		case "template.description":
+			names = append(names, "描述")
+		case "template.content":
+			names = append(names, "内容")
+		case "template_id":
+			names = append(names, "模板 ID")
+		default:
+			names = append(names, field)
+		}
+	}
+	return strings.Join(names, "、")
+}
+
+func templateCapabilityPayload(action string, state map[string]any) (map[string]any, error) {
+	action = strings.ToLower(strings.TrimSpace(action))
+	template := mapFromInterface(state["template"])
+	capabilityID := templateActionCapabilityID(action)
+	bodyPayload := map[string]any{}
+	switch action {
+	case "create":
+		bodyPayload = map[string]any{
+			"action":      action,
+			"name":        firstNonEmptyTemplateString(normalizeString(template["title"]), normalizeString(template["name"])),
+			"description": normalizeString(template["description"]),
+			"content":     normalizeString(template["content"]),
+		}
+	case "update":
+		bodyPayload = map[string]any{
+			"action":      action,
+			"template_id": uint64FromAny(state["template_id"]),
+			"name":        firstNonEmptyTemplateString(normalizeString(template["title"]), normalizeString(template["name"])),
+			"description": normalizeString(template["description"]),
+			"content":     normalizeString(template["content"]),
+		}
+	case "get", "delete":
+		bodyPayload = map[string]any{
+			"action":      action,
+			"template_id": uint64FromAny(state["template_id"]),
+		}
+	case "list":
+		bodyPayload = map[string]any{"action": action}
+	default:
+		return nil, fmt.Errorf("unsupported template action: %s", action)
+	}
+	return map[string]any{
+		"method":   "POST",
+		"endpoint": "/api/v1/integration/capabilities/invoke",
+		"body": map[string]any{
+			"capabilityId":      capabilityID,
+			"action":            action,
+			"preferredProtocol": "agent",
+			"payload":           bodyPayload,
+			"metadata": map[string]any{
+				"auth_required":  false,
+				"tenant_scoped":  true,
+				"capability_id":  capabilityID,
+				"prepared_by":    "template.prepare",
+				"schema_version": "1.0",
+			},
+		},
+	}, nil
+}
+
+func templateActionCapabilityID(action string) string {
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "create":
+		return "com.powerx.plugins.base.template.create"
+	case "update":
+		return "com.powerx.plugins.base.template.update"
+	case "get":
+		return "com.powerx.plugins.base.template.read"
+	case "delete":
+		return "com.powerx.plugins.base.template.delete"
+	case "list":
+		return "com.powerx.plugins.base.template.list"
+	default:
+		return ""
+	}
+}
+
+func cloneAnyMap(in map[string]any) map[string]any {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		if nested := mapFromInterface(v); len(nested) > 0 {
+			out[k] = cloneAnyMap(nested)
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+func mapFromInterface(value any) map[string]any {
+	switch v := value.(type) {
+	case map[string]any:
+		return v
+	default:
+		return nil
+	}
+}
+
+func firstNonEmptyTemplateString(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func uint64FromAny(value any) uint64 {
+	switch v := value.(type) {
+	case uint64:
+		return v
+	case uint:
+		return uint64(v)
+	case int:
+		if v > 0 {
+			return uint64(v)
+		}
+	case int64:
+		if v > 0 {
+			return uint64(v)
+		}
+	case float64:
+		if v > 0 {
+			return uint64(v)
+		}
+	case json.Number:
+		parsed, _ := strconv.ParseUint(v.String(), 10, 64)
+		return parsed
+	case string:
+		parsed, _ := strconv.ParseUint(strings.TrimSpace(v), 10, 64)
+		return parsed
+	}
+	return 0
 }

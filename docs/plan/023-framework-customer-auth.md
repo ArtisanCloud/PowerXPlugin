@@ -8,6 +8,8 @@
 
 framework 应沉淀的是 Customer Identity/Auth 的公共契约与工具，而不是“客户、会员、学员、患者、粉丝”等行业实体。
 
+生产数据权威源在 PowerX Core。PowerXPlugin framework 不定义生产 customer 表结构，只定义运行时 contract、middleware、adapter 和 local dev mirror 约束。插件 local 模式的 customer 表只是开发调试镜像，必须对齐 PowerX Core customer schema；如果 Core 缺表，应先补齐 Core，再同步 framework skeleton/scaffold 和插件 local mirror。
+
 ## 2. 目标
 
 1. 在 framework 中提供统一 customer 身份上下文，使业务插件只依赖稳定的 CustomerContext。
@@ -16,6 +18,7 @@ framework 应沉淀的是 Customer Identity/Auth 的公共契约与工具，而�
 4. 支持 local、core、wechat、delegate、mock 等不同身份来源，但对插件业务暴露一致上下文。
 5. 为插件测试提供标准 helper，避免每个插件重复实现 token、context、middleware 测试工具。
 6. 与 member IAM 保持语义隔离：member IAM 管后台操作者，customer auth 管 C 端外部用户。
+7. 明确 PowerX Core 是 production customer identity/auth 的权威源，framework 只消费和适配。
 
 ## 3. 非目标
 
@@ -23,7 +26,37 @@ framework 应沉淀的是 Customer Identity/Auth 的公共契约与工具，而�
 2. 不定义家长、球员、学员、会员、患者、粉丝等业务身份。
 3. 不管理业务档案、成长等级、会员权益、训练目标、报告等插件领域数据。
 4. 不复用 member IAM 的后台成员权限模型来表达 C 端用户。
-5. 不要求 framework 自己持久化 customer。framework 只定义接口与默认实现边界，真实数据可来自 PowerX Core、local dev store、第三方登录或测试 mock。
+5. 不要求 framework 自己持久化生产 customer。framework 只定义接口与默认实现边界，真实生产数据来自 PowerX Core 或平台级 delegated identity source；local dev store 和测试 mock 只能用于开发调试。
+
+## 3.1 数据权威源
+
+PowerX Core 负责生产 customer 数据模型：
+
+1. `customer_accounts`：C 端 customer 主账号。
+2. `customer_auth_identities`：密码、手机号、邮箱、微信、Apple、第三方登录身份。
+3. `customer_tenant_memberships`：customer 与 tenant 的访问关系。
+4. `mini_app_entries`：shared app 场景下的合法租户入口。
+5. `customer_sessions`：refresh/session 生命周期。
+6. `customer_login_events`：注册、登录、校验、刷新、登出审计。
+
+Framework 与 Core 的映射：
+
+| Framework runtime | Core 权威来源 |
+| --- | --- |
+| `CustomerContext.customer_uuid` | `customer_accounts.uuid` |
+| `CustomerContext.tenant_uuid` | `customer_tenant_memberships.tenant_uuid` 或 `mini_app_entries.tenant_uuid` |
+| `CustomerContext.membership_uuid` | `customer_tenant_memberships.uuid` |
+| `CustomerContext.roles/scopes` | `customer_tenant_memberships.roles/scopes` |
+| `CustomerMembership` | `customer_tenant_memberships` |
+| `BootstrapContext` | `mini_app_entries` |
+| `CustomerAuthResult` | `customer_accounts` + `customer_auth_identities` + `customer_sessions` |
+
+插件 local 模式可以落本地表，但必须遵循：
+
+1. 仅用于 `IAMMode=local` 的开发调试。
+2. 表结构、字段命名、状态枚举、membership 语义与 PowerX Core 保持兼容。
+3. Core schema 变更后，PowerXPlugin skeleton/scaffold 和业务插件 local mirror 同步变更。
+4. 不得把家长、球员、学员、患者、粉丝等行业概念写入 framework customer 表。
 
 ## 4. 与 Member IAM 的区别
 
@@ -439,3 +472,13 @@ skeleton 与业务插件只保留：
 5. `Roles` 与 `Scopes` 的命名是否需要与 capability/permission 系统对齐。
 6. local dev 模式是否继续支持注册/登录，或只提供 mock validator。
 7. framework 是否需要提供非 Gin adapter，例如 FastAPI/Node runtime 的同名契约。
+
+## 19. 实现状态
+
+截至 2026-06-24，framework customer identity/auth 主体迁移已完成：
+
+1. `framework/backend/go/runtime/customerfw` 已提供 context、token validator、auth middleware、tenant resolver、membership middleware/cache、bootstrap contract、delegated auth client、source policy 与测试 helper。
+2. skeleton mini-app 已通过 adapter 接入 `customerfw.Authenticate`、`customerfw.RequireMembership`、`/mini-app/bootstrap/resolve`、`/mini-app/auth/validate`。
+3. scaffold 与 CLI Go-Gin 模板已同步 customer auth adapter、handler、routes 与 config source policy 字段。
+4. 对外文档已整理到 `docs/guides/develop/auth/customer.md` 和 `docs/contracts/customer-auth.openapi.yaml`。
+5. 静态边界检查已加入 `scripts/contracts/validate-customer-auth-boundary.sh`，并挂入 `npm test`。

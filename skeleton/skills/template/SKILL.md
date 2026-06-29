@@ -26,6 +26,86 @@ response_guidance:
     - 用户只说“创建模板”时，只追问：请提供这个模板的标题、描述和内容。
   skill_execution:
     - 成功时说明模板 ID、标题，以及用户下一步可以查询、更新或删除。
+action_required_args:
+  create:
+    - template.title
+    - template.description
+    - template.content
+  update:
+    - template_id
+    - template.title
+    - template.description
+    - template.content
+  get:
+    - template_id
+  delete:
+    - template_id
+  list: []
+action_optional_args:
+  list:
+    - q
+    - page
+    - page_size
+slot_mapping:
+  template.title:
+    labels: ["标题", "名称", "模板标题"]
+  template.description:
+    labels: ["描述", "用途", "说明"]
+  template.content:
+    labels: ["内容", "正文", "模板内容"]
+pending_task_policy:
+  enabled: true
+  merge_window_messages: 6
+  merge_window_seconds: 900
+  confirm_before_execute: false
+state_contract:
+  schema_version: "1.0"
+  state_keys:
+    template.create:
+      action: create
+      status_enum:
+        - collecting
+        - ready
+        - awaiting_confirmation
+        - executing
+        - completed
+        - failed
+      required_args:
+        - template.title
+        - template.description
+        - template.content
+      merge_policy:
+        mode: skill_defined
+        allow_cross_turn: true
+        window_messages: 6
+        window_seconds: 900
+    template.update:
+      action: update
+      status_enum:
+        - collecting
+        - ready
+        - awaiting_confirmation
+        - executing
+        - completed
+        - failed
+      required_args:
+        - template_id
+        - template.title
+        - template.description
+        - template.content
+      merge_policy:
+        mode: skill_defined
+        allow_cross_turn: true
+        window_messages: 6
+        window_seconds: 900
+result_presentation:
+  create:
+    title: "模板已创建"
+    primary_link: "template.detail_path"
+    visible_fields:
+      - template.id
+      - template.title
+      - template.detail_path
 capability: powerxplugin.template
 action_capabilities:
   create: com.powerx.plugins.base.template.create
@@ -38,6 +118,7 @@ status: active
 executor:
   type: capability
   capability: powerxplugin.template
+  prepare_capability: com.powerx.plugins.base.template.prepare
   action_map:
     create: com.powerx.plugins.base.template.create
     get: com.powerx.plugins.base.template.read

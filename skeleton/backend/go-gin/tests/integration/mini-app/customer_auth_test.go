@@ -5,14 +5,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
+	models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/customer"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/mini-app"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 func TestMiniAppCustomerAuth_MissingToken(t *testing.T) {
@@ -90,6 +95,7 @@ func setupMiniAppAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 	t.Helper()
 	engine := gin.New()
 	g := engine.Group("/api/v1")
+	models.ForceSchemaForTests("")
 
 	cfg := &config.Config{
 		Server:  &config.ServerConfig{APIPrefix: "/api/v1"},
@@ -100,9 +106,39 @@ func setupMiniAppAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 		},
 	}
 	deps := &app.Deps{Config: cfg, Ctx: context.Background()}
+	dsn := "file:" + strings.NewReplacer("/", "_", " ", "_").Replace(t.Name()) + "?mode=memory&cache=shared"
+	db, err := gorm.Open(dbx.SQLiteDialector(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	createCustomerMirrorTables(t, db)
+	deps.DB = db
+	seedCustomerMembership(t, db, "00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002")
 
 	miniapp.RegisterAPIRoutes(g, deps)
 	return engine, deps
+}
+
+func seedCustomerMembership(t *testing.T, db *gorm.DB, tenantUUID string, customerUUID string) {
+	t.Helper()
+	account := &customer.CustomerAccount{
+		CustomerUUID: customerUUID,
+		Status:       customer.StatusActive,
+		TenantUuid:   tenantUUID,
+	}
+	if err := db.Create(account).Error; err != nil {
+		t.Fatalf("seed customer account: %v", err)
+	}
+	membership := &customer.CustomerTenantMembership{
+		MembershipUUID: customerUUID + "-membership",
+		TenantUUID:     tenantUUID,
+		CustomerUUID:   customerUUID,
+		Status:         customer.StatusActive,
+		Source:         "local_dev",
+	}
+	if err := db.Create(membership).Error; err != nil {
+		t.Fatalf("seed customer membership: %v", err)
+	}
 }
 
 func assertErrorCode(t *testing.T, body []byte, code string) {

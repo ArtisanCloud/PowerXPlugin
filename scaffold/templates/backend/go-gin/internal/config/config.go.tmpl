@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -125,6 +126,8 @@ type CustomerAuthConfig struct {
 	JWTAudience      string `yaml:"jwt_audience" json:"jwt_audience"`
 	JWTSecret        string `yaml:"jwt_secret" json:"jwt_secret"`
 	CacheTTLSeconds  int    `yaml:"cache_ttl_seconds" json:"cache_ttl_seconds"`
+	BreakGlassLocal  bool   `yaml:"break_glass_local" json:"break_glass_local"`
+	BreakGlassReason string `yaml:"break_glass_reason" json:"break_glass_reason"`
 }
 
 // ServerConfig 服务配置
@@ -297,7 +300,6 @@ type GatewayConfig struct {
 	APIPrefix    string        `yaml:"api_prefix" json:"api_prefix"`
 	AuthScheme   string        `yaml:"auth_scheme" json:"auth_scheme"`
 	APIKey       string        `yaml:"api_key" json:"api_key"`
-	TenantUUID   string        `yaml:"tenant_uuid" json:"tenant_uuid"`
 	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
 	UserAgent    string        `yaml:"user_agent" json:"user_agent"`
 	UseMock      []string      `yaml:"use_mock" json:"use_mock"`
@@ -520,7 +522,7 @@ func getDefaultConfig() *Config {
 	return &Config{
 		DevMode: true,
 		Server: &ServerConfig{
-			BindAddr: ":{{ .BackendPort }}",
+			BindAddr: ":8078",
 		},
 		Integration: &IntegrationConfig{
 			Idempotency: IntegrationIdempotencyConfig{
@@ -1182,7 +1184,6 @@ func normalizeConfig(cfg *Config) {
 		cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(resolveConfigValue(cfg.Gateway.AuthScheme))
 		cfg.Gateway.RefreshToken = ""
 		cfg.Gateway.APIKey = resolveConfigValue(cfg.Gateway.APIKey)
-		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
 		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
 
 		if cfg.Gateway.AuthScheme == "" {
@@ -1194,7 +1195,6 @@ func normalizeConfig(cfg *Config) {
 		if cfg.Logging != nil && cfg.Logging.DebugMode && !isHostDelegatedMode(cfg) {
 			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
 			apiKey := strings.TrimSpace(cfg.Gateway.APIKey)
-			tenantUUID := strings.TrimSpace(cfg.Gateway.TenantUUID)
 
 			hasAny := baseURL != "" || apiKey != ""
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
@@ -1208,13 +1208,11 @@ func normalizeConfig(cfg *Config) {
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.api_key":     apiKey != "",
-					"gateway.tenant_uuid": tenantUUID,
 				}), "Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
 
 				cfg.Gateway.BaseURL = ""
 				cfg.Gateway.AuthScheme = ""
 				cfg.Gateway.APIKey = ""
-				cfg.Gateway.TenantUUID = ""
 			}
 		}
 	}
@@ -1530,9 +1528,9 @@ func (c *Config) Validate() error {
 		c.CustomerAuth.Mode = mode
 	}
 	switch c.CustomerAuth.Mode {
-	case "local", "delegate":
+	case "local", "local_dev", "mock", "delegate", "platform", "third_party":
 	default:
-		return NewConfigError("customer_auth.mode must be one of: local, delegate")
+		return NewConfigError("customer_auth.mode must be one of: local, local_dev, mock, delegate, platform, third_party")
 	}
 
 	if strings.TrimSpace(c.CustomerAuth.DelegateTimeout) == "" {
@@ -1545,10 +1543,10 @@ func (c *Config) Validate() error {
 		return NewConfigError("customer_auth.cache_ttl_seconds must be non-negative")
 	}
 
-	if c.CustomerAuth.Mode == "delegate" {
+	if c.CustomerAuth.Mode == "delegate" || c.CustomerAuth.Mode == "platform" || c.CustomerAuth.Mode == "third_party" {
 		endpoint := strings.TrimSpace(c.CustomerAuth.DelegateEndpoint)
 		if endpoint == "" {
-			return NewConfigError("customer_auth.delegate_endpoint is required when mode=delegate")
+			return NewConfigError("customer_auth.delegate_endpoint is required when customer_auth.mode delegates to platform")
 		}
 		parsed, err := url.Parse(endpoint)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
@@ -1556,10 +1554,19 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.CustomerAuth.Mode == "local" && c.IsProduction() {
-		if strings.TrimSpace(c.CustomerAuth.JWTSecret) == "" {
-			return NewConfigError("customer_auth.jwt_secret is required in production when mode=local")
-		}
+	sourceMode := customerfw.CustomerAuthSource(c.CustomerAuth.Mode)
+	if c.CustomerAuth.Mode == "local" {
+		sourceMode = customerfw.CustomerAuthSourceLocal
+	}
+	if err := customerfw.ValidateSourcePolicy(customerfw.SourcePolicy{
+		Mode:       sourceMode,
+		Production: c.IsProduction(),
+		BreakGlass: c.CustomerAuth.BreakGlassLocal,
+	}); err != nil {
+		return NewConfigError(err.Error())
+	}
+	if c.IsProduction() && c.CustomerAuth.BreakGlassLocal && strings.TrimSpace(c.CustomerAuth.BreakGlassReason) == "" {
+		return NewConfigError("customer_auth.break_glass_reason is required when break_glass_local is enabled")
 	}
 
 	// EventBridge 配置默认值与验证
@@ -1771,15 +1778,6 @@ func (c *Config) Validate() error {
 			}
 			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
 				return NewConfigError("gateway config requires base_url + credential matching auth_scheme")
-			}
-
-			if c.Gateway.AuthScheme == "bearer" {
-				tenantUUID := strings.TrimSpace(c.Gateway.TenantUUID)
-				if tenantUUID != "" {
-					if _, err := uuid.Parse(tenantUUID); err != nil {
-						return NewConfigError("gateway.tenant_uuid must be a valid UUID string")
-					}
-				}
 			}
 		}
 	}

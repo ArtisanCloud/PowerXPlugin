@@ -135,6 +135,27 @@ export const useUserStore = defineStore("user", {
       });
     },
 
+    // 通用客户基础管理读权限；仅表示 customer identity/auth/membership 基础能力，不代表 SCRM 业务权限。
+    canReadCustomers: (state): boolean => {
+      if (state.context?.is_root) return true;
+
+      const perms = (state.context?.permissions || []).map((item) =>
+        String(item || "").trim()
+      );
+      const allowExact = new Set([
+        "customer.read",
+        "customer:read",
+        "base.customer.read",
+        "base.customer:read",
+        "*:*",
+      ]);
+      const allowSuffix = [":customer:read", ":customer.read", ":base.customer:read", ":base.customer.read"];
+      return perms.some((perm) => {
+        if (allowExact.has(perm)) return true;
+        return allowSuffix.some((suffix) => perm.endsWith(suffix));
+      });
+    },
+
     // 用户显示名称
     displayName: (state): string => {
       return (

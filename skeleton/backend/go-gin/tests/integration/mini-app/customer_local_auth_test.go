@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -262,29 +263,12 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 	g := engine.Group("/api/v1")
 
 	models.ForceSchemaForTests("")
-	db, err := gorm.Open(dbx.SQLiteDialector("file::memory:?cache=shared"), &gorm.Config{})
+	dsn := "file:" + strings.NewReplacer("/", "_", " ", "_").Replace(t.Name()) + "?mode=memory&cache=shared"
+	db, err := gorm.Open(dbx.SQLiteDialector(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	// Use explicit DDL for sqlite compatibility (avoid jsonb defaults).
-	ddl := `CREATE TABLE IF NOT EXISTS customer_accounts (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		tenant_uuid TEXT NOT NULL,
-		created_at DATETIME,
-		updated_at DATETIME,
-		deleted_at DATETIME,
-		customer_uuid TEXT NOT NULL,
-		email TEXT,
-		phone TEXT,
-		password_hash TEXT,
-		status TEXT NOT NULL DEFAULT 'active',
-		metadata TEXT,
-		email_verified INTEGER NOT NULL DEFAULT 0,
-		phone_verified INTEGER NOT NULL DEFAULT 0
-	);`
-	if err := db.Exec(ddl).Error; err != nil {
-		t.Fatalf("create customer_accounts: %v", err)
-	}
+	createCustomerMirrorTables(t, db)
 	templateDDL := `CREATE TABLE IF NOT EXISTS template (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		tenant_uuid TEXT NOT NULL,
@@ -325,6 +309,121 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 
 	miniapp.RegisterAPIRoutes(g, deps)
 	return engine, deps
+}
+
+func createCustomerMirrorTables(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	ddls := []string{
+		`CREATE TABLE IF NOT EXISTS customer_accounts (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			customer_uuid TEXT NOT NULL,
+			primary_email TEXT,
+			primary_phone TEXT,
+			display_name TEXT,
+			avatar_url TEXT,
+			locale TEXT,
+			timezone TEXT,
+			status TEXT NOT NULL DEFAULT 'active',
+			metadata TEXT,
+			email TEXT,
+			phone TEXT,
+			password_hash TEXT,
+			email_verified INTEGER NOT NULL DEFAULT 0,
+			phone_verified INTEGER NOT NULL DEFAULT 0,
+			tenant_uuid TEXT
+		);`,
+		`CREATE TABLE IF NOT EXISTS customer_auth_identities (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			customer_uuid TEXT NOT NULL,
+			provider TEXT NOT NULL,
+			provider_subject TEXT,
+			email TEXT,
+			phone TEXT,
+			password_hash TEXT,
+			status TEXT NOT NULL DEFAULT 'active',
+			verified_at DATETIME,
+			metadata TEXT
+		);`,
+		`CREATE TABLE IF NOT EXISTS customer_tenant_memberships (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			membership_uuid TEXT NOT NULL,
+			tenant_uuid TEXT NOT NULL,
+			customer_uuid TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'active',
+			roles TEXT,
+			scopes TEXT,
+			source TEXT NOT NULL DEFAULT 'local_dev',
+			expires_at DATETIME,
+			metadata TEXT
+		);`,
+		`CREATE TABLE IF NOT EXISTS mini_app_entries (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			entry_uuid TEXT NOT NULL,
+			tenant_uuid TEXT NOT NULL,
+			entry_code TEXT NOT NULL,
+			entry_type TEXT NOT NULL,
+			app_key TEXT,
+			appid TEXT,
+			channel TEXT,
+			campaign TEXT,
+			brand_name TEXT,
+			org_name TEXT,
+			theme TEXT,
+			features TEXT,
+			status TEXT NOT NULL DEFAULT 'active',
+			expires_at DATETIME,
+			metadata TEXT
+		);`,
+		`CREATE TABLE IF NOT EXISTS customer_sessions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			session_uuid TEXT NOT NULL,
+			customer_uuid TEXT NOT NULL,
+			tenant_uuid TEXT,
+			membership_uuid TEXT,
+			refresh_token_hash TEXT,
+			source TEXT NOT NULL DEFAULT 'local_dev',
+			issued_at DATETIME,
+			expires_at DATETIME,
+			revoked_at DATETIME,
+			metadata TEXT
+		);`,
+		`CREATE TABLE IF NOT EXISTS customer_login_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			tenant_uuid TEXT,
+			customer_uuid TEXT,
+			identity_provider TEXT,
+			event_type TEXT NOT NULL,
+			ok INTEGER NOT NULL DEFAULT 0,
+			error_code TEXT,
+			ip TEXT,
+			user_agent TEXT,
+			trace_id TEXT,
+			metadata TEXT
+		);`,
+	}
+	for _, ddl := range ddls {
+		if err := db.Exec(ddl).Error; err != nil {
+			t.Fatalf("create customer mirror table: %v", err)
+		}
+	}
 }
 
 func doJSON(t *testing.T, engine *gin.Engine, method, path, tenantUUID string, body any, headers map[string]string) *httptest.ResponseRecorder {

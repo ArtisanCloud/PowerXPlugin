@@ -419,17 +419,19 @@ func TestStreamAgentSSEUsesGatewayEndpoint(t *testing.T) {
 	}
 	client := NewClient(cfg, nil)
 	stream, err := client.StreamAgentSSE(context.Background(), AgentStreamParams{
-		AgentID:   "agent-1",
-		SessionID: "session-1",
-		TraceID:   "trace-1",
-		Query:     "hello",
-		Intent:    "agent.bound_capabilities",
+		AgentID:            "agent-1",
+		SessionID:          "session-1",
+		TraceID:            "trace-1",
+		Query:              "hello",
+		Intent:             "agent.bound_capabilities",
+		RegenFromMessageID: "215",
 	})
 	require.NoError(t, err)
 	defer stream.Body.Close()
 	require.Equal(t, "/api/v1/agents/stream/sse", gotPath)
 	require.Contains(t, gotQuery, "agent_id=agent-1")
 	require.Contains(t, gotQuery, "intent=agent.bound_capabilities")
+	require.Contains(t, gotQuery, "regen_from_message_id=215")
 	require.Equal(t, "ApiKey token", gotAuth)
 }
 

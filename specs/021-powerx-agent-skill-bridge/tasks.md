@@ -142,6 +142,17 @@
 
 ---
 
+## Phase 9: Agent Run State Protocol 对齐
+
+- [X] T056 [Shared] 文档对齐：补齐 PowerXPlugin 对 PowerX Agent Run State Protocol 的消费边界、Skill manifest 扩展和调试 UI 验收：`docs/plan/021-powerx-agent-skill-bridge.md`, `specs/021-powerx-agent-skill-bridge/spec.md`, `specs/021-powerx-agent-skill-bridge/tasks.md`
+- [X] T057 [P] [US4] Framework Client 增加 `agent_run.*` typed event 定义与 decoder：`framework/backend/go/runtime/powerx/agent/events.go`, `framework/backend/go/runtime/powerx/agent/sse.go`
+- [X] T058 [P] [US4] Framework Client 增加 `AgentRunState` reducer，聚合 `run/session/message/response_plan/tasks/pending_params/results/errors/trace_links`：`framework/backend/go/runtime/powerx/agent/run_state.go`
+- [X] T059 [US1] Skill Package loader 解析 `action_required_args/action_optional_args/slot_mapping/pending_task_policy/result_presentation` 并写入 PluginSkillManifest：`framework/backend/go/runtime/skills/package_loader.go`, `framework/backend/go/runtime/skills/manifest.go`
+- [X] T060 [US6] Skeleton 初始化模板能力时同步 run state 展示元数据到底座，重复点击保持 upsert 幂等：`skeleton/backend/go-gin/internal/agent_registry/*`, `skeleton/backend/go-gin/internal/sync/*`, `skeleton/skills/template/SKILL.md`
+- [X] T061 [US3] Skeleton Agent Chat 调试页渲染 `AgentRunStatePanel`，覆盖任务卡、缺参卡、结果卡、错误卡和 trace 入口：`skeleton/web-admin/*`
+- [X] T062 [P] [US3] E2E：缺参创建模板时展示 `awaiting_params`，补参后展示 `running/completed` 与详情链接：`skeleton/web-admin/tests/e2e/agent-run-state.spec.ts`
+- [X] T063 [P] [US3] E2E：没有 `agent_run.task_completed` 和真实 result 时，调试页不得显示成功状态：`skeleton/web-admin/tests/e2e/agent-run-state.spec.ts`
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -153,6 +164,7 @@
 5. Phase 6 依赖 Phase 4/5。
 6. Phase 7 依赖 Phase 5。
 7. Phase 8 依赖全部用户故事。
+8. Phase 9 依赖 PowerX Core `024-ai-engineering-skills` 的 Agent Run State Protocol；插件侧只实现协议消费和 Skill manifest 元数据供给。
 
 ### User Story Dependencies
 

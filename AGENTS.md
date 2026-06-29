@@ -31,6 +31,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-29
 - PostgreSQL/SQLite（复用 IAM 表并新增 external_identity/binding/challenge/risk_event） (019-iam-federated-channel-login)
 - Go 1.24（backend runtime/framework）, TypeScript 4.x（web-admin 验证） + framework runtime/common logging, slog/logrus adapter, skeleton logger bridge, observability hooks (020-framework-logger)
 - N/A（不新增业务持久化表；仅复用现有配置来源与日志后端） (020-framework-logger)
+- Go 1.24 + Gin middleware/context, existing skeleton customer auth, PowerX STS/delegated client patterns, framework runtime common logging/errors (023-framework-customer-auth)
+- Framework 不新增生产 customer 持久化；skeleton local/dev 可复用现有 customer 表；生产 membership/customer 数据由 PowerX Core 或平台身份源权威维护 (023-framework-customer-auth)
 
 ## Project Structure
 
@@ -48,9 +50,9 @@ npm test && npm run lint
 Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 
 ## Recent Changes
+- 023-framework-customer-auth: Added Go 1.24 + Gin middleware/context, existing skeleton customer auth, PowerX STS/delegated client patterns, framework runtime common logging/errors
 - 020-framework-logger: Added Go 1.24（backend runtime/framework）, TypeScript 4.x（web-admin 验证） + framework runtime/common logging, slog/logrus adapter, skeleton logger bridge, observability hooks
 - 019-iam-federated-channel-login: Added Go 1.24, TypeScript 5.x (Nuxt 4.2) + framework IAM contracts/context/errors, skeleton IAM/auth service, RBAC, observability/audi
-- 018-framework-iam-unification: Added Go 1.24 + framework middleware/context/rbac；skeleton IAM local store；delegated auth proxy
 
 ## Manifest 迁移公告（2025-12-08）
 - 开发态唯一清单移动到 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。

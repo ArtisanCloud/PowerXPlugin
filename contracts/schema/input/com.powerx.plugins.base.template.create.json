@@ -3,8 +3,11 @@
   "title": "TemplateCreateInput",
   "type": "object",
   "properties": {
-    "name": { "type": "string" }
+    "action": { "type": "string", "const": "create" },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "content": { "type": "string", "minLength": 1 }
   },
-  "required": ["name"],
+  "required": ["name", "description", "content"],
   "additionalProperties": false
 }

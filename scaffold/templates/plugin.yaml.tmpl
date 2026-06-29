@@ -123,6 +123,28 @@ frontend:
                 path: /templates/crud
                 route: templates/crud
                 order: 2
+          - id: plugins.{{ .PluginID }}.business
+            title: 业务运营
+            title_i18n:
+              namespace: menus
+              key: menu.{{ .PluginID }}.business.title
+              default: Business Operations
+            icon: i-heroicons-briefcase
+            path: /admin/business/customers
+            route: admin/business/customers
+            order: 3
+            children:
+              - id: plugins.{{ .PluginID }}.business.customer_base
+                title: 客户基础管理
+                title_i18n:
+                  namespace: menus
+                  key: menu.{{ .PluginID }}.business.customer_base
+                  default: Customer Base Management
+                icon: i-heroicons-user-group
+                path: /admin/business/customers
+                route: admin/business/customers
+                order: 1
+                required_policies: [customer:read]
 
 agents:
   - id: {{ .PluginID }}.assistant

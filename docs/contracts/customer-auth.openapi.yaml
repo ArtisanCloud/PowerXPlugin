@@ -1,0 +1,634 @@
+openapi: 3.1.0
+info:
+  title: Framework Customer Identity/Auth Contract
+  version: 0.1.0
+  description: >
+    Framework-level customer identity/auth contract for protected C-end requests,
+    tenant bootstrap, delegated customer auth, and membership validation. Concrete
+    deployments may expose these as plugin endpoints or bind them as internal adapters.
+    Validation note: protected tenant-scoped endpoints MUST reject missing tenant
+    context, token/request/bootstrap tenant mismatch, and multiple customer token
+    credentials that resolve to different customers or tenants before plugin
+    business handlers execute.
+servers:
+  - url: https://{host}/api/v1
+    variables:
+      host:
+        default: localhost:8078
+tags:
+  - name: CustomerBootstrap
+  - name: CustomerAuth
+  - name: CustomerMembership
+  - name: CustomerContext
+paths:
+  /customer/bootstrap/resolve:
+    post:
+      summary: Resolve C-end entry hints into tenant context
+      tags: [CustomerBootstrap]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BootstrapResolveRequest'
+      responses:
+        '200':
+          description: Entry resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BootstrapResolveResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Entry cannot be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /customer/auth/register:
+    post:
+      summary: Register customer through the platform/delegated identity source
+      description: >
+        Framework adapter contract. A deployment may expose this as a C-end
+        endpoint or bind it internally, but production execution must delegate to
+        the configured platform identity source. Public exposure must include
+        abuse protection such as rate limiting or equivalent backoff.
+      tags: [CustomerAuth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Customer registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Customer already exists or tenant selection required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          $ref: '#/components/responses/DelegateUnavailable'
+  /customer/auth/login:
+    post:
+      summary: Login customer through the platform/delegated identity source
+      description: >
+        Framework adapter contract. A deployment may expose this as a C-end
+        endpoint or bind it internally, but production execution must delegate to
+        the configured platform identity source and must not silently fall back to
+        local/mock identity sources. Public exposure must include abuse protection
+        such as rate limiting, lockout, or equivalent backoff.
+      tags: [CustomerAuth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Customer authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResultEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Tenant selection required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          $ref: '#/components/responses/DelegateUnavailable'
+  /customer/auth/wechat/login:
+    post:
+      summary: Login customer with WeChat Mini Program code
+      description: >
+        Shared Mini Program login contract. Client obtains a js_code from
+        wx.login/uni.login and sends it together with the resolved tenant entry
+        context. The platform identity source exchanges the code through
+        PowerWechat/code2session, binds provider=wechat + openid to a generic
+        customer account, ensures tenant membership, and returns a customer token.
+        Business roles such as player, parent, fan, or member remain plugin-side
+        domain models and must not be stored in framework customer tables.
+      tags: [CustomerAuth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WechatMiniAppLoginRequest'
+      responses:
+        '200':
+          description: Customer authenticated with WeChat Mini Program identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResultEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Tenant mismatch or invalid entry context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          $ref: '#/components/responses/DelegateUnavailable'
+  /customer/auth/validate:
+    post:
+      summary: Validate customer token and normalize customer context
+      description: >
+        Framework adapter contract for token validation. Public deployments should
+        treat this as an internal/proxy-safe operation unless explicitly exposed
+        with equivalent authorization controls.
+      tags: [CustomerAuth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateTokenRequest'
+      responses:
+        '200':
+          description: Token validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Tenant mismatch or forbidden source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                tenantRequired:
+                  summary: Tenant context required for tenant-scoped route
+                  value:
+                    success: false
+                    error:
+                      code: CUSTOMER_TENANT_REQUIRED
+                      message: customer tenant required
+                tokenConflict:
+                  summary: Authorization and X-Customer-Token resolve to different identities
+                  value:
+                    success: false
+                    error:
+                      code: CUSTOMER_TOKEN_INVALID
+                      message: customer token credentials conflict
+        '503':
+          $ref: '#/components/responses/DelegateUnavailable'
+  /customer/memberships/resolve:
+    post:
+      summary: Resolve customer membership for current tenant
+      tags: [CustomerMembership]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveMembershipRequest'
+      responses:
+        '200':
+          description: Membership resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveMembershipResponse'
+        '403':
+          description: Missing or inactive membership
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          $ref: '#/components/responses/DelegateUnavailable'
+  /customer/memberships:
+    get:
+      summary: List current customer tenant memberships
+      description: >
+        Returns memberships for the authenticated current customer. Implementations
+        must not allow callers to enumerate arbitrary customer memberships unless
+        the call is bound to an internal trusted adapter with equivalent authorization.
+      tags: [CustomerMembership]
+      security:
+        - customerBearer: []
+        - customerHeader: []
+      parameters:
+        - in: query
+          name: customer_uuid
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: >
+            Optional diagnostic hint. When present, it must match the authenticated
+            current customer unless the endpoint is used as an internal trusted adapter.
+      responses:
+        '200':
+          description: Memberships listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMembershipsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Requested customer does not match authenticated context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          $ref: '#/components/responses/DelegateUnavailable'
+  /customer/context/me:
+    get:
+      summary: Return normalized current customer context for diagnostics/protected route tests
+      tags: [CustomerContext]
+      security:
+        - customerBearer: []
+        - customerHeader: []
+      parameters:
+        - in: header
+          name: tenant_uuid
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: tenant_uuid
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Current context resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerContextEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Tenant mismatch or membership denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+components:
+  securitySchemes:
+    customerBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: customer-token
+    customerHeader:
+      type: apiKey
+      in: header
+      name: X-Customer-Token
+  schemas:
+    BootstrapResolveRequest:
+      type: object
+      properties:
+        scene:
+          type: string
+        invite_code:
+          type: string
+        org_code:
+          type: string
+        tenant_hint:
+          type: string
+        channel:
+          type: string
+      additionalProperties: false
+    BootstrapContext:
+      type: object
+      required: [tenant_uuid, entry_type]
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+        org_uuid:
+          type: string
+          format: uuid
+        entry_type:
+          type: string
+          enum: [scene, invite_code, org_code, tenant_hint, direct]
+        campaign:
+          type: string
+        channel:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+    BootstrapResolveResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/BootstrapContext'
+    RegisterRequest:
+      type: object
+      required: [identifier]
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+        identifier:
+          type: string
+          description: Email, phone, channel openid, or platform-supported login identifier.
+        password:
+          type: string
+          minLength: 8
+        channel:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    LoginRequest:
+      type: object
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+        identifier:
+          type: string
+        password:
+          type: string
+        channel:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      anyOf:
+        - required: [identifier]
+        - required: [code, channel]
+    WechatMiniAppLoginRequest:
+      type: object
+      required: [tenant_uuid, code]
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+        code:
+          type: string
+          description: js_code returned by wx.login/uni.login in MP-WEIXIN.
+        channel:
+          type: string
+          enum: [wechat_miniapp]
+          default: wechat_miniapp
+        nickname:
+          type: string
+        avatar_url:
+          type: string
+        profile:
+          type: object
+          additionalProperties: true
+      additionalProperties: false
+    AuthResult:
+      type: object
+      required: [access_token, expires_in, customer_context]
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+          format: int64
+        customer_context:
+          $ref: '#/components/schemas/CustomerContext'
+        available_memberships:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerMembership'
+        trace_id:
+          type: string
+    AuthResultEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AuthResult'
+    ValidateTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+        tenant_uuid:
+          type: string
+          format: uuid
+        bootstrap:
+          $ref: '#/components/schemas/BootstrapContext'
+    ValidateTokenResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CustomerTokenValidationResult'
+    CustomerTokenValidationResult:
+      type: object
+      required: [valid, source]
+      properties:
+        valid:
+          type: boolean
+        customer_context:
+          $ref: '#/components/schemas/CustomerContext'
+        token_expires_at:
+          type: string
+          format: date-time
+        token_tenant_uuid:
+          type: string
+          format: uuid
+        source:
+          type: string
+          enum: [platform, delegate, third_party, local_dev, mock]
+        error_code:
+          type: string
+        error_message:
+          type: string
+    ResolveMembershipRequest:
+      type: object
+      required: [customer_uuid, tenant_uuid]
+      properties:
+        customer_uuid:
+          type: string
+          format: uuid
+        tenant_uuid:
+          type: string
+          format: uuid
+    ResolveMembershipResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CustomerMembership'
+    ListMembershipsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomerMembership'
+    CustomerContextEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/CustomerContext'
+    CustomerContext:
+      type: object
+      required: [customer_uuid, source, authenticated]
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+        customer_uuid:
+          type: string
+          format: uuid
+        membership_uuid:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          enum: [platform, delegate, third_party, local_dev, mock]
+        authenticated:
+          type: boolean
+        attributes:
+          type: object
+          additionalProperties: true
+        raw_claims:
+          type: object
+          additionalProperties: true
+        trace_id:
+          type: string
+    CustomerMembership:
+      type: object
+      required: [tenant_uuid, customer_uuid, membership_uuid, status, source]
+      properties:
+        tenant_uuid:
+          type: string
+          format: uuid
+        customer_uuid:
+          type: string
+          format: uuid
+        membership_uuid:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, pending, suspended, disabled, deleted]
+        roles:
+          type: array
+          items:
+            type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          enum: [platform, delegate, third_party, local_dev, mock]
+        expires_at:
+          type: string
+          format: date-time
+        policy_version:
+          type: string
+    ErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - CUSTOMER_TOKEN_MISSING
+                - CUSTOMER_TOKEN_INVALID
+                - CUSTOMER_UNAUTHENTICATED
+                - CUSTOMER_TENANT_MISMATCH
+                - CUSTOMER_TENANT_REQUIRED
+                - CUSTOMER_MEMBERSHIP_REQUIRED
+                - CUSTOMER_MEMBERSHIP_DISABLED
+                - CUSTOMER_DELEGATE_UNAVAILABLE
+                - CUSTOMER_BOOTSTRAP_FAILED
+                - CUSTOMER_CONTEXT_MISSING
+                - CUSTOMER_IDENTITY_SOURCE_FORBIDDEN
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+            trace_id:
+              type: string
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: Token missing, invalid, or unauthenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    DelegateUnavailable:
+      description: Platform/delegated identity source unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'

@@ -33,21 +33,26 @@ type PackageSource struct {
 }
 
 type skillFrontmatter struct {
-	ID               string                      `yaml:"id"`
-	Name             string                      `yaml:"name"`
-	Title            string                      `yaml:"title"`
-	Provider         string                      `yaml:"provider"`
-	Version          string                      `yaml:"version"`
-	Description      string                      `yaml:"description"`
-	IntentExamples   []string                    `yaml:"intent_examples"`
-	ResponseGuidance map[string][]string         `yaml:"response_guidance"`
-	Capability       string                      `yaml:"capability"`
-	ActionCapabilities map[string]string         `yaml:"action_capabilities"`
-	Visibility       string                      `yaml:"visibility"`
-	Status           string                      `yaml:"status"`
-	Executor         runtime.PluginSkillExecutor `yaml:"executor"`
-	InputSchema      any                         `yaml:"input_schema"`
-	OutputSchema     any                         `yaml:"output_schema"`
+	ID                 string                      `yaml:"id"`
+	Name               string                      `yaml:"name"`
+	Title              string                      `yaml:"title"`
+	Provider           string                      `yaml:"provider"`
+	Version            string                      `yaml:"version"`
+	Description        string                      `yaml:"description"`
+	IntentExamples     []string                    `yaml:"intent_examples"`
+	ResponseGuidance   map[string][]string         `yaml:"response_guidance"`
+	ActionRequiredArgs map[string][]string         `yaml:"action_required_args"`
+	ActionOptionalArgs map[string][]string         `yaml:"action_optional_args"`
+	SlotMapping        map[string]runtime.SlotSpec `yaml:"slot_mapping"`
+	PendingTaskPolicy  *runtime.PendingTaskPolicy  `yaml:"pending_task_policy"`
+	ResultPresentation map[string]runtime.ResultPresentation `yaml:"result_presentation"`
+	Capability         string                      `yaml:"capability"`
+	ActionCapabilities map[string]string           `yaml:"action_capabilities"`
+	Visibility         string                      `yaml:"visibility"`
+	Status             string                      `yaml:"status"`
+	Executor           runtime.PluginSkillExecutor `yaml:"executor"`
+	InputSchema        any                         `yaml:"input_schema"`
+	OutputSchema       any                         `yaml:"output_schema"`
 }
 
 func LoadTemplatePackage() (PackageSource, error) {
@@ -94,18 +99,23 @@ func LoadPackageAt(packagePath string) (PackageSource, error) {
 		return PackageSource{}, fmt.Errorf("output_schema: %w", err)
 	}
 	manifest := runtime.PluginSkillManifest{
-		SkillID:          strings.TrimSpace(fm.ID),
-		Provider:         strings.TrimSpace(fm.Provider),
-		Version:          firstNonEmptyString(fm.Version, "1.0.0"),
-		Title:            strings.TrimSpace(fm.Title),
-		Description:      strings.TrimSpace(fm.Description),
-		IntentExamples:   fm.IntentExamples,
-		ResponseGuidance: normalizeResponseGuidance(fm.ResponseGuidance),
-		InputSchema:      inputSchema,
-		OutputSchema:     outputSchema,
-		Executor:         fm.Executor,
-		Visibility:       firstNonEmptyString(fm.Visibility, "tenant"),
-		Status:           firstNonEmptyString(fm.Status, "active"),
+		SkillID:            strings.TrimSpace(fm.ID),
+		Provider:           strings.TrimSpace(fm.Provider),
+		Version:            firstNonEmptyString(fm.Version, "1.0.0"),
+		Title:              strings.TrimSpace(fm.Title),
+		Description:        strings.TrimSpace(fm.Description),
+		IntentExamples:     fm.IntentExamples,
+		ResponseGuidance:   normalizeResponseGuidance(fm.ResponseGuidance),
+		ActionRequiredArgs: normalizeResponseGuidance(fm.ActionRequiredArgs),
+		ActionOptionalArgs: normalizeResponseGuidance(fm.ActionOptionalArgs),
+		SlotMapping:        fm.SlotMapping,
+		PendingTaskPolicy:  fm.PendingTaskPolicy,
+		ResultPresentation: fm.ResultPresentation,
+		InputSchema:        inputSchema,
+		OutputSchema:       outputSchema,
+		Executor:           fm.Executor,
+		Visibility:         firstNonEmptyString(fm.Visibility, "tenant"),
+		Status:             firstNonEmptyString(fm.Status, "active"),
 	}
 	if manifest.Executor.Capability == "" {
 		manifest.Executor.Capability = strings.TrimSpace(fm.Capability)

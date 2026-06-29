@@ -25,6 +25,12 @@
 - Q: 插件 Skill 是否应该只用 Go manifest 定义？ → A: 不应该。插件 Skill 源格式必须对齐 Agent Skills 的 `SKILL.md` 目录包规范，Go manifest 只能作为解析后的运行时对象或测试样例。
 - Q: PowerXPlugin 本地 Plugin Registry 入库是否与 `SKILL.md` 冲突？ → A: 不冲突。`SKILL.md` 是源格式；Plugin Registry 保存解析后的 manifest、prompt、schema、executor、checksum 与同步状态；PowerX 底座保存治理态 Registry。
 
+### Session 2026-06-24
+
+- Q: 插件调试页是否需要自己定义多任务、多智能体和缺参状态协议？ → A: 不需要，也不允许。插件调试页必须消费 PowerX Core Agent Run State Protocol 的 `agent_run.*` 事件，并用 Framework Client reducer 聚合为 `AgentRunState`。
+- Q: 插件 Skill 的必填参数、slot 映射和结果链接在哪里定义？ → A: 定义在 `SKILL.md` manifest 中，包括 `action_required_args/action_optional_args/slot_mapping/pending_task_policy/result_presentation`；Core 只执行通用校验和状态流转。
+- Q: 插件页面能否根据本地判断显示“已创建/已完成”？ → A: 不可以。只有 PowerX 返回 `agent_run.task_completed` 且包含真实 Skill/Capability result 时，页面才能展示成功状态。
+
 ## User Scenarios & Testing
 
 ### User Story 1 - 插件声明并暴露 Skill 源定义 (Priority: P1)
@@ -45,17 +51,19 @@
 
 ### User Story 2 - 插件 Skill action 通过 Capability 执行业务 (Priority: P1)
 
-作为插件业务开发者，我希望 Skill 只声明 action 到 capability 的映射，由既有 Capability Invocation 统一处理路由、上下文校验、错误模型和结果包装，以便 PowerX Agent Runtime 可以稳定执行插件业务能力。
+作为插件业务开发者，我希望 Skill 通过 `executor.prepare_capability` 自己完成业务状态合并、缺参判断和执行阀门，并在 `ready_to_execute=true` 时返回标准 `capability_request`，由既有 Capability Invocation 统一处理路由、上下文校验、错误模型和结果包装。
 
 **Why this priority**: 如果 Skill 再单独实现 executor 协议，就会形成 Agent 调用、Capability 调用、Skill 调用三套执行链路，租户上下文、错误码、trace 与鉴权会漂移。
 
-**Independent Test**: Agent Runtime 命中插件 Skill 后，读取 `action_capabilities` 或 `executor.action_map`，把 `action=create` 解析为模板创建 capability，并通过 `/api/v1/integration/capabilities/invoke` 或 PowerX Capability Gateway 执行业务；缺少上下文、Skill 不存在、action 无映射、capability 不匹配时 fail-fast。
+**Independent Test**: Agent Runtime 命中插件 Skill 后，先调用 `executor.prepare_capability`。当 prepare 返回 `ready_to_execute=false` 时，页面显示缺参等待；当 prepare 返回 `ready_to_execute=true` 与 `capability_request` 时，Core 才通过 `/api/v1/integration/capabilities/invoke` 或 PowerX Capability Gateway 执行业务；缺少上下文、Skill 不存在、prepare capability 缺失、capability_request 缺失或 capability 不匹配时 fail-fast。
 
 **Acceptance Scenarios**:
 
-1. **Given** PowerX Agent Runtime 命中插件 Skill 并携带完整上下文，**When** planner 提取到合法 action，**Then** Core 按 action 映射调用对应 capability handler。
-2. **Given** 请求缺少 `tenant_uuid` 或 `trace_id`，**When** capability handler 收到调用，**Then** 返回稳定上下文缺失错误。
-3. **Given** 请求中的 action 没有映射到 capability，**When** Agent Runtime 尝试执行，**Then** Core fail-fast 并记录 Agent Trace。
+1. **Given** PowerX Agent Runtime 命中插件 Skill 并携带完整上下文，**When** planner 生成 Skill task，**Then** Core 先调用 `executor.prepare_capability`，不得直接按 action_map 执行。
+2. **Given** prepare 返回缺参，**When** Core 收到 `missing_fields/state_patch/message`，**Then** Core 持久化 SkillState 并发出 `agent_run.awaiting_params`。
+3. **Given** prepare 返回 `ready_to_execute=true`，**When** Core 收到 `capability_request`，**Then** Core 只按该请求调用对应 capability handler。
+4. **Given** 请求缺少 `tenant_uuid` 或 `trace_id`，**When** capability handler 收到调用，**Then** 返回稳定上下文缺失错误。
+5. **Given** prepare 未返回 `capability_request` 却声明 ready，**When** Agent Runtime 尝试执行，**Then** Core fail-fast 并记录 Agent Trace。
 
 ---
 
@@ -146,11 +154,11 @@
 - **FR-002**: Framework 必须提供 Skill 注册表，插件启动时校验必填字段、重复 ID、executor 声明和 schema 合法性。
 - **FR-003**: Framework 必须暴露 `GET /api/v1/plugin/skills`，返回当前插件已注册 Skill 列表。
 - **FR-004**: Framework 必须暴露 `GET /api/v1/plugin/skills/:skill_id/schema`，返回指定 Skill 的输入输出 schema。
-- **FR-005**: Framework 不得把 PowerX Capability Invocation 作为标准业务执行入口；Skill 执行必须由 PowerX Core 将 action 映射到 capability 后进入 Capability Invocation。
+- **FR-005**: Framework 不得提供独立 Skill invoke 业务执行路径；Skill 执行必须先经过 `executor.prepare_capability`，由 Skill 返回 `ready_to_execute/capability_request` 后进入 PowerX Capability Invocation。
 - **FR-006**: Framework 必须定义 `PluginSkillInvocationContext`，至少包含 `tenant_uuid/user_uuid/agent_id/session_id/message_id/skill_id/trace_id/channel/locale`。
 - **FR-007**: Framework 必须在 capability handler 执行前强制校验关键上下文，缺失时返回稳定上下文错误。
 - **FR-008**: Framework 必须校验请求 `skill_id` 与已注册 Skill 匹配；未找到时返回 `skill.not_found`。
-- **FR-009**: Framework 必须校验 capability 与 Skill manifest 的 `action_capabilities` / `executor.action_map` 一致；不一致时返回稳定 capability mismatch 错误。
+- **FR-009**: Framework 必须校验 prepare 返回的 `capability_request.capability_id` 与 Skill manifest 的 `action_capabilities` / `executor.action_map` 一致；不一致时返回稳定 capability mismatch 错误。
 - **FR-010**: Framework 必须复用 Capability Invocation 结果模型，覆盖 `success/status/message/task_id/data/trace_id/error`。
 - **FR-011**: Framework 必须提供稳定错误模型，至少覆盖 `skill.not_found`、上下文缺失、capability mismatch、capability unavailable、execution failed。
 - **FR-012**: Framework Client 必须封装 PowerX Agent 非流式调用、SSE 流式调用和 WS 流式调用。
@@ -172,6 +180,12 @@
 - **FR-028**: Skeleton 模板 Skill 必须落地为 `skills/template/SKILL.md` 包；初始化按钮必须从该包解析并 upsert/sync，不得继续依赖硬编码 manifest 作为唯一来源。
 - **FR-029**: Framework 必须支持 `SKILL.md` frontmatter 的 `response_guidance` 分组，并解析到 `PluginSkillManifest.response_guidance`；同步到底座时必须写入 `prompt_spec.response_guidance`。
 - **FR-030**: 插件业务回复规范必须分层维护：Agent `persona/prompt_seed` 只描述 Agent 级身份和策略，Skill `response_guidance/input_schema` 描述能力级参数、缺参追问、how-to 和执行结果表达；不得要求 PowerX Core 写入插件业务专用规则。
+- **FR-031**: Framework Client 必须支持 PowerX Agent Run State Protocol typed event，至少解析 `agent_run.started/response_plan/intent_detected/plan_created/task_status/task_started/awaiting_params/task_completed/task_failed/final/ended`。
+- **FR-032**: Framework Client 必须提供 `AgentRunState` reducer，将实时 SSE/WS 与历史 payload 聚合为 `run/session/message/response_plan/tasks/pending_params/results/errors/trace_links`。
+- **FR-033**: 插件 Agent Chat 调试页必须渲染 `AgentRunState`，展示 task 状态、缺参卡、结果卡和 trace 入口，不得只展示最终文本。
+- **FR-034**: Skeleton `SKILL.md` loader 必须解析并校验 `action_required_args/action_optional_args/slot_mapping/pending_task_policy/result_presentation`，同步到底座时保留这些字段。
+- **FR-035**: 插件页面不得基于本地状态生成业务成功结论；成功状态必须来自 `agent_run.task_completed` 和真实 `result/links`。
+- **FR-036**: Trace 跳转必须携带足够定位字段，至少包含 `tenant_uuid/session_id/message_id/run_id/task_id`；不得只跳到底座 session 列表。
 
 ### Key Entities
 
@@ -183,6 +197,8 @@
 - **PluginSkillResult**: executor 返回的结构化结果。
 - **PowerXAgentClientConfig**: Framework Client 调用 PowerX Agent 的配置，包含 base URL、STS/Bearer、SSE/WS 路径和超时策略。
 - **AgentStreamEvent**: Framework Client 输出的统一事件对象。
+- **AgentRunState**: Framework Client 根据 PowerX `agent_run.*` 事件聚合出的运行状态树，用于插件调试页渲染多任务、多 Agent、缺参、结果和错误。
+- **AgentTaskState**: 单个 task 的状态对象，包含 Agent、Skill、Capability、action、缺参字段、结果链接、错误与 trace 定位字段。
 - **PluginSkillDefinition**: 插件 Skill 开发态记录，包含 manifest、prompt/schema、executor、capability、PowerX skill 映射和同步状态。
 - **PluginAgentDefinition**: 插件 Agent 开发态记录，包含 prompt、模型引用、绑定本地/PowerX Skill、PowerX agent 映射和同步状态。
 - **PluginRegistrySyncState**: 插件自有同步状态模型，记录 `pending/synced/failed/drifted/disabled`、`sync_error`、`last_sync_at` 与 `trace_id`。
@@ -196,6 +212,10 @@
 - **SC-005**: delegated 模式下错误凭证或缺失配置 100% 启动失败，不允许隐式降级到匿名或业务直连。
 - **SC-006**: 合法 Agent/Skill Plugin Registry 同步后 95% 在 3 秒内回写 `powerx_agent_uuid/powerx_skill_id/sync_status`。
 - **SC-007**: Agent Chat 可运行 Agent 列表中，未同步、同步失败或 PowerX 侧 disabled 的 Agent 出现率为 0%。
+- **SC-008**: 插件调试页消费 `agent_run.*` 后，100% 可展示缺参、运行中、完成、失败四类 task 状态。
+- **SC-009**: 创建类任务缺参时，插件调试页 100% 展示自然语言缺参提示，不要求用户输入 JSON 或 schema 字段路径。
+- **SC-010**: 没有 `agent_run.task_completed` 与真实 result 的请求，插件调试页成功状态误报率为 0。
+- **SC-011**: 点击插件调试页 trace 入口，100% 可定位到底座对应 message/task trace，而不是仅进入 session 列表。
 
 ## Assumptions
 
@@ -203,3 +223,4 @@
 - PowerXPlugin 已具备基础 Auth、Gateway Client、WS Bus 与 IAM 机制，可作为本 feature 的依赖。
 - 首版以 Go Framework 为主，前端提供最小 Chat Client 封装与 Skeleton 示例。
 - 本 feature 不实现 PowerX 侧 Skill Registry，只提供插件侧源定义、executor、client 封装、本地 Plugin Registry 管理和调用 PowerX 的同步代理。
+- Agent Run State Protocol 的权威定义在 PowerX Core；PowerXPlugin 只实现 typed event、reducer、UI 消费与 Skill manifest 元数据供给。

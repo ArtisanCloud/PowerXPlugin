@@ -235,10 +235,15 @@ func intFromMap(input map[string]any, key string, fallback int) int {
 }
 
 func templateResult(id uint64, name, description, content string) map[string]any {
+	detailPath := fmt.Sprintf("/templates/crud?template_id=%d", id)
 	return map[string]any{
 		"id":          id,
 		"title":       name,
 		"description": description,
 		"content":     content,
+		"detail_path": detailPath,
+		"links": map[string]any{
+			"admin": detailPath,
+		},
 	}
 }

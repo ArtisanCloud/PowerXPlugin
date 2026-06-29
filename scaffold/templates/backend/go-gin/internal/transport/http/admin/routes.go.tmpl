@@ -5,6 +5,7 @@ import (
 	"{{ .BackendModulePath }}/internal/shared/app"
 	admincapability "{{ .BackendModulePath }}/internal/transport/http/admin/capability"
 	adminconsole "{{ .BackendModulePath }}/internal/transport/http/admin/console"
+	admincustomer "{{ .BackendModulePath }}/internal/transport/http/admin/customer"
 	adminiam "{{ .BackendModulePath }}/internal/transport/http/admin/iam"
 	adminintegration "{{ .BackendModulePath }}/internal/transport/http/admin/integration"
 	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
@@ -32,6 +33,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		adminoperations.RegisterRoutes(admin, deps)
 		adminconsole.RegisterRoutes(admin, deps)
 		admincapability.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		admincustomer.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminintegration.RegisterRoutes(admin, deps)
 		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminiam.RegisterRoutes(admin, deps)

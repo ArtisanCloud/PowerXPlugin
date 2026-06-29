@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplatePrepareInput",
+  "type": "object",
+  "properties": {
+    "action": { "type": "string", "enum": ["create", "get", "update", "delete", "list"] },
+    "template_id": { "type": ["integer", "string"] },
+    "name": { "type": "string" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "content": { "type": "string" },
+    "template": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "user_message": { "type": "string" },
+    "state": {
+      "type": "object",
+      "properties": {
+        "state_key": { "type": "string" },
+        "schema_version": { "type": "string" },
+        "collected": { "type": "object", "additionalProperties": true },
+        "missing": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

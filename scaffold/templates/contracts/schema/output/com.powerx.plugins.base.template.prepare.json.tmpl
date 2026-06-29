@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TemplatePrepareOutput",
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["awaiting_params", "completed"] },
+    "ready_to_execute": { "type": "boolean" },
+    "missing_fields": { "type": "array", "items": { "type": "string" } },
+    "state_patch": { "type": "object", "additionalProperties": true },
+    "message": { "type": "string" },
+    "capability_request": {
+      "type": "object",
+      "properties": {
+        "capability_id": { "type": "string" },
+        "payload": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["capability_id", "payload"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["status", "ready_to_execute", "missing_fields", "state_patch"],
+  "additionalProperties": true
+}

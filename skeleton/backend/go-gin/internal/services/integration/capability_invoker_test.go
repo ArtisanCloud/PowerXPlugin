@@ -247,6 +247,54 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
+func TestCapabilityInvokerTemplatePrepareCollectsAndBuildsCapabilityRequest(t *testing.T) {
+	_, templateSvc := setupTemplateService(t)
+	invoker := NewCapabilityInvoker(templateSvc, stream.NewBroker(), logrus.New().WithField("test", "prepare"), nil)
+
+	awaitingEnvelope := &domain.IntegrationEnvelope{
+		TenantUuid: "tenant-prepare",
+		ToolScope:  "agent.template.prepare",
+		PayloadRef: `{"action":"create","template":{"title":"测试模板","description":"用于验证插件 CRUD"}}`,
+		Metadata: map[string]any{
+			"capability_id": "com.powerx.plugins.base.template.prepare",
+		},
+	}
+	awaitingResult, err := invoker.Invoke(context.Background(), awaitingEnvelope)
+	require.NoError(t, err)
+	var awaiting map[string]any
+	require.NoError(t, json.Unmarshal(awaitingResult.Payload, &awaiting))
+	require.Equal(t, "awaiting_params", awaiting["status"])
+	require.Equal(t, false, awaiting["ready_to_execute"])
+	require.Equal(t, []interface{}{"template.content"}, awaiting["missing_fields"])
+
+	readyEnvelope := &domain.IntegrationEnvelope{
+		TenantUuid: "tenant-prepare",
+		ToolScope:  "agent.template.prepare",
+		PayloadRef: `{"action":"create","content":"这是一条测试内容","state":{"collected":{"action":"create","template":{"title":"测试模板","description":"用于验证插件 CRUD"}}}}`,
+		Metadata: map[string]any{
+			"capability_id": "com.powerx.plugins.base.template.prepare",
+		},
+	}
+	readyResult, err := invoker.Invoke(context.Background(), readyEnvelope)
+	require.NoError(t, err)
+	var ready map[string]any
+	require.NoError(t, json.Unmarshal(readyResult.Payload, &ready))
+	require.Equal(t, "completed", ready["status"])
+	require.Equal(t, true, ready["ready_to_execute"])
+	request, ok := ready["capability_request"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "com.powerx.plugins.base.template.create", request["capability_id"])
+	reqPayload, ok := request["payload"].(map[string]any)
+	require.True(t, ok)
+	body, ok := reqPayload["body"].(map[string]any)
+	require.True(t, ok)
+	payload, ok := body["payload"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "测试模板", payload["name"])
+	require.Equal(t, "用于验证插件 CRUD", payload["description"])
+	require.Equal(t, "这是一条测试内容", payload["content"])
+}
+
 func mustParseUint64(t *testing.T, value string) uint64 {
 	t.Helper()
 	parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)

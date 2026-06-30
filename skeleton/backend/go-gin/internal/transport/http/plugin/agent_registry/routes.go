@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -114,6 +115,20 @@ func (i registrationIdentity) rewriteManifest(in any) any {
 	if skillID, ok := out["skill_id"].(string); ok {
 		out["skill_id"] = i.powerXSkillID(skillID)
 	}
+	if capability, ok := out["capability"].(string); ok {
+		out["capability"] = i.capabilityID(capability)
+	}
+	if actions, ok := out["action_capabilities"].(map[string]any); ok {
+		for action, value := range actions {
+			if capability, ok := value.(string); ok {
+				actions[action] = i.capabilityID(capability)
+			}
+		}
+		out["action_capabilities"] = actions
+	}
+	if executor, ok := out["executor"]; ok {
+		out["executor"] = i.rewriteExecutor(executor)
+	}
 	return out
 }
 
@@ -125,6 +140,9 @@ func (i registrationIdentity) rewriteExecutor(in any) any {
 	}
 	if capability, ok := out["capability"].(string); ok {
 		out["capability"] = i.capabilityID(capability)
+	}
+	if capability, ok := out["prepare_capability"].(string); ok {
+		out["prepare_capability"] = i.capabilityID(capability)
 	}
 	if actionMap, ok := out["action_map"].(map[string]any); ok {
 		for action, value := range actionMap {
@@ -144,6 +162,9 @@ func (i registrationIdentity) rewriteSkillManifest(manifest runtimeskills.Plugin
 	}
 	if strings.TrimSpace(manifest.Executor.Capability) != "" {
 		manifest.Executor.Capability = i.capabilityID(manifest.Executor.Capability)
+	}
+	if strings.TrimSpace(manifest.Executor.PrepareCapability) != "" {
+		manifest.Executor.PrepareCapability = i.capabilityID(manifest.Executor.PrepareCapability)
 	}
 	if len(manifest.Executor.ActionMap) > 0 {
 		next := make(map[string]string, len(manifest.Executor.ActionMap))
@@ -321,8 +342,9 @@ func (h *Handler) ListAgents(c *gin.Context) {
 	if !ok {
 		return
 	}
+	identity := currentRegistrationIdentity()
 	var items []dbm.PluginAgent
-	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, pluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_LIST_FAILED", err.Error())
 		return
 	}
@@ -334,8 +356,9 @@ func (h *Handler) ListRunnableAgents(c *gin.Context) {
 	if !ok {
 		return
 	}
+	identity := currentRegistrationIdentity()
 	var items []dbm.PluginAgent
-	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND sync_status = ? AND powerx_agent_uuid <> ''", tenantUUID, pluginID, dbm.SyncStatusSynced).Order("updated_at DESC").Find(&items).Error; err != nil {
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND sync_status = ? AND powerx_agent_uuid <> ''", tenantUUID, identity.PluginID, dbm.SyncStatusSynced).Order("updated_at DESC").Find(&items).Error; err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_RUNNABLE_FAILED", err.Error())
 		return
 	}
@@ -361,8 +384,11 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 	}
 	req.PluginAgentID = strings.TrimSpace(req.PluginAgentID)
 	req.Name = strings.TrimSpace(req.Name)
+	identity := currentRegistrationIdentity()
 	req.AgentKey = firstNonEmpty(req.AgentKey, req.PluginAgentID)
 	req.PluginAgentID = firstNonEmpty(req.PluginAgentID, req.AgentKey)
+	req.PluginAgentID = identity.pluginAgentID(req.PluginAgentID)
+	req.AgentKey = identity.agentKey(req.AgentKey)
 	if req.PluginAgentID == "" || req.Name == "" || req.AgentKey == "" {
 		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_REQUIRED", "plugin_agent_id, agent_key and name are required")
 		return
@@ -375,7 +401,7 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 	}
 	status := dbm.SyncStatusDraft
 	var existing dbm.PluginAgent
-	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_agent_id = ?", tenantUUID, pluginID, req.PluginAgentID).First(&existing).Error
+	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_agent_id = ?", tenantUUID, identity.PluginID, req.PluginAgentID).First(&existing).Error
 	if err == nil {
 		if existing.SyncStatus == dbm.SyncStatusSynced {
 			status = dbm.SyncStatusDrifted
@@ -408,7 +434,7 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 	item := dbm.PluginAgent{
 		BaseModel:       baseModel(tenantUUID),
 		PluginAgentID:   req.PluginAgentID,
-		PluginID:        pluginID,
+		PluginID:        identity.PluginID,
 		PowerXAgentUUID: strings.TrimSpace(req.PowerXAgentUUID),
 		AgentKey:        req.AgentKey,
 		Name:            req.Name,
@@ -510,6 +536,10 @@ func (h *Handler) InitializeTemplateBuiltin(c *gin.Context) {
 	}
 	identity := currentRegistrationIdentity()
 	manifest := identity.rewriteSkillManifest(pkg.Manifest)
+	if err := validateTemplateSkillManifest(manifest); err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_PACKAGE_INVALID", err.Error())
+		return
+	}
 	intentExamples := mustJSON(manifest.IntentExamples)
 	inputSchema := mustJSON(pkg.InputSchema)
 	outputSchema := mustJSON(pkg.OutputSchema)
@@ -1011,6 +1041,26 @@ func defaultExecutor(v any, capability string) any {
 		"type":       "capability",
 		"capability": strings.TrimSpace(capability),
 	}
+}
+
+func validateTemplateSkillManifest(manifest runtimeskills.PluginSkillManifest) error {
+	required := map[string]string{
+		"executor.type":               manifest.Executor.Type,
+		"executor.capability":         manifest.Executor.Capability,
+		"executor.prepare_capability": manifest.Executor.PrepareCapability,
+	}
+	for field, value := range required {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("%s is required", field)
+		}
+	}
+	if strings.TrimSpace(manifest.Executor.Type) != "capability" {
+		return fmt.Errorf("executor.type must be capability")
+	}
+	if len(manifest.Executor.ActionMap) == 0 {
+		return fmt.Errorf("executor.action_map is required")
+	}
+	return nil
 }
 
 func checksumJSON(parts ...[]byte) string {

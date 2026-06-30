@@ -13,6 +13,7 @@ PowerXPlugin 侧需要提供配套 Framework 能力：
 5. 插件自有维护 Agent/Skill Plugin Registry，并通过插件 backend proxy 同步到 PowerX 底座生成运行态记录。
 6. 插件 Skill 源定义必须采用 `SKILL.md` 目录包规范；本地 Plugin Registry 和 PowerX Registry 只保存解析后的治理态快照。
 7. 插件业务回复规范必须分层维护：Agent `persona/prompt_seed` 保存 Agent 级身份与策略，Skill `response_guidance/input_schema` 保存能力级说明、缺参追问和执行结果表达；PowerX Core Runtime 只负责通用编排和安全边界。
+8. 插件调试页与 PowerX Web Admin 必须对齐 PowerX Agent Run State Protocol：多任务、多智能体、缺参等待、执行状态、结果链接和 trace 入口由 `agent_run.*` 事件与 `AgentRunState` reducer 表达，插件不得自定义一套私有任务状态。
 
 ## 2. 机制定位
 
@@ -36,6 +37,10 @@ PowerX Agent Session / Stream API
 PowerX Agent Runtime
         ↓
 PowerX Agent Skill Bridge
+        ↓
+Skill prepare capability
+        ↓
+ready_to_execute=true 时返回 capability_request
         ↓
 PowerXPlugin Capability Handler
         ↓
@@ -73,6 +78,7 @@ Plugin Debug Chat / Channel Plugin
    - `PluginSkillManifest`
    - `PluginSkillRegistry`
    - `PluginSkillExecutor`
+   - `PluginSkillPrepare`
    - `PluginSkillInvocation`
    - `PluginSkillInvocationContext`
    - `PluginSkillResult`
@@ -85,11 +91,12 @@ Plugin Debug Chat / Channel Plugin
    - `PowerXAgentWSClient`
    - `PowerXCapabilityClient`
 
-3. 统一插件 Skill 接口：
+3. 统一插件 Skill 发现接口。Skill 业务执行不提供独立 invoke 入口，必须由 PowerX Core 调用 `executor.prepare_capability`，再按 Skill 返回的 `capability_request` 进入 PowerX Capability Invocation：
 
 ```text
 GET  /api/v1/plugin/skills
 GET  /api/v1/plugin/skills/:skill_id/schema
+executor.prepare_capability -> PowerX Capability Invocation
 PowerX Capability Invocation
 GET  /api/v1/plugin/skills/invocations/:invocation_id
 ```
@@ -125,6 +132,20 @@ PluginRegistrySyncState
 ```
 
 本地 Plugin Registry 只保存开发态声明和同步状态；PowerX 底座 Agent/Skill/Binding 才是运行态权威源。同步失败、漂移、未发布 Skill 绑定时必须 fail-fast，不允许本地模拟运行。
+
+7. 对齐 Agent Run State Protocol：
+
+```text
+PowerX Agent SSE/WS agent_run.*
+        ↓
+PowerXPlugin Framework Client decoder
+        ↓
+AgentRunState reducer
+        ↓
+Plugin Agent Chat 调试页面
+```
+
+PowerXPlugin 只负责协议消费、状态聚合和 UI 展示，不负责判断任务是否成功。任务成功必须来自 PowerX Core 的 `agent_run.task_completed` 和真实 Skill/Capability result。
 
 ## 4. 与既有 feature 的关系
 
@@ -199,12 +220,62 @@ response_guidance:
     - 只追问缺失字段，不要把缺参当成执行失败。
   skill_execution:
     - 成功时说明模板 ID、名称，以及用户下一步可以查询或更新。
+action_required_args:
+  create:
+    - template.title
+    - template.description
+    - template.content
+  update:
+    - template_id
+  delete:
+    - template_id
+  get:
+    - template_id
+action_optional_args:
+  list:
+    - q
+    - page
+    - page_size
+slot_mapping:
+  template.title:
+    labels: ["标题", "名称", "模板标题"]
+  template.description:
+    labels: ["描述", "用途", "说明"]
+  template.content:
+    labels: ["内容", "正文", "模板内容"]
+pending_task_policy:
+  enabled: true
+  merge_window_messages: 6
+  merge_window_seconds: 900
+  confirm_before_execute: false
+result_presentation:
+  create:
+    title: "模板已创建"
+    primary_link: "template.detail_path"
+    visible_fields:
+      - template.id
+      - template.title
+      - template.detail_path
 capability: powerxplugin.template
+action_capabilities:
+  create: com.powerx.plugins.base.template.create
+  get: com.powerx.plugins.base.template.read
+  update: com.powerx.plugins.base.template.update
+  delete: com.powerx.plugins.base.template.delete
+  list: com.powerx.plugins.base.template.list
 visibility: tenant
 status: active
 executor:
   type: capability
-  method: POSTinput_schema: ./schema.input.json
+  capability: powerxplugin.template
+  prepare_capability: com.powerx.plugins.base.template.prepare
+  action_map:
+    create: com.powerx.plugins.base.template.create
+    get: com.powerx.plugins.base.template.read
+    update: com.powerx.plugins.base.template.update
+    delete: com.powerx.plugins.base.template.delete
+    list: com.powerx.plugins.base.template.list
+input_schema: ./schema.input.json
 output_schema: ./schema.output.json
 ---
 
@@ -265,6 +336,20 @@ SKILL.md frontmatter
   },
   "executor": {
     "type": "capability",        "capability": "powerxplugin.template"
+  },
+  "action_required_args": {
+    "create": ["template.title", "template.description", "template.content"]
+  },
+  "pending_task_policy": {
+    "enabled": true,
+    "merge_window_messages": 6,
+    "merge_window_seconds": 900
+  },
+  "result_presentation": {
+    "create": {
+      "title": "模板已创建",
+      "primary_link": "template.detail_path"
+    }
   }
 }
 ```
@@ -354,3 +439,62 @@ PowerX底座能力
 5. trace 可按 `tenant_uuid/plugin_id/skill_id/session_id/trace_id` 串联。
 6. 插件自有创建 Skill/Agent Plugin Definition 后，可同步生成 PowerX 侧 Skill/Agent/Binding 并回写映射 ID。
 7. Agent Chat 下拉框不展示未同步、同步失败、漂移或 PowerX 侧 disabled 的 Agent。
+
+## 10. Agent Run State Protocol 对齐
+
+PowerXPlugin 不定义独立智能体运行协议。插件调试页、skeleton 示例和 Framework Client 必须消费 PowerX Core 的 Agent Run State Protocol。
+
+标准事件：
+
+```text
+agent_run.started
+agent_run.response_plan
+agent_run.intent_detected
+agent_run.plan_created
+agent_run.task_status
+agent_run.task_started
+agent_run.awaiting_params
+agent_run.task_completed
+agent_run.task_failed
+agent_run.final
+agent_run.ended
+```
+
+Framework Client 输出统一状态：
+
+```text
+AgentRunState
+  run
+  session
+  message
+  response_plan
+  tasks[]
+  pending_params[]
+  results[]
+  errors[]
+  trace_links[]
+```
+
+插件侧页面要求：
+
+1. `Agent Chat 调试` 必须展示 task 状态卡，不只展示最终 assistant 文本。
+2. 缺参时展示 `AgentPendingParamsCard`，字段名称来自 Skill `slot_mapping`，用户可以用自然语言补充。
+3. 成功时展示 `AgentTaskResultCard`，链接来自 Skill `result_presentation` 与 capability result。
+4. 失败时展示稳定错误码和 trace 入口，不允许空白回复。
+5. 点击 trace 必须带上 `tenant_uuid/session_id/message_id/run_id/task_id`，跳到底座 Trace 详情而不是只跳 session 列表。
+6. PowerXPlugin 不根据本地判断生成“已创建/已完成”文案；只有收到 `agent_run.task_completed` 且包含真实 result 时，UI 才展示成功状态。
+
+Skill 包要求：
+
+1. 必须声明 `executor.prepare_capability`，由该能力合并业务状态、判断缺参并返回 `ready_to_execute`。
+2. `ready_to_execute=true` 时必须返回 `capability_request.capability_id` 与 `capability_request.payload`。
+3. 必须声明 action 到 capability 的映射，用于 Skill 自己构造 `capability_request` 与治理校验；Core 不得绕过 prepare 直接按 action_map 执行。
+4. 创建、更新、删除等动作必须声明 `action_required_args`。
+5. 需要多轮补参的动作必须声明 `pending_task_policy`。
+6. 需要跳转详情页的结果必须声明 `result_presentation`，实际链接值由 capability result 返回。
+
+与 A2A 的关系：
+
+1. A2A 是底座多智能体委派能力。
+2. Agent Run State Protocol 是插件调试页与底座页面共同消费的 UI 状态协议。
+3. 插件只需要按协议展示子 Agent task，不需要实现 Google A2A。

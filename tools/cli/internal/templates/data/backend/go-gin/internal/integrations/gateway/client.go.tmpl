@@ -18,10 +18,10 @@ import (
 	"time"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
-	"github.com/google/uuid"
 	"{{ .BackendModulePath }}/internal/capabilities"
 	"{{ .BackendModulePath }}/internal/config"
 	logger "{{ .BackendModulePath }}/internal/logger"
+	"github.com/google/uuid"
 )
 
 const (
@@ -198,14 +198,15 @@ type AgentSessionMessageRecord struct {
 }
 
 type AgentStreamParams struct {
-	AgentID    string
-	SessionID  string
-	TraceID    string
-	Query      string
-	Intent     string
-	Source     string
-	Env        string
-	TenantUUID string
+	AgentID            string
+	SessionID          string
+	TraceID            string
+	Query              string
+	Intent             string
+	Source             string
+	Env                string
+	TenantUUID         string
+	RegenFromMessageID string
 }
 
 type AgentSessionListOptions struct {
@@ -1252,6 +1253,9 @@ func (c *Client) StreamAgentSSE(ctx context.Context, params AgentStreamParams) (
 	query.Set("q", strings.TrimSpace(params.Query))
 	if intent := strings.TrimSpace(params.Intent); intent != "" {
 		query.Set("intent", intent)
+	}
+	if regenFromMessageID := strings.TrimSpace(params.RegenFromMessageID); regenFromMessageID != "" {
+		query.Set("regen_from_message_id", regenFromMessageID)
 	}
 	if source := strings.TrimSpace(params.Source); source != "" {
 		query.Set("source", source)

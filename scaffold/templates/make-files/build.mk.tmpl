@@ -8,8 +8,6 @@
 
 # ===== 基础信息 =====
 PLUGIN_ID           ?= com.powerx.plugins.base
-# 从 plugin.yaml 读取版本（若失败则默认 0.1.0）
-VERSION             ?= $(shell awk -F': *' '/^version:/ {print $$2; exit}' plugin.yaml 2>/dev/null || echo "0.1.0")
 PLATFORM            ?= host
 TARGET_ARCH         ?= amd64
 
@@ -229,6 +227,10 @@ dist: plugin-yaml-check dist-backend frontend-build
 	  mkdir -p $(DIST_DIR)/config; \
 	  cp config/event_fabric.yaml $(DIST_DIR)/config/event_fabric.yaml; \
 	fi
+	@if [ -d "skills" ]; then \
+	  mkdir -p $(DIST_DIR)/skills; \
+	  cp -R skills/. $(DIST_DIR)/skills/; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(DIST_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(DIST_BACKEND_BIN)/; fi
 	@if [ -d "$(FRONTEND_OUTPUT)" ] && [ -n "$$(ls -A $(FRONTEND_OUTPUT) 2>/dev/null)" ]; then \
@@ -244,6 +246,13 @@ dist: plugin-yaml-check dist-backend frontend-build
 	@if [ -f README.md ]; then cp README.md $(DIST_DIR)/; fi
 	@if [ "$(DIST_VERIFY)" = "1" ]; then \
 	  echo "==> dist 验证（内建）"; \
+	  rg -q 'POWERX_BIND_ADDR:[[:space:]]*":__POWERX_DYNAMIC_PORT__"' "$(DIST_DIR)/plugin.yaml" || { echo "❌ dist 验证失败：plugin.yaml 必须使用 POWERX_BIND_ADDR 动态端口占位符"; exit 1; }; \
+	  ! rg -q 'port:[[:space:]]*(8078|8086)[[:space:]]*$$' "$(DIST_DIR)/plugin.yaml" || { echo "❌ dist 验证失败：plugin.yaml 不应固化旧 backend port"; exit 1; }; \
+	  echo "manifest runtime port check: ok"; \
+	  if [ -d "skills" ]; then \
+	    find "$(DIST_DIR)/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -print -quit | rg -q . || { echo "❌ dist 验证失败：skills 目录没有标准 SKILL.md 包"; exit 1; }; \
+	    echo "skills package check: ok"; \
+	  fi; \
 	  if [ "$(BACKEND)" != "fastapi" ]; then \
 	    test -s "$(DIST_BACKEND_BIN)/plugin" || { echo "❌ dist 验证失败：缺少后端二进制 $(DIST_BACKEND_BIN)/plugin"; exit 1; }; \
 	    strings "$(DIST_BACKEND_BIN)/plugin" | rg -q "/ws-bus/test-flow" || { echo "❌ dist 验证失败：binary 缺少 /ws-bus/test-flow"; exit 1; }; \
@@ -282,6 +291,10 @@ release: build frontend-build
 	  mkdir -p $(RELEASE_DIR)/config; \
 	  cp config/event_fabric.yaml $(RELEASE_DIR)/config/event_fabric.yaml; \
 	fi
+	@if [ -d "skills" ]; then \
+	  mkdir -p $(RELEASE_DIR)/skills; \
+	  cp -R skills/. $(RELEASE_DIR)/skills/; \
+	fi
 	@cp $(BUILD_DIR)/plugin $(RELEASE_BACKEND_BIN)/
 	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(RELEASE_BACKEND_BIN)/; fi
 	@cp -R $(FRONTEND_OUTPUT)/. $(RELEASE_WEBADMIN_OUTPUT)/
@@ -290,6 +303,9 @@ release: build frontend-build
 	  cp -R $(FRONTEND_DIR)/i18n/. $(RELEASE_WEBADMIN_DIR)/i18n/; \
 	fi
 	@if [ -f README.md ]; then cp README.md $(RELEASE_DIR)/; fi
+	@rg -q 'POWERX_BIND_ADDR:[[:space:]]*":__POWERX_DYNAMIC_PORT__"' "$(RELEASE_DIR)/plugin.yaml" || { echo "❌ release 验证失败：plugin.yaml 必须使用 POWERX_BIND_ADDR 动态端口占位符"; exit 1; }
+	@! rg -q 'port:[[:space:]]*(8078|8086)[[:space:]]*$$' "$(RELEASE_DIR)/plugin.yaml" || { echo "❌ release 验证失败：plugin.yaml 不应固化旧 backend port"; exit 1; }
+	@echo "release manifest runtime port check: ok"
 
 # ===== 打包 zip =====
 .PHONY: package

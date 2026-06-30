@@ -193,6 +193,25 @@
         </UButton>
       </div>
 
+      <div v-if="canReadCustomers">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.businessOperations') }}
+        </div>
+        <UButton
+          to="/admin/business/customers"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/admin/business/customers'),
+          }"
+        >
+          <UIcon name="i-heroicons-user-group" class="w-4 h-4 mr-3" />
+          {{ t('navigation.customerBase') }}
+        </UButton>
+      </div>
+
       <div v-if="showIAMMenu">
         <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {{ t('navigation.iam') }}
@@ -354,7 +373,7 @@ const showIAMMenu = computed(() => {
   return localIAM && (canManageIAM.value || isLoggedIn.value);
 });
 const userStore = useUserStore();
-const { isRoot, isCurrentTenantAdmin, canReadTemplates, isLoggedIn } = storeToRefs(userStore);
+const { isRoot, isCurrentTenantAdmin, canReadTemplates, canReadCustomers, isLoggedIn } = storeToRefs(userStore);
 const canManageIAM = computed(() => Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value));
 const showCapabilityLab = computed(() => {
   const envFlag = runtimeConfig.public?.showCapabilityLab;

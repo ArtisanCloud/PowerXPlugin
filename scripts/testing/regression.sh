@@ -224,6 +224,7 @@ YAML
 
     CONFIG_PATH="$backend_cfg" POWERX_BIND_ADDR=":${BACKEND_PORT}" PORT="${BACKEND_PORT}" \
       POWERX_PROXY=0 IAMMode=local IAM_MODE=local STANDALONE=1 \
+      PLUGIN_SKILLS_DIR="${ROOT_DIR}/skeleton/skills" \
       PX_GATEWAY_BASE_URL="" PX_GATEWAY_AUTH_SCHEME="" PX_GATEWAY_API_KEY="" \
       PX_PLUGIN_TOOL_TOKEN="" PX_TOOL_REFRESH_TOKEN="" PX_USE_MOCK="" \
       "${BACKEND_RUNNER_BIN}" >"$BACKEND_LOG" 2>&1 &
@@ -262,6 +263,16 @@ YAML
 }
 
 start_backend
+
+if [ "${REGRESSION_RUN_E2E:-1}" = "0" ]; then
+  echo "[R-3] Skipping frontend build and Playwright E2E (REGRESSION_RUN_E2E=0)"
+  echo "Logs stored at ${BACKEND_LOG}"
+
+  end_ts=$(date +%s)
+  elapsed=$((end_ts - start_ts))
+  echo "=== Regression workflow complete in ${elapsed}s ==="
+  exit 0
+fi
 
 echo "[R-3] Preparing frontend dependencies"
 pushd skeleton/web-admin/nuxt > /dev/null

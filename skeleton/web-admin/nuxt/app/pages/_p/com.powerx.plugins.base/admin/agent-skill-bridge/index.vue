@@ -105,9 +105,9 @@
 
           <div v-else class="mx-auto max-w-4xl space-y-5">
             <div
-              v-for="item in chatMessages"
+              v-for="(item, index) in chatMessages"
               :key="item.id"
-              class="flex gap-3"
+              class="group flex gap-3"
               :class="item.role === 'user' ? 'justify-end' : 'justify-start'"
             >
               <UAvatar
@@ -116,17 +116,129 @@
                 size="sm"
                 class="mt-1 bg-primary text-white"
               />
-              <div
-                class="max-w-[78%] rounded-lg px-4 py-3 text-sm leading-6 shadow-sm"
-                :class="item.role === 'user'
-                  ? 'bg-primary text-white'
-                  : 'border border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100'"
-                :data-testid="item.role === 'assistant' ? 'agent-chat-final' : undefined"
-              >
-                <div class="whitespace-pre-wrap">{{ item.content }}</div>
-                <div v-if="item.pending" class="mt-2 flex items-center gap-2 text-xs opacity-70">
-                  <UIcon name="i-heroicons-arrow-path" class="h-3 w-3 animate-spin" />
-                  <span>streaming</span>
+              <div class="flex max-w-[78%] flex-col" :class="item.role === 'user' ? 'items-end' : 'items-start'">
+                <div
+                  class="w-full rounded-lg px-4 py-3 text-sm leading-6 shadow-sm"
+                  :class="item.role === 'user'
+                    ? 'bg-primary text-white'
+                    : 'border border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100'"
+                  :data-testid="item.role === 'assistant' ? 'agent-chat-final' : undefined"
+                >
+                  <div class="whitespace-pre-wrap">{{ item.content }}</div>
+                  <div v-if="item.pending" class="mt-2 flex items-center gap-2 text-xs opacity-70">
+                    <UIcon name="i-heroicons-arrow-path" class="h-3 w-3 animate-spin" />
+                    <span>streaming</span>
+                  </div>
+                <div
+                  v-if="item.role === 'assistant' && messageRunTasks(item).length"
+                  class="mt-3"
+                  data-testid="agent-message-run-trace"
+                >
+                  <details class="group rounded-md border border-gray-200 bg-white/70 dark:border-gray-800 dark:bg-gray-950/70">
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <UIcon name="i-heroicons-bolt" class="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-300" />
+                        <span class="shrink-0 font-medium text-gray-800 dark:text-gray-100">执行链路</span>
+                        <UBadge :color="taskBadgeColor(messageRunStatus(item))" variant="soft">{{ runStatusLabel(messageRunStatus(item)) }}</UBadge>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                        <span v-if="messageRunParticipants(item).length">参与 {{ messageRunParticipants(item).length }}</span>
+                        <span>{{ messageRunSummary(item).completed }}/{{ messageRunSummary(item).total }}</span>
+                        <span>{{ messageRunSummary(item).percent }}%</span>
+                        <UIcon name="i-heroicons-chevron-down" class="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
+                      </div>
+                    </summary>
+
+                    <div class="space-y-1.5 border-t border-gray-200 p-3 dark:border-gray-800">
+                      <div v-if="messageRunParticipants(item).length" class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span class="text-gray-500 dark:text-gray-400">参与</span>
+                        <span
+                          v-for="participant in messageRunParticipants(item)"
+                          :key="participant.key"
+                          class="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-primary-700 dark:bg-primary-500/10 dark:text-primary-200"
+                        >
+                          <UIcon name="i-heroicons-user-circle" class="h-3.5 w-3.5" />
+                          <span>{{ participant.label }}</span>
+                          <span class="text-primary-500 dark:text-primary-300">×{{ participant.count }}</span>
+                        </span>
+                      </div>
+                      <div
+                        v-for="task in messageRunTasks(item)"
+                        :key="task.task_id || task.node_ref || task.action || JSON.stringify(task)"
+                        class="rounded-md border px-2.5 py-2 text-xs"
+                        :class="taskCardClass(task.status)"
+                      >
+                        <div class="flex items-center gap-2.5">
+                          <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[11px] font-semibold text-primary-700 dark:bg-primary-500/20 dark:text-primary-100">
+                            {{ taskAvatarText(task) }}
+                          </div>
+                          <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between gap-2">
+                              <div class="truncate font-medium text-gray-900 dark:text-white">{{ taskTitle(task) }}</div>
+                              <div class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{{ taskProgressPercent(task) }}%</div>
+                            </div>
+                            <div class="mt-0.5 truncate text-gray-500 dark:text-gray-400">{{ taskSubtitle(task) || runStatusLabel(task.status) }}</div>
+                            <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                              <div
+                                class="h-full rounded-full transition-all"
+                                :class="String(task.status || '').toLowerCase() === 'failed' ? 'bg-red-500' : 'bg-primary-500'"
+                                :style="{ width: `${taskProgressPercent(task)}%` }"
+                              />
+                            </div>
+                          </div>
+                          <UBadge class="shrink-0" :color="taskBadgeColor(task.status)" variant="soft">{{ runStatusLabel(task.status) }}</UBadge>
+                        </div>
+                        <div v-if="task.status === 'awaiting_params' && task.missing_fields?.length" class="mt-1.5 rounded bg-amber-50 px-2 py-1 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                          需要补充：{{ task.missing_fields.join("、") }}
+                        </div>
+                        <div v-if="task.status === 'completed' && resultSummary(task.result)" class="mt-1.5 rounded bg-green-50 px-2 py-1 text-green-800 dark:bg-green-950 dark:text-green-200">
+                          {{ resultSummary(task.result) }}
+                        </div>
+                        <div v-if="task.status === 'failed' && task.error" class="mt-1.5 flex items-start justify-between gap-2 rounded bg-red-50 px-2 py-1 text-red-800 dark:bg-red-950 dark:text-red-200">
+                          <span class="line-clamp-2 min-w-0">{{ errorSummary(task.error) }}</span>
+                          <UButton
+                            icon="i-heroicons-clipboard-document"
+                            size="xs"
+                            color="error"
+                            variant="ghost"
+                            title="复制追踪信息"
+                            aria-label="复制追踪信息"
+                            @click.stop="copyTaskTrace(task, item.runState)"
+                          />
+                        </div>
+                      </div>
+                      <details v-if="messageRunEvents(item).length" class="pt-1 text-xs">
+                        <summary class="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                          查看事件 {{ messageRunEvents(item).length }}
+                        </summary>
+                        <div class="mt-2 max-h-48 space-y-1 overflow-auto rounded-md bg-gray-950 p-2 text-gray-100">
+                          <div v-for="event in messageRunEvents(item)" :key="event.id" class="border-b border-gray-800 pb-1 last:border-0">
+                            <div class="flex items-center justify-between gap-2">
+                              <span class="font-medium">{{ event.type }}</span>
+                              <span class="text-gray-500">{{ event.time }}</span>
+                            </div>
+                            <div v-if="event.summary" class="mt-0.5 text-gray-400">{{ event.summary }}</div>
+                          </div>
+                        </div>
+                      </details>
+                    </div>
+	                  </details>
+	                </div>
+                </div>
+	                <div
+	                  v-if="item.role === 'user'"
+	                  class="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  <UButton
+                    icon="i-heroicons-pencil-square"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    :disabled="loading"
+                    @click="openRegenerateDialog(item, index)"
+                  >
+                    重新编辑
+                  </UButton>
                 </div>
               </div>
               <UAvatar
@@ -205,6 +317,120 @@
 
           <section class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
             <div class="mb-3 flex items-center justify-between">
+              <div class="text-sm font-semibold text-gray-900 dark:text-white">运行状态</div>
+              <UBadge :color="runStateBadgeColor" variant="soft" data-testid="agent-run-state-status">{{ runStateStatus }}</UBadge>
+            </div>
+            <div v-if="runStateParticipants.length" class="mb-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span class="text-gray-500 dark:text-gray-400">参与</span>
+              <span
+                v-for="participant in runStateParticipants"
+                :key="participant.key"
+                class="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-primary-700 dark:bg-primary-500/10 dark:text-primary-200"
+              >
+                <UIcon name="i-heroicons-user-circle" class="h-3.5 w-3.5" />
+                <span>{{ participant.label }}</span>
+                <span class="text-primary-500 dark:text-primary-300">×{{ participant.count }}</span>
+              </span>
+            </div>
+            <div v-if="runStateTasks.length" class="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span class="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                总 {{ runStateSummary.total }}
+              </span>
+              <span class="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                进度 {{ runStateSummary.completed }}/{{ runStateSummary.total }}
+              </span>
+              <span class="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+                阶段 {{ runStateSummary.currentStage }}/{{ runStateSummary.totalStages }}
+              </span>
+              <span class="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                运行 {{ runStateSummary.running }}
+              </span>
+              <span class="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 dark:bg-blue-950 dark:text-blue-200">
+                待补 {{ runStateSummary.awaiting }}
+              </span>
+              <span class="rounded-full bg-red-50 px-2 py-0.5 text-red-700 dark:bg-red-950 dark:text-red-200">
+                失败 {{ runStateSummary.failed }}
+              </span>
+            </div>
+            <div v-if="runStateTasks.length" class="space-y-2" data-testid="agent-run-state-panel">
+              <div v-for="group in runStateStageGroups" :key="group.key" class="rounded-md border border-gray-200 p-2 dark:border-gray-800">
+                <div class="mb-2 flex items-center justify-between gap-2 text-xs">
+                  <div class="font-medium text-gray-900 dark:text-white">{{ group.label }}</div>
+                  <UBadge color="neutral" variant="soft">{{ group.parallel ? "并行" : "串行" }}</UBadge>
+                </div>
+                <div class="space-y-2">
+                  <div
+                    v-for="task in group.tasks"
+                    :key="task.task_id || task.node_ref || task.action || JSON.stringify(task)"
+                    class="rounded-md border px-3 py-2 text-xs"
+                    :class="taskCardClass(task.status)"
+                  >
+                    <div class="flex items-center gap-2.5">
+                      <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[11px] font-semibold text-primary-700 dark:bg-primary-500/20 dark:text-primary-100">
+                        {{ taskAvatarText(task) }}
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="truncate font-medium text-gray-900 dark:text-white">{{ taskTitle(task) }}</div>
+                          <div class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{{ taskProgressPercent(task) }}%</div>
+                        </div>
+                        <div class="mt-1 truncate text-gray-500 dark:text-gray-400">{{ taskSubtitle(task) || runStatusLabel(task.status) }}</div>
+                        <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                          <div
+                            class="h-full rounded-full transition-all"
+                            :class="String(task.status || '').toLowerCase() === 'failed' ? 'bg-red-500' : 'bg-primary-500'"
+                            :style="{ width: `${taskProgressPercent(task)}%` }"
+                          />
+                        </div>
+                      </div>
+                      <UBadge class="shrink-0" :color="taskBadgeColor(task.status)" variant="soft">{{ runStatusLabel(task.status) }}</UBadge>
+                    </div>
+                    <div v-if="task.depends_on?.length" class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                      依赖：{{ task.depends_on.join("、") }}
+                    </div>
+                    <div v-if="task.status === 'awaiting_params' && task.missing_fields?.length" class="mt-2 rounded-md bg-amber-50 p-2 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                      需要补充：{{ task.missing_fields.join("、") }}
+                    </div>
+                    <div v-if="task.status === 'completed' && resultSummary(task.result)" class="mt-2 rounded-md bg-green-50 p-2 text-green-800 dark:bg-green-950 dark:text-green-200">
+                      {{ resultSummary(task.result) }}
+                    </div>
+                    <div v-if="task.status === 'failed' && task.error" class="mt-2 flex items-start justify-between gap-2 rounded-md bg-red-50 p-2 text-red-800 dark:bg-red-950 dark:text-red-200">
+                      <span class="line-clamp-2 min-w-0">{{ errorSummary(task.error) }}</span>
+                      <UButton
+                        icon="i-heroicons-clipboard-document"
+                        size="xs"
+                        color="error"
+                        variant="ghost"
+                        title="复制追踪信息"
+                        aria-label="复制追踪信息"
+                        @click.stop="copyTaskTrace(task)"
+                      />
+                    </div>
+                    <div v-if="task.links?.length" class="mt-2 flex flex-wrap gap-2">
+                      <UButton
+                        v-for="link in task.links"
+                        :key="String(link.url || link.href || link.label || JSON.stringify(link))"
+                        icon="i-heroicons-arrow-top-right-on-square"
+                        size="xs"
+                        color="neutral"
+                        variant="soft"
+                        :to="String(link.url || link.href || '') || undefined"
+                        target="_blank"
+                      >
+                        {{ String(link.label || link.title || "查看结果") }}
+                      </UButton>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="rounded-md bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+              等待 agent_run.* 状态事件。
+            </div>
+          </section>
+
+          <section class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+            <div class="mb-3 flex items-center justify-between">
               <div class="text-sm font-semibold text-gray-900 dark:text-white">执行过程</div>
               <UBadge variant="soft">{{ eventCount }} events</UBadge>
             </div>
@@ -274,6 +500,43 @@
         </div>
       </aside>
     </div>
+
+    <UModal
+      v-model:open="regenerateDialogOpen"
+      title="重新编辑问题"
+      description="修改这条问题后，将从这里重新生成后续回答。"
+      :ui="{ content: 'w-[min(92vw,640px)] max-w-none' }"
+    >
+      <template #content>
+        <div class="space-y-4 p-5">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">重新编辑问题</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">修改这条问题后，将从这里重新生成后续回答。</p>
+          </div>
+          <UTextarea
+            v-model="regenerateText"
+            class="w-full"
+            :rows="4"
+            autoresize
+            :maxrows="8"
+            placeholder="输入新的问题..."
+            data-testid="agent-chat-regenerate-input"
+            @keydown="handleRegenerateKeydown"
+          />
+          <div class="flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+            <UButton color="neutral" variant="soft" @click="closeRegenerateDialog">取消</UButton>
+            <UButton
+              icon="i-heroicons-arrow-path"
+              :disabled="!regenerateText.trim() || loading"
+              :loading="loading"
+              @click="confirmRegenerate"
+            >
+              保存并重新生成
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
@@ -293,9 +556,59 @@ type AgentEvent = {
 
 type ChatMessage = {
   id: string;
+  rawId?: string;
   role: "user" | "assistant";
   content: string;
   pending?: boolean;
+  runState?: RunState;
+  events?: AgentEvent[];
+};
+
+type RunStateTask = {
+  run_id?: string;
+  session_id?: string;
+  message_id?: string;
+  trace_id?: string;
+  task_id?: string;
+  parent_task_id?: string;
+  depends_on?: string[];
+  stage?: number;
+  parallel_group?: string;
+  team_id?: string;
+  agent_id?: string;
+  agent_name?: string;
+  node_kind?: string;
+  node_ref?: string;
+  skill_id?: string;
+  capability_id?: string;
+  action?: string;
+  failure_policy?: string;
+  status?: string;
+  message?: string;
+  summary?: string;
+  request_id?: string;
+  progress?: number;
+  progress_percent?: number;
+  percent?: number;
+  missing_fields?: string[];
+  collected_params?: Record<string, unknown>;
+  result?: unknown;
+  links?: Array<Record<string, unknown>>;
+  error?: unknown;
+};
+
+type RunState = {
+  run: Record<string, unknown>;
+  summary?: Record<string, unknown>;
+  response_plan?: Record<string, unknown>;
+  intent?: Record<string, unknown>;
+  plan?: Record<string, unknown>;
+  tasks: RunStateTask[];
+  pending_params: RunStateTask[];
+  results: RunStateTask[];
+  errors: RunStateTask[];
+  trace_links: Array<Record<string, unknown>>;
+  ended?: boolean;
 };
 
 type AgentOption = {
@@ -337,6 +650,8 @@ type AgentSessionMessageRecord = {
   id?: number | string;
   role?: string;
   content?: string;
+  meta?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 };
 
 type PowerXAgentRecord = {
@@ -369,6 +684,8 @@ const bearerToken = ref("");
 const rawLog = ref("");
 const finalMessage = ref("");
 const timeline = ref<AgentEvent[]>([]);
+const runState = ref<RunState>(createEmptyRunState());
+const activeRunEvents = ref<AgentEvent[]>([]);
 const selectedEventId = ref("");
 const eventCount = ref(0);
 const chatMessages = ref<ChatMessage[]>([]);
@@ -377,6 +694,9 @@ const loading = ref(false);
 const status = ref<"idle" | "streaming" | "completed" | "error" | "aborted">("idle");
 const errorText = ref("");
 const auth = useAuth();
+const regenerateDialogOpen = ref(false);
+const regenerateText = ref("");
+const regenerateMessageIndex = ref(-1);
 let abortController: AbortController | null = null;
 let activeAssistantMessageID = "";
 let assistantBuffer = "";
@@ -406,7 +726,8 @@ const connectionLabel = computed(() => {
 
 const welcomeText = computed(() => {
   if (agentsError.value) return agentsError.value;
-  if (!connectionReady.value) return "请先在 Agent 管理中同步插件 Agent。";
+  if (!agentId.value.trim()) return "请先在 Agent 管理中同步插件 Agent。";
+  if (!sessionId.value.trim()) return "请新建或选择一个 Agent 会话。";
   return "当前会话暂无消息";
 });
 
@@ -450,6 +771,24 @@ const selectedEvent = computed(() => {
   return timeline.value.find((item) => item.id === selectedEventId.value) || null;
 });
 
+const runStateTasks = computed(() => runState.value.tasks || []);
+const runStateSummary = computed(() => buildRunStateSummary(runState.value));
+const runStateStageGroups = computed(() => groupRunStateTasksByStage(runStateTasks.value));
+const runStateParticipants = computed(() => buildRunParticipants(runStateTasks.value));
+
+const runStateStatus = computed(() => {
+  const summaryStatus = String(runState.value.summary?.status || "").trim();
+  if (summaryStatus) return summaryStatus;
+  if (runState.value.errors?.length) return "failed";
+  if (runState.value.pending_params?.length) return "awaiting_params";
+  if (runState.value.tasks?.some((task) => task.status === "running")) return "running";
+  if (runState.value.tasks?.length && runState.value.tasks.every((task) => ["completed", "skipped"].includes(String(task.status || "")))) return "completed";
+  if (runState.value.ended) return "ended";
+  return "idle";
+});
+
+const runStateBadgeColor = computed(() => taskBadgeColor(runStateStatus.value));
+
 watch(selectedAgentId, (next) => {
   if (suppressAgentWatch) return;
   const selected = agentOptions.value.find((item) => item.value === next);
@@ -471,15 +810,18 @@ onMounted(async () => {
 });
 
 const canSend = computed(() => {
+  return canSendText(message.value);
+});
+
+function canSendText(input: string) {
   return Boolean(
-    message.value.trim() &&
+    input.trim() &&
       agentId.value.trim() &&
       sessionId.value.trim() &&
-      traceId.value.trim() &&
       !sessionLoading.value &&
       !loading.value
   );
-});
+}
 
 const statusLabel = computed(() => {
   switch (status.value) {
@@ -737,6 +1079,8 @@ async function loadSessions(agent = currentAgent.value, selectFirst = false) {
     const currentStillExists = items.some((item) => item.id === sessionId.value);
     if (selectFirst && items.length > 0) {
       await selectSession(items[0]);
+    } else if (selectFirst && items.length === 0 && targetAgent.value === agentId.value) {
+      await createSession(targetAgent);
     } else if (!currentStillExists && items.length > 0 && targetAgent.value === agentId.value) {
       await selectSession(items[0]);
     } else if (!currentStillExists && targetAgent.value === agentId.value) {
@@ -786,7 +1130,7 @@ async function selectSession(item: SessionItem) {
   await loadSessionMessages(item.id);
 }
 
-async function loadSessionMessages(id: string) {
+async function loadSessionMessages(id: string, options: { preserveCurrentOnEmpty?: boolean } = {}) {
   const sessionUUID = String(id || "").trim();
   if (!sessionUUID) return;
   try {
@@ -798,9 +1142,20 @@ async function loadSessionMessages(id: string) {
       throw new Error(`PowerX Agent messages proxy failed: HTTP ${response.status}`);
     }
     const payload = await response.json();
-    chatMessages.value = extractMessageItems(payload)
+    const nextMessages = extractMessageItems(payload)
       .map(normalizeChatMessage)
       .filter((item): item is ChatMessage => Boolean(item));
+    if (options.preserveCurrentOnEmpty && nextMessages.length === 0 && chatMessages.value.length > 0) {
+      errorText.value = "Agent final 已返回，但会话历史尚未包含 assistant 消息。";
+      return;
+    }
+    if (options.preserveCurrentOnEmpty && activeAssistantMessageID) {
+      const current = chatMessages.value.find((item) => item.id === activeAssistantMessageID);
+      if (current?.runState?.tasks?.length && !nextMessages.some((item) => item.role === "assistant" && item.runState?.tasks?.length)) {
+        return;
+      }
+    }
+    chatMessages.value = nextMessages;
   } catch (error) {
     errorText.value = error instanceof Error ? error.message : String(error);
   }
@@ -817,13 +1172,31 @@ function extractMessageItems(payload: unknown): AgentSessionMessageRecord[] {
 
 function normalizeChatMessage(record: AgentSessionMessageRecord): ChatMessage | null {
   const role = String(record.role || "").trim();
+  const rawId = String(record.id || "").trim();
   if (role !== "user" && role !== "assistant") return null;
   return {
-    id: `${role}_${String(record.id || Date.now())}`,
+    id: rawId ? `${role}_${rawId}` : `${role}_${Date.now()}`,
+    rawId,
     role,
     content: String(record.content || ""),
     pending: false,
+    runState: normalizeMessageRunState(record),
   };
+}
+
+function normalizeMessageRunState(record: AgentSessionMessageRecord): RunState | undefined {
+  const meta = record.meta || record.metadata || {};
+  const raw = (meta.run_state || meta.runState) as Record<string, unknown> | undefined;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const tasks = Array.isArray(raw.tasks) ? raw.tasks.filter(isPlainObject).map((task) => taskFromRunPayload(task)) : [];
+  if (!tasks.length) return undefined;
+  const state = createEmptyRunState();
+  state.run = isPlainObject(raw.run) ? raw.run : {};
+  state.summary = isPlainObject(raw.summary) ? raw.summary : undefined;
+  state.tasks = tasks;
+  state.ended = Boolean(raw.ended);
+  refreshRunStateCollections(state);
+  return state;
 }
 
 async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -878,6 +1251,8 @@ function resetRuntimeState() {
   rawLog.value = "";
   finalMessage.value = "";
   timeline.value = [];
+  runState.value = createEmptyRunState();
+  activeRunEvents.value = [];
   selectedEventId.value = "";
   eventCount.value = 0;
   errorText.value = "";
@@ -887,6 +1262,39 @@ function resetRuntimeState() {
   if (currentSessionItem.value) {
     currentSessionItem.value.summary = currentSessionSummary.value;
   }
+}
+
+function createEmptyRunState(): RunState {
+  return {
+    run: {},
+    tasks: [],
+    pending_params: [],
+    results: [],
+    errors: [],
+    trace_links: [],
+  };
+}
+
+function cloneRunState(state: RunState): RunState {
+  return {
+    run: { ...(state.run || {}) },
+    summary: state.summary ? { ...state.summary } : undefined,
+    response_plan: state.response_plan ? { ...state.response_plan } : undefined,
+    intent: state.intent ? { ...state.intent } : undefined,
+    plan: state.plan ? { ...state.plan } : undefined,
+    tasks: (state.tasks || []).map((task) => ({
+      ...task,
+      depends_on: task.depends_on ? [...task.depends_on] : undefined,
+      missing_fields: task.missing_fields ? [...task.missing_fields] : undefined,
+      collected_params: task.collected_params ? { ...task.collected_params } : undefined,
+      links: task.links ? task.links.map((link) => ({ ...link })) : undefined,
+    })),
+    pending_params: (state.pending_params || []).map((task) => ({ ...task })),
+    results: (state.results || []).map((task) => ({ ...task })),
+    errors: (state.errors || []).map((task) => ({ ...task })),
+    trace_links: (state.trace_links || []).map((link) => ({ ...link })),
+    ended: state.ended,
+  };
 }
 
 function abortStream() {
@@ -902,7 +1310,14 @@ function abortStream() {
 
 function appendChatMessage(role: "user" | "assistant", content: string, pending = false) {
   const id = `${role}_${Date.now()}_${chatMessages.value.length}`;
-  chatMessages.value.push({ id, role, content, pending });
+  chatMessages.value.push({
+    id,
+    role,
+    content,
+    pending,
+    runState: role === "assistant" ? cloneRunState(runState.value) : undefined,
+    events: role === "assistant" ? [] : undefined,
+  });
   return id;
 }
 
@@ -918,6 +1333,7 @@ function markAssistantPending(pending: boolean) {
   const target = chatMessages.value.find((item) => item.id === activeAssistantMessageID);
   if (!target) return;
   target.pending = pending;
+  syncActiveAssistantRunTrace();
 }
 
 function appendAssistantText(delta: string) {
@@ -933,6 +1349,14 @@ function setAssistantText(text: string) {
   updateAssistantMessage(assistantBuffer);
 }
 
+function syncActiveAssistantRunTrace() {
+  if (!activeAssistantMessageID) return;
+  const target = chatMessages.value.find((item) => item.id === activeAssistantMessageID);
+  if (!target || target.role !== "assistant") return;
+  target.runState = cloneRunState(runState.value);
+  target.events = activeRunEvents.value.map((event) => ({ ...event, payload: { ...event.payload } }));
+}
+
 function handleInputKeydown(event: KeyboardEvent) {
   if (event.key !== "Enter") return;
   if (!event.metaKey && !event.ctrlKey) return;
@@ -941,8 +1365,13 @@ function handleInputKeydown(event: KeyboardEvent) {
 }
 
 async function send() {
-  if (!canSend.value) return;
-  const userMessage = message.value.trim();
+  await sendMessageText(message.value, { clearInput: true });
+}
+
+async function sendMessageText(input: string, options: { clearInput?: boolean; replaceFromIndex?: number; regenerateFromMessageId?: string } = {}) {
+  if (!canSendText(input)) return;
+  const userMessage = input.trim();
+  if (!userMessage) return;
   abortStream();
   loading.value = true;
   status.value = "streaming";
@@ -953,12 +1382,18 @@ async function send() {
   selectedEventId.value = "";
   eventCount.value = 0;
   assistantBuffer = "";
+  if (typeof options.replaceFromIndex === "number" && options.replaceFromIndex >= 0) {
+    chatMessages.value = chatMessages.value.slice(0, options.replaceFromIndex);
+  }
   appendChatMessage("user", userMessage);
   if (currentSessionItem.value) {
     currentSessionItem.value.summary = userMessage;
   }
   activeAssistantMessageID = appendChatMessage("assistant", "正在连接 PowerX Agent Runtime...", true);
-  message.value = "";
+  if (options.clearInput !== false) {
+    message.value = "";
+  }
+  traceId.value = `trace_${Date.now()}`;
 
   abortController = new AbortController();
   try {
@@ -968,16 +1403,20 @@ async function send() {
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
+    const params: Record<string, string> = {
+      agent_uuid: currentAgent.value.uuid,
+      session_uuid: sessionId.value.trim(),
+      trace_id: traceId.value.trim(),
+      q: userMessage,
+      source: "powerxplugin.local_chat",
+      env: "dev",
+    };
+    if (options.regenerateFromMessageId) {
+      params.regen_from_message_id = options.regenerateFromMessageId;
+    }
     await createFetchSSE({
       path: agentProxyPath,
-      params: {
-        agent_uuid: currentAgent.value.uuid,
-        session_uuid: sessionId.value.trim(),
-        trace_id: traceId.value.trim(),
-        q: userMessage,
-        source: "powerxplugin.local_chat",
-        env: "dev",
-      },
+      params,
       headers,
       signal: abortController.signal,
       onEvent: consumeSSEEvent,
@@ -986,11 +1425,12 @@ async function send() {
       status.value = "completed";
     }
     if (!finalMessage.value) {
-      finalMessage.value = "PowerX Agent Runtime 已结束本次会话。";
-      updateAssistantMessage(finalMessage.value);
+      status.value = "error";
+      errorText.value = "Agent Run State 协议错误：运行已结束但未收到 agent_run.final。";
+      updateAssistantMessage(errorText.value);
     }
     markAssistantPending(false);
-    await loadSessionMessages(sessionId.value.trim());
+    await loadSessionMessages(sessionId.value.trim(), { preserveCurrentOnEmpty: Boolean(finalMessage.value) });
   } catch (error) {
     markAssistantPending(false);
     if ((error as Error)?.name === "AbortError") {
@@ -1010,23 +1450,454 @@ async function send() {
   }
 }
 
+function openRegenerateDialog(item: ChatMessage, index: number) {
+  if (loading.value || item.role !== "user") return;
+  regenerateMessageIndex.value = index;
+  regenerateText.value = item.content;
+  regenerateDialogOpen.value = true;
+}
+
+function closeRegenerateDialog() {
+  regenerateDialogOpen.value = false;
+  regenerateText.value = "";
+  regenerateMessageIndex.value = -1;
+}
+
+function handleRegenerateKeydown(event: KeyboardEvent) {
+  if (event.key !== "Enter") return;
+  if (!event.metaKey && !event.ctrlKey) return;
+  event.preventDefault();
+  confirmRegenerate();
+}
+
+async function confirmRegenerate() {
+  const text = regenerateText.value.trim();
+  const index = regenerateMessageIndex.value;
+  if (!text || index < 0 || loading.value) return;
+  const target = chatMessages.value[index];
+  if (!target?.rawId) {
+    errorText.value = "这条消息缺少后端 message_id，不能重新生成。请刷新会话后重试。";
+    closeRegenerateDialog();
+    return;
+  }
+  closeRegenerateDialog();
+  await sendMessageText(text, { clearInput: false, replaceFromIndex: index, regenerateFromMessageId: target.rawId });
+}
+
 function consumeSSEEvent(event: SSEStreamEvent) {
   rawLog.value += `${event.raw}\n\n`;
   const payload = normalizeEventPayload(event.payload);
   const type = String(payload.type || event.event || "message");
   const summary = summarizeEvent(type, payload);
   recordRuntimeEvent(type, summary, payload);
+  applyRunStateEvent(type, payload);
+  syncActiveAssistantRunTrace();
   const delta = extractVisibleDelta(type, payload);
   if (delta) appendAssistantText(delta);
-  if (type === "final") {
+  if (type === "agent_run.final") {
     finalMessage.value = extractFinalMessage(payload);
     setAssistantText(finalMessage.value);
   }
-  if (type === "error") {
+  if (type === "error" || type === "agent_run.task_failed") {
     errorText.value = summary || "PowerX Agent returned error";
     status.value = "error";
-    updateAssistantMessage(errorText.value);
+    if (!finalMessage.value) updateAssistantMessage(errorText.value);
   }
+}
+
+function applyRunStateEvent(type: string, payload: Record<string, unknown>) {
+  const normalizedType = normalizeRunStateEventType(type, payload);
+  if (!normalizedType) return;
+  const next = { ...runState.value, run: { ...(runState.value.run || {}) } };
+  if (normalizedType === "agent_run.started") {
+    mergeIdentity(next.run, payload);
+  } else if (normalizedType === "agent_run.response_plan") {
+    next.response_plan = unwrapRunPayload(payload);
+  } else if (normalizedType === "agent_run.intent_detected") {
+    next.intent = unwrapRunPayload(payload);
+  } else if (normalizedType === "agent_run.plan_created") {
+    next.plan = unwrapRunPayload(payload);
+    if (isPlainObject(next.plan.summary)) {
+      next.summary = next.plan.summary as Record<string, unknown>;
+    }
+    const plannedTasks = tasksFromPlanPayload(next.plan);
+    if (plannedTasks.length) {
+      next.tasks = mergeRunTasks(next.tasks || [], plannedTasks);
+      refreshRunStateCollections(next);
+    }
+  } else if (["agent_run.task_status", "agent_run.task_started", "agent_run.awaiting_params", "agent_run.task_completed", "agent_run.task_failed"].includes(normalizedType)) {
+    const task = taskFromRunPayload(payload);
+    if (normalizedType === "agent_run.task_started" && !task.status) task.status = "running";
+    if (normalizedType === "agent_run.awaiting_params") task.status = "awaiting_params";
+    if (normalizedType === "agent_run.task_completed" && !task.status) task.status = "completed";
+    if (normalizedType === "agent_run.task_failed" && !task.status) task.status = "failed";
+    next.tasks = upsertRunTask(next.tasks || [], task);
+    refreshRunStateCollections(next);
+  } else if (normalizedType === "agent_run.ended") {
+    next.ended = true;
+  }
+  next.summary = buildRunStateSummary(next);
+  mergeIdentity(next.run, payload);
+  runState.value = next;
+}
+
+function normalizeRunStateEventType(type: string, payload: Record<string, unknown>) {
+  if (type.startsWith("agent_run.")) return type;
+  const payloadType = String(payload.type || payload.event || "").trim();
+  if (payloadType.startsWith("agent_run.")) return payloadType;
+  return "";
+}
+
+function unwrapRunPayload(payload: Record<string, unknown>) {
+  const nested = payload.payload;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  return payload;
+}
+
+function taskFromRunPayload(payload: Record<string, unknown>): RunStateTask {
+  const p = unwrapRunPayload(payload);
+  return {
+    run_id: stringValue(p.run_id),
+    session_id: stringValue(p.session_id),
+    message_id: stringValue(p.message_id),
+    trace_id: stringValue(p.trace_id),
+    task_id: stringValue(p.task_id || p.node_id),
+    parent_task_id: stringValue(p.parent_task_id),
+    depends_on: Array.isArray(p.depends_on) ? p.depends_on.map((item) => String(item)).filter(Boolean) : [],
+    stage: Number(p.stage || 0),
+    parallel_group: stringValue(p.parallel_group),
+    team_id: stringValue(p.team_id),
+    agent_id: stringValue(p.agent_id),
+    agent_name: stringValue(p.agent_name || p.agent_key),
+    node_kind: stringValue(p.node_kind),
+    node_ref: stringValue(p.node_ref),
+    skill_id: stringValue(p.skill_id),
+    capability_id: stringValue(p.capability_id),
+    action: stringValue(p.action),
+    failure_policy: stringValue(p.failure_policy),
+    status: stringValue(p.status),
+    message: stringValue(p.message || p.display_message),
+    summary: stringValue(p.summary || p.result_message),
+    request_id: stringValue(p.request_id),
+    missing_fields: Array.isArray(p.missing_fields) ? p.missing_fields.map((item) => String(item)) : [],
+    collected_params: isPlainObject(p.collected_params) ? p.collected_params as Record<string, unknown> : undefined,
+    result: p.result || p.result_summary || p.data,
+    links: Array.isArray(p.links) ? p.links.filter(isPlainObject) as Array<Record<string, unknown>> : [],
+    error: p.error || p.detail || p.message,
+  };
+}
+
+function tasksFromPlanPayload(payload: Record<string, unknown>): RunStateTask[] {
+  const rawTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+  return rawTasks.filter(isPlainObject).map((task) => {
+    const stage = Number(task.stage || 0);
+    return emptyStringFiltered({
+      task_id: stringValue(task.task_id || task.node_id),
+      parent_task_id: stringValue(task.parent_task_id),
+      depends_on: Array.isArray(task.depends_on) ? task.depends_on.map((item) => String(item)).filter(Boolean) : [],
+      stage,
+      parallel_group: stringValue(task.parallel_group || (stage > 0 ? `stage_${stage}` : "")),
+      team_id: stringValue(task.team_id),
+      agent_id: stringValue(task.agent_id),
+      agent_name: stringValue(task.agent_name || task.agent_key),
+      node_kind: stringValue(task.node_kind),
+      node_ref: stringValue(task.node_ref),
+      skill_id: stringValue(task.skill_id),
+      capability_id: stringValue(task.capability_id),
+      action: stringValue(task.action),
+      failure_policy: stringValue(task.failure_policy),
+      message: stringValue(task.message || task.display_message),
+      summary: stringValue(task.summary || task.result_message),
+      status: stringValue(task.status || "pending"),
+    });
+  });
+}
+
+function mergeRunTasks(current: RunStateTask[], incoming: RunStateTask[]) {
+  return incoming.reduce((tasks, task) => upsertRunTask(tasks, task), current);
+}
+
+function refreshRunStateCollections(state: RunState) {
+  state.pending_params = state.tasks.filter((item) => item.status === "awaiting_params");
+  state.results = state.tasks.filter((item) => item.status === "completed" && item.result);
+  state.errors = state.tasks.filter((item) => item.status === "failed");
+}
+
+function upsertRunTask(tasks: RunStateTask[], task: RunStateTask) {
+  const key = runTaskKey(task);
+  const index = tasks.findIndex((item) => runTaskMatches(item, task, key));
+  if (index < 0) return [...tasks, task];
+  const next = [...tasks];
+  next[index] = { ...next[index], ...emptyStringFiltered(task) };
+  return next;
+}
+
+function runTaskKey(task: RunStateTask) {
+  return [
+    task.stage ? `stage:${task.stage}` : "",
+    task.parallel_group ? `group:${task.parallel_group}` : "",
+    task.node_ref ? `node:${task.node_ref}` : "",
+    task.action ? `action:${task.action}` : "",
+    task.skill_id ? `skill:${task.skill_id}` : "",
+    task.capability_id ? `cap:${task.capability_id}` : "",
+    task.agent_id ? `agent:${task.agent_id}` : "",
+    task.agent_name ? `agent_name:${task.agent_name}` : "",
+  ].filter(Boolean).join("|") || task.task_id || "";
+}
+
+function runTaskMatches(current: RunStateTask, incoming: RunStateTask, incomingKey = runTaskKey(incoming)) {
+  if (current.task_id && incoming.task_id && current.task_id === incoming.task_id) return true;
+  const currentKey = runTaskKey(current);
+  if (currentKey && incomingKey && currentKey === incomingKey) return true;
+  if (current.stage && incoming.stage && Number(current.stage) !== Number(incoming.stage)) return false;
+  const currentNode = current.node_ref || current.action || current.skill_id || current.capability_id || current.agent_id || current.agent_name;
+  const incomingNode = incoming.node_ref || incoming.action || incoming.skill_id || incoming.capability_id || incoming.agent_id || incoming.agent_name;
+  return Boolean(currentNode && incomingNode && currentNode === incomingNode);
+}
+
+function emptyStringFiltered(task: RunStateTask) {
+  const out: RunStateTask = {};
+  for (const [key, value] of Object.entries(task)) {
+    if (value === "" || value === undefined || value === null) continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    (out as Record<string, unknown>)[key] = value;
+  }
+  return out;
+}
+
+function mergeIdentity(run: Record<string, unknown>, payload: Record<string, unknown>) {
+  const p = unwrapRunPayload(payload);
+  for (const key of ["run_id", "session_id", "message_id", "trace_id"]) {
+    if (p[key]) run[key] = p[key];
+  }
+}
+
+function stringValue(value: unknown) {
+  return String(value || "").trim();
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function buildRunStateSummary(state: RunState) {
+  const tasks = state.tasks || [];
+  const count = (status: string) => tasks.filter((task) => task.status === status).length;
+  const totalStages = Math.max(0, ...tasks.map((task) => Number(task.stage || 0)));
+  const activeStages = tasks
+    .filter((task) => ["running", "awaiting_params"].includes(String(task.status || "")))
+    .map((task) => Number(task.stage || 0))
+    .filter((stage) => stage > 0);
+  const currentStage = activeStages.length ? Math.min(...activeStages) : totalStages;
+  return {
+    total: Number(state.summary?.total_tasks || tasks.length),
+    pending: Number(state.summary?.pending_tasks || count("pending")),
+    awaiting: Number(state.summary?.awaiting_tasks || count("awaiting_params")),
+    running: Number(state.summary?.running_tasks || count("running")),
+    completed: Number(state.summary?.completed_tasks || count("completed")),
+    failed: Number(state.summary?.failed_tasks || count("failed")),
+    skipped: Number(state.summary?.skipped_tasks || count("skipped")),
+    currentStage: Number(state.summary?.current_stage || currentStage || 0),
+    totalStages: Number(state.summary?.total_stages || totalStages || 0),
+    blockedReason: String(state.summary?.blocked_reason || ""),
+  };
+}
+
+function groupRunStateTasksByStage(tasks: RunStateTask[]) {
+  const groups = new Map<string, RunStateTask[]>();
+  for (const task of tasks) {
+    const stage = Number(task.stage || 0);
+    const group = task.parallel_group || (stage > 0 ? `stage_${stage}` : "stage_unknown");
+    const key = `${stage || 999999}:${group}`;
+    groups.set(key, [...(groups.get(key) || []), task]);
+  }
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => {
+      const left = Number(a.split(":")[0]);
+      const right = Number(b.split(":")[0]);
+      return left - right;
+    })
+    .map(([key, items]) => {
+      const [stageRaw, group] = key.split(":");
+      const stage = Number(stageRaw);
+      return {
+        key,
+        label: stage === 999999 ? "未分阶段任务" : `阶段 ${stage}`,
+        group,
+        parallel: items.length > 1,
+        tasks: items,
+      };
+    });
+}
+
+function taskTitle(task: RunStateTask) {
+  return task.agent_name || task.node_ref || task.skill_id || task.capability_id || task.action || task.task_id || "任务";
+}
+
+function taskSubtitle(task: RunStateTask) {
+  const readable = readableTaskMessage(task);
+  if (readable) return readable;
+  const stage = task.stage ? `stage ${task.stage}` : "";
+  return [task.node_kind, task.action, task.agent_id, task.team_id, stage, task.failure_policy].filter(Boolean).join(" / ");
+}
+
+function readableTaskMessage(task: RunStateTask) {
+  return humanReadableValue(task.message) || humanReadableValue(task.summary) || humanReadableValue(task.result);
+}
+
+function humanReadableValue(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (!isPlainObject(value)) return "";
+  for (const key of ["message", "summary", "content", "text", "title", "description"]) {
+    const text = value[key];
+    if (typeof text === "string" && text.trim()) return text.trim();
+  }
+  return "";
+}
+
+function taskAvatarText(task: RunStateTask) {
+  return taskTitle(task).slice(0, 1).toUpperCase();
+}
+
+function taskProgressPercent(task: RunStateTask) {
+  const raw = task.progress_percent ?? task.progress ?? task.percent;
+  const num = Number(raw);
+  if (Number.isFinite(num) && num >= 0) return Math.min(100, Math.max(0, Math.round(num > 1 ? num : num * 100)));
+  switch (String(task.status || "").toLowerCase()) {
+    case "completed":
+    case "skipped":
+    case "failed":
+      return 100;
+    case "awaiting_params":
+      return 50;
+    case "running":
+      return 35;
+    default:
+      return 0;
+  }
+}
+
+function buildRunParticipants(tasks: RunStateTask[]) {
+  const map = new Map<string, { key: string; label: string; count: number }>();
+  for (const task of tasks) {
+    const label = String(
+      task.agent_name ||
+      task.agent_id ||
+      task.team_id ||
+      task.node_ref ||
+      task.skill_id ||
+      task.capability_id ||
+      "当前智能体"
+    ).trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
+    const current = map.get(key);
+    if (current) current.count += 1;
+    else map.set(key, { key, label, count: 1 });
+  }
+  return Array.from(map.values());
+}
+
+function messageRunTasks(item: ChatMessage) {
+  return dedupeRunTasks(item.runState?.tasks || []);
+}
+
+function dedupeRunTasks(tasks: RunStateTask[]) {
+  return tasks.reduce((acc, task) => upsertRunTask(acc, task), [] as RunStateTask[]);
+}
+
+function messageRunEvents(item: ChatMessage) {
+  return item.events || [];
+}
+
+function messageRunSummary(item: ChatMessage) {
+  const tasks = messageRunTasks(item);
+  const total = Number(item.runState?.summary?.total_tasks || tasks.length || 0);
+  const completed = Number(item.runState?.summary?.completed_tasks || tasks.filter((task) => ["completed", "skipped"].includes(String(task.status || ""))).length);
+  const percent = total > 0 ? Math.min(100, Math.max(0, Math.round((completed / total) * 100))) : 0;
+  return { total, completed, percent };
+}
+
+function messageRunParticipants(item: ChatMessage) {
+  return buildRunParticipants(messageRunTasks(item));
+}
+
+function messageRunStatus(item: ChatMessage) {
+  const tasks = messageRunTasks(item);
+  if (tasks.some((task) => task.status === "failed")) return "failed";
+  if (tasks.some((task) => task.status === "awaiting_params")) return "awaiting_params";
+  if (tasks.some((task) => task.status === "running")) return "running";
+  if (tasks.length && tasks.every((task) => ["completed", "skipped"].includes(String(task.status || "")))) return "completed";
+  return item.runState?.ended ? "ended" : "pending";
+}
+
+function runStatusLabel(status: string | undefined) {
+  switch (status) {
+    case "running":
+      return "执行中";
+    case "completed":
+      return "已完成";
+    case "failed":
+      return "失败";
+    case "awaiting_params":
+      return "待补充";
+    case "skipped":
+      return "已跳过";
+    case "ended":
+      return "已结束";
+    case "pending":
+      return "待执行";
+    default:
+      return status || "未知";
+  }
+}
+
+function taskBadgeColor(status: string | undefined) {
+  switch (status) {
+    case "running":
+      return "warning";
+    case "completed":
+      return "success";
+    case "failed":
+      return "error";
+    case "awaiting_params":
+      return "warning";
+    case "skipped":
+      return "neutral";
+    default:
+      return "primary";
+  }
+}
+
+function taskCardClass(status: string | undefined) {
+  switch (status) {
+    case "completed":
+      return "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40";
+    case "failed":
+      return "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40";
+    case "awaiting_params":
+      return "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40";
+    default:
+      return "border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900";
+  }
+}
+
+function resultSummary(result: unknown) {
+  if (typeof result === "string") return result;
+  if (isPlainObject(result)) {
+    return humanReadableValue(result);
+  }
+  return "";
+}
+
+function errorSummary(error: unknown) {
+  if (typeof error === "string") return error;
+  if (isPlainObject(error)) {
+    return String(error.message || error.error || error.code || JSON.stringify(error));
+  }
+  return JSON.stringify(error);
 }
 
 function recordRuntimeEvent(type: string, summary: string, payload: Record<string, unknown>) {
@@ -1057,6 +1928,7 @@ function recordRuntimeEvent(type: string, summary: string, payload: Record<strin
       count,
     };
     timeline.value.push(item);
+    activeRunEvents.value.push({ ...item, payload: { ...item.payload } });
     if (!selectedEventId.value) selectedEventId.value = item.id;
     return;
   }
@@ -1068,6 +1940,7 @@ function recordRuntimeEvent(type: string, summary: string, payload: Record<strin
     payload,
   };
   timeline.value.push(item);
+  activeRunEvents.value.push({ ...item, payload: { ...item.payload } });
   if (!selectedEventId.value) selectedEventId.value = item.id;
 }
 
@@ -1089,26 +1962,27 @@ function normalizeEventPayload(payload: unknown): Record<string, unknown> {
 }
 
 function summarizeEvent(type: string, payload: Record<string, unknown>) {
-  if (type === "intent") {
-    const tasks = Array.isArray(payload.tasks) ? payload.tasks.length : "";
-    return tasks ? `识别到 ${tasks} 个候选任务` : "意图识别完成";
-  }
-  if (type === "plan") {
-    const plan = payload.plan as Record<string, unknown> | undefined;
-    const tasks = Array.isArray(plan?.tasks) ? plan?.tasks.length : "";
-    return tasks ? `计划包含 ${tasks} 个节点` : "计划生成完成";
-  }
-  if (type === "node_start" || type === "node_end") {
-    const kind = String(payload.node_kind || payload.kind || "node");
-    const ref = String(payload.node_ref || payload.skill_id || payload.node_id || "");
-    const statusText = String(payload.status || (type === "node_start" ? "running" : "done"));
-    return [kind, ref, statusText].filter(Boolean).join(" / ");
-  }
-  if (type === "final") {
-    return extractFinalMessage(payload);
-  }
-  if (type === "error") {
-    return String(payload.message || payload.error || "error");
+  if (type.startsWith("agent_run.")) {
+    const eventPayload = unwrapRunPayload(payload);
+    if (type === "agent_run.response_plan") return String(eventPayload.response_mode || "响应规划完成");
+    if (type === "agent_run.intent_detected") {
+      const tasks = Array.isArray(eventPayload.tasks) ? eventPayload.tasks.length : "";
+      return tasks ? `识别到 ${tasks} 个候选任务` : "意图识别完成";
+    }
+    if (type === "agent_run.plan_created") {
+      const plan = eventPayload.plan as Record<string, unknown> | undefined;
+      const tasks = Array.isArray(plan?.tasks) ? plan?.tasks.length : "";
+      return tasks ? `计划包含 ${tasks} 个节点` : "计划生成完成";
+    }
+    if (["agent_run.task_status", "agent_run.task_started", "agent_run.awaiting_params", "agent_run.task_completed", "agent_run.task_failed"].includes(type)) {
+      const kind = String(eventPayload.node_kind || "task");
+      const ref = String(eventPayload.node_ref || eventPayload.skill_id || eventPayload.capability_id || eventPayload.task_id || "");
+      const statusText = String(eventPayload.status || type.replace("agent_run.", ""));
+      return [kind, ref, statusText].filter(Boolean).join(" / ");
+    }
+    if (type === "agent_run.final") return extractFinalMessage(payload);
+    if (type === "agent_run.ended") return payload.success === false ? "运行结束：失败" : "运行结束";
+    return String(eventPayload.message || eventPayload.status || "");
   }
   return String(payload.message || payload.status || "");
 }
@@ -1134,6 +2008,9 @@ function extractVisibleDelta(type: string, payload: Record<string, unknown>) {
 }
 
 function extractFinalMessage(payload: Record<string, unknown>) {
+  const nestedPayload = payload.payload as Record<string, unknown> | undefined;
+  const nestedData = nestedPayload?.data as Record<string, unknown> | undefined;
+  const nestedResult = nestedPayload?.result as Record<string, unknown> | undefined;
   const candidates = [
     payload.text,
     payload.message,
@@ -1142,8 +2019,14 @@ function extractFinalMessage(payload: Record<string, unknown>) {
     ((payload.data as Record<string, unknown> | undefined)?.result as Record<string, unknown> | undefined)?.content,
     ((payload.data as Record<string, unknown> | undefined)?.result as Record<string, unknown> | undefined)?.message,
     (payload.result as Record<string, unknown> | undefined)?.content,
-    (payload.payload as Record<string, unknown> | undefined)?.message,
-    (payload.payload as Record<string, unknown> | undefined)?.content,
+    nestedPayload?.message,
+    nestedPayload?.content,
+    nestedData?.content,
+    nestedData?.message,
+    (nestedData?.result as Record<string, unknown> | undefined)?.content,
+    (nestedData?.result as Record<string, unknown> | undefined)?.message,
+    nestedResult?.content,
+    nestedResult?.message,
     (payload.data as Record<string, unknown> | undefined)?.message,
     (payload.result as Record<string, unknown> | undefined)?.message,
   ];
@@ -1157,5 +2040,35 @@ function extractFinalMessage(payload: Record<string, unknown>) {
 async function copyRaw() {
   if (!rawLog.value || typeof navigator === "undefined") return;
   await navigator.clipboard?.writeText(rawLog.value);
+}
+
+function compactObject(value: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== "" && item !== undefined && item !== null));
+}
+
+function buildTaskTracePayload(task: RunStateTask, state: RunState = runState.value) {
+  const run = state.run || {};
+  return compactObject({
+    trace_id: task.trace_id || String(run.trace_id || ""),
+    run_id: task.run_id || String(run.run_id || ""),
+    session_id: task.session_id || String(run.session_id || activeSessionId.value || ""),
+    message_id: task.message_id || String(run.message_id || ""),
+    task_id: task.task_id,
+    node_kind: task.node_kind,
+    node_ref: task.node_ref,
+    agent_id: task.agent_id || activeAgent.value?.uuid || String(activeAgent.value?.id || ""),
+    agent_name: task.agent_name || activeAgent.value?.label,
+    skill_id: task.skill_id || activeAgent.value?.skillId,
+    capability_id: task.capability_id || activeAgent.value?.capability,
+    action: task.action,
+    status: task.status,
+    request_id: task.request_id || (isPlainObject(task.error) ? String(task.error.request_id || "") : ""),
+    error: errorSummary(task.error),
+  });
+}
+
+async function copyTaskTrace(task: RunStateTask, state: RunState = runState.value) {
+  if (typeof navigator === "undefined") return;
+  await navigator.clipboard?.writeText(JSON.stringify(buildTaskTracePayload(task, state), null, 2));
 }
 </script>

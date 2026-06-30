@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -34,6 +35,54 @@ func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.Invo
 }
 
 func (f *fakeCapabilityGateway) ListPlatformCapabilities(_ context.Context, _ capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) ResolveGatewayTenantUUID(_ context.Context) (string, error) {
+	return "", nil
+}
+
+func (f *fakeCapabilityGateway) ListAgents(_ context.Context, _ string) ([]capgateway.AgentRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) GetAgent(_ context.Context, _ string) (*capgateway.AgentRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) SyncPluginSkill(_ context.Context, _ capgateway.PluginSkillSyncParams) (*capgateway.PluginSkillSyncResult, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) SyncPluginAgent(_ context.Context, _ capgateway.PluginAgentSyncParams) (*capgateway.PluginAgentSyncResult, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) RegisterCatalog(_ context.Context, _ *capabilities.CatalogSnapshot, _ []capabilities.ProtocolAsset) error {
+	return nil
+}
+
+func (f *fakeCapabilityGateway) CreateAgentSession(_ context.Context, _ capgateway.AgentSessionParams) (*capgateway.AgentSessionRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) ListAgentSessions(_ context.Context, _ capgateway.AgentSessionListOptions) ([]capgateway.AgentSessionRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) ListAgentSessionMessages(_ context.Context, _ capgateway.AgentSessionMessageListOptions) ([]capgateway.AgentSessionMessageRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) DeleteAgentSession(_ context.Context, _ capgateway.AgentSessionMutationOptions) error {
+	return nil
+}
+
+func (f *fakeCapabilityGateway) ArchiveAgentSession(_ context.Context, _ capgateway.AgentSessionMutationOptions) error {
+	return nil
+}
+
+func (f *fakeCapabilityGateway) StreamAgentSSE(_ context.Context, _ capgateway.AgentStreamParams) (*capgateway.AgentStream, error) {
 	return nil, nil
 }
 

@@ -7,12 +7,11 @@ import (
 	"log/slog"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 
+	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Logger 全局日志实例
@@ -51,31 +50,45 @@ func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge in
 	}
 	Logger.SetLevel(logLevel)
 
-	logWriter, warnMsg := resolveLogWriter(
-		strings.ToLower(strings.TrimSpace(output)),
-		strings.TrimSpace(filePath),
-		maxSize,
-		maxBackups,
-		maxAge,
-	)
-	if warnMsg != "" {
-		_, _ = fmt.Fprintln(os.Stderr, warnMsg)
-	}
-
-	handlerOpts := &slog.HandlerOptions{
-		Level: mapLogrusLevel(logLevel),
-	}
 	logFormat := strings.ToLower(strings.TrimSpace(format))
 	if logFormat == "" {
 		logFormat = "json"
 	}
-	var handler slog.Handler
-	if logFormat == "text" {
-		handler = slog.NewTextHandler(logWriter, handlerOpts)
-	} else {
-		handler = slog.NewJSONHandler(logWriter, handlerOpts)
+	runtime, err := runtimelogging.Init(runtimelogging.Config{
+		Policy: runtimelogging.Policy{
+			Mode:   runtimelogging.ModeStandalone,
+			Sinks:  []runtimelogging.SinkType{runtimelogging.SinkType(strings.ToLower(strings.TrimSpace(output)))},
+			Format: logFormat,
+			Level:  logLevel.String(),
+			Retry: runtimelogging.RetryPolicy{
+				Enabled:     true,
+				MaxAttempts: 3,
+				BackoffMS:   200,
+			},
+		},
+		File: runtimelogging.FileOptions{
+			Path:       strings.TrimSpace(filePath),
+			MaxSizeMB:  maxSize,
+			MaxBackups: maxBackups,
+			MaxAgeDays: maxAge,
+			Cleanup:    true,
+		},
+		Stdout:       os.Stdout,
+		Stderr:       os.Stderr,
+		SetDefault:   true,
+		CleanupFiles: true,
+	})
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "logger output=%s fallback to stdout: %v\n", output, err)
+		runtime, _ = runtimelogging.Init(runtimelogging.Config{
+			Policy:       runtimelogging.DefaultPolicy(),
+			Stdout:       os.Stdout,
+			Stderr:       os.Stderr,
+			SetDefault:   true,
+			CleanupFiles: false,
+		})
 	}
-	setBackendLogger(slog.New(handler))
+	setBackendLogger(runtime.Logger)
 	slog.SetDefault(Slog())
 
 	// logrus 仅作为兼容层，统一转发到 slog backend
@@ -96,46 +109,6 @@ func Init(level, format, output, filePath string, maxSize, maxBackups, maxAge in
 	std.SetReportCaller(Logger.ReportCaller)
 	std.ReplaceHooks(make(logrus.LevelHooks))
 	std.AddHook(&slogForwardHook{backend: Slog()})
-}
-
-func ensureLogParentDir(filePath string) error {
-	parent := strings.TrimSpace(filepath.Dir(strings.TrimSpace(filePath)))
-	if parent == "" || parent == "." {
-		return nil
-	}
-	return os.MkdirAll(parent, 0o755)
-}
-
-func resolveLogWriter(output, filePath string, maxSize, maxBackups, maxAge int) (io.Writer, string) {
-	switch output {
-	case "stderr":
-		return os.Stderr, ""
-	case "file":
-		if filePath == "" {
-			return os.Stdout, "logger output=file but file_path is empty, fallback to stdout"
-		}
-		if err := ensureLogParentDir(filePath); err != nil {
-			return os.Stdout, fmt.Sprintf("logger output=file fallback to stdout: mkdir failed file_path=%s err=%v", filePath, err)
-		}
-		writer := &lumberjack.Logger{
-			Filename:   filePath,
-			MaxSize:    normalizeRotateValue(maxSize, 100),
-			MaxBackups: normalizeRotateValue(maxBackups, 3),
-			MaxAge:     normalizeRotateValue(maxAge, 28),
-			Compress:   false,
-			LocalTime:  true,
-		}
-		return writer, ""
-	default:
-		return os.Stdout, ""
-	}
-}
-
-func normalizeRotateValue(v, fallback int) int {
-	if v <= 0 {
-		return fallback
-	}
-	return v
 }
 
 func mapLogrusLevel(level logrus.Level) slog.Leveler {

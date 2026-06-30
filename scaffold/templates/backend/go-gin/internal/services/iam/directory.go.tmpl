@@ -43,6 +43,7 @@ type AuthTokens struct {
 	ExpiresIn     int64
 	Scope         string
 	ExpiresAt     time.Time
+	TenantUUID    string
 	PluginID      string
 	PolicyVersion string
 }

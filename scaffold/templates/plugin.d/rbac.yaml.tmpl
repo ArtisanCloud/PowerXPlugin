@@ -4,14 +4,54 @@ rbac:
       actions: [read]
     - resource: {{ .PluginID }}.template
       actions: [read, create, update, delete]
+    - resource: customer
+      actions: [read, create]
 
 permissions:
   - resource: admin
     actions: [read]
   - resource: {{ .PluginID }}.template
     actions: [read, create, update, delete]
+  - resource: customer
+    actions: [read, create]
 
 routes:
   basePath: /api/v1
   adminManifest: /api/v1/admin/manifest
   rbac: /api/v1/admin/rbac
+  permissions:
+    - method: GET
+      path: /admin/customers/overview
+      permission:
+        resource: customer
+        action: read
+    - method: GET
+      path: /admin/customers/accounts
+      permission:
+        resource: customer
+        action: read
+    - method: POST
+      path: /admin/customers/accounts
+      permission:
+        resource: customer
+        action: create
+    - method: GET
+      path: /admin/customers/identities
+      permission:
+        resource: customer
+        action: read
+    - method: GET
+      path: /admin/customers/memberships
+      permission:
+        resource: customer
+        action: read
+    - method: GET
+      path: /admin/customers/login-events
+      permission:
+        resource: customer
+        action: read
+    - method: GET
+      path: /admin/customers/mini-app-entries
+      permission:
+        resource: customer
+        action: read

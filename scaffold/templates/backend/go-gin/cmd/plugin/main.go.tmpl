@@ -440,7 +440,6 @@ func main() {
 			BaseURL:    strings.TrimSpace(cfg.Gateway.BaseURL),
 			AuthScheme: strings.TrimSpace(cfg.Gateway.AuthScheme),
 			APIKey:     strings.TrimSpace(cfg.Gateway.APIKey),
-			TenantID:   strings.TrimSpace(cfg.Gateway.TenantUUID),
 			Timeout:    cfg.Gateway.Timeout,
 			UserAgent:  strings.TrimSpace(cfg.Gateway.UserAgent),
 		},

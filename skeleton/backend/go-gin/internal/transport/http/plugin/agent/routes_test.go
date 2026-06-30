@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	cfgpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
@@ -51,6 +52,9 @@ func (stubGateway) SyncPluginSkill(context.Context, gateway.PluginSkillSyncParam
 }
 func (stubGateway) SyncPluginAgent(context.Context, gateway.PluginAgentSyncParams) (*gateway.PluginAgentSyncResult, error) {
 	return nil, nil
+}
+func (stubGateway) RegisterCatalog(context.Context, *capabilities.CatalogSnapshot, []capabilities.ProtocolAsset) error {
+	return nil
 }
 func (stubGateway) CreateAgentSession(_ context.Context, params gateway.AgentSessionParams) (*gateway.AgentSessionRecord, error) {
 	if strings.TrimSpace(params.AgentUUID) == "" && strings.TrimSpace(params.AgentID) == "" {
@@ -111,6 +115,7 @@ func (stubGateway) StreamAgentSSE(_ context.Context, params gateway.AgentStreamP
 		Body:       io.NopCloser(strings.NewReader("event: final\ndata: {\"type\":\"final\"}\n\n")),
 	}, nil
 }
+func (stubGateway) Close() error { return nil }
 
 func TestListSessionsUsesPluginBackendGateway(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -168,8 +173,6 @@ func TestDeleteSessionUsesGatewayCredentialTenant(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), `"ok":true`)
 }
-func (stubGateway) Close() error { return nil }
-
 func (g *captureGateway) StreamAgentSSE(ctx context.Context, params gateway.AgentStreamParams) (*gateway.AgentStream, error) {
 	g.params = params
 	return g.stubGateway.StreamAgentSSE(ctx, params)
@@ -257,11 +260,12 @@ func TestStreamSSEPrefersExplicitUUIDParams(t *testing.T) {
 	RegisterAPIRoutes(router.Group("/api/v1"), &app.Deps{CapabilityGateway: gateway})
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/plugin/agent/stream/sse?agent_uuid=00000000-0000-4000-8000-000000000001&agent_id=legacy-agent&session_uuid=10000000-0000-4000-8000-000000000101&session_id=legacy-session&trace_id=trace_test&q=hello&intent=agent.bound_capabilities", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/plugin/agent/stream/sse?agent_uuid=00000000-0000-4000-8000-000000000001&agent_id=legacy-agent&session_uuid=10000000-0000-4000-8000-000000000101&session_id=legacy-session&trace_id=trace_test&q=hello&intent=agent.bound_capabilities&regen_from_message_id=215", nil)
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, "00000000-0000-4000-8000-000000000001", gateway.params.AgentID)
 	require.Equal(t, "10000000-0000-4000-8000-000000000101", gateway.params.SessionID)
 	require.Equal(t, "agent.bound_capabilities", gateway.params.Intent)
+	require.Equal(t, "215", gateway.params.RegenFromMessageID)
 }

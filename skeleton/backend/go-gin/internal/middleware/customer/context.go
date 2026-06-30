@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	customerdomain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/customer"
+	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,6 +20,7 @@ func SetCustomerContext(c *gin.Context, cc *customerdomain.CustomerContext) {
 		return
 	}
 	c.Set(ginCustomerContextKey, cc)
+	customerfw.SetGinContext(c, customersvc.ToFrameworkContext(cc))
 	if c.Request != nil {
 		c.Request = c.Request.WithContext(customerdomain.SetContext(c.Request.Context(), cc))
 	}
@@ -33,11 +36,24 @@ func GetCustomerContext(c *gin.Context) (*customerdomain.CustomerContext, bool) 
 			return cc, true
 		}
 	}
+	if fwcc, ok := customerfw.ContextFromGin(c); ok {
+		cc := customersvc.FromFrameworkContext(fwcc)
+		if cc != nil {
+			c.Set(ginCustomerContextKey, cc)
+			return cc, true
+		}
+	}
 	return nil, false
 }
 
 // CustomerContextFromRequest reads CustomerContext from a standard context.
 func CustomerContextFromRequest(ctx context.Context) (*customerdomain.CustomerContext, bool) {
+	if fwcc, ok := customerfw.ContextFrom(ctx); ok {
+		cc := customersvc.FromFrameworkContext(fwcc)
+		if cc != nil {
+			return cc, true
+		}
+	}
 	return customerdomain.ContextFrom(ctx)
 }
 

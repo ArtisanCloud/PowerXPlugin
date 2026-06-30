@@ -23,11 +23,22 @@ const (
 type CustomerContext struct {
 	TenantUUID    string           `json:"tenant_uuid"`
 	CustomerUUID  string           `json:"customer_uuid"`
+	Profile       CustomerProfile  `json:"profile,omitempty"`
 	Roles         []string         `json:"roles,omitempty"`
 	SourceMode    CustomerAuthMode `json:"source_mode"`
 	Attributes    map[string]any   `json:"attributes,omitempty"`
 	RawClaims     map[string]any   `json:"raw_claims,omitempty"`
 	Authenticated bool             `json:"authenticated"`
+}
+
+type CustomerProfile struct {
+	DisplayName string `json:"display_name,omitempty"`
+	Nickname    string `json:"nickname,omitempty"`
+	GivenName   string `json:"given_name,omitempty"`
+	FamilyName  string `json:"family_name,omitempty"`
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	Locale      string `json:"locale,omitempty"`
+	Timezone    string `json:"timezone,omitempty"`
 }
 
 type customerContextKey struct{}

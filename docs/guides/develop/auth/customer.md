@@ -1,192 +1,434 @@
-# Customer 鉴权策略（Mini-App / 2C 场景）
+# Customer Identity/Auth 开发指南
 
-> 适用范围：PowerX 插件在 C 端（mini-app）暴露产品/下单等接口，需要识别租户 + Customer 身份。脚手架在 Skeleton/local 模式内置 `customer.CustomerAccount`（表 `customer_accounts`）用于本地账号体系；部署在宿主（PowerX，Delegated 模式）时则复用宿主 CRM 的 Customer 校验能力。
+## 功能背景与目标
 
-## 模式划分
+Customer Identity/Auth 是 PowerXPlugin framework 提供给插件的通用 C 端身份能力。插件只依赖 framework 注入的 `CustomerContext`，不用在业务模块里重复解析 token、判断 tenant、校验 membership。
 
-| 模式 | 触发条件 | Customer 记录来源 | Token 签发者 | 适配说明 |
-| --- | --- | --- | --- | --- |
-| **Delegated（宿主）** | `POWERX_PROXY=1` 或明示 `POWERX_CUSTOMER_DELEGATE=true` | PowerX 底座 CRM / IAM | 宿主安全域 | 插件不落地 Credential，仅校验宿主颁发的 customer token，并将 claims 转写到 `TenantContext`。 |
-| **Skeleton（Standalone）** | 无宿主反代；`POWERX_CUSTOMER_DELEGATE` 关闭 | 插件维护的 `customer_accounts` 表（`CustomerAccount`） | 插件自身的 JWT/STS 服务 | 本地注册/登录签发 customer token；token 内携带 `tenant_uuid`，后续请求可仅携带 token（不强依赖 `tenant_uuid`）。 |
+生产环境的 customer 主数据、登录身份、租户 membership、shared app 入口和 session 审计归属 PowerX Core。PowerXPlugin framework 不拥有生产 customer 表，只提供 runtime contract、middleware、delegated adapter、测试工具和 local dev mirror 规则。插件 local 模式里的 customer 表只是开发调试镜像，必须与 PowerX Core customer schema 保持兼容。
 
-> **重要**：`customer_accounts`（本地 Customer 账号）及相关注册/登录接口只会在 Skeleton 模式启用，方便插件独立运行或本地调试时拥有客户体系；当插件部署在宿主（Delegated 模式）时，经由 PowerX 底座 CRM/IAM 颁发和验证 customer token，插件侧不会创建/维护任何 Customer 鉴权表结构，所有 Customer 数据均在宿主侧。
+Framework 只负责这些通用能力：
 
-### 配置入口（Skeleton / Delegated 共用）
+- 解析 `Authorization: Bearer <token>` 或 `X-Customer-Token`
+- 校验 customer token
+- 解析并注入 `tenant_uuid`
+- 注入 `CustomerContext`
+- 阻断未登录、跨租户、缺少 membership 的请求
+- 定义 delegated/core auth、bootstrap、membership resolver 合同
 
-Skeleton 后端配置文件示例位于 `skeleton/backend/go-gin/etc/config.example.yaml`，其中新增 `customer_auth` 段落用于切换模式：
+Framework 提供 customer identity 与基础展示属性契约。基础展示属性只包含 PowerX Core customer 主账号可通用表达的字段：`display_name`、`nickname`、`given_name`、`family_name`、`avatar_url`、`locale`、`timezone`。这些字段通过 `CustomerContext.profile` 传递，供列表、详情、登录态展示和跨插件基础识别使用。
 
-- `customer_auth.mode: local`：启用本地 Customer（Skeleton）注册/登录与 JWT 签发；
-- `customer_auth.mode: delegate`：启用宿主委托校验（Delegated），需要配置 `customer_auth.delegate_endpoint`。
+Framework 不提供 SCRM 或行业 customer 模型。客户标签、客户跟进、客户归属员工、销售线索、球员、家长、学员、会员权益、训练目标、成长报告等都必须留在业务插件侧。
 
-## 目标能力
+## 数据权威源与 local mirror
 
-1. **租户隔离**：受保护的 `/mini-app/*` 继续要求存在 tenant 上下文；该上下文可来自 `tenant_uuid`/query，也可由 customer token 的 `tenant_uuid` 注入。若请求已显式携带 tenant 且与 token tenant 不一致，返回 `TENANT_MISMATCH`。
-2. **统一上下文**：定义 `CustomerContext`（`customer_uuid/customer_id/roles/attributes`），通过 `authx.SetTenantContext` 或新的 `SetCustomerContext` 挂入 `gin.Context`，Service 层可通过 `customer.ContextFrom(ctx)` 获取。
-3. **统一返回**：所有 mini-app handler 使用 `contracts.Response*` 封装（参考 `skeleton/backend/go-gin/internal/transport/http/mini-app/template_handler.go`），以满足 `.codex/skills/crud/api-rest/SKILL.md` 内嵌规则的 envelope 约定。
+PowerX Core 是 Customer Identity/Auth 的生产权威源：
 
-## tenant_uuid 的来源与规则（对齐现有实现）
+| 数据 | 生产权威源 | Framework 责任 | 插件责任 |
+| --- | --- | --- | --- |
+| customer 主账号 | PowerX Core `customer_accounts` | 映射为 `CustomerContext.customer_uuid` 和 `CustomerContext.profile` 基础展示属性 | 只引用 `customer_uuid`，需要展示时读取基础属性 |
+| 登录身份/第三方绑定 | PowerX Core `customer_auth_identities` | 调用 delegated/core validator | 不保存登录密钥 |
+| customer 租户关系 | PowerX Core `customer_tenant_memberships` | 映射为 `CustomerMembership` 并阻断无效 membership | 只做业务授权补充 |
+| shared app 入口 | PowerX Core `mini_app_entries` | 通过 bootstrap client 解析 `tenant_uuid` | 不绕过合法入口 |
+| session/refresh/audit | PowerX Core `customer_sessions`、`customer_login_events` | 统一错误码与诊断 | 不记录 raw token/secret |
+| 行业档案 | 插件业务库 | 不承载 | 例如标签、跟进、归属销售、球员、家长关系、训练档案 |
 
-### 来源优先级（从高到低）
+插件 local 模式规则：
 
-对 `/mini-app/*` 受保护接口：
+1. local customer 表只用于本地开发和调试，不是生产 schema 决策来源。
+2. local 表必须镜像 PowerX Core customer 字段、状态枚举和 membership 语义。
+3. PowerX Core customer schema 调整后，PowerXPlugin skeleton/scaffold 和插件 local mirror 必须同步。
+4. 插件不得把家长、球员、学员、患者、粉丝等行业字段加入 framework customer 表。
+5. 生产环境必须委托 PowerX Core 或平台级 identity source，禁止静默回退到 local/mock。
 
-1. **Customer token**：`Authorization: Bearer <token>`（或 `X-Customer-Token`）内的 `tenant_uuid`（推荐，适用于 standalone 与宿主网关两种模式）。
-2. **请求显式 tenant**：`tenant_uuid` header 或 query `tenant_uuid`（主要用于宿主网关显式注入、或调试场景）。
+PowerX Core customer 权威模型见 PowerX Core 文档：
 
-> `EnsureTenant()` 在最终阶段只要求“能解析到 tenant”，并不强制必须来自 header；因此 **mini-app 请求可以只带 token**（tenant 会被中间件注入）。
-
-### 一致性校验（TENANT_MISMATCH）
-
-- 若请求显式携带 `tenant_uuid`/query `tenant_uuid`，同时 token 里也有 `tenant_uuid`，且两者不一致：返回 `403 TENANT_MISMATCH`。
-- 若请求未显式携带 tenant：以 token 的 tenant 为准，并写入 `TenantContext` 供后续 repo/service 使用。
-
-### 登录/注册时的 tenant 规则
-
-- `POST /mini-app/auth/register`：必须明确目标租户（优先 `tenant_uuid`，否则 body `tenant_uuid`；两者同时存在必须一致）。
-- `POST /mini-app/auth/login`：
-  - 可不传 `tenant_uuid`（header/body 都可以省略）；
-  - 若该 `login` 仅存在于一个租户：自动选该租户并签发 token（token 内携带 `tenant_uuid`）；
-  - 若该 `login` 在多个租户存在且未指定 `tenant_uuid`：返回 `409 TENANT_SELECTION_REQUIRED`，并在 `error.details.tenants[]` 返回候选租户列表，客户端选择后带 `tenant_uuid` 再次登录即可。
-
-## 关键组件
-
-### CustomerAuthenticator 接口
-
-```go
-// backend/internal/services/customer/authenticator.go
-// 伪代码
- type CustomerAuthenticator interface {
-     Authenticate(ctx context.Context, token string) (*CustomerContext, error)
- }
+```text
+docs/plan/iam/customer-identity-auth.md
 ```
 
-提供两种实现：
+## Framework / SCRM / 业务插件边界
 
-- `DelegateCustomerAuthenticator`：调用宿主 `/api/v1/customer/auth/validate`（示例），验证后返回宿主 claims；失败时将宿主错误映射到 `contracts.ResponseUnauthorized`。
-- `LocalCustomerAuthenticator`：
-  - 解析本地 JWT（与 admin JWT 共用 `middleware.JWTAuth`，但 issuer/audience 不同）。
-  - 或者走邮箱/手机号 + 密码登录 -> 生成自定义 token。
-  - Token payload 至少包含 `tenant_uuid`、`customer_uuid`、`exp`，并可附加角色、渠道等字段。
+结论：Framework 管身份和访问边界，SCRM 管客户业务关系，业务插件管自己的行业模型。
 
-### CustomerContext 与中间件
+| 能力 | 归属 | 说明 |
+| --- | --- | --- |
+| member token 校验 | Framework IAM | 后台员工身份，不属于 `customerfw` |
+| member context / RBAC | Framework IAM | 管理端权限与租户上下文 |
+| customer token 校验 | `customerfw` | C 端外部用户身份校验 |
+| customer context 注入 | `customerfw` | `tenant_uuid`、`customer_uuid`、`membership_uuid`、`profile`、roles、scopes、source |
+| customer tenant membership 校验 | `customerfw` | 只判断 customer 是否可访问当前 tenant |
+| customer register/login/validate 委托合同 | `customerfw` | 生产权威源通常是 PowerX Core 或平台身份源 |
+| 基础展示属性 | `customerfw` + PowerX Core | `display_name`、`nickname`、`given_name`、`family_name`、`avatar_url`、`locale`、`timezone` |
+| 客户业务档案 | SCRM 插件 | 标签、画像扩展、跟进属性、归属关系、业务属性 |
+| 客户标签/分群 | SCRM 插件 | 通过 SCRM capability/API 调用 |
+| 客户跟进/时间线 | SCRM 插件 | 不进入 framework |
+| member 与 customer 的销售/服务关系 | SCRM 插件 | 例如归属销售、服务顾问、协作人 |
+| 客户生命周期/线索/商机 | SCRM 插件 | SCRM 业务域 |
+| 行业模型 | 业务插件 | 例如球员、患者、学员、粉丝、成长报告 |
 
-1. 在 `backend/internal/middleware` 下新增 `CustomerContext` 结构和 getter/setter。
-2. Mini-app Router：
+SCRM 插件本身也应该使用 framework：
 
-```go
-miniAppGroup := r.engine.Group(prefix)
-miniAppGroup.Use(middleware2.RequestTrace())
-miniappapi.RegisterRoutes(miniAppGroup, r.deps)
+- SCRM 管理端使用 Framework IAM 识别后台 member / employee。
+- SCRM C 端接口使用 `customerfw` 识别 customer、tenant 和 membership。
+- SCRM 内部再维护自己的业务档案、标签、归属、跟进、时间线等业务模型。
+
+其他插件如果只需要知道“当前 C 端用户是谁”或展示基础名称，直接读取 `customerfw.CustomerContext` 和 `CustomerContext.profile`。如果需要客户标签、客户归属员工、客户跟进记录、生命周期、线索商机等业务数据，应通过 SCRM 插件暴露的 capability/API 调用，不要要求 `customerfw` 增加这些行业字段。
+
+## 角色与适用范围
+
+| 角色 | 用途 |
+| --- | --- |
+| 插件后端开发 | 在 mini-app / C 端路由接入 customer 鉴权与 membership 校验 |
+| 插件前端/小程序开发 | 确认 token、tenant、错误码和本地联调方式 |
+| QA | 验证成功、未登录、跨租户、membership 拒绝等路径 |
+| 平台/Framework 开发 | 实现或替换 `CustomerTokenValidator`、`CustomerMembershipResolver`、`CustomerAuthClient` |
+
+当前实现面向 Go Gin skeleton。其他语言或框架应对齐 `docs/contracts/customer-auth.openapi.yaml` 的合同与错误码。
+
+## 整体架构与模块关系
+
+```mermaid
+flowchart LR
+  Client[Mini-App Client] -->|Authorization / X-Customer-Token| PluginRoute[Plugin mini-app route]
+  PluginRoute --> Auth[customerfw.Authenticate]
+  Auth --> Validator[CustomerTokenValidator]
+  Validator --> Core[PowerX Core / Delegate / Local Dev]
+  Auth --> Tenant[tenant resolution]
+  Tenant --> Membership[customerfw.RequireMembership]
+  Membership --> Resolver[CustomerMembershipResolver]
+  Membership --> Handler[Plugin business handler]
+  Handler --> Domain[Plugin domain model]
 ```
 
-在 `miniapp.RegisterRoutes` 内，为 `/mini-app` group 增加 `CustomerAuthMiddleware(authenticator)`：
+模块边界：
+
+| 模块 | 责任 |
+| --- | --- |
+| `framework/backend/go/runtime/customerfw` | 通用 customer 身份、token、tenant、membership 合同与 middleware |
+| Framework IAM | 后台 member / employee 身份、RBAC、管理端权限 |
+| SCRM 插件 | 客户业务档案、标签、跟进、member-customer 业务关系 |
+| `skeleton/backend/go-gin/internal/services/customer/*adapter.go` | skeleton 现有 auth 实现到 framework contract 的适配 |
+| `skeleton/backend/go-gin/internal/transport/http/mini-app/routes.go` | mini-app protected group 接入 customerfw |
+| 插件业务模块 | 只读取 `CustomerContext`，实现自己的业务模型 |
+
+## 核心流程
+
+```mermaid
+flowchart TD
+  A[请求 /mini-app protected API] --> B{是否有 customer token}
+  B -->|否| E1[401 CUSTOMER_TOKEN_MISSING]
+  B -->|是| C[CustomerTokenValidator.Validate]
+  C -->|失败| E2[401 CUSTOMER_TOKEN_INVALID 或 503 CUSTOMER_DELEGATE_UNAVAILABLE]
+  C -->|成功| D{tenant 是否可解析}
+  D -->|否| E3[CUSTOMER_TENANT_REQUIRED]
+  D -->|冲突| E4[403 CUSTOMER_TENANT_MISMATCH]
+  D -->|成功| F[注入 CustomerContext + tenant_uuid]
+  F --> G[RequireMembership]
+  G -->|缺失/禁用| E5[403 CUSTOMER_MEMBERSHIP_REQUIRED / CUSTOMER_MEMBERSHIP_DISABLED]
+  G -->|active| H[进入插件业务 handler]
+```
+
+## 跨角色协作流程
+
+```mermaid
+flowchart LR
+  subgraph C[Mini-App 客户端]
+    C1[登录获取 customer token]
+    C2[请求插件 C 端接口]
+  end
+  subgraph P[插件后端]
+    P1[customerfw.Authenticate]
+    P2[customerfw.RequireMembership]
+    P3[业务 handler 读取 CustomerContext]
+  end
+  subgraph X[PowerX Core / Delegate]
+    X1[Validate token]
+    X2[Resolve membership]
+  end
+  C1 --> X1
+  C2 --> P1
+  P1 --> X1
+  X1 --> P1
+  P1 --> P2
+  P2 --> X2
+  X2 --> P2
+  P2 --> P3
+```
+
+## 前置条件与依赖
+
+- Go framework module 已包含 `framework/backend/go/runtime/customerfw`。
+- Gin 插件后端通过 `go.work` 或已发布版本引用 framework。
+- 生产环境应由 PowerX Core / delegated identity source 实现 customer token 校验。
+- 本地开发可使用 local/dev validator 或 skeleton 现有 local JWT adapter。
+- tenant-scoped C 端接口必须能解析到 `tenant_uuid`，来源可以是 token、header、query 或 bootstrap 结果。
+- membership 校验必须在业务 handler 前执行。
+
+## 操作步骤
+
+### 页面操作步骤
+
+当前 framework customer auth 是后端能力，没有固定管理端页面。插件前端或小程序需要做三件事：
+
+| 动作 | 入口 | 预期结果 | 失败处理 |
+| --- | --- | --- | --- |
+| 登录或注册 customer | PowerX Core 或插件本地登录入口 | 获得 customer token | 查看登录接口响应错误码 |
+| 保存 token | 小程序/移动端安全存储 | 后续请求可带 token | token 丢失会返回 `CUSTOMER_TOKEN_MISSING` |
+| 请求受保护接口 | `/api/v1/mini-app/*` | 返回业务数据 | 根据错误码处理重新登录、选择 tenant 或提示无权限 |
+
+### 微信小程序登录
+
+Shared App 模式下，小程序 AppID/AppSecret 属于平台或共享小程序配置，不属于单个租户。租户识别必须来自合法入口解析结果，例如 `mini_app_entries` 返回的 `tenant_uuid`、`entry_code`、`scene` 或邀请链接上下文。没有 tenant 入口上下文的请求必须拒绝，不允许静默落到默认租户。
+
+微信小程序登录流程：
+
+```mermaid
+sequenceDiagram
+  participant MP as 微信小程序
+  participant Plugin as 插件 mini-app API
+  participant FW as customerfw
+  participant WX as PowerWechat / 微信 code2session
+  participant Core as PowerX Core customer auth
+
+  MP->>Plugin: bootstrap/resolve(scene|invite_code)
+  Plugin-->>MP: tenant_uuid + entry context
+  MP->>MP: uni.login(provider=weixin)
+  MP->>Plugin: POST /mini-app/auth/wechat/login(code, tenant_uuid)
+  Plugin->>FW: Login(channel=wechat_miniapp, code, tenant_uuid)
+  FW->>Core: /customer/auth/wechat/login
+  Core->>WX: code2session
+  WX-->>Core: openid / unionid / session_key
+  Core->>Core: upsert customer + identity + membership
+  Core-->>Plugin: customer token + CustomerContext
+  Plugin-->>MP: token
+```
+
+Framework 提供的通用能力：
+
+| 能力 | Framework 合同 |
+| --- | --- |
+| 微信换码 | `customerfw.NewPowerWeChatMiniAppExchanger()`，内部使用 PowerWechat `miniProgram.Auth.Session(ctx, code)` |
+| 登录通道 | `customerfw.CustomerAuthChannelWeChatMiniApp` |
+| 委托路径 | `/customer/auth/wechat/login` |
+| customer 来源 | `CustomerAuthSourceWeChat` |
+
+插件侧只做两件事：
+
+1. 小程序端调用 `uni.login({ provider: "weixin" })` 获取 `code`。
+2. 插件后端把 `code + tenant_uuid` 传给 `customerfw.LoginInput{Channel: customerfw.CustomerAuthChannelWeChatMiniApp}`。
+
+PowerX Core 或 local dev mirror 负责：
+
+1. 用 PowerWechat/code2session 换取 `openid`、`unionid`、`session_key`。
+2. 以 `provider=wechat`、`provider_subject=openid` 绑定通用 customer。
+3. 根据入口 `tenant_uuid` 创建或校验 `customer_tenant_memberships`。
+4. 签发 customer token。
+
+注意：家长、球员、学员、粉丝等行业身份不是 customer framework 字段。插件拿到 `customer_uuid` 后，再在自己的业务表里创建球员档案、家长关系或训练档案。
+
+### 接口调用步骤
+
+受保护接口请求：
+
+```bash
+curl -i \
+  -H "Authorization: Bearer ${CUSTOMER_TOKEN}" \
+  -H "tenant_uuid: 00000000-0000-0000-0000-000000000001" \
+  http://localhost:8078/api/v1/mini-app/ping
+```
+
+成功响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "tenant_uuid": "00000000-0000-0000-0000-000000000001",
+    "customer": {
+      "tenant_uuid": "00000000-0000-0000-0000-000000000001",
+      "customer_uuid": "00000000-0000-0000-0000-000000000002",
+      "membership_uuid": "00000000-0000-0000-0000-000000000002:00000000-0000-0000-0000-000000000001",
+      "authenticated": true
+    }
+  }
+}
+```
+
+常见失败响应：
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CUSTOMER_TENANT_MISMATCH",
+    "message": "customer tenant mismatch"
+  }
+}
+```
+
+稳定合同见 [customer-auth.openapi.yaml](/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/docs/contracts/customer-auth.openapi.yaml)。
+
+### 本地命令步骤
+
+运行 framework customer auth 测试：
+
+```bash
+cd framework/backend/go
+go test ./runtime/customerfw
+```
+
+预期结果：
+
+```text
+ok github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw
+```
+
+运行 Gin skeleton mini-app 回归：
+
+```bash
+cd skeleton/backend/go-gin
+go test ./tests/integration/mini-app ./tests/unit
+```
+
+预期结果：
+
+```text
+ok github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/integration/mini-app
+ok github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/tests/unit
+```
+
+## 插件后端接入方式
+
+Protected route 推荐写法：
 
 ```go
-group := rg.Group("/mini-app",
-    customerhttp.Authenticate(authenticator),
-    httpmw.EnsureTenant(),
+protected := base.Group(
+	"",
+	customerfw.Authenticate(coreCustomerClient, customerfw.RequireTenant()),
+	customerfw.RequireMembership(membershipResolver),
+	tenantfw.EnsureTenant(),
 )
 ```
 
-其中 `customerhttp.Authenticate` 负责：
-- 从 Header（如 `Authorization: Bearer <token>` 或 `X-Customer-Token`）提取凭证。
-- 调用 `CustomerAuthenticator.Authenticate`。
-- 若请求显式携带 tenant，则校验 `request.tenant_uuid == customer.tenant_uuid`；否则把 `customer.tenant_uuid` 注入到请求上下文，供 `EnsureTenant()` 与后续 service/repo 使用。
-- 将 `CustomerContext` 写入请求上下文，供 Handler/Service 使用。
-
-### Skeleton 模式数据流
-
-1. **注册/登录 API**：在 `skeleton/backend/go-gin/internal/transport/http/mini-app` 下提供 `/mini-app/auth/register`、`/mini-app/auth/login`，操作 `customer_accounts`（`CustomerAccount`）表。
-2. **密码存储**：务必使用 `bcrypt`/`argon2`；不存明文密码。
-3. **Token 颁发**：在登录成功后使用 `middleware.JWTAuth` 的 helper：
+Handler 里只读 framework context：
 
 ```go
-token := jwt.NewWithClaims(...)
-claims := CustomerClaims{TenantUUID, CustomerUUID, Roles, Exp}
+cc := customerfw.MustContextFromGin(c)
+tenantUUID := cc.TenantUUID
+customerUUID := cc.CustomerUUID
 ```
 
-Issuer 可以使用 `POWERX_SECURITY_JWT_ISSUER` 或单独的 `POWERX_CUSTOMER_JWT_ISSUER`。Mini-app 客户端保存 token，并在每次请求携带。
+Service 层使用标准 `context.Context`：
 
-### Delegated 模式数据流
+```go
+cc, ok := customerfw.ContextFrom(ctx)
+if !ok {
+	return customerfw.NewError(customerfw.CodeCustomerContextMissing, "customer context missing")
+}
+```
 
-1. 客户端调用 PowerX 宿主的登录入口，获取宿主颁发的 customer token。
-2. mini-app 中间件调用宿主校验端点（可由宿主在 header 中注入 STS context，或暴露 `/api/v1/customer/tokens:inspect`）。
-3. 宿主返回的 payload 包含 `tenant_uuid` 和 `customer_uuid`，插件只需要做匹配与续传；无需落库。
-4. 如需缓存，可使用 Redis 缓存校验结果，TTL 不超过 token `exp`。
+插件业务代码不要读取 raw token，也不要自己解析 customer claims。
 
-## 步骤建议
+## 预期结果与验收标准
 
-1. **接口设计**：在 `specs/**/spec.yaml` 增补 `/mini-app/auth/login` 等端点，定义成功/失败响应（统一 envelope）。
-2. **Service**：
-   - `internal/services/customer/auth/local_service.go`：注册/登录/密钥生成。
-   - `internal/services/customer/auth/delegate_service.go`：HTTP 客户端调用宿主。
-3. **Repository**：`internal/entity/repository/customer`（若尚未生成）继承 `BaseRepository`，封装 `FindByCustomerID`, `CreateCustomer` 等，全部通过 `WithTenantTx`。
-4. **Middleware**：`internal/transport/http/middleware/customer_auth.go` 新增中间件，将 `CustomerContext` 存储在 Gin context + request context 中。
-5. **Handler 更新**：
-   - mini-app handler 通过新的 helper `customerctx.FromGin(c)` 获取当前客户。
-   - 错误统一用 `contracts.ResponseUnauthorized` 或 `ResponseBadRequest`。
-6. **配置**：
-   - `backend/etc/config.*.yaml` 新增 `customerAuth` 段落（`mode: delegate|local`, `delegateEndpoint`, `jwtIssuer`, `jwtSecret`）。
-   - `plugin.yaml` 可声明 mini-app 接口需要的 scopes（如 `com.powerx.plugins.ecommerce:miniapp.product`）。
+- 有效 customer token 可以进入 protected mini-app handler。
+- handler 和 service 能读取同一个 `CustomerContext`。
+- 未携带 customer token 返回 `CUSTOMER_TOKEN_MISSING` 或兼容的 401 envelope。
+- 多个 token 凭证解析到不同 customer 或 tenant 时，请求被拒绝。
+- token tenant、request tenant、bootstrap tenant 不一致时，请求被拒绝。
+- tenant-scoped 接口没有 tenant context 时，请求被拒绝。
+- membership 缺失、禁用、删除、过期时，请求在业务 handler 前被拒绝。
+- 日志、诊断、审计字段不得输出 raw token、password、secret。
 
-## 注意事项
+## 代码实现映射
 
-- **安全**：Skeleton 模式下禁用弱密码；token 过期时间建议 ≤ 2 小时，并支持 refresh token 或 STS 交换接口。
-- **审计**：在日志中记录 `tenant_uuid`、`customer_uuid`、`request_id`，必要时在 `observability` 域新增 customer 访问日志。
-- **兼容**：若宿主/本地都可能存在，使用工厂模式基于配置决定加载哪个 authenticator；保持接口一致即可在两种模式间切换。
-- **测试**：
-  - 单测 `LocalCustomerAuthenticator`（密码正确/错误、租户 mismatch）。
-  - 集成测试 mini-app handler，验证 `contracts.Response*` envelope。
-  - 若启用 Redis 缓存，添加 TTL 相关测试。
+| 能力 | 文件 |
+| --- | --- |
+| CustomerContext 与 Gin/context helper | `framework/backend/go/runtime/customerfw/context.go` |
+| 稳定错误码与 HTTP 映射 | `framework/backend/go/runtime/customerfw/errors.go` |
+| token validator 与多 token 一致性 | `framework/backend/go/runtime/customerfw/validator.go` |
+| Authenticate middleware | `framework/backend/go/runtime/customerfw/middleware.go` |
+| tenant resolution | `framework/backend/go/runtime/customerfw/tenant.go` |
+| membership contract/middleware | `framework/backend/go/runtime/customerfw/membership.go` |
+| membership cache | `framework/backend/go/runtime/customerfw/membership_cache.go` |
+| mock/local resolver | `framework/backend/go/runtime/customerfw/membership_mock.go` |
+| bootstrap contract | `framework/backend/go/runtime/customerfw/bootstrap.go` |
+| delegated/core auth client contract | `framework/backend/go/runtime/customerfw/auth_client.go` |
+| skeleton authenticator adapter | `skeleton/backend/go-gin/internal/services/customer/framework_adapter.go` |
+| skeleton membership adapter | `skeleton/backend/go-gin/internal/services/customer/membership_adapter.go` |
+| skeleton mini-app route wiring | `skeleton/backend/go-gin/internal/transport/http/mini-app/routes.go` |
+| skeleton integration tests | `skeleton/backend/go-gin/tests/integration/mini-app/customer_*_test.go` |
 
-## 操作指南（推荐）
+## 常见问题与排障
 
-### Skeleton（local）模式：注册 → 登录 → 调用受保护接口
+| 问题 | 表现 | 处理 |
+| --- | --- | --- |
+| 没带 token | 401，`CUSTOMER_TOKEN_MISSING` | 检查 `Authorization` 或 `X-Customer-Token` |
+| token 无效 | 401，`CUSTOMER_TOKEN_INVALID` | 确认 token 签发方、过期时间、issuer/audience |
+| tenant 冲突 | 403，`CUSTOMER_TENANT_MISMATCH` | 对比 token、header/query、bootstrap 的 `tenant_uuid` |
+| 没有 tenant | `CUSTOMER_TENANT_REQUIRED` | tenant-scoped route 必须提供 tenant 或使用含 tenant 的 token |
+| membership 不可用 | 403，`CUSTOMER_MEMBERSHIP_REQUIRED` / `CUSTOMER_MEMBERSHIP_DISABLED` | 检查 resolver 是否返回 active membership |
+| delegate 不可用 | 503，`CUSTOMER_DELEGATE_UNAVAILABLE` | 检查 PowerX Core/delegate endpoint、网络、超时和凭证 |
 
-1. 配置 `customer_auth`（示例见 `skeleton/backend/go-gin/etc/config.example.yaml`）：
-   - `customer_auth.mode: local`
-   - 开发态可复用 `context.hmac_secret`；生产态必须配置 `customer_auth.jwt_secret`
-2. 调用注册接口（必须明确目标租户：优先使用 `tenant_uuid`；若 header 不可用，可在 body 里传 `tenant_uuid`；两者同时存在时必须一致）：
-   - `POST /api/v1/mini-app/auth/register`
-3. 调用登录接口获取 token：
-   - `POST /api/v1/mini-app/auth/login`
-   - 多租户提示：当同一 `login`（邮箱/手机号）在多个租户存在且请求未指定 `tenant_uuid` 时，接口返回 `409` + `TENANT_SELECTION_REQUIRED`，并在 `error.details.tenants[]` 给出候选租户列表；客户端选择后再次登录即可。
-4. 使用 token 调用受保护接口（示例：`GET /api/v1/mini-app/ping`）：
-   - `Authorization: Bearer <token>` 或 `X-Customer-Token: <token>`
-   - `tenant_uuid` 头可省略（tenant 会从 token 注入）；若显式携带，则必须与 token 中的 `tenant_uuid` 一致。
+排查命令：
 
-更完整的命令与参数请参考 `specs/010-auth-customer/quickstart.md`。
+```bash
+rg -n "CUSTOMER_|customerfw|CustomerContext" framework/backend/go/runtime/customerfw skeleton/backend/go-gin/internal
+```
 
-### 示例：给移动端暴露 mini-app Template API
+安全检查：
 
-在本仓库 Skeleton 后端中，已新增只读的 Template API（仅返回 `published + approved` 模板），用于移动端/小程序等 C 端读取：
+```bash
+rg -n "log\\.(Info|Warn|Error|Debug)|slog\\.|logrus\\." \
+  framework/backend/go/runtime/customerfw skeleton/backend/go-gin/internal \
+  -g '!**/*test*' | rg -n "token|password|secret|refresh_token|access_token"
+```
 
-- `GET /api/v1/mini-app/templates`（分页：`page`/`page_size`，可选 `q` 搜索）
-- `GET /api/v1/mini-app/templates/:id`
+预期不出现新增 raw token/password/secret 日志。
 
-上述接口位于 `/mini-app/*` 保护域内：必须携带 `Authorization: Bearer <customer_token>`（或 `X-Customer-Token`）。`tenant_uuid` 可省略（tenant 会从 token 注入）；若显式携带，则必须与 token tenant 一致。
+## 测试工具
 
-### Delegated（delegate）模式：宿主校验 → 插件只做转发与租户匹配
+Framework 提供标准测试 helper，插件测试不需要手写 token parser 或 context 注入：
 
-1. 配置 `customer_auth`：
-   - `customer_auth.mode: delegate`
-   - `customer_auth.delegate_endpoint: <PowerX 校验端点 URL>`
-   - 可选：`customer_auth.cache_ttl_seconds`（启用内存缓存，TTL 不超过宿主返回的 token 过期时间）
-2. mini-app 客户端从宿主获取 customer token 后，请求插件 `/mini-app/*`：
-   - `tenant_uuid: <tenant_uuid>`
-   - `Authorization: Bearer <host_customer_token>`
-3. 插件行为：
-   - 调用 `delegate_endpoint` 校验 token（POST JSON + 透传 `Authorization` 与 `tenant_uuid`）
-   - 校验响应中的 `tenant_uuid` 与请求一致，否则返回 `TENANT_MISMATCH`
-   - 不创建/更新任何 customer 表记录（customer 表仅 Skeleton 使用）
+```go
+validator := customerfw.NewMockCustomerValidator(&customerfw.CustomerContext{
+	TenantUUID:    "tenant-a",
+	CustomerUUID:  "customer-a",
+	Authenticated: true,
+})
 
-### 可观测性（Metrics & Logs）
+resolver := customerfw.NewMockMembershipResolver(customerfw.CustomerMembership{
+	TenantUUID:     "tenant-a",
+	CustomerUUID:   "customer-a",
+	MembershipUUID: "membership-a",
+	Status:         customerfw.CustomerMembershipActive,
+})
 
-- **日志事件**：`customer.auth.validation` / `customer.auth.login` / `customer.auth.register`（字段含 `tenant_uuid`、`customer_uuid`、`request_id`、`latency_ms`）
-- **指标**（Admin Runtime Metrics 输出）：
-  - `powerx_customer_auth_validation_total{plugin_id,mode,result}`
-  - `powerx_customer_auth_validation_latency_ms_sum{...}` / `powerx_customer_auth_validation_latency_ms_count{...}`
-  - `powerx_customer_auth_login_total{plugin_id,result}`
-  - `powerx_customer_auth_login_latency_ms_sum{...}` / `powerx_customer_auth_login_latency_ms_count{...}`
+token := customerfw.TestToken("customer-a", "tenant-a")
+ctx := customerfw.WithCustomerContext(context.Background(), &customerfw.CustomerContext{
+	TenantUUID:    "tenant-a",
+	CustomerUUID:  "customer-a",
+	Authenticated: true,
+})
+```
 
-通过以上策略，插件即可在不同部署形态下同时满足“必须带租户上下文”和“Customer 身份校验”两个目标，而且能与现有 Constitution / Ruleset（统一响应、模块隔离、可观测）保持一致。
+建议每个插件至少覆盖：
+
+- 有效 customer token 成功进入 handler。
+- 缺少 token 返回未登录。
+- tenant mismatch 被拒绝。
+- membership disabled/missing 被拒绝。
+- delegate unavailable 返回稳定错误。
+
+## 回滚与风险控制
+
+- 插件业务 handler 应只依赖 `CustomerContext`，不要耦合 skeleton local auth 结构。
+- 若 delegated identity source 暂不可用，本地开发可以使用 local/dev validator；生产环境不能静默 fallback 到 mock/local。
+- membership cache TTL 必须短于 token 有效期，membership 变更后应支持失效或保守拒绝。
+- 回滚 skeleton 接入时，只需要从 protected route 移除 `customerfw.Authenticate` / `customerfw.RequireMembership`，但不建议在 tenant-scoped C 端接口上线后这么做。
+
+## 变更记录
+
+| 日期 | 版本 | 变更 |
+| --- | --- | --- |
+| 2026-06-24 | 0.1.0 | 整理为 framework customer identity/auth 对外开发指南，覆盖本地调试、合同、接入与排障 |

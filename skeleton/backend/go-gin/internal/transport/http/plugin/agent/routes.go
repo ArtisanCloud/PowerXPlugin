@@ -175,14 +175,15 @@ func (h *Handler) StreamSSE(c *gin.Context) {
 	}
 
 	params := gateway.AgentStreamParams{
-		AgentID:    firstNonEmpty(c.Query("agent_uuid"), c.Query("agent_id")),
-		SessionID:  firstNonEmpty(c.Query("session_uuid"), c.Query("session_id")),
-		TraceID:    strings.TrimSpace(c.Query("trace_id")),
-		Query:      strings.TrimSpace(c.Query("q")),
-		Intent:     strings.TrimSpace(c.Query("intent")),
-		Source:     strings.TrimSpace(c.Query("source")),
-		Env:        strings.TrimSpace(c.Query("env")),
-		TenantUUID: h.tenantUUID(c),
+		AgentID:            firstNonEmpty(c.Query("agent_uuid"), c.Query("agent_id")),
+		SessionID:          firstNonEmpty(c.Query("session_uuid"), c.Query("session_id")),
+		TraceID:            strings.TrimSpace(c.Query("trace_id")),
+		Query:              strings.TrimSpace(c.Query("q")),
+		Intent:             strings.TrimSpace(c.Query("intent")),
+		Source:             strings.TrimSpace(c.Query("source")),
+		Env:                strings.TrimSpace(c.Query("env")),
+		TenantUUID:         h.tenantUUID(c),
+		RegenFromMessageID: strings.TrimSpace(c.Query("regen_from_message_id")),
 	}
 	stream, err := h.deps.CapabilityGateway.StreamAgentSSE(c.Request.Context(), params)
 	if err != nil {

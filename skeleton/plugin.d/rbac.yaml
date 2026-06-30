@@ -11,6 +11,10 @@ permissions:
   - actions:
       - create
       - read
+    resource: customer
+  - actions:
+      - create
+      - read
     resource: integration
   - actions:
       - create
@@ -29,6 +33,10 @@ rbac:
         - read
         - update
       resource: base.templates
+    - actions:
+        - create
+        - read
+      resource: customer
     - actions:
         - create
         - read
@@ -73,4 +81,39 @@ routes:
       permission:
         action: create
         resource: integration
+    - method: GET
+      path: /admin/customers/overview
+      permission:
+        action: read
+        resource: customer
+    - method: GET
+      path: /admin/customers/accounts
+      permission:
+        action: read
+        resource: customer
+    - method: POST
+      path: /admin/customers/accounts
+      permission:
+        action: create
+        resource: customer
+    - method: GET
+      path: /admin/customers/identities
+      permission:
+        action: read
+        resource: customer
+    - method: GET
+      path: /admin/customers/memberships
+      permission:
+        action: read
+        resource: customer
+    - method: GET
+      path: /admin/customers/login-events
+      permission:
+        action: read
+        resource: customer
+    - method: GET
+      path: /admin/customers/mini-app-entries
+      permission:
+        action: read
+        resource: customer
   rbac: /api/v1/admin/rbac

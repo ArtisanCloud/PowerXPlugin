@@ -7,6 +7,7 @@ PowerXPlugin 使用 JSON Schema 和 OpenAPI 描述插件与宿主之间的契约
 - `rbac.json`：约束 RBAC 权限声明的格式。
 - `rbac.schema.json`：示例 RBAC 报告，声明插件角色与所需宿主权限。
 - `openapi.yaml`：记录框架保留端点与 skeleton 示例 API。
+- `customer-auth.openapi.yaml`：Customer Identity/Auth 稳定合同，描述 C 端 customer token、tenant、membership、bootstrap 与 delegated auth 错误语义。
 
 ## 更新流程
 

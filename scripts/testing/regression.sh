@@ -264,6 +264,16 @@ YAML
 
 start_backend
 
+if [ "${REGRESSION_RUN_E2E:-1}" = "0" ]; then
+  echo "[R-3] Skipping frontend build and Playwright E2E (REGRESSION_RUN_E2E=0)"
+  echo "Logs stored at ${BACKEND_LOG}"
+
+  end_ts=$(date +%s)
+  elapsed=$((end_ts - start_ts))
+  echo "=== Regression workflow complete in ${elapsed}s ==="
+  exit 0
+fi
+
 echo "[R-3] Preparing frontend dependencies"
 pushd skeleton/web-admin/nuxt > /dev/null
 # act 会把宿主工作区整个拷贝进容器，可能包含不同平台的 node_modules（例如 macOS）。

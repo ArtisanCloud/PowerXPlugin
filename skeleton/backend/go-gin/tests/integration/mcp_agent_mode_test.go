@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	integrationModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	runtimeModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"

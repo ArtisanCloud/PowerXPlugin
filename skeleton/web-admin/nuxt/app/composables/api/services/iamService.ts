@@ -1,5 +1,6 @@
 import { useApiClient } from "../_client";
 import type { ApiResponse } from "../types/types";
+import type { ProviderModeDiagnostics } from "../useProviderMode";
 
 export interface TenantSummary {
   id: number;
@@ -83,6 +84,11 @@ export const useIAMService = () => {
   };
 
   return {
+    mode: () =>
+      client<ApiResponse<ProviderModeDiagnostics>>(`${base}/mode`, {
+        method: "GET",
+        silentAuthError: true,
+      }),
     listTenants: (params: TenantListParams = {}) =>
       client<ApiResponse<{ items: TenantSummary[]; total: number }>>(
         `${base}/tenants?${buildQuery({

@@ -49,7 +49,7 @@ admin_console:
 ### 2.4 `context`
 - `hmac_secret/key_id`
 - `jwks_url/issuer/audience/ttl`
-- `iam_mode`（`local | delegated`）
+- `provider_mode`（`local | delegated`）
 
 ### 2.5 `security`
 - `enable_cors/cors_origins`

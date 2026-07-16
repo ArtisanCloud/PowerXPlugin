@@ -3,6 +3,7 @@ package middleware
 import (
 	"strings"
 
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"{{ .BackendModulePath }}/internal/contracts"
 	capgateway "{{ .BackendModulePath }}/internal/integrations/gateway"
 	obsintegration "{{ .BackendModulePath }}/internal/observability/integration"
@@ -28,9 +29,9 @@ func RequireCapabilityGateway(c *gin.Context, deps *app.Deps) bool {
 	if deps == nil {
 		obsintegration.RecordPluginGatewayInvokeFailure("SERVICE_UNAVAILABLE")
 		contracts.ResponseErrorWithDetails(c, 503, "SERVICE_UNAVAILABLE", "capability gateway unavailable", gin.H{
-			"required": delegatedGatewayRequired,
-			"present":  []string{},
-			"iam_mode": "unknown",
+			"required":      delegatedGatewayRequired,
+			"present":       []string{},
+			"provider_mode": "unknown",
 		})
 		return false
 	}
@@ -39,9 +40,9 @@ func RequireCapabilityGateway(c *gin.Context, deps *app.Deps) bool {
 		if cfgErr := capgateway.ValidateDelegatedConfig(deps.Config); cfgErr != nil {
 			obsintegration.RecordPluginGatewayInvokeFailure(cfgErr.Code)
 			contracts.ResponseErrorWithDetails(c, 503, cfgErr.Code, cfgErr.Message, gin.H{
-				"required": cfgErr.Required,
-				"present":  cfgErr.Present,
-				"iam_mode": cfgErr.IAMMode,
+				"required":      cfgErr.Required,
+				"present":       cfgErr.Present,
+				"provider_mode": cfgErr.ProviderMode,
 			})
 			return false
 		}
@@ -50,9 +51,9 @@ func RequireCapabilityGateway(c *gin.Context, deps *app.Deps) bool {
 	if deps.CapabilityGateway == nil || !deps.CapabilityGateway.Enabled() {
 		obsintegration.RecordPluginGatewayInvokeFailure("SERVICE_UNAVAILABLE")
 		contracts.ResponseErrorWithDetails(c, 503, "SERVICE_UNAVAILABLE", "capability gateway unavailable", gin.H{
-			"required": delegatedGatewayRequired,
-			"present":  detectGatewayPresent(deps),
-			"iam_mode": detectGatewayIAMMode(deps),
+			"required":      delegatedGatewayRequired,
+			"present":       detectGatewayPresent(deps),
+			"provider_mode": detectGatewayProviderMode(deps),
 		})
 		return false
 	}
@@ -63,26 +64,26 @@ func shouldEnforceDelegatedContract(deps *app.Deps) bool {
 	if deps == nil {
 		return false
 	}
-	if deps.IAMMode == iamservice.IAMModeDelegated {
+	if deps.ProviderMode == fwprovider.ModeDelegated || deps.IAMAdapterMode == iamservice.IAMAdapterModeDelegated {
 		return true
 	}
-	return strings.EqualFold(detectGatewayIAMMode(deps), "delegated")
+	return strings.EqualFold(detectGatewayProviderMode(deps), "delegated")
 }
 
-func detectGatewayIAMMode(deps *app.Deps) string {
+func detectGatewayProviderMode(deps *app.Deps) string {
 	if deps == nil {
 		return "unknown"
 	}
-	if deps.IAMMode == iamservice.IAMModeDelegated {
+	if deps.ProviderMode == fwprovider.ModeDelegated || deps.IAMAdapterMode == iamservice.IAMAdapterModeDelegated {
 		return "delegated"
 	}
-	if deps.IAMMode == iamservice.IAMModeLocal {
+	if deps.ProviderMode == fwprovider.ModeLocal || deps.IAMAdapterMode == iamservice.IAMAdapterModeLocal {
 		return "local"
 	}
 	if deps.Config == nil || deps.Config.Context == nil {
 		return "unknown"
 	}
-	mode := strings.ToLower(strings.TrimSpace(deps.Config.Context.IAMMode))
+	mode := strings.ToLower(strings.TrimSpace(deps.Config.Context.ProviderMode))
 	if mode == "" {
 		return "unknown"
 	}

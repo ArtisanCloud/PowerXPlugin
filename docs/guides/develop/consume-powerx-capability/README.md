@@ -97,7 +97,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 >
 > - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`），并覆盖 `config.yaml` 中同名配置。
 > - 宿主模式要求 `POWERX_PROXY=1`，并提供 `PX_GATEWAY_BASE_URL + POWERX_STS_CLIENT_ID + POWERX_STS_CLIENT_SECRET + POWERX_GRPC_UPSTREAM_ADDRESS + POWERX_GRPC_UPSTREAM_TENANT_UUID`；否则会返回 503。
-> - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`IAM_MODE=local`），会覆盖 `.env` 的值，请先清理。
+> - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`POWERX_PROVIDER_MODE=local`），会覆盖 `.env` 的值，请先清理。
 
 ### Gateway API 前缀规范（含 WS-Bus）
 

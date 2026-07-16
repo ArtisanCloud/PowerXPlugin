@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	customermodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/customer"
 	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
@@ -104,8 +106,29 @@ type updateAccountRequest struct {
 }
 
 func (h *Handler) Overview(c *gin.Context) {
+	if h.isDelegated() {
+		if h.deps == nil || h.deps.CustomerAdmin == nil {
+			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
+			return
+		}
+		tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, c.Query("tenant_uuid"))
+		if mismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeForbidden, "tenant_uuid mismatch")
+			return
+		}
+		overview, err := h.deps.CustomerAdmin.Overview(c.Request.Context(), customerfw.ListAccountsRequest{
+			TenantUUID: tenantUUID,
+			RequestID:  requestID(c),
+		})
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		contracts.ResponseSuccess(c, overview)
+		return
+	}
 	if h.db == nil {
-		contracts.ResponseSuccess(c, emptyOverview())
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer local database provider is not configured", h.diagnostics())
 		return
 	}
 	tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, c.Query("tenant_uuid"))
@@ -127,8 +150,29 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if h.isDelegated() {
+		if h.deps == nil || h.deps.CustomerAdmin == nil {
+			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
+			return
+		}
+		query.TenantUUID, _ = admincommon.ResolveTenantUUIDStrict(c, query.TenantUUID)
+		page, err := h.deps.CustomerAdmin.ListAccounts(c.Request.Context(), customerfw.ListAccountsRequest{
+			TenantUUID: query.TenantUUID,
+			Query:      query.Query,
+			Status:     query.Status,
+			Page:       query.Page,
+			PageSize:   query.PageSize,
+			RequestID:  requestID(c),
+		})
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		contracts.ResponseSuccess(c, page)
+		return
+	}
 	if h.db == nil {
-		contracts.ResponseSuccess(c, emptyPage(query))
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer local database provider is not configured", h.diagnostics())
 		return
 	}
 	query.TenantUUID, _ = admincommon.ResolveTenantUUIDStrict(c, query.TenantUUID)
@@ -160,7 +204,60 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	contracts.ResponseSuccess(c, makePage(items, query, total))
 }
 
+func (h *Handler) Mode(c *gin.Context) {
+	contracts.ResponseSuccess(c, h.diagnostics())
+}
+
+func (h *Handler) diagnostics() admincommon.ProviderDiagnostics {
+	mode := string(fwprovider.ModeLocal)
+	if h != nil && h.deps != nil && strings.TrimSpace(h.deps.ProviderMode.String()) != "" {
+		mode = h.deps.ProviderMode.String()
+	}
+	return admincommon.NewProviderDiagnostics(mode, h != nil && h.deps != nil && h.deps.CustomerAdmin != nil, h != nil && h.db != nil)
+}
+
+func (h *Handler) isDelegated() bool {
+	return h != nil && h.deps != nil && h.deps.ProviderMode == fwprovider.ModeDelegated
+}
+
 func (h *Handler) CreateAccount(c *gin.Context) {
+	if h.isDelegated() {
+		if h.deps == nil || h.deps.CustomerAdmin == nil {
+			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
+			return
+		}
+		var req createAccountRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+			return
+		}
+		tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, req.TenantUUID)
+		if mismatch {
+			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeForbidden, "tenant_uuid mismatch")
+			return
+		}
+		item, err := h.deps.CustomerAdmin.CreateAccount(c.Request.Context(), customerfw.CreateAccountRequest{
+			TenantUUID:  tenantUUID,
+			Email:       req.Email,
+			Phone:       req.Phone,
+			Password:    req.Password,
+			DisplayName: req.DisplayName,
+			Nickname:    req.Nickname,
+			GivenName:   req.GivenName,
+			FamilyName:  req.FamilyName,
+			AvatarURL:   req.AvatarURL,
+			Locale:      req.Locale,
+			Timezone:    req.Timezone,
+			Metadata:    req.Metadata,
+			RequestID:   requestID(c),
+		})
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		contracts.ResponseCreated(c, item)
+		return
+	}
 	if h.db == nil {
 		contracts.ResponseServiceUnavailable(c, "customer database unavailable", nil)
 		return
@@ -226,6 +323,34 @@ func (h *Handler) CreateAccount(c *gin.Context) {
 }
 
 func (h *Handler) GetAccount(c *gin.Context) {
+	if h.isDelegated() {
+		if h.deps == nil || h.deps.CustomerAdmin == nil {
+			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
+			return
+		}
+		customerUUID := strings.TrimSpace(c.Param("customerUUID"))
+		if customerUUID == "" {
+			contracts.ResponseBadRequest(c, "customer_uuid is required")
+			return
+		}
+		page, err := h.deps.CustomerAdmin.ListAccounts(c.Request.Context(), customerfw.ListAccountsRequest{
+			TenantUUID: admincommon.ResolveTenantUUID(c),
+			Query:      customerUUID,
+			Page:       1,
+			PageSize:   1,
+			RequestID:  requestID(c),
+		})
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		if page == nil || len(page.Items) == 0 {
+			contracts.ResponseNotFound(c, "customer account not found")
+			return
+		}
+		contracts.ResponseSuccess(c, page.Items[0])
+		return
+	}
 	if h.db == nil {
 		contracts.ResponseServiceUnavailable(c, "customer database unavailable", nil)
 		return
@@ -238,6 +363,42 @@ func (h *Handler) GetAccount(c *gin.Context) {
 }
 
 func (h *Handler) UpdateAccount(c *gin.Context) {
+	if h.isDelegated() {
+		if h.deps == nil || h.deps.CustomerAdmin == nil {
+			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
+			return
+		}
+		var req updateAccountRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+			return
+		}
+		item, err := h.deps.CustomerAdmin.UpdateAccount(c.Request.Context(), customerfw.UpdateAccountRequest{
+			CustomerUUID:  strings.TrimSpace(c.Param("customerUUID")),
+			PrimaryEmail:  req.PrimaryEmail,
+			PrimaryPhone:  req.PrimaryPhone,
+			Email:         req.Email,
+			Phone:         req.Phone,
+			DisplayName:   req.DisplayName,
+			Nickname:      req.Nickname,
+			GivenName:     req.GivenName,
+			FamilyName:    req.FamilyName,
+			AvatarURL:     req.AvatarURL,
+			Locale:        req.Locale,
+			Timezone:      req.Timezone,
+			Status:        req.Status,
+			EmailVerified: req.EmailVerified,
+			PhoneVerified: req.PhoneVerified,
+			Metadata:      req.Metadata,
+			RequestID:     requestID(c),
+		})
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		contracts.ResponseSuccess(c, item)
+		return
+	}
 	if h.db == nil {
 		contracts.ResponseServiceUnavailable(c, "customer database unavailable", nil)
 		return
@@ -324,7 +485,7 @@ func (h *Handler) ListIdentities(c *gin.Context) {
 		return
 	}
 	if h.db == nil {
-		contracts.ResponseSuccess(c, emptyPage(query))
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer identity provider is not configured for this endpoint", h.diagnostics())
 		return
 	}
 	db := h.db.Model(&customermodel.CustomerAuthIdentity{})
@@ -421,7 +582,7 @@ func (h *Handler) ListMemberships(c *gin.Context) {
 		return
 	}
 	if h.db == nil {
-		contracts.ResponseSuccess(c, emptyPage(query))
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer membership provider is not configured for this endpoint", h.diagnostics())
 		return
 	}
 	query.TenantUUID, _ = admincommon.ResolveTenantUUIDStrict(c, query.TenantUUID)
@@ -458,7 +619,7 @@ func (h *Handler) ListLoginEvents(c *gin.Context) {
 		return
 	}
 	if h.db == nil {
-		contracts.ResponseSuccess(c, emptyPage(query))
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer login event provider is not configured for this endpoint", h.diagnostics())
 		return
 	}
 	query.TenantUUID, _ = admincommon.ResolveTenantUUIDStrict(c, query.TenantUUID)
@@ -495,7 +656,7 @@ func (h *Handler) ListMiniAppEntries(c *gin.Context) {
 		return
 	}
 	if h.db == nil {
-		contracts.ResponseSuccess(c, emptyPage(query))
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer mini app entry provider is not configured for this endpoint", h.diagnostics())
 		return
 	}
 	query.TenantUUID, _ = admincommon.ResolveTenantUUIDStrict(c, query.TenantUUID)
@@ -626,4 +787,14 @@ func count(db *gorm.DB) int64 {
 		_ = db.Count(&v).Error
 	}
 	return v
+}
+
+func requestID(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	if v := strings.TrimSpace(c.GetHeader("X-Request-ID")); v != "" {
+		return v
+	}
+	return strings.TrimSpace(c.GetString("request_id"))
 }

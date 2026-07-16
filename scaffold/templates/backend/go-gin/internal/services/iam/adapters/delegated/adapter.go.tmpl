@@ -43,7 +43,7 @@ func (a *Adapter) Authorize(_ context.Context, req fwiamcontracts.AuthorizationR
 		Action:     req.Action,
 		TenantUUID: req.TenantUUID,
 		UserID:     req.UserID,
-		Mode:       string(fwiamcontracts.IAMModeDelegated),
+		Mode:       string(fwiamcontracts.IAMAdapterModeDelegated),
 		TraceID:    req.TraceID,
 	}, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated authorize mapping is not enabled yet")
 }

@@ -8,7 +8,8 @@
 #   历史顶层字段仍兼容读取，但不建议继续新增。
 #
 # Auth / IAM / 运行模式环境变量速查（未在 YAML 中硬编码，以免泄露敏感信息）：
-#   POWERX_PROXY                - 设为 1 时表示本地进程接宿主能力/WS 链路；是否 Delegated 由 IAMMode 决定
+#   POWERX_PROVIDER_MODE        - 业务 provider 数据源：local 或 delegated
+#   POWERX_PROXY                - 设为 1 时表示本地进程接宿主能力/WS 链路；不推导 provider mode
 #   POWERX_CORE_ENDPOINT        - Delegated 模式访问宿主 Core API 的基址（默认 http://localhost:8077）
 #   POWERX_AUTH_TOKEN           - 插件向宿主 Core 鉴权用的服务 Token
 #   PLUGIN_IAM_TENANT_KEY/NAME  - Standalone 模式默认租户唯一键与显示名
@@ -117,8 +118,8 @@ runtime:
       enabled: true
       path: "/healthz"
   logging:
-    # 仅 IAMMode=delegated 的宿主委派语义会强制 stdout + json。
-    # IAMMode=local + POWERX_PROXY=1 是本地联调宿主能力，仍按本配置输出。
+    # POWERX_PROXY=1 的宿主链路语义会强制 stdout + json。
+    # POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=0 仍按本配置输出。
     level: "debug"
     format: "json"
     output: "stdout"

@@ -24,8 +24,8 @@ type SeedOptions struct {
 	AdminName  string
 }
 
-func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode IAMMode) error {
-	if mode != IAMModeLocal {
+func SeedLocalAdmin(ctx context.Context, db *gorm.DB, cfg *config.Config, mode IAMAdapterMode) error {
+	if mode != IAMAdapterModeLocal {
 		log.Printf("[iam] skip local admin seed (mode=%s)", mode)
 		return nil
 	}

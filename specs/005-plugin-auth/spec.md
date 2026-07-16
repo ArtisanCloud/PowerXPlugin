@@ -20,7 +20,7 @@
 
 **Why this priority**: 没有 Delegated 登录，插件无法在 PowerX 生产环境运行，是 Marketplace 上架的前置条件。
 
-**Independent Test**: 在启用 `IAMMode=delegated` 且 `POWERX_PROXY=1` 的环境下，仅部署前端+后端，验证管理员可以通过 `/users/login` → API 调用成功，并获得宿主返回的用户上下文。
+**Independent Test**: 在启用 `POWERX_PROVIDER_MODE=delegated` 且 `POWERX_PROXY=1` 的环境下，仅部署前端+后端，验证管理员可以通过 `/users/login` → API 调用成功，并获得宿主返回的用户上下文。
 
 **Acceptance Scenarios**:
 
@@ -39,7 +39,7 @@
 
 **Acceptance Scenarios**:
 
-1. **Given** `IAMMode=local` 且 `POWERX_PROXY=0`，**When** 服务启动并检测模式为 Local，**Then** `migrate` 自动包含 IAM 表且创建默认管理员，开发者可使用默认凭证登录。
+1. **Given** `POWERX_PROVIDER_MODE=local` 且 `POWERX_PROXY=0`，**When** 服务启动并检测模式为 Local，**Then** `migrate` 自动包含 IAM 表且创建默认管理员，开发者可使用默认凭证登录。
 2. **Given** Local 模式已登录，**When** 用户在 UI 中重置 Token 或登出，**Then** 所有 Token、Cookie、sessionStorage 被清除，API 请求返回 401 并重定向到登录页。
 
 ---
@@ -96,12 +96,12 @@
 
 **Why this priority**：模板 CRUD 是脚手架交付的核心示例，缺乏 RBAC 信息会导致安全审计不过关，也让宿主无法自动收敛权限列表。
 
-**Independent Test**：在 Standalone 模式下为角色授予 `base.templates.read/manage` 后访问 `/api/v1/templates`，未授予则收到 403；在 Delegated 模式下启用 `IAMMode=delegated` 且 `POWERX_PROXY=1`，即使插件不再维护角色，也能在 manifest 和 `/admin/rbac` 输出中看到模板相关资源，方便宿主 IAM 映射。
+**Independent Test**：在 Standalone 模式下为角色授予 `base.templates.read/manage` 后访问 `/api/v1/templates`，未授予则收到 403；在 Delegated 模式下启用 `POWERX_PROVIDER_MODE=delegated` 且 `POWERX_PROXY=1`，即使插件不再维护角色，也能在 manifest 和 `/admin/rbac` 输出中看到模板相关资源，方便宿主 IAM 映射。
 
 **Acceptance Scenarios**：
 
-1. **Given** Standalone 模式，`IAMMode=local` 且 `POWERX_PROXY=0`，**When** 用户调用模板 CRUD API，**Then** `middleware.RBAC` 会从 Route→Permission Map 匹配 `base.templates.read`/`base.templates.manage` 并根据本地权限判定 200 或 403。
-2. **Given** Delegated 模式，`IAMMode=delegated` 且 `POWERX_PROXY=1`，**When** 插件返回 manifest/RBAC 信息，**Then** PowerX 核心可读取 `base.templates.*` 资源并在宿主 IAM 中映射，同时插件前端根据 runtimeConfig 自动将模板页面切换为只读或展示“由宿主控制权限”的提示，不再要求 iframe 登录。
+1. **Given** Standalone 模式，`POWERX_PROVIDER_MODE=local` 且 `POWERX_PROXY=0`，**When** 用户调用模板 CRUD API，**Then** `middleware.RBAC` 会从 Route→Permission Map 匹配 `base.templates.read`/`base.templates.manage` 并根据本地权限判定 200 或 403。
+2. **Given** Delegated 模式，`POWERX_PROVIDER_MODE=delegated` 且 `POWERX_PROXY=1`，**When** 插件返回 manifest/RBAC 信息，**Then** PowerX 核心可读取 `base.templates.*` 资源并在宿主 IAM 中映射，同时插件前端根据 runtimeConfig 自动将模板页面切换为只读或展示“由宿主控制权限”的提示，不再要求 iframe 登录。
 
 ---
 
@@ -119,7 +119,7 @@
 - **FR-002**: `useAuth` 必须实现 `initAuth`、`getToken`、`isTokenExpired`、`logout`，并在登出时清理 localStorage、sessionStorage、`px_*` cookie 与 Pinia 用户 store。
 - **FR-003**: `useApiClient` 必须在请求前自动附加 `Authorization` 与 `tenant_uuid`，并在收到 401 时自动调用 `/admin/user/auth/refresh`（或本地 IAM 刷新接口）后重放原请求；刷新失败时需调用 `clearAuth` 并重定向到 `/users/login`。
 - **FR-004**: 前端需要在全局中间件拦截所有除 `users/*` 白名单外的路由，未登录用户必须被导航到登录页，并带上原目标的 `redirect` 参数。
-- **FR-005**: 后端必须提供 `internal/services/iam.IAMDirectory` 接口及 Delegated、Local 双实现，Resolver 根据 `IAMMode` 与 `POWERX_PROXY` 决定模式。
+- **FR-005**: 后端必须提供 `internal/services/iam.IAMDirectory` 接口及 delegated/local 双实现；`POWERX_PROVIDER_MODE` 决定 provider 数据源，`POWERX_PROXY` 只决定是否接宿主代理/网关链路。
 - **FR-006**: Delegated 模式下，后端必须使用 `POWERX_CORE_ENDPOINT`、`POWERX_AUTH_TOKEN` 调用宿主 `/admin/user/auth/login|refresh|logout|me/context`，并将宿主响应原样返回前端。
 - **FR-007**: Local 模式下，`migrate` 必须包含 IAM 表（用户、角色、部门、租户）并生成可配置的默认管理员；管理员账号/密码需由 `PLUGIN_IAM_ADMIN_*` 环境变量或配置文件显式提供（缺失则报错并终止）；Delegated 模式下必须跳过这些表，避免污染宿主数据库。
 - **FR-008**: 所有受保护路由必须挂载 JWT / Signed-Context 中间件，优先校验 `Authorization` Bearer Token；若未提供并启用了 Signed Context，则回退 `X-PowerX-CTX`。
@@ -144,4 +144,4 @@
 - **SC-001**: 在 Delegated 模式下，90% 的登录请求在 2 秒内完成并返回受保护页面，并与宿主 Token 完全一致（字段/过期时间差异 ≤ 5 秒）。
 - **SC-002**: Local 模式下，`go run ./cmd/database/main.go setup` 可在 1 分钟内完成 IAM 表迁移并生成可用的默认管理员，Playwright 用例可在独立环境全部通过。
 - **SC-003**: Token 刷新成功率 ≥ 98%，失败时用户看到明确提示并在 5 秒内被重定向到登录页面，无静默失败。
-- **SC-004**: 指标 `plugin_iam_delegate_errors_total`、`plugin_auth_logout_total`、`plugin_iam_mode` 在 Prometheus 中可见，运维可基于这些指标设定告警，使认证相关 P1 事故的定位时间 < 10 分钟。
+- **SC-004**: 指标 `plugin_iam_delegate_errors_total`、`plugin_auth_logout_total`、`plugin_provider_mode` 在 Prometheus 中可见，运维可基于这些指标设定告警，使认证相关 P1 事故的定位时间 < 10 分钟。

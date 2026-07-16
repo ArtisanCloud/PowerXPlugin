@@ -9,7 +9,7 @@ import (
 
 	"{{ .BackendModulePath }}/internal/entity/models"
 	agentregistry "{{ .BackendModulePath }}/internal/entity/models/agent_registry"
-	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
+	identitymodel "{{ .BackendModulePath }}/internal/entity/models/iam"
 	metadatamodel "{{ .BackendModulePath }}/internal/entity/models/metadata"
 	templatemodel "{{ .BackendModulePath }}/internal/entity/models/template"
 	sampleskills "{{ .BackendModulePath }}/internal/skills"
@@ -285,7 +285,7 @@ func metadataSeedTenantUUIDs(db *gorm.DB) ([]string, error) {
 		out = append(out, value)
 	}
 	add(defaultTenantUUID)
-	var tenants []iammodel.Tenant
+	var tenants []identitymodel.Tenant
 	if err := db.Find(&tenants).Error; err != nil {
 		return nil, err
 	}

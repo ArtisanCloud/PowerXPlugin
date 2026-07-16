@@ -16,7 +16,7 @@ func TestKnowledgeConfigDefaults(t *testing.T) {
 func TestKnowledgeConfigDefaultsDelegatedInProxyModeWithLocalIAM(t *testing.T) {
 	t.Setenv("POWERX_PROXY", "1")
 	cfg := getDefaultConfig()
-	cfg.Context.IAMMode = "local"
+	cfg.Context.ProviderMode = "local"
 	cfg.Knowledge = nil
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("validate: %v", err)

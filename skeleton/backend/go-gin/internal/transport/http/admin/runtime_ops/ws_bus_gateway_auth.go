@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
@@ -36,7 +36,7 @@ func resolveGatewayBearerToken(c *gin.Context, deps *app.Deps) string {
 			return ""
 		}
 	}
-	if deps.IAMMode != iamservice.IAMModeDelegated {
+	if deps.ProviderMode != fwprovider.ModeDelegated {
 		return ""
 	}
 	if raw, ok := middleware.GetRawBearerToken(c); ok {
@@ -109,7 +109,7 @@ func logGatewayAuthSelection(c *gin.Context, deps *app.Deps, outboundBearer stri
 		runtimelogging.FieldTokenSource: outboundSource,
 		"biz_scene":                     "wsbus_gateway_auth",
 		"biz_domain":                    "runtime_ops",
-		"iam_mode":                      deps.IAMMode,
+		"provider_mode":                 deps.ProviderMode,
 		"inbound_bearer_present":        inboundBearerPresent,
 		"inbound_bearer_prefix":         inboundBearerPrefix,
 		"outbound_bearer_prefix":        tokenPrefix(outboundBearer),
@@ -147,7 +147,7 @@ func resolveWSBusHostClientConfig(deps *app.Deps) (cfg fwwsbus.HostClientConfig,
 		Timeout:    gw.Timeout,
 	}
 
-	if deps.IAMMode == iamservice.IAMModeDelegated {
+	if deps.ProviderMode == fwprovider.ModeDelegated {
 		cfg.AuthScheme = "bearer"
 		cfg.TokenProvider = newPowerXSTSTokenProvider(deps)
 		return cfg, true

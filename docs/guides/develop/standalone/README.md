@@ -211,8 +211,8 @@ npm run dev
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `IAMMode` / `IAM_MODE` | `local` | IAM 语义模式（`local` / `delegated`）。`delegated` 视为宿主模式语义。 |
-| `POWERX_PROXY` | `0` | 链路开关：`0` 本地链路，`1` 宿主链路。`IAMMode=delegated` 时按宿主链路处理。 |
+| `POWERX_PROVIDER_MODE` | `local` | provider 数据源模式：`local` 使用插件本地 service / DB，`delegated` 使用 framework client 调 PowerX Core 能力。 |
+| `POWERX_PROXY` | `0` | 链路开关：`0` 本地链路，`1` 宿主代理/网关链路；不推导、不覆盖 provider mode。 |
 | `PX_GATEWAY_BASE_URL` | N/A | 宿主链路目标地址（PowerX 网关基址）。仅在宿主链路生效。 |
 | `PX_GATEWAY_AUTH_SCHEME` | `bearer` | 鉴权模式开关；宿主发布默认 `bearer`。 |
 | `POWERX_STS_CLIENT_ID` / `POWERX_STS_CLIENT_SECRET` | N/A | 宿主 delegated 出站调用底座时的 STS client 凭证。 |
@@ -227,8 +227,8 @@ npm run dev
 > 后端运行模式与配置加载说明：
 >
 > - **配置文件位置**：统一使用 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`）。Go Gin 与 FastAPI 都会自动读取该文件。
-> - **环境变量覆盖**：`.env` 会覆盖进程环境变量与 `config.yaml`，因此建议将 `POWERX_PROXY`、`IAMMode`、`PX_GATEWAY_*` 统一写在这里，避免 GoLand Run Config 里残留旧值。
-> - **宿主模式（PowerX Core）**：需要宿主契约（`PX_GATEWAY_BASE_URL` + 鉴权凭证）。
+> - **环境变量覆盖**：`.env` 会覆盖进程环境变量与 `config.yaml`，因此建议将 `POWERX_PROXY`、`POWERX_PROVIDER_MODE`、`PX_GATEWAY_*` 统一写在这里，避免 GoLand Run Config 里残留旧值。
+> - **宿主链路（PowerX Core）**：需要宿主契约（`PX_GATEWAY_BASE_URL` + 鉴权凭证）。
 >   - 默认与推荐：STS access token（Bearer，`aud=powerx:api`）
 >   - `PX_GATEWAY_API_KEY` 仅用于 standalone 本地联调，不作为宿主发布默认口径
 >   - WS Bus runtime 调试接口的租户优先从入站 token/上下文 `tid` 推导；若缺失，则使用显式 `tenant_uuid`。
@@ -236,10 +236,10 @@ npm run dev
 >
 > **模式判定主口径（推荐）**：
 >
-> - 先看 `IAMMode`：`local` / `delegated`
-> - `delegated` 统一按宿主链路处理
-> - `local` 再看 `POWERX_PROXY` 决定本地链路或宿主链路
-> - 宿主链路使用 STS，standalone 本地联调使用 ApiKey
+> - 先看 `POWERX_PROVIDER_MODE`：`local` / `delegated`
+> - 再看 `POWERX_PROXY`：`0` 本地链路，`1` 宿主代理/网关链路
+> - `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=1` 使用 STS
+> - `POWERX_PROVIDER_MODE=local + POWERX_PROXY=1` 本地联调使用 ApiKey
 >
 > 详细判定顺序、三种有效组合、代码入口与日志验收见：
 > - `docs/guides/develop/standalone/mode-resolution.md`
@@ -277,7 +277,7 @@ npm run dev
 
 ```bash
 cd skeleton/backend/go-gin
-POWERX_PROXY=0 IAMMode=local go run ./cmd/plugin
+POWERX_PROXY=0 POWERX_PROVIDER_MODE=local go run ./cmd/plugin
 ```
 
 2. 准备本地管理员 token（示例变量名）：
@@ -317,7 +317,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
 
 ```bash
 cd skeleton/backend/go-gin
-POWERX_PROXY=1 IAMMode=local go run ./cmd/plugin
+POWERX_PROXY=1 POWERX_PROVIDER_MODE=local go run ./cmd/plugin
 ```
 
 鉴权示例：
@@ -391,7 +391,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
 
 补充建议：
 
-- 每次联调前先打印运行模式二元组：`IAMMode / POWERX_PROXY`。
+- 每次联调前先打印运行模式二元组：`POWERX_PROVIDER_MODE / POWERX_PROXY`。
 - 在宿主联调场景，优先验证 `grant -> publish -> event` 的完整链路，再排查业务 topic 权限。
 
 ### 1.4.6 标准联调记录模板（提单/群沟通统一格式）
@@ -406,7 +406,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
 - 代码分支与提交：<branch> / <commit>
 
 ### 1) 运行模式
-- IAMMode: local | delegated
+- POWERX_PROVIDER_MODE: local | delegated
 - POWERX_PROXY: 0 | 1
 
 ### 2) Token 与租户
@@ -436,7 +436,7 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
 - 初步判断：路径问题 / 权限问题 / 租户不一致 / 模式配置不一致
 ```
 
-> ⚠️ 只有当 `POWERX_PROXY=0` 且 `IAMMode=local` 时，Web Admin 才会渲染“组织与权限”菜单与本地 IAM 页面；切换为 Delegated 后，菜单会自动隐藏，并提示管理员前往宿主 PowerX 进行组织管理。
+> 正式业务菜单在 `POWERX_PROVIDER_MODE=delegated` 下保持可见；页面通过后端 `/mode` diagnostics 展示 provider/read-only 状态，并按 RBAC 控制可见性和操作按钮。
 
 > `skeleton/backend/go-gin/etc/` 目录内包含示例 `config.yaml` 与 `security_baseline.yaml`。默认 DSN 为 `file:../.cache/powerxplugin.db?cache=shared&_fk=1`，Loader 会把它解析成相对于 `config.yaml` 的路径，因此无论在仓库根目录还是 `skeleton/backend/go-gin` 执行命令，最终都会落在 `skeleton/.cache/` 下；若希望把文件放到仓库根目录，也可以把 DSN 改成 `file:../../.cache/powerxplugin.db?cache=shared&_fk=1` 或通过 `POWERX_DB_DSN` 环境变量覆盖。若改为纯内存 DSN（如 `file::memory:?cache=shared`），请在同一进程内连续执行 `migrate` 与 `seed`。示例配置同时关闭了 Marketplace 推荐和续费提醒的后台任务，避免在空表上触发告警。
 >

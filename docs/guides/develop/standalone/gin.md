@@ -31,6 +31,6 @@ curl http://127.0.0.1:8078/healthz
 
 ## 说明
 
-- 后端会自动读取 `skeleton/backend/.env`；请在该文件中设置 `IAMMode/POWERX_PROXY/PLUGIN_IAM_*` 等变量。
-- Standalone 运行模式应保持 `POWERX_PROXY=0`，否则会被视作宿主模式。
+- 后端会自动读取 `skeleton/backend/.env`；请在该文件中设置 `POWERX_PROVIDER_MODE/POWERX_PROXY/PLUGIN_IAM_*` 等变量。
+- Standalone 本地数据源应保持 `POWERX_PROVIDER_MODE=local`；是否接宿主链路只由 `POWERX_PROXY` 表示。
 - 如果需要仅执行迁移或种子，可改用 `migrate` / `seed`。

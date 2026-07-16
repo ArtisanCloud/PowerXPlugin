@@ -1,13 +1,8 @@
-package iamcontext
+package provider
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
-	iamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
-)
-
-func TestModeResolver_ConfigPriority(t *testing.T) {
+func TestModeResolver_ConfigConflict(t *testing.T) {
 	resolver := ModeResolver{}
 
 	mode, record, err := resolver.Resolve(ResolveInput{
@@ -24,11 +19,8 @@ func TestModeResolver_ConfigPriority(t *testing.T) {
 	if !record.ConflictDetected {
 		t.Fatalf("expected conflict flag to be true")
 	}
-	if !iamerrors.IsCode(err, iamerrors.CodeModeConflict) {
-		t.Fatalf("expected code %s, got %s", iamerrors.CodeModeConflict, iamerrors.CodeOf(err))
-	}
-	if got := iamerrors.StatusCode(err); got != 409 {
-		t.Fatalf("expected status 409, got %d", got)
+	if !IsConflict(err) {
+		t.Fatalf("expected conflict error, got %v", err)
 	}
 }
 
@@ -43,7 +35,7 @@ func TestModeResolver_ResolveFromConfigWhenNoConflict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mode != contracts.IAMModeDelegated {
+	if mode != ModeDelegated {
 		t.Fatalf("expected delegated mode, got %q", mode)
 	}
 	if record.Audit.Source != "config" {
@@ -51,7 +43,7 @@ func TestModeResolver_ResolveFromConfigWhenNoConflict(t *testing.T) {
 	}
 }
 
-func TestModeResolver_ResolveFromPowerXProxy(t *testing.T) {
+func TestModeResolver_DoesNotResolveFromPowerXProxy(t *testing.T) {
 	resolver := ModeResolver{}
 
 	mode, record, err := resolver.Resolve(ResolveInput{
@@ -60,11 +52,11 @@ func TestModeResolver_ResolveFromPowerXProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mode != contracts.IAMModeDelegated {
-		t.Fatalf("expected delegated mode, got %q", mode)
+	if mode != ModeLocal {
+		t.Fatalf("expected local mode, got %q", mode)
 	}
-	if record.Audit.Source != "env:POWERX_PROXY" {
-		t.Fatalf("expected source env:POWERX_PROXY, got %q", record.Audit.Source)
+	if record.Audit.Source != "default" {
+		t.Fatalf("expected source default, got %q", record.Audit.Source)
 	}
 }
 
@@ -75,7 +67,7 @@ func TestModeResolver_DefaultLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mode != contracts.IAMModeLocal {
+	if mode != ModeLocal {
 		t.Fatalf("expected local mode, got %q", mode)
 	}
 	if record.Audit.Source != "default" {
@@ -95,10 +87,7 @@ func TestModeResolver_InvalidMode(t *testing.T) {
 	if mode != "" {
 		t.Fatalf("expected empty mode, got %q", mode)
 	}
-	if !iamerrors.IsCode(err, iamerrors.CodeModeInvalid) {
-		t.Fatalf("expected code %s, got %s", iamerrors.CodeModeInvalid, iamerrors.CodeOf(err))
-	}
-	if got := iamerrors.StatusCode(err); got != 400 {
-		t.Fatalf("expected status 400, got %d", got)
+	if !IsInvalid(err) {
+		t.Fatalf("expected invalid error, got %v", err)
 	}
 }

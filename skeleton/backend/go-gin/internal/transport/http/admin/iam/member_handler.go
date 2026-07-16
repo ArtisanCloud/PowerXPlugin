@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -13,11 +14,17 @@ import (
 )
 
 type MemberHandler struct {
-	service *srviam.UserService
+	service   *srviam.UserService
+	mode      srviam.IAMAdapterMode
+	directory fwiamcontracts.DirectoryService
 }
 
-func NewMemberHandler(svc *srviam.UserService) *MemberHandler {
-	return &MemberHandler{service: svc}
+func NewMemberHandler(svc *srviam.UserService, mode srviam.IAMAdapterMode, directories ...fwiamcontracts.DirectoryService) *MemberHandler {
+	var directory fwiamcontracts.DirectoryService
+	if len(directories) > 0 {
+		directory = directories[0]
+	}
+	return &MemberHandler{service: svc, mode: mode, directory: directory}
 }
 
 func (h *MemberHandler) List(c *gin.Context) {
@@ -29,6 +36,27 @@ func (h *MemberHandler) List(c *gin.Context) {
 	query.TenantUUID = admincommon.ResolveTenantUUID(c)
 	if strings.TrimSpace(query.TenantUUID) == "" {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		if h.directory == nil {
+			contracts.ResponseServiceUnavailable(c, "IAM delegated directory provider is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "delegated"})
+			return
+		}
+		members, err := h.directory.ListMembers(c.Request.Context(), query.TenantUUID)
+		if err != nil {
+			respondIAMError(c, err)
+			return
+		}
+		contracts.ResponseSuccess(c, gin.H{
+			"items":     members,
+			"page":      resultPage(query.Page),
+			"page_size": resultPageSize(query.PageSize),
+		})
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
 	items, err := h.service.List(c.Request.Context(), srviam.UserFilter{
@@ -48,6 +76,14 @@ func (h *MemberHandler) List(c *gin.Context) {
 }
 
 func (h *MemberHandler) Create(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "member write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	var req CreateMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
@@ -84,6 +120,14 @@ func (h *MemberHandler) Create(c *gin.Context) {
 }
 
 func (h *MemberHandler) Update(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "member write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
 		contracts.ResponseBadRequest(c, "invalid user id")
@@ -123,6 +167,14 @@ func (h *MemberHandler) Update(c *gin.Context) {
 }
 
 func (h *MemberHandler) BulkImport(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "member write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	var req BulkImportMembersRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())

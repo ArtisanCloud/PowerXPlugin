@@ -4,7 +4,7 @@ export interface FrontendRuntimeModeState {
   mode: FrontendRuntimeMode;
   insidePowerX: boolean;
   powerxProxy: "0" | "1";
-  iamMode: "local" | "delegated";
+  providerMode: "local" | "delegated";
   gatewayAuthScheme: "bearer" | "apikey" | "";
 }
 
@@ -17,7 +17,7 @@ function toBool(value: unknown): boolean {
   return false;
 }
 
-function normalizeIAMMode(value: unknown): "local" | "delegated" {
+function normalizeProviderMode(value: unknown): "local" | "delegated" {
   const normalized = String(value || "").trim().toLowerCase();
   return normalized === "delegated" ? "delegated" : "local";
 }
@@ -33,14 +33,14 @@ export function resolveFrontendRuntimeMode(): FrontendRuntimeModeState {
   const runtimeConfig = useRuntimeConfig();
   const pub = runtimeConfig.public || {};
   const insidePowerX = toBool(pub.insidePowerX);
-  const iamMode = normalizeIAMMode(pub.iamMode);
+  const providerMode = normalizeProviderMode(pub.providerMode);
   const powerxProxy: "0" | "1" = toBool(pub.powerxProxy) || insidePowerX ? "1" : "0";
   const gatewayAuthScheme = normalizeGatewayAuthScheme(pub.gatewayAuthScheme);
 
   let mode: FrontendRuntimeMode = "standalone_local";
-  if (iamMode === "delegated") {
+  if (providerMode === "delegated") {
     mode = "host_delegated";
-  } else if (powerxProxy === "1" && iamMode === "local") {
+  } else if (powerxProxy === "1" && providerMode === "local") {
     mode = "local_proxy";
   }
 
@@ -48,7 +48,7 @@ export function resolveFrontendRuntimeMode(): FrontendRuntimeModeState {
     mode,
     insidePowerX,
     powerxProxy,
-    iamMode,
+    providerMode,
     gatewayAuthScheme,
   };
 }

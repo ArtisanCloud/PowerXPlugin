@@ -401,7 +401,7 @@ PowerXPlugin Web
 
 - `POWERX_PLUGIN_REGISTRATION_MODE` 只能是 `installed` 或 `local`，未配置或非法值必须 fail-fast。
 - 安装包的 `plugin.yaml` 必须设置 `POWERX_PLUGIN_REGISTRATION_MODE=installed`。
-- 本地调试如果要使用 `.local`，插件 backend 必须以 `POWERX_PLUGIN_REGISTRATION_MODE=local`、`POWERX_PROXY=1`、`IAMMode=local` 启动，并自动调用 Core `/api/v1/internal/plugins/debug-hosts` 登记 `com.powerx.plugins.base.local` 的 backend 端口。
+- 本地调试如果要使用 `.local`，插件 backend 必须以 `POWERX_PLUGIN_REGISTRATION_MODE=local`、`POWERX_PROXY=1`、`POWERX_PROVIDER_MODE=local` 启动，并自动调用 Core `/api/v1/internal/plugins/debug-hosts` 登记 `com.powerx.plugins.base.local` 的 backend 端口。
 - 不允许一边同步 `.local` Agent/Skill，一边调用已安装的非 `.local` 插件代理；这会导致 `TENANT_PLUGIN_DISABLED`。
 
 ### 8.2 本地 `.local` 调试链路与权限
@@ -420,7 +420,7 @@ PowerXPlugin Web
 ```env
 POWERX_PLUGIN_REGISTRATION_MODE=local
 POWERX_PROXY=1
-IAMMode=local
+POWERX_PROVIDER_MODE=local
 PX_GATEWAY_AUTH_SCHEME=apikey
 PX_GATEWAY_API_KEY=<tenant integration api key>
 PX_GATEWAY_BASE_URL=http://127.0.0.1:8077/api/v1
@@ -430,7 +430,7 @@ PX_GATEWAY_BASE_URL=http://127.0.0.1:8077/api/v1
 
 - `POWERX_PLUGIN_REGISTRATION_MODE=local`：Agent/Skill/Capability 同步为 `.local` 身份。
 - `POWERX_PROXY=1`：插件通过 PowerX Core 网关访问底座能力；这不等价于 delegated IAM。
-- `IAMMode=local`：插件本地进程自己解析本地请求上下文，不由 Core 托管注入 delegated 身份。
+- `POWERX_PROVIDER_MODE=local`：插件本地进程自己解析本地请求上下文，不由 Core 托管注入 delegated 身份。
 - `PX_GATEWAY_API_KEY`：只用于 Plugin -> Core 的注册/同步，不用于 Core -> Plugin 的 runtime 回调。
 
 Core debug host 注册必须使用新路径：
@@ -579,7 +579,7 @@ curl -s http://127.0.0.1:8077/__debug/plugins | jq '.apis | keys'
 - 插件 backend 端口，不是 Nuxt 端口。
 - `POWERX_PLUGIN_REGISTRATION_MODE=local`。
 - `POWERX_PROXY=1`。
-- `IAMMode=local`。
+- `POWERX_PROVIDER_MODE=local`。
 - `PX_GATEWAY_BASE_URL` 指向 PowerX Core `/api/v1`。
 - `PX_GATEWAY_API_KEY` 有调用 `/api/v1/internal/plugins/debug-hosts` 的权限和租户上下文。
 

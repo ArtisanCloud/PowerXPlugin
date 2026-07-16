@@ -6,8 +6,7 @@ import (
 	"strings"
 	"time"
 
-	fwiamcontext "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/context"
-	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/logger"
 	"{{ .BackendModulePath }}/internal/middleware"
@@ -312,8 +311,8 @@ func (r *Router) buildJWT() middleware.JWTAuthConfig {
 	}
 
 	cfg := middleware.JWTAuthConfig{
-		Issuer:             issuer,
-		AcceptAudiences:    audiences,
+		Issuer:          issuer,
+		AcceptAudiences: audiences,
 		// HMAC secret is sourced from cfg.Context.HMACSecret.
 		// In local mode, cmd/plugin bootstrap ensures this value is prepared via EnsureLocalIAMSecret.
 		HMACSecret:         "",
@@ -376,28 +375,25 @@ func (r *Router) buildRBAC() *middleware.RBACConfig {
 }
 
 func shouldUseDelegatedIAM(cfg *config.Config) bool {
-	mode := resolveIAMMode(cfg)
-	return mode == fwiamcontracts.IAMModeDelegated
+	mode := resolveProviderMode(cfg)
+	return mode == fwprovider.ModeDelegated
 }
 
-func resolveIAMMode(cfg *config.Config) fwiamcontracts.IAMMode {
+func resolveProviderMode(cfg *config.Config) fwprovider.Mode {
 	var configMode string
 	if cfg != nil && cfg.Context != nil {
-		configMode = cfg.Context.IAMMode
+		configMode = cfg.Context.ProviderMode
 	}
 
-	envMode := strings.TrimSpace(os.Getenv("IAM_MODE"))
-	if envMode == "" {
-		envMode = strings.TrimSpace(os.Getenv("IAMMode"))
-	}
-	resolver := fwiamcontext.ModeResolver{}
-	mode, _, err := resolver.Resolve(fwiamcontext.ResolveInput{
+	envMode := strings.TrimSpace(os.Getenv("POWERX_PROVIDER_MODE"))
+	resolver := fwprovider.ModeResolver{}
+	mode, _, err := resolver.Resolve(fwprovider.ResolveInput{
 		ConfigMode:  configMode,
 		EnvMode:     envMode,
 		PowerXProxy: strings.TrimSpace(os.Getenv("POWERX_PROXY")),
 	})
 	if err != nil {
-		return fwiamcontracts.IAMModeLocal
+		return fwprovider.ModeLocal
 	}
 	return mode
 }

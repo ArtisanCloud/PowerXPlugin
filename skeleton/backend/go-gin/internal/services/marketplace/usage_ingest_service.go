@@ -9,8 +9,8 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
-	marketobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/marketplace"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	marketobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/marketplace"
 )
 
 // UsageMetricInput captures a single metric within an ingest request.

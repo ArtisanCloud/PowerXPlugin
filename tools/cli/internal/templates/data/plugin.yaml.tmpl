@@ -19,7 +19,7 @@ runtime:
   env:
     POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
     POWERX_PROXY: "1"
-    IAMMode: "delegated"
+    POWERX_PROVIDER_MODE: "delegated"
     POWERX_PLUGIN_ID: "{{ .PluginID }}"
     POWERX_PLUGIN_REGISTRATION_MODE: installed
     POWERX_SECURITY_JWT_ISSUER: "powerx-auth"
@@ -57,6 +57,7 @@ frontend:
         NITRO_HOST: 127.0.0.1
         POWERX_PROXY: "1"
         NUXT_PUBLIC_INSIDE_POWERX: "1"
+        NUXT_PUBLIC_POWERX_PROVIDER_MODE: delegated
       health:
         http: /healthz
         interval: 5s

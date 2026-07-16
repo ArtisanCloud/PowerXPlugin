@@ -23,14 +23,14 @@
       <!-- 中间快捷操作 -->
       <div class="flex items-center space-x-3">
         <UBadge
-          :color="iamModeBadge.color"
+          :color="providerModeBadge.color"
           variant="outline"
           class="text-xs font-semibold"
         >
-          {{ iamModeBadge.label }}
+          {{ providerModeBadge.label }}
         </UBadge>
         <p class="text-xs text-gray-600 dark:text-gray-300">
-          {{ iamModeBadge.description }}
+          {{ providerModeBadge.description }}
         </p>
       </div>
 
@@ -170,7 +170,7 @@ const handleLogout = async () => {
   await auth.logout();
 };
 
-const iamModeBadge = computed(() => {
+const providerModeBadge = computed(() => {
   const standalone = auth.localIAMEnabled?.value ?? false;
   return {
     label: standalone ? "本地 IAM" : "Delegated IAM",

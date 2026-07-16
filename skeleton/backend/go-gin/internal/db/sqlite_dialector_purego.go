@@ -17,4 +17,3 @@ func SQLiteDialector(dsn string) gorm.Dialector {
 		DSN:        dsn,
 	}
 }
-

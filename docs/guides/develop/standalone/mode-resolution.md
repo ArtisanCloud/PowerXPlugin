@@ -2,51 +2,131 @@
 
 ## 1. 目标
 
-统一插件在本地开发、宿主联调、宿主安装三类场景下的模式判定与鉴权策略，避免 `IAMMode`、`POWERX_PROXY`、`insidePowerX` 混用导致链路偏差。
+统一插件在本地开发、宿主联调、宿主安装三类场景下的模式判定，避免把 provider 数据源选择、宿主代理链路、前端嵌入状态混成一个开关。
 
-## 2. 单一判定口径（后端真实规则）
+当前唯一有效口径：
 
-后端以 `IAMMode` + `POWERX_PROXY` 解析“有效运行模式（effective mode）”：
+- `POWERX_PROVIDER_MODE` 决定业务 provider 数据源：`local` 或 `delegated`
+- `POWERX_PROXY` 决定是否接宿主代理/网关链路：`0` 或 `1`
+- `NUXT_PUBLIC_INSIDE_POWERX` 只决定前端是否按宿主嵌入上下文运行
 
-1. 先解析 `IAMMode`（`config.context.iam_mode` 优先，其次环境变量）。
-2. 若 `IAMMode=delegated`，直接按宿主链路处理（等效 `effective_proxy=1`）。
-3. 若 `IAMMode=local`，再看 `POWERX_PROXY`：
-   - `0` => 本地链路
-   - `1` => 宿主链路
-4. 仅当宿主链路生效时，才解析出站鉴权凭证。
+`POWERX_PROXY` 不得推导、覆盖或隐式改变 provider mode。
 
-## 3. 三种有效模式（推荐心智模型）
+## 2. 后端真实规则
 
-| 模式 | IAMMode | POWERX_PROXY | effective_proxy | 说明 |
-|---|---|---|---|---|
-| M1 纯本地 | local | 0 | 0 | 本地 IAM + 本地能力链路 |
-| M2 本地联调宿主能力 | local | 1 | 1 | 本地启动插件，但 WS/能力走宿主 |
-| M3 委派模式 | delegated | 任意（按 1 处理） | 1 | 宿主语义模式（含本地模拟宿主） |
+后端先解析 provider mode，再解析 proxy link：
 
-> 约束：`delegated` 不再依赖 `POWERX_PROXY` 是否显式为 `1`，运行时视为宿主链路。
+1. provider mode 来源：
+   - `config.context.provider_mode`
+   - `POWERX_PROVIDER_MODE`
+   - 未设置时默认 `local`
+2. proxy link 来源：
+   - `POWERX_PROXY=1` 表示启用宿主代理/网关链路
+   - `POWERX_PROXY=0` 或未设置表示本地链路
+3. 两者相互独立：
+   - `POWERX_PROVIDER_MODE=delegated` 不等价于 `POWERX_PROXY=1`
+   - `POWERX_PROXY=1` 不等价于 `POWERX_PROVIDER_MODE=delegated`
+4. 缺少 provider 或 delegated provider 不可用时，业务 API 必须明确返回 503，不返回假空数据。
 
-## 4. 前端变量职责（和后端解耦）
+## 3. 2x2 模式矩阵
 
-前端不参与后端鉴权决策，只做“页面运行上下文”识别：
+| 场景 | POWERX_PROVIDER_MODE | POWERX_PROXY | 数据源 | 链路 | 说明 |
+|---|---|---:|---|---|---|
+| standalone local | local | 0 | 插件本地 service / DB | 本地 | 默认本地开发 |
+| local + proxy debug | local | 1 | 插件本地 service / DB | 宿主 gateway/proxy | 本地数据源联调宿主能力、WS、scheduler |
+| standalone delegated | delegated | 0 | framework client / delegated provider | 本地进程直连已配置能力 | 用于本地模拟 delegated provider，不自动启用宿主代理 |
+| host delegated | delegated | 1 | framework client / PowerX Core | 宿主 gateway/proxy | 标准宿主安装/委派模式 |
 
-1. 前端主判定字段：`runtimeConfig.public.insidePowerX`。
-2. `insidePowerX` 表示页面是否运行在宿主插件容器语义中（影响路由/baseURL/代理策略）。
-3. `NUXT_PUBLIC_INSIDE_POWERX` 仅是前端覆盖入口，不代表后端真实运行模式。
-4. `POWERX_PROXY` 是后端链路开关；可在构建时派生到前端，但两者职责不同。
+关键约束：
+
+- 只有 `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=1` 才执行宿主 delegated 环境契约校验。
+- `POWERX_PROVIDER_MODE=local + POWERX_PROXY=1` 是合法调试组合，不得被强行当成 delegated。
+- `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=0` 可以启动，但 delegated client/provider 不可用时必须明确失败。
+
+## 4. 前端变量职责
+
+前端不参与后端 provider 决策，只消费后端页面 API 与 `/mode` diagnostics。
+
+1. `runtimeConfig.public.providerMode`
+   - 来源：`NUXT_PUBLIC_POWERX_PROVIDER_MODE` 或 `POWERX_PROVIDER_MODE`
+   - 未设置时默认 `local`
+   - 不从 `insidePowerX` 或 `POWERX_PROXY` 推导
+2. `runtimeConfig.public.insidePowerX`
+   - 只表示页面是否在宿主插件容器语义中运行
+   - 影响 base URL、路由前缀、嵌入布局
+3. `runtimeConfig.public.powerxProxy`
+   - 只暴露宿主代理链路状态
+   - 不表示 provider mode
 
 推荐实践：
 
-1. `make dist`（宿主安装包）固定 `insidePowerX=1`。
-2. 本地 standalone 默认 `insidePowerX=0`。
-3. 本地模拟宿主嵌入时可设 `insidePowerX=1`，但后端是否走宿主链路仍由 `IAMMode/POWERX_PROXY` 决定。
+1. 宿主安装包显式注入：
+   - `POWERX_PROVIDER_MODE=delegated`
+   - `POWERX_PROXY=1`
+   - `NUXT_PUBLIC_INSIDE_POWERX=1`
+   - `NUXT_PUBLIC_POWERX_PROVIDER_MODE=delegated`
+2. 本地 standalone 默认：
+   - `POWERX_PROVIDER_MODE=local`
+   - `POWERX_PROXY=0`
+   - `NUXT_PUBLIC_INSIDE_POWERX=0`
+3. 本地联调宿主链路：
+   - `POWERX_PROVIDER_MODE=local`
+   - `POWERX_PROXY=1`
+   - 使用 ApiKey 或对应 gateway 调试凭证
 
-## 5. 宿主链路鉴权规则（effective_proxy=1）
+## 5. 宿主链路鉴权规则
 
-1. 标准宿主链路统一使用 STS access token（Bearer，`aud=powerx:api`）。
-2. 不默认透传入站 delegated/user bearer 到宿主 ws-bus 接口。
-3. `PX_GATEWAY_API_KEY` 仅用于 standalone 本地联调，不作为宿主发布默认口径。
+### host delegated
 
-## 6. WS / Capability Contract v2 对齐
+`POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=1`：
+
+1. 使用 STS access token（Bearer，`aud=powerx:api`）。
+2. 必须提供：
+   - `PX_GATEWAY_BASE_URL`
+   - `POWERX_STS_CLIENT_ID`
+   - `POWERX_STS_CLIENT_SECRET`
+   - `POWERX_GRPC_UPSTREAM_ADDRESS`
+   - `POWERX_GRPC_UPSTREAM_TENANT_UUID`
+   - `PX_GATEWAY_AUTH_SCHEME=bearer`
+3. 缺失时启动 fail-fast 或相关 API 返回明确 503。
+4. 不默认透传入站 delegated/user bearer 到宿主 ws-bus 接口。
+
+### local + proxy debug
+
+`POWERX_PROVIDER_MODE=local + POWERX_PROXY=1`：
+
+1. 业务页面数据仍来自插件本地 service / DB。
+2. 调 PowerX 底座能力时使用 gateway debug 凭证。
+3. 推荐：
+   - `PX_GATEWAY_AUTH_SCHEME=apikey`
+   - `PX_GATEWAY_API_KEY=<PowerX API Key>`
+4. 出站 header：`Authorization: ApiKey <key>`。
+
+## 6. 页面 API 策略
+
+正式业务页面不感知运行模式，路径保持稳定：
+
+- `/api/v1/admin/metadata/*`
+- `/api/v1/admin/iam/*`
+- `/api/v1/admin/customers/*`
+- `/api/v1/admin/ai-settings/*`
+
+后端按 provider mode 自动切换数据源：
+
+- `local`：插件本地 service / DB
+- `delegated`：framework client -> gateway/capability -> PowerX Core
+
+每个模块的 `/mode` 或 diagnostics 至少返回：
+
+- `mode`
+- `provider`
+- `delegated_available`
+- `local_available`
+- `read_only`
+
+缺 provider 时必须明确返回 503。
+
+## 7. WS / Capability Contract v2
 
 1. 地址契约由宿主注入：
    - `PX_GATEWAY_BASE_URL`（HTTP）
@@ -60,9 +140,9 @@
 4. topic 必须字节级一致（grant / subscribe / publish 同值）。
 5. 验收以 `sub_sent -> ack_ok -> event_ok` 三段为准。
 
-## 6.1 Runtime Scheduler Host 调用规则
+## 8. Runtime Scheduler Host 调用规则
 
-`local + proxy` 下，Scheduler 调用 PowerX 底座能力的标准口径如下：
+`local + proxy debug` 下，Scheduler 调 PowerX 底座能力的标准口径如下：
 
 1. 插件前端只调用插件后端 runtime API：
    - `POST /api/v1/admin/runtime/scheduler/jobs`
@@ -78,51 +158,46 @@
    - `POST /api/v1/admin/scheduler/jobs/{job_id}/trigger`
    - `POST /api/v1/admin/scheduler/jobs/{job_id}/pause`
    - `POST /api/v1/admin/scheduler/jobs/{job_id}/resume`
-3. `IAMMode=local + POWERX_PROXY=1` 使用：
+3. `POWERX_PROVIDER_MODE=local + POWERX_PROXY=1` 使用：
    - `PX_GATEWAY_AUTH_SCHEME=apikey`
    - `PX_GATEWAY_API_KEY=<PowerX API Key>`
-   - 出站 header：`Authorization: ApiKey <key>`
 4. host Scheduler 请求不传 `tenant_uuid`。PowerX 从 ApiKey 鉴权上下文解析租户；如果显式传入 tenant，会导致 `SCHEDULER_TENANT_MISMATCH`。
-5. PowerX API Key Profile 必须勾选 `com.corex.scheduler.jobs` 的 REST 权限；权限目录应包含 `admin_scheduler_jobs`、`admin_scheduler_jobs_job_id`、`pause/resume/trigger/runs`。
-6. 到期或手动触发后，标准通知 topic 为 `powerx.runtime.scheduler.triggered.v1`，插件通过既有 EventBridge/WSBus 链路接收。
+5. PowerX API Key Profile 必须勾选 `com.corex.scheduler.jobs` 的 REST 权限。
+6. 到期或手动触发后，标准通知 topic 为 `powerx.runtime.scheduler.triggered.v1`。
 
-## 7. 代码定位（当前实现）
+## 9. 代码定位
 
-1. IAM 解析入口：
-   - `skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go`
+1. provider mode 解析入口：
+   - 当前：`skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go`
+   - 目标：迁移为 provider resolver，不继续借 IAM 命名
 2. 启动期模式日志与契约检查：
    - `skeleton/backend/go-gin/cmd/plugin/main.go`
    - 关键日志：`Runtime mode resolved (2x2)`、`WS/Capability routing`
 3. taskbus provider / 宿主链路约束：
    - `skeleton/backend/go-gin/cmd/plugin/taskbus_provider.go`
-4. framework ws-bus 宿主客户端（标准路径与调用入口）：
+4. framework ws-bus 宿主客户端：
    - `framework/backend/go/runtime/wsbus/host_client.go`
-5. skeleton 侧鉴权观测日志（用于排查 token 来源）：
+5. skeleton 侧鉴权观测日志：
    - `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_gateway_auth.go`
 6. framework Scheduler host client：
    - `framework/backend/go/runtime/scheduler/http_host_client.go`
 7. skeleton Scheduler runtime API：
    - `skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/scheduler_job_handler.go`
 
-## 8. Framework 统一封装（当前基线）
-
-为避免业务页面重复判断模式，前后端都已收敛到统一 helper：
+## 10. 前后端 helper 基线
 
 1. 后端模式与 host client 解析：
    - `resolveWSBusHostClientConfig(...)`
-   - 位置：`skeleton/backend/go-gin/internal/transport/http/admin/runtime_ops/ws_bus_gateway_auth.go`
-   - 输出：`host_delegated / local_proxy / standalone_local` 对应的 host client 配置（`baseURL/apiPrefix/authScheme/token|apiKey`）
+   - 输出：`host_delegated / local_proxy / standalone_local` 对应 host client 配置
 2. 前端模式解析：
    - `resolveFrontendRuntimeMode()`
-   - 位置：`skeleton/web-admin/nuxt/app/utils/runtime-mode.ts`
-   - 输出：`mode`、`insidePowerX`、`powerxProxy`、`iamMode`、`gatewayAuthScheme`
+   - 输出：`mode`、`insidePowerX`、`powerxProxy`、`providerMode`、`gatewayAuthScheme`
 3. framework WS URL 统一构造：
    - `createPluginWsClient(...).buildURL()`
-   - 位置：`framework/frontend/nuxt/framework-client/ws.ts`
-   - 规则：优先 `wsBaseURL`，其次 `hostBaseURL`，最终兜底 `window.location.origin + wsPath`（避免因页面漏传参数直接抛错）
-4. 业务页面只消费 helper 结果，不再自行拼接 WS/API 地址。
+   - 规则：优先 `wsBaseURL`，其次 `hostBaseURL`，最终兜底 `window.location.origin + wsPath`
+4. 业务页面只消费后端 `/mode` 和 helper 结果，不自行拼接 WS/API 地址。
 
-## 9. 最小自检清单
+## 11. 最小自检清单
 
 1. 启动日志出现：
    - `Runtime mode resolved (2x2)`
@@ -130,27 +205,28 @@
 2. 宿主链路鉴权日志包含：
    - `gateway_auth_scheme`
    - `outbound_token_source`
+   - `provider_mode`
 3. WS 联调必须同时满足：
    - `Grant=ok`
    - `Publish=ok`
    - `ack_ok=true`
    - `event_ok=true`
 
-## 10. Breaking Change（Token 收敛）
+## 12. Breaking Change
 
-从当前版本开始，旧静态 Tool Token 链路已废弃：
+旧静态 Tool Token 链路已废弃：
 
-1. `IAMMode=delegated` 且 `POWERX_PROXY=1`：
-   - 必须使用 STS access token（`aud=powerx:api`）
-   - 缺少 `POWERX_STS_CLIENT_ID` / `POWERX_STS_CLIENT_SECRET` / `POWERX_GRPC_UPSTREAM_*` 会被拒绝（fail-fast）
-2. `IAMMode=local` 且 `POWERX_PROXY=1`：
-   - 本地联调使用 `PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY`
-   - 不再读取静态 bearer tool token
-3. `POWERX_PROXY=0`：
+1. `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=1`
+   - 必须使用 STS access token
+   - 缺少 STS/gRPC 契约变量会被拒绝
+2. `POWERX_PROVIDER_MODE=local + POWERX_PROXY=1`
+   - 本地联调用 ApiKey
+   - 不读取静态 bearer tool token
+3. `POWERX_PROXY=0`
    - 不依赖宿主 STS 凭证
 
 迁移建议：
 
-1. 宿主部署脚本只注入 `PX_GATEWAY_BASE_URL` 与 STS/gRPC 契约变量
-2. 本地联调脚本只注入 ApiKey 契约变量
-3. 旧静态 Tool Token 环境变量应直接删除
+1. 宿主部署脚本显式注入 provider mode、proxy link、STS/gRPC 契约变量。
+2. 本地联调脚本显式注入 provider mode、proxy link、ApiKey 契约变量。
+3. 旧静态 Tool Token 环境变量直接删除。

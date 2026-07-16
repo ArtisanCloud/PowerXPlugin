@@ -6,7 +6,7 @@ namespace PowerXPlugin.Framework.IAM;
 public class IAMRegistry
 {
     private readonly object _lock = new();
-    private IAMMode? _mode;
+    private IAMAdapterMode? _mode;
 
     public IDirectoryService? Directory { get; private set; }
     public IAuthzService? Authz { get; private set; }
@@ -14,9 +14,9 @@ public class IAMRegistry
 
     public bool IsBound => Directory != null && Authz != null && IdentityContext != null;
 
-    public IAMMode? Mode => _mode;
+    public IAMAdapterMode? Mode => _mode;
 
-    public void Bind(IAMMode mode, IDirectoryService directory, IAuthzService authz, IIdentityContextService identityContext)
+    public void Bind(IAMAdapterMode mode, IDirectoryService directory, IAuthzService authz, IIdentityContextService identityContext)
     {
         ArgumentNullException.ThrowIfNull(directory);
         ArgumentNullException.ThrowIfNull(authz);

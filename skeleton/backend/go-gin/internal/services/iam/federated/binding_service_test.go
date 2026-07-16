@@ -7,7 +7,7 @@ import (
 
 	iamrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
 	EntityModels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	identitymodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 )
 
 func TestBindingServiceCRUDAndTenantIsolation(t *testing.T) {
@@ -18,15 +18,15 @@ func TestBindingServiceCRUDAndTenantIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&iammodel.User{}, &iammodel.Member{}, &iammodel.FederatedBinding{}); err != nil {
+	if err := db.AutoMigrate(&identitymodel.User{}, &identitymodel.Member{}, &identitymodel.FederatedBinding{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	seedUser := &iammodel.User{Email: "user@example.com", PasswordHash: "x", Status: iammodel.StatusActive}
+	seedUser := &identitymodel.User{Email: "user@example.com", PasswordHash: "x", Status: identitymodel.StatusActive}
 	if err := db.Create(seedUser).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-	memberA := &iammodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-a"}, UserID: seedUser.ID, Username: "u1", Status: iammodel.StatusActive}
-	memberB := &iammodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-b"}, UserID: seedUser.ID, Username: "u2", Status: iammodel.StatusActive}
+	memberA := &identitymodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-a"}, UserID: seedUser.ID, Username: "u1", Status: identitymodel.StatusActive}
+	memberB := &identitymodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-b"}, UserID: seedUser.ID, Username: "u2", Status: identitymodel.StatusActive}
 	if err := db.Create(memberA).Error; err != nil {
 		t.Fatalf("seed memberA: %v", err)
 	}
@@ -78,14 +78,14 @@ func TestBindingServiceTenantScopeIsolation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&iammodel.User{}, &iammodel.Member{}, &iammodel.FederatedBinding{}); err != nil {
+	if err := db.AutoMigrate(&identitymodel.User{}, &identitymodel.Member{}, &identitymodel.FederatedBinding{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	seedUser := &iammodel.User{Email: "scope@example.com", PasswordHash: "x", Status: iammodel.StatusActive}
+	seedUser := &identitymodel.User{Email: "scope@example.com", PasswordHash: "x", Status: identitymodel.StatusActive}
 	if err := db.Create(seedUser).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-	member := &iammodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-a"}, UserID: seedUser.ID, Username: "scope-u", Status: iammodel.StatusActive}
+	member := &identitymodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-a"}, UserID: seedUser.ID, Username: "scope-u", Status: identitymodel.StatusActive}
 	if err := db.Create(member).Error; err != nil {
 		t.Fatalf("seed member: %v", err)
 	}
@@ -128,14 +128,14 @@ func TestJITServiceUniqueMatchAutoBind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&iammodel.User{}, &iammodel.Member{}, &iammodel.FederatedBinding{}); err != nil {
+	if err := db.AutoMigrate(&identitymodel.User{}, &identitymodel.Member{}, &identitymodel.FederatedBinding{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	user := &iammodel.User{Email: "jit@example.com", Phone: "13800000000", PasswordHash: "x", Status: iammodel.StatusActive, CreatedAt: time.Now()}
+	user := &identitymodel.User{Email: "jit@example.com", Phone: "13800000000", PasswordHash: "x", Status: identitymodel.StatusActive, CreatedAt: time.Now()}
 	if err := db.Create(user).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-	member := &iammodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-j"}, UserID: user.ID, Username: "jit", Status: iammodel.StatusActive}
+	member := &identitymodel.Member{BaseModel: EntityModels.BaseModel{TenantUuid: "tenant-j"}, UserID: user.ID, Username: "jit", Status: identitymodel.StatusActive}
 	if err := db.Create(member).Error; err != nil {
 		t.Fatalf("seed member: %v", err)
 	}

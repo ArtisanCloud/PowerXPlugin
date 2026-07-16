@@ -9,7 +9,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	agentregistry "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/agent_registry"
-	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	identitymodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	metadatamodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/metadata"
 	templatemodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
 	sampleskills "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/skills"
@@ -285,7 +285,7 @@ func metadataSeedTenantUUIDs(db *gorm.DB) ([]string, error) {
 		out = append(out, value)
 	}
 	add(defaultTenantUUID)
-	var tenants []iammodel.Tenant
+	var tenants []identitymodel.Tenant
 	if err := db.Find(&tenants).Error; err != nil {
 		return nil, err
 	}

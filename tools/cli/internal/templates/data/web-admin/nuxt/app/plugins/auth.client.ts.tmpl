@@ -7,7 +7,7 @@ export default defineNuxtPlugin(() => {
     runtimeConfig.public?.delegatedMode === true ||
     runtimeConfig.public?.delegatedMode === "true";
 
-  auth.setIAMModeFlags?.(delegatedMode);
+  auth.setProviderModeFlags?.(delegatedMode);
 
   if (process.client) {
     auth.initAuth();

@@ -11,6 +11,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	}
 	handler := NewHandler(deps)
 	group := admin.Group("/customers")
+	group.GET("/mode", handler.Mode)
 	group.GET("/overview", handler.Overview)
 	group.GET("/accounts", handler.ListAccounts)
 	group.POST("/accounts", handler.CreateAccount)

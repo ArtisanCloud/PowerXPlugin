@@ -64,7 +64,7 @@ PowerXPlugin Web 调试页
 ```env
 POWERX_PLUGIN_REGISTRATION_MODE=local
 POWERX_PROXY=1
-IAMMode=local
+POWERX_PROVIDER_MODE=local
 PX_GATEWAY_BASE_URL=http://127.0.0.1:8077/api/v1
 PX_GATEWAY_AUTH_SCHEME=apikey
 PX_GATEWAY_API_KEY=<tenant integration api key>
@@ -74,7 +74,7 @@ PX_GATEWAY_API_KEY=<tenant integration api key>
 
 - `POWERX_PLUGIN_REGISTRATION_MODE=local` 决定同步出的插件 ID 和 Skill ID 带 `.local`。
 - `POWERX_PROXY=1` 表示插件通过 PowerX Core 网关访问底座接口。
-- `IAMMode=local` 表示插件本地进程按 local 调试方式处理身份，不是 Core 托管 installed 进程。
+- `POWERX_PROVIDER_MODE=local` 表示插件本地进程按 local 调试方式处理身份，不是 Core 托管 installed 进程。
 - `PX_GATEWAY_API_KEY` 只用于 Plugin -> Core 注册、同步、调试请求，不用于 Core -> Plugin 的 runtime 回调。
 
 ### 3.2 Core 必须能看到 local debug host

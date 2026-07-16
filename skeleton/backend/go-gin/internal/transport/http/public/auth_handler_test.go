@@ -36,7 +36,7 @@ func TestAuthHandler_LoginSuccess(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
+	handler := NewAuthHandler(&app.Deps{IAMAdapterMode: iamservice.IAMAdapterModeDelegated, AuthProxy: proxy})
 	router.POST("/auth/login", handler.Login)
 
 	body := `{"identifier":"user@example.com","password":"secret"}`
@@ -64,7 +64,7 @@ func TestAuthHandler_LoginUnavailable(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
+	handler := NewAuthHandler(&app.Deps{IAMAdapterMode: iamservice.IAMAdapterModeDelegated, AuthProxy: proxy})
 	router.POST("/auth/login", handler.Login)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"identifier":"a","password":"b"}`))
@@ -87,7 +87,7 @@ func TestAuthHandler_RefreshUnauthorized(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
+	handler := NewAuthHandler(&app.Deps{IAMAdapterMode: iamservice.IAMAdapterModeDelegated, AuthProxy: proxy})
 	router.POST("/auth/refresh", handler.Refresh)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/refresh", bytes.NewBufferString(`{"refresh_token":"abc"}`))
@@ -120,7 +120,7 @@ func TestAuthHandler_MeContextSuccess(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeDelegated, AuthProxy: proxy})
+	handler := NewAuthHandler(&app.Deps{IAMAdapterMode: iamservice.IAMAdapterModeDelegated, AuthProxy: proxy})
 	router.GET("/auth/me/context", handler.MeContext)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/me/context", nil)
@@ -187,7 +187,7 @@ func TestAuthHandler_LocalLogin(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeLocal, IAMDirectory: local})
+	handler := NewAuthHandler(&app.Deps{IAMAdapterMode: iamservice.IAMAdapterModeLocal, IAMDirectory: local})
 	router.POST("/auth/login", handler.Login)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(`{"identifier":"admin","password":"pwd"}`))
@@ -224,7 +224,7 @@ func TestAuthHandler_LocalMeContext(t *testing.T) {
 		},
 	}
 	router := gin.New()
-	handler := NewAuthHandler(&app.Deps{IAMMode: iamservice.IAMModeLocal, IAMDirectory: local})
+	handler := NewAuthHandler(&app.Deps{IAMAdapterMode: iamservice.IAMAdapterModeLocal, IAMDirectory: local})
 	router.GET("/auth/me/context", handler.MeContext)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/me/context", nil)
@@ -264,7 +264,7 @@ type localDirStub struct {
 	ctxFn     func(context.Context, string) (*iamservice.UserContext, error)
 }
 
-func (l *localDirStub) Mode() iamservice.IAMMode { return iamservice.IAMModeLocal }
+func (l *localDirStub) Mode() iamservice.IAMAdapterMode { return iamservice.IAMAdapterModeLocal }
 
 func (l *localDirStub) Login(ctx context.Context, req iamservice.LoginRequest) (*iamservice.AuthTokens, *iamservice.UserContext, error) {
 	if l.loginFn != nil {

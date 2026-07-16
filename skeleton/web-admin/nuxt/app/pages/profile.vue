@@ -47,7 +47,7 @@
             </div>
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">IAM 模式</dt>
-              <dd>{{ iamModeLabel }}</dd>
+              <dd>{{ providerModeLabel }}</dd>
             </div>
           </dl>
         </div>
@@ -93,8 +93,8 @@ const currentTenant = computed(() => userStore.currentTenant);
 const displayName = computed(() => userStore.displayName);
 const avatarUrl = computed(() => userStore.avatarUrl);
 const avatarText = computed(() => displayName.value.slice(0, 1).toUpperCase() || "U");
-const iamModeLabel = computed(() => {
-  const raw = String(runtimeConfig.public?.iamMode || "").trim();
+const providerModeLabel = computed(() => {
+  const raw = String(runtimeConfig.public?.providerMode || "").trim();
   if (raw) return raw;
   return runtimeConfig.public?.delegatedMode || runtimeConfig.public?.insidePowerX ? "delegated" : "local";
 });

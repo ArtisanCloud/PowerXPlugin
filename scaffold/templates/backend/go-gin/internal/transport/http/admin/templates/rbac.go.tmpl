@@ -14,13 +14,13 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 	manage := authx.Permission{Resource: "base.templates", Action: "manage"}
 
 	return map[string]authx.Permission{
-		"GET:" + base:                   read,
-		"GET:" + base + "/*":            read,
-		"POST:" + base:                  manage,
-		"PUT:" + base + "/*":            manage,
-		"DELETE:" + base + "/*":         manage,
-		"POST:" + base + "/batch-clone": manage,
-		"POST:" + base + "/*/validate":  manage,
+		"GET:" + base:                        read,
+		"GET:" + base + "/*":                 read,
+		"POST:" + base:                       manage,
+		"PUT:" + base + "/*":                 manage,
+		"DELETE:" + base + "/*":              manage,
+		"POST:" + base + "/batch-clone":      manage,
+		"POST:" + base + "/*/validate":       manage,
 		"POST:" + adminBase + "/batch-clone": manage,
 		"POST:" + adminBase + "/*/validate":  manage,
 	}

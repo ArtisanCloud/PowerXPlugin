@@ -9,7 +9,7 @@
 
 本特性将 IAM 契约从 skeleton 上提到 framework，目标是让插件业务层只依赖 framework IAM 接口即可在 `standalone(local)` 与 `delegated` 模式间切换。  
 关键策略已在 clarify 阶段冻结：
-1. 模式优先级：`config.context.iam_mode` > 环境变量；冲突 fail-fast。
+1. 模式优先级：`config.context.provider_mode` > 环境变量；冲突 fail-fast。
 2. adapter 切换：启动期单选绑定，运行期不自动切换。
 3. delegated 写边界：组织/成员/角色/权限写操作只允许宿主侧执行，插件侧只读。
 4. local 最小集：租户、部门、成员、角色、权限五类实体完整可用。

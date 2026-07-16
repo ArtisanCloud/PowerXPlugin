@@ -143,12 +143,12 @@ func writeCatalogSnapshot(t *testing.T, path string, snapshot *capabilities.Cata
 func makeStubExposureTree(t *testing.T, root string) {
 	t.Helper()
 	files := map[string]string{
-		"contracts/exposure/openapi.yaml":              "openapi: \"3.0.0\"\ninfo:\n  title: stub\n",
-		"contracts/exposure/proto/demo.proto":          "syntax = \"proto3\";\npackage demo;\n",
-		"contracts/exposure/workflow/demo.json":        "{\"id\":\"demo\"}\n",
-		"contracts/exposure/mcp-tools.json":            "{\"plugin_id\":\"demo\",\"tools\":[]}\n",
-		"contracts/exposure/agent-streams/demo.yaml":   "capability_id: demo\n",
-		"dist/agent-sdk/manifest.json":                 "{\"plugin_id\":\"demo\",\"tools\":[]}\n",
+		"contracts/exposure/openapi.yaml":            "openapi: \"3.0.0\"\ninfo:\n  title: stub\n",
+		"contracts/exposure/proto/demo.proto":        "syntax = \"proto3\";\npackage demo;\n",
+		"contracts/exposure/workflow/demo.json":      "{\"id\":\"demo\"}\n",
+		"contracts/exposure/mcp-tools.json":          "{\"plugin_id\":\"demo\",\"tools\":[]}\n",
+		"contracts/exposure/agent-streams/demo.yaml": "capability_id: demo\n",
+		"dist/agent-sdk/manifest.json":               "{\"plugin_id\":\"demo\",\"tools\":[]}\n",
 	}
 	for rel, content := range files {
 		abs := filepath.Join(root, rel)

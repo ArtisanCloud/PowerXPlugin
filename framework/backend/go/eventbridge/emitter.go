@@ -52,9 +52,7 @@ func (f *Factory) NewEmitter() (Emitter, error) {
 	}
 
 	local := NewLocalEmitter(f.cfg.LocalQueueSize, opts...)
-	hostManaged := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" ||
-		strings.EqualFold(strings.TrimSpace(os.Getenv("IAM_MODE")), "delegated") ||
-		strings.EqualFold(strings.TrimSpace(os.Getenv("IAMMode")), "delegated")
+	hostManaged := strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
 	slog.Info("eventbridge factory decide",
 		"enabled", f.cfg.Enabled,
 		"mode", f.cfg.Mode,

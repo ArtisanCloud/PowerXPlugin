@@ -205,7 +205,7 @@ server:
   log_level: "debug"
   dev_mode: true
 context:
-  iam_mode: "local"
+  provider_mode: "local"
 database:
   driver: "memory"
   dsn: "file:powerxplugin-regression?mode=memory&cache=shared"
@@ -223,7 +223,7 @@ gateway:
 YAML
 
     CONFIG_PATH="$backend_cfg" POWERX_BIND_ADDR=":${BACKEND_PORT}" PORT="${BACKEND_PORT}" \
-      POWERX_PROXY=0 IAMMode=local IAM_MODE=local STANDALONE=1 \
+      POWERX_PROXY=0 POWERX_PROVIDER_MODE=local STANDALONE=1 \
       PLUGIN_SKILLS_DIR="${ROOT_DIR}/skeleton/skills" \
       PX_GATEWAY_BASE_URL="" PX_GATEWAY_AUTH_SCHEME="" PX_GATEWAY_API_KEY="" \
       PX_PLUGIN_TOOL_TOKEN="" PX_TOOL_REFRESH_TOKEN="" PX_USE_MOCK="" \

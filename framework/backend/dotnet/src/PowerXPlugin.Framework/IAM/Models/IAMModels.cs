@@ -92,7 +92,7 @@ public record DirectorySnapshot
     public IReadOnlyList<Permission> Permissions { get; init; } = Array.Empty<Permission>();
 }
 
-public enum IAMMode
+public enum IAMAdapterMode
 {
     Local,
     Delegated

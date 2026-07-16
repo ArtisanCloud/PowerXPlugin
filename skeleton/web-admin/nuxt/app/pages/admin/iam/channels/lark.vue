@@ -7,8 +7,9 @@
         <p class="text-sm text-gray-600 dark:text-slate-300">配置完成后可用于扫码挑战重写与同步任务鉴权。</p>
       </div>
       <div class="flex gap-2">
+        <UBadge color="neutral" variant="soft">{{ providerModeLabel }}</UBadge>
         <UButton variant="outline" :loading="refreshing" @click="reloadConfig">刷新</UButton>
-        <UButton color="primary" :loading="saving" @click="saveForm">保存配置</UButton>
+        <UButton color="primary" :loading="saving" :disabled="readonlyMode" @click="saveForm">保存配置</UButton>
       </div>
     </div>
 
@@ -22,7 +23,7 @@
         <p class="mt-1 text-cyan-200/90">字段映射：`Tenant Key -> tenant_key`，`App ID -> app_id`，`App Secret -> app_secret`。</p>
       </div>
 
-      <UForm :state="form" class="space-y-4">
+      <UForm :state="form" class="space-y-4" :disabled="readonlyMode">
         <div class="grid gap-4 md:grid-cols-2">
           <UFormField label="配置状态">
             <USelect v-model="form.status" :items="statusOptions" />
@@ -75,6 +76,8 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useToast } from "#imports";
 import { storeToRefs } from "pinia";
 import { useApiClient } from "~/composables/api/_client";
+import { useIAMService } from "~/composables/api/services/iamService";
+import { defaultProviderMode, normalizeProviderMode, type ProviderModeDiagnostics } from "~/composables/api/useProviderMode";
 import { useUserStore } from "~/stores/user";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 
@@ -111,10 +114,15 @@ type LarkConfigResponse = {
 };
 
 const toast = useToast();
+const { t } = useI18n();
 const { get, put } = useApiClient();
+const iam = useIAMService();
 const showSecret = ref(false);
 const saving = ref(false);
 const refreshing = ref(false);
+const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
+const readonlyMode = computed(() => Boolean(providerMode.value.read_only));
+const providerModeLabel = computed(() => providerMode.value.mode === "delegated" ? t("providerMode.delegated") : t("providerMode.local"));
 
 const statusOptions = [
   { label: "active", value: "active" },
@@ -172,6 +180,10 @@ const validateRequired = () => {
 };
 
 const saveForm = async () => {
+  if (readonlyMode.value) {
+    toast.add({ title: t("providerMode.readOnly"), description: t("providerMode.readOnlyDescription"), color: "warning" });
+    return;
+  }
   const error = validateRequired();
   if (error) {
     toast.add({ title: "保存失败", description: error, color: "error" });
@@ -221,7 +233,13 @@ const reloadConfig = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    const response = await iam.mode();
+    providerMode.value = normalizeProviderMode((response as any)?.data);
+  } catch {
+    providerMode.value = defaultProviderMode();
+  }
   reloadConfig();
 });
 </script>

@@ -241,7 +241,30 @@
     "title": "AI Settings",
     "description": "Unified AI capability configuration entry for this plugin. The page only shows provider status until a real provider is wired.",
     "providerNotConfigured": "AI settings provider is not configured",
-    "providerNotConfiguredDescription": "This plugin has not connected a local or PowerX AI settings provider yet. Once connected, this page will read configuration through the plugin backend."
+    "providerNotConfiguredDescription": "This plugin has not connected a local or PowerX AI settings provider yet. Once connected, this page will read configuration through the plugin backend.",
+    "empty": "No configuration",
+    "cards": {
+      "provider": "Current provider",
+      "delegatedAvailable": "Delegated provider",
+      "health": "Health"
+    },
+    "sections": {
+      "summary": "Summary",
+      "routing": "Routing",
+      "providers": "Provider Profiles",
+      "models": "Model Profiles"
+    },
+    "columns": {
+      "name": "Name",
+      "provider": "Provider",
+      "status": "Status"
+    }
+  },
+  "providerMode": {
+    "local": "Local mode",
+    "delegated": "Delegated mode",
+    "readOnly": "Read-only mode",
+    "readOnlyDescription": "The current provider is read-only. This operation is unavailable."
   },
   "frameworkLab": {
     "title": "Framework Function Test",

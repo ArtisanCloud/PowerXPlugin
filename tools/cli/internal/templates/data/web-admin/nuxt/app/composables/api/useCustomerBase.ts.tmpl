@@ -1,5 +1,6 @@
 import { apiGet, apiPatch, apiPost, useApiClient } from "./_client";
 import type { ApiResponse } from "./_base";
+import type { ProviderModeDiagnostics } from "./useProviderMode";
 
 export interface CustomerOverview {
   tenant_uuid?: string;
@@ -161,6 +162,9 @@ export function useCustomerBaseApi() {
   const overview = (query?: CustomerBaseQuery, init?: any) =>
     apiGet<ApiResponse<CustomerOverview>>("admin/customers/overview", cleanQuery(query), init);
 
+  const mode = (init?: any) =>
+    apiGet<ApiResponse<ProviderModeDiagnostics>>("admin/customers/mode", undefined, init);
+
   const listAccounts = (query?: CustomerBaseQuery, init?: any) =>
     apiGet<ApiResponse<CustomerPage<CustomerAccount>>>("admin/customers/accounts", cleanQuery(query), init);
 
@@ -187,6 +191,7 @@ export function useCustomerBaseApi() {
 
   return {
     baseURL,
+    mode,
     overview,
     listAccounts,
     createAccount,

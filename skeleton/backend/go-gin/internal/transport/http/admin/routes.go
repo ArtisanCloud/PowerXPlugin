@@ -1,7 +1,7 @@
 package admin
 
 import (
-	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	adminaisettings "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/ai_settings"
 	admincapability "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/capability"
@@ -49,7 +49,7 @@ func adminTenantGroup(parent *gin.RouterGroup, deps *app.Deps) *gin.RouterGroup 
 		return nil
 	}
 	needTenant := false
-	if deps != nil && deps.IAMMode == iamservice.IAMModeDelegated {
+	if deps != nil && deps.ProviderMode == fwprovider.ModeDelegated {
 		needTenant = true
 	}
 	if !needTenant {

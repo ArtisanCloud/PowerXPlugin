@@ -24,7 +24,7 @@ runtime:
     POWERX_PLUGIN_ID: com.powerx.plugins.base
     POWERX_PLUGIN_REGISTRATION_MODE: installed
     POWERX_PROXY: "1"
-    IAMMode: delegated
+    POWERX_PROVIDER_MODE: delegated
 backend:
   entry: backend/bin/plugin
   port: 0
@@ -215,7 +215,7 @@ TENANT_PLUGIN_DISABLED
 处理：
 
 1. 确认安装包 `plugin.yaml` 设置 `POWERX_PLUGIN_REGISTRATION_MODE: installed`。
-2. 如果是本地联调，确认插件 backend 以 `POWERX_PLUGIN_REGISTRATION_MODE=local`、`POWERX_PROXY=1`、`IAMMode=local` 启动，并且 backend 端口不是 Nuxt 端口。
+2. 如果是本地联调，确认插件 backend 以 `POWERX_PLUGIN_REGISTRATION_MODE=local`、`POWERX_PROXY=1`、`POWERX_PROVIDER_MODE=local` 启动，并且 backend 端口不是 Nuxt 端口。
 3. 用 `curl -s http://127.0.0.1:8077/__debug/plugins | jq '.apis | keys'` 确认包含 `com.powerx.plugins.base.local`。
 4. 重新执行“初始化/同步模板智能体”。
 5. 新开 Agent session 测试。

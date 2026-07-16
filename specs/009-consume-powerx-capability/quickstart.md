@@ -50,7 +50,7 @@
 
 5. **观测与日志**
    - 框架自动记录 `capabilityId`、`tenantUUID`、`traceId`、耗时；若触发限流会写入 `rateLimitExceeded` 事件。
-   - 启动日志必须出现 gateway preflight 结果（`iam_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）。
+   - 启动日志必须出现 gateway preflight 结果（`provider_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）。
    - 指标需包含 `plugin_gateway_config_valid{plugin_id,mode}` 与 `plugin_gateway_invoke_fail_total{code}`。
    - 如需手动验证，执行 `scripts/capabilities/run-from-package.mjs --manifest ./skeleton/plugin.yaml --cap com.corex.media.assets.manage --action Create`。
 

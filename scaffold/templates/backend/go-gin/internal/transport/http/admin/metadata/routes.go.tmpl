@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"{{ .BackendModulePath }}/internal/contracts"
-	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	metadatasvc "{{ .BackendModulePath }}/internal/services/metadata"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
@@ -20,7 +20,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 		return
 	}
 	h := &Handler{
-		mode:      deps.IAMMode,
+		mode:      deps.ProviderMode,
 		delegated: deps.Metadata,
 		local:     metadatasvc.NewService(deps.DB),
 	}
@@ -41,7 +41,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 }
 
 type Handler struct {
-	mode      iamservice.IAMMode
+	mode      fwprovider.Mode
 	delegated *fwmetadata.Client
 	local     *metadatasvc.Service
 }
@@ -95,15 +95,7 @@ type createResourceTypeRequest struct {
 }
 
 func (h *Handler) Mode(c *gin.Context) {
-	mode := strings.TrimSpace(h.mode.String())
-	if mode == "" {
-		mode = string(iamservice.IAMModeLocal)
-	}
-	contracts.ResponseSuccess(c, gin.H{
-		"mode":                mode,
-		"delegated_available": h.delegated != nil,
-		"local_available":     h.local != nil,
-	})
+	contracts.ResponseSuccess(c, h.diagnostics())
 }
 
 func (h *Handler) ListDictionaryNamespaces(c *gin.Context) {
@@ -356,6 +348,10 @@ func (h *Handler) CreateResourceType(c *gin.Context) {
 
 func (h *Handler) options(c *gin.Context) (metadatasvc.ListOptions, bool) {
 	if h.isDelegated() {
+		if h.delegated == nil {
+			admincommon.ProviderUnavailable(c, "METADATA_PROVIDER_NOT_CONFIGURED", "metadata delegated provider is not configured", h.diagnostics())
+			return metadatasvc.ListOptions{}, false
+		}
 		return metadatasvc.ListOptions{
 			Module: strings.TrimSpace(c.Query("module")), Namespace: strings.TrimSpace(c.Query("namespace")),
 			ResourceType: strings.TrimSpace(c.Query("resource_type")), Status: strings.TrimSpace(c.Query("status")),
@@ -368,7 +364,7 @@ func (h *Handler) options(c *gin.Context) (metadatasvc.ListOptions, bool) {
 		return metadatasvc.ListOptions{}, false
 	}
 	if h.local == nil {
-		contracts.ResponseServiceUnavailable(c, "local metadata store is unavailable", nil)
+		admincommon.ProviderUnavailable(c, "METADATA_PROVIDER_NOT_CONFIGURED", "local metadata store is unavailable", h.diagnostics())
 		return metadatasvc.ListOptions{}, false
 	}
 	return metadatasvc.ListOptions{
@@ -379,7 +375,15 @@ func (h *Handler) options(c *gin.Context) (metadatasvc.ListOptions, bool) {
 }
 
 func (h *Handler) isDelegated() bool {
-	return h != nil && h.mode == iamservice.IAMModeDelegated
+	return h != nil && h.mode == fwprovider.ModeDelegated
+}
+
+func (h *Handler) diagnostics() admincommon.ProviderDiagnostics {
+	mode := string(fwprovider.ModeLocal)
+	if h != nil && strings.TrimSpace(h.mode.String()) != "" {
+		mode = h.mode.String()
+	}
+	return admincommon.NewProviderDiagnostics(mode, h != nil && h.delegated != nil, h != nil && h.local != nil)
 }
 
 func respondPage[T any](c *gin.Context, page *fwmetadata.Page[T], err error) {

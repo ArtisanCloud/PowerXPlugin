@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 
 const loginEmail = process.env.PLAYWRIGHT_LOCAL_EMAIL || 'admin@local.test';
 const loginPassword = process.env.PLAYWRIGHT_LOCAL_PASSWORD || 'S3cret!!';
-const iamMode = process.env.PLAYWRIGHT_LOCAL_IAM;
+const localIAMFlag = process.env.PLAYWRIGHT_LOCAL_IAM;
 
-if (iamMode !== '1') {
+if (localIAMFlag !== '1') {
   test.skip(true, 'Set PLAYWRIGHT_LOCAL_IAM=1 to run IAM organization e2e tests.');
 }
 

@@ -42,13 +42,15 @@ func (g *knowledgeGatewayStub) ListPlatformCapabilities(context.Context, capgate
 }
 func (g *knowledgeGatewayStub) ListKnowledgeSpaces(_ context.Context, opts capgateway.KnowledgeSpaceListOptions) ([]capgateway.KnowledgeSpaceRuntimeRecord, error) {
 	g.lastSpaces = opts
-	return []capgateway.KnowledgeSpaceRuntimeRecord{{
-		UUID:           "space-1",
-		SpaceName:      "客服知识空间",
-		Status:         "active",
-		DepartmentCode: "support",
-		RAGProfileKey:  "default",
-	}}, nil
+	return []capgateway.KnowledgeSpaceRuntimeRecord{
+		{
+			UUID:           "space-1",
+			SpaceName:      "客服知识空间",
+			Status:         "active",
+			DepartmentCode: "support",
+			RAGProfileKey:  "default",
+		},
+	}, nil
 }
 func (g *knowledgeGatewayStub) CreateKnowledgeSpace(_ context.Context, params capgateway.KnowledgeSpaceCreateParams) (*capgateway.KnowledgeSpaceRecord, error) {
 	if g.createErr != nil {

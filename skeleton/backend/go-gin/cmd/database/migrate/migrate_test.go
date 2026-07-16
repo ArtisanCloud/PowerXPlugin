@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	EntityModels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
-	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	identitymodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	_ "modernc.org/sqlite"
@@ -30,10 +30,10 @@ func TestMigratePluginModelsIncludesFederatedIAMTables(t *testing.T) {
 	}
 
 	mustHave := []interface{}{
-		&iammodel.FederatedExternalIdentity{},
-		&iammodel.FederatedBinding{},
-		&iammodel.FederatedLoginChallenge{},
-		&iammodel.FederatedRiskEvent{},
+		&identitymodel.FederatedExternalIdentity{},
+		&identitymodel.FederatedBinding{},
+		&identitymodel.FederatedLoginChallenge{},
+		&identitymodel.FederatedRiskEvent{},
 	}
 	for _, model := range mustHave {
 		if !db.Migrator().HasTable(model) {

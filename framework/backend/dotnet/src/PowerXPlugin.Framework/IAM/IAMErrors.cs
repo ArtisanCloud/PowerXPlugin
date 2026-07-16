@@ -2,8 +2,8 @@ namespace PowerXPlugin.Framework.IAM;
 
 public static class IAMErrors
 {
-    public const string CodeInvalidMode = "IAM_MODE_INVALID";
-    public const string CodeModeConflict = "IAM_MODE_CONFLICT";
+    public const string CodeInvalidMode = "IAM_ADAPTER_MODE_INVALID";
+    public const string CodeModeConflict = "IAM_ADAPTER_MODE_CONFLICT";
     public const string CodeAdapterNotBound = "IAM_ADAPTER_NOT_BOUND";
     public const string CodeAdapterAlreadyBound = "IAM_ADAPTER_ALREADY_BOUND";
     public const string CodeUnauthorized = "IAM_UNAUTHORIZED";

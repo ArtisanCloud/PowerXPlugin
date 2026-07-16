@@ -11,6 +11,10 @@
         <p class="text-sm text-gray-600 dark:text-gray-400">
           配置站点信息、功能开关与安全策略，保持与宿主 PowerX 控制台一致的体验。
         </p>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <UBadge color="neutral" variant="soft">{{ providerModeLabel }}</UBadge>
+          <UBadge v-if="providerReadOnly" color="warning" variant="soft">{{ $t("providerMode.readOnly") }}</UBadge>
+        </div>
       </div>
     </div>
 
@@ -308,9 +312,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useToast } from "#imports";
 import { storeToRefs } from "pinia";
+import { useIAMService } from "~/composables/api/services/iamService";
+import { defaultProviderMode, normalizeProviderMode, type ProviderModeDiagnostics } from "~/composables/api/useProviderMode";
 import { useUserStore } from "~/stores/user";
 
 definePageMeta({
@@ -320,9 +326,16 @@ definePageMeta({
 });
 
 const toast = useToast();
+const { t } = useI18n();
+const iam = useIAMService();
 const userStore = useUserStore();
 const { isRoot, isCurrentTenantAdmin } = storeToRefs(userStore);
-const readonlyMode = computed(() => !(Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value)));
+const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
+const providerReadOnly = computed(() => Boolean(providerMode.value.read_only));
+const providerModeLabel = computed(() =>
+  providerMode.value.mode === "delegated" ? t("providerMode.delegated") : t("providerMode.local")
+);
+const readonlyMode = computed(() => providerReadOnly.value || !(Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value)));
 
 const defaultSettings = () => ({
   siteName: "PowerX Plugin IAM",
@@ -431,8 +444,8 @@ const activeCategory = ref("basic");
 const saveSettings = () => {
   if (readonlyMode.value) {
     toast.add({
-      title: "只读模式",
-      description: "当前账号无编辑权限，请联系租户管理员。",
+      title: t("providerMode.readOnly"),
+      description: t("providerMode.readOnlyDescription"),
       color: "warning",
     });
     return;
@@ -450,4 +463,13 @@ const resetSettings = () => {
     title: "已恢复默认设置",
   });
 };
+
+onMounted(async () => {
+  try {
+    const response = await iam.mode();
+    providerMode.value = normalizeProviderMode((response as any)?.data);
+  } catch {
+    providerMode.value = defaultProviderMode();
+  }
+});
 </script>

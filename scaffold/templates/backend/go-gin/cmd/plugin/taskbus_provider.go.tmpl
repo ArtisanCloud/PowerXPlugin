@@ -106,7 +106,7 @@ func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient)
 		SourcePlugin:   strings.TrimSpace(eventCfg.SourcePlugin),
 		PayloadVersion: strings.TrimSpace(eventCfg.PayloadVersion),
 	}
-	if cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), "delegated") {
+	if cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), "delegated") {
 		hostCfg.TokenProvider = client.NewPowerXSTSTokenProvider(pxc).TokenFunc()
 	}
 	return fwtaskbus.NewHostProvider(hostCfg)

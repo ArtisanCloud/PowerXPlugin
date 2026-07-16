@@ -95,19 +95,7 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 }
 
 func shouldForceHostLogging(cfg *config.Config) bool {
-	if cfg != nil && cfg.Context != nil {
-		if strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), string(iamservice.IAMModeDelegated)) {
-			return true
-		}
-		if strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), string(iamservice.IAMModeLocal)) {
-			return false
-		}
-	}
-	envMode := strings.TrimSpace(os.Getenv("IAM_MODE"))
-	if envMode == "" {
-		envMode = strings.TrimSpace(os.Getenv("IAMMode"))
-	}
-	return strings.EqualFold(envMode, string(iamservice.IAMModeDelegated))
+	return strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
 }
 
 func initFederatedRuntime(queryDB *gorm.DB) {
@@ -154,17 +142,17 @@ func BindFrameworkIAM(deps *sharedapp.Deps, registry *fwiamadapters.Registry) er
 	}
 
 	var (
-		mode   fwiamcontracts.IAMMode
+		mode   fwiamcontracts.IAMAdapterMode
 		bundle fwiamadapters.Bundle
 		err    error
 	)
 
-	switch deps.IAMMode {
-	case iamservice.IAMModeDelegated:
-		mode = fwiamcontracts.IAMModeDelegated
+	switch deps.IAMAdapterMode {
+	case iamservice.IAMAdapterModeDelegated:
+		mode = fwiamcontracts.IAMAdapterModeDelegated
 		bundle, err = delegatedadapter.NewBundle(deps.AuthProxy)
 	default:
-		mode = fwiamcontracts.IAMModeLocal
+		mode = fwiamcontracts.IAMAdapterModeLocal
 		bundle, err = localadapter.NewBundle(deps.IAMDirectory)
 	}
 	if err != nil {

@@ -3,8 +3,8 @@ package iamerrors
 import "errors"
 
 const (
-	CodeModeInvalid        = "IAM_MODE_INVALID"
-	CodeModeConflict       = "IAM_MODE_CONFLICT"
+	CodeModeInvalid        = "PROVIDER_MODE_INVALID"
+	CodeModeConflict       = "PROVIDER_MODE_CONFLICT"
 	CodeAdapterNotBound    = "IAM_ADAPTER_NOT_BOUND"
 	CodeAdapterAlreadyBind = "IAM_ADAPTER_ALREADY_BOUND"
 	CodeUnauthorized       = "IAM_UNAUTHORIZED"

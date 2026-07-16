@@ -10,7 +10,7 @@ runtime:
     POWERX_PLUGIN_ID: com.powerx.plugins.base
     POWERX_PLUGIN_REGISTRATION_MODE: installed
     POWERX_PROXY: "1"
-    IAMMode: delegated
+    POWERX_PROVIDER_MODE: delegated
     POWERX_SECURITY_JWT_AUDIENCE: plugin:com.powerx.plugins.base
 backend:
   entry: backend/bin/plugin
@@ -39,6 +39,7 @@ frontend:
         NITRO_HOST: 127.0.0.1
         POWERX_PROXY: "1"
         NUXT_PUBLIC_INSIDE_POWERX: "1"
+        NUXT_PUBLIC_POWERX_PROVIDER_MODE: delegated
       health:
         http: /healthz
         interval: 5s

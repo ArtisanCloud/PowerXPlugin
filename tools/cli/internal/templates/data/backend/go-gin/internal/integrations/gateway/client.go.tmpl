@@ -36,11 +36,11 @@ const (
 )
 
 type GatewayConfigError struct {
-	Code     string
-	Message  string
-	Required []string
-	Present  []string
-	IAMMode  string
+	Code         string
+	Message      string
+	Required     []string
+	Present      []string
+	ProviderMode string
 }
 
 type PlatformAPIError struct {
@@ -382,33 +382,33 @@ func NewClient(cfg *config.Config, log *logger.Entry, opts ...ClientOption) *Cli
 	baseURL := effectiveGatewayBaseURL(gcfg)
 	authScheme := effectiveGatewayAuthScheme(gcfg)
 	credential := gatewayCredential(gcfg, authScheme)
-	iamMode := gatewayIAMMode(cfg)
+	providerMode := gatewayProviderMode(cfg)
 	hostDelegated := isHostDelegatedMode(cfg)
 
 	if baseURL == "" {
-		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, iamMode, requiredGatewayEnv(cfg, gcfg, authScheme))
+		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, providerMode, requiredGatewayEnv(cfg, gcfg, authScheme))
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
 	if authScheme == "" {
-		cfgErr := newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer or apikey", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_AUTH_SCHEME"})
+		cfgErr := newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer or apikey", gcfg, providerMode, []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_AUTH_SCHEME"})
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
 	if authScheme == "bearer" && credential == "" {
 		if hostDelegated {
-			if cfgErr := validateHostDelegatedConfig(cfg, gcfg, iamMode); cfgErr != nil {
+			if cfgErr := validateHostDelegatedConfig(cfg, gcfg, providerMode); cfgErr != nil {
 				c.offlineReason = cfgErr.Error()
 				return c
 			}
 		} else {
-			cfgErr := newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "bearer gateway requires STS token provider", gcfg, iamMode, requiredGatewayEnv(cfg, gcfg, authScheme))
+			cfgErr := newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "bearer gateway requires STS token provider", gcfg, providerMode, requiredGatewayEnv(cfg, gcfg, authScheme))
 			c.offlineReason = cfgErr.Error()
 			return c
 		}
 	}
 	if authScheme == "apikey" && credential == "" {
-		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingAPIKey, "PX_GATEWAY_API_KEY is required", gcfg, iamMode, []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_API_KEY", "PX_GATEWAY_AUTH_SCHEME=apikey"})
+		cfgErr := newGatewayConfigError(ErrCodeGatewayMissingAPIKey, "PX_GATEWAY_API_KEY is required", gcfg, providerMode, []string{"PX_GATEWAY_BASE_URL", "PX_GATEWAY_API_KEY", "PX_GATEWAY_AUTH_SCHEME=apikey"})
 		c.offlineReason = cfgErr.Error()
 		return c
 	}
@@ -554,7 +554,7 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 			"gateway_api_prefix":     apiPrefix,
 			"gateway_effective_base": effectiveBase,
 			"gateway_auth_scheme":    authScheme,
-			"mode":                   gatewayIAMMode(c.cfg),
+			"mode":                   gatewayProviderMode(c.cfg),
 			"tenant_uuid":            maskTenantUUID(tenantAudit),
 			"user_id":                tokenClaims.UserID,
 			"permission":             permissionAudit,
@@ -2444,35 +2444,35 @@ func ensureLogger(entry *logger.Entry) *logger.Entry {
 
 // ValidateDelegatedConfig validates delegated gateway contract v1.
 func ValidateDelegatedConfig(cfg *config.Config) *GatewayConfigError {
-	iamMode := gatewayIAMMode(cfg)
+	providerMode := gatewayProviderMode(cfg)
 	var gcfg *config.GatewayConfig
 	if cfg != nil {
 		gcfg = cfg.Gateway
 	}
 	if isHostDelegatedMode(cfg) {
-		return validateHostDelegatedConfig(cfg, gcfg, iamMode)
+		return validateHostDelegatedConfig(cfg, gcfg, providerMode)
 	}
 	required := requiredGatewayEnv(cfg, gcfg, effectiveGatewayAuthScheme(gcfg))
 
 	if effectiveGatewayBaseURL(gcfg) == "" {
-		return newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, iamMode, required)
+		return newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, providerMode, required)
 	}
 	authScheme := effectiveGatewayAuthScheme(gcfg)
 	if authScheme == "" {
-		return newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer or apikey", gcfg, iamMode, required)
+		return newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer or apikey", gcfg, providerMode, required)
 	}
 	if gatewayCredential(gcfg, authScheme) == "" {
 		switch authScheme {
 		case "apikey":
-			return newGatewayConfigError(ErrCodeGatewayMissingAPIKey, "PX_GATEWAY_API_KEY is required", gcfg, iamMode, required)
+			return newGatewayConfigError(ErrCodeGatewayMissingAPIKey, "PX_GATEWAY_API_KEY is required", gcfg, providerMode, required)
 		default:
-			return newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "bearer gateway requires STS token provider", gcfg, iamMode, required)
+			return newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "bearer gateway requires STS token provider", gcfg, providerMode, required)
 		}
 	}
 	return nil
 }
 
-func validateHostDelegatedConfig(cfg *config.Config, gcfg *config.GatewayConfig, iamMode string) *GatewayConfigError {
+func validateHostDelegatedConfig(cfg *config.Config, gcfg *config.GatewayConfig, providerMode string) *GatewayConfigError {
 	required := []string{
 		"PX_GATEWAY_BASE_URL",
 		"POWERX_STS_CLIENT_ID",
@@ -2481,17 +2481,17 @@ func validateHostDelegatedConfig(cfg *config.Config, gcfg *config.GatewayConfig,
 		"PX_GATEWAY_AUTH_SCHEME=bearer",
 	}
 	if effectiveGatewayBaseURL(gcfg) == "" {
-		return newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, iamMode, required)
+		return newGatewayConfigError(ErrCodeGatewayMissingBaseURL, "PX_GATEWAY_BASE_URL is required", gcfg, providerMode, required)
 	}
 	if effectiveGatewayAuthScheme(gcfg) != "bearer" {
-		return newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer", gcfg, iamMode, required)
+		return newGatewayConfigError(ErrCodeGatewayInvalidScheme, "gateway auth_scheme must be bearer", gcfg, providerMode, required)
 	}
 	if cfg == nil || cfg.GRPCUpstream == nil ||
 		strings.TrimSpace(cfg.GRPCUpstream.STSClientID) == "" ||
 		strings.TrimSpace(cfg.GRPCUpstream.STSClientSecret) == "" ||
 		strings.TrimSpace(cfg.GRPCUpstream.Address) == "" ||
 		strings.TrimSpace(cfg.GRPCUpstream.TenantUUID) == "" {
-		return newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "delegated host mode requires STS client env", gcfg, iamMode, required)
+		return newGatewayConfigError(ErrCodeGatewayMissingSTSClient, "delegated host mode requires STS client env", gcfg, providerMode, required)
 	}
 	return nil
 }
@@ -2784,11 +2784,11 @@ func buildGatewayAuthHeader(authScheme, credential string) string {
 	}
 }
 
-func gatewayIAMMode(cfg *config.Config) string {
+func gatewayProviderMode(cfg *config.Config) string {
 	if cfg == nil || cfg.Context == nil {
 		return "unknown"
 	}
-	mode := strings.ToLower(strings.TrimSpace(cfg.Context.IAMMode))
+	mode := strings.ToLower(strings.TrimSpace(cfg.Context.ProviderMode))
 	if mode == "" {
 		return "unknown"
 	}
@@ -2798,7 +2798,7 @@ func gatewayIAMMode(cfg *config.Config) string {
 func isHostDelegatedMode(cfg *config.Config) bool {
 	return cfg != nil &&
 		strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" &&
-		gatewayIAMMode(cfg) == "delegated"
+		gatewayProviderMode(cfg) == "delegated"
 }
 
 func requiredGatewayEnv(cfg *config.Config, gcfg *config.GatewayConfig, authScheme string) []string {
@@ -2825,7 +2825,7 @@ func gcfgValueAPIKey(gcfg *config.GatewayConfig) string {
 	return gcfg.APIKey
 }
 
-func newGatewayConfigError(code, msg string, gcfg *config.GatewayConfig, iamMode string, required []string) *GatewayConfigError {
+func newGatewayConfigError(code, msg string, gcfg *config.GatewayConfig, providerMode string, required []string) *GatewayConfigError {
 	present := make([]string, 0, 3)
 	if gcfg != nil {
 		if strings.TrimSpace(gcfg.BaseURL) != "" {
@@ -2850,11 +2850,11 @@ func newGatewayConfigError(code, msg string, gcfg *config.GatewayConfig, iamMode
 		present = append(present, "POWERX_STS_CLIENT_SECRET")
 	}
 	return &GatewayConfigError{
-		Code:     code,
-		Message:  msg,
-		Required: required,
-		Present:  present,
-		IAMMode:  iamMode,
+		Code:         code,
+		Message:      msg,
+		Required:     required,
+		Present:      present,
+		ProviderMode: providerMode,
 	}
 }
 

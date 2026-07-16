@@ -443,8 +443,8 @@ type ContextConfig struct {
 	Audience string        `yaml:"audience" json:"audience"`
 	TTL      time.Duration `yaml:"ttl" json:"ttl"`
 
-	// IAM 模式（可选）：delegated / local，留空按环境变量规则推断
-	IAMMode string `yaml:"iam_mode" json:"iam_mode"`
+	// Provider 模式（可选）：delegated / local，留空按环境变量规则推断
+	ProviderMode string `yaml:"provider_mode" json:"provider_mode"`
 }
 
 // Load 加载配置，优先级：YAML 文件 > 默认值（不再从环境变量覆盖）
@@ -1028,10 +1028,8 @@ func loadEnvConfig(cfg *Config) {
 			cfg.Context.TTL = ttl
 		}
 	}
-	if iamMode := resolveConfigValue(os.Getenv("IAM_MODE")); iamMode != "" {
-		cfg.Context.IAMMode = iamMode
-	} else if iamModeCamel := resolveConfigValue(os.Getenv("IAMMode")); iamModeCamel != "" {
-		cfg.Context.IAMMode = iamModeCamel
+	if providerMode := resolveConfigValue(os.Getenv("POWERX_PROVIDER_MODE")); providerMode != "" {
+		cfg.Context.ProviderMode = providerMode
 	}
 
 	// gRPC 上游配置
@@ -1289,7 +1287,7 @@ func isHostDelegatedMode(cfg *Config) bool {
 	if !isPowerXProxyMode() {
 		return false
 	}
-	return cfg != nil && cfg.Context != nil && strings.ToLower(strings.TrimSpace(cfg.Context.IAMMode)) == "delegated"
+	return cfg != nil && cfg.Context != nil && strings.ToLower(strings.TrimSpace(cfg.Context.ProviderMode)) == "delegated"
 }
 
 func isPowerXProxyMode() bool {

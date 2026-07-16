@@ -44,7 +44,7 @@ func TestRegistry_BindAndResolve(t *testing.T) {
 		t.Fatalf("expected registry to be unbound initially")
 	}
 
-	err := registry.Bind(contracts.IAMModeLocal, Bundle{
+	err := registry.Bind(contracts.IAMAdapterModeLocal, Bundle{
 		Directory: stubDirectory{},
 		Authz:     stubAuthz{},
 		Context:   stubIdentityContext{},
@@ -56,7 +56,7 @@ func TestRegistry_BindAndResolve(t *testing.T) {
 		t.Fatalf("expected registry to be bound")
 	}
 	mode, ok := registry.Mode()
-	if !ok || mode != contracts.IAMModeLocal {
+	if !ok || mode != contracts.IAMAdapterModeLocal {
 		t.Fatalf("expected local mode, got mode=%q ok=%v", mode, ok)
 	}
 	if _, err := registry.Directory(); err != nil {
@@ -73,11 +73,11 @@ func TestRegistry_BindAndResolve(t *testing.T) {
 func TestRegistry_BindFailWhenAlreadyBound(t *testing.T) {
 	registry := NewRegistry()
 	first := Bundle{Directory: stubDirectory{}, Authz: stubAuthz{}, Context: stubIdentityContext{}}
-	if err := registry.Bind(contracts.IAMModeLocal, first); err != nil {
+	if err := registry.Bind(contracts.IAMAdapterModeLocal, first); err != nil {
 		t.Fatalf("unexpected first bind error: %v", err)
 	}
 
-	err := registry.Bind(contracts.IAMModeDelegated, first)
+	err := registry.Bind(contracts.IAMAdapterModeDelegated, first)
 	if err == nil {
 		t.Fatalf("expected second bind error")
 	}

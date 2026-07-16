@@ -1,12 +1,14 @@
 package iam
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	federatedsvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/federated"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
@@ -16,15 +18,20 @@ import (
 type ChannelDingTalkHandler struct {
 	configSvc *federatedsvc.DingTalkConfigService
 	syncSvc   *federatedsvc.DingTalkSyncTaskService
+	mode      iamservice.IAMAdapterMode
 }
 
 func NewChannelDingTalkHandler(configSvc *federatedsvc.DingTalkConfigService) *ChannelDingTalkHandler {
-	return &ChannelDingTalkHandler{configSvc: configSvc}
+	return &ChannelDingTalkHandler{configSvc: configSvc, mode: iamservice.IAMAdapterModeLocal}
 }
 
 func NewChannelDingTalkHandlerWithDeps(deps *app.Deps) *ChannelDingTalkHandler {
+	mode := iamservice.IAMAdapterModeLocal
+	if deps != nil && deps.IAMAdapterMode != "" {
+		mode = deps.IAMAdapterMode
+	}
 	if deps == nil || deps.DB == nil {
-		return &ChannelDingTalkHandler{}
+		return &ChannelDingTalkHandler{mode: mode}
 	}
 	configSvc := federatedsvc.NewDingTalkConfigService(deps.DB)
 	syncRepo := repo.NewChannelSyncTaskRepository(deps.DB)
@@ -40,6 +47,7 @@ func NewChannelDingTalkHandlerWithDeps(deps *app.Deps) *ChannelDingTalkHandler {
 	return &ChannelDingTalkHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewDingTalkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),
+		mode:      mode,
 	}
 }
 
@@ -54,6 +62,9 @@ type dingtalkConfigRequest struct {
 }
 
 func (h *ChannelDingTalkHandler) GetConfig(c *gin.Context) {
+	if h.delegated(c) {
+		return
+	}
 	if h.configSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "dingtalk config service not available", nil)
 		return
@@ -76,6 +87,9 @@ func (h *ChannelDingTalkHandler) GetConfig(c *gin.Context) {
 }
 
 func (h *ChannelDingTalkHandler) SaveConfig(c *gin.Context) {
+	if h.delegatedReadOnly(c, "dingtalk config write operations are not allowed in delegated mode") {
+		return
+	}
 	if h.configSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "dingtalk config service not available", nil)
 		return
@@ -108,6 +122,9 @@ func (h *ChannelDingTalkHandler) SaveConfig(c *gin.Context) {
 }
 
 func (h *ChannelDingTalkHandler) TriggerSyncTask(c *gin.Context) {
+	if h.delegatedReadOnly(c, "dingtalk sync operations are not allowed in delegated mode") {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "dingtalk sync task service not available", nil)
 		return
@@ -135,6 +152,9 @@ func (h *ChannelDingTalkHandler) TriggerSyncTask(c *gin.Context) {
 }
 
 func (h *ChannelDingTalkHandler) ListSyncTasks(c *gin.Context) {
+	if h.delegated(c) {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "dingtalk sync task service not available", nil)
 		return
@@ -163,6 +183,9 @@ func (h *ChannelDingTalkHandler) ListSyncTasks(c *gin.Context) {
 }
 
 func (h *ChannelDingTalkHandler) ClearSyncTasks(c *gin.Context) {
+	if h.delegatedReadOnly(c, "dingtalk sync task clear operations are not allowed in delegated mode") {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "dingtalk sync task service not available", nil)
 		return
@@ -184,18 +207,39 @@ func (h *ChannelDingTalkHandler) ClearSyncTasks(c *gin.Context) {
 	contracts.ResponseSuccess(c, gin.H{"deleted": affected})
 }
 
+func (h *ChannelDingTalkHandler) delegated(c *gin.Context) bool {
+	if h != nil && h.mode == iamservice.IAMAdapterModeDelegated {
+		contracts.ResponseErrorWithDetails(c, http.StatusServiceUnavailable, "IAM_PROVIDER_NOT_CONFIGURED", "IAM delegated channel provider is not configured", gin.H{"mode": h.mode.String(), "provider": "delegated"})
+		return true
+	}
+	return false
+}
+
+func (h *ChannelDingTalkHandler) delegatedReadOnly(c *gin.Context, message string) bool {
+	if h != nil && h.mode == iamservice.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, 405, "IAM_DELEGATED_READ_ONLY", message)
+		return true
+	}
+	return false
+}
+
 type ChannelLarkHandler struct {
 	configSvc *federatedsvc.LarkConfigService
 	syncSvc   *federatedsvc.LarkSyncTaskService
+	mode      iamservice.IAMAdapterMode
 }
 
 func NewChannelLarkHandler(configSvc *federatedsvc.LarkConfigService) *ChannelLarkHandler {
-	return &ChannelLarkHandler{configSvc: configSvc}
+	return &ChannelLarkHandler{configSvc: configSvc, mode: iamservice.IAMAdapterModeLocal}
 }
 
 func NewChannelLarkHandlerWithDeps(deps *app.Deps) *ChannelLarkHandler {
+	mode := iamservice.IAMAdapterModeLocal
+	if deps != nil && deps.IAMAdapterMode != "" {
+		mode = deps.IAMAdapterMode
+	}
 	if deps == nil || deps.DB == nil {
-		return &ChannelLarkHandler{}
+		return &ChannelLarkHandler{mode: mode}
 	}
 	configSvc := federatedsvc.NewLarkConfigService(deps.DB)
 	syncRepo := repo.NewChannelSyncTaskRepository(deps.DB)
@@ -211,6 +255,7 @@ func NewChannelLarkHandlerWithDeps(deps *app.Deps) *ChannelLarkHandler {
 	return &ChannelLarkHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewLarkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),
+		mode:      mode,
 	}
 }
 
@@ -225,6 +270,9 @@ type larkConfigRequest struct {
 }
 
 func (h *ChannelLarkHandler) GetConfig(c *gin.Context) {
+	if h.delegated(c) {
+		return
+	}
 	if h.configSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "lark config service not available", nil)
 		return
@@ -247,6 +295,9 @@ func (h *ChannelLarkHandler) GetConfig(c *gin.Context) {
 }
 
 func (h *ChannelLarkHandler) SaveConfig(c *gin.Context) {
+	if h.delegatedReadOnly(c, "lark config write operations are not allowed in delegated mode") {
+		return
+	}
 	if h.configSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "lark config service not available", nil)
 		return
@@ -279,6 +330,9 @@ func (h *ChannelLarkHandler) SaveConfig(c *gin.Context) {
 }
 
 func (h *ChannelLarkHandler) TriggerSyncTask(c *gin.Context) {
+	if h.delegatedReadOnly(c, "lark sync operations are not allowed in delegated mode") {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "lark sync task service not available", nil)
 		return
@@ -306,6 +360,9 @@ func (h *ChannelLarkHandler) TriggerSyncTask(c *gin.Context) {
 }
 
 func (h *ChannelLarkHandler) ListSyncTasks(c *gin.Context) {
+	if h.delegated(c) {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "lark sync task service not available", nil)
 		return
@@ -334,6 +391,9 @@ func (h *ChannelLarkHandler) ListSyncTasks(c *gin.Context) {
 }
 
 func (h *ChannelLarkHandler) ClearSyncTasks(c *gin.Context) {
+	if h.delegatedReadOnly(c, "lark sync task clear operations are not allowed in delegated mode") {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "lark sync task service not available", nil)
 		return
@@ -353,4 +413,20 @@ func (h *ChannelLarkHandler) ClearSyncTasks(c *gin.Context) {
 		return
 	}
 	contracts.ResponseSuccess(c, gin.H{"deleted": affected})
+}
+
+func (h *ChannelLarkHandler) delegated(c *gin.Context) bool {
+	if h != nil && h.mode == iamservice.IAMAdapterModeDelegated {
+		contracts.ResponseErrorWithDetails(c, http.StatusServiceUnavailable, "IAM_PROVIDER_NOT_CONFIGURED", "IAM delegated channel provider is not configured", gin.H{"mode": h.mode.String(), "provider": "delegated"})
+		return true
+	}
+	return false
+}
+
+func (h *ChannelLarkHandler) delegatedReadOnly(c *gin.Context, message string) bool {
+	if h != nil && h.mode == iamservice.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, 405, "IAM_DELEGATED_READ_ONLY", message)
+		return true
+	}
+	return false
 }

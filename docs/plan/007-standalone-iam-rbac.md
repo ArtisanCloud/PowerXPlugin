@@ -78,7 +78,7 @@
 3. **作用域字段**：`Role`/`Permission` 增加 `scope_type`（`system` or `tenant`），`system.admin` 可跨租户管理；其它角色默认只在所属租户生效。
 4. **策略来源追踪**：`iam_permissions.source` 标记 `local_seed`、`manifest_sync` 等，便于 CLI/脚本与宿主的权限同步器保持一致。
 
-> 通过沿用宿主的三元模型，可复用其自动推导策略、OpenAPI 同步工具与 STS 策略缓存，减少自定义实现带来的割裂。所有组织/RBAC 菜单仅在 Standalone（`POWERX_PROXY=0` 且 `POWERX_PROXY=false`）时展示；Delegated 模式读取宿主 IAM，因此需隐藏相关入口以免混淆。
+> 通过沿用宿主的三元模型，可复用其 OpenAPI 同步工具与 STS 策略缓存，减少自定义实现带来的割裂。组织/RBAC 正式菜单在 `POWERX_PROVIDER_MODE=delegated` 下保持可见；页面通过 `/mode` diagnostics 与 RBAC/read-only 状态控制展示和操作。
 
 ## 6. 权限模型与资源域
 
@@ -159,7 +159,7 @@
   - `/admin/iam/departments`：树图 + 拖拽排序。
 - 组件：`components/iam/PermissionTree.vue`、`FormInviteMember.vue` 等。
 - 数据：使用 `$fetch('/api/v1/admin/iam/...')`，并利用 `useAuth` 的 `tenantId`。
-- **模式感知**：在 `app/plugins/auth.client.ts` 或 Layout 层读取 `runtimeConfig.public.insidePowerX` 与 `POWERX_PROXY` 标志，仅当 `standalone=true` 时渲染上述菜单与页面；Delegated 模式自动隐藏该分组并在导航中展示宿主导向链接（如“回到 PowerX 宿主 IAM”）。
+- **模式感知**：前端业务路径保持稳定，不通过 `POWERX_PROXY` 推导 provider mode。正式菜单按 RBAC 可见性控制；页面读取后端 `/mode` diagnostics 展示 local/delegated 与 read-only 状态。
 
 ### 9.3 CLI & 模版
 - `px-plugin init` 生成的 `config.example.yaml` 自动包含 Standalone IAM 配置段落。

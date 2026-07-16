@@ -27,9 +27,10 @@ def _request_mode() -> str:
     return "standalone"
 
 
-def _iam_mode() -> str:
-    if os.getenv("POWERX_PROXY") == "1":
-        return "delegated"
+def _provider_mode() -> str:
+    mode = os.getenv("POWERX_PROVIDER_MODE", "").strip().lower()
+    if mode in {"local", "delegated"}:
+        return mode
     return "local"
 
 
@@ -92,10 +93,10 @@ async def request_trace_middleware(request: Request, call_next: Callable):
     tenant_ctx = get_tenant_context(request)
     trace_id = _trace_identifier(request)
     _LOGGER.info(
-        "[PLUGIN-REQ-TRACE] stage=begin mode=%s iam_mode=%s method=%s path=%s auth=%s auth.head=%s "
+        "[PLUGIN-REQ-TRACE] stage=begin mode=%s provider_mode=%s method=%s path=%s auth=%s auth.head=%s "
         "tenant_uuid=%s user_id=%s trace=%s ip=%s ua=%s",
         _request_mode(),
-        _iam_mode(),
+        _provider_mode(),
         request.method,
         request.url.path,
         auth_mode,
@@ -116,10 +117,10 @@ async def request_trace_middleware(request: Request, call_next: Callable):
         auth_mode = "bearer(validated)"
     tenant_ctx = get_tenant_context(request)
     _LOGGER.info(
-        "[PLUGIN-REQ-TRACE] stage=end mode=%s iam_mode=%s status=%s latency=%s auth=%s auth.head=%s "
+        "[PLUGIN-REQ-TRACE] stage=end mode=%s provider_mode=%s status=%s latency=%s auth=%s auth.head=%s "
         "tenant_uuid=%s user_id=%s trace=%s",
         _request_mode(),
-        _iam_mode(),
+        _provider_mode(),
         response.status_code,
         f"{latency:.3f}s",
         auth_mode,

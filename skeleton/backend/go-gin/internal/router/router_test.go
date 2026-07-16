@@ -6,13 +6,14 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 )
 
-func TestBuildJWTInProxyMode(t *testing.T) {
+func TestBuildJWTInDelegatedProviderMode(t *testing.T) {
 	cfg := &config.Config{
 		Server: &config.ServerConfig{},
 	}
 	r := &Router{cfg: cfg}
 
 	t.Setenv("POWERX_PROXY", "1")
+	t.Setenv("POWERX_PROVIDER_MODE", "delegated")
 	t.Setenv("POWERX_SECURITY_JWT_ISSUER", "powerx-auth")
 	t.Setenv("POWERX_SECURITY_JWT_AUDIENCE", "plugin:com.powerx.plugins.base")
 	t.Setenv("POWERX_SECURITY_JWT_SECRET", "secret")
@@ -21,10 +22,10 @@ func TestBuildJWTInProxyMode(t *testing.T) {
 	jwtCfg := r.buildJWT()
 
 	if jwtCfg.Optional {
-		t.Fatal("expected strict JWT validation when running in PowerX proxy")
+		t.Fatal("expected strict JWT validation when running in delegated provider mode")
 	}
 	if !jwtCfg.AllowSignedContext {
-		t.Fatal("expected signed context to be allowed in proxy mode")
+		t.Fatal("expected signed context to be allowed in delegated provider mode")
 	}
 	if jwtCfg.Issuer != "powerx-auth" {
 		t.Fatalf("unexpected issuer, got %s", jwtCfg.Issuer)

@@ -21,7 +21,9 @@ func NewGatewayInvokerAdapter(client GatewayClient) GatewayInvokerAdapter {
 
 func (a GatewayInvokerAdapter) Invoke(ctx context.Context, req fwgateway.InvokeRequest) (*fwgateway.Response, error) {
 	if a.Client == nil {
-		return nil, &fwgateway.InvocationError{StatusCode: 503, Errors: []fwgateway.GatewayError{{Code: "METADATA_GATEWAY_CLIENT_MISSING", Message: "metadata gateway client is required"}}}
+		return nil, &fwgateway.InvocationError{StatusCode: 503, Errors: []fwgateway.GatewayError{
+			{Code: "METADATA_GATEWAY_CLIENT_MISSING", Message: "metadata gateway client is required"},
+		}}
 	}
 	resp, err := a.Client.Invoke(ctx, gateway.InvokeParams{
 		CapabilityID:      req.CapabilityID,
@@ -38,7 +40,9 @@ func (a GatewayInvokerAdapter) Invoke(ctx context.Context, req fwgateway.InvokeR
 		return nil, err
 	}
 	if resp == nil {
-		return nil, &fwgateway.InvocationError{StatusCode: 502, Errors: []fwgateway.GatewayError{{Code: "METADATA_GATEWAY_EMPTY_RESPONSE", Message: "metadata gateway returned empty response"}}}
+		return nil, &fwgateway.InvocationError{StatusCode: 502, Errors: []fwgateway.GatewayError{
+			{Code: "METADATA_GATEWAY_EMPTY_RESPONSE", Message: "metadata gateway returned empty response"},
+		}}
 	}
 	return &fwgateway.Response{
 		TraceID: resp.TraceID,

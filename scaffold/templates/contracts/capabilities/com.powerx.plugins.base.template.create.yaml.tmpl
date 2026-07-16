@@ -1,9 +1,17 @@
 id: {{ .PluginID }}.template.create
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 创建模板
+  zh: 创建模板
+  en: Create Template
 description: "创建模板的原子能力，暴露 REST/gRPC/Workflow/Agent 多协议入口。"
+description_i18n:
+  zh-CN: 创建模板的原子能力，暴露 REST/gRPC/Workflow/Agent 多协议入口。
+  zh: 创建模板的原子能力，暴露 REST/gRPC/Workflow/Agent 多协议入口。
+  en: Create a template through REST, gRPC, workflow, or agent entry points.
 rbac:
-  resource: template
+  resource: base.templates
   actions: [create]
 provides:
   - id: schema/input/{{ .PluginID }}.template.create.v1
@@ -15,11 +23,18 @@ provides:
     kind: output
     version: 1.0.0
 metadata:
+  agent_response:
+    content: '已创建模板「{{ .template.name }}」，状态为 {{ .template.status }}。[查看模板](/templates/crud?template_id={{ .template.id }})'
+    links:
+      - id: '{{ .template.id }}'
+        kind: template
+        label: '查看模板「{{ .template.name }}」'
+        href: '/templates/crud?template_id={{ .template.id }}'
   protocols:
     rest:
       method: POST
-      path: /api/v1/templates
-      description: "PowerX Gateway 统一鉴权后的 REST 入口"
+      path: /api/v1/integration/capabilities/invoke
+      description: "PowerX Gateway 统一鉴权后的插件能力入口"
     grpc:
       service: powerx.template.TemplateService
       method: CreateTemplate
@@ -29,6 +44,6 @@ metadata:
       id: base.template.create
       scope: agent.template.create
       transport: http
-      endpoint: /api/v1/templates
+      endpoint: /api/v1/integration/capabilities/invoke
     agent_stream:
       channel: contracts/exposure/agent-streams/template-compose.yaml

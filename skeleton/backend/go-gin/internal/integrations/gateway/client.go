@@ -43,6 +43,20 @@ type GatewayConfigError struct {
 	IAMMode  string
 }
 
+type PlatformAPIError struct {
+	Operation  string
+	StatusCode int
+	Code       int
+	Message    string
+}
+
+func (e *PlatformAPIError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s failed: status=%d code=%d message=%s", strings.TrimSpace(e.Operation), e.StatusCode, e.Code, e.Message)
+}
+
 func (e *GatewayConfigError) Error() string {
 	if e == nil {
 		return ""
@@ -111,6 +125,81 @@ type PlatformCapabilityProtocol struct {
 	ToolRef   string `json:"tool_ref"`
 }
 
+type KnowledgeSpaceListOptions struct {
+	TenantUUID string
+	Status     string
+	Keyword    string
+	Page       int
+	PageSize   int
+}
+
+type KnowledgeSpaceRuntimeRecord struct {
+	UUID           string `json:"uuid"`
+	SpaceName      string `json:"space_name"`
+	Status         string `json:"status"`
+	DepartmentCode string `json:"department_code"`
+	RAGProfileKey  string `json:"rag_profile_key"`
+	UpdatedAt      string `json:"updated_at"`
+	CreatedAt      string `json:"created_at"`
+}
+
+type KnowledgeSpaceCreateParams struct {
+	TenantUUID              string
+	SpaceName               string
+	Description             string
+	DepartmentCode          string
+	Visibility              string
+	PolicyTemplateVersionID string
+	IngestionProfileKey     string
+	IndexProfileKey         string
+	RAGProfileKey           string
+	CPUCores                int
+	StorageGB               int
+	IngestionConcurrency    int
+	FeatureFlags            []string
+	RequestedBy             string
+}
+
+type KnowledgeSpaceRetireParams struct {
+	TenantUUID  string
+	SpaceID     string
+	Reason      string
+	RequestedBy string
+	DropVectors bool
+}
+
+type KnowledgeSpaceDeleteParams struct {
+	TenantUUID  string
+	SpaceID     string
+	RequestedBy string
+	Force       bool
+	DropVectors bool
+}
+
+type LocalDebugHostRegistrationParams struct {
+	PluginID     string
+	Environment  string
+	HTTPPort     int
+	GRPCPort     int
+	TTLSeconds   int
+	Capabilities []string
+}
+
+type KnowledgeSpaceRecord struct {
+	SpaceID                 string         `json:"spaceId"`
+	TenantUUID              string         `json:"tenant_uuid"`
+	SpaceName               string         `json:"spaceName"`
+	DepartmentCode          string         `json:"departmentCode"`
+	Status                  string         `json:"status"`
+	PolicyTemplateVersionID string         `json:"policyTemplateVersionId"`
+	IngestionProfileKey     string         `json:"ingestionProfileKey"`
+	IndexProfileKey         string         `json:"indexProfileKey"`
+	RAGProfileKey           string         `json:"ragProfileKey"`
+	FeatureFlags            []string       `json:"featureFlags"`
+	Quotas                  map[string]any `json:"quotas"`
+	IAMStatus               string         `json:"iamStatus"`
+}
+
 type AgentRecord struct {
 	ID          any            `json:"id,omitempty"`
 	UUID        string         `json:"uuid,omitempty"`
@@ -122,19 +211,26 @@ type AgentRecord struct {
 }
 
 type PluginSkillSyncParams struct {
-	PluginSkillID  string
-	PowerXSkillID  string
-	Version        string
-	Title          string
-	Description    string
-	IntentExamples any
-	InputSchema    any
-	OutputSchema   any
-	PromptSpec     any
-	Executor       any
-	Capability     string
-	Checksum       string
-	Provider       string
+	PluginSkillID      string
+	PowerXSkillID      string
+	Version            string
+	Title              string
+	Description        string
+	IntentExamples     any
+	ResponseGuidance   any
+	ActionRequiredArgs any
+	ActionOptionalArgs any
+	SlotMapping        any
+	PendingTaskPolicy  any
+	StateContract      any
+	ResultPresentation any
+	InputSchema        any
+	OutputSchema       any
+	PromptSpec         any
+	Executor           any
+	Capability         string
+	Checksum           string
+	Provider           string
 }
 
 type PluginSkillSyncResult struct {
@@ -206,6 +302,7 @@ type AgentStreamParams struct {
 	Source             string
 	Env                string
 	TenantUUID         string
+	OriginTenantUUID   string
 	RegenFromMessageID string
 }
 
@@ -382,10 +479,10 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 	tokenSource := resolveTokenSource(c.cfg, requestAuthHeader)
 	tokenClaims := parseAuthIdentityClaims(requestAuthHeader)
 	tokenTID := ""
-	if params.AuthRequired && strings.TrimSpace(requestAuthHeader) == "" {
+	if params.AuthRequired && strings.TrimSpace(requestAuthHeader) == "" && !c.hasServiceGatewayCredential() {
 		return nil, &PolicyError{
 			Code:    "GW_POLICY_AUTH_REQUIRED",
-			Message: "auth_required=true 时必须提供请求态 Authorization（Bearer STS token）",
+			Message: "auth_required=true 时必须提供请求态 Authorization（Bearer STS token）或配置服务态 Gateway 凭证",
 		}
 	}
 	if params.TenantScoped {
@@ -484,6 +581,20 @@ func (c *Client) Invoke(ctx context.Context, params InvokeParams) (*InvokeResult
 		Data:    resp.Data,
 		Raw:     resp.RawData,
 	}, nil
+}
+
+func (c *Client) hasServiceGatewayCredential() bool {
+	if c == nil || c.cfg == nil || c.cfg.Gateway == nil {
+		return false
+	}
+	switch effectiveGatewayAuthScheme(c.cfg.Gateway) {
+	case "apikey":
+		return strings.TrimSpace(c.cfg.Gateway.APIKey) != ""
+	case "bearer":
+		return c.tokenProvider != nil
+	default:
+		return false
+	}
 }
 
 func extractMapValue(payload any, key string) any {
@@ -690,6 +801,291 @@ func (c *Client) ListAgents(ctx context.Context, env string) ([]AgentRecord, err
 	return payload.Data.Items, nil
 }
 
+func (c *Client) ListKnowledgeSpaces(ctx context.Context, opts KnowledgeSpaceListOptions) ([]KnowledgeSpaceRuntimeRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/tenant/plugin-runtime/knowledge-spaces")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+
+	query := url.Values{}
+	page := opts.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := opts.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	query.Set("page", strconv.Itoa(page))
+	query.Set("page_size", strconv.Itoa(pageSize))
+	if status := strings.TrimSpace(opts.Status); status != "" {
+		query.Set("status", status)
+	}
+	if keyword := strings.TrimSpace(opts.Keyword); keyword != "" {
+		query.Set("keyword", keyword)
+	}
+	if encoded := query.Encode(); encoded != "" {
+		endpoint += "?" + encoded
+	}
+
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant := strings.TrimSpace(opts.TenantUUID); tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+		req.Header.Set("X-Tenant-UUID", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var payload platformKnowledgeSpaceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("decode knowledge space list: %w", err)
+	}
+	if resp.StatusCode >= 400 || payload.Code >= 400 {
+		return nil, &PlatformAPIError{
+			Operation:  "platform knowledge space list",
+			StatusCode: resp.StatusCode,
+			Code:       payload.Code,
+			Message:    payload.Message,
+		}
+	}
+	return payload.Data.Items, nil
+}
+
+func (c *Client) CreateKnowledgeSpace(ctx context.Context, params KnowledgeSpaceCreateParams) (*KnowledgeSpaceRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/admin/knowledge-spaces")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	body := map[string]any{
+		"spaceName":               strings.TrimSpace(params.SpaceName),
+		"description":             strings.TrimSpace(params.Description),
+		"departmentCode":          strings.TrimSpace(params.DepartmentCode),
+		"visibility":              firstNonEmptyString(params.Visibility, "tenant"),
+		"policyTemplateVersionId": firstNonEmptyString(params.PolicyTemplateVersionID, "default-v1"),
+		"ingestionProfileKey":     firstNonEmptyString(params.IngestionProfileKey, "default"),
+		"indexProfileKey":         firstNonEmptyString(params.IndexProfileKey, "default"),
+		"ragProfileKey":           firstNonEmptyString(params.RAGProfileKey, "p1_general"),
+		"featureFlags":            params.FeatureFlags,
+		"requestedBy":             firstNonEmptyString(params.RequestedBy, "plugin-knowledge-lab"),
+		"quotas": map[string]any{
+			"cpuCores":             positiveOrDefaultInt(params.CPUCores, 1),
+			"storageGb":            positiveOrDefaultInt(params.StorageGB, 50),
+			"ingestionConcurrency": positiveOrDefaultInt(params.IngestionConcurrency, 1),
+		},
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant := strings.TrimSpace(params.TenantUUID); tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+		req.Header.Set("X-Tenant-UUID", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	var response platformKnowledgeSpaceCreateResponse
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decode knowledge space create: %w", err)
+	}
+	if resp.StatusCode >= 400 || response.Code >= 400 {
+		return nil, &PlatformAPIError{
+			Operation:  "platform knowledge space create",
+			StatusCode: resp.StatusCode,
+			Code:       response.Code,
+			Message:    response.Message,
+		}
+	}
+	return &response.Data, nil
+}
+
+func (c *Client) RetireKnowledgeSpace(ctx context.Context, params KnowledgeSpaceRetireParams) (*KnowledgeSpaceRecord, error) {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return nil, fmt.Errorf("gateway config missing")
+	}
+	spaceID := strings.TrimSpace(params.SpaceID)
+	if spaceID == "" {
+		return nil, fmt.Errorf("knowledge space id is required")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/admin/knowledge-spaces/"+url.PathEscape(spaceID)+"/retire")
+	if endpoint == "" {
+		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	body := map[string]any{
+		"reason":      firstNonEmptyString(params.Reason, "retired from plugin knowledge lab"),
+		"requestedBy": firstNonEmptyString(params.RequestedBy, "plugin-knowledge-lab"),
+		"dropVectors": params.DropVectors,
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant := strings.TrimSpace(params.TenantUUID); tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+		req.Header.Set("X-Tenant-UUID", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	var response platformKnowledgeSpaceCreateResponse
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("decode knowledge space retire: %w", err)
+	}
+	if resp.StatusCode >= 400 || response.Code >= 400 {
+		return nil, &PlatformAPIError{
+			Operation:  "platform knowledge space retire",
+			StatusCode: resp.StatusCode,
+			Code:       response.Code,
+			Message:    response.Message,
+		}
+	}
+	return &response.Data, nil
+}
+
+func (c *Client) DeleteKnowledgeSpace(ctx context.Context, params KnowledgeSpaceDeleteParams) error {
+	if c.cfg == nil || c.cfg.Gateway == nil {
+		return fmt.Errorf("gateway config missing")
+	}
+	spaceID := strings.TrimSpace(params.SpaceID)
+	if spaceID == "" {
+		return fmt.Errorf("knowledge space id is required")
+	}
+	gcfg := c.cfg.Gateway
+	endpoint := gatewayEndpoint(gcfg, "/admin/knowledge-spaces/"+url.PathEscape(spaceID))
+	if endpoint == "" {
+		return fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
+	}
+	body := map[string]any{
+		"requestedBy": firstNonEmptyString(params.RequestedBy, "plugin-knowledge-lab"),
+		"force":       params.Force,
+		"dropVectors": params.DropVectors,
+	}
+	authScheme := effectiveGatewayAuthScheme(gcfg)
+	timeout := gcfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	ctxReq, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	credential, err := c.gatewayCredential(ctxReq, authScheme)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctxReq, http.MethodDelete, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", buildGatewayAuthHeader(authScheme, credential))
+	if tenant := strings.TrimSpace(params.TenantUUID); tenant != "" {
+		req.Header.Set("tenant_uuid", tenant)
+		req.Header.Set("X-Tenant-UUID", tenant)
+	}
+	req.Header.Set("X-Request-ID", uuid.NewString())
+
+	var response platformKnowledgeSpaceDeleteResponse
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("decode knowledge space delete: %w", err)
+	}
+	if resp.StatusCode >= 400 || response.Code >= 400 {
+		return &PlatformAPIError{
+			Operation:  "platform knowledge space delete",
+			StatusCode: resp.StatusCode,
+			Code:       response.Code,
+			Message:    response.Message,
+		}
+	}
+	return nil
+}
+
 func (c *Client) GetAgent(ctx context.Context, agentUUID string) (*AgentRecord, error) {
 	if c.cfg == nil || c.cfg.Gateway == nil {
 		return nil, fmt.Errorf("gateway config missing")
@@ -760,33 +1156,45 @@ func (c *Client) SyncPluginSkill(ctx context.Context, params PluginSkillSyncPara
 		return nil, fmt.Errorf("skill capability is required")
 	}
 	body := map[string]any{
-		"skill_id":        firstNonEmptyString(params.PowerXSkillID, params.PluginSkillID),
-		"plugin_skill_id": params.PluginSkillID,
-		"provider":        strings.TrimSpace(params.Provider),
-		"version":         firstNonEmptyString(params.Version, "1.0.0"),
-		"title":           strings.TrimSpace(params.Title),
-		"description":     strings.TrimSpace(params.Description),
-		"intent_examples": params.IntentExamples,
-		"input_schema":    params.InputSchema,
-		"output_schema":   params.OutputSchema,
-		"prompt_spec":     params.PromptSpec,
-		"executor":        params.Executor,
-		"capability":      strings.TrimSpace(params.Capability),
-		"checksum":        normalizeSHA256Checksum(params.Checksum),
-		"source":          "plugin",
-		"sync_source":     "plugin_registry",
+		"skill_id":             firstNonEmptyString(params.PowerXSkillID, params.PluginSkillID),
+		"plugin_skill_id":      params.PluginSkillID,
+		"provider":             strings.TrimSpace(params.Provider),
+		"version":              firstNonEmptyString(params.Version, "1.0.0"),
+		"title":                strings.TrimSpace(params.Title),
+		"description":          strings.TrimSpace(params.Description),
+		"intent_examples":      params.IntentExamples,
+		"response_guidance":    params.ResponseGuidance,
+		"action_required_args": params.ActionRequiredArgs,
+		"action_optional_args": params.ActionOptionalArgs,
+		"slot_mapping":         params.SlotMapping,
+		"pending_task_policy":  params.PendingTaskPolicy,
+		"state_contract":       params.StateContract,
+		"result_presentation":  params.ResultPresentation,
+		"input_schema":         params.InputSchema,
+		"output_schema":        params.OutputSchema,
+		"prompt_spec":          params.PromptSpec,
+		"executor":             params.Executor,
+		"capability":           strings.TrimSpace(params.Capability),
+		"checksum":             normalizeSHA256Checksum(params.Checksum),
+		"source":               "plugin",
+		"sync_source":          "plugin_registry",
 	}
-	endpoint := "/admin/skills/plugin-registry/sync"
-	if strings.TrimSpace(params.PowerXSkillID) != "" {
-		endpoint = "/admin/skills/plugin-registry/" + url.PathEscape(strings.TrimSpace(params.PowerXSkillID)) + "/sync"
+	powerXSkillID := firstNonEmptyString(params.PowerXSkillID, params.PluginSkillID)
+	if strings.TrimSpace(powerXSkillID) == "" {
+		return nil, fmt.Errorf("powerx skill id is required")
 	}
+	endpoint := "/admin/skills/plugin-registry/" + url.PathEscape(strings.TrimSpace(powerXSkillID)) + "/sync"
 	raw, traceID, err := c.doPlatformJSON(ctx, http.MethodPost, endpoint, body)
 	if err != nil {
 		return nil, err
 	}
+	status := firstNonEmptyString(stringFromMap(raw, "status"), "synced")
+	if !strings.EqualFold(status, "published") {
+		return nil, fmt.Errorf("plugin skill sync did not publish skill %s: status=%s", powerXSkillID, status)
+	}
 	return &PluginSkillSyncResult{
-		PowerXSkillID: firstNonEmptyString(stringFromMap(raw, "powerx_skill_id"), stringFromMap(raw, "skill_id"), strings.TrimSpace(params.PowerXSkillID), strings.TrimSpace(params.PluginSkillID)),
-		Status:        firstNonEmptyString(stringFromMap(raw, "status"), "synced"),
+		PowerXSkillID: firstNonEmptyString(stringFromMap(raw, "powerx_skill_id"), stringFromMap(raw, "skill_id"), strings.TrimSpace(powerXSkillID)),
+		Status:        status,
 		TraceID:       traceID,
 		Raw:           raw,
 	}, nil
@@ -883,7 +1291,11 @@ func (c *Client) RegisterCatalog(ctx context.Context, catalog *capabilities.Cata
 		if path == "" {
 			continue
 		}
-		content, err := os.ReadFile(path)
+		diskPath := strings.TrimSpace(asset.DiskPath)
+		if diskPath == "" {
+			diskPath = path
+		}
+		content, err := os.ReadFile(diskPath)
 		if err != nil {
 			return fmt.Errorf("read capability asset %s: %w", path, err)
 		}
@@ -900,6 +1312,36 @@ func (c *Client) RegisterCatalog(ctx context.Context, catalog *capabilities.Cata
 	})
 	if err != nil {
 		return fmt.Errorf("sync capability catalog: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) RegisterLocalDebugHost(ctx context.Context, params LocalDebugHostRegistrationParams) error {
+	pluginID := strings.TrimSpace(params.PluginID)
+	if pluginID == "" {
+		return fmt.Errorf("plugin id is required")
+	}
+	if params.HTTPPort <= 0 {
+		return fmt.Errorf("http port is required")
+	}
+	environment := strings.TrimSpace(params.Environment)
+	if environment == "" {
+		environment = "local"
+	}
+	ttlSeconds := params.TTLSeconds
+	if ttlSeconds <= 0 {
+		ttlSeconds = 3600
+	}
+	body := map[string]any{
+		"pluginId":     pluginID,
+		"environment":  environment,
+		"httpPort":     params.HTTPPort,
+		"grpcPort":     params.GRPCPort,
+		"ttlSeconds":   ttlSeconds,
+		"capabilities": params.Capabilities,
+	}
+	if _, _, err := c.doPlatformJSON(ctx, http.MethodPost, "/internal/plugins/debug-hosts", body); err != nil {
+		return fmt.Errorf("register local debug host: %w", err)
 	}
 	return nil
 }
@@ -1229,6 +1671,20 @@ func (c *Client) StreamAgentSSE(ctx context.Context, params AgentStreamParams) (
 	query := url.Values{}
 	agentID := strings.TrimSpace(params.AgentID)
 	sessionID := strings.TrimSpace(params.SessionID)
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"module":                "agent",
+		"biz_scene":             "gateway_stream_agent_sse",
+		"biz_domain":            "agent",
+		"component":             "gateway.client",
+		"stage":                 "resolve_session_start",
+		"agent_id":              agentID,
+		"session_id":            sessionID,
+		"trace_id":              params.TraceID,
+		"env":                   params.Env,
+		"tenant_uuid":           params.TenantUUID,
+		"origin_tenant_uuid":    params.OriginTenantUUID,
+		"regen_from_message_id": params.RegenFromMessageID,
+	}), "gateway stream agent sse resolve session start")
 	resolvedSessionID, err := c.ResolveAgentSessionID(ctx, AgentSessionListOptions{
 		AgentID:    agentID,
 		SessionID:  sessionID,
@@ -1236,10 +1692,38 @@ func (c *Client) StreamAgentSSE(ctx context.Context, params AgentStreamParams) (
 		TenantUUID: params.TenantUUID,
 	})
 	if err != nil {
+		logger.ErrorCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"module":             "agent",
+			"biz_scene":          "gateway_stream_agent_sse",
+			"biz_domain":         "agent",
+			"component":          "gateway.client",
+			"stage":              "resolve_session_failed",
+			"agent_id":           agentID,
+			"session_id":         sessionID,
+			"trace_id":           params.TraceID,
+			"env":                params.Env,
+			"tenant_uuid":        params.TenantUUID,
+			"origin_tenant_uuid": params.OriginTenantUUID,
+			"error":              err.Error(),
+		}), "gateway stream agent sse resolve session failed")
 		return nil, err
 	}
 	sessionUUID := sessionID
 	sessionID = strings.TrimSpace(resolvedSessionID)
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"module":              "agent",
+		"biz_scene":           "gateway_stream_agent_sse",
+		"biz_domain":          "agent",
+		"component":           "gateway.client",
+		"stage":               "resolve_session_done",
+		"agent_id":            agentID,
+		"session_uuid":        sessionUUID,
+		"resolved_session_id": sessionID,
+		"trace_id":            params.TraceID,
+		"env":                 params.Env,
+		"tenant_uuid":         params.TenantUUID,
+		"origin_tenant_uuid":  params.OriginTenantUUID,
+	}), "gateway stream agent sse resolve session done")
 	if looksLikeUUID(agentID) {
 		query.Set("agent_uuid", agentID)
 	} else {
@@ -1263,10 +1747,25 @@ func (c *Client) StreamAgentSSE(ctx context.Context, params AgentStreamParams) (
 	if env := strings.TrimSpace(params.Env); env != "" {
 		query.Set("env", env)
 	}
+	if originTenantUUID := strings.TrimSpace(params.OriginTenantUUID); originTenantUUID != "" {
+		query.Set("origin_tenant_uuid", originTenantUUID)
+	}
 	endpoint += "?" + query.Encode()
 
 	credential, err := c.gatewayCredential(ctx, authScheme)
 	if err != nil {
+		logger.ErrorCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"module":      "agent",
+			"biz_scene":   "gateway_stream_agent_sse",
+			"biz_domain":  "agent",
+			"component":   "gateway.client",
+			"stage":       "gateway_credential_failed",
+			"auth_scheme": authScheme,
+			"trace_id":    params.TraceID,
+			"env":         params.Env,
+			"tenant_uuid": tenant,
+			"error":       err.Error(),
+		}), "gateway stream agent sse credential failed")
 		return nil, err
 	}
 
@@ -1283,13 +1782,49 @@ func (c *Client) StreamAgentSSE(ctx context.Context, params AgentStreamParams) (
 	req.Header.Set("X-Request-ID", strings.TrimSpace(params.TraceID))
 
 	client := &http.Client{}
+	logger.InfoCtx(logger.WithLogFields(ctx, map[string]interface{}{
+		"module":      "agent",
+		"biz_scene":   "gateway_stream_agent_sse",
+		"biz_domain":  "agent",
+		"component":   "gateway.client",
+		"stage":       "core_stream_request",
+		"endpoint":    endpoint,
+		"auth_scheme": authScheme,
+		"trace_id":    params.TraceID,
+		"env":         params.Env,
+		"tenant_uuid": tenant,
+	}), "gateway stream agent sse request core")
 	resp, err := client.Do(req)
 	if err != nil {
+		logger.ErrorCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"module":     "agent",
+			"biz_scene":  "gateway_stream_agent_sse",
+			"biz_domain": "agent",
+			"component":  "gateway.client",
+			"stage":      "core_stream_request_failed",
+			"endpoint":   endpoint,
+			"trace_id":   params.TraceID,
+			"env":        params.Env,
+			"error":      err.Error(),
+		}), "gateway stream agent sse request core failed")
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		logger.ErrorCtx(logger.WithLogFields(ctx, map[string]interface{}{
+			"module":      "agent",
+			"biz_scene":   "gateway_stream_agent_sse",
+			"biz_domain":  "agent",
+			"component":   "gateway.client",
+			"stage":       "core_stream_status_failed",
+			"endpoint":    endpoint,
+			"status":      resp.StatusCode,
+			"body":        strings.TrimSpace(string(body)),
+			"trace_id":    params.TraceID,
+			"env":         params.Env,
+			"tenant_uuid": tenant,
+		}), "gateway stream agent sse core returned error")
 		return nil, fmt.Errorf("powerx agent stream failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return &AgentStream{
@@ -1533,6 +2068,13 @@ func firstNonEmptyString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func positiveOrDefaultInt(value int, fallback int) int {
+	if value > 0 {
+		return value
+	}
+	return fallback
 }
 
 func stringFromMap(values map[string]any, key string) string {
@@ -2113,6 +2655,29 @@ type platformAgentResponse struct {
 	Message string `json:"message"`
 	Data    struct {
 		Items []AgentRecord `json:"items"`
+	} `json:"data"`
+}
+
+type platformKnowledgeSpaceResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Items []KnowledgeSpaceRuntimeRecord `json:"items"`
+	} `json:"data"`
+}
+
+type platformKnowledgeSpaceCreateResponse struct {
+	Code    int                  `json:"code"`
+	Message string               `json:"message"`
+	Data    KnowledgeSpaceRecord `json:"data"`
+}
+
+type platformKnowledgeSpaceDeleteResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Deleted bool   `json:"deleted"`
+		SpaceID string `json:"spaceId"`
 	} `json:"data"`
 }
 

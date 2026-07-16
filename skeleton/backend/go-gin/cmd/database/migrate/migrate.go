@@ -15,6 +15,7 @@ import (
 	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	integrationModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
 	marketplaceModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
+	metadataModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/metadata"
 	operationsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/operations"
 	runtimeOpsModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
 	securityModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
@@ -68,6 +69,13 @@ var businessTables = []interface{}{
 	&adminconsoleModel.AuditEvent{},
 	&adminconsoleModel.ConfigChange{},
 	&adminconsoleModel.JobRun{},
+	&metadataModel.DictionaryNamespace{},
+	&metadataModel.DictionaryItem{},
+	&metadataModel.Taxonomy{},
+	&metadataModel.TaxonomyNode{},
+	&metadataModel.Tag{},
+	&metadataModel.TagBinding{},
+	&metadataModel.ResourceType{},
 }
 
 var iamTables = []interface{}{

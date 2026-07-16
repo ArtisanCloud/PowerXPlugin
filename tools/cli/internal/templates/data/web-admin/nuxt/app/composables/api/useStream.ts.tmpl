@@ -67,10 +67,19 @@ function getOptionalAuthToken() {
 function getOptionalTenantUUID() {
   if (typeof window === "undefined") return "";
   return (
+    window.localStorage.getItem("px_current_tenant_uuid") ||
     window.localStorage.getItem("tenant_uuid") ||
     window.localStorage.getItem("tenantUuid") ||
+    readCookie("tenant_uuid") ||
     ""
   );
+}
+
+function readCookie(name: string) {
+  if (typeof document === "undefined") return "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : "";
 }
 
 // 便捷的实时数据流组合式函数

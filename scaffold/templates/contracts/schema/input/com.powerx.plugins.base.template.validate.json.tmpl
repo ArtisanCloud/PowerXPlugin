@@ -3,6 +3,11 @@
   "title": "TemplateValidateInput",
   "type": "object",
   "properties": {
+    "template_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "模板主键 ID。Agent capability payload 统一使用 template_id；REST path {id} 只属于 REST transport。"
+    },
     "rules": {
       "type": "array",
       "items": { "type": "string" },
@@ -13,5 +18,6 @@
       "description": "true 时所有规则都会当成错误返回，默认仅关键规则标记为 error。"
     }
   },
+  "required": ["template_id"],
   "additionalProperties": false
 }

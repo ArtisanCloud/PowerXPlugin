@@ -1,12 +1,16 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	domain "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/integration"
@@ -15,6 +19,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	srvtemplates "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/templates"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -58,7 +63,7 @@ func (r *HandlerRegistry) Register(handler CapabilityHandler, scopes ...string) 
 }
 
 func (r *HandlerRegistry) HandlerByCapability(capabilityID string) (CapabilityHandler, bool) {
-	handler, ok := r.byCapability[capabilityID]
+	handler, ok := r.byCapability[normalizeLocalCapabilityID(capabilityID)]
 	return handler, ok
 }
 
@@ -67,6 +72,48 @@ func (r *HandlerRegistry) CapabilityByScope(scope string) string {
 		return ""
 	}
 	return r.scopeAlias[strings.TrimSpace(strings.ToLower(scope))]
+}
+
+func normalizeLocalCapabilityID(capabilityID string) string {
+	id := strings.TrimSpace(capabilityID)
+	if id == "" {
+		return ""
+	}
+	return strings.Replace(id, ".local.", ".", 1)
+}
+
+func localizeCapabilityIDForRequest(capabilityID string, envelope *domain.IntegrationEnvelope) string {
+	id := strings.TrimSpace(capabilityID)
+	if id == "" || envelope == nil || envelope.Metadata == nil {
+		return id
+	}
+	raw, ok := envelope.Metadata["capability_id"]
+	if !ok {
+		return id
+	}
+	requested := normalizeString(raw)
+	localPrefix, basePrefix, ok := localCapabilityPrefixes(requested)
+	if !ok || strings.Contains(id, ".local.") || !strings.HasPrefix(id, basePrefix) {
+		return id
+	}
+	return localPrefix + strings.TrimPrefix(id, basePrefix)
+}
+
+func localCapabilityPrefixes(capabilityID string) (localPrefix string, basePrefix string, ok bool) {
+	id := strings.TrimSpace(capabilityID)
+	if id == "" {
+		return "", "", false
+	}
+	idx := strings.Index(id, ".local.")
+	if idx < 0 {
+		return "", "", false
+	}
+	localPrefix = id[:idx+len(".local.")]
+	basePrefix = id[:idx] + "."
+	if strings.TrimSpace(localPrefix) == "" || strings.TrimSpace(basePrefix) == "" {
+		return "", "", false
+	}
+	return localPrefix, basePrefix, true
 }
 
 // CapabilityInvoker 根据 registry 调度不同能力的 handler。
@@ -79,12 +126,16 @@ type CapabilityInvoker struct {
 // NewCapabilityInvoker wires business handlers with HostInvoker contract.
 func NewCapabilityInvoker(templateService *srvtemplates.TemplateService, broker *stream.Broker, logger *pxlog.Entry, fallback HostInvoker) HostInvoker {
 	registry := NewHandlerRegistry()
-	registry.Register(&templatePrepareHandler{}, "agent.template.prepare")
+	registry.Register(&templatePrepareHandler{svc: templateService}, "agent.template.prepare")
 	registry.Register(&templateListHandler{svc: templateService}, "agent.template.list")
 	registry.Register(&templateReadHandler{svc: templateService}, "agent.template.read")
 	registry.Register(&templateCreateHandler{svc: templateService}, "agent.template.create")
 	registry.Register(&templateUpdateHandler{svc: templateService}, "agent.template.update")
 	registry.Register(&templateDeleteHandler{svc: templateService}, "agent.template.delete")
+	registry.Register(&templateValidateHandler{svc: templateService}, "agent.template.validate")
+	registry.Register(&templateBatchCloneHandler{svc: templateService}, "agent.template.batch_clone")
+	registry.Register(&templateReviewHandler{svc: templateService}, "agent.template.review")
+	registry.Register(&templatePublishHandler{svc: templateService}, "agent.template.publish")
 	registry.Register(&templateComposeHandler{svc: templateService, broker: broker, logger: logger}, "agent.template.compose")
 	registry.Register(&templateAuditHandler{svc: templateService, broker: broker, logger: logger}, "agent.template.audit")
 	registry.Register(&templateQualityHandler{svc: templateService, broker: broker, logger: logger}, "agent.template.quality_distribute")
@@ -104,9 +155,24 @@ func (i *CapabilityInvoker) Invoke(ctx context.Context, envelope *domain.Integra
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx = authx.ContextWithTenantUUID(ctx, envelope.TenantUuid)
+	resourceTenantUUID := resourceTenantUUIDFromEnvelope(envelope)
+	if resourceTenantUUID == "" {
+		return nil, errors.New("origin_tenant_uuid or tenant_uuid is required for capability resource ownership")
+	}
+	ctx = authx.ContextWithTenantUUID(ctx, resourceTenantUUID)
 
 	capabilityID := i.capabilityFromEnvelope(envelope)
+	if i.logger != nil {
+		pxlog.DebugCtx(pxlog.WithLogFields(ctx, map[string]interface{}{
+			"module":             "integration",
+			"biz_scene":          "capability_invoke_tenant_scope",
+			"biz_domain":         "integration",
+			"component":          "integration.capability_invoker",
+			"capability_id":      capabilityID,
+			"tenant_uuid":        strings.TrimSpace(envelope.TenantUuid),
+			"origin_tenant_uuid": resourceTenantUUID,
+		}), "resolved capability resource tenant")
+	}
 	if handler, ok := i.registry.HandlerByCapability(capabilityID); ok {
 		return handler.Handle(ctx, envelope)
 	}
@@ -142,9 +208,26 @@ func (i *CapabilityInvoker) capabilityFromEnvelope(envelope *domain.IntegrationE
 	return ""
 }
 
+func resourceTenantUUIDFromEnvelope(envelope *domain.IntegrationEnvelope) string {
+	if envelope == nil {
+		return ""
+	}
+	if envelope.Metadata != nil {
+		if tenantUUID := normalizeString(envelope.Metadata["origin_tenant_uuid"]); tenantUUID != "" {
+			return tenantUUID
+		}
+		if tenantUUID := normalizeString(envelope.Metadata["resource_tenant_uuid"]); tenantUUID != "" {
+			return tenantUUID
+		}
+	}
+	return strings.TrimSpace(envelope.TenantUuid)
+}
+
 // ---- handler 实现 ----
 
-type templatePrepareHandler struct{}
+type templatePrepareHandler struct {
+	svc *srvtemplates.TemplateService
+}
 
 func (h *templatePrepareHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
 	var payload templatePreparePayload
@@ -160,6 +243,10 @@ func (h *templatePrepareHandler) Handle(ctx context.Context, envelope *domain.In
 		action = "create"
 	}
 	merged := mergeTemplatePrepareState(state, payload)
+	resolution, err := h.resolveTemplateReference(ctx, action, merged)
+	if err != nil {
+		return nil, err
+	}
 	missing := missingTemplateFields(action, merged)
 	resp := map[string]any{
 		"status":           "awaiting_params",
@@ -167,6 +254,12 @@ func (h *templatePrepareHandler) Handle(ctx context.Context, envelope *domain.In
 		"missing_fields":   missing,
 		"state_patch":      merged,
 		"message":          templatePrepareMessage(action, missing),
+	}
+	if strings.EqualFold(action, "delete") && stringSliceContains(missing, "confirmation") {
+		resp["message"] = templateDeleteConfirmationMessage(merged)
+	}
+	if resolution != nil && resolution.Message != "" && len(missing) > 0 {
+		resp["message"] = resolution.Message
 	}
 	if len(missing) == 0 {
 		reqPayload, err := templateCapabilityPayload(action, merged)
@@ -177,17 +270,141 @@ func (h *templatePrepareHandler) Handle(ctx context.Context, envelope *domain.In
 		resp["ready_to_execute"] = true
 		resp["missing_fields"] = []string{}
 		resp["capability_request"] = map[string]any{
-			"capability_id": templateActionCapabilityID(action),
+			"capability_id": localizeCapabilityIDForRequest(templateActionCapabilityID(action), envelope),
 			"payload":       reqPayload,
 		}
 		resp["message"] = "参数已完整，准备执行模板操作。"
 	}
+	status := normalizeString(resp["status"])
 	payloadBytes, _ := json.Marshal(resp)
-	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+	return &HostInvocationResult{Status: status, Payload: payloadBytes}, nil
 }
 
 func (h *templatePrepareHandler) CapabilityID() string {
 	return "com.powerx.plugins.base.template.prepare"
+}
+
+type templateReferenceResolution struct {
+	Message string
+}
+
+func (h *templatePrepareHandler) resolveTemplateReference(ctx context.Context, action string, state map[string]any) (*templateReferenceResolution, error) {
+	action = strings.ToLower(strings.TrimSpace(action))
+	if action != "get" && action != "update" && action != "delete" {
+		return nil, nil
+	}
+	if uint64FromAny(state["template_id"]) > 0 {
+		return nil, nil
+	}
+	query := templateLookupQuery(state)
+	if query == "" {
+		return nil, nil
+	}
+	if h == nil || h.svc == nil {
+		return nil, errors.New("template service unavailable")
+	}
+	page, err := h.svc.List(ctx, query, 1, 10)
+	if err != nil {
+		return nil, err
+	}
+	matches := page.List
+	exact := make([]*dbtemplate.Template, 0, len(matches))
+	for _, tpl := range matches {
+		if tpl != nil && strings.EqualFold(strings.TrimSpace(tpl.Name), query) {
+			exact = append(exact, tpl)
+		}
+	}
+	if len(exact) == 1 {
+		setResolvedTemplate(state, exact[0])
+		return nil, nil
+	}
+	if len(exact) > 1 {
+		state["template_candidates"] = templateCandidateViews(exact)
+		return &templateReferenceResolution{Message: templateCandidateMessage("找到多个同名模板，请选择要操作的模板。", exact)}, nil
+	}
+	if len(matches) == 1 {
+		setResolvedTemplate(state, matches[0])
+		return nil, nil
+	}
+	if len(matches) > 1 {
+		state["template_candidates"] = templateCandidateViews(matches)
+		return &templateReferenceResolution{Message: templateCandidateMessage("找到多个匹配模板，请选择要操作的模板。", matches)}, nil
+	}
+	return &templateReferenceResolution{Message: "没有找到匹配的模板，请补充正确的模板名称。"}, nil
+}
+
+func templateLookupQuery(state map[string]any) string {
+	if state == nil {
+		return ""
+	}
+	template := mapFromInterface(state["template"])
+	return firstNonEmptyTemplateString(
+		normalizeString(state["template_ref"]),
+		normalizeString(state["template_name"]),
+		normalizeString(state["q"]),
+		normalizeString(template["title"]),
+		normalizeString(template["name"]),
+	)
+}
+
+func setResolvedTemplate(state map[string]any, tpl *dbtemplate.Template) {
+	if state == nil || tpl == nil {
+		return
+	}
+	state["template_id"] = tpl.ID
+	state["template_name"] = tpl.Name
+	state["resolved_template"] = map[string]any{
+		"name":        tpl.Name,
+		"description": tpl.Description,
+		"status":      tpl.Status,
+		"detail_path": templateDetailPath(tpl.ID),
+	}
+}
+
+func templateCandidateViews(items []*dbtemplate.Template) []map[string]any {
+	candidates := make([]map[string]any, 0, len(items))
+	for _, tpl := range items {
+		if tpl == nil {
+			continue
+		}
+		candidates = append(candidates, map[string]any{
+			"template_id":   tpl.ID,
+			"name":          tpl.Name,
+			"description":   tpl.Description,
+			"status":        tpl.Status,
+			"review_status": tpl.ReviewStatus,
+			"detail_path":   templateDetailPath(tpl.ID),
+		})
+	}
+	return candidates
+}
+
+func templateCandidateMessage(prefix string, items []*dbtemplate.Template) string {
+	lines := []string{strings.TrimSpace(prefix)}
+	for _, tpl := range items {
+		if tpl == nil {
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("- [%s](%s)（模板 ID：%d）", tpl.Name, templateDetailPath(tpl.ID), tpl.ID))
+	}
+	lines = append(lines, "请回复要操作的模板 ID，或提供更准确的模板名称。")
+	return strings.Join(lines, "\n")
+}
+
+func templateDeleteConfirmationMessage(state map[string]any) string {
+	templateName := firstNonEmptyTemplateString(normalizeString(state["template_name"]), normalizeString(mapFromInterface(state["resolved_template"])["name"]))
+	templateID := uint64FromAny(state["template_id"])
+	if templateName == "" {
+		templateName = "该模板"
+	}
+	if templateID == 0 {
+		return "请确认是否删除" + templateName + "。"
+	}
+	return fmt.Sprintf("请确认是否删除模板「%s」。[查看模板详情](%s)（模板 ID：%d）\n确认删除后我才会执行。", templateName, templateDetailPath(templateID), templateID)
+}
+
+func templateDetailPath(id uint64) string {
+	return fmt.Sprintf("/templates/crud?template_id=%d", id)
 }
 
 type templateListHandler struct {
@@ -216,8 +433,15 @@ func (h *templateListHandler) Handle(ctx context.Context, envelope *domain.Integ
 	if err != nil {
 		return nil, err
 	}
-	payloadBytes, _ := json.Marshal(result)
-	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+	resp := map[string]any{
+		"items": templateViews(result.List),
+		"pagination": map[string]any{
+			"page":      result.PageIndex,
+			"page_size": result.PageSize,
+			"total":     result.Total,
+		},
+	}
+	return hostResultWithAgentResponse(h.CapabilityID(), resp)
 }
 
 func (h *templateListHandler) CapabilityID() string {
@@ -243,8 +467,9 @@ func (h *templateReadHandler) Handle(ctx context.Context, envelope *domain.Integ
 	if err != nil {
 		return nil, err
 	}
-	payloadBytes, _ := json.Marshal(tpl)
-	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+	return hostResultWithAgentResponse(h.CapabilityID(), map[string]any{
+		"template": templateView(tpl),
+	})
 }
 
 func (h *templateReadHandler) CapabilityID() string {
@@ -275,8 +500,12 @@ func (h *templateCreateHandler) Handle(ctx context.Context, envelope *domain.Int
 	if err != nil {
 		return nil, err
 	}
-	payloadBytes, _ := json.Marshal(tpl)
-	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+	resp := map[string]any{
+		"id":       strconv.FormatUint(tpl.ID, 10),
+		"status":   tpl.Status,
+		"template": templateView(tpl),
+	}
+	return hostResultWithAgentResponse(h.CapabilityID(), resp)
 }
 
 func (h *templateCreateHandler) CapabilityID() string {
@@ -318,8 +547,9 @@ func (h *templateUpdateHandler) Handle(ctx context.Context, envelope *domain.Int
 	if err != nil {
 		return nil, err
 	}
-	payloadBytes, _ := json.Marshal(updated)
-	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+	return hostResultWithAgentResponse(h.CapabilityID(), map[string]any{
+		"template": templateView(updated),
+	})
 }
 
 func (h *templateUpdateHandler) CapabilityID() string {
@@ -345,15 +575,145 @@ func (h *templateDeleteHandler) Handle(ctx context.Context, envelope *domain.Int
 		return nil, err
 	}
 	resp := map[string]any{
-		"deleted":     true,
-		"template_id": payload.TemplateID,
+		"id":      strconv.FormatUint(payload.TemplateID, 10),
+		"deleted": true,
+	}
+	return hostResultWithAgentResponse(h.CapabilityID(), resp)
+}
+
+func (h *templateDeleteHandler) CapabilityID() string {
+	return "com.powerx.plugins.base.template.delete"
+}
+
+type templateValidateHandler struct {
+	svc *srvtemplates.TemplateService
+}
+
+func (h *templateValidateHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
+	if h == nil || h.svc == nil {
+		return nil, errors.New("template service unavailable")
+	}
+	var payload templateValidatePayload
+	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
+		return nil, err
+	}
+	if payload.TemplateID == 0 {
+		return nil, errors.New("template_id is required")
+	}
+	result, err := h.svc.Validate(ctx, payload.TemplateID, payload.Rules, payload.Strict)
+	if err != nil {
+		return nil, err
+	}
+	payloadBytes, _ := json.Marshal(result)
+	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+}
+
+func (h *templateValidateHandler) CapabilityID() string {
+	return "com.powerx.plugins.base.template.validate"
+}
+
+type templateBatchCloneHandler struct {
+	svc *srvtemplates.TemplateService
+}
+
+func (h *templateBatchCloneHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
+	if h == nil || h.svc == nil {
+		return nil, errors.New("template service unavailable")
+	}
+	var payload templateBatchClonePayload
+	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
+		return nil, err
+	}
+	if len(payload.SourceIDs) == 0 {
+		return nil, errors.New("source_ids is required")
+	}
+	result, err := h.svc.BatchClone(ctx, payload.SourceIDs, payload.Copies, srvtemplates.BatchCloneOptions{
+		NamePrefix:        payload.NamePrefix,
+		DescriptionPrefix: payload.DescriptionPrefix,
+	})
+	if err != nil {
+		return nil, err
+	}
+	payloadBytes, _ := json.Marshal(result)
+	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+}
+
+func (h *templateBatchCloneHandler) CapabilityID() string {
+	return "com.powerx.plugins.base.template.batch_clone"
+}
+
+type templateReviewHandler struct {
+	svc *srvtemplates.TemplateService
+}
+
+func (h *templateReviewHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
+	if h == nil || h.svc == nil {
+		return nil, errors.New("template service unavailable")
+	}
+	var payload templateReviewPayload
+	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
+		return nil, err
+	}
+	if payload.TemplateID == 0 {
+		return nil, errors.New("template_id is required")
+	}
+	reviewer := strings.TrimSpace(payload.Reviewer)
+	if reviewer == "" {
+		reviewer = "system"
+	}
+	reviewed, err := h.svc.MarkReviewed(ctx, payload.TemplateID, reviewer, payload.Comments, payload.Approved)
+	if err != nil {
+		return nil, err
+	}
+	status := srvtemplates.TemplateReviewRejected
+	if payload.Approved {
+		status = srvtemplates.TemplateReviewApproved
+	}
+	resp := map[string]any{
+		"template_id": strconv.FormatUint(reviewed.ID, 10),
+		"status":      status,
+		"reviewer":    reviewer,
+		"template":    templateView(reviewed),
 	}
 	payloadBytes, _ := json.Marshal(resp)
 	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
 }
 
-func (h *templateDeleteHandler) CapabilityID() string {
-	return "com.powerx.plugins.base.template.delete"
+func (h *templateReviewHandler) CapabilityID() string {
+	return "com.powerx.plugins.base.template.review"
+}
+
+type templatePublishHandler struct {
+	svc *srvtemplates.TemplateService
+}
+
+func (h *templatePublishHandler) Handle(ctx context.Context, envelope *domain.IntegrationEnvelope) (*HostInvocationResult, error) {
+	if h == nil || h.svc == nil {
+		return nil, errors.New("template service unavailable")
+	}
+	var payload templatePublishPayload
+	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
+		return nil, err
+	}
+	if payload.TemplateID == 0 {
+		return nil, errors.New("template_id is required")
+	}
+	published, err := h.svc.Publish(ctx, payload.TemplateID, payload.Channel)
+	if err != nil {
+		return nil, err
+	}
+	resp := map[string]any{
+		"template_id":    strconv.FormatUint(published.ID, 10),
+		"publish_status": "deployed",
+		"published_at":   published.PublishedAt,
+		"template":       templateView(published),
+	}
+	payloadBytes, _ := json.Marshal(resp)
+	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+}
+
+func (h *templatePublishHandler) CapabilityID() string {
+	return "com.powerx.plugins.base.template.publish"
 }
 
 type templateComposeHandler struct {
@@ -590,7 +950,11 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 		return nil, err
 	}
 	response := map[string]any{
-		"scanned_total": int(list.Total),
+		"scanned_total":  int(list.Total),
+		"violations":     []map[string]any{},
+		"cloned_ids":     []uint64{},
+		"failed_clones":  []srvtemplates.BatchCloneFailure{},
+		"publish_status": "",
 	}
 	if list.List == nil || len(list.List) == 0 {
 		payloadBytes, _ := json.Marshal(response)
@@ -600,6 +964,7 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 	if validation, err := h.svc.Validate(ctx, primary.ID, payload.ValidateRules, false); err == nil {
 		response["validated_template_id"] = strconv.FormatUint(primary.ID, 10)
 		response["validation_passed"] = validation.Valid
+		response["violations"] = validation.Violations
 		emitEvent(h.broker, envelope, "template.validate.completed", map[string]any{
 			"template_id": primary.ID,
 			"valid":       validation.Valid,
@@ -625,6 +990,8 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 		return nil, err
 	}
 	response["created_template_ids"] = cloneResult.CreatedIDs
+	response["cloned_ids"] = cloneResult.CreatedIDs
+	response["failed_clones"] = cloneResult.Failed
 	emitEvent(h.broker, envelope, "template.batch_clone.completed", map[string]any{
 		"source_ids":  sourceIDs,
 		"created_ids": cloneResult.CreatedIDs,
@@ -646,6 +1013,19 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 		return nil, err
 	}
 	response["updated_template_id"] = strconv.FormatUint(updated.ID, 10)
+	if strings.TrimSpace(payload.PublishChannel) != "" {
+		published, err := h.svc.Publish(ctx, updated.ID, payload.PublishChannel)
+		if err != nil {
+			return nil, err
+		}
+		response["publish_status"] = "deployed"
+		response["published_template_id"] = strconv.FormatUint(published.ID, 10)
+		emitEvent(h.broker, envelope, "template.publish.completed", map[string]any{
+			"template_id":     published.ID,
+			"publish_channel": published.PublishChannel,
+			"published_at":    published.PublishedAt,
+		})
+	}
 	emitEvent(h.broker, envelope, "template.update.completed", map[string]any{
 		"template_id": updated.ID,
 		"description": updated.Description,
@@ -718,15 +1098,23 @@ type templateListPayload struct {
 }
 
 type templatePreparePayload struct {
-	Action      string         `json:"action"`
-	TemplateID  uint64         `json:"template_id"`
-	Name        string         `json:"name"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	Content     string         `json:"content"`
-	Template    map[string]any `json:"template"`
-	UserMessage string         `json:"user_message"`
-	State       struct {
+	Action       string              `json:"action"`
+	TemplateID   any                 `json:"template_id"`
+	TemplateRef  string              `json:"template_ref"`
+	TemplateName string              `json:"template_name"`
+	Name         string              `json:"name"`
+	Title        string              `json:"title"`
+	Description  string              `json:"description"`
+	Content      string              `json:"content"`
+	Confirmed    any                 `json:"confirmed"`
+	Confirmation string              `json:"confirmation"`
+	Q            string              `json:"q"`
+	Page         int                 `json:"page"`
+	PageSize     int                 `json:"page_size"`
+	List         templateListPayload `json:"list"`
+	Template     map[string]any      `json:"template"`
+	UserMessage  string              `json:"user_message"`
+	State        struct {
 		StateKey      string         `json:"state_key"`
 		SchemaVersion string         `json:"schema_version"`
 		Collected     map[string]any `json:"collected"`
@@ -753,6 +1141,32 @@ type templateUpdatePayload struct {
 
 type templateDeletePayload struct {
 	TemplateID uint64 `json:"template_id"`
+}
+
+type templateValidatePayload struct {
+	TemplateID uint64   `json:"template_id"`
+	Rules      []string `json:"rules"`
+	Strict     bool     `json:"strict"`
+}
+
+type templateBatchClonePayload struct {
+	SourceIDs         []uint64 `json:"source_ids"`
+	Copies            int      `json:"copies"`
+	NamePrefix        string   `json:"name_prefix"`
+	DescriptionPrefix string   `json:"description_prefix"`
+}
+
+type templateReviewPayload struct {
+	TemplateID uint64 `json:"template_id"`
+	Approved   bool   `json:"approved"`
+	Comments   string `json:"comments"`
+	Reviewer   string `json:"reviewer"`
+}
+
+type templatePublishPayload struct {
+	TemplateID uint64 `json:"template_id"`
+	Channel    string `json:"channel"`
+	Version    string `json:"version"`
 }
 
 type templateComposePayload struct {
@@ -815,8 +1229,25 @@ func mergeTemplatePrepareState(state map[string]any, payload templatePreparePayl
 		action = "create"
 	}
 	merged["action"] = action
-	if payload.TemplateID > 0 {
-		merged["template_id"] = payload.TemplateID
+	if templateID := uint64FromAny(payload.TemplateID); templateID > 0 {
+		merged["template_id"] = templateID
+	} else if ref := normalizeString(payload.TemplateID); ref != "" {
+		merged["template_ref"] = ref
+	}
+	if ref := firstNonEmptyTemplateString(payload.TemplateRef, payload.TemplateName, normalizeString(merged["template_ref"]), normalizeString(merged["template_name"])); ref != "" {
+		merged["template_ref"] = ref
+	}
+	if boolFromAny(payload.Confirmed) || isAffirmativeConfirmation(payload.Confirmation) || isAffirmativeConfirmation(payload.UserMessage) {
+		merged["confirmed"] = true
+	}
+	if q := firstNonEmptyTemplateString(payload.Q, payload.List.Q); q != "" {
+		merged["q"] = q
+	}
+	if page := firstPositiveInt(payload.Page, payload.List.Page); page > 0 {
+		merged["page"] = page
+	}
+	if pageSize := firstPositiveInt(payload.PageSize, payload.List.PageSize); pageSize > 0 {
+		merged["page_size"] = pageSize
 	}
 	template := mapFromInterface(merged["template"])
 	if template == nil {
@@ -859,7 +1290,7 @@ func missingTemplateFields(action string, state map[string]any) []string {
 		}
 	case "update":
 		if uint64FromAny(state["template_id"]) == 0 {
-			missing = append(missing, "template_id")
+			missing = append(missing, "template_ref")
 		}
 		if normalizeString(template["title"]) == "" && normalizeString(template["name"]) == "" {
 			missing = append(missing, "template.title")
@@ -872,7 +1303,10 @@ func missingTemplateFields(action string, state map[string]any) []string {
 		}
 	case "get", "delete":
 		if uint64FromAny(state["template_id"]) == 0 {
-			missing = append(missing, "template_id")
+			missing = append(missing, "template_ref")
+		}
+		if action == "delete" && uint64FromAny(state["template_id"]) > 0 && !boolFromAny(state["confirmed"]) {
+			missing = append(missing, "confirmation")
 		}
 	case "list":
 	default:
@@ -889,11 +1323,11 @@ func templatePrepareMessage(action string, missing []string) string {
 	case "create":
 		return "请补充这个模板的" + templateMissingFieldNames(missing) + "。"
 	case "update":
-		return "请补充要更新的模板 ID，以及" + templateMissingFieldNames(missing) + "。"
+		return "请补充要更新的模板名称，以及" + templateMissingFieldNames(missing) + "。"
 	case "get":
-		return "请提供要查询的模板 ID。"
+		return "请提供要查询的模板名称。"
 	case "delete":
-		return "请提供要删除的模板 ID。"
+		return "请提供要删除的模板名称。"
 	default:
 		return "请说明要执行的模板操作。"
 	}
@@ -911,6 +1345,10 @@ func templateMissingFieldNames(fields []string) string {
 			names = append(names, "内容")
 		case "template_id":
 			names = append(names, "模板 ID")
+		case "template_ref":
+			names = append(names, "模板名称")
+		case "confirmation":
+			names = append(names, "删除确认")
 		default:
 			names = append(names, field)
 		}
@@ -921,7 +1359,6 @@ func templateMissingFieldNames(fields []string) string {
 func templateCapabilityPayload(action string, state map[string]any) (map[string]any, error) {
 	action = strings.ToLower(strings.TrimSpace(action))
 	template := mapFromInterface(state["template"])
-	capabilityID := templateActionCapabilityID(action)
 	bodyPayload := map[string]any{}
 	switch action {
 	case "create":
@@ -946,26 +1383,19 @@ func templateCapabilityPayload(action string, state map[string]any) (map[string]
 		}
 	case "list":
 		bodyPayload = map[string]any{"action": action}
+		if q := normalizeString(state["q"]); q != "" {
+			bodyPayload["q"] = q
+		}
+		if page := intFromAny(state["page"]); page > 0 {
+			bodyPayload["page"] = page
+		}
+		if pageSize := intFromAny(state["page_size"]); pageSize > 0 {
+			bodyPayload["page_size"] = pageSize
+		}
 	default:
 		return nil, fmt.Errorf("unsupported template action: %s", action)
 	}
-	return map[string]any{
-		"method":   "POST",
-		"endpoint": "/api/v1/integration/capabilities/invoke",
-		"body": map[string]any{
-			"capabilityId":      capabilityID,
-			"action":            action,
-			"preferredProtocol": "agent",
-			"payload":           bodyPayload,
-			"metadata": map[string]any{
-				"auth_required":  false,
-				"tenant_scoped":  true,
-				"capability_id":  capabilityID,
-				"prepared_by":    "template.prepare",
-				"schema_version": "1.0",
-			},
-		},
-	}, nil
+	return bodyPayload, nil
 }
 
 func templateActionCapabilityID(action string) string {
@@ -983,6 +1413,238 @@ func templateActionCapabilityID(action string) string {
 	default:
 		return ""
 	}
+}
+
+func templateViews(in []*dbtemplate.Template) []map[string]any {
+	out := make([]map[string]any, 0, len(in))
+	for _, tpl := range in {
+		out = append(out, templateView(tpl))
+	}
+	return out
+}
+
+func templateView(tpl *dbtemplate.Template) map[string]any {
+	if tpl == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":              strconv.FormatUint(tpl.ID, 10),
+		"name":            tpl.Name,
+		"description":     tpl.Description,
+		"content":         tpl.Content,
+		"status":          tpl.Status,
+		"review_status":   tpl.ReviewStatus,
+		"reviewed_by":     tpl.ReviewedBy,
+		"reviewed_at":     tpl.ReviewedAt,
+		"review_comment":  tpl.ReviewComment,
+		"publish_channel": tpl.PublishChannel,
+		"published_at":    tpl.PublishedAt,
+		"cleanup_reason":  tpl.CleanupReason,
+		"cleaned_at":      tpl.CleanedAt,
+		"created_at":      tpl.CreatedAt,
+		"updated_at":      tpl.UpdatedAt,
+	}
+}
+
+type capabilityContractDocument struct {
+	Metadata capabilityContractMetadata `yaml:"metadata"`
+}
+
+type capabilityContractMetadata struct {
+	AgentResponse agentResponseSpec `yaml:"agent_response"`
+}
+
+type agentResponseSpec struct {
+	Content string                  `yaml:"content"`
+	Links   []agentResponseLinkSpec `yaml:"links"`
+}
+
+type agentResponseLinkSpec struct {
+	ID    string `yaml:"id"`
+	Kind  string `yaml:"kind"`
+	Label string `yaml:"label"`
+	Href  string `yaml:"href"`
+}
+
+func hostResultWithAgentResponse(capabilityID string, data map[string]any) (*HostInvocationResult, error) {
+	rendered, err := renderCapabilityAgentResponse(capabilityID, data)
+	if err != nil {
+		return nil, err
+	}
+	payloadBytes, _ := json.Marshal(rendered)
+	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
+}
+
+func renderCapabilityAgentResponse(capabilityID string, data map[string]any) (map[string]any, error) {
+	if strings.TrimSpace(capabilityID) == "" {
+		return nil, errors.New("capability_id is required for agent response rendering")
+	}
+	if data == nil {
+		data = map[string]any{}
+	}
+	renderData := withAgentResponseDerivedFields(data)
+	spec, err := loadCapabilityAgentResponseSpec(capabilityID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(spec.Content) == "" {
+		return nil, fmt.Errorf("capability %s missing metadata.agent_response.content", capabilityID)
+	}
+	out := cloneAnyMap(data)
+	content, err := renderAgentResponseTemplate(capabilityID, "content", spec.Content, renderData)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(content) == "" {
+		return nil, fmt.Errorf("capability %s rendered empty agent response content", capabilityID)
+	}
+	out["content"] = content
+	links := make([]map[string]any, 0, len(spec.Links))
+	for i, linkSpec := range spec.Links {
+		link, err := renderAgentResponseLink(capabilityID, i, linkSpec, renderData)
+		if err != nil {
+			return nil, err
+		}
+		links = append(links, link)
+	}
+	if len(links) > 0 {
+		out["links"] = links
+	}
+	return out, nil
+}
+
+func withAgentResponseDerivedFields(data map[string]any) map[string]any {
+	out := cloneAnyMap(data)
+	if out == nil {
+		out = map[string]any{}
+	}
+	if _, exists := out["summary"]; !exists {
+		out["summary"] = templateItemsSummary(out["items"])
+	}
+	return out
+}
+
+func templateItemsSummary(value any) string {
+	items, ok := value.([]map[string]any)
+	if !ok || len(items) == 0 {
+		return "没有匹配的模板。"
+	}
+	limit := len(items)
+	if limit > 5 {
+		limit = 5
+	}
+	lines := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		item := items[i]
+		id := normalizeString(item["id"])
+		name := normalizeString(item["name"])
+		status := normalizeString(item["status"])
+		if id == "" || name == "" {
+			return ""
+		}
+		line := fmt.Sprintf("- [%s](/templates/crud?template_id=%s)", name, id)
+		if status != "" {
+			line = fmt.Sprintf("%s（%s）", line, status)
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func loadCapabilityAgentResponseSpec(capabilityID string) (agentResponseSpec, error) {
+	contractPath, err := resolveCapabilityContractPath(normalizeLocalCapabilityID(capabilityID))
+	if err != nil {
+		return agentResponseSpec{}, err
+	}
+	raw, err := os.ReadFile(contractPath)
+	if err != nil {
+		return agentResponseSpec{}, fmt.Errorf("read capability contract %s failed: %w", contractPath, err)
+	}
+	var doc capabilityContractDocument
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		return agentResponseSpec{}, fmt.Errorf("parse capability contract %s failed: %w", contractPath, err)
+	}
+	return doc.Metadata.AgentResponse, nil
+}
+
+func resolveCapabilityContractPath(capabilityID string) (string, error) {
+	fileName := strings.TrimSpace(capabilityID) + ".yaml"
+	if strings.TrimSpace(fileName) == ".yaml" {
+		return "", errors.New("capability_id is required")
+	}
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_CONTRACTS_DIR")); root != "" {
+		return existingCapabilityContractPath(filepath.Join(root, "capabilities", fileName))
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("read cwd failed: %w", err)
+	}
+	for dir := filepath.Clean(cwd); ; dir = filepath.Dir(dir) {
+		candidate := filepath.Join(dir, "contracts", "capabilities", fileName)
+		if _, err := os.Stat(candidate); err == nil {
+			return filepath.Clean(candidate), nil
+		}
+		if parent := filepath.Dir(dir); parent == dir {
+			break
+		}
+	}
+	return "", fmt.Errorf("capability contract not found for %s; set POWERX_PLUGIN_CONTRACTS_DIR", capabilityID)
+}
+
+func existingCapabilityContractPath(path string) (string, error) {
+	clean := filepath.Clean(path)
+	if _, err := os.Stat(clean); err != nil {
+		return "", fmt.Errorf("capability contract not found: %s: %w", clean, err)
+	}
+	return clean, nil
+}
+
+func renderAgentResponseTemplate(capabilityID, field, body string, data map[string]any) (string, error) {
+	tpl, err := template.New(capabilityID + "." + field).Option("missingkey=error").Parse(body)
+	if err != nil {
+		return "", fmt.Errorf("parse %s metadata.agent_response.%s failed: %w", capabilityID, field, err)
+	}
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("render %s metadata.agent_response.%s failed: %w", capabilityID, field, err)
+	}
+	return strings.TrimSpace(buf.String()), nil
+}
+
+func renderAgentResponseLink(capabilityID string, index int, spec agentResponseLinkSpec, data map[string]any) (map[string]any, error) {
+	if strings.TrimSpace(spec.Label) == "" {
+		return nil, fmt.Errorf("capability %s metadata.agent_response.links[%d].label is required", capabilityID, index)
+	}
+	if strings.TrimSpace(spec.Href) == "" {
+		return nil, fmt.Errorf("capability %s metadata.agent_response.links[%d].href is required", capabilityID, index)
+	}
+	label, err := renderAgentResponseTemplate(capabilityID, fmt.Sprintf("links[%d].label", index), spec.Label, data)
+	if err != nil {
+		return nil, err
+	}
+	href, err := renderAgentResponseTemplate(capabilityID, fmt.Sprintf("links[%d].href", index), spec.Href, data)
+	if err != nil {
+		return nil, err
+	}
+	link := map[string]any{
+		"label": label,
+		"href":  href,
+	}
+	if id := strings.TrimSpace(spec.ID); id != "" {
+		rendered, err := renderAgentResponseTemplate(capabilityID, fmt.Sprintf("links[%d].id", index), id, data)
+		if err != nil {
+			return nil, err
+		}
+		link["id"] = rendered
+	}
+	if kind := strings.TrimSpace(spec.Kind); kind != "" {
+		rendered, err := renderAgentResponseTemplate(capabilityID, fmt.Sprintf("links[%d].kind", index), kind, data)
+		if err != nil {
+			return nil, err
+		}
+		link["kind"] = rendered
+	}
+	return link, nil
 }
 
 func cloneAnyMap(in map[string]any) map[string]any {
@@ -1016,6 +1678,105 @@ func firstNonEmptyTemplateString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func firstPositiveInt(values ...int) int {
+	for _, value := range values {
+		if value > 0 {
+			return value
+		}
+	}
+	return 0
+}
+
+func stringSliceContains(values []string, target string) bool {
+	target = strings.TrimSpace(target)
+	for _, value := range values {
+		if strings.TrimSpace(value) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func boolFromAny(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return v
+	case string:
+		switch strings.ToLower(strings.TrimSpace(v)) {
+		case "true", "1", "yes", "y", "confirmed", "confirm", "ok", "确认", "确定", "是":
+			return true
+		default:
+			return false
+		}
+	case int:
+		return v != 0
+	case int64:
+		return v != 0
+	case uint64:
+		return v != 0
+	case float64:
+		return v != 0
+	case json.Number:
+		parsed, _ := strconv.ParseBool(strings.TrimSpace(v.String()))
+		if parsed {
+			return true
+		}
+		n, _ := strconv.ParseInt(strings.TrimSpace(v.String()), 10, 64)
+		return n != 0
+	default:
+		return false
+	}
+}
+
+func isAffirmativeConfirmation(value string) bool {
+	text := strings.TrimSpace(strings.ToLower(value))
+	if text == "" {
+		return false
+	}
+	switch text {
+	case "确认", "确认删除", "确定", "确定删除", "是", "可以", "执行", "删除", "yes", "y", "ok", "confirm", "confirmed":
+		return true
+	default:
+		return false
+	}
+}
+
+func intFromAny(value any) int {
+	switch v := value.(type) {
+	case int:
+		if v > 0 {
+			return v
+		}
+	case int64:
+		if v > 0 {
+			return int(v)
+		}
+	case uint:
+		if v > 0 {
+			return int(v)
+		}
+	case uint64:
+		if v > 0 {
+			return int(v)
+		}
+	case float64:
+		if v > 0 {
+			return int(v)
+		}
+	case json.Number:
+		parsed, _ := strconv.Atoi(v.String())
+		if parsed > 0 {
+			return parsed
+		}
+	case string:
+		parsed, _ := strconv.Atoi(strings.TrimSpace(v))
+		if parsed > 0 {
+			return parsed
+		}
+	}
+	return 0
 }
 
 func uint64FromAny(value any) uint64 {

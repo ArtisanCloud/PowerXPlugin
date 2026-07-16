@@ -19,27 +19,29 @@ response_guidance:
   capability_howto:
     - create 和 update 需要用户提供标题、描述和内容。
     - 不要询问额外类型、分类或业务归属；这个对象没有这些字段。
-    - get、update、delete 需要 template_id。
+    - get、update、delete 优先使用模板名称定位；不要要求用户输入内部 template_id。
+    - delete 在唯一定位到模板后也必须二次确认，确认消息必须包含可点击的模板详情链接。
   clarify_params:
     - 只追问缺失信息，不要把缺参当成执行失败。
     - 追问时使用“标题、描述、内容”等对象字段说法，不要输出 template.title、template.description、template.content 或 JSON/schema 术语。
     - 用户只说“创建模板”时，只追问：请提供这个模板的标题、描述和内容。
   skill_execution:
-    - 成功时说明模板 ID、标题，以及用户下一步可以查询、更新或删除。
+    - 成功时说明模板标题，以及用户下一步可以查询、更新或删除；内部 ID 只作为链接或调试信息使用。
 action_required_args:
   create:
     - template.title
     - template.description
     - template.content
   update:
-    - template_id
+    - template_ref
     - template.title
     - template.description
     - template.content
   get:
-    - template_id
+    - template_ref
   delete:
-    - template_id
+    - template_ref
+    - confirmation
   list: []
 action_optional_args:
   list:
@@ -57,7 +59,7 @@ pending_task_policy:
   enabled: true
   merge_window_messages: 6
   merge_window_seconds: 900
-  confirm_before_execute: false
+  confirm_before_execute: true
 state_contract:
   schema_version: "1.0"
   state_keys:
@@ -89,7 +91,7 @@ state_contract:
         - completed
         - failed
       required_args:
-        - template_id
+        - template_ref
         - template.title
         - template.description
         - template.content
@@ -145,9 +147,9 @@ output_schema: ./schema.output.json
 ## Capability Summary
 
 - 创建模板：根据用户给出的标题、描述和内容创建模板对象。
-- 查询模板：根据 `template_id` 读取模板详情。
-- 更新模板：根据 `template_id` 修改标题、描述和内容。
-- 删除模板：根据 `template_id` 删除指定模板对象。
+- 查询模板：根据模板名称定位模板，内部解析为执行所需 ID 后读取详情。
+- 更新模板：根据模板名称定位模板，内部解析为执行所需 ID 后修改标题、描述和内容。
+- 删除模板：根据模板名称定位模板，内部解析为执行所需 ID 后删除指定模板对象。
 - 列表模板：列出模板对象，可按关键词筛选。
 
 ## Input Guidance
@@ -155,7 +157,8 @@ output_schema: ./schema.output.json
 - `action` 是必要字段，可取 `create`、`get`、`update`、`delete`、`list`。
 - `create` 和 `update` 需要标题、描述和内容。内部执行时会映射到 `template.title`、`template.description`、`template.content`。
 - 模板对象没有额外类型、分类或业务归属字段；不要要求用户提供这些信息。
-- `get`、`update` 和 `delete` 通常需要 `template_id`。
+- `get`、`update` 和 `delete` 优先提取用户给出的模板名称，写入 `template_ref` 或 `template_name`；不要要求用户输入内部 `template_id`。
+- 删除模板必须二次确认。唯一命中时先返回模板名称、详情链接和模板 ID；用户明确确认后才执行删除。
 - `list` 可以不传 `template_id`，但可以携带关键词筛选条件。
 
 ## Conversation Guidance
@@ -173,6 +176,7 @@ output_schema: ./schema.output.json
 - 识别用户对模板对象的管理意图，并转换为结构化 `action`。
 - `create` 和 `update` 时提取 `template.title`、`template.description`、`template.content`。
 - 如果用户说“名称”，可视为“标题”。
-- `get` 和 `delete` 时提取 `template_id`。
+- `get`、`update` 和 `delete` 时提取模板名称；只有用户明确给出数字 ID 时才写入 `template_id`。
+- 用户回复“确认删除”“确定删除”“yes”等明确确认语义时，写入 `confirmed: true` 或 `confirmation: "确认删除"`。
 - `list` 时可以不传 `template_id`。
 - 返回简洁、结构化、可审计的执行结果。

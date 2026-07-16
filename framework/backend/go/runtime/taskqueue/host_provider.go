@@ -17,6 +17,30 @@ type TokenProvider interface {
 	Token(ctx context.Context) (string, error)
 }
 
+type tokenInvalidator interface {
+	InvalidateToken()
+}
+
+type legacyTokenInvalidator interface {
+	Invalidate()
+}
+
+type AuthenticationError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *AuthenticationError) Error() string {
+	if e == nil {
+		return ""
+	}
+	body := strings.TrimSpace(e.Body)
+	if body == "" {
+		return fmt.Sprintf("taskqueue host authentication failed: status=%d", e.StatusCode)
+	}
+	return fmt.Sprintf("taskqueue host authentication failed: status=%d body=%s", e.StatusCode, body)
+}
+
 type HostProviderConfig struct {
 	BaseURL       string
 	APIPrefix     string
@@ -27,6 +51,7 @@ type HostProviderConfig struct {
 	TenantUUID    string
 	UserAgent     string
 	Timeout       time.Duration
+	HTTPClient    *http.Client
 }
 
 type HostProvider struct {
@@ -54,16 +79,27 @@ func NewHostProvider(cfg HostProviderConfig) (*HostProvider, error) {
 	if ua == "" {
 		ua = "powerx-plugin-taskqueue/0.1"
 	}
+	authScheme := normalizeAuthScheme(cfg.AuthScheme, cfg.APIKey)
+	if authScheme == "apikey" && strings.TrimSpace(cfg.APIKey) == "" {
+		return nil, errors.New("taskqueue host provider: api key is required for apikey auth")
+	}
+	if authScheme == "bearer" && strings.TrimSpace(cfg.Token) == "" && cfg.TokenProvider == nil {
+		return nil, errors.New("taskqueue host provider: token provider is required for bearer auth")
+	}
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: timeout}
+	}
 	return &HostProvider{
 		baseURL:       baseURL,
 		apiPrefix:     normalizeAPIPrefix(cfg.APIPrefix),
-		authScheme:    normalizeAuthScheme(cfg.AuthScheme, cfg.APIKey),
+		authScheme:    authScheme,
 		apiKey:        strings.TrimSpace(cfg.APIKey),
 		token:         strings.TrimSpace(cfg.Token),
 		tokenProvider: cfg.TokenProvider,
 		tenantUUID:    strings.TrimSpace(cfg.TenantUUID),
 		userAgent:     ua,
-		httpClient:    &http.Client{Timeout: timeout},
+		httpClient:    httpClient,
 	}, nil
 }
 
@@ -132,41 +168,19 @@ func (p *HostProvider) do(ctx context.Context, method, path string, body any, ou
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, method, p.endpoint(path), bytes.NewReader(bodyBytes))
+	resp, raw, err := p.doAttempt(ctx, method, path, bodyBytes)
 	if err != nil {
-		return nil, err
+		return raw, err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", p.userAgent)
-	if p.tenantUUID != "" {
-		req.Header.Set("tenant_uuid", p.tenantUUID)
-	}
-	switch p.authScheme {
-	case "apikey":
-		if p.apiKey != "" {
-			req.Header.Set("Authorization", "ApiKey "+p.apiKey)
-		}
-	default:
-		token := p.token
-		if token == "" && p.tokenProvider != nil {
-			token, err = p.tokenProvider.Token(ctx)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
+	if isAuthStatus(resp.StatusCode) && p.authScheme == "bearer" && p.tokenProvider != nil {
+		p.invalidateToken()
+		resp, raw, err = p.doAttempt(ctx, method, path, bodyBytes)
+		if err != nil {
+			return raw, err
 		}
 	}
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	raw, readErr := io.ReadAll(resp.Body)
-	if readErr != nil {
-		return nil, readErr
+	if isAuthStatus(resp.StatusCode) {
+		return raw, &AuthenticationError{StatusCode: resp.StatusCode, Body: string(raw)}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return raw, fmt.Errorf("taskqueue host request failed: status=%d body=%s", resp.StatusCode, string(raw))
@@ -204,8 +218,65 @@ func (p *HostProvider) do(ctx context.Context, method, path string, body any, ou
 	return raw, nil
 }
 
+func (p *HostProvider) doAttempt(ctx context.Context, method, path string, bodyBytes []byte) (*http.Response, []byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, p.endpoint(path), bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", p.userAgent)
+	if p.tenantUUID != "" {
+		req.Header.Set("tenant_uuid", p.tenantUUID)
+	}
+	switch p.authScheme {
+	case "apikey":
+		if p.apiKey != "" {
+			req.Header.Set("Authorization", "ApiKey "+p.apiKey)
+		}
+	default:
+		token := p.token
+		if token == "" && p.tokenProvider != nil {
+			token, err = p.tokenProvider.Token(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+	}
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+	raw, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return resp, nil, readErr
+	}
+	return resp, raw, nil
+}
+
 func (p *HostProvider) endpoint(path string) string {
 	return p.baseURL + p.apiPrefix + path
+}
+
+func (p *HostProvider) invalidateToken() {
+	if p == nil || p.tokenProvider == nil {
+		return
+	}
+	if provider, ok := p.tokenProvider.(tokenInvalidator); ok {
+		provider.InvalidateToken()
+		return
+	}
+	if provider, ok := p.tokenProvider.(legacyTokenInvalidator); ok {
+		provider.Invalidate()
+	}
+}
+
+func isAuthStatus(status int) bool {
+	return status == http.StatusUnauthorized || status == http.StatusForbidden
 }
 
 type hostMessage struct {

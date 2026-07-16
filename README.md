@@ -13,6 +13,7 @@
 ## 深入指南
 
 - **架构设计**：[docs/plan/001-init-project.md](./docs/plan/001-init-project.md)
+- **安装到 PowerX**：[docs/guides/develop/install-to-powerx/README.md](./docs/guides/develop/install-to-powerx/README.md)
 - **Standalone 运行指南**：[docs/guides/develop/standalone-mode.md](./docs/guides/develop/standalone-mode.md)
 - **迁移实践**：[docs/guide/migration/base-to-skeleton.md](./docs/guide/migration/base-to-skeleton.md)
 - **框架发布指南**：[docs/guides/develop/framework-release.md](./docs/guides/develop/framework-release.md)

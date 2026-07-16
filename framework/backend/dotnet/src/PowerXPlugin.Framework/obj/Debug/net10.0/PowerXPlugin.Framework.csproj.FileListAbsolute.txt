@@ -1,0 +1,13 @@
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/bin/Debug/net10.0/PowerXPlugin.Framework.deps.json
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/bin/Debug/net10.0/PowerXPlugin.Framework.dll
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/bin/Debug/net10.0/PowerXPlugin.Framework.pdb
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.csproj.AssemblyReference.cache
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.GeneratedMSBuildEditorConfig.editorconfig
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.AssemblyInfoInputs.cache
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.AssemblyInfo.cs
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.csproj.CoreCompileInputs.cache
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.sourcelink.json
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.dll
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/refint/PowerXPlugin.Framework.dll
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/PowerXPlugin.Framework.pdb
+/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/obj/Debug/net10.0/ref/PowerXPlugin.Framework.dll

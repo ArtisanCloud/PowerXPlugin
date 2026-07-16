@@ -2,7 +2,6 @@ package integration
 
 import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,7 +15,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	group := rg.Group("/integration")
 	{
 		group.POST("/dispatch", handler.Dispatch)
-		group.POST("/capabilities/invoke", httpmw.RequireRoot(), handler.InvokeCapability)
+		group.POST("/capabilities/invoke", handler.InvokeCapability)
 
 		group.GET("/grant-matrix", handler.ListGrantMatrix)
 		group.POST("/grant-matrix", handler.SubmitGrantMatrix)

@@ -15,6 +15,10 @@ func JWTAuth(cfg authx.JWTAuthConfig) gin.HandlerFunc {
 		// 第一通道：标准解析（Bearer -> HS256 claims / 或签名上下文）
 		if tc, bearer, ok := authx.ParseFromHeaders(c.GetHeader, cfg); ok {
 			authx.SetTenantContext(c, tc)
+			if strings.TrimSpace(tc.TenantUUID) != "" {
+				c.Request = c.Request.WithContext(authx.ContextWithTenantUUID(c.Request.Context(), tc.TenantUUID))
+				c.Set("tenant_uuid", strings.TrimSpace(tc.TenantUUID))
+			}
 			authx.SetRawBearerToken(c, bearer)
 			c.Next()
 			return

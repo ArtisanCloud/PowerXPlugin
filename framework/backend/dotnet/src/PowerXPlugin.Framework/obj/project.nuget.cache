@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "dgSpecHash": "b1G4H5RyGn4=",
+  "success": true,
+  "projectFilePath": "/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/PowerXPlugin/framework/backend/dotnet/src/PowerXPlugin.Framework/PowerXPlugin.Framework.csproj",
+  "expectedPackageFiles": [
+    "/Users/michaelhu/.nuget/packages/cronos/0.13.0/cronos.0.13.0.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.bcl.cryptography/10.0.2/microsoft.bcl.cryptography.10.0.2.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.entityframeworkcore/10.0.0/microsoft.entityframeworkcore.10.0.0.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.entityframeworkcore.abstractions/10.0.0/microsoft.entityframeworkcore.abstractions.10.0.0.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.entityframeworkcore.analyzers/10.0.0/microsoft.entityframeworkcore.analyzers.10.0.0.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.identitymodel.abstractions/8.19.2/microsoft.identitymodel.abstractions.8.19.2.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.identitymodel.jsonwebtokens/8.19.2/microsoft.identitymodel.jsonwebtokens.8.19.2.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.identitymodel.logging/8.19.2/microsoft.identitymodel.logging.8.19.2.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/microsoft.identitymodel.tokens/8.19.2/microsoft.identitymodel.tokens.8.19.2.nupkg.sha512",
+    "/Users/michaelhu/.nuget/packages/system.identitymodel.tokens.jwt/8.19.2/system.identitymodel.tokens.jwt.8.19.2.nupkg.sha512"
+  ],
+  "logs": []
+}

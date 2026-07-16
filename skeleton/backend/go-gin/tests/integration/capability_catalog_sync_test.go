@@ -40,6 +40,7 @@ func TestCapabilityCatalogSyncExportsWorkflowAssets(t *testing.T) {
 	}
 
 	required := []string{
+		"contracts/capabilities/com.powerx.plugins.base.template.list.yaml",
 		"contracts/exposure/openapi.yaml",
 		"contracts/exposure/workflow/template-compose.json",
 		"contracts/exposure/agent-streams/template-compose.yaml",
@@ -64,6 +65,38 @@ func TestCapabilityCatalogSyncExportsWorkflowAssets(t *testing.T) {
 	}
 	if len(client.assets) != len(assets) {
 		t.Fatalf("HostSyncClient 接收的资产数量不符，期望 %d 实际 %d", len(assets), len(client.assets))
+	}
+}
+
+func TestCapabilityCatalogSyncExportsDescriptorAssetsFromBackendCWD(t *testing.T) {
+	repoRoot := repoRootFromIntegration(t)
+	workRoot := prepareCapabilitySyncWorkspace(t, repoRoot)
+	backendDir := filepath.Join(workRoot, "backend")
+	if err := os.MkdirAll(backendDir, 0o755); err != nil {
+		t.Fatalf("创建 backend 工作目录失败: %v", err)
+	}
+	t.Setenv("POWERX_CAPABILITY_CATALOG", filepath.Join(workRoot, "capabilities", "catalog.json"))
+	chdirForTest(t, backendDir)
+
+	assets, err := capabilities.NewManager(nil, nil).ExportProtocols(context.Background())
+	if err != nil {
+		t.Fatalf("导出协议资产失败: %v", err)
+	}
+	if !containsAssetPath(assets, "contracts/capabilities/com.powerx.plugins.base.template.list.yaml") {
+		t.Fatalf("descriptor 资产缺失: contracts/capabilities/com.powerx.plugins.base.template.list.yaml")
+	}
+	asset, ok := findAssetPath(assets, "contracts/exposure/agent-streams/template-audit.yaml")
+	if !ok {
+		t.Fatalf("agent stream 资产缺失: contracts/exposure/agent-streams/template-audit.yaml")
+	}
+	if asset.Path != "contracts/exposure/agent-streams/template-audit.yaml" {
+		t.Fatalf("asset 上报路径不应受 cwd 影响，实际 %s", asset.Path)
+	}
+	if asset.DiskPath == "" {
+		t.Fatalf("asset 本地磁盘路径缺失")
+	}
+	if _, err := os.Stat(asset.DiskPath); err != nil {
+		t.Fatalf("asset 本地磁盘路径不可读 %s: %v", asset.DiskPath, err)
 	}
 }
 

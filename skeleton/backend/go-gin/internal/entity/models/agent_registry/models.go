@@ -60,6 +60,7 @@ type PluginAgent struct {
 	ModelProfileRef  string         `gorm:"type:varchar(180)" json:"model_profile_ref"`
 	Persona          string         `gorm:"type:text" json:"persona"`
 	PromptSeed       string         `gorm:"type:text" json:"prompt_seed"`
+	Meta             datatypes.JSON `gorm:"type:jsonb;default:'{}'" json:"meta"`
 	PluginSkillIDs   datatypes.JSON `gorm:"type:jsonb" json:"plugin_skill_ids"`
 	PowerXSkillIDs   datatypes.JSON `gorm:"column:powerx_skill_ids;type:jsonb" json:"powerx_skill_ids"`
 	PowerXStatus     string         `gorm:"column:powerx_status;type:varchar(32)" json:"powerx_status"`

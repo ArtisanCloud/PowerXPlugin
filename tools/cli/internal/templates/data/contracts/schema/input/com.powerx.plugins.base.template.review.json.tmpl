@@ -3,9 +3,10 @@
   "title": "TemplateReviewInput",
   "type": "object",
   "properties": {
-    "template_id": { "type": "string" },
+    "template_id": { "type": "integer", "minimum": 1 },
     "approved": { "type": "boolean" },
-    "comments": { "type": "string" }
+    "comments": { "type": "string" },
+    "reviewer": { "type": "string" }
   },
   "required": ["template_id", "approved"],
   "additionalProperties": false

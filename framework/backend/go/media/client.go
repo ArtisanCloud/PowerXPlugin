@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -172,19 +173,19 @@ type PresignAssetOutput struct {
 
 func (c *Client) CreateAsset(ctx context.Context, input CreateAssetInput) (*Asset, error) {
 	payload := map[string]any{
-		"tenant_uuid":        strings.TrimSpace(input.TenantUUID),
-		"operator_id":        strings.TrimSpace(input.OperatorID),
-		"name":               strings.TrimSpace(input.Name),
-		"description":        strings.TrimSpace(input.Description),
-		"driver":             strings.TrimSpace(input.Driver),
-		"folder":             strings.TrimSpace(input.Folder),
-		"owner_subject_type": strings.TrimSpace(input.OwnerSubjectType),
-		"owner_subject_id":   strings.TrimSpace(input.OwnerSubjectID),
-		"tags":               append([]string(nil), input.Tags...),
-		"upload_channel":     firstNonEmpty(string(input.UploadChannel), string(UploadChannelPresigned)),
-		"external_url":       strings.TrimSpace(input.ExternalURL),
+		"tenant_uuid":      strings.TrimSpace(input.TenantUUID),
+		"operator_id":      strings.TrimSpace(input.OperatorID),
+		"name":             strings.TrimSpace(input.Name),
+		"description":      strings.TrimSpace(input.Description),
+		"driver":           strings.TrimSpace(input.Driver),
+		"folder":           strings.TrimSpace(input.Folder),
+		"ownerSubjectType": strings.TrimSpace(input.OwnerSubjectType),
+		"ownerSubjectId":   strings.TrimSpace(input.OwnerSubjectID),
+		"tags":             append([]string(nil), input.Tags...),
+		"uploadMethod":     firstNonEmpty(string(input.UploadChannel), string(UploadChannelPresigned)),
+		"externalUrl":      strings.TrimSpace(input.ExternalURL),
 	}
-	result, err := c.invoke(ctx, CapabilityMediaAssetsManage, "CreateMediaAsset", payload, input.TenantUUID, input.RequestID)
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "CreateMediaAsset", http.MethodPost, "/api/v1/media/assets", nil, payload, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -192,10 +193,11 @@ func (c *Client) CreateAsset(ctx context.Context, input CreateAssetInput) (*Asse
 }
 
 func (c *Client) GetAsset(ctx context.Context, input GetAssetInput) (*Asset, error) {
-	result, err := c.invoke(ctx, CapabilityMediaAssetsRead, "GetMediaAsset", map[string]any{
-		"tenant_uuid": strings.TrimSpace(input.TenantUUID),
-		"uuid":        strings.TrimSpace(input.UUID),
-	}, input.TenantUUID, input.RequestID)
+	query := map[string]any{}
+	if strings.TrimSpace(input.TenantUUID) != "" {
+		query["tenant_uuid"] = strings.TrimSpace(input.TenantUUID)
+	}
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsRead, "GetMediaAsset", http.MethodGet, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID)), query, nil, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +220,7 @@ func (c *Client) UpdateAsset(ctx context.Context, input UpdateAssetInput) (*Asse
 	if input.BusinessStatus != nil {
 		payload["business_status"] = string(*input.BusinessStatus)
 	}
-	result, err := c.invoke(ctx, CapabilityMediaAssetsRead, "UpdateMediaAsset", payload, input.TenantUUID, input.RequestID)
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "UpdateMediaAsset", http.MethodPatch, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID)), nil, payload, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -227,15 +229,15 @@ func (c *Client) UpdateAsset(ctx context.Context, input UpdateAssetInput) (*Asse
 
 func (c *Client) PresignAsset(ctx context.Context, input PresignAssetInput) (*PresignAssetOutput, error) {
 	payload := map[string]any{
-		"tenant_uuid":        strings.TrimSpace(input.TenantUUID),
-		"uuid":               strings.TrimSpace(input.UUID),
-		"operator_id":        strings.TrimSpace(input.OperatorID),
-		"action":             firstNonEmpty(string(input.Action), string(PresignActionDownload)),
-		"expires_in_seconds": input.ExpiresInSeconds,
-		"method":             strings.TrimSpace(input.Method),
-		"metadata":           copyStringMap(input.Headers),
+		"tenant_uuid":      strings.TrimSpace(input.TenantUUID),
+		"uuid":             strings.TrimSpace(input.UUID),
+		"operator_id":      strings.TrimSpace(input.OperatorID),
+		"action":           firstNonEmpty(string(input.Action), string(PresignActionDownload)),
+		"expiresInSeconds": input.ExpiresInSeconds,
+		"method":           strings.TrimSpace(input.Method),
+		"headers":          copyStringMap(input.Headers),
 	}
-	result, err := c.invoke(ctx, CapabilityMediaAssetsManage, "PresignMediaAsset", payload, input.TenantUUID, input.RequestID)
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "PresignMediaAsset", http.MethodPost, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID))+"/presign", nil, payload, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -249,12 +251,12 @@ func (c *Client) CreateAssetVariant(ctx context.Context, input CreateAssetVarian
 		"variant":     strings.TrimSpace(input.Variant),
 		"name":        strings.TrimSpace(input.Name),
 		"driver":      strings.TrimSpace(input.Driver),
-		"object_key":  strings.TrimSpace(input.ObjectKey),
-		"size_bytes":  input.SizeBytes,
-		"mime_type":   strings.TrimSpace(input.MimeType),
+		"objectKey":   strings.TrimSpace(input.ObjectKey),
+		"sizeBytes":   input.SizeBytes,
+		"mimeType":    strings.TrimSpace(input.MimeType),
 		"metadata":    copyStringMap(input.Metadata),
 	}
-	result, err := c.invoke(ctx, CapabilityMediaAssetsManage, "CreateMediaAssetVariant", payload, input.TenantUUID, input.RequestID)
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "CreateMediaAssetVariant", http.MethodPost, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID))+"/variants", nil, payload, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -263,16 +265,16 @@ func (c *Client) CreateAssetVariant(ctx context.Context, input CreateAssetVarian
 
 func (c *Client) PresignAssetVariant(ctx context.Context, input PresignAssetVariantInput) (*PresignAssetOutput, error) {
 	payload := map[string]any{
-		"tenant_uuid":        strings.TrimSpace(input.TenantUUID),
-		"uuid":               strings.TrimSpace(input.UUID),
-		"variant":            strings.TrimSpace(input.Variant),
-		"operator_id":        strings.TrimSpace(input.OperatorID),
-		"action":             firstNonEmpty(string(input.Action), string(PresignActionDownload)),
-		"expires_in_seconds": input.ExpiresInSeconds,
-		"method":             strings.TrimSpace(input.Method),
-		"metadata":           copyStringMap(input.Headers),
+		"tenant_uuid":      strings.TrimSpace(input.TenantUUID),
+		"uuid":             strings.TrimSpace(input.UUID),
+		"variant":          strings.TrimSpace(input.Variant),
+		"operator_id":      strings.TrimSpace(input.OperatorID),
+		"action":           firstNonEmpty(string(input.Action), string(PresignActionDownload)),
+		"expiresInSeconds": input.ExpiresInSeconds,
+		"method":           strings.TrimSpace(input.Method),
+		"headers":          copyStringMap(input.Headers),
 	}
-	result, err := c.invoke(ctx, CapabilityMediaAssetsManage, "PresignMediaAssetVariant", payload, input.TenantUUID, input.RequestID)
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "PresignMediaAssetVariant", http.MethodPost, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID))+"/variants/"+url.PathEscape(strings.TrimSpace(input.Variant))+"/presign", nil, payload, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -340,14 +342,24 @@ func (c *Client) DownloadBytes(ctx context.Context, ticket *PresignAssetOutput) 
 	return io.ReadAll(resp.Body)
 }
 
-func (c *Client) invoke(ctx context.Context, capabilityID, action string, payload map[string]any, tenantUUID, requestID string) (*gateway.Response, error) {
+func (c *Client) invokeREST(ctx context.Context, capabilityID, action, method, endpoint string, query map[string]any, body map[string]any, tenantUUID, requestID string) (*gateway.Response, error) {
 	if c == nil || c.gateway == nil {
 		return nil, errors.New("media gateway is not configured")
+	}
+	payload := map[string]any{
+		"method":   strings.TrimSpace(strings.ToUpper(method)),
+		"endpoint": strings.TrimSpace(endpoint),
+	}
+	if len(query) > 0 {
+		payload["query"] = query
+	}
+	if body != nil {
+		payload["body"] = body
 	}
 	return c.gateway.Invoke(ctx, gateway.InvokeRequest{
 		CapabilityID:      capabilityID,
 		Action:            action,
-		PreferredProtocol: "grpc",
+		PreferredProtocol: "rest",
 		Payload:           payload,
 		RequestID:         strings.TrimSpace(requestID),
 		TenantUUID:        strings.TrimSpace(tenantUUID),

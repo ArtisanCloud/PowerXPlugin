@@ -8,6 +8,7 @@ runtime:
   env:
     POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
     POWERX_PLUGIN_ID: com.powerx.plugins.base
+    POWERX_PLUGIN_REGISTRATION_MODE: installed
     POWERX_PROXY: "1"
     IAMMode: delegated
     POWERX_SECURITY_JWT_AUDIENCE: plugin:com.powerx.plugins.base
@@ -118,6 +119,31 @@ frontend:
                 path: /admin/templates/framework-lab
                 route: admin/templates/framework-lab
                 order: 3
+                required_policies:
+                  - "admin:root"
+          - id: plugins.com.powerx.plugins.base.powerx
+            title: PowerX底座能力
+            title_i18n:
+              namespace: menus
+              key: menu.com.powerx.plugins.base.powerx.title
+              default: PowerX Base Capabilities
+            icon: i-heroicons-cpu-chip
+            path: /powerx/knowledge-lab
+            route: powerx/knowledge-lab
+            order: 3
+            required_policies:
+              - "admin:root"
+            children:
+              - id: plugins.com.powerx.plugins.base.powerx.knowledge_lab
+                title: 知识库调试
+                title_i18n:
+                  namespace: menus
+                  key: menu.com.powerx.plugins.base.powerx.knowledge_lab
+                  default: Knowledge Lab
+                icon: i-heroicons-circle-stack
+                path: /powerx/knowledge-lab
+                route: powerx/knowledge-lab
+                order: 1
                 required_policies:
                   - "admin:root"
 assets:

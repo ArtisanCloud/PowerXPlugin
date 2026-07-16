@@ -23,6 +23,7 @@ import (
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
@@ -39,6 +40,7 @@ type Deps struct {
 	Ctx                 context.Context
 	PowerXClient        *client.PowerXServiceClient
 	CapabilityGateway   gatewayClient
+	Metadata            *fwmetadata.Client
 	Config              *config.Config
 	CapabilitiesManager capabilities.Manager
 	CapabilityMetrics   *capmetrics.Metrics
@@ -64,6 +66,10 @@ type gatewayClient interface {
 	Enabled() bool
 	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
 	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	ListKnowledgeSpaces(ctx context.Context, opts gateway.KnowledgeSpaceListOptions) ([]gateway.KnowledgeSpaceRuntimeRecord, error)
+	CreateKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceCreateParams) (*gateway.KnowledgeSpaceRecord, error)
+	RetireKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceRetireParams) (*gateway.KnowledgeSpaceRecord, error)
+	DeleteKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceDeleteParams) error
 	ResolveGatewayTenantUUID(ctx context.Context) (string, error)
 	ListAgents(ctx context.Context, env string) ([]gateway.AgentRecord, error)
 	GetAgent(ctx context.Context, agentUUID string) (*gateway.AgentRecord, error)

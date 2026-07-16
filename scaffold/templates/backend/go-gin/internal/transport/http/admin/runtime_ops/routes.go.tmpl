@@ -53,4 +53,18 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	logging.GET("/policy", loggingPolicyHandler.Get)
 	logging.PUT("/policy", loggingPolicyHandler.Put)
 	logging.POST("/probe", LoggingProbeHandler())
+
+	knowledgeHandler := NewKnowledgeHandler(deps)
+	knowledge := router.Group("/knowledge")
+	knowledge.GET("/provider", knowledgeHandler.Provider)
+	knowledge.GET("/catalog", knowledgeHandler.Catalog)
+	knowledge.GET("/spaces", knowledgeHandler.Spaces)
+	knowledge.POST("/spaces", knowledgeHandler.CreateSpace)
+	knowledge.POST("/media/upload", knowledgeHandler.UploadIngestionSource)
+	knowledge.POST("/spaces/:spaceID/ingest", knowledgeHandler.IngestSpace)
+	knowledge.POST("/spaces/:spaceID/retire", knowledgeHandler.RetireSpace)
+	knowledge.DELETE("/spaces/:spaceID", knowledgeHandler.DeleteSpace)
+	knowledge.GET("/spaces/:spaceID/ingestions", knowledgeHandler.Ingestions)
+	knowledge.GET("/spaces/:spaceID/policy", knowledgeHandler.Policy)
+	knowledge.POST("/search", knowledgeHandler.Search)
 }

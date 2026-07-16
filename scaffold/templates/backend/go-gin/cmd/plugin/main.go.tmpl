@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -15,6 +17,7 @@ import (
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	runtimecap "{{ .BackendModulePath }}/cmd/plugin/runtime"
 	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
@@ -23,8 +26,10 @@ import (
 	dbpkg "{{ .BackendModulePath }}/internal/db"
 	marketplacerepo "{{ .BackendModulePath }}/internal/entity/repository/marketplace"
 	repository "{{ .BackendModulePath }}/internal/entity/repository/plugin"
+	grpcclient "{{ .BackendModulePath }}/internal/grpc/client"
 	grpcserver "{{ .BackendModulePath }}/internal/grpc/server"
 	capgateway "{{ .BackendModulePath }}/internal/integrations/gateway"
+	metadataintegration "{{ .BackendModulePath }}/internal/integrations/metadata"
 	powerxclient "{{ .BackendModulePath }}/internal/integrations/powerx"
 	integrationjobs "{{ .BackendModulePath }}/internal/jobs/integration"
 	marketplacejobs "{{ .BackendModulePath }}/internal/jobs/marketplace"
@@ -42,6 +47,7 @@ import (
 	agent "{{ .BackendModulePath }}/internal/services/agent"
 	"{{ .BackendModulePath }}/internal/services/authproxy"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
+	integrationservice "{{ .BackendModulePath }}/internal/services/integration"
 	marketplacesvc "{{ .BackendModulePath }}/internal/services/marketplace"
 	recommendation "{{ .BackendModulePath }}/internal/services/recommendation"
 	"{{ .BackendModulePath }}/internal/shared/app"
@@ -294,19 +300,16 @@ func main() {
 	if cfg != nil && cfg.Gateway != nil {
 		gatewayOpts := []capgateway.ClientOption{}
 		if iamResolver.Mode() == iamservice.IAMModeDelegated && strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
-			gatewayOpts = append(gatewayOpts, capgateway.WithTokenProvider(func(ctx context.Context) (string, error) {
-				if pxc == nil {
-					return "", fmt.Errorf("powerx STS client is not configured")
-				}
-				token := strings.TrimSpace(pxc.GetToken())
-				if token != "" && token != "sts" {
-					return token, nil
-				}
-				token, _, err := pxc.ExchangeSTS(ctx)
-				return strings.TrimSpace(token), err
-			}))
+			gatewayOpts = append(gatewayOpts, capgateway.WithTokenProvider(grpcclient.NewPowerXSTSTokenProvider(pxc).TokenFunc()))
 		}
 		capabilityGateway = capgateway.NewClient(cfg, logger.WithField("component", "capability_gateway_client"), gatewayOpts...)
+	}
+	if err := registerLocalDebugHostIfNeeded(ctx, cfg, capabilityGateway); err != nil {
+		logger.WithError(err).Warn("Failed to register local plugin debug host; continuing without host debug registration")
+	}
+	metadataClient, err := buildMetadataClient(cfg, capabilityGateway)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize metadata client")
 	}
 
 	// 初始化 WS Bus Hub（standalone 可选 Redis，默认内存）
@@ -378,6 +381,7 @@ func main() {
 		Ctx:                 rootCtx,
 		PowerXClient:        pxc,
 		CapabilityGateway:   capabilityGateway,
+		Metadata:            metadataClient,
 		Config:              cfg,
 		CapabilitiesManager: capManager,
 		CapabilityMetrics:   capMetrics,
@@ -451,6 +455,7 @@ func main() {
 			"iam_mode_source": deps.IAMModeSource,
 		}).WithError(err).Fatal("Failed to bind framework IAM registry")
 	}
+	fwApp.RegisterCapabilityInvoker(integrationservice.NewFrameworkCapabilityInvoker(deps, deps.RuntimeLogger(ctx, "framework_capability_invoker", nil)))
 
 	if err := fwrouter.AttachHTTPServer(fwApp); err != nil {
 		logger.WithError(err).Fatal("Failed to attach HTTP server")
@@ -735,6 +740,71 @@ func validateDelegatedGatewayContract(cfg *config.Config, mode iamservice.IAMMod
 		return nil
 	}
 	return capgateway.ValidateDelegatedConfig(cfg)
+}
+
+func buildMetadataClient(cfg *config.Config, gatewayClient *capgateway.Client) (*fwmetadata.Client, error) {
+	if gatewayClient == nil {
+		return nil, nil
+	}
+	tenantUUID := ""
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		tenantUUID = strings.TrimSpace(cfg.GRPCUpstream.TenantUUID)
+	}
+	return fwmetadata.NewClient(fwmetadata.Config{
+		Invoker:    metadataintegration.NewGatewayInvokerAdapter(gatewayClient),
+		TenantUUID: tenantUUID,
+		PageSize:   fwmetadata.DefaultPageSize,
+	})
+}
+
+func registerLocalDebugHostIfNeeded(ctx context.Context, cfg *config.Config, gateway *capgateway.Client) error {
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("POWERX_PLUGIN_REGISTRATION_MODE")), "local") {
+		return nil
+	}
+	if gateway == nil {
+		return fmt.Errorf("gateway client is required for local plugin registration")
+	}
+	httpPort, err := resolveLocalHTTPPort(cfg)
+	if err != nil {
+		return err
+	}
+	pluginID := app.PluginID + ".local"
+	if err := gateway.RegisterLocalDebugHost(ctx, capgateway.LocalDebugHostRegistrationParams{
+		PluginID:    pluginID,
+		Environment: "local",
+		HTTPPort:    httpPort,
+		TTLSeconds:  3600,
+	}); err != nil {
+		return err
+	}
+	logger.WithFields(logger.Fields{
+		"plugin_id": pluginID,
+		"http_port": httpPort,
+	}).Info("Registered local plugin debug host with PowerX Core")
+	return nil
+}
+
+func resolveLocalHTTPPort(cfg *config.Config) (int, error) {
+	if cfg == nil || cfg.Server == nil {
+		return 0, fmt.Errorf("server config is required for local plugin registration")
+	}
+	bindAddr := strings.TrimSpace(cfg.Server.BindAddr)
+	if bindAddr == "" {
+		return 0, fmt.Errorf("server bind address is required for local plugin registration")
+	}
+	_, portText, err := net.SplitHostPort(bindAddr)
+	if err != nil {
+		if strings.HasPrefix(bindAddr, ":") && len(bindAddr) > 1 {
+			portText = strings.TrimPrefix(bindAddr, ":")
+		} else {
+			return 0, fmt.Errorf("parse server bind address %q: %w", bindAddr, err)
+		}
+	}
+	port, err := strconv.Atoi(strings.TrimSpace(portText))
+	if err != nil || port <= 0 {
+		return 0, fmt.Errorf("server bind address %q must contain a positive http port", bindAddr)
+	}
+	return port, nil
 }
 
 func validateHostDelegatedEnvContract(iamResolver *pluginbootstrap.IAMResolver) error {

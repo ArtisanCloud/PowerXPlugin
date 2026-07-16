@@ -121,6 +121,19 @@
           {{ t('navigation.capabilityLab') }}
         </UButton>
         <UButton
+          to="/powerx/knowledge-lab"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/powerx/knowledge-lab'),
+          }"
+        >
+          <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
+          {{ t('navigation.knowledgeLab') }}
+        </UButton>
+        <UButton
           to="/powerx/agents"
           variant="ghost"
           color="neutral"
@@ -352,6 +365,40 @@
           </UButton>
         </div>
       </div>
+
+      <div v-if="isLoggedIn">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.settings') }}
+        </div>
+        <div class="space-y-1">
+          <UButton
+            :to="metadataGovernancePath"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive(metadataGovernancePath) || isExactActive('/admin/settings/metadata-governance'),
+            }"
+          >
+            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
+            {{ t('navigation.metadataGovernance') }}
+          </UButton>
+          <UButton
+            :to="aiSettingsPath"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isExactActive(aiSettingsPath) || isExactActive('/admin/settings/ai-settings'),
+            }"
+          >
+            <UIcon name="i-heroicons-cpu-chip" class="w-4 h-4 mr-3" />
+            {{ t('navigation.aiSettings') }}
+          </UButton>
+        </div>
+      </div>
     </nav>
   </aside>
 </template>
@@ -390,6 +437,13 @@ const showCapabilityLab = computed(() => {
   }
   return Boolean(isRoot.value);
 });
+const pluginAdminBase = computed(() => {
+  const configured = String(runtimeConfig.public?.pluginAdminBase || "").trim();
+  return configured || "/_p/com.powerx.plugins.base/admin/";
+});
+const adminPath = (path: string) => `${pluginAdminBase.value.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+const metadataGovernancePath = computed(() => adminPath("settings/metadata-governance"));
+const aiSettingsPath = computed(() => adminPath("settings/ai-settings"));
 
 onMounted(() => {
   if (!userStore.context && !userStore.isLoading) {

@@ -3,8 +3,8 @@
   "title": "TemplateReadInput",
   "type": "object",
   "properties": {
-    "id": { "type": "string", "description": "模板主键 ID" }
+    "template_id": { "type": "integer", "minimum": 1, "description": "模板主键 ID。Agent capability payload 统一使用 template_id；REST path {id} 只属于 REST transport。" }
   },
-  "required": ["id"],
+  "required": ["template_id"],
   "additionalProperties": false
 }

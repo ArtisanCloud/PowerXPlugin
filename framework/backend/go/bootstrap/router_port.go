@@ -28,3 +28,31 @@ type Context interface {
 	Context() context.Context
 	SetContext(ctx context.Context)
 }
+
+// CapabilityInvoker is the framework-level local capability execution hook.
+// Plugins register one when they own capabilities that must execute in-process.
+type CapabilityInvoker interface {
+	CanInvokeCapability(capabilityID string) bool
+	InvokeCapability(ctx context.Context, params CapabilityInvokeParams) (*CapabilityInvokeResult, error)
+}
+
+// CapabilityInvokeParams describes a framework capability invocation request.
+type CapabilityInvokeParams struct {
+	CapabilityID      string
+	Action            string
+	PreferredProtocol string
+	Payload           map[string]any
+	Metadata          map[string]any
+	Headers           map[string]string
+	RequestID         string
+	TenantUUID        string
+}
+
+// CapabilityInvokeResult is the normalized local capability response.
+type CapabilityInvokeResult struct {
+	TraceID  string
+	Status   string
+	Data     any
+	Raw      []byte
+	Metadata map[string]any
+}

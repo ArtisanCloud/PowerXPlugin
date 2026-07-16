@@ -1,0 +1,711 @@
+<template>
+  <UContainer class="py-8 space-y-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="space-y-2">
+        <UBadge color="info" variant="soft">{{ $t("metadataGovernance.badge") }}</UBadge>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+          {{ $t("metadataGovernance.title") }}
+        </h1>
+        <p class="max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+          {{ $t("metadataGovernance.description") }}
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <UBadge color="neutral" variant="soft">{{ modeLabel }}</UBadge>
+        <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="reloadActive">
+          {{ $t("common.refresh") }}
+        </UButton>
+      </div>
+    </div>
+
+    <UAlert
+      v-if="errorMessage"
+      color="error"
+      variant="soft"
+      icon="i-heroicons-exclamation-triangle"
+      :title="$t('metadataGovernance.loadFailed')"
+      :description="errorMessage"
+    />
+
+    <UCard>
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <UTabs v-model="activeTab" :items="tabs" />
+          <div class="flex flex-wrap items-center gap-2">
+            <UInput
+              v-model="query"
+              icon="i-heroicons-magnifying-glass"
+              :placeholder="$t('metadataGovernance.searchPlaceholder')"
+              class="w-64"
+              @keyup.enter="reloadActive"
+            />
+            <USelect v-model="moduleFilter" :items="moduleOptions" class="w-44" />
+            <USelect v-model="statusFilter" :items="statusOptions" class="w-36" />
+            <USelect v-model="pageSize" :items="pageSizeOptions" class="w-28" />
+          </div>
+        </div>
+      </template>
+
+      <div v-if="activeTab === 'dictionaries'" class="grid gap-4 lg:grid-cols-[minmax(280px,380px)_1fr]">
+        <div class="min-w-0 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $t("metadataGovernance.dictionaryNamespaces") }}</p>
+              <UButton size="xs" variant="soft" icon="i-heroicons-plus" @click="openCreate('dictionaryNamespace')">
+                {{ $t("metadataGovernance.create.dictionaryNamespace.button") }}
+              </UButton>
+            </div>
+          </div>
+          <div class="max-h-[620px] overflow-auto">
+            <button
+              v-for="item in dictionaryNamespaces"
+              :key="item.uuid"
+              type="button"
+              class="block w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+              :class="selectedDictionary?.uuid === item.uuid ? 'bg-primary-50 dark:bg-primary-950/40' : ''"
+              @click="selectDictionary(item)"
+            >
+              <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.display_name || item.namespace }}</p>
+              <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{{ moduleLabel(item.module) }} · {{ item.namespace }}</p>
+            </button>
+            <div v-if="!dictionaryNamespaces.length && !loading" class="px-4 py-8 text-sm text-gray-500">
+              {{ $t("metadataGovernance.empty") }}
+            </div>
+          </div>
+          <div v-if="dictionaryNamespacesPage.total > 0" class="border-t border-gray-200 px-3 py-2 dark:border-gray-800">
+            <UPagination
+              v-model:page="page"
+              :total="dictionaryNamespacesPage.total"
+              :items-per-page="pageSize"
+              size="sm"
+            />
+          </div>
+        </div>
+
+        <div class="min-w-0 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ selectedDictionary?.display_name || $t("metadataGovernance.selectDictionary") }}
+              </p>
+              <p v-if="selectedDictionary" class="text-xs text-gray-500 dark:text-gray-400">
+                {{ selectedDictionary.namespace }}
+              </p>
+            </div>
+            <UBadge color="neutral" variant="soft">{{ dictionaryItemsPage.total }}</UBadge>
+            <UButton
+              size="xs"
+              variant="soft"
+              icon="i-heroicons-plus"
+              :disabled="!selectedDictionary"
+              @click="openCreate('dictionaryItem')"
+            >
+              {{ $t("metadataGovernance.create.dictionaryItem.button") }}
+            </UButton>
+          </div>
+          <UTable :data="dictionaryItems" :columns="dictionaryItemColumns" :loading="loading">
+            <template #name-cell="{ row }">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ row.original.display_name || row.original.code }}</p>
+                <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ row.original.code }}</p>
+              </div>
+            </template>
+            <template #status-cell="{ row }">
+              <UBadge :color="statusColor(row.original.status)" variant="soft">{{ statusText(row.original.status) }}</UBadge>
+            </template>
+          </UTable>
+          <div v-if="dictionaryItemsPage.total > 0" class="border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span class="text-sm text-gray-500 dark:text-gray-400">
+                {{ paginationText(dictionaryItemsPage, detailPageSize) }}
+              </span>
+              <div class="flex items-center gap-2">
+                <USelect v-model="detailPageSize" :items="pageSizeOptions" class="w-24" />
+                <UPagination
+                  v-model:page="detailPage"
+                  :total="dictionaryItemsPage.total"
+                  :items-per-page="detailPageSize"
+                  size="sm"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="activeTab === 'taxonomies'" class="grid gap-4 lg:grid-cols-[minmax(280px,380px)_1fr]">
+        <div class="min-w-0 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-sm font-medium text-gray-900 dark:text-white">{{ $t("metadataGovernance.taxonomies") }}</p>
+              <UButton size="xs" variant="soft" icon="i-heroicons-plus" @click="openCreate('taxonomy')">
+                {{ $t("metadataGovernance.create.taxonomy.button") }}
+              </UButton>
+            </div>
+          </div>
+          <div class="max-h-[620px] overflow-auto">
+            <button
+              v-for="item in taxonomies"
+              :key="item.uuid"
+              type="button"
+              class="block w-full border-b border-gray-100 px-4 py-3 text-left last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
+              :class="selectedTaxonomy?.uuid === item.uuid ? 'bg-primary-50 dark:bg-primary-950/40' : ''"
+              @click="selectTaxonomy(item)"
+            >
+              <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ item.display_name || item.namespace }}</p>
+              <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{{ moduleLabel(item.module) }} · {{ item.namespace }}</p>
+            </button>
+            <div v-if="!taxonomies.length && !loading" class="px-4 py-8 text-sm text-gray-500">
+              {{ $t("metadataGovernance.empty") }}
+            </div>
+          </div>
+          <div v-if="taxonomiesPage.total > 0" class="border-t border-gray-200 px-3 py-2 dark:border-gray-800">
+            <UPagination
+              v-model:page="page"
+              :total="taxonomiesPage.total"
+              :items-per-page="pageSize"
+              size="sm"
+            />
+          </div>
+        </div>
+
+        <div class="min-w-0 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ selectedTaxonomy?.display_name || $t("metadataGovernance.selectTaxonomy") }}
+              </p>
+              <p v-if="selectedTaxonomy" class="text-xs text-gray-500 dark:text-gray-400">
+                {{ selectedTaxonomy.namespace }}
+              </p>
+            </div>
+            <UBadge color="neutral" variant="soft">{{ taxonomyNodesPage.total }}</UBadge>
+            <UButton
+              size="xs"
+              variant="soft"
+              icon="i-heroicons-plus"
+              :disabled="!selectedTaxonomy"
+              @click="openCreate('taxonomyNode')"
+            >
+              {{ $t("metadataGovernance.create.taxonomyNode.button") }}
+            </UButton>
+          </div>
+          <UTable :data="taxonomyNodes" :columns="taxonomyNodeColumns" :loading="loading">
+            <template #name-cell="{ row }">
+              <div class="min-w-0" :style="{ paddingLeft: `${Math.min(row.original.depth || 0, 6) * 14}px` }">
+                <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ row.original.display_name || row.original.code }}</p>
+                <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ row.original.path || row.original.code }}</p>
+              </div>
+            </template>
+            <template #status-cell="{ row }">
+              <UBadge :color="statusColor(row.original.status)" variant="soft">{{ statusText(row.original.status) }}</UBadge>
+            </template>
+          </UTable>
+          <div v-if="taxonomyNodesPage.total > 0" class="border-t border-gray-200 px-4 py-3 dark:border-gray-800">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span class="text-sm text-gray-500 dark:text-gray-400">
+                {{ paginationText(taxonomyNodesPage, detailPageSize) }}
+              </span>
+              <div class="flex items-center gap-2">
+                <USelect v-model="detailPageSize" :items="pageSizeOptions" class="w-24" />
+                <UPagination
+                  v-model:page="detailPage"
+                  :total="taxonomyNodesPage.total"
+                  :items-per-page="detailPageSize"
+                  size="sm"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="activeTab === 'tags'" class="space-y-3">
+        <div class="flex justify-end">
+          <UButton size="sm" variant="soft" icon="i-heroicons-plus" @click="openCreate('tag')">
+            {{ $t("metadataGovernance.create.tag.button") }}
+          </UButton>
+        </div>
+        <UTable :data="tags" :columns="tagColumns" :loading="loading">
+        <template #name-cell="{ row }">
+          <div class="flex min-w-0 items-center gap-2">
+            <span class="h-3 w-3 rounded-full border border-gray-300" :style="{ backgroundColor: row.original.color || '#94a3b8' }" />
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ row.original.display_name || row.original.code }}</p>
+              <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ row.original.namespace }} · {{ row.original.code }}</p>
+            </div>
+          </div>
+        </template>
+        <template #resource-cell="{ row }">
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ resourceLabel(row.original.resource_type) }}</span>
+        </template>
+        <template #status-cell="{ row }">
+          <UBadge :color="statusColor(row.original.status)" variant="soft">{{ statusText(row.original.status) }}</UBadge>
+        </template>
+        </UTable>
+      </div>
+
+      <div v-else class="space-y-3">
+        <div class="flex justify-end">
+          <UButton size="sm" variant="soft" icon="i-heroicons-plus" @click="openCreate('resourceType')">
+            {{ $t("metadataGovernance.create.resourceType.button") }}
+          </UButton>
+        </div>
+        <UTable :data="resourceTypes" :columns="resourceTypeColumns" :loading="loading">
+        <template #name-cell="{ row }">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ row.original.display_name || resourceLabel(row.original.resource_type) }}</p>
+            <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ row.original.resource_type }}</p>
+          </div>
+        </template>
+        <template #module-cell="{ row }">
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ moduleLabel(row.original.module) }}</span>
+        </template>
+        <template #binding-cell="{ row }">
+          <UBadge :color="row.original.binding_enabled ? 'success' : 'neutral'" variant="soft">
+            {{ row.original.binding_enabled ? $t("common.enabled") : $t("common.disabled") }}
+          </UBadge>
+        </template>
+        <template #status-cell="{ row }">
+          <UBadge :color="statusColor(row.original.status)" variant="soft">{{ statusText(row.original.status) }}</UBadge>
+        </template>
+        </UTable>
+      </div>
+
+      <template #footer>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span class="text-sm text-gray-500 dark:text-gray-400">
+            {{ paginationText(activePage, pageSize) }}
+          </span>
+          <UPagination
+            v-if="activePage.total > 0"
+            v-model:page="page"
+            :total="activePage.total"
+            :items-per-page="pageSize"
+            show-edges
+          />
+        </div>
+      </template>
+    </UCard>
+
+    <MetadataCreateModal
+      v-model:open="createOpen"
+      :target="createTarget"
+      :taxonomy-nodes="taxonomyNodes"
+      :module-items="createModuleOptions"
+      :resource-type-items="resourceTypeOptions"
+      :default-module="defaultCreateModule"
+      :context-title="createContextTitle"
+      :context-description="createContextDescription"
+      :active-locale="locale"
+      :submitting="createSubmitting"
+      :error-message="createError"
+      @submit="submitCreate"
+    />
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+import MetadataCreateModal from "~/components/settings/metadata-governance/MetadataCreateModal.vue";
+import { useMetadataGovernanceApi, type DictionaryNamespace, type Taxonomy } from "~/composables/api/useMetadataGovernance";
+
+type CreateTarget = "dictionaryNamespace" | "dictionaryItem" | "taxonomy" | "taxonomyNode" | "tag" | "resourceType";
+
+const { t, locale } = useI18n();
+const api = useMetadataGovernanceApi();
+
+const activeTab = ref("dictionaries");
+const query = ref("");
+const moduleFilter = ref("__all__");
+const statusFilter = ref("__all__");
+const page = ref(1);
+const pageSize = ref(20);
+const detailPage = ref(1);
+const detailPageSize = ref(20);
+const loading = ref(false);
+const errorMessage = ref("");
+const runtimeMode = ref("");
+const createOpen = ref(false);
+const createTarget = ref<CreateTarget>("dictionaryNamespace");
+const createSubmitting = ref(false);
+const createError = ref("");
+
+const dictionaryNamespaces = ref<any[]>([]);
+const dictionaryItems = ref<any[]>([]);
+const taxonomies = ref<any[]>([]);
+const taxonomyNodes = ref<any[]>([]);
+const tags = ref<any[]>([]);
+const resourceTypes = ref<any[]>([]);
+const selectedDictionary = ref<DictionaryNamespace | null>(null);
+const selectedTaxonomy = ref<Taxonomy | null>(null);
+
+const defaultPage = () => ({ total: 0, page: 1, page_size: pageSize.value });
+const dictionaryNamespacesPage = ref(defaultPage());
+const dictionaryItemsPage = ref(defaultPage());
+const taxonomiesPage = ref(defaultPage());
+const taxonomyNodesPage = ref(defaultPage());
+const tagsPage = ref(defaultPage());
+const resourceTypesPage = ref(defaultPage());
+
+const tabs = computed(() => [
+  { label: t("metadataGovernance.tabs.dictionaries"), value: "dictionaries", icon: "i-heroicons-book-open" },
+  { label: t("metadataGovernance.tabs.taxonomies"), value: "taxonomies", icon: "i-heroicons-list-bullet" },
+  { label: t("metadataGovernance.tabs.tags"), value: "tags", icon: "i-heroicons-tag" },
+  { label: t("metadataGovernance.tabs.resourceTypes"), value: "resourceTypes", icon: "i-heroicons-cube" },
+]);
+
+const statusOptions = computed(() => [
+  { label: t("common.all"), value: "__all__" },
+  { label: t("status.active"), value: "active" },
+  { label: t("status.inactive"), value: "inactive" },
+  { label: t("status.disabled"), value: "disabled" },
+]);
+const pageSizeOptions = [10, 20, 50, 100];
+
+const allModules = computed(() => {
+  const values = [
+    ...dictionaryNamespaces.value.map((item) => item.module),
+    ...taxonomies.value.map((item) => item.module),
+    ...resourceTypes.value.map((item) => item.module),
+  ].filter(Boolean);
+  return Array.from(new Set(values)).sort();
+});
+const moduleOptions = computed(() => [
+  { label: t("metadataGovernance.allModules"), value: "__all__" },
+  ...allModules.value.map((value) => ({ label: moduleLabel(value), value })),
+]);
+const createModuleOptions = computed(() => {
+  const modules = allModules.value.length > 0 ? allModules.value : ["corex.customer"];
+  return modules.map((value) => ({ label: moduleLabel(value), value }));
+});
+const resourceTypeOptions = computed(() => {
+  const values = resourceTypes.value.length > 0 ? resourceTypes.value : [];
+  return values.map((item) => ({ label: item.display_name || resourceLabel(item.resource_type), value: item.resource_type, module: item.module }));
+});
+const taxonomyParentOptions = computed(() => [
+  { label: t("metadataGovernance.form.root"), value: "__root__" },
+  ...taxonomyNodes.value.map((item) => ({ label: `${"  ".repeat(Math.max(0, Number(item.depth || 0)))}${item.display_name || item.code}`, value: item.uuid })),
+]);
+
+const modeLabel = computed(() => runtimeMode.value === "delegated" ? t("metadataGovernance.mode.delegated") : t("metadataGovernance.mode.local"));
+const activePage = computed(() => {
+  if (activeTab.value === "dictionaries") return dictionaryNamespacesPage.value;
+  if (activeTab.value === "taxonomies") return taxonomiesPage.value;
+  if (activeTab.value === "tags") return tagsPage.value;
+  return resourceTypesPage.value;
+});
+
+const baseQuery = () => ({
+  module: moduleFilter.value,
+  status: statusFilter.value,
+  q: query.value,
+  locale: locale.value,
+  page: page.value,
+  page_size: pageSize.value,
+});
+const detailQuery = () => ({
+  status: statusFilter.value,
+  q: query.value,
+  locale: locale.value,
+  page: detailPage.value,
+  page_size: detailPageSize.value,
+});
+
+const defaultCreateModule = computed(() => {
+  if (moduleFilter.value !== "__all__") return moduleFilter.value;
+  if (createTarget.value === "dictionaryItem" && selectedDictionary.value?.module) return selectedDictionary.value.module;
+  if (createTarget.value === "taxonomyNode" && selectedTaxonomy.value?.module) return selectedTaxonomy.value.module;
+  return createModuleOptions.value[0]?.value || "";
+});
+const createContextTitle = computed(() => {
+  if (createTarget.value === "dictionaryItem" && selectedDictionary.value) {
+    return t("metadataGovernance.create.context.dictionary", { name: selectedDictionary.value.display_name || selectedDictionary.value.namespace });
+  }
+  if (createTarget.value === "taxonomyNode" && selectedTaxonomy.value) {
+    return t("metadataGovernance.create.context.taxonomy", { name: selectedTaxonomy.value.display_name || selectedTaxonomy.value.namespace });
+  }
+  return "";
+});
+const createContextDescription = computed(() => "");
+
+const dictionaryItemColumns = computed(() => [
+  { accessorKey: "name", header: t("metadataGovernance.columns.name") },
+  { accessorKey: "reference_count", header: t("metadataGovernance.columns.references") },
+  { accessorKey: "status", header: t("metadataGovernance.columns.status") },
+]);
+const taxonomyNodeColumns = computed(() => [
+  { accessorKey: "name", header: t("metadataGovernance.columns.name") },
+  { accessorKey: "depth", header: t("metadataGovernance.columns.depth") },
+  { accessorKey: "reference_count", header: t("metadataGovernance.columns.references") },
+  { accessorKey: "status", header: t("metadataGovernance.columns.status") },
+]);
+const tagColumns = computed(() => [
+  { accessorKey: "name", header: t("metadataGovernance.columns.name") },
+  { accessorKey: "resource", header: t("metadataGovernance.columns.resourceType") },
+  { accessorKey: "usage_count", header: t("metadataGovernance.columns.usage") },
+  { accessorKey: "status", header: t("metadataGovernance.columns.status") },
+]);
+const resourceTypeColumns = computed(() => [
+  { accessorKey: "name", header: t("metadataGovernance.columns.name") },
+  { accessorKey: "module", header: t("metadataGovernance.columns.module") },
+  { accessorKey: "binding", header: t("metadataGovernance.columns.binding") },
+  { accessorKey: "status", header: t("metadataGovernance.columns.status") },
+]);
+
+async function loadMode() {
+  try {
+    const res = await api.mode({ silentAuthError: true });
+    runtimeMode.value = String(res.data?.mode || "");
+  } catch {
+    runtimeMode.value = "";
+  }
+}
+
+async function reloadActive() {
+  loading.value = true;
+  errorMessage.value = "";
+  try {
+    if (activeTab.value === "dictionaries") await loadDictionaries();
+    else if (activeTab.value === "taxonomies") await loadTaxonomies();
+    else if (activeTab.value === "tags") await loadTags();
+    else await loadResourceTypes();
+  } catch (error: any) {
+    errorMessage.value = error?.data?.error?.message || error?.message || t("metadataGovernance.loadFailed");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function loadDictionaries() {
+  const res = await api.listDictionaryNamespaces(baseQuery());
+  dictionaryNamespaces.value = res.data?.items || [];
+  dictionaryNamespacesPage.value = normalizePage(res.data);
+  if (!selectedDictionary.value || !dictionaryNamespaces.value.some((item) => item.uuid === selectedDictionary.value?.uuid)) {
+    selectedDictionary.value = dictionaryNamespaces.value[0] || null;
+  }
+  await loadDictionaryItems();
+}
+
+async function loadDictionaryItems() {
+  if (!selectedDictionary.value) {
+    dictionaryItems.value = [];
+    dictionaryItemsPage.value = defaultPage();
+    return;
+  }
+  const res = await api.listDictionaryItems(selectedDictionary.value.uuid, {
+    ...detailQuery(),
+  });
+  dictionaryItems.value = res.data?.items || [];
+  dictionaryItemsPage.value = normalizePage(res.data);
+}
+
+async function loadTaxonomies() {
+  const res = await api.listTaxonomies(baseQuery());
+  taxonomies.value = res.data?.items || [];
+  taxonomiesPage.value = normalizePage(res.data);
+  if (!selectedTaxonomy.value || !taxonomies.value.some((item) => item.uuid === selectedTaxonomy.value?.uuid)) {
+    selectedTaxonomy.value = taxonomies.value[0] || null;
+  }
+  await loadTaxonomyNodes();
+}
+
+async function loadTaxonomyNodes() {
+  if (!selectedTaxonomy.value) {
+    taxonomyNodes.value = [];
+    taxonomyNodesPage.value = defaultPage();
+    return;
+  }
+  const res = await api.listTaxonomyNodes(selectedTaxonomy.value.uuid, {
+    ...detailQuery(),
+  });
+  taxonomyNodes.value = res.data?.items || [];
+  taxonomyNodesPage.value = normalizePage(res.data);
+}
+
+async function loadTags() {
+  const res = await api.listTags(baseQuery());
+  tags.value = res.data?.items || [];
+  tagsPage.value = normalizePage(res.data);
+}
+
+async function loadResourceTypes() {
+  const res = await api.listResourceTypes(baseQuery());
+  resourceTypes.value = res.data?.items || [];
+  resourceTypesPage.value = normalizePage(res.data);
+}
+
+function selectDictionary(item: DictionaryNamespace) {
+  selectedDictionary.value = item;
+  detailPage.value = 1;
+  loadDictionaryItems();
+}
+
+function selectTaxonomy(item: Taxonomy) {
+  selectedTaxonomy.value = item;
+  detailPage.value = 1;
+  loadTaxonomyNodes();
+}
+
+function normalizePage(data: any) {
+  return {
+    total: Number(data?.pagination?.total ?? data?.total ?? 0),
+    page: Number(data?.pagination?.page ?? data?.page ?? 1),
+    page_size: Number(data?.pagination?.page_size ?? data?.page_size ?? pageSize.value),
+  };
+}
+
+function moduleLabel(value: string) {
+  return humanize(value);
+}
+
+function resourceLabel(value: string) {
+  return humanize(value);
+}
+
+function humanize(value: string) {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  const last = text.split(".").filter(Boolean).pop() || text;
+  return last.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function statusText(value: string) {
+  if (value === "active") return t("status.active");
+  if (value === "inactive") return t("status.inactive");
+  if (value === "disabled") return t("status.disabled");
+  return value || "-";
+}
+
+function statusColor(value: string) {
+  if (value === "active") return "success";
+  if (value === "disabled" || value === "inactive") return "neutral";
+  return "warning";
+}
+
+function paginationText(info: { total?: number; page?: number; page_size?: number }, size: number) {
+  const total = Number(info?.total || 0);
+  const current = Number(info?.page || 1);
+  const pageSizeValue = Number(info?.page_size || size || 20);
+  const start = total === 0 ? 0 : (current - 1) * pageSizeValue + 1;
+  const end = Math.min(current * pageSizeValue, total);
+  return t("metadataGovernance.pagination", { start, end, total, page: current });
+}
+
+function openCreate(target: CreateTarget) {
+  createTarget.value = target;
+  createError.value = "";
+  createOpen.value = true;
+}
+
+function ensureNoLocalDuplicate(payload: Record<string, unknown>) {
+  const namespace = String(payload.namespace || "").trim();
+  const code = String(payload.code || "").trim();
+  const resourceType = String(payload.resource_type || payload.resourceType || "").trim();
+  if (createTarget.value === "dictionaryNamespace" && dictionaryNamespaces.value.some((item) => item.namespace === namespace)) {
+    throw new Error(t("metadataGovernance.create.duplicateNamespace"));
+  }
+  if (createTarget.value === "dictionaryItem" && dictionaryItems.value.some((item) => item.code === code)) {
+    throw new Error(t("metadataGovernance.create.duplicateCode"));
+  }
+  if (createTarget.value === "taxonomy" && taxonomies.value.some((item) => item.namespace === namespace)) {
+    throw new Error(t("metadataGovernance.create.duplicateNamespace"));
+  }
+  if (createTarget.value === "taxonomyNode" && taxonomyNodes.value.some((item) => item.code === code)) {
+    throw new Error(t("metadataGovernance.create.duplicateCode"));
+  }
+  if (createTarget.value === "tag" && tags.value.some((item) => item.namespace === namespace && item.resource_type === resourceType && item.code === code)) {
+    throw new Error(t("metadataGovernance.create.duplicateTag"));
+  }
+  if (createTarget.value === "resourceType" && resourceTypes.value.some((item) => item.resource_type === resourceType)) {
+    throw new Error(t("metadataGovernance.create.duplicateResourceType"));
+  }
+}
+
+function createErrorMessage(error: any) {
+  const code = String(error?.data?.error?.code || error?.response?._data?.error?.code || "").trim();
+  const message = String(error?.data?.error?.message || error?.response?._data?.error?.message || error?.message || "").trim();
+  const field = String(error?.data?.error?.details?.field || error?.response?._data?.error?.details?.field || "").trim();
+  if (code === "METADATA_DUPLICATE" || message.startsWith("metadata.duplicate") || message.includes("duplicate key value")) {
+    return t(duplicateI18nKey(message, field));
+  }
+  return message || t("metadataGovernance.create.failed");
+}
+
+function duplicateI18nKey(message: string, field: string) {
+  if (message === "metadata.duplicate.namespace" || field === "namespace") {
+    return "metadataGovernance.create.duplicateNamespace";
+  }
+  if (message === "metadata.duplicate.code" || field === "code") {
+    return "metadataGovernance.create.duplicateCode";
+  }
+  if (message === "metadata.duplicate.tag" || field === "tag") {
+    return "metadataGovernance.create.duplicateTag";
+  }
+  if (message === "metadata.duplicate.resource_type" || field === "resource_type") {
+    return "metadataGovernance.create.duplicateResourceType";
+  }
+  if (createTarget.value === "dictionaryNamespace" || createTarget.value === "taxonomy") {
+    return "metadataGovernance.create.duplicateNamespace";
+  }
+  if (createTarget.value === "dictionaryItem" || createTarget.value === "taxonomyNode") {
+    return "metadataGovernance.create.duplicateCode";
+  }
+  if (createTarget.value === "tag") {
+    return "metadataGovernance.create.duplicateTag";
+  }
+  if (createTarget.value === "resourceType") {
+    return "metadataGovernance.create.duplicateResourceType";
+  }
+  return "metadataGovernance.create.duplicate";
+}
+
+async function submitCreate(payload: Record<string, unknown>) {
+  createSubmitting.value = true;
+  createError.value = "";
+  try {
+    ensureNoLocalDuplicate(payload);
+    if (createTarget.value === "dictionaryNamespace") {
+      await api.createDictionaryNamespace(payload);
+      await reloadActive();
+    } else if (createTarget.value === "dictionaryItem") {
+      if (!selectedDictionary.value) throw new Error(t("metadataGovernance.selectDictionary"));
+      await api.createDictionaryItem(selectedDictionary.value.uuid, payload);
+      await loadDictionaryItems();
+    } else if (createTarget.value === "taxonomy") {
+      await api.createTaxonomy(payload);
+      await reloadActive();
+    } else if (createTarget.value === "taxonomyNode") {
+      if (!selectedTaxonomy.value) throw new Error(t("metadataGovernance.selectTaxonomy"));
+      await api.createTaxonomyNode(selectedTaxonomy.value.uuid, payload);
+      await loadTaxonomyNodes();
+    } else if (createTarget.value === "tag") {
+      await api.createTag(payload);
+      await reloadActive();
+    } else if (createTarget.value === "resourceType") {
+      await api.createResourceType(payload);
+      await reloadActive();
+    }
+    createOpen.value = false;
+  } catch (error: any) {
+    createError.value = createErrorMessage(error);
+  } finally {
+    createSubmitting.value = false;
+  }
+}
+
+watch([activeTab, moduleFilter, statusFilter, pageSize], () => {
+  page.value = 1;
+  detailPage.value = 1;
+  reloadActive();
+});
+watch(page, () => reloadActive());
+watch([detailPage, detailPageSize], () => {
+  if (activeTab.value === "dictionaries") loadDictionaryItems();
+  if (activeTab.value === "taxonomies") loadTaxonomyNodes();
+});
+
+onMounted(async () => {
+  await loadMode();
+  await reloadActive();
+});
+</script>

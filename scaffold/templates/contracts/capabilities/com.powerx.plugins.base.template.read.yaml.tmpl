@@ -1,9 +1,17 @@
 id: {{ .PluginID }}.template.read
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 读取模板
+  zh: 读取模板
+  en: Read Template
 description: "读取单个模板详情的原子能力。"
+description_i18n:
+  zh-CN: 读取单个模板详情的原子能力。
+  zh: 读取单个模板详情的原子能力。
+  en: Read the details of a single template.
 rbac:
-  resource: template
+  resource: base.templates
   actions: [read]
 provides:
   - id: schema/input/{{ .PluginID }}.template.read.v1
@@ -15,11 +23,18 @@ provides:
     kind: output
     version: 1.0.0
 metadata:
+  agent_response:
+    content: '已找到模板「{{ .template.name }}」。[查看模板](/templates/crud?template_id={{ .template.id }})'
+    links:
+      - id: '{{ .template.id }}'
+        kind: template
+        label: '查看模板「{{ .template.name }}」'
+        href: '/templates/crud?template_id={{ .template.id }}'
   protocols:
     rest:
-      method: GET
-      path: /api/v1/templates/{id}
-      description: "基于模板 ID 的 REST 详情入口"
+      method: POST
+      path: /api/v1/integration/capabilities/invoke
+      description: "PowerX Gateway 统一鉴权后的插件能力入口"
     grpc:
       service: powerx.template.TemplateService
       method: GetTemplate
@@ -27,4 +42,4 @@ metadata:
       id: base.template.read
       scope: agent.template.read
       transport: http
-      endpoint: /api/v1/templates/{id}
+      endpoint: /api/v1/integration/capabilities/invoke

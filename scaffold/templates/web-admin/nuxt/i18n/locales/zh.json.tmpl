@@ -16,6 +16,8 @@
     "reset": "重置",
     "close": "关闭",
     "refresh": "刷新",
+    "enabled": "已启用",
+    "disabled": "已停用",
     "error": "发生错误",
     "retry": "重试",
     "reload": "重新加载",
@@ -30,7 +32,8 @@
   },
   "status": {
     "active": "启用",
-    "inactive": "停用"
+    "inactive": "停用",
+    "disabled": "停用"
   },
   "menu": {
     "openMarket": "开放市场",
@@ -79,6 +82,7 @@
     "businessOperations": "业务运营",
     "customerBase": "客户基础管理",
     "capabilityLab": "PowerX 能力调试",
+    "knowledgeLab": "知识库调试",
     "powerxPluginAgents": "Agent 管理",
     "powerxPluginSkills": "Skill 管理",
     "agentSkillBridge": "Agent Chat 调试",
@@ -94,9 +98,150 @@
     "channelWecomSync": "同步中心",
     "channelDingtalk": "钉钉配置",
     "channelLark": "飞书配置",
+    "settings": "设置",
+    "metadataGovernance": "元数据治理",
+    "aiSettings": "AI 设置",
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
+  },
+  "metadataGovernance": {
+    "badge": "设置",
+    "title": "元数据治理",
+    "description": "统一查看插件当前可用的数据字典、分类体系、标签和资源类型。Standalone 模式读取插件本地数据库，Delegated 模式通过 PowerX 底座能力读取。",
+    "loadFailed": "元数据加载失败",
+    "searchPlaceholder": "搜索名称、编码或路径",
+    "allModules": "选择模块",
+    "empty": "暂无数据",
+    "dictionaryNamespaces": "字典命名空间",
+    "taxonomies": "分类体系",
+    "selectDictionary": "请选择字典",
+    "selectTaxonomy": "请选择分类体系",
+    "pagination": "显示 {start}-{end} / 共 {total} 条，第 {page} 页",
+    "create": {
+      "errorTitle": "创建失败",
+      "validation": {
+        "required": "请填写必填字段。",
+        "localizedNameRequired": "请填写简体中文名称。",
+        "englishNameRequired": "请填写英文名称，系统会用英文名称生成英文标识。",
+        "machineIdentifierInvalid": "英文标识必须以小写英文字母开头，只能包含小写英文字母、数字，并可使用 .、_、- 分段。",
+        "namespaceModuleMismatch": "命名空间标识必须属于所选模块，例如 corex.customer 或 corex.customer.level。",
+        "resourceTypeRequired": "请先准备可绑定的资源类型。"
+      },
+      "context": {
+        "dictionary": "当前字典：{name}",
+        "taxonomy": "当前分类体系：{name}"
+      },
+      "dictionaryNamespace": {
+        "button": "新增字典",
+        "title": "新增字典命名空间",
+        "description": "创建一组扁平字典项的业务容器。"
+      },
+      "dictionaryItem": {
+        "button": "新增字典项",
+        "title": "新增字典项",
+        "description": "在当前字典命名空间下创建一个扁平选项。"
+      },
+      "taxonomy": {
+        "button": "新增分类体系",
+        "title": "新增分类体系",
+        "description": "创建一棵可维护父子节点的分类树。"
+      },
+      "taxonomyNode": {
+        "button": "新增分类节点",
+        "title": "新增分类节点",
+        "description": "在当前分类体系下创建根节点或子节点。"
+      },
+      "tag": {
+        "button": "新增标签",
+        "title": "新增标签",
+        "description": "创建一个扁平标签，用于资源打标和筛选。"
+      },
+      "resourceType": {
+        "button": "新增资源类型",
+        "title": "新增资源类型",
+        "description": "声明一个可被标签和引用治理绑定的业务对象类型。"
+      },
+      "failed": "创建失败",
+      "required": "请填写必填字段",
+      "duplicate": "相同的编码或命名空间已存在，请换一个再保存。",
+      "duplicateNamespace": "命名空间已存在，请换一个命名空间。",
+      "duplicateCode": "编码已存在，请换一个英文编码。",
+      "duplicateTag": "该资源类型下已存在相同标签编码。",
+      "duplicateResourceType": "资源类型已存在，请换一个资源类型。"
+    },
+    "form": {
+      "module": "模块",
+      "modulePlaceholder": "选择模块",
+      "moduleSearchPlaceholder": "搜索模块",
+      "namespace": "命名空间",
+      "namespaceSuffix": "命名空间后缀",
+      "namespaceSuffixPlaceholder": "例如 level 或 status",
+      "namespaceSuffixPlaceholderTag": "例如 tag",
+      "resourceType": "资源类型",
+      "resourceTypePlaceholder": "例如 customer.account",
+      "resourceTypeSelectPlaceholder": "选择资源类型",
+      "resourceTypeSearchPlaceholder": "搜索资源类型",
+      "code": "英文编码",
+      "machineIdentifier": "英文标识",
+      "machineIdentifierPlaceholder": "例如 enabled 或 vip_customer",
+      "sortOrder": "排序",
+      "maxDepth": "最大层级",
+      "parent": "上级节点",
+      "parentNode": "父节点",
+      "root": "根节点",
+      "rootNode": "根节点",
+      "color": "颜色",
+      "validatorKey": "校验器标识",
+      "validatorKeyPlaceholder": "例如 customer.account",
+      "bindingEnabled": "允许绑定",
+      "zhName": "中文名称",
+      "enName": "英文名称",
+      "description": "描述",
+      "localizedName": "名称",
+      "localizedDescription": "描述",
+      "localizedNamePlaceholder": "请输入名称",
+      "localizedDescriptionPlaceholder": "请输入描述",
+      "requiredLocaleSection": "默认语言",
+      "requiredLocaleDescription": "后端契约要求默认语言名称必填。",
+      "optionalLocaleSection": "其他语言",
+      "optionalLocaleDescription": "选择一种语言后维护名称和描述，已填写语言会在下方标记。",
+      "localeSelectPlaceholder": "选择语言",
+      "localeSearchPlaceholder": "搜索语言",
+      "locale": {
+        "zh_CN": "简体中文",
+        "en": "English",
+        "ja": "日本語",
+        "ko": "한국어"
+      }
+    },
+    "mode": {
+      "local": "本地模式",
+      "delegated": "底座模式"
+    },
+    "tabs": {
+      "dictionaries": "数据字典",
+      "taxonomies": "分类体系",
+      "tags": "标签",
+      "resourceTypes": "资源类型"
+    },
+    "columns": {
+      "name": "名称",
+      "module": "模块",
+      "resourceType": "资源类型",
+      "references": "引用",
+      "usage": "使用量",
+      "depth": "层级",
+      "binding": "可绑定",
+      "status": "状态"
+    }
+  },
+  "aiSettings": {
+    "badge": "设置",
+    "title": "AI 设置",
+    "description": "统一查看插件侧 AI 能力配置入口。当前页面只呈现 provider 接入状态，不伪造未接入的模型配置。",
+    "providerNotConfigured": "AI 设置 Provider 未配置",
+    "providerNotConfiguredDescription": "当前插件尚未接入本地或底座 AI 设置 Provider。接入后此页面会通过插件后端统一读取配置。"
   },
   "frameworkLab": {
     "title": "framework功能测试",
@@ -1190,13 +1335,39 @@
       "deleteConfirm": "确认删除 \"{name}\" 模板？",
       "readonlyTitle": "宿主控制模板权限",
       "readonlyDescription": "当前运行于宿主 Delegated 模式，模板 CRUD 仅供查看。请在 PowerX 控制台调整 RBAC 后再尝试写操作。",
-      "readonlyToast": "宿主模式下模板仅可查看，请联系管理员开放权限。"
+      "readonlyToast": "宿主模式下模板仅可查看，请联系管理员开放权限。",
+      "focusLocated": "已定位模板「{name}」",
+      "errors": {
+        "templateNotFound": "未找到模板",
+        "createFailed": "创建模板失败",
+        "updateFailed": "更新模板失败",
+        "deleteFailed": "删除模板失败"
+      }
     },
     "form": {
       "modalDescription": "请填写下方的模板信息。",
       "name": "模板名称",
       "description": "描述",
       "content": "内容"
+    }
+  },
+  "agentSkillBridge": {
+    "permissions": {
+      "title": "Agent 权限",
+      "loading": "正在计算当前用户权限...",
+      "loadingShort": "计算中",
+      "error": "错误",
+      "unknown": "未知",
+      "available": "可用",
+      "unavailable": "受限",
+      "allowed": "允许",
+      "denied": "拒绝",
+      "tenant": "租户",
+      "user": "用户",
+      "root": "Root",
+      "yes": "是",
+      "no": "否",
+      "empty": "选择 Agent 后显示权限。"
     }
   },
   "message": {

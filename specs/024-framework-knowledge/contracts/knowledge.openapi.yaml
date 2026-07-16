@@ -1,0 +1,305 @@
+openapi: 3.1.0
+info:
+  title: PowerXPlugin Framework Knowledge Contract
+  version: 0.1.0
+  description: >
+    Provider-neutral contract for framework knowledge search, retrieval, document indexing,
+    and provider diagnostics. Concrete production calls may be delegated to PowerX Core.
+paths:
+  /framework/knowledge/search:
+    post:
+      summary: Search knowledge spaces
+      operationId: searchKnowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeQuery'
+      responses:
+        '200':
+          description: Search result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSearchResult'
+        '400':
+          description: Invalid query or tenant required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeError'
+        '503':
+          description: Provider unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeError'
+  /framework/knowledge/documents:
+    put:
+      summary: Upsert a knowledge document
+      operationId: upsertKnowledgeDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeDocument'
+      responses:
+        '200':
+          description: Index job or completed upsert state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeIndexJob'
+  /framework/knowledge/documents/{document_id}:
+    delete:
+      summary: Delete a knowledge document
+      operationId: deleteKnowledgeDocument
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: space_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delete index job or completed delete state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeIndexJob'
+  /framework/knowledge/providers/current:
+    get:
+      summary: Inspect current knowledge provider capabilities
+      operationId: getKnowledgeProviderCapabilities
+      responses:
+        '200':
+          description: Provider capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderCapabilities'
+components:
+  schemas:
+    KnowledgeQuery:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+        space_ids:
+          type: array
+          items:
+            type: string
+        tenant_uuid:
+          type: string
+        plugin_id:
+          type: string
+        agent_uuid:
+          type: string
+        skill_id:
+          type: string
+        caller_type:
+          type: string
+          enum: [member, customer, agent, system]
+        locale:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        min_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        filters:
+          type: object
+          additionalProperties: true
+        trace_id:
+          type: string
+    KnowledgeSearchResult:
+      type: object
+      required: [provider, chunks, citations, total]
+      properties:
+        query_id:
+          type: string
+        provider:
+          type: string
+        space_id:
+          type: string
+        chunks:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeChunk'
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeCitation'
+        total:
+          type: integer
+        diagnostics:
+          type: object
+          additionalProperties: true
+        trace_id:
+          type: string
+    KnowledgeChunk:
+      type: object
+      required: [chunk_id, document_id, text, citation]
+      properties:
+        chunk_id:
+          type: string
+        document_id:
+          type: string
+        space_id:
+          type: string
+        text:
+          type: string
+        score:
+          type: number
+        position:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        citation:
+          $ref: '#/components/schemas/KnowledgeCitation'
+    KnowledgeCitation:
+      type: object
+      required: [document_id, title]
+      properties:
+        document_id:
+          type: string
+        chunk_id:
+          type: string
+        title:
+          type: string
+        uri:
+          type: string
+        version:
+          type: string
+        position:
+          type: object
+          additionalProperties: true
+        provider:
+          type: string
+        retrieved_at:
+          type: string
+          format: date-time
+    KnowledgeDocument:
+      type: object
+      required: [document_id, space_id, title]
+      properties:
+        document_id:
+          type: string
+        space_id:
+          type: string
+        title:
+          type: string
+        uri:
+          type: string
+        content:
+          type: string
+        content_type:
+          type: string
+        checksum:
+          type: string
+        version:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+          enum: [private, tenant, plugin, public]
+        metadata:
+          type: object
+          additionalProperties: true
+    KnowledgeIndexJob:
+      type: object
+      required: [job_id, operation, status]
+      properties:
+        job_id:
+          type: string
+        space_id:
+          type: string
+        document_id:
+          type: string
+        operation:
+          type: string
+          enum: [upsert, delete, reindex]
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, cancelled]
+        error_code:
+          type: string
+        message:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+    ProviderCapabilities:
+      type: object
+      required: [provider, mode, operations]
+      properties:
+        provider:
+          type: string
+        mode:
+          type: string
+          enum: [local, delegated, mock, third_party]
+        operations:
+          type: array
+          items:
+            type: string
+            enum: [search, retrieve, upsert, delete, reindex, health]
+        limits:
+          type: object
+          additionalProperties: true
+        health:
+          type: string
+          enum: [ready, degraded, unavailable]
+    KnowledgeError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - KNOWLEDGE_PROVIDER_UNAVAILABLE
+            - KNOWLEDGE_UNAUTHORIZED
+            - KNOWLEDGE_FORBIDDEN
+            - KNOWLEDGE_NOT_FOUND
+            - KNOWLEDGE_RATE_LIMITED
+            - KNOWLEDGE_UNSUPPORTED_CAPABILITY
+            - KNOWLEDGE_TENANT_REQUIRED
+            - KNOWLEDGE_TENANT_MISMATCH
+            - KNOWLEDGE_INVALID_DOCUMENT
+            - KNOWLEDGE_INDEX_FAILED
+            - KNOWLEDGE_REDACTION_REQUIRED
+        message:
+          type: string
+        provider:
+          type: string
+        operation:
+          type: string
+        retryable:
+          type: boolean
+        trace_id:
+          type: string
+        safe_details:
+          type: object
+          additionalProperties: true

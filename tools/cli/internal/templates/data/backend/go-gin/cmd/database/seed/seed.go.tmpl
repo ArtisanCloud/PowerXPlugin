@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"{{ .BackendModulePath }}/internal/entity/models"
 	agentregistry "{{ .BackendModulePath }}/internal/entity/models/agent_registry"
+	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
+	metadatamodel "{{ .BackendModulePath }}/internal/entity/models/metadata"
 	templatemodel "{{ .BackendModulePath }}/internal/entity/models/template"
 	sampleskills "{{ .BackendModulePath }}/internal/skills"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -21,6 +25,9 @@ const (
 
 func SeedPluginData(ctx context.Context, db *gorm.DB) error {
 	if err := seedTemplateSkillPackage(ctx, db); err != nil {
+		return err
+	}
+	if err := seedLocalMetadata(ctx, db); err != nil {
 		return err
 	}
 	seedTemplates := []struct {
@@ -105,6 +112,215 @@ func SeedPluginData(ctx context.Context, db *gorm.DB) error {
 	return nil
 }
 
+func seedLocalMetadata(ctx context.Context, db *gorm.DB) error {
+	ctxDB := db.WithContext(ctx)
+	tenantUUIDs, err := metadataSeedTenantUUIDs(ctxDB)
+	if err != nil {
+		return err
+	}
+	for _, tenantUUID := range tenantUUIDs {
+		if err := seedLocalMetadataForTenant(ctxDB, tenantUUID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func seedLocalMetadataForTenant(ctxDB *gorm.DB, tenantUUID string) error {
+	customerLevelNamespace := metadatamodel.DictionaryNamespace{
+		UUID:            metadataSeedUUID(tenantUUID, "dictionary_namespace:corex.customer.level"),
+		TenantUUID:      tenantUUID,
+		Namespace:       "corex.customer.level",
+		Module:          "corex.customer",
+		NameI18n:        datatypes.JSONMap{"zh": "客户级别", "zh-CN": "客户级别", "en": "Customer Level"},
+		DescriptionI18n: datatypes.JSONMap{"zh": "客户价值和服务分层", "zh-CN": "客户价值和服务分层", "en": "Customer value and service tier"},
+		Status:          "active",
+	}
+	if err := upsertMetadata(ctxDB, &metadatamodel.DictionaryNamespace{}, "tenant_uuid = ? AND namespace = ?", []any{tenantUUID, customerLevelNamespace.Namespace}, customerLevelNamespace); err != nil {
+		return err
+	}
+	dictionaryItems := []metadatamodel.DictionaryItem{
+		{
+			UUID:            metadataSeedUUID(tenantUUID, "dictionary_item:corex.customer.level:standard"),
+			TenantUUID:      tenantUUID,
+			NamespaceUUID:   customerLevelNamespace.UUID,
+			Code:            "standard",
+			LabelI18n:       datatypes.JSONMap{"zh": "标准客户", "zh-CN": "标准客户", "en": "Standard"},
+			DescriptionI18n: datatypes.JSONMap{"zh": "默认客户服务级别", "zh-CN": "默认客户服务级别", "en": "Default customer service tier"},
+			Status:          "active",
+			SortOrder:       10,
+		},
+		{
+			UUID:            metadataSeedUUID(tenantUUID, "dictionary_item:corex.customer.level:vip"),
+			TenantUUID:      tenantUUID,
+			NamespaceUUID:   customerLevelNamespace.UUID,
+			Code:            "vip",
+			LabelI18n:       datatypes.JSONMap{"zh": "VIP 客户", "zh-CN": "VIP 客户", "en": "VIP"},
+			DescriptionI18n: datatypes.JSONMap{"zh": "高价值客户服务级别", "zh-CN": "高价值客户服务级别", "en": "High value customer service tier"},
+			Status:          "active",
+			SortOrder:       20,
+		},
+	}
+	for _, item := range dictionaryItems {
+		if err := upsertMetadata(ctxDB, &metadatamodel.DictionaryItem{}, "namespace_uuid = ? AND code = ?", []any{item.NamespaceUUID, item.Code}, item); err != nil {
+			return err
+		}
+	}
+
+	customerLifecycle := metadatamodel.Taxonomy{
+		UUID:            metadataSeedUUID(tenantUUID, "taxonomy:corex.customer.lifecycle"),
+		TenantUUID:      tenantUUID,
+		Namespace:       "corex.customer.lifecycle",
+		Module:          "corex.customer",
+		NameI18n:        datatypes.JSONMap{"zh": "客户生命周期", "zh-CN": "客户生命周期", "en": "Customer Lifecycle"},
+		DescriptionI18n: datatypes.JSONMap{"zh": "客户关系阶段分类", "zh-CN": "客户关系阶段分类", "en": "Customer relationship stages"},
+		MaxDepth:        3,
+		Status:          "active",
+	}
+	if err := upsertMetadata(ctxDB, &metadatamodel.Taxonomy{}, "tenant_uuid = ? AND namespace = ?", []any{tenantUUID, customerLifecycle.Namespace}, customerLifecycle); err != nil {
+		return err
+	}
+	taxonomyNodes := []metadatamodel.TaxonomyNode{
+		{
+			UUID:         metadataSeedUUID(tenantUUID, "taxonomy_node:corex.customer.lifecycle:prospect"),
+			TenantUUID:   tenantUUID,
+			TaxonomyUUID: customerLifecycle.UUID,
+			Code:         "prospect",
+			LabelI18n:    datatypes.JSONMap{"zh": "潜在客户", "zh-CN": "潜在客户", "en": "Prospect"},
+			Path:         "prospect",
+			Depth:        0,
+			SortOrder:    10,
+			Status:       "active",
+			Version:      1,
+		},
+		{
+			UUID:         metadataSeedUUID(tenantUUID, "taxonomy_node:corex.customer.lifecycle:active_customer"),
+			TenantUUID:   tenantUUID,
+			TaxonomyUUID: customerLifecycle.UUID,
+			Code:         "active_customer",
+			LabelI18n:    datatypes.JSONMap{"zh": "活跃客户", "zh-CN": "活跃客户", "en": "Active Customer"},
+			Path:         "active_customer",
+			Depth:        0,
+			SortOrder:    20,
+			Status:       "active",
+			Version:      1,
+		},
+	}
+	for _, node := range taxonomyNodes {
+		if err := upsertMetadata(ctxDB, &metadatamodel.TaxonomyNode{}, "taxonomy_uuid = ? AND code = ?", []any{node.TaxonomyUUID, node.Code}, node); err != nil {
+			return err
+		}
+	}
+
+	resourceType := metadatamodel.ResourceType{
+		UUID:            metadataSeedUUID(tenantUUID, "resource_type:corex.customer.account"),
+		TenantUUID:      tenantUUID,
+		ResourceType:    "corex.customer.account",
+		Module:          "corex.customer",
+		NameI18n:        datatypes.JSONMap{"zh": "客户账号", "zh-CN": "客户账号", "en": "Customer Account"},
+		DescriptionI18n: datatypes.JSONMap{"zh": "C 端客户基础账号资源", "zh-CN": "C 端客户基础账号资源", "en": "Customer account resource"},
+		BindingEnabled:  true,
+		ValidatorStatus: "ready",
+		Status:          "active",
+	}
+	if err := upsertMetadata(ctxDB, &metadatamodel.ResourceType{}, "tenant_uuid = ? AND resource_type = ?", []any{tenantUUID, resourceType.ResourceType}, resourceType); err != nil {
+		return err
+	}
+
+	tags := []metadatamodel.Tag{
+		{
+			UUID:         metadataSeedUUID(tenantUUID, "tag:corex.customer.account:important"),
+			TenantUUID:   tenantUUID,
+			Namespace:    "corex.customer.tags",
+			ResourceType: resourceType.ResourceType,
+			Code:         "important",
+			LabelI18n:    datatypes.JSONMap{"zh": "重点客户", "zh-CN": "重点客户", "en": "Important"},
+			Color:        "#2563eb",
+			Status:       "active",
+		},
+		{
+			UUID:         metadataSeedUUID(tenantUUID, "tag:corex.customer.account:needs_followup"),
+			TenantUUID:   tenantUUID,
+			Namespace:    "corex.customer.tags",
+			ResourceType: resourceType.ResourceType,
+			Code:         "needs_followup",
+			LabelI18n:    datatypes.JSONMap{"zh": "需要跟进", "zh-CN": "需要跟进", "en": "Needs Follow-up"},
+			Color:        "#f59e0b",
+			Status:       "active",
+		},
+	}
+	for _, tag := range tags {
+		if err := upsertMetadata(ctxDB, &metadatamodel.Tag{}, "tenant_uuid = ? AND namespace = ? AND resource_type = ? AND code = ?", []any{tenantUUID, tag.Namespace, tag.ResourceType, tag.Code}, tag); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func upsertMetadata[T any](db *gorm.DB, model any, query string, arg any, value T) error {
+	args, ok := arg.([]any)
+	if !ok {
+		args = []any{arg}
+	}
+	err := db.Where(query, args...).First(model).Error
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return db.Create(&value).Error
+	case err != nil:
+		return err
+	default:
+		return db.Model(model).Updates(value).Error
+	}
+}
+
+func metadataSeedTenantUUIDs(db *gorm.DB) ([]string, error) {
+	seen := map[string]bool{}
+	out := make([]string, 0, 4)
+	add := func(value string) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			return
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	add(defaultTenantUUID)
+	var tenants []iammodel.Tenant
+	if err := db.Find(&tenants).Error; err != nil {
+		return nil, err
+	}
+	for _, tenant := range tenants {
+		add(tenant.UUID)
+	}
+	return out, nil
+}
+
+func metadataSeedUUID(tenantUUID string, key string) string {
+	if strings.TrimSpace(tenantUUID) == defaultTenantUUID {
+		switch strings.TrimSpace(key) {
+		case "dictionary_namespace:corex.customer.level":
+			return "10000000-0000-0000-0000-000000000101"
+		case "dictionary_item:corex.customer.level:standard":
+			return "10000000-0000-0000-0000-000000000111"
+		case "dictionary_item:corex.customer.level:vip":
+			return "10000000-0000-0000-0000-000000000112"
+		case "taxonomy:corex.customer.lifecycle":
+			return "10000000-0000-0000-0000-000000000201"
+		case "taxonomy_node:corex.customer.lifecycle:prospect":
+			return "10000000-0000-0000-0000-000000000211"
+		case "taxonomy_node:corex.customer.lifecycle:active_customer":
+			return "10000000-0000-0000-0000-000000000212"
+		case "resource_type:corex.customer.account":
+			return "10000000-0000-0000-0000-000000000301"
+		case "tag:corex.customer.account:important":
+			return "10000000-0000-0000-0000-000000000401"
+		case "tag:corex.customer.account:needs_followup":
+			return "10000000-0000-0000-0000-000000000402"
+		}
+	}
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(strings.TrimSpace(tenantUUID)+":"+strings.TrimSpace(key))).String()
+}
+
 func seedTemplateSkillPackage(ctx context.Context, db *gorm.DB) error {
 	pkg, err := sampleskills.LoadTemplatePackage()
 	if err != nil {
@@ -183,6 +399,18 @@ func seedTemplateSkillPackage(ctx context.Context, db *gorm.DB) error {
 	}
 
 	pluginSkillIDs := []string{pkg.Manifest.SkillID}
+	templateAgentMeta := map[string]any{
+		"title_i18n": map[string]string{
+			"zh-CN": "模板智能体",
+			"zh":    "模板智能体",
+			"en":    "Template Agent",
+		},
+		"description_i18n": map[string]string{
+			"zh-CN": "面向插件开发者和管理员的 PowerXPlugin 模板对象管理智能体，负责解释并执行模板对象的创建、查询、更新、删除和列表等任务。",
+			"zh":    "面向插件开发者和管理员的 PowerXPlugin 模板对象管理智能体，负责解释并执行模板对象的创建、查询、更新、删除和列表等任务。",
+			"en":    "PowerXPlugin template object management agent for plugin developers and administrators. It explains and executes template object create, read, update, delete, and list tasks.",
+		},
+	}
 	var agent agentregistry.PluginAgent
 	err = ctxDB.Where("tenant_uuid = ? AND plugin_id = ? AND plugin_agent_id = ?", defaultTenantUUID, pluginID, "template-agent").First(&agent).Error
 	agentUpdates := map[string]any{
@@ -191,6 +419,7 @@ func seedTemplateSkillPackage(ctx context.Context, db *gorm.DB) error {
 		"description":        "面向插件开发者和管理员的 PowerXPlugin 模板对象管理智能体，负责解释并执行模板对象的创建、查询、更新、删除和列表等任务。",
 		"persona":            "你是 PowerXPlugin 模板对象管理助手，服务对象是插件开发者和插件管理员。你负责围绕模板对象进行自然语言对话、能力解释、参数澄清和任务执行。回答时应先理解用户当前问题，再基于当前绑定 Skill 的真实 metadata 说明能力或发起执行；不要编造未绑定能力，不要暴露内部 skill_id、executor path、schema 字段名。",
 		"prompt_seed":        "当用户询问你是谁或能做什么时，请以模板对象管理助手身份回答，并只基于当前已绑定 Skill 的真实 metadata 介绍能力。能力介绍应先说明服务对象，再概括模板创建、查询、更新、删除和列表；推荐先测试创建模板。用户要求执行时，按 Skill response_guidance 和 input_schema 判断缺参并追问，参数足够后调用绑定 Skill。",
+		"meta":               datatypes.JSON(mustJSON(templateAgentMeta)),
 		"plugin_skill_ids":   datatypes.JSON(mustJSON(pluginSkillIDs)),
 		"sync_error_code":    "",
 		"sync_error_message": "",
@@ -206,6 +435,7 @@ func seedTemplateSkillPackage(ctx context.Context, db *gorm.DB) error {
 			Description:    "面向插件开发者和管理员的 PowerXPlugin 模板对象管理智能体，负责解释并执行模板对象的创建、查询、更新、删除和列表等任务。",
 			Persona:        "你是 PowerXPlugin 模板对象管理助手，服务对象是插件开发者和插件管理员。你负责围绕模板对象进行自然语言对话、能力解释、参数澄清和任务执行。回答时应先理解用户当前问题，再基于当前绑定 Skill 的真实 metadata 说明能力或发起执行；不要编造未绑定能力，不要暴露内部 skill_id、executor path、schema 字段名。",
 			PromptSeed:     "当用户询问你是谁或能做什么时，请以模板对象管理助手身份回答，并只基于当前已绑定 Skill 的真实 metadata 介绍能力。能力介绍应先说明服务对象，再概括模板创建、查询、更新、删除和列表；推荐先测试创建模板。用户要求执行时，按 Skill response_guidance 和 input_schema 判断缺参并追问，参数足够后调用绑定 Skill。",
+			Meta:           datatypes.JSON(mustJSON(templateAgentMeta)),
 			PluginSkillIDs: datatypes.JSON(mustJSON(pluginSkillIDs)),
 			PowerXSkillIDs: datatypes.JSON(mustJSON([]string{})),
 			SyncStatus:     agentregistry.SyncStatusDraft,

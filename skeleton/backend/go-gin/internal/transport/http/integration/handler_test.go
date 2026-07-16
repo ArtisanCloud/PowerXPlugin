@@ -22,11 +22,13 @@ type fakeCapabilityGateway struct {
 	lastParams capgateway.InvokeParams
 	result     *capgateway.InvokeResult
 	err        error
+	callCount  int
 }
 
 func (f *fakeCapabilityGateway) Enabled() bool { return true }
 
 func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.InvokeParams) (*capgateway.InvokeResult, error) {
+	f.callCount++
 	f.lastParams = params
 	if f.err != nil {
 		return nil, f.err
@@ -36,6 +38,22 @@ func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.Invo
 
 func (f *fakeCapabilityGateway) ListPlatformCapabilities(_ context.Context, _ capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
 	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) ListKnowledgeSpaces(_ context.Context, _ capgateway.KnowledgeSpaceListOptions) ([]capgateway.KnowledgeSpaceRuntimeRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) CreateKnowledgeSpace(_ context.Context, _ capgateway.KnowledgeSpaceCreateParams) (*capgateway.KnowledgeSpaceRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) RetireKnowledgeSpace(_ context.Context, _ capgateway.KnowledgeSpaceRetireParams) (*capgateway.KnowledgeSpaceRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) DeleteKnowledgeSpace(_ context.Context, _ capgateway.KnowledgeSpaceDeleteParams) error {
+	return nil
 }
 
 func (f *fakeCapabilityGateway) ResolveGatewayTenantUUID(_ context.Context) (string, error) {
@@ -136,6 +154,45 @@ func TestInvokeCapabilitySuccess(t *testing.T) {
 	require.Equal(t, "com.corex.media.assets.manage", fake.lastParams.CapabilityID)
 	require.True(t, fake.lastParams.AuthRequired)
 	require.True(t, fake.lastParams.TenantScoped)
+}
+
+func TestInvokeCapabilityRouteAllowsTenantContextWithoutRootRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	fake := &fakeCapabilityGateway{
+		result: &capgateway.InvokeResult{
+			TraceID: "trace-route",
+			Status:  "accepted",
+			Data: map[string]any{
+				"ok": true,
+			},
+		},
+	}
+	deps := &app.Deps{CapabilityGateway: fake}
+	router := gin.New()
+	group := router.Group("/api/v1")
+	group.Use(func(c *gin.Context) {
+		authx.SetTenantContext(c, authx.TenantContext{
+			TenantUUID: "aeffc79f-e72a-4fd9-b908-5c150bce3741",
+			UserID:     1001,
+			Roles:      []string{"member"},
+		})
+		authx.SetRawBearerToken(c, "test-token")
+		c.Next()
+	})
+	RegisterAPIRoutes(group, deps)
+
+	body := `{"capabilityId":"com.corex.media.assets.manage","action":"List","payload":{"limit":1}}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integration/capabilities/invoke", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-token")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NotContains(t, w.Body.String(), "root privileges required")
+	require.Equal(t, "com.corex.media.assets.manage", fake.lastParams.CapabilityID)
 }
 
 func TestInvokeCapabilityUnavailable(t *testing.T) {

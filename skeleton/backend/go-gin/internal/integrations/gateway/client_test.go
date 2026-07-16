@@ -79,6 +79,124 @@ func TestInvokeUsesRealTransport(t *testing.T) {
 	require.Equal(t, "asset-1", result.Data["mediaId"])
 }
 
+func TestSyncPluginSkillRequiresPublishedPath(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "ApiKey token", r.Header.Get("Authorization"))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"code":    200,
+			"message": "success",
+			"data": map[string]any{
+				"powerx_skill_id": "powerxplugin.template.basic",
+				"skill_id":        "powerxplugin.template.basic",
+				"status":          "published",
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient(&config.Config{Gateway: &config.GatewayConfig{
+		BaseURL:    server.URL + "/api/v1",
+		AuthScheme: "apikey",
+		APIKey:     "token",
+	}}, nil)
+	result, err := client.SyncPluginSkill(context.Background(), PluginSkillSyncParams{
+		PluginSkillID: "powerxplugin.template.basic",
+		Title:         "模板对象基础能力",
+		Capability:    "com.powerx.plugins.base.template.create",
+		Provider:      "com.powerx.plugins.base",
+		Executor: map[string]any{
+			"type":               "capability",
+			"capability":         "com.powerx.plugins.base.template.create",
+			"prepare_capability": "com.powerx.plugins.base.template.prepare",
+			"action_map": map[string]any{
+				"create": "com.powerx.plugins.base.template.create",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "powerxplugin.template.basic", result.PowerXSkillID)
+	require.Equal(t, "published", result.Status)
+	require.Equal(t, "/api/v1/admin/skills/plugin-registry/powerxplugin.template.basic/sync", gotPath)
+}
+
+func TestRegisterLocalDebugHostPostsInternalDebugHosts(t *testing.T) {
+	var gotPath string
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "ApiKey token", r.Header.Get("Authorization"))
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"code":    200,
+			"message": "success",
+			"data": map[string]any{
+				"pluginId": "com.powerx.plugins.base.local",
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient(&config.Config{Gateway: &config.GatewayConfig{
+		BaseURL:    server.URL + "/api/v1",
+		AuthScheme: "apikey",
+		APIKey:     "token",
+	}}, nil)
+	err := client.RegisterLocalDebugHost(context.Background(), LocalDebugHostRegistrationParams{
+		PluginID:    "com.powerx.plugins.base.local",
+		Environment: "local",
+		HTTPPort:    8078,
+		TTLSeconds:  3600,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "/api/v1/internal/plugins/debug-hosts", gotPath)
+	require.Equal(t, "com.powerx.plugins.base.local", gotBody["pluginId"])
+	require.Equal(t, "local", gotBody["environment"])
+	require.Equal(t, float64(8078), gotBody["httpPort"])
+	require.Equal(t, float64(3600), gotBody["ttlSeconds"])
+}
+
+func TestSyncPluginSkillRejectsUnpublishedStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"code":    200,
+			"message": "success",
+			"data": map[string]any{
+				"powerx_skill_id": "powerxplugin.template.basic",
+				"status":          "draft",
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient(&config.Config{Gateway: &config.GatewayConfig{
+		BaseURL:    server.URL + "/api/v1",
+		AuthScheme: "apikey",
+		APIKey:     "token",
+	}}, nil)
+	_, err := client.SyncPluginSkill(context.Background(), PluginSkillSyncParams{
+		PluginSkillID: "powerxplugin.template.basic",
+		Title:         "模板对象基础能力",
+		Capability:    "com.powerx.plugins.base.template.create",
+		Provider:      "com.powerx.plugins.base",
+		Executor: map[string]any{
+			"type":               "capability",
+			"capability":         "com.powerx.plugins.base.template.create",
+			"prepare_capability": "com.powerx.plugins.base.template.prepare",
+			"action_map": map[string]any{
+				"create": "com.powerx.plugins.base.template.create",
+			},
+		},
+	})
+	require.ErrorContains(t, err, "did not publish")
+}
+
 type stubTransport struct {
 	resp    *frameworkgateway.Response
 	err     error
@@ -191,6 +309,226 @@ func TestAPIKeyRequestsDoNotSendTenantHeader(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestListKnowledgeSpacesUsesPluginRuntimeAPI(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/tenant/plugin-runtime/knowledge-spaces", r.URL.Path)
+		require.Equal(t, "1", r.URL.Query().Get("page"))
+		require.Equal(t, "50", r.URL.Query().Get("page_size"))
+		require.Equal(t, "active", r.URL.Query().Get("status"))
+		require.Equal(t, "客服", r.URL.Query().Get("keyword"))
+		require.Equal(t, "ApiKey token", r.Header.Get("Authorization"))
+		require.Equal(t, "00000000-0000-0000-0000-000000000001", r.Header.Get("tenant_uuid"))
+		require.Equal(t, "00000000-0000-0000-0000-000000000001", r.Header.Get("X-Tenant-UUID"))
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"code":200,
+			"message":"success",
+			"data":{
+				"items":[
+					{
+						"uuid":"space-1",
+						"space_name":"客服知识库",
+						"status":"active",
+						"department_code":"support",
+						"rag_profile_key":"default",
+						"updated_at":"2026-06-30T10:00:00Z",
+						"created_at":"2026-06-30T09:00:00Z"
+					}
+				],
+				"pagination":{"total":1,"page":1,"page_size":50}
+			}
+		}`)
+	})
+	l, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: l,
+		Config: &http.Server{
+			Handler: handler,
+		},
+	}
+	server.Start()
+	defer server.Close()
+
+	cfg := &config.Config{
+		Gateway: &config.GatewayConfig{
+			BaseURL:    server.URL,
+			AuthScheme: "apikey",
+			APIKey:     "token",
+			Timeout:    2 * time.Second,
+		},
+	}
+	client := NewClient(cfg, nil)
+
+	records, err := client.ListKnowledgeSpaces(context.Background(), KnowledgeSpaceListOptions{
+		TenantUUID: "00000000-0000-0000-0000-000000000001",
+		Status:     "active",
+		Keyword:    "客服",
+		PageSize:   50,
+	})
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	require.Equal(t, "space-1", records[0].UUID)
+	require.Equal(t, "客服知识库", records[0].SpaceName)
+	require.Equal(t, "support", records[0].DepartmentCode)
+	require.Equal(t, "default", records[0].RAGProfileKey)
+}
+
+func TestCreateKnowledgeSpaceUsesPowerXAdminAPI(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/admin/knowledge-spaces", r.URL.Path)
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "ApiKey token", r.Header.Get("Authorization"))
+		require.Equal(t, "00000000-0000-0000-0000-000000000001", r.Header.Get("tenant_uuid"))
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "插件联调知识空间", body["spaceName"])
+		require.Equal(t, "dev", body["departmentCode"])
+		require.Equal(t, "default-v1", body["policyTemplateVersionId"])
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"code":201,
+			"message":"success",
+			"data":{
+				"spaceId":"space-created",
+				"tenant_uuid":"00000000-0000-0000-0000-000000000001",
+				"spaceName":"插件联调知识空间",
+				"departmentCode":"dev",
+				"status":"pending",
+				"policyTemplateVersionId":"default-v1",
+				"ragProfileKey":"p1_general",
+				"quotas":{"cpuCores":1,"storageGb":50,"ingestionConcurrency":1}
+			}
+		}`)
+	})
+	l, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: l,
+		Config: &http.Server{
+			Handler: handler,
+		},
+	}
+	server.Start()
+	defer server.Close()
+
+	client := NewClient(&config.Config{Gateway: &config.GatewayConfig{
+		BaseURL:    server.URL,
+		AuthScheme: "apikey",
+		APIKey:     "token",
+		Timeout:    2 * time.Second,
+	}}, nil)
+	record, err := client.CreateKnowledgeSpace(context.Background(), KnowledgeSpaceCreateParams{
+		TenantUUID:     "00000000-0000-0000-0000-000000000001",
+		SpaceName:      "插件联调知识空间",
+		DepartmentCode: "dev",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "space-created", record.SpaceID)
+	require.Equal(t, "插件联调知识空间", record.SpaceName)
+}
+
+func TestRetireKnowledgeSpaceUsesPowerXAdminAPI(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/admin/knowledge-spaces/space-1/retire", r.URL.Path)
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "ApiKey token", r.Header.Get("Authorization"))
+		require.Equal(t, "tenant-a", r.Header.Get("tenant_uuid"))
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "debug cleanup", body["reason"])
+		require.Equal(t, "plugin-knowledge-lab", body["requestedBy"])
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+			"code":202,
+			"message":"success",
+			"data":{
+				"spaceId":"space-1",
+				"tenant_uuid":"tenant-a",
+				"spaceName":"插件联调知识空间",
+				"departmentCode":"dev",
+				"status":"retired",
+				"policyTemplateVersionId":"default-v1",
+				"ragProfileKey":"p1_general",
+				"quotas":{"cpuCores":1,"storageGb":50,"ingestionConcurrency":1}
+			}
+		}`)
+	})
+	l, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: l,
+		Config: &http.Server{
+			Handler: handler,
+		},
+	}
+	server.Start()
+	defer server.Close()
+
+	client := NewClient(&config.Config{Gateway: &config.GatewayConfig{
+		BaseURL:    server.URL,
+		AuthScheme: "apikey",
+		APIKey:     "token",
+		Timeout:    2 * time.Second,
+	}}, nil)
+	record, err := client.RetireKnowledgeSpace(context.Background(), KnowledgeSpaceRetireParams{
+		TenantUUID:  "tenant-a",
+		SpaceID:     "space-1",
+		Reason:      "debug cleanup",
+		RequestedBy: "plugin-knowledge-lab",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "space-1", record.SpaceID)
+	require.Equal(t, "retired", record.Status)
+}
+
+func TestDeleteKnowledgeSpaceUsesPowerXAdminAPI(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/api/v1/admin/knowledge-spaces/space-1", r.URL.Path)
+		require.Equal(t, http.MethodDelete, r.Method)
+		require.Equal(t, "ApiKey token", r.Header.Get("Authorization"))
+		require.Equal(t, "tenant-a", r.Header.Get("tenant_uuid"))
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "plugin-knowledge-lab", body["requestedBy"])
+		require.Equal(t, true, body["dropVectors"])
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"code":200,"message":"success","data":{"deleted":true,"spaceId":"space-1"}}`)
+	})
+	l, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
+	}
+	server := &httptest.Server{
+		Listener: l,
+		Config: &http.Server{
+			Handler: handler,
+		},
+	}
+	server.Start()
+	defer server.Close()
+
+	client := NewClient(&config.Config{Gateway: &config.GatewayConfig{
+		BaseURL:    server.URL,
+		AuthScheme: "apikey",
+		APIKey:     "token",
+		Timeout:    2 * time.Second,
+	}}, nil)
+	err = client.DeleteKnowledgeSpace(context.Background(), KnowledgeSpaceDeleteParams{
+		TenantUUID:  "tenant-a",
+		SpaceID:     "space-1",
+		RequestedBy: "plugin-knowledge-lab",
+		DropVectors: true,
+	})
+	require.NoError(t, err)
+}
+
 func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
@@ -221,7 +559,7 @@ func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 	require.Error(t, listErr)
 }
 
-func TestInvokePolicyRequiresRequestAuthorization(t *testing.T) {
+func TestInvokePolicyUsesServiceCredentialWhenRequestAuthorizationMissing(t *testing.T) {
 	cfg := &config.Config{
 		Gateway: &config.GatewayConfig{
 			BaseURL:    "https://gateway.dev.powerx",
@@ -230,18 +568,17 @@ func TestInvokePolicyRequiresRequestAuthorization(t *testing.T) {
 		},
 	}
 	client := NewClient(cfg, nil)
-	client.transport = &stubTransport{
+	stub := &stubTransport{
 		resp: &frameworkgateway.Response{TraceID: "trace-1", Status: "ok"},
 	}
+	client.transport = stub
 	_, err := client.Invoke(context.Background(), InvokeParams{
 		CapabilityID: "com.corex.media.assets.manage",
 		Action:       "List",
 		AuthRequired: true,
 	})
-	var policyErr *PolicyError
-	require.Error(t, err)
-	require.True(t, errors.As(err, &policyErr))
-	require.Equal(t, "GW_POLICY_AUTH_REQUIRED", policyErr.Code)
+	require.NoError(t, err)
+	require.False(t, stub.lastReq.DisableAuth)
 }
 
 func TestInvokePolicyTenantScopedRequiresTenantClaim(t *testing.T) {
@@ -424,6 +761,7 @@ func TestStreamAgentSSEUsesGatewayEndpoint(t *testing.T) {
 		TraceID:            "trace-1",
 		Query:              "hello",
 		Intent:             "agent.bound_capabilities",
+		OriginTenantUUID:   "00000000-0000-0000-0000-000000000001",
 		RegenFromMessageID: "215",
 	})
 	require.NoError(t, err)
@@ -431,6 +769,7 @@ func TestStreamAgentSSEUsesGatewayEndpoint(t *testing.T) {
 	require.Equal(t, "/api/v1/agents/stream/sse", gotPath)
 	require.Contains(t, gotQuery, "agent_id=agent-1")
 	require.Contains(t, gotQuery, "intent=agent.bound_capabilities")
+	require.Contains(t, gotQuery, "origin_tenant_uuid=00000000-0000-0000-0000-000000000001")
 	require.Contains(t, gotQuery, "regen_from_message_id=215")
 	require.Equal(t, "ApiKey token", gotAuth)
 }

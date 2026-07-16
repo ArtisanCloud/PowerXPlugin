@@ -3,9 +3,28 @@
   "title": "TemplateCreateOutput",
   "type": "object",
   "properties": {
+    "content": { "type": "string" },
     "id": { "type": "string" },
-    "status": { "type": "string" }
+    "links": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/AgentResponseLink" }
+    },
+    "status": { "type": "string" },
+    "template": { "type": "object" }
   },
   "required": ["id"],
-  "additionalProperties": true
+  "additionalProperties": true,
+  "definitions": {
+    "AgentResponseLink": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "label": { "type": "string" },
+        "href": { "type": "string" }
+      },
+      "required": ["label", "href"],
+      "additionalProperties": true
+    }
+  }
 }

@@ -45,7 +45,7 @@
 - **Constraints**: 来自 JWT 或 Signed Context；需在 request middleware 校验；`roles` 用于 RBAC。
 
 ### ProviderModeSetting
-- **Fields**: `mode (enum: delegated|local)`, `source (enum: config/env/derived)`, `powerx_proxy`, `powerx_rbac_delegate`, `context_override`.
+- **Fields**: `mode (enum: delegated|local)`, `source (enum: context.provider_mode|POWERX_PROVIDER_MODE)`, `powerx_proxy`, `context_provider_mode`.
 - **Usage**: 缓存 Resolver 判断结果，写入日志和指标。
 
 ## Relationships Diagram (textual)

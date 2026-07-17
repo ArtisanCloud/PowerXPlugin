@@ -24,12 +24,12 @@ provides:
     version: 1.0.0
 metadata:
   agent_response:
-    content: '已找到模板「{{ .template.name }}」。[查看模板](/templates/crud?template_id={{ .template.id }})'
+    content: '已找到模板「{{`{{ .template.name }}`}}」。[查看模板](/templates/crud?template_id={{`{{ .template.id }}`}})'
     links:
-      - id: '{{ .template.id }}'
+      - id: '{{`{{ .template.id }}`}}'
         kind: template
-        label: '查看模板「{{ .template.name }}」'
-        href: '/templates/crud?template_id={{ .template.id }}'
+        label: '查看模板「{{`{{ .template.name }}`}}」'
+        href: '/templates/crud?template_id={{`{{ .template.id }}`}}'
   protocols:
     rest:
       method: POST

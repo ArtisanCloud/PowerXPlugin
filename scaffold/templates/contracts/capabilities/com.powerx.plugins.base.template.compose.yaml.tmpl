@@ -1,7 +1,15 @@
 id: {{ .PluginID }}.template.compose
 type: Tool
 version: 1.0.0
+title_i18n:
+  zh-CN: 模板编排
+  zh: 模板编排
+  en: Template Composition
 description: "复合 Workflow，串联草稿、审核、发布节点，供 Workflow Builder 与 Agent Hub 复用。"
+description_i18n:
+  zh-CN: 复合 Workflow，串联草稿、审核、发布节点，供 Workflow Builder 与 Agent Hub 复用。
+  zh: 复合 Workflow，串联草稿、审核、发布节点，供 Workflow Builder 与 Agent Hub 复用。
+  en: Run a composite workflow that connects draft, review, and publish steps for Workflow Builder and Agent Hub.
 rbac:
   resource: template
   actions: [create]

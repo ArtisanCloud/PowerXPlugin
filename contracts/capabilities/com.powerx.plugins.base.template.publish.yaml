@@ -1,7 +1,15 @@
 id: com.powerx.plugins.base.template.publish
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 发布模板
+  zh: 发布模板
+  en: Publish Template
 description: "将审核通过的模板发布到业务租户。"
+description_i18n:
+  zh-CN: 将审核通过的模板发布到业务租户。
+  zh: 将审核通过的模板发布到业务租户。
+  en: Publish an approved template to a business tenant.
 rbac:
   resource: template
   actions: [update]
@@ -18,6 +26,6 @@ metadata:
   protocols:
     rest:
       method: POST
-      path: /api/v1/templates/{id}/publish
+      path: /api/v1/integration/capabilities/invoke
     workflow:
       template: contracts/exposure/workflow/template-compose.json

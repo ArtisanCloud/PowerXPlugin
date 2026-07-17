@@ -15,6 +15,7 @@ import (
 	idrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/integration"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	obsintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/integration"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 
@@ -162,6 +163,120 @@ func (s *DispatchService) Dispatch(ctx context.Context, channel, resource, actio
 
 	obsintegration.RecordEnvelope(channel, "accepted")
 	return outcome, nil
+}
+
+// InvokeCapability executes a capability owned by this plugin from PowerX Core's
+// local debug callback path. It intentionally does not proxy back to Core.
+func (s *DispatchService) InvokeCapability(ctx context.Context, capabilityID, action string, payload map[string]any, meta map[string]any, tenantUUID string) (*DispatchOutcome, error) {
+	if s == nil {
+		return nil, errors.New("dispatch service unavailable")
+	}
+	if s.invoker == nil {
+		return nil, errors.New("dispatch invoker not configured")
+	}
+	capabilityID = strings.TrimSpace(capabilityID)
+	if capabilityID == "" {
+		return nil, errors.New("capability_id is required")
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, errors.New("tenant_uuid is required for local capability invoke")
+	}
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("invalid capability payload: %w", err)
+	}
+
+	metadata := make(map[string]any, len(meta)+2)
+	for k, v := range meta {
+		key := strings.TrimSpace(k)
+		if key != "" {
+			metadata[key] = v
+		}
+	}
+	metadata["capability_id"] = capabilityID
+	if strings.TrimSpace(action) != "" {
+		metadata["action"] = strings.TrimSpace(action)
+	}
+
+	traceID := uuid.New()
+	if raw := normalizeMetadataString(metadata["trace_id"]); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			traceID = parsed
+		}
+	}
+	correlationID := traceID
+	if raw := normalizeMetadataString(metadata["correlation_id"]); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			correlationID = parsed
+		}
+	}
+
+	start := s.now().UTC()
+	envelope := &domain.IntegrationEnvelope{
+		MessageID:     uuid.New(),
+		TraceID:       traceID,
+		CorrelationID: correlationID,
+		TenantUuid:    tenantUUID,
+		ToolScope:     inferToolScopeFromCapability(capabilityID, metadata),
+		IssuedAt:      start,
+		PayloadRef:    string(payloadBytes),
+		Metadata:      metadata,
+		Signature:     "powerx-core-local-capability-invoke",
+	}
+	envelope.Normalize()
+
+	result, err := s.invoker.Invoke(ctx, envelope)
+	if err != nil {
+		obsintegration.RecordEnvelope("LOCAL", "error")
+		return nil, err
+	}
+	outcome := &DispatchOutcome{
+		Status:        "accepted",
+		TraceID:       traceID.String(),
+		CorrelationID: correlationID.String(),
+		Latency:       time.Since(start),
+	}
+	if result != nil {
+		if strings.TrimSpace(result.Status) != "" {
+			outcome.Status = result.Status
+		}
+		outcome.Payload = result.Payload
+		outcome.Metadata = result.Metadata
+	}
+	if outcome.Latency < 0 {
+		outcome.Latency = 0
+	}
+	obsintegration.RecordEnvelope("LOCAL", "accepted")
+	return outcome, nil
+}
+
+func inferToolScopeFromCapability(capabilityID string, meta map[string]any) string {
+	if raw := normalizeMetadataString(meta["tool_scope"]); raw != "" {
+		return raw
+	}
+	id := strings.Replace(strings.TrimSpace(capabilityID), ".local.", ".", 1)
+	if idx := strings.LastIndex(id, ".template."); idx >= 0 {
+		action := strings.TrimSpace(id[idx+len(".template."):])
+		if action != "" && !strings.Contains(action, ".") {
+			return "agent.template." + action
+		}
+	}
+	return "capability." + strings.TrimSpace(capabilityID)
+}
+
+func normalizeMetadataString(v any) string {
+	switch value := v.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case fmt.Stringer:
+		return strings.TrimSpace(value.String())
+	default:
+		return ""
+	}
 }
 
 func (s *DispatchService) handleIdempotencyClaim(

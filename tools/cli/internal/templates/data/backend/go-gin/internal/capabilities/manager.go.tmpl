@@ -89,8 +89,9 @@ type ExecutionConfig struct {
 
 // ProtocolAsset captures generated exposure artefacts.
 type ProtocolAsset struct {
-	Type string `json:"type"`
-	Path string `json:"path"`
+	Type     string `json:"type"`
+	Path     string `json:"path"`
+	DiskPath string `json:"-"`
 }
 
 type manager struct {
@@ -624,6 +625,11 @@ type assetRoot struct {
 	matcher      func(path string) bool
 }
 
+type assetFile struct {
+	relPath  string
+	diskPath string
+}
+
 func (e *fileSystemAssetExporter) Export(ctx context.Context, catalog *CatalogSnapshot) ([]ProtocolAsset, error) {
 	var assets []ProtocolAsset
 	for _, root := range e.roots {
@@ -635,19 +641,20 @@ func (e *fileSystemAssetExporter) Export(ctx context.Context, catalog *CatalogSn
 			return nil, err
 		}
 		for _, f := range files {
-			assets = append(assets, ProtocolAsset{Type: root.protocolType, Path: f})
+			assets = append(assets, ProtocolAsset{Type: root.protocolType, Path: f.relPath, DiskPath: f.diskPath})
 		}
 	}
 	return assets, nil
 }
 
-func walkFiles(dir string, matcher func(string) bool) ([]string, error) {
-	var results []string
-	root := filepath.Clean(dir)
-	cwd, _ := os.Getwd()
-	absRoot := root
-	if !filepath.IsAbs(absRoot) && cwd != "" {
-		absRoot = filepath.Join(cwd, root)
+func walkFiles(dir string, matcher func(string) bool) ([]assetFile, error) {
+	var results []assetFile
+	absRoot, relBase, resolveErr := resolveAssetRoot(dir)
+	if resolveErr != nil {
+		if errors.Is(resolveErr, os.ErrNotExist) {
+			return results, nil
+		}
+		return nil, resolveErr
 	}
 	err := filepath.WalkDir(absRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -657,8 +664,8 @@ func walkFiles(dir string, matcher func(string) bool) ([]string, error) {
 			return nil
 		}
 		rel := path
-		if cwd != "" {
-			if r, err := filepath.Rel(cwd, path); err == nil {
+		if relBase != "" {
+			if r, err := filepath.Rel(relBase, path); err == nil {
 				rel = r
 			}
 		}
@@ -666,13 +673,59 @@ func walkFiles(dir string, matcher func(string) bool) ([]string, error) {
 		if matcher != nil && !matcher(rel) {
 			return nil
 		}
-		results = append(results, rel)
+		results = append(results, assetFile{
+			relPath:  rel,
+			diskPath: path,
+		})
 		return nil
 	})
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("capabilities: walk %s failed: %w", dir, err)
 	}
 	return results, nil
+}
+
+func resolveAssetRoot(dir string) (absRoot string, relBase string, err error) {
+	root := filepath.Clean(strings.TrimSpace(dir))
+	if root == "" || root == "." {
+		return "", "", os.ErrNotExist
+	}
+	if filepath.IsAbs(root) {
+		if _, err := os.Stat(root); err == nil {
+			return root, filepath.Dir(root), nil
+		}
+		return "", "", os.ErrNotExist
+	}
+	cwd, _ := os.Getwd()
+	if cwd == "" {
+		cwd = "."
+	}
+	for _, base := range candidateAssetBases(cwd) {
+		candidate := filepath.Clean(filepath.Join(base, root))
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, base, nil
+		}
+	}
+	return "", "", os.ErrNotExist
+}
+
+func candidateAssetBases(start string) []string {
+	start = filepath.Clean(start)
+	out := []string{start}
+	seen := map[string]struct{}{start: {}}
+	current := start
+	for i := 0; i < 8; i++ {
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		if _, ok := seen[parent]; !ok {
+			out = append(out, parent)
+			seen[parent] = struct{}{}
+		}
+		current = parent
+	}
+	return out
 }
 
 // ValidateExecution enforces sync/async constraints and populates defaults.

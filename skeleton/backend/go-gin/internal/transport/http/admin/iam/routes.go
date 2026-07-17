@@ -18,31 +18,41 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group := admin.Group("/iam")
 	group.GET("/mode", modeHandler(deps))
 
-	if deps.DB == nil {
-		return
+	var audit *srviam.AuditService
+	var stsSvc *srviam.STSService
+	var roleSvc *srviam.RoleService
+	var tenantSvc *srviam.TenantService
+	var departmentSvc *srviam.DepartmentService
+	var userSvc *srviam.UserService
+	if deps.DB != nil {
+		audit = srviam.NewAuditService(deps.DB)
+		stsSvc = srviam.NewSTSService(deps.Config, audit, app.PluginID, "")
+		roleSvc = srviam.NewRoleService(deps.DB, audit, app.PluginID)
+		tenantSvc = srviam.NewTenantService(deps.DB, audit)
+		departmentSvc = srviam.NewDepartmentService(deps.DB, audit)
+		userSvc = srviam.NewUserService(deps.DB, audit)
 	}
 
-	audit := srviam.NewAuditService(deps.DB)
-	stsSvc := srviam.NewSTSService(deps.Config, audit, app.PluginID, "")
-	roleSvc := srviam.NewRoleService(deps.DB, audit, app.PluginID)
-
 	tenantHandler := NewTenantHandler(
-		srviam.NewTenantService(deps.DB, audit),
+		tenantSvc,
 		deps.IAMDirectoryService,
 		deps.IAMAuthzService,
-		deps.IAMMode,
+		deps.IAMAdapterMode,
 	)
-	departmentHandler := NewDepartmentHandler(srviam.NewDepartmentService(deps.DB, audit), deps.IAMMode)
-	memberHandler := NewMemberHandler(srviam.NewUserService(deps.DB, audit))
-	roleHandler := NewRoleHandler(roleSvc)
-	rolePermissionsHandler := NewRolePermissionsHandler(roleSvc)
-	roleMembersHandler := NewRoleMembersHandler(roleSvc)
-	permissionHandler := NewPermissionHandler(roleSvc)
+	departmentHandler := NewDepartmentHandler(departmentSvc, deps.IAMAdapterMode, deps.IAMDirectoryService)
+	memberHandler := NewMemberHandler(userSvc, deps.IAMAdapterMode, deps.IAMDirectoryService)
+	roleHandler := NewRoleHandler(roleSvc, deps.IAMAdapterMode, deps.IAMDirectoryService)
+	rolePermissionsHandler := NewRolePermissionsHandler(roleSvc, deps.IAMAdapterMode)
+	roleMembersHandler := NewRoleMembersHandler(roleSvc, deps.IAMAdapterMode)
+	permissionHandler := NewPermissionHandler(roleSvc, deps.IAMAdapterMode, deps.IAMDirectoryService)
 	auditHandler := NewAuditHandler(audit)
-	stsHandler := NewSTSHandler(deps.IAMMode, stsSvc)
+	stsHandler := NewSTSHandler(deps.IAMAdapterMode, stsSvc)
 	sessionSvc := federatedsvc.NewSessionService()
-	fedRepo := federatedrepo.NewFederatedBindingRepository(deps.DB)
-	bindingSvc := federatedsvc.NewBindingService(fedRepo, deps.DB, sessionSvc)
+	var bindingSvc *federatedsvc.BindingService
+	if deps.DB != nil {
+		fedRepo := federatedrepo.NewFederatedBindingRepository(deps.DB)
+		bindingSvc = federatedsvc.NewBindingService(fedRepo, deps.DB, sessionSvc)
+	}
 	jitPolicySvc := federatedsvc.NewJITPolicyService()
 	mappingSvc := federatedsvc.NewMappingService()
 	federatedBindingHandler := NewFederatedBindingHandler(bindingSvc, jitPolicySvc, mappingSvc)
@@ -75,13 +85,15 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.DELETE("/roles/:id/members", roleMembersHandler.Remove)
 
 	group.GET("/permissions", permissionHandler.List)
-	group.GET("/audit/logs", auditHandler.List)
-	group.POST("/auth/local/sts", stsHandler.Mint)
-	group.GET("/federated/bindings", federatedBindingHandler.List)
-	group.POST("/federated/bindings", federatedBindingHandler.Create)
-	group.DELETE("/federated/bindings", federatedBindingHandler.Delete)
-	group.PUT("/federated/jit-policy", federatedBindingHandler.UpdateJITPolicy)
-	group.PUT("/federated/mapping-policy", federatedBindingHandler.UpdateMappingPolicy)
+	if deps.DB != nil {
+		group.GET("/audit/logs", auditHandler.List)
+		group.POST("/auth/local/sts", stsHandler.Mint)
+		group.GET("/federated/bindings", federatedBindingHandler.List)
+		group.POST("/federated/bindings", federatedBindingHandler.Create)
+		group.DELETE("/federated/bindings", federatedBindingHandler.Delete)
+		group.PUT("/federated/jit-policy", federatedBindingHandler.UpdateJITPolicy)
+		group.PUT("/federated/mapping-policy", federatedBindingHandler.UpdateMappingPolicy)
+	}
 	group.GET("/channels/wecom/config", wecomChannelHandler.GetConfig)
 	group.PUT("/channels/wecom/config", wecomChannelHandler.SaveConfig)
 	group.GET("/channels/wecom/sync-tasks", wecomChannelHandler.ListSyncTasks)
@@ -107,14 +119,18 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 
 func modeHandler(deps *app.Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		mode := strings.TrimSpace(deps.IAMMode.String())
+		mode := strings.TrimSpace(deps.IAMAdapterMode.String())
 		if mode == "" {
 			mode = "local"
 		}
 		registryBound := deps.IAMRegistry != nil && deps.IAMRegistry.IsBound()
 		contracts.ResponseSuccess(c, gin.H{
 			"mode":                mode,
-			"source":              strings.TrimSpace(deps.IAMModeSource),
+			"source":              strings.TrimSpace(deps.IAMAdapterModeSource),
+			"provider":            mode,
+			"delegated_available": deps.IAMDirectoryService != nil,
+			"local_available":     deps.IAMDirectory != nil || deps.DB != nil,
+			"read_only":           mode == "delegated",
 			"registry_bound":      registryBound,
 			"directory_available": deps.IAMDirectoryService != nil,
 			"authz_available":     deps.IAMAuthzService != nil,

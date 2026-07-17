@@ -125,32 +125,15 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 			hostPublishOK = true
 		}
 
-		// Ensure UI probe can always observe an event frame on current plugin WS session.
-		// Only host flow needs local echo; local flow already publishes directly to local hub.
-		echoResult := fwwsbus.PublishResult{OK: true}
-		if useHost {
-			echoResult = fwwsbus.NewLocalPublisher(deps.WSBusHub, nil).Publish(
-				context.Background(),
-				topic,
-				payload,
-				fwwsbus.PublishOptions{
-					TenantUUID: tenantUUID,
-					MemberUUID: strings.TrimSpace(req.MemberUUID),
-					TraceID:    traceID,
-				},
-			)
-			if !echoResult.OK {
-				contracts.ResponseError(c, http.StatusBadRequest, echoResult.ErrorCode, echoResult.ErrorMessage)
-				return
-			}
-		}
+		echoOK := !useHost
+		echoSkipped := useHost
 
 		flowMode := "local_only"
 		if req.ForceLocal {
 			flowMode = "local_forced"
 		}
 		if useHost {
-			flowMode = "host_fallback_local_only"
+			flowMode = "host_strict_ok"
 			if hostReachable && hostGrantOK && hostPublishOK {
 				flowMode = "host_strict_ok"
 			}
@@ -163,7 +146,8 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 			"trace_id":        traceID,
 			"grant_ok":        grantResult.OK,
 			"publish_ok":      publishResult.OK,
-			"echo_ok":         echoResult.OK,
+			"echo_ok":         echoOK,
+			"echo_skipped":    echoSkipped,
 			"flow_mode":       flowMode,
 			"host_reachable":  hostReachable,
 			"host_grant_ok":   hostGrantOK,

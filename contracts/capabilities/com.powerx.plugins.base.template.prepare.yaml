@@ -1,7 +1,15 @@
 id: com.powerx.plugins.base.template.prepare
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 准备模板执行
+  zh: 准备模板执行
+  en: Prepare Template Execution
 description: "模板对象 Skill 的执行准备能力，负责合并会话状态、判断缺参并生成后续能力调用请求。"
+description_i18n:
+  zh-CN: 模板对象 Skill 的执行准备能力，负责合并会话状态、判断缺参并生成后续能力调用请求。
+  zh: 模板对象 Skill 的执行准备能力，负责合并会话状态、判断缺参并生成后续能力调用请求。
+  en: Prepare template skill execution by merging session state, detecting missing fields, and building follow-up capability calls.
 rbac:
   resource: template
   actions: [read]

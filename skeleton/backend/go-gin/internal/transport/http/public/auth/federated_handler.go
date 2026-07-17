@@ -220,7 +220,7 @@ func (h *FederatedHandler) Callback(c *gin.Context) {
 		TenantUUID: challenge.TenantUUID,
 	})
 	if err != nil {
-		n := h.contextSvc.NormalizeUnavailableError(resolveIAMMode(h.deps), err)
+		n := h.contextSvc.NormalizeUnavailableError(resolveIAMAdapterMode(h.deps), err)
 		h.auditSvc.Record(authobs.FederatedAuditEvent{
 			Provider:       provider.Key(),
 			TenantUUID:     challenge.TenantUUID,
@@ -246,7 +246,7 @@ func (h *FederatedHandler) Callback(c *gin.Context) {
 		return
 	}
 	result := h.loginService.Build(identity, challenge.TenantUUID)
-	result.Context = h.contextSvc.NormalizeContext(resolveIAMMode(h.deps), result.Context)
+	result.Context = h.contextSvc.NormalizeContext(resolveIAMAdapterMode(h.deps), result.Context)
 	authobs.RecordFederatedLoginSuccess(app.PluginID, challenge.TenantUUID)
 	h.auditSvc.Record(authobs.FederatedAuditEvent{
 		Provider:         provider.Key(),
@@ -443,11 +443,11 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func resolveIAMMode(deps *app.Deps) string {
+func resolveIAMAdapterMode(deps *app.Deps) string {
 	if deps == nil {
 		return "standalone"
 	}
-	mode := strings.TrimSpace(deps.IAMMode.String())
+	mode := strings.TrimSpace(deps.IAMAdapterMode.String())
 	if mode == "" {
 		return "standalone"
 	}

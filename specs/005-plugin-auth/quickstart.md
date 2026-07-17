@@ -11,7 +11,7 @@ This guide shows how to run the Skeleton in both Delegated (PowerX host) and Loc
 | Variable | Purpose | Delegated Example | Local Example |
 |----------|---------|------------------|---------------|
 | `POWERX_PROXY` | 注入来源，宿主=1 | `1` | `0`
-| `IAMMode` | 启动模式 | `delegated` | `local`
+| `POWERX_PROVIDER_MODE` | 启动模式 | `delegated` | `local`
 | `POWERX_CORE_ENDPOINT` | 宿主 API | `http://powerx-core:8077` | optional
 | `POWERX_AUTH_TOKEN` | 插件→宿主鉴权 | `eyJ...` | optional
 | `POWERX_TENANT_ID` | 当前租户 | `tenant_123` | optional
@@ -23,7 +23,7 @@ This guide shows how to run the Skeleton in both Delegated (PowerX host) and Loc
 ```bash
 # 后端
 cd skeleton/backend/go-gin
-IAMMode=delegated POWERX_PROXY=1 \
+POWERX_PROVIDER_MODE=delegated POWERX_PROXY=1 \
 POWERX_CORE_ENDPOINT="http://localhost:8077" \
 POWERX_AUTH_TOKEN="dev-token" \
 go run ./cmd/plugin
@@ -41,7 +41,7 @@ npm run dev
 ```bash
 cd skeleton/backend/go-gin
 export POWERX_PROXY=0
-export IAMMode=local
+export POWERX_PROVIDER_MODE=local
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
@@ -74,8 +74,8 @@ cd tools/cli && go run ./cmd/px-plugin init dev.plugin.test
 - 运行 `go run ./cmd/plugin` + `npm run dev` 验证 CLI 产物的登录流程。
 
 ## 6. Observability Checklist
-- 确认 `plugin_iam_mode`, `plugin_auth_login_total`, `plugin_auth_refresh_total`, `plugin_auth_logout_total`, `plugin_iam_delegate_errors_total` 指标在 `/metrics` 暴露。
-- `request_trace` 日志需含 `iam_mode`, `auth`, `tenant_uuid`, `user_id`, `trace_id`。
+- 确认 `plugin_provider_mode`, `plugin_auth_login_total`, `plugin_auth_refresh_total`, `plugin_auth_logout_total`, `plugin_iam_delegate_errors_total` 指标在 `/metrics` 暴露。
+- `request_trace` 日志需含 `provider_mode`, `auth`, `tenant_uuid`, `user_id`, `trace_id`。
 - 打开/关闭 Local 模式应各自写一条 Info 日志。
 
 ## 7. 验收与性能

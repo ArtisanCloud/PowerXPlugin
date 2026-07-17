@@ -127,14 +127,31 @@ func NewPowerXServiceClient(ctx context.Context, c *cfgpkg.GRPCUpstream) (*Power
 			if err != nil {
 				return nil, err
 			}
-			if resp == nil || resp.Data == nil {
-				return nil, fmt.Errorf("empty response from STS Exchange")
+			if resp == nil {
+				return nil, fmt.Errorf("empty response from STS Exchange: %s", stsExchangeMetaSummary(resp))
+			}
+			if meta := resp.GetMeta(); meta != nil && meta.GetCode() != 0 && meta.GetCode() != 200 {
+				return nil, fmt.Errorf("STS Exchange failed: code=%d message=%s request_id=%s", meta.GetCode(), meta.GetMessage(), meta.GetRequestId())
+			}
+			if resp.Data == nil {
+				return nil, fmt.Errorf("empty response from STS Exchange: %s", stsExchangeMetaSummary(resp))
 			}
 			return &STSExchangeResponse{AccessToken: resp.Data.GetAccessToken(), ExpiresIn: int32(resp.Data.GetExpiresIn())}, nil
 		})
 	}
 
 	return p, nil
+}
+
+func stsExchangeMetaSummary(resp *stsv1.ExchangeResponse) string {
+	if resp == nil {
+		return "response is nil"
+	}
+	meta := resp.GetMeta()
+	if meta == nil {
+		return "meta is nil"
+	}
+	return fmt.Sprintf("code=%d message=%s request_id=%s", meta.GetCode(), meta.GetMessage(), meta.GetRequestId())
 }
 
 // ensureConn: 若未连接或不可用，尝试拨号（短超时）。

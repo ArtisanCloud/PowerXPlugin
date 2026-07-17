@@ -18,6 +18,7 @@ func TestClientCreatePresignUpdateUsesMediaCapabilities(t *testing.T) {
 	asset, err := client.CreateAsset(context.Background(), CreateAssetInput{
 		TenantUUID:       "tenant-001",
 		Name:             "design.png",
+		Driver:           "local",
 		OwnerSubjectType: "ai_craft_asset",
 		OwnerSubjectID:   "track/original/design.png",
 		UploadChannel:    UploadChannelPresigned,
@@ -49,25 +50,40 @@ func TestClientCreatePresignUpdateUsesMediaCapabilities(t *testing.T) {
 	require.Len(t, gw.calls, 3)
 	require.Equal(t, CapabilityMediaAssetsManage, gw.calls[0].CapabilityID)
 	require.Equal(t, "CreateMediaAsset", gw.calls[0].Action)
-	require.Equal(t, "grpc", gw.calls[0].PreferredProtocol)
+	require.Equal(t, "rest", gw.calls[0].PreferredProtocol)
 	require.Equal(t, "tenant-001", gw.calls[0].TenantUUID)
 	createPayload, ok := gw.calls[0].Payload.(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "presign_upload", createPayload["upload_channel"])
-	require.Equal(t, "ai_craft_asset", createPayload["owner_subject_type"])
+	require.Equal(t, http.MethodPost, createPayload["method"])
+	require.Equal(t, "/api/v1/media/assets", createPayload["endpoint"])
+	createBody, ok := createPayload["body"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "local", createBody["driver"])
+	require.Equal(t, "presign_upload", createBody["uploadMethod"])
+	require.Equal(t, "ai_craft_asset", createBody["ownerSubjectType"])
+	require.Equal(t, "track/original/design.png", createBody["ownerSubjectId"])
 
 	require.Equal(t, CapabilityMediaAssetsManage, gw.calls[1].CapabilityID)
 	require.Equal(t, "PresignMediaAsset", gw.calls[1].Action)
 	presignPayload, ok := gw.calls[1].Payload.(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "upload", presignPayload["action"])
-	require.Equal(t, http.MethodPut, presignPayload["method"])
+	require.Equal(t, http.MethodPost, presignPayload["method"])
+	require.Equal(t, "/api/v1/media/assets/media-asset-001/presign", presignPayload["endpoint"])
+	presignBody, ok := presignPayload["body"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "upload", presignBody["action"])
+	require.Equal(t, http.MethodPut, presignBody["method"])
+	require.Equal(t, uint32(900), presignBody["expiresInSeconds"])
 
-	require.Equal(t, CapabilityMediaAssetsRead, gw.calls[2].CapabilityID)
+	require.Equal(t, CapabilityMediaAssetsManage, gw.calls[2].CapabilityID)
 	require.Equal(t, "UpdateMediaAsset", gw.calls[2].Action)
 	updatePayload, ok := gw.calls[2].Payload.(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "under_review", updatePayload["business_status"])
+	require.Equal(t, http.MethodPatch, updatePayload["method"])
+	require.Equal(t, "/api/v1/media/assets/media-asset-001", updatePayload["endpoint"])
+	updateBody, ok := updatePayload["body"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "under_review", updateBody["business_status"])
 }
 
 func TestClientDownloadUsesPresignTicket(t *testing.T) {
@@ -90,8 +106,12 @@ func TestClientDownloadUsesPresignTicket(t *testing.T) {
 	require.Equal(t, "PresignMediaAsset", gw.calls[0].Action)
 	payload, ok := gw.calls[0].Payload.(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "download", payload["action"])
-	require.Equal(t, http.MethodGet, payload["method"])
+	require.Equal(t, http.MethodPost, payload["method"])
+	require.Equal(t, "/api/v1/media/assets/media-asset-001/presign", payload["endpoint"])
+	presignBody, ok := payload["body"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "download", presignBody["action"])
+	require.Equal(t, http.MethodGet, presignBody["method"])
 }
 
 func TestClientMediaAssetVariantUsesManageCapability(t *testing.T) {
@@ -125,14 +145,22 @@ func TestClientMediaAssetVariantUsesManageCapability(t *testing.T) {
 	require.Equal(t, "CreateMediaAssetVariant", gw.calls[0].Action)
 	createPayload, ok := gw.calls[0].Payload.(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "preview", createPayload["variant"])
-	require.Equal(t, "media-asset-001", createPayload["uuid"])
+	require.Equal(t, http.MethodPost, createPayload["method"])
+	require.Equal(t, "/api/v1/media/assets/media-asset-001/variants", createPayload["endpoint"])
+	createBody, ok := createPayload["body"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "preview", createBody["variant"])
+	require.Equal(t, "media-asset-001", createBody["uuid"])
 
 	require.Equal(t, "PresignMediaAssetVariant", gw.calls[1].Action)
 	presignPayload, ok := gw.calls[1].Payload.(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "preview", presignPayload["variant"])
-	require.Equal(t, "upload", presignPayload["action"])
+	require.Equal(t, http.MethodPost, presignPayload["method"])
+	require.Equal(t, "/api/v1/media/assets/media-asset-001/variants/preview/presign", presignPayload["endpoint"])
+	presignBody, ok := presignPayload["body"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "preview", presignBody["variant"])
+	require.Equal(t, "upload", presignBody["action"])
 }
 
 type fakeGateway struct {
@@ -165,7 +193,7 @@ func (f *fakeGateway) Invoke(_ context.Context, req gateway.InvokeRequest) (*gat
 			"mime_type":   "image/jpeg",
 		}}, nil
 	case "PresignMediaAsset":
-		payload, _ := req.Payload.(map[string]any)
+		payload := requestBody(req)
 		method := http.MethodGet
 		if payload["action"] == "upload" {
 			method = http.MethodPut
@@ -178,7 +206,7 @@ func (f *fakeGateway) Invoke(_ context.Context, req gateway.InvokeRequest) (*gat
 			"object_key":         "media-asset-001",
 		}}, nil
 	case "PresignMediaAssetVariant":
-		payload, _ := req.Payload.(map[string]any)
+		payload := requestBody(req)
 		method := http.MethodGet
 		if payload["action"] == "upload" {
 			method = http.MethodPut
@@ -193,6 +221,12 @@ func (f *fakeGateway) Invoke(_ context.Context, req gateway.InvokeRequest) (*gat
 	default:
 		return &gateway.Response{Data: map[string]any{}}, nil
 	}
+}
+
+func requestBody(req gateway.InvokeRequest) map[string]any {
+	payload, _ := req.Payload.(map[string]any)
+	body, _ := payload["body"].(map[string]any)
+	return body
 }
 
 type fakeHTTPTransport struct{}

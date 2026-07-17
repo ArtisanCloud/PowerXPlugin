@@ -4,7 +4,6 @@ export const TENANT_UUID_STORAGE_KEY = "px_current_tenant_uuid";
 const LEGACY_TENANT_UUID_STORAGE_KEY = "tenant_uuid";
 const PLACEHOLDER_TENANT_UUIDS = new Set([
   "00000000-0000-0000-0000-000000000000",
-  "00000000-0000-0000-0000-000000000001",
 ]);
 
 const normalize = (value?: string | null) => {

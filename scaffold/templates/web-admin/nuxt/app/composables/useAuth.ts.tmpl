@@ -537,7 +537,7 @@ export const useAuth = () => {
     }
   };
 
-  const setIAMModeFlags = (isDelegated: boolean) => {
+  const setProviderModeFlags = (isDelegated: boolean) => {
     delegatedIAM.value = isDelegated;
     localIAMEnabled.value = !isDelegated;
   };
@@ -653,6 +653,6 @@ export const useAuth = () => {
     restoreFromStorage: syncFromStorage,
     localIAMEnabled: readonly(localIAMEnabled),
     delegatedIAM: readonly(delegatedIAM),
-    setIAMModeFlags,
+    setProviderModeFlags,
   };
 };

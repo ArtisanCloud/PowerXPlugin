@@ -19,8 +19,9 @@ runtime:
   env:
     POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
     POWERX_PROXY: "1"
-    IAMMode: "delegated"
+    POWERX_PROVIDER_MODE: "delegated"
     POWERX_PLUGIN_ID: "{{ .PluginID }}"
+    POWERX_PLUGIN_REGISTRATION_MODE: installed
     POWERX_SECURITY_JWT_ISSUER: "powerx-auth"
     POWERX_SECURITY_JWT_AUDIENCE: "plugin:{{ .PluginID }}"
     POWERX_SECURITY_JWT_SECRET: "${POWERX_AUTH_JWTSECRET}"
@@ -56,6 +57,7 @@ frontend:
         NITRO_HOST: 127.0.0.1
         POWERX_PROXY: "1"
         NUXT_PUBLIC_INSIDE_POWERX: "1"
+        NUXT_PUBLIC_POWERX_PROVIDER_MODE: delegated
       health:
         http: /healthz
         interval: 5s
@@ -126,6 +128,31 @@ frontend:
                 path: /templates/crud
                 route: templates/crud
                 order: 2
+          - id: plugins.{{ .PluginID }}.powerx
+            title: PowerX底座能力
+            title_i18n:
+              namespace: menus
+              key: menu.{{ .PluginID }}.powerx.title
+              default: PowerX Base Capabilities
+            icon: i-heroicons-cpu-chip
+            path: /powerx/knowledge-lab
+            route: powerx/knowledge-lab
+            order: 3
+            required_policies:
+              - "admin:root"
+            children:
+              - id: plugins.{{ .PluginID }}.powerx.knowledge_lab
+                title: 知识库调试
+                title_i18n:
+                  namespace: menus
+                  key: menu.{{ .PluginID }}.powerx.knowledge_lab
+                  default: Knowledge Lab
+                icon: i-heroicons-circle-stack
+                path: /powerx/knowledge-lab
+                route: powerx/knowledge-lab
+                order: 1
+                required_policies:
+                  - "admin:root"
 agents:
   - id: {{ .PluginID }}.assistant
     plugin_id: {{ .PluginID }}

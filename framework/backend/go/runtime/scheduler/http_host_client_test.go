@@ -66,6 +66,7 @@ func TestHTTPHostClientUsesLocalProxyAPIKey(t *testing.T) {
 func TestHTTPHostClientCreatesHostSchedulerJob(t *testing.T) {
 	var gotPath string
 	var gotBody string
+	var gotTenantHeader string
 	client, err := NewHTTPHostClient(HostProviderConfig{
 		BaseURL:    "http://powerx.local",
 		APIPrefix:  "/api/v1",
@@ -73,6 +74,7 @@ func TestHTTPHostClientCreatesHostSchedulerJob(t *testing.T) {
 		Token:      "sts-token",
 		HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			gotPath = req.URL.Path
+			gotTenantHeader = req.Header.Get("X-Tenant-UUID")
 			raw, _ := io.ReadAll(req.Body)
 			gotBody = string(raw)
 			return &http.Response{
@@ -107,6 +109,9 @@ func TestHTTPHostClientCreatesHostSchedulerJob(t *testing.T) {
 	if strings.Contains(gotBody, "tenant_uuid") {
 		t.Fatalf("body should not include tenant_uuid: %s", gotBody)
 	}
+	if gotTenantHeader != "" {
+		t.Fatalf("X-Tenant-UUID = %q, want empty", gotTenantHeader)
+	}
 	if job.JobID != "sch-host-001" {
 		t.Fatalf("job_id = %q", job.JobID)
 	}
@@ -114,12 +119,14 @@ func TestHTTPHostClientCreatesHostSchedulerJob(t *testing.T) {
 
 func TestHTTPHostClientCreatesHostSchedulerJobWithoutTenant(t *testing.T) {
 	var gotBody string
+	var gotTenantHeader string
 	client, err := NewHTTPHostClient(HostProviderConfig{
 		BaseURL:    "http://powerx.local",
 		APIPrefix:  "/api/v1",
 		AuthScheme: "apikey",
 		APIKey:     "local-proxy-key",
 		HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			gotTenantHeader = req.Header.Get("X-Tenant-UUID")
 			raw, _ := io.ReadAll(req.Body)
 			gotBody = string(raw)
 			return &http.Response{
@@ -134,7 +141,7 @@ func TestHTTPHostClientCreatesHostSchedulerJobWithoutTenant(t *testing.T) {
 		t.Fatalf("NewHTTPHostClient() error = %v", err)
 	}
 
-	job, err := NewHostProvider(HostProviderConfig{}, client).CreateJob(context.Background(), JobSpec{
+	job, err := NewHostProvider(HostProviderConfig{TenantUUID: "tenant-001"}, client).CreateJob(context.Background(), JobSpec{
 		OwnerType:    OwnerTypePlugin,
 		OwnerID:      "com.powerx.plugins.ai-craft",
 		Name:         "debug",
@@ -147,6 +154,9 @@ func TestHTTPHostClientCreatesHostSchedulerJobWithoutTenant(t *testing.T) {
 	if strings.Contains(gotBody, "tenant_uuid") {
 		t.Fatalf("body should not include tenant_uuid: %s", gotBody)
 	}
+	if gotTenantHeader != "" {
+		t.Fatalf("X-Tenant-UUID = %q, want empty", gotTenantHeader)
+	}
 	if job.JobID != "sch-host-001" {
 		t.Fatalf("job_id = %q", job.JobID)
 	}
@@ -155,12 +165,14 @@ func TestHTTPHostClientCreatesHostSchedulerJobWithoutTenant(t *testing.T) {
 func TestHTTPHostClientTriggerUsesPowerXActionContract(t *testing.T) {
 	var gotBody []byte
 	var gotContentType string
+	var gotTenantHeader string
 	client, err := NewHTTPHostClient(HostProviderConfig{
 		BaseURL:    "http://powerx.local",
 		AuthScheme: "apikey",
 		APIKey:     "local-proxy-key",
 		HTTPClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			gotContentType = req.Header.Get("Content-Type")
+			gotTenantHeader = req.Header.Get("X-Tenant-UUID")
 			if req.Body != nil {
 				gotBody, _ = io.ReadAll(req.Body)
 			}
@@ -176,7 +188,7 @@ func TestHTTPHostClientTriggerUsesPowerXActionContract(t *testing.T) {
 		t.Fatalf("NewHTTPHostClient() error = %v", err)
 	}
 
-	if err := client.TriggerJob(context.Background(), "sch-host-001", ""); err != nil {
+	if err := client.TriggerJob(context.Background(), "sch-host-001", "tenant-001"); err != nil {
 		t.Fatalf("TriggerJob() error = %v", err)
 	}
 	if len(gotBody) != 0 {
@@ -184,6 +196,9 @@ func TestHTTPHostClientTriggerUsesPowerXActionContract(t *testing.T) {
 	}
 	if gotContentType != "" {
 		t.Fatalf("Content-Type = %q, want empty", gotContentType)
+	}
+	if gotTenantHeader != "" {
+		t.Fatalf("X-Tenant-UUID = %q, want empty", gotTenantHeader)
 	}
 }
 

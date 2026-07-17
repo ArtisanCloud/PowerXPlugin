@@ -44,7 +44,7 @@
 - **Fields**: `tenant_uuid`, `user_id`, `roles[]`, `permissions[]`, `policy_version`, `issued_at`.
 - **Constraints**: 来自 JWT 或 Signed Context；需在 request middleware 校验；`roles` 用于 RBAC。
 
-### IAMModeSetting
+### ProviderModeSetting
 - **Fields**: `mode (enum: delegated|local)`, `source (enum: config/env/derived)`, `powerx_proxy`, `powerx_rbac_delegate`, `context_override`.
 - **Usage**: 缓存 Resolver 判断结果，写入日志和指标。
 
@@ -63,4 +63,4 @@ AuthTokens ↔ TenantContext (runtime only)
 - Local 模式管理员凭证必须由 env/config 提供，否则 migrate 失败。
 - Delegated 模式 API 请求必须携带 `tenant_uuid`（来自 cookie/localStorage），并自动附带 `Authorization: Bearer <token>`。
 - 所有刷新请求若 token 已过期则先清理本地缓存再提示登录。
-- `plugin_iam_mode` 指标需在服务启动和模式切换时更新。
+- `plugin_provider_mode` 指标需在服务启动和模式切换时更新。

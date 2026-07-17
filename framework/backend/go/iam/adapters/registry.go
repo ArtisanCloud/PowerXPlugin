@@ -18,7 +18,7 @@ type Bundle struct {
 type Registry struct {
 	mu     sync.RWMutex
 	bound  bool
-	mode   contracts.IAMMode
+	mode   contracts.IAMAdapterMode
 	bundle Bundle
 }
 
@@ -28,8 +28,8 @@ func NewRegistry() *Registry {
 }
 
 // Bind 在启动阶段绑定唯一 adapter。
-func (r *Registry) Bind(mode contracts.IAMMode, bundle Bundle) error {
-	if mode != contracts.IAMModeLocal && mode != contracts.IAMModeDelegated {
+func (r *Registry) Bind(mode contracts.IAMAdapterMode, bundle Bundle) error {
+	if mode != contracts.IAMAdapterModeLocal && mode != contracts.IAMAdapterModeDelegated {
 		return iamerrors.New(iamerrors.CodeModeInvalid, "invalid iam mode for adapter binding")
 	}
 	if bundle.Directory == nil || bundle.Authz == nil || bundle.Context == nil {
@@ -56,7 +56,7 @@ func (r *Registry) IsBound() bool {
 }
 
 // Mode 返回当前绑定模式；未绑定时 ok=false。
-func (r *Registry) Mode() (mode contracts.IAMMode, ok bool) {
+func (r *Registry) Mode() (mode contracts.IAMAdapterMode, ok bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.bound {

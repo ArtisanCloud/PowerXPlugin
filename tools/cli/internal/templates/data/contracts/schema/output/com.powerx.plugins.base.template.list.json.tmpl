@@ -3,9 +3,14 @@
   "title": "TemplateListOutput",
   "type": "object",
   "properties": {
+    "content": { "type": "string" },
     "items": {
       "type": "array",
       "items": { "$ref": "#/definitions/Template" }
+    },
+    "links": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/AgentResponseLink" }
     },
     "pagination": {
       "type": "object",
@@ -21,6 +26,17 @@
   "required": ["items", "pagination"],
   "additionalProperties": false,
   "definitions": {
+    "AgentResponseLink": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "label": { "type": "string" },
+        "href": { "type": "string" }
+      },
+      "required": ["label", "href"],
+      "additionalProperties": true
+    },
     "Template": {
       "type": "object",
       "properties": {

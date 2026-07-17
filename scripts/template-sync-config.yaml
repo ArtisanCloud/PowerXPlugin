@@ -248,6 +248,24 @@ mappings:
       - globs: ["**/*"]
         literal: "com.powerx.plugins.base"
         replace: "{{ .PluginID }}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .template.name }}"
+        replace: "{{`{{ .template.name }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .template.status }}"
+        replace: "{{`{{ .template.status }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .template.id }}"
+        replace: "{{`{{ .template.id }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .pagination.total }}"
+        replace: "{{`{{ .pagination.total }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .summary }}"
+        replace: "{{`{{ .summary }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .id }}"
+        replace: "{{`{{ .id }}`}}"
   - name: codex-assets
     source: .codex
     include:

@@ -35,9 +35,9 @@ const opts = program.parse(process.argv).opts();
 async function main() {
   const normalizedMode = normalizeMode(opts.mode);
   applyEnvFiles(normalizedMode, opts.envFile);
-  if (opts.use-mock) {
-    process.env.PX_USE_MOCK = opts.use-mock;
-    console.log(`[capabilities] PX_USE_MOCK 已设置为 ${opts.use-mock}`);
+  if (opts.useMock) {
+    process.env.PX_USE_MOCK = opts.useMock;
+    console.log(`[capabilities] PX_USE_MOCK 已设置为 ${opts.useMock}`);
   }
 
   const manifestInfo = resolveManifestPath(normalizedMode, opts.manifest);

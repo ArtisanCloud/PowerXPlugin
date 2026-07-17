@@ -5,10 +5,26 @@
   "properties": {
     "action": { "type": "string", "enum": ["create", "get", "update", "delete", "list"] },
     "template_id": { "type": ["integer", "string"] },
+    "template_ref": { "type": "string", "description": "用户可见的模板名称或描述性引用。prepare 会内部解析为 template_id。" },
+    "template_name": { "type": "string", "description": "用户可见的模板名称。prepare 会内部解析为 template_id。" },
     "name": { "type": "string" },
     "title": { "type": "string" },
     "description": { "type": "string" },
     "content": { "type": "string" },
+    "confirmed": { "type": ["boolean", "string"], "description": "删除操作的二次确认标记。" },
+    "confirmation": { "type": "string", "description": "用户对删除操作的确认语义，例如确认删除。" },
+    "q": { "type": "string", "description": "list action 的模糊搜索关键字" },
+    "page": { "type": "integer", "minimum": 1, "description": "list action 的页码" },
+    "page_size": { "type": "integer", "minimum": 1, "maximum": 100, "description": "list action 的每页数量" },
+    "list": {
+      "type": "object",
+      "properties": {
+        "q": { "type": "string" },
+        "page": { "type": "integer", "minimum": 1 },
+        "page_size": { "type": "integer", "minimum": 1, "maximum": 100 }
+      },
+      "additionalProperties": false
+    },
     "template": {
       "type": "object",
       "properties": {

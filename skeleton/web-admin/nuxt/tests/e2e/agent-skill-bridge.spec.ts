@@ -131,7 +131,7 @@ test.describe('Agent Skill Bridge local chat', () => {
     await expect(page.getByTestId('agent-chat-proxy')).toHaveValue('/api/v1/plugin/agent/stream/sse');
     await page.getByTestId('agent-chat-send').click();
 
-    await expect(page.getByTestId('agent-chat-status')).toHaveText(/completed/);
+    await expect(page.getByTestId('agent-chat-status')).toHaveText(/ended/);
     await expect(page.getByTestId('agent-chat-timeline')).toContainText('intent');
     await expect(page.getByTestId('agent-chat-timeline')).toContainText('node_end');
     await expect(page.getByTestId('agent-chat-final')).toContainText('已创建视频重构任务');
@@ -197,7 +197,7 @@ test.describe('Agent Skill Bridge local chat', () => {
     );
     await page.getByTestId('agent-chat-send').click();
 
-    await expect(page.getByTestId('agent-chat-status')).toHaveText(/completed/);
+    await expect(page.getByTestId('agent-chat-status')).toHaveText(/ended/);
     expect(forbidden).toEqual([]);
   });
 

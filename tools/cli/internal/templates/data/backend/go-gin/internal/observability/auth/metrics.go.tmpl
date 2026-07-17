@@ -13,7 +13,7 @@ const (
 	metricRefreshTotal        = "plugin_auth_refresh_total"
 	metricLogoutTotal         = "plugin_auth_logout_total"
 	metricDelegateErrorsTotal = "plugin_iam_delegate_errors_total"
-	metricIAMModeGauge        = "plugin_iam_mode"
+	metricProviderModeGauge   = "plugin_provider_mode"
 	metricIAMRoleChangeTotal  = "plugin_iam_role_change_total"
 	metricRBACDeniedTotal     = "plugin_rbac_denied_total"
 )
@@ -157,12 +157,12 @@ func RecordRBACDenied(pluginID, resource, action string) {
 	ensureCounter(metricRBACDeniedTotal)[labelKey(labels)]++
 }
 
-// ObserveMode sets the IAM mode gauge (1 for selected mode, 0 for the opposite).
+// ObserveMode sets the provider mode gauge (1 for selected mode, 0 for the opposite).
 func ObserveMode(mode string) {
 	metricsMu.Lock()
 	defer metricsMu.Unlock()
 	mode = normalizedMode(mode)
-	gauge := ensureGauge(metricIAMModeGauge)
+	gauge := ensureGauge(metricProviderModeGauge)
 	gauge[labelKey(map[string]string{"mode": mode})] = 1
 	other := "local"
 	if mode == "local" {
@@ -183,10 +183,10 @@ func RenderMetrics(w io.Writer) {
 		}
 	}
 
-	if gaugeSeries, ok := gauges[metricIAMModeGauge]; ok {
-		fmt.Fprintf(w, "# TYPE %s gauge\n", metricIAMModeGauge)
+	if gaugeSeries, ok := gauges[metricProviderModeGauge]; ok {
+		fmt.Fprintf(w, "# TYPE %s gauge\n", metricProviderModeGauge)
 		for _, labels := range sortedKeys(gaugeSeries) {
-			fmt.Fprintf(w, "%s{%s} %g\n", metricIAMModeGauge, labels, gaugeSeries[labels])
+			fmt.Fprintf(w, "%s{%s} %g\n", metricProviderModeGauge, labels, gaugeSeries[labels])
 		}
 	}
 }

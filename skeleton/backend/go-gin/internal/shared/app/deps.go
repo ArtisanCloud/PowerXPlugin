@@ -22,7 +22,11 @@ import (
 	"gorm.io/gorm"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
@@ -35,35 +39,44 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
-	DB                  *gorm.DB
-	Ctx                 context.Context
-	PowerXClient        *client.PowerXServiceClient
-	CapabilityGateway   gatewayClient
-	Config              *config.Config
-	CapabilitiesManager capabilities.Manager
-	CapabilityMetrics   *capmetrics.Metrics
-	TaxProviderClient   *marketplacesvc.TaxProviderClient
-	MarketplaceBilling  marketplacesvc.BillingClient
-	LicenseAuthority    marketplacesvc.LicenseAuthority
-	LicenseCache        marketplacesvc.LicenseCache
-	OperationsMetrics   *opsmetrics.Metrics
-	AdminConsoleMetrics *adminmetrics.Metrics
-	EventEmitter        fweventbridge.Emitter
-	WSBusHub            fwwsbus.LocalHub
-	IAMMode             iamservice.IAMMode
-	IAMModeSource       string
-	AuthProxy           DelegatedAuthProxy
-	IAMDirectory        iamservice.IAMDirectory
-	IAMRegistry         *fwiamadapters.Registry
-	IAMDirectoryService fwiamcontracts.DirectoryService
-	IAMAuthzService     fwiamcontracts.AuthzService
-	IAMContextService   fwiamcontracts.IdentityContextService
+	DB                   *gorm.DB
+	Ctx                  context.Context
+	PowerXClient         *client.PowerXServiceClient
+	CapabilityGateway    gatewayClient
+	Metadata             *fwmetadata.Client
+	CustomerAdmin        *customerfw.AdminClient
+	AISettings           *fwaisettings.Client
+	Config               *config.Config
+	CapabilitiesManager  capabilities.Manager
+	CapabilityMetrics    *capmetrics.Metrics
+	TaxProviderClient    *marketplacesvc.TaxProviderClient
+	MarketplaceBilling   marketplacesvc.BillingClient
+	LicenseAuthority     marketplacesvc.LicenseAuthority
+	LicenseCache         marketplacesvc.LicenseCache
+	OperationsMetrics    *opsmetrics.Metrics
+	AdminConsoleMetrics  *adminmetrics.Metrics
+	EventEmitter         fweventbridge.Emitter
+	WSBusHub             fwwsbus.LocalHub
+	ProviderMode         fwprovider.Mode
+	ProviderModeSource   string
+	IAMAdapterMode       iamservice.IAMAdapterMode
+	IAMAdapterModeSource string
+	AuthProxy            DelegatedAuthProxy
+	IAMDirectory         iamservice.IAMDirectory
+	IAMRegistry          *fwiamadapters.Registry
+	IAMDirectoryService  fwiamcontracts.DirectoryService
+	IAMAuthzService      fwiamcontracts.AuthzService
+	IAMContextService    fwiamcontracts.IdentityContextService
 }
 
 type gatewayClient interface {
 	Enabled() bool
 	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
 	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	ListKnowledgeSpaces(ctx context.Context, opts gateway.KnowledgeSpaceListOptions) ([]gateway.KnowledgeSpaceRuntimeRecord, error)
+	CreateKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceCreateParams) (*gateway.KnowledgeSpaceRecord, error)
+	RetireKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceRetireParams) (*gateway.KnowledgeSpaceRecord, error)
+	DeleteKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceDeleteParams) error
 	ResolveGatewayTenantUUID(ctx context.Context) (string, error)
 	ListAgents(ctx context.Context, env string) ([]gateway.AgentRecord, error)
 	GetAgent(ctx context.Context, agentUUID string) (*gateway.AgentRecord, error)
@@ -194,11 +207,11 @@ func inferBizDomain(component string) string {
 }
 
 func (d *Deps) LocalIAMEnabled() bool {
-	return d != nil && d.IAMMode == iamservice.IAMModeLocal && d.IAMDirectory != nil
+	return d != nil && d.IAMAdapterMode == iamservice.IAMAdapterModeLocal && d.IAMDirectory != nil
 }
 
 func (d *Deps) DelegatedIAMEnabled() bool {
-	return d != nil && d.IAMMode == iamservice.IAMModeDelegated && d.AuthProxy != nil
+	return d != nil && d.IAMAdapterMode == iamservice.IAMAdapterModeDelegated && d.AuthProxy != nil
 }
 
 func (d *Deps) LocalDirectory() iamservice.IAMDirectory {

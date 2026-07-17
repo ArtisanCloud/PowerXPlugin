@@ -27,8 +27,8 @@ func TestRegisterRoutes_ModeEndpoint(t *testing.T) {
 	admin := engine.Group("/admin")
 
 	deps := &app.Deps{
-		IAMMode:       iamservice.IAMModeDelegated,
-		IAMModeSource: "config",
+		IAMAdapterMode:       iamservice.IAMAdapterModeDelegated,
+		IAMAdapterModeSource: "config",
 	}
 	RegisterRoutes(admin, deps)
 
@@ -101,6 +101,52 @@ func TestRegisterRoutes_ChannelFederatedConfigRoutes(t *testing.T) {
 		engine.ServeHTTP(rec, req)
 		if rec.Code == http.StatusNotFound {
 			t.Fatalf("route missing: %s %s", item.method, item.path)
+		}
+	}
+}
+
+func TestRegisterRoutes_ChannelRoutesDelegatedWithoutDB(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	admin := engine.Group("/admin")
+
+	deps := &app.Deps{IAMAdapterMode: iamservice.IAMAdapterModeDelegated}
+	RegisterRoutes(admin, deps)
+
+	cases := []struct {
+		method string
+		path   string
+		body   string
+		status int
+		code   string
+	}{
+		{method: http.MethodGet, path: "/admin/iam/channels/wecom/config", status: http.StatusServiceUnavailable, code: "IAM_PROVIDER_NOT_CONFIGURED"},
+		{method: http.MethodPut, path: "/admin/iam/channels/wecom/config", body: `{"corp_id":"c","agent_id":1,"secret":"s"}`, status: http.StatusMethodNotAllowed, code: "IAM_DELEGATED_READ_ONLY"},
+		{method: http.MethodPost, path: "/admin/iam/channels/wecom/sync-tasks", body: `{"action":"full_sync"}`, status: http.StatusMethodNotAllowed, code: "IAM_DELEGATED_READ_ONLY"},
+		{method: http.MethodDelete, path: "/admin/iam/channels/wecom/sync-tasks", status: http.StatusMethodNotAllowed, code: "IAM_DELEGATED_READ_ONLY"},
+		{method: http.MethodGet, path: "/admin/iam/channels/dingtalk/config", status: http.StatusServiceUnavailable, code: "IAM_PROVIDER_NOT_CONFIGURED"},
+		{method: http.MethodGet, path: "/admin/iam/channels/lark/config", status: http.StatusServiceUnavailable, code: "IAM_PROVIDER_NOT_CONFIGURED"},
+	}
+	for _, item := range cases {
+		var req *http.Request
+		if item.body == "" {
+			req = httptest.NewRequest(item.method, item.path, nil)
+		} else {
+			req = httptest.NewRequest(item.method, item.path, bytes.NewBufferString(item.body))
+			req.Header.Set("Content-Type", "application/json")
+		}
+		rec := httptest.NewRecorder()
+		engine.ServeHTTP(rec, req)
+		if rec.Code != item.status {
+			t.Fatalf("%s %s status=%d want=%d body=%s", item.method, item.path, rec.Code, item.status, rec.Body.String())
+		}
+
+		var resp contracts.APIResponse
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+		if resp.Error == nil || resp.Error.Code != item.code {
+			t.Fatalf("%s %s error code=%#v want=%s", item.method, item.path, resp.Error, item.code)
 		}
 	}
 }

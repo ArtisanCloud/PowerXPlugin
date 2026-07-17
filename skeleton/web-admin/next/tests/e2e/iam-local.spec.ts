@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { seedAuthStorage } from './_utils'
 
-const iamMode = process.env.PLAYWRIGHT_LOCAL_IAM
-if (iamMode !== '1') {
+const localIAMFlag = process.env.PLAYWRIGHT_LOCAL_IAM
+if (localIAMFlag !== '1') {
   test.skip(true, 'Set PLAYWRIGHT_LOCAL_IAM=1 for local IAM flow tests.')
 }
 

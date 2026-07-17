@@ -42,14 +42,16 @@ type registrationIdentity struct {
 	Suffix   string
 }
 
-func currentRegistrationIdentity() registrationIdentity {
-	identity := registrationIdentity{PluginID: pluginID}
-	if strings.TrimSpace(strings.ToLower(getenv("POWERX_PLUGIN_REGISTRATION_MODE"))) == "installed" {
-		return identity
+func currentRegistrationIdentity() (registrationIdentity, error) {
+	mode := strings.TrimSpace(strings.ToLower(getenv("POWERX_PLUGIN_REGISTRATION_MODE")))
+	switch mode {
+	case "installed":
+		return registrationIdentity{PluginID: pluginID}, nil
+	case "local":
+		return registrationIdentity{PluginID: pluginID + ".local", Suffix: "local"}, nil
+	default:
+		return registrationIdentity{}, fmt.Errorf("POWERX_PLUGIN_REGISTRATION_MODE must be one of installed or local, got %q", mode)
 	}
-	identity.Suffix = "local"
-	identity.PluginID = pluginID + ".local"
-	return identity
 }
 
 func (i registrationIdentity) pluginSkillID(base string) string {
@@ -176,6 +178,28 @@ func (i registrationIdentity) rewriteSkillManifest(manifest runtimeskills.Plugin
 	return manifest
 }
 
+func allPowerXSkillIDsMatchIdentity(skillIDs []string, identity registrationIdentity) bool {
+	if len(skillIDs) == 0 {
+		return false
+	}
+	for _, skillID := range skillIDs {
+		skillID = strings.TrimSpace(skillID)
+		if skillID == "" {
+			return false
+		}
+		if identity.Suffix == "local" {
+			if !strings.HasSuffix(skillID, ".local") {
+				return false
+			}
+			continue
+		}
+		if strings.HasSuffix(skillID, ".local") {
+			return false
+		}
+	}
+	return true
+}
+
 type Handler struct {
 	deps *app.Deps
 }
@@ -209,15 +233,16 @@ type skillRequest struct {
 }
 
 type agentRequest struct {
-	PluginAgentID   string   `json:"plugin_agent_id"`
-	PowerXAgentUUID string   `json:"powerx_agent_uuid"`
-	AgentKey        string   `json:"agent_key"`
-	Name            string   `json:"name"`
-	Description     string   `json:"description"`
-	ModelProfileRef string   `json:"model_profile_ref"`
-	Persona         string   `json:"persona"`
-	PromptSeed      string   `json:"prompt_seed"`
-	PluginSkillIDs  []string `json:"plugin_skill_ids"`
+	PluginAgentID   string         `json:"plugin_agent_id"`
+	PowerXAgentUUID string         `json:"powerx_agent_uuid"`
+	AgentKey        string         `json:"agent_key"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description"`
+	ModelProfileRef string         `json:"model_profile_ref"`
+	Persona         string         `json:"persona"`
+	PromptSeed      string         `json:"prompt_seed"`
+	Meta            map[string]any `json:"meta"`
+	PluginSkillIDs  []string       `json:"plugin_skill_ids"`
 }
 
 func (h *Handler) ListSkills(c *gin.Context) {
@@ -225,8 +250,13 @@ func (h *Handler) ListSkills(c *gin.Context) {
 	if !ok {
 		return
 	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
 	var items []dbm.PluginSkill
-	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, pluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_LIST_FAILED", err.Error())
 		return
 	}
@@ -236,6 +266,11 @@ func (h *Handler) ListSkills(c *gin.Context) {
 func (h *Handler) UpsertSkill(c *gin.Context) {
 	tenantUUID, ok := h.tenantUUID(c)
 	if !ok {
+		return
+	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
 		return
 	}
 	var req skillRequest
@@ -259,7 +294,7 @@ func (h *Handler) UpsertSkill(c *gin.Context) {
 	checksum := checksumJSON(intentExamples, inputSchema, outputSchema, promptSpec, executor)
 	nowStatus := dbm.SyncStatusDraft
 	var existing dbm.PluginSkill
-	err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_skill_id = ? AND version = ?", tenantUUID, pluginID, req.PluginSkillID, version).First(&existing).Error
+	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_skill_id = ? AND version = ?", tenantUUID, identity.PluginID, req.PluginSkillID, version).First(&existing).Error
 	if err == nil {
 		if existing.SyncStatus == dbm.SyncStatusSynced {
 			nowStatus = dbm.SyncStatusDrifted
@@ -295,7 +330,7 @@ func (h *Handler) UpsertSkill(c *gin.Context) {
 	item := dbm.PluginSkill{
 		BaseModel:      baseModel(tenantUUID),
 		PluginSkillID:  req.PluginSkillID,
-		PluginID:       pluginID,
+		PluginID:       identity.PluginID,
 		PowerXSkillID:  strings.TrimSpace(req.PowerXSkillID),
 		Version:        version,
 		Title:          req.Title,
@@ -342,7 +377,11 @@ func (h *Handler) ListAgents(c *gin.Context) {
 	if !ok {
 		return
 	}
-	identity := currentRegistrationIdentity()
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
 	var items []dbm.PluginAgent
 	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_LIST_FAILED", err.Error())
@@ -356,7 +395,11 @@ func (h *Handler) ListRunnableAgents(c *gin.Context) {
 	if !ok {
 		return
 	}
-	identity := currentRegistrationIdentity()
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
 	var items []dbm.PluginAgent
 	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND sync_status = ? AND powerx_agent_uuid <> ''", tenantUUID, identity.PluginID, dbm.SyncStatusSynced).Order("updated_at DESC").Find(&items).Error; err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_RUNNABLE_FAILED", err.Error())
@@ -365,6 +408,15 @@ func (h *Handler) ListRunnableAgents(c *gin.Context) {
 	filtered := make([]dbm.PluginAgent, 0, len(items))
 	for _, item := range items {
 		if strings.EqualFold(strings.TrimSpace(item.PowerXStatus), "disabled") {
+			continue
+		}
+		if strings.TrimSpace(item.PluginID) != identity.PluginID {
+			continue
+		}
+		if strings.TrimSpace(item.PluginAgentID) != identity.pluginAgentID(templateAgentID) {
+			continue
+		}
+		if !allPowerXSkillIDsMatchIdentity(stringsFromJSON(item.PowerXSkillIDs), identity) {
 			continue
 		}
 		filtered = append(filtered, item)
@@ -384,7 +436,11 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 	}
 	req.PluginAgentID = strings.TrimSpace(req.PluginAgentID)
 	req.Name = strings.TrimSpace(req.Name)
-	identity := currentRegistrationIdentity()
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
 	req.AgentKey = firstNonEmpty(req.AgentKey, req.PluginAgentID)
 	req.PluginAgentID = firstNonEmpty(req.PluginAgentID, req.AgentKey)
 	req.PluginAgentID = identity.pluginAgentID(req.PluginAgentID)
@@ -414,6 +470,7 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 			"model_profile_ref":  strings.TrimSpace(req.ModelProfileRef),
 			"persona":            strings.TrimSpace(req.Persona),
 			"prompt_seed":        strings.TrimSpace(req.PromptSeed),
+			"meta":               datatypes.JSON(mustJSON(req.Meta)),
 			"plugin_skill_ids":   datatypes.JSON(mustJSON(pluginSkillIDs)),
 			"powerx_skill_ids":   datatypes.JSON(mustJSON(powerxSkillIDs)),
 			"sync_status":        status,
@@ -442,6 +499,7 @@ func (h *Handler) UpsertAgent(c *gin.Context) {
 		ModelProfileRef: strings.TrimSpace(req.ModelProfileRef),
 		Persona:         strings.TrimSpace(req.Persona),
 		PromptSeed:      strings.TrimSpace(req.PromptSeed),
+		Meta:            datatypes.JSON(mustJSON(req.Meta)),
 		PluginSkillIDs:  datatypes.JSON(mustJSON(pluginSkillIDs)),
 		PowerXSkillIDs:  datatypes.JSON(mustJSON(powerxSkillIDs)),
 		SyncStatus:      dbm.SyncStatusDraft,
@@ -534,7 +592,11 @@ func (h *Handler) InitializeTemplateBuiltin(c *gin.Context) {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_PACKAGE_LOAD_FAILED", err.Error())
 		return
 	}
-	identity := currentRegistrationIdentity()
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
 	manifest := identity.rewriteSkillManifest(pkg.Manifest)
 	if err := validateTemplateSkillManifest(manifest); err != nil {
 		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_PACKAGE_INVALID", err.Error())
@@ -545,9 +607,15 @@ func (h *Handler) InitializeTemplateBuiltin(c *gin.Context) {
 	outputSchema := mustJSON(pkg.OutputSchema)
 	frontmatter := mustJSON(pkg.Frontmatter)
 	promptSpec := mustJSON(map[string]any{
-		"source":            "skill_package",
-		"body_markdown":     pkg.BodyMarkdown,
-		"response_guidance": manifest.ResponseGuidance,
+		"source":               "skill_package",
+		"body_markdown":        pkg.BodyMarkdown,
+		"response_guidance":    manifest.ResponseGuidance,
+		"action_required_args": manifest.ActionRequiredArgs,
+		"action_optional_args": manifest.ActionOptionalArgs,
+		"slot_mapping":         manifest.SlotMapping,
+		"pending_task_policy":  manifest.PendingTaskPolicy,
+		"state_contract":       manifest.StateContract,
+		"result_presentation":  manifest.ResultPresentation,
 	})
 	executor := mustJSON(manifest.Executor)
 	checksum := pkg.Checksum
@@ -708,19 +776,26 @@ func (h *Handler) syncPluginSkill(c *gin.Context, item *dbm.PluginSkill) error {
 	}
 	_ = h.db(c).Model(item).Updates(map[string]any{"sync_status": dbm.SyncStatusPending, "sync_error_code": "", "sync_error_message": ""}).Error
 	result, err := h.deps.CapabilityGateway.SyncPluginSkill(c.Request.Context(), gateway.PluginSkillSyncParams{
-		PluginSkillID:  item.PluginSkillID,
-		PowerXSkillID:  item.PowerXSkillID,
-		Version:        item.Version,
-		Title:          item.Title,
-		Description:    item.Description,
-		IntentExamples: jsonRaw(item.IntentExamples),
-		InputSchema:    jsonRaw(item.InputSchema),
-		OutputSchema:   jsonRaw(item.OutputSchema),
-		PromptSpec:     jsonRaw(item.PromptSpec),
-		Executor:       jsonRaw(item.Executor),
-		Capability:     item.Capability,
-		Checksum:       item.Checksum,
-		Provider:       item.PluginID,
+		PluginSkillID:      item.PluginSkillID,
+		PowerXSkillID:      item.PowerXSkillID,
+		Version:            item.Version,
+		Title:              item.Title,
+		Description:        item.Description,
+		IntentExamples:     jsonRaw(item.IntentExamples),
+		ResponseGuidance:   skillContractValue(item, "response_guidance"),
+		ActionRequiredArgs: skillContractValue(item, "action_required_args"),
+		ActionOptionalArgs: skillContractValue(item, "action_optional_args"),
+		SlotMapping:        skillContractValue(item, "slot_mapping"),
+		PendingTaskPolicy:  skillContractValue(item, "pending_task_policy"),
+		StateContract:      skillContractValue(item, "state_contract"),
+		ResultPresentation: skillContractValue(item, "result_presentation"),
+		InputSchema:        jsonRaw(item.InputSchema),
+		OutputSchema:       jsonRaw(item.OutputSchema),
+		PromptSpec:         jsonRaw(item.PromptSpec),
+		Executor:           jsonRaw(item.Executor),
+		Capability:         item.Capability,
+		Checksum:           item.Checksum,
+		Provider:           item.PluginID,
 	})
 	if err != nil {
 		markSkillFailed(h.db(c), item, "POWERX_SKILL_SYNC_FAILED", err.Error(), "")
@@ -780,6 +855,7 @@ func (h *Handler) syncPluginAgent(c *gin.Context, item *dbm.PluginAgent) error {
 		PromptSeed:      item.PromptSeed,
 		SkillIDs:        powerxSkillIDs,
 		Provider:        item.PluginID,
+		Meta:            mapFromJSON(item.Meta),
 	})
 	if err != nil {
 		markAgentFailed(h.db(c), item, "POWERX_AGENT_SYNC_FAILED", err.Error(), "")
@@ -809,8 +885,13 @@ func (h *Handler) db(c *gin.Context) *gorm.DB {
 
 func (h *Handler) findSkill(c *gin.Context, tenantUUID string) (*dbm.PluginSkill, bool) {
 	id := strings.TrimSpace(c.Param("id"))
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return nil, false
+	}
 	var item dbm.PluginSkill
-	q := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, pluginID)
+	q := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID)
 	if numericID, ok := parseUint64(id); ok {
 		q = q.Where("id = ?", numericID)
 	} else {
@@ -831,8 +912,13 @@ func (h *Handler) findSkill(c *gin.Context, tenantUUID string) (*dbm.PluginSkill
 
 func (h *Handler) findAgent(c *gin.Context, tenantUUID string) (*dbm.PluginAgent, bool) {
 	id := strings.TrimSpace(c.Param("id"))
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return nil, false
+	}
 	var item dbm.PluginAgent
-	q := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, pluginID)
+	q := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID)
 	if numericID, ok := parseUint64(id); ok {
 		q = q.Where("id = ?", numericID)
 	} else {
@@ -855,8 +941,12 @@ func (h *Handler) resolvePowerXSkillIDs(c *gin.Context, tenantUUID string, plugi
 	if len(pluginIDs) == 0 {
 		return nil, nil
 	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		return nil, err
+	}
 	var items []dbm.PluginSkill
-	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_skill_id IN ?", tenantUUID, pluginID, pluginIDs).Find(&items).Error; err != nil {
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_skill_id IN ?", tenantUUID, identity.PluginID, pluginIDs).Find(&items).Error; err != nil {
 		return nil, err
 	}
 	byID := map[string]dbm.PluginSkill{}
@@ -996,6 +1086,35 @@ func jsonRaw(raw datatypes.JSON) any {
 	var out any
 	if len(raw) == 0 {
 		return map[string]any{}
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return map[string]any{}
+	}
+	return out
+}
+
+func skillContractValue(item *dbm.PluginSkill, key string) any {
+	key = strings.TrimSpace(key)
+	if item == nil || key == "" {
+		return map[string]any{}
+	}
+	if frontmatter := mapFromJSON(item.FrontmatterJSON); len(frontmatter) > 0 {
+		if value, ok := frontmatter[key]; ok && value != nil {
+			return value
+		}
+	}
+	if promptSpec := mapFromJSON(item.PromptSpec); len(promptSpec) > 0 {
+		if value, ok := promptSpec[key]; ok && value != nil {
+			return value
+		}
+	}
+	return map[string]any{}
+}
+
+func mapFromJSON(raw datatypes.JSON) map[string]any {
+	out := map[string]any{}
+	if len(raw) == 0 {
+		return out
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
 		return map[string]any{}

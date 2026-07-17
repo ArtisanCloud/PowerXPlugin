@@ -79,6 +79,9 @@ type Config struct {
 	// CustomerAuth (mini-app / 2C) 鉴权配置。
 	CustomerAuth *CustomerAuthConfig `yaml:"customer_auth" json:"customer_auth"`
 
+	// Knowledge 智能体/Skill 知识库 provider 配置。
+	Knowledge *KnowledgeConfig `yaml:"knowledge" json:"knowledge"`
+
 	// EventBridge (TaskBus / 本地事件桥) 配置。
 	EventBridge *EventBridgeConfig `yaml:"event_bridge" json:"event_bridge"`
 
@@ -155,6 +158,7 @@ type RuntimeConfig struct {
 	WSBus       *WSBusConfig        `yaml:"ws_bus" json:"ws_bus"`
 	Integration *IntegrationConfig  `yaml:"integration" json:"integration"`
 	Cache       *RuntimeCacheConfig `yaml:"cache" json:"cache"`
+	Knowledge   *KnowledgeConfig    `yaml:"knowledge" json:"knowledge"`
 }
 
 type RuntimeCacheConfig struct {
@@ -184,6 +188,9 @@ func applyRuntimeNamespacesToLegacy(cfg *Config) {
 	if cfg.Runtime.Integration != nil {
 		cfg.Integration = cfg.Runtime.Integration
 	}
+	if cfg.Runtime.Knowledge != nil {
+		cfg.Knowledge = cfg.Runtime.Knowledge
+	}
 	if cfg.Logging != nil {
 		if ginMode := strings.TrimSpace(cfg.Runtime.GinMode); ginMode != "" {
 			cfg.Logging.GinMode = strings.ToLower(ginMode)
@@ -211,6 +218,7 @@ func syncLegacyNamespacesToRuntime(cfg *Config) {
 	cfg.Runtime.EventBridge = cfg.EventBridge
 	cfg.Runtime.WSBus = cfg.WSBus
 	cfg.Runtime.Integration = cfg.Integration
+	cfg.Runtime.Knowledge = cfg.Knowledge
 	if cfg.Logging != nil {
 		cfg.Runtime.GinMode = cfg.Logging.GinMode
 		httpLog := cfg.Logging.HTTPAccess
@@ -435,8 +443,8 @@ type ContextConfig struct {
 	Audience string        `yaml:"audience" json:"audience"`
 	TTL      time.Duration `yaml:"ttl" json:"ttl"`
 
-	// IAM 模式（可选）：delegated / local，留空按环境变量规则推断
-	IAMMode string `yaml:"iam_mode" json:"iam_mode"`
+	// Provider 模式（可选）：delegated / local，留空按环境变量规则推断
+	ProviderMode string `yaml:"provider_mode" json:"provider_mode"`
 }
 
 // Load 加载配置，优先级：YAML 文件 > 默认值（不再从环境变量覆盖）
@@ -1020,10 +1028,8 @@ func loadEnvConfig(cfg *Config) {
 			cfg.Context.TTL = ttl
 		}
 	}
-	if iamMode := resolveConfigValue(os.Getenv("IAM_MODE")); iamMode != "" {
-		cfg.Context.IAMMode = iamMode
-	} else if iamModeCamel := resolveConfigValue(os.Getenv("IAMMode")); iamModeCamel != "" {
-		cfg.Context.IAMMode = iamModeCamel
+	if providerMode := resolveConfigValue(os.Getenv("POWERX_PROVIDER_MODE")); providerMode != "" {
+		cfg.Context.ProviderMode = providerMode
 	}
 
 	// gRPC 上游配置
@@ -1245,13 +1251,47 @@ func normalizeConfig(cfg *Config) {
 		cfg.CustomerAuth.JWTAudience = resolveConfigValue(cfg.CustomerAuth.JWTAudience)
 		cfg.CustomerAuth.JWTSecret = resolveConfigValue(cfg.CustomerAuth.JWTSecret)
 	}
+	if cfg.Knowledge != nil {
+		cfg.Knowledge.Mode = strings.ToLower(resolveConfigValue(cfg.Knowledge.Mode))
+		cfg.Knowledge.DelegateEndpoint = resolveConfigValue(cfg.Knowledge.DelegateEndpoint)
+		cfg.Knowledge.DelegateTimeout = resolveConfigValue(cfg.Knowledge.DelegateTimeout)
+	}
+	applyKnowledgeEnvOverrides(cfg)
+}
+
+func applyKnowledgeEnvOverrides(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	if knowledgeMode := firstEnvValue("POWERX_KNOWLEDGE_MODE", "PX_KNOWLEDGE_MODE"); knowledgeMode != "" {
+		if cfg.Knowledge == nil {
+			cfg.Knowledge = &KnowledgeConfig{}
+		}
+		cfg.Knowledge.Mode = strings.ToLower(strings.TrimSpace(knowledgeMode))
+	}
+	if knowledgeEndpoint := firstEnvValue("POWERX_KNOWLEDGE_DELEGATE_ENDPOINT", "PX_KNOWLEDGE_DELEGATE_ENDPOINT"); knowledgeEndpoint != "" {
+		if cfg.Knowledge == nil {
+			cfg.Knowledge = &KnowledgeConfig{}
+		}
+		cfg.Knowledge.DelegateEndpoint = strings.TrimSpace(knowledgeEndpoint)
+	}
+	if knowledgeTimeout := firstEnvValue("POWERX_KNOWLEDGE_DELEGATE_TIMEOUT", "PX_KNOWLEDGE_DELEGATE_TIMEOUT"); knowledgeTimeout != "" {
+		if cfg.Knowledge == nil {
+			cfg.Knowledge = &KnowledgeConfig{}
+		}
+		cfg.Knowledge.DelegateTimeout = strings.TrimSpace(knowledgeTimeout)
+	}
 }
 
 func isHostDelegatedMode(cfg *Config) bool {
-	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
+	if !isPowerXProxyMode() {
 		return false
 	}
-	return cfg != nil && cfg.Context != nil && strings.ToLower(strings.TrimSpace(cfg.Context.IAMMode)) == "delegated"
+	return cfg != nil && cfg.Context != nil && strings.ToLower(strings.TrimSpace(cfg.Context.ProviderMode)) == "delegated"
+}
+
+func isPowerXProxyMode() bool {
+	return strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
 }
 
 func normalizeGRPCServerConfig(server *GRPCServer) {
@@ -1567,6 +1607,11 @@ func (c *Config) Validate() error {
 	}
 	if c.IsProduction() && c.CustomerAuth.BreakGlassLocal && strings.TrimSpace(c.CustomerAuth.BreakGlassReason) == "" {
 		return NewConfigError("customer_auth.break_glass_reason is required when break_glass_local is enabled")
+	}
+
+	applyKnowledgeEnvOverrides(c)
+	if err := c.NormalizeKnowledgeConfig(); err != nil {
+		return err
 	}
 
 	// EventBridge 配置默认值与验证

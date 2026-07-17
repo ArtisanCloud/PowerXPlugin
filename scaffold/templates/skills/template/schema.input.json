@@ -10,6 +10,18 @@
     "template_id": {
       "type": "string"
     },
+    "template_ref": {
+      "type": "string"
+    },
+    "template_name": {
+      "type": "string"
+    },
+    "confirmed": {
+      "type": ["boolean", "string"]
+    },
+    "confirmation": {
+      "type": "string"
+    },
     "q": {
       "type": "string"
     },

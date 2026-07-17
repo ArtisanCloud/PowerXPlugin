@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -34,9 +35,10 @@ func TestRequireCapabilityGatewayDelegatedConfigMissing(t *testing.T) {
 	r := gin.New()
 	r.POST("/invoke", func(c *gin.Context) {
 		deps := &app.Deps{
-			IAMMode: iamservice.IAMModeDelegated,
+			ProviderMode:   fwprovider.ModeDelegated,
+			IAMAdapterMode: iamservice.IAMAdapterModeDelegated,
 			Config: &config.Config{
-				Context: &config.ContextConfig{IAMMode: "delegated"},
+				Context: &config.ContextConfig{ProviderMode: "delegated"},
 				Gateway: &config.GatewayConfig{
 					BaseURL:    "https://gateway.example.com",
 					AuthScheme: "bearer",
@@ -68,9 +70,10 @@ func TestRequireCapabilityGatewayDelegatedUnavailable(t *testing.T) {
 	r := gin.New()
 	r.POST("/invoke", func(c *gin.Context) {
 		deps := &app.Deps{
-			IAMMode: iamservice.IAMModeDelegated,
+			ProviderMode:   fwprovider.ModeDelegated,
+			IAMAdapterMode: iamservice.IAMAdapterModeDelegated,
 			Config: &config.Config{
-				Context: &config.ContextConfig{IAMMode: "delegated"},
+				Context: &config.ContextConfig{ProviderMode: "delegated"},
 				Gateway: &config.GatewayConfig{
 					BaseURL:    "https://gateway.example.com",
 					AuthScheme: "bearer",

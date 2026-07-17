@@ -351,17 +351,22 @@ func registerCapabilityProxy(app *bootstrap.App) {
 		return client.ContractStatus()
 	}
 	group := app.Router.Group(APIPrefix)
-	group.Handle(http.MethodPost, "/integration/capabilities/invoke", capabilityInvokeHandler(service, statusProvider))
+	group.Handle(http.MethodPost, "/integration/capabilities/invoke", capabilityInvokeHandlerWithLocal(service, statusProvider, app.CapabilityInvoker()))
 }
 
 type capabilityInvokeRequest struct {
-	CapabilityID string                 `json:"capabilityId"`
-	Action       string                 `json:"action"`
-	Payload      map[string]any         `json:"payload"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	CapabilityID      string         `json:"capabilityId"`
+	Action            string         `json:"action"`
+	PreferredProtocol string         `json:"preferredProtocol"`
+	Payload           map[string]any `json:"payload"`
+	Metadata          map[string]any `json:"metadata,omitempty"`
 }
 
 func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider func() *gateway.ContractStatus) bootstrap.Handler {
+	return capabilityInvokeHandlerWithLocal(service, statusProvider, nil)
+}
+
+func capabilityInvokeHandlerWithLocal(service *capabilityinvoker.Service, statusProvider func() *gateway.ContractStatus, localInvoker bootstrap.CapabilityInvoker) bootstrap.Handler {
 	return func(ctx bootstrap.Context) {
 		startAt := time.Now()
 		ensureCapabilityProxyCORS(ctx)
@@ -374,24 +379,12 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 			ctx.SetHeader("X-Trace-Id", traceID)
 		}
 		pluginID := firstNonEmpty(strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")), "unknown")
-		tenantUUID := strings.TrimSpace(ctx.Header("tenant_uuid"))
+		tenantUUID := firstNonEmpty(strings.TrimSpace(ctx.Header("tenant_uuid")), strings.TrimSpace(ctx.Header("X-Tenant-UUID")))
 		method := ctx.Method()
 		clientPath := "/integration/capabilities/invoke"
 		logProxyEvent("API-IN", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, 0, map[string]any{
 			"gate_decision": "pending",
 		})
-		if service == nil {
-			logProxyEvent("PROXY-TRANSPORT-ERR", requestID, traceID, pluginID, tenantUUID, method, clientPath, http.StatusServiceUnavailable, elapsedMS(startAt), map[string]any{
-				"gate_decision": "deny",
-				"deny_reason":   "capability service unavailable",
-				"error_message": "capability service unavailable",
-			})
-			ctx.JSON(http.StatusServiceUnavailable, map[string]string{
-				"error":      "capability service unavailable",
-				"request_id": requestID,
-			})
-			return
-		}
 		var warnings []string
 		if statusProvider != nil {
 			if status := statusProvider(); status != nil && status.Outdated {
@@ -422,7 +415,6 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 		logProxyEvent("GATE-ALLOW", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, elapsedMS(startAt), map[string]any{
 			"gate_decision": "allow",
 		})
-		logProxyEvent("PROXY-OUT", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, elapsedMS(startAt), nil)
 		headers := collectCapabilityProxyHeaders(ctx)
 		if module := proxyMockModule(headers); module != "" {
 			warnings = append(warnings, "通过 X-PX-Use-Mock 请求 Mock 模块: "+module)
@@ -433,13 +425,79 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 			}
 			headers["tenant_uuid"] = tenantUUID
 		}
+		if localInvoker != nil && localInvoker.CanInvokeCapability(req.CapabilityID) {
+			logProxyEvent("LOCAL-INVOKE", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, elapsedMS(startAt), map[string]any{
+				"capability_id": req.CapabilityID,
+			})
+			result, err := localInvoker.InvokeCapability(ctx.Context(), bootstrap.CapabilityInvokeParams{
+				CapabilityID:      req.CapabilityID,
+				Action:            req.Action,
+				PreferredProtocol: req.PreferredProtocol,
+				Payload:           req.Payload,
+				Metadata:          req.Metadata,
+				Headers:           headers,
+				RequestID:         requestID,
+				TenantUUID:        tenantUUID,
+			})
+			if err != nil {
+				logProxyEvent("LOCAL-ERR", requestID, traceID, pluginID, tenantUUID, method, clientPath, http.StatusBadGateway, elapsedMS(startAt), map[string]any{
+					"capability_id": req.CapabilityID,
+					"error_message": truncate(err.Error(), 512),
+				})
+				ctx.JSON(http.StatusBadGateway, map[string]any{
+					"error": map[string]any{
+						"code":    "",
+						"message": err.Error(),
+						"type":    "local",
+					},
+					"traceId": "",
+				})
+				return
+			}
+			response := localCapabilityResponse(result)
+			if len(warnings) > 0 {
+				response["warnings"] = warnings
+			}
+			if len(result.Raw) > 0 {
+				response["raw"] = json.RawMessage(result.Raw)
+			}
+			if len(result.Metadata) > 0 {
+				response["metadata"] = result.Metadata
+			}
+			if result.TraceID != "" {
+				ctx.SetHeader("X-Trace-Id", result.TraceID)
+			}
+			if requestID != "" {
+				ctx.SetHeader("X-Request-ID", requestID)
+			}
+			logProxyEvent("LOCAL-RESP", requestID, firstNonEmpty(result.TraceID, traceID), pluginID, tenantUUID, method, clientPath, http.StatusOK, elapsedMS(startAt), map[string]any{
+				"capability_id": req.CapabilityID,
+				"status":        result.Status,
+			})
+			ctx.JSON(http.StatusOK, response)
+			return
+		}
+		if service == nil {
+			logProxyEvent("PROXY-TRANSPORT-ERR", requestID, traceID, pluginID, tenantUUID, method, clientPath, http.StatusServiceUnavailable, elapsedMS(startAt), map[string]any{
+				"gate_decision": "deny",
+				"deny_reason":   "capability service unavailable",
+				"error_message": "capability service unavailable",
+			})
+			ctx.JSON(http.StatusServiceUnavailable, map[string]string{
+				"error":      "capability service unavailable",
+				"request_id": requestID,
+			})
+			return
+		}
+		logProxyEvent("PROXY-OUT", requestID, traceID, pluginID, tenantUUID, method, clientPath, 0, elapsedMS(startAt), nil)
 		result, err := service.Invoke(ctx.Context(), capabilityinvoker.InvokeParams{
-			CapabilityID: req.CapabilityID,
-			Action:       req.Action,
-			Payload:      req.Payload,
-			Headers:      headers,
-			RequestID:    requestID,
-			TenantUUID:   tenantUUID,
+			CapabilityID:      req.CapabilityID,
+			Action:            req.Action,
+			PreferredProtocol: req.PreferredProtocol,
+			Payload:           req.Payload,
+			Headers:           headers,
+			RequestID:         requestID,
+			TenantUUID:        tenantUUID,
 		})
 		if err != nil {
 			event := "PROXY-TRANSPORT-ERR"
@@ -483,6 +541,32 @@ func capabilityInvokeHandler(service *capabilityinvoker.Service, statusProvider 
 		})
 		ctx.JSON(http.StatusOK, response)
 	}
+}
+
+func localCapabilityResponse(result *bootstrap.CapabilityInvokeResult) map[string]any {
+	response := map[string]any{
+		"traceId": "",
+		"status":  "",
+		"data":    map[string]any{},
+	}
+	if result == nil {
+		return response
+	}
+	response["traceId"] = result.TraceID
+	response["status"] = result.Status
+	if result.Data != nil {
+		response["data"] = result.Data
+	}
+	if data, ok := result.Data.(map[string]any); ok {
+		for k, v := range data {
+			key := strings.TrimSpace(k)
+			if key == "" {
+				continue
+			}
+			response[key] = v
+		}
+	}
+	return response
 }
 
 func writeCapabilityError(ctx bootstrap.Context, err error, warnings []string) {

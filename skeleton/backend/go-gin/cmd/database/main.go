@@ -34,12 +34,12 @@ func main() {
 	}
 	models.InitSchemaFrom(cfg.Database.Schema) // 必须在所有 DB 操作之前
 
-	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
-	if err := iamResolver.Err(); err != nil {
-		log.Fatalf("[iam] mode resolution failed: %v", err)
+	providerResolver := pluginbootstrap.NewProviderResolver(cfg)
+	if err := providerResolver.Err(); err != nil {
+		log.Fatalf("[provider] mode resolution failed: %v", err)
 	}
-	includeIAM := iamResolver.Mode() == iamservice.IAMModeLocal
-	log.Printf("[iam] mode=%s source=%s includeIAM=%v", iamResolver.Mode(), iamResolver.Source(), includeIAM)
+	includeIAM := providerResolver.IsLocal()
+	log.Printf("[provider] mode=%s source=%s includeIAM=%v", providerResolver.Mode(), providerResolver.Source(), includeIAM)
 
 	ctx := context.Background()
 	// 连接数据库
@@ -56,13 +56,13 @@ func main() {
 		fmt.Println("migrate ok")
 
 	case "seed":
-		if err := seed.SeedPluginData(ctx, db); err != nil {
-			log.Fatal("seed failed:", err)
-		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, providerResolver.IAMAdapterMode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
+		}
+		if err := seed.SeedPluginData(ctx, db); err != nil {
+			log.Fatal("seed failed:", err)
 		}
 		fmt.Println("seed ok")
 
@@ -72,13 +72,13 @@ func main() {
 		}
 		fmt.Println("migrate ok")
 
-		if err := seed.SeedPluginData(ctx, db); err != nil {
-			log.Fatal("seed failed:", err)
-		}
 		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, providerResolver.IAMAdapterMode()); err != nil {
 				log.Fatal("iam seed failed:", err)
 			}
+		}
+		if err := seed.SeedPluginData(ctx, db); err != nil {
+			log.Fatal("seed failed:", err)
 		}
 		fmt.Println("seed ok")
 
@@ -95,14 +95,14 @@ func main() {
 		}
 		fmt.Println("migrate ok")
 
+		if includeIAM {
+			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, providerResolver.IAMAdapterMode()); err != nil {
+				log.Fatal("iam seed failed:", err)
+			}
+		}
 		// 最后 seed
 		if err := seed.SeedPluginData(ctx, db); err != nil {
 			log.Fatal("seed failed:", err)
-		}
-		if includeIAM {
-			if err := iamservice.SeedLocalAdmin(ctx, db, cfg, iamResolver.Mode()); err != nil {
-				log.Fatal("iam seed failed:", err)
-			}
 		}
 		fmt.Println("seed ok")
 

@@ -181,6 +181,78 @@ func TestCapabilityProxyRoute(t *testing.T) {
 	}
 }
 
+func TestCapabilityProxyUsesLocalInvokerForOwnedCapability(t *testing.T) {
+	app := bootstrap.NewApp(&bootstrap.Config{
+		Listen: ":0",
+		Gateway: bootstrap.GatewayConfig{
+			BaseURL:    "http://127.0.0.1:1",
+			AuthScheme: "apikey",
+			APIKey:     "demo-key",
+			TenantID:   "tenant-123",
+		},
+	})
+	local := &fakeLocalCapabilityInvoker{
+		allowed: "com.powerx.plugins.base.local.template.prepare",
+		result: &bootstrap.CapabilityInvokeResult{
+			TraceID: "local-trace",
+			Status:  "completed",
+			Data: map[string]any{
+				"status":           "completed",
+				"ready_to_execute": true,
+				"capability_request": map[string]any{
+					"capability_id": "com.powerx.plugins.base.local.template.create",
+					"payload":       map[string]any{"name": "测试模板"},
+				},
+			},
+		},
+	}
+	app.RegisterCapabilityInvoker(local)
+	if err := AttachHTTPServer(app); err != nil {
+		t.Fatalf("attach http server: %v", err)
+	}
+	RegisterFrameworkRoutes(app)
+	httpRouter, _ := app.Router.(*httpRouter)
+
+	health := httptest.NewRecorder()
+	httpRouter.root.ServeHTTP(health, httptest.NewRequest(http.MethodGet, HealthzPath, nil))
+	if health.Code != http.StatusOK {
+		t.Fatalf("expected healthz to remain registered, got %d", health.Code)
+	}
+
+	body := `{"capabilityId":"com.powerx.plugins.base.local.template.prepare","action":"create","preferredProtocol":"agent","payload":{"action":"create"}}`
+	req := httptest.NewRequest(http.MethodPost, APIPrefix+"/integration/capabilities/invoke", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("tenant_uuid", "tenant-local")
+	rec := httptest.NewRecorder()
+	httpRouter.root.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected local invoke success, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if local.callCount != 1 {
+		t.Fatalf("expected local invoker to be called once, got %d", local.callCount)
+	}
+	if local.lastParams.TenantUUID != "tenant-local" {
+		t.Fatalf("expected tenant forwarded to local invoker, got %s", local.lastParams.TenantUUID)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload["traceId"] != "local-trace" {
+		t.Fatalf("expected local trace, got %v", payload["traceId"])
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok || data["ready_to_execute"] != true {
+		t.Fatalf("expected local data, got %#v", payload["data"])
+	}
+	if payload["ready_to_execute"] != true {
+		t.Fatalf("expected ready_to_execute flattened for Core parser, got %#v", payload)
+	}
+	if _, ok := payload["capability_request"].(map[string]any); !ok {
+		t.Fatalf("expected capability_request flattened for Core parser, got %#v", payload)
+	}
+}
+
 func TestCapabilityInvokeHandlerEmitsWarnings(t *testing.T) {
 	fake := &fakeGatewayInvoker{
 		response: &gateway.Response{
@@ -367,6 +439,27 @@ func (f *fakeGatewayInvoker) Invoke(ctx context.Context, req gateway.InvokeReque
 		return nil, f.err
 	}
 	return f.response, nil
+}
+
+type fakeLocalCapabilityInvoker struct {
+	allowed    string
+	result     *bootstrap.CapabilityInvokeResult
+	err        error
+	callCount  int
+	lastParams bootstrap.CapabilityInvokeParams
+}
+
+func (f *fakeLocalCapabilityInvoker) CanInvokeCapability(capabilityID string) bool {
+	return strings.TrimSpace(capabilityID) == f.allowed
+}
+
+func (f *fakeLocalCapabilityInvoker) InvokeCapability(ctx context.Context, params bootstrap.CapabilityInvokeParams) (*bootstrap.CapabilityInvokeResult, error) {
+	f.callCount++
+	f.lastParams = params
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.result, nil
 }
 
 func TestMatchSegments(t *testing.T) {

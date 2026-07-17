@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -14,14 +15,44 @@ import (
 )
 
 type RoleHandler struct {
-	service *srviam.RoleService
+	service   *srviam.RoleService
+	mode      srviam.IAMAdapterMode
+	directory fwiamcontracts.DirectoryService
 }
 
-func NewRoleHandler(svc *srviam.RoleService) *RoleHandler {
-	return &RoleHandler{service: svc}
+func NewRoleHandler(svc *srviam.RoleService, mode srviam.IAMAdapterMode, directories ...fwiamcontracts.DirectoryService) *RoleHandler {
+	var directory fwiamcontracts.DirectoryService
+	if len(directories) > 0 {
+		directory = directories[0]
+	}
+	return &RoleHandler{service: svc, mode: mode, directory: directory}
 }
 
 func (h *RoleHandler) Get(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		tenantUUID := admincommon.ResolveTenantUUID(c)
+		if strings.TrimSpace(tenantUUID) == "" {
+			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+			return
+		}
+		roles, ok := h.delegatedRoles(c, tenantUUID)
+		if !ok {
+			return
+		}
+		id := strings.TrimSpace(c.Param("id"))
+		for _, role := range roles {
+			if role.ID == id || role.Code == id {
+				contracts.ResponseSuccess(c, role)
+				return
+			}
+		}
+		contracts.ResponseNotFound(c, "role not found")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	id, err := parseUintParam(c, "id")
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
@@ -52,6 +83,18 @@ func (h *RoleHandler) List(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		roles, ok := h.delegatedRoles(c, query.TenantUUID)
+		if !ok {
+			return
+		}
+		contracts.ResponseSuccess(c, gin.H{"items": roles})
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	roles, err := h.service.List(c.Request.Context(), srviam.RoleFilter{
 		TenantUUID: query.TenantUUID,
 		Query:      query.Query,
@@ -64,6 +107,14 @@ func (h *RoleHandler) List(c *gin.Context) {
 }
 
 func (h *RoleHandler) Create(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "role write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	var req CreateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
@@ -95,6 +146,14 @@ func (h *RoleHandler) Create(c *gin.Context) {
 }
 
 func (h *RoleHandler) Update(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "role write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	id, err := parseUintParam(c, "id")
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
@@ -118,6 +177,14 @@ func (h *RoleHandler) Update(c *gin.Context) {
 }
 
 func (h *RoleHandler) Delete(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "role write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	id, err := parseUintParam(c, "id")
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
@@ -129,15 +196,37 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 	contracts.ResponseSuccessWithMessage(c, gin.H{"role_id": id}, "deleted")
 }
 
-type RolePermissionsHandler struct {
-	service *srviam.RoleService
+func (h *RoleHandler) delegatedRoles(c *gin.Context, tenantUUID string) ([]fwiamcontracts.Role, bool) {
+	if h.directory == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM delegated directory provider is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "delegated"})
+		return nil, false
+	}
+	roles, err := h.directory.ListRoles(c.Request.Context(), tenantUUID)
+	if err != nil {
+		respondIAMError(c, err)
+		return nil, false
+	}
+	return roles, true
 }
 
-func NewRolePermissionsHandler(svc *srviam.RoleService) *RolePermissionsHandler {
-	return &RolePermissionsHandler{service: svc}
+type RolePermissionsHandler struct {
+	service *srviam.RoleService
+	mode    srviam.IAMAdapterMode
+}
+
+func NewRolePermissionsHandler(svc *srviam.RoleService, mode srviam.IAMAdapterMode) *RolePermissionsHandler {
+	return &RolePermissionsHandler{service: svc, mode: mode}
 }
 
 func (h *RolePermissionsHandler) Replace(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "role permission write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	id, err := parseUintParam(c, "id")
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
@@ -169,10 +258,11 @@ func (h *RolePermissionsHandler) Replace(c *gin.Context) {
 
 type RoleMembersHandler struct {
 	service *srviam.RoleService
+	mode    srviam.IAMAdapterMode
 }
 
-func NewRoleMembersHandler(svc *srviam.RoleService) *RoleMembersHandler {
-	return &RoleMembersHandler{service: svc}
+func NewRoleMembersHandler(svc *srviam.RoleService, mode srviam.IAMAdapterMode) *RoleMembersHandler {
+	return &RoleMembersHandler{service: svc, mode: mode}
 }
 
 func (h *RoleMembersHandler) Add(c *gin.Context) {
@@ -184,6 +274,14 @@ func (h *RoleMembersHandler) Remove(c *gin.Context) {
 }
 
 func (h *RoleMembersHandler) mutateMembers(c *gin.Context, add bool) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "role member write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	id, err := parseUintParam(c, "id")
 	if err != nil {
 		contracts.ResponseBadRequest(c, err.Error())
@@ -223,14 +321,42 @@ func (h *RoleMembersHandler) mutateMembers(c *gin.Context, add bool) {
 }
 
 type PermissionHandler struct {
-	service *srviam.RoleService
+	service   *srviam.RoleService
+	mode      srviam.IAMAdapterMode
+	directory fwiamcontracts.DirectoryService
 }
 
-func NewPermissionHandler(svc *srviam.RoleService) *PermissionHandler {
-	return &PermissionHandler{service: svc}
+func NewPermissionHandler(svc *srviam.RoleService, mode srviam.IAMAdapterMode, directories ...fwiamcontracts.DirectoryService) *PermissionHandler {
+	var directory fwiamcontracts.DirectoryService
+	if len(directories) > 0 {
+		directory = directories[0]
+	}
+	return &PermissionHandler{service: svc, mode: mode, directory: directory}
 }
 
 func (h *PermissionHandler) List(c *gin.Context) {
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		tenantUUID := admincommon.ResolveTenantUUID(c)
+		if strings.TrimSpace(tenantUUID) == "" {
+			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+			return
+		}
+		if h.directory == nil {
+			contracts.ResponseServiceUnavailable(c, "IAM delegated directory provider is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "delegated"})
+			return
+		}
+		perms, err := h.directory.ListPermissions(c.Request.Context(), tenantUUID)
+		if err != nil {
+			respondIAMError(c, err)
+			return
+		}
+		contracts.ResponseSuccess(c, gin.H{"items": perms})
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	perms, err := h.service.ListPermissions(c.Request.Context())
 	if handleRoleError(c, err) {
 		return

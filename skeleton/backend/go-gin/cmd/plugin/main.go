@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -15,6 +17,10 @@ import (
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	runtimecap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin/runtime"
 	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
@@ -23,8 +29,10 @@ import (
 	dbpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
+	grpcclient "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
 	grpcserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/server"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+	metadataintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/metadata"
 	powerxclient "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/powerx"
 	integrationjobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/jobs/integration"
 	marketplacejobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/jobs/marketplace"
@@ -42,6 +50,7 @@ import (
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	integrationservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
 	recommendation "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -186,47 +195,46 @@ func main() {
 		}
 	}
 
-	iamResolver := pluginbootstrap.NewIAMResolver(cfg)
-	if err := iamResolver.Err(); err != nil {
+	providerResolver := pluginbootstrap.NewProviderResolver(cfg)
+	if err := providerResolver.Err(); err != nil {
 		logger.WithFields(logger.Fields{
-			"iam_mode":       iamResolver.Mode(),
-			"iam_source":     iamResolver.Source(),
-			"conflict":       iamResolver.Record().ConflictDetected,
-			"decision":       iamResolver.Record().DecisionReason,
-			"config_mode":    iamResolver.Record().ConfigMode,
-			"env_mode":       iamResolver.Record().EnvMode,
-			"effective_mode": iamResolver.Record().EffectiveMode,
-		}).WithError(err).Fatal("IAM mode resolution failed")
+			"provider_mode":   providerResolver.Mode(),
+			"provider_source": providerResolver.Source(),
+			"conflict":        providerResolver.Record().ConflictDetected,
+			"decision":        providerResolver.Record().DecisionReason,
+			"config_mode":     providerResolver.Record().ConfigMode,
+			"env_mode":        providerResolver.Record().EnvMode,
+			"effective_mode":  providerResolver.Record().EffectiveMode,
+		}).WithError(err).Fatal("Provider mode resolution failed")
 	}
-	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
+	mode := strings.ToLower(strings.TrimSpace(providerResolver.Mode().String()))
 	if mode == "" {
 		mode = "unknown"
 	}
-	if err := validateHostDelegatedEnvContract(iamResolver); err != nil {
+	if err := validateHostDelegatedEnvContract(providerResolver); err != nil {
 		logger.WithError(err).WithFields(logger.Fields{
-			"iam_mode":     iamResolver.Mode(),
-			"iam_source":   iamResolver.Source(),
-			"POWERX_PROXY": normalizedProxy(strings.TrimSpace(os.Getenv("POWERX_PROXY"))),
-			"IAM_MODE":     strings.TrimSpace(os.Getenv("IAM_MODE")),
-			"IAMMode":      strings.TrimSpace(os.Getenv("IAMMode")),
+			"provider_mode":        providerResolver.Mode(),
+			"provider_source":      providerResolver.Source(),
+			"POWERX_PROXY":         normalizedProxy(strings.TrimSpace(os.Getenv("POWERX_PROXY"))),
+			"POWERX_PROVIDER_MODE": strings.TrimSpace(os.Getenv("POWERX_PROVIDER_MODE")),
 		}).Fatal("Host delegated env contract validation failed")
 	}
-	contractErr := validateDelegatedGatewayContract(cfg, iamResolver.Mode())
+	contractErr := validateDelegatedGatewayContract(cfg, providerResolver.Mode())
 	gatewayFields := gatewayContractLogFields(cfg, mode)
 	gatewayFields["gateway_contract_valid"] = contractErr == nil
 	logger.WithFields(gatewayFields).Info("Gateway contract status")
 	integrationmetrics.SetPluginGatewayConfigValid(app.PluginID, mode, contractErr == nil)
-	if contractErr != nil && iamResolver.Mode() == iamservice.IAMModeDelegated {
+	if contractErr != nil && providerResolver.IsDelegated() {
 		logger.WithFields(logger.Fields{
-			"code":     contractErr.Code,
-			"required": strings.Join(contractErr.Required, ","),
-			"present":  strings.Join(contractErr.Present, ","),
-			"iam_mode": contractErr.IAMMode,
+			"code":          contractErr.Code,
+			"required":      strings.Join(contractErr.Required, ","),
+			"present":       strings.Join(contractErr.Present, ","),
+			"provider_mode": contractErr.ProviderMode,
 		}).WithError(contractErr).Fatal("Delegated gateway contract validation failed")
 	}
 
-	logRuntimeModeMatrix(cfg, iamResolver)
-	auth.ObserveMode(iamResolver.Mode().String())
+	logRuntimeModeMatrix(cfg, providerResolver)
+	auth.ObserveMode(providerResolver.Mode().String())
 	if cfg != nil && cfg.Logging != nil && cfg.Logging.DebugMode {
 		gatewayMode := "local"
 		if os.Getenv("POWERX_PROXY") == "1" && cfg != nil && cfg.Gateway != nil {
@@ -235,19 +243,18 @@ func main() {
 			}
 		}
 		logger.WithFields(logger.Fields{
-			"iam_mode":            iamResolver.Mode(),
-			"iam_source":          iamResolver.Source(),
-			"gateway_mode":        gatewayMode,
-			"POWERX_PROXY":        os.Getenv("POWERX_PROXY"),
-			"IAMMode":             os.Getenv("IAMMode"),
-			"IAM_MODE":            os.Getenv("IAM_MODE"),
-			"PX_GATEWAY_BASE_URL": strings.TrimSpace(cfg.Gateway.BaseURL),
+			"provider_mode":        providerResolver.Mode(),
+			"provider_source":      providerResolver.Source(),
+			"gateway_mode":         gatewayMode,
+			"POWERX_PROXY":         os.Getenv("POWERX_PROXY"),
+			"POWERX_PROVIDER_MODE": os.Getenv("POWERX_PROVIDER_MODE"),
+			"PX_GATEWAY_BASE_URL":  strings.TrimSpace(cfg.Gateway.BaseURL),
 		}).Info("Mode decision")
 	}
 
 	var authClient *authproxy.DelegatedClient
 	var localIAM iamservice.IAMDirectory
-	if iamResolver.Mode() == iamservice.IAMModeDelegated {
+	if providerResolver.IsDelegated() {
 		client, err := authproxy.NewDelegatedClient("", "")
 		if err != nil {
 			logger.WithError(err).Warn("Failed to initialize delegated auth proxy; auth endpoints will be unavailable")
@@ -293,20 +300,25 @@ func main() {
 	var capabilityGateway *capgateway.Client
 	if cfg != nil && cfg.Gateway != nil {
 		gatewayOpts := []capgateway.ClientOption{}
-		if iamResolver.Mode() == iamservice.IAMModeDelegated && strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
-			gatewayOpts = append(gatewayOpts, capgateway.WithTokenProvider(func(ctx context.Context) (string, error) {
-				if pxc == nil {
-					return "", fmt.Errorf("powerx STS client is not configured")
-				}
-				token := strings.TrimSpace(pxc.GetToken())
-				if token != "" && token != "sts" {
-					return token, nil
-				}
-				token, _, err := pxc.ExchangeSTS(ctx)
-				return strings.TrimSpace(token), err
-			}))
+		if providerResolver.IsDelegated() && strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
+			gatewayOpts = append(gatewayOpts, capgateway.WithTokenProvider(grpcclient.NewPowerXSTSTokenProvider(pxc).TokenFunc()))
 		}
 		capabilityGateway = capgateway.NewClient(cfg, logger.WithField("component", "capability_gateway_client"), gatewayOpts...)
+	}
+	if err := registerLocalDebugHostIfNeeded(ctx, cfg, capabilityGateway); err != nil {
+		logger.WithError(err).Warn("Failed to register local plugin debug host; continuing without host debug registration")
+	}
+	metadataClient, err := buildMetadataClient(cfg, capabilityGateway)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize metadata client")
+	}
+	customerAdminClient, err := buildCustomerAdminClient(cfg, capabilityGateway)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize customer admin client")
+	}
+	aiSettingsClient, err := buildAISettingsClient(cfg, capabilityGateway)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize AI settings client")
 	}
 
 	// 初始化 WS Bus Hub（standalone 可选 Redis，默认内存）
@@ -374,25 +386,30 @@ func main() {
 	}
 
 	deps := &app.Deps{
-		DB:                  queryDB,
-		Ctx:                 rootCtx,
-		PowerXClient:        pxc,
-		CapabilityGateway:   capabilityGateway,
-		Config:              cfg,
-		CapabilitiesManager: capManager,
-		CapabilityMetrics:   capMetrics,
-		TaxProviderClient:   taxClient,
-		MarketplaceBilling:  nil,
-		LicenseAuthority:    nil,
-		LicenseCache:        licenseCache,
-		OperationsMetrics:   opsmetrics.NewMetrics(),
-		AdminConsoleMetrics: adminmetrics.NewMetrics(),
-		EventEmitter:        bridgeEmitter,
-		WSBusHub:            wsHub,
-		IAMMode:             iamResolver.Mode(),
-		IAMModeSource:       iamResolver.Source(),
-		AuthProxy:           authClient,
-		IAMDirectory:        localIAM,
+		DB:                   queryDB,
+		Ctx:                  rootCtx,
+		PowerXClient:         pxc,
+		CapabilityGateway:    capabilityGateway,
+		Metadata:             metadataClient,
+		CustomerAdmin:        customerAdminClient,
+		AISettings:           aiSettingsClient,
+		Config:               cfg,
+		CapabilitiesManager:  capManager,
+		CapabilityMetrics:    capMetrics,
+		TaxProviderClient:    taxClient,
+		MarketplaceBilling:   nil,
+		LicenseAuthority:     nil,
+		LicenseCache:         licenseCache,
+		OperationsMetrics:    opsmetrics.NewMetrics(),
+		AdminConsoleMetrics:  adminmetrics.NewMetrics(),
+		EventEmitter:         bridgeEmitter,
+		WSBusHub:             wsHub,
+		ProviderMode:         providerResolver.Mode(),
+		ProviderModeSource:   providerResolver.Source(),
+		IAMAdapterMode:       providerResolver.IAMAdapterMode(),
+		IAMAdapterModeSource: providerResolver.Source(),
+		AuthProxy:            authClient,
+		IAMDirectory:         localIAM,
 	}
 
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)
@@ -447,10 +464,11 @@ func main() {
 	fwApp := fwbootstrap.NewApp(appCfg)
 	if err := pluginbootstrap.BindFrameworkIAM(deps, fwApp.IAMRegistry()); err != nil {
 		logger.WithFields(logger.Fields{
-			"iam_mode":        deps.IAMMode,
-			"iam_mode_source": deps.IAMModeSource,
+			"provider_mode":   deps.ProviderMode,
+			"provider_source": deps.ProviderModeSource,
 		}).WithError(err).Fatal("Failed to bind framework IAM registry")
 	}
+	fwApp.RegisterCapabilityInvoker(integrationservice.NewFrameworkCapabilityInvoker(deps, deps.RuntimeLogger(ctx, "framework_capability_invoker", nil)))
 
 	if err := fwrouter.AttachHTTPServer(fwApp); err != nil {
 		logger.WithError(err).Fatal("Failed to attach HTTP server")
@@ -625,10 +643,10 @@ func registerWSRoute(app *fwbootstrap.App, handler http.Handler) {
 	app.Router.Handle(http.MethodGet, targetPath, rewriteToTarget)
 }
 
-func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMResolver) {
-	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
+func logRuntimeModeMatrix(cfg *config.Config, providerResolver *pluginbootstrap.ProviderResolver) {
+	mode := strings.ToLower(strings.TrimSpace(providerResolver.Mode().String()))
 	if mode == "" {
-		mode = string(iamservice.IAMModeLocal)
+		mode = string(fwprovider.ModeLocal)
 	}
 
 	proxyRaw := strings.TrimSpace(os.Getenv("POWERX_PROXY"))
@@ -663,7 +681,7 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 		if gatewayAuthScheme != "bearer" {
 			missingGateway = append(missingGateway, "PX_GATEWAY_AUTH_SCHEME=bearer")
 		}
-		if proxyEnabled && mode == string(iamservice.IAMModeDelegated) && !stsReady {
+		if proxyEnabled && mode == string(fwprovider.ModeDelegated) && !stsReady {
 			missingGateway = append(missingGateway, "POWERX_STS_CLIENT_ID/SECRET,POWERX_GRPC_UPSTREAM_ADDRESS/TENANT_UUID")
 		}
 	}
@@ -678,14 +696,14 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 
 	fields := logger.Fields{
 		"matrix_row":              fmt.Sprintf("%s | %s", mode, normalizedProxy(proxyRaw)),
-		"iam_mode":                mode,
-		"iam_source":              iamResolver.Source(),
+		"provider_mode":           mode,
+		"provider_source":         providerResolver.Source(),
 		"POWERX_PROXY":            normalizedProxy(proxyRaw),
 		"iam_result":              iamResultLabel(mode),
 		"ws_capability_target":    wsTarget,
 		"ws_capability_target_zh": wsDisplay,
 		"scenario":                modeScenarioLabel(mode, proxyEnabled),
-		"priority_note":           modePriorityNote(iamResolver.Source(), mode, proxyEnabled),
+		"priority_note":           modePriorityNote(providerResolver.Source(), mode, proxyEnabled),
 	}
 
 	if proxyEnabled {
@@ -699,9 +717,9 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 		"matrix_row": fields["matrix_row"],
 	}).Info("Runtime mode resolved (2x2)")
 	logger.WithFields(logger.Fields{
-		"iam_mode":   fields["iam_mode"],
-		"iam_source": fields["iam_source"],
-		"iam_result": fields["iam_result"],
+		"provider_mode":   fields["provider_mode"],
+		"provider_source": fields["provider_source"],
+		"iam_result":      fields["iam_result"],
 	}).Info("IAM decision")
 	logger.WithFields(logger.Fields{
 		"POWERX_PROXY":  fields["POWERX_PROXY"],
@@ -730,19 +748,113 @@ func logRuntimeModeMatrix(cfg *config.Config, iamResolver *pluginbootstrap.IAMRe
 	}
 }
 
-func validateDelegatedGatewayContract(cfg *config.Config, mode iamservice.IAMMode) *capgateway.GatewayConfigError {
-	if mode != iamservice.IAMModeDelegated {
+func validateDelegatedGatewayContract(cfg *config.Config, mode fwprovider.Mode) *capgateway.GatewayConfigError {
+	if mode != fwprovider.ModeDelegated {
 		return nil
 	}
 	return capgateway.ValidateDelegatedConfig(cfg)
 }
 
-func validateHostDelegatedEnvContract(iamResolver *pluginbootstrap.IAMResolver) error {
-	if iamResolver == nil {
+func buildMetadataClient(cfg *config.Config, gatewayClient *capgateway.Client) (*fwmetadata.Client, error) {
+	if gatewayClient == nil {
+		return nil, nil
+	}
+	tenantUUID := ""
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		tenantUUID = strings.TrimSpace(cfg.GRPCUpstream.TenantUUID)
+	}
+	return fwmetadata.NewClient(fwmetadata.Config{
+		Invoker:    metadataintegration.NewGatewayInvokerAdapter(gatewayClient),
+		TenantUUID: tenantUUID,
+		PageSize:   fwmetadata.DefaultPageSize,
+	})
+}
+
+func buildCustomerAdminClient(cfg *config.Config, gatewayClient *capgateway.Client) (*customerfw.AdminClient, error) {
+	if gatewayClient == nil {
+		return nil, nil
+	}
+	tenantUUID := ""
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		tenantUUID = strings.TrimSpace(cfg.GRPCUpstream.TenantUUID)
+	}
+	return customerfw.NewAdminClient(customerfw.AdminClientConfig{
+		Invoker:    metadataintegration.NewGatewayInvokerAdapter(gatewayClient),
+		TenantUUID: tenantUUID,
+		PageSize:   20,
+	})
+}
+
+func buildAISettingsClient(cfg *config.Config, gatewayClient *capgateway.Client) (*fwaisettings.Client, error) {
+	if gatewayClient == nil {
+		return nil, nil
+	}
+	tenantUUID := ""
+	if cfg != nil && cfg.GRPCUpstream != nil {
+		tenantUUID = strings.TrimSpace(cfg.GRPCUpstream.TenantUUID)
+	}
+	return fwaisettings.NewClient(fwaisettings.Config{
+		Invoker:    metadataintegration.NewGatewayInvokerAdapter(gatewayClient),
+		TenantUUID: tenantUUID,
+	})
+}
+
+func registerLocalDebugHostIfNeeded(ctx context.Context, cfg *config.Config, gateway *capgateway.Client) error {
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("POWERX_PLUGIN_REGISTRATION_MODE")), "local") {
 		return nil
 	}
-	mode := strings.ToLower(strings.TrimSpace(iamResolver.Mode().String()))
-	if mode != string(iamservice.IAMModeDelegated) {
+	if gateway == nil {
+		return fmt.Errorf("gateway client is required for local plugin registration")
+	}
+	httpPort, err := resolveLocalHTTPPort(cfg)
+	if err != nil {
+		return err
+	}
+	pluginID := app.PluginID + ".local"
+	if err := gateway.RegisterLocalDebugHost(ctx, capgateway.LocalDebugHostRegistrationParams{
+		PluginID:    pluginID,
+		Environment: "local",
+		HTTPPort:    httpPort,
+		TTLSeconds:  3600,
+	}); err != nil {
+		return err
+	}
+	logger.WithFields(logger.Fields{
+		"plugin_id": pluginID,
+		"http_port": httpPort,
+	}).Info("Registered local plugin debug host with PowerX Core")
+	return nil
+}
+
+func resolveLocalHTTPPort(cfg *config.Config) (int, error) {
+	if cfg == nil || cfg.Server == nil {
+		return 0, fmt.Errorf("server config is required for local plugin registration")
+	}
+	bindAddr := strings.TrimSpace(cfg.Server.BindAddr)
+	if bindAddr == "" {
+		return 0, fmt.Errorf("server bind address is required for local plugin registration")
+	}
+	_, portText, err := net.SplitHostPort(bindAddr)
+	if err != nil {
+		if strings.HasPrefix(bindAddr, ":") && len(bindAddr) > 1 {
+			portText = strings.TrimPrefix(bindAddr, ":")
+		} else {
+			return 0, fmt.Errorf("parse server bind address %q: %w", bindAddr, err)
+		}
+	}
+	port, err := strconv.Atoi(strings.TrimSpace(portText))
+	if err != nil || port <= 0 {
+		return 0, fmt.Errorf("server bind address %q must contain a positive http port", bindAddr)
+	}
+	return port, nil
+}
+
+func validateHostDelegatedEnvContract(providerResolver *pluginbootstrap.ProviderResolver) error {
+	if providerResolver == nil {
+		return nil
+	}
+	mode := strings.ToLower(strings.TrimSpace(providerResolver.Mode().String()))
+	if mode != string(fwprovider.ModeDelegated) {
 		return nil
 	}
 	// 仅宿主 delegated 场景做 fail-fast；允许 standalone_mock_delegated 本地联调。
@@ -752,12 +864,11 @@ func validateHostDelegatedEnvContract(iamResolver *pluginbootstrap.IAMResolver) 
 
 	missing := make([]string, 0, 2)
 	invalid := make([]string, 0, 1)
-	iamModeEnv := strings.ToLower(strings.TrimSpace(os.Getenv("IAM_MODE")))
-	iamModeLegacy := strings.ToLower(strings.TrimSpace(os.Getenv("IAMMode")))
-	if iamModeEnv == "" && iamModeLegacy == "" {
-		missing = append(missing, "IAM_MODE=delegated")
-	} else if iamModeEnv != "delegated" && iamModeLegacy != "delegated" {
-		invalid = append(invalid, fmt.Sprintf("IAM_MODE=%s IAMMode=%s", iamModeEnv, iamModeLegacy))
+	providerModeEnv := strings.ToLower(strings.TrimSpace(os.Getenv("POWERX_PROVIDER_MODE")))
+	if providerModeEnv == "" {
+		missing = append(missing, "POWERX_PROVIDER_MODE=delegated")
+	} else if providerModeEnv != "delegated" {
+		invalid = append(invalid, fmt.Sprintf("POWERX_PROVIDER_MODE=%s", providerModeEnv))
 	}
 
 	scheme := strings.ToLower(strings.TrimSpace(os.Getenv("PX_GATEWAY_AUTH_SCHEME")))
@@ -794,7 +905,7 @@ func gatewayContractLogFields(cfg *config.Config, mode string) logger.Fields {
 			strings.TrimSpace(cfg.GRPCUpstream.STSClientSecret) != ""
 	}
 	return logger.Fields{
-		"iam_mode":                 mode,
+		"provider_mode":            mode,
 		"gateway_base_url_present": baseURLPresent,
 		"sts_client_present":       stsClientPresent,
 		"auth_scheme":              authScheme,
@@ -809,7 +920,7 @@ func normalizedProxy(value string) string {
 }
 
 func iamResultLabel(mode string) string {
-	if mode == string(iamservice.IAMModeDelegated) {
+	if mode == string(fwprovider.ModeDelegated) {
 		return "委派 IAM"
 	}
 	return "本地 IAM"
@@ -817,13 +928,13 @@ func iamResultLabel(mode string) string {
 
 func modeScenarioLabel(mode string, proxyEnabled bool) string {
 	switch {
-	case mode == string(iamservice.IAMModeLocal) && !proxyEnabled:
+	case mode == string(fwprovider.ModeLocal) && !proxyEnabled:
 		return "standalone_local"
-	case mode == string(iamservice.IAMModeLocal) && proxyEnabled:
+	case mode == string(fwprovider.ModeLocal) && proxyEnabled:
 		return "local + proxy（调试态）"
-	case mode == string(iamservice.IAMModeDelegated) && !proxyEnabled:
+	case mode == string(fwprovider.ModeDelegated) && !proxyEnabled:
 		return "standalone_mock_delegated"
-	case mode == string(iamservice.IAMModeDelegated) && proxyEnabled:
+	case mode == string(fwprovider.ModeDelegated) && proxyEnabled:
 		return "host_delegated"
 	default:
 		return "自定义组合"
@@ -833,15 +944,15 @@ func modeScenarioLabel(mode string, proxyEnabled bool) string {
 func modePriorityNote(source, mode string, proxyEnabled bool) string {
 	switch source {
 	case "config":
-		if mode == string(iamservice.IAMModeLocal) && proxyEnabled {
-			return "IAMMode=local 显式配置，覆盖 POWERX_PROXY"
+		if mode == string(fwprovider.ModeLocal) && proxyEnabled {
+			return "POWERX_PROVIDER_MODE=local 显式配置，覆盖 POWERX_PROXY"
 		}
-		if mode == string(iamservice.IAMModeDelegated) && !proxyEnabled {
-			return "IAMMode=delegated 显式配置，覆盖 POWERX_PROXY"
+		if mode == string(fwprovider.ModeDelegated) && !proxyEnabled {
+			return "POWERX_PROVIDER_MODE=delegated 显式配置，覆盖 POWERX_PROXY"
 		}
-		return "IAMMode 显式配置优先级最高"
-	case "env:POWERX_PROXY":
-		return "POWERX_PROXY=1 生效（未设置 IAMMode）"
+		return "POWERX_PROVIDER_MODE 显式配置优先级最高"
+	case "default":
+		return "未设置 POWERX_PROVIDER_MODE，默认使用 local provider"
 	default:
 		return "未显式配置，使用默认 local"
 	}

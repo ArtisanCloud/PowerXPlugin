@@ -1,7 +1,15 @@
 id: {{ .PluginID }}.template.review
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 审核模板
+  zh: 审核模板
+  en: Review Template
 description: "审核模板草稿，附带意见与敏感字段校验。"
+description_i18n:
+  zh-CN: 审核模板草稿，附带意见与敏感字段校验。
+  zh: 审核模板草稿，附带意见与敏感字段校验。
+  en: Review a template draft with comments and sensitive-field checks.
 rbac:
   resource: template
   actions: [update]
@@ -18,10 +26,10 @@ metadata:
   protocols:
     rest:
       method: POST
-      path: /api/v1/templates/{id}/review
-      description: "供审核人提交复核意见"
+      path: /api/v1/integration/capabilities/invoke
+      description: "PowerX Gateway 统一鉴权后的插件能力入口"
     agent_tool:
       id: base.template.review
       scope: agent.template.review
       transport: http
-      endpoint: /api/v1/templates/{id}/review
+      endpoint: /api/v1/integration/capabilities/invoke

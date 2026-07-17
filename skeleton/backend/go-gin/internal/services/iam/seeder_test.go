@@ -9,7 +9,7 @@ import (
 
 func TestSeedLocalAdminSkipsInDelegatedMode(t *testing.T) {
 	t.Setenv("POWERX_PROXY", "1")
-	if err := SeedLocalAdmin(context.Background(), nil, &config.Config{}, IAMModeLocal); err != nil {
+	if err := SeedLocalAdmin(context.Background(), nil, &config.Config{}, IAMAdapterModeLocal); err != nil {
 		t.Fatalf("expected skip without error, got %v", err)
 	}
 }

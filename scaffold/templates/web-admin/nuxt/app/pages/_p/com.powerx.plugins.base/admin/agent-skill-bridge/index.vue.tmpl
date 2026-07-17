@@ -124,7 +124,23 @@
                     : 'border border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100'"
                   :data-testid="item.role === 'assistant' ? 'agent-chat-final' : undefined"
                 >
-                  <div class="whitespace-pre-wrap">{{ `{{ item.content }}` }}</div>
+                  <div class="whitespace-pre-wrap">
+                    <template
+                      v-for="(part, partIndex) in messageContentParts(item.content)"
+                      :key="`${item.id}_part_${partIndex}`"
+                    >
+                      <NuxtLink
+                        v-if="part.href"
+                        :to="part.href"
+                        target="_blank"
+                        class="font-medium underline underline-offset-2"
+                        :class="item.role === 'user' ? 'text-white' : 'text-primary'"
+                      >
+                        {{ `{{ part.text }}` }}
+                      </NuxtLink>
+                      <template v-else>{{ `{{ part.text }}` }}</template>
+                    </template>
+                  </div>
                   <div v-if="item.pending" class="mt-2 flex items-center gap-2 text-xs opacity-70">
                     <UIcon name="i-heroicons-arrow-path" class="h-3 w-3 animate-spin" />
                     <span>streaming</span>
@@ -196,15 +212,18 @@
                         </div>
                         <div v-if="task.status === 'failed' && task.error" class="mt-1.5 flex items-start justify-between gap-2 rounded bg-red-50 px-2 py-1 text-red-800 dark:bg-red-950 dark:text-red-200">
                           <span class="line-clamp-2 min-w-0">{{ `{{ errorSummary(task.error) }}` }}</span>
-                          <UButton
-                            icon="i-heroicons-clipboard-document"
-                            size="xs"
-                            color="error"
-                            variant="ghost"
-                            title="复制追踪信息"
-                            aria-label="复制追踪信息"
-                            @click.stop="copyTaskTrace(task, item.runState)"
-                          />
+                          <div class="flex shrink-0 items-center gap-1">
+                            <span v-if="copyStatusText" class="text-[11px] text-red-700 dark:text-red-200">{{ `{{ copyStatusText }}` }}</span>
+                            <button
+                              type="button"
+                              class="relative z-10 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-red-700 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900"
+                              title="复制追踪信息"
+                              aria-label="复制追踪信息"
+                              @click.stop.prevent="copyTaskTrace(task, item.runState)"
+                            >
+                              <UIcon name="i-heroicons-clipboard-document" class="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                       <details v-if="messageRunEvents(item).length" class="pt-1 text-xs">
@@ -317,7 +336,10 @@
 
           <section class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
             <div class="mb-3 flex items-center justify-between">
-              <div class="text-sm font-semibold text-gray-900 dark:text-white">运行状态</div>
+              <div class="flex items-center gap-2">
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">运行状态</div>
+                <span v-if="copyStatusText" class="text-[11px] text-gray-500 dark:text-gray-400">{{ `{{ copyStatusText }}` }}</span>
+              </div>
               <UBadge :color="runStateBadgeColor" variant="soft" data-testid="agent-run-state-status">{{ `{{ runStateStatus }}` }}</UBadge>
             </div>
             <div v-if="runStateParticipants.length" class="mb-2 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -396,15 +418,18 @@
                     </div>
                     <div v-if="task.status === 'failed' && task.error" class="mt-2 flex items-start justify-between gap-2 rounded-md bg-red-50 p-2 text-red-800 dark:bg-red-950 dark:text-red-200">
                       <span class="line-clamp-2 min-w-0">{{ `{{ errorSummary(task.error) }}` }}</span>
-                      <UButton
-                        icon="i-heroicons-clipboard-document"
-                        size="xs"
-                        color="error"
-                        variant="ghost"
-                        title="复制追踪信息"
-                        aria-label="复制追踪信息"
-                        @click.stop="copyTaskTrace(task)"
-                      />
+                      <div class="flex shrink-0 items-center gap-1">
+                        <span v-if="copyStatusText" class="text-[11px] text-red-700 dark:text-red-200">{{ `{{ copyStatusText }}` }}</span>
+                        <button
+                          type="button"
+                          class="relative z-10 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-red-700 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900"
+                          title="复制追踪信息"
+                          aria-label="复制追踪信息"
+                          @click.stop.prevent="copyTaskTrace(task)"
+                        >
+                          <UIcon name="i-heroicons-clipboard-document" class="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                     <div v-if="task.links?.length" class="mt-2 flex flex-wrap gap-2">
                       <UButton
@@ -482,6 +507,61 @@
           </section>
 
           <section class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ `{{ t("agentSkillBridge.permissions.title") }}` }}</div>
+              <UBadge :color="agentPermissionBadgeColor" variant="soft">
+                {{ `{{ agentPermissionStatusLabel }}` }}
+              </UBadge>
+            </div>
+            <div v-if="agentPermissionsLoading" class="rounded-md bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+              {{ `{{ t("agentSkillBridge.permissions.loading") }}` }}
+            </div>
+            <div v-else-if="agentPermissionsError" class="rounded-md bg-red-50 p-3 text-xs text-red-700 dark:bg-red-950 dark:text-red-200">
+              {{ `{{ agentPermissionsError }}` }}
+            </div>
+            <div v-else-if="agentPermissions" class="space-y-3 text-xs">
+              <dl class="space-y-2">
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="text-gray-500">{{ `{{ t("agentSkillBridge.permissions.root") }}` }}</dt>
+                  <dd class="font-mono text-gray-900 dark:text-white">
+                    {{ `{{ agentPermissions.user.is_root ? t("agentSkillBridge.permissions.yes") : t("agentSkillBridge.permissions.no") }}` }}
+                  </dd>
+                </div>
+              </dl>
+              <div class="space-y-2">
+                <div
+                  v-for="action in agentPermissions.actions"
+                  :key="`${action.skill_id}:${action.action}:${action.capability_id}`"
+                  class="rounded-md border border-gray-200 p-2 dark:border-gray-800"
+                >
+                  <div class="mb-1 flex items-center justify-between gap-2">
+                    <div class="font-medium text-gray-900 dark:text-white">{{ `{{ action.action }}` }}</div>
+                    <UBadge :color="action.allowed ? 'success' : 'error'" variant="soft">
+                      {{ `{{ action.allowed ? t("agentSkillBridge.permissions.allowed") : t("agentSkillBridge.permissions.denied") }}` }}
+                    </UBadge>
+                  </div>
+                  <div class="truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">{{ `{{ action.capability_id }}` }}</div>
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    <span
+                      v-for="permission in action.required_permissions"
+                      :key="permission"
+                      class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                    >
+                      {{ `{{ permission }}` }}
+                    </span>
+                  </div>
+                  <div v-if="action.deny_code" class="mt-1 text-[11px] text-red-600 dark:text-red-300">
+                    {{ `{{ action.deny_code }}` }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="rounded-md bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+              {{ `{{ t("agentSkillBridge.permissions.empty") }}` }}
+            </div>
+          </section>
+
+          <section class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
             <div class="mb-3 flex items-center justify-between">
               <div class="text-sm font-semibold text-gray-900 dark:text-white">Raw SSE</div>
               <UButton icon="i-heroicons-clipboard" size="xs" variant="ghost" @click="copyRaw">复制</UButton>
@@ -544,6 +624,8 @@
 import { createFetchSSE, type SSEStreamEvent } from "~/composables/api/useStream";
 import { getAuthToken } from "~/composables/api/_base";
 import { useAuth } from "~/composables/useAuth";
+import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
+import { useI18n } from "vue-i18n";
 
 type AgentEvent = {
   id: string;
@@ -565,6 +647,7 @@ type ChatMessage = {
 };
 
 type RunStateTask = {
+  event?: string;
   run_id?: string;
   session_id?: string;
   message_id?: string;
@@ -590,6 +673,7 @@ type RunStateTask = {
   progress?: number;
   progress_percent?: number;
   percent?: number;
+  updated_at?: string;
   missing_fields?: string[];
   collected_params?: Record<string, unknown>;
   result?: unknown;
@@ -659,6 +743,7 @@ type PowerXAgentRecord = {
   uuid?: string;
   powerx_agent_uuid?: string;
   plugin_agent_id?: string;
+  plugin_id?: string;
   agent_key?: string;
   key?: string;
   name?: string;
@@ -666,6 +751,41 @@ type PowerXAgentRecord = {
   sync_status?: string;
   plugin_skill_ids?: string[] | string;
   powerx_skill_ids?: string[] | string;
+};
+
+type AgentPermissionAction = {
+  action: string;
+  skill_id: string;
+  capability_id: string;
+  descriptor_capability_id: string;
+  rbac_resource: string;
+  rbac_actions: string[];
+  required_permissions: string[];
+  permission_candidates: string[];
+  allowed: boolean;
+  deny_code?: string;
+  unavailable_reason?: string;
+};
+
+type AgentEffectivePermissions = {
+  agent: {
+    plugin_agent_id: string;
+    plugin_id: string;
+    powerx_agent_uuid: string;
+    agent_key: string;
+    name: string;
+    sync_status: string;
+  };
+  user: {
+    tenant_uuid: string;
+    user_id: number;
+    member_id: number;
+    is_root: boolean;
+    roles: string[];
+    permissions: string[];
+  };
+  can_use_agent: boolean;
+  actions: AgentPermissionAction[];
 };
 
 const agentProxyPath = "plugin/agent/stream/sse";
@@ -691,12 +811,17 @@ const eventCount = ref(0);
 const chatMessages = ref<ChatMessage[]>([]);
 const sessionItems = ref<SessionItem[]>([]);
 const loading = ref(false);
-const status = ref<"idle" | "streaming" | "completed" | "error" | "aborted">("idle");
+const status = ref<"idle" | "streaming" | "ended" | "error" | "aborted">("idle");
 const errorText = ref("");
+const copyStatusText = ref("");
 const auth = useAuth();
+const { t } = useI18n();
 const regenerateDialogOpen = ref(false);
 const regenerateText = ref("");
 const regenerateMessageIndex = ref(-1);
+const agentPermissions = ref<AgentEffectivePermissions | null>(null);
+const agentPermissionsLoading = ref(false);
+const agentPermissionsError = ref("");
 let abortController: AbortController | null = null;
 let activeAssistantMessageID = "";
 let assistantBuffer = "";
@@ -788,12 +913,27 @@ const runStateStatus = computed(() => {
 });
 
 const runStateBadgeColor = computed(() => taskBadgeColor(runStateStatus.value));
+const agentPermissionStatusLabel = computed(() => {
+  if (agentPermissionsLoading.value) return t("agentSkillBridge.permissions.loadingShort");
+  if (agentPermissionsError.value) return t("agentSkillBridge.permissions.error");
+  if (!agentPermissions.value) return t("agentSkillBridge.permissions.unknown");
+  return agentPermissions.value.can_use_agent
+    ? t("agentSkillBridge.permissions.available")
+    : t("agentSkillBridge.permissions.unavailable");
+});
+const agentPermissionBadgeColor = computed(() => {
+  if (agentPermissionsLoading.value) return "neutral";
+  if (agentPermissionsError.value) return "error";
+  if (!agentPermissions.value) return "neutral";
+  return agentPermissions.value.can_use_agent ? "success" : "warning";
+});
 
 watch(selectedAgentId, (next) => {
   if (suppressAgentWatch) return;
   const selected = agentOptions.value.find((item) => item.value === next);
   if (!selected) return;
   agentId.value = selected.value;
+  void loadAgentEffectivePermissions(selected);
   void loadSessions(selected, true);
 });
 
@@ -827,8 +967,8 @@ const statusLabel = computed(() => {
   switch (status.value) {
     case "streaming":
       return "streaming";
-    case "completed":
-      return "completed";
+    case "ended":
+      return "ended";
     case "error":
       return "error";
     case "aborted":
@@ -842,8 +982,8 @@ const statusColor = computed(() => {
   switch (status.value) {
     case "streaming":
       return "warning";
-    case "completed":
-      return "success";
+    case "ended":
+      return "neutral";
     case "error":
       return "error";
     case "aborted":
@@ -878,6 +1018,10 @@ function requestHeaders(contentType = false) {
   const token = authToken();
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  }
+  const tenantUUID = resolveTenantUUIDForRequest();
+  if (tenantUUID) {
+    headers.tenant_uuid = tenantUUID;
   }
   return headers;
 }
@@ -956,11 +1100,19 @@ async function loadPowerXAgents() {
     if (!items.length) {
       throw new Error("没有已同步的插件 Agent，请先在 Agent 管理中同步 Agent");
     }
-    const defaultAgent = items[0];
+    const previousAgentId = agentId.value.trim();
+    const defaultAgent = items.find((item) => item.value === previousAgentId) || items[0];
     agentOptions.value = items;
     suppressAgentWatch = true;
     selectedAgentId.value = defaultAgent.value;
     agentId.value = defaultAgent.value;
+    await loadAgentEffectivePermissions(defaultAgent);
+    if (previousAgentId && previousAgentId !== defaultAgent.value) {
+      sessionId.value = "";
+      sessionItems.value = sessionItems.value.filter((item) => item.agentId === defaultAgent.value);
+      chatMessages.value = [];
+      resetRuntimeState();
+    }
     await loadSessions(defaultAgent, true);
     suppressAgentWatch = false;
   } catch (error) {
@@ -969,6 +1121,8 @@ async function loadPowerXAgents() {
     agentOptions.value = [];
     selectedAgentId.value = "";
     agentId.value = "";
+    agentPermissions.value = null;
+    agentPermissionsError.value = "";
     sessionId.value = "";
     sessionItems.value = [];
     status.value = "error";
@@ -976,6 +1130,41 @@ async function loadPowerXAgents() {
   } finally {
     suppressAgentWatch = false;
     agentsLoading.value = false;
+  }
+}
+
+function extractAgentPermissions(payload: unknown): AgentEffectivePermissions {
+  const root = payload as Record<string, any>;
+  const data = root?.data ?? root;
+  if (!data || typeof data !== "object") {
+    throw new Error("Agent permission response missing data");
+  }
+  return data as AgentEffectivePermissions;
+}
+
+async function loadAgentEffectivePermissions(agent = currentAgent.value) {
+  if (typeof window === "undefined") return;
+  const agentUUID = String(agent?.uuid || agent?.value || "").trim();
+  if (!agentUUID) {
+    agentPermissions.value = null;
+    agentPermissionsError.value = "";
+    return;
+  }
+  agentPermissionsLoading.value = true;
+  agentPermissionsError.value = "";
+  try {
+    const url = new URL(`/api/v1/plugin/agent/agents/${encodeURIComponent(agentUUID)}/effective-permissions`, window.location.origin);
+    const response = await fetch(url.toString(), { headers: requestHeaders() });
+    if (!response.ok) {
+      throw new Error(`Agent permissions failed: HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    agentPermissions.value = extractAgentPermissions(payload);
+  } catch (error) {
+    agentPermissions.value = null;
+    agentPermissionsError.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    agentPermissionsLoading.value = false;
   }
 }
 
@@ -1336,6 +1525,25 @@ function markAssistantPending(pending: boolean) {
   syncActiveAssistantRunTrace();
 }
 
+function messageContentParts(content: string) {
+  const text = String(content || "");
+  const parts: Array<{ text: string; href?: string }> = [];
+  const pattern = /\[([^\]\n]+)\]\(((?:\/|https?:\/\/)[^) \n]+)\)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ text: text.slice(lastIndex, match.index) });
+    }
+    parts.push({ text: match[1], href: match[2] });
+    lastIndex = pattern.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push({ text: text.slice(lastIndex) });
+  }
+  return parts.length ? parts : [{ text }];
+}
+
 function appendAssistantText(delta: string) {
   if (!delta) return;
   assistantBuffer = `${assistantBuffer}${delta}`;
@@ -1411,6 +1619,12 @@ async function sendMessageText(input: string, options: { clearInput?: boolean; r
       source: "powerxplugin.local_chat",
       env: "dev",
     };
+    const tenantUUID = resolveTenantUUIDForRequest();
+    if (!tenantUUID) {
+      throw new Error("当前租户为空，不能发起 Agent Skill Bridge 调试请求");
+    }
+    params.tenant_uuid = tenantUUID;
+    params.origin_tenant_uuid = tenantUUID;
     if (options.regenerateFromMessageId) {
       params.regen_from_message_id = options.regenerateFromMessageId;
     }
@@ -1422,7 +1636,7 @@ async function sendMessageText(input: string, options: { clearInput?: boolean; r
       onEvent: consumeSSEEvent,
     });
     if (status.value === "streaming") {
-      status.value = "completed";
+      status.value = "ended";
     }
     if (!finalMessage.value) {
       status.value = "error";
@@ -1440,14 +1654,43 @@ async function sendMessageText(input: string, options: { clearInput?: boolean; r
     }
     status.value = "error";
     errorText.value = error instanceof Error ? error.message : String(error);
+    markRunStateFailed(errorText.value);
     updateAssistantMessage(errorText.value);
   } finally {
     loading.value = false;
     abortController = null;
-    if (status.value === "completed") {
+    if (status.value === "ended") {
       await loadSessions(currentAgent.value, false);
     }
   }
+}
+
+function markRunStateFailed(message: string) {
+  const text = String(message || "Agent stream failed").trim();
+  runState.value.summary = {
+    ...(runState.value.summary || {}),
+    status: "failed",
+    message: text,
+    trace_id: traceId.value,
+  };
+  runState.value.ended = true;
+  const failedTask: RunStateTask = {
+    event: "agent_run.task_failed",
+    task_id: "agent_stream",
+    node_kind: "gateway",
+    node_ref: agentProxyPath,
+    action: "stream",
+    status: "failed",
+    message: text,
+    error: text,
+    trace_id: traceId.value,
+    agent_id: String(currentAgent.value?.id || agentId.value || ""),
+    agent_name: currentAgent.value?.label || "PowerX Agent Proxy",
+    updated_at: new Date().toISOString(),
+  };
+  runState.value.tasks = [...(runState.value.tasks || []), failedTask];
+  runState.value.errors = [...(runState.value.errors || []), failedTask];
+  syncActiveAssistantRunTrace();
 }
 
 function openRegenerateDialog(item: ChatMessage, index: number) {
@@ -1621,7 +1864,7 @@ function mergeRunTasks(current: RunStateTask[], incoming: RunStateTask[]) {
 
 function refreshRunStateCollections(state: RunState) {
   state.pending_params = state.tasks.filter((item) => item.status === "awaiting_params");
-  state.results = state.tasks.filter((item) => item.status === "completed" && item.result);
+  state.results = state.tasks.filter((item) => item.status === "completed" && (item.result || item.links?.length));
   state.errors = state.tasks.filter((item) => item.status === "failed");
 }
 
@@ -2038,8 +2281,8 @@ function extractFinalMessage(payload: Record<string, unknown>) {
 }
 
 async function copyRaw() {
-  if (!rawLog.value || typeof navigator === "undefined") return;
-  await navigator.clipboard?.writeText(rawLog.value);
+  if (!rawLog.value) return;
+  await copyText(rawLog.value, "原始事件已复制");
 }
 
 function compactObject(value: Record<string, unknown>) {
@@ -2051,15 +2294,15 @@ function buildTaskTracePayload(task: RunStateTask, state: RunState = runState.va
   return compactObject({
     trace_id: task.trace_id || String(run.trace_id || ""),
     run_id: task.run_id || String(run.run_id || ""),
-    session_id: task.session_id || String(run.session_id || activeSessionId.value || ""),
+    session_id: task.session_id || String(run.session_id || sessionId.value || ""),
     message_id: task.message_id || String(run.message_id || ""),
     task_id: task.task_id,
     node_kind: task.node_kind,
     node_ref: task.node_ref,
-    agent_id: task.agent_id || activeAgent.value?.uuid || String(activeAgent.value?.id || ""),
-    agent_name: task.agent_name || activeAgent.value?.label,
-    skill_id: task.skill_id || activeAgent.value?.skillId,
-    capability_id: task.capability_id || activeAgent.value?.capability,
+    agent_id: task.agent_id || currentAgent.value?.uuid || String(currentAgent.value?.id || ""),
+    agent_name: task.agent_name || currentAgent.value?.label,
+    skill_id: task.skill_id || currentAgent.value?.skillId,
+    capability_id: task.capability_id || currentAgent.value?.capability,
     action: task.action,
     status: task.status,
     request_id: task.request_id || (isPlainObject(task.error) ? String(task.error.request_id || "") : ""),
@@ -2068,7 +2311,47 @@ function buildTaskTracePayload(task: RunStateTask, state: RunState = runState.va
 }
 
 async function copyTaskTrace(task: RunStateTask, state: RunState = runState.value) {
-  if (typeof navigator === "undefined") return;
-  await navigator.clipboard?.writeText(JSON.stringify(buildTaskTracePayload(task, state), null, 2));
+  await copyText(JSON.stringify(buildTaskTracePayload(task, state), null, 2), "追踪信息已复制");
+}
+
+async function copyText(text: string, successMessage: string) {
+  if (typeof window === "undefined" || !text) return;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      fallbackCopyText(text);
+    }
+    setCopyStatus(successMessage);
+  } catch (error) {
+    try {
+      fallbackCopyText(text);
+      setCopyStatus(successMessage);
+    } catch (fallbackError) {
+      console.error("copy failed", fallbackError || error);
+      setCopyStatus("复制失败，请手动选择文本");
+    }
+  }
+}
+
+function fallbackCopyText(text: string) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  if (!ok) throw new Error("document.execCommand copy failed");
+}
+
+function setCopyStatus(message: string) {
+  copyStatusText.value = message;
+  window.setTimeout(() => {
+    if (copyStatusText.value === message) copyStatusText.value = "";
+  }, 1800);
 }
 </script>

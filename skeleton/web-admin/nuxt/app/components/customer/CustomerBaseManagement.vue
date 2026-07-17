@@ -12,6 +12,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <UBadge color="neutral" variant="soft">{{ providerModeLabel }}</UBadge>
         <UInput
           v-model="search"
           icon="i-heroicons-magnifying-glass"
@@ -22,7 +23,7 @@
         <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="reloadAll">
           刷新
         </UButton>
-        <UButton icon="i-heroicons-plus" color="primary" @click="openCreateForm">
+        <UButton icon="i-heroicons-plus" color="primary" :disabled="isReadOnly" @click="openCreateForm">
           新增客户
         </UButton>
       </div>
@@ -124,6 +125,7 @@
               color="neutral"
               variant="soft"
               icon="i-heroicons-pencil-square"
+              :disabled="isReadOnly"
               @click="openEdit(row.original)"
             >
               编辑
@@ -319,7 +321,7 @@
             <UButton color="neutral" variant="soft" icon="i-heroicons-clock" @click="showRelated('loginEvents')">
               登录事件
             </UButton>
-            <UButton v-if="selectedAccount" color="primary" variant="soft" icon="i-heroicons-pencil-square" @click="openEdit(selectedAccount)">
+            <UButton v-if="selectedAccount" color="primary" variant="soft" icon="i-heroicons-pencil-square" :disabled="isReadOnly" @click="openEdit(selectedAccount)">
               编辑资料
             </UButton>
           </div>
@@ -415,6 +417,7 @@ import {
   type MiniAppEntry,
 } from "~/composables/api/useCustomerBase";
 import { useIAMService } from "~/composables/api/services/iamService";
+import { defaultProviderMode, normalizeProviderMode, type ProviderModeDiagnostics } from "~/composables/api/useProviderMode";
 import { useUserStore } from "~/stores/user";
 
 type TabKey = "accounts" | "identities" | "memberships" | "loginEvents" | "entries";
@@ -423,6 +426,7 @@ type TableRow = Record<string, any>;
 const api = useCustomerBaseApi();
 const iam = useIAMService();
 const userStore = useUserStore();
+const { t } = useI18n();
 const { isRoot, currentTenantUuid, currentTenant } = storeToRefs(userStore);
 const activeTab = ref<TabKey>("accounts");
 const search = ref("");
@@ -440,6 +444,7 @@ const updating = ref(false);
 const createError = ref("");
 const editError = ref("");
 const detailError = ref("");
+const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
 const selectedAccount = ref<CustomerAccount | null>(null);
 const customerFilterUUID = ref("");
 const tenantOptions = ref<{ label: string; value: string }[]>([]);
@@ -613,6 +618,10 @@ const activePage = computed<CustomerPage<any>>(() => {
 });
 
 const activeItems = computed<TableRow[]>(() => activePage.value.items || []);
+const providerModeLabel = computed(() =>
+  providerMode.value.mode === "delegated" ? t("providerMode.delegated") : t("providerMode.local")
+);
+const isReadOnly = computed(() => Boolean(providerMode.value.read_only));
 const resolvedCurrentTenantUUID = computed(() => currentTenantUuid.value?.trim() || "");
 const shortUUID = (value?: string) => {
   const text = String(value || "").trim();
@@ -660,6 +669,7 @@ const accountDetailRows = computed(() => {
 });
 
 async function openCreateForm() {
+  if (isReadOnly.value) return;
   createError.value = "";
   createForm.email = "";
   createForm.phone = "";
@@ -728,6 +738,10 @@ function validateCreateForm() {
 }
 
 async function submitCreate() {
+  if (isReadOnly.value) {
+    createError.value = t("providerMode.readOnlyDescription");
+    return;
+  }
   createError.value = validateCreateForm();
   if (createError.value) return;
   creating.value = true;
@@ -789,6 +803,7 @@ async function openDetail(row: TableRow) {
 }
 
 function openEdit(row: TableRow) {
+  if (isReadOnly.value) return;
   const account = row as CustomerAccount;
   editError.value = "";
   editForm.customer_uuid = account.customer_uuid || "";
@@ -810,6 +825,10 @@ function openEdit(row: TableRow) {
 }
 
 async function submitEdit() {
+  if (isReadOnly.value) {
+    editError.value = t("providerMode.readOnlyDescription");
+    return;
+  }
   if (!editForm.customer_uuid) return;
   updating.value = true;
   editError.value = "";
@@ -886,10 +905,20 @@ async function reloadCurrentTab() {
 async function reloadAll() {
   loading.value = true;
   try {
+    await reloadMode();
     await reloadOverview();
     await reloadCurrentTab();
   } finally {
     loading.value = false;
+  }
+}
+
+async function reloadMode() {
+  try {
+    const response = await api.mode({ silentAuthError: true });
+    providerMode.value = normalizeProviderMode(response.data);
+  } catch {
+    providerMode.value = defaultProviderMode();
   }
 }
 

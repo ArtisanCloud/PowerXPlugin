@@ -1,14 +1,16 @@
 package admin
 
 import (
-	iamservice "{{ .BackendModulePath }}/internal/services/iam"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"{{ .BackendModulePath }}/internal/shared/app"
+	adminaisettings "{{ .BackendModulePath }}/internal/transport/http/admin/ai_settings"
 	admincapability "{{ .BackendModulePath }}/internal/transport/http/admin/capability"
 	adminconsole "{{ .BackendModulePath }}/internal/transport/http/admin/console"
 	admincustomer "{{ .BackendModulePath }}/internal/transport/http/admin/customer"
 	adminiam "{{ .BackendModulePath }}/internal/transport/http/admin/iam"
 	adminintegration "{{ .BackendModulePath }}/internal/transport/http/admin/integration"
 	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
+	adminmetadata "{{ .BackendModulePath }}/internal/transport/http/admin/metadata"
 	adminoperations "{{ .BackendModulePath }}/internal/transport/http/admin/operations"
 	adminruntime "{{ .BackendModulePath }}/internal/transport/http/admin/runtime_ops"
 	adminsecurity "{{ .BackendModulePath }}/internal/transport/http/admin/security"
@@ -34,6 +36,8 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		adminconsole.RegisterRoutes(admin, deps)
 		admincapability.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		admincustomer.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminmetadata.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminaisettings.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminintegration.RegisterRoutes(admin, deps)
 		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminiam.RegisterRoutes(admin, deps)
@@ -45,7 +49,7 @@ func adminTenantGroup(parent *gin.RouterGroup, deps *app.Deps) *gin.RouterGroup 
 		return nil
 	}
 	needTenant := false
-	if deps != nil && deps.IAMMode == iamservice.IAMModeDelegated {
+	if deps != nil && deps.ProviderMode == fwprovider.ModeDelegated {
 		needTenant = true
 	}
 	if !needTenant {

@@ -82,11 +82,10 @@ const rootDir = fileURLToPath(new URL('./', import.meta.url))
 const vueUseShim = resolvePath(rootDir, 'app/shims/vueuse-core.ts')
 const vueUseReal = resolvePath(rootDir, 'node_modules/@vueuse/core/dist/index.js')
 
-const resolveIAMMode = () => {
+const resolveProviderMode = () => {
   const raw = (
-    process.env.NUXT_PUBLIC_IAM_MODE ??
-    process.env.IAMMode ??
-    process.env.IAM_MODE ??
+    process.env.NUXT_PUBLIC_POWERX_PROVIDER_MODE ??
+    process.env.POWERX_PROVIDER_MODE ??
     ''
   )
     .trim()
@@ -94,10 +93,10 @@ const resolveIAMMode = () => {
   if (raw === 'local' || raw === 'delegated') {
     return raw
   }
-  return INSIDE_POWERX ? 'delegated' : 'local'
+  return 'local'
 }
-const IAM_MODE = resolveIAMMode()
-const DELEGATED_MODE = IAM_MODE === 'delegated'
+const PROVIDER_MODE = resolveProviderMode()
+const DELEGATED_MODE = PROVIDER_MODE === 'delegated'
 const capabilityInvokeEndpoint = '/integration/capabilities/invoke'
 const capabilityApiBase = INSIDE_POWERX ? hostApiBase : localApiBase
 // 在宿主代理模式下指定 api base，即“模拟 standalone” 场景
@@ -318,7 +317,7 @@ export default defineNuxtConfig({
       powerxPluginId: pluginId,
       powerxPluginVersion: pluginVersion,
       insidePowerX: INSIDE_POWERX,
-      iamMode: IAM_MODE,
+      providerMode: PROVIDER_MODE,
       powerxProxy: POWERX_PROXY_PUBLIC,
       gatewayAuthScheme: String(process.env.PX_GATEWAY_AUTH_SCHEME || '').trim().toLowerCase(),
       delegatedMode: DELEGATED_MODE,

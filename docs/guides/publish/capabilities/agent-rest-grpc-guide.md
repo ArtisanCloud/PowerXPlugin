@@ -13,7 +13,7 @@
 - 进入 `skeleton/backend/go-gin` 并根据需要设置数据库：
   ```bash
   export POWERX_PROXY=0
-  export IAM_MODE=local
+  export POWERX_PROVIDER_MODE=local
   export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
   export PLUGIN_IAM_TENANT_NAME="Local Tenant"
   export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
@@ -25,7 +25,7 @@
 
 ```bash
 cd skeleton/backend/go-gin
-POWERX_PROXY=0 IAM_MODE=local go run ./cmd/plugin
+POWERX_PROXY=0 POWERX_PROVIDER_MODE=local go run ./cmd/plugin
 ```
 
 - 默认 HTTP 监听 `:8078`，gRPC 监听 `:9101`（若端口被占用会自动递增）。

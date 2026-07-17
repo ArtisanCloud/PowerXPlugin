@@ -12,6 +12,10 @@
               "crud": "模版 CRUD",
               "framework_lab": "framework功能测试"
             },
+            "powerx": {
+              "title": "PowerX底座能力",
+              "knowledge_lab": "知识库调试"
+            },
             "integration": {
               "title": "集成中心",
               "webhooks": "Webhooks",

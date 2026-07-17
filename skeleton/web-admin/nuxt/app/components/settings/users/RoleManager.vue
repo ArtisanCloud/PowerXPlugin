@@ -26,6 +26,9 @@ import type {
 } from "~/composables/api/services/roleService";
 
 const { t } = useI18n();
+const props = withDefaults(defineProps<{ readonly?: boolean }>(), {
+  readonly: false,
+});
 const toast = useToast();
 const roleStore = useRoleStore();
 const tenantService = useTenantService();
@@ -234,11 +237,13 @@ const resetForm = () => {
 };
 
 const openAddForm = () => {
+  if (props.readonly) return;
   resetForm();
   showForm.value = true;
 };
 
 const openEditForm = (role: Role) => {
+  if (props.readonly) return;
   resetForm();
   roleForm.name = role.name;
   roleForm.code = role.code;
@@ -253,6 +258,7 @@ const openEditForm = (role: Role) => {
 };
 
 const openCloneForm = (role: Role) => {
+  if (props.readonly) return;
   resetForm();
   roleForm.name = `${role.name} Copy`;
   roleForm.code = `${role.code}_copy`;
@@ -266,6 +272,10 @@ const openCloneForm = (role: Role) => {
 };
 
 const saveRole = async () => {
+  if (props.readonly) {
+    notifyOnce(t("providerMode.readOnly"), t("providerMode.readOnlyDescription"), "warning");
+    return;
+  }
   if (!roleForm.name || !roleForm.code) {
     notifyOnce(
       t("iam.roles.notifications.missingFieldsTitle"),
@@ -321,6 +331,10 @@ const saveRole = async () => {
 };
 
 const deleteRole = async (id: number) => {
+  if (props.readonly) {
+    notifyOnce(t("providerMode.readOnly"), t("providerMode.readOnlyDescription"), "warning");
+    return;
+  }
   if (!confirm(t("iam.roles.notifications.deleteConfirm"))) return;
   try {
     await roleStore.deleteRole(id);
@@ -438,6 +452,7 @@ const columns = computed(() => [
               size: "xs",
               variant: "ghost",
               icon: "i-heroicons-document-duplicate",
+              disabled: props.readonly,
               onClick: () => openCloneForm(role),
             },
             { default: () => t("iam.roles.actions.clone") }
@@ -448,6 +463,7 @@ const columns = computed(() => [
               size: "xs",
               variant: "ghost",
               icon: "i-heroicons-pencil-square",
+              disabled: props.readonly,
               onClick: () => openEditForm(role),
             },
             { default: () => t("common.edit") }
@@ -460,6 +476,7 @@ const columns = computed(() => [
                 color: "error",
                 variant: "ghost",
                 icon: "i-heroicons-trash",
+                disabled: props.readonly,
                 onClick: () => deleteRole(role.id),
               },
               { default: () => t("common.delete") }
@@ -510,6 +527,10 @@ const openPermissionDrawer = async (role: Role) => {
 };
 
 const savePermissionSelection = async () => {
+  if (props.readonly) {
+    notifyOnce(t("providerMode.readOnly"), t("providerMode.readOnlyDescription"), "warning");
+    return;
+  }
   if (!activeRole.value || !selectedRoleDetail.value) return;
   const tenantUuid =
     selectedRoleDetail.value.tenant_uuid || selectedTenantUuid.value;
@@ -602,6 +623,10 @@ const toggleMemberSelection = (memberId: number) => {
 const membersSaving = ref(false);
 
 const saveMembers = async () => {
+  if (props.readonly) {
+    notifyOnce(t("providerMode.readOnly"), t("providerMode.readOnlyDescription"), "warning");
+    return;
+  }
   if (!activeRole.value || !selectedRoleDetail.value) return;
   const tenantUuid =
     selectedRoleDetail.value.tenant_uuid || selectedTenantUuid.value;
@@ -706,6 +731,7 @@ onMounted(async () => {
         <UButton
           icon="i-heroicons-plus"
           color="primary"
+          :disabled="props.readonly"
           @click="openAddForm"
         >
           {{ t("iam.roles.actions.create") }}
@@ -844,7 +870,7 @@ onMounted(async () => {
           <UButton color="neutral" variant="subtle" @click="showForm = false">
             {{ t("common.cancel") }}
           </UButton>
-          <UButton color="primary" type="submit" form="role-form">
+          <UButton color="primary" type="submit" form="role-form" :disabled="props.readonly">
             {{ t("common.save") }}
           </UButton>
         </div>
@@ -876,7 +902,7 @@ onMounted(async () => {
           >
             {{ t("common.cancel") }}
           </UButton>
-          <UButton color="primary" @click="savePermissionSelection">
+          <UButton color="primary" :disabled="props.readonly" @click="savePermissionSelection">
             {{ t("common.save") }}
           </UButton>
         </div>
@@ -953,6 +979,7 @@ onMounted(async () => {
             <UButton
               color="primary"
               :loading="membersSaving"
+              :disabled="props.readonly"
               @click="saveMembers"
             >
               {{ t("common.save") }}

@@ -22,7 +22,7 @@ type iamConfig struct {
 		Schema string `yaml:"schema"`
 	} `yaml:"database"`
 	Context struct {
-		IAMMode string `yaml:"iam_mode"`
+		ProviderMode string `yaml:"provider_mode"`
 	} `yaml:"context"`
 	baseDir string
 }
@@ -194,11 +194,11 @@ func maskDSN(dsn string) string {
 }
 
 func detectDelegatedMode(cfg *iamConfig) string {
-	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
-		return "POWERX_PROXY"
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("POWERX_PROVIDER_MODE")), "delegated") {
+		return "POWERX_PROVIDER_MODE"
 	}
-	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), "delegated") {
-		return "context.iam_mode"
+	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), "delegated") {
+		return "context.provider_mode"
 	}
 	return ""
 }

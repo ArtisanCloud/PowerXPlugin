@@ -46,14 +46,15 @@ make build-px-plugin
 `px-plugin init` 生成的 Nuxt 工程默认支持 Standalone 与宿主代理双模式，常用变量如下：
 
 - `POWERX_PROXY`：`0`（Standalone）/`1`（宿主代理）
+- `NUXT_PUBLIC_POWERX_PROVIDER_MODE`：可选 `local`/`delegated`，未指定时默认 `local`
 - `NUXT_PUBLIC_API_BASE`：API 基址（默认 `http://localhost:<backend-port>`）
 - `NUXT_PUBLIC_API_PREFIX`：默认 `/api/v1`
 - `NUXT_DEV_API_PROXY`：开发态 HTTP 代理目标
 - `NUXT_DEV_WS_PROXY`：开发态 WS 代理目标
 - `NUXT_PUBLIC_POWERX_CORE_BASE`：PowerX Core 地址（默认 `http://localhost:8077`）
-- `NUXT_PUBLIC_IAM_MODE`：可选 `local`/`delegated`，未指定时按 `POWERX_PROXY` 自动推导
 
 建议：
 
-1. Standalone 开发：`POWERX_PROXY=0`，前端直连本地 backend。
-2. 宿主联调：`POWERX_PROXY=1`，并确认插件网关凭证（Bearer/ApiKey）与 backend 配置一致。
+1. Standalone 开发：`POWERX_PROVIDER_MODE=local POWERX_PROXY=0`，前端直连本地 backend。
+2. 本地联调宿主链路：`POWERX_PROVIDER_MODE=local POWERX_PROXY=1`，并确认插件网关 ApiKey 与 backend 配置一致。
+3. 宿主委派：`POWERX_PROVIDER_MODE=delegated POWERX_PROXY=1`，并确认 STS/gRPC 契约变量齐全。

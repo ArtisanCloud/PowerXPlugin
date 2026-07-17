@@ -59,7 +59,7 @@ Framework 与 Core 的映射：
 
 插件 local 模式可以落本地表，但必须遵循：
 
-1. 仅用于 `IAMMode=local` 的开发调试。
+1. 仅用于 `POWERX_PROVIDER_MODE=local` 的开发调试。
 2. 表结构、字段命名、状态枚举、membership 语义与 PowerX Core 保持兼容。
 3. Core schema 变更后，PowerXPlugin skeleton/scaffold 和业务插件 local mirror 同步变更。
 4. 可以镜像 PowerX Core customer 基础展示字段，但不得把标签、跟进、归属销售、家长、球员、学员、患者、粉丝等行业概念写入 framework customer 表。

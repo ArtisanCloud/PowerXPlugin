@@ -15,7 +15,7 @@ import (
 func TestDepartmentHandler_DelegatedRejectsWrite(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewDepartmentHandler(nil, iamservice.IAMModeDelegated)
+	handler := NewDepartmentHandler(nil, iamservice.IAMAdapterModeDelegated)
 
 	router.POST("/departments", handler.Create)
 

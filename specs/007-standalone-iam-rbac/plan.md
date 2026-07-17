@@ -5,7 +5,7 @@
 
 ## Summary
 
-构建 Standalone 模式下可独立运行的 IAM & RBAC 能力：本地数据库存储租户/部门/成员/角色/权限，Web Admin 提供组织管理 UI，后端暴露 `/api/v1/admin/iam/**` 和 Local Auth/STS 接口，并与 Manifest/指标/文档同步，保证与宿主 PowerX RBAC 三元模型一致且在 Delegated 模式自动隐藏本地菜单。
+构建 Standalone 模式下可独立运行的 IAM & RBAC 能力：本地数据库存储租户/部门/成员/角色/权限，Web Admin 提供组织管理 UI，后端暴露 `/api/v1/admin/iam/**` 和 Local Auth/STS 接口，并与 Manifest/指标/文档同步，保证与宿主 PowerX RBAC 三元模型一致；delegated provider 下正式菜单保持可见，由 RBAC 与 read-only 状态控制操作。
 
 ## Technical Context
 

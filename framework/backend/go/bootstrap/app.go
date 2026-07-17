@@ -31,9 +31,10 @@ type App struct {
 	shutdown func(context.Context) error
 	closeFn  func() error
 
-	gatewayClient    *gateway.Client
-	federatedFactory contracts.ProviderFactory
-	iamRegistry      *iamadapters.Registry
+	gatewayClient     *gateway.Client
+	federatedFactory  contracts.ProviderFactory
+	iamRegistry       *iamadapters.Registry
+	capabilityInvoker CapabilityInvoker
 
 	mu       sync.RWMutex
 	manifest *manifest.Plugin
@@ -215,6 +216,26 @@ func (a *App) Manifest() *manifest.Plugin {
 // GatewayClient 返回已注入的 Gateway Client（可能为空）。
 func (a *App) GatewayClient() *gateway.Client {
 	return a.gatewayClient
+}
+
+// RegisterCapabilityInvoker registers the plugin-owned local capability executor.
+func (a *App) RegisterCapabilityInvoker(invoker CapabilityInvoker) {
+	if a == nil {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.capabilityInvoker = invoker
+}
+
+// CapabilityInvoker returns the registered local capability executor, if any.
+func (a *App) CapabilityInvoker() CapabilityInvoker {
+	if a == nil {
+		return nil
+	}
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.capabilityInvoker
 }
 
 // FederatedProviderFactory 返回联邦登录 provider factory。

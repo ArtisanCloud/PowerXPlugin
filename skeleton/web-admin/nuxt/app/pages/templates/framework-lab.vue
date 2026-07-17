@@ -33,7 +33,7 @@
           <p>Topic: <span class="font-mono">{{ capabilityNotifyTopic || memberNotifyTopic || "-" }}</span></p>
           <p>Flow Mode: <span>{{ notificationFlowMode || "-" }}</span></p>
           <p>Backend POWERX_PROXY: <span>{{ notificationPowerXProxy || "-" }}</span></p>
-          <p>Backend IAMMode: <span>{{ notificationIAMMode || "-" }}</span></p>
+          <p>Backend ProviderMode: <span>{{ notificationProviderMode || "-" }}</span></p>
           <p>Host Publish: <span>{{ notificationHostPublishOK || "-" }}</span></p>
           <p>Last Event Topic: <span class="font-mono">{{ notificationLastEventTopic || "-" }}</span></p>
           <p>Last Event At: <span>{{ notificationLastEventAt || "-" }}</span></p>
@@ -116,7 +116,7 @@
         <div class="grid gap-2 text-sm text-gray-600 dark:text-gray-300 md:grid-cols-2">
           <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
           <p>Scheduler Provider: <span>{{ schedulerMode }}</span></p>
-          <p>Tenant UUID: <span class="font-mono">{{ schedulerTenantUUID || "-" }}</span></p>
+          <p>Tenant UUID: <span class="font-mono">{{ schedulerTenantUUID || selectedSchedulerJob?.tenant_uuid || "-" }}</span></p>
           <p>Selected Job: <span class="font-mono">{{ selectedSchedulerJobID || "-" }}</span></p>
           <p>Last Action: <span>{{ schedulerLastAction || "idle" }}</span></p>
           <p>Last Topic: <span class="font-mono">{{ schedulerLastTopic || "-" }}</span></p>
@@ -215,7 +215,7 @@ const capabilityNotifyMemberUUID = ref("")
 const notificationTarget = ref("")
 const notificationFlowMode = ref("")
 const notificationPowerXProxy = ref("")
-const notificationIAMMode = ref("")
+const notificationProviderMode = ref("")
 const notificationHostPublishOK = ref("")
 const activeTab = ref<"notification" | "gateway" | "local" | "scheduler-local" | "scheduler-host">("notification")
 const schedulerMode = computed<"local" | "host">(() => activeTab.value === "scheduler-host" ? "host" : "local")
@@ -417,7 +417,7 @@ const sendCapabilityNotification = async () => {
     const resolvedTopic = String(data.topic || memberTopic).trim()
     notificationFlowMode.value = flowMode
     notificationPowerXProxy.value = String(data.powerx_proxy || "").trim()
-    notificationIAMMode.value = String(data.iam_mode || "").trim()
+    notificationProviderMode.value = String(data.provider_mode || "").trim()
     notificationHostPublishOK.value = data.host_publish_ok === undefined ? "" : String(Boolean(data.host_publish_ok))
     const target = flowMode.startsWith("host") ? "PowerX 底座通知" : "插件本地通知"
     notificationTarget.value = target
@@ -462,7 +462,7 @@ const runWSBusFlow = async () => {
     wsFlowGrantStatus.value = flowResp?.success === false ? "failed" : "ok"
     wsFlowPublishStatus.value = flowResp?.success === false ? "failed" : "ok"
     wsFlowMode.value = String(flowResp?.data?.flow_mode || "-")
-    wsFlowEchoStatus.value = flowResp?.data?.echo_ok ? "ok" : "failed"
+    wsFlowEchoStatus.value = flowResp?.data?.echo_skipped ? "skipped" : (flowResp?.data?.echo_ok ? "ok" : "failed")
     wsFlowHostReachable.value = flowResp?.data?.host_reachable ? "yes" : "no"
     wsFlowHostGrantStatus.value = flowResp?.data?.host_grant_ok ? "ok" : "failed"
     wsFlowHostPublishStatus.value = flowResp?.data?.host_publish_ok ? "ok" : "failed"
@@ -518,10 +518,11 @@ const runLocalWSFlow = async () => {
   }
 }
 
-const refreshSchedulerJobs = async () => {
+const refreshSchedulerJobs = async (options: { updateLastAction?: boolean } = {}) => {
   if (shouldSkipSchedulerRequest()) {
     return
   }
+  const updateLastAction = options.updateLastAction !== false
   schedulerListing.value = true
   schedulerLastError.value = ""
   try {
@@ -530,7 +531,9 @@ const refreshSchedulerJobs = async () => {
     if (!selectedSchedulerJobID.value && schedulerJobs.value[0]?.job_id) {
       selectedSchedulerJobID.value = schedulerJobs.value[0].job_id
     }
-    schedulerLastAction.value = `${schedulerMode.value} list ok: jobs=${schedulerJobs.value.length}`
+    if (updateLastAction) {
+      schedulerLastAction.value = `${schedulerMode.value} list ok: jobs=${schedulerJobs.value.length}`
+    }
   } catch (error: any) {
     schedulerLastError.value = String(error?.message || "list scheduler jobs failed")
     showToast({ title: "Scheduler 列表失败", message: schedulerLastError.value, color: "error", duration: 5000 })
@@ -544,7 +547,7 @@ const startSchedulerPolling = () => {
   let rounds = 0
   schedulerPollTimer = setInterval(async () => {
     rounds += 1
-    await refreshSchedulerJobs()
+    await refreshSchedulerJobs({ updateLastAction: false })
     if (selectedSchedulerJob.value?.status === "completed" || rounds >= 30) {
       if (schedulerPollTimer) {
         clearInterval(schedulerPollTimer)
@@ -590,9 +593,12 @@ const createSchedulerSample = async () => {
       },
     })
     selectedSchedulerJobID.value = job.job_id
+    if (!schedulerTenantUUID.value && job.tenant_uuid) {
+      schedulerTenantUUID.value = job.tenant_uuid
+    }
     schedulerLastTopic.value = job.topic || "powerx.runtime.scheduler.triggered.v1"
     schedulerLastAction.value = `${schedulerMode.value} create ok: ${job.job_id}; next run at ${runAt}`
-    await refreshSchedulerJobs()
+    await refreshSchedulerJobs({ updateLastAction: false })
     if (schedulerMode.value === "local") {
       startSchedulerPolling()
     }
@@ -614,20 +620,25 @@ const triggerSchedulerJobByID = async (jobID: string) => {
   }
   schedulerTriggering.value = true
   schedulerLastError.value = ""
+  schedulerLastAction.value = `${schedulerMode.value} trigger pending: ${jobID}`
   try {
     if (schedulerMode.value === "local") {
       schedulerProbe.connect()
       schedulerProbe.subscribeTopic(schedulerNotifyTopic.value)
     }
     const result: any = await schedulerApi.triggerJob(jobID, schedulerRequestOptions.value)
-    schedulerLastAction.value = `${schedulerMode.value} trigger ok: ${jobID}`
+    const hostTriggerOK = result?.host_trigger_ok === true
+    const localSkipped = result?.local_notification_skipped === true
+    schedulerLastAction.value = schedulerMode.value === "host"
+      ? `host trigger ok: ${jobID}; PowerX=${hostTriggerOK ? "ok" : "-"}; local_notify=${localSkipped ? "skipped" : "-"}`
+      : `local trigger ok: ${jobID}`
     const notifyTopic = String(result?.notification?.topic || "").trim()
     if (notifyTopic) {
       schedulerLastTopic.value = notifyTopic
       schedulerProbe.subscribeTopic(notifyTopic)
     }
     showToast({ title: "Scheduler 触发成功", message: schedulerMode.value === "local" ? "已发送本地通知" : jobID, color: "success", duration: 3500 })
-    await refreshSchedulerJobs()
+    await refreshSchedulerJobs({ updateLastAction: false })
   } catch (error: any) {
     schedulerLastError.value = String(error?.message || "trigger scheduler job failed")
     showToast({ title: "Scheduler 触发失败", message: schedulerLastError.value, color: "error", duration: 5000 })
@@ -648,7 +659,7 @@ const pauseSchedulerJobByID = async (jobID: string) => {
   try {
     await schedulerApi.pauseJob(jobID, schedulerRequestOptions.value)
     schedulerLastAction.value = `${schedulerMode.value} pause ok: ${jobID}`
-    await refreshSchedulerJobs()
+    await refreshSchedulerJobs({ updateLastAction: false })
   } catch (error: any) {
     schedulerLastError.value = String(error?.message || "pause scheduler job failed")
     showToast({ title: "Scheduler 暂停失败", message: schedulerLastError.value, color: "error", duration: 5000 })
@@ -669,7 +680,7 @@ const resumeSchedulerJobByID = async (jobID: string) => {
   try {
     await schedulerApi.resumeJob(jobID, schedulerRequestOptions.value)
     schedulerLastAction.value = `${schedulerMode.value} resume ok: ${jobID}`
-    await refreshSchedulerJobs()
+    await refreshSchedulerJobs({ updateLastAction: false })
   } catch (error: any) {
     schedulerLastError.value = String(error?.message || "resume scheduler job failed")
     showToast({ title: "Scheduler 恢复失败", message: schedulerLastError.value, color: "error", duration: 5000 })

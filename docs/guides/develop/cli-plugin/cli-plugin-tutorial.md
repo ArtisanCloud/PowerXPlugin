@@ -110,7 +110,7 @@ Nuxt 常用环境变量（`web-admin/.env.local`）：
 - `NUXT_DEV_API_PROXY`
 - `NUXT_DEV_WS_PROXY`
 - `NUXT_PUBLIC_POWERX_CORE_BASE`（可选）
-- `NUXT_PUBLIC_IAM_MODE=local|delegated`（可选）
+- `NUXT_PUBLIC_POWERX_PROVIDER_MODE=local|delegated`（可选）
 
 前端（Next）：
 

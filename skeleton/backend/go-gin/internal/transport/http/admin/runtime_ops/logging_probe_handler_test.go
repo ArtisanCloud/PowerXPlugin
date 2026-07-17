@@ -52,7 +52,7 @@ func TestLoggingProbeHandlerContract(t *testing.T) {
 		t.Fatalf("status mismatch, got=%d body=%s", rec.Code, rec.Body.String())
 	}
 	var envelope struct {
-		Code int    `json:"code"`
+		Code int `json:"code"`
 		Data struct {
 			TraceID  string                       `json:"trace_id"`
 			Outcomes []runtimelogging.SinkOutcome `json:"outcomes"`

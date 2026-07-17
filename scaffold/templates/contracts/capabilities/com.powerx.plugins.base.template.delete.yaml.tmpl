@@ -24,7 +24,7 @@ provides:
     version: 1.0.0
 metadata:
   agent_response:
-    content: '已删除模板 #{{ .id }}。[查看模板列表](/templates/crud)'
+    content: '已删除模板 #{{`{{ .id }}`}}。[查看模板列表](/templates/crud)'
     links:
       - kind: template_list
         label: 查看模板列表

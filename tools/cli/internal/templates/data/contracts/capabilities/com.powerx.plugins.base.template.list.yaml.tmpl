@@ -25,8 +25,8 @@ provides:
 metadata:
   agent_response:
     content: |-
-      已查询到 {{ .pagination.total }} 个模板。
-      {{ .summary }}
+      已查询到 {{`{{ .pagination.total }}`}} 个模板。
+      {{`{{ .summary }}`}}
       [查看模板列表](/templates/crud)
     links:
       - kind: template_list

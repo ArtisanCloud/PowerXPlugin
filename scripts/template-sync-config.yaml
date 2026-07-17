@@ -257,6 +257,15 @@ mappings:
       - globs: ["capabilities/**/*.yaml"]
         literal: "{{ .template.id }}"
         replace: "{{`{{ .template.id }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .pagination.total }}"
+        replace: "{{`{{ .pagination.total }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .summary }}"
+        replace: "{{`{{ .summary }}`}}"
+      - globs: ["capabilities/**/*.yaml"]
+        literal: "{{ .id }}"
+        replace: "{{`{{ .id }}`}}"
   - name: codex-assets
     source: .codex
     include:

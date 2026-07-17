@@ -4,45 +4,39 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 )
 
-type ProviderMode string
+type LinkMode string
 
 const (
-	ProviderModeLocal ProviderMode = "local"
-	ProviderModeHost  ProviderMode = "host"
+	LinkModeLocal LinkMode = "local"
+	LinkModeHost  LinkMode = "host"
 )
 
 type ResolveInput struct {
-	ConfigIAMMode contracts.IAMMode
-	EnvMode       string
-	PowerXProxy   string
+	ConfigProviderMode fwprovider.Mode
+	EnvMode            string
+	PowerXProxy        string
 }
 
 type ResolveResult struct {
-	Mode   ProviderMode
+	Mode   LinkMode
 	Source string
 }
 
 func ResolveProviderMode(input ResolveInput) ResolveResult {
 	if firstNonEmpty(input.PowerXProxy, os.Getenv("POWERX_PROXY")) == "1" {
-		return ResolveResult{Mode: ProviderModeHost, Source: "env:POWERX_PROXY"}
+		return ResolveResult{Mode: LinkModeHost, Source: "env:POWERX_PROXY"}
 	}
-	envMode := strings.ToLower(strings.TrimSpace(firstNonEmpty(input.EnvMode, os.Getenv("IAMMode"), os.Getenv("IAM_MODE"))))
-	if envMode == string(contracts.IAMModeLocal) {
-		return ResolveResult{Mode: ProviderModeLocal, Source: "env:iam_mode"}
+	envMode := strings.ToLower(strings.TrimSpace(firstNonEmpty(input.EnvMode, os.Getenv("POWERX_PROVIDER_MODE"))))
+	if envMode == string(fwprovider.ModeLocal) || envMode == string(fwprovider.ModeDelegated) {
+		return ResolveResult{Mode: LinkModeLocal, Source: "env:provider_mode"}
 	}
-	if envMode == string(contracts.IAMModeDelegated) {
-		return ResolveResult{Mode: ProviderModeHost, Source: "env:iam_mode"}
+	if input.ConfigProviderMode == fwprovider.ModeLocal || input.ConfigProviderMode == fwprovider.ModeDelegated {
+		return ResolveResult{Mode: LinkModeLocal, Source: "config:provider_mode"}
 	}
-	if input.ConfigIAMMode == contracts.IAMModeLocal {
-		return ResolveResult{Mode: ProviderModeLocal, Source: "config:iam_mode"}
-	}
-	if input.ConfigIAMMode == contracts.IAMModeDelegated {
-		return ResolveResult{Mode: ProviderModeHost, Source: "config:iam_mode"}
-	}
-	return ResolveResult{Mode: ProviderModeLocal, Source: "iam_mode"}
+	return ResolveResult{Mode: LinkModeLocal, Source: "default"}
 }
 
 func firstNonEmpty(values ...string) string {

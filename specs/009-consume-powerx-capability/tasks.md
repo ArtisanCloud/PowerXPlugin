@@ -107,7 +107,7 @@
 - [x] T039 [US1] 在 `skeleton/backend/go-gin/internal/integrations/gateway/client.go` 删除 delegated 下 `PX_TOOL_TOKEN` 与 apikey 兼容逻辑，并增加 `tid` claim 校验（失败返回 `GW_TOKEN_INVALID_TID`）。
 - [x] T040 [US1] 在 `skeleton/backend/go-gin/cmd/plugin/main.go` 增加 delegated 启动 fail-fast；缺失 `PX_GATEWAY_BASE_URL`/`PX_PLUGIN_TOOL_TOKEN` 或 `auth_scheme!=bearer` 直接退出。
 - [x] T041 [US1] 新增统一 Gateway Guard（`transport/http/middleware/capability_gateway.go`）并让 `/integration/*` 路由统一返回固定错误结构与错误码。
-- [x] T042 [US1] 增加指标与日志：`plugin_gateway_config_valid{plugin_id,mode}`、`plugin_gateway_invoke_fail_total{code}`，并固定启动日志字段（`iam_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）。
+- [x] T042 [US1] 增加指标与日志：`plugin_gateway_config_valid{plugin_id,mode}`、`plugin_gateway_invoke_fail_total{code}`，并固定启动日志字段（`provider_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）。
 - [x] T043 [US1] 更新文档：`specs/009-*` 与开发指南中删除 `PX_TOOL_TOKEN` delegated 口径，仅保留 `PX_PLUGIN_TOOL_TOKEN`。
 - [x] T044 [US1] 新增 CI 规则：扫描代码/文档中 delegated 相关逻辑，若新增 `PX_TOOL_TOKEN` 作为 delegated 凭证则失败。
 - [x] T045 [US1] 与 PowerX 主仓联动补充验收：PostEnable 凭证探活失败时插件状态应为 `enable_failed_missing_gateway_credential`。

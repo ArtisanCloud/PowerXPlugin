@@ -10,11 +10,12 @@ import (
 	"time"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	fwscheduler "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"{{ .BackendModulePath }}/internal/contracts"
-	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	"{{ .BackendModulePath }}/internal/shared/app"
+	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -50,14 +51,10 @@ type schedulerJobSpecRequest struct {
 
 // NewSchedulerJobHandler constructs scheduler job handler.
 func NewSchedulerJobHandler(deps *app.Deps) *SchedulerJobHandler {
-	defaultTenant := ""
-	if deps != nil && deps.Config != nil && deps.Config.Gateway != nil {
-		defaultTenant = strings.TrimSpace(deps.Config.Gateway.TenantUUID)
-	}
 	return &SchedulerJobHandler{
 		localScheduler: resolveSchedulerFacade(deps),
 		hostScheduler:  resolveHostSchedulerFacade(deps),
-		defaultTenant:  defaultTenant,
+		defaultTenant:  "",
 		deps:           deps,
 	}
 }
@@ -113,7 +110,7 @@ func resolveSchedulerHostProviderConfig(deps *app.Deps) fwscheduler.HostProvider
 		UserAgent:  strings.TrimSpace(gw.UserAgent),
 		Timeout:    gw.Timeout,
 	}
-	if deps.IAMMode == iamservice.IAMModeDelegated && strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
+	if deps.ProviderMode == fwprovider.ModeDelegated && strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" {
 		cfg.AuthScheme = "bearer"
 		cfg.TokenProvider = func(ctx context.Context) (string, error) {
 			return newPowerXSTSTokenProvider(deps)(ctx)
@@ -141,9 +138,6 @@ func resolveSchedulerHostProviderConfig(deps *app.Deps) fwscheduler.HostProvider
 }
 
 func schedulerHostLinkEnabled(deps *app.Deps) bool {
-	if deps != nil && deps.IAMMode == iamservice.IAMModeDelegated {
-		return true
-	}
 	return strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
 }
 
@@ -216,13 +210,21 @@ func (h *SchedulerJobHandler) List(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
 		return
 	}
-	scheduler := h.schedulerForMode(c, schedulerDebugRequest{ProviderMode: c.Query("provider_mode")})
+	mode := schedulerProviderModeFromRequest(c, schedulerDebugRequest{ProviderMode: c.Query("provider_mode")})
+	scheduler := h.schedulerForMode(c, schedulerDebugRequest{ProviderMode: mode})
 	if scheduler == nil {
 		contracts.ResponseServiceUnavailable(c, "scheduler facade unavailable", nil)
 		return
 	}
+	tenantUUID := h.tenantUUID(c)
+	if mode != fwscheduler.ModeHost {
+		tenantUUID = tenantUUIDFromRequestLegacy(c)
+		if strings.TrimSpace(tenantUUID) == "" {
+			tenantUUID = h.defaultTenant
+		}
+	}
 	jobs, err := scheduler.ListJobs(c.Request.Context(), fwscheduler.ListJobsInput{
-		TenantUUID: h.tenantUUID(c),
+		TenantUUID: tenantUUID,
 		OwnerType:  c.Query("owner_type"),
 		OwnerID:    c.Query("owner_id"),
 		Status:     c.Query("status"),
@@ -320,9 +322,13 @@ func (h *SchedulerJobHandler) Trigger(c *gin.Context) {
 		notification = h.publishLocalSchedulerNotification(c.Request.Context(), strings.TrimSpace(c.GetHeader("X-Request-ID")), job, tenantUUID)
 	}
 	contracts.ResponseSuccess(c, gin.H{
-		"job_id":       jobID,
-		"status":       "triggered",
-		"notification": notification,
+		"job_id":                     jobID,
+		"status":                     "triggered",
+		"provider_mode":              mode,
+		"effective_target":           mode,
+		"host_trigger_ok":            mode == fwscheduler.ModeHost,
+		"local_notification_skipped": mode == fwscheduler.ModeHost,
+		"notification":               notification,
 	})
 }
 
@@ -508,19 +514,46 @@ func (h *SchedulerJobHandler) applyJobDefaults(c *gin.Context, req *fwscheduler.
 }
 
 func (h *SchedulerJobHandler) tenantUUID(c *gin.Context) string {
-	if schedulerProviderModeFromRequest(c, schedulerDebugRequest{}) == fwscheduler.ModeHost {
+	tenantUUID, mismatch := h.resolveTenantUUID(c, "")
+	if mismatch {
 		return ""
 	}
-	if v := tenantUUIDFromRequest(c); v != "" {
-		return v
-	}
-	if h != nil {
-		return strings.TrimSpace(h.defaultTenant)
+	if strings.TrimSpace(tenantUUID) != "" {
+		return strings.TrimSpace(tenantUUID)
 	}
 	return ""
 }
 
-func tenantUUIDFromRequest(c *gin.Context) string {
+func (h *SchedulerJobHandler) resolveTenantUUID(c *gin.Context, requested string) (string, bool) {
+	if tenantUUID, mismatch := tenantUUIDFromRequest(c, requested); strings.TrimSpace(tenantUUID) != "" || mismatch {
+		return tenantUUID, mismatch
+	}
+	if c != nil && c.Request != nil && h != nil && h.deps != nil && h.deps.CapabilityGateway != nil && schedulerHostLinkEnabled(h.deps) {
+		if tenantUUID, err := h.deps.CapabilityGateway.ResolveGatewayTenantUUID(c.Request.Context()); err == nil && strings.TrimSpace(tenantUUID) != "" {
+			return strings.TrimSpace(tenantUUID), false
+		}
+	}
+	if h != nil {
+		return strings.TrimSpace(h.defaultTenant), false
+	}
+	return "", false
+}
+
+func tenantUUIDFromRequest(c *gin.Context, requested string) (string, bool) {
+	tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, requested)
+	if mismatch {
+		return "", true
+	}
+	if strings.TrimSpace(tenantUUID) != "" {
+		return strings.TrimSpace(tenantUUID), false
+	}
+	if v := tenantUUIDFromRequestLegacy(c); v != "" {
+		return v, false
+	}
+	return "", false
+}
+
+func tenantUUIDFromRequestLegacy(c *gin.Context) string {
 	if c == nil {
 		return ""
 	}

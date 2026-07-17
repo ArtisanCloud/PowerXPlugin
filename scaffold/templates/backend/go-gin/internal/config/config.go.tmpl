@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	pxlog "{{ .BackendModulePath }}/internal/logger"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -78,6 +79,9 @@ type Config struct {
 	// CustomerAuth (mini-app / 2C) 鉴权配置。
 	CustomerAuth *CustomerAuthConfig `yaml:"customer_auth" json:"customer_auth"`
 
+	// Knowledge 智能体/Skill 知识库 provider 配置。
+	Knowledge *KnowledgeConfig `yaml:"knowledge" json:"knowledge"`
+
 	// EventBridge (TaskBus / 本地事件桥) 配置。
 	EventBridge *EventBridgeConfig `yaml:"event_bridge" json:"event_bridge"`
 
@@ -125,6 +129,8 @@ type CustomerAuthConfig struct {
 	JWTAudience      string `yaml:"jwt_audience" json:"jwt_audience"`
 	JWTSecret        string `yaml:"jwt_secret" json:"jwt_secret"`
 	CacheTTLSeconds  int    `yaml:"cache_ttl_seconds" json:"cache_ttl_seconds"`
+	BreakGlassLocal  bool   `yaml:"break_glass_local" json:"break_glass_local"`
+	BreakGlassReason string `yaml:"break_glass_reason" json:"break_glass_reason"`
 }
 
 // ServerConfig 服务配置
@@ -152,6 +158,7 @@ type RuntimeConfig struct {
 	WSBus       *WSBusConfig        `yaml:"ws_bus" json:"ws_bus"`
 	Integration *IntegrationConfig  `yaml:"integration" json:"integration"`
 	Cache       *RuntimeCacheConfig `yaml:"cache" json:"cache"`
+	Knowledge   *KnowledgeConfig    `yaml:"knowledge" json:"knowledge"`
 }
 
 type RuntimeCacheConfig struct {
@@ -181,6 +188,9 @@ func applyRuntimeNamespacesToLegacy(cfg *Config) {
 	if cfg.Runtime.Integration != nil {
 		cfg.Integration = cfg.Runtime.Integration
 	}
+	if cfg.Runtime.Knowledge != nil {
+		cfg.Knowledge = cfg.Runtime.Knowledge
+	}
 	if cfg.Logging != nil {
 		if ginMode := strings.TrimSpace(cfg.Runtime.GinMode); ginMode != "" {
 			cfg.Logging.GinMode = strings.ToLower(ginMode)
@@ -208,6 +218,7 @@ func syncLegacyNamespacesToRuntime(cfg *Config) {
 	cfg.Runtime.EventBridge = cfg.EventBridge
 	cfg.Runtime.WSBus = cfg.WSBus
 	cfg.Runtime.Integration = cfg.Integration
+	cfg.Runtime.Knowledge = cfg.Knowledge
 	if cfg.Logging != nil {
 		cfg.Runtime.GinMode = cfg.Logging.GinMode
 		httpLog := cfg.Logging.HTTPAccess
@@ -297,7 +308,6 @@ type GatewayConfig struct {
 	APIPrefix    string        `yaml:"api_prefix" json:"api_prefix"`
 	AuthScheme   string        `yaml:"auth_scheme" json:"auth_scheme"`
 	APIKey       string        `yaml:"api_key" json:"api_key"`
-	TenantUUID   string        `yaml:"tenant_uuid" json:"tenant_uuid"`
 	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
 	UserAgent    string        `yaml:"user_agent" json:"user_agent"`
 	UseMock      []string      `yaml:"use_mock" json:"use_mock"`
@@ -433,8 +443,8 @@ type ContextConfig struct {
 	Audience string        `yaml:"audience" json:"audience"`
 	TTL      time.Duration `yaml:"ttl" json:"ttl"`
 
-	// IAM 模式（可选）：delegated / local，留空按环境变量规则推断
-	IAMMode string `yaml:"iam_mode" json:"iam_mode"`
+	// Provider 模式（可选）：delegated / local，留空按环境变量规则推断
+	ProviderMode string `yaml:"provider_mode" json:"provider_mode"`
 }
 
 // Load 加载配置，优先级：YAML 文件 > 默认值（不再从环境变量覆盖）
@@ -1018,10 +1028,8 @@ func loadEnvConfig(cfg *Config) {
 			cfg.Context.TTL = ttl
 		}
 	}
-	if iamMode := resolveConfigValue(os.Getenv("IAM_MODE")); iamMode != "" {
-		cfg.Context.IAMMode = iamMode
-	} else if iamModeCamel := resolveConfigValue(os.Getenv("IAMMode")); iamModeCamel != "" {
-		cfg.Context.IAMMode = iamModeCamel
+	if providerMode := resolveConfigValue(os.Getenv("POWERX_PROVIDER_MODE")); providerMode != "" {
+		cfg.Context.ProviderMode = providerMode
 	}
 
 	// gRPC 上游配置
@@ -1182,7 +1190,6 @@ func normalizeConfig(cfg *Config) {
 		cfg.Gateway.AuthScheme = normalizeGatewayAuthScheme(resolveConfigValue(cfg.Gateway.AuthScheme))
 		cfg.Gateway.RefreshToken = ""
 		cfg.Gateway.APIKey = resolveConfigValue(cfg.Gateway.APIKey)
-		cfg.Gateway.TenantUUID = strings.ToLower(resolveConfigValue(cfg.Gateway.TenantUUID))
 		cfg.Gateway.AuthBaseURL = resolveConfigValue(cfg.Gateway.AuthBaseURL)
 
 		if cfg.Gateway.AuthScheme == "" {
@@ -1194,7 +1201,6 @@ func normalizeConfig(cfg *Config) {
 		if cfg.Logging != nil && cfg.Logging.DebugMode && !isHostDelegatedMode(cfg) {
 			baseURL := strings.TrimSpace(cfg.Gateway.BaseURL)
 			apiKey := strings.TrimSpace(cfg.Gateway.APIKey)
-			tenantUUID := strings.TrimSpace(cfg.Gateway.TenantUUID)
 
 			hasAny := baseURL != "" || apiKey != ""
 			incomplete := baseURL == "" || !hasGatewayCredential(cfg.Gateway)
@@ -1208,13 +1214,11 @@ func normalizeConfig(cfg *Config) {
 					"gateway.base_url":    baseURL,
 					"gateway.auth_scheme": cfg.Gateway.AuthScheme,
 					"gateway.api_key":     apiKey != "",
-					"gateway.tenant_uuid": tenantUUID,
 				}), "Gateway config is incomplete; gateway disabled in dev mode (set gateway.base_url + selected credential)")
 
 				cfg.Gateway.BaseURL = ""
 				cfg.Gateway.AuthScheme = ""
 				cfg.Gateway.APIKey = ""
-				cfg.Gateway.TenantUUID = ""
 			}
 		}
 	}
@@ -1247,13 +1251,47 @@ func normalizeConfig(cfg *Config) {
 		cfg.CustomerAuth.JWTAudience = resolveConfigValue(cfg.CustomerAuth.JWTAudience)
 		cfg.CustomerAuth.JWTSecret = resolveConfigValue(cfg.CustomerAuth.JWTSecret)
 	}
+	if cfg.Knowledge != nil {
+		cfg.Knowledge.Mode = strings.ToLower(resolveConfigValue(cfg.Knowledge.Mode))
+		cfg.Knowledge.DelegateEndpoint = resolveConfigValue(cfg.Knowledge.DelegateEndpoint)
+		cfg.Knowledge.DelegateTimeout = resolveConfigValue(cfg.Knowledge.DelegateTimeout)
+	}
+	applyKnowledgeEnvOverrides(cfg)
+}
+
+func applyKnowledgeEnvOverrides(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	if knowledgeMode := firstEnvValue("POWERX_KNOWLEDGE_MODE", "PX_KNOWLEDGE_MODE"); knowledgeMode != "" {
+		if cfg.Knowledge == nil {
+			cfg.Knowledge = &KnowledgeConfig{}
+		}
+		cfg.Knowledge.Mode = strings.ToLower(strings.TrimSpace(knowledgeMode))
+	}
+	if knowledgeEndpoint := firstEnvValue("POWERX_KNOWLEDGE_DELEGATE_ENDPOINT", "PX_KNOWLEDGE_DELEGATE_ENDPOINT"); knowledgeEndpoint != "" {
+		if cfg.Knowledge == nil {
+			cfg.Knowledge = &KnowledgeConfig{}
+		}
+		cfg.Knowledge.DelegateEndpoint = strings.TrimSpace(knowledgeEndpoint)
+	}
+	if knowledgeTimeout := firstEnvValue("POWERX_KNOWLEDGE_DELEGATE_TIMEOUT", "PX_KNOWLEDGE_DELEGATE_TIMEOUT"); knowledgeTimeout != "" {
+		if cfg.Knowledge == nil {
+			cfg.Knowledge = &KnowledgeConfig{}
+		}
+		cfg.Knowledge.DelegateTimeout = strings.TrimSpace(knowledgeTimeout)
+	}
 }
 
 func isHostDelegatedMode(cfg *Config) bool {
-	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
+	if !isPowerXProxyMode() {
 		return false
 	}
-	return cfg != nil && cfg.Context != nil && strings.ToLower(strings.TrimSpace(cfg.Context.IAMMode)) == "delegated"
+	return cfg != nil && cfg.Context != nil && strings.ToLower(strings.TrimSpace(cfg.Context.ProviderMode)) == "delegated"
+}
+
+func isPowerXProxyMode() bool {
+	return strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
 }
 
 func normalizeGRPCServerConfig(server *GRPCServer) {
@@ -1530,9 +1568,9 @@ func (c *Config) Validate() error {
 		c.CustomerAuth.Mode = mode
 	}
 	switch c.CustomerAuth.Mode {
-	case "local", "delegate":
+	case "local", "local_dev", "mock", "delegate", "platform", "third_party":
 	default:
-		return NewConfigError("customer_auth.mode must be one of: local, delegate")
+		return NewConfigError("customer_auth.mode must be one of: local, local_dev, mock, delegate, platform, third_party")
 	}
 
 	if strings.TrimSpace(c.CustomerAuth.DelegateTimeout) == "" {
@@ -1545,10 +1583,10 @@ func (c *Config) Validate() error {
 		return NewConfigError("customer_auth.cache_ttl_seconds must be non-negative")
 	}
 
-	if c.CustomerAuth.Mode == "delegate" {
+	if c.CustomerAuth.Mode == "delegate" || c.CustomerAuth.Mode == "platform" || c.CustomerAuth.Mode == "third_party" {
 		endpoint := strings.TrimSpace(c.CustomerAuth.DelegateEndpoint)
 		if endpoint == "" {
-			return NewConfigError("customer_auth.delegate_endpoint is required when mode=delegate")
+			return NewConfigError("customer_auth.delegate_endpoint is required when customer_auth.mode delegates to platform")
 		}
 		parsed, err := url.Parse(endpoint)
 		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
@@ -1556,10 +1594,24 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.CustomerAuth.Mode == "local" && c.IsProduction() {
-		if strings.TrimSpace(c.CustomerAuth.JWTSecret) == "" {
-			return NewConfigError("customer_auth.jwt_secret is required in production when mode=local")
-		}
+	sourceMode := customerfw.CustomerAuthSource(c.CustomerAuth.Mode)
+	if c.CustomerAuth.Mode == "local" {
+		sourceMode = customerfw.CustomerAuthSourceLocal
+	}
+	if err := customerfw.ValidateSourcePolicy(customerfw.SourcePolicy{
+		Mode:       sourceMode,
+		Production: c.IsProduction(),
+		BreakGlass: c.CustomerAuth.BreakGlassLocal,
+	}); err != nil {
+		return NewConfigError(err.Error())
+	}
+	if c.IsProduction() && c.CustomerAuth.BreakGlassLocal && strings.TrimSpace(c.CustomerAuth.BreakGlassReason) == "" {
+		return NewConfigError("customer_auth.break_glass_reason is required when break_glass_local is enabled")
+	}
+
+	applyKnowledgeEnvOverrides(c)
+	if err := c.NormalizeKnowledgeConfig(); err != nil {
+		return err
 	}
 
 	// EventBridge 配置默认值与验证
@@ -1771,15 +1823,6 @@ func (c *Config) Validate() error {
 			}
 			if strings.TrimSpace(c.Gateway.BaseURL) == "" || !hasGatewayCredential(c.Gateway) {
 				return NewConfigError("gateway config requires base_url + credential matching auth_scheme")
-			}
-
-			if c.Gateway.AuthScheme == "bearer" {
-				tenantUUID := strings.TrimSpace(c.Gateway.TenantUUID)
-				if tenantUUID != "" {
-					if _, err := uuid.Parse(tenantUUID); err != nil {
-						return NewConfigError("gateway.tenant_uuid must be a valid UUID string")
-					}
-				}
 			}
 		}
 	}

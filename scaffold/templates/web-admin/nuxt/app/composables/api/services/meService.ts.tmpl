@@ -55,7 +55,7 @@ export const useMeService = () => {
   const auth = useAuth();
   const runtimeConfig = useRuntimeConfig();
   const delegatedMode = (() => {
-    const raw = String(runtimeConfig.public?.iamMode || "").trim().toLowerCase();
+    const raw = String(runtimeConfig.public?.providerMode || "").trim().toLowerCase();
     if (raw) return raw === "delegated";
     return Boolean(runtimeConfig.public?.delegatedMode || runtimeConfig.public?.insidePowerX);
   })();

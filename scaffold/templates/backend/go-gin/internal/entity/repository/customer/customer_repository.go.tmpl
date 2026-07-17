@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	customerdomain "{{ .BackendModulePath }}/internal/domain/customer"
 	customermodel "{{ .BackendModulePath }}/internal/entity/models/customer"
 	"{{ .BackendModulePath }}/internal/entity/repository"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -128,7 +131,116 @@ func (r *Repository) CreateCustomer(ctx context.Context, customer *customermodel
 		}
 	}
 
-	return r.Create(ctx, customer)
+	if customer.CustomerUUID == "" {
+		customer.CustomerUUID = uuid.NewString()
+	}
+	if customer.PrimaryEmail == "" {
+		customer.PrimaryEmail = customer.Email
+	}
+	if customer.PrimaryPhone == "" {
+		customer.PrimaryPhone = customer.Phone
+	}
+	if customer.Metadata == nil {
+		customer.Metadata = datatypes.JSONMap{}
+	}
+
+	tx := r.DB.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	if err := tx.Create(customer).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	identity := &customermodel.CustomerAuthIdentity{
+		CustomerUUID: customer.CustomerUUID,
+		Provider:     "password",
+		Email:        customer.Email,
+		Phone:        customer.Phone,
+		PasswordHash: customer.PasswordHash,
+		Status:       customer.Status,
+		Metadata:     datatypes.JSONMap{},
+	}
+	if customer.EmailVerified || customer.PhoneVerified {
+		now := time.Now()
+		identity.VerifiedAt = &now
+	}
+	if err := tx.Create(identity).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	membership := &customermodel.CustomerTenantMembership{
+		MembershipUUID: uuid.NewString(),
+		TenantUUID:     tenantUUID,
+		CustomerUUID:   customer.CustomerUUID,
+		Status:         customer.Status,
+		Roles:          datatypes.JSON([]byte("[]")),
+		Scopes:         datatypes.JSON([]byte("[]")),
+		Source:         "local_dev",
+		Metadata:       datatypes.JSONMap{},
+	}
+	if err := tx.Create(membership).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+	return customer, nil
+}
+
+func (r *Repository) ResolveMembership(ctx context.Context, customerUUID string, tenantUUID string) (*customermodel.CustomerTenantMembership, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	customerUUID = strings.ToLower(strings.TrimSpace(customerUUID))
+	tenantUUID = strings.ToLower(strings.TrimSpace(tenantUUID))
+	if customerUUID == "" || tenantUUID == "" {
+		return nil, ErrCustomerNotFound
+	}
+	var out customermodel.CustomerTenantMembership
+	err := r.DB.WithContext(ctx).
+		Where("customer_uuid = ? AND tenant_uuid = ?", customerUUID, tenantUUID).
+		First(&out).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (r *Repository) ListMemberships(ctx context.Context, customerUUID string) ([]customermodel.CustomerTenantMembership, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("repository database is not initialized")
+	}
+	customerUUID = strings.ToLower(strings.TrimSpace(customerUUID))
+	if customerUUID == "" {
+		return nil, ErrCustomerNotFound
+	}
+	var out []customermodel.CustomerTenantMembership
+	err := r.DB.WithContext(ctx).
+		Where("customer_uuid = ?", customerUUID).
+		Where("status <> ?", string(customerdomain.CustomerStatusDeleted)).
+		Find(&out).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, ErrCustomerNotFound
+	}
+	return out, nil
 }
 
 func (r *Repository) UpdateStatus(ctx context.Context, tenantUUID string, customerUUID string, status string) error {

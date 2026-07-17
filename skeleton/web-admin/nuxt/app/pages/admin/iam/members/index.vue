@@ -4,6 +4,8 @@ import { storeToRefs } from "pinia";
 import DepartmentManager from "@/components/settings/users/DepartmentManager.vue";
 import UserShell from "@/components/settings/users/UsersShell.vue";
 import PermissionShell from "@/components/settings/users/PermissionShell.vue";
+import { useIAMService } from "~/composables/api/services/iamService";
+import { defaultProviderMode, normalizeProviderMode, type ProviderModeDiagnostics } from "~/composables/api/useProviderMode";
 import { useUserStore } from "~/stores/user";
 
 definePageMeta({
@@ -13,13 +15,20 @@ definePageMeta({
 });
 
 const { t } = useI18n();
+const iam = useIAMService();
 const activeTab = ref("departments");
+const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
 
 // 使用用户状态 Store
 const userStore = useUserStore();
 const { isRoot, isCurrentTenantAdmin, isLoading, error } =
   storeToRefs(userStore);
 const canManageIAM = computed(() => Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value));
+const readonlyMode = computed(() => Boolean(providerMode.value.read_only));
+const canWriteIAM = computed(() => canManageIAM.value && !readonlyMode.value);
+const providerModeLabel = computed(() =>
+  providerMode.value.mode === "delegated" ? t("providerMode.delegated") : t("providerMode.local")
+);
 
 // 根据用户角色动态生成选项卡
 const tabs = computed(() => {
@@ -50,6 +59,12 @@ const tabs = computed(() => {
 // 组件挂载时加载用户上下文
 onMounted(async () => {
   try {
+    const modeResponse = await iam.mode();
+    providerMode.value = normalizeProviderMode((modeResponse as any)?.data);
+  } catch {
+    providerMode.value = defaultProviderMode();
+  }
+  try {
     await userStore.fetchUserContext();
   } catch (error) {
     console.error("加载用户上下文失败:", error);
@@ -66,6 +81,10 @@ onMounted(async () => {
       <p class="mt-2 text-gray-600 dark:text-gray-300">
         {{ t("organization.description") }}
       </p>
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <UBadge color="neutral" variant="soft">{{ providerModeLabel }}</UBadge>
+        <UBadge v-if="readonlyMode" color="warning" variant="soft">{{ t("providerMode.readOnly") }}</UBadge>
+      </div>
     </div>
 
     <section
@@ -91,8 +110,8 @@ onMounted(async () => {
       </div>
 
       <div class="mt-8 space-y-8 text-gray-900 dark:text-gray-100">
-        <DepartmentManager v-if="activeTab === 'departments'" :readonly="!canManageIAM" />
-        <UserShell v-else-if="activeTab === 'users'" :readonly="!canManageIAM" />
+        <DepartmentManager v-if="activeTab === 'departments'" :readonly="!canWriteIAM" />
+        <UserShell v-else-if="activeTab === 'users'" :readonly="!canWriteIAM" />
         <PermissionShell v-else-if="activeTab === 'permissions'" />
       </div>
     </section>

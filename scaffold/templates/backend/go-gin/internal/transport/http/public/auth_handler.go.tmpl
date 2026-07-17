@@ -32,7 +32,7 @@ type authProxy interface {
 
 // AuthHandler exposes /api/v1/auth public endpoints.
 type AuthHandler struct {
-	mode      iamservice.IAMMode
+	mode      iamservice.IAMAdapterMode
 	proxy     authProxy
 	local     iamservice.IAMDirectory
 	tenantSvc *iamservice.TenantService
@@ -47,7 +47,7 @@ func NewAuthHandler(deps *app.Deps) *AuthHandler {
 	if deps.DB != nil {
 		tenantSvc = iamservice.NewTenantService(deps.DB, nil)
 	}
-	return &AuthHandler{mode: deps.IAMMode, proxy: deps.AuthProxy, local: deps.IAMDirectory, tenantSvc: tenantSvc}
+	return &AuthHandler{mode: deps.IAMAdapterMode, proxy: deps.AuthProxy, local: deps.IAMDirectory, tenantSvc: tenantSvc}
 }
 
 // RegisterAuthRoutes wires /auth routes beneath the API prefix.
@@ -69,12 +69,12 @@ func RegisterAuthRoutes(group *gin.RouterGroup, deps *app.Deps) {
 // Login proxies login requests to PowerX Core.
 func (h *AuthHandler) Login(c *gin.Context) {
 	switch h.mode {
-	case iamservice.IAMModeDelegated:
+	case iamservice.IAMAdapterModeDelegated:
 		if !h.ensureDelegated(c) {
 			return
 		}
 		h.handleDelegatedLogin(c)
-	case iamservice.IAMModeLocal:
+	case iamservice.IAMAdapterModeLocal:
 		h.handleLocalLogin(c)
 	default:
 		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
@@ -84,12 +84,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // Refresh exchanges refresh_token for a new access token.
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	switch h.mode {
-	case iamservice.IAMModeDelegated:
+	case iamservice.IAMAdapterModeDelegated:
 		if !h.ensureDelegated(c) {
 			return
 		}
 		h.handleDelegatedRefresh(c)
-	case iamservice.IAMModeLocal:
+	case iamservice.IAMAdapterModeLocal:
 		h.handleLocalRefresh(c)
 	default:
 		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
@@ -99,12 +99,12 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 // Logout revokes the current refresh token upstream.
 func (h *AuthHandler) Logout(c *gin.Context) {
 	switch h.mode {
-	case iamservice.IAMModeDelegated:
+	case iamservice.IAMAdapterModeDelegated:
 		if !h.ensureDelegated(c) {
 			return
 		}
 		h.handleDelegatedLogout(c)
-	case iamservice.IAMModeLocal:
+	case iamservice.IAMAdapterModeLocal:
 		h.handleLocalLogout(c)
 	default:
 		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
@@ -114,12 +114,12 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // MeContext fetches the active user context from PowerX Core.
 func (h *AuthHandler) MeContext(c *gin.Context) {
 	switch h.mode {
-	case iamservice.IAMModeDelegated:
+	case iamservice.IAMAdapterModeDelegated:
 		if !h.ensureDelegated(c) {
 			return
 		}
 		h.handleDelegatedMeContext(c)
-	case iamservice.IAMModeLocal:
+	case iamservice.IAMAdapterModeLocal:
 		h.handleLocalMeContext(c)
 	default:
 		contracts.ResponseServiceUnavailable(c, "当前 IAM 模式未启用", nil)
@@ -193,7 +193,7 @@ func (h *AuthHandler) SearchTenants(c *gin.Context) {
 }
 
 func (h *AuthHandler) ensureDelegated(c *gin.Context) bool {
-	if h.mode != iamservice.IAMModeDelegated {
+	if h.mode != iamservice.IAMAdapterModeDelegated {
 		contracts.ResponseServiceUnavailable(c, "当前路由仅支持 Delegated 模式", nil)
 		return false
 	}
@@ -561,14 +561,16 @@ func mapTokens(tokens *iamservice.AuthTokens) gin.H {
 		expiresAt = time.Now().Add(time.Duration(tokens.ExpiresIn) * time.Second)
 	}
 	return gin.H{
-		"token_type":     tokens.TokenType,
-		"access_token":   tokens.AccessToken,
-		"refresh_token":  tokens.RefreshToken,
-		"expires_in":     tokens.ExpiresIn,
-		"expires_at":     expiresAt.UnixMilli(),
-		"scope":          tokens.Scope,
-		"policy_version": tokens.PolicyVersion,
-		"plugin_id":      tokens.PluginID,
+		"token_type":          tokens.TokenType,
+		"access_token":        tokens.AccessToken,
+		"refresh_token":       tokens.RefreshToken,
+		"expires_in":          tokens.ExpiresIn,
+		"expires_at":          expiresAt.UnixMilli(),
+		"scope":               tokens.Scope,
+		"tenant_uuid":         strings.TrimSpace(tokens.TenantUUID),
+		"current_tenant_uuid": strings.TrimSpace(tokens.TenantUUID),
+		"policy_version":      tokens.PolicyVersion,
+		"plugin_id":           tokens.PluginID,
 	}
 }
 

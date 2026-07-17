@@ -9,24 +9,24 @@
 
 ## Technical Context
 
-**Language/Version**: Go 1.24 (backend), TypeScript 5 / Nuxt 4.2 (web admin)  
-**Primary Dependencies**: Gin, Gorm, `$fetch`/Nitro、Pinia、`@nuxt/ui`, PowerX framework middleware、`@artisan-cloud/plugin-framework-*`  
-**Storage**: 插件数据库（SQLite/PostgreSQL 由配置决定）中的业务表 + 新增 IAM 表（Local 模式）；Delegated 模式仅读写宿主 API  
-**Testing**: `go test ./...`, `npm test`, `npm run lint`, Playwright (登录/刷新/登出)  
-**Target Platform**: Linux (PowerX host pods) + 浏览器（Chrome/Edge/Safari 最新版）  
-**Project Type**: Web（Go backend + Nuxt admin SPA）  
-**Performance Goals**: Delegated 登录 p90 ≤ 2s；Token 刷新成功率 ≥98%；登出清理耗时 <1s；本地模式迁移 + 种子 ≤60s  
-**Constraints**: Must fail closed when Core auth不可用；token 仅存 localStorage+cookie；模板需可通过 `px-plugin init` 即可运行；需要记录 `plugin_iam_mode` 指标  
+**Language/Version**: Go 1.24 (backend), TypeScript 5 / Nuxt 4.2 (web admin)
+**Primary Dependencies**: Gin, Gorm, `$fetch`/Nitro、Pinia、`@nuxt/ui`, PowerX framework middleware、`@artisan-cloud/plugin-framework-*`
+**Storage**: 插件数据库（SQLite/PostgreSQL 由配置决定）中的业务表 + 新增 IAM 表（Local 模式）；Delegated 模式仅读写宿主 API
+**Testing**: `go test ./...`, `npm test`, `npm run lint`, Playwright (登录/刷新/登出)
+**Target Platform**: Linux (PowerX host pods) + 浏览器（Chrome/Edge/Safari 最新版）
+**Project Type**: Web（Go backend + Nuxt admin SPA）
+**Performance Goals**: Delegated 登录 p90 ≤ 2s；Token 刷新成功率 ≥98%；登出清理耗时 <1s；本地模式迁移 + 种子 ≤60s
+**Constraints**: Must fail closed when Core auth不可用；token 仅存 localStorage+cookie；模板需可通过 `px-plugin init` 即可运行；需要记录 `plugin_provider_mode` 指标
 **Scale/Scope**: 预计单租户上千活跃用户、几十插件实例；需要支持多租户 Token / Tenant Header 同步
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- **I. 双重使命仓库**：✅ 方案所有改动都会同步 Skeleton 与模板，并在 Quickstart 中强调 `npm run sync:templates`。  
-- **II. 契约优先兼容性**：✅ Phase 1 输出 OpenAPI (`/specs/005-plugin-auth/contracts/auth.openapi.yaml`) 并要求后端/前端消费。  
-- **III. Go + Nuxt 基线**：✅ 技术栈仅使用 Go Gin + Nuxt 4；无额外语言。  
-- **IV. 脚手架与 CLI 纪律**：✅ 快速上手文档要求 `px-plugin init` 校验，并同步 CLI 模板环境变量。  
+- **I. 双重使命仓库**：✅ 方案所有改动都会同步 Skeleton 与模板，并在 Quickstart 中强调 `npm run sync:templates`。
+- **II. 契约优先兼容性**：✅ Phase 1 输出 OpenAPI (`/specs/005-plugin-auth/contracts/auth.openapi.yaml`) 并要求后端/前端消费。
+- **III. Go + Nuxt 基线**：✅ 技术栈仅使用 Go Gin + Nuxt 4；无额外语言。
+- **IV. 脚手架与 CLI 纪律**：✅ 快速上手文档要求 `px-plugin init` 校验，并同步 CLI 模板环境变量。
 - **V. 透明交付**：✅ Spec/plan/research/data-model/quickstart 均记录真实状态；无闸门豁免。
 > 结论：无宪章违规，可进入 Phase 0。
 
@@ -101,9 +101,9 @@ scaffold/templates/** + tools/cli/** mirror skeleton
 |------|-------|-------|
 | 明确 Delegated 模式下 Core 故障策略（fail-closed vs fallback） | Backend | 参考 PowerX IAM 要求 → fail-closed |
 | 确认 Local 模式管理员凭证注入方式 | Backend | 使用 `PLUGIN_IAM_ADMIN_*` env / config，缺失则报错 |
-| 统一模式切换环境变量（`IAMMode` + `POWERX_PROXY`） | Backend | 记录速记表，供 Resolver 使用 |
+| 统一模式切换环境变量（`POWERX_PROVIDER_MODE` + `POWERX_PROXY`） | Backend | 记录速记表，供 Resolver 使用 |
 | Token 存储 & 同步策略 | Frontend | 沿用宿主 localStorage + cookie + storage event |
-| Observability 指标与日志字段 | Backend | `plugin_iam_mode`、`plugin_auth_login_total` 等 |
+| Observability 指标与日志字段 | Backend | `plugin_provider_mode`、`plugin_auth_login_total` 等 |
 
 > 产物：`/specs/005-plugin-auth/research.md`
 
@@ -111,7 +111,7 @@ scaffold/templates/** + tools/cli/** mirror skeleton
 
 | Deliverable | Description |
 |-------------|-------------|
-| `data-model.md` | 描述 AuthTokens、TenantContext、User、Tenant、Role、Department、IAMModeSetting 等实体及约束 |
+| `data-model.md` | 描述 AuthTokens、TenantContext、User、Tenant、Role、Department、ProviderModeSetting 等实体及约束 |
 | `contracts/auth.openapi.yaml` | 定义 `/api/v1/auth/{login,refresh,logout,me/context}` 请求/响应、header、错误模型 |
 | `quickstart.md` | 引导开发者在 Delegated 与 Local 模式间切换、配置 env、运行测试（Go & Nuxt） |
 | Skeleton 变更 | `useAuth`、`authService`、middleware、后端 `IAMDirectory`、router/public handler、migrate 拆分 |
@@ -125,7 +125,7 @@ scaffold/templates/** + tools/cli/** mirror skeleton
 | Task | Details |
 |------|---------|
 | 细化任务拆解 | 交给 `/speckit.tasks`：前端、后端、模板、测试、文档、CI |
-| 定义验收测试 | Playwright login/refresh/logout，Go 单测覆盖 IAMResolver、AuthProxy |
+| 定义验收测试 | Playwright login/refresh/logout，Go 单测覆盖 ProviderResolver、AuthProxy |
 | 集成计划 | 先在 Skeleton 验证，再同步模板 + CLI，最后运行 `px-plugin init` 生成样例并 smoke test |
 
 ---

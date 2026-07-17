@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	"{{ .BackendModulePath }}/internal/contracts"
 	iamm "{{ .BackendModulePath }}/internal/entity/models/iam"
 	authmw "{{ .BackendModulePath }}/internal/middleware"
@@ -14,8 +15,9 @@ import (
 )
 
 type DepartmentHandler struct {
-	service *srviam.DepartmentService
-	mode    srviam.IAMMode
+	service   *srviam.DepartmentService
+	mode      srviam.IAMAdapterMode
+	directory fwiamcontracts.DirectoryService
 }
 
 type departmentNode struct {
@@ -23,8 +25,12 @@ type departmentNode struct {
 	Children []*departmentNode `json:"children,omitempty"`
 }
 
-func NewDepartmentHandler(svc *srviam.DepartmentService, mode srviam.IAMMode) *DepartmentHandler {
-	return &DepartmentHandler{service: svc, mode: mode}
+func NewDepartmentHandler(svc *srviam.DepartmentService, mode srviam.IAMAdapterMode, directories ...fwiamcontracts.DirectoryService) *DepartmentHandler {
+	var directory fwiamcontracts.DirectoryService
+	if len(directories) > 0 {
+		directory = directories[0]
+	}
+	return &DepartmentHandler{service: svc, mode: mode, directory: directory}
 }
 
 func (h *DepartmentHandler) List(c *gin.Context) {
@@ -38,6 +44,18 @@ func (h *DepartmentHandler) List(c *gin.Context) {
 	}
 	if strings.TrimSpace(query.TenantUUID) == "" {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		deps, ok := h.delegatedDepartments(c, query.TenantUUID)
+		if !ok {
+			return
+		}
+		contracts.ResponseSuccess(c, gin.H{"items": deps})
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local department service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
 	deps, err := h.service.List(c.Request.Context(), srviam.DepartmentFilter{TenantUUID: query.TenantUUID})
@@ -59,6 +77,18 @@ func (h *DepartmentHandler) Tree(c *gin.Context) {
 	}
 	if strings.TrimSpace(query.TenantUUID) == "" {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	if h.mode == srviam.IAMAdapterModeDelegated {
+		deps, ok := h.delegatedDepartments(c, query.TenantUUID)
+		if !ok {
+			return
+		}
+		contracts.ResponseSuccess(c, buildDelegatedDepartmentTree(deps))
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local department service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
 	deps, err := h.service.List(c.Request.Context(), srviam.DepartmentFilter{TenantUUID: query.TenantUUID})
@@ -85,8 +115,12 @@ func (h *DepartmentHandler) Tree(c *gin.Context) {
 }
 
 func (h *DepartmentHandler) Create(c *gin.Context) {
-	if h.mode == srviam.IAMModeDelegated {
+	if h.mode == srviam.IAMAdapterModeDelegated {
 		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "department write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local department service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
 	var req CreateDepartmentRequest
@@ -124,8 +158,12 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 }
 
 func (h *DepartmentHandler) Update(c *gin.Context) {
-	if h.mode == srviam.IAMModeDelegated {
+	if h.mode == srviam.IAMAdapterModeDelegated {
 		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "department write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local department service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -159,8 +197,12 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 }
 
 func (h *DepartmentHandler) Delete(c *gin.Context) {
-	if h.mode == srviam.IAMModeDelegated {
+	if h.mode == srviam.IAMAdapterModeDelegated {
 		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "department write operations are not allowed in delegated mode")
+		return
+	}
+	if h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local department service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -179,4 +221,41 @@ func (h *DepartmentHandler) Delete(c *gin.Context) {
 		return
 	}
 	contracts.ResponseSuccess(c, gin.H{"ok": true})
+}
+
+func (h *DepartmentHandler) delegatedDepartments(c *gin.Context, tenantUUID string) ([]fwiamcontracts.Department, bool) {
+	if h.directory == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM delegated directory provider is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "delegated"})
+		return nil, false
+	}
+	deps, err := h.directory.ListDepartments(c.Request.Context(), tenantUUID)
+	if err != nil {
+		respondIAMError(c, err)
+		return nil, false
+	}
+	return deps, true
+}
+
+type delegatedDepartmentNode struct {
+	fwiamcontracts.Department
+	Children []*delegatedDepartmentNode `json:"children,omitempty"`
+}
+
+func buildDelegatedDepartmentTree(deps []fwiamcontracts.Department) []*delegatedDepartmentNode {
+	nodes := make(map[string]*delegatedDepartmentNode, len(deps))
+	for i := range deps {
+		copy := deps[i]
+		nodes[copy.ID] = &delegatedDepartmentNode{Department: copy}
+	}
+	roots := make([]*delegatedDepartmentNode, 0, len(deps))
+	for _, node := range nodes {
+		if strings.TrimSpace(node.ParentID) != "" {
+			if parent, ok := nodes[node.ParentID]; ok {
+				parent.Children = append(parent.Children, node)
+				continue
+			}
+		}
+		roots = append(roots, node)
+	}
+	return roots
 }

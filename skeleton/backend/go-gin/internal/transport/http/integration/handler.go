@@ -114,7 +114,7 @@ func (h *Handler) RotateSecret(c *gin.Context) {
 func (h *Handler) InvokeCapability(c *gin.Context) {
 	ensureInvokeCORS(c)
 
-	if h == nil || !httpmw.RequireCapabilityGateway(c, h.deps) {
+	if h == nil {
 		return
 	}
 
@@ -132,6 +132,10 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	}
 
 	payload := ensurePayload(req.Payload)
+	if !httpmw.RequireCapabilityGateway(c, h.deps) {
+		return
+	}
+
 	preferredProtocol := strings.TrimSpace(req.PreferredProtocol)
 	if preferredProtocol == "" {
 		preferredProtocol = inferPreferredProtocol(payload)

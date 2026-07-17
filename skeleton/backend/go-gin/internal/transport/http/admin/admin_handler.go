@@ -112,6 +112,11 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 				Actions:     []string{"read", "create", "update", "delete"},
 				Description: "Template management permissions",
 			},
+			{
+				Resource:    "customer",
+				Actions:     []string{"read", "create"},
+				Description: "Customer identity, authentication source and tenant membership permissions",
+			},
 		},
 
 		Agents: []contracts.AgentConfig{

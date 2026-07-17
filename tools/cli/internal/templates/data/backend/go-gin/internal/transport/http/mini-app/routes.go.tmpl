@@ -1,8 +1,9 @@
 package miniapp
 
 import (
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	"{{ .BackendModulePath }}/internal/contracts"
-	customermw "{{ .BackendModulePath }}/internal/middleware/customer"
+	customersvc "{{ .BackendModulePath }}/internal/services/customer"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"{{ .BackendModulePath }}/internal/transport/http/mini-app/customerhttp"
@@ -23,9 +24,16 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	handler := NewCustomerHandler(deps)
 	auth.POST("/register", handler.Register)
 	auth.POST("/login", handler.Login)
+	auth.POST("/validate", handler.Validate)
+	base.POST("/bootstrap/resolve", handler.ResolveBootstrap)
 
 	// Protected mini-app endpoints require a validated customer token.
-	protected := base.Group("", customerhttp.Authenticate(deps), httpmw.EnsureTenant())
+	protected := base.Group(
+		"",
+		customerhttp.Authenticate(deps),
+		customerfw.RequireMembership(customersvc.NewFrameworkMembershipResolver(deps.DB)),
+		httpmw.EnsureTenant(),
+	)
 	protected.GET("/ping", ping)
 
 	templates := NewMiniAppTemplateHandler(deps)
@@ -35,7 +43,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 
 func ping(c *gin.Context) {
 	tenantUUID, _ := httpmw.TenantUUIDString(c)
-	cc, _ := customermw.GetCustomerContext(c)
+	cc, _ := customerfw.ContextFromGin(c)
 	contracts.ResponseSuccess(c, gin.H{
 		"tenant_uuid": tenantUUID,
 		"customer":    cc,

@@ -1,9 +1,17 @@
 id: {{ .PluginID }}.template.list
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 查询模板列表
+  zh: 查询模板列表
+  en: List Templates
 description: "查询模板列表的原子能力，支持分页与关键词过滤。"
+description_i18n:
+  zh-CN: 查询模板列表的原子能力，支持分页与关键词过滤。
+  zh: 查询模板列表的原子能力，支持分页与关键词过滤。
+  en: List templates with pagination and keyword filters.
 rbac:
-  resource: template
+  resource: base.templates
   actions: [read]
 provides:
   - id: schema/input/{{ .PluginID }}.template.list.v1
@@ -15,11 +23,20 @@ provides:
     kind: output
     version: 1.0.0
 metadata:
+  agent_response:
+    content: |-
+      已查询到 {{`{{ .pagination.total }}`}} 个模板。
+      {{`{{ .summary }}`}}
+      [查看模板列表](/templates/crud)
+    links:
+      - kind: template_list
+        label: 查看模板列表
+        href: /templates/crud
   protocols:
     rest:
-      method: GET
-      path: /api/v1/templates
-      description: "PowerX Gateway 统一鉴权后的 REST 列表入口"
+      method: POST
+      path: /api/v1/integration/capabilities/invoke
+      description: "PowerX Gateway 统一鉴权后的插件能力入口"
     grpc:
       service: powerx.template.TemplateService
       method: ListTemplates
@@ -27,4 +44,4 @@ metadata:
       id: base.template.list
       scope: agent.template.list
       transport: http
-      endpoint: /api/v1/templates
+      endpoint: /api/v1/integration/capabilities/invoke

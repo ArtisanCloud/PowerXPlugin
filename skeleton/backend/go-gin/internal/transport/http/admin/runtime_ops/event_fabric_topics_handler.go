@@ -247,7 +247,7 @@ func resolveGatewayAuthHeader(deps *app.Deps, outboundBearer string) (string, er
 		if outboundBearer != "" {
 			return "Bearer " + outboundBearer, nil
 		}
-		if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" && deps.IAMMode.String() == "delegated" {
+		if strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1" && deps.ProviderMode.String() == "delegated" {
 			token, err := newPowerXSTSTokenProvider(deps)(context.Background())
 			if err != nil {
 				return "", fmt.Errorf("STS token exchange failed: %w", err)

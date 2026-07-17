@@ -262,7 +262,7 @@ func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action stri
 			UserAgent:  strings.TrimSpace(h.deps.Config.Gateway.UserAgent),
 			Timeout:    h.deps.Config.Gateway.Timeout,
 		}
-		if h.deps.IAMMode.String() == "delegated" {
+		if h.deps.IAMAdapterMode.String() == "delegated" {
 			cfg.AuthScheme = "bearer"
 			cfg.TokenProvider = func(ctx context.Context) (string, error) {
 				if h.deps == nil || h.deps.PowerXClient == nil {

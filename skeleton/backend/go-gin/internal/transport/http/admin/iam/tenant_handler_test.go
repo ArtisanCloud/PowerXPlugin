@@ -63,7 +63,7 @@ func TestTenantHandler_DelegatedErrorSemantics401(t *testing.T) {
 			},
 		},
 		tenantTestAuthz{},
-		iamservice.IAMModeDelegated,
+		iamservice.IAMAdapterModeDelegated,
 	)
 	router.GET("/tenants", handler.List)
 
@@ -90,7 +90,7 @@ func TestTenantHandler_DelegatedErrorSemantics403(t *testing.T) {
 				}, nil
 			},
 		},
-		iamservice.IAMModeDelegated,
+		iamservice.IAMAdapterModeDelegated,
 	)
 	router.GET("/tenants", handler.List)
 
@@ -112,7 +112,7 @@ func TestTenantHandler_DelegatedErrorSemantics424(t *testing.T) {
 				return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "upstream unavailable")
 			},
 		},
-		iamservice.IAMModeDelegated,
+		iamservice.IAMAdapterModeDelegated,
 	)
 	router.GET("/tenants", handler.List)
 

@@ -95,15 +95,6 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 				return
 			}
 			hostPublishOK = true
-			echoResult := fwwsbus.NewLocalPublisher(deps.WSBusHub, nil).Publish(context.Background(), topic, payload, fwwsbus.PublishOptions{
-				TenantUUID: tenantUUID,
-				MemberUUID: strings.TrimSpace(req.MemberUUID),
-				TraceID:    traceID,
-			})
-			if !echoResult.OK {
-				contracts.ResponseError(c, http.StatusBadRequest, echoResult.ErrorCode, echoResult.ErrorMessage)
-				return
-			}
 		} else {
 			publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
 				fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
@@ -125,7 +116,7 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 		flowMode := "local_only"
 		effectiveTarget := "local"
 		if useHost {
-			flowMode = "host_fallback_local_echo"
+			flowMode = "host_strict_ok"
 			effectiveTarget = "host"
 			if hostReachable && hostPublishOK {
 				flowMode = "host_strict_ok"
@@ -141,7 +132,7 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 			"flow_mode":        flowMode,
 			"effective_target": effectiveTarget,
 			"powerx_proxy":     powerxProxy,
-			"iam_mode":         strings.TrimSpace(deps.IAMMode.String()),
+			"provider_mode":    strings.TrimSpace(deps.ProviderMode.String()),
 			"host_reachable":   hostReachable,
 			"host_publish_ok":  hostPublishOK,
 		})

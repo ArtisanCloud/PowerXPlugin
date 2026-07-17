@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -107,18 +106,8 @@ func newHostTaskBusProvider(cfg *config.Config, pxc *client.PowerXServiceClient)
 		SourcePlugin:   strings.TrimSpace(eventCfg.SourcePlugin),
 		PayloadVersion: strings.TrimSpace(eventCfg.PayloadVersion),
 	}
-	if cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.IAMMode), "delegated") {
-		hostCfg.TokenProvider = func(ctx context.Context) (string, error) {
-			if pxc == nil {
-				return "", fmt.Errorf("powerx STS client is not configured")
-			}
-			token := strings.TrimSpace(pxc.GetToken())
-			if token != "" && token != "sts" {
-				return token, nil
-			}
-			token, _, err := pxc.ExchangeSTS(ctx)
-			return strings.TrimSpace(token), err
-		}
+	if cfg != nil && cfg.Context != nil && strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), "delegated") {
+		hostCfg.TokenProvider = client.NewPowerXSTSTokenProvider(pxc).TokenFunc()
 	}
 	return fwtaskbus.NewHostProvider(hostCfg)
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	iammodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	identitymodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	"gorm.io/gorm"
 )
 
@@ -66,8 +66,8 @@ func (s *JITService) Handle(ctx context.Context, req JITRequest) (JITResult, err
 	return JITResult{Bound: true, MemberID: binding.MemberID}, nil
 }
 
-func (s *JITService) findCandidates(ctx context.Context, tenantUUID, email, phone string) ([]iammodel.Member, error) {
-	userQuery := s.db.WithContext(ctx).Model(&iammodel.User{})
+func (s *JITService) findCandidates(ctx context.Context, tenantUUID, email, phone string) ([]identitymodel.Member, error) {
+	userQuery := s.db.WithContext(ctx).Model(&identitymodel.User{})
 	if email != "" && phone != "" {
 		userQuery = userQuery.Where("lower(email) = ? OR phone = ?", email, phone)
 	} else if email != "" {
@@ -80,13 +80,13 @@ func (s *JITService) findCandidates(ctx context.Context, tenantUUID, email, phon
 		return nil, err
 	}
 	if len(userIDs) == 0 {
-		return []iammodel.Member{}, nil
+		return []identitymodel.Member{}, nil
 	}
 
-	query := s.db.WithContext(ctx).Model(&iammodel.Member{}).
+	query := s.db.WithContext(ctx).Model(&identitymodel.Member{}).
 		Where("tenant_uuid = ?", strings.TrimSpace(tenantUUID)).
 		Where("user_id IN ?", userIDs)
-	rows := make([]iammodel.Member, 0)
+	rows := make([]identitymodel.Member, 0)
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, err
 	}

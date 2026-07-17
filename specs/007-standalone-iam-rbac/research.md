@@ -1,7 +1,7 @@
 # Research: Standalone 模式 IAM & RBAC
 
 ## 决策 1：本地 IAM 运行模式
-- **Decision**: Standalone 默认启用 Local IAM（`POWERX_PROXY=0`），Delegated 模式自动隐藏本地菜单并回退宿主 IAM。
+- **Decision**: Standalone 默认启用 local provider（`POWERX_PROVIDER_MODE=local`），`POWERX_PROXY` 只控制链路；delegated provider 下正式 IAM 菜单保持可见，页面展示 provider/read-only 状态并按 RBAC 控制操作。
 - **Rationale**: 需要离线/独立演示能力，同时保持与宿主兼容；文档将强调切换变量与隐藏逻辑。
 - **Alternatives considered**: 全量依赖宿主 IAM（Delegated Only）会阻断本地调试；混合模式（同时暴露本地+宿主）增加安全风险。
 

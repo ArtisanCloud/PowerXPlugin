@@ -43,7 +43,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-  A["输入: IAMMode + POWERX_PROXY + provider_mode"] --> B["插件 Runtime Scheduler API"]
+  A["输入: POWERX_PROVIDER_MODE + POWERX_PROXY + provider_mode"] --> B["插件 Runtime Scheduler API"]
   B -->|local| C["LocalProvider 创建/触发 job"]
   B -->|host| D["HostProvider 调 PowerX REST Scheduler"]
   D -->|ApiKey/Bearer 通过| E["PowerX 创建 job"]
@@ -84,9 +84,10 @@ flowchart LR
 ## 6. 前置条件与依赖
 
 - 配置：
-  - `IAMMode=local + POWERX_PROXY=0`：本地 Scheduler，tenant 由本地上下文/请求解析。
-  - `IAMMode=local + POWERX_PROXY=1`：local+proxy，host Scheduler 使用 `PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY`。
-  - `IAMMode=delegated`：宿主委派链路，host Scheduler 使用 Bearer/STS。
+  - `POWERX_PROVIDER_MODE=local + POWERX_PROXY=0`：本地 Scheduler，tenant 由本地上下文/请求解析。
+  - `POWERX_PROVIDER_MODE=local + POWERX_PROXY=1`：local+proxy，host Scheduler 使用 `PX_GATEWAY_AUTH_SCHEME=apikey` + `PX_GATEWAY_API_KEY`。
+  - `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=0`：standalone delegated，用于本地模拟 delegated provider。
+  - `POWERX_PROVIDER_MODE=delegated + POWERX_PROXY=1`：host delegated，host Scheduler 使用 Bearer/STS。
 - PowerX 权限：
   - API Key Profile 需要勾选 `com.corex.scheduler.jobs` 对应 REST 权限。
   - 权限目录应包含 `admin_scheduler_jobs`、`admin_scheduler_jobs_job_id`、`pause/resume/trigger/runs`。

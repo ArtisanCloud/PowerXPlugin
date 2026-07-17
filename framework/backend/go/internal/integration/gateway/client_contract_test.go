@@ -1,6 +1,10 @@
 package gateway
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,6 +73,57 @@ func TestContractStatusDetectsMismatch(t *testing.T) {
 	}
 	if !strings.Contains(status.Message, "hash-remote") {
 		t.Fatalf("expected warning message to mention expected version, got %s", status.Message)
+	}
+}
+
+func TestInvokeMapsArrayDataToItemsAndRecords(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/tenant/invocations" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]any{
+			"traceId": "trace-array",
+			"status":  "ok",
+			"data": []any{
+				map[string]any{"jobId": "job-1", "status": "completed"},
+			},
+		}); err != nil {
+			t.Fatalf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+	client, err := NewClient(Config{
+		BaseURL:     server.URL,
+		AuthScheme:  "bearer",
+		BearerToken: "token",
+	})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	resp, err := client.Invoke(context.Background(), InvokeRequest{
+		CapabilityID:      "com.corex.rest.admin.gin.get_api_v1_admin_knowledge_spaces_spaceid_ingestion_jobs",
+		Action:            "ListIngestionJobs",
+		PreferredProtocol: "rest",
+		Payload: map[string]any{
+			"method":   http.MethodGet,
+			"endpoint": "/api/v1/admin/knowledge-spaces/space-1/ingestion-jobs",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Invoke: %v", err)
+	}
+	items, ok := resp.Data["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected array data to be exposed as items, data=%+v raw=%s", resp.Data, string(resp.RawData))
+	}
+	records, ok := resp.Data["records"].([]any)
+	if !ok || len(records) != 1 {
+		t.Fatalf("expected array data to be exposed as records, data=%+v raw=%s", resp.Data, string(resp.RawData))
+	}
+	if !strings.Contains(string(resp.RawData), `"jobId":"job-1"`) {
+		t.Fatalf("expected raw data to be preserved, raw=%s", string(resp.RawData))
 	}
 }
 

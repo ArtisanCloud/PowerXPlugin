@@ -57,6 +57,10 @@ func TestJWTAuthAllowsBearerHS256(t *testing.T) {
 		if !ok {
 			t.Fatal("tenant context missing")
 		}
+		ctxTenant, ok := authx.TenantUUIDFromContext(c.Request.Context())
+		if !ok || ctxTenant != "00000000-0000-0000-0000-000000000001" {
+			t.Fatalf("unexpected request context tenant uuid: %q", ctxTenant)
+		}
 		if got.MemberID != 4201 {
 			t.Fatalf("unexpected member id: %d", got.MemberID)
 		}

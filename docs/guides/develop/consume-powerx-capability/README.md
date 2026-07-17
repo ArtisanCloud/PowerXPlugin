@@ -97,7 +97,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 >
 > - Go Gin / FastAPI 后端会自动读取 `skeleton/backend/.env`（示例见 `skeleton/backend/.env.example`），并覆盖 `config.yaml` 中同名配置。
 > - 宿主模式要求 `POWERX_PROXY=1`，并提供 `PX_GATEWAY_BASE_URL + POWERX_STS_CLIENT_ID + POWERX_STS_CLIENT_SECRET + POWERX_GRPC_UPSTREAM_ADDRESS + POWERX_GRPC_UPSTREAM_TENANT_UUID`；否则会返回 503。
-> - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`IAM_MODE=local`），会覆盖 `.env` 的值，请先清理。
+> - 若 GoLand Run Config 中仍有旧环境变量（如 `POWERX_PROXY=0`/`POWERX_PROVIDER_MODE=local`），会覆盖 `.env` 的值，请先清理。
 
 ### Gateway API 前缀规范（含 WS-Bus）
 
@@ -220,6 +220,10 @@ Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“�
 | `Authorization` 相关 401 | 凭证缺失/过期，或运行模式与凭证策略不匹配；delegated 检查 STS client 配置，local 检查 `PX_GATEWAY_API_KEY`。 |
 | `mock is not defined`（`run-from-package`） | 当前 CLI Bug，临时改用 `node scripts/capabilities/validate-capabilities.mjs` + Go 测试。 |
 | 契约版本警告 | `dist/capability-contracts.json` 与 `PX_GATEWAY_CONTRACT_VERSION` 不一致。运行 `npm --prefix scripts/capabilities run digest` 更新摘要并检查 `docs/plan/009...` 的契约升级流程。 |
+
+## 8. Agent Client 边界
+
+Gateway Client 用于插件消费 PowerX 平台能力；Agent Client 用于 PowerX Agent Runtime 会话和事件流。智能任务调试应使用 `runtime/powerx/agent` 的 invoke、SSE 或 WS typed event 解码，不要在业务层重复实现 Agent stream 协议。delegated 模式下 Agent Client 只接受 bearer/STS，不接受 `PX_TOOL_TOKEN` 或 `PX_GATEWAY_API_KEY` 作为 delegated 凭证。
 
 ---
 

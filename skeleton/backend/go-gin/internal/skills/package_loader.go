@@ -1,0 +1,339 @@
+package skills
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	runtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
+	"gopkg.in/yaml.v3"
+)
+
+const (
+	TemplateSkillDir = "template"
+)
+
+type PackageSource struct {
+	Manifest     runtime.PluginSkillManifest
+	PackagePath  string
+	SkillMDPath  string
+	RawMarkdown  string
+	Frontmatter  map[string]any
+	BodyMarkdown string
+	InputSchema  runtime.JSONSchema
+	OutputSchema runtime.JSONSchema
+	Checksum     string
+	SourceFormat string
+}
+
+type skillFrontmatter struct {
+	ID                 string                                `yaml:"id"`
+	Name               string                                `yaml:"name"`
+	Title              string                                `yaml:"title"`
+	Provider           string                                `yaml:"provider"`
+	Version            string                                `yaml:"version"`
+	Description        string                                `yaml:"description"`
+	IntentExamples     []string                              `yaml:"intent_examples"`
+	ResponseGuidance   map[string][]string                   `yaml:"response_guidance"`
+	ActionRequiredArgs map[string][]string                   `yaml:"action_required_args"`
+	ActionOptionalArgs map[string][]string                   `yaml:"action_optional_args"`
+	SlotMapping        map[string]runtime.SlotSpec           `yaml:"slot_mapping"`
+	PendingTaskPolicy  *runtime.PendingTaskPolicy            `yaml:"pending_task_policy"`
+	StateContract      map[string]any                        `yaml:"state_contract"`
+	ResultPresentation map[string]runtime.ResultPresentation `yaml:"result_presentation"`
+	Capability         string                                `yaml:"capability"`
+	ActionCapabilities map[string]string                     `yaml:"action_capabilities"`
+	Visibility         string                                `yaml:"visibility"`
+	Status             string                                `yaml:"status"`
+	Executor           runtime.PluginSkillExecutor           `yaml:"executor"`
+	InputSchema        any                                   `yaml:"input_schema"`
+	OutputSchema       any                                   `yaml:"output_schema"`
+}
+
+func LoadTemplatePackage() (PackageSource, error) {
+	return LoadPackage(TemplateSkillDir)
+}
+
+func LoadPackage(name string) (PackageSource, error) {
+	root, err := findSkillsRoot(name)
+	if err != nil {
+		return PackageSource{}, err
+	}
+	return LoadPackageAt(filepath.Join(root, filepath.Clean(name)))
+}
+
+func LoadPackageAt(packagePath string) (PackageSource, error) {
+	packagePath = filepath.Clean(packagePath)
+	skillMDPath := filepath.Join(packagePath, "SKILL.md")
+	rawBytes, err := os.ReadFile(skillMDPath)
+	if err != nil {
+		return PackageSource{}, fmt.Errorf("read SKILL.md: %w", err)
+	}
+	raw := string(rawBytes)
+	frontRaw, body, err := splitFrontmatter(raw)
+	if err != nil {
+		return PackageSource{}, err
+	}
+	var fm skillFrontmatter
+	if err := yaml.Unmarshal([]byte(frontRaw), &fm); err != nil {
+		return PackageSource{}, fmt.Errorf("parse SKILL.md frontmatter: %w", err)
+	}
+	var frontMap map[string]any
+	if err := yaml.Unmarshal([]byte(frontRaw), &frontMap); err != nil {
+		return PackageSource{}, fmt.Errorf("parse SKILL.md frontmatter map: %w", err)
+	}
+	if strings.TrimSpace(body) == "" {
+		return PackageSource{}, errors.New("SKILL.md body is required")
+	}
+	inputSchema, err := resolveSchema(packagePath, fm.InputSchema)
+	if err != nil {
+		return PackageSource{}, fmt.Errorf("input_schema: %w", err)
+	}
+	outputSchema, err := resolveSchema(packagePath, fm.OutputSchema)
+	if err != nil {
+		return PackageSource{}, fmt.Errorf("output_schema: %w", err)
+	}
+	manifest := runtime.PluginSkillManifest{
+		SkillID:            strings.TrimSpace(fm.ID),
+		Provider:           strings.TrimSpace(fm.Provider),
+		Version:            firstNonEmptyString(fm.Version, "1.0.0"),
+		Title:              strings.TrimSpace(fm.Title),
+		Description:        strings.TrimSpace(fm.Description),
+		IntentExamples:     fm.IntentExamples,
+		ResponseGuidance:   normalizeResponseGuidance(fm.ResponseGuidance),
+		ActionRequiredArgs: normalizeResponseGuidance(fm.ActionRequiredArgs),
+		ActionOptionalArgs: normalizeResponseGuidance(fm.ActionOptionalArgs),
+		SlotMapping:        fm.SlotMapping,
+		PendingTaskPolicy:  fm.PendingTaskPolicy,
+		StateContract:      fm.StateContract,
+		ResultPresentation: fm.ResultPresentation,
+		InputSchema:        inputSchema,
+		OutputSchema:       outputSchema,
+		Executor:           fm.Executor,
+		Visibility:         firstNonEmptyString(fm.Visibility, "tenant"),
+		Status:             firstNonEmptyString(fm.Status, "active"),
+	}
+	if manifest.Executor.Capability == "" {
+		manifest.Executor.Capability = strings.TrimSpace(fm.Capability)
+	}
+	if len(manifest.Executor.ActionMap) == 0 && len(fm.ActionCapabilities) > 0 {
+		manifest.Executor.ActionMap = normalizeStringMap(fm.ActionCapabilities)
+	}
+	if err := runtime.ValidateManifest(manifest); err != nil {
+		return PackageSource{}, err
+	}
+	checksum, err := packageChecksum(packagePath)
+	if err != nil {
+		return PackageSource{}, err
+	}
+	return PackageSource{
+		Manifest:     manifest,
+		PackagePath:  packagePath,
+		SkillMDPath:  skillMDPath,
+		RawMarkdown:  raw,
+		Frontmatter:  frontMap,
+		BodyMarkdown: strings.TrimSpace(body),
+		InputSchema:  inputSchema,
+		OutputSchema: outputSchema,
+		Checksum:     checksum,
+		SourceFormat: "skill_package",
+	}, nil
+}
+
+func findSkillsRoot(packageName string) (string, error) {
+	packageName = filepath.Clean(packageName)
+	if value := strings.TrimSpace(os.Getenv("PLUGIN_SKILLS_DIR")); value != "" {
+		root, err := filepath.Abs(value)
+		if err != nil {
+			return "", err
+		}
+		if hasSkillPackage(root, packageName) {
+			return root, nil
+		}
+		return "", fmt.Errorf("skill package %q not found under PLUGIN_SKILLS_DIR", packageName)
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		candidate := filepath.Join(dir, "skills")
+		if st, err := os.Stat(candidate); err == nil && st.IsDir() && hasSkillPackage(candidate, packageName) {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", fmt.Errorf("skill package %q not found; set PLUGIN_SKILLS_DIR", packageName)
+}
+
+func hasSkillPackage(root, packageName string) bool {
+	st, err := os.Stat(filepath.Join(root, packageName, "SKILL.md"))
+	return err == nil && !st.IsDir()
+}
+
+func splitFrontmatter(raw string) (string, string, error) {
+	normalized := strings.ReplaceAll(raw, "\r\n", "\n")
+	if !strings.HasPrefix(normalized, "---\n") {
+		return "", "", errors.New("SKILL.md frontmatter is required")
+	}
+	rest := strings.TrimPrefix(normalized, "---\n")
+	idx := strings.Index(rest, "\n---\n")
+	if idx < 0 {
+		return "", "", errors.New("SKILL.md frontmatter closing marker is required")
+	}
+	return rest[:idx], rest[idx+len("\n---\n"):], nil
+}
+
+func resolveSchema(packagePath string, value any) (runtime.JSONSchema, error) {
+	if value == nil {
+		return runtime.JSONSchema{}, nil
+	}
+	switch typed := value.(type) {
+	case string:
+		path, err := safePackagePath(packagePath, typed)
+		if err != nil {
+			return nil, err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		var out map[string]any
+		if err := json.Unmarshal(raw, &out); err != nil {
+			return nil, err
+		}
+		return runtime.JSONSchema(out), nil
+	case map[string]any:
+		return runtime.JSONSchema(typed), nil
+	default:
+		b, err := json.Marshal(typed)
+		if err != nil {
+			return nil, err
+		}
+		var out map[string]any
+		if err := json.Unmarshal(b, &out); err != nil {
+			return nil, err
+		}
+		return runtime.JSONSchema(out), nil
+	}
+}
+
+func safePackagePath(packagePath, ref string) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return "", errors.New("schema path is required")
+	}
+	if filepath.IsAbs(ref) {
+		return "", errors.New("absolute schema path is not allowed")
+	}
+	clean := filepath.Clean(filepath.Join(packagePath, ref))
+	rel, err := filepath.Rel(packagePath, clean)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", errors.New("schema path must stay inside skill package")
+	}
+	return clean, nil
+}
+
+func packageChecksum(packagePath string) (string, error) {
+	files := []string{}
+	if err := filepath.WalkDir(packagePath, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		files = append(files, path)
+		return nil
+	}); err != nil {
+		return "", err
+	}
+	sort.Strings(files)
+	h := sha256.New()
+	for _, path := range files {
+		rel, _ := filepath.Rel(packagePath, path)
+		_, _ = h.Write([]byte(rel))
+		_, _ = h.Write([]byte{0})
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		_, _ = h.Write(raw)
+		_, _ = h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func normalizeResponseGuidance(raw map[string][]string) map[string][]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(raw))
+	for key, values := range raw {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		cleaned := make([]string, 0, len(values))
+		seen := map[string]struct{}{}
+		for _, value := range values {
+			value = strings.TrimSpace(value)
+			if value == "" {
+				continue
+			}
+			lower := strings.ToLower(value)
+			if _, ok := seen[lower]; ok {
+				continue
+			}
+			seen[lower] = struct{}{}
+			cleaned = append(cleaned, value)
+		}
+		if len(cleaned) > 0 {
+			out[key] = cleaned
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func normalizeStringMap(raw map[string]string) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(raw))
+	for key, value := range raw {
+		key = strings.ToLower(strings.TrimSpace(key))
+		value = strings.TrimSpace(value)
+		if key != "" && value != "" {
+			out[key] = value
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}

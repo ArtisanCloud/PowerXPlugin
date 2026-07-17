@@ -11,14 +11,14 @@
 | `/auth/me/context` 返回空 | 请求缺少 `Authorization` header 或本地 JWT Secret 与配置不一致 | 确认前端 `localStorage` 存在 `access_token`；检查 `context.hmac_secret` |
 
 ## Delegated 模式检查清单
-1. `IAMMode=delegated`（宿主标准场景通常同时 `POWERX_PROXY=1`）。
+1. `POWERX_PROVIDER_MODE=delegated`（宿主标准场景通常同时 `POWERX_PROXY=1`）。
 2. `POWERX_CORE_ENDPOINT` 可从插件容器访问（`curl $POWERX_CORE_ENDPOINT/_health`）。
 3. `POWERX_AUTH_TOKEN` 在宿主侧仍有效（查看宿主日志 `service-token` 相关提示）。
-4. 插件日志需出现 `IAM mode resolved` 且 `mode=delegated`。
+4. 插件日志需出现 `Provider mode resolved` 且 `provider_mode=delegated`。
 5. 如需模拟宿主故障，可停止 Core，前端应提示 fail-closed。
 
 ## Local 模式检查清单
-1. `IAMMode=local` 且 `PLUGIN_IAM_ADMIN_*`、`PLUGIN_IAM_TENANT_*` 均已设置。
+1. `POWERX_PROVIDER_MODE=local` 且 `PLUGIN_IAM_ADMIN_*`、`PLUGIN_IAM_TENANT_*` 均已设置。
 2. 运行 `go run ./cmd/database/main.go setup` 以创建 `iam_*` 表和管理员账户。
 3. 默认管理员：`PLUGIN_IAM_ADMIN_EMAIL` / `PLUGIN_IAM_ADMIN_PASSWORD`。
 4. 本地 JWT 依赖 `context.hmac_secret`、`context.issuer`、`context.audience`；需要与前端/中间件一致。
@@ -33,7 +33,7 @@
 7. 多 Tab 同步：任一浏览器 Tab 清除 token（storage event）后，其他 Tab 会自动跳转登入页，可在控制台执行 `localStorage.removeItem('access_token')` 验证。
 
 ## 指标
-- `plugin_iam_mode{mode="delegated|local"}` – 当前模式。
+- `plugin_provider_mode{mode="delegated|local"}` – 当前 provider 模式。
 - `plugin_auth_login_total{mode}` – 登录次数。
 - `plugin_auth_refresh_total{mode}` – 刷新次数及成功率，可结合 `result` 标签区分成功/失败。
 - `plugin_auth_delegate_errors_total{type}` – 委托模式错误（网络/401/其它）。

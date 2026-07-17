@@ -1,0 +1,109 @@
+package ai_settings
+
+import (
+	"net/http"
+
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
+)
+
+func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
+	if admin == nil || deps == nil {
+		return
+	}
+	h := &Handler{mode: deps.ProviderMode, deps: deps}
+	group := admin.Group("/ai-settings")
+	group.GET("/mode", h.Mode)
+	group.GET("/summary", h.Summary)
+	group.GET("/provider-profiles", h.ProviderProfiles)
+	group.GET("/model-profiles", h.ModelProfiles)
+	group.GET("/routing", h.Routing)
+	group.GET("/health", h.Health)
+}
+
+type Handler struct {
+	mode fwprovider.Mode
+	deps *app.Deps
+}
+
+func (h *Handler) Mode(c *gin.Context) {
+	contracts.ResponseSuccess(c, h.diagnostics())
+}
+
+func (h *Handler) Summary(c *gin.Context) {
+	if h.isDelegated() && h.deps != nil && h.deps.AISettings != nil {
+		out, err := h.deps.AISettings.Summary(c.Request.Context(), requestID(c))
+		respondDelegated(c, out, err)
+		return
+	}
+	admincommon.ProviderUnavailable(c, "AI_SETTINGS_PROVIDER_NOT_CONFIGURED", "AI settings provider is not configured for this plugin", h.diagnostics())
+}
+
+func (h *Handler) ProviderProfiles(c *gin.Context) {
+	if h.isDelegated() && h.deps != nil && h.deps.AISettings != nil {
+		items, err := h.deps.AISettings.ProviderProfiles(c.Request.Context(), requestID(c))
+		respondDelegated(c, gin.H{"items": items}, err)
+		return
+	}
+	admincommon.ProviderUnavailable(c, "AI_SETTINGS_PROVIDER_NOT_CONFIGURED", "AI settings provider is not configured for this plugin", h.diagnostics())
+}
+
+func (h *Handler) ModelProfiles(c *gin.Context) {
+	if h.isDelegated() && h.deps != nil && h.deps.AISettings != nil {
+		items, err := h.deps.AISettings.ModelProfiles(c.Request.Context(), requestID(c))
+		respondDelegated(c, gin.H{"items": items}, err)
+		return
+	}
+	admincommon.ProviderUnavailable(c, "AI_SETTINGS_PROVIDER_NOT_CONFIGURED", "AI settings provider is not configured for this plugin", h.diagnostics())
+}
+
+func (h *Handler) Routing(c *gin.Context) {
+	if h.isDelegated() && h.deps != nil && h.deps.AISettings != nil {
+		out, err := h.deps.AISettings.Routing(c.Request.Context(), requestID(c))
+		respondDelegated(c, out, err)
+		return
+	}
+	admincommon.ProviderUnavailable(c, "AI_SETTINGS_PROVIDER_NOT_CONFIGURED", "AI settings provider is not configured for this plugin", h.diagnostics())
+}
+
+func (h *Handler) Health(c *gin.Context) {
+	if h.isDelegated() && h.deps != nil && h.deps.AISettings != nil {
+		out, err := h.deps.AISettings.Health(c.Request.Context(), requestID(c))
+		respondDelegated(c, out, err)
+		return
+	}
+	admincommon.ProviderUnavailable(c, "AI_SETTINGS_PROVIDER_NOT_CONFIGURED", "AI settings provider is not configured for this plugin", h.diagnostics())
+}
+
+func (h *Handler) diagnostics() admincommon.ProviderDiagnostics {
+	mode := string(fwprovider.ModeLocal)
+	if h != nil && h.mode.String() != "" {
+		mode = h.mode.String()
+	}
+	return admincommon.NewProviderDiagnostics(mode, h != nil && h.deps != nil && h.deps.AISettings != nil, false)
+}
+
+func (h *Handler) isDelegated() bool {
+	return h != nil && h.mode == fwprovider.ModeDelegated
+}
+
+func respondDelegated(c *gin.Context, data any, err error) {
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadGateway, "AI_SETTINGS_GATEWAY_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, data)
+}
+
+func requestID(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	if v := c.GetHeader("X-Request-ID"); v != "" {
+		return v
+	}
+	return c.GetString("request_id")
+}

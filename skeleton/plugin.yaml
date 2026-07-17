@@ -6,11 +6,16 @@ runtime:
   kind: process
   entry: backend/bin/plugin
   env:
+    POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
     POWERX_PLUGIN_ID: com.powerx.plugins.base
+    POWERX_PLUGIN_REGISTRATION_MODE: installed
+    POWERX_PROXY: "1"
+    POWERX_PROVIDER_MODE: delegated
     POWERX_SECURITY_JWT_AUDIENCE: plugin:com.powerx.plugins.base
 backend:
   entry: backend/bin/plugin
-  port: 8078
+  # 0 means the PowerX host allocates and injects the runtime port.
+  port: 0
   health: /healthz
 
 endpoints:
@@ -33,6 +38,8 @@ frontend:
         NODE_ENV: production
         NITRO_HOST: 127.0.0.1
         POWERX_PROXY: "1"
+        NUXT_PUBLIC_INSIDE_POWERX: "1"
+        NUXT_PUBLIC_POWERX_PROVIDER_MODE: delegated
       health:
         http: /healthz
         interval: 5s
@@ -59,7 +66,8 @@ frontend:
         route: intro
         order: 20
         slot: group.plugins
-        required_policies: [template:read]
+        required_policies:
+          - "template:read"
         children:
           - id: plugins.com.powerx.plugins.base.intro
             title: PowerX Base Plugin Intro
@@ -112,8 +120,33 @@ frontend:
                 path: /admin/templates/framework-lab
                 route: admin/templates/framework-lab
                 order: 3
-                required_policies: [admin:root]
-
+                required_policies:
+                  - "admin:root"
+          - id: plugins.com.powerx.plugins.base.powerx
+            title: PowerX底座能力
+            title_i18n:
+              namespace: menus
+              key: menu.com.powerx.plugins.base.powerx.title
+              default: PowerX Base Capabilities
+            icon: i-heroicons-cpu-chip
+            path: /powerx/knowledge-lab
+            route: powerx/knowledge-lab
+            order: 3
+            required_policies:
+              - "admin:root"
+            children:
+              - id: plugins.com.powerx.plugins.base.powerx.knowledge_lab
+                title: 知识库调试
+                title_i18n:
+                  namespace: menus
+                  key: menu.com.powerx.plugins.base.powerx.knowledge_lab
+                  default: Knowledge Lab
+                icon: i-heroicons-circle-stack
+                path: /powerx/knowledge-lab
+                route: powerx/knowledge-lab
+                order: 1
+                required_policies:
+                  - "admin:root"
 assets:
   public_dir: ./web-admin/public
   webAdminPath: ./web-admin/.output

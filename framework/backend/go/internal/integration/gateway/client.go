@@ -103,9 +103,40 @@ func (e *InvocationError) Error() string {
 		return "<nil>"
 	}
 	if len(e.Errors) == 0 {
+		if msg := summarizeGatewayBody(e.Body); msg != "" {
+			return fmt.Sprintf("gateway invocation failed: %s (trace=%s status=%d)", msg, e.TraceID, e.StatusCode)
+		}
 		return fmt.Sprintf("gateway invocation failed: status=%d trace=%s", e.StatusCode, e.TraceID)
 	}
 	return fmt.Sprintf("gateway invocation failed: %s (trace=%s status=%d)", e.Errors[0].Message, e.TraceID, e.StatusCode)
+}
+
+func summarizeGatewayBody(body []byte) string {
+	raw := strings.TrimSpace(string(body))
+	if raw == "" {
+		return ""
+	}
+	var env struct {
+		Error any `json:"error"`
+	}
+	if err := json.Unmarshal(body, &env); err == nil && env.Error != nil {
+		switch value := env.Error.(type) {
+		case string:
+			if text := strings.TrimSpace(value); text != "" {
+				return text
+			}
+		case map[string]any:
+			for _, key := range []string{"message", "code"} {
+				if text, ok := value[key].(string); ok && strings.TrimSpace(text) != "" {
+					return strings.TrimSpace(text)
+				}
+			}
+		}
+	}
+	if len(raw) > 512 {
+		return raw[:512] + "..."
+	}
+	return raw
 }
 
 // Client 负责 REST/gRPC 能力调用封装。
@@ -267,6 +298,14 @@ func (c *Client) Invoke(ctx context.Context, req InvokeRequest) (*Response, erro
 		var data map[string]any
 		if err := json.Unmarshal(envelope.Data, &data); err == nil {
 			result.Data = data
+		} else {
+			var items []any
+			if err := json.Unmarshal(envelope.Data, &items); err == nil {
+				result.Data = map[string]any{
+					"items":   items,
+					"records": items,
+				}
+			}
 		}
 	}
 

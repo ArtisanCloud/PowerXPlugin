@@ -74,41 +74,41 @@ func (p *HostProvider) PauseJob(ctx context.Context, jobID string, tenantUUID st
 	if p == nil || p.client == nil {
 		return ErrHostProviderUnavailable
 	}
-	return p.client.PauseJob(ctx, strings.TrimSpace(jobID), "")
+	return p.client.PauseJob(ctx, strings.TrimSpace(jobID), firstNonEmpty(tenantUUID, p.cfg.TenantUUID))
 }
 
 func (p *HostProvider) ResumeJob(ctx context.Context, jobID string, tenantUUID string) error {
 	if p == nil || p.client == nil {
 		return ErrHostProviderUnavailable
 	}
-	return p.client.ResumeJob(ctx, strings.TrimSpace(jobID), "")
+	return p.client.ResumeJob(ctx, strings.TrimSpace(jobID), firstNonEmpty(tenantUUID, p.cfg.TenantUUID))
 }
 
 func (p *HostProvider) TriggerJob(ctx context.Context, jobID string, tenantUUID string) error {
 	if p == nil || p.client == nil {
 		return ErrHostProviderUnavailable
 	}
-	return p.client.TriggerJob(ctx, strings.TrimSpace(jobID), "")
+	return p.client.TriggerJob(ctx, strings.TrimSpace(jobID), firstNonEmpty(tenantUUID, p.cfg.TenantUUID))
 }
 
 func (p *HostProvider) GetJob(ctx context.Context, jobID string, tenantUUID string) (*Job, error) {
 	if p == nil || p.client == nil {
 		return nil, ErrHostProviderUnavailable
 	}
-	return p.client.GetJob(ctx, strings.TrimSpace(jobID), "")
+	return p.client.GetJob(ctx, strings.TrimSpace(jobID), firstNonEmpty(tenantUUID, p.cfg.TenantUUID))
 }
 
 func (p *HostProvider) ListJobs(ctx context.Context, in ListJobsInput) ([]*Job, error) {
 	if p == nil || p.client == nil {
 		return nil, ErrHostProviderUnavailable
 	}
-	in.TenantUUID = ""
+	in.TenantUUID = firstNonEmpty(in.TenantUUID, p.cfg.TenantUUID)
 	return p.client.ListJobs(ctx, in)
 }
 
 func (p *HostProvider) applyDefaults(job JobSpec) JobSpec {
 	job = job.normalized()
-	job.TenantUUID = ""
+	job.TenantUUID = firstNonEmpty(job.TenantUUID, p.cfg.TenantUUID)
 	return job
 }
 

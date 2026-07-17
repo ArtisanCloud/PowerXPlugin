@@ -1,0 +1,1233 @@
+package agent_registry
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	runtimeskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	basemodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/agent_registry"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	sampleskills "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/skills"
+	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const pluginID = "com.powerx.plugins.base"
+
+const (
+	templateAgentID          = "template-agent"
+	templateAgentKey         = "powerxplugin.template.agent"
+	templateAgentName        = "模板智能体"
+	templateAgentDescription = "面向插件开发者和管理员的 PowerXPlugin 基础模板对象管理智能体，负责解释并执行模板对象的创建、查询、更新、删除和列表等任务。"
+	templateAgentPersona     = "你是 PowerXPlugin 基础模板对象管理助手，服务对象是插件开发者和插件管理员。模板对象只是插件侧最小 CRUD 示例对象，只有标题、描述和内容三个核心字段。你负责围绕模板对象进行自然语言对话、能力解释、参数澄清和任务执行。回答时应先理解用户当前问题，再基于当前绑定 Skill 的真实 metadata 说明能力或发起执行；不要编造未绑定能力，不要追问额外类型、分类、业务归属或其他对象字段之外的信息，不要暴露内部 skill_id、executor path、schema 字段名。"
+	templateAgentPromptSeed  = "当用户询问你是谁或能做什么时，请以基础模板对象管理助手身份回答，并只基于当前已绑定 Skill 的真实 metadata 介绍能力。能力介绍应说明模板对象只有标题、描述和内容，再概括模板创建、查询、更新、删除和列表；推荐先测试创建模板。用户要求执行时，按 Skill response_guidance 和 input_schema 判断缺参并追问，参数足够后调用绑定 Skill。"
+)
+
+type registrationIdentity struct {
+	PluginID string
+	Suffix   string
+}
+
+func currentRegistrationIdentity() (registrationIdentity, error) {
+	mode := strings.TrimSpace(strings.ToLower(getenv("POWERX_PLUGIN_REGISTRATION_MODE")))
+	switch mode {
+	case "installed":
+		return registrationIdentity{PluginID: pluginID}, nil
+	case "local":
+		return registrationIdentity{PluginID: pluginID + ".local", Suffix: "local"}, nil
+	default:
+		return registrationIdentity{}, fmt.Errorf("POWERX_PLUGIN_REGISTRATION_MODE must be one of installed or local, got %q", mode)
+	}
+}
+
+func (i registrationIdentity) pluginSkillID(base string) string {
+	return withDotSuffix(base, i.Suffix)
+}
+
+func (i registrationIdentity) powerXSkillID(base string) string {
+	return withDotSuffix(base, i.Suffix)
+}
+
+func (i registrationIdentity) pluginAgentID(base string) string {
+	return withHyphenSuffix(base, i.Suffix)
+}
+
+func (i registrationIdentity) agentKey(base string) string {
+	return withDotSuffix(base, i.Suffix)
+}
+
+func (i registrationIdentity) capabilityID(base string) string {
+	base = strings.TrimSpace(base)
+	if i.Suffix == "" || !strings.HasPrefix(base, pluginID+".") {
+		return base
+	}
+	return i.PluginID + strings.TrimPrefix(base, pluginID)
+}
+
+func (i registrationIdentity) rewriteCatalog(catalog *capabilities.CatalogSnapshot) *capabilities.CatalogSnapshot {
+	if catalog == nil {
+		return nil
+	}
+	out := *catalog
+	out.PluginID = i.PluginID
+	out.Entries = make([]capabilities.CatalogEntry, 0, len(catalog.Entries))
+	for _, entry := range catalog.Entries {
+		next := entry
+		next.ID = i.capabilityID(entry.ID)
+		next.Protocols = rewriteProtocolMap(entry.Protocols)
+		out.Entries = append(out.Entries, next)
+	}
+	return &out
+}
+
+func rewriteProtocolMap(in map[string]interface{}) map[string]interface{} {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]interface{}, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func (i registrationIdentity) rewriteManifest(in any) any {
+	raw, _ := json.Marshal(in)
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return in
+	}
+	if provider, ok := out["provider"].(string); ok && provider == pluginID {
+		out["provider"] = i.PluginID
+	}
+	if skillID, ok := out["skill_id"].(string); ok {
+		out["skill_id"] = i.powerXSkillID(skillID)
+	}
+	if capability, ok := out["capability"].(string); ok {
+		out["capability"] = i.capabilityID(capability)
+	}
+	if actions, ok := out["action_capabilities"].(map[string]any); ok {
+		for action, value := range actions {
+			if capability, ok := value.(string); ok {
+				actions[action] = i.capabilityID(capability)
+			}
+		}
+		out["action_capabilities"] = actions
+	}
+	if executor, ok := out["executor"]; ok {
+		out["executor"] = i.rewriteExecutor(executor)
+	}
+	return out
+}
+
+func (i registrationIdentity) rewriteExecutor(in any) any {
+	raw, _ := json.Marshal(in)
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return in
+	}
+	if capability, ok := out["capability"].(string); ok {
+		out["capability"] = i.capabilityID(capability)
+	}
+	if capability, ok := out["prepare_capability"].(string); ok {
+		out["prepare_capability"] = i.capabilityID(capability)
+	}
+	if actionMap, ok := out["action_map"].(map[string]any); ok {
+		for action, value := range actionMap {
+			if capability, ok := value.(string); ok {
+				actionMap[action] = i.capabilityID(capability)
+			}
+		}
+		out["action_map"] = actionMap
+	}
+	return out
+}
+
+func (i registrationIdentity) rewriteSkillManifest(manifest runtimeskills.PluginSkillManifest) runtimeskills.PluginSkillManifest {
+	manifest.SkillID = i.powerXSkillID(manifest.SkillID)
+	if strings.TrimSpace(manifest.Provider) == "" || manifest.Provider == pluginID {
+		manifest.Provider = i.PluginID
+	}
+	if strings.TrimSpace(manifest.Executor.Capability) != "" {
+		manifest.Executor.Capability = i.capabilityID(manifest.Executor.Capability)
+	}
+	if strings.TrimSpace(manifest.Executor.PrepareCapability) != "" {
+		manifest.Executor.PrepareCapability = i.capabilityID(manifest.Executor.PrepareCapability)
+	}
+	if len(manifest.Executor.ActionMap) > 0 {
+		next := make(map[string]string, len(manifest.Executor.ActionMap))
+		for action, capabilityID := range manifest.Executor.ActionMap {
+			next[action] = i.capabilityID(capabilityID)
+		}
+		manifest.Executor.ActionMap = next
+	}
+	return manifest
+}
+
+func allPowerXSkillIDsMatchIdentity(skillIDs []string, identity registrationIdentity) bool {
+	if len(skillIDs) == 0 {
+		return false
+	}
+	for _, skillID := range skillIDs {
+		skillID = strings.TrimSpace(skillID)
+		if skillID == "" {
+			return false
+		}
+		if identity.Suffix == "local" {
+			if !strings.HasSuffix(skillID, ".local") {
+				return false
+			}
+			continue
+		}
+		if strings.HasSuffix(skillID, ".local") {
+			return false
+		}
+	}
+	return true
+}
+
+type Handler struct {
+	deps *app.Deps
+}
+
+func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
+	h := &Handler{deps: deps}
+	group := rg.Group("/plugin/agent-registry")
+	group.GET("/skills", h.ListSkills)
+	group.POST("/skills", h.UpsertSkill)
+	group.POST("/skills/:id/sync", h.SyncSkill)
+	group.GET("/agents", h.ListAgents)
+	group.GET("/agents/runnable", h.ListRunnableAgents)
+	group.POST("/agents", h.UpsertAgent)
+	group.POST("/agents/:id/sync", h.SyncAgent)
+	group.POST("/agents/:id/refresh", h.RefreshAgent)
+	group.POST("/builtin/template/initialize", h.InitializeTemplateBuiltin)
+}
+
+type skillRequest struct {
+	PluginSkillID  string `json:"plugin_skill_id"`
+	PowerXSkillID  string `json:"powerx_skill_id"`
+	Version        string `json:"version"`
+	Title          string `json:"title"`
+	Description    string `json:"description"`
+	IntentExamples any    `json:"intent_examples"`
+	InputSchema    any    `json:"input_schema"`
+	OutputSchema   any    `json:"output_schema"`
+	PromptSpec     any    `json:"prompt_spec"`
+	Executor       any    `json:"executor"`
+	Capability     string `json:"capability"`
+}
+
+type agentRequest struct {
+	PluginAgentID   string         `json:"plugin_agent_id"`
+	PowerXAgentUUID string         `json:"powerx_agent_uuid"`
+	AgentKey        string         `json:"agent_key"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description"`
+	ModelProfileRef string         `json:"model_profile_ref"`
+	Persona         string         `json:"persona"`
+	PromptSeed      string         `json:"prompt_seed"`
+	Meta            map[string]any `json:"meta"`
+	PluginSkillIDs  []string       `json:"plugin_skill_ids"`
+}
+
+func (h *Handler) ListSkills(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
+	var items []dbm.PluginSkill
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_LIST_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+
+func (h *Handler) UpsertSkill(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
+	var req skillRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_SKILL_INVALID_REQUEST", err.Error())
+		return
+	}
+	req.PluginSkillID = strings.TrimSpace(req.PluginSkillID)
+	req.Title = strings.TrimSpace(req.Title)
+	req.Capability = strings.TrimSpace(req.Capability)
+	if req.PluginSkillID == "" || req.Title == "" || req.Capability == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_SKILL_REQUIRED", "plugin_skill_id, title and capability are required")
+		return
+	}
+	version := firstNonEmpty(req.Version, "1.0.0")
+	intentExamples := mustJSON(req.IntentExamples)
+	inputSchema := mustJSON(defaultObject(req.InputSchema))
+	outputSchema := mustJSON(defaultObject(req.OutputSchema))
+	promptSpec := mustJSON(defaultObject(req.PromptSpec))
+	executor := mustJSON(defaultExecutor(req.Executor, req.Capability))
+	checksum := checksumJSON(intentExamples, inputSchema, outputSchema, promptSpec, executor)
+	nowStatus := dbm.SyncStatusDraft
+	var existing dbm.PluginSkill
+	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_skill_id = ? AND version = ?", tenantUUID, identity.PluginID, req.PluginSkillID, version).First(&existing).Error
+	if err == nil {
+		if existing.SyncStatus == dbm.SyncStatusSynced {
+			nowStatus = dbm.SyncStatusDrifted
+		}
+		updates := map[string]any{
+			"powerx_skill_id":    strings.TrimSpace(req.PowerXSkillID),
+			"title":              req.Title,
+			"description":        strings.TrimSpace(req.Description),
+			"intent_examples":    datatypes.JSON(intentExamples),
+			"input_schema":       datatypes.JSON(inputSchema),
+			"output_schema":      datatypes.JSON(outputSchema),
+			"prompt_spec":        datatypes.JSON(promptSpec),
+			"executor":           datatypes.JSON(executor),
+			"capability":         req.Capability,
+			"checksum":           checksum,
+			"sync_status":        nowStatus,
+			"sync_error_code":    "",
+			"sync_error_message": "",
+			"last_sync_trace_id": existing.LastSyncTraceID,
+		}
+		if err := h.db(c).Model(&existing).Updates(updates).Error; err != nil {
+			contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_SAVE_FAILED", err.Error())
+			return
+		}
+		_ = h.db(c).First(&existing, existing.ID).Error
+		contracts.ResponseSuccess(c, existing)
+		return
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_LOOKUP_FAILED", err.Error())
+		return
+	}
+	item := dbm.PluginSkill{
+		BaseModel:      baseModel(tenantUUID),
+		PluginSkillID:  req.PluginSkillID,
+		PluginID:       identity.PluginID,
+		PowerXSkillID:  strings.TrimSpace(req.PowerXSkillID),
+		Version:        version,
+		Title:          req.Title,
+		Description:    strings.TrimSpace(req.Description),
+		IntentExamples: datatypes.JSON(intentExamples),
+		InputSchema:    datatypes.JSON(inputSchema),
+		OutputSchema:   datatypes.JSON(outputSchema),
+		PromptSpec:     datatypes.JSON(promptSpec),
+		Executor:       datatypes.JSON(executor),
+		Capability:     req.Capability,
+		Checksum:       checksum,
+		SyncStatus:     dbm.SyncStatusDraft,
+	}
+	if err := h.db(c).Create(&item).Error; err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_CREATE_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseCreated(c, item)
+}
+
+func (h *Handler) SyncSkill(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	item, ok := h.findSkill(c, tenantUUID)
+	if !ok {
+		return
+	}
+	if h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
+		markSkillFailed(h.db(c), item, "POWERX_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured", "")
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+	if err := h.syncPluginSkill(c, item); err != nil {
+		responsePowerXSyncError(c, "POWERX_SKILL_SYNC_FAILED", err)
+		return
+	}
+	contracts.ResponseSuccess(c, item)
+}
+
+func (h *Handler) ListAgents(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
+	var items []dbm.PluginAgent
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID).Order("updated_at DESC").Find(&items).Error; err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_LIST_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+
+func (h *Handler) ListRunnableAgents(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
+	var items []dbm.PluginAgent
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND sync_status = ? AND powerx_agent_uuid <> ''", tenantUUID, identity.PluginID, dbm.SyncStatusSynced).Order("updated_at DESC").Find(&items).Error; err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_RUNNABLE_FAILED", err.Error())
+		return
+	}
+	filtered := make([]dbm.PluginAgent, 0, len(items))
+	for _, item := range items {
+		if strings.EqualFold(strings.TrimSpace(item.PowerXStatus), "disabled") {
+			continue
+		}
+		if strings.TrimSpace(item.PluginID) != identity.PluginID {
+			continue
+		}
+		if strings.TrimSpace(item.PluginAgentID) != identity.pluginAgentID(templateAgentID) {
+			continue
+		}
+		if !allPowerXSkillIDsMatchIdentity(stringsFromJSON(item.PowerXSkillIDs), identity) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": filtered})
+}
+
+func (h *Handler) UpsertAgent(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	var req agentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_INVALID_REQUEST", err.Error())
+		return
+	}
+	req.PluginAgentID = strings.TrimSpace(req.PluginAgentID)
+	req.Name = strings.TrimSpace(req.Name)
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
+	req.AgentKey = firstNonEmpty(req.AgentKey, req.PluginAgentID)
+	req.PluginAgentID = firstNonEmpty(req.PluginAgentID, req.AgentKey)
+	req.PluginAgentID = identity.pluginAgentID(req.PluginAgentID)
+	req.AgentKey = identity.agentKey(req.AgentKey)
+	if req.PluginAgentID == "" || req.Name == "" || req.AgentKey == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_REQUIRED", "plugin_agent_id, agent_key and name are required")
+		return
+	}
+	pluginSkillIDs := normalizeStrings(req.PluginSkillIDs)
+	powerxSkillIDs, err := h.resolvePowerXSkillIDs(c, tenantUUID, pluginSkillIDs)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_SKILL_INVALID", err.Error())
+		return
+	}
+	status := dbm.SyncStatusDraft
+	var existing dbm.PluginAgent
+	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_agent_id = ?", tenantUUID, identity.PluginID, req.PluginAgentID).First(&existing).Error
+	if err == nil {
+		if existing.SyncStatus == dbm.SyncStatusSynced {
+			status = dbm.SyncStatusDrifted
+		}
+		if err := h.db(c).Model(&existing).Updates(map[string]any{
+			"powerx_agent_uuid":  strings.TrimSpace(req.PowerXAgentUUID),
+			"agent_key":          req.AgentKey,
+			"name":               req.Name,
+			"description":        strings.TrimSpace(req.Description),
+			"model_profile_ref":  strings.TrimSpace(req.ModelProfileRef),
+			"persona":            strings.TrimSpace(req.Persona),
+			"prompt_seed":        strings.TrimSpace(req.PromptSeed),
+			"meta":               datatypes.JSON(mustJSON(req.Meta)),
+			"plugin_skill_ids":   datatypes.JSON(mustJSON(pluginSkillIDs)),
+			"powerx_skill_ids":   datatypes.JSON(mustJSON(powerxSkillIDs)),
+			"sync_status":        status,
+			"sync_error_code":    "",
+			"sync_error_message": "",
+		}).Error; err != nil {
+			contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_SAVE_FAILED", err.Error())
+			return
+		}
+		_ = h.db(c).First(&existing, existing.ID).Error
+		contracts.ResponseSuccess(c, existing)
+		return
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_LOOKUP_FAILED", err.Error())
+		return
+	}
+	item := dbm.PluginAgent{
+		BaseModel:       baseModel(tenantUUID),
+		PluginAgentID:   req.PluginAgentID,
+		PluginID:        identity.PluginID,
+		PowerXAgentUUID: strings.TrimSpace(req.PowerXAgentUUID),
+		AgentKey:        req.AgentKey,
+		Name:            req.Name,
+		Description:     strings.TrimSpace(req.Description),
+		ModelProfileRef: strings.TrimSpace(req.ModelProfileRef),
+		Persona:         strings.TrimSpace(req.Persona),
+		PromptSeed:      strings.TrimSpace(req.PromptSeed),
+		Meta:            datatypes.JSON(mustJSON(req.Meta)),
+		PluginSkillIDs:  datatypes.JSON(mustJSON(pluginSkillIDs)),
+		PowerXSkillIDs:  datatypes.JSON(mustJSON(powerxSkillIDs)),
+		SyncStatus:      dbm.SyncStatusDraft,
+	}
+	if err := h.db(c).Create(&item).Error; err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_CREATE_FAILED", err.Error())
+		return
+	}
+	contracts.ResponseCreated(c, item)
+}
+
+func (h *Handler) SyncAgent(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	item, ok := h.findAgent(c, tenantUUID)
+	if !ok {
+		return
+	}
+	powerxSkillIDs := stringsFromJSON(item.PowerXSkillIDs)
+	if len(powerxSkillIDs) == 0 {
+		markAgentFailed(h.db(c), item, "PLUGIN_AGENT_SKILLS_REQUIRED", "agent registry requires at least one synced skill", "")
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_SKILLS_REQUIRED", "agent registry requires at least one synced skill")
+		return
+	}
+	if h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
+		markAgentFailed(h.db(c), item, "POWERX_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured", "")
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+	if err := h.syncPluginAgent(c, item); err != nil {
+		responsePowerXSyncError(c, "POWERX_AGENT_SYNC_FAILED", err)
+		return
+	}
+	contracts.ResponseSuccess(c, item)
+}
+
+func (h *Handler) RefreshAgent(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+	item, ok := h.findAgent(c, tenantUUID)
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(item.PowerXAgentUUID) == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "PLUGIN_AGENT_NOT_SYNCED", "agent registry has no powerx_agent_uuid")
+		return
+	}
+	if h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+	record, err := h.deps.CapabilityGateway.GetAgent(c.Request.Context(), item.PowerXAgentUUID)
+	if err != nil {
+		markAgentFailed(h.db(c), item, "POWERX_AGENT_REFRESH_FAILED", err.Error(), "")
+		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_REFRESH_FAILED", err.Error())
+		return
+	}
+	status := firstNonEmpty(record.Status, item.PowerXStatus, "active")
+	syncStatus := dbm.SyncStatusSynced
+	if strings.EqualFold(status, "disabled") || strings.EqualFold(status, "inactive") {
+		syncStatus = dbm.SyncStatusDisabled
+	}
+	now := time.Now().UTC()
+	if err := h.db(c).Model(item).Updates(map[string]any{
+		"powerx_status":      status,
+		"sync_status":        syncStatus,
+		"last_sync_at":       &now,
+		"sync_error_code":    "",
+		"sync_error_message": "",
+	}).Error; err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_REFRESH_SAVE_FAILED", err.Error())
+		return
+	}
+	_ = h.db(c).First(item, item.ID).Error
+	contracts.ResponseSuccess(c, item)
+}
+
+func (h *Handler) InitializeTemplateBuiltin(c *gin.Context) {
+	tenantUUID, ok := h.tenantUUID(c)
+	if !ok {
+		return
+	}
+
+	pkg, err := sampleskills.LoadTemplatePackage()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_PACKAGE_LOAD_FAILED", err.Error())
+		return
+	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return
+	}
+	manifest := identity.rewriteSkillManifest(pkg.Manifest)
+	if err := validateTemplateSkillManifest(manifest); err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_PACKAGE_INVALID", err.Error())
+		return
+	}
+	intentExamples := mustJSON(manifest.IntentExamples)
+	inputSchema := mustJSON(pkg.InputSchema)
+	outputSchema := mustJSON(pkg.OutputSchema)
+	frontmatter := mustJSON(pkg.Frontmatter)
+	promptSpec := mustJSON(map[string]any{
+		"source":               "skill_package",
+		"body_markdown":        pkg.BodyMarkdown,
+		"response_guidance":    manifest.ResponseGuidance,
+		"action_required_args": manifest.ActionRequiredArgs,
+		"action_optional_args": manifest.ActionOptionalArgs,
+		"slot_mapping":         manifest.SlotMapping,
+		"pending_task_policy":  manifest.PendingTaskPolicy,
+		"state_contract":       manifest.StateContract,
+		"result_presentation":  manifest.ResultPresentation,
+	})
+	executor := mustJSON(manifest.Executor)
+	checksum := pkg.Checksum
+
+	var skill dbm.PluginSkill
+	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_skill_id = ? AND version = ?", tenantUUID, identity.PluginID, manifest.SkillID, manifest.Version).First(&skill).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		skill = dbm.PluginSkill{
+			BaseModel:       baseModel(tenantUUID),
+			PluginSkillID:   manifest.SkillID,
+			PluginID:        identity.PluginID,
+			Version:         manifest.Version,
+			Title:           manifest.Title,
+			Description:     manifest.Description,
+			IntentExamples:  datatypes.JSON(intentExamples),
+			InputSchema:     datatypes.JSON(inputSchema),
+			OutputSchema:    datatypes.JSON(outputSchema),
+			PromptSpec:      datatypes.JSON(promptSpec),
+			Executor:        datatypes.JSON(executor),
+			Capability:      manifest.Executor.Capability,
+			SourceFormat:    pkg.SourceFormat,
+			PackagePath:     pkg.PackagePath,
+			SkillMDPath:     pkg.SkillMDPath,
+			RawMarkdown:     pkg.RawMarkdown,
+			FrontmatterJSON: datatypes.JSON(frontmatter),
+			BodyMarkdown:    pkg.BodyMarkdown,
+			PackageChecksum: pkg.Checksum,
+			Checksum:        checksum,
+			SyncStatus:      dbm.SyncStatusDraft,
+		}
+		if err := h.db(c).Create(&skill).Error; err != nil {
+			contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_BOOTSTRAP_FAILED", err.Error())
+			return
+		}
+	} else if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_LOOKUP_FAILED", err.Error())
+		return
+	} else {
+		updates := map[string]any{
+			"title":              manifest.Title,
+			"description":        manifest.Description,
+			"intent_examples":    datatypes.JSON(intentExamples),
+			"input_schema":       datatypes.JSON(inputSchema),
+			"output_schema":      datatypes.JSON(outputSchema),
+			"prompt_spec":        datatypes.JSON(promptSpec),
+			"executor":           datatypes.JSON(executor),
+			"capability":         manifest.Executor.Capability,
+			"source_format":      pkg.SourceFormat,
+			"package_path":       pkg.PackagePath,
+			"skill_md_path":      pkg.SkillMDPath,
+			"raw_markdown":       pkg.RawMarkdown,
+			"frontmatter_json":   datatypes.JSON(frontmatter),
+			"body_markdown":      pkg.BodyMarkdown,
+			"package_checksum":   pkg.Checksum,
+			"checksum":           checksum,
+			"sync_status":        dbm.SyncStatusPending,
+			"sync_error_code":    "",
+			"sync_error_message": "",
+		}
+		if err := h.db(c).Model(&skill).Updates(updates).Error; err != nil {
+			contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_SKILL_BOOTSTRAP_SAVE_FAILED", err.Error())
+			return
+		}
+		_ = h.db(c).First(&skill, skill.ID).Error
+	}
+
+	gatewayReady := h.deps != nil && h.deps.CapabilityGateway != nil && h.deps.CapabilityGateway.Enabled()
+	if !gatewayReady {
+		markSkillFailed(h.db(c), &skill, "POWERX_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured", "")
+		_ = h.db(c).First(&skill, skill.ID).Error
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
+		return
+	}
+	if h.deps.CapabilitiesManager == nil {
+		markSkillFailed(h.db(c), &skill, "PLUGIN_CAPABILITY_MANAGER_UNAVAILABLE", "Capability manager is not configured", "")
+		_ = h.db(c).First(&skill, skill.ID).Error
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "PLUGIN_CAPABILITY_MANAGER_UNAVAILABLE", "Capability manager is not configured")
+		return
+	}
+	if err := h.syncCapabilityCatalog(c.Request.Context(), identity); err != nil {
+		markSkillFailed(h.db(c), &skill, "POWERX_CAPABILITY_CATALOG_SYNC_FAILED", err.Error(), "")
+		_ = h.db(c).First(&skill, skill.ID).Error
+		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_CAPABILITY_CATALOG_SYNC_FAILED", err.Error())
+		return
+	}
+	if err := h.syncPluginSkill(c, &skill); err != nil {
+		responsePowerXSyncError(c, "POWERX_SKILL_SYNC_FAILED", err)
+		return
+	}
+
+	pluginSkillIDs := []string{manifest.SkillID}
+	powerxSkillIDs := []string{skill.PowerXSkillID}
+	pluginAgentID := identity.pluginAgentID(templateAgentID)
+	agentKey := identity.agentKey(templateAgentKey)
+	var agent dbm.PluginAgent
+	err = h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_agent_id = ?", tenantUUID, identity.PluginID, pluginAgentID).First(&agent).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		agent = dbm.PluginAgent{
+			BaseModel:      baseModel(tenantUUID),
+			PluginAgentID:  pluginAgentID,
+			PluginID:       identity.PluginID,
+			AgentKey:       agentKey,
+			Name:           templateAgentName,
+			Description:    templateAgentDescription,
+			Persona:        templateAgentPersona,
+			PromptSeed:     templateAgentPromptSeed,
+			PluginSkillIDs: datatypes.JSON(mustJSON(pluginSkillIDs)),
+			PowerXSkillIDs: datatypes.JSON(mustJSON(powerxSkillIDs)),
+			SyncStatus:     dbm.SyncStatusDraft,
+		}
+		if err := h.db(c).Create(&agent).Error; err != nil {
+			contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_BOOTSTRAP_FAILED", err.Error())
+			return
+		}
+	} else if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_LOOKUP_FAILED", err.Error())
+		return
+	} else {
+		updates := map[string]any{
+			"agent_key":          agentKey,
+			"name":               templateAgentName,
+			"description":        templateAgentDescription,
+			"persona":            templateAgentPersona,
+			"prompt_seed":        templateAgentPromptSeed,
+			"plugin_skill_ids":   datatypes.JSON(mustJSON(pluginSkillIDs)),
+			"powerx_skill_ids":   datatypes.JSON(mustJSON(powerxSkillIDs)),
+			"sync_status":        dbm.SyncStatusPending,
+			"sync_error_code":    "",
+			"sync_error_message": "",
+		}
+		if err := h.db(c).Model(&agent).Updates(updates).Error; err != nil {
+			contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_AGENT_BOOTSTRAP_SAVE_FAILED", err.Error())
+			return
+		}
+		_ = h.db(c).First(&agent, agent.ID).Error
+	}
+
+	if skill.SyncStatus != dbm.SyncStatusSynced {
+		markAgentFailed(h.db(c), &agent, "POWERX_SKILL_NOT_SYNCED", "Skill must be synced before agent sync", "")
+		_ = h.db(c).First(&agent, agent.ID).Error
+		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_SYNC_SKIPPED", "Skill must be synced before agent sync")
+		return
+	}
+	if err := h.syncPluginAgent(c, &agent); err != nil {
+		responsePowerXSyncError(c, "POWERX_AGENT_SYNC_FAILED", err)
+		return
+	}
+
+	contracts.ResponseSuccess(c, gin.H{
+		"skill": skill,
+		"agent": agent,
+	})
+}
+
+func (h *Handler) syncPluginSkill(c *gin.Context, item *dbm.PluginSkill) error {
+	if item == nil {
+		return errors.New("skill registry is required")
+	}
+	_ = h.db(c).Model(item).Updates(map[string]any{"sync_status": dbm.SyncStatusPending, "sync_error_code": "", "sync_error_message": ""}).Error
+	result, err := h.deps.CapabilityGateway.SyncPluginSkill(c.Request.Context(), gateway.PluginSkillSyncParams{
+		PluginSkillID:      item.PluginSkillID,
+		PowerXSkillID:      item.PowerXSkillID,
+		Version:            item.Version,
+		Title:              item.Title,
+		Description:        item.Description,
+		IntentExamples:     jsonRaw(item.IntentExamples),
+		ResponseGuidance:   skillContractValue(item, "response_guidance"),
+		ActionRequiredArgs: skillContractValue(item, "action_required_args"),
+		ActionOptionalArgs: skillContractValue(item, "action_optional_args"),
+		SlotMapping:        skillContractValue(item, "slot_mapping"),
+		PendingTaskPolicy:  skillContractValue(item, "pending_task_policy"),
+		StateContract:      skillContractValue(item, "state_contract"),
+		ResultPresentation: skillContractValue(item, "result_presentation"),
+		InputSchema:        jsonRaw(item.InputSchema),
+		OutputSchema:       jsonRaw(item.OutputSchema),
+		PromptSpec:         jsonRaw(item.PromptSpec),
+		Executor:           jsonRaw(item.Executor),
+		Capability:         item.Capability,
+		Checksum:           item.Checksum,
+		Provider:           item.PluginID,
+	})
+	if err != nil {
+		markSkillFailed(h.db(c), item, "POWERX_SKILL_SYNC_FAILED", err.Error(), "")
+		return err
+	}
+	now := time.Now().UTC()
+	if err := h.db(c).Model(item).Updates(map[string]any{
+		"powerx_skill_id":    firstNonEmpty(result.PowerXSkillID, item.PowerXSkillID, item.PluginSkillID),
+		"sync_status":        dbm.SyncStatusSynced,
+		"sync_error_code":    "",
+		"sync_error_message": "",
+		"last_sync_trace_id": result.TraceID,
+		"last_sync_at":       &now,
+	}).Error; err != nil {
+		return err
+	}
+	return h.db(c).First(item, item.ID).Error
+}
+
+func (h *Handler) syncCapabilityCatalog(ctx context.Context, identity registrationIdentity) error {
+	if h == nil || h.deps == nil || h.deps.CapabilitiesManager == nil {
+		return errors.New("capability manager is not configured")
+	}
+	if h.deps.CapabilityGateway == nil {
+		return errors.New("PowerX gateway client is not configured")
+	}
+	catalog, err := h.deps.CapabilitiesManager.ExportCatalog(ctx)
+	if err != nil {
+		return err
+	}
+	assets, err := h.deps.CapabilitiesManager.ExportProtocols(ctx)
+	if err != nil {
+		return err
+	}
+	return h.deps.CapabilityGateway.RegisterCatalog(ctx, identity.rewriteCatalog(catalog), assets)
+}
+
+func (h *Handler) syncPluginAgent(c *gin.Context, item *dbm.PluginAgent) error {
+	if item == nil {
+		return errors.New("agent registry is required")
+	}
+	powerxSkillIDs := stringsFromJSON(item.PowerXSkillIDs)
+	if len(powerxSkillIDs) == 0 {
+		err := errors.New("agent registry requires at least one synced skill")
+		markAgentFailed(h.db(c), item, "PLUGIN_AGENT_SKILLS_REQUIRED", err.Error(), "")
+		return err
+	}
+	_ = h.db(c).Model(item).Updates(map[string]any{"sync_status": dbm.SyncStatusPending, "sync_error_code": "", "sync_error_message": ""}).Error
+	result, err := h.deps.CapabilityGateway.SyncPluginAgent(c.Request.Context(), gateway.PluginAgentSyncParams{
+		PluginAgentID:   item.PluginAgentID,
+		PowerXAgentUUID: item.PowerXAgentUUID,
+		AgentKey:        item.AgentKey,
+		Name:            item.Name,
+		Description:     item.Description,
+		ModelProfileRef: item.ModelProfileRef,
+		Persona:         item.Persona,
+		PromptSeed:      item.PromptSeed,
+		SkillIDs:        powerxSkillIDs,
+		Provider:        item.PluginID,
+		Meta:            mapFromJSON(item.Meta),
+	})
+	if err != nil {
+		markAgentFailed(h.db(c), item, "POWERX_AGENT_SYNC_FAILED", err.Error(), "")
+		return err
+	}
+	now := time.Now().UTC()
+	if err := h.db(c).Model(item).Updates(map[string]any{
+		"powerx_agent_uuid":  firstNonEmpty(result.PowerXAgentUUID, item.PowerXAgentUUID),
+		"powerx_status":      firstNonEmpty(result.Status, "active"),
+		"sync_status":        dbm.SyncStatusSynced,
+		"sync_error_code":    "",
+		"sync_error_message": "",
+		"last_sync_trace_id": result.TraceID,
+		"last_sync_at":       &now,
+	}).Error; err != nil {
+		return err
+	}
+	return h.db(c).First(item, item.ID).Error
+}
+
+func (h *Handler) db(c *gin.Context) *gorm.DB {
+	if h != nil && h.deps != nil && h.deps.DB != nil {
+		return h.deps.DB.WithContext(c.Request.Context())
+	}
+	return nil
+}
+
+func (h *Handler) findSkill(c *gin.Context, tenantUUID string) (*dbm.PluginSkill, bool) {
+	id := strings.TrimSpace(c.Param("id"))
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return nil, false
+	}
+	var item dbm.PluginSkill
+	q := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID)
+	if numericID, ok := parseUint64(id); ok {
+		q = q.Where("id = ?", numericID)
+	} else {
+		q = q.Where("plugin_skill_id = ? OR powerx_skill_id = ?", id, id)
+	}
+	if err := q.First(&item).Error; err != nil {
+		status := http.StatusInternalServerError
+		code := "PLUGIN_SKILL_LOOKUP_FAILED"
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusNotFound
+			code = "PLUGIN_SKILL_NOT_FOUND"
+		}
+		contracts.ResponseError(c, status, code, err.Error())
+		return nil, false
+	}
+	return &item, true
+}
+
+func (h *Handler) findAgent(c *gin.Context, tenantUUID string) (*dbm.PluginAgent, bool) {
+	id := strings.TrimSpace(c.Param("id"))
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "PLUGIN_REGISTRATION_MODE_INVALID", err.Error())
+		return nil, false
+	}
+	var item dbm.PluginAgent
+	q := h.db(c).Where("tenant_uuid = ? AND plugin_id = ?", tenantUUID, identity.PluginID)
+	if numericID, ok := parseUint64(id); ok {
+		q = q.Where("id = ?", numericID)
+	} else {
+		q = q.Where("plugin_agent_id = ? OR powerx_agent_uuid = ?", id, id)
+	}
+	if err := q.First(&item).Error; err != nil {
+		status := http.StatusInternalServerError
+		code := "PLUGIN_AGENT_LOOKUP_FAILED"
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusNotFound
+			code = "PLUGIN_AGENT_NOT_FOUND"
+		}
+		contracts.ResponseError(c, status, code, err.Error())
+		return nil, false
+	}
+	return &item, true
+}
+
+func (h *Handler) resolvePowerXSkillIDs(c *gin.Context, tenantUUID string, pluginIDs []string) ([]string, error) {
+	if len(pluginIDs) == 0 {
+		return nil, nil
+	}
+	identity, err := currentRegistrationIdentity()
+	if err != nil {
+		return nil, err
+	}
+	var items []dbm.PluginSkill
+	if err := h.db(c).Where("tenant_uuid = ? AND plugin_id = ? AND plugin_skill_id IN ?", tenantUUID, identity.PluginID, pluginIDs).Find(&items).Error; err != nil {
+		return nil, err
+	}
+	byID := map[string]dbm.PluginSkill{}
+	for _, item := range items {
+		byID[item.PluginSkillID] = item
+	}
+	out := make([]string, 0, len(pluginIDs))
+	for _, pluginID := range pluginIDs {
+		item, exists := byID[pluginID]
+		if !exists {
+			return nil, errors.New("skill registry not found: " + pluginID)
+		}
+		if item.SyncStatus != dbm.SyncStatusSynced || strings.TrimSpace(item.PowerXSkillID) == "" {
+			return nil, errors.New("skill registry is not synced: " + pluginID)
+		}
+		out = append(out, item.PowerXSkillID)
+	}
+	return out, nil
+}
+
+func (h *Handler) tenantUUID(c *gin.Context) (string, bool) {
+	if h != nil && h.deps != nil && h.deps.CapabilityGateway != nil && h.deps.CapabilityGateway.Enabled() {
+		if value, err := h.deps.CapabilityGateway.ResolveGatewayTenantUUID(c.Request.Context()); err == nil {
+			if tenant := usableTenantUUID(value); tenant != "" {
+				return tenant, true
+			}
+		}
+	}
+	if h != nil && h.deps != nil && h.deps.Config != nil {
+		if h.deps.Config.GRPCUpstream != nil {
+			if value := usableTenantUUID(h.deps.Config.GRPCUpstream.TenantUUID); value != "" {
+				return value, true
+			}
+		}
+	}
+	if value := usableTenantUUID(c.GetHeader("tenant_uuid")); value != "" {
+		return value, true
+	}
+	if value := usableTenantUUID(c.GetHeader("X-Tenant-UUID")); value != "" {
+		return value, true
+	}
+	if value := usableTenantUUID(c.Query("tenant_uuid")); value != "" {
+		return value, true
+	}
+	if value, ok := authx.TenantUUIDFromContext(c.Request.Context()); ok {
+		if tenant := usableTenantUUID(value); tenant != "" {
+			return tenant, true
+		}
+	}
+	contracts.ResponseError(c, http.StatusBadRequest, "TENANT_UUID_REQUIRED", "tenant_uuid is required")
+	return "", false
+}
+
+func usableTenantUUID(value string) string {
+	tenant := strings.TrimSpace(value)
+	switch tenant {
+	case "", "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000001":
+		return ""
+	default:
+		return tenant
+	}
+}
+
+func baseModel(tenantUUID string) basemodels.BaseModel {
+	return basemodels.BaseModel{TenantUuid: tenantUUID}
+}
+
+func markSkillFailed(db *gorm.DB, item *dbm.PluginSkill, code, message, traceID string) {
+	if db == nil || item == nil {
+		return
+	}
+	_ = db.Model(item).Updates(map[string]any{
+		"sync_status":        dbm.SyncStatusFailed,
+		"sync_error_code":    strings.TrimSpace(code),
+		"sync_error_message": strings.TrimSpace(message),
+		"last_sync_trace_id": strings.TrimSpace(traceID),
+	}).Error
+}
+
+func markAgentFailed(db *gorm.DB, item *dbm.PluginAgent, code, message, traceID string) {
+	if db == nil || item == nil {
+		return
+	}
+	_ = db.Model(item).Updates(map[string]any{
+		"sync_status":        dbm.SyncStatusFailed,
+		"sync_error_code":    strings.TrimSpace(code),
+		"sync_error_message": strings.TrimSpace(message),
+		"last_sync_trace_id": strings.TrimSpace(traceID),
+	}).Error
+}
+
+func responsePowerXSyncError(c *gin.Context, fallbackCode string, err error) {
+	message := strings.TrimSpace(errString(err))
+	if message == "" {
+		message = "PowerX 同步失败"
+	}
+	if isPowerXAdminRequired(message) {
+		contracts.ResponseErrorWithDetails(
+			c,
+			http.StatusForbidden,
+			"POWERX_ADMIN_REQUIRED",
+			"PowerX 拒绝当前 Gateway 凭证：同步固有 Skill/Agent 需要 PowerX root/admin 身份，请检查 PX_GATEWAY_API_KEY 或 Bearer token 在 PowerX 端是否具备管理端权限。",
+			gin.H{"cause": message},
+		)
+		return
+	}
+	contracts.ResponseError(c, http.StatusBadGateway, fallbackCode, message)
+}
+
+func isPowerXAdminRequired(message string) bool {
+	lower := strings.ToLower(strings.TrimSpace(message))
+	return strings.Contains(lower, "admin only") || strings.Contains(lower, "forbidden")
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func mustJSON(v any) []byte {
+	if v == nil {
+		return []byte(`{}`)
+	}
+	if raw, ok := v.(datatypes.JSON); ok {
+		return raw
+	}
+	b, err := json.Marshal(v)
+	if err != nil || len(b) == 0 {
+		return []byte(`{}`)
+	}
+	return b
+}
+
+func jsonRaw(raw datatypes.JSON) any {
+	var out any
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return map[string]any{}
+	}
+	return out
+}
+
+func skillContractValue(item *dbm.PluginSkill, key string) any {
+	key = strings.TrimSpace(key)
+	if item == nil || key == "" {
+		return map[string]any{}
+	}
+	if frontmatter := mapFromJSON(item.FrontmatterJSON); len(frontmatter) > 0 {
+		if value, ok := frontmatter[key]; ok && value != nil {
+			return value
+		}
+	}
+	if promptSpec := mapFromJSON(item.PromptSpec); len(promptSpec) > 0 {
+		if value, ok := promptSpec[key]; ok && value != nil {
+			return value
+		}
+	}
+	return map[string]any{}
+}
+
+func mapFromJSON(raw datatypes.JSON) map[string]any {
+	out := map[string]any{}
+	if len(raw) == 0 {
+		return out
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return map[string]any{}
+	}
+	return out
+}
+
+func stringsFromJSON(raw datatypes.JSON) []string {
+	var out []string
+	_ = json.Unmarshal(raw, &out)
+	return normalizeStrings(out)
+}
+
+func normalizeStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+func defaultObject(v any) any {
+	if v != nil {
+		return v
+	}
+	return map[string]any{}
+}
+
+func defaultExecutor(v any, capability string) any {
+	if v != nil {
+		return v
+	}
+	return map[string]any{
+		"type":       "capability",
+		"capability": strings.TrimSpace(capability),
+	}
+}
+
+func validateTemplateSkillManifest(manifest runtimeskills.PluginSkillManifest) error {
+	required := map[string]string{
+		"executor.type":               manifest.Executor.Type,
+		"executor.capability":         manifest.Executor.Capability,
+		"executor.prepare_capability": manifest.Executor.PrepareCapability,
+	}
+	for field, value := range required {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("%s is required", field)
+		}
+	}
+	if strings.TrimSpace(manifest.Executor.Type) != "capability" {
+		return fmt.Errorf("executor.type must be capability")
+	}
+	if len(manifest.Executor.ActionMap) == 0 {
+		return fmt.Errorf("executor.action_map is required")
+	}
+	return nil
+}
+
+func checksumJSON(parts ...[]byte) string {
+	h := sha256.New()
+	for _, part := range parts {
+		_, _ = h.Write(part)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func parseUint64(value string) (uint64, bool) {
+	var out uint64
+	for _, ch := range strings.TrimSpace(value) {
+		if ch < '0' || ch > '9' {
+			return 0, false
+		}
+		out = out*10 + uint64(ch-'0')
+	}
+	return out, strings.TrimSpace(value) != ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func withDotSuffix(value string, suffix string) string {
+	value = strings.TrimSpace(value)
+	suffix = strings.TrimSpace(suffix)
+	if value == "" || suffix == "" || strings.HasSuffix(value, "."+suffix) {
+		return value
+	}
+	return value + "." + suffix
+}
+
+func withHyphenSuffix(value string, suffix string) string {
+	value = strings.TrimSpace(value)
+	suffix = strings.TrimSpace(suffix)
+	if value == "" || suffix == "" || strings.HasSuffix(value, "-"+suffix) {
+		return value
+	}
+	return value + "-" + suffix
+}
+
+func getenv(key string) string {
+	return os.Getenv(key)
+}

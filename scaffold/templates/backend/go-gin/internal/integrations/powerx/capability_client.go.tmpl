@@ -134,37 +134,26 @@ func (c *CapabilityClient) buildRequestPayload(catalog *capabilities.CatalogSnap
 		Assets:  make([]catalogSyncAsset, 0, len(assets)),
 	}
 	for _, asset := range assets {
-		if strings.TrimSpace(asset.Path) == "" {
+		path := strings.TrimSpace(asset.Path)
+		if path == "" {
 			continue
 		}
-		content, err := os.ReadFile(asset.Path)
-		if err != nil {
-			logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
-				"module":     "capability",
-				"biz_scene":  "capability_catalog_asset_read",
-				"biz_domain": "capability",
-				"component":  "capability_client",
-				"asset_path": asset.Path,
-				"error":      err.Error(),
-			}), "skip asset: unable to read file")
-			continue
+		diskPath := strings.TrimSpace(asset.DiskPath)
+		if diskPath == "" {
+			diskPath = path
 		}
-		info, err := os.Stat(asset.Path)
+		content, err := os.ReadFile(diskPath)
 		if err != nil {
-			logger.WarnCtx(logger.WithLogFields(context.Background(), map[string]interface{}{
-				"module":     "capability",
-				"biz_scene":  "capability_catalog_asset_stat",
-				"biz_domain": "capability",
-				"component":  "capability_client",
-				"asset_path": asset.Path,
-				"error":      err.Error(),
-			}), "skip asset: stat failed")
-			continue
+			return nil, fmt.Errorf("read capability asset %s: %w", path, err)
+		}
+		info, err := os.Stat(diskPath)
+		if err != nil {
+			return nil, fmt.Errorf("stat capability asset %s: %w", path, err)
 		}
 		checksum := sha256.Sum256(content)
 		payload.Assets = append(payload.Assets, catalogSyncAsset{
 			Type:     asset.Type,
-			Path:     filepath.ToSlash(asset.Path),
+			Path:     filepath.ToSlash(path),
 			Size:     info.Size(),
 			Checksum: fmt.Sprintf("%x", checksum[:]),
 			Content:  base64.StdEncoding.EncodeToString(content),

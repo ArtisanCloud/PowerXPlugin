@@ -46,7 +46,7 @@ func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.Authorizatio
 			Action:     req.Action,
 			TenantUUID: req.TenantUUID,
 			UserID:     req.UserID,
-			Mode:       string(fwiamcontracts.IAMModeLocal),
+			Mode:       string(fwiamcontracts.IAMAdapterModeLocal),
 			TraceID:    req.TraceID,
 		}, nil
 	}
@@ -57,7 +57,7 @@ func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.Authorizatio
 		Action:     req.Action,
 		TenantUUID: req.TenantUUID,
 		UserID:     req.UserID,
-		Mode:       string(fwiamcontracts.IAMModeLocal),
+		Mode:       string(fwiamcontracts.IAMAdapterModeLocal),
 		TraceID:    req.TraceID,
 	}, nil
 }

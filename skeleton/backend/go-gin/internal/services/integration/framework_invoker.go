@@ -1,0 +1,72 @@
+package integration
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+
+	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+)
+
+// FrameworkCapabilityInvoker adapts this plugin's dispatch service to the
+// framework-level capability invoke entry.
+type FrameworkCapabilityInvoker struct {
+	dispatch *DispatchService
+}
+
+func NewFrameworkCapabilityInvoker(deps *app.Deps, logger *pxlog.Entry) fwbootstrap.CapabilityInvoker {
+	dispatch := BuildDispatchService(deps, logger)
+	if dispatch == nil {
+		return nil
+	}
+	return &FrameworkCapabilityInvoker{dispatch: dispatch}
+}
+
+func (i *FrameworkCapabilityInvoker) CanInvokeCapability(capabilityID string) bool {
+	id := strings.TrimSpace(capabilityID)
+	if id == "" {
+		return false
+	}
+	base := strings.TrimSpace(app.PluginID)
+	if base == "" {
+		return false
+	}
+	return strings.HasPrefix(id, base+".") || strings.HasPrefix(id, base+".local.")
+}
+
+func (i *FrameworkCapabilityInvoker) InvokeCapability(ctx context.Context, params fwbootstrap.CapabilityInvokeParams) (*fwbootstrap.CapabilityInvokeResult, error) {
+	if i == nil || i.dispatch == nil {
+		return nil, errors.New("framework capability invoker unavailable")
+	}
+	tenantUUID := strings.TrimSpace(params.TenantUUID)
+	if tenantUUID == "" {
+		tenantUUID = strings.TrimSpace(params.Headers["tenant_uuid"])
+	}
+	if tenantUUID == "" {
+		tenantUUID = strings.TrimSpace(params.Headers["X-Tenant-UUID"])
+	}
+	outcome, err := i.dispatch.InvokeCapability(ctx, params.CapabilityID, params.Action, params.Payload, params.Metadata, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	result := &fwbootstrap.CapabilityInvokeResult{
+		TraceID:  outcome.TraceID,
+		Status:   outcome.Status,
+		Raw:      outcome.Payload,
+		Metadata: outcome.Metadata,
+	}
+	if len(outcome.Payload) > 0 {
+		var decoded any
+		if err := json.Unmarshal(outcome.Payload, &decoded); err == nil {
+			result.Data = decoded
+		} else {
+			result.Data = json.RawMessage(outcome.Payload)
+		}
+	} else {
+		result.Data = map[string]any{}
+	}
+	return result, nil
+}

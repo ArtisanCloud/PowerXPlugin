@@ -145,7 +145,7 @@ HTTP 状态码与错误码的映射在 handler 中明确调用 `contracts.Respon
 | --- | --- | --- | --- | --- |
 | `compatibilityDate` | ✅ `2025-11-02` | ✅ | ✅ | 对齐 |
 | `ssr` | ✅ `false` | ✅ | ✅ | 对齐 |
-| `runtimeConfig.public`（`apiBaseUrl/pluginApiBase/insidePowerX/iamMode`） | ✅ | ✅ | ✅ | 对齐 |
+| `runtimeConfig.public`（`apiBaseUrl/pluginApiBase/insidePowerX/providerMode`） | ✅ | ✅ | ✅ | 对齐 |
 | Nitro `routeRules` headers | ✅ | ✅ | ✅ | 对齐 |
 | Dev HMR / 代理（`/api`、`/ws`、`/_p/{pluginId}/api`） | ✅ | ✅ | ✅ | 对齐 |
 | `@nuxt/icon` / `@pinia/nuxt` / `@nuxtjs/color-mode` | ✅ | ✅ | ✅ | 对齐 |

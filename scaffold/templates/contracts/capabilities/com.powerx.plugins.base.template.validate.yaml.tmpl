@@ -1,7 +1,15 @@
 id: {{ .PluginID }}.template.validate
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 校验模板
+  zh: 校验模板
+  en: Validate Template
 description: "对指定模板执行规则校验并返回违规项，支持 Agent 巡检。"
+description_i18n:
+  zh-CN: 对指定模板执行规则校验并返回违规项，支持 Agent 巡检。
+  zh: 对指定模板执行规则校验并返回违规项，支持 Agent 巡检。
+  en: Validate a template against rules and return violations for agent audit flows.
 rbac:
   resource: template
   actions: [read]
@@ -18,8 +26,8 @@ metadata:
   protocols:
     rest:
       method: POST
-      path: /api/v1/templates/{id}/validate
-      description: "PowerX Gateway 统一鉴权后的模板校验入口"
+      path: /api/v1/integration/capabilities/invoke
+      description: "PowerX Gateway 统一鉴权后的插件能力入口"
     grpc:
       service: powerx.template.TemplateService
       method: ValidateTemplate
@@ -29,4 +37,4 @@ metadata:
       id: base.template.validate
       scope: agent.template.validate
       transport: http
-      endpoint: /api/v1/templates/{id}/validate
+      endpoint: /api/v1/integration/capabilities/invoke

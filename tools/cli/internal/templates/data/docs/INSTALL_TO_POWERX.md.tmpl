@@ -229,6 +229,14 @@ VERSION=0.2.0 make dist
 
 `make dist` 默认依次执行 `go build`, `npm install`, `npm run build` 并将产物归档到 `dist/`。若你的项目尚未集成 Makefile，可先运行下方“手动构建”步骤再回到这里。
 
+端口说明：
+
+- dist 是可安装产物，不携带某个环境的 PowerX 后端端口或 Web Admin 端口。
+- 插件后端监听地址由 `plugin.yaml` 的 `POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"` 声明，实际端口由 PowerX 宿主在启用插件时注入。
+- 插件后端访问 PowerX gateway 使用运行时 `PX_GATEWAY_BASE_URL`。
+- 浏览器侧访问 PowerX 使用运行时 `NUXT_PUBLIC_POWERX_CORE_BASE` 与 `NUXT_PUBLIC_WS_ORIGIN`。
+- dev/systemd 环境的 `server.port`、`web_admin_port` 应来自 PowerX 运行时配置，例如 `/etc/powerx-dev/config.yaml`。
+
 ### 步骤 3：手动构建（可选）
 
 如果 CLI/Makefile 尚未完善，可直接在插件项目手工构建：

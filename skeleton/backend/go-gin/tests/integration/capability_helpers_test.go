@@ -55,3 +55,12 @@ func containsAssetPath(assets []capabilities.ProtocolAsset, rel string) bool {
 	}
 	return false
 }
+
+func findAssetPath(assets []capabilities.ProtocolAsset, rel string) (capabilities.ProtocolAsset, bool) {
+	for _, asset := range assets {
+		if asset.Path == rel {
+			return asset, true
+		}
+	}
+	return capabilities.ProtocolAsset{}, false
+}

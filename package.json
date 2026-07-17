@@ -10,7 +10,9 @@
     "build": "npm --workspaces --if-present run build && npm --prefix skeleton/web-admin/nuxt run build",
     "sync:templates": "node scripts/sync-templates.mjs",
     "check:agent-paths": "node scripts/check-agent-paths.mjs",
-    "test": "node scripts/capabilities/run-from-package.mjs"
+    "check:customer-auth-boundary": "bash scripts/contracts/validate-customer-auth-boundary.sh",
+    "check:framework-knowledge-boundary": "bash scripts/contracts/validate-framework-knowledge-boundary.sh",
+    "test": "node scripts/capabilities/run-from-package.mjs && npm run check:customer-auth-boundary && npm run check:framework-knowledge-boundary"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",

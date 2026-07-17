@@ -42,24 +42,27 @@ docs/plan/014-framework-scheduler.md
 
 ### 3.1 识别信号
 
-1. 主信号：`IAMMode` + `POWERX_PROXY`
+1. 主信号：`POWERX_PROVIDER_MODE` + `POWERX_PROXY`
 2. 执行提供者：`runtime.event_bridge.taskbus_provider`
 3. 网关鉴权：`delegated` 使用 STS/Bearer；`local + proxy` 使用 ApiKey
 
 ### 3.2 推荐决策表
 
-1. `POWERX_PROXY!=1`：
+1. `POWERX_PROVIDER_MODE=local` 且 `POWERX_PROXY!=1`：
    - 运行模式：`standalone local`
    - 推荐 `taskbus_provider=redis`
    - 说明：事件在插件本地闭环，WS 走 `:8078/api/ws`
-2. `IAMMode=local` 且 `POWERX_PROXY=1`：
+2. `POWERX_PROVIDER_MODE=local` 且 `POWERX_PROXY=1`：
    - 运行模式：`local + proxy`
    - 推荐 `PX_GATEWAY_AUTH_SCHEME=apikey`
    - 说明：本地启动插件，但 Scheduler/WS/能力出站走 PowerX 底座网关
-3. `IAMMode=delegated`：
-   - 运行模式：`delegated proxy`
+3. `POWERX_PROVIDER_MODE=delegated` 且 `POWERX_PROXY=1`：
+   - 运行模式：`host delegated`
    - 推荐 `taskbus_provider=host`
-   - 说明：宿主语义模式，出站由 framework gateway 代理到底座
+   - 说明：宿主委派模式，出站由 framework gateway 代理到底座并使用 STS/Bearer
+4. `POWERX_PROVIDER_MODE=delegated` 且 `POWERX_PROXY!=1`：
+   - 运行模式：`standalone delegated`
+   - 说明：可用于本地模拟 delegated provider；provider 不可用时必须明确失败
 
 ### 3.3 封装边界（必须遵守）
 
@@ -114,7 +117,7 @@ runtime:
 
 ```yaml
 context:
-  iam_mode: "local"
+  provider_mode: "local"
 gateway:
   base_url: "http://127.0.0.1:8077"
   api_prefix: "/api/v1"

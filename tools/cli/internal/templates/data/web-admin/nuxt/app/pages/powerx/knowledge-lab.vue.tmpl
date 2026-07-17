@@ -1,0 +1,1687 @@
+<template>
+  <div class="w-full max-w-none space-y-6 px-5 py-6 lg:px-8">
+    <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-slate-900">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div class="space-y-2">
+          <UBreadcrumb :links="[{ label: 'PowerX', to: '/' }, { label: '知识空间' }]" />
+          <div class="flex items-center gap-3">
+            <UIcon name="i-heroicons-book-open" class="text-primary-600 dark:text-primary-300" />
+            <div>
+              <p class="text-sm text-gray-500 dark:text-gray-400">知识</p>
+              <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">知识空间总览</h1>
+              <p class="text-sm text-gray-600 dark:text-gray-300">按 PowerX 知识空间模型验证插件 framework provider、入库记录、策略和 Playground 委托链路。</p>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <UButton icon="i-heroicons-plus-circle" color="primary" variant="soft" @click="openCreateSpaceModal">新建空间</UButton>
+          <UButton icon="i-heroicons-magnifying-glass" color="neutral" variant="soft" @click="focusPlayground">Playground</UButton>
+          <UButton icon="i-heroicons-arrow-path" color="neutral" variant="ghost" :loading="providerLoading" @click="refreshKnowledgeState">刷新状态</UButton>
+        </div>
+      </div>
+    </div>
+
+    <UAlert
+      v-if="providerError"
+      icon="i-heroicons-exclamation-triangle"
+      color="error"
+      variant="soft"
+      title="知识库 Provider 不可用"
+      :description="providerError"
+    />
+
+    <UAlert
+      v-if="knowledgeNotice.message"
+      :icon="knowledgeNotice.icon"
+      :color="knowledgeNotice.color"
+      variant="soft"
+      :title="knowledgeNotice.title"
+      :description="knowledgeNotice.message"
+    />
+
+    <ToastAlert
+      v-model="toast.visible"
+      :title="toast.title"
+      :message="toast.message"
+      :color="toast.color"
+      :duration="toast.duration"
+    />
+
+    <UModal
+      v-model:open="createSpaceOpen"
+      title="新建知识空间"
+      description="空间用于承载知识内容。创建后回到知识空间总览进行入库与检索验证。"
+      :ui="{ content: 'w-[min(96vw,1040px)] max-w-none max-h-[calc(100dvh-2rem)] overflow-y-auto', body: 'p-6', footer: 'p-6 pt-0' }"
+    >
+      <template #body>
+        <form id="knowledge-space-create-form" class="w-full space-y-6" @submit.prevent="createKnowledgeSpace">
+          <section class="w-full rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-slate-950">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
+              <h3 class="text-base font-semibold text-gray-900 dark:text-white">基本信息</h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">无需填写租户 UUID，系统会使用当前运行上下文。</p>
+            </div>
+            <div class="grid gap-5 p-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+              <UFormField label="空间名称" required>
+                <UInput v-model="createForm.spaceName" class="w-full" icon="i-heroicons-rectangle-stack" placeholder="例如：运营手册 / 产品知识库" :disabled="createLoading" />
+              </UFormField>
+              <UFormField label="所属部门" required>
+                <USelect v-model="createForm.departmentCode" :items="departmentSelectItems" class="w-full" :disabled="createLoading" />
+              </UFormField>
+            </div>
+          </section>
+
+          <section class="w-full rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-slate-950">
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
+              <h3 class="text-base font-semibold text-gray-900 dark:text-white">知识库类型与检索策略</h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ `{{ selectedScene.description }}` }}</p>
+            </div>
+            <div class="grid gap-5 p-6">
+              <UFormField label="知识库类型" required>
+                <USelectMenu
+                  :model-value="createForm.sceneKey"
+                  :items="knowledgeSceneItems"
+                  value-key="value"
+                  label-key="label"
+                  :search-input="{ placeholder: '搜索知识库类型' }"
+                  :portal="true"
+                  class="w-full"
+                  :ui="{ content: 'z-[80] min-w-[min(90vw,900px)] max-h-72 overflow-y-auto', item: 'whitespace-normal break-words' }"
+                  :disabled="createLoading"
+                  @update:model-value="onKnowledgeSceneChange"
+                />
+                <template #help>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ selectedScene.description }}` }}</span>
+                </template>
+              </UFormField>
+
+              <UFormField label="检索策略" required>
+                <USelectMenu
+                  :model-value="createForm.strategyPackageKey"
+                  :items="strategyPackageItems"
+                  value-key="value"
+                  label-key="label"
+                  :search-input="{ placeholder: '搜索检索策略' }"
+                  :portal="true"
+                  class="w-full"
+                  :ui="{ content: 'z-[80] min-w-[min(90vw,900px)] max-h-72 overflow-y-auto', item: 'whitespace-normal break-words' }"
+                  :disabled="createLoading"
+                  @update:model-value="onStrategyPackageChange"
+                />
+                <template #help>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ strategyUseCase(selectedStrategyPackage) }}` }}</span>
+                </template>
+              </UFormField>
+              <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-slate-900 dark:text-gray-300">
+                <div class="font-medium text-gray-900 dark:text-white">推荐配置</div>
+                <div class="mt-2">知识库类型：{{ `{{ selectedScene.label }}` }}</div>
+                <div class="mt-1">检索策略：{{ `{{ strategyDisplayLabel(selectedStrategyPackage) }}` }}</div>
+                <div class="mt-1">策略说明：{{ `{{ strategyUseCase(selectedStrategyPackage) }}` }}</div>
+                <div class="mt-1">推荐 Profile：{{ `{{ profileLabel(selectedStrategyPackage.recommended_profile_key) }}` }}</div>
+                <div class="mt-1">适用场景：{{ `{{ selectedScene.label }}` }}</div>
+                <div class="mt-1">不适合：{{ `{{ strategyNotFor(selectedStrategyPackage) }}` }}</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-slate-950">
+                <UAlert color="success" variant="soft" title="策略依赖校验通过" />
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                  <span class="text-sm font-medium text-gray-900 dark:text-white">将启用的索引通道：</span>
+                  <UBadge v-for="channel in enabledIndexChannels" :key="channel" color="neutral" variant="soft">{{ `{{ channelLabel(channel) }}` }}</UBadge>
+                  <span v-if="!enabledIndexChannels.length" class="text-sm text-gray-500 dark:text-gray-400">无额外索引通道</span>
+                </div>
+                <div class="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
+                  <div class="text-gray-500 dark:text-gray-400">IngestionProfileKey：<span class="text-gray-900 dark:text-white">{{ `{{ createForm.ingestionProfileKey }}` }}</span></div>
+                  <div class="text-gray-500 dark:text-gray-400">IndexProfileKey：<span class="text-gray-900 dark:text-white">{{ `{{ createForm.indexProfileKey }}` }}</span></div>
+                  <div class="text-gray-500 dark:text-gray-400">RAGProfileKey：<span class="text-gray-900 dark:text-white">{{ `{{ createForm.ragProfileKey }}` }}</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <UAlert
+            v-if="createError"
+            icon="i-heroicons-x-circle"
+            color="error"
+            variant="soft"
+            title="创建失败"
+            :description="createError"
+          />
+        </form>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="soft" :disabled="createLoading" @click="createSpaceOpen = false">取消</UButton>
+          <UButton type="submit" form="knowledge-space-create-form" icon="i-heroicons-plus-circle" :loading="createLoading">创建空间</UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="ingestionOpen"
+      title="入库任务"
+      description="选择空间与来源，触发一次 PowerX 知识空间入库作业。"
+      :ui="{ content: 'w-[min(96vw,860px)] max-w-none', body: 'p-6', footer: 'p-6 pt-0' }"
+    >
+      <template #body>
+        <form id="knowledge-ingestion-form" class="space-y-5" @submit.prevent="submitIngestion">
+          <UAlert
+            v-if="ingestionError"
+            icon="i-heroicons-x-circle"
+            color="error"
+            variant="soft"
+            title="入库失败"
+            :description="ingestionError"
+          />
+
+          <UFormField label="知识空间" required>
+            <USelect v-model="ingestionForm.spaceId" :items="spaceSelectItems" class="w-full" :disabled="ingestionLoading || !spaceSelectItems.length" />
+          </UFormField>
+
+          <div v-if="ingestionSpace.id" class="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-slate-950">
+            <div class="font-medium text-gray-900 dark:text-white">{{ `{{ ingestionSpace.spaceName || ingestionSpace.name }}` }}</div>
+            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ `{{ ingestionSpace.departmentCode || ingestionSpace.department || '-' }}` }} · {{ `{{ ingestionSpace.statusLabel || ingestionSpace.status }}` }}
+            </div>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <UBadge :color="modeColor" variant="soft">{{ `{{ providerModeLabel(providerState.mode || ingestionSpace.provider_mode || 'local') }}` }}</UBadge>
+              <UBadge color="neutral" variant="soft">{{ `{{ providerState.provider || ingestionSpace.provider || 'local' }}` }}</UBadge>
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <UFormField label="来源方式" required>
+              <USelect v-model="ingestionSourceMethod" :items="ingestionSourceMethodItems" class="w-full" :disabled="ingestionLoading" />
+            </UFormField>
+            <UFormField label="来源类型" required>
+              <USelect v-model="ingestionForm.format" :items="ingestionFormatItems" class="w-full" :disabled="ingestionLoading" />
+            </UFormField>
+            <UFormField label="Ingestion Profile">
+              <UInput v-model="ingestionForm.ingestionProfile" class="w-full" placeholder="p1_general" :disabled="ingestionLoading" />
+            </UFormField>
+          </div>
+
+          <UFormField v-if="ingestionSourceMethod === 'upload'" label="上传文件" required>
+            <input
+              type="file"
+              accept=".pdf,.md,.markdown,.txt,.csv,.html,.htm"
+              class="block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:border-gray-800 dark:bg-slate-950 dark:text-gray-200"
+              :disabled="ingestionLoading"
+              @change="onIngestionFileChange"
+            />
+            <template #help>
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                文件会先通过 Gateway Media 能力上传到 PowerX Media，再使用预签名下载链接作为入库来源。
+              </span>
+            </template>
+          </UFormField>
+
+          <UFormField v-else label="来源 URI" required>
+            <UInput v-model="ingestionForm.sourceUri" class="w-full" icon="i-heroicons-link" placeholder="https://..." :disabled="ingestionLoading" />
+            <template #help>
+              <span class="text-xs text-gray-500 dark:text-gray-400">外链模式要求该 URL 可被 PowerX 入库 Worker 抓取。</span>
+            </template>
+          </UFormField>
+
+          <UFormField label="Requested By">
+            <UInput v-model="ingestionForm.requestedBy" class="w-full" :disabled="ingestionLoading" />
+          </UFormField>
+        </form>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton color="neutral" variant="soft" :disabled="ingestionLoading" @click="ingestionOpen = false">取消</UButton>
+          <UButton type="submit" form="knowledge-ingestion-form" icon="i-heroicons-arrow-up-tray" :loading="ingestionLoading" :disabled="!canSubmitIngestion">立即入库</UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="resultOpen"
+      :title="resultPanelTitle"
+      description="查看本次操作返回的入库记录、检索结果或诊断信息。"
+      :ui="{ content: 'max-w-5xl w-[92vw] mx-auto' }"
+    >
+      <template #body>
+        <div class="max-h-[72vh] space-y-4 overflow-auto pr-1">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-document-magnifying-glass" class="text-primary-600 dark:text-primary-300" />
+              <span class="font-semibold text-gray-900 dark:text-white">{{ `{{ resultPanelTitle }}` }}</span>
+            </div>
+            <UBadge color="neutral" variant="soft">{{ `{{ resultCountLabel }}` }}</UBadge>
+          </div>
+
+          <UAlert
+            v-if="searchError"
+            icon="i-heroicons-x-circle"
+            color="error"
+            variant="soft"
+            :title="resultErrorTitle"
+            :description="searchError"
+          />
+
+          <UAlert
+            v-if="diagnosticsSummary && resultKind !== 'policy'"
+            icon="i-heroicons-information-circle"
+            color="info"
+            variant="soft"
+            :title="diagnosticsTitle"
+            :description="diagnosticsSummary"
+          />
+
+          <div v-if="resultKind === 'ingestions'" class="space-y-4">
+            <div v-if="ingestionJobs.length" class="overflow-x-auto">
+              <table class="min-w-[780px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                <thead>
+                  <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    <th class="px-3 py-2">任务</th>
+                    <th class="px-3 py-2">状态</th>
+                    <th class="px-3 py-2">Chunk</th>
+                    <th class="px-3 py-2">覆盖率</th>
+                    <th class="px-3 py-2">Embedding</th>
+                    <th class="px-3 py-2">原因</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <tr v-for="job in pagedIngestionJobs" :key="job.jobId || job.id" class="hover:bg-gray-50 dark:hover:bg-slate-800/70">
+                    <td class="px-3 py-3 font-mono text-xs text-gray-700 dark:text-gray-200">{{ `{{ compactId(job.jobId || job.id || '-') }}` }}</td>
+                    <td class="px-3 py-3">
+                      <UBadge :color="ingestionStatusColor(job.status)" variant="soft">{{ `{{ job.status || '-' }}` }}</UBadge>
+                    </td>
+                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ job.chunkTotal ?? '-' }}` }}</td>
+                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ formatPercent(job.chunkCoveragePct) }}` }}</td>
+                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ formatPercent(job.embeddingSuccessPct) }}` }}</td>
+                    <td class="max-w-[260px] px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{{ `{{ job.reason || job.errorCode || '-' }}` }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <UAlert
+              v-else
+              icon="i-heroicons-inbox"
+              color="neutral"
+              variant="soft"
+              title="暂无入库记录"
+              description="当你开始入库后，这里会显示入库作业与结果摘要。"
+            />
+            <div v-if="ingestionJobs.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+              <div>显示 {{ `{{ ingestionPageStart }}` }}-{{ `{{ ingestionPageEnd }}` }} / 共 {{ `{{ ingestionJobs.length }}` }} 条</div>
+              <div class="flex items-center gap-2">
+                <span>每页</span>
+                <USelect v-model="ingestionPageSize" :items="ingestionPageSizeItems" class="w-24" />
+                <UButton size="xs" color="neutral" variant="soft" :disabled="ingestionPage <= 1" @click="ingestionPage--">上一页</UButton>
+                <span>第 {{ `{{ ingestionPage }}` }} / {{ `{{ ingestionPageCount }}` }} 页</span>
+                <UButton size="xs" color="neutral" variant="soft" :disabled="ingestionPage >= ingestionPageCount" @click="ingestionPage++">下一页</UButton>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="resultKind === 'policy'" class="space-y-4">
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
+                <div class="font-medium text-gray-900 dark:text-white">当前空间配置</div>
+                <div class="mt-3 space-y-2 text-gray-600 dark:text-gray-300">
+                  <div>空间：{{ `{{ selectedSpace.spaceName || selectedSpace.name || '-' }}` }}</div>
+                  <div>状态：{{ `{{ selectedSpace.statusLabel || selectedSpace.status || '-' }}` }}</div>
+                  <div>入库 Profile：{{ `{{ selectedSpace.ingestionProfileKey || '-' }}` }}</div>
+                  <div>索引 Profile：{{ `{{ selectedSpace.indexProfileKey || '-' }}` }}</div>
+                  <div>RAG Profile：{{ `{{ selectedSpace.ragProfileKey || '-' }}` }}</div>
+                </div>
+              </div>
+              <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
+                <div class="font-medium text-gray-900 dark:text-white">策略包</div>
+                <div class="mt-3 space-y-2 text-gray-600 dark:text-gray-300">
+                  <div>当前策略：{{ `{{ strategyDisplayLabel(selectedPolicyPackage) }}` }}</div>
+                  <div>推荐 Profile：{{ `{{ profileLabel(selectedPolicyPackage.recommended_profile_key) }}` }}</div>
+                  <div>策略模板：{{ `{{ selectedSpace.policyTemplateVersionId || '-' }}` }}</div>
+                  <div>运行模式：{{ `{{ providerModeLabel(providerState.mode || String(policyPayload?.provider_mode || 'local')) }}` }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="grid gap-4 md:grid-cols-3">
+              <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
+                <div class="font-medium text-gray-900 dark:text-white">索引通道依赖</div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <UBadge v-for="channel in selectedPolicyIndexChannels" :key="channel" color="primary" variant="soft">{{ `{{ channelLabel(channel) }}` }}</UBadge>
+                  <span v-if="!selectedPolicyIndexChannels.length" class="text-gray-500 dark:text-gray-400">无额外索引通道</span>
+                </div>
+              </div>
+              <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
+                <div class="font-medium text-gray-900 dark:text-white">运行时能力</div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <UBadge v-for="item in selectedPolicyRuntimeDeps" :key="item" color="neutral" variant="soft">{{ `{{ item }}` }}</UBadge>
+                  <span v-if="!selectedPolicyRuntimeDeps.length" class="text-gray-500 dark:text-gray-400">无</span>
+                </div>
+              </div>
+              <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
+                <div class="font-medium text-gray-900 dark:text-white">离线/索引产物</div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <UBadge v-for="item in selectedPolicyAssetDeps" :key="item" color="neutral" variant="soft">{{ `{{ item }}` }}</UBadge>
+                  <span v-if="!selectedPolicyAssetDeps.length" class="text-gray-500 dark:text-gray-400">无</span>
+                </div>
+              </div>
+            </div>
+            <div class="rounded-md border border-gray-200 p-4 dark:border-gray-800">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="font-medium text-gray-900 dark:text-white">融合策略</div>
+                  <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">底座融合策略接口返回后，这里显示策略状态、权重和说明。</div>
+                </div>
+                <UBadge color="neutral" variant="soft">{{ `{{ policyStrategies.length }}` }} 条</UBadge>
+              </div>
+              <div v-if="policyStrategies.length" class="mt-4 overflow-x-auto">
+                <table class="min-w-[720px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                  <thead>
+                    <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      <th class="px-3 py-2">策略</th>
+                      <th class="px-3 py-2">状态</th>
+                      <th class="px-3 py-2">权重</th>
+                      <th class="px-3 py-2">说明</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tr v-for="strategy in policyStrategies" :key="String(strategy.id || strategy.uuid || strategy.name || strategy.strategyId)" class="hover:bg-gray-50 dark:hover:bg-slate-800/70">
+                      <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ strategy.name || strategy.strategyName || strategy.strategyId || '-' }}` }}</td>
+                      <td class="px-3 py-3"><UBadge color="neutral" variant="soft">{{ `{{ strategy.status || '-' }}` }}</UBadge></td>
+                      <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ strategy.weight ?? strategy.scoreWeight ?? '-' }}` }}</td>
+                      <td class="px-3 py-3 text-gray-500 dark:text-gray-400">{{ `{{ strategy.description || strategy.reason || '-' }}` }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <UAlert
+                v-else
+                icon="i-heroicons-adjustments-horizontal"
+                color="neutral"
+                variant="soft"
+                title="融合未配置"
+                description="底座当前 fusion strategies 返回空数组；这不是检索空态，表示该空间还没有融合策略记录。"
+                class="mt-4"
+              />
+            </div>
+          </div>
+          <div v-else-if="result?.chunks?.length" class="space-y-3">
+            <div
+              v-for="chunk in result.chunks"
+              :key="chunk.chunk_id"
+              class="rounded-md border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-slate-950"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-medium text-gray-900 dark:text-white">{{ `{{ chunk.citation?.title || chunk.document_id }}` }}</div>
+                <UBadge color="success" variant="soft">得分 {{ `{{ formatScore(chunk.score) }}` }}</UBadge>
+              </div>
+              <p class="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200">{{ `{{ chunk.text }}` }}</p>
+              <div class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                {{ `{{ chunk.document_id }}` }} · {{ `{{ chunk.space_id }}` }} · {{ `{{ chunk.citation?.provider || result.provider }}` }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="py-8 text-sm text-gray-500 dark:text-gray-400">暂无检索结果。</div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end">
+          <UButton color="neutral" variant="soft" @click="resultOpen = false">关闭</UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <div
+      v-if="contractGaps.length"
+      class="flex items-start gap-3 rounded-md border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-100"
+    >
+      <UIcon name="i-heroicons-information-circle" class="mt-0.5 shrink-0 text-sky-600 dark:text-sky-300" />
+      <div class="min-w-0">
+        <div class="font-medium">底座接口状态</div>
+        <div class="mt-1 text-sky-800/80 dark:text-sky-100/80">空间列表已接入 PowerX 真实 runtime API；新建和维护知识空间请在 PowerX 底座完成。本页只验证插件 framework provider 调用链。</div>
+      </div>
+    </div>
+
+    <div class="grid gap-6 2xl:grid-cols-[minmax(980px,1fr)_420px]">
+      <div class="space-y-6">
+        <UCard>
+          <template #header>
+            <div class="space-y-4">
+              <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">知识空间</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                  <UBadge :color="modeColor" variant="soft">{{ `{{ providerModeLabel(providerState.mode || 'local') }}` }}</UBadge>
+                  <UBadge color="neutral" variant="soft">{{ `{{ spaces.length }}` }} 个空间</UBadge>
+                </div>
+              </div>
+              <div class="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px]">
+                <UInput v-model="filters.keyword" icon="i-heroicons-magnifying-glass" placeholder="搜索空间、部门或 Profile" />
+                <USelect v-model="filters.department" :items="departmentItems" class="w-full" />
+                <USelect v-model="filters.status" :items="statusItems" class="w-full" />
+              </div>
+            </div>
+          </template>
+
+          <div class="overflow-x-auto">
+            <table class="min-w-[1080px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
+              <thead>
+                <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <th class="w-[280px] px-4 py-3">空间</th>
+                  <th class="w-[140px] px-4 py-3">部门</th>
+                  <th class="w-[120px] px-4 py-3">状态</th>
+                  <th class="w-[260px] px-4 py-3">Profile / 策略</th>
+                  <th class="w-[130px] px-4 py-3">配额</th>
+                  <th class="w-[260px] px-4 py-3 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                <tr
+                  v-for="space in filteredSpaces"
+                  :key="space.id"
+                  :class="[
+                    'cursor-pointer transition hover:bg-gray-50 dark:hover:bg-slate-800/70',
+                    selectedSpaceId === space.id ? 'bg-primary-50/70 dark:bg-primary-950/20' : ''
+                  ]"
+                  @click="selectSpace(space.id)"
+                >
+                  <td class="px-4 py-4">
+                    <div class="flex items-start gap-3">
+                      <div class="flex h-9 w-9 items-center justify-center rounded-md bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300">
+                        <UIcon :name="space.icon" />
+                      </div>
+                      <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="font-semibold text-gray-900 dark:text-white">{{ `{{ space.spaceName || space.name }}` }}</span>
+                          <UBadge v-if="space.department" color="neutral" variant="soft">{{ `{{ space.department }}` }}</UBadge>
+                        </div>
+                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">ID: {{ `{{ compactId(space.id) }}` }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4">
+                    <div class="space-y-1">
+                      <div class="font-medium text-gray-900 dark:text-white">{{ `{{ space.departmentCode || space.department || '-' }}` }}</div>
+                      <UBadge color="info" variant="soft">{{ `{{ spaceTypeLabel(space) }}` }}</UBadge>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4">
+                    <UBadge :color="space.statusColor" variant="soft">{{ `{{ space.statusLabel }}` }}</UBadge>
+                  </td>
+                  <td class="px-4 py-4">
+                    <div class="max-w-[260px] space-y-1 text-xs text-gray-600 dark:text-gray-300">
+                      <div>策略：{{ `{{ space.policyTemplateVersionId || '-' }}` }}</div>
+                      <div>入库：{{ `{{ space.ingestionProfileKey || '-' }}` }}</div>
+                      <div>索引：{{ `{{ space.indexProfileKey || '-' }}` }}</div>
+                      <div>RAG：{{ `{{ space.ragProfileKey || '-' }}` }}</div>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4 text-xs text-gray-600 dark:text-gray-300">
+                    <div>CPU {{ `{{ quotaValue(space, 'cpuCores') }}` }}</div>
+                    <div>存储 {{ `{{ quotaValue(space, 'storageGb') }}` }} GB</div>
+                    <div>并发 {{ `{{ quotaValue(space, 'ingestionConcurrency') }}` }}</div>
+                  </td>
+                  <td class="px-4 py-4">
+                    <div class="grid grid-cols-2 justify-end gap-2">
+                      <UButton size="xs" color="success" variant="soft" icon="i-heroicons-arrow-up-tray" @click.stop="openIngestionModal(space)">入库</UButton>
+                      <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-link" @click.stop="showDataSource(space.id)">连接数据源</UButton>
+                      <UButton size="xs" color="neutral" variant="soft" icon="i-heroicons-clipboard-document-list" @click.stop="showIngestion(space.id)">入库记录</UButton>
+                      <UButton size="xs" color="neutral" variant="soft" icon="i-heroicons-adjustments-horizontal" @click.stop="showPolicy(space.id)">策略</UButton>
+                      <UButton v-if="space.status !== 'retired'" size="xs" color="error" variant="soft" icon="i-heroicons-archive-box" :loading="retiringSpaceId === space.id" @click.stop="retireSpace(space)">归档</UButton>
+                      <UButton size="xs" color="error" variant="solid" icon="i-heroicons-trash" :loading="deletingSpaceId === space.id" :disabled="space.status !== 'retired'" @click.stop="deleteSpace(space)">删除</UButton>
+                      <UButton class="col-span-2" size="xs" color="neutral" variant="soft" icon="i-heroicons-magnifying-glass" @click.stop="focusPlayground(space.id)">Playground</UButton>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+            <div v-if="!filteredSpaces.length" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+              {{ `{{ spaces.length ? "没有匹配的知识空间。" : "当前 provider 没有返回真实知识空间。" }}` }}
+            </div>
+        </UCard>
+
+      </div>
+
+      <div class="space-y-6">
+        <UCard>
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-command-line" class="text-primary-600 dark:text-primary-300" />
+              <span class="font-semibold text-gray-900 dark:text-white">检索调试</span>
+            </div>
+          </template>
+
+          <form ref="playgroundFormRef" class="space-y-4" @submit.prevent="runSearch">
+            <UFormField label="当前空间">
+              <USelect v-model="selectedSpaceId" :items="spaceSelectItems" class="w-full" :disabled="!spaceSelectItems.length" placeholder="请选择真实知识空间" />
+            </UFormField>
+            <UFormField v-if="!selectedSpaceId && providerState.mode !== 'delegated'" label="本地调试 space_id">
+              <UInput v-model="form.local_space_id" placeholder="例如：kb-after-sales" />
+            </UFormField>
+            <div v-if="selectedSpaceId" class="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-slate-950">
+              <div class="font-medium text-gray-900 dark:text-white">{{ `{{ selectedSpace.spaceName || selectedSpace.name }}` }}</div>
+              <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ `{{ selectedSpace.departmentCode || selectedSpace.department || '-' }}` }} · {{ `{{ selectedSpace.statusLabel || selectedSpace.status }}` }}
+              </div>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <UBadge :color="modeColor" variant="soft">{{ `{{ providerModeLabel(providerState.mode || selectedSpace.provider_mode || 'local') }}` }}</UBadge>
+                <UBadge color="neutral" variant="soft">{{ `{{ providerState.provider || selectedSpace.provider || 'local' }}` }}</UBadge>
+              </div>
+            </div>
+            <UAlert
+              v-else
+              icon="i-heroicons-information-circle"
+              color="neutral"
+              variant="soft"
+              title="未选择知识空间"
+              description="空间列表来自 framework provider。若当前是 local 模式且没有真实记录，可输入本地调试 space_id 后执行入库；delegated 模式不会创建本地调试数据。"
+            />
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField label="知识库类型">
+                <USelect v-model="form.space_type" :items="knowledgeTypeItems" class="w-full" />
+              </UFormField>
+              <UFormField label="Provider 模式">
+                <USelect v-model="form.provider_mode" :items="providerModeItems" class="w-full" disabled />
+              </UFormField>
+              <UFormField label="返回数量">
+                <UInput v-model.number="form.limit" type="number" min="1" max="20" />
+              </UFormField>
+            </div>
+            <UFormField label="检索问题" required>
+              <UTextarea v-model="form.query" :rows="4" placeholder="输入要检索的问题或关键词" />
+            </UFormField>
+
+            <div class="flex justify-end gap-2">
+              <UButton type="submit" icon="i-heroicons-play" :loading="searchLoading" :disabled="!form.query.trim()">开始检索</UButton>
+            </div>
+          </form>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-gray-900 dark:text-white">Provider 诊断</span>
+              <UBadge :color="healthColor" variant="soft">{{ `{{ healthLabel(capabilities.health) }}` }}</UBadge>
+            </div>
+          </template>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">Provider</div>
+              <div class="font-semibold text-gray-900 dark:text-white">{{ `{{ providerState.provider || '-' }}` }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">生产模式</div>
+              <div class="font-semibold text-gray-900 dark:text-white">{{ `{{ providerState.production ? '是' : '否' }}` }}</div>
+            </div>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <UBadge v-for="op in capabilities.operations || []" :key="op" color="info" variant="soft">{{ `{{ op }}` }}</UBadge>
+            <span v-if="!capabilities.operations?.length" class="text-sm text-gray-500 dark:text-gray-400">暂无能力信息</span>
+          </div>
+          <div v-if="selectedSpace.contract_gaps?.length" class="mt-4 space-y-2">
+            <div class="text-xs font-medium text-gray-500 dark:text-gray-400">协议缺口</div>
+            <div v-for="gap in selectedSpace.contract_gaps" :key="gap" class="rounded-md bg-gray-50 p-2 text-xs text-gray-600 dark:bg-slate-950 dark:text-gray-300">
+              {{ `{{ gap }}` }}
+            </div>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <span class="font-semibold text-gray-900 dark:text-white">引用与诊断</span>
+          </template>
+          <div class="space-y-4">
+            <div class="space-y-2">
+              <div v-for="citation in result?.citations || []" :key="`${citation.document_id}:${citation.chunk_id}`" class="rounded-md bg-gray-50 p-3 text-sm dark:bg-slate-950">
+                <div class="font-medium text-gray-900 dark:text-white">{{ `{{ citation.title }}` }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ `{{ citation.document_id }}` }} · {{ `{{ citation.version || '-' }}` }}</div>
+              </div>
+              <div v-if="!result?.citations?.length" class="text-sm text-gray-500 dark:text-gray-400">暂无引用。</div>
+            </div>
+            <pre class="max-h-56 overflow-auto rounded-md bg-gray-950 p-3 text-xs text-gray-100">{{ `{{ diagnosticsText }}` }}</pre>
+          </div>
+        </UCard>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import ToastAlert from "~/components/ToastAlert.vue";
+import { apiPost, useApiClient } from "~/composables/api/_client";
+
+type ProviderResponse = {
+  provider?: string;
+  mode?: string;
+  production?: boolean;
+  capabilities?: {
+    provider?: string;
+    mode?: string;
+    operations?: string[];
+    health?: string;
+    limits?: Record<string, unknown>;
+  };
+};
+
+type SearchResult = {
+  provider?: string;
+  total?: number;
+  chunks?: Array<{
+    chunk_id?: string;
+    document_id?: string;
+    space_id?: string;
+    text?: string;
+    score?: number;
+    citation?: {
+      title?: string;
+      document_id?: string;
+      chunk_id?: string;
+      provider?: string;
+      version?: string;
+    };
+  }>;
+  citations?: Array<{
+    title?: string;
+    document_id?: string;
+    chunk_id?: string;
+    provider?: string;
+    version?: string;
+  }>;
+  diagnostics?: Record<string, unknown>;
+};
+
+type IngestionJobRecord = {
+  id?: string;
+  jobId?: string;
+  status?: string;
+  retryCount?: number;
+  errorCode?: string;
+  reason?: string;
+  chunkTotal?: number;
+  chunkCoveragePct?: number;
+  embeddingSuccessPct?: number;
+  maskingCoveragePct?: number;
+};
+
+type SpaceRow = {
+  id: string;
+  name: string;
+  spaceId?: string;
+  spaceName?: string;
+  tenant_uuid?: string;
+  department: string;
+  departmentCode?: string;
+  type: string;
+  typeLabel?: string;
+  type_label?: string;
+  status: string;
+  statusLabel?: string;
+  status_label?: string;
+  statusColor?: "success" | "warning" | "neutral" | "error" | "info";
+  status_color?: "success" | "warning" | "neutral" | "error" | "info";
+  provider?: string;
+  provider_mode?: string;
+  policyTemplateVersionId?: string;
+  ingestionProfileKey?: string;
+  indexProfileKey?: string;
+  ragProfileKey?: string;
+  featureFlags?: string[];
+  quotas?: Record<string, unknown>;
+  contract_gaps?: string[];
+  icon?: string;
+};
+
+type StrategyDependency = {
+  index?: string[];
+  runtime?: string[];
+  assets?: string[];
+};
+
+type KnowledgeScenePreset = {
+  key: string;
+  label: string;
+  description?: string;
+  default_strategy_package?: string;
+  default_bundle?: string;
+};
+
+type StrategyPackagePreset = {
+  key: string;
+  label: string;
+  display_label?: string;
+  summary?: string;
+  use_case?: string;
+  not_for?: string;
+  recommended_profile_key?: string;
+  dependencies?: StrategyDependency;
+};
+
+type StrategyBundlePreset = {
+  key: string;
+  label: string;
+  description?: string;
+};
+
+type KnowledgeCatalog = {
+  version?: string;
+  source?: string;
+  scenes?: KnowledgeScenePreset[];
+  strategy_packages?: StrategyPackagePreset[];
+  strategy_bundles?: StrategyBundlePreset[];
+  metadata?: Record<string, unknown>;
+};
+
+const { get, post, delete: del } = useApiClient();
+
+const providerLoading = ref(false);
+const searchLoading = ref(false);
+const createLoading = ref(false);
+const ingestionLoading = ref(false);
+const retiringSpaceId = ref("");
+const deletingSpaceId = ref("");
+const providerError = ref("");
+const searchError = ref("");
+const createError = ref("");
+const ingestionError = ref("");
+const diagnosticsTitle = ref("诊断结果");
+const providerState = ref<ProviderResponse>({});
+const knowledgeCatalog = ref<KnowledgeCatalog>({});
+const result = ref<SearchResult | null>(null);
+const ingestionJobs = ref<IngestionJobRecord[]>([]);
+const policyPayload = ref<Record<string, any> | null>(null);
+const selectedSpaceId = ref("");
+const playgroundFormRef = ref<HTMLFormElement | null>(null);
+const contractGaps = ref<string[]>([]);
+const createSpaceOpen = ref(false);
+const ingestionOpen = ref(false);
+const resultOpen = ref(false);
+const resultKind = ref<"diagnostics" | "ingestions" | "policy" | "search">("diagnostics");
+const ingestionPage = ref(1);
+const ingestionPageSize = ref(10);
+const selectedIngestionFile = ref<File | null>(null);
+const ingestionSourceMethod = ref<"upload" | "url">("upload");
+const toast = reactive({
+  visible: false,
+  title: "",
+  message: "",
+  color: "success" as "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral",
+  duration: 4500,
+});
+const knowledgeNotice = reactive({
+  title: "",
+  message: "",
+  color: "info" as "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral",
+  icon: "i-heroicons-information-circle",
+});
+
+const form = reactive({
+  query: "退款政策",
+  space_type: "tenant",
+  provider_mode: "local",
+  local_space_id: "",
+  limit: 5,
+});
+
+const filters = reactive({
+  keyword: "",
+  department: "all",
+  status: "all",
+});
+
+const createForm = reactive({
+  spaceName: "插件联调知识空间",
+  departmentCode: "dev",
+  sceneKey: "product_specs",
+  strategyPackageKey: "H_fusion",
+  ingestionProfileKey: "p1_general",
+  indexProfileKey: "p1_general",
+  ragProfileKey: "p1_general",
+  featureFlags: ["rag.strategy_package:H_fusion", "rag.scene:product_specs", "rag.bundle:p1_general"],
+  cpuCores: 4,
+  storageGb: 200,
+  ingestionConcurrency: 2,
+});
+
+const ingestionForm = reactive({
+  spaceId: "",
+  format: "markdown",
+  sourceUri: "",
+  ingestionProfile: "p1_general",
+  requestedBy: "plugin-knowledge-lab",
+});
+
+const spaces = ref<SpaceRow[]>([]);
+
+const profileLabels: Record<string, string> = {
+  p0_basic: "P0 基础（p0_basic）",
+  p1_general: "P1 通用推荐（p1_general）",
+  p2_high_accuracy: "P2 高准确/合规（p2_high_accuracy）",
+  p3_kg_strong: "P3 KG 约束（p3_kg_strong）",
+};
+
+type IndexChannel = "dense" | "sparse" | "hier" | "kg" | "time" | "structured";
+const knowledgeScenesByKey = computed(() => Object.fromEntries((knowledgeCatalog.value.scenes || []).map((scene) => [scene.key, scene])));
+const strategyPackagesByKey = computed(() => Object.fromEntries((knowledgeCatalog.value.strategy_packages || []).map((pkg) => [pkg.key, pkg])));
+const knowledgeSceneItems = computed(() => (knowledgeCatalog.value.scenes || []).map((scene) => ({ label: scene.label || scene.key, value: scene.key })));
+const strategyPackageItems = computed(() => (knowledgeCatalog.value.strategy_packages || []).map((pkg) => ({ label: `${strategyDisplayLabel(pkg)} · ${pkg.summary || pkg.label || pkg.key}`, value: pkg.key })));
+const selectedScene = computed(() => knowledgeScenesByKey.value[createForm.sceneKey] || (knowledgeCatalog.value.scenes || [])[0] || { key: "product_specs", label: "产品规格 / 参数查询", description: "" });
+const selectedStrategyPackage = computed(() => strategyPackagesByKey.value[createForm.strategyPackageKey] || (knowledgeCatalog.value.strategy_packages || [])[0] || { key: "H_fusion", label: "H Fusion（融合检索）", recommended_profile_key: "p1_general", dependencies: { index: [] } });
+
+function profileLabel(key?: string) {
+  return profileLabels[key || ""] || key || "-";
+}
+
+function normalizeStrategyPackageKey(value: unknown) {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "value" in value) {
+    return String((value as { value?: unknown }).value || "");
+  }
+  return "";
+}
+
+function normalizeSceneKey(value: unknown) {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "value" in value) {
+    return String((value as { value?: unknown }).value || "");
+  }
+  return "";
+}
+
+function setCreateStrategyPackage(value: unknown, sceneKey?: string) {
+  const key = normalizeStrategyPackageKey(value);
+  const packageKey = strategyPackagesByKey.value[key] ? key : selectedStrategyPackage.value.key;
+  const pkg = strategyPackagesByKey.value[packageKey] || selectedStrategyPackage.value;
+  const profileKey = pkg.recommended_profile_key || "p1_general";
+  const resolvedSceneKey = sceneKey && knowledgeScenesByKey.value[sceneKey] ? sceneKey : createForm.sceneKey;
+  createForm.strategyPackageKey = packageKey;
+  createForm.ingestionProfileKey = profileKey;
+  createForm.indexProfileKey = profileKey;
+  createForm.ragProfileKey = profileKey;
+  createForm.featureFlags = [
+    "rag.strategy_package:" + packageKey,
+    "rag.scene:" + resolvedSceneKey,
+    "rag.bundle:" + profileKey,
+  ];
+  if (resolvedSceneKey === "custom_expert") {
+    createForm.featureFlags.push("rag.guided");
+  }
+}
+
+function setCreateKnowledgeScene(value: unknown) {
+  const key = normalizeSceneKey(value);
+  const sceneKey = knowledgeScenesByKey.value[key] ? key : selectedScene.value.key;
+  createForm.sceneKey = sceneKey;
+  setCreateStrategyPackage(knowledgeScenesByKey.value[sceneKey]?.default_strategy_package || "H_fusion", sceneKey);
+}
+
+function onKnowledgeSceneChange(value: unknown) {
+  setCreateKnowledgeScene(value);
+}
+
+function onStrategyPackageChange(value: unknown) {
+  setCreateStrategyPackage(value);
+}
+
+const enabledIndexChannels = computed<IndexChannel[]>(() => {
+  const keys = new Set(selectedStrategyPackage.value.dependencies?.index || []);
+  const out: IndexChannel[] = [];
+  const push = (key: string, channel: IndexChannel) => {
+    if (keys.has(key)) out.push(channel);
+  };
+  push("index.dense", "dense");
+  push("index.sparse", "sparse");
+  push("index.hier", "hier");
+  push("index.kg", "kg");
+  push("index.time_fields", "time");
+  push("index.structured_fields", "structured");
+  return out;
+});
+
+function channelLabel(channel: string) {
+  switch (channel) {
+    case "dense": return "Dense";
+    case "sparse": return "Sparse(BM25)";
+    case "hier": return "Hier";
+    case "kg": return "KG";
+    case "time": return "Time";
+    case "structured": return "Structured";
+    default: return channel;
+  }
+}
+
+function strategyDisplayLabel(pkg: StrategyPackagePreset) {
+  return pkg.display_label || pkg.label || pkg.key || "-";
+}
+
+function strategyUseCase(pkg: StrategyPackagePreset) {
+  return pkg.use_case || pkg.summary || pkg.label || "-";
+}
+
+function strategyNotFor(pkg: StrategyPackagePreset) {
+  return pkg.not_for || "请根据底座策略依赖与实际数据质量评估。";
+}
+
+const spaceTypeItems = [
+  { label: "全部类型", value: "all" },
+  { label: "租户知识", value: "tenant" },
+  { label: "插件知识", value: "plugin" },
+  { label: "公共知识", value: "public" },
+  { label: "Agent/Skill 知识", value: "agent" },
+  { label: "底座知识", value: "platform" },
+];
+
+const knowledgeTypeItems = spaceTypeItems.filter((item) => item.value !== "all");
+const statusItems = [
+  { label: "全部状态", value: "all" },
+  { label: "可用", value: "active" },
+  { label: "待权限配置", value: "pending_iam" },
+  { label: "已归档", value: "retired" },
+  { label: "待接口接入", value: "pending" },
+  { label: "不可用", value: "unavailable" },
+];
+const providerModeItems = [
+  { label: "本地", value: "local" },
+  { label: "底座委托", value: "delegated" },
+  { label: "模拟", value: "mock" },
+];
+const ingestionFormatItems = [
+  { label: "Markdown", value: "markdown" },
+  { label: "PDF", value: "pdf" },
+  { label: "Text", value: "text" },
+  { label: "HTML", value: "html" },
+  { label: "CSV", value: "csv" },
+];
+const ingestionSourceMethodItems = [
+  { label: "文件上传", value: "upload" },
+  { label: "外链 URI", value: "url" },
+];
+const ingestionPageSizeItems = [
+  { label: "5", value: 5 },
+  { label: "10", value: 10 },
+  { label: "20", value: 20 },
+];
+
+const departmentSelectItems = computed(() => {
+  const departments = Array.from(new Set(spaces.value.map((space) => space.departmentCode || space.department).filter(Boolean))).sort();
+  const fallback = departments.length ? departments : ["dev", "ops", "support"];
+  return fallback.map((department) => ({ label: department, value: department }));
+});
+
+async function openCreateSpaceModal() {
+  createError.value = "";
+  if (!knowledgeCatalog.value.scenes?.length || !knowledgeCatalog.value.strategy_packages?.length) {
+    await loadKnowledgeCatalog();
+  }
+  setCreateStrategyPackage(createForm.strategyPackageKey);
+  createSpaceOpen.value = true;
+}
+
+async function createKnowledgeSpace() {
+  createLoading.value = true;
+  createError.value = "";
+  try {
+    if (!createForm.spaceName.trim()) {
+      createError.value = "请填写空间名称。";
+      return;
+    }
+    if (!createForm.departmentCode.trim()) {
+      createError.value = "请填写所属部门。";
+      return;
+    }
+    const payload: Record<string, any> = {
+      spaceName: createForm.spaceName.trim(),
+      departmentCode: createForm.departmentCode.trim(),
+      visibility: "tenant",
+      description: "插件知识库联调",
+      policyTemplateVersionId: "default-v1",
+      ingestionProfileKey: createForm.ingestionProfileKey,
+      indexProfileKey: createForm.indexProfileKey,
+      ragProfileKey: createForm.ragProfileKey,
+      featureFlags: [...createForm.featureFlags],
+      cpuCores: createForm.cpuCores,
+      storageGb: createForm.storageGb,
+      ingestionConcurrency: createForm.ingestionConcurrency,
+      requestedBy: "plugin-knowledge-lab",
+    };
+    const created = unwrap<Record<string, any>>(await post("/admin/runtime/knowledge/spaces", payload));
+    createSpaceOpen.value = false;
+    await loadSpaces();
+    const createdID = String(created?.spaceId || created?.uuid || "");
+    if (createdID) {
+      selectedSpaceId.value = createdID;
+    }
+  } catch (error: any) {
+    if (isConflictError(error)) {
+      await loadSpaces();
+      const existing = findExistingSpace(createForm.spaceName, createForm.departmentCode);
+      if (existing) {
+        selectedSpaceId.value = existing.id;
+      }
+      createError.value = "同一租户下已存在该空间，已刷新列表。可以直接选择已有空间继续入库和检索。";
+      return;
+    }
+    createError.value = errorMessage(error);
+  } finally {
+    createLoading.value = false;
+  }
+}
+
+async function retireSpace(space: SpaceRow) {
+  const spaceID = String(space.id || space.spaceId || "").trim();
+  if (!spaceID) return;
+  const name = String(space.spaceName || space.name || spaceID);
+  const ok = window.confirm(`确认归档知识空间「${name}」？归档后空间会进入 retained/retired 状态，不会被硬删除。`);
+  if (!ok) return;
+  retiringSpaceId.value = spaceID;
+  providerError.value = "";
+  try {
+    await post(`/admin/runtime/knowledge/spaces/${encodeURIComponent(spaceID)}/retire`, {
+      reason: "plugin knowledge lab cleanup",
+      requestedBy: "plugin-knowledge-lab",
+      dropVectors: false,
+    });
+    await loadSpaces();
+    if (selectedSpaceId.value === spaceID && spaces.value.length && !spaces.value.some((item) => item.id === spaceID && item.status !== "retired")) {
+      selectedSpaceId.value = spaces.value.find((item) => item.status !== "retired")?.id || spaces.value[0]?.id || "";
+    }
+  } catch (error: any) {
+    providerError.value = errorMessage(error);
+  } finally {
+    retiringSpaceId.value = "";
+  }
+}
+
+async function deleteSpace(space: SpaceRow) {
+  const spaceID = String(space.id || space.spaceId || "").trim();
+  if (!spaceID) return;
+  const name = String(space.spaceName || space.name || spaceID);
+  const ok = window.confirm(`确认删除知识空间「${name}」？这会清理空间记录、入库任务、chunk、策略和调试索引记录。`);
+  if (!ok) return;
+  deletingSpaceId.value = spaceID;
+  providerError.value = "";
+  try {
+    await del(`/admin/runtime/knowledge/spaces/${encodeURIComponent(spaceID)}`, {
+      body: JSON.stringify({
+        requestedBy: "plugin-knowledge-lab",
+        force: false,
+        dropVectors: true,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    await loadSpaces();
+    if (selectedSpaceId.value === spaceID) {
+      selectedSpaceId.value = spaces.value[0]?.id || "";
+    }
+  } catch (error: any) {
+    providerError.value = errorMessage(error);
+  } finally {
+    deletingSpaceId.value = "";
+  }
+}
+
+const capabilities = computed(() => providerState.value.capabilities || {});
+const resultPanelTitle = computed(() => {
+  if (resultKind.value === "ingestions") return "入库记录";
+  if (resultKind.value === "policy") return "知识空间策略";
+  if (resultKind.value === "search") return "Playground 结果";
+  return diagnosticsTitle.value || "诊断结果";
+});
+const resultErrorTitle = computed(() => {
+  if (resultKind.value === "ingestions") return "入库记录读取失败";
+  if (resultKind.value === "policy") return "策略读取失败";
+  if (resultKind.value === "search") return "检索失败";
+  return "操作失败";
+});
+const resultCountLabel = computed(() => {
+  if (resultKind.value === "ingestions") return `${ingestionJobs.value.length} 条`;
+  if (resultKind.value === "policy") return `${policyStrategies.value.length} 条`;
+  return `${result.value?.total ?? result.value?.chunks?.length ?? 0} 条`;
+});
+const modeColor = computed(() => {
+  const mode = providerState.value.mode;
+  if (mode === "delegated") return "primary";
+  if (mode === "local") return "warning";
+  if (mode === "mock") return "neutral";
+  return "info";
+});
+const healthColor = computed(() => capabilities.value.health === "ready" ? "success" : "warning");
+const diagnosticsText = computed(() => JSON.stringify(result.value?.diagnostics || {}, null, 2));
+const diagnosticsSummary = computed(() => summarizeDiagnostics(result.value?.diagnostics));
+const ingestionPageCount = computed(() => Math.max(1, Math.ceil(ingestionJobs.value.length / ingestionPageSize.value)));
+const pagedIngestionJobs = computed(() => {
+  const page = Math.min(Math.max(ingestionPage.value, 1), ingestionPageCount.value);
+  const start = (page - 1) * ingestionPageSize.value;
+  return ingestionJobs.value.slice(start, start + ingestionPageSize.value);
+});
+const ingestionPageStart = computed(() => ingestionJobs.value.length ? (Math.min(ingestionPage.value, ingestionPageCount.value) - 1) * ingestionPageSize.value + 1 : 0);
+const ingestionPageEnd = computed(() => Math.min(ingestionPageStart.value + ingestionPageSize.value - 1, ingestionJobs.value.length));
+const policyStrategies = computed(() => normalizePolicyStrategies(policyPayload.value));
+const selectedPolicyPackage = computed(() => {
+  const packageKey = inferStrategyPackageKey(selectedSpace.value);
+  return strategyPackagesByKey.value[packageKey] || selectedStrategyPackage.value;
+});
+const selectedPolicyIndexChannels = computed<IndexChannel[]>(() => indexChannelsFromDependencies(selectedPolicyPackage.value.dependencies));
+const selectedPolicyRuntimeDeps = computed(() => selectedPolicyPackage.value.dependencies?.runtime || []);
+const selectedPolicyAssetDeps = computed(() => selectedPolicyPackage.value.dependencies?.assets || []);
+const departmentItems = computed(() => {
+  const departments = Array.from(new Set(spaces.value.map((space) => space.departmentCode || space.department).filter(Boolean))).sort();
+  return [{ label: "全部部门", value: "all" }, ...departments.map((department) => ({ label: department, value: department }))];
+});
+const spaceSelectItems = computed(() => spaces.value.map((space) => ({ label: `${space.spaceName || space.name} · ${spaceTypeLabel(space)}`, value: space.id })));
+const selectedSpace = computed(() => spaces.value.find((space) => space.id === selectedSpaceId.value) || ({} as SpaceRow));
+const ingestionSpace = computed(() => spaces.value.find((space) => space.id === ingestionForm.spaceId) || ({} as SpaceRow));
+const canSubmitIngestion = computed(() => {
+  if (!ingestionForm.spaceId) return false;
+  if (ingestionSourceMethod.value === "upload") return Boolean(selectedIngestionFile.value);
+  return Boolean(ingestionForm.sourceUri.trim());
+});
+const activeSpaceId = computed(() => selectedSpaceId.value || (providerState.value.mode !== "delegated" ? form.local_space_id.trim() : ""));
+const filteredSpaces = computed(() => {
+  const keyword = filters.keyword.trim().toLowerCase();
+  return spaces.value.filter((space) => {
+    const department = space.departmentCode || space.department;
+    const matchKeyword = !keyword || `${space.spaceName || space.name} ${space.id} ${department} ${space.policyTemplateVersionId || ""} ${space.ingestionProfileKey || ""} ${space.indexProfileKey || ""} ${space.ragProfileKey || ""}`.toLowerCase().includes(keyword);
+    const matchDepartment = filters.department === "all" || department === filters.department;
+    const matchStatus = filters.status === "all" || space.status === filters.status;
+    return matchKeyword && matchDepartment && matchStatus;
+  });
+});
+
+function indexChannelsFromDependencies(dependencies?: StrategyDependency): IndexChannel[] {
+  const keys = new Set(dependencies?.index || []);
+  const channels: IndexChannel[] = [];
+  const push = (key: string, channel: IndexChannel) => {
+    if (keys.has(key)) channels.push(channel);
+  };
+  push("index.dense", "dense");
+  push("index.sparse", "sparse");
+  push("index.hier", "hier");
+  push("index.kg", "kg");
+  push("index.time_fields", "time");
+  push("index.structured_fields", "structured");
+  return channels;
+}
+
+function inferStrategyPackageKey(space: SpaceRow) {
+  const flags = (space.featureFlags || []).map((flag) => String(flag || "").trim());
+  const fromFlag = flags.find((flag) => flag.toLowerCase().startsWith("rag.strategy_package:"))?.slice("rag.strategy_package:".length);
+  if (fromFlag && strategyPackagesByKey.value[fromFlag]) return fromFlag;
+  const profile = space.ragProfileKey || space.indexProfileKey || space.ingestionProfileKey;
+  if (profile === "p0_basic" && strategyPackagesByKey.value.A_simple) return "A_simple";
+  if (profile === "p2_high_accuracy" && strategyPackagesByKey.value.O_crag) return "O_crag";
+  if (profile === "p3_kg_strong" && strategyPackagesByKey.value.K_kg) return "K_kg";
+  return strategyPackagesByKey.value.H_fusion ? "H_fusion" : selectedStrategyPackage.value.key;
+}
+
+watch(selectedSpace, (space) => {
+  form.space_type = space.type === "platform" ? "tenant" : space.type;
+});
+
+watch(
+  () => providerState.value.mode,
+  (mode) => {
+    form.provider_mode = mode || "local";
+    if (mode === "delegated") {
+      form.local_space_id = "";
+    }
+  },
+);
+
+watch([ingestionPageSize, ingestionJobs], () => {
+  ingestionPage.value = Math.min(Math.max(ingestionPage.value, 1), ingestionPageCount.value);
+});
+
+function unwrap<T>(payload: any): T {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return payload.data as T;
+  }
+  return payload as T;
+}
+
+function errorMessage(error: any) {
+  return String(error?.data?.error?.message || error?.data?.error || error?.message || "请求失败");
+}
+
+function showToast(title: string, message: string, color: typeof toast.color = "info", duration = 4500) {
+  toast.title = title;
+  toast.message = message;
+  toast.color = color;
+  toast.duration = duration;
+  toast.visible = false;
+  nextTick(() => {
+    toast.visible = true;
+  });
+}
+
+function setKnowledgeNotice(title: string, message: string, color: typeof knowledgeNotice.color = "info", icon = "i-heroicons-information-circle") {
+  knowledgeNotice.title = title;
+  knowledgeNotice.message = message;
+  knowledgeNotice.color = color;
+  knowledgeNotice.icon = icon;
+}
+
+async function openResultModal() {
+  await nextTick();
+  resultOpen.value = true;
+}
+
+function summarizeDiagnostics(diagnostics?: Record<string, unknown>) {
+  if (!diagnostics) return "";
+  const job = diagnostics.job as Record<string, unknown> | undefined;
+  const records = diagnostics.records as unknown[] | undefined;
+  const contractGap = String(diagnostics.contract_gap || "");
+  const message = String(diagnostics.message || "");
+  const nextAction = String(diagnostics.next_action || "");
+  const note = String(diagnostics.note || "");
+  const status = String(diagnostics.status || job?.status || diagnostics.provider_mode || "");
+  const traceID = String(diagnostics.trace_id || "");
+  if (contractGap) return contractGap;
+  if (message) return nextAction ? `${message} ${nextAction}` : message;
+  if (Array.isArray(records)) return records.length ? `已返回 ${records.length} 条入库记录。` : "底座当前没有返回入库记录。";
+  if (status || traceID) return `状态：${status || "-"}${traceID ? `，Trace：${traceID}` : ""}`;
+  if (note) return note;
+  return "已更新诊断结果，详情见右侧引用与诊断。";
+}
+
+function isConflictError(error: any) {
+  const code = String(error?.data?.code || error?.data?.error?.code || "").toUpperCase();
+  const status = Number(error?.status || error?.statusCode || error?.response?.status || error?.data?.status || 0);
+  return status === 409 || code === "KNOWLEDGE_CONFLICT";
+}
+
+function findExistingSpace(spaceName: string, departmentCode: string) {
+  const name = spaceName.trim();
+  const department = departmentCode.trim();
+  return spaces.value.find((space) => {
+    const existingName = String(space.spaceName || space.name || "").trim();
+    const existingDepartment = String(space.departmentCode || space.department || "").trim();
+    return existingName === name && (!department || existingDepartment === department);
+  });
+}
+
+async function loadProvider() {
+  providerLoading.value = true;
+  providerError.value = "";
+  try {
+    providerState.value = unwrap<ProviderResponse>(await get("/admin/runtime/knowledge/provider"));
+  } catch (error: any) {
+    providerError.value = errorMessage(error);
+  } finally {
+    providerLoading.value = false;
+  }
+}
+
+async function loadKnowledgeCatalog() {
+  try {
+    knowledgeCatalog.value = unwrap<KnowledgeCatalog>(await get("/admin/runtime/knowledge/catalog"));
+    if (!knowledgeCatalog.value.scenes?.some((scene) => scene.key === createForm.sceneKey)) {
+      createForm.sceneKey = knowledgeCatalog.value.scenes?.[0]?.key || "product_specs";
+    }
+    if (!knowledgeCatalog.value.strategy_packages?.some((pkg) => pkg.key === createForm.strategyPackageKey)) {
+      createForm.strategyPackageKey = knowledgeScenesByKey.value[createForm.sceneKey]?.default_strategy_package || knowledgeCatalog.value.strategy_packages?.[0]?.key || "H_fusion";
+    }
+    setCreateStrategyPackage(createForm.strategyPackageKey, createForm.sceneKey);
+  } catch (error: any) {
+    providerError.value = errorMessage(error);
+  }
+}
+
+async function loadSpaces() {
+  try {
+    const payload = unwrap<{ spaces?: SpaceRow[]; contract_gaps?: string[] }>(await get("/admin/runtime/knowledge/spaces"));
+    contractGaps.value = payload.contract_gaps || [];
+    spaces.value = (payload.spaces || []).map(normalizeSpace);
+    if (spaces.value.length && !spaces.value.some((space) => space.id === selectedSpaceId.value)) {
+      selectedSpaceId.value = spaces.value[0]?.id || "";
+    }
+    if (!spaces.value.length) {
+      selectedSpaceId.value = "";
+    }
+  } catch (error: any) {
+    providerError.value = errorMessage(error);
+  }
+}
+
+async function refreshKnowledgeState() {
+  providerLoading.value = true;
+  providerError.value = "";
+  try {
+    await loadProvider();
+    await loadKnowledgeCatalog();
+    await loadSpaces();
+  } finally {
+    providerLoading.value = false;
+  }
+}
+
+async function runSearch() {
+  searchLoading.value = true;
+  searchError.value = "";
+  ingestionJobs.value = [];
+  policyPayload.value = null;
+  resultKind.value = "search";
+  try {
+    if (!activeSpaceId.value) {
+      searchError.value = providerState.value.mode === "delegated" ? "请先从底座返回的真实知识空间中选择一个空间。" : "请先选择真实知识空间，或填写本地调试 space_id。";
+      await openResultModal();
+      return;
+    }
+    const payload: Record<string, any> = {
+      query: form.query,
+      space_id: activeSpaceId.value,
+      visibility: form.space_type,
+      limit: form.limit,
+    };
+    result.value = unwrap<SearchResult>(await post("/admin/runtime/knowledge/search", payload));
+    await openResultModal();
+  } catch (error: any) {
+    searchError.value = errorMessage(error);
+    await openResultModal();
+  } finally {
+    searchLoading.value = false;
+  }
+}
+
+function openIngestionModal(space: SpaceRow) {
+  const spaceId = String(space.id || space.spaceId || "").trim();
+  selectSpace(spaceId);
+  ingestionError.value = "";
+  ingestionForm.spaceId = spaceId;
+  ingestionForm.format = "markdown";
+  ingestionForm.sourceUri = "";
+  ingestionForm.ingestionProfile = space.ingestionProfileKey || space.ragProfileKey || "p1_general";
+  ingestionForm.requestedBy = "plugin-knowledge-lab";
+  ingestionSourceMethod.value = "upload";
+  selectedIngestionFile.value = null;
+  ingestionOpen.value = true;
+}
+
+function onIngestionFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] || null;
+  selectedIngestionFile.value = file;
+  if (!file) return;
+  ingestionForm.format = inferIngestionFormat(file.name);
+  ingestionForm.sourceUri = "";
+}
+
+async function submitIngestion() {
+  const spaceId = String(ingestionForm.spaceId || "").trim();
+  if (!spaceId) {
+    ingestionError.value = "请选择知识空间。";
+    return;
+  }
+  if (ingestionSourceMethod.value === "upload" && !selectedIngestionFile.value) {
+    ingestionError.value = "请选择要上传的文件。";
+    return;
+  }
+  if (ingestionSourceMethod.value === "url" && !ingestionForm.sourceUri.trim()) {
+    ingestionError.value = "请填写来源 URI。";
+    return;
+  }
+  ingestionLoading.value = true;
+  ingestionError.value = "";
+  try {
+    let sourceUri = ingestionForm.sourceUri.trim();
+    if (ingestionSourceMethod.value === "upload" && selectedIngestionFile.value) {
+      const formData = new FormData();
+      formData.set("file", selectedIngestionFile.value);
+      formData.set("spaceId", spaceId);
+      formData.set("format", ingestionForm.format);
+      formData.set("requestedBy", ingestionForm.requestedBy.trim() || "plugin-knowledge-lab");
+      const uploaded = unwrap<Record<string, any>>(await apiPost("/admin/runtime/knowledge/media/upload", formData));
+      sourceUri = String(uploaded.sourceUri || "").trim();
+      if (!sourceUri) {
+        throw new Error("Media 上传未返回 sourceUri");
+      }
+      if (uploaded.format) {
+        ingestionForm.format = String(uploaded.format);
+      }
+    }
+    const payload = unwrap<Record<string, unknown>>(await post(`/admin/runtime/knowledge/spaces/${encodeURIComponent(spaceId)}/ingest`, {
+      format: ingestionForm.format,
+      sourceUri,
+      ingestionProfile: ingestionForm.ingestionProfile.trim() || "p1_general",
+      requestedBy: ingestionForm.requestedBy.trim() || "plugin-knowledge-lab",
+    }));
+    diagnosticsTitle.value = "入库任务已触发";
+    ingestionJobs.value = [];
+    policyPayload.value = null;
+    resultKind.value = "diagnostics";
+    result.value = diagnosticsResult(payload);
+    setKnowledgeNotice("入库任务已触发", "文件已上传到 PowerX Media，并已向知识空间提交入库任务。", "success", "i-heroicons-check-circle");
+    showToast("入库任务已触发", "底座已接受入库任务请求；可用检索调试验证索引结果。", "success");
+    ingestionOpen.value = false;
+    await loadSpaces();
+    await openResultModal();
+    return true;
+  } catch (error: any) {
+    ingestionError.value = errorMessage(error);
+    showToast("入库失败", ingestionError.value, "error", 7000);
+    return false;
+  } finally {
+    ingestionLoading.value = false;
+  }
+}
+
+function inferIngestionFormat(filename: string) {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  if (ext === "md" || ext === "markdown") return "markdown";
+  if (ext === "txt") return "text";
+  if (ext === "pdf") return "pdf";
+  if (ext === "html" || ext === "htm") return "html";
+  if (ext === "csv") return "csv";
+  return ingestionForm.format || "markdown";
+}
+
+function selectSpace(spaceId: string) {
+  if (spaces.value.some((space) => space.id === spaceId)) {
+    selectedSpaceId.value = spaceId;
+    return;
+  }
+  selectedSpaceId.value = "";
+  form.local_space_id = spaceId;
+}
+
+async function focusPlayground(spaceId?: string) {
+  if (spaceId) {
+    selectSpace(spaceId);
+  }
+  await nextTick();
+  playgroundFormRef.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function showIngestion(spaceId: string) {
+  selectSpace(spaceId);
+  searchError.value = "";
+  policyPayload.value = null;
+  resultKind.value = "ingestions";
+  try {
+    const payload = unwrap<Record<string, unknown>>(await get(`/admin/runtime/knowledge/spaces/${encodeURIComponent(spaceId)}/ingestions?limit=20`));
+    diagnosticsTitle.value = "入库记录";
+    ingestionJobs.value = normalizeIngestionJobs(payload);
+    ingestionPage.value = 1;
+    result.value = diagnosticsResult(payload);
+    setKnowledgeNotice("入库记录已刷新", summarizeDiagnostics(payload) || "已读取当前入库记录。", "info");
+    await openResultModal();
+  } catch (error: any) {
+    searchError.value = errorMessage(error);
+    showToast("入库记录读取失败", searchError.value, "error", 7000);
+    await openResultModal();
+  }
+}
+
+function showDataSource(spaceId: string) {
+  selectSpace(spaceId);
+  ingestionJobs.value = [];
+  policyPayload.value = null;
+  resultKind.value = "diagnostics";
+  diagnosticsTitle.value = "数据源连接";
+  const payload = {
+    space_id: spaceId,
+    provider: providerState.value.provider || "local",
+    provider_mode: providerState.value.mode || "local",
+    contract_gap: "PowerX 当前知识空间协议尚未开放数据源连接管理接口；插件侧已选中该空间，可继续查看入库记录、策略或执行检索。",
+  };
+  result.value = diagnosticsResult(payload);
+  setKnowledgeNotice("数据源连接暂未开放", payload.contract_gap, "warning", "i-heroicons-exclamation-triangle");
+  openResultModal();
+}
+
+async function showPolicy(spaceId: string) {
+  selectSpace(spaceId);
+  searchError.value = "";
+  ingestionJobs.value = [];
+  resultKind.value = "policy";
+  try {
+    const payload = unwrap<Record<string, unknown>>(await get(`/admin/runtime/knowledge/spaces/${encodeURIComponent(spaceId)}/policy`));
+    diagnosticsTitle.value = "知识空间策略";
+    policyPayload.value = payload;
+    result.value = diagnosticsResult(payload);
+    setKnowledgeNotice("策略已刷新", summarizeDiagnostics(payload) || "已读取知识空间策略。", "info");
+    await openResultModal();
+  } catch (error: any) {
+    searchError.value = errorMessage(error);
+    showToast("策略读取失败", searchError.value, "error", 7000);
+    await openResultModal();
+  }
+}
+
+function diagnosticsResult(diagnostics: Record<string, unknown>): SearchResult {
+  return {
+    provider: providerState.value.provider || "local",
+    total: 0,
+    chunks: [],
+    citations: [],
+    diagnostics,
+  };
+}
+
+function normalizeIngestionJobs(payload: Record<string, unknown>): IngestionJobRecord[] {
+  const records = Array.isArray(payload.records) ? payload.records : Array.isArray(payload.items) ? payload.items : [];
+  return records.map((record: any) => ({
+    id: String(record?.id || record?.jobId || record?.job_id || ""),
+    jobId: String(record?.jobId || record?.job_id || record?.id || ""),
+    status: String(record?.status || ""),
+    retryCount: numberOrUndefined(record?.retryCount ?? record?.retry_count),
+    errorCode: String(record?.errorCode || record?.error_code || ""),
+    reason: String(record?.reason || record?.blockedReason || record?.blocked_reason || ""),
+    chunkTotal: numberOrUndefined(record?.chunkTotal ?? record?.chunk_total),
+    chunkCoveragePct: numberOrUndefined(record?.chunkCoveragePct ?? record?.chunk_coverage_pct),
+    embeddingSuccessPct: numberOrUndefined(record?.embeddingSuccessPct ?? record?.embedding_success_pct),
+    maskingCoveragePct: numberOrUndefined(record?.maskingCoveragePct ?? record?.masking_coverage_pct),
+  }));
+}
+
+function normalizePolicyStrategies(payload?: Record<string, any> | null): Record<string, any>[] {
+  if (!payload) return [];
+  const candidates = [
+    payload.strategies,
+    payload.items,
+    payload.records,
+    payload.data,
+    payload.fusion_strategy,
+    payload.fusion_strategy?.data,
+    payload.fusion_strategy?.items,
+    payload.fusion_strategy?.records,
+    payload.fusion_strategy?.payload?.data,
+    payload.fusion_strategy?.payload?.items,
+    payload.fusion_strategy?.result?.data,
+    payload.fusion_strategy?.result?.items,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.map((item) => item && typeof item === "object" ? item as Record<string, any> : { name: String(item) });
+    }
+  }
+  return [];
+}
+
+function numberOrUndefined(value: unknown) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+function formatPercent(value?: number) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return "-";
+  return `${Number(value).toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+function ingestionStatusColor(status?: string) {
+  const normalized = String(status || "").toLowerCase();
+  if (["completed", "success", "succeeded"].includes(normalized)) return "success";
+  if (["failed", "blocked", "error"].includes(normalized)) return "error";
+  if (["running", "processing", "queued", "pending"].includes(normalized)) return "warning";
+  return "neutral";
+}
+
+function normalizeSpace(space: SpaceRow): SpaceRow {
+  const status = space.status || "pending";
+  const id = space.id || space.spaceId || "debug";
+  const name = space.name || space.spaceName || id;
+  return {
+    ...space,
+    id,
+    name,
+    spaceId: space.spaceId || id,
+    spaceName: space.spaceName || name,
+    department: space.department || space.departmentCode || "-",
+    departmentCode: space.departmentCode || space.department || "-",
+    typeLabel: space.typeLabel || space.type_label || space.type,
+    statusLabel: space.statusLabel || space.status_label || statusLabel(status),
+    statusColor: space.statusColor || space.status_color || statusColor(status),
+    icon: space.icon || "i-heroicons-circle-stack",
+  };
+}
+
+function statusColor(status: string): "success" | "warning" | "neutral" | "error" | "info" {
+  if (status === "active" || status === "ready") return "success";
+  if (status === "pending" || status === "pending_iam") return "warning";
+  if (status === "unavailable") return "error";
+  return "neutral";
+}
+
+function statusLabel(status: string) {
+  if (status === "active") return "可用";
+  if (status === "pending_iam") return "待权限配置";
+  if (status === "retired") return "已归档";
+  if (status === "ready") return "本地可调试";
+  if (status === "pending") return "待接口接入";
+  if (status === "unavailable") return "不可用";
+  return status;
+}
+
+function providerModeLabel(mode?: string) {
+  if (mode === "delegated") return "底座委托";
+  if (mode === "local") return "本地";
+  if (mode === "mock") return "模拟";
+  return mode || "-";
+}
+
+function healthLabel(health?: string) {
+  if (health === "ready") return "正常";
+  if (health === "degraded") return "降级";
+  if (health === "unavailable") return "不可用";
+  return health || "-";
+}
+
+function spaceTypeLabel(space: SpaceRow) {
+  return space.typeLabel || space.type_label || space.type;
+}
+
+function compactId(value: string) {
+  if (!value) return "-";
+  return value.length > 12 ? `${value.slice(0, 8)}...` : value;
+}
+
+function quotaValue(space: SpaceRow, key: "cpuCores" | "storageGb" | "ingestionConcurrency") {
+  const value = space.quotas?.[key];
+  if (value === undefined || value === null || value === "") return "-";
+  return String(value);
+}
+
+function formatScore(score?: number) {
+  if (typeof score !== "number") return "-";
+  return score.toFixed(2);
+}
+
+onMounted(() => {
+  refreshKnowledgeState();
+});
+</script>

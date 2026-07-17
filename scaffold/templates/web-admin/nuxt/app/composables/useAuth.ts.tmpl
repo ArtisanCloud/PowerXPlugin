@@ -2,6 +2,7 @@ import { getCurrentScope, onScopeDispose, readonly } from "vue";
 import { useRuntimeConfig } from "#imports";
 import type { LoginResponse } from "~/composables/api/services/authService";
 import { useAuthService } from "~/composables/api/services/authService";
+import { persistTenantUUID } from "~/utils/tenant-context";
 
 const STORAGE_KEYS = [
   "access_token",
@@ -101,9 +102,18 @@ const extractTenantUuidFromToken = (token?: string | null) => {
   return null;
 };
 
-const storeTenantUuidFromToken = (token?: string | null) => {
-  const uuid = extractTenantUuidFromToken(token);
-  writeCookie("tenant_uuid", uuid && uuid.length ? uuid : null);
+const storeTenantUuid = (uuid?: string | null) => {
+  const normalized = String(uuid || "").trim();
+  writeCookie("tenant_uuid", normalized || null);
+  persistTenantUUID(normalized || null);
+};
+
+const storeTenantUuidFromAuth = (data: LoginResponse, token?: string | null) => {
+  const uuid =
+    String(data.current_tenant_uuid || "").trim() ||
+    String(data.tenant_uuid || "").trim() ||
+    extractTenantUuidFromToken(token);
+  storeTenantUuid(uuid);
 };
 
 const safeLocalStorage = {
@@ -240,7 +250,7 @@ export const useAuth = () => {
     writeCookie("token", access);
     writeCookie(REFRESH_COOKIE_KEY, finalRefresh || null);
     writeCookie(EXPIRES_AT_COOKIE_KEY, String(expires));
-    storeTenantUuidFromToken(access);
+    storeTenantUuidFromAuth(data, access);
     setTokenState(access, finalRefresh || null, expires, "persist");
     isAuthenticated.value = true;
     hasAuthenticated.value = true;
@@ -527,7 +537,7 @@ export const useAuth = () => {
     }
   };
 
-  const setIAMModeFlags = (isDelegated: boolean) => {
+  const setProviderModeFlags = (isDelegated: boolean) => {
     delegatedIAM.value = isDelegated;
     localIAMEnabled.value = !isDelegated;
   };
@@ -643,6 +653,6 @@ export const useAuth = () => {
     restoreFromStorage: syncFromStorage,
     localIAMEnabled: readonly(localIAMEnabled),
     delegatedIAM: readonly(delegatedIAM),
-    setIAMModeFlags,
+    setProviderModeFlags,
   };
 };

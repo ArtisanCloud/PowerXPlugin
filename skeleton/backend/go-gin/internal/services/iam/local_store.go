@@ -95,7 +95,7 @@ func NewLocalDirectory(db *gorm.DB, cfg *config.Config) (*LocalDirectory, error)
 	}, nil
 }
 
-func (d *LocalDirectory) Mode() IAMMode { return IAMModeLocal }
+func (d *LocalDirectory) Mode() IAMAdapterMode { return IAMAdapterModeLocal }
 
 func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthTokens, *UserContext, error) {
 	identifier := strings.TrimSpace(req.Identifier)
@@ -558,6 +558,7 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		ExpiresIn:     int64(d.accessTTL.Seconds()),
 		Scope:         "access",
 		ExpiresAt:     expires,
+		TenantUUID:    strings.TrimSpace(userCtx.TenantUUID),
 		PluginID:      d.pluginID,
 		PolicyVersion: d.policyVersion,
 	}, nil

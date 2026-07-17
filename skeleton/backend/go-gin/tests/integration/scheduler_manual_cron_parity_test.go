@@ -21,7 +21,7 @@ func TestSchedulerManualCronParityAndTracePropagation(t *testing.T) {
 			SourcePlugin:   "com.powerx.plugins.base",
 			PayloadVersion: "v1",
 		},
-		Gateway: &config.GatewayConfig{TenantUUID: "00000000-0000-0000-0000-000000000001"},
+		GRPCUpstream: &config.GRPCUpstream{TenantUUID: "00000000-0000-0000-0000-000000000001"},
 	}
 	dispatcher := integrationjobs.NewSchedulerEventDispatcher(cfg, emitter, logrus.NewEntry(logrus.New()))
 

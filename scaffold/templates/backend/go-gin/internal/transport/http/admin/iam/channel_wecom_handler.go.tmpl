@@ -1,12 +1,14 @@
 package iam
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"{{ .BackendModulePath }}/internal/contracts"
 	repo "{{ .BackendModulePath }}/internal/domain/repository/iam"
+	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	federatedsvc "{{ .BackendModulePath }}/internal/services/iam/federated"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
@@ -16,15 +18,20 @@ import (
 type ChannelWeComHandler struct {
 	configSvc *federatedsvc.WeComConfigService
 	syncSvc   *federatedsvc.WeComSyncTaskService
+	mode      iamservice.IAMAdapterMode
 }
 
 func NewChannelWeComHandler(configSvc *federatedsvc.WeComConfigService) *ChannelWeComHandler {
-	return &ChannelWeComHandler{configSvc: configSvc}
+	return &ChannelWeComHandler{configSvc: configSvc, mode: iamservice.IAMAdapterModeLocal}
 }
 
 func NewChannelWeComHandlerWithDeps(deps *app.Deps) *ChannelWeComHandler {
+	mode := iamservice.IAMAdapterModeLocal
+	if deps != nil && deps.IAMAdapterMode != "" {
+		mode = deps.IAMAdapterMode
+	}
 	if deps == nil || deps.DB == nil {
-		return &ChannelWeComHandler{}
+		return &ChannelWeComHandler{mode: mode}
 	}
 	configSvc := federatedsvc.NewWeComConfigService(deps.DB)
 	syncRepo := repo.NewChannelSyncTaskRepository(deps.DB)
@@ -40,6 +47,7 @@ func NewChannelWeComHandlerWithDeps(deps *app.Deps) *ChannelWeComHandler {
 	return &ChannelWeComHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewWeComSyncTaskService(syncRepo, configSvc, publisher, deps.DB),
+		mode:      mode,
 	}
 }
 
@@ -60,6 +68,9 @@ type syncTaskRequest struct {
 }
 
 func (h *ChannelWeComHandler) GetConfig(c *gin.Context) {
+	if h.delegated(c) {
+		return
+	}
 	if h.configSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "wecom config service not available", nil)
 		return
@@ -82,6 +93,9 @@ func (h *ChannelWeComHandler) GetConfig(c *gin.Context) {
 }
 
 func (h *ChannelWeComHandler) SaveConfig(c *gin.Context) {
+	if h.delegatedReadOnly(c, "wecom config write operations are not allowed in delegated mode") {
+		return
+	}
 	if h.configSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "wecom config service not available", nil)
 		return
@@ -116,6 +130,9 @@ func (h *ChannelWeComHandler) SaveConfig(c *gin.Context) {
 }
 
 func (h *ChannelWeComHandler) TriggerSyncTask(c *gin.Context) {
+	if h.delegatedReadOnly(c, "wecom sync operations are not allowed in delegated mode") {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "wecom sync task service not available", nil)
 		return
@@ -143,6 +160,9 @@ func (h *ChannelWeComHandler) TriggerSyncTask(c *gin.Context) {
 }
 
 func (h *ChannelWeComHandler) ListSyncTasks(c *gin.Context) {
+	if h.delegated(c) {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "wecom sync task service not available", nil)
 		return
@@ -171,6 +191,9 @@ func (h *ChannelWeComHandler) ListSyncTasks(c *gin.Context) {
 }
 
 func (h *ChannelWeComHandler) ClearSyncTasks(c *gin.Context) {
+	if h.delegatedReadOnly(c, "wecom sync task clear operations are not allowed in delegated mode") {
+		return
+	}
 	if h.syncSvc == nil {
 		contracts.ResponseServiceUnavailable(c, "wecom sync task service not available", nil)
 		return
@@ -190,6 +213,22 @@ func (h *ChannelWeComHandler) ClearSyncTasks(c *gin.Context) {
 		return
 	}
 	contracts.ResponseSuccess(c, gin.H{"deleted": affected})
+}
+
+func (h *ChannelWeComHandler) delegated(c *gin.Context) bool {
+	if h != nil && h.mode == iamservice.IAMAdapterModeDelegated {
+		contracts.ResponseErrorWithDetails(c, http.StatusServiceUnavailable, "IAM_PROVIDER_NOT_CONFIGURED", "IAM delegated channel provider is not configured", gin.H{"mode": h.mode.String(), "provider": "delegated"})
+		return true
+	}
+	return false
+}
+
+func (h *ChannelWeComHandler) delegatedReadOnly(c *gin.Context, message string) bool {
+	if h != nil && h.mode == iamservice.IAMAdapterModeDelegated {
+		contracts.ResponseError(c, 405, "IAM_DELEGATED_READ_ONLY", message)
+		return true
+	}
+	return false
 }
 
 func isMissingSyncTaskTable(err error) bool {

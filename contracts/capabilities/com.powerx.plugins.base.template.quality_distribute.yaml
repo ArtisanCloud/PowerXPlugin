@@ -1,7 +1,15 @@
 id: com.powerx.plugins.base.template.quality_distribute
 type: Tool
 version: 1.0.0
+title_i18n:
+  zh-CN: 模板质量分发
+  zh: 模板质量分发
+  en: Template Quality Distribution
 description: "模板巡检 + 批量克隆分发的复合 Workflow，供 Agent 快速使用。"
+description_i18n:
+  zh-CN: 模板巡检 + 批量克隆分发的复合 Workflow，供 Agent 快速使用。
+  zh: 模板巡检 + 批量克隆分发的复合 Workflow，供 Agent 快速使用。
+  en: Run a composite workflow for template auditing, batch cloning, and distribution.
 rbac:
   resource: template
   actions: [read]

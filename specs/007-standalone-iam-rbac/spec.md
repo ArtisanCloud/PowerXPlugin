@@ -132,7 +132,7 @@
 - **SC-002**: 在租户内完成创建部门→邀请成员→分配角色→成员登录的端到端流程，全程 95% 操作步骤带有审计记录且可在 Runbook 中复现。
 - **SC-003**: 所有受保护 API 在权限不足时返回 403，并在 `plugin_rbac_denied_total` 中可观测；E2E 测试覆盖成功与拒绝路径。
 - **SC-004**: CLI `iam export` 能输出完整租户/角色/权限映射，并在 10 秒内完成单租户导出；导出的数据可用于灾备或迁移评审。
-- **SC-005**: Delegated 模式下访问 Standalone IAM 页面触发隐藏逻辑的准确率达 100%，文档明确阐述切换步骤。
+- **SC-005**: Delegated 模式下正式 IAM 页面仍可访问，并通过 `/mode` diagnostics 与 RBAC/read-only 状态准确展示 provider 来源，文档明确阐述切换步骤。
 
 ## Clarifications
 

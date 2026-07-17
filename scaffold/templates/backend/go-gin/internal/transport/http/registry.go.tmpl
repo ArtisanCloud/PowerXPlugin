@@ -20,6 +20,9 @@ import (
 	"{{ .BackendModulePath }}/internal/transport/http/admin/templates"
 	agentapi "{{ .BackendModulePath }}/internal/transport/http/agent"
 	integrationapi "{{ .BackendModulePath }}/internal/transport/http/integration"
+	pluginagent "{{ .BackendModulePath }}/internal/transport/http/plugin/agent"
+	pluginagentregistry "{{ .BackendModulePath }}/internal/transport/http/plugin/agent_registry"
+	pluginskills "{{ .BackendModulePath }}/internal/transport/http/plugin/skills"
 	publicassets "{{ .BackendModulePath }}/internal/transport/http/public/assets"
 	publicmarketplace "{{ .BackendModulePath }}/internal/transport/http/public/marketplace"
 	tenantmarketplace "{{ .BackendModulePath }}/internal/transport/http/tenant/marketplace"
@@ -46,6 +49,9 @@ func NewRegistry(engine *gin.Engine, deps *app.Deps) *Registry {
 func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	admin.RegisterAPIRoutes(gApi, r.deps)
 	agentapi.RegisterAPIRoutes(gApi, r.deps)
+	pluginagent.RegisterAPIRoutes(gApi, r.deps)
+	pluginagentregistry.RegisterAPIRoutes(gApi, r.deps)
+	pluginskills.RegisterAPIRoutes(gApi, r.deps)
 	templates.RegisterAPIRoutes(gApi, r.deps)
 	integrationapi.RegisterAPIRoutes(gApi, r.deps)
 	r.RegisterMarketplaceRoutes(gApi)

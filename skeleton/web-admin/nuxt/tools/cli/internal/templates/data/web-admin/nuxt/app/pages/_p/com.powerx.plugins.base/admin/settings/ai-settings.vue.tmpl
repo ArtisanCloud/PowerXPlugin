@@ -1,0 +1,47 @@
+<template>
+  <UContainer class="py-8 space-y-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="space-y-2">
+        <UBadge color="info" variant="soft">{{ $t("aiSettings.badge") }}</UBadge>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+          {{ $t("aiSettings.title") }}
+        </h1>
+        <p class="max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+          {{ $t("aiSettings.description") }}
+        </p>
+      </div>
+      <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="loadSummary">
+        {{ $t("common.refresh") }}
+      </UButton>
+    </div>
+
+    <UAlert
+      color="warning"
+      variant="soft"
+      icon="i-heroicons-exclamation-triangle"
+      :title="$t('aiSettings.providerNotConfigured')"
+      :description="message"
+    />
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+const { t } = useI18n();
+const { client } = useApiClient();
+
+const loading = ref(false);
+const message = ref(t("aiSettings.providerNotConfiguredDescription"));
+
+async function loadSummary() {
+  loading.value = true;
+  try {
+    await client("admin/ai-settings/summary", { method: "GET", silentAuthError: true });
+  } catch (error: any) {
+    message.value = error?.data?.error?.message || t("aiSettings.providerNotConfiguredDescription");
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(loadSummary);
+</script>

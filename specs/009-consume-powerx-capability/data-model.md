@@ -36,7 +36,7 @@
 | message | string | 人类可读错误信息。 |
 | details.required | array | 当前模式所需配置字段。 |
 | details.present | array | 当前已检测到的配置字段（脱敏）。 |
-| details.iam_mode | string | 当前 IAM 模式（`delegated/local`）。 |
+| details.provider_mode | string | 当前 IAM 模式（`delegated/local`）。 |
 | request_id | string | 请求追踪 ID。 |
 
 ## InvocationRequest

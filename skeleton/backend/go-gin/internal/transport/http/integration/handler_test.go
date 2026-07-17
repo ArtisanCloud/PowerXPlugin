@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -21,11 +22,13 @@ type fakeCapabilityGateway struct {
 	lastParams capgateway.InvokeParams
 	result     *capgateway.InvokeResult
 	err        error
+	callCount  int
 }
 
 func (f *fakeCapabilityGateway) Enabled() bool { return true }
 
 func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.InvokeParams) (*capgateway.InvokeResult, error) {
+	f.callCount++
 	f.lastParams = params
 	if f.err != nil {
 		return nil, f.err
@@ -34,6 +37,70 @@ func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.Invo
 }
 
 func (f *fakeCapabilityGateway) ListPlatformCapabilities(_ context.Context, _ capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) ListKnowledgeSpaces(_ context.Context, _ capgateway.KnowledgeSpaceListOptions) ([]capgateway.KnowledgeSpaceRuntimeRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) CreateKnowledgeSpace(_ context.Context, _ capgateway.KnowledgeSpaceCreateParams) (*capgateway.KnowledgeSpaceRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) RetireKnowledgeSpace(_ context.Context, _ capgateway.KnowledgeSpaceRetireParams) (*capgateway.KnowledgeSpaceRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) DeleteKnowledgeSpace(_ context.Context, _ capgateway.KnowledgeSpaceDeleteParams) error {
+	return nil
+}
+
+func (f *fakeCapabilityGateway) ResolveGatewayTenantUUID(_ context.Context) (string, error) {
+	return "", nil
+}
+
+func (f *fakeCapabilityGateway) ListAgents(_ context.Context, _ string) ([]capgateway.AgentRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) GetAgent(_ context.Context, _ string) (*capgateway.AgentRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) SyncPluginSkill(_ context.Context, _ capgateway.PluginSkillSyncParams) (*capgateway.PluginSkillSyncResult, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) SyncPluginAgent(_ context.Context, _ capgateway.PluginAgentSyncParams) (*capgateway.PluginAgentSyncResult, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) RegisterCatalog(_ context.Context, _ *capabilities.CatalogSnapshot, _ []capabilities.ProtocolAsset) error {
+	return nil
+}
+
+func (f *fakeCapabilityGateway) CreateAgentSession(_ context.Context, _ capgateway.AgentSessionParams) (*capgateway.AgentSessionRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) ListAgentSessions(_ context.Context, _ capgateway.AgentSessionListOptions) ([]capgateway.AgentSessionRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) ListAgentSessionMessages(_ context.Context, _ capgateway.AgentSessionMessageListOptions) ([]capgateway.AgentSessionMessageRecord, error) {
+	return nil, nil
+}
+
+func (f *fakeCapabilityGateway) DeleteAgentSession(_ context.Context, _ capgateway.AgentSessionMutationOptions) error {
+	return nil
+}
+
+func (f *fakeCapabilityGateway) ArchiveAgentSession(_ context.Context, _ capgateway.AgentSessionMutationOptions) error {
+	return nil
+}
+
+func (f *fakeCapabilityGateway) StreamAgentSSE(_ context.Context, _ capgateway.AgentStreamParams) (*capgateway.AgentStream, error) {
 	return nil, nil
 }
 
@@ -87,6 +154,45 @@ func TestInvokeCapabilitySuccess(t *testing.T) {
 	require.Equal(t, "com.corex.media.assets.manage", fake.lastParams.CapabilityID)
 	require.True(t, fake.lastParams.AuthRequired)
 	require.True(t, fake.lastParams.TenantScoped)
+}
+
+func TestInvokeCapabilityRouteAllowsTenantContextWithoutRootRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	fake := &fakeCapabilityGateway{
+		result: &capgateway.InvokeResult{
+			TraceID: "trace-route",
+			Status:  "accepted",
+			Data: map[string]any{
+				"ok": true,
+			},
+		},
+	}
+	deps := &app.Deps{CapabilityGateway: fake}
+	router := gin.New()
+	group := router.Group("/api/v1")
+	group.Use(func(c *gin.Context) {
+		authx.SetTenantContext(c, authx.TenantContext{
+			TenantUUID: "aeffc79f-e72a-4fd9-b908-5c150bce3741",
+			UserID:     1001,
+			Roles:      []string{"member"},
+		})
+		authx.SetRawBearerToken(c, "test-token")
+		c.Next()
+	})
+	RegisterAPIRoutes(group, deps)
+
+	body := `{"capabilityId":"com.corex.media.assets.manage","action":"List","payload":{"limit":1}}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integration/capabilities/invoke", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-token")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NotContains(t, w.Body.String(), "root privileges required")
+	require.Equal(t, "com.corex.media.assets.manage", fake.lastParams.CapabilityID)
 }
 
 func TestInvokeCapabilityUnavailable(t *testing.T) {

@@ -3,14 +3,14 @@ import { gotoLogin, loginWithPassword } from './_utils'
 
 const loginEmail = process.env.PLAYWRIGHT_LOCAL_EMAIL || 'admin@local.test'
 const loginPassword = process.env.PLAYWRIGHT_LOCAL_PASSWORD || 'S3cret!!'
-const iamMode = process.env.PLAYWRIGHT_LOCAL_IAM
+const localIAMFlag = process.env.PLAYWRIGHT_LOCAL_IAM
 
-if (iamMode !== '1' && iamMode !== '0') {
+if (localIAMFlag !== '1' && localIAMFlag !== '0') {
   test.skip(true, 'Set PLAYWRIGHT_LOCAL_IAM=1(local) or PLAYWRIGHT_LOCAL_IAM=0(delegated).')
 }
 
-const localSuite = iamMode !== '0' ? test.describe : test.describe.skip
-const delegatedSuite = iamMode === '0' ? test.describe : test.describe.skip
+const localSuite = localIAMFlag !== '0' ? test.describe : test.describe.skip
+const delegatedSuite = localIAMFlag === '0' ? test.describe : test.describe.skip
 
 localSuite('Local IAM Login Flow (Next)', () => {
   test('logs in, persists tokens, and enters intro page', async ({ page }) => {

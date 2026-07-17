@@ -29,10 +29,10 @@
 - [x] T007 [US1] 在 `skeleton/backend/go-gin/internal/transport/http/public/auth_handler.go` 与 `/auth/login|refresh|logout|me/context` 路由中注入 Standalone 模式分支，并记录 `plugin_id`、`policy_version`。
   - [x] T007a 统一 `/auth/login|refresh|logout|me/context` Handler 的模式分支与错误提示，补充 `plugin_id/policy_version` 响应字段。
   - [x] T007b 更新路由/中间件注册，确保 Standalone 模式默认启用本地目录，Delegated 模式保持回退，同时扩展 auth metrics 标签。
-- [x] T008 [US1] 修改 `web-admin/app/plugins/auth.client.ts`、`app/middleware/auth.global.ts`，确保 Standalone 模式展示登录页与“组织与权限”菜单，Delegated 模式隐藏。
+- [x] T008 [US1] 修改 `web-admin/app/plugins/auth.client.ts`、`app/middleware/auth.global.ts`，确保正式“组织与权限”菜单按 RBAC 展示，delegated provider 下页面显示 provider/read-only 状态。
   - [x] T008a 在 `useAuth`/`auth.client.ts` 增加 `localIAMEnabled` 与 `delegatedIAM` runtime flag，控制登录流程与错误提示。
-  - [x] T008b 在 `AppSidebar`/导航区域按 flag 渲染“组织与权限”菜单，Delegated 模式完全隐藏。
-- [x] T009 [P] [US1] 编写/更新 `web-admin/tests/e2e/auth-local.spec.ts`，覆盖 Standalone 登录、菜单显示；补充 Delegated 模式隐藏断言。
+  - [x] T008b 在 `AppSidebar`/导航区域按 RBAC 渲染“组织与权限”菜单，delegated provider 下保持正式入口可见。
+- [x] T009 [P] [US1] 编写/更新 `web-admin/tests/e2e/auth-local.spec.ts`，覆盖 Standalone 登录、菜单显示；补充 delegated provider 下 mode/read-only 状态断言。
   - [x] T009a Standalone 用例：模拟本地管理员登录，断言 token/storage、菜单可见。
   - [x] T009b Delegated 用例：设置 `PLAYWRIGHT_LOCAL_IAM=0` 或代理 env，断言登录入口隐藏或给出提示。
 - [x] T010 [US1] Quickstart 文档与 README 增加 Standalone 初始化步骤、Playwright 用例入口。

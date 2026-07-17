@@ -8,7 +8,7 @@ import (
 
 	iamrepo "{{ .BackendModulePath }}/internal/domain/repository/iam"
 	EntityModels "{{ .BackendModulePath }}/internal/entity/models"
-	iammodel "{{ .BackendModulePath }}/internal/entity/models/iam"
+	identitymodel "{{ .BackendModulePath }}/internal/entity/models/iam"
 	"gorm.io/gorm"
 )
 
@@ -39,14 +39,14 @@ func NewBindingService(repo *iamrepo.FederatedBindingRepository, db *gorm.DB, se
 	return &BindingService{repo: repo, db: db, sessionSvc: sessionSvc}
 }
 
-func (s *BindingService) List(ctx context.Context, tenantUUID, provider string) ([]iammodel.FederatedBinding, error) {
+func (s *BindingService) List(ctx context.Context, tenantUUID, provider string) ([]identitymodel.FederatedBinding, error) {
 	if strings.TrimSpace(tenantUUID) == "" {
 		return nil, ErrTenantUUIDRequired
 	}
 	return s.repo.List(ctx, tenantUUID, provider)
 }
 
-func (s *BindingService) Bind(ctx context.Context, in BindInput) (*iammodel.FederatedBinding, error) {
+func (s *BindingService) Bind(ctx context.Context, in BindInput) (*identitymodel.FederatedBinding, error) {
 	tenantUUID := strings.TrimSpace(in.TenantUUID)
 	provider := strings.ToLower(strings.TrimSpace(in.Provider))
 	tenantScope := strings.TrimSpace(in.TenantScope)
@@ -79,7 +79,7 @@ func (s *BindingService) Bind(ctx context.Context, in BindInput) (*iammodel.Fede
 		return s.repo.Save(ctx, existing)
 	}
 
-	binding := &iammodel.FederatedBinding{
+	binding := &identitymodel.FederatedBinding{
 		BaseModel:      BaseModels(tenantUUID),
 		Provider:       provider,
 		TenantScope:    tenantScope,
@@ -93,11 +93,11 @@ func (s *BindingService) Bind(ctx context.Context, in BindInput) (*iammodel.Fede
 	return s.repo.Save(ctx, binding)
 }
 
-func (s *BindingService) Unbind(ctx context.Context, tenantUUID, provider, externalUserID string) (*iammodel.FederatedBinding, error) {
+func (s *BindingService) Unbind(ctx context.Context, tenantUUID, provider, externalUserID string) (*identitymodel.FederatedBinding, error) {
 	return s.UnbindScoped(ctx, tenantUUID, provider, "", externalUserID)
 }
 
-func (s *BindingService) UnbindScoped(ctx context.Context, tenantUUID, provider, tenantScope, externalUserID string) (*iammodel.FederatedBinding, error) {
+func (s *BindingService) UnbindScoped(ctx context.Context, tenantUUID, provider, tenantScope, externalUserID string) (*identitymodel.FederatedBinding, error) {
 	if strings.TrimSpace(tenantUUID) == "" {
 		return nil, ErrTenantUUIDRequired
 	}
@@ -122,7 +122,7 @@ func (s *BindingService) memberInTenant(ctx context.Context, memberID uint64, te
 		return false
 	}
 	var count int64
-	_ = s.db.WithContext(ctx).Model(&iammodel.Member{}).Where("id = ? AND tenant_uuid = ?", memberID, tenantUUID).Count(&count).Error
+	_ = s.db.WithContext(ctx).Model(&identitymodel.Member{}).Where("id = ? AND tenant_uuid = ?", memberID, tenantUUID).Count(&count).Error
 	return count > 0
 }
 

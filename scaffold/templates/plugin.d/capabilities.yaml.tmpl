@@ -1,8 +1,15 @@
 capabilities:
   imports:
+    - contracts/capabilities/{{ .PluginID }}.template.prepare.yaml
     - contracts/capabilities/{{ .PluginID }}.template.create.yaml
     - contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
   provides:
+    - id: {{ .PluginID }}.template.prepare
+      version: 1.0.0
+      descriptor: contracts/capabilities/{{ .PluginID }}.template.prepare.yaml
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.prepare.json
+        output: contracts/schema/output/{{ .PluginID }}.template.prepare.json
     - id: {{ .PluginID }}.template.create
       version: 1.0.0
       descriptor: contracts/capabilities/{{ .PluginID }}.template.create.yaml

@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	fwscheduler "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -26,9 +29,7 @@ func TestSchedulerJobHandlerCRUDAndActions(t *testing.T) {
 	emitter := eventbridge.NewLocalEmitter(8)
 	deps := &app.Deps{
 		EventEmitter: emitter,
-		Config: &config.Config{
-			Gateway: &config.GatewayConfig{TenantUUID: "tenant-001"},
-		},
+		Config:       &config.Config{},
 	}
 	handler := NewSchedulerJobHandler(deps)
 	r := gin.New()
@@ -42,6 +43,7 @@ func TestSchedulerJobHandlerCRUDAndActions(t *testing.T) {
 
 	createResp := postSchedulerJSON(t, r, "/scheduler/jobs", map[string]any{
 		"name":          "sample_progress_50",
+		"tenant_uuid":   "tenant-001",
 		"schedule_type": "once",
 		"schedule_expr": time.Now().UTC().Add(time.Hour).Format(time.RFC3339),
 		"payload": map[string]any{
@@ -138,9 +140,7 @@ func TestSchedulerJobHandlerHostModeUnavailable(t *testing.T) {
 
 	deps := &app.Deps{
 		EventEmitter: eventbridge.NewLocalEmitter(8),
-		Config: &config.Config{
-			Gateway: &config.GatewayConfig{TenantUUID: "tenant-001"},
-		},
+		Config:       &config.Config{},
 	}
 	handler := NewSchedulerJobHandler(deps)
 	r := gin.New()
@@ -148,6 +148,7 @@ func TestSchedulerJobHandlerHostModeUnavailable(t *testing.T) {
 
 	resp := postSchedulerJSON(t, r, "/scheduler/jobs", map[string]any{
 		"provider_mode": "host",
+		"tenant_uuid":   "tenant-001",
 		"name":          "sample_progress_50",
 		"schedule_type": "once",
 		"schedule_expr": "2026-05-15T10:30:00Z",
@@ -160,25 +161,24 @@ func TestSchedulerJobHandlerHostModeUnavailable(t *testing.T) {
 	}
 }
 
-func TestSchedulerJobHandlerHostModeDoesNotSendRequestTenant(t *testing.T) {
+func TestSchedulerJobHandlerHostModeUsesRequestTenant(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	handler := NewSchedulerJobHandler(&app.Deps{
 		EventEmitter: eventbridge.NewLocalEmitter(8),
-		Config: &config.Config{
-			Gateway: &config.GatewayConfig{TenantUUID: "tenant-from-gateway-config"},
-		},
+		Config:       &config.Config{},
 	})
 	req := httptest.NewRequest(http.MethodGet, "/scheduler/jobs?provider_mode=host", nil)
+	req.Header.Set("tenant_uuid", "tenant-from-request")
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = req
 
-	if got := handler.tenantUUID(c); got != "" {
-		t.Fatalf("host tenant = %q, want empty", got)
+	if got := handler.tenantUUID(c); got != "tenant-from-request" {
+		t.Fatalf("host tenant = %q, want tenant-from-request", got)
 	}
 }
 
-func TestSchedulerJobHandlerHostModeIgnoresGlobalTenantHeader(t *testing.T) {
+func TestSchedulerJobHandlerHostModeUsesTenantHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	handler := NewSchedulerJobHandler(&app.Deps{
 		EventEmitter: eventbridge.NewLocalEmitter(8),
@@ -190,8 +190,8 @@ func TestSchedulerJobHandlerHostModeIgnoresGlobalTenantHeader(t *testing.T) {
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = req
 
-	if got := handler.tenantUUID(c); got != "" {
-		t.Fatalf("host tenant from global header = %q, want empty", got)
+	if got := handler.tenantUUID(c); got != "tenant-from-global-client" {
+		t.Fatalf("host tenant from header = %q, want tenant-from-global-client", got)
 	}
 }
 
@@ -228,19 +228,22 @@ func TestSchedulerJobHandlerLocalProxyUsesConfiguredAPIKey(t *testing.T) {
 	t.Setenv("POWERX_PROXY", "1")
 
 	var gotAuth string
+	var gotTenantHeader string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/admin/scheduler/jobs" {
 			t.Fatalf("unexpected scheduler path: %s", r.URL.Path)
 		}
 		gotAuth = r.Header.Get("Authorization")
+		gotTenantHeader = r.Header.Get("X-Tenant-UUID")
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"success":true,"data":{"job_id":"job-1","owner_type":"plugin","owner_id":"com.powerx.plugins.base","name":"host-create","schedule_type":"once","schedule_expr":"2026-05-15T10:30:00Z","status":"active"}}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"job_id":"job-1","tenant_uuid":"tenant-001","owner_type":"plugin","owner_id":"com.powerx.plugins.base","name":"host-create","schedule_type":"once","schedule_expr":"2026-05-15T10:30:00Z","status":"active"}}`))
 	}))
 	defer server.Close()
 
 	handler := NewSchedulerJobHandler(&app.Deps{
-		EventEmitter: eventbridge.NewLocalEmitter(8),
-		IAMMode:      iamservice.IAMModeLocal,
+		EventEmitter:   eventbridge.NewLocalEmitter(8),
+		ProviderMode:   fwprovider.ModeLocal,
+		IAMAdapterMode: iamservice.IAMAdapterModeLocal,
 		Config: &config.Config{
 			Gateway: &config.GatewayConfig{
 				BaseURL:    server.URL,
@@ -255,6 +258,7 @@ func TestSchedulerJobHandlerLocalProxyUsesConfiguredAPIKey(t *testing.T) {
 
 	resp := postSchedulerJSON(t, r, "/scheduler/jobs?provider_mode=host", map[string]any{
 		"provider_mode": "host",
+		"tenant_uuid":   "tenant-001",
 		"owner_type":    "plugin",
 		"owner_id":      "com.powerx.plugins.base",
 		"name":          "host-create",
@@ -267,10 +271,146 @@ func TestSchedulerJobHandlerLocalProxyUsesConfiguredAPIKey(t *testing.T) {
 	if gotAuth != "ApiKey gateway-key" {
 		t.Fatalf("Authorization=%q, want ApiKey gateway-key", gotAuth)
 	}
+	if gotTenantHeader != "" {
+		t.Fatalf("X-Tenant-UUID=%q, want empty", gotTenantHeader)
+	}
+}
+
+func TestSchedulerJobHandlerLocalProxyTriggersPowerXHost(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("POWERX_PROXY", "1")
+
+	var gotPath string
+	var gotMethod string
+	var gotAuth string
+	var gotTenantHeader string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotMethod = r.Method
+		gotAuth = r.Header.Get("Authorization")
+		gotTenantHeader = r.Header.Get("X-Tenant-UUID")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":{"job":{"job_id":"sch-host-001","tenant_uuid":"tenant-001","owner_type":"plugin","owner_id":"com.powerx.plugins.base","name":"host-trigger","schedule_type":"once","schedule_expr":"2026-05-15T10:30:00Z","status":"active"},"run":{"run_id":"run-001"}}}`))
+	}))
+	defer server.Close()
+
+	hub := fwwsbus.NewMemoryHub()
+	localEvents := make(chan fwwsbus.Event, 1)
+	hub.Subscribe("plugin.notify.tenant.tenant-001", func(ev fwwsbus.Event) {
+		localEvents <- ev
+	})
+	handler := NewSchedulerJobHandler(&app.Deps{
+		EventEmitter:   eventbridge.NewLocalEmitter(8),
+		ProviderMode:   fwprovider.ModeLocal,
+		IAMAdapterMode: iamservice.IAMAdapterModeLocal,
+		WSBusHub:       hub,
+		Config: &config.Config{
+			Gateway: &config.GatewayConfig{
+				BaseURL:    server.URL,
+				APIPrefix:  "/api/v1",
+				AuthScheme: "apikey",
+				APIKey:     "gateway-key",
+			},
+		},
+	})
+	r := gin.New()
+	r.POST("/scheduler/jobs/:jobId/trigger", handler.Trigger)
+
+	resp := postSchedulerJSON(t, r, "/scheduler/jobs/sch-host-001/trigger?tenant_uuid=tenant-001", map[string]any{
+		"provider_mode": "host",
+		"force_host":    true,
+	})
+	if resp.Code != http.StatusOK {
+		t.Fatalf("host trigger status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	if gotMethod != http.MethodPost || gotPath != "/api/v1/admin/scheduler/jobs/sch-host-001/trigger" {
+		t.Fatalf("host request = %s %s", gotMethod, gotPath)
+	}
+	if gotAuth != "ApiKey gateway-key" {
+		t.Fatalf("Authorization=%q, want ApiKey gateway-key", gotAuth)
+	}
+	if gotTenantHeader != "" {
+		t.Fatalf("X-Tenant-UUID=%q, want empty", gotTenantHeader)
+	}
+	var body struct {
+		Data struct {
+			ProviderMode             string `json:"provider_mode"`
+			EffectiveTarget          string `json:"effective_target"`
+			HostTriggerOK            bool   `json:"host_trigger_ok"`
+			LocalNotificationSkipped bool   `json:"local_notification_skipped"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Data.ProviderMode != "host" || body.Data.EffectiveTarget != "host" || !body.Data.HostTriggerOK || !body.Data.LocalNotificationSkipped {
+		t.Fatalf("unexpected response body=%s", resp.Body.String())
+	}
+	select {
+	case ev := <-localEvents:
+		t.Fatalf("host trigger must not publish local ws event, got topic=%s trace_id=%s", ev.Topic, ev.TraceID)
+	default:
+	}
+}
+
+func TestSchedulerJobHandlerHostTriggerDoesNotPublishLocalNotification(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fake := &captureSchedulerHostClient{}
+	hub := fwwsbus.NewMemoryHub()
+	localEvents := make(chan fwwsbus.Event, 1)
+	hub.Subscribe("plugin.notify.tenant.tenant-local", func(ev fwwsbus.Event) {
+		localEvents <- ev
+	})
+	handler := &SchedulerJobHandler{
+		localScheduler: fwscheduler.NewLocalProvider(fwscheduler.LocalProviderConfig{}),
+		hostScheduler:  fwscheduler.NewHostProvider(fwscheduler.HostProviderConfig{}, fake),
+		deps:           &app.Deps{WSBusHub: hub},
+	}
+	r := gin.New()
+	r.POST("/scheduler/jobs/:jobId/trigger", handler.Trigger)
+
+	resp := postSchedulerJSON(t, r, "/scheduler/jobs/sch-host-001/trigger?tenant_uuid=tenant-local", map[string]any{
+		"provider_mode": "host",
+		"force_host":    true,
+	})
+	if resp.Code != http.StatusOK {
+		t.Fatalf("host trigger status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	if fake.triggeredJobID != "sch-host-001" {
+		t.Fatalf("triggered job id=%q", fake.triggeredJobID)
+	}
+	if fake.triggeredTenantUUID != "tenant-local" {
+		t.Fatalf("host trigger tenant_uuid=%q, want tenant-local", fake.triggeredTenantUUID)
+	}
+	if fake.triggerCount.Load() != 1 {
+		t.Fatalf("trigger count=%d", fake.triggerCount.Load())
+	}
+	var body struct {
+		Data struct {
+			Notification struct {
+				OK     bool   `json:"ok"`
+				Reason string `json:"reason"`
+			} `json:"notification"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Data.Notification.OK || body.Data.Notification.Reason != "not local scheduler" {
+		t.Fatalf("host trigger should not publish local notification, body=%s", resp.Body.String())
+	}
+	select {
+	case ev := <-localEvents:
+		t.Fatalf("host trigger must not publish local ws event, got topic=%s trace_id=%s", ev.Topic, ev.TraceID)
+	default:
+	}
 }
 
 type captureSchedulerHostClient struct {
-	created fwscheduler.JobSpec
+	created             fwscheduler.JobSpec
+	triggeredJobID      string
+	triggeredTenantUUID string
+	triggerCount        atomic.Int32
 }
 
 func (c *captureSchedulerHostClient) CreateJob(_ context.Context, job fwscheduler.JobSpec) (*fwscheduler.Job, error) {
@@ -286,7 +426,10 @@ func (c *captureSchedulerHostClient) PauseJob(context.Context, string, string) e
 func (c *captureSchedulerHostClient) ResumeJob(context.Context, string, string) error {
 	return nil
 }
-func (c *captureSchedulerHostClient) TriggerJob(context.Context, string, string) error {
+func (c *captureSchedulerHostClient) TriggerJob(_ context.Context, jobID string, tenantUUID string) error {
+	c.triggeredJobID = jobID
+	c.triggeredTenantUUID = tenantUUID
+	c.triggerCount.Add(1)
 	return nil
 }
 func (c *captureSchedulerHostClient) GetJob(context.Context, string, string) (*fwscheduler.Job, error) {

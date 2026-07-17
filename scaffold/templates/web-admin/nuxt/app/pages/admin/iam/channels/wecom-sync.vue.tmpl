@@ -22,6 +22,7 @@
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
           <UBadge :color="configReady ? 'success' : 'warning'" variant="soft">
             {{ `{{ configReady ? "配置已就绪" : "配置未完成" }}` }}
           </UBadge>
@@ -31,7 +32,7 @@
             variant="outline"
             color="error"
             size="sm"
-            :disabled="!syncTasks.length || clearLoading"
+            :disabled="readonlyMode || !syncTasks.length || clearLoading"
             :loading="clearLoading"
             @click="clearSyncTasks"
           >
@@ -77,7 +78,7 @@
         <div class="flex flex-wrap items-center gap-2">
           <UButton
             color="primary"
-            :disabled="!configReady || isActionBusy"
+            :disabled="readonlyMode || !configReady || isActionBusy"
             :loading="syncingAction === 'full_sync'"
             @click="runSync('full_sync')"
           >
@@ -86,7 +87,7 @@
           <UButton
             variant="outline"
             color="error"
-            :disabled="!syncTasks.length || clearLoading"
+            :disabled="readonlyMode || !syncTasks.length || clearLoading"
             :loading="clearLoading"
             @click="clearSyncTasks"
           >
@@ -215,8 +216,11 @@ import { useToast } from "#imports";
 import { storeToRefs } from "pinia";
 import { getAuthToken, resolveApiBase } from "~/composables/api/_base";
 import { useApiClient } from "~/composables/api/_client";
+import { useIAMService } from "~/composables/api/services/iamService";
+import { defaultProviderMode, normalizeProviderMode, type ProviderModeDiagnostics } from "~/composables/api/useProviderMode";
 import { useUserStore } from "~/stores/user";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
+import { createPluginWsClient } from "@artisan-cloud/plugin-framework-client";
 
 definePageMeta({
   title: "企业微信同步中心",
@@ -249,7 +253,9 @@ type WecomConfigResponse = {
 };
 
 const toast = useToast();
+const { t } = useI18n();
 const { get, post, delete: del } = useApiClient();
+const iam = useIAMService();
 
 const syncingAction = ref("");
 const tasksLoading = ref(false);
@@ -269,6 +275,9 @@ let wsConn: WebSocket | null = null;
 let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let wsClosedByClient = false;
 const wsConnected = ref(false);
+const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
+const readonlyMode = computed(() => Boolean(providerMode.value.read_only));
+const providerModeLabel = computed(() => providerMode.value.mode === "delegated" ? t("providerMode.delegated") : t("providerMode.local"));
 
 const statusOptions = [
   { label: "全部状态", value: "all" },
@@ -472,7 +481,14 @@ const connectWS = () => {
   const wsURL = buildWsURL();
   if (!wsURL) return;
   wsClosedByClient = false;
-  wsConn = new WebSocket(wsURL);
+  const parsedWsURL = new URL(wsURL);
+  wsConn = createPluginWsClient({
+    pluginId: String(useRuntimeConfig().public?.powerxPluginId || "com.powerx.plugins.base"),
+    wsBaseURL: `${parsedWsURL.protocol}//${parsedWsURL.host}`,
+    wsPath: parsedWsURL.pathname,
+    token: getAuthToken(),
+    tenantUuid: tenantUUID.value,
+  }).connect();
   wsConn.onopen = () => {
     wsConnected.value = true;
     stopTaskPolling();
@@ -582,6 +598,10 @@ const fetchSyncTasks = async (silent = false) => {
 };
 
 const runSync = async (action: string) => {
+  if (readonlyMode.value) {
+    toast.add({ title: t("providerMode.readOnly"), description: t("providerMode.readOnlyDescription"), color: "warning" });
+    return;
+  }
   if (!configReady.value) {
     toast.add({
       title: "无法触发同步",
@@ -613,6 +633,10 @@ const runSync = async (action: string) => {
 };
 
 const clearSyncTasks = async () => {
+  if (readonlyMode.value) {
+    toast.add({ title: t("providerMode.readOnly"), description: t("providerMode.readOnlyDescription"), color: "warning" });
+    return;
+  }
   if (!syncTasks.value.length) return;
   const confirmed = typeof window === "undefined" ? true : window.confirm("确认清空当前租户的全部同步任务记录？");
   if (!confirmed) return;
@@ -680,6 +704,12 @@ const formatTime = (raw?: string) => {
 
 onMounted(async () => {
   try {
+    try {
+      const response = await iam.mode();
+      providerMode.value = normalizeProviderMode((response as any)?.data);
+    } catch {
+      providerMode.value = defaultProviderMode();
+    }
     await Promise.all([fetchConfigReadiness(), fetchSyncTasks(true)]);
     connectWS();
     if (!wsConnected.value && hasPendingTasks()) startTaskPolling();

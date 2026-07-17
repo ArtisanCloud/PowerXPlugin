@@ -20,6 +20,9 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/templates"
 	agentapi "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/agent"
 	integrationapi "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/integration"
+	pluginagent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/plugin/agent"
+	pluginagentregistry "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/plugin/agent_registry"
+	pluginskills "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/plugin/skills"
 	publicassets "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/public/assets"
 	publicmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/public/marketplace"
 	tenantmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/tenant/marketplace"
@@ -46,6 +49,9 @@ func NewRegistry(engine *gin.Engine, deps *app.Deps) *Registry {
 func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	admin.RegisterAPIRoutes(gApi, r.deps)
 	agentapi.RegisterAPIRoutes(gApi, r.deps)
+	pluginagent.RegisterAPIRoutes(gApi, r.deps)
+	pluginagentregistry.RegisterAPIRoutes(gApi, r.deps)
+	pluginskills.RegisterAPIRoutes(gApi, r.deps)
 	templates.RegisterAPIRoutes(gApi, r.deps)
 	integrationapi.RegisterAPIRoutes(gApi, r.deps)
 	r.RegisterMarketplaceRoutes(gApi)

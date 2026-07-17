@@ -4,7 +4,7 @@
 ```bash
 cd skeleton/backend/go-gin
 export POWERX_PROXY=0
-export IAMMode=local
+export POWERX_PROVIDER_MODE=local
 export PLUGIN_IAM_TENANT_KEY=00000000-0000-0000-0000-000000000001
 export PLUGIN_IAM_TENANT_NAME="Local Tenant"
 export PLUGIN_IAM_ADMIN_EMAIL=admin@local.test
@@ -15,7 +15,7 @@ export PLUGIN_IAM_POLICY_VERSION="local.v1"
 go run ./cmd/database/main.go setup
 ```
 - `setup`=迁移+种子，日志出现 `iam tables migrated` 与 `local admin seeded` 即成功。
-- Delegated 模式切换：设置 `IAMMode=delegated` 且 `POWERX_PROXY=1`，本地 IAM 菜单自动隐藏。
+- Delegated 模式切换：设置 `POWERX_PROVIDER_MODE=delegated`；如需宿主链路再设置 `POWERX_PROXY=1`。正式 IAM 菜单保持可见，页面通过 `/mode` diagnostics 展示 provider/read-only 状态。
 - 登录/刷新接口会返回 `plugin_id` 与 `policy_version` 字段，可用于排查 Manifest 版本与 Token 来源。
 
 ## 2. 启动后端与前端

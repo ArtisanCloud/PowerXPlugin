@@ -2,6 +2,7 @@
 
 # Go build artifacts
 bin/
+obj/
 *.exe
 examples/verify-external/backend/backend
 *.test

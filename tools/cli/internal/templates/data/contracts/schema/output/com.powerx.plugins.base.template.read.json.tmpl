@@ -3,11 +3,27 @@
   "title": "TemplateReadOutput",
   "type": "object",
   "properties": {
+    "content": { "type": "string" },
+    "links": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/AgentResponseLink" }
+    },
     "template": { "$ref": "#/definitions/Template" }
   },
   "required": ["template"],
   "additionalProperties": false,
   "definitions": {
+    "AgentResponseLink": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "label": { "type": "string" },
+        "href": { "type": "string" }
+      },
+      "required": ["label", "href"],
+      "additionalProperties": true
+    },
     "Template": {
       "type": "object",
       "properties": {

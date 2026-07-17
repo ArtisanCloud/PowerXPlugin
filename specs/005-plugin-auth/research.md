@@ -16,7 +16,7 @@
   - *随机生成并打印* ➜ 不便复现、难以自动化；被拒。
 
 ## 3. 模式判定环境变量
-- **Decision**: 解析依据收敛为 `IAMMode`（`local`/`delegated`）与 `POWERX_PROXY`（`0`/`1`）。resolver 缓存结果并在日志中打印。
+- **Decision**: 解析依据收敛为 `POWERX_PROVIDER_MODE`（`local`/`delegated`）与 `POWERX_PROXY`（`0`/`1`）。resolver 缓存结果并在日志中打印。
 - **Rationale**: 与宿主注入模型保持一致，可在特殊调试时强制 override。
 - **Alternatives considered**:
   - *仅依赖 POWERX_PROXY* ➜ 无法在宿主环境下临时启用本地模式；被拒。
@@ -28,6 +28,6 @@
   - *使用内存/JSON 存储* ➜ 无法支持 CI、示例测试；被拒。
 
 ## 5. 观测指标与日志
-- **Decision**: 暴露 `plugin_auth_login_total{mode}`、`plugin_auth_refresh_total{result}`、`plugin_auth_logout_total`、`plugin_iam_mode{mode}`、`plugin_iam_delegate_errors_total{type}`，并在 request_trace 中打印 `auth_mode`、`tenant_uuid`、`user_id`（遮蔽 PII）。
+- **Decision**: 暴露 `plugin_auth_login_total{mode}`、`plugin_auth_refresh_total{result}`、`plugin_auth_logout_total`、`plugin_provider_mode{mode}`、`plugin_iam_delegate_errors_total{type}`，并在 request_trace 中打印 `auth_mode`、`tenant_uuid`、`user_id`（遮蔽 PII）。
 - **Rationale**: 与 PowerX 观测规范兼容，便于排障/审计。
 - **Alternatives considered**: 仅在日志中附带信息但不出指标 ➜ 难以做实时告警；被拒。

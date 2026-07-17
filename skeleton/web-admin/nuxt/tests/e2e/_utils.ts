@@ -11,6 +11,8 @@ export const pluginAdminBasePath = () => `/_p/${resolvePluginId()}/admin`;
 
 const resolveBaseUrl = () => process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
 
+export const resolvePlaywrightBaseUrl = () => resolveBaseUrl();
+
 const ensureZhLocale = async (page: Page) => {
   const base = resolveBaseUrl();
   let url: URL | null = null;

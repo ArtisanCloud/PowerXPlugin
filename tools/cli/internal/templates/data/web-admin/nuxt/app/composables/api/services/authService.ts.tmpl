@@ -120,6 +120,8 @@ export interface LoginResponse {
   expires_in: number;
   refresh_token: string;
   scope: string;
+  tenant_uuid?: string;
+  current_tenant_uuid?: string;
   plugin_id?: string;
   policy_version?: string;
 }

@@ -1,9 +1,17 @@
 id: com.powerx.plugins.base.template.delete
 type: API
 version: 1.0.0
+title_i18n:
+  zh-CN: 删除模板
+  zh: 删除模板
+  en: Delete Template
 description: "删除模板的原子能力，供 REST/gRPC 使用。"
+description_i18n:
+  zh-CN: 删除模板的原子能力，供 REST/gRPC 使用。
+  zh: 删除模板的原子能力，供 REST/gRPC 使用。
+  en: Delete a template through REST or gRPC entry points.
 rbac:
-  resource: template
+  resource: base.templates
   actions: [delete]
 provides:
   - id: schema/input/com.powerx.plugins.base.template.delete.v1
@@ -15,11 +23,17 @@ provides:
     kind: output
     version: 1.0.0
 metadata:
+  agent_response:
+    content: '已删除模板 #{{ .id }}。[查看模板列表](/templates/crud)'
+    links:
+      - kind: template_list
+        label: 查看模板列表
+        href: /templates/crud
   protocols:
     rest:
-      method: DELETE
-      path: /api/v1/templates/{id}
-      description: "PowerX Gateway 统一鉴权后的 REST 删除入口"
+      method: POST
+      path: /api/v1/integration/capabilities/invoke
+      description: "PowerX Gateway 统一鉴权后的插件能力入口"
     grpc:
       service: powerx.template.TemplateService
       method: DeleteTemplate
@@ -27,4 +41,4 @@ metadata:
       id: base.template.delete
       scope: agent.template.delete
       transport: http
-      endpoint: /api/v1/templates/{id}
+      endpoint: /api/v1/integration/capabilities/invoke

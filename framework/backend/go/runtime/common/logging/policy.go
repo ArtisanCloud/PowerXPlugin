@@ -18,6 +18,7 @@ type SinkType string
 
 const (
 	SinkStdout SinkType = "stdout"
+	SinkStderr SinkType = "stderr"
 	SinkFile   SinkType = "file"
 	SinkLoki   SinkType = "loki"
 )
@@ -116,7 +117,7 @@ func ValidatePolicy(p Policy) error {
 	}
 
 	validSinks := map[SinkType]struct{}{
-		SinkStdout: {}, SinkFile: {}, SinkLoki: {},
+		SinkStdout: {}, SinkStderr: {}, SinkFile: {}, SinkLoki: {},
 	}
 	for _, sink := range p.Sinks {
 		if _, ok := validSinks[sink]; !ok {

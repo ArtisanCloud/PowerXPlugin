@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-type IAMMode string
+type IAMAdapterMode string
 
 const (
-	IAMModeDelegated IAMMode = "delegated"
-	IAMModeLocal     IAMMode = "local"
+	IAMAdapterModeDelegated IAMAdapterMode = "delegated"
+	IAMAdapterModeLocal     IAMAdapterMode = "local"
 )
 
-func (m IAMMode) String() string { return string(m) }
+func (m IAMAdapterMode) String() string { return string(m) }
 
 var (
 	ErrUnsupportedMode  = errors.New("iam: unsupported mode")
@@ -43,6 +43,7 @@ type AuthTokens struct {
 	ExpiresIn     int64
 	Scope         string
 	ExpiresAt     time.Time
+	TenantUUID    string
 	PluginID      string
 	PolicyVersion string
 }
@@ -99,7 +100,7 @@ type TenantContext struct {
 }
 
 type IAMDirectory interface {
-	Mode() IAMMode
+	Mode() IAMAdapterMode
 	Login(ctx context.Context, req LoginRequest) (*AuthTokens, *UserContext, error)
 	Refresh(ctx context.Context, refreshToken string) (*AuthTokens, error)
 	Logout(ctx context.Context, refreshToken string) error

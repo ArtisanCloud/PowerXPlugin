@@ -1,0 +1,955 @@
+<template>
+  <UContainer class="py-8 space-y-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="space-y-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <UBadge color="neutral" variant="soft">基础能力</UBadge>
+          <UBadge color="info" variant="soft">非 SCRM</UBadge>
+        </div>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">客户基础管理</h1>
+        <p class="max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+          查看 C 端客户账号、外部身份、租户关系、登录事件与 MiniApp 入口解析结果。
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <UBadge color="neutral" variant="soft">{{ providerModeLabel }}</UBadge>
+        <UInput
+          v-model="search"
+          icon="i-heroicons-magnifying-glass"
+          placeholder="搜索 UUID、邮箱、手机、入口码"
+          class="w-72"
+          @keyup.enter="reloadCurrentTab"
+        />
+        <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="reloadAll">
+          刷新
+        </UButton>
+        <UButton icon="i-heroicons-plus" color="primary" :disabled="isReadOnly" @click="openCreateForm">
+          新增客户
+        </UButton>
+      </div>
+    </div>
+
+    <UAlert color="info" variant="soft" icon="i-heroicons-information-circle">
+      <template #title>边界说明</template>
+      <template #description>
+        本页面只管理客户身份、认证来源和租户归属。客户画像、标签、分群、跟进、销售归属和营销生命周期由 SCRM 插件实现。
+      </template>
+    </UAlert>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <UCard v-for="item in stats" :key="item.label">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ item.label }}</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ item.value }}</p>
+          </div>
+          <UIcon :name="item.icon" class="h-8 w-8 text-primary-600 dark:text-primary-300" />
+        </div>
+      </UCard>
+    </div>
+
+    <UCard>
+      <template #header>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <UTabs v-model="activeTab" :items="tabs" />
+          <div class="flex items-center gap-2">
+            <USelect v-model="status" :items="statusOptions" class="w-36" />
+            <USelect v-model="pageSize" :items="pageSizeOptions" class="w-28" />
+          </div>
+        </div>
+      </template>
+
+      <div
+        v-if="customerFilterUUID && activeTab !== 'accounts'"
+        class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700"
+      >
+        <div class="text-sm text-gray-600 dark:text-gray-300">
+          当前仅显示客户
+          <span class="font-mono text-xs text-gray-900 dark:text-white">{{ customerFilterUUID }}</span>
+          的关联记录
+        </div>
+        <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-x-mark" @click="clearCustomerFilter">
+          清除过滤
+        </UButton>
+      </div>
+
+      <UTable
+        :columns="activeColumns"
+        :data="activeItems"
+        :loading="loading"
+        :ui="{ table: 'min-w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700' }"
+      >
+        <template #status-cell="{ row }">
+          <UBadge :color="statusColor(row.original.status)" variant="soft">
+            {{ row.original.status || "-" }}
+          </UBadge>
+        </template>
+        <template #ok-cell="{ row }">
+          <UBadge :color="row.original.ok ? 'success' : 'error'" variant="soft">
+            {{ row.original.ok ? "成功" : "失败" }}
+          </UBadge>
+        </template>
+        <template #uuid-cell="{ row }">
+          <span class="block truncate font-mono text-xs" :title="row.original.uuid || ''">
+            {{ shortUUID(row.original.uuid) }}
+          </span>
+        </template>
+        <template #customer-cell="{ row }">
+          <span class="block truncate font-mono text-xs" :title="row.original.customer_uuid || ''">
+            {{ shortUUID(row.original.customer_uuid) }}
+          </span>
+        </template>
+        <template #tenant-cell="{ row }">
+          <span class="block truncate font-mono text-xs" :title="row.original.tenant_uuid || ''">
+            {{ shortUUID(row.original.tenant_uuid) }}
+          </span>
+        </template>
+        <template #updated-cell="{ row }">
+          <span class="text-sm text-gray-600 dark:text-gray-300">{{ formatDate(row.original.updated_at || row.original.created_at) }}</span>
+        </template>
+        <template #actions-cell="{ row }">
+          <div class="flex items-center gap-2">
+            <UButton
+              v-if="row.original.customer_uuid"
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-heroicons-eye"
+              @click="openDetail(row.original)"
+            >
+              查看
+            </UButton>
+            <UButton
+              v-if="activeTab === 'accounts'"
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-heroicons-pencil-square"
+              :disabled="isReadOnly"
+              @click="openEdit(row.original)"
+            >
+              编辑
+            </UButton>
+          </div>
+        </template>
+      </UTable>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+        <span class="text-sm text-gray-500 dark:text-gray-400">
+          共 {{ activePage.total }} 条，当前第 {{ activePage.page }} / {{ Math.max(activePage.total_pages, 1) }} 页
+        </span>
+        <UPagination
+          v-if="activePage.total_pages > 1"
+          v-model:page="page"
+          :total="activePage.total"
+          :items-per-page="pageSize"
+          show-edges
+        />
+      </div>
+    </UCard>
+
+    <UModal
+      v-model:open="showCreateModal"
+      title="新增客户账号"
+      description="创建基础客户身份、密码登录身份和当前租户关系。"
+    >
+      <template #content>
+        <form class="space-y-5 p-6" @submit.prevent="submitCreate">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">新增客户账号</h2>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              创建基础客户身份、密码登录身份和当前租户关系。
+            </p>
+          </div>
+
+          <UAlert color="warning" variant="soft" icon="i-heroicons-exclamation-triangle">
+            <template #title>仅限基础身份</template>
+            <template #description>
+              这里不会创建客户画像、标签、分群或跟进记录。
+            </template>
+          </UAlert>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormField v-if="isRoot" label="租户" required class="md:col-span-2">
+              <USelectMenu
+                v-model="createForm.tenant_uuid"
+                v-model:search-term="tenantSearch"
+                :items="tenantOptions"
+                :loading="loadingTenants"
+                :search-input="{ placeholder: '搜索租户名称' }"
+                value-key="value"
+                label-key="label"
+                ignore-filter
+                :portal="false"
+                :content="{ side: 'bottom', sideOffset: 6, collisionPadding: 12 }"
+                :ui="{ content: 'z-[80]', viewport: 'max-h-56' }"
+                placeholder="选择租户"
+                class="w-full"
+              >
+                <template #content-bottom>
+                  <div
+                    v-if="tenantTotalPages > 1"
+                    class="flex items-center justify-between gap-3 border-t border-gray-200 px-2 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
+                  >
+                    <span class="truncate">共 {{ tenantTotal }} 个，第 {{ tenantPage }} / {{ tenantTotalPages }} 页</span>
+                    <div class="flex shrink-0 items-center gap-1">
+                      <UButton
+                        icon="i-heroicons-chevron-left"
+                        size="xs"
+                        variant="soft"
+                        color="neutral"
+                        aria-label="上一页租户"
+                        :disabled="tenantPage <= 1 || loadingTenants"
+                        @click.stop="changeTenantPage(tenantPage - 1)"
+                      />
+                      <UButton
+                        icon="i-heroicons-chevron-right"
+                        size="xs"
+                        variant="soft"
+                        color="neutral"
+                        aria-label="下一页租户"
+                        :disabled="tenantPage >= tenantTotalPages || loadingTenants"
+                        @click.stop="changeTenantPage(tenantPage + 1)"
+                      />
+                    </div>
+                  </div>
+                </template>
+              </USelectMenu>
+            </UFormField>
+            <UFormField v-else label="当前租户">
+              <UInput :model-value="currentTenantLabel" readonly />
+            </UFormField>
+            <UFormField label="显示名">
+              <UInput v-model="createForm.display_name" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="昵称">
+              <UInput v-model="createForm.nickname" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="姓">
+              <UInput v-model="createForm.family_name" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="名">
+              <UInput v-model="createForm.given_name" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="邮箱">
+              <UInput
+                v-model="createForm.email"
+                autocomplete="off"
+                name="customer_email"
+                placeholder="customer@example.com"
+              />
+            </UFormField>
+            <UFormField label="手机号">
+              <UInput
+                v-model="createForm.phone"
+                autocomplete="off"
+                name="customer_phone"
+                placeholder="可选，与邮箱二选一"
+              />
+            </UFormField>
+            <UFormField label="客户登录密码" required help="用于 C 端客户本地登录，不是后台员工/member 密码。">
+              <UInput
+                v-model="createForm.password"
+                type="password"
+                autocomplete="new-password"
+                name="customer_login_password"
+                placeholder="至少 8 位"
+              />
+            </UFormField>
+            <UFormField label="备注">
+              <UInput v-model="createForm.note" placeholder="写入 metadata.note" />
+            </UFormField>
+          </div>
+
+          <p v-if="createError" class="text-sm text-error-600 dark:text-error-400">{{ createError }}</p>
+
+          <div class="flex justify-end gap-2">
+            <UButton variant="ghost" color="neutral" :disabled="creating" @click="showCreateModal = false">
+              取消
+            </UButton>
+            <UButton type="submit" color="primary" icon="i-heroicons-check" :loading="creating">
+              创建
+            </UButton>
+          </div>
+        </form>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showDetailModal"
+      title="客户详情"
+      description="查看客户基础资料和关联记录。"
+      :ui="{ content: 'max-w-3xl w-full' }"
+    >
+      <template #content>
+        <div class="space-y-5 p-6">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">客户详情</h2>
+              <p class="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">
+                {{ selectedAccount?.customer_uuid || "-" }}
+              </p>
+            </div>
+            <UBadge :color="statusColor(selectedAccount?.status)" variant="soft">
+              {{ selectedAccount?.status || "-" }}
+            </UBadge>
+          </div>
+
+          <div v-if="detailLoading" class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            加载中...
+          </div>
+          <div v-else class="space-y-3">
+            <UAlert v-if="detailError" color="warning" variant="soft" icon="i-heroicons-exclamation-triangle">
+              <template #title>详情接口暂不可用</template>
+              <template #description>{{ detailError }}</template>
+            </UAlert>
+            <div class="grid gap-3 md:grid-cols-2">
+              <div v-for="item in accountDetailRows" :key="item.label" class="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.label }}</p>
+                <p class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ item.value || "-" }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+            <UButton color="neutral" variant="soft" icon="i-heroicons-identification" @click="showRelated('identities')">
+              外部身份
+            </UButton>
+            <UButton color="neutral" variant="soft" icon="i-heroicons-building-office-2" @click="showRelated('memberships')">
+              租户关系
+            </UButton>
+            <UButton color="neutral" variant="soft" icon="i-heroicons-clock" @click="showRelated('loginEvents')">
+              登录事件
+            </UButton>
+            <UButton v-if="selectedAccount" color="primary" variant="soft" icon="i-heroicons-pencil-square" :disabled="isReadOnly" @click="openEdit(selectedAccount)">
+              编辑资料
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showEditModal"
+      title="编辑客户资料"
+      description="编辑客户账号基础资料，不修改密码、身份绑定或租户关系。"
+      :ui="{ content: 'max-w-3xl w-full' }"
+    >
+      <template #content>
+        <div class="space-y-5 p-6">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">编辑客户资料</h2>
+            <p class="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">
+              {{ editForm.customer_uuid || "-" }}
+            </p>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormField label="显示名">
+              <UInput v-model="editForm.display_name" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="昵称">
+              <UInput v-model="editForm.nickname" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="姓">
+              <UInput v-model="editForm.family_name" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="名">
+              <UInput v-model="editForm.given_name" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="状态">
+              <USelect v-model="editForm.status" :items="editableStatusOptions" class="w-full" />
+            </UFormField>
+            <UFormField label="主邮箱">
+              <UInput v-model="editForm.primary_email" autocomplete="off" placeholder="customer@example.com" />
+            </UFormField>
+            <UFormField label="主手机号">
+              <UInput v-model="editForm.primary_phone" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="邮箱">
+              <UInput v-model="editForm.email" autocomplete="off" placeholder="customer@example.com" />
+            </UFormField>
+            <UFormField label="手机号">
+              <UInput v-model="editForm.phone" autocomplete="off" placeholder="可选" />
+            </UFormField>
+            <UFormField label="头像 URL" class="md:col-span-2">
+              <UInput v-model="editForm.avatar_url" autocomplete="off" placeholder="https://..." />
+            </UFormField>
+            <UFormField label="Locale">
+              <UInput v-model="editForm.locale" autocomplete="off" placeholder="zh-CN" />
+            </UFormField>
+            <UFormField label="Timezone">
+              <UInput v-model="editForm.timezone" autocomplete="off" placeholder="Asia/Shanghai" />
+            </UFormField>
+            <UFormField label="邮箱已验证">
+              <USwitch v-model="editForm.email_verified" />
+            </UFormField>
+            <UFormField label="手机号已验证">
+              <USwitch v-model="editForm.phone_verified" />
+            </UFormField>
+          </div>
+
+          <p v-if="editError" class="text-sm text-error-600 dark:text-error-400">{{ editError }}</p>
+
+          <div class="flex justify-end gap-2">
+            <UButton variant="ghost" color="neutral" :disabled="updating" @click="showEditModal = false">
+              取消
+            </UButton>
+            <UButton color="primary" icon="i-heroicons-check" :loading="updating" @click="submitEdit">
+              保存
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+import {
+  useCustomerBaseApi,
+  type CustomerAccount,
+  type CustomerIdentity,
+  type CustomerLoginEvent,
+  type CustomerMembership,
+  type CustomerOverview,
+  type CustomerPage,
+  type MiniAppEntry,
+} from "~/composables/api/useCustomerBase";
+import { useIAMService } from "~/composables/api/services/iamService";
+import { defaultProviderMode, normalizeProviderMode, type ProviderModeDiagnostics } from "~/composables/api/useProviderMode";
+import { useUserStore } from "~/stores/user";
+
+type TabKey = "accounts" | "identities" | "memberships" | "loginEvents" | "entries";
+type TableRow = Record<string, any>;
+
+const api = useCustomerBaseApi();
+const iam = useIAMService();
+const userStore = useUserStore();
+const { t } = useI18n();
+const { isRoot, currentTenantUuid, currentTenant } = storeToRefs(userStore);
+const activeTab = ref<TabKey>("accounts");
+const search = ref("");
+const status = ref("all");
+const page = ref(1);
+const pageSize = ref(20);
+const loading = ref(false);
+const loadingTenants = ref(false);
+const showCreateModal = ref(false);
+const showDetailModal = ref(false);
+const showEditModal = ref(false);
+const creating = ref(false);
+const detailLoading = ref(false);
+const updating = ref(false);
+const createError = ref("");
+const editError = ref("");
+const detailError = ref("");
+const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
+const selectedAccount = ref<CustomerAccount | null>(null);
+const customerFilterUUID = ref("");
+const tenantOptions = ref<{ label: string; value: string }[]>([]);
+const tenantSearch = ref("");
+const tenantPage = ref(1);
+const tenantPageSize = 20;
+const tenantTotal = ref(0);
+let tenantSearchTimer: ReturnType<typeof setTimeout> | undefined;
+const createForm = reactive({
+  tenant_uuid: "",
+  email: "",
+  phone: "",
+  password: "",
+  display_name: "",
+  nickname: "",
+  given_name: "",
+  family_name: "",
+  note: "",
+});
+const editForm = reactive({
+  customer_uuid: "",
+  primary_email: "",
+  primary_phone: "",
+  email: "",
+  phone: "",
+  display_name: "",
+  nickname: "",
+  given_name: "",
+  family_name: "",
+  avatar_url: "",
+  locale: "",
+  timezone: "",
+  status: "active",
+  email_verified: false,
+  phone_verified: false,
+});
+const overview = ref<CustomerOverview>({
+  accounts_total: 0,
+  accounts_active: 0,
+  memberships_total: 0,
+  memberships_active: 0,
+  mini_app_entries_active: 0,
+  login_events_24h: 0,
+});
+
+const emptyPage = <T,>(): CustomerPage<T> => ({
+  items: [],
+  page: 1,
+  page_size: pageSize.value,
+  total: 0,
+  total_pages: 0,
+});
+
+const accounts = ref<CustomerPage<CustomerAccount>>(emptyPage());
+const identities = ref<CustomerPage<CustomerIdentity>>(emptyPage());
+const memberships = ref<CustomerPage<CustomerMembership>>(emptyPage());
+const loginEvents = ref<CustomerPage<CustomerLoginEvent>>(emptyPage());
+const entries = ref<CustomerPage<MiniAppEntry>>(emptyPage());
+
+const tabs = [
+  { label: "客户账号", value: "accounts" },
+  { label: "外部身份", value: "identities" },
+  { label: "租户关系", value: "memberships" },
+  { label: "登录事件", value: "loginEvents" },
+  { label: "MiniApp 入口", value: "entries" },
+];
+
+const statusOptions = [
+  { label: "全部状态", value: "all" },
+  { label: "Active", value: "active" },
+  { label: "Pending", value: "pending" },
+  { label: "Suspended", value: "suspended" },
+  { label: "Disabled", value: "disabled" },
+];
+
+const editableStatusOptions = statusOptions.filter((item) => item.value !== "all");
+
+const pageSizeOptions = [
+  { label: "20 / 页", value: 20 },
+  { label: "50 / 页", value: 50 },
+  { label: "100 / 页", value: 100 },
+];
+
+const stats = computed(() => [
+  { label: "客户账号", value: overview.value.accounts_total, icon: "i-heroicons-user-circle" },
+  { label: "活跃租户关系", value: overview.value.memberships_active, icon: "i-heroicons-building-office-2" },
+  { label: "可用入口", value: overview.value.mini_app_entries_active, icon: "i-heroicons-qr-code" },
+  { label: "24h 登录事件", value: overview.value.login_events_24h, icon: "i-heroicons-clock" },
+]);
+
+const accountColumns = [
+  { accessorKey: "display_name", header: "显示名", size: 180, minSize: 140 },
+  { accessorKey: "customer_uuid", header: "客户ID", id: "customer", size: 120, minSize: 100 },
+  { accessorKey: "primary_email", header: "邮箱" },
+  { accessorKey: "primary_phone", header: "手机" },
+  { accessorKey: "tenant_uuid", header: "租户ID", id: "tenant", size: 120, minSize: 100 },
+  { accessorKey: "status", header: "状态" },
+  { accessorKey: "updated_at", header: "更新时间", id: "updated" },
+];
+const identityColumns = [
+  { accessorKey: "provider", header: "来源" },
+  { accessorKey: "provider_subject", header: "外部主体" },
+  { accessorKey: "customer_uuid", header: "客户ID", id: "customer", size: 120, minSize: 100 },
+  { accessorKey: "email", header: "邮箱" },
+  { accessorKey: "phone", header: "手机" },
+  { accessorKey: "status", header: "状态" },
+  { accessorKey: "updated_at", header: "更新时间", id: "updated" },
+];
+const membershipColumns = [
+  { accessorKey: "membership_uuid", header: "关系ID", id: "uuid", size: 120, minSize: 100 },
+  { accessorKey: "customer_uuid", header: "客户ID", id: "customer", size: 120, minSize: 100 },
+  { accessorKey: "tenant_uuid", header: "租户ID", id: "tenant", size: 120, minSize: 100 },
+  { accessorKey: "source", header: "来源" },
+  { accessorKey: "status", header: "状态" },
+  { accessorKey: "updated_at", header: "更新时间", id: "updated" },
+];
+const loginEventColumns = [
+  { accessorKey: "identity_provider", header: "来源" },
+  { accessorKey: "event_type", header: "事件" },
+  { accessorKey: "customer_uuid", header: "客户ID", id: "customer", size: 120, minSize: 100 },
+  { accessorKey: "tenant_uuid", header: "租户ID", id: "tenant", size: 120, minSize: 100 },
+  { accessorKey: "ok", header: "结果" },
+  { accessorKey: "error_code", header: "错误码" },
+  { accessorKey: "created_at", header: "时间", id: "updated" },
+];
+const entryColumns = [
+  { accessorKey: "entry_code", header: "入口码" },
+  { accessorKey: "entry_type", header: "类型" },
+  { accessorKey: "tenant_uuid", header: "租户ID", id: "tenant", size: 120, minSize: 100 },
+  { accessorKey: "channel", header: "渠道" },
+  { accessorKey: "campaign", header: "活动" },
+  { accessorKey: "status", header: "状态" },
+  { accessorKey: "updated_at", header: "更新时间", id: "updated" },
+];
+const actionColumn = { accessorKey: "actions", header: "操作", id: "actions" };
+
+const activeColumns = computed(() => {
+  let columns;
+  switch (activeTab.value) {
+    case "identities":
+      columns = identityColumns;
+      break;
+    case "memberships":
+      columns = membershipColumns;
+      break;
+    case "loginEvents":
+      columns = loginEventColumns;
+      break;
+    case "entries":
+      columns = entryColumns;
+      break;
+    default:
+      columns = accountColumns;
+  }
+  return [...columns, actionColumn];
+});
+
+const activePage = computed<CustomerPage<any>>(() => {
+  switch (activeTab.value) {
+    case "identities":
+      return identities.value;
+    case "memberships":
+      return memberships.value;
+    case "loginEvents":
+      return loginEvents.value;
+    case "entries":
+      return entries.value;
+    default:
+      return accounts.value;
+  }
+});
+
+const activeItems = computed<TableRow[]>(() => activePage.value.items || []);
+const providerModeLabel = computed(() =>
+  providerMode.value.mode === "delegated" ? t("providerMode.delegated") : t("providerMode.local")
+);
+const isReadOnly = computed(() => Boolean(providerMode.value.read_only));
+const resolvedCurrentTenantUUID = computed(() => currentTenantUuid.value?.trim() || "");
+const shortUUID = (value?: string) => {
+  const text = String(value || "").trim();
+  if (!text) return "-";
+  if (text.length <= 16) return text;
+  return `${text.slice(0, 8)}...${text.slice(-4)}`;
+};
+const currentTenantLabel = computed(() => {
+  const tenant = currentTenant.value as any;
+  const name = String(tenant?.tenant_name || tenant?.name || "").trim();
+  const uuid = resolvedCurrentTenantUUID.value;
+  if (name && uuid) return `${name} / ${uuid}`;
+  return uuid || "未解析到当前租户";
+});
+const tenantTotalPages = computed(() => Math.max(1, Math.ceil(tenantTotal.value / tenantPageSize)));
+
+const query = computed(() => ({
+  page: page.value,
+  page_size: pageSize.value,
+  q: search.value.trim() || undefined,
+  status: status.value === "all" ? undefined : status.value,
+  customer_uuid: activeTab.value === "accounts" ? undefined : customerFilterUUID.value || undefined,
+}));
+
+const accountDetailRows = computed(() => {
+  const item = selectedAccount.value;
+  if (!item) return [];
+  return [
+    { label: "显示名", value: item.display_name },
+    { label: "昵称", value: item.nickname },
+    { label: "姓", value: item.family_name },
+    { label: "名", value: item.given_name },
+    { label: "Tenant UUID", value: item.tenant_uuid },
+    { label: "主邮箱", value: item.primary_email },
+    { label: "主手机号", value: item.primary_phone },
+    { label: "邮箱", value: item.email },
+    { label: "手机号", value: item.phone },
+    { label: "邮箱验证", value: item.email_verified ? "已验证" : "未验证" },
+    { label: "手机验证", value: item.phone_verified ? "已验证" : "未验证" },
+    { label: "Locale", value: item.locale },
+    { label: "Timezone", value: item.timezone },
+    { label: "创建时间", value: formatDate(item.created_at) },
+    { label: "更新时间", value: formatDate(item.updated_at) },
+  ];
+});
+
+async function openCreateForm() {
+  if (isReadOnly.value) return;
+  createError.value = "";
+  createForm.email = "";
+  createForm.phone = "";
+  createForm.password = "";
+  createForm.display_name = "";
+  createForm.nickname = "";
+  createForm.given_name = "";
+  createForm.family_name = "";
+  createForm.note = "";
+  if (isRoot.value) {
+    await loadTenantOptions({ reset: true });
+    createForm.tenant_uuid = tenantOptions.value.some((item) => item.value === createForm.tenant_uuid)
+      ? createForm.tenant_uuid
+      : tenantOptions.value[0]?.value || "";
+  } else {
+    createForm.tenant_uuid = resolvedCurrentTenantUUID.value || overview.value.tenant_uuid || "";
+  }
+  showCreateModal.value = true;
+}
+
+async function loadTenantOptions(options: { reset?: boolean } = {}) {
+  if (!isRoot.value || loadingTenants.value) return;
+  if (options.reset) tenantPage.value = 1;
+  loadingTenants.value = true;
+  try {
+    const response = await iam.listTenants({
+      page: tenantPage.value,
+      pageSize: tenantPageSize,
+      status: "active",
+      query: tenantSearch.value.trim() || undefined,
+    });
+    const items = response.data?.items || [];
+    tenantTotal.value = Number(response.data?.total || items.length || 0);
+    const options = items
+      .map((tenant: any) => {
+        const value = String(tenant.uuid || tenant.key || "").trim();
+        if (!value) return null;
+        const label = String(tenant.name || tenant.key || value).trim();
+        return { label, value };
+      })
+      .filter(Boolean) as { label: string; value: string }[];
+    const selected = createForm.tenant_uuid.trim();
+    const hasSelected = selected && options.some((item) => item.value === selected);
+    if (selected && !hasSelected) {
+      const current = tenantOptions.value.find((item) => item.value === selected);
+      if (current) options.unshift(current);
+    }
+    tenantOptions.value = options;
+  } finally {
+    loadingTenants.value = false;
+  }
+}
+
+function changeTenantPage(nextPage: number) {
+  const normalized = Math.min(Math.max(nextPage, 1), tenantTotalPages.value);
+  if (normalized === tenantPage.value) return;
+  tenantPage.value = normalized;
+  loadTenantOptions();
+}
+
+function validateCreateForm() {
+  if (!createForm.tenant_uuid.trim()) return "Tenant UUID 必填";
+  if (!createForm.email.trim() && !createForm.phone.trim()) return "邮箱或手机号至少填写一个";
+  if (createForm.password.length < 8) return "密码至少 8 位";
+  return "";
+}
+
+async function submitCreate() {
+  if (isReadOnly.value) {
+    createError.value = t("providerMode.readOnlyDescription");
+    return;
+  }
+  createError.value = validateCreateForm();
+  if (createError.value) return;
+  creating.value = true;
+  try {
+    await api.createAccount({
+      tenant_uuid: createForm.tenant_uuid.trim(),
+      email: createForm.email.trim() || undefined,
+      phone: createForm.phone.trim() || undefined,
+      password: createForm.password,
+      display_name: createForm.display_name.trim() || undefined,
+      nickname: createForm.nickname.trim() || undefined,
+      given_name: createForm.given_name.trim() || undefined,
+      family_name: createForm.family_name.trim() || undefined,
+      metadata: createForm.note.trim() ? { note: createForm.note.trim() } : undefined,
+    });
+    showCreateModal.value = false;
+    activeTab.value = "accounts";
+    page.value = 1;
+    await reloadAll();
+  } catch (error: any) {
+    createError.value =
+      error?.data?.error?.message ||
+      error?.response?._data?.error?.message ||
+      error?.message ||
+      "创建失败";
+  } finally {
+    creating.value = false;
+  }
+}
+
+async function openDetail(row: TableRow) {
+  const customerUUID = String(row.customer_uuid || "").trim();
+  if (!customerUUID) return;
+  showDetailModal.value = true;
+  detailLoading.value = true;
+  detailError.value = "";
+  selectedAccount.value = { ...(row as CustomerAccount), customer_uuid: customerUUID };
+  if (activeTab.value === "accounts") {
+    detailLoading.value = false;
+    return;
+  }
+  try {
+    const response = await api.getAccount(customerUUID);
+    selectedAccount.value = response.data;
+  } catch (error: any) {
+    const status = error?.response?.status || error?.status;
+    if (status === 404) {
+      detailError.value = "当前后端未返回客户详情，已保留列表行里的基础数据。请确认后端服务已重启并加载最新路由。";
+    } else {
+      detailError.value =
+        error?.data?.error?.message ||
+        error?.response?._data?.error?.message ||
+        error?.message ||
+        "加载客户详情失败";
+    }
+  } finally {
+    detailLoading.value = false;
+  }
+}
+
+function openEdit(row: TableRow) {
+  if (isReadOnly.value) return;
+  const account = row as CustomerAccount;
+  editError.value = "";
+  editForm.customer_uuid = account.customer_uuid || "";
+  editForm.primary_email = account.primary_email || "";
+  editForm.primary_phone = account.primary_phone || "";
+  editForm.email = account.email || "";
+  editForm.phone = account.phone || "";
+  editForm.display_name = account.display_name || "";
+  editForm.nickname = account.nickname || "";
+  editForm.given_name = account.given_name || "";
+  editForm.family_name = account.family_name || "";
+  editForm.avatar_url = account.avatar_url || "";
+  editForm.locale = account.locale || "";
+  editForm.timezone = account.timezone || "";
+  editForm.status = account.status || "active";
+  editForm.email_verified = Boolean(account.email_verified);
+  editForm.phone_verified = Boolean(account.phone_verified);
+  showEditModal.value = true;
+}
+
+async function submitEdit() {
+  if (isReadOnly.value) {
+    editError.value = t("providerMode.readOnlyDescription");
+    return;
+  }
+  if (!editForm.customer_uuid) return;
+  updating.value = true;
+  editError.value = "";
+  try {
+    const response = await api.updateAccount(editForm.customer_uuid, {
+      primary_email: editForm.primary_email.trim(),
+      primary_phone: editForm.primary_phone.trim(),
+      email: editForm.email.trim(),
+      phone: editForm.phone.trim(),
+      display_name: editForm.display_name.trim(),
+      nickname: editForm.nickname.trim(),
+      given_name: editForm.given_name.trim(),
+      family_name: editForm.family_name.trim(),
+      avatar_url: editForm.avatar_url.trim(),
+      locale: editForm.locale.trim(),
+      timezone: editForm.timezone.trim(),
+      status: editForm.status,
+      email_verified: editForm.email_verified,
+      phone_verified: editForm.phone_verified,
+    });
+    selectedAccount.value = response.data;
+    showEditModal.value = false;
+    await reloadAll();
+  } catch (error: any) {
+    editError.value =
+      error?.data?.error?.message ||
+      error?.response?._data?.error?.message ||
+      error?.message ||
+      "保存失败";
+  } finally {
+    updating.value = false;
+  }
+}
+
+function showRelated(tab: Exclude<TabKey, "accounts" | "entries">) {
+  if (!selectedAccount.value?.customer_uuid) return;
+  customerFilterUUID.value = selectedAccount.value.customer_uuid;
+  activeTab.value = tab;
+  page.value = 1;
+  showDetailModal.value = false;
+  reloadCurrentTab();
+}
+
+function clearCustomerFilter() {
+  customerFilterUUID.value = "";
+  page.value = 1;
+  reloadCurrentTab();
+}
+
+async function reloadOverview() {
+  const response = await api.overview();
+  overview.value = response.data;
+}
+
+async function reloadCurrentTab() {
+  loading.value = true;
+  try {
+    if (activeTab.value === "accounts") {
+      accounts.value = (await api.listAccounts(query.value)).data;
+    } else if (activeTab.value === "identities") {
+      identities.value = (await api.listIdentities(query.value)).data;
+    } else if (activeTab.value === "memberships") {
+      memberships.value = (await api.listMemberships(query.value)).data;
+    } else if (activeTab.value === "loginEvents") {
+      loginEvents.value = (await api.listLoginEvents(query.value)).data;
+    } else {
+      entries.value = (await api.listMiniAppEntries(query.value)).data;
+    }
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function reloadAll() {
+  loading.value = true;
+  try {
+    await reloadMode();
+    await reloadOverview();
+    await reloadCurrentTab();
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function reloadMode() {
+  try {
+    const response = await api.mode({ silentAuthError: true });
+    providerMode.value = normalizeProviderMode(response.data);
+  } catch {
+    providerMode.value = defaultProviderMode();
+  }
+}
+
+function statusColor(value?: string) {
+  if (value === "active") return "success";
+  if (value === "pending") return "warning";
+  if (value === "suspended" || value === "disabled") return "error";
+  return "neutral";
+}
+
+function formatDate(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+watch([activeTab, status, pageSize], () => {
+  page.value = 1;
+  reloadCurrentTab();
+});
+watch(page, () => reloadCurrentTab());
+watch(tenantSearch, () => {
+  if (!showCreateModal.value || !isRoot.value) return;
+  if (tenantSearchTimer) clearTimeout(tenantSearchTimer);
+  tenantSearchTimer = setTimeout(() => {
+    loadTenantOptions({ reset: true });
+  }, 300);
+});
+
+onMounted(() => {
+  reloadAll();
+});
+</script>

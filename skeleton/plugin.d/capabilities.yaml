@@ -7,6 +7,7 @@ capabilities:
     - contracts/capabilities/com.powerx.plugins.base.template.create.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.delete.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.list.yaml
+    - contracts/capabilities/com.powerx.plugins.base.template.prepare.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.publish.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.quality_distribute.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.read.yaml
@@ -55,6 +56,12 @@ capabilities:
       schemas:
         input: contracts/schema/input/com.powerx.plugins.base.template.list.json
         output: contracts/schema/output/com.powerx.plugins.base.template.list.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.template.prepare.yaml
+      id: com.powerx.plugins.base.template.prepare
+      schemas:
+        input: contracts/schema/input/com.powerx.plugins.base.template.prepare.json
+        output: contracts/schema/output/com.powerx.plugins.base.template.prepare.json
       version: 1.0.0
     - descriptor: contracts/capabilities/com.powerx.plugins.base.template.publish.yaml
       id: com.powerx.plugins.base.template.publish

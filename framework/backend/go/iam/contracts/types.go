@@ -2,12 +2,12 @@ package contracts
 
 import "time"
 
-// IAMMode 描述运行时 IAM 模式。
-type IAMMode string
+// IAMAdapterMode 描述运行时 IAM 模式。
+type IAMAdapterMode string
 
 const (
-	IAMModeLocal     IAMMode = "local"
-	IAMModeDelegated IAMMode = "delegated"
+	IAMAdapterModeLocal     IAMAdapterMode = "local"
+	IAMAdapterModeDelegated IAMAdapterMode = "delegated"
 )
 
 // Tenant 为统一租户模型。

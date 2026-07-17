@@ -5,6 +5,7 @@
   "imports": [
     "contracts/capabilities/com.powerx.plugins.base.template.list.yaml",
     "contracts/capabilities/com.powerx.plugins.base.template.read.yaml",
+    "contracts/capabilities/com.powerx.plugins.base.template.prepare.yaml",
     "contracts/capabilities/com.powerx.plugins.base.template.create.yaml",
     "contracts/capabilities/com.powerx.plugins.base.template.update.yaml",
     "contracts/capabilities/com.powerx.plugins.base.template.delete.yaml",
@@ -48,6 +49,22 @@
         "timeout_seconds": 0
       },
       "checksum": "a593e2d0af3b378d13102d4e1fe19f24fe4eb7dd263a7d8d73be96eb4dbe938d"
+    },
+    {
+      "id": "com.powerx.plugins.base.template.prepare",
+      "version": "1.0.0",
+      "descriptor": "contracts/capabilities/com.powerx.plugins.base.template.prepare.yaml",
+      "schemas": {},
+      "protocols": {},
+      "tags": [],
+      "execution": {
+        "mode": "sync",
+        "callback_url": "",
+        "sse_channel": "",
+        "status_endpoint": "",
+        "timeout_seconds": 0
+      },
+      "checksum": "5690f33af26d8ec0da861ed4103f3b1041c3caa972e26f053aaa63be752f583b"
     },
     {
       "id": "com.powerx.plugins.base.template.create",

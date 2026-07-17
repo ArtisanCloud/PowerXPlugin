@@ -40,7 +40,7 @@ func TestLoadFallsBackToMemoryDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadRespectsIAMModeEnv(t *testing.T) {
+func TestLoadRespectsProviderModeEnv(t *testing.T) {
 	tempDir := t.TempDir()
 	wd, err := os.Getwd()
 	if err != nil {
@@ -51,14 +51,36 @@ func TestLoadRespectsIAMModeEnv(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chdir(wd) })
 
-	t.Setenv("IAM_MODE", "delegated")
+	t.Setenv("POWERX_PROVIDER_MODE", "delegated")
 
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("加载配置失败: %v", err)
 	}
-	if cfg.Context == nil || cfg.Context.IAMMode != "delegated" {
-		t.Fatalf("IAM_MODE 环境变量未生效，期望 delegated 实际 %q", cfg.Context.IAMMode)
+	if cfg.Context == nil || cfg.Context.ProviderMode != "delegated" {
+		t.Fatalf("POWERX_PROVIDER_MODE 环境变量未生效，期望 delegated 实际 %q", cfg.Context.ProviderMode)
+	}
+}
+
+func TestLoadIgnoresUnknownProviderModeEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("获取当前目录失败: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("切换工作目录失败: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+
+	t.Setenv("POWERX_UNKNOWN_PROVIDER_MODE", "delegated")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.Context != nil && cfg.Context.ProviderMode == "delegated" {
+		t.Fatalf("legacy IAM mode env must not affect provider mode")
 	}
 }
 
@@ -185,14 +207,14 @@ func TestLoadResolvesPlaceholderDefaults(t *testing.T) {
 
 func TestLoadKeepsGatewayBaseURLInHostDelegatedSTSMode(t *testing.T) {
 	tempDir := t.TempDir()
-	configContent := "logging:\n  debug_mode: true\ncontext:\n  iam_mode: delegated\ngateway:\n  base_url: http://127.0.0.1:8077\n  auth_scheme: bearer\n"
+	configContent := "logging:\n  debug_mode: true\ncontext:\n  provider_mode: delegated\ngateway:\n  base_url: http://127.0.0.1:8077\n  auth_scheme: bearer\n"
 	configFile := filepath.Join(tempDir, "config.yaml")
 	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
 		t.Fatalf("写入测试配置失败: %v", err)
 	}
 	t.Setenv("CONFIG_PATH", tempDir)
 	t.Setenv("POWERX_PROXY", "1")
-	t.Setenv("IAM_MODE", "delegated")
+	t.Setenv("POWERX_PROVIDER_MODE", "delegated")
 	t.Setenv("PX_GATEWAY_AUTH_SCHEME", "bearer")
 	t.Setenv("POWERX_STS_CLIENT_ID", "com.powerx.plugins.base.tenant")
 	t.Setenv("POWERX_STS_CLIENT_SECRET", "secret")

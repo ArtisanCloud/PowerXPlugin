@@ -18,20 +18,20 @@ type TenantHandler struct {
 	service   *srviam.TenantService
 	directory fwiamcontracts.DirectoryService
 	authz     fwiamcontracts.AuthzService
-	mode      srviam.IAMMode
+	mode      srviam.IAMAdapterMode
 }
 
 func NewTenantHandler(
 	svc *srviam.TenantService,
 	directory fwiamcontracts.DirectoryService,
 	authz fwiamcontracts.AuthzService,
-	mode srviam.IAMMode,
+	mode srviam.IAMAdapterMode,
 ) *TenantHandler {
 	return &TenantHandler{service: svc, directory: directory, authz: authz, mode: mode}
 }
 
 func (h *TenantHandler) List(c *gin.Context) {
-	if h.mode == srviam.IAMModeDelegated && h.directory != nil {
+	if h.mode == srviam.IAMAdapterModeDelegated && h.directory != nil {
 		tenantUUID := strings.TrimSpace(c.Query("tenant_uuid"))
 		if tenantUUID == "" {
 			tenantUUID = admincommon.ResolveTenantUUID(c)
@@ -60,22 +60,26 @@ func (h *TenantHandler) List(c *gin.Context) {
 			respondIAMError(c, err)
 			return
 		}
-			contracts.ResponseSuccess(c, gin.H{
-				"items": []gin.H{
-					{
-						"uuid":   tenant.TenantUUID,
-						"key":    tenant.TenantKey,
-						"name":   tenant.Name,
-						"status": tenant.Status,
-					},
+		contracts.ResponseSuccess(c, gin.H{
+			"items": []gin.H{
+				{
+					"uuid":   tenant.TenantUUID,
+					"key":    tenant.TenantKey,
+					"name":   tenant.Name,
+					"status": tenant.Status,
 				},
-				"total":     1,
-				"page":      1,
-				"page_size": 20,
-			})
+			},
+			"total":     1,
+			"page":      1,
+			"page_size": 20,
+		})
 		return
 	}
 
+	if h == nil || h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "IAM local tenant service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
+		return
+	}
 	var query TenantListQuery
 	if err := c.ShouldBindQuery(&query); err != nil {
 		contracts.ResponseBadRequest(c, "invalid query: "+err.Error())
@@ -120,7 +124,7 @@ func (h *TenantHandler) List(c *gin.Context) {
 }
 
 func (h *TenantHandler) Create(c *gin.Context) {
-	if h.mode == srviam.IAMModeDelegated {
+	if h.mode == srviam.IAMAdapterModeDelegated {
 		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "tenant write operations are not allowed in delegated mode")
 		return
 	}
@@ -154,7 +158,7 @@ func (h *TenantHandler) Create(c *gin.Context) {
 }
 
 func (h *TenantHandler) Update(c *gin.Context) {
-	if h.mode == srviam.IAMModeDelegated {
+	if h.mode == srviam.IAMAdapterModeDelegated {
 		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "tenant write operations are not allowed in delegated mode")
 		return
 	}

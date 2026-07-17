@@ -16,6 +16,8 @@
     "reset": "Reset",
     "close": "Close",
     "refresh": "Refresh",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
     "error": "Something went wrong",
     "retry": "Retry",
     "reload": "Reload",
@@ -30,7 +32,8 @@
   },
   "status": {
     "active": "Active",
-    "inactive": "Inactive"
+    "inactive": "Inactive",
+    "disabled": "Disabled"
   },
   "menu": {
     "openMarket": "Open Market",
@@ -71,11 +74,18 @@
     "templates": "Templates",
     "templatesCrud": "Template CRUD",
     "templatesDevelop": "Templates Develop Guide",
+    "powerxBaseCapabilities": "PowerX Base Capabilities",
     "frameworkLab": "Framework Function Test",
     "capabilities": "Plugin Capability Registry",
     "capabilitiesExposure": "Exposure & Quotas",
     "capabilitiesLifecycle": "Lifecycle Governance",
+    "businessOperations": "Business Operations",
+    "customerBase": "Customer Base Management",
     "capabilityLab": "PowerX Capability Lab",
+    "knowledgeLab": "Knowledge Lab",
+    "powerxPluginAgents": "Agent Management",
+    "powerxPluginSkills": "Skill Management",
+    "agentSkillBridge": "Agent Chat Debug",
     "iam": "IAM & Access",
     "iamOverview": "IAM Overview",
     "iamDepartments": "Departments",
@@ -88,9 +98,173 @@
     "channelWecomSync": "Sync Center",
     "channelDingtalk": "DingTalk Config",
     "channelLark": "Lark Config",
+    "settings": "Settings",
+    "metadataGovernance": "Metadata Governance",
+    "aiSettings": "AI Settings",
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
+  },
+  "metadataGovernance": {
+    "badge": "Settings",
+    "title": "Metadata Governance",
+    "description": "Review dictionaries, taxonomies, tags, and resource types available to this plugin. Standalone mode reads the plugin database; delegated mode reads PowerX base capabilities.",
+    "loadFailed": "Failed to load metadata",
+    "searchPlaceholder": "Search name, code, or path",
+    "allModules": "Select module",
+    "empty": "No data",
+    "dictionaryNamespaces": "Dictionary namespaces",
+    "taxonomies": "Taxonomies",
+    "selectDictionary": "Select a dictionary",
+    "selectTaxonomy": "Select a taxonomy",
+    "pagination": "Showing {start}-{end} / {total}, page {page}",
+    "create": {
+      "errorTitle": "Create failed",
+      "validation": {
+        "required": "Fill in all required fields.",
+        "localizedNameRequired": "Fill in the Simplified Chinese name.",
+        "englishNameRequired": "Fill in the English name. The English identifier is generated from it.",
+        "machineIdentifierInvalid": "The English identifier must start with a lowercase letter and contain only lowercase letters, numbers, and . _ - separators.",
+        "namespaceModuleMismatch": "The namespace identifier must belong to the selected module, for example corex.customer or corex.customer.level.",
+        "resourceTypeRequired": "Prepare bindable resource types first."
+      },
+      "context": {
+        "dictionary": "Current dictionary: {name}",
+        "taxonomy": "Current taxonomy: {name}"
+      },
+      "dictionaryNamespace": {
+        "button": "Create dictionary",
+        "title": "Create dictionary namespace",
+        "description": "Create a business container for a flat set of dictionary items."
+      },
+      "dictionaryItem": {
+        "button": "Create item",
+        "title": "Create dictionary item",
+        "description": "Create a flat option under the selected dictionary namespace."
+      },
+      "taxonomy": {
+        "button": "Create taxonomy",
+        "title": "Create taxonomy",
+        "description": "Create a category tree that can contain parent-child nodes."
+      },
+      "taxonomyNode": {
+        "button": "Create node",
+        "title": "Create taxonomy node",
+        "description": "Create a root node or child node under the selected taxonomy."
+      },
+      "tag": {
+        "button": "Create tag",
+        "title": "Create tag",
+        "description": "Create a flat tag for resource labeling and filtering."
+      },
+      "resourceType": {
+        "button": "Create resource type",
+        "title": "Create resource type",
+        "description": "Declare a business object type that can be bound by tags and references."
+      },
+      "failed": "Create failed",
+      "required": "Fill required fields",
+      "duplicate": "The same code or namespace already exists. Use another value before saving.",
+      "duplicateNamespace": "Namespace already exists. Use another namespace.",
+      "duplicateCode": "Code already exists. Use another English code.",
+      "duplicateTag": "A tag with the same code already exists for this resource type.",
+      "duplicateResourceType": "Resource type already exists. Use another resource type."
+    },
+    "form": {
+      "module": "Module",
+      "modulePlaceholder": "Select module",
+      "moduleSearchPlaceholder": "Search modules",
+      "namespace": "Namespace",
+      "namespaceSuffix": "Namespace suffix",
+      "namespaceSuffixPlaceholder": "For example level or status",
+      "namespaceSuffixPlaceholderTag": "For example tag",
+      "resourceType": "Resource Type",
+      "resourceTypePlaceholder": "For example customer.account",
+      "resourceTypeSelectPlaceholder": "Select resource type",
+      "resourceTypeSearchPlaceholder": "Search resource types",
+      "code": "English Code",
+      "machineIdentifier": "English identifier",
+      "machineIdentifierPlaceholder": "For example enabled or vip_customer",
+      "sortOrder": "Sort Order",
+      "maxDepth": "Max Depth",
+      "parent": "Parent Node",
+      "parentNode": "Parent node",
+      "root": "Root",
+      "rootNode": "Root node",
+      "color": "Color",
+      "validatorKey": "Validator Key",
+      "validatorKeyPlaceholder": "For example customer.account",
+      "bindingEnabled": "Binding Enabled",
+      "zhName": "Chinese Name",
+      "enName": "English Name",
+      "description": "Description",
+      "localizedName": "Name",
+      "localizedDescription": "Description",
+      "localizedNamePlaceholder": "Enter name",
+      "localizedDescriptionPlaceholder": "Enter description",
+      "requiredLocaleSection": "Default language",
+      "requiredLocaleDescription": "The backend contract requires a default-language name.",
+      "optionalLocaleSection": "Other languages",
+      "optionalLocaleDescription": "Select one language to edit its name and description. Filled languages are shown below.",
+      "localeSelectPlaceholder": "Select language",
+      "localeSearchPlaceholder": "Search language",
+      "locale": {
+        "zh_CN": "简体中文",
+        "en": "English",
+        "ja": "日本語",
+        "ko": "한국어"
+      }
+    },
+    "mode": {
+      "local": "Local mode",
+      "delegated": "Delegated mode"
+    },
+    "tabs": {
+      "dictionaries": "Dictionaries",
+      "taxonomies": "Taxonomies",
+      "tags": "Tags",
+      "resourceTypes": "Resource Types"
+    },
+    "columns": {
+      "name": "Name",
+      "module": "Module",
+      "resourceType": "Resource Type",
+      "references": "References",
+      "usage": "Usage",
+      "depth": "Depth",
+      "binding": "Bindable",
+      "status": "Status"
+    }
+  },
+  "aiSettings": {
+    "badge": "Settings",
+    "title": "AI Settings",
+    "description": "Unified AI capability configuration entry for this plugin. The page only shows provider status until a real provider is wired.",
+    "providerNotConfigured": "AI settings provider is not configured",
+    "providerNotConfiguredDescription": "This plugin has not connected a local or PowerX AI settings provider yet. Once connected, this page will read configuration through the plugin backend.",
+    "empty": "No configuration",
+    "cards": {
+      "provider": "Current provider",
+      "delegatedAvailable": "Delegated provider",
+      "health": "Health"
+    },
+    "sections": {
+      "summary": "Summary",
+      "routing": "Routing",
+      "providers": "Provider Profiles",
+      "models": "Model Profiles"
+    },
+    "columns": {
+      "name": "Name",
+      "provider": "Provider",
+      "status": "Status"
+    }
+  },
+  "providerMode": {
+    "local": "Local mode",
+    "delegated": "Delegated mode",
+    "readOnly": "Read-only mode",
+    "readOnlyDescription": "The current provider is read-only. This operation is unavailable."
   },
   "frameworkLab": {
     "title": "Framework Function Test",
@@ -1120,13 +1294,39 @@
       "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
       "readonlyTitle": "Templates are controlled by the host",
       "readonlyDescription": "Running in Delegated mode. CRUD is read-only until the host grants `base.templates.*` permissions.",
-      "readonlyToast": "Read-only mode enforced by PowerX. Ask your admin to grant template permissions."
+      "readonlyToast": "Read-only mode enforced by PowerX. Ask your admin to grant template permissions.",
+      "focusLocated": "Located template \"{name}\"",
+      "errors": {
+        "templateNotFound": "Template not found",
+        "createFailed": "Failed to create template",
+        "updateFailed": "Failed to update template",
+        "deleteFailed": "Failed to delete template"
+      }
     },
     "form": {
       "modalDescription": "Fill out the template details below.",
       "name": "Template Name",
       "description": "Description",
       "content": "Content"
+    }
+  },
+  "agentSkillBridge": {
+    "permissions": {
+      "title": "Agent Permissions",
+      "loading": "Calculating current user permissions...",
+      "loadingShort": "Loading",
+      "error": "Error",
+      "unknown": "Unknown",
+      "available": "Available",
+      "unavailable": "Restricted",
+      "allowed": "Allowed",
+      "denied": "Denied",
+      "tenant": "Tenant",
+      "user": "User",
+      "root": "Root",
+      "yes": "Yes",
+      "no": "No",
+      "empty": "Select an agent to inspect permissions."
     }
   },
   "message": {

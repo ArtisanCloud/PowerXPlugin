@@ -1,0 +1,53 @@
+package metadata
+
+import (
+	"context"
+
+	fwgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+)
+
+type GatewayClient interface {
+	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
+}
+
+type GatewayInvokerAdapter struct {
+	Client GatewayClient
+}
+
+func NewGatewayInvokerAdapter(client GatewayClient) GatewayInvokerAdapter {
+	return GatewayInvokerAdapter{Client: client}
+}
+
+func (a GatewayInvokerAdapter) Invoke(ctx context.Context, req fwgateway.InvokeRequest) (*fwgateway.Response, error) {
+	if a.Client == nil {
+		return nil, &fwgateway.InvocationError{StatusCode: 503, Errors: []fwgateway.GatewayError{
+			{Code: "METADATA_GATEWAY_CLIENT_MISSING", Message: "metadata gateway client is required"},
+		}}
+	}
+	resp, err := a.Client.Invoke(ctx, gateway.InvokeParams{
+		CapabilityID:      req.CapabilityID,
+		Action:            req.Action,
+		PreferredProtocol: req.PreferredProtocol,
+		Payload:           req.Payload,
+		Headers:           req.Headers,
+		RequestID:         req.RequestID,
+		TenantUUID:        req.TenantUUID,
+		AuthRequired:      !req.DisableAuth,
+		TenantScoped:      false,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, &fwgateway.InvocationError{StatusCode: 502, Errors: []fwgateway.GatewayError{
+			{Code: "METADATA_GATEWAY_EMPTY_RESPONSE", Message: "metadata gateway returned empty response"},
+		}}
+	}
+	return &fwgateway.Response{
+		TraceID: resp.TraceID,
+		Status:  resp.Status,
+		Data:    resp.Data,
+		RawData: resp.Raw,
+	}, nil
+}

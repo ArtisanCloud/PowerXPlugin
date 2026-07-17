@@ -1,15 +1,38 @@
 <script setup lang="ts">
 import RoleManager from "~/components/settings/users/RoleManager.vue";
+import { useIAMService } from "~/composables/api/services/iamService";
+import { defaultProviderMode, normalizeProviderMode, type ProviderModeDiagnostics } from "~/composables/api/useProviderMode";
 
 definePageMeta({
   title: "角色管理",
   icon: "i-heroicons-shield-check",
   order: 9,
 });
+
+const { t } = useI18n();
+const iam = useIAMService();
+const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
+const readonlyMode = computed(() => Boolean(providerMode.value.read_only));
+const providerModeLabel = computed(() =>
+  providerMode.value.mode === "delegated" ? t("providerMode.delegated") : t("providerMode.local")
+);
+
+onMounted(async () => {
+  try {
+    const response = await iam.mode();
+    providerMode.value = normalizeProviderMode((response as any)?.data);
+  } catch {
+    providerMode.value = defaultProviderMode();
+  }
+});
 </script>
 
 <template>
-  <div class="p-6">
-    <RoleManager />
+  <div class="p-6 space-y-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
+      <UBadge v-if="readonlyMode" color="warning" variant="soft">{{ `{{ t("providerMode.readOnly") }}` }}</UBadge>
+    </div>
+    <RoleManager :readonly="readonlyMode" />
   </div>
 </template>

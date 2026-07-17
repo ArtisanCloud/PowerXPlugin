@@ -1,13 +1,16 @@
 package admin
 
 import (
-	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	adminaisettings "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/ai_settings"
 	admincapability "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/capability"
 	adminconsole "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/console"
+	admincustomer "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/customer"
 	adminiam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/iam"
 	adminintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/integration"
 	adminmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/marketplace"
+	adminmetadata "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/metadata"
 	adminoperations "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/operations"
 	adminruntime "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/runtime_ops"
 	adminsecurity "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/security"
@@ -32,6 +35,9 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		adminoperations.RegisterRoutes(admin, deps)
 		adminconsole.RegisterRoutes(admin, deps)
 		admincapability.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		admincustomer.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminmetadata.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminaisettings.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminintegration.RegisterRoutes(admin, deps)
 		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminiam.RegisterRoutes(admin, deps)
@@ -43,7 +49,7 @@ func adminTenantGroup(parent *gin.RouterGroup, deps *app.Deps) *gin.RouterGroup 
 		return nil
 	}
 	needTenant := false
-	if deps != nil && deps.IAMMode == iamservice.IAMModeDelegated {
+	if deps != nil && deps.ProviderMode == fwprovider.ModeDelegated {
 		needTenant = true
 	}
 	if !needTenant {

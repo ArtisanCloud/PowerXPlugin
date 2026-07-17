@@ -85,10 +85,10 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 - **FR-020**: 在 `delegated` 模式下，`PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_GATEWAY_AUTH_SCHEME=bearer` 任一缺失或不合法时，插件进程必须启动失败（fail-fast），不得降级继续运行。
 - **FR-021**: `PX_PLUGIN_TOOL_TOKEN` 必须包含可解析的 `tid` claim；缺失 `tid` 时返回标准错误码 `GW_TOKEN_INVALID_TID` 并阻断调用。
 - **FR-022**: Gateway 配置错误必须统一使用错误码：`GW_CFG_MISSING_BASE_URL`、`GW_CFG_MISSING_TOOL_TOKEN`、`GW_CFG_INVALID_AUTH_SCHEME`、`GW_TOKEN_INVALID_TID`。
-- **FR-023**: 所有 `/integration/*` 入口必须复用同一 Guard，并返回固定错误结构：`code`、`message`、`details.required`、`details.present`、`details.iam_mode`、`request_id`。
+- **FR-023**: 所有 `/integration/*` 入口必须复用同一 Guard，并返回固定错误结构：`code`、`message`、`details.required`、`details.present`、`details.provider_mode`、`request_id`。
 - **FR-024**: 宿主（PowerX）在插件安装/启用链路必须向插件进程注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_GATEWAY_AUTH_SCHEME=bearer`；插件不再从本地 `.env` 推断 delegated 凭证。
 - **FR-025**: 宿主（PowerX）在 PostEnable 阶段必须执行一次插件进程内凭证探活；失败时将插件状态标记为 `enable_failed_missing_gateway_credential`。
-- **FR-026**: 观测必须包含启动日志字段（`iam_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）与指标（`plugin_gateway_config_valid{plugin_id,mode}`、`plugin_gateway_invoke_fail_total{code}`）。
+- **FR-026**: 观测必须包含启动日志字段（`provider_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）与指标（`plugin_gateway_config_valid{plugin_id,mode}`、`plugin_gateway_invoke_fail_total{code}`）。
 
 ### Key Entities *(include if feature involves data)*
 

@@ -34,7 +34,15 @@
         "additionalProperties": false
       }
     },
-    "publish_status": { "type": "string" }
+    "publish_status": { "type": "string" },
+    "validated_template_id": { "type": "string" },
+    "validation_passed": { "type": "boolean" },
+    "created_template_ids": {
+      "type": "array",
+      "items": { "type": "integer" }
+    },
+    "updated_template_id": { "type": "string" },
+    "published_template_id": { "type": "string" }
   },
   "required": ["scanned_total", "violations", "cloned_ids", "failed_clones"],
   "additionalProperties": false

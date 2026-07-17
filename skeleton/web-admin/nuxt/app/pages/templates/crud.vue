@@ -116,7 +116,7 @@
           {{ paginationSummary }}
         </span>
         <UPagination
-          v-if="pagination.totalPages > 1"
+          v-if="pagination.total > 0"
           v-model:page="pagination.page"
           :total="pagination.total"
           :items-per-page="pagination.pageSize"
@@ -166,6 +166,7 @@ type TemplateFormState = {
 
 const {
   listTemplates,
+  getTemplate,
   createTemplate: createTemplateApi,
   updateTemplate: updateTemplateApi,
   deleteTemplate: deleteTemplateApi,
@@ -202,6 +203,7 @@ const toast = reactive({
 })
 
 const { t } = useI18n()
+const route = useRoute()
 
 const auth = useAuth()
 const userStore = useUserStore()
@@ -337,6 +339,45 @@ const fetchTemplates = async () => {
   }
 }
 
+const focusTemplateFromRoute = async () => {
+  const rawID = route.query.template_id
+  const templateID = Array.isArray(rawID) ? rawID[0] : rawID
+  if (!templateID) {
+    return
+  }
+  try {
+    const res = await getTemplate(templateID, makeLogHandlers("templates:get", { id: templateID }))
+    if (!res?.success || !res.data) {
+      throw new Error(res?.message || t("templates.crud.errors.templateNotFound"))
+    }
+    const tpl = res.data
+    const existingIndex = templates.value.findIndex((item) => String(item.id) === String(tpl.id))
+    if (existingIndex >= 0) {
+      templates.value.splice(existingIndex, 1, tpl)
+    } else {
+      templates.value = [tpl, ...templates.value]
+    }
+    if (!isDelegatedReadOnly.value) {
+      startEdit(tpl)
+      return
+    }
+    showToast({
+      title: t("templates.crud.listTitle"),
+      message: t("templates.crud.focusLocated", { name: tpl.name }),
+      color: "info",
+      duration: 4500,
+    })
+  } catch (error: any) {
+    console.error("[templates/crud] Failed to focus template", error)
+    showToast({
+      title: t("message.error"),
+      message: error?.message || t("message.error"),
+      color: "error",
+      duration: 5000,
+    })
+  }
+}
+
 const resetForm = () => {
   editingId.value = null
   Object.assign(form, defaultFormValue())
@@ -398,7 +439,7 @@ const handleSubmit = async (payload: { name: string; description: string; conten
         makeLogHandlers("templates:update", { id: editingId.value, payload })
       )
       if (!res?.success) {
-        throw new Error(res?.message || "Update template failed")
+        throw new Error(res?.message || t("templates.crud.errors.updateFailed"))
       }
     } else {
       const res = await createTemplateApi(
@@ -406,7 +447,7 @@ const handleSubmit = async (payload: { name: string; description: string; conten
         makeLogHandlers("templates:create", { payload })
       )
       if (!res?.success) {
-        throw new Error(res?.message || "Create template failed")
+        throw new Error(res?.message || t("templates.crud.errors.createFailed"))
       }
     }
     if (!isUpdate) {
@@ -452,7 +493,7 @@ const performDelete = async () => {
       makeLogHandlers("templates:delete", { id: selectedTemplate.value.id })
     )
     if (!res?.success) {
-      throw new Error(res?.message || "Delete template failed")
+      throw new Error(res?.message || t("templates.crud.errors.deleteFailed"))
     }
     const shouldMoveToPreviousPage = templates.value.length === 1 && pagination.page > 1
     if (shouldMoveToPreviousPage) {
@@ -570,6 +611,7 @@ onMounted(async () => {
   }
   if (canReadTemplateList.value) {
     await fetchTemplates()
+    await focusTemplateFromRoute()
   }
 })
 </script>

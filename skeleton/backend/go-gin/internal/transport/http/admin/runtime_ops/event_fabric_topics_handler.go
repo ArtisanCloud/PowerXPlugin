@@ -37,7 +37,7 @@ type upstreamEnvelope struct {
 }
 
 // EventFabricCreateTopicHandler 提供 standalone+proxy 调试入口：
-// 插件接收请求后，代理到底座 /api/v1/admin/event-fabric/topics。
+// 插件接收请求后，代理到底座服务态 /api/v1/event-fabric/topics。
 func EventFabricCreateTopicHandler(deps *app.Deps) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if deps == nil || deps.Config == nil || deps.Config.Gateway == nil {
@@ -80,7 +80,7 @@ func EventFabricCreateTopicHandler(deps *app.Deps) gin.HandlerFunc {
 		if strings.HasSuffix(baseURL, "/api/v1") {
 			baseURL = strings.TrimSuffix(baseURL, "/api/v1")
 		}
-		endpoint := strings.TrimRight(baseURL, "/") + "/api/v1/admin/event-fabric/topics"
+		endpoint := strings.TrimRight(baseURL, "/") + "/api/v1/event-fabric/topics"
 		requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
 		if requestID == "" {
 			requestID = uuid.NewString()

@@ -997,6 +997,8 @@ func loadEnvConfig(cfg *Config) {
 	}
 	if schema := resolveConfigValue(os.Getenv("POWERX_DB_SCHEMA")); schema != "" {
 		cfg.Database.Schema = schema
+	} else if schema := resolveConfigValue(os.Getenv("POWERX_PLUGIN_DB_SCHEMA")); schema != "" {
+		cfg.Database.Schema = schema
 	}
 	if secret := resolveConfigValue(os.Getenv("POWERX_TOOLGRANT_SECRET")); secret != "" {
 		cfg.Security.ToolGrantSecret = secret

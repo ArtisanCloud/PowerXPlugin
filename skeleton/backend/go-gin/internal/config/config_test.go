@@ -125,6 +125,34 @@ func TestLoadAppliesEnvOverrides(t *testing.T) {
 	}
 }
 
+func TestLoadAppliesPluginSchemaEnvWhenDatabaseSchemaEnvMissing(t *testing.T) {
+	const (
+		dsn    = "postgres://user:pass@127.0.0.1:5432/powerx_test?sslmode=disable"
+		schema = "px_com_powerx_plugin_demo"
+	)
+
+	t.Setenv("POWERX_DB_DSN", dsn)
+	t.Setenv("POWERX_PLUGIN_DB_SCHEMA", schema)
+	t.Setenv("POWERX_DEV_MODE", "true")
+	t.Setenv("POWERX_PROVIDER_MODE", "local")
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := "server:\n  bind_addr: \"127.0.0.1:0\"\ndatabase:\n  schema: \"public\"\nlogging:\n  debug_mode: true\n"
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+	t.Setenv("CONFIG_PATH", tempDir)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.Database == nil || cfg.Database.Schema != schema {
+		t.Fatalf("POWERX_PLUGIN_DB_SCHEMA 未生效，database=%#v", cfg.Database)
+	}
+}
+
 func TestLoadMapsHostWebAdminOriginsToCORS(t *testing.T) {
 	tempDir := t.TempDir()
 	configContent := strings.Join([]string{

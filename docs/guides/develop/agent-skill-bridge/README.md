@@ -6,6 +6,22 @@
 
 PowerXPlugin 只提供插件侧声明、Framework、同步代理和调试入口；PowerX Core 是运行时权威。
 
+PowerXPlugin Template agent 不是示例 UI，而是 Agent Skill Bridge 的参考实现；其他插件调试页必须按它的事件 reducer、消息渲染和结果判定规则实现。
+
+唯一回复链路：
+
+```text
+PowerX Agent Runtime
+  -> base_flow
+  -> LLM stream final
+  -> agent_run.final
+  -> agent_run.ended
+```
+
+Agent 普通问答、能力介绍、缺参追问、执行结果总结，都必须走这条链路。插件调试页只消费 `agent_run.*` 事件，不生成最终回答。PowerX Core 不应因为 `no executable task`、`no task plan`、没有业务 task 或 final 到达较晚，就走 `direct_final`、local fallback、mock assistant response 或 hardcoded response。
+
+当用户问“你是谁 / 你能做什么 / 有什么技能”时，这仍然是 Agent Runtime 的普通回复场景，不是插件前端本地拼接，也不是 Core 特殊 hardcode response。
+
 标准执行链路：
 
 ```text
@@ -26,7 +42,18 @@ PowerXPlugin 只提供插件侧声明、Framework、同步代理和调试入口�
 - 插件 Chat 直接调用插件业务 CRUD API 来假装智能体执行。
 - 插件暴露独立 `/api/v1/plugin/skills/invoke` 作为业务执行入口。
 - PowerX Core 写死某个插件的业务字段、话术或行业流程。
+- PowerX Core 为能力介绍、缺参、no-task 场景增加 `direct_final`、local fallback、mock assistant response。
+- 插件前端在没有 `agent_run.final` 时使用本地兜底文案覆盖 Runtime 返回内容。
 - 没有真实 `agent_run.task_completed` 和 result/links 时展示“已创建/已完成”。
+
+no-task / capability-intro 不是异常场景。没有业务 task 不等于 fallback，不等于 mock，不等于协议异常。
+
+| 用户意图 | 是否产生业务 task | 正确事件结果 |
+| --- | --- | --- |
+| 你是谁 | 否 | `agent_run.response_plan` + `agent_run.final` + `agent_run.ended` |
+| 你有什么能力 | 否 | `agent_run.response_plan` + `agent_run.final` + `agent_run.ended` |
+| 创建/下载/生成视频但缺参 | 可能 pending | `agent_run.awaiting_params` + `agent_run.final` + `agent_run.ended` |
+| 参数完整并执行 | 是 | `agent_run.task_started` + `agent_run.task_completed` + `agent_run.final` + `agent_run.ended` |
 
 ## 2. 职责边界
 
@@ -675,6 +702,8 @@ fail-fast 规则：
 
 插件调试页和 PowerX 对话页都必须消费 PowerX `agent_run.*` 协议。
 
+插件调试页的职责是 reducer：把 Runtime 事件折叠成对话消息、运行过程和业务结果区。它不是另一个 Agent Runtime，也不是最终回答生成器。
+
 必须支持的事件：
 
 ```text
@@ -692,6 +721,32 @@ agent_run.ended
 agent_run.error
 ```
 
+### 9.1 唯一事件消费规则
+
+普通问答、能力介绍、缺参追问和执行总结的最终自然语言内容，只能来自 `agent_run.final`。`agent_run.ended` 只表示本轮 run 生命周期结束。
+
+| 事件 | UI reducer 行为 |
+| --- | --- |
+| `agent_run.final` | 只更新 assistant message content。 |
+| `agent_run.ended` | 只标记本轮 run 结束，停止 streaming/pending 状态。 |
+| `agent_run.task_completed` | 只有 payload 内存在真实 `result` 或 `links` 时，才进入业务结果区。 |
+| `agent_run.task_failed` | 进入失败区，展示 `code/reason/detail/trace_id`。 |
+| `agent_run.awaiting_params` | 展示自然语言缺参提示和缺失字段 trace，不显示“已完成”。 |
+| `agent_run.response_plan` | 只展示在执行过程/trace。 |
+| `agent_run.intent_detected` | 只展示在执行过程/trace。 |
+| `agent_run.plan_created` | 只展示在执行过程/trace；不能因为 plan 存在就显示完成。 |
+| `agent_run.task_started` / `agent_run.task_status` | 更新运行中任务状态。 |
+
+禁止 reducer 行为：
+
+- 不得在 `agent_run.ended success=true` 后，把 pending、running、awaiting_params task 自动改成 completed。
+- 不得因为 `agent_run.final` 或 `agent_run.ended` 到达，就显示“任务完成”。
+- 不得用本地兜底文案覆盖 Runtime 返回内容。
+- 不得把 `response_planner`、`context_builder`、`final_response` 等内部阶段展示为业务完成结果。
+- 不得在插件前端生成“你是谁 / 你能做什么 / 缺哪些参数 / 已创建成功”这类最终回答。
+
+### 9.2 业务结果判定
+
 展示规则：
 
 - `agent_run.final` / `agent_run.ended` 只代表本轮回复结束，不代表业务任务完成。
@@ -699,6 +754,44 @@ agent_run.error
 - `response_planner`、`context_builder`、`final_response` 是内部运行阶段，不应该算作业务任务完成。
 - 创建类任务失败时，必须展示失败原因和 `request_id/trace_id` 复制入口。
 - 缺参时展示自然语言缺参提示，不要求用户输入 JSON。
+
+示例：
+
+| 事件序列 | 对话区 | 业务结果区 |
+| --- | --- | --- |
+| `response_plan` -> `final` -> `ended` | 展示 Runtime final | 不展示业务完成 |
+| `awaiting_params` -> `final` -> `ended` | 展示 Runtime 缺参追问 | 不展示业务完成 |
+| `task_started` -> `task_completed(result/links)` -> `final` -> `ended` | 展示 Runtime 总结 | 展示真实 result/links |
+| `task_started` -> `task_failed` -> `final` -> `ended` | 展示 Runtime 错误说明 | 展示失败区 |
+
+### 9.3 Agent final 消息格式
+
+`agent_run.final` content 允许包含受控 Markdown：
+
+- `[label](/internal/path)`
+- `[label](https://example.com/path)`
+- `**bold**`
+
+调试页必须按 Template agent 的 `messageContentParts` 思路渲染可见消息：
+
+- 内部链接使用 `NuxtLink`。
+- 外链使用 `target="_blank"`。
+- 不使用 `v-html`，除非引入明确 sanitizer 并通过安全审查。
+- 不裸露 Markdown 控制字符，例如不要把 `[详情](/path)` 和 `**重点**` 原样显示给用户。
+- 不支持的 Markdown 能力应明确失败或保持 Runtime 输出纯文本，不要做半截解析。
+
+### 9.4 插件接入排查顺序
+
+插件调试页出现回答不准、能力介绍不完整、缺参追问错误、结果展示异常时，按这个顺序检查：
+
+1. Agent manifest / persona / prompt_seed。
+2. `SKILL.md response_guidance`。
+3. capability registry。
+4. plugin sync result。
+5. frontend event reducer。
+6. Core event payload。
+
+只有确认 PowerX Core 没有发出规范事件，才提交 Core 修复。不得为了某个插件的回答效果，在 Core 增加业务 fallback、`direct_final`、hardcoded prompt、mock response。
 
 ## 10. 初始化与测试流程
 
@@ -785,6 +878,9 @@ order by capability_id, updated_at desc;
 - 只介绍当前 Agent 绑定的 Skill。
 - 不编造平台通用能力。
 - 不暴露 skill_id、executor path、schema 字段。
+- 事件链路是 `agent_run.response_plan` + `agent_run.final` + `agent_run.ended`。
+- 插件调试页只展示 Runtime final，不使用本地 mock 或 fallback 文案。
+- 不出现业务 `task_completed`，也不显示“任务完成”。
 
 10. 测试缺参：
 
@@ -845,6 +941,8 @@ delegated 模式必须配置：
 - Skill 是否同步了最新 `response_guidance`。
 - Core DB 的 `skills_registry_records.manifest_json` 是否包含最新字段。
 - 当前 session 是否是旧污染 session。
+- 插件调试页是否在本地拼接能力介绍或兜底回复。
+- Core 是否被加入了插件专属 hardcoded response、`direct_final` 或 mock response。
 
 ### 12.2 缺参后没有继续执行
 
@@ -863,6 +961,7 @@ delegated 模式必须配置：
 - UI 是否把 `response_planner/context_builder` 当成业务任务。
 - 是否存在 `agent_run.task_completed`。
 - task result/links 是否为空。
+- 是否在 `agent_run.ended success=true` 后把 pending/running/awaiting_params 自动改成 completed。
 
 ### 12.4 初始化后还是旧能力
 
@@ -873,7 +972,27 @@ delegated 模式必须配置：
 - dist 包中是否包含 `skills/<skill_id>/SKILL.md`。
 - PowerX Core 是否仍在跑旧进程。
 
-## 13. 相关文档
+## 13. Template 对齐清单
+
+其他插件调试页接入 Agent Skill Bridge 前必须逐项确认：
+
+- [ ] 插件 ID 与 provider 一致。
+- [ ] Agent 已初始化并绑定 Skill。
+- [ ] `SKILL.md` 有 `response_guidance`。
+- [ ] 能力介绍走 Runtime final，不走本地 mock。
+- [ ] 消息渲染支持受控 Markdown：内部链接、外链、粗体。
+- [ ] `agent_run.final` / `agent_run.ended` 不算业务完成。
+- [ ] 只有 `agent_run.task_completed` + 真实 `result` 或 `links` 才展示业务结果。
+- [ ] 刷新后能恢复历史消息。
+- [ ] 错误展示读取 `code/reason/detail/trace_id`。
+
+对齐代码：
+
+- `skeleton/web-admin/nuxt/app/pages/_p/com.powerx.plugins.base/admin/agent-skill-bridge/index.vue`
+- `scaffold/templates/web-admin/nuxt/app/pages/_p/com.powerx.plugins.base/admin/agent-skill-bridge/index.vue.tmpl`
+- `tools/cli/internal/templates/data/web-admin/nuxt/app/pages/_p/com.powerx.plugins.base/admin/agent-skill-bridge/index.vue.tmpl`
+
+## 14. 相关文档
 
 PowerX Core 侧机制文档：
 

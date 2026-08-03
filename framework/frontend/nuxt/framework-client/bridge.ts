@@ -79,11 +79,24 @@ export interface PowerXPluginPingPayload {
   ts: number;
 }
 
+export type PowerXFullscreenAction = "enter" | "exit" | "toggle";
+
+export interface PowerXPluginFullscreenPayload {
+  source: "powerx-plugin";
+  type: "fullscreen:request";
+  action: PowerXFullscreenAction;
+  pluginId?: string;
+  instanceId?: string;
+  route?: string;
+  reason?: string;
+}
+
 export type PowerXPluginToHost =
   | PowerXPluginReadyPayload
   | PowerXPluginRequestSyncPayload
   | PowerXPluginAuthTokenRequestPayload
-  | PowerXPluginPingPayload;
+  | PowerXPluginPingPayload
+  | PowerXPluginFullscreenPayload;
 
 export interface PowerXBridgeLogger {
   info?: (...args: any[]) => void;
@@ -204,6 +217,18 @@ export class PowerXBridgeClient {
     this.sendToParent({ source: "plugin", type: "ping", ts: Date.now() });
   }
 
+  requestFullscreen(options: PowerXFullscreenRequestOptions = {}) {
+    return this.sendFullscreenRequest("enter", options);
+  }
+
+  exitFullscreen(options: PowerXFullscreenRequestOptions = {}) {
+    return this.sendFullscreenRequest("exit", options);
+  }
+
+  toggleFullscreen(options: PowerXFullscreenRequestOptions = {}) {
+    return this.sendFullscreenRequest("toggle", options);
+  }
+
   private handle = (event: MessageEvent<any>) => {
     const data = event.data as PowerXHostMessage;
     if (!data || data.source !== "powerx") return;
@@ -235,9 +260,22 @@ export class PowerXBridgeClient {
     const target = win?.parent || win?.top;
     if (!win || !target || target === win) {
       this.log("no parent window; skip postMessage", payload);
-      return;
+      return false;
     }
     target.postMessage(payload, this.lastHostOrigin || "*");
+    return true;
+  }
+
+  private sendFullscreenRequest(
+    action: PowerXFullscreenAction,
+    options: PowerXFullscreenRequestOptions = {},
+  ) {
+    return this.sendToParent(createFullscreenPayload(action, {
+      pluginId: options.pluginId || this.pluginId,
+      instanceId: options.instanceId || this.instanceId,
+      route: options.route,
+      reason: options.reason,
+    }));
   }
 
   private isAllowedOrigin(origin: string) {
@@ -296,4 +334,66 @@ export function requestPowerXHostAuthToken(pluginId: string, instanceId?: string
     instanceId: resolvedInstanceId,
   };
   win.parent.postMessage(payload, "*");
+}
+
+export interface PowerXFullscreenRequestOptions {
+  pluginId?: string;
+  instanceId?: string;
+  route?: string;
+  reason?: string;
+}
+
+export function requestPowerXHostFullscreen(
+  pluginId: string,
+  options: PowerXFullscreenRequestOptions = {},
+) {
+  return postPowerXHostFullscreen("enter", pluginId, options);
+}
+
+export function exitPowerXHostFullscreen(
+  pluginId: string,
+  options: PowerXFullscreenRequestOptions = {},
+) {
+  return postPowerXHostFullscreen("exit", pluginId, options);
+}
+
+export function togglePowerXHostFullscreen(
+  pluginId: string,
+  options: PowerXFullscreenRequestOptions = {},
+) {
+  return postPowerXHostFullscreen("toggle", pluginId, options);
+}
+
+function postPowerXHostFullscreen(
+  action: PowerXFullscreenAction,
+  pluginId: string,
+  options: PowerXFullscreenRequestOptions = {},
+) {
+  const win = getWindow();
+  if (!win?.parent || win.parent === win) return false;
+  const payload = createFullscreenPayload(action, {
+    ...options,
+    pluginId,
+  });
+  win.parent.postMessage(payload, "*");
+  return true;
+}
+
+function createFullscreenPayload(
+  action: PowerXFullscreenAction,
+  options: PowerXFullscreenRequestOptions,
+): PowerXPluginFullscreenPayload {
+  return {
+    source: "powerx-plugin",
+    type: "fullscreen:request",
+    action,
+    pluginId: options.pluginId,
+    instanceId:
+      options.instanceId ||
+      (typeof location === "undefined" ? undefined : location.pathname + location.search),
+    route:
+      options.route ||
+      (typeof location === "undefined" ? undefined : location.pathname + location.search),
+    reason: options.reason,
+  };
 }

@@ -34,23 +34,27 @@ internal class SchedulerRunner : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                var now = DateTime.UtcNow;
-                var jobs = await _scheduler.ListJobsAsync(status: JobStatus.Active);
-                foreach (var job in jobs.Where(j => j.NextRunAt <= now))
+                try
                 {
-                    if (_handlers.TryGetValue(job.Name, out var handler))
+                    var now = DateTime.UtcNow;
+                    var jobs = await _scheduler.ListJobsAsync(status: JobStatus.Active);
+                    foreach (var job in jobs.Where(j => j.NextRunAt <= now))
                     {
-                        await handler(job, ct);
-                        job.NextRunAt = LocalScheduler.ComputeNextRun(job.ScheduleType, job.ScheduleExpr, now);
+                        if (_handlers.TryGetValue(job.Name, out var handler))
+                        {
+                            await handler(job, ct);
+                            job.NextRunAt = LocalScheduler.ComputeNextRun(job.ScheduleType, job.ScheduleExpr, now);
+                        }
                     }
                 }
+                catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogError(ex, "Scheduler tick failed"); }
+                await Task.Delay(TimeSpan.FromMinutes(1), ct);
             }
-            catch (Exception ex) { _logger.LogError(ex, "Scheduler tick failed"); }
-            await Task.Delay(TimeSpan.FromMinutes(1), ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
 }

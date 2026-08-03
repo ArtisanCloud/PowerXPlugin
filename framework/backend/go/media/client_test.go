@@ -23,6 +23,11 @@ func TestClientCreatePresignUpdateUsesMediaCapabilities(t *testing.T) {
 		OwnerSubjectID:   "track/original/design.png",
 		UploadChannel:    UploadChannelPresigned,
 		Tags:             []string{"ai-craft"},
+		ObjectKey:        "2a66f690-4ca6-5154-acb2-645171e4a87f",
+		SizeBytes:        10,
+		MimeType:         "image/png",
+		ContentSHA256:    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		Metadata:         map[string]string{"source": "unit-test"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "media-asset-001", asset.UUID)
@@ -62,6 +67,14 @@ func TestClientCreatePresignUpdateUsesMediaCapabilities(t *testing.T) {
 	require.Equal(t, "presign_upload", createBody["uploadMethod"])
 	require.Equal(t, "ai_craft_asset", createBody["ownerSubjectType"])
 	require.Equal(t, "track/original/design.png", createBody["ownerSubjectId"])
+	require.Equal(t, "2a66f690-4ca6-5154-acb2-645171e4a87f", createBody["objectKey"])
+	require.Equal(t, int64(10), createBody["sizeBytes"])
+	require.Equal(t, "image/png", createBody["mimeType"])
+	require.Equal(t, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", createBody["contentSha256"])
+	metadata, ok := createBody["metadata"].(map[string]string)
+	require.True(t, ok)
+	require.Equal(t, "unit-test", metadata["source"])
+	require.Equal(t, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", metadata["content_sha256"])
 
 	require.Equal(t, CapabilityMediaAssetsManage, gw.calls[1].CapabilityID)
 	require.Equal(t, "PresignMediaAsset", gw.calls[1].Action)

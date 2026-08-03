@@ -1,15 +1,21 @@
 export { usePluginApi } from "./api";
 export type { PluginApi, PluginApiOptions } from "./api";
 export {
+  exitPowerXHostFullscreen,
   initPowerXBridge,
   PowerXBridgeClient,
+  requestPowerXHostFullscreen,
   requestPowerXHostAuthToken,
+  togglePowerXHostFullscreen,
 } from "./bridge";
 export type {
   PowerXAuthTokenPayload,
   PowerXBridgeLogger,
   PowerXBridgeOptions,
+  PowerXFullscreenAction,
+  PowerXFullscreenRequestOptions,
   PowerXHostMessage,
+  PowerXPluginFullscreenPayload,
   PowerXPluginToHost,
   PowerXSyncPayload,
   PowerXThemeKey,

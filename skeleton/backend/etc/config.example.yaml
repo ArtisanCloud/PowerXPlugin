@@ -175,12 +175,16 @@ host:
   web_admin_origins:
     - "http://localhost:3030"
     - "http://127.0.0.1:3030"
+    - "http://localhost:3131"
+    - "http://127.0.0.1:3131"
 
 security:
   enable_cors: true
   cors_origins:
     - "http://localhost:3031"
     - "http://127.0.0.1:3031"
+    - "http://localhost:3131"
+    - "http://127.0.0.1:3131"
   rate_limit:
     enabled: false
 

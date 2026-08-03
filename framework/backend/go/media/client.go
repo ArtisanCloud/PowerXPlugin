@@ -101,11 +101,16 @@ type CreateAssetInput struct {
 	Description      string
 	Driver           string
 	Folder           string
+	ObjectKey        string
+	SizeBytes        int64
+	MimeType         string
 	OwnerSubjectType string
 	OwnerSubjectID   string
 	Tags             []string
 	UploadChannel    UploadChannel
 	ExternalURL      string
+	ContentSHA256    string
+	Metadata         map[string]string
 	RequestID        string
 }
 
@@ -184,6 +189,11 @@ func (c *Client) CreateAsset(ctx context.Context, input CreateAssetInput) (*Asse
 		"tags":             append([]string(nil), input.Tags...),
 		"uploadMethod":     firstNonEmpty(string(input.UploadChannel), string(UploadChannelPresigned)),
 		"externalUrl":      strings.TrimSpace(input.ExternalURL),
+		"objectKey":        strings.TrimSpace(input.ObjectKey),
+		"sizeBytes":        input.SizeBytes,
+		"mimeType":         strings.TrimSpace(input.MimeType),
+		"contentSha256":    strings.TrimSpace(input.ContentSHA256),
+		"metadata":         createAssetMetadata(input),
 	}
 	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "CreateMediaAsset", http.MethodPost, "/api/v1/media/assets", nil, payload, input.TenantUUID, input.RequestID)
 	if err != nil {
@@ -481,6 +491,18 @@ func copyStringMap(in map[string]string) map[string]string {
 		if strings.TrimSpace(k) != "" {
 			out[k] = v
 		}
+	}
+	return out
+}
+
+func createAssetMetadata(input CreateAssetInput) map[string]string {
+	out := copyStringMap(input.Metadata)
+	contentSHA256 := strings.TrimSpace(input.ContentSHA256)
+	if contentSHA256 != "" {
+		if out == nil {
+			out = map[string]string{}
+		}
+		out["content_sha256"] = contentSHA256
 	}
 	return out
 }

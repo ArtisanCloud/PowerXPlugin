@@ -59,3 +59,22 @@ func TestProviderResolver_ProxyDoesNotSelectProviderMode(t *testing.T) {
 		t.Fatalf("source mismatch, got=%s want=default", got)
 	}
 }
+
+func TestShouldForceHostLoggingRequiresDelegatedProxyMode(t *testing.T) {
+	t.Setenv("POWERX_PROXY", "1")
+
+	localCfg := &config.Config{Context: &config.ContextConfig{ProviderMode: "local"}}
+	if shouldForceHostLogging(localCfg) {
+		t.Fatal("local + proxy should preserve configured logging output")
+	}
+
+	delegatedCfg := &config.Config{Context: &config.ContextConfig{ProviderMode: "delegated"}}
+	if !shouldForceHostLogging(delegatedCfg) {
+		t.Fatal("delegated + proxy should force host logging output")
+	}
+
+	t.Setenv("POWERX_PROXY", "0")
+	if shouldForceHostLogging(delegatedCfg) {
+		t.Fatal("non-proxy mode should not force host logging output")
+	}
+}

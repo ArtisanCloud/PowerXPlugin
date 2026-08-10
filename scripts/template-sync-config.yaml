@@ -41,6 +41,18 @@ mappings:
       - globs: ["package.json"]
         literal: '"name": "powerxplugin-skeleton-web-admin"'
         replace: '"name": "{{ .PluginSlug }}-web-admin"'
+      - globs: ["package.json"]
+        literal: '"@artisan-cloud/plugin-framework-admin": "0.0.10"'
+        replace: '"@artisan-cloud/plugin-framework-admin": "{{ .FrameworkAdminRef }}"'
+      - globs: ["package.json"]
+        literal: '"@artisan-cloud/plugin-framework-client": "0.0.10"'
+        replace: '"@artisan-cloud/plugin-framework-client": "{{ .FrameworkClientRef }}"'
+      - globs:
+          - "app/pages/agent-skill-bridge.vue"
+          - "app/pages/powerx/agents.vue"
+          - "app/pages/powerx/skills.vue"
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
       - globs: ["app/app.vue"]
         literal: 'title: "PowerX Sample Plugin"'
         replace: 'title: "{{ .PluginName }}"'

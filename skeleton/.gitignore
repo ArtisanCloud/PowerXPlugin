@@ -3,6 +3,10 @@
 Thumbs.db
 .idea/
 .vscode/
+!/.vscode/
+!/.vscode/launch.json
+!/.vscode/tasks.json
+!/.vscode/extensions.json
 
 # Environment / secrets
 .env
@@ -39,6 +43,7 @@ web-admin/.eslintcache
 web-admin/.stylelintcache
 
 # Backend (Go)
+backend/plugin
 backend/bin/
 backend/.cache/
 backend/logs/
@@ -46,6 +51,8 @@ backend/tmp/
 backend/coverage.out
 backend/etc/config.yaml
 backend/etc/host-values.yaml
+__debug_bin*
+**/__debug_bin*
 
 # Root-level overrides (non-production secrets)
 config/config.yaml

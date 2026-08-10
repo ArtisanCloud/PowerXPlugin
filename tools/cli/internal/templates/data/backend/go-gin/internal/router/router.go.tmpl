@@ -79,7 +79,11 @@ func (r *Router) Setup() *gin.Engine {
 func (r *Router) setupGlobalMiddleware() {
 
 	// 健康检查（在其它中间件前放行 /healthz）
-	r.engine.Use(middleware.HealthCheck("/healthz"))
+	r.engine.Use(middleware.HealthCheck("/healthz", middleware.HealthInfo{
+		PluginID: app.PluginID,
+		Version:  app.PluginVersion,
+		Service:  app.PluginName,
+	}))
 
 	// 恢复
 	r.engine.Use(middleware.Recovery())

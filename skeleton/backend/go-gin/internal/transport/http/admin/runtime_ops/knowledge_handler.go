@@ -3,8 +3,6 @@ package runtime_ops
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +23,6 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 const (
@@ -710,8 +707,6 @@ func (h *KnowledgeHandler) UploadIngestionSource(c *gin.Context) {
 	}
 	sourceFormat := firstNonEmpty(c.PostForm("format"), knowledgeFormatFromFilename(fileName), "markdown")
 	requestedBy := firstNonEmpty(c.PostForm("requestedBy"), "plugin-knowledge-lab")
-	contentSHA256 := sha256Hex(raw)
-	objectKey := deterministicMediaAssetUUID("content_sha256:" + contentSHA256)
 
 	mediaClient := fwmedia.NewClient(knowledgeMediaGatewayAdapter{gateway: h.deps.CapabilityGateway}, http.DefaultClient)
 	asset, err := mediaClient.CreateAsset(c.Request.Context(), fwmedia.CreateAssetInput{
@@ -719,15 +714,10 @@ func (h *KnowledgeHandler) UploadIngestionSource(c *gin.Context) {
 		Name:             fileName,
 		Description:      "PowerX Plugin knowledge ingestion source",
 		Driver:           "local",
-		ObjectKey:        objectKey,
-		SizeBytes:        int64(len(raw)),
-		MimeType:         contentType,
 		OwnerSubjectType: "knowledge_space",
 		OwnerSubjectID:   spaceID,
 		Tags:             []string{"knowledge_space", "knowledge_ingestion_source"},
 		UploadChannel:    fwmedia.UploadChannelPresigned,
-		ContentSHA256:    contentSHA256,
-		Metadata:         map[string]string{"content_sha256": contentSHA256},
 		RequestID:        strings.TrimSpace(c.GetHeader("X-Request-ID")),
 	})
 	if err != nil {
@@ -837,20 +827,6 @@ func knowledgeFormatFromFilename(name string) string {
 	default:
 		return ""
 	}
-}
-
-func sha256Hex(raw []byte) string {
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
-}
-
-func deterministicMediaAssetUUID(seed string) string {
-	sum := sha256.Sum256([]byte(seed))
-	raw := make([]byte, 16)
-	copy(raw, sum[:16])
-	raw[6] = (raw[6] & 0x0f) | 0x50
-	raw[8] = (raw[8] & 0x3f) | 0x80
-	return uuid.UUID(raw).String()
 }
 
 func (h *KnowledgeHandler) Policy(c *gin.Context) {

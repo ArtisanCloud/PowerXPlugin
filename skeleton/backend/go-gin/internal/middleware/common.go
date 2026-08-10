@@ -282,15 +282,35 @@ func SecurityHeaders() gin.HandlerFunc {
 	}
 }
 
+// HealthInfo describes static plugin metadata returned by the health endpoint.
+type HealthInfo struct {
+	PluginID string
+	Version  string
+	Service  string
+}
+
 // HealthCheck 健康检查中间件
-func HealthCheck(endpoint string) gin.HandlerFunc {
+func HealthCheck(endpoint string, info ...HealthInfo) gin.HandlerFunc {
+	healthInfo := HealthInfo{}
+	if len(info) > 0 {
+		healthInfo = info[0]
+	}
 	return func(c *gin.Context) {
 		if c.Request.Method == "GET" && c.Request.URL.Path == endpoint {
-			c.JSON(http.StatusOK, gin.H{
-				"status":    "healthy",
+			payload := gin.H{
+				"status":    "ok",
 				"timestamp": time.Now().UTC(),
-				"service":   "powerx-plugin-base",
-			})
+			}
+			if healthInfo.PluginID != "" {
+				payload["plugin_id"] = healthInfo.PluginID
+			}
+			if healthInfo.Version != "" {
+				payload["version"] = healthInfo.Version
+			}
+			if healthInfo.Service != "" {
+				payload["service"] = healthInfo.Service
+			}
+			c.JSON(http.StatusOK, payload)
 			c.Abort()
 			return
 		}

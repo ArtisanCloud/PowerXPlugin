@@ -17,6 +17,7 @@ import (
 	providerWeCom "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/providers/wecom"
 	federatedRisk "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/federated/risk"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/db"
 	"{{ .BackendModulePath }}/internal/entity/models"
@@ -95,7 +96,13 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 }
 
 func shouldForceHostLogging(cfg *config.Config) bool {
-	return strings.TrimSpace(os.Getenv("POWERX_PROXY")) == "1"
+	if strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
+		return false
+	}
+	if cfg == nil || cfg.Context == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(cfg.Context.ProviderMode), string(fwprovider.ModeDelegated))
 }
 
 func initFederatedRuntime(queryDB *gorm.DB) {

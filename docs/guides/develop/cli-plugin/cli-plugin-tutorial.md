@@ -9,13 +9,30 @@
 
 ## 1) 构建并安装 `px-plugin`
 
-推荐（全局可直接调用）：
+推荐（全局可直接调用）。正式发布或团队共享时，使用已确认的 CLI tag：
 
 ```bash
-make install-px-plugin PX_PLUGIN_CLI_VERSION=v0.0.3.3-alpha
+make install-px-plugin PX_PLUGIN_CLI_VERSION=v1.0.1
 hash -r
 px-plugin --version
 ```
+
+本地验证当前 checkout 时，推荐用 `git describe` 生成可追踪版本戳：
+
+```bash
+make install-px-plugin PX_PLUGIN_CLI_VERSION="$(git describe --tags --dirty --always)"
+hash -r
+px-plugin --version
+```
+
+什么时候需要更新 `PX_PLUGIN_CLI_VERSION`：
+
+- `tools/cli` 的命令行为有变化
+- `scaffold/templates` 或 `tools/cli/internal/templates/data` 的脚手架模板有变化
+- `docs/contracts` 或 `tools/cli/internal/contracts/data` 的契约有变化
+- 要把本地安装结果交给团队复用或用于发布链路
+
+只是重复安装同一份代码时不需要升版本；只做本地临时调试时也可以不传，此时 `px-plugin --version` 会显示 `dev` 和当前构建信息。
 
 仅本地构建（不覆盖全局）：
 
@@ -26,22 +43,54 @@ make build-px-plugin
 
 ## 2) 初始化插件项目
 
-命名规则（`plugin-id`）：
+先区分两个名字，避免把插件运行时标识和本地目录混在一起：
 
-```text
-^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$
-```
+- 项目目录名：本地文件夹名，例如 `com.powerx.plugins.hello-world`
+- 插件 ID：写入 `plugin.yaml` 的 `id`，也是运行时注册、路由、能力归属使用的标识，例如 `com.powerx.plugins.hello-world`
 
-示例（推荐交互模式）：
+推荐用交互模式初始化。命令里的参数会作为 `Plugin ID` 的默认值；如果不修改 `Target directory`，项目目录名也会默认使用同一个值：
 
 ```bash
 cd /private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins
 px-plugin init com.powerx.plugins.hello-world
 ```
 
+交互过程示例：
+
+```text
+Entering init guide (interactive mode).
+Plugin ID [com.powerx.plugins.hello-world]:
+Backend:
+  1) go-gin (default)
+  2) python-fastapi
+Choose number [1]:
+Admin frontend:
+  1) nuxt (default)
+  2) next
+Choose number [1]:
+Backend port [8078]:
+Frontend port [3131]:
+GitHub org/user [your-org]: ArtisanCloud
+Module root [github.com/ArtisanCloud/com.powerx.plugins.hello-world]:
+Target directory [com.powerx.plugins.hello-world]:
+Install dependencies now (go mod tidy + npm install) [y/n] [y]:
+```
+
+这个例子最终得到：
+
+- `plugin.yaml` 里的 `id`: `com.powerx.plugins.hello-world`
+- 项目目录：`/private/var/www/html/ArtisanCloud/X/PowerX/Core/Plugins/com.powerx.plugins.hello-world`
+
+当前 CLI 校验规则如下：
+
+```text
+^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$
+```
+
 交互向导会确认：
 - backend / admin
 - module root（默认 `github.com/<org>/<plugin-id>`）
+- target directory（项目目录名；默认跟随最终确认的插件 ID）
 - 是否安装依赖（`go mod tidy` + `npm install`）
 - 是否复制配置（`*.example -> .local/.yaml`）
 - 是否 `git init`

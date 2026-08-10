@@ -98,6 +98,7 @@ func runInit(args []string) error {
 
 	pluginName := derivePluginName(pluginID)
 	pluginSlug := derivePluginSlug(pluginID)
+	pluginDBName := derivePluginDBName(pluginID)
 
 	moduleRoot := normalizeModuleRoot(*module, pluginID)
 
@@ -126,6 +127,7 @@ func runInit(args []string) error {
 		PluginID:           pluginID,
 		PluginName:         pluginName,
 		PluginSlug:         pluginSlug,
+		PluginDBName:       pluginDBName,
 		Version:            *version,
 		GoVersion:          *goVersion,
 		BackendModulePath:  backendModule,
@@ -608,6 +610,13 @@ func derivePluginSlug(id string) string {
 	replacer := strings.NewReplacer(".", "-", "_", "-", " ", "-")
 	slug = replacer.Replace(slug)
 	return slug
+}
+
+func derivePluginDBName(id string) string {
+	name := strings.ToLower(id)
+	replacer := strings.NewReplacer(".", "_", "-", "_", " ", "_")
+	name = replacer.Replace(name)
+	return name
 }
 
 func detectFrameworkReplace(backendDir string) string {

@@ -232,6 +232,14 @@ mappings:
         suffix: .tmpl
       - path: tools/cli/internal/templates/data
         suffix: .tmpl
+  - name: root-vscode
+    source: scaffold/templates/.vscode
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: tools/cli/internal/templates/data/.vscode
   - name: contracts
     source: contracts
     targets:

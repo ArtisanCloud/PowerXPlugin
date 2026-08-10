@@ -482,6 +482,7 @@ func main() {
 	if err := manifest.Register(fwApp, manifestx.Plugin()); err != nil {
 		logger.WithError(err).Fatal("Failed to register manifest")
 	}
+	registerHealthzRoute(fwApp, manifestx.Plugin())
 	// 宿主模式下注册 WS Bus topic（standalone 不触发）
 	wsRegisterTopics, err := security.LoadEventFabricTopics(eventLogger)
 	if err != nil {
@@ -641,6 +642,20 @@ func registerWSRoute(app *fwbootstrap.App, handler http.Handler) {
 	}
 
 	app.Router.Handle(http.MethodGet, targetPath, rewriteToTarget)
+}
+
+func registerHealthzRoute(app *fwbootstrap.App, plugin manifest.Plugin) {
+	if app == nil || app.Router == nil {
+		return
+	}
+	app.Router.Handle(http.MethodGet, fwrouter.HealthzPath, func(ctx fwbootstrap.Context) {
+		ctx.JSON(http.StatusOK, map[string]string{
+			"status":    "ok",
+			"plugin_id": plugin.ID,
+			"version":   plugin.Version,
+			"service":   plugin.Name,
+		})
+	})
 }
 
 func logRuntimeModeMatrix(cfg *config.Config, providerResolver *pluginbootstrap.ProviderResolver) {

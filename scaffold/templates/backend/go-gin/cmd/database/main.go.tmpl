@@ -38,6 +38,9 @@ func main() {
 	if err := providerResolver.Err(); err != nil {
 		log.Fatalf("[provider] mode resolution failed: %v", err)
 	}
+	if err := validateDatabaseRuntime(cfg, providerResolver); err != nil {
+		log.Fatalf("database runtime boundary validation failed: %v", err)
+	}
 	includeIAM := providerResolver.IsLocal()
 	log.Printf("[provider] mode=%s source=%s includeIAM=%v", providerResolver.Mode(), providerResolver.Source(), includeIAM)
 

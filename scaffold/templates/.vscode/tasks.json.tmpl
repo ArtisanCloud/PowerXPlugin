@@ -1,0 +1,106 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+{{- if eq .BackendType "go-gin" }}
+    {
+      "label": "Backend: go run",
+      "type": "shell",
+      "command": "go run ./cmd/plugin",
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "env": {
+          "CONFIG_PATH": "${workspaceFolder}/backend/etc",
+          "POWERX_PLUGIN_CONFIG_DIR": "${workspaceFolder}/backend/etc",
+          "POWERX_PROVIDER_MODE": "local",
+          "POWERX_PROXY": "0",
+          "POWERX_BIND_ADDR": ":{{ .BackendPort }}",
+          "PORT": "{{ .BackendPort }}",
+          "POWERX_GRPC_SERVER_PORT": "9101",
+          "PX_GATEWAY_BASE_URL": "http://127.0.0.1:8077",
+          "PX_GATEWAY_API_PREFIX": "/api/v1",
+          "PX_GATEWAY_AUTH_SCHEME": "apikey"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+{{- else if eq .BackendType "python-fastapi" }}
+    {
+      "label": "Backend: fastapi dev",
+      "type": "shell",
+      "command": "bash scripts/dev.sh",
+      "options": {
+        "cwd": "${workspaceFolder}/backend",
+        "env": {
+          "HOST": "127.0.0.1",
+          "PORT": "{{ .BackendPort }}",
+          "POWERX_PROVIDER_MODE": "local",
+          "POWERX_PROXY": "0",
+          "PX_GATEWAY_BASE_URL": "http://127.0.0.1:8077",
+          "PX_GATEWAY_API_PREFIX": "/api/v1",
+          "PX_GATEWAY_AUTH_SCHEME": "apikey"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+{{- end }}
+{{- if eq .FrontendType "nuxt" }}
+    {
+      "label": "Web Admin: npm dev",
+      "type": "shell",
+      "command": "npm run dev -- --host 0.0.0.0 --port {{ .FrontendPort }}",
+      "options": {
+        "cwd": "${workspaceFolder}/web-admin",
+        "env": {
+          "POWERX_PROVIDER_MODE": "local",
+          "POWERX_PROXY": "0",
+          "NUXT_PUBLIC_INSIDE_POWERX": "0",
+          "NUXT_DEV_PORT": "{{ .FrontendPort }}",
+          "NUXT_PUBLIC_API_BASE": "http://localhost:{{ .BackendPort }}",
+          "NUXT_PUBLIC_API_PREFIX": "/api/v1",
+          "NUXT_DEV_API_PROXY": "http://127.0.0.1:{{ .BackendPort }}",
+          "NUXT_DEV_WS_PROXY": "ws://127.0.0.1:{{ .BackendPort }}",
+          "NUXT_PUBLIC_POWERX_CORE_BASE": "http://localhost:8077",
+          "NUXT_PUBLIC_POWERX_PROVIDER_MODE": "local"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+{{- else if eq .FrontendType "next" }}
+    {
+      "label": "Web Admin: npm dev",
+      "type": "shell",
+      "command": "npm run dev -- --hostname 0.0.0.0 --port {{ .FrontendPort }}",
+      "options": {
+        "cwd": "${workspaceFolder}/web-admin",
+        "env": {
+          "POWERX_PROVIDER_MODE": "local",
+          "POWERX_PROXY": "0",
+          "NEXT_DEV_PORT": "{{ .FrontendPort }}",
+          "NEXT_PUBLIC_API_BASE": "http://localhost:{{ .BackendPort }}",
+          "NEXT_PUBLIC_API_PREFIX": "/api/v1",
+          "NEXT_DEV_API_PROXY": "http://127.0.0.1:{{ .BackendPort }}",
+          "NEXT_PUBLIC_BRIDGE_DEBUG": "false"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+{{- end }}
+    {
+      "label": "Full Stack: Backend + Web Admin",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+{{- if eq .BackendType "go-gin" }}
+        "Backend: go run",
+{{- else if eq .BackendType "python-fastapi" }}
+        "Backend: fastapi dev",
+{{- end }}
+        "Web Admin: npm dev"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

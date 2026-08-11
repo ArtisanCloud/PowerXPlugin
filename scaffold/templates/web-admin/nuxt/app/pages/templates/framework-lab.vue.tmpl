@@ -228,7 +228,7 @@ const canUseHostScheduler = computed(() => resolveFrontendRuntimeMode().mode !==
 const canCreateSchedulerSample = computed(() => schedulerMode.value === "local" || canUseHostScheduler.value)
 const schedulerResolvedTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim())
 const schedulerTenantUUID = computed(() => schedulerMode.value === "local" ? (schedulerResolvedTenantUUID.value || "00000000-0000-0000-0000-000000000001") : "")
-const schedulerPluginID = "com.powerx.plugins.base"
+const schedulerPluginID = "{{ .PluginID }}"
 const schedulerRequestOptions = computed(() => ({
   ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}),
   provider_mode: schedulerMode.value,

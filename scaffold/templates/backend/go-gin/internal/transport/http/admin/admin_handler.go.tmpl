@@ -19,7 +19,7 @@ func runtimePluginVersion() string {
 	if v := strings.TrimSpace(os.Getenv("NUXT_PUBLIC_POWERX_PLUGIN_VERSION")); v != "" {
 		return v
 	}
-	return "0.8.0"
+	return app.PluginVersion
 }
 
 // AdminHandler 管理端处理器
@@ -39,8 +39,8 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 	log := logger.HandlerLogger("admin").WithContext(c.Request.Context())
 
 	manifest := &contracts.PluginManifest{
-		ID:          "com.powerx.plugins.base",
-		Name:        "PowerX Base Plugin",
+		ID:          "{{ .PluginID }}",
+		Name:        "{{ .PluginName }}",
 		Version:     runtimePluginVersion(),
 		Description: "A starter plugin that showcases template management capabilities for PowerX",
 		Author:      "PowerX Team",
@@ -60,7 +60,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 			Routes: map[string]string{
 				"/admin/*": "index.html",
 			},
-			PublicPath: "/_p/com.powerx.plugins.base/admin/",
+			PublicPath: "/_p/{{ .PluginID }}/admin/",
 		},
 
 		Menus: []contracts.MenuConfig{
@@ -122,7 +122,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 		Agents: []contracts.AgentConfig{
 			{
 				ID:           "base.assistant",
-				PluginID:     "com.powerx.plugins.base",
+				PluginID:     "{{ .PluginID }}",
 				Name:         "Base 助理",
 				Description:  "智能的 Base 模板助手，可以帮助创建与查询模板内容",
 				Model:        "gpt-4",
@@ -138,7 +138,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 		Tools: []contracts.ToolConfig{
 			{
 				ID:           "base.template.create",
-				PluginID:     "com.powerx.plugins.base",
+				PluginID:     "{{ .PluginID }}",
 				Name:         "创建模板",
 				Description:  "创建一个新的模板记录",
 				Transport:    "http",
@@ -188,7 +188,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 			},
 			{
 				ID:           "base.template.query",
-				PluginID:     "com.powerx.plugins.base",
+				PluginID:     "{{ .PluginID }}",
 				Name:         "查询模板",
 				Description:  "查询模板列表",
 				Transport:    "http",

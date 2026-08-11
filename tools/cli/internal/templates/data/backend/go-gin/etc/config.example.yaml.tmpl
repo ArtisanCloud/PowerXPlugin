@@ -53,8 +53,8 @@ database:
   # 开发建议：默认使用 Postgres（更接近生产；SQLite 仅保留最小可跑通子集，且不保证所有表/约束/时间字段行为一致）。
   driver: "postgres"
   # 你可以复用本机 Postgres，但务必使用独立 schema，避免与宿主/其它插件冲突。
-  # 先确保数据库存在（例如 com_powerx_plugins_base），schema 会由程序自动创建。
-  dsn: "postgres://powerx:powerx@localhost:5432/com_powerx_plugins_base?sslmode=disable"
+  # 先确保数据库存在（例如 {{ .PluginDBName }}），schema 会由程序自动创建。
+  dsn: "postgres://powerx:powerx@localhost:5432/{{ .PluginDBName }}?sslmode=disable"
   schema: "public"
   # 如需快速本地试跑（最小能力集）可切到 SQLite：
   # driver: "sqlite"
@@ -252,5 +252,5 @@ operations:
 # 如需切换到 Postgres，可以将 driver 设置为 postgres 并提供 dsn，例如：
 # database:
 #   driver: "postgres"
-#   dsn: "postgres://powerx:powerx@localhost:5432/com_powerx_plugins_base?sslmode=disable"
+#   dsn: "postgres://powerx:powerx@localhost:5432/{{ .PluginDBName }}?sslmode=disable"
 #   schema: "public"

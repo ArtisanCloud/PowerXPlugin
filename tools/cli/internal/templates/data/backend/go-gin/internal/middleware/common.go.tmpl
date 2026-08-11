@@ -376,5 +376,5 @@ func pluginIDForLog() string {
 	if pluginID := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ID")); pluginID != "" {
 		return pluginID
 	}
-	return "com.powerx.plugins.base"
+	return "{{ .PluginID }}"
 }

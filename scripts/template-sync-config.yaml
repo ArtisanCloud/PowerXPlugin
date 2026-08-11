@@ -300,6 +300,49 @@ mappings:
       - globs: ["make-files/build.mk"]
         literal: "PLUGIN_ID           ?= com.powerx.plugins.base"
         replace: "PLUGIN_ID           ?= {{ .PluginID }}"
+  - name: root-agents
+    source: .
+    include:
+      - "AGENTS.md"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["AGENTS.md"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["AGENTS.md"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["AGENTS.md"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["AGENTS.md"]
+        literal: "开发态唯一清单移动到 `plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。"
+        replace: "开发态唯一清单位于 `plugin.yaml`，所有脚本/文档示例应以生成项目根目录为基准。"
+      - globs: ["AGENTS.md"]
+        literal: "本地执行 `npm test`、`make validate`、`px-plugin capabilities *`、`make dist` 等命令时，请在 `skeleton/` 目录下运行或显式传入 `--manifest ./plugin.yaml`。"
+        replace: "本地执行 `npm test`、`make validate`、`px-plugin capabilities *`、`make dist` 等命令时，请在项目根目录运行或显式传入 `--manifest ./plugin.yaml`。"
   - name: root-vscode
     source: scaffold/templates/.vscode
     include:

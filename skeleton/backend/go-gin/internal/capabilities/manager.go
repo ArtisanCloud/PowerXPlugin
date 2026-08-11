@@ -544,46 +544,70 @@ func mergeCatalogReferences(manifestPath string, root map[string]any) error {
 	if doc, err := loadCatalog("capabilities"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["capabilities"]; ok {
-			root["capabilities"] = section
+		if err := mergeCatalogSection(root, doc, "capabilities", "capabilities"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("events"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["events"]; ok {
-			root["events"] = section
+		if err := mergeCatalogSection(root, doc, "events", "events"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("agent_tools"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["agent_tools"]; ok {
-			root["agent_tools"] = section
+		if err := mergeCatalogSection(root, doc, "agent_tools", "agent_tools"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("exposure"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["exposure"]; ok {
-			root["exposure"] = section
+		if err := mergeCatalogSection(root, doc, "exposure", "exposure"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("rbac"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["rbac"]; ok {
-			root["rbac"] = section
-		}
-		if section, ok := doc["permissions"]; ok {
-			root["permissions"] = section
-		}
-		if section, ok := doc["routes"]; ok {
-			root["routes"] = section
+		for _, field := range []string{"rbac", "permissions", "routes"} {
+			if err := mergeCatalogSection(root, doc, "rbac", field); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+func mergeCatalogSection(root, catalog map[string]any, catalogName, field string) error {
+	section, ok := catalog[field]
+	if !ok || isEmptyManifestValue(section) {
+		return nil
+	}
+	if existing, exists := root[field]; exists && !isEmptyManifestValue(existing) {
+		return fmt.Errorf("catalog conflict on field %q (catalog=%s)", field, catalogName)
+	}
+	root[field] = section
+	return nil
+}
+
+func isEmptyManifestValue(value any) bool {
+	if value == nil {
+		return true
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed) == ""
+	case []any:
+		return len(typed) == 0
+	case map[string]any:
+		return len(typed) == 0
+	default:
+		return false
+	}
 }
 
 func resolveManifestPath() string {

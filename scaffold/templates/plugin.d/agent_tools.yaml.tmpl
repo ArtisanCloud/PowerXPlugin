@@ -1,5 +1,25 @@
 agent_tools:
-  - id: {{ .PluginID }}.template.create
+  - id: base.template.create
     capability: {{ .PluginID }}.template.create
-    handler: backend/internal/handlers/capabilities/template/create_handler.go
-    description: 创建示例模板
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#CreateTemplate
+    description: "以 REST/API 形式创建模板，并为 Agent 暴露工具。"
+  - id: base.template.compose
+    capability: {{ .PluginID }}.template.compose
+    handler: contracts/exposure/workflow/template-compose.json
+    description: "复合 Workflow，串联草稿、审核与发布步骤。"
+  - id: base.template.audit
+    capability: {{ .PluginID }}.template.audit
+    handler: contracts/exposure/workflow/template-audit.json
+    description: "巡检模板库并在检测到异常时自动修复+发布。"
+  - id: base.template.batch_clone
+    capability: {{ .PluginID }}.template.batch_clone
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#BatchCloneTemplates
+    description: "批量克隆模板的 REST/API 工具。"
+  - id: base.template.validate
+    capability: {{ .PluginID }}.template.validate
+    handler: backend/internal/transport/http/admin/templates/template_handler.go#ValidateTemplateCapability
+    description: "模板质量巡检工具，返回违规项供 Agent 决策。"
+  - id: base.template.quality_distribute
+    capability: {{ .PluginID }}.template.quality_distribute
+    handler: contracts/exposure/workflow/template-quality-distribute.json
+    description: "巡检 + 克隆 + 发布的复合 Workflow。"

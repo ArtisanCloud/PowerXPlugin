@@ -9,7 +9,7 @@ topics:
         principal_id: "member:system"
         actions: [publish, subscribe]
       - principal_type: plugin
-        principal_id: "plugin:com.powerx.plugins.base"
+        principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
 
   - key: _topic.audit.template.updated
@@ -21,7 +21,7 @@ topics:
         principal_id: "member:system"
         actions: [publish]
       - principal_type: plugin
-        principal_id: "plugin:com.powerx.plugins.base"
+        principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
 
   - key: _topic.template.validate.completed
@@ -33,7 +33,7 @@ topics:
         principal_id: "member:system"
         actions: [publish]
       - principal_type: plugin
-        principal_id: "plugin:com.powerx.plugins.base"
+        principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
 
   - key: _topic.template.batch_clone.completed
@@ -45,7 +45,7 @@ topics:
         principal_id: "member:system"
         actions: [publish]
       - principal_type: plugin
-        principal_id: "plugin:com.powerx.plugins.base"
+        principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
 
   - key: _topic.template.update.completed
@@ -57,7 +57,7 @@ topics:
         principal_id: "member:system"
         actions: [publish]
       - principal_type: plugin
-        principal_id: "plugin:com.powerx.plugins.base"
+        principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
 
   - key: powerx.runtime.scheduler.triggered.v1
@@ -69,5 +69,5 @@ topics:
         principal_id: "member:system"
         actions: [publish, subscribe]
       - principal_type: plugin
-        principal_id: "plugin:com.powerx.plugins.base"
+        principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]

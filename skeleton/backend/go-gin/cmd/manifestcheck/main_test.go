@@ -30,7 +30,7 @@ func TestValidateCatalogConflicts(t *testing.T) {
 		}
 	})
 
-	t.Run("rbac catalog conflicts with top-level permissions", func(t *testing.T) {
+	t.Run("rbac catalog conflicts with top-level permission declarations", func(t *testing.T) {
 		plugin := map[string]interface{}{
 			"catalogs": map[string]interface{}{
 				"rbac": "./plugin.d/rbac.yaml",
@@ -103,4 +103,99 @@ func TestCatalogConflictDetectedBeforeMergeFromFiles(t *testing.T) {
 	if !strings.Contains(err.Error(), "remove top-level events and keep plugin.d/events.yaml only") {
 		t.Fatalf("expected remediation hint, got %q", err.Error())
 	}
+}
+
+func TestValidateEventTopicsRequiresPluginPublishACL(t *testing.T) {
+	plugin := map[string]interface{}{
+		"id": "com.powerx.plugins.demo",
+		"events": map[string]interface{}{
+			"topics": []interface{}{
+				map[string]interface{}{
+					"key":     "powerx.runtime.scheduler.triggered.v1",
+					"actions": []interface{}{"publish", "subscribe"},
+				},
+			},
+		},
+	}
+
+	t.Run("accepts plugin publish acl", func(t *testing.T) {
+		eventFabric := map[string]interface{}{
+			"topics": []interface{}{
+				map[string]interface{}{
+					"key": "powerx.runtime.scheduler.triggered.v1",
+					"acl": []interface{}{
+						map[string]interface{}{
+							"principal_type": "member",
+							"principal_id":   "member:system",
+							"actions":        []interface{}{"publish", "subscribe"},
+						},
+						map[string]interface{}{
+							"principal_type": "plugin",
+							"principal_id":   "plugin:com.powerx.plugins.demo",
+							"actions":        []interface{}{"publish"},
+						},
+					},
+				},
+			},
+		}
+
+		if err := validateEventTopics(plugin, eventFabric); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("rejects member or role only acl", func(t *testing.T) {
+		eventFabric := map[string]interface{}{
+			"topics": []interface{}{
+				map[string]interface{}{
+					"key": "powerx.runtime.scheduler.triggered.v1",
+					"acl": []interface{}{
+						map[string]interface{}{
+							"principal_type": "member",
+							"principal_id":   "member:system",
+							"actions":        []interface{}{"publish", "subscribe"},
+						},
+						map[string]interface{}{
+							"principal_type": "role",
+							"principal_id":   "role:role_admin",
+							"actions":        []interface{}{"publish"},
+						},
+					},
+				},
+			},
+		}
+
+		err := validateEventTopics(plugin, eventFabric)
+		if err == nil {
+			t.Fatal("expected missing plugin publish ACL error, got nil")
+		}
+		if !strings.Contains(err.Error(), "缺少插件服务态 publish ACL (plugin:com.powerx.plugins.demo)") {
+			t.Fatalf("expected plugin principal ACL error, got %q", err.Error())
+		}
+	})
+
+	t.Run("rejects plugin acl without publish", func(t *testing.T) {
+		eventFabric := map[string]interface{}{
+			"topics": []interface{}{
+				map[string]interface{}{
+					"key": "powerx.runtime.scheduler.triggered.v1",
+					"acl": []interface{}{
+						map[string]interface{}{
+							"principal_type": "plugin",
+							"principal_id":   "plugin:com.powerx.plugins.demo",
+							"actions":        []interface{}{"subscribe"},
+						},
+					},
+				},
+			},
+		}
+
+		err := validateEventTopics(plugin, eventFabric)
+		if err == nil {
+			t.Fatal("expected missing plugin publish ACL error, got nil")
+		}
+		if !strings.Contains(err.Error(), "powerx.runtime.scheduler.triggered.v1") {
+			t.Fatalf("expected topic in error, got %q", err.Error())
+		}
+	})
 }

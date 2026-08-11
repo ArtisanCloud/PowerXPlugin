@@ -1,23 +1,96 @@
 exposure:
   channels:
-    - type: rest
-      capability: {{ .PluginID }}.template.create
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/resources
-      method: POST
-      auth: jwt
-      rbac: {{ .PluginID }}:template
-    - type: agent_tool
-      capability: {{ .PluginID }}.template.create
-      agent_tool_id: {{ .PluginID }}.template.create
-    - type: rest
+    - auth: jwt
       capability: {{ .PluginID }}.auth.me_context
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/admin/user/auth/me/context
       method: GET
-      auth: jwt
-      rbac: {{ .PluginID }}:template
-    - type: rest
-      capability: {{ .PluginID }}.auth.me_context
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/auth/me/context
-      method: GET
-      auth: jwt
-      rbac: {{ .PluginID }}:template
+      rbac: admin:read
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.batch_clone
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:create
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.create
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:create
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.delete
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:delete
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.list
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:read
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.prepare
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:read
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.publish
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:update
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.read
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:read
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.review
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:update
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.update
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:update
+      type: rest
+    - auth: jwt
+      capability: {{ .PluginID }}.template.validate
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: template:read
+      type: rest
+    - auth: workflow
+      capability: {{ .PluginID }}.template.compose
+      entrypoint: contracts/exposure/workflow/template-compose.json
+      type: workflow
+    - auth: toolgrant
+      capability: {{ .PluginID }}.template.compose
+      entrypoint: contracts/exposure/mcp-tools.json
+      type: agent_tool
+    - auth: workflow
+      capability: {{ .PluginID }}.template.audit
+      entrypoint: contracts/exposure/workflow/template-audit.json
+      type: workflow
+    - auth: toolgrant
+      capability: {{ .PluginID }}.template.audit
+      entrypoint: contracts/exposure/mcp-tools.json
+      type: agent_tool
+    - auth: workflow
+      capability: {{ .PluginID }}.template.quality_distribute
+      entrypoint: contracts/exposure/workflow/template-quality-distribute.json
+      type: workflow
+    - auth: toolgrant
+      capability: {{ .PluginID }}.template.quality_distribute
+      entrypoint: contracts/exposure/mcp-tools.json
+      type: agent_tool
+    - auth: workflow
+      capability: {{ .PluginID }}.template.quality_distribute
+      entrypoint: contracts/exposure/agent-streams/template-quality-distribute.yaml
+      type: agent_stream

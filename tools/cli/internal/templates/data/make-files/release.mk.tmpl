@@ -25,7 +25,7 @@ LOCAL_INSTALL_PXP_TMP ?= $(DIST_ROOT)/.pxp-unpack
 PACKAGE ?=
 
 .PHONY: package-pxp
-package-pxp: verify-manifest build frontend-build
+package-pxp: verify-manifest plugin-permission-declaration-check build frontend-build
 	@echo "[package] Staging artefacts in $(PACKAGE_VERSION_DIR)"
 	@rm -rf $(PACKAGE_VERSION_DIR)
 	@mkdir -p $(PACKAGE_META_DIR) $(PACKAGE_BACKEND_DIR) $(PACKAGE_FRONTEND_DIR)

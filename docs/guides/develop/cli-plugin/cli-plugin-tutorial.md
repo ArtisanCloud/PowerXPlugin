@@ -176,3 +176,19 @@ npm run dev
 - `docs/guides/publish/local-install.md`
 
 `local-install.md` 负责完整的 `dist/zip/.pxp` 与 `POST /admin/plugins/install/local` 流程。
+
+## 7) 权限声明检查
+
+新生成项目的 `plugin.yaml` 必须按 PowerX 权限声明规范维护顶层 `permissions[]`。详细规则见：
+
+- `docs/guides/plugin_release/permission_declaration.md`
+- PowerX Core 权威规范：`/private/var/www/html/ArtisanCloud/X/PowerX/Core/PowerX/docs/guides/plugin_release/permission_declaration.md`
+
+本地检查：
+
+```bash
+make plugin-permission-declaration-check
+make dist
+```
+
+`make dist` 会强制执行权限声明检查，页面 binding 没有覆盖菜单路径、binding path 写了 `/_p/<plugin_id>` 或 `/api/v1` 时都会失败。

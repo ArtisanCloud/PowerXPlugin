@@ -8,27 +8,27 @@ exposure:
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.batch_clone
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/batch-clone
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
       rbac: template:create
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.create
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
-      rbac: template:create
+      rbac: base.templates:create
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.delete
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}
-      method: DELETE
-      rbac: template:delete
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:delete
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.list
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates
-      method: GET
-      rbac: template:read
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:read
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.prepare
@@ -38,31 +38,31 @@ exposure:
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.publish
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}/publish
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
       rbac: template:update
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.read
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}
-      method: GET
-      rbac: template:read
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:read
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.review
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}/review
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
       rbac: template:update
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.update
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}
-      method: PUT
-      rbac: template:update
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
+      method: POST
+      rbac: base.templates:update
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.validate
-      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/templates/{id}/validate
+      entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
       rbac: template:read
       type: rest

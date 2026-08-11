@@ -289,6 +289,8 @@ mappings:
       - "Makefile"
       - ".gitignore"
       - "make-files/**/*"
+      - "scripts/manifest/**/*"
+      - "docs/guides/plugin_release/**/*"
     exclude:
       - "make-files/**/.DS_Store"
     targets:
@@ -300,6 +302,68 @@ mappings:
       - globs: ["make-files/build.mk"]
         literal: "PLUGIN_ID           ?= com.powerx.plugins.base"
         replace: "PLUGIN_ID           ?= {{ .PluginID }}"
+  - name: plugin-manifest
+    source: skeleton
+    include:
+      - "plugin.yaml"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["plugin.yaml"]
+        literal: "id: com.powerx.plugins.base"
+        replace: "id: {{ .PluginID }}"
+      - globs: ["plugin.yaml"]
+        literal: "name: PowerX Base Plugin"
+        replace: "name: {{ .PluginName }}"
+      - globs: ["plugin.yaml"]
+        literal: "version: 0.1.4"
+        replace: "version: {{ .Version }}"
+      - globs: ["plugin.yaml"]
+        literal: "PowerX Base Plugin"
+        replace: "{{ .PluginName }}"
+      - globs: ["plugin.yaml"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
+      - globs: ["plugin.yaml"]
+        literal: "com_powerx_plugins_base"
+        replace: "{{ .PluginDBName }}"
+      - globs: ["plugin.yaml"]
+        literal: "PowerX Base"
+        replace: "{{ .PluginName }}"
+  - name: plugin-catalogs
+    source: skeleton
+    include:
+      - "plugin.d/**/*"
+    exclude:
+      - "plugin.d/**/.DS_Store"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["plugin.d/**/*.yaml"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
+      - globs: ["plugin.d/**/*.yaml"]
+        literal: "com_powerx_plugins_base"
+        replace: "{{ .PluginDBName }}"
+  - name: event-fabric-config
+    source: skeleton
+    include:
+      - "config/event_fabric.yaml"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["config/event_fabric.yaml"]
+        literal: "plugin:com.powerx.plugins.base"
+        replace: "plugin:{{ .PluginID }}"
   - name: root-agents
     source: .
     include:

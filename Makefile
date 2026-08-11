@@ -11,6 +11,7 @@ help: ## Show available make targets
 	@echo "  skeleton-install   Install skeleton dist to PowerX host (API_BASE/TOKEN required)"
 	@echo "  skeleton-reinstall Disable -> force install -> switch version"
 	@echo "  plugin-yaml-check  One-shot plugin.yaml checks (id/capabilities/events)"
+	@echo "  plugin-permission-declaration-check  Check PowerX permissions/page/api bindings"
 	@echo "  manifest-align-fix Auto sync plugin.d catalogs from capabilities and verify mapping"
 	@echo "  manifest-align-check Strict check catalog drift/mapping for CI gate"
 	@echo "  dist               Alias of 'make -C skeleton dist'"
@@ -26,7 +27,7 @@ ci-agent-assets: ## Check .codex/.specify path normalization
 # Proxy common targets to skeleton/Makefile to unify entrypoints.
 .PHONY: test test-smoke test-regression test-cli-devwatch ci-all ci-backend ci-frontend \
         skeleton-dist skeleton-install skeleton-reinstall \
-        plugin-id-check plugin-yaml-check manifest-align-fix manifest-align-check \
+        plugin-id-check plugin-yaml-check plugin-permission-declaration-check manifest-align-fix manifest-align-check \
         dist dist-linux package pack package-pxp local-install local-install-run local-install-pxp release package-release \
         build-px-plugin \
         install-px-plugin \
@@ -47,6 +48,9 @@ plugin-id-check: ## Check plugin id naming & legacy prefix residues
 
 plugin-yaml-check: ## One-shot plugin.yaml checks (id/capabilities/events)
 	@$(MAKE) -C $(SKELETON_DIR) plugin-yaml-check BACKEND=$(BACKEND)
+
+plugin-permission-declaration-check: ## Check PowerX permissions/page/api bindings
+	@$(MAKE) -C $(SKELETON_DIR) plugin-permission-declaration-check BACKEND=$(BACKEND)
 
 manifest-align-fix: ## Auto sync plugin.d catalogs and verify capability mapping
 	@node .codex/skills/ci/manifest-align/scripts/manifest-align-check.mjs --fix

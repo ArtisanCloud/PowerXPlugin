@@ -287,7 +287,7 @@ func TestGetAgentEffectivePermissionsUsesSkillCapabilityRBAC(t *testing.T) {
 		authx.SetTenantContext(c, authx.TenantContext{
 			TenantUUID:  testTenantUUID,
 			UserID:      42,
-			Permissions: []string{"base.templates:create"},
+			Permissions: []string{"template:create"},
 		})
 		c.Next()
 	})
@@ -304,7 +304,7 @@ func TestGetAgentEffectivePermissionsUsesSkillCapabilityRBAC(t *testing.T) {
 	require.Contains(t, w.Body.String(), `"allowed":true`)
 	require.Contains(t, w.Body.String(), `"action":"delete"`)
 	require.Contains(t, w.Body.String(), `"deny_code":"permission_denied"`)
-	require.Contains(t, w.Body.String(), `"base.templates:create"`)
+	require.Contains(t, w.Body.String(), `"template:create"`)
 }
 
 func TestGetAgentEffectivePermissionsLooksUpAgentByGatewayTenantAndAuthorizesUserTenant(t *testing.T) {
@@ -346,7 +346,7 @@ func TestGetAgentEffectivePermissionsLooksUpAgentByGatewayTenantAndAuthorizesUse
 		authx.SetTenantContext(c, authx.TenantContext{
 			TenantUUID:  testOriginTenantUUID,
 			UserID:      42,
-			Permissions: []string{"base.templates:create"},
+			Permissions: []string{"template:create"},
 		})
 		c.Next()
 	})

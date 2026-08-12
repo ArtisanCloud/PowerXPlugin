@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -143,6 +144,8 @@ func (d *LocalDirectory) Login(ctx context.Context, req LoginRequest) (*AuthToke
 		Permissions:   perms,
 		DepartmentIDs: deptIDs,
 		PolicyVersion: d.policyVersion,
+		PermsHash:     permissionCodesHash(perms),
+		AuthzSource:   "local_mock",
 		PluginID:      d.pluginID,
 		IssuedAt:      time.Now(),
 	}
@@ -209,6 +212,8 @@ func (d *LocalDirectory) LoginByFederated(ctx context.Context, req FederatedLogi
 		Permissions:   perms,
 		DepartmentIDs: deptIDs,
 		PolicyVersion: d.policyVersion,
+		PermsHash:     permissionCodesHash(perms),
+		AuthzSource:   "local_mock",
 		PluginID:      d.pluginID,
 		IssuedAt:      time.Now(),
 	}
@@ -264,6 +269,8 @@ func (d *LocalDirectory) Refresh(ctx context.Context, refreshToken string) (*Aut
 		Permissions:   perms,
 		DepartmentIDs: deptIDs,
 		PolicyVersion: d.policyVersion,
+		PermsHash:     permissionCodesHash(perms),
+		AuthzSource:   "local_mock",
 		PluginID:      d.pluginID,
 		IssuedAt:      time.Now(),
 	}
@@ -426,6 +433,8 @@ func (d *LocalDirectory) UserContextFromToken(ctx context.Context, bearer string
 		Permissions:   claims.Permissions,
 		DepartmentIDs: deptIDs,
 		PolicyVersion: policyVersion,
+		PermsHash:     firstNonEmpty(claims.PermsHash, permissionCodesHash(claims.Permissions)),
+		AuthzSource:   firstNonEmpty(claims.AuthzSource, "local_mock"),
 		PluginID:      pluginID,
 		IssuedAt:      time.Now(),
 	}, nil
@@ -521,19 +530,22 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 	now := time.Now()
 	expires := now.Add(d.accessTTL)
 	claims := authx.PowerXClaims{
-		TenantUUID:    authx.TenantClaim(strings.TrimSpace(userCtx.TenantUUID)),
-		TenantID:      int64(userCtx.TenantID),
-		UserUUID:      strings.TrimSpace(userCtx.UserUUID),
-		UserID:        int64(userCtx.UserID),
-		MemberUUID:    strings.TrimSpace(userCtx.MemberUUID),
-		MemberID:      int64(userCtx.MemberID),
-		MemberIDAlias: int64(userCtx.MemberID),
-		IsRoot:        userCtx.IsRoot,
-		Roles:         userCtx.Roles,
-		Permissions:   userCtx.Permissions,
-		PolicyVersion: userCtx.PolicyVersion,
-		PluginID:      d.pluginID,
-		Scope:         "access",
+		TenantUUID:      authx.TenantClaim(strings.TrimSpace(userCtx.TenantUUID)),
+		TenantID:        int64(userCtx.TenantID),
+		UserUUID:        strings.TrimSpace(userCtx.UserUUID),
+		UserID:          int64(userCtx.UserID),
+		MemberUUID:      strings.TrimSpace(userCtx.MemberUUID),
+		MemberID:        int64(userCtx.MemberID),
+		MemberIDAlias:   int64(userCtx.MemberID),
+		IsRoot:          userCtx.IsRoot,
+		Roles:           userCtx.Roles,
+		Permissions:     userCtx.Permissions,
+		PermissionCodes: userCtx.Permissions,
+		PolicyVersion:   userCtx.PolicyVersion,
+		PermsHash:       firstNonEmpty(userCtx.PermsHash, permissionCodesHash(userCtx.Permissions)),
+		AuthzSource:     firstNonEmpty(userCtx.AuthzSource, "local_mock"),
+		PluginID:        d.pluginID,
+		Scope:           "access",
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    d.issuer,
 			Audience:  jwt.ClaimStrings{d.audience},
@@ -561,7 +573,22 @@ func (d *LocalDirectory) issueTokens(userCtx *UserContext) (*AuthTokens, error) 
 		TenantUUID:    strings.TrimSpace(userCtx.TenantUUID),
 		PluginID:      d.pluginID,
 		PolicyVersion: d.policyVersion,
+		PermsHash:     firstNonEmpty(userCtx.PermsHash, permissionCodesHash(userCtx.Permissions)),
+		AuthzSource:   firstNonEmpty(userCtx.AuthzSource, "local_mock"),
 	}, nil
+}
+
+func permissionCodesHash(codes []string) string {
+	normalized := make([]string, 0, len(codes))
+	for _, code := range codes {
+		code = strings.TrimSpace(strings.ToLower(code))
+		if code != "" {
+			normalized = append(normalized, code)
+		}
+	}
+	sort.Strings(normalized)
+	sum := sha256.Sum256([]byte(strings.Join(normalized, "\n")))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func (d *LocalDirectory) ensureIdentityUUIDs(ctx context.Context, user *iamm.User, member *iamm.Member) error {
@@ -699,23 +726,11 @@ func (d *LocalDirectory) formatPermissionCode(resource, action string) string {
 	if res == "" || act == "" {
 		return ""
 	}
-	// 保留通配符 “*” 作为全局资源，不要追加插件前缀，确保 `*:*` 仍能匹配所有权限。
-	if res != "*" {
-		plugID := strings.TrimSpace(d.pluginID)
-		if plugID != "" && !strings.Contains(res, ":") {
-			res = plugID + ":" + res
-		}
-	}
 	return res + ":" + act
 }
 
 func valueOrDefault(values ...string) string {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
+	return firstNonEmpty(values...)
 }
 
 func resolvePluginID() string {

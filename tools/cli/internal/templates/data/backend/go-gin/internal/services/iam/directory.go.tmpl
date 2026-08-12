@@ -46,6 +46,8 @@ type AuthTokens struct {
 	TenantUUID    string
 	PluginID      string
 	PolicyVersion string
+	PermsHash     string
+	AuthzSource   string
 }
 
 type UserContext struct {
@@ -67,6 +69,8 @@ type UserContext struct {
 	Permissions   []string
 	DepartmentIDs []uint64
 	PolicyVersion string
+	PermsHash     string
+	AuthzSource   string
 	PluginID      string
 	IssuedAt      time.Time
 }

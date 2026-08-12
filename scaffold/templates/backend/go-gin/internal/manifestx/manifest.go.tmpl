@@ -11,23 +11,6 @@ func Plugin() manifest.Plugin {
 		ID:      app.PluginID,
 		Name:    app.PluginName,
 		Version: app.PluginVersion,
-		Permissions: []string{
-			"iam.tenant.read",
-			"iam.tenant.write",
-			"iam.department.read",
-			"iam.department.write",
-			"iam.department.delete",
-			"iam.user.read",
-			"iam.user.write",
-			"iam.role.read",
-			"iam.role.write",
-			"iam.role.delete",
-			"iam.permission.read",
-			"iam.audit.read",
-			"iam.sts.mint",
-			"base.templates.read",
-			"base.templates.manage",
-		},
 		Menus: []manifest.Menu{
 			{
 				Path:  "/_p/{{ .PluginID }}/admin/templates/intro",

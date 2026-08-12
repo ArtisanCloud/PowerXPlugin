@@ -6,6 +6,8 @@
 
 如果生成项目不在同一台机器或没有 PowerX Core checkout，请以团队 PowerX Core 仓库中的同名文档为准。本文只说明当前插件项目如何按该规范修改 `plugin.yaml` 并通过本地检查。
 
+运行时 `manifestx.Plugin()` 只用于向 framework/router 层登记插件 ID、名称、版本和运行态菜单等基础信息，不是正式授权来源。正式权限只能来自有效 manifest 的 `permissions[]`；脚手架分片模式下就是 `plugin.d/rbac.yaml`。不得再在 `manifestx.Plugin().Permissions` 里维护旧三段式权限或另一套 `resource:action` 清单，framework 的 `manifest.Register()` 也不得用旧 runtime manifest permissions schema 阻断插件启动。
+
 ## 1. Manifest 分片布局
 
 当前生成项目默认使用分片 catalog：
@@ -34,18 +36,39 @@ catalog conflict on field "permissions" (catalog=rbac)
 - `type: menu`：插件菜单入口
 - `type: page`：插件后台页面访问权限
 
-示例使用 `com.powerx.plugins.hello-world` 作为插件 ID。权限码使用 DB-safe 前缀：
+示例使用 `com.powerx.plugins.hello-world` 作为插件 ID。插件 ID 只能作为 `plugin.yaml.id` 或 PowerX 侧 `source=plugin:<plugin_id>`，不能拼进 `permission_code/module/resource/action/menu_path`。
+
+所有权限类型都必须提供面向管理员的展示文案：
+
+- `type: menu` 必须有 `title_i18n` / `description_i18n`
+- `type: page` / `type: action` / `type: data` 必须有 `title_i18n` / `description_i18n`
+- `type: api` 必须有 `title_i18n` / `description_i18n`
+
+API 的 `permission_code`、HTTP `method/path`、`/_p/<plugin_id>`、`/api/v1` 只能作为技术辅助信息，不能作为 PowerX 角色权限页主标题或说明。插件 API 权限的正式来源是插件包有效 manifest 内的 `permissions[]`；使用 `catalogs.rbac` 时必须写在 `plugin.d/rbac.yaml`。
+
+权限码必须使用业务域 `module.resource:action`：
 
 ```yaml
 # plugin.d/rbac.yaml
-permission_code: com_powerx_plugins_hello_world.console:read
+permission_code: template.template:manage
+module: template
+resource: template
+action: manage
 ```
 
-不要把带中划线的插件 ID 直接写进权限码：
+不要把带中划线的插件 ID 或插件 ID 派生命名写进权限码：
 
 ```yaml
 permission_code: com.powerx.plugins.hello-world.console:read
+permission_code: com_powerx_plugins_hello_world.console:read
 ```
+
+菜单声明还必须和 `frontend.admin.menus` 做双向审计：
+
+- 菜单项只要声明 `required_policies`，每个值都必须命中已声明的 `type=menu.permission_code`。
+- 每个 `type=menu` 权限都必须被至少一个菜单项的 `required_policies` 引用；否则视为 invalid/orphan。
+- `type=menu.menu_path` 必须等于对应菜单项在 `frontend.admin.menus` 中的真实 `id` 祖先链。
+- `menu_path` 和菜单 `id` 都不能包含插件 ID、`/_p`、`/api/v1`、URL 或 API path 片段。
 
 API 授权键统一使用 `effective_permission_code`：
 
@@ -58,7 +81,33 @@ effective_permission_code =
 
 PowerX Gateway 预检、插件前端按钮判断和插件后端二次校验必须使用同一个 effective 权限。`*_api:*` 这类 raw API permission 默认只是接口 binding 的技术登记键，不作为业务动作授权键，除非该 API 显式 `independent: true`。
 
-## 3. page binding
+PowerX 角色权限页固定分两类视图：
+
+- 菜单权限：只展示 `type=menu`，按 `menu_path` 渲染菜单树。
+- 能力/API 权限：按“来源 -> 模块 -> 操作权限/API 权限”展示。第一层来源只能是 `PowerX 底座` 或具体插件，插件来源由 `plugin_id` / `iam_permission.source=plugin:<plugin_id>` 派生；`admin`、`settings`、`production` 等只能作为第二层 `module`，不能作为来源。`page/action/data` 归入操作权限，`api` 归入 API 权限。来源筛选必须是 `全部来源 / PowerX 底座 / 插件`，不能用“全部插件”同时显示底座权限。
+
+## 3. menu/page binding
+
+`type: menu` 必须声明菜单层级和联动页面权限：
+
+```yaml
+permissions:
+  - type: menu
+    permission_code: menu.console:view
+    module: console
+    menu_path:
+      - console
+    page_permission_codes:
+      - console.page:read
+    title_i18n:
+      zh-CN: 后台菜单
+      en: Admin menu
+    description_i18n:
+      zh-CN: 允许查看后台菜单入口。
+      en: Allows viewing admin menu entries.
+    risk_level: low
+    data_scope: tenant
+```
 
 `type: page` 必须有 GET `protocol_bindings`：
 
@@ -66,8 +115,10 @@ PowerX Gateway 预检、插件前端按钮判断和插件后端二次校验必�
 # plugin.d/rbac.yaml
 permissions:
   - type: page
-    permission_code: com_powerx_plugins_hello_world.console:read
-    module: com_powerx_plugins_hello_world
+    permission_code: console.page:read
+    module: console
+    resource: page
+    action: read
     title_i18n:
       zh-CN: Hello World 插件后台页面读取
       en: Read Hello World plugin admin pages
@@ -110,7 +161,7 @@ path: /v1/intro
 `type: api` 必须有 `protocol_bindings`，并且必须解析出 `effective_permission_code`：
 
 ```yaml
-business_permission_code: com_powerx_plugins_hello_world.template:create
+business_permission_code: template.template:create
 ```
 
 或：
@@ -123,15 +174,64 @@ independent: true
 
 | API 声明 | effective 权限 | 适用场景 |
 |---|---|---|
-| `permission_code=com_powerx_plugins_hello_world.template_api:create` + `business_permission_code=com_powerx_plugins_hello_world.template:create` | `com_powerx_plugins_hello_world.template:create` | API 只是业务动作的技术入口。 |
-| `permission_code=com_powerx_plugins_hello_world.audit_api:export` + `independent: true` | `com_powerx_plugins_hello_world.audit_api:export` | API 本身是独立授权边界。 |
-| `permission_code=com_powerx_plugins_hello_world.template_api:read` 且无 `business_permission_code`、无 `independent` | 无效声明 | 必须补 `business_permission_code` 或显式 `independent: true`。 |
+| `permission_code=template.template_api:create` + `business_permission_code=template.template:create` | `template.template:create` | API 只是业务动作的技术入口。 |
+| `permission_code=audit.audit_api:export` + `independent: true` | `audit.audit_api:export` | API 本身是独立授权边界。 |
+| `permission_code=template.template_api:read` 且无 `business_permission_code`、无 `independent` | 无效声明 | 必须补 `business_permission_code` 或显式 `independent: true`。 |
 
-如果 `business_permission_code` 非空，它必须引用同一 `permissions[]` 中已声明的 `type: action` 权限。即使同时写了 `independent: true`，effective 权限仍以 `business_permission_code` 为准。
+如果 `business_permission_code` 非空，它必须引用同一 `permissions[]` 中已声明的 `type: page/action/data` 操作权限。即使同时写了 `independent: true`，effective 权限仍以 `business_permission_code` 为准。
 
 API binding 的 path 同样写插件内部路径，不写 `/api/v1` 或 `/v1`。
 
+推荐写法：
+
+```yaml
+permissions:
+  - type: api
+    permission_code: template.template_api:create
+    business_permission_code: template.template:create
+    module: template
+    resource: template_api
+    action: create
+    title_i18n:
+      zh-CN: 创建模板接口
+      en: Create template API
+    description_i18n:
+      zh-CN: 允许调用创建模板接口。
+      en: Allows calling the create template API.
+    risk_level: medium
+    data_scope: tenant
+    protocol_bindings:
+      - channel: rest
+        method: POST
+        path: /templates
+        actor_context: admin_user
+        resource_scope: tenant
+```
+
+错误写法：
+
+```yaml
+title_i18n:
+  zh-CN: POST /templates
+description_i18n:
+  zh-CN: template.template_api:create
+```
+
+动态路径统一写 `*`，不得写 `{uuid}` 或 `:id`：
+
+```yaml
+path: /templates/*
+```
+
 旧 `rbac.resources` 和 `routes.permissions` 只服务插件本地 RBAC 或历史兼容，不能生成 PowerX Gateway 正式接口授权。只要 `plugin.d/rbac.yaml.routes.permissions` 中声明了某个 HTTP route，就必须有对应的 `type: api` + `protocol_bindings` 覆盖同一个 method/path。
+
+宿主安装期 discovery 接口不是用户业务 API，不能写入 `permissions[].protocol_bindings`：
+
+- `/plugin/skills`
+- `/plugin/skills/*`
+- `/plugin/skills/*/schema`
+
+PowerX 安装/启用插件时会先调用这些接口读取插件元数据和 Skill 描述，此时插件能力尚未完成登记，也不存在某个用户请求携带的 `permission_codes/policy_version/perms_hash` 授权快照。插件实现必须把这些 host discovery 路由和业务/管理 API 分组隔离：它们不走用户态 JWT/RBAC，也不能返回业务数据或执行业务动作。需要管理员操作的插件智能体管理接口，例如 `/plugin/agent-registry/*`，仍然是普通管理 API，必须声明 `type: api` 并按 `effective_permission_code` 校验。
 
 运行时合同入口和调试入口不能靠路径推断成业务权限：
 
@@ -188,14 +288,23 @@ make package-pxp
 - 有效 manifest 位置的 `permissions[]` 必须存在
 - 使用 `catalogs.rbac` 时，主 `plugin.yaml` 不能声明 `permissions`、`rbac`、`routes`
 - 每个权限声明必须有 `permission_code`、`module`、`title_i18n`、`description_i18n`、`risk_level`、`data_scope`
+- API 的 `title_i18n` / `description_i18n` 必须是用户可读文案，不能直接等于 `permission_code`、HTTP method/path、`/_p/<plugin_id>` 或 `/api/v1`
+- `permission_code/module/resource/action/menu_path` 不能包含插件 ID 或插件 ID 派生命名
+- `type: menu` 必须有非空 `menu_path` 和 `page_permission_codes`
+- `frontend.admin.menus[].required_policies` 必须引用已声明的 `type=menu.permission_code`
+- 每个 `type=menu` 必须被菜单引用，且 `menu_path` 必须等于菜单真实 `id` 祖先链
+- `type: page/action/api` 必须有 `module/resource/action`
+- `permission_code` 必须等于 `module.resource:action`
 - `type: page` 必须有 GET `protocol_bindings`
 - `type: api` 必须有 `protocol_bindings`
 - `type: api` 必须解析出 `effective_permission_code`
-- 非空 `business_permission_code` 必须引用已声明的 `type: action` 权限
+- 非空 `business_permission_code` 必须引用已声明的 `type: page/action/data` 操作权限
 - `business_permission_code` 为空时，只有 `independent: true` 才能使用 API 自身 `permission_code` 作为 effective 权限
 - `routes.permissions` 中的每个 method/path 必须被某个 `type: api` binding 覆盖
 - 同一个 API method/path 不能重复绑定到多个不同 effective 权限
 - binding path 不能包含 `/_p/<plugin_id>`、`/api/v1`、`/api`、`/v1`
+- binding path 动态段必须使用 `*`，不能使用 `{param}` 或 `:param`
+- binding path 不能声明宿主安装期 discovery 路由 `/plugin/skills/**`
 - 菜单页面必须被 page binding 覆盖
 - `plugin.d/events.yaml` 中声明 publish 的 topic，必须在 `config/event_fabric.yaml` 中给 `plugin:<plugin_id>` 授权 publish
 
@@ -231,7 +340,7 @@ curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 - 前端用于菜单、页面、按钮显隐。
 - 后端按接口 binding 解析出的 effective 权限用于敏感 API 二次校验。
-- local 和 delegated 模式输出同结构授权快照。
+- local 和 delegated 模式输出同结构授权快照，字段必须是 `permission_codes/policy_version/perms_hash/source`。
 - 不使用旧粗权限作为长期 alias。
 - delegated 模式仍必须加载显式 route permission 表，并按 PowerX 下发的授权快照和 effective 权限二次校验。
 - health、静态资源、runtime contract、debug/test-flow 入口必须显式排除或独立授权，不得靠路径推断。
@@ -241,12 +350,16 @@ curl -sS -H "Authorization: Bearer $ADMIN_TOKEN" \
 ```json
 {
   "permission_codes": [
-    "com_powerx_plugins_hello_world.console:read"
+    "console.page:read",
+    "template.template:manage"
   ],
   "policy_version": "2026-08-11T10:00:00Z",
-  "perms_hash": "sha256:..."
+  "perms_hash": "sha256:...",
+  "source": "signed_claims"
 }
 ```
+
+local 模式只能模拟 delegated 授权快照，`source` 必须是 `local_mock`，不得另维护一套正式授权定义。
 
 ## 8. 默认角色和回滚
 

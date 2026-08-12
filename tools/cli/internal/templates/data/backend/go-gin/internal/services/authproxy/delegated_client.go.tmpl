@@ -178,6 +178,8 @@ type loginResponse struct {
 	Scope         string `json:"scope"`
 	PluginID      string `json:"plugin_id,omitempty"`
 	PolicyVersion string `json:"policy_version,omitempty"`
+	PermsHash     string `json:"perms_hash,omitempty"`
+	AuthzSource   string `json:"source,omitempty"`
 }
 
 func (lr loginResponse) toTokens(refresh string) *iamservice.AuthTokens {
@@ -191,6 +193,8 @@ func (lr loginResponse) toTokens(refresh string) *iamservice.AuthTokens {
 		ExpiresAt:     expires,
 		PluginID:      lr.PluginID,
 		PolicyVersion: lr.PolicyVersion,
+		PermsHash:     lr.PermsHash,
+		AuthzSource:   lr.AuthzSource,
 	}
 }
 
@@ -356,6 +360,10 @@ type MeContext struct {
 	Members           []MeMemberBrief `json:"members"`
 	Roles             []string        `json:"roles,omitempty"`
 	Permissions       []string        `json:"permissions,omitempty"`
+	PermissionCodes   []string        `json:"permission_codes,omitempty"`
+	PolicyVersion     string          `json:"policy_version,omitempty"`
+	PermsHash         string          `json:"perms_hash,omitempty"`
+	Source            string          `json:"source,omitempty"`
 	Capabilities      any             `json:"capabilities,omitempty"`
 }
 

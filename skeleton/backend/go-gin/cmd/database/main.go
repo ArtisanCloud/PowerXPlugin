@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	// 加载配置
-	cfg, err := config.Load()
+	cfg, err := config.LoadForMigration()
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}

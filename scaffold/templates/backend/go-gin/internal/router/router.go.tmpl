@@ -191,6 +191,7 @@ func (r *Router) setupRoutes() {
 
 	// 使用 API 注册器注册所有路由（保持你现有的注册逻辑）
 	apiRegistry := http.NewRegistry(r.engine, r.deps)
+	apiRegistry.RegisterHostDiscoveryRoutes(r.engine.Group(prefix))
 
 	// API 分组 + 鉴权 + RBAC（Admin / Integration / Marketplace 等）
 	gProtected := r.engine.Group(prefix)
@@ -231,9 +232,6 @@ func (r *Router) GetEngine() *gin.Engine {
 // injectRBACFromRegistry 将各模块声明的 RBAC 合并到配置中。
 func (r *Router) injectRBACFromRegistry(rbacCfg *middleware.RBACConfig, reg *http.Registry) {
 	if rbacCfg == nil || reg == nil {
-		return
-	}
-	if rbacCfg.DelegateToPowerX {
 		return
 	}
 	for route, perm := range reg.RBACMap() {

@@ -16,19 +16,19 @@ exposure:
       capability: com.powerx.plugins.base.template.create
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
-      rbac: base.templates:create
+      rbac: template:create
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.delete
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
-      rbac: base.templates:delete
+      rbac: template:delete
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.list
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
-      rbac: base.templates:read
+      rbac: template:read
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.prepare
@@ -46,7 +46,7 @@ exposure:
       capability: com.powerx.plugins.base.template.read
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
-      rbac: base.templates:read
+      rbac: template:read
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.review
@@ -58,7 +58,7 @@ exposure:
       capability: com.powerx.plugins.base.template.update
       entrypoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/integration/capabilities/invoke
       method: POST
-      rbac: base.templates:update
+      rbac: template:update
       type: rest
     - auth: jwt
       capability: com.powerx.plugins.base.template.validate

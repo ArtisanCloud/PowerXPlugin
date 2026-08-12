@@ -539,7 +539,7 @@ func buildActionPermissionView(
 	view.RBACResource = resource
 	view.RBACActions = actions
 	view.RequiredPermissions = permissionNames(resource, actions)
-	view.PermissionCandidates = permissionCandidates(record.Descriptor.ID, resource, actions)
+	view.PermissionCandidates = permissionCandidates(resource, actions)
 	if resource == "" || len(actions) == 0 {
 		view.DenyCode = "capability_rbac_missing"
 		view.UnavailableReason = "capability rbac resource/actions are required"
@@ -554,7 +554,7 @@ func buildActionPermissionView(
 		return view
 	}
 	for _, rbacAction := range actions {
-		if hasAnyPermissionCandidate(tc.Permissions, record.Descriptor.ID, resource, rbacAction) {
+		if hasAnyPermissionCandidate(tc.Permissions, resource, rbacAction) {
 			view.Allowed = true
 			return view
 		}
@@ -674,45 +674,17 @@ func permissionNames(resource string, actions []string) []string {
 	return out
 }
 
-func permissionCandidates(capabilityID, resource string, actions []string) []string {
-	out := permissionNames(resource, actions)
-	capabilityPluginID := capabilityPluginID(capabilityID)
-	if capabilityPluginID == "" || strings.TrimSpace(resource) == "" {
-		return normalizeStrings(out)
-	}
-	for _, action := range actions {
-		action = strings.TrimSpace(action)
-		if action == "" {
-			continue
-		}
-		out = append(out, capabilityPluginID+":"+strings.TrimSpace(resource)+":"+action)
-	}
-	return normalizeStrings(out)
+func permissionCandidates(resource string, actions []string) []string {
+	return normalizeStrings(permissionNames(resource, actions))
 }
 
-func capabilityPluginID(capabilityID string) string {
-	capabilityID = strings.TrimSpace(capabilityID)
-	prefix := app.PluginID + "."
-	if strings.HasPrefix(capabilityID, prefix) {
-		return app.PluginID
-	}
-	return ""
-}
-
-func hasAnyPermissionCandidate(userPerms []string, capabilityID, resource, action string) bool {
+func hasAnyPermissionCandidate(userPerms []string, resource, action string) bool {
 	resource = strings.TrimSpace(resource)
 	action = strings.TrimSpace(action)
 	if resource == "" || action == "" {
 		return false
 	}
-	if authx.HasPerm(userPerms, authx.Permission{Resource: resource, Action: action}) {
-		return true
-	}
-	pluginID := capabilityPluginID(capabilityID)
-	if pluginID == "" {
-		return false
-	}
-	return authx.HasPerm(userPerms, authx.Permission{Resource: pluginID + ":" + resource, Action: action})
+	return authx.HasPerm(userPerms, authx.Permission{Resource: resource, Action: action})
 }
 
 func anyActionAllowed(actions []agentPermissionActionView) bool {

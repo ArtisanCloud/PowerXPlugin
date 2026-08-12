@@ -51,7 +51,6 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	agentapi.RegisterAPIRoutes(gApi, r.deps)
 	pluginagent.RegisterAPIRoutes(gApi, r.deps)
 	pluginagentregistry.RegisterAPIRoutes(gApi, r.deps)
-	pluginskills.RegisterAPIRoutes(gApi, r.deps)
 	templates.RegisterAPIRoutes(gApi, r.deps)
 	integrationapi.RegisterAPIRoutes(gApi, r.deps)
 	r.RegisterMarketplaceRoutes(gApi)
@@ -70,6 +69,14 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	r.mergeRBAC(templates.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(integrationRBACEntries(r.apiPrefix()))
 	r.mergeRBAC(marketplacePublicRBACEntries(r.apiPrefix()))
+}
+
+// RegisterHostDiscoveryRoutes registers host bootstrap/discovery endpoints that
+// PowerX calls during plugin installation before any tenant user auth snapshot
+// exists. These endpoints expose plugin metadata only; business/admin APIs stay
+// in RegisterAPIRoutes and remain protected by JWT + RBAC.
+func (r *Registry) RegisterHostDiscoveryRoutes(root *gin.RouterGroup) {
+	pluginskills.RegisterAPIRoutes(root, r.deps)
 }
 
 func (r *Registry) PrintRegisteredRoutes() {

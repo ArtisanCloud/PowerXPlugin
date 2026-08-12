@@ -139,16 +139,10 @@ func methodToAction(method string) string {
 	}
 }
 
-// NormalizePermission ensures permission resources follow plugin scope namespace.
+// NormalizePermission trims route permission fields. PowerX plugin permission
+// codes are business permissions and must not be prefixed with the plugin ID.
 func (cfg *RBACConfig) NormalizePermission(perm Permission) Permission {
 	perm.Resource = strings.TrimSpace(perm.Resource)
 	perm.Action = strings.TrimSpace(perm.Action)
-	if cfg == nil {
-		return perm
-	}
-	pluginID := strings.TrimSpace(cfg.PluginID)
-	if pluginID != "" && perm.Resource != "" && !strings.Contains(perm.Resource, ":") {
-		perm.Resource = pluginID + ":" + perm.Resource
-	}
 	return perm
 }

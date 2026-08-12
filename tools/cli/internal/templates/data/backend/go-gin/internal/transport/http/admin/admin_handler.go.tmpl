@@ -102,13 +102,13 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 						},
 					},
 				},
-				RequiredPermissions: []string{"base.templates:read"},
+				RequiredPermissions: []string{"template.template:read"},
 			},
 		},
 
 		Permissions: []contracts.PermissionConfig{
 			{
-				Resource:    "base.templates",
+				Resource:    "template.template",
 				Actions:     []string{"read", "create", "update", "delete"},
 				Description: "Template management permissions",
 			},
@@ -131,7 +131,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 					"base.template.create",
 					"base.template.query",
 				},
-				RequiredPermissions: []string{"base.templates:read"},
+				RequiredPermissions: []string{"template.template:read"},
 			},
 		},
 
@@ -144,7 +144,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 				Transport:    "http",
 				Endpoint:     "/api/v1/templates",
 				Method:       "POST",
-				RBACResource: "base.templates",
+				RBACResource: "template.template",
 				InputSchema: &contracts.JSONSchema{
 					Type: "object",
 					Properties: map[string]*contracts.JSONSchemaProperty{
@@ -194,7 +194,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 				Transport:    "http",
 				Endpoint:     "/api/v1/templates",
 				Method:       "GET",
-				RBACResource: "base.templates",
+				RBACResource: "template.template",
 				InputSchema: &contracts.JSONSchema{
 					Type: "object",
 					Properties: map[string]*contracts.JSONSchemaProperty{
@@ -289,7 +289,7 @@ func (h *AdminHandler) GetRBACInfo(c *gin.Context) {
 	rbacInfo := &contracts.RBACInfo{
 		Resources: []contracts.Resource{
 			{
-				Name:        "base.templates",
+				Name:        "template.template",
 				Description: "Base 模板管理",
 				Actions: []contracts.Action{
 					{Name: "read", Description: "查看模板"},
@@ -304,31 +304,31 @@ func (h *AdminHandler) GetRBACInfo(c *gin.Context) {
 				Name:        "base_master",
 				Description: "Base Master 角色",
 				Permissions: []string{
-					"base.templates:*",
+					"template.template:*",
 				},
 			},
 			{
 				Name:        "template_editor",
 				Description: "模板编辑角色",
 				Permissions: []string{
-					"base.templates:read",
-					"base.templates:create",
-					"base.templates:update",
+					"template.template:read",
+					"template.template:create",
+					"template.template:update",
 				},
 			},
 			{
 				Name:        "template_viewer",
 				Description: "模板查看角色",
 				Permissions: []string{
-					"base.templates:read",
+					"template.template:read",
 				},
 			},
 		},
 		Permissions: []contracts.Permission{
-			{Resource: "base.templates", Action: "read"},
-			{Resource: "base.templates", Action: "create"},
-			{Resource: "base.templates", Action: "update"},
-			{Resource: "base.templates", Action: "delete"},
+			{Resource: "template.template", Action: "read"},
+			{Resource: "template.template", Action: "create"},
+			{Resource: "template.template", Action: "update"},
+			{Resource: "template.template", Action: "delete"},
 		},
 	}
 

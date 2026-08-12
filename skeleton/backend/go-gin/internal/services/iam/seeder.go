@@ -380,7 +380,7 @@ func seedDefaultTenantUserRole(tx *gorm.DB, tenantUUID string) error {
 	}
 
 	permissions := []iamm.Permission{
-		{Resource: "base.templates", Action: "read", Description: "Read templates"},
+		{Resource: "template.template", Action: "read", Description: "Read templates"},
 		{Resource: "iam.department", Action: "read", Description: "Read IAM departments"},
 		{Resource: "iam.user", Action: "read", Description: "Read IAM users"},
 	}

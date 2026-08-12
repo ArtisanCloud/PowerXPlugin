@@ -9,6 +9,8 @@ const PERMISSION_CODE_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+:[a-z][a-z0
 const RISK_LEVELS = new Set(["low", "medium", "high", "critical"]);
 const DATA_SCOPES = new Set(["tenant", "global", "system"]);
 const API_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE"]);
+const PERMISSION_TYPES = new Set(["menu", "page", "action", "data", "api"]);
+const HOST_DISCOVERY_ROUTE_PREFIXES = ["/plugin/skills"];
 
 const args = process.argv.slice(2);
 const manifestArg = readArg("--manifest") ?? "plugin.yaml";
@@ -25,6 +27,7 @@ const manifest = loadManifest(manifestPath, repoRoot);
 const pluginId = String(manifest?.id ?? "");
 const permissionSource = loadPermissionSource(manifest, manifestPath, repoRoot);
 const permissions = permissionSource.permissions;
+const forbiddenPermissionFragments = buildForbiddenPermissionFragments(pluginId);
 
 if (!Array.isArray(permissions) || permissions.length === 0) {
   errors.push(`${permissionSource.label} must declare a non-empty permissions[] array`);
@@ -33,7 +36,12 @@ if (!Array.isArray(permissions) || permissions.length === 0) {
 const pageBindingPaths = new Set();
 const apiBindingKeys = new Set();
 const apiBindingEffectiveCodes = new Map();
-const actionPermissionCodes = collectPermissionCodesByType(permissions, "action");
+const pagePermissionCodes = collectPermissionCodesByType(permissions, "page");
+const menuPermissionCodes = collectPermissionCodesByType(permissions, "menu");
+const operationPermissionCodes = collectPermissionCodesByTypes(permissions, ["page", "action", "data"]);
+const menuPermissionPaths = new Map();
+
+validateDuplicatePermissionCodes(permissions);
 
 for (const [index, permission] of Array.isArray(permissions) ? permissions.entries() : []) {
   const label = `permissions[${index}]`;
@@ -44,23 +52,36 @@ for (const [index, permission] of Array.isArray(permissions) ? permissions.entri
   }
 
   const type = String(permission.type ?? "");
-  if (!["menu", "page", "action", "api"].includes(type)) {
-    errors.push(`${label}.type must be one of menu/page/action/api`);
+  if (!PERMISSION_TYPES.has(type)) {
+    errors.push(`${label}.type must be one of menu/page/action/data/api`);
   }
 
   validatePermissionBasics(permission, label);
 
+  if (type === "menu") {
+    validateMenuPermission(permission, label, pagePermissionCodes, menuPermissionPaths);
+  }
+
   if (type === "page") {
+    validateStructuredPermission(permission, label);
     validatePagePermission(permission, label, pageBindingPaths, pluginId);
   }
 
+  if (type === "action" || type === "data") {
+    validateStructuredPermission(permission, label);
+  }
+
   if (type === "api") {
-    validateApiPermission(permission, label, pluginId, apiBindingKeys, apiBindingEffectiveCodes, actionPermissionCodes);
+    validateStructuredPermission(permission, label);
+    validateApiPermission(permission, label, pluginId, apiBindingKeys, apiBindingEffectiveCodes, operationPermissionCodes);
+    validateApiDisplayI18n(permission, label);
   }
 }
 
-validateMenuCoverage(manifest, pageBindingPaths);
-validateRouteApiCoverage(permissionSource.catalog, apiBindingKeys);
+validateMenuCoverage(manifest, pageBindingPaths, menuPermissionCodes, menuPermissionPaths);
+validateRouteApiCoverage(permissionSource.catalog, apiBindingKeys, apiBindingEffectiveCodes);
+validateLegacyRBACResources(permissionSource.catalog);
+validateEventFabricPublishACL(manifest, manifestPath, repoRoot, pluginId);
 
 if (errors.length > 0) {
   fail(errors);
@@ -111,10 +132,12 @@ function validatePermissionBasics(permission, label) {
   if (!PERMISSION_CODE_PATTERN.test(code)) {
     errors.push(`${label}.permission_code must match ${PERMISSION_CODE_PATTERN}`);
   }
+  validateNoPluginIdentity(code, `${label}.permission_code`);
 
   if (!isNonEmptyString(permission.module)) {
     errors.push(`${label}.module must be a non-empty module name`);
   }
+  validateNoPluginIdentity(permission.module, `${label}.module`);
 
   if (!isNonEmptyI18n(permission.title_i18n)) {
     errors.push(`${label}.title_i18n must contain at least one non-empty locale string`);
@@ -135,6 +158,59 @@ function validatePermissionBasics(permission, label) {
 
   if (permission.default_role_grants !== undefined && !isStringArray(permission.default_role_grants)) {
     errors.push(`${label}.default_role_grants must be an array of role code strings when declared`);
+  }
+
+  if (permission.source !== undefined) {
+    errors.push(`${label}.source must not be declared by plugins; PowerX derives source from plugin_id / iam_permission.source`);
+  }
+}
+
+function validateMenuPermission(permission, label, pagePermissionCodes, menuPermissionPaths) {
+  if (!isNonEmptyStringArray(permission.menu_path)) {
+    errors.push(`${label} type=menu must declare menu_path as a non-empty string array`);
+  } else {
+    for (const [index, segment] of permission.menu_path.entries()) {
+      validateNoPluginIdentity(segment, `${label}.menu_path[${index}]`);
+      validateNoMenuPathReservedSegment(segment, `${label}.menu_path[${index}]`);
+      if (!/^[a-z][a-z0-9_]*$/.test(segment)) {
+        errors.push(`${label}.menu_path[${index}] must be a stable lowercase business key`);
+      }
+    }
+    const code = String(permission.permission_code ?? "").trim();
+    if (code) {
+      menuPermissionPaths.set(code, permission.menu_path.map((segment) => String(segment).trim()));
+    }
+  }
+
+  if (!isNonEmptyStringArray(permission.page_permission_codes)) {
+    errors.push(`${label} type=menu must declare page_permission_codes as a non-empty array of page permission_code strings`);
+  } else {
+    for (const [index, code] of permission.page_permission_codes.entries()) {
+      if (!pagePermissionCodes.has(code)) {
+        errors.push(`${label}.page_permission_codes[${index}] must reference a declared type=page permission_code: ${code}`);
+      }
+    }
+  }
+}
+
+function validateStructuredPermission(permission, label) {
+  for (const field of ["resource", "action"]) {
+    if (!isNonEmptyString(permission[field])) {
+      errors.push(`${label}.${field} must be declared for type=${permission.type}`);
+      continue;
+    }
+    validateNoPluginIdentity(permission[field], `${label}.${field}`);
+    if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/.test(String(permission[field]))) {
+      errors.push(`${label}.${field} must be a lowercase business key`);
+    }
+  }
+
+  const parsed = splitPermissionCode(permission.permission_code);
+  if (!parsed) return;
+  const expectedLeft = `${String(permission.module ?? "").trim()}.${String(permission.resource ?? "").trim()}`;
+  const expected = `${expectedLeft}:${String(permission.action ?? "").trim()}`;
+  if (permission.permission_code !== expected) {
+    errors.push(`${label}.permission_code must equal module.resource:action (${expected})`);
   }
 }
 
@@ -158,14 +234,14 @@ function validatePagePermission(permission, label, pageBindingPaths, pluginId) {
   }
 }
 
-function validateApiPermission(permission, label, pluginId, apiBindingKeys, apiBindingEffectiveCodes, actionPermissionCodes) {
+function validateApiPermission(permission, label, pluginId, apiBindingKeys, apiBindingEffectiveCodes, operationPermissionCodes) {
   const bindings = permission.protocol_bindings;
   if (!Array.isArray(bindings) || bindings.length === 0) {
     errors.push(`${label} type=api must declare non-empty protocol_bindings[]`);
     return;
   }
 
-  const effectivePermissionCode = resolveEffectivePermissionCode(permission, label, actionPermissionCodes);
+  const effectivePermissionCode = resolveEffectivePermissionCode(permission, label, operationPermissionCodes);
 
   for (const [index, binding] of bindings.entries()) {
     const bindingLabel = `${label}.protocol_bindings[${index}]`;
@@ -190,17 +266,55 @@ function validateApiPermission(permission, label, pluginId, apiBindingKeys, apiB
   }
 }
 
-function resolveEffectivePermissionCode(permission, label, actionPermissionCodes) {
+function validateApiDisplayI18n(permission, label) {
+  const code = String(permission.permission_code ?? "").trim();
+  const technicalValues = [
+    code,
+    `/_p/${pluginId}`,
+    "/_p/",
+    "/api/v1",
+  ].filter(Boolean);
+
+  const bindings = Array.isArray(permission.protocol_bindings) ? permission.protocol_bindings : [];
+  for (const binding of bindings) {
+    const method = String(binding?.method ?? "").trim().toUpperCase();
+    const bindingPath = normalizePath(binding?.path);
+    if (bindingPath) {
+      technicalValues.push(bindingPath);
+      if (method) {
+        technicalValues.push(`${method} ${bindingPath}`);
+      }
+    }
+  }
+
+  for (const field of ["title_i18n", "description_i18n"]) {
+    for (const [locale, value] of i18nEntries(permission[field])) {
+      const normalized = value.trim();
+      if (!normalized) continue;
+      for (const technicalValue of technicalValues) {
+        if (normalized === technicalValue) {
+          errors.push(`${label}.${field}.${locale} must be user-readable copy, not technical API metadata: ${technicalValue}`);
+        }
+      }
+    }
+  }
+}
+
+function resolveEffectivePermissionCode(permission, label, operationPermissionCodes) {
   const businessCode = String(permission.business_permission_code ?? "").trim();
   if (businessCode !== "") {
+    if (permission.independent === true) {
+      errors.push(`${label} type=api must not declare independent: true when business_permission_code is set`);
+    }
     if (!PERMISSION_CODE_PATTERN.test(businessCode)) {
       errors.push(`${label}.business_permission_code must match ${PERMISSION_CODE_PATTERN}`);
       return "";
     }
-    if (!actionPermissionCodes.has(businessCode)) {
-      errors.push(`${label}.business_permission_code must reference a declared type=action permission_code: ${businessCode}`);
+    if (!operationPermissionCodes.has(businessCode)) {
+      errors.push(`${label}.business_permission_code must reference a declared type=page/action/data permission_code: ${businessCode}`);
       return "";
     }
+    validateNoPluginIdentity(businessCode, `${label}.business_permission_code`);
     return businessCode;
   }
 
@@ -265,18 +379,47 @@ function validateBindingPath(rawPath, label, pluginId) {
       return;
     }
   }
+
+  if (/[{][^/{}]+[}]/.test(bindingPath) || /(^|\/):[^/]+/.test(bindingPath)) {
+    errors.push(`${label}.path must use '*' for dynamic segments, not '{param}' or ':param': ${bindingPath}`);
+  }
+
+  if (isHostDiscoveryRoute(bindingPath)) {
+    errors.push(`${label}.path must not declare host discovery route ${bindingPath}; PowerX calls these during install before user authorization snapshots exist`);
+  }
 }
 
-function validateMenuCoverage(manifest, pageBindingPaths) {
-  const menuPaths = collectMenuPaths(manifest?.frontend?.admin?.menus ?? []);
-  for (const menuPath of menuPaths) {
-    if (!pageBindingPaths.has(menuPath)) {
-      errors.push(`frontend.admin.menus path is not covered by a type=page permission binding: ${menuPath}`);
+function validateMenuCoverage(manifest, pageBindingPaths, menuPermissionCodes, menuPermissionPaths) {
+  const menuItems = collectMenuItems(manifest?.frontend?.admin?.menus ?? []);
+  const referencedMenuPermissionCodes = new Set();
+
+  for (const item of menuItems) {
+    if (item.pagePath && !pageBindingPaths.has(item.pagePath)) {
+      errors.push(`frontend.admin.menus path is not covered by a type=page permission binding: ${item.pagePath}`);
+    }
+
+    for (const [index, policy] of item.requiredPolicies.entries()) {
+      if (!menuPermissionCodes.has(policy)) {
+        errors.push(`frontend.admin.menus required_policies[${index}] references no declared type=menu permission: ${policy} (menu_path=${item.idPath.join("/") || "<root>"})`);
+        continue;
+      }
+      referencedMenuPermissionCodes.add(policy);
+      const expectedPath = item.idPath;
+      const actualPath = menuPermissionPaths.get(policy) ?? [];
+      if (!sameStringArray(actualPath, expectedPath)) {
+        errors.push(`type=menu permission ${policy} menu_path mismatch: expected ${expectedPath.join("/")}, got ${actualPath.join("/") || "<empty>"}`);
+      }
+    }
+  }
+
+  for (const code of menuPermissionCodes) {
+    if (!referencedMenuPermissionCodes.has(code)) {
+      errors.push(`type=menu permission is not referenced by any frontend.admin.menus required_policies: ${code}`);
     }
   }
 }
 
-function validateRouteApiCoverage(catalog, apiBindingKeys) {
+function validateRouteApiCoverage(catalog, apiBindingKeys, apiBindingEffectiveCodes) {
   const routePermissions = catalog?.routes?.permissions;
   if (!Array.isArray(routePermissions) || routePermissions.length === 0) return;
 
@@ -297,23 +440,107 @@ function validateRouteApiCoverage(catalog, apiBindingKeys) {
       errors.push(`${label}.path must be an absolute path`);
       continue;
     }
-    if (!apiBindingKeys.has(routeBindingKey(method, routePath))) {
+    validateBindingPath(route.path, label, pluginId);
+    const key = routeBindingKey(method, routePath);
+    if (!apiBindingKeys.has(key)) {
       errors.push(`${label} ${method} ${routePath} must be covered by a type=api protocol_binding; routes.permissions does not register PowerX Gateway permissions`);
+      continue;
+    }
+    const routePermission = permissionFromRouteEntry(route);
+    const effectiveCode = apiBindingEffectiveCodes.get(key);
+    if (routePermission && effectiveCode && routePermission !== effectiveCode) {
+      errors.push(`${label} ${method} ${routePath} must map to effective_permission_code ${effectiveCode}, got ${routePermission}`);
     }
   }
 }
 
-function collectMenuPaths(menus) {
-  const result = new Set();
-  const visit = (items) => {
+function validateLegacyRBACResources(catalog) {
+  const resources = catalog?.rbac?.resources;
+  if (!Array.isArray(resources)) return;
+  for (const [index, entry] of resources.entries()) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    validateNoPluginIdentity(entry.resource, `rbac.resources[${index}].resource`);
+  }
+}
+
+function validateEventFabricPublishACL(manifest, manifestPath, repoRoot, pluginId) {
+  const eventsCatalogPath = String(manifest?.catalogs?.events ?? "").trim();
+  if (!eventsCatalogPath) return;
+
+  const eventsPath = resolveManifestRelativePath(manifestPath, eventsCatalogPath);
+  if (!fs.existsSync(eventsPath)) return;
+
+  const eventsCatalog = loadManifest(eventsPath, repoRoot);
+  const publishTopics = new Set();
+  const topics = eventsCatalog?.events?.topics;
+  if (!Array.isArray(topics)) return;
+
+  for (const topic of topics) {
+    if (!topic || typeof topic !== "object" || Array.isArray(topic)) continue;
+    const key = String(topic.key ?? "").trim();
+    const actions = Array.isArray(topic.actions) ? topic.actions.map((action) => String(action).trim().toLowerCase()) : [];
+    if (key && actions.includes("publish")) {
+      publishTopics.add(key);
+    }
+  }
+  if (publishTopics.size === 0) return;
+
+  const fabricPath = path.resolve(path.dirname(manifestPath), "config/event_fabric.yaml");
+  if (!fs.existsSync(fabricPath)) {
+    errors.push(`config/event_fabric.yaml is required because ${eventsCatalogPath} declares publish topics`);
+    return;
+  }
+
+  const fabric = loadManifest(fabricPath, repoRoot);
+  const fabricTopics = new Map();
+  for (const topic of Array.isArray(fabric?.topics) ? fabric.topics : []) {
+    if (!topic || typeof topic !== "object" || Array.isArray(topic)) continue;
+    const key = String(topic.key ?? "").trim();
+    if (key) fabricTopics.set(key, topic);
+  }
+
+  const pluginPrincipal = `plugin:${pluginId}`;
+  for (const topicKey of publishTopics) {
+    const topic = fabricTopics.get(topicKey);
+    if (!topic) {
+      errors.push(`event_fabric topic missing for publish topic: ${topicKey}`);
+      continue;
+    }
+    const acl = Array.isArray(topic.acl) ? topic.acl : [];
+    const hasPluginPublish = acl.some((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+      const principalType = String(entry.principal_type ?? "").trim();
+      const principalID = String(entry.principal_id ?? "").trim();
+      const actions = Array.isArray(entry.actions) ? entry.actions.map((action) => String(action).trim().toLowerCase()) : [];
+      return principalType === "plugin" && principalID === pluginPrincipal && actions.includes("publish");
+    });
+    if (!hasPluginPublish) {
+      errors.push(`event_fabric topic ${topicKey} must grant plugin principal ${pluginPrincipal} publish`);
+    }
+  }
+}
+
+function collectMenuItems(menus) {
+  const result = [];
+  const visit = (items, ancestors = []) => {
     if (!Array.isArray(items)) return;
     for (const item of items) {
       if (!item || typeof item !== "object") continue;
-      const menuPath = normalizePath(item.path);
-      if (menuPath && shouldRequirePageBinding(menuPath)) {
-        result.add(menuPath);
+      const id = String(item.id ?? "").trim();
+      if (id) {
+        validateMenuItemID(id, "frontend.admin.menus[].id");
       }
-      visit(item.children);
+      const idPath = id ? [...ancestors, id] : [...ancestors];
+      const menuPath = normalizePath(item.path);
+      const requiredPolicies = Array.isArray(item.required_policies)
+        ? item.required_policies.map((policy) => String(policy).trim()).filter(Boolean)
+        : [];
+      if (menuPath && shouldRequirePageBinding(menuPath)) {
+        result.push({ idPath, pagePath: menuPath, requiredPolicies });
+      } else if (requiredPolicies.length > 0) {
+        result.push({ idPath, pagePath: "", requiredPolicies });
+      }
+      visit(item.children, idPath);
     }
   };
   visit(menus);
@@ -359,13 +586,31 @@ function pathHasPrefix(targetPath, prefix) {
   return targetPath === normalizedPrefix || targetPath.startsWith(`${normalizedPrefix}/`);
 }
 
+function isHostDiscoveryRoute(targetPath) {
+  return HOST_DISCOVERY_ROUTE_PREFIXES.some((prefix) => pathHasPrefix(targetPath, prefix));
+}
+
 function routeBindingKey(method, routePath) {
   return `${String(method).toUpperCase()} ${normalizePath(routePath)}`;
+}
+
+function permissionFromRouteEntry(route) {
+  const resource = String(route?.resource ?? "").trim();
+  const action = String(route?.action ?? "").trim();
+  if (!resource || !action) return "";
+  validateNoPluginIdentity(resource, "routes.permissions[].resource");
+  validateNoPluginIdentity(action, "routes.permissions[].action");
+  return `${resource}:${action}`;
 }
 
 function isNonEmptyI18n(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   return Object.values(value).some((entry) => typeof entry === "string" && entry.trim().length > 0);
+}
+
+function i18nEntries(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  return Object.entries(value).filter(([, entry]) => typeof entry === "string");
 }
 
 function isNonEmptyString(value) {
@@ -374,6 +619,22 @@ function isNonEmptyString(value) {
 
 function isStringArray(value) {
   return Array.isArray(value) && value.every((entry) => isNonEmptyString(entry));
+}
+
+function isNonEmptyStringArray(value) {
+  return isStringArray(value) && value.length > 0;
+}
+
+function validateDuplicatePermissionCodes(permissions) {
+  const seen = new Set();
+  for (const [index, permission] of Array.isArray(permissions) ? permissions.entries() : []) {
+    const code = String(permission?.permission_code ?? "").trim();
+    if (!code) continue;
+    if (seen.has(code)) {
+      errors.push(`permissions[${index}].permission_code duplicates another declaration: ${code}`);
+    }
+    seen.add(code);
+  }
 }
 
 function collectPermissionCodesByType(permissions, type) {
@@ -388,6 +649,76 @@ function collectPermissionCodesByType(permissions, type) {
     }
   }
   return codes;
+}
+
+function collectPermissionCodesByTypes(permissions, types) {
+  const wanted = new Set(types);
+  const codes = new Set();
+  if (!Array.isArray(permissions)) return codes;
+  for (const permission of permissions) {
+    if (!permission || typeof permission !== "object" || Array.isArray(permission)) continue;
+    if (!wanted.has(String(permission.type ?? ""))) continue;
+    const code = String(permission.permission_code ?? "").trim();
+    if (code) {
+      codes.add(code);
+    }
+  }
+  return codes;
+}
+
+function splitPermissionCode(code) {
+  const raw = String(code ?? "").trim();
+  const match = raw.match(/^(.+):([^:]+)$/);
+  if (!match) return null;
+  return { left: match[1], action: match[2] };
+}
+
+function buildForbiddenPermissionFragments(pluginId) {
+  const fragments = new Set();
+  const raw = String(pluginId ?? "").trim();
+  if (raw) {
+    fragments.add(raw.toLowerCase());
+    fragments.add(raw.replace(/[-.]/g, "_").toLowerCase());
+  }
+  fragments.add("com.powerx.plugins.base");
+  fragments.add("com_powerx_plugins_base");
+  return Array.from(fragments).filter(Boolean);
+}
+
+function validateNoPluginIdentity(value, label) {
+  if (value === undefined || value === null) return;
+  const raw = String(value).trim().toLowerCase();
+  if (!raw) return;
+  for (const fragment of forbiddenPermissionFragments) {
+    if (raw.includes(fragment)) {
+      errors.push(`${label} must not include plugin id or plugin-derived namespace: ${value}`);
+      return;
+    }
+  }
+}
+
+function validateNoMenuPathReservedSegment(value, label) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return;
+  if (raw === "apps" || raw === "_p" || raw === "api" || raw === "api_v1" || raw === "v1") {
+    errors.push(`${label} must not include APPS, _p, API path, or host route segments: ${value}`);
+  }
+  if (raw.includes("/") || raw.includes(":")) {
+    errors.push(`${label} must be a menu key, not a URL or API path segment: ${value}`);
+  }
+}
+
+function validateMenuItemID(value, label) {
+  validateNoPluginIdentity(value, label);
+  validateNoMenuPathReservedSegment(value, label);
+  if (!/^[a-z][a-z0-9_]*$/.test(String(value ?? ""))) {
+    errors.push(`${label} must be a stable lowercase business key: ${value}`);
+  }
+}
+
+function sameStringArray(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
 }
 
 function loadManifest(filePath, rootDir) {

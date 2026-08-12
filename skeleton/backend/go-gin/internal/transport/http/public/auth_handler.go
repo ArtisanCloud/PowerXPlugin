@@ -331,7 +331,8 @@ func mapDelegatedMeContext(ctx *authproxy.MeContext) gin.H {
 			break
 		}
 	}
-	manageByPermission := hasPermission(ctx.Permissions, "base.templates.manage")
+	permissionCodes := delegatedPermissionCodes(ctx)
+	manageByPermission := hasPermission(permissionCodes, "template.template:manage")
 	manageAllowed := ctx.IsRoot || memberAdmin || manageByPermission
 	capabilities := gin.H{
 		"templates": gin.H{
@@ -352,9 +353,23 @@ func mapDelegatedMeContext(ctx *authproxy.MeContext) gin.H {
 		"user":                ctx.User,
 		"members":             ctx.Members,
 		"roles":               ctx.Roles,
-		"permissions":         ctx.Permissions,
+		"permissions":         permissionCodes,
+		"permission_codes":    permissionCodes,
+		"policy_version":      ctx.PolicyVersion,
+		"perms_hash":          strings.TrimSpace(ctx.PermsHash),
+		"source":              strings.TrimSpace(ctx.Source),
 		"capabilities":        capabilities,
 	}
+}
+
+func delegatedPermissionCodes(ctx *authproxy.MeContext) []string {
+	if ctx == nil {
+		return nil
+	}
+	if len(ctx.PermissionCodes) > 0 {
+		return ctx.PermissionCodes
+	}
+	return ctx.Permissions
 }
 
 func (h *AuthHandler) handleLocalLogin(c *gin.Context) {
@@ -486,14 +501,17 @@ func mapUserContext(uc *iamservice.UserContext) gin.H {
 			"display_name": uc.DisplayName,
 			"is_root":      uc.IsRoot,
 		},
-		"roles":          uc.Roles,
-		"permissions":    uc.Permissions,
-		"policy_version": uc.PolicyVersion,
+		"roles":            uc.Roles,
+		"permissions":      uc.Permissions,
+		"permission_codes": uc.Permissions,
+		"policy_version":   uc.PolicyVersion,
+		"perms_hash":       strings.TrimSpace(uc.PermsHash),
+		"source":           strings.TrimSpace(uc.AuthzSource),
 		"capabilities": gin.H{
 			"templates": gin.H{
-				"can_create": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "base.templates.manage"),
-				"can_update": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "base.templates.manage"),
-				"can_delete": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "base.templates.manage"),
+				"can_create": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "template.template:manage"),
+				"can_update": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "template.template:manage"),
+				"can_delete": uc.IsRoot || hasAdminRole(uc.Roles) || hasPermission(uc.Permissions, "template.template:manage"),
 			},
 		},
 	}
@@ -570,6 +588,8 @@ func mapTokens(tokens *iamservice.AuthTokens) gin.H {
 		"tenant_uuid":         strings.TrimSpace(tokens.TenantUUID),
 		"current_tenant_uuid": strings.TrimSpace(tokens.TenantUUID),
 		"policy_version":      tokens.PolicyVersion,
+		"perms_hash":          strings.TrimSpace(tokens.PermsHash),
+		"source":              strings.TrimSpace(tokens.AuthzSource),
 		"plugin_id":           tokens.PluginID,
 	}
 }

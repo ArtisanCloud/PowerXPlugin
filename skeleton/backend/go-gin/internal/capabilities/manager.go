@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -623,17 +622,31 @@ func resolveManifestPath() string {
 		filepath.Join(cwd, "..", "plugin.yaml"),
 		filepath.Join(cwd, "..", "..", "plugin.yaml"),
 	}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		dir := filepath.Dir(file)
-		candidates = append(candidates,
-			filepath.Join(dir, "..", "..", "..", "..", "plugin.yaml"),
-			filepath.Join(dir, "..", "..", "..", "..", "..", "plugin.yaml"),
-		)
-	}
 	for _, cand := range candidates {
 		if info, err := os.Stat(cand); err == nil && !info.IsDir() {
 			return cand
 		}
+	}
+	if exe, err := os.Executable(); err == nil {
+		if found := findManifestFrom(filepath.Dir(exe)); found != "" {
+			return found
+		}
+	}
+	return ""
+}
+
+func findManifestFrom(start string) string {
+	current := filepath.Clean(start)
+	for i := 0; i < 8; i++ {
+		candidate := filepath.Join(current, "plugin.yaml")
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
 	}
 	return ""
 }
@@ -836,20 +849,16 @@ func resolveCatalogFilePath(pathValue string) (string, string) {
 		return base, ""
 	}
 
-	candidates := make([]string, 0, 8)
+	candidates := make([]string, 0, 3)
 	if manifestPath := resolveManifestPath(); manifestPath != "" {
 		manifestDir := filepath.Dir(manifestPath)
 		candidates = append(candidates,
 			filepath.Join(manifestDir, "capabilities", "catalog.json"),
-			filepath.Join(manifestDir, "..", "capabilities", "catalog.json"),
 		)
 	}
 	if cwd != "" {
 		candidates = append(candidates,
-			filepath.Join(cwd, "skeleton", "capabilities", "catalog.json"),
 			filepath.Join(cwd, "..", "capabilities", "catalog.json"),
-			filepath.Join(cwd, "..", "..", "capabilities", "catalog.json"),
-			filepath.Join(cwd, "..", "..", "..", "capabilities", "catalog.json"),
 		)
 	}
 

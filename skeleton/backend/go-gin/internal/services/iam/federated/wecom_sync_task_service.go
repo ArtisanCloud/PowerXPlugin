@@ -1007,7 +1007,7 @@ func (s *WeComSyncTaskService) ensureTenantUserRole(tx *gorm.DB, tenantUUID stri
 	}
 
 	permissions := []model.Permission{
-		{Resource: "base.templates", Action: "read", Description: "Read templates"},
+		{Resource: "template.template", Action: "read", Description: "Read templates"},
 		{Resource: "iam.department", Action: "read", Description: "Read IAM departments"},
 		{Resource: "iam.user", Action: "read", Description: "Read IAM users"},
 	}

@@ -27,19 +27,22 @@ type JWTAuthConfig struct {
 }
 
 type PowerXClaims struct {
-	TenantUUID    TenantClaim `json:"tid"`
-	TenantID      int64       `json:"tid_n,omitempty"`
-	UserUUID      string      `json:"uid,omitempty"`
-	UserID        int64       `json:"uid_n,omitempty"`
-	MemberUUID    string      `json:"mid,omitempty"`
-	MemberID      int64       `json:"mid_n,omitempty"`
-	MemberIDAlias int64       `json:"member_id,omitempty"`
-	IsRoot        bool        `json:"is_root"`
-	Roles         []string    `json:"roles"`
-	Permissions   []string    `json:"perms"`
-	PolicyVersion string      `json:"policy_version"`
-	PluginID      string      `json:"plugin_id,omitempty"`
-	Scope         string      `json:"scope,omitempty"`
+	TenantUUID      TenantClaim `json:"tid"`
+	TenantID        int64       `json:"tid_n,omitempty"`
+	UserUUID        string      `json:"uid,omitempty"`
+	UserID          int64       `json:"uid_n,omitempty"`
+	MemberUUID      string      `json:"mid,omitempty"`
+	MemberID        int64       `json:"mid_n,omitempty"`
+	MemberIDAlias   int64       `json:"member_id,omitempty"`
+	IsRoot          bool        `json:"is_root"`
+	Roles           []string    `json:"roles"`
+	Permissions     []string    `json:"perms"`
+	PermissionCodes []string    `json:"permission_codes"`
+	PolicyVersion   string      `json:"policy_version"`
+	PermsHash       string      `json:"perms_hash"`
+	AuthzSource     string      `json:"source"`
+	PluginID        string      `json:"plugin_id,omitempty"`
+	Scope           string      `json:"scope,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -73,19 +76,23 @@ func (t TenantClaim) String() string {
 
 func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		TenantUUID    TenantClaim `json:"tid"`
-		TenantID      any         `json:"tid_n"`
-		UserID        any         `json:"uid"`
-		UserIDNumeric any         `json:"uid_n"`
-		MemberID      any         `json:"mid"`
-		MemberIDNum   any         `json:"mid_n"`
-		MemberIDAlias any         `json:"member_id"`
-		IsRoot        bool        `json:"is_root"`
-		Roles         []string    `json:"roles"`
-		Permissions   []string    `json:"perms"`
-		PolicyVersion string      `json:"policy_version"`
-		PluginID      string      `json:"plugin_id,omitempty"`
-		Scope         string      `json:"scope,omitempty"`
+		TenantUUID      TenantClaim `json:"tid"`
+		TenantID        any         `json:"tid_n"`
+		UserID          any         `json:"uid"`
+		UserIDNumeric   any         `json:"uid_n"`
+		MemberID        any         `json:"mid"`
+		MemberIDNum     any         `json:"mid_n"`
+		MemberIDAlias   any         `json:"member_id"`
+		IsRoot          bool        `json:"is_root"`
+		Roles           []string    `json:"roles"`
+		Permissions     []string    `json:"perms"`
+		PermissionCodes []string    `json:"permission_codes"`
+		PolicyVersion   string      `json:"policy_version"`
+		PermsHash       string      `json:"perms_hash"`
+		AuthzSource     string      `json:"source"`
+		AuthzSourceAlt  string      `json:"authz_source"`
+		PluginID        string      `json:"plugin_id,omitempty"`
+		Scope           string      `json:"scope,omitempty"`
 		jwt.RegisteredClaims
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -124,8 +131,14 @@ func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
 	c.MemberIDAlias = memberID
 	c.IsRoot = raw.IsRoot
 	c.Roles = raw.Roles
-	c.Permissions = raw.Permissions
+	c.PermissionCodes = raw.PermissionCodes
+	c.Permissions = raw.PermissionCodes
+	if len(c.Permissions) == 0 {
+		c.Permissions = raw.Permissions
+	}
 	c.PolicyVersion = raw.PolicyVersion
+	c.PermsHash = raw.PermsHash
+	c.AuthzSource = firstNonEmpty(raw.AuthzSource, raw.AuthzSourceAlt)
 	c.PluginID = raw.PluginID
 	c.Scope = raw.Scope
 	c.RegisteredClaims = raw.RegisteredClaims
@@ -206,6 +219,10 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 	if err != nil || token == nil || !token.Valid {
 		return TenantContext{}, errors.New("invalid token")
 	}
+	authzSource := strings.TrimSpace(claims.AuthzSource)
+	if authzSource == "" && hasDelegatedAuthzSnapshot(claims.PermissionCodes, claims.PolicyVersion, claims.PermsHash) {
+		authzSource = "signed_claims"
+	}
 	return TenantContext{
 		TenantUUID:    strings.TrimSpace(claims.TenantUUID.String()),
 		TenantID:      claims.TenantID,
@@ -215,21 +232,26 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 		Roles:         claims.Roles,
 		Permissions:   claims.Permissions,
 		PolicyVersion: claims.PolicyVersion,
+		PermsHash:     claims.PermsHash,
+		AuthzSource:   authzSource,
 		PluginID:      strings.TrimSpace(claims.PluginID),
 	}, nil
 }
 
 type signedCtx struct {
-	TenantUUID    string   `json:"tid"`
-	TenantID      int64    `json:"tid_n,omitempty"`
-	UserID        int64    `json:"uid"`
-	MemberID      int64    `json:"mid,omitempty"`
-	IsRoot        bool     `json:"is_root"`
-	Roles         []string `json:"roles"`
-	Permissions   []string `json:"perms"`
-	PolicyVersion string   `json:"policy_version"`
-	PluginID      string   `json:"plugin_id,omitempty"`
-	TS            int64    `json:"ts"`
+	TenantUUID     string   `json:"tid"`
+	TenantID       int64    `json:"tid_n,omitempty"`
+	UserID         int64    `json:"uid"`
+	MemberID       int64    `json:"mid,omitempty"`
+	IsRoot         bool     `json:"is_root"`
+	Roles          []string `json:"roles"`
+	Permissions    []string `json:"permission_codes"`
+	PolicyVersion  string   `json:"policy_version"`
+	PermsHash      string   `json:"perms_hash"`
+	AuthzSource    string   `json:"source"`
+	AuthzSourceAlt string   `json:"authz_source"`
+	PluginID       string   `json:"plugin_id,omitempty"`
+	TS             int64    `json:"ts"`
 }
 
 func tryLoadSignedContext(h func(string) string, secret string, maxAgeSec int64) (TenantContext, bool) {
@@ -257,14 +279,18 @@ func tryLoadSignedContext(h func(string) string, secret string, maxAgeSec int64)
 	if maxAgeSec > 0 && (time.Now().Unix()-sc.TS) > maxAgeSec {
 		return TenantContext{}, false
 	}
+	authzSource := firstNonEmpty(sc.AuthzSource, sc.AuthzSourceAlt)
+	if authzSource == "" && hasDelegatedAuthzSnapshot(sc.Permissions, sc.PolicyVersion, sc.PermsHash) {
+		authzSource = "signed_context"
+	}
 	return TenantContext{TenantUUID: strings.TrimSpace(sc.TenantUUID), TenantID: sc.TenantID, UserID: sc.UserID, MemberID: sc.MemberID, IsRoot: sc.IsRoot, Roles: sc.Roles,
-		Permissions: sc.Permissions, PolicyVersion: sc.PolicyVersion, PluginID: strings.TrimSpace(sc.PluginID)}, true
+		Permissions: sc.Permissions, PolicyVersion: sc.PolicyVersion, PermsHash: sc.PermsHash, AuthzSource: authzSource, PluginID: strings.TrimSpace(sc.PluginID)}, true
 }
 
 // 供客户端出站兜底：把 TenantContext 签成 X-PowerX-CTX / SIG
 func SignContext(tc TenantContext, secret string) (ctxB64, sigHex string, ts int64, err error) {
 	sc := signedCtx{TenantUUID: strings.TrimSpace(tc.TenantUUID), TenantID: tc.TenantID, UserID: tc.UserID, MemberID: tc.MemberID, IsRoot: tc.IsRoot, Roles: tc.Roles,
-		Permissions: tc.Permissions, PolicyVersion: tc.PolicyVersion, PluginID: tc.PluginID, TS: time.Now().Unix()}
+		Permissions: tc.Permissions, PolicyVersion: tc.PolicyVersion, PermsHash: tc.PermsHash, AuthzSource: tc.AuthzSource, PluginID: tc.PluginID, TS: time.Now().Unix()}
 	b, e := json.Marshal(&sc)
 	if e != nil {
 		return "", "", 0, e
@@ -274,4 +300,25 @@ func SignContext(tc TenantContext, secret string) (ctxB64, sigHex string, ts int
 	mac.Write([]byte(ctxB64))
 	sigHex = hex.EncodeToString(mac.Sum(nil))
 	return ctxB64, sigHex, sc.TS, nil
+}
+
+func hasDelegatedAuthzSnapshot(permissionCodes []string, policyVersion string, permsHash string) bool {
+	if strings.TrimSpace(policyVersion) == "" || strings.TrimSpace(permsHash) == "" {
+		return false
+	}
+	for _, code := range permissionCodes {
+		if strings.TrimSpace(code) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }

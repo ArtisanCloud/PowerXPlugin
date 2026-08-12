@@ -51,10 +51,11 @@
       }
     },
     "permissions": {
+      "description": "Deprecated runtime hint only. Formal RBAC permissions must be declared in plugin.d/rbac.yaml permissions[].",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^[a-z0-9.-]+\\.[a-z0-9.-]+\\.[a-z0-9.-]+$"
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+:[a-z][a-z0-9_]*$"
       }
     }
   },

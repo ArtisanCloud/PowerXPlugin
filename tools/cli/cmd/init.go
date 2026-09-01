@@ -23,7 +23,7 @@ const (
 	defaultFrameworkVersion = "v0.0.21"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
 	defaultAdminVersion     = "0.0.10"
-	defaultClientVersion    = "0.0.10"
+	defaultClientVersion    = "0.0.11"
 )
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)

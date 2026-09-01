@@ -44,7 +44,7 @@ onMounted(() => permissionStore.fetchList());
     <div v-else-if="permissions.length === 0" class="py-8 text-center text-gray-500">{{ `{{ $t("organization.permission.empty.title") }}` }}</div>
     <div v-else class="divide-y rounded-lg border border-gray-200 dark:border-slate-700">
       <div v-for="permission in permissions" :key="permission.permission_uuid" class="p-4">
-        <div class="font-medium text-gray-900 dark:text-white">{{ `{{ permission.meta?.label || `${permission.resource}:${permission.action}` }}` }}</div>
+        <div class="font-medium text-gray-900 dark:text-white">{{ `{{ permission.meta?.label || [permission.resource, permission.action].join(':') }}` }}</div>
         <div class="mt-1 text-sm text-gray-500 dark:text-gray-300">{{ `{{ permission.description || "-" }}` }}</div>
       </div>
     </div>

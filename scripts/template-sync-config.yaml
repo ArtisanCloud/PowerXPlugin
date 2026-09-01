@@ -351,6 +351,13 @@ mappings:
       - globs: ["plugin.d/**/*.yaml"]
         literal: "com_powerx_plugins_base"
         replace: "{{ .PluginDBName }}"
+      # Topic scopes are resolved by the runtime, not by the scaffold renderer.
+      - globs: ["plugin.d/events.yaml"]
+        literal: "{{tenant_uuid}}"
+        replace: '{{"{{"}}tenant_uuid{{"}}"}}'
+      - globs: ["plugin.d/events.yaml"]
+        literal: "{{member_uuid}}"
+        replace: '{{"{{"}}member_uuid{{"}}"}}'
   - name: event-fabric-config
     source: skeleton
     include:

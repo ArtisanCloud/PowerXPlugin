@@ -36,13 +36,13 @@ events:
       scope: tenant
       event_types: [message]
       description: Scheduler 标准触发事件
-    - key: _topic.notify.tenant.{{tenant_uuid}}
+    - key: _topic.notify.tenant.{{"{{"}}tenant_uuid{{"}}"}}
       protocols: [ws]
       actions: [publish, subscribe]
       scope: tenant
       event_types: [message]
       description: 租户通知事件
-    - key: _topic.notify.member.{{member_uuid}}
+    - key: _topic.notify.member.{{"{{"}}member_uuid{{"}}"}}
       protocols: [ws]
       actions: [publish, subscribe]
       scope: member

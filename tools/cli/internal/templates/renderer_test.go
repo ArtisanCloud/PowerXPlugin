@@ -2,6 +2,29 @@ package templates
 
 import "testing"
 
+func TestRenderAll_EmbeddedTemplatesParse(t *testing.T) {
+	_, err := RenderAll(t.TempDir(), Data{
+		PluginID:           "com.powerx.template-test",
+		PluginName:         "Template Test",
+		PluginSlug:         "template-test",
+		PluginDBName:       "com_powerx_template_test",
+		Version:            "0.1.0",
+		GoVersion:          "1.24",
+		BackendModulePath:  "example.com/template-test/backend",
+		BackendType:        BackendGoGin,
+		FrontendType:       FrontendNuxt,
+		BackendPort:        8078,
+		FrontendPort:       3131,
+		FrameworkVersion:   "v0.0.21",
+		FrameworkAdminRef:  "0.0.10",
+		FrameworkClientRef: "0.0.11",
+		AppFrontendType:    FrontendNuxt,
+	}, Options{})
+	if err != nil {
+		t.Fatalf("RenderAll() error = %v", err)
+	}
+}
+
 func TestNormalizeTargetPath_SelectsOnlyChosenBackendAndFrontend(t *testing.T) {
 	tests := []struct {
 		name         string

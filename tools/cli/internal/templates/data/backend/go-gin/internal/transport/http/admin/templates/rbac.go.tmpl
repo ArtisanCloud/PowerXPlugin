@@ -10,8 +10,8 @@ import (
 func RBACEntries(prefix string) map[string]authx.Permission {
 	base := strings.TrimRight(prefix, "/") + "/templates"
 	adminBase := strings.TrimRight(prefix, "/") + "/admin/templates"
-	read := authx.Permission{Resource: "base.templates", Action: "read"}
-	manage := authx.Permission{Resource: "base.templates", Action: "manage"}
+	read := authx.Permission{Resource: "template.template", Action: "read"}
+	manage := authx.Permission{Resource: "template.template", Action: "manage"}
 
 	return map[string]authx.Permission{
 		"GET:" + base:                        read,

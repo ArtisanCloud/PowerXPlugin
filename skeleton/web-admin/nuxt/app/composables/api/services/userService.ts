@@ -2,7 +2,6 @@ import { useIAMService, type MemberRecord } from "./iamService";
 import type { ApiResponse } from "../types/types";
 
 export interface User {
-  id: number;
   uuid: string;
   createdAt: string;
   updatedAt: string;
@@ -15,10 +14,8 @@ export interface User {
 }
 
 export interface Member {
-  id: number;
   uuid: string;
   tenant_uuid: string;
-  user_id: number;
   username: string;
   display_name: string;
   avatar_url?: string;
@@ -31,7 +28,7 @@ export interface Member {
 export interface MemberWithProfile {
   Member: Member;
   User: User;
-  DeptIDs: number[] | null;
+	DeptUUIDs: string[] | null;
   RoleCodes: string[];
 }
 
@@ -41,10 +38,6 @@ export interface UserListParams {
   page?: number;
   page_size?: number;
   status?: number | string;
-}
-
-export interface RoleMembersPayload {
-  member_ids: number[];
 }
 
 type MemberListResponse = {
@@ -58,31 +51,28 @@ type MemberListResponse = {
 };
 
 const toMemberWithProfile = (record: MemberRecord): MemberWithProfile => {
-  const memberID = (record as any).member_id ?? (record as any).id ?? 0;
+	const memberUUID = record.member_uuid;
   const createdAt = (record as any).created_at || (record as any).createdAt || "";
   const updatedAt = (record as any).updated_at || (record as any).updatedAt || createdAt;
   const status =
     record.status === "disabled" || record.status === "locked" ? 0 : 1;
   return {
     Member: {
-      id: Number(memberID),
-      uuid: `${memberID}`,
+		uuid: memberUUID,
       tenant_uuid: record.tenant_uuid,
-      user_id: record.user_id,
       username: record.username,
       display_name: record.display_name || record.email || record.username,
       avatar_url: (record as any).avatar_url,
       status,
       meta: {
-        department: record.department_id,
+		department_uuids: record.department_uuids,
         phone: record.phone,
       },
       createdAt,
       updatedAt,
     },
     User: {
-      id: record.user_id,
-      uuid: `${record.user_id}`,
+		uuid: memberUUID,
       createdAt,
       updatedAt,
       email: record.email,
@@ -92,11 +82,7 @@ const toMemberWithProfile = (record: MemberRecord): MemberWithProfile => {
       status,
       meta: {},
     },
-    DeptIDs: Array.isArray((record as any).department_ids)
-      ? ((record as any).department_ids as any[])
-          .map((item) => Number(item || 0))
-          .filter((id) => Number.isFinite(id) && id > 0)
-      : (record.department_id ? [record.department_id] : []),
+		DeptUUIDs: Array.isArray(record.department_uuids) ? record.department_uuids : [],
     RoleCodes: Array.isArray(record.roles) ? record.roles : [],
   };
 };
@@ -172,38 +158,36 @@ export const useUserService = () => {
       display_name: data.display_name ?? data.name,
       username: data.username,
       phone: data.phone,
-      department_id: data.departmentId ?? data.department_id,
-      department_ids: data.departmentIds ?? data.department_ids,
-      roles: data.roles ?? data.roleIds ?? [],
+		department_uuids: data.departmentUUIDs ?? [],
+		role_uuids: data.roleUUIDs ?? [],
       status: typeof data.status === "number" ? (data.status === 1 ? "active" : "disabled") : data.status,
     };
     const response = await iamService.createMember(payload);
     return (response as any)?.data ?? response;
   };
 
-  const updateUser = async (memberId: number, data: Record<string, any>) => {
+	const updateUser = async (memberUUID: string, data: Record<string, any>) => {
     const payload = {
       email: data.email,
       display_name: data.display_name ?? data.name,
       username: data.username,
       phone: data.phone,
-      department_id: data.departmentId ?? data.department_id,
-      department_ids: data.departmentIds ?? data.department_ids,
-      roles: data.roles ?? data.roleIds,
+		department_uuids: data.departmentUUIDs ?? [],
+		role_uuids: data.roleUUIDs ?? [],
       replace_roles: data.replaceRoles ?? true,
       status: typeof data.status === "number" ? (data.status === 1 ? "active" : "disabled") : data.status,
     };
-    const response = await iamService.updateMember(memberId, payload);
+		const response = await iamService.updateMember(memberUUID, payload);
     return (response as any)?.data ?? response;
   };
 
-  const setUserStatus = async (memberId: number, data: { status: number }) => {
+	const setUserStatus = async (memberUUID: string, data: { status: number }) => {
     const status = data.status === 1 ? "active" : "disabled";
-    return updateUser(memberId, { status });
+		return updateUser(memberUUID, { status });
   };
 
-  const deleteUser = async (memberId: number) => {
-    await setUserStatus(memberId, { status: 0 });
+	const deleteUser = async (memberUUID: string) => {
+		await setUserStatus(memberUUID, { status: 0 });
     return { ok: true };
   };
 
@@ -213,7 +197,7 @@ export const useUserService = () => {
     updateUser,
     deleteUser,
     setUserStatus,
-    addUserToTenant: async () => ({ member_id: 0 }),
+    addUserToTenant: async () => ({ member_uuid: "" }),
     forceLogout: async () => ({ ok: true }),
   };
 };

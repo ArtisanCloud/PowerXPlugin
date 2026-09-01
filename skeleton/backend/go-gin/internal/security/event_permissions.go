@@ -217,7 +217,14 @@ func mergeCatalogReferences(manifestPath string, root map[string]any) error {
 }
 
 func defaultManifestPath() string {
-	if p := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_MANIFEST_PATH")); p != "" {
+	for _, key := range []string{"POWERX_PLUGIN_MANIFEST_PATH", "POWERX_PLUGIN_MANIFEST"} {
+		p := strings.TrimSpace(os.Getenv(key))
+		if p == "" {
+			continue
+		}
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			return p
+		}
 		return p
 	}
 	cwd, _ := os.Getwd()
@@ -239,7 +246,30 @@ func defaultManifestPath() string {
 			return cand
 		}
 	}
+	if exe, err := os.Executable(); err == nil {
+		if found := findManifestFrom(filepath.Dir(exe)); found != "" {
+			return found
+		}
+	}
 	return filepath.Join("skeleton", "plugin.yaml")
+}
+
+func DefaultManifestPath() string { return defaultManifestPath() }
+
+func findManifestFrom(start string) string {
+	current := filepath.Clean(start)
+	for i := 0; i < 8; i++ {
+		candidate := filepath.Join(current, "plugin.yaml")
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return ""
 }
 
 type PermissionedEmitter struct {

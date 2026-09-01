@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	dbm "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
@@ -285,6 +286,7 @@ func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action stri
 		}
 	}
 
+	publisher = frameworkrealtime.NewAuthorizedWSPublisher(publisher, h.deps.RealtimeDescriptors, "message")
 	result := publisher.Publish(c.Request.Context(), templateUpdateTopic, payload, fwwsbus.PublishOptions{
 		TenantUUID: tenantUUID,
 		TraceID:    traceID,

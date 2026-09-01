@@ -1,30 +1,16 @@
 package manifestx
 
-import "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+import (
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+)
 
 // Plugin returns the manifest definition consumed by the framework/router layer.
 func Plugin() manifest.Plugin {
 	return manifest.Plugin{
-		ID:      "com.powerx.plugins.base",
-		Name:    "PowerX Base Plugin",
-		Version: "0.1.0",
-		Permissions: []string{
-			"iam.tenant.read",
-			"iam.tenant.write",
-			"iam.department.read",
-			"iam.department.write",
-			"iam.department.delete",
-			"iam.user.read",
-			"iam.user.write",
-			"iam.role.read",
-			"iam.role.write",
-			"iam.role.delete",
-			"iam.permission.read",
-			"iam.audit.read",
-			"iam.sts.mint",
-			"base.templates.read",
-			"base.templates.manage",
-		},
+		ID:      app.PluginID,
+		Name:    app.PluginName,
+		Version: app.PluginVersion,
 		Menus: []manifest.Menu{
 			{
 				Path:  "/_p/com.powerx.plugins.base/admin/templates/intro",

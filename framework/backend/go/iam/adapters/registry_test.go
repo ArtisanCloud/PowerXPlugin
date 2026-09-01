@@ -19,6 +19,15 @@ func (stubDirectory) ListDepartments(context.Context, string) ([]contracts.Depar
 func (stubDirectory) ListMembers(context.Context, string) ([]contracts.Member, error) {
 	return nil, nil
 }
+func (stubDirectory) GetMember(context.Context, string, string) (*contracts.Member, error) {
+	return &contracts.Member{MemberUUID: "member-1", TenantUUID: "tenant-1"}, nil
+}
+func (stubDirectory) BatchGetMembers(context.Context, string, []string) ([]contracts.Member, error) {
+	return []contracts.Member{{MemberUUID: "member-1", TenantUUID: "tenant-1"}}, nil
+}
+func (stubDirectory) BatchResolveMembers(context.Context, string, []string) (*contracts.MemberResolution, error) {
+	return &contracts.MemberResolution{}, nil
+}
 func (stubDirectory) ListRoles(context.Context, string) ([]contracts.Role, error) {
 	return nil, nil
 }

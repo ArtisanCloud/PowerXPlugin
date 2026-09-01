@@ -54,7 +54,7 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 
 		topic := strings.TrimSpace(req.Topic)
 		if topic == "" {
-			topic = "plugin.notify.tenant." + tenantUUID
+			topic = "_topic.notify.tenant." + tenantUUID
 		}
 
 		title := strings.TrimSpace(req.Title)
@@ -71,6 +71,9 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 		}
 		if traceID == "" {
 			traceID = "ws-notify-" + time.Now().UTC().Format("20060102T150405.000Z")
+		}
+		if !allowWSBusPublish(c, deps, topic, tenantUUID, req.MemberUUID, traceID) {
+			return
 		}
 
 		payload := gin.H{

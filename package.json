@@ -12,7 +12,9 @@
     "check:agent-paths": "node scripts/check-agent-paths.mjs",
     "check:customer-auth-boundary": "bash scripts/contracts/validate-customer-auth-boundary.sh",
     "check:framework-knowledge-boundary": "bash scripts/contracts/validate-framework-knowledge-boundary.sh",
-    "test": "node scripts/capabilities/run-from-package.mjs && npm run check:customer-auth-boundary && npm run check:framework-knowledge-boundary"
+    "check:iam-directory-boundary": "bash scripts/contracts/validate-iam-directory-boundary.sh",
+    "check:realtime-transport": "bash scripts/contracts/validate-realtime-transport.sh",
+    "test": "node scripts/capabilities/run-from-package.mjs && npm run check:customer-auth-boundary && npm run check:framework-knowledge-boundary && npm run check:iam-directory-boundary && npm run check:realtime-transport"
   },
   "dependencies": {
     "fast-glob": "^3.3.3",

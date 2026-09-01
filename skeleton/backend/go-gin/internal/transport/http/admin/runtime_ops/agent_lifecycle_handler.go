@@ -1,0 +1,44 @@
+package runtime_ops
+
+import (
+	"net/http"
+	"strings"
+
+	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
+	"github.com/gin-gonic/gin"
+)
+
+type AgentLifecycleHandler struct{ deps *app.Deps }
+
+func NewAgentLifecycleHandler(deps *app.Deps) *AgentLifecycleHandler {
+	return &AgentLifecycleHandler{deps: deps}
+}
+
+func (h *AgentLifecycleHandler) Health(c *gin.Context) {
+	if h == nil || h.deps == nil || h.deps.AgentRuntime == nil {
+		contracts.ResponseServiceUnavailable(c, "agent lifecycle runtime is not configured", nil)
+		return
+	}
+	if tenant := admincommon.ResolveTenantUUID(c); strings.TrimSpace(tenant) == "" {
+		contracts.ResponseBadRequest(c, "tenant_uuid is required")
+		return
+	}
+	agentUUID := strings.TrimSpace(c.Param("agentUUID"))
+	if agentUUID == "" {
+		contracts.ResponseBadRequest(c, "agent_uuid is required")
+		return
+	}
+	summary, err := h.deps.AgentRuntime.GetHealthSummary(c.Request.Context(), agentUUID)
+	if err != nil {
+		if typed, ok := err.(*powerxagent.Error); ok && typed.Code == powerxagent.ErrCodeForbidden {
+			contracts.ResponseError(c, http.StatusForbidden, typed.Code, typed.Message)
+			return
+		}
+		contracts.ResponseError(c, http.StatusBadGateway, "AGENT_UPSTREAM_DEPENDENCY", err.Error())
+		return
+	}
+	contracts.ResponseSuccess(c, summary)
+}

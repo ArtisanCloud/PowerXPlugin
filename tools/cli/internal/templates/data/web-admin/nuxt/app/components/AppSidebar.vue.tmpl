@@ -439,7 +439,7 @@ const showCapabilityLab = computed(() => {
 });
 const pluginAdminBase = computed(() => {
   const configured = String(runtimeConfig.public?.pluginAdminBase || "").trim();
-  return configured || "/_p/com.powerx.plugins.base/admin/";
+  return configured || "/_p/{{ .PluginID }}/admin/";
 });
 const adminPath = (path: string) => `${pluginAdminBase.value.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 const metadataGovernancePath = computed(() => adminPath("settings/metadata-governance"));

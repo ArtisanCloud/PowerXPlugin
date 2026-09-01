@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -89,7 +90,7 @@ func Handler(deps *app.Deps, jwtCfg middleware.JWTAuthConfig) gin.HandlerFunc {
 			}
 			switch strings.ToLower(strings.TrimSpace(req.Type)) {
 			case "subscribe":
-				ws.subscribe(subscriber, req.Topics)
+				ws.subscribe(subscriber, req.Topics, deps.RealtimeDescriptors)
 				ws.send(wsResponse{Type: "ack", Message: "subscribed", Payload: gin.H{"topics": req.Topics}})
 			case "unsubscribe":
 				ws.unsubscribe(req.Topics)
@@ -124,13 +125,18 @@ func resolveIdentity(c *gin.Context, jwtCfg middleware.JWTAuthConfig) (tenantUUI
 	return "", "", false
 }
 
-func (w *wsConn) subscribe(subscriber wsSubscriber, topics []string) {
+func (w *wsConn) subscribe(subscriber wsSubscriber, topics []string, descriptors []frameworkrealtime.Descriptor) {
 	for _, topic := range topics {
 		clean := strings.TrimSpace(topic)
 		if clean == "" {
 			continue
 		}
 		if _, exists := w.subs[clean]; exists {
+			continue
+		}
+		decision := frameworkrealtime.Decide(descriptors, frameworkrealtime.ActionSubscribe, clean, frameworkrealtime.ProtocolWS, "message", frameworkrealtime.Scope{TenantUUID: w.tenantUUID, MemberUUID: w.memberUUID})
+		if !decision.Allowed {
+			w.send(wsResponse{Type: "error", Topic: clean, Message: decision.Reason})
 			continue
 		}
 		unsub := subscriber.Subscribe(clean, func(ev fwwsbus.Event) {

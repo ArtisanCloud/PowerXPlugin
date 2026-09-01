@@ -1,16 +1,105 @@
 capabilities:
   imports:
-    - contracts/capabilities/{{ .PluginID }}.template.list.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.read.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.prepare.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.create.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.update.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.delete.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.review.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.publish.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.compose.yaml
+    - contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
     - contracts/capabilities/{{ .PluginID }}.template.audit.yaml
     - contracts/capabilities/{{ .PluginID }}.template.batch_clone.yaml
-    - contracts/capabilities/{{ .PluginID }}.template.validate.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.compose.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.create.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.delete.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.list.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.prepare.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.publish.yaml
     - contracts/capabilities/{{ .PluginID }}.template.quality_distribute.yaml
-    - contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.read.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.review.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.update.yaml
+    - contracts/capabilities/{{ .PluginID }}.template.validate.yaml
+  provides:
+    - descriptor: contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
+      id: {{ .PluginID }}.auth.me_context
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.auth.me_context.json
+        output: contracts/schema/output/{{ .PluginID }}.auth.me_context.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.audit.yaml
+      id: {{ .PluginID }}.template.audit
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.audit.json
+        output: contracts/schema/output/{{ .PluginID }}.template.audit.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.batch_clone.yaml
+      id: {{ .PluginID }}.template.batch_clone
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.batch_clone.json
+        output: contracts/schema/output/{{ .PluginID }}.template.batch_clone.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.compose.yaml
+      id: {{ .PluginID }}.template.compose
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.compose.json
+        output: contracts/schema/output/{{ .PluginID }}.template.compose.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.create.yaml
+      id: {{ .PluginID }}.template.create
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.create.json
+        output: contracts/schema/output/{{ .PluginID }}.template.create.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.delete.yaml
+      id: {{ .PluginID }}.template.delete
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.delete.json
+        output: contracts/schema/output/{{ .PluginID }}.template.delete.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.list.yaml
+      id: {{ .PluginID }}.template.list
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.list.json
+        output: contracts/schema/output/{{ .PluginID }}.template.list.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.prepare.yaml
+      id: {{ .PluginID }}.template.prepare
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.prepare.json
+        output: contracts/schema/output/{{ .PluginID }}.template.prepare.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.publish.yaml
+      id: {{ .PluginID }}.template.publish
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.publish.json
+        output: contracts/schema/output/{{ .PluginID }}.template.publish.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.quality_distribute.yaml
+      id: {{ .PluginID }}.template.quality_distribute
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.quality_distribute.json
+        output: contracts/schema/output/{{ .PluginID }}.template.quality_distribute.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.read.yaml
+      id: {{ .PluginID }}.template.read
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.read.json
+        output: contracts/schema/output/{{ .PluginID }}.template.read.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.review.yaml
+      id: {{ .PluginID }}.template.review
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.review.json
+        output: contracts/schema/output/{{ .PluginID }}.template.review.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.update.yaml
+      id: {{ .PluginID }}.template.update
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.update.json
+        output: contracts/schema/output/{{ .PluginID }}.template.update.json
+      version: 1.0.0
+    - descriptor: contracts/capabilities/{{ .PluginID }}.template.validate.yaml
+      id: {{ .PluginID }}.template.validate
+      schemas:
+        input: contracts/schema/input/{{ .PluginID }}.template.validate.json
+        output: contracts/schema/output/{{ .PluginID }}.template.validate.json
+      version: 1.0.0
+  required:
+    - com.corex.eventfabric.publish
+    - com.corex.media.assets.manage
+    - com.corex.notifications.test

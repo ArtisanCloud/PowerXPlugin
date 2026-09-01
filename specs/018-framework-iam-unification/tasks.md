@@ -3,7 +3,7 @@
 **Input**: Design documents from `/specs/018-framework-iam-unification/`  
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/iam-unification.openapi.yaml, quickstart.md
 
-**Tests**: 包含。该特性在 spec 中明确要求独立验证（模式切换、契约一致性、上下文与权限判定）。
+**Tests**: 包含。历史 `[X]` 仅表示文档或测试骨架曾创建，不代表 production 能力已实现。下列纠正任务完成并验收前，不得把 US1-US3 标记为完成。
 
 ## Phase 1: Setup (Shared Infrastructure)
 
@@ -32,7 +32,7 @@
 - [X] T013 [P] 补充模式解析与错误语义单元测试 in framework/backend/go/iam/context/mode_resolver_test.go
 - [X] T014 [P] 补充 adapter 注册与单选绑定测试 in framework/backend/go/iam/adapters/registry_test.go
 
-**Checkpoint**: Framework IAM 基础契约、模式解析、错误语义、adapter 注册机制已可用。
+**Checkpoint**: Framework IAM 基础契约、Registry 和部分基础测试可用；这不是 production adapter 已可用的证明。
 
 ---
 
@@ -43,19 +43,19 @@
 
 ### Tests for User Story 1
 
-- [X] T015 [P] [US1] 增加双模式切换集成测试 in skeleton/backend/go-gin/internal/bootstrap/iam_resolver_test.go
+- [X] T015 [P] [US1] 增加真实 production adapter 的双模式切换集成测试 in skeleton/backend/go-gin/internal/bootstrap/iam_resolver_test.go
 - [X] T016 [P] [US1] 增加管理端模式查询接口测试 in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes_test.go
 
 ### Implementation for User Story 1
 
-- [X] T017 [US1] 实现 local adapter 对 framework 契约的绑定 in skeleton/backend/go-gin/internal/services/iam/adapters/local/adapter.go
-- [X] T018 [US1] 实现 delegated adapter 对 framework 契约的绑定 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/adapter.go
+- [ ] T017 [US1] 将 local adapter 中 numeric ID 转换、空成员/权限返回替换为 UUID-only 的 production Directory/Authz/Context 实现 in skeleton/backend/go-gin/internal/services/iam/adapters/local/
+- [ ] T018 [US1] 将 delegated adapter 中空目录投影和未启用授权映射替换为基于 Core Host Contract 的 production 实现 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/
 - [X] T019 [US1] 在 skeleton 启动流程接入 framework IAM registry 绑定 in skeleton/backend/go-gin/internal/bootstrap/app.go
-- [X] T020 [US1] 改造 IAM 模式解析入口使用 framework resolver in skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go
+- [X] T020 [US1] 建立并接入 IAM 模式解析入口使用 framework resolver in skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go
 - [X] T021 [US1] 改造 admin IAM 路由以读取统一 mode/context 能力 in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes.go
 - [X] T022 [US1] 在 router 装配中替换业务侧 IAM 依赖为 framework contracts in skeleton/backend/go-gin/internal/router/router.go
 
-**Checkpoint**: US1 完成后，插件可无改业务 handler 在 local/delegated 间切换。
+**Checkpoint（已撤销）**: 当前没有可验证的 production local/delegated adapter，US1 尚未完成。
 
 ---
 
@@ -66,19 +66,19 @@
 
 ### Tests for User Story 2
 
-- [X] T023 [P] [US2] 增加 IAM 契约一致性测试（组织查询）in framework/backend/go/iam/contracts/directory_contract_test.go
+- [ ] T023 [P] [US2] 增加 production adapter 的 IAM 契约一致性测试（组织查询、单成员、批量成员）in framework/backend/go/iam/contracts/directory_contract_test.go
 - [X] T024 [P] [US2] 增加 delegated 写操作拒绝测试（405）in skeleton/backend/go-gin/internal/transport/http/admin/iam/department_handler_test.go
-- [X] T025 [P] [US2] 增加角色授权与成员绑定语义测试 in skeleton/backend/go-gin/internal/services/iam/role_service_test.go
+- [ ] T025 [P] [US2] 增加 UUID-only 角色授权与成员绑定语义测试 in skeleton/backend/go-gin/internal/services/iam/role_service_test.go
 
 ### Implementation for User Story 2
 
-- [X] T026 [US2] 补齐 framework DirectoryService 契约实现入口 in framework/backend/go/iam/contracts/directory_service.go
-- [X] T027 [US2] 在 local adapter 映射 tenant/department/member/role/permission 查询能力 in skeleton/backend/go-gin/internal/services/iam/adapters/local/directory_adapter.go
-- [X] T028 [US2] 在 delegated adapter 映射组织只读与写拒绝策略 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/directory_adapter.go
-- [X] T029 [US2] 统一 admin IAM handlers 使用 framework Directory/Authz 契约 in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler.go
+- [X] T026 [US2] 扩展 framework DirectoryService 实现入口：GetMember/BatchGetMembers 与 UUID-only Member DTO in framework/backend/go/iam/contracts/directory_service.go
+- [ ] T027 [US2] 在 local adapter 映射 tenant/department/member/role/permission 查询能力；禁止空集合伪装成功 in skeleton/backend/go-gin/internal/services/iam/adapters/local/directory_adapter.go
+- [ ] T028 [US2] 在 delegated adapter 通过 Core Host Contract 映射组织只读查询；禁止空投影伪装成功 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/directory_adapter.go
+- [ ] T029 [US2] 统一 admin IAM handlers 使用已完成的 framework Directory/Authz 契约 in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler.go
 - [X] T030 [US2] 统一 RBAC 资源动作映射与错误输出 in skeleton/backend/go-gin/internal/transport/http/admin/iam/rbac.go
 
-**Checkpoint**: US2 完成后，组织与权限能力在双模式下具备一致契约与可审计行为。
+**Checkpoint（已撤销）**: 当前没有 production Directory adapter，也没有按 member UUID 查询合同，US2 尚未完成。
 
 ---
 
@@ -101,7 +101,7 @@
 - [X] T037 [US3] 在 skeleton gateway 集成层接入统一 token 来源与审计字段 in skeleton/backend/go-gin/internal/integrations/gateway/client.go
 - [X] T038 [US3] 在 runtime 日志中补充 mode/tenant/user/permission/trace 字段 in skeleton/backend/go-gin/internal/logger/runtime.go
 
-**Checkpoint**: US3 完成后，身份上下文与鉴权判定语义在 framework 层统一闭环。
+**Checkpoint（已撤销）**: 未完成 production adapter 装配与跨模式合同验证，US3 尚未完成。
 
 ---
 
@@ -109,10 +109,20 @@
 
 **Purpose**: 收口迁移说明、契约文档和全量验证。
 
-- [X] T039 [P] 更新 IAM 统一契约 OpenAPI 细节（错误码与只读边界）in specs/018-framework-iam-unification/contracts/iam-unification.openapi.yaml
-- [X] T040 [P] 更新迁移说明与对插件开发者接入指引 in specs/018-framework-iam-unification/quickstart.md
-- [X] T041 更新实施计划中的结构描述与术语一致性 in specs/018-framework-iam-unification/plan.md
-- [X] T042 执行并记录 018 回归结果 in tmp/018-framework-iam-unification-regression.md
+- [X] T039 [P] 纠正 IAM 统一契约文档、错误语义与只读边界描述 in specs/018-framework-iam-unification/contracts/iam-unification.openapi.yaml
+- [X] T040 [P] 纠正迁移说明与插件接入指引，不再声称 adapter 已交付 in specs/018-framework-iam-unification/quickstart.md
+- [X] T041 纠正实施计划状态、结构描述与术语 in specs/018-framework-iam-unification/plan.md
+- [X] T042 定义并发布 Core IAM Host Contract（GetMember/BatchGetMembers，UUID DTO、鉴权、错误码）后，执行并记录 018 回归结果 in tmp/018-framework-iam-unification-regression.md
+
+## Phase 6A: Corrective Delivery — Directory Production Adapters
+
+- [X] T043 扩展 framework DirectoryService：GetMember/BatchGetMembers，并把 Member/IdentityContext 改为 UUID-only contract in framework/backend/go/iam/contracts/
+- [ ] T044 [P] 实现 local Directory/Authz/IdentityContext production adapter，不向业务层暴露 numeric primary key in skeleton/backend/go-gin/internal/services/iam/adapters/local/
+- [ ] T045 [P] 在 Core Host Contract 发布后实现 delegated Directory/Authz/IdentityContext production adapter in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/
+- [X] T046 在 Bootstrap 根据 mode 绑定唯一 production Bundle；缺失 adapter 必须 fail-fast in skeleton/backend/go-gin/internal/bootstrap/
+- [ ] T047 [P] 增加 local/delegated 单成员、批量、未找到、跨租户、无权限、上游不可用合同测试
+- [X] T048 [P] 增加“display_name 不得为 UUID”、禁止本地 SQL/原始 Gateway 解析的架构回归检查
+- [ ] T049 以至少一个真实业务插件完成 Registry 消费验证；业务侧不得保留 IAM SQL 或 UUID 显示 fallback
 
 ---
 

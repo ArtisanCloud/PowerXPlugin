@@ -33,6 +33,17 @@ func (tenantTestDirectory) ListMembers(context.Context, string) ([]fwiamcontract
 	return nil, nil
 }
 
+func (tenantTestDirectory) GetMember(context.Context, string, string) (*fwiamcontracts.Member, error) {
+	return nil, fwiamerrors.New(fwiamerrors.CodeMemberNotFound, "member not found")
+}
+
+func (tenantTestDirectory) BatchGetMembers(context.Context, string, []string) ([]fwiamcontracts.Member, error) {
+	return nil, nil
+}
+func (tenantTestDirectory) BatchResolveMembers(context.Context, string, []string) (*fwiamcontracts.MemberResolution, error) {
+	return &fwiamcontracts.MemberResolution{}, nil
+}
+
 func (tenantTestDirectory) ListRoles(context.Context, string) ([]fwiamcontracts.Role, error) {
 	return nil, nil
 }

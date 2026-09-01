@@ -19,7 +19,7 @@ func runtimePluginVersion() string {
 	if v := strings.TrimSpace(os.Getenv("NUXT_PUBLIC_POWERX_PLUGIN_VERSION")); v != "" {
 		return v
 	}
-	return "0.8.0"
+	return app.PluginVersion
 }
 
 // AdminHandler 管理端处理器
@@ -39,8 +39,8 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 	log := logger.HandlerLogger("admin").WithContext(c.Request.Context())
 
 	manifest := &contracts.PluginManifest{
-		ID:          "com.powerx.plugins.base",
-		Name:        "PowerX Base Plugin",
+		ID:          "{{ .PluginID }}",
+		Name:        "{{ .PluginName }}",
 		Version:     runtimePluginVersion(),
 		Description: "A starter plugin that showcases template management capabilities for PowerX",
 		Author:      "PowerX Team",
@@ -60,7 +60,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 			Routes: map[string]string{
 				"/admin/*": "index.html",
 			},
-			PublicPath: "/_p/com.powerx.plugins.base/admin/",
+			PublicPath: "/_p/{{ .PluginID }}/admin/",
 		},
 
 		Menus: []contracts.MenuConfig{
@@ -102,13 +102,13 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 						},
 					},
 				},
-				RequiredPermissions: []string{"base.templates:read"},
+				RequiredPermissions: []string{"template.template:read"},
 			},
 		},
 
 		Permissions: []contracts.PermissionConfig{
 			{
-				Resource:    "base.templates",
+				Resource:    "template.template",
 				Actions:     []string{"read", "create", "update", "delete"},
 				Description: "Template management permissions",
 			},
@@ -122,7 +122,7 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 		Agents: []contracts.AgentConfig{
 			{
 				ID:           "base.assistant",
-				PluginID:     "com.powerx.plugins.base",
+				PluginID:     "{{ .PluginID }}",
 				Name:         "Base 助理",
 				Description:  "智能的 Base 模板助手，可以帮助创建与查询模板内容",
 				Model:        "gpt-4",
@@ -131,20 +131,20 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 					"base.template.create",
 					"base.template.query",
 				},
-				RequiredPermissions: []string{"base.templates:read"},
+				RequiredPermissions: []string{"template.template:read"},
 			},
 		},
 
 		Tools: []contracts.ToolConfig{
 			{
 				ID:           "base.template.create",
-				PluginID:     "com.powerx.plugins.base",
+				PluginID:     "{{ .PluginID }}",
 				Name:         "创建模板",
 				Description:  "创建一个新的模板记录",
 				Transport:    "http",
 				Endpoint:     "/api/v1/templates",
 				Method:       "POST",
-				RBACResource: "base.templates",
+				RBACResource: "template.template",
 				InputSchema: &contracts.JSONSchema{
 					Type: "object",
 					Properties: map[string]*contracts.JSONSchemaProperty{
@@ -188,13 +188,13 @@ func (h *AdminHandler) GetManifest(c *gin.Context) {
 			},
 			{
 				ID:           "base.template.query",
-				PluginID:     "com.powerx.plugins.base",
+				PluginID:     "{{ .PluginID }}",
 				Name:         "查询模板",
 				Description:  "查询模板列表",
 				Transport:    "http",
 				Endpoint:     "/api/v1/templates",
 				Method:       "GET",
-				RBACResource: "base.templates",
+				RBACResource: "template.template",
 				InputSchema: &contracts.JSONSchema{
 					Type: "object",
 					Properties: map[string]*contracts.JSONSchemaProperty{
@@ -289,7 +289,7 @@ func (h *AdminHandler) GetRBACInfo(c *gin.Context) {
 	rbacInfo := &contracts.RBACInfo{
 		Resources: []contracts.Resource{
 			{
-				Name:        "base.templates",
+				Name:        "template.template",
 				Description: "Base 模板管理",
 				Actions: []contracts.Action{
 					{Name: "read", Description: "查看模板"},
@@ -304,31 +304,31 @@ func (h *AdminHandler) GetRBACInfo(c *gin.Context) {
 				Name:        "base_master",
 				Description: "Base Master 角色",
 				Permissions: []string{
-					"base.templates:*",
+					"template.template:*",
 				},
 			},
 			{
 				Name:        "template_editor",
 				Description: "模板编辑角色",
 				Permissions: []string{
-					"base.templates:read",
-					"base.templates:create",
-					"base.templates:update",
+					"template.template:read",
+					"template.template:create",
+					"template.template:update",
 				},
 			},
 			{
 				Name:        "template_viewer",
 				Description: "模板查看角色",
 				Permissions: []string{
-					"base.templates:read",
+					"template.template:read",
 				},
 			},
 		},
 		Permissions: []contracts.Permission{
-			{Resource: "base.templates", Action: "read"},
-			{Resource: "base.templates", Action: "create"},
-			{Resource: "base.templates", Action: "update"},
-			{Resource: "base.templates", Action: "delete"},
+			{Resource: "template.template", Action: "read"},
+			{Resource: "template.template", Action: "create"},
+			{Resource: "template.template", Action: "update"},
+			{Resource: "template.template", Action: "delete"},
 		},
 	}
 

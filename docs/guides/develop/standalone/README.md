@@ -369,14 +369,14 @@ curl -X POST "http://127.0.0.1:8078/api/v1/admin/runtime/ws-bus/publish" \
 ```json
 {
   "tenant_uuid": "00000000-0000-0000-0000-000000000001",
-  "topic": "plugin.notify.tenant.00000000-0000-0000-0000-000000000001",
+  "topic": "_topic.notify.tenant.00000000-0000-0000-0000-000000000001",
   "title": "WS Test Notification",
   "message": "websocket probe event",
   "trace_id": "trace-xxx"
 }
 ```
 
-- `topic` 为空时，后端默认发布到 `plugin.notify.tenant.{tenant_uuid}`。
+- `topic` 为空时，后端默认发布到 `_topic.notify.tenant.{tenant_uuid}`。
 - `tenant_uuid` 可从请求头/上下文解析；若无法解析会返回 `tenant_uuid is required`。
 
 ### 1.4.5 WebSocket 联调失败排查速查

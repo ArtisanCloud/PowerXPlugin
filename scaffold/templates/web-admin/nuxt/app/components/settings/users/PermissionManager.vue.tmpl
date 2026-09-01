@@ -28,7 +28,8 @@ const tenantService = useTenantService();
 
 /** ====== 类型 ====== */
 type Role = {
-  id: number;
+  role_uuid: string;
+  tenant_uuid: string;
   name: string;
   code: string;
   description?: string;
@@ -37,7 +38,7 @@ type Role = {
 };
 
 type Permission = {
-  id: number;
+  permission_uuid: string;
   plugin?: string;
   resource?: string;
   action?: string;
@@ -137,8 +138,8 @@ watchEffect(() => {
 
 /** 选中角色变化时拉取其权限ID */
 watch(selectedRole, async (r) => {
-  if (r?.id) {
-    await permissionStore.fetchRolePermissionIDs(r.id);
+  if (r?.role_uuid) {
+    await permissionStore.fetchRolePermissionUUIDs(r.role_uuid);
   }
 });
 
@@ -146,7 +147,7 @@ watch(selectedRole, async (r) => {
 const searchQuery = ref("");
 const showRoleForm = ref(false);
 const isEditing = ref(false);
-const editingId = ref<number | null>(null);
+const editingRoleUUID = ref<string | null>(null);
 
 const roleForm = reactive({
   name: "",
@@ -154,14 +155,14 @@ const roleForm = reactive({
   description: "",
   scope: "tenant" as "system" | "tenant",
   tenant_uuid: undefined as string | undefined,
-  permissions: [] as number[],
+  permissions: [] as string[],
 });
 
 /** ====== 首屏加载权限 & 当前角色权限 ====== */
 onMounted(async () => {
   await permissionStore.fetchAllActive(); // ← 改成全量拉取
-  if (selectedRole.value?.id) {
-    await permissionStore.fetchRolePermissionIDs(selectedRole.value.id);
+  if (selectedRole.value?.role_uuid) {
+    await permissionStore.fetchRolePermissionUUIDs(selectedRole.value.role_uuid);
   }
 });
 
@@ -188,7 +189,7 @@ const resetRoleForm = () => {
   roleForm.permissions = [];
   selectedTenant.value = null;
   isEditing.value = false;
-  editingId.value = null;
+  editingRoleUUID.value = null;
 };
 
 const openAddRoleForm = () => {
@@ -221,9 +222,9 @@ const openEditRoleForm = (role: Role) => {
   roleForm.name = role.name;
   roleForm.code = role.code;
   roleForm.description = role.description || "";
-  roleForm.permissions = [...(roleSelection.value[role.id] || [])];
+  roleForm.permissions = [...(roleSelection.value[role.role_uuid] || [])];
   isEditing.value = true;
-  editingId.value = role.id;
+  editingRoleUUID.value = role.role_uuid;
   showRoleForm.value = true;
 };
 
@@ -239,15 +240,15 @@ const saveRole = async () => {
     return;
   }
   try {
-    if (isEditing.value && editingId.value !== null) {
-      await roleStore.updateRole(editingId.value, {
+    if (isEditing.value && editingRoleUUID.value !== null) {
+      await roleStore.updateRole(editingRoleUUID.value, {
         name: roleForm.name,
         code: roleForm.code,
         description: roleForm.description,
       });
-      roleSelection.value[editingId.value] = [...roleForm.permissions];
-      await permissionStore.setRolePermissionIDs(
-        editingId.value,
+      roleSelection.value[editingRoleUUID.value] = [...roleForm.permissions];
+      await permissionStore.setRolePermissionUUIDs(
+        editingRoleUUID.value,
         tenantUuid,
         roleForm.permissions
       );
@@ -258,13 +259,13 @@ const saveRole = async () => {
         name: roleForm.name,
         description: roleForm.description,
         scope_type: roleForm.scope,
-        permission_ids: roleForm.permissions,
+        permission_uuids: roleForm.permissions,
       });
-      if (result.role?.id) {
-        const finalPermIds = result.perm?.now || roleForm.permissions;
-        roleSelection.value[result.role.id] = [...finalPermIds];
-        permissionStore.roleInitialSelection[result.role.id] = [
-          ...finalPermIds,
+      if (result.role?.role_uuid) {
+        const finalPermUUIDs = result.role.permission_uuids || roleForm.permissions;
+        roleSelection.value[result.role.role_uuid] = [...finalPermUUIDs];
+        permissionStore.roleInitialSelection[result.role.role_uuid] = [
+          ...finalPermUUIDs,
         ];
       }
     }
@@ -284,8 +285,8 @@ const saveRole = async () => {
   }
 };
 
-const deleteRole = async (id: number) => {
-  const role = roles.value.find((r: any) => r.id === id) as Role | undefined;
+const deleteRole = async (roleUUID: string) => {
+  const role = roles.value.find((r: any) => r.role_uuid === roleUUID) as Role | undefined;
   if (role && role.builtin) {
     notifyOnce(
       "系统角色不能删除",
@@ -296,9 +297,9 @@ const deleteRole = async (id: number) => {
   }
   if (confirm("确定要删除此角色吗？")) {
     try {
-      await roleStore.deleteRole(id);
-      delete roleSelection.value[id];
-      if (selectedRole.value?.id === id) {
+      await roleStore.deleteRole(roleUUID);
+      delete roleSelection.value[roleUUID];
+      if (selectedRole.value?.role_uuid === roleUUID) {
         selectedRole.value = (roles.value[0] as any) ?? null;
       }
     } catch (error) {
@@ -332,63 +333,63 @@ const selectRole = (role: Role) => {
 };
 
 /** —— 当前角色权限 —— */
-const hasPermission = (permissionId: number) => {
-  const roleId = selectedRole.value?.id;
-  if (!roleId) return false;
-  return (roleSelection.value[roleId] || []).includes(permissionId);
+const hasPermission = (permissionUUID: string) => {
+  const roleUUID = selectedRole.value?.role_uuid;
+  if (!roleUUID) return false;
+  return (roleSelection.value[roleUUID] || []).includes(permissionUUID);
 };
 
 // ✅ 新增：是否有改动（对比初始态）
 const dirty = computed(() => {
-  const roleId = selectedRole.value?.id;
-  if (!roleId) return false;
-  const cur = new Set(roleSelection.value[roleId] || []);
-  const init = new Set(permissionStore.roleInitialSelection[roleId] || []);
+  const roleUUID = selectedRole.value?.role_uuid;
+  if (!roleUUID) return false;
+  const cur = new Set(roleSelection.value[roleUUID] || []);
+  const init = new Set(permissionStore.roleInitialSelection[roleUUID] || []);
   if (cur.size !== init.size) return true;
   for (const id of cur) if (!init.has(id)) return true;
   return false;
 });
 
 /** 勾选单个权限（列表页） */
-const togglePermission = (permissionId: number) => {
-  const roleId = selectedRole.value?.id;
-  if (!roleId) return;
-  const set = new Set(roleSelection.value[roleId] || []);
-  if (set.has(permissionId)) set.delete(permissionId);
-  else set.add(permissionId);
-  roleSelection.value[roleId] = Array.from(set);
+const togglePermission = (permissionUUID: string) => {
+  const roleUUID = selectedRole.value?.role_uuid;
+  if (!roleUUID) return;
+  const set = new Set(roleSelection.value[roleUUID] || []);
+  if (set.has(permissionUUID)) set.delete(permissionUUID);
+  else set.add(permissionUUID);
+  roleSelection.value[roleUUID] = Array.from(set);
 };
 
 /** 勾选整模块权限（列表页） */
 const toggleModulePermissions = (module: string, checked: boolean) => {
-  const roleId = selectedRole.value?.id;
-  if (!roleId) return;
+  const roleUUID = selectedRole.value?.role_uuid;
+  if (!roleUUID) return;
   const ids = permissions.value
     .filter((p) => p.module === module)
-    .map((p) => p.id);
-  const set = new Set(roleSelection.value[roleId] || []);
+    .map((p) => p.permission_uuid);
+  const set = new Set(roleSelection.value[roleUUID] || []);
   if (checked) ids.forEach((id) => set.add(id));
   else ids.forEach((id) => set.delete(id));
-  roleSelection.value[roleId] = Array.from(set);
+  roleSelection.value[roleUUID] = Array.from(set);
 };
 
 const isModuleFullySelected = (module: string) => {
-  const roleId = selectedRole.value?.id;
-  if (!roleId) return false;
+  const roleUUID = selectedRole.value?.role_uuid;
+  if (!roleUUID) return false;
   const ids = permissions.value
     .filter((p) => p.module === module)
-    .map((p) => p.id);
-  const cur = new Set(roleSelection.value[roleId] || []);
+    .map((p) => p.permission_uuid);
+  const cur = new Set(roleSelection.value[roleUUID] || []);
   return ids.length > 0 && ids.every((id) => cur.has(id));
 };
 
 const isModulePartiallySelected = (module: string) => {
-  const roleId = selectedRole.value?.id;
-  if (!roleId) return false;
+  const roleUUID = selectedRole.value?.role_uuid;
+  if (!roleUUID) return false;
   const ids = permissions.value
     .filter((p) => p.module === module)
-    .map((p) => p.id);
-  const cur = new Set(roleSelection.value[roleId] || []);
+    .map((p) => p.permission_uuid);
+  const cur = new Set(roleSelection.value[roleUUID] || []);
   const picked = ids.filter((id) => cur.has(id)).length;
   return picked > 0 && picked < ids.length;
 };
@@ -396,8 +397,8 @@ const isModulePartiallySelected = (module: string) => {
 /** 保存按钮：一次性提交 set-ids */
 const saving = ref(false);
 const saveRolePermissions = async () => {
-  const roleId = selectedRole.value?.id;
-  if (!roleId) return;
+  const roleUUID = selectedRole.value?.role_uuid;
+  if (!roleUUID) return;
   const tenantUuid =
     selectedRole.value?.tenant_uuid || currentTenantUuid.value;
   if (!tenantUuid) {
@@ -406,8 +407,8 @@ const saveRolePermissions = async () => {
   }
   try {
     saving.value = true;
-    const ids = roleSelection.value[roleId] || [];
-    await permissionStore.setRolePermissionIDs(roleId, tenantUuid, ids);
+    const permissionUUIDs = roleSelection.value[roleUUID] || [];
+    await permissionStore.setRolePermissionUUIDs(roleUUID, tenantUuid, permissionUUIDs);
   } catch (e) {
     console.error(e);
     const { title, description } = normalizeApiError(e, {
@@ -500,7 +501,7 @@ const roleColumns = computed(() => {
                   color: "red",
                   variant: "ghost",
                   icon: "i-heroicons-trash",
-                  onClick: () => deleteRole(role.id),
+                  onClick: () => deleteRole(role.role_uuid),
                 },
                 { default: () => "删除" }
               ),
@@ -513,12 +514,12 @@ const roleColumns = computed(() => {
 
 /** ====== 表单内权限选择（弹窗） ====== */
 const formModulePermissionIds = (module: string) =>
-  permissions.value.filter((p) => p.module === module).map((p) => p.id);
-const hasFormPermission = (permissionId: number) =>
-  roleForm.permissions.includes(permissionId);
-const toggleFormPermission = (permissionId: number) => {
-  const i = roleForm.permissions.indexOf(permissionId);
-  if (i === -1) roleForm.permissions.push(permissionId);
+  permissions.value.filter((p) => p.module === module).map((p) => p.permission_uuid);
+const hasFormPermission = (permissionUUID: string) =>
+  roleForm.permissions.includes(permissionUUID);
+const toggleFormPermission = (permissionUUID: string) => {
+  const i = roleForm.permissions.indexOf(permissionUUID);
+  if (i === -1) roleForm.permissions.push(permissionUUID);
   else roleForm.permissions.splice(i, 1);
 };
 const toggleFormModulePermissions = (module: string, checked: boolean) => {
@@ -595,11 +596,11 @@ const isFormModulePartiallySelected = (module: string) => {
           <div class="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
             <div
               v-for="role in filteredRoles"
-              :key="role.id"
+              :key="role.role_uuid"
               @click="selectRole(role)"
               :class="[
                 'p-4 cursor-pointer hover:bg-gray-50',
-                selectedRole && selectedRole.id === role.id
+                selectedRole && selectedRole.role_uuid === role.role_uuid
                   ? 'bg-primary-50'
                   : '',
               ]"
@@ -645,7 +646,7 @@ const isFormModulePartiallySelected = (module: string) => {
                     variant="ghost"
                     icon="i-heroicons-trash"
                     size="xs"
-                    @click.stop="deleteRole(role.id)"
+                    @click.stop="deleteRole(role.role_uuid)"
                   />
                 </div>
               </div>
@@ -724,12 +725,12 @@ const isFormModulePartiallySelected = (module: string) => {
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
                     <div
                       v-for="perm in typeGroups[type]"
-                      :key="perm.id"
+                      :key="perm.permission_uuid"
                       class="flex items-start"
                     >
                       <UCheckbox
-                        :model-value="hasPermission(perm.id)"
-                        @update:model-value="togglePermission(perm.id)"
+                        :model-value="hasPermission(perm.permission_uuid)"
+                        @update:model-value="togglePermission(perm.permission_uuid)"
                       />
                       <div class="ml-2 flex-1">
                         <div class="flex items-center gap-2">
@@ -883,13 +884,13 @@ const isFormModulePartiallySelected = (module: string) => {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                           <div
                             v-for="perm in typeGroups[type]"
-                            :key="perm.id"
+                            :key="perm.permission_uuid"
                             class="flex items-start"
                           >
                             <UCheckbox
-                              :model-value="hasFormPermission(perm.id)"
+                              :model-value="hasFormPermission(perm.permission_uuid)"
                               @update:model-value="
-                                toggleFormPermission(perm.id)
+                                toggleFormPermission(perm.permission_uuid)
                               "
                             />
                             <div class="ml-2 flex-1">

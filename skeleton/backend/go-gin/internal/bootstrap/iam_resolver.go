@@ -1,0 +1,42 @@
+package bootstrap
+
+import (
+	"fmt"
+	"strings"
+
+	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
+	sharedapp "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+)
+
+// ResolveAndBindFrameworkIAM is the sole startup boundary between provider-mode
+// resolution and the framework IAM registry. A mismatch is a configuration
+// error: the process must not bind a different adapter as a fallback.
+func ResolveAndBindFrameworkIAM(deps *sharedapp.Deps, resolver *ProviderResolver, registry *fwiamadapters.Registry) error {
+	if deps == nil || resolver == nil || registry == nil {
+		return fmt.Errorf("iam resolver requires deps, provider resolver and registry")
+	}
+	if err := resolver.Err(); err != nil {
+		return fmt.Errorf("iam provider mode resolution: %w", err)
+	}
+	expected := resolver.IAMAdapterMode()
+	if deps.IAMAdapterMode != expected {
+		return fmt.Errorf("iam adapter mode mismatch: deps=%s resolver=%s", deps.IAMAdapterMode, expected)
+	}
+	if strings.TrimSpace(deps.IAMAdapterModeSource) == "" {
+		deps.IAMAdapterModeSource = resolver.Source()
+	}
+	return BindFrameworkIAM(deps, registry)
+}
+
+// ValidateIAMBinding reports an incomplete startup binding before routes are
+// registered. It intentionally has no recovery path.
+func ValidateIAMBinding(deps *sharedapp.Deps) error {
+	if deps == nil || deps.IAMRegistry == nil || !deps.IAMRegistry.IsBound() || deps.IAMDirectoryService == nil || deps.IAMAuthzService == nil || deps.IAMContextService == nil {
+		return fmt.Errorf("framework IAM production bundle is not bound")
+	}
+	mode, ok := deps.IAMRegistry.Mode()
+	if !ok || string(mode) != deps.IAMAdapterMode.String() {
+		return fmt.Errorf("framework IAM registry mode does not match resolved mode")
+	}
+	return nil
+}

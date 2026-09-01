@@ -3,6 +3,7 @@
 # Go build artifacts
 bin/
 obj/
+__debug_bin*
 *.exe
 examples/verify-external/backend/backend
 *.test

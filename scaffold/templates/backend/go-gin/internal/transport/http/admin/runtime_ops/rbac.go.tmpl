@@ -22,10 +22,10 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 		"POST:" + base + "/quota/overrides":              {Resource: "runtime.ops", Action: "manage"},
 		"GET:" + base + "/metrics":                       {Resource: "runtime.ops", Action: "observe"},
 		"POST:" + base + "/event-bridge/emit":            {Resource: "runtime.ops", Action: "invoke"},
-		"POST:" + base + "/event-fabric/topics":          {Resource: "runtime.ops", Action: "invoke"},
-		"POST:" + base + "/ws-bus/grant":                 {Resource: "runtime.ops", Action: "invoke"},
-		"POST:" + base + "/ws-bus/publish":               {Resource: "runtime.ops", Action: "invoke"},
-		"POST:" + base + "/ws-bus/test-flow":             {Resource: "runtime.ops", Action: "invoke"},
+		"POST:" + base + "/event-fabric/topics":          {Resource: "runtime.ops", Action: "manage"},
+		"POST:" + base + "/ws-bus/grant":                 {Resource: "runtime.ops", Action: "manage"},
+		"POST:" + base + "/ws-bus/publish":               {Resource: "runtime.ops", Action: "manage"},
+		"POST:" + base + "/ws-bus/test-flow":             {Resource: "runtime.ops", Action: "manage"},
 		"POST:" + base + "/scheduler/mode/validate":      {Resource: "runtime.ops", Action: "manage"},
 		"POST:" + base + "/scheduler/dispatches/*/retry": {Resource: "runtime.ops", Action: "manage"},
 		"POST:" + base + "/scheduler/dispatches/*/pause": {Resource: "runtime.ops", Action: "manage"},
@@ -33,5 +33,6 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 		"GET:" + base + "/logging/policy":                {Resource: "runtime.ops", Action: "read"},
 		"PUT:" + base + "/logging/policy":                {Resource: "runtime.ops", Action: "manage"},
 		"POST:" + base + "/logging/probe":                {Resource: "runtime.ops", Action: "invoke"},
+		"GET:" + base + "/agent-lifecycle/*/health":      {Resource: "runtime.ops", Action: "observe"},
 	}
 }

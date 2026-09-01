@@ -11,6 +11,7 @@ import (
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwscheduler "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/scheduler"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
@@ -450,7 +451,7 @@ func (h *SchedulerJobHandler) publishLocalSchedulerNotification(ctx context.Cont
 	if tenantUUID == "" {
 		return gin.H{"ok": false, "reason": "tenant_uuid required"}
 	}
-	topic := "plugin.notify.tenant." + tenantUUID
+	topic := "_topic.notify.tenant." + tenantUUID
 	traceID := schedulerPayloadString(job.Payload, "trace_id")
 	if traceID == "" {
 		traceID = strings.TrimSpace(requestID)
@@ -477,7 +478,12 @@ func (h *SchedulerJobHandler) publishLocalSchedulerNotification(ctx context.Cont
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	result := fwwsbus.NewLocalPublisher(h.deps.WSBusHub, nil).Publish(ctx, topic, payload, fwwsbus.PublishOptions{
+	publisher := frameworkrealtime.NewAuthorizedWSPublisher(
+		fwwsbus.NewLocalPublisher(h.deps.WSBusHub, nil),
+		h.deps.RealtimeDescriptors,
+		"message",
+	)
+	result := publisher.Publish(ctx, topic, payload, fwwsbus.PublishOptions{
 		TenantUUID: tenantUUID,
 		TraceID:    traceID,
 	})

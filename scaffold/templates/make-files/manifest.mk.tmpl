@@ -87,6 +87,11 @@ plugin-yaml-check: plugin-yaml-sync plugin-id-check ## 一条命令校验 plugin
 		--event-fabric "$(ABS_EVENT_FABRIC_FILE)"
 	@echo "✅ plugin.yaml checks passed"
 
+.PHONY: plugin-permission-declaration-check
+plugin-permission-declaration-check: ## 校验 PowerX plugin permissions[] 与 page/api protocol_bindings
+	@echo "[manifest] checking plugin permission declarations"
+	@node scripts/manifest/check-permission-declaration.mjs --manifest "$(PLUGIN_FILE)"
+
 .PHONY: plugin-id-check
 plugin-id-check: ## 检查插件 ID 命名是否符合 com.powerx.plugins.*
 	@echo "[manifest] checking plugin id naming convention"

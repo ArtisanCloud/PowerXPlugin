@@ -20,6 +20,8 @@ type TenantContext struct {
 	Roles         []string `json:"roles"`
 	Permissions   []string `json:"permissions"`
 	PolicyVersion string   `json:"policy_version"`
+	PermsHash     string   `json:"perms_hash"`
+	AuthzSource   string   `json:"source"`
 	PluginID      string   `json:"plugin_id"`
 }
 

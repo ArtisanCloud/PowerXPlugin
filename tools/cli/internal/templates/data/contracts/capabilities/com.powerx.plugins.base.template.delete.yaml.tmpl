@@ -11,7 +11,7 @@ description_i18n:
   zh: 删除模板的原子能力，供 REST/gRPC 使用。
   en: Delete a template through REST or gRPC entry points.
 rbac:
-  resource: base.templates
+  resource: template
   actions: [delete]
 provides:
   - id: schema/input/{{ .PluginID }}.template.delete.v1

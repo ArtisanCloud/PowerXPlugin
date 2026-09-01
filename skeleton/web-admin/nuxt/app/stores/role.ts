@@ -77,9 +77,9 @@ export const useRoleStore = defineStore("role", () => {
       scope_type: scope,
       createdAt: role.createdAt || role.created_at,
       updatedAt: role.updatedAt || role.updated_at,
-      permission_ids:
-        role.permission_ids || role.permissionIds || role.permissions || [],
-      member_ids: role.member_ids || role.memberIds || [],
+		role_uuid: role.role_uuid || role.roleUUID,
+		permission_uuids: role.permission_uuids || [],
+		member_uuids: role.member_uuids || [],
       member_count: role.member_count ?? role.memberCount ?? 0,
       builtin: role.builtin ?? false,
     };
@@ -124,12 +124,12 @@ export const useRoleStore = defineStore("role", () => {
     }
   };
 
-  const fetchRole = async (id: number) => {
+	const fetchRole = async (roleUUID: string) => {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await roleService.getRole(id);
+		const response = await roleService.getRole(roleUUID);
       if (!isApiSuccess(response)) {
         throw new Error(response?.message || "获取角色信息失败");
       }
@@ -168,7 +168,6 @@ export const useRoleStore = defineStore("role", () => {
       roles.value.push(roleData);
       return {
         role: roleData,
-        perm: (payload as any)?.perm,
       };
     } catch (err) {
       error.value = err instanceof Error ? err.message : "创建角色失败";
@@ -179,12 +178,12 @@ export const useRoleStore = defineStore("role", () => {
     }
   };
 
-  const updateRole = async (id: number, data: RoleUpdateParams) => {
+	const updateRole = async (roleUUID: string, data: RoleUpdateParams) => {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await roleService.updateRole(id, data);
+		const response = await roleService.updateRole(roleUUID, data);
       if (!isApiSuccess(response)) {
         throw new Error(response?.message || "更新角色失败");
       }
@@ -192,16 +191,16 @@ export const useRoleStore = defineStore("role", () => {
       const nextRole = payload
         ? normalizeRole(payload)
         : normalizeRole({
-            ...(roles.value.find((role) => role.id === id) || {}),
+			...(roles.value.find((role) => role.role_uuid === roleUUID) || {}),
             ...data,
           });
 
-      const index = roles.value.findIndex((role) => role.id === id);
+		const index = roles.value.findIndex((role) => role.role_uuid === roleUUID);
       if (index !== -1) {
         roles.value[index] = nextRole;
       }
 
-      if (currentRole.value?.id === id) {
+		if (currentRole.value?.role_uuid === roleUUID) {
         currentRole.value = nextRole;
       }
 
@@ -214,22 +213,22 @@ export const useRoleStore = defineStore("role", () => {
     }
   };
 
-  const deleteRole = async (id: number) => {
+	const deleteRole = async (roleUUID: string) => {
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await roleService.deleteRole(id);
+		const response = await roleService.deleteRole(roleUUID);
       if (!isApiSuccess(response)) {
         throw new Error(response?.message || "删除角色失败");
       }
 
-      const index = roles.value.findIndex((role) => role.id === id);
+		const index = roles.value.findIndex((role) => role.role_uuid === roleUUID);
       if (index !== -1) {
         roles.value.splice(index, 1);
       }
 
-      if (currentRole.value?.id === id) {
+		if (currentRole.value?.role_uuid === roleUUID) {
         currentRole.value = null;
       }
 

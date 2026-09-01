@@ -6,7 +6,7 @@ migrate: ## 运行数据库迁移
 	@if [ "$(BACKEND)" = "fastapi" ]; then \
 		cd $(BACKEND_DIR) && alembic upgrade head; \
 	else \
-		cd $(BACKEND_DIR) && go run ./cmd/database/main.go migrate; \
+		cd $(BACKEND_DIR) && go run ./cmd/database migrate; \
 	fi
 
 .PHONY: migrate-cmd
@@ -19,7 +19,7 @@ seed: ## 运行数据种子脚本
 	@if [ "$(BACKEND)" = "fastapi" ]; then \
 		cd $(BACKEND_DIR) && python scripts/seed_db.py; \
 	else \
-		cd $(BACKEND_DIR) && go run ./cmd/database/main.go seed; \
+		cd $(BACKEND_DIR) && go run ./cmd/database seed; \
 	fi
 
 .PHONY: setup-db
@@ -28,7 +28,7 @@ setup-db: ## 执行迁移并填充初始数据
 	@if [ "$(BACKEND)" = "fastapi" ]; then \
 		cd $(BACKEND_DIR) && alembic upgrade head && python scripts/seed_db.py; \
 	else \
-		cd $(BACKEND_DIR) && go run ./cmd/database/main.go setup; \
+		cd $(BACKEND_DIR) && go run ./cmd/database setup; \
 	fi
 
 .PHONY: reset-db
@@ -40,7 +40,7 @@ reset-db: ## 重置数据库（危险操作）
 		if [ "$(BACKEND)" = "fastapi" ]; then \
 			cd $(BACKEND_DIR) && python scripts/reset_db.py && alembic upgrade head && python scripts/seed_db.py; \
 		else \
-			cd $(BACKEND_DIR) && go run ./cmd/database/main.go refresh; \
+			cd $(BACKEND_DIR) && go run ./cmd/database refresh; \
 		fi; \
 	else \
 		echo "操作已取消"; \

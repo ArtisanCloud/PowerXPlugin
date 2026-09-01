@@ -95,6 +95,8 @@ type Config struct {
 	DBDSN      string `yaml:"-" json:"db_dsn,omitempty"`
 	DBSchema   string `yaml:"-" json:"db_schema,omitempty"`
 	RunMigrate bool   `yaml:"-" json:"run_migrate,omitempty"`
+
+	skipRuntimeGatewayValidation bool
 }
 
 // EventBridgeConfig 控制事件桥接（本地 emitter / TaskBus emitter / 双写）的行为。
@@ -447,12 +449,28 @@ type ContextConfig struct {
 	ProviderMode string `yaml:"provider_mode" json:"provider_mode"`
 }
 
+type loadOptions struct {
+	skipRuntimeGatewayValidation bool
+}
+
 // Load 加载配置，优先级：YAML 文件 > 默认值（不再从环境变量覆盖）
 func Load() (*Config, error) {
+	return loadWithOptions(loadOptions{})
+}
+
+// LoadForMigration loads configuration for schema migration/seed commands.
+// Migration only requires database/provider boundaries; runtime gateway and
+// STS readiness are validated by the plugin runtime process.
+func LoadForMigration() (*Config, error) {
+	return loadWithOptions(loadOptions{skipRuntimeGatewayValidation: true})
+}
+
+func loadWithOptions(opts loadOptions) (*Config, error) {
 	loadEnvFiles()
 
 	// 设置默认配置
 	cfg := getDefaultConfig()
+	cfg.skipRuntimeGatewayValidation = opts.skipRuntimeGatewayValidation
 
 	// 尝试加载 YAML 配置文件
 	configDir, err := loadYAMLConfig(cfg)
@@ -996,6 +1014,8 @@ func loadEnvConfig(cfg *Config) {
 		cfg.Database.DSN = dsn
 	}
 	if schema := resolveConfigValue(os.Getenv("POWERX_DB_SCHEMA")); schema != "" {
+		cfg.Database.Schema = schema
+	} else if schema := resolveConfigValue(os.Getenv("POWERX_PLUGIN_DB_SCHEMA")); schema != "" {
 		cfg.Database.Schema = schema
 	}
 	if secret := resolveConfigValue(os.Getenv("POWERX_TOOLGRANT_SECRET")); secret != "" {
@@ -1800,7 +1820,7 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Gateway != nil {
+	if c.Gateway != nil && !c.skipRuntimeGatewayValidation {
 		hasGatewayFields := strings.TrimSpace(c.Gateway.BaseURL) != "" ||
 			strings.TrimSpace(c.Gateway.APIKey) != ""
 		if hasGatewayFields {

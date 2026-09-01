@@ -239,6 +239,7 @@ func createIAMTablesForTest(db *gorm.DB) error {
 			display_name TEXT,
 			avatar_url TEXT,
 			status TEXT,
+			department_uuid TEXT,
 			department_id INTEGER,
 			meta TEXT,
 			last_login_at DATETIME,
@@ -249,6 +250,7 @@ func createIAMTablesForTest(db *gorm.DB) error {
 		`CREATE TABLE IF NOT EXISTS iam_roles (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_uuid TEXT,
+			uuid TEXT,
 			code TEXT,
 			name TEXT,
 			description TEXT,
@@ -260,6 +262,7 @@ func createIAMTablesForTest(db *gorm.DB) error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS iam_permissions (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT,
 			resource TEXT,
 			action TEXT,
 			description TEXT,
@@ -267,12 +270,16 @@ func createIAMTablesForTest(db *gorm.DB) error {
 			updated_at DATETIME
 		)`,
 		`CREATE TABLE IF NOT EXISTS iam_member_roles (
+			member_uuid TEXT,
+			role_uuid TEXT,
 			member_id INTEGER,
 			role_id INTEGER,
 			created_at DATETIME,
 			PRIMARY KEY (member_id, role_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS iam_role_permissions (
+			role_uuid TEXT,
+			permission_uuid TEXT,
 			role_id INTEGER,
 			permission_id INTEGER,
 			tenant_uuid TEXT,
@@ -293,6 +300,7 @@ func createIAMTablesForTest(db *gorm.DB) error {
 		`CREATE TABLE IF NOT EXISTS iam_audit_logs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			tenant_uuid TEXT,
+			actor_member_uuid TEXT,
 			actor_member_id INTEGER,
 			action TEXT,
 			resource TEXT,

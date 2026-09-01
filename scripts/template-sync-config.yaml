@@ -41,6 +41,24 @@ mappings:
       - globs: ["package.json"]
         literal: '"name": "powerxplugin-skeleton-web-admin"'
         replace: '"name": "{{ .PluginSlug }}-web-admin"'
+      - globs: ["package.json"]
+        literal: '"@artisan-cloud/plugin-framework-admin": "0.0.10"'
+        replace: '"@artisan-cloud/plugin-framework-admin": "{{ .FrameworkAdminRef }}"'
+      - globs: ["package.json"]
+        literal: '"@artisan-cloud/plugin-framework-client": "0.0.10"'
+        replace: '"@artisan-cloud/plugin-framework-client": "{{ .FrameworkClientRef }}"'
+      - globs:
+          - "app/pages/agent-skill-bridge.vue"
+          - "app/pages/powerx/agents.vue"
+          - "app/pages/powerx/skills.vue"
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
+      - globs: ["app/components/AppSidebar.vue"]
+        literal: '"/_p/com.powerx.plugins.base/admin/"'
+        replace: '"/_p/{{ .PluginID }}/admin/"'
+      - globs: ["app/pages/templates/framework-lab.vue"]
+        literal: 'const schedulerPluginID = "com.powerx.plugins.base"'
+        replace: 'const schedulerPluginID = "{{ .PluginID }}"'
       - globs: ["app/app.vue"]
         literal: 'title: "PowerX Sample Plugin"'
         replace: 'title: "{{ .PluginName }}"'
@@ -137,6 +155,7 @@ mappings:
     exclude:
       - "**/*_test.go"
       - "internal/**/README.md"
+      - ".cache/**"
       - "etc/config.yaml"
     replacements:
       - globs: ["**/*.go", "**/*.proto", "go.mod", "go.sum"]
@@ -175,6 +194,15 @@ mappings:
       - globs: ["internal/manifestx/manifest.go"]
         literal: 'Path:  "/_p/com.powerx.plugins.base/admin/templates/crud"'
         replace: 'Path:  "/_p/{{ .PluginID }}/admin/templates/crud"'
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'Path:  "/_p/com.powerx.plugins.base/admin/iam/overview"'
+        replace: 'Path:  "/_p/{{ .PluginID }}/admin/iam/overview"'
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'Path:  "/_p/com.powerx.plugins.base/admin/iam/members"'
+        replace: 'Path:  "/_p/{{ .PluginID }}/admin/iam/members"'
+      - globs: ["internal/manifestx/manifest.go"]
+        literal: 'Path:  "/_p/com.powerx.plugins.base/admin/iam/roles"'
+        replace: 'Path:  "/_p/{{ .PluginID }}/admin/iam/roles"'
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Name: "PowerX Base Plugin"'
         replace: 'Name: "{{ .PluginName }}"'
@@ -184,6 +212,39 @@ mappings:
       - globs: ["internal/manifestx/manifest.go.tmpl"]
         literal: 'Version: "0.1.0"'
         replace: 'Version: "{{ .Version }}"'
+      - globs: ["internal/shared/app/consts.go"]
+        literal: 'const PluginID = "com.powerx.plugins.base"'
+        replace: 'const PluginID = "{{ .PluginID }}"'
+      - globs: ["internal/shared/app/consts.go"]
+        literal: 'const PluginName = "PowerX Base Plugin"'
+        replace: 'const PluginName = "{{ .PluginName }}"'
+      - globs: ["internal/shared/app/consts.go"]
+        literal: 'const PluginVersion = "0.1.0"'
+        replace: 'const PluginVersion = "{{ .Version }}"'
+      - globs: ["internal/services/iam/local_store.go"]
+        literal: 'defaultPluginID      = "com.powerx.plugins.base"'
+        replace: 'defaultPluginID      = "{{ .PluginID }}"'
+      - globs: ["internal/transport/http/admin/admin_handler.go"]
+        literal: 'ID:          "com.powerx.plugins.base"'
+        replace: 'ID:          "{{ .PluginID }}"'
+      - globs: ["internal/transport/http/admin/admin_handler.go"]
+        literal: 'Name:        "PowerX Base Plugin"'
+        replace: 'Name:        "{{ .PluginName }}"'
+      - globs: ["internal/transport/http/admin/admin_handler.go"]
+        literal: 'return "0.8.0"'
+        replace: 'return app.PluginVersion'
+      - globs: ["internal/transport/http/admin/admin_handler.go"]
+        literal: 'PublicPath: "/_p/com.powerx.plugins.base/admin/"'
+        replace: 'PublicPath: "/_p/{{ .PluginID }}/admin/"'
+      - globs: ["internal/transport/http/admin/admin_handler.go"]
+        literal: 'PluginID:     "com.powerx.plugins.base"'
+        replace: 'PluginID:     "{{ .PluginID }}"'
+      - globs: ["internal/transport/http/plugin/agent_registry/routes.go"]
+        literal: 'const pluginID = "com.powerx.plugins.base"'
+        replace: 'const pluginID = app.PluginID'
+      - globs: ["internal/middleware/common.go", "internal/transport/http/middleware/request_trace.go"]
+        literal: 'return "com.powerx.plugins.base"'
+        replace: 'return "{{ .PluginID }}"'
   - name: backend-fastapi
     source: skeleton/backend/python-fastapi
     targets:
@@ -219,12 +280,17 @@ mappings:
       - globs: ["config.example.yaml"]
         literal: "bind_addr: \":8078\""
         replace: "bind_addr: \":{{ .BackendPort }}\""
+      - globs: ["config.example.yaml"]
+        literal: "com_powerx_plugins_base"
+        replace: "{{ .PluginDBName }}"
   - name: root-makefiles
     source: skeleton
     include:
       - "Makefile"
       - ".gitignore"
       - "make-files/**/*"
+      - "scripts/manifest/**/*"
+      - "docs/guides/plugin_release/**/*"
     exclude:
       - "make-files/**/.DS_Store"
     targets:
@@ -232,6 +298,138 @@ mappings:
         suffix: .tmpl
       - path: tools/cli/internal/templates/data
         suffix: .tmpl
+    replacements:
+      - globs: ["make-files/build.mk"]
+        literal: "PLUGIN_ID           ?= com.powerx.plugins.base"
+        replace: "PLUGIN_ID           ?= {{ .PluginID }}"
+  - name: plugin-manifest
+    source: skeleton
+    include:
+      - "plugin.yaml"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["plugin.yaml"]
+        literal: "id: com.powerx.plugins.base"
+        replace: "id: {{ .PluginID }}"
+      - globs: ["plugin.yaml"]
+        literal: "name: PowerX Base Plugin"
+        replace: "name: {{ .PluginName }}"
+      - globs: ["plugin.yaml"]
+        literal: "version: 0.1.4"
+        replace: "version: {{ .Version }}"
+      - globs: ["plugin.yaml"]
+        literal: "PowerX Base Plugin"
+        replace: "{{ .PluginName }}"
+      - globs: ["plugin.yaml"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
+      - globs: ["plugin.yaml"]
+        literal: "com_powerx_plugins_base"
+        replace: "{{ .PluginDBName }}"
+      - globs: ["plugin.yaml"]
+        literal: "PowerX Base"
+        replace: "{{ .PluginName }}"
+  - name: plugin-catalogs
+    source: skeleton
+    include:
+      - "plugin.d/**/*"
+    exclude:
+      - "plugin.d/**/.DS_Store"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["plugin.d/**/*.yaml"]
+        literal: "com.powerx.plugins.base"
+        replace: "{{ .PluginID }}"
+      - globs: ["plugin.d/**/*.yaml"]
+        literal: "com_powerx_plugins_base"
+        replace: "{{ .PluginDBName }}"
+      # Topic scopes are resolved by the runtime, not by the scaffold renderer.
+      - globs: ["plugin.d/events.yaml"]
+        literal: "{{tenant_uuid}}"
+        replace: '{{"{{"}}tenant_uuid{{"}}"}}'
+      - globs: ["plugin.d/events.yaml"]
+        literal: "{{member_uuid}}"
+        replace: '{{"{{"}}member_uuid{{"}}"}}'
+  - name: event-fabric-config
+    source: skeleton
+    include:
+      - "config/event_fabric.yaml"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["config/event_fabric.yaml"]
+        literal: "plugin:com.powerx.plugins.base"
+        replace: "plugin:{{ .PluginID }}"
+      # These are runtime topic placeholders, not scaffold template variables.
+      # Escape them so generated Go templates render the literal {{...}} token.
+      - globs: ["config/event_fabric.yaml"]
+        literal: "{{tenant_uuid}}"
+        replace: '{{"{{"}}tenant_uuid{{"}}"}}'
+      - globs: ["config/event_fabric.yaml"]
+        literal: "{{member_uuid}}"
+        replace: '{{"{{"}}member_uuid{{"}}"}}'
+  - name: root-agents
+    source: .
+    include:
+      - "AGENTS.md"
+    targets:
+      - path: scaffold/templates
+        suffix: .tmpl
+      - path: tools/cli/internal/templates/data
+        suffix: .tmpl
+    replacements:
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/plugin.yaml"
+        replace: "plugin.yaml"
+      - globs: ["AGENTS.md"]
+        literal: "./skeleton/plugin.yaml"
+        replace: "./plugin.yaml"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/plugin.d"
+        replace: "plugin.d"
+      - globs: ["AGENTS.md"]
+        literal: "./skeleton/plugin.d"
+        replace: "./plugin.d"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/backend/go-gin"
+        replace: "backend"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/backend/python-fastapi"
+        replace: "backend"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/web-admin/nuxt"
+        replace: "web-admin"
+      - globs: ["AGENTS.md"]
+        literal: "skeleton/web-admin/next"
+        replace: "web-admin"
+      - globs: ["AGENTS.md"]
+        literal: "make -C skeleton "
+        replace: "make "
+      - globs: ["AGENTS.md"]
+        literal: "开发态唯一清单移动到 `plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。"
+        replace: "开发态唯一清单位于 `plugin.yaml`，所有脚本/文档示例应以生成项目根目录为基准。"
+      - globs: ["AGENTS.md"]
+        literal: "本地执行 `npm test`、`make validate`、`px-plugin capabilities *`、`make dist` 等命令时，请在 `skeleton/` 目录下运行或显式传入 `--manifest ./plugin.yaml`。"
+        replace: "本地执行 `npm test`、`make validate`、`px-plugin capabilities *`、`make dist` 等命令时，请在项目根目录运行或显式传入 `--manifest ./plugin.yaml`。"
+  - name: root-vscode
+    source: scaffold/templates/.vscode
+    include:
+      - "**/*"
+    exclude:
+      - "**/.DS_Store"
+    targets:
+      - path: tools/cli/internal/templates/data/.vscode
   - name: contracts
     source: contracts
     targets:

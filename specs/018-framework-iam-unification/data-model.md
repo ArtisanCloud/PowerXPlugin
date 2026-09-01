@@ -29,8 +29,8 @@
 - **Purpose**: 统一身份上下文载体。
 - **Key Fields**:
   - `tenant_uuid`
-  - `user_id`
-  - `member_id`
+  - `user_uuid`（可选）
+  - `member_uuid`（可选）
   - `roles[]`
   - `permissions[]`
   - `policy_version`
@@ -56,11 +56,11 @@
 
 - **Purpose**: 组织层级结构。
 - **Key Fields**:
-  - `id`
+  - `department_uuid`（唯一跨边界标识）
   - `tenant_uuid`
   - `name`
   - `code`
-  - `parent_id`
+  - `parent_department_uuid`
 - **Relationships**:
   - Department N:1 Tenant
   - Department 1:N Members
@@ -70,13 +70,13 @@
 
 - **Purpose**: 人员主体（组织维度）。
 - **Key Fields**:
-  - `id`
+  - `member_uuid`（唯一跨边界标识）
   - `tenant_uuid`
-  - `user_id`
+  - `user_uuid`（可选；与 member_uuid 独立）
   - `display_name`
   - `status`
 - **Relationships**:
-  - Member N:1 Tenant
+- Member N:1 Tenant
   - Member N:M Roles
   - Member N:M Departments
 
@@ -84,7 +84,7 @@
 
 - **Purpose**: 权限集合载体。
 - **Key Fields**:
-  - `id`
+  - `role_uuid`（唯一跨边界标识）
   - `tenant_uuid`
   - `code`
   - `name`
@@ -117,5 +117,10 @@
   - `mode`
   - `trace_id`
 - **State**:
-  - `allowed` / `denied`
+- `allowed` / `denied`
 
+## 10. Identifier Rules
+
+- `tenant_uuid`、`department_uuid`、`member_uuid`、`user_uuid`、`role_uuid` 是 API、事件、审计和跨服务引用的唯一标识。
+- 数据库 numeric primary key 如存在，仅限 adapter 内部持久化实现；不得出现在 framework contracts、Host Contract 或业务插件 DTO。
+- `display_name` 是展示字段，不是身份字段；为空时不得以任何 UUID 替代。

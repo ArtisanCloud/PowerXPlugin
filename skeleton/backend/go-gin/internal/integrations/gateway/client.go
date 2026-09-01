@@ -1825,7 +1825,12 @@ func (c *Client) StreamAgentSSE(ctx context.Context, params AgentStreamParams) (
 			"env":         params.Env,
 			"tenant_uuid": tenant,
 		}), "gateway stream agent sse core returned error")
-		return nil, fmt.Errorf("powerx agent stream failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, &PlatformAPIError{
+			Operation:  "powerx_agent_stream",
+			StatusCode: resp.StatusCode,
+			Code:       resp.StatusCode,
+			Message:    strings.TrimSpace(string(body)),
+		}
 	}
 	return &AgentStream{
 		StatusCode: resp.StatusCode,

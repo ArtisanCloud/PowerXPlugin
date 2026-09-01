@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"{{ .BackendModulePath }}/internal/contracts"
 	repo "{{ .BackendModulePath }}/internal/domain/repository/iam"
@@ -39,11 +40,12 @@ func NewChannelWeComHandlerWithDeps(deps *app.Deps) *ChannelWeComHandler {
 		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
 		"",
 		nil,
-		"wecom.sync.progress",
+		"_topic.iam.wecom.sync.progress",
 	)
 	if adapter, ok := publisher.(*fwwsbus.Adapter); ok {
 		adapter.EnableHubBridge(deps.WSBusHub)
 	}
+	publisher = frameworkrealtime.NewAuthorizedWSPublisher(publisher, deps.RealtimeDescriptors, "message")
 	return &ChannelWeComHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewWeComSyncTaskService(syncRepo, configSvc, publisher, deps.DB),

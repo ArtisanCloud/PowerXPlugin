@@ -26,7 +26,14 @@ import (
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
+	powerxknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/knowledge"
+	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
+	powerxskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/skills"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
@@ -35,6 +42,13 @@ type DelegatedAuthProxy interface {
 	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
 	Logout(ctx context.Context, refreshToken string) error
 	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+	GetDirectoryMember(ctx context.Context, memberUUID string) (*authproxy.DirectoryMember, error)
+	BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]authproxy.DirectoryMember, error)
+	BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*authproxy.DirectoryMemberResolution, error)
+	ListDirectoryDepartments(ctx context.Context) ([]authproxy.DirectoryDepartment, error)
+	ListDirectoryRoles(ctx context.Context) ([]authproxy.DirectoryRole, error)
+	ListDirectoryPermissions(ctx context.Context) ([]authproxy.DirectoryPermission, error)
+	CheckDirectoryAuthorization(ctx context.Context, request authproxy.DirectoryAuthorizationRequest) (*authproxy.AuthorizationDecision, error)
 }
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
@@ -46,6 +60,12 @@ type Deps struct {
 	Metadata             *fwmetadata.Client
 	CustomerAdmin        *customerfw.AdminClient
 	AISettings           *fwaisettings.Client
+	AI                   *powerxai.Client
+	AgentRuntime         *powerxagent.Client
+	CapabilityRegistry   powerxcapability.Registry
+	KnowledgeQABridge    powerxknowledge.QABridge
+	Notifications        powerxnotifications.Publisher
+	Skills               powerxskills.Invoker
 	Config               *config.Config
 	CapabilitiesManager  capabilities.Manager
 	CapabilityMetrics    *capmetrics.Metrics
@@ -57,6 +77,7 @@ type Deps struct {
 	AdminConsoleMetrics  *adminmetrics.Metrics
 	EventEmitter         fweventbridge.Emitter
 	WSBusHub             fwwsbus.LocalHub
+	RealtimeDescriptors  []frameworkrealtime.Descriptor
 	ProviderMode         fwprovider.Mode
 	ProviderModeSource   string
 	IAMAdapterMode       iamservice.IAMAdapterMode

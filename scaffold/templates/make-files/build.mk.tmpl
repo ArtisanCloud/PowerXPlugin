@@ -7,7 +7,7 @@
 # =========================
 
 # ===== 基础信息 =====
-PLUGIN_ID           ?= com.powerx.plugins.base
+PLUGIN_ID           ?= {{ .PluginID }}
 PLATFORM            ?= host
 TARGET_ARCH         ?= amd64
 
@@ -213,7 +213,7 @@ check-base-standalone: frontend-build-standalone
 
 # ===== 生成 dist（目录安装包，给 PowerX 的 install/local 用）=====
 .PHONY: dist
-dist: plugin-yaml-check dist-backend frontend-build
+dist: plugin-yaml-check plugin-permission-declaration-check dist-backend frontend-build
 	@echo "==> 生成 dist 安装包目录：$(DIST_DIR)"
 	@rm -rf $(DIST_DIR)
 	@mkdir -p $(DIST_BACKEND_BIN) $(DIST_WEBADMIN_OUTPUT)

@@ -20,10 +20,10 @@ import (
 const (
 	defaultVersion          = "0.1.0"
 	defaultGoVersion        = "1.24"
-	defaultFrameworkVersion = "v0.0.6-alpha"
+	defaultFrameworkVersion = "v0.0.21"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
-	defaultAdminVersion     = "^0.0.1-alpha"
-	defaultClientVersion    = "^0.0.1-alpha"
+	defaultAdminVersion     = "0.0.10"
+	defaultClientVersion    = "0.0.11"
 )
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)
@@ -98,6 +98,7 @@ func runInit(args []string) error {
 
 	pluginName := derivePluginName(pluginID)
 	pluginSlug := derivePluginSlug(pluginID)
+	pluginDBName := derivePluginDBName(pluginID)
 
 	moduleRoot := normalizeModuleRoot(*module, pluginID)
 
@@ -126,6 +127,7 @@ func runInit(args []string) error {
 		PluginID:           pluginID,
 		PluginName:         pluginName,
 		PluginSlug:         pluginSlug,
+		PluginDBName:       pluginDBName,
 		Version:            *version,
 		GoVersion:          *goVersion,
 		BackendModulePath:  backendModule,
@@ -608,6 +610,13 @@ func derivePluginSlug(id string) string {
 	replacer := strings.NewReplacer(".", "-", "_", "-", " ", "-")
 	slug = replacer.Replace(slug)
 	return slug
+}
+
+func derivePluginDBName(id string) string {
+	name := strings.ToLower(id)
+	replacer := strings.NewReplacer(".", "_", "-", "_", " ", "_")
+	name = replacer.Replace(name)
+	return name
 }
 
 func detectFrameworkReplace(backendDir string) string {

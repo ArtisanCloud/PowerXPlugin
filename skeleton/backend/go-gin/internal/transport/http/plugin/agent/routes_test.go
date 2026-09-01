@@ -159,6 +159,16 @@ func TestListSessionsUsesPluginBackendGateway(t *testing.T) {
 	require.Contains(t, w.Body.String(), "10000000-0000-4000-8000-000000000101")
 }
 
+func TestMapAgentStreamErrorPreservesStableUpstreamStatus(t *testing.T) {
+	status, code := mapAgentStreamError(&gateway.PlatformAPIError{StatusCode: http.StatusForbidden})
+	require.Equal(t, http.StatusForbidden, status)
+	require.Equal(t, "POWERX_AGENT_STREAM_FORBIDDEN", code)
+
+	status, code = mapAgentStreamError(&gateway.PlatformAPIError{StatusCode: http.StatusServiceUnavailable})
+	require.Equal(t, http.StatusBadGateway, status)
+	require.Equal(t, "POWERX_AGENT_STREAM_UPSTREAM_DEPENDENCY", code)
+}
+
 func TestListSessionMessagesUsesPluginBackendGateway(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -287,7 +297,7 @@ func TestGetAgentEffectivePermissionsUsesSkillCapabilityRBAC(t *testing.T) {
 		authx.SetTenantContext(c, authx.TenantContext{
 			TenantUUID:  testTenantUUID,
 			UserID:      42,
-			Permissions: []string{"base.templates:create"},
+			Permissions: []string{"template:create"},
 		})
 		c.Next()
 	})
@@ -304,7 +314,7 @@ func TestGetAgentEffectivePermissionsUsesSkillCapabilityRBAC(t *testing.T) {
 	require.Contains(t, w.Body.String(), `"allowed":true`)
 	require.Contains(t, w.Body.String(), `"action":"delete"`)
 	require.Contains(t, w.Body.String(), `"deny_code":"permission_denied"`)
-	require.Contains(t, w.Body.String(), `"base.templates:create"`)
+	require.Contains(t, w.Body.String(), `"template:create"`)
 }
 
 func TestGetAgentEffectivePermissionsLooksUpAgentByGatewayTenantAndAuthorizesUserTenant(t *testing.T) {
@@ -346,7 +356,7 @@ func TestGetAgentEffectivePermissionsLooksUpAgentByGatewayTenantAndAuthorizesUse
 		authx.SetTenantContext(c, authx.TenantContext{
 			TenantUUID:  testOriginTenantUUID,
 			UserID:      42,
-			Permissions: []string{"base.templates:create"},
+			Permissions: []string{"template:create"},
 		})
 		c.Next()
 	})

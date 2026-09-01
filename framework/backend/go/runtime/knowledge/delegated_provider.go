@@ -17,6 +17,13 @@ type CatalogDelegatedClient interface {
 	GetKnowledgeCatalog(ctx context.Context) (*KnowledgeCatalog, error)
 }
 
+// CapabilityDelegatedClient declares the operations actually exposed by the
+// Host Contract. Without this declaration, delegated providers expose no
+// business operation rather than guessing from a client implementation.
+type CapabilityDelegatedClient interface {
+	DelegatedCapabilities(ctx context.Context) ProviderCapabilities
+}
+
 type DelegatedProviderConfig struct {
 	Name    string
 	Client  DelegatedClient
@@ -41,14 +48,23 @@ func (p *DelegatedProvider) Name() string { return p.name }
 
 func (p *DelegatedProvider) Mode() string { return ProviderModeDelegated }
 
-func (p *DelegatedProvider) Capabilities(context.Context) ProviderCapabilities {
-	return BasicCapabilities(p.name, ProviderModeDelegated, OperationSearch, OperationUpsert, OperationDelete, OperationReindex, OperationHealth, OperationCatalog)
+func (p *DelegatedProvider) Capabilities(ctx context.Context) ProviderCapabilities {
+	if client, ok := p.client.(CapabilityDelegatedClient); ok && client != nil {
+		caps := client.DelegatedCapabilities(ctx)
+		caps.Provider = p.name
+		caps.Mode = ProviderModeDelegated
+		return caps
+	}
+	return BasicCapabilities(p.name, ProviderModeDelegated, OperationHealth)
 }
 
 func (p *DelegatedProvider) Catalog(ctx context.Context) (*KnowledgeCatalog, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationCatalog); err != nil {
+		return nil, err
+	}
 	client, ok := p.client.(CatalogDelegatedClient)
 	if !ok || client == nil {
-		return DefaultKnowledgeCatalog("framework_delegated_fallback"), nil
+		return nil, &Error{Code: CodeUnsupportedCapability, Message: "knowledge delegated catalog client is unavailable", Provider: p.name, Operation: OperationCatalog}
 	}
 	callCtx, cancel := p.withTimeout(ctx)
 	defer cancel()
@@ -57,12 +73,15 @@ func (p *DelegatedProvider) Catalog(ctx context.Context) (*KnowledgeCatalog, err
 		return nil, p.mapError(OperationCatalog, "", err)
 	}
 	if catalog == nil {
-		return DefaultKnowledgeCatalog("framework_delegated_empty_fallback"), nil
+		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated catalog response is empty", Provider: p.name, Operation: OperationCatalog, Retryable: true}
 	}
 	return catalog, nil
 }
 
 func (p *DelegatedProvider) ListSpaces(ctx context.Context, input ListSpacesInput) ([]KnowledgeSpace, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationRetrieve); err != nil {
+		return nil, err
+	}
 	if p.client == nil {
 		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationRetrieve, Retryable: true, TraceID: input.TraceID}
 	}
@@ -80,6 +99,9 @@ func (p *DelegatedProvider) ListSpaces(ctx context.Context, input ListSpacesInpu
 }
 
 func (p *DelegatedProvider) Search(ctx context.Context, query KnowledgeQuery) (*KnowledgeSearchResult, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationSearch); err != nil {
+		return nil, err
+	}
 	if p.client == nil {
 		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationSearch, Retryable: true, TraceID: query.TraceID}
 	}
@@ -97,6 +119,9 @@ func (p *DelegatedProvider) Search(ctx context.Context, query KnowledgeQuery) (*
 }
 
 func (p *DelegatedProvider) UpsertDocument(ctx context.Context, document KnowledgeDocument) (*KnowledgeIndexJob, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationUpsert); err != nil {
+		return nil, err
+	}
 	if p.client == nil {
 		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationUpsert, Retryable: true}
 	}
@@ -114,6 +139,9 @@ func (p *DelegatedProvider) UpsertDocument(ctx context.Context, document Knowled
 }
 
 func (p *DelegatedProvider) DeleteDocument(ctx context.Context, input DeleteDocumentInput) (*KnowledgeIndexJob, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationDelete); err != nil {
+		return nil, err
+	}
 	if p.client == nil {
 		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationDelete, Retryable: true}
 	}
@@ -127,6 +155,9 @@ func (p *DelegatedProvider) DeleteDocument(ctx context.Context, input DeleteDocu
 }
 
 func (p *DelegatedProvider) Reindex(ctx context.Context, input ReindexInput) (*KnowledgeIndexJob, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationReindex); err != nil {
+		return nil, err
+	}
 	if p.client == nil {
 		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationReindex, Retryable: true}
 	}

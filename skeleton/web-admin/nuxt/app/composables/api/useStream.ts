@@ -1,5 +1,5 @@
 import { resolveApiBase } from "./_base";
-import { createPluginSSEClient, createPluginWsClient } from "@artisan-cloud/plugin-framework-client";
+import { createRealtimeClient } from "@artisan-cloud/plugin-framework-client";
 
 export interface SSEStreamEvent {
   event: string;
@@ -17,34 +17,27 @@ export interface FetchSSEOptions {
 }
 
 export function createSSE(path: string, params?: Record<string, any>) {
-  return createPluginSSEClient({
-    pluginId: resolvePluginId(),
-    apiBaseURL: resolveApiBase(),
-    token: getOptionalAuthToken(),
-    tenantUuid: getOptionalTenantUUID(),
-    withCredentials: false,
-  }).connect({ path, params });
+  return createRealtime().connectSSE({ path, params });
 }
 
 export async function createFetchSSE(options: FetchSSEOptions) {
-  await createPluginSSEClient({
+  await createRealtime().streamSSE(options);
+}
+
+export function createWS(path: string) {
+  return createRealtime().connectWS({
+    wsPath: path.startsWith("/") ? path : `/${path}`,
+  });
+}
+
+function createRealtime() {
+  return createRealtimeClient({
     pluginId: resolvePluginId(),
     apiBaseURL: resolveApiBase(),
     token: getOptionalAuthToken(),
     tenantUuid: getOptionalTenantUUID(),
     withCredentials: false,
-  }).stream(options);
-}
-
-export function createWS(path: string) {
-  const client = createPluginWsClient({
-    pluginId: resolvePluginId(),
-    apiBaseURL: resolveApiBase(),
-    wsPath: path.startsWith("/") ? path : `/${path}`,
-    token: getOptionalAuthToken(),
-    tenantUuid: getOptionalTenantUUID(),
   });
-  return client.connect();
 }
 
 function resolvePluginId() {

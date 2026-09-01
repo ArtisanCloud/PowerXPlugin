@@ -40,3 +40,9 @@
 - **Alternatives considered**:
   - 继续由 skeleton 定义契约：复用成本高，跨插件一致性差。
 
+## Decision 6: Directory 查询遵循 Host Contract First 与 UUID-only
+
+- **Decision**: framework 仅定义并消费稳定的 `member_uuid`/`user_uuid` DTO；delegated adapter 只能调用 PowerX Core 已发布的 IAM Host API。最小查询为 `GetMember` 与 `BatchGetMembers`。
+- **Rationale**: Core 内部 service、数据库表和 Gateway 原始 `map[string]any` 都不是插件合同；绕过它们会造成版本漂移、租户隔离漏洞和显示字段不一致。
+- **Failure policy**: 成员不存在、无权限、跨租户和上游不可用必须显式失败。显示名无法解析时返回空值或错误，不得将 UUID 当作名称；不提供 local 回退、缓存伪造结果或全量列表查询兜底。
+- **Prerequisite**: 如果 Core 尚未发布按成员 UUID 查询/批量查询的正式接口，应先由 Core 完成接口与 OpenAPI，再实现 delegated adapter。

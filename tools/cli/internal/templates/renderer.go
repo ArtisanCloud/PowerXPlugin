@@ -23,6 +23,7 @@ type Data struct {
 	PluginID           string
 	PluginName         string
 	PluginSlug         string
+	PluginDBName       string
 	Version            string
 	GoVersion          string
 	BackendModulePath  string

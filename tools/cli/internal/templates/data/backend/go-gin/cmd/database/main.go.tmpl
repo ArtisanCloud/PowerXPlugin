@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	// 加载配置
-	cfg, err := config.Load()
+	cfg, err := config.LoadForMigration()
 	if err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
@@ -37,6 +37,9 @@ func main() {
 	providerResolver := pluginbootstrap.NewProviderResolver(cfg)
 	if err := providerResolver.Err(); err != nil {
 		log.Fatalf("[provider] mode resolution failed: %v", err)
+	}
+	if err := validateDatabaseRuntime(cfg, providerResolver); err != nil {
+		log.Fatalf("database runtime boundary validation failed: %v", err)
 	}
 	includeIAM := providerResolver.IsLocal()
 	log.Printf("[provider] mode=%s source=%s includeIAM=%v", providerResolver.Mode(), providerResolver.Source(), includeIAM)

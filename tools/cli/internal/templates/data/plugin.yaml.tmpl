@@ -1,35 +1,17 @@
-# plugin.yaml 是 PowerX 插件管理器读取的 Manifest，声明插件固定的元信息与能力。
-# 生成后请根据实际情况补充描述、数据使用、权限等信息。
 id: {{ .PluginID }}
 name: {{ .PluginName }}
 version: {{ .Version }}
-description: "{{ .PluginName }} 插件描述"
-corex_version: ">=0.1.0"
-security_baseline_version: "2025.10"
-
-data_usage:
-  - purpose: tenant_data_classification
-    type: pii_inventory
-    retention: 365d
-    requires_consent: true
-
+description: "PowerX 基础模板插件，提供模板 CRUD、能力注册与多协议暴露示例。"
 runtime:
   kind: process
   entry: backend/bin/plugin
   env:
     POWERX_BIND_ADDR: ":__POWERX_DYNAMIC_PORT__"
-    POWERX_PROXY: "1"
-    POWERX_PROVIDER_MODE: "delegated"
-    POWERX_PLUGIN_ID: "{{ .PluginID }}"
+    POWERX_PLUGIN_ID: {{ .PluginID }}
     POWERX_PLUGIN_REGISTRATION_MODE: installed
-    POWERX_SECURITY_JWT_ISSUER: "powerx-auth"
-    POWERX_SECURITY_JWT_AUDIENCE: "plugin:{{ .PluginID }}"
-    POWERX_SECURITY_JWT_SECRET: "${POWERX_AUTH_JWTSECRET}"
-  health:
-    http: /healthz
-    interval: 10s
-    timeout: 3s
-
+    POWERX_PROXY: "1"
+    POWERX_PROVIDER_MODE: delegated
+    POWERX_SECURITY_JWT_AUDIENCE: plugin:{{ .PluginID }}
 backend:
   entry: backend/bin/plugin
   # 0 means the PowerX host allocates and injects the runtime port.
@@ -73,7 +55,7 @@ frontend:
         - zh-CN
         - en
     menus:
-      - id: plugins.{{ .PluginID }}
+      - id: console
         title: {{ .PluginName }}
         title_i18n:
           namespace: menus
@@ -85,9 +67,9 @@ frontend:
         order: 20
         slot: group.plugins
         required_policies:
-          - "{{ .PluginID }}:template:read"
+          - menu.console:view
         children:
-          - id: plugins.{{ .PluginID }}.intro
+          - id: intro
             title: {{ .PluginName }} Intro
             title_i18n:
               namespace: menus
@@ -97,7 +79,7 @@ frontend:
             path: /intro
             route: intro
             order: 1
-          - id: plugins.{{ .PluginID }}.templates
+          - id: templates
             title: 模版
             title_i18n:
               namespace: menus
@@ -108,7 +90,7 @@ frontend:
             route: templates
             order: 2
             children:
-              - id: plugins.{{ .PluginID }}.templates.develop
+              - id: develop
                 title: 开发介绍
                 title_i18n:
                   namespace: menus
@@ -118,7 +100,7 @@ frontend:
                 path: /templates/develop
                 route: templates/develop
                 order: 1
-              - id: plugins.{{ .PluginID }}.templates.crud
+              - id: crud
                 title: 模版 CRUD
                 title_i18n:
                   namespace: menus
@@ -128,20 +110,32 @@ frontend:
                 path: /templates/crud
                 route: templates/crud
                 order: 2
-          - id: plugins.{{ .PluginID }}.powerx
+              - id: framework_lab
+                title: framework功能测试
+                title_i18n:
+                  namespace: menus
+                  key: menu.{{ .PluginID }}.templates.framework_lab
+                  default: Framework Function Test
+                icon: i-heroicons-beaker
+                path: /admin/templates/framework-lab
+                route: admin/templates/framework-lab
+                order: 3
+                required_policies:
+                  - menu.console.templates.framework_lab:view
+          - id: powerx
             title: PowerX底座能力
             title_i18n:
               namespace: menus
               key: menu.{{ .PluginID }}.powerx.title
-              default: PowerX Base Capabilities
+              default: {{ .PluginName }} Capabilities
             icon: i-heroicons-cpu-chip
             path: /powerx/knowledge-lab
             route: powerx/knowledge-lab
             order: 3
             required_policies:
-              - "admin:root"
+              - menu.console.powerx:view
             children:
-              - id: plugins.{{ .PluginID }}.powerx.knowledge_lab
+              - id: knowledge_lab
                 title: 知识库调试
                 title_i18n:
                   namespace: menus
@@ -152,28 +146,10 @@ frontend:
                 route: powerx/knowledge-lab
                 order: 1
                 required_policies:
-                  - "admin:root"
-agents:
-  - id: {{ .PluginID }}.assistant
-    plugin_id: {{ .PluginID }}
-    name: {{ .PluginName }} 助理
-    description: "{{ .PluginName }} 内置 Agent"
-    default_tools:
-      - {{ .PluginID }}.template.create
-
-# 工具清单侧重声明接口契约，真实业务参数通过 config.yaml 或环境变量注入
-tools:
-  - id: {{ .PluginID }}.template.create
-    plugin_id: {{ .PluginID }}
-    name: 创建示例
-    description: 创建示例数据
-    transport: http
-    endpoint: ${POWERX_PLUGIN_HTTP_BASE:-/api/v1}/resources
-    method: POST
-    rbac_resource: {{ .PluginID }}:template
-
-dependencies:
-  requires: []
+                  - menu.console.powerx.knowledge_lab:view
+assets:
+  public_dir: ./web-admin/public
+  webAdminPath: ./web-admin/.output
 
 migrations:
   driver: go
@@ -182,10 +158,6 @@ migrations:
   workdir: ./backend
   once: true
   timeout: 60s
-
-assets:
-  public_dir: ./web-admin/public
-  webAdminPath: ./web-admin/.output
 
 checksums:
   package_sha256: ""

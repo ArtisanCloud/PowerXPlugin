@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -544,46 +543,70 @@ func mergeCatalogReferences(manifestPath string, root map[string]any) error {
 	if doc, err := loadCatalog("capabilities"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["capabilities"]; ok {
-			root["capabilities"] = section
+		if err := mergeCatalogSection(root, doc, "capabilities", "capabilities"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("events"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["events"]; ok {
-			root["events"] = section
+		if err := mergeCatalogSection(root, doc, "events", "events"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("agent_tools"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["agent_tools"]; ok {
-			root["agent_tools"] = section
+		if err := mergeCatalogSection(root, doc, "agent_tools", "agent_tools"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("exposure"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["exposure"]; ok {
-			root["exposure"] = section
+		if err := mergeCatalogSection(root, doc, "exposure", "exposure"); err != nil {
+			return err
 		}
 	}
 	if doc, err := loadCatalog("rbac"); err != nil {
 		return err
 	} else if doc != nil {
-		if section, ok := doc["rbac"]; ok {
-			root["rbac"] = section
-		}
-		if section, ok := doc["permissions"]; ok {
-			root["permissions"] = section
-		}
-		if section, ok := doc["routes"]; ok {
-			root["routes"] = section
+		for _, field := range []string{"rbac", "permissions", "routes"} {
+			if err := mergeCatalogSection(root, doc, "rbac", field); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+func mergeCatalogSection(root, catalog map[string]any, catalogName, field string) error {
+	section, ok := catalog[field]
+	if !ok || isEmptyManifestValue(section) {
+		return nil
+	}
+	if existing, exists := root[field]; exists && !isEmptyManifestValue(existing) {
+		return fmt.Errorf("catalog conflict on field %q (catalog=%s)", field, catalogName)
+	}
+	root[field] = section
+	return nil
+}
+
+func isEmptyManifestValue(value any) bool {
+	if value == nil {
+		return true
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed) == ""
+	case []any:
+		return len(typed) == 0
+	case map[string]any:
+		return len(typed) == 0
+	default:
+		return false
+	}
 }
 
 func resolveManifestPath() string {
@@ -599,17 +622,31 @@ func resolveManifestPath() string {
 		filepath.Join(cwd, "..", "plugin.yaml"),
 		filepath.Join(cwd, "..", "..", "plugin.yaml"),
 	}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		dir := filepath.Dir(file)
-		candidates = append(candidates,
-			filepath.Join(dir, "..", "..", "..", "..", "plugin.yaml"),
-			filepath.Join(dir, "..", "..", "..", "..", "..", "plugin.yaml"),
-		)
-	}
 	for _, cand := range candidates {
 		if info, err := os.Stat(cand); err == nil && !info.IsDir() {
 			return cand
 		}
+	}
+	if exe, err := os.Executable(); err == nil {
+		if found := findManifestFrom(filepath.Dir(exe)); found != "" {
+			return found
+		}
+	}
+	return ""
+}
+
+func findManifestFrom(start string) string {
+	current := filepath.Clean(start)
+	for i := 0; i < 8; i++ {
+		candidate := filepath.Join(current, "plugin.yaml")
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
 	}
 	return ""
 }
@@ -812,20 +849,16 @@ func resolveCatalogFilePath(pathValue string) (string, string) {
 		return base, ""
 	}
 
-	candidates := make([]string, 0, 8)
+	candidates := make([]string, 0, 3)
 	if manifestPath := resolveManifestPath(); manifestPath != "" {
 		manifestDir := filepath.Dir(manifestPath)
 		candidates = append(candidates,
 			filepath.Join(manifestDir, "capabilities", "catalog.json"),
-			filepath.Join(manifestDir, "..", "capabilities", "catalog.json"),
 		)
 	}
 	if cwd != "" {
 		candidates = append(candidates,
-			filepath.Join(cwd, "skeleton", "capabilities", "catalog.json"),
 			filepath.Join(cwd, "..", "capabilities", "catalog.json"),
-			filepath.Join(cwd, "..", "..", "capabilities", "catalog.json"),
-			filepath.Join(cwd, "..", "..", "..", "capabilities", "catalog.json"),
 		)
 	}
 

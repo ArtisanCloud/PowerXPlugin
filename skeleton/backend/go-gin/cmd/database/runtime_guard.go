@@ -1,0 +1,53 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+)
+
+func validateDatabaseRuntime(cfg *config.Config, resolver *pluginbootstrap.ProviderResolver) error {
+	if cfg == nil || cfg.Database == nil {
+		return fmt.Errorf("database runtime config is required")
+	}
+	if resolver == nil {
+		return fmt.Errorf("provider mode is required")
+	}
+	if !resolver.IsDelegated() {
+		return nil
+	}
+
+	pluginSchema := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_DB_SCHEMA"))
+	dbSchemaEnv := strings.TrimSpace(os.Getenv("POWERX_DB_SCHEMA"))
+	cfgSchema := strings.TrimSpace(cfg.Database.Schema)
+	if pluginSchema == "" {
+		return fmt.Errorf("delegated database setup requires POWERX_PLUGIN_DB_SCHEMA")
+	}
+	if dbSchemaEnv == "" {
+		return fmt.Errorf("delegated database setup requires POWERX_DB_SCHEMA")
+	}
+	if cfgSchema == "" {
+		return fmt.Errorf("delegated database setup requires database.schema")
+	}
+	if pluginSchema != dbSchemaEnv || pluginSchema != cfgSchema {
+		return fmt.Errorf("delegated database schema mismatch: POWERX_PLUGIN_DB_SCHEMA=%s POWERX_DB_SCHEMA=%s database.schema=%s", pluginSchema, dbSchemaEnv, cfgSchema)
+	}
+	if err := validateDelegatedPluginSchema(pluginSchema); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateDelegatedPluginSchema(schema string) error {
+	norm := strings.ToLower(strings.TrimSpace(schema))
+	if norm == "" {
+		return fmt.Errorf("delegated database setup refuses empty schema")
+	}
+	if norm == "public" || norm == "information_schema" || norm == "pg_catalog" || strings.HasPrefix(norm, "pg_") {
+		return fmt.Errorf("delegated database setup refuses protected schema: %s", schema)
+	}
+	return nil
+}

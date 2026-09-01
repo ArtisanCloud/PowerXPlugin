@@ -11,7 +11,7 @@ description_i18n:
   zh: 更新模板内容的原子能力，覆盖名称/描述/正文。
   en: Update template content, including name, description, and body.
 rbac:
-  resource: base.templates
+  resource: template
   actions: [update]
 provides:
   - id: schema/input/com.powerx.plugins.base.template.update.v1

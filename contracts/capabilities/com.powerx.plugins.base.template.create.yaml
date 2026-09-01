@@ -11,7 +11,7 @@ description_i18n:
   zh: 创建模板的原子能力，暴露 REST/gRPC/Workflow/Agent 多协议入口。
   en: Create a template through REST, gRPC, workflow, or agent entry points.
 rbac:
-  resource: base.templates
+  resource: template
   actions: [create]
 provides:
   - id: schema/input/com.powerx.plugins.base.template.create.v1

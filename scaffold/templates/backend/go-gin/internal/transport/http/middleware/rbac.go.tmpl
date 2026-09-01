@@ -13,7 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RBAC 仅做粗粒度权限判定；在 DelegateToPowerX 模式下只校验令牌来源
+// RBAC checks route permissions in both local and delegated modes. Delegated
+// mode first verifies the PowerX token source, then still uses the route table
+// and PowerX-issued permission snapshot for plugin-side secondary authz.
 func RBAC(cfg *authx.RBACConfig, _ authx.ABACClient, _ func(string, string) (bool, map[string]any)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if cfg == nil || !cfg.Enabled || c.Request.Method == http.MethodOptions {
@@ -30,24 +32,31 @@ func RBAC(cfg *authx.RBACConfig, _ authx.ABACClient, _ func(string, string) (boo
 			return
 		}
 
-		if cfg.DelegateToPowerX {
-			if allowPowerXDelegate(c, cfg) {
-				c.Next()
-			} else {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"error": "PowerX delegated authentication required",
-					"hint":  "请在宿主 PowerX 登录后再访问插件，或设置 POWERX_PROXY=0 运行 Standalone 模式",
-				})
-			}
-			return
-		}
-
 		tc, ok := authx.GetTenantContext(c)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Role Authentication required"})
 			return
 		}
-		if authx.IsSuperAdmin(tc.Roles, cfg.SuperAdminRoles) {
+
+		if cfg.DelegateToPowerX {
+			if allowPowerXDelegate(c, cfg) {
+				if err := validateDelegatedAuthzSnapshot(tc); err != nil {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+						"error":  "PowerX delegated authorization snapshot invalid",
+						"reason": err.Error(),
+					})
+					return
+				}
+			} else {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": "PowerX delegated authentication required",
+					"hint":  "请在宿主 PowerX 登录后再访问插件，或设置 POWERX_PROXY=0 运行 Standalone 模式",
+				})
+				return
+			}
+		}
+
+		if tc.IsRoot || authx.IsSuperAdmin(tc.Roles, cfg.SuperAdminRoles) {
 			c.Next()
 			return
 		}
@@ -111,6 +120,26 @@ func allowPowerXDelegate(c *gin.Context, cfg *authx.RBACConfig) bool {
 		return false
 	}
 	return true
+}
+
+func validateDelegatedAuthzSnapshot(tc authx.TenantContext) error {
+	if strings.TrimSpace(tc.PolicyVersion) == "" {
+		return errors.New("policy_version missing")
+	}
+	if strings.TrimSpace(tc.PermsHash) == "" {
+		return errors.New("perms_hash missing")
+	}
+	source := strings.TrimSpace(tc.AuthzSource)
+	switch source {
+	case "claims", "signed_claims", "signed_context", "introspection":
+		return nil
+	case "":
+		return errors.New("source missing")
+	case "local_mock":
+		return errors.New("local_mock source is not valid for delegated mode")
+	default:
+		return errors.New("source invalid")
+	}
 }
 
 func decodeJWTClaims(raw string) (map[string]any, error) {

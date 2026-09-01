@@ -100,7 +100,8 @@ POST /api/v1/admin/scheduler/jobs/{job_id}/resume
 
 3. host Scheduler 请求不传 `tenant_uuid`。租户由 PowerX 根据 ApiKey/Bearer 鉴权上下文解析；若插件显式传入 `tenant_uuid`，framework host client 也会在出站前清空。
 4. `owner_type/owner_id` 表示调度任务归属，测试按钮默认使用当前 skeleton 插件 ID。PowerX 对 owner 的最终授权以底座实现为准。
-5. PowerX API Key Profile 必须包含 `com.corex.scheduler.jobs` 对应 REST 权限。权限目录中应能看到并勾选 `admin_scheduler_jobs`、`admin_scheduler_jobs_job_id`、`pause/resume/trigger/runs` 等资源。
+5. `local + proxy` 使用 ApiKey 时，PowerX API Key Profile 必须包含 `com.corex.scheduler.jobs` 对应 REST 权限。权限目录中应能看到并勾选 `admin_scheduler_jobs`、`admin_scheduler_jobs_job_id`、`pause/resume/trigger/runs` 等资源。
+6. `delegated + POWERX_PROXY=1` 使用 STS/Bearer 时，PowerX Core 必须把 `/api/v1/admin/scheduler/jobs` 系列声明为插件服务运行时合同并加入 STS direct route policy。否则插件会收到 `scheduler host request failed: status=403 ... sts token not allowed for this route`。
 
 ## 4. 配置建议（最小可用）
 
@@ -304,9 +305,10 @@ await scheduler.createJob({
 3. `401`：`gateway.auth_scheme` 与实际凭证不匹配（Bearer/ApiKey 混用）。
 4. 两种模式行为不一致：优先检查 `POWERX_PROXY` 与 `taskbus_provider` 是否按决策表配对。
 5. API Key 权限页看不到 Scheduler：检查 PowerX `backend/config/platform_capabilities/*.yaml` 是否已为 `com.corex.scheduler.jobs` 注册 REST protocols，并重新 seed/刷新权限目录。
-6. `SCHEDULER_TENANT_MISMATCH`：host 调用不应传 `tenant_uuid`，检查插件是否已使用 framework host client，且 PowerX API key 解析出的租户是否正确。
-7. `SCHEDULER_PLUGIN_OWNER_MISMATCH`：说明请求已进入 PowerX Scheduler 服务内部 owner 校验，先确认 PowerX 已按 ApiKey REST 权限链路适配 owner 授权。
-8. 底座 SchedulerService 只存在 proto/capability 但不可调用：先补底座服务实现与 framework HostProvider，再接入业务插件。
+6. `sts token not allowed for this route`：检查 PowerX Core 的 STS direct route policy 是否显式允许 `GET/POST /api/v1/admin/scheduler/jobs`、`GET/PATCH /api/v1/admin/scheduler/jobs/{job_id}`、`POST /trigger|pause|resume`、`GET /runs`。这不是插件 page/api RBAC，也不是 topic ACL。
+7. `SCHEDULER_TENANT_MISMATCH`：host 调用不应传 `tenant_uuid`，检查插件是否已使用 framework host client，且 PowerX API key 解析出的租户是否正确。
+8. `SCHEDULER_PLUGIN_OWNER_MISMATCH`：说明请求已进入 PowerX Scheduler 服务内部 owner 校验，先确认 PowerX 已按 ApiKey REST 权限链路适配 owner 授权。
+9. 底座 SchedulerService 只存在 proto/capability 但不可调用：先补底座服务实现与 framework HostProvider，再接入业务插件。
 
 ## 9. 当前代码实现映射
 

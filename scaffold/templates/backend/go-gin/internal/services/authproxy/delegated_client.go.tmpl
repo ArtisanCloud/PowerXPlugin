@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -168,6 +168,126 @@ func (c *DelegatedClient) ResolveIdentityContext(ctx context.Context, accessToke
 	return IdentityContextFromMeContext(me)
 }
 
+type DirectoryMember struct {
+	MemberUUID  string `json:"member_uuid"`
+	TenantUUID  string `json:"tenant_uuid"`
+	UserUUID    string `json:"user_uuid"`
+	DisplayName string `json:"display_name,omitempty"`
+	Status      int16  `json:"status"`
+}
+type DirectoryMemberResolution struct {
+	Items              []DirectoryMember `json:"items"`
+	MissingMemberUUIDs []string          `json:"missing_member_uuids"`
+}
+type DirectoryDepartment struct {
+	DepartmentUUID       string `json:"department_uuid"`
+	TenantUUID           string `json:"tenant_uuid"`
+	Name                 string `json:"name"`
+	Code                 string `json:"code"`
+	ParentDepartmentUUID string `json:"parent_department_uuid"`
+}
+type DirectoryRole struct {
+	RoleUUID    string `json:"role_uuid"`
+	TenantUUID  string `json:"tenant_uuid"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+type DirectoryPermission struct {
+	PermissionUUID string `json:"permission_uuid"`
+	Resource       string `json:"resource"`
+	Action         string `json:"action"`
+	Scope          string `json:"scope"`
+}
+type AuthorizationDecision struct {
+	Allowed    bool   `json:"allowed"`
+	ReasonCode string `json:"reason_code"`
+}
+
+// DirectoryAuthorizationRequest is the fixed Host Contract payload for
+// tenant-scoped IAM authorization checks. Keep dynamic Gateway maps outside
+// the Framework and delegated adapter boundary.
+type DirectoryAuthorizationRequest struct {
+	MemberUUID string `json:"member_uuid,omitempty"`
+	UserUUID   string `json:"user_uuid,omitempty"`
+	Resource   string `json:"resource"`
+	Action     string `json:"action"`
+	TraceID    string `json:"trace_id,omitempty"`
+}
+
+func (c *DelegatedClient) ListDirectoryDepartments(ctx context.Context) ([]DirectoryDepartment, error) {
+	var r struct {
+		Items []DirectoryDepartment `json:"items"`
+	}
+	if e := c.get(ctx, "/tenant/iam/departments", &r, nil); e != nil {
+		return nil, e
+	}
+	return r.Items, nil
+}
+func (c *DelegatedClient) ListDirectoryRoles(ctx context.Context) ([]DirectoryRole, error) {
+	var r struct {
+		Items []DirectoryRole `json:"items"`
+	}
+	if e := c.get(ctx, "/tenant/iam/roles", &r, nil); e != nil {
+		return nil, e
+	}
+	return r.Items, nil
+}
+func (c *DelegatedClient) ListDirectoryPermissions(ctx context.Context) ([]DirectoryPermission, error) {
+	var r struct {
+		Items []DirectoryPermission `json:"items"`
+	}
+	if e := c.get(ctx, "/tenant/iam/permissions", &r, nil); e != nil {
+		return nil, e
+	}
+	return r.Items, nil
+}
+func (c *DelegatedClient) CheckDirectoryAuthorization(ctx context.Context, request DirectoryAuthorizationRequest) (*AuthorizationDecision, error) {
+	var r AuthorizationDecision
+	if e := c.post(ctx, "/tenant/iam/authorization:check", request, &r, nil); e != nil {
+		return nil, e
+	}
+	return &r, nil
+}
+
+func (c *DelegatedClient) GetDirectoryMember(ctx context.Context, memberUUID string) (*DirectoryMember, error) {
+	memberUUID = strings.TrimSpace(memberUUID)
+	if memberUUID == "" {
+		return nil, fmt.Errorf("authproxy: member_uuid required")
+	}
+	var member DirectoryMember
+	if err := c.get(ctx, "/tenant/iam/members/"+url.PathEscape(memberUUID), &member, nil); err != nil {
+		return nil, err
+	}
+	return &member, nil
+}
+
+func (c *DelegatedClient) BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]DirectoryMember, error) {
+	if len(memberUUIDs) == 0 {
+		return nil, fmt.Errorf("authproxy: member_uuids required")
+	}
+	var response struct {
+		Items []DirectoryMember `json:"items"`
+	}
+	if err := c.post(ctx, "/tenant/iam/members:batch-get", map[string]any{"member_uuids": memberUUIDs}, &response, nil); err != nil {
+		return nil, err
+	}
+	return response.Items, nil
+}
+
+// BatchResolveDirectoryMembers resolves historical member references. Unlike
+// BatchGetDirectoryMembers, missing members are represented in the response.
+func (c *DelegatedClient) BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*DirectoryMemberResolution, error) {
+	if len(memberUUIDs) == 0 {
+		return nil, fmt.Errorf("authproxy: member_uuids required")
+	}
+	var response DirectoryMemberResolution
+	if err := c.post(ctx, "/tenant/iam/members:batch-resolve", map[string]any{"member_uuids": memberUUIDs}, &response, nil); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
 // ----- HTTP helpers -----
 
 type loginResponse struct {
@@ -178,6 +298,8 @@ type loginResponse struct {
 	Scope         string `json:"scope"`
 	PluginID      string `json:"plugin_id,omitempty"`
 	PolicyVersion string `json:"policy_version,omitempty"`
+	PermsHash     string `json:"perms_hash,omitempty"`
+	AuthzSource   string `json:"source,omitempty"`
 }
 
 func (lr loginResponse) toTokens(refresh string) *iamservice.AuthTokens {
@@ -191,6 +313,8 @@ func (lr loginResponse) toTokens(refresh string) *iamservice.AuthTokens {
 		ExpiresAt:     expires,
 		PluginID:      lr.PluginID,
 		PolicyVersion: lr.PolicyVersion,
+		PermsHash:     lr.PermsHash,
+		AuthzSource:   lr.AuthzSource,
 	}
 }
 
@@ -285,6 +409,7 @@ func (h *hostSuccess) UnmarshalJSON(data []byte) error {
 // ProxyError captures upstream HTTP failures.
 type ProxyError struct {
 	Status         int
+	ReasonCode     string
 	Message        string
 	UpstreamMethod string
 	UpstreamPath   string
@@ -306,10 +431,11 @@ func (e *ProxyError) Error() string {
 func parseProxyError(req *http.Request, resp *http.Response) error {
 	body, _ := io.ReadAll(resp.Body)
 	var errResp struct {
-		Code      int    `json:"code"`
-		Message   string `json:"message"`
-		Error     string `json:"error"`
-		ErrorCode string `json:"error_code"`
+		Code       int    `json:"code"`
+		Message    string `json:"message"`
+		Error      string `json:"error"`
+		ErrorCode  string `json:"error_code"`
+		ReasonCode string `json:"reason_code"`
 	}
 	msg := resp.Status
 	if len(body) > 0 {
@@ -339,6 +465,7 @@ func parseProxyError(req *http.Request, resp *http.Response) error {
 	}
 	return &ProxyError{
 		Status:         resp.StatusCode,
+		ReasonCode:     strings.TrimSpace(firstNonEmpty(errResp.ReasonCode, errResp.ErrorCode)),
 		Message:        msg,
 		UpstreamMethod: upstreamMethod,
 		UpstreamPath:   upstreamPath,
@@ -356,6 +483,10 @@ type MeContext struct {
 	Members           []MeMemberBrief `json:"members"`
 	Roles             []string        `json:"roles,omitempty"`
 	Permissions       []string        `json:"permissions,omitempty"`
+	PermissionCodes   []string        `json:"permission_codes,omitempty"`
+	PolicyVersion     string          `json:"policy_version,omitempty"`
+	PermsHash         string          `json:"perms_hash,omitempty"`
+	Source            string          `json:"source,omitempty"`
 	Capabilities      any             `json:"capabilities,omitempty"`
 }
 
@@ -400,13 +531,14 @@ func IdentityContextFromMeContext(me *MeContext) (*fwiamcontracts.IdentityContex
 		Roles:       normalizeStringSlice(me.Roles),
 		Permissions: normalizeStringSlice(me.Permissions),
 	}
-	if me.User != nil && me.User.ID > 0 {
-		identity.UserID = strconv.FormatUint(me.User.ID, 10)
+	if me.User != nil {
+		identity.UserUUID = firstNonEmpty(me.User.UserUUID, me.User.UUID)
 	}
-	if me.CurrentMemberID != nil && *me.CurrentMemberID > 0 {
-		identity.MemberID = strconv.FormatUint(*me.CurrentMemberID, 10)
-	} else if len(me.Members) > 0 && me.Members[0].MemberID > 0 {
-		identity.MemberID = strconv.FormatUint(me.Members[0].MemberID, 10)
+	if len(me.Members) > 0 {
+		identity.MemberUUID = strings.TrimSpace(me.Members[0].MemberUUID)
+	}
+	if identity.UserUUID == "" || identity.MemberUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated identity context is missing user_uuid or member_uuid")
 	}
 	return identity, nil
 }
@@ -426,4 +558,13 @@ func normalizeStringSlice(values []string) []string {
 		result = append(result, normalized)
 	}
 	return result
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }

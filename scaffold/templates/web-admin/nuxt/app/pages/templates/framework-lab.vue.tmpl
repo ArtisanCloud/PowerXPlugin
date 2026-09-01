@@ -228,7 +228,7 @@ const canUseHostScheduler = computed(() => resolveFrontendRuntimeMode().mode !==
 const canCreateSchedulerSample = computed(() => schedulerMode.value === "local" || canUseHostScheduler.value)
 const schedulerResolvedTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim())
 const schedulerTenantUUID = computed(() => schedulerMode.value === "local" ? (schedulerResolvedTenantUUID.value || "00000000-0000-0000-0000-000000000001") : "")
-const schedulerPluginID = "com.powerx.plugins.base"
+const schedulerPluginID = "{{ .PluginID }}"
 const schedulerRequestOptions = computed(() => ({
   ...(schedulerTenantUUID.value ? { tenant_uuid: schedulerTenantUUID.value } : {}),
   provider_mode: schedulerMode.value,
@@ -244,7 +244,7 @@ const userStore = useUserStore()
 const auth = useAuth()
 const resolvedTenantNotifyTopic = computed(() => {
   const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim()
-  return tenantUUID ? `plugin.notify.tenant.${tenantUUID}` : ""
+  return tenantUUID ? `_topic.notify.tenant.${tenantUUID}` : ""
 })
 const gatewayProbe = useNotificationProbe("gateway", "_topic.system.notification")
 const localProbe = useNotificationProbe("local", "")
@@ -261,9 +261,9 @@ const notificationLastEventAt = computed(() => String(notificationProbe.value.la
 const notificationWsDiag = computed(() => notificationProbe.value.wsDiag.value)
 const memberNotifyTopic = computed(() => {
   const memberUUID = ensureMemberUUID()
-  return memberUUID ? `plugin.notify.member.${memberUUID}` : ""
+  return memberUUID ? `_topic.notify.member.${memberUUID}` : ""
 })
-const schedulerNotifyTopic = computed(() => schedulerTenantUUID.value ? `plugin.notify.tenant.${schedulerTenantUUID.value}` : resolvedTenantNotifyTopic.value)
+const schedulerNotifyTopic = computed(() => schedulerTenantUUID.value ? `_topic.notify.tenant.${schedulerTenantUUID.value}` : resolvedTenantNotifyTopic.value)
 const schedulerLastNotifyAt = computed(() => String(schedulerProbe.lastEventAt.value || ""))
 const schedulerLastNotifyEvent = computed(() => schedulerProbe.events.value[0] || null)
 const schedulerLastNotifyTitle = computed(() => String(schedulerLastNotifyEvent.value?.title || ""))
@@ -395,7 +395,7 @@ const sendCapabilityNotification = async () => {
   }
   capabilityNotifying.value = true
   try {
-    const memberTopic = `plugin.notify.member.${targetMemberUUID}`
+    const memberTopic = `_topic.notify.member.${targetMemberUUID}`
     capabilityNotifyMemberUUID.value = targetMemberUUID
     notificationTarget.value = "插件本地通知"
     capabilityNotifyTopic.value = memberTopic
@@ -487,8 +487,8 @@ const runLocalWSFlow = async () => {
   localWsTenantFromConnection.value = tenantFromConnection
   localWsTenantFromPublish.value = tenantUUID
   localWsTopic.value = tenantUUID
-    ? `plugin.notify.tenant.${tenantUUID}`
-    : "plugin.notify.tenant.00000000-0000-0000-0000-000000000001"
+    ? `_topic.notify.tenant.${tenantUUID}`
+    : "_topic.notify.tenant.00000000-0000-0000-0000-000000000001"
   try {
     localProbe.connect()
     localProbe.subscribeTopic(localWsTopic.value)

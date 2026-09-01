@@ -87,7 +87,7 @@ func (c *Client) StreamSSE(ctx context.Context, query url.Values) ([]AgentStream
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, &Error{Code: ErrCodeTransport, Message: resp.Status}
+		return nil, transportError(resp)
 	}
 	return DecodeSSE(resp.Body)
 }

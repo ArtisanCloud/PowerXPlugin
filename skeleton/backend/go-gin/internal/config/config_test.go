@@ -125,6 +125,61 @@ func TestLoadAppliesEnvOverrides(t *testing.T) {
 	}
 }
 
+func TestLoadAppliesPluginSchemaEnvWhenDatabaseSchemaEnvMissing(t *testing.T) {
+	const (
+		dsn    = "postgres://user:pass@127.0.0.1:5432/powerx_test?sslmode=disable"
+		schema = "px_com_powerx_plugin_demo"
+	)
+
+	t.Setenv("POWERX_DB_DSN", dsn)
+	t.Setenv("POWERX_PLUGIN_DB_SCHEMA", schema)
+	t.Setenv("POWERX_DEV_MODE", "true")
+	t.Setenv("POWERX_PROVIDER_MODE", "local")
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "config.yaml")
+	configContent := "server:\n  bind_addr: \"127.0.0.1:0\"\ndatabase:\n  schema: \"public\"\nlogging:\n  debug_mode: true\n"
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("写入测试配置失败: %v", err)
+	}
+	t.Setenv("CONFIG_PATH", tempDir)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("加载配置失败: %v", err)
+	}
+	if cfg.Database == nil || cfg.Database.Schema != schema {
+		t.Fatalf("POWERX_PLUGIN_DB_SCHEMA 未生效，database=%#v", cfg.Database)
+	}
+}
+
+func TestLoadForMigrationSkipsRuntimeGatewaySTSValidation(t *testing.T) {
+	tempDir := t.TempDir()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("获取当前目录失败: %v", err)
+	}
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("切换工作目录失败: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+
+	t.Setenv("POWERX_PROVIDER_MODE", "delegated")
+	t.Setenv("POWERX_PROXY", "1")
+	t.Setenv("PX_GATEWAY_BASE_URL", "http://127.0.0.1:8077")
+	t.Setenv("PX_GATEWAY_AUTH_SCHEME", "bearer")
+	t.Setenv("POWERX_DB_DSN", "postgres://user:pass@127.0.0.1:5432/powerx_test?sslmode=disable")
+	t.Setenv("POWERX_DB_SCHEMA", "px_com_powerx_plugins_base")
+	t.Setenv("POWERX_PLUGIN_DB_SCHEMA", "px_com_powerx_plugins_base")
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "STS client") {
+		t.Fatalf("Load() should still enforce runtime gateway STS validation, err=%v", err)
+	}
+	if _, err := LoadForMigration(); err != nil {
+		t.Fatalf("LoadForMigration() should skip runtime gateway STS validation: %v", err)
+	}
+}
+
 func TestLoadMapsHostWebAdminOriginsToCORS(t *testing.T) {
 	tempDir := t.TempDir()
 	configContent := strings.Join([]string{

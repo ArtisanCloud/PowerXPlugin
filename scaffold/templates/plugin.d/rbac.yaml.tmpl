@@ -1,57 +1,2270 @@
+permissions:
+  - data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows viewing the PowerX Base plugin admin menu entries.
+      zh-CN: 允许查看 PowerX Base 插件后台菜单入口。
+    menu_path:
+      - console
+    module: console
+    page_permission_codes:
+      - console.page:read
+    permission_code: menu.console:view
+    risk_level: low
+    title_i18n:
+      en: PowerX Base plugin menu
+      zh-CN: PowerX Base 插件菜单
+    type: menu
+  - data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows viewing the framework lab menu entry.
+      zh-CN: 允许查看 Framework 功能测试菜单入口。
+    menu_path:
+      - console
+      - templates
+      - framework_lab
+    module: console
+    page_permission_codes:
+      - console.page:read
+    permission_code: menu.console.templates.framework_lab:view
+    risk_level: low
+    title_i18n:
+      en: Framework lab menu
+      zh-CN: Framework 功能测试菜单
+    type: menu
+  - data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows viewing the PowerX base capability menu entry.
+      zh-CN: 允许查看 PowerX 底座能力菜单入口。
+    menu_path:
+      - console
+      - powerx
+    module: console
+    page_permission_codes:
+      - console.page:read
+    permission_code: menu.console.powerx:view
+    risk_level: low
+    title_i18n:
+      en: PowerX base capabilities menu
+      zh-CN: PowerX 底座能力菜单
+    type: menu
+  - data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows viewing the knowledge lab menu entry.
+      zh-CN: 允许查看知识库调试菜单入口。
+    menu_path:
+      - console
+      - powerx
+      - knowledge_lab
+    module: console
+    page_permission_codes:
+      - console.page:read
+    permission_code: menu.console.powerx.knowledge_lab:view
+    risk_level: low
+    title_i18n:
+      en: Knowledge lab menu
+      zh-CN: 知识库调试菜单
+    type: menu
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows access to PowerX Base plugin admin sample, template, and capability pages.
+      zh-CN: 允许访问 PowerX Base 插件后台示例页面、模板页面和基础能力页面。
+    module: console
+    permission_code: console.page:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /intro
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /templates
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /templates/develop
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /templates/crud
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/templates/framework-lab
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /powerx/knowledge-lab
+        resource_scope: tenant
+    resource: page
+    risk_level: low
+    title_i18n:
+      en: Read PowerX Base plugin admin pages
+      zh-CN: PowerX Base 插件后台页面读取
+    type: page
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading customer admin records exposed by the plugin.
+      zh-CN: 允许读取插件暴露的客户后台记录。
+    module: customer
+    permission_code: customer.account:read
+    resource: account
+    risk_level: low
+    title_i18n:
+      en: Read customer records
+      zh-CN: 读取客户记录
+    type: action
+  - action: create
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows creating customer admin records exposed by the plugin.
+      zh-CN: 允许创建插件暴露的客户后台记录。
+    module: customer
+    permission_code: customer.account:create
+    resource: account
+    risk_level: medium
+    title_i18n:
+      en: Create customer records
+      zh-CN: 创建客户记录
+    type: action
+  - action: read
+    business_permission_code: customer.account:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling customer read APIs exposed by the plugin.
+      zh-CN: 允许调用插件暴露的客户读取接口。
+    module: customer
+    permission_code: customer.account_api:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/mode
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/overview
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/accounts
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/accounts/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/identities
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/memberships
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/login-events
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/customers/mini-app-entries
+        resource_scope: tenant
+    resource: account_api
+    risk_level: low
+    title_i18n:
+      en: Customer read APIs
+      zh-CN: 客户读取接口
+    type: api
+  - action: create
+    business_permission_code: customer.account:create
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling customer create APIs exposed by the plugin.
+      zh-CN: 允许调用插件暴露的客户创建接口。
+    module: customer
+    permission_code: customer.account_api:create
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/customers/accounts
+        resource_scope: tenant
+    resource: account_api
+    risk_level: medium
+    title_i18n:
+      en: Customer create APIs
+      zh-CN: 客户创建接口
+    type: api
+  - action: update
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows updating customer admin records exposed by the plugin.
+      zh-CN: 允许更新插件暴露的客户后台记录。
+    module: customer
+    permission_code: customer.account:update
+    resource: account
+    risk_level: medium
+    title_i18n:
+      en: Update customer records
+      zh-CN: 更新客户记录
+    type: action
+  - action: update
+    business_permission_code: customer.account:update
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling customer update APIs exposed by the plugin.
+      zh-CN: 允许调用插件暴露的客户更新接口。
+    module: customer
+    permission_code: customer.account_api:update
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/customers/accounts/*
+        resource_scope: tenant
+    resource: account_api
+    risk_level: medium
+    title_i18n:
+      en: Customer update APIs
+      zh-CN: 客户更新接口
+    type: api
+  - action: invoke
+    business_permission_code: runtime.ops:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows invoking integration runtime contract APIs. These APIs are independent infrastructure authorization boundaries.
+      zh-CN: 允许调用集成运行时合同接口。这些接口是独立的基础设施授权边界。
+    module: runtime
+    permission_code: runtime.contract_api:invoke
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/notifications/test
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/ws-bus/grant
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/ws-bus/publish
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/event-fabric/topics
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /integration/capabilities/invoke
+        resource_scope: tenant
+    resource: contract_api
+    risk_level: high
+    title_i18n:
+      en: Runtime contract APIs
+      zh-CN: 运行时合同接口
+    type: api
+  - action: invoke
+    business_permission_code: runtime.ops:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows invoking debug or test-flow runtime probes retained in the package.
+      zh-CN: 允许调用包内保留的调试或测试流运行时探针。
+    module: runtime
+    permission_code: runtime.debug_api:invoke
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/ws-bus/test-flow
+        resource_scope: tenant
+    resource: debug_api
+    risk_level: critical
+    title_i18n:
+      en: Runtime debug APIs
+      zh-CN: 运行时调试接口
+    type: api
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading base plugin admin manifest and RBAC metadata.
+      zh-CN: 允许读取 Base 插件后台清单与 RBAC 元数据。
+    module: metadata
+    permission_code: metadata.admin:read
+    resource: admin
+    risk_level: low
+    title_i18n:
+      en: Read admin metadata
+      zh-CN: 读取后台元数据
+    type: action
+  - action: read
+    business_permission_code: metadata.admin:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling base plugin admin manifest and RBAC metadata APIs.
+      zh-CN: 允许调用 Base 插件后台清单与 RBAC 元数据接口。
+    module: metadata
+    permission_code: metadata.admin_api:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/manifest
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/rbac
+        resource_scope: tenant
+    resource: admin_api
+    risk_level: low
+    title_i18n:
+      en: Admin metadata APIs
+      zh-CN: 后台元数据接口
+    type: api
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading template records and validation metadata.
+      zh-CN: 允许读取模板记录与校验元数据。
+    module: template
+    permission_code: template.template:read
+    resource: template
+    risk_level: low
+    title_i18n:
+      en: Read templates
+      zh-CN: 读取模板
+    type: action
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows creating, updating, deleting, cloning, and validating templates.
+      zh-CN: 允许创建、更新、删除、克隆与校验模板。
+    module: template
+    permission_code: template.template:manage
+    resource: template
+    risk_level: medium
+    title_i18n:
+      en: Manage templates
+      zh-CN: 管理模板
+    type: action
+  - action: read
+    business_permission_code: template.template:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling template read APIs.
+      zh-CN: 允许调用模板读取接口。
+    module: template
+    permission_code: template.template_api:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /templates
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /templates/*
+        resource_scope: tenant
+    resource: template_api
+    risk_level: low
+    title_i18n:
+      en: Template read APIs
+      zh-CN: 模板读取接口
+    type: api
+  - action: manage
+    business_permission_code: template.template:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling template management APIs.
+      zh-CN: 允许调用模板管理接口。
+    module: template
+    permission_code: template.template_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /templates
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /templates/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /templates/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/templates/batch-clone
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/templates/*/validate
+        resource_scope: tenant
+    resource: template_api
+    risk_level: medium
+    title_i18n:
+      en: Template management APIs
+      zh-CN: 模板管理接口
+    type: api
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading local IAM tenants, departments, members, roles, permissions, channels, and audit data.
+      zh-CN: 允许读取本地 IAM 租户、部门、成员、角色、权限、渠道与审计数据。
+    module: iam
+    permission_code: iam.iam:read
+    resource: iam
+    risk_level: low
+    title_i18n:
+      en: Read IAM data
+      zh-CN: 读取 IAM 数据
+    type: action
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows managing local IAM tenants, departments, members, roles, federated bindings, and channel sync tasks.
+      zh-CN: 允许管理本地 IAM 租户、部门、成员、角色、联合身份绑定与渠道同步任务。
+    module: iam
+    permission_code: iam.iam:manage
+    resource: iam
+    risk_level: high
+    title_i18n:
+      en: Manage IAM data
+      zh-CN: 管理 IAM 数据
+    type: action
+  - action: read
+    business_permission_code: iam.iam:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling local IAM read APIs.
+      zh-CN: 允许调用本地 IAM 读取接口。
+    module: iam
+    permission_code: iam.iam_api:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/mode
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/tenants
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/departments
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/departments/tree
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/members
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/users
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/roles
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/roles/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/permissions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/audit/logs
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/federated/bindings
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/channels/wecom/config
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/channels/wecom/sync-tasks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/channels/dingtalk/config
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/channels/dingtalk/sync-tasks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/channels/lark/config
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/iam/channels/lark/sync-tasks
+        resource_scope: tenant
+    resource: iam_api
+    risk_level: low
+    title_i18n:
+      en: IAM read APIs
+      zh-CN: IAM 读取接口
+    type: api
+  - action: manage
+    business_permission_code: iam.iam:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling local IAM management APIs.
+      zh-CN: 允许调用本地 IAM 管理接口。
+    module: iam
+    permission_code: iam.iam_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/tenants
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/iam/tenants/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/departments
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/iam/departments/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/iam/departments/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/members
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/iam/members/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/members/import
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/users
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/iam/users/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/users/import
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/roles
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/iam/roles/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/iam/roles/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/iam/roles/*/permissions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/roles/*/members
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/iam/roles/*/members
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/auth/local/sts
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/federated/bindings
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/iam/federated/bindings
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/iam/federated/jit-policy
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/iam/federated/mapping-policy
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/iam/channels/wecom/config
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/channels/wecom/sync-tasks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/iam/channels/wecom/sync-tasks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/iam/channels/dingtalk/config
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/channels/dingtalk/sync-tasks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/iam/channels/dingtalk/sync-tasks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/iam/channels/lark/config
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/iam/channels/lark/sync-tasks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/iam/channels/lark/sync-tasks
+        resource_scope: tenant
+    resource: iam_api
+    risk_level: high
+    title_i18n:
+      en: IAM management APIs
+      zh-CN: IAM 管理接口
+    type: api
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading delegated metadata and AI settings views.
+      zh-CN: 允许读取委派元数据与 AI 设置视图。
+    module: settings
+    permission_code: settings.platform:read
+    resource: platform
+    risk_level: low
+    title_i18n:
+      en: Read platform settings
+      zh-CN: 读取平台设置
+    type: action
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows managing metadata dictionaries, taxonomies, tags, and resource types.
+      zh-CN: 允许管理元数据字典、分类、标签与资源类型。
+    module: settings
+    permission_code: settings.platform:manage
+    resource: platform
+    risk_level: medium
+    title_i18n:
+      en: Manage platform settings
+      zh-CN: 管理平台设置
+    type: action
+  - action: read
+    business_permission_code: settings.platform:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling delegated metadata and AI settings read APIs.
+      zh-CN: 允许调用委派元数据与 AI 设置读取接口。
+    module: settings
+    permission_code: settings.platform_api:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/metadata/mode
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/metadata/dictionaries
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/metadata/dictionaries/*/items
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/metadata/taxonomies
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/metadata/taxonomies/*/nodes
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/metadata/tags
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/metadata/resource-types
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/ai-settings/mode
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/ai-settings/summary
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/ai-settings/provider-profiles
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/ai-settings/model-profiles
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/ai-settings/routing
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/ai-settings/health
+        resource_scope: tenant
+    resource: platform_api
+    risk_level: low
+    title_i18n:
+      en: Platform settings read APIs
+      zh-CN: 平台设置读取接口
+    type: api
+  - action: manage
+    business_permission_code: settings.platform:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling metadata management APIs.
+      zh-CN: 允许调用元数据管理接口。
+    module: settings
+    permission_code: settings.platform_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/metadata/dictionaries
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/metadata/dictionaries/*/items
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/metadata/taxonomies
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/metadata/taxonomies/*/nodes
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/metadata/tags
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/metadata/resource-types
+        resource_scope: tenant
+    resource: platform_api
+    risk_level: medium
+    title_i18n:
+      en: Platform settings management APIs
+      zh-CN: 平台设置管理接口
+    type: api
+  - action: read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading runtime, scheduler, logging, and knowledge runtime state.
+      zh-CN: 允许读取运行时、调度器、日志与知识运行状态。
+    module: runtime
+    permission_code: runtime.ops:read
+    resource: ops
+    risk_level: low
+    title_i18n:
+      en: Read runtime operations
+      zh-CN: 读取运行时运维
+    type: action
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows managing runtime, scheduler, logging, and knowledge operations.
+      zh-CN: 允许管理运行时、调度器、日志与知识运维操作。
+    module: runtime
+    permission_code: runtime.ops:manage
+    resource: ops
+    risk_level: high
+    title_i18n:
+      en: Manage runtime operations
+      zh-CN: 管理运行时运维
+    type: action
+  - action: read
+    business_permission_code: runtime.ops:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling runtime operations read APIs.
+      zh-CN: 允许调用运行时运维读取接口。
+    module: runtime
+    permission_code: runtime.ops_api:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/quota/status
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/metrics
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/scheduler/jobs
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/scheduler/jobs/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/logging/policy
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/knowledge/provider
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/knowledge/catalog
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/knowledge/spaces
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/knowledge/spaces/*/ingestions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/runtime/knowledge/spaces/*/policy
+        resource_scope: tenant
+    resource: ops_api
+    risk_level: low
+    title_i18n:
+      en: Runtime operations read APIs
+      zh-CN: 运行时运维读取接口
+    type: api
+  - action: manage
+    business_permission_code: runtime.ops:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling runtime operations management APIs.
+      zh-CN: 允许调用运行时运维管理接口。
+    module: runtime
+    permission_code: runtime.ops_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/bootstrap
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/sessions/register
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/sessions/*/ack
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/sessions/*/heartbeat
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/sessions/*/close
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/sessions/*/invoke
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/quota/overrides
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/event-bridge/emit
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/jobs
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/runtime/scheduler/jobs/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/jobs/*/pause
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/jobs/*/resume
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/jobs/*/trigger
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/mode/validate
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/dispatches/*/retry
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/dispatches/*/pause
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/scheduler/tickets/*/resume
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/runtime/logging/policy
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/logging/probe
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/knowledge/spaces
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/knowledge/media/upload
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/knowledge/spaces/*/ingest
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/knowledge/spaces/*/retire
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/runtime/knowledge/spaces/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/runtime/knowledge/search
+        resource_scope: tenant
+    resource: ops_api
+    risk_level: high
+    title_i18n:
+      en: Runtime operations management APIs
+      zh-CN: 运行时运维管理接口
+    type: api
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading, submitting, reviewing, exposing, and managing plugin capabilities.
+      zh-CN: 允许读取、提交、审核、暴露与管理插件能力。
+    module: capability
+    permission_code: capability.registry:manage
+    resource: registry
+    risk_level: high
+    title_i18n:
+      en: Manage capabilities
+      zh-CN: 管理能力
+    type: action
+  - action: manage
+    business_permission_code: capability.registry:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling capability registration, review, exposure, quota, and lifecycle APIs.
+      zh-CN: 允许调用能力注册、审核、暴露、配额与生命周期接口。
+    module: capability
+    permission_code: capability.registry_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/sources
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/register/template
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/register/validate
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/register
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/reviews/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/reviews/*/resubmit
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/reviews/tasks/*/comments
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/reviews/tasks/*/decision
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/exposure/template
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/exposure/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/capabilities/exposure/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/quotas/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/quotas/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/lifecycle/template
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/capabilities/lifecycle
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/lifecycle
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/capabilities/lifecycle/*/status
+        resource_scope: tenant
+    resource: registry_api
+    risk_level: high
+    title_i18n:
+      en: Capability management APIs
+      zh-CN: 能力管理接口
+    type: api
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading and managing integration approvals, grants, webhooks, secrets, dispatches, and capability invocations.
+      zh-CN: 允许读取和管理集成审批、授权矩阵、Webhook、密钥、调度与能力调用。
+    module: integration
+    permission_code: integration.integration:manage
+    resource: integration
+    risk_level: high
+    title_i18n:
+      en: Manage integrations
+      zh-CN: 管理集成
+    type: action
+  - action: manage
+    business_permission_code: integration.integration:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling integration management APIs.
+      zh-CN: 允许调用集成管理接口。
+    module: integration
+    permission_code: integration.integration_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/integration/approvals
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/approvals/*/approve
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/approvals/*/reject
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/integration/grant-matrix
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/integration/webhooks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/webhooks
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/integration/webhooks/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /admin/integration/webhooks/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/integration/webhooks/*/attempts
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/webhooks/attempts/*/replay
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/integration/secrets
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/secrets
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/secrets/*/rotate
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/secrets/*/rotate/complete
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/integration/secrets/*/revoke
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/integration/secrets/*/audit
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /integration/dispatch
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /integration/grant-matrix
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /integration/webhooks/subscriptions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /integration/webhooks/subscriptions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /integration/webhooks/dlq/*/replay
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /integration/secrets
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /integration/secrets/*/rotate
+        resource_scope: tenant
+    resource: integration_api
+    risk_level: high
+    title_i18n:
+      en: Integration management APIs
+      zh-CN: 集成管理接口
+    type: api
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading, publishing, reviewing, metering, and managing marketplace records and licenses.
+      zh-CN: 允许读取、发布、审核、计量与管理市场记录和许可证。
+    module: marketplace
+    permission_code: marketplace.marketplace:manage
+    resource: marketplace
+    risk_level: high
+    title_i18n:
+      en: Manage marketplace
+      zh-CN: 管理市场
+    type: action
+  - action: manage
+    business_permission_code: marketplace.marketplace:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling marketplace admin and tenant-facing APIs exposed by the plugin.
+      zh-CN: 允许调用插件暴露的市场后台与租户侧接口。
+    module: marketplace
+    permission_code: marketplace.marketplace_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/marketplace/listings
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/marketplace/listings
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/marketplace/listings/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/marketplace/listings/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/marketplace/listings/*/review
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/marketplace/listings/*/publish
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/marketplace/listings/*/suspend
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/marketplace/checklist/graphql
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/marketplace/recommendation/config
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/marketplace/recommendation/sync
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/marketplace/recommendation/experiment
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/marketplace/usage
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/marketplace/usage/tenants/*/licenses/*/metrics
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/marketplace/revenue-share/reports
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /marketplace/listings
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /marketplace/listings
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /marketplace/listings/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /marketplace/listings/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /marketplace/listings/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /marketplace/listings/*/status
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /marketplace/licenses
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /marketplace/licenses/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /marketplace/licenses/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /marketplace/licenses/*/offline-extend
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /marketplace/usage
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /marketplace/usage/tenants/*/licenses/*/metrics
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /marketplace/revenue-share/reports
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /marketplace/sla/*
+        resource_scope: tenant
+    resource: marketplace_api
+    risk_level: high
+    title_i18n:
+      en: Marketplace APIs
+      zh-CN: 市场接口
+    type: api
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows reading and managing operations support, incidents, SLA, console, and security records.
+      zh-CN: 允许读取和管理运维支持、事件、SLA、控制台与安全记录。
+    module: operations
+    permission_code: operations.operations:manage
+    resource: operations
+    risk_level: high
+    title_i18n:
+      en: Manage operations
+      zh-CN: 管理运维
+    type: action
+  - action: manage
+    business_permission_code: operations.operations:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling operations, console, and security APIs.
+      zh-CN: 允许调用运维、控制台与安全接口。
+    module: operations
+    permission_code: operations.operations_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/operations/support/playbook
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/operations/support/playbook
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/operations/support/channels/test
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/operations/support/metrics
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/operations/incidents
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/operations/incidents
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/operations/incidents/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/operations/incidents/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/operations/incidents/*/timeline
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/operations/sla/profiles
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/operations/sla/profiles
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/operations/sla/profiles/recompute
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PATCH
+        path: /admin/operations/sla/profiles/actuals
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/dev-console/config/sections
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: PUT
+        path: /admin/dev-console/config/sections/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/dev-console/audit/events
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/dev-console/audit/export
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/dev-console/jobs/runs
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/dev-console/jobs/runs/*/retry
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/dev-console/safe-ops/actions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/dev-console/troubleshooting/summary
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/dev-console/webhooks/attempts
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/dev-console/webhooks/attempts/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/security/consent-tokens
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/security/consent-tokens/*/revoke
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/security/lifecycle-events
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/security/audit-reports
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/security/advisories
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/security/advisories
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/security/advisories/*/publish
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/security/toolgrants/revoke
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/security/toolgrants/revocations
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/security/toolgrants/usage
+        resource_scope: tenant
+    resource: operations_api
+    risk_level: high
+    title_i18n:
+      en: Operations APIs
+      zh-CN: 运维接口
+    type: api
+  - action: manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows using and administering plugin agents, plugin skills, and agent registry synchronization.
+      zh-CN: 允许使用和管理插件智能体、插件技能与智能体注册同步。
+    module: agent
+    permission_code: agent.plugin:manage
+    resource: plugin
+    risk_level: high
+    title_i18n:
+      en: Manage plugin agents
+      zh-CN: 管理插件智能体
+    type: action
+  - action: manage
+    business_permission_code: agent.plugin:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows calling plugin agent, skill, registry, credential, STS, and agent security APIs.
+      zh-CN: 允许调用插件智能体、技能、注册、凭证、STS 与智能体安全接口。
+    module: agent
+    permission_code: agent.plugin_api:manage
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /agent/tenants/*/credentials
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /agent/sts/exchange
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /agent/security/privacy/consent
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /agent/security/privacy/lifecycle
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /agent/security/toolgrants/verify
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent/agents
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent/agents/*/effective-permissions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent/sessions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent/sessions
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent/sessions/*/messages
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent/sessions/*/archive
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: DELETE
+        path: /plugin/agent/sessions/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent/stream/sse
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent-registry/skills
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent-registry/skills
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent-registry/skills/*/sync
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent-registry/agents
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent-registry/agents/runnable
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent-registry/agents
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent-registry/agents/*/sync
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent-registry/agents/*/refresh
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent-registry/builtin/template/initialize
+        resource_scope: tenant
+    resource: plugin_api
+    risk_level: high
+    title_i18n:
+      en: Plugin agent APIs
+      zh-CN: 插件智能体接口
+    type: api
 rbac:
   resources:
-    - resource: admin
-      actions: [read]
-    - resource: {{ .PluginID }}.template
-      actions: [read, create, update, delete]
-    - resource: customer
-      actions: [read, create]
-
-permissions:
-  - resource: admin
-    actions: [read]
-  - resource: {{ .PluginID }}.template
-    actions: [read, create, update, delete]
-  - resource: customer
-    actions: [read, create]
-
+    - actions:
+        - read
+      resource: admin
+    - actions:
+        - read
+      resource: admin.metadata
+    - actions:
+        - read
+        - write
+      resource: admin.security.advisory
+    - actions:
+        - read
+      resource: admin.security.audit
+    - actions:
+        - read
+        - write
+      resource: admin.security.consent
+    - actions:
+        - read
+      resource: admin.security.lifecycle
+    - actions:
+        - read
+        - write
+      resource: admin.security.toolgrant
+    - actions:
+        - invoke
+        - manage
+        - read
+        - write
+      resource: agent
+    - actions:
+        - manage
+        - read
+        - review
+        - write
+      resource: capabilities
+    - actions:
+        - create
+        - read
+        - update
+      resource: customer
+    - actions:
+        - delete
+        - manage
+        - read
+        - write
+      resource: iam
+    - actions:
+        - read
+      resource: iam.audit
+    - actions:
+        - read
+        - write
+      resource: iam.department
+    - actions:
+        - read
+      resource: iam.mode
+    - actions:
+        - read
+      resource: iam.permission
+    - actions:
+        - delete
+        - read
+        - write
+      resource: iam.role
+    - actions:
+        - mint
+      resource: iam.sts
+    - actions:
+        - read
+        - write
+      resource: iam.tenant
+    - actions:
+        - read
+        - write
+      resource: iam.user
+    - actions:
+        - create
+        - invoke
+        - manage
+        - read
+        - write
+      resource: integration
+    - actions:
+        - create
+        - read
+      resource: integration.capabilities
+    - actions:
+        - invoke
+      resource: integration.dispatch
+    - actions:
+        - manage
+        - read
+      resource: integration.grant_matrix
+    - actions:
+        - manage
+        - read
+      resource: integration.secrets
+    - actions:
+        - manage
+        - read
+      resource: integration.webhooks
+    - actions:
+        - ingest
+        - manage
+        - purchase
+        - read
+        - review
+        - view
+        - write
+      resource: marketplace
+    - actions:
+        - manage
+        - purchase
+        - read
+      resource: marketplace.license
+    - actions:
+        - read
+        - review
+        - write
+      resource: marketplace.listings
+    - actions:
+        - manage
+        - read
+      resource: marketplace.recommendation
+    - actions:
+        - read
+      resource: marketplace.revenue
+    - actions:
+        - read
+      resource: marketplace.sla
+    - actions:
+        - ingest
+        - view
+      resource: marketplace.usage
+    - actions:
+        - command
+        - execute
+        - export
+        - manage
+        - read
+        - write
+      resource: operations
+    - actions:
+        - command
+        - read
+      resource: operations.incident
+    - actions:
+        - manage
+        - read
+      resource: operations.plugin.admin
+    - actions:
+        - export
+        - read
+      resource: operations.plugin.audit
+    - actions:
+        - execute
+        - read
+      resource: operations.plugin.ops
+    - actions:
+        - manage
+        - read
+      resource: operations.sla
+    - actions:
+        - manage
+        - read
+      resource: operations.support
+    - actions:
+        - manage
+        - read
+      resource: platform.settings
+    - actions:
+        - invoke
+        - manage
+        - read
+        - write
+      resource: plugin.agent
+    - actions:
+        - read
+      resource: plugin.skills
+    - actions:
+        - invoke
+        - manage
+        - observe
+        - read
+      resource: runtime.ops
+    - actions:
+        - manage
+        - read
+        - write
+      resource: security
+    - actions:
+        - create
+        - delete
+        - read
+        - update
+      resource: template
+    - actions:
+        - create
+        - delete
+        - manage
+        - read
+        - update
+      resource: template.template
 routes:
-  basePath: /api/v1
   adminManifest: /api/v1/admin/manifest
-  rbac: /api/v1/admin/rbac
+  basePath: /api/v1
   permissions:
+    - method: POST
+      path: /admin/notifications/test
+      permission:
+        action: invoke
+        resource: runtime.ops
+    - method: POST
+      path: /admin/runtime/ws-bus/test-flow
+      permission:
+        action: invoke
+        resource: runtime.ops
+    - method: POST
+      path: /admin/runtime/ws-bus/grant
+      permission:
+        action: invoke
+        resource: runtime.ops
+    - method: POST
+      path: /admin/runtime/ws-bus/publish
+      permission:
+        action: invoke
+        resource: runtime.ops
+    - method: POST
+      path: /admin/runtime/event-fabric/topics
+      permission:
+        action: invoke
+        resource: runtime.ops
+    - method: POST
+      path: /integration/capabilities/invoke
+      permission:
+        action: create
+        resource: integration
     - method: GET
       path: /admin/customers/overview
       permission:
-        resource: customer
         action: read
+        resource: customer
     - method: GET
       path: /admin/customers/accounts
       permission:
-        resource: customer
         action: read
+        resource: customer
     - method: POST
       path: /admin/customers/accounts
       permission:
-        resource: customer
         action: create
+        resource: customer
     - method: GET
       path: /admin/customers/identities
       permission:
-        resource: customer
         action: read
+        resource: customer
     - method: GET
       path: /admin/customers/memberships
       permission:
-        resource: customer
         action: read
+        resource: customer
     - method: GET
       path: /admin/customers/login-events
       permission:
-        resource: customer
         action: read
+        resource: customer
     - method: GET
       path: /admin/customers/mini-app-entries
       permission:
-        resource: customer
         action: read
+        resource: customer
+  rbac: /api/v1/admin/rbac

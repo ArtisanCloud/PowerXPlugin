@@ -33,7 +33,7 @@
 
 ## 4) 运行时 `manifestx` 约束（高频漏项）
 
-- `manifestx.Plugin().Permissions` 必须使用三段式：`domain.resource.action`
+- `manifestx.Plugin().Permissions` 不得作为正式授权来源；正式权限必须来自有效 manifest 的 `permissions[]`，使用 `catalogs.rbac` 时即 `plugin.d/rbac.yaml`
 - 仅允许字符：`[a-z0-9.-]`
 - 示例：`ai-craft.template.read`
 - 反例：`template.read`（两段式，进程启动阶段可能直接 Fatal）
@@ -75,4 +75,3 @@ make skeleton-reinstall VERSION=<new_version> API_BASE=<api_base> TOKEN=<token>
   - 先查 `plugin.d/exposure.yaml` 与 `plugin.d/rbac.yaml`
 - `500`（运行阶段）：
   - 先查插件进程日志、数据库 schema、迁移执行情况、`manifestx` 字段合法性
-

@@ -1,8 +1,81 @@
 events:
   topics:
     - key: _topic.template.update
+      protocols: [ws]
       actions: [publish, subscribe]
+      scope: tenant
+      event_types: [message]
       description: 模板状态更新事件
+    - key: _topic.audit.template.updated
+      protocols: [ws]
+      actions: [publish]
+      scope: tenant
+      event_types: [message]
+      description: 模板审计更新事件
+    - key: _topic.template.validate.completed
+      protocols: [ws]
+      actions: [publish]
+      scope: tenant
+      event_types: [message]
+      description: 模板校验完成事件
+    - key: _topic.template.batch_clone.completed
+      protocols: [ws]
+      actions: [publish]
+      scope: tenant
+      event_types: [message]
+      description: 模板批量克隆完成事件
+    - key: _topic.template.update.completed
+      protocols: [ws]
+      actions: [publish]
+      scope: tenant
+      event_types: [message]
+      description: 模板更新完成事件
     - key: powerx.runtime.scheduler.triggered.v1
+      protocols: [ws]
       actions: [publish, subscribe]
+      scope: tenant
+      event_types: [message]
       description: Scheduler 标准触发事件
+    - key: _topic.notify.tenant.{{"{{"}}tenant_uuid{{"}}"}}
+      protocols: [ws]
+      actions: [publish, subscribe]
+      scope: tenant
+      event_types: [message]
+      description: 租户通知事件
+    - key: _topic.notify.member.{{"{{"}}member_uuid{{"}}"}}
+      protocols: [ws]
+      actions: [publish, subscribe]
+      scope: member
+      event_types: [message]
+      description: 成员通知事件
+    - key: _topic.iam.wecom.sync.progress
+      protocols: [ws]
+      actions: [publish, subscribe]
+      scope: tenant
+      event_types: [message]
+      description: 企业微信同步进度事件
+    - key: _topic.iam.dingtalk.sync.progress
+      protocols: [ws]
+      actions: [publish, subscribe]
+      scope: tenant
+      event_types: [message]
+      description: 钉钉同步进度事件
+    - key: _topic.iam.lark.sync.progress
+      protocols: [ws]
+      actions: [publish, subscribe]
+      scope: tenant
+      event_types: [message]
+      description: 飞书同步进度事件
+  channels:
+    - key: _channel.mcp.session
+      protocols: [sse, ws]
+      actions: [publish, subscribe]
+      scope: tenant
+      event_types: [session.registered, session.ready, session.heartbeat, session.closed, invoke.completed, progress]
+      description: MCP 会话生命周期与执行进度事件
+    - key: _channel.agent.stream
+      protocols: [sse]
+      actions: [subscribe]
+      scope: tenant
+      event_types: [start, token, final, end, error]
+      description: Agent Runtime 原始 SSE 透传事件

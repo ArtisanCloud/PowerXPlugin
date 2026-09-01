@@ -325,7 +325,8 @@ func (h *Handler) StreamSSE(c *gin.Context) {
 			"regen_from_message_id": params.RegenFromMessageID,
 			"error":                 err.Error(),
 		}), "powerx agent stream proxy failed")
-		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_STREAM_FAILED", err.Error())
+		status, code := mapAgentStreamError(err)
+		contracts.ResponseError(c, status, code, code)
 		return
 	}
 	defer stream.Body.Close()
@@ -337,6 +338,23 @@ func (h *Handler) StreamSSE(c *gin.Context) {
 		RequestID:  stream.Header.Get("X-Request-ID"),
 		TraceID:    firstNonEmpty(stream.Header.Get("X-Trace-ID"), params.TraceID),
 	})
+}
+
+func mapAgentStreamError(err error) (int, string) {
+	var upstream *gateway.PlatformAPIError
+	if errors.As(err, &upstream) {
+		switch upstream.StatusCode {
+		case http.StatusUnauthorized:
+			return http.StatusUnauthorized, "POWERX_AGENT_STREAM_UNAUTHORIZED"
+		case http.StatusForbidden:
+			return http.StatusForbidden, "POWERX_AGENT_STREAM_FORBIDDEN"
+		case http.StatusNotFound:
+			return http.StatusNotFound, "POWERX_AGENT_STREAM_NOT_FOUND"
+		case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			return http.StatusBadGateway, "POWERX_AGENT_STREAM_UPSTREAM_DEPENDENCY"
+		}
+	}
+	return http.StatusBadGateway, "POWERX_AGENT_STREAM_FAILED"
 }
 
 func parsePositiveInt(raw string, fallback int) int {
@@ -539,7 +557,7 @@ func buildActionPermissionView(
 	view.RBACResource = resource
 	view.RBACActions = actions
 	view.RequiredPermissions = permissionNames(resource, actions)
-	view.PermissionCandidates = permissionCandidates(record.Descriptor.ID, resource, actions)
+	view.PermissionCandidates = permissionCandidates(resource, actions)
 	if resource == "" || len(actions) == 0 {
 		view.DenyCode = "capability_rbac_missing"
 		view.UnavailableReason = "capability rbac resource/actions are required"
@@ -554,7 +572,7 @@ func buildActionPermissionView(
 		return view
 	}
 	for _, rbacAction := range actions {
-		if hasAnyPermissionCandidate(tc.Permissions, record.Descriptor.ID, resource, rbacAction) {
+		if hasAnyPermissionCandidate(tc.Permissions, resource, rbacAction) {
 			view.Allowed = true
 			return view
 		}
@@ -674,45 +692,17 @@ func permissionNames(resource string, actions []string) []string {
 	return out
 }
 
-func permissionCandidates(capabilityID, resource string, actions []string) []string {
-	out := permissionNames(resource, actions)
-	capabilityPluginID := capabilityPluginID(capabilityID)
-	if capabilityPluginID == "" || strings.TrimSpace(resource) == "" {
-		return normalizeStrings(out)
-	}
-	for _, action := range actions {
-		action = strings.TrimSpace(action)
-		if action == "" {
-			continue
-		}
-		out = append(out, capabilityPluginID+":"+strings.TrimSpace(resource)+":"+action)
-	}
-	return normalizeStrings(out)
+func permissionCandidates(resource string, actions []string) []string {
+	return normalizeStrings(permissionNames(resource, actions))
 }
 
-func capabilityPluginID(capabilityID string) string {
-	capabilityID = strings.TrimSpace(capabilityID)
-	prefix := app.PluginID + "."
-	if strings.HasPrefix(capabilityID, prefix) {
-		return app.PluginID
-	}
-	return ""
-}
-
-func hasAnyPermissionCandidate(userPerms []string, capabilityID, resource, action string) bool {
+func hasAnyPermissionCandidate(userPerms []string, resource, action string) bool {
 	resource = strings.TrimSpace(resource)
 	action = strings.TrimSpace(action)
 	if resource == "" || action == "" {
 		return false
 	}
-	if authx.HasPerm(userPerms, authx.Permission{Resource: resource, Action: action}) {
-		return true
-	}
-	pluginID := capabilityPluginID(capabilityID)
-	if pluginID == "" {
-		return false
-	}
-	return authx.HasPerm(userPerms, authx.Permission{Resource: pluginID + ":" + resource, Action: action})
+	return authx.HasPerm(userPerms, authx.Permission{Resource: resource, Action: action})
 }
 
 func anyActionAllowed(actions []agentPermissionActionView) bool {

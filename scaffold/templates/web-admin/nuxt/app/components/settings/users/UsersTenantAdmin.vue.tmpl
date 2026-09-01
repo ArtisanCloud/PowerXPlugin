@@ -35,15 +35,13 @@ type StatusType = "active" | "inactive";
 type UserCategory = "all" | "active" | "inactive";
 
 interface RowUser {
-  id: number; // Member ID
-  userId?: number; // User ID
-  sourceType: "federated" | "local";
+	memberUUID: string;
   name: string;
   username?: string;
   email?: string;
   phone?: string;
   department?: string;
-  departmentIds: number[];
+	departmentUUIDs: string[];
   roles: string[];
   status: StatusType | string;
   avatar: string;
@@ -54,7 +52,6 @@ interface RowUser {
 const users = ref<RowUser[]>([]);
 const loading = ref(false);
 const userCategory = ref<UserCategory>("all");
-const federatedMemberSource = ref<Record<number, string>>({});
 
 // ====== 过滤/分页（与你现有一致） ======
 const searchQuery = ref("");
@@ -70,7 +67,7 @@ const pagination = reactive({ page: 1, pageSize: 10, total: 0, totalPages: 0 });
 const departmentTreeItems = computed(() => {
   const convertDepartmentToTreeNode = (dept: Department) => ({
     label: dept.name || "未命名部门",
-    value: String(dept.id),
+	value: dept.uuid,
     icon: "i-heroicons-building-office-2",
     children: dept.children?.map(convertDepartmentToTreeNode) || [],
     disabled: dept.status === 0, // 假设status为0表示禁用
@@ -78,14 +75,14 @@ const departmentTreeItems = computed(() => {
 
   return departmentStore.tree.map(convertDepartmentToTreeNode);
 });
-const roleOptions = ref<Array<{ label: string; value: number; code: string }>>([]);
+const roleOptions = ref<Array<{ label: string; value: string; code: string }>>([]);
 
 const departmentFlatOptions = computed(() => {
-  const out: Array<{ label: string; value: number }> = [];
+	const out: Array<{ label: string; value: string }> = [];
   const walk = (nodes: Department[], prefix = "") => {
     for (const node of nodes) {
       const label = prefix ? `${prefix} / ${node.name}` : node.name;
-      out.push({ label, value: Number(node.id) });
+		out.push({ label, value: node.uuid });
       if (Array.isArray(node.children) && node.children.length > 0) {
         walk(node.children as Department[], label);
       }
@@ -96,18 +93,18 @@ const departmentFlatOptions = computed(() => {
 });
 
 const departmentNameMap = computed(() => {
-  const map = new Map<number, string>();
+	const map = new Map<string, string>();
   for (const item of departmentFlatOptions.value) {
     map.set(item.value, item.label);
   }
   return map;
 });
 
-const roleCodeToIDMap = computed(() => {
-  const map = new Map<string, number>();
+const roleCodeToUUIDMap = computed(() => {
+	const map = new Map<string, string>();
   for (const item of roleOptions.value) {
     if (item.code) {
-      map.set(String(item.code).toLowerCase(), Number(item.value));
+		map.set(String(item.code).toLowerCase(), item.value);
     }
   }
   return map;
@@ -146,8 +143,7 @@ async function exportUsers(format: ExportFormat) {
       const { default: Papa } = await import("papaparse");
       content = Papa.unparse(
         users.value.map((u) => ({
-          用户ID: u.userId || "",
-          类型: u.sourceType === "federated" ? "渠道同步" : "本地",
+			用户ID: u.username || u.email || "",
           姓名: u.name,
           用户名: u.username,
           邮箱: u.email,
@@ -228,7 +224,7 @@ const importExportItems = computed(() => [
 // ====== 新增/编辑 ======
 const showForm = ref(false);
 const isEditing = ref(false);
-const editingId = ref<number | null>(null);
+const editingMemberUUID = ref<string | null>(null);
 
 // 统一"扁平表单" -> 后端映射 User+Member（我们之前对齐的）
 const userForm = reactive({
@@ -236,9 +232,8 @@ const userForm = reactive({
   username: "",
   email: "",
   phone: "",
-  departmentId: null as number | null,
-  departmentIds: [] as number[],
-  roleIds: [] as number[],
+	departmentUUIDs: [] as string[],
+	roleUUIDs: [] as string[],
   avatarUrl: "",
   password: "",
   confirmPassword: "",
@@ -251,16 +246,15 @@ function resetForm() {
   userForm.username = "";
   userForm.email = "";
   userForm.phone = "";
-  userForm.departmentId = null;
-  userForm.departmentIds = [];
-  userForm.roleIds = [];
+	userForm.departmentUUIDs = [];
+	userForm.roleUUIDs = [];
   userForm.avatarUrl = "";
   userForm.password = "";
   userForm.confirmPassword = "";
   userForm.status = "active";
   userForm.meta = {};
   isEditing.value = false;
-  editingId.value = null;
+	editingMemberUUID.value = null;
 }
 
 function openAddForm() {
@@ -271,7 +265,7 @@ function openAddForm() {
 function openEditForm(row: RowUser) {
   resetForm();
   isEditing.value = true;
-  editingId.value = row.id; // 这里使用的是Member的ID
+	editingMemberUUID.value = row.memberUUID;
 
   // 将行数据映射回表单
   userForm.name = row.name;
@@ -281,11 +275,10 @@ function openEditForm(row: RowUser) {
   userForm.avatarUrl = row.avatar;
   userForm.status = row.status === "active" ? "active" : "disabled";
   userForm.meta = row.meta || {};
-  userForm.departmentIds = Array.isArray(row.departmentIds) ? [...row.departmentIds] : [];
-  userForm.departmentId = userForm.departmentIds.length > 0 ? userForm.departmentIds[0] : null;
-  userForm.roleIds = (row.roles || [])
-    .map((code) => roleCodeToIDMap.value.get(String(code || "").toLowerCase()) || 0)
-    .filter((id) => id > 0);
+	userForm.departmentUUIDs = Array.isArray(row.departmentUUIDs) ? [...row.departmentUUIDs] : [];
+	userForm.roleUUIDs = (row.roles || [])
+		.map((code) => roleCodeToUUIDMap.value.get(String(code || "").toLowerCase()) || "")
+		.filter(Boolean);
   showForm.value = true;
 }
 
@@ -302,7 +295,7 @@ async function saveUser() {
   }
 
   try {
-    if (isEditing.value && editingId.value) {
+	if (isEditing.value && editingMemberUUID.value) {
       // 更新用户
       const updatePayload = {
         display_name: userForm.name,
@@ -310,12 +303,11 @@ async function saveUser() {
         phone: userForm.phone,
         avatar_url: userForm.avatarUrl,
         status: userForm.status === "active" ? "active" : "disabled",
-        department_id: userForm.departmentIds?.[0] || null,
-        department_ids: userForm.departmentIds || [],
-        roleIds: userForm.roleIds || [],
+		departmentUUIDs: userForm.departmentUUIDs,
+		roleUUIDs: userForm.roleUUIDs,
         replaceRoles: true,
       };
-      await userService.updateUser(editingId.value, updatePayload);
+		await userService.updateUser(editingMemberUUID.value, updatePayload);
     } else {
       // 创建系统用户
       const createPayload = {
@@ -328,9 +320,8 @@ async function saveUser() {
         meta: userForm.meta ?? {},
         username: userForm.username || userForm.email.split("@")[0],
         initial_password: userForm.password,
-        department_id: userForm.departmentIds?.[0] || null,
-        department_ids: userForm.departmentIds || [],
-        roleIds: userForm.roleIds || [],
+		departmentUUIDs: userForm.departmentUUIDs,
+		roleUUIDs: userForm.roleUUIDs,
       };
       await userService.createSystemUser(createPayload);
     }
@@ -341,12 +332,12 @@ async function saveUser() {
   }
 }
 
-async function deleteUser(id: number) {
+async function deleteUser(memberUUID: string) {
   if (!confirm(t("organization.user.confirmDelete"))) return;
   try {
     // 注意：这里的id是Member的ID，但API可能需要User的ID
     // 根据后端实现调整
-    await userService.deleteUser(id);
+	await userService.deleteUser(memberUUID);
     await loadUsers(); // 重新加载数据
   } catch (e: any) {
     alert(e?.message || "删除失败");
@@ -356,9 +347,7 @@ async function deleteUser(id: number) {
 async function toggleUserStatus(row: RowUser) {
   try {
     const newStatus = row.status === "active" ? 0 : 1;
-    // 注意：这里的row.id是Member的ID，但API可能需要User的ID
-    // 根据后端实现调整
-    await userService.setUserStatus(row.id, { status: newStatus });
+		await userService.setUserStatus(row.memberUUID, { status: newStatus });
     await loadUsers(); // 重新加载数据
   } catch (e: any) {
     alert(e?.message || "状态更新失败");
@@ -369,8 +358,7 @@ async function toggleUserStatus(row: RowUser) {
 const filteredUsers = computed(() => {
   return users.value.filter((item) => {
     if (filters.department) {
-      const departmentID = Number(filters.department);
-      if (!item.departmentIds.includes(departmentID)) {
+		if (!item.departmentUUIDs.includes(filters.department)) {
         return false;
       }
     }
@@ -493,20 +481,6 @@ const columns = computed(() => {
       },
     },
     {
-      id: "userId",
-      accessorKey: "userId",
-      header: "用户ID",
-    },
-    {
-      id: "sourceType",
-      accessorKey: "sourceType",
-      header: "类型",
-      cell: ({ row }: any) => {
-        const u = row.original as RowUser;
-        return u.sourceType === "federated" ? "渠道同步" : "本地";
-      },
-    },
-    {
       id: "name",
       accessorKey: "name",
       header: t("organization.user.table.name").toString(),
@@ -626,7 +600,7 @@ const columns = computed(() => {
               variant: "ghost",
               icon: "i-heroicons-trash",
               disabled: props.readonly,
-              onClick: () => deleteUser(u.id),
+				onClick: () => deleteUser(u.memberUUID),
             },
             () => t("organization.common.delete")
           ),
@@ -650,26 +624,23 @@ function isSyntheticWecomEmail(email?: string): boolean {
 
 // 转换API数据为组件需要的格式
 function transformUserData(memberWithProfile: MemberWithProfile): RowUser {
-  const { Member, User, DeptIDs, RoleCodes } = memberWithProfile;
+	const { Member, User, DeptUUIDs, RoleCodes } = memberWithProfile;
   const mergedMeta = { ...User.meta, ...Member.meta } as Record<string, any>;
   const rawEmail = String(User.email || "").trim();
-  const provider = String(federatedMemberSource.value[Member.id] || "").toLowerCase();
-  const departmentIDs = Array.isArray(DeptIDs)
-    ? DeptIDs.map((id) => Number(id || 0)).filter((id) => Number.isFinite(id) && id > 0)
-    : [];
-  const departmentLabels = departmentIDs
-    .map((id) => departmentNameMap.value.get(id) || `#${id}`)
+	const departmentUUIDs = Array.isArray(DeptUUIDs)
+		? DeptUUIDs.filter(Boolean)
+		: [];
+	const departmentLabels = departmentUUIDs
+		.map((uuid) => departmentNameMap.value.get(uuid) || t("organization.department.unknown"))
     .filter(Boolean);
   return {
-    id: Member.id, // 使用Member的ID作为主要ID
-    userId: User.id, // 保存User的ID以备后用
-    sourceType: provider ? "federated" : "local",
+		memberUUID: Member.uuid,
     name: Member.display_name || User.display_name,
     username: Member.username,
     email: props.readonly ? "" : (isSyntheticWecomEmail(rawEmail) ? "" : rawEmail),
     phone: props.readonly ? "" : (User.phone || ""),
     department: departmentLabels.join(" / "),
-    departmentIds: departmentIDs,
+		departmentUUIDs,
     roles: props.readonly ? [] : (Array.isArray(RoleCodes) ? RoleCodes : []),
     status: Member.status === 1 ? "active" : "inactive",
     avatar:
@@ -693,10 +664,10 @@ async function loadRoleOptions() {
       ? items
           .map((item: any) => ({
             label: String(item?.name || item?.code || "").trim(),
-            value: Number(item?.id || 0),
+			value: String(item?.role_uuid || ""),
             code: String(item?.code || "").trim(),
           }))
-          .filter((item: any) => item.value > 0 && item.code)
+			.filter((item: any) => item.value && item.code)
       : [];
   } catch (error) {
     console.error("加载角色数据失败:", error);
@@ -727,30 +698,7 @@ async function loadUsers() {
       params.q = searchQuery.value.trim(); // 后端使用q参数
     }
 
-    const [response, bindingResp] = await Promise.all([
-      userService.getUsers(params),
-      iamService.listFederatedBindings({
-        tenantUuid: props.tenantUuid,
-      }),
-    ]);
-
-    const bindingPayload = (bindingResp as any)?.data ?? bindingResp ?? {};
-    const bindingItems =
-      bindingPayload?.data?.items ??
-      bindingPayload?.items ??
-      bindingPayload?.data ??
-      [];
-    const sourceMap: Record<number, string> = {};
-    if (Array.isArray(bindingItems)) {
-      for (const item of bindingItems) {
-        const memberID = Number((item as any)?.member_id || 0);
-        const provider = String((item as any)?.provider || "").trim();
-        if (memberID > 0 && provider) {
-          sourceMap[memberID] = provider;
-        }
-      }
-    }
-    federatedMemberSource.value = sourceMap;
+    const response = await userService.getUsers(params);
 
     if (response.data) {
       users.value = response.data.items.map(transformUserData);
@@ -1003,26 +951,26 @@ onMounted(async () => {
             </UFormField>
             <UFormField :label="$t('organization.user.form.department')" class="md:col-span-2">
               <USelectMenu
-                v-model="userForm.departmentIds"
+				v-model="userForm.departmentUUIDs"
                 :items="departmentFlatOptions"
                 value-key="value"
                 searchable
                 multiple
                 class="w-full"
                 :placeholder="$t('organization.user.form.selectDepartment')"
-                @update:model-value="(values:any) => { userForm.departmentIds = (values || []).map((v:any) => Number(v)); userForm.departmentId = userForm.departmentIds[0] || null; }"
+				@update:model-value="(values:any) => { userForm.departmentUUIDs = (values || []).map((v:any) => String(v)); }"
               />
             </UFormField>
             <UFormField :label="$t('organization.user.form.role')" class="md:col-span-2">
               <USelectMenu
-                v-model="userForm.roleIds"
+				v-model="userForm.roleUUIDs"
                 :items="roleOptions"
                 value-key="value"
                 searchable
                 multiple
                 class="w-full"
                 :placeholder="$t('organization.user.form.selectRole')"
-                @update:model-value="(values:any) => { userForm.roleIds = (values || []).map((v:any) => Number(v)); }"
+				@update:model-value="(values:any) => { userForm.roleUUIDs = (values || []).map((v:any) => String(v)); }"
               />
             </UFormField>
             <UFormField

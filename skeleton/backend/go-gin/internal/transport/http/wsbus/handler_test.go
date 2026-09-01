@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
@@ -27,13 +28,13 @@ func TestSubscribeFiltersMemberScopedEvents(t *testing.T) {
 	conn.sendHook = func(wsResponse) {
 		sent++
 	}
-	conn.subscribe(subscriber, []string{"plugin.notify.member.11111111-1111-4111-8111-111111111111"})
+	conn.subscribe(subscriber, []string{"_topic.notify.member.11111111-1111-4111-8111-111111111111"}, []frameworkrealtime.Descriptor{{Key: "_topic.notify.member.11111111-1111-4111-8111-111111111111", Protocols: []frameworkrealtime.Protocol{frameworkrealtime.ProtocolWS}, Actions: []frameworkrealtime.Action{frameworkrealtime.ActionSubscribe}, Scope: frameworkrealtime.ScopeMember, EventTypes: []string{"message"}}})
 	if subscriber.handler == nil {
 		t.Fatal("expected subscription handler")
 	}
 
 	subscriber.handler(fwwsbus.Event{
-		Topic:      "plugin.notify.member.22222222-2222-4222-8222-222222222222",
+		Topic:      "_topic.notify.member.22222222-2222-4222-8222-222222222222",
 		TenantUUID: "tenant-1",
 		MemberUUID: "22222222-2222-4222-8222-222222222222",
 	})
@@ -42,7 +43,7 @@ func TestSubscribeFiltersMemberScopedEvents(t *testing.T) {
 	}
 
 	subscriber.handler(fwwsbus.Event{
-		Topic:      "plugin.notify.member.11111111-1111-4111-8111-111111111111",
+		Topic:      "_topic.notify.member.11111111-1111-4111-8111-111111111111",
 		TenantUUID: "tenant-1",
 		MemberUUID: "11111111-1111-4111-8111-111111111111",
 	})
@@ -51,7 +52,7 @@ func TestSubscribeFiltersMemberScopedEvents(t *testing.T) {
 	}
 
 	subscriber.handler(fwwsbus.Event{
-		Topic:      "plugin.notify.tenant.tenant-1",
+		Topic:      "_topic.notify.tenant.tenant-1",
 		TenantUUID: "tenant-1",
 	})
 	if sent != 2 {
@@ -62,10 +63,10 @@ func TestSubscribeFiltersMemberScopedEvents(t *testing.T) {
 func TestMemoryHubCarriesMemberUUID(t *testing.T) {
 	hub := fwwsbus.NewMemoryHub()
 	received := make(chan fwwsbus.Event, 1)
-	hub.Subscribe("plugin.notify.member.11111111-1111-4111-8111-111111111111", func(ev fwwsbus.Event) {
+	hub.Subscribe("_topic.notify.member.11111111-1111-4111-8111-111111111111", func(ev fwwsbus.Event) {
 		received <- ev
 	})
-	err := hub.Publish(context.Background(), "plugin.notify.member.11111111-1111-4111-8111-111111111111", map[string]any{"ok": true}, fwwsbus.PublishOptions{
+	err := hub.Publish(context.Background(), "_topic.notify.member.11111111-1111-4111-8111-111111111111", map[string]any{"ok": true}, fwwsbus.PublishOptions{
 		TenantUUID: "tenant-1",
 		MemberUUID: "11111111-1111-4111-8111-111111111111",
 		TraceID:    "trace-1",

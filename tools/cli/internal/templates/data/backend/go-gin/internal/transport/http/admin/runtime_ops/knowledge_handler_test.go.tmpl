@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
-	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
-	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
-	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"{{ .BackendModulePath }}/internal/capabilities"
+	"{{ .BackendModulePath }}/internal/config"
+	capgateway "{{ .BackendModulePath }}/internal/integrations/gateway"
+	authmw "{{ .BackendModulePath }}/internal/middleware"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 )
 

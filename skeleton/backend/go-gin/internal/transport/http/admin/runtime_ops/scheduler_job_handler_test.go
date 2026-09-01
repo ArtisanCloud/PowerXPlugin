@@ -296,7 +296,7 @@ func TestSchedulerJobHandlerLocalProxyTriggersPowerXHost(t *testing.T) {
 
 	hub := fwwsbus.NewMemoryHub()
 	localEvents := make(chan fwwsbus.Event, 1)
-	hub.Subscribe("plugin.notify.tenant.tenant-001", func(ev fwwsbus.Event) {
+	hub.Subscribe("_topic.notify.tenant.tenant-001", func(ev fwwsbus.Event) {
 		localEvents <- ev
 	})
 	handler := NewSchedulerJobHandler(&app.Deps{
@@ -358,7 +358,7 @@ func TestSchedulerJobHandlerHostTriggerDoesNotPublishLocalNotification(t *testin
 	fake := &captureSchedulerHostClient{}
 	hub := fwwsbus.NewMemoryHub()
 	localEvents := make(chan fwwsbus.Event, 1)
-	hub.Subscribe("plugin.notify.tenant.tenant-local", func(ev fwwsbus.Event) {
+	hub.Subscribe("_topic.notify.tenant.tenant-local", func(ev fwwsbus.Event) {
 		localEvents <- ev
 	})
 	handler := &SchedulerJobHandler{

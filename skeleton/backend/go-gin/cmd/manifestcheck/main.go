@@ -167,7 +167,9 @@ func mergeCatalogReferences(pluginPath string, plugin map[string]interface{}) er
 			plugin["rbac"] = section
 		}
 		if section, ok := doc["permissions"]; ok {
-			plugin["permissions"] = section
+			if _, exists := plugin["permissions"]; !exists {
+				plugin["permissions"] = section
+			}
 		}
 		if section, ok := doc["routes"]; ok {
 			plugin["routes"] = section
@@ -218,10 +220,23 @@ func validateEventTopics(pluginData, eventFabricData map[string]interface{}) err
 	if err != nil {
 		return err
 	}
+	pluginPublishTopics, err := collectPublishTopics(pluginData, []string{"events", "topics"}, []string{"key", "name", "topic"})
+	if err != nil {
+		return err
+	}
 	fabricTopics, err := collectTopics(eventFabricData, []string{"topics"}, []string{"topic", "key", "name"})
 	if err != nil {
 		return err
 	}
+	fabricACL, err := collectTopicACLs(eventFabricData, []string{"topics"}, []string{"topic", "key", "name"})
+	if err != nil {
+		return err
+	}
+	pluginID, err := lookupString(pluginData, "id")
+	if err != nil {
+		return err
+	}
+	pluginPrincipalID := "plugin:" + pluginID
 
 	pluginSet := make(map[string]struct{}, len(pluginTopics))
 	for _, topic := range pluginTopics {
@@ -244,13 +259,20 @@ func validateEventTopics(pluginData, eventFabricData map[string]interface{}) err
 			missingInPlugin = append(missingInPlugin, topic)
 		}
 	}
+	var missingPluginPublishACL []string
+	for _, topic := range pluginPublishTopics {
+		if !hasPluginPublishACL(fabricACL[topic], pluginPrincipalID) {
+			missingPluginPublishACL = append(missingPluginPublishACL, topic)
+		}
+	}
 
-	if len(missingInFabric) == 0 && len(missingInPlugin) == 0 {
+	if len(missingInFabric) == 0 && len(missingInPlugin) == 0 && len(missingPluginPublishACL) == 0 {
 		return nil
 	}
 
 	sort.Strings(missingInFabric)
 	sort.Strings(missingInPlugin)
+	sort.Strings(missingPluginPublishACL)
 	var issues []string
 	if len(missingInFabric) > 0 {
 		issues = append(issues, fmt.Sprintf("plugin.yaml.events.topics 缺失执行层映射: %s", strings.Join(missingInFabric, ", ")))
@@ -258,8 +280,133 @@ func validateEventTopics(pluginData, eventFabricData map[string]interface{}) err
 	if len(missingInPlugin) > 0 {
 		issues = append(issues, fmt.Sprintf("config/event_fabric.yaml.topics 存在未声明 topic: %s", strings.Join(missingInPlugin, ", ")))
 	}
+	if len(missingPluginPublishACL) > 0 {
+		issues = append(issues, fmt.Sprintf("config/event_fabric.yaml.topics 缺少插件服务态 publish ACL (%s): %s", pluginPrincipalID, strings.Join(missingPluginPublishACL, ", ")))
+	}
 
 	return errors.New(strings.Join(issues, "; "))
+}
+
+func collectPublishTopics(data map[string]interface{}, path []string, keys []string) ([]string, error) {
+	value, err := lookup(data, path...)
+	if err != nil {
+		return nil, fmt.Errorf("missing required field: %s", strings.Join(path, "."))
+	}
+
+	items, ok := value.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("%s must be an array", strings.Join(path, "."))
+	}
+	seen := make(map[string]struct{}, len(items))
+	topics := make([]string, 0, len(items))
+	for idx, item := range items {
+		obj, ok := item.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("%s[%d] must be an object", strings.Join(path, "."), idx)
+		}
+		if !containsAction(obj["actions"], "publish") {
+			continue
+		}
+		topic := topicName(obj, keys)
+		if topic == "" {
+			return nil, fmt.Errorf("%s[%d] missing topic key (supported: %s)", strings.Join(path, "."), idx, strings.Join(keys, ", "))
+		}
+		if _, exists := seen[topic]; exists {
+			continue
+		}
+		seen[topic] = struct{}{}
+		topics = append(topics, topic)
+	}
+	return topics, nil
+}
+
+func collectTopicACLs(data map[string]interface{}, path []string, keys []string) (map[string][]map[string]interface{}, error) {
+	value, err := lookup(data, path...)
+	if err != nil {
+		return nil, fmt.Errorf("missing required field: %s", strings.Join(path, "."))
+	}
+
+	items, ok := value.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("%s must be an array", strings.Join(path, "."))
+	}
+	result := make(map[string][]map[string]interface{}, len(items))
+	for idx, item := range items {
+		obj, ok := item.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("%s[%d] must be an object", strings.Join(path, "."), idx)
+		}
+		topic := topicName(obj, keys)
+		if topic == "" {
+			return nil, fmt.Errorf("%s[%d] missing topic key (supported: %s)", strings.Join(path, "."), idx, strings.Join(keys, ", "))
+		}
+		rawACL, exists := obj["acl"]
+		if !exists || rawACL == nil {
+			result[topic] = nil
+			continue
+		}
+		aclItems, ok := rawACL.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("%s[%d].acl must be an array", strings.Join(path, "."), idx)
+		}
+		for aclIdx, aclItem := range aclItems {
+			aclObj, ok := aclItem.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("%s[%d].acl[%d] must be an object", strings.Join(path, "."), idx, aclIdx)
+			}
+			result[topic] = append(result[topic], aclObj)
+		}
+	}
+	return result, nil
+}
+
+func hasPluginPublishACL(acls []map[string]interface{}, pluginPrincipalID string) bool {
+	for _, acl := range acls {
+		if strings.TrimSpace(stringValue(acl, "principal_type")) != "plugin" {
+			continue
+		}
+		if strings.TrimSpace(stringValue(acl, "principal_id")) != pluginPrincipalID {
+			continue
+		}
+		if containsAction(acl["actions"], "publish") {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAction(value interface{}, action string) bool {
+	switch typed := value.(type) {
+	case []interface{}:
+		for _, item := range typed {
+			if strings.TrimSpace(fmt.Sprintf("%v", item)) == action {
+				return true
+			}
+		}
+	case []string:
+		for _, item := range typed {
+			if strings.TrimSpace(item) == action {
+				return true
+			}
+		}
+	case string:
+		for _, item := range strings.Split(typed, ",") {
+			if strings.TrimSpace(item) == action {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func topicName(obj map[string]interface{}, keys []string) string {
+	for _, key := range keys {
+		topic := strings.TrimSpace(stringValue(obj, key))
+		if topic != "" {
+			return topic
+		}
+	}
+	return ""
 }
 
 func collectTopics(data map[string]interface{}, path []string, keys []string) ([]string, error) {
@@ -283,13 +430,7 @@ func collectTopics(data map[string]interface{}, path []string, keys []string) ([
 		if !ok {
 			return nil, fmt.Errorf("%s[%d] must be an object", strings.Join(path, "."), idx)
 		}
-		var topic string
-		for _, key := range keys {
-			topic = strings.TrimSpace(stringValue(obj, key))
-			if topic != "" {
-				break
-			}
-		}
+		topic := topicName(obj, keys)
 		if topic == "" {
 			return nil, fmt.Errorf("%s[%d] missing topic key (supported: %s)", strings.Join(path, "."), idx, strings.Join(keys, ", "))
 		}
@@ -813,6 +954,7 @@ func buildExposureCatalog(existing map[string]interface{}, descriptors []catalog
 
 func buildRBACCatalog(existing map[string]interface{}, descriptors []catalogDescriptor) map[string]interface{} {
 	resourceActions := make(map[string]map[string]bool)
+	permissionDeclarations := make([]interface{}, 0)
 
 	mergeResourceActions := func(items []interface{}) {
 		for _, item := range items {
@@ -843,7 +985,17 @@ func buildRBACCatalog(existing map[string]interface{}, descriptors []catalogDesc
 		}
 	}
 	if raw, ok := existing["permissions"].([]interface{}); ok {
-		mergeResourceActions(raw)
+		for _, item := range raw {
+			entry, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if isPermissionDeclaration(entry) {
+				permissionDeclarations = append(permissionDeclarations, item)
+				continue
+			}
+			mergeResourceActions([]interface{}{item})
+		}
 	}
 
 	for _, descriptor := range descriptors {
@@ -870,7 +1022,6 @@ func buildRBACCatalog(existing map[string]interface{}, descriptors []catalogDesc
 	sort.Strings(resourceNames)
 
 	resources := make([]map[string]interface{}, 0, len(resourceNames))
-	permissions := make([]map[string]interface{}, 0, len(resourceNames))
 	for _, resource := range resourceNames {
 		actions := make([]string, 0, len(resourceActions[resource]))
 		for action := range resourceActions[resource] {
@@ -878,10 +1029,6 @@ func buildRBACCatalog(existing map[string]interface{}, descriptors []catalogDesc
 		}
 		sort.Strings(actions)
 		resources = append(resources, map[string]interface{}{
-			"resource": resource,
-			"actions":  actions,
-		})
-		permissions = append(permissions, map[string]interface{}{
 			"resource": resource,
 			"actions":  actions,
 		})
@@ -902,9 +1049,15 @@ func buildRBACCatalog(existing map[string]interface{}, descriptors []catalogDesc
 		"rbac": map[string]interface{}{
 			"resources": resources,
 		},
-		"permissions": permissions,
+		"permissions": permissionDeclarations,
 		"routes":      routes,
 	}
+}
+
+func isPermissionDeclaration(entry map[string]interface{}) bool {
+	return strings.TrimSpace(stringFromAny(entry["permission_code"])) != "" ||
+		strings.TrimSpace(stringFromAny(entry["type"])) != "" ||
+		entry["protocol_bindings"] != nil
 }
 
 func loadYAMLFileOptional(path string) (map[string]interface{}, error) {

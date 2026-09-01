@@ -79,7 +79,11 @@ func (r *Router) Setup() *gin.Engine {
 func (r *Router) setupGlobalMiddleware() {
 
 	// 健康检查（在其它中间件前放行 /healthz）
-	r.engine.Use(middleware.HealthCheck("/healthz"))
+	r.engine.Use(middleware.HealthCheck("/healthz", middleware.HealthInfo{
+		PluginID: app.PluginID,
+		Version:  app.PluginVersion,
+		Service:  app.PluginName,
+	}))
 
 	// 恢复
 	r.engine.Use(middleware.Recovery())
@@ -187,6 +191,7 @@ func (r *Router) setupRoutes() {
 
 	// 使用 API 注册器注册所有路由（保持你现有的注册逻辑）
 	apiRegistry := http.NewRegistry(r.engine, r.deps)
+	apiRegistry.RegisterHostDiscoveryRoutes(r.engine.Group(prefix))
 
 	// API 分组 + 鉴权 + RBAC（Admin / Integration / Marketplace 等）
 	gProtected := r.engine.Group(prefix)
@@ -197,7 +202,7 @@ func (r *Router) setupRoutes() {
 	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
 	r.inferRBACFromRoutes(rbacCfg, prefix)
 
-	mcptransport.RegisterRoutes(r.engine, prefix)
+	mcptransport.RegisterRoutes(gProtected, r.deps)
 	wsbustransport.RegisterRoutes(r.engine, r.deps, jwtCfg, prefix)
 	if rbacCfg != nil && !rbacCfg.DelegateToPowerX {
 		base := strings.TrimRight(prefix, "/") + "/admin/runtime/internal"
@@ -227,9 +232,6 @@ func (r *Router) GetEngine() *gin.Engine {
 // injectRBACFromRegistry 将各模块声明的 RBAC 合并到配置中。
 func (r *Router) injectRBACFromRegistry(rbacCfg *middleware.RBACConfig, reg *http.Registry) {
 	if rbacCfg == nil || reg == nil {
-		return
-	}
-	if rbacCfg.DelegateToPowerX {
 		return
 	}
 	for route, perm := range reg.RBACMap() {

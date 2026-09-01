@@ -996,6 +996,10 @@ type knowledgeGatewayDelegatedClient struct {
 	}
 }
 
+func (knowledgeGatewayDelegatedClient) DelegatedCapabilities(context.Context) fwknowledge.ProviderCapabilities {
+	return fwknowledge.BasicCapabilities("powerx_plugin_runtime", fwknowledge.ProviderModeDelegated, fwknowledge.OperationRetrieve, fwknowledge.OperationHealth)
+}
+
 func (c knowledgeGatewayDelegatedClient) ListKnowledgeSpaces(ctx context.Context, input fwknowledge.ListSpacesInput) ([]fwknowledge.KnowledgeSpace, error) {
 	if c.gateway == nil {
 		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "PowerX Gateway 客户端未配置")
@@ -1015,7 +1019,7 @@ func (c knowledgeGatewayDelegatedClient) ListKnowledgeSpaces(ctx context.Context
 	for _, record := range records {
 		space := fwknowledge.KnowledgeSpace{
 			SpaceID:        strings.TrimSpace(record.UUID),
-			SpaceName:      firstNonEmpty(record.SpaceName, record.UUID),
+			SpaceName:      strings.TrimSpace(record.SpaceName),
 			TenantUUID:     input.TenantUUID,
 			DepartmentCode: record.DepartmentCode,
 			Visibility:     fwknowledge.VisibilityTenant,
@@ -1027,7 +1031,7 @@ func (c knowledgeGatewayDelegatedClient) ListKnowledgeSpaces(ctx context.Context
 				"updated_at": record.UpdatedAt,
 			},
 		}
-		if space.SpaceID != "" {
+		if space.SpaceID != "" && space.SpaceName != "" {
 			spaces = append(spaces, space)
 		}
 	}
@@ -1035,57 +1039,15 @@ func (c knowledgeGatewayDelegatedClient) ListKnowledgeSpaces(ctx context.Context
 }
 
 func (c knowledgeGatewayDelegatedClient) GetKnowledgeCatalog(context.Context) (*fwknowledge.KnowledgeCatalog, error) {
-	catalog := fwknowledge.DefaultKnowledgeCatalog("powerx_delegated_fallback")
-	if catalog.Metadata == nil {
-		catalog.Metadata = map[string]any{}
-	}
-	catalog.Metadata["delegated_note"] = "PowerX catalog endpoint is not exposed yet; using framework-compatible fallback"
-	return catalog, nil
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge catalog is not exposed by the current Host Contract")
 }
 
 func (c knowledgeGatewayDelegatedClient) SearchKnowledge(ctx context.Context, query fwknowledge.KnowledgeQuery) (*fwknowledge.KnowledgeSearchResult, error) {
-	if c.gateway == nil {
-		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "PowerX Gateway 客户端未配置")
-	}
-	query = query.Normalized()
-	result, err := c.gateway.Invoke(ctx, capgateway.InvokeParams{
-		CapabilityID:      knowledgeCapabilityPlanRetrieval,
-		Action:            "PlanRetrieval",
-		PreferredProtocol: "rest",
-		Payload: map[string]any{
-			"method":   http.MethodPost,
-			"endpoint": "/api/v1/admin/knowledge-spaces/" + firstNonEmpty(query.SpaceIDs...) + "/playground/retrieval",
-			"body": map[string]any{
-				"query":   query.Query,
-				"topK":    query.Limit,
-				"filters": query.Filters,
-			},
-		},
-		RequestID:    query.TraceID,
-		TenantUUID:   query.TenantUUID,
-		AuthRequired: true,
-		TenantScoped: false,
-	})
-	if err != nil {
-		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, err.Error())
-	}
-	return decodeKnowledgeSearchResult(result, query), nil
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge search is not exposed by the current Host Contract")
 }
 
 func (c knowledgeGatewayDelegatedClient) UpsertKnowledgeDocument(ctx context.Context, document fwknowledge.KnowledgeDocument) (*fwknowledge.KnowledgeIndexJob, error) {
-	sourceURI := strings.TrimSpace(document.URI)
-	if sourceURI == "" {
-		return nil, fwknowledge.NewError(fwknowledge.CodeInvalidDocument, "knowledge ingestion sourceUri is required; upload the source through PowerX Media first")
-	}
-	return c.invokeIndexJob(ctx, knowledgeCapabilityCreateIngestionJob, "CreateIngestionJob", document.TenantUUID, map[string]any{
-		"method":   http.MethodPost,
-		"endpoint": "/api/v1/admin/knowledge-spaces/" + url.PathEscape(strings.TrimSpace(document.SpaceID)) + "/ingestion-jobs",
-		"body": map[string]any{
-			"sourceUri":   sourceURI,
-			"format":      firstNonEmpty(document.ContentType, "markdown"),
-			"requestedBy": "plugin-knowledge-lab",
-		},
-	})
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge ingestion is not exposed by the current Host Contract")
 }
 
 func (c knowledgeGatewayDelegatedClient) DeleteKnowledgeDocument(context.Context, fwknowledge.DeleteDocumentInput) (*fwknowledge.KnowledgeIndexJob, error) {

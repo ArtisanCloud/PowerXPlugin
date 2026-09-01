@@ -7,6 +7,7 @@ export interface PluginWsOptions {
   insidePowerX?: boolean;
   token?: string;
   tenantUuid?: string;
+  memberUuid?: string;
 }
 
 export interface PluginWsClient {
@@ -33,6 +34,7 @@ export interface PluginWsBusState {
   status: PluginWsBusStatus;
   connected: boolean;
   tenantUuid: string;
+  memberUuid: string;
   welcomeReceived: boolean;
   subscribeSentAt: number;
   ackReceivedAt: number;
@@ -66,7 +68,7 @@ export interface PluginWsBusClientOptions extends PluginWsOptions {
 export interface PluginWsBusClient {
   connect(): void;
   disconnect(): void;
-  setContext(input: { tenantUuid?: string; token?: string }): void;
+  setContext(input: { tenantUuid?: string; memberUuid?: string; token?: string }): void;
   subscribe(topics: Array<string | null | undefined>): void;
   unsubscribe(topics: Array<string | null | undefined>): void;
   getState(): PluginWsBusState;
@@ -147,6 +149,7 @@ export function createPluginWsBusClient(
   let manualClosing = false;
   let token = String(options.token || "").trim();
   let tenantUuid = String(options.tenantUuid || "").trim();
+  let memberUuid = String(options.memberUuid || "").trim();
   const queuedTopics = new Set<string>();
   const sentTopics = new Set<string>();
   const reconnectIntervalMs = Math.max(
@@ -157,6 +160,7 @@ export function createPluginWsBusClient(
     status: "idle",
     connected: false,
     tenantUuid,
+    memberUuid,
     welcomeReceived: false,
     subscribeSentAt: 0,
     ackReceivedAt: 0,
@@ -376,10 +380,13 @@ export function createPluginWsBusClient(
     setContext(input) {
       const nextToken = String(input.token || "").trim();
       const nextTenantUuid = String(input.tenantUuid || "").trim();
-      const changed = nextToken !== token || nextTenantUuid !== tenantUuid;
+      const nextMemberUuid = String(input.memberUuid || "").trim();
+      const changed = nextToken !== token || nextTenantUuid !== tenantUuid || nextMemberUuid !== memberUuid;
       token = nextToken;
       tenantUuid = nextTenantUuid;
+      memberUuid = nextMemberUuid;
       state.tenantUuid = tenantUuid;
+      state.memberUuid = memberUuid;
       if (
         changed &&
         ws &&

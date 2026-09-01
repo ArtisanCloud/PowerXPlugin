@@ -65,11 +65,11 @@ export function useMemberService() {
       });
       return (response as any)?.data ?? response;
     },
-    updateMember: async (id: number, payload: Record<string, any>) => {
-      const response = await iamService.updateMember(id, payload);
+	updateMember: async (memberUUID: string, payload: Record<string, any>) => {
+		const response = await iamService.updateMember(memberUUID, payload);
       return (response as any)?.data ?? response;
     },
-    deleteMember: async (_id: number) => {
+	deleteMember: async (_memberUUID: string) => {
       console.warn("deleteMember not supported via IAM service.");
       return false;
     },

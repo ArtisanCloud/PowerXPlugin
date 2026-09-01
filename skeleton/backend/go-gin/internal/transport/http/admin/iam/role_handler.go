@@ -3,7 +3,6 @@ package iam
 import (
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
@@ -39,9 +38,9 @@ func (h *RoleHandler) Get(c *gin.Context) {
 		if !ok {
 			return
 		}
-		id := strings.TrimSpace(c.Param("id"))
+		id := strings.TrimSpace(c.Param("role_uuid"))
 		for _, role := range roles {
-			if role.ID == id || role.Code == id {
+			if role.RoleUUID == id {
 				contracts.ResponseSuccess(c, role)
 				return
 			}
@@ -53,12 +52,12 @@ func (h *RoleHandler) Get(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := parseUintParam(c, "id")
-	if err != nil {
-		contracts.ResponseBadRequest(c, err.Error())
+	roleUUID := strings.TrimSpace(c.Param("role_uuid"))
+	if !validUUIDs([]string{roleUUID}) {
+		contracts.ResponseBadRequest(c, "invalid role_uuid")
 		return
 	}
-	role, err := h.service.Get(c.Request.Context(), id)
+	role, err := h.service.GetByUUID(c.Request.Context(), roleUUID)
 	if handleRoleError(c, err) {
 		return
 	}
@@ -123,21 +122,25 @@ func (h *RoleHandler) Create(c *gin.Context) {
 	if strings.TrimSpace(req.TenantUUID) == "" {
 		req.TenantUUID = admincommon.ResolveTenantUUID(c)
 	}
+	if (req.CloneRoleUUID != nil && !validUUIDs([]string{*req.CloneRoleUUID})) || !validUUIDs(req.PermissionUUIDs) || !validUUIDs(req.MemberUUIDs) {
+		contracts.ResponseBadRequest(c, "role relationship fields must contain UUID values")
+		return
+	}
 	if strings.TrimSpace(req.TenantUUID) == "" {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
 	actorID := currentActorID(c)
-	role, err := h.service.Create(c.Request.Context(), srviam.CreateRoleInput{
-		TenantUUID:    req.TenantUUID,
-		Code:          req.Code,
-		Name:          req.Name,
-		Description:   req.Description,
-		ScopeType:     req.ScopeType,
-		CloneRoleID:   req.CloneRoleID,
-		PermissionIDs: req.PermissionIDs,
-		MemberIDs:     req.MemberIDs,
-		ActorID:       actorID,
+	role, err := h.service.CreateByUUID(c.Request.Context(), srviam.CreateRoleUUIDInput{
+		TenantUUID:      req.TenantUUID,
+		Code:            req.Code,
+		Name:            req.Name,
+		Description:     req.Description,
+		ScopeType:       req.ScopeType,
+		CloneRoleUUID:   req.CloneRoleUUID,
+		PermissionUUIDs: req.PermissionUUIDs,
+		MemberUUIDs:     req.MemberUUIDs,
+		ActorID:         actorID,
 	})
 	if handleRoleError(c, err) {
 		return
@@ -154,9 +157,9 @@ func (h *RoleHandler) Update(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := parseUintParam(c, "id")
-	if err != nil {
-		contracts.ResponseBadRequest(c, err.Error())
+	roleUUID := strings.TrimSpace(c.Param("role_uuid"))
+	if !validUUIDs([]string{roleUUID}) {
+		contracts.ResponseBadRequest(c, "invalid role_uuid")
 		return
 	}
 	var req UpdateRoleRequest
@@ -164,7 +167,7 @@ func (h *RoleHandler) Update(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 		return
 	}
-	role, err := h.service.Update(c.Request.Context(), id, srviam.UpdateRoleInput{
+	role, err := h.service.UpdateByUUID(c.Request.Context(), roleUUID, srviam.UpdateRoleInput{
 		Name:        req.Name,
 		Description: req.Description,
 		ScopeType:   req.ScopeType,
@@ -185,15 +188,15 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := parseUintParam(c, "id")
-	if err != nil {
-		contracts.ResponseBadRequest(c, err.Error())
+	roleUUID := strings.TrimSpace(c.Param("role_uuid"))
+	if !validUUIDs([]string{roleUUID}) {
+		contracts.ResponseBadRequest(c, "invalid role_uuid")
 		return
 	}
-	if handleRoleError(c, h.service.Delete(c.Request.Context(), id, currentActorID(c))) {
+	if handleRoleError(c, h.service.DeleteByUUID(c.Request.Context(), roleUUID, currentActorID(c))) {
 		return
 	}
-	contracts.ResponseSuccessWithMessage(c, gin.H{"role_id": id}, "deleted")
+	contracts.ResponseSuccessWithMessage(c, gin.H{"role_uuid": roleUUID}, "deleted")
 }
 
 func (h *RoleHandler) delegatedRoles(c *gin.Context, tenantUUID string) ([]fwiamcontracts.Role, bool) {
@@ -227,9 +230,9 @@ func (h *RolePermissionsHandler) Replace(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := parseUintParam(c, "id")
-	if err != nil {
-		contracts.ResponseBadRequest(c, err.Error())
+	roleUUID := strings.TrimSpace(c.Param("role_uuid"))
+	if !validUUIDs([]string{roleUUID}) {
+		contracts.ResponseBadRequest(c, "invalid role_uuid")
 		return
 	}
 	var req ReplaceRolePermissionsRequest
@@ -244,11 +247,15 @@ func (h *RolePermissionsHandler) Replace(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
-	role, err := h.service.ReplacePermissions(c.Request.Context(), srviam.ReplaceRolePermissionsInput{
-		RoleID:        id,
-		TenantUUID:    req.TenantUUID,
-		PermissionIDs: req.PermissionIDs,
-		ActorID:       currentActorID(c),
+	if !validUUIDs(req.PermissionUUIDs) {
+		contracts.ResponseBadRequest(c, "permission_uuids must contain UUID values")
+		return
+	}
+	role, err := h.service.ReplacePermissionsByUUID(c.Request.Context(), srviam.ReplaceRolePermissionsUUIDInput{
+		RoleUUID:        roleUUID,
+		TenantUUID:      req.TenantUUID,
+		PermissionUUIDs: req.PermissionUUIDs,
+		ActorID:         currentActorID(c),
 	})
 	if handleRoleError(c, err) {
 		return
@@ -282,9 +289,9 @@ func (h *RoleMembersHandler) mutateMembers(c *gin.Context, add bool) {
 		contracts.ResponseServiceUnavailable(c, "IAM local role service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := parseUintParam(c, "id")
-	if err != nil {
-		contracts.ResponseBadRequest(c, err.Error())
+	roleUUID := strings.TrimSpace(c.Param("role_uuid"))
+	if !validUUIDs([]string{roleUUID}) {
+		contracts.ResponseBadRequest(c, "invalid role_uuid")
 		return
 	}
 	var req RoleMembersRequest
@@ -299,16 +306,21 @@ func (h *RoleMembersHandler) mutateMembers(c *gin.Context, add bool) {
 		contracts.ResponseBadRequest(c, "tenant_uuid is required")
 		return
 	}
-	input := srviam.RoleMembersInput{
-		RoleID:     id,
-		TenantUUID: req.TenantUUID,
-		MemberIDs:  req.MemberIDs,
-		ActorID:    currentActorID(c),
+	if !validUUIDs(req.MemberUUIDs) {
+		contracts.ResponseBadRequest(c, "member_uuids must contain UUID values")
+		return
 	}
+	input := srviam.RoleMembersUUIDInput{
+		RoleUUID:    roleUUID,
+		TenantUUID:  req.TenantUUID,
+		MemberUUIDs: req.MemberUUIDs,
+		ActorID:     currentActorID(c),
+	}
+	var err error
 	if add {
-		err = h.service.AddMembers(c.Request.Context(), input)
+		err = h.service.AddMembersByUUID(c.Request.Context(), input)
 	} else {
-		err = h.service.RemoveMembers(c.Request.Context(), input)
+		err = h.service.RemoveMembersByUUID(c.Request.Context(), input)
 	}
 	if handleRoleError(c, err) {
 		return
@@ -317,7 +329,7 @@ func (h *RoleMembersHandler) mutateMembers(c *gin.Context, add bool) {
 	if add {
 		action = "added"
 	}
-	contracts.ResponseSuccessWithMessage(c, gin.H{"role_id": id, "member_ids": req.MemberIDs}, action)
+	contracts.ResponseSuccessWithMessage(c, gin.H{"role_uuid": roleUUID, "member_uuids": req.MemberUUIDs}, action)
 }
 
 type PermissionHandler struct {
@@ -362,18 +374,6 @@ func (h *PermissionHandler) List(c *gin.Context) {
 		return
 	}
 	contracts.ResponseSuccess(c, gin.H{"items": perms})
-}
-
-func parseUintParam(c *gin.Context, name string) (uint64, error) {
-	value := c.Param(name)
-	if value == "" {
-		value = c.Query(name)
-	}
-	id, err := strconv.ParseUint(value, 10, 64)
-	if err != nil || id == 0 {
-		return 0, errors.New("invalid " + name)
-	}
-	return id, nil
 }
 
 func currentActorID(c *gin.Context) *uint64 {

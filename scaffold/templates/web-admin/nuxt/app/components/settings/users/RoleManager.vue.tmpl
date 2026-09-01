@@ -80,8 +80,8 @@ const error = computed(() => roleStore.error);
 
 const showForm = ref(false);
 const isEditing = ref(false);
-const editingId = ref<number | null>(null);
-const cloneSourceId = ref<number | null>(null);
+const editingRoleUUID = ref<string | null>(null);
+const cloneSourceUUID = ref<string | null>(null);
 
 const roleForm = reactive({
   name: "",
@@ -89,7 +89,7 @@ const roleForm = reactive({
   description: "",
   scope: "tenant" as "tenant" | "system",
   tenant_uuid: "",
-  permissions: [] as number[],
+  permissions: [] as string[],
 });
 
 const filteredRoles = computed(() => {
@@ -232,8 +232,8 @@ const resetForm = () => {
   roleForm.tenant_uuid = selectedTenantUuid.value;
   roleForm.permissions = [];
   isEditing.value = false;
-  editingId.value = null;
-  cloneSourceId.value = null;
+  editingRoleUUID.value = null;
+  cloneSourceUUID.value = null;
 };
 
 const openAddForm = () => {
@@ -253,7 +253,7 @@ const openEditForm = (role: Role) => {
     | "system";
   roleForm.tenant_uuid = role.tenant_uuid || selectedTenantUuid.value;
   isEditing.value = true;
-  editingId.value = role.id;
+  editingRoleUUID.value = role.role_uuid;
   showForm.value = true;
 };
 
@@ -267,7 +267,7 @@ const openCloneForm = (role: Role) => {
     | "tenant"
     | "system";
   roleForm.tenant_uuid = role.tenant_uuid || selectedTenantUuid.value;
-  cloneSourceId.value = role.id;
+  cloneSourceUUID.value = role.role_uuid;
   showForm.value = true;
 };
 
@@ -296,13 +296,13 @@ const saveRole = async () => {
   }
 
   try {
-    if (isEditing.value && editingId.value !== null) {
+    if (isEditing.value && editingRoleUUID.value !== null) {
       const updateData: RoleUpdateParams = {
         name: roleForm.name,
         description: roleForm.description,
         scope_type: roleForm.scope,
       };
-      await roleStore.updateRole(editingId.value, updateData);
+      await roleStore.updateRole(editingRoleUUID.value, updateData);
       notifyOnce(t("iam.roles.notifications.updated"), "", "success");
     } else {
       const createData: RoleCreateParams = {
@@ -311,8 +311,8 @@ const saveRole = async () => {
         name: roleForm.name.trim(),
         description: roleForm.description,
         scope_type: roleForm.scope,
-        clone_role_id: cloneSourceId.value ?? undefined,
-        permission_ids: roleForm.permissions,
+		clone_role_uuid: cloneSourceUUID.value ?? undefined,
+		permission_uuids: roleForm.permissions,
       };
       await roleStore.createRole(createData);
       notifyOnce(t("iam.roles.notifications.created"), "", "success");
@@ -330,7 +330,7 @@ const saveRole = async () => {
   }
 };
 
-const deleteRole = async (id: number) => {
+const deleteRole = async (roleUUID: string) => {
   if (props.readonly) {
     notifyOnce(t("providerMode.readOnly"), t("providerMode.readOnlyDescription"), "warning");
     return;
@@ -477,7 +477,7 @@ const columns = computed(() => [
                 variant: "ghost",
                 icon: "i-heroicons-trash",
                 disabled: props.readonly,
-                onClick: () => deleteRole(role.id),
+				onClick: () => deleteRole(role.role_uuid),
               },
               { default: () => t("common.delete") }
             ),
@@ -489,7 +489,7 @@ const columns = computed(() => [
 
 const permissionDrawerOpen = ref(false);
 const permissionDrawerLoading = ref(false);
-const permissionSelection = ref<number[]>([]);
+const permissionSelection = ref<string[]>([]);
 const activeRole = ref<Role | null>(null);
 const selectedRoleDetail = ref<Role | null>(null);
 
@@ -500,7 +500,7 @@ const ensurePermissionCatalog = async () => {
 };
 
 const loadRoleDetail = async (role: Role) => {
-  const detail = await roleStore.fetchRole(role.id);
+  const detail = await roleStore.fetchRole(role.role_uuid);
   selectedRoleDetail.value = detail;
   return detail;
 };
@@ -513,7 +513,7 @@ const openPermissionDrawer = async (role: Role) => {
   try {
     await ensurePermissionCatalog();
     const detail = await loadRoleDetail(role);
-    permissionSelection.value = [...(detail?.permission_ids ?? [])];
+		permissionSelection.value = [...(detail?.permission_uuids ?? [])];
   } catch (err: any) {
     toast.add({
       title: t("common.error"),
@@ -536,11 +536,10 @@ const savePermissionSelection = async () => {
     selectedRoleDetail.value.tenant_uuid || selectedTenantUuid.value;
   if (!tenantUuid) return;
   try {
-    await permissionStore.setRolePermissionIDs(
-      selectedRoleDetail.value.id,
-      tenantUuid,
-      permissionSelection.value
-    );
+		await iamService.replaceRolePermissions(selectedRoleDetail.value.role_uuid, {
+			tenant_uuid: tenantUuid,
+			permission_uuids: permissionSelection.value,
+		});
     notifyOnce(t("iam.roles.notifications.permissionsSaved"), "", "success");
     permissionDrawerOpen.value = false;
     await loadRoles(true);
@@ -557,8 +556,8 @@ const membersDrawerOpen = ref(false);
 const membersLoading = ref(false);
 const memberCandidates = ref<MemberRecord[]>([]);
 const memberSearch = ref("");
-const selectedMemberIds = ref<number[]>([]);
-const originalMemberIds = ref<number[]>([]);
+const selectedMemberUUIDs = ref<string[]>([]);
+const originalMemberUUIDs = ref<string[]>([]);
 
 const filteredMemberCandidates = computed(() => {
   if (!memberSearch.value.trim()) return memberCandidates.value;
@@ -594,10 +593,8 @@ const openMembersDrawer = async (role: Role) => {
     } else {
       memberCandidates.value = [];
     }
-    originalMemberIds.value = (detail?.member_ids ?? []).map((id) =>
-      Number(id)
-    );
-    selectedMemberIds.value = [...originalMemberIds.value];
+	originalMemberUUIDs.value = [...(detail?.member_uuids ?? [])];
+	selectedMemberUUIDs.value = [...originalMemberUUIDs.value];
   } catch (err: any) {
     toast.add({
       title: t("common.error"),
@@ -610,14 +607,14 @@ const openMembersDrawer = async (role: Role) => {
   }
 };
 
-const toggleMemberSelection = (memberId: number) => {
-  const next = new Set(selectedMemberIds.value);
-  if (next.has(memberId)) {
-    next.delete(memberId);
-  } else {
-    next.add(memberId);
-  }
-  selectedMemberIds.value = Array.from(next);
+const toggleMemberSelection = (memberUUID: string) => {
+	const next = new Set(selectedMemberUUIDs.value);
+	if (next.has(memberUUID)) {
+		next.delete(memberUUID);
+	} else {
+		next.add(memberUUID);
+	}
+	selectedMemberUUIDs.value = Array.from(next);
 };
 
 const membersSaving = ref(false);
@@ -633,21 +630,21 @@ const saveMembers = async () => {
   if (!tenantUuid) return;
   membersSaving.value = true;
   try {
-    const current = new Set(selectedMemberIds.value);
-    const previous = new Set(originalMemberIds.value);
+		const current = new Set(selectedMemberUUIDs.value);
+		const previous = new Set(originalMemberUUIDs.value);
     const toAdd = [...current].filter((id) => !previous.has(id));
     const toRemove = [...previous].filter((id) => !current.has(id));
 
     if (toAdd.length) {
-      await iamService.addRoleMembers(activeRole.value.id, {
-        tenant_uuid: tenantUuid,
-        member_ids: toAdd,
+		await iamService.addRoleMembers(activeRole.value.role_uuid, {
+			tenant_uuid: tenantUuid,
+			member_uuids: toAdd,
       });
     }
     if (toRemove.length) {
-      await iamService.removeRoleMembers(activeRole.value.id, {
-        tenant_uuid: tenantUuid,
-        member_ids: toRemove,
+		await iamService.removeRoleMembers(activeRole.value.role_uuid, {
+			tenant_uuid: tenantUuid,
+			member_uuids: toRemove,
       });
     }
 
@@ -938,7 +935,7 @@ onMounted(async () => {
           >
             <label
               v-for="member in filteredMemberCandidates"
-              :key="member.member_id"
+				:key="member.member_uuid"
               class="flex items-center justify-between gap-3 py-2"
             >
               <div>
@@ -948,8 +945,8 @@ onMounted(async () => {
                 </p>
               </div>
               <UCheckbox
-                :model-value="selectedMemberIds.includes(member.member_id)"
-                @update:model-value="() => toggleMemberSelection(member.member_id)"
+				:model-value="selectedMemberUUIDs.includes(member.member_uuid)"
+				@update:model-value="() => toggleMemberSelection(member.member_uuid)"
               />
             </label>
             <p
@@ -965,7 +962,7 @@ onMounted(async () => {
         <div class="flex justify-between items-center border-t border-gray-100 dark:border-gray-800 p-4">
           <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ `{{ t("iam.roles.membersDrawer.selectionSummary", {
-                count: selectedMemberIds.length,
+				count: selectedMemberUUIDs.length,
               }) }}` }}
           </p>
           <div class="flex gap-2">

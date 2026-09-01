@@ -79,10 +79,15 @@
 - **FR-005**: 系统 MUST 定义统一错误语义（认证失败、权限不足、上下文缺失、上游不可用）并跨模式保持一致。
 - **FR-006**: 系统 MUST 提供统一审计与观测字段，至少包含 tenant、user、role、permission、mode、trace。
 - **FR-007**: skeleton MUST 作为 framework IAM 契约的适配实现存在，不再承担契约定义职责。
-- **FR-008**: 系统 MUST 提供向后兼容迁移路径，使现有插件可分阶段迁移到 framework IAM 接口。
+- **FR-008**: 系统 MUST 发布破坏性变更说明与迁移步骤；新契约生效后不为废弃接口、废弃数据格式或旧 adapter 提供静默兼容或 fallback。
 - **FR-009**: 在 delegated 模式下，组织/成员/角色/权限等写操作 MUST 由宿主接口承载；插件侧只读，不本地持久化写入。
 - **FR-010**: 在 standalone(local) 模式下，系统 MUST 至少提供租户、部门、成员、角色、权限五类实体能力，作为可运行最小集。
 - **FR-011**: 系统 MUST 在启动阶段完成 IAM adapter 单选绑定（local 或 delegated），运行期不得自动切换 adapter。
+- **FR-012**: `DirectoryService` MUST 提供 `GetMember(ctx, tenantUUID, memberUUID)` 与 `BatchGetMembers(ctx, tenantUUID, memberUUIDs)`；按 UUID 的业务查询不得通过拉取全量成员列表替代。
+- **FR-013**: 所有跨插件、跨服务、API、事件和审计中的成员引用 MUST 使用 `member_uuid`；`user_uuid` 与 `member_uuid` 语义独立，不得互相替代。
+- **FR-014**: 成员不存在、跨租户、无权限与 delegated 上游不可用 MUST 返回稳定错误；不得返回空成功结果掩盖异常。
+- **FR-015**: `display_name` 仅承载人类可读名称。解析失败时必须为空或返回明确错误，MUST NOT 回填成员 UUID。
+- **FR-016**: delegated adapter MUST 仅调用 PowerX Core 已发布的 Host IAM Contract；MUST NOT 直连 Core 数据库、调用 Core 内部 service 或解析 Gateway 原始 `map[string]any`。
 
 ### Key Entities *(include if feature involves data)*
 
@@ -91,7 +96,7 @@
 - **Organization Node**: 组织结构节点（tenant、department、member 的层级关系）。
 - **Tenant**: 本地 IAM 租户主体，作为组织与权限边界。
 - **Department**: 租户内部门层级节点，承载组织树关系。
-- **Member**: 租户内成员主体，关联用户标识与组织归属。
+- **Member**: 租户内成员主体，以 `member_uuid` 为稳定跨边界标识；可选关联独立的 `user_uuid`。
 - **Role**: 权限集合载体，定义可授予能力范围。
 - **Permission**: 原子权限项（resource/action），用于统一鉴权判定。
 - **Authorization Decision**: 权限判定结果，包含结果、原因和审计信息。

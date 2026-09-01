@@ -4,26 +4,25 @@ import type { ApiResponse } from "../types/types";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 
 export interface Department {
-  id: number;
+	 uuid: string;
   tenant_uuid: string;
   name: string;
   code: string;
   key?: string;
-  parent_id?: number | null;
+	 parent_department_uuid?: string | null;
   description?: string;
   path?: string;
   sort?: number;
   sort_order?: number;
-  leader_member_id?: number | null;
   status?: number;
   meta?: any;
   children?: Department[];
 }
 
 export interface DepartmentCreateParams {
-  name: string;
-  key?: string;
-  parent_id?: number | null;
+	name: string;
+	key?: string;
+	parent_department_uuid?: string | null;
   description?: string;
   sort?: number;
   status?: number;
@@ -33,10 +32,9 @@ export interface DepartmentCreateParams {
 export type DepartmentUpdateParams = {
   name?: string;
   key?: string;
-  new_parent_id?: number | null;
+	parent_department_uuid?: string | null;
   sort?: number;
   description?: string;
-  leader_member_id?: number | null;
   status?: number;
   meta?: any;
 };
@@ -81,41 +79,27 @@ const unwrapList = (resp: any): any[] => {
   return [];
 };
 
-const toNumber = (value: any): number | undefined => {
-  if (value === null || value === undefined) return undefined;
-  const num = Number(value);
-  return Number.isFinite(num) ? num : undefined;
-};
-
 const normalizeDepartmentEntry = (dept: any): Department => {
   const childNodes = Array.isArray(dept?.children)
     ? dept.children.map(normalizeDepartmentEntry)
     : undefined;
-  const parentCandidate =
-    dept?.parent_id ?? dept?.parentId ?? dept?.parent ?? undefined;
+	const parentCandidate = dept?.parent_department_uuid;
   const sortCandidate =
     dept?.sort ?? dept?.sort_order ?? dept?.sortOrder ?? undefined;
 
   const normalized: Department = {
-    id: Number(dept?.id ?? 0),
+		uuid: String(dept?.uuid ?? ""),
     tenant_uuid: String(
       dept?.tenant_uuid || dept?.tenantUuid || dept?.tenantUUID || ""
     ),
     name: String(dept?.name ?? ""),
     code: String(dept?.code || dept?.key || ""),
     key: dept?.code || dept?.key || undefined,
-    parent_id:
-      parentCandidate === null
-        ? null
-        : toNumber(parentCandidate) ?? undefined,
+		parent_department_uuid: parentCandidate === null ? null : (typeof parentCandidate === "string" ? parentCandidate : undefined),
     description: dept?.description,
     path: typeof dept?.path === "string" ? dept.path : undefined,
-    sort_order: toNumber(sortCandidate),
-    sort: toNumber(sortCandidate),
-    leader_member_id:
-      dept?.leader_member_id === null
-        ? null
-        : toNumber(dept?.leader_member_id ?? dept?.leaderMemberId),
+		sort_order: typeof sortCandidate === "number" ? sortCandidate : undefined,
+		sort: typeof sortCandidate === "number" ? sortCandidate : undefined,
     status:
       dept?.status === null || dept?.status === undefined
         ? undefined
@@ -127,7 +111,7 @@ const normalizeDepartmentEntry = (dept: any): Department => {
   };
 
   if (!normalized.code) {
-    normalized.code = slugify(normalized.name || `dept-${normalized.id}`);
+		normalized.code = slugify(normalized.name || "department");
   }
   if (!normalized.key) {
     normalized.key = normalized.code;
@@ -168,9 +152,8 @@ const buildCreatePayload = (
     name: params.name?.trim(),
     code: params.key?.trim() || slugify(params.name || ""),
   };
-  if (params.parent_id !== undefined) {
-    payload.parent_id =
-      params.parent_id === null ? null : Number(params.parent_id);
+	if (params.parent_department_uuid !== undefined) {
+		payload.parent_department_uuid = params.parent_department_uuid;
   }
   if (params.description) {
     payload.description = params.description;
@@ -192,11 +175,8 @@ const buildUpdatePayload = (params: DepartmentUpdateParams) => {
   if (params.description) {
     payload.description = params.description;
   }
-  if (Object.prototype.hasOwnProperty.call(params, "new_parent_id")) {
-    payload.parent_id =
-      params.new_parent_id === null || params.new_parent_id === undefined
-        ? params.new_parent_id
-        : Number(params.new_parent_id);
+	if (Object.prototype.hasOwnProperty.call(params, "parent_department_uuid")) {
+		payload.parent_department_uuid = params.parent_department_uuid;
   }
   return payload;
 };
@@ -215,13 +195,7 @@ export function useDepartmentService() {
   return {
     getDepartmentTree: async (): Promise<Department[]> => {
       const query = { params: buildTenantQuery() };
-      let res: ApiResponse<any> | any;
-      try {
-        res = await apiClient.get<ApiResponse<any>>(`${baseUrl}/tree`, query);
-      } catch (error) {
-        console.warn("尝试 /tree 端点失败，降级使用列表接口:", error);
-        res = await apiClient.get<ApiResponse<any>>(baseUrl, query);
-      }
+		const res = await apiClient.get<ApiResponse<any>>(`${baseUrl}/tree`, query);
       return parseDepartmentsFromResponse(res);
     },
 
@@ -235,25 +209,25 @@ export function useDepartmentService() {
     },
 
     updateDepartment: async (
-      id: number,
+		departmentUUID: string,
       data: DepartmentUpdateParams
     ): Promise<Department | null> => {
       const payload = buildUpdatePayload(data);
       const res = await apiClient.patch<ApiResponse<any>>(
-        `${baseUrl}/${id}`,
+		`${baseUrl}/${departmentUUID}`,
         payload
       );
       return extractDepartmentFromResponse(res);
     },
 
-    deleteDepartment: async (id: number): Promise<boolean> => {
-      await apiClient.delete<ApiResponse<null>>(`${baseUrl}/${id}`);
+	deleteDepartment: async (departmentUUID: string): Promise<boolean> => {
+		await apiClient.delete<ApiResponse<null>>(`${baseUrl}/${departmentUUID}`);
       return true;
     },
 
-    getDepartment: async (id: number): Promise<Department | null> => {
-      const list = await fetchAll();
-      return list.find((dept) => dept.id === Number(id)) ?? null;
+	getDepartment: async (departmentUUID: string): Promise<Department | null> => {
+		const list = await fetchAll();
+		return list.find((dept) => dept.uuid === departmentUUID) ?? null;
     },
   };
 }

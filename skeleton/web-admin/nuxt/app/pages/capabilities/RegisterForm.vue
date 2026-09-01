@@ -159,6 +159,7 @@
                   </UButton>
                   <UButton
                     v-if="isWorkflowKind(row.original.kind)"
+                    data-testid="mcp-debug-capability"
                     size="xs"
                     variant="outline"
                     color="primary"
@@ -864,6 +865,7 @@
               </div>
               <div class="flex flex-wrap gap-3">
                 <UButton
+                  data-testid="mcp-session-register"
                   color="primary"
                   :loading="mcpRegisterLoading"
                   @click="handleMcpRegister"
@@ -1172,10 +1174,12 @@
 	                </div>
                 <div class="flex items-center gap-2">
                   <UBadge
+                    data-testid="mcp-stream-state"
                     :label="mcpStreamConnected ? $t('capabilities.mcp.stream.connected') : $t('capabilities.mcp.stream.disconnected')"
                     :color="mcpStreamConnected ? 'green' : 'gray'"
                   />
                   <UButton
+                    data-testid="mcp-stream-toggle"
                     size="xs"
                     variant="soft"
                     color="primary"
@@ -1199,7 +1203,7 @@
               <p v-if="mcpStreamError" class="text-rose-300">
                 {{ mcpStreamError }}
               </p>
-	              <div v-if="mcpEvents.length" class="space-y-3">
+	              <div v-if="mcpEvents.length" data-testid="mcp-stream-events" class="space-y-3">
 	                <UCard
 	                  v-for="event in mcpEvents"
 	                  :key="`${event.type}-${event.timestamp}`"

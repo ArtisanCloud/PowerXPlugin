@@ -22,35 +22,32 @@ export interface TenantListParams {
 }
 
 export interface Department {
-  id: number;
+  uuid: string;
   tenant_uuid: string;
   name: string;
   code: string;
-  parent_id?: number;
+	parent_department_uuid?: string;
   description?: string;
   path: string;
   sort_order: number;
 }
 
 export interface MemberRecord {
-  id?: number;
-  member_id: number;
+	member_uuid: string;
   tenant_uuid: string;
-  user_id: number;
   email: string;
   phone?: string;
   display_name: string;
   username: string;
   status: string;
-  department_id?: number;
-  department_ids?: number[];
+	department_uuids?: string[];
   created_at: string;
   last_login_at?: string;
   roles: string[];
 }
 
 export interface RoleRecord {
-  id: number;
+	role_uuid: string;
   tenant_uuid: string;
   code: string;
   name: string;
@@ -58,13 +55,13 @@ export interface RoleRecord {
   scope_type: string;
   policy_version: string;
   member_count: number;
-  permission_ids?: number[];
-  member_ids?: number[];
+	permission_uuids?: string[];
+	member_uuids?: string[];
   created_at: string;
 }
 
 export interface PermissionRecord {
-  id: number;
+	permission_uuid: string;
   resource: string;
   action: string;
   description?: string;
@@ -122,13 +119,13 @@ export const useIAMService = () => {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    updateDepartment: (id: number, payload: Record<string, any>) =>
-      client<ApiResponse<Department>>(`${base}/departments/${id}`, {
+	updateDepartment: (departmentUUID: string, payload: Record<string, any>) =>
+	      client<ApiResponse<Department>>(`${base}/departments/${departmentUUID}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
-    deleteDepartment: (id: number) =>
-      client<ApiResponse<{ ok: boolean }>>(`${base}/departments/${id}`, {
+	deleteDepartment: (departmentUUID: string) =>
+	      client<ApiResponse<{ ok: boolean }>>(`${base}/departments/${departmentUUID}`, {
         method: "DELETE",
       }),
     listMembers: (params: MemberListParams) =>
@@ -147,8 +144,8 @@ export const useIAMService = () => {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    updateMember: (id: number, payload: Record<string, any>) =>
-      client<ApiResponse<MemberRecord>>(`${base}/members/${id}`, {
+	updateMember: (memberUUID: string, payload: Record<string, any>) =>
+	      client<ApiResponse<MemberRecord>>(`${base}/members/${memberUUID}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
@@ -171,32 +168,32 @@ export const useIAMService = () => {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    updateRole: (id: number, payload: UpdateRolePayload) =>
-      client<ApiResponse<RoleRecord>>(`${base}/roles/${id}`, {
+	updateRole: (roleUUID: string, payload: UpdateRolePayload) =>
+	      client<ApiResponse<RoleRecord>>(`${base}/roles/${roleUUID}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
-    deleteRole: (id: number) =>
-      client<ApiResponse<{ ok: boolean }>>(`${base}/roles/${id}`, {
+	deleteRole: (roleUUID: string) =>
+	      client<ApiResponse<{ ok: boolean }>>(`${base}/roles/${roleUUID}`, {
         method: "DELETE",
       }),
-    replaceRolePermissions: (id: number, payload: ReplaceRolePermissionsPayload) =>
-      client<ApiResponse<RoleRecord>>(`${base}/roles/${id}/permissions`, {
+	replaceRolePermissions: (roleUUID: string, payload: ReplaceRolePermissionsPayload) =>
+	      client<ApiResponse<RoleRecord>>(`${base}/roles/${roleUUID}/permissions`, {
         method: "PUT",
         body: JSON.stringify(payload),
       }),
-    addRoleMembers: (id: number, payload: RoleMembersPayload) =>
-      client<ApiResponse<{ ok: boolean }>>(`${base}/roles/${id}/members`, {
+	addRoleMembers: (roleUUID: string, payload: RoleMembersPayload) =>
+	      client<ApiResponse<{ ok: boolean }>>(`${base}/roles/${roleUUID}/members`, {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    removeRoleMembers: (id: number, payload: RoleMembersPayload) =>
-      client<ApiResponse<{ ok: boolean }>>(`${base}/roles/${id}/members`, {
+	removeRoleMembers: (roleUUID: string, payload: RoleMembersPayload) =>
+	      client<ApiResponse<{ ok: boolean }>>(`${base}/roles/${roleUUID}/members`, {
         method: "DELETE",
         body: JSON.stringify(payload),
       }),
-    getRole: (id: number) =>
-      client<ApiResponse<RoleRecord>>(`${base}/roles/${id}`, {
+	getRole: (roleUUID: string) =>
+	      client<ApiResponse<RoleRecord>>(`${base}/roles/${roleUUID}`, {
         method: "GET",
       }),
     listFederatedBindings: (params: { tenantUuid: string; provider?: string }) =>
@@ -229,9 +226,9 @@ export interface BulkImportPayload {
     display_name?: string;
     username?: string;
     phone?: string;
-    department_id?: number | null;
+	department_uuids?: string[];
     status?: string;
-    roles?: number[];
+	role_uuids?: string[];
   }>;
 }
 
@@ -247,9 +244,9 @@ export interface CreateRolePayload {
   name: string;
   description?: string;
   scope_type?: string;
-  clone_role_id?: number;
-  permission_ids?: number[];
-  member_ids?: number[];
+	clone_role_uuid?: string;
+	permission_uuids?: string[];
+	member_uuids?: string[];
 }
 
 export interface UpdateRolePayload {
@@ -260,12 +257,12 @@ export interface UpdateRolePayload {
 
 export interface ReplaceRolePermissionsPayload {
   tenant_uuid: string;
-  permission_ids: number[];
+	permission_uuids: string[];
 }
 
 export interface RoleMembersPayload {
   tenant_uuid: string;
-  member_ids: number[];
+	member_uuids: string[];
 }
 
 export interface FederatedBindingRecord {

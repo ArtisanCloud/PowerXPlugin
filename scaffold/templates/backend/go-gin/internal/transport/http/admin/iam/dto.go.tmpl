@@ -25,19 +25,19 @@ type DepartmentListQuery struct {
 }
 
 type CreateDepartmentRequest struct {
-	TenantUUID  string  `json:"tenant_uuid"`
-	Name        string  `json:"name" binding:"required"`
-	Code        string  `json:"code"`
-	ParentID    *uint64 `json:"parent_id"`
-	Description string  `json:"description"`
-	SortOrder   int     `json:"sort_order"`
+	TenantUUID           string  `json:"tenant_uuid"`
+	Name                 string  `json:"name" binding:"required"`
+	Code                 string  `json:"code"`
+	ParentDepartmentUUID *string `json:"parent_department_uuid"`
+	Description          string  `json:"description"`
+	SortOrder            int     `json:"sort_order"`
 }
 
 type UpdateDepartmentRequest struct {
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	SortOrder   *int    `json:"sort_order"`
-	ParentID    *uint64 `json:"parent_id"`
+	Name                 string  `json:"name"`
+	Description          string  `json:"description"`
+	SortOrder            *int    `json:"sort_order"`
+	ParentDepartmentUUID *string `json:"parent_department_uuid"`
 }
 
 type MemberListQuery struct {
@@ -49,34 +49,32 @@ type MemberListQuery struct {
 }
 
 type CreateMemberRequest struct {
-	TenantUUID    string   `json:"tenant_uuid"`
-	Email         string   `json:"email" binding:"required"`
-	DisplayName   string   `json:"display_name"`
-	Username      string   `json:"username"`
-	Phone         string   `json:"phone"`
-	DepartmentID  *uint64  `json:"department_id"`
-	DepartmentIDs []uint64 `json:"department_ids"`
-	Status        string   `json:"status"`
-	Roles         []uint64 `json:"roles"`
+	TenantUUID      string   `json:"tenant_uuid"`
+	Email           string   `json:"email" binding:"required"`
+	DisplayName     string   `json:"display_name"`
+	Username        string   `json:"username"`
+	Phone           string   `json:"phone"`
+	DepartmentUUIDs []string `json:"department_uuids"`
+	Status          string   `json:"status"`
+	RoleUUIDs       []string `json:"role_uuids"`
 }
 
 type UpdateMemberRequest struct {
-	DisplayName   string   `json:"display_name"`
-	Status        string   `json:"status"`
-	DepartmentID  *uint64  `json:"department_id"`
-	DepartmentIDs []uint64 `json:"department_ids"`
-	Roles         []uint64 `json:"roles"`
-	ReplaceRoles  bool     `json:"replace_roles"`
+	DisplayName     string   `json:"display_name"`
+	Status          string   `json:"status"`
+	DepartmentUUIDs []string `json:"department_uuids"`
+	RoleUUIDs       []string `json:"role_uuids"`
+	ReplaceRoles    bool     `json:"replace_roles"`
 }
 
 type BulkImportMemberEntry struct {
-	Email        string   `json:"email" binding:"required,email"`
-	DisplayName  string   `json:"display_name"`
-	Username     string   `json:"username"`
-	Phone        string   `json:"phone"`
-	DepartmentID *uint64  `json:"department_id"`
-	Status       string   `json:"status"`
-	Roles        []uint64 `json:"roles"`
+	Email           string   `json:"email" binding:"required,email"`
+	DisplayName     string   `json:"display_name"`
+	Username        string   `json:"username"`
+	Phone           string   `json:"phone"`
+	DepartmentUUIDs []string `json:"department_uuids"`
+	Status          string   `json:"status"`
+	RoleUUIDs       []string `json:"role_uuids"`
 }
 
 type BulkImportMembersRequest struct {
@@ -91,14 +89,14 @@ type RoleListQuery struct {
 }
 
 type CreateRoleRequest struct {
-	TenantUUID    string   `json:"tenant_uuid"`
-	Code          string   `json:"code" binding:"required"`
-	Name          string   `json:"name" binding:"required"`
-	Description   string   `json:"description"`
-	ScopeType     string   `json:"scope_type"`
-	CloneRoleID   *uint64  `json:"clone_role_id"`
-	PermissionIDs []uint64 `json:"permission_ids"`
-	MemberIDs     []uint64 `json:"member_ids"`
+	TenantUUID      string   `json:"tenant_uuid"`
+	Code            string   `json:"code" binding:"required"`
+	Name            string   `json:"name" binding:"required"`
+	Description     string   `json:"description"`
+	ScopeType       string   `json:"scope_type"`
+	CloneRoleUUID   *string  `json:"clone_role_uuid"`
+	PermissionUUIDs []string `json:"permission_uuids"`
+	MemberUUIDs     []string `json:"member_uuids"`
 }
 
 type UpdateRoleRequest struct {
@@ -108,11 +106,11 @@ type UpdateRoleRequest struct {
 }
 
 type ReplaceRolePermissionsRequest struct {
-	TenantUUID    string   `json:"tenant_uuid"`
-	PermissionIDs []uint64 `json:"permission_ids"`
+	TenantUUID      string   `json:"tenant_uuid"`
+	PermissionUUIDs []string `json:"permission_uuids"`
 }
 
 type RoleMembersRequest struct {
-	TenantUUID string   `json:"tenant_uuid"`
-	MemberIDs  []uint64 `json:"member_ids"`
+	TenantUUID  string   `json:"tenant_uuid"`
+	MemberUUIDs []string `json:"member_uuids"`
 }

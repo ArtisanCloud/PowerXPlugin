@@ -12,8 +12,8 @@ func TestIdentityContextResolver_ResolveIdentity(t *testing.T) {
 	resolver := IdentityContextResolver{}
 	token := buildUnsignedJWT(`{
 		"tid":"11111111-1111-1111-1111-111111111111",
-		"sub":"user-42",
-		"member_id":"member-7",
+		"user_uuid":"22222222-2222-2222-2222-222222222222",
+		"member_uuid":"33333333-3333-3333-3333-333333333333",
 		"roles":["admin","ops"],
 		"permissions":["iam.tenant.read","iam.member.write"],
 		"policy_version":"2026.04",
@@ -27,11 +27,11 @@ func TestIdentityContextResolver_ResolveIdentity(t *testing.T) {
 	if identity.TenantUUID != "11111111-1111-1111-1111-111111111111" {
 		t.Fatalf("tenant mismatch, got=%s", identity.TenantUUID)
 	}
-	if identity.UserID != "user-42" {
-		t.Fatalf("user mismatch, got=%s", identity.UserID)
+	if identity.UserUUID != "22222222-2222-2222-2222-222222222222" {
+		t.Fatalf("user mismatch, got=%s", identity.UserUUID)
 	}
-	if identity.MemberID != "member-7" {
-		t.Fatalf("member mismatch, got=%s", identity.MemberID)
+	if identity.MemberUUID != "33333333-3333-3333-3333-333333333333" {
+		t.Fatalf("member mismatch, got=%s", identity.MemberUUID)
 	}
 	if len(identity.Roles) != 2 || identity.Roles[0] != "admin" || identity.Roles[1] != "ops" {
 		t.Fatalf("roles mismatch: %#v", identity.Roles)

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -41,6 +42,9 @@ func WSBusPublishHandler(deps *app.Deps) gin.HandlerFunc {
 		if traceID == "" {
 			traceID = strings.TrimSpace(c.GetHeader("X-Request-ID"))
 		}
+		if !allowWSBusPublish(c, deps, req.Topic, tenantUUID, req.MemberUUID, traceID) {
+			return
+		}
 
 		publisher := fwwsbus.Publisher(fwwsbus.NewAdapter(
 			fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
@@ -73,4 +77,31 @@ func WSBusPublishHandler(deps *app.Deps) gin.HandlerFunc {
 		}
 		contracts.ResponseSuccess(c, gin.H{"ok": true})
 	}
+}
+
+// allowWSBusPublish makes events.yaml the sole allowlist for management-plane
+// WebSocket publishes. A missing descriptor is deliberately a hard failure: an
+// operator cannot turn an arbitrary topic into a public realtime surface.
+func allowWSBusPublish(c *gin.Context, deps *app.Deps, topic, tenantUUID, memberUUID, traceID string) bool {
+	var descriptors []frameworkrealtime.Descriptor
+	if deps != nil {
+		descriptors = deps.RealtimeDescriptors
+	}
+	decision := frameworkrealtime.Decide(
+		descriptors,
+		frameworkrealtime.ActionPublish,
+		strings.TrimSpace(topic),
+		frameworkrealtime.ProtocolWS,
+		"message",
+		frameworkrealtime.Scope{
+			TenantUUID: strings.TrimSpace(tenantUUID),
+			MemberUUID: strings.TrimSpace(memberUUID),
+			TraceID:    strings.TrimSpace(traceID),
+		},
+	)
+	if decision.Allowed {
+		return true
+	}
+	contracts.ResponseError(c, http.StatusForbidden, decision.Reason, decision.Reason)
+	return false
 }

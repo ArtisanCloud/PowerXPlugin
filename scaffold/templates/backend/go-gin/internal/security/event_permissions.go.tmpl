@@ -254,6 +254,8 @@ func defaultManifestPath() string {
 	return filepath.Join("skeleton", "plugin.yaml")
 }
 
+func DefaultManifestPath() string { return defaultManifestPath() }
+
 func findManifestFrom(start string) string {
 	current := filepath.Clean(start)
 	for i := 0; i < 8; i++ {

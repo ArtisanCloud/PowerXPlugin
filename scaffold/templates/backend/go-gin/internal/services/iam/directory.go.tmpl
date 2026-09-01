@@ -3,6 +3,8 @@ package iam
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -20,6 +22,7 @@ var (
 	ErrAuthUnavailable  = errors.New("iam: auth service unavailable")
 	ErrUnauthorized     = errors.New("iam: unauthorized")
 	ErrInvalidArguments = errors.New("iam: invalid arguments")
+	ErrMemberNotFound   = errors.New("iam: member not found")
 )
 
 type LoginRequest struct {
@@ -77,6 +80,7 @@ type UserContext struct {
 
 type RoleInfo struct {
 	ID          uint64
+	UUID        string
 	TenantUUID  string
 	TenantUuid  string
 	Code        string
@@ -86,6 +90,7 @@ type RoleInfo struct {
 
 type DepartmentInfo struct {
 	ID          uint64
+	UUID        string
 	TenantUUID  string
 	TenantUuid  string
 	Name        string
@@ -97,6 +102,8 @@ type DepartmentInfo struct {
 type TenantContext struct {
 	TenantUUID  string
 	TenantUuid  string
+	UserUUID    string
+	MemberUUID  string
 	UserID      uint64
 	Roles       []string
 	Permissions []string
@@ -111,5 +118,40 @@ type IAMDirectory interface {
 	CurrentUser(ctx context.Context) (*UserContext, error)
 	ListRoles(ctx context.Context, tenantUUID string) ([]RoleInfo, error)
 	ListDepartments(ctx context.Context, tenantUUID string) ([]DepartmentInfo, error)
+	ListMembers(ctx context.Context, tenantUUID string) ([]MemberInfo, error)
+	GetMember(ctx context.Context, tenantUUID, memberUUID string) (*MemberInfo, error)
 	CheckPermission(ctx context.Context, tc TenantContext, resource, action string) error
+}
+
+type MemberInfo struct {
+	MemberUUID  string
+	TenantUUID  string
+	UserUUID    string
+	DisplayName string
+	Status      string
+}
+
+// PermissionInfo is the UUID-only permission catalog projection for framework consumers.
+type PermissionInfo struct {
+	PermissionUUID string
+	Resource       string
+	Action         string
+	Scope          string
+}
+
+func NormalizeMemberUUIDs(memberUUIDs []string) ([]string, error) {
+	seen := make(map[string]struct{}, len(memberUUIDs))
+	result := make([]string, 0, len(memberUUIDs))
+	for _, raw := range memberUUIDs {
+		memberUUID := strings.TrimSpace(raw)
+		if memberUUID == "" {
+			return nil, fmt.Errorf("%w: member_uuid is required", ErrInvalidArguments)
+		}
+		if _, exists := seen[memberUUID]; exists {
+			return nil, fmt.Errorf("%w: duplicate member_uuid", ErrInvalidArguments)
+		}
+		seen[memberUUID] = struct{}{}
+		result = append(result, memberUUID)
+	}
+	return result, nil
 }

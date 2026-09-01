@@ -159,6 +159,16 @@ func TestListSessionsUsesPluginBackendGateway(t *testing.T) {
 	require.Contains(t, w.Body.String(), "10000000-0000-4000-8000-000000000101")
 }
 
+func TestMapAgentStreamErrorPreservesStableUpstreamStatus(t *testing.T) {
+	status, code := mapAgentStreamError(&gateway.PlatformAPIError{StatusCode: http.StatusForbidden})
+	require.Equal(t, http.StatusForbidden, status)
+	require.Equal(t, "POWERX_AGENT_STREAM_FORBIDDEN", code)
+
+	status, code = mapAgentStreamError(&gateway.PlatformAPIError{StatusCode: http.StatusServiceUnavailable})
+	require.Equal(t, http.StatusBadGateway, status)
+	require.Equal(t, "POWERX_AGENT_STREAM_UPSTREAM_DEPENDENCY", code)
+}
+
 func TestListSessionMessagesUsesPluginBackendGateway(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

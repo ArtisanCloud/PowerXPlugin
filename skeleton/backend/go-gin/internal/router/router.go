@@ -202,7 +202,7 @@ func (r *Router) setupRoutes() {
 	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
 	r.inferRBACFromRoutes(rbacCfg, prefix)
 
-	mcptransport.RegisterRoutes(r.engine, prefix)
+	mcptransport.RegisterRoutes(gProtected, r.deps)
 	wsbustransport.RegisterRoutes(r.engine, r.deps, jwtCfg, prefix)
 	if rbacCfg != nil && !rbacCfg.DelegateToPowerX {
 		base := strings.TrimRight(prefix, "/") + "/admin/runtime/internal"

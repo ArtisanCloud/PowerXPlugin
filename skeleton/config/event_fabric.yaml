@@ -71,3 +71,63 @@ topics:
       - principal_type: plugin
         principal_id: "plugin:com.powerx.plugins.base"
         actions: [publish]
+
+  - key: _topic.notify.tenant.{{tenant_uuid}}
+    namespace: _topic.notify.tenant
+    name: "{{tenant_uuid}}"
+    description: 租户通知事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]
+      - principal_type: plugin
+        principal_id: "plugin:com.powerx.plugins.base"
+        actions: [publish]
+
+  - key: _topic.notify.member.{{member_uuid}}
+    namespace: _topic.notify.member
+    name: "{{member_uuid}}"
+    description: 成员通知事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]
+      - principal_type: plugin
+        principal_id: "plugin:com.powerx.plugins.base"
+        actions: [publish]
+
+  - key: _topic.iam.wecom.sync.progress
+    namespace: _topic.iam.wecom.sync
+    name: progress
+    description: 企业微信同步进度事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]
+      - principal_type: plugin
+        principal_id: "plugin:com.powerx.plugins.base"
+        actions: [publish]
+
+  - key: _topic.iam.dingtalk.sync.progress
+    namespace: _topic.iam.dingtalk.sync
+    name: progress
+    description: 钉钉同步进度事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]
+      - principal_type: plugin
+        principal_id: "plugin:com.powerx.plugins.base"
+        actions: [publish]
+
+  - key: _topic.iam.lark.sync.progress
+    namespace: _topic.iam.lark.sync
+    name: progress
+    description: 飞书同步进度事件
+    acl:
+      - principal_type: member
+        principal_id: "member:system"
+        actions: [publish, subscribe]
+      - principal_type: plugin
+        principal_id: "plugin:com.powerx.plugins.base"
+        actions: [publish]

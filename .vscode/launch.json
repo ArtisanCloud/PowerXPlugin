@@ -2,12 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Backend: Go Gin",
-      "type": "go",
+      "name": "Backend: Go Gin (Dev)",
+      "type": "node-terminal",
       "request": "launch",
-      "mode": "debug",
-      "program": "${workspaceFolder}/skeleton/backend/go-gin/cmd/plugin",
       "cwd": "${workspaceFolder}/skeleton/backend/go-gin",
+      "command": "go run ./cmd/plugin",
       "env": {
         "CONFIG_PATH": "${workspaceFolder}/skeleton/backend/etc",
         "POWERX_PLUGIN_CONFIG_DIR": "${workspaceFolder}/skeleton/backend/etc",
@@ -45,7 +44,7 @@
     {
       "name": "Full Stack: Backend + Web Admin",
       "configurations": [
-        "Backend: Go Gin",
+        "Backend: Go Gin (Dev)",
         "Web Admin: Nuxt"
       ],
       "stopAll": true

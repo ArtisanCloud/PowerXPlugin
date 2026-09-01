@@ -21,6 +21,7 @@ import (
 	securityModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	templateModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
 	toolgrantModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/tool_grant"
+	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
 )
@@ -111,6 +112,14 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 	if len(tables) == 0 {
 		return nil
 	}
+	// Existing databases can have an earlier nullable UUID column. Backfill it
+	// before AutoMigrate attempts to enforce the model's NOT NULL constraint.
+	// New tables are intentionally skipped here and created by AutoMigrate.
+	if includeIAM {
+		if err := ensureIAMIdentityUUIDs(ctx, db); err != nil {
+			return err
+		}
+	}
 	if err := safeAutoMigrate(ctx, db, tables); err != nil {
 		return err
 	}
@@ -118,8 +127,155 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 		if err := ensureIAMConstraints(ctx, db); err != nil {
 			return err
 		}
+		if err := backfillIAMUUIDRelations(ctx, db); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// backfillIAMUUIDRelations upgrades existing local IAM rows without accepting
+// numeric IDs at the API boundary. It is idempotent and only fills an empty
+// UUID relation from the pre-existing private numeric key.
+func backfillIAMUUIDRelations(ctx context.Context, db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	// AutoMigrate adds UUID columns but does not run BeforeCreate for rows that
+	// predate the columns. Populate the business objects first, then derive all
+	// UUID relations from those stable values.
+	if err := backfillIAMObjectUUIDs(ctx, db); err != nil {
+		return err
+	}
+	var departments []identitymodel.Department
+	if err := db.WithContext(ctx).Find(&departments).Error; err != nil {
+		return err
+	}
+	departmentUUIDs := make(map[uint64]string, len(departments))
+	for _, department := range departments {
+		departmentUUIDs[department.ID] = strings.TrimSpace(department.UUID)
+	}
+	for _, department := range departments {
+		if department.ParentID == nil || strings.TrimSpace(derefString(department.ParentDepartmentUUID)) != "" {
+			continue
+		}
+		if parentUUID := strings.TrimSpace(departmentUUIDs[*department.ParentID]); parentUUID != "" {
+			if err := db.WithContext(ctx).Model(&identitymodel.Department{}).Where("id = ?", department.ID).Update("parent_department_uuid", parentUUID).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	var members []identitymodel.Member
+	if err := db.WithContext(ctx).Find(&members).Error; err != nil {
+		return err
+	}
+	memberUUIDs := make(map[uint64]string, len(members))
+	for _, member := range members {
+		memberUUIDs[member.ID] = strings.TrimSpace(member.UUID)
+		if member.DepartmentID != nil && strings.TrimSpace(derefString(member.DepartmentUUID)) == "" {
+			if departmentUUID := strings.TrimSpace(departmentUUIDs[*member.DepartmentID]); departmentUUID != "" {
+				if err := db.WithContext(ctx).Model(&identitymodel.Member{}).Where("id = ?", member.ID).Update("department_uuid", departmentUUID).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	var roles []identitymodel.Role
+	if err := db.WithContext(ctx).Find(&roles).Error; err != nil {
+		return err
+	}
+	roleUUIDs := make(map[uint64]string, len(roles))
+	for _, role := range roles {
+		roleUUIDs[role.ID] = strings.TrimSpace(role.UUID)
+	}
+	var permissions []identitymodel.Permission
+	if err := db.WithContext(ctx).Find(&permissions).Error; err != nil {
+		return err
+	}
+	permissionUUIDs := make(map[uint64]string, len(permissions))
+	for _, permission := range permissions {
+		permissionUUIDs[permission.ID] = strings.TrimSpace(permission.UUID)
+	}
+	var memberRoles []identitymodel.MemberRole
+	if err := db.WithContext(ctx).Find(&memberRoles).Error; err != nil {
+		return err
+	}
+	for _, relation := range memberRoles {
+		updates := map[string]any{}
+		if strings.TrimSpace(relation.MemberUUID) == "" && strings.TrimSpace(memberUUIDs[relation.UserID]) != "" {
+			updates["member_uuid"] = memberUUIDs[relation.UserID]
+		}
+		if strings.TrimSpace(relation.RoleUUID) == "" && strings.TrimSpace(roleUUIDs[relation.RoleID]) != "" {
+			updates["role_uuid"] = roleUUIDs[relation.RoleID]
+		}
+		if len(updates) > 0 {
+			if err := db.WithContext(ctx).Model(&identitymodel.MemberRole{}).Where("member_id = ? AND role_id = ?", relation.UserID, relation.RoleID).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+	}
+	var rolePermissions []identitymodel.RolePermission
+	if err := db.WithContext(ctx).Find(&rolePermissions).Error; err != nil {
+		return err
+	}
+	for _, relation := range rolePermissions {
+		updates := map[string]any{}
+		if strings.TrimSpace(relation.RoleUUID) == "" && strings.TrimSpace(roleUUIDs[relation.RoleID]) != "" {
+			updates["role_uuid"] = roleUUIDs[relation.RoleID]
+		}
+		if strings.TrimSpace(relation.PermissionUUID) == "" && strings.TrimSpace(permissionUUIDs[relation.PermissionID]) != "" {
+			updates["permission_uuid"] = permissionUUIDs[relation.PermissionID]
+		}
+		if len(updates) > 0 {
+			if err := db.WithContext(ctx).Model(&identitymodel.RolePermission{}).Where("role_id = ? AND permission_id = ?", relation.RoleID, relation.PermissionID).Updates(updates).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func backfillIAMObjectUUIDs(ctx context.Context, db *gorm.DB) error {
+	tables := []string{
+		identitymodel.Tenant{}.TableName(),
+		identitymodel.User{}.TableName(),
+		identitymodel.Member{}.TableName(),
+		identitymodel.Department{}.TableName(),
+		identitymodel.Role{}.TableName(),
+		identitymodel.Permission{}.TableName(),
+	}
+	for _, table := range tables {
+		var rows []struct {
+			ID   uint64
+			UUID string
+		}
+		if err := db.WithContext(ctx).Table(table).Select("id, uuid").Find(&rows).Error; err != nil {
+			return err
+		}
+		for _, row := range rows {
+			if validIAMUUID(row.UUID) {
+				continue
+			}
+			if err := db.WithContext(ctx).Table(table).Where("id = ?", row.ID).Update("uuid", uuid.NewString()).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validIAMUUID(value string) bool {
+	parsed, err := uuid.Parse(strings.TrimSpace(value))
+	return err == nil && parsed.String() == strings.ToLower(strings.TrimSpace(value))
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func safeAutoMigrate(ctx context.Context, db *gorm.DB, tables []interface{}) error {
@@ -321,28 +477,54 @@ func ensureIAMConstraints(ctx context.Context, db *gorm.DB) error {
 func ensureIAMIdentityUUIDs(ctx context.Context, db *gorm.DB) error {
 	userTable := models.S(models.TableIAMUsers)
 	memberTable := models.S(models.TableIAMMembers)
-	if err := ensureUUIDColumn(ctx, db, userTable); err != nil {
-		return err
+	roleTable := models.S(models.TableIAMRoles)
+	departmentTable := models.S(models.TableIAMDepartments)
+	permissionTable := models.S(models.TableIAMPermissions)
+	entries := []struct {
+		table string
+		seed  string
+		index string
+	}{
+		{userTable, "iam_users", "idx_iam_users_uuid"},
+		{memberTable, "iam_members", "idx_iam_members_uuid"},
+		{roleTable, "iam_roles", "idx_iam_roles_uuid"},
+		{departmentTable, "iam_departments", "idx_iam_departments_uuid"},
+		{permissionTable, "iam_permissions", "idx_iam_permissions_uuid"},
 	}
-	if err := ensureUUIDColumn(ctx, db, memberTable); err != nil {
-		return err
-	}
-	if err := backfillIdentityUUID(ctx, db, userTable, "iam_users"); err != nil {
-		return err
-	}
-	if err := backfillIdentityUUID(ctx, db, memberTable, "iam_members"); err != nil {
-		return err
-	}
-	statements := []string{
-		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_users_uuid ON %s (uuid) WHERE uuid IS NOT NULL`, userTable),
-		fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS idx_iam_members_uuid ON %s (uuid) WHERE uuid IS NOT NULL`, memberTable),
-	}
-	for _, stmt := range statements {
+	for _, entry := range entries {
+		// Legacy installations can have a subset of IAM tables. Each existing
+		// table must be repaired independently; one missing table must not skip
+		// UUID backfill for roles, departments, or permissions.
+		exists, err := iamTableExists(ctx, db, entry.table)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			continue
+		}
+		if err := ensureUUIDColumn(ctx, db, entry.table); err != nil {
+			return err
+		}
+		if err := backfillIdentityUUID(ctx, db, entry.table, entry.seed); err != nil {
+			return err
+		}
+		stmt := fmt.Sprintf(`CREATE UNIQUE INDEX IF NOT EXISTS %s ON %s (uuid) WHERE uuid IS NOT NULL`, entry.index, entry.table)
 		if err := execIgnoreExists(ctx, db, stmt); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func iamTableExists(ctx context.Context, db *gorm.DB, tableName string) (bool, error) {
+	if isSQLite(db) {
+		return db.Migrator().HasTable(tableName), nil
+	}
+	var relation *string
+	if err := db.WithContext(ctx).Raw("SELECT to_regclass(?)", tableName).Scan(&relation).Error; err != nil {
+		return false, err
+	}
+	return relation != nil && strings.TrimSpace(*relation) != "", nil
 }
 
 func ensureUUIDColumn(ctx context.Context, db *gorm.DB, tableName string) error {

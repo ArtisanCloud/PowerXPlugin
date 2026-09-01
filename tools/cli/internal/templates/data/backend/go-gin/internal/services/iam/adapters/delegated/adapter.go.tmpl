@@ -11,6 +11,13 @@ import (
 
 type delegatedProxy interface {
 	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+	GetDirectoryMember(ctx context.Context, memberUUID string) (*authproxy.DirectoryMember, error)
+	BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]authproxy.DirectoryMember, error)
+	BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*authproxy.DirectoryMemberResolution, error)
+	ListDirectoryDepartments(ctx context.Context) ([]authproxy.DirectoryDepartment, error)
+	ListDirectoryRoles(ctx context.Context) ([]authproxy.DirectoryRole, error)
+	ListDirectoryPermissions(ctx context.Context) ([]authproxy.DirectoryPermission, error)
+	CheckDirectoryAuthorization(ctx context.Context, request authproxy.DirectoryAuthorizationRequest) (*authproxy.AuthorizationDecision, error)
 }
 
 type identityResolver interface {
@@ -35,17 +42,21 @@ func NewBundle(proxy delegatedProxy) (fwiamadapters.Bundle, error) {
 	}, nil
 }
 
-func (a *Adapter) Authorize(_ context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
-	return &fwiamcontracts.AuthorizationDecision{
-		Allowed:    false,
-		ReasonCode: fwiamerrors.CodeUpstreamDependency,
+func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
+	r, err := a.proxy.CheckDirectoryAuthorization(ctx, authproxy.DirectoryAuthorizationRequest{
+		MemberUUID: req.MemberUUID,
+		UserUUID:   req.UserUUID,
 		Resource:   req.Resource,
 		Action:     req.Action,
-		TenantUUID: req.TenantUUID,
-		UserID:     req.UserID,
-		Mode:       string(fwiamcontracts.IAMAdapterModeDelegated),
 		TraceID:    req.TraceID,
-	}, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated authorize mapping is not enabled yet")
+	})
+	if err != nil {
+		return nil, mapDirectoryError(err)
+	}
+	if r == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated authorization response is empty")
+	}
+	return &fwiamcontracts.AuthorizationDecision{Allowed: r.Allowed, ReasonCode: r.ReasonCode, Resource: req.Resource, Action: req.Action, TenantUUID: req.TenantUUID, UserUUID: req.UserUUID, MemberUUID: req.MemberUUID, Mode: string(fwiamcontracts.IAMAdapterModeDelegated), TraceID: req.TraceID}, nil
 }
 
 func (a *Adapter) ResolveIdentity(ctx context.Context, bearerToken string) (*fwiamcontracts.IdentityContext, error) {

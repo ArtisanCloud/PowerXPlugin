@@ -325,7 +325,8 @@ func (h *Handler) StreamSSE(c *gin.Context) {
 			"regen_from_message_id": params.RegenFromMessageID,
 			"error":                 err.Error(),
 		}), "powerx agent stream proxy failed")
-		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_STREAM_FAILED", err.Error())
+		status, code := mapAgentStreamError(err)
+		contracts.ResponseError(c, status, code, code)
 		return
 	}
 	defer stream.Body.Close()
@@ -337,6 +338,23 @@ func (h *Handler) StreamSSE(c *gin.Context) {
 		RequestID:  stream.Header.Get("X-Request-ID"),
 		TraceID:    firstNonEmpty(stream.Header.Get("X-Trace-ID"), params.TraceID),
 	})
+}
+
+func mapAgentStreamError(err error) (int, string) {
+	var upstream *gateway.PlatformAPIError
+	if errors.As(err, &upstream) {
+		switch upstream.StatusCode {
+		case http.StatusUnauthorized:
+			return http.StatusUnauthorized, "POWERX_AGENT_STREAM_UNAUTHORIZED"
+		case http.StatusForbidden:
+			return http.StatusForbidden, "POWERX_AGENT_STREAM_FORBIDDEN"
+		case http.StatusNotFound:
+			return http.StatusNotFound, "POWERX_AGENT_STREAM_NOT_FOUND"
+		case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+			return http.StatusBadGateway, "POWERX_AGENT_STREAM_UPSTREAM_DEPENDENCY"
+		}
+	}
+	return http.StatusBadGateway, "POWERX_AGENT_STREAM_FAILED"
 }
 
 func parsePositiveInt(raw string, fallback int) int {

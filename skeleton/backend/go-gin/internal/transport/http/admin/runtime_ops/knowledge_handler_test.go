@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
@@ -513,7 +512,7 @@ func TestKnowledgeHandlerDeleteSpaceUsesGateway(t *testing.T) {
 	}
 }
 
-func TestKnowledgeHandlerDelegatedSearchUsesQABridgeCapability(t *testing.T) {
+func TestKnowledgeHandlerDelegatedSearchRejectsUnavailableHostContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	gateway := &knowledgeGatewayStub{}
@@ -531,28 +530,14 @@ func TestKnowledgeHandlerDelegatedSearchUsesQABridgeCapability(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/search", bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if gateway.last.CapabilityID != knowledgeCapabilityPlanRetrieval || gateway.last.PreferredProtocol != "rest" {
-		t.Fatalf("unexpected gateway params: %+v", gateway.last)
+	if gateway.last.CapabilityID != "" {
+		t.Fatalf("unpublished Host Contract must not invoke an admin capability: %+v", gateway.last)
 	}
-	if !gateway.last.AuthRequired {
-		t.Fatalf("knowledge delegated search must require gateway service auth: %+v", gateway.last)
-	}
-	payloadMap, ok := gateway.last.Payload.(map[string]any)
-	if !ok {
-		t.Fatalf("expected gateway payload map: %+v", gateway.last.Payload)
-	}
-	if payloadMap["method"] != http.MethodPost || payloadMap["endpoint"] != "/api/v1/admin/knowledge-spaces/debug/playground/retrieval" {
-		t.Fatalf("search must use PowerX REST playground retrieval endpoint, payload=%+v", payloadMap)
-	}
-	body, ok := payloadMap["body"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected gateway body payload: %+v", payloadMap)
-	}
-	if body["query"] != "refund" || body["topK"] == nil {
-		t.Fatalf("unexpected retrieval body: %+v", body)
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"code":"KNOWLEDGE_UNSUPPORTED_CAPABILITY"`)) {
+		t.Fatalf("expected stable unsupported code, body=%s", rec.Body.String())
 	}
 }
 
@@ -655,7 +640,7 @@ func TestKnowledgeHandlerResolveMediaURL(t *testing.T) {
 	}
 }
 
-func TestKnowledgeGatewayDelegatedClientRejectsDocumentWithoutURI(t *testing.T) {
+func TestKnowledgeGatewayDelegatedClientRejectsUnpublishedIngestionContract(t *testing.T) {
 	gateway := &knowledgeGatewayStub{}
 	client := knowledgeGatewayDelegatedClient{gateway: gateway}
 
@@ -665,13 +650,13 @@ func TestKnowledgeGatewayDelegatedClientRejectsDocumentWithoutURI(t *testing.T) 
 		ContentType: "markdown",
 	})
 	if err == nil {
-		t.Fatal("expected missing sourceUri error")
+		t.Fatal("expected unavailable ingestion contract")
 	}
 	if gateway.last.CapabilityID != "" {
 		t.Fatalf("gateway should not be invoked without document URI, got %+v", gateway.last)
 	}
-	if !strings.Contains(err.Error(), "sourceUri is required") {
-		t.Fatalf("expected explicit sourceUri error, got %v", err)
+	if fwknowledge.CodeOf(err) != fwknowledge.CodeUnsupportedCapability {
+		t.Fatalf("expected stable unsupported code, got %v", err)
 	}
 }
 

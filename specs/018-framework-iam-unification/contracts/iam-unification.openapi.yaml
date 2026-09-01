@@ -1,10 +1,11 @@
 openapi: 3.0.3
 info:
   title: Framework IAM Unification Contract
-  version: 0.2.0
+  version: 0.3.0
   description: >
     Unified IAM contract for local and delegated modes.
-    Includes unified error semantics and delegated read-only boundaries.
+    Documents framework-facing semantics only. It is not proof that a Core Host
+    endpoint or a production adapter is already available.
 servers:
   - url: /api/v1
 paths:
@@ -89,6 +90,109 @@ paths:
           description: Created.
         "405":
           $ref: "#/components/responses/IAMDelegatedReadOnly"
+  /admin/iam/members/{member_uuid}:
+    get:
+      summary: Resolve one member by tenant_uuid and member_uuid.
+      description: >
+        Contract target for framework DirectoryService.GetMember. A delegated
+        adapter may implement it only through a published Core Host Contract.
+      parameters:
+        - $ref: "#/components/parameters/MemberUUID"
+      responses:
+        "200":
+          description: Member resolved.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "404":
+          $ref: "#/components/responses/IAMMemberNotFound"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
+  /admin/iam/members:batch-get:
+    post:
+      summary: Resolve members by member UUID in one tenant.
+      description: Contract target for framework DirectoryService.BatchGetMembers.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_uuid, member_uuids]
+              properties:
+                tenant_uuid:
+                  type: string
+                  format: uuid
+                member_uuids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "200":
+          description: Members resolved; each item is keyed by member_uuid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Member"
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
+  /admin/iam/members:batch-resolve:
+    post:
+      summary: Resolve historical members while retaining missing references.
+      description: >
+        Contract target for DirectoryService.BatchResolveMembers. Missing or
+        cross-tenant member UUIDs are returned explicitly; validation,
+        authentication, authorization and upstream failures remain errors.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_uuid, member_uuids]
+              properties:
+                tenant_uuid:
+                  type: string
+                  format: uuid
+                member_uuids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "200":
+          description: Resolved members and explicitly missing UUIDs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResolveResponse"
+        "401":
+          $ref: "#/components/responses/IAMUnauthorized"
+        "403":
+          $ref: "#/components/responses/IAMForbidden"
+        "424":
+          $ref: "#/components/responses/IAMUpstreamDependency"
   /admin/iam/roles:
     get:
       summary: List roles by tenant.
@@ -167,6 +271,26 @@ components:
             error:
               code: IAM_DELEGATED_READ_ONLY
               message: write operations are not allowed in delegated mode
+    IAMMemberNotFound:
+      description: The member UUID does not exist in the requested tenant.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: IAM_MEMBER_NOT_FOUND
+              message: member not found
+
+  parameters:
+    MemberUUID:
+      name: member_uuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
 
   schemas:
     ModeResponse:
@@ -202,10 +326,12 @@ components:
         tenant_uuid:
           type: string
           format: uuid
-        user_id:
+        user_uuid:
           type: string
-        member_id:
+          format: uuid
+        member_uuid:
           type: string
+          format: uuid
         roles:
           type: array
           items:
@@ -239,6 +365,7 @@ components:
             - IAM_UPSTREAM_DEPENDENCY
             - IAM_ADAPTER_NOT_BOUND
             - IAM_DELEGATED_READ_ONLY
+            - IAM_MEMBER_NOT_FOUND
             - INVALID_TENANT_UUID
             - TENANT_CONTEXT_CONFLICT
         message:
@@ -246,3 +373,50 @@ components:
         details:
           type: object
           additionalProperties: true
+
+    MemberResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/Member"
+
+    MemberResolveResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          required: [items, missing_member_uuids]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Member"
+            missing_member_uuids:
+              type: array
+              items:
+                type: string
+                format: uuid
+
+    Member:
+      type: object
+      required: [member_uuid, tenant_uuid]
+      properties:
+        member_uuid:
+          type: string
+          format: uuid
+        tenant_uuid:
+          type: string
+          format: uuid
+        user_uuid:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+          description: Human-readable name. Never populated with a UUID fallback.
+        status:
+          type: string

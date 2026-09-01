@@ -11,7 +11,7 @@ const loginAsLocalAdmin = async (page: Page) => {
 
 const mockPowerXAgents = async (page: Page) => {
   let sessionSeq = 100;
-  await page.route('**/api/v1/plugin/agent/agents**', async (route) => {
+  await page.route('**/api/v1/plugin/agent-registry/agents/runnable**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -38,7 +38,49 @@ const mockPowerXAgents = async (page: Page) => {
       }),
     });
   });
-  await page.route('**/api/v1/plugin/agent/sessions', async (route) => {
+  // The chat is enabled only after this shell has loaded permissions, sessions,
+  // and messages. Keep all three under one proxy matcher to cover query strings.
+  await page.route('**/api/v1/plugin/agent/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (/\/agents\/[^/]+\/effective-permissions$/.test(pathname)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { can_use_agent: true, actions: [] } }),
+      });
+      return;
+    }
+    if (/\/sessions\/[^/]+\/messages$/.test(pathname)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: { items: [] } }),
+      });
+      return;
+    }
+    if (pathname.endsWith('/sessions') && request.method() !== 'POST') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            items: [{
+              uuid: '10000000-0000-4000-8000-000000000101',
+              session_id: '10000000-0000-4000-8000-000000000101',
+              agent_uuid: '00000000-0000-4000-8000-000000000001',
+              status: 'active',
+            }],
+          },
+        }),
+      });
+      return;
+    }
+    if (!pathname.endsWith('/sessions') || request.method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
     const requestBody = route.request().postDataJSON();
     const agentUUID = String(requestBody.agent_uuid || '');
     sessionSeq += 1;
@@ -76,6 +118,10 @@ test.describe('Agent Skill Bridge local chat', () => {
 
   test('sends local chat requests through the plugin Agent SSE proxy', async ({ page }) => {
     await seedAuthStorage(page);
+    const bootstrapRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/v1/plugin/agent/')) bootstrapRequests.push(request.url());
+    });
     await mockPowerXAgents(page);
     const seen: string[] = [];
     const forbidden: string[] = [];
@@ -95,8 +141,8 @@ test.describe('Agent Skill Bridge local chat', () => {
     await page.route('**/api/v1/plugin/agent/stream/sse**', async (route) => {
       seen.push(route.request().url());
       const url = new URL(route.request().url());
-      expect(url.searchParams.get('agent_id')).toBe('00000000-0000-4000-8000-000000000001');
-      expect(url.searchParams.get('session_id')).toMatch(/^10000000-0000-4000-8000-000000000\d{3}$/);
+      expect(url.searchParams.get('agent_uuid')).toBe('00000000-0000-4000-8000-000000000001');
+      expect(url.searchParams.get('session_uuid')).toMatch(/^10000000-0000-4000-8000-000000000\d{3}$/);
       expect(url.searchParams.get('q')).toContain('篮球模板');
       await route.fulfill({
         status: 200,
@@ -114,10 +160,10 @@ test.describe('Agent Skill Bridge local chat', () => {
           'event: node_end',
           'data: {"type":"node_end","node_kind":"skill","node_ref":"mediax.video_rebuilder.cn","status":"completed"}',
           '',
-          'event: final',
-          'data: {"type":"final","trace_id":"trace_local_debug","payload":{"message":"已创建视频重构任务"}}',
+          'event: agent_run.final',
+          'data: {"type":"agent_run.final","trace_id":"trace_local_debug","payload":{"message":"已创建视频重构任务"}}',
           '',
-        ].join('\n')
+        ].join('\n') + '\n'
       });
     });
 
@@ -128,7 +174,13 @@ test.describe('Agent Skill Bridge local chat', () => {
     );
     await expect(page.getByTestId('agent-chat-agent')).toHaveValue('00000000-0000-4000-8000-000000000001');
     await expect(page.getByTestId('agent-chat-session')).toHaveValue(/^10000000-0000-4000-8000-000000000\d{3}$/);
-    await expect(page.getByTestId('agent-chat-proxy')).toHaveValue('/api/v1/plugin/agent/stream/sse');
+	await expect(page.getByTestId('agent-chat-proxy')).toHaveValue('plugin/agent/stream/sse');
+	await page.getByTestId('agent-chat-input').fill('篮球模板');
+    await expect.poll(() => bootstrapRequests).toEqual(expect.arrayContaining([
+      expect.stringContaining('/effective-permissions'),
+      expect.stringContaining('/sessions'),
+    ]));
+    await expect(page.getByTestId('agent-chat-send')).toBeEnabled();
     await page.getByTestId('agent-chat-send').click();
 
     await expect(page.getByTestId('agent-chat-status')).toHaveText(/ended/);

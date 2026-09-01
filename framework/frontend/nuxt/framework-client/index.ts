@@ -65,14 +65,23 @@ export type {
   PluginWsClient,
   PluginWsOptions,
 } from "./ws";
-export { createPluginSSEClient, readSSEStream } from "./sse";
+export { createManagedPluginSSEConnection, createPluginSSEClient, readSSEStream } from "./sse";
 export type {
   PluginSSEClient,
   PluginSSEConnectOptions,
+  PluginSSEManagedConnection,
   PluginSSEOptions,
+  PluginSSEState,
+  PluginSSEStatus,
   PluginSSEStreamEvent,
   PluginSSEStreamOptions,
 } from "./sse";
+export { createRealtimeClient } from "./realtime";
+export type {
+  RealtimeClient,
+  RealtimeClientOptions,
+  RealtimeContext,
+} from "./realtime";
 export { createFrameworkLogger, setFrameworkLoggerOptions } from "./logger";
 export type {
   FrameworkLogger,

@@ -2,7 +2,6 @@ package iam
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
@@ -11,6 +10,7 @@ import (
 	srviam "{{ .BackendModulePath }}/internal/services/iam"
 	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type MemberHandler struct {
@@ -100,17 +100,20 @@ func (h *MemberHandler) Create(c *gin.Context) {
 		uid := uint64(tc.UserID)
 		actorID = &uid
 	}
-	member, err := h.service.Create(c.Request.Context(), srviam.CreateUserInput{
-		TenantUUID:    req.TenantUUID,
-		Email:         req.Email,
-		DisplayName:   req.DisplayName,
-		Username:      req.Username,
-		Phone:         req.Phone,
-		DepartmentID:  req.DepartmentID,
-		DepartmentIDs: req.DepartmentIDs,
-		Status:        req.Status,
-		Roles:         req.Roles,
-		ActorID:       actorID,
+	if !validUUIDs(req.DepartmentUUIDs) || !validUUIDs(req.RoleUUIDs) {
+		contracts.ResponseBadRequest(c, "department_uuids and role_uuids must contain UUID values")
+		return
+	}
+	member, err := h.service.CreateByUUID(c.Request.Context(), srviam.CreateUserUUIDInput{
+		TenantUUID:      req.TenantUUID,
+		Email:           req.Email,
+		DisplayName:     req.DisplayName,
+		Username:        req.Username,
+		Phone:           req.Phone,
+		DepartmentUUIDs: req.DepartmentUUIDs,
+		Status:          req.Status,
+		RoleUUIDs:       req.RoleUUIDs,
+		ActorID:         actorID,
 	})
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -128,9 +131,9 @@ func (h *MemberHandler) Update(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "IAM local member service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		contracts.ResponseBadRequest(c, "invalid user id")
+	memberUUID := strings.TrimSpace(c.Param("member_uuid"))
+	if _, err := uuid.Parse(memberUUID); err != nil {
+		contracts.ResponseBadRequest(c, "invalid member_uuid")
 		return
 	}
 	var req UpdateMemberRequest
@@ -149,15 +152,18 @@ func (h *MemberHandler) Update(c *gin.Context) {
 		uid := uint64(tc.UserID)
 		actorID = &uid
 	}
-	member, err := h.service.Update(c.Request.Context(), id, srviam.UpdateUserInput{
-		TenantUUID:    tenantUUID,
-		DisplayName:   req.DisplayName,
-		Status:        req.Status,
-		DepartmentID:  req.DepartmentID,
-		DepartmentIDs: req.DepartmentIDs,
-		Roles:         req.Roles,
-		ReplaceRoles:  req.ReplaceRoles,
-		ActorID:       actorID,
+	if !validUUIDs(req.DepartmentUUIDs) || !validUUIDs(req.RoleUUIDs) {
+		contracts.ResponseBadRequest(c, "department_uuids and role_uuids must contain UUID values")
+		return
+	}
+	member, err := h.service.UpdateByUUID(c.Request.Context(), memberUUID, srviam.UpdateUserUUIDInput{
+		TenantUUID:      tenantUUID,
+		DisplayName:     req.DisplayName,
+		Status:          req.Status,
+		DepartmentUUIDs: req.DepartmentUUIDs,
+		RoleUUIDs:       req.RoleUUIDs,
+		ReplaceRoles:    req.ReplaceRoles,
+		ActorID:         actorID,
 	})
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -189,26 +195,46 @@ func (h *MemberHandler) BulkImport(c *gin.Context) {
 		contracts.ResponseBadRequest(c, "users required")
 		return
 	}
-	payloads := make([]srviam.CreateUserInput, 0, len(req.Users))
 	for _, entry := range req.Users {
-		payloads = append(payloads, srviam.CreateUserInput{
-			TenantUUID:   req.TenantUUID,
-			Email:        entry.Email,
-			DisplayName:  entry.DisplayName,
-			Username:     entry.Username,
-			Phone:        entry.Phone,
-			DepartmentID: entry.DepartmentID,
-			Status:       entry.Status,
-			Roles:        entry.Roles,
-		})
+		if !validUUIDs(entry.DepartmentUUIDs) || !validUUIDs(entry.RoleUUIDs) {
+			contracts.ResponseBadRequest(c, "department_uuids and role_uuids must contain UUID values")
+			return
+		}
 	}
-	result, err := h.service.BulkImport(c.Request.Context(), payloads)
+	result := &srviam.UserBulkImportResult{Created: []*srviam.UserView{}, Failed: []srviam.UserBulkImportError{}}
+	var err error
+	for idx, entry := range req.Users {
+		member, createErr := h.service.CreateByUUID(c.Request.Context(), srviam.CreateUserUUIDInput{TenantUUID: req.TenantUUID, Email: entry.Email, DisplayName: entry.DisplayName, Username: entry.Username, Phone: entry.Phone, DepartmentUUIDs: entry.DepartmentUUIDs, Status: entry.Status, RoleUUIDs: entry.RoleUUIDs})
+		if createErr != nil {
+			if err == nil {
+				err = createErr
+			}
+			result.Failed = append(result.Failed, srviam.UserBulkImportError{Index: idx, Email: entry.Email, Message: createErr.Error(), Err: createErr})
+			continue
+		}
+		result.Created = append(result.Created, member)
+	}
 	if result == nil {
 		result = &srviam.UserBulkImportResult{}
 	}
-	if err != nil && len(result.Failed) == len(payloads) {
+	if err != nil && len(result.Failed) == len(req.Users) {
 		contracts.ResponseError(c, http.StatusBadRequest, contracts.ErrCodeInvalidRequest, err.Error())
 		return
 	}
 	contracts.ResponseSuccess(c, result)
+}
+
+func validUUIDs(values []string) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		parsed, err := uuid.Parse(strings.TrimSpace(value))
+		if err != nil || parsed.String() != strings.ToLower(strings.TrimSpace(value)) {
+			return false
+		}
+		if _, exists := seen[parsed.String()]; exists {
+			return false
+		}
+		seen[parsed.String()] = struct{}{}
+	}
+	return true
 }

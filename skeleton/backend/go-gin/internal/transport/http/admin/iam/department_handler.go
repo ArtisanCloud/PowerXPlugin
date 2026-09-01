@@ -2,7 +2,6 @@ package iam
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
@@ -12,6 +11,7 @@ import (
 	srviam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type DepartmentHandler struct {
@@ -96,15 +96,15 @@ func (h *DepartmentHandler) Tree(c *gin.Context) {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
-	nodes := make(map[uint64]*departmentNode, len(deps))
+	nodes := make(map[string]*departmentNode, len(deps))
 	for i := range deps {
 		copy := deps[i]
-		nodes[copy.ID] = &departmentNode{Department: copy}
+		nodes[copy.UUID] = &departmentNode{Department: copy}
 	}
 	var roots []*departmentNode
 	for _, node := range nodes {
-		if node.ParentID != nil {
-			if parent, ok := nodes[*node.ParentID]; ok {
+		if node.ParentDepartmentUUID != nil {
+			if parent, ok := nodes[*node.ParentDepartmentUUID]; ok {
 				parent.Children = append(parent.Children, node)
 				continue
 			}
@@ -141,14 +141,20 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 		uid := uint64(tc.UserID)
 		actorID = &uid
 	}
-	dept, err := h.service.Create(c.Request.Context(), srviam.CreateDepartmentInput{
-		TenantUUID:  req.TenantUUID,
-		Name:        req.Name,
-		Code:        req.Code,
-		ParentID:    req.ParentID,
-		Description: req.Description,
-		SortOrder:   req.SortOrder,
-		ActorID:     actorID,
+	if req.ParentDepartmentUUID != nil && strings.TrimSpace(*req.ParentDepartmentUUID) != "" {
+		if _, err := uuid.Parse(strings.TrimSpace(*req.ParentDepartmentUUID)); err != nil {
+			contracts.ResponseBadRequest(c, "invalid parent_department_uuid")
+			return
+		}
+	}
+	dept, err := h.service.CreateByUUID(c.Request.Context(), srviam.CreateDepartmentUUIDInput{
+		TenantUUID:           req.TenantUUID,
+		Name:                 req.Name,
+		Code:                 req.Code,
+		ParentDepartmentUUID: req.ParentDepartmentUUID,
+		Description:          req.Description,
+		SortOrder:            req.SortOrder,
+		ActorID:              actorID,
 	})
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -166,9 +172,9 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "IAM local department service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		contracts.ResponseBadRequest(c, "invalid department id")
+	departmentUUID := strings.TrimSpace(c.Param("department_uuid"))
+	if _, err := uuid.Parse(departmentUUID); err != nil {
+		contracts.ResponseBadRequest(c, "invalid department_uuid")
 		return
 	}
 	var req UpdateDepartmentRequest
@@ -182,12 +188,13 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 		uid := uint64(tc.UserID)
 		actorID = &uid
 	}
-	dept, err := h.service.Update(c.Request.Context(), id, srviam.UpdateDepartmentInput{
-		Name:        req.Name,
-		Description: req.Description,
-		SortOrder:   req.SortOrder,
-		ParentID:    req.ParentID,
-		ActorID:     actorID,
+	dept, err := h.service.UpdateByUUID(c.Request.Context(), departmentUUID, srviam.UpdateDepartmentUUIDInput{
+		TenantUUID:           admincommon.ResolveTenantUUID(c),
+		Name:                 req.Name,
+		Description:          req.Description,
+		SortOrder:            req.SortOrder,
+		ParentDepartmentUUID: req.ParentDepartmentUUID,
+		ActorID:              actorID,
 	})
 	if err != nil {
 		contracts.ResponseInternalError(c, err)
@@ -205,9 +212,9 @@ func (h *DepartmentHandler) Delete(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "IAM local department service is not configured", gin.H{"code": "IAM_PROVIDER_NOT_CONFIGURED", "mode": h.mode.String(), "provider": "local"})
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		contracts.ResponseBadRequest(c, "invalid department id")
+	departmentUUID := strings.TrimSpace(c.Param("department_uuid"))
+	if _, err := uuid.Parse(departmentUUID); err != nil {
+		contracts.ResponseBadRequest(c, "invalid department_uuid")
 		return
 	}
 	tc, _ := authmw.GetTenantContext(c)
@@ -216,7 +223,7 @@ func (h *DepartmentHandler) Delete(c *gin.Context) {
 		uid := uint64(tc.UserID)
 		actorID = &uid
 	}
-	if err := h.service.Delete(c.Request.Context(), id, actorID); err != nil {
+	if err := h.service.DeleteByUUID(c.Request.Context(), admincommon.ResolveTenantUUID(c), departmentUUID, actorID); err != nil {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
@@ -245,12 +252,12 @@ func buildDelegatedDepartmentTree(deps []fwiamcontracts.Department) []*delegated
 	nodes := make(map[string]*delegatedDepartmentNode, len(deps))
 	for i := range deps {
 		copy := deps[i]
-		nodes[copy.ID] = &delegatedDepartmentNode{Department: copy}
+		nodes[copy.DepartmentUUID] = &delegatedDepartmentNode{Department: copy}
 	}
 	roots := make([]*delegatedDepartmentNode, 0, len(deps))
 	for _, node := range nodes {
-		if strings.TrimSpace(node.ParentID) != "" {
-			if parent, ok := nodes[node.ParentID]; ok {
+		if strings.TrimSpace(node.ParentDepartmentUUID) != "" {
+			if parent, ok := nodes[node.ParentDepartmentUUID]; ok {
 				parent.Children = append(parent.Children, node)
 				continue
 			}

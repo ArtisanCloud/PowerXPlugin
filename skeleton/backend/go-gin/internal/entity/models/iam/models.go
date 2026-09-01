@@ -68,15 +68,18 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 
 type Member struct {
 	models.BaseModel
-	UUID         string            `gorm:"type:uuid;uniqueIndex:idx_iam_members_uuid" json:"uuid"`
-	UserID       uint64            `gorm:"column:user_id;not null;index:idx_iam_users_account" json:"user_id"`
-	Username     string            `gorm:"size:64;not null;index:idx_iam_users_username" json:"username"`
-	DisplayName  string            `gorm:"size:128" json:"display_name"`
-	AvatarURL    string            `gorm:"size:255" json:"avatar_url"`
-	Status       string            `gorm:"size:32;not null;default:'active';index:idx_iam_users_status" json:"status"`
-	DepartmentID *uint64           `gorm:"index:idx_iam_users_department" json:"department_id"`
-	Meta         datatypes.JSONMap `gorm:"type:jsonb" json:"meta"`
-	LastLoginAt  *time.Time        `gorm:"column:last_login_at;index:idx_iam_users_last_login" json:"last_login_at,omitempty"`
+	UUID        string `gorm:"type:uuid;uniqueIndex:idx_iam_members_uuid" json:"uuid"`
+	UserID      uint64 `gorm:"column:user_id;not null;index:idx_iam_users_account" json:"user_id"`
+	Username    string `gorm:"size:64;not null;index:idx_iam_users_username" json:"username"`
+	DisplayName string `gorm:"size:128" json:"display_name"`
+	AvatarURL   string `gorm:"size:255" json:"avatar_url"`
+	Status      string `gorm:"size:32;not null;default:'active';index:idx_iam_users_status" json:"status"`
+	// DepartmentUUID is the only business-object relationship exposed outside
+	// the local IAM store. DepartmentID remains a private migration column.
+	DepartmentUUID *string           `gorm:"column:department_uuid;type:uuid;index:idx_iam_members_department_uuid" json:"department_uuid,omitempty"`
+	DepartmentID   *uint64           `gorm:"index:idx_iam_users_department" json:"-"`
+	Meta           datatypes.JSONMap `gorm:"type:jsonb" json:"meta"`
+	LastLoginAt    *time.Time        `gorm:"column:last_login_at;index:idx_iam_users_last_login" json:"last_login_at,omitempty"`
 }
 
 func (Member) TableName() string { return models.S(models.TableIAMMembers) }
@@ -90,6 +93,7 @@ func (m *Member) BeforeCreate(tx *gorm.DB) error {
 
 type Role struct {
 	models.BaseModel
+	UUID          string `gorm:"type:uuid;not null;uniqueIndex:idx_iam_roles_uuid" json:"uuid"`
 	Code          string `gorm:"size:64;not null;index:idx_iam_roles_code" json:"code"`
 	Name          string `gorm:"size:128;not null" json:"name"`
 	Description   string `gorm:"size:255" json:"description"`
@@ -99,8 +103,16 @@ type Role struct {
 
 func (Role) TableName() string { return models.S(models.TableIAMRoles) }
 
+func (r *Role) BeforeCreate(tx *gorm.DB) error {
+	if strings.TrimSpace(r.UUID) == "" {
+		r.UUID = uuid.NewString()
+	}
+	return nil
+}
+
 type Permission struct {
-	ID          uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	ID          uint64    `gorm:"primaryKey;autoIncrement" json:"-"`
+	UUID        string    `gorm:"type:uuid;not null;uniqueIndex:idx_iam_permissions_uuid" json:"uuid"`
 	Resource    string    `gorm:"size:128;not null;uniqueIndex:idx_iam_permissions_resource_action,priority:1" json:"resource"`
 	Action      string    `gorm:"size:64;not null;uniqueIndex:idx_iam_permissions_resource_action,priority:2" json:"action"`
 	Description string    `gorm:"size:255" json:"description"`
@@ -110,32 +122,54 @@ type Permission struct {
 
 func (Permission) TableName() string { return models.S(models.TableIAMPermissions) }
 
+func (p *Permission) BeforeCreate(tx *gorm.DB) error {
+	if strings.TrimSpace(p.UUID) == "" {
+		p.UUID = uuid.NewString()
+	}
+	return nil
+}
+
 type Department struct {
 	models.BaseModel
-	Name        string  `gorm:"size:128;not null;index:idx_iam_departments_name" json:"name"`
-	Code        string  `gorm:"size:64;not null;index:idx_iam_departments_code" json:"code"`
-	ParentID    *uint64 `gorm:"index:idx_iam_departments_parent" json:"parent_id"`
-	Description string  `gorm:"size:255" json:"description"`
-	Path        string  `gorm:"size:512;not null;index:idx_iam_departments_path" json:"path"`
-	SortOrder   int     `gorm:"default:0;index:idx_iam_departments_sort" json:"sort_order"`
+	UUID string `gorm:"type:uuid;not null;uniqueIndex:idx_iam_departments_uuid" json:"uuid"`
+	Name string `gorm:"size:128;not null;index:idx_iam_departments_name" json:"name"`
+	Code string `gorm:"size:64;not null;index:idx_iam_departments_code" json:"code"`
+	// ParentDepartmentUUID is the stable hierarchy relation. ParentID is kept
+	// only while existing local databases are backfilled by migrations.
+	ParentDepartmentUUID *string `gorm:"column:parent_department_uuid;type:uuid;index:idx_iam_departments_parent_uuid" json:"parent_department_uuid,omitempty"`
+	ParentID             *uint64 `gorm:"index:idx_iam_departments_parent" json:"-"`
+	Description          string  `gorm:"size:255" json:"description"`
+	Path                 string  `gorm:"size:512;not null;index:idx_iam_departments_path" json:"path"`
+	SortOrder            int     `gorm:"default:0;index:idx_iam_departments_sort" json:"sort_order"`
 }
 
 func (Department) TableName() string { return models.S(models.TableIAMDepartments) }
 
+func (d *Department) BeforeCreate(tx *gorm.DB) error {
+	if strings.TrimSpace(d.UUID) == "" {
+		d.UUID = uuid.NewString()
+	}
+	return nil
+}
+
 type MemberRole struct {
-	UserID    uint64    `gorm:"column:member_id;primaryKey" json:"user_id"`
-	RoleID    uint64    `gorm:"primaryKey" json:"role_id"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	MemberUUID string    `gorm:"column:member_uuid;type:uuid;uniqueIndex:idx_iam_member_roles_uuid,priority:1" json:"member_uuid"`
+	RoleUUID   string    `gorm:"column:role_uuid;type:uuid;uniqueIndex:idx_iam_member_roles_uuid,priority:2" json:"role_uuid"`
+	UserID     uint64    `gorm:"column:member_id;primaryKey" json:"-"`
+	RoleID     uint64    `gorm:"primaryKey" json:"-"`
+	CreatedAt  time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (MemberRole) TableName() string { return models.S(models.TableIAMMemberRoles) }
 
 type RolePermission struct {
-	RoleID        uint64    `gorm:"primaryKey" json:"role_id"`
-	PermissionID  uint64    `gorm:"primaryKey" json:"permission_id"`
-	TenantUuid    string    `gorm:"type:uuid;not null;index:idx_iam_role_permissions_tenant" json:"tenant_uuid"`
-	PolicyVersion string    `gorm:"size:64;not null;default:'v1'" json:"policy_version"`
-	CreatedAt     time.Time `gorm:"autoCreateTime" json:"created_at"`
+	RoleUUID       string    `gorm:"column:role_uuid;type:uuid;uniqueIndex:idx_iam_role_permissions_uuid,priority:1" json:"role_uuid"`
+	PermissionUUID string    `gorm:"column:permission_uuid;type:uuid;uniqueIndex:idx_iam_role_permissions_uuid,priority:2" json:"permission_uuid"`
+	RoleID         uint64    `gorm:"primaryKey" json:"-"`
+	PermissionID   uint64    `gorm:"primaryKey" json:"-"`
+	TenantUuid     string    `gorm:"type:uuid;not null;index:idx_iam_role_permissions_tenant" json:"tenant_uuid"`
+	PolicyVersion  string    `gorm:"size:64;not null;default:'v1'" json:"policy_version"`
+	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (RolePermission) TableName() string { return models.S(models.TableIAMRolePermissions) }
@@ -155,10 +189,11 @@ func (RefreshToken) TableName() string { return models.S(models.TableIAMRefreshT
 
 type AuditLog struct {
 	models.BaseModel
-	ActorUserID *uint64           `gorm:"column:actor_member_id;index:idx_iam_audit_actor" json:"actor_user_id"`
-	Action      string            `gorm:"size:128;not null;index:idx_iam_audit_action" json:"action"`
-	Resource    string            `gorm:"size:128;not null;index:idx_iam_audit_resource" json:"resource"`
-	Diff        datatypes.JSONMap `gorm:"type:jsonb" json:"diff"`
+	ActorMemberUUID *string           `gorm:"column:actor_member_uuid;type:uuid;index:idx_iam_audit_actor_uuid" json:"actor_member_uuid,omitempty"`
+	ActorUserID     *uint64           `gorm:"column:actor_member_id;index:idx_iam_audit_actor" json:"-"`
+	Action          string            `gorm:"size:128;not null;index:idx_iam_audit_action" json:"action"`
+	Resource        string            `gorm:"size:128;not null;index:idx_iam_audit_resource" json:"resource"`
+	Diff            datatypes.JSONMap `gorm:"type:jsonb" json:"diff"`
 }
 
 func (AuditLog) TableName() string { return models.S(models.TableIAMAuditLogs) }

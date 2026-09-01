@@ -240,11 +240,11 @@ const subscribeNotificationTopics = () => {
   subscribeTopic("_topic.system.notification");
   const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim();
   if (tenantUUID) {
-    subscribeTopic(`plugin.notify.tenant.${tenantUUID}`);
+    subscribeTopic(`_topic.notify.tenant.${tenantUUID}`);
   }
   const memberUUID = String(userStore.currentMemberUuid || "").trim();
   if (memberUUID) {
-    subscribeTopic(`plugin.notify.member.${memberUUID}`);
+    subscribeTopic(`_topic.notify.member.${memberUUID}`);
   }
 };
 

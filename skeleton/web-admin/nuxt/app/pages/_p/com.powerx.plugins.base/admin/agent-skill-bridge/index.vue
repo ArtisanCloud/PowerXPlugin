@@ -287,7 +287,7 @@
               icon="i-heroicons-paper-airplane"
               data-testid="agent-chat-send"
               :loading="loading"
-              :disabled="!canSend"
+              :disabled="!canSendText(message)"
               square
               @click="send"
             />
@@ -626,6 +626,7 @@ import { getAuthToken } from "~/composables/api/_base";
 import { useAuth } from "~/composables/useAuth";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 import { useI18n } from "vue-i18n";
+import { onUnmounted } from "vue";
 
 type AgentEvent = {
   id: string;
@@ -949,13 +950,9 @@ onMounted(async () => {
   await loadPowerXAgents();
 });
 
-const canSend = computed(() => {
-  return canSendText(message.value);
-});
-
 function canSendText(input: string) {
   return Boolean(
-    input.trim() &&
+      input.trim() &&
       agentId.value.trim() &&
       sessionId.value.trim() &&
       !sessionLoading.value &&
@@ -1106,7 +1103,6 @@ async function loadPowerXAgents() {
     suppressAgentWatch = true;
     selectedAgentId.value = defaultAgent.value;
     agentId.value = defaultAgent.value;
-    await loadAgentEffectivePermissions(defaultAgent);
     if (previousAgentId && previousAgentId !== defaultAgent.value) {
       sessionId.value = "";
       sessionItems.value = sessionItems.value.filter((item) => item.agentId === defaultAgent.value);
@@ -1114,6 +1110,9 @@ async function loadPowerXAgents() {
       resetRuntimeState();
     }
     await loadSessions(defaultAgent, true);
+    // 权限摘要仅用于显示，实际调用仍由 Host API 授权。不能让该辅助读取
+    // 阻塞会话恢复，否则一个迟滞的权限端点会把聊天入口永久置为禁用。
+    void loadAgentEffectivePermissions(defaultAgent);
     suppressAgentWatch = false;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1496,6 +1495,10 @@ function abortStream() {
     loading.value = false;
   }
 }
+
+onUnmounted(() => {
+  abortStream();
+});
 
 function appendChatMessage(role: "user" | "assistant", content: string, pending = false) {
   const id = `${role}_${Date.now()}_${chatMessages.value.length}`;

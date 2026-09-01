@@ -14,22 +14,21 @@ export const useDepartmentStore = defineStore("department", {
   }),
 
   getters: {
-    // 例：根据 id 快速查找
-    byId: (state) => {
-      const map = new Map<number, Department>();
-      state.flat.forEach((d) => map.set(d.id, d));
-      return (id: number) => map.get(id) || null;
+    byUUID: (state) => {
+      const map = new Map<string, Department>();
+      state.flat.forEach((d) => map.set(d.uuid, d));
+      return (uuid: string) => map.get(uuid) || null;
     },
 
     // 获取根部门
     rootDepartments: (state) => {
-      return state.tree.filter((d) => !d.parent_id);
+      return state.tree.filter((d) => !d.parent_department_uuid);
     },
 
     // 获取指定部门的子部门
     getChildren: (state) => {
-      return (parentId: number) =>
-        state.flat.filter((d) => d.parent_id === parentId);
+      return (parentUUID: string) =>
+        state.flat.filter((d) => d.parent_department_uuid === parentUUID);
     },
   },
 
@@ -64,7 +63,7 @@ export const useDepartmentStore = defineStore("department", {
     },
 
     // 创建部门
-    async createDepartment(payload: { name: string; parent_id?: number }) {
+    async createDepartment(payload: { name: string; parent_department_uuid?: string }) {
       const api = useDepartmentService();
       try {
         await api.createDepartment(payload);
@@ -76,10 +75,10 @@ export const useDepartmentStore = defineStore("department", {
     },
 
     // 更新部门
-    async updateDepartment(id: number, payload: Partial<Department>) {
+    async updateDepartment(uuid: string, payload: Partial<Department>) {
       const api = useDepartmentService();
       try {
-        await api.updateDepartment(id, payload);
+        await api.updateDepartment(uuid, payload);
         await this.fetchTree({ force: true });
       } catch (error) {
         console.error("更新部门失败:", error);
@@ -88,10 +87,10 @@ export const useDepartmentStore = defineStore("department", {
     },
 
     // 删除部门
-    async deleteDepartment(id: number) {
+    async deleteDepartment(uuid: string) {
       const api = useDepartmentService();
       try {
-        await api.deleteDepartment(id);
+        await api.deleteDepartment(uuid);
         await this.fetchTree({ force: true });
       } catch (error) {
         console.error("删除部门失败:", error);
@@ -100,13 +99,13 @@ export const useDepartmentStore = defineStore("department", {
     },
 
     // 可选：单个详情（会同时同步到 flat）
-    async fetchOne(id: number) {
+    async fetchOne(uuid: string) {
       const api = useDepartmentService();
       try {
-        const d = await api.getDepartment?.(id);
+        const d = await api.getDepartment?.(uuid);
         if (!d) return null;
         // 更新 flat
-        const idx = this.flat.findIndex((x) => x.id === id);
+        const idx = this.flat.findIndex((x) => x.uuid === uuid);
         if (idx >= 0) this.flat[idx] = d;
         else this.flat.push(d);
         return d;
@@ -118,7 +117,7 @@ export const useDepartmentStore = defineStore("department", {
 
     // 可选：本地新增/更新/删除，结合接口成功后再同步
     upsertLocal(dept: Department) {
-      const idx = this.flat.findIndex((x) => x.id === dept.id);
+      const idx = this.flat.findIndex((x) => x.uuid === dept.uuid);
       if (idx >= 0) this.flat[idx] = { ...this.flat[idx], ...dept };
       else this.flat.push(dept);
     },
@@ -132,11 +131,11 @@ export const useDepartmentStore = defineStore("department", {
 
 // 工具：扁平化
 function flattenTree(nodes: Department[] = []): Department[] {
-  const out: Department[] = [];
-  const walk = (arr: Department[], parentId: number | null = null) => {
-    for (const n of arr) {
-      out.push({ ...n, parent_id: n.parent_id ?? parentId });
-      if (n.children?.length) walk(n.children, n.id);
+	const out: Department[] = [];
+	const walk = (arr: Department[], parentUUID: string | null = null) => {
+		for (const n of arr) {
+			out.push({ ...n, parent_department_uuid: n.parent_department_uuid ?? parentUUID });
+			if (n.children?.length) walk(n.children, n.uuid);
     }
   };
   walk(nodes);

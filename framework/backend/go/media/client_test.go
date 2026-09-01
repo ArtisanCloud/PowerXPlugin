@@ -159,7 +159,7 @@ func TestClientMediaAssetVariantUsesManageCapability(t *testing.T) {
 	createPayload, ok := gw.calls[0].Payload.(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, http.MethodPost, createPayload["method"])
-	require.Equal(t, "/api/v1/media/assets/media-asset-001/variants", createPayload["endpoint"])
+	require.Equal(t, "/api/v1/media/assets/media-asset-001/variants/preview", createPayload["endpoint"])
 	createBody, ok := createPayload["body"].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, "preview", createBody["variant"])
@@ -174,6 +174,49 @@ func TestClientMediaAssetVariantUsesManageCapability(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "preview", presignBody["variant"])
 	require.Equal(t, "upload", presignBody["action"])
+}
+
+func TestClientListAndDeleteAssetsUseTypedCatalogContract(t *testing.T) {
+	gw := &fakeGateway{}
+	client := NewClient(gw, &http.Client{Transport: fakeHTTPTransport{}})
+
+	assets, err := client.ListAssets(context.Background(), ListAssetsInput{
+		TenantUUID:       "tenant-001",
+		Page:             2,
+		PageSize:         50,
+		Keyword:          "design",
+		OwnerSubjectType: "ai_craft_track",
+		OwnerSubjectID:   "track-001",
+		Tags:             []string{"ai-craft"},
+		BusinessStatuses: []BusinessStatus{BusinessStatusPublished},
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), assets.Total)
+	require.Equal(t, "media-asset-001", assets.Items[0].UUID)
+
+	require.NoError(t, client.DeleteAsset(context.Background(), DeleteAssetInput{
+		TenantUUID: "tenant-001",
+		UUID:       "media-asset-001",
+	}))
+
+	require.Len(t, gw.calls, 2)
+	require.Equal(t, CapabilityMediaAssetsRead, gw.calls[0].CapabilityID)
+	require.Equal(t, "ListMediaAssets", gw.calls[0].Action)
+	listPayload, ok := gw.calls[0].Payload.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, http.MethodGet, listPayload["method"])
+	require.Equal(t, "/api/v1/media/assets", listPayload["endpoint"])
+	query, ok := listPayload["query"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "ai_craft_track", query["ownerSubjectType"])
+	require.Equal(t, []string{"published"}, query["businessStatus"])
+
+	require.Equal(t, CapabilityMediaAssetsManage, gw.calls[1].CapabilityID)
+	require.Equal(t, "DeleteMediaAsset", gw.calls[1].Action)
+	deletePayload, ok := gw.calls[1].Payload.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, http.MethodDelete, deletePayload["method"])
+	require.Equal(t, "/api/v1/media/assets/media-asset-001", deletePayload["endpoint"])
 }
 
 type fakeGateway struct {
@@ -194,6 +237,24 @@ func (f *fakeGateway) Invoke(_ context.Context, req gateway.InvokeRequest) (*gat
 			"business_status":  "under_review",
 			"owner_subject_id": "track/original/design.png",
 		}}, nil
+	case "ListMediaAssets":
+		return &gateway.Response{Data: map[string]any{
+			"items": []map[string]any{{
+				"uuid":             "media-asset-001",
+				"tenant_uuid":      "tenant-001",
+				"name":             "design.png",
+				"driver":           "local",
+				"objectKey":        "media-asset-001",
+				"mimeType":         "image/png",
+				"businessStatus":   "published",
+				"ownerSubjectType": "ai_craft_track",
+			}},
+			"total":    1,
+			"page":     2,
+			"pageSize": 50,
+		}}, nil
+	case "DeleteMediaAsset":
+		return &gateway.Response{Data: map[string]any{"deleted": true}}, nil
 	case "CreateMediaAssetVariant":
 		return &gateway.Response{Data: map[string]any{
 			"uuid":        "media-variant-001",

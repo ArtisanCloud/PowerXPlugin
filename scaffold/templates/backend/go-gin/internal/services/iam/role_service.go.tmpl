@@ -37,24 +37,54 @@ type RoleFilter struct {
 }
 
 type RoleView struct {
-	ID            uint64    `json:"id"`
-	TenantUUID    string    `json:"tenant_uuid"`
-	Code          string    `json:"code"`
-	Name          string    `json:"name"`
-	Description   string    `json:"description"`
-	ScopeType     string    `json:"scope_type"`
-	PolicyVersion string    `json:"policy_version"`
-	PermissionIDs []uint64  `json:"permission_ids,omitempty"`
-	MemberIDs     []uint64  `json:"member_ids,omitempty"`
-	MemberCount   int64     `json:"member_count"`
-	CreatedAt     time.Time `json:"created_at"`
+	RoleUUID        string    `json:"role_uuid"`
+	ID              uint64    `json:"-"`
+	TenantUUID      string    `json:"tenant_uuid"`
+	Code            string    `json:"code"`
+	Name            string    `json:"name"`
+	Description     string    `json:"description"`
+	ScopeType       string    `json:"scope_type"`
+	PolicyVersion   string    `json:"policy_version"`
+	PermissionUUIDs []string  `json:"permission_uuids,omitempty"`
+	MemberUUIDs     []string  `json:"member_uuids,omitempty"`
+	PermissionIDs   []uint64  `json:"-"`
+	MemberIDs       []uint64  `json:"-"`
+	MemberCount     int64     `json:"member_count"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type PermissionView struct {
-	ID          uint64 `json:"id"`
-	Resource    string `json:"resource"`
-	Action      string `json:"action"`
-	Description string `json:"description"`
+	PermissionUUID string `json:"permission_uuid"`
+	ID             uint64 `json:"-"`
+	Resource       string `json:"resource"`
+	Action         string `json:"action"`
+	Description    string `json:"description"`
+}
+
+type CreateRoleUUIDInput struct {
+	TenantUUID      string
+	Code            string
+	Name            string
+	Description     string
+	ScopeType       string
+	CloneRoleUUID   *string
+	PermissionUUIDs []string
+	MemberUUIDs     []string
+	ActorID         *uint64
+}
+
+type ReplaceRolePermissionsUUIDInput struct {
+	RoleUUID        string
+	TenantUUID      string
+	PermissionUUIDs []string
+	ActorID         *uint64
+}
+
+type RoleMembersUUIDInput struct {
+	RoleUUID    string
+	TenantUUID  string
+	MemberUUIDs []string
+	ActorID     *uint64
 }
 
 type CreateRoleInput struct {
@@ -127,6 +157,7 @@ func (s *RoleService) List(ctx context.Context, filter RoleFilter) ([]RoleView, 
 	view := make([]RoleView, 0, len(roles))
 	for _, role := range roles {
 		view = append(view, RoleView{
+			RoleUUID:      role.UUID,
 			ID:            role.ID,
 			TenantUUID:    role.TenantUuid,
 			Code:          role.Code,
@@ -154,19 +185,111 @@ func (s *RoleService) Get(ctx context.Context, id uint64) (*RoleView, error) {
 	if err != nil {
 		return nil, err
 	}
+	permissionUUIDs, err := s.rolePermissionUUIDs(ctx, role.UUID)
+	if err != nil {
+		return nil, err
+	}
+	memberUUIDs, err := s.roleMemberUUIDs(ctx, role.UUID)
+	if err != nil {
+		return nil, err
+	}
 	return &RoleView{
-		ID:            role.ID,
-		TenantUUID:    role.TenantUuid,
-		Code:          role.Code,
-		Name:          role.Name,
-		Description:   role.Description,
-		ScopeType:     role.ScopeType,
-		PolicyVersion: role.PolicyVersion,
-		PermissionIDs: perms[role.ID],
-		MemberIDs:     memberIDs,
-		MemberCount:   int64(len(memberIDs)),
-		CreatedAt:     role.CreatedAt,
+		RoleUUID:        role.UUID,
+		ID:              role.ID,
+		TenantUUID:      role.TenantUuid,
+		Code:            role.Code,
+		Name:            role.Name,
+		Description:     role.Description,
+		ScopeType:       role.ScopeType,
+		PolicyVersion:   role.PolicyVersion,
+		PermissionIDs:   perms[role.ID],
+		MemberIDs:       memberIDs,
+		PermissionUUIDs: permissionUUIDs,
+		MemberUUIDs:     memberUUIDs,
+		MemberCount:     int64(len(memberIDs)),
+		CreatedAt:       role.CreatedAt,
 	}, nil
+}
+
+// GetByUUID is the UUID-only business boundary for local IAM callers.
+func (s *RoleService) GetByUUID(ctx context.Context, roleUUID string) (*RoleView, error) {
+	role, err := s.loadRoleByUUID(ctx, roleUUID)
+	if err != nil {
+		return nil, err
+	}
+	return s.Get(ctx, role.ID)
+}
+
+func (s *RoleService) CreateByUUID(ctx context.Context, input CreateRoleUUIDInput) (*RoleView, error) {
+	permissionIDs, err := s.permissionIDsByUUID(ctx, input.PermissionUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	memberIDs, err := s.memberIDsByUUID(ctx, input.TenantUUID, input.MemberUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	var cloneRoleID *uint64
+	if input.CloneRoleUUID != nil && strings.TrimSpace(*input.CloneRoleUUID) != "" {
+		role, err := s.loadRoleByUUID(ctx, *input.CloneRoleUUID)
+		if err != nil {
+			return nil, err
+		}
+		cloneRoleID = &role.ID
+	}
+	return s.Create(ctx, CreateRoleInput{TenantUUID: input.TenantUUID, Code: input.Code, Name: input.Name, Description: input.Description, ScopeType: input.ScopeType, CloneRoleID: cloneRoleID, PermissionIDs: permissionIDs, MemberIDs: memberIDs, ActorID: input.ActorID})
+}
+
+func (s *RoleService) UpdateByUUID(ctx context.Context, roleUUID string, input UpdateRoleInput) (*RoleView, error) {
+	role, err := s.loadRoleByUUID(ctx, roleUUID)
+	if err != nil {
+		return nil, err
+	}
+	return s.Update(ctx, role.ID, input)
+}
+
+func (s *RoleService) DeleteByUUID(ctx context.Context, roleUUID string, actorID *uint64) error {
+	role, err := s.loadRoleByUUID(ctx, roleUUID)
+	if err != nil {
+		return err
+	}
+	return s.Delete(ctx, role.ID, actorID)
+}
+
+func (s *RoleService) ReplacePermissionsByUUID(ctx context.Context, input ReplaceRolePermissionsUUIDInput) (*RoleView, error) {
+	role, err := s.loadRoleByUUID(ctx, input.RoleUUID)
+	if err != nil {
+		return nil, err
+	}
+	permissionIDs, err := s.permissionIDsByUUID(ctx, input.PermissionUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	return s.ReplacePermissions(ctx, ReplaceRolePermissionsInput{RoleID: role.ID, TenantUUID: input.TenantUUID, PermissionIDs: permissionIDs, ActorID: input.ActorID})
+}
+
+func (s *RoleService) AddMembersByUUID(ctx context.Context, input RoleMembersUUIDInput) error {
+	role, err := s.loadRoleByUUID(ctx, input.RoleUUID)
+	if err != nil {
+		return err
+	}
+	memberIDs, err := s.memberIDsByUUID(ctx, input.TenantUUID, input.MemberUUIDs)
+	if err != nil {
+		return err
+	}
+	return s.AddMembers(ctx, RoleMembersInput{RoleID: role.ID, TenantUUID: input.TenantUUID, MemberIDs: memberIDs, ActorID: input.ActorID})
+}
+
+func (s *RoleService) RemoveMembersByUUID(ctx context.Context, input RoleMembersUUIDInput) error {
+	role, err := s.loadRoleByUUID(ctx, input.RoleUUID)
+	if err != nil {
+		return err
+	}
+	memberIDs, err := s.memberIDsByUUID(ctx, input.TenantUUID, input.MemberUUIDs)
+	if err != nil {
+		return err
+	}
+	return s.RemoveMembers(ctx, RoleMembersInput{RoleID: role.ID, TenantUUID: input.TenantUUID, MemberIDs: memberIDs, ActorID: input.ActorID})
 }
 
 func (s *RoleService) Create(ctx context.Context, input CreateRoleInput) (*RoleView, error) {
@@ -456,13 +579,95 @@ func (s *RoleService) ListPermissions(ctx context.Context) ([]PermissionView, er
 	result := make([]PermissionView, 0, len(perms))
 	for _, p := range perms {
 		result = append(result, PermissionView{
-			ID:          p.ID,
-			Resource:    p.Resource,
-			Action:      p.Action,
-			Description: p.Description,
+			PermissionUUID: p.UUID,
+			ID:             p.ID,
+			Resource:       p.Resource,
+			Action:         p.Action,
+			Description:    p.Description,
 		})
 	}
 	return result, nil
+}
+
+func (s *RoleService) loadRoleByUUID(ctx context.Context, roleUUID string) (*iamm.Role, error) {
+	if strings.TrimSpace(roleUUID) == "" {
+		return nil, ErrRoleNotFound
+	}
+	var role iamm.Role
+	if err := s.db.WithContext(ctx).Where("uuid = ?", strings.TrimSpace(roleUUID)).First(&role).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRoleNotFound
+		}
+		return nil, err
+	}
+	return &role, nil
+}
+
+func (s *RoleService) permissionIDsByUUID(ctx context.Context, values []string) ([]uint64, error) {
+	values = uniqueStrings(values)
+	if len(values) == 0 {
+		return nil, nil
+	}
+	var permissions []iamm.Permission
+	if err := s.db.WithContext(ctx).Where("uuid IN ?", values).Find(&permissions).Error; err != nil {
+		return nil, err
+	}
+	if len(permissions) != len(values) {
+		return nil, errors.New("one or more permission_uuids do not exist")
+	}
+	ids := make([]uint64, 0, len(permissions))
+	for _, permission := range permissions {
+		ids = append(ids, permission.ID)
+	}
+	return ids, nil
+}
+
+func (s *RoleService) memberIDsByUUID(ctx context.Context, tenantUUID string, values []string) ([]uint64, error) {
+	values = uniqueStrings(values)
+	if len(values) == 0 {
+		return nil, nil
+	}
+	var members []iamm.Member
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid IN ?", normalizeTenant(tenantUUID), values).Find(&members).Error; err != nil {
+		return nil, err
+	}
+	if len(members) != len(values) {
+		return nil, errors.New("one or more member_uuids do not belong to tenant")
+	}
+	ids := make([]uint64, 0, len(members))
+	for _, member := range members {
+		ids = append(ids, member.ID)
+	}
+	return ids, nil
+}
+
+func (s *RoleService) rolePermissionUUIDs(ctx context.Context, roleUUID string) ([]string, error) {
+	var values []string
+	err := s.db.WithContext(ctx).Model(&iamm.RolePermission{}).Where("role_uuid = ?", roleUUID).Pluck("permission_uuid", &values).Error
+	return values, err
+}
+
+func (s *RoleService) roleMemberUUIDs(ctx context.Context, roleUUID string) ([]string, error) {
+	var values []string
+	err := s.db.WithContext(ctx).Model(&iamm.MemberRole{}).Where("role_uuid = ?", roleUUID).Pluck("member_uuid", &values).Error
+	return values, err
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }
 
 func (s *RoleService) loadRole(ctx context.Context, id uint64) (*iamm.Role, error) {
@@ -558,7 +763,14 @@ func addMembersToRoleTx(ctx context.Context, tx *gorm.DB, role *iamm.Role, membe
 		}
 	}
 	for _, member := range memberIDs {
-		rel := &iamm.MemberRole{UserID: member, RoleID: role.ID}
+		memberUUID := ""
+		for _, validMember := range validMembers {
+			if validMember.ID == member {
+				memberUUID = validMember.UUID
+				break
+			}
+		}
+		rel := &iamm.MemberRole{MemberUUID: memberUUID, RoleUUID: role.UUID, UserID: member, RoleID: role.ID}
 		if err := tx.Clauses(clauseOnConflictDoNothing()).Create(rel).Error; err != nil {
 			return err
 		}
@@ -576,12 +788,25 @@ func replaceRolePermissionsTx(ctx context.Context, tx *gorm.DB, role *iamm.Role,
 	if len(permissionIDs) == 0 {
 		return nil
 	}
+	var permissions []iamm.Permission
+	if err := tx.WithContext(ctx).Where("id IN ?", uniqueUint64(permissionIDs)).Find(&permissions).Error; err != nil {
+		return err
+	}
+	if len(permissions) != len(uniqueUint64(permissionIDs)) {
+		return errors.New("one or more permissions do not exist")
+	}
+	permissionUUIDs := make(map[uint64]string, len(permissions))
+	for _, permission := range permissions {
+		permissionUUIDs[permission.ID] = permission.UUID
+	}
 	for _, pid := range uniqueUint64(permissionIDs) {
 		rp := &iamm.RolePermission{
-			RoleID:        role.ID,
-			PermissionID:  pid,
-			TenantUuid:    strings.TrimSpace(role.TenantUuid),
-			PolicyVersion: policyVersion,
+			RoleUUID:       role.UUID,
+			PermissionUUID: permissionUUIDs[pid],
+			RoleID:         role.ID,
+			PermissionID:   pid,
+			TenantUuid:     strings.TrimSpace(role.TenantUuid),
+			PolicyVersion:  policyVersion,
 		}
 		if err := tx.Create(rp).Error; err != nil {
 			return err

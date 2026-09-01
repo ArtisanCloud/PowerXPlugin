@@ -4,12 +4,14 @@ import "errors"
 
 const (
 	CodeModeInvalid        = "PROVIDER_MODE_INVALID"
+	CodeInvalidArgument    = "IAM_INVALID_ARGUMENT"
 	CodeModeConflict       = "PROVIDER_MODE_CONFLICT"
 	CodeAdapterNotBound    = "IAM_ADAPTER_NOT_BOUND"
 	CodeAdapterAlreadyBind = "IAM_ADAPTER_ALREADY_BOUND"
 	CodeUnauthorized       = "IAM_UNAUTHORIZED"
 	CodeForbidden          = "IAM_FORBIDDEN"
 	CodeUpstreamDependency = "IAM_UPSTREAM_DEPENDENCY"
+	CodeMemberNotFound     = "IAM_MEMBER_NOT_FOUND"
 )
 
 // Error 表示 IAM 域内的统一错误对象。
@@ -73,11 +75,13 @@ func StatusCode(err error) int {
 		return 401
 	case CodeForbidden:
 		return 403
+	case CodeMemberNotFound:
+		return 404
 	case CodeUpstreamDependency, CodeAdapterNotBound:
 		return 424
 	case CodeModeConflict, CodeAdapterAlreadyBind:
 		return 409
-	case CodeModeInvalid:
+	case CodeModeInvalid, CodeInvalidArgument:
 		return 400
 	default:
 		return 500

@@ -33,5 +33,6 @@ func RBACEntries(prefix string) map[string]authx.Permission {
 		"GET:" + base + "/logging/policy":                {Resource: "runtime.ops", Action: "read"},
 		"PUT:" + base + "/logging/policy":                {Resource: "runtime.ops", Action: "manage"},
 		"POST:" + base + "/logging/probe":                {Resource: "runtime.ops", Action: "invoke"},
+		"GET:" + base + "/agent-lifecycle/*/health":      {Resource: "runtime.ops", Action: "observe"},
 	}
 }

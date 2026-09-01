@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
@@ -36,7 +37,18 @@ func TestMCPAgentModeInterop(t *testing.T) {
 		Server:      &config.ServerConfig{APIPrefix: "/api/v1"},
 		Integration: &config.IntegrationConfig{},
 	}
-	deps := &app.Deps{DB: db, Config: cfg, Ctx: context.Background()}
+	deps := &app.Deps{
+		DB:     db,
+		Config: cfg,
+		Ctx:    context.Background(),
+		RealtimeDescriptors: []frameworkrealtime.Descriptor{{
+			Key:        "_channel.mcp.session",
+			Protocols:  []frameworkrealtime.Protocol{frameworkrealtime.ProtocolSSE},
+			Actions:    []frameworkrealtime.Action{frameworkrealtime.ActionPublish},
+			Scope:      frameworkrealtime.ScopeTenant,
+			EventTypes: []string{"session.registered", "session.ready", "session.heartbeat", "session.closed", "invoke.completed", "progress"},
+		}},
+	}
 	handler := runtimehttp.NewSessionsHandler(deps)
 
 	tenantID := "00000000-0000-0000-0000-000000009999"

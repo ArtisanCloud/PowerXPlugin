@@ -10,6 +10,10 @@ type TokenProvider interface {
 	Token(context.Context) (string, error)
 }
 
+type TokenProviderFunc func(context.Context) (string, error)
+
+func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
+
 type StaticBearerTokenProvider struct {
 	TokenValue string
 }

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	repo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/domain/repository/iam"
@@ -39,11 +40,12 @@ func NewChannelDingTalkHandlerWithDeps(deps *app.Deps) *ChannelDingTalkHandler {
 		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
 		"",
 		nil,
-		"dingtalk.sync.progress",
+		"_topic.iam.dingtalk.sync.progress",
 	)
 	if adapter, ok := publisher.(*fwwsbus.Adapter); ok {
 		adapter.EnableHubBridge(deps.WSBusHub)
 	}
+	publisher = frameworkrealtime.NewAuthorizedWSPublisher(publisher, deps.RealtimeDescriptors, "message")
 	return &ChannelDingTalkHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewDingTalkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),
@@ -247,11 +249,12 @@ func NewChannelLarkHandlerWithDeps(deps *app.Deps) *ChannelLarkHandler {
 		fwwsbus.NewLocalPublisher(deps.WSBusHub, nil),
 		"",
 		nil,
-		"lark.sync.progress",
+		"_topic.iam.lark.sync.progress",
 	)
 	if adapter, ok := publisher.(*fwwsbus.Adapter); ok {
 		adapter.EnableHubBridge(deps.WSBusHub)
 	}
+	publisher = frameworkrealtime.NewAuthorizedWSPublisher(publisher, deps.RealtimeDescriptors, "message")
 	return &ChannelLarkHandler{
 		configSvc: configSvc,
 		syncSvc:   federatedsvc.NewLarkSyncTaskService(syncRepo, configSvc, publisher, deps.DB),

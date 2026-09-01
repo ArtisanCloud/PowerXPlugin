@@ -42,6 +42,31 @@ func NewClient(cfg PowerXAgentClientConfig, opts ...func(*Client)) (*Client, err
 	return c, nil
 }
 
+// NewClientWithTokenProvider binds a server-owned STS provider, for example
+// the Skeleton PowerX STS token manager. Delegated callers cannot substitute a
+// static bearer token through this path.
+func NewClientWithTokenProvider(cfg PowerXAgentClientConfig, provider TokenProvider, opts ...func(*Client)) (*Client, error) {
+	cfg = cfg.WithDefaults()
+	if provider == nil {
+		return nil, newError(ErrCodeAuthInvalid, "token provider is required")
+	}
+	if cfg.Mode == ModeDelegated {
+		if strings.ToLower(cfg.AuthScheme) != AuthBearer || strings.TrimSpace(cfg.BearerToken) != "" {
+			return nil, newError(ErrCodeAuthInvalid, "delegated mode requires an injected STS bearer provider")
+		}
+		if strings.TrimSpace(cfg.BaseURL) == "" {
+			return nil, newError(ErrCodeConfigInvalid, "base_url is required")
+		}
+	} else if err := ValidateConfig(cfg); err != nil {
+		return nil, err
+	}
+	c := &Client{cfg: cfg, http: &http.Client{Timeout: cfg.Timeout}, tokens: provider}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c, nil
+}
+
 func WithHTTPClient(httpClient *http.Client) func(*Client) {
 	return func(c *Client) {
 		if httpClient != nil {
@@ -78,7 +103,7 @@ func (c *Client) Invoke(ctx context.Context, req AgentInvokeRequest) (AgentInvok
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return out, &Error{Code: ErrCodeTransport, Message: resp.Status}
+		return out, transportError(resp)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return out, err

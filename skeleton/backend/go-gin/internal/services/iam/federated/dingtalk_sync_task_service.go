@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const topicDingTalkSyncProgress = "dingtalk.sync.progress"
+const topicDingTalkSyncProgress = "_topic.iam.dingtalk.sync.progress"
 
 type DingTalkSyncTaskService struct {
 	base *ChannelSyncTaskService

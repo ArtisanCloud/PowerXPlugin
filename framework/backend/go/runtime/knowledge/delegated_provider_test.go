@@ -13,6 +13,10 @@ type fakeDelegatedClient struct {
 	delay  time.Duration
 }
 
+func (fakeDelegatedClient) DelegatedCapabilities(context.Context) ProviderCapabilities {
+	return BasicCapabilities("fake", ProviderModeDelegated, OperationRetrieve, OperationSearch, OperationUpsert, OperationDelete, OperationReindex, OperationHealth)
+}
+
 func (f fakeDelegatedClient) ListKnowledgeSpaces(ctx context.Context, input ListSpacesInput) ([]KnowledgeSpace, error) {
 	if f.delay > 0 {
 		select {

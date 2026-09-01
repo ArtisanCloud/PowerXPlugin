@@ -495,7 +495,7 @@ const connectWS = () => {
     wsConn?.send(
       JSON.stringify({
         type: "subscribe",
-        topics: ["wecom.sync.progress"],
+		topics: ["_topic.iam.wecom.sync.progress"],
       })
     );
   };
@@ -507,7 +507,7 @@ const connectWS = () => {
       return;
     }
     if (String(parsed?.type || "").toLowerCase() !== "event") return;
-    if (String(parsed?.topic || "") !== "wecom.sync.progress") return;
+	if (String(parsed?.topic || "") !== "_topic.iam.wecom.sync.progress") return;
     upsertTaskByWS(parsed?.payload || {});
     if (!hasPendingTasks()) {
       stopTaskPolling();

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const topicLarkSyncProgress = "lark.sync.progress"
+const topicLarkSyncProgress = "_topic.iam.lark.sync.progress"
 
 type LarkSyncTaskService struct {
 	base *ChannelSyncTaskService

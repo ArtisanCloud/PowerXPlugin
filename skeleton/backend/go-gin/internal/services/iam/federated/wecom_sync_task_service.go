@@ -28,7 +28,7 @@ type WeComSyncTaskService struct {
 }
 
 const wecomSyncTaskTimeout = 2 * time.Minute
-const topicWeComSyncProgress = "wecom.sync.progress"
+const topicWeComSyncProgress = "_topic.iam.wecom.sync.progress"
 
 type weComSyncProgressEvent struct {
 	TenantUUID   string `json:"tenant_uuid"`

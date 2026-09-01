@@ -3,7 +3,7 @@ import type { ApiResponse } from "../types/types";
 
 // 角色接口定义
 export interface Role {
-  id: number;
+	role_uuid: string;
   tenant_uuid: string;
   code: string;
   name: string;
@@ -11,8 +11,8 @@ export interface Role {
   scope?: "system" | "tenant";
   scope_type?: "system" | "tenant";
   policy_version?: string;
-  permission_ids?: number[];
-  member_ids?: number[];
+	permission_uuids?: string[];
+	member_uuids?: string[];
   member_count?: number;
   createdAt?: string;
   created_at?: string;
@@ -40,9 +40,9 @@ export interface RoleCreateParams {
   name: string;
   description?: string;
   scope_type?: "system" | "tenant";
-  clone_role_id?: number;
-  permission_ids?: number[];
-  member_ids?: number[];
+	clone_role_uuid?: string;
+	permission_uuids?: string[];
+	member_uuids?: string[];
 }
 
 // 角色更新参数
@@ -54,17 +54,8 @@ export interface RoleUpdateParams {
 }
 
 // 权限设置结果
-export interface SetIDsResult {
-  added: number[] | null;
-  removed: number[] | null;
-  now: number[];
-  skipped_deprecated: number[] | null;
-}
-
-// 创建角色响应（带权限）
 export interface CreateRoleWithPermsResponse {
   role: Role;
-  perm?: SetIDsResult;
 }
 
 // 分页响应
@@ -115,8 +106,8 @@ export const useRoleService = () => {
     /**
      * 获取单个角色信息
      */
-    getRole: (id: number) => {
-      return apiClient.get<ApiResponse<Role>>(`${baseUrl}/${id}`);
+	getRole: (roleUUID: string) => {
+		return apiClient.get<ApiResponse<Role>>(`${baseUrl}/${roleUUID}`);
     },
 
     /**
@@ -129,9 +120,9 @@ export const useRoleService = () => {
         name: data.name,
         description: data.description,
         scope_type: data.scope_type,
-        clone_role_id: data.clone_role_id,
-        permission_ids: data.permission_ids,
-        member_ids: data.member_ids,
+		clone_role_uuid: data.clone_role_uuid,
+		permission_uuids: data.permission_uuids,
+		member_uuids: data.member_uuids,
       };
       return apiClient.post<ApiResponse<Role>>(baseUrl, payload);
     },
@@ -139,14 +130,14 @@ export const useRoleService = () => {
     /**
      * 更新角色
      */
-    updateRole: (id: number, data: RoleUpdateParams) => {
+	updateRole: (roleUUID: string, data: RoleUpdateParams) => {
       const payload = {
         name: data.name,
         description: data.description,
         scope_type: data.scope_type,
       };
       return apiClient.patch<ApiResponse<{ updated: boolean }>>(
-        `${baseUrl}/${id}`,
+		`${baseUrl}/${roleUUID}`,
         payload
       );
     },
@@ -154,9 +145,9 @@ export const useRoleService = () => {
     /**
      * 删除角色
      */
-    deleteRole: (id: number) => {
+	deleteRole: (roleUUID: string) => {
       return apiClient.delete<ApiResponse<{ deleted: boolean }>>(
-        `${baseUrl}/${id}`
+		`${baseUrl}/${roleUUID}`
       );
     },
   };

@@ -2,7 +2,6 @@ package local
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
@@ -36,7 +35,8 @@ func NewBundle(directory iamservice.IAMDirectory) (fwiamadapters.Bundle, error) 
 func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
 	tc := iamservice.TenantContext{
 		TenantUUID: req.TenantUUID,
-		UserID:     toUint64(req.UserID),
+		UserUUID:   req.UserUUID,
+		MemberUUID: req.MemberUUID,
 	}
 	err := a.directory.CheckPermission(ctx, tc, req.Resource, req.Action)
 	if err == nil {
@@ -45,7 +45,8 @@ func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.Authorizatio
 			Resource:   req.Resource,
 			Action:     req.Action,
 			TenantUUID: req.TenantUUID,
-			UserID:     req.UserID,
+			UserUUID:   req.UserUUID,
+			MemberUUID: req.MemberUUID,
 			Mode:       string(fwiamcontracts.IAMAdapterModeLocal),
 			TraceID:    req.TraceID,
 		}, nil
@@ -56,7 +57,8 @@ func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.Authorizatio
 		Resource:   req.Resource,
 		Action:     req.Action,
 		TenantUUID: req.TenantUUID,
-		UserID:     req.UserID,
+		UserUUID:   req.UserUUID,
+		MemberUUID: req.MemberUUID,
 		Mode:       string(fwiamcontracts.IAMAdapterModeLocal),
 		TraceID:    req.TraceID,
 	}, nil
@@ -76,28 +78,12 @@ func (a *Adapter) ResolveIdentity(ctx context.Context, bearerToken string) (*fwi
 	}
 	return &fwiamcontracts.IdentityContext{
 		TenantUUID:  firstNonEmpty(userCtx.TenantUUID, userCtx.TenantUuid),
-		UserID:      toStringUint(userCtx.UserID),
-		MemberID:    toStringUint(userCtx.MemberID),
+		UserUUID:    strings.TrimSpace(userCtx.UserUUID),
+		MemberUUID:  strings.TrimSpace(userCtx.MemberUUID),
 		Roles:       append([]string{}, userCtx.Roles...),
 		Permissions: append([]string{}, userCtx.Permissions...),
 		PolicyVer:   userCtx.PolicyVersion,
 	}, nil
-}
-
-func toStringUint(v uint64) string {
-	return strconv.FormatUint(v, 10)
-}
-
-func toUint64(raw string) uint64 {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0
-	}
-	v, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return v
 }
 
 func firstNonEmpty(values ...string) string {

@@ -51,6 +51,30 @@ type CreateDepartmentInput struct {
 	ActorID     *uint64
 }
 
+// CreateDepartmentUUIDInput is the public, cross-boundary UUID-only input.
+// Numeric primary keys remain an internal persistence implementation detail.
+type CreateDepartmentUUIDInput struct {
+	TenantUUID           string
+	Name                 string
+	Code                 string
+	ParentDepartmentUUID *string
+	Description          string
+	SortOrder            int
+	ActorID              *uint64
+}
+
+func (s *DepartmentService) CreateByUUID(ctx context.Context, input CreateDepartmentUUIDInput) (*iamm.Department, error) {
+	var parentID *uint64
+	if input.ParentDepartmentUUID != nil {
+		parent, err := s.departmentByUUID(ctx, input.TenantUUID, *input.ParentDepartmentUUID)
+		if err != nil {
+			return nil, err
+		}
+		parentID = &parent.ID
+	}
+	return s.Create(ctx, CreateDepartmentInput{TenantUUID: input.TenantUUID, Name: input.Name, Code: input.Code, ParentID: parentID, Description: input.Description, SortOrder: input.SortOrder, ActorID: input.ActorID})
+}
+
 func (s *DepartmentService) Create(ctx context.Context, input CreateDepartmentInput) (*iamm.Department, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("iam: department service unavailable")
@@ -80,6 +104,8 @@ func (s *DepartmentService) Create(ctx context.Context, input CreateDepartmentIn
 	dept.TenantUuid = tenantUUID
 	if parent != nil {
 		dept.ParentID = &parent.ID
+		parentUUID := parent.UUID
+		dept.ParentDepartmentUUID = &parentUUID
 		dept.Path = buildDeptPath(parent.Path, code)
 	} else {
 		dept.Path = buildDeptPath("", code)
@@ -128,6 +154,55 @@ type UpdateDepartmentInput struct {
 	ActorID     *uint64
 }
 
+type UpdateDepartmentUUIDInput struct {
+	TenantUUID           string
+	Name                 string
+	Description          string
+	SortOrder            *int
+	ParentDepartmentUUID *string
+	ActorID              *uint64
+}
+
+func (s *DepartmentService) UpdateByUUID(ctx context.Context, departmentUUID string, input UpdateDepartmentUUIDInput) (*iamm.Department, error) {
+	dept, err := s.departmentByUUID(ctx, input.TenantUUID, departmentUUID)
+	if err != nil {
+		return nil, err
+	}
+	var parentID *uint64
+	if input.ParentDepartmentUUID != nil {
+		if strings.TrimSpace(*input.ParentDepartmentUUID) == "" {
+			zero := uint64(0)
+			parentID = &zero
+		} else {
+			parent, err := s.departmentByUUID(ctx, input.TenantUUID, *input.ParentDepartmentUUID)
+			if err != nil {
+				return nil, err
+			}
+			parentID = &parent.ID
+		}
+	}
+	return s.Update(ctx, dept.ID, UpdateDepartmentInput{Name: input.Name, Description: input.Description, SortOrder: input.SortOrder, ParentID: parentID, ActorID: input.ActorID})
+}
+
+func (s *DepartmentService) DeleteByUUID(ctx context.Context, tenantUUID, departmentUUID string, actorID *uint64) error {
+	dept, err := s.departmentByUUID(ctx, tenantUUID, departmentUUID)
+	if err != nil {
+		return err
+	}
+	return s.Delete(ctx, dept.ID, actorID)
+}
+
+func (s *DepartmentService) departmentByUUID(ctx context.Context, tenantUUID, departmentUUID string) (*iamm.Department, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("iam: department service unavailable")
+	}
+	var dept iamm.Department
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid = ?", strings.TrimSpace(tenantUUID), strings.TrimSpace(departmentUUID)).First(&dept).Error; err != nil {
+		return nil, err
+	}
+	return &dept, nil
+}
+
 func (s *DepartmentService) Update(ctx context.Context, id uint64, input UpdateDepartmentInput) (*iamm.Department, error) {
 	if s == nil || s.db == nil {
 		return nil, errors.New("iam: department service unavailable")
@@ -163,10 +238,12 @@ func (s *DepartmentService) Update(ctx context.Context, id uint64, input UpdateD
 					return nil, fmt.Errorf("department cannot be moved under its own child")
 				}
 				changes["parent_id"] = targetID
+				changes["parent_department_uuid"] = newParent.UUID
 				pp := newParent.Path
 				parentPathOverride = &pp
 			} else {
 				changes["parent_id"] = nil
+				changes["parent_department_uuid"] = nil
 				newParent = nil
 				pp := ""
 				parentPathOverride = &pp

@@ -49,6 +49,21 @@ export interface PluginSSEClient {
   stream(options: PluginSSEStreamOptions): Promise<void>;
 }
 
+export type PluginSSEStatus = "idle" | "connecting" | "connected" | "error" | "closed";
+
+export interface PluginSSEState {
+  status: PluginSSEStatus;
+  url: string;
+  lastEventName: string;
+  lastEventAt: number;
+}
+
+export interface PluginSSEManagedConnection {
+  connect(): void;
+  close(): void;
+  getState(): PluginSSEState;
+}
+
 const trimSlashes = (value: string) => value.replace(/^\/+|\/+$/g, "");
 
 const appendParams = (url: URL, params?: Record<string, unknown>) => {
@@ -77,7 +92,8 @@ export function createPluginSSEClient(
     if (options.insidePowerX && hostBase) {
       return hostBase;
     }
-    return apiBase || window.location.origin;
+    if (!apiBase) return window.location.origin;
+    return new URL(apiBase, window.location.origin).toString();
   };
 
   const buildURL = (
@@ -137,45 +153,104 @@ export function createPluginSSEClient(
   };
 
   const stream = async (streamOptions: PluginSSEStreamOptions) => {
-    const url = buildURL(streamOptions.path, streamOptions.params, {
-      tenantUuid: streamOptions.tenantUuid,
-    });
-    const headers: Record<string, string> = {
-      Accept: "text/event-stream",
-      "Cache-Control": "no-cache",
-      ...(streamOptions.headers || {}),
-    };
-    const token = normalizeBearer(
-      String(streamOptions.token || options.token || ""),
-    );
-    if (token) {
-      headers.Authorization = token;
+    try {
+      const url = buildURL(streamOptions.path, streamOptions.params, {
+        tenantUuid: streamOptions.tenantUuid,
+      });
+      const headers: Record<string, string> = {
+        Accept: "text/event-stream",
+        "Cache-Control": "no-cache",
+        ...(streamOptions.headers || {}),
+      };
+      const token = normalizeBearer(
+        String(streamOptions.token || options.token || ""),
+      );
+      if (token) {
+        headers.Authorization = token;
+      }
+      const tenantUuid = String(
+        streamOptions.tenantUuid || options.tenantUuid || "",
+      ).trim();
+      if (tenantUuid) {
+        headers.tenant_uuid = tenantUuid;
+      }
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+        signal: streamOptions.signal,
+        credentials: options.withCredentials === false ? "same-origin" : "include",
+      });
+      if (!response.ok) {
+        throw new Error(`SSE stream failed: HTTP ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error("SSE stream response body is empty");
+      }
+      await readSSEStream(response.body, streamOptions.onEvent);
+    } catch (cause) {
+      const error = cause instanceof Error ? cause : new Error(String(cause));
+      streamOptions.onError?.(error);
+      throw error;
     }
-    const tenantUuid = String(
-      streamOptions.tenantUuid || options.tenantUuid || "",
-    ).trim();
-    if (tenantUuid) {
-      headers.tenant_uuid = tenantUuid;
-    }
-    const response = await fetch(url, {
-      method: "GET",
-      headers,
-      signal: streamOptions.signal,
-      credentials: options.withCredentials === false ? "same-origin" : "include",
-    });
-    if (!response.ok) {
-      throw new Error(`SSE stream failed: HTTP ${response.status}`);
-    }
-    if (!response.body) {
-      throw new Error("SSE stream response body is empty");
-    }
-    await readSSEStream(response.body, streamOptions.onEvent);
   };
 
   return {
     buildURL,
     connect,
     stream,
+  };
+}
+
+// createManagedPluginSSEConnection owns a single EventSource lifecycle. It is
+// intentionally separate from fetch SSE, whose caller owns an AbortController.
+export function createManagedPluginSSEConnection(
+  client: PluginSSEClient,
+  options: PluginSSEConnectOptions,
+  onState?: (state: PluginSSEState) => void,
+): PluginSSEManagedConnection {
+  let source: EventSource | null = null;
+  const state: PluginSSEState = { status: "idle", url: "", lastEventName: "", lastEventAt: 0 };
+  const emit = () => onState?.({ ...state });
+  const close = () => {
+    if (source) source.close();
+    source = null;
+    state.status = "closed";
+    emit();
+  };
+  return {
+    connect() {
+      close();
+      state.status = "connecting";
+      state.url = client.buildURL(options.path, options.params, { token: options.token, tenantUuid: options.tenantUuid });
+      emit();
+      source = client.connect({
+        ...options,
+        onOpen: (event) => {
+          state.status = "connected";
+          emit();
+          options.onOpen?.(event);
+        },
+        onError: (event) => {
+          state.status = "error";
+          emit();
+          options.onError?.(event);
+        },
+        onMessage: (event) => {
+          state.lastEventName = "message";
+          state.lastEventAt = Date.now();
+          emit();
+          options.onMessage?.(event);
+        },
+        events: Object.fromEntries(Object.entries(options.events || {}).map(([eventName, handler]) => [eventName, (event: MessageEvent) => {
+          state.lastEventName = eventName;
+          state.lastEventAt = Date.now();
+          emit();
+          handler(event);
+        }])),
+      });
+    },
+    close,
+    getState: () => ({ ...state }),
   };
 }
 
@@ -186,20 +261,25 @@ export async function readSSEStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let splitIndex = findSSEBoundary(buffer);
-    while (splitIndex >= 0) {
-      const chunk = buffer.slice(0, splitIndex);
-      buffer = buffer.slice(skipBoundary(buffer, splitIndex));
-      emitSSEChunk(chunk, onEvent);
-      splitIndex = findSSEBoundary(buffer);
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let splitIndex = findSSEBoundary(buffer);
+      while (splitIndex >= 0) {
+        const chunk = buffer.slice(0, splitIndex);
+        buffer = buffer.slice(skipBoundary(buffer, splitIndex));
+        emitSSEChunk(chunk, onEvent);
+        splitIndex = findSSEBoundary(buffer);
+      }
     }
-  }
-  if (buffer.trim()) {
-    emitSSEChunk(buffer, onEvent);
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      emitSSEChunk(buffer, onEvent);
+    }
+  } finally {
+    reader.releaseLock();
   }
 }
 

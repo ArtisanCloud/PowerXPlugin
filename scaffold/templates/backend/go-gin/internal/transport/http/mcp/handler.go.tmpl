@@ -2,43 +2,44 @@ package mcp
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	frameworksse "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ssebus"
+	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
 	"{{ .BackendModulePath }}/internal/mcp/stream"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"gorm.io/gorm"
 )
 
 // Handler serves MCP stream endpoints (SSE/WebSocket).
 type Handler struct {
-	broker *stream.Broker
+	broker      *stream.Broker
+	db          *gorm.DB
+	descriptors []frameworkrealtime.Descriptor
 }
 
 // NewHandler builds a stream handler.
-func NewHandler() *Handler {
-	return &Handler{broker: stream.DefaultBroker()}
+func NewHandler(deps *app.Deps) *Handler {
+	h := &Handler{broker: stream.DefaultBroker()}
+	if deps != nil {
+		h.db = deps.DB
+		h.descriptors = deps.RealtimeDescriptors
+	}
+	return h
 }
 
 // RegisterRoutes binds SSE/WS handlers to the engine.
-func RegisterRoutes(engine *gin.Engine, apiPrefix string) {
-	if engine == nil {
+func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
+	if router == nil {
 		return
 	}
-	h := NewHandler()
-	paths := []string{"/mcp/sse", "/mcp/ws"}
-	if trimmed := strings.TrimSpace(apiPrefix); trimmed != "" && trimmed != "/" {
-		base := strings.TrimRight(trimmed, "/")
-		paths = append(paths, base+"/mcp/sse", base+"/mcp/ws")
-	}
-	for _, p := range paths {
-		if strings.HasSuffix(p, "/sse") {
-			engine.GET(p, h.ServeSSE)
-		} else {
-			engine.GET(p, h.ServeWebsocket)
-		}
-	}
+	h := NewHandler(deps)
+	router.GET("/mcp/sse", h.ServeSSE)
+	router.GET("/mcp/ws", h.ServeWebsocket)
 }
 
 // ServeSSE streams session events over Server-Sent Events.
@@ -46,6 +47,9 @@ func (h *Handler) ServeSSE(c *gin.Context) {
 	sessionID := c.Query("session_id")
 	if sessionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session_id is required"})
+		return
+	}
+	if !h.authorizeSession(c, sessionID) {
 		return
 	}
 	ch, cancel := h.broker.Subscribe(sessionID)
@@ -95,6 +99,9 @@ func (h *Handler) ServeWebsocket(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session_id is required"})
 		return
 	}
+	if !h.authorizeSession(c, sessionID) {
+		return
+	}
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
@@ -137,4 +144,43 @@ func (h *Handler) ServeWebsocket(c *gin.Context) {
 			}
 		}
 	}
+}
+
+// authorizeSession prevents a caller from subscribing to another tenant's MCP
+// session. A missing or cross-tenant session has the same 404 response so the
+// transport cannot be used as a session-existence oracle.
+func (h *Handler) authorizeSession(c *gin.Context, sessionID string) bool {
+	if h == nil || h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "mcp session store is unavailable"})
+		return false
+	}
+	tenantUUID, err := authx.RequireTenantUUID(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant context is required"})
+		return false
+	}
+	var session model.MCPSession
+	if err := h.db.WithContext(c.Request.Context()).
+		Where("id = ? AND tenant_uuid = ?", sessionID, tenantUUID).
+		First(&session).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "mcp session not found"})
+			return false
+		}
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "mcp session lookup failed"})
+		return false
+	}
+	decision := frameworkrealtime.Decide(
+		h.descriptors,
+		frameworkrealtime.ActionSubscribe,
+		"_channel.mcp.session",
+		frameworkrealtime.ProtocolSSE,
+		"session.ready",
+		frameworkrealtime.Scope{TenantUUID: tenantUUID},
+	)
+	if !decision.Allowed {
+		c.JSON(http.StatusForbidden, gin.H{"error": decision.Reason})
+		return false
+	}
+	return true
 }

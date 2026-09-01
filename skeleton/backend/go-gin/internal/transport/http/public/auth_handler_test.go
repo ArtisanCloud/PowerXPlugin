@@ -172,6 +172,34 @@ func (s *stubProxy) MeContext(ctx context.Context, token string) (*authproxy.MeC
 	return nil, nil
 }
 
+func (s *stubProxy) GetDirectoryMember(context.Context, string) (*authproxy.DirectoryMember, error) {
+	return nil, nil
+}
+
+func (s *stubProxy) BatchGetDirectoryMembers(context.Context, []string) ([]authproxy.DirectoryMember, error) {
+	return nil, nil
+}
+
+func (s *stubProxy) BatchResolveDirectoryMembers(context.Context, []string) (*authproxy.DirectoryMemberResolution, error) {
+	return &authproxy.DirectoryMemberResolution{}, nil
+}
+
+func (s *stubProxy) ListDirectoryDepartments(context.Context) ([]authproxy.DirectoryDepartment, error) {
+	return nil, nil
+}
+
+func (s *stubProxy) ListDirectoryRoles(context.Context) ([]authproxy.DirectoryRole, error) {
+	return nil, nil
+}
+
+func (s *stubProxy) ListDirectoryPermissions(context.Context) ([]authproxy.DirectoryPermission, error) {
+	return nil, nil
+}
+
+func (s *stubProxy) CheckDirectoryAuthorization(context.Context, authproxy.DirectoryAuthorizationRequest) (*authproxy.AuthorizationDecision, error) {
+	return nil, nil
+}
+
 func TestAuthHandler_LocalLogin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	local := &localDirStub{
@@ -297,6 +325,14 @@ func (l *localDirStub) ListRoles(ctx context.Context, tenantUUID string) ([]iams
 
 func (l *localDirStub) ListDepartments(ctx context.Context, tenantUUID string) ([]iamservice.DepartmentInfo, error) {
 	return nil, nil
+}
+
+func (l *localDirStub) ListMembers(ctx context.Context, tenantUUID string) ([]iamservice.MemberInfo, error) {
+	return nil, nil
+}
+
+func (l *localDirStub) GetMember(ctx context.Context, tenantUUID, memberUUID string) (*iamservice.MemberInfo, error) {
+	return nil, iamservice.ErrMemberNotFound
 }
 
 func (l *localDirStub) CheckPermission(ctx context.Context, tc iamservice.TenantContext, resource, action string) error {

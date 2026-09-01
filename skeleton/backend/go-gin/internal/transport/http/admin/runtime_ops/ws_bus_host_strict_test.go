@@ -11,6 +11,7 @@ import (
 	"time"
 
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -137,7 +138,14 @@ func TestNotificationTestHostModeDoesNotPublishLocalEcho(t *testing.T) {
 
 func hostStrictWSBusDeps(baseURL string, hub fwwsbus.LocalHub) *app.Deps {
 	return &app.Deps{
-		WSBusHub:     hub,
+		WSBusHub: hub,
+		RealtimeDescriptors: []frameworkrealtime.Descriptor{{
+			Key:        "_topic.system.notification",
+			Protocols:  []frameworkrealtime.Protocol{frameworkrealtime.ProtocolWS},
+			Actions:    []frameworkrealtime.Action{frameworkrealtime.ActionPublish},
+			Scope:      frameworkrealtime.ScopeTenant,
+			EventTypes: []string{"message"},
+		}},
 		ProviderMode: fwprovider.ModeLocal,
 		Config: &config.Config{
 			Gateway: &config.GatewayConfig{

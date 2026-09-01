@@ -67,22 +67,22 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.GET("/departments", departmentHandler.List)
 	group.GET("/departments/tree", departmentHandler.Tree)
 	group.POST("/departments", departmentHandler.Create)
-	group.PATCH("/departments/:id", departmentHandler.Update)
-	group.DELETE("/departments/:id", departmentHandler.Delete)
+	group.PATCH("/departments/:department_uuid", departmentHandler.Update)
+	group.DELETE("/departments/:department_uuid", departmentHandler.Delete)
 
 	group.GET("/members", memberHandler.List)
 	group.POST("/members", memberHandler.Create)
-	group.PATCH("/members/:id", memberHandler.Update)
+	group.PATCH("/members/:member_uuid", memberHandler.Update)
 	group.POST("/members/import", memberHandler.BulkImport)
 
 	group.GET("/roles", roleHandler.List)
 	group.POST("/roles", roleHandler.Create)
-	group.GET("/roles/:id", roleHandler.Get)
-	group.PATCH("/roles/:id", roleHandler.Update)
-	group.DELETE("/roles/:id", roleHandler.Delete)
-	group.PUT("/roles/:id/permissions", rolePermissionsHandler.Replace)
-	group.POST("/roles/:id/members", roleMembersHandler.Add)
-	group.DELETE("/roles/:id/members", roleMembersHandler.Remove)
+	group.GET("/roles/:role_uuid", roleHandler.Get)
+	group.PATCH("/roles/:role_uuid", roleHandler.Update)
+	group.DELETE("/roles/:role_uuid", roleHandler.Delete)
+	group.PUT("/roles/:role_uuid/permissions", rolePermissionsHandler.Replace)
+	group.POST("/roles/:role_uuid/members", roleMembersHandler.Add)
+	group.DELETE("/roles/:role_uuid/members", roleMembersHandler.Remove)
 
 	group.GET("/permissions", permissionHandler.List)
 	if deps.DB != nil {
@@ -110,11 +110,6 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.POST("/channels/lark/sync-tasks", larkChannelHandler.TriggerSyncTask)
 	group.DELETE("/channels/lark/sync-tasks", larkChannelHandler.ClearSyncTasks)
 
-	// Legacy aliases for compatibility (deprecated)
-	group.GET("/users", memberHandler.List)
-	group.POST("/users", memberHandler.Create)
-	group.PATCH("/users/:id", memberHandler.Update)
-	group.POST("/users/import", memberHandler.BulkImport)
 }
 
 func modeHandler(deps *app.Deps) gin.HandlerFunc {

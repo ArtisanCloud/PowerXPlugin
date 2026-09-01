@@ -2,11 +2,17 @@ package local
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
+	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 )
+
+type permissionCatalogResolver interface {
+	ListPermissions(ctx context.Context, tenantUUID string) ([]iamservice.PermissionInfo, error)
+}
 
 func (a *Adapter) GetTenant(_ context.Context, tenantUUID string) (*fwiamcontracts.Tenant, error) {
 	tenantUUID = strings.TrimSpace(tenantUUID)
@@ -21,26 +27,95 @@ func (a *Adapter) ListDepartments(ctx context.Context, tenantUUID string) ([]fwi
 	if err != nil {
 		return nil, err
 	}
+	byID := make(map[uint64]string, len(items))
+	for _, item := range items {
+		if strings.TrimSpace(item.UUID) == "" {
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local department is missing department_uuid")
+		}
+		byID[item.ID] = strings.TrimSpace(item.UUID)
+	}
 	result := make([]fwiamcontracts.Department, 0, len(items))
 	for _, item := range items {
-		parentID := ""
+		parentUUID := ""
 		if item.ParentID != nil {
-			parentID = strings.TrimSpace(toStringUint(*item.ParentID))
+			var ok bool
+			parentUUID, ok = byID[*item.ParentID]
+			if !ok || parentUUID == "" {
+				return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local department parent is missing department_uuid")
+			}
 		}
 		result = append(result, fwiamcontracts.Department{
-			ID:         toStringUint(item.ID),
-			TenantUUID: firstNonEmpty(item.TenantUUID, item.TenantUuid),
-			Name:       item.Name,
-			Code:       item.Code,
-			ParentID:   parentID,
+			DepartmentUUID:       strings.TrimSpace(item.UUID),
+			TenantUUID:           firstNonEmpty(item.TenantUUID, item.TenantUuid),
+			Name:                 item.Name,
+			Code:                 item.Code,
+			ParentDepartmentUUID: parentUUID,
 		})
 	}
 	return result, nil
 }
 
-func (a *Adapter) ListMembers(_ context.Context, _ string) ([]fwiamcontracts.Member, error) {
-	// Local IAMDirectory 目前没有批量成员列表接口，US2 先保留统一读契约返回空集合。
-	return []fwiamcontracts.Member{}, nil
+func (a *Adapter) ListMembers(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Member, error) {
+	items, err := a.directory.ListMembers(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]fwiamcontracts.Member, 0, len(items))
+	for _, item := range items {
+		if strings.TrimSpace(item.MemberUUID) == "" || strings.TrimSpace(item.UserUUID) == "" {
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local member is missing member_uuid or user_uuid")
+		}
+		result = append(result, memberFromInfo(item))
+	}
+	return result, nil
+}
+
+func (a *Adapter) GetMember(ctx context.Context, tenantUUID, memberUUID string) (*fwiamcontracts.Member, error) {
+	item, err := a.directory.GetMember(ctx, tenantUUID, memberUUID)
+	if err != nil {
+		return nil, mapMemberError(err)
+	}
+	member := memberFromInfo(*item)
+	return &member, nil
+}
+
+func (a *Adapter) BatchGetMembers(ctx context.Context, tenantUUID string, memberUUIDs []string) ([]fwiamcontracts.Member, error) {
+	memberUUIDs, err := iamservice.NormalizeMemberUUIDs(memberUUIDs)
+	if err != nil {
+		return nil, fwiamerrors.Wrap(fwiamerrors.CodeInvalidArgument, "member_uuids are invalid", err)
+	}
+	result := make([]fwiamcontracts.Member, 0, len(memberUUIDs))
+	for _, memberUUID := range memberUUIDs {
+		member, err := a.GetMember(ctx, tenantUUID, memberUUID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, *member)
+	}
+	return result, nil
+}
+
+func (a *Adapter) BatchResolveMembers(ctx context.Context, tenantUUID string, memberUUIDs []string) (*fwiamcontracts.MemberResolution, error) {
+	memberUUIDs, err := iamservice.NormalizeMemberUUIDs(memberUUIDs)
+	if err != nil {
+		return nil, fwiamerrors.Wrap(fwiamerrors.CodeInvalidArgument, "member_uuids are invalid", err)
+	}
+	result := &fwiamcontracts.MemberResolution{
+		Items:              make([]fwiamcontracts.Member, 0, len(memberUUIDs)),
+		MissingMemberUUIDs: make([]string, 0),
+	}
+	for _, memberUUID := range memberUUIDs {
+		member, err := a.GetMember(ctx, tenantUUID, memberUUID)
+		if fwiamerrors.CodeOf(err) == fwiamerrors.CodeMemberNotFound {
+			result.MissingMemberUUIDs = append(result.MissingMemberUUIDs, memberUUID)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		result.Items = append(result.Items, *member)
+	}
+	return result, nil
 }
 
 func (a *Adapter) ListRoles(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Role, error) {
@@ -50,8 +125,11 @@ func (a *Adapter) ListRoles(ctx context.Context, tenantUUID string) ([]fwiamcont
 	}
 	result := make([]fwiamcontracts.Role, 0, len(items))
 	for _, item := range items {
+		if strings.TrimSpace(item.UUID) == "" {
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local role is missing role_uuid")
+		}
 		result = append(result, fwiamcontracts.Role{
-			ID:          toStringUint(item.ID),
+			RoleUUID:    strings.TrimSpace(item.UUID),
 			TenantUUID:  firstNonEmpty(item.TenantUUID, item.TenantUuid),
 			Code:        item.Code,
 			Name:        item.Name,
@@ -61,7 +139,38 @@ func (a *Adapter) ListRoles(ctx context.Context, tenantUUID string) ([]fwiamcont
 	return result, nil
 }
 
-func (a *Adapter) ListPermissions(_ context.Context, _ string) ([]fwiamcontracts.Permission, error) {
-	// Local IAMDirectory 目前没有全量权限查询接口，US2 先保留统一读契约返回空集合。
-	return []fwiamcontracts.Permission{}, nil
+func (a *Adapter) ListPermissions(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Permission, error) {
+	resolver, ok := a.directory.(permissionCatalogResolver)
+	if !ok {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local permission catalog adapter is not configured")
+	}
+	items, err := resolver.ListPermissions(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]fwiamcontracts.Permission, 0, len(items))
+	for _, item := range items {
+		if strings.TrimSpace(item.PermissionUUID) == "" {
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local permission is missing permission_uuid")
+		}
+		result = append(result, fwiamcontracts.Permission{PermissionUUID: strings.TrimSpace(item.PermissionUUID), Resource: strings.TrimSpace(item.Resource), Action: strings.TrimSpace(item.Action), Scope: strings.TrimSpace(item.Scope)})
+	}
+	return result, nil
+}
+
+func memberFromInfo(item iamservice.MemberInfo) fwiamcontracts.Member {
+	return fwiamcontracts.Member{
+		MemberUUID:  strings.TrimSpace(item.MemberUUID),
+		TenantUUID:  strings.TrimSpace(item.TenantUUID),
+		UserUUID:    strings.TrimSpace(item.UserUUID),
+		DisplayName: strings.TrimSpace(item.DisplayName),
+		Status:      strings.TrimSpace(item.Status),
+	}
+}
+
+func mapMemberError(err error) error {
+	if errors.Is(err, iamservice.ErrMemberNotFound) {
+		return fwiamerrors.New(fwiamerrors.CodeMemberNotFound, "member not found")
+	}
+	return err
 }

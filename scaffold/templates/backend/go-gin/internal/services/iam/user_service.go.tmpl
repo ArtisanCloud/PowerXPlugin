@@ -32,20 +32,22 @@ type UserFilter struct {
 }
 
 type UserView struct {
-	ID            uint64            `json:"id"`
-	UserID        uint64            `json:"user_id"`
-	TenantUUID    string            `json:"tenant_uuid"`
-	Email         string            `json:"email"`
-	Phone         string            `json:"phone"`
-	DisplayName   string            `json:"display_name"`
-	Username      string            `json:"username"`
-	Status        string            `json:"status"`
-	DepartmentID  *uint64           `json:"department_id"`
-	DepartmentIDs []uint64          `json:"department_ids,omitempty" gorm:"-"`
-	Meta          datatypes.JSONMap `json:"-"`
-	LastLoginAt   *time.Time        `json:"last_login_at,omitempty"`
-	CreatedAt     time.Time         `json:"created_at"`
-	Roles         []string          `json:"roles" gorm:"-"`
+	ID              uint64            `json:"-"`
+	UserID          uint64            `json:"-"`
+	MemberUUID      string            `json:"member_uuid"`
+	TenantUUID      string            `json:"tenant_uuid"`
+	Email           string            `json:"email"`
+	Phone           string            `json:"phone"`
+	DisplayName     string            `json:"display_name"`
+	Username        string            `json:"username"`
+	Status          string            `json:"status"`
+	DepartmentID    *uint64           `json:"-"`
+	DepartmentIDs   []uint64          `json:"-" gorm:"-"`
+	DepartmentUUIDs []string          `json:"department_uuids,omitempty" gorm:"-"`
+	Meta            datatypes.JSONMap `json:"-"`
+	LastLoginAt     *time.Time        `json:"last_login_at,omitempty"`
+	CreatedAt       time.Time         `json:"created_at"`
+	Roles           []string          `json:"roles" gorm:"-"`
 }
 
 type UserBulkImportResult struct {
@@ -70,7 +72,7 @@ func (s *UserService) List(ctx context.Context, filter UserFilter) ([]UserView, 
 	}
 	query := s.db.WithContext(ctx).
 		Table(iamm.Member{}.TableName()+" u").
-		Select(`u.id AS id, u.user_id AS user_id, u.tenant_uuid, u.username, u.status, u.department_id,
+		Select(`u.id AS id, u.uuid AS member_uuid, u.user_id AS user_id, u.tenant_uuid, u.username, u.status, u.department_id,
             u.meta, u.last_login_at, u.created_at, COALESCE(u.display_name, a.display_name) AS display_name,
             a.email, a.phone`).
 		Joins("JOIN "+iamm.User{}.TableName()+" a ON a.id = u.user_id").
@@ -112,6 +114,9 @@ func (s *UserService) List(ctx context.Context, filter UserFilter) ([]UserView, 
 			result[i].Roles = roles
 		}
 		result[i].DepartmentIDs = extractDepartmentIDs(result[i].Meta, result[i].DepartmentID)
+		if err := s.hydrateUUIDView(ctx, &result[i]); err != nil {
+			return nil, err
+		}
 	}
 	return result, nil
 }
@@ -162,21 +167,29 @@ func (s *UserService) assignRoles(ctx context.Context, tx *gorm.DB, tenantUUID s
 	if len(cleaned) == 0 {
 		return tx.WithContext(ctx).Where("member_id = ?", userID).Delete(&iamm.MemberRole{}).Error
 	}
-	var count int64
+	var roles []iamm.Role
 	if err := tx.WithContext(ctx).Model(&iamm.Role{}).
 		Where("tenant_uuid = ?", tenantUUID).
 		Where("id IN ?", cleaned).
-		Count(&count).Error; err != nil {
+		Find(&roles).Error; err != nil {
 		return err
 	}
-	if count != int64(len(cleaned)) {
+	if len(roles) != len(cleaned) {
 		return fmt.Errorf("role ids do not belong to tenant")
+	}
+	roleUUIDs := make(map[uint64]string, len(roles))
+	for _, role := range roles {
+		roleUUIDs[role.ID] = role.UUID
 	}
 	if err := tx.WithContext(ctx).Where("member_id = ?", userID).Delete(&iamm.MemberRole{}).Error; err != nil {
 		return err
 	}
 	for _, roleID := range cleaned {
-		rel := &iamm.MemberRole{UserID: userID, RoleID: roleID}
+		var member iamm.Member
+		if err := tx.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", userID, tenantUUID).First(&member).Error; err != nil {
+			return err
+		}
+		rel := &iamm.MemberRole{MemberUUID: member.UUID, RoleUUID: roleUUIDs[roleID], UserID: userID, RoleID: roleID}
 		if err := tx.WithContext(ctx).Create(rel).Error; err != nil {
 			return err
 		}
@@ -195,6 +208,30 @@ type CreateUserInput struct {
 	Status        string
 	ActorID       *uint64
 	Roles         []uint64
+}
+
+type CreateUserUUIDInput struct {
+	TenantUUID      string
+	Email           string
+	DisplayName     string
+	Username        string
+	Phone           string
+	DepartmentUUIDs []string
+	Status          string
+	ActorID         *uint64
+	RoleUUIDs       []string
+}
+
+func (s *UserService) CreateByUUID(ctx context.Context, input CreateUserUUIDInput) (*UserView, error) {
+	departmentIDs, err := s.departmentIDsByUUID(ctx, input.TenantUUID, input.DepartmentUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	roleIDs, err := s.roleIDsByUUID(ctx, input.TenantUUID, input.RoleUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	return s.Create(ctx, CreateUserInput{TenantUUID: input.TenantUUID, Email: input.Email, DisplayName: input.DisplayName, Username: input.Username, Phone: input.Phone, DepartmentIDs: departmentIDs, Status: input.Status, ActorID: input.ActorID, Roles: roleIDs})
 }
 
 func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserView, error) {
@@ -265,6 +302,12 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 		if len(departmentIDs) > 0 {
 			primaryDeptID := departmentIDs[0]
 			record.DepartmentID = &primaryDeptID
+			var department iamm.Department
+			if err := tx.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", primaryDeptID, tenantUUID).First(&department).Error; err != nil {
+				return err
+			}
+			departmentUUID := department.UUID
+			record.DepartmentUUID = &departmentUUID
 		}
 		if err := tx.Create(record).Error; err != nil {
 			return err
@@ -286,6 +329,7 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 			DepartmentID:  record.DepartmentID,
 			DepartmentIDs: extractDepartmentIDs(record.Meta, record.DepartmentID),
 			CreatedAt:     record.CreatedAt,
+			MemberUUID:    record.UUID,
 		}
 		return nil
 	})
@@ -296,6 +340,9 @@ func (s *UserService) Create(ctx context.Context, input CreateUserInput) (*UserV
 		roleMap, err := s.userRolesMap(ctx, []uint64{created.ID})
 		if err == nil {
 			created.Roles = roleMap[created.ID]
+		}
+		if err := s.hydrateUUIDView(ctx, created); err != nil {
+			return nil, err
 		}
 	}
 	if s.audit != nil && created != nil {
@@ -328,6 +375,32 @@ type UpdateUserInput struct {
 	ActorID       *uint64
 	Roles         []uint64
 	ReplaceRoles  bool
+}
+
+type UpdateUserUUIDInput struct {
+	TenantUUID      string
+	DisplayName     string
+	Status          string
+	DepartmentUUIDs []string
+	ActorID         *uint64
+	RoleUUIDs       []string
+	ReplaceRoles    bool
+}
+
+func (s *UserService) UpdateByUUID(ctx context.Context, memberUUID string, input UpdateUserUUIDInput) (*UserView, error) {
+	var member iamm.Member
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid = ?", strings.TrimSpace(input.TenantUUID), strings.TrimSpace(memberUUID)).First(&member).Error; err != nil {
+		return nil, err
+	}
+	departmentIDs, err := s.departmentIDsByUUID(ctx, input.TenantUUID, input.DepartmentUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	roleIDs, err := s.roleIDsByUUID(ctx, input.TenantUUID, input.RoleUUIDs)
+	if err != nil {
+		return nil, err
+	}
+	return s.Update(ctx, member.ID, UpdateUserInput{TenantUUID: input.TenantUUID, DisplayName: input.DisplayName, Status: input.Status, DepartmentIDs: departmentIDs, ActorID: input.ActorID, Roles: roleIDs, ReplaceRoles: input.ReplaceRoles})
 }
 
 func (s *UserService) BulkImport(ctx context.Context, inputs []CreateUserInput) (*UserBulkImportResult, error) {
@@ -391,20 +464,32 @@ func (s *UserService) Update(ctx context.Context, id uint64, input UpdateUserInp
 	if input.DepartmentIDs != nil {
 		if len(departmentIDs) == 0 {
 			updates["department_id"] = nil
+			updates["department_uuid"] = nil
 			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, nil)
 		} else {
 			primary := departmentIDs[0]
 			if user.DepartmentID == nil || *user.DepartmentID != primary {
 				updates["department_id"] = primary
+				var department iamm.Department
+				if err := s.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", primary, user.TenantUuid).First(&department).Error; err != nil {
+					return nil, err
+				}
+				updates["department_uuid"] = department.UUID
 			}
 			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, departmentIDs)
 		}
 	} else if input.DepartmentID != nil {
 		if *input.DepartmentID == 0 {
 			updates["department_id"] = nil
+			updates["department_uuid"] = nil
 			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, nil)
 		} else if user.DepartmentID == nil || *user.DepartmentID != *input.DepartmentID {
 			updates["department_id"] = *input.DepartmentID
+			var department iamm.Department
+			if err := s.db.WithContext(ctx).Where("id = ? AND tenant_uuid = ?", *input.DepartmentID, user.TenantUuid).First(&department).Error; err != nil {
+				return nil, err
+			}
+			updates["department_uuid"] = department.UUID
 			updates["meta"] = mergeDepartmentIDsMeta(user.Meta, []uint64{*input.DepartmentID})
 		}
 	}
@@ -450,6 +535,9 @@ func (s *UserService) Update(ctx context.Context, id uint64, input UpdateUserInp
 		LastLoginAt:   user.LastLoginAt,
 		CreatedAt:     user.CreatedAt,
 		Roles:         roleMap[user.ID],
+	}
+	if err := s.hydrateUUIDView(ctx, view); err != nil {
+		return nil, err
 	}
 	if s.audit != nil && (len(updates) > 0 || rolesChanged) {
 		diff := make(map[string]any, len(updates))
@@ -563,6 +651,81 @@ func (s *UserService) resolveDepartments(ctx context.Context, tenantUUID string,
 		return nil, fmt.Errorf("department ids do not belong to tenant")
 	}
 	return rows, nil
+}
+
+func (s *UserService) departmentIDsByUUID(ctx context.Context, tenantUUID string, departmentUUIDs []string) ([]uint64, error) {
+	uuids := uniqueStrings(departmentUUIDs)
+	if len(uuids) == 0 {
+		return nil, nil
+	}
+	var rows []iamm.Department
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid IN ?", strings.TrimSpace(tenantUUID), uuids).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) != len(uuids) {
+		return nil, fmt.Errorf("department uuids do not belong to tenant")
+	}
+	byUUID := make(map[string]uint64, len(rows))
+	for _, row := range rows {
+		byUUID[row.UUID] = row.ID
+	}
+	ids := make([]uint64, 0, len(uuids))
+	for _, value := range uuids {
+		ids = append(ids, byUUID[value])
+	}
+	return ids, nil
+}
+
+func (s *UserService) roleIDsByUUID(ctx context.Context, tenantUUID string, roleUUIDs []string) ([]uint64, error) {
+	uuids := uniqueStrings(roleUUIDs)
+	if len(uuids) == 0 {
+		return nil, nil
+	}
+	var rows []iamm.Role
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid IN ?", strings.TrimSpace(tenantUUID), uuids).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) != len(uuids) {
+		return nil, fmt.Errorf("role uuids do not belong to tenant")
+	}
+	byUUID := make(map[string]uint64, len(rows))
+	for _, row := range rows {
+		byUUID[row.UUID] = row.ID
+	}
+	ids := make([]uint64, 0, len(uuids))
+	for _, value := range uuids {
+		ids = append(ids, byUUID[value])
+	}
+	return ids, nil
+}
+
+func (s *UserService) hydrateUUIDView(ctx context.Context, view *UserView) error {
+	if view == nil {
+		return nil
+	}
+	var member iamm.Member
+	if err := s.db.WithContext(ctx).Where("id = ?", view.ID).First(&member).Error; err != nil {
+		return err
+	}
+	view.MemberUUID = member.UUID
+	ids := extractDepartmentIDs(member.Meta, member.DepartmentID)
+	if len(ids) == 0 {
+		return nil
+	}
+	var departments []iamm.Department
+	if err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&departments).Error; err != nil {
+		return err
+	}
+	byID := make(map[uint64]string, len(departments))
+	for _, department := range departments {
+		byID[department.ID] = department.UUID
+	}
+	for _, id := range ids {
+		if value := byID[id]; value != "" {
+			view.DepartmentUUIDs = append(view.DepartmentUUIDs, value)
+		}
+	}
+	return nil
 }
 
 func normalizeDepartmentIDs(values []uint64) []uint64 {

@@ -25,12 +25,12 @@
 
 **Language/Version**: Go 1.24  
 **Primary Dependencies**: framework middleware/context/rbac；skeleton IAM local store；delegated auth proxy  
-**Storage**: PostgreSQL/SQLite（local 模式复用现有 IAM 表）；delegated 模式不新增插件侧组织写入  
+**Storage**: PostgreSQL/SQLite（local 模式复用现有 IAM 表）；delegated 模式不新增插件侧组织写入；所有跨边界对象引用使用 UUID
 **Testing**: `go test ./...`、contract tests（adapter 一致性）、integration tests（mode switch + authz semantics）  
 **Target Platform**: Linux plugin runtime（生产）+ macOS/Linux 开发环境  
 **Project Type**: backend framework + skeleton adapter migration  
 **Performance Goals**: IAM 上下文解析与权限判定在既有接口下 p95 不劣化超过 10%；模式切换错误首跳发现率 100%  
-**Constraints**: 必须满足宪章中的 Host Contract First、Tenant UUID、Zero Trust；delegated 下禁止插件侧组织写入；运行期禁止 adapter 自动切换  
+**Constraints**: 必须满足宪章中的 Host Contract First、Tenant UUID、Zero Trust；delegated 下禁止插件侧组织写入、禁止直连 Core 内部 service/数据库或解析 Gateway 原始对象；运行期禁止 adapter 自动切换和静默 fallback
 **Scale/Scope**: 首批覆盖 2+ 插件迁移；统一 tenant/department/member/role/permission 与 token/context 读取链路
 
 ## Constitution Check
@@ -110,13 +110,13 @@ skeleton/backend/go-gin/internal/
 2. [contracts/iam-unification.openapi.yaml](./contracts/iam-unification.openapi.yaml)（统一 API 契约骨架）
 3. [quickstart.md](./quickstart.md)（双模式接入与回归步骤）
 
-## Implementation Status (2026-04-12)
+## Implementation Status (2026-08-29，已纠正)
 
-1. Phase 1-2：已完成（契约、模式解析、错误语义、registry 绑定）。
-2. US1：已完成（插件无感切换 local/delegated）。
-3. US2：已完成（组织与权限能力统一暴露，delegated 写拒绝）。
-4. US3：已完成（token/context 解析统一、auth_guard 统一判定、mode/tenant/user/permission/trace 审计字段补齐）。
-5. Phase 6：进行中（文档与回归收口）。
+1. 已完成：基础 DTO、Registry 单选绑定、部分模式/错误/identity-context 基础设施及其单元测试。
+2. 未完成：production local/delegated Directory、Authz、IdentityContext adapter；Registry 的 Bootstrap 装配；真实插件消费验证。
+3. 已完成：`GetMember`、`BatchGetMembers` 与以 UUID 为边界的标准 Member DTO；未完成：Core 已发布并经 capability/grant 联调验证的 delegated IAM Host Contract。
+4. 未完成：local/delegated 一致性、成员不存在、上游不可用、跨租户和“显示名不得回退 UUID”的合同测试。
+5. 因此 US1-US3 和 Phase 6 均不得标记为完成；本特性状态为 **in progress**，而非已交付。
 
 ## Complexity Tracking
 

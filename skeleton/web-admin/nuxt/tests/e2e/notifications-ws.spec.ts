@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { gotoWithFallback, seedAuthStorage } from "./_utils";
 
 const tenantUUID = "00000000-0000-0000-0000-000000000001";
-const notifyTopic = `plugin.notify.tenant.${tenantUUID}`;
+const notifyTopic = `_topic.notify.tenant.${tenantUUID}`;
 
 const userContextPayload = {
   success: true,

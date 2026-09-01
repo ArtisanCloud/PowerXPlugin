@@ -20,25 +20,33 @@ type Tenant struct {
 
 // Department 为统一部门模型。
 type Department struct {
-	ID         string `json:"id"`
-	TenantUUID string `json:"tenant_uuid"`
-	Name       string `json:"name"`
-	Code       string `json:"code,omitempty"`
-	ParentID   string `json:"parent_id,omitempty"`
+	DepartmentUUID       string `json:"department_uuid"`
+	TenantUUID           string `json:"tenant_uuid"`
+	Name                 string `json:"name"`
+	Code                 string `json:"code,omitempty"`
+	ParentDepartmentUUID string `json:"parent_department_uuid,omitempty"`
 }
 
 // Member 为统一成员模型。
 type Member struct {
-	ID          string `json:"id"`
+	MemberUUID  string `json:"member_uuid"`
 	TenantUUID  string `json:"tenant_uuid"`
-	UserID      string `json:"user_id,omitempty"`
+	UserUUID    string `json:"user_uuid,omitempty"`
 	DisplayName string `json:"display_name,omitempty"`
 	Status      string `json:"status,omitempty"`
 }
 
+// MemberResolution is the tolerant batch directory result used by historical
+// audit readers. Missing UUIDs are explicit; authentication, authorization,
+// validation, and upstream failures remain errors.
+type MemberResolution struct {
+	Items              []Member  `json:"items"`
+	MissingMemberUUIDs []string `json:"missing_member_uuids"`
+}
+
 // Role 为统一角色模型。
 type Role struct {
-	ID          string `json:"id"`
+	RoleUUID    string `json:"role_uuid"`
 	TenantUUID  string `json:"tenant_uuid"`
 	Code        string `json:"code"`
 	Name        string `json:"name"`
@@ -47,15 +55,17 @@ type Role struct {
 
 // Permission 为统一权限模型。
 type Permission struct {
-	Resource string `json:"resource"`
-	Action   string `json:"action"`
-	Scope    string `json:"scope,omitempty"`
+	PermissionUUID string `json:"permission_uuid"`
+	Resource       string `json:"resource"`
+	Action         string `json:"action"`
+	Scope          string `json:"scope,omitempty"`
 }
 
 // AuthorizationRequest 描述授权判定输入。
 type AuthorizationRequest struct {
 	TenantUUID  string `json:"tenant_uuid"`
-	UserID      string `json:"user_id,omitempty"`
+	UserUUID    string `json:"user_uuid,omitempty"`
+	MemberUUID  string `json:"member_uuid,omitempty"`
 	Resource    string `json:"resource"`
 	Action      string `json:"action"`
 	TraceID     string `json:"trace_id,omitempty"`
@@ -69,7 +79,8 @@ type AuthorizationDecision struct {
 	Resource   string `json:"resource"`
 	Action     string `json:"action"`
 	TenantUUID string `json:"tenant_uuid,omitempty"`
-	UserID     string `json:"user_id,omitempty"`
+	UserUUID   string `json:"user_uuid,omitempty"`
+	MemberUUID string `json:"member_uuid,omitempty"`
 	Mode       string `json:"mode,omitempty"`
 	TraceID    string `json:"trace_id,omitempty"`
 }
@@ -77,8 +88,8 @@ type AuthorizationDecision struct {
 // IdentityContext 为统一身份上下文载体。
 type IdentityContext struct {
 	TenantUUID  string   `json:"tenant_uuid"`
-	UserID      string   `json:"user_id,omitempty"`
-	MemberID    string   `json:"member_id,omitempty"`
+	UserUUID    string   `json:"user_uuid,omitempty"`
+	MemberUUID  string   `json:"member_uuid,omitempty"`
 	Roles       []string `json:"roles,omitempty"`
 	Permissions []string `json:"permissions,omitempty"`
 	PolicyVer   string   `json:"policy_version,omitempty"`

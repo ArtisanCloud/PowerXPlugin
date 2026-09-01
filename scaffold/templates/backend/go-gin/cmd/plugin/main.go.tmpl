@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -20,7 +21,14 @@ import (
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
+	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
+	powerxknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/knowledge"
+	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
+	powerxskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/skills"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	runtimecap "{{ .BackendModulePath }}/cmd/plugin/runtime"
 	pluginbootstrap "{{ .BackendModulePath }}/internal/bootstrap"
@@ -345,13 +353,63 @@ func main() {
 		wsHub = fwwsbus.NewMemoryHub()
 	}
 
+	manifestPath := security.DefaultManifestPath()
+	eventsData, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "plugin.d", "events.yaml"))
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to load realtime event descriptors")
+	}
+	realtimeDescriptors, err := frameworkrealtime.LoadDescriptors(eventsData)
+	if err != nil {
+		logger.WithError(err).Fatal("Invalid realtime event descriptors")
+	}
+
+	var agentRuntime *powerxagent.Client
+	var aiRuntime *powerxai.Client
+	var capabilityRegistry *powerxcapability.Client
+	var knowledgeQABridge *powerxknowledge.Client
+	var notificationsRuntime *powerxnotifications.Client
+	var skillsRuntime *powerxskills.Client
+	if providerResolver.IsDelegated() {
+		if cfg == nil || cfg.Gateway == nil || strings.TrimSpace(cfg.Gateway.BaseURL) == "" || pxc == nil {
+			logger.Fatal("Delegated Agent runtime requires Gateway base URL and PowerX STS client")
+		}
+		stsTokens := grpcclient.NewPowerXSTSTokenProvider(pxc)
+		agentRuntime, err = powerxagent.NewClientWithTokenProvider(powerxagent.PowerXAgentClientConfig{
+			Mode:    powerxagent.ModeDelegated,
+			BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL),
+		}, powerxagent.TokenProviderFunc(stsTokens.TokenFunc()))
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Agent runtime client")
+		}
+		aiRuntime, err = powerxai.NewClientWithTokenProvider(powerxai.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxai.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated AI runtime client")
+		}
+		capabilityRegistry, err = powerxcapability.NewClientWithTokenProvider(powerxcapability.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxcapability.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Capability Registry client")
+		}
+		knowledgeQABridge, err = powerxknowledge.NewClientWithTokenProvider(powerxknowledge.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxknowledge.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Knowledge QA bridge client")
+		}
+		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Notifications client")
+		}
+		skillsRuntime, err = powerxskills.NewClientWithTokenProvider(powerxskills.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxskills.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Skills runtime client")
+		}
+	}
+
 	// 初始化 EventBridge Emitter（本地/TaskBus/双写；TaskBus SDK 未就绪时可自动降级到本地 emitter）
 	eventLogger := logger.WithField("component", "event_bridge")
 	eventCfg := cfg.EventBridge
 	if eventCfg != nil && strings.TrimSpace(eventCfg.SourcePlugin) == "" {
 		eventCfg.SourcePlugin = app.PluginID
 	}
-	taskBusRuntime := resolveTaskBusRuntime(cfg, wsHub, eventLogger, pxc)
+	taskBusRuntime := resolveTaskBusRuntime(cfg, wsHub, eventLogger, pxc, realtimeDescriptors)
 
 	var bridgeEmitter fweventbridge.Emitter
 	if eventCfg == nil {
@@ -384,7 +442,6 @@ func main() {
 	} else if perms.Enforced() {
 		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
 	}
-
 	deps := &app.Deps{
 		DB:                   queryDB,
 		Ctx:                  rootCtx,
@@ -393,6 +450,12 @@ func main() {
 		Metadata:             metadataClient,
 		CustomerAdmin:        customerAdminClient,
 		AISettings:           aiSettingsClient,
+		AI:                   aiRuntime,
+		AgentRuntime:         agentRuntime,
+		CapabilityRegistry:   capabilityRegistry,
+		KnowledgeQABridge:    knowledgeQABridge,
+		Notifications:        notificationsRuntime,
+		Skills:               skillsRuntime,
 		Config:               cfg,
 		CapabilitiesManager:  capManager,
 		CapabilityMetrics:    capMetrics,
@@ -404,6 +467,7 @@ func main() {
 		AdminConsoleMetrics:  adminmetrics.NewMetrics(),
 		EventEmitter:         bridgeEmitter,
 		WSBusHub:             wsHub,
+		RealtimeDescriptors:  realtimeDescriptors,
 		ProviderMode:         providerResolver.Mode(),
 		ProviderModeSource:   providerResolver.Source(),
 		IAMAdapterMode:       providerResolver.IAMAdapterMode(),
@@ -462,11 +526,14 @@ func main() {
 		},
 	}
 	fwApp := fwbootstrap.NewApp(appCfg)
-	if err := pluginbootstrap.BindFrameworkIAM(deps, fwApp.IAMRegistry()); err != nil {
+	if err := pluginbootstrap.ResolveAndBindFrameworkIAM(deps, providerResolver, fwApp.IAMRegistry()); err != nil {
 		logger.WithFields(logger.Fields{
 			"provider_mode":   deps.ProviderMode,
 			"provider_source": deps.ProviderModeSource,
 		}).WithError(err).Fatal("Failed to bind framework IAM registry")
+	}
+	if err := pluginbootstrap.ValidateIAMBinding(deps); err != nil {
+		logger.WithError(err).Fatal("Framework IAM registry binding is incomplete")
 	}
 	fwApp.RegisterCapabilityInvoker(integrationservice.NewFrameworkCapabilityInvoker(deps, deps.RuntimeLogger(ctx, "framework_capability_invoker", nil)))
 

@@ -131,6 +131,34 @@ type GetAssetInput struct {
 	RequestID  string
 }
 
+// ListAssetsInput describes the tenant-scoped asset catalog query exposed by
+// PowerX Core. Zero Page and PageSize let Core apply its documented defaults.
+type ListAssetsInput struct {
+	TenantUUID       string
+	Page             int
+	PageSize         int
+	Keyword          string
+	Driver           string
+	OwnerSubjectType string
+	OwnerSubjectID   string
+	Tags             []string
+	BusinessStatuses []BusinessStatus
+	RequestID        string
+}
+
+type ListAssetsOutput struct {
+	Items    []Asset
+	Total    int64
+	Page     int
+	PageSize int
+}
+
+type DeleteAssetInput struct {
+	TenantUUID string
+	UUID       string
+	RequestID  string
+}
+
 type PresignAssetInput struct {
 	TenantUUID       string
 	UUID             string
@@ -214,6 +242,55 @@ func (c *Client) GetAsset(ctx context.Context, input GetAssetInput) (*Asset, err
 	return decodeAsset(result.Data)
 }
 
+func (c *Client) ListAssets(ctx context.Context, input ListAssetsInput) (*ListAssetsOutput, error) {
+	query := map[string]any{}
+	if value := strings.TrimSpace(input.TenantUUID); value != "" {
+		query["tenant_uuid"] = value
+	}
+	if input.Page > 0 {
+		query["page"] = input.Page
+	}
+	if input.PageSize > 0 {
+		query["pageSize"] = input.PageSize
+	}
+	if value := strings.TrimSpace(input.Keyword); value != "" {
+		query["keyword"] = value
+	}
+	if value := strings.TrimSpace(input.Driver); value != "" {
+		query["driver"] = value
+	}
+	if value := strings.TrimSpace(input.OwnerSubjectType); value != "" {
+		query["ownerSubjectType"] = value
+	}
+	if value := strings.TrimSpace(input.OwnerSubjectID); value != "" {
+		query["ownerSubjectId"] = value
+	}
+	if len(input.Tags) > 0 {
+		query["tags"] = append([]string(nil), input.Tags...)
+	}
+	if len(input.BusinessStatuses) > 0 {
+		statuses := make([]string, 0, len(input.BusinessStatuses))
+		for _, status := range input.BusinessStatuses {
+			if value := strings.TrimSpace(string(status)); value != "" {
+				statuses = append(statuses, value)
+			}
+		}
+		if len(statuses) > 0 {
+			query["businessStatus"] = statuses
+		}
+	}
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsRead, "ListMediaAssets", http.MethodGet, "/api/v1/media/assets", query, nil, input.TenantUUID, input.RequestID)
+	if err != nil {
+		return nil, err
+	}
+	return decodeAssetList(result.Data)
+}
+
+func (c *Client) DeleteAsset(ctx context.Context, input DeleteAssetInput) error {
+	_, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "DeleteMediaAsset", http.MethodDelete, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID)), nil, nil, input.TenantUUID, input.RequestID)
+	return err
+}
+
 func (c *Client) UpdateAsset(ctx context.Context, input UpdateAssetInput) (*Asset, error) {
 	payload := map[string]any{
 		"tenant_uuid": strings.TrimSpace(input.TenantUUID),
@@ -266,7 +343,7 @@ func (c *Client) CreateAssetVariant(ctx context.Context, input CreateAssetVarian
 		"mimeType":    strings.TrimSpace(input.MimeType),
 		"metadata":    copyStringMap(input.Metadata),
 	}
-	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "CreateMediaAssetVariant", http.MethodPost, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID))+"/variants", nil, payload, input.TenantUUID, input.RequestID)
+	result, err := c.invokeREST(ctx, CapabilityMediaAssetsManage, "CreateMediaAssetVariant", http.MethodPost, "/api/v1/media/assets/"+url.PathEscape(strings.TrimSpace(input.UUID))+"/variants/"+url.PathEscape(strings.TrimSpace(input.Variant)), nil, payload, input.TenantUUID, input.RequestID)
 	if err != nil {
 		return nil, err
 	}
@@ -421,6 +498,33 @@ func decodeAssetVariant(data map[string]any) (*AssetVariant, error) {
 		return nil, errors.New("media asset variant response missing variant")
 	}
 	return &out, nil
+}
+
+func decodeAssetList(data map[string]any) (*ListAssetsOutput, error) {
+	raw := unwrapData(data)
+	mapValue, ok := raw.(map[string]any)
+	if !ok {
+		return nil, errors.New("media asset list response data is invalid")
+	}
+	itemsValue, ok := mapValue["items"]
+	if !ok {
+		return nil, errors.New("media asset list response missing items")
+	}
+	var items []Asset
+	if err := decodeMap(itemsValue, &items); err != nil {
+		return nil, err
+	}
+	for index := range items {
+		if strings.TrimSpace(items[index].UUID) == "" {
+			return nil, errors.New("media asset list response contains asset without uuid")
+		}
+	}
+	return &ListAssetsOutput{
+		Items:    items,
+		Total:    firstNumberFromMap(mapValue, "total"),
+		Page:     int(firstNumberFromMap(mapValue, "page")),
+		PageSize: int(firstNumberFromMap(mapValue, "pageSize", "page_size")),
+	}, nil
 }
 
 func decodePresign(data map[string]any) (*PresignAssetOutput, error) {

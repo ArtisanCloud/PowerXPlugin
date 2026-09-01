@@ -39,8 +39,8 @@ func (IdentityContextResolver) ResolveIdentity(_ context.Context, bearerToken st
 
 	return &contracts.IdentityContext{
 		TenantUUID:  strings.ToLower(parsedTenant.String()),
-		UserID:      firstClaimString(claims, "sub", "user_id", "uid"),
-		MemberID:    firstClaimString(claims, "member_id", "mid"),
+		UserUUID:    firstClaimString(claims, "user_uuid"),
+		MemberUUID:  firstClaimString(claims, "member_uuid"),
 		Roles:       parseStringSliceClaim(claims["roles"]),
 		Permissions: parseStringSliceClaim(claims["permissions"]),
 		PolicyVer:   firstClaimString(claims, "policy_version", "policy_ver"),

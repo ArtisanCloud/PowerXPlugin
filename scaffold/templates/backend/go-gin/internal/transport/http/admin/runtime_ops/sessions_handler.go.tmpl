@@ -8,6 +8,7 @@ import (
 	"time"
 
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	"{{ .BackendModulePath }}/internal/contracts"
 	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
 	model "{{ .BackendModulePath }}/internal/entity/models/runtime_ops"
@@ -26,28 +27,32 @@ import (
 
 // SessionsHandler handles MCP session admin endpoints.
 type SessionsHandler struct {
-	svc     *runtimeops.MCPSessionService
-	adapter *mcpintegration.SessionAdapter
-	broker  *stream.Broker
-	logger  *pxlog.Entry
+	svc         *runtimeops.MCPSessionService
+	adapter     *mcpintegration.SessionAdapter
+	broker      *stream.Broker
+	logger      *pxlog.Entry
+	descriptors []frameworkrealtime.Descriptor
 }
 
 // NewSessionsHandler constructs handler with dependencies.
 func NewSessionsHandler(deps *app.Deps) *SessionsHandler {
 	var (
-		db     *gorm.DB
-		logger *pxlog.Entry
+		db          *gorm.DB
+		logger      *pxlog.Entry
+		descriptors []frameworkrealtime.Descriptor
 	)
 	if deps != nil {
 		db = deps.DB
 		logger = deps.RuntimeLogger(deps.Ctx, "mcp_session_handler", nil)
+		descriptors = deps.RealtimeDescriptors
 	}
 	dispatch := integrationService.BuildDispatchService(deps, logger)
 	return &SessionsHandler{
-		svc:     runtimeops.NewMCPSessionService(db),
-		adapter: mcpintegration.NewSessionAdapter(dispatch, logger),
-		broker:  stream.DefaultBroker(),
-		logger:  logger,
+		svc:         runtimeops.NewMCPSessionService(db),
+		adapter:     mcpintegration.NewSessionAdapter(dispatch, logger),
+		broker:      stream.DefaultBroker(),
+		logger:      logger,
+		descriptors: descriptors,
 	}
 }
 
@@ -73,7 +78,10 @@ func (h *SessionsHandler) Register(c *gin.Context) {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
-	h.publishEvent(stored.ID, "session.registered", stored)
+	if !h.publishEvent(stored.TenantUuid, stored.ID, "session.registered", stored) {
+		contracts.ResponseServiceUnavailable(c, "mcp realtime publish is unavailable", nil)
+		return
+	}
 	contracts.ResponseSuccess(c, stored)
 }
 
@@ -94,7 +102,10 @@ func (h *SessionsHandler) Ack(c *gin.Context) {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
-	h.publishEvent(updated.ID, "session.ready", updated)
+	if !h.publishEvent(updated.TenantUuid, updated.ID, "session.ready", updated) {
+		contracts.ResponseServiceUnavailable(c, "mcp realtime publish is unavailable", nil)
+		return
+	}
 	contracts.ResponseSuccess(c, updated)
 }
 
@@ -112,10 +123,13 @@ func (h *SessionsHandler) Heartbeat(c *gin.Context) {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
-	h.publishEvent(updated.ID, "session.heartbeat", map[string]any{
+	if !h.publishEvent(updated.TenantUuid, updated.ID, "session.heartbeat", map[string]any{
 		"missed_heartbeats": req.MissedHeartbeats,
 		"last_ping_at":      updated.LastPingAt,
-	})
+	}) {
+		contracts.ResponseServiceUnavailable(c, "mcp realtime publish is unavailable", nil)
+		return
+	}
 	contracts.ResponseSuccess(c, updated)
 }
 
@@ -133,9 +147,12 @@ func (h *SessionsHandler) Close(c *gin.Context) {
 		contracts.ResponseInternalError(c, err)
 		return
 	}
-	h.publishEvent(updated.ID, "session.closed", map[string]any{
+	if !h.publishEvent(updated.TenantUuid, updated.ID, "session.closed", map[string]any{
 		"reason": req.Reason,
-	})
+	}) {
+		contracts.ResponseServiceUnavailable(c, "mcp realtime publish is unavailable", nil)
+		return
+	}
 	contracts.ResponseSuccess(c, updated)
 }
 
@@ -187,12 +204,15 @@ func (h *SessionsHandler) Invoke(c *gin.Context) {
 		h.handleDispatchError(c, err)
 		return
 	}
-	h.publishEvent(sessionID, "invoke.completed", map[string]any{
+	if !h.publishEvent(req.TenantUuid, sessionID, "invoke.completed", map[string]any{
 		"session_id":     sessionID,
 		"status":         outcome.Status,
 		"trace_id":       outcome.TraceID,
 		"correlation_id": outcome.CorrelationID,
-	})
+	}) {
+		contracts.ResponseServiceUnavailable(c, "mcp realtime publish is unavailable", nil)
+		return
+	}
 
 	response := gin.H{
 		"status":         outcome.Status,
@@ -233,9 +253,20 @@ func (h *SessionsHandler) handleDispatchError(c *gin.Context, err error) {
 	}
 }
 
-func (h *SessionsHandler) publishEvent(sessionID, eventType string, payload interface{}) {
-	if h.broker == nil || sessionID == "" {
-		return
+func (h *SessionsHandler) publishEvent(tenantUUID, sessionID, eventType string, payload interface{}) bool {
+	if h == nil || h.broker == nil || sessionID == "" {
+		return false
+	}
+	decision := frameworkrealtime.Decide(
+		h.descriptors,
+		frameworkrealtime.ActionPublish,
+		"_channel.mcp.session",
+		frameworkrealtime.ProtocolSSE,
+		eventType,
+		frameworkrealtime.Scope{TenantUUID: tenantUUID},
+	)
+	if !decision.Allowed {
+		return false
 	}
 	h.broker.Publish(stream.Event{
 		SessionID: sessionID,
@@ -243,6 +274,7 @@ func (h *SessionsHandler) publishEvent(sessionID, eventType string, payload inte
 		Payload:   payload,
 		Timestamp: time.Now().UTC(),
 	})
+	return true
 }
 
 type registerSessionRequest struct {

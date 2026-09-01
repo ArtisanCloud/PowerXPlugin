@@ -9,6 +9,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/event"
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwtaskbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskbus"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
@@ -33,7 +34,7 @@ type taskBusRuntime struct {
 	StartConsumer func(ctx context.Context)
 }
 
-func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry, pxc *client.PowerXServiceClient) taskBusRuntime {
+func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry, pxc *client.PowerXServiceClient, descriptors []frameworkrealtime.Descriptor) taskBusRuntime {
 	mode := resolveTaskBusProviderMode(cfg)
 	switch mode {
 	case "host":
@@ -43,7 +44,7 @@ func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlo
 	case "redis":
 		return taskBusRuntime{
 			Provider:      newRedisTaskBusProvider(cfg),
-			StartConsumer: newRedisConsumerStarter(cfg, wsHub, log),
+			StartConsumer: newRedisConsumerStarter(cfg, wsHub, log, descriptors),
 		}
 	default:
 		if log != nil {
@@ -56,7 +57,7 @@ func resolveTaskBusRuntime(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlo
 }
 
 func resolveTaskBusProvider(cfg *config.Config, log *pxlog.Entry) fweventbridge.TaskBusProvider {
-	return resolveTaskBusRuntime(cfg, nil, log, nil).Provider
+	return resolveTaskBusRuntime(cfg, nil, log, nil, nil).Provider
 }
 
 func resolveTaskBusProviderMode(cfg *config.Config) string {
@@ -126,7 +127,7 @@ func newRedisTaskBusProvider(cfg *config.Config) fweventbridge.TaskBusProvider {
 	})
 }
 
-func newRedisConsumerStarter(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry) func(ctx context.Context) {
+func newRedisConsumerStarter(cfg *config.Config, wsHub fwwsbus.LocalHub, log *pxlog.Entry, descriptors []frameworkrealtime.Descriptor) func(ctx context.Context) {
 	if cfg == nil || cfg.EventBridge == nil || wsHub == nil {
 		return nil
 	}
@@ -148,7 +149,7 @@ func newRedisConsumerStarter(cfg *config.Config, wsHub fwwsbus.LocalHub, log *px
 			}
 			return
 		}
-		publisher := fwwsbus.NewLocalPublisher(wsHub, nil)
+		publisher := frameworkrealtime.NewAuthorizedWSPublisher(fwwsbus.NewLocalPublisher(wsHub, nil), descriptors, "message")
 		err = consumer.Consume(ctx, func(handlerCtx context.Context, ev event.Event) error {
 			payload, payloadErr := decodeEventPayload(ev.Payload)
 			if payloadErr != nil {

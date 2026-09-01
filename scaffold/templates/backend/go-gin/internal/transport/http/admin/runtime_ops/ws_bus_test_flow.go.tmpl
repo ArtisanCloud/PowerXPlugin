@@ -52,6 +52,9 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 		if traceID == "" {
 			traceID = "ws-bus-flow-" + time.Now().UTC().Format("20060102T150405.000Z")
 		}
+		if !allowWSBusPublish(c, deps, topic, tenantUUID, req.MemberUUID, traceID) {
+			return
+		}
 
 		outboundBearer := ""
 		hostCfg, useHost := resolveWSBusHostClientConfig(deps)

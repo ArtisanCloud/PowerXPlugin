@@ -309,6 +309,7 @@ func (d *LocalDirectory) ListRoles(ctx context.Context, tenantUUID string) ([]Ro
 	for _, r := range roles {
 		result = append(result, RoleInfo{
 			ID:          r.ID,
+			UUID:        strings.TrimSpace(r.UUID),
 			TenantUUID:  scopeTenant,
 			TenantUuid:  r.TenantUuid,
 			Code:        r.Code,
@@ -333,6 +334,7 @@ func (d *LocalDirectory) ListDepartments(ctx context.Context, tenantUUID string)
 	for _, dep := range deps {
 		info := DepartmentInfo{
 			ID:          dep.ID,
+			UUID:        strings.TrimSpace(dep.UUID),
 			TenantUUID:  scopeTenant,
 			TenantUuid:  dep.TenantUuid,
 			Name:        dep.Name,
@@ -347,9 +349,134 @@ func (d *LocalDirectory) ListDepartments(ctx context.Context, tenantUUID string)
 	return result, nil
 }
 
+// ListPermissions exposes the local permission catalog with stable UUIDs.
+// It is intentionally separate from IAMDirectory: only the framework adapter needs
+// the catalog, while legacy administrative services still own their write workflow.
+func (d *LocalDirectory) ListPermissions(ctx context.Context, _ string) ([]PermissionInfo, error) {
+	var permissions []iamm.Permission
+	if err := d.db.WithContext(ctx).Order("resource ASC, action ASC").Find(&permissions).Error; err != nil {
+		return nil, err
+	}
+	result := make([]PermissionInfo, 0, len(permissions))
+	for _, permission := range permissions {
+		if strings.TrimSpace(permission.UUID) == "" {
+			return nil, fmt.Errorf("iam: permission %s:%s is missing uuid", permission.Resource, permission.Action)
+		}
+		result = append(result, PermissionInfo{
+			PermissionUUID: strings.TrimSpace(permission.UUID),
+			Resource:       strings.TrimSpace(permission.Resource),
+			Action:         strings.TrimSpace(permission.Action),
+		})
+	}
+	return result, nil
+}
+
+func (d *LocalDirectory) ListMembers(ctx context.Context, tenantUUID string) ([]MemberInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	scopeTenant := tenantIdentifier(tenant)
+	var members []iamm.Member
+	if err := d.db.WithContext(ctx).
+		Where("tenant_uuid = ?", scopeTenant).
+		Order("id ASC").
+		Find(&members).Error; err != nil {
+		return nil, err
+	}
+	result := make([]MemberInfo, 0, len(members))
+	for _, member := range members {
+		info, err := d.memberInfo(ctx, scopeTenant, &member)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, *info)
+	}
+	return result, nil
+}
+
+func (d *LocalDirectory) GetMember(ctx context.Context, tenantUUID, memberUUID string) (*MemberInfo, error) {
+	tenant, err := d.findTenantByIdentifier(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	memberUUID = strings.TrimSpace(memberUUID)
+	if memberUUID == "" {
+		return nil, ErrInvalidArguments
+	}
+	scopeTenant := tenantIdentifier(tenant)
+	var member iamm.Member
+	err = d.db.WithContext(ctx).
+		Where("tenant_uuid = ? AND uuid = ?", scopeTenant, memberUUID).
+		First(&member).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrMemberNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return d.memberInfo(ctx, scopeTenant, &member)
+}
+
+func (d *LocalDirectory) memberInfo(ctx context.Context, tenantUUID string, member *iamm.Member) (*MemberInfo, error) {
+	if member == nil || strings.TrimSpace(member.UUID) == "" {
+		return nil, ErrMemberNotFound
+	}
+	var user iamm.User
+	if err := d.db.WithContext(ctx).Where("id = ?", member.UserID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	if err := d.ensureIdentityUUIDs(ctx, &user, member); err != nil {
+		return nil, err
+	}
+	return &MemberInfo{
+		MemberUUID:  strings.TrimSpace(member.UUID),
+		TenantUUID:  strings.TrimSpace(tenantUUID),
+		UserUUID:    strings.TrimSpace(user.UUID),
+		DisplayName: valueOrDefault(member.DisplayName, user.DisplayName),
+		Status:      strings.TrimSpace(member.Status),
+	}, nil
+}
+
 func (d *LocalDirectory) CheckPermission(ctx context.Context, tc TenantContext, resource, action string) error {
 	if resource == "" || action == "" {
 		return ErrInvalidArguments
+	}
+	if len(tc.Roles) == 0 && len(tc.Permissions) == 0 {
+		tenant, err := d.findTenantByIdentifier(ctx, tc.TenantUUID)
+		if err != nil {
+			return err
+		}
+		scopeTenant := tenantIdentifier(tenant)
+		var member iamm.Member
+		query := d.db.WithContext(ctx).Where("tenant_uuid = ?", scopeTenant)
+		switch {
+		case strings.TrimSpace(tc.MemberUUID) != "":
+			query = query.Where("uuid = ?", strings.TrimSpace(tc.MemberUUID))
+		case strings.TrimSpace(tc.UserUUID) != "":
+			var user iamm.User
+			if err := d.db.WithContext(ctx).Where("uuid = ?", strings.TrimSpace(tc.UserUUID)).First(&user).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return ErrUnauthorized
+				}
+				return err
+			}
+			query = query.Where("user_id = ?", user.ID)
+		default:
+			return ErrUnauthorized
+		}
+		if err := query.First(&member).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrUnauthorized
+			}
+			return err
+		}
+		roles, permissions, err := d.loadRolePermissionCodes(ctx, member.ID)
+		if err != nil {
+			return fmt.Errorf("iam: load authorization: %w", err)
+		}
+		tc.Roles = roles
+		tc.Permissions = permissions
 	}
 	for _, role := range tc.Roles {
 		if role == "system.admin" {

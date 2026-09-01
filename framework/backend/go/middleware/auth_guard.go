@@ -45,7 +45,7 @@ func AuthGuardWithOptions(opts AuthGuardOptions) bootstrap.Middleware {
 
 			decision, err := opts.Authz.Authorize(ctx.Context(), contracts.AuthorizationRequest{
 				TenantUUID: tenantUUID,
-				UserID:     resolveUserID(ctx, opts.UserResolver),
+				UserUUID:   resolveUserID(ctx, opts.UserResolver),
 				Resource:   strings.TrimSpace(opts.Resource),
 				Action:     strings.TrimSpace(opts.Action),
 				TraceID:    resolveTraceID(ctx, opts.TraceResolver),

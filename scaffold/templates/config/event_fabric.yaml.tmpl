@@ -72,9 +72,9 @@ topics:
         principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
 
-  - key: _topic.notify.tenant.{{tenant_uuid}}
+  - key: _topic.notify.tenant.{{"{{"}}tenant_uuid{{"}}"}}
     namespace: _topic.notify.tenant
-    name: "{{tenant_uuid}}"
+    name: "{{"{{"}}tenant_uuid{{"}}"}}"
     description: 租户通知事件
     acl:
       - principal_type: member
@@ -84,9 +84,9 @@ topics:
         principal_id: "plugin:{{ .PluginID }}"
         actions: [publish]
 
-  - key: _topic.notify.member.{{member_uuid}}
+  - key: _topic.notify.member.{{"{{"}}member_uuid{{"}}"}}
     namespace: _topic.notify.member
-    name: "{{member_uuid}}"
+    name: "{{"{{"}}member_uuid{{"}}"}}"
     description: 成员通知事件
     acl:
       - principal_type: member

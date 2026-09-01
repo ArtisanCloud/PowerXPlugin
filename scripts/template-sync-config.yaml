@@ -364,6 +364,14 @@ mappings:
       - globs: ["config/event_fabric.yaml"]
         literal: "plugin:com.powerx.plugins.base"
         replace: "plugin:{{ .PluginID }}"
+      # These are runtime topic placeholders, not scaffold template variables.
+      # Escape them so generated Go templates render the literal {{...}} token.
+      - globs: ["config/event_fabric.yaml"]
+        literal: "{{tenant_uuid}}"
+        replace: '{{"{{"}}tenant_uuid{{"}}"}}'
+      - globs: ["config/event_fabric.yaml"]
+        literal: "{{member_uuid}}"
+        replace: '{{"{{"}}member_uuid{{"}}"}}'
   - name: root-agents
     source: .
     include:

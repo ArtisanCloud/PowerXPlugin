@@ -81,6 +81,9 @@ func (resolverProxyStub) BatchGetDirectoryMembers(context.Context, []string) ([]
 func (resolverProxyStub) BatchResolveDirectoryMembers(context.Context, []string) (*authproxy.DirectoryMemberResolution, error) {
 	return nil, errors.New("not used")
 }
+func (resolverProxyStub) BatchResolveDirectoryMembersByDisplayNames(context.Context, []string) (*authproxy.DirectoryMemberDisplayNameResolution, error) {
+	return nil, errors.New("not used")
+}
 func (resolverProxyStub) ListDirectoryDepartments(context.Context) ([]authproxy.DirectoryDepartment, error) {
 	return nil, errors.New("not used")
 }

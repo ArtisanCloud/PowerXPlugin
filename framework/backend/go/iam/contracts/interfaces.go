@@ -12,6 +12,10 @@ type DirectoryService interface {
 	// BatchResolveMembers resolves historical member references without turning
 	// missing or cross-tenant references into a transport failure.
 	BatchResolveMembers(ctx context.Context, tenantUUID string, memberUUIDs []string) (*MemberResolution, error)
+	// BatchResolveMembersByDisplayNames resolves import-time human names without
+	// treating a missing or non-unique name as a transport failure. Results stay
+	// in request order so callers can associate each result with its source row.
+	BatchResolveMembersByDisplayNames(ctx context.Context, tenantUUID string, displayNames []string) (*MemberDisplayNameResolution, error)
 	ListRoles(ctx context.Context, tenantUUID string) ([]Role, error)
 	ListPermissions(ctx context.Context, tenantUUID string) ([]Permission, error)
 }

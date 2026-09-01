@@ -11,8 +11,10 @@ import (
 )
 
 type directoryStub struct {
-	members     map[string]iamservice.MemberInfo
-	permissions []iamservice.PermissionInfo
+	members              map[string]iamservice.MemberInfo
+	permissions          []iamservice.PermissionInfo
+	displayNameResult    []iamservice.MemberDisplayNameResolutionItem
+	displayNameResultErr error
 }
 
 func (directoryStub) Mode() iamservice.IAMAdapterMode { return iamservice.IAMAdapterModeLocal }
@@ -51,6 +53,9 @@ func (directoryStub) CheckPermission(context.Context, iamservice.TenantContext, 
 }
 func (s directoryStub) ListPermissions(context.Context, string) ([]iamservice.PermissionInfo, error) {
 	return s.permissions, nil
+}
+func (s directoryStub) BatchResolveMembersByDisplayNames(context.Context, string, []string) ([]iamservice.MemberDisplayNameResolutionItem, error) {
+	return s.displayNameResult, s.displayNameResultErr
 }
 
 func TestAdapterGetMemberUsesUUIDAndNeverUsesItAsDisplayName(t *testing.T) {
@@ -95,6 +100,25 @@ func TestAdapterBatchResolveMembersReturnsMissingWithoutUUIDDisplayFallback(t *t
 		t.Fatalf("BatchResolveMembers() error = %v", err)
 	}
 	if len(result.Items) != 1 || result.Items[0].DisplayName != "Alpha" || len(result.MissingMemberUUIDs) != 1 || result.MissingMemberUUIDs[0] != "member-b" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestAdapterBatchResolveMembersByDisplayNamesPreservesPerInputOutcomes(t *testing.T) {
+	bundle, err := NewBundle(directoryStub{displayNameResult: []iamservice.MemberDisplayNameResolutionItem{
+		{DisplayName: "Alpha", Status: iamservice.MemberDisplayNameFound, Member: &iamservice.MemberInfo{MemberUUID: "member-a", TenantUUID: "tenant-a", UserUUID: "user-a", DisplayName: "Alpha"}},
+		{DisplayName: "Unknown", Status: iamservice.MemberDisplayNameNotFound},
+		{DisplayName: "Beta", Status: iamservice.MemberDisplayNameAmbiguous},
+		{DisplayName: "Alpha", Status: iamservice.MemberDisplayNameFound, Member: &iamservice.MemberInfo{MemberUUID: "member-a", TenantUUID: "tenant-a", UserUUID: "user-a", DisplayName: "Alpha"}},
+	}})
+	if err != nil {
+		t.Fatalf("NewBundle() error = %v", err)
+	}
+	result, err := bundle.Directory.BatchResolveMembersByDisplayNames(context.Background(), "tenant-a", []string{"Alpha", "Unknown", "Beta", "Alpha"})
+	if err != nil {
+		t.Fatalf("BatchResolveMembersByDisplayNames() error = %v", err)
+	}
+	if len(result.Items) != 4 || result.Items[0].Status != fwiamcontracts.MemberDisplayNameResolutionFound || result.Items[0].Member == nil || result.Items[0].Member.MemberUUID != "member-a" || result.Items[1].Status != fwiamcontracts.MemberDisplayNameResolutionNotFound || result.Items[2].Status != fwiamcontracts.MemberDisplayNameResolutionAmbiguous || result.Items[2].Member != nil || result.Items[3].DisplayName != "Alpha" {
 		t.Fatalf("result = %#v", result)
 	}
 }

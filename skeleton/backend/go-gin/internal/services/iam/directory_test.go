@@ -23,3 +23,16 @@ func TestNormalizeMemberUUIDsPreservesCallerOrder(t *testing.T) {
 		t.Fatalf("NormalizeMemberUUIDs() = %#v", got)
 	}
 }
+
+func TestNormalizeMemberDisplayNamesPreservesDuplicatesAndRejectsBlank(t *testing.T) {
+	got, err := NormalizeMemberDisplayNames([]string{" Alpha ", "Alpha", "Beta"})
+	if err != nil {
+		t.Fatalf("NormalizeMemberDisplayNames() error = %v", err)
+	}
+	if len(got) != 3 || got[0] != "Alpha" || got[1] != "Alpha" || got[2] != "Beta" {
+		t.Fatalf("NormalizeMemberDisplayNames() = %#v", got)
+	}
+	if _, err := NormalizeMemberDisplayNames([]string{"Alpha", " "}); !errors.Is(err, ErrInvalidArguments) {
+		t.Fatalf("expected ErrInvalidArguments, got %v", err)
+	}
+}

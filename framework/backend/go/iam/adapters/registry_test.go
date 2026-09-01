@@ -28,6 +28,9 @@ func (stubDirectory) BatchGetMembers(context.Context, string, []string) ([]contr
 func (stubDirectory) BatchResolveMembers(context.Context, string, []string) (*contracts.MemberResolution, error) {
 	return &contracts.MemberResolution{}, nil
 }
+func (stubDirectory) BatchResolveMembersByDisplayNames(context.Context, string, []string) (*contracts.MemberDisplayNameResolution, error) {
+	return &contracts.MemberDisplayNameResolution{}, nil
+}
 func (stubDirectory) ListRoles(context.Context, string) ([]contracts.Role, error) {
 	return nil, nil
 }

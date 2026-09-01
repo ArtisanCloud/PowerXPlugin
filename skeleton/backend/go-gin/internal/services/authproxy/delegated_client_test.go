@@ -34,6 +34,27 @@ func TestDelegatedClientDirectoryMemberReadsCoreEnvelope(t *testing.T) {
 	}
 }
 
+func TestDelegatedClientDirectoryMemberUsesGatewayAPIKeyWithoutServiceTokenHeader(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "ApiKey gateway-key" {
+			t.Fatalf("authorization = %q", got)
+		}
+		if got := r.Header.Get("X-PowerX-Service-Token"); got != "" {
+			t.Fatalf("unexpected service token header = %q", got)
+		}
+		_, _ = w.Write([]byte(`{"code":0,"data":{"member_uuid":"member-a","tenant_uuid":"tenant-a","user_uuid":"user-a","display_name":"Alpha","status":1}}`))
+	}))
+	defer server.Close()
+
+	client, err := NewDelegatedClient(server.URL, "", WithGatewayAPIKey("gateway-key"))
+	if err != nil {
+		t.Fatalf("NewDelegatedClient() error = %v", err)
+	}
+	if _, err := client.GetDirectoryMember(context.Background(), "member-a"); err != nil {
+		t.Fatalf("GetDirectoryMember() error = %v", err)
+	}
+}
+
 func TestDelegatedClientBatchResolveDirectoryMembersReadsMissingUUIDs(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/tenant/iam/members:batch-resolve" {
@@ -59,6 +80,35 @@ func TestDelegatedClientBatchResolveDirectoryMembersReadsMissingUUIDs(t *testing
 		t.Fatalf("BatchResolveDirectoryMembers() error = %v", err)
 	}
 	if len(result.Items) != 1 || result.Items[0].DisplayName != "Alpha" || len(result.MissingMemberUUIDs) != 1 || result.MissingMemberUUIDs[0] != "member-b" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestDelegatedClientBatchResolveDirectoryMembersByDisplayNamesPreservesItems(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/tenant/iam/members:batch-find-by-display-names" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		var payload map[string][]string
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if got := payload["display_names"]; len(got) != 3 || got[0] != "Alpha" || got[1] != "Unknown" || got[2] != "Beta" {
+			t.Fatalf("display_names = %#v", got)
+		}
+		_, _ = w.Write([]byte(`{"code":0,"data":{"items":[{"display_name":"Alpha","status":"found","member":{"member_uuid":"member-a","user_uuid":"user-a","display_name":"Alpha"}},{"display_name":"Unknown","status":"not_found"},{"display_name":"Beta","status":"ambiguous","members":[{"member_uuid":"must-not-cross-framework-boundary","user_uuid":"must-not-cross-framework-boundary","display_name":"Beta"}]}]}}`))
+	}))
+	defer server.Close()
+
+	client, err := NewDelegatedClient(server.URL, "service-token")
+	if err != nil {
+		t.Fatalf("NewDelegatedClient() error = %v", err)
+	}
+	result, err := client.BatchResolveDirectoryMembersByDisplayNames(context.Background(), []string{"Alpha", "Unknown", "Beta"})
+	if err != nil {
+		t.Fatalf("BatchResolveDirectoryMembersByDisplayNames() error = %v", err)
+	}
+	if len(result.Items) != 3 || result.Items[0].Member == nil || result.Items[0].Member.MemberUUID != "member-a" || result.Items[1].Status != "not_found" || result.Items[2].Status != "ambiguous" {
 		t.Fatalf("result = %#v", result)
 	}
 }

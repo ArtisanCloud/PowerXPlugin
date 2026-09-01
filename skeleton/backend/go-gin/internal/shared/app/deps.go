@@ -45,6 +45,7 @@ type DelegatedAuthProxy interface {
 	GetDirectoryMember(ctx context.Context, memberUUID string) (*authproxy.DirectoryMember, error)
 	BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]authproxy.DirectoryMember, error)
 	BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*authproxy.DirectoryMemberResolution, error)
+	BatchResolveDirectoryMembersByDisplayNames(ctx context.Context, displayNames []string) (*authproxy.DirectoryMemberDisplayNameResolution, error)
 	ListDirectoryDepartments(ctx context.Context) ([]authproxy.DirectoryDepartment, error)
 	ListDirectoryRoles(ctx context.Context) ([]authproxy.DirectoryRole, error)
 	ListDirectoryPermissions(ctx context.Context) ([]authproxy.DirectoryPermission, error)

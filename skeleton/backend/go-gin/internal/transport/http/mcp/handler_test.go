@@ -9,24 +9,18 @@ import (
 	"time"
 
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	model "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/runtime_ops"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/mcp/stream"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func TestServeSSEStreamsFrameworkEvent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	broker := stream.NewBroker()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open database: %v", err)
-	}
-	if err := db.AutoMigrate(&model.MCPSession{}); err != nil {
-		t.Fatalf("migrate session: %v", err)
-	}
+	db := openMCPTestDB(t)
 	if err := db.Create(&model.MCPSession{ID: "session-1", TenantUuid: "tenant-1", RuntimeAssignmentID: "assignment-1", State: "READY"}).Error; err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
@@ -55,13 +49,7 @@ func TestServeSSEStreamsFrameworkEvent(t *testing.T) {
 
 func TestServeSSEDeniesCrossTenantSession(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open database: %v", err)
-	}
-	if err := db.AutoMigrate(&model.MCPSession{}); err != nil {
-		t.Fatalf("migrate session: %v", err)
-	}
+	db := openMCPTestDB(t)
 	if err := db.Create(&model.MCPSession{ID: "session-private", TenantUuid: "tenant-a", RuntimeAssignmentID: "assignment-1", State: "READY"}).Error; err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
@@ -78,13 +66,7 @@ func TestServeSSEDeniesCrossTenantSession(t *testing.T) {
 
 func TestServeSSEDeniesUndeclaredChannel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open database: %v", err)
-	}
-	if err := db.AutoMigrate(&model.MCPSession{}); err != nil {
-		t.Fatalf("migrate session: %v", err)
-	}
+	db := openMCPTestDB(t)
 	if err := db.Create(&model.MCPSession{ID: "session-1", TenantUuid: "tenant-1", RuntimeAssignmentID: "assignment-1", State: "READY"}).Error; err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
@@ -97,6 +79,19 @@ func TestServeSSEDeniesUndeclaredChannel(t *testing.T) {
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("status=%d body=%q", recorder.Code, recorder.Body.String())
 	}
+}
+
+func openMCPTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	dsn := "file:mcp_" + strings.ReplaceAll(t.Name(), "/", "_") + "?mode=memory&cache=shared&_time_format=sqlite"
+	db, err := gorm.Open(dbx.SQLiteDialector(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	if err := db.AutoMigrate(&model.MCPSession{}); err != nil {
+		t.Fatalf("migrate session: %v", err)
+	}
+	return db
 }
 
 func mcpDescriptors() []frameworkrealtime.Descriptor {

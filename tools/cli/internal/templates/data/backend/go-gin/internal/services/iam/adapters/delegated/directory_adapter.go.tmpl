@@ -139,6 +139,51 @@ func (a *Adapter) BatchResolveMembers(ctx context.Context, tenantUUID string, me
 	return result, nil
 }
 
+func (a *Adapter) BatchResolveMembersByDisplayNames(ctx context.Context, tenantUUID string, displayNames []string) (*fwiamcontracts.MemberDisplayNameResolution, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeModeInvalid, "tenant_uuid is required")
+	}
+	normalized, err := iamservice.NormalizeMemberDisplayNames(displayNames)
+	if err != nil {
+		return nil, fwiamerrors.Wrap(fwiamerrors.CodeInvalidArgument, "display_names are invalid", err)
+	}
+	resolution, err := a.proxy.BatchResolveDirectoryMembersByDisplayNames(ctx, normalized)
+	if err != nil {
+		return nil, mapDirectoryError(err)
+	}
+	if resolution == nil || len(resolution.Items) != len(normalized) {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated display-name directory response is invalid")
+	}
+	result := &fwiamcontracts.MemberDisplayNameResolution{Items: make([]fwiamcontracts.MemberDisplayNameResolutionItem, 0, len(normalized))}
+	for index, item := range resolution.Items {
+		if strings.TrimSpace(item.DisplayName) != normalized[index] {
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated display-name directory response does not preserve request order")
+		}
+		out := fwiamcontracts.MemberDisplayNameResolutionItem{DisplayName: normalized[index], Status: fwiamcontracts.MemberDisplayNameResolutionStatus(strings.TrimSpace(item.Status))}
+		switch out.Status {
+		case fwiamcontracts.MemberDisplayNameResolutionFound:
+			if item.Member == nil || strings.TrimSpace(item.Member.MemberUUID) == "" || strings.TrimSpace(item.Member.UserUUID) == "" || strings.TrimSpace(item.Member.DisplayName) == "" {
+				return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated display-name directory response is invalid")
+			}
+			out.Member = &fwiamcontracts.Member{
+				MemberUUID:  strings.TrimSpace(item.Member.MemberUUID),
+				TenantUUID:  tenantUUID,
+				UserUUID:    strings.TrimSpace(item.Member.UserUUID),
+				DisplayName: strings.TrimSpace(item.Member.DisplayName),
+			}
+		case fwiamcontracts.MemberDisplayNameResolutionNotFound, fwiamcontracts.MemberDisplayNameResolutionAmbiguous:
+			if item.Member != nil {
+				return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated display-name directory response exposes an unresolved member")
+			}
+		default:
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated display-name directory response has an unknown status")
+		}
+		result.Items = append(result.Items, out)
+	}
+	return result, nil
+}
+
 func mapDirectoryError(err error) error {
 	var proxyErr *authproxy.ProxyError
 	if errors.As(err, &proxyErr) {

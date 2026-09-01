@@ -418,6 +418,43 @@ func (d *LocalDirectory) GetMember(ctx context.Context, tenantUUID, memberUUID s
 	return d.memberInfo(ctx, scopeTenant, &member)
 }
 
+// BatchResolveMembersByDisplayNames applies the same tenant-scoped exact
+// directory semantics as the delegated Host Contract. Names are import input,
+// never identity: only a unique match yields a member UUID.
+func (d *LocalDirectory) BatchResolveMembersByDisplayNames(ctx context.Context, tenantUUID string, displayNames []string) ([]MemberDisplayNameResolutionItem, error) {
+	normalized, err := NormalizeMemberDisplayNames(displayNames)
+	if err != nil {
+		return nil, err
+	}
+	members, err := d.ListMembers(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	byDisplayName := make(map[string][]MemberInfo, len(members))
+	for _, member := range members {
+		name := strings.TrimSpace(member.DisplayName)
+		if name != "" {
+			byDisplayName[name] = append(byDisplayName[name], member)
+		}
+	}
+	result := make([]MemberDisplayNameResolutionItem, 0, len(normalized))
+	for _, displayName := range normalized {
+		matches := byDisplayName[displayName]
+		item := MemberDisplayNameResolutionItem{DisplayName: displayName, Status: MemberDisplayNameNotFound}
+		switch len(matches) {
+		case 1:
+			item.Status = MemberDisplayNameFound
+			member := matches[0]
+			item.Member = &member
+		case 0:
+		default:
+			item.Status = MemberDisplayNameAmbiguous
+		}
+		result = append(result, item)
+	}
+	return result, nil
+}
+
 func (d *LocalDirectory) memberInfo(ctx context.Context, tenantUUID string, member *iamm.Member) (*MemberInfo, error) {
 	if member == nil || strings.TrimSpace(member.UUID) == "" {
 		return nil, ErrMemberNotFound

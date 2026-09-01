@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- Framework IAM 新增批量显示名解析合同；local/delegated adapter 统一返回 `found`、`not_found`、`ambiguous`，用于导入场景将姓名安全解析为成员 UUID。
+- Skeleton delegated IAM 支持 Gateway API Key Host Contract，并在 `apikey` 配置下发送标准 `Authorization: ApiKey` 凭证。
 - `px-plugin iam export/seed` CLI 子命令，可离线导出租户/角色/成员 JSON，并在 Standalone 模式快速重置默认管理员；`Quickstart`/`Runbook` 新增示例与推荐参数。
 - Delegated IAM Auth Proxy（Go）与 `/api/v1/auth/*` 公共路由，覆盖 login/refresh/logout/me/context 及 `docs/contracts/manifest.yaml` 示范清单
 - `useAuth` Vitest 单测与 `tests/e2e/auth-delegated.spec.ts` Playwright 场景，验证 token fallback/Fail-Closed 交互

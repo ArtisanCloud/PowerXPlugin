@@ -43,6 +43,9 @@ func (tenantTestDirectory) BatchGetMembers(context.Context, string, []string) ([
 func (tenantTestDirectory) BatchResolveMembers(context.Context, string, []string) (*fwiamcontracts.MemberResolution, error) {
 	return &fwiamcontracts.MemberResolution{}, nil
 }
+func (tenantTestDirectory) BatchResolveMembersByDisplayNames(context.Context, string, []string) (*fwiamcontracts.MemberDisplayNameResolution, error) {
+	return &fwiamcontracts.MemberDisplayNameResolution{}, nil
+}
 
 func (tenantTestDirectory) ListRoles(context.Context, string) ([]fwiamcontracts.Role, error) {
 	return nil, nil

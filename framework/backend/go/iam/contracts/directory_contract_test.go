@@ -71,11 +71,47 @@ func (s *stubDirectoryService) BatchResolveMembers(_ context.Context, _ string, 
 	return result, nil
 }
 
+func (s *stubDirectoryService) BatchResolveMembersByDisplayNames(_ context.Context, _ string, displayNames []string) (*MemberDisplayNameResolution, error) {
+	result := &MemberDisplayNameResolution{Items: make([]MemberDisplayNameResolutionItem, 0, len(displayNames))}
+	for _, displayName := range displayNames {
+		matches := make([]Member, 0, 1)
+		for _, member := range s.listMembers {
+			if member.DisplayName == displayName {
+				matches = append(matches, member)
+			}
+		}
+		item := MemberDisplayNameResolutionItem{DisplayName: displayName, Status: MemberDisplayNameResolutionNotFound}
+		if len(matches) == 1 {
+			item.Status = MemberDisplayNameResolutionFound
+			item.Member = &matches[0]
+		} else if len(matches) > 1 {
+			item.Status = MemberDisplayNameResolutionAmbiguous
+		}
+		result.Items = append(result.Items, item)
+	}
+	return result, nil
+}
+
 func (s *stubDirectoryService) ListRoles(context.Context, string) ([]Role, error) {
 	if s.listFailureError != nil {
 		return nil, s.listFailureError
 	}
 	return s.listRoles, nil
+}
+
+func TestDirectoryContractServiceResolvesDisplayNamesPerInput(t *testing.T) {
+	service := &stubDirectoryService{listMembers: []Member{
+		{MemberUUID: "member-a", TenantUUID: "tenant-1", DisplayName: "Alpha"},
+		{MemberUUID: "member-b", TenantUUID: "tenant-1", DisplayName: "Beta"},
+		{MemberUUID: "member-c", TenantUUID: "tenant-1", DisplayName: "Beta"},
+	}}
+	result, err := service.BatchResolveMembersByDisplayNames(context.Background(), "tenant-1", []string{"Alpha", "Unknown", "Beta", "Alpha"})
+	if err != nil {
+		t.Fatalf("BatchResolveMembersByDisplayNames() error = %v", err)
+	}
+	if len(result.Items) != 4 || result.Items[0].Status != MemberDisplayNameResolutionFound || result.Items[0].Member.MemberUUID != "member-a" || result.Items[1].Status != MemberDisplayNameResolutionNotFound || result.Items[2].Status != MemberDisplayNameResolutionAmbiguous || result.Items[2].Member != nil || result.Items[3].Status != MemberDisplayNameResolutionFound {
+		t.Fatalf("result = %#v", result)
+	}
 }
 
 func (s *stubDirectoryService) ListPermissions(context.Context, string) ([]Permission, error) {

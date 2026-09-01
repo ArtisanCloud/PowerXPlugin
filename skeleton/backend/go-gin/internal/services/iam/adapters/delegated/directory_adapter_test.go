@@ -11,14 +11,15 @@ import (
 )
 
 type directoryProxyStub struct {
-	member      *authproxy.DirectoryMember
-	members     []authproxy.DirectoryMember
-	resolution  *authproxy.DirectoryMemberResolution
-	departments []authproxy.DirectoryDepartment
-	roles       []authproxy.DirectoryRole
-	permissions []authproxy.DirectoryPermission
-	decision    *authproxy.AuthorizationDecision
-	err         error
+	member         *authproxy.DirectoryMember
+	members        []authproxy.DirectoryMember
+	resolution     *authproxy.DirectoryMemberResolution
+	nameResolution *authproxy.DirectoryMemberDisplayNameResolution
+	departments    []authproxy.DirectoryDepartment
+	roles          []authproxy.DirectoryRole
+	permissions    []authproxy.DirectoryPermission
+	decision       *authproxy.AuthorizationDecision
+	err            error
 }
 
 func (s directoryProxyStub) MeContext(context.Context, string) (*authproxy.MeContext, error) {
@@ -34,6 +35,9 @@ func (s directoryProxyStub) BatchGetDirectoryMembers(context.Context, []string) 
 }
 func (s directoryProxyStub) BatchResolveDirectoryMembers(context.Context, []string) (*authproxy.DirectoryMemberResolution, error) {
 	return s.resolution, s.err
+}
+func (s directoryProxyStub) BatchResolveDirectoryMembersByDisplayNames(context.Context, []string) (*authproxy.DirectoryMemberDisplayNameResolution, error) {
+	return s.nameResolution, s.err
 }
 func (s directoryProxyStub) ListDirectoryDepartments(context.Context) ([]authproxy.DirectoryDepartment, error) {
 	return s.departments, s.err
@@ -138,6 +142,25 @@ func TestAdapterBatchResolveMembersPreservesResolvedAndMissingUUIDs(t *testing.T
 		t.Fatalf("BatchResolveMembers() error = %v", err)
 	}
 	if len(result.Items) != 1 || result.Items[0].DisplayName != "Alpha" || len(result.MissingMemberUUIDs) != 1 || result.MissingMemberUUIDs[0] != "member-b" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestAdapterBatchResolveMembersByDisplayNamesPreservesFoundMissingAndAmbiguous(t *testing.T) {
+	bundle, err := NewBundle(directoryProxyStub{nameResolution: &authproxy.DirectoryMemberDisplayNameResolution{Items: []authproxy.DirectoryMemberDisplayNameResolutionItem{
+		{DisplayName: "Alpha", Status: "found", Member: &authproxy.DirectoryMemberDisplayNameMatch{MemberUUID: "member-a", UserUUID: "user-a", DisplayName: "Alpha"}},
+		{DisplayName: "Unknown", Status: "not_found"},
+		{DisplayName: "Beta", Status: "ambiguous"},
+		{DisplayName: "Alpha", Status: "found", Member: &authproxy.DirectoryMemberDisplayNameMatch{MemberUUID: "member-a", UserUUID: "user-a", DisplayName: "Alpha"}},
+	}}})
+	if err != nil {
+		t.Fatalf("NewBundle() error = %v", err)
+	}
+	result, err := bundle.Directory.BatchResolveMembersByDisplayNames(context.Background(), "tenant-a", []string{"Alpha", "Unknown", "Beta", "Alpha"})
+	if err != nil {
+		t.Fatalf("BatchResolveMembersByDisplayNames() error = %v", err)
+	}
+	if len(result.Items) != 4 || result.Items[0].Status != fwiamcontracts.MemberDisplayNameResolutionFound || result.Items[0].Member == nil || result.Items[0].Member.MemberUUID != "member-a" || result.Items[0].Member.TenantUUID != "tenant-a" || result.Items[0].Member.Status != "" || result.Items[1].Status != fwiamcontracts.MemberDisplayNameResolutionNotFound || result.Items[2].Status != fwiamcontracts.MemberDisplayNameResolutionAmbiguous || result.Items[2].Member != nil {
 		t.Fatalf("result = %#v", result)
 	}
 }

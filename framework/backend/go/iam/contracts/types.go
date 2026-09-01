@@ -40,8 +40,31 @@ type Member struct {
 // audit readers. Missing UUIDs are explicit; authentication, authorization,
 // validation, and upstream failures remain errors.
 type MemberResolution struct {
-	Items              []Member  `json:"items"`
+	Items              []Member `json:"items"`
 	MissingMemberUUIDs []string `json:"missing_member_uuids"`
+}
+
+// MemberDisplayNameResolutionStatus describes the only per-item outcomes of
+// a tenant-scoped exact display-name lookup.
+type MemberDisplayNameResolutionStatus string
+
+const (
+	MemberDisplayNameResolutionFound     MemberDisplayNameResolutionStatus = "found"
+	MemberDisplayNameResolutionNotFound  MemberDisplayNameResolutionStatus = "not_found"
+	MemberDisplayNameResolutionAmbiguous MemberDisplayNameResolutionStatus = "ambiguous"
+)
+
+// MemberDisplayNameResolution keeps one result for each requested display
+// name. A Member is present only for a unique match; ambiguous responses do
+// not reveal candidate identities.
+type MemberDisplayNameResolution struct {
+	Items []MemberDisplayNameResolutionItem `json:"items"`
+}
+
+type MemberDisplayNameResolutionItem struct {
+	DisplayName string                            `json:"display_name"`
+	Status      MemberDisplayNameResolutionStatus `json:"status"`
+	Member      *Member                           `json:"member,omitempty"`
 }
 
 // Role 为统一角色模型。

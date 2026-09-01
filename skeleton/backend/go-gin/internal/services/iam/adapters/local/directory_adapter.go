@@ -14,6 +14,10 @@ type permissionCatalogResolver interface {
 	ListPermissions(ctx context.Context, tenantUUID string) ([]iamservice.PermissionInfo, error)
 }
 
+type displayNameMemberResolver interface {
+	BatchResolveMembersByDisplayNames(ctx context.Context, tenantUUID string, displayNames []string) ([]iamservice.MemberDisplayNameResolutionItem, error)
+}
+
 func (a *Adapter) GetTenant(_ context.Context, tenantUUID string) (*fwiamcontracts.Tenant, error) {
 	tenantUUID = strings.TrimSpace(tenantUUID)
 	if tenantUUID == "" {
@@ -114,6 +118,40 @@ func (a *Adapter) BatchResolveMembers(ctx context.Context, tenantUUID string, me
 			return nil, err
 		}
 		result.Items = append(result.Items, *member)
+	}
+	return result, nil
+}
+
+func (a *Adapter) BatchResolveMembersByDisplayNames(ctx context.Context, tenantUUID string, displayNames []string) (*fwiamcontracts.MemberDisplayNameResolution, error) {
+	resolver, ok := a.directory.(displayNameMemberResolver)
+	if !ok {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local display-name directory adapter is not configured")
+	}
+	items, err := resolver.BatchResolveMembersByDisplayNames(ctx, tenantUUID, displayNames)
+	if err != nil {
+		if errors.Is(err, iamservice.ErrInvalidArguments) {
+			return nil, fwiamerrors.Wrap(fwiamerrors.CodeInvalidArgument, "display_names are invalid", err)
+		}
+		return nil, err
+	}
+	result := &fwiamcontracts.MemberDisplayNameResolution{Items: make([]fwiamcontracts.MemberDisplayNameResolutionItem, 0, len(items))}
+	for _, item := range items {
+		out := fwiamcontracts.MemberDisplayNameResolutionItem{DisplayName: strings.TrimSpace(item.DisplayName), Status: fwiamcontracts.MemberDisplayNameResolutionStatus(item.Status)}
+		switch out.Status {
+		case fwiamcontracts.MemberDisplayNameResolutionFound:
+			if item.Member == nil || strings.TrimSpace(item.Member.MemberUUID) == "" || strings.TrimSpace(item.Member.TenantUUID) != strings.TrimSpace(tenantUUID) {
+				return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local display-name directory response is invalid")
+			}
+			member := memberFromInfo(*item.Member)
+			out.Member = &member
+		case fwiamcontracts.MemberDisplayNameResolutionNotFound, fwiamcontracts.MemberDisplayNameResolutionAmbiguous:
+			if item.Member != nil {
+				return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local display-name directory response exposes an unresolved member")
+			}
+		default:
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local display-name directory response has an unknown status")
+		}
+		result.Items = append(result.Items, out)
 	}
 	return result, nil
 }

@@ -27,6 +27,7 @@ type DelegatedClient struct {
 	apiBase      string
 	httpClient   HTTPClient
 	serviceToken string
+	apiKey       string
 	pluginID     string
 }
 
@@ -46,6 +47,15 @@ func WithHTTPClient(c HTTPClient) Option {
 func WithPluginID(id string) Option {
 	return func(dc *DelegatedClient) {
 		dc.pluginID = id
+	}
+}
+
+// WithGatewayAPIKey configures the delegated client for the explicit Gateway
+// API-key Host Contract. It is intentionally distinct from an STS service
+// token so callers cannot silently send an API key as a Bearer token.
+func WithGatewayAPIKey(apiKey string) Option {
+	return func(dc *DelegatedClient) {
+		dc.apiKey = strings.TrimSpace(apiKey)
 	}
 }
 
@@ -179,6 +189,23 @@ type DirectoryMemberResolution struct {
 	Items              []DirectoryMember `json:"items"`
 	MissingMemberUUIDs []string          `json:"missing_member_uuids"`
 }
+type DirectoryMemberDisplayNameResolution struct {
+	Items []DirectoryMemberDisplayNameResolutionItem `json:"items"`
+}
+
+// DirectoryMemberDisplayNameMatch intentionally contains only the fields the
+// Host contract exposes for a unique exact-name match. Tenant scope comes from
+// the authenticated Host credential, not a response field.
+type DirectoryMemberDisplayNameMatch struct {
+	MemberUUID  string `json:"member_uuid"`
+	UserUUID    string `json:"user_uuid"`
+	DisplayName string `json:"display_name"`
+}
+type DirectoryMemberDisplayNameResolutionItem struct {
+	DisplayName string                           `json:"display_name"`
+	Status      string                           `json:"status"`
+	Member      *DirectoryMemberDisplayNameMatch `json:"member,omitempty"`
+}
 type DirectoryDepartment struct {
 	DepartmentUUID       string `json:"department_uuid"`
 	TenantUUID           string `json:"tenant_uuid"`
@@ -288,6 +315,20 @@ func (c *DelegatedClient) BatchResolveDirectoryMembers(ctx context.Context, memb
 	return &response, nil
 }
 
+// BatchResolveDirectoryMembersByDisplayNames resolves spreadsheet input with
+// the tenant derived from the delegated credential. The Host response is kept
+// per input so consumers can identify invalid source rows without guessing.
+func (c *DelegatedClient) BatchResolveDirectoryMembersByDisplayNames(ctx context.Context, displayNames []string) (*DirectoryMemberDisplayNameResolution, error) {
+	if len(displayNames) == 0 {
+		return nil, fmt.Errorf("authproxy: display_names required")
+	}
+	var response DirectoryMemberDisplayNameResolution
+	if err := c.post(ctx, "/tenant/iam/members:batch-find-by-display-names", map[string]any{"display_names": displayNames}, &response, nil); err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
 // ----- HTTP helpers -----
 
 type loginResponse struct {
@@ -342,10 +383,15 @@ func (c *DelegatedClient) get(ctx context.Context, path string, out any, extraHe
 }
 
 func (c *DelegatedClient) applyHeaders(req *http.Request, extra map[string]string) {
-	if c.serviceToken != "" {
-		if extra == nil || strings.TrimSpace(extra["Authorization"]) == "" {
+	if extra == nil || strings.TrimSpace(extra["Authorization"]) == "" {
+		switch {
+		case c.apiKey != "":
+			req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", c.apiKey))
+		case c.serviceToken != "":
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.serviceToken))
 		}
+	}
+	if c.serviceToken != "" {
 		req.Header.Set("X-PowerX-Service-Token", c.serviceToken)
 	}
 	if c.pluginID != "" {

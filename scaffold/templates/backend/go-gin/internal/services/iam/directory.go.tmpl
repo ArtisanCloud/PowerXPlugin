@@ -131,6 +131,22 @@ type MemberInfo struct {
 	Status      string
 }
 
+type MemberDisplayNameResolutionStatus string
+
+const (
+	MemberDisplayNameFound     MemberDisplayNameResolutionStatus = "found"
+	MemberDisplayNameNotFound  MemberDisplayNameResolutionStatus = "not_found"
+	MemberDisplayNameAmbiguous MemberDisplayNameResolutionStatus = "ambiguous"
+)
+
+// MemberDisplayNameResolutionItem is the local IAM projection used by the
+// framework adapter. Member is populated only when the name has one match.
+type MemberDisplayNameResolutionItem struct {
+	DisplayName string
+	Status      MemberDisplayNameResolutionStatus
+	Member      *MemberInfo
+}
+
 // PermissionInfo is the UUID-only permission catalog projection for framework consumers.
 type PermissionInfo struct {
 	PermissionUUID string
@@ -152,6 +168,24 @@ func NormalizeMemberUUIDs(memberUUIDs []string) ([]string, error) {
 		}
 		seen[memberUUID] = struct{}{}
 		result = append(result, memberUUID)
+	}
+	return result, nil
+}
+
+// NormalizeMemberDisplayNames trims import values while preserving caller
+// order and duplicates. Unlike member UUIDs, duplicate names are valid: each
+// spreadsheet row needs its own found/not_found/ambiguous result.
+func NormalizeMemberDisplayNames(displayNames []string) ([]string, error) {
+	if len(displayNames) == 0 {
+		return nil, fmt.Errorf("%w: display_names are required", ErrInvalidArguments)
+	}
+	result := make([]string, 0, len(displayNames))
+	for _, raw := range displayNames {
+		displayName := strings.TrimSpace(raw)
+		if displayName == "" {
+			return nil, fmt.Errorf("%w: display_name is required", ErrInvalidArguments)
+		}
+		result = append(result, displayName)
 	}
 	return result, nil
 }

@@ -263,7 +263,16 @@ func main() {
 	var authClient *authproxy.DelegatedClient
 	var localIAM iamservice.IAMDirectory
 	if providerResolver.IsDelegated() {
-		client, err := authproxy.NewDelegatedClient("", "")
+		delegatedBaseURL := ""
+		delegatedOptions := make([]authproxy.Option, 0, 1)
+		if cfg != nil && cfg.Gateway != nil {
+			delegatedBaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
+			switch strings.ToLower(strings.TrimSpace(cfg.Gateway.AuthScheme)) {
+			case "apikey", "api_key", "api-key":
+				delegatedOptions = append(delegatedOptions, authproxy.WithGatewayAPIKey(cfg.Gateway.APIKey))
+			}
+		}
+		client, err := authproxy.NewDelegatedClient(delegatedBaseURL, "", delegatedOptions...)
 		if err != nil {
 			logger.WithError(err).Warn("Failed to initialize delegated auth proxy; auth endpoints will be unavailable")
 		} else {

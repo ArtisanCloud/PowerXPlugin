@@ -184,6 +184,10 @@ func (s *stubProxy) BatchResolveDirectoryMembers(context.Context, []string) (*au
 	return &authproxy.DirectoryMemberResolution{}, nil
 }
 
+func (s *stubProxy) BatchResolveDirectoryMembersByDisplayNames(context.Context, []string) (*authproxy.DirectoryMemberDisplayNameResolution, error) {
+	return &authproxy.DirectoryMemberDisplayNameResolution{}, nil
+}
+
 func (s *stubProxy) ListDirectoryDepartments(context.Context) ([]authproxy.DirectoryDepartment, error) {
 	return nil, nil
 }

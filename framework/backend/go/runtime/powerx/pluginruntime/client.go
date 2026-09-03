@@ -20,6 +20,10 @@ type TokenProvider interface {
 	Token(context.Context) (string, error)
 }
 
+type TokenProviderFunc func(context.Context) (string, error)
+
+func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
+
 type Config struct {
 	BaseURL         string
 	BearerToken     string
@@ -123,6 +127,28 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	}
 	c.tokens = stsToken{client: client}
 	return c, nil
+}
+
+// NewClientWithTokenProvider reuses the plugin-owned STS flow for tenant
+// runtime calls, so individual Framework modules do not create credentials.
+func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *http.Client) (*Client, error) {
+	if strings.TrimSpace(cfg.BaseURL) == "" {
+		return nil, errors.New("powerx plugin runtime base_url is required")
+	}
+	if provider == nil {
+		return nil, errors.New("powerx plugin runtime token provider is required")
+	}
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	client := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), tokens: provider}
+	if httpClient != nil {
+		client.http = httpClient
+	} else {
+		client.http = &http.Client{Timeout: timeout}
+	}
+	return client, nil
 }
 
 func (c *Client) ListKnowledgeSpaces(ctx context.Context, input ListKnowledgeSpacesInput) (*ListKnowledgeSpacesOutput, error) {

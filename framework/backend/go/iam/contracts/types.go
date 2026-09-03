@@ -36,6 +36,22 @@ type Member struct {
 	Status      string `json:"status,omitempty"`
 }
 
+// MemberPageRequest is the explicit bounded member-directory query shared by
+// local and delegated IAM modes. Tenant identity remains a separate argument
+// and is never accepted from a Host request body.
+type MemberPageRequest struct {
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+}
+
+// MemberPage is a stable UUID-only member-directory page.
+type MemberPage struct {
+	Items    []Member `json:"items"`
+	Page     int      `json:"page"`
+	PageSize int      `json:"page_size"`
+	Total    int64    `json:"total"`
+}
+
 // MemberResolution is the tolerant batch directory result used by historical
 // audit readers. Missing UUIDs are explicit; authentication, authorization,
 // validation, and upstream failures remain errors.

@@ -11,6 +11,7 @@ type DelegatedClient interface {
 	UpsertKnowledgeDocument(ctx context.Context, document KnowledgeDocument) (*KnowledgeIndexJob, error)
 	DeleteKnowledgeDocument(ctx context.Context, input DeleteDocumentInput) (*KnowledgeIndexJob, error)
 	ReindexKnowledgeDocument(ctx context.Context, input ReindexInput) (*KnowledgeIndexJob, error)
+	GetKnowledgeIndexJob(ctx context.Context, input IndexJobQuery) (*KnowledgeIndexJob, error)
 }
 
 type CatalogDelegatedClient interface {
@@ -164,6 +165,22 @@ func (p *DelegatedProvider) Reindex(ctx context.Context, input ReindexInput) (*K
 	callCtx, cancel := p.withTimeout(ctx)
 	defer cancel()
 	job, err := p.client.ReindexKnowledgeDocument(callCtx, input)
+	if err != nil {
+		return nil, p.mapError(OperationReindex, input.TraceID, err)
+	}
+	return job, nil
+}
+
+func (p *DelegatedProvider) GetIndexJob(ctx context.Context, input IndexJobQuery) (*KnowledgeIndexJob, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationReindex); err != nil {
+		return nil, err
+	}
+	if p.client == nil {
+		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationReindex, Retryable: true, TraceID: input.TraceID}
+	}
+	callCtx, cancel := p.withTimeout(ctx)
+	defer cancel()
+	job, err := p.client.GetKnowledgeIndexJob(callCtx, input)
 	if err != nil {
 		return nil, p.mapError(OperationReindex, input.TraceID, err)
 	}

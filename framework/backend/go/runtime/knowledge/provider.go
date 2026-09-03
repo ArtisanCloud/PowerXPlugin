@@ -26,6 +26,7 @@ type KnowledgeProvider interface {
 	UpsertDocument(ctx context.Context, document KnowledgeDocument) (*KnowledgeIndexJob, error)
 	DeleteDocument(ctx context.Context, input DeleteDocumentInput) (*KnowledgeIndexJob, error)
 	Reindex(ctx context.Context, input ReindexInput) (*KnowledgeIndexJob, error)
+	GetIndexJob(ctx context.Context, input IndexJobQuery) (*KnowledgeIndexJob, error)
 }
 
 func Supports(caps ProviderCapabilities, operation string) bool {

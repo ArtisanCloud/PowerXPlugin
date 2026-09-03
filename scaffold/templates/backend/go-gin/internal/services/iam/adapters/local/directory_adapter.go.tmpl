@@ -74,6 +74,26 @@ func (a *Adapter) ListMembers(ctx context.Context, tenantUUID string) ([]fwiamco
 	return result, nil
 }
 
+func (a *Adapter) ListMembersPage(ctx context.Context, tenantUUID string, request fwiamcontracts.MemberPageRequest) (*fwiamcontracts.MemberPage, error) {
+	if strings.TrimSpace(tenantUUID) == "" || request.Page < 1 || request.PageSize < 1 || request.PageSize > 200 {
+		return nil, fwiamerrors.New(fwiamerrors.CodeInvalidArgument, "tenant_uuid and pagination are required")
+	}
+	items, err := a.ListMembers(ctx, tenantUUID)
+	if err != nil {
+		return nil, err
+	}
+	total := len(items)
+	start := (request.Page - 1) * request.PageSize
+	if start >= total {
+		return &fwiamcontracts.MemberPage{Items: []fwiamcontracts.Member{}, Page: request.Page, PageSize: request.PageSize, Total: int64(total)}, nil
+	}
+	end := start + request.PageSize
+	if end > total {
+		end = total
+	}
+	return &fwiamcontracts.MemberPage{Items: items[start:end], Page: request.Page, PageSize: request.PageSize, Total: int64(total)}, nil
+}
+
 func (a *Adapter) GetMember(ctx context.Context, tenantUUID, memberUUID string) (*fwiamcontracts.Member, error) {
 	item, err := a.directory.GetMember(ctx, tenantUUID, memberUUID)
 	if err != nil {

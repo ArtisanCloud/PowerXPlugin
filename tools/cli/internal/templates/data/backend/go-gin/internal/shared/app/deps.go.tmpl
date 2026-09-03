@@ -25,6 +25,7 @@ import (
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
 	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
 	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
@@ -42,6 +43,8 @@ type DelegatedAuthProxy interface {
 	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
 	Logout(ctx context.Context, refreshToken string) error
 	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+	GetDirectoryTenant(ctx context.Context) (*authproxy.DirectoryTenant, error)
+	ListDirectoryMembers(ctx context.Context, page, pageSize int) (*authproxy.DirectoryMemberPage, error)
 	GetDirectoryMember(ctx context.Context, memberUUID string) (*authproxy.DirectoryMember, error)
 	BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]authproxy.DirectoryMember, error)
 	BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*authproxy.DirectoryMemberResolution, error)
@@ -65,6 +68,7 @@ type Deps struct {
 	AgentRuntime         *powerxagent.Client
 	CapabilityRegistry   powerxcapability.Registry
 	KnowledgeQABridge    powerxknowledge.QABridge
+	KnowledgeDirectory   fwknowledge.DelegatedClient
 	Notifications        powerxnotifications.Publisher
 	Skills               powerxskills.Invoker
 	Config               *config.Config

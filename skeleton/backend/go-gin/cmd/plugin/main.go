@@ -20,6 +20,7 @@ import (
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
 	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
 	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
@@ -376,6 +377,7 @@ func main() {
 	var aiRuntime *powerxai.Client
 	var capabilityRegistry *powerxcapability.Client
 	var knowledgeQABridge *powerxknowledge.Client
+	var knowledgeDirectory fwknowledge.DelegatedClient
 	var notificationsRuntime *powerxnotifications.Client
 	var skillsRuntime *powerxskills.Client
 	if providerResolver.IsDelegated() {
@@ -402,6 +404,7 @@ func main() {
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Knowledge QA bridge client")
 		}
+		knowledgeDirectory = knowledgeQABridge
 		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Notifications client")
@@ -463,6 +466,7 @@ func main() {
 		AgentRuntime:         agentRuntime,
 		CapabilityRegistry:   capabilityRegistry,
 		KnowledgeQABridge:    knowledgeQABridge,
+		KnowledgeDirectory:   knowledgeDirectory,
 		Notifications:        notificationsRuntime,
 		Skills:               skillsRuntime,
 		Config:               cfg,

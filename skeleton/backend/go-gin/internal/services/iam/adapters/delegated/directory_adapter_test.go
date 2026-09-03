@@ -11,6 +11,8 @@ import (
 )
 
 type directoryProxyStub struct {
+	tenant         *authproxy.DirectoryTenant
+	memberPage     *authproxy.DirectoryMemberPage
 	member         *authproxy.DirectoryMember
 	members        []authproxy.DirectoryMember
 	resolution     *authproxy.DirectoryMemberResolution
@@ -24,6 +26,12 @@ type directoryProxyStub struct {
 
 func (s directoryProxyStub) MeContext(context.Context, string) (*authproxy.MeContext, error) {
 	return nil, errors.New("not used")
+}
+func (s directoryProxyStub) GetDirectoryTenant(context.Context) (*authproxy.DirectoryTenant, error) {
+	return s.tenant, s.err
+}
+func (s directoryProxyStub) ListDirectoryMembers(context.Context, int, int) (*authproxy.DirectoryMemberPage, error) {
+	return s.memberPage, s.err
 }
 
 func (s directoryProxyStub) GetDirectoryMember(context.Context, string) (*authproxy.DirectoryMember, error) {
@@ -73,6 +81,27 @@ func TestAdapterGetMemberMapsHostNotFound(t *testing.T) {
 	_, err = bundle.Directory.GetMember(context.Background(), "tenant-a", "member-a")
 	if fwiamerrors.CodeOf(err) != fwiamerrors.CodeMemberNotFound {
 		t.Fatalf("error code = %q, want %q", fwiamerrors.CodeOf(err), fwiamerrors.CodeMemberNotFound)
+	}
+}
+
+func TestAdapterGetsTenantAndBoundedMemberPage(t *testing.T) {
+	bundle, err := NewBundle(directoryProxyStub{
+		tenant: &authproxy.DirectoryTenant{TenantUUID: "tenant-a", TenantKey: "acme", Name: "Acme", Status: "active"},
+		memberPage: &authproxy.DirectoryMemberPage{
+			Items:      []authproxy.DirectoryMember{{MemberUUID: "member-a", TenantUUID: "tenant-a", UserUUID: "user-a", DisplayName: "Alpha", Status: 1}},
+			Pagination: authproxy.DirectoryPagination{Page: 2, PageSize: 25, Total: 26},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewBundle() error = %v", err)
+	}
+	tenant, err := bundle.Directory.GetTenant(context.Background(), "tenant-a")
+	if err != nil || tenant.Name != "Acme" || tenant.TenantKey != "acme" {
+		t.Fatalf("GetTenant() = %#v, %v", tenant, err)
+	}
+	page, err := bundle.Directory.ListMembersPage(context.Background(), "tenant-a", fwiamcontracts.MemberPageRequest{Page: 2, PageSize: 25})
+	if err != nil || page.Total != 26 || len(page.Items) != 1 || page.Items[0].MemberUUID != "member-a" {
+		t.Fatalf("ListMembersPage() = %#v, %v", page, err)
 	}
 }
 

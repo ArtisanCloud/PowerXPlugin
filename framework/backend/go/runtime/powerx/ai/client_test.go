@@ -67,6 +67,16 @@ func TestClientReturnsHTTPErrorWithoutFabricatingData(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, apiErr.StatusCode)
 }
 
+func TestClientUsesAPIKeyAuthorizationForLocalGateway(t *testing.T) {
+	transport := &recordingTransport{}
+	client, err := NewClient(Config{BaseURL: "https://core.example", AuthScheme: "apikey", APIKey: "local-key"}, &http.Client{Transport: transport})
+	require.NoError(t, err)
+
+	_, err = client.LLMInvoke(context.Background(), LLMInvokeInput{ModelKey: "model", Inputs: []ContentItem{{Role: "user", Type: "text", Content: "hello"}}})
+	require.NoError(t, err)
+	require.Equal(t, []string{"ApiKey local-key"}, transport.authorizations)
+}
+
 type recordingTransport struct {
 	calls          []string
 	authorizations []string

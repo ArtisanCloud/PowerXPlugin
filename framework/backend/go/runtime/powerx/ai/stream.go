@@ -29,7 +29,7 @@ type LLMStreamInput struct {
 }
 
 func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent func(LLMStreamEvent) error) error {
-	if c == nil || c.http == nil || c.tokens == nil {
+	if c == nil || c.http == nil || c.authorization == nil {
 		return errors.New("powerx ai client is not configured")
 	}
 	body := struct {
@@ -51,11 +51,11 @@ func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent fu
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	token, err := c.tokens.Token(ctx)
+	authorization, err := c.authorization.Authorization(ctx)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", authorization)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent fu
 }
 
 func (c *Client) LLMSessionStream(ctx context.Context, sessionID string, onEvent func(LLMStreamEvent) error) error {
-	if c == nil || c.http == nil || c.tokens == nil {
+	if c == nil || c.http == nil || c.authorization == nil {
 		return errors.New("powerx ai client is not configured")
 	}
 	if strings.TrimSpace(sessionID) == "" {
@@ -79,11 +79,11 @@ func (c *Client) LLMSessionStream(ctx context.Context, sessionID string, onEvent
 		return err
 	}
 	req.Header.Set("Accept", "text/event-stream")
-	token, err := c.tokens.Token(ctx)
+	authorization, err := c.authorization.Authorization(ctx)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", authorization)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err

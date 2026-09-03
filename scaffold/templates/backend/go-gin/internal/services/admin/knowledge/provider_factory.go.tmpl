@@ -82,3 +82,7 @@ func (unavailableDelegatedClient) DeleteKnowledgeDocument(context.Context, fwkno
 func (unavailableDelegatedClient) ReindexKnowledgeDocument(context.Context, fwknowledge.ReindexInput) (*fwknowledge.KnowledgeIndexJob, error) {
 	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
 }
+
+func (unavailableDelegatedClient) GetKnowledgeIndexJob(context.Context, fwknowledge.IndexJobQuery) (*fwknowledge.KnowledgeIndexJob, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
+}

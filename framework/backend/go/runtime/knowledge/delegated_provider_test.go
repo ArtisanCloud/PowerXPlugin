@@ -51,6 +51,10 @@ func (f fakeDelegatedClient) ReindexKnowledgeDocument(context.Context, ReindexIn
 	return nil, f.err
 }
 
+func (f fakeDelegatedClient) GetKnowledgeIndexJob(context.Context, IndexJobQuery) (*KnowledgeIndexJob, error) {
+	return nil, f.err
+}
+
 func TestDelegatedProviderNormalizesSuccess(t *testing.T) {
 	doc := FixtureDocument("space-a", "doc-a", "FAQ", "refund policy")
 	provider := NewDelegatedProvider(DelegatedProviderConfig{Client: fakeDelegatedClient{result: FixtureSearchResult("powerx_delegated", doc, "refund policy")}})

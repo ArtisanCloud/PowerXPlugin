@@ -88,6 +88,19 @@ func TestAdapterGetMemberMapsNotFound(t *testing.T) {
 	}
 }
 
+func TestAdapterListMembersPageUsesBoundedDirectoryPage(t *testing.T) {
+	bundle, err := NewBundle(directoryStub{members: map[string]iamservice.MemberInfo{
+		"member-a": {MemberUUID: "member-a", TenantUUID: "tenant-a", UserUUID: "user-a", DisplayName: "Alpha"},
+	}})
+	if err != nil {
+		t.Fatalf("NewBundle() error = %v", err)
+	}
+	page, err := bundle.Directory.ListMembersPage(context.Background(), "tenant-a", fwiamcontracts.MemberPageRequest{Page: 1, PageSize: 1})
+	if err != nil || page.Total != 1 || len(page.Items) != 1 || page.Items[0].MemberUUID != "member-a" {
+		t.Fatalf("ListMembersPage() = %#v, %v", page, err)
+	}
+}
+
 func TestAdapterBatchResolveMembersReturnsMissingWithoutUUIDDisplayFallback(t *testing.T) {
 	bundle, err := NewBundle(directoryStub{members: map[string]iamservice.MemberInfo{
 		"member-a": {MemberUUID: "member-a", TenantUUID: "tenant-a", UserUUID: "user-a", DisplayName: "Alpha", Status: "active"},

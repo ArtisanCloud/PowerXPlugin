@@ -11,6 +11,8 @@ import (
 
 type delegatedProxy interface {
 	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+	GetDirectoryTenant(ctx context.Context) (*authproxy.DirectoryTenant, error)
+	ListDirectoryMembers(ctx context.Context, page, pageSize int) (*authproxy.DirectoryMemberPage, error)
 	GetDirectoryMember(ctx context.Context, memberUUID string) (*authproxy.DirectoryMember, error)
 	BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]authproxy.DirectoryMember, error)
 	BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*authproxy.DirectoryMemberResolution, error)

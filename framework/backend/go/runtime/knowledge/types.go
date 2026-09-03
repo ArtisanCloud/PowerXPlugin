@@ -182,6 +182,14 @@ type KnowledgeIndexJob struct {
 	FinishedAt time.Time `json:"finished_at,omitempty"`
 }
 
+// IndexJobQuery addresses an asynchronous index job within the caller's
+// tenant. The tenant is never serialized to a delegated Host request.
+type IndexJobQuery struct {
+	JobID      string `json:"job_id,omitempty"`
+	TenantUUID string `json:"tenant_uuid,omitempty"`
+	TraceID    string `json:"trace_id,omitempty"`
+}
+
 type DeleteDocumentInput struct {
 	SpaceID    string `json:"space_id,omitempty"`
 	DocumentID string `json:"document_id,omitempty"`
@@ -190,7 +198,9 @@ type DeleteDocumentInput struct {
 }
 
 type ReindexInput struct {
-	SpaceID    string `json:"space_id,omitempty"`
+	SpaceID string `json:"space_id,omitempty"`
+	// DocumentID is optional. Empty requests a complete space rebuild when the
+	// delegated Host publishes only a space-level index operation.
 	DocumentID string `json:"document_id,omitempty"`
 	TenantUUID string `json:"tenant_uuid,omitempty"`
 	TraceID    string `json:"trace_id,omitempty"`
@@ -304,9 +314,6 @@ func (d KnowledgeDocument) Normalized() KnowledgeDocument {
 
 func (d KnowledgeDocument) Validate() error {
 	d = d.Normalized()
-	if d.DocumentID == "" {
-		return NewError(CodeInvalidDocument, ErrDocumentIDRequired.Error())
-	}
 	if d.SpaceID == "" {
 		return NewError(CodeInvalidDocument, ErrSpaceIDRequired.Error())
 	}

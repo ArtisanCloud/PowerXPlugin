@@ -34,6 +34,42 @@ func TestDelegatedClientDirectoryMemberReadsCoreEnvelope(t *testing.T) {
 	}
 }
 
+func TestDelegatedClientDirectoryTenantAndMemberPageReadCoreEnvelope(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer service-token" {
+			t.Fatalf("authorization = %q", got)
+		}
+		switch r.URL.Path {
+		case "/api/v1/tenant/iam/tenant":
+			_, _ = w.Write([]byte(`{"code":0,"data":{"tenant_uuid":"tenant-a","tenant_key":"acme","name":"Acme","status":"active"}}`))
+		case "/api/v1/tenant/iam/members":
+			if got := r.URL.Query().Get("page"); got != "2" {
+				t.Fatalf("page = %q", got)
+			}
+			if got := r.URL.Query().Get("page_size"); got != "25" {
+				t.Fatalf("page_size = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"code":0,"data":{"items":[{"member_uuid":"member-a","tenant_uuid":"tenant-a","user_uuid":"user-a","display_name":"Alpha","status":1}],"pagination":{"page":2,"page_size":25,"total":26}}}`))
+		default:
+			t.Fatalf("unexpected path = %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewDelegatedClient(server.URL, "service-token")
+	if err != nil {
+		t.Fatalf("NewDelegatedClient() error = %v", err)
+	}
+	tenant, err := client.GetDirectoryTenant(context.Background())
+	if err != nil || tenant.TenantUUID != "tenant-a" || tenant.Name != "Acme" {
+		t.Fatalf("GetDirectoryTenant() = %#v, %v", tenant, err)
+	}
+	page, err := client.ListDirectoryMembers(context.Background(), 2, 25)
+	if err != nil || page.Pagination.Total != 26 || len(page.Items) != 1 || page.Items[0].MemberUUID != "member-a" {
+		t.Fatalf("ListDirectoryMembers() = %#v, %v", page, err)
+	}
+}
+
 func TestDelegatedClientDirectoryMemberUsesGatewayAPIKeyWithoutServiceTokenHeader(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "ApiKey gateway-key" {

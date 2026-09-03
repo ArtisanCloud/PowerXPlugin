@@ -937,10 +937,10 @@ func (h *KnowledgeHandler) provider() (fwknowledge.KnowledgeProvider, error) {
 }
 
 func (h *KnowledgeHandler) delegatedKnowledgeClient() fwknowledge.DelegatedClient {
-	if !h.gatewayReady() {
+	if h == nil || h.deps == nil || h.deps.KnowledgeDirectory == nil {
 		return nil
 	}
-	return knowledgeGatewayDelegatedClient{gateway: h.deps.CapabilityGateway}
+	return h.deps.KnowledgeDirectory
 }
 
 func (h *KnowledgeHandler) gatewayReady() bool {
@@ -1056,6 +1056,10 @@ func (c knowledgeGatewayDelegatedClient) DeleteKnowledgeDocument(context.Context
 
 func (c knowledgeGatewayDelegatedClient) ReindexKnowledgeDocument(context.Context, fwknowledge.ReindexInput) (*fwknowledge.KnowledgeIndexJob, error) {
 	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge reindex is not exposed by the current gateway contract")
+}
+
+func (c knowledgeGatewayDelegatedClient) GetKnowledgeIndexJob(context.Context, fwknowledge.IndexJobQuery) (*fwknowledge.KnowledgeIndexJob, error) {
+	return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "PowerX delegated knowledge job query is not exposed by the current gateway contract")
 }
 
 func (c knowledgeGatewayDelegatedClient) invokeIndexJob(ctx context.Context, capabilityID, action, tenantUUID string, payload map[string]any) (*fwknowledge.KnowledgeIndexJob, error) {

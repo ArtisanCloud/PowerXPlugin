@@ -370,7 +370,7 @@ func TestKnowledgeHandlerDelegatedIngestionsReadsTenantInvocationNestedResult(t 
 	}
 }
 
-func TestKnowledgeHandlerDelegatedSpacesUseFrameworkProviderGatewayAdapter(t *testing.T) {
+func TestKnowledgeHandlerDelegatedSpacesUseInjectedFrameworkDirectory(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	gateway := &knowledgeGatewayStub{}
@@ -379,7 +379,8 @@ func TestKnowledgeHandlerDelegatedSpacesUseFrameworkProviderGatewayAdapter(t *te
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces", handler.Spaces)
 

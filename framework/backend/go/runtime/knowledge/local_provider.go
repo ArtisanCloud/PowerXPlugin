@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type LocalProviderConfig struct {
@@ -19,6 +21,7 @@ type LocalProvider struct {
 	name          string
 	requireTenant bool
 	documents     map[string]KnowledgeDocument
+	jobs          map[string]KnowledgeIndexJob
 }
 
 func NewLocalProvider(cfg LocalProviderConfig) *LocalProvider {
@@ -30,6 +33,7 @@ func NewLocalProvider(cfg LocalProviderConfig) *LocalProvider {
 		name:          name,
 		requireTenant: cfg.RequireTenant,
 		documents:     map[string]KnowledgeDocument{},
+		jobs:          map[string]KnowledgeIndexJob{},
 	}
 }
 
@@ -162,8 +166,13 @@ func (p *LocalProvider) UpsertDocument(ctx context.Context, document KnowledgeDo
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if document.DocumentID == "" {
+		document.DocumentID = uuid.NewString()
+	}
 	p.documents[documentKey(document.SpaceID, document.DocumentID)] = document
-	return CompletedIndexJob(IndexOperationUpsert, document), nil
+	job := CompletedIndexJob(IndexOperationUpsert, document)
+	p.jobs[job.JobID] = *job
+	return job, nil
 }
 
 func (p *LocalProvider) DeleteDocument(ctx context.Context, input DeleteDocumentInput) (*KnowledgeIndexJob, error) {
@@ -180,7 +189,9 @@ func (p *LocalProvider) DeleteDocument(ctx context.Context, input DeleteDocument
 	defer p.mu.Unlock()
 	delete(p.documents, documentKey(input.SpaceID, input.DocumentID))
 	now := time.Now().UTC()
-	return &KnowledgeIndexJob{JobID: "delete:" + input.SpaceID + ":" + input.DocumentID, SpaceID: input.SpaceID, DocumentID: input.DocumentID, Operation: IndexOperationDelete, Status: IndexStatusSucceeded, StartedAt: now, FinishedAt: now}, nil
+	job := &KnowledgeIndexJob{JobID: uuid.NewString(), SpaceID: input.SpaceID, DocumentID: input.DocumentID, Operation: IndexOperationDelete, Status: IndexStatusSucceeded, StartedAt: now, FinishedAt: now}
+	p.jobs[job.JobID] = *job
+	return job, nil
 }
 
 func (p *LocalProvider) Reindex(ctx context.Context, input ReindexInput) (*KnowledgeIndexJob, error) {
@@ -190,11 +201,26 @@ func (p *LocalProvider) Reindex(ctx context.Context, input ReindexInput) (*Knowl
 	if input.SpaceID == "" {
 		return nil, NewError(CodeInvalidDocument, ErrSpaceIDRequired.Error())
 	}
-	if input.DocumentID == "" {
-		return nil, NewError(CodeInvalidDocument, ErrDocumentIDRequired.Error())
-	}
 	now := time.Now().UTC()
-	return &KnowledgeIndexJob{JobID: "reindex:" + input.SpaceID + ":" + input.DocumentID, SpaceID: input.SpaceID, DocumentID: input.DocumentID, Operation: IndexOperationReindex, Status: IndexStatusSucceeded, StartedAt: now, FinishedAt: now}, nil
+	job := &KnowledgeIndexJob{JobID: uuid.NewString(), SpaceID: input.SpaceID, DocumentID: input.DocumentID, Operation: IndexOperationReindex, Status: IndexStatusSucceeded, StartedAt: now, FinishedAt: now}
+	p.mu.Lock()
+	p.jobs[job.JobID] = *job
+	p.mu.Unlock()
+	return job, nil
+}
+
+func (p *LocalProvider) GetIndexJob(_ context.Context, input IndexJobQuery) (*KnowledgeIndexJob, error) {
+	input.JobID = strings.TrimSpace(input.JobID)
+	if input.JobID == "" {
+		return nil, NewError(CodeInvalidDocument, "knowledge job_id is required")
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	job, ok := p.jobs[input.JobID]
+	if !ok {
+		return nil, NewError(CodeNotFound, "knowledge index job not found")
+	}
+	return &job, nil
 }
 
 func matchesQueryScope(document KnowledgeDocument, query KnowledgeQuery) bool {

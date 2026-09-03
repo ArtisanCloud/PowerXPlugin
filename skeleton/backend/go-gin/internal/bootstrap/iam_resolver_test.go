@@ -72,6 +72,12 @@ func (resolverProxyStub) Logout(context.Context, string) error { return errors.N
 func (resolverProxyStub) MeContext(context.Context, string) (*authproxy.MeContext, error) {
 	return nil, errors.New("not used")
 }
+func (resolverProxyStub) GetDirectoryTenant(context.Context) (*authproxy.DirectoryTenant, error) {
+	return nil, errors.New("not used")
+}
+func (resolverProxyStub) ListDirectoryMembers(context.Context, int, int) (*authproxy.DirectoryMemberPage, error) {
+	return nil, errors.New("not used")
+}
 func (resolverProxyStub) GetDirectoryMember(context.Context, string) (*authproxy.DirectoryMember, error) {
 	return nil, errors.New("not used")
 }

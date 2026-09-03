@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -185,6 +186,21 @@ type DirectoryMember struct {
 	DisplayName string `json:"display_name,omitempty"`
 	Status      int16  `json:"status"`
 }
+type DirectoryTenant struct {
+	TenantUUID string `json:"tenant_uuid"`
+	TenantKey  string `json:"tenant_key"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+}
+type DirectoryMemberPage struct {
+	Items      []DirectoryMember   `json:"items"`
+	Pagination DirectoryPagination `json:"pagination"`
+}
+type DirectoryPagination struct {
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+	Total    int64 `json:"total"`
+}
 type DirectoryMemberResolution struct {
 	Items              []DirectoryMember `json:"items"`
 	MissingMemberUUIDs []string          `json:"missing_member_uuids"`
@@ -287,6 +303,30 @@ func (c *DelegatedClient) GetDirectoryMember(ctx context.Context, memberUUID str
 		return nil, err
 	}
 	return &member, nil
+}
+
+// GetDirectoryTenant reads the tenant determined by the Host credential.
+func (c *DelegatedClient) GetDirectoryTenant(ctx context.Context) (*DirectoryTenant, error) {
+	var tenant DirectoryTenant
+	if err := c.get(ctx, "/tenant/iam/tenant", &tenant, nil); err != nil {
+		return nil, err
+	}
+	return &tenant, nil
+}
+
+// ListDirectoryMembers reads exactly one Host-controlled member page.
+func (c *DelegatedClient) ListDirectoryMembers(ctx context.Context, page, pageSize int) (*DirectoryMemberPage, error) {
+	if page < 1 || pageSize < 1 || pageSize > 200 {
+		return nil, fmt.Errorf("authproxy: invalid directory pagination")
+	}
+	query := url.Values{}
+	query.Set("page", strconv.Itoa(page))
+	query.Set("page_size", strconv.Itoa(pageSize))
+	var response DirectoryMemberPage
+	if err := c.get(ctx, "/tenant/iam/members?"+query.Encode(), &response, nil); err != nil {
+		return nil, err
+	}
+	return &response, nil
 }
 
 func (c *DelegatedClient) BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]DirectoryMember, error) {

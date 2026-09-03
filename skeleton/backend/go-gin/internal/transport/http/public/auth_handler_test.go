@@ -172,6 +172,14 @@ func (s *stubProxy) MeContext(ctx context.Context, token string) (*authproxy.MeC
 	return nil, nil
 }
 
+func (s *stubProxy) GetDirectoryTenant(context.Context) (*authproxy.DirectoryTenant, error) {
+	return nil, nil
+}
+
+func (s *stubProxy) ListDirectoryMembers(context.Context, int, int) (*authproxy.DirectoryMemberPage, error) {
+	return &authproxy.DirectoryMemberPage{}, nil
+}
+
 func (s *stubProxy) GetDirectoryMember(context.Context, string) (*authproxy.DirectoryMember, error) {
 	return nil, nil
 }

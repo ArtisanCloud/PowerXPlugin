@@ -32,6 +32,9 @@ func (tenantTestDirectory) ListDepartments(context.Context, string) ([]fwiamcont
 func (tenantTestDirectory) ListMembers(context.Context, string) ([]fwiamcontracts.Member, error) {
 	return nil, nil
 }
+func (tenantTestDirectory) ListMembersPage(context.Context, string, fwiamcontracts.MemberPageRequest) (*fwiamcontracts.MemberPage, error) {
+	return &fwiamcontracts.MemberPage{}, nil
+}
 
 func (tenantTestDirectory) GetMember(context.Context, string, string) (*fwiamcontracts.Member, error) {
 	return nil, fwiamerrors.New(fwiamerrors.CodeMemberNotFound, "member not found")

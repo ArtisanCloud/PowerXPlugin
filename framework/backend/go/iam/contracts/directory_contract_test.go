@@ -36,6 +36,13 @@ func (s *stubDirectoryService) ListMembers(context.Context, string) ([]Member, e
 	return s.listMembers, nil
 }
 
+func (s *stubDirectoryService) ListMembersPage(_ context.Context, _ string, request MemberPageRequest) (*MemberPage, error) {
+	if s.listFailureError != nil {
+		return nil, s.listFailureError
+	}
+	return &MemberPage{Items: s.listMembers, Page: request.Page, PageSize: request.PageSize, Total: int64(len(s.listMembers))}, nil
+}
+
 func (s *stubDirectoryService) GetMember(_ context.Context, _ string, memberUUID string) (*Member, error) {
 	for _, member := range s.listMembers {
 		if member.MemberUUID == memberUUID {

@@ -112,6 +112,35 @@
                   </span>
                 </span>
                 <span v-else>该能力未在 catalog 声明额外协议（默认 REST）</span>
+                <UButton
+                  v-if="hostContractModule"
+                  :to="{ path: '/powerx/host-contract-lab', query: { module: hostContractModule } }"
+                  color="primary"
+                  variant="link"
+                  size="xs"
+                >
+                  {{ `{{ t('capabilityLab.openHostContract') }}` }}
+                </UButton>
+              </div>
+              <UAlert
+                v-if="selectedSuiteCapability"
+                class="mt-3"
+                icon="i-heroicons-shield-exclamation"
+                color="amber"
+                variant="soft"
+                :title="t('capabilityLab.suiteCapability.title')"
+                :description="t('capabilityLab.suiteCapability.description', { provider: selectedSuiteCapability.providerPluginID || t('capabilityLab.suiteCapability.unknownProvider') })"
+              />
+              <div v-if="selectedSuiteCapability" class="mt-2 flex items-center gap-2 text-xs">
+                <UButton size="xs" variant="soft" :loading="grantStatusLoading" @click="checkSelectedGrantStatus">
+                  {{ `{{ grantStatusLoading ? t('capabilityLab.grantStatus.loading') : t('capabilityLab.grantStatus.check') }}` }}
+                </UButton>
+                <span v-if="selectedGrantStatus" class="text-gray-600 dark:text-gray-300">
+                  {{ `{{ grantStatusLabel }}` }} · {{ `{{ selectedGrantStatus.reason_code }}` }}
+                </span>
+                <span v-else-if="grantStatusError" class="text-red-600 dark:text-red-300">
+                  {{ `{{ t('capabilityLab.grantStatus.failed') }}` }}
+                </span>
               </div>
             </label>
 
@@ -224,7 +253,7 @@
                 type="submit"
                 color="primary"
                 :loading="loading"
-                :disabled="!form.capabilityId || !form.action || !isPayloadValid"
+                :disabled="!form.capabilityId || !form.action || !isPayloadValid || !!selectedSuiteCapability"
               >
                 立即调用
               </UButton>
@@ -401,7 +430,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter, useRuntimeConfig } from '#imports'
+import { useI18n, useRoute, useRouter, useRuntimeConfig } from '#imports'
 import { useCapabilityLab } from '~/composables/useCapabilityLab'
 import { useCapabilityCatalogApi } from '~/composables/api/useCapabilityCatalog'
 import { useUserStore } from '~/stores/user'
@@ -411,6 +440,7 @@ definePageMeta({
 })
 
 const userStore = useUserStore()
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 if (process.client && !userStore.context) {
@@ -425,6 +455,8 @@ type CapabilityOption = {
   value: string
   module: string
   protocols?: Record<string, any> | null
+  providerPluginID?: string
+  source?: string
 }
 
 type ActionProtocol = 'rest' | 'grpc' | 'workflow' | 'agent' | 'other'
@@ -455,6 +487,9 @@ type NormalizedProtocolEntry = {
 }
 
 const capabilityCatalogApi = useCapabilityCatalogApi()
+const grantStatusLoading = ref(false)
+const grantStatusError = ref('')
+const selectedGrantStatus = ref<{ capability_id: string; status: 'granted' | 'not_granted' | 'unknown'; reason_code: string } | null>(null)
 const capabilityOptions = ref<CapabilityOption[]>([])
 const capabilityListLoading = ref(false)
 const sourceListLoading = ref(false)
@@ -548,7 +583,9 @@ async function fetchCapabilityOptions() {
         label: entry?.kind ? `${entry.id} · ${entry.kind}` : entry.id,
         value: entry.id,
         module: entry?.module || deriveCapabilityModule(entry?.id),
-        protocols: entry?.protocols
+        protocols: entry?.protocols,
+        providerPluginID: entry?.provider_plugin_id,
+        source: entry?.source
       }))
     if (!normalized.length) {
       capabilityOptions.value = []
@@ -670,6 +707,61 @@ const filteredCapabilityOptions = computed(() => {
 const selectedCapabilityOption = computed(() =>
   capabilityOptions.value.find((entry) => entry.value === form.capabilityId)
 )
+
+const selectedSuiteCapability = computed(() => {
+  const option = selectedCapabilityOption.value
+  if (!option?.providerPluginID || option.providerPluginID === 'com.powerx.plugins.base') {
+    return null
+  }
+  return option
+})
+
+const grantStatusLabel = computed(() => {
+  switch (selectedGrantStatus.value?.status) {
+    case 'granted': return t('capabilityLab.grantStatus.granted')
+    case 'not_granted': return t('capabilityLab.grantStatus.notGranted')
+    default: return t('capabilityLab.grantStatus.unknown')
+  }
+})
+
+async function checkSelectedGrantStatus() {
+  const capabilityID = selectedSuiteCapability.value?.value
+  if (!capabilityID) return
+  grantStatusLoading.value = true
+  grantStatusError.value = ''
+  selectedGrantStatus.value = null
+  try {
+    const items = await capabilityCatalogApi.grantStatus([capabilityID])
+    selectedGrantStatus.value = items[0] || null
+    if (!selectedGrantStatus.value) grantStatusError.value = 'missing_item'
+  } catch (error: any) {
+    grantStatusError.value = String(error?.message || 'request_failed')
+  } finally {
+    grantStatusLoading.value = false
+  }
+}
+
+watch(() => form.capabilityId, () => {
+  selectedGrantStatus.value = null
+  grantStatusError.value = ''
+})
+
+const hostContractModule = computed(() => {
+  const capabilityID = String(form.capabilityId || '').trim().toLowerCase()
+  const mappings: Array<[string, string]> = [
+    ['com.corex.iam.', 'iam'],
+    ['com.corex.knowledge.', 'knowledge'],
+    ['com.corex.media.', 'media'],
+    ['com.corex.agent.', 'agent'],
+    ['com.corex.ai.', 'ai'],
+    ['com.corex.capability.', 'capability_registry'],
+    ['com.corex.integration.', 'integration_gateway'],
+    ['com.corex.skills.', 'skills'],
+    ['com.corex.notifications.', 'notifications'],
+    ['com.corex.plugin-runtime.', 'plugin_runtime']
+  ]
+  return mappings.find(([prefix]) => capabilityID.startsWith(prefix))?.[1] || ''
+})
 
 function ensureCapabilitySelection() {
   const list = filteredCapabilityOptions.value
@@ -1081,6 +1173,10 @@ const safePreviewPayload = () => {
 }
 
 async function handleInvoke() {
+	if (selectedSuiteCapability.value) {
+		errorMessage.value = t('capabilityLab.suiteCapability.invokeBlocked')
+		return
+	}
   if (!form.capabilityId || !form.action) {
     errorMessage.value = '能力/Action 不能为空'
     return

@@ -105,6 +105,93 @@ func TestCatalogConflictDetectedBeforeMergeFromFiles(t *testing.T) {
 	}
 }
 
+func TestValidateRequiredHostCapabilities(t *testing.T) {
+	required := []string{"com.corex.capabilities.grant_status.read", "com.corex.metadata.dictionary.read"}
+
+	plugin := map[string]interface{}{
+		"capabilities": map[string]interface{}{
+			"required": stringSliceToInterfaces(required),
+		},
+	}
+	if err := validateRequiredHostCapabilities(plugin); err != nil {
+		t.Fatalf("explicit read-only requirements rejected: %v", err)
+	}
+
+	missing := map[string]interface{}{
+		"capabilities": map[string]interface{}{
+			"required": stringSliceToInterfaces(required[1:]),
+		},
+	}
+	err := validateRequiredHostCapabilities(missing)
+	if err == nil {
+		t.Fatal("missing grant-status capability accepted")
+	}
+	if !strings.Contains(err.Error(), "com.corex.capabilities.grant_status.read") {
+		t.Fatalf("expected missing capability in error, got %q", err.Error())
+	}
+
+	malformed := map[string]interface{}{
+		"capabilities": map[string]interface{}{
+			"required": []interface{}{123},
+		},
+	}
+	err = validateRequiredHostCapabilities(malformed)
+	if err == nil {
+		t.Fatal("expected malformed required capability entry to fail")
+	}
+	if !strings.Contains(err.Error(), "capabilities.required[0]") {
+		t.Fatalf("expected invalid entry location in error, got %q", err.Error())
+	}
+}
+
+func TestRequiredCapabilitiesAreExplicitAndStrict(t *testing.T) {
+	for _, tc := range []struct {
+		ids     []interface{}
+		invalid bool
+	}{
+		{[]interface{}{}, false},
+		{[]interface{}{"com.corex.capabilities.grant_status.read"}, false},
+		{[]interface{}{"com.corex.capabilities.grant_status.read", "com.example.plugin.read"}, false},
+		{[]interface{}{"com.corex.capabilities.grant_status.read", "com.corex.capabilities.grant_status.read"}, true},
+		{[]interface{}{" com.corex.capabilities.grant_status.read"}, true},
+	} {
+		err := validateRequiredHostCapabilities(map[string]interface{}{"capabilities": map[string]interface{}{"required": tc.ids}})
+		if (err != nil) != tc.invalid {
+			t.Fatalf("ids=%v err=%v", tc.ids, err)
+		}
+	}
+}
+
+func TestShouldLoadManifest(t *testing.T) {
+	cases := []struct {
+		name             string
+		manifestPath     string
+		capabilitiesOnly bool
+		pluginOnly       bool
+		want             bool
+	}{
+		{name: "full validation", manifestPath: "manifest.yaml", want: true},
+		{name: "capabilities only", manifestPath: "manifest.yaml", capabilitiesOnly: true, want: false},
+		{name: "plugin only", manifestPath: "manifest.yaml", pluginOnly: true, want: false},
+		{name: "no manifest", want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldLoadManifest(tc.manifestPath, tc.capabilitiesOnly, tc.pluginOnly); got != tc.want {
+				t.Fatalf("shouldLoadManifest() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func stringSliceToInterfaces(values []string) []interface{} {
+	result := make([]interface{}, 0, len(values))
+	for _, value := range values {
+		result = append(result, value)
+	}
+	return result
+}
+
 func TestValidateEventTopicsRequiresPluginPublishACL(t *testing.T) {
 	plugin := map[string]interface{}{
 		"id": "com.powerx.plugins.demo",

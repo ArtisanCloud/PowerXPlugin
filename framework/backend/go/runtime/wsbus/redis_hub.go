@@ -117,6 +117,13 @@ func (h *RedisHub) Start(ctx context.Context) error {
 			ctx = context.Background()
 		}
 		pubsub := h.client.Subscribe(ctx, h.channel)
+		// Wait for the subscription acknowledgement before reporting readiness.
+		// Subscribe alone is lazy and does not prove Redis is reachable.
+		if _, err := pubsub.Receive(ctx); err != nil {
+			h.subErr = err
+			_ = pubsub.Close()
+			return
+		}
 		go func() {
 			defer pubsub.Close()
 			ch := pubsub.Channel()

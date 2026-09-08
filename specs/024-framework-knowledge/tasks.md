@@ -160,6 +160,11 @@
 
 ## Dependencies & Execution Order
 
+## 2026-09-04 双模式补充任务
+
+- [X] T0DM1 将正式 Knowledge Lab 绑定 `runtime/powerx/knowledge` Host Contract；历史 QA bridge 独立保留。
+- [X] T0DM2 验证 local/delegated Provider 均由 Framework Factory 装配，缺 provider 明确失败。
+
 1. Phase 1 Setup has no dependencies.
 2. Phase 2 Foundational Contracts blocks all stories.
 3. US1 and US2 are P1 and should be implemented before index lifecycle work.

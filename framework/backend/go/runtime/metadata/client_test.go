@@ -63,7 +63,7 @@ func TestListDictionaryItemsBuildsGatewayInvocation(t *testing.T) {
 	if !ok {
 		t.Fatalf("payload type = %T", req.Payload)
 	}
-	if payload.Method != http.MethodGet || payload.Endpoint != "/api/v1/admin/metadata/dictionaries/ns-uuid/items" {
+	if payload.Method != http.MethodGet || payload.Endpoint != "/api/v1/tenant/metadata/dictionaries/ns-uuid/items" {
 		t.Fatalf("payload = %+v", payload)
 	}
 	if payload.Query["locale"] != "en" || payload.Query["page_size"] != 50 {
@@ -96,47 +96,19 @@ func TestResolveDictionaryItemRequiresExactCode(t *testing.T) {
 	}
 }
 
-func TestReplaceTagBindingsByCodeResolvesTagUUIDs(t *testing.T) {
-	invoker := &stubInvoker{queue: []*gateway.Response{
-		{Data: map[string]any{"payload": map[string]any{
-			"items":      []any{map[string]any{"uuid": "tag-vip", "namespace": "customer", "resource_type": "corex.customer", "code": "vip", "label_i18n": map[string]any{"en": "VIP"}, "status": "enabled"}},
-			"pagination": map[string]any{"total": 1, "page": 1, "page_size": 100},
-		}}},
-		{Data: map[string]any{"payload": map[string]any{
-			"items": []any{map[string]any{"tag_uuid": "tag-vip", "resource_type": "corex.customer", "resource_uuid": "customer-uuid"}},
-		}}},
-	}}
-	client, err := NewClient(Config{Invoker: invoker})
+func TestLegacyTagBindingReplacementFailsExplicitly(t *testing.T) {
+	client, err := NewClient(Config{Invoker: &stubInvoker{}})
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
 	}
 
-	items, err := client.ReplaceTagBindingsByCode(context.Background(), ReplaceTagBindingsByCodeRequest{
+	_, err = client.ReplaceTagBindings(context.Background(), ReplaceTagBindingsRequest{
 		ResourceType: "corex.customer",
 		ResourceUUID: "customer-uuid",
-		Namespace:    "customer",
-		TagCodes:     []string{"vip"},
+		TagUUIDs:     []string{"tag-uuid"},
 	})
-	if err != nil {
-		t.Fatalf("ReplaceTagBindingsByCode() error = %v", err)
-	}
-	if len(items) != 1 || items[0].TagUUID != "tag-vip" {
-		t.Fatalf("items = %+v", items)
-	}
-	if len(invoker.requests) != 2 {
-		t.Fatalf("requests len = %d", len(invoker.requests))
-	}
-	payload, ok := invoker.requests[1].Payload.(restPayload)
-	if !ok {
-		t.Fatalf("payload type = %T", invoker.requests[1].Payload)
-	}
-	body, ok := payload.Body.(map[string]any)
-	if !ok {
-		t.Fatalf("body type = %T", payload.Body)
-	}
-	uuids, ok := body["tag_uuids"].([]string)
-	if !ok || len(uuids) != 1 || uuids[0] != "tag-vip" {
-		t.Fatalf("tag_uuids = %#v", body["tag_uuids"])
+	if CodeOf(err) != CodeInvalidArgument {
+		t.Fatalf("CodeOf(err) = %s err=%v", CodeOf(err), err)
 	}
 }
 

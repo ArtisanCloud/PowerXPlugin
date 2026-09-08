@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -235,44 +236,48 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 		req.Header.Set("Content-Type", "application/json")
 	}
 	token, err := c.tokens.Token(ctx)
-	if err != nil {
-		return err
+	if err != nil || strings.TrimSpace(token) == "" {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
 	defer resp.Body.Close()
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 502, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(payload)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(payload, "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"), Body: string(payload)}
 	}
 	if output == nil {
 		return nil
 	}
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
+	if err := hostcontract.DecodeData(payload, output); err != nil {
+		return &HTTPError{StatusCode: 502, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
-	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return err
-	}
-	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return errors.New("powerx plugin runtime response missing data")
-	}
-	return json.Unmarshal(envelope.Data, output)
+	return nil
 }
 
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("powerx plugin runtime request failed: status=%d", e.StatusCode)
+	return fmt.Sprintf("powerx plugin runtime request failed: reason=%s status=%d", e.ReasonCode, e.StatusCode)
 }
 
 type staticToken string

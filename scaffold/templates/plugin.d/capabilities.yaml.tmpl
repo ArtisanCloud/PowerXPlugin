@@ -100,6 +100,17 @@ capabilities:
         output: contracts/schema/output/{{ .PluginID }}.template.validate.json
       version: 1.0.0
   required:
+    - com.corex.agent.invoke
+    - com.corex.agent.session.manage
+    - com.corex.capabilities.grant_status.read
+    - com.corex.customer.memberships.delegated_read
     - com.corex.eventfabric.publish
+    - com.corex.iam.authorization.check
+    - com.corex.iam.directory.read
+    - com.corex.iam.members.read
+    - com.corex.knowledge.directory.read
+    - com.corex.knowledge.document.manage
+    - com.corex.knowledge.search.read
     - com.corex.media.assets.manage
-    - com.corex.notifications.test
+    - com.corex.media.assets.read
+    - com.corex.notifications.create

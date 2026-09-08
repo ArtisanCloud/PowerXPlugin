@@ -1924,12 +1924,12 @@ permissions:
       - actor_context: admin_user
         channel: rest
         method: GET
-        path: /plugin/agent/sessions/*/messages
+        path: /plugin/agent/sessions/*
         resource_scope: tenant
       - actor_context: admin_user
         channel: rest
-        method: POST
-        path: /plugin/agent/sessions/*/archive
+        method: PATCH
+        path: /plugin/agent/sessions/*
         resource_scope: tenant
       - actor_context: admin_user
         channel: rest
@@ -1938,8 +1938,38 @@ permissions:
         resource_scope: tenant
       - actor_context: admin_user
         channel: rest
+        method: POST
+        path: /plugin/agent/sessions/*/archive
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
         method: GET
-        path: /plugin/agent/stream/sse
+        path: /plugin/agent/sessions/*/messages
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent/sessions/*/messages
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent/sessions/*/invocations
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent/sessions/*/invocations/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /plugin/agent/sessions/*/invocations/*/cancel
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /plugin/agent/sessions/*/invocations/*/events
         resource_scope: tenant
       - actor_context: admin_user
         channel: rest

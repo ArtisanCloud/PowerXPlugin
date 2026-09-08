@@ -41,7 +41,7 @@ func (c *Client) ListDictionaryNamespaces(ctx context.Context, req ListDictionar
 	setQuery(query, "module", req.Module)
 	setQuery(query, "status", req.Status)
 	setQuery(query, "q", req.Query)
-	return invokePage[DictionaryNamespace](c, ctx, "metadata.dictionary.list_namespaces", CapabilityDictionaryRead, http.MethodGet, "/api/v1/admin/metadata/dictionaries", query, nil, req.RequestID)
+	return invokePage[DictionaryNamespace](c, ctx, "metadata.dictionary.list_namespaces", CapabilityDictionaryRead, http.MethodGet, "/api/v1/tenant/metadata/dictionaries", query, nil, req.RequestID)
 }
 
 func (c *Client) CreateDictionaryNamespace(ctx context.Context, req CreateDictionaryNamespaceRequest) (*DictionaryNamespace, error) {
@@ -58,7 +58,7 @@ func (c *Client) CreateDictionaryNamespace(ctx context.Context, req CreateDictio
 		"description_i18n": req.DescriptionI18n,
 	}
 	var out DictionaryNamespace
-	if err := c.invokePayload(ctx, "metadata.dictionary.create_namespace", CapabilityDictionaryManage, http.MethodPost, "/api/v1/admin/metadata/dictionaries", nil, body, req.RequestID, &out); err != nil {
+	if err := c.invokePayload(ctx, "metadata.dictionary.create_namespace", CapabilityDictionaryManage, http.MethodPost, "/api/v1/tenant/metadata/dictionaries", nil, body, req.RequestID, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -88,7 +88,7 @@ func (c *Client) ListDictionaryItems(ctx context.Context, req ListDictionaryItem
 	query := c.pageQuery(req.Page, req.PageSize, req.Locale)
 	setQuery(query, "status", req.Status)
 	setQuery(query, "q", req.Query)
-	endpoint := fmt.Sprintf("/api/v1/admin/metadata/dictionaries/%s/items", strings.TrimSpace(req.NamespaceUUID))
+	endpoint := fmt.Sprintf("/api/v1/tenant/metadata/dictionaries/%s/items", strings.TrimSpace(req.NamespaceUUID))
 	return invokePage[DictionaryItem](c, ctx, "metadata.dictionary.list_items", CapabilityDictionaryRead, http.MethodGet, endpoint, query, nil, req.RequestID)
 }
 
@@ -105,7 +105,7 @@ func (c *Client) CreateDictionaryItem(ctx context.Context, req CreateDictionaryI
 		"description_i18n": req.DescriptionI18n,
 		"sort_order":       req.SortOrder,
 	}
-	endpoint := fmt.Sprintf("/api/v1/admin/metadata/dictionaries/%s/items", strings.TrimSpace(req.NamespaceUUID))
+	endpoint := fmt.Sprintf("/api/v1/tenant/metadata/dictionaries/%s/items", strings.TrimSpace(req.NamespaceUUID))
 	var out DictionaryItem
 	if err := c.invokePayload(ctx, "metadata.dictionary.create_item", CapabilityDictionaryManage, http.MethodPost, endpoint, nil, body, req.RequestID, &out); err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (c *Client) ListTaxonomies(ctx context.Context, req ListTaxonomiesRequest) 
 	setQuery(query, "module", req.Module)
 	setQuery(query, "status", req.Status)
 	setQuery(query, "q", req.Query)
-	return invokePage[Taxonomy](c, ctx, "metadata.taxonomy.list", CapabilityTaxonomyRead, http.MethodGet, "/api/v1/admin/metadata/taxonomies", query, nil, req.RequestID)
+	return invokePage[Taxonomy](c, ctx, "metadata.taxonomy.list", CapabilityTaxonomyRead, http.MethodGet, "/api/v1/tenant/metadata/taxonomies", query, nil, req.RequestID)
 }
 
 func (c *Client) CreateTaxonomy(ctx context.Context, req CreateTaxonomyRequest) (*Taxonomy, error) {
@@ -161,7 +161,7 @@ func (c *Client) CreateTaxonomy(ctx context.Context, req CreateTaxonomyRequest) 
 		"max_depth":        req.MaxDepth,
 	}
 	var out Taxonomy
-	if err := c.invokePayload(ctx, "metadata.taxonomy.create", CapabilityTaxonomyManage, http.MethodPost, "/api/v1/admin/metadata/taxonomies", nil, body, req.RequestID, &out); err != nil {
+	if err := c.invokePayload(ctx, "metadata.taxonomy.create", CapabilityTaxonomyManage, http.MethodPost, "/api/v1/tenant/metadata/taxonomies", nil, body, req.RequestID, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -191,7 +191,7 @@ func (c *Client) ListTaxonomyNodes(ctx context.Context, req ListTaxonomyNodesReq
 	query := c.pageQuery(req.Page, req.PageSize, req.Locale)
 	setQuery(query, "status", req.Status)
 	setQuery(query, "q", req.Query)
-	endpoint := fmt.Sprintf("/api/v1/admin/metadata/taxonomies/%s/nodes", strings.TrimSpace(req.TaxonomyUUID))
+	endpoint := fmt.Sprintf("/api/v1/tenant/metadata/taxonomies/%s/nodes", strings.TrimSpace(req.TaxonomyUUID))
 	return invokePage[TaxonomyNode](c, ctx, "metadata.taxonomy.list_nodes", CapabilityTaxonomyRead, http.MethodGet, endpoint, query, nil, req.RequestID)
 }
 
@@ -209,7 +209,7 @@ func (c *Client) CreateTaxonomyNode(ctx context.Context, req CreateTaxonomyNodeR
 		"description_i18n": req.DescriptionI18n,
 		"sort_order":       req.SortOrder,
 	}
-	endpoint := fmt.Sprintf("/api/v1/admin/metadata/taxonomies/%s/nodes", strings.TrimSpace(req.TaxonomyUUID))
+	endpoint := fmt.Sprintf("/api/v1/tenant/metadata/taxonomies/%s/nodes", strings.TrimSpace(req.TaxonomyUUID))
 	var out TaxonomyNode
 	if err := c.invokePayload(ctx, "metadata.taxonomy.create_node", CapabilityTaxonomyManage, http.MethodPost, endpoint, nil, body, req.RequestID, &out); err != nil {
 		return nil, err
@@ -248,7 +248,7 @@ func (c *Client) ListTags(ctx context.Context, req ListTagsRequest) (*Page[Tag],
 	setQuery(query, "resource_type", req.ResourceType)
 	setQuery(query, "status", req.Status)
 	setQuery(query, "q", req.Query)
-	return invokePage[Tag](c, ctx, "metadata.tag.list", CapabilityTagRead, http.MethodGet, "/api/v1/admin/metadata/tags", query, nil, req.RequestID)
+	return invokePage[Tag](c, ctx, "metadata.tag.list", CapabilityTagRead, http.MethodGet, "/api/v1/tenant/metadata/tags", query, nil, req.RequestID)
 }
 
 func (c *Client) CreateTag(ctx context.Context, req CreateTagRequest) (*Tag, error) {
@@ -270,7 +270,7 @@ func (c *Client) CreateTag(ctx context.Context, req CreateTagRequest) (*Tag, err
 		"description_i18n": req.DescriptionI18n,
 	}
 	var out Tag
-	if err := c.invokePayload(ctx, "metadata.tag.create", CapabilityTagManage, http.MethodPost, "/api/v1/admin/metadata/tags", nil, body, req.RequestID, &out); err != nil {
+	if err := c.invokePayload(ctx, "metadata.tag.create", CapabilityTagManage, http.MethodPost, "/api/v1/tenant/metadata/tags", nil, body, req.RequestID, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -308,21 +308,7 @@ func (c *Client) ListTagBindings(ctx context.Context, req ListTagBindingsRequest
 	if strings.TrimSpace(req.ResourceUUID) == "" {
 		return nil, invalid("metadata.tag_binding.list", "metadata: resource_uuid is required")
 	}
-	query := map[string]any{
-		"resource_type": strings.TrimSpace(req.ResourceType),
-		"resource_uuid": strings.TrimSpace(req.ResourceUUID),
-	}
-	setQuery(query, "locale", firstNonEmpty(req.Locale, c.locale))
-	var envelope struct {
-		Items []TagBinding `json:"items"`
-	}
-	if err := c.invokePayload(ctx, "metadata.tag_binding.list", CapabilityTagRead, http.MethodGet, "/api/v1/admin/metadata/tag-bindings", query, nil, req.RequestID, &envelope); err != nil {
-		return nil, err
-	}
-	if envelope.Items == nil {
-		envelope.Items = []TagBinding{}
-	}
-	return envelope.Items, nil
+	return nil, &Error{Code: CodeInvalidArgument, Message: "metadata tenant Host Contract does not expose tag-binding enumeration", Operation: "metadata.tag_binding.list"}
 }
 
 func (c *Client) ReplaceTagBindings(ctx context.Context, req ReplaceTagBindingsRequest) ([]TagBinding, error) {
@@ -332,21 +318,7 @@ func (c *Client) ReplaceTagBindings(ctx context.Context, req ReplaceTagBindingsR
 	if strings.TrimSpace(req.ResourceUUID) == "" {
 		return nil, invalid("metadata.tag_binding.replace", "metadata: resource_uuid is required")
 	}
-	body := map[string]any{
-		"resource_type": strings.TrimSpace(req.ResourceType),
-		"resource_uuid": strings.TrimSpace(req.ResourceUUID),
-		"tag_uuids":     append([]string(nil), req.TagUUIDs...),
-	}
-	var envelope struct {
-		Items []TagBinding `json:"items"`
-	}
-	if err := c.invokePayload(ctx, "metadata.tag_binding.replace", CapabilityTagManage, http.MethodPut, "/api/v1/admin/metadata/tag-bindings", nil, body, req.RequestID, &envelope); err != nil {
-		return nil, err
-	}
-	if envelope.Items == nil {
-		envelope.Items = []TagBinding{}
-	}
-	return envelope.Items, nil
+	return nil, &Error{Code: CodeInvalidArgument, Message: "metadata tenant Host Contract does not expose tag-binding replacement", Operation: "metadata.tag_binding.replace"}
 }
 
 func (c *Client) ReplaceTagBindingsByCode(ctx context.Context, req ReplaceTagBindingsByCodeRequest) ([]TagBinding, error) {
@@ -380,7 +352,7 @@ func (c *Client) ListResourceTypes(ctx context.Context, req ListResourceTypesReq
 	setQuery(query, "module", req.Module)
 	setQuery(query, "status", req.Status)
 	setQuery(query, "q", req.Query)
-	return invokePage[ResourceType](c, ctx, "metadata.resource_type.list", CapabilityResourceTypeRead, http.MethodGet, "/api/v1/admin/metadata/resource-types", query, nil, req.RequestID)
+	return invokePage[ResourceType](c, ctx, "metadata.resource_type.list", CapabilityResourceTypeRead, http.MethodGet, "/api/v1/tenant/metadata/resource-types", query, nil, req.RequestID)
 }
 
 func (c *Client) CreateResourceType(ctx context.Context, req CreateResourceTypeRequest) (*ResourceType, error) {
@@ -399,7 +371,7 @@ func (c *Client) CreateResourceType(ctx context.Context, req CreateResourceTypeR
 		"binding_enabled":  req.BindingEnabled,
 	}
 	var out ResourceType
-	if err := c.invokePayload(ctx, "metadata.resource_type.create", CapabilityResourceTypeManage, http.MethodPost, "/api/v1/admin/metadata/resource-types", nil, body, req.RequestID, &out); err != nil {
+	if err := c.invokePayload(ctx, "metadata.resource_type.create", CapabilityResourceTypeManage, http.MethodPost, "/api/v1/tenant/metadata/resource-types", nil, body, req.RequestID, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

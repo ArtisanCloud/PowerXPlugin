@@ -27,12 +27,19 @@ func (a *Adapter) GetTenant(_ context.Context, tenantUUID string) (*fwiamcontrac
 }
 
 func (a *Adapter) ListDepartments(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Department, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeModeInvalid, "tenant uuid is required")
+	}
 	items, err := a.directory.ListDepartments(ctx, tenantUUID)
 	if err != nil {
 		return nil, err
 	}
 	byID := make(map[uint64]string, len(items))
 	for _, item := range items {
+		if firstNonEmpty(item.TenantUUID, item.TenantUuid) != tenantUUID {
+			return nil, fwiamerrors.New(fwiamerrors.CodeMemberNotFound, "department not found")
+		}
 		if strings.TrimSpace(item.UUID) == "" {
 			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local department is missing department_uuid")
 		}
@@ -60,13 +67,17 @@ func (a *Adapter) ListDepartments(ctx context.Context, tenantUUID string) ([]fwi
 }
 
 func (a *Adapter) ListMembers(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Member, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeModeInvalid, "tenant uuid is required")
+	}
 	items, err := a.directory.ListMembers(ctx, tenantUUID)
 	if err != nil {
 		return nil, err
 	}
 	result := make([]fwiamcontracts.Member, 0, len(items))
 	for _, item := range items {
-		if strings.TrimSpace(item.MemberUUID) == "" || strings.TrimSpace(item.UserUUID) == "" {
+		if strings.TrimSpace(item.TenantUUID) != tenantUUID || strings.TrimSpace(item.MemberUUID) == "" || strings.TrimSpace(item.UserUUID) == "" {
 			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local member is missing member_uuid or user_uuid")
 		}
 		result = append(result, memberFromInfo(item))
@@ -95,9 +106,17 @@ func (a *Adapter) ListMembersPage(ctx context.Context, tenantUUID string, reques
 }
 
 func (a *Adapter) GetMember(ctx context.Context, tenantUUID, memberUUID string) (*fwiamcontracts.Member, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	memberUUID = strings.TrimSpace(memberUUID)
+	if tenantUUID == "" || memberUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeModeInvalid, "tenant_uuid and member_uuid are required")
+	}
 	item, err := a.directory.GetMember(ctx, tenantUUID, memberUUID)
 	if err != nil {
 		return nil, mapMemberError(err)
+	}
+	if item == nil || strings.TrimSpace(item.TenantUUID) != tenantUUID || strings.TrimSpace(item.MemberUUID) != memberUUID || strings.TrimSpace(item.UserUUID) == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeMemberNotFound, "member not found")
 	}
 	member := memberFromInfo(*item)
 	return &member, nil
@@ -177,12 +196,19 @@ func (a *Adapter) BatchResolveMembersByDisplayNames(ctx context.Context, tenantU
 }
 
 func (a *Adapter) ListRoles(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Role, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, fwiamerrors.New(fwiamerrors.CodeModeInvalid, "tenant uuid is required")
+	}
 	items, err := a.directory.ListRoles(ctx, tenantUUID)
 	if err != nil {
 		return nil, err
 	}
 	result := make([]fwiamcontracts.Role, 0, len(items))
 	for _, item := range items {
+		if firstNonEmpty(item.TenantUUID, item.TenantUuid) != tenantUUID {
+			return nil, fwiamerrors.New(fwiamerrors.CodeMemberNotFound, "role not found")
+		}
 		if strings.TrimSpace(item.UUID) == "" {
 			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "local role is missing role_uuid")
 		}

@@ -71,4 +71,6 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	agentLifecycle := NewAgentLifecycleHandler(deps)
 	agent := router.Group("/agent-lifecycle")
 	agent.GET("/:agentUUID/health", agentLifecycle.Health)
+	agent.GET("/:agentUUID/health/history", agentLifecycle.HealthHistory)
+	agent.GET("/:agentUUID/bridge/state", agentLifecycle.BridgeState)
 }

@@ -5,6 +5,8 @@
 **Status**: Draft  
 **Input**: 基于 `docs/plan/023-framework-customer-auth.md`，为 PowerXPlugin Framework 定义面向 C 端外部用户的通用 Customer Identity/Auth 能力。该能力只解决插件如何识别、校验、获取 customer 身份和租户关系，不承载任何行业 customer 模型。
 
+> 2026-09-04 对齐：Customer 需补 Runtime Factory、`LocalCustomerStore` contract 与 delegated membership adapter；local 存储不必镜像 Core 内部 schema，但必须输出同形 `CustomerContext`。
+
 ## Clarifications
 
 ### Session 2026-06-24

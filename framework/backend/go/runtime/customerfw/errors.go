@@ -15,16 +15,40 @@ const (
 	CodeCustomerTenantRequired        ErrorCode = "CUSTOMER_TENANT_REQUIRED"
 	CodeCustomerMembershipRequired    ErrorCode = "CUSTOMER_MEMBERSHIP_REQUIRED"
 	CodeCustomerMembershipDisabled    ErrorCode = "CUSTOMER_MEMBERSHIP_DISABLED"
+	CodeCustomerForbidden             ErrorCode = "CUSTOMER_FORBIDDEN"
 	CodeCustomerDelegateUnavailable   ErrorCode = "CUSTOMER_DELEGATE_UNAVAILABLE"
 	CodeCustomerBootstrapFailed       ErrorCode = "CUSTOMER_BOOTSTRAP_FAILED"
 	CodeCustomerContextMissing        ErrorCode = "CUSTOMER_CONTEXT_MISSING"
 	CodeCustomerIdentitySourceBlocked ErrorCode = "CUSTOMER_IDENTITY_SOURCE_FORBIDDEN"
+	CodeCustomerInvalidArgument       ErrorCode = "CUSTOMER_INVALID_ARGUMENT"
+	CodeCustomerCredentialInvalid     ErrorCode = "CUSTOMER_CREDENTIAL_INVALID"
+	CodeCustomerIdentityNotFound      ErrorCode = "CUSTOMER_IDENTITY_NOT_FOUND"
 )
 
 type Error struct {
-	Code    ErrorCode `json:"code"`
-	Message string    `json:"message"`
-	Cause   error     `json:"-"`
+	StatusCode int       `json:"-"`
+	ReasonCode string    `json:"reason_code,omitempty"`
+	Code       ErrorCode `json:"code"`
+	Message    string    `json:"message"`
+	Cause      error     `json:"-"`
+}
+
+// HTTPStatus preserves a formal Core error status across wrapping. Local
+// errors continue to use the Framework's semantic code mapping.
+func HTTPStatus(err error) int {
+	var typed *Error
+	if errors.As(err, &typed) && typed != nil && typed.StatusCode >= 400 && typed.StatusCode <= 599 {
+		return typed.StatusCode
+	}
+	return HTTPStatusForCode(CodeOf(err))
+}
+
+func ReasonOf(err error) string {
+	var typed *Error
+	if errors.As(err, &typed) && typed != nil && typed.ReasonCode != "" {
+		return typed.ReasonCode
+	}
+	return string(CodeOf(err))
 }
 
 func (e *Error) Error() string {
@@ -70,12 +94,14 @@ func CodeOf(err error) ErrorCode {
 
 func HTTPStatusForCode(code ErrorCode) int {
 	switch code {
-	case CodeCustomerTokenMissing, CodeCustomerTokenInvalid, CodeCustomerUnauthenticated, CodeCustomerContextMissing:
+	case CodeCustomerTokenMissing, CodeCustomerTokenInvalid, CodeCustomerUnauthenticated, CodeCustomerContextMissing, CodeCustomerCredentialInvalid:
 		return http.StatusUnauthorized
-	case CodeCustomerTenantMismatch, CodeCustomerMembershipRequired, CodeCustomerMembershipDisabled, CodeCustomerIdentitySourceBlocked:
+	case CodeCustomerTenantMismatch, CodeCustomerMembershipRequired, CodeCustomerMembershipDisabled, CodeCustomerForbidden, CodeCustomerIdentitySourceBlocked:
 		return http.StatusForbidden
-	case CodeCustomerTenantRequired, CodeCustomerBootstrapFailed:
+	case CodeCustomerTenantRequired, CodeCustomerBootstrapFailed, CodeCustomerInvalidArgument:
 		return http.StatusBadRequest
+	case CodeCustomerIdentityNotFound:
+		return http.StatusNotFound
 	case CodeCustomerDelegateUnavailable:
 		return http.StatusServiceUnavailable
 	default:

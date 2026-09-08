@@ -73,16 +73,22 @@ Current skeleton examples:
 
 ## 7. Agent SSE Probe
 
-Use PowerX Core probe endpoint through plugin backend:
+Subscribe to an existing service-session invocation through the plugin backend.
+Create the session, append a user message, and POST its message UUID to
+`/plugin/agent/sessions/{session_uuid}/invocations` with an `Idempotency-Key`
+before subscribing. The browser uses plugin admin credentials; only Framework
+uses STS when calling Core. Disconnecting the subscription does not cancel work.
 
 ```bash
-curl -N "http://127.0.0.1:8078/api/v1/plugin/agent/stream/sse?agent_id=<agent>&session_id=<session>&trace_id=<trace>&q=hello"
+curl -N "http://127.0.0.1:8078/api/v1/plugin/agent/sessions/$SESSION_UUID/invocations/$INVOCATION_UUID/events" \
+  -H "Authorization: Bearer $PLUGIN_ADMIN_TOKEN" -H 'Accept: text/event-stream'
 ```
 
 Expected:
 
 - HTTP 200 for valid configuration.
-- Raw Agent SSE event names preserved.
+- Events are state/final/error/end, not token or agent_run events. Only explicit
+  end terminates a complete subscription; cancelling uses a separate POST cancel.
 - Errors mapped to stable framework error events with trace/request IDs.
 
 ## 8. Verified commands

@@ -207,6 +207,25 @@ func TestCatalogServiceListSourceAllMergesCorexAndPlugin(t *testing.T) {
 	}
 }
 
+func TestCatalogServicePlatformEntryPreservesProviderMetadata(t *testing.T) {
+	svc := &CatalogService{}
+	entries := svc.fromPlatformRecords([]gateway.PlatformCapabilityRecord{{
+		CapabilityID:  "com.powerx.plugins.scrm.leads.read",
+		PluginID:      "com.powerx.plugins.scrm",
+		PluginVersion: "1.2.3",
+		Source:        "plugin",
+	}})
+	if len(entries) != 1 {
+		t.Fatalf("entries=%d, want 1", len(entries))
+	}
+	if entries[0].ProviderPluginID != "com.powerx.plugins.scrm" {
+		t.Fatalf("provider_plugin_id=%q", entries[0].ProviderPluginID)
+	}
+	if entries[0].Source != "plugin" {
+		t.Fatalf("source=%q", entries[0].Source)
+	}
+}
+
 func TestCatalogServiceListSourceAnyEqualsAll(t *testing.T) {
 	svc := &CatalogService{
 		manager: &fakeCatalogManager{

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
+
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -211,7 +213,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input any, out
 		return err
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(payload)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(payload, "AI_UPSTREAM_DEPENDENCY"), Body: string(payload)}
 	}
 	if output == nil {
 		return nil
@@ -230,6 +232,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input any, out
 
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 

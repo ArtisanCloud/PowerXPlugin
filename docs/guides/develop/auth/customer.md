@@ -4,7 +4,7 @@
 
 Customer Identity/Auth 是 PowerXPlugin framework 提供给插件的通用 C 端身份能力。插件只依赖 framework 注入的 `CustomerContext`，不用在业务模块里重复解析 token、判断 tenant、校验 membership。
 
-生产环境的 customer 主数据、登录身份、租户 membership、shared app 入口和 session 审计归属 PowerX Core。PowerXPlugin framework 不拥有生产 customer 表，只提供 runtime contract、middleware、delegated adapter、测试工具和 local dev mirror 规则。插件 local 模式里的 customer 表只是开发调试镜像，必须与 PowerX Core customer schema 保持兼容。
+生产环境的 customer 主数据、登录身份、租户 membership、shared app 入口和 session 审计归属 PowerX Core。PowerXPlugin framework 不拥有生产 customer 表，只提供 runtime contract、middleware、delegated adapter、测试工具和 local adapter 规则。插件 local 模式可以保有自己的 Customer 存储实现，但必须实现同一 Framework contract，保证 UUID、状态、membership、roles/scopes 和 `CustomerContext` 语义一致；不得复制或依赖 Core 内部表结构。模式选择属于 Framework Runtime Factory，插件业务层不得自行分流。详见《[Framework 双模式业务模块规范](../framework-dual-mode-business-modules.md)》。
 
 Framework 只负责这些通用能力：
 
@@ -35,7 +35,7 @@ PowerX Core 是 Customer Identity/Auth 的生产权威源：
 插件 local 模式规则：
 
 1. local customer 表只用于本地开发和调试，不是生产 schema 决策来源。
-2. local 表必须镜像 PowerX Core customer 字段、状态枚举和 membership 语义。
+2. local adapter 必须满足 PowerX Core customer contract 的身份、状态和 membership 语义，但不要求镜像 Core 内部表字段或表名。
 3. PowerX Core customer schema 调整后，PowerXPlugin skeleton/scaffold 和插件 local mirror 必须同步。
 4. 插件不得把家长、球员、学员、患者、粉丝等行业字段加入 framework customer 表。
 5. 生产环境必须委托 PowerX Core 或平台级 identity source，禁止静默回退到 local/mock。
@@ -178,6 +178,11 @@ flowchart LR
 
 ### 微信小程序登录
 
+当前支持边界（2026-09-08）：本节旧 Core 微信委托流程不再适用，不能据此接入。
+Framework 已移除 `/customer/auth/wechat/login` 旧客户端；当前正式 Core Auth adapter
+只接受已实现的 Shopify Storefront 验证通道。微信换码工具只能由插件 local adapter
+显式使用，不能推断 Core 已提供相同 verifier。后续 Core 发布其他正式 channel 后再扩展。
+
 Shared App 模式下，小程序 AppID/AppSecret 属于平台或共享小程序配置，不属于单个租户。租户识别必须来自合法入口解析结果，例如 `mini_app_entries` 返回的 `tenant_uuid`、`entry_code`、`scene` 或邀请链接上下文。没有 tenant 入口上下文的请求必须拒绝，不允许静默落到默认租户。
 
 微信小程序登录流程：
@@ -215,9 +220,9 @@ Framework 提供的通用能力：
 插件侧只做两件事：
 
 1. 小程序端调用 `uni.login({ provider: "weixin" })` 获取 `code`。
-2. 插件后端把 `code + tenant_uuid` 传给 `customerfw.LoginInput{Channel: customerfw.CustomerAuthChannelWeChatMiniApp}`。
+2. 插件后端从已校验的小程序入口、邀请码或 scene 上下文解析 tenant，并将该受信任上下文交给 `customerfw.LoginInput{Channel: customerfw.CustomerAuthChannelWeChatMiniApp}`；客户端请求不得自行指定 tenant。
 
-PowerX Core 或 local dev mirror 负责：
+PowerX Core adapter 或插件注入的 local adapter 负责：
 
 1. 用 PowerWechat/code2session 换取 `openid`、`unionid`、`session_key`。
 2. 以 `provider=wechat`、`provider_subject=openid` 绑定通用 customer。

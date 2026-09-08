@@ -2,10 +2,12 @@
 
 export * from "./useTemplate";
 export * from "./useStream";
+export * from "./useAgentSessions";
 export * from "./useCapabilityRegistry";
 export * from "./useCapabilityExposure";
 export * from "./useCapabilityLifecycle";
 export * from "./useCapabilityCatalog";
+export * from "./useHostContractLab";
 export * from "./useScheduler";
 export {
   useApiClient,

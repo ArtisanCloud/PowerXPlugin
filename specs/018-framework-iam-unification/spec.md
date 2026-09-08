@@ -5,6 +5,8 @@
 **Status**: Draft  
 **Input**: User description: "把 local/delegated 的 IAM 统一接口上提到 framework（组织、成员、角色、权限、token、上下文解析），输出 framework iam 契约 + adapter 机制；skeleton 只做实现适配。"
 
+> 2026-09-04 对齐：IAM Registry 是双模式 Runtime Factory 样板；local bundle 由插件注入，delegated bundle 只调 Core Host Contract，缺 adapter 明确失败。
+
 ## Clarifications
 
 ### Session 2026-04-11

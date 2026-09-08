@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
+	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
@@ -27,6 +29,7 @@ type CatalogService struct {
 	descriptorCache    map[string]*descriptorMetadata
 	descriptorCacheMux sync.RWMutex
 	cfg                *config.Config
+	capabilityRuntime  *fwcapability.Runtime
 }
 
 type gatewayClient interface {
@@ -60,11 +63,26 @@ func NewCatalogService(deps *app.Deps) *CatalogService {
 		return nil
 	}
 	return &CatalogService{
-		manager:         mgr,
-		gateway:         deps.CapabilityGateway,
-		cfg:             deps.Config,
-		descriptorCache: make(map[string]*descriptorMetadata),
+		manager:           mgr,
+		gateway:           deps.CapabilityGateway,
+		cfg:               deps.Config,
+		capabilityRuntime: deps.CapabilityAccess,
+		descriptorCache:   make(map[string]*descriptorMetadata),
 	}
+}
+
+// GrantStatus returns Core's effective grant result for the current service
+// credential. It intentionally has no local fallback: catalog presence is not
+// evidence of a grant.
+func (s *CatalogService) GrantStatus(ctx context.Context, capabilityIDs []string) ([]powerxcapability.GrantStatusItem, error) {
+	if s == nil || s.capabilityRuntime == nil {
+		return nil, errors.New("capability grant-status client not configured")
+	}
+	registry, err := s.capabilityRuntime.Registry()
+	if err != nil {
+		return nil, err
+	}
+	return registry.GrantStatus(ctx, powerxcapability.GrantStatusInput{CapabilityIDs: capabilityIDs})
 }
 
 // List returns the normalized capability entries from the catalog snapshot.
@@ -217,10 +235,12 @@ func (s *CatalogService) fromPlatformRecords(records []gateway.PlatformCapabilit
 	result := make([]capabilities.CatalogEntry, 0, len(records))
 	for _, record := range records {
 		entry := capabilities.CatalogEntry{
-			ID:        strings.TrimSpace(record.CapabilityID),
-			Version:   strings.TrimSpace(record.PluginVersion),
-			Tags:      append([]string{}, record.Categories...),
-			Protocols: convertPlatformProtocols(record.Protocols),
+			ID:               strings.TrimSpace(record.CapabilityID),
+			ProviderPluginID: strings.TrimSpace(record.PluginID),
+			Source:           strings.TrimSpace(record.Source),
+			Version:          strings.TrimSpace(record.PluginVersion),
+			Tags:             append([]string{}, record.Categories...),
+			Protocols:        convertPlatformProtocols(record.Protocols),
 			Execution: capabilities.ExecutionConfig{
 				Mode: strings.ToLower(strings.TrimSpace(record.ExecutionMode)),
 			},

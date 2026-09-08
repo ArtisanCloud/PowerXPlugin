@@ -3,7 +3,6 @@ package miniapp
 import (
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	"{{ .BackendModulePath }}/internal/contracts"
-	customersvc "{{ .BackendModulePath }}/internal/services/customer"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
 	"{{ .BackendModulePath }}/internal/transport/http/mini-app/customerhttp"
@@ -31,7 +30,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	protected := base.Group(
 		"",
 		customerhttp.Authenticate(deps),
-		customerfw.RequireMembership(customersvc.NewFrameworkMembershipResolver(deps.DB)),
+		customerhttp.RequireMembership(deps),
 		httpmw.EnsureTenant(),
 	)
 	protected.GET("/ping", ping)

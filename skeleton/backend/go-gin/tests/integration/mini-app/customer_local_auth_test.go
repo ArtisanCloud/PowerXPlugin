@@ -11,10 +11,13 @@ import (
 	"testing"
 	"time"
 
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
+	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/mini-app"
 	"github.com/gin-gonic/gin"
@@ -306,6 +309,22 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 		},
 	}
 	deps := &app.Deps{Config: cfg, Ctx: context.Background(), DB: db}
+	localExternal, err := customersvc.NewLocalExternalIdentityResolver(db, "test-plugin")
+	if err != nil {
+		t.Fatalf("new local external identity resolver: %v", err)
+	}
+	localStore := customersvc.NewLocalFrameworkCustomerStore(
+		customersvc.NewLocalFrameworkAuthClient(
+			customersvc.NewLocalAuthService(cfg, customerrepo.NewRepository(db)),
+			customersvc.NewFrameworkValidator(customersvc.NewAuthenticatorFactory(cfg, nil).Build()),
+		),
+		localExternal,
+		customersvc.NewFrameworkMembershipResolver(db),
+	)
+	deps.CustomerRuntime, err = customerfw.NewRuntime(fwprovider.ModeLocal, customerfw.AdaptersFromLocalStore(localStore), customerfw.RuntimeAdapters{})
+	if err != nil {
+		t.Fatalf("new local customer runtime: %v", err)
+	}
 
 	miniapp.RegisterAPIRoutes(g, deps)
 	return engine, deps

@@ -25,6 +25,7 @@ func RegisterRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		{
 			catalog.GET("", catalogHandler.List)
 			catalog.GET("/sources", catalogHandler.Sources)
+			catalog.POST("/grant-status", catalogHandler.GrantStatus)
 		}
 	}
 	group := rg.Group("/capabilities/register", httpmw.RequireRoot())

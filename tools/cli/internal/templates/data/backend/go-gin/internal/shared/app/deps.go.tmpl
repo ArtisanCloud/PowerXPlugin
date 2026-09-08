@@ -22,19 +22,29 @@ import (
 	"gorm.io/gorm"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
+	fwai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai"
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
+	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/media"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	fwnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/notifications"
+	fwpluginrelease "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginrelease"
+	fwpluginruntime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginruntime"
 	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
 	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
 	powerxknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/knowledge"
+	powerxmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/media"
 	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
 	powerxskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/skills"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	fwskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
@@ -61,15 +71,26 @@ type Deps struct {
 	Ctx                  context.Context
 	PowerXClient         *client.PowerXServiceClient
 	CapabilityGateway    gatewayClient
-	Metadata             *fwmetadata.Client
+	Metadata             *fwmetadata.Runtime
 	CustomerAdmin        *customerfw.AdminClient
+	CustomerRuntime      *customerfw.Runtime
 	AISettings           *fwaisettings.Client
+	AIInvocation         *fwai.Runtime
 	AI                   *powerxai.Client
+	AgentLifecycle       *fwagent.Runtime
 	AgentRuntime         *powerxagent.Client
+	CapabilityAccess     *fwcapability.Runtime
 	CapabilityRegistry   powerxcapability.Registry
+	IntegrationGateway   *fwintegration.Runtime
+	MediaCatalog         *fwmedia.Runtime
+	Media                powerxmedia.AssetReader
+	PluginRuntime        *fwpluginruntime.Runtime
+	PluginRelease        *fwpluginrelease.Runtime
 	KnowledgeQABridge    powerxknowledge.QABridge
 	KnowledgeDirectory   fwknowledge.DelegatedClient
+	NotificationDelivery *fwnotifications.Runtime
 	Notifications        powerxnotifications.Publisher
+	SkillInvocation      *fwskills.Runtime
 	Skills               powerxskills.Invoker
 	Config               *config.Config
 	CapabilitiesManager  capabilities.Manager
@@ -109,12 +130,6 @@ type gatewayClient interface {
 	SyncPluginSkill(ctx context.Context, params gateway.PluginSkillSyncParams) (*gateway.PluginSkillSyncResult, error)
 	SyncPluginAgent(ctx context.Context, params gateway.PluginAgentSyncParams) (*gateway.PluginAgentSyncResult, error)
 	RegisterCatalog(ctx context.Context, catalog *capabilities.CatalogSnapshot, assets []capabilities.ProtocolAsset) error
-	CreateAgentSession(ctx context.Context, params gateway.AgentSessionParams) (*gateway.AgentSessionRecord, error)
-	ListAgentSessions(ctx context.Context, opts gateway.AgentSessionListOptions) ([]gateway.AgentSessionRecord, error)
-	ListAgentSessionMessages(ctx context.Context, opts gateway.AgentSessionMessageListOptions) ([]gateway.AgentSessionMessageRecord, error)
-	DeleteAgentSession(ctx context.Context, opts gateway.AgentSessionMutationOptions) error
-	ArchiveAgentSession(ctx context.Context, opts gateway.AgentSessionMutationOptions) error
-	StreamAgentSSE(ctx context.Context, params gateway.AgentStreamParams) (*gateway.AgentStream, error)
 	Close() error
 }
 

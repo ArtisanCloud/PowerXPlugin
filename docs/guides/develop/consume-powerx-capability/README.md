@@ -1,5 +1,7 @@
 # PowerX 能力消费操作手册
 
+> **2026-09-08：业务模块接入已统一至 [Framework 业务模块接入指南（local / delegated）](../../features/009-consume-powerx-capability/guide.md)。** 下文仅保留早期通用 Gateway/Capability Lab 的历史说明，不作为新业务装配或授权依据。local 必须注入插件实现；API Key 是单独的远程开发验证，不是 local 数据实现。新业务不复制本页旧协议 payload，而使用主指南对应的 typed contract。
+
 > 适用范围：PowerXPlugin 仓库（插件后端 + web-admin + Skeleton），覆盖宿主 Delegated 模式与 Skeleton Standalone 模式。  
 > 关联文档：[`docs/plan/009-consume-powerx-capability.md`](../../plan/009-consume-powerx-capability.md)、PowerX 底座指南 [`PowerX/docs/guides/develop/open_capability`](../../../../PowerX/Core/PowerX/docs/guides/develop/open_capability)。
 
@@ -151,7 +153,7 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
    - HTTP handler 统一调用 `transport/http/middleware.RequireCapabilityGateway`，确保网关不可用时输出一致的 503 结构。
 4. **前端调用**：
    - 使用 `framework/frontend/nuxt/framework-admin/layer/app/plugins/powerx-capability.client.ts` 或 `usePowerXCapability` composable，调用插件后端 API。
-   - 支持在 UI 中展示 Gateway TraceId、Mock 提示、警告（如契约版本过期 -> 服务端会设置 `X-PowerX-Contract-Status` header）。
+   - 支持在 UI 中展示 Gateway TraceId 与结构化失败原因；不以 Mock 或本地数据替代失败结果。
 5. **观测**：
    - `framework/backend/go/observability` 记录 `capabilityId`、`tenantUUID`、`traceId`。
    - `docs/operations/observability.md` 记录指标与排障步骤。
@@ -160,16 +162,14 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 
 1. **环境准备**：
    - 根据 `.env.local` 模板手动写入 `PX_GATEWAY_BASE_URL/PX_GATEWAY_AUTH_SCHEME=apikey/PX_GATEWAY_API_KEY`。
-   - `skeleton/backend/.env.example` 默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`。若暂时没有 ApiKey，可把 `PX_USE_MOCK=media` 等写入以验证前后端链路。
-   - 可选：`PX_USE_MOCK=<module>` 用于 Dev Gateway 不可达时的 Mock。
+   - `skeleton/backend/.env.example` 默认把 `PX_GATEWAY_BASE_URL` 指向 `http://127.0.0.1:8077`。没有被精确授权的 ApiKey 时，必须先完成 capability grant；不得用 Mock 验证正式 Host Contract。
 2. **后端配置**：
-   - `skeleton/backend/go-gin/internal/integrations/gateway` 包装框架 Gateway Client，支持 Mock/离线提示。
-   - `skeleton/backend/go-gin/cmd/server/main.go` 在启动时检测 Token 过期、输出提示。
+   - `skeleton/backend/go-gin/internal/integrations/gateway` 包装框架 Gateway Client，并保留 Gateway 结构化错误。
+   - `skeleton/backend/go-gin/cmd/server/main.go` 在启动时校验受控凭证配置，缺失时输出诊断并拒绝对应调用。
 3. **前端**：
    - `skeleton/web-admin/nuxt` 复用和宿主一致的 `powerx-capability` 插件，只不过 `runtimeConfig.public.powerx.apiBase` 默认为本地 `http://127.0.0.1:8078/api/v1`。
 4. **调试**：
-   - `npm --prefix skeleton/web-admin/nuxt run dev -- --use-mock=media` 可在前端快速切 Mock。
-   - `scripts/capabilities/run-from-package.mjs --mode skeleton --manifest ./skeleton/plugin.yaml --cap <capabilityId>` 自动读取 `.env.local` 并打印请求/响应日志。（当前版本 `--use-mock` 选项存在 “mock is not defined” Bug，需后续修复。）
+   - `scripts/capabilities/run-from-package.mjs --mode skeleton --manifest ./skeleton/plugin.yaml --cap <capabilityId>` 自动读取本地受控配置并打印请求/响应日志。
 5. **观测**：
    - Skeleton 后端同样会记录 `traceId`/限流事件，便于复现宿主场景。
 
@@ -198,19 +198,17 @@ Plugin Web Admin ──(HTTPS)──> 插件后端 API (/api/v1/integration/capa
 
 ## 6. Skeleton 能力调试页（Capability Lab）
 
-Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“能力”分组下的“开放能力调试”入口），仅 `IsRoot`/系统管理员可打开。该页面与正式业务共用同一后端 `/api/v1/integration/capabilities/invoke`，方便开发者在本地验证 Gateway 链路、Mock 及契约告警。能力下拉会请求插件后端 `/api/v1/admin/capabilities?source=corex`，后端再通过 Gateway 调用 PowerX `/tenant/capabilities` 获取最新的 `source=corex` 底座能力，因此模块/Action/协议信息与底座文档保持实时一致；若未携带 `source` 参数，则继续返回本地 manifest 数据以兼容其他管理页面。页面直接依据实时的 PowerX Capability Catalog 生成「模块 → 能力 → Action」三级联动，并在选择 REST Action 时**自动填充包含 `preferredProtocol/method/endpoint/query/body` 的模板**，提示你补齐 `/tenant/invocations` 所需字段；gRPC/Workflow/其他协议同样会根据 catalog 返回值自动补齐 service/method/字段，无需再借助本地 mock。
+Skeleton web-admin 已内置 `/powerx/capability-lab` 页面（侧边导航“能力”分组下的“开放能力调试”入口），仅 `IsRoot`/系统管理员可打开。该页面与正式业务共用同一后端 `/api/v1/integration/capabilities/invoke`，用于本地验证 Gateway 链路及契约告警。能力下拉会请求插件后端 `/api/v1/admin/capabilities?source=corex`，后端再通过 Gateway 调用 PowerX `/tenant/capabilities` 获取最新的 `source=corex` 底座能力，因此模块/Action/协议信息与底座文档保持实时一致；若未携带 `source` 参数，则继续返回本地 manifest 数据供其他管理页面使用。页面直接依据实时的 PowerX Capability Catalog 生成「模块 → 能力 → Action」三级联动，并在选择 REST Action 时**自动填充包含 `preferredProtocol/method/endpoint/query/body` 的模板**，提示你补齐 `/tenant/invocations` 所需字段；gRPC/Workflow/其他协议同样会根据 catalog 返回值自动补齐 service/method/字段。
 
 **使用步骤**
 
 1. 启动 `skeleton/backend/go-gin` 与 `skeleton/web-admin/nuxt`，使用 Root 账户登录后点击“开放能力调试”。
-2. 在“调用配置”卡片填写 `capabilityId`、`action` 和 JSON `payload`。选择 REST Action 后，Payload 区域会展示模板（含 `method`、`endpoint`、`headers`、`query`、`body`），并允许你一键插入；gRPC/Other Action 会提示协议类型与必填字段。可选参数包括：
-   - **Mock 模块**：在输入框填写模块名（如 `media`），页面会透传 `X-PX-Use-Mock: <module>` 到后端/Gateway；响应 `warnings` 中会标记“通过 X-PX-Use-Mock 请求 Mock 模块”，方便确认 Mock 是否生效。
-   - **Request ID / API Base**：用于调试自定义 `X-Request-ID` 或手动切换代理地址。
+2. 在“调用配置”卡片填写 `capabilityId`、`action` 和 JSON `payload`。选择 REST Action 后，Payload 区域会展示模板（含 `method`、`endpoint`、`headers`、`query`、`body`），并允许你一键插入；gRPC/Other Action 会提示协议类型与必填字段。可选参数仅包括 Request ID；前端不得输入 tenant、凭证或 Core API Base。
 3. “请求预览”实时展示最终 URL、Headers、Body，可一键复制到 curl / `.http` 文件。
-4. 调用完成后，“调用结果”显示状态、TraceId、耗时与 JSON 响应；若契约版本过期、Mock 被启用或 Gateway 返回提示，都会出现在 `warnings` 中。“最近记录”会缓存最近 5 条请求，便于回放。
-5. Gateway 不可达时，可在页面中指定 Mock 模块，或结合 `.env.local` 中的 `PX_USE_MOCK`，以验证前后端封装是否正常。
+4. 调用完成后，“调用结果”显示状态、TraceId、耗时与 JSON 响应；契约版本或 Gateway 返回的结构化提示会显示为 warnings。“最近记录”会缓存最近 5 条请求，便于回放。
+5. Gateway 不可达、认证失败或 capability 未获 grant 时，修复配置或授权后重新执行；不得以 Mock、本地数据或替代凭证绕过失败。
 
-> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理；调试头主要包含 `X-PX-Use-Mock` / `X-Request-ID`，`tenant_uuid` 不作为该页面固定输入项。
+> 页面不会直接暴露任何 `PX_*` 凭证，所有请求均通过插件后端代理；调试头仅含 `X-Request-ID` 等可追踪元数据，`tenant_uuid` 不作为页面输入项。
 
 ## 7. 常见问题 & 排障
 

@@ -5,6 +5,7 @@ import (
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 )
@@ -38,11 +39,7 @@ func NewBundle(proxy delegatedProxy) (fwiamadapters.Bundle, error) {
 		return fwiamadapters.Bundle{}, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, "delegated auth proxy is nil")
 	}
 	adapter := &Adapter{proxy: proxy}
-	return fwiamadapters.Bundle{
-		Directory: adapter,
-		Authz:     adapter,
-		Context:   adapter,
-	}, nil
+	return fwiamdelegated.NewBundle(adapter)
 }
 
 func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {

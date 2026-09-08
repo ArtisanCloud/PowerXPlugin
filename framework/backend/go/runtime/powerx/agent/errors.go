@@ -2,8 +2,11 @@ package agent
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 )
 
 const (
@@ -20,10 +23,12 @@ const (
 )
 
 type Error struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	TraceID   string `json:"trace_id,omitempty"`
-	RequestID string `json:"request_id,omitempty"`
+	StatusCode int    `json:"-"`
+	ReasonCode string `json:"reason_code,omitempty"`
+	Code       string `json:"code"`
+	Message    string `json:"message"`
+	TraceID    string `json:"trace_id,omitempty"`
+	RequestID  string `json:"request_id,omitempty"`
 }
 
 func (e *Error) Error() string {
@@ -38,6 +43,14 @@ func newError(code, message string) *Error {
 }
 
 func transportError(resp *http.Response) *Error {
+	var raw []byte
+	if resp != nil && resp.Body != nil {
+		raw, _ = io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	}
+	return transportErrorPayload(resp, raw)
+}
+
+func transportErrorPayload(resp *http.Response, raw []byte) *Error {
 	if resp == nil {
 		return newError(ErrCodeTransport, "empty agent response")
 	}
@@ -55,9 +68,11 @@ func transportError(resp *http.Response) *Error {
 		code = ErrCodeUnavailable
 	}
 	return &Error{
-		Code:      code,
-		Message:   fmt.Sprintf("agent host request failed: status=%d", resp.StatusCode),
-		TraceID:   strings.TrimSpace(resp.Header.Get("X-Trace-ID")),
-		RequestID: strings.TrimSpace(resp.Header.Get("X-Request-ID")),
+		StatusCode: resp.StatusCode,
+		ReasonCode: hostcontract.ParseReasonCode(raw, code),
+		Code:       code,
+		Message:    fmt.Sprintf("agent host request failed: status=%d", resp.StatusCode),
+		TraceID:    strings.TrimSpace(resp.Header.Get("X-Trace-ID")),
+		RequestID:  strings.TrimSpace(resp.Header.Get("X-Request-ID")),
 	}
 }

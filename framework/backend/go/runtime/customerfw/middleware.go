@@ -2,6 +2,7 @@ package customerfw
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -132,6 +133,12 @@ func Authenticate(validator CustomerTokenValidator, options ...AuthOption) gin.H
 			}
 		}
 
+		// Preserve the credential which was successfully validated. The
+		// delegated membership adapter needs this proof for Core; it must not
+		// reconstruct customer identity from CustomerContext fields.
+		if c.Request != nil {
+			c.Request = c.Request.WithContext(WithCustomerCredential(c.Request.Context(), credentials[0].Token))
+		}
 		SetGinContext(c, cc)
 		emitAudit(opts.audit, resolvedTenant, cc.CustomerUUID, cc.Source, true, latency, nil)
 		c.Next()
@@ -202,15 +209,20 @@ func DefaultTenantInjector(c *gin.Context, tenantUUID string) {
 
 func defaultErrorWriter(c *gin.Context, err error) {
 	code := CodeOf(err)
-	c.AbortWithStatusJSON(HTTPStatusForCode(code), gin.H{
+	c.AbortWithStatusJSON(HTTPStatus(err), gin.H{
 		"error": gin.H{
-			"code":    string(code),
-			"message": err.Error(),
+			"code":        string(code),
+			"reason_code": ReasonOf(err),
+			"message":     string(code),
 		},
 	})
 }
 
 func mapValidatorError(err error) error {
+	var typed *Error
+	if errors.As(err, &typed) && typed != nil {
+		return err
+	}
 	code := CodeOf(err)
 	if code != CodeCustomerTokenInvalid {
 		return err

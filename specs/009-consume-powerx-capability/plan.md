@@ -7,28 +7,22 @@
 
 ## Summary
 
-插件在宿主与 Skeleton 模式需要统一消费 PowerX 核心能力。我们将在 framework/backend/frontend/脚本层封装 Integration Gateway 调用（REST/gRPC）、Tool Grant 凭证、Mock 降级与观测，配合文档/CLI 引导 manifest 申领与速查，并确保调用链满足零信任、Tenant UUID、限流与 trace 要求。
+当前实施围绕 Framework contract → delegated client → 启动 Factory → 插件 local 注入 → 合同与安装验收推进。插件业务层不自行分流；本地 Store/事务由插件实现，Core 权威数据只通过正式 Host Contract 访问。
 
-- 关键交付：
-- Gateway Client + 后端服务封装：统一 `/tenant/invocations`/gRPC 调用、凭证注入、错误/trace 处理，并对前端暴露受控 API；
-- Runtime 策略统一：框架内置 `delegated/local` 模式分流、鉴权凭证约束、HTTP Guard 与启动期配置校验；
-- Delegated Gateway Contract v1：宿主注入 `PX_GATEWAY_BASE_URL + PX_PLUGIN_TOOL_TOKEN + PX_GATEWAY_AUTH_SCHEME=bearer`，插件按强约束 fail-fast；
-- Skeleton dev 体验：`px-plugin login`、`.env.local`、Mock 降级、CLI 辅助工具；
-- 契约升级守护：生成能力契约版本摘要、比对并提醒插件开发者在兼容窗口内升级；
-- 限流/配额治理：暴露配置入口、命令及观测指标，确保调用链尊重 Registry/租户额度。
+唯一对外入口为 [业务模块接入指南](../../docs/guides/features/009-consume-powerx-capability/guide.md)，[双模式规范](../../docs/guides/develop/framework-dual-mode-business-modules.md)维护共同规则，[覆盖台账](../../docs/contracts/powerx-core-framework-coverage.md)维护状态。示例随接口编译验证，不替代真实安装授权验收。
 
 ## Technical Context
 
 | 项目 | 说明 |
 | --- | --- |
 | Language/Version | Go 1.24 backend、TypeScript 5 + Nuxt 4.2（Node.js 20）frontend/scripts |
-| Primary Dependencies | Integration Gateway `/tenant/invocations` & gRPC、`@artisan-cloud/plugin-framework-*`、px-plugin CLI、STS/Tool Grant、`scripts/capabilities` |
-| Storage | 无新增持久层；仅依赖现有 manifest/config，Mock 数据存内存 |
-| Testing | Go `make test`、integration stub；Nuxt `npm test`/Playwright；`px-plugin capabilities plan|apply`；`scripts/capabilities/run-from-package.mjs` |
+| Primary Dependencies | Core Host Contract/OpenAPI、`@artisan-cloud/plugin-framework-*`、px-plugin CLI、STS service actor、Gateway API Key（仅本地调试）、`scripts/capabilities` |
+| Storage | 无新增持久层；仅依赖现有 manifest/config |
+| Testing | Go `make test`、typed-client/handler contract tests；Nuxt `npm test`/Playwright；manifest required-capability 静态校验 |
 | Target Platform | PowerX 插件 backend（Linux 宿主）+ web-admin（Nuxt SSR/static）+ Skeleton 本地环境 |
 | Project Type | 全栈插件（backend + web-admin + scripts + skeleton） |
-| Performance Goals | Gateway 调用 P95 < 2s；降级检测 < 5s；Trace 覆盖 ≥99%；能力申领失败率 <2% |
-| Constraints | 仅允许通过 Integration Gateway；`delegated` 模式仅允许 `PX_PLUGIN_TOOL_TOKEN` Bearer（禁止 `PX_TOOL_TOKEN`/ApiKey fallback）；缺失宿主注入凭证即启动失败；Skeleton Mock 必须提示；禁止访问宿主内部 API；契约升级需保留兼容窗口并发布提示 |
+| Performance Goals | Host Contract 调用 P95 < 2s；Trace 覆盖 ≥99%；capability grant 拒绝可诊断 |
+| Constraints | 通用调用仅通过 Integration Gateway；正式模块调用仅通过 Framework typed Host Contract；`delegated` 模式只使用宿主 STS service actor；本地 API Key 仅限精确 scope 的 Skeleton 调试；缺失凭证或 grant 必须显式失败；禁止访问宿主内部 API、请求注入 tenant 或 Mock/本地降级 |
 | Scale/Scope | 需覆盖 >50 CoreX 能力 ID、百 TPS 调用，支持多租户/多插件部署 |
 
 ## Constitution Check
@@ -36,9 +30,9 @@
 *GATE: Must pass before Phase 0 research. Phase 1 结束后复查。*
 
 - ✅ **Host Contract First**：所有能力通过 Gateway/Registry 契约，无内部 API 依赖。
-- ✅ **Tenant Isolation & Zero Trust**：框架注入 `tenant_uuid`、Tool Token、`X-Request-ID`/traceId，Skeleton 亦遵循。
+- ✅ **Tenant Isolation & Zero Trust**：Core 从 STS service actor 或 Gateway API Key 推导 tenant；Framework 保留 `X-Request-ID`/traceId，Skeleton 不接受调用方 tenant。
 - ✅ **Service-Centric Architecture**：Gateway Client 位于服务/框架层，Handler/前端仅使用接口。
-- ✅ **Observable & Testable Delivery**：设计包含统一日志、指标、限流事件、CLI/Mock 测试链路。
+- ✅ **Observable & Testable Delivery**：设计包含统一日志、指标、限流事件、CLI 与 typed-contract 测试链路。
 - ✅ **Minimal Footprint & Versioned Releases**：不增加新项目或持久层，沿用现有 Go/Nuxt 模板。
 
 ## Project Structure
@@ -55,7 +49,7 @@ specs/009-consume-powerx-capability/
 └── checklists/
 ```
 
-### Source Code (repository root)
+### Source Code（历史目录方案，不作为当前源码路径）
 
 ```text
 backend/
@@ -88,7 +82,7 @@ docs/
 
 无额外宪章违例需求；若后续新增项目/依赖将单独提 RFC。
 
-## Capability Contract Upgrade & Quota Strategy
+## Capability Contract Upgrade & Quota Strategy（历史规划，非交付承诺）
 
 1. **契约版本守护**
    - 在 `scripts/capabilities` 目录新增契约摘要生成脚本（Phase 3/4 依赖），将 `contracts/powerx-capability-invoke.openapi.yaml` 等资产写入 `dist/capability-contracts.json` 并记录版本号。
@@ -100,7 +94,7 @@ docs/
    - 在 `framework/backend/go/observability` 中暴露限流/配额指标（命中率、被拒绝次数），并在限流事件时写 `audit.capability.invocation.denied`。
    - 在 docs/operations 章节说明如何配置与监控限流/配额。
 
-## Runtime Gateway Policy Alignment
+## Runtime Gateway Policy Alignment（历史 Tool Token 阶段，非当前装配说明）
 
 1. **框架级 Host Capability Client**
    - 在 framework 层提供统一 client，内部完成 `detectRuntimeGatewayMode`、凭证策略分流、请求头注入、错误结构归一化。
@@ -118,3 +112,15 @@ docs/
    - PowerX 在插件进程启动环境中注入 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN`、`PX_GATEWAY_AUTH_SCHEME=bearer`。
    - PostEnable 执行“进程内凭证探活”（debug health check）；失败标记 `enable_failed_missing_gateway_credential`。
    - 默认 stub 下发路径不再视为成功路径，必须以插件进程可观测到变量并通过探活为准。
+
+## 2026-09-03 实施增量：Core Host Contract Lab
+
+本增量复用既有 Capability Lab、Framework typed client 与 Skeleton 后端代理，不新建第二套 Gateway client。它把“通用 capability 调试”和“正式 Core Host Contract 验收”明确分层：前者继续经 Capability Registry，后者通过具体模块的 Framework adapter。
+
+| 层 | 职责 | 不允许的行为 |
+| --- | --- | --- |
+| `Capability Lab` | 目录发现、通用 capability invoke、协议元数据诊断 | 充当 IAM/Knowledge 等正式 Host DTO 的替代客户端 |
+| `Host Contract Lab` | 强类型模块 probe、稳定错误映射、异步任务状态与 trace 展示 | 前端直连 Core、请求注入 tenant、静默 fallback |
+| Framework typed client | STS/API-Key 出站、DTO 映射与错误归一化 | 读取 Core 数据库或调用未声明的内部路由 |
+
+安装态 delegated 使用 STS service actor；Skeleton 的 API-Key 调试仅用于开发验证，不能替代安装态 capability grant 验收。任何 Host 写操作均采用单独的测试对象与显式确认，不作为默认 smoke test。

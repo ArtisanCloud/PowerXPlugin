@@ -5,6 +5,8 @@
 
 ## Summary
 
+`KnowledgeProvider` 的选择必须集中在 Framework Runtime Factory；旧 QA bridge 是独立诊断兼容面，不能作为 delegated Host Contract 失败时的回退。
+
 将智能体知识库能力抽象为 PowerXPlugin Framework 的通用 runtime contract。Framework 负责 provider 选择、统一 search/retrieve/upsert/delete/reindex 契约、local/delegated provider 边界、tenant/plugin/agent/skill 作用域、引用/citation、稳定错误、诊断和测试 helper。Skeleton 保留装配、示例和 runtime debug 入口，scaffold/CLI 模板同步；生产默认委托 PowerX Core，不允许静默 local fallback。
 
 ## Technical Context

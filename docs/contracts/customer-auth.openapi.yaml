@@ -3,6 +3,11 @@ info:
   title: Framework Customer Identity/Auth Contract
   version: 0.1.0
   description: >
+    Historical plugin-facing proposal, NOT a PowerX Core Host Contract.
+    The legacy Framework delegated transport for these paths was removed on
+    2026-09-08. Core authentication uses /api/v1/tenant/customer/auth/register,
+    /login and /validate with the formal Core DTOs and service credentials.
+    This document must not be used to implement a delegated Core client.
     Framework-level customer identity/auth contract for protected C-end requests,
     tenant bootstrap, delegated customer auth, and membership validation. Concrete
     deployments may expose these as plugin endpoints or bind them as internal adapters.

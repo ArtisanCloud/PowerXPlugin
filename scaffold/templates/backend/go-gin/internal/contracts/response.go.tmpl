@@ -54,6 +54,11 @@ func ResponseSuccessWithMessage(c *gin.Context, data interface{}, message string
 	c.JSON(http.StatusOK, response)
 }
 
+// ResponseAccepted returns a 202 response with the standard plugin envelope.
+func ResponseAccepted(c *gin.Context, data interface{}) {
+	c.JSON(http.StatusAccepted, MakeSuccess(data, "", getRequestID(c)))
+}
+
 // ResponseCreated returns a 201 response with payload.
 func ResponseCreated(c *gin.Context, data interface{}) {
 	response := APIResponse{
@@ -77,6 +82,13 @@ func ResponseError(c *gin.Context, statusCode int, code, message string) {
 		RequestID: getRequestID(c),
 	}
 	c.JSON(statusCode, response)
+}
+
+// ResponseErrorWithReason exposes machine identifiers, not implementation text.
+func ResponseErrorWithReason(c *gin.Context, status int, code, reason string) {
+	response := MakeError(code, code, nil, getRequestID(c))
+	response.Error.ReasonCode = reason
+	c.JSON(status, response)
 }
 
 // ResponseErrorWithDetails 返回带详情的错误响应

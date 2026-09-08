@@ -19,11 +19,11 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	if admin == nil || deps == nil {
 		return
 	}
-	h := &Handler{
-		mode:      deps.ProviderMode,
-		delegated: deps.Metadata,
-		local:     metadatasvc.NewService(deps.DB),
+	var delegated fwmetadata.Service
+	if deps.Metadata != nil {
+		delegated, _ = deps.Metadata.Service()
 	}
+	h := &Handler{mode: deps.ProviderMode, delegated: delegated, local: metadatasvc.NewService(deps.DB)}
 	group := admin.Group("/metadata")
 	group.GET("/mode", h.Mode)
 	group.GET("/dictionaries", h.ListDictionaryNamespaces)
@@ -42,7 +42,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 
 type Handler struct {
 	mode      fwprovider.Mode
-	delegated *fwmetadata.Client
+	delegated fwmetadata.Service
 	local     *metadatasvc.Service
 }
 
@@ -388,7 +388,7 @@ func (h *Handler) diagnostics() admincommon.ProviderDiagnostics {
 
 func respondPage[T any](c *gin.Context, page *fwmetadata.Page[T], err error) {
 	if err != nil {
-		contracts.ResponseError(c, http.StatusBadGateway, "METADATA_GATEWAY_FAILED", err.Error())
+		respondMetadataError(c, err)
 		return
 	}
 	if page == nil {
@@ -411,10 +411,20 @@ func respondItem[T any](c *gin.Context, item *T, err error) {
 			contracts.ResponseErrorWithDetails(c, http.StatusConflict, "METADATA_DUPLICATE", message, gin.H{"field": field})
 			return
 		}
-		contracts.ResponseError(c, http.StatusBadGateway, "METADATA_GATEWAY_FAILED", err.Error())
+		respondMetadataError(c, err)
 		return
 	}
 	contracts.ResponseSuccess(c, gin.H{"payload": item})
+}
+
+func respondMetadataError(c *gin.Context, err error) {
+	code := fwmetadata.CodeOf(err)
+	status := fwmetadata.HTTPStatusForCode(code)
+	var hostErr *fwmetadata.Error
+	if errors.As(err, &hostErr) && hostErr.StatusCode >= 400 && hostErr.StatusCode <= 599 {
+		status = hostErr.StatusCode
+	}
+	contracts.ResponseError(c, status, string(code), string(code))
 }
 
 func duplicateMessage(field string) string {

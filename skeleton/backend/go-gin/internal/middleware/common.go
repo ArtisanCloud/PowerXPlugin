@@ -10,6 +10,7 @@ import (
 	"time"
 
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwmiddleware "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -146,48 +147,8 @@ func Recovery() gin.HandlerFunc {
 }
 
 // Timeout 超时中间件
-func Timeout(timeout time.Duration) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if isRealtimeStreamRequest(c.Request) {
-			c.Next()
-			return
-		}
-
-		// 简单的超时处理，实际使用中可能需要更复杂的实现
-		finish := make(chan struct{})
-		panicChan := make(chan interface{}, 1)
-
-		go func() {
-			defer func() {
-				if p := recover(); p != nil {
-					panicChan <- p
-				}
-			}()
-			c.Next()
-			finish <- struct{}{}
-		}()
-
-		select {
-		case p := <-panicChan:
-			panic(p)
-		case <-finish:
-			// 请求正常完成
-		case <-time.After(timeout):
-			requestID := strings.TrimSpace(c.GetString("request_id"))
-			if requestID != "" {
-				c.Header("X-Request-ID", requestID)
-			}
-			c.JSON(http.StatusRequestTimeout, gin.H{
-				"request_id": requestID,
-				"timestamp":  time.Now().UTC(),
-				"error": gin.H{
-					"code":    "REQUEST_TIMEOUT",
-					"message": "Request timeout",
-				},
-			})
-			c.Abort()
-		}
-	}
+func Timeout(timeout time.Duration, next http.Handler) http.Handler {
+	return fwmiddleware.TimeoutHandler(next, timeout, isRealtimeStreamRequest)
 }
 
 func isRealtimeStreamRequest(req *http.Request) bool {

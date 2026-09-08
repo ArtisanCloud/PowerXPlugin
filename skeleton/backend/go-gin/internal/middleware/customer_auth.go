@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,12 @@ import (
 // 以便后续 EnsureTenant() 能正确识别租户上下文（适用于 standalone 与宿主网关两种模式）。
 func CustomerAuth(authenticator customersvc.Authenticator, audit *customerobs.AuditLogger) gin.HandlerFunc {
 	validator := customersvc.NewFrameworkValidator(authenticator)
+	return CustomerAuthWithValidator(validator, audit)
+}
+
+// CustomerAuthWithValidator is the Runtime-facing form. The caller has already
+// selected local or delegated customer authentication through customerfw.
+func CustomerAuthWithValidator(validator customerfw.CustomerTokenValidator, audit *customerobs.AuditLogger) gin.HandlerFunc {
 	return customerfw.Authenticate(
 		validator,
 		customerfw.RequireTenant(),
@@ -34,6 +41,10 @@ func CustomerAuth(authenticator customersvc.Authenticator, audit *customerobs.Au
 		}),
 		customerfw.WithErrorWriter(writeCustomerFrameworkError),
 	)
+}
+
+func CustomerMembership(resolver customerfw.CustomerMembershipResolver) gin.HandlerFunc {
+	return customerfw.RequireMembership(resolver, customerfw.WithMembershipErrorWriter(writeCustomerFrameworkError))
 }
 
 func resolveCustomerRequestTenant(c *gin.Context) string {
@@ -67,6 +78,11 @@ func injectCustomerTenant(c *gin.Context, resolvedTenantUUID string) {
 }
 
 func writeCustomerFrameworkError(c *gin.Context, err error) {
+	var hostError *customerfw.Error
+	if errors.As(err, &hostError) && hostError != nil && hostError.StatusCode >= 400 && hostError.StatusCode <= 599 {
+		contracts.ResponseErrorWithReason(c, customerfw.HTTPStatus(err), string(customerfw.CodeOf(err)), customerfw.ReasonOf(err))
+		return
+	}
 	code := customerfw.CodeOf(err)
 	switch code {
 	case customerfw.CodeCustomerTokenMissing:
@@ -75,10 +91,15 @@ func writeCustomerFrameworkError(c *gin.Context, err error) {
 		contracts.ResponseServiceUnavailable(c, "customer auth delegate unavailable", nil)
 	case customerfw.CodeCustomerTenantMismatch:
 		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeTenantMismatch, "customer tenant mismatch")
+	case customerfw.CodeCustomerForbidden:
+		contracts.ResponseError(c, http.StatusForbidden, string(code), string(code))
 	case customerfw.CodeCustomerTenantRequired:
 		contracts.ResponseUnauthorized(c, "tenant context missing")
 	case customerfw.CodeCustomerMembershipRequired, customerfw.CodeCustomerMembershipDisabled:
-		contracts.ResponseError(c, http.StatusForbidden, string(code), err.Error())
+		// The transport exposes a stable machine code only. Product-facing
+		// translations belong to the caller/UI locale bundle; never surface a
+		// Framework adapter's implementation message.
+		contracts.ResponseError(c, http.StatusForbidden, string(code), string(code))
 	default:
 		contracts.ResponseUnauthorized(c, "customer token invalid")
 	}

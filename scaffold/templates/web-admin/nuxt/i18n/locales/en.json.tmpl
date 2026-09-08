@@ -1,4 +1,13 @@
 {
+  "agentSession": {
+    "agentRequired": "Select a synchronized Agent first.",
+    "untitled": "Untitled session",
+    "unsupportedEdit": "Service sessions do not rewrite message history. Append a new message.",
+    "pendingRetry": "The previous request is unresolved. Retry the same content, or cancel after obtaining its invocation.",
+    "connecting": "Connecting to Agent service…",
+    "detached": "Result subscription disconnected. Execution is not automatically cancelled.",
+    "failed": "Agent session request failed: {reason}"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -82,7 +91,9 @@
     "businessOperations": "Business Operations",
     "customerBase": "Customer Base Management",
     "capabilityLab": "PowerX Capability Lab",
+    "hostContractLab": "Host Contract Lab",
     "knowledgeLab": "Knowledge Lab",
+    "knowledgeQALab": "Knowledge QA Lab",
     "powerxPluginAgents": "Agent Management",
     "powerxPluginSkills": "Skill Management",
     "agentSkillBridge": "Agent Chat Debug",
@@ -104,6 +115,23 @@
     "profile": "Profile",
     "help": "Help",
     "logout": "Logout"
+  },
+  "capabilityLab": {
+    "openHostContract": "Open matching Host Contract",
+    "suiteCapability": {
+      "title": "Suite capability is not yet admitted to Framework",
+      "description": "The capability from {provider} is visible in the catalog, but its credential grant must be verified in an installed runtime and it has not met UUID and Host Contract admission requirements. Generic invocation is blocked.",
+      "unknownProvider": "unknown suite plugin",
+      "invokeBlocked": "This suite capability has not passed Framework Host Contract admission, so generic invocation is blocked."
+    },
+    "grantStatus": {
+      "check": "Check current credential grant",
+      "loading": "Checking current credential grant…",
+      "granted": "Current credential is granted",
+      "notGranted": "Current credential is not granted",
+      "unknown": "Grant status is unknown",
+      "failed": "Unable to read grant status"
+    }
   },
   "metadataGovernance": {
     "badge": "Settings",
@@ -1328,6 +1356,41 @@
       "no": "No",
       "empty": "Select an agent to inspect permissions."
     }
+  },
+  "hostContract": {
+    "title": "PowerX Host Contract Lab",
+    "description": "Probe platform modules through typed Framework contracts; tenant, capability, and authorization are fixed by backend credentials and the allowlist.",
+    "refresh": "Refresh all",
+    "boundaryTitle": "Controlled diagnostic boundary",
+    "boundaryDescription": "This page never accepts tenant_uuid, never accesses the Core database directly, and does not replace Capability Lab.",
+    "capability": "Required capability",
+    "providerMode": "Provider mode",
+    "trace": "Latest trace",
+    "reason": "Stable reason code",
+    "notDeclared": "Not declared",
+    "probe": "Run probe",
+    "ready": "Ready",
+    "unavailable": "Unavailable",
+    "notChecked": "Not checked",
+    "resultTitle": "Latest request result",
+    "resultDescription": "Only controlled contract data and stable errors returned by the plugin backend are displayed.",
+    "operationTitle": "Controlled contract operation",
+    "module": "Business module",
+    "operation": "Operation",
+    "inputJSON": "Input JSON",
+    "confirmWrite": "I confirm this write operation",
+    "inputJSONPlaceholder": "Enter a JSON object",
+    "knowledgeWriteTitle": "Knowledge test operation",
+    "knowledgeWriteWarning": "Asynchronous write operation",
+    "knowledgeWriteDescription": "This only submits an index rebuild for the selected knowledge space. Confirm the space is safe for testing.",
+    "spaceUUID": "Knowledge space UUID",
+    "documentUUID": "Test document UUID",
+    "uuidPlaceholder": "Enter UUID",
+    "confirmKnowledgeWrite": "I confirm the index rebuild for the test space above",
+    "rebuildIndex": "Submit index rebuild",
+    "deleteDocument": "Delete test document",
+    "refreshJob": "Refresh job",
+    "modules": {"iam":"IAM","knowledge":"Knowledge","media":"Media","agent":"Agent","ai":"AI","capability_registry":"Capability Registry","integration_gateway":"Integration Gateway","skills":"Skills","notifications":"Notifications","plugin_runtime":"Plugin Runtime"}
   },
   "message": {
     "saveSuccess": "Saved successfully",

@@ -48,8 +48,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] 将 local adapter 中 numeric ID 转换、空成员/权限返回替换为 UUID-only 的 production Directory/Authz/Context 实现 in skeleton/backend/go-gin/internal/services/iam/adapters/local/
-- [ ] T018 [US1] 将 delegated adapter 中空目录投影和未启用授权映射替换为基于 Core Host Contract 的 production 实现 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/
+- [X] T017 [US1] 将 local adapter 中 numeric ID 转换、空成员/权限返回替换为 UUID-only 的 production Directory/Authz/Context 实现 in skeleton/backend/go-gin/internal/services/iam/adapters/local/
+- [X] T018 [US1] 将 delegated adapter 中空目录投影和未启用授权映射替换为基于 Core Host Contract 的 production 实现 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/
 - [X] T019 [US1] 在 skeleton 启动流程接入 framework IAM registry 绑定 in skeleton/backend/go-gin/internal/bootstrap/app.go
 - [X] T020 [US1] 建立并接入 IAM 模式解析入口使用 framework resolver in skeleton/backend/go-gin/internal/bootstrap/iam_resolver.go
 - [X] T021 [US1] 改造 admin IAM 路由以读取统一 mode/context 能力 in skeleton/backend/go-gin/internal/transport/http/admin/iam/routes.go
@@ -66,16 +66,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] 增加 production adapter 的 IAM 契约一致性测试（组织查询、单成员、批量成员）in framework/backend/go/iam/contracts/directory_contract_test.go
+- [X] T023 [P] [US2] 增加 production adapter 的 IAM 契约一致性测试（组织查询、单成员、批量成员）in skeleton/backend/go-gin/internal/services/iam/adapters/directory_contract_test.go；测试以 Framework `DirectoryService` contract 断言，避免突破 Go internal 包边界。
 - [X] T024 [P] [US2] 增加 delegated 写操作拒绝测试（405）in skeleton/backend/go-gin/internal/transport/http/admin/iam/department_handler_test.go
-- [ ] T025 [P] [US2] 增加 UUID-only 角色授权与成员绑定语义测试 in skeleton/backend/go-gin/internal/services/iam/role_service_test.go
+- [X] T025 [P] [US2] 增加 UUID-only 角色授权与成员绑定语义测试 in skeleton/backend/go-gin/internal/services/iam/role_service_test.go
 
 ### Implementation for User Story 2
 
 - [X] T026 [US2] 扩展 framework DirectoryService 实现入口：GetMember/BatchGetMembers 与 UUID-only Member DTO in framework/backend/go/iam/contracts/directory_service.go
-- [ ] T027 [US2] 在 local adapter 映射 tenant/department/member/role/permission 查询能力；禁止空集合伪装成功 in skeleton/backend/go-gin/internal/services/iam/adapters/local/directory_adapter.go
-- [ ] T028 [US2] 在 delegated adapter 通过 Core Host Contract 映射组织只读查询；禁止空投影伪装成功 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/directory_adapter.go
-- [ ] T029 [US2] 统一 admin IAM handlers 使用已完成的 framework Directory/Authz 契约 in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler.go
+- [X] T027 [US2] 在 local adapter 映射 tenant/department/member/role/permission 查询能力；禁止空集合伪装成功 in skeleton/backend/go-gin/internal/services/iam/adapters/local/directory_adapter.go
+- [X] T028 [US2] 在 delegated adapter 通过 Core Host Contract 映射组织只读查询；禁止空投影伪装成功 in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/directory_adapter.go
+- [X] T029 [US2] 统一 admin IAM handlers 使用已完成的 framework Directory/Authz 契约 in skeleton/backend/go-gin/internal/transport/http/admin/iam/tenant_handler.go；delegated tenant-scoped 读取/授权经 Framework contract，local 全局 tenant 管理保留 local service，更新边界仅接受 `tenant_uuid`。
 - [X] T030 [US2] 统一 RBAC 资源动作映射与错误输出 in skeleton/backend/go-gin/internal/transport/http/admin/iam/rbac.go
 
 **Checkpoint（已撤销）**: 当前没有 production Directory adapter，也没有按 member UUID 查询合同，US2 尚未完成。
@@ -117,10 +117,10 @@
 ## Phase 6A: Corrective Delivery — Directory Production Adapters
 
 - [X] T043 扩展 framework DirectoryService：GetMember/BatchGetMembers，并把 Member/IdentityContext 改为 UUID-only contract in framework/backend/go/iam/contracts/
-- [ ] T044 [P] 实现 local Directory/Authz/IdentityContext production adapter，不向业务层暴露 numeric primary key in skeleton/backend/go-gin/internal/services/iam/adapters/local/
-- [ ] T045 [P] 在 Core Host Contract 发布后实现 delegated Directory/Authz/IdentityContext production adapter in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/
+- [X] T044 [P] 实现 local Directory/Authz/IdentityContext production adapter，不向业务层暴露 numeric primary key in skeleton/backend/go-gin/internal/services/iam/adapters/local/
+- [X] T045 [P] 在 Core Host Contract 发布后实现 delegated Directory/Authz/IdentityContext production adapter in skeleton/backend/go-gin/internal/services/iam/adapters/delegated/
 - [X] T046 在 Bootstrap 根据 mode 绑定唯一 production Bundle；缺失 adapter 必须 fail-fast in skeleton/backend/go-gin/internal/bootstrap/
-- [ ] T047 [P] 增加 local/delegated 单成员、批量、未找到、跨租户、无权限、上游不可用合同测试
+- [X] T047 [P] 增加 local/delegated 单成员、批量、未找到、跨租户、无权限、上游不可用合同测试
 - [X] T048 [P] 增加“display_name 不得为 UUID”、禁止本地 SQL/原始 Gateway 解析的架构回归检查
 - [ ] T049 以至少一个真实业务插件完成 Registry 消费验证；业务侧不得保留 IAM SQL 或 UUID 显示 fallback
 

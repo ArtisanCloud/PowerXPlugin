@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
 	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
@@ -31,9 +32,12 @@ func NewCustomerHandler(deps *app.Deps) *CustomerHandler {
 		factory = customersvc.NewAuthenticatorFactory(deps.Config, nil)
 	}
 	validator := customersvc.NewFrameworkValidator(factory.Build())
-	auth := customersvc.NewFrameworkAuthClient(nil, svc, validator)
-	if deps != nil {
-		auth = customersvc.NewFrameworkAuthClient(deps.Config, svc, validator)
+	var auth customerfw.CustomerAuthClient = customersvc.NewLocalFrameworkAuthClient(svc, validator)
+	if deps != nil && deps.CustomerRuntime != nil {
+		auth = deps.CustomerRuntime.AuthClient()
+	} else if (&CustomerHandler{deps: deps}).useDelegate() {
+		// Missing runtime is a configuration error, never a local fallback.
+		auth = (*customerfw.Runtime)(nil).AuthClient()
 	}
 	return &CustomerHandler{deps: deps, svc: svc, auth: auth, bootstrap: customersvc.NewBootstrapAdapter()}
 }
@@ -133,6 +137,8 @@ func (h *CustomerHandler) Register(c *gin.Context) {
 	}
 	if err != nil {
 		switch {
+		case h.useDelegate():
+			writeFrameworkCustomerError(c, err)
 		case errors.Is(err, customerrepo.ErrCustomerExists):
 			contracts.ResponseError(c, http.StatusConflict, contracts.ErrCodeConflict, "customer already exists")
 		case errors.Is(err, customersvc.ErrCustomerMode):
@@ -192,6 +198,10 @@ func (h *CustomerHandler) Login(c *gin.Context) {
 	}
 	if err != nil {
 		var selectionErr *customersvc.TenantSelectionRequiredError
+		if h.useDelegate() {
+			writeFrameworkCustomerError(c, err)
+			return
+		}
 		if errors.As(err, &selectionErr) {
 			tenants := make([]map[string]string, 0, len(selectionErr.Tenants))
 			for _, t := range selectionErr.Tenants {
@@ -302,16 +312,7 @@ func resolveTenantFromHeaderOrBodyOptional(c *gin.Context, bodyTenantUUID string
 }
 
 func writeFrameworkCustomerError(c *gin.Context, err error) {
-	switch customerfw.CodeOf(err) {
-	case customerfw.CodeCustomerDelegateUnavailable:
-		contracts.ResponseServiceUnavailable(c, "customer auth delegate unavailable", nil)
-	case customerfw.CodeCustomerTokenMissing:
-		contracts.ResponseUnauthorized(c, "customer token missing")
-	case customerfw.CodeCustomerBootstrapFailed:
-		contracts.ResponseBadRequest(c, "customer bootstrap failed")
-	default:
-		contracts.ResponseUnauthorized(c, "customer token invalid")
-	}
+	contracts.ResponseErrorWithReason(c, customerfw.HTTPStatus(err), string(customerfw.CodeOf(err)), customerfw.ReasonOf(err))
 }
 
 func bearerFromHeader(raw string) string {
@@ -332,6 +333,14 @@ func firstNonEmpty(values ...string) string {
 }
 
 func (h *CustomerHandler) useDelegate() bool {
+	if h != nil && h.deps != nil {
+		if h.deps.CustomerRuntime != nil {
+			return h.deps.CustomerRuntime.Mode() == provider.ModeDelegated
+		}
+		if h.deps.ProviderMode == provider.ModeDelegated {
+			return true
+		}
+	}
 	return h != nil && h.deps != nil && h.deps.Config != nil && h.deps.Config.CustomerAuth != nil &&
 		strings.TrimSpace(strings.ToLower(h.deps.Config.CustomerAuth.Mode)) != "local" &&
 		strings.TrimSpace(strings.ToLower(h.deps.Config.CustomerAuth.Mode)) != "local_dev"

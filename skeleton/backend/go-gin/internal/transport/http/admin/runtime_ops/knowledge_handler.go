@@ -17,6 +17,7 @@ import (
 	fwgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
 	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/media"
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	knowledgeSvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/knowledge"
@@ -150,6 +151,17 @@ type knowledgeSpaceDebugRow struct {
 }
 
 func NewKnowledgeHandler(deps *app.Deps) *KnowledgeHandler {
+	// Normal bootstrap sets ProviderMode before constructing handlers. Keep
+	// isolated handler construction deterministic by resolving an explicitly
+	// configured knowledge source once here; requests never select a mode.
+	if deps != nil && deps.ProviderMode == "" && deps.Config != nil && deps.Config.Knowledge != nil {
+		switch strings.ToLower(strings.TrimSpace(deps.Config.Knowledge.Mode)) {
+		case fwknowledge.ProviderModeDelegated, fwknowledge.ProviderModeThirdParty:
+			deps.ProviderMode = fwprovider.ModeDelegated
+		case fwknowledge.ProviderModeLocal, fwknowledge.ProviderModeMock:
+			deps.ProviderMode = fwprovider.ModeLocal
+		}
+	}
 	return &KnowledgeHandler{deps: deps}
 }
 
@@ -921,17 +933,20 @@ func (h *KnowledgeHandler) Search(c *gin.Context) {
 
 func (h *KnowledgeHandler) provider() (fwknowledge.KnowledgeProvider, error) {
 	if h == nil {
-		return knowledgeSvc.NewProviderFactory(nil, nil, nil).Build()
+		return knowledgeSvc.NewProviderFactory(nil, fwprovider.ModeLocal, nil, nil).Build()
 	}
 	h.providerOnce.Do(func() {
 		var appCfg *config.Config
 		if h.deps != nil {
 			appCfg = h.deps.Config
 		}
-		h.knowledgeProvider, h.providerErr = knowledgeSvc.NewProviderFactory(appCfg, nil, nil).Build()
-		if h.providerErr == nil && h.knowledgeProvider.Mode() == fwknowledge.ProviderModeDelegated {
-			h.knowledgeProvider, h.providerErr = knowledgeSvc.NewProviderFactory(appCfg, h.delegatedKnowledgeClient(), nil).Build()
+		mode := fwprovider.ModeLocal
+		if h.deps != nil {
+			if h.deps.ProviderMode != "" {
+				mode = h.deps.ProviderMode
+			}
 		}
+		h.knowledgeProvider, h.providerErr = knowledgeSvc.NewProviderFactory(appCfg, mode, h.delegatedKnowledgeClient(), nil).Build()
 	})
 	return h.knowledgeProvider, h.providerErr
 }

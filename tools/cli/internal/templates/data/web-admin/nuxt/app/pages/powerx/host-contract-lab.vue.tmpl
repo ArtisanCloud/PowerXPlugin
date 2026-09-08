@@ -1,0 +1,180 @@
+<template>
+  <div class="mx-auto max-w-7xl space-y-6 p-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ `{{ t("hostContract.title") }}` }}</h1>
+        <p class="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-300">{{ `{{ t("hostContract.description") }}` }}</p>
+      </div>
+      <UButton icon="i-heroicons-arrow-path" :loading="refreshing" @click="refreshAll">{{ `{{ t("hostContract.refresh") }}` }}</UButton>
+    </div>
+
+    <UAlert color="info" icon="i-heroicons-information-circle" :title="t('hostContract.boundaryTitle')" :description="t('hostContract.boundaryDescription')" />
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <UCard v-for="item in visibleModules" :key="item.module" class="bg-white/95 dark:bg-gray-900">
+        <template #header>
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 class="font-semibold text-gray-900 dark:text-white">{{ `{{ t(["hostContract", "modules", item.module].join(".")) }}` }}</h2>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ `{{ item.operation }}` }}</p>
+            </div>
+            <UBadge :color="badgeColor(item)" variant="subtle">{{ `{{ statusLabel(item) }}` }}</UBadge>
+          </div>
+        </template>
+        <dl class="space-y-2 text-sm">
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.capability") }}` }}</dt><dd class="break-all font-mono text-xs">{{ `{{ item.capabilityID || t("hostContract.notDeclared") }}` }}</dd></div>
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.providerMode") }}` }}</dt><dd>{{ `{{ item.providerMode || "-" }}` }}</dd></div>
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.trace") }}` }}</dt><dd class="break-all font-mono text-xs">{{ `{{ item.traceID || "-" }}` }}</dd></div>
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.reason") }}` }}</dt><dd class="break-all font-mono text-xs">{{ `{{ item.reasonCode || "-" }}` }}</dd></div>
+        </dl>
+        <template #footer><UButton block size="sm" variant="outline" :loading="item.loading" @click="runProbe(item)">{{ `{{ t("hostContract.probe") }}` }}</UButton></template>
+      </UCard>
+    </div>
+
+    <div class="grid gap-6 xl:grid-cols-2">
+      <UCard>
+        <template #header><h2 class="font-semibold text-gray-900 dark:text-white">{{ `{{ t("hostContract.operationTitle") }}` }}</h2></template>
+        <div class="space-y-3">
+          <UFormField :label="t('hostContract.module')"><USelect v-model="manualModule" :items="modules" option-attribute="module" value-attribute="module" /></UFormField>
+          <UFormField :label="t('hostContract.operation')"><UInput v-model="manualOperation" /></UFormField>
+          <UFormField :label="t('hostContract.inputJSON')"><UTextarea v-model="manualInput" :rows="6" class="font-mono" :placeholder="t('hostContract.inputJSONPlaceholder')" /></UFormField>
+          <UCheckbox v-model="manualConfirmed" :label="t('hostContract.confirmWrite')" />
+          <UButton :loading="manualLoading" @click="runManual">{{ `{{ t("hostContract.probe") }}` }}</UButton>
+        </div>
+      </UCard>
+      <UCard>
+        <template #header><h2 class="font-semibold text-gray-900 dark:text-white">{{ `{{ t("hostContract.resultTitle") }}` }}</h2></template>
+        <p class="mb-3 text-sm text-gray-600 dark:text-gray-300">{{ `{{ t("hostContract.resultDescription") }}` }}</p>
+        <pre class="max-h-96 overflow-auto rounded bg-gray-950 p-4 text-xs text-gray-100">{{ `{{ lastResult }}` }}</pre>
+      </UCard>
+      <UCard>
+        <template #header><h2 class="font-semibold text-gray-900 dark:text-white">{{ `{{ t("hostContract.knowledgeWriteTitle") }}` }}</h2></template>
+        <UAlert color="warning" icon="i-heroicons-exclamation-triangle" :title="t('hostContract.knowledgeWriteWarning')" :description="t('hostContract.knowledgeWriteDescription')" />
+        <div class="mt-4 space-y-4">
+          <UFormField :label="t('hostContract.spaceUUID')" required><UInput v-model="knowledgeSpaceUUID" :placeholder="t('hostContract.uuidPlaceholder')" /></UFormField>
+          <UFormField :label="t('hostContract.documentUUID')"><UInput v-model="knowledgeDocumentUUID" :placeholder="t('hostContract.uuidPlaceholder')" /></UFormField>
+          <UCheckbox v-model="knowledgeConfirmed" :label="t('hostContract.confirmKnowledgeWrite')" />
+          <UButton block color="warning" :disabled="!knowledgeConfirmed || !knowledgeSpaceUUID" :loading="knowledgeWriteLoading" @click="rebuildKnowledgeIndex">{{ `{{ t("hostContract.rebuildIndex") }}` }}</UButton>
+          <UButton block color="error" variant="outline" :disabled="!knowledgeConfirmed || !knowledgeSpaceUUID || !knowledgeDocumentUUID" :loading="knowledgeDeleteLoading" @click="deleteKnowledgeDocument">{{ `{{ t("hostContract.deleteDocument") }}` }}</UButton>
+          <div v-if="knowledgeJobUUID" class="flex gap-2"><UInput :model-value="knowledgeJobUUID" readonly /><UButton :loading="jobLoading" @click="refreshKnowledgeJob">{{ `{{ t("hostContract.refreshJob") }}` }}</UButton></div>
+        </div>
+      </UCard>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute } from "#imports";
+import { useHostContractLabApi, type HostContractModule } from "~/composables/api";
+
+const { t } = useI18n();
+const route = useRoute();
+const { probe, normalizeError } = useHostContractLabApi();
+const refreshing = ref(false);
+const knowledgeSpaceUUID = ref("");
+const knowledgeDocumentUUID = ref("");
+const knowledgeConfirmed = ref(false);
+const knowledgeWriteLoading = ref(false);
+const knowledgeDeleteLoading = ref(false);
+const knowledgeJobUUID = ref("");
+const jobLoading = ref(false);
+const lastResult = ref("-");
+const manualModule = ref<HostContractModule>("skills");
+const manualOperation = ref("skill.invoke");
+const manualInput = ref("{}");
+const manualConfirmed = ref(false);
+const manualLoading = ref(false);
+
+type Card = { module: HostContractModule; operation: string; capabilityID: string; providerMode: string; traceID: string; reasonCode: string; loading: boolean; ready: boolean | null };
+const modules = reactive<Card[]>([
+  { module: "iam", operation: "tenant.get", capabilityID: "com.corex.iam.members.read", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "knowledge", operation: "spaces.list", capabilityID: "com.corex.knowledge.directory.read", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "media", operation: "status", capabilityID: "com.corex.media.assets.read", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "agent", operation: "status", capabilityID: "", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "ai", operation: "status", capabilityID: "", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "capability_registry", operation: "status", capabilityID: "", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "integration_gateway", operation: "status", capabilityID: "", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "skills", operation: "status", capabilityID: "", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "notifications", operation: "status", capabilityID: "", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+  { module: "plugin_runtime", operation: "status", capabilityID: "", providerMode: "", traceID: "", reasonCode: "", loading: false, ready: null },
+]);
+
+const requestedModule = computed(() => {
+  const value = route.query.module;
+  const module = Array.isArray(value) ? value[0] : value;
+  if (typeof module !== "string") return "";
+  return modules.some((item) => item.module === module) ? module as HostContractModule : "";
+});
+const visibleModules = computed(() => requestedModule.value
+  ? modules.filter((item) => item.module === requestedModule.value)
+  : modules,
+);
+
+async function runProbe(item: Card) {
+  item.loading = true;
+  item.reasonCode = "";
+  try {
+    const response = await probe(item.module, item.operation);
+    const result = response.data;
+    item.capabilityID = result.capability_id || item.capabilityID;
+    item.providerMode = result.provider_mode;
+    item.traceID = result.trace_id || "";
+    item.reasonCode = result.reason_code || "";
+    item.ready = result.result?.ready === false ? false : true;
+    lastResult.value = JSON.stringify(result, null, 2);
+  } catch (error) {
+    const normalized = normalizeError(error);
+    item.reasonCode = normalized.reasonCode;
+    item.traceID = normalized.traceID || "";
+    item.ready = false;
+    lastResult.value = JSON.stringify(normalized, null, 2);
+  } finally {
+    item.loading = false;
+  }
+}
+async function runManual() {
+  manualLoading.value = true;
+  try {
+    const input = JSON.parse(manualInput.value) as Record<string, unknown>;
+    const response = await probe(manualModule.value, manualOperation.value, input, manualConfirmed.value);
+    lastResult.value = JSON.stringify(response.data, null, 2);
+  } catch (error) { lastResult.value = JSON.stringify(normalizeError(error), null, 2); } finally { manualLoading.value = false; }
+}
+async function rebuildKnowledgeIndex() {
+  knowledgeWriteLoading.value = true;
+  try {
+    const response = await probe("knowledge", "index.rebuild", { space_uuid: knowledgeSpaceUUID.value }, true);
+    const result = response.data;
+    const job = result.result?.job as { job_uuid?: string } | undefined;
+    knowledgeJobUUID.value = String(job?.job_uuid || "");
+    lastResult.value = JSON.stringify(result, null, 2);
+  } catch (error) { lastResult.value = JSON.stringify(normalizeError(error), null, 2); } finally { knowledgeWriteLoading.value = false; }
+}
+async function refreshKnowledgeJob() {
+  if (!knowledgeJobUUID.value) return;
+  jobLoading.value = true;
+  try { const response = await probe("knowledge", "index_job.get", { job_uuid: knowledgeJobUUID.value }); lastResult.value = JSON.stringify(response.data, null, 2); } catch (error) { lastResult.value = JSON.stringify(normalizeError(error), null, 2); } finally { jobLoading.value = false; }
+}
+async function deleteKnowledgeDocument() {
+  knowledgeDeleteLoading.value = true;
+  try {
+    const response = await probe("knowledge", "document.delete", { space_uuid: knowledgeSpaceUUID.value, document_uuid: knowledgeDocumentUUID.value }, true);
+    const result = response.data;
+    const job = result.result?.job as { job_uuid?: string } | undefined;
+    knowledgeJobUUID.value = String(job?.job_uuid || "");
+    lastResult.value = JSON.stringify(result, null, 2);
+  } catch (error) { lastResult.value = JSON.stringify(normalizeError(error), null, 2); } finally { knowledgeDeleteLoading.value = false; }
+}
+async function refreshAll() { refreshing.value = true; try { await Promise.all(modules.map(runProbe)); } finally { refreshing.value = false; } }
+function badgeColor(item: Card) { return item.ready === true ? "success" : item.ready === false ? "error" : "neutral"; }
+function statusLabel(item: Card) { return item.ready === true ? t("hostContract.ready") : item.ready === false ? t("hostContract.unavailable") : t("hostContract.notChecked"); }
+onMounted(async () => {
+  if (requestedModule.value) {
+    const selected = modules.find((item) => item.module === requestedModule.value);
+    if (selected) await runProbe(selected);
+    return;
+  }
+  await refreshAll();
+});
+</script>

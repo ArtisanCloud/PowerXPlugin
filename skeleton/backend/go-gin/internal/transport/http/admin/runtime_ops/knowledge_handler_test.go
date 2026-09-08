@@ -97,24 +97,7 @@ func (g *knowledgeGatewayStub) SyncPluginAgent(context.Context, capgateway.Plugi
 func (g *knowledgeGatewayStub) RegisterCatalog(context.Context, *capabilities.CatalogSnapshot, []capabilities.ProtocolAsset) error {
 	return nil
 }
-func (g *knowledgeGatewayStub) CreateAgentSession(context.Context, capgateway.AgentSessionParams) (*capgateway.AgentSessionRecord, error) {
-	return nil, nil
-}
-func (g *knowledgeGatewayStub) ListAgentSessions(context.Context, capgateway.AgentSessionListOptions) ([]capgateway.AgentSessionRecord, error) {
-	return nil, nil
-}
-func (g *knowledgeGatewayStub) ListAgentSessionMessages(context.Context, capgateway.AgentSessionMessageListOptions) ([]capgateway.AgentSessionMessageRecord, error) {
-	return nil, nil
-}
-func (g *knowledgeGatewayStub) DeleteAgentSession(context.Context, capgateway.AgentSessionMutationOptions) error {
-	return nil
-}
-func (g *knowledgeGatewayStub) ArchiveAgentSession(context.Context, capgateway.AgentSessionMutationOptions) error {
-	return nil
-}
-func (g *knowledgeGatewayStub) StreamAgentSSE(context.Context, capgateway.AgentStreamParams) (*capgateway.AgentStream, error) {
-	return nil, nil
-}
+
 func (g *knowledgeGatewayStub) Close() error { return nil }
 
 func TestKnowledgeHandlerProvider(t *testing.T) {
@@ -226,7 +209,8 @@ func TestKnowledgeHandlerDelegatedPolicyUsesGatewayCapability(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/policy", handler.Policy)
 
@@ -273,7 +257,8 @@ func TestKnowledgeHandlerDelegatedIngestionsUsesPowerXIngestionJobsCapability(t 
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/ingestions", handler.Ingestions)
 
@@ -314,7 +299,8 @@ func TestKnowledgeHandlerDelegatedIngestionsReadsArrayRawData(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/ingestions", handler.Ingestions)
 
@@ -352,7 +338,8 @@ func TestKnowledgeHandlerDelegatedIngestionsReadsTenantInvocationNestedResult(t 
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/ingestions", handler.Ingestions)
 
@@ -407,7 +394,8 @@ func TestKnowledgeHandlerSpacesRejectsTenantMismatch(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces", handler.Spaces)
 
@@ -437,7 +425,8 @@ func TestKnowledgeHandlerCreateSpaceConflictUsesKnowledgeConflictCode(t *testing
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces", handler.CreateSpace)
 
@@ -466,7 +455,8 @@ func TestKnowledgeHandlerRetireSpaceUsesGateway(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces/:spaceID/retire", handler.RetireSpace)
 
@@ -494,7 +484,8 @@ func TestKnowledgeHandlerDeleteSpaceUsesGateway(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.DELETE("/spaces/:spaceID", handler.DeleteSpace)
 
@@ -522,7 +513,8 @@ func TestKnowledgeHandlerDelegatedSearchRejectsUnavailableHostContract(t *testin
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/search", handler.Search)
 
@@ -551,7 +543,8 @@ func TestKnowledgeHandlerDelegatedIngestSpaceUsesPowerXIngestionJobsCapability(t
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces/:spaceID/ingest", handler.IngestSpace)
 
@@ -601,7 +594,8 @@ func TestKnowledgeHandlerDelegatedIngestSpaceRejectsMissingSourceURI(t *testing.
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces/:spaceID/ingest", handler.IngestSpace)
 

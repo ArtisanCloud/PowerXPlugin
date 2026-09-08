@@ -13,12 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
 type Config struct {
-	BaseURL, BearerToken, STSClientID, STSClientSecret, STSTokenURL string
-	Timeout                                                         time.Duration
+	BaseURL, BearerToken, APIKey, AuthScheme, STSClientID, STSClientSecret, STSTokenURL string
+	Timeout                                                                             time.Duration
 }
 type tokenProvider interface {
 	Token(context.Context) (string, error)
@@ -33,15 +34,17 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type Client struct {
-	baseURL string
-	http    *http.Client
-	token   tokenProvider
+	baseURL    string
+	http       *http.Client
+	token      tokenProvider
+	authScheme string
 }
 
 // Registry is the Framework boundary for tenant Capability Registry access.
 // Plugin business services should depend on this interface, not on Client.
 type Registry interface {
 	List(context.Context, ListInput) ([]Capability, error)
+	GrantStatus(context.Context, GrantStatusInput) ([]GrantStatusItem, error)
 	Resolve(context.Context, ResolveInput) (*ResolveResult, error)
 	Invoke(context.Context, InvokeInput) (*InvokeResult, error)
 	GetInvocation(context.Context, string) (*Invocation, error)
@@ -51,11 +54,12 @@ type Registry interface {
 // capability contract's authorization and retry semantics.
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("powerx capability request failed: status=%d", e.StatusCode)
+	return fmt.Sprintf("powerx capability request failed: reason=%s status=%d", e.ReasonCode, e.StatusCode)
 }
 
 type Protocol struct {
@@ -94,6 +98,20 @@ type Capability struct {
 type ListInput struct {
 	Page, PageSize                                int
 	PluginID, Intent, ToolScope, Protocol, Source string
+}
+
+// GrantStatusInput asks Core to evaluate only the current credential's
+// effective grants. Tenant and caller identity are always derived by Core.
+type GrantStatusInput struct {
+	CapabilityIDs []string `json:"capability_ids"`
+}
+
+// GrantStatusItem is the stable result of Core's grant-status Host Contract.
+// Status is one of granted, not_granted, or unknown.
+type GrantStatusItem struct {
+	CapabilityID string `json:"capability_id"`
+	Status       string `json:"status"`
+	ReasonCode   string `json:"reason_code"`
 }
 type ResolveInput struct{ Method, Endpoint, Source string }
 type ResolveResult struct {
@@ -143,7 +161,7 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return nil, errors.New("powerx capability base_url is required")
 	}
-	c := &Client{baseURL: strings.TrimRight(cfg.BaseURL, "/")}
+	c := &Client{baseURL: strings.TrimRight(cfg.BaseURL, "/"), authScheme: "Bearer"}
 	if httpClient != nil {
 		c.http = httpClient
 	} else {
@@ -152,6 +170,14 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 			timeout = 30 * time.Second
 		}
 		c.http = &http.Client{Timeout: timeout}
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.AuthScheme), "apikey") || strings.EqualFold(strings.TrimSpace(cfg.AuthScheme), "api_key") || strings.EqualFold(strings.TrimSpace(cfg.AuthScheme), "api-key") {
+		if strings.TrimSpace(cfg.APIKey) == "" {
+			return nil, errors.New("powerx capability api key is required for apikey auth_scheme")
+		}
+		c.token = staticToken(strings.TrimSpace(cfg.APIKey))
+		c.authScheme = "ApiKey"
+		return c, nil
 	}
 	if token := strings.TrimSpace(cfg.BearerToken); token != "" {
 		c.token = staticToken(token)
@@ -174,7 +200,7 @@ func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *
 	if provider == nil {
 		return nil, errors.New("powerx capability token provider is required")
 	}
-	c := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), token: provider}
+	c := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), token: provider, authScheme: "Bearer"}
 	if httpClient != nil {
 		c.http = httpClient
 	} else {
@@ -207,6 +233,21 @@ func (c *Client) List(ctx context.Context, in ListInput) ([]Capability, error) {
 		path += "?" + encoded
 	}
 	if err := c.do(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return nil, err
+	}
+	return raw.Items, nil
+}
+
+// GrantStatus evaluates the current service credential without executing the
+// requested business capabilities.
+func (c *Client) GrantStatus(ctx context.Context, in GrantStatusInput) ([]GrantStatusItem, error) {
+	if len(in.CapabilityIDs) == 0 {
+		return nil, errors.New("capability_ids is required")
+	}
+	var raw struct {
+		Items []GrantStatusItem `json:"items"`
+	}
+	if err := c.do(ctx, http.MethodPost, "/api/v1/tenant/capabilities:grant-status", in, &raw); err != nil {
 		return nil, err
 	}
 	return raw.Items, nil
@@ -267,32 +308,35 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		req.Header.Set("Content-Type", "application/json")
 	}
 	token, err := c.token.Token(ctx)
-	if err != nil {
-		return err
+	if err != nil || strings.TrimSpace(token) == "" {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", c.authScheme+" "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 502, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(raw)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "CAPABILITY_UPSTREAM_DEPENDENCY"), Body: string(raw)}
 	}
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
+	if err := hostcontract.DecodeData(raw, out); err != nil {
+		return &HTTPError{StatusCode: 502, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return err
-	}
-	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return errors.New("powerx capability response missing data")
-	}
-	return json.Unmarshal(envelope.Data, out)
+	return nil
 }
 
 type staticToken string

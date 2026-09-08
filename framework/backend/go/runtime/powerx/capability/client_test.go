@@ -18,6 +18,9 @@ func TestClientUsesTenantCapabilityRegistryContract(t *testing.T) {
 		case "/api/v1/tenant/capabilities":
 			require.Equal(t, "page=2&page_size=10&plugin_id=com.example.plugin&protocol=rest", req.URL.RawQuery)
 			return capabilityResponse(http.StatusOK, `{"data":{"items":[{"capability_id":"com.example.read","plugin_id":"com.example.plugin","plugin_version":"1.2.3","title":"Read","source":"plugin","categories":["data"],"tool_scope":["tenant"],"policy":{"prefer":"rest","fallback":["skill"]},"protocols":[{"channel":"rest","method":"GET","endpoint":"/v1/items","auth_type":"sts"}],"capabilities_hash":"cap-hash","protocol_hash":"proto-hash","status":"published"}]}}`), nil
+		case "/api/v1/tenant/capabilities:grant-status":
+			require.Equal(t, http.MethodPost, req.Method)
+			return capabilityResponse(http.StatusOK, `{"data":{"items":[{"capability_id":"com.example.read","status":"granted","reason_code":"CAPABILITY_GRANTED"}]}}`), nil
 		case "/api/v1/tenant/capabilities/resolve":
 			require.Equal(t, "endpoint=%2Fv1%2Fitems%2F42&method=GET&source=plugin", req.URL.RawQuery)
 			return capabilityResponse(http.StatusOK, `{"data":{"primary_match":{"capability_id":"com.example.read","plugin_id":"com.example.plugin","source":"plugin","protocol":"rest","method":"GET","pattern_endpoint":"/v1/items/:id"}}}`), nil
@@ -41,6 +44,10 @@ func TestClientUsesTenantCapabilityRegistryContract(t *testing.T) {
 	require.Equal(t, "com.example.read", items[0].CapabilityID)
 	require.Equal(t, "1.2.3", items[0].PluginVersion)
 	require.Equal(t, "rest", items[0].Policy.Prefer)
+	grants, err := client.GrantStatus(context.Background(), GrantStatusInput{CapabilityIDs: []string{"com.example.read"}})
+	require.NoError(t, err)
+	require.Equal(t, "granted", grants[0].Status)
+	require.Equal(t, "CAPABILITY_GRANTED", grants[0].ReasonCode)
 	resolved, err := client.Resolve(context.Background(), ResolveInput{Method: "get", Endpoint: "/v1/items/42", Source: "plugin"})
 	require.NoError(t, err)
 	require.Equal(t, "/v1/items/:id", resolved.PatternEndpoint)

@@ -1,4 +1,13 @@
 {
+  "agentSession": {
+    "agentRequired": "请先选择已同步的 Agent。",
+    "untitled": "未命名会话",
+    "unsupportedEdit": "当前服务会话不支持改写历史消息，请追加新消息。",
+    "pendingRetry": "上一条请求的执行状态尚未确认，请使用相同内容重试，或在取得执行记录后取消。",
+    "connecting": "正在连接 Agent 服务…",
+    "detached": "已断开结果订阅，执行不会自动取消。",
+    "failed": "Agent 会话请求失败：{reason}"
+  },
   "common": {
     "save": "保存",
     "cancel": "取消",
@@ -82,7 +91,9 @@
     "businessOperations": "业务运营",
     "customerBase": "客户基础管理",
     "capabilityLab": "PowerX 能力调试",
+    "hostContractLab": "底座合同调试",
     "knowledgeLab": "知识库调试",
+    "knowledgeQALab": "知识库 QA 调试",
     "powerxPluginAgents": "Agent 管理",
     "powerxPluginSkills": "Skill 管理",
     "agentSkillBridge": "Agent Chat 调试",
@@ -104,6 +115,23 @@
     "profile": "个人中心",
     "help": "帮助",
     "logout": "退出"
+  },
+  "capabilityLab": {
+    "openHostContract": "打开对应底座合同",
+    "suiteCapability": {
+      "title": "套件能力尚未完成 Framework 准入",
+      "description": "提供方 {provider} 的能力已在目录中可见，但当前凭证授权状态须在安装态核验，且尚未满足 UUID 与 Host Contract 准入条件，不能从通用调试入口调用。",
+      "unknownProvider": "未知套件插件",
+      "invokeBlocked": "套件能力尚未完成 Framework Host Contract 准入，已阻止通用调用。"
+    },
+    "grantStatus": {
+      "check": "查询当前凭证授权",
+      "loading": "正在查询当前凭证授权…",
+      "granted": "当前凭证已获授权",
+      "notGranted": "当前凭证未获授权",
+      "unknown": "授权状态未知",
+      "failed": "无法查询授权状态"
+    }
   },
   "metadataGovernance": {
     "badge": "设置",
@@ -1392,6 +1420,41 @@
       "no": "否",
       "empty": "选择 Agent 后显示权限。"
     }
+  },
+  "hostContract": {
+    "title": "PowerX 底座合同调试",
+    "description": "通过 Framework 的强类型合同探测各底座模块；租户、能力与鉴权均由后端凭证和固定 allowlist 决定。",
+    "refresh": "刷新全部",
+    "boundaryTitle": "受控调试边界",
+    "boundaryDescription": "此页面不接受 tenant_uuid，不会直接访问 Core 数据库，也不会替代通用 Capability Lab。",
+    "capability": "所需能力",
+    "providerMode": "运行模式",
+    "trace": "最近 Trace",
+    "reason": "稳定原因码",
+    "notDeclared": "未声明",
+    "probe": "执行探测",
+    "ready": "可用",
+    "unavailable": "不可用",
+    "notChecked": "未检测",
+    "resultTitle": "最近请求结果",
+    "resultDescription": "只展示插件后端返回的受控合同数据和稳定错误码。",
+    "operationTitle": "受控合同操作",
+    "module": "业务模块",
+    "operation": "操作名",
+    "inputJSON": "输入 JSON",
+    "confirmWrite": "我确认执行写操作",
+    "inputJSONPlaceholder": "请输入 JSON 对象",
+    "knowledgeWriteTitle": "知识库测试操作",
+    "knowledgeWriteWarning": "异步写操作",
+    "knowledgeWriteDescription": "只对指定知识空间提交索引重建；请确认该空间可用于测试。",
+    "spaceUUID": "知识空间 UUID",
+    "documentUUID": "测试文档 UUID",
+    "uuidPlaceholder": "请输入 UUID",
+    "confirmKnowledgeWrite": "我确认向上述测试空间提交索引重建",
+    "rebuildIndex": "提交索引重建",
+    "deleteDocument": "删除测试文档",
+    "refreshJob": "刷新任务",
+    "modules": {"iam":"IAM","knowledge":"知识库","media":"媒资","agent":"Agent","ai":"AI","capability_registry":"能力目录","integration_gateway":"集成网关","skills":"Skills","notifications":"通知","plugin_runtime":"插件运行时"}
   },
   "message": {
     "saveSuccess": "保存成功",

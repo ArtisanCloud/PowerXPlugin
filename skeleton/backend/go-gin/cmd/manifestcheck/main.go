@@ -53,9 +53,12 @@ func run(pluginPath, manifestPath, schemaPath, eventFabricPath string, capabilit
 	if err := mergeCatalogReferences(pluginPath, pluginMap); err != nil {
 		return fmt.Errorf("merge plugin catalogs: %w", err)
 	}
+	if err := validateRequiredHostCapabilities(pluginMap); err != nil {
+		return fmt.Errorf("invalid_manifest: %w", err)
+	}
 
 	var manifestMap map[string]interface{}
-	if manifestPath != "" {
+	if shouldLoadManifest(manifestPath, capabilitiesOnly, pluginOnly) {
 		manifestMap, err = loadYAMLFile(manifestPath)
 		if err != nil {
 			return fmt.Errorf("load manifest: %w", err)
@@ -102,6 +105,41 @@ func run(pluginPath, manifestPath, schemaPath, eventFabricPath string, capabilit
 		}
 	}
 
+	return nil
+}
+
+func shouldLoadManifest(manifestPath string, capabilitiesOnly, pluginOnly bool) bool {
+	return manifestPath != "" && !capabilitiesOnly && !pluginOnly
+}
+
+// Required capabilities are plugin policy, not every module the Framework
+// ships. Non-empty requirements need the grant-status capability used by the
+// delegated startup preflight. No implicit IAM/Knowledge write grants.
+func validateRequiredHostCapabilities(plugin map[string]interface{}) error {
+	capabilities, ok := plugin["capabilities"].(map[string]interface{})
+	if !ok {
+		return errors.New("capabilities.required is required for Framework Host Contract clients")
+	}
+	requiredRaw, ok := capabilities["required"].([]interface{})
+	if !ok {
+		return errors.New("capabilities.required must be an array for Framework Host Contract clients")
+	}
+	required := make(map[string]struct{}, len(requiredRaw))
+	for index, value := range requiredRaw {
+		capabilityID, ok := value.(string)
+		if !ok || capabilityID == "" || strings.TrimSpace(capabilityID) != capabilityID {
+			return fmt.Errorf("capabilities.required[%d] must be a non-empty capability ID", index)
+		}
+		if _, duplicate := required[capabilityID]; duplicate {
+			return fmt.Errorf("capabilities.required[%d]: duplicate capability %q", index, capabilityID)
+		}
+		required[capabilityID] = struct{}{}
+	}
+	if len(required) > 0 {
+		if _, ok := required["com.corex.capabilities.grant_status.read"]; !ok {
+			return errors.New("capabilities.required missing com.corex.capabilities.grant_status.read")
+		}
+	}
 	return nil
 }
 

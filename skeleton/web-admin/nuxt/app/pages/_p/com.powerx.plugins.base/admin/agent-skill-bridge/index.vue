@@ -18,7 +18,7 @@
             />
           </div>
           <div class="flex items-center gap-2">
-            <UButton icon="i-heroicons-plus" class="flex-1 justify-center" :loading="sessionLoading" :disabled="loading || sessionLoading || !agentId.trim()" @click="createSession()">
+            <UButton data-testid="agent-chat-create-session" icon="i-heroicons-plus" class="flex-1 justify-center" :loading="sessionLoading" :disabled="loading || sessionLoading || !agentId.trim()" @click="createSession()">
               新建会话
             </UButton>
             <UButton icon="i-heroicons-arrow-path" color="neutral" variant="soft" square :loading="agentsLoading || sessionLoading" :disabled="loading" @click="loadSessions(currentAgent, false)" />
@@ -254,7 +254,8 @@
                     color="neutral"
                     variant="ghost"
                     :disabled="loading"
-                    @click="openRegenerateDialog(item, index)"
+                    :title="t('agentSession.unsupportedEdit')"
+                    @click="errorText = t('agentSession.unsupportedEdit')"
                   >
                     重新编辑
                   </UButton>
@@ -296,8 +297,8 @@
               color="neutral"
               variant="ghost"
               square
-              :disabled="!loading"
-              @click="abortStream"
+              :disabled="!activeInvocationId"
+              @click="cancelCurrentRun"
             />
           </div>
         </footer>
@@ -621,7 +622,8 @@
 </template>
 
 <script setup lang="ts">
-import { createFetchSSE, type SSEStreamEvent } from "~/composables/api/useStream";
+import { type SSEStreamEvent } from "~/composables/api/useStream";
+import { useAgentSessionsApi, type AgentSession, type AgentMessage, type AgentAttempt } from "~/composables/api/useAgentSessions";
 import { getAuthToken } from "~/composables/api/_base";
 import { useAuth } from "~/composables/useAuth";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
@@ -716,28 +718,8 @@ type SessionItem = {
   createdAt: number;
 };
 
-type AgentSessionRecord = {
-  id?: number | string;
-  uuid?: string;
-  session_id?: string;
-  sessionId?: string;
-  agentId?: number | string;
-  agent_id?: number | string;
-  title?: string;
-  status?: string;
-  latestAt?: string;
-  latest_at?: string;
-  createdAt?: string;
-  created_at?: string;
-};
-
-type AgentSessionMessageRecord = {
-  id?: number | string;
-  role?: string;
-  content?: string;
-  meta?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-};
+type AgentSessionRecord = AgentSession;
+type AgentSessionMessageRecord = AgentMessage;
 
 type PowerXAgentRecord = {
   id?: number | string;
@@ -789,7 +771,9 @@ type AgentEffectivePermissions = {
   actions: AgentPermissionAction[];
 };
 
-const agentProxyPath = "plugin/agent/stream/sse";
+const agentProxyPath = "plugin/agent/sessions";
+const sessionAPI = useAgentSessionsApi();
+const pendingAttempts = new Map<string, AgentAttempt>();
 
 const agentOptions = ref<AgentOption[]>([]);
 const agentsLoading = ref(false);
@@ -799,6 +783,7 @@ const agentsError = ref("");
 const selectedAgentId = ref("");
 const agentId = ref("");
 const sessionId = ref("");
+const activeInvocationId = ref("");
 const traceId = ref(`trace_${Date.now()}`);
 const message = ref("");
 const bearerToken = ref("");
@@ -877,7 +862,7 @@ const skillTarget = computed(() => ({
 const currentSessionSummary = computed(() => {
   const lastUserMessage = [...chatMessages.value].reverse().find((item) => item.role === "user");
   if (lastUserMessage?.content) return lastUserMessage.content;
-  return sessionId.value.trim() || "本地调试会话";
+  return currentSessionItem.value?.title || t("agentSession.untitled");
 });
 
 const currentSessionItem = computed(() => {
@@ -1167,77 +1152,25 @@ async function loadAgentEffectivePermissions(agent = currentAgent.value) {
   }
 }
 
-function extractSessionID(payload: unknown) {
-  const root = payload as Record<string, any>;
-  const data = root?.data ?? root;
-  const candidates = [
-    data?.uuid,
-    data?.session_uuid,
-    data?.session_id,
-    data?.sessionId,
-    data?.id,
-  ];
-  for (const item of candidates) {
-    const text = String(item || "").trim();
-    if (text) return text;
-  }
-  throw new Error("PowerX Agent session response missing session uuid");
+function extractSessionID(payload: AgentSession) {
+  if (!payload.session_uuid) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return payload.session_uuid;
 }
 
 async function createSession(agent = currentAgent.value) {
-  if (typeof window === "undefined") return;
   if (sessionLoading.value) return;
-  const targetAgent = agent || currentAgent.value;
-  if (!String(targetAgent.value || "").trim()) {
-    errorText.value = "agent_id is required";
-    return;
-  }
+  if (!agent.uuid) { errorText.value = t("agentSession.agentRequired"); return; }
   abortStream();
   sessionLoading.value = true;
-  errorText.value = "";
   try {
-    const body: Record<string, unknown> = {
-      title: targetAgent.sessionTitle,
-      env: "dev",
-      meta: {
-        source: "powerxplugin.local_chat",
-      },
-    };
-    if (targetAgent.uuid) {
-      body.agent_uuid = targetAgent.uuid;
-    } else {
-      body.agent_id = String(targetAgent.id || targetAgent.value).trim();
-    }
-    const headers = requestHeaders(true);
-    const response = await fetch("/api/v1/plugin/agent/sessions", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      throw new Error(`PowerX Agent session proxy failed: HTTP ${response.status}`);
-    }
-    const payload = await response.json();
-    const createdSessionId = extractSessionID(payload);
-    sessionId.value = createdSessionId;
-    upsertSessionItem({
-      id: createdSessionId,
-      agentId: targetAgent.value,
-      title: targetAgent.sessionTitle,
-      summary: createdSessionId,
-      createdAt: Date.now(),
-    });
-    resetRuntimeState();
-    chatMessages.value = [];
-    await loadSessions(targetAgent, false);
-    await loadSessionMessages(createdSessionId);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    errorText.value = message;
-    status.value = "error";
-  } finally {
-    sessionLoading.value = false;
-  }
+    const created = await sessionAPI.create(agent.uuid, agent.sessionTitle);
+    sessionId.value = extractSessionID(created);
+    upsertSessionItem(normalizeSessionRecord(created, agent));
+    resetRuntimeState(); chatMessages.value = [];
+    await loadSessions(agent, false);
+    await loadSessionMessages(created.session_uuid);
+  } catch (error) { errorText.value = sessionErrorText(error); }
+  finally { sessionLoading.value = false; }
 }
 
 function upsertSessionItem(item: SessionItem) {
@@ -1245,62 +1178,24 @@ function upsertSessionItem(item: SessionItem) {
   sessionItems.value = [item, ...existing].slice(0, 20);
 }
 
-async function loadSessions(agent = currentAgent.value, selectFirst = false) {
-  if (typeof window === "undefined") return;
-  const targetAgent = agent || currentAgent.value;
-  const agentUUID = String(targetAgent.uuid || targetAgent.value || "").trim();
-  if (!agentUUID) return;
+async function loadSessions(agent = currentAgent.value, selectFirst = true) {
+  if (!agent.uuid) return;
   try {
-    const url = new URL("/api/v1/plugin/agent/sessions", window.location.origin);
-    url.searchParams.set("agent_uuid", agentUUID);
-    url.searchParams.set("env", "dev");
-    url.searchParams.set("status", "active");
-    url.searchParams.set("limit", "50");
-    const response = await fetch(url.toString(), { headers: requestHeaders() });
-    if (!response.ok) {
-      throw new Error(`PowerX Agent sessions proxy failed: HTTP ${response.status}`);
-    }
-    const payload = await response.json();
-    const items = extractSessionItems(payload).map((record) => normalizeSessionRecord(record, targetAgent));
-    const otherAgentItems = sessionItems.value.filter((item) => item.agentId !== targetAgent.value);
-    sessionItems.value = [...items, ...otherAgentItems].slice(0, 50);
-    const currentStillExists = items.some((item) => item.id === sessionId.value);
-    if (selectFirst && items.length > 0) {
-      await selectSession(items[0]);
-    } else if (selectFirst && items.length === 0 && targetAgent.value === agentId.value) {
-      await createSession(targetAgent);
-    } else if (!currentStillExists && items.length > 0 && targetAgent.value === agentId.value) {
-      await selectSession(items[0]);
-    } else if (!currentStillExists && targetAgent.value === agentId.value) {
-      sessionId.value = "";
-      resetConversation();
-    }
-  } catch (error) {
-    errorText.value = error instanceof Error ? error.message : String(error);
-  }
+    const items = (await sessionAPI.list()).filter(record => record.agent_uuid === agent.uuid && record.status === "active").map(record => normalizeSessionRecord(record, agent));
+    sessionItems.value = [...items, ...sessionItems.value.filter(item => item.agentId !== agent.value)];
+    if (selectFirst && items.length) await selectSession(items[0]);
+    else if (!items.some(item => item.id === sessionId.value) && agent.value === agentId.value) { sessionId.value = ""; resetConversation(); }
+  } catch (error) { errorText.value = sessionErrorText(error); }
 }
 
-function extractSessionItems(payload: unknown): AgentSessionRecord[] {
-  const root = payload as Record<string, any>;
-  const candidates = [root?.data?.items, root?.items, root?.data];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate as AgentSessionRecord[];
-  }
-  return [];
+function extractSessionItems(payload: { data: { items: AgentSessionRecord[] } }): AgentSessionRecord[] {
+  if (!Array.isArray(payload?.data?.items)) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return payload.data.items;
 }
 
 function normalizeSessionRecord(record: AgentSessionRecord, agent: AgentOption): SessionItem {
-  const id = String(record.uuid || record.session_id || record.sessionId || record.id || "").trim();
-  const title = String(record.title || agent.sessionTitle || "Agent 会话").trim();
-  const createdText = String(record.latestAt || record.latest_at || record.createdAt || record.created_at || "").trim();
-  const createdAt = createdText ? Date.parse(createdText) || Date.now() : Date.now();
-  return {
-    id,
-    agentId: agent.value,
-    title,
-    summary: id,
-    createdAt,
-  };
+  if (!record.session_uuid) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return { id: record.session_uuid, agentId: agent.value, title: record.title || t("agentSession.untitled"), summary: "", createdAt: Date.parse(record.created_at) };
 }
 
 async function selectSession(item: SessionItem) {
@@ -1314,77 +1209,29 @@ async function selectSession(item: SessionItem) {
     suppressAgentWatch = false;
   }
   sessionId.value = item.id;
+  activeInvocationId.value = pendingAttempts.get(item.id)?.invocationUUID || "";
   resetRuntimeState();
   await loadSessionMessages(item.id);
 }
 
-async function loadSessionMessages(id: string, options: { preserveCurrentOnEmpty?: boolean } = {}) {
-  const sessionUUID = String(id || "").trim();
-  if (!sessionUUID) return;
-  try {
-    const url = new URL(`/api/v1/plugin/agent/sessions/${encodeURIComponent(sessionUUID)}/messages`, window.location.origin);
-    url.searchParams.set("env", "dev");
-    url.searchParams.set("limit", "200");
-    const response = await fetch(url.toString(), { headers: requestHeaders() });
-    if (!response.ok) {
-      throw new Error(`PowerX Agent messages proxy failed: HTTP ${response.status}`);
-    }
-    const payload = await response.json();
-    const nextMessages = extractMessageItems(payload)
-      .map(normalizeChatMessage)
-      .filter((item): item is ChatMessage => Boolean(item));
-    if (options.preserveCurrentOnEmpty && nextMessages.length === 0 && chatMessages.value.length > 0) {
-      errorText.value = "Agent final 已返回，但会话历史尚未包含 assistant 消息。";
-      return;
-    }
-    if (options.preserveCurrentOnEmpty && activeAssistantMessageID) {
-      const current = chatMessages.value.find((item) => item.id === activeAssistantMessageID);
-      if (current?.runState?.tasks?.length && !nextMessages.some((item) => item.role === "assistant" && item.runState?.tasks?.length)) {
-        return;
-      }
-    }
-    chatMessages.value = nextMessages;
-  } catch (error) {
-    errorText.value = error instanceof Error ? error.message : String(error);
-  }
+async function loadSessionMessages(id: string, _options: { preserveCurrentOnEmpty?: boolean } = {}) {
+  if (!id) return;
+  try { chatMessages.value = (await sessionAPI.messages(id)).map(normalizeChatMessage).filter((item): item is ChatMessage => item !== null); }
+  catch (error) { errorText.value = sessionErrorText(error); }
 }
 
-function extractMessageItems(payload: unknown): AgentSessionMessageRecord[] {
-  const root = payload as Record<string, any>;
-  const candidates = [root?.data?.items, root?.items, root?.data];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate as AgentSessionMessageRecord[];
-  }
-  return [];
+function extractMessageItems(payload: { data: { items: AgentSessionMessageRecord[] } }): AgentSessionMessageRecord[] {
+  if (!Array.isArray(payload?.data?.items)) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return payload.data.items;
 }
 
 function normalizeChatMessage(record: AgentSessionMessageRecord): ChatMessage | null {
-  const role = String(record.role || "").trim();
-  const rawId = String(record.id || "").trim();
-  if (role !== "user" && role !== "assistant") return null;
-  return {
-    id: rawId ? `${role}_${rawId}` : `${role}_${Date.now()}`,
-    rawId,
-    role,
-    content: String(record.content || ""),
-    pending: false,
-    runState: normalizeMessageRunState(record),
-  };
+  if (!record.message_uuid || !["user","assistant"].includes(record.role)) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return { id: record.message_uuid, rawId: record.message_uuid, role: record.role, content: record.content, pending: false };
 }
 
-function normalizeMessageRunState(record: AgentSessionMessageRecord): RunState | undefined {
-  const meta = record.meta || record.metadata || {};
-  const raw = (meta.run_state || meta.runState) as Record<string, unknown> | undefined;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-  const tasks = Array.isArray(raw.tasks) ? raw.tasks.filter(isPlainObject).map((task) => taskFromRunPayload(task)) : [];
-  if (!tasks.length) return undefined;
-  const state = createEmptyRunState();
-  state.run = isPlainObject(raw.run) ? raw.run : {};
-  state.summary = isPlainObject(raw.summary) ? raw.summary : undefined;
-  state.tasks = tasks;
-  state.ended = Boolean(raw.ended);
-  refreshRunStateCollections(state);
-  return state;
+function normalizeMessageRunState(_record: AgentSessionMessageRecord): RunState | undefined {
+  return undefined; // Service-session messages do not expose a legacy run_state payload.
 }
 
 async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -1399,34 +1246,11 @@ async function responseErrorMessage(response: Response, fallback: string): Promi
 }
 
 async function deleteSession(item: SessionItem) {
-  const id = String(item?.id || "").trim();
-  if (!id) return;
-  abortStream();
-  deletingSessionId.value = id;
-  try {
-    const url = new URL(`/api/v1/plugin/agent/sessions/${encodeURIComponent(id)}`, window.location.origin);
-    url.searchParams.set("env", "dev");
-    const response = await fetch(url.toString(), {
-      method: "DELETE",
-      headers: requestHeaders(),
-    });
-    if (!response.ok) {
-      throw new Error(await responseErrorMessage(response, `PowerX Agent session delete failed: HTTP ${response.status}`));
-    }
-    sessionItems.value = sessionItems.value.filter((item) => item.id !== id);
-    await loadSessions(currentAgent.value, false);
-    const next = visibleSessionItems.value[0];
-    if (id === sessionId.value.trim() && next) {
-      await selectSession(next);
-    } else if (id === sessionId.value.trim()) {
-      sessionId.value = "";
-      resetConversation();
-    }
-  } catch (error) {
-    errorText.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    deletingSessionId.value = "";
-  }
+  if (!item.id) return;
+  abortStream(); deletingSessionId.value = item.id;
+  try { await sessionAPI.remove(item.id); pendingAttempts.delete(item.id); await loadSessions(currentAgent.value, false); }
+  catch (error) { errorText.value = sessionErrorText(error); }
+  finally { deletingSessionId.value = ""; }
 }
 
 function resetConversation() {
@@ -1436,6 +1260,7 @@ function resetConversation() {
 
 function resetRuntimeState() {
   abortStream();
+  activeInvocationId.value = pendingAttempts.get(sessionId.value)?.invocationUUID || "";
   rawLog.value = "";
   finalMessage.value = "";
   timeline.value = [];
@@ -1580,92 +1405,46 @@ async function send() {
 }
 
 async function sendMessageText(input: string, options: { clearInput?: boolean; replaceFromIndex?: number; regenerateFromMessageId?: string } = {}) {
+  if (options.regenerateFromMessageId || options.replaceFromIndex !== undefined) { errorText.value = t("agentSession.unsupportedEdit"); return; }
   if (!canSendText(input)) return;
-  const userMessage = input.trim();
-  if (!userMessage) return;
-  abortStream();
-  loading.value = true;
-  status.value = "streaming";
-  errorText.value = "";
-  rawLog.value = "";
-  finalMessage.value = "";
-  timeline.value = [];
-  selectedEventId.value = "";
-  eventCount.value = 0;
-  assistantBuffer = "";
-  if (typeof options.replaceFromIndex === "number" && options.replaceFromIndex >= 0) {
-    chatMessages.value = chatMessages.value.slice(0, options.replaceFromIndex);
-  }
-  appendChatMessage("user", userMessage);
-  if (currentSessionItem.value) {
-    currentSessionItem.value.summary = userMessage;
-  }
-  activeAssistantMessageID = appendChatMessage("assistant", "正在连接 PowerX Agent Runtime...", true);
-  if (options.clearInput !== false) {
-    message.value = "";
-  }
-  traceId.value = `trace_${Date.now()}`;
-
-  abortController = new AbortController();
+  const sid = sessionId.value, content = input.trim();
+  let attempt = pendingAttempts.get(sid);
+  if (attempt && attempt.content !== content) { errorText.value = t("agentSession.pendingRetry"); return; }
+  if (!attempt) { attempt = { session: sid, content, appendKey: crypto.randomUUID(), invokeKey: crypto.randomUUID() }; pendingAttempts.set(sid, attempt); }
+  abortStream(); loading.value = true; status.value = "streaming"; errorText.value = ""; finalMessage.value = "";
+  activeAssistantMessageID = appendChatMessage("assistant", t("agentSession.connecting"), true);
+  if (options.clearInput !== false) message.value = "";
+  const controller = new AbortController(); abortController = controller;
   try {
-    const headers: Record<string, string> = {
-    };
-    const token = authToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-    const params: Record<string, string> = {
-      agent_uuid: currentAgent.value.uuid,
-      session_uuid: sessionId.value.trim(),
-      trace_id: traceId.value.trim(),
-      q: userMessage,
-      source: "powerxplugin.local_chat",
-      env: "dev",
-    };
-    const tenantUUID = resolveTenantUUIDForRequest();
-    if (!tenantUUID) {
-      throw new Error("当前租户为空，不能发起 Agent Skill Bridge 调试请求");
-    }
-    params.tenant_uuid = tenantUUID;
-    params.origin_tenant_uuid = tenantUUID;
-    if (options.regenerateFromMessageId) {
-      params.regen_from_message_id = options.regenerateFromMessageId;
-    }
-    await createFetchSSE({
-      path: agentProxyPath,
-      params,
-      headers,
-      signal: abortController.signal,
-      onEvent: consumeSSEEvent,
-    });
-    if (status.value === "streaming") {
-      status.value = "ended";
-    }
-    if (!finalMessage.value) {
-      status.value = "error";
-      errorText.value = "Agent Run State 协议错误：运行已结束但未收到 agent_run.final。";
-      updateAssistantMessage(errorText.value);
-    }
-    markAssistantPending(false);
-    await loadSessionMessages(sessionId.value.trim(), { preserveCurrentOnEmpty: Boolean(finalMessage.value) });
+    const invocation = await sessionAPI.submit(attempt);
+    if (controller.signal.aborted) return;
+    activeInvocationId.value = invocation.invocation_uuid;
+    traceId.value = invocation.trace_uuid;
+    await sessionAPI.subscribe(sid, invocation.invocation_uuid, controller.signal, (event) => {
+      const payload = event.payload as Record<string, any>;
+      rawLog.value += event.raw + "\n\n";
+      if (event.event === "final") { finalMessage.value = payload.output; setAssistantText(payload.output); }
+      if (event.event === "error") { errorText.value = sessionErrorText(new Error(String(payload.reason_code))); status.value = "error"; }
+      if (event.event === "end") { pendingAttempts.delete(sid); activeInvocationId.value = ""; if (payload.status === "succeeded") status.value = "ended"; }
+    }, requestHeaders());
+    await loadSessionMessages(sid);
   } catch (error) {
-    markAssistantPending(false);
-    if ((error as Error)?.name === "AbortError") {
-      status.value = "aborted";
-      updateAssistantMessage("已停止本次会话。");
-      return;
-    }
-    status.value = "error";
-    errorText.value = error instanceof Error ? error.message : String(error);
-    markRunStateFailed(errorText.value);
-    updateAssistantMessage(errorText.value);
-  } finally {
-    loading.value = false;
-    abortController = null;
-    if (status.value === "ended") {
-      await loadSessions(currentAgent.value, false);
-    }
-  }
+    if (controller.signal.aborted) { status.value = "aborted"; errorText.value = t("agentSession.detached"); }
+    else { status.value = "error"; errorText.value = sessionErrorText(error); }
+  } finally { if (abortController === controller) { markAssistantPending(false); loading.value = false; abortController = null; } }
+}
+
+function sessionErrorText(error: unknown) {
+  const value = error as any;
+  const reason = String(value?.data?.error?.reason_code || value?.data?.reason_code || value?.message || "AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return t("agentSession.failed", { reason });
+}
+
+async function cancelCurrentRun() {
+  const attempt = pendingAttempts.get(sessionId.value);
+  if (!attempt?.invocationUUID) { errorText.value = t("agentSession.pendingRetry"); return; }
+  try { await sessionAPI.cancel(attempt.session, attempt.invocationUUID); }
+  catch (error) { errorText.value = sessionErrorText(error); }
 }
 
 function markRunStateFailed(message: string) {

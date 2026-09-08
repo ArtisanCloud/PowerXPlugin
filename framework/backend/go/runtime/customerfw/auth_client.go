@@ -9,6 +9,7 @@ type RegisterInput struct {
 	Password   string             `json:"password,omitempty"`
 	Profile    CustomerAttributes `json:"profile,omitempty"`
 	Attributes map[string]any     `json:"attributes,omitempty"`
+	Credential CustomerCredential `json:"credential,omitempty"`
 }
 
 type LoginInput struct {
@@ -21,6 +22,15 @@ type LoginInput struct {
 	AvatarURL  string             `json:"avatar_url,omitempty"`
 	Profile    CustomerAttributes `json:"profile,omitempty"`
 	Attributes map[string]any     `json:"attributes,omitempty"`
+	Credential CustomerCredential `json:"credential,omitempty"`
+}
+
+// CustomerCredential is verified by Core for delegated authentication. Its
+// value is opaque to Framework and must never be logged or persisted by a
+// plugin. Current Core contract supports shopify_customer_access_token.
+type CustomerCredential struct {
+	Type  string `json:"type,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type AuthResult struct {

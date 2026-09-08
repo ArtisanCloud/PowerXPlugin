@@ -10,6 +10,7 @@ type ErrorCode string
 const (
 	CodeClientUnavailable ErrorCode = "METADATA_CLIENT_UNAVAILABLE"
 	CodeInvalidRequest    ErrorCode = "METADATA_INVALID_REQUEST"
+	CodeInvalidArgument   ErrorCode = "METADATA_INVALID_ARGUMENT"
 	CodeUnauthorized      ErrorCode = "METADATA_UNAUTHORIZED"
 	CodeForbidden         ErrorCode = "METADATA_FORBIDDEN"
 	CodeNotFound          ErrorCode = "METADATA_NOT_FOUND"
@@ -19,12 +20,13 @@ const (
 )
 
 type Error struct {
-	Code      ErrorCode      `json:"code"`
-	Message   string         `json:"message"`
-	Operation string         `json:"operation,omitempty"`
-	TraceID   string         `json:"trace_id,omitempty"`
-	Details   map[string]any `json:"details,omitempty"`
-	Cause     error          `json:"-"`
+	StatusCode int            `json:"-"`
+	Code       ErrorCode      `json:"code"`
+	Message    string         `json:"message"`
+	Operation  string         `json:"operation,omitempty"`
+	TraceID    string         `json:"trace_id,omitempty"`
+	Details    map[string]any `json:"details,omitempty"`
+	Cause      error          `json:"-"`
 }
 
 func (e *Error) Error() string {
@@ -65,7 +67,7 @@ func HTTPStatusForCode(code ErrorCode) int {
 		return http.StatusNotFound
 	case CodeConflict:
 		return http.StatusConflict
-	case CodeInvalidRequest, CodeDecodeFailed:
+	case CodeInvalidRequest, CodeInvalidArgument:
 		return http.StatusBadRequest
 	case CodeClientUnavailable:
 		return http.StatusServiceUnavailable

@@ -197,6 +197,12 @@
 
 ## Dependencies & Execution Order
 
+## 2026-09-04 双模式补充任务
+
+- [X] T0DM1 定义 `CustomerRuntime`、`LocalCustomerStore` 和 Factory，集中选择 local/delegated adapter。
+- [X] T0DM2 实现 delegated membership adapter；Core `com.corex.customer.memberships.delegated_read` 已发布后，使用 STS + customer JWT 双凭证读取当前 membership；未配置时明确返回 unavailable。
+- [ ] T0DM3 protected mini-app membership 已改由 `CustomerRuntime` 选择 adapter，且 local/delegated contract tests 已覆盖；待 Core 发布 customer register/login/validate Host Contract 后，移除 CustomerHandler 的历史认证模式分支。
+
 ### Phase Dependencies
 
 1. Phase 1 Setup has no dependencies.

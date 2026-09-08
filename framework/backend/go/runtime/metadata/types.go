@@ -119,6 +119,7 @@ type Tag struct {
 }
 
 type TagBinding struct {
+	BindingUUID  string `json:"binding_uuid"`
 	TagUUID      string `json:"tag_uuid"`
 	ResourceType string `json:"resource_type"`
 	ResourceUUID string `json:"resource_uuid"`
@@ -230,6 +231,7 @@ type CreateDictionaryNamespaceRequest struct {
 }
 
 type CreateDictionaryItemRequest struct {
+	Metadata        map[string]any
 	NamespaceUUID   string
 	Code            string
 	LabelI18n       I18nMap
@@ -275,4 +277,56 @@ type CreateResourceTypeRequest struct {
 	ValidatorKey    string
 	BindingEnabled  bool
 	RequestID       string
+}
+
+// UpdateDictionaryNamespaceRequest is a partial update addressed only by the
+// namespace UUID. Tenant identity is deliberately not part of this DTO.
+type UpdateDictionaryNamespaceRequest struct {
+	NamespaceUUID   string
+	NameI18n        *I18nMap
+	DescriptionI18n *I18nMap
+	Status          *string
+	RequestID       string
+}
+
+type UpdateDictionaryItemRequest struct {
+	ItemUUID        string
+	LabelI18n       *I18nMap
+	DescriptionI18n *I18nMap
+	SortOrder       *int
+	Status          *string
+	Metadata        *map[string]any
+	RequestID       string
+}
+
+type UpdateTaxonomyNodeRequest struct {
+	NodeUUID        string
+	LabelI18n       *I18nMap
+	DescriptionI18n *I18nMap
+	SortOrder       *int
+	Status          *string
+	Version         int64
+	RequestID       string
+}
+
+type UpdateResourceTypeRequest struct {
+	ResourceTypeUUID string
+	NameI18n         *I18nMap
+	DescriptionI18n  *I18nMap
+	ValidatorKey     *string
+	BindingEnabled   *bool
+	Status           *string
+	RequestID        string
+}
+
+type CreateTagBindingRequest struct {
+	TagUUID      string
+	ResourceType string
+	ResourceUUID string
+	RequestID    string
+}
+
+type DeleteTagBindingRequest struct {
+	BindingUUID string
+	RequestID   string
 }

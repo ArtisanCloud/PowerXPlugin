@@ -7,6 +7,8 @@
 
 ## Summary
 
+本计划中的 Registry 语义等同于 Framework Runtime Factory：业务代码只依赖 IAM contract；插件 bootstrap 注入 local bundle，delegated bundle 只能由 Framework Core adapter 构造。不得在 handler/service 再次分支判断 mode。
+
 本特性将 IAM 契约从 skeleton 上提到 framework，目标是让插件业务层只依赖 framework IAM 接口即可在 `standalone(local)` 与 `delegated` 模式间切换。  
 关键策略已在 clarify 阶段冻结：
 1. 模式优先级：`config.context.provider_mode` > 环境变量；冲突 fail-fast。

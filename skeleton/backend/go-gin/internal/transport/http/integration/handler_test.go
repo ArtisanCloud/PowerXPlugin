@@ -80,30 +80,6 @@ func (f *fakeCapabilityGateway) RegisterCatalog(_ context.Context, _ *capabiliti
 	return nil
 }
 
-func (f *fakeCapabilityGateway) CreateAgentSession(_ context.Context, _ capgateway.AgentSessionParams) (*capgateway.AgentSessionRecord, error) {
-	return nil, nil
-}
-
-func (f *fakeCapabilityGateway) ListAgentSessions(_ context.Context, _ capgateway.AgentSessionListOptions) ([]capgateway.AgentSessionRecord, error) {
-	return nil, nil
-}
-
-func (f *fakeCapabilityGateway) ListAgentSessionMessages(_ context.Context, _ capgateway.AgentSessionMessageListOptions) ([]capgateway.AgentSessionMessageRecord, error) {
-	return nil, nil
-}
-
-func (f *fakeCapabilityGateway) DeleteAgentSession(_ context.Context, _ capgateway.AgentSessionMutationOptions) error {
-	return nil
-}
-
-func (f *fakeCapabilityGateway) ArchiveAgentSession(_ context.Context, _ capgateway.AgentSessionMutationOptions) error {
-	return nil
-}
-
-func (f *fakeCapabilityGateway) StreamAgentSSE(_ context.Context, _ capgateway.AgentStreamParams) (*capgateway.AgentStream, error) {
-	return nil, nil
-}
-
 func (f *fakeCapabilityGateway) Close() error { return nil }
 
 func TestInvokeCapabilitySuccess(t *testing.T) {

@@ -453,8 +453,8 @@ mappings:
         literal: "{{ .template.status }}"
         replace: "{{`{{ .template.status }}`}}"
       - globs: ["capabilities/**/*.yaml"]
-        literal: "{{ .template.id }}"
-        replace: "{{`{{ .template.id }}`}}"
+        literal: "{{ .template.uuid }}"
+        replace: "{{`{{ .template.uuid }}`}}"
       - globs: ["capabilities/**/*.yaml"]
         literal: "{{ .pagination.total }}"
         replace: "{{`{{ .pagination.total }}`}}"

@@ -3,10 +3,13 @@
   "title": "TemplateBatchCloneInput",
   "type": "object",
   "properties": {
-    "source_ids": {
+    "source_uuids": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "integer", "minimum": 1 }
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
     },
     "copies": {
       "type": "integer",
@@ -28,6 +31,8 @@
       "description": "管理端填入的备注，不会对能力输出造成影响。"
     }
   },
-  "required": ["source_ids"],
+  "required": [
+    "source_uuids"
+  ],
   "additionalProperties": false
 }

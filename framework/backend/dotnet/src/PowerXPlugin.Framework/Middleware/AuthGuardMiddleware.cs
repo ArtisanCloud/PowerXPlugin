@@ -45,7 +45,7 @@ public static class AuthGuardMiddlewareExtensions
             var req = new AuthorizationRequest
             {
                 TenantUUID = tenantUuid,
-                UserID = userId,
+                UserUUID = userId,
                 Resource = options.Resource,
                 Action = options.Action,
                 TraceID = traceId

@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	customermodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/customer"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -77,7 +77,7 @@ func openCustomerIdentityTestDB(t *testing.T, name string) *gorm.DB {
 	t.Helper()
 	models.ForceSchemaForTests("")
 	t.Cleanup(func() { models.ForceSchemaForTests("public") })
-	db, err := gorm.Open(sqlite.Open("file:"+name+"?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:"+name+"?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

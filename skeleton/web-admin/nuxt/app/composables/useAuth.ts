@@ -391,6 +391,8 @@ export const useAuth = () => {
   const getToken = () => {
     ensureStorageConsistency("getToken");
     if (isTokenExpired()) {
+      // Expiry invalidates the current access state, not the refresh credential.
+      isAuthenticated.value = false;
       return null;
     }
     if (!token.value) {

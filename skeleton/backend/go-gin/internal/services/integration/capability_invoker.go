@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -293,7 +294,7 @@ func (h *templatePrepareHandler) resolveTemplateReference(ctx context.Context, a
 	if action != "get" && action != "update" && action != "delete" {
 		return nil, nil
 	}
-	if uint64FromAny(state["template_id"]) > 0 {
+	if uuidFromAny(state["template_uuid"]) != "" {
 		return nil, nil
 	}
 	query := templateLookupQuery(state)
@@ -351,13 +352,13 @@ func setResolvedTemplate(state map[string]any, tpl *dbtemplate.Template) {
 	if state == nil || tpl == nil {
 		return
 	}
-	state["template_id"] = tpl.ID
+	state["template_uuid"] = tpl.UUID
 	state["template_name"] = tpl.Name
 	state["resolved_template"] = map[string]any{
 		"name":        tpl.Name,
 		"description": tpl.Description,
 		"status":      tpl.Status,
-		"detail_path": templateDetailPath(tpl.ID),
+		"detail_path": templateDetailPath(tpl.UUID),
 	}
 }
 
@@ -368,12 +369,12 @@ func templateCandidateViews(items []*dbtemplate.Template) []map[string]any {
 			continue
 		}
 		candidates = append(candidates, map[string]any{
-			"template_id":   tpl.ID,
+			"template_uuid": tpl.UUID,
 			"name":          tpl.Name,
 			"description":   tpl.Description,
 			"status":        tpl.Status,
 			"review_status": tpl.ReviewStatus,
-			"detail_path":   templateDetailPath(tpl.ID),
+			"detail_path":   templateDetailPath(tpl.UUID),
 		})
 	}
 	return candidates
@@ -385,26 +386,25 @@ func templateCandidateMessage(prefix string, items []*dbtemplate.Template) strin
 		if tpl == nil {
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("- [%s](%s)（模板 ID：%d）", tpl.Name, templateDetailPath(tpl.ID), tpl.ID))
+		lines = append(lines, fmt.Sprintf("- [%s](%s)", tpl.Name, templateDetailPath(tpl.UUID)))
 	}
-	lines = append(lines, "请回复要操作的模板 ID，或提供更准确的模板名称。")
 	return strings.Join(lines, "\n")
 }
 
 func templateDeleteConfirmationMessage(state map[string]any) string {
 	templateName := firstNonEmptyTemplateString(normalizeString(state["template_name"]), normalizeString(mapFromInterface(state["resolved_template"])["name"]))
-	templateID := uint64FromAny(state["template_id"])
+	templateUUID := uuidFromAny(state["template_uuid"])
 	if templateName == "" {
 		templateName = "该模板"
 	}
-	if templateID == 0 {
+	if templateUUID == "" {
 		return "请确认是否删除" + templateName + "。"
 	}
-	return fmt.Sprintf("请确认是否删除模板「%s」。[查看模板详情](%s)（模板 ID：%d）\n确认删除后我才会执行。", templateName, templateDetailPath(templateID), templateID)
+	return fmt.Sprintf("请确认是否删除模板「%s」。[查看模板详情](%s)\n确认删除后我才会执行。", templateName, templateDetailPath(templateUUID))
 }
 
-func templateDetailPath(id uint64) string {
-	return fmt.Sprintf("/templates/crud?template_id=%d", id)
+func templateDetailPath(id string) string {
+	return fmt.Sprintf("/templates/crud?template_uuid=%s", id)
 }
 
 type templateListHandler struct {
@@ -460,10 +460,10 @@ func (h *templateReadHandler) Handle(ctx context.Context, envelope *domain.Integ
 	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
 		return nil, err
 	}
-	if payload.TemplateID == 0 {
-		return nil, errors.New("template_id is required")
+	if payload.TemplateUUID == "" {
+		return nil, errors.New("template_uuid is required")
 	}
-	tpl, err := h.svc.GetByID(ctx, payload.TemplateID)
+	tpl, err := h.svc.GetByUUID(ctx, payload.TemplateUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +501,7 @@ func (h *templateCreateHandler) Handle(ctx context.Context, envelope *domain.Int
 		return nil, err
 	}
 	resp := map[string]any{
-		"id":       strconv.FormatUint(tpl.ID, 10),
+		"uuid":     tpl.UUID,
 		"status":   tpl.Status,
 		"template": templateView(tpl),
 	}
@@ -524,10 +524,10 @@ func (h *templateUpdateHandler) Handle(ctx context.Context, envelope *domain.Int
 	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
 		return nil, err
 	}
-	if payload.TemplateID == 0 {
-		return nil, errors.New("template_id is required")
+	if payload.TemplateUUID == "" {
+		return nil, errors.New("template_uuid is required")
 	}
-	current, err := h.svc.GetByID(ctx, payload.TemplateID)
+	current, err := h.svc.GetByUUID(ctx, payload.TemplateUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +543,7 @@ func (h *templateUpdateHandler) Handle(ctx context.Context, envelope *domain.Int
 	if content == "" {
 		content = current.Content
 	}
-	updated, err := h.svc.Update(ctx, payload.TemplateID, name, description, content)
+	updated, err := h.svc.Update(ctx, payload.TemplateUUID, name, description, content)
 	if err != nil {
 		return nil, err
 	}
@@ -568,14 +568,14 @@ func (h *templateDeleteHandler) Handle(ctx context.Context, envelope *domain.Int
 	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
 		return nil, err
 	}
-	if payload.TemplateID == 0 {
-		return nil, errors.New("template_id is required")
+	if payload.TemplateUUID == "" {
+		return nil, errors.New("template_uuid is required")
 	}
-	if err := h.svc.Delete(ctx, payload.TemplateID); err != nil {
+	if err := h.svc.Delete(ctx, payload.TemplateUUID); err != nil {
 		return nil, err
 	}
 	resp := map[string]any{
-		"id":      strconv.FormatUint(payload.TemplateID, 10),
+		"uuid":    payload.TemplateUUID,
 		"deleted": true,
 	}
 	return hostResultWithAgentResponse(h.CapabilityID(), resp)
@@ -597,10 +597,10 @@ func (h *templateValidateHandler) Handle(ctx context.Context, envelope *domain.I
 	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
 		return nil, err
 	}
-	if payload.TemplateID == 0 {
-		return nil, errors.New("template_id is required")
+	if payload.TemplateUUID == "" {
+		return nil, errors.New("template_uuid is required")
 	}
-	result, err := h.svc.Validate(ctx, payload.TemplateID, payload.Rules, payload.Strict)
+	result, err := h.svc.Validate(ctx, payload.TemplateUUID, payload.Rules, payload.Strict)
 	if err != nil {
 		return nil, err
 	}
@@ -624,10 +624,10 @@ func (h *templateBatchCloneHandler) Handle(ctx context.Context, envelope *domain
 	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
 		return nil, err
 	}
-	if len(payload.SourceIDs) == 0 {
-		return nil, errors.New("source_ids is required")
+	if len(payload.SourceUUIDs) == 0 {
+		return nil, errors.New("source_uuids is required")
 	}
-	result, err := h.svc.BatchClone(ctx, payload.SourceIDs, payload.Copies, srvtemplates.BatchCloneOptions{
+	result, err := h.svc.BatchClone(ctx, payload.SourceUUIDs, payload.Copies, srvtemplates.BatchCloneOptions{
 		NamePrefix:        payload.NamePrefix,
 		DescriptionPrefix: payload.DescriptionPrefix,
 	})
@@ -654,14 +654,14 @@ func (h *templateReviewHandler) Handle(ctx context.Context, envelope *domain.Int
 	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
 		return nil, err
 	}
-	if payload.TemplateID == 0 {
-		return nil, errors.New("template_id is required")
+	if payload.TemplateUUID == "" {
+		return nil, errors.New("template_uuid is required")
 	}
 	reviewer := strings.TrimSpace(payload.Reviewer)
 	if reviewer == "" {
 		reviewer = "system"
 	}
-	reviewed, err := h.svc.MarkReviewed(ctx, payload.TemplateID, reviewer, payload.Comments, payload.Approved)
+	reviewed, err := h.svc.MarkReviewed(ctx, payload.TemplateUUID, reviewer, payload.Comments, payload.Approved)
 	if err != nil {
 		return nil, err
 	}
@@ -670,10 +670,10 @@ func (h *templateReviewHandler) Handle(ctx context.Context, envelope *domain.Int
 		status = srvtemplates.TemplateReviewApproved
 	}
 	resp := map[string]any{
-		"template_id": strconv.FormatUint(reviewed.ID, 10),
-		"status":      status,
-		"reviewer":    reviewer,
-		"template":    templateView(reviewed),
+		"template_uuid": reviewed.UUID,
+		"status":        status,
+		"reviewer":      reviewer,
+		"template":      templateView(reviewed),
 	}
 	payloadBytes, _ := json.Marshal(resp)
 	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
@@ -695,15 +695,15 @@ func (h *templatePublishHandler) Handle(ctx context.Context, envelope *domain.In
 	if err := decodeInlinePayload(envelope.PayloadRef, &payload); err != nil {
 		return nil, err
 	}
-	if payload.TemplateID == 0 {
-		return nil, errors.New("template_id is required")
+	if payload.TemplateUUID == "" {
+		return nil, errors.New("template_uuid is required")
 	}
-	published, err := h.svc.Publish(ctx, payload.TemplateID, payload.Channel)
+	published, err := h.svc.Publish(ctx, payload.TemplateUUID, payload.Channel)
 	if err != nil {
 		return nil, err
 	}
 	resp := map[string]any{
-		"template_id":    strconv.FormatUint(published.ID, 10),
+		"template_uuid":  published.UUID,
 		"publish_status": "deployed",
 		"published_at":   published.PublishedAt,
 		"template":       templateView(published),
@@ -746,7 +746,7 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 		"stage":           "draft",
 		"status":          tpl.Status,
 		"review_status":   tpl.ReviewStatus,
-		"template_id":     tpl.ID,
+		"template_uuid":   tpl.UUID,
 		"publish_channel": tpl.PublishChannel,
 	})
 	emitEvent(h.broker, envelope, "draft.created", tpl)
@@ -755,7 +755,7 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 	if reviewer == "" {
 		reviewer = "system"
 	}
-	reviewed, err := h.svc.MarkReviewed(ctx, tpl.ID, reviewer, payload.Review.Comment, true)
+	reviewed, err := h.svc.MarkReviewed(ctx, tpl.UUID, reviewer, payload.Review.Comment, true)
 	if err != nil {
 		return nil, err
 	}
@@ -767,14 +767,14 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 		"reviewed_at":   reviewed.ReviewedAt,
 	})
 	emitEvent(h.broker, envelope, "template.review.completed", map[string]any{
-		"template_id":    reviewed.ID,
+		"template_uuid":  reviewed.UUID,
 		"review_status":  reviewed.ReviewStatus,
 		"reviewed_by":    reviewed.ReviewedBy,
 		"reviewed_at":    reviewed.ReviewedAt,
 		"review_comment": reviewed.ReviewComment,
 	})
 
-	published, err := h.svc.Publish(ctx, tpl.ID, payload.PublishChannel)
+	published, err := h.svc.Publish(ctx, tpl.UUID, payload.PublishChannel)
 	if err != nil {
 		return nil, err
 	}
@@ -783,7 +783,7 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 		publishStatusValue = fmt.Sprintf("published:%s", ch)
 	}
 	publishPayload := map[string]any{
-		"template_id":     published.ID,
+		"template_uuid":   published.UUID,
 		"status":          published.Status,
 		"publish_channel": published.PublishChannel,
 		"published_at":    published.PublishedAt,
@@ -801,7 +801,7 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 	if cleanupReason == "" {
 		cleanupReason = "auto-clean"
 	}
-	cleaned, err := h.svc.Cleanup(ctx, tpl.ID, cleanupReason)
+	cleaned, err := h.svc.Cleanup(ctx, tpl.UUID, cleanupReason)
 	if err != nil {
 		return nil, err
 	}
@@ -812,15 +812,15 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 		"cleaned_at":     cleaned.CleanedAt,
 	})
 	emitEvent(h.broker, envelope, "template.cleanup.completed", map[string]any{
-		"template_id":    cleaned.ID,
+		"template_uuid":  cleaned.UUID,
 		"status":         cleaned.Status,
 		"cleanup_reason": cleaned.CleanupReason,
 		"cleaned_at":     cleaned.CleanedAt,
 	})
 
 	resp := map[string]any{
-		"template_id":     strconv.FormatUint(tpl.ID, 10),
-		"draft_id":        strconv.FormatUint(tpl.ID, 10),
+		"template_uuid":   tpl.UUID,
+		"draft_uuid":      tpl.UUID,
 		"status":          cleaned.Status,
 		"review_status":   cleaned.ReviewStatus,
 		"publish_status":  publishStatusValue,
@@ -835,7 +835,7 @@ func (h *templateComposeHandler) Handle(ctx context.Context, envelope *domain.In
 		Status:  "accepted",
 		Payload: payloadBytes,
 		Metadata: map[string]any{
-			"template_id": tpl.ID,
+			"template_uuid": tpl.UUID,
 		},
 	}, nil
 }
@@ -892,15 +892,15 @@ func (h *templateAuditHandler) Handle(ctx context.Context, envelope *domain.Inte
 		if strings.TrimSpace(desc) == "" {
 			desc = selected.Description
 		}
-		updated, err := h.svc.Update(ctx, selected.ID, selected.Name, desc, payload.UpdatePayload.Content)
+		updated, err := h.svc.Update(ctx, selected.UUID, selected.Name, desc, payload.UpdatePayload.Content)
 		if err != nil {
 			return nil, err
 		}
-		response["selected_template_id"] = strconv.FormatUint(updated.ID, 10)
+		response["selected_template_uuid"] = updated.UUID
 		response["updated"] = true
 		evtPayload := map[string]any{
-			"template_id": updated.ID,
-			"description": updated.Description,
+			"template_uuid": updated.UUID,
+			"description":   updated.Description,
 		}
 		events := []map[string]any{
 			{
@@ -952,7 +952,7 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 	response := map[string]any{
 		"scanned_total":  int(list.Total),
 		"violations":     []map[string]any{},
-		"cloned_ids":     []uint64{},
+		"cloned_uuids":   []string{},
 		"failed_clones":  []srvtemplates.BatchCloneFailure{},
 		"publish_status": "",
 	}
@@ -961,19 +961,19 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 		return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
 	}
 	primary := list.List[0]
-	if validation, err := h.svc.Validate(ctx, primary.ID, payload.ValidateRules, false); err == nil {
-		response["validated_template_id"] = strconv.FormatUint(primary.ID, 10)
+	if validation, err := h.svc.Validate(ctx, primary.UUID, payload.ValidateRules, false); err == nil {
+		response["validated_template_uuid"] = primary.UUID
 		response["validation_passed"] = validation.Valid
 		response["violations"] = validation.Violations
 		emitEvent(h.broker, envelope, "template.validate.completed", map[string]any{
-			"template_id": primary.ID,
-			"valid":       validation.Valid,
-			"violations":  validation.Violations,
+			"template_uuid": primary.UUID,
+			"valid":         validation.Valid,
+			"violations":    validation.Violations,
 		})
 	}
-	sourceIDs := make([]uint64, len(list.List))
+	sourceUUIDs := make([]string, len(list.List))
 	for idx, tpl := range list.List {
-		sourceIDs[idx] = tpl.ID
+		sourceUUIDs[idx] = tpl.UUID
 	}
 	copies := payload.Clone.Copies
 	if copies <= 0 {
@@ -982,25 +982,25 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 	if copies > 20 {
 		copies = 20
 	}
-	cloneResult, err := h.svc.BatchClone(ctx, sourceIDs, copies, srvtemplates.BatchCloneOptions{
+	cloneResult, err := h.svc.BatchClone(ctx, sourceUUIDs, copies, srvtemplates.BatchCloneOptions{
 		NamePrefix:        payload.Clone.NamePrefix,
 		DescriptionPrefix: payload.Clone.DescriptionPrefix,
 	})
 	if err != nil {
 		return nil, err
 	}
-	response["created_template_ids"] = cloneResult.CreatedIDs
-	response["cloned_ids"] = cloneResult.CreatedIDs
+	response["created_template_uuids"] = cloneResult.CreatedUUIDs
+	response["cloned_uuids"] = cloneResult.CreatedUUIDs
 	response["failed_clones"] = cloneResult.Failed
 	emitEvent(h.broker, envelope, "template.batch_clone.completed", map[string]any{
-		"source_ids":  sourceIDs,
-		"created_ids": cloneResult.CreatedIDs,
+		"source_uuids":  sourceUUIDs,
+		"created_uuids": cloneResult.CreatedUUIDs,
 	})
-	targetID := primary.ID
-	if len(cloneResult.CreatedIDs) > 0 {
-		targetID = cloneResult.CreatedIDs[0]
+	targetID := primary.UUID
+	if len(cloneResult.CreatedUUIDs) > 0 {
+		targetID = cloneResult.CreatedUUIDs[0]
 	}
-	target, err := h.svc.GetByID(ctx, targetID)
+	target, err := h.svc.GetByUUID(ctx, targetID)
 	if err != nil {
 		return nil, err
 	}
@@ -1012,23 +1012,23 @@ func (h *templateQualityHandler) Handle(ctx context.Context, envelope *domain.In
 	if err != nil {
 		return nil, err
 	}
-	response["updated_template_id"] = strconv.FormatUint(updated.ID, 10)
+	response["updated_template_uuid"] = updated.UUID
 	if strings.TrimSpace(payload.PublishChannel) != "" {
-		published, err := h.svc.Publish(ctx, updated.ID, payload.PublishChannel)
+		published, err := h.svc.Publish(ctx, updated.UUID, payload.PublishChannel)
 		if err != nil {
 			return nil, err
 		}
 		response["publish_status"] = "deployed"
-		response["published_template_id"] = strconv.FormatUint(published.ID, 10)
+		response["published_template_uuid"] = published.UUID
 		emitEvent(h.broker, envelope, "template.publish.completed", map[string]any{
-			"template_id":     published.ID,
+			"template_uuid":   published.UUID,
 			"publish_channel": published.PublishChannel,
 			"published_at":    published.PublishedAt,
 		})
 	}
 	emitEvent(h.broker, envelope, "template.update.completed", map[string]any{
-		"template_id": updated.ID,
-		"description": updated.Description,
+		"template_uuid": updated.UUID,
+		"description":   updated.Description,
 	})
 	payloadBytes, _ := json.Marshal(response)
 	return &HostInvocationResult{Status: "accepted", Payload: payloadBytes}, nil
@@ -1069,8 +1069,41 @@ func decodeInlinePayload(payloadRef string, dest interface{}) error {
 	if !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
 		return errors.New("payload_ref must be inline JSON for this capability")
 	}
+	var fields any
+	if err := json.Unmarshal([]byte(trimmed), &fields); err != nil {
+		return err
+	}
+	if err := validateTemplateUUIDFields(fields); err != nil {
+		return err
+	}
 	if err := json.Unmarshal([]byte(trimmed), dest); err != nil {
 		return fmt.Errorf("invalid payload_ref: %w", err)
+	}
+	return nil
+}
+
+func validateTemplateUUIDFields(value any) error {
+	switch v := value.(type) {
+	case map[string]any:
+		for k, x := range v {
+			switch k {
+			case "template_id", "source_ids", "source_id", "created_ids":
+				return errors.New("TEMPLATE_NUMERIC_REFERENCE_REJECTED")
+			case "template_uuid":
+				if x != "" && uuidFromAny(x) == "" {
+					return errors.New("TEMPLATE_INVALID_UUID")
+				}
+			}
+			if e := validateTemplateUUIDFields(x); e != nil {
+				return e
+			}
+		}
+	case []any:
+		for _, x := range v {
+			if e := validateTemplateUUIDFields(x); e != nil {
+				return e
+			}
+		}
 	}
 	return nil
 }
@@ -1099,7 +1132,7 @@ type templateListPayload struct {
 
 type templatePreparePayload struct {
 	Action       string              `json:"action"`
-	TemplateID   any                 `json:"template_id"`
+	TemplateUUID string              `json:"template_uuid"`
 	TemplateRef  string              `json:"template_ref"`
 	TemplateName string              `json:"template_name"`
 	Name         string              `json:"name"`
@@ -1123,7 +1156,7 @@ type templatePreparePayload struct {
 }
 
 type templateReadPayload struct {
-	TemplateID uint64 `json:"template_id"`
+	TemplateUUID string `json:"template_uuid"`
 }
 
 type templateCreatePayload struct {
@@ -1133,40 +1166,40 @@ type templateCreatePayload struct {
 }
 
 type templateUpdatePayload struct {
-	TemplateID  uint64 `json:"template_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Content     string `json:"content"`
+	TemplateUUID string `json:"template_uuid"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	Content      string `json:"content"`
 }
 
 type templateDeletePayload struct {
-	TemplateID uint64 `json:"template_id"`
+	TemplateUUID string `json:"template_uuid"`
 }
 
 type templateValidatePayload struct {
-	TemplateID uint64   `json:"template_id"`
-	Rules      []string `json:"rules"`
-	Strict     bool     `json:"strict"`
+	TemplateUUID string   `json:"template_uuid"`
+	Rules        []string `json:"rules"`
+	Strict       bool     `json:"strict"`
 }
 
 type templateBatchClonePayload struct {
-	SourceIDs         []uint64 `json:"source_ids"`
+	SourceUUIDs       []string `json:"source_uuids"`
 	Copies            int      `json:"copies"`
 	NamePrefix        string   `json:"name_prefix"`
 	DescriptionPrefix string   `json:"description_prefix"`
 }
 
 type templateReviewPayload struct {
-	TemplateID uint64 `json:"template_id"`
-	Approved   bool   `json:"approved"`
-	Comments   string `json:"comments"`
-	Reviewer   string `json:"reviewer"`
+	TemplateUUID string `json:"template_uuid"`
+	Approved     bool   `json:"approved"`
+	Comments     string `json:"comments"`
+	Reviewer     string `json:"reviewer"`
 }
 
 type templatePublishPayload struct {
-	TemplateID uint64 `json:"template_id"`
-	Channel    string `json:"channel"`
-	Version    string `json:"version"`
+	TemplateUUID string `json:"template_uuid"`
+	Channel      string `json:"channel"`
+	Version      string `json:"version"`
 }
 
 type templateComposePayload struct {
@@ -1229,10 +1262,8 @@ func mergeTemplatePrepareState(state map[string]any, payload templatePreparePayl
 		action = "create"
 	}
 	merged["action"] = action
-	if templateID := uint64FromAny(payload.TemplateID); templateID > 0 {
-		merged["template_id"] = templateID
-	} else if ref := normalizeString(payload.TemplateID); ref != "" {
-		merged["template_ref"] = ref
+	if templateUUID := uuidFromAny(payload.TemplateUUID); templateUUID != "" {
+		merged["template_uuid"] = templateUUID
 	}
 	if ref := firstNonEmptyTemplateString(payload.TemplateRef, payload.TemplateName, normalizeString(merged["template_ref"]), normalizeString(merged["template_name"])); ref != "" {
 		merged["template_ref"] = ref
@@ -1289,7 +1320,7 @@ func missingTemplateFields(action string, state map[string]any) []string {
 			missing = append(missing, "template.content")
 		}
 	case "update":
-		if uint64FromAny(state["template_id"]) == 0 {
+		if uuidFromAny(state["template_uuid"]) == "" {
 			missing = append(missing, "template_ref")
 		}
 		if normalizeString(template["title"]) == "" && normalizeString(template["name"]) == "" {
@@ -1302,10 +1333,10 @@ func missingTemplateFields(action string, state map[string]any) []string {
 			missing = append(missing, "template.content")
 		}
 	case "get", "delete":
-		if uint64FromAny(state["template_id"]) == 0 {
+		if uuidFromAny(state["template_uuid"]) == "" {
 			missing = append(missing, "template_ref")
 		}
-		if action == "delete" && uint64FromAny(state["template_id"]) > 0 && !boolFromAny(state["confirmed"]) {
+		if action == "delete" && uuidFromAny(state["template_uuid"]) != "" && !boolFromAny(state["confirmed"]) {
 			missing = append(missing, "confirmation")
 		}
 	case "list":
@@ -1343,7 +1374,7 @@ func templateMissingFieldNames(fields []string) string {
 			names = append(names, "描述")
 		case "template.content":
 			names = append(names, "内容")
-		case "template_id":
+		case "template_uuid":
 			names = append(names, "模板 ID")
 		case "template_ref":
 			names = append(names, "模板名称")
@@ -1370,16 +1401,16 @@ func templateCapabilityPayload(action string, state map[string]any) (map[string]
 		}
 	case "update":
 		bodyPayload = map[string]any{
-			"action":      action,
-			"template_id": uint64FromAny(state["template_id"]),
-			"name":        firstNonEmptyTemplateString(normalizeString(template["title"]), normalizeString(template["name"])),
-			"description": normalizeString(template["description"]),
-			"content":     normalizeString(template["content"]),
+			"action":        action,
+			"template_uuid": uuidFromAny(state["template_uuid"]),
+			"name":          firstNonEmptyTemplateString(normalizeString(template["title"]), normalizeString(template["name"])),
+			"description":   normalizeString(template["description"]),
+			"content":       normalizeString(template["content"]),
 		}
 	case "get", "delete":
 		bodyPayload = map[string]any{
-			"action":      action,
-			"template_id": uint64FromAny(state["template_id"]),
+			"action":        action,
+			"template_uuid": uuidFromAny(state["template_uuid"]),
 		}
 	case "list":
 		bodyPayload = map[string]any{"action": action}
@@ -1428,7 +1459,7 @@ func templateView(tpl *dbtemplate.Template) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":              strconv.FormatUint(tpl.ID, 10),
+		"uuid":            tpl.UUID,
 		"name":            tpl.Name,
 		"description":     tpl.Description,
 		"content":         tpl.Content,
@@ -1536,13 +1567,13 @@ func templateItemsSummary(value any) string {
 	lines := make([]string, 0, limit)
 	for i := 0; i < limit; i++ {
 		item := items[i]
-		id := normalizeString(item["id"])
+		id := normalizeString(item["uuid"])
 		name := normalizeString(item["name"])
 		status := normalizeString(item["status"])
 		if id == "" || name == "" {
 			return ""
 		}
-		line := fmt.Sprintf("- [%s](/templates/crud?template_id=%s)", name, id)
+		line := fmt.Sprintf("- [%s](/templates/crud?template_uuid=%s)", name, id)
 		if status != "" {
 			line = fmt.Sprintf("%s（%s）", line, status)
 		}
@@ -1779,30 +1810,14 @@ func intFromAny(value any) int {
 	return 0
 }
 
-func uint64FromAny(value any) uint64 {
-	switch v := value.(type) {
-	case uint64:
-		return v
-	case uint:
-		return uint64(v)
-	case int:
-		if v > 0 {
-			return uint64(v)
-		}
-	case int64:
-		if v > 0 {
-			return uint64(v)
-		}
-	case float64:
-		if v > 0 {
-			return uint64(v)
-		}
-	case json.Number:
-		parsed, _ := strconv.ParseUint(v.String(), 10, 64)
-		return parsed
-	case string:
-		parsed, _ := strconv.ParseUint(strings.TrimSpace(v), 10, 64)
-		return parsed
+func uuidFromAny(value any) string {
+	v, ok := value.(string)
+	if !ok {
+		return ""
 	}
-	return 0
+	parsed, e := uuid.Parse(v)
+	if e != nil || parsed == uuid.Nil || parsed.String() != v {
+		return ""
+	}
+	return v
 }

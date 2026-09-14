@@ -29,6 +29,7 @@ import (
 var businessTables = []interface{}{
 	&models.PluginCredential{},
 	&models.PluginTenantExt{},
+	&models.LocalAISetting{},
 	&agentRegistryModel.PluginSkill{},
 	&agentRegistryModel.PluginAgent{},
 	&templateModel.Template{},
@@ -115,12 +116,21 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 	// Existing databases can have an earlier nullable UUID column. Backfill it
 	// before AutoMigrate attempts to enforce the model's NOT NULL constraint.
 	// New tables are intentionally skipped here and created by AutoMigrate.
+	if err := ensureTemplateUUIDs(ctx, db); err != nil {
+		return err
+	}
 	if includeIAM {
 		if err := ensureIAMIdentityUUIDs(ctx, db); err != nil {
 			return err
 		}
 	}
 	if err := safeAutoMigrate(ctx, db, tables); err != nil {
+		return err
+	}
+	if err := migrateLocalAISettingSources(ctx, db); err != nil {
+		return err
+	}
+	if err := removeObsoleteAICatalogSource(ctx, db); err != nil {
 		return err
 	}
 	if includeIAM {
@@ -130,6 +140,47 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 		if err := backfillIAMUUIDRelations(ctx, db); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// migrateLocalAISettingSources splits the old single profile slot into local
+// and PowerX source partitions. Existing rows retain their previous plugin
+// configuration and are therefore assigned to the local partition.
+func migrateLocalAISettingSources(ctx context.Context, db *gorm.DB) error {
+	if !db.Migrator().HasColumn(&models.LocalAISetting{}, "source") {
+		return nil
+	}
+	table := models.LocalAISetting{}.TableName()
+	if err := db.WithContext(ctx).Table(table).Where("source IS NULL OR source = ''").Update("source", "local").Error; err != nil {
+		return err
+	}
+	const legacyIndex = "uk_local_ai_settings_tenant_env_modality"
+	const sourceIndex = "uk_local_ai_settings_tenant_env_modality_source"
+	if db.Migrator().HasIndex(&models.LocalAISetting{}, legacyIndex) {
+		if err := db.Migrator().DropIndex(&models.LocalAISetting{}, legacyIndex); err != nil {
+			return err
+		}
+	}
+	if !db.Migrator().HasIndex(&models.LocalAISetting{}, sourceIndex) {
+		if err := db.Migrator().CreateIndex(&models.LocalAISetting{}, sourceIndex); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// removeObsoleteAICatalogSource removes the previously persisted page-only
+// catalog preference. It is idempotent: the generic system-config table is
+// kept for future settings, while this no-longer-valid key is removed.
+func removeObsoleteAICatalogSource(ctx context.Context, db *gorm.DB) error {
+	if db.Migrator().HasTable(&models.PluginSystemConfig{}) {
+		if err := db.WithContext(ctx).Where("key = ?", "ai.catalog_source").Delete(&models.PluginSystemConfig{}).Error; err != nil {
+			return err
+		}
+	}
+	if db.Migrator().HasColumn(&models.LocalAISetting{}, "catalog_source") {
+		return db.Migrator().DropColumn(&models.LocalAISetting{}, "catalog_source")
 	}
 	return nil
 }
@@ -528,8 +579,16 @@ func iamTableExists(ctx context.Context, db *gorm.DB, tableName string) (bool, e
 }
 
 func ensureUUIDColumn(ctx context.Context, db *gorm.DB, tableName string) error {
-	if db.Migrator().HasColumn(tableName, "uuid") {
-		return nil
+	// SQLite HasColumn may match an unquoted tenant_uuid column for uuid.
+	// Inspect exact names rather than a DDL substring match.
+	columns, err := db.WithContext(ctx).Migrator().ColumnTypes(tableName)
+	if err != nil {
+		return err
+	}
+	for _, column := range columns {
+		if column.Name() == "uuid" {
+			return nil
+		}
 	}
 	columnType := "uuid"
 	if isSQLite(db) {

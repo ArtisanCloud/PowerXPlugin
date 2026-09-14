@@ -48,11 +48,11 @@ func (s *TemplateService) ListPublished(ctx context.Context, q string, page, pag
 	return s.repo.FindPage(ctx, conditions, page, pageSize, cb, q)
 }
 
-func (s *TemplateService) GetPublishedByID(ctx context.Context, id uint64) (*dbm.Template, error) {
+func (s *TemplateService) GetPublishedByUUID(ctx context.Context, id string) (*dbm.Template, error) {
 	if s == nil || s.repo == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	tpl, err := s.repo.FindByID(ctx, id)
+	tpl, err := s.repo.FindByUUID(ctx, id)
 	if err != nil {
 		return nil, err
 	}

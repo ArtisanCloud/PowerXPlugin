@@ -81,14 +81,14 @@ func (s *Server) GetTemplate(ctx context.Context, req *GetTemplateRequest) (*Tem
 	if err := s.ensureService(); err != nil {
 		return nil, err
 	}
-	if req == nil || req.GetId() == 0 {
+	if req == nil || req.GetUuid() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 	ctx, err := s.ensureTenant(ctx, req.GetTenantUuid())
 	if err != nil {
 		return nil, err
 	}
-	tpl, err := s.service.GetByID(ctx, req.GetId())
+	tpl, err := s.service.GetByUUID(ctx, req.GetUuid())
 	if err != nil {
 		return nil, mapTemplateError(err)
 	}
@@ -117,14 +117,14 @@ func (s *Server) UpdateTemplate(ctx context.Context, req *UpdateTemplateRequest)
 	if err := s.ensureService(); err != nil {
 		return nil, err
 	}
-	if req == nil || req.GetId() == 0 {
+	if req == nil || req.GetUuid() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 	ctx, err := s.ensureTenant(ctx, req.GetTenantUuid())
 	if err != nil {
 		return nil, err
 	}
-	tpl, err := s.service.Update(ctx, req.GetId(), req.GetName(), req.GetDescription(), req.GetContent())
+	tpl, err := s.service.Update(ctx, req.GetUuid(), req.GetName(), req.GetDescription(), req.GetContent())
 	if err != nil {
 		return nil, mapTemplateError(err)
 	}
@@ -135,14 +135,14 @@ func (s *Server) DeleteTemplate(ctx context.Context, req *DeleteTemplateRequest)
 	if err := s.ensureService(); err != nil {
 		return nil, err
 	}
-	if req == nil || req.GetId() == 0 {
+	if req == nil || req.GetUuid() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 	ctx, err := s.ensureTenant(ctx, req.GetTenantUuid())
 	if err != nil {
 		return nil, err
 	}
-	if err := s.service.Delete(ctx, req.GetId()); err != nil {
+	if err := s.service.Delete(ctx, req.GetUuid()); err != nil {
 		return nil, mapTemplateError(err)
 	}
 	return &emptypb.Empty{}, nil
@@ -152,29 +152,29 @@ func (s *Server) BatchCloneTemplates(ctx context.Context, req *BatchCloneTemplat
 	if err := s.ensureService(); err != nil {
 		return nil, err
 	}
-	if req == nil || len(req.GetSourceIds()) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "source_ids is required")
+	if req == nil || len(req.GetSourceUuids()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "TEMPLATE_SOURCE_UUIDS_REQUIRED")
 	}
 	ctx, err := s.ensureTenant(ctx, req.GetTenantUuid())
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.service.BatchClone(ctx, req.GetSourceIds(), int(req.GetCopies()), srvtemplates.BatchCloneOptions{
+	res, err := s.service.BatchClone(ctx, req.GetSourceUuids(), int(req.GetCopies()), srvtemplates.BatchCloneOptions{
 		NamePrefix:        req.GetNamePrefix(),
 		DescriptionPrefix: req.GetDescriptionPrefix(),
 	})
 	if err != nil {
 		return nil, mapTemplateError(err)
 	}
-	resp := &BatchCloneTemplatesResponse{CreatedIds: []uint64{}, Failed: []*BatchCloneFailure{}}
+	resp := &BatchCloneTemplatesResponse{CreatedUuids: []string{}, Failed: []*BatchCloneFailure{}}
 	if res != nil {
-		if len(res.CreatedIDs) > 0 {
-			resp.CreatedIds = append(resp.CreatedIds, res.CreatedIDs...)
+		if len(res.CreatedUUIDs) > 0 {
+			resp.CreatedUuids = append(resp.CreatedUuids, res.CreatedUUIDs...)
 		}
 		if len(res.Failed) > 0 {
 			resp.Failed = make([]*BatchCloneFailure, 0, len(res.Failed))
 			for _, failure := range res.Failed {
-				resp.Failed = append(resp.Failed, &BatchCloneFailure{SourceId: failure.SourceID, Reason: failure.Reason})
+				resp.Failed = append(resp.Failed, &BatchCloneFailure{SourceUuid: failure.SourceUUID, Reason: failure.Reason})
 			}
 		}
 	}
@@ -185,20 +185,20 @@ func (s *Server) ValidateTemplate(ctx context.Context, req *ValidateTemplateRequ
 	if err := s.ensureService(); err != nil {
 		return nil, err
 	}
-	if req == nil || req.GetId() == 0 {
+	if req == nil || req.GetUuid() == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 	ctx, err := s.ensureTenant(ctx, req.GetTenantUuid())
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.service.Validate(ctx, req.GetId(), req.GetRules(), req.GetStrict())
+	res, err := s.service.Validate(ctx, req.GetUuid(), req.GetRules(), req.GetStrict())
 	if err != nil {
 		return nil, mapTemplateError(err)
 	}
-	resp := &ValidateTemplateResponse{TemplateId: req.GetId(), Valid: true, Violations: []*ValidationViolation{}}
+	resp := &ValidateTemplateResponse{TemplateUuid: req.GetUuid(), Valid: true, Violations: []*ValidationViolation{}}
 	if res != nil {
-		resp.TemplateId = res.TemplateID
+		resp.TemplateUuid = res.TemplateUUID
 		resp.Valid = res.Valid
 		if len(res.Violations) > 0 {
 			resp.Violations = make([]*ValidationViolation, 0, len(res.Violations))
@@ -247,7 +247,7 @@ func toProtoTemplate(tpl *dbtemplate.Template) *Template {
 		return nil
 	}
 	proto := &Template{
-		Id:          tpl.ID,
+		Uuid:        tpl.UUID,
 		Name:        tpl.Name,
 		Description: tpl.Description,
 		Content:     tpl.Content,

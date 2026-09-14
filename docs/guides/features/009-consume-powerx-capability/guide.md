@@ -8,13 +8,15 @@
 
 这是当前源码的接入基线，不是所有 Core 接口的安装态验收证书。Agent Session 已接入 Core P1 正式合同；Core P3 已交付，Framework 安装态撤权验证仍后置，P2 非全量验收。稳定模块可以开始 local 开发。
 
+**2026-09-08 消费者审计更新：不能把模块名等同于完整业务支持。** Media 已接入 Asset 与 preview Variant 上传/完成/下载 ticket 合同，详见 §7.4；Core 尚需迁移、seed 和重启；IAM 仅支持目录、授权与身份上下文，不支持组织写入或后台登录会话管理。Capability/Integration 已有 typed client 和单选工厂，Core 已交付八项实时授权规则，真实安装验收后置。具体缺口、责任和交付要求见 [消费者缺口任务单](../../../contracts/framework-consumer-contract-gaps.md)。依赖缺失操作的业务不得强制迁移，也不得回退旧 Gateway；不依赖这些操作的模块继续接入。
+
 ## 2. 角色与适用范围
 
 - 插件开发者：实现 local adapter、可信上下文、数据隔离和插件业务测试。
 - Framework：维护共用接口、单选工厂、typed delegated transport 和合同测试。
 - PowerX：维护能力发布、租户 registration、凭证 grant、服务态身份与资源隔离。
 
-范围为下表的 13 类业务边界，不包含所有 Core 管理 API。Realtime/TaskBus 属于基础设施，不要求插件复制 Framework 的实现。
+范围为下表的业务边界及 §7.5 新增 Cache/TaskCenter，不包含所有 Core 管理 API。Realtime/TaskBus 属于基础设施，不要求插件复制 Framework 的实现。
 
 ### 文档职责与 Use Case 索引
 
@@ -23,6 +25,8 @@
 | 文档 | 适用角色 | 独立验收口径 |
 |---|---|---|
 | [local adapter 实施步骤](usecase-local-adapter.md) | 插件后端开发 | 接口编译通过、真实 local 数据与隔离测试通过、不调用 Core |
+| [Skeleton 本地 AI／Agent](usecase-skeleton-local-ai-agent.md) | Skeleton 开发与 QA | 本地模型配置、会话执行／取消与租户隔离；明确当前驱动和未实现范围 |
+| [Skeleton 本地能力目录／集成网关](usecase-skeleton-local-capability.md) | Skeleton 开发与 QA | 模板 UUID 迁移、声明能力执行、幂等及租户隔离；不模拟 Core grant |
 | [delegated 装配与安装验收](usecase-delegated-runtime.md) | 插件后端、部署与 QA | 可信 STS、最小 grant、真实成功/拒绝/撤权，且不访问 local 表 |
 | [可编译装配示例](examples/bootstrap.go)及[示例测试](examples/bootstrap_test.go) | 插件后端开发 | 使用真实 Framework 工厂与客户端验证 local/delegated 单选、grant 失败；不依赖运行中的 Core |
 
@@ -104,7 +108,7 @@ go doc github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts.D
 |---|---|---|---|
 | [IAM](../../../../framework/backend/go/iam/contracts/interfaces.go) | `iam/contracts.DirectoryService`、`AuthzService`、`IdentityContextService` | `iam/adapters.NewRegistry().Bind(mode, Bundle)`，再获取 Directory/Authz/IdentityContext | 目录分页、严格 batch-get、容错 batch-resolve、姓名 found/not_found/ambiguous、授权 deny 与调用失败区分 |
 | [Knowledge](../../../../framework/backend/go/runtime/knowledge/provider.go) | `runtime/knowledge.KnowledgeProvider` | `Provider()` | ListSpaces/Catalog/Search、文档写删、重建和 job；Name/Mode/Capabilities 如实报告 |
-| [Media](../../../../framework/backend/go/runtime/media/runtime.go) | `runtime/media.Service` | `Media()`；只读消费者可用 `Assets()` | 十项资源/传输/变体操作；asset_uuid、variant_uuid；不能返回内部 object key |
+| [Media](../../../../framework/backend/go/runtime/media/runtime.go) | `runtime/media.Service` | `Media()`；只读消费者可用 `Assets()` | 十三项 Asset/Variant 元数据与传输操作；local 必须实现三项新增 Variant 方法。asset_uuid、variant_uuid；不能返回内部 object key |
 | [Customer](../../../../framework/backend/go/runtime/customerfw/runtime.go) | `runtime/customerfw.LocalCustomerStore`，或分开注入 `RuntimeAdapters` | `Auth()`、`ExternalIdentity()`、`Membership()` | 注册/登录/验证、外部身份解析、当前租户 membership；业务角色来自 membership，不来自消息 actor_role |
 | [Metadata](../../../../framework/backend/go/runtime/metadata/runtime.go) | `runtime/metadata.Service` | `Service()` | 字典、树、标签、TagBinding、资源类型及六项 Resolve；分页不能只搜第一页；binding_uuid 可寻址 |
 | [Agent](../../../../framework/backend/go/runtime/agent/runtime.go) | `runtime/agent.AgentService`、`SessionService` | `Agent()`、`Sessions()` | 六项生命周期；Sessions 覆盖 12 项正式服务会话操作。旧 Agent Invoke/StreamSSE 在 delegated 下明确拒绝，改用 Sessions，不兼容人工会话路由 |
@@ -170,7 +174,7 @@ IAM Bundle 当前要求三项非空；不能假设已支持仅 Directory 绑定�
 | Notifications | `com.corex.notifications.create`；正式路径为 `POST /api/v1/notifications` |
 | Plugin Release | `com.corex.plugin_release.sessions.read/manage`、`imports.read/manage`，展开为四个 ID |
 
-此表是当前 Core 声明映射，不证明每条授权链路已安装验收。Capability/Integration/Skills/Plugin Runtime 及 AI 模型列表等操作的完整 method/path/grant 映射仍待 Core P2 交付；不要猜测 ID 或申请 admin 权限填空。存在 typed local contract 不受该等待影响。
+此表是当前 Core 声明映射，不证明每条授权链路已安装验收。Capability/Integration 八项入口已收到 Core 授权映射：除 grant-status 自身权限外按当前凭证目标 grant 过滤/执行，不新增虚构 capability ID；Skills/Plugin Runtime 及 AI 模型列表等剩余 P2 范围不由本次交付自动覆盖；不要猜测 ID 或申请 admin 权限填空。存在 typed local contract 不受该等待影响。
 
 上表缩写仅用于阅读，manifest 中必须逐项写完整 ID。缺映射时由 Framework/Core 确认后再启用对应 delegated 操作，不能要求插件猜 scope。操作所需能力不等于整个包的所有能力：导入一个包不会自动授权，也不要求申请所有模块。
 
@@ -218,32 +222,98 @@ capabilities:
 
 不得写字面通配符，也不必因为 Framework 编译进 IAM/Knowledge 就声明其写能力。修改清单后由安装/升级授权流程生效，重启不等于授予权限。`RequireGrants` 不会修改授权。
 
-### 7.3 页面与接口诊断（可后置）
+### 7.3 合同诊断（可后置）
 
-已启动 Skeleton 后，登录 root 管理员访问 `/powerx/host-contract-lab`，选择已实现模块的只读操作，点击由 locale key `hostContract.probe` 渲染的按钮并查看结果。这个页面只覆盖部分操作，不是全部模块的完成门槛。
-
-只读状态接口示例，`PLUGIN_BASE_URL` 使用实际监听地址，`PLUGIN_ADMIN_TOKEN` 是插件管理端用户凭证，不是 STS：
+“底座合同调试”只自动展示各模块的 status 装配检查，不提供通用 JSON 输入、最近请求面板或写操作。运行相关包测试可验证 adapter 装配、输入校验、租户边界和稳定错误码；真实调用必须在“PowerX 能力调试”或对应的知识库、Agent、Skill、Chat 业务页面完成。
 
 ```bash
-curl --fail-with-body "$PLUGIN_BASE_URL/api/v1/admin/host-contract/probe" \
-  -H "Authorization: Bearer $PLUGIN_ADMIN_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"module":"media","operation":"status","input":{}}'
+go test ./framework/backend/go/runtime/powerx/hostcontract ./skeleton/backend/go-gin/internal/transport/http/admin/host_contract -count=1
 ```
 
-结果包含 `module`、`provider_mode`、`result` 或稳定错误；状态可用只证明当前 adapter 已装配，不证明远端资源调用成功。未配置 local Media 时返回不可用是正确结果；不要为得到绿灯注入 Core 客户端。
-
-已装配 Media 的成功响应片段（省略 capability_id、observed_at 等字段；不是本次真实请求证据）：
-
-```json
-{"success":true,"data":{"module":"media","operation":"status","provider_mode":"delegated","result":{"ready":true}}}
-```
-
-若返回 401/403，先区分插件入站的 root/tenant 检查与 Core 出站鉴权；不要因为有 Core 凭证就跳过插件入站权限。完整错误包含哪些字段以该 handler 的信封为准。
-
-HTTP 层使用 Skeleton 的标准 `success/data/error` 信封；Core 的响应不能直接当作插件 HTTP 信封。不要把 SDK 的 Go DTO 直接当作跨模式请求入参放行：插件 handler 仍需拒绝未知身份覆盖字段并执行入站认证/RBAC。前端只调用插件 API，不持有 STS/API Key。不同模块的 JSON 字段以 DTO tags 为准，不统一猜成 snake_case。
+状态绿灯不等于远端资源已连通；委托模式的授权与 Trace 仍应在“PowerX 能力调试”中验收。前端不持有 STS/API Key，业务写操作不得通过通用 JSON 面板绕过对象级校验。
 
 本地开发启动仍是 `cd skeleton/backend/go-gin && go run ./cmd/plugin`，不使用调试器。检查终端/项目配置的日志路径；不要另外启动第二个占用同端口的进程。
+
+### 7.4 Media preview Variant 迁移
+
+`media.Service` 新增三项方法，是 local adapter 的编译期变更；必须补齐真实实现和测试替身，不能用空方法满足接口。
+
+```go
+PresignVariantUpload(ctx context.Context, assetUUID, variantUUID string, in powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error)
+CompleteVariantUpload(ctx context.Context, assetUUID, variantUUID string, in powerxmedia.CompleteUploadInput) (*powerxmedia.Variant, error)
+PresignVariantDownload(ctx context.Context, assetUUID, variantUUID string, in powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error)
+```
+
+1. 从 `Runtime.Media()` 取 Service；`CreateVariantInput` 必须提供文件 SHA256 hex `Checksum`、VariantType、SizeBytes、MimeType，保存返回的 UUID。pending_upload 不表示可展示。
+2. 调用 PresignVariantUpload；`VariantTicketInput{}` 发出 `{}` 使用默认 900 秒；非零 ExpiresInSeconds 范围 60–3600，实际票据仍受资产上传窗口限制。
+3. 按 ticket Method/Headers/URL 发送文件字节；相对 URL 使用可信 Core BaseURL 解析，不拼旧路径。此请求不附加 STS 或用户凭证，不记录 ticket。PUT 204 后必须调用 CompleteVariantUpload，Checksum 与创建时一致。
+4. complete 只接受匹配 UUID、ready 和非空 CompletedAt；错误保持 Core reason_code。失败对象不隐式重置，不能用原文件资源替代 preview。
+5. PresignVariantDownload 获取读取票据。过期/撤销后显式重新请求，不永久保存 URL。父资产删除后旧票据失效；实际下载按票据，不再走旧 Gateway resource 路由。
+
+Core 部署前需隔离库验证后执行 make migrate、make seed、部署重启；历史 Variant 默认 failed，历史无 caller_subject trace 不自动归属插件。本次尚未进行真实部署验收。AI Craft 实现其 local 存储并迁移业务入口，Framework 不修改插件数据库。
+
+### 7.5 Cache / TaskCenter delegated 装配
+
+两个包均提供 `NewHostProvider(hostapi.Config, hostapi.TokenProvider, *http.Client)`，返回各自 Service。新客户端仅支持 STS，不支持 API Key。后端 STS 层须提供 `hostapi.Credential{Token, TenantUUID}`，两者必须来自同一可信凭证绑定，不能从调用方请求拼装或把 Scope 填入凭证归属。
+
+启动时构造 host Service，再分别传给 `cache.NewRuntime(mode, localCache, hostCache)`、`taskcenter.NewRuntime(mode, localTasks, hostTasks)`；调用 `.Cache()`、`.Tasks()` 获取接口并注入业务。local 仍只使用插件实现。示意：
+
+```go
+hostCache, err := cache.NewHostProvider(hostapi.Config{BaseURL: coreBaseURL}, trustedSTSProvider, nil)
+if err != nil { return err }
+runtime, err := cache.NewRuntime(mode, localCache, hostCache)
+if err != nil { return err }
+service, err := runtime.Cache()
+if err != nil { return err }
+entry, err := service.Get(ctx, cache.Scope{TenantUUID: tenantUUID, Namespace: "license"}, cache.GetInput{Key: "entitlement"})
+// err 必须返回或显式处理；只有 err == nil 才读取 entry.Found。
+```
+
+本次四项 capability 为 `com.corex.runtime.cache.read`、`com.corex.runtime.cache.manage`、`com.corex.runtime.taskcenter.read`、`com.corex.runtime.taskcenter.manage`，按实际操作申请；保留既有 grant-status 预检约定。Core 使用 capability-seed + 既有插件授权流程，不通过全量 seed 自动扩权。
+
+Cache TTL 必须是 1ms–24h 的整毫秒，值最多 1 MiB；Task revision 最大为有符号 bigint，payload/result JSON 最多 256 KiB，拒绝重复字段。local 同步这些限制，详见 [合同与部署说明](../../../contracts/cache-taskcenter-host-requirements.md)。未部署 Core 时不得回退本地；写入后返回依赖错误不保证副作用已回滚，应显式核查再重试。
+
+### 7.6 Skeleton / scaffold 的 Cache 与 TaskCenter 验证
+
+Skeleton 是这两个模块的示例消费者：`internal/services/runtimeexample.Build` 在启动时选择 local 内存存储或 delegated HostProvider，并通过 `Deps.CacheRuntime/TaskCenterRuntime` 注入 Host Lab。local 数据重启即清空，不是生产数据库实现；TaskCenter 仅维护任务记录，不会执行任务。其他模块的 local adapter 是否存在须逐项核对，不能由这两项成功推断全部模块可用。
+
+```mermaid
+flowchart LR
+  subgraph Browser[测试人员 / 页面]
+    A[选择模块和操作] --> B[写操作确认]
+    Z[查看结果与机器码]
+  end
+  subgraph Plugin[Skeleton / 生成插件]
+    C[Host Lab 校验身份与输入] --> D[启动单选 Runtime]
+    D --> L[local 内存 adapter]
+  end
+  subgraph Core[PowerX]
+    H[delegated STS / 实时 grant / 存储]
+  end
+  B --> C
+  D --> H
+  L --> Z
+  H --> Z
+  C -->|拒绝| Z
+  H -->|401 / 403 / 503 不回退 local| Z
+```
+
+1. local：使用 `context.provider_mode: local`，环境模式与配置保持一致；在 `skeleton/backend/go-gin` 运行 `go run ./cmd/plugin`。Cache 与 TaskCenter 的读写合同仅由定向 Go 测试验证，业务页面不暴露通用 probe。
+2. delegated：Core 部署六项接口与四项 capability 后，重新构建 `make dist`，安装/升级 Skeleton 并确认四项 grant 已同步。安装环境 provider 必须为 delegated，配置不得残留 local 覆盖。通过“PowerX 能力调试”验证委托链路、Trace 与撤权后的 403；API Key 不能替代这两项的 STS 验证。
+
+仓库根目录回归命令：
+
+```bash
+go test -race ./skeleton/backend/go-gin/internal/services/runtimeexample ./skeleton/backend/go-gin/internal/transport/http/admin/host_contract -count=1
+npm run sync:templates -- --check
+PX_TEST_GENERATED_BUILD=1 go test ./tools/cli/internal/templates -run '^TestGeneratedBackendBuild$' -count=1 -timeout=10m
+```
+
+最后一条在临时生成工程中设置 `GOWORK=off`，显式 replace 到本轮待发布 Framework，验证模块路径替换及后端编译。它不证明旧发布版本含有新接口。发布必须先发布 Framework，再更新 CLI 的 `defaultFrameworkVersion` 与 Skeleton go.mod，最后发布同步模板的 CLI；现有安装的 CLI 不会自动更新内嵌模板，`make dist` 产物也不会在安装时自动升级 Framework。本轮不自动改版本或发布。
+
+代码映射：`cmd/plugin/main.go` 装配、`internal/services/runtimeexample` 本地存储与工厂、`internal/transport/http/admin/host_contract/storage.go` 六项 probe、`plugin.d/capabilities.yaml` 四项授权声明、`tools/cli/internal/templates/generated_build_test.go` 生成物编译守卫。回滚仅回退代码/包与其对应版本，不添加跨模式 fallback；测试缓存用 delete 清理，local 任务随示例进程退出清除，Core 任务不提供删除时不得直接清库。
+
+2026-09-09：新增上述双模式示例与生成物 CI 检查；真实浏览器和安装态验证仍需实际运行后记录。
 
 ## 8. 预期结果与验收标准
 
@@ -283,7 +353,7 @@ npm run sync:templates -- --check
 | required 实际 grant | `framework/backend/go/runtime/capability/preflight.go` |
 | manifest 校验 | `skeleton/backend/go-gin/cmd/manifestcheck/main.go` |
 | 启动装配 | `skeleton/backend/go-gin/cmd/plugin/main.go` |
-| 页面 probe | `skeleton/backend/go-gin/internal/transport/http/admin/host_contract/routes.go` |
+| 合同定向测试 | `skeleton/backend/go-gin/internal/transport/http/admin/host_contract/*_test.go` |
 
 ## 10. 常见问题与排障
 

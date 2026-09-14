@@ -135,7 +135,14 @@ func tokenPrefix(token string) string {
 // 2) local+proxy(POWERX_PROXY=1 + IAM local): 按 PX_GATEWAY_AUTH_SCHEME 选择 bearer/apikey；
 // 3) local(POWERX_PROXY!=1): 不走 host client。
 func resolveWSBusHostClientConfig(deps *app.Deps) (cfg fwwsbus.HostClientConfig, useHost bool) {
-	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil || strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1" {
+	return resolveWSBusHostClientConfigForTest(deps, false)
+}
+
+// resolveWSBusHostClientConfigForTest selects the PowerX Host transport for an
+// explicit diagnostic without changing the runtime's POWERX_PROXY decision.
+// forceHost is deliberately limited to the administrative test-flow endpoint.
+func resolveWSBusHostClientConfigForTest(deps *app.Deps, forceHost bool) (cfg fwwsbus.HostClientConfig, useHost bool) {
+	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil || (!forceHost && strings.TrimSpace(os.Getenv("POWERX_PROXY")) != "1") {
 		return fwwsbus.HostClientConfig{}, false
 	}
 	gw := deps.Config.Gateway

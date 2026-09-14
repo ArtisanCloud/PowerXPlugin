@@ -51,6 +51,10 @@ type knowledgeStub struct {
 	reindex  fwknowledge.ReindexInput
 }
 
+func (*knowledgeStub) DelegatedCapabilities(context.Context) fwknowledge.ProviderCapabilities {
+	return fwknowledge.BasicCapabilities("test", "delegated", fwknowledge.OperationRetrieve, fwknowledge.OperationReindex)
+}
+
 func (s *knowledgeStub) ListKnowledgeSpaces(context.Context, fwknowledge.ListSpacesInput) ([]fwknowledge.KnowledgeSpace, error) {
 	return []fwknowledge.KnowledgeSpace{}, nil
 }
@@ -96,6 +100,15 @@ func (*mediaStub) PresignDownload(context.Context, string) (*powerxmedia.Transfe
 	return &powerxmedia.TransferTicket{}, nil
 }
 func (*mediaStub) CreateVariant(context.Context, string, powerxmedia.CreateVariantInput) (*powerxmedia.Variant, error) {
+	return &powerxmedia.Variant{}, nil
+}
+func (*mediaStub) PresignVariantUpload(context.Context, string, string, powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error) {
+	return &powerxmedia.TransferTicket{}, nil
+}
+func (*mediaStub) PresignVariantDownload(context.Context, string, string, powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error) {
+	return &powerxmedia.TransferTicket{}, nil
+}
+func (*mediaStub) CompleteVariantUpload(context.Context, string, string, powerxmedia.CompleteUploadInput) (*powerxmedia.Variant, error) {
 	return &powerxmedia.Variant{}, nil
 }
 func (*mediaStub) GetVariant(context.Context, string) (*powerxmedia.Variant, error) {
@@ -196,7 +209,7 @@ func TestProbeReportsUnavailableDirectoryWithoutLocalFallback(t *testing.T) {
 
 func TestProbeKnowledgeWriteRequiresConfirmation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	response := executeProbe(t, NewHandler(&app.Deps{KnowledgeDirectory: &knowledgeStub{}}), map[string]any{
+	response := executeProbe(t, NewHandler(&app.Deps{KnowledgeProvider: fwknowledge.NewDelegatedProvider(fwknowledge.DelegatedProviderConfig{Client: &knowledgeStub{}})}), map[string]any{
 		"module": "knowledge", "operation": "index.rebuild", "input": map[string]any{"space_uuid": probeTenantUUID},
 	})
 	if response.Code != http.StatusConflict {
@@ -209,7 +222,7 @@ func TestProbeKnowledgeIndexJobUsesTenantScopedTypedClient(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	knowledge := &knowledgeStub{}
 	jobUUID := "33333333-3333-3333-3333-333333333333"
-	response := executeProbe(t, NewHandler(&app.Deps{KnowledgeDirectory: knowledge}), map[string]any{
+	response := executeProbe(t, NewHandler(&app.Deps{KnowledgeProvider: fwknowledge.NewDelegatedProvider(fwknowledge.DelegatedProviderConfig{Client: knowledge})}), map[string]any{
 		"module": "knowledge", "operation": "index_job.get", "input": map[string]any{"job_uuid": jobUUID},
 	})
 	if response.Code != http.StatusOK {

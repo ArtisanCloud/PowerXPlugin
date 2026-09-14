@@ -14,6 +14,8 @@ type Operation string
 type ReasonCode string
 
 const (
+	ModuleCache              Module = "cache"
+	ModuleTaskCenter         Module = "taskcenter"
 	ModuleIAM                Module = "iam"
 	ModuleKnowledge          Module = "knowledge"
 	ModuleMedia              Module = "media"
@@ -176,7 +178,20 @@ func ValidateNoTenantOverride(value any) error {
 }
 
 var moduleOperations = map[Module]map[Operation]OperationDescriptor{
+	ModuleCache: {
+		OperationStatus: descriptor(ModuleCache, OperationStatus, "", true, false),
+		"get":           descriptor(ModuleCache, "get", "com.corex.runtime.cache.read", true, false),
+		"set":           descriptor(ModuleCache, "set", "com.corex.runtime.cache.manage", false, true),
+		"delete":        descriptor(ModuleCache, "delete", "com.corex.runtime.cache.manage", false, true),
+	},
+	ModuleTaskCenter: {
+		OperationStatus: descriptor(ModuleTaskCenter, OperationStatus, "", true, false),
+		"create":        descriptor(ModuleTaskCenter, "create", "com.corex.runtime.taskcenter.manage", false, true),
+		"get":           descriptor(ModuleTaskCenter, "get", "com.corex.runtime.taskcenter.read", true, false),
+		"update":        descriptor(ModuleTaskCenter, "update", "com.corex.runtime.taskcenter.manage", false, true),
+	},
 	ModuleIAM: {
+		OperationStatus:                        descriptor(ModuleIAM, OperationStatus, "", true, false),
 		OperationIAMTenant:                     descriptor(ModuleIAM, OperationIAMTenant, "com.corex.iam.directory.read", true, false),
 		OperationIAMMembersList:                descriptor(ModuleIAM, OperationIAMMembersList, "com.corex.iam.directory.read", true, false),
 		OperationIAMMemberGet:                  descriptor(ModuleIAM, OperationIAMMemberGet, "com.corex.iam.members.read", true, false),
@@ -189,6 +204,7 @@ var moduleOperations = map[Module]map[Operation]OperationDescriptor{
 		OperationIAMAuthorizationCheck:         descriptor(ModuleIAM, OperationIAMAuthorizationCheck, "com.corex.iam.authorization.check", true, false),
 	},
 	ModuleKnowledge: {
+		OperationStatus:                  descriptor(ModuleKnowledge, OperationStatus, "", true, false),
 		OperationKnowledgeSpacesList:     descriptor(ModuleKnowledge, OperationKnowledgeSpacesList, "com.corex.knowledge.directory.read", true, false),
 		OperationKnowledgeSearch:         descriptor(ModuleKnowledge, OperationKnowledgeSearch, "com.corex.knowledge.search.read", true, false),
 		OperationKnowledgeIndexJobGet:    descriptor(ModuleKnowledge, OperationKnowledgeIndexJobGet, "com.corex.knowledge.document.manage", true, false),
@@ -197,10 +213,33 @@ var moduleOperations = map[Module]map[Operation]OperationDescriptor{
 		OperationKnowledgeIndexRebuild:   descriptor(ModuleKnowledge, OperationKnowledgeIndexRebuild, "com.corex.knowledge.document.manage", false, true),
 	},
 	ModuleMedia: {
-		OperationStatus:          descriptor(ModuleMedia, OperationStatus, "com.corex.media.assets.read", true, false),
-		OperationMediaAssetsList: descriptor(ModuleMedia, OperationMediaAssetsList, "com.corex.media.assets.read", true, false),
+		"asset.get":                descriptor(ModuleMedia, "asset.get", "com.corex.media.assets.read", true, false),
+		"asset.create":             descriptor(ModuleMedia, "asset.create", "com.corex.media.assets.manage", false, true),
+		"asset.update":             descriptor(ModuleMedia, "asset.update", "com.corex.media.assets.manage", false, true),
+		"asset.delete":             descriptor(ModuleMedia, "asset.delete", "com.corex.media.assets.manage", false, true),
+		"asset.presign_upload":     descriptor(ModuleMedia, "asset.presign_upload", "com.corex.media.assets.manage", false, true),
+		"asset.complete_upload":    descriptor(ModuleMedia, "asset.complete_upload", "com.corex.media.assets.manage", false, true),
+		"asset.presign_download":   descriptor(ModuleMedia, "asset.presign_download", "com.corex.media.assets.read", true, false),
+		"variant.create":           descriptor(ModuleMedia, "variant.create", "com.corex.media.assets.manage", false, true),
+		"variant.get":              descriptor(ModuleMedia, "variant.get", "com.corex.media.assets.read", true, false),
+		"variant.presign_upload":   descriptor(ModuleMedia, "variant.presign_upload", "com.corex.media.assets.manage", false, true),
+		"variant.complete_upload":  descriptor(ModuleMedia, "variant.complete_upload", "com.corex.media.assets.manage", false, true),
+		"variant.presign_download": descriptor(ModuleMedia, "variant.presign_download", "com.corex.media.assets.read", true, false),
+		OperationStatus:            descriptor(ModuleMedia, OperationStatus, "com.corex.media.assets.read", true, false),
+		OperationMediaAssetsList:   descriptor(ModuleMedia, OperationMediaAssetsList, "com.corex.media.assets.read", true, false),
 	},
 	ModuleAgent: {
+		"session.create":            descriptor(ModuleAgent, "session.create", "com.corex.agent.session.manage", false, true),
+		"sessions.list":             descriptor(ModuleAgent, "sessions.list", "com.corex.agent.session.manage", true, false),
+		"session.get":               descriptor(ModuleAgent, "session.get", "com.corex.agent.session.manage", true, false),
+		"session.rename":            descriptor(ModuleAgent, "session.rename", "com.corex.agent.session.manage", false, true),
+		"session.archive":           descriptor(ModuleAgent, "session.archive", "com.corex.agent.session.manage", false, true),
+		"session.delete":            descriptor(ModuleAgent, "session.delete", "com.corex.agent.session.manage", false, true),
+		"session.message.append":    descriptor(ModuleAgent, "session.message.append", "com.corex.agent.session.manage", false, true),
+		"session.messages.list":     descriptor(ModuleAgent, "session.messages.list", "com.corex.agent.session.manage", true, false),
+		"session.invoke":            descriptor(ModuleAgent, "session.invoke", "com.corex.agent.invoke", false, true),
+		"session.invocation.get":    descriptor(ModuleAgent, "session.invocation.get", "com.corex.agent.session.manage", true, false),
+		"session.invocation.cancel": descriptor(ModuleAgent, "session.invocation.cancel", "com.corex.agent.invoke", false, true),
 		OperationStatus:             descriptor(ModuleAgent, OperationStatus, "", true, false),
 		OperationAgentHealthSummary: descriptor(ModuleAgent, OperationAgentHealthSummary, "com.corex.agent.lifecycle.manage", true, false),
 		OperationAgentFreeze:        descriptor(ModuleAgent, OperationAgentFreeze, "com.corex.agent.lifecycle.manage", false, true),
@@ -208,6 +247,8 @@ var moduleOperations = map[Module]map[Operation]OperationDescriptor{
 		OperationAgentRebalance:     descriptor(ModuleAgent, OperationAgentRebalance, "com.corex.agent.lifecycle.manage", false, true),
 	},
 	ModuleAI: {
+		"llm.invoke":          descriptor(ModuleAI, "llm.invoke", "", false, true),
+		"embedding.invoke":    descriptor(ModuleAI, "embedding.invoke", "", false, true),
 		OperationStatus:       descriptor(ModuleAI, OperationStatus, "", true, false),
 		OperationAIModelsList: descriptor(ModuleAI, OperationAIModelsList, "", true, false),
 	},

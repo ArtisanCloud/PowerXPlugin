@@ -13,11 +13,11 @@
       </template>
 
       <div class="flex items-center gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
-        <UButton size="xs" :variant="activeTab === 'notification' ? 'solid' : 'soft'" color="info" @click="activeTab = 'notification'">通知测试</UButton>
+        <UButton size="xs" :variant="activeTab === 'notification' ? 'solid' : 'soft'" color="info" @click="activeTab = 'notification'">{{ $t("frameworkLab.localNotificationTab") }}</UButton>
         <UButton size="xs" :variant="activeTab === 'gateway' ? 'solid' : 'soft'" color="primary" @click="activeTab = 'gateway'">网关WS测试</UButton>
         <UButton size="xs" :variant="activeTab === 'local' ? 'solid' : 'soft'" color="success" @click="activeTab = 'local'">本地WS测试</UButton>
         <UButton size="xs" :variant="activeTab === 'scheduler-local' ? 'solid' : 'soft'" color="warning" @click="selectSchedulerLocalTab">本地 Scheduler</UButton>
-        <UButton size="xs" :variant="activeTab === 'scheduler-host' ? 'solid' : 'soft'" color="primary" :disabled="!canUseHostScheduler" @click="selectSchedulerHostTab">网关 Scheduler</UButton>
+        <UButton size="xs" :variant="activeTab === 'scheduler-host' ? 'solid' : 'soft'" color="primary" @click="selectSchedulerHostTab">网关 Scheduler</UButton>
       </div>
 
       <div v-if="activeTab === 'notification'" class="space-y-6 pt-4">
@@ -35,12 +35,6 @@
           <p>Backend POWERX_PROXY: <span>{{ notificationPowerXProxy || "-" }}</span></p>
           <p>Backend ProviderMode: <span>{{ notificationProviderMode || "-" }}</span></p>
           <p>Host Publish: <span>{{ notificationHostPublishOK || "-" }}</span></p>
-          <p>Last Event Topic: <span class="font-mono">{{ notificationLastEventTopic || "-" }}</span></p>
-          <p>Last Event At: <span>{{ notificationLastEventAt || "-" }}</span></p>
-          <p>diag.connected_ok: <span>{{ notificationWsDiag.connectedOK }}</span></p>
-          <p>diag.sub_sent: <span>{{ notificationWsDiag.subSent }}</span></p>
-          <p>diag.ack_ok: <span>{{ notificationWsDiag.ackOK }}</span></p>
-          <p>diag.event_ok: <span>{{ notificationWsDiag.eventOK }}</span></p>
         </div>
       </div>
 
@@ -49,7 +43,7 @@
           <div class="flex items-center gap-3">
             <UButton size="sm" color="primary" icon="i-heroicons-signal" :loading="gatewayWsNotifying" @click="runWSBusFlow">网关WS测试通知</UButton>
           </div>
-          <p class="w-full text-xs text-gray-500 dark:text-gray-400">网关 WS 测试会显式请求 host/proxy 流程，并在本地 WS 会话回显诊断事件。</p>
+          <p class="w-full text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.gatewayHint") }}</p>
         </div>
 
         <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
@@ -59,20 +53,9 @@
           <p>Publish: <span>{{ wsFlowPublishStatus }}</span></p>
           <p>Flow Mode: <span>{{ wsFlowMode }}</span></p>
           <p>Runtime Mode: <span>{{ runtimeModeView }}</span></p>
-          <p>Echo: <span>{{ wsFlowEchoStatus }}</span></p>
           <p>Host Reachable: <span>{{ wsFlowHostReachable }}</span></p>
           <p>Host Grant: <span>{{ wsFlowHostGrantStatus }}</span></p>
           <p>Host Publish: <span>{{ wsFlowHostPublishStatus }}</span></p>
-          <p>Last Event Topic: <span class="font-mono">{{ gatewayLastEventTopic || "-" }}</span></p>
-          <p>Last Event At: <span>{{ gatewayLastEventAt || "-" }}</span></p>
-          <p>diag.connected_ok: <span>{{ gatewayWsDiag.connectedOK }}</span></p>
-          <p>diag.welcome_ok: <span>{{ gatewayWsDiag.welcomeOK }}</span></p>
-          <p>diag.sub_sent: <span>{{ gatewayWsDiag.subSent }}</span></p>
-          <p>diag.ack_ok: <span>{{ gatewayWsDiag.ackOK }}</span></p>
-          <p>diag.event_ok: <span>{{ gatewayWsDiag.eventOK }}</span></p>
-          <p>diag.last_ack.req_id: <span class="font-mono">{{ gatewayWsDiag.lastAckReqID || "-" }}</span></p>
-          <p>diag.last_event.topic: <span class="font-mono">{{ gatewayWsDiag.lastEventTopic || "-" }}</span></p>
-          <p>diag.last_event.trace_id: <span class="font-mono">{{ gatewayWsDiag.lastEventTraceID || "-" }}</span></p>
         </div>
       </div>
 
@@ -105,7 +88,7 @@
 
       <div v-else class="space-y-6 pt-4">
         <div class="flex items-center gap-3 flex-wrap">
-          <UButton size="sm" :color="schedulerMode === 'host' ? 'primary' : 'warning'" icon="i-heroicons-clock" :disabled="!canCreateSchedulerSample" :loading="schedulerCreating" @click="createSchedulerSample">创建 Scheduler 样例</UButton>
+          <UButton size="sm" :color="schedulerMode === 'host' ? 'primary' : 'warning'" icon="i-heroicons-clock" :loading="schedulerCreating" @click="createSchedulerSample">创建 Scheduler 样例</UButton>
           <UButton size="sm" color="primary" variant="soft" icon="i-heroicons-arrow-path" :loading="schedulerListing" @click="refreshSchedulerJobs">刷新列表</UButton>
           <UButton size="sm" color="success" icon="i-heroicons-play" :disabled="!selectedSchedulerJobID" :loading="schedulerTriggering" @click="triggerSelectedSchedulerJob">立即触发</UButton>
           <UButton size="sm" color="neutral" variant="soft" icon="i-heroicons-pause" :disabled="!selectedSchedulerJobID" :loading="schedulerPausing" @click="pauseSelectedSchedulerJob">暂停</UButton>
@@ -202,7 +185,6 @@ const wsFlowTraceID = ref("")
 const wsFlowGrantStatus = ref("idle")
 const wsFlowPublishStatus = ref("idle")
 const wsFlowMode = ref("-")
-const wsFlowEchoStatus = ref("-")
 const wsFlowHostReachable = ref("-")
 const wsFlowHostGrantStatus = ref("-")
 const wsFlowHostPublishStatus = ref("-")
@@ -224,8 +206,6 @@ const notificationTargetLabel = computed(() => {
   const target = notificationTarget.value || "framework runtime 自动选择"
   return target
 })
-const canUseHostScheduler = computed(() => resolveFrontendRuntimeMode().mode !== "standalone_local")
-const canCreateSchedulerSample = computed(() => schedulerMode.value === "local" || canUseHostScheduler.value)
 const schedulerResolvedTenantUUID = computed(() => String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim())
 const schedulerTenantUUID = computed(() => schedulerMode.value === "local" ? (schedulerResolvedTenantUUID.value || "00000000-0000-0000-0000-000000000001") : "")
 const schedulerPluginID = "com.powerx.plugins.base"
@@ -246,19 +226,11 @@ const resolvedTenantNotifyTopic = computed(() => {
   const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim()
   return tenantUUID ? `_topic.notify.tenant.${tenantUUID}` : ""
 })
-const gatewayProbe = useNotificationProbe("gateway", "_topic.system.notification")
 const localProbe = useNotificationProbe("local", "")
 const schedulerProbe = useNotificationProbe("scheduler", "")
-const gatewayLastEventTopic = computed(() => String(gatewayProbe.lastEventTopic.value || ""))
-const gatewayLastEventAt = computed(() => String(gatewayProbe.lastEventAt.value || ""))
-const gatewayWsDiag = computed(() => gatewayProbe.wsDiag.value)
 const localLastEventTopic = computed(() => String(localProbe.lastEventTopic.value || ""))
 const localLastEventAt = computed(() => String(localProbe.lastEventAt.value || ""))
 const localWsDiag = computed(() => localProbe.wsDiag.value)
-const notificationProbe = computed(() => notificationTarget.value === "PowerX 底座通知" ? gatewayProbe : localProbe)
-const notificationLastEventTopic = computed(() => String(notificationProbe.value.lastEventTopic.value || ""))
-const notificationLastEventAt = computed(() => String(notificationProbe.value.lastEventAt.value || ""))
-const notificationWsDiag = computed(() => notificationProbe.value.wsDiag.value)
 const memberNotifyTopic = computed(() => {
   const memberUUID = ensureMemberUUID()
   return memberUUID ? `_topic.notify.member.${memberUUID}` : ""
@@ -270,45 +242,21 @@ const schedulerLastNotifyTitle = computed(() => String(schedulerLastNotifyEvent.
 const schedulerLastNotifyMessage = computed(() => String(schedulerLastNotifyEvent.value?.message || ""))
 const selectedSchedulerJob = computed(() => schedulerJobs.value.find((job) => job.job_id === selectedSchedulerJobID.value) || null)
 const selectedSchedulerNextRunAt = computed(() => String(selectedSchedulerJob.value?.schedule_expr || selectedSchedulerJob.value?.next_run_at || ""))
-let schedulerPollTimer: ReturnType<typeof setInterval> | null = null
-
-const stopSchedulerPolling = () => {
-  if (schedulerPollTimer) {
-    clearInterval(schedulerPollTimer)
-    schedulerPollTimer = null
-  }
-}
-
 const selectSchedulerLocalTab = () => {
-  stopSchedulerPolling()
   activeTab.value = "scheduler-local"
 }
 
 const selectSchedulerHostTab = () => {
-  if (!canUseHostScheduler.value) {
-    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
-    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
-    return
-  }
-  stopSchedulerPolling()
   activeTab.value = "scheduler-host"
 }
 
 const shouldSkipSchedulerRequest = () => {
   if (!auth.isAuthenticated.value) {
-    stopSchedulerPolling()
-    schedulerLastError.value = "当前未登录，已停止 Scheduler 轮询"
-    schedulerLastAction.value = "scheduler polling stopped: unauthenticated"
+    schedulerLastError.value = "当前未登录，已跳过 Scheduler 请求"
+    schedulerLastAction.value = "scheduler request skipped: unauthenticated"
     return true
   }
   if (activeTab.value !== "scheduler-local" && activeTab.value !== "scheduler-host") {
-    stopSchedulerPolling()
-    return true
-  }
-  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
-    stopSchedulerPolling()
-    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，已跳过网关 Scheduler 列表请求"
-    schedulerLastAction.value = "host scheduler skipped"
     return true
   }
   return false
@@ -401,13 +349,12 @@ const sendCapabilityNotification = async () => {
     capabilityNotifyTopic.value = memberTopic
     localProbe.connect()
     localProbe.subscribeTopic(memberTopic)
-    gatewayProbe.connect()
-    gatewayProbe.subscribeTopic("_topic.system.notification")
-    await waitFor(() => Boolean(localProbe.wsDiag.value.connectedOK || gatewayProbe.wsDiag.value.connectedOK), 3000)
+    await waitFor(() => Boolean(localProbe.wsDiag.value.connectedOK), 3000)
     const traceID = makeTraceID()
     const resp: any = await apiClient.post("/admin/notifications/test", {
       topic: memberTopic,
       member_uuid: targetMemberUUID,
+      force_local: true,
       title: "Plugin 测试通知",
       message: "这是一条来自 framework runtime 统一入口的 member 通知",
       trace_id: traceID,
@@ -438,7 +385,6 @@ const runWSBusFlow = async () => {
   wsFlowGrantStatus.value = "pending"
   wsFlowPublishStatus.value = "idle"
   wsFlowMode.value = "-"
-  wsFlowEchoStatus.value = "-"
   wsFlowHostReachable.value = "-"
   wsFlowHostGrantStatus.value = "-"
   wsFlowHostPublishStatus.value = "-"
@@ -446,10 +392,9 @@ const runWSBusFlow = async () => {
   wsFlowTraceID.value = makeTraceID()
   try {
     const traceID = wsFlowTraceID.value
-    gatewayProbe.connect()
-    gatewayProbe.subscribeTopic(wsFlowTopic.value)
     const flowResp: any = await apiClient.post("/admin/runtime/ws-bus/test-flow", {
       topic: wsFlowTopic.value,
+      force_host: true,
       trace_id: traceID,
       payload: {
         type: "framework.wsbus.test",
@@ -462,7 +407,6 @@ const runWSBusFlow = async () => {
     wsFlowGrantStatus.value = flowResp?.success === false ? "failed" : "ok"
     wsFlowPublishStatus.value = flowResp?.success === false ? "failed" : "ok"
     wsFlowMode.value = String(flowResp?.data?.flow_mode || "-")
-    wsFlowEchoStatus.value = flowResp?.data?.echo_skipped ? "skipped" : (flowResp?.data?.echo_ok ? "ok" : "failed")
     wsFlowHostReachable.value = flowResp?.data?.host_reachable ? "yes" : "no"
     wsFlowHostGrantStatus.value = flowResp?.data?.host_grant_ok ? "ok" : "failed"
     wsFlowHostPublishStatus.value = flowResp?.data?.host_publish_ok ? "ok" : "failed"
@@ -542,27 +486,7 @@ const refreshSchedulerJobs = async (options: { updateLastAction?: boolean } = {}
   }
 }
 
-const startSchedulerPolling = () => {
-  stopSchedulerPolling()
-  let rounds = 0
-  schedulerPollTimer = setInterval(async () => {
-    rounds += 1
-    await refreshSchedulerJobs({ updateLastAction: false })
-    if (selectedSchedulerJob.value?.status === "completed" || rounds >= 30) {
-      if (schedulerPollTimer) {
-        clearInterval(schedulerPollTimer)
-        schedulerPollTimer = null
-      }
-    }
-  }, 3000)
-}
-
 const createSchedulerSample = async () => {
-  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
-    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
-    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
-    return
-  }
   schedulerCreating.value = true
   schedulerLastError.value = ""
   try {
@@ -599,9 +523,6 @@ const createSchedulerSample = async () => {
     schedulerLastTopic.value = job.topic || "powerx.runtime.scheduler.triggered.v1"
     schedulerLastAction.value = `${schedulerMode.value} create ok: ${job.job_id}; next run at ${runAt}`
     await refreshSchedulerJobs({ updateLastAction: false })
-    if (schedulerMode.value === "local") {
-      startSchedulerPolling()
-    }
     showToast({ title: "Scheduler 创建成功", message: job.job_id, color: "success", duration: 3500 })
   } catch (error: any) {
     schedulerLastError.value = String(error?.message || "create scheduler job failed")
@@ -613,11 +534,6 @@ const createSchedulerSample = async () => {
 
 const triggerSchedulerJobByID = async (jobID: string) => {
   if (!jobID) return
-  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
-    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
-    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
-    return
-  }
   schedulerTriggering.value = true
   schedulerLastError.value = ""
   schedulerLastAction.value = `${schedulerMode.value} trigger pending: ${jobID}`
@@ -649,11 +565,6 @@ const triggerSchedulerJobByID = async (jobID: string) => {
 
 const pauseSchedulerJobByID = async (jobID: string) => {
   if (!jobID) return
-  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
-    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
-    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
-    return
-  }
   schedulerPausing.value = true
   schedulerLastError.value = ""
   try {
@@ -670,11 +581,6 @@ const pauseSchedulerJobByID = async (jobID: string) => {
 
 const resumeSchedulerJobByID = async (jobID: string) => {
   if (!jobID) return
-  if (schedulerMode.value === "host" && !canUseHostScheduler.value) {
-    schedulerLastError.value = "当前不是 local_proxy/host_delegated 模式，网关 Scheduler 不可用"
-    showToast({ title: "Scheduler 不可用", message: schedulerLastError.value, color: "warning", duration: 4500 })
-    return
-  }
   schedulerResuming.value = true
   schedulerLastError.value = ""
   try {
@@ -703,7 +609,4 @@ onMounted(async () => {
   }
 })
 
-onBeforeUnmount(() => {
-  stopSchedulerPolling()
-})
 </script>

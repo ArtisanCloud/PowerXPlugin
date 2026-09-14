@@ -27,10 +27,10 @@
       "use": "com.powerx.plugins.base.template.read",
       "io": {
         "in_map": {
-          "id": "{{task.collect-stale.output.candidates[0].id}}"
+          "template_uuid": "{{task.collect-stale.output.candidates[0].uuid}}"
         },
         "out_map": {
-          "template_id": "output.id",
+          "template_uuid": "output.uuid",
           "current_content": "output.content"
         }
       }
@@ -41,11 +41,11 @@
       "use": "com.powerx.plugins.base.template.update",
       "io": {
         "in_map": {
-          "id": "{{task.inspect-primary.output.template_id}}",
+          "template_uuid": "{{task.inspect-primary.output.template_uuid}}",
           "body": "{{var.update_payload}}"
         },
         "out_map": {
-          "updated_id": "output.id"
+          "updated_id": "output.uuid"
         }
       }
     }

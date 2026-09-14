@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
+	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	marketplacemodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/marketplace"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func TestLocalPublisherUsesTrustedTenantAndPersistsNotification(t *testing.T) {
 	models.ForceSchemaForTests("")
 	t.Cleanup(func() { models.ForceSchemaForTests("public") })
-	db, err := gorm.Open(sqlite.Open("file:local_notification_publisher?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(dbx.SQLiteDialector("file:local_notification_publisher?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

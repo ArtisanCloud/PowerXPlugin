@@ -175,7 +175,7 @@ const {
 const templates = ref<Template[]>([])
 const loading = ref(false)
 const saving = ref(false)
-const editingId = ref<number | null>(null)
+const editingId = ref<string | null>(null)
 const showFormModal = ref(false)
 const deleteDialog = ref(false)
 const deleting = ref(false)
@@ -340,7 +340,7 @@ const fetchTemplates = async () => {
 }
 
 const focusTemplateFromRoute = async () => {
-  const rawID = route.query.template_id
+  const rawID = route.query.template_uuid
   const templateID = Array.isArray(rawID) ? rawID[0] : rawID
   if (!templateID) {
     return
@@ -351,7 +351,7 @@ const focusTemplateFromRoute = async () => {
       throw new Error(res?.message || t("templates.crud.errors.templateNotFound"))
     }
     const tpl = res.data
-    const existingIndex = templates.value.findIndex((item) => String(item.id) === String(tpl.id))
+    const existingIndex = templates.value.findIndex((item) => String(item.uuid) === String(tpl.uuid))
     if (existingIndex >= 0) {
       templates.value.splice(existingIndex, 1, tpl)
     } else {
@@ -412,7 +412,7 @@ const startCreate = () => {
 
 const startEdit = (tpl: Template) => {
   if (!ensureWritable()) return
-  editingId.value = tpl.id
+  editingId.value = tpl.uuid
   Object.assign(form, {
     name: tpl.name,
     description: tpl.description,
@@ -489,8 +489,8 @@ const performDelete = async () => {
   deleting.value = true
   try {
     const res = await deleteTemplateApi(
-      selectedTemplate.value.id,
-      makeLogHandlers("templates:delete", { id: selectedTemplate.value.id })
+      selectedTemplate.value.uuid,
+      makeLogHandlers("templates:delete", { id: selectedTemplate.value.uuid })
     )
     if (!res?.success) {
       throw new Error(res?.message || t("templates.crud.errors.deleteFailed"))

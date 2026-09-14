@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	knowledgeprovider "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/knowledge"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/runtimeexample"
+	"github.com/gin-gonic/gin"
 	"net"
 	"net/http"
 	"os"
@@ -49,6 +53,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
+	localaisettingsrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/ai_settings"
 	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
@@ -72,6 +77,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
+	localaisettings "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/ai_settings"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -387,6 +393,7 @@ func main() {
 	var integrationGatewayRuntime *fwintegration.Runtime
 	var pluginRuntimeClient *powerxpluginruntime.Client
 	var pluginRuntimeRuntime *fwpluginruntime.Runtime
+	var localPluginRuntime *runtimeexample.LocalPluginRuntime
 	var pluginReleaseClient *powerxpluginrelease.Client
 	var pluginReleaseRuntime *fwpluginrelease.Runtime
 	var mediaRuntime *powerxmedia.HostClient
@@ -400,11 +407,15 @@ func main() {
 	var delegatedCustomerMembership customerfw.CustomerMembershipResolver
 	var delegatedCustomerAuth customerfw.CustomerAuthClient
 	var delegatedMetadata *fwmetadata.HostClient
+	var runtimeTokens hostapi.TokenProvider
+	runtimeHostConfig := hostapi.Config{}
 	if providerResolver.IsDelegated() {
 		if cfg == nil || cfg.Gateway == nil || strings.TrimSpace(cfg.Gateway.BaseURL) == "" || pxc == nil {
 			logger.Fatal("Delegated Agent runtime requires Gateway base URL and PowerX STS client")
 		}
 		stsTokens := grpcclient.NewPowerXSTSTokenProvider(pxc)
+		runtimeTokens = stsTokens
+		runtimeHostConfig.BaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
 		agentRuntime, err = powerxagent.NewClientWithTokenProvider(powerxagent.PowerXAgentClientConfig{
 			Mode:    powerxagent.ModeDelegated,
 			BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL),
@@ -485,17 +496,69 @@ func main() {
 			logger.WithError(err).Fatal("Failed to initialize local API-key Capability Registry client")
 		}
 	}
-	agentLifecycleRuntime, err = fwagent.NewRuntime(providerResolver.Mode(), nil, agentRuntime, fwagent.WithSessions(nil, agentRuntime))
+	cacheRuntime, taskCenterRuntime, err := runtimeexample.Build(providerResolver.Mode(), runtimeHostConfig, runtimeTokens, nil)
+	selectedKnowledge, knowledgeErr := knowledgeprovider.NewProviderFactory(cfg, providerResolver.Mode(), knowledgeDirectory, nil).Build()
+	if knowledgeErr != nil {
+		logger.WithError(knowledgeErr).Fatal("KNOWLEDGE_PROVIDER_INITIALIZATION_FAILED")
+	}
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to initialize Agent lifecycle runtime")
+		logger.WithError(err).Fatal("RUNTIME_HOST_INITIALIZATION_FAILED")
 	}
 	metadataRuntime, err := fwmetadata.NewRuntime(providerResolver.Mode(), nil, delegatedMetadata)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Metadata runtime")
 	}
-	aiInvocationRuntime, err = fwai.NewRuntime(providerResolver.Mode(), nil, aiRuntime)
+	var localAI *runtimeexample.LocalAI
+	var localGenerative fwai.GenerativeService
+	localAI, err = runtimeexample.NewLocalAI(cfg.LocalAI, nil)
+	if err != nil {
+		logger.WithError(err).Fatal("AI_LOCAL_INITIALIZATION_FAILED")
+	}
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		localGenerative = localAI
+	}
+	var selectedAISettings fwaisettings.Service
+	var localAISettings *localaisettings.LocalSettingsService
+	{
+		// This is the plugin-owned settings page configuration. It remains
+		// available even when runtime calls are proxied to PowerX.
+		localSettingsRepo, repoErr := localaisettingsrepo.NewLocalSettingsRepository(queryDB)
+		if repoErr != nil {
+			logger.WithError(repoErr).Fatal("AI_LOCAL_SETTINGS_REPOSITORY_INITIALIZATION_FAILED")
+		}
+		localAISettings, err = localaisettings.NewLocalSettingsService(localSettingsRepo, cfg.LocalAI, localAI)
+		if err != nil {
+			logger.WithError(err).Fatal("AI_LOCAL_SETTINGS_INITIALIZATION_FAILED")
+		}
+		if cfg.AICatalog == nil || strings.TrimSpace(cfg.AICatalog.Directory) == "" {
+			logger.Fatal("AI_CATALOG_NOT_CONFIGURED")
+		}
+		localAISettings.Catalog, err = localaisettings.LoadCatalog(cfg.AICatalog.Directory)
+		if err != nil {
+			logger.WithError(err).Fatal("AI_CATALOG_INITIALIZATION_FAILED")
+		}
+	}
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		selectedAISettings = localAI
+	} else if aiSettingsClient != nil {
+		selectedAISettings = aiSettingsClient
+	}
+	aiInvocationRuntime, err = fwai.NewRuntime(providerResolver.Mode(), localGenerative, aiRuntime)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize AI invocation runtime")
+	}
+	var localAgentLifecycle fwagent.LifecycleService
+	var localAgentSessions fwagent.SessionService
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		localAgent, buildErr := runtimeexample.NewLocalAgent(app.PluginID, cfg.LocalAI, localAI)
+		if buildErr != nil {
+			logger.WithError(buildErr).Fatal("AGENT_LOCAL_INITIALIZATION_FAILED")
+		}
+		localAgentLifecycle, localAgentSessions = localAgent, localAgent
+	}
+	agentLifecycleRuntime, err = fwagent.NewRuntime(providerResolver.Mode(), localAgentLifecycle, agentRuntime, fwagent.WithSessions(localAgentSessions, agentRuntime))
+	if err != nil {
+		logger.WithError(err).Fatal("AGENT_RUNTIME_INITIALIZATION_FAILED")
 	}
 	localSkillRegistry, err := skeletonskills.NewTemplateRegistry(queryDB)
 	if err != nil {
@@ -514,17 +577,34 @@ func main() {
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Notifications runtime")
 	}
-	// capabilityRegistry may be an explicit Core API-key debug client in local
-	// mode. It is not a plugin-local Registry implementation.
-	capabilityAccessRuntime, err = fwcapability.NewRuntime(providerResolver.Mode(), nil, capabilityRegistry)
+	var localCapabilityRegistry fwcapability.Registry
+	var localIntegrationGateway fwintegration.Gateway
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		entries, loadErr := capManager.ListCapabilities(ctx)
+		if loadErr != nil {
+			logger.WithError(loadErr).Fatal("CAPABILITY_LOCAL_CATALOG_FAILED")
+		}
+		localRuntime, buildErr := integrationservice.NewLocalCapabilityRuntime(app.PluginID, entries, queryDB)
+		if buildErr != nil {
+			logger.WithError(buildErr).Fatal("CAPABILITY_LOCAL_INITIALIZATION_FAILED")
+		}
+		localCapabilityRegistry, localIntegrationGateway = localRuntime, localRuntime
+	}
+	capabilityAccessRuntime, err = fwcapability.NewRuntime(providerResolver.Mode(), localCapabilityRegistry, capabilityRegistry)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Capability Registry runtime")
 	}
-	integrationGatewayRuntime, err = fwintegration.NewRuntime(providerResolver.Mode(), nil, integrationGatewayClient)
+	integrationGatewayRuntime, err = fwintegration.NewRuntime(providerResolver.Mode(), localIntegrationGateway, integrationGatewayClient)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Integration Gateway runtime")
 	}
-	pluginRuntimeRuntime, err = fwpluginruntime.NewRuntime(providerResolver.Mode(), nil, pluginRuntimeClient)
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		localPluginRuntime, err = runtimeexample.NewLocalPluginRuntime(localAI, selectedKnowledge)
+		if err != nil {
+			logger.WithError(err).Fatal("PLUGIN_RUNTIME_LOCAL_INITIALIZATION_FAILED")
+		}
+	}
+	pluginRuntimeRuntime, err = fwpluginruntime.NewRuntime(providerResolver.Mode(), localPluginRuntime, pluginRuntimeClient)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Plugin Runtime")
 	}
@@ -532,7 +612,20 @@ func main() {
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Plugin Release runtime")
 	}
-	mediaCatalogRuntime, err = fwmedia.NewRuntime(providerResolver.Mode(), nil, mediaRuntime)
+	var localMedia *runtimeexample.LocalMedia
+	var localMediaService fwmedia.Service
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		host, port, splitErr := net.SplitHostPort(cfg.Server.BindAddr)
+		if splitErr != nil {
+			logger.WithError(splitErr).Fatal("MEDIA_LOCAL_BIND_ADDR_INVALID")
+		}
+		if host == "" || host == "0.0.0.0" || host == "::" {
+			host = "127.0.0.1"
+		}
+		localMedia = runtimeexample.NewLocalMedia("http://" + net.JoinHostPort(host, port))
+		localMediaService = localMedia
+	}
+	mediaCatalogRuntime, err = fwmedia.NewRuntime(providerResolver.Mode(), localMediaService, mediaRuntime)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Media catalog runtime")
 	}
@@ -607,7 +700,12 @@ func main() {
 		Metadata:             metadataRuntime,
 		CustomerAdmin:        customerAdminClient,
 		CustomerRuntime:      customerRuntime,
-		AISettings:           aiSettingsClient,
+		KnowledgeProvider:    selectedKnowledge,
+		CacheRuntime:         cacheRuntime,
+		TaskCenterRuntime:    taskCenterRuntime,
+		AISettings:           selectedAISettings,
+		PowerXAISettings:     aiSettingsClient,
+		LocalAISettings:      localAISettings,
 		AIInvocation:         aiInvocationRuntime,
 		AI:                   aiRuntime,
 		AgentLifecycle:       agentLifecycleRuntime,
@@ -672,16 +770,6 @@ func main() {
 		}))
 	}
 
-	// 设置 gin engine 路由
-	r := pluginrouter.NewRouter(cfg, deps)
-	engine := r.Setup()
-
-	// 创建 gRPC 服务器（可选）
-	gs, err := grpcserver.NewGRPCServer(ctx, deps, cfg.GRPCServer)
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to create gRPC server")
-	}
-
 	appCfg := &fwbootstrap.Config{
 		Listen:     cfg.Server.BindAddr,
 		Env:        cfg.Server.Mode,
@@ -703,6 +791,17 @@ func main() {
 	}
 	if err := pluginbootstrap.ValidateIAMBinding(deps); err != nil {
 		logger.WithError(err).Fatal("Framework IAM registry binding is incomplete")
+	}
+	// All identity services must be bound before handlers capture dependencies.
+	r := pluginrouter.NewRouter(cfg, deps)
+	engine := r.Setup()
+	if localMedia != nil {
+		engine.GET(runtimeexample.MediaTransferPath, gin.WrapH(http.HandlerFunc(localMedia.ServeTransfer)))
+		engine.PUT(runtimeexample.MediaTransferPath, gin.WrapH(http.HandlerFunc(localMedia.ServeTransfer)))
+	}
+	gs, err := grpcserver.NewGRPCServer(ctx, deps, cfg.GRPCServer)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to create gRPC server")
 	}
 	fwApp.RegisterCapabilityInvoker(integrationservice.NewFrameworkCapabilityInvoker(deps, deps.RuntimeLogger(ctx, "framework_capability_invoker", nil)))
 

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter"
 	"os"
 	"strings"
 
@@ -16,6 +18,7 @@ import (
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
+	localaisettings "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/ai_settings"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
@@ -67,6 +70,9 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
+	KnowledgeProvider    fwknowledge.KnowledgeProvider
+	CacheRuntime         *cache.Runtime
+	TaskCenterRuntime    *taskcenter.Runtime
 	DB                   *gorm.DB
 	Ctx                  context.Context
 	PowerXClient         *client.PowerXServiceClient
@@ -74,7 +80,9 @@ type Deps struct {
 	Metadata             *fwmetadata.Runtime
 	CustomerAdmin        *customerfw.AdminClient
 	CustomerRuntime      *customerfw.Runtime
-	AISettings           *fwaisettings.Client
+	AISettings           fwaisettings.Service
+	PowerXAISettings     *fwaisettings.Client
+	LocalAISettings      *localaisettings.LocalSettingsService
 	AIInvocation         *fwai.Runtime
 	AI                   *powerxai.Client
 	AgentLifecycle       *fwagent.Runtime

@@ -3,6 +3,8 @@ package capability
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/module"
@@ -68,5 +70,44 @@ func TestLocalRuntimeDoesNotUseCoreDebugRegistry(t *testing.T) {
 	var moduleErr *module.Error
 	if registry != nil || !errors.As(err, &moduleErr) || moduleErr.Code != "FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE" {
 		t.Fatalf("registry=%T err=%v", registry, err)
+	}
+}
+
+type countingRegistry struct {
+	registryStub
+	calls *int
+}
+
+func (s countingRegistry) Invoke(context.Context, powerxcapability.InvokeInput) (*powerxcapability.InvokeResult, error) {
+	*s.calls++
+	return nil, nil
+}
+
+func TestDelegatedHTTPDenialDoesNotInvokeLocal(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/tenant/invocations" || r.Header.Get("Authorization") != "Bearer test-sts" {
+			t.Errorf("method=%s path=%s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"reason_code":"TEST_GRANT_DENIED"}`))
+	}))
+	defer server.Close()
+	client, err := powerxcapability.NewClientWithTokenProvider(powerxcapability.Config{BaseURL: server.URL}, powerxcapability.TokenProviderFunc(func(context.Context) (string, error) { return "test-sts", nil }), server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	runtime, err := NewRuntime(provider.ModeDelegated, countingRegistry{calls: &calls}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry, err := runtime.Registry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = registry.Invoke(context.Background(), powerxcapability.InvokeInput{CapabilityID: "com.test.operation"})
+	var upstream *powerxcapability.HTTPError
+	if !errors.As(err, &upstream) || upstream.StatusCode != 403 || upstream.ReasonCode != "TEST_GRANT_DENIED" || calls != 0 {
+		t.Fatalf("err=%v local_calls=%d", err, calls)
 	}
 }

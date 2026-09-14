@@ -9,6 +9,8 @@
 
 当前实施围绕 Framework contract → delegated client → 启动 Factory → 插件 local 注入 → 合同与安装验收推进。插件业务层不自行分流；本地 Store/事务由插件实现，Core 权威数据只通过正式 Host Contract 访问。
 
+2026-09-08 消费者审计新增范围：Media Variant 传输、独立组织写 contract，以及 Registry/Gateway 逐操作授权映射。详见 [任务单](../../docs/contracts/framework-consumer-contract-gaps.md) 和 tasks Phase 15。现有 Media Variant 元数据方法不代表支持文件传输；IAM Directory 不承接组织写入或后台登录会话；已有 Registry/Gateway typed client 不等于授权全量验收。
+
 唯一对外入口为 [业务模块接入指南](../../docs/guides/features/009-consume-powerx-capability/guide.md)，[双模式规范](../../docs/guides/develop/framework-dual-mode-business-modules.md)维护共同规则，[覆盖台账](../../docs/contracts/powerx-core-framework-coverage.md)维护状态。示例随接口编译验证，不替代真实安装授权验收。
 
 ## Technical Context

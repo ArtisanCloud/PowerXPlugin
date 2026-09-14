@@ -3,6 +3,10 @@ package host_contract
 import (
 	"encoding/json"
 	"errors"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	fwmodule "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/module"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter"
 	"io"
 	"math"
 	"net/http"
@@ -31,16 +35,18 @@ import (
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	fwskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
-	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type Handler struct {
+	cache         *cache.Runtime
+	tasks         *taskcenter.Runtime
 	directory     fwiamcontracts.DirectoryService
 	authorizer    fwiamcontracts.AuthzService
-	knowledge     fwknowledge.DelegatedClient
+	knowledge     fwknowledge.KnowledgeProvider
 	agent         *fwagent.Runtime
 	ai            *fwai.Runtime
 	capabilities  *fwcapability.Runtime
@@ -56,9 +62,11 @@ type Handler struct {
 func NewHandler(deps *app.Deps) *Handler {
 	h := &Handler{}
 	if deps != nil {
+		h.cache = deps.CacheRuntime
+		h.tasks = deps.TaskCenterRuntime
 		h.directory = deps.IAMDirectoryService
 		h.authorizer = deps.IAMAuthzService
-		h.knowledge = deps.KnowledgeDirectory
+		h.knowledge = deps.KnowledgeProvider
 		h.agent = deps.AgentLifecycle
 		h.ai = deps.AIInvocation
 		h.capabilities = deps.CapabilityAccess
@@ -76,12 +84,18 @@ func NewHandler(deps *app.Deps) *Handler {
 func (h *Handler) Probe(c *gin.Context) {
 	var request hostcontract.ProbeRequest
 	decoder := json.NewDecoder(c.Request.Body)
+	decoder.UseNumber()
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&request); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
 		respondError(c, http.StatusBadRequest, hostcontract.ReasonInvalidArgument)
 		return
 	}
-	if hasTenantOverride(c) {
+	tenantUUID, ok := authx.TenantUUIDFromContext(c.Request.Context())
+	if !ok || strings.TrimSpace(tenantUUID) == "" {
+		respondError(c, http.StatusUnauthorized, hostcontract.ReasonUnauthorized)
+		return
+	}
+	if hasTenantOverride(c, tenantUUID) {
 		respondError(c, http.StatusBadRequest, hostcontract.ReasonTenantOverrideForbidden)
 		return
 	}
@@ -98,12 +112,6 @@ func (h *Handler) Probe(c *gin.Context) {
 		respondError(c, http.StatusConflict, hostcontract.ReasonConfirmationRequired)
 		return
 	}
-	tenantUUID, ok := httpmw.TenantUUIDFromContext(c)
-	if !ok || strings.TrimSpace(tenantUUID) == "" {
-		respondError(c, http.StatusUnauthorized, hostcontract.ReasonUnauthorized)
-		return
-	}
-
 	result := hostcontract.ProbeResult{
 		Module:       descriptor.Module,
 		Operation:    descriptor.Operation,
@@ -111,7 +119,24 @@ func (h *Handler) Probe(c *gin.Context) {
 		CapabilityID: descriptor.CapabilityID,
 		ObservedAt:   time.Now().UTC(),
 	}
+	if descriptor.Operation == hostcontract.OperationStatus {
+		if err := h.probeBinding(request.Input, &result); err != nil {
+			status, reason, trace := mapTypedClientError(err)
+			result.TraceID = trace
+			respondProbeError(c, result, status, reason)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+		return
+	}
 	switch descriptor.Module {
+	case hostcontract.ModuleCache, hostcontract.ModuleTaskCenter:
+		if err := h.probeStorage(c, tenantUUID, request.Input, &result); err != nil {
+			status, reason, trace := mapTypedClientError(err)
+			result.TraceID = trace
+			respondProbeError(c, result, status, reason)
+			return
+		}
 	case hostcontract.ModuleIAM:
 		if h.directory == nil {
 			respondProbeError(c, result, http.StatusFailedDependency, hostcontract.ReasonUpstreamDependency)
@@ -160,6 +185,9 @@ func (h *Handler) probeRuntimeModule(c *gin.Context, input map[string]any, resul
 	ctx := c.Request.Context()
 	switch result.Module {
 	case hostcontract.ModuleMedia:
+		if result.Operation != hostcontract.OperationStatus && result.Operation != hostcontract.OperationMediaAssetsList {
+			return h.probeMediaTransfer(c, input, result)
+		}
 		if h.media == nil {
 			return &hostcontract.Error{Reason: hostcontract.ReasonUpstreamDependency}
 		}
@@ -199,6 +227,9 @@ func (h *Handler) probeRuntimeModule(c *gin.Context, input map[string]any, resul
 			return &hostcontract.Error{Reason: hostcontract.ReasonUnsupportedOperation}
 		}
 	case hostcontract.ModuleAgent:
+		if strings.HasPrefix(string(result.Operation), "session.") || result.Operation == "sessions.list" {
+			return h.probeAgentSession(c, input, result)
+		}
 		if h.agent == nil {
 			return &hostcontract.Error{Reason: hostcontract.ReasonUpstreamDependency}
 		}
@@ -273,6 +304,9 @@ func (h *Handler) probeRuntimeModule(c *gin.Context, input map[string]any, resul
 			return &hostcontract.Error{Reason: hostcontract.ReasonUnsupportedOperation}
 		}
 	case hostcontract.ModuleAI:
+		if result.Operation == "llm.invoke" || result.Operation == "embedding.invoke" {
+			return h.probeAIExecution(c, input, result)
+		}
 		if h.ai == nil {
 			return &hostcontract.Error{Reason: hostcontract.ReasonUpstreamDependency}
 		}
@@ -621,7 +655,7 @@ func (h *Handler) probeKnowledge(c *gin.Context, tenant string, input map[string
 		if err := ensureInputKeys(input); err != nil {
 			return err
 		}
-		items, err := h.knowledge.ListKnowledgeSpaces(c.Request.Context(), fwknowledge.ListSpacesInput{TenantUUID: tenant})
+		items, err := h.knowledge.ListSpaces(c.Request.Context(), fwknowledge.ListSpacesInput{TenantUUID: tenant})
 		if err != nil {
 			return err
 		}
@@ -642,7 +676,7 @@ func (h *Handler) probeKnowledge(c *gin.Context, tenant string, input map[string
 		if err != nil {
 			return err
 		}
-		item, err := h.knowledge.SearchKnowledge(c.Request.Context(), fwknowledge.KnowledgeQuery{TenantUUID: tenant, Query: query, SpaceIDs: spaces, Limit: limit, TraceID: traceID})
+		item, err := h.knowledge.Search(c.Request.Context(), fwknowledge.KnowledgeQuery{TenantUUID: tenant, Query: query, SpaceIDs: spaces, Limit: limit, TraceID: traceID})
 		if err != nil {
 			return err
 		}
@@ -656,7 +690,7 @@ func (h *Handler) probeKnowledge(c *gin.Context, tenant string, input map[string
 		if err != nil {
 			return err
 		}
-		item, err := h.knowledge.GetKnowledgeIndexJob(c.Request.Context(), fwknowledge.IndexJobQuery{TenantUUID: tenant, JobID: jobID, TraceID: traceID})
+		item, err := h.knowledge.GetIndexJob(c.Request.Context(), fwknowledge.IndexJobQuery{TenantUUID: tenant, JobID: jobID, TraceID: traceID})
 		if err != nil {
 			return err
 		}
@@ -697,7 +731,7 @@ func (h *Handler) probeKnowledge(c *gin.Context, tenant string, input map[string
 		if err != nil {
 			return err
 		}
-		item, err := h.knowledge.UpsertKnowledgeDocument(c.Request.Context(), fwknowledge.KnowledgeDocument{TenantUUID: tenant, SpaceID: spaceID, Title: title, URI: uri, Content: content, ContentType: contentType, Checksum: checksum, Version: version, Tags: tags})
+		item, err := h.knowledge.UpsertDocument(c.Request.Context(), fwknowledge.KnowledgeDocument{TenantUUID: tenant, SpaceID: spaceID, Title: title, URI: uri, Content: content, ContentType: contentType, Checksum: checksum, Version: version, Tags: tags})
 		if err != nil {
 			return err
 		}
@@ -714,7 +748,7 @@ func (h *Handler) probeKnowledge(c *gin.Context, tenant string, input map[string
 		if err != nil {
 			return err
 		}
-		item, err := h.knowledge.DeleteKnowledgeDocument(c.Request.Context(), fwknowledge.DeleteDocumentInput{TenantUUID: tenant, SpaceID: spaceID, DocumentID: documentID, TraceID: traceID})
+		item, err := h.knowledge.DeleteDocument(c.Request.Context(), fwknowledge.DeleteDocumentInput{TenantUUID: tenant, SpaceID: spaceID, DocumentID: documentID, TraceID: traceID})
 		if err != nil {
 			return err
 		}
@@ -727,7 +761,7 @@ func (h *Handler) probeKnowledge(c *gin.Context, tenant string, input map[string
 		if err != nil {
 			return err
 		}
-		item, err := h.knowledge.ReindexKnowledgeDocument(c.Request.Context(), fwknowledge.ReindexInput{TenantUUID: tenant, SpaceID: spaceID, TraceID: traceID})
+		item, err := h.knowledge.Reindex(c.Request.Context(), fwknowledge.ReindexInput{TenantUUID: tenant, SpaceID: spaceID, TraceID: traceID})
 		if err != nil {
 			return err
 		}
@@ -886,8 +920,23 @@ func (h *Handler) probeIAM(c *gin.Context, tenantUUID string, input map[string]a
 	return nil
 }
 
-func hasTenantOverride(c *gin.Context) bool {
-	return strings.TrimSpace(c.Query("tenant_uuid")) != "" || strings.TrimSpace(c.GetHeader("tenant_uuid")) != ""
+func hasTenantOverride(c *gin.Context, tenant string) bool {
+	for _, key := range []string{"tenant_uuid", "tenantUuid", "tenant_id", "tenantId"} {
+		if c.Request.URL.Query().Has(key) {
+			return true
+		}
+	}
+	// Browser SDK tenant hints may confirm, but never establish, authority.
+	for _, key := range []string{"tenant_uuid", "X-Tenant-UUID"} {
+		values := c.Request.Header.Values(key)
+		if len(values) > 1 {
+			return true
+		}
+		if len(values) == 1 && values[0] != tenant {
+			return true
+		}
+	}
+	return false
 }
 
 func providerMode(mode fwprovider.Mode) string {
@@ -914,6 +963,25 @@ func mapIAMError(err error) (int, hostcontract.ReasonCode) {
 }
 
 func mapTypedClientError(err error) (int, hostcontract.ReasonCode, string) {
+	var bindingError *fwmodule.Error
+	if errors.As(err, &bindingError) {
+		return http.StatusServiceUnavailable, hostcontract.ReasonCode(bindingError.Code), ""
+	}
+	var upstream *hostapi.HTTPError
+	if errors.As(err, &upstream) {
+		return upstream.StatusCode, hostcontract.ReasonCode(upstream.ReasonCode), upstream.RequestID
+	}
+	for _, invalid := range []error{cache.ErrInvalidArgument, taskcenter.ErrInvalidArgument} {
+		if errors.Is(err, invalid) {
+			return 400, hostcontract.ReasonCode(invalid.Error()), ""
+		}
+	}
+	if errors.Is(err, taskcenter.ErrNotFound) {
+		return 404, hostcontract.ReasonCode(taskcenter.ErrNotFound.Error()), ""
+	}
+	if errors.Is(err, taskcenter.ErrConflict) {
+		return 409, hostcontract.ReasonCode(taskcenter.ErrConflict.Error()), ""
+	}
 	if err == nil {
 		return http.StatusOK, "", ""
 	}
@@ -995,6 +1063,13 @@ func inputPositiveInt(input map[string]any, key string, fallback, maximum int) (
 	value, ok := input[key]
 	if !ok {
 		return fallback, nil
+	}
+	if valueNumber, isNumber := value.(json.Number); isNumber {
+		parsed, err := valueNumber.Int64()
+		if err != nil || parsed <= 0 || parsed > int64(maximum) {
+			return 0, &hostcontract.Error{Reason: hostcontract.ReasonInvalidArgument}
+		}
+		return int(parsed), nil
 	}
 	number, ok := value.(float64)
 	if !ok || math.Trunc(number) != number || number <= 0 || number > float64(maximum) {

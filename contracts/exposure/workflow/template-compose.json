@@ -17,7 +17,7 @@
           "body": "{{var.template_draft}}"
         },
         "out_map": {
-          "template_id": "output.id"
+          "template_uuid": "output.uuid"
         }
       }
     },
@@ -31,7 +31,7 @@
       },
       "io": {
         "in_map": {
-          "template_id": "{{task.draft.output.template_id}}",
+          "template_uuid": "{{task.draft.output.template_uuid}}",
           "approved": "{{var.review.approved}}",
           "comments": "{{var.review.comments}}"
         },
@@ -50,7 +50,7 @@
       },
       "io": {
         "in_map": {
-          "template_id": "{{task.draft.output.template_id}}",
+          "template_uuid": "{{task.draft.output.template_uuid}}",
           "approved": "{{task.review.output.approved}}",
           "channel": "{{var.publish_channel}}"
         },

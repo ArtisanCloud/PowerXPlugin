@@ -1,0 +1,142 @@
+<template>
+  <UContainer class="space-y-6 py-8">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <div class="mb-2 flex items-center gap-2"><UBadge color="info" variant="soft">{{ t('aiSettings.badge') }}</UBadge><UBadge color="neutral" variant="soft">{{ modeLabel }}</UBadge></div>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('aiSettings.title') }}</h1>
+        <p class="mt-1 text-sm text-gray-600 dark:text-slate-200">{{ t('aiSettings.description') }}</p>
+      </div>
+      <div class="flex gap-2"><UButton icon="i-heroicons-cloud-arrow-up" :loading="saving" @click="saveSettings">{{ t('common.save') }}</UButton><UButton icon="i-heroicons-arrow-path" variant="soft" @click="reset">{{ t('common.reset') }}</UButton></div>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-4">
+      <aside class="space-y-4">
+        <UCard><template #header>{{ t('aiSettings.environment') }}</template><USelect v-model="environment" :items="environmentOptions" class="w-full" /></UCard>
+        <UCard><template #header>{{ t('aiSettings.catalogSource') }}</template><USelect v-model="catalogSource" :items="catalogSourceOptions" class="w-full" /><p class="mt-2 text-xs text-gray-500 dark:text-slate-300">{{ t('aiSettings.catalogSourceDescription') }}</p></UCard>
+        <UCard><template #header>{{ t('aiSettings.modalityTabsLabel') }}</template><div class="space-y-1"><UButton v-for="item in modalities" :key="item.value" block :variant="modality === item.value ? 'solid' : 'ghost'" :icon="item.icon" class="justify-start" @click="modality = item.value">{{ item.label }}</UButton></div></UCard>
+      </aside>
+
+      <main class="space-y-6 lg:col-span-2">
+        <UCard>
+          <template #header><h2 class="font-semibold">{{ currentTitle }} · {{ t('aiSettings.general') }}</h2></template>
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormField :label="t('aiSettings.provider')"><USelect v-model="draft.provider" :items="providerOptions" class="w-full" /></UFormField>
+            <UFormField v-if="appOptions.length" :label="t('aiSettings.app')"><USelect v-model="draft.app" :items="appOptions" class="w-full" /></UFormField>
+            <UFormField :label="t('aiSettings.model')"><USelectMenu :key="modelSelectorKey" v-model="draft.modelKey" :items="modelOptions" value-key="value" :search-input="{ placeholder: t('aiSettings.searchModel') }" class="w-full" /></UFormField>
+            <UFormField :label="t('aiSettings.baseURL')" class="md:col-span-2"><UInput v-model="draft.endpoint" placeholder="http://127.0.0.1:11434" /></UFormField>
+            <UFormField v-if="requiresCredentialReference" :label="t('aiSettings.credentialReference')" class="md:col-span-2" :description="t('aiSettings.credentialReferenceDescription')"><UInput v-model="draft.credentialRef" autocomplete="off" /></UFormField>
+          </div>
+          <UAlert v-if="catalogError" class="mt-4" color="warning" variant="soft" :title="t('aiSettings.catalogUnavailable')" :description="catalogError" icon="i-heroicons-exclamation-triangle" />
+        </UCard>
+        <UCard>
+          <template #header><h2 class="font-semibold">{{ currentTitle }} · {{ t('aiSettings.parameters') }}</h2></template>
+          <div v-if="modality === 'llm'" class="grid gap-4 md:grid-cols-2"><UFormField :label="t('aiSettings.temperature')"><UInput v-model.number="draft.temperature" type="number" min="0" max="2" step="0.1" /></UFormField><UFormField :label="t('aiSettings.maxTokens')"><UInput v-model.number="draft.maxTokens" type="number" min="1" /></UFormField><UFormField :label="t('aiSettings.topP')"><UInput v-model.number="draft.topP" type="number" min="0" max="1" step="0.1" /></UFormField><UCheckbox v-model="draft.stream" :label="t('aiSettings.stream')" class="self-end" /></div>
+          <p v-else class="text-sm text-gray-600 dark:text-slate-200">{{ t('aiSettings.modalityParametersPending') }}</p>
+        </UCard>
+      </main>
+
+      <aside class="space-y-6">
+        <UCard><template #header><h2 class="font-semibold">{{ t('aiSettings.connectionTest') }}</h2></template><p class="mb-4 text-sm text-gray-600 dark:text-slate-200">{{ t('aiSettings.testTarget', { modality: currentTitle, provider: draft.provider || t('aiSettings.notSelected'), model: selectedModel?.label || t('aiSettings.notSelected') }) }}</p><div class="flex gap-2"><UButton size="sm" icon="i-heroicons-wifi" :loading="testing === 'connection'" @click="testConnection">{{ t('aiSettings.testConnection') }}</UButton><UButton size="sm" variant="soft" icon="i-heroicons-command-line" :loading="testing === 'quick'" @click="quickCall">{{ t('aiSettings.quickCall') }}</UButton></div><div class="mt-4 min-h-20 rounded-md border border-gray-200 p-3 text-sm text-gray-600 dark:border-slate-700 dark:text-slate-200">{{ testResult || t('aiSettings.noTestResult') }}</div></UCard>
+        <UCard><template #header><h2 class="font-semibold">{{ t('aiSettings.profileStatus') }}</h2></template><dl class="space-y-3 text-sm"><div><dt class="text-gray-500">{{ t('aiSettings.modelCount') }}</dt><dd>{{ profiles.length }}</dd></div><div><dt class="text-gray-500">{{ t('aiSettings.activeProfile') }}</dt><dd>{{ selectedModel?.label || t('aiSettings.notSelected') }}</dd></div><div><dt class="text-gray-500">{{ t('aiSettings.connectionStatus') }}</dt><dd>{{ t('aiSettings.states.not_verified') }}</dd></div></dl></UCard>
+      </aside>
+    </div>
+  </UContainer>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useApiClient } from '~/composables/api/_client';
+import { defaultProviderMode, normalizeProviderMode } from '~/composables/api/useProviderMode';
+
+type Modality = 'llm' | 'image' | 'embedding' | 'audio_tts' | 'audio_asr' | 'video' | 'model3d' | 'rerank';
+type ModelProfile = { name?: string; model_key?: string; model?: string; provider?: string; endpoint?: string; modalities?: string[] };
+type CatalogAuth = { scheme?: string; fields?: string[]; defaults?: Record<string, string> };
+type CatalogProvider = { id: string; name: string; apps?: { id: string; name: string }[]; auth?: CatalogAuth };
+type CatalogModel = { id: string; label: string };
+const { t } = useI18n();
+const toast = useToast();
+const { client } = useApiClient();
+const saving = ref(false);
+const testing = ref<'connection' | 'quick' | ''>('');
+const testResult = ref('');
+const profiles = ref<ModelProfile[]>([]);
+const catalogProviders = ref<CatalogProvider[]>([]);
+const catalogModels = ref<CatalogModel[]>([]);
+const catalogError = ref('');
+const providerMode = ref(defaultProviderMode());
+const environment = ref('development');
+const catalogSource = ref<'local' | 'powerx'>('local');
+const modality = ref<Modality>('llm');
+const draft = reactive({ provider: '', app: '', modelKey: '', endpoint: '', credentialRef: '', temperature: 0.7, maxTokens: 4096, topP: 1, stream: true });
+const environmentOptions = computed(() => [{ label: t('aiSettings.environments.development'), value: 'development' }, { label: t('aiSettings.environments.production'), value: 'production' }]);
+const catalogSourceOptions = computed(() => [{ label: t('aiSettings.catalogSources.local'), value: 'local' }, { label: t('aiSettings.catalogSources.powerx'), value: 'powerx' }]);
+const modalities = computed(() => [{ value: 'llm' as const, label: t('aiSettings.modalities.llm'), icon: 'i-heroicons-bars-3-bottom-left' }, { value: 'image' as const, label: t('aiSettings.modalities.image'), icon: 'i-heroicons-photo' }, { value: 'embedding' as const, label: t('aiSettings.modalities.embedding'), icon: 'i-heroicons-square-3-stack-3d' }, { value: 'audio_tts' as const, label: t('aiSettings.modalities.audioTTS'), icon: 'i-heroicons-speaker-wave' }, { value: 'audio_asr' as const, label: t('aiSettings.modalities.audioASR'), icon: 'i-heroicons-microphone' }, { value: 'video' as const, label: t('aiSettings.modalities.video'), icon: 'i-heroicons-video-camera' }, { value: 'model3d' as const, label: t('aiSettings.modalities.model3d'), icon: 'i-heroicons-cube' }, { value: 'rerank' as const, label: t('aiSettings.modalities.rerank'), icon: 'i-heroicons-arrows-up-down' }]);
+const currentTitle = computed(() => modalities.value.find((item) => item.value === modality.value)?.label || '');
+const modeLabel = computed(() => providerMode.value.mode === 'delegated' ? t('providerMode.delegated') : t('providerMode.local'));
+const providerOptions = computed(() => {
+  const options = catalogProviders.value.map((item) => ({ label: item.name, value: item.id }));
+  if (draft.provider && !options.some((item) => item.value === draft.provider)) options.unshift({ label: draft.provider, value: draft.provider });
+  return options;
+});
+const selectedProvider = computed(() => catalogProviders.value.find((item) => item.id === draft.provider));
+const appOptions = computed(() => (selectedProvider.value?.apps || []).map((item) => ({ label: item.name, value: item.id })));
+// PowerX renders model IDs in this selector (for example qwen3:8b), not the
+// catalog's human-oriented description. The ID is also the persisted value.
+const modelOptions = computed(() => {
+  const options = catalogModels.value.map((item) => ({ label: item.id, value: item.id }));
+  if (draft.modelKey && !options.some((item) => item.value === draft.modelKey)) options.unshift({ label: draft.modelKey, value: draft.modelKey });
+  return options;
+});
+// USelect caches its option collection while it is open. Recreate it when the
+// catalog scope changes so a local profile value never narrows the Core list.
+const modelSelectorKey = computed(() => `${modality.value}:${draft.provider}:${draft.app}:${catalogModels.value.length}`);
+const selectedModel = computed(() => {
+  const catalogModel = catalogModels.value.find((item) => item.id === draft.modelKey);
+  if (catalogModel) return catalogModel;
+  const runtimeModel = profiles.value.find((item) => (item.model_key || item.name) === draft.modelKey);
+  if (runtimeModel) return { id: draft.modelKey, label: runtimeModel.model || runtimeModel.name || draft.modelKey };
+  return draft.modelKey ? { id: draft.modelKey, label: draft.modelKey } : undefined;
+});
+const requiresCredentialReference = computed(() => Boolean(selectedProvider.value?.auth?.fields?.some((field) => field !== 'base_url')));
+function reset() { const selected = profiles.value[0]; draft.provider = selected?.provider || ''; draft.app = ''; draft.modelKey = selected?.model_key || selected?.name || ''; draft.endpoint = selected?.endpoint || ''; draft.credentialRef = ''; draft.temperature = 0.7; draft.maxTokens = 4096; draft.topP = 1; draft.stream = true; testResult.value = ''; }
+function requestBody() { return { source: catalogSource.value, environment: environment.value, modality: modality.value, provider: draft.provider, app: draft.app, model_key: draft.modelKey, endpoint: draft.endpoint, credential_ref: draft.credentialRef, parameters: modality.value === 'llm' ? { temperature: draft.temperature, max_tokens: draft.maxTokens, top_p: draft.topP, stream: draft.stream } : {} }; }
+async function saveSettings() { saving.value = true; try { await client('admin/ai-settings/local-setting', { method: 'PUT', body: requestBody() }); toast.add({ title: t('common.success'), description: t('aiSettings.saveSucceeded'), color: 'success' }); } catch { toast.add({ title: t('common.error'), description: t('aiSettings.saveFailed'), color: 'error' }); } finally { saving.value = false; } }
+async function testConnection() { testing.value = 'connection'; testResult.value = ''; try { await client('admin/ai-settings/test-connection', { method: 'POST', body: requestBody() }); testResult.value = t('aiSettings.connectionSucceeded'); } catch { testResult.value = t('aiSettings.connectionFailed'); } finally { testing.value = ''; } }
+async function quickCall() { testing.value = 'quick'; testResult.value = ''; try { const out: any = await client('admin/ai-settings/quick-call', { method: 'POST', body: requestBody() }); testResult.value = String(out?.data?.text || out?.text || t('aiSettings.quickCallEmpty')); } catch { testResult.value = t('aiSettings.quickCallFailed'); } finally { testing.value = ''; } }
+async function loadSavedSetting() { try { const out: any = await client('admin/ai-settings/local-setting', { method: 'GET', query: { environment: environment.value, modality: modality.value, source: catalogSource.value }, silentAuthError: true }); const item = out?.data ?? out; if (!item?.model_key) { draft.provider = ''; draft.app = ''; draft.modelKey = ''; draft.endpoint = ''; draft.credentialRef = ''; draft.temperature = 0.7; draft.maxTokens = 4096; draft.topP = 1; draft.stream = true; return; } draft.provider = item.provider || ''; draft.app = item.app || ''; draft.modelKey = item.model_key; draft.endpoint = item.endpoint || ''; draft.credentialRef = item.credential_ref || ''; const params = item.parameters || {}; if (modality.value === 'llm') { draft.temperature = Number(params.temperature ?? 0.7); draft.maxTokens = Number(params.max_tokens ?? 4096); draft.topP = Number(params.top_p ?? 1); draft.stream = params.stream !== false; } } catch { /* profile is optional until first save */ } }
+async function loadCatalog() {
+  try {
+    const out: any = await client('admin/ai-settings/catalog/providers', { method: 'GET', query: { modality: modality.value, source: catalogSource.value }, silentAuthError: true });
+    const data = out?.data ?? out ?? {};
+    catalogProviders.value = Array.isArray(data.items) ? data.items : [];
+    if (catalogProviders.value.length && !catalogProviders.value.some((item) => item.id === draft.provider)) draft.provider = catalogProviders.value[0]?.id || draft.provider;
+    return true;
+  } catch {
+    catalogProviders.value = [];
+    catalogModels.value = [];
+    catalogError.value = t('aiSettings.catalogUnavailableDescription');
+    return false;
+  }
+}
+async function loadCatalogModels() {
+  if (!draft.provider) { catalogModels.value = []; return; }
+  try {
+    const out: any = await client('admin/ai-settings/catalog/models', { method: 'GET', query: { modality: modality.value, provider: draft.provider, app: draft.app, source: catalogSource.value }, silentAuthError: true });
+    const data = out?.data ?? out ?? {};
+    catalogModels.value = Array.isArray(data.items) ? data.items : [];
+    if (catalogModels.value.length && !catalogModels.value.some((item) => item.id === draft.modelKey)) draft.modelKey = catalogModels.value[0]?.id || draft.modelKey;
+    if (!draft.endpoint) draft.endpoint = selectedProvider.value?.auth?.defaults?.base_url || '';
+  } catch {
+    catalogModels.value = [];
+    catalogError.value = t('aiSettings.catalogUnavailableDescription');
+  }
+}
+async function refreshCatalog() { catalogError.value = ''; if (await loadCatalog()) await loadCatalogModels(); }
+async function refreshProfile() { await loadSavedSetting(); await refreshCatalog(); }
+watch([modality], () => { void refreshProfile(); });
+watch(() => draft.provider, () => { draft.app = ''; const endpoint = selectedProvider.value?.auth?.defaults?.base_url; if (endpoint) draft.endpoint = endpoint; void loadCatalogModels(); });
+watch(() => draft.app, () => { void loadCatalogModels(); });
+watch([environment], () => { void loadSavedSetting(); });
+watch(catalogSource, () => { void refreshProfile(); });
+onMounted(async () => { try { const [mode, modelResponse] = await Promise.all([client<any>('admin/ai-settings/mode', { method: 'GET', silentAuthError: true }), client<any>('admin/ai-settings/model-profiles', { method: 'GET', silentAuthError: true })]); providerMode.value = normalizeProviderMode(mode?.data); const data = modelResponse?.data ?? modelResponse ?? {}; profiles.value = Array.isArray(data.items) ? data.items : []; reset(); await refreshProfile(); } catch { toast.add({ title: t('common.error'), description: t('aiSettings.loadFailed'), color: 'error' }); } });
+</script>

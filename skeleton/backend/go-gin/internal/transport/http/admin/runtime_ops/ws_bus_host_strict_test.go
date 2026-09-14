@@ -80,13 +80,53 @@ func TestWSBusTestFlowHostModeDoesNotPublishLocalEcho(t *testing.T) {
 	assertNoLocalWSEvent(t, localEvents)
 }
 
+func TestWSBusTestFlowForceHostIgnoresRuntimeProxyMode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("POWERX_PROXY", "0")
+
+	var hostGrantCount atomic.Int32
+	var hostPublishCount atomic.Int32
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/admin/runtime/ws-bus/grant":
+			hostGrantCount.Add(1)
+		case "/api/v1/admin/runtime/ws-bus/publish":
+			hostPublishCount.Add(1)
+		default:
+			t.Errorf("unexpected host path: %s", r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":{"ok":true}}`))
+	}))
+	defer host.Close()
+
+	deps := hostStrictWSBusDeps(host.URL, fwwsbus.NewMemoryHub())
+	// _topic.system.notification is PowerX-owned, not a plugin-local descriptor.
+	deps.RealtimeDescriptors = nil
+	router := gin.New()
+	router.POST("/test-flow", WSBusTestFlowHandler(deps))
+	resp := postRuntimeOpsJSON(t, router, "/test-flow", map[string]any{
+		"topic":      "_topic.system.notification",
+		"force_host": true,
+		"trace_id":   "trace-force-host",
+	}, map[string]string{"tenant_uuid": "tenant-001"})
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	if hostGrantCount.Load() != 1 || hostPublishCount.Load() != 1 {
+		t.Fatalf("host grant/publish counts = %d/%d", hostGrantCount.Load(), hostPublishCount.Load())
+	}
+}
+
 func TestNotificationTestHostModeDoesNotPublishLocalEcho(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	t.Setenv("POWERX_PROXY", "1")
+	t.Setenv("POWERX_PROXY", "0")
 
 	var hostNotifyCount atomic.Int32
 	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/notifications/test" {
+		if r.URL.Path != "/api/v1/admin/notifications/test" {
 			t.Errorf("unexpected host path: %s", r.URL.Path)
 			http.NotFound(w, r)
 			return
@@ -109,6 +149,7 @@ func TestNotificationTestHostModeDoesNotPublishLocalEcho(t *testing.T) {
 	resp := postRuntimeOpsJSON(t, router, "/notifications/test", map[string]any{
 		"tenant_uuid": "tenant-001",
 		"topic":       "_topic.system.notification",
+		"force_host":  true,
 		"title":       "PowerX host notification",
 		"message":     "host only",
 		"trace_id":    "trace-host-notify",
@@ -134,6 +175,47 @@ func TestNotificationTestHostModeDoesNotPublishLocalEcho(t *testing.T) {
 		t.Fatalf("host notification count=%d", hostNotifyCount.Load())
 	}
 	assertNoLocalWSEvent(t, localEvents)
+}
+
+func TestNotificationTestForceLocalIgnoresRuntimeProxyMode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("POWERX_PROXY", "1")
+
+	var hostNotifyCount atomic.Int32
+	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hostNotifyCount.Add(1)
+		http.Error(w, "host must not be called", http.StatusInternalServerError)
+	}))
+	defer host.Close()
+
+	hub := fwwsbus.NewMemoryHub()
+	localEvents := make(chan fwwsbus.Event, 1)
+	hub.Subscribe("_topic.system.notification", func(ev fwwsbus.Event) {
+		localEvents <- ev
+	})
+	deps := hostStrictWSBusDeps(host.URL, hub)
+	router := gin.New()
+	router.POST("/notifications/test", NotificationTestHandler(deps))
+	resp := postRuntimeOpsJSON(t, router, "/notifications/test", map[string]any{
+		"tenant_uuid": "tenant-001",
+		"topic":       "_topic.system.notification",
+		"force_local": true,
+		"trace_id":    "trace-force-local-notification",
+	}, nil)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	if hostNotifyCount.Load() != 0 {
+		t.Fatalf("force_local must not call host, calls=%d", hostNotifyCount.Load())
+	}
+	select {
+	case event := <-localEvents:
+		if event.Topic != "_topic.system.notification" {
+			t.Fatalf("local topic=%q", event.Topic)
+		}
+	default:
+		t.Fatal("force_local must publish through the local ws bus")
+	}
 }
 
 func hostStrictWSBusDeps(baseURL string, hub fwwsbus.LocalHub) *app.Deps {

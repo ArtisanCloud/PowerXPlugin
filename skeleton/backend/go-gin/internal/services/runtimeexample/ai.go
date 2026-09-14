@@ -1,0 +1,531 @@
+package runtimeexample
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/url"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	fw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	dto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/google/uuid"
+)
+
+// LocalAI follows Core's model-selection -> driver -> execution boundary.
+// The initial driver is Ollama chat/embed. Unsupported modalities fail explicitly;
+// there is no model auto-download, Core fallback, or simulated generation.
+type LocalAI struct {
+	models   map[string]config.LocalAIModel
+	http     *http.Client
+	mu       sync.Mutex
+	sessions map[string]*localAISession
+}
+type localAISession struct {
+	tenant, model string
+	inputs        []dto.ContentItem
+	busy          bool
+}
+
+var _ fw.GenerativeService = (*LocalAI)(nil)
+
+func aiError(status int, reason string) error {
+	return &hostapi.HTTPError{StatusCode: status, ReasonCode: "AI_" + reason}
+}
+
+func NewLocalAI(cfg *config.LocalAIConfig, transport http.RoundTripper) (*LocalAI, error) {
+	s := &LocalAI{models: map[string]config.LocalAIModel{}, sessions: map[string]*localAISession{}, http: &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	if cfg == nil {
+		return s, nil
+	}
+	for _, m := range cfg.Models {
+		var err error
+		m, err = normalizeLocalAIModel(m)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := s.models[m.Key]; ok {
+			return nil, aiError(400, "LOCAL_CONFIG_INVALID")
+		}
+		s.models[m.Key] = m
+	}
+	return s, nil
+}
+
+func normalizeLocalAIModel(m config.LocalAIModel) (config.LocalAIModel, error) {
+	u, err := url.Parse(m.Endpoint)
+	if m.Key == "" || strings.TrimSpace(m.Key) != m.Key || m.Model == "" || m.Provider != "ollama" || err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") || m.TimeoutSeconds < 0 || m.TimeoutSeconds > 600 || len(m.Modalities) == 0 {
+		return config.LocalAIModel{}, aiError(400, "LOCAL_CONFIG_INVALID")
+	}
+	for _, mod := range m.Modalities {
+		if mod != "llm" && mod != "vlm" && mod != "embedding" {
+			return config.LocalAIModel{}, aiError(400, "LOCAL_CONFIG_INVALID")
+		}
+	}
+	m.Modalities = append([]string(nil), m.Modalities...)
+	if m.TimeoutSeconds == 0 {
+		m.TimeoutSeconds = 120
+	}
+	m.Endpoint = strings.TrimRight(m.Endpoint, "/")
+	return m, nil
+}
+
+func (s *LocalAI) model(ctx context.Context, key, mod string) (config.LocalAIModel, error) {
+	if _, err := mediaTenant(ctx); err != nil {
+		return config.LocalAIModel{}, aiError(401, "UNAUTHORIZED")
+	}
+	m, ok := s.models[key]
+	if !ok {
+		return m, aiError(503, "MODEL_NOT_CONFIGURED")
+	}
+	for _, v := range m.Modalities {
+		if v == mod {
+			return m, nil
+		}
+	}
+	return m, aiError(422, "MODALITY_UNSUPPORTED")
+}
+
+func (s *LocalAI) ListLLMModels(ctx context.Context, env string) (*dto.ListLLMModelsOutput, error) {
+	if _, err := mediaTenant(ctx); err != nil {
+		return nil, aiError(401, "UNAUTHORIZED")
+	}
+	if env != "" && env != "local" {
+		return nil, aiError(400, "INVALID_ARGUMENT")
+	}
+	out := &dto.ListLLMModelsOutput{Environment: "local", Items: []dto.LLMModel{}}
+	for _, m := range s.models {
+		for _, mod := range m.Modalities {
+			if mod == "llm" {
+				out.Items = append(out.Items, dto.LLMModel{ModelKey: m.Key, Provider: m.Provider, Model: m.Model, Source: "local", Configured: true, ProfileConfigured: true})
+				break
+			}
+		}
+	}
+	sort.Slice(out.Items, func(i, j int) bool { return out.Items[i].ModelKey < out.Items[j].ModelKey })
+	return out, nil
+}
+
+func (s *LocalAI) post(ctx context.Context, m config.LocalAIModel, path string, body any) (*http.Response, error) {
+	raw, err := json.Marshal(body)
+	if err != nil || len(raw) > 2<<20 {
+		return nil, aiError(400, "INVALID_ARGUMENT")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.Endpoint+path, bytes.NewReader(raw))
+	if err != nil {
+		return nil, aiError(400, "LOCAL_CONFIG_INVALID")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	r, err := s.http.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, aiError(503, "UPSTREAM_DEPENDENCY")
+	}
+	if r.StatusCode != http.StatusOK {
+		r.Body.Close()
+		return nil, aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	return r, nil
+}
+
+// TestConnection performs a real Ollama health request for the declared model.
+// It deliberately does not treat a TCP connection as a successful model test.
+func (s *LocalAI) TestConnection(ctx context.Context, key string) error {
+	m, err := s.model(ctx, key, "llm")
+	if err != nil {
+		return err
+	}
+	return s.testConnection(ctx, m)
+}
+
+// TestConnectionWithProfile verifies the unsaved or saved local AI profile
+// shown on the settings page. A catalog entry is not a runtime declaration:
+// the profile supplies the endpoint and model to test.
+func (s *LocalAI) TestConnectionWithProfile(ctx context.Context, profile config.LocalAIModel) error {
+	_, err := s.quickCallWithProfile(ctx, profile, "ping")
+	return err
+}
+
+func (s *LocalAI) testConnection(ctx context.Context, m config.LocalAIModel) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(m.TimeoutSeconds)*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.Endpoint+"/api/tags", nil)
+	if err != nil {
+		return aiError(400, "LOCAL_CONFIG_INVALID")
+	}
+	r, err := s.http.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return aiError(503, "UPSTREAM_DEPENDENCY")
+	}
+	defer r.Body.Close()
+	if r.StatusCode != http.StatusOK {
+		return aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	return nil
+}
+
+// QuickCall verifies the complete chat path using the selected model.
+func (s *LocalAI) QuickCall(ctx context.Context, key string) (string, error) {
+	out, err := s.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: key, Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: "Reply with OK."}}})
+	if err != nil {
+		return "", err
+	}
+	return out.Text, nil
+}
+
+// QuickCallWithProfile uses the settings profile directly, without requiring
+// the selected catalog model to be duplicated in static local_ai.models.
+func (s *LocalAI) QuickCallWithProfile(ctx context.Context, profile config.LocalAIModel) (string, error) {
+	return s.quickCallWithProfile(ctx, profile, "Reply with OK.")
+}
+
+func (s *LocalAI) quickCallWithProfile(ctx context.Context, profile config.LocalAIModel, prompt string) (string, error) {
+	m, err := normalizeLocalAIModel(profile)
+	if err != nil {
+		return "", err
+	}
+	body, err := chatBody(m, dto.LLMInvokeInput{Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}}, false, false)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(m.TimeoutSeconds)*time.Second)
+	defer cancel()
+	r, err := s.post(ctx, m, "/api/chat", body)
+	if err != nil {
+		return "", err
+	}
+	defer r.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(r.Body, (4<<20)+1))
+	if err != nil || len(raw) > 4<<20 {
+		return "", aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	var out ollamaChat
+	if json.Unmarshal(raw, &out) != nil || !out.Done || out.Error != "" {
+		return "", aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	return out.Message.Content, nil
+}
+
+type ollamaMessage struct {
+	Role    string   `json:"role"`
+	Content string   `json:"content"`
+	Images  []string `json:"images,omitempty"`
+}
+type ollamaChat struct {
+	Message    ollamaMessage `json:"message"`
+	Done       bool          `json:"done"`
+	Reason     string        `json:"done_reason"`
+	Error      string        `json:"error"`
+	Prompt     int           `json:"prompt_eval_count"`
+	Completion int           `json:"eval_count"`
+}
+
+func chatBody(m config.LocalAIModel, in dto.LLMInvokeInput, stream, vision bool) (map[string]any, error) {
+	if len(in.Inputs) == 0 || len(in.Inputs) > 128 {
+		return nil, aiError(400, "INVALID_ARGUMENT")
+	}
+	messages := []ollamaMessage{}
+	for _, v := range in.Inputs {
+		role := v.Role
+		if role == "" {
+			role = "user"
+		}
+		if role != "user" && role != "assistant" && role != "system" {
+			return nil, aiError(400, "INVALID_ARGUMENT")
+		}
+		msg := ollamaMessage{Role: role, Content: v.Content}
+		switch v.Type {
+		case "", "text":
+			if v.URL != "" || len(v.Content) > 65536 {
+				return nil, aiError(400, "INVALID_ARGUMENT")
+			}
+		case "image":
+			if !vision || role != "user" || v.Content != "" {
+				return nil, aiError(400, "INVALID_ARGUMENT")
+			}
+			// Inline images only: never fetch a user-selected URL from the server.
+			header, data, ok := strings.Cut(v.URL, ",")
+			if !ok || !strings.HasPrefix(header, "data:image/") || !strings.HasSuffix(header, ";base64") {
+				return nil, aiError(400, "INVALID_ARGUMENT")
+			}
+			decoded, e := base64.StdEncoding.DecodeString(data)
+			if e != nil || len(decoded) == 0 || len(decoded) > 1<<20 {
+				return nil, aiError(400, "INVALID_ARGUMENT")
+			}
+			msg.Images = []string{data}
+		default:
+			return nil, aiError(400, "INVALID_ARGUMENT")
+		}
+		messages = append(messages, msg)
+	}
+	opts := map[string]any{}
+	for k, v := range in.Params {
+		switch k {
+		case "temperature", "top_p", "num_predict", "seed":
+			opts[k] = v
+		default:
+			return nil, aiError(400, "INVALID_ARGUMENT")
+		}
+	}
+	return map[string]any{"model": m.Model, "messages": messages, "stream": stream, "options": opts}, nil
+}
+
+func (s *LocalAI) chat(ctx context.Context, in dto.LLMInvokeInput, vision bool) (*dto.LLMInvokeOutput, error) {
+	mod := "llm"
+	if vision {
+		mod = "vlm"
+	}
+	m, err := s.model(ctx, in.ModelKey, mod)
+	if err != nil {
+		return nil, err
+	}
+	body, err := chatBody(m, in, false, vision)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(m.TimeoutSeconds)*time.Second)
+	defer cancel()
+	r, err := s.post(ctx, m, "/api/chat", body)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(r.Body, (4<<20)+1))
+	if err != nil || len(raw) > 4<<20 {
+		return nil, aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	var out ollamaChat
+	if json.Unmarshal(raw, &out) != nil || !out.Done || out.Error != "" {
+		return nil, aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	return &dto.LLMInvokeOutput{Type: "text", Text: out.Message.Content, FinishReason: out.Reason, Usage: map[string]any{"prompt_tokens": out.Prompt, "completion_tokens": out.Completion, "total_tokens": out.Prompt + out.Completion}}, nil
+}
+func (s *LocalAI) LLMInvoke(ctx context.Context, in dto.LLMInvokeInput) (*dto.LLMInvokeOutput, error) {
+	return s.chat(ctx, in, false)
+}
+func (s *LocalAI) VLMInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
+	out, e := s.chat(ctx, dto.LLMInvokeInput{ModelKey: in.ModelKey, Inputs: in.Inputs, Params: in.Params}, true)
+	if e != nil {
+		return nil, e
+	}
+	raw, e := json.Marshal(out)
+	return &dto.ModalInvokeOutput{Data: raw}, e
+}
+
+func (s *LocalAI) LLMStream(ctx context.Context, in dto.LLMStreamInput, emit func(dto.LLMStreamEvent) error) error {
+	if emit == nil {
+		return aiError(400, "INVALID_ARGUMENT")
+	}
+	m, err := s.model(ctx, in.ModelKey, "llm")
+	if err != nil {
+		return err
+	}
+	body, err := chatBody(m, in.LLMInvokeInput, true, false)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(m.TimeoutSeconds)*time.Second)
+	defer cancel()
+	r, err := s.post(ctx, m, "/api/chat", body)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	scanner := bufio.NewScanner(io.LimitReader(r.Body, (4<<20)+1))
+	scanner.Buffer(make([]byte, 4096), 1<<20)
+	trace := uuid.NewString()
+	var text strings.Builder
+	for scanner.Scan() {
+		var out ollamaChat
+		if json.Unmarshal(scanner.Bytes(), &out) != nil || out.Error != "" {
+			return aiError(502, "UPSTREAM_DEPENDENCY")
+		}
+		if out.Message.Content != "" {
+			text.WriteString(out.Message.Content)
+			if text.Len() > 1<<20 {
+				return aiError(502, "UPSTREAM_DEPENDENCY")
+			}
+			if err := emit(dto.LLMStreamEvent{Type: "delta", TraceID: trace, Delta: out.Message.Content}); err != nil {
+				return err
+			}
+		}
+		if out.Done {
+			return emit(dto.LLMStreamEvent{Type: "end", TraceID: trace, Text: text.String(), FinishReason: out.Reason})
+		}
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return aiError(502, "STREAM_INCOMPLETE")
+}
+
+func (s *LocalAI) EmbeddingInvoke(ctx context.Context, in dto.EmbeddingInvokeInput) (*dto.EmbeddingInvokeOutput, error) {
+	m, err := s.model(ctx, in.ModelKey, "embedding")
+	if err != nil {
+		return nil, err
+	}
+	if len(in.Inputs) == 0 || len(in.Inputs) > 128 || len(in.Params) > 0 {
+		return nil, aiError(400, "INVALID_ARGUMENT")
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(m.TimeoutSeconds)*time.Second)
+	defer cancel()
+	r, err := s.post(ctx, m, "/api/embed", map[string]any{"model": m.Model, "input": in.Inputs})
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(r.Body, (4<<20)+1))
+	if err != nil || len(raw) > 4<<20 {
+		return nil, aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	var out struct {
+		Vectors [][]float32 `json:"embeddings"`
+		Error   string      `json:"error"`
+	}
+	if json.Unmarshal(raw, &out) != nil || out.Error != "" || len(out.Vectors) != len(in.Inputs) {
+		return nil, aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	n := len(out.Vectors[0])
+	if n == 0 {
+		return nil, aiError(502, "UPSTREAM_DEPENDENCY")
+	}
+	for _, v := range out.Vectors {
+		if len(v) != n {
+			return nil, aiError(502, "UPSTREAM_DEPENDENCY")
+		}
+	}
+	return &dto.EmbeddingInvokeOutput{Vectors: out.Vectors}, nil
+}
+
+func (s *LocalAI) ImageInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
+	_, err := s.model(ctx, in.ModelKey, "image")
+	return nil, err
+}
+func (s *LocalAI) VideoInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
+	_, err := s.model(ctx, in.ModelKey, "video")
+	return nil, err
+}
+func (s *LocalAI) TTSInvoke(ctx context.Context, in dto.ModalInvokeInput) (*dto.ModalInvokeOutput, error) {
+	_, err := s.model(ctx, in.ModelKey, "tts")
+	return nil, err
+}
+
+func (s *LocalAI) CreateLLMSession(ctx context.Context, in dto.CreateLLMSessionInput) (*dto.LLMSession, error) {
+	if _, err := s.model(ctx, in.ModelKey, "llm"); err != nil {
+		return nil, err
+	}
+	if len(in.Title) > 256 {
+		return nil, aiError(400, "INVALID_ARGUMENT")
+	}
+	tenant, _ := mediaTenant(ctx)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.sessions) >= 64 {
+		return nil, aiError(409, "LOCAL_CAPACITY_EXCEEDED")
+	}
+	id := uuid.NewString()
+	s.sessions[id] = &localAISession{tenant: tenant, model: in.ModelKey}
+	return &dto.LLMSession{SessionID: id}, nil
+}
+func (s *LocalAI) AppendLLMSessionMessage(ctx context.Context, id string, in dto.AppendLLMSessionMessageInput) error {
+	tenant, err := mediaTenant(ctx)
+	if err != nil {
+		return aiError(401, "UNAUTHORIZED")
+	}
+	if in.Role != "user" || len(in.Content) == 0 {
+		return aiError(400, "INVALID_ARGUMENT")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v := s.sessions[id]
+	if v == nil || v.tenant != tenant {
+		return aiError(404, "SESSION_NOT_FOUND")
+	}
+	if v.busy {
+		return aiError(409, "SESSION_BUSY")
+	}
+	if len(v.inputs)+len(in.Content) > 128 {
+		return aiError(409, "LOCAL_CAPACITY_EXCEEDED")
+	}
+	items := append([]dto.ContentItem(nil), in.Content...)
+	if aiInputBytes(v.inputs)+aiInputBytes(items) > 256<<10 {
+		return aiError(409, "LOCAL_CAPACITY_EXCEEDED")
+	}
+	for i := range items {
+		if items[i].Role != "" && items[i].Role != "user" {
+			return aiError(400, "INVALID_ARGUMENT")
+		}
+		items[i].Role = "user"
+	}
+	if _, err := chatBody(s.models[v.model], dto.LLMInvokeInput{Inputs: items}, false, false); err != nil {
+		return err
+	}
+	v.inputs = append(v.inputs, items...)
+	return nil
+}
+func (s *LocalAI) LLMSessionStream(ctx context.Context, id string, emit func(dto.LLMStreamEvent) error) error {
+	tenant, err := mediaTenant(ctx)
+	if err != nil {
+		return aiError(401, "UNAUTHORIZED")
+	}
+	s.mu.Lock()
+	v := s.sessions[id]
+	if v == nil || v.tenant != tenant {
+		s.mu.Unlock()
+		return aiError(404, "SESSION_NOT_FOUND")
+	}
+	if v.busy {
+		s.mu.Unlock()
+		return aiError(409, "SESSION_BUSY")
+	}
+	if len(v.inputs) == 0 || len(v.inputs) >= 128 || v.inputs[len(v.inputs)-1].Role != "user" {
+		s.mu.Unlock()
+		return aiError(409, "SESSION_NOT_READY")
+	}
+	if emit == nil {
+		s.mu.Unlock()
+		return aiError(400, "INVALID_ARGUMENT")
+	}
+	v.busy = true
+	in := dto.LLMStreamInput{LLMInvokeInput: dto.LLMInvokeInput{ModelKey: v.model, Inputs: append([]dto.ContentItem(nil), v.inputs...)}}
+	s.mu.Unlock()
+	defer func() { s.mu.Lock(); v.busy = false; s.mu.Unlock() }()
+	var reply string
+	err = s.LLMStream(ctx, in, func(ev dto.LLMStreamEvent) error {
+		if ev.Type == "end" {
+			if len(ev.Text) > 65536 || aiInputBytes(in.Inputs)+len(ev.Text) > 256<<10 {
+				return aiError(409, "LOCAL_CAPACITY_EXCEEDED")
+			}
+			reply = ev.Text
+		}
+		return emit(ev)
+	})
+	if err == nil {
+		s.mu.Lock()
+		v.inputs = append(v.inputs, dto.ContentItem{Role: "assistant", Type: "text", Content: reply})
+		s.mu.Unlock()
+	}
+	return err
+}
+
+func aiInputBytes(items []dto.ContentItem) int {
+	n := 0
+	for _, v := range items {
+		n += len(v.Content) + len(v.URL)
+	}
+	return n
+}

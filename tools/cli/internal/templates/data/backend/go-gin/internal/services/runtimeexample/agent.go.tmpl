@@ -1,0 +1,578 @@
+package runtimeexample
+
+import (
+	"context"
+	"encoding/json"
+	"net/url"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+
+	fw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	dto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
+	aidto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"{{ .BackendModulePath }}/internal/config"
+	"github.com/google/uuid"
+)
+
+// LocalAgent owns bounded development sessions for one startup-bound plugin.
+// Like Core agent_session, invocations have explicit idempotency, terminal
+// states and cancellation. Disconnecting an event consumer does not cancel work.
+type LocalAgent struct {
+	plugin   string
+	ai       *LocalAI
+	agents   map[string]config.LocalAgent
+	mu       sync.Mutex
+	sessions map[string]*localAgentSession
+	frozen   map[string]bool
+}
+type localAgentSession struct {
+	tenant     string
+	value      dto.ServiceSession
+	messages   []dto.ServiceMessage
+	appendKeys map[string]string
+	runs       map[string]*localAgentRun
+	invokeKeys map[string]string
+}
+type localAgentRun struct {
+	value   dto.ServiceInvocation
+	cancel  context.CancelFunc
+	changed chan struct{}
+}
+
+var _ fw.SessionService = (*LocalAgent)(nil)
+var _ fw.LifecycleService = (*LocalAgent)(nil)
+
+func agentError(status int, code string) error {
+	return &hostapi.HTTPError{StatusCode: status, ReasonCode: "AGENT_SESSION_" + code}
+}
+func validAgentUUID(s string) bool {
+	v, e := uuid.Parse(s)
+	return e == nil && v != uuid.Nil && v.String() == s
+}
+func validAgentKey(s string) bool {
+	return s != "" && len(s) <= 128 && strings.TrimSpace(s) == s && !strings.ContainsAny(s, "\r\n")
+}
+func agentScope(ctx context.Context) (string, error) {
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	v, e := mediaTenant(ctx)
+	if e != nil {
+		return "", agentError(401, "UNAUTHORIZED")
+	}
+	return v, nil
+}
+func NewLocalAgent(plugin string, cfg *config.LocalAIConfig, ai *LocalAI) (*LocalAgent, error) {
+	if strings.TrimSpace(plugin) == "" || ai == nil {
+		return nil, agentError(400, "LOCAL_CONFIG_INVALID")
+	}
+	s := &LocalAgent{plugin: plugin, ai: ai, agents: map[string]config.LocalAgent{}, sessions: map[string]*localAgentSession{}, frozen: map[string]bool{}}
+	if cfg != nil {
+		for _, a := range cfg.Agents {
+			m, ok := ai.models[a.ModelKey]
+			llm := false
+			for _, v := range m.Modalities {
+				llm = llm || v == "llm"
+			}
+			if !validAgentUUID(a.UUID) || a.Name == "" || !ok || !llm {
+				return nil, agentError(400, "LOCAL_CONFIG_INVALID")
+			}
+			if _, ok := s.agents[a.UUID]; ok {
+				return nil, agentError(400, "LOCAL_CONFIG_INVALID")
+			}
+			s.agents[a.UUID] = a
+		}
+	}
+	return s, nil
+}
+
+// session must be called with mu held. Deleted sessions remain tombstones so
+// stale invocation and idempotency identifiers cannot refer to a new resource.
+func (s *LocalAgent) session(ctx context.Context, id string) (*localAgentSession, error) {
+	t, e := agentScope(ctx)
+	if e != nil {
+		return nil, e
+	}
+	if !validAgentUUID(id) {
+		return nil, agentError(400, "INVALID_ARGUMENT")
+	}
+	v := s.sessions[id]
+	if v == nil || v.tenant != t || v.value.Status == "deleted" {
+		return nil, agentError(404, "NOT_FOUND")
+	}
+	return v, nil
+}
+func (s *LocalAgent) CreateSession(ctx context.Context, in dto.CreateSessionInput) (*dto.ServiceSession, error) {
+	t, e := agentScope(ctx)
+	if e != nil {
+		return nil, e
+	}
+	if !validAgentUUID(in.AgentUUID) || strings.TrimSpace(in.Title) == "" || len(in.Title) > 256 || !utf8.ValidString(in.Title) {
+		return nil, agentError(400, "INVALID_ARGUMENT")
+	}
+	if _, ok := s.agents[in.AgentUUID]; !ok {
+		return nil, agentError(404, "AGENT_NOT_FOUND")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.frozen[t+in.AgentUUID] {
+		return nil, agentError(409, "AGENT_FROZEN")
+	}
+	if len(s.sessions) >= 64 {
+		return nil, agentError(409, "LOCAL_CAPACITY_EXCEEDED")
+	}
+	now := time.Now().UTC()
+	v := dto.ServiceSession{SessionUUID: uuid.NewString(), AgentUUID: in.AgentUUID, Title: in.Title, Status: "active", Revision: 1, CreatedAt: now, UpdatedAt: now}
+	s.sessions[v.SessionUUID] = &localAgentSession{tenant: t, value: v, messages: []dto.ServiceMessage{}, appendKeys: map[string]string{}, runs: map[string]*localAgentRun{}, invokeKeys: map[string]string{}}
+	return &v, nil
+}
+func agentPage(p dto.SessionPage) (int, int, error) {
+	if p.Page == 0 {
+		p.Page = 1
+	}
+	if p.PageSize == 0 {
+		p.PageSize = 20
+	}
+	if p.Page < 1 || p.Page > 1000000 || p.PageSize < 1 || p.PageSize > 100 {
+		return 0, 0, agentError(400, "INVALID_ARGUMENT")
+	}
+	return p.Page, p.PageSize, nil
+}
+func agentSlice(n, p, size int) (int, int) {
+	start := (p - 1) * size
+	if start > n {
+		start = n
+	}
+	end := start + size
+	if end > n {
+		end = n
+	}
+	return start, end
+}
+func (s *LocalAgent) ListSessions(ctx context.Context, p dto.SessionPage) (*dto.ServiceSessionList, error) {
+	t, e := agentScope(ctx)
+	if e != nil {
+		return nil, e
+	}
+	page, size, e := agentPage(p)
+	if e != nil {
+		return nil, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := []dto.ServiceSession{}
+	for _, v := range s.sessions {
+		if v.tenant == t && v.value.Status != "deleted" {
+			items = append(items, v.value)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].SessionUUID < items[j].SessionUUID })
+	n := len(items)
+	a, b := agentSlice(n, page, size)
+	return &dto.ServiceSessionList{Items: items[a:b], Total: int64(n), Page: page, PageSize: size}, nil
+}
+func (s *LocalAgent) GetSession(ctx context.Context, id string) (*dto.ServiceSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, e := s.session(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	out := v.value
+	return &out, nil
+}
+func activeRun(v *localAgentSession) bool {
+	for _, r := range v.runs {
+		if r.value.Status == "running" {
+			return true
+		}
+	}
+	return false
+}
+func (s *LocalAgent) mutate(ctx context.Context, id, title, status string) (*dto.ServiceSession, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, e := s.session(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	if activeRun(v) {
+		return nil, agentError(409, "CONFLICT")
+	}
+	if status != "" {
+		v.value.Status = status
+	} else {
+		if strings.TrimSpace(title) == "" || len(title) > 256 || !utf8.ValidString(title) {
+			return nil, agentError(400, "INVALID_ARGUMENT")
+		}
+		v.value.Title = title
+	}
+	v.value.Revision++
+	v.value.UpdatedAt = time.Now().UTC()
+	out := v.value
+	return &out, nil
+}
+func (s *LocalAgent) RenameSession(ctx context.Context, id, title string) (*dto.ServiceSession, error) {
+	return s.mutate(ctx, id, title, "")
+}
+func (s *LocalAgent) ArchiveSession(ctx context.Context, id string) (*dto.ServiceSession, error) {
+	return s.mutate(ctx, id, "", "archived")
+}
+func (s *LocalAgent) DeleteSession(ctx context.Context, id string) (*dto.ServiceSession, error) {
+	return s.mutate(ctx, id, "", "deleted")
+}
+func (s *LocalAgent) AppendSessionMessage(ctx context.Context, id, key string, in dto.AppendSessionMessageInput) (*dto.ServiceMessage, error) {
+	if !validAgentKey(key) || in.Role != "user" || strings.TrimSpace(in.Content) == "" || len(in.Content) > 65536 || !utf8.ValidString(in.Content) {
+		return nil, agentError(400, "INVALID_ARGUMENT")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, e := s.session(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	if old, ok := v.appendKeys[key]; ok {
+		for _, m := range v.messages {
+			if m.MessageUUID == old {
+				if m.Role != in.Role || m.Content != in.Content {
+					return nil, agentError(409, "CONFLICT")
+				}
+				return &m, nil
+			}
+		}
+	}
+	if v.value.Status != "active" || activeRun(v) || s.frozen[v.tenant+v.value.AgentUUID] {
+		return nil, agentError(409, "CONFLICT")
+	}
+	if len(v.messages) >= 128 || agentMessageBytes(v.messages)+len(in.Content) > 256<<10 {
+		return nil, agentError(409, "LOCAL_CAPACITY_EXCEEDED")
+	}
+	m := dto.ServiceMessage{MessageUUID: uuid.NewString(), SessionUUID: id, Role: in.Role, Content: in.Content, Sequence: int64(len(v.messages) + 1), CreatedAt: time.Now().UTC()}
+	v.messages = append(v.messages, m)
+	v.appendKeys[key] = m.MessageUUID
+	v.value.Revision++
+	v.value.UpdatedAt = m.CreatedAt
+	return &m, nil
+}
+func (s *LocalAgent) ListSessionMessages(ctx context.Context, id string, p dto.SessionPage) (*dto.ServiceMessageList, error) {
+	page, size, e := agentPage(p)
+	if e != nil {
+		return nil, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, e := s.session(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	n := len(v.messages)
+	a, b := agentSlice(n, page, size)
+	items := append([]dto.ServiceMessage{}, v.messages[a:b]...)
+	return &dto.ServiceMessageList{Items: items, Total: int64(n), Page: page, PageSize: size}, nil
+}
+func copyRun(v dto.ServiceInvocation) *dto.ServiceInvocation {
+	if v.FinishedAt != nil {
+		t := *v.FinishedAt
+		v.FinishedAt = &t
+	}
+	return &v
+}
+func agentMessageBytes(messages []dto.ServiceMessage) int {
+	n := 0
+	for _, m := range messages {
+		n += len(m.Content)
+	}
+	return n
+}
+func (s *LocalAgent) InvokeSession(ctx context.Context, id, msg, key string) (*dto.ServiceInvocation, error) {
+	if !validAgentUUID(msg) || !validAgentKey(key) {
+		return nil, agentError(400, "INVALID_ARGUMENT")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, e := s.session(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	if old, ok := v.invokeKeys[key]; ok {
+		r := v.runs[old]
+		if r.value.MessageUUID != msg {
+			return nil, agentError(409, "CONFLICT")
+		}
+		return copyRun(r.value), nil
+	}
+	if v.value.Status != "active" || activeRun(v) || s.frozen[v.tenant+v.value.AgentUUID] {
+		return nil, agentError(409, "CONFLICT")
+	}
+	if len(v.runs) >= 128 || len(v.messages) >= 128 {
+		return nil, agentError(409, "LOCAL_CAPACITY_EXCEEDED")
+	}
+	history := []aidto.ContentItem{}
+	found := false
+	for _, m := range v.messages {
+		history = append(history, aidto.ContentItem{Role: m.Role, Type: "text", Content: m.Content})
+		if m.MessageUUID == msg {
+			if m.Role != "user" {
+				return nil, agentError(400, "INVALID_ARGUMENT")
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, agentError(404, "MESSAGE_NOT_FOUND")
+	}
+	now := time.Now().UTC()
+	runctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
+	r := &localAgentRun{value: dto.ServiceInvocation{InvocationUUID: uuid.NewString(), SessionUUID: id, MessageUUID: msg, TraceUUID: uuid.NewString(), Status: "running", ReasonCode: "AGENT_SESSION_RUNNING", CreatedAt: now, DeadlineAt: now.Add(10 * time.Minute)}, cancel: cancel, changed: make(chan struct{})}
+	v.runs[r.value.InvocationUUID] = r
+	v.invokeKeys[key] = r.value.InvocationUUID
+	model := s.agents[v.value.AgentUUID].ModelKey
+	go func() {
+		defer cancel()
+		out, err := s.ai.LLMInvoke(runctx, aidto.LLMInvokeInput{ModelKey: model, Inputs: history})
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if r.value.Status != "running" {
+			return
+		}
+		done := time.Now().UTC()
+		r.value.FinishedAt = &done
+		if err != nil || out == nil || len(out.Text) > 65536 || agentMessageBytes(v.messages)+len(out.Text) > 256<<10 {
+			r.value.Status = "failed"
+			r.value.ReasonCode = "AGENT_SESSION_UPSTREAM_DEPENDENCY"
+		} else {
+			r.value.Status = "succeeded"
+			r.value.ReasonCode = "AGENT_SESSION_SUCCEEDED"
+			r.value.Output = out.Text
+			v.messages = append(v.messages, dto.ServiceMessage{MessageUUID: uuid.NewString(), SessionUUID: id, Role: "assistant", Content: out.Text, Sequence: int64(len(v.messages) + 1), CreatedAt: done})
+		}
+		v.value.Revision++
+		v.value.UpdatedAt = done
+		close(r.changed)
+	}()
+	return copyRun(r.value), nil
+}
+func (s *LocalAgent) run(ctx context.Context, id, rid string) (*localAgentRun, error) {
+	v, e := s.session(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	if !validAgentUUID(rid) {
+		return nil, agentError(400, "INVALID_ARGUMENT")
+	}
+	r := v.runs[rid]
+	if r == nil {
+		return nil, agentError(404, "INVOCATION_NOT_FOUND")
+	}
+	return r, nil
+}
+func (s *LocalAgent) GetSessionInvocation(ctx context.Context, id, rid string) (*dto.ServiceInvocation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, e := s.run(ctx, id, rid)
+	if e != nil {
+		return nil, e
+	}
+	return copyRun(r.value), nil
+}
+func (s *LocalAgent) CancelSessionInvocation(ctx context.Context, id, rid string) (*dto.ServiceInvocation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, e := s.run(ctx, id, rid)
+	if e != nil {
+		return nil, e
+	}
+	if r.value.Status == "running" {
+		now := time.Now().UTC()
+		r.value.Status = "cancelled"
+		r.value.ReasonCode = "AGENT_SESSION_CANCELLED"
+		r.value.FinishedAt = &now
+		r.cancel()
+		close(r.changed)
+	}
+	return copyRun(r.value), nil
+}
+func (s *LocalAgent) StreamSessionEvents(ctx context.Context, id, rid string, emit func(dto.SessionEvent) error) error {
+	if emit == nil {
+		return agentError(400, "INVALID_ARGUMENT")
+	}
+	s.mu.Lock()
+	r, e := s.run(ctx, id, rid)
+	if e != nil {
+		s.mu.Unlock()
+		return e
+	}
+	v := copyRun(r.value)
+	changed := r.changed
+	s.mu.Unlock()
+	if e = emit(dto.SessionEvent{Type: "state", Invocation: v, Status: v.Status}); e != nil {
+		return e
+	}
+	if v.Status == "running" {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-changed:
+		}
+		v, e = s.GetSessionInvocation(ctx, id, rid)
+		if e != nil {
+			return e
+		}
+	}
+	if v.Status == "succeeded" {
+		if e = emit(dto.SessionEvent{Type: "final", Invocation: v, Status: v.Status}); e != nil {
+			return e
+		}
+	} else {
+		if e = emit(dto.SessionEvent{Type: "error", ReasonCode: v.ReasonCode, Status: v.Status}); e != nil {
+			return e
+		}
+	}
+	if e = emit(dto.SessionEvent{Type: "end", Status: v.Status}); e != nil {
+		return e
+	}
+	if v.Status != "succeeded" {
+		return &hostapi.HTTPError{StatusCode: 503, ReasonCode: v.ReasonCode}
+	}
+	return nil
+}
+
+func (s *LocalAgent) Invoke(context.Context, dto.AgentInvokeRequest) (dto.AgentInvokeResponse, error) {
+	return dto.AgentInvokeResponse{}, agentError(400, "CONTRACT_REQUIRED")
+}
+func (s *LocalAgent) StreamSSE(context.Context, url.Values, func(dto.AgentStreamEvent) error) error {
+	return agentError(400, "CONTRACT_REQUIRED")
+}
+func (s *LocalAgent) agent(ctx context.Context, id string) (string, config.LocalAgent, error) {
+	t, e := agentScope(ctx)
+	if e != nil {
+		return "", config.LocalAgent{}, e
+	}
+	a, ok := s.agents[id]
+	if !ok {
+		return "", a, agentError(404, "AGENT_NOT_FOUND")
+	}
+	return t, a, nil
+}
+func (s *LocalAgent) GetHealthSummary(ctx context.Context, id string) (*dto.HealthSummary, error) {
+	t, _, e := s.agent(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := &dto.HealthSummary{Status: "unverified"}
+	var succeeded, failed int
+	for _, v := range s.sessions {
+		if v.tenant != t || v.value.AgentUUID != id {
+			continue
+		}
+		for _, r := range v.runs {
+			if r.value.Status == "succeeded" {
+				succeeded++
+			}
+			if r.value.Status == "failed" {
+				failed++
+			}
+			if r.value.FinishedAt != nil && r.value.FinishedAt.Format(time.RFC3339Nano) > out.UpdatedAt {
+				out.UpdatedAt = r.value.FinishedAt.Format(time.RFC3339Nano)
+			}
+		}
+	}
+	n := succeeded + failed
+	if n > 0 {
+		out.Status = "observed"
+		out.Metrics.SuccessRate = float64(succeeded) / float64(n)
+		out.Metrics.ErrorRate = float64(failed) / float64(n)
+		out.HealthScore = int32(100 * succeeded / n)
+	}
+	if s.frozen[t+id] {
+		out.Status = "frozen"
+	}
+	return out, nil
+}
+func (s *LocalAgent) ListHealthHistory(ctx context.Context, id string, hours, limit int) (*dto.HealthHistory, error) {
+	if hours < 0 || hours > 8760 || limit < 0 || limit > 1000 {
+		return nil, agentError(400, "INVALID_ARGUMENT")
+	}
+	t, _, e := s.agent(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	if hours == 0 {
+		hours = 24
+	}
+	if limit == 0 {
+		limit = 20
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cutoff := time.Now().Add(-time.Duration(hours) * time.Hour)
+	out := &dto.HealthHistory{Snapshots: []dto.HealthSummary{}}
+	for _, v := range s.sessions {
+		if v.tenant != t || v.value.AgentUUID != id {
+			continue
+		}
+		for _, r := range v.runs {
+			if r.value.FinishedAt == nil || r.value.FinishedAt.Before(cutoff) {
+				continue
+			}
+			h := dto.HealthSummary{Status: r.value.Status, UpdatedAt: r.value.FinishedAt.Format(time.RFC3339Nano)}
+			if r.value.Status == "succeeded" {
+				h.HealthScore = 100
+				h.Metrics.SuccessRate = 1
+			} else if r.value.Status == "failed" {
+				h.Metrics.ErrorRate = 1
+			}
+			h.Metrics.P95LatencyMs = int32(r.value.FinishedAt.Sub(r.value.CreatedAt).Milliseconds())
+			out.Snapshots = append(out.Snapshots, h)
+		}
+	}
+	sort.Slice(out.Snapshots, func(i, j int) bool { return out.Snapshots[i].UpdatedAt > out.Snapshots[j].UpdatedAt })
+	if len(out.Snapshots) > limit {
+		out.Snapshots = out.Snapshots[:limit]
+	}
+	return out, nil
+}
+func (s *LocalAgent) GetBridgeState(ctx context.Context, id string, limit int) (*json.RawMessage, error) {
+	t, a, e := s.agent(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw, e := json.Marshal(map[string]any{"agent_uuid": id, "plugin_id": s.plugin, "model_key": a.ModelKey, "frozen": s.frozen[t+id], "capacity_instances": 1})
+	out := json.RawMessage(raw)
+	return &out, e
+}
+func (s *LocalAgent) control(ctx context.Context, id string, freeze bool) (*dto.BridgeLifecycleResult, error) {
+	t, a, e := s.agent(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.frozen[t+id] = freeze
+	status := "active"
+	if freeze {
+		status = "frozen"
+	}
+	return &dto.BridgeLifecycleResult{Agent: dto.BridgeAgent{UUID: id, TenantUUID: t, Alias: a.Name, Status: status}}, nil
+}
+func (s *LocalAgent) Freeze(ctx context.Context, id string, _ dto.BridgeControlInput) (*dto.BridgeLifecycleResult, error) {
+	return s.control(ctx, id, true)
+}
+func (s *LocalAgent) Recover(ctx context.Context, id string, _ dto.BridgeControlInput) (*dto.BridgeLifecycleResult, error) {
+	return s.control(ctx, id, false)
+}
+func (s *LocalAgent) Rebalance(ctx context.Context, id string, in dto.BridgeRebalanceInput) (*dto.BridgeLifecycleResult, error) {
+	if _, _, e := s.agent(ctx, id); e != nil {
+		return nil, e
+	}
+	return nil, agentError(422, "REBALANCE_UNSUPPORTED")
+}

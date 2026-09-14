@@ -97,6 +97,8 @@ delegated 启动失败时检查 required capability 发布、租户 registration
 
 ## T079 Agent 实际消费链路迁移
 
+以下为该批次历史结果；前端 unit 与浏览器合同验证已在 T080 收口，安装态验证仍独立后置。
+
 - `/plugin/agent/sessions` 的 12 项 HTTP 操作全部通过 `Deps.AgentLifecycle.Sessions()`，不再调用 CapabilityGateway。旧人工 Session Gateway 方法、numeric/tenant 输入 DTO 和旧 SSE 路由删除；相应过时测试由新合同测试替换。
 - 页面 `agent-skill-bridge` 通过 `useAgentSessionsApi` 消费标准插件 success/data/error 信封；创建仅 agent_uuid/title，消息和执行使用独立幂等键，查询分页使用 page/page_size。不再把 user/tenant、agent_id 或 regen_from_message_id 发给 Core。
 - Invoke/订阅分离；同一待确认请求的显式重试保留键和已经取得的消息/执行 UUID。不把 EOF 当成功，不在断连后调用 cancel；停止按钮显式请求 cancel。Core 未发布的历史消息改写不提供兼容功能。
@@ -105,3 +107,12 @@ delegated 启动失败时检查 required capability 发布、租户 registration
 - 验证结果：Framework/Skeleton/CLI 全量 Go 回归通过（114 个有测试包）；Agent handler、Gateway、skills 定向 race 通过；Session 前端单元测试 5 项通过，Nuxt build 通过，Manifest/模板同步检查通过。Playwright 新合同用例 4 项仅做发现检查，未运行浏览器联调。
 - 前端整套 unit 执行结果为 15 通过、8 失败；失败全部来自既有 `useAuth.fallback.spec.ts` 无法解析 `tenant-context.ts` 的 `#app` 导入。单独执行该文件可重现；本轮未修改认证逻辑或该测试配置，不能宣称前端全量 unit 通过。
 - T077 验证：Framework/Skeleton/CLI 全量 Go 回归 114 个测试包通过，五个客户端整包 race 通过，新增 Skills 矩阵再次 race 通过；模板检查及本轮 diff 检查通过。
+
+## T080 前端认证与 Agent 浏览器合同验证（2026-09-08）
+
+- Vitest 为 `tenant-context.ts` 的 `#app/useCookie` 提供按名称隔离的 Ref mock，每项测试重置 cookie 与 storage 监听引用；不修改生产 Nuxt 导入路径。
+- `getToken()` 遇到过期 access token 时同步清除 `isAuthenticated` 状态，但保留 refresh credential；回归覆盖拒绝过期 access、保留 refresh、正常续期后恢复登录态。
+- Agent Playwright fixture 补齐入站用户上下文和 effective-permissions 的 user 对象，拦截未声明的 API 为明确 503，不访问真实 Core。增加未捕获页面异常断言，以及 failed/interrupted 不展示成功 output 的断言。
+- `cd skeleton/web-admin/nuxt && npm run test:unit`：5 个文件、23 项通过。
+- 在独立 43131 端口运行临时 Nuxt 开发服务后，执行 `PLAYWRIGHT_BASE_URL=http://127.0.0.1:43131 ./node_modules/.bin/playwright test tests/e2e/agent-skill-bridge.spec.ts tests/e2e/agent-run-state.spec.ts --workers=1 --reporter=line`：Chromium 4 项通过。覆盖 UUID 会话创建、append/invoke/events 成功、失败与断流；这是实际浏览器 + HTTP fixture，不是 Core/插件安装态联调，也不代表全部 E2E 通过。
+- `npm run sync:templates -- --check`、`go test ./tools/cli/internal/templates -count=1` 与 `git diff --check` 通过；认证修复已同步 scaffold 和 CLI 内嵌模板。临时 Nuxt 进程已关闭，未迁移、seed、发布或修改 Core 授权；测试运行器覆盖的历史报告已恢复，不作为本次成功证据。

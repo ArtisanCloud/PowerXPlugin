@@ -37,7 +37,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 
 	templates := NewMiniAppTemplateHandler(deps)
 	protected.GET("/templates", templates.ListPublished)
-	protected.GET("/templates/:id", templates.GetPublished)
+	protected.GET("/templates/:uuid", templates.GetPublished)
 }
 
 func ping(c *gin.Context) {

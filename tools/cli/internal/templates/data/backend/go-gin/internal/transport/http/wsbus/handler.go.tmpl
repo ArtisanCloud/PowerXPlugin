@@ -1,8 +1,6 @@
 package wsbus
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"path"
 	"strings"
@@ -103,7 +101,6 @@ func Handler(deps *app.Deps, jwtCfg middleware.JWTAuthConfig) gin.HandlerFunc {
 }
 
 func resolveIdentity(c *gin.Context, jwtCfg middleware.JWTAuthConfig) (tenantUUID string, memberUUID string, ok bool) {
-	tenant := strings.TrimSpace(c.Query("tenant_uuid"))
 	authz := strings.TrimSpace(c.Query("authorization"))
 	if authz == "" {
 		authz = strings.TrimSpace(c.GetHeader("Authorization"))
@@ -116,11 +113,7 @@ func resolveIdentity(c *gin.Context, jwtCfg middleware.JWTAuthConfig) (tenantUUI
 	}
 	tc, _, ok := middleware.ParseFromHeaders(header, jwtCfg)
 	if ok && strings.TrimSpace(tc.TenantUUID) != "" {
-		memberUUID = memberUUIDFromBearer(authz)
-		return strings.TrimSpace(tc.TenantUUID), memberUUID, true
-	}
-	if tenant != "" {
-		return tenant, "", true
+		return strings.TrimSpace(tc.TenantUUID), strings.TrimSpace(tc.MemberUUID), true
 	}
 	return "", "", false
 }
@@ -150,60 +143,6 @@ func (w *wsConn) subscribe(subscriber wsSubscriber, topics []string, descriptors
 		})
 		w.subs[clean] = unsub
 	}
-}
-
-func memberUUIDFromBearer(authz string) string {
-	raw := strings.TrimSpace(authz)
-	if strings.HasPrefix(strings.ToLower(raw), "bearer ") {
-		raw = strings.TrimSpace(raw[7:])
-	}
-	parts := strings.Split(raw, ".")
-	if len(parts) < 2 {
-		return ""
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return ""
-	}
-	var claims map[string]any
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return ""
-	}
-	for _, key := range []string{"mid", "member_uuid", "sub"} {
-		value := strings.TrimSpace(stringClaim(claims[key]))
-		if isUUIDLike(value) {
-			return value
-		}
-	}
-	return ""
-}
-
-func stringClaim(value any) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	default:
-		return ""
-	}
-}
-
-func isUUIDLike(value string) bool {
-	if len(value) != 36 {
-		return false
-	}
-	for i, ch := range value {
-		switch i {
-		case 8, 13, 18, 23:
-			if ch != '-' {
-				return false
-			}
-		default:
-			if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func (w *wsConn) unsubscribe(topics []string) {

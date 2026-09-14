@@ -93,4 +93,6 @@ const (
 	TableIAMRefreshTokens                = "iam_refresh_tokens"
 	TableIAMAuditLogs                    = "iam_audit_logs"
 	TableIAMChannelSyncTasks             = "iam_channel_sync_tasks"
+	TableLocalAISettings                 = "local_ai_settings"
+	TablePluginSystemConfigs             = "plugin_system_configs"
 )

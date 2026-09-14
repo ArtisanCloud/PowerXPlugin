@@ -1,0 +1,52 @@
+package ai_settings
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	"gorm.io/gorm"
+)
+
+type LocalSettingsRepository struct{ db *gorm.DB }
+
+func NewLocalSettingsRepository(db *gorm.DB) (*LocalSettingsRepository, error) {
+	if db == nil {
+		return nil, errors.New("local AI settings repository database is required")
+	}
+	return &LocalSettingsRepository{db: db}, nil
+}
+
+func (r *LocalSettingsRepository) Get(ctx context.Context, tenantUUID, environment, modality, source string) (*models.LocalAISetting, error) {
+	var item models.LocalAISetting
+	err := r.db.WithContext(ctx).Where("tenant_uuid = ? AND environment = ? AND modality = ? AND source = ?", tenantUUID, environment, modality, source).First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *LocalSettingsRepository) Upsert(ctx context.Context, item *models.LocalAISetting) (*models.LocalAISetting, error) {
+	if item == nil || strings.TrimSpace(item.TenantUUID) == "" {
+		return nil, errors.New("tenant UUID is required")
+	}
+	return item, r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing models.LocalAISetting
+		err := tx.Where("tenant_uuid = ? AND environment = ? AND modality = ? AND source = ?", item.TenantUUID, item.Environment, item.Modality, item.Source).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return tx.Create(item).Error
+		}
+		if err != nil {
+			return err
+		}
+		item.UUID = existing.UUID
+		return tx.Model(&existing).Updates(map[string]any{
+			"provider": item.Provider, "app": item.App, "model_key": item.ModelKey,
+			"endpoint": item.Endpoint, "credential_ref": item.CredentialRef, "parameters": item.Parameters,
+		}).Error
+	})
+}

@@ -7,7 +7,7 @@
       "type": "string",
       "enum": ["create", "get", "update", "delete", "list"]
     },
-    "template_id": {
+    "template_uuid": {
       "type": "string"
     },
     "template_ref": {

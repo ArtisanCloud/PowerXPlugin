@@ -276,9 +276,9 @@ func TestSchedulerJobHandlerLocalProxyUsesConfiguredAPIKey(t *testing.T) {
 	}
 }
 
-func TestSchedulerJobHandlerLocalProxyTriggersPowerXHost(t *testing.T) {
+func TestSchedulerJobHandlerForceHostTriggersPowerXHost(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	t.Setenv("POWERX_PROXY", "1")
+	t.Setenv("POWERX_PROXY", "0")
 
 	var gotPath string
 	var gotMethod string

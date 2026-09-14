@@ -3,6 +3,7 @@ package templates
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 	"time"
 
@@ -35,14 +36,14 @@ type BatchCloneOptions struct {
 
 // BatchCloneFailure 表示单个源模板的克隆失败记录。
 type BatchCloneFailure struct {
-	SourceID uint64 `json:"source_id"`
-	Reason   string `json:"reason"`
+	SourceUUID string `json:"source_uuid"`
+	Reason     string `json:"reason"`
 }
 
 // BatchCloneResult 汇总批量克隆的成功与失败 ID。
 type BatchCloneResult struct {
-	CreatedIDs []uint64            `json:"created_ids"`
-	Failed     []BatchCloneFailure `json:"failed"`
+	CreatedUUIDs []string            `json:"created_uuids"`
+	Failed       []BatchCloneFailure `json:"failed"`
 }
 
 // ValidationViolation represents a single lint failure.
@@ -55,9 +56,9 @@ type ValidationViolation struct {
 
 // ValidationResult aggregates violations for a template.
 type ValidationResult struct {
-	TemplateID uint64                `json:"template_id"`
-	Valid      bool                  `json:"valid"`
-	Violations []ValidationViolation `json:"violations"`
+	TemplateUUID string                `json:"template_uuid"`
+	Valid        bool                  `json:"valid"`
+	Violations   []ValidationViolation `json:"violations"`
 }
 
 func NewTemplateService(db *gorm.DB) *TemplateService {
@@ -84,11 +85,11 @@ func (s *TemplateService) List(
 	return s.TemplateRepo.FindPage(ctx, nil, page, pageSize, cb, q)
 }
 
-func (s *TemplateService) GetByID(ctx context.Context, id uint64) (*dbm.Template, error) {
-	if id == 0 {
+func (s *TemplateService) GetByUUID(ctx context.Context, id string) (*dbm.Template, error) {
+	if id == "" {
 		return nil, gorm.ErrInvalidData
 	}
-	tpl, err := s.TemplateRepo.FindByID(ctx, id)
+	tpl, err := s.TemplateRepo.FindByUUID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -115,10 +116,10 @@ func (s *TemplateService) Create(
 
 func (s *TemplateService) Update(
 	ctx context.Context,
-	id uint64,
+	id string,
 	name, description, content string,
 ) (*dbm.Template, error) {
-	if id == 0 {
+	if id == "" {
 		return nil, gorm.ErrInvalidData
 	}
 	fields := map[string]interface{}{
@@ -126,23 +127,31 @@ func (s *TemplateService) Update(
 		"description": description,
 		"content":     content,
 	}
-	return s.TemplateRepo.UpdateByID(ctx, id, fields)
+	return s.TemplateRepo.UpdateByUUID(ctx, id, fields)
 }
 
-func (s *TemplateService) Delete(ctx context.Context, id uint64) error {
-	if id == 0 {
+func (s *TemplateService) Delete(ctx context.Context, id string) error {
+	if id == "" {
 		return gorm.ErrInvalidData
 	}
-	return s.TemplateRepo.DeleteByID(ctx, id)
+	return s.TemplateRepo.DeleteByUUID(ctx, id)
 }
 
 // BatchClone 执行批量克隆，最多复制 50 份，允许部分失败。
-func (s *TemplateService) BatchClone(ctx context.Context, sourceIDs []uint64, copies int, opts BatchCloneOptions) (*BatchCloneResult, error) {
+func (s *TemplateService) BatchClone(ctx context.Context, sourceUUIDs []string, copies int, opts BatchCloneOptions) (*BatchCloneResult, error) {
 	if s == nil || s.TemplateRepo == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if len(sourceIDs) == 0 {
+	if len(sourceUUIDs) == 0 || len(sourceUUIDs) > 100 {
 		return nil, gorm.ErrInvalidData
+	}
+	seen := map[string]bool{}
+	for _, id := range sourceUUIDs {
+		u, err := uuid.Parse(id)
+		if err != nil || u == uuid.Nil || u.String() != id || seen[id] {
+			return nil, gorm.ErrInvalidData
+		}
+		seen[id] = true
 	}
 	if copies <= 0 {
 		copies = 1
@@ -151,16 +160,16 @@ func (s *TemplateService) BatchClone(ctx context.Context, sourceIDs []uint64, co
 		copies = 50
 	}
 	result := &BatchCloneResult{
-		CreatedIDs: make([]uint64, 0, len(sourceIDs)*copies),
-		Failed:     make([]BatchCloneFailure, 0),
+		CreatedUUIDs: make([]string, 0, len(sourceUUIDs)*copies),
+		Failed:       make([]BatchCloneFailure, 0),
 	}
 	namePrefix := strings.TrimSpace(opts.NamePrefix)
 	descPrefix := strings.TrimSpace(opts.DescriptionPrefix)
 
-	for _, srcID := range sourceIDs {
-		tpl, err := s.GetByID(ctx, srcID)
+	for _, srcID := range sourceUUIDs {
+		tpl, err := s.GetByUUID(ctx, srcID)
 		if err != nil {
-			result.Failed = append(result.Failed, BatchCloneFailure{SourceID: srcID, Reason: err.Error()})
+			result.Failed = append(result.Failed, BatchCloneFailure{SourceUUID: srcID, Reason: err.Error()})
 			continue
 		}
 		for i := 0; i < copies; i++ {
@@ -174,10 +183,10 @@ func (s *TemplateService) BatchClone(ctx context.Context, sourceIDs []uint64, co
 			}
 			saved, err := s.TemplateRepo.Create(ctx, clone)
 			if err != nil {
-				result.Failed = append(result.Failed, BatchCloneFailure{SourceID: srcID, Reason: err.Error()})
+				result.Failed = append(result.Failed, BatchCloneFailure{SourceUUID: srcID, Reason: err.Error()})
 				continue
 			}
-			result.CreatedIDs = append(result.CreatedIDs, saved.ID)
+			result.CreatedUUIDs = append(result.CreatedUUIDs, saved.UUID)
 		}
 	}
 
@@ -187,11 +196,11 @@ func (s *TemplateService) BatchClone(ctx context.Context, sourceIDs []uint64, co
 	return result, nil
 }
 
-func (s *TemplateService) MarkReviewed(ctx context.Context, id uint64, reviewer, comment string, approved bool) (*dbm.Template, error) {
+func (s *TemplateService) MarkReviewed(ctx context.Context, id string, reviewer, comment string, approved bool) (*dbm.Template, error) {
 	if s == nil || s.TemplateRepo == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if id == 0 {
+	if id == "" {
 		return nil, gorm.ErrInvalidData
 	}
 	status := TemplateReviewRejected
@@ -204,14 +213,14 @@ func (s *TemplateService) MarkReviewed(ctx context.Context, id uint64, reviewer,
 		"reviewed_by":    strings.TrimSpace(reviewer),
 		"reviewed_at":    time.Now().UTC(),
 	}
-	return s.TemplateRepo.UpdateByID(ctx, id, fields)
+	return s.TemplateRepo.UpdateByUUID(ctx, id, fields)
 }
 
-func (s *TemplateService) Publish(ctx context.Context, id uint64, channel string) (*dbm.Template, error) {
+func (s *TemplateService) Publish(ctx context.Context, id string, channel string) (*dbm.Template, error) {
 	if s == nil || s.TemplateRepo == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if id == 0 {
+	if id == "" {
 		return nil, gorm.ErrInvalidData
 	}
 	fields := map[string]interface{}{
@@ -219,14 +228,14 @@ func (s *TemplateService) Publish(ctx context.Context, id uint64, channel string
 		"publish_channel": strings.TrimSpace(channel),
 		"published_at":    time.Now().UTC(),
 	}
-	return s.TemplateRepo.UpdateByID(ctx, id, fields)
+	return s.TemplateRepo.UpdateByUUID(ctx, id, fields)
 }
 
-func (s *TemplateService) Cleanup(ctx context.Context, id uint64, reason string) (*dbm.Template, error) {
+func (s *TemplateService) Cleanup(ctx context.Context, id string, reason string) (*dbm.Template, error) {
 	if s == nil || s.TemplateRepo == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if id == 0 {
+	if id == "" {
 		return nil, gorm.ErrInvalidData
 	}
 	fields := map[string]interface{}{
@@ -234,18 +243,18 @@ func (s *TemplateService) Cleanup(ctx context.Context, id uint64, reason string)
 		"cleanup_reason": strings.TrimSpace(reason),
 		"cleaned_at":     time.Now().UTC(),
 	}
-	return s.TemplateRepo.UpdateByID(ctx, id, fields)
+	return s.TemplateRepo.UpdateByUUID(ctx, id, fields)
 }
 
 // Validate 根据规则检查模板内容。
-func (s *TemplateService) Validate(ctx context.Context, id uint64, rules []string, strict bool) (*ValidationResult, error) {
+func (s *TemplateService) Validate(ctx context.Context, id string, rules []string, strict bool) (*ValidationResult, error) {
 	if s == nil || s.TemplateRepo == nil {
 		return nil, gorm.ErrInvalidDB
 	}
-	if id == 0 {
+	if id == "" {
 		return nil, gorm.ErrInvalidData
 	}
-	tpl, err := s.GetByID(ctx, id)
+	tpl, err := s.GetByUUID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -255,9 +264,9 @@ func (s *TemplateService) Validate(ctx context.Context, id uint64, rules []strin
 	}
 
 	res := &ValidationResult{
-		TemplateID: id,
-		Valid:      true,
-		Violations: make([]ValidationViolation, 0),
+		TemplateUUID: id,
+		Valid:        true,
+		Violations:   make([]ValidationViolation, 0),
 	}
 
 	for _, rule := range normalized {

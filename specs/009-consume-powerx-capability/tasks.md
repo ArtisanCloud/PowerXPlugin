@@ -177,6 +177,8 @@
 
 ## Phase 12: Installed Plugin Acceptance
 
+2026-09-08 纠正：历史已勾选任务仅覆盖其列出的操作，不代表插件完整业务迁移完成。Media Variant 传输、IAM 组织写入以及 P2 逐操作授权证据继续由 Phase 15 跟踪，不得归为纯安装联调。
+
 - [ ] T062 在 PowerX 安装态声明并授予每个 probe 所需 capability；插件升级/重新启用后核对 STS `allowed_capabilities`，仅重启不计为完成。
 - [ ] T063 逐模块记录真实请求时间、provider mode、capability、trace、结果与失败 reason_code；未成功的项保留 `ready_for_integration`。
 - [ ] T064 对 API-Key 开发验证和 STS 安装态验证分别记录，禁止以 API-Key 成功替代 STS 验收。
@@ -203,3 +205,21 @@
 - [x] T077 收口 Capability/Integration/Skills/Notifications/Plugin Runtime 五个 delegated 客户端的 token 阶段取消、响应读取错误与资源关闭合同；Skills 补完整错误信封矩阵，不新增重试、模式降级或假定的 Core API。
 - [x] T078 接入 Core P1 Agent Session 12 项操作：UUID DTO、STS transport、独立 SessionService/Runtime.Sessions、Skeleton 装配、幂等输入/错误/SSE 终止测试及 local 接入说明。delegated 旧人工 Invoke/SSE 明确拒绝；安装态证据仍由 T062–T064/T073 跟踪。
 - [x] T079 修正实际 Agent 消费链路：Skeleton 12 项 Session HTTP 入口通过 Runtime.Sessions 调用；删除旧 Gateway 会话方法/DTO，页面使用 UUID-only API、稳定幂等键、独立 Invoke/订阅/cancel；同步 RBAC、最小 required、标准插件信封、locale、模板与回归测试。浏览器及安装态验收仍后置。
+- [x] T080 修复前端认证测试的 Nuxt cookie mock 与过期 access 状态，保留正常 refresh；补齐 Agent 浏览器合同 fixture 和页面异常/失败断言。23 项 unit 与 4 项 Chromium 合同用例实际通过；不替代 T062–T064/T073 的真实安装态验证，详见 framework-bootstrap-followup.md。
+
+## Phase 15: Consumer Contract Gaps
+
+- [x] T081 依据 AI Craft/SCRM 实际消费纠正 Media、IAM 与 Capability/Integration 范围，统一主指南和覆盖台账；交付 `docs/contracts/framework-consumer-contract-gaps.md`，区分已存在路由与缺失功能，不发布猜测的 Host API。
+- [x] T082 Core 已交付 Variant upload/complete/download 的 UUID-only Host Contract、状态、票据隔离/吊销、精确 grant 和合同测试；见 Core framework-consumer-core-delivery.md。未 migrate/seed/重启，不算部署验收。
+- [x] T083 Framework 已接入 T082：三项 Service/HostClient 方法、checksum/status/completed_at DTO、TTL 对象请求、完成响应校验、取消与错误测试；Skeleton test double 同步、全 Framework 编译通过、模板 check 通过。主指南 §7.4 说明 local 接口变更；AI Craft 业务迁移独立验收。
+- [ ] T084 Core 冻结部门/成员及关联写入合同、来源绑定、幂等、冲突与权限边界；Framework 随后新增独立组织写 contract/Factory/delegated adapter，SCRM 提供 local 实现。
+- [ ] T085 对 T072 的八项 Registry/Gateway 操作交付 method/path/入口权限/目标权限/执行位置/撤权证据矩阵，Framework 按实际差异修正 transport，SCRM 按已消费操作接入。不能因 typed client 已存在或诊断 CapabilityID 为空就宣称授权已通过或完全没有合同。
+
+T085 进度：Core 已交付八项实时授权与 caller_subject 隔离规则；Framework 已核对现有 method/path 和错误传播，六包定向测试通过。SCRM 接入与部署后的真实撤权/主体隔离尚未验收，保持未勾选；不要求创建额外网关 capability ID。
+
+## Phase 16: Cache / TaskCenter Host Contract
+
+- [x] T086 定义 Cache/TaskCenter Service 与启动单选 Factory；local 持久化由插件实现，禁止 host 失败后回退 local。
+- [x] T087 对齐 Core 六项正式 Host API：STS 凭证租户绑定、四项 capability、base64/TTL/JSON/CAS 约束、稳定错误和失败路径测试；更新指南 §7.5 与合同任务单。
+- [ ] T088 Core 目标环境部署及插件授权后，验证安装态缓存隔离/过期、任务幂等/CAS/撤权；电商将 LicenseCache 与任务接口注入对应 Runtime。不得将本地 HTTP 合同测试标为安装态成功。
+- [x] T089 Skeleton Cache/TaskCenter 启动单选、local 示例存储、Host Lab 六项 probe/状态入口、四项 required、前端模块与 locale、模板同步及关闭 workspace 的生成物编译检查；真实安装态仍归 T088。

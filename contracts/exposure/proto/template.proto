@@ -7,7 +7,8 @@ option go_package = "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/inter
 import "google/protobuf/empty.proto";
 
 message Template {
-  uint64 id = 1;
+  reserved 1;
+  string uuid = 11;
   string name = 2;
   string description = 3;
   string content = 4;
@@ -17,7 +18,8 @@ message Template {
 }
 
 message GetTemplateRequest {
-  uint64 id = 1;
+  reserved 1;
+  string uuid = 11;
   string tenant_uuid = 2;
 }
 
@@ -47,7 +49,8 @@ message CreateTemplateRequest {
 }
 
 message UpdateTemplateRequest {
-  uint64 id = 1;
+  reserved 1;
+  string uuid = 11;
   string name = 2;
   string description = 3;
   string content = 4;
@@ -55,12 +58,14 @@ message UpdateTemplateRequest {
 }
 
 message DeleteTemplateRequest {
-  uint64 id = 1;
+  reserved 1;
+  string uuid = 11;
   string tenant_uuid = 2;
 }
 
 message BatchCloneTemplatesRequest {
-  repeated uint64 source_ids = 1;
+  reserved 1;
+  repeated string source_uuids = 11;
   int32 copies = 2;
   string name_prefix = 3;
   string description_prefix = 4;
@@ -68,17 +73,20 @@ message BatchCloneTemplatesRequest {
 }
 
 message BatchCloneFailure {
-  uint64 source_id = 1;
+  reserved 1;
+  string source_uuid = 11;
   string reason = 2;
 }
 
 message BatchCloneTemplatesResponse {
-  repeated uint64 created_ids = 1;
+  reserved 1;
+  repeated string created_uuids = 11;
   repeated BatchCloneFailure failed = 2;
 }
 
 message ValidateTemplateRequest {
-  uint64 id = 1;
+  reserved 1;
+  string uuid = 11;
   repeated string rules = 2;
   bool strict = 3;
   string tenant_uuid = 4;
@@ -92,7 +100,8 @@ message ValidationViolation {
 }
 
 message ValidateTemplateResponse {
-  uint64 template_id = 1;
+  reserved 1;
+  string template_uuid = 11;
   bool valid = 2;
   repeated ValidationViolation violations = 3;
 }

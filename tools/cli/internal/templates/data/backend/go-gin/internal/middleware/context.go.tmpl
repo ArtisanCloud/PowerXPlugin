@@ -13,6 +13,7 @@ import (
 
 type TenantContext struct {
 	TenantUUID    string   `json:"tenant_uuid"`
+	MemberUUID    string   `json:"member_uuid,omitempty"`
 	TenantID      int64    `json:"tenant_id"`
 	UserID        int64    `json:"user_id"`
 	MemberID      int64    `json:"member_id"`

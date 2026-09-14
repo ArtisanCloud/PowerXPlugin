@@ -1,95 +1,83 @@
+using System.Text.Json.Serialization;
+
 namespace PowerXPlugin.Framework.IAM.Models;
 
 public record Tenant
 {
-    public string UUID { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string Key { get; init; } = "";
-    public int Status { get; init; } = 1;
-    public string Plan { get; init; } = "free";
+    [JsonPropertyName("tenant_uuid")] public string TenantUUID { get; init; } = "";
+    [JsonPropertyName("tenant_key")] public string TenantKey { get; init; } = "";
+    [JsonPropertyName("name")] public string Name { get; init; } = "";
+    [JsonPropertyName("status")] public string Status { get; init; } = "";
 }
 
 public record Department
 {
-    public string UUID { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string? ParentUUID { get; init; }
-    public string TenantUUID { get; init; } = "";
-    public DateTime CreatedAt { get; init; }
-    public DateTime UpdatedAt { get; init; }
+    [JsonPropertyName("department_uuid")] public string DepartmentUUID { get; init; } = "";
+    [JsonPropertyName("tenant_uuid")] public string TenantUUID { get; init; } = "";
+    [JsonPropertyName("name")] public string Name { get; init; } = "";
+    [JsonPropertyName("code")] public string Code { get; init; } = "";
+    [JsonPropertyName("parent_department_uuid")] public string? ParentDepartmentUUID { get; init; }
 }
 
 public record Member
 {
-    public string UUID { get; init; } = "";
-    public string TenantUUID { get; init; } = "";
-    public string UserID { get; init; } = "";
-    public string Username { get; init; } = "";
-    public string? DisplayName { get; init; }
-    public int Status { get; init; } = 1;
-    public DateTime CreatedAt { get; init; }
-    public DateTime UpdatedAt { get; init; }
+    [JsonPropertyName("member_uuid")] public string MemberUUID { get; init; } = "";
+    [JsonPropertyName("tenant_uuid")] public string TenantUUID { get; init; } = "";
+    [JsonPropertyName("user_uuid")] public string UserUUID { get; init; } = "";
+    [JsonPropertyName("display_name")] public string? DisplayName { get; init; }
+    [JsonPropertyName("status")] public string Status { get; init; } = "";
 }
 
 public record Role
 {
-    public string UUID { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string Code { get; init; } = "";
-    public string? Description { get; init; }
-    public List<Permission> Permissions { get; init; } = new();
+    [JsonPropertyName("role_uuid")] public string RoleUUID { get; init; } = "";
+    [JsonPropertyName("tenant_uuid")] public string TenantUUID { get; init; } = "";
+    [JsonPropertyName("code")] public string Code { get; init; } = "";
+    [JsonPropertyName("name")] public string Name { get; init; } = "";
+    [JsonPropertyName("description")] public string? Description { get; init; }
 }
 
 public record Permission
 {
-    public string UUID { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string Code { get; init; } = "";
-    public string Resource { get; init; } = "";
-    public string Action { get; init; } = "";
-    public string? Description { get; init; }
+    [JsonPropertyName("permission_uuid")] public string PermissionUUID { get; init; } = "";
+    [JsonPropertyName("resource")] public string Resource { get; init; } = "";
+    [JsonPropertyName("action")] public string Action { get; init; } = "";
+    [JsonPropertyName("scope")] public string? Scope { get; init; }
 }
 
 public record AuthorizationRequest
 {
-    public string TenantUUID { get; init; } = "";
-    public string UserID { get; init; } = "";
-    public string Resource { get; init; } = "";
-    public string Action { get; init; } = "";
-    public string? TraceID { get; init; }
-    public string? PolicyToken { get; init; }
+    [JsonPropertyName("tenant_uuid")] public string TenantUUID { get; init; } = "";
+    [JsonPropertyName("user_uuid")] public string? UserUUID { get; init; }
+    [JsonPropertyName("member_uuid")] public string? MemberUUID { get; init; }
+    [JsonPropertyName("resource")] public string Resource { get; init; } = "";
+    [JsonPropertyName("action")] public string Action { get; init; } = "";
+    [JsonPropertyName("trace_id")] public string? TraceID { get; init; }
+    [JsonPropertyName("policy_token")] public string? PolicyToken { get; init; }
 }
 
 public record AuthorizationDecision
 {
-    public bool Allowed { get; init; }
-    public string? ReasonCode { get; init; }
-    public string Resource { get; init; } = "";
-    public string Action { get; init; } = "";
-    public string TenantUUID { get; init; } = "";
-    public string UserID { get; init; } = "";
-    public string Mode { get; init; } = "";
-    public string? TraceID { get; init; }
+    [JsonPropertyName("allowed")] public bool Allowed { get; init; }
+    [JsonPropertyName("reason_code")] public string? ReasonCode { get; init; }
+    [JsonPropertyName("resource")] public string Resource { get; init; } = "";
+    [JsonPropertyName("action")] public string Action { get; init; } = "";
+    [JsonPropertyName("tenant_uuid")] public string TenantUUID { get; init; } = "";
+    [JsonPropertyName("user_uuid")] public string? UserUUID { get; init; }
+    [JsonPropertyName("member_uuid")] public string? MemberUUID { get; init; }
+    [JsonPropertyName("mode")] public string Mode { get; init; } = "";
+    [JsonPropertyName("trace_id")] public string? TraceID { get; init; }
 }
 
 public record IdentityContext
 {
-    public string? TenantUUID { get; init; }
-    public string? UserID { get; init; }
-    public string? MemberID { get; init; }
-    public List<string> Roles { get; init; } = new();
-    public List<string> Permissions { get; init; } = new();
-    public string? PolicyVer { get; init; }
-    public string? TraceID { get; init; }
-}
-
-public record DirectorySnapshot
-{
-    public Tenant? Tenant { get; init; }
-    public IReadOnlyList<Department> Departments { get; init; } = Array.Empty<Department>();
-    public IReadOnlyList<Member> Members { get; init; } = Array.Empty<Member>();
-    public IReadOnlyList<Role> Roles { get; init; } = Array.Empty<Role>();
-    public IReadOnlyList<Permission> Permissions { get; init; } = Array.Empty<Permission>();
+    [JsonPropertyName("tenant_uuid")] public string? TenantUUID { get; init; }
+    [JsonPropertyName("user_uuid")] public string? UserUUID { get; init; }
+    [JsonPropertyName("member_uuid")] public string? MemberUUID { get; init; }
+    [JsonPropertyName("roles")] public List<string> Roles { get; init; } = [];
+    [JsonPropertyName("permissions")] public List<string> Permissions { get; init; } = [];
+    [JsonPropertyName("policy_ver")] public string? PolicyVer { get; init; }
+    [JsonPropertyName("trace_id")] public string? TraceID { get; init; }
 }
 
 public enum IAMAdapterMode

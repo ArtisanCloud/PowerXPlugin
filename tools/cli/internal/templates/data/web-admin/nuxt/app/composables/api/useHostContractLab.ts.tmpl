@@ -1,16 +1,8 @@
 import { apiPost } from "./_client";
 
 export type HostContractModule =
-  | "iam"
-  | "knowledge"
-  | "media"
-  | "agent"
-  | "ai"
-  | "capability_registry"
-  | "integration_gateway"
-  | "skills"
-  | "notifications"
-  | "plugin_runtime";
+  | "cache" | "taskcenter" | "iam" | "knowledge" | "media" | "agent" | "ai"
+  | "capability_registry" | "integration_gateway" | "skills" | "notifications" | "plugin_runtime";
 
 export interface HostContractProbeResult {
   module: HostContractModule;
@@ -23,22 +15,21 @@ export interface HostContractProbeResult {
   observed_at: string;
 }
 
-export interface HostContractProbeError {
-  status?: number;
-  reasonCode: string;
-  traceID?: string;
+export interface HostContractProbeError { status?: number; reasonCode: string; traceID?: string }
+
+export function hostContractBindingState(result: HostContractProbeResult): boolean | null {
+  return typeof result.result?.adapter_available === "boolean" ? result.result.adapter_available : null;
 }
 
 export function useHostContractLabApi() {
-  async function probe(module: HostContractModule, operation: string, input: Record<string, unknown> = {}, confirm = false) {
+  async function probe(module: HostContractModule) {
     return await apiPost<{ data: HostContractProbeResult }>("/admin/host-contract/probe", {
       module,
-      operation,
-      input,
-      confirm,
+      operation: "status",
+      input: {},
+      confirm: false,
     });
   }
-
   function normalizeError(error: any): HostContractProbeError {
     const payload = error?.data || error?.response?._data || error?._data || {};
     return {
@@ -47,6 +38,5 @@ export function useHostContractLabApi() {
       traceID: String(payload?.error?.trace_id || payload?.data?.trace_id || "") || undefined,
     };
   }
-
   return { probe, normalizeError };
 }

@@ -10,5 +10,7 @@ for (const outcome of ['failed','interrupted'] as const) {
     await expect(page.getByTestId('agent-chat-status')).toContainText('error');
     expect(seen.filter(r=>r.method==='POST'&&r.path.endsWith('/invocations'))).toHaveLength(1);
     expect(seen.some(r=>r.path.endsWith('/cancel'))).toBe(false);
+    await expect(page.getByTestId('agent-chat-final').last()).not.toContainText('test.output');
+    expect(seen.pageErrors).toEqual([]);
   });
 }

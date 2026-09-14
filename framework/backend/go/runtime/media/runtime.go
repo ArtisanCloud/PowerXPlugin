@@ -16,8 +16,9 @@ type AssetCatalog interface {
 	ListAssets(context.Context, powerxmedia.ListAssetsInput) (*powerxmedia.ListAssetsOutput, error)
 }
 
-// Service is the full currently-published Media Host Contract. Plugins inject
-// their own local implementation; delegated mode uses powerxmedia.HostClient.
+// Service covers asset and variant metadata and transfer tickets. Uploading
+// bytes does not complete a variant; CompleteVariantUpload verifies the object.
+// Plugins inject their local implementation; delegated uses powerxmedia.HostClient.
 type Service interface {
 	AssetCatalog
 	GetAsset(context.Context, string) (*powerxmedia.HostAsset, error)
@@ -29,6 +30,9 @@ type Service interface {
 	PresignDownload(context.Context, string) (*powerxmedia.TransferTicket, error)
 	CreateVariant(context.Context, string, powerxmedia.CreateVariantInput) (*powerxmedia.Variant, error)
 	GetVariant(context.Context, string) (*powerxmedia.Variant, error)
+	PresignVariantUpload(context.Context, string, string, powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error)
+	CompleteVariantUpload(context.Context, string, string, powerxmedia.CompleteUploadInput) (*powerxmedia.Variant, error)
+	PresignVariantDownload(context.Context, string, string, powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error)
 }
 
 // Runtime selects one startup-supplied adapter from the trusted ProviderMode.

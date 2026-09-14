@@ -3,6 +3,14 @@ import { ref } from "vue";
 
 const refreshMock = vi.fn();
 const logoutMock = vi.fn();
+const cookieRefs = new Map<string, ReturnType<typeof ref>>();
+
+vi.mock("#app", () => ({
+  useCookie: (name: string) => {
+    if (!cookieRefs.has(name)) cookieRefs.set(name, ref(null));
+    return cookieRefs.get(name)!;
+  },
+}));
 
 vi.mock("~/composables/api/services/authService", () => ({
   useAuthService: () => ({
@@ -38,6 +46,8 @@ describe("useAuth", () => {
 
   beforeEach(() => {
     vi.resetModules();
+    cookieRefs.clear();
+    storageHandler = undefined;
 
     const stateMap = new Map<string, ReturnType<typeof ref>>();
     vi.stubGlobal("useState", (key: string, init?: () => any) => {
@@ -139,7 +149,7 @@ describe("useAuth", () => {
     expect(auth.isAuthenticated.value).toBe(true);
   });
 
-  it("强制清理过期 token 并要求重新登录", async () => {
+  it("expired access is withheld while refresh credentials remain available", async () => {
     const auth = await loadAuth();
     auth.setAuth(sampleTokens() as any);
     auth.expiresAt.value = Date.now() - 10_000;
@@ -148,7 +158,16 @@ describe("useAuth", () => {
 
     expect(value).toBeNull();
     expect(auth.isAuthenticated.value).toBe(false);
-    expect(auth.token.value).toBeNull();
+    expect(auth.refreshToken.value).toBe("refresh-token");
+    expect(localStore["refresh_token"]).toBe("refresh-token");
+    expect(navigateTo).not.toHaveBeenCalled();
+
+    refreshMock.mockResolvedValueOnce({
+      success: true,
+      data: { ...sampleTokens(), access_token: "renewed-token" },
+    });
+    expect(await auth.ensureFreshToken()).toBe("renewed-token");
+    expect(auth.isAuthenticated.value).toBe(true);
   });
 
   it("ensureFreshToken 会在过期时调用 refreshToken 并落盘新 token", async () => {

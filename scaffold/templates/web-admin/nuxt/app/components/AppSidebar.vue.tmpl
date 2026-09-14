@@ -94,10 +94,23 @@
           {{ `{{ t('navigation.powerxBaseCapabilities') }}` }}
         </div>
         <UButton
-          to="/admin/templates/framework-lab"
+          to="/powerx/host-contract-lab"
           variant="ghost"
           color="neutral"
           class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/powerx/host-contract-lab'),
+          }"
+        >
+          <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4 mr-3" />
+          {{ `{{ t('navigation.hostContractLab') }}` }}
+        </UButton>
+        <UButton
+          to="/admin/templates/framework-lab"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
           :class="{
             'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
               isExactActive('/admin/templates/framework-lab'),
@@ -119,19 +132,6 @@
         >
           <UIcon name="i-heroicons-beaker" class="w-4 h-4 mr-3" />
           {{ `{{ t('navigation.capabilityLab') }}` }}
-        </UButton>
-        <UButton
-          to="/powerx/host-contract-lab"
-          variant="ghost"
-          color="neutral"
-          class="w-full justify-start mt-1"
-          :class="{
-            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-              isExactActive('/powerx/host-contract-lab'),
-          }"
-        >
-          <UIcon name="i-heroicons-squares-2x2" class="w-4 h-4 mr-3" />
-          {{ `{{ t('navigation.hostContractLab') }}` }}
         </UButton>
         <UButton
           to="/powerx/knowledge-lab"

@@ -81,6 +81,7 @@ func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
 		UserID          any         `json:"uid"`
 		UserIDNumeric   any         `json:"uid_n"`
 		MemberID        any         `json:"mid"`
+		MemberUUID      any         `json:"member_uuid"`
 		MemberIDNum     any         `json:"mid_n"`
 		MemberIDAlias   any         `json:"member_id"`
 		IsRoot          bool        `json:"is_root"`
@@ -126,7 +127,10 @@ func (c *PowerXClaims) UnmarshalJSON(data []byte) error {
 	c.TenantID = tenantID
 	c.UserUUID = stringClaim(raw.UserID)
 	c.UserID = userID
-	c.MemberUUID = stringClaim(raw.MemberID)
+	// Gateway-issued credentials use member_uuid while locally issued
+	// credentials use mid. Both are signed claims, but member_uuid is the
+	// canonical cross-boundary identity and must take precedence when present.
+	c.MemberUUID = firstNonEmpty(stringClaim(raw.MemberUUID), stringClaim(raw.MemberID))
 	c.MemberID = memberID
 	c.MemberIDAlias = memberID
 	c.IsRoot = raw.IsRoot
@@ -225,6 +229,7 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 	}
 	return TenantContext{
 		TenantUUID:    strings.TrimSpace(claims.TenantUUID.String()),
+		MemberUUID:    strings.TrimSpace(claims.MemberUUID),
 		TenantID:      claims.TenantID,
 		UserID:        claims.UserID,
 		MemberID:      claims.MemberID,

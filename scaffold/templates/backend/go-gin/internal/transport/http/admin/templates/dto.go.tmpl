@@ -10,17 +10,17 @@ import (
 // Template domain HTTP DTOs.
 
 const (
-	TemplateErrCodeInvalidID         = "TEMPLATE_INVALID_ID"
-	TemplateErrCodeValidationFailed  = "TEMPLATE_VALIDATION_FAILED"
-	TemplateErrCodeSourceIDsRequired = "TEMPLATE_SOURCE_IDS_REQUIRED"
-	templateFieldName                = "name"
-	templateFieldDescription         = "description"
-	templateFieldContent             = "content"
-	templateFieldSourceIDs           = "source_ids"
-	templateFieldID                  = "id"
-	templateMaxNameLength            = 128
-	templateMaxDescriptionLength     = 512
-	templateMaxContentLength         = 10000
+	TemplateErrCodeInvalidID           = "TEMPLATE_INVALID_ID"
+	TemplateErrCodeValidationFailed    = "TEMPLATE_VALIDATION_FAILED"
+	TemplateErrCodeSourceUUIDsRequired = "TEMPLATE_SOURCE_UUIDS_REQUIRED"
+	templateFieldName                  = "name"
+	templateFieldDescription           = "description"
+	templateFieldContent               = "content"
+	templateFieldSourceUUIDs           = "source_uuids"
+	templateFieldID                    = "id"
+	templateMaxNameLength              = 128
+	templateMaxDescriptionLength       = 512
+	templateMaxContentLength           = 10000
 )
 
 type TemplateValidationError struct {
@@ -51,7 +51,7 @@ type TemplateListResponse struct {
 }
 
 type TemplateResponse struct {
-	ID          uint64    `json:"id"`
+	UUID        string    `json:"uuid"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Content     string    `json:"content"`
@@ -64,7 +64,7 @@ func NewTemplateResponse(tpl *dbm.Template) TemplateResponse {
 		return TemplateResponse{}
 	}
 	return TemplateResponse{
-		ID:          tpl.ID,
+		UUID:        tpl.UUID,
 		Name:        tpl.Name,
 		Description: tpl.Description,
 		Content:     tpl.Content,
@@ -149,7 +149,7 @@ func (r *UpdateTemplateRequest) Validate() *TemplateValidationError {
 }
 
 type BatchCloneRequest struct {
-	SourceIDs         []uint64 `json:"source_ids"        binding:"required"`
+	SourceUUIDs       []string `json:"source_uuids"        binding:"required"`
 	Copies            int      `json:"copies"            binding:"omitempty,min=1,max=50"`
 	NamePrefix        string   `json:"name_prefix"`
 	DescriptionPrefix string   `json:"description_prefix"`
@@ -166,8 +166,8 @@ func (r *BatchCloneRequest) Normalize() {
 }
 
 func (r *BatchCloneRequest) Validate() *TemplateValidationError {
-	if r == nil || len(r.SourceIDs) == 0 {
-		return &TemplateValidationError{Code: TemplateErrCodeSourceIDsRequired, Field: templateFieldSourceIDs, Message: "source_ids is required"}
+	if r == nil || len(r.SourceUUIDs) == 0 {
+		return &TemplateValidationError{Code: TemplateErrCodeSourceUUIDsRequired, Field: templateFieldSourceUUIDs, Message: "source_uuids is required"}
 	}
 	return nil
 }
@@ -177,7 +177,7 @@ type ValidateTemplateRequest struct {
 	Strict bool     `json:"strict"`
 }
 
-func newInvalidTemplateIDError() *TemplateValidationError {
+func newInvalidTemplateUUIDError() *TemplateValidationError {
 	return &TemplateValidationError{
 		Code:    TemplateErrCodeInvalidID,
 		Field:   templateFieldID,

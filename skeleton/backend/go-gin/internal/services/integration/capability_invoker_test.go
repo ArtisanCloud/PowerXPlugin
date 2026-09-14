@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
+	"github.com/google/uuid"
 	"testing"
 	"time"
 
@@ -138,9 +137,9 @@ func TestCapabilityInvokerAuditUpdatesTemplate(t *testing.T) {
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(result.Payload, &resp))
 	require.Equal(t, true, resp["updated"])
-	require.Equal(t, fmt.Sprintf("%d", tpl.ID), resp["selected_template_id"])
+	require.Equal(t, fmt.Sprintf("%s", tpl.UUID), resp["selected_template_uuid"])
 
-	updated, err := templateSvc.GetByID(ctx, tpl.ID)
+	updated, err := templateSvc.GetByUUID(ctx, tpl.UUID)
 	require.NoError(t, err)
 	require.Equal(t, "new desc", updated.Description)
 	require.Equal(t, "updated body", updated.Content)
@@ -179,13 +178,13 @@ func TestCapabilityInvokerQualityDistributeClonesTemplate(t *testing.T) {
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(result.Payload, &resp))
 
-	createdRaw, ok := resp["created_template_ids"].([]interface{})
+	createdRaw, ok := resp["created_template_uuids"].([]interface{})
 	require.True(t, ok)
 	require.NotEmpty(t, createdRaw)
 
-	updatedID, _ := resp["updated_template_id"].(string)
+	updatedID, _ := resp["updated_template_uuid"].(string)
 	require.NotEmpty(t, updatedID)
-	updated, err := templateSvc.GetByID(ctx, mustParseUint64(t, updatedID))
+	updated, err := templateSvc.GetByUUID(ctx, mustParseUUID(t, updatedID))
 	require.NoError(t, err)
 	require.Equal(t, "## qa content", updated.Content)
 
@@ -224,7 +223,7 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.True(t, ok)
 	require.NotEmpty(t, items)
 	require.Contains(t, listPayload["content"], "Seed")
-	require.Contains(t, listPayload["content"], "/templates/crud?template_id=")
+	require.Contains(t, listPayload["content"], "/templates/crud?template_uuid=")
 	pagination, ok := listPayload["pagination"].(map[string]any)
 	require.True(t, ok)
 	require.Equal(t, float64(1), pagination["page"])
@@ -232,7 +231,7 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	readEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
 		ToolScope:  "agent.template.read",
-		PayloadRef: fmt.Sprintf(`{"template_id":%d}`, seed.ID),
+		PayloadRef: fmt.Sprintf(`{"template_uuid":%q}`, seed.UUID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.read",
 		},
@@ -243,7 +242,7 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.NoError(t, json.Unmarshal(readResult.Payload, &readPayload))
 	readTemplate, ok := readPayload["template"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, fmt.Sprintf("%d", seed.ID), readTemplate["id"])
+	require.Equal(t, fmt.Sprintf("%s", seed.UUID), readTemplate["uuid"])
 
 	createEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
@@ -257,16 +256,16 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.NoError(t, err)
 	var createPayload map[string]any
 	require.NoError(t, json.Unmarshal(createResult.Payload, &createPayload))
-	createdID := mustParseUint64(t, createPayload["id"].(string))
+	createdID := mustParseUUID(t, createPayload["uuid"].(string))
 	require.NotZero(t, createdID)
 	createdTemplate, ok := createPayload["template"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, createPayload["id"], createdTemplate["id"])
+	require.Equal(t, createPayload["uuid"], createdTemplate["uuid"])
 
 	updateEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
 		ToolScope:  "agent.template.update",
-		PayloadRef: fmt.Sprintf(`{"template_id":%d,"description":"updated via crud"}`, createdID),
+		PayloadRef: fmt.Sprintf(`{"template_uuid":%q,"description":"updated via crud"}`, createdID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.update",
 		},
@@ -283,7 +282,7 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	validateEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
 		ToolScope:  "agent.template.validate",
-		PayloadRef: fmt.Sprintf(`{"template_id":%d}`, createdID),
+		PayloadRef: fmt.Sprintf(`{"template_uuid":%q}`, createdID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.validate",
 		},
@@ -292,12 +291,12 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.NoError(t, err)
 	var validatePayload map[string]any
 	require.NoError(t, json.Unmarshal(validateResult.Payload, &validatePayload))
-	require.Equal(t, float64(createdID), validatePayload["template_id"])
+	require.Equal(t, createdID, validatePayload["template_uuid"])
 
 	reviewEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
 		ToolScope:  "agent.template.review",
-		PayloadRef: fmt.Sprintf(`{"template_id":%d,"approved":true,"comments":"ok","reviewer":"qa"}`, createdID),
+		PayloadRef: fmt.Sprintf(`{"template_uuid":%q,"approved":true,"comments":"ok","reviewer":"qa"}`, createdID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.review",
 		},
@@ -306,13 +305,13 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.NoError(t, err)
 	var reviewPayload map[string]any
 	require.NoError(t, json.Unmarshal(reviewResult.Payload, &reviewPayload))
-	require.Equal(t, fmt.Sprintf("%d", createdID), reviewPayload["template_id"])
+	require.Equal(t, fmt.Sprintf("%s", createdID), reviewPayload["template_uuid"])
 	require.Equal(t, "approved", reviewPayload["status"])
 
 	publishEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
 		ToolScope:  "agent.template.publish",
-		PayloadRef: fmt.Sprintf(`{"template_id":%d,"channel":"tenant"}`, createdID),
+		PayloadRef: fmt.Sprintf(`{"template_uuid":%q,"channel":"tenant"}`, createdID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.publish",
 		},
@@ -321,13 +320,13 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.NoError(t, err)
 	var publishPayload map[string]any
 	require.NoError(t, json.Unmarshal(publishResult.Payload, &publishPayload))
-	require.Equal(t, fmt.Sprintf("%d", createdID), publishPayload["template_id"])
+	require.Equal(t, fmt.Sprintf("%s", createdID), publishPayload["template_uuid"])
 	require.Equal(t, "deployed", publishPayload["publish_status"])
 
 	batchCloneEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
 		ToolScope:  "agent.template.batch_clone",
-		PayloadRef: fmt.Sprintf(`{"source_ids":[%d],"copies":1}`, createdID),
+		PayloadRef: fmt.Sprintf(`{"source_uuids":[%q],"copies":1}`, createdID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.batch_clone",
 		},
@@ -336,14 +335,14 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	require.NoError(t, err)
 	var batchClonePayload map[string]any
 	require.NoError(t, json.Unmarshal(batchCloneResult.Payload, &batchClonePayload))
-	clonedIDs, ok := batchClonePayload["created_ids"].([]interface{})
+	clonedIDs, ok := batchClonePayload["created_uuids"].([]interface{})
 	require.True(t, ok)
 	require.NotEmpty(t, clonedIDs)
 
 	deleteEnvelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-crud",
 		ToolScope:  "agent.template.delete",
-		PayloadRef: fmt.Sprintf(`{"template_id":%d}`, createdID),
+		PayloadRef: fmt.Sprintf(`{"template_uuid":%q}`, createdID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.delete",
 		},
@@ -353,9 +352,9 @@ func TestCapabilityInvokerCRUDHandlers(t *testing.T) {
 	var deletePayload map[string]any
 	require.NoError(t, json.Unmarshal(deleteResult.Payload, &deletePayload))
 	require.Equal(t, true, deletePayload["deleted"])
-	require.Equal(t, fmt.Sprintf("%d", createdID), deletePayload["id"])
+	require.Equal(t, fmt.Sprintf("%s", createdID), deletePayload["uuid"])
 
-	_, err = templateSvc.GetByID(ctx, createdID)
+	_, err = templateSvc.GetByUUID(ctx, createdID)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
@@ -468,7 +467,7 @@ func TestCapabilityInvokerTemplatePrepareAcceptsStringNumericTemplateID(t *testi
 	envelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-prepare-id-string",
 		ToolScope:  "agent.template.prepare",
-		PayloadRef: `{"action":"delete","template_id":"123"}`,
+		PayloadRef: `{"action":"delete","template_uuid":"11111111-1111-4111-8111-111111111111"}`,
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.prepare",
 		},
@@ -483,7 +482,7 @@ func TestCapabilityInvokerTemplatePrepareAcceptsStringNumericTemplateID(t *testi
 	require.Equal(t, []interface{}{"confirmation"}, awaiting["missing_fields"])
 	statePatch, ok := awaiting["state_patch"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, float64(123), statePatch["template_id"])
+	require.Equal(t, "11111111-1111-4111-8111-111111111111", statePatch["template_uuid"])
 }
 
 func TestCapabilityInvokerTemplatePrepareResolvesTemplateNameAndRequiresDeleteConfirmation(t *testing.T) {
@@ -496,7 +495,7 @@ func TestCapabilityInvokerTemplatePrepareResolvesTemplateNameAndRequiresDeleteCo
 	envelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-prepare-id-name",
 		ToolScope:  "agent.template.prepare",
-		PayloadRef: `{"action":"delete","template_id":"测试模板"}`,
+		PayloadRef: `{"action":"delete","template_ref":"测试模板"}`,
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.prepare",
 		},
@@ -510,10 +509,10 @@ func TestCapabilityInvokerTemplatePrepareResolvesTemplateNameAndRequiresDeleteCo
 	require.Equal(t, false, awaiting["ready_to_execute"])
 	require.Equal(t, []interface{}{"confirmation"}, awaiting["missing_fields"])
 	require.Contains(t, awaiting["message"], "查看模板详情")
-	require.Contains(t, awaiting["message"], fmt.Sprintf("template_id=%d", seed.ID))
+	require.Contains(t, awaiting["message"], fmt.Sprintf("template_uuid=%s", seed.UUID))
 	statePatch, ok := awaiting["state_patch"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, float64(seed.ID), statePatch["template_id"])
+	require.Equal(t, seed.UUID, statePatch["template_uuid"])
 	require.Equal(t, "测试模板", statePatch["template_name"])
 }
 
@@ -527,7 +526,7 @@ func TestCapabilityInvokerTemplatePrepareExecutesDeleteAfterConfirmation(t *test
 	envelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-prepare-confirm-delete",
 		ToolScope:  "agent.template.prepare",
-		PayloadRef: fmt.Sprintf(`{"action":"delete","user_message":"确认删除","state":{"collected":{"action":"delete","template_id":%d,"template_name":"测试模板"}}}`, seed.ID),
+		PayloadRef: fmt.Sprintf(`{"action":"delete","user_message":"确认删除","state":{"collected":{"action":"delete","template_uuid":%q,"template_name":"测试模板"}}}`, seed.UUID),
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.prepare",
 		},
@@ -543,7 +542,7 @@ func TestCapabilityInvokerTemplatePrepareExecutesDeleteAfterConfirmation(t *test
 	require.True(t, ok)
 	reqPayload, ok := request["payload"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, float64(seed.ID), reqPayload["template_id"])
+	require.Equal(t, seed.UUID, reqPayload["template_uuid"])
 }
 
 func TestCapabilityInvokerTemplatePrepareReturnsDuplicateTemplateCandidates(t *testing.T) {
@@ -571,9 +570,8 @@ func TestCapabilityInvokerTemplatePrepareReturnsDuplicateTemplateCandidates(t *t
 	require.NoError(t, json.Unmarshal(result.Payload, &awaiting))
 	require.Equal(t, false, awaiting["ready_to_execute"])
 	require.Equal(t, []interface{}{"template_ref"}, awaiting["missing_fields"])
-	require.Contains(t, awaiting["message"], fmt.Sprintf("template_id=%d", first.ID))
-	require.Contains(t, awaiting["message"], fmt.Sprintf("template_id=%d", second.ID))
-	require.Contains(t, awaiting["message"], "模板 ID")
+	require.Contains(t, awaiting["message"], fmt.Sprintf("template_uuid=%s", first.UUID))
+	require.Contains(t, awaiting["message"], fmt.Sprintf("template_uuid=%s", second.UUID))
 	statePatch, ok := awaiting["state_patch"].(map[string]any)
 	require.True(t, ok)
 	candidates, ok := statePatch["template_candidates"].([]interface{})
@@ -588,7 +586,7 @@ func TestCapabilityInvokerTemplatePrepareAsksForTemplateNameWhenLookupMisses(t *
 	envelope := &domain.IntegrationEnvelope{
 		TenantUuid: "tenant-prepare-ref-miss",
 		ToolScope:  "agent.template.prepare",
-		PayloadRef: `{"action":"delete","template_id":"不存在的模板"}`,
+		PayloadRef: `{"action":"delete","template_ref":"不存在的模板"}`,
 		Metadata: map[string]any{
 			"capability_id": "com.powerx.plugins.base.template.prepare",
 		},
@@ -615,11 +613,12 @@ func TestLocalizeCapabilityIDForRequestIsPluginAgnostic(t *testing.T) {
 	require.Equal(t, "com.example.plugins.demo.local.template.create", got)
 }
 
-func mustParseUint64(t *testing.T, value string) uint64 {
+func mustParseUUID(t *testing.T, value string) string {
 	t.Helper()
-	parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+	parsed, err := uuid.Parse(value)
 	require.NoError(t, err)
-	return parsed
+	require.Equal(t, parsed.String(), value)
+	return value
 }
 
 func setupTemplateService(t *testing.T) (*gorm.DB, *srvtemplates.TemplateService) {

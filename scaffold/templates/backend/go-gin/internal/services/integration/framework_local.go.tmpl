@@ -1,0 +1,272 @@
+package integration
+
+import (
+	"context"
+	"encoding/json"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	fwcap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	fwint "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
+	capdto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
+	intdto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/integration"
+	"{{ .BackendModulePath }}/internal/capabilities"
+	domain "{{ .BackendModulePath }}/internal/entity/models/integration"
+	"{{ .BackendModulePath }}/internal/mcp/stream"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	templates "{{ .BackendModulePath }}/internal/services/admin/templates"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+// LocalCapabilityRuntime executes only this plugin's declared, implemented
+// handlers. It never calls Core or manufactures Core credential grants.
+// Records are bounded, process-local development data; restart clears them.
+type LocalCapabilityRuntime struct {
+	plugin  string
+	entries []capdto.Capability
+	invoker HostInvoker
+	mu      sync.Mutex
+	records map[string]capdto.Invocation
+	replays map[string]localReplay
+}
+type localReplay struct {
+	request string
+	result  capdto.InvokeResult
+	err     error
+}
+
+var _ fwcap.Registry = (*LocalCapabilityRuntime)(nil)
+var _ fwint.Gateway = (*LocalCapabilityRuntime)(nil)
+
+func localCapabilityError(status int, reason string) error {
+	return &hostapi.HTTPError{StatusCode: status, ReasonCode: reason}
+}
+
+func NewLocalCapabilityRuntime(plugin string, entries []capabilities.CatalogEntry, db *gorm.DB) (*LocalCapabilityRuntime, error) {
+	if strings.TrimSpace(plugin) == "" || db == nil {
+		return nil, localCapabilityError(400, "CAPABILITY_LOCAL_CONFIG_INVALID")
+	}
+	inv := NewCapabilityInvoker(templates.NewTemplateService(db), stream.NewBroker(), nil, nil).(*CapabilityInvoker)
+	r := &LocalCapabilityRuntime{plugin: plugin, invoker: inv, records: map[string]capdto.Invocation{}, replays: map[string]localReplay{}}
+	seen := map[string]bool{}
+	for _, e := range entries {
+		// Exact registration only: no legacy alias, external plugin, or Core entry.
+		if _, ok := inv.registry.byCapability[e.ID]; !ok {
+			continue
+		}
+		if e.ProviderPluginID != "" && e.ProviderPluginID != plugin {
+			continue
+		}
+		if seen[e.ID] {
+			return nil, localCapabilityError(400, "CAPABILITY_LOCAL_CONFIG_INVALID")
+		}
+		seen[e.ID] = true
+		protocol := capdto.Protocol{Channel: "local", Method: "INVOKE", Endpoint: "local://" + plugin + "/" + e.ID}
+		r.entries = append(r.entries, capdto.Capability{CapabilityID: e.ID, PluginID: plugin, PluginVersion: e.Version, Title: e.Title, Description: e.Description, Source: "local", Status: "active", Protocols: []capdto.Protocol{protocol}})
+	}
+	sort.Slice(r.entries, func(i, j int) bool { return r.entries[i].CapabilityID < r.entries[j].CapabilityID })
+	return r, nil
+}
+func localCapabilityTenant(ctx context.Context) (string, error) {
+	if ctx == nil {
+		return "", localCapabilityError(401, "CAPABILITY_UNAUTHORIZED")
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	t, _ := authx.TenantUUIDFromContext(ctx)
+	u, e := uuid.Parse(t)
+	if e != nil || u == uuid.Nil || u.String() != t {
+		return "", localCapabilityError(401, "CAPABILITY_UNAUTHORIZED")
+	}
+	return t, nil
+}
+func (r *LocalCapabilityRuntime) List(ctx context.Context, in capdto.ListInput) ([]capdto.Capability, error) {
+	if _, e := localCapabilityTenant(ctx); e != nil {
+		return nil, e
+	}
+	if in.Page < 0 || in.PageSize < 0 || in.PageSize > 100 {
+		return nil, localCapabilityError(400, "CAPABILITY_INVALID_ARGUMENT")
+	}
+	out := []capdto.Capability{}
+	for _, v := range r.entries {
+		if (in.PluginID != "" && in.PluginID != r.plugin) || (in.Source != "" && in.Source != "local") || (in.Protocol != "" && in.Protocol != "local") || in.Intent != "" || in.ToolScope != "" {
+			continue
+		}
+		v.Protocols = append([]capdto.Protocol(nil), v.Protocols...)
+		out = append(out, v)
+	}
+	size := in.PageSize
+	if size == 0 {
+		size = 100
+	}
+	page := in.Page
+	if page == 0 {
+		page = 1
+	}
+	if page > (len(out)/size)+1 {
+		return []capdto.Capability{}, nil
+	}
+	start := (page - 1) * size
+	end := start + size
+	if end > len(out) {
+		end = len(out)
+	}
+	return out[start:end], nil
+}
+func (r *LocalCapabilityRuntime) GrantStatus(ctx context.Context, _ capdto.GrantStatusInput) ([]capdto.GrantStatusItem, error) {
+	if _, e := localCapabilityTenant(ctx); e != nil {
+		return nil, e
+	}
+	return nil, localCapabilityError(503, "CAPABILITY_LOCAL_GRANT_STATUS_UNAVAILABLE")
+}
+func (r *LocalCapabilityRuntime) Resolve(ctx context.Context, in capdto.ResolveInput) (*capdto.ResolveResult, error) {
+	if _, e := localCapabilityTenant(ctx); e != nil {
+		return nil, e
+	}
+	for _, v := range r.entries {
+		p := v.Protocols[0]
+		if in.Method == p.Method && in.Endpoint == p.Endpoint && (in.Source == "" || in.Source == "local") {
+			return &capdto.ResolveResult{CapabilityID: v.CapabilityID, PluginID: r.plugin, Source: "local", Protocol: "local", Method: p.Method, PatternEndpoint: p.Endpoint}, nil
+		}
+	}
+	return nil, localCapabilityError(404, "CAPABILITY_NOT_FOUND")
+}
+func (r *LocalCapabilityRuntime) Invoke(ctx context.Context, in capdto.InvokeInput) (*capdto.InvokeResult, error) {
+	tenant, e := localCapabilityTenant(ctx)
+	if e != nil {
+		return nil, e
+	}
+	if in.Intent != "" || in.ToolScope != "" || len(in.ToolGrantIDs) > 0 || len(in.Context) > 0 || in.TraceID != "" || (in.PreferredProtocol != "" && in.PreferredProtocol != "local") || len(in.IdempotencyKey) > 128 {
+		return nil, localCapabilityError(400, "CAPABILITY_INVALID_ARGUMENT")
+	}
+	found := false
+	for _, v := range r.entries {
+		if v.CapabilityID == in.CapabilityID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, localCapabilityError(404, "CAPABILITY_NOT_FOUND")
+	}
+	for _, k := range []string{"tenant_uuid", "origin_tenant_uuid", "plugin_id"} {
+		if _, ok := in.Payload[k]; ok {
+			return nil, localCapabilityError(400, "CAPABILITY_INVALID_ARGUMENT")
+		}
+	}
+	payload, e := json.Marshal(in.Payload)
+	if e != nil || len(payload) > 262144 {
+		return nil, localCapabilityError(400, "CAPABILITY_INVALID_ARGUMENT")
+	}
+	if validateTemplateUUIDFields(in.Payload) != nil {
+		return nil, localCapabilityError(400, "CAPABILITY_INVALID_ARGUMENT")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	key := tenant + "/" + in.IdempotencyKey
+	fingerprint := in.CapabilityID + "/" + string(payload)
+	if in.IdempotencyKey != "" {
+		if prev, ok := r.replays[key]; ok {
+			if prev.request != fingerprint {
+				return nil, localCapabilityError(409, "CAPABILITY_IDEMPOTENCY_CONFLICT")
+			}
+			out := cloneLocalResult(prev.result)
+			return &out, prev.err
+		}
+	}
+	if len(r.records) >= 256 {
+		return nil, localCapabilityError(503, "CAPABILITY_LOCAL_CAPACITY_EXCEEDED")
+	}
+	if e = ctx.Err(); e != nil {
+		return nil, e
+	}
+	trace := uuid.NewString()
+	start := time.Now()
+	result, invokeErr := r.invoker.Invoke(ctx, &domain.IntegrationEnvelope{TenantUuid: tenant, PayloadRef: string(payload), Metadata: map[string]any{"capability_id": in.CapabilityID}})
+	out := capdto.InvokeResult{TraceID: trace, Status: "succeeded", ProtocolUsed: "local"}
+	if invokeErr == nil {
+		if result == nil || json.Unmarshal(result.Payload, &out.Payload) != nil {
+			invokeErr = localCapabilityError(502, "CAPABILITY_INVALID_RESPONSE")
+		}
+	}
+	record := capdto.Invocation{TraceID: trace, TenantUUID: tenant, CapabilityID: in.CapabilityID, ProtocolUsed: "local", Status: "succeeded", LatencyMS: int(time.Since(start).Milliseconds())}
+	if invokeErr != nil {
+		out.Status = "failed"
+		record.Status = "failed"
+		record.Error = &capdto.InvocationError{Code: "CAPABILITY_LOCAL_EXECUTION_FAILED"}
+		invokeErr = localCapabilityError(422, record.Error.Code)
+	}
+	r.records[trace] = record
+	if in.IdempotencyKey != "" {
+		r.replays[key] = localReplay{request: fingerprint, result: cloneLocalResult(out), err: invokeErr}
+	}
+	return &out, invokeErr
+}
+func cloneLocalResult(in capdto.InvokeResult) capdto.InvokeResult {
+	b, _ := json.Marshal(in)
+	var out capdto.InvokeResult
+	_ = json.Unmarshal(b, &out)
+	return out
+}
+func (r *LocalCapabilityRuntime) GetInvocation(ctx context.Context, id string) (*capdto.Invocation, error) {
+	tenant, e := localCapabilityTenant(ctx)
+	if e != nil {
+		return nil, e
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	v, ok := r.records[id]
+	if !ok || v.TenantUUID != tenant {
+		return nil, localCapabilityError(404, "CAPABILITY_INVOCATION_NOT_FOUND")
+	}
+	if v.Error != nil {
+		copyError := *v.Error
+		v.Error = &copyError
+	}
+	return &v, nil
+}
+func (r *LocalCapabilityRuntime) routeUUID(tenant, id string) string {
+	return uuid.NewSHA1(uuid.NameSpaceURL, []byte(tenant+"/"+r.plugin+"/"+id)).String()
+}
+func (r *LocalCapabilityRuntime) ListRoutes(ctx context.Context, in intdto.ListRoutesInput) ([]intdto.RouteSummary, error) {
+	tenant, e := localCapabilityTenant(ctx)
+	if e != nil {
+		return nil, e
+	}
+	out := []intdto.RouteSummary{}
+	for _, v := range r.entries {
+		if (in.CapabilityID != "" && in.CapabilityID != v.CapabilityID) || (in.Channel != "" && in.Channel != "local") {
+			continue
+		}
+		out = append(out, intdto.RouteSummary{RouteUUID: r.routeUUID(tenant, v.CapabilityID), RouteSlug: r.routeUUID(tenant, v.CapabilityID), CapabilityID: v.CapabilityID, Channels: []string{"local"}, LifecycleState: "active", Status: "active"})
+	}
+	return out, nil
+}
+func (r *LocalCapabilityRuntime) GetRoute(ctx context.Context, id string) (*intdto.RouteDetail, error) {
+	items, e := r.ListRoutes(ctx, intdto.ListRoutesInput{})
+	if e != nil {
+		return nil, e
+	}
+	for _, v := range items {
+		if v.RouteUUID == id {
+			return &intdto.RouteDetail{RouteUUID: v.RouteUUID, RouteSlug: v.RouteSlug, CapabilityID: v.CapabilityID, Channels: v.Channels, LifecycleState: v.LifecycleState, Status: v.Status, CurrentVersion: 1}, nil
+		}
+	}
+	return nil, localCapabilityError(404, "INTEGRATION_ROUTE_NOT_FOUND")
+}
+func (r *LocalCapabilityRuntime) InvokeRoute(ctx context.Context, id string, in intdto.InvokeRouteInput) (*intdto.InvokeRouteOutput, error) {
+	route, e := r.GetRoute(ctx, id)
+	if e != nil {
+		return nil, e
+	}
+	out, e := r.Invoke(ctx, capdto.InvokeInput{CapabilityID: route.CapabilityID, Payload: in.Payload, Context: in.Context, IdempotencyKey: in.IdempotencyKey})
+	if e != nil {
+		return nil, e
+	}
+	return &intdto.InvokeRouteOutput{Result: out.Payload, RoutedCapabilityID: route.CapabilityID, RoutedAdapter: "local", TraceID: out.TraceID, DispatchedAt: time.Now().UTC().Format(time.RFC3339Nano)}, nil
+}

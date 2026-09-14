@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -173,12 +172,12 @@ func TestMiniAppLocalAuth_MiniAppTemplatesPublishedOnly(t *testing.T) {
 	token := loginOut["data"].(map[string]any)["token"].(string)
 
 	// seed templates: 1 published+approved, 1 draft
-	if err := deps.DB.Exec(`INSERT INTO template (tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?)`,
-		tenantUUID, "Published", "Desc", "Content", "published", "approved").Error; err != nil {
+	if err := deps.DB.Exec(`INSERT INTO template (uuid, tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"11111111-1111-4111-8111-111111111111", tenantUUID, "Published", "Desc", "Content", "published", "approved").Error; err != nil {
 		t.Fatalf("insert published template: %v", err)
 	}
-	if err := deps.DB.Exec(`INSERT INTO template (tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?)`,
-		tenantUUID, "Draft", "Desc", "Content", "draft", "pending").Error; err != nil {
+	if err := deps.DB.Exec(`INSERT INTO template (uuid, tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"22222222-2222-4222-8222-222222222222", tenantUUID, "Draft", "Desc", "Content", "draft", "pending").Error; err != nil {
 		t.Fatalf("insert draft template: %v", err)
 	}
 
@@ -201,8 +200,8 @@ func TestMiniAppLocalAuth_MiniAppTemplatesPublishedOnly(t *testing.T) {
 	}
 
 	// read published template
-	id := int(item["id"].(float64))
-	rec = doJSON(t, engine, http.MethodGet, "/api/v1/mini-app/templates/"+strconv.Itoa(id), tenantUUID, nil, map[string]string{
+	id := item["uuid"].(string)
+	rec = doJSON(t, engine, http.MethodGet, "/api/v1/mini-app/templates/"+id, tenantUUID, nil, map[string]string{
 		"Authorization": "Bearer " + token,
 	})
 	if rec.Code != http.StatusOK {
@@ -273,6 +272,7 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 	}
 	createCustomerMirrorTables(t, db)
 	templateDDL := `CREATE TABLE IF NOT EXISTS template (
+		uuid TEXT NOT NULL UNIQUE,
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		tenant_uuid TEXT NOT NULL,
 		created_at DATETIME,

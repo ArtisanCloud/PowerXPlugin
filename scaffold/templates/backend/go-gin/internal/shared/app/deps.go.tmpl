@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter"
 	"os"
 	"strings"
 
@@ -16,6 +18,7 @@ import (
 	adminmetrics "{{ .BackendModulePath }}/internal/observability/admin_console"
 	capmetrics "{{ .BackendModulePath }}/internal/observability/capability"
 	opsmetrics "{{ .BackendModulePath }}/internal/observability/operations"
+	localaisettings "{{ .BackendModulePath }}/internal/services/ai_settings"
 	"{{ .BackendModulePath }}/internal/services/authproxy"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	marketplacesvc "{{ .BackendModulePath }}/internal/services/marketplace"
@@ -67,6 +70,9 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
+	KnowledgeProvider    fwknowledge.KnowledgeProvider
+	CacheRuntime         *cache.Runtime
+	TaskCenterRuntime    *taskcenter.Runtime
 	DB                   *gorm.DB
 	Ctx                  context.Context
 	PowerXClient         *client.PowerXServiceClient
@@ -74,7 +80,9 @@ type Deps struct {
 	Metadata             *fwmetadata.Runtime
 	CustomerAdmin        *customerfw.AdminClient
 	CustomerRuntime      *customerfw.Runtime
-	AISettings           *fwaisettings.Client
+	AISettings           fwaisettings.Service
+	PowerXAISettings     *fwaisettings.Client
+	LocalAISettings      *localaisettings.LocalSettingsService
 	AIInvocation         *fwai.Runtime
 	AI                   *powerxai.Client
 	AgentLifecycle       *fwagent.Runtime

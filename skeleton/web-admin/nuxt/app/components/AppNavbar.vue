@@ -237,8 +237,7 @@ const formatTime = (value?: string) => {
 };
 
 const subscribeNotificationTopics = () => {
-  subscribeTopic("_topic.system.notification");
-  const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim();
+	const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim();
   if (tenantUUID) {
     subscribeTopic(`_topic.notify.tenant.${tenantUUID}`);
   }

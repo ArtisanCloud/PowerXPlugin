@@ -28,10 +28,10 @@
         "use": "com.powerx.plugins.base.template.read",
         "io": {
           "in_map": {
-            "id": "{{task.collect-stale.output.candidates[0].id}}"
+            "template_uuid": "{{task.collect-stale.output.candidates[0].uuid}}"
           },
           "out_map": {
-            "template_id": "output.id",
+            "template_uuid": "output.uuid",
             "current_content": "output.content"
           }
         }
@@ -42,11 +42,11 @@
         "use": "com.powerx.plugins.base.template.update",
         "io": {
           "in_map": {
-            "id": "{{task.inspect-primary.output.template_id}}",
+            "template_uuid": "{{task.inspect-primary.output.template_uuid}}",
             "body": "{{var.update_payload}}"
           },
           "out_map": {
-            "updated_id": "output.id"
+            "updated_id": "output.uuid"
           }
         }
       }
@@ -80,7 +80,7 @@
       "name": "读取模板",
       "description": "获取指定模板详情。",
       "transport": "http",
-      "endpoint": "/api/v1/templates/{id}",
+      "endpoint": "/api/v1/templates/{uuid}",
       "method": "GET",
       "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.read.json",
       "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.read.json"
@@ -91,7 +91,7 @@
       "name": "更新模板",
       "description": "批量或单条修改模板内容。",
       "transport": "http",
-      "endpoint": "/api/v1/templates/{id}",
+      "endpoint": "/api/v1/templates/{uuid}",
       "method": "PUT",
       "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.update.json",
       "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.update.json"

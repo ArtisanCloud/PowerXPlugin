@@ -3,9 +3,11 @@ package media
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
@@ -82,17 +84,90 @@ type CompleteUploadInput struct {
 	Checksum string `json:"checksum"`
 }
 type Variant struct {
-	VariantUUID string `json:"variant_uuid"`
-	AssetUUID   string `json:"asset_uuid"`
-	Name        string `json:"name,omitempty"`
-	MimeType    string `json:"mime_type"`
-	SizeBytes   int64  `json:"size_bytes"`
+	Status      string     `json:"status"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	VariantUUID string     `json:"variant_uuid"`
+	AssetUUID   string     `json:"asset_uuid"`
+	Name        string     `json:"name,omitempty"`
+	MimeType    string     `json:"mime_type"`
+	SizeBytes   int64      `json:"size_bytes"`
 }
 type CreateVariantInput struct {
+	Checksum    string `json:"checksum"`
 	VariantType string `json:"variant_type"`
 	Name        string `json:"name,omitempty"`
 	MimeType    string `json:"mime_type"`
 	SizeBytes   int64  `json:"size_bytes"`
+}
+
+// VariantTicketInput omits a zero TTL to select Core's 900-second default.
+// Explicit TTL values must be between 60 and 3600 seconds.
+type VariantTicketInput struct {
+	ExpiresInSeconds int64 `json:"expires_in_seconds,omitempty"`
+}
+
+func (c *HostClient) PresignVariantUpload(ctx context.Context, assetUUID, variantUUID string, in VariantTicketInput) (*TransferTicket, error) {
+	return c.variantTicket(ctx, assetUUID, variantUUID, "presign-upload", in)
+}
+
+func (c *HostClient) PresignVariantDownload(ctx context.Context, assetUUID, variantUUID string, in VariantTicketInput) (*TransferTicket, error) {
+	return c.variantTicket(ctx, assetUUID, variantUUID, "presign-download", in)
+}
+
+func variantPath(assetUUID, variantUUID string) string {
+	return "/api/v1/tenant/media/assets/" + url.PathEscape(assetUUID) + "/variants/" + url.PathEscape(variantUUID)
+}
+
+func validateVariantRequest(ctx context.Context, assetUUID, variantUUID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	for _, value := range []string{assetUUID, variantUUID} {
+		id, err := uuid.Parse(value)
+		if err != nil || id == uuid.Nil || id.String() != value {
+			return mediaHostError(http.StatusBadRequest, nil)
+		}
+	}
+	return nil
+}
+
+func (c *HostClient) variantTicket(ctx context.Context, assetUUID, variantUUID, action string, in VariantTicketInput) (*TransferTicket, error) {
+	if err := validateVariantRequest(ctx, assetUUID, variantUUID); err != nil {
+		return nil, err
+	}
+	if in.ExpiresInSeconds != 0 && (in.ExpiresInSeconds < 60 || in.ExpiresInSeconds > 3600) {
+		return nil, mediaHostError(http.StatusBadRequest, nil)
+	}
+	var out TransferTicket
+	if err := c.do(ctx, http.MethodPost, variantPath(assetUUID, variantUUID)+"/"+action, in, &out); err != nil {
+		return nil, err
+	}
+	wantMethod := http.MethodGet
+	if action == "presign-upload" {
+		wantMethod = http.MethodPut
+	}
+	if _, err := time.Parse(time.RFC3339, out.ExpiresAt); err != nil || out.Method != wantMethod {
+		return nil, mediaHostError(http.StatusBadGateway, nil)
+	}
+	return &out, nil
+}
+
+func (c *HostClient) CompleteVariantUpload(ctx context.Context, assetUUID, variantUUID string, in CompleteUploadInput) (*Variant, error) {
+	if err := validateVariantRequest(ctx, assetUUID, variantUUID); err != nil {
+		return nil, err
+	}
+	checksum, err := hex.DecodeString(in.Checksum)
+	if err != nil || len(checksum) != 32 {
+		return nil, mediaHostError(http.StatusBadRequest, nil)
+	}
+	var out Variant
+	if err := c.do(ctx, http.MethodPost, variantPath(assetUUID, variantUUID)+"/complete-upload", in, &out); err != nil {
+		return nil, err
+	}
+	if out.AssetUUID != assetUUID || out.VariantUUID != variantUUID || out.Status != "ready" || out.CompletedAt == nil {
+		return nil, mediaHostError(http.StatusBadGateway, nil)
+	}
+	return &out, nil
 }
 
 func (c *HostClient) ListAssets(ctx context.Context, in ListAssetsInput) (*ListAssetsOutput, error) {
@@ -185,6 +260,9 @@ func (c *HostClient) do(ctx context.Context, method, path string, input, out any
 		return err
 	}
 	token, err := c.tokens.Token(ctx)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if err != nil || strings.TrimSpace(token) == "" {
 		return mediaHostError(http.StatusServiceUnavailable, nil)
 	}
@@ -202,6 +280,9 @@ func (c *HostClient) do(ctx context.Context, method, path string, input, out any
 	}
 	defer resp.Body.Close()
 	raw, readErr := io.ReadAll(io.LimitReader(resp.Body, (1<<20)+1))
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if readErr != nil || len(raw) > 1<<20 {
 		return mediaHostError(http.StatusBadGateway, nil)
 	}

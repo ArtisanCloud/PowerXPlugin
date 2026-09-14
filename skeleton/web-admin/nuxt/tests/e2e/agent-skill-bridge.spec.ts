@@ -13,6 +13,7 @@ test('Agent chat uses append, invoke and read-only events', async ({page})=>{
   expect(operations[1].body).toEqual({message_uuid:messageUUID});
   expect(operations[0].key).toBeTruthy();expect(operations[1].key).toBeTruthy();
   expect(seen.some(r=>r.path.endsWith('/stream/sse'))).toBe(false);
+  expect(seen.pageErrors).toEqual([]);
 });
 
 test('session creation only sends the formal UUID DTO', async ({page})=>{
@@ -22,4 +23,5 @@ test('session creation only sends the formal UUID DTO', async ({page})=>{
   const body=seen.find(r=>r.method==='POST'&&r.path.endsWith('/sessions'))!.body;
   expect(Object.keys(body).sort()).toEqual(['agent_uuid','title']);
   expect(body.agent_uuid).toBe(agentUUID);
+  expect(seen.pageErrors).toEqual([]);
 });

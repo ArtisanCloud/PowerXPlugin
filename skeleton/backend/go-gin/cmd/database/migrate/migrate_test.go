@@ -7,10 +7,33 @@ import (
 
 	EntityModels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	identitymodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	_ "modernc.org/sqlite"
 )
+
+// legacyLocalAISetting reproduces the profile schema released before the
+// catalog source became a tenant system setting.
+type legacyLocalAISetting struct {
+	ID            uint64 `gorm:"primaryKey"`
+	TenantUUID    string `gorm:"column:tenant_uuid"`
+	CatalogSource string `gorm:"column:catalog_source"`
+}
+
+func (legacyLocalAISetting) TableName() string { return EntityModels.LocalAISetting{}.TableName() }
+
+type legacySingleAIProfile struct {
+	ID          uint64         `gorm:"primaryKey"`
+	TenantUUID  string         `gorm:"column:tenant_uuid;uniqueIndex:uk_local_ai_settings_tenant_env_modality,priority:1"`
+	Environment string         `gorm:"column:environment;uniqueIndex:uk_local_ai_settings_tenant_env_modality,priority:2"`
+	Modality    string         `gorm:"column:modality;uniqueIndex:uk_local_ai_settings_tenant_env_modality,priority:3"`
+	Provider    string         `gorm:"column:provider"`
+	ModelKey    string         `gorm:"column:model_key"`
+	Parameters  datatypes.JSON `gorm:"column:parameters;type:json;not null"`
+}
+
+func (legacySingleAIProfile) TableName() string { return EntityModels.LocalAISetting{}.TableName() }
 
 func TestMigratePluginModelsIncludesFederatedIAMTables(t *testing.T) {
 	EntityModels.ForceSchemaForTests("")
@@ -58,6 +81,80 @@ func TestMigratePluginModelsIncludesFederatedIAMTables(t *testing.T) {
 		if !db.Migrator().HasColumn(table, column) {
 			t.Fatalf("%s.%s = missing", table, column)
 		}
+	}
+}
+
+func TestRemoveObsoleteAICatalogSourceDeletesSavedPreference(t *testing.T) {
+	EntityModels.ForceSchemaForTests("")
+	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
+	db, err := gorm.Open(sqlite.Dialector{DriverName: "sqlite", DSN: "file:ai_catalog_source_migration?mode=memory&cache=shared"}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&legacyLocalAISetting{}, &EntityModels.PluginSystemConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	tenant := "11111111-1111-4111-8111-111111111111"
+	if err := db.Create(&legacyLocalAISetting{TenantUUID: tenant, CatalogSource: "powerx"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&EntityModels.PluginSystemConfig{TenantUUID: tenant, Key: "ai.catalog_source", Value: []byte(`"powerx"`)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := removeObsoleteAICatalogSource(context.Background(), db); err != nil {
+		t.Fatalf("removeObsoleteAICatalogSource() error = %v", err)
+	}
+	if db.Migrator().HasColumn(EntityModels.LocalAISetting{}.TableName(), "catalog_source") {
+		t.Fatal("legacy local_ai_settings.catalog_source still exists")
+	}
+	var count int64
+	if err := db.Model(&EntityModels.PluginSystemConfig{}).Where("tenant_uuid = ? AND key = ?", tenant, "ai.catalog_source").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("obsolete ai.catalog_source count=%d, want 0", count)
+	}
+}
+
+func TestMigrateLocalAISettingSourcesSplitsLegacyProfileSlot(t *testing.T) {
+	EntityModels.ForceSchemaForTests("")
+	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
+	db, err := gorm.Open(sqlite.Dialector{DriverName: "sqlite", DSN: "file:ai_profile_source_migration?mode=memory&cache=shared"}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&legacySingleAIProfile{}); err != nil {
+		t.Fatal(err)
+	}
+	legacy := legacySingleAIProfile{TenantUUID: "11111111-1111-4111-8111-111111111111", Environment: "development", Modality: "llm", Provider: "baidu", ModelKey: "ERNIE-Bot-4", Parameters: datatypes.JSON([]byte(`{}`))}
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("ALTER TABLE local_ai_settings ADD COLUMN source text NOT NULL DEFAULT 'local'").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateLocalAISettingSources(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	var local struct {
+		Provider string `gorm:"column:provider"`
+		ModelKey string `gorm:"column:model_key"`
+		Source   string `gorm:"column:source"`
+	}
+	if err := db.Table(EntityModels.LocalAISetting{}.TableName()).Select("provider, model_key, source").Where("tenant_uuid = ? AND environment = ? AND modality = ? AND source = ?", legacy.TenantUUID, "development", "llm", "local").Take(&local).Error; err != nil {
+		t.Fatal(err)
+	}
+	if local.Provider != "baidu" || local.ModelKey != "ERNIE-Bot-4" {
+		t.Fatalf("migrated profile=%+v", local)
+	}
+	if err := db.Exec("INSERT INTO local_ai_settings (tenant_uuid, environment, modality, source, provider, model_key, parameters) VALUES (?, ?, ?, ?, ?, ?, ?)", legacy.TenantUUID, "development", "llm", "powerx", "ollama", "qwen3:8b", "{}").Error; err != nil {
+		t.Fatalf("create powerx partition: %v", err)
+	}
+	if db.Migrator().HasIndex(&EntityModels.LocalAISetting{}, "uk_local_ai_settings_tenant_env_modality") {
+		t.Fatal("legacy unique index still exists")
+	}
+	if !db.Migrator().HasIndex(&EntityModels.LocalAISetting{}, "uk_local_ai_settings_tenant_env_modality_source") {
+		t.Fatal("source-partitioned unique index is missing")
 	}
 }
 

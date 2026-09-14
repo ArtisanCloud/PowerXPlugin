@@ -18,7 +18,7 @@
             "body": "{{var.template_draft}}"
           },
           "out_map": {
-            "template_id": "output.id"
+            "template_uuid": "output.uuid"
           }
         }
       },
@@ -32,7 +32,7 @@
         },
         "io": {
           "in_map": {
-            "template_id": "{{task.draft.output.template_id}}",
+            "template_uuid": "{{task.draft.output.template_uuid}}",
             "approved": "{{var.review.approved}}",
             "comments": "{{var.review.comments}}"
           },
@@ -51,7 +51,7 @@
         },
         "io": {
           "in_map": {
-            "template_id": "{{task.draft.output.template_id}}",
+            "template_uuid": "{{task.draft.output.template_uuid}}",
             "approved": "{{task.review.output.approved}}",
             "channel": "{{var.publish_channel}}"
           },
@@ -90,7 +90,7 @@
       "name": "审核模板",
       "description": "审核草稿并附加评论。",
       "transport": "http",
-      "endpoint": "/api/v1/templates/{id}/review",
+      "endpoint": "/api/v1/templates/{uuid}/review",
       "method": "POST",
       "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.review.json",
       "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.review.json"
@@ -101,7 +101,7 @@
       "name": "发布模板",
       "description": "将审核通过的模板发布到业务租户。",
       "transport": "http",
-      "endpoint": "/api/v1/templates/{id}/publish",
+      "endpoint": "/api/v1/templates/{uuid}/publish",
       "method": "POST",
       "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.publish.json",
       "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.publish.json"

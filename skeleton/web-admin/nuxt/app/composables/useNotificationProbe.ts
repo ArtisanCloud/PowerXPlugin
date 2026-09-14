@@ -45,16 +45,10 @@ function buildWsURL(scope: string) {
   const pluginId =
     String(runtimeConfig.public?.powerxPluginId || "").trim() ||
     "com.powerx.plugins.base";
-  const isGatewayScope = scope === "gateway";
   const wsBaseURL = String(
-    isGatewayScope
-      ? runtimeConfig.public?.pxWsBaseUrl ||
-          runtimeConfig.public?.wsOrigin ||
-          runtimeConfig.public?.powerxCoreBase ||
-          (typeof window !== "undefined" ? window.location.origin : "")
-      : runtimeConfig.public?.wsOrigin ||
-          resolveApiBase() ||
-          (typeof window !== "undefined" ? window.location.origin : "")
+    runtimeConfig.public?.wsOrigin ||
+      resolveApiBase() ||
+      (typeof window !== "undefined" ? window.location.origin : "")
   ).trim();
   const wsPath = String(
     runtimeConfig.public?.wsUrl || runtimeConfig.public?.wsPath || "/api/ws"
@@ -64,7 +58,7 @@ function buildWsURL(scope: string) {
     apiBaseURL: resolveApiBase(),
     wsBaseURL,
     wsPath,
-    insidePowerX: isGatewayScope ? true : runtimeMode.insidePowerX,
+    insidePowerX: runtimeMode.insidePowerX,
     token,
     tenantUuid: getTenantUuid(),
   });
@@ -82,7 +76,7 @@ function buildWsURL(scope: string) {
 }
 
 function resolveDefaultTopic(fallback?: string) {
-  return String(fallback || "_topic.system.notification").trim();
+  return String(fallback || "").trim();
 }
 
 function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent {
@@ -101,7 +95,10 @@ function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent
   };
 }
 
-export function useNotificationProbe(scope = "default", defaultTopic = "_topic.system.notification") {
+// Plugin-local consumers must opt in to a declared topic. A PowerX system
+// topic belongs to the host WS endpoint and must never be subscribed through
+// the plugin-local /api/ws transport by default.
+export function useNotificationProbe(scope = "default", defaultTopic = "") {
   let wsConn: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let closedByClient = false;

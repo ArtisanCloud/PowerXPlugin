@@ -11,6 +11,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 		return
 	}
 	handler := NewHandler(deps)
-	group := admin.Group("/host-contract", httpmw.EnsureTenant(), httpmw.RequireRoot())
+	// Probe requires the authenticated tenant context; do not populate it from headers.
+	group := admin.Group("/host-contract", httpmw.RequireRoot())
 	group.POST("/probe", handler.Probe)
 }

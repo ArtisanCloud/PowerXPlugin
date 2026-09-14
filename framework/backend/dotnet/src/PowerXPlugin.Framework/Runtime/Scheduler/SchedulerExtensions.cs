@@ -8,9 +8,33 @@ public static class SchedulerExtensions
 {
     public static IServiceCollection AddLocalScheduler(this IServiceCollection services)
     {
-        services.AddSingleton<LocalScheduler>();
-        services.AddSingleton<IScheduler>(sp => sp.GetRequiredService<LocalScheduler>());
-        services.AddHostedService<SchedulerRunner>();
+        return services.AddPowerXScheduler(SchedulerAdapterMode.Local, _ => throw new InvalidOperationException(SchedulerErrors.CodeInvalidMode));
+    }
+
+    /// <summary>
+    /// Registers exactly one scheduler implementation selected at application
+    /// startup. Delegated mode never starts the in-process runner.
+    /// </summary>
+    public static IServiceCollection AddPowerXScheduler(
+        this IServiceCollection services,
+        SchedulerAdapterMode mode,
+        Func<IServiceProvider, IScheduler> delegatedFactory)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(delegatedFactory);
+        switch (mode)
+        {
+            case SchedulerAdapterMode.Local:
+                services.AddSingleton<LocalScheduler>();
+                services.AddSingleton<IScheduler>(sp => sp.GetRequiredService<LocalScheduler>());
+                services.AddHostedService<SchedulerRunner>();
+                break;
+            case SchedulerAdapterMode.Delegated:
+                services.AddSingleton(delegatedFactory);
+                break;
+            default:
+                throw new SchedulerAdapterException(SchedulerErrors.CodeInvalidMode);
+        }
         return services;
     }
 }

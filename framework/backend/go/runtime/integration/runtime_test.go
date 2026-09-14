@@ -6,6 +6,8 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/module"
 	powerxintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -48,5 +50,57 @@ func TestRuntimeFailsClosedWhenSelectedAdapterMissing(t *testing.T) {
 	var moduleErr *module.Error
 	if !errors.As(err, &moduleErr) || moduleErr.Code != "FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE" {
 		t.Fatalf("Gateway error=%v", err)
+	}
+}
+
+type rejectingGateway struct {
+	gatewayStub
+	calls *int
+	err   error
+}
+
+func (s rejectingGateway) InvokeRoute(context.Context, string, powerxintegration.InvokeRouteInput) (*powerxintegration.InvokeRouteOutput, error) {
+	*s.calls++
+	return nil, s.err
+}
+
+func TestLocalRuntimeCannotUseDelegatedGateway(t *testing.T) {
+	calls := 0
+	runtime, err := NewRuntime(provider.ModeLocal, nil, rejectingGateway{calls: &calls})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := runtime.Gateway()
+	if gateway != nil || err == nil || calls != 0 {
+		t.Fatalf("gateway=%T err=%v calls=%d", gateway, err, calls)
+	}
+}
+
+func TestDelegatedHTTPDenialDoesNotInvokeLocal(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/tenant/integration/routes/test-route/invoke" || r.Header.Get("Authorization") != "Bearer test-sts" {
+			t.Errorf("method=%s path=%s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"reason_code":"TEST_GRANT_DENIED"}`))
+	}))
+	defer server.Close()
+	client, err := powerxintegration.NewClientWithTokenProvider(powerxintegration.Config{BaseURL: server.URL}, powerxintegration.TokenProviderFunc(func(context.Context) (string, error) { return "test-sts", nil }), server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	runtime, err := NewRuntime(provider.ModeDelegated, rejectingGateway{calls: &calls}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway, err := runtime.Gateway()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = gateway.InvokeRoute(context.Background(), "test-route", powerxintegration.InvokeRouteInput{Payload: map[string]any{"operation": "test"}})
+	var upstream *powerxintegration.HTTPError
+	if !errors.As(err, &upstream) || upstream.StatusCode != 403 || upstream.ReasonCode != "TEST_GRANT_DENIED" || calls != 0 {
+		t.Fatalf("err=%v local_calls=%d", err, calls)
 	}
 }

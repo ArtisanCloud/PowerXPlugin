@@ -932,6 +932,9 @@ func (h *KnowledgeHandler) Search(c *gin.Context) {
 }
 
 func (h *KnowledgeHandler) provider() (fwknowledge.KnowledgeProvider, error) {
+	if h != nil && h.deps != nil && h.deps.KnowledgeProvider != nil {
+		return h.deps.KnowledgeProvider, nil
+	}
 	if h == nil {
 		return knowledgeSvc.NewProviderFactory(nil, fwprovider.ModeLocal, nil, nil).Build()
 	}

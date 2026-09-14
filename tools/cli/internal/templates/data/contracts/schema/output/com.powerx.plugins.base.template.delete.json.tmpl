@@ -3,26 +3,49 @@
   "title": "TemplateDeleteOutput",
   "type": "object",
   "properties": {
-    "content": { "type": "string" },
-    "id": { "type": "string" },
+    "content": {
+      "type": "string"
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
     "links": {
       "type": "array",
-      "items": { "$ref": "#/definitions/AgentResponseLink" }
+      "items": {
+        "$ref": "#/definitions/AgentResponseLink"
+      }
     },
-    "deleted": { "type": "boolean" }
+    "deleted": {
+      "type": "boolean"
+    }
   },
-  "required": ["id", "deleted"],
+  "required": [
+    "uuid",
+    "deleted"
+  ],
   "additionalProperties": false,
   "definitions": {
     "AgentResponseLink": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "kind": { "type": "string" },
-        "label": { "type": "string" },
-        "href": { "type": "string" }
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "href": {
+          "type": "string"
+        }
       },
-      "required": ["label", "href"],
+      "required": [
+        "label",
+        "href"
+      ],
       "additionalProperties": true
     }
   }

@@ -41,6 +41,15 @@ func (s catalogStub) PresignDownload(context.Context, string) (*powerxmedia.Tran
 func (s catalogStub) CreateVariant(context.Context, string, powerxmedia.CreateVariantInput) (*powerxmedia.Variant, error) {
 	return &powerxmedia.Variant{VariantUUID: s.label}, nil
 }
+func (s catalogStub) PresignVariantUpload(context.Context, string, string, powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error) {
+	return &powerxmedia.TransferTicket{URL: s.label}, nil
+}
+func (s catalogStub) PresignVariantDownload(context.Context, string, string, powerxmedia.VariantTicketInput) (*powerxmedia.TransferTicket, error) {
+	return &powerxmedia.TransferTicket{URL: s.label}, nil
+}
+func (s catalogStub) CompleteVariantUpload(context.Context, string, string, powerxmedia.CompleteUploadInput) (*powerxmedia.Variant, error) {
+	return &powerxmedia.Variant{VariantUUID: s.label}, nil
+}
 func (s catalogStub) GetVariant(context.Context, string) (*powerxmedia.Variant, error) {
 	return &powerxmedia.Variant{VariantUUID: s.label}, nil
 }
@@ -82,5 +91,30 @@ func TestRuntimeFailsClosedWhenSelectedAdapterIsMissing(t *testing.T) {
 	var moduleErr *module.Error
 	if !errors.As(err, &moduleErr) || moduleErr.Code != "FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE" {
 		t.Fatalf("Assets() error = %v", err)
+	}
+}
+
+func TestVariantTransfersUseSelectedAdapter(t *testing.T) {
+	for _, mode := range []provider.Mode{provider.ModeLocal, provider.ModeDelegated} {
+		r, err := NewRuntime(mode, catalogStub{label: "local"}, catalogStub{label: "delegated"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		s, err := r.Media()
+		if err != nil {
+			t.Fatal(err)
+		}
+		u, err := s.PresignVariantUpload(context.Background(), "asset", "variant", powerxmedia.VariantTicketInput{})
+		if err != nil || u.URL != string(mode) {
+			t.Fatalf("upload=%v err=%v", u, err)
+		}
+		d, err := s.PresignVariantDownload(context.Background(), "asset", "variant", powerxmedia.VariantTicketInput{})
+		if err != nil || d.URL != string(mode) {
+			t.Fatalf("download=%v err=%v", d, err)
+		}
+		v, err := s.CompleteVariantUpload(context.Background(), "asset", "variant", powerxmedia.CompleteUploadInput{})
+		if err != nil || v.VariantUUID != string(mode) {
+			t.Fatalf("variant=%v err=%v", v, err)
+		}
 	}
 }

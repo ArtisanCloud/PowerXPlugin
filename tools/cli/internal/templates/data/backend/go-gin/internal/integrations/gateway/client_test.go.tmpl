@@ -210,14 +210,14 @@ func (s *stubTransport) Invoke(ctx context.Context, req frameworkgateway.InvokeR
 
 func (s *stubTransport) Close() error { return nil }
 
-func TestListPlatformCapabilitiesSuccess(t *testing.T) {
+func TestListPlatformCapabilityCatalogSuccess(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/tenant/capabilities" {
 			http.NotFound(w, r)
 			return
 		}
-		if got := r.URL.Query().Get("source"); got != "corex" {
-			http.Error(w, "missing source", http.StatusBadRequest)
+		if got := r.URL.RawQuery; got != "page=1&page_size=200" {
+			http.Error(w, "unexpected catalog query", http.StatusBadRequest)
 			return
 		}
 		if r.Header.Get("Authorization") != "ApiKey token" {
@@ -231,13 +231,10 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 				"items":[
 					{
 						"capability_id":"com.corex.media.assets.read",
-						"plugin_id":"corex",
-						"plugin_version":"1.0.0",
+						"title":"Media Assets Read",
+						"description":"Read media assets",
 						"source":"corex",
 						"categories":["media"],
-						"protocols":[{"channel":"rest","endpoint":"/api/v1/media/assets","method":"GET"}],
-						"capabilities_hash":"abc",
-						"protocol_hash":"def",
 						"status":"published"
 					}
 				]
@@ -267,11 +264,11 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 	}
 	client := NewClient(cfg, nil)
 
-	records, err := client.ListPlatformCapabilities(context.Background(), ListPlatformCapabilitiesOptions{Source: "corex"})
+	records, err := client.ListPlatformCapabilityCatalog(context.Background(), ListPlatformCapabilityCatalogOptions{})
 	require.NoError(t, err)
 	require.Len(t, records, 1)
 	require.Equal(t, "com.corex.media.assets.read", records[0].CapabilityID)
-	require.Equal(t, "rest", records[0].Protocols[0].Channel)
+	require.Equal(t, "Media Assets Read", records[0].Title)
 }
 
 func TestAPIKeyRequestsDoNotSendTenantHeader(t *testing.T) {
@@ -432,7 +429,7 @@ func TestCreateKnowledgeSpaceUsesPowerXAdminAPI(t *testing.T) {
 	require.Equal(t, "插件联调知识空间", record.SpaceName)
 }
 
-func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
+func TestListPlatformCapabilityCatalogHTTPError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	})
@@ -458,7 +455,7 @@ func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 	}
 	client := NewClient(cfg, nil)
 
-	_, listErr := client.ListPlatformCapabilities(context.Background(), ListPlatformCapabilitiesOptions{Source: "corex"})
+	_, listErr := client.ListPlatformCapabilityCatalog(context.Background(), ListPlatformCapabilityCatalogOptions{})
 	require.Error(t, listErr)
 }
 

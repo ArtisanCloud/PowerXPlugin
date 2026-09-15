@@ -106,7 +106,7 @@ func TestCatalogConflictDetectedBeforeMergeFromFiles(t *testing.T) {
 }
 
 func TestValidateRequiredHostCapabilities(t *testing.T) {
-	required := []string{"com.corex.capabilities.grant_status.read", "com.corex.metadata.dictionary.read"}
+	required := []string{"com.corex.capabilities.catalog.read", "com.corex.capabilities.grant_status.read", "com.corex.metadata.dictionary.read"}
 
 	plugin := map[string]interface{}{
 		"capabilities": map[string]interface{}{
@@ -117,17 +117,27 @@ func TestValidateRequiredHostCapabilities(t *testing.T) {
 		t.Fatalf("explicit read-only requirements rejected: %v", err)
 	}
 
-	missing := map[string]interface{}{
+	missingCatalog := map[string]interface{}{
 		"capabilities": map[string]interface{}{
-			"required": stringSliceToInterfaces(required[1:]),
+			"required": stringSliceToInterfaces([]string{"com.corex.capabilities.grant_status.read"}),
 		},
 	}
-	err := validateRequiredHostCapabilities(missing)
+	err := validateRequiredHostCapabilities(missingCatalog)
 	if err == nil {
-		t.Fatal("missing grant-status capability accepted")
+		t.Fatal("missing catalog capability accepted")
 	}
-	if !strings.Contains(err.Error(), "com.corex.capabilities.grant_status.read") {
-		t.Fatalf("expected missing capability in error, got %q", err.Error())
+	if !strings.Contains(err.Error(), "com.corex.capabilities.catalog.read") {
+		t.Fatalf("expected missing catalog capability in error, got %q", err.Error())
+	}
+
+	missingGrantStatus := map[string]interface{}{
+		"capabilities": map[string]interface{}{
+			"required": stringSliceToInterfaces([]string{"com.corex.capabilities.catalog.read"}),
+		},
+	}
+	err = validateRequiredHostCapabilities(missingGrantStatus)
+	if err == nil || !strings.Contains(err.Error(), "com.corex.capabilities.grant_status.read") {
+		t.Fatalf("expected missing grant-status capability error, got %v", err)
 	}
 
 	malformed := map[string]interface{}{
@@ -150,10 +160,10 @@ func TestRequiredCapabilitiesAreExplicitAndStrict(t *testing.T) {
 		invalid bool
 	}{
 		{[]interface{}{}, false},
-		{[]interface{}{"com.corex.capabilities.grant_status.read"}, false},
-		{[]interface{}{"com.corex.capabilities.grant_status.read", "com.example.plugin.read"}, false},
-		{[]interface{}{"com.corex.capabilities.grant_status.read", "com.corex.capabilities.grant_status.read"}, true},
-		{[]interface{}{" com.corex.capabilities.grant_status.read"}, true},
+		{[]interface{}{"com.corex.capabilities.catalog.read", "com.corex.capabilities.grant_status.read"}, false},
+		{[]interface{}{"com.corex.capabilities.catalog.read", "com.corex.capabilities.grant_status.read", "com.example.plugin.read"}, false},
+		{[]interface{}{"com.corex.capabilities.catalog.read", "com.corex.capabilities.grant_status.read", "com.corex.capabilities.grant_status.read"}, true},
+		{[]interface{}{" com.corex.capabilities.catalog.read", "com.corex.capabilities.grant_status.read"}, true},
 	} {
 		err := validateRequiredHostCapabilities(map[string]interface{}{"capabilities": map[string]interface{}{"required": tc.ids}})
 		if (err != nil) != tc.invalid {

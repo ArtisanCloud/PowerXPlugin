@@ -85,6 +85,25 @@ public record Job
     public Dictionary<string, object?>? Payload { get; init; }
 }
 
+/// <summary>
+/// Stable payload emitted when a Scheduler job fires. Consumers must verify
+/// owner and business action, then persist the idempotency key before/with
+/// business state mutation. Host-triggered messages use this same envelope.
+/// </summary>
+public sealed record SchedulerTriggeredPayload(
+    [property: JsonPropertyName("job_id")] string JobId,
+    [property: JsonPropertyName("job_name")] string JobName,
+    [property: JsonPropertyName("owner_type")] string OwnerType,
+    [property: JsonPropertyName("owner_id")] string OwnerId,
+    [property: JsonPropertyName("tenant_uuid")] string TenantUuid,
+    [property: JsonPropertyName("trigger_source")] string TriggerSource,
+    [property: JsonPropertyName("scheduled_at")] DateTime ScheduledAt,
+    [property: JsonPropertyName("fired_at")] DateTime FiredAt,
+    [property: JsonPropertyName("trace_id")] string TraceId,
+    [property: JsonPropertyName("idempotency_key")] string IdempotencyKey,
+    [property: JsonPropertyName("business_action")] string? BusinessAction,
+    [property: JsonPropertyName("payload")] Dictionary<string, object?> Payload);
+
 public sealed class SchedulerAdapterException : Exception
 {
     public string Code { get; }

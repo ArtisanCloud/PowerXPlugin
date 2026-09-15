@@ -2,17 +2,13 @@ package capability
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
-	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
 	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
@@ -29,13 +25,13 @@ type CatalogService struct {
 	descriptorCache    map[string]*descriptorMetadata
 	descriptorCacheMux sync.RWMutex
 	cfg                *config.Config
-	capabilityRuntime  *fwcapability.Runtime
+	capabilityRegistry powerxcapability.Registry
 }
 
 type gatewayClient interface {
 	Enabled() bool
 	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
-	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	ListPlatformCapabilityCatalog(ctx context.Context, opts gateway.ListPlatformCapabilityCatalogOptions) ([]gateway.PlatformCapabilityCatalogRecord, error)
 	Close() error
 }
 
@@ -63,11 +59,11 @@ func NewCatalogService(deps *app.Deps) *CatalogService {
 		return nil
 	}
 	return &CatalogService{
-		manager:           mgr,
-		gateway:           deps.CapabilityGateway,
-		cfg:               deps.Config,
-		capabilityRuntime: deps.CapabilityAccess,
-		descriptorCache:   make(map[string]*descriptorMetadata),
+		manager:            mgr,
+		gateway:            deps.CapabilityGateway,
+		cfg:                deps.Config,
+		capabilityRegistry: deps.CapabilityRegistry,
+		descriptorCache:    make(map[string]*descriptorMetadata),
 	}
 }
 
@@ -75,14 +71,74 @@ func NewCatalogService(deps *app.Deps) *CatalogService {
 // credential. It intentionally has no local fallback: catalog presence is not
 // evidence of a grant.
 func (s *CatalogService) GrantStatus(ctx context.Context, capabilityIDs []string) ([]powerxcapability.GrantStatusItem, error) {
-	if s == nil || s.capabilityRuntime == nil {
+	if s == nil || s.capabilityRegistry == nil {
 		return nil, errors.New("capability grant-status client not configured")
 	}
-	registry, err := s.capabilityRuntime.Registry()
+	return s.capabilityRegistry.GrantStatus(ctx, powerxcapability.GrantStatusInput{CapabilityIDs: capabilityIDs})
+}
+
+// CoreXContract returns the formal protocol contract for one capability that
+// the current Gateway API key is already authorized to call. It is deliberately
+// separate from the published catalog: the catalog is discovery metadata only.
+func (s *CatalogService) CoreXContract(ctx context.Context, capabilityID string) (*capabilities.CatalogEntry, error) {
+	if s == nil || s.capabilityRegistry == nil {
+		return nil, errors.New("PowerX capability contract client not configured")
+	}
+	capabilityID = strings.TrimSpace(capabilityID)
+	if capabilityID == "" {
+		return nil, errors.New("capability_id is required")
+	}
+	items, err := s.capabilityRegistry.List(ctx, powerxcapability.ListInput{
+		Page: 1, PageSize: 200, Source: "corex",
+	})
 	if err != nil {
 		return nil, err
 	}
-	return registry.GrantStatus(ctx, powerxcapability.GrantStatusInput{CapabilityIDs: capabilityIDs})
+	for _, item := range items {
+		if strings.TrimSpace(item.CapabilityID) != capabilityID {
+			continue
+		}
+		return &capabilities.CatalogEntry{
+			ID:          item.CapabilityID,
+			Title:       item.Title,
+			Description: item.Description,
+			Source:      item.Source,
+			Tags:        append([]string{}, item.Categories...),
+			Module:      deriveCapabilityModule(item.CapabilityID),
+			Kind:        "Capability",
+			Protocols:   formalProtocolMap(item.Protocols),
+		}, nil
+	}
+	return nil, fmt.Errorf("current Gateway API key has no formal contract for capability %q", capabilityID)
+}
+
+func formalProtocolMap(protocols []powerxcapability.Protocol) map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, protocol := range protocols {
+		channel := strings.TrimSpace(protocol.Channel)
+		if channel == "" {
+			continue
+		}
+		detail := map[string]interface{}{}
+		if value := strings.TrimSpace(protocol.Endpoint); value != "" {
+			detail["endpoint"] = value
+		}
+		if value := strings.TrimSpace(protocol.Method); value != "" {
+			detail["method"] = value
+		}
+		if value := strings.TrimSpace(protocol.RPC); value != "" {
+			detail["rpc"] = value
+		}
+		if value := strings.TrimSpace(protocol.SchemaRef); value != "" {
+			detail["schema_ref"] = value
+		}
+		if value := strings.TrimSpace(protocol.ToolRef); value != "" {
+			detail["tool_ref"] = value
+		}
+		entries, _ := result[channel].([]map[string]interface{})
+		result[channel] = append(entries, detail)
+	}
+	return result
 }
 
 // List returns the normalized capability entries from the catalog snapshot.
@@ -104,14 +160,7 @@ func (s *CatalogService) List(ctx context.Context, opts ListOptions) ([]capabili
 	if source == "all" {
 		platformEntries, platformErr := s.listPlatformCatalog(ctx, ListOptions{Source: "corex"})
 		if platformErr != nil {
-			logger.WarnCtx(logger.WithLogFields(ctx, map[string]interface{}{
-				"module":     "capability",
-				"biz_scene":  "capability_catalog_list",
-				"biz_domain": "capability",
-				"component":  "capability_catalog_service",
-				"source":     "all",
-				"error":      platformErr.Error(),
-			}), "failed to load platform capability catalog for source=all, falling back to local manifest")
+			return nil, fmt.Errorf("failed to load platform capability catalog for source=all: %w", platformErr)
 		}
 		localEntries, localErr := s.listLocalCatalog(ctx)
 		if localErr != nil {
@@ -173,88 +222,32 @@ func (s *CatalogService) listLocalCatalog(ctx context.Context) ([]capabilities.C
 
 func (s *CatalogService) listPlatformCatalog(ctx context.Context, opts ListOptions) ([]capabilities.CatalogEntry, error) {
 	if s.gateway == nil || !s.gateway.Enabled() {
-		return s.listPlatformCatalogViaAdminAPI(ctx)
+		return nil, errors.New("PowerX platform capability catalog gateway is not configured")
 	}
-	records, err := s.gateway.ListPlatformCapabilities(ctx, gateway.ListPlatformCapabilitiesOptions{
-		Source:  opts.Source,
-		Channel: "",
+	records, err := s.gateway.ListPlatformCapabilityCatalog(ctx, gateway.ListPlatformCapabilityCatalogOptions{
+		Page:     1,
+		PageSize: 200,
 	})
-	if err == nil && len(records) > 0 {
-		return s.fromPlatformRecords(records), nil
-	}
-	return s.listPlatformCatalogViaAdminAPI(ctx)
-}
-
-func (s *CatalogService) listPlatformCatalogViaAdminAPI(ctx context.Context) ([]capabilities.CatalogEntry, error) {
-	if s.cfg == nil || s.cfg.Gateway == nil {
-		return nil, errors.New("gateway config missing")
-	}
-	base := strings.TrimRight(strings.TrimSpace(s.cfg.Gateway.BaseURL), "/")
-	if base == "" {
-		return nil, errors.New("PX_GATEWAY_BASE_URL 未配置")
-	}
-	apiKey := strings.TrimSpace(s.cfg.Gateway.APIKey)
-	authScheme := strings.ToLower(strings.TrimSpace(s.cfg.Gateway.AuthScheme))
-	client := &http.Client{Timeout: 10 * time.Second}
-	url := fmt.Sprintf("%s/admin/platform-capabilities?page=1&page_size=200", base)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("PowerX platform capability catalog request failed: %w", err)
 	}
-	req.Header.Set("Accept", "application/json")
-	switch authScheme {
-	case "apikey", "api_key", "api-key":
-		if apiKey != "" {
-			req.Header.Set("Authorization", "ApiKey "+apiKey)
-		}
-	}
-	req.Header.Set("X-Request-ID", fmt.Sprintf("cap-catalog-%d", time.Now().UnixNano()))
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var payload platformCapabilitiesResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return nil, fmt.Errorf("decode platform capabilities: %w", err)
-	}
-	if resp.StatusCode >= 400 || payload.Code >= 400 {
-		return nil, fmt.Errorf("platform capabilities request failed: status=%d code=%d message=%s", resp.StatusCode, payload.Code, payload.Message)
-	}
-	records := payload.toPlatformRecords()
 	if len(records) == 0 {
-		return nil, errors.New("platform capability catalog returned empty data")
+		return nil, errors.New("PowerX platform capability catalog returned empty data")
 	}
-	return s.fromPlatformRecords(records), nil
+	return s.fromPlatformCatalogRecords(records), nil
 }
 
-func (s *CatalogService) fromPlatformRecords(records []gateway.PlatformCapabilityRecord) []capabilities.CatalogEntry {
+func (s *CatalogService) fromPlatformCatalogRecords(records []gateway.PlatformCapabilityCatalogRecord) []capabilities.CatalogEntry {
 	result := make([]capabilities.CatalogEntry, 0, len(records))
 	for _, record := range records {
 		entry := capabilities.CatalogEntry{
-			ID:               strings.TrimSpace(record.CapabilityID),
-			ProviderPluginID: strings.TrimSpace(record.PluginID),
-			Source:           strings.TrimSpace(record.Source),
-			Version:          strings.TrimSpace(record.PluginVersion),
-			Tags:             append([]string{}, record.Categories...),
-			Protocols:        convertPlatformProtocols(record.Protocols),
-			Execution: capabilities.ExecutionConfig{
-				Mode: strings.ToLower(strings.TrimSpace(record.ExecutionMode)),
-			},
-			Module: deriveCapabilityModule(record.CapabilityID),
-			Kind:   detectPlatformKind(record),
-			Checksum: func() string {
-				if strings.TrimSpace(record.CapabilitiesHash) != "" {
-					return record.CapabilitiesHash
-				}
-				return record.ProtocolHash
-			}(),
-		}
-		if strings.TrimSpace(entry.Execution.Mode) == "" {
-			entry.Execution.Mode = "sync"
+			ID:          strings.TrimSpace(record.CapabilityID),
+			Title:       strings.TrimSpace(record.Title),
+			Description: strings.TrimSpace(record.Description),
+			Source:      strings.TrimSpace(record.Source),
+			Tags:        append([]string{}, record.Categories...),
+			Module:      deriveCapabilityModule(record.CapabilityID),
+			Kind:        "Capability",
 		}
 		result = append(result, entry)
 	}
@@ -283,136 +276,6 @@ func deriveCapabilityModule(id string) string {
 		return strings.TrimSpace(id)
 	}
 	return strings.Join(parts[:len(parts)-1], ".")
-}
-
-func convertPlatformProtocols(protocols []gateway.PlatformCapabilityProtocol) map[string]interface{} {
-	if len(protocols) == 0 {
-		return nil
-	}
-
-	grouped := make(map[string][]map[string]interface{})
-	for _, proto := range protocols {
-		channel := strings.ToLower(strings.TrimSpace(proto.Channel))
-		if channel == "" {
-			channel = "rest"
-		}
-
-		payload := map[string]interface{}{}
-		if v := strings.TrimSpace(proto.Endpoint); v != "" {
-			payload["endpoint"] = v
-			if channel == "rest" || channel == "http" {
-				payload["path"] = v
-			} else {
-				payload["service"] = v
-			}
-		}
-		if v := strings.TrimSpace(proto.Method); v != "" {
-			payload["method"] = strings.ToUpper(v)
-		}
-		if v := strings.TrimSpace(proto.RPC); v != "" {
-			payload["rpc"] = v
-			if _, exists := payload["method"]; !exists {
-				payload["method"] = v
-			}
-		}
-		if v := strings.TrimSpace(proto.SchemaRef); v != "" {
-			payload["schema_ref"] = v
-		}
-		if v := strings.TrimSpace(proto.ToolRef); v != "" {
-			payload["tool_ref"] = v
-		}
-		if len(payload) == 0 {
-			payload["defined"] = true
-		}
-		grouped[channel] = append(grouped[channel], payload)
-	}
-
-	result := make(map[string]interface{}, len(grouped))
-	for channel, entries := range grouped {
-		if len(entries) == 1 {
-			result[channel] = entries[0]
-			continue
-		}
-		result[channel] = entries
-	}
-	return result
-}
-
-func detectPlatformKind(record gateway.PlatformCapabilityRecord) string {
-	if hasWorkflowChannel(record.Protocols) {
-		return "Workflow"
-	}
-	return "Capability"
-}
-
-func hasWorkflowChannel(protocols []gateway.PlatformCapabilityProtocol) bool {
-	for _, proto := range protocols {
-		channel := strings.ToLower(strings.TrimSpace(proto.Channel))
-		if strings.Contains(channel, "workflow") || strings.Contains(channel, "composite") {
-			return true
-		}
-	}
-	return false
-}
-
-type platformCapabilitiesResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		Modules []platformCapabilityModule `json:"modules"`
-	} `json:"data"`
-}
-
-type platformCapabilityModule struct {
-	Module       string                       `json:"module"`
-	Capabilities []platformCapabilityEnvelope `json:"capabilities"`
-}
-
-type platformCapabilityEnvelope struct {
-	CapabilityID  string                               `json:"capability_id"`
-	PluginID      string                               `json:"plugin_id"`
-	PluginVersion string                               `json:"plugin_version"`
-	Source        string                               `json:"source"`
-	Protocols     []platformCapabilityProtocolEnvelope `json:"protocols"`
-}
-
-type platformCapabilityProtocolEnvelope struct {
-	Channel   string `json:"channel"`
-	Endpoint  string `json:"endpoint"`
-	SchemaRef string `json:"schema_ref"`
-	Method    string `json:"method"`
-	RPC       string `json:"rpc"`
-	ToolRef   string `json:"tool_ref"`
-}
-
-func (resp platformCapabilitiesResponse) toPlatformRecords() []gateway.PlatformCapabilityRecord {
-	var records []gateway.PlatformCapabilityRecord
-	for _, module := range resp.Data.Modules {
-		for _, cap := range module.Capabilities {
-			record := gateway.PlatformCapabilityRecord{
-				CapabilityID:     cap.CapabilityID,
-				PluginID:         cap.PluginID,
-				PluginVersion:    cap.PluginVersion,
-				Source:           cap.Source,
-				ExecutionMode:    "sync",
-				Protocols:        make([]gateway.PlatformCapabilityProtocol, 0, len(cap.Protocols)),
-				CapabilitiesHash: "",
-				ProtocolHash:     "",
-			}
-			for _, proto := range cap.Protocols {
-				record.Protocols = append(record.Protocols, gateway.PlatformCapabilityProtocol{
-					Channel:   proto.Channel,
-					Endpoint:  proto.Endpoint,
-					SchemaRef: proto.SchemaRef,
-					Method:    proto.Method,
-					RPC:       proto.RPC,
-					ToolRef:   proto.ToolRef,
-				})
-			}
-			records = append(records, record)
-		}
-	}
-	return records
 }
 
 var descriptorSearchBases = []string{

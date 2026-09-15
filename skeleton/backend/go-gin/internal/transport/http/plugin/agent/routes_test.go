@@ -38,7 +38,7 @@ func (stubGateway) Enabled() bool { return true }
 func (stubGateway) Invoke(context.Context, gateway.InvokeParams) (*gateway.InvokeResult, error) {
 	return nil, nil
 }
-func (stubGateway) ListPlatformCapabilities(context.Context, gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error) {
+func (stubGateway) ListPlatformCapabilityCatalog(context.Context, gateway.ListPlatformCapabilityCatalogOptions) ([]gateway.PlatformCapabilityCatalogRecord, error) {
 	return nil, nil
 }
 func (stubGateway) ListKnowledgeSpaces(context.Context, gateway.KnowledgeSpaceListOptions) ([]gateway.KnowledgeSpaceRuntimeRecord, error) {

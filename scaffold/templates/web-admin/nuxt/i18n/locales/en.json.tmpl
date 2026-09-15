@@ -118,6 +118,7 @@
   },
   "capabilityLab": {
     "openHostContract": "Open matching Host Contract",
+    "payloadHelp": "Payload must strictly follow the declared invocation contract for this capability. A catalog entry without a contract cannot be inferred or invoked here.",
     "suiteCapability": {
       "title": "Suite capability is not yet admitted to Framework",
       "description": "The capability from {provider} is visible in the catalog, but its credential grant must be verified in an installed runtime and it has not met UUID and Host Contract admission requirements. Generic invocation is blocked.",
@@ -131,6 +132,15 @@
       "notGranted": "Current credential is not granted",
       "unknown": "Grant status is unknown",
       "failed": "Unable to read grant status"
+    },
+    "corexCatalog": {
+      "contractLoading": "Loading the formal invocation contract authorized for the current key…",
+      "contractLoadFailed": "Unable to load the formal invocation contract",
+      "contractUnavailable": "The current key has no formal invocation contract for this capability.",
+      "contractRequired": "Load this capability's formal invocation contract before debugging.",
+      "formalTarget": "Formal contract target: {method} {endpoint}; schema: {schema}",
+      "protocolHelp": "Choose only from protocols declared in this capability's formal contract.",
+      "actionHelp": "Action, endpoint, and method come from the formal contract; enter request parameters below."
     }
   },
   "metadataGovernance": {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
@@ -35,6 +36,16 @@ type capabilityInvokeRequest struct {
 	PreferredProtocol string                 `json:"preferredProtocol"`
 	Payload           map[string]any         `json:"payload"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// coreXCapabilityInvokeRequest intentionally mirrors Core's unified
+// /tenant/invocations contract. Action remains a UI-only label derived from
+// the formal contract and must never cross this boundary.
+type coreXCapabilityInvokeRequest struct {
+	CapabilityID      string         `json:"capability_id"`
+	PreferredProtocol string         `json:"preferred_protocol,omitempty"`
+	Payload           map[string]any `json:"payload"`
+	Context           map[string]any `json:"context,omitempty"`
 }
 
 type gatewayAuthPolicy struct {
@@ -215,6 +226,54 @@ func (h *Handler) InvokeCapability(c *gin.Context) {
 	h.logInvokeCORSHeaders(c)
 
 	contracts.ResponseSuccess(c, response)
+}
+
+// InvokeCoreXCapability invokes an already-authorized CoreX capability using
+// the plugin service API key. It is separate from InvokeCapability because the
+// legacy gateway debug envelope contains Action, while Core does not accept it.
+func (h *Handler) InvokeCoreXCapability(c *gin.Context) {
+	ensureInvokeCORS(c)
+	if h == nil || h.deps == nil || h.deps.CapabilityRegistry == nil {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "COREX_CAPABILITY_REGISTRY_UNAVAILABLE", "COREX_CAPABILITY_REGISTRY_UNAVAILABLE")
+		return
+	}
+	var req coreXCapabilityInvokeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		contracts.ResponseBadRequest(c, "COREX_INVOCATION_PAYLOAD_INVALID")
+		return
+	}
+	capabilityID := strings.TrimSpace(req.CapabilityID)
+	if capabilityID == "" {
+		contracts.ResponseBadRequest(c, "COREX_INVOCATION_CAPABILITY_ID_REQUIRED")
+		return
+	}
+	result, err := h.deps.CapabilityRegistry.Invoke(c.Request.Context(), powerxcapability.InvokeInput{
+		CapabilityID:      capabilityID,
+		PreferredProtocol: strings.TrimSpace(req.PreferredProtocol),
+		IdempotencyKey:    strings.TrimSpace(c.GetHeader("X-Request-ID")),
+		Payload:           ensurePayload(req.Payload),
+		Context:           ensurePayload(req.Context),
+	})
+	if err != nil {
+		var upstream *powerxcapability.HTTPError
+		if errors.As(err, &upstream) && upstream != nil {
+			contracts.ResponseErrorWithDetails(c, upstream.StatusCode, upstream.ReasonCode, upstream.ReasonCode, gin.H{"upstream": upstream.Body})
+			return
+		}
+		contracts.ResponseError(c, http.StatusBadGateway, "COREX_CAPABILITY_INVOKE_FAILED", "COREX_CAPABILITY_INVOKE_FAILED")
+		return
+	}
+	if result == nil {
+		contracts.ResponseError(c, http.StatusBadGateway, "COREX_CAPABILITY_INVOKE_EMPTY_RESPONSE", "COREX_CAPABILITY_INVOKE_EMPTY_RESPONSE")
+		return
+	}
+	if traceID := strings.TrimSpace(result.TraceID); traceID != "" {
+		c.Header("X-Trace-Id", traceID)
+	}
+	contracts.ResponseSuccess(c, gin.H{
+		"traceId": result.TraceID, "status": result.Status, "protocolUsed": result.ProtocolUsed,
+		"fallbackUsed": result.FallbackUsed, "payload": result.Payload, "result": result.Result,
+	})
 }
 
 func (h *Handler) resolveGatewayAuthHeaders(c *gin.Context, headers map[string]string, policy gatewayAuthPolicy) (map[string]string, error) {

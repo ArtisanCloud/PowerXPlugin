@@ -127,7 +127,7 @@ type Deps struct {
 type gatewayClient interface {
 	Enabled() bool
 	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
-	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	ListPlatformCapabilityCatalog(ctx context.Context, opts gateway.ListPlatformCapabilityCatalogOptions) ([]gateway.PlatformCapabilityCatalogRecord, error)
 	ListKnowledgeSpaces(ctx context.Context, opts gateway.KnowledgeSpaceListOptions) ([]gateway.KnowledgeSpaceRuntimeRecord, error)
 	CreateKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceCreateParams) (*gateway.KnowledgeSpaceRecord, error)
 	RetireKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceRetireParams) (*gateway.KnowledgeSpaceRecord, error)

@@ -90,39 +90,25 @@ type InvokeResult struct {
 	MockReason string
 }
 
-// ListPlatformCapabilitiesOptions controls remote catalog listing.
-type ListPlatformCapabilitiesOptions struct {
-	Source   string
-	Channel  string
+// ListPlatformCapabilityCatalogOptions controls published CoreX catalog listing.
+// The remote catalog is metadata only and must not be treated as an invocation
+// contract or authorization result.
+type ListPlatformCapabilityCatalogOptions struct {
+	Page     int
 	PageSize int
 }
 
-// PlatformCapabilityRecord mirrors PowerX capability registry DTO.
-type PlatformCapabilityRecord struct {
-	CapabilityID     string                       `json:"capability_id"`
-	PluginID         string                       `json:"plugin_id"`
-	PluginVersion    string                       `json:"plugin_version"`
-	Title            string                       `json:"title"`
-	Description      string                       `json:"description"`
-	Source           string                       `json:"source"`
-	Categories       []string                     `json:"categories"`
-	Intents          []string                     `json:"intents"`
-	ToolScope        []string                     `json:"tool_scope"`
-	CapabilitiesHash string                       `json:"capabilities_hash"`
-	ProtocolHash     string                       `json:"protocol_hash"`
-	Status           string                       `json:"status"`
-	ExecutionMode    string                       `json:"execution_mode"`
-	Protocols        []PlatformCapabilityProtocol `json:"protocols"`
-}
-
-// PlatformCapabilityProtocol describes channel metadata.
-type PlatformCapabilityProtocol struct {
-	Channel   string `json:"channel"`
-	Endpoint  string `json:"endpoint"`
-	SchemaRef string `json:"schema_ref"`
-	Method    string `json:"method"`
-	RPC       string `json:"rpc"`
-	ToolRef   string `json:"tool_ref"`
+// PlatformCapabilityCatalogRecord mirrors the safe Core catalog DTO. It
+// intentionally omits protocols, endpoints, methods, and schemas.
+type PlatformCapabilityCatalogRecord struct {
+	CapabilityID string   `json:"capability_id"`
+	Title        string   `json:"title"`
+	Description  string   `json:"description"`
+	Source       string   `json:"source"`
+	Categories   []string `json:"categories"`
+	Intents      []string `json:"intents"`
+	ToolScope    []string `json:"tool_scope"`
+	Status       string   `json:"status"`
 }
 
 type KnowledgeSpaceListOptions struct {
@@ -532,13 +518,14 @@ func extractMapValue(payload any, key string) any {
 	return valueMap[key]
 }
 
-// ListPlatformCapabilities retrieves platform capability metadata via tenant API.
-func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatformCapabilitiesOptions) ([]PlatformCapabilityRecord, error) {
+// ListPlatformCapabilityCatalog retrieves published CoreX catalog metadata via
+// the tenant API. Callers must use grant-status before any invocation.
+func (c *Client) ListPlatformCapabilityCatalog(ctx context.Context, opts ListPlatformCapabilityCatalogOptions) ([]PlatformCapabilityCatalogRecord, error) {
 	if c.cfg == nil || c.cfg.Gateway == nil {
 		return nil, fmt.Errorf("gateway config missing")
 	}
 	gcfg := c.cfg.Gateway
-	endpoint := gatewayEndpoint(gcfg, "/tenant/capabilities")
+	endpoint := gatewayEndpoint(gcfg, "/tenant/capabilities/catalog")
 	if endpoint == "" {
 		return nil, fmt.Errorf("PX_GATEWAY_BASE_URL 未配置")
 	}
@@ -551,14 +538,11 @@ func (c *Client) ListPlatformCapabilities(ctx context.Context, opts ListPlatform
 	}
 
 	query := url.Values{}
-	if source := strings.TrimSpace(opts.Source); source != "" {
-		query.Set("source", source)
-	} else {
-		query.Set("source", "corex")
+	page := opts.Page
+	if page <= 0 {
+		page = 1
 	}
-	if channel := strings.TrimSpace(opts.Channel); channel != "" {
-		query.Set("channel", channel)
-	}
+	query.Set("page", strconv.Itoa(page))
 	pageSize := opts.PageSize
 	if pageSize <= 0 || pageSize > 500 {
 		pageSize = 200
@@ -2102,7 +2086,7 @@ type platformCapabilityResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    struct {
-		Items []PlatformCapabilityRecord `json:"items"`
+		Items []PlatformCapabilityCatalogRecord `json:"items"`
 	} `json:"data"`
 }
 

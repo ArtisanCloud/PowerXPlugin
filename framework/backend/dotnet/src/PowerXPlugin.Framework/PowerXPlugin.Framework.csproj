@@ -7,6 +7,9 @@
     <RootNamespace>PowerXPlugin.Framework</RootNamespace>
     <Version>0.0.1-alpha</Version>
     <Description>PowerX Plugin Framework for .NET - provides Bootstrap, Middleware, IAM, RBAC, Routing, EventBridge, and Manifest modules matching the Go framework contracts.</Description>
+    <!-- Core owns this protobuf contract.  Direct source consumers compile it
+         from Core just like CRM uses this Framework through replace. -->
+    <PowerXCoreGrpcContractsRoot Condition="'$(PowerXCoreGrpcContractsRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../../../../../../PowerX/backend/api/grpc/contracts'))</PowerXCoreGrpcContractsRoot>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +20,18 @@
     <PackageReference Include="Cronos" Version="0.13.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
+    <PackageReference Include="Google.Protobuf" Version="3.29.3" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.67.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.67.0" PrivateAssets="All" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="$(PowerXCoreGrpcContractsRoot)/powerx/event_fabric/v1/event_fabric.proto" GrpcServices="Client" />
+  </ItemGroup>
+
+  <Target Name="ValidatePowerXCoreGrpcContracts" BeforeTargets="Protobuf_Compile">
+    <Error Condition="!Exists('$(PowerXCoreGrpcContractsRoot)/powerx/event_fabric/v1/event_fabric.proto')"
+           Text="PowerX Core Event Fabric proto was not found at $(PowerXCoreGrpcContractsRoot). Set PowerXCoreGrpcContractsRoot to Core backend/api/grpc/contracts." />
+  </Target>
 
 </Project>

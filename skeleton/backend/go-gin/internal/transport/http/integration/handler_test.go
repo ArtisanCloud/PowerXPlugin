@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	frameworkgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
@@ -25,6 +26,28 @@ type fakeCapabilityGateway struct {
 	callCount  int
 }
 
+type fakeCoreXCapabilityRegistry struct {
+	lastInput powerxcapability.InvokeInput
+	result    *powerxcapability.InvokeResult
+}
+
+func (*fakeCoreXCapabilityRegistry) List(context.Context, powerxcapability.ListInput) ([]powerxcapability.Capability, error) {
+	return nil, nil
+}
+func (*fakeCoreXCapabilityRegistry) GrantStatus(context.Context, powerxcapability.GrantStatusInput) ([]powerxcapability.GrantStatusItem, error) {
+	return nil, nil
+}
+func (*fakeCoreXCapabilityRegistry) Resolve(context.Context, powerxcapability.ResolveInput) (*powerxcapability.ResolveResult, error) {
+	return nil, nil
+}
+func (f *fakeCoreXCapabilityRegistry) Invoke(_ context.Context, in powerxcapability.InvokeInput) (*powerxcapability.InvokeResult, error) {
+	f.lastInput = in
+	return f.result, nil
+}
+func (*fakeCoreXCapabilityRegistry) GetInvocation(context.Context, string) (*powerxcapability.Invocation, error) {
+	return nil, nil
+}
+
 func (f *fakeCapabilityGateway) Enabled() bool { return true }
 
 func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.InvokeParams) (*capgateway.InvokeResult, error) {
@@ -36,7 +59,7 @@ func (f *fakeCapabilityGateway) Invoke(_ context.Context, params capgateway.Invo
 	return f.result, nil
 }
 
-func (f *fakeCapabilityGateway) ListPlatformCapabilities(_ context.Context, _ capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
+func (f *fakeCapabilityGateway) ListPlatformCapabilityCatalog(_ context.Context, _ capgateway.ListPlatformCapabilityCatalogOptions) ([]capgateway.PlatformCapabilityCatalogRecord, error) {
 	return nil, nil
 }
 
@@ -130,6 +153,28 @@ func TestInvokeCapabilitySuccess(t *testing.T) {
 	require.Equal(t, "com.corex.media.assets.manage", fake.lastParams.CapabilityID)
 	require.True(t, fake.lastParams.AuthRequired)
 	require.True(t, fake.lastParams.TenantScoped)
+}
+
+func TestInvokeCoreXCapabilityDoesNotSendUIActionToCore(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	registry := &fakeCoreXCapabilityRegistry{result: &powerxcapability.InvokeResult{TraceID: "corex-trace", Status: "succeeded"}}
+	handler := &Handler{deps: &app.Deps{CapabilityRegistry: registry}}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integration/corex/capabilities/invoke", strings.NewReader(`{
+      "capability_id":"com.corex.media.assets.read",
+      "preferred_protocol":"rest",
+      "payload":{"method":"GET","endpoint":"/api/v1/media/assets","query":{"page":1}},
+      "context":{}
+    }`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+	handler.InvokeCoreXCapability(c)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "com.corex.media.assets.read", registry.lastInput.CapabilityID)
+	require.Equal(t, "rest", registry.lastInput.PreferredProtocol)
+	require.Equal(t, "GET", registry.lastInput.Payload["method"])
+	require.Equal(t, "/api/v1/media/assets", registry.lastInput.Payload["endpoint"])
 }
 
 func TestInvokeCapabilityRouteAllowsTenantContextWithoutRootRole(t *testing.T) {

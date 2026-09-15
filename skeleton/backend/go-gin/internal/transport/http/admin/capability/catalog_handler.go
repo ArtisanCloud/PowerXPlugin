@@ -110,3 +110,23 @@ func (h *CatalogHandler) GrantStatus(c *gin.Context) {
 	}
 	contracts.ResponseSuccess(c, gin.H{"items": items})
 }
+
+// CoreXContract returns only the selected capability's authorized formal
+// invocation contract. Browser clients never receive the Gateway API key.
+func (h *CatalogHandler) CoreXContract(c *gin.Context) {
+	if h == nil || h.service == nil {
+		contracts.ResponseServiceUnavailable(c, "capability contract service not available", nil)
+		return
+	}
+	entry, err := h.service.CoreXContract(c.Request.Context(), c.Param("capabilityID"))
+	if err != nil {
+		var upstream *powerxcapability.HTTPError
+		if errors.As(err, &upstream) && upstream != nil {
+			contracts.ResponseErrorWithDetails(c, upstream.StatusCode, upstream.ReasonCode, upstream.ReasonCode, gin.H{"upstream": upstream.Body})
+			return
+		}
+		contracts.ResponseErrorWithDetails(c, http.StatusBadGateway, contracts.ErrCodeInternalError, "failed to load capability formal contract", gin.H{"error": err.Error()})
+		return
+	}
+	contracts.ResponseSuccess(c, entry)
+}

@@ -191,6 +191,19 @@ AI Craft 后半段业务建议全部走 durable scheduler job：
 8. 待完成：将 `HostProvider` 接到底座真实 SchedulerService SDK/路由。
 9. 待完成：AI Craft 通过 framework 注册 job，并订阅 `powerx.runtime.scheduler.triggered.v1` 执行业务。
 
+### .NET 运行时对齐（2026-09-14）
+
+`.NET` Framework 的 `AddPowerXScheduler(Local)` 现在会注册 `LocalEventBridge`。
+local runner 到期后只发布标准 `SchedulerTriggeredPayload` 到
+`powerx.runtime.scheduler.triggered.v1`，不再保留 scheduler 内部业务 handler；业务插件
+必须自行注册 EventBridge consumer，并对 `owner_id`、`business_action` 与
+`idempotency_key` 做校验和持久化防重。
+
+`PowerXSchedulerClient` 仅解决 delegated 的 job 管理调用；当前 .NET 尚没有 Host
+EventBridge/TaskBus 的订阅 transport、subscription grant 或消费 ack 合同。因此
+delegated 插件不得创建需要本地业务消费者的 job，更不能把 `LocalEventBridge` 当作
+Host subscriber fallback。
+
 ## 7. 底座待确认项
 
 1. `powerx.scheduler.v1.SchedulerService` 的 proto、Go SDK、鉴权方式、服务地址与路由是否已发布。

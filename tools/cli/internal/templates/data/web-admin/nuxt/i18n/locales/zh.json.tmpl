@@ -118,6 +118,7 @@
   },
   "capabilityLab": {
     "openHostContract": "打开对应底座合同",
+    "payloadHelp": "Payload 必须严格符合当前能力已声明的调用合同；目录缺少合同信息时不能从此处推导或调用。",
     "suiteCapability": {
       "title": "套件能力尚未完成 Framework 准入",
       "description": "提供方 {provider} 的能力已在目录中可见，但当前凭证授权状态须在安装态核验，且尚未满足 UUID 与 Host Contract 准入条件，不能从通用调试入口调用。",
@@ -131,6 +132,15 @@
       "notGranted": "当前凭证未获授权",
       "unknown": "授权状态未知",
       "failed": "无法查询授权状态"
+    },
+    "corexCatalog": {
+      "contractLoading": "正在读取当前 Key 已获授权的正式调用合同…",
+      "contractLoadFailed": "无法读取正式调用合同",
+      "contractUnavailable": "当前 Key 未获得该能力的正式调用合同。",
+      "contractRequired": "请先加载该能力的正式调用合同后再调试。",
+      "formalTarget": "正式合同目标：{method} {endpoint}；Schema：{schema}",
+      "protocolHelp": "协议仅可在当前能力正式合同声明的协议中选择。",
+      "actionHelp": "Action、地址和 method 均来自正式合同；请在参数区填写请求参数。"
     }
   },
   "metadataGovernance": {

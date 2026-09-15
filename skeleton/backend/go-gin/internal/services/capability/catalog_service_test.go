@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
@@ -149,7 +150,7 @@ func (m *fakeCatalogManager) RegisterWithHost(ctx context.Context, client capabi
 
 type fakeGatewayClient struct {
 	enabled bool
-	records []gateway.PlatformCapabilityRecord
+	records []gateway.PlatformCapabilityCatalogRecord
 	err     error
 }
 
@@ -159,14 +160,57 @@ func (g *fakeGatewayClient) Invoke(ctx context.Context, params gateway.InvokePar
 	return nil, nil
 }
 
-func (g *fakeGatewayClient) ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error) {
+func (g *fakeGatewayClient) ListPlatformCapabilityCatalog(ctx context.Context, opts gateway.ListPlatformCapabilityCatalogOptions) ([]gateway.PlatformCapabilityCatalogRecord, error) {
 	if g.err != nil {
 		return nil, g.err
 	}
-	return append([]gateway.PlatformCapabilityRecord(nil), g.records...), nil
+	return append([]gateway.PlatformCapabilityCatalogRecord(nil), g.records...), nil
 }
 
 func (g *fakeGatewayClient) Close() error { return nil }
+
+type fakeCapabilityRegistry struct {
+	items []powerxcapability.Capability
+	err   error
+}
+
+func (f *fakeCapabilityRegistry) List(context.Context, powerxcapability.ListInput) ([]powerxcapability.Capability, error) {
+	return append([]powerxcapability.Capability(nil), f.items...), f.err
+}
+func (*fakeCapabilityRegistry) GrantStatus(context.Context, powerxcapability.GrantStatusInput) ([]powerxcapability.GrantStatusItem, error) {
+	return nil, nil
+}
+func (*fakeCapabilityRegistry) Resolve(context.Context, powerxcapability.ResolveInput) (*powerxcapability.ResolveResult, error) {
+	return nil, nil
+}
+func (*fakeCapabilityRegistry) Invoke(context.Context, powerxcapability.InvokeInput) (*powerxcapability.InvokeResult, error) {
+	return nil, nil
+}
+func (*fakeCapabilityRegistry) GetInvocation(context.Context, string) (*powerxcapability.Invocation, error) {
+	return nil, nil
+}
+
+func TestCatalogServiceCoreXContractUsesAuthorizedFormalContract(t *testing.T) {
+	svc := &CatalogService{capabilityRegistry: &fakeCapabilityRegistry{items: []powerxcapability.Capability{{
+		CapabilityID: "com.corex.media.assets.read",
+		Source:       "corex",
+		Protocols: []powerxcapability.Protocol{{
+			Channel: "rest", Method: "GET", Endpoint: "/api/v1/media/assets",
+		}},
+	}}}}
+
+	entry, err := svc.CoreXContract(context.Background(), "com.corex.media.assets.read")
+	if err != nil {
+		t.Fatalf("CoreXContract error: %v", err)
+	}
+	rest, ok := entry.Protocols["rest"].([]map[string]interface{})
+	if !ok || len(rest) != 1 {
+		t.Fatalf("rest contract=%#v", entry.Protocols["rest"])
+	}
+	if rest[0]["method"] != "GET" || rest[0]["endpoint"] != "/api/v1/media/assets" {
+		t.Fatalf("formal REST contract=%#v", rest[0])
+	}
+}
 
 func TestCatalogServiceListSourceAllMergesCorexAndPlugin(t *testing.T) {
 	svc := &CatalogService{
@@ -178,7 +222,7 @@ func TestCatalogServiceListSourceAllMergesCorexAndPlugin(t *testing.T) {
 		},
 		gateway: &fakeGatewayClient{
 			enabled: true,
-			records: []gateway.PlatformCapabilityRecord{
+			records: []gateway.PlatformCapabilityCatalogRecord{
 				{CapabilityID: "com.corex.media.assets.read"},
 				{CapabilityID: "com.shared.dup"},
 			},
@@ -207,22 +251,26 @@ func TestCatalogServiceListSourceAllMergesCorexAndPlugin(t *testing.T) {
 	}
 }
 
-func TestCatalogServicePlatformEntryPreservesProviderMetadata(t *testing.T) {
+func TestCatalogServicePlatformEntryUsesSafeCatalogMetadata(t *testing.T) {
 	svc := &CatalogService{}
-	entries := svc.fromPlatformRecords([]gateway.PlatformCapabilityRecord{{
-		CapabilityID:  "com.powerx.plugins.scrm.leads.read",
-		PluginID:      "com.powerx.plugins.scrm",
-		PluginVersion: "1.2.3",
-		Source:        "plugin",
+	entries := svc.fromPlatformCatalogRecords([]gateway.PlatformCapabilityCatalogRecord{{
+		CapabilityID: "com.corex.media.assets.read",
+		Title:        "Media Assets Read",
+		Description:  "Read media assets",
+		Source:       "corex",
+		Categories:   []string{"media"},
 	}})
 	if len(entries) != 1 {
 		t.Fatalf("entries=%d, want 1", len(entries))
 	}
-	if entries[0].ProviderPluginID != "com.powerx.plugins.scrm" {
-		t.Fatalf("provider_plugin_id=%q", entries[0].ProviderPluginID)
+	if entries[0].Title != "Media Assets Read" || entries[0].Description != "Read media assets" {
+		t.Fatalf("safe catalog metadata was not preserved: %+v", entries[0])
 	}
-	if entries[0].Source != "plugin" {
+	if entries[0].Source != "corex" {
 		t.Fatalf("source=%q", entries[0].Source)
+	}
+	if len(entries[0].Protocols) != 0 {
+		t.Fatalf("catalog entry must not expose protocols: %+v", entries[0].Protocols)
 	}
 }
 
@@ -233,7 +281,7 @@ func TestCatalogServiceListSourceAnyEqualsAll(t *testing.T) {
 		},
 		gateway: &fakeGatewayClient{
 			enabled: true,
-			records: []gateway.PlatformCapabilityRecord{{CapabilityID: "com.corex.media.assets.read"}},
+			records: []gateway.PlatformCapabilityCatalogRecord{{CapabilityID: "com.corex.media.assets.read"}},
 		},
 		descriptorCache: make(map[string]*descriptorMetadata),
 	}
@@ -247,7 +295,7 @@ func TestCatalogServiceListSourceAnyEqualsAll(t *testing.T) {
 	}
 }
 
-func TestCatalogServiceListSourceAllFallbacksToLocalWhenGatewayFails(t *testing.T) {
+func TestCatalogServiceListSourceAllReturnsGatewayFailure(t *testing.T) {
 	svc := &CatalogService{
 		manager: &fakeCatalogManager{
 			entries: []capabilities.CatalogEntry{{ID: "com.powerx.plugins.base.template.list"}},
@@ -259,11 +307,8 @@ func TestCatalogServiceListSourceAllFallbacksToLocalWhenGatewayFails(t *testing.
 		descriptorCache: make(map[string]*descriptorMetadata),
 	}
 
-	entries, err := svc.List(context.Background(), ListOptions{Source: "all"})
-	if err != nil {
-		t.Fatalf("expected local fallback for source=all, got %v", err)
-	}
-	if len(entries) != 1 || entries[0].ID != "com.powerx.plugins.base.template.list" {
-		t.Fatalf("unexpected local fallback result: %+v", entries)
+	_, err := svc.List(context.Background(), ListOptions{Source: "all"})
+	if err == nil {
+		t.Fatal("expected gateway failure for source=all")
 	}
 }

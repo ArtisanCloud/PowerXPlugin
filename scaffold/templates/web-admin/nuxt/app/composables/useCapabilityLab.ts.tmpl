@@ -4,6 +4,8 @@ import {
   type PowerXCapabilityResponse,
   usePowerXCapability
 } from '~/composables/usePowerXCapability'
+import { apiPost } from '~/composables/api/_client'
+import type { ApiResponse } from '~/composables/api/_base'
 import { getAuthToken } from '~/composables/api/_base'
 
 class CapabilityLabBridgeError extends Error {
@@ -43,6 +45,27 @@ export interface CapabilityLabInvokeRequest {
   apiBase?: string
   preferredProtocol?: string
   mode?: 'gateway' | 'local'
+}
+
+// action is retained only in browser-side history. It is not included in the
+// Core request because /tenant/invocations rejects unknown action fields.
+export interface CoreXCapabilityLabInvokeRequest {
+  capabilityId: string
+  action: string
+  preferredProtocol?: string
+  payload: Record<string, any>
+  context?: Record<string, any>
+  payloadText: string
+  requestId?: string
+}
+
+type CoreXCapabilityLabInvokeResponse = {
+  traceId?: string
+  status?: string
+  protocolUsed?: string
+  fallbackUsed?: boolean
+  payload?: Record<string, any>
+  result?: Record<string, any>
 }
 
 const now = () => {
@@ -177,8 +200,62 @@ export const useCapabilityLab = () => {
     }
   }
 
+  const invokeCoreXCapability = async (request: CoreXCapabilityLabInvokeRequest) => {
+    const started = now()
+    const historyRequest: CapabilityLabInvokeRequest = {
+      capabilityId: request.capabilityId,
+      action: request.action,
+      payload: request.payload,
+      payloadText: request.payloadText,
+      requestId: request.requestId,
+      preferredProtocol: request.preferredProtocol
+    }
+    try {
+      const response = await apiPost<ApiResponse<CoreXCapabilityLabInvokeResponse>>(
+        'integration/corex/capabilities/invoke',
+        {
+          capability_id: request.capabilityId,
+          preferred_protocol: request.preferredProtocol?.trim() || undefined,
+          payload: request.payload,
+          context: request.context || {}
+        },
+        request.requestId ? { headers: { 'X-Request-ID': request.requestId } } : undefined
+      )
+      const data = response.data || {}
+      const normalized: PowerXCapabilityResponse = {
+        traceId: data.traceId,
+        status: data.status,
+        data: { protocolUsed: data.protocolUsed, fallbackUsed: data.fallbackUsed, payload: data.payload, result: data.result },
+        raw: data
+      }
+      durationMs.value = now() - started
+      result.value = normalized
+      warnings.value = []
+      lastTraceId.value = normalized.traceId ?? null
+      errorMessage.value = ''
+      errorDetails.value = null
+      pushHistory(historyRequest, {
+        success: true, traceId: normalized.traceId, warnings: [], duration: durationMs.value ?? 0, rawText: safeStringify(normalized.raw)
+      })
+      toast.add({ title: '调用成功', description: normalized.traceId ? `TraceId: ${normalized.traceId}` : undefined, color: 'green' })
+    } catch (err: any) {
+      durationMs.value = now() - started
+      result.value = null
+      warnings.value = []
+      lastTraceId.value = err?.data?.traceId ?? null
+      errorMessage.value = err?.data?.error?.message || err?.message || '能力调用失败'
+      errorDetails.value = err?.data?.error?.details ?? err?.data ?? null
+      pushHistory(historyRequest, {
+        success: false, traceId: lastTraceId.value, error: errorMessage.value, warnings: [], duration: durationMs.value ?? 0, rawText: safeStringify(errorDetails.value)
+      })
+      toast.add({ title: '调用失败', description: errorMessage.value, color: 'red' })
+      throw err
+    }
+  }
+
   return {
     invokeCapability,
+    invokeCoreXCapability,
     clearHistory,
     loading,
     result,

@@ -23,7 +23,7 @@ func (enabledGateway) Enabled() bool { return true }
 func (enabledGateway) Invoke(_ context.Context, _ capgateway.InvokeParams) (*capgateway.InvokeResult, error) {
 	return &capgateway.InvokeResult{}, nil
 }
-func (enabledGateway) ListPlatformCapabilities(_ context.Context, _ capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
+func (enabledGateway) ListPlatformCapabilityCatalog(_ context.Context, _ capgateway.ListPlatformCapabilityCatalogOptions) ([]capgateway.PlatformCapabilityCatalogRecord, error) {
 	return nil, nil
 }
 func (enabledGateway) Close() error { return nil }

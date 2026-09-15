@@ -62,9 +62,15 @@ export function useCapabilityCatalogApi() {
       { capability_ids: capabilityIds },
     ).then((res) => res.data.items);
 
+  const coreXContract = (capabilityId: string) =>
+    apiGet<ApiResponse<CapabilityCatalogEntry>>(
+      `admin/capabilities/corex-contract/${encodeURIComponent(capabilityId)}`,
+    ).then((res) => res.data);
+
   return {
     list,
     listSources,
     grantStatus,
+    coreXContract,
   };
 }

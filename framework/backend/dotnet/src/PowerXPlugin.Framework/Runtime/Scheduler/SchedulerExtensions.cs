@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PowerXPlugin.Framework.EventBridge;
 
 namespace PowerXPlugin.Framework.Runtime.Scheduler;
 
@@ -25,6 +26,7 @@ public static class SchedulerExtensions
         switch (mode)
         {
             case SchedulerAdapterMode.Local:
+                services.AddLocalEventBridge();
                 services.AddSingleton<LocalScheduler>();
                 services.AddSingleton<IScheduler>(sp => sp.GetRequiredService<LocalScheduler>());
                 services.AddHostedService<SchedulerRunner>();
@@ -46,15 +48,14 @@ internal class SchedulerRunner : BackgroundService
 {
     private readonly LocalScheduler _scheduler;
     private readonly ILogger<SchedulerRunner> _logger;
-    private readonly Dictionary<string, SchedulerHandler> _handlers = new();
+    private readonly IEventEmitter _eventEmitter;
 
-    public SchedulerRunner(LocalScheduler scheduler, ILogger<SchedulerRunner> logger)
+    public SchedulerRunner(LocalScheduler scheduler, IEventEmitter eventEmitter, ILogger<SchedulerRunner> logger)
     {
         _scheduler = scheduler;
+        _eventEmitter = eventEmitter;
         _logger = logger;
     }
-
-    public void RegisterHandler(string jobName, SchedulerHandler handler) => _handlers[jobName] = handler;
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -68,11 +69,27 @@ internal class SchedulerRunner : BackgroundService
                     var jobs = await _scheduler.ListJobsAsync(status: JobStatus.Active);
                     foreach (var job in jobs.Where(j => j.NextRunAt <= now))
                     {
-                        if (_handlers.TryGetValue(job.Name, out var handler))
+                        var scheduledAt = job.NextRunAt;
+                        var traceId = Guid.NewGuid().ToString();
+                        var payload = new SchedulerTriggeredPayload(
+                            job.JobId, job.Name, job.OwnerType, job.OwnerId, job.TenantUuid,
+                            "cron", scheduledAt, now, traceId,
+                            $"{job.Uuid}:{scheduledAt.Ticks}",
+                            TryGetString(job.Payload, "business_action"), job.Payload ?? []);
+                        await _eventEmitter.EmitAsync(new FrameworkEvent
                         {
-                            await handler(job, ct);
-                            job.NextRunAt = LocalScheduler.ComputeNextRun(job.ScheduleType, job.ScheduleExpr, now);
-                        }
+                            Topic = job.Topic,
+                            Meta = new EventMeta
+                            {
+                                TenantUUID = job.TenantUuid,
+                                SourcePlugin = job.OwnerId,
+                                TraceID = traceId,
+                                OccurredAt = now
+                            },
+                            Payload = payload
+                        }, ct);
+                        job.LastRunAt = now;
+                        job.NextRunAt = LocalScheduler.ComputeNextRun(job.ScheduleType, job.ScheduleExpr, now);
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogError(ex, "Scheduler tick failed"); }
@@ -81,4 +98,7 @@ internal class SchedulerRunner : BackgroundService
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
     }
+
+    private static string? TryGetString(IReadOnlyDictionary<string, object?>? payload, string key) =>
+        payload != null && payload.TryGetValue(key, out var value) ? value?.ToString() : null;
 }

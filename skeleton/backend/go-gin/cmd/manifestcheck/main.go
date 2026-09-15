@@ -136,8 +136,13 @@ func validateRequiredHostCapabilities(plugin map[string]interface{}) error {
 		required[capabilityID] = struct{}{}
 	}
 	if len(required) > 0 {
-		if _, ok := required["com.corex.capabilities.grant_status.read"]; !ok {
-			return errors.New("capabilities.required missing com.corex.capabilities.grant_status.read")
+		for _, capabilityID := range []string{
+			"com.corex.capabilities.catalog.read",
+			"com.corex.capabilities.grant_status.read",
+		} {
+			if _, ok := required[capabilityID]; !ok {
+				return fmt.Errorf("capabilities.required missing %s", capabilityID)
+			}
 		}
 	}
 	return nil

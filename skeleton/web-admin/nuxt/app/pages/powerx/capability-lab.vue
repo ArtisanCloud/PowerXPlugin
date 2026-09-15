@@ -23,29 +23,6 @@
       :ui="{ title: 'text-gray-900 dark:text-gray-100', description: 'text-gray-700 dark:text-gray-200' }"
     />
 
-    <UAlert
-      v-else-if="showPowerXAccessHint"
-      icon="i-heroicons-exclamation-triangle"
-      color="blue"
-      variant="soft"
-      title="未配置 PowerX 底座访问（CoreX 能力列表可能为空）"
-      :ui="{ title: 'text-gray-900 dark:text-gray-100', description: 'text-gray-700 dark:text-gray-200' }"
-    >
-      <template #description>
-        <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-          <p>
-            当前会以 <code class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-800 dark:bg-gray-800 dark:text-gray-100">{{ powerxCoreBase }}</code>
-            作为 PowerX Core 访问基址；若你本机未启动 Core，或未配置 Dev Gateway 凭证，则 `source=corex` 能力列表会返回空。
-          </p>
-          <ol class="list-decimal space-y-1 pl-5">
-            <li>启动 PowerX Core（或设置 `NUXT_PUBLIC_POWERX_CORE_BASE` 指向可访问的 Core）。</li>
-            <li>在 Skeleton/插件项目写入后端 `.env.local`（`PX_GATEWAY_BASE_URL` + `PX_GATEWAY_API_KEY`，或宿主模式 STS client）。</li>
-            <li>重启插件后端后再刷新本页面。</li>
-          </ol>
-        </div>
-      </template>
-    </UAlert>
-
     <div v-else class="grid gap-6 lg:grid-cols-2">
       <div class="space-y-6">
         <UCard>
@@ -111,9 +88,11 @@
                     {{ protocol }}
                   </span>
                 </span>
+                <span v-else-if="isCoreXCatalogEntry && coreXContractLoading">{{ t('capabilityLab.corexCatalog.contractLoading') }}</span>
+                <span v-else-if="isCoreXCatalogEntry">{{ t('capabilityLab.corexCatalog.contractUnavailable') }}</span>
                 <span v-else>该能力未在 catalog 声明额外协议（默认 REST）</span>
                 <UButton
-                  v-if="hostContractModule"
+                  v-if="hostContractModule && !isCoreXCatalogEntry"
                   :to="{ path: '/powerx/host-contract-lab', query: { module: hostContractModule } }"
                   color="primary"
                   variant="link"
@@ -131,7 +110,7 @@
                 :title="t('capabilityLab.suiteCapability.title')"
                 :description="t('capabilityLab.suiteCapability.description', { provider: selectedSuiteCapability.providerPluginID || t('capabilityLab.suiteCapability.unknownProvider') })"
               />
-              <div v-if="selectedSuiteCapability" class="mt-2 flex items-center gap-2 text-xs">
+              <div v-if="selectedCatalogCapability" class="mt-2 flex items-center gap-2 text-xs">
                 <UButton size="xs" variant="soft" :loading="grantStatusLoading" @click="checkSelectedGrantStatus">
                   {{ grantStatusLoading ? t('capabilityLab.grantStatus.loading') : t('capabilityLab.grantStatus.check') }}
                 </UButton>
@@ -144,6 +123,14 @@
               </div>
             </label>
 
+            <UAlert
+              v-if="isCoreXCatalogEntry && coreXContractError"
+              icon="i-heroicons-exclamation-triangle"
+              color="amber"
+              variant="soft"
+              :title="t('capabilityLab.corexCatalog.contractLoadFailed')"
+              :description="coreXContractError"
+            />
             <label class="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
               <span>协议（preferredProtocol）<span class="text-red-500">*</span></span>
               <USelect
@@ -155,7 +142,8 @@
                 class="w-full"
               />
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                Action 仅用于语义标记，真正的路由由 `preferredProtocol + method + endpoint` 决定。默认根据能力/Action 自动切换，必要时可手动覆盖。
+                <span v-if="isCoreXCatalogEntry">{{ t('capabilityLab.corexCatalog.protocolHelp') }}</span>
+                <span v-else>Action 仅用于语义标记，真正的路由由 `preferredProtocol + method + endpoint` 决定。默认根据能力/Action 自动切换，必要时可手动覆盖。</span>
               </span>
             </label>
 
@@ -166,15 +154,21 @@
                 :items="actionOptions"
                 option-attribute="label"
                 value-attribute="value"
-                :disabled="!actionOptions.length"
                 searchable
                 placeholder="选择或输入 action"
                 class="w-full"
               />
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                <span v-if="actionOptions.length">可直接选择 REST/gRPC/Workflow 对应的动作，必要时可编辑输入框覆盖</span>
+                <span v-if="actionOptions.length && isCoreXCatalogEntry">{{ t('capabilityLab.corexCatalog.actionHelp') }}</span>
+                <span v-else-if="actionOptions.length">可直接选择 REST/gRPC/Workflow 对应的动作，必要时可编辑输入框覆盖</span>
                 <span v-else>请先选择 Capability ID</span>
               </span>
+              <div
+                v-if="isCoreXCatalogEntry && selectedFormalTarget"
+                class="rounded border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-900 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-100"
+              >
+                {{ t('capabilityLab.corexCatalog.formalTarget', selectedFormalTarget) }}
+              </div>
             </label>
 
             <label class="flex flex-col gap-1 text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -207,7 +201,7 @@
                 </div>
               </div>
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                请按网关要求补齐 `method`、`endpoint`、`headers`、`query`、`body`；详细字段说明见内部《PowerX 能力消费》指南。
+                {{ t('capabilityLab.payloadHelp') }}
               </span>
             </label>
 
@@ -466,6 +460,7 @@ type ActionOptionMeta = {
   http?: {
     method?: string
     path?: string
+    schemaRef?: string
   }
   grpc?: {
     service?: string
@@ -494,6 +489,9 @@ const capabilityOptions = ref<CapabilityOption[]>([])
 const capabilityListLoading = ref(false)
 const sourceListLoading = ref(false)
 const capabilityLoadError = ref('')
+const coreXContractLoading = ref(false)
+const coreXContractError = ref('')
+const coreXContract = ref<{ protocols?: Record<string, any> } | null>(null)
 const selectedModule = ref('')
 const selectedSource = ref('corex')
 const sourceOptions = ref([
@@ -580,10 +578,10 @@ async function fetchCapabilityOptions() {
     const entries = await capabilityCatalogApi.list({ source: sourceQuery })
     const normalized = (entries || [])
       .map((entry) => ({
-        label: entry?.kind ? `${entry.id} · ${entry.kind}` : entry.id,
+        label: entry?.title ? `${entry.id} · ${entry.title}` : (entry?.kind ? `${entry.id} · ${entry.kind}` : entry.id),
         value: entry.id,
         module: entry?.module || deriveCapabilityModule(entry?.id),
-        protocols: entry?.protocols,
+        protocols: entry?.source === 'corex' ? undefined : entry?.protocols,
         providerPluginID: entry?.provider_plugin_id,
         source: entry?.source
       }))
@@ -610,14 +608,6 @@ const defaultApiBase =
   (runtimeConfig.public?.apiBase as string | undefined) ??
   ''
 
-const powerxCoreBase = computed(() => String(runtimeConfig.public?.powerxCoreBase || ''))
-const showPowerXAccessHint = computed(() => {
-  if (!isAuthorized.value) return false
-  if (capabilityListLoading.value) return false
-  if (normalizeSourceQuery(selectedSource.value) !== 'corex') return false
-  return capabilityLoadError.value.includes('source=corex')
-})
-
 const DEFAULT_PAYLOAD_TEXT = '{\n  \n}'
 const payloadTouched = ref(false)
 const isAutoFillingPayload = ref(false)
@@ -632,7 +622,6 @@ const form = reactive({
   apiBase: defaultApiBase
 })
 
-const defaultActionSuggestions = ['List', 'Get', 'Create', 'Update', 'Delete', 'Publish', 'Trigger', 'Execute']
 const showRequestPreview = ref(true)
 const codeBlockClass =
   'font-mono text-[13px] leading-relaxed whitespace-pre-wrap break-all overflow-x-auto text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-slate-900/70 border border-gray-200 dark:border-gray-700 rounded shadow-inner shadow-black/5'
@@ -664,6 +653,7 @@ const canonicalString = (value: any) => {
 
 const {
   invokeCapability,
+  invokeCoreXCapability,
   clearHistory,
   loading,
   result,
@@ -708,6 +698,12 @@ const selectedCapabilityOption = computed(() =>
   capabilityOptions.value.find((entry) => entry.value === form.capabilityId)
 )
 
+const isCoreXCatalogEntry = computed(() => {
+  const catalogSource = normalizeSourceQuery(selectedSource.value)
+  return catalogSource === 'corex' || selectedCapabilityOption.value?.source === 'corex'
+})
+const selectedCatalogCapability = computed(() => selectedCapabilityOption.value || null)
+
 const selectedSuiteCapability = computed(() => {
   const option = selectedCapabilityOption.value
   if (!option?.providerPluginID || option.providerPluginID === 'com.powerx.plugins.base') {
@@ -725,7 +721,7 @@ const grantStatusLabel = computed(() => {
 })
 
 async function checkSelectedGrantStatus() {
-  const capabilityID = selectedSuiteCapability.value?.value
+  const capabilityID = selectedCatalogCapability.value?.value
   if (!capabilityID) return
   grantStatusLoading.value = true
   grantStatusError.value = ''
@@ -744,7 +740,27 @@ async function checkSelectedGrantStatus() {
 watch(() => form.capabilityId, () => {
   selectedGrantStatus.value = null
   grantStatusError.value = ''
+  loadCoreXContract()
 })
+
+async function loadCoreXContract() {
+  coreXContract.value = null
+  coreXContractError.value = ''
+  if (!isCoreXCatalogEntry.value || !form.capabilityId) return
+  coreXContractLoading.value = true
+  form.preferredProtocol = ''
+  form.action = ''
+  try {
+    coreXContract.value = await capabilityCatalogApi.coreXContract(form.capabilityId)
+    if (!coreXContract.value?.protocols || !Object.keys(coreXContract.value.protocols).length) {
+      coreXContractError.value = t('capabilityLab.corexCatalog.contractUnavailable')
+    }
+  } catch (error: any) {
+    coreXContractError.value = String(error?.message || t('capabilityLab.corexCatalog.contractUnavailable'))
+  } finally {
+    coreXContractLoading.value = false
+  }
+}
 
 const hostContractModule = computed(() => {
   const capabilityID = String(form.capabilityId || '').trim().toLowerCase()
@@ -781,7 +797,11 @@ function deriveCapabilityModule(value: string | undefined | null) {
   return parts.slice(0, parts.length - 1).join('.')
 }
 
-const normalizedProtocolEntries = computed(() => normalizeCapabilityProtocols(selectedCapabilityOption.value?.protocols))
+const normalizedProtocolEntries = computed(() => {
+  return normalizeCapabilityProtocols(
+    isCoreXCatalogEntry.value ? coreXContract.value?.protocols : selectedCapabilityOption.value?.protocols
+  )
+})
 
 const allActionOptions = computed<ActionOption[]>(() => {
   const suggestions = new Map<string, ActionOption>()
@@ -832,14 +852,6 @@ const allActionOptions = computed<ActionOption[]>(() => {
     })
   })
 
-  if (!suggestions.size) {
-    add(deriveActionFromCapabilityId(form.capabilityId), undefined, { protocol: 'rest' })
-  }
-
-  if (!suggestions.size) {
-    defaultActionSuggestions.forEach((item) => add(item, undefined, { protocol: 'rest' }))
-  }
-
   return Array.from(suggestions.values())
 })
 
@@ -861,6 +873,18 @@ const selectedActionOption = computed<ActionOption | null>(() => {
 })
 
 const selectedActionMeta = computed<ActionOptionMeta | null>(() => selectedActionOption.value?.meta ?? null)
+const selectedFormalTarget = computed(() => {
+  if (!isCoreXCatalogEntry.value || !selectedActionMeta.value) return null
+  const http = selectedActionMeta.value.http
+  if (http?.method && http.path) {
+    return { method: http.method, endpoint: http.path, schema: http.schemaRef || '—' }
+  }
+  const grpc = selectedActionMeta.value.grpc
+  if (grpc?.service || grpc?.method) {
+    return { method: grpc.method || 'RPC', endpoint: grpc.service || '—', schema: '—' }
+  }
+  return null
+})
 
 function normalizeCapabilityProtocols(protocols?: Record<string, any> | null): NormalizedProtocolEntry[] {
   if (!protocols) {
@@ -905,9 +929,6 @@ const selectedCapabilityProtocols = computed(() => {
     const label = protocolDisplayNameMap[entry.protocol] || entry.channel.toUpperCase()
     set.add(label)
   })
-  if (!set.size) {
-    set.add('REST')
-  }
   return Array.from(set)
 })
 
@@ -915,10 +936,12 @@ const recommendedPayloadTemplate = computed(() => {
   const protocol = (form.preferredProtocol || '').toLowerCase() as ActionProtocol
   if (protocol === 'rest') {
     const httpMeta = selectedActionMeta.value?.http ?? normalizeHttpMeta(lookupProtocolDetail(protocol))
+    if (isCoreXCatalogEntry.value) return buildCoreXRestPayloadTemplate()
     return buildRestPayloadTemplate(httpMeta)
   }
   if (protocol === 'grpc') {
     const grpcMeta = selectedActionMeta.value?.grpc ?? normalizeGrpcMeta(lookupProtocolDetail(protocol))
+    if (isCoreXCatalogEntry.value) return buildCoreXGRPCPayloadTemplate()
     return buildGrpcPayloadTemplate(grpcMeta)
   }
   if (protocol === 'workflow') {
@@ -966,11 +989,8 @@ const protocolDisplayNameMap: Record<ActionProtocol, string> = {
 }
 
 const availableProtocols = computed<ActionProtocol[]>(() => {
-  const set = new Set<ActionProtocol>()
+	const set = new Set<ActionProtocol>()
   selectedCapabilityProtocols.value.forEach((label) => set.add(mapProtocolLabelToValue(label)))
-  if (!set.size) {
-    set.add('rest')
-  }
   return Array.from(set)
 })
 
@@ -1022,8 +1042,8 @@ function deriveActionFromHttp(method?: string, endpoint?: string) {
 }
 
 function buildRestPayloadTemplate(http?: { method?: string; path?: string }) {
-  const method = (http?.method || 'GET').toUpperCase()
-  const endpoint = http?.path || '/api/v1/<resource>'
+  const method = (http?.method || '').toUpperCase()
+  const endpoint = http?.path || ''
   return JSON.stringify(
     {
       method,
@@ -1037,6 +1057,14 @@ function buildRestPayloadTemplate(http?: { method?: string; path?: string }) {
     null,
     2
   )
+}
+
+function buildCoreXRestPayloadTemplate() {
+  return JSON.stringify({ headers: {}, query: {}, body: {} }, null, 2)
+}
+
+function buildCoreXGRPCPayloadTemplate() {
+  return JSON.stringify({ metadata: {}, body: {} }, null, 2)
 }
 
 function buildGrpcPayloadTemplate(grpc?: { service?: string; method?: string }) {
@@ -1091,7 +1119,8 @@ function normalizeHttpMeta(detail?: Record<string, any> | null) {
   }
   return {
     method,
-    path
+    path,
+    schemaRef: typeof detail.schema_ref === 'string' ? detail.schema_ref.trim() : undefined
   }
 }
 
@@ -1147,7 +1176,7 @@ const requestPreview = computed(() => {
   const body: Record<string, any> = {
     capabilityId: form.capabilityId || '<空>',
     action: form.action || '<空>',
-    payload: safePreviewPayload()
+    payload: invocationPayloadPreview()
   }
   if (form.preferredProtocol) {
     body.preferredProtocol = form.preferredProtocol
@@ -1173,6 +1202,10 @@ const safePreviewPayload = () => {
 }
 
 async function handleInvoke() {
+	if (isCoreXCatalogEntry.value && (coreXContractLoading.value || coreXContractError.value || !coreXContract.value)) {
+		errorMessage.value = t('capabilityLab.corexCatalog.contractRequired')
+		return
+	}
 	if (selectedSuiteCapability.value) {
 		errorMessage.value = t('capabilityLab.suiteCapability.invokeBlocked')
 		return
@@ -1189,7 +1222,30 @@ async function handleInvoke() {
   if (form.mockModule?.trim()) {
     headers['X-PX-Use-Mock'] = form.mockModule.trim()
   }
-  const payload = parsePayload()
+  let payload: Record<string, any>
+  try {
+    payload = buildInvocationPayload()
+  } catch (error: any) {
+    errorMessage.value = error?.message || t('capabilityLab.corexCatalog.contractRequired')
+    return
+  }
+
+  if (isCoreXCatalogEntry.value) {
+    try {
+      await invokeCoreXCapability({
+        capabilityId: form.capabilityId.trim(),
+        action: form.action.trim(),
+        preferredProtocol: form.preferredProtocol.trim() || undefined,
+        payload,
+        context: {},
+        payloadText: JSON.stringify(payload, null, 2),
+        requestId: form.requestId?.trim() || undefined
+      })
+    } catch {
+      // 错误在 useCapabilityLab 中统一提示。
+    }
+    return
+  }
 
   try {
     await invokeCapability({
@@ -1207,6 +1263,46 @@ async function handleInvoke() {
     }
   } catch {
     // 错误在 useCapabilityLab 中统一提示
+  }
+}
+
+function buildInvocationPayload() {
+  const editablePayload = parsePayload()
+  if (!isCoreXCatalogEntry.value) return editablePayload
+  const protocol = (form.preferredProtocol || '').toLowerCase() as ActionProtocol
+  if (protocol === 'rest') {
+    const http = selectedActionMeta.value?.http
+    if (!http?.method || !http.path) throw new Error(t('capabilityLab.corexCatalog.contractRequired'))
+    return {
+      method: http.method,
+      endpoint: http.path,
+      headers: asObject(editablePayload.headers),
+      query: asObject(editablePayload.query),
+      body: asObject(editablePayload.body)
+    }
+  }
+  if (protocol === 'grpc') {
+    const grpc = selectedActionMeta.value?.grpc
+    if (!grpc?.service || !grpc.method) throw new Error(t('capabilityLab.corexCatalog.contractRequired'))
+    return {
+      endpoint: grpc.service,
+      rpc: grpc.method,
+      metadata: asObject(editablePayload.metadata),
+      body: asObject(editablePayload.body)
+    }
+  }
+  return editablePayload
+}
+
+function asObject(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}
+}
+
+function invocationPayloadPreview() {
+  try {
+    return buildInvocationPayload()
+  } catch {
+    return safePreviewPayload()
   }
 }
 
@@ -1283,7 +1379,7 @@ watch(capabilityOptions, () => {
 
 watch(protocolOptions, (options) => {
   if (!options.length) {
-    form.preferredProtocol = 'rest'
+    form.preferredProtocol = ''
     return
   }
   const hasRest = options.some((option) => option.value === 'rest')

@@ -21,6 +21,7 @@ import (
 	securityModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/security"
 	templateModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/template"
 	toolgrantModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/tool_grant"
+	localvector "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/knowledge/vectorstore"
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"gorm.io/gorm"
@@ -30,6 +31,33 @@ var businessTables = []interface{}{
 	&models.PluginCredential{},
 	&models.PluginTenantExt{},
 	&models.LocalAISetting{},
+	&models.LocalKnowledgeSpace{},
+	&models.LocalKnowledgeDocument{},
+	&models.LocalKnowledgeRoute{},
+	&models.LocalKnowledgeKGNode{},
+	&models.LocalKnowledgeKGEdge{},
+	&models.LocalKnowledgeChunk{},
+	&models.LocalIngestionProfileVersion{},
+	&models.LocalIndexProfileVersion{},
+	&models.LocalRAGProfileVersion{},
+	&models.LocalKnowledgeIngestionJob{},
+	&models.LocalKnowledgeJobChunk{},
+	&models.LocalKnowledgeIndexJob{},
+	&models.LocalKnowledgeVectorIndex{},
+	&models.LocalKnowledgeArtifactBundle{},
+	&models.LocalKnowledgeAuditTrailEntry{},
+	&models.LocalKnowledgeCorpusCheckJob{},
+	&models.LocalKnowledgeDecayTask{},
+	&models.LocalKnowledgeDeltaJob{},
+	&models.LocalKnowledgeFeedbackCase{},
+	&models.LocalKnowledgeFusionStrategyVersion{},
+	&models.LocalKnowledgeIAMSyncTask{},
+	&models.LocalKnowledgePolicyTemplateVersion{},
+	&models.LocalKnowledgeSourceConnectorInstance{},
+	&models.LocalKnowledgeSourceCredential{},
+	&models.LocalKnowledgeSpaceSyncJob{},
+	&models.LocalKnowledgeReleasePolicy{},
+	&models.LocalKnowledgeReleaseBatch{},
 	&agentRegistryModel.PluginSkill{},
 	&agentRegistryModel.PluginAgent{},
 	&templateModel.Template{},
@@ -44,6 +72,8 @@ var businessTables = []interface{}{
 	&marketplaceModel.LicenseEvent{},
 	&marketplaceModel.TaxTransaction{},
 	&customerModel.CustomerAccount{},
+	&customerModel.Contact{},
+	&customerModel.ContactIdentity{},
 	&customerModel.CustomerAuthIdentity{},
 	&customerModel.CustomerTenantMembership{},
 	&customerModel.MiniAppEntry{},
@@ -100,6 +130,13 @@ var iamTables = []interface{}{
 
 // MigratePluginModels 只做 AutoMigrate（最小实现）
 func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) error {
+	return MigratePluginModelsWithConfig(ctx, db, nil, includeIAM)
+}
+
+// MigratePluginModelsWithConfig keeps the normal model migration compatible
+// with callers that do not have runtime configuration, while make migrate can
+// additionally provision the explicit local pgvector infrastructure.
+func MigratePluginModelsWithConfig(ctx context.Context, db *gorm.DB, cfg *config.Config, includeIAM bool) error {
 	if db == nil {
 		return nil
 	}
@@ -119,12 +156,36 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 	if err := ensureTemplateUUIDs(ctx, db); err != nil {
 		return err
 	}
+	if err := ensureMetadataTagBindingUUIDs(ctx, db); err != nil {
+		return err
+	}
+	if err := ensureContactIdentityChannelDictionaryItemUUID(ctx, db); err != nil {
+		return err
+	}
 	if includeIAM {
 		if err := ensureIAMIdentityUUIDs(ctx, db); err != nil {
 			return err
 		}
 	}
+	// Normalize the former `name` column before AutoMigrate sees the current
+	// `space_name` model.  The old field is not a compatibility field: it is
+	// copied once and removed in the same migration run.
+	if err := migrateLocalKnowledgeSpaceName(ctx, db); err != nil {
+		return err
+	}
+	if err := ensureLocalKnowledgeVectorIndexTenant(ctx, db); err != nil {
+		return err
+	}
 	if err := safeAutoMigrate(ctx, db, tables); err != nil {
+		return err
+	}
+	if err := ensureLocalKnowledgePGVector(ctx, db, cfg); err != nil {
+		return err
+	}
+	if err := removeObsoleteLocalKnowledgeSchema(ctx, db); err != nil {
+		return err
+	}
+	if err := migrateLocalKnowledgeProfileReferences(ctx, db); err != nil {
 		return err
 	}
 	if err := migrateLocalAISettingSources(ctx, db); err != nil {
@@ -142,6 +203,217 @@ func MigratePluginModels(ctx context.Context, db *gorm.DB, includeIAM bool) erro
 		}
 	}
 	return nil
+}
+
+func ensureLocalKnowledgePGVector(ctx context.Context, db *gorm.DB, cfg *config.Config) error {
+	if cfg == nil || !cfg.LocalPGVectorEnabled() {
+		return nil
+	}
+	pg := cfg.Knowledge.VectorStore.PGVector
+	log.Printf("[migrate] local knowledge pgvector target=%s.%s dimensions=%d", pg.Schema, pg.Table, pg.Dimensions)
+	if err := localvector.EnsurePGVectorTable(ctx, db, localvector.PGVectorConfig{
+		Schema:     pg.Schema,
+		Table:      pg.Table,
+		Dimensions: pg.Dimensions,
+		Lists:      pg.Lists,
+	}, cfg.Database.Schema); err != nil {
+		return fmt.Errorf("local knowledge pgvector migration failed: %w", err)
+	}
+	log.Printf("[migrate] local knowledge pgvector ready: %s.%s", pg.Schema, pg.Table)
+	return nil
+}
+
+// ensureLocalKnowledgeVectorIndexTenant upgrades the short-lived pre-Dense
+// index catalog before AutoMigrate applies the non-null tenant UUID contract.
+// The backfill is derived only from the owning local knowledge space; an
+// orphan index is rejected rather than assigned a synthetic tenant.
+func ensureLocalKnowledgeVectorIndexTenant(_ context.Context, db *gorm.DB) error {
+	if db == nil || !db.Migrator().HasTable(&models.LocalKnowledgeVectorIndex{}) {
+		return nil
+	}
+	indexTable := models.LocalKnowledgeVectorIndex{}.TableName()
+	if !db.Migrator().HasColumn(&models.LocalKnowledgeVectorIndex{}, "TenantUUID") {
+		if err := db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN tenant_uuid varchar(36)", indexTable)).Error; err != nil {
+			return err
+		}
+	}
+	spaceTable := models.LocalKnowledgeSpace{}.TableName()
+	if err := db.Exec(fmt.Sprintf("UPDATE %s SET tenant_uuid = (SELECT tenant_uuid FROM %s WHERE %s.uuid = %s.space_uuid) WHERE tenant_uuid IS NULL OR CAST(tenant_uuid AS TEXT) = ''", indexTable, spaceTable, spaceTable, indexTable)).Error; err != nil {
+		return err
+	}
+	var orphanCount int64
+	if err := db.Table(indexTable).Where("tenant_uuid IS NULL OR CAST(tenant_uuid AS TEXT) = ''").Count(&orphanCount).Error; err != nil {
+		return err
+	}
+	if orphanCount != 0 {
+		return fmt.Errorf("local knowledge vector indexes have %d tenantless rows", orphanCount)
+	}
+	return nil
+}
+
+// removeObsoleteLocalKnowledgeSchema removes the abandoned first-generation
+// local knowledge projection. The formal Core-aligned version and job tables
+// are the only supported storage shape.
+func removeObsoleteLocalKnowledgeSchema(_ context.Context, db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	for _, table := range []string{"local_knowledge_profiles", "local_knowledge_jobs", "local_knowledge_chunk_vectors"} {
+		if db.Migrator().HasTable(table) {
+			if err := db.Migrator().DropTable(table); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// migrateLocalKnowledgeSpaceName removes the abandoned `name` storage field.
+// Existing values are copied into the Core-aligned `space_name` field before
+// the old column is dropped.  A blank historical name is rejected explicitly
+// instead of allowing an invalid space to survive the migration.
+func migrateLocalKnowledgeSpaceName(_ context.Context, db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	table := models.LocalKnowledgeSpace{}.TableName()
+	// Inspect physical columns rather than asking GORM to resolve a current Go
+	// field.  `name` deliberately no longer exists in LocalKnowledgeSpace.
+	hasName, err := hasPhysicalColumn(db, table, "name")
+	if err != nil {
+		return err
+	}
+	if !hasName {
+		return nil
+	}
+	hasSpaceName, err := hasPhysicalColumn(db, table, "space_name")
+	if err != nil {
+		return err
+	}
+	if !hasSpaceName {
+		// It must initially be nullable: SQLite cannot add a NOT NULL column to
+		// a populated table, and PostgreSQL must first receive the historical
+		// values.  PostgreSQL gets NOT NULL restored below; SQLite's subsequent
+		// AutoMigrate rebuild applies the current model constraint.
+		if err := db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN space_name varchar(128)", table)).Error; err != nil {
+			return err
+		}
+	}
+	if err := db.Exec(fmt.Sprintf("UPDATE %s SET space_name = name WHERE space_name IS NULL OR TRIM(space_name) = ''", table)).Error; err != nil {
+		return err
+	}
+	var missing int64
+	if err := db.Raw(fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE space_name IS NULL OR TRIM(space_name) = ''", table)).Scan(&missing).Error; err != nil {
+		return err
+	}
+	if missing != 0 {
+		return fmt.Errorf("local knowledge space migration found %d rows without a usable legacy name", missing)
+	}
+	if !isSQLite(db) {
+		if err := db.Exec(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN space_name SET NOT NULL", table)).Error; err != nil {
+			return err
+		}
+	}
+	// Use native DDL rather than GORM's SQLite table-recreation path: the
+	// latter resolves `name` against the current Go model and panics because
+	// that legacy field is deliberately no longer present there.
+	if err := db.Exec(fmt.Sprintf("ALTER TABLE %s DROP COLUMN name", table)).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+func hasPhysicalColumn(db *gorm.DB, table, column string) (bool, error) {
+	baseTable := strings.Trim(strings.TrimSpace(table[strings.LastIndex(table, ".")+1:]), `"`)
+	if db != nil && db.Dialector != nil {
+		switch db.Dialector.Name() {
+		case "postgres":
+			var count int64
+			schema := models.Schema()
+			if err := db.Raw(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? AND table_name = ? AND column_name = ?`, schema, baseTable, column).Scan(&count).Error; err != nil {
+				return false, err
+			}
+			return count != 0, nil
+		case "sqlite":
+			var count int64
+			if err := db.Raw(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, baseTable, column).Scan(&count).Error; err != nil {
+				return false, err
+			}
+			return count != 0, nil
+		}
+	}
+	columns, err := db.Migrator().ColumnTypes(table)
+	if err != nil {
+		// The SQLite test migration intentionally skips local-knowledge tables.
+		// A missing table therefore means there is no legacy column to migrate.
+		if isSQLite(db) && strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, item := range columns {
+		if strings.EqualFold(item.Name(), column) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// migrateLocalKnowledgeProfileReferences promotes old UUID links to the same
+// logical profile-key contract used by PowerX Core.  It runs before the UUID
+// columns are dropped, so existing local spaces retain their selected policy.
+func migrateLocalKnowledgeProfileReferences(_ context.Context, db *gorm.DB) error {
+	if db == nil {
+		return nil
+	}
+	table := models.LocalKnowledgeSpace{}.TableName()
+	columns := []struct{ oldColumn, newColumn, profileTable string }{
+		{"ingestion_profile_uuid", "ingestion_profile_key", models.LocalIngestionProfileVersion{}.TableName()},
+		{"index_profile_uuid", "index_profile_key", models.LocalIndexProfileVersion{}.TableName()},
+		{"rag_profile_uuid", "rag_profile_key", models.LocalRAGProfileVersion{}.TableName()},
+	}
+	for _, item := range columns {
+		hasOld, err := hasPhysicalColumn(db, table, item.oldColumn)
+		if err != nil {
+			return err
+		}
+		hasNew, err := hasPhysicalColumn(db, table, item.newColumn)
+		if err != nil {
+			return err
+		}
+		if !hasOld || !hasNew {
+			continue
+		}
+		query := fmt.Sprintf("UPDATE %s AS space SET %s = profile.profile_key FROM %s AS profile WHERE space.%s = profile.uuid AND (space.%s = '' OR space.%s = 'default')", table, item.newColumn, item.profileTable, item.oldColumn, item.newColumn, item.newColumn)
+		if err := db.Exec(query).Error; err != nil {
+			return err
+		}
+	}
+	for _, column := range []string{"profile_uuid", "ingestion_profile_uuid", "index_profile_uuid", "rag_profile_uuid"} {
+		hasColumn, err := hasPhysicalColumn(db, table, column)
+		if err != nil {
+			return err
+		}
+		if hasColumn {
+			if err := dropPhysicalColumn(db, table, column); err != nil {
+				return err
+			}
+		}
+	}
+	hasDescription, err := hasPhysicalColumn(db, table, "description")
+	if err != nil {
+		return err
+	}
+	if hasDescription {
+		if err := dropPhysicalColumn(db, table, "description"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func dropPhysicalColumn(db *gorm.DB, table, column string) error {
+	return db.Exec(fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", table, column)).Error
 }
 
 // migrateLocalAISettingSources splits the old single profile slot into local

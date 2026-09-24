@@ -7,16 +7,24 @@ import (
 	"errors"
 	"io"
 	"mime"
+	"strconv"
 	"strings"
+	"time"
 )
 
-// SessionEvent contains durable execution state, not token deltas. Error events
-// are delivered to the callback and also returned as an error after end.
+// SessionEvent is a durable invocation-state frame. EventID is acknowledged
+// only after the callback succeeds and is reused as Last-Event-ID on reconnect.
 type SessionEvent struct {
+	EventID    string
 	Type       string
 	Invocation *ServiceInvocation
 	Status     string
 	ReasonCode string
+}
+type sessionStreamState struct {
+	cursor   int
+	final    bool
+	terminal error
 }
 
 func (c *Client) StreamSessionEvents(ctx context.Context, id, invocation string, fn func(SessionEvent) error) error {
@@ -27,41 +35,72 @@ func (c *Client) StreamSessionEvents(ctx context.Context, id, invocation string,
 	if fn == nil {
 		return sessionInvalid()
 	}
-	resp, e := c.sessionRequest(ctx, "GET", p+"/events", "", nil)
-	if e != nil {
-		return e
+	state, attempts := sessionStreamState{}, 0
+	for {
+		cursor := ""
+		if state.cursor > 0 {
+			cursor = strconv.Itoa(state.cursor)
+		}
+		resp, e := c.sessionRequestWithCursor(ctx, "GET", p+"/events", "", nil, cursor)
+		if e != nil {
+			return e
+		}
+		if resp.StatusCode >= 400 {
+			resp.Body.Close()
+			return transportError(resp)
+		}
+		media, _, e := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if e != nil || media != "text/event-stream" || resp.StatusCode != 200 {
+			resp.Body.Close()
+			return sessionDependency()
+		}
+		e = consumeSessionEventsState(resp.Body, id, invocation, &state, fn)
+		resp.Body.Close()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if errors.Is(e, errSessionStreamEnd) {
+			return nil
+		}
+		if e == nil || !errors.Is(e, errSessionStreamInterrupted) {
+			return e
+		}
+		attempts++
+		if !c.cfg.ReconnectPolicy.Enabled || attempts > c.cfg.ReconnectPolicy.MaxAttempts {
+			return e
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(c.cfg.ReconnectPolicy.Backoff):
+		}
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return transportError(resp)
-	}
-	media, _, e := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	if e != nil || media != "text/event-stream" || resp.StatusCode != 200 {
-		return sessionDependency()
-	}
-	e = consumeSessionEvents(resp.Body, id, invocation, fn)
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	return e
 }
 
 var errSessionStreamEnd = errors.New("AGENT_SESSION_STREAM_END")
+var errSessionStreamInterrupted = errors.New("AGENT_SESSION_STREAM_INTERRUPTED")
 
+// consumeSessionEvents remains a testable one-shot decoder.
 func consumeSessionEvents(r io.Reader, session, invocation string, fn func(SessionEvent) error) error {
+	return consumeSessionEventsState(r, session, invocation, &sessionStreamState{}, fn)
+}
+func consumeSessionEventsState(r io.Reader, session, invocation string, state *sessionStreamState, fn func(SessionEvent) error) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 4096), 1<<20)
-	var kind string
+	var kind, eventID string
 	var data strings.Builder
-	var streamError error
-	var final bool
 	flush := func() error {
 		if data.Len() == 0 {
 			kind = ""
+			eventID = ""
 			return nil
 		}
+		id, e := strconv.Atoi(eventID)
+		if e != nil || id < 1 || id > 3 || id <= state.cursor {
+			return sessionDependency()
+		}
 		raw := []byte(data.String())
-		ev := SessionEvent{Type: kind}
+		ev := SessionEvent{EventID: eventID, Type: kind}
 		switch kind {
 		case "state", "final":
 			var v ServiceInvocation
@@ -69,10 +108,10 @@ func consumeSessionEvents(r io.Reader, session, invocation string, fn func(Sessi
 				return sessionDependency()
 			}
 			if kind == "final" {
-				if v.Status != "succeeded" || final || streamError != nil {
+				if v.Status != "succeeded" || state.final || state.terminal != nil {
 					return sessionDependency()
 				}
-				final = true
+				state.final = true
 			}
 			ev.Invocation = &v
 			ev.Status = v.Status
@@ -80,11 +119,11 @@ func consumeSessionEvents(r io.Reader, session, invocation string, fn func(Sessi
 			var v struct {
 				Reason string `json:"reason_code"`
 			}
-			if json.Unmarshal(raw, &v) != nil || strings.TrimSpace(v.Reason) == "" || final {
+			if json.Unmarshal(raw, &v) != nil || strings.TrimSpace(v.Reason) == "" || state.final || state.terminal != nil {
 				return sessionDependency()
 			}
 			ev.ReasonCode = v.Reason
-			streamError = sessionError(0, v.Reason)
+			state.terminal = sessionError(0, v.Reason)
 		case "end":
 			var v struct {
 				Status string `json:"status"`
@@ -92,7 +131,7 @@ func consumeSessionEvents(r io.Reader, session, invocation string, fn func(Sessi
 			if json.Unmarshal(raw, &v) != nil {
 				return sessionDependency()
 			}
-			if (v.Status == "succeeded" && !final) || (v.Status != "succeeded" && v.Status != "failed" && v.Status != "cancelled") || ((v.Status == "failed" || v.Status == "cancelled") && streamError == nil) {
+			if (v.Status == "succeeded" && !state.final) || (v.Status != "succeeded" && v.Status != "failed" && v.Status != "cancelled") || ((v.Status == "failed" || v.Status == "cancelled") && state.terminal == nil) {
 				return sessionDependency()
 			}
 			ev.Status = v.Status
@@ -102,9 +141,14 @@ func consumeSessionEvents(r io.Reader, session, invocation string, fn func(Sessi
 		if e := fn(ev); e != nil {
 			return e
 		}
+		state.cursor = id
 		data.Reset()
 		kind = ""
+		eventID = ""
 		if ev.Type == "end" {
+			if state.terminal != nil {
+				return state.terminal
+			}
 			return errSessionStreamEnd
 		}
 		return nil
@@ -113,9 +157,6 @@ func consumeSessionEvents(r io.Reader, session, invocation string, fn func(Sessi
 		line := scanner.Text()
 		if line == "" {
 			if e := flush(); e != nil {
-				if e == errSessionStreamEnd {
-					return streamError
-				}
 				return e
 			}
 			continue
@@ -129,6 +170,8 @@ func consumeSessionEvents(r io.Reader, session, invocation string, fn func(Sessi
 		}
 		value = strings.TrimPrefix(value, " ")
 		switch field {
+		case "id":
+			eventID = value
 		case "event":
 			kind = value
 		case "data":
@@ -144,6 +187,5 @@ func consumeSessionEvents(r io.Reader, session, invocation string, fn func(Sessi
 	if scanner.Err() != nil {
 		return sessionDependency()
 	}
-	// EOF without an explicit end is an interrupted subscription, not success.
-	return sessionError(502, "AGENT_SESSION_STREAM_INTERRUPTED")
+	return errSessionStreamInterrupted
 }

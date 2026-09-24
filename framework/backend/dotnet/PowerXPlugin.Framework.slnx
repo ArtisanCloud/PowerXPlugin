@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/PowerXPlugin.Framework/PowerXPlugin.Framework.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PowerXPlugin.Framework.Tests/PowerXPlugin.Framework.Tests.csproj" />
+  </Folder>
 </Solution>

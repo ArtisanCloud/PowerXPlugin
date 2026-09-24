@@ -1,0 +1,276 @@
+package local_knowledge
+
+import (
+	"encoding/json"
+	"net/http"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+type profileVersionView struct {
+	UUID             string         `json:"uuid"`
+	ProfileKey       string         `json:"profile_key"`
+	Version          int            `json:"version"`
+	Status           string         `json:"status"`
+	DisplayName      string         `json:"display_name"`
+	Config           datatypes.JSON `json:"config"`
+	RollbackFromUUID *string        `json:"rollback_from_uuid,omitempty"`
+	PublishedAt      *time.Time     `json:"published_at,omitempty"`
+	PublishedBy      string         `json:"published_by,omitempty"`
+	CreatedBy        string         `json:"created_by,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+}
+
+type createProfileVersionInput struct {
+	ProfileKey  string          `json:"profile_key" binding:"required,max=128"`
+	DisplayName string          `json:"display_name" binding:"required,max=128"`
+	Config      json.RawMessage `json:"config"`
+}
+
+var profileKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
+
+func profileKind(c *gin.Context) (string, bool) {
+	kind := strings.TrimSpace(c.Param("kind"))
+	if kind == "ingestion" || kind == "index" || kind == "rag" {
+		return kind, true
+	}
+	contracts.ResponseError(c, http.StatusBadRequest, "INVALID_PROFILE_KIND", "INVALID_PROFILE_KIND")
+	return "", false
+}
+
+func toProfileVersionView(uuid, key string, version int, status, displayName string, config datatypes.JSON, rollback *string, publishedAt *time.Time, publishedBy, createdBy string, createdAt, updatedAt time.Time) profileVersionView {
+	return profileVersionView{UUID: uuid, ProfileKey: key, Version: version, Status: status, DisplayName: displayName, Config: config, RollbackFromUUID: rollback, PublishedAt: publishedAt, PublishedBy: publishedBy, CreatedBy: createdBy, CreatedAt: createdAt, UpdatedAt: updatedAt}
+}
+
+func uuidReference(value string) *string {
+	return &value
+}
+
+func (h *handler) listProfileVersions(c *gin.Context) {
+	tenantUUID, ok := tenant(c)
+	if !ok {
+		return
+	}
+	kind, ok := profileKind(c)
+	if !ok {
+		return
+	}
+	items := []profileVersionView{}
+	switch kind {
+	case "ingestion":
+		var rows []models.LocalIngestionProfileVersion
+		if err := h.db.Where("tenant_uuid=?", tenantUUID).Order("profile_key asc, version desc").Find(&rows).Error; err != nil {
+			contracts.ResponseInternalError(c, err)
+			return
+		}
+		for _, row := range rows {
+			items = append(items, toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt))
+		}
+	case "index":
+		var rows []models.LocalIndexProfileVersion
+		if err := h.db.Where("tenant_uuid=?", tenantUUID).Order("profile_key asc, version desc").Find(&rows).Error; err != nil {
+			contracts.ResponseInternalError(c, err)
+			return
+		}
+		for _, row := range rows {
+			items = append(items, toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt))
+		}
+	case "rag":
+		var rows []models.LocalRAGProfileVersion
+		if err := h.db.Where("tenant_uuid=?", tenantUUID).Order("profile_key asc, version desc").Find(&rows).Error; err != nil {
+			contracts.ResponseInternalError(c, err)
+			return
+		}
+		for _, row := range rows {
+			items = append(items, toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt))
+		}
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+
+func validateProfileVersionInput(in createProfileVersionInput) (datatypes.JSON, bool) {
+	if !profileKeyPattern.MatchString(strings.TrimSpace(in.ProfileKey)) || strings.TrimSpace(in.DisplayName) == "" {
+		return nil, false
+	}
+	config := datatypes.JSON([]byte(`{}`))
+	if len(in.Config) > 0 {
+		if !json.Valid(in.Config) || json.Unmarshal(in.Config, &map[string]any{}) != nil {
+			return nil, false
+		}
+		config = datatypes.JSON(in.Config)
+	}
+	return config, true
+}
+
+func (h *handler) createProfileVersion(c *gin.Context) {
+	tenantUUID, ok := tenant(c)
+	if !ok {
+		return
+	}
+	kind, ok := profileKind(c)
+	if !ok {
+		return
+	}
+	var in createProfileVersionInput
+	if c.ShouldBindJSON(&in) != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_ARGUMENT", "INVALID_ARGUMENT")
+		return
+	}
+	config, valid := validateProfileVersionInput(in)
+	if !valid {
+		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_PROFILE_VERSION", "INVALID_PROFILE_VERSION")
+		return
+	}
+	key, name := strings.TrimSpace(in.ProfileKey), strings.TrimSpace(in.DisplayName)
+	var out profileVersionView
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		version := 1
+		switch kind {
+		case "ingestion":
+			var latest models.LocalIngestionProfileVersion
+			if err := tx.Where("tenant_uuid=? AND profile_key=?", tenantUUID, key).Order("version desc").First(&latest).Error; err == nil {
+				version = latest.Version + 1
+			} else if err != gorm.ErrRecordNotFound {
+				return err
+			}
+			row := models.LocalIngestionProfileVersion{TenantUUID: tenantUUID, ProfileKey: key, Version: version, Status: "draft", DisplayName: name, Config: config}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+			out = toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt)
+		case "index":
+			var latest models.LocalIndexProfileVersion
+			if err := tx.Where("tenant_uuid=? AND profile_key=?", tenantUUID, key).Order("version desc").First(&latest).Error; err == nil {
+				version = latest.Version + 1
+			} else if err != gorm.ErrRecordNotFound {
+				return err
+			}
+			row := models.LocalIndexProfileVersion{TenantUUID: tenantUUID, ProfileKey: key, Version: version, Status: "draft", DisplayName: name, Config: config}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+			out = toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt)
+		case "rag":
+			var latest models.LocalRAGProfileVersion
+			if err := tx.Where("tenant_uuid=? AND profile_key=?", tenantUUID, key).Order("version desc").First(&latest).Error; err == nil {
+				version = latest.Version + 1
+			} else if err != gorm.ErrRecordNotFound {
+				return err
+			}
+			row := models.LocalRAGProfileVersion{TenantUUID: tenantUUID, ProfileKey: key, Version: version, Status: "draft", DisplayName: name, Config: config}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+			out = toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt)
+		}
+		return nil
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": out})
+}
+
+func (h *handler) publishProfileVersion(c *gin.Context) {
+	tenantUUID, ok := tenant(c)
+	if !ok {
+		return
+	}
+	kind, ok := profileKind(c)
+	if !ok {
+		return
+	}
+	id := c.Param("uuid")
+	now := time.Now()
+	var err error
+	switch kind {
+	case "ingestion":
+		err = h.db.Model(&models.LocalIngestionProfileVersion{}).Where("tenant_uuid=? AND uuid=?", tenantUUID, id).Updates(map[string]any{"status": "published", "published_at": now}).Error
+	case "index":
+		err = h.db.Model(&models.LocalIndexProfileVersion{}).Where("tenant_uuid=? AND uuid=?", tenantUUID, id).Updates(map[string]any{"status": "published", "published_at": now}).Error
+	case "rag":
+		err = h.db.Model(&models.LocalRAGProfileVersion{}).Where("tenant_uuid=? AND uuid=?", tenantUUID, id).Updates(map[string]any{"status": "published", "published_at": now}).Error
+	}
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"uuid": id})
+}
+
+func (h *handler) rollbackProfileVersion(c *gin.Context) {
+	tenantUUID, ok := tenant(c)
+	if !ok {
+		return
+	}
+	kind, ok := profileKind(c)
+	if !ok {
+		return
+	}
+	id := c.Param("uuid")
+	var out profileVersionView
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		switch kind {
+		case "ingestion":
+			var source models.LocalIngestionProfileVersion
+			if e := tx.Where("tenant_uuid=? AND uuid=?", tenantUUID, id).First(&source).Error; e != nil {
+				return e
+			}
+			var latest models.LocalIngestionProfileVersion
+			e := tx.Where("tenant_uuid=? AND profile_key=?", tenantUUID, source.ProfileKey).Order("version desc").First(&latest).Error
+			if e != nil && e != gorm.ErrRecordNotFound {
+				return e
+			}
+			row := models.LocalIngestionProfileVersion{TenantUUID: tenantUUID, ProfileKey: source.ProfileKey, Version: latest.Version + 1, Status: "draft", DisplayName: source.DisplayName, Config: source.Config, RollbackFromUUID: uuidReference(source.UUID)}
+			if e = tx.Create(&row).Error; e != nil {
+				return e
+			}
+			out = toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt)
+		case "index":
+			var source models.LocalIndexProfileVersion
+			if e := tx.Where("tenant_uuid=? AND uuid=?", tenantUUID, id).First(&source).Error; e != nil {
+				return e
+			}
+			var latest models.LocalIndexProfileVersion
+			e := tx.Where("tenant_uuid=? AND profile_key=?", tenantUUID, source.ProfileKey).Order("version desc").First(&latest).Error
+			if e != nil && e != gorm.ErrRecordNotFound {
+				return e
+			}
+			row := models.LocalIndexProfileVersion{TenantUUID: tenantUUID, ProfileKey: source.ProfileKey, Version: latest.Version + 1, Status: "draft", DisplayName: source.DisplayName, Config: source.Config, RollbackFromUUID: uuidReference(source.UUID)}
+			if e = tx.Create(&row).Error; e != nil {
+				return e
+			}
+			out = toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt)
+		case "rag":
+			var source models.LocalRAGProfileVersion
+			if e := tx.Where("tenant_uuid=? AND uuid=?", tenantUUID, id).First(&source).Error; e != nil {
+				return e
+			}
+			var latest models.LocalRAGProfileVersion
+			e := tx.Where("tenant_uuid=? AND profile_key=?", tenantUUID, source.ProfileKey).Order("version desc").First(&latest).Error
+			if e != nil && e != gorm.ErrRecordNotFound {
+				return e
+			}
+			row := models.LocalRAGProfileVersion{TenantUUID: tenantUUID, ProfileKey: source.ProfileKey, Version: latest.Version + 1, Status: "draft", DisplayName: source.DisplayName, Config: source.Config, RollbackFromUUID: uuidReference(source.UUID)}
+			if e = tx.Create(&row).Error; e != nil {
+				return e
+			}
+			out = toProfileVersionView(row.UUID, row.ProfileKey, row.Version, row.Status, row.DisplayName, row.Config, row.RollbackFromUUID, row.PublishedAt, row.PublishedBy, row.CreatedBy, row.CreatedAt, row.UpdatedAt)
+		}
+		return nil
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": out})
+}

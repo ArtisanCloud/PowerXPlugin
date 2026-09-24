@@ -1,0 +1,55 @@
+<template>
+  <main class="mx-auto w-full max-w-5xl space-y-6 px-5 py-6 lg:px-8">
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-[#172536]">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div><p class="text-sm text-gray-500 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.sources.eyebrow') }}</p><h1 class="mt-1 text-2xl font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.sources.title') }}</h1><p class="mt-2 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ space?.name }}</p></div>
+        <UButton color="neutral" variant="outline" :to="overviewPath">{{ t('knowledgeSpaces.detail.backToOverview') }}</UButton>
+      </div>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]">
+      <header class="border-b border-slate-200 p-5 dark:border-slate-700"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.sources.connectedTitle') }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.sources.connectedDescription') }}</p></header>
+      <div v-if="loading" class="p-10 text-center text-sm">{{ t('common.loading') }}</div>
+      <div v-else-if="!sources.length" class="p-10 text-center text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.sources.empty') }}</div>
+      <div v-else class="divide-y divide-slate-100 dark:divide-slate-800"><article v-for="source in sources" :key="source.uuid" class="flex flex-wrap items-center justify-between gap-4 p-5"><div><p class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ providerLabel(source.provider) }} · {{ source.credential_name }}</p><p class="mt-1 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ t(`knowledgeSpaces.sources.syncMode.${source.sync_mode}`) }} · {{ source.schedule || t('knowledgeSpaces.sources.noSchedule') }}</p><p v-if="source.last_error" class="mt-1 text-xs text-amber-700 dark:text-amber-300">{{ sourceFailureLabel(source.last_error) }}</p></div><UBadge :color="source.status === 'active' ? 'success' : source.status === 'failed' ? 'error' : 'warning'" variant="soft">{{ t(`knowledgeSpaces.sources.status.${source.status}`) }}</UBadge></article></div>
+    </section>
+
+    <section v-if="space" class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]">
+      <header class="border-b border-slate-200 p-5 dark:border-slate-700"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.sources.createTitle') }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.sources.createDescription') }}</p></header>
+      <div class="space-y-5 p-5"><div class="grid gap-5 md:grid-cols-2"><UFormField :label="t('knowledgeSpaces.sources.provider')" required><USelectMenu v-model="provider" :items="providerItems" value-key="value" label-key="label" class="w-full" /></UFormField><UFormField :label="t('knowledgeSpaces.sources.authType')" required><USelectMenu v-model="authType" :items="authTypeItems" value-key="value" label-key="label" class="w-full" /></UFormField><UFormField :label="t('knowledgeSpaces.sources.credentialName')" required><UInput v-model="credentialName" class="w-full" /></UFormField><UFormField :label="t('knowledgeSpaces.sources.secretRef')" required><UInput v-model="secretRef" class="w-full" /><template #help>{{ t('knowledgeSpaces.sources.secretRefHelp') }}</template></UFormField><UFormField :label="t('knowledgeSpaces.sources.syncModeLabel')" required><USelectMenu v-model="syncMode" :items="syncModeItems" value-key="value" label-key="label" class="w-full" /></UFormField><UFormField :label="t('knowledgeSpaces.sources.schedule')"><UInput v-model="schedule" class="w-full" /></UFormField></div><UFormField :label="t('knowledgeSpaces.sources.scope')" required><UTextarea v-model="scopeText" :rows="6" class="w-full" /><template #help>{{ t('knowledgeSpaces.sources.scopeHelp') }}</template></UFormField><UAlert color="warning" variant="soft" :title="t('knowledgeSpaces.sources.workerTitle')" :description="t('knowledgeSpaces.sources.workerDescription')" /><div class="flex justify-end"><UButton :loading="saving" @click="save">{{ t('knowledgeSpaces.sources.createAction') }}</UButton></div></div>
+    </section>
+  </main>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useLocalKnowledgeApi, type LocalKnowledgeSpace, type LocalKnowledgeSpaceSource } from '~/composables/api/useLocalKnowledge'
+
+const { t } = useI18n()
+const toast = useToast()
+const api = useLocalKnowledgeApi()
+const route = useRoute()
+const runtimeConfig = useRuntimeConfig()
+const uuid = computed(() => String(route.params.uuid || ''))
+const adminBase = computed(() => String(runtimeConfig.public?.pluginAdminBase || '/_p/com.powerx.plugins.base/admin/').replace(/\/+$/, ''))
+const overviewPath = computed(() => `${adminBase.value}/knowledge`)
+const space = ref<LocalKnowledgeSpace | null>(null)
+const sources = ref<LocalKnowledgeSpaceSource[]>([])
+const loading = ref(false)
+const saving = ref(false)
+const provider = ref<'notion' | 'feishu'>('notion')
+const authType = ref<'token' | 'oauth'>('token')
+const credentialName = ref('')
+const secretRef = ref('')
+const syncMode = ref<'full_then_incremental' | 'incremental'>('full_then_incremental')
+const schedule = ref('@hourly')
+const scopeText = ref('{\n  "resource": ""\n}')
+const providerItems = computed(() => [{ label: t('knowledgeSpaces.sources.providers.notion'), value: 'notion' }, { label: t('knowledgeSpaces.sources.providers.feishu'), value: 'feishu' }])
+const authTypeItems = computed(() => [{ label: t('knowledgeSpaces.sources.authTypes.token'), value: 'token' }, { label: t('knowledgeSpaces.sources.authTypes.oauth'), value: 'oauth' }])
+const syncModeItems = computed(() => [{ label: t('knowledgeSpaces.sources.syncMode.full_then_incremental'), value: 'full_then_incremental' }, { label: t('knowledgeSpaces.sources.syncMode.incremental'), value: 'incremental' }])
+function providerLabel(value: string) { return t(`knowledgeSpaces.sources.providers.${value}`) }
+function sourceFailureLabel(value: string) { return value === 'SYNC_WORKER_NOT_CONFIGURED' ? t('knowledgeSpaces.sources.workerNotConfigured') : value }
+async function load() { loading.value = true; try { const [spaceOut, sourceOut] = await Promise.all([api.spaces(), api.sources(uuid.value)]); space.value = (spaceOut.items || []).find(item => item.uuid === uuid.value) || null; sources.value = sourceOut.items || [] } catch { toast.add({ title: t('common.error'), description: t('knowledgeSpaces.sources.loadFailed'), color: 'error' }) } finally { loading.value = false } }
+async function save() { let scope: Record<string, unknown>; try { scope = JSON.parse(scopeText.value) as Record<string, unknown> } catch { toast.add({ title: t('common.error'), description: t('knowledgeSpaces.sources.invalidScope'), color: 'error' }); return }; if (!credentialName.value.trim() || !secretRef.value.trim() || !Object.keys(scope).length) { toast.add({ title: t('common.error'), description: t('knowledgeSpaces.sources.invalidInput'), color: 'error' }); return }; saving.value = true; try { await api.createSource(uuid.value, { provider: provider.value, auth_type: authType.value, credential_name: credentialName.value.trim(), secret_ref: secretRef.value.trim(), scope, sync_mode: syncMode.value, schedule: schedule.value.trim() }); toast.add({ title: t('common.success'), description: t('knowledgeSpaces.sources.created'), color: 'success' }); await load() } catch { toast.add({ title: t('common.error'), description: t('knowledgeSpaces.sources.createFailed'), color: 'error' }) } finally { saving.value = false } }
+onMounted(load)
+</script>

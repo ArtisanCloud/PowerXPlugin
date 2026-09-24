@@ -103,18 +103,44 @@ func (in ListSpacesInput) Normalized() ListSpacesInput {
 }
 
 type KnowledgeDocument struct {
-	DocumentID  string         `json:"document_id,omitempty"`
-	SpaceID     string         `json:"space_id,omitempty"`
-	Title       string         `json:"title,omitempty"`
-	URI         string         `json:"uri,omitempty"`
-	Content     string         `json:"content,omitempty"`
-	ContentType string         `json:"content_type,omitempty"`
-	Checksum    string         `json:"checksum,omitempty"`
-	Version     string         `json:"version,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
-	Visibility  string         `json:"visibility,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	TenantUUID  string         `json:"tenant_uuid,omitempty"`
+	DocumentID  string           `json:"document_id,omitempty"`
+	SpaceID     string           `json:"space_id,omitempty"`
+	Title       string           `json:"title,omitempty"`
+	URI         string           `json:"uri,omitempty"`
+	Content     string           `json:"content,omitempty"`
+	ContentType string           `json:"content_type,omitempty"`
+	Checksum    string           `json:"checksum,omitempty"`
+	Version     string           `json:"version,omitempty"`
+	Tags        []string         `json:"tags,omitempty"`
+	Visibility  string           `json:"visibility,omitempty"`
+	Metadata    map[string]any   `json:"metadata,omitempty"`
+	TenantUUID  string           `json:"tenant_uuid,omitempty"`
+	Ingestion   *IngestionConfig `json:"ingestion,omitempty"`
+}
+
+// IngestionConfig is the immutable, task-scoped ingestion snapshot. It mirrors
+// PowerX's ingestion contract so a document submitted locally has the same
+// segmentation semantics as one submitted to the delegated Host.
+type IngestionConfig struct {
+	IngestionProfile    string   `json:"ingestion_profile,omitempty"`
+	ProcessorProfile    string   `json:"processor_profile,omitempty"`
+	MaskingProfile      string   `json:"masking_profile,omitempty"`
+	Priority            string   `json:"priority,omitempty"`
+	RAGSceneKey         string   `json:"rag_scene_key,omitempty"`
+	RAGBundleKey        string   `json:"rag_bundle_key,omitempty"`
+	RAGPrimary          string   `json:"rag_primary,omitempty"`
+	SegmentMode         string   `json:"segment_mode,omitempty"`
+	ChunkSize           int      `json:"chunk_size,omitempty"`
+	ChunkOverlap        int      `json:"chunk_overlap,omitempty"`
+	SegmentSizePolicy   string   `json:"segment_size_policy,omitempty"`
+	SegmentOrder        []string `json:"segment_order,omitempty"`
+	Separators          []string `json:"separators,omitempty"`
+	PagePriority        bool     `json:"page_priority,omitempty"`
+	AnchorHeadingPath   bool     `json:"anchor_heading_path,omitempty"`
+	AnchorClauseID      bool     `json:"anchor_clause_id,omitempty"`
+	AnchorRowNumber     bool     `json:"anchor_row_number,omitempty"`
+	AnchorSpeaker       bool     `json:"anchor_speaker,omitempty"`
+	AnchorSentenceIndex bool     `json:"anchor_sentence_index,omitempty"`
 }
 
 type KnowledgePosition map[string]any

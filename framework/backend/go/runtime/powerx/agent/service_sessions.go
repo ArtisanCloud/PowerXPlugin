@@ -130,6 +130,12 @@ func sessionKey(k string) bool {
 }
 
 func (c *Client) sessionRequest(ctx context.Context, method, path, key string, body any) (*http.Response, error) {
+	return c.sessionRequestWithCursor(ctx, method, path, key, body, "")
+}
+
+// sessionRequestWithCursor is restricted to the idempotent event subscription.
+// The cursor is an acknowledged SSE frame, never an invocation input.
+func (c *Client) sessionRequestWithCursor(ctx context.Context, method, path, key string, body any, cursor string) (*http.Response, error) {
 	if c == nil || c.cfg.Mode != ModeDelegated || c.tokens == nil || c.http == nil {
 		return nil, sessionError(503, "AGENT_SESSION_UNAVAILABLE")
 	}
@@ -168,6 +174,9 @@ func (c *Client) sessionRequest(ctx context.Context, method, path, key string, b
 	}
 	if strings.HasSuffix(path, "/events") {
 		req.Header.Set("Accept", "text/event-stream")
+		if cursor != "" {
+			req.Header.Set("Last-Event-ID", cursor)
+		}
 	}
 	client := *c.http
 	// A Host Contract is a fixed route. Never redirect service credentials or

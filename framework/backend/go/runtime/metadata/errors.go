@@ -8,15 +8,16 @@ import (
 type ErrorCode string
 
 const (
-	CodeClientUnavailable ErrorCode = "METADATA_CLIENT_UNAVAILABLE"
-	CodeInvalidRequest    ErrorCode = "METADATA_INVALID_REQUEST"
-	CodeInvalidArgument   ErrorCode = "METADATA_INVALID_ARGUMENT"
-	CodeUnauthorized      ErrorCode = "METADATA_UNAUTHORIZED"
-	CodeForbidden         ErrorCode = "METADATA_FORBIDDEN"
-	CodeNotFound          ErrorCode = "METADATA_NOT_FOUND"
-	CodeConflict          ErrorCode = "METADATA_CONFLICT"
-	CodeDecodeFailed      ErrorCode = "METADATA_DECODE_FAILED"
-	CodeGatewayFailed     ErrorCode = "METADATA_GATEWAY_FAILED"
+	CodeClientUnavailable    ErrorCode = "METADATA_CLIENT_UNAVAILABLE"
+	CodeOperationUnavailable ErrorCode = "METADATA_OPERATION_UNAVAILABLE"
+	CodeInvalidRequest       ErrorCode = "METADATA_INVALID_REQUEST"
+	CodeInvalidArgument      ErrorCode = "METADATA_INVALID_ARGUMENT"
+	CodeUnauthorized         ErrorCode = "METADATA_UNAUTHORIZED"
+	CodeForbidden            ErrorCode = "METADATA_FORBIDDEN"
+	CodeNotFound             ErrorCode = "METADATA_NOT_FOUND"
+	CodeConflict             ErrorCode = "METADATA_CONFLICT"
+	CodeDecodeFailed         ErrorCode = "METADATA_DECODE_FAILED"
+	CodeGatewayFailed        ErrorCode = "METADATA_GATEWAY_FAILED"
 )
 
 type Error struct {
@@ -69,7 +70,7 @@ func HTTPStatusForCode(code ErrorCode) int {
 		return http.StatusConflict
 	case CodeInvalidRequest, CodeInvalidArgument:
 		return http.StatusBadRequest
-	case CodeClientUnavailable:
+	case CodeClientUnavailable, CodeOperationUnavailable:
 		return http.StatusServiceUnavailable
 	default:
 		return http.StatusBadGateway

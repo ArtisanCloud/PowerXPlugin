@@ -10,6 +10,7 @@ import (
 	adminhostcontract "{{ .BackendModulePath }}/internal/transport/http/admin/host_contract"
 	adminiam "{{ .BackendModulePath }}/internal/transport/http/admin/iam"
 	adminintegration "{{ .BackendModulePath }}/internal/transport/http/admin/integration"
+	adminlocalknowledge "{{ .BackendModulePath }}/internal/transport/http/admin/local_knowledge"
 	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
 	adminmetadata "{{ .BackendModulePath }}/internal/transport/http/admin/metadata"
 	adminoperations "{{ .BackendModulePath }}/internal/transport/http/admin/operations"
@@ -40,6 +41,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		adminhostcontract.RegisterRoutes(admin, deps)
 		adminmetadata.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminaisettings.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminlocalknowledge.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminintegration.RegisterRoutes(admin, deps)
 		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminiam.RegisterRoutes(admin, deps)

@@ -313,15 +313,15 @@ func TestServiceSessionEvents(t *testing.T) {
 	run := invocationFixture()
 	run.Status = "succeeded"
 	raw, _ := json.Marshal(run)
-	good := "event: state\ndata: " + string(raw) + "\n\nevent: final\ndata: " + string(raw) + "\n\nevent: end\ndata: {\"status\":\"succeeded\"}\n\n"
+	good := "id: 1\nevent: state\ndata: " + string(raw) + "\n\nid: 2\nevent: final\ndata: " + string(raw) + "\n\nid: 3\nevent: end\ndata: {\"status\":\"succeeded\"}\n\n"
 	for _, tc := range []struct {
 		name, stream string
 		wantErr      bool
 	}{
 		{"success", good, false},
-		{"missing_end", strings.Split(good, "event: end")[0], true},
-		{"missing_final", "event: end\ndata: {\"status\":\"succeeded\"}\n\n", true},
-		{"failure", "event: error\ndata: {\"reason_code\":\"AGENT_SESSION_UPSTREAM_DEPENDENCY\"}\n\nevent: end\ndata: {\"status\":\"failed\"}\n\n", true},
+		{"missing_end", strings.Split(good, "id: 3")[0], true},
+		{"missing_final", "id: 3\nevent: end\ndata: {\"status\":\"succeeded\"}\n\n", true},
+		{"failure", "id: 2\nevent: error\ndata: {\"reason_code\":\"AGENT_SESSION_UPSTREAM_DEPENDENCY\"}\n\nid: 3\nevent: end\ndata: {\"status\":\"failed\"}\n\n", true},
 		{"wrong_subject", strings.ReplaceAll(good, testSessionUUID, testAgentUUID), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

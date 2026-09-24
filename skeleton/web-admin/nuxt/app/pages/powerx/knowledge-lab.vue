@@ -766,6 +766,7 @@ type KnowledgeCatalog = {
 };
 
 const { get, post, delete: del } = useApiClient();
+const route = useRoute();
 
 const providerLoading = ref(false);
 const searchLoading = ref(false);
@@ -1327,7 +1328,10 @@ async function loadSpaces() {
     const payload = unwrap<{ spaces?: SpaceRow[]; contract_gaps?: string[] }>(await get("/admin/runtime/knowledge/spaces"));
     contractGaps.value = payload.contract_gaps || [];
     spaces.value = (payload.spaces || []).map(normalizeSpace);
-    if (spaces.value.length && !spaces.value.some((space) => space.id === selectedSpaceId.value)) {
+    const requestedSpaceID = typeof route.query.space_uuid === "string" ? route.query.space_uuid : "";
+    if (requestedSpaceID && spaces.value.some((space) => space.id === requestedSpaceID)) {
+      selectedSpaceId.value = requestedSpaceID;
+    } else if (spaces.value.length && !spaces.value.some((space) => space.id === selectedSpaceId.value)) {
       selectedSpaceId.value = spaces.value[0]?.id || "";
     }
     if (!spaces.value.length) {

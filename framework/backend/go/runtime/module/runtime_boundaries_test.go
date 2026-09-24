@@ -8,6 +8,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
@@ -30,6 +31,7 @@ func TestUninitializedRuntimesFailClosed(t *testing.T) {
 		{(*agent.Runtime)(nil), []string{"Agent", "Lifecycle", "Sessions"}},
 		{(*ai.Runtime)(nil), []string{"Generative"}},
 		{(*capability.Runtime)(nil), []string{"Registry"}},
+		{(*contactfw.Runtime)(nil), []string{"Store"}},
 		{(*customerfw.Runtime)(nil), []string{"Auth", "ExternalIdentity", "Membership"}},
 		{(*integration.Runtime)(nil), []string{"Gateway"}},
 		{(*knowledge.Runtime)(nil), []string{"Provider"}},

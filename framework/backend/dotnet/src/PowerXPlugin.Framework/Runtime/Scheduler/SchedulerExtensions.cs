@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PowerXPlugin.Framework.EventBridge;
+using PowerXPlugin.Framework.Runtime.Common;
 
 namespace PowerXPlugin.Framework.Runtime.Scheduler;
 
@@ -9,7 +10,7 @@ public static class SchedulerExtensions
 {
     public static IServiceCollection AddLocalScheduler(this IServiceCollection services)
     {
-        return services.AddPowerXScheduler(SchedulerAdapterMode.Local, _ => throw new InvalidOperationException(SchedulerErrors.CodeInvalidMode));
+        return services.AddPowerXScheduler(ProviderMode.Local, _ => throw new InvalidOperationException(SchedulerErrors.CodeInvalidMode));
     }
 
     /// <summary>
@@ -18,26 +19,19 @@ public static class SchedulerExtensions
     /// </summary>
     public static IServiceCollection AddPowerXScheduler(
         this IServiceCollection services,
-        SchedulerAdapterMode mode,
+        ProviderMode mode,
         Func<IServiceProvider, IScheduler> delegatedFactory)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(delegatedFactory);
-        switch (mode)
+        if (mode == ProviderMode.Local)
         {
-            case SchedulerAdapterMode.Local:
-                services.AddLocalEventBridge();
-                services.AddSingleton<LocalScheduler>();
-                services.AddSingleton<IScheduler>(sp => sp.GetRequiredService<LocalScheduler>());
-                services.AddHostedService<SchedulerRunner>();
-                break;
-            case SchedulerAdapterMode.Delegated:
-                services.AddSingleton(delegatedFactory);
-                break;
-            default:
-                throw new SchedulerAdapterException(SchedulerErrors.CodeInvalidMode);
+            services.AddLocalEventBridge();
+            services.AddSingleton<LocalScheduler>();
+            services.AddHostedService<SchedulerRunner>();
         }
-        return services;
+        return services.AddPowerXRuntime<IScheduler>("scheduler", mode,
+            sp => sp.GetRequiredService<LocalScheduler>(), delegatedFactory);
     }
 }
 

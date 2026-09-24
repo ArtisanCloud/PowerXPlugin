@@ -125,6 +125,7 @@ func (m *Tag) BeforeCreate(tx *gorm.DB) error {
 
 type TagBinding struct {
 	models.BaseNoTenantModel
+	UUID         string `gorm:"column:uuid;type:uuid;not null;uniqueIndex:uk_metadata_tag_bindings_uuid" json:"uuid"`
 	TenantUUID   string `gorm:"column:tenant_uuid;type:uuid;not null;uniqueIndex:uk_metadata_tag_bindings_resource_tag,priority:1;index" json:"tenant_uuid"`
 	ResourceType string `gorm:"column:resource_type;type:varchar(160);not null;uniqueIndex:uk_metadata_tag_bindings_resource_tag,priority:2;index" json:"resource_type"`
 	ResourceUUID string `gorm:"column:resource_uuid;type:uuid;not null;uniqueIndex:uk_metadata_tag_bindings_resource_tag,priority:3;index" json:"resource_uuid"`
@@ -132,6 +133,13 @@ type TagBinding struct {
 }
 
 func (TagBinding) TableName() string { return models.S(models.TableMetadataTagBindings) }
+
+func (m *TagBinding) BeforeCreate(tx *gorm.DB) error {
+	if strings.TrimSpace(m.UUID) == "" {
+		m.UUID = uuid.NewString()
+	}
+	return nil
+}
 
 type ResourceType struct {
 	models.BaseNoTenantModel

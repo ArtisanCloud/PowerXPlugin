@@ -9,7 +9,7 @@ namespace PowerXPlugin.Framework.Runtime.EventFabric.Delegated;
 /// provider: Core's generated protobuf contract stays inside Framework, while
 /// a plugin receives only Framework delivery types and acknowledgement rules.
 /// </summary>
-public sealed class PowerXEventFabricClient : IEventFabricSubscriber, IDisposable
+public sealed class PowerXEventFabricClient : IEventRuntime, IDisposable
 {
     private readonly PowerXEventFabricClientOptions _options;
     private readonly GrpcChannel _channel;
@@ -79,7 +79,7 @@ public sealed class PowerXEventFabricClient : IEventFabricSubscriber, IDisposabl
 
     public void Dispose() => _channel.Dispose();
 
-    private Metadata Headers() => new()
+    private Grpc.Core.Metadata Headers() => new()
     {
         { "tenant-uuid", TrustedTenant() },
         { "authorization", $"{NormalizeAuthScheme(_options.AuthScheme)} {_options.Credential.Trim()}" },

@@ -96,7 +96,7 @@ func TestResolveDictionaryItemRequiresExactCode(t *testing.T) {
 	}
 }
 
-func TestLegacyTagBindingReplacementFailsExplicitly(t *testing.T) {
+func TestUnavailableTagBindingReplacementFailsExplicitly(t *testing.T) {
 	client, err := NewClient(Config{Invoker: &stubInvoker{}})
 	if err != nil {
 		t.Fatalf("NewClient() error = %v", err)
@@ -107,7 +107,7 @@ func TestLegacyTagBindingReplacementFailsExplicitly(t *testing.T) {
 		ResourceUUID: "customer-uuid",
 		TagUUIDs:     []string{"tag-uuid"},
 	})
-	if CodeOf(err) != CodeInvalidArgument {
+	if CodeOf(err) != CodeOperationUnavailable {
 		t.Fatalf("CodeOf(err) = %s err=%v", CodeOf(err), err)
 	}
 }

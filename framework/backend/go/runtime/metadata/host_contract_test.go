@@ -51,16 +51,16 @@ func TestResolveFindsLaterPage(t *testing.T) {
 		t.Fatalf("result=%v err=%v calls=%d", out, err, calls)
 	}
 }
-func TestDeleteBindingAcceptsNoContent(t *testing.T) {
+func TestReplaceBindingsAcceptsEmptyArray(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "DELETE" || r.URL.Path != "/api/v1/tenant/metadata/tag-bindings/11111111-1111-4111-8111-111111111111" {
+		if r.Method != "PUT" || r.URL.Path != "/api/v1/tenant/metadata/tag-bindings:replace" {
 			t.Errorf("request=%s %s", r.Method, r.URL.Path)
 		}
-		w.WriteHeader(204)
+		_, _ = w.Write([]byte(`{"data":{"payload":{"items":[]}}}`))
 	}))
 	defer server.Close()
 	c, _ := NewHostClientWithTokenProvider(HostClientConfig{BaseURL: server.URL}, HostTokenProviderFunc(func(context.Context) (string, error) { return "sts", nil }), server.Client())
-	if err := c.DeleteTagBinding(context.Background(), DeleteTagBindingRequest{BindingUUID: "11111111-1111-4111-8111-111111111111"}); err != nil {
+	if _, err := c.ReplaceTagBindings(context.Background(), ReplaceTagBindingsRequest{ResourceType: "corex.customer", ResourceUUID: "11111111-1111-4111-8111-111111111111", TagUUIDs: []string{}}); err != nil {
 		t.Fatal(err)
 	}
 }

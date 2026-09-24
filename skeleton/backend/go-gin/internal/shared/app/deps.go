@@ -22,6 +22,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/runtimeexample"
 	"gorm.io/gorm"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -30,6 +31,7 @@ import (
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
 	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	contactfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	fwintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
@@ -70,58 +72,68 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
-	KnowledgeProvider    fwknowledge.KnowledgeProvider
-	CacheRuntime         *cache.Runtime
-	TaskCenterRuntime    *taskcenter.Runtime
-	DB                   *gorm.DB
-	Ctx                  context.Context
-	PowerXClient         *client.PowerXServiceClient
-	CapabilityGateway    gatewayClient
-	Metadata             *fwmetadata.Runtime
-	CustomerAdmin        *customerfw.AdminClient
-	CustomerRuntime      *customerfw.Runtime
-	AISettings           fwaisettings.Service
-	PowerXAISettings     *fwaisettings.Client
-	LocalAISettings      *localaisettings.LocalSettingsService
-	AIInvocation         *fwai.Runtime
-	AI                   *powerxai.Client
-	AgentLifecycle       *fwagent.Runtime
-	AgentRuntime         *powerxagent.Client
-	CapabilityAccess     *fwcapability.Runtime
-	CapabilityRegistry   powerxcapability.Registry
-	IntegrationGateway   *fwintegration.Runtime
-	MediaCatalog         *fwmedia.Runtime
-	Media                powerxmedia.AssetReader
-	PluginRuntime        *fwpluginruntime.Runtime
-	PluginRelease        *fwpluginrelease.Runtime
-	KnowledgeQABridge    powerxknowledge.QABridge
-	KnowledgeDirectory   fwknowledge.DelegatedClient
-	NotificationDelivery *fwnotifications.Runtime
-	Notifications        powerxnotifications.Publisher
-	SkillInvocation      *fwskills.Runtime
-	Skills               powerxskills.Invoker
-	Config               *config.Config
-	CapabilitiesManager  capabilities.Manager
-	CapabilityMetrics    *capmetrics.Metrics
-	TaxProviderClient    *marketplacesvc.TaxProviderClient
-	MarketplaceBilling   marketplacesvc.BillingClient
-	LicenseAuthority     marketplacesvc.LicenseAuthority
-	LicenseCache         marketplacesvc.LicenseCache
-	OperationsMetrics    *opsmetrics.Metrics
-	AdminConsoleMetrics  *adminmetrics.Metrics
-	EventEmitter         fweventbridge.Emitter
-	WSBusHub             fwwsbus.LocalHub
-	RealtimeDescriptors  []frameworkrealtime.Descriptor
-	ProviderMode         fwprovider.Mode
-	ProviderModeSource   string
-	IAMAdapterMode       iamservice.IAMAdapterMode
-	IAMAdapterModeSource string
-	AuthProxy            DelegatedAuthProxy
-	IAMDirectory         iamservice.IAMDirectory
-	IAMRegistry          *fwiamadapters.Registry
-	IAMDirectoryService  fwiamcontracts.DirectoryService
-	IAMAuthzService      fwiamcontracts.AuthzService
-	IAMContextService    fwiamcontracts.IdentityContextService
+	KnowledgeProvider             fwknowledge.KnowledgeProvider
+	CacheRuntime                  *cache.Runtime
+	TaskCenterRuntime             *taskcenter.Runtime
+	DB                            *gorm.DB
+	Ctx                           context.Context
+	PowerXClient                  *client.PowerXServiceClient
+	CapabilityGateway             gatewayClient
+	Metadata                      *fwmetadata.Runtime
+	MetadataDebugLocalRuntime     *fwmetadata.Runtime
+	MetadataDebugDelegatedRuntime *fwmetadata.Runtime
+	CustomerAdmin                 *customerfw.AdminClient
+	CustomerAccountSelector       *customerfw.AccountSelectorClient
+	CustomerRuntime               *customerfw.Runtime
+	ContactRuntime                *contactfw.Runtime
+	// ContactDebug* are deliberately separate from ContactRuntime. They exist
+	// only for the Framework lab where an administrator explicitly selects a
+	// route per request; normal business traffic remains startup-mode bound.
+	ContactDebugLocalRuntime     *contactfw.Runtime
+	ContactDebugDelegatedRuntime *contactfw.Runtime
+	AISettings                   fwaisettings.Service
+	PowerXAISettings             *fwaisettings.Client
+	LocalAISettings              *localaisettings.LocalSettingsService
+	LocalAI                      *runtimeexample.LocalAI
+	AIInvocation                 *fwai.Runtime
+	AI                           *powerxai.Client
+	AgentLifecycle               *fwagent.Runtime
+	AgentRuntime                 *powerxagent.Client
+	CapabilityAccess             *fwcapability.Runtime
+	CapabilityRegistry           powerxcapability.Registry
+	IntegrationGateway           *fwintegration.Runtime
+	MediaCatalog                 *fwmedia.Runtime
+	Media                        powerxmedia.AssetReader
+	PluginRuntime                *fwpluginruntime.Runtime
+	PluginRelease                *fwpluginrelease.Runtime
+	KnowledgeQABridge            powerxknowledge.QABridge
+	KnowledgeDirectory           fwknowledge.DelegatedClient
+	NotificationDelivery         *fwnotifications.Runtime
+	Notifications                powerxnotifications.Publisher
+	SkillInvocation              *fwskills.Runtime
+	Skills                       powerxskills.Invoker
+	Config                       *config.Config
+	CapabilitiesManager          capabilities.Manager
+	CapabilityMetrics            *capmetrics.Metrics
+	TaxProviderClient            *marketplacesvc.TaxProviderClient
+	MarketplaceBilling           marketplacesvc.BillingClient
+	LicenseAuthority             marketplacesvc.LicenseAuthority
+	LicenseCache                 marketplacesvc.LicenseCache
+	OperationsMetrics            *opsmetrics.Metrics
+	AdminConsoleMetrics          *adminmetrics.Metrics
+	EventEmitter                 fweventbridge.Emitter
+	WSBusHub                     fwwsbus.LocalHub
+	RealtimeDescriptors          []frameworkrealtime.Descriptor
+	ProviderMode                 fwprovider.Mode
+	ProviderModeSource           string
+	IAMAdapterMode               iamservice.IAMAdapterMode
+	IAMAdapterModeSource         string
+	AuthProxy                    DelegatedAuthProxy
+	IAMDirectory                 iamservice.IAMDirectory
+	IAMRegistry                  *fwiamadapters.Registry
+	IAMDirectoryService          fwiamcontracts.DirectoryService
+	IAMAuthzService              fwiamcontracts.AuthzService
+	IAMContextService            fwiamcontracts.IdentityContextService
 }
 
 type gatewayClient interface {

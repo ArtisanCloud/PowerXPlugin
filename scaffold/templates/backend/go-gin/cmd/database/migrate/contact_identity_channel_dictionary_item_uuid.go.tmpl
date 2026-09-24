@@ -1,0 +1,48 @@
+package migrate
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"{{ .BackendModulePath }}/internal/entity/models"
+	"gorm.io/gorm"
+)
+
+// ensureContactIdentityChannelDictionaryItemUUID upgrades the local Contact
+// identity schema without inferring a dictionary item from the removed channel
+// text. Historical rows intentionally remain NULL and are rejected by the
+// runtime with CONTACT_IDENTITY_CHANNEL_MIGRATION_REQUIRED until an operator
+// explicitly assigns an approved dictionary item UUID.
+func ensureContactIdentityChannelDictionaryItemUUID(ctx context.Context, db *gorm.DB) error {
+	table := models.S(models.TableCustomerContactIdentities)
+	exists, err := iamTableExists(ctx, db, table)
+	if err != nil || !exists {
+		return err
+	}
+	columns, err := db.WithContext(ctx).Migrator().ColumnTypes(table)
+	if err != nil {
+		return err
+	}
+	for _, column := range columns {
+		if column.Name() == "channel_dictionary_item_uuid" {
+			return nil
+		}
+	}
+	columnType := "uuid"
+	if isSQLite(db) {
+		columnType = "TEXT"
+	}
+	statement := fmt.Sprintf("ALTER TABLE %s ADD COLUMN channel_dictionary_item_uuid %s", table, columnType)
+	if strings.EqualFold(db.Dialector.Name(), "postgres") {
+		statement = fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS channel_dictionary_item_uuid %s", table, columnType)
+	}
+	if err := db.WithContext(ctx).Exec(statement).Error; err != nil {
+		lower := strings.ToLower(err.Error())
+		if strings.Contains(lower, "duplicate column") || strings.Contains(lower, "already exists") {
+			return nil
+		}
+		return fmt.Errorf("ensure channel dictionary item uuid on %s failed: %w", table, err)
+	}
+	return nil
+}

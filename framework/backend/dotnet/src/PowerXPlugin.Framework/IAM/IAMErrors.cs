@@ -9,6 +9,7 @@ public static class IAMErrors
     public const string CodeUnauthorized = "IAM_UNAUTHORIZED";
     public const string CodeForbidden = "IAM_FORBIDDEN";
     public const string CodeUpstreamDependency = "IAM_UPSTREAM_DEPENDENCY";
+    public const string CodeIdentityDelegationUnavailable = "IAM_IDENTITY_DELEGATION_UNAVAILABLE";
 
     public static int StatusCode(string code) => code switch
     {
@@ -19,6 +20,7 @@ public static class IAMErrors
         CodeUnauthorized => 401,
         CodeForbidden => 403,
         CodeUpstreamDependency => 424,
+        CodeIdentityDelegationUnavailable => 424,
         _ => 500
     };
 }

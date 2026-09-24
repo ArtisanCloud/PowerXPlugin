@@ -115,6 +115,47 @@ func (s *LocalAI) ListLLMModels(ctx context.Context, env string) (*dto.ListLLMMo
 	return out, nil
 }
 
+// EmbeddingModelKeys exposes only locally configured embedding-capable models.
+// It intentionally does not inspect Gateway or PowerX catalog models: local
+// knowledge indexing must use a plugin-owned local runtime driver.
+func (s *LocalAI) EmbeddingModelKeys() []string {
+	if s == nil {
+		return nil
+	}
+	keys := make([]string, 0)
+	for key, model := range s.models {
+		for _, modality := range model.Modalities {
+			if modality == "embedding" {
+				keys = append(keys, key)
+				break
+			}
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// LLMModelKeys exposes the declared local text-generation models for callers
+// that need an explicit generation dependency (for example HyDE retrieval).
+// It never discovers a Core/Gateway model: the local strategy remains bound to
+// a plugin-owned driver and configuration.
+func (s *LocalAI) LLMModelKeys() []string {
+	if s == nil {
+		return nil
+	}
+	keys := make([]string, 0)
+	for key, model := range s.models {
+		for _, modality := range model.Modalities {
+			if modality == "llm" {
+				keys = append(keys, key)
+				break
+			}
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func (s *LocalAI) post(ctx context.Context, m config.LocalAIModel, path string, body any) (*http.Response, error) {
 	raw, err := json.Marshal(body)
 	if err != nil || len(raw) > 2<<20 {

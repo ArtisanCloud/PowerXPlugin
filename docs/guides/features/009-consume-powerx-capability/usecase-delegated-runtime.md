@@ -45,6 +45,7 @@ bootstrap 顺序：
 
 - IAM：目录使用 STS；`ResolveIdentity` 另有被解析的用户 Bearer 输入，不能将目录 STS 本身当作人类身份。可信 tenant 参数仅作合同上下文/一致性约束，不由用户选择，也不序列化为 Host tenant 覆盖。
 - Customer：Core Auth 的 Register/Login 使用 `Channel: "shopify_storefront"` 和 `CustomerCredential{Type: "shopify_customer_access_token", Value: ...}`；Core 必须配置可用 verifier。外部 identity resolve 不是用户登录，其最小结果不提供可靠 roles。Validate/Membership 使用 `WithCustomerCredential`；示例的 `ValidateCustomer` 演示请求级转交。SDK 的 local 注册字段不保证 delegated 支持；不要把 local 密码登录 UI 直接宣称兼容 Core Shopify 登录。
+- Customer 基础资料与 Contact：按[独立使用场景](usecase-customer-contact.md)选择 `accounts.service_read/manage` 与 `contacts.service_read/manage`。API Key 的成功探测不证明安装实例已获 STS grant；插件服务主体不使用 `admin_manage`。
 - Agent：按主指南 §7.2 执行独立 append/invoke/events/cancel；不再调用旧 `/agents/sessions`、`/agents/stream/sse`。Session STS-only，API Key 无法代替。订阅是已存在 invocation 的结果流，不是执行入口。
 - Media：上传票据不是上传完成；按票据传输文件后再 complete，读取 variant 使用 variant_uuid，不暴露内部 object key。
 - Knowledge：异步写入返回 job，不把 202/queued 当作索引完成。显式查询任务状态是合同操作，不是给 SSE 增加轮询降级。

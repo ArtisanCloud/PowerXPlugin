@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PowerXPlugin.Framework.IAM.Contracts;
 using PowerXPlugin.Framework.IAM.Models;
+using PowerXPlugin.Framework.Runtime.Common;
 
 namespace PowerXPlugin.Framework.IAM;
 
@@ -16,20 +17,12 @@ public sealed record IAMAdapterBundle(
 
 public static class IAMRuntime
 {
-    public static IAMRegistry CreateRegistry(IAMAdapterMode mode, IAMAdapterBundle local, IAMAdapterBundle delegated)
+    public static IAMRegistry CreateRegistry(ProviderMode mode, IAMAdapterBundle selected)
     {
-        ArgumentNullException.ThrowIfNull(local);
-        ArgumentNullException.ThrowIfNull(delegated);
-
-        var selected = mode switch
-        {
-            IAMAdapterMode.Local => local,
-            IAMAdapterMode.Delegated => delegated,
-            _ => throw new IAMAdapterException(IAMErrors.CodeInvalidMode)
-        };
+        ArgumentNullException.ThrowIfNull(selected);
 
         var registry = new IAMRegistry();
-        registry.Bind(mode, selected.Directory, selected.Authz, selected.IdentityContext);
+        registry.Bind(mode == ProviderMode.Local ? IAMAdapterMode.Local : IAMAdapterMode.Delegated, selected.Directory, selected.Authz, selected.IdentityContext);
         return registry;
     }
 
@@ -39,7 +32,7 @@ public static class IAMRuntime
     /// </summary>
     public static IServiceCollection AddPowerXIamRegistry(
         this IServiceCollection services,
-        IAMAdapterMode mode,
+        ProviderMode mode,
         Func<IServiceProvider, IAMAdapterBundle> localFactory,
         Func<IServiceProvider, IAMAdapterBundle> delegatedFactory)
     {
@@ -47,8 +40,9 @@ public static class IAMRuntime
         ArgumentNullException.ThrowIfNull(localFactory);
         ArgumentNullException.ThrowIfNull(delegatedFactory);
 
-        services.AddSingleton(sp => CreateRegistry(mode, localFactory(sp), delegatedFactory(sp)));
-        return services;
+        return services.AddPowerXRuntime<IAMRegistry>("iam", mode,
+            sp => CreateRegistry(mode, localFactory(sp)),
+            sp => CreateRegistry(mode, delegatedFactory(sp)));
     }
 }
 

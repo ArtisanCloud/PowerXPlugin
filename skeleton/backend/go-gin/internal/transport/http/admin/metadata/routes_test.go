@@ -71,3 +71,46 @@ func TestMetadataHandlerLocalDoesNotCallDelegatedClient(t *testing.T) {
 		t.Fatal("local metadata handler must not call delegated Metadata Host Contract")
 	}
 }
+
+type debugTagStore struct {
+	fwmetadata.Service
+	calls  int
+	tenant string
+}
+
+func (s *debugTagStore) ListTags(ctx context.Context, _ fwmetadata.ListTagsRequest) (*fwmetadata.Page[fwmetadata.Tag], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.Tag]{Items: []fwmetadata.Tag{}}, nil
+}
+
+func TestMetadataDebugUsesOnlySelectedFrameworkRuntime(t *testing.T) {
+	local, delegated := &debugTagStore{}, &debugTagStore{}
+	localRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeLocal, local, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegatedRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeDelegated, nil, delegated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{debugLocal: localRuntime, debugDelegated: delegatedRuntime}
+	for _, test := range []struct {
+		route, tenant              string
+		localCalls, delegatedCalls int
+	}{
+		{"local", "11111111-1111-4111-8111-111111111111", 1, 0},
+		{"delegated", "", 1, 1},
+	} {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodGet, "/metadata/debug/tags?framework_debug_route="+test.route+"&tenant_uuid=11111111-1111-4111-8111-111111111111", nil)
+		h.DebugListTags(c)
+		if rec.Code != http.StatusOK || local.calls != test.localCalls || delegated.calls != test.delegatedCalls {
+			t.Fatalf("route=%s status=%d local=%d delegated=%d", test.route, rec.Code, local.calls, delegated.calls)
+		}
+	}
+	if local.tenant == "" || delegated.tenant != "" {
+		t.Fatalf("tenant context local=%q delegated=%q", local.tenant, delegated.tenant)
+	}
+}

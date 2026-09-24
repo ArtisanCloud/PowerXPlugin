@@ -238,6 +238,27 @@
         </UButton>
       </div>
 
+      <div v-if="isLoggedIn">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.knowledgeSpaces') }}
+        </div>
+        <div class="space-y-1">
+          <UButton
+            :to="knowledgeSpacePath"
+            variant="ghost"
+            color="neutral"
+            class="w-full justify-start"
+            :class="{
+              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                isKnowledgeSpaceRoute,
+            }"
+          >
+            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
+            {{ t('navigation.knowledgeSpaces') }}
+          </UButton>
+        </div>
+      </div>
+
       <div v-if="showIAMMenu">
         <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {{ t('navigation.iam') }}
@@ -457,6 +478,11 @@ const pluginAdminBase = computed(() => {
 const adminPath = (path: string) => `${pluginAdminBase.value.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 const metadataGovernancePath = computed(() => adminPath("settings/metadata-governance"));
 const aiSettingsPath = computed(() => adminPath("settings/ai-settings"));
+const knowledgeSpacePath = computed(() => adminPath("knowledge"));
+const isKnowledgeSpaceRoute = computed(() => {
+  const path = normalizePath(route.path);
+  return path === normalizePath(knowledgeSpacePath.value) || path.startsWith(`${normalizePath(knowledgeSpacePath.value)}/`) || path.startsWith("/admin/knowledge");
+});
 
 onMounted(() => {
   if (!userStore.context && !userStore.isLoading) {

@@ -2,6 +2,7 @@ package knowledge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -59,6 +60,13 @@ func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
 		case "POST /api/v1/tenant/knowledge/search":
 			return knowledgeResponse(http.StatusOK, `{"data":{"items":[{"space_uuid":"11111111-1111-1111-1111-111111111111","document_uuid":"22222222-2222-2222-2222-222222222222","title":"Refund FAQ","uri":"powerx://faq/refund","excerpt":"Refund policy","tags":["refund"]}]}}`), nil
 		case "POST /api/v1/tenant/knowledge/spaces/11111111-1111-1111-1111-111111111111/documents":
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			require.Equal(t, "semantic", body["segmentMode"])
+			require.Equal(t, float64(640), body["chunkSize"])
+			require.Equal(t, []any{"size", "segment", "separator"}, body["segmentOrder"])
+			require.Equal(t, []any{"\\n\\n", "。"}, body["separators"])
+			require.Equal(t, true, body["anchorHeadingPath"])
 			return knowledgeResponse(http.StatusAccepted, `{"data":{"job_uuid":"33333333-3333-3333-3333-333333333333","status":"queued","operation":"upsert","document_uuid":"22222222-2222-2222-2222-222222222222"}}`), nil
 		case "DELETE /api/v1/tenant/knowledge/spaces/11111111-1111-1111-1111-111111111111/documents/22222222-2222-2222-2222-222222222222":
 			return knowledgeResponse(http.StatusAccepted, `{"data":{"job_uuid":"44444444-4444-4444-4444-444444444444","status":"queued","operation":"delete","document_uuid":"22222222-2222-2222-2222-222222222222"}}`), nil
@@ -85,7 +93,14 @@ func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
 	require.Equal(t, "Refund policy", result.Chunks[0].Text)
 	require.Equal(t, "22222222-2222-2222-2222-222222222222", result.Chunks[0].Citation.DocumentID)
 
-	upsert, err := client.UpsertKnowledgeDocument(context.Background(), fwknowledge.KnowledgeDocument{SpaceID: spaces[0].SpaceID, Title: "Refund FAQ", URI: "powerx://faq/refund", Content: "Refund policy", ContentType: "text/markdown", Version: "v1"})
+	upsert, err := client.UpsertKnowledgeDocument(context.Background(), fwknowledge.KnowledgeDocument{
+		SpaceID: spaces[0].SpaceID, Title: "Refund FAQ", URI: "powerx://faq/refund", Content: "Refund policy", ContentType: "text/markdown", Version: "v1",
+		Ingestion: &fwknowledge.IngestionConfig{
+			IngestionProfile: "p0_basic", ProcessorProfile: "builtin/default", Priority: "high",
+			SegmentMode: "semantic", ChunkSize: 640, ChunkOverlap: 80, SegmentSizePolicy: "target",
+			SegmentOrder: []string{"size", "segment", "separator"}, Separators: []string{"\\n\\n", "。"}, AnchorHeadingPath: true,
+		},
+	})
 	require.NoError(t, err)
 	require.Equal(t, "22222222-2222-2222-2222-222222222222", upsert.DocumentID)
 

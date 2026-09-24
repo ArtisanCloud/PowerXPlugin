@@ -11,6 +11,7 @@ import (
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -25,6 +26,43 @@ type knowledgeGatewayStub struct {
 	invokeData map[string]any
 	invokeRaw  json.RawMessage
 	createErr  error
+}
+
+func TestLocalBM25AndFusionScoreRankRelevantChunkFirst(t *testing.T) {
+	rows := []localSearchRow{
+		{LocalKnowledgeChunk: models.LocalKnowledgeChunk{Content: "退款政策支持七天无理由退款"}},
+		{LocalKnowledgeChunk: models.LocalKnowledgeChunk{Content: "物流配送时效说明"}},
+	}
+	scores := localBM25Scores(rows, "退款政策")
+	if scores[0] <= scores[1] || scores[0] == 0 {
+		t.Fatalf("BM25 should rank matching chunk first: %#v", scores)
+	}
+	if got := localCosineSimilarity([]float32{1, 0}, []float32{1, 0}); got != 1 {
+		t.Fatalf("cosine=%v want 1", got)
+	}
+	if got := localCosineSimilarity([]float32{1, 0}, []float32{0, 1}); got != 0 {
+		t.Fatalf("cosine=%v want 0", got)
+	}
+}
+
+func TestLocalKnowledgeACLGatesDepartmentAndMemberScopes(t *testing.T) {
+	acl := localKnowledgeACL{memberUUID: "member-a", department: "support", spaceDepartment: "support"}
+	if !acl.allows(localSearchRow{AccessScope: "space_department"}) {
+		t.Fatal("member in the owning department should be allowed")
+	}
+	if (localKnowledgeACL{memberUUID: "member-a", department: "sales", spaceDepartment: "support"}).allows(localSearchRow{AccessScope: "space_department"}) {
+		t.Fatal("member outside the owning department must be denied")
+	}
+	allowed, err := json.Marshal([]string{"member-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !acl.allows(localSearchRow{AccessScope: "members", AllowedMemberUUIDs: allowed}) {
+		t.Fatal("explicitly allowed member should be allowed")
+	}
+	if !(localKnowledgeACL{root: true}).allows(localSearchRow{AccessScope: "members"}) {
+		t.Fatal("root should bypass document scope")
+	}
 }
 
 func (g *knowledgeGatewayStub) Enabled() bool { return true }

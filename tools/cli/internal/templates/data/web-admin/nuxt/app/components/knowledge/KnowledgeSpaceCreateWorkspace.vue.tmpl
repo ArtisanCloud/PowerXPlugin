@@ -1,0 +1,42 @@
+<template>
+  <main class="mx-auto w-full max-w-5xl space-y-6 px-5 py-6 lg:px-8">
+    <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-[#172536]">
+      <p class="text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ t('knowledgeSpaces.overview.eyebrow') }}` }}</p>
+      <h1 class="mt-1 text-2xl font-semibold text-gray-900 dark:text-[#fdfcff]">{{ `{{ t('knowledgeSpaces.create.title') }}` }}</h1>
+      <p class="mt-2 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ t('knowledgeSpaces.create.description') }}` }}</p>
+    </header>
+
+    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]">
+      <header class="flex items-center justify-between border-b border-slate-200 p-5 dark:border-slate-700"><div><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ `{{ t('knowledgeSpaces.create.basicTitle') }}` }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ t('knowledgeSpaces.create.basicDescription') }}` }}</p></div><UButton color="neutral" variant="outline" :to="overviewPath">{{ `{{ t('knowledgeSpaces.create.back') }}` }}</UButton></header>
+      <div class="grid gap-5 p-5 md:grid-cols-2">
+        <UFormField :label="t('knowledgeSpaces.ui.spaceName')" required><UInput v-model="draft.name" class="w-full" :placeholder="t('knowledgeSpaces.create.namePlaceholder')" icon="i-heroicons-rectangle-stack" /></UFormField>
+        <UFormField :label="t('knowledgeSpaces.ui.department')" required><USelectMenu v-model="draft.department_code" :items="departmentOptions" value-key="value" label-key="label" :loading="departmentsLoading" :placeholder="t('knowledgeSpaces.create.departmentPlaceholder')" :portal="false" class="w-full" /><template #help><span v-if="departmentsError" class="text-error-500">{{ `{{ departmentsError }}` }}</span><span v-else-if="!departmentsLoading && !departmentOptions.length" class="text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ t('knowledgeSpaces.create.noDepartments') }}` }}</span></template></UFormField>
+      </div>
+      <footer class="flex justify-end gap-2 border-t border-slate-200 p-5 dark:border-slate-700"><UButton color="neutral" variant="subtle" :to="overviewPath">{{ `{{ t('common.cancel') }}` }}</UButton><UButton :loading="saving" :disabled="!canSave" @click="save">{{ `{{ t('knowledgeSpaces.create.submit') }}` }}</UButton></footer>
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]">
+      <header class="border-b border-slate-200 p-5 dark:border-slate-700"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ `{{ t('knowledgeSpaces.ui.strategyPackage') }}` }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ t('knowledgeSpaces.create.strategyDescription') }}` }}</p></header>
+      <div class="grid gap-5 p-5 md:grid-cols-2">
+        <UFormField :label="t('knowledgeSpaces.ui.strategyPackage')" required><USelectMenu v-model="draft.strategy_package_key" :items="strategyOptions" value-key="value" label-key="label" :search-input="{ placeholder: t('knowledgeSpaces.create.searchStrategy') }" :portal="false" class="w-full" /><template #help><span class="text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ selectedStrategy ? strategySummary(selectedStrategy.key) : '' }}` }}</span></template></UFormField>
+        <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700"><h3 class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ `{{ t('knowledgeSpaces.ui.strategyAutoMapping') }}` }}</h3><p class="mt-3 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ t('knowledgeSpaces.create.recommendedProfile') }}` }}：<span class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ `{{ profileLabel(selectedStrategy?.profile_key) }}` }}</span></p><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ `{{ t('knowledgeSpaces.create.executionStatus') }}` }}：<span class="font-medium" :class="selectedStrategy?.ready ? 'text-success-600 dark:text-success-400' : 'text-warning-700 dark:text-warning-300'">{{ `{{ selectedStrategy?.ready ? t('knowledgeSpaces.ui.strategyReady') : t('knowledgeSpaces.create.unavailableLocally') }}` }}</span></p></div>
+      </div>
+      <div class="px-5 pb-5"><UAlert v-if="selectedStrategy && !selectedStrategy.ready" color="warning" variant="soft" :title="t('knowledgeSpaces.create.strategyUnavailableTitle')" :description="t('knowledgeSpaces.create.strategyUnavailableDescription')" /><UAlert v-else-if="selectedStrategy" color="success" variant="soft" :title="t('knowledgeSpaces.ui.strategyReady')" :description="t('knowledgeSpaces.create.strategyReadyDescription')" /></div>
+    </section>
+  </main>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useLocalKnowledgeApi, type KnowledgeStrategyPackage } from '~/composables/api/useLocalKnowledge'
+import { useDepartmentService, type Department } from '~/composables/api/services/departmentService'
+const { t } = useI18n(); const toast = useToast(); const api = useLocalKnowledgeApi(); const departmentsApi = useDepartmentService(); const runtimeConfig = useRuntimeConfig(); const router = useRouter()
+const draft = reactive({ name: '', department_code: '', strategy_package_key: '' }); const departments = ref<Department[]>([]); const strategies = ref<KnowledgeStrategyPackage[]>([]); const departmentsLoading = ref(false); const departmentsError = ref(''); const saving = ref(false)
+const adminBase = computed(() => String(runtimeConfig.public?.pluginAdminBase || '/_p/com.powerx.plugins.base/admin/').replace(/\/+$/, '')); const overviewPath = computed(() => `${adminBase.value}/knowledge`)
+function flatten(nodes: Department[], out: Department[] = []) { for (const item of nodes) { out.push(item); if (item.children?.length) flatten(item.children, out) }; return out }
+const departmentOptions = computed(() => flatten(departments.value).map(item => ({ label: item.name, value: item.code }))); const strategyOptions = computed(() => strategies.value.map(item => ({ label: strategyLabel(item.key), value: item.key, disabled: !item.ready }))); const selectedStrategy = computed(() => strategies.value.find(item => item.key === draft.strategy_package_key)); const canSave = computed(() => Boolean(draft.name.trim() && draft.department_code && selectedStrategy.value?.ready))
+function strategyLabel(key: string) { return t(`knowledgeSpaces.strategies.${key}.label`) } function strategySummary(key: string) { return t(`knowledgeSpaces.strategies.${key}.summary`) } function profileLabel(key?: string) { return key ? t(`knowledgeSpaces.profiles.${key}`) : '-' }
+async function load() { departmentsLoading.value = true; departmentsError.value = ''; try { const [tree, catalog] = await Promise.all([departmentsApi.getDepartmentTree(), api.strategyPackages()]); departments.value = tree; strategies.value = catalog.items || []; draft.department_code = departmentOptions.value[0]?.value || ''; draft.strategy_package_key = strategies.value.find(item => item.ready)?.key || '' } catch { departmentsError.value = t('knowledgeSpaces.create.loadFailed'); toast.add({ title: t('common.error'), description: t('knowledgeSpaces.create.loadFailed'), color: 'error' }) } finally { departmentsLoading.value = false } }
+async function save() { if (!canSave.value) return; saving.value = true; let created = false; try { const space = await api.saveSpace({ ...draft, name: draft.name.trim() }); created = true; await api.activateVectorIndex(space.uuid); toast.add({ title: t('common.success'), description: t('knowledgeSpaces.ui.spaceSavedAndVectorActivated'), color: 'success' }); await router.push(overviewPath.value) } catch { toast.add({ title: t('common.error'), description: created ? t('knowledgeSpaces.ui.spaceSavedVectorActivationFailed') : t('knowledgeSpaces.ui.spaceSaveFailed'), color: 'error' }); if (created) await router.push(overviewPath.value) } finally { saving.value = false } }
+onMounted(load)
+</script>

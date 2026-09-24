@@ -2,6 +2,14 @@ import { apiGet, apiPatch, apiPost, useApiClient } from "./_client";
 import type { ApiResponse } from "./_base";
 import type { ProviderModeDiagnostics } from "./useProviderMode";
 
+export interface CustomerModeDiagnostics extends ProviderModeDiagnostics {
+  gateway_auth_scheme?: string;
+  account_selector_capability?: string;
+  account_manage_capability?: string;
+  contact_read_capability?: string;
+  contact_manage_capability?: string;
+}
+
 export interface CustomerOverview {
   tenant_uuid?: string;
   accounts_total: number;
@@ -56,6 +64,46 @@ export interface CustomerIdentity {
   updated_at?: string;
 }
 
+export interface CustomerContact {
+  contact_uuid: string;
+  customer_uuid: string;
+  display_name: string;
+  given_name?: string;
+  family_name?: string;
+  status: "active" | "inactive" | "temporary";
+  roles: ("primary" | "legal_representative")[];
+  tags: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomerContactIdentity {
+  identity_uuid: string;
+  contact_uuid: string;
+  channel_dictionary_item_uuid: string;
+  external_subject: string;
+  status: "active" | "inactive";
+}
+
+export interface CreateCustomerContactInput {
+  display_name: string;
+  given_name?: string;
+  family_name?: string;
+  status: "active" | "inactive" | "temporary";
+  roles?: ("primary" | "legal_representative")[];
+  tags?: string[];
+  creation_intent: "explicit_create" | "explicit_temporary";
+}
+
+export interface UpdateCustomerContactInput {
+  display_name?: string;
+  given_name?: string;
+  family_name?: string;
+  status?: "active" | "inactive" | "temporary";
+  roles?: ("primary" | "legal_representative")[];
+  tags?: string[];
+}
+
 export interface CustomerMembership {
   id: number;
   membership_uuid: string;
@@ -108,6 +156,7 @@ export interface CustomerBaseQuery {
   q?: string;
   status?: string;
   provider?: string;
+  framework_debug_route?: "local" | "delegated";
   customer_uuid?: string;
   tenant_uuid?: string;
 }
@@ -125,6 +174,19 @@ export interface CreateCustomerAccountInput {
   locale?: string;
   timezone?: string;
   metadata?: Record<string, any>;
+}
+
+export interface CreateBasicCustomerInput {
+  display_name: string;
+  nickname?: string;
+  given_name?: string;
+  family_name?: string;
+  primary_email?: string;
+  primary_phone?: string;
+  avatar_url?: string;
+  status?: "active" | "pending" | "suspended" | "disabled";
+  locale?: string;
+  timezone?: string;
 }
 
 export interface CreateCustomerAccountResult {
@@ -163,13 +225,16 @@ export function useCustomerBaseApi() {
     apiGet<ApiResponse<CustomerOverview>>("admin/customers/overview", cleanQuery(query), init);
 
   const mode = (init?: any) =>
-    apiGet<ApiResponse<ProviderModeDiagnostics>>("admin/customers/mode", undefined, init);
+    apiGet<ApiResponse<CustomerModeDiagnostics>>("admin/customers/mode", undefined, init);
 
   const listAccounts = (query?: CustomerBaseQuery, init?: any) =>
     apiGet<ApiResponse<CustomerPage<CustomerAccount>>>("admin/customers/accounts", cleanQuery(query), init);
 
   const createAccount = (input: CreateCustomerAccountInput, init?: any) =>
     apiPost<ApiResponse<CreateCustomerAccountResult>>("admin/customers/accounts", input, init);
+
+  const createBasicAccount = (input: CreateBasicCustomerInput, route: "local" | "delegated", init?: any) =>
+    apiPost<ApiResponse<CustomerAccount>>(`admin/customers/debug/basic-accounts?framework_debug_route=${route}`, input, init);
 
   const getAccount = (customerUUID: string, query?: CustomerBaseQuery, init?: any) =>
     apiGet<ApiResponse<CustomerAccount>>(`admin/customers/accounts/${encodeURIComponent(customerUUID)}`, cleanQuery(query), init);
@@ -189,17 +254,34 @@ export function useCustomerBaseApi() {
   const listMiniAppEntries = (query?: CustomerBaseQuery, init?: any) =>
     apiGet<ApiResponse<CustomerPage<MiniAppEntry>>>("admin/customers/mini-app-entries", cleanQuery(query), init);
 
+  const listContacts = (customerUUID: string, query?: CustomerBaseQuery, init?: any) =>
+    apiGet<ApiResponse<CustomerPage<CustomerContact>>>(`admin/customers/${encodeURIComponent(customerUUID)}/contacts`, cleanQuery(query), init);
+
+  const createContact = (customerUUID: string, input: CreateCustomerContactInput, init?: any) =>
+    apiPost<ApiResponse<CustomerContact>>(`admin/customers/${encodeURIComponent(customerUUID)}/contacts`, input, init);
+
+  const updateContact = (customerUUID: string, contactUUID: string, input: UpdateCustomerContactInput, init?: any) =>
+    apiPatch<ApiResponse<CustomerContact>>(`admin/customers/${encodeURIComponent(customerUUID)}/contacts/${encodeURIComponent(contactUUID)}`, input, init);
+
+  const bindContactIdentity = (customerUUID: string, contactUUID: string, input: { channel_dictionary_item_uuid: string; external_subject: string }, init?: any) =>
+    apiPost<ApiResponse<CustomerContactIdentity>>(`admin/customers/${encodeURIComponent(customerUUID)}/contacts/${encodeURIComponent(contactUUID)}/identities`, input, init);
+
   return {
     baseURL,
     mode,
     overview,
     listAccounts,
     createAccount,
+    createBasicAccount,
     getAccount,
     updateAccount,
     listIdentities,
     listMemberships,
     listLoginEvents,
     listMiniAppEntries,
+    listContacts,
+    createContact,
+    updateContact,
+    bindContactIdentity,
   };
 }

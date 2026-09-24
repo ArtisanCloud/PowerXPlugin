@@ -104,6 +104,42 @@ type CreateTagInput struct {
 	DescriptionI18n map[string]string
 }
 
+type UpdateTagInput struct {
+	TenantUUID      string
+	TagUUID         string
+	LabelI18n       *map[string]string
+	DescriptionI18n *map[string]string
+	Color           *string
+	Status          *string
+	Locale          string
+}
+
+type ListTagBindingsInput struct {
+	TenantUUID   string
+	ResourceType string
+	ResourceUUID string
+	Locale       string
+}
+
+type ReplaceTagBindingsInput struct {
+	TenantUUID   string
+	ResourceType string
+	ResourceUUID string
+	TagUUIDs     []string
+	Locale       string
+}
+
+type UpdateTaxonomyNodeInput struct {
+	TenantUUID      string
+	NodeUUID        string
+	LabelI18n       *map[string]string
+	DescriptionI18n *map[string]string
+	SortOrder       *int
+	Status          *string
+	Version         int64
+	Locale          string
+}
+
 type CreateResourceTypeInput struct {
 	TenantUUID      string
 	ResourceType    string
@@ -401,6 +437,186 @@ func (s *Service) CreateTag(ctx context.Context, in CreateTagInput) (*fwmetadata
 	return &item, nil
 }
 
+// UpdateTag intentionally has no delete alternative. Used tags can only be
+// made inactive, preserving their historical bindings and auditability.
+func (s *Service) UpdateTag(ctx context.Context, in UpdateTagInput) (*fwmetadata.Tag, error) {
+	if err := require(in.TenantUUID, in.TagUUID); err != nil {
+		return nil, err
+	}
+	var row model.Tag
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid = ?", strings.TrimSpace(in.TenantUUID), strings.TrimSpace(in.TagUUID)).First(&row).Error; err != nil {
+		return nil, err
+	}
+	updates := map[string]any{}
+	if in.LabelI18n != nil {
+		updates["label_i18n"] = jsonMap(*in.LabelI18n)
+	}
+	if in.DescriptionI18n != nil {
+		updates["description_i18n"] = jsonMap(*in.DescriptionI18n)
+	}
+	if in.Color != nil {
+		updates["color"] = strings.TrimSpace(*in.Color)
+	}
+	if in.Status != nil {
+		status := strings.TrimSpace(*in.Status)
+		if status != "active" && status != "inactive" {
+			return nil, errors.New("metadata: tag status must be active or inactive")
+		}
+		updates["status"] = status
+	}
+	if len(updates) > 0 {
+		if err := s.db.WithContext(ctx).Model(&row).Updates(updates).Error; err != nil {
+			return nil, err
+		}
+		if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid = ?", strings.TrimSpace(in.TenantUUID), strings.TrimSpace(in.TagUUID)).First(&row).Error; err != nil {
+			return nil, err
+		}
+	}
+	return tagView(row, in.Locale), nil
+}
+
+func (s *Service) ListTagBindings(ctx context.Context, in ListTagBindingsInput) ([]fwmetadata.TagBinding, error) {
+	if err := require(in.TenantUUID, in.ResourceType, in.ResourceUUID); err != nil {
+		return nil, err
+	}
+	var bindings []model.TagBinding
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND resource_type = ? AND resource_uuid = ?", strings.TrimSpace(in.TenantUUID), strings.TrimSpace(in.ResourceType), strings.TrimSpace(in.ResourceUUID)).Order("created_at asc, uuid asc").Find(&bindings).Error; err != nil {
+		return nil, err
+	}
+	if len(bindings) == 0 {
+		return []fwmetadata.TagBinding{}, nil
+	}
+	tagUUIDs := make([]string, 0, len(bindings))
+	for _, binding := range bindings {
+		tagUUIDs = append(tagUUIDs, binding.TagUUID)
+	}
+	var tags []model.Tag
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid IN ?", strings.TrimSpace(in.TenantUUID), tagUUIDs).Find(&tags).Error; err != nil {
+		return nil, err
+	}
+	byUUID := make(map[string]model.Tag, len(tags))
+	for _, tag := range tags {
+		byUUID[tag.UUID] = tag
+	}
+	out := make([]fwmetadata.TagBinding, 0, len(bindings))
+	for _, binding := range bindings {
+		var tag *fwmetadata.Tag
+		if row, ok := byUUID[binding.TagUUID]; ok {
+			tag = tagView(row, in.Locale)
+		}
+		out = append(out, fwmetadata.TagBinding{UUID: binding.UUID, TagUUID: binding.TagUUID, ResourceType: binding.ResourceType, ResourceUUID: binding.ResourceUUID, Tag: tag})
+	}
+	return out, nil
+}
+
+// ReplaceTagBindings serializes the resource scope in one transaction. It is
+// idempotent: the same tag set produces the same binding rows and order.
+func (s *Service) ReplaceTagBindings(ctx context.Context, in ReplaceTagBindingsInput) ([]fwmetadata.TagBinding, error) {
+	if err := require(in.TenantUUID, in.ResourceType, in.ResourceUUID); err != nil {
+		return nil, err
+	}
+	unique := make([]string, 0, len(in.TagUUIDs))
+	seen := map[string]struct{}{}
+	for _, raw := range in.TagUUIDs {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			return nil, errors.New("metadata: tag_uuid is required")
+		}
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			unique = append(unique, id)
+		}
+	}
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if len(unique) > 0 {
+			var count int64
+			if err := tx.Model(&model.Tag{}).Where("tenant_uuid = ? AND uuid IN ?", strings.TrimSpace(in.TenantUUID), unique).Count(&count).Error; err != nil {
+				return err
+			}
+			if count != int64(len(unique)) {
+				return gorm.ErrRecordNotFound
+			}
+		}
+		var existing []model.TagBinding
+		if err := tx.Where("tenant_uuid = ? AND resource_type = ? AND resource_uuid = ?", strings.TrimSpace(in.TenantUUID), strings.TrimSpace(in.ResourceType), strings.TrimSpace(in.ResourceUUID)).Find(&existing).Error; err != nil {
+			return err
+		}
+		existingByTag := map[string]model.TagBinding{}
+		for _, binding := range existing {
+			existingByTag[binding.TagUUID] = binding
+		}
+		keep := map[string]struct{}{}
+		for _, id := range unique {
+			keep[id] = struct{}{}
+		}
+		for _, binding := range existing {
+			if _, ok := keep[binding.TagUUID]; !ok {
+				if err := tx.Delete(&binding).Error; err != nil {
+					return err
+				}
+			}
+		}
+		for _, id := range unique {
+			if _, ok := existingByTag[id]; !ok {
+				if err := tx.Create(&model.TagBinding{TenantUUID: strings.TrimSpace(in.TenantUUID), ResourceType: strings.TrimSpace(in.ResourceType), ResourceUUID: strings.TrimSpace(in.ResourceUUID), TagUUID: id}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return s.ListTagBindings(ctx, ListTagBindingsInput{TenantUUID: in.TenantUUID, ResourceType: in.ResourceType, ResourceUUID: in.ResourceUUID, Locale: in.Locale})
+}
+
+func (s *Service) UpdateTaxonomyNode(ctx context.Context, in UpdateTaxonomyNodeInput) (*fwmetadata.TaxonomyNode, error) {
+	if err := require(in.TenantUUID, in.NodeUUID); err != nil {
+		return nil, err
+	}
+	var row model.TaxonomyNode
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid = ?", strings.TrimSpace(in.TenantUUID), strings.TrimSpace(in.NodeUUID)).First(&row).Error; err != nil {
+		return nil, err
+	}
+	if in.Version <= 0 || row.Version != in.Version {
+		return nil, errors.New("metadata: taxonomy node version conflict")
+	}
+	updates := map[string]any{"version": row.Version + 1}
+	if in.LabelI18n != nil {
+		updates["label_i18n"] = jsonMap(*in.LabelI18n)
+	}
+	if in.DescriptionI18n != nil {
+		updates["description_i18n"] = jsonMap(*in.DescriptionI18n)
+	}
+	if in.SortOrder != nil {
+		updates["sort_order"] = *in.SortOrder
+	}
+	if in.Status != nil {
+		status := strings.TrimSpace(*in.Status)
+		if status != "active" && status != "inactive" {
+			return nil, errors.New("metadata: taxonomy node status must be active or inactive")
+		}
+		if status == "inactive" {
+			var children int64
+			if err := s.db.WithContext(ctx).Model(&model.TaxonomyNode{}).Where("tenant_uuid = ? AND parent_uuid = ? AND status = ?", strings.TrimSpace(in.TenantUUID), row.UUID, "active").Count(&children).Error; err != nil {
+				return nil, err
+			}
+			if children > 0 {
+				return nil, errors.New("metadata: active child nodes must be handled before parent inactivation")
+			}
+		}
+		updates["status"] = status
+	}
+	if err := s.db.WithContext(ctx).Model(&model.TaxonomyNode{}).Where("tenant_uuid = ? AND uuid = ? AND version = ?", strings.TrimSpace(in.TenantUUID), row.UUID, row.Version).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.WithContext(ctx).Where("tenant_uuid = ? AND uuid = ?", strings.TrimSpace(in.TenantUUID), row.UUID).First(&row).Error; err != nil {
+		return nil, err
+	}
+	return taxonomyNodeView(row, in.Locale), nil
+}
+
 func (s *Service) ListResourceTypes(ctx context.Context, opts ListOptions) (*fwmetadata.Page[fwmetadata.ResourceType], error) {
 	var rows []model.ResourceType
 	var total int64
@@ -551,6 +767,19 @@ func mapString(in map[string]any) fwmetadata.I18nMap {
 		}
 	}
 	return out
+}
+
+func tagView(row model.Tag, locale string) *fwmetadata.Tag {
+	return &fwmetadata.Tag{UUID: row.UUID, Namespace: row.Namespace, ResourceType: row.ResourceType, Code: row.Code,
+		LabelI18n: mapString(row.LabelI18n), DescriptionI18n: mapString(row.DescriptionI18n), Color: row.Color,
+		Status: row.Status, UsageCount: row.UsageCount, Display: display(row.LabelI18n, row.DescriptionI18n, locale)}
+}
+
+func taxonomyNodeView(row model.TaxonomyNode, locale string) *fwmetadata.TaxonomyNode {
+	return &fwmetadata.TaxonomyNode{UUID: row.UUID, TaxonomyUUID: row.TaxonomyUUID, ParentUUID: row.ParentUUID, Code: row.Code,
+		LabelI18n: mapString(row.LabelI18n), DescriptionI18n: mapString(row.DescriptionI18n), Path: row.Path, Depth: row.Depth,
+		SortOrder: row.SortOrder, Status: row.Status, ReferenceCount: row.ReferenceCount, Version: row.Version,
+		Display: display(row.LabelI18n, row.DescriptionI18n, locale)}
 }
 
 func display(name, description map[string]any, locale string) fwmetadata.Display {

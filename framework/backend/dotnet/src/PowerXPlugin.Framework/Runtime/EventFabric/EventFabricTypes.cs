@@ -48,6 +48,15 @@ public interface IEventFabricSubscriber
     Task ConsumeAsync(EventFabricSubscription subscription, EventFabricHandler handler, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Startup-selected Event Fabric subscription boundary. Publishing remains a
+/// separate Core contract; this runtime deliberately models only the shared
+/// delivery, acknowledgement and failure semantics available in both modes.
+/// </summary>
+public interface IEventRuntime : IEventFabricSubscriber
+{
+}
+
 public static class EventFabricErrors
 {
     public const string CodeUnavailable = "FRAMEWORK_EVENT_FABRIC_UNAVAILABLE";
@@ -56,6 +65,7 @@ public static class EventFabricErrors
     public const string CodeUnauthorized = "FRAMEWORK_EVENT_FABRIC_UNAUTHORIZED";
     public const string CodeForbidden = "FRAMEWORK_EVENT_FABRIC_FORBIDDEN";
     public const string CodeUpstreamDependency = "FRAMEWORK_EVENT_FABRIC_UPSTREAM_DEPENDENCY";
+    public const string CodeNack = "FRAMEWORK_EVENT_FABRIC_NACK";
 }
 
 public sealed class EventFabricAdapterException : InvalidOperationException

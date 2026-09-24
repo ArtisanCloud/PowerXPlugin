@@ -28,6 +28,7 @@
 | [Skeleton 本地 AI／Agent](usecase-skeleton-local-ai-agent.md) | Skeleton 开发与 QA | 本地模型配置、会话执行／取消与租户隔离；明确当前驱动和未实现范围 |
 | [Skeleton 本地能力目录／集成网关](usecase-skeleton-local-capability.md) | Skeleton 开发与 QA | 模板 UUID 迁移、声明能力执行、幂等及租户隔离；不模拟 Core grant |
 | [delegated 装配与安装验收](usecase-delegated-runtime.md) | 插件后端、部署与 QA | 可信 STS、最小 grant、真实成功/拒绝/撤权，且不访问 local 表 |
+| [Customer 基础资料与 Contact Runtime](usecase-customer-contact.md) | 插件后端与 QA | 客户清单/基础创建、联系人六项操作；区分 API Key 调试与安装态 STS 验收 |
 | [可编译装配示例](examples/bootstrap.go)及[示例测试](examples/bootstrap_test.go) | 插件后端开发 | 使用真实 Framework 工厂与客户端验证 local/delegated 单选、grant 失败；不依赖运行中的 Core |
 
 其他文档各司其职：[双模式规范](../../develop/framework-dual-mode-business-modules.md)维护架构规则；[覆盖台账](../../../contracts/powerx-core-framework-coverage.md)是实现范围和验收状态的唯一来源；[specs/tasks](../../../../specs/009-consume-powerx-capability/tasks.md)保留实施与历史记录。本文不另维护一套完成百分比。发现代码、指南与 Core 合同不一致时，应停止该操作并向 Framework 提交差异，不由插件增加旧协议兼容。
@@ -110,6 +111,7 @@ go doc github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts.D
 | [Knowledge](../../../../framework/backend/go/runtime/knowledge/provider.go) | `runtime/knowledge.KnowledgeProvider` | `Provider()` | ListSpaces/Catalog/Search、文档写删、重建和 job；Name/Mode/Capabilities 如实报告 |
 | [Media](../../../../framework/backend/go/runtime/media/runtime.go) | `runtime/media.Service` | `Media()`；只读消费者可用 `Assets()` | 十三项 Asset/Variant 元数据与传输操作；local 必须实现三项新增 Variant 方法。asset_uuid、variant_uuid；不能返回内部 object key |
 | [Customer](../../../../framework/backend/go/runtime/customerfw/runtime.go) | `runtime/customerfw.LocalCustomerStore`，或分开注入 `RuntimeAdapters` | `Auth()`、`ExternalIdentity()`、`Membership()` | 注册/登录/验证、外部身份解析、当前租户 membership；业务角色来自 membership，不来自消息 actor_role |
+| [Contact](../../../../framework/backend/go/runtime/contactfw/runtime.go) | `runtime/contactfw.LocalStore` | `Store()`；启动时 `ValidateRequired()` | 按客户 UUID 创建、读取、更新、分页、解析/绑定渠道身份；tenant 从可信上下文取得。见[使用场景](usecase-customer-contact.md) |
 | [Metadata](../../../../framework/backend/go/runtime/metadata/runtime.go) | `runtime/metadata.Service` | `Service()` | 字典、树、标签、TagBinding、资源类型及六项 Resolve；分页不能只搜第一页；binding_uuid 可寻址 |
 | [Agent](../../../../framework/backend/go/runtime/agent/runtime.go) | `runtime/agent.AgentService`、`SessionService` | `Agent()`、`Sessions()` | 六项生命周期；Sessions 覆盖 12 项正式服务会话操作。旧 Agent Invoke/StreamSSE 在 delegated 下明确拒绝，改用 Sessions，不兼容人工会话路由 |
 | [AI](../../../../framework/backend/go/runtime/ai/runtime.go) | `runtime/ai.GenerativeService` | `Generative()` | 模型列表、LLM invoke/stream/session、Embedding、VLM、Image、Video、TTS，共十一项 |
@@ -121,6 +123,10 @@ go doc github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts.D
 | [Plugin Release](../../../../framework/backend/go/runtime/pluginrelease/runtime.go) | `runtime/pluginrelease.Service` | `Service()` | 创建/读/停止 install session、创建/读 import job；不能把接收任务伪装为安装完成 |
 
 IAM Bundle 当前要求三项非空；不能假设已支持仅 Directory 绑定。Customer 可用 `AdaptersFromLocalStore(store)` 转为三组 adapter，或显式提供 `RuntimeAdapters`。Knowledge 的 Catalog/Capabilities 是 Framework 语义，不意味着 Core 有同名路由。AI 的部分 provider payload 保留 RawMessage，不承诺所有厂商输出统一字段。
+
+Customer 行仅对应身份/鉴权；基础客户清单与创建由 `customerfw.AccountSelectorClient` 提供 typed delegated 调用，local 暂由插件自行实现（Skeleton 有示例），**目前没有通用 Account Runtime**。Contact 是独立的双模式 Store；两者的完整接入方式见 [Customer/Contact 场景](usecase-customer-contact.md)。
+
+Metadata 的 Core tenant Host 目前缺少标签更新、绑定读取与绑定原子替换的 service actor 路由，Framework Lab 的 delegated 线路会将这些操作标记为不可用；交付要求见 [Core Metadata Host 合同缺口](../../../contracts/metadata-tenant-host-debug-gap.md)。
 
 **装配粒度不能凭想象拆分：** Media `NewRuntime` 接受完整 `Service`，`Assets()` 只缩小消费接口，不表示可只注入 `AssetCatalog`。Agent `AgentService` 仍包含旧 standalone `Invoke/StreamSSE` 方法；新执行业务只消费独立 `SessionService`，不要把旧方法当作 delegated 入口。Customer 三组 accessor 可独立检查，但声明为必需的每一组都必须有真实实现。
 
@@ -143,6 +149,8 @@ IAM Bundle 当前要求三项非空；不能假设已支持仅 Directory 绑定�
 | Plugin Runtime | `runtime/powerx/pluginruntime.NewClientWithTokenProvider` | `pluginruntime.NewRuntime` |
 | Plugin Release | `runtime/powerx/pluginrelease.NewClientWithTokenProvider` | `pluginrelease.NewRuntime` |
 | Customer | `customerfw.NewDelegatedCoreAuthClient`、`NewDelegatedMembershipResolver`、`NewExternalIdentityResolver` | 分别放入 `RuntimeAdapters.Auth/Membership/External`；External 的 Invoker 必须是已装配 STS 的 Gateway，不是 Customer Admin 客户端 |
+| Contact | `contactfw.NewCapabilityClient(CapabilityClientConfig{Invoker})` | 注入 `contactfw.NewRuntime(mode, localStore, delegatedClient)`，检查 `ValidateRequired()`，业务消费 `Store()` |
+| Customer 基础资料 | `customerfw.NewAccountSelectorClient(invoker)` | 单独的 service-scoped delegated client；local 实现由插件提供，不注入 Customer Auth Runtime |
 
 各客户端 TokenProvider 是对应包的接口或 `TokenProviderFunc`（Media/Metadata 为 `HostTokenProviderFunc`，Customer 为 `ServiceTokenProviderFunc`），可包装同一个可信 STS `func(context.Context) (string, error)`；函数返回原始 token，不加 `Bearer ` 前缀。构造成功只表示依赖配置有效，不代表网络或 grant 已验证。
 
@@ -168,6 +176,8 @@ IAM Bundle 当前要求三项非空；不能假设已支持仅 Directory 绑定�
 | Media 读取/资源 CRUD/传输/创建变体 | `com.corex.media.assets.read`、`manage`、`transfer`、`variants.manage`（后三项同 assets 前缀） |
 | Customer Auth | `com.corex.customer.auth.register`、`login`、`validate`（后两项同 auth 前缀） |
 | Customer membership/外部身份 | `com.corex.customer.memberships.delegated_read`、`com.corex.customer.external_identities.resolve` |
+| Customer 基础客户清单/创建 | `com.corex.customer.accounts.service_read`、`com.corex.customer.accounts.service_manage`；按实际操作选择 |
+| Contact 读取/管理 | `com.corex.customer.contacts.service_read`、`com.corex.customer.contacts.service_manage`；按实际操作选择 |
 | Metadata | `com.corex.metadata.{dictionary,taxonomy,tag,resource_type}.{read,manage}`，这是八个独立 ID，不是通配符授权 |
 | Agent | Session 全部操作要求 `com.corex.agent.session.manage`，执行额外要求 `com.corex.agent.invoke`；生命周期要求 `com.corex.agent.lifecycle.manage`。Session SSE 不使用旧 stream capability；Session 只支持 STS |
 | AI 调用 | `com.corex.ai.llm.invoke`、`llm.stream`、`llm.session.create`、`llm.session.append`、`embedding.invoke`、`vlm.invoke`、`image.invoke`、`video.invoke`、`tts.invoke`（均同 ai 前缀） |

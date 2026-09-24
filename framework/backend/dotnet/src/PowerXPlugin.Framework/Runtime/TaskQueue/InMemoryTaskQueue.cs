@@ -2,8 +2,8 @@ using System.Collections.Concurrent;
 
 namespace PowerXPlugin.Framework.Runtime.TaskQueue;
 
-/// <summary>Local-only queue for standalone development; never selected as a delegated fallback.</summary>
-public sealed class InMemoryTaskQueue : ITaskQueue
+/// <summary>Reference store for tests/development only; not production local persistence.</summary>
+public sealed class InMemoryTaskQueue : ILocalTaskQueueStore
 {
     private readonly ConcurrentDictionary<string, ConcurrentQueue<TaskQueueMessage>> _queues = new(StringComparer.Ordinal);
 

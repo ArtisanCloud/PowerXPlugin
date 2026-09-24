@@ -279,7 +279,7 @@
       v-model:open="showDetailModal"
       title="客户详情"
       description="查看客户基础资料和关联记录。"
-      :ui="{ content: 'max-w-3xl w-full' }"
+      :ui="{ content: 'max-h-[calc(100vh-2rem)] max-w-3xl w-full overflow-y-auto' }"
     >
       <template #content>
         <div class="space-y-5 p-6">
@@ -311,18 +311,12 @@
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
-            <UButton color="neutral" variant="soft" icon="i-heroicons-identification" @click="showRelated('identities')">
-              外部身份
-            </UButton>
-            <UButton color="neutral" variant="soft" icon="i-heroicons-building-office-2" @click="showRelated('memberships')">
-              租户关系
-            </UButton>
-            <UButton color="neutral" variant="soft" icon="i-heroicons-clock" @click="showRelated('loginEvents')">
-              登录事件
+          <div class="flex flex-wrap items-center justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-800">
+            <UButton color="primary" variant="soft" icon="i-heroicons-user-group" @click="openContacts">
+              {{ `{{ t("customerContact.manage") }}` }}
             </UButton>
             <UButton v-if="selectedAccount" color="primary" variant="soft" icon="i-heroicons-pencil-square" :disabled="isReadOnly" @click="openEdit(selectedAccount)">
-              编辑资料
+              {{ `{{ t("customerContact.editCustomerProfile") }}` }}
             </UButton>
           </div>
         </div>
@@ -402,6 +396,67 @@
         </div>
       </template>
     </UModal>
+
+    <UModal
+      v-model:open="showContactsModal"
+      :title="t('customerContact.title')"
+      :description="t('customerContact.description')"
+      :ui="{ content: 'max-w-3xl w-full' }"
+    >
+      <template #content>
+        <div class="space-y-5 p-6">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ `{{ t("customerContact.title") }}` }}</h2>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ `{{ t("customerContact.description") }}` }}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <UButton icon="i-heroicons-arrow-path" color="neutral" variant="soft" :loading="contactsLoading" @click="loadContacts">{{ `{{ t("customerContact.refresh") }}` }}</UButton>
+              <UButton icon="i-heroicons-plus" color="primary" :disabled="isReadOnly" @click="openContactCreate">{{ `{{ t("customerContact.create") }}` }}</UButton>
+            </div>
+          </div>
+
+          <UAlert v-if="contactsError" color="error" variant="soft" :title="contactsError" />
+          <template v-else>
+            <div class="flex flex-wrap items-center gap-2">
+              <UInput v-model="contactSearch" icon="i-heroicons-magnifying-glass" :placeholder="t('customerContact.search')" class="min-w-56 flex-1" @keyup.enter="resetContactsAndLoad" />
+              <USelect v-model="contactStatus" :items="contactFilterStatusOptions" class="w-36" @update:model-value="resetContactsAndLoad" />
+            </div>
+            <UTable :columns="contactColumns" :data="contacts.items" :loading="contactsLoading">
+              <template #status-cell="{ row }"><UBadge :color="statusColor(row.original.status)" variant="soft">{{ `{{ row.original.status }}` }}</UBadge></template>
+              <template #roles-cell="{ row }"><span class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ row.original.roles?.join(', ') || "-" }}` }}</span></template>
+              <template #tags-cell="{ row }"><span class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ row.original.tags?.join(', ') || t("customerContact.noTags") }}` }}</span></template>
+              <template #updated-cell="{ row }"><span class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ formatDate(row.original.updated_at || row.original.created_at) }}` }}</span></template>
+              <template #actions-cell="{ row }"><UButton size="xs" variant="soft" color="neutral" icon="i-heroicons-pencil-square" :disabled="isReadOnly" @click="openContactEdit(row.original)">{{ `{{ t("common.edit") }}` }}</UButton></template>
+            </UTable>
+            <div v-if="!contactsLoading && contacts.items.length === 0" class="rounded-lg border border-dashed border-gray-300 p-5 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">{{ `{{ t("customerContact.empty") }}` }}</div>
+            <div class="flex items-center justify-between border-t border-gray-200 pt-3 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+              <span>{{ `{{ t("customerContact.total", { total: contacts.total }) }}` }}</span>
+              <UPagination v-if="contacts.total > contactPageSize" v-model:page="contactPage" :total="contacts.total" :items-per-page="contactPageSize" show-edges />
+            </div>
+          </template>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="showContactFormModal" :title="contactFormMode === 'create' ? t('customerContact.create') : t('customerContact.edit')" :ui="{ content: 'max-w-2xl w-full' }">
+      <template #content>
+        <form class="space-y-4 p-6" @submit.prevent="submitContact">
+          <div class="grid gap-4 md:grid-cols-2">
+            <UFormField :label="t('customerContact.displayName')" required class="md:col-span-2"><UInput v-model="contactForm.display_name" :placeholder="t('customerContact.displayNamePlaceholder')" /></UFormField>
+            <UFormField :label="t('customerContact.givenName')"><UInput v-model="contactForm.given_name" /></UFormField>
+            <UFormField :label="t('customerContact.familyName')"><UInput v-model="contactForm.family_name" /></UFormField>
+            <UFormField :label="t('customerContact.status')"><USelect v-model="contactForm.status" :items="contactStatusOptions" class="w-full" /></UFormField>
+            <UFormField :label="t('customerContact.tags')">
+              <UInput v-model="contactForm.tags" :placeholder="t('customerContact.tagsPlaceholder')" />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ `{{ t("customerContact.tagsHelp") }}` }}</p>
+            </UFormField>
+          </div>
+          <p v-if="contactCreateError" class="text-sm text-error-600 dark:text-error-400">{{ `{{ contactCreateError }}` }}</p>
+          <div class="flex justify-end gap-2"><UButton type="button" color="neutral" variant="ghost" :disabled="creatingContact" @click="showContactFormModal = false">{{ `{{ t("common.cancel") }}` }}</UButton><UButton type="submit" color="primary" :loading="creatingContact">{{ `{{ contactFormMode === "create" ? t("customerContact.create") : t("common.save") }}` }}</UButton></div>
+        </form>
+      </template>
+    </UModal>
   </UContainer>
 </template>
 
@@ -409,6 +464,7 @@
 import {
   useCustomerBaseApi,
   type CustomerAccount,
+  type CustomerContact,
   type CustomerIdentity,
   type CustomerLoginEvent,
   type CustomerMembership,
@@ -438,14 +494,27 @@ const loadingTenants = ref(false);
 const showCreateModal = ref(false);
 const showDetailModal = ref(false);
 const showEditModal = ref(false);
+const showContactsModal = ref(false);
+const showContactFormModal = ref(false);
 const creating = ref(false);
 const detailLoading = ref(false);
 const updating = ref(false);
+const contactsLoading = ref(false);
+const creatingContact = ref(false);
 const createError = ref("");
 const editError = ref("");
 const detailError = ref("");
+const contactsError = ref("");
+const contactCreateError = ref("");
 const providerMode = ref<ProviderModeDiagnostics>(defaultProviderMode());
 const selectedAccount = ref<CustomerAccount | null>(null);
+const contacts = ref<CustomerPage<CustomerContact>>({ items: [], page: 1, page_size: 20, total: 0, total_pages: 0 });
+const contactSearch = ref("");
+const contactStatus = ref("all");
+const contactPage = ref(1);
+const contactPageSize = 20;
+const contactFormMode = ref<"create" | "edit">("create");
+const editingContactUUID = ref("");
 const customerFilterUUID = ref("");
 const tenantOptions = ref<{ label: string; value: string }[]>([]);
 const tenantSearch = ref("");
@@ -480,6 +549,13 @@ const editForm = reactive({
   status: "active",
   email_verified: false,
   phone_verified: false,
+});
+const contactForm = reactive({
+  display_name: "",
+  given_name: "",
+  family_name: "",
+  status: "active" as "active" | "inactive" | "temporary",
+  tags: "",
 });
 const overview = ref<CustomerOverview>({
   accounts_total: 0,
@@ -521,6 +597,15 @@ const statusOptions = [
 ];
 
 const editableStatusOptions = statusOptions.filter((item) => item.value !== "all");
+const contactStatusOptions = [
+  { label: t("customerContact.statusActive"), value: "active" },
+  { label: t("customerContact.statusInactive"), value: "inactive" },
+  { label: t("customerContact.statusTemporary"), value: "temporary" },
+];
+const contactFilterStatusOptions = [
+  { label: t("customerContact.statusAll"), value: "all" },
+  ...contactStatusOptions,
+];
 
 const pageSizeOptions = [
   { label: "20 / 页", value: 20 },
@@ -578,6 +663,14 @@ const entryColumns = [
   { accessorKey: "campaign", header: "活动" },
   { accessorKey: "status", header: "状态" },
   { accessorKey: "updated_at", header: "更新时间", id: "updated" },
+];
+const contactColumns = [
+  { accessorKey: "display_name", header: t("customerContact.displayName") },
+  { accessorKey: "status", header: t("customerContact.status"), id: "status" },
+  { accessorKey: "roles", header: t("customerContact.roles") },
+  { accessorKey: "tags", header: t("customerContact.tags"), id: "tags" },
+  { accessorKey: "updated_at", header: t("customerContact.updatedAt"), id: "updated" },
+  { accessorKey: "actions", header: t("customerContact.actions"), id: "actions" },
 ];
 const actionColumn = { accessorKey: "actions", header: "操作", id: "actions" };
 
@@ -802,6 +895,128 @@ async function openDetail(row: TableRow) {
   }
 }
 
+async function openContacts() {
+  if (!selectedAccount.value?.customer_uuid) return;
+  contactCreateError.value = "";
+  contactsError.value = "";
+  contactPage.value = 1;
+  showContactsModal.value = true;
+  await loadContacts();
+}
+
+async function loadContacts() {
+  const customerUUID = selectedAccount.value?.customer_uuid;
+  if (!customerUUID) return;
+  contactsLoading.value = true;
+  contactsError.value = "";
+  try {
+    contacts.value = (await api.listContacts(customerUUID, {
+      page: contactPage.value,
+      page_size: contactPageSize,
+      q: contactSearch.value.trim() || undefined,
+      status: contactStatus.value === "all" ? undefined : contactStatus.value,
+    })).data;
+  } catch (error: any) {
+    contactsError.value = contactErrorMessage(error, "loadFailed");
+  } finally {
+    contactsLoading.value = false;
+  }
+}
+
+function resetContactsAndLoad() {
+  contactPage.value = 1;
+  loadContacts();
+}
+
+function resetContactForm() {
+  Object.assign(contactForm, { display_name: "", given_name: "", family_name: "", status: "active", tags: "" });
+  contactCreateError.value = "";
+}
+
+function openContactCreate() {
+  if (isReadOnly.value) return;
+  contactFormMode.value = "create";
+  editingContactUUID.value = "";
+  resetContactForm();
+  showContactFormModal.value = true;
+}
+
+function openContactEdit(contact: CustomerContact) {
+  if (isReadOnly.value) return;
+  contactFormMode.value = "edit";
+  editingContactUUID.value = contact.contact_uuid;
+  Object.assign(contactForm, {
+    display_name: contact.display_name || "",
+    given_name: contact.given_name || "",
+    family_name: contact.family_name || "",
+    status: contact.status || "active",
+    tags: (contact.tags || []).join(", "),
+  });
+  contactCreateError.value = "";
+  showContactFormModal.value = true;
+}
+
+async function submitContact() {
+  if (isReadOnly.value || !selectedAccount.value?.customer_uuid) return;
+  if (!contactForm.display_name.trim()) { contactCreateError.value = t("customerContact.displayNameRequired"); return; }
+  const tags = parseContactTags();
+  if (tags === null) {
+    contactCreateError.value = t("customerContact.invalidTags");
+    return;
+  }
+  creatingContact.value = true;
+  contactCreateError.value = "";
+  try {
+    const input = {
+      display_name: contactForm.display_name.trim(),
+      given_name: contactForm.given_name.trim() || undefined,
+      family_name: contactForm.family_name.trim() || undefined,
+      status: contactForm.status,
+      tags,
+    };
+    if (contactFormMode.value === "create") {
+      await api.createContact(selectedAccount.value.customer_uuid, {
+        ...input,
+        creation_intent: contactForm.status === "temporary" ? "explicit_temporary" : "explicit_create",
+      });
+    } else {
+      await api.updateContact(selectedAccount.value.customer_uuid, editingContactUUID.value, input);
+    }
+    showContactFormModal.value = false;
+    resetContactForm();
+    await loadContacts();
+  } catch (error: any) {
+    contactCreateError.value = contactErrorMessage(error, "createFailed");
+  } finally {
+    creatingContact.value = false;
+  }
+}
+
+function parseContactTags(): string[] | null {
+  const tags = contactForm.tags
+    .split(/[,，;；\s]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (tags.length > 20 || tags.some((tag) => !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(tag))) return null;
+  if (tags.reduce((total, tag) => total + tag.length, 0) > 1024) return null;
+  return tags;
+}
+
+function contactErrorMessage(error: any, fallbackKey: "loadFailed" | "createFailed") {
+  const code = String(
+    error?.data?.error?.code ||
+    error?.response?._data?.error?.code ||
+    error?.data?.error?.message ||
+    error?.response?._data?.error?.message ||
+    ""
+  ).trim();
+  if (code === "CONTACT_LOCAL_UNAVAILABLE") return t("customerContact.localUnavailable");
+  if (code === "CONTACT_DELEGATE_UNAVAILABLE") return t("customerContact.delegateUnavailable");
+  if (code === "CONTACT_CUSTOMER_MEMBERSHIP_INACTIVE") return t("customerContact.customerUnavailable");
+  if (code === "CONTACT_INVALID_ARGUMENT") return t("customerContact.invalidInput");
+  return t(`customerContact.${fallbackKey}`);
+}
+
 function openEdit(row: TableRow) {
   if (isReadOnly.value) return;
   const account = row as CustomerAccount;
@@ -861,15 +1076,6 @@ async function submitEdit() {
   } finally {
     updating.value = false;
   }
-}
-
-function showRelated(tab: Exclude<TabKey, "accounts" | "entries">) {
-  if (!selectedAccount.value?.customer_uuid) return;
-  customerFilterUUID.value = selectedAccount.value.customer_uuid;
-  activeTab.value = tab;
-  page.value = 1;
-  showDetailModal.value = false;
-  reloadCurrentTab();
 }
 
 function clearCustomerFilter() {
@@ -941,6 +1147,9 @@ watch([activeTab, status, pageSize], () => {
   reloadCurrentTab();
 });
 watch(page, () => reloadCurrentTab());
+watch(contactPage, () => {
+  if (showContactsModal.value) loadContacts();
+});
 watch(tenantSearch, () => {
   if (!showCreateModal.value || !isRoot.value) return;
   if (tenantSearchTimer) clearTimeout(tenantSearchTimer);

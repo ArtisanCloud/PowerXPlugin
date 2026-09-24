@@ -7,23 +7,33 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	fwgateway "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
 	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/media"
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	dto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	iammodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	knowledgeSvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/knowledge"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const (
@@ -32,6 +42,8 @@ const (
 	knowledgeCapabilityListIngestionJobs    = "com.corex.rest.admin.gin.get_api_v1_admin_knowledge_spaces_spaceid_ingestion_jobs"
 	knowledgeCapabilityCreateIngestionJob   = "com.corex.rest.admin.gin.post_api_v1_admin_knowledge_spaces_spaceid_ingestion_jobs"
 )
+
+var localVectorTablePattern = regexp.MustCompile(`^local_knowledge_vectors_v1_[1-9][0-9]*$`)
 
 type KnowledgeHandler struct {
 	deps              *app.Deps
@@ -52,6 +64,17 @@ type knowledgeSearchRequest struct {
 	Tags       []string        `json:"tags"`
 	Fixture    *fixturePayload `json:"fixture"`
 	Filters    map[string]any  `json:"filters"`
+}
+
+type localSearchRow struct {
+	models.LocalKnowledgeChunk
+	Title              string
+	Vector             datatypes.JSON
+	EffectiveFrom      *time.Time
+	EffectiveTo        *time.Time
+	AccessScope        string
+	AllowedMemberUUIDs datatypes.JSON
+	Tags               datatypes.JSON
 }
 
 type knowledgeCreateSpaceRequest struct {
@@ -902,6 +925,19 @@ func (h *KnowledgeHandler) Search(c *gin.Context) {
 		return
 	}
 	req.TenantUUID = tenantUUID
+	// Plugin-local knowledge spaces are durable database records managed from
+	// /admin/knowledge/*. Do not use the former in-memory fixture provider for
+	// a real local-space query.
+	if provider.Mode() == fwknowledge.ProviderModeLocal && h != nil && h.deps != nil && h.deps.DB != nil && strings.TrimSpace(req.SpaceID) != "" {
+		if result, handled, searchErr := h.searchPersistedLocal(c, req); handled {
+			if searchErr != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": searchErr.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+			return
+		}
+	}
 	if local, ok := provider.(*fwknowledge.LocalProvider); ok && req.Fixture != nil {
 		if _, err := local.UpsertDocument(c.Request.Context(), req.Fixture.document(req)); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
@@ -929,6 +965,841 @@ func (h *KnowledgeHandler) Search(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+}
+
+func (h *KnowledgeHandler) searchPersistedLocal(c *gin.Context, req knowledgeSearchRequest) (*fwknowledge.KnowledgeSearchResult, bool, error) {
+	var space models.LocalKnowledgeSpace
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid = ? AND uuid = ?", req.TenantUUID, req.SpaceID).First(&space).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, nil
+		}
+		return nil, true, err
+	}
+	var profile models.LocalRAGProfileVersion
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid = ? AND profile_key = ? AND status = ?", req.TenantUUID, space.RAGProfileKey, "published").Order("version desc").First(&profile).Error; err != nil {
+		return nil, true, err
+	}
+	var profileConfig struct {
+		TopK     int     `json:"top_k"`
+		MinScore float64 `json:"min_score"`
+		Strategy string  `json:"strategy"`
+	}
+	if len(profile.Config) > 0 {
+		_ = json.Unmarshal(profile.Config, &profileConfig)
+	}
+	strategy := localKnowledgeStrategy(space.FeatureFlags)
+	if strategy == "A1_routing" {
+		target, routeErr := h.resolveLocalKnowledgeRoute(c.Request.Context(), req.TenantUUID, space.UUID, req.Query)
+		if routeErr != nil {
+			return nil, true, routeErr
+		}
+		req.SpaceID = target
+		result, _, err := h.searchPersistedLocal(c, req)
+		if result != nil {
+			if result.Diagnostics == nil {
+				result.Diagnostics = map[string]any{}
+			}
+			result.Diagnostics["routed_from_space"] = space.UUID
+		}
+		return result, true, err
+	}
+	needsDense := strategy == "A_simple" || strategy == "A0_acl" || strategy == "A2_time_aware" || strategy == "B_semantic_chunking" || strategy == "C_context_enriched" || strategy == "E_query_transform" || strategy == "F_rerank" || strategy == "G_rse" || strategy == "H_fusion" || strategy == "I_hyde" || strategy == "J_hier" || strategy == "K_kg" || strategy == "M_adaptive" || strategy == "N_self_rag" || strategy == "O_crag"
+	queryForEmbedding := req.Query
+	if strategy == "E_query_transform" || strategy == "I_hyde" {
+		if h.deps.LocalAI == nil {
+			return nil, true, fmt.Errorf("LOCAL_HYDE_MODEL_NOT_CONFIGURED")
+		}
+		keys := h.deps.LocalAI.LLMModelKeys()
+		if len(keys) == 0 {
+			return nil, true, fmt.Errorf("LOCAL_HYDE_MODEL_NOT_CONFIGURED")
+		}
+		prompt := "Rewrite this knowledge-base search query into concise retrieval terms. Return only the rewritten query.\n\nQuery: " + req.Query
+		if strategy == "I_hyde" {
+			prompt = "Write one concise hypothetical knowledge-base passage that would answer this search query. Return only the passage.\n\nQuery: " + req.Query
+		}
+		generated, generateErr := h.deps.LocalAI.LLMInvoke(c.Request.Context(), dto.LLMInvokeInput{
+			ModelKey: keys[0],
+			Inputs: []dto.ContentItem{{
+				Role:    "user",
+				Type:    "text",
+				Content: prompt,
+			}},
+		})
+		if generateErr != nil || generated == nil || strings.TrimSpace(generated.Text) == "" {
+			return nil, true, fmt.Errorf("LOCAL_QUERY_TRANSFORM_FAILED")
+		}
+		queryForEmbedding = strings.TrimSpace(generated.Text)
+	}
+	queryVector := []float32(nil)
+	if needsDense {
+		if h.deps.LocalAI == nil || strings.TrimSpace(space.EmbeddingProfileKey) == "" {
+			return nil, true, fmt.Errorf("local dense index is not configured")
+		}
+		out, invokeErr := h.deps.LocalAI.EmbeddingInvoke(c.Request.Context(), dto.EmbeddingInvokeInput{ModelKey: space.EmbeddingProfileKey, Inputs: []string{queryForEmbedding}})
+		if invokeErr != nil || out == nil || len(out.Vectors) != 1 || len(out.Vectors[0]) == 0 {
+			return nil, true, fmt.Errorf("local query embedding failed")
+		}
+		queryVector = out.Vectors[0]
+	}
+	vectorTable := ""
+	if needsDense {
+		if h.deps.DB == nil || h.deps.DB.Dialector == nil || h.deps.DB.Dialector.Name() != "postgres" {
+			return nil, true, fmt.Errorf("local dense index requires PostgreSQL pgvector")
+		}
+		var activeIndex models.LocalKnowledgeVectorIndex
+		if strings.TrimSpace(space.ActiveVectorIndexKey) == "" || h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid=? AND space_uuid=? AND index_key=? AND status=?", req.TenantUUID, space.UUID, space.ActiveVectorIndexKey, "active").First(&activeIndex).Error != nil {
+			return nil, true, fmt.Errorf("local dense index is not activated")
+		}
+		if !localVectorTablePattern.MatchString(strings.TrimSpace(activeIndex.VectorTable)) || activeIndex.Dimensions != len(queryVector) {
+			return nil, true, fmt.Errorf("local dense index is invalid")
+		}
+		vectorTable = `"` + activeIndex.VectorTable + `"`
+	}
+	var rows []localSearchRow
+	selectColumns := "chunks.*, documents.title, documents.effective_from, documents.effective_to, documents.access_scope, documents.allowed_member_uuids, documents.tags, vectors.vector"
+	if needsDense {
+		selectColumns = "chunks.*, documents.title, documents.effective_from, documents.effective_to, documents.access_scope, documents.allowed_member_uuids, documents.tags, vectors.embedding::text::jsonb AS vector"
+	}
+	db := h.deps.DB.WithContext(c.Request.Context()).Table(models.LocalKnowledgeChunk{}.TableName() + " AS chunks").
+		Select(selectColumns).Joins("JOIN " + models.LocalKnowledgeDocument{}.TableName() + " AS documents ON documents.uuid = chunks.document_uuid AND documents.tenant_uuid = chunks.tenant_uuid")
+	if needsDense {
+		db = db.Joins("JOIN " + vectorTable + " AS vectors ON vectors.chunk_uuid = chunks.uuid AND vectors.space_uuid = chunks.space_uuid")
+	} else {
+		// Dense embeddings are stored exclusively in the active pgvector table.
+		// Sparse-only retrieval must not recreate or depend on the removed JSON
+		// vector compatibility table.
+		db = db.Joins("LEFT JOIN (SELECT NULL AS vector) AS vectors ON 1 = 0")
+	}
+	if err := db.
+		Where("chunks.tenant_uuid = ? AND chunks.space_uuid = ?", req.TenantUUID, space.UUID).Find(&rows).Error; err != nil {
+		return nil, true, err
+	}
+	if needsDense && len(rows) == 0 {
+		return nil, true, fmt.Errorf("local dense index has no indexed chunks")
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = profileConfig.TopK
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+	lexicalScores := localBM25Scores(rows, req.Query)
+	scored := make([]localKnowledgeScoredRow, 0, len(rows))
+	feedbackScores := map[string]float64{}
+	feedbackTotal, feedbackCount := 0.0, 0
+	if strategy == "L_feedback" || strategy == "M_adaptive" {
+		var cases []models.LocalKnowledgeFeedbackCase
+		if err := h.deps.DB.WithContext(c.Request.Context()).Where("space_uuid = ?", space.UUID).Find(&cases).Error; err != nil {
+			return nil, true, err
+		}
+		for _, item := range cases {
+			var ids []string
+			if json.Unmarshal(item.LinkedChunks, &ids) == nil {
+				for _, id := range ids {
+					feedbackScores[id] += item.QualityScore
+					feedbackTotal += item.QualityScore
+					feedbackCount++
+				}
+			}
+		}
+	}
+	acl, aclErr := h.localKnowledgeACL(c, req.TenantUUID, space.DepartmentCode)
+	if strategy == "A0_acl" && aclErr != nil {
+		return nil, true, aclErr
+	}
+	graphScores := map[string]float64{}
+	if strategy == "K_kg" {
+		var graphErr error
+		graphScores, graphErr = h.localKnowledgeGraphBoost(c.Request.Context(), req.TenantUUID, space.UUID, req.Query)
+		if graphErr != nil {
+			return nil, true, graphErr
+		}
+	}
+	for i, row := range rows {
+		if strategy == "A0_acl" && !acl.allows(row) {
+			continue
+		}
+		if strategy == "A2_time_aware" && !localDocumentEffectiveAt(row.EffectiveFrom, row.EffectiveTo, time.Now()) {
+			continue
+		}
+		var score float64
+		switch strategy {
+		case "A_simple", "A2_time_aware", "B_semantic_chunking", "C_context_enriched", "E_query_transform", "F_rerank", "G_rse", "I_hyde", "J_hier":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = localCosineSimilarity(queryVector, vector)
+		case "K_kg":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = localCosineSimilarity(queryVector, vector) + graphScores[row.UUID]
+		case "H_fusion":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = (localNormalizeCosine(localCosineSimilarity(queryVector, vector)) + localNormalizeBM25(lexicalScores[i])) / 2
+		case "N_self_rag":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = localCosineSimilarity(queryVector, vector)
+		case "O_crag":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			score = (localNormalizeCosine(localCosineSimilarity(queryVector, vector)) + localNormalizeBM25(lexicalScores[i])) / 2
+		case "D_doc_augmentation":
+			score = lexicalScores[i] + localAugmentedFieldScore(row, req.Query)
+		case "L_feedback":
+			score = lexicalScores[i] + feedbackScores[row.UUID]
+		case "M_adaptive":
+			vector, decodeErr := localVector(row.Vector)
+			if decodeErr != nil {
+				return nil, true, decodeErr
+			}
+			if feedbackCount > 0 && feedbackTotal/float64(feedbackCount) < 0.5 {
+				score = (localNormalizeCosine(localCosineSimilarity(queryVector, vector)) + localNormalizeBM25(lexicalScores[i])) / 2
+			} else {
+				score = localCosineSimilarity(queryVector, vector)
+			}
+		default:
+			score = lexicalScores[i]
+		}
+		if score < profileConfig.MinScore || score == 0 {
+			continue
+		}
+		scored = append(scored, localKnowledgeScoredRow{row: row, score: score})
+	}
+	if strategy == "F_rerank" {
+		// A reranker receives a bounded candidate set, not the entire corpus.
+		// Keep the highest dense candidates before asking the configured model.
+		sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+		if len(scored) > 30 {
+			scored = scored[:30]
+		}
+		reranked, rerankErr := h.localLLMRerank(c.Request.Context(), req.Query, scored, nil)
+		if rerankErr != nil {
+			return nil, true, rerankErr
+		}
+		for i := range scored {
+			score, ok := reranked[scored[i].row.UUID]
+			if !ok {
+				return nil, true, fmt.Errorf("LOCAL_RERANK_RESULT_INCOMPLETE")
+			}
+			scored[i].score = score
+		}
+	}
+	if strategy == "G_rse" {
+		sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+		if len(scored) > 30 {
+			scored = scored[:30]
+		}
+		lexicon := localDomainLexicon(scored)
+		if len(lexicon) == 0 {
+			return nil, true, fmt.Errorf("LOCAL_DOMAIN_LEXICON_REQUIRED")
+		}
+		reranked, rerankErr := h.localLLMRerank(c.Request.Context(), req.Query, scored, lexicon)
+		if rerankErr != nil {
+			return nil, true, rerankErr
+		}
+		for i := range scored {
+			score, ok := reranked[scored[i].row.UUID]
+			if !ok {
+				return nil, true, fmt.Errorf("LOCAL_RERANK_RESULT_INCOMPLETE")
+			}
+			scored[i].score = score
+		}
+	}
+	selfRAGLoopCount := 0
+	if strategy == "N_self_rag" || strategy == "O_crag" {
+		sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+		if len(scored) > 30 {
+			scored = scored[:30]
+		}
+		review, reviewErr := h.localEvidenceReview(c.Request.Context(), req.Query, scored)
+		if reviewErr != nil {
+			return nil, true, reviewErr
+		}
+		selfRAGLoopCount = 1
+		if strategy == "N_self_rag" && !review.Sufficient {
+			if strings.TrimSpace(review.FollowupQuery) == "" {
+				return nil, true, fmt.Errorf("LOCAL_SELF_RAG_FOLLOWUP_REQUIRED")
+			}
+			out, invokeErr := h.deps.LocalAI.EmbeddingInvoke(c.Request.Context(), dto.EmbeddingInvokeInput{ModelKey: space.EmbeddingProfileKey, Inputs: []string{review.FollowupQuery}})
+			if invokeErr != nil || out == nil || len(out.Vectors) != 1 || len(out.Vectors[0]) == 0 {
+				return nil, true, fmt.Errorf("LOCAL_SELF_RAG_FOLLOWUP_EMBEDDING_FAILED")
+			}
+			for i := range scored {
+				vector, decodeErr := localVector(scored[i].row.Vector)
+				if decodeErr != nil {
+					return nil, true, decodeErr
+				}
+				scored[i].score = localCosineSimilarity(out.Vectors[0], vector)
+			}
+			sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+			review, reviewErr = h.localEvidenceReview(c.Request.Context(), review.FollowupQuery, scored)
+			if reviewErr != nil {
+				return nil, true, reviewErr
+			}
+			selfRAGLoopCount = 2
+		}
+		if strategy == "O_crag" && !review.Sufficient {
+			lexicalByChunk := make(map[string]float64, len(rows))
+			for i, row := range rows {
+				lexicalByChunk[row.UUID] = lexicalScores[i]
+			}
+			for i := range scored {
+				scored[i].score = lexicalByChunk[scored[i].row.UUID]
+			}
+			sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+			review, reviewErr = h.localEvidenceReview(c.Request.Context(), req.Query, scored)
+			if reviewErr != nil {
+				return nil, true, reviewErr
+			}
+			selfRAGLoopCount = 2
+		}
+		if !review.Sufficient {
+			return nil, true, fmt.Errorf("LOCAL_EVIDENCE_REJECTED")
+		}
+		approved := map[string]bool{}
+		for _, chunkUUID := range review.ApprovedIDs {
+			approved[chunkUUID] = true
+		}
+		filtered := scored[:0]
+		for _, item := range scored {
+			if approved[item.row.UUID] {
+				filtered = append(filtered, item)
+			}
+		}
+		scored = filtered
+	}
+	sort.SliceStable(scored, func(i, j int) bool { return scored[i].score > scored[j].score })
+	if len(scored) > limit {
+		scored = scored[:limit]
+	}
+	out := make([]fwknowledge.KnowledgeChunk, 0, len(scored))
+	citations := make([]fwknowledge.KnowledgeCitation, 0, len(scored))
+	for _, item := range scored {
+		citation := fwknowledge.KnowledgeCitation{DocumentID: item.row.DocumentUUID, ChunkID: item.row.UUID, Title: item.row.Title, Provider: "plugin_local", RetrievedAt: time.Now()}
+		text := item.row.Content
+		if strategy == "C_context_enriched" {
+			text = localContextEnrichedText(rows, item.row.UUID)
+		}
+		if strategy == "J_hier" {
+			if section := localChunkSection(item.row.Metadata); section != "" {
+				text = section + "\n" + text
+			}
+		}
+		out = append(out, fwknowledge.KnowledgeChunk{ChunkID: item.row.UUID, DocumentID: item.row.DocumentUUID, SpaceID: item.row.SpaceUUID, Text: text, Score: item.score, Citation: &citation, TenantUUID: req.TenantUUID})
+		citations = append(citations, citation)
+	}
+	diagnostics := map[string]any{"strategy": profileConfig.Strategy, "profile": profile.DisplayName, "profile_version": profile.Version}
+	if strategy == "I_hyde" {
+		diagnostics["hyde_generation"] = "local_llm"
+	}
+	if strategy == "E_query_transform" {
+		diagnostics["query_transform"] = "local_llm"
+	}
+	if strategy == "F_rerank" {
+		diagnostics["reranker"] = "local_llm_structured"
+	}
+	if strategy == "G_rse" {
+		diagnostics["rse"] = "local_llm_rerank_with_document_lexicon"
+	}
+	if strategy == "K_kg" {
+		diagnostics["graph_query"] = "local_persisted_kg"
+	}
+	if strategy == "N_self_rag" {
+		diagnostics["self_rag_evidence_loops"] = selfRAGLoopCount
+	}
+	if strategy == "O_crag" {
+		diagnostics["crag_correction"] = "fusion_then_sparse_when_evidence_rejected"
+		diagnostics["evidence_loops"] = selfRAGLoopCount
+	}
+	if strategy == "L_feedback" {
+		diagnostics["feedback_rerank"] = "local_feedback_cases"
+	}
+	if strategy == "M_adaptive" {
+		if feedbackCount > 0 && feedbackTotal/float64(feedbackCount) < 0.5 {
+			diagnostics["adaptive_policy"] = "fusion_low_feedback"
+		} else {
+			diagnostics["adaptive_policy"] = "dense_default"
+		}
+	}
+	return &fwknowledge.KnowledgeSearchResult{QueryID: c.GetString("request_id"), Provider: "plugin_local", SpaceID: space.UUID, Chunks: out, Citations: citations, Total: len(out), TraceID: c.GetString("request_id"), Diagnostics: diagnostics}, true, nil
+}
+
+type localKnowledgeScoredRow struct {
+	row   localSearchRow
+	score float64
+}
+
+// localLLMRerank is intentionally strict: a malformed or partial model result
+// fails the request.  We never quietly substitute the pre-rerank dense order.
+func (h *KnowledgeHandler) localLLMRerank(ctx context.Context, query string, candidates []localKnowledgeScoredRow, lexicon []string) (map[string]float64, error) {
+	if h == nil || h.deps == nil || h.deps.LocalAI == nil {
+		return nil, fmt.Errorf("LOCAL_RERANKER_NOT_CONFIGURED")
+	}
+	keys := h.deps.LocalAI.LLMModelKeys()
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("LOCAL_RERANKER_NOT_CONFIGURED")
+	}
+	if len(candidates) == 0 {
+		return map[string]float64{}, nil
+	}
+	type candidate struct {
+		ID   string `json:"id"`
+		Text string `json:"text"`
+	}
+	items := make([]candidate, 0, len(candidates))
+	for _, item := range candidates {
+		items = append(items, candidate{ID: item.row.UUID, Text: item.row.Content})
+	}
+	rawCandidates, err := json.Marshal(items)
+	if err != nil {
+		return nil, err
+	}
+	prompt := "Rank every candidate for the query. Return JSON only in exactly this shape: {\"scores\":[{\"id\":\"candidate uuid\",\"score\":0.0}]}. Score must be a number from 0 to 1. Include every candidate exactly once.\n\nQuery: " + query
+	if len(lexicon) > 0 {
+		prompt += "\n\nDomain lexicon: " + strings.Join(lexicon, ", ") + "\nUse the lexicon only to expand the query semantics before ranking."
+	}
+	prompt += "\n\nCandidates: " + string(rawCandidates)
+	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}})
+	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
+		return nil, fmt.Errorf("LOCAL_RERANK_FAILED")
+	}
+	var parsed struct {
+		Scores []struct {
+			ID    string  `json:"id"`
+			Score float64 `json:"score"`
+		} `json:"scores"`
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(result.Text)), &parsed) != nil || len(parsed.Scores) != len(candidates) {
+		return nil, fmt.Errorf("LOCAL_RERANK_INVALID_RESPONSE")
+	}
+	expected := make(map[string]bool, len(candidates))
+	for _, item := range candidates {
+		expected[item.row.UUID] = true
+	}
+	scores := make(map[string]float64, len(candidates))
+	for _, item := range parsed.Scores {
+		if !expected[item.ID] || item.Score < 0 || item.Score > 1 {
+			return nil, fmt.Errorf("LOCAL_RERANK_INVALID_RESPONSE")
+		}
+		if _, exists := scores[item.ID]; exists {
+			return nil, fmt.Errorf("LOCAL_RERANK_INVALID_RESPONSE")
+		}
+		scores[item.ID] = item.Score
+	}
+	if len(scores) != len(candidates) {
+		return nil, fmt.Errorf("LOCAL_RERANK_RESULT_INCOMPLETE")
+	}
+	return scores, nil
+}
+
+func localDomainLexicon(rows []localKnowledgeScoredRow) []string {
+	seen := map[string]bool{}
+	terms := make([]string, 0, 32)
+	for _, item := range rows {
+		var tags []string
+		if json.Unmarshal(item.row.Tags, &tags) != nil {
+			continue
+		}
+		for _, tag := range tags {
+			tag = strings.TrimSpace(strings.ToLower(tag))
+			if tag != "" && !seen[tag] {
+				seen[tag] = true
+				terms = append(terms, tag)
+				if len(terms) == 32 {
+					return terms
+				}
+			}
+		}
+	}
+	return terms
+}
+
+type localEvidenceReviewResult struct {
+	Sufficient    bool     `json:"sufficient"`
+	ApprovedIDs   []string `json:"approved_ids"`
+	FollowupQuery string   `json:"followup_query"`
+}
+
+// localEvidenceReview is shared by N and O.  The model is required to select
+// explicit persisted chunk UUIDs; it cannot manufacture a citation.
+func (h *KnowledgeHandler) localEvidenceReview(ctx context.Context, query string, candidates []localKnowledgeScoredRow) (localEvidenceReviewResult, error) {
+	if h == nil || h.deps == nil || h.deps.LocalAI == nil {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_CHECKER_NOT_CONFIGURED")
+	}
+	keys := h.deps.LocalAI.LLMModelKeys()
+	if len(keys) == 0 {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_CHECKER_NOT_CONFIGURED")
+	}
+	type candidate struct {
+		ID   string `json:"id"`
+		Text string `json:"text"`
+	}
+	items := make([]candidate, 0, len(candidates))
+	expected := make(map[string]bool, len(candidates))
+	for _, item := range candidates {
+		items = append(items, candidate{ID: item.row.UUID, Text: item.row.Content})
+		expected[item.row.UUID] = true
+	}
+	rawCandidates, err := json.Marshal(items)
+	if err != nil {
+		return localEvidenceReviewResult{}, err
+	}
+	prompt := "Check whether the candidate evidence supports the query. Return JSON only in exactly this shape: {\"sufficient\":true,\"approved_ids\":[\"candidate uuid\"],\"followup_query\":\"\"}. approved_ids must contain only supported candidate ids. If insufficient, set sufficient=false and provide a concise followup_query.\n\nQuery: " + query + "\n\nCandidates: " + string(rawCandidates)
+	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}})
+	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_CHECK_FAILED")
+	}
+	var review localEvidenceReviewResult
+	if json.Unmarshal([]byte(strings.TrimSpace(result.Text)), &review) != nil {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_INVALID_RESPONSE")
+	}
+	seen := map[string]bool{}
+	for _, id := range review.ApprovedIDs {
+		if !expected[id] || seen[id] {
+			return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_INVALID_RESPONSE")
+		}
+		seen[id] = true
+	}
+	if review.Sufficient && len(review.ApprovedIDs) == 0 {
+		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_INVALID_RESPONSE")
+	}
+	return review, nil
+}
+
+func (h *KnowledgeHandler) localKnowledgeGraphBoost(ctx context.Context, tenantUUID, spaceUUID, query string) (map[string]float64, error) {
+	var nodes []models.LocalKnowledgeKGNode
+	if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND space_uuid=?", tenantUUID, spaceUUID).Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("LOCAL_KG_GRAPH_NOT_INDEXED")
+	}
+	type nodeProps struct {
+		Name       string   `json:"name"`
+		ChunkUUIDs []string `json:"chunk_uuids"`
+	}
+	matches := map[string]nodeProps{}
+	needle := strings.ToLower(strings.TrimSpace(query))
+	for _, node := range nodes {
+		var props nodeProps
+		if json.Unmarshal(node.Props, &props) != nil || strings.TrimSpace(props.Name) == "" {
+			continue
+		}
+		name := strings.ToLower(strings.TrimSpace(props.Name))
+		if strings.Contains(needle, name) {
+			matches[node.UUID] = props
+		}
+	}
+	boost := map[string]float64{}
+	for _, props := range matches {
+		for _, chunkUUID := range props.ChunkUUIDs {
+			boost[chunkUUID] += 1
+		}
+	}
+	if len(matches) == 0 {
+		return boost, nil
+	}
+	var edges []models.LocalKnowledgeKGEdge
+	if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND space_uuid=? AND (src_node_uuid IN ? OR dst_node_uuid IN ?)", tenantUUID, spaceUUID, mapsKeys(matches), mapsKeys(matches)).Find(&edges).Error; err != nil {
+		return nil, err
+	}
+	allProps := map[string]nodeProps{}
+	for _, node := range nodes {
+		var props nodeProps
+		if json.Unmarshal(node.Props, &props) == nil {
+			allProps[node.UUID] = props
+		}
+	}
+	for _, edge := range edges {
+		peerUUID := edge.DstNodeUUID
+		if _, hit := matches[peerUUID]; !hit {
+			peerUUID = edge.SrcNodeUUID
+		}
+		if props, ok := allProps[peerUUID]; ok {
+			for _, chunkUUID := range props.ChunkUUIDs {
+				boost[chunkUUID] += .25
+			}
+		}
+	}
+	return boost, nil
+}
+
+func mapsKeys[V any](items map[string]V) []string {
+	keys := make([]string, 0, len(items))
+	for key := range items {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func (h *KnowledgeHandler) resolveLocalKnowledgeRoute(ctx context.Context, tenantUUID, routerSpaceUUID, query string) (string, error) {
+	var routes []models.LocalKnowledgeRoute
+	if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND router_space_uuid=? AND enabled=?", tenantUUID, routerSpaceUUID, true).Order("priority asc").Find(&routes).Error; err != nil {
+		return "", err
+	}
+	needle := strings.ToLower(query)
+	for _, route := range routes {
+		var keywords []string
+		if json.Unmarshal(route.Keywords, &keywords) != nil {
+			continue
+		}
+		for _, keyword := range keywords {
+			if keyword = strings.TrimSpace(strings.ToLower(keyword)); keyword != "" && strings.Contains(needle, keyword) {
+				var target models.LocalKnowledgeSpace
+				if err := h.deps.DB.WithContext(ctx).Where("tenant_uuid=? AND uuid=?", tenantUUID, route.TargetSpaceUUID).First(&target).Error; err != nil {
+					return "", fmt.Errorf("LOCAL_ROUTE_TARGET_UNAVAILABLE")
+				}
+				if localKnowledgeStrategy(target.FeatureFlags) == "A1_routing" {
+					return "", fmt.Errorf("LOCAL_ROUTE_TARGET_INVALID")
+				}
+				return target.UUID, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("LOCAL_ROUTE_NOT_FOUND")
+}
+
+type localKnowledgeACL struct {
+	root            bool
+	memberUUID      string
+	department      string
+	spaceDepartment string
+}
+
+func (h *KnowledgeHandler) localKnowledgeACL(c *gin.Context, tenantUUID, spaceDepartment string) (localKnowledgeACL, error) {
+	tenantContext, ok := authx.GetTenantContext(c)
+	if !ok {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_SUBJECT_REQUIRED")
+	}
+	if tenantContext.IsRoot {
+		return localKnowledgeACL{root: true}, nil
+	}
+	memberUUID := strings.TrimSpace(tenantContext.MemberUUID)
+	if memberUUID == "" {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_SUBJECT_REQUIRED")
+	}
+	var member iammodels.Member
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("uuid = ?", memberUUID).First(&member).Error; err != nil {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_SUBJECT_NOT_FOUND")
+	}
+	if member.DepartmentUUID == nil || strings.TrimSpace(*member.DepartmentUUID) == "" {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_DEPARTMENT_REQUIRED")
+	}
+	var department iammodels.Department
+	if err := h.deps.DB.WithContext(c.Request.Context()).Where("tenant_uuid = ? AND uuid = ?", tenantUUID, *member.DepartmentUUID).First(&department).Error; err != nil {
+		return localKnowledgeACL{}, fmt.Errorf("LOCAL_ACL_DEPARTMENT_REQUIRED")
+	}
+	return localKnowledgeACL{memberUUID: memberUUID, department: strings.ToLower(strings.TrimSpace(department.Code)), spaceDepartment: strings.ToLower(strings.TrimSpace(spaceDepartment))}, nil
+}
+
+func (acl localKnowledgeACL) allows(row localSearchRow) bool {
+	if acl.root {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(row.AccessScope), "tenant") {
+		return true
+	}
+	var allowed []string
+	_ = json.Unmarshal(row.AllowedMemberUUIDs, &allowed)
+	for _, memberUUID := range allowed {
+		if memberUUID == acl.memberUUID {
+			return true
+		}
+	}
+	// The default document ACL is the knowledge space's owning department.
+	return strings.EqualFold(strings.TrimSpace(row.AccessScope), "space_department") && acl.department == acl.spaceDepartment
+}
+
+func localKnowledgeStrategy(flags datatypes.JSON) string {
+	var values []string
+	if json.Unmarshal(flags, &values) != nil {
+		return "A0_acl"
+	}
+	for _, value := range values {
+		if strings.HasPrefix(value, "rag.strategy_package:") {
+			return strings.TrimPrefix(value, "rag.strategy_package:")
+		}
+	}
+	return "A0_acl"
+}
+
+func localVector(raw datatypes.JSON) ([]float32, error) {
+	var vector []float32
+	if len(raw) == 0 || json.Unmarshal(raw, &vector) != nil || len(vector) == 0 {
+		return nil, fmt.Errorf("invalid local dense vector")
+	}
+	return vector, nil
+}
+
+func localCosineSimilarity(left, right []float32) float64 {
+	if len(left) == 0 || len(left) != len(right) {
+		return 0
+	}
+	var dot, leftNorm, rightNorm float64
+	for i := range left {
+		dot += float64(left[i] * right[i])
+		leftNorm += float64(left[i] * left[i])
+		rightNorm += float64(right[i] * right[i])
+	}
+	if leftNorm == 0 || rightNorm == 0 {
+		return 0
+	}
+	return dot / math.Sqrt(leftNorm*rightNorm)
+}
+
+func localNormalizeCosine(score float64) float64 { return (score + 1) / 2 }
+func localNormalizeBM25(score float64) float64   { return score / (score + 1) }
+
+func localDocumentEffectiveAt(from, to *time.Time, at time.Time) bool {
+	if from != nil && at.Before(*from) {
+		return false
+	}
+	return to == nil || !at.After(*to)
+}
+
+func localChunkSection(metadata datatypes.JSON) string {
+	var data struct {
+		Section string `json:"section"`
+	}
+	if json.Unmarshal(metadata, &data) != nil {
+		return ""
+	}
+	return strings.TrimSpace(data.Section)
+}
+
+func localAugmentedFieldScore(row localSearchRow, query string) float64 {
+	var metadata struct {
+		Title    string   `json:"title"`
+		Keywords []string `json:"augmented_keywords"`
+	}
+	if json.Unmarshal(row.Metadata, &metadata) != nil {
+		return 0
+	}
+	queryTerms := localRetrievalTerms(query)
+	if len(queryTerms) == 0 {
+		return 0
+	}
+	candidates := localRetrievalTerms(metadata.Title)
+	for _, keyword := range metadata.Keywords {
+		candidates = append(candidates, localRetrievalTerms(keyword)...)
+	}
+	if len(candidates) == 0 {
+		return 0
+	}
+	matched := 0
+	for _, term := range queryTerms {
+		for _, candidate := range candidates {
+			if term == candidate {
+				matched++
+				break
+			}
+		}
+	}
+	return float64(matched) / float64(len(queryTerms))
+}
+
+func localContextEnrichedText(rows []localSearchRow, chunkUUID string) string {
+	for _, row := range rows {
+		if row.UUID != chunkUUID {
+			continue
+		}
+		neighbors := make([]string, 0, 3)
+		for _, candidate := range rows {
+			if candidate.DocumentUUID != row.DocumentUUID || candidate.Ordinal < row.Ordinal-1 || candidate.Ordinal > row.Ordinal+1 {
+				continue
+			}
+			neighbors = append(neighbors, candidate.Content)
+		}
+		return strings.Join(neighbors, "\n")
+	}
+	return ""
+}
+
+func localBM25Scores(rows []localSearchRow, query string) []float64 {
+	terms := localRetrievalTerms(query)
+	scores := make([]float64, len(rows))
+	if len(terms) == 0 || len(rows) == 0 {
+		return scores
+	}
+	lengths := make([]int, len(rows))
+	docFrequency := make(map[string]int, len(terms))
+	for i, row := range rows {
+		tokens := localRetrievalTerms(row.Content)
+		lengths[i] = len(tokens)
+		seen := map[string]bool{}
+		for _, token := range tokens {
+			for _, term := range terms {
+				if token == term {
+					seen[term] = true
+				}
+			}
+		}
+		for term := range seen {
+			docFrequency[term]++
+		}
+	}
+	var totalLength int
+	for _, length := range lengths {
+		totalLength += length
+	}
+	averageLength := float64(totalLength) / float64(len(rows))
+	if averageLength == 0 {
+		return scores
+	}
+	const k1, b = 1.2, 0.75
+	for i, row := range rows {
+		tokens := localRetrievalTerms(row.Content)
+		counts := map[string]int{}
+		for _, token := range tokens {
+			counts[token]++
+		}
+		for _, term := range terms {
+			frequency := float64(counts[term])
+			if frequency == 0 {
+				continue
+			}
+			idf := math.Log(1 + (float64(len(rows)-docFrequency[term])+0.5)/(float64(docFrequency[term])+0.5))
+			denominator := frequency + k1*(1-b+b*float64(lengths[i])/averageLength)
+			scores[i] += idf * frequency * (k1 + 1) / denominator
+		}
+	}
+	return scores
+}
+
+func localRetrievalTerms(value string) []string {
+	value = strings.ToLower(value)
+	terms := strings.Fields(value)
+	runes := []rune(value)
+	for start := 0; start < len(runes); {
+		if !unicode.Is(unicode.Han, runes[start]) {
+			start++
+			continue
+		}
+		end := start
+		for end < len(runes) && unicode.Is(unicode.Han, runes[end]) {
+			end++
+		}
+		for i := start; i+1 < end; i++ {
+			terms = append(terms, string(runes[i:i+2]))
+		}
+		if end-start == 1 {
+			terms = append(terms, string(runes[start:end]))
+		}
+		start = end
+	}
+	return terms
 }
 
 func (h *KnowledgeHandler) provider() (fwknowledge.KnowledgeProvider, error) {

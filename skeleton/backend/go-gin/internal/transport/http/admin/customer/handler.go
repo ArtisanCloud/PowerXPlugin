@@ -1,12 +1,16 @@
 package customer
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	contactfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
@@ -16,6 +20,8 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -150,20 +156,32 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if h.isDelegated() {
-		if h.deps == nil || h.deps.CustomerAdmin == nil {
+	mode, err := h.listAccountsMode(c)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "CUSTOMER_DEBUG_ROUTE_INVALID", "CUSTOMER_DEBUG_ROUTE_INVALID")
+		return
+	}
+	if mode == fwprovider.ModeDelegated {
+		debugSelector := strings.TrimSpace(c.Query("framework_debug_route")) == "delegated"
+		if h.deps == nil || (debugSelector && h.deps.CustomerAccountSelector == nil) || (!debugSelector && h.deps.CustomerAdmin == nil) {
 			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
 			return
 		}
 		query.TenantUUID, _ = admincommon.ResolveTenantUUIDStrict(c, query.TenantUUID)
-		page, err := h.deps.CustomerAdmin.ListAccounts(c.Request.Context(), customerfw.ListAccountsRequest{
+		listRequest := customerfw.ListAccountsRequest{
 			TenantUUID: query.TenantUUID,
 			Query:      query.Query,
 			Status:     query.Status,
 			Page:       query.Page,
 			PageSize:   query.PageSize,
 			RequestID:  requestID(c),
-		})
+		}
+		var page *customerfw.AccountPage
+		if debugSelector {
+			page, err = h.deps.CustomerAccountSelector.ListAccounts(c.Request.Context(), listRequest)
+		} else {
+			page, err = h.deps.CustomerAdmin.ListAccounts(c.Request.Context(), listRequest)
+		}
 		if err != nil {
 			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
 			return
@@ -204,8 +222,39 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	contracts.ResponseSuccess(c, makePage(items, query, total))
 }
 
+// listAccountsMode is deliberately limited to the Framework Lab's explicit
+// per-request probe. Normal Customer traffic still follows startup ProviderMode.
+func (h *Handler) listAccountsMode(c *gin.Context) (fwprovider.Mode, error) {
+	route := strings.TrimSpace(c.Query("framework_debug_route"))
+	if route == "" || route == "runtime" {
+		if h != nil && h.deps != nil {
+			return h.deps.ProviderMode, nil
+		}
+		return fwprovider.ModeLocal, nil
+	}
+	mode := fwprovider.Mode(route)
+	if mode != fwprovider.ModeLocal && mode != fwprovider.ModeDelegated {
+		return "", fmt.Errorf("invalid framework debug route")
+	}
+	return mode, nil
+}
+
 func (h *Handler) Mode(c *gin.Context) {
-	contracts.ResponseSuccess(c, h.diagnostics())
+	diagnostics := h.diagnostics()
+	authScheme := ""
+	if h != nil && h.deps != nil && h.deps.Config != nil && h.deps.Config.Gateway != nil {
+		authScheme = strings.ToLower(strings.TrimSpace(h.deps.Config.Gateway.AuthScheme))
+	}
+	contracts.ResponseSuccess(c, gin.H{
+		"mode": diagnostics.Mode, "provider": diagnostics.Provider,
+		"delegated_available":         h != nil && h.deps != nil && h.deps.CustomerAccountSelector != nil && h.deps.ContactDebugDelegatedRuntime != nil,
+		"local_available":             diagnostics.LocalAvailable,
+		"gateway_auth_scheme":         authScheme,
+		"account_selector_capability": customerfw.CapabilityCustomerAccountsServiceRead,
+		"account_manage_capability":   customerfw.CapabilityCustomerAccountsServiceManage,
+		"contact_read_capability":     contactfw.CapabilityContactsServiceRead,
+		"contact_manage_capability":   contactfw.CapabilityContactsServiceManage,
+	})
 }
 
 func (h *Handler) diagnostics() admincommon.ProviderDiagnostics {
@@ -218,6 +267,80 @@ func (h *Handler) diagnostics() admincommon.ProviderDiagnostics {
 
 func (h *Handler) isDelegated() bool {
 	return h != nil && h.deps != nil && h.deps.ProviderMode == fwprovider.ModeDelegated
+}
+
+// CreateBasicAccount is reserved for the Framework Lab's explicit route probe.
+// It creates a customer profile and tenant membership, without a login identity.
+func (h *Handler) CreateBasicAccount(c *gin.Context) {
+	mode, err := h.listAccountsMode(c)
+	if err != nil || strings.TrimSpace(c.Query("framework_debug_route")) == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "CUSTOMER_DEBUG_ROUTE_INVALID", "CUSTOMER_DEBUG_ROUTE_INVALID")
+		return
+	}
+	var req customerfw.CreateBasicAccountRequest
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_CREATE_INVALID_BODY")
+		return
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_CREATE_INVALID_BODY")
+		return
+	}
+	if strings.TrimSpace(req.DisplayName) == "" && strings.TrimSpace(req.Nickname) == "" && strings.TrimSpace(req.PrimaryEmail) == "" && strings.TrimSpace(req.PrimaryPhone) == "" {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_IDENTITY_REQUIRED")
+		return
+	}
+	if req.Status != "" && req.Status != customermodel.StatusActive && req.Status != customermodel.StatusPending && req.Status != customermodel.StatusSuspended && req.Status != customermodel.StatusDisabled {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_STATUS_INVALID")
+		return
+	}
+	tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, "")
+	if mismatch {
+		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeForbidden, "CUSTOMER_TENANT_MISMATCH")
+		return
+	}
+	if _, err := uuid.Parse(tenantUUID); err != nil {
+		contracts.ResponseBadRequest(c, "CUSTOMER_TENANT_UUID_REQUIRED")
+		return
+	}
+	if mode == fwprovider.ModeDelegated {
+		if h.deps == nil || h.deps.CustomerAccountSelector == nil {
+			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "CUSTOMER_PROVIDER_NOT_CONFIGURED", h.diagnostics())
+			return
+		}
+		req.RequestID = requestID(c)
+		item, err := h.deps.CustomerAccountSelector.CreateBasicAccount(c.Request.Context(), req)
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		contracts.ResponseCreated(c, item)
+		return
+	}
+	if h.db == nil {
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "CUSTOMER_PROVIDER_NOT_CONFIGURED", h.diagnostics())
+		return
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = customermodel.StatusActive
+	}
+	item := customermodel.CustomerAccount{CustomerUUID: uuid.NewString(), TenantUuid: tenantUUID, Status: status, PrimaryEmail: strings.TrimSpace(req.PrimaryEmail), PrimaryPhone: strings.TrimSpace(req.PrimaryPhone), DisplayName: strings.TrimSpace(req.DisplayName), Nickname: strings.TrimSpace(req.Nickname), GivenName: strings.TrimSpace(req.GivenName), FamilyName: strings.TrimSpace(req.FamilyName), AvatarURL: strings.TrimSpace(req.AvatarURL), Locale: strings.TrimSpace(req.Locale), Timezone: strings.TrimSpace(req.Timezone), Metadata: datatypes.JSONMap{}}
+	membership := customermodel.CustomerTenantMembership{MembershipUUID: uuid.NewString(), TenantUUID: tenantUUID, CustomerUUID: item.CustomerUUID, Status: status, Roles: datatypes.JSON([]byte("[]")), Scopes: datatypes.JSON([]byte("[]")), Source: "local_dev", Metadata: datatypes.JSONMap{}}
+	err = h.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&item).Error; err != nil {
+			return err
+		}
+		return tx.Create(&membership).Error
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseCreated(c, newAccountDTO(item))
 }
 
 func (h *Handler) CreateAccount(c *gin.Context) {

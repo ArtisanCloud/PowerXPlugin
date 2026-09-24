@@ -8,7 +8,7 @@ local authentication remains plugin-supplied. Missing adapters never fall back.
 
 `customerfw` provides generic C-end external customer identity and authorization primitives for plugin mini-app routes.
 
-The package is intentionally limited to:
+The `CustomerRuntime` identity/auth boundary is intentionally limited to:
 
 - validating customer tokens
 - attaching a normalized `CustomerContext`
@@ -17,7 +17,7 @@ The package is intentionally limited to:
 - defining bootstrap and delegated auth client contracts
 - providing diagnostics fields that avoid raw token or secret values
 
-It does not model SCRM or industry concepts such as customer profiles, tags, owners, follow-ups, timelines, players, guardians, learners, patients, fans, benefits, training plans, or reports. Those remain plugin domain models and should be exposed through plugin capabilities such as SCRM when other plugins need them.
+The separate `AccountSelectorClient` in this package lists and creates basic customer account records through service-scoped Core capabilities; it is not part of `CustomerRuntime`, and this package does not provide a generic local Account Store. Neither contract models SCRM or industry concepts such as customer profiles, tags, owners, follow-ups, timelines, players, guardians, learners, patients, fans, benefits, training plans, or reports. Those remain plugin domain models and should be exposed through plugin capabilities such as SCRM when other plugins need them.
 
 It does carry generic PowerX Core customer display attributes through `CustomerContext.Profile`: `display_name`, `nickname`, `given_name`, `family_name`, `avatar_url`, `locale`, and `timezone`. Those fields are the base customer identity shape, not an SCRM or industry domain model.
 
@@ -76,4 +76,5 @@ ctx := customerfw.WithCustomerContext(context.Background(), &customerfw.Customer
 Developer-facing docs:
 
 - `docs/guides/develop/auth/customer.md`
+- `docs/guides/features/009-consume-powerx-capability/usecase-customer-contact.md` describes the separate account selector and Contact runtime; this Auth runtime is not an Account Store.
 - `docs/contracts/customer-auth.openapi.yaml`

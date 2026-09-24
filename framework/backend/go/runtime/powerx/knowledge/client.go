@@ -292,6 +292,27 @@ func (c *Client) UpsertKnowledgeDocument(ctx context.Context, document fwknowled
 	var response hostIndexJob
 	path := "/api/v1/tenant/knowledge/spaces/" + url.PathEscape(document.SpaceID) + "/documents"
 	payload := map[string]any{"title": document.Title, "uri": document.URI, "content": document.Content, "content_type": document.ContentType, "checksum": document.Checksum, "version": document.Version, "tags": document.Tags}
+	if ingestion := document.Ingestion; ingestion != nil {
+		payload["ingestionProfile"] = ingestion.IngestionProfile
+		payload["processorProfile"] = ingestion.ProcessorProfile
+		payload["maskingProfile"] = ingestion.MaskingProfile
+		payload["priority"] = ingestion.Priority
+		payload["ragSceneKey"] = ingestion.RAGSceneKey
+		payload["ragBundleKey"] = ingestion.RAGBundleKey
+		payload["ragPrimary"] = ingestion.RAGPrimary
+		payload["segmentMode"] = ingestion.SegmentMode
+		payload["chunkSize"] = ingestion.ChunkSize
+		payload["chunkOverlap"] = ingestion.ChunkOverlap
+		payload["segmentSizePolicy"] = ingestion.SegmentSizePolicy
+		payload["segmentOrder"] = ingestion.SegmentOrder
+		payload["separators"] = ingestion.Separators
+		payload["pagePriority"] = ingestion.PagePriority
+		payload["anchorHeadingPath"] = ingestion.AnchorHeadingPath
+		payload["anchorClauseId"] = ingestion.AnchorClauseID
+		payload["anchorRowNumber"] = ingestion.AnchorRowNumber
+		payload["anchorSpeaker"] = ingestion.AnchorSpeaker
+		payload["anchorSentenceIndex"] = ingestion.AnchorSentenceIndex
+	}
 	if err := c.request(ctx, http.MethodPost, path, payload, &response); err != nil {
 		return nil, mapHostError(err)
 	}

@@ -1,0 +1,383 @@
+<template>
+  <main class="mx-auto w-full max-w-5xl space-y-6 px-5 py-6 lg:px-8">
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-[#172536]">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p class="text-sm text-gray-500 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.overview.eyebrow') }}</p>
+          <h1 class="mt-1 text-2xl font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.title') }}</h1>
+          <p class="mt-2 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.description') }}</p>
+        </div>
+        <UButton color="neutral" variant="outline" :to="overviewPath">{{ t('knowledgeSpaces.detail.backToOverview') }}</UButton>
+      </div>
+    </section>
+    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]">
+      <div class="border-b border-slate-200 p-5 dark:border-slate-700">
+        <UAlert color="warning" variant="soft" :title="t('knowledgeSpaces.ingestion.embeddingLimitTitle')" :description="t('knowledgeSpaces.ingestion.embeddingLimitDescription')" />
+        <div class="mt-5 flex items-center justify-between text-sm text-gray-600 dark:text-[#d6e2ff]">
+          <span>{{ t('knowledgeSpaces.ingestion.step', { current: step, total: 4 }) }}</span>
+          <UBadge color="neutral" variant="soft">{{ t('knowledgeSpaces.ingestion.stepBadge', { current: step }) }}</UBadge>
+        </div>
+      </div>
+      <div class="p-5">
+        <div v-if="step === 1" class="space-y-5">
+          <UFormField :label="t('knowledgeSpaces.ingestion.space')" required>
+            <USelectMenu v-model="spaceUUID" :items="spaceItems" value-key="value" label-key="label" class="w-full" :disabled="Boolean(route.params.uuid)" />
+          </UFormField>
+          <div class="grid gap-5 md:grid-cols-2">
+            <UFormField :label="t('knowledgeSpaces.ingestion.sourceType')">
+              <USelectMenu v-model="sourceType" :items="sourceTypeItems" value-key="value" label-key="label" class="w-full" />
+            </UFormField>
+            <UFormField :label="t('knowledgeSpaces.ingestion.sourceMethod')">
+              <USelectMenu v-model="sourceMethod" :items="sourceMethodItems" value-key="value" label-key="label" class="w-full" />
+            </UFormField>
+          </div>
+          <UAlert v-if="sourceType === 'pdf'" color="warning" variant="soft" :title="t('knowledgeSpaces.ingestion.sourceUnavailableTitle')" :description="t('knowledgeSpaces.ingestion.sourceUnavailableDescription')" />
+          <template v-if="sourceMethod === 'upload'">
+            <UFormField :label="t('knowledgeSpaces.ingestion.uploadFiles')" required>
+              <input :key="fileInputKey" type="file" multiple accept=".txt,.md,.markdown,.html,.htm,.csv" class="block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-950 dark:text-gray-100" :disabled="saving" @change="readFiles">
+              <template #help>{{ t('knowledgeSpaces.ingestion.uploadFilesHelp') }}</template>
+            </UFormField>
+            <div v-if="uploadFiles.length" class="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+              <div v-for="item in uploadFiles" :key="item.id" class="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
+                <div class="min-w-0">
+                  <p class="truncate font-medium text-gray-900 dark:text-[#fdfcff]">{{ item.file.name }}</p>
+                  <p class="mt-1 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ uploadStatusLabel(item.status) }}</p>
+                </div>
+                <UButton color="neutral" variant="ghost" size="xs" :disabled="saving" @click="removeUploadFile(item.id)">{{ t('knowledgeSpaces.ingestion.removeFile') }}</UButton>
+              </div>
+            </div>
+            <div v-else class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-gray-600 dark:border-slate-700 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.uploadQueueEmpty') }}</div>
+          </template>
+          <template v-else>
+            <UFormField :label="t('knowledgeSpaces.ui.documentTitle')" required><UInput v-model="title" class="w-full" /></UFormField>
+            <UFormField :label="t('knowledgeSpaces.ui.documentContent')" required><UTextarea v-model="content" :rows="14" class="w-full" /></UFormField>
+          </template>
+        </div>
+        <div v-else-if="step === 2" class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.62fr)]">
+          <div class="space-y-5">
+            <UFormField :label="t('knowledgeSpaces.ingestion.strategyPackage')" required>
+              <USelect v-model="strategyPackageKey" :items="strategyPackageItems" class="w-full" />
+              <template #help><span class="text-xs text-gray-600 dark:text-[#d6e2ff]">{{ selectedStrategySummary }}</span></template>
+            </UFormField>
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField :label="t('knowledgeSpaces.ingestion.priority')"><USelect v-model="ingestion.priority" :items="priorityItems" class="w-full" /></UFormField>
+              <div class="flex items-end">
+                <UButton color="neutral" variant="soft" class="w-full justify-center" @click="advancedOpen = !advancedOpen">{{ advancedOpen ? t('knowledgeSpaces.ui.advancedHide') : t('knowledgeSpaces.ui.advancedShow') }}</UButton>
+              </div>
+            </div>
+            <section v-if="advancedOpen" class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <p class="text-sm font-medium text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.effectiveIngestionProfile') }}</p>
+              <p class="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-gray-900 dark:border-slate-700 dark:bg-[#1b2a3d] dark:text-[#fdfcff]">{{ ingestion.ingestion_profile }}</p>
+              <p class="mt-2 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.effectiveIngestionProfileHint') }}</p>
+            </section>
+          </div>
+          <aside class="space-y-5 rounded-xl border border-slate-200 p-5 text-sm dark:border-slate-700 dark:bg-[#111a2b]">
+            <div class="flex items-start justify-between gap-3">
+              <div><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ui.guidanceTitle') }}</h2><p class="mt-1 text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ui.guidanceDescription') }}</p></div>
+              <UBadge color="neutral" variant="soft">{{ t('knowledgeSpaces.ui.strategyBadge') }}</UBadge>
+            </div>
+            <p class="text-gray-700 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ui.currentSelection') }}：{{ selectedStrategyLabel }}</p>
+            <div><p class="text-xs text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ui.recommendedProfile') }}</p><div class="mt-2 flex flex-wrap gap-2"><UBadge color="primary" variant="soft">{{ selectedProfileLabel }}</UBadge><UBadge color="neutral" variant="soft">{{ t('knowledgeSpaces.ui.couplingLow') }}</UBadge></div></div>
+            <div><p class="text-xs text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ui.applicableScenes') }}</p><div class="mt-2 flex flex-wrap gap-2"><UBadge v-for="scene in selectedSceneLabels" :key="scene" color="neutral" variant="soft">{{ scene }}</UBadge></div></div>
+            <p class="text-gray-600 dark:text-[#d6e2ff]">{{ selectedStrategyDecisionHint }}</p>
+            <p class="border-t border-slate-200 pt-4 text-xs text-gray-600 dark:border-slate-700 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ui.strategyNextHint') }}</p>
+          </aside>
+        </div>
+        <div v-else-if="step === 3" class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.62fr)]">
+          <div class="space-y-5">
+            <section class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.segmentOrder') }}</h2>
+              <p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.segmentOrderDescription') }}</p>
+              <div class="mt-4 space-y-3">
+                <div v-for="(order, index) in ingestion.segment_order" :key="order" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-[#1b2a3d]">
+                  <div><p class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ segmentOrderLabel(order) }}</p><p class="mt-1 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ segmentOrderHelp(order) }}</p></div>
+                  <div class="flex items-center gap-1"><UButton icon="i-heroicons-chevron-up" size="xs" color="neutral" variant="ghost" :disabled="index === 0" @click="moveSegmentOrder(index, index - 1)" /><UButton icon="i-heroicons-chevron-down" size="xs" color="neutral" variant="ghost" :disabled="index === ingestion.segment_order.length - 1" @click="moveSegmentOrder(index, index + 1)" /></div>
+                </div>
+              </div>
+            </section>
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField :label="t('knowledgeSpaces.ingestion.segmentMode')"><USelect v-model="ingestion.segment_mode" :items="segmentModeItems" class="w-full" /><template #help>{{ segmentModeHint }}</template></UFormField>
+              <UFormField :label="t('knowledgeSpaces.ingestion.segmentSizePolicy')"><USelect v-model="ingestion.segment_size_policy" :items="sizePolicyItems" class="w-full" /><template #help>{{ sizePolicyHint }}</template></UFormField>
+              <UFormField :label="t('knowledgeSpaces.ingestion.chunkSize')"><UInput v-model.number="ingestion.chunk_size" type="number" class="w-full" /><template #help>{{ t('knowledgeSpaces.ingestion.chunkSizeHint') }}</template></UFormField>
+              <UFormField :label="t('knowledgeSpaces.ingestion.chunkOverlap')"><UInput v-model.number="ingestion.chunk_overlap" type="number" class="w-full" /><template #help>{{ t('knowledgeSpaces.ingestion.chunkOverlapHint') }}</template></UFormField>
+            </div>
+            <section class="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.anchorsTitle') }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.anchorsDescription') }}</p></div>
+              <UFormField :label="t('knowledgeSpaces.ingestion.separators')"><UTextarea v-model="separatorsText" :rows="4" class="w-full" /><template #help>{{ t('knowledgeSpaces.ingestion.separatorsHint') }}</template></UFormField>
+              <div class="grid gap-3 text-sm md:grid-cols-2">
+                <UCheckbox v-model="ingestion.page_priority" :label="t('knowledgeSpaces.ingestion.pagePriority')" />
+                <UCheckbox v-model="ingestion.anchor_heading_path" :label="t('knowledgeSpaces.ingestion.anchorHeadingPath')" />
+                <UCheckbox v-model="ingestion.anchor_clause_id" :label="t('knowledgeSpaces.ingestion.anchorClauseId')" />
+                <UCheckbox v-model="ingestion.anchor_row_number" :label="t('knowledgeSpaces.ingestion.anchorRowNumber')" />
+                <UCheckbox v-model="ingestion.anchor_speaker" :label="t('knowledgeSpaces.ingestion.anchorSpeaker')" />
+                <UCheckbox v-model="ingestion.anchor_sentence_index" :label="t('knowledgeSpaces.ingestion.anchorSentenceIndex')" />
+              </div>
+            </section>
+          </div>
+          <aside class="space-y-4 rounded-xl border border-slate-200 p-5 text-sm dark:border-slate-700 dark:bg-[#111a2b]">
+            <div><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.effectivePolicy') }}</h2><p class="mt-1 text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.effectivePolicyDescription') }}</p></div>
+            <dl class="space-y-3 text-gray-700 dark:text-[#d6e2ff]"><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ t('knowledgeSpaces.ingestion.segmentOrder') }}</dt><dd class="mt-1">{{ effectiveOrderLabel }}</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ t('knowledgeSpaces.ingestion.segmentMode') }}</dt><dd class="mt-1">{{ segmentModeLabel }}</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ t('knowledgeSpaces.ingestion.chunkSummary') }}</dt><dd class="mt-1">{{ ingestion.chunk_size }} / {{ ingestion.chunk_overlap }}（{{ sizePolicyLabel }}）</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ t('knowledgeSpaces.ingestion.separators') }}</dt><dd class="mt-1 break-all">{{ effectiveSeparators }}</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ t('knowledgeSpaces.ingestion.anchorsTitle') }}</dt><dd class="mt-1">{{ effectiveAnchors }}</dd></div></dl>
+          </aside>
+        </div>
+        <div v-else class="space-y-4">
+          <h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.confirmTitle') }}</h2>
+          <dl class="grid gap-4 rounded-xl border border-slate-200 p-4 text-sm md:grid-cols-2 dark:border-slate-700">
+            <div><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.space') }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ space?.name }}</dd></div>
+            <div><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.sourceMethod') }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ sourceMethodLabel }}</dd></div>
+            <div v-if="sourceMethod === 'upload'"><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.uploadFiles') }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.fileCount', { count: uploadFiles.length }) }}</dd></div>
+            <div v-else><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ui.documentTitle') }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ title }}</dd></div>
+            <div><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.ingestion.snapshotPreview') }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ ingestion.segment_mode }} · {{ ingestion.chunk_size }} / {{ ingestion.chunk_overlap }}</dd></div>
+          </dl>
+          <section v-if="sourceMethod === 'upload'" class="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+            <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-700"><p class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ingestion.progressTitle') }}</p><UProgress class="mt-3" :value="batchProgress" :max="100" /></div>
+            <div v-for="item in uploadFiles" :key="item.id" class="border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
+              <div class="flex items-center justify-between gap-3"><p class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-[#fdfcff]">{{ item.file.name }}</p><span class="shrink-0 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ itemProgressText(item) }}</span></div>
+              <UProgress class="mt-2" size="xs" :value="item.progress" :max="100" :color="item.status === 'failed' ? 'error' : item.status === 'completed' ? 'success' : 'primary'" />
+              <p v-if="item.errorCode" class="mt-2 text-xs text-red-600 dark:text-red-300">{{ uploadErrorLabel(item.errorCode) }}</p>
+            </div>
+          </section>
+        </div>
+      </div>
+      <footer class="flex justify-between border-t border-slate-200 p-5 dark:border-slate-700">
+        <UButton color="neutral" variant="ghost" :disabled="step === 1 || saving" @click="step--">{{ t('common.back') }}</UButton>
+        <UButton v-if="step < 4" :disabled="!canContinue" @click="step++">{{ t('common.next') }}</UButton>
+        <UButton v-else :loading="saving" :disabled="!canSubmit" @click="submit">{{ t('knowledgeSpaces.ingestion.submit') }}</UButton>
+      </footer>
+    </section>
+  </main>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useLocalKnowledgeApi, type KnowledgeStrategyPackage, type LocalKnowledgeIngestionSnapshot, type LocalKnowledgeSpace, type KnowledgeProfileVersion } from '~/composables/api/useLocalKnowledge'
+import { getAuthToken, resolveApiBase } from '~/composables/api/_base'
+import { createPluginWsClient } from '@artisan-cloud/plugin-framework-client'
+
+type UploadFileStatus = 'ready' | 'reading' | 'processing' | 'completed' | 'failed'
+type UploadFileItem = { id: string; file: File; content: string; status: UploadFileStatus; progress: number; stage: string; documentUUID?: string; errorCode?: string }
+type IngestionProgressEvent = { document_uuid?: string; status?: string; stage?: string; progress_percent?: number; error_code?: string }
+
+const { t } = useI18n()
+const toast = useToast()
+const api = useLocalKnowledgeApi()
+const route = useRoute()
+const runtimeConfig = useRuntimeConfig()
+const step = ref(1)
+const spaceUUID = ref(String(route.params.uuid || ''))
+const spaces = ref<LocalKnowledgeSpace[]>([])
+const profiles = ref<KnowledgeProfileVersion[]>([])
+const strategyPackages = ref<KnowledgeStrategyPackage[]>([])
+const vectorActive = ref(false)
+const title = ref('')
+const content = ref('')
+const sourceType = ref('markdown')
+const sourceMethod = ref<'upload' | 'manual'>('upload')
+const uploadFiles = ref<UploadFileItem[]>([])
+const fileInputKey = ref(0)
+const saving = ref(false)
+const advancedOpen = ref(false)
+const strategyPackageKey = ref('A_simple')
+const ingestion = reactive<Omit<LocalKnowledgeIngestionSnapshot, 'separators'>>({
+  ingestion_profile: '', processor_profile: 'builtin/default', masking_profile: '', priority: 'normal',
+  segment_mode: 'unit', chunk_size: 800, chunk_overlap: 120, segment_size_policy: 'target',
+  segment_order: ['page', 'size', 'segment', 'separator'], page_priority: false, anchor_heading_path: true,
+  anchor_clause_id: false, anchor_row_number: false, anchor_speaker: false, anchor_sentence_index: false,
+})
+const separatorsText = ref('\\n\\n\n\\n\n。\n. \n! \n? ')
+let ingestionWS: WebSocket | null = null
+
+const adminBase = computed(() => String(runtimeConfig.public?.pluginAdminBase || '/_p/com.powerx.plugins.base/admin/').replace(/\/+$/, ''))
+const overviewPath = computed(() => `${adminBase.value}/knowledge`)
+const space = computed(() => spaces.value.find(item => item.uuid === spaceUUID.value))
+const spaceItems = computed(() => spaces.value.map(item => ({ label: item.name, value: item.uuid })))
+const strategyPackageItems = computed(() => strategyPackages.value.filter(item => item.ready).map(item => ({ label: item.key, value: item.key })))
+const selectedStrategy = computed(() => strategyPackages.value.find(item => item.key === strategyPackageKey.value))
+const selectedStrategyLabel = computed(() => t(`knowledgeSpaces.ui.strategyLabels.${strategyPackageKey.value}`))
+const selectedProfileLabel = computed(() => t(`knowledgeSpaces.ui.profileLabels.${selectedStrategy.value?.profile_key || ingestion.ingestion_profile}`))
+const selectedStrategySummary = computed(() => t('knowledgeSpaces.ui.strategySummary', { profile: selectedProfileLabel.value }))
+const selectedSceneLabels = computed(() => {
+  const scenes = selectedStrategy.value?.profile_key === 'p0_basic' ? ['faq', 'sop'] : selectedStrategy.value?.profile_key === 'p3_kg_strong' ? ['structured', 'traceable'] : ['sop', 'faq', 'runbook']
+  return scenes.map(scene => t(`knowledgeSpaces.ui.sceneLabels.${scene}`))
+})
+const selectedStrategyDecisionHint = computed(() => t('knowledgeSpaces.ui.strategyDecisionHint', { profile: selectedProfileLabel.value }))
+const sourceTypeItems = computed(() => [
+  { label: t('knowledgeSpaces.ingestion.markdown'), value: 'markdown' },
+  { label: t('knowledgeSpaces.ingestion.text'), value: 'text' },
+  { label: t('knowledgeSpaces.ingestion.html'), value: 'html' },
+  { label: t('knowledgeSpaces.ingestion.csv'), value: 'csv' },
+  { label: t('knowledgeSpaces.ingestion.pdf'), value: 'pdf', disabled: true },
+])
+const sourceMethodItems = computed(() => [
+  { label: t('knowledgeSpaces.ingestion.localUpload'), value: 'upload' },
+  { label: t('knowledgeSpaces.ingestion.manual'), value: 'manual' },
+])
+const sourceMethodLabel = computed(() => sourceMethodItems.value.find(item => item.value === sourceMethod.value)?.label || '')
+const profile = computed(() => profiles.value.find(item => item.profile_key === space.value?.ingestion_profile_key && item.status === 'published'))
+const chunkSize = computed(() => Number(profile.value?.config?.chunk_size || 800))
+const chunkOverlap = computed(() => Number(profile.value?.config?.chunk_overlap || 120))
+const priorityItems = computed(() => [
+  { label: t('knowledgeSpaces.ingestion.normal'), value: 'normal' },
+  { label: t('knowledgeSpaces.ingestion.high'), value: 'high' },
+])
+const segmentModeItems = computed(() => ['unit', 'heading', 'clause', 'semantic', 'table_row', 'code_block', 'conversation'].map(value => ({ label: t(`knowledgeSpaces.ingestion.modeOptions.${value}`), value })))
+const sizePolicyItems = computed(() => ['target', 'cap'].map(value => ({ label: t(`knowledgeSpaces.ingestion.sizePolicyOptions.${value}`), value })))
+const taskIngestion = computed<LocalKnowledgeIngestionSnapshot>(() => ({ ...ingestion, segment_order: [...ingestion.segment_order], separators: separatorsText.value.split('\n').map(value => value.trim()).filter(Boolean) }))
+const effectiveOrderLabel = computed(() => ingestion.segment_order.map(segmentOrderLabel).join(' → '))
+const segmentModeLabel = computed(() => t(`knowledgeSpaces.ingestion.modeOptions.${ingestion.segment_mode}`))
+const sizePolicyLabel = computed(() => t(`knowledgeSpaces.ingestion.sizePolicyOptions.${ingestion.segment_size_policy}`))
+const effectiveSeparators = computed(() => taskIngestion.value.separators.join(' / '))
+const effectiveAnchors = computed(() => {
+  const items = [
+    ingestion.anchor_heading_path ? t('knowledgeSpaces.ingestion.anchorHeadingPath') : '',
+    ingestion.anchor_clause_id ? t('knowledgeSpaces.ingestion.anchorClauseId') : '',
+    ingestion.anchor_row_number ? t('knowledgeSpaces.ingestion.anchorRowNumber') : '',
+    ingestion.anchor_speaker ? t('knowledgeSpaces.ingestion.anchorSpeaker') : '',
+    ingestion.anchor_sentence_index ? t('knowledgeSpaces.ingestion.anchorSentenceIndex') : '',
+  ].filter(Boolean)
+  return items.length ? items.join(' / ') : t('knowledgeSpaces.ingestion.none')
+})
+const segmentModeHint = computed(() => t(`knowledgeSpaces.ingestion.modeHints.${ingestion.segment_mode}`))
+const sizePolicyHint = computed(() => t(`knowledgeSpaces.ingestion.sizePolicyHints.${ingestion.segment_size_policy}`))
+const uploadReady = computed(() => uploadFiles.value.length > 0 && uploadFiles.value.every(item => item.status === 'ready'))
+const sourceReady = computed(() => Boolean(spaceUUID.value) && sourceType.value !== 'pdf' && (sourceMethod.value === 'upload' ? uploadReady.value : Boolean(title.value.trim() && content.value.trim())))
+const strategyReady = computed(() => Boolean(ingestion.ingestion_profile.trim() && ingestion.processor_profile.trim() && ingestion.priority))
+const segmentationReady = computed(() => Boolean(ingestion.segment_mode && ingestion.chunk_size > 0 && ingestion.chunk_overlap >= 0 && ingestion.chunk_overlap < ingestion.chunk_size && taskIngestion.value.segment_order.length && taskIngestion.value.separators.length))
+const canContinue = computed(() => step.value === 1 ? sourceReady.value : step.value === 2 ? strategyReady.value : segmentationReady.value)
+const canSubmit = computed(() => Boolean(space.value && vectorActive.value && sourceReady.value && strategyReady.value && segmentationReady.value))
+const batchProgress = computed(() => uploadFiles.value.length ? Math.round(uploadFiles.value.reduce((total, item) => total + item.progress, 0) / uploadFiles.value.length) : 0)
+
+async function load() {
+  try {
+    const [out, profileOut, strategyOut] = await Promise.all([api.spaces(), api.profileVersions('ingestion'), api.strategyPackages()])
+    spaces.value = out.items || []
+    profiles.value = profileOut.items || []
+    strategyPackages.value = strategyOut.items || []
+    await loadVector()
+    applySpaceDefaults()
+  } catch {
+    toast.add({ title: t('common.error'), description: t('knowledgeSpaces.ui.loadFailed'), color: 'error' })
+  }
+}
+function applySpaceDefaults() {
+  if (!space.value) return
+  ingestion.ingestion_profile = space.value.ingestion_profile_key || 'default'
+  ingestion.chunk_size = chunkSize.value
+  ingestion.chunk_overlap = chunkOverlap.value
+  strategyPackageKey.value = spaceStrategyPackage(space.value)
+  applyStrategyPackageDefaults()
+}
+function spaceStrategyPackage(value: LocalKnowledgeSpace) {
+  return value.feature_flags?.find(flag => flag.startsWith('rag.strategy_package:'))?.replace('rag.strategy_package:', '') || 'A_simple'
+}
+function applyStrategyPackageDefaults() {
+  const selected = strategyPackages.value.find(item => item.key === strategyPackageKey.value)
+  if (!selected) return
+  ingestion.ingestion_profile = selected.profile_key
+  ingestion.rag_bundle_key = selected.profile_key
+  ingestion.rag_primary = selected.key
+  ingestion.rag_scene_key = 'custom_expert'
+}
+function moveSegmentOrder(from: number, to: number) {
+  if (from < 0 || to < 0 || from >= ingestion.segment_order.length || to >= ingestion.segment_order.length) return
+  const [item] = ingestion.segment_order.splice(from, 1)
+  ingestion.segment_order.splice(to, 0, item)
+}
+function segmentOrderLabel(value: string) { return t(`knowledgeSpaces.ingestion.segmentOrderLabels.${value}`) }
+function segmentOrderHelp(value: string) { return t(`knowledgeSpaces.ingestion.segmentOrderHelp.${value}`) }
+async function loadVector() {
+  if (!spaceUUID.value) return
+  vectorActive.value = Boolean((await api.vectorIndexStatus(spaceUUID.value)).active)
+}
+function clearUploadFiles() { uploadFiles.value = []; fileInputKey.value++ }
+function removeUploadFile(id: string) { uploadFiles.value = uploadFiles.value.filter(item => item.id !== id) }
+function uploadStatusLabel(status: UploadFileStatus) { return t(`knowledgeSpaces.ingestion.uploadStatus.${status}`) }
+function itemProgressText(item: UploadFileItem) { return `${item.stage ? t(`knowledgeSpaces.ingestion.progressStages.${item.stage}`) : uploadStatusLabel(item.status)} · ${item.progress}%` }
+function uploadErrorLabel(code: string) {
+  const supported = ['FILE_READ_FAILED', 'DOCUMENT_URI_CONFLICT', 'EMBEDDING_MODEL_NOT_CONFIGURED', 'VECTOR_INDEX_NOT_ACTIVATED', 'INGESTION_PROFILE_NOT_PUBLISHED', 'EMBEDDING_INVOKE_FAILED', 'INDEX_WRITE_FAILED']
+  return supported.includes(code) ? t(`knowledgeSpaces.ingestion.uploadErrors.${code}`) : t('knowledgeSpaces.ingestion.uploadErrors.UNKNOWN', { code })
+}
+function errorCodeOf(error: unknown) {
+  const value = error as { data?: { error?: { code?: string }; code?: string }; response?: { _data?: { error?: { code?: string }; code?: string } } }
+  return String(value?.data?.error?.code || value?.data?.code || value?.response?._data?.error?.code || value?.response?._data?.code || 'UNKNOWN').trim()
+}
+async function readFiles(event: Event) {
+  const files = Array.from((event.target as HTMLInputElement).files || [])
+  fileInputKey.value++
+  if (!files.length) return
+  const existing = new Set(uploadFiles.value.map(item => item.id))
+  const additions = await Promise.all(files.filter(file => !existing.has(`${file.name}:${file.size}:${file.lastModified}`)).map(async (file) => {
+    const item: UploadFileItem = { id: `${file.name}:${file.size}:${file.lastModified}`, file, content: '', status: 'reading', progress: 0, stage: 'reading' }
+    try { item.content = await file.text(); item.status = item.content.trim() ? 'ready' : 'failed'; item.progress = item.status === 'ready' ? 0 : 100; item.stage = item.status === 'ready' ? 'ready' : 'failed' } catch { item.status = 'failed'; item.progress = 100; item.stage = 'failed'; item.errorCode = 'FILE_READ_FAILED' }
+    return item
+  }))
+  uploadFiles.value = [...uploadFiles.value, ...additions]
+}
+async function submit() {
+  if (!canSubmit.value || !space.value) return
+  saving.value = true
+  try {
+    if (sourceMethod.value === 'manual') {
+      const document = await api.saveDocument(space.value.uuid, { title: title.value.trim(), content: content.value.trim(), source_type: 'manual', tags: [], ingestion: taskIngestion.value })
+      await api.indexDocument(document.uuid)
+      toast.add({ title: t('common.success'), description: t('knowledgeSpaces.ingestion.submitted'), color: 'success' })
+      await navigateTo(`${adminBase.value}/knowledge/${space.value.uuid}/records`)
+      return
+    }
+    let completed = 0
+    for (const item of uploadFiles.value) {
+      item.status = 'processing'
+      item.stage = 'creating'
+      item.progress = 2
+      item.errorCode = undefined
+      try {
+        const document = await api.saveDocument(space.value.uuid, { title: item.file.name.replace(/\.[^.]+$/, '') || item.file.name, content: item.content, source_type: 'upload', tags: [], ingestion: taskIngestion.value })
+        item.documentUUID = document.uuid
+        item.stage = 'preparing'
+        item.progress = 5
+        await api.indexDocument(document.uuid)
+        item.status = 'completed'
+        item.stage = 'completed'
+        item.progress = 100
+        completed++
+      } catch (error) { item.status = 'failed'; item.stage = 'failed'; item.progress = 100; item.errorCode = errorCodeOf(error) }
+    }
+    if (completed === uploadFiles.value.length) {
+      toast.add({ title: t('common.success'), description: t('knowledgeSpaces.ingestion.batchSubmitted', { count: completed }), color: 'success' })
+      await navigateTo(`${adminBase.value}/knowledge/${space.value.uuid}/records`)
+    } else {
+      toast.add({ title: t('common.error'), description: t('knowledgeSpaces.ingestion.batchSubmitFailed', { count: completed, total: uploadFiles.value.length }), color: 'error' })
+    }
+  } finally { saving.value = false }
+}
+watch(spaceUUID, async () => { await loadVector(); applySpaceDefaults() })
+watch(strategyPackageKey, applyStrategyPackageDefaults)
+watch(sourceMethod, clearUploadFiles)
+watch(sourceType, () => { if (sourceMethod.value === 'upload') clearUploadFiles() })
+function wsEndpoint() {
+  if (typeof window === 'undefined') return ''
+  const apiBase = new URL(resolveApiBase(), window.location.origin)
+  const protocol = apiBase.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${apiBase.host}`
+}
+function startIngestionWS() {
+  const endpoint = wsEndpoint()
+  if (!endpoint || ingestionWS) return
+  ingestionWS = createPluginWsClient({ pluginId: String(runtimeConfig.public?.powerxPluginId || 'com.powerx.plugins.base'), wsBaseURL: endpoint, wsPath: '/api/ws', token: getAuthToken() }).connect()
+  ingestionWS.onopen = () => ingestionWS?.send(JSON.stringify({ type: 'subscribe', topics: ['_topic.knowledge.ingestion.progress'] }))
+  ingestionWS.onmessage = (event) => {
+    let message: { type?: string; topic?: string; payload?: IngestionProgressEvent }
+    try { message = JSON.parse(String(event.data || '{}')) } catch { return }
+    if (message.type !== 'event' || message.topic !== '_topic.knowledge.ingestion.progress') return
+    const payload = message.payload || {}
+    const item = uploadFiles.value.find(candidate => candidate.documentUUID === payload.document_uuid)
+    if (!item) return
+    item.status = payload.status === 'completed' ? 'completed' : payload.status === 'failed' ? 'failed' : 'processing'
+    item.stage = payload.stage || item.stage
+    item.progress = Math.max(0, Math.min(100, Number(payload.progress_percent ?? item.progress)))
+    item.errorCode = payload.error_code || item.errorCode
+  }
+  ingestionWS.onclose = () => { ingestionWS = null }
+}
+onMounted(async () => { await load(); startIngestionWS() })
+onBeforeUnmount(() => { ingestionWS?.close(); ingestionWS = null })
+</script>

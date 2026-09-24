@@ -90,6 +90,11 @@ Skeleton 和生成模板提供 Knowledge Lab 调试入口：
 
 - `docs/guides/develop/knowledge/fixtures/after-sales-refund-sop.md`
 
+用于验证多切块、主题隔离和召回质量的演示语料：
+
+- `docs/guides/develop/knowledge/demos/refund-and-after-sales-policy.md`
+- `docs/guides/develop/knowledge/demos/production-order-manual-verification.md`
+
 推荐创建知识空间时选择：
 
 - 知识库类型：SOP / 制度 / 产品说明

@@ -7,6 +7,7 @@ import (
 
 	EntityModels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	identitymodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -33,7 +34,35 @@ type legacySingleAIProfile struct {
 	Parameters  datatypes.JSON `gorm:"column:parameters;type:json;not null"`
 }
 
+// legacyLocalKnowledgeSpace reproduces the former space shape.  `name` and
+// the JSON vector table are intentionally absent after the migration.
+type legacyLocalKnowledgeSpace struct {
+	ID                   uint64  `gorm:"primaryKey"`
+	UUID                 string  `gorm:"type:uuid;not null;uniqueIndex"`
+	TenantUUID           string  `gorm:"type:uuid;not null"`
+	Name                 string  `gorm:"type:varchar(128);not null"`
+	Description          string  `gorm:"type:text"`
+	IngestionProfileUUID *string `gorm:"type:uuid"`
+	IndexProfileUUID     *string `gorm:"type:uuid"`
+	RAGProfileUUID       *string `gorm:"type:uuid"`
+}
+
+func (legacyLocalKnowledgeSpace) TableName() string {
+	return EntityModels.LocalKnowledgeSpace{}.TableName()
+}
+
 func (legacySingleAIProfile) TableName() string { return EntityModels.LocalAISetting{}.TableName() }
+
+type legacyLocalKnowledgeVectorIndex struct {
+	ID        uint64 `gorm:"primaryKey"`
+	UUID      string `gorm:"column:uuid"`
+	SpaceUUID string `gorm:"column:space_uuid"`
+	IndexKey  string `gorm:"column:index_key"`
+}
+
+func (legacyLocalKnowledgeVectorIndex) TableName() string {
+	return EntityModels.LocalKnowledgeVectorIndex{}.TableName()
+}
 
 func TestMigratePluginModelsIncludesFederatedIAMTables(t *testing.T) {
 	EntityModels.ForceSchemaForTests("")
@@ -81,6 +110,133 @@ func TestMigratePluginModelsIncludesFederatedIAMTables(t *testing.T) {
 		if !db.Migrator().HasColumn(table, column) {
 			t.Fatalf("%s.%s = missing", table, column)
 		}
+	}
+}
+
+func TestEnsureContactIdentityChannelDictionaryItemUUIDPreservesLegacyRowsForExplicitRepair(t *testing.T) {
+	EntityModels.ForceSchemaForTests("")
+	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
+	db, err := gorm.Open(sqlite.Dialector{DriverName: "sqlite", DSN: "file:legacy_contact_identity_" + uuid.NewString() + "?mode=memory&cache=shared"}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`CREATE TABLE customer_contact_identities (id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL, external_subject TEXT NOT NULL)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO customer_contact_identities (channel, external_subject) VALUES ('email', 'legacy@example.test')`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureContactIdentityChannelDictionaryItemUUID(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasColumn("customer_contact_identities", "channel_dictionary_item_uuid") {
+		t.Fatal("channel_dictionary_item_uuid is missing")
+	}
+	var assigned *string
+	if err := db.Raw(`SELECT channel_dictionary_item_uuid FROM customer_contact_identities WHERE external_subject = ?`, "legacy@example.test").Scan(&assigned).Error; err != nil {
+		t.Fatal(err)
+	}
+	if assigned != nil {
+		t.Fatalf("legacy channel was inferred as %q", *assigned)
+	}
+}
+
+func TestMigratePluginModelsIncludesCoreAlignedLocalKnowledgeTables(t *testing.T) {
+	EntityModels.ForceSchemaForTests("")
+	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
+	db, err := gorm.Open(sqlite.Dialector{DriverName: "sqlite", DSN: "file:local_knowledge_schema_" + uuid.NewString() + "?mode=memory&cache=shared"}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	models := []interface{}{
+		&EntityModels.LocalKnowledgeSpace{}, &EntityModels.LocalKnowledgeDocument{}, &EntityModels.LocalKnowledgeChunk{}, &EntityModels.LocalKnowledgeKGNode{}, &EntityModels.LocalKnowledgeKGEdge{},
+		&EntityModels.LocalIngestionProfileVersion{}, &EntityModels.LocalIndexProfileVersion{}, &EntityModels.LocalRAGProfileVersion{},
+		&EntityModels.LocalKnowledgeIngestionJob{}, &EntityModels.LocalKnowledgeJobChunk{}, &EntityModels.LocalKnowledgeIndexJob{}, &EntityModels.LocalKnowledgeVectorIndex{},
+		&EntityModels.LocalKnowledgeArtifactBundle{}, &EntityModels.LocalKnowledgeAuditTrailEntry{}, &EntityModels.LocalKnowledgeCorpusCheckJob{},
+		&EntityModels.LocalKnowledgeDecayTask{}, &EntityModels.LocalKnowledgeDeltaJob{}, &EntityModels.LocalKnowledgeFeedbackCase{},
+		&EntityModels.LocalKnowledgeFusionStrategyVersion{}, &EntityModels.LocalKnowledgeIAMSyncTask{},
+		&EntityModels.LocalKnowledgePolicyTemplateVersion{}, &EntityModels.LocalKnowledgeSourceConnectorInstance{},
+		&EntityModels.LocalKnowledgeSourceCredential{}, &EntityModels.LocalKnowledgeSpaceSyncJob{},
+		&EntityModels.LocalKnowledgeReleasePolicy{}, &EntityModels.LocalKnowledgeReleaseBatch{},
+	}
+	if err := db.AutoMigrate(models...); err != nil {
+		t.Fatal(err)
+	}
+	for _, model := range models {
+		if !db.Migrator().HasTable(model) {
+			t.Fatalf("HasTable(%T) = false", model)
+		}
+	}
+	for table, column := range map[string]string{
+		EntityModels.LocalKnowledgeSpace{}.TableName():        "policy_template_version_uuid",
+		EntityModels.LocalKnowledgeDocument{}.TableName():     "index_status",
+		EntityModels.LocalKnowledgeIngestionJob{}.TableName(): "artifact_bundle_uuid",
+		EntityModels.LocalKnowledgeFeedbackCase{}.TableName(): "reprocess_job_uuid",
+		EntityModels.LocalKnowledgeReleaseBatch{}.TableName(): "policy_uuid",
+	} {
+		if !db.Migrator().HasColumn(table, column) {
+			t.Fatalf("%s.%s = missing", table, column)
+		}
+	}
+	if !db.Migrator().HasColumn(EntityModels.LocalKnowledgeIngestionJob{}.TableName(), "progress_percent") {
+		t.Fatal("local knowledge ingestion progress_percent column = missing")
+	}
+	spaceTable := EntityModels.LocalKnowledgeSpace{}.TableName()
+	for _, column := range []string{"space_name", "ingestion_profile_key", "index_profile_key", "rag_profile_key", "embedding_profile_key", "active_vector_index_key"} {
+		if !db.Migrator().HasColumn(spaceTable, column) {
+			t.Fatalf("%s.%s = missing", spaceTable, column)
+		}
+	}
+	if db.Migrator().HasColumn(spaceTable, "description") {
+		t.Fatalf("%s.description = unexpected legacy plugin-only column", spaceTable)
+	}
+}
+
+func TestMigratePluginModelsRemovesLegacyKnowledgeSpaceNameAndJSONVectors(t *testing.T) {
+	EntityModels.ForceSchemaForTests("")
+	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
+	db, err := gorm.Open(sqlite.Dialector{DriverName: "sqlite", DSN: "file:legacy_knowledge_space_" + uuid.NewString() + "?mode=memory&cache=shared"}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&legacyLocalKnowledgeSpace{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("CREATE TABLE local_knowledge_chunk_vectors (id integer primary key, vector text)").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&legacyLocalKnowledgeSpace{UUID: uuid.NewString(), TenantUUID: "11111111-1111-4111-8111-111111111111", Name: "legacy-space"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := MigratePluginModels(context.Background(), db, false); err != nil {
+		t.Fatal(err)
+	}
+	spaceTable := EntityModels.LocalKnowledgeSpace{}.TableName()
+	for _, column := range []string{"name", "description", "ingestion_profile_uuid", "index_profile_uuid", "rag_profile_uuid"} {
+		hasLegacyColumn, err := hasPhysicalColumn(db, spaceTable, column)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hasLegacyColumn {
+			t.Fatalf("%s.%s = legacy column was not removed", spaceTable, column)
+		}
+	}
+	hasSpaceName, err := hasPhysicalColumn(db, spaceTable, "space_name")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasSpaceName {
+		t.Fatalf("%s.space_name = missing", spaceTable)
+	}
+	var spaceName string
+	if err := db.Raw("SELECT space_name FROM local_knowledge_spaces WHERE tenant_uuid = ?", "11111111-1111-4111-8111-111111111111").Scan(&spaceName).Error; err != nil {
+		t.Fatal(err)
+	}
+	if spaceName != "legacy-space" {
+		t.Fatalf("space_name = %q, want legacy-space", spaceName)
+	}
+	if db.Migrator().HasTable("local_knowledge_chunk_vectors") {
+		t.Fatal("local_knowledge_chunk_vectors = legacy table was not removed")
 	}
 }
 
@@ -294,5 +450,36 @@ func TestEnsureIAMIdentityUUIDsBackfillsBeforeAutoMigrate(t *testing.T) {
 		if count != 0 {
 			t.Fatalf("%s retained %d empty uuid rows", table, count)
 		}
+	}
+}
+
+func TestEnsureLocalKnowledgeVectorIndexTenantBackfillsOwningSpace(t *testing.T) {
+	EntityModels.ForceSchemaForTests("")
+	t.Cleanup(func() { EntityModels.ForceSchemaForTests("public") })
+	db, err := gorm.Open(sqlite.Dialector{DriverName: "sqlite", DSN: "file:knowledge_vector_tenant?mode=memory&cache=shared"}, &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&EntityModels.LocalKnowledgeSpace{}, &legacyLocalKnowledgeVectorIndex{}); err != nil {
+		t.Fatal(err)
+	}
+	space := EntityModels.LocalKnowledgeSpace{TenantUUID: "11111111-1111-4111-8111-111111111111", SpaceName: "support", DepartmentCode: "support"}
+	if err := db.Create(&space).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&legacyLocalKnowledgeVectorIndex{UUID: "22222222-2222-4222-8222-222222222222", SpaceUUID: space.UUID, IndexKey: "dense"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureLocalKnowledgeVectorIndexTenant(context.Background(), db); err != nil {
+		t.Fatalf("ensureLocalKnowledgeVectorIndexTenant() error = %v", err)
+	}
+	var got struct {
+		TenantUUID string `gorm:"column:tenant_uuid"`
+	}
+	if err := db.Table(EntityModels.LocalKnowledgeVectorIndex{}.TableName()).Select("tenant_uuid").Where("uuid = ?", "22222222-2222-4222-8222-222222222222").Take(&got).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.TenantUUID != space.TenantUUID {
+		t.Fatalf("tenant uuid=%q want %q", got.TenantUUID, space.TenantUUID)
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	localvector "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/knowledge/vectorstore"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	delegatedadapter "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam/adapters/delegated"
@@ -88,6 +89,21 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 			"component":  "bootstrap.app",
 			"error":      err.Error(),
 		})
+	}
+	if cfg.LocalPGVectorEnabled() && cfg.Knowledge.VectorStore.PGVector.EnableMigrations {
+		pg := cfg.Knowledge.VectorStore.PGVector
+		if err := localvector.EnsurePGVectorTable(ctx, queryDB, localvector.PGVectorConfig{
+			Schema:     pg.Schema,
+			Table:      pg.Table,
+			Dimensions: pg.Dimensions,
+			Lists:      pg.Lists,
+		}, cfg.Database.Schema); err != nil {
+			logger.FatalWith(nil, context.Background(), "Failed to initialize local knowledge pgvector store", logger.Fields{
+				"module":    "knowledge",
+				"component": "pgvector",
+				"error":     err.Error(),
+			})
+		}
 	}
 
 	initFederatedRuntime(queryDB)

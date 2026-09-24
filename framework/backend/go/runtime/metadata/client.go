@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
@@ -276,6 +277,18 @@ func (c *Client) CreateTag(ctx context.Context, req CreateTagRequest) (*Tag, err
 	return &out, nil
 }
 
+func (c *Client) UpdateTag(ctx context.Context, req UpdateTagRequest) (*Tag, error) {
+	if strings.TrimSpace(req.TagUUID) == "" {
+		return nil, invalid("metadata.tag.update", "metadata: tag_uuid is required")
+	}
+	body := map[string]any{"label_i18n": req.LabelI18n, "description_i18n": req.DescriptionI18n, "color": req.Color, "status": req.Status}
+	var out Tag
+	if err := c.invokePayload(ctx, "metadata.tag.update", CapabilityTagManage, http.MethodPatch, "/api/v1/tenant/metadata/tags/"+url.PathEscape(req.TagUUID), nil, body, req.RequestID, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *Client) ResolveTag(ctx context.Context, resourceType, namespace, code string) (*Tag, error) {
 	resourceType = strings.TrimSpace(resourceType)
 	namespace = strings.TrimSpace(namespace)
@@ -308,7 +321,7 @@ func (c *Client) ListTagBindings(ctx context.Context, req ListTagBindingsRequest
 	if strings.TrimSpace(req.ResourceUUID) == "" {
 		return nil, invalid("metadata.tag_binding.list", "metadata: resource_uuid is required")
 	}
-	return nil, &Error{Code: CodeInvalidArgument, Message: "metadata tenant Host Contract does not expose tag-binding enumeration", Operation: "metadata.tag_binding.list"}
+	return nil, &Error{Code: CodeOperationUnavailable, Message: "metadata tenant Host Contract does not expose tag-binding enumeration", Operation: "metadata.tag_binding.list"}
 }
 
 func (c *Client) ReplaceTagBindings(ctx context.Context, req ReplaceTagBindingsRequest) ([]TagBinding, error) {
@@ -318,7 +331,7 @@ func (c *Client) ReplaceTagBindings(ctx context.Context, req ReplaceTagBindingsR
 	if strings.TrimSpace(req.ResourceUUID) == "" {
 		return nil, invalid("metadata.tag_binding.replace", "metadata: resource_uuid is required")
 	}
-	return nil, &Error{Code: CodeInvalidArgument, Message: "metadata tenant Host Contract does not expose tag-binding replacement", Operation: "metadata.tag_binding.replace"}
+	return nil, &Error{Code: CodeOperationUnavailable, Message: "metadata tenant Host Contract does not expose tag-binding replacement", Operation: "metadata.tag_binding.replace"}
 }
 
 func (c *Client) ReplaceTagBindingsByCode(ctx context.Context, req ReplaceTagBindingsByCodeRequest) ([]TagBinding, error) {

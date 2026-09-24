@@ -28,13 +28,23 @@ type Service interface {
 	ResolveTaxonomyNode(context.Context, string, string) (*TaxonomyNode, error)
 	ListTags(context.Context, ListTagsRequest) (*Page[Tag], error)
 	CreateTag(context.Context, CreateTagRequest) (*Tag, error)
+	UpdateTag(context.Context, UpdateTagRequest) (*Tag, error)
 	ResolveTag(context.Context, string, string, string) (*Tag, error)
-	CreateTagBinding(context.Context, CreateTagBindingRequest) (*TagBinding, error)
-	DeleteTagBinding(context.Context, DeleteTagBindingRequest) error
+	ListTagBindings(context.Context, ListTagBindingsRequest) ([]TagBinding, error)
+	ReplaceTagBindings(context.Context, ReplaceTagBindingsRequest) ([]TagBinding, error)
 	ListResourceTypes(context.Context, ListResourceTypesRequest) (*Page[ResourceType], error)
 	CreateResourceType(context.Context, CreateResourceTypeRequest) (*ResourceType, error)
 	UpdateResourceType(context.Context, UpdateResourceTypeRequest) (*ResourceType, error)
 	ResolveResourceType(context.Context, string) (*ResourceType, error)
+}
+
+// ValidateRequired is called by a module which declares metadata as a
+// dependency during bootstrap. It deliberately resolves the selected adapter
+// once; a missing local or delegated adapter is a startup error, not a
+// request-time fallback opportunity.
+func (r *Runtime) ValidateRequired() error {
+	_, err := r.Service()
+	return err
 }
 
 // Runtime binds exactly one metadata adapter during startup. In local mode the

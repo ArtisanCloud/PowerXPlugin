@@ -15,8 +15,22 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.GET("/overview", handler.Overview)
 	group.GET("/accounts", handler.ListAccounts)
 	group.POST("/accounts", handler.CreateAccount)
+	group.POST("/debug/basic-accounts", handler.CreateBasicAccount)
 	group.GET("/accounts/:customerUUID", handler.GetAccount)
 	group.PATCH("/accounts/:customerUUID", handler.UpdateAccount)
+	contacts := NewContactHandler(deps)
+	// Contact follows the PowerX Core customer-scoped contract.  It is not an
+	// account sub-resource: a customer may have many login accounts over time.
+	group.GET("/:customerUUID/contacts", contacts.List)
+	group.POST("/:customerUUID/contacts", contacts.Create)
+	group.GET("/:customerUUID/contacts/:contactUUID", contacts.Get)
+	group.PATCH("/:customerUUID/contacts/:contactUUID", contacts.Update)
+	group.POST("/:customerUUID/contacts:resolve-identity", contacts.ResolveIdentity)
+	group.POST("/:customerUUID/contacts/:contactUUID/identities", contacts.BindIdentity)
+	// Keep the action in its own path segment. Gin does not permit a named
+	// parameter and an action suffix (":identityUUID:migrate-channel") in one
+	// segment, and rejects the whole router during startup when it sees one.
+	group.POST("/:customerUUID/contacts/:contactUUID/identities/:identityUUID/migrate-channel", contacts.MigrateIdentityChannel)
 	group.GET("/identities", handler.ListIdentities)
 	group.GET("/memberships", handler.ListMemberships)
 	group.GET("/login-events", handler.ListLoginEvents)

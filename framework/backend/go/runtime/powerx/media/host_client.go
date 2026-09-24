@@ -33,7 +33,24 @@ type HostClientConfig struct {
 type HostClient struct {
 	baseURL string
 	tokens  HostTokenProvider
+	apiKey  string
 	http    *http.Client
+}
+
+// NewHostClientWithAPIKey binds standalone proxy authentication explicitly.
+// Installed plugins must use NewHostClientWithTokenProvider instead.
+func NewHostClientWithAPIKey(cfg HostClientConfig, apiKey string, httpClient *http.Client) (*HostClient, error) {
+	if strings.TrimSpace(cfg.BaseURL) == "" || strings.TrimSpace(apiKey) == "" {
+		return nil, errors.New("MEDIA_PROXY_BASE_URL_AND_API_KEY_REQUIRED")
+	}
+	if httpClient == nil {
+		timeout := cfg.Timeout
+		if timeout <= 0 {
+			timeout = 30 * time.Second
+		}
+		httpClient = &http.Client{Timeout: timeout}
+	}
+	return &HostClient{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), apiKey: strings.TrimSpace(apiKey), http: httpClient}, nil
 }
 
 func NewHostClientWithTokenProvider(cfg HostClientConfig, tokens HostTokenProvider, httpClient *http.Client) (*HostClient, error) {
@@ -220,7 +237,7 @@ func (c *HostClient) DeleteAsset(ctx context.Context, id string) error {
 }
 func (c *HostClient) PresignUpload(ctx context.Context, id string) (*TransferTicket, error) {
 	var out TransferTicket
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/presign-upload", nil, &out)
+	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/presign-upload", struct{}{}, &out)
 	return &out, err
 }
 func (c *HostClient) CompleteUpload(ctx context.Context, id string, in CompleteUploadInput) (*HostAsset, error) {
@@ -230,7 +247,7 @@ func (c *HostClient) CompleteUpload(ctx context.Context, id string, in CompleteU
 }
 func (c *HostClient) PresignDownload(ctx context.Context, id string) (*TransferTicket, error) {
 	var out TransferTicket
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/presign-download", nil, &out)
+	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/media/assets/"+url.PathEscape(id)+"/presign-download", struct{}{}, &out)
 	return &out, err
 }
 func (c *HostClient) CreateVariant(ctx context.Context, id string, in CreateVariantInput) (*Variant, error) {
@@ -244,7 +261,7 @@ func (c *HostClient) GetVariant(ctx context.Context, id string) (*Variant, error
 	return &out, err
 }
 func (c *HostClient) do(ctx context.Context, method, path string, input, out any) error {
-	if c == nil || c.http == nil || c.tokens == nil {
+	if c == nil || c.http == nil || (c.tokens == nil && c.apiKey == "") {
 		return errors.New("powerx media Host client is not configured")
 	}
 	var body io.Reader
@@ -259,14 +276,18 @@ func (c *HostClient) do(ctx context.Context, method, path string, input, out any
 	if err != nil {
 		return err
 	}
-	token, err := c.tokens.Token(ctx)
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "ApiKey "+c.apiKey)
+	} else {
+		token, err := c.tokens.Token(ctx)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err != nil || strings.TrimSpace(token) == "" {
+			return mediaHostError(http.StatusServiceUnavailable, nil)
+		}
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
 	}
-	if err != nil || strings.TrimSpace(token) == "" {
-		return mediaHostError(http.StatusServiceUnavailable, nil)
-	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
 	req.Header.Set("Accept", "application/json")
 	if input != nil {
 		req.Header.Set("Content-Type", "application/json")

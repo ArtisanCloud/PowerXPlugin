@@ -36,11 +36,12 @@ type HostClientConfig struct {
 }
 
 type HostClient struct {
-	baseURL  string
-	tokens   HostTokenProvider
-	http     *http.Client
-	locale   string
-	pageSize int
+	baseURL    string
+	tokens     HostTokenProvider
+	authScheme string
+	http       *http.Client
+	locale     string
+	pageSize   int
 }
 
 func NewHostClientWithTokenProvider(cfg HostClientConfig, tokens HostTokenProvider, httpClient *http.Client) (*HostClient, error) {
@@ -61,7 +62,22 @@ func NewHostClientWithTokenProvider(cfg HostClientConfig, tokens HostTokenProvid
 	if pageSize <= 0 {
 		pageSize = DefaultPageSize
 	}
-	return &HostClient{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), tokens: tokens, http: httpClient, locale: strings.TrimSpace(cfg.Locale), pageSize: pageSize}, nil
+	return &HostClient{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), tokens: tokens, authScheme: "Bearer", http: httpClient, locale: strings.TrimSpace(cfg.Locale), pageSize: pageSize}, nil
+}
+
+// NewHostClientWithAPIKey is for an explicitly configured service API key.
+// The Core tenant Host Contract derives tenant scope from the credential.
+func NewHostClientWithAPIKey(cfg HostClientConfig, apiKey string, httpClient *http.Client) (*HostClient, error) {
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return nil, errors.New("METADATA_HOST_API_KEY_REQUIRED")
+	}
+	client, err := NewHostClientWithTokenProvider(cfg, HostTokenProviderFunc(func(context.Context) (string, error) { return apiKey, nil }), httpClient)
+	if err != nil {
+		return nil, err
+	}
+	client.authScheme = "ApiKey"
+	return client, nil
 }
 
 func (c *HostClient) ListDictionaryNamespaces(ctx context.Context, in ListDictionaryNamespacesRequest) (*Page[DictionaryNamespace], error) {
@@ -209,6 +225,14 @@ func (c *HostClient) CreateTag(ctx context.Context, in CreateTagRequest) (*Tag, 
 	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/metadata/tags", nil, map[string]any{"namespace": strings.TrimSpace(in.Namespace), "resource_type": strings.TrimSpace(in.ResourceType), "code": strings.TrimSpace(in.Code), "color": strings.TrimSpace(in.Color), "label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n}, &out)
 	return &out, err
 }
+func (c *HostClient) UpdateTag(ctx context.Context, in UpdateTagRequest) (*Tag, error) {
+	if !validHostUUID(in.TagUUID) {
+		return nil, hostInvalid("metadata.tag.update")
+	}
+	var out Tag
+	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/metadata/tags/"+url.PathEscape(in.TagUUID), nil, map[string]any{"label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "color": in.Color, "status": in.Status}, &out)
+	return &out, err
+}
 func (c *HostClient) ResolveTag(ctx context.Context, resourceType, namespace, code string) (*Tag, error) {
 	resourceType = strings.TrimSpace(resourceType)
 	namespace = strings.TrimSpace(namespace)
@@ -223,19 +247,48 @@ func (c *HostClient) ResolveTag(ctx context.Context, resourceType, namespace, co
 		return item.ResourceType == resourceType && item.Namespace == namespace && item.Code == code
 	})
 }
-func (c *HostClient) CreateTagBinding(ctx context.Context, in CreateTagBindingRequest) (*TagBinding, error) {
-	if !validHostUUID(in.TagUUID) || strings.TrimSpace(in.ResourceType) == "" || !validHostUUID(in.ResourceUUID) {
-		return nil, hostInvalid("metadata.tag_binding.create")
+func (c *HostClient) ListTagBindings(ctx context.Context, in ListTagBindingsRequest) ([]TagBinding, error) {
+	if strings.TrimSpace(in.ResourceType) == "" || !validHostUUID(in.ResourceUUID) {
+		return nil, hostInvalid("metadata.tag_binding.list")
 	}
-	var out TagBinding
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/metadata/tag-bindings", nil, map[string]any{"tag_uuid": strings.TrimSpace(in.TagUUID), "resource_type": strings.TrimSpace(in.ResourceType), "resource_uuid": strings.TrimSpace(in.ResourceUUID)}, &out)
-	return &out, err
+	var out struct {
+		Items []TagBinding `json:"items"`
+	}
+	err := c.do(ctx, http.MethodGet, "/api/v1/tenant/metadata/tag-bindings", url.Values{"resource_type": []string{strings.TrimSpace(in.ResourceType)}, "resource_uuid": []string{strings.TrimSpace(in.ResourceUUID)}}, nil, &out)
+	if err != nil {
+		return nil, err
+	}
+	return validateHostBindings(out.Items)
 }
-func (c *HostClient) DeleteTagBinding(ctx context.Context, in DeleteTagBindingRequest) error {
-	if !validHostUUID(in.BindingUUID) {
-		return hostInvalid("metadata.tag_binding.delete")
+func (c *HostClient) ReplaceTagBindings(ctx context.Context, in ReplaceTagBindingsRequest) ([]TagBinding, error) {
+	if strings.TrimSpace(in.ResourceType) == "" || !validHostUUID(in.ResourceUUID) {
+		return nil, hostInvalid("metadata.tag_binding.replace")
 	}
-	return c.do(ctx, http.MethodDelete, "/api/v1/tenant/metadata/tag-bindings/"+url.PathEscape(in.BindingUUID), nil, nil, nil)
+	for _, tagUUID := range in.TagUUIDs {
+		if !validHostUUID(tagUUID) {
+			return nil, hostInvalid("metadata.tag_binding.replace")
+		}
+	}
+	var out struct {
+		Items []TagBinding `json:"items"`
+	}
+	err := c.do(ctx, http.MethodPut, "/api/v1/tenant/metadata/tag-bindings:replace", nil, map[string]any{"resource_type": strings.TrimSpace(in.ResourceType), "resource_uuid": strings.TrimSpace(in.ResourceUUID), "tag_uuids": in.TagUUIDs}, &out)
+	if err != nil {
+		return nil, err
+	}
+	return validateHostBindings(out.Items)
+}
+
+func validateHostBindings(items []TagBinding) ([]TagBinding, error) {
+	if items == nil {
+		return nil, &Error{Code: CodeDecodeFailed, Message: "metadata.response_items_missing"}
+	}
+	for i := range items {
+		if !validHostUUID(items[i].UUID) || !validHostUUID(items[i].TagUUID) || !validHostUUID(items[i].ResourceUUID) {
+			return nil, &Error{Code: CodeDecodeFailed, Message: "metadata.response_uuid_invalid"}
+		}
+	}
+	return items, nil
 }
 func (c *HostClient) ListResourceTypes(ctx context.Context, in ListResourceTypesRequest) (*Page[ResourceType], error) {
 	var out Page[ResourceType]
@@ -322,7 +375,7 @@ func (c *HostClient) do(ctx context.Context, method, path string, query url.Valu
 	if err != nil || strings.TrimSpace(token) == "" {
 		return &Error{Code: CodeClientUnavailable, Message: "metadata host token is unavailable", Cause: err}
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", c.authScheme+" "+token)
 	req.Header.Set("Accept", "application/json")
 	if input != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -403,7 +456,7 @@ func validateHostObject(out any) error {
 	case *Tag:
 		id = value.UUID
 	case *TagBinding:
-		id = value.BindingUUID
+		id = value.UUID
 	case *ResourceType:
 		id = value.UUID
 	case *Page[DictionaryNamespace]:

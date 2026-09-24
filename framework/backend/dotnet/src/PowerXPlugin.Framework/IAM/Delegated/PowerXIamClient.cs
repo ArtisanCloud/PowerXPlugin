@@ -79,11 +79,12 @@ public sealed class PowerXIamClient : IDirectoryService, IAuthzService, IIdentit
         return result with { Mode = IAMAdapterMode.Delegated.ToString().ToLowerInvariant() };
     }
 
-    public async Task<IdentityContext?> ResolveIdentity(string? bearerToken, CancellationToken ct = default)
+    public Task<IdentityContext?> ResolveIdentity(string? bearerToken, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(bearerToken)) throw new IAMAdapterException(IAMErrors.CodeUnauthorized);
-        var response = await SendAsync(HttpMethod.Get, "/admin/user/auth/me/context", null, bearerToken.Trim(), ct);
-        return Deserialize<IdentityContext>(response);
+        // The Framework never forwards an inbound user bearer through its
+        // service-to-host client. Core must expose a dedicated delegated
+        // identity-exchange contract before this operation can be enabled.
+        return Task.FromException<IdentityContext?>(new IAMAdapterException(IAMErrors.CodeIdentityDelegationUnavailable));
     }
 
     private async Task<List<T>> GetItemsAsync<T>(string path, CancellationToken ct)

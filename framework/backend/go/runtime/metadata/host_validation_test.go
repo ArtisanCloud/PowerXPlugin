@@ -46,12 +46,14 @@ func TestMetadataUUIDsRejectBeforeTransport(t *testing.T) {
 				return e
 			},
 			func() error {
-				_, e := c.CreateTagBinding(context.Background(), CreateTagBindingRequest{TagUUID: id, ResourceUUID: id, ResourceType: "test"})
+				_, e := c.ListTagBindings(context.Background(), ListTagBindingsRequest{ResourceUUID: id, ResourceType: "test"})
 				return e
 			},
 			func() error {
-				return c.DeleteTagBinding(context.Background(), DeleteTagBindingRequest{BindingUUID: id})
+				_, e := c.ReplaceTagBindings(context.Background(), ReplaceTagBindingsRequest{ResourceUUID: id, ResourceType: "test", TagUUIDs: []string{id}})
+				return e
 			},
+			func() error { _, e := c.UpdateTag(context.Background(), UpdateTagRequest{TagUUID: id}); return e },
 			func() error {
 				_, e := c.UpdateResourceType(context.Background(), UpdateResourceTypeRequest{ResourceTypeUUID: id})
 				return e

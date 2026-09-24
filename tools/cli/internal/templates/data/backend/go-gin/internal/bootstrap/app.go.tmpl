@@ -21,6 +21,7 @@ import (
 	"{{ .BackendModulePath }}/internal/config"
 	"{{ .BackendModulePath }}/internal/db"
 	"{{ .BackendModulePath }}/internal/entity/models"
+	localvector "{{ .BackendModulePath }}/internal/knowledge/vectorstore"
 	"{{ .BackendModulePath }}/internal/logger"
 	iamservice "{{ .BackendModulePath }}/internal/services/iam"
 	delegatedadapter "{{ .BackendModulePath }}/internal/services/iam/adapters/delegated"
@@ -88,6 +89,21 @@ func BootstrapPlugin(ctx context.Context, cfg *config.Config) (*gorm.DB, error) 
 			"component":  "bootstrap.app",
 			"error":      err.Error(),
 		})
+	}
+	if cfg.LocalPGVectorEnabled() && cfg.Knowledge.VectorStore.PGVector.EnableMigrations {
+		pg := cfg.Knowledge.VectorStore.PGVector
+		if err := localvector.EnsurePGVectorTable(ctx, queryDB, localvector.PGVectorConfig{
+			Schema:     pg.Schema,
+			Table:      pg.Table,
+			Dimensions: pg.Dimensions,
+			Lists:      pg.Lists,
+		}, cfg.Database.Schema); err != nil {
+			logger.FatalWith(nil, context.Background(), "Failed to initialize local knowledge pgvector store", logger.Fields{
+				"module":    "knowledge",
+				"component": "pgvector",
+				"error":     err.Error(),
+			})
+		}
 	}
 
 	initFederatedRuntime(queryDB)

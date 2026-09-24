@@ -1,0 +1,1855 @@
+// Package local_knowledge exposes only plugin-owned knowledge-space records.
+// PowerX Core knowledge data is intentionally absent from this surface.
+package local_knowledge
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+	"unicode"
+
+	dto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	iammodels "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/iam"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+func (h *handler) localEmbeddingModelKey() string {
+	if h == nil || h.ai == nil {
+		return ""
+	}
+	keys := h.ai.EmbeddingModelKeys()
+	if len(keys) == 0 {
+		return ""
+	}
+	return keys[0]
+}
+
+func (h *handler) localLLMModelKey() string {
+	if h == nil || h.ai == nil {
+		return ""
+	}
+	keys := h.ai.LLMModelKeys()
+	if len(keys) == 0 {
+		return ""
+	}
+	return keys[0]
+}
+
+func (h *handler) localEmbeddingModel(key string) (config.LocalAIModel, bool) {
+	if h == nil || h.config == nil || h.config.LocalAI == nil {
+		return config.LocalAIModel{}, false
+	}
+	for _, model := range h.config.LocalAI.Models {
+		if model.Key == key {
+			return model, true
+		}
+	}
+	return config.LocalAIModel{}, false
+}
+
+type handler struct {
+	db        *gorm.DB
+	publisher fwwsbus.Publisher
+	ai        interface {
+		EmbeddingInvoke(context.Context, dto.EmbeddingInvokeInput) (*dto.EmbeddingInvokeOutput, error)
+		EmbeddingModelKeys() []string
+		LLMModelKeys() []string
+		LLMInvoke(context.Context, dto.LLMInvokeInput) (*dto.LLMInvokeOutput, error)
+	}
+	config *config.Config
+}
+
+const localKnowledgeIngestionProgressTopic = "_topic.knowledge.ingestion.progress"
+
+type localKnowledgeIngestionProgress struct {
+	JobUUID         string `json:"job_uuid"`
+	DocumentUUID    string `json:"document_uuid"`
+	SpaceUUID       string `json:"space_uuid"`
+	Status          string `json:"status"`
+	Stage           string `json:"stage"`
+	ProgressPercent int    `json:"progress_percent"`
+	ChunkTotal      int    `json:"chunk_total"`
+	ErrorCode       string `json:"error_code,omitempty"`
+}
+
+// reportIngestionProgress persists the same state exposed to the UI before it
+// emits an authorized tenant-scoped WebSocket event. The database state is the
+// recovery source after a page refresh; WS is only the real-time transport.
+func (h *handler) reportIngestionProgress(ctx context.Context, tenantUUID, jobUUID, documentUUID, spaceUUID, status, stage string, progressPercent, chunkTotal int, errorCode string) {
+	if h == nil || h.db == nil || strings.TrimSpace(jobUUID) == "" {
+		return
+	}
+	var job models.LocalKnowledgeIngestionJob
+	if err := h.db.Where("tenant_uuid=? AND space_uuid=? AND uuid=?", tenantUUID, spaceUUID, jobUUID).First(&job).Error; err != nil {
+		return
+	}
+	updates := map[string]any{
+		"status":           status,
+		"progress_percent": progressPercent,
+	}
+	if stage == "writing" || status == "completed" || (status == "failed" && progressPercent >= 75) {
+		updates["embedding_success_pct"] = 100
+	}
+	if chunkTotal >= 0 {
+		updates["chunk_total"] = chunkTotal
+	}
+	if status == "running" && job.StartedAt == nil {
+		updates["started_at"] = time.Now().UTC()
+	}
+	if status == "running" {
+		updates["completed_at"] = nil
+		updates["error_code"] = ""
+	}
+	if status == "completed" || status == "failed" {
+		updates["completed_at"] = time.Now().UTC()
+	}
+	if strings.TrimSpace(errorCode) != "" {
+		updates["error_code"] = strings.TrimSpace(errorCode)
+	}
+	if err := h.db.Model(&job).Updates(updates).Error; err != nil {
+		slog.Error("local knowledge ingestion progress update failed", "document_uuid", documentUUID, "error", err)
+		return
+	}
+	if status == "failed" {
+		if err := h.db.Model(&models.LocalKnowledgeDocument{}).
+			Where("tenant_uuid=? AND space_uuid=? AND uuid=? AND index_status=?", tenantUUID, spaceUUID, documentUUID, "queued").
+			Update("index_status", "failed").Error; err != nil {
+			slog.Error("local knowledge document failure status update failed", "document_uuid", documentUUID, "error", err)
+		}
+	}
+	if h.publisher == nil {
+		return
+	}
+	result := h.publisher.Publish(ctx, localKnowledgeIngestionProgressTopic, localKnowledgeIngestionProgress{
+		JobUUID: job.UUID, DocumentUUID: documentUUID, SpaceUUID: spaceUUID, Status: status,
+		Stage: stage, ProgressPercent: progressPercent, ChunkTotal: chunkTotal, ErrorCode: strings.TrimSpace(errorCode),
+	}, fwwsbus.PublishOptions{TenantUUID: tenantUUID})
+	if !result.OK {
+		slog.Warn("local knowledge ingestion progress publish failed", "document_uuid", documentUUID, "error_code", result.ErrorCode, "error", result.ErrorMessage)
+	}
+}
+
+func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
+	if admin == nil || deps == nil || deps.DB == nil {
+		return
+	}
+	var publisher fwwsbus.Publisher
+	if deps.WSBusHub != nil {
+		publisher = frameworkrealtime.NewAuthorizedWSPublisher(
+			fwwsbus.NewAdapter(fwwsbus.NewLocalPublisher(deps.WSBusHub, nil), "", nil),
+			deps.RealtimeDescriptors,
+			"message",
+		)
+	}
+	h := &handler{db: deps.DB, ai: deps.LocalAI, config: deps.Config, publisher: publisher}
+	g := admin.Group("/local-knowledge")
+	g.GET("/profile-versions/:kind", h.listProfileVersions)
+	g.POST("/profile-versions/:kind", h.createProfileVersion)
+	g.POST("/profile-versions/:kind/:uuid/publish", h.publishProfileVersion)
+	g.POST("/profile-versions/:kind/:uuid/rollback", h.rollbackProfileVersion)
+	g.GET("/strategy-packages", h.listStrategyPackages)
+	g.GET("/spaces", h.listSpaces)
+	g.GET("/spaces/:uuid/vector-index", h.getVectorIndexStatus)
+	g.POST("/spaces/:uuid/vector-index/activate", h.activateVectorIndex)
+	g.GET("/routes", h.listRoutes)
+	g.POST("/routes", h.saveRoute)
+	g.DELETE("/routes/:uuid", h.deleteRoute)
+	g.POST("/spaces/:uuid/feedback", h.createFeedback)
+	g.POST("/spaces", h.saveSpace)
+	g.PUT("/spaces/:uuid", h.saveSpace)
+	g.DELETE("/spaces/:uuid", h.deleteSpace)
+	g.GET("/spaces/:uuid/documents", h.listDocuments)
+	g.GET("/documents/:uuid/inspection", h.inspectDocument)
+	g.GET("/documents/:uuid/chunks", h.listDocumentChunks)
+	g.GET("/documents/:uuid/chunks/:chunkUUID", h.getDocumentChunk)
+	g.PATCH("/documents/:uuid/chunks/:chunkUUID", h.updateDocumentChunk)
+	g.GET("/spaces/:uuid/sources", h.listSpaceSources)
+	g.POST("/spaces/:uuid/sources", h.createSpaceSource)
+	g.POST("/spaces/:uuid/documents", h.createDocument)
+	g.PUT("/documents/:uuid", h.saveDocument)
+	g.DELETE("/documents/:uuid", h.deleteDocument)
+	g.POST("/documents/:uuid/index", h.indexDocument)
+	g.GET("/spaces/:uuid/jobs", h.listJobs)
+	g.GET("/spaces/:uuid/ingestion-jobs", h.listIngestionJobs)
+	g.GET("/spaces/:uuid/ingestion-jobs/:jobUUID", h.getIngestionJob)
+	g.GET("/spaces/:uuid/ingestion-jobs/:jobUUID/chunks", h.listIngestionJobChunks)
+}
+
+type feedbackInput struct {
+	ChunkUUIDs   []string `json:"chunk_uuids" binding:"required,min=1"`
+	QualityScore float64  `json:"quality_score" binding:"gte=0,lte=1"`
+	IssueType    string   `json:"issue_type" binding:"required,max=64"`
+}
+
+func (h *handler) createFeedback(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var in feedbackInput
+	if c.ShouldBindJSON(&in) != nil {
+		contracts.ResponseError(c, 400, "INVALID_FEEDBACK", "INVALID_FEEDBACK")
+		return
+	}
+	var space models.LocalKnowledgeSpace
+	if h.db.Where("tenant_uuid=? AND uuid=?", t, c.Param("uuid")).First(&space).Error != nil {
+		contracts.ResponseError(c, 404, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	var count int64
+	if h.db.Model(&models.LocalKnowledgeChunk{}).Where("tenant_uuid=? AND space_uuid=? AND uuid IN ?", t, space.UUID, in.ChunkUUIDs).Count(&count).Error != nil || count != int64(len(in.ChunkUUIDs)) {
+		contracts.ResponseError(c, 400, "INVALID_FEEDBACK_CHUNKS", "INVALID_FEEDBACK_CHUNKS")
+		return
+	}
+	raw, _ := json.Marshal(in.ChunkUUIDs)
+	actor := "system"
+	if tc, exists := authx.GetTenantContext(c); exists && tc.MemberUUID != "" {
+		actor = tc.MemberUUID
+	}
+	row := models.LocalKnowledgeFeedbackCase{SpaceUUID: space.UUID, ReportedBy: actor, IssueType: in.IssueType, Status: "open", LinkedChunks: raw, QualityScore: in.QualityScore}
+	if err := h.db.Create(&row).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, row)
+}
+
+type routeInput struct {
+	RouterSpaceUUID string   `json:"router_space_uuid" binding:"required"`
+	TargetSpaceUUID string   `json:"target_space_uuid" binding:"required"`
+	Keywords        []string `json:"keywords" binding:"required,min=1"`
+	Priority        int      `json:"priority"`
+}
+
+func (h *handler) listRoutes(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var rows []models.LocalKnowledgeRoute
+	if err := h.db.Where("tenant_uuid=?", t).Order("priority asc").Find(&rows).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": rows})
+}
+func (h *handler) saveRoute(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var in routeInput
+	if c.ShouldBindJSON(&in) != nil || in.RouterSpaceUUID == in.TargetSpaceUUID {
+		contracts.ResponseError(c, 400, "INVALID_ROUTE", "INVALID_ROUTE")
+		return
+	}
+	var router, target models.LocalKnowledgeSpace
+	if h.db.Where("tenant_uuid=? AND uuid=?", t, in.RouterSpaceUUID).First(&router).Error != nil || h.db.Where("tenant_uuid=? AND uuid=?", t, in.TargetSpaceUUID).First(&target).Error != nil || knowledgeStrategy(router.FeatureFlags) != "A1_routing" {
+		contracts.ResponseError(c, 400, "INVALID_ROUTE", "INVALID_ROUTE")
+		return
+	}
+	keywords := make([]string, 0, len(in.Keywords))
+	for _, v := range in.Keywords {
+		if v = strings.TrimSpace(strings.ToLower(v)); v != "" {
+			keywords = append(keywords, v)
+		}
+	}
+	if len(keywords) == 0 {
+		contracts.ResponseError(c, 400, "INVALID_ROUTE", "INVALID_ROUTE")
+		return
+	}
+	raw, _ := json.Marshal(keywords)
+	row := models.LocalKnowledgeRoute{TenantUUID: t, RouterSpaceUUID: router.UUID, TargetSpaceUUID: target.UUID, Keywords: raw, Priority: in.Priority, Enabled: true}
+	if row.Priority == 0 {
+		row.Priority = 100
+	}
+	if err := h.db.Create(&row).Error; err != nil {
+		contracts.ResponseError(c, 400, "ROUTE_SAVE_FAILED", "ROUTE_SAVE_FAILED")
+		return
+	}
+	contracts.ResponseSuccess(c, row)
+}
+func (h *handler) deleteRoute(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	result := h.db.Where("tenant_uuid=? AND uuid=?", t, c.Param("uuid")).Delete(&models.LocalKnowledgeRoute{})
+	if result.Error != nil {
+		contracts.ResponseInternalError(c, result.Error)
+		return
+	}
+	if result.RowsAffected == 0 {
+		contracts.ResponseError(c, 404, "ROUTE_NOT_FOUND", "ROUTE_NOT_FOUND")
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"uuid": c.Param("uuid")})
+}
+func tenant(c *gin.Context) (string, bool) {
+	t, ok := authx.TenantUUIDFromContext(c.Request.Context())
+	if !ok || t == "" {
+		contracts.ResponseError(c, http.StatusUnauthorized, "UNAUTHORIZED", "UNAUTHORIZED")
+		return "", false
+	}
+	return t, true
+}
+
+type spaceInput struct {
+	Name               string `json:"name" binding:"required,max=128"`
+	DepartmentCode     string `json:"department_code" binding:"required,max=64"`
+	StrategyPackageKey string `json:"strategy_package_key" binding:"required,max=64"`
+}
+
+func (h *handler) listStrategyPackages(c *gin.Context) {
+	catalog, err := loadStrategyCatalog()
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(catalog.StrategyPackages))
+	for _, item := range orderedStrategies(catalog) {
+		bundle := catalog.Bundles[item.ProfileKey]
+		ready, missing := localStrategyReadiness(item, bundle, h.localEmbeddingModelKey() != "", h.localLLMModelKey() != "")
+		items = append(items, gin.H{"key": item.Key, "profile_key": item.ProfileKey, "dependencies": item.Dependencies, "bundle_prerequisites": bundle.Prerequisites, "ready": ready, "missing_requirements": missing})
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+
+func (h *handler) listSpaces(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var v []models.LocalKnowledgeSpace
+	if e := h.db.WithContext(c).Where("tenant_uuid=?", t).Order("space_name asc").Find(&v).Error; e != nil {
+		contracts.ResponseInternalError(c, e)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": v})
+}
+func (h *handler) saveSpace(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var in spaceInput
+	if c.ShouldBindJSON(&in) != nil || strings.TrimSpace(in.Name) == "" {
+		contracts.ResponseError(c, 400, "INVALID_ARGUMENT", "INVALID_ARGUMENT")
+		return
+	}
+	catalog, catalogErr := loadStrategyCatalog()
+	if catalogErr != nil {
+		contracts.ResponseInternalError(c, catalogErr)
+		return
+	}
+	strategy, exists := findStrategyPackage(catalog, strings.TrimSpace(in.StrategyPackageKey))
+	if !exists {
+		contracts.ResponseError(c, 400, "STRATEGY_PACKAGE_NOT_FOUND", "STRATEGY_PACKAGE_NOT_FOUND")
+		return
+	}
+	ready, _ := localStrategyReadiness(strategy, catalog.Bundles[strategy.ProfileKey], h.localEmbeddingModelKey() != "", h.localLLMModelKey() != "")
+	if !ready {
+		contracts.ResponseError(c, 400, "STRATEGY_REQUIREMENTS_UNAVAILABLE", "STRATEGY_REQUIREMENTS_UNAVAILABLE")
+		return
+	}
+	var department iammodels.Department
+	if e := h.db.Where("tenant_uuid=? AND lower(code)=?", t, strings.ToLower(strings.TrimSpace(in.DepartmentCode))).First(&department).Error; e != nil {
+		contracts.ResponseError(c, 400, "DEPARTMENT_NOT_FOUND", "DEPARTMENT_NOT_FOUND")
+		return
+	}
+	if e := h.ensureBuiltinProfiles(t, strategy.ProfileKey); e != nil {
+		contracts.ResponseInternalError(c, e)
+		return
+	}
+	id := c.Param("uuid")
+	flags, _ := json.Marshal([]string{"rag.strategy_package:" + strategy.Key, "rag.bundle:" + strategy.ProfileKey})
+	s := models.LocalKnowledgeSpace{TenantUUID: t, SpaceName: strings.TrimSpace(in.Name), DepartmentCode: department.Code, IngestionProfileKey: strategy.ProfileKey, IndexProfileKey: strategy.ProfileKey, RAGProfileKey: strategy.ProfileKey, Status: "active", FeatureFlags: flags}
+	if id == "" {
+		if e := h.db.Create(&s).Error; e != nil {
+			contracts.ResponseError(c, 400, "SPACE_SAVE_FAILED", "SPACE_SAVE_FAILED")
+			return
+		}
+	} else {
+		var old models.LocalKnowledgeSpace
+		if e := h.db.Where("tenant_uuid=? AND uuid=?", t, id).First(&old).Error; e != nil {
+			contracts.ResponseError(c, 404, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+			return
+		}
+		s.UUID = old.UUID
+		if e := h.db.Model(&old).Updates(&s).Error; e != nil {
+			contracts.ResponseInternalError(c, e)
+			return
+		}
+	}
+	contracts.ResponseSuccess(c, s)
+}
+func (h *handler) deleteSpace(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	id := c.Param("uuid")
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		var s models.LocalKnowledgeSpace
+		if e := tx.Where("tenant_uuid=? AND uuid=?", t, id).First(&s).Error; e != nil {
+			return e
+		}
+		var docs []models.LocalKnowledgeDocument
+		tx.Where("tenant_uuid=? AND space_uuid=?", t, id).Find(&docs)
+		if e := h.deleteLocalVectorRows(tx, t, id, ""); e != nil {
+			return e
+		}
+		for _, d := range docs {
+			if err := tx.Where("tenant_uuid=? AND document_uuid=?", t, d.UUID).Delete(&models.LocalKnowledgeChunk{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("tenant_uuid=? AND document_uuid=?", t, d.UUID).Delete(&models.LocalKnowledgeIndexJob{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("tenant_uuid=? AND source_id=?", t, d.UUID).Delete(&models.LocalKnowledgeIngestionJob{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("tenant_uuid=? AND space_uuid=?", t, id).Delete(&models.LocalKnowledgeJobChunk{}).Error; err != nil {
+			return err
+		}
+		tx.Where("tenant_uuid=? AND space_uuid=?", t, id).Delete(&models.LocalKnowledgeDocument{})
+		tx.Where("tenant_uuid=? AND space_uuid=?", t, id).Delete(&models.LocalKnowledgeVectorIndex{})
+		return tx.Delete(&s).Error
+	})
+	if err != nil {
+		contracts.ResponseError(c, 404, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"uuid": id})
+}
+
+type documentInput struct {
+	Title         string                  `json:"title" binding:"required,max=255"`
+	Content       string                  `json:"content" binding:"required"`
+	SourceType    string                  `json:"source_type" binding:"omitempty,oneof=manual upload"`
+	Tags          []string                `json:"tags"`
+	EffectiveFrom string                  `json:"effective_from"`
+	EffectiveTo   string                  `json:"effective_to"`
+	Ingestion     *localIngestionSnapshot `json:"ingestion"`
+}
+
+// localIngestionSnapshot deliberately mirrors PowerX's task-level ingestion
+// contract. It is persisted with the ingestion job and is the sole source of
+// truth for retries and later reindexing of that task.
+type localIngestionSnapshot struct {
+	IngestionProfile    string   `json:"ingestion_profile"`
+	ProcessorProfile    string   `json:"processor_profile"`
+	MaskingProfile      string   `json:"masking_profile"`
+	Priority            string   `json:"priority"`
+	RAGSceneKey         string   `json:"rag_scene_key"`
+	RAGBundleKey        string   `json:"rag_bundle_key"`
+	RAGPrimary          string   `json:"rag_primary"`
+	SegmentMode         string   `json:"segment_mode"`
+	ChunkSize           int      `json:"chunk_size"`
+	ChunkOverlap        int      `json:"chunk_overlap"`
+	SegmentSizePolicy   string   `json:"segment_size_policy"`
+	SegmentOrder        []string `json:"segment_order"`
+	Separators          []string `json:"separators"`
+	PagePriority        bool     `json:"page_priority"`
+	AnchorHeadingPath   bool     `json:"anchor_heading_path"`
+	AnchorClauseID      bool     `json:"anchor_clause_id"`
+	AnchorRowNumber     bool     `json:"anchor_row_number"`
+	AnchorSpeaker       bool     `json:"anchor_speaker"`
+	AnchorSentenceIndex bool     `json:"anchor_sentence_index"`
+}
+
+func normalizeLocalIngestionSnapshot(in *localIngestionSnapshot, space models.LocalKnowledgeSpace) localIngestionSnapshot {
+	strategy := knowledgeStrategy(space.FeatureFlags)
+	value := localIngestionSnapshot{IngestionProfile: space.IngestionProfileKey, ProcessorProfile: "builtin/default", Priority: "normal", RAGSceneKey: "custom_expert", RAGBundleKey: space.RAGProfileKey, RAGPrimary: strategy, SegmentMode: "unit", ChunkSize: 800, ChunkOverlap: 120, SegmentSizePolicy: "target", SegmentOrder: []string{"page", "size", "segment", "separator"}, Separators: []string{"\\n\\n", "\\n", "。", ". ", "! ", "? "}, AnchorHeadingPath: true}
+	if in == nil {
+		return value
+	}
+	value = *in
+	value.IngestionProfile = strings.TrimSpace(value.IngestionProfile)
+	if value.IngestionProfile == "" {
+		value.IngestionProfile = space.IngestionProfileKey
+	}
+	value.ProcessorProfile = strings.TrimSpace(value.ProcessorProfile)
+	if value.ProcessorProfile == "" {
+		value.ProcessorProfile = "builtin/default"
+	}
+	value.MaskingProfile = strings.TrimSpace(value.MaskingProfile)
+	value.RAGSceneKey = strings.TrimSpace(value.RAGSceneKey)
+	if value.RAGSceneKey == "" {
+		value.RAGSceneKey = "custom_expert"
+	}
+	value.RAGBundleKey = strings.TrimSpace(value.RAGBundleKey)
+	if value.RAGBundleKey == "" {
+		value.RAGBundleKey = space.RAGProfileKey
+	}
+	value.RAGPrimary = strings.TrimSpace(value.RAGPrimary)
+	if value.RAGPrimary == "" {
+		value.RAGPrimary = strategy
+	}
+	if value.Priority != "high" {
+		value.Priority = "normal"
+	}
+	value.SegmentMode = strings.ToLower(strings.TrimSpace(value.SegmentMode))
+	switch value.SegmentMode {
+	case "unit", "heading", "clause", "semantic", "table_row", "code_block", "conversation":
+	default:
+		value.SegmentMode = "unit"
+	}
+	if value.ChunkSize <= 0 {
+		value.ChunkSize = 800
+	}
+	if value.ChunkOverlap < 0 || value.ChunkOverlap >= value.ChunkSize {
+		value.ChunkOverlap = 120
+	}
+	if value.SegmentSizePolicy != "cap" {
+		value.SegmentSizePolicy = "target"
+	}
+	if len(value.SegmentOrder) == 0 {
+		value.SegmentOrder = []string{"page", "size", "segment", "separator"}
+	} else {
+		valid := map[string]struct{}{"page": {}, "size": {}, "segment": {}, "separator": {}}
+		order := make([]string, 0, len(value.SegmentOrder))
+		seen := make(map[string]struct{}, len(value.SegmentOrder))
+		for _, step := range value.SegmentOrder {
+			step = strings.ToLower(strings.TrimSpace(step))
+			if _, ok := valid[step]; !ok {
+				continue
+			}
+			if _, duplicated := seen[step]; duplicated {
+				continue
+			}
+			seen[step] = struct{}{}
+			order = append(order, step)
+		}
+		if len(order) == 0 {
+			value.SegmentOrder = []string{"page", "size", "segment", "separator"}
+		} else {
+			value.SegmentOrder = order
+		}
+	}
+	if len(value.Separators) == 0 {
+		value.Separators = []string{"\n\n", "\n", "。", ". ", "! ", "? "}
+	}
+	return value
+}
+
+type spaceSourceInput struct {
+	Provider       string         `json:"provider" binding:"required,oneof=notion feishu"`
+	CredentialUUID string         `json:"credential_uuid"`
+	AuthType       string         `json:"auth_type" binding:"omitempty,oneof=token oauth"`
+	CredentialName string         `json:"credential_name"`
+	SecretRef      string         `json:"secret_ref"`
+	Scope          map[string]any `json:"scope" binding:"required"`
+	SyncMode       string         `json:"sync_mode" binding:"required,oneof=full_then_incremental incremental"`
+	Schedule       string         `json:"schedule" binding:"max=128"`
+}
+
+func localKnowledgeActor(c *gin.Context) string {
+	if tc, ok := authx.GetTenantContext(c); ok && strings.TrimSpace(tc.MemberUUID) != "" {
+		return tc.MemberUUID
+	}
+	return "system"
+}
+
+func (h *handler) listSpaceSources(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	spaceUUID := c.Param("uuid")
+	var space models.LocalKnowledgeSpace
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, spaceUUID).First(&space).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	var jobs []models.LocalKnowledgeSpaceSyncJob
+	if err := h.db.Where("tenant_uuid=? AND space_uuid=?", t, space.UUID).Order("created_at desc").Find(&jobs).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	connectorIDs := make([]string, 0, len(jobs))
+	for _, job := range jobs {
+		connectorIDs = append(connectorIDs, job.ConnectorUUID)
+	}
+	var connectors []models.LocalKnowledgeSourceConnectorInstance
+	if len(connectorIDs) > 0 {
+		if err := h.db.Where("tenant_uuid=? AND uuid IN ?", t, connectorIDs).Find(&connectors).Error; err != nil {
+			contracts.ResponseInternalError(c, err)
+			return
+		}
+	}
+	credentialsByUUID := map[string]models.LocalKnowledgeSourceCredential{}
+	credentialIDs := make([]string, 0, len(connectors))
+	for _, connector := range connectors {
+		credentialIDs = append(credentialIDs, connector.CredentialUUID)
+	}
+	if len(credentialIDs) > 0 {
+		var credentials []models.LocalKnowledgeSourceCredential
+		if err := h.db.Where("tenant_uuid=? AND uuid IN ?", t, credentialIDs).Find(&credentials).Error; err != nil {
+			contracts.ResponseInternalError(c, err)
+			return
+		}
+		for _, credential := range credentials {
+			credentialsByUUID[credential.UUID] = credential
+		}
+	}
+	connectorsByUUID := map[string]models.LocalKnowledgeSourceConnectorInstance{}
+	for _, connector := range connectors {
+		connectorsByUUID[connector.UUID] = connector
+	}
+	items := make([]gin.H, 0, len(jobs))
+	for _, job := range jobs {
+		connector, connectorOK := connectorsByUUID[job.ConnectorUUID]
+		credential, credentialOK := credentialsByUUID[connector.CredentialUUID]
+		if !connectorOK || !credentialOK {
+			continue
+		}
+		items = append(items, gin.H{
+			"uuid":              job.UUID,
+			"connector_uuid":    connector.UUID,
+			"provider":          job.Provider,
+			"credential_uuid":   credential.UUID,
+			"credential_name":   credential.Label,
+			"credential_status": credential.Status,
+			"sync_mode":         job.SyncMode,
+			"schedule":          job.Schedule,
+			"status":            job.Status,
+			"scope":             job.Scope,
+			"last_error":        job.LastError,
+			"created_at":        job.CreatedAt,
+			"updated_at":        job.UpdatedAt,
+		})
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+
+func (h *handler) createSpaceSource(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	spaceUUID := c.Param("uuid")
+	var space models.LocalKnowledgeSpace
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, spaceUUID).First(&space).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	var in spaceSourceInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_SOURCE_CONNECTION", "INVALID_SOURCE_CONNECTION")
+		return
+	}
+	in.Provider = strings.TrimSpace(strings.ToLower(in.Provider))
+	in.CredentialUUID = strings.TrimSpace(in.CredentialUUID)
+	in.CredentialName = strings.TrimSpace(in.CredentialName)
+	in.SecretRef = strings.TrimSpace(in.SecretRef)
+	in.AuthType = strings.TrimSpace(strings.ToLower(in.AuthType))
+	in.SyncMode = strings.TrimSpace(strings.ToLower(in.SyncMode))
+	in.Schedule = strings.TrimSpace(in.Schedule)
+	if len(in.Scope) == 0 {
+		contracts.ResponseError(c, http.StatusBadRequest, "SOURCE_SCOPE_REQUIRED", "SOURCE_SCOPE_REQUIRED")
+		return
+	}
+	actor := localKnowledgeActor(c)
+	var out models.LocalKnowledgeSpaceSyncJob
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		var credential models.LocalKnowledgeSourceCredential
+		if in.CredentialUUID != "" {
+			if err := tx.Where("tenant_uuid=? AND uuid=? AND provider=? AND status=?", t, in.CredentialUUID, in.Provider, "active").First(&credential).Error; err != nil {
+				return fmt.Errorf("SOURCE_CREDENTIAL_NOT_FOUND")
+			}
+		} else {
+			if in.CredentialName == "" || in.SecretRef == "" || in.AuthType == "" {
+				return fmt.Errorf("SOURCE_CREDENTIAL_REQUIRED")
+			}
+			metadata, err := json.Marshal(gin.H{"secret_ref_configured": true})
+			if err != nil {
+				return err
+			}
+			credential = models.LocalKnowledgeSourceCredential{TenantUUID: t, Provider: in.Provider, AuthType: in.AuthType, Label: in.CredentialName, Status: "active", SecretRef: in.SecretRef, Metadata: metadata, CreatedBy: actor, UpdatedBy: actor}
+			if err := tx.Create(&credential).Error; err != nil {
+				return err
+			}
+		}
+		var connector models.LocalKnowledgeSourceConnectorInstance
+		err := tx.Where("tenant_uuid=? AND provider=? AND credential_uuid=? AND status=?", t, in.Provider, credential.UUID, "active").First(&connector).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		if err == gorm.ErrRecordNotFound {
+			connector = models.LocalKnowledgeSourceConnectorInstance{TenantUUID: t, Provider: in.Provider, CredentialUUID: credential.UUID, Status: "active", Config: []byte(`{}`), CreatedBy: actor, UpdatedBy: actor}
+			if err := tx.Create(&connector).Error; err != nil {
+				return err
+			}
+		}
+		scope, err := json.Marshal(in.Scope)
+		if err != nil {
+			return err
+		}
+		out = models.LocalKnowledgeSpaceSyncJob{TenantUUID: t, SpaceUUID: space.UUID, ConnectorUUID: connector.UUID, Provider: in.Provider, SyncMode: in.SyncMode, Schedule: in.Schedule, Status: "blocked", Scope: scope, LastError: "SYNC_WORKER_NOT_CONFIGURED", CreatedBy: actor, UpdatedBy: actor}
+		return tx.Create(&out).Error
+	}); err != nil {
+		switch err.Error() {
+		case "SOURCE_CREDENTIAL_NOT_FOUND", "SOURCE_CREDENTIAL_REQUIRED":
+			contracts.ResponseError(c, http.StatusBadRequest, err.Error(), err.Error())
+		default:
+			contracts.ResponseInternalError(c, err)
+		}
+		return
+	}
+	contracts.ResponseSuccess(c, out)
+}
+
+func (h *handler) listDocuments(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var d []models.LocalKnowledgeDocument
+	if e := h.db.Where("tenant_uuid=? AND space_uuid=?", t, c.Param("uuid")).Order("updated_at desc").Find(&d).Error; e != nil {
+		contracts.ResponseInternalError(c, e)
+		return
+	}
+	items := make([]gin.H, 0, len(d))
+	for _, document := range d {
+		items = append(items, localDocumentView(document))
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+
+func localDocumentView(document models.LocalKnowledgeDocument) gin.H {
+	return gin.H{
+		"uuid": document.UUID, "space_uuid": document.SpaceUUID,
+		"title": document.Title, "uri": document.URI, "content": document.Content,
+		"content_type": document.ContentType, "checksum": document.Checksum,
+		"version": document.Version, "tags": document.Tags, "source_type": document.SourceType,
+		"effective_from": document.EffectiveFrom, "effective_to": document.EffectiveTo,
+		"access_scope": document.AccessScope, "allowed_member_uuids": document.AllowedMemberUUIDs,
+		"status": document.Status, "indexed_at": document.IndexedAt,
+		"chunk_count": document.ChunkCount, "created_at": document.CreatedAt, "updated_at": document.UpdatedAt,
+	}
+}
+
+// inspectDocument returns the persisted document, its ordered chunks and the
+// active vector-index verification result. It never invokes embedding or
+// modifies index data, so the admin UI can safely use it as an inspection view.
+func (h *handler) inspectDocument(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var document models.LocalKnowledgeDocument
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, c.Param("uuid")).First(&document).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "DOCUMENT_NOT_FOUND", "DOCUMENT_NOT_FOUND")
+		return
+	}
+	var documentChunks []models.LocalKnowledgeChunk
+	if err := h.db.Where("tenant_uuid=? AND document_uuid=?", t, document.UUID).Order("ordinal asc").Find(&documentChunks).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+
+	inspection := gin.H{
+		"document":              localDocumentView(document),
+		"persisted_chunk_count": len(documentChunks),
+		"vector_count":          0,
+		"vector_status":         "unavailable",
+	}
+	if h.db.Dialector == nil || h.db.Dialector.Name() != "postgres" {
+		inspection["vector_reason"] = "VECTOR_STORE_POSTGRES_REQUIRED"
+		contracts.ResponseSuccess(c, inspection)
+		return
+	}
+	var space models.LocalKnowledgeSpace
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, document.SpaceUUID).First(&space).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	var index models.LocalKnowledgeVectorIndex
+	if strings.TrimSpace(space.ActiveVectorIndexKey) == "" || h.db.Where("tenant_uuid=? AND space_uuid=? AND index_key=? AND status=?", t, space.UUID, space.ActiveVectorIndexKey, "active").First(&index).Error != nil {
+		inspection["vector_status"] = "unavailable"
+		inspection["vector_reason"] = "VECTOR_INDEX_NOT_ACTIVATED"
+		contracts.ResponseSuccess(c, inspection)
+		return
+	}
+	quotedTable, err := quoteLocalVectorTable(index.VectorTable)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusConflict, "VECTOR_INDEX_INVALID", "VECTOR_INDEX_INVALID")
+		return
+	}
+	var vectorCount int64
+	query := "SELECT COUNT(*) FROM " + quotedTable + " WHERE space_uuid = ? AND chunk_uuid IN (SELECT uuid FROM " + models.LocalKnowledgeChunk{}.TableName() + " WHERE tenant_uuid = ? AND document_uuid = ?)"
+	if err := h.db.Raw(query, document.SpaceUUID, t, document.UUID).Scan(&vectorCount).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	inspection["vector_count"] = vectorCount
+	inspection["vector_dimensions"] = index.Dimensions
+	inspection["vector_index_key"] = index.IndexKey
+	if vectorCount == int64(len(documentChunks)) {
+		inspection["vector_status"] = "verified"
+	} else {
+		inspection["vector_status"] = "mismatch"
+		inspection["vector_reason"] = "VECTOR_CHUNK_COUNT_MISMATCH"
+	}
+	contracts.ResponseSuccess(c, inspection)
+}
+
+type localKnowledgeChunkListItem struct {
+	UUID      string `json:"uuid"`
+	Ordinal   int    `json:"ordinal"`
+	Kind      string `json:"kind"`
+	CharCount int    `json:"char_count"`
+}
+
+func (h *handler) listDocumentChunks(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var document models.LocalKnowledgeDocument
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, c.Param("uuid")).First(&document).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "DOCUMENT_NOT_FOUND", "DOCUMENT_NOT_FOUND")
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "25"))
+	if pageSize < 1 {
+		pageSize = 25
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	var total int64
+	if err := h.db.Model(&models.LocalKnowledgeChunk{}).Where("tenant_uuid=? AND document_uuid=?", t, document.UUID).Count(&total).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	var chunks []models.LocalKnowledgeChunk
+	if err := h.db.Where("tenant_uuid=? AND document_uuid=?", t, document.UUID).Order("ordinal asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&chunks).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	items := make([]localKnowledgeChunkListItem, 0, len(chunks))
+	for _, chunk := range chunks {
+		items = append(items, localKnowledgeChunkListItem{UUID: chunk.UUID, Ordinal: chunk.Ordinal, Kind: chunk.Kind, CharCount: len([]rune(chunk.Content))})
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items, "page": page, "page_size": pageSize, "total": total})
+}
+
+func (h *handler) getDocumentChunk(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var chunk models.LocalKnowledgeChunk
+	if err := h.db.Where("tenant_uuid=? AND document_uuid=? AND uuid=?", t, c.Param("uuid"), c.Param("chunkUUID")).First(&chunk).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "CHUNK_NOT_FOUND", "CHUNK_NOT_FOUND")
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"uuid": chunk.UUID, "ordinal": chunk.Ordinal, "kind": chunk.Kind, "content": chunk.Content, "metadata": chunk.Metadata})
+}
+
+type documentChunkUpdateInput struct {
+	Content string `json:"content" binding:"required"`
+}
+
+// updateDocumentChunk applies an explicit local override to one persisted chunk.
+// It intentionally does not rewrite the source document: generated chunks can overlap,
+// so there is no lossless inverse mapping from a chunk back to the original content.
+func (h *handler) updateDocumentChunk(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var in documentChunkUpdateInput
+	if c.ShouldBindJSON(&in) != nil || strings.TrimSpace(in.Content) == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_ARGUMENT", "INVALID_ARGUMENT")
+		return
+	}
+	var document models.LocalKnowledgeDocument
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, c.Param("uuid")).First(&document).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "DOCUMENT_NOT_FOUND", "DOCUMENT_NOT_FOUND")
+		return
+	}
+	var chunk models.LocalKnowledgeChunk
+	if err := h.db.Where("tenant_uuid=? AND document_uuid=? AND uuid=?", t, document.UUID, c.Param("chunkUUID")).First(&chunk).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "CHUNK_NOT_FOUND", "CHUNK_NOT_FOUND")
+		return
+	}
+	var space models.LocalKnowledgeSpace
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, document.SpaceUUID).First(&space).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	embeddingModelKey := strings.TrimSpace(space.EmbeddingProfileKey)
+	if _, configured := h.localEmbeddingModel(embeddingModelKey); !configured || h.ai == nil {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "EMBEDDING_MODEL_NOT_CONFIGURED", "EMBEDDING_MODEL_NOT_CONFIGURED")
+		return
+	}
+	var activeIndex models.LocalKnowledgeVectorIndex
+	if strings.TrimSpace(space.ActiveVectorIndexKey) == "" || h.db.Where("tenant_uuid=? AND space_uuid=? AND index_key=? AND status=?", t, space.UUID, space.ActiveVectorIndexKey, "active").First(&activeIndex).Error != nil {
+		contracts.ResponseError(c, http.StatusConflict, "VECTOR_INDEX_NOT_ACTIVATED", "VECTOR_INDEX_NOT_ACTIVATED")
+		return
+	}
+	vectorTable, err := quoteLocalVectorTable(activeIndex.VectorTable)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusConflict, "VECTOR_INDEX_INVALID", "VECTOR_INDEX_INVALID")
+		return
+	}
+	content := strings.TrimSpace(in.Content)
+	embeddings, err := h.ai.EmbeddingInvoke(c.Request.Context(), dto.EmbeddingInvokeInput{ModelKey: embeddingModelKey, Inputs: []string{content}})
+	if err != nil || embeddings == nil || len(embeddings.Vectors) != 1 || len(embeddings.Vectors[0]) == 0 {
+		contracts.ResponseError(c, http.StatusBadGateway, "EMBEDDING_INVOKE_FAILED", "EMBEDDING_INVOKE_FAILED")
+		return
+	}
+	if len(embeddings.Vectors[0]) != activeIndex.Dimensions {
+		contracts.ResponseError(c, http.StatusConflict, "VECTOR_INDEX_DIMENSION_MISMATCH", "VECTOR_INDEX_DIMENSION_MISMATCH")
+		return
+	}
+	vector, err := vectorLiteral(embeddings.Vectors[0])
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	metadata := map[string]any{}
+	if len(chunk.Metadata) > 0 && json.Unmarshal(chunk.Metadata, &metadata) != nil {
+		contracts.ResponseError(c, http.StatusConflict, "CHUNK_METADATA_INVALID", "CHUNK_METADATA_INVALID")
+		return
+	}
+	now := time.Now().UTC()
+	metadata["manual_override"] = true
+	metadata["manual_override_at"] = now.Format(time.RFC3339Nano)
+	metadata["manual_override_by"] = localKnowledgeActor(c)
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	chunk.Content = content
+	chunk.Metadata = datatypes.JSON(metadataJSON)
+	vectorJSON, err := vectorMetadata(chunk)
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&chunk).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec("INSERT INTO "+vectorTable+" (space_uuid, chunk_uuid, embedding, metadata, updated_at) VALUES (?, ?, ?::vector, ?::jsonb, NOW()) ON CONFLICT (space_uuid, chunk_uuid) DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata, updated_at = NOW()", chunk.SpaceUUID, chunk.UUID, vector, vectorJSON).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.LocalKnowledgeVectorIndex{}).Where("tenant_uuid=? AND uuid=?", t, activeIndex.UUID).Update("last_used_at", now).Error
+	}); err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"uuid": chunk.UUID, "ordinal": chunk.Ordinal, "kind": chunk.Kind, "content": chunk.Content, "metadata": chunk.Metadata})
+}
+func (h *handler) createDocument(c *gin.Context) { h.saveDocumentForSpace(c, c.Param("uuid"), true) }
+func (h *handler) saveDocument(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var d models.LocalKnowledgeDocument
+	if e := h.db.Where("tenant_uuid=? AND uuid=?", t, c.Param("uuid")).First(&d).Error; e != nil {
+		contracts.ResponseError(c, 404, "DOCUMENT_NOT_FOUND", "DOCUMENT_NOT_FOUND")
+		return
+	}
+	h.saveDocumentForSpace(c, d.SpaceUUID, false)
+}
+func (h *handler) saveDocumentForSpace(c *gin.Context, space string, isCreate bool) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var in documentInput
+	if c.ShouldBindJSON(&in) != nil || strings.TrimSpace(in.Title) == "" || strings.TrimSpace(in.Content) == "" {
+		contracts.ResponseError(c, 400, "INVALID_ARGUMENT", "INVALID_ARGUMENT")
+		return
+	}
+	effectiveFrom, effectiveTo, validTimeRange := parseEffectiveRange(in.EffectiveFrom, in.EffectiveTo)
+	if !validTimeRange {
+		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_EFFECTIVE_TIME_RANGE", "INVALID_EFFECTIVE_TIME_RANGE")
+		return
+	}
+	var spaceRecord models.LocalKnowledgeSpace
+	if e := h.db.Where("tenant_uuid=? AND uuid=?", t, space).First(&spaceRecord).Error; e != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	snapshot := normalizeLocalIngestionSnapshot(in.Ingestion, spaceRecord)
+	var existing models.LocalKnowledgeDocument
+	if isCreate {
+		existing = models.LocalKnowledgeDocument{TenantUUID: t, SpaceUUID: space, SourceType: "manual", ContentType: "text/markdown", Version: "1"}
+		if strings.TrimSpace(in.SourceType) != "" {
+			existing.SourceType = strings.TrimSpace(in.SourceType)
+		}
+	} else if e := h.db.Where("tenant_uuid=? AND uuid=?", t, c.Param("uuid")).First(&existing).Error; e != nil {
+		contracts.ResponseError(c, 404, "DOCUMENT_NOT_FOUND", "DOCUMENT_NOT_FOUND")
+		return
+	}
+	existing.Title = strings.TrimSpace(in.Title)
+	existing.Content = strings.TrimSpace(in.Content)
+	existing.URI = "local://" + space + "/" + existing.Title
+	existing.Checksum = fmt.Sprintf("%x", sha256.Sum256([]byte(existing.Content)))
+	existing.Status = "queued"
+	existing.ChunkCount = 0
+	existing.EffectiveFrom = effectiveFrom
+	existing.EffectiveTo = effectiveTo
+	if isCreate {
+		var conflict models.LocalKnowledgeDocument
+		err := h.db.Where("tenant_uuid=? AND space_uuid=? AND uri=?", t, space, existing.URI).First(&conflict).Error
+		if err == nil {
+			contracts.ResponseError(c, http.StatusConflict, "DOCUMENT_URI_CONFLICT", "DOCUMENT_URI_CONFLICT")
+			return
+		}
+		if err != nil && err != gorm.ErrRecordNotFound {
+			contracts.ResponseInternalError(c, err)
+			return
+		}
+	}
+	tags := make([]string, 0, len(in.Tags))
+	seenTags := map[string]bool{}
+	for _, tag := range in.Tags {
+		tag = strings.TrimSpace(strings.ToLower(tag))
+		if tag != "" && !seenTags[tag] {
+			seenTags[tag] = true
+			tags = append(tags, tag)
+		}
+	}
+	rawTags, marshalErr := json.Marshal(tags)
+	if marshalErr != nil {
+		contracts.ResponseInternalError(c, marshalErr)
+		return
+	}
+	existing.Tags = rawTags
+	if !isCreate {
+		existing.Version = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	var err error
+	if isCreate {
+		err = h.db.Create(&existing).Error
+	} else {
+		err = h.db.Save(&existing).Error
+	}
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	if isCreate {
+		actor := "system"
+		if tc, exists := authx.GetTenantContext(c); exists && strings.TrimSpace(tc.MemberUUID) != "" {
+			actor = tc.MemberUUID
+		}
+		metrics, marshalErr := json.Marshal(gin.H{
+			"document_uuid": existing.UUID,
+			"source_title":  existing.Title,
+			"content_type":  existing.ContentType,
+			"source_scheme": "local",
+			"ingestion":     snapshot,
+		})
+		if marshalErr != nil {
+			contracts.ResponseInternalError(c, marshalErr)
+			return
+		}
+		job := models.LocalKnowledgeIngestionJob{
+			TenantUUID:      t,
+			SpaceUUID:       existing.SpaceUUID,
+			SourceID:        existing.UUID,
+			SourceType:      existing.SourceType,
+			Status:          "queued",
+			Priority:        snapshot.Priority,
+			SubmittedBy:     actor,
+			MetricsSnapshot: metrics,
+		}
+		if createErr := h.db.Create(&job).Error; createErr != nil {
+			contracts.ResponseInternalError(c, createErr)
+			return
+		}
+	}
+	contracts.ResponseSuccess(c, localDocumentView(existing))
+}
+
+func parseEffectiveRange(from, to string) (*time.Time, *time.Time, bool) {
+	parse := func(value string) (*time.Time, bool) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return nil, true
+		}
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			return nil, false
+		}
+		return &parsed, true
+	}
+	effectiveFrom, ok := parse(from)
+	if !ok {
+		return nil, nil, false
+	}
+	effectiveTo, ok := parse(to)
+	if !ok || (effectiveFrom != nil && effectiveTo != nil && effectiveTo.Before(*effectiveFrom)) {
+		return nil, nil, false
+	}
+	return effectiveFrom, effectiveTo, true
+}
+
+type knowledgeChunkPart struct {
+	Content  string
+	Metadata []byte
+}
+
+func chunks(content string, size, overlap int) []string {
+	r := []rune(strings.TrimSpace(content))
+	out := []string{}
+	for start := 0; start < len(r); {
+		end := start + size
+		if end > len(r) {
+			end = len(r)
+		}
+		out = append(out, string(r[start:end]))
+		if end == len(r) {
+			break
+		}
+		start = end - overlap
+	}
+	return out
+}
+
+func buildKnowledgeChunks(content, strategy string, size, overlap int) []knowledgeChunkPart {
+	if strategy != "B_semantic_chunking" && strategy != "C_context_enriched" && strategy != "J_hier" {
+		plain := chunks(content, size, overlap)
+		parts := make([]knowledgeChunkPart, 0, len(plain))
+		for _, text := range plain {
+			parts = append(parts, knowledgeChunkPart{Content: text, Metadata: []byte(`{}`)})
+		}
+		return parts
+	}
+	var parts []knowledgeChunkPart
+	section := ""
+	buffer := make([]string, 0)
+	flush := func() {
+		if len(buffer) == 0 {
+			return
+		}
+		text := strings.TrimSpace(strings.Join(buffer, "\n"))
+		for _, item := range chunks(text, size, overlap) {
+			metadata, _ := json.Marshal(gin.H{"section": section, "hierarchical": true})
+			parts = append(parts, knowledgeChunkPart{Content: item, Metadata: metadata})
+		}
+		buffer = buffer[:0]
+	}
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			flush()
+			section = strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+			continue
+		}
+		buffer = append(buffer, line)
+	}
+	flush()
+	if len(parts) == 0 {
+		return buildKnowledgeChunks(content, "", size, overlap)
+	}
+	return parts
+}
+
+func buildKnowledgeChunksWithSnapshot(content, strategy string, size, overlap int, snapshot localIngestionSnapshot) []knowledgeChunkPart {
+	if snapshot.SegmentMode == "heading" {
+		strategy = "B_semantic_chunking"
+	}
+	if snapshot.SegmentMode == "table_row" {
+		return applyLocalIngestionMetadata(chunkLocalUnits(strings.Split(content, "\n"), size, overlap), snapshot)
+	}
+	if snapshot.SegmentMode == "code_block" {
+		return applyLocalIngestionMetadata(chunkLocalUnits(strings.Split(content, "```"), size, overlap), snapshot)
+	}
+	if snapshot.SegmentMode == "clause" || snapshot.SegmentMode == "conversation" || snapshot.SegmentMode == "unit" {
+		separators := snapshot.Separators
+		if len(separators) > 0 {
+			segments := []string{content}
+			for _, separator := range separators {
+				// The API accepts escaped newlines ("\\n") so a task snapshot
+				// remains inspectable and portable. Do not TrimSpace here: an
+				// actual newline is itself a valid separator.
+				separator = strings.ReplaceAll(separator, "\\n", "\n")
+				if separator == "" {
+					continue
+				}
+				next := make([]string, 0, len(segments))
+				for _, segment := range segments {
+					next = append(next, strings.Split(segment, separator)...)
+				}
+				segments = next
+			}
+			parts := make([]knowledgeChunkPart, 0, len(segments))
+			for _, segment := range segments {
+				for _, item := range chunks(segment, size, overlap) {
+					if strings.TrimSpace(item) != "" {
+						parts = append(parts, knowledgeChunkPart{Content: item, Metadata: []byte(`{}`)})
+					}
+				}
+			}
+			if len(parts) > 0 {
+				return applyLocalIngestionMetadata(parts, snapshot)
+			}
+		}
+	}
+	return applyLocalIngestionMetadata(buildKnowledgeChunks(content, strategy, size, overlap), snapshot)
+}
+
+func chunkLocalUnits(units []string, size, overlap int) []knowledgeChunkPart {
+	parts := make([]knowledgeChunkPart, 0, len(units))
+	for _, unit := range units {
+		for _, item := range chunks(unit, size, overlap) {
+			if strings.TrimSpace(item) != "" {
+				parts = append(parts, knowledgeChunkPart{Content: item, Metadata: []byte(`{}`)})
+			}
+		}
+	}
+	return parts
+}
+
+func applyLocalIngestionMetadata(parts []knowledgeChunkPart, snapshot localIngestionSnapshot) []knowledgeChunkPart {
+	for i := range parts {
+		metadata := map[string]any{}
+		_ = json.Unmarshal(parts[i].Metadata, &metadata)
+		metadata["segment_mode"] = snapshot.SegmentMode
+		metadata["segment_size_policy"] = snapshot.SegmentSizePolicy
+		metadata["segment_order"] = snapshot.SegmentOrder
+		metadata["processor_profile"] = snapshot.ProcessorProfile
+		if snapshot.MaskingProfile != "" {
+			metadata["masking_profile"] = snapshot.MaskingProfile
+		}
+		anchors := make([]string, 0, 5)
+		if snapshot.AnchorHeadingPath {
+			anchors = append(anchors, "heading_path")
+		}
+		if snapshot.AnchorClauseID {
+			anchors = append(anchors, "clause_id")
+		}
+		if snapshot.AnchorRowNumber {
+			anchors = append(anchors, "row_number")
+		}
+		if snapshot.AnchorSpeaker {
+			anchors = append(anchors, "speaker")
+		}
+		if snapshot.AnchorSentenceIndex {
+			anchors = append(anchors, "sentence_index")
+		}
+		metadata["anchors"] = anchors
+		if encoded, err := json.Marshal(metadata); err == nil {
+			parts[i].Metadata = encoded
+		}
+	}
+	return parts
+}
+
+// augmentKnowledgeChunks is the local D document-augmentation pipeline. It
+// creates deterministic, inspectable structured fields during indexing; no
+// generated metadata is silently fabricated by a model.
+func augmentKnowledgeChunks(parts []knowledgeChunkPart, title, strategy string) []knowledgeChunkPart {
+	if strategy != "D_doc_augmentation" {
+		return parts
+	}
+	for i := range parts {
+		metadata := map[string]any{}
+		_ = json.Unmarshal(parts[i].Metadata, &metadata)
+		metadata["title"] = strings.TrimSpace(title)
+		metadata["augmented_keywords"] = localKnowledgeKeywords(title + "\n" + parts[i].Content)
+		encoded, err := json.Marshal(metadata)
+		if err != nil {
+			continue
+		}
+		parts[i].Metadata = encoded
+	}
+	return parts
+}
+
+func localKnowledgeKeywords(value string) []string {
+	seen := map[string]bool{}
+	items := make([]string, 0, 12)
+	add := func(value string) {
+		value = strings.TrimSpace(strings.ToLower(value))
+		if value == "" || seen[value] || len([]rune(value)) < 2 {
+			return
+		}
+		seen[value] = true
+		items = append(items, value)
+	}
+	for _, token := range strings.Fields(strings.ToLower(value)) {
+		add(token)
+	}
+	runes := []rune(value)
+	for i := 0; i+1 < len(runes) && len(items) < 12; i++ {
+		if unicode.Is(unicode.Han, runes[i]) && unicode.Is(unicode.Han, runes[i+1]) {
+			add(string(runes[i : i+2]))
+		}
+	}
+	return items
+}
+
+func knowledgeStrategy(flags []byte) string {
+	var values []string
+	if json.Unmarshal(flags, &values) != nil {
+		return ""
+	}
+	for _, value := range values {
+		if strings.HasPrefix(value, "rag.strategy_package:") {
+			return strings.TrimPrefix(value, "rag.strategy_package:")
+		}
+	}
+	return ""
+}
+func (h *handler) indexDocument(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	id := c.Param("uuid")
+	var d models.LocalKnowledgeDocument
+	var s models.LocalKnowledgeSpace
+	var p models.LocalIngestionProfileVersion
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, id).First(&d).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "DOCUMENT_NOT_FOUND", "DOCUMENT_NOT_FOUND")
+		return
+	}
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", t, d.SpaceUUID).First(&s).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	snapshot := normalizeLocalIngestionSnapshot(nil, s)
+	var ingestionJob models.LocalKnowledgeIngestionJob
+	err := h.db.Where("tenant_uuid=? AND space_uuid=? AND source_id=?", t, d.SpaceUUID, d.UUID).Order("id desc").First(&ingestionJob).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	if err == nil && len(ingestionJob.MetricsSnapshot) > 0 {
+		var saved struct {
+			Ingestion *localIngestionSnapshot `json:"ingestion"`
+		}
+		if json.Unmarshal(ingestionJob.MetricsSnapshot, &saved) == nil && saved.Ingestion != nil {
+			snapshot = normalizeLocalIngestionSnapshot(saved.Ingestion, s)
+		}
+	}
+	if err == nil && ingestionJob.Status == "running" {
+		contracts.ResponseError(c, http.StatusConflict, "INGESTION_ALREADY_RUNNING", "INGESTION_ALREADY_RUNNING")
+		return
+	}
+	if err != nil || ingestionJob.Status != "queued" {
+		metrics, marshalErr := json.Marshal(gin.H{"document_uuid": d.UUID, "source_title": d.Title, "ingestion": snapshot})
+		if marshalErr != nil {
+			contracts.ResponseInternalError(c, marshalErr)
+			return
+		}
+		ingestionJob = models.LocalKnowledgeIngestionJob{
+			TenantUUID: t, SpaceUUID: d.SpaceUUID, SourceID: d.UUID, SourceType: d.SourceType,
+			Status: "queued", Priority: snapshot.Priority, MetricsSnapshot: datatypes.JSON(metrics),
+		}
+		if createErr := h.db.Create(&ingestionJob).Error; createErr != nil {
+			contracts.ResponseInternalError(c, createErr)
+			return
+		}
+	}
+	claim := h.db.Model(&models.LocalKnowledgeIngestionJob{}).
+		Where("tenant_uuid=? AND space_uuid=? AND uuid=? AND status=?", t, d.SpaceUUID, ingestionJob.UUID, "queued").
+		Update("status", "running")
+	if claim.Error != nil {
+		contracts.ResponseInternalError(c, claim.Error)
+		return
+	}
+	if claim.RowsAffected != 1 {
+		contracts.ResponseError(c, http.StatusConflict, "INGESTION_ALREADY_RUNNING", "INGESTION_ALREADY_RUNNING")
+		return
+	}
+	h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "running", "preparing", 5, 0, "")
+	embeddingModelKey := strings.TrimSpace(s.EmbeddingProfileKey)
+	_, configured := h.localEmbeddingModel(embeddingModelKey)
+	if !configured || h.ai == nil {
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 0, 0, "EMBEDDING_MODEL_NOT_CONFIGURED")
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "EMBEDDING_MODEL_NOT_CONFIGURED", "EMBEDDING_MODEL_NOT_CONFIGURED")
+		return
+	}
+	var activeIndex models.LocalKnowledgeVectorIndex
+	if strings.TrimSpace(s.ActiveVectorIndexKey) == "" || h.db.Where("tenant_uuid=? AND space_uuid=? AND index_key=? AND status=?", t, s.UUID, s.ActiveVectorIndexKey, "active").First(&activeIndex).Error != nil {
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 0, 0, "VECTOR_INDEX_NOT_ACTIVATED")
+		contracts.ResponseError(c, http.StatusConflict, "VECTOR_INDEX_NOT_ACTIVATED", "VECTOR_INDEX_NOT_ACTIVATED")
+		return
+	}
+	vectorTable, tableErr := quoteLocalVectorTable(activeIndex.VectorTable)
+	if tableErr != nil {
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 0, 0, "VECTOR_INDEX_INVALID")
+		contracts.ResponseError(c, http.StatusConflict, "VECTOR_INDEX_INVALID", "VECTOR_INDEX_INVALID")
+		return
+	}
+	if err := h.db.Where("tenant_uuid=? AND profile_key=? AND status=?", t, snapshot.IngestionProfile, "published").Order("version desc").First(&p).Error; err != nil {
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 0, 0, "INGESTION_PROFILE_NOT_PUBLISHED")
+		contracts.ResponseError(c, http.StatusConflict, "INGESTION_PROFILE_NOT_PUBLISHED", "INGESTION_PROFILE_NOT_PUBLISHED")
+		return
+	}
+	var ingestionConfig struct {
+		ChunkSize    int `json:"chunk_size"`
+		ChunkOverlap int `json:"chunk_overlap"`
+	}
+	if len(p.Config) > 0 {
+		_ = json.Unmarshal(p.Config, &ingestionConfig)
+	}
+	if snapshot.ChunkSize > 0 {
+		ingestionConfig.ChunkSize = snapshot.ChunkSize
+	}
+	if snapshot.ChunkOverlap >= 0 {
+		ingestionConfig.ChunkOverlap = snapshot.ChunkOverlap
+	}
+	if ingestionConfig.ChunkSize <= 0 {
+		ingestionConfig.ChunkSize = 800
+	}
+	if ingestionConfig.ChunkOverlap < 0 || ingestionConfig.ChunkOverlap >= ingestionConfig.ChunkSize {
+		ingestionConfig.ChunkOverlap = 120
+	}
+	strategy := knowledgeStrategy(s.FeatureFlags)
+	if strings.TrimSpace(snapshot.RAGPrimary) != "" {
+		strategy = snapshot.RAGPrimary
+	}
+	var graph *localKnowledgeGraph
+	if strategy == "K_kg" {
+		graphResult, graphErr := h.extractLocalKnowledgeGraph(c.Request.Context(), d.Content)
+		if graphErr != nil {
+			h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 0, 0, "KG_EXTRACTION_FAILED")
+			contracts.ResponseError(c, http.StatusBadGateway, "KG_EXTRACTION_FAILED", "KG_EXTRACTION_FAILED")
+			return
+		}
+		graph = graphResult
+	}
+	parts := buildKnowledgeChunksWithSnapshot(d.Content, strategy, ingestionConfig.ChunkSize, ingestionConfig.ChunkOverlap, snapshot)
+	parts = augmentKnowledgeChunks(parts, d.Title, strategy)
+	if len(parts) == 0 {
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 0, 0, "DOCUMENT_CONTENT_EMPTY")
+		contracts.ResponseError(c, http.StatusBadRequest, "DOCUMENT_CONTENT_EMPTY", "DOCUMENT_CONTENT_EMPTY")
+		return
+	}
+	h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "running", "chunking", 25, len(parts), "")
+	inputs := make([]string, 0, len(parts))
+	for _, part := range parts {
+		inputs = append(inputs, part.Content)
+	}
+	h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "running", "embedding", 45, len(parts), "")
+	embeddings, err := h.ai.EmbeddingInvoke(c.Request.Context(), dto.EmbeddingInvokeInput{ModelKey: embeddingModelKey, Inputs: inputs})
+	if err != nil || embeddings == nil || len(embeddings.Vectors) != len(parts) || len(embeddings.Vectors) == 0 || len(embeddings.Vectors[0]) == 0 {
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 25, len(parts), "EMBEDDING_INVOKE_FAILED")
+		contracts.ResponseError(c, http.StatusBadGateway, "EMBEDDING_INVOKE_FAILED", "EMBEDDING_INVOKE_FAILED")
+		return
+	}
+	dimensions := len(embeddings.Vectors[0])
+	for _, vector := range embeddings.Vectors {
+		if len(vector) != dimensions {
+			h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 25, len(parts), "EMBEDDING_DIMENSION_MISMATCH")
+			contracts.ResponseError(c, http.StatusBadGateway, "EMBEDDING_DIMENSION_MISMATCH", "EMBEDDING_DIMENSION_MISMATCH")
+			return
+		}
+	}
+	if activeIndex.Dimensions != dimensions {
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 25, len(parts), "VECTOR_INDEX_DIMENSION_MISMATCH")
+		contracts.ResponseError(c, http.StatusConflict, "VECTOR_INDEX_DIMENSION_MISMATCH", "VECTOR_INDEX_DIMENSION_MISMATCH")
+		return
+	}
+	h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "running", "writing", 75, len(parts), "")
+	var out models.LocalKnowledgeIndexJob
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		startedAt := time.Now()
+		out = models.LocalKnowledgeIndexJob{TenantUUID: t, SpaceUUID: d.SpaceUUID, DocumentUUID: uuidReference(d.UUID), Operation: "reindex", Status: "running", StartedAt: &startedAt}
+		if e := tx.Create(&out).Error; e != nil {
+			return e
+		}
+		if e := h.deleteLocalVectorRows(tx, t, d.SpaceUUID, d.UUID); e != nil {
+			return e
+		}
+		if e := tx.Where("tenant_uuid=? AND document_uuid=?", t, d.UUID).Delete(&models.LocalKnowledgeKGEdge{}).Error; e != nil {
+			return e
+		}
+		if e := tx.Where("tenant_uuid=? AND document_uuid=?", t, d.UUID).Delete(&models.LocalKnowledgeKGNode{}).Error; e != nil {
+			return e
+		}
+		if e := tx.Where("tenant_uuid=? AND document_uuid=?", t, d.UUID).Delete(&models.LocalKnowledgeChunk{}).Error; e != nil {
+			return e
+		}
+		chunkUUIDByOrdinal := make(map[int]string, len(parts))
+		for i, part := range parts {
+			chunk := models.LocalKnowledgeChunk{TenantUUID: t, SpaceUUID: d.SpaceUUID, DocumentUUID: d.UUID, JobUUID: uuidReference(out.UUID), Ordinal: i, Kind: "chunk", Content: part.Content, Metadata: part.Metadata}
+			if e := tx.Create(&chunk).Error; e != nil {
+				return e
+			}
+			if e := persistLocalJobChunk(tx, ingestionJob.UUID, chunk); e != nil {
+				return e
+			}
+			chunkUUIDByOrdinal[i] = chunk.UUID
+			vector, e := vectorLiteral(embeddings.Vectors[i])
+			if e != nil {
+				return e
+			}
+			metadata, e := vectorMetadata(chunk)
+			if e != nil {
+				return e
+			}
+			if e := tx.Exec("INSERT INTO "+vectorTable+" (space_uuid, chunk_uuid, embedding, metadata, updated_at) VALUES (?, ?, ?::vector, ?::jsonb, NOW()) ON CONFLICT (space_uuid, chunk_uuid) DO UPDATE SET embedding = EXCLUDED.embedding, metadata = EXCLUDED.metadata, updated_at = NOW()", d.SpaceUUID, chunk.UUID, vector, metadata).Error; e != nil {
+				return e
+			}
+		}
+		if graph != nil {
+			if e := persistLocalKnowledgeGraph(tx, t, d.SpaceUUID, d.UUID, graph, chunkUUIDByOrdinal); e != nil {
+				return e
+			}
+		}
+		d.Status = "indexed"
+		indexedAt := time.Now()
+		d.IndexedAt = &indexedAt
+		d.ChunkCount = len(parts)
+		if e := tx.Save(&d).Error; e != nil {
+			return e
+		}
+		now := time.Now()
+		if e := tx.Model(&models.LocalKnowledgeVectorIndex{}).Where("tenant_uuid=? AND uuid=?", t, activeIndex.UUID).Update("last_used_at", now).Error; e != nil {
+			return e
+		}
+		completedAt := time.Now()
+		out.Status = "completed"
+		out.CompletedAt = &completedAt
+		if e := tx.Save(&out).Error; e != nil {
+			return e
+		}
+		metrics, e := json.Marshal(gin.H{
+			"document_uuid":  d.UUID,
+			"source_title":   d.Title,
+			"index_job_uuid": out.UUID,
+			"chunk_total":    len(parts),
+			"vector_index":   activeIndex.IndexKey,
+			"ingestion":      snapshot,
+		})
+		if e != nil {
+			return e
+		}
+		return tx.Model(&models.LocalKnowledgeIngestionJob{}).
+			Where("tenant_uuid=? AND space_uuid=? AND uuid=? AND status=?", t, d.SpaceUUID, ingestionJob.UUID, "running").
+			Updates(map[string]any{
+				"status":                "completed",
+				"chunk_total":           len(parts),
+				"paragraph_chunk_count": len(parts),
+				"chunk_covered_pct":     100,
+				"embedding_success_pct": 100,
+				"progress_percent":      100,
+				"completed_at":          completedAt,
+				"metrics_snapshot":      datatypes.JSON(metrics),
+			}).Error
+	})
+	if err != nil {
+		slog.Error("local knowledge document index transaction failed",
+			"document_uuid", d.UUID,
+			"space_uuid", d.SpaceUUID,
+			"vector_index", activeIndex.IndexKey,
+			"error", err,
+		)
+		h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "failed", "failed", 75, len(parts), "INDEX_WRITE_FAILED")
+		contracts.ResponseError(c, http.StatusInternalServerError, "INDEX_WRITE_FAILED", "INDEX_WRITE_FAILED")
+		return
+	}
+	h.reportIngestionProgress(c.Request.Context(), t, ingestionJob.UUID, d.UUID, d.SpaceUUID, "completed", "completed", 100, len(parts), "")
+	contracts.ResponseSuccess(c, out)
+}
+
+type localKnowledgeGraph struct {
+	Entities  []localKnowledgeGraphEntity   `json:"entities"`
+	Relations []localKnowledgeGraphRelation `json:"relations"`
+}
+type localKnowledgeGraphEntity struct {
+	Name          string `json:"name"`
+	Type          string `json:"type"`
+	ChunkOrdinals []int  `json:"chunk_ordinals"`
+}
+type localKnowledgeGraphRelation struct {
+	Subject   string `json:"subject"`
+	Predicate string `json:"predicate"`
+	Object    string `json:"object"`
+}
+
+// extractLocalKnowledgeGraph uses the explicitly configured local LLM and a
+// strict JSON contract. A malformed graph is an indexing failure, never a
+// fabricated graph fallback.
+func (h *handler) extractLocalKnowledgeGraph(ctx context.Context, content string) (*localKnowledgeGraph, error) {
+	if h == nil || h.ai == nil {
+		return nil, fmt.Errorf("LOCAL_KG_MODEL_NOT_CONFIGURED")
+	}
+	keys := h.ai.LLMModelKeys()
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("LOCAL_KG_MODEL_NOT_CONFIGURED")
+	}
+	prompt := "Extract a compact knowledge graph from this document. Return JSON only in exactly this shape: {\"entities\":[{\"name\":\"...\",\"type\":\"entity\",\"chunk_ordinals\":[0]}],\"relations\":[{\"subject\":\"...\",\"predicate\":\"...\",\"object\":\"...\"}]}. Use only entities stated by the document. Chunk ordinals may be 0 when the document is not yet chunked.\n\nDocument:\n" + content
+	result, err := h.ai.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}})
+	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
+		return nil, fmt.Errorf("LOCAL_KG_EXTRACTION_FAILED")
+	}
+	var graph localKnowledgeGraph
+	if json.Unmarshal([]byte(strings.TrimSpace(result.Text)), &graph) != nil || len(graph.Entities) == 0 {
+		return nil, fmt.Errorf("LOCAL_KG_INVALID_RESPONSE")
+	}
+	seen := map[string]bool{}
+	for i := range graph.Entities {
+		graph.Entities[i].Name = strings.TrimSpace(graph.Entities[i].Name)
+		graph.Entities[i].Type = strings.TrimSpace(graph.Entities[i].Type)
+		key := strings.ToLower(graph.Entities[i].Name)
+		if key == "" || seen[key] {
+			return nil, fmt.Errorf("LOCAL_KG_INVALID_RESPONSE")
+		}
+		seen[key] = true
+		if graph.Entities[i].Type == "" {
+			graph.Entities[i].Type = "entity"
+		}
+	}
+	for i := range graph.Relations {
+		graph.Relations[i].Subject = strings.TrimSpace(graph.Relations[i].Subject)
+		graph.Relations[i].Predicate = strings.TrimSpace(graph.Relations[i].Predicate)
+		graph.Relations[i].Object = strings.TrimSpace(graph.Relations[i].Object)
+		if !seen[strings.ToLower(graph.Relations[i].Subject)] || !seen[strings.ToLower(graph.Relations[i].Object)] || graph.Relations[i].Predicate == "" {
+			return nil, fmt.Errorf("LOCAL_KG_INVALID_RESPONSE")
+		}
+	}
+	return &graph, nil
+}
+
+func persistLocalKnowledgeGraph(tx *gorm.DB, tenantUUID, spaceUUID, documentUUID string, graph *localKnowledgeGraph, chunkUUIDByOrdinal map[int]string) error {
+	nodeByName := make(map[string]models.LocalKnowledgeKGNode, len(graph.Entities))
+	for _, entity := range graph.Entities {
+		chunkUUIDs := make([]string, 0, len(entity.ChunkOrdinals))
+		for _, ordinal := range entity.ChunkOrdinals {
+			if chunkUUID, ok := chunkUUIDByOrdinal[ordinal]; ok {
+				chunkUUIDs = append(chunkUUIDs, chunkUUID)
+			}
+		}
+		if len(chunkUUIDs) == 0 {
+			for _, chunkUUID := range chunkUUIDByOrdinal {
+				chunkUUIDs = append(chunkUUIDs, chunkUUID)
+			}
+		}
+		props, err := json.Marshal(gin.H{"name": entity.Name, "document_uuid": documentUUID, "chunk_uuids": chunkUUIDs})
+		if err != nil {
+			return err
+		}
+		nodeID := fmt.Sprintf("%x", sha256.Sum256([]byte(documentUUID+"\x00"+strings.ToLower(entity.Name))))
+		node := models.LocalKnowledgeKGNode{TenantUUID: tenantUUID, SpaceUUID: spaceUUID, DocumentUUID: documentUUID, NodeID: nodeID, NodeType: entity.Type, Props: props}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+		nodeByName[strings.ToLower(entity.Name)] = node
+	}
+	for _, relation := range graph.Relations {
+		source := nodeByName[strings.ToLower(relation.Subject)]
+		target := nodeByName[strings.ToLower(relation.Object)]
+		props, err := json.Marshal(gin.H{"document_uuid": documentUUID})
+		if err != nil {
+			return err
+		}
+		edgeID := fmt.Sprintf("%x", sha256.Sum256([]byte(documentUUID+"\x00"+source.UUID+"\x00"+relation.Predicate+"\x00"+target.UUID)))
+		edge := models.LocalKnowledgeKGEdge{TenantUUID: tenantUUID, SpaceUUID: spaceUUID, DocumentUUID: documentUUID, EdgeID: edgeID, SrcNodeUUID: source.UUID, DstNodeUUID: target.UUID, Predicate: relation.Predicate, Props: props}
+		if err := tx.Create(&edge).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (h *handler) deleteDocument(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	id := c.Param("uuid")
+	err := h.db.Transaction(func(tx *gorm.DB) error {
+		var d models.LocalKnowledgeDocument
+		if err := tx.Where("tenant_uuid=? AND uuid=?", t, id).First(&d).Error; err != nil {
+			return err
+		}
+		if err := h.deleteLocalVectorRows(tx, t, d.SpaceUUID, d.UUID); err != nil {
+			return err
+		}
+		if err := tx.Where("tenant_uuid=? AND document_uuid=?", t, id).Delete(&models.LocalKnowledgeKGEdge{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("tenant_uuid=? AND document_uuid=?", t, id).Delete(&models.LocalKnowledgeKGNode{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("tenant_uuid=? AND document_uuid=?", t, id).Delete(&models.LocalKnowledgeChunk{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("tenant_uuid=? AND document_uuid=?", t, id).Delete(&models.LocalKnowledgeIndexJob{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("tenant_uuid=? AND source_id=?", t, id).Delete(&models.LocalKnowledgeIngestionJob{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("tenant_uuid=? AND document_uuid=?", t, id).Delete(&models.LocalKnowledgeJobChunk{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("tenant_uuid=? AND uuid=?", t, id).Delete(&models.LocalKnowledgeDocument{}).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			contracts.ResponseError(c, http.StatusNotFound, "DOCUMENT_NOT_FOUND", "DOCUMENT_NOT_FOUND")
+		} else {
+			contracts.ResponseInternalError(c, err)
+		}
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"uuid": id})
+}
+func (h *handler) listJobs(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var j []models.LocalKnowledgeIndexJob
+	if e := h.db.Where("tenant_uuid=? AND space_uuid=?", t, c.Param("uuid")).Order("created_at desc").Limit(30).Find(&j).Error; e != nil {
+		contracts.ResponseInternalError(c, e)
+		return
+	}
+	sort.Slice(j, func(i, k int) bool { return j[i].CreatedAt.After(j[k].CreatedAt) })
+	contracts.ResponseSuccess(c, gin.H{"items": j})
+}
+
+func (h *handler) listIngestionJobs(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "25"))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 25
+	}
+	query := h.db.Model(&models.LocalKnowledgeIngestionJob{}).Where("tenant_uuid=? AND space_uuid=?", t, c.Param("uuid"))
+	if sourceID := strings.TrimSpace(c.Query("source_id")); sourceID != "" {
+		if _, err := uuid.Parse(sourceID); err != nil {
+			contracts.ResponseError(c, http.StatusBadRequest, "INVALID_SOURCE_ID", "INVALID_SOURCE_ID")
+			return
+		}
+		query = query.Where("source_id=?", sourceID)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	var jobs []models.LocalKnowledgeIngestionJob
+	if err := query.Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&jobs).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(jobs))
+	for _, job := range jobs {
+		items = append(items, localIngestionJobView(job))
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items, "page": page, "page_size": pageSize, "total": total})
+}
+
+func localIngestionJobView(job models.LocalKnowledgeIngestionJob) gin.H {
+	progressPercent := job.ProgressPercent
+	if job.Status == "completed" {
+		progressPercent = 100
+	}
+	return gin.H{
+		"uuid": job.UUID, "space_uuid": job.SpaceUUID, "source_id": job.SourceID,
+		"source_type": job.SourceType, "status": job.Status, "priority": job.Priority,
+		"retry_count": job.RetryCount, "chunk_total": job.ChunkTotal,
+		"progress_percent": progressPercent, "summary_chunk_count": job.SummaryChunkCount,
+		"paragraph_chunk_count": job.ParagraphChunkCount, "chunk_covered_pct": job.ChunkCoveredPct,
+		"embedding_success_pct": job.EmbeddingSuccessPct, "masking_coverage_pct": job.MaskingCoveragePct,
+		"artifact_bundle_uuid": job.ArtifactBundleUUID, "error_code": job.ErrorCode,
+		"blocked_reason": job.BlockedReason, "submitted_by": job.SubmittedBy,
+		"started_at": job.StartedAt, "completed_at": job.CompletedAt,
+		"metrics_snapshot": job.MetricsSnapshot, "created_at": job.CreatedAt,
+	}
+}
+
+func (h *handler) getIngestionJob(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var job models.LocalKnowledgeIngestionJob
+	if err := h.db.Where("tenant_uuid=? AND space_uuid=? AND uuid=?", t, c.Param("uuid"), c.Param("jobUUID")).First(&job).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "INGESTION_JOB_NOT_FOUND", "INGESTION_JOB_NOT_FOUND")
+		return
+	}
+	contracts.ResponseSuccess(c, localIngestionJobView(job))
+}
+
+func persistLocalJobChunk(tx *gorm.DB, jobUUID string, chunk models.LocalKnowledgeChunk) error {
+	return tx.Create(&models.LocalKnowledgeJobChunk{
+		TenantUUID: chunk.TenantUUID, SpaceUUID: chunk.SpaceUUID, DocumentUUID: chunk.DocumentUUID,
+		JobUUID: jobUUID, Ordinal: chunk.Ordinal, Kind: chunk.Kind, Content: chunk.Content, Metadata: chunk.Metadata,
+	}).Error
+}
+
+func (h *handler) listIngestionJobChunks(c *gin.Context) {
+	t, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var job models.LocalKnowledgeIngestionJob
+	if err := h.db.Where("tenant_uuid=? AND space_uuid=? AND uuid=?", t, c.Param("uuid"), c.Param("jobUUID")).First(&job).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "INGESTION_JOB_NOT_FOUND", "INGESTION_JOB_NOT_FOUND")
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "25"))
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 25
+	}
+	query := h.db.Model(&models.LocalKnowledgeJobChunk{}).Where("tenant_uuid=? AND space_uuid=? AND job_uuid=?", t, job.SpaceUUID, job.UUID)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	var chunks []models.LocalKnowledgeJobChunk
+	if err := query.Order("ordinal asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&chunks).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(chunks))
+	for _, chunk := range chunks {
+		items = append(items, gin.H{
+			"uuid": chunk.UUID, "ordinal": chunk.Ordinal, "kind": chunk.Kind,
+			"content": chunk.Content, "metadata": chunk.Metadata,
+		})
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items, "page": page, "page_size": pageSize, "total": total})
+}

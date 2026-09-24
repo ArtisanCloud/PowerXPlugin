@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -23,7 +24,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	if deps.Metadata != nil {
 		delegated, _ = deps.Metadata.Service()
 	}
-	h := &Handler{mode: deps.ProviderMode, delegated: delegated, local: metadatasvc.NewService(deps.DB)}
+	h := &Handler{mode: deps.ProviderMode, delegated: delegated, local: metadatasvc.NewService(deps.DB), debugLocal: deps.MetadataDebugLocalRuntime, debugDelegated: deps.MetadataDebugDelegatedRuntime}
 	group := admin.Group("/metadata")
 	group.GET("/mode", h.Mode)
 	group.GET("/dictionaries", h.ListDictionaryNamespaces)
@@ -38,12 +39,151 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.POST("/tags", h.CreateTag)
 	group.GET("/resource-types", h.ListResourceTypes)
 	group.POST("/resource-types", h.CreateResourceType)
+	// Framework-lab endpoints take an explicit debug route and never inherit
+	// the production ProviderMode selection.
+	group.GET("/debug/tags", h.DebugListTags)
+	group.POST("/debug/tags", h.DebugCreateTag)
+	group.PATCH("/debug/tags/:tag_uuid", h.DebugUpdateTag)
+	group.GET("/debug/tag-bindings", h.DebugListTagBindings)
+	group.PUT("/debug/tag-bindings:replace", h.DebugReplaceTagBindings)
+	group.PATCH("/debug/taxonomy-nodes/:node_uuid", h.DebugUpdateTaxonomyNode)
+	group.GET("/debug/taxonomies/:taxonomy_uuid/nodes", h.DebugListTaxonomyNodes)
 }
 
 type Handler struct {
-	mode      fwprovider.Mode
-	delegated fwmetadata.Service
-	local     *metadatasvc.Service
+	mode           fwprovider.Mode
+	delegated      fwmetadata.Service
+	local          *metadatasvc.Service
+	debugLocal     *fwmetadata.Runtime
+	debugDelegated *fwmetadata.Runtime
+}
+
+func (h *Handler) debugService(c *gin.Context) (fwmetadata.Service, context.Context, bool) {
+	var runtime *fwmetadata.Runtime
+	switch strings.TrimSpace(c.Query("framework_debug_route")) {
+	case "local":
+		runtime = h.debugLocal
+	case "delegated":
+		runtime = h.debugDelegated
+	default:
+		contracts.ResponseError(c, http.StatusBadRequest, string(fwmetadata.CodeInvalidArgument), string(fwmetadata.CodeInvalidArgument))
+		return nil, nil, false
+	}
+	if runtime == nil {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, string(fwmetadata.CodeOperationUnavailable), string(fwmetadata.CodeOperationUnavailable))
+		return nil, nil, false
+	}
+	service, err := runtime.Service()
+	if err != nil {
+		respondMetadataError(c, err)
+		return nil, nil, false
+	}
+	ctx := c.Request.Context()
+	if runtime.Mode() == fwprovider.ModeLocal {
+		tenantUUID := admincommon.ResolveTenantUUID(c)
+		if tenantUUID == "" {
+			contracts.ResponseBadRequest(c, "tenant_uuid is required")
+			return nil, nil, false
+		}
+		ctx = fwmetadata.WithTenantUUID(ctx, tenantUUID)
+	}
+	return service, ctx, true
+}
+
+func (h *Handler) DebugListTags(c *gin.Context) {
+	service, ctx, ok := h.debugService(c)
+	if !ok {
+		return
+	}
+	page, err := service.ListTags(ctx, fwmetadata.ListTagsRequest{Namespace: c.Query("namespace"), ResourceType: c.Query("resource_type"), Status: c.Query("status"), Query: c.Query("q"), Locale: c.Query("locale"), Page: intQuery(c, "page", 1), PageSize: intQuery(c, "page_size", fwmetadata.DefaultPageSize), RequestID: requestID(c)})
+	respondPage(c, page, err)
+}
+func (h *Handler) DebugCreateTag(c *gin.Context) {
+	service, ctx, ok := h.debugService(c)
+	if !ok {
+		return
+	}
+	var req createTagRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	item, err := service.CreateTag(ctx, fwmetadata.CreateTagRequest{Namespace: req.Namespace, ResourceType: req.ResourceType, Code: req.Code, Color: req.Color, LabelI18n: req.LabelI18n, DescriptionI18n: req.DescriptionI18n, RequestID: requestID(c)})
+	respondItem(c, item, err)
+}
+func (h *Handler) DebugUpdateTag(c *gin.Context) {
+	service, ctx, ok := h.debugService(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		LabelI18n       *fwmetadata.I18nMap `json:"label_i18n"`
+		DescriptionI18n *fwmetadata.I18nMap `json:"description_i18n"`
+		Color           *string             `json:"color"`
+		Status          *string             `json:"status"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	item, err := service.UpdateTag(ctx, fwmetadata.UpdateTagRequest{TagUUID: strings.TrimSpace(c.Param("tag_uuid")), LabelI18n: req.LabelI18n, DescriptionI18n: req.DescriptionI18n, Color: req.Color, Status: req.Status, RequestID: requestID(c)})
+	respondItem(c, item, err)
+}
+func (h *Handler) DebugListTagBindings(c *gin.Context) {
+	service, ctx, ok := h.debugService(c)
+	if !ok {
+		return
+	}
+	items, err := service.ListTagBindings(ctx, fwmetadata.ListTagBindingsRequest{ResourceType: c.Query("resource_type"), ResourceUUID: c.Query("resource_uuid"), Locale: c.Query("locale"), RequestID: requestID(c)})
+	if err != nil {
+		respondMetadataError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+func (h *Handler) DebugReplaceTagBindings(c *gin.Context) {
+	service, ctx, ok := h.debugService(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		ResourceType string   `json:"resource_type"`
+		ResourceUUID string   `json:"resource_uuid"`
+		TagUUIDs     []string `json:"tag_uuids"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	items, err := service.ReplaceTagBindings(ctx, fwmetadata.ReplaceTagBindingsRequest{ResourceType: req.ResourceType, ResourceUUID: req.ResourceUUID, TagUUIDs: req.TagUUIDs, RequestID: requestID(c)})
+	if err != nil {
+		respondMetadataError(c, err)
+		return
+	}
+	contracts.ResponseSuccess(c, gin.H{"items": items})
+}
+func (h *Handler) DebugUpdateTaxonomyNode(c *gin.Context) {
+	service, ctx, ok := h.debugService(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		LabelI18n       *fwmetadata.I18nMap `json:"label_i18n"`
+		DescriptionI18n *fwmetadata.I18nMap `json:"description_i18n"`
+		SortOrder       *int                `json:"sort_order"`
+		Status          *string             `json:"status"`
+		Version         int64               `json:"version"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	item, err := service.UpdateTaxonomyNode(ctx, fwmetadata.UpdateTaxonomyNodeRequest{NodeUUID: strings.TrimSpace(c.Param("node_uuid")), LabelI18n: req.LabelI18n, DescriptionI18n: req.DescriptionI18n, SortOrder: req.SortOrder, Status: req.Status, Version: req.Version, RequestID: requestID(c)})
+	respondItem(c, item, err)
+}
+func (h *Handler) DebugListTaxonomyNodes(c *gin.Context) {
+	service, ctx, ok := h.debugService(c)
+	if !ok {
+		return
+	}
+	page, err := service.ListTaxonomyNodes(ctx, fwmetadata.ListTaxonomyNodesRequest{TaxonomyUUID: strings.TrimSpace(c.Param("taxonomy_uuid")), Page: intQuery(c, "page", 1), PageSize: intQuery(c, "page_size", fwmetadata.DefaultPageSize), RequestID: requestID(c)})
+	respondPage(c, page, err)
 }
 
 type createDictionaryNamespaceRequest struct {

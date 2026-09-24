@@ -39,6 +39,20 @@ type Client struct {
 
 type I18nMap map[string]string
 
+type tenantUUIDContextKey struct{}
+
+// WithTenantUUID adds the tenant scope resolved by the trusted transport.
+// Local adapters must use it for every read and write; callers must never
+// source tenant identity from a request body.
+func WithTenantUUID(ctx context.Context, tenantUUID string) context.Context {
+	return context.WithValue(ctx, tenantUUIDContextKey{}, tenantUUID)
+}
+
+func TenantUUIDFromContext(ctx context.Context) (string, bool) {
+	value, ok := ctx.Value(tenantUUIDContextKey{}).(string)
+	return value, ok && value != ""
+}
+
 type Display struct {
 	DisplayName        string `json:"display_name,omitempty"`
 	DisplayDescription string `json:"display_description,omitempty"`
@@ -119,7 +133,7 @@ type Tag struct {
 }
 
 type TagBinding struct {
-	BindingUUID  string `json:"binding_uuid"`
+	UUID         string `json:"uuid"`
 	TagUUID      string `json:"tag_uuid"`
 	ResourceType string `json:"resource_type"`
 	ResourceUUID string `json:"resource_uuid"`
@@ -309,6 +323,18 @@ type UpdateTaxonomyNodeRequest struct {
 	RequestID       string
 }
 
+// UpdateTagRequest changes the mutable attributes of a tag. Tags are never
+// physically deleted: callers set Status to inactive when a used tag must no
+// longer be offered for new bindings.
+type UpdateTagRequest struct {
+	TagUUID         string
+	LabelI18n       *I18nMap
+	DescriptionI18n *I18nMap
+	Color           *string
+	Status          *string
+	RequestID       string
+}
+
 type UpdateResourceTypeRequest struct {
 	ResourceTypeUUID string
 	NameI18n         *I18nMap
@@ -317,16 +343,4 @@ type UpdateResourceTypeRequest struct {
 	BindingEnabled   *bool
 	Status           *string
 	RequestID        string
-}
-
-type CreateTagBindingRequest struct {
-	TagUUID      string
-	ResourceType string
-	ResourceUUID string
-	RequestID    string
-}
-
-type DeleteTagBindingRequest struct {
-	BindingUUID string
-	RequestID   string
 }

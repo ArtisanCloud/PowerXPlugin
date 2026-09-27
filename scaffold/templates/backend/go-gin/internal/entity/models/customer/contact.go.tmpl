@@ -18,6 +18,8 @@ type Contact struct {
 	DisplayName  string         `gorm:"column:display_name;type:varchar(128);not null;index" json:"display_name"`
 	GivenName    string         `gorm:"column:given_name;type:varchar(128)" json:"given_name,omitempty"`
 	FamilyName   string         `gorm:"column:family_name;type:varchar(128)" json:"family_name,omitempty"`
+	Email        string         `gorm:"column:email;type:varchar(255);index" json:"email,omitempty"`
+	Phone        string         `gorm:"column:phone;type:varchar(32);index" json:"phone,omitempty"`
 	Status       string         `gorm:"column:status;type:varchar(32);not null;default:'active';index" json:"status"`
 	Roles        datatypes.JSON `gorm:"column:roles;type:jsonb;not null;default:'[]'::jsonb" json:"roles"`
 	Tags         datatypes.JSON `gorm:"column:tags;type:jsonb;not null;default:'[]'::jsonb" json:"tags"`

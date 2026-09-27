@@ -41,16 +41,27 @@
               :search-input="{ placeholder: t('metadataGovernance.form.moduleSearchPlaceholder') }"
             />
           </UFormField>
-          <UFormField :label="t('metadataGovernance.form.namespaceSuffix')" required>
+          <UFormField
+            name="namespaceSuffix"
+            :label="t('metadataGovernance.form.namespaceSuffix')"
+            :error="namespaceSuffixError"
+            required
+          >
             <div class="flex w-full overflow-hidden rounded-md ring ring-inset ring-accented focus-within:ring-2 focus-within:ring-primary">
-              <div class="flex max-w-[45%] shrink-0 items-center truncate bg-muted px-3 text-sm text-muted" :title="namespacePrefix">
+              <div
+                class="flex max-w-[45%] shrink-0 items-center truncate bg-muted px-3 text-sm text-muted"
+                :title="namespacePrefix"
+              >
                 {{ `{{ namespacePrefix }}` }}
               </div>
               <UInput
                 v-model="form.namespaceSuffix"
                 class="min-w-0 flex-1"
-                :ui="{ base: 'rounded-l-none ring-0 focus-visible:ring-0' }"
+                :ui="{ base: 'w-full min-w-0 rounded-l-none ring-0 focus-visible:ring-0' }"
                 :placeholder="namespaceSuffixPlaceholder"
+                :aria-label="t('metadataGovernance.form.namespaceSuffix')"
+                autocomplete="off"
+                @blur="namespaceSuffixTouched = true"
               />
             </div>
           </UFormField>
@@ -91,16 +102,27 @@
               :search-input="{ placeholder: t('metadataGovernance.form.resourceTypeSearchPlaceholder') }"
             />
           </UFormField>
-          <UFormField :label="t('metadataGovernance.form.namespaceSuffix')" required>
+          <UFormField
+            name="namespaceSuffix"
+            :label="t('metadataGovernance.form.namespaceSuffix')"
+            :error="namespaceSuffixError"
+            required
+          >
             <div class="flex w-full overflow-hidden rounded-md ring ring-inset ring-accented focus-within:ring-2 focus-within:ring-primary">
-              <div class="flex max-w-[45%] shrink-0 items-center truncate bg-muted px-3 text-sm text-muted" :title="namespacePrefix">
+              <div
+                class="flex max-w-[45%] shrink-0 items-center truncate bg-muted px-3 text-sm text-muted"
+                :title="namespacePrefix"
+              >
                 {{ `{{ namespacePrefix }}` }}
               </div>
               <UInput
                 v-model="form.namespaceSuffix"
                 class="min-w-0 flex-1"
-                :ui="{ base: 'rounded-l-none ring-0 focus-visible:ring-0' }"
+                :ui="{ base: 'w-full min-w-0 rounded-l-none ring-0 focus-visible:ring-0' }"
                 :placeholder="namespaceSuffixPlaceholder"
+                :aria-label="t('metadataGovernance.form.namespaceSuffix')"
+                autocomplete="off"
+                @blur="namespaceSuffixTouched = true"
               />
             </div>
           </UFormField>
@@ -363,6 +385,12 @@ const emptyForm = () => {
 
 const form = reactive(emptyForm());
 const validationError = ref("");
+const namespaceSuffixTouched = ref(false);
+const namespaceSuffixError = computed(() =>
+  namespaceSuffixTouched.value && !form.namespaceSuffix.trim()
+    ? t("metadataGovernance.create.validation.namespaceSuffixRequired")
+    : undefined,
+);
 const selectedOptionalLocale = ref(defaultOptionalLocale());
 const error = computed(() => validationError.value || props.errorMessage || "");
 const filledOptionalLocales = computed(() =>
@@ -383,6 +411,7 @@ watch(
     Object.assign(form, emptyForm());
     selectedOptionalLocale.value = defaultOptionalLocale();
     validationError.value = "";
+    namespaceSuffixTouched.value = false;
   },
 );
 
@@ -424,6 +453,10 @@ const optionalI18nMap = (values: Record<string, string>) => {
 
 const submit = () => {
   validationError.value = "";
+  if (needsDefinitionFields.value || props.target === "tag") {
+    namespaceSuffixTouched.value = true;
+    if (!form.namespaceSuffix.trim()) return;
+  }
   if (!String(form.names[requiredLocale] || "").trim()) {
     validationError.value = t("metadataGovernance.create.validation.localizedNameRequired");
     return;

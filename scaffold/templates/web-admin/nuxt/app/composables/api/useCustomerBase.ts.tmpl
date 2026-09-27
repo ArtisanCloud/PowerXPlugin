@@ -1,3 +1,5 @@
+export interface ExternalIdentityItem { identity_uuid: string; customer_uuid: string; provider_subject: string; status: string; type: string; primary_contact_uuid?: string }
+export interface ExternalIdentityResult extends Partial<ExternalIdentityItem> { found?: boolean; item?: ExternalIdentityItem; items?: ExternalIdentityItem[]; total?: number; page?: number; page_size?: number }
 import { apiGet, apiPatch, apiPost, useApiClient } from "./_client";
 import type { ApiResponse } from "./_base";
 import type { ProviderModeDiagnostics } from "./useProviderMode";
@@ -31,6 +33,8 @@ export interface CustomerPage<T> {
 export interface CustomerAccount {
   id: number;
   customer_uuid: string;
+  type: "person" | "company" | "";
+  primary_contact_uuid?: string;
   tenant_uuid?: string;
   primary_email?: string;
   primary_phone?: string;
@@ -70,6 +74,8 @@ export interface CustomerContact {
   display_name: string;
   given_name?: string;
   family_name?: string;
+  email?: string;
+  phone?: string;
   status: "active" | "inactive" | "temporary";
   roles: ("primary" | "legal_representative")[];
   tags: string[];
@@ -89,6 +95,8 @@ export interface CreateCustomerContactInput {
   display_name: string;
   given_name?: string;
   family_name?: string;
+  email?: string;
+  phone?: string;
   status: "active" | "inactive" | "temporary";
   roles?: ("primary" | "legal_representative")[];
   tags?: string[];
@@ -99,6 +107,8 @@ export interface UpdateCustomerContactInput {
   display_name?: string;
   given_name?: string;
   family_name?: string;
+  email?: string;
+  phone?: string;
   status?: "active" | "inactive" | "temporary";
   roles?: ("primary" | "legal_representative")[];
   tags?: string[];
@@ -177,6 +187,8 @@ export interface CreateCustomerAccountInput {
 }
 
 export interface CreateBasicCustomerInput {
+  type: "person" | "company";
+  primary_contact?: { display_name: string; given_name?: string; family_name?: string; email?: string; phone?: string };
   display_name: string;
   nickname?: string;
   given_name?: string;
@@ -220,6 +232,8 @@ const cleanQuery = (query: CustomerBaseQuery = {}) =>
 
 export function useCustomerBaseApi() {
   const { baseURL } = useApiClient();
+  const externalIdentities = (input: Record<string, unknown>, route: "local" | "delegated") =>
+    apiPost<ApiResponse<ExternalIdentityResult>>(`admin/customers/debug/external-identities?framework_debug_route=${route}`, input);
 
   const overview = (query?: CustomerBaseQuery, init?: any) =>
     apiGet<ApiResponse<CustomerOverview>>("admin/customers/overview", cleanQuery(query), init);
@@ -267,6 +281,7 @@ export function useCustomerBaseApi() {
     apiPost<ApiResponse<CustomerContactIdentity>>(`admin/customers/${encodeURIComponent(customerUUID)}/contacts/${encodeURIComponent(contactUUID)}/identities`, input, init);
 
   return {
+    externalIdentities,
     baseURL,
     mode,
     overview,

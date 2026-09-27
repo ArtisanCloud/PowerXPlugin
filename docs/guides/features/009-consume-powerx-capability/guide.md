@@ -124,7 +124,7 @@ go doc github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts.D
 
 IAM Bundle 当前要求三项非空；不能假设已支持仅 Directory 绑定。Customer 可用 `AdaptersFromLocalStore(store)` 转为三组 adapter，或显式提供 `RuntimeAdapters`。Knowledge 的 Catalog/Capabilities 是 Framework 语义，不意味着 Core 有同名路由。AI 的部分 provider payload 保留 RawMessage，不承诺所有厂商输出统一字段。
 
-Customer 行仅对应身份/鉴权；基础客户清单与创建由 `customerfw.AccountSelectorClient` 提供 typed delegated 调用，local 暂由插件自行实现（Skeleton 有示例），**目前没有通用 Account Runtime**。Contact 是独立的双模式 Store；两者的完整接入方式见 [Customer/Contact 场景](usecase-customer-contact.md)。
+Customer 行仅对应身份/鉴权；基础客户清单、创建与更新由 `customerfw.AccountSelectorClient` 提供 typed delegated 调用，local 暂由插件自行实现（Skeleton 有示例），**目前没有通用 Account Runtime**。Contact 是独立的双模式 Store；两者的完整接入方式见 [Customer/Contact 场景](usecase-customer-contact.md)。
 
 Metadata 的 Core tenant Host 目前缺少标签更新、绑定读取与绑定原子替换的 service actor 路由，Framework Lab 的 delegated 线路会将这些操作标记为不可用；交付要求见 [Core Metadata Host 合同缺口](../../../contracts/metadata-tenant-host-debug-gap.md)。
 

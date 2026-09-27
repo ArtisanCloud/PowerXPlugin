@@ -139,3 +139,17 @@ func (f knowledgeRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 func knowledgeResponse(status int, body string) *http.Response {
 	return &http.Response{StatusCode: status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}
 }
+
+func TestKnowledgeAPIKeyUsesTenantHostContract(t *testing.T) {
+	client, err := NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, "server-key", &http.Client{Transport: knowledgeRoundTrip(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "ApiKey server-key", req.Header.Get("Authorization"))
+		require.Empty(t, req.Header.Get("tenant_uuid"))
+		require.Equal(t, "/api/v1/tenant/knowledge/spaces", req.URL.Path)
+		return knowledgeResponse(http.StatusForbidden, `{"reason_code":"KNOWLEDGE_FORBIDDEN"}`), nil
+	})})
+	require.NoError(t, err)
+	_, err = client.ListKnowledgeSpaces(context.Background(), fwknowledge.ListSpacesInput{})
+	require.Equal(t, fwknowledge.CodeForbidden, fwknowledge.CodeOf(err))
+	_, err = NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, " ", nil)
+	require.Error(t, err)
+}

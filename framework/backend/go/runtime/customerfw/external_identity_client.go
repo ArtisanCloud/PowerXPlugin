@@ -26,9 +26,11 @@ type ResolveExternalIdentityRequest struct {
 }
 
 type ExternalIdentityResolution struct {
-	CustomerUUID   string `json:"customer_uuid"`
-	MembershipUUID string `json:"membership_uuid"`
-	DisplayName    string `json:"display_name"`
+	CustomerUUID       string `json:"customer_uuid"`
+	MembershipUUID     string `json:"membership_uuid"`
+	Type               string `json:"type"`
+	PrimaryContactUUID string `json:"primary_contact_uuid"`
+	DisplayName        string `json:"display_name"`
 }
 
 func NewExternalIdentityResolver(cfg ExternalIdentityResolverConfig) (*ExternalIdentityResolver, error) {
@@ -42,7 +44,7 @@ func (c *ExternalIdentityResolver) Resolve(ctx context.Context, req ResolveExter
 	if c == nil || c.invoker == nil {
 		return nil, errors.New("customer external identity: gateway invoker is required")
 	}
-	if strings.TrimSpace(req.ProviderSubject) == "" || strings.TrimSpace(req.DisplayName) == "" {
+	if !ValidExternalIdentitySubject(strings.TrimSpace(req.ProviderSubject)) || strings.TrimSpace(req.DisplayName) == "" {
 		return nil, errors.New("customer external identity: provider_subject and display_name are required")
 	}
 	resp, err := c.invoker.Invoke(ctx, gateway.InvokeRequest{
@@ -69,7 +71,7 @@ func (c *ExternalIdentityResolver) Resolve(ctx context.Context, req ResolveExter
 	if err := json.Unmarshal(raw, &result); err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(result.Item.CustomerUUID) == "" || strings.TrimSpace(result.Item.MembershipUUID) == "" {
+	if strings.TrimSpace(result.Item.CustomerUUID) == "" || strings.TrimSpace(result.Item.MembershipUUID) == "" || (result.Item.Type != "person" && result.Item.Type != "company") || strings.TrimSpace(result.Item.PrimaryContactUUID) == "" {
 		return nil, errors.New("customer external identity: incomplete response")
 	}
 	return &result.Item, nil

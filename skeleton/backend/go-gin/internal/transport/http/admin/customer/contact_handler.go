@@ -19,6 +19,8 @@ type ContactHandler struct{ deps *app.Deps }
 func NewContactHandler(deps *app.Deps) *ContactHandler { return &ContactHandler{deps: deps} }
 
 type contactCreateRequest struct {
+	Email          string           `json:"email" binding:"omitempty,email,max=255"`
+	Phone          string           `json:"phone" binding:"max=32"`
 	DisplayName    string           `json:"display_name" binding:"required,max=128"`
 	GivenName      string           `json:"given_name" binding:"max=128"`
 	FamilyName     string           `json:"family_name" binding:"max=128"`
@@ -28,6 +30,8 @@ type contactCreateRequest struct {
 	CreationIntent string           `json:"creation_intent" binding:"required,oneof=explicit_create explicit_temporary"`
 }
 type contactUpdateRequest struct {
+	Email       *string           `json:"email"`
+	Phone       *string           `json:"phone"`
 	DisplayName *string           `json:"display_name" binding:"omitempty,max=128"`
 	GivenName   *string           `json:"given_name" binding:"omitempty,max=128"`
 	FamilyName  *string           `json:"family_name" binding:"omitempty,max=128"`
@@ -66,7 +70,7 @@ func (h *ContactHandler) Create(c *gin.Context) {
 		contracts.ResponseError(c, http.StatusBadRequest, string(contactfw.CodeInvalidArgument), string(contactfw.CodeInvalidArgument))
 		return
 	}
-	item, err := store.Create(ctx, contactfw.CreateContactInput{CustomerUUID: customerUUID, DisplayName: req.DisplayName, GivenName: req.GivenName, FamilyName: req.FamilyName, Status: req.Status, Roles: req.Roles, Tags: req.Tags, CreationIntent: contactfw.CreationIntent(req.CreationIntent)})
+	item, err := store.Create(ctx, contactfw.CreateContactInput{CustomerUUID: customerUUID, DisplayName: req.DisplayName, GivenName: req.GivenName, FamilyName: req.FamilyName, Email: req.Email, Phone: req.Phone, Status: req.Status, Roles: req.Roles, Tags: req.Tags, CreationIntent: contactfw.CreationIntent(req.CreationIntent)})
 	if err != nil {
 		h.respondError(c, err)
 		return
@@ -97,7 +101,7 @@ func (h *ContactHandler) Update(c *gin.Context) {
 		contracts.ResponseError(c, http.StatusBadRequest, string(contactfw.CodeInvalidArgument), string(contactfw.CodeInvalidArgument))
 		return
 	}
-	item, err := store.Update(ctx, contactfw.UpdateContactInput{CustomerUUID: customerUUID, ContactUUID: strings.TrimSpace(c.Param("contactUUID")), DisplayName: req.DisplayName, GivenName: req.GivenName, FamilyName: req.FamilyName, Status: req.Status, Roles: req.Roles, Tags: req.Tags})
+	item, err := store.Update(ctx, contactfw.UpdateContactInput{CustomerUUID: customerUUID, ContactUUID: strings.TrimSpace(c.Param("contactUUID")), DisplayName: req.DisplayName, GivenName: req.GivenName, FamilyName: req.FamilyName, Email: req.Email, Phone: req.Phone, Status: req.Status, Roles: req.Roles, Tags: req.Tags})
 	if err != nil {
 		h.respondError(c, err)
 		return

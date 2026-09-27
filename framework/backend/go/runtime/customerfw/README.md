@@ -78,3 +78,13 @@ Developer-facing docs:
 - `docs/guides/develop/auth/customer.md`
 - `docs/guides/features/009-consume-powerx-capability/usecase-customer-contact.md` describes the separate account selector and Contact runtime; this Auth runtime is not an Account Store.
 - `docs/contracts/customer-auth.openapi.yaml`
+
+### 客户默认类型与主联系人（2026-09-26）
+
+`CreateBasicAccount` 未指定或空 `Type` 默认 `person`；明确 `company` 保留且创建须提供自然人主联系人。Delegated 由 Core 在客户写入或已验证身份解析事务中补存历史空类型、复用唯一有效 Contact 或为个人创建 Contact，并返回稳定 UUID；Framework 不在插件本地补写。外部身份结果接受 person/company，不得将 company 改成 person。失效引用、多有效联系人歧义须失败。客户/联系人查询保持只读。Local 持久化适配器应由插件在自己的客户写入事务落实相同规则。
+
+### 客户外部身份管理（2026-09-27）
+
+`NewExternalIdentityClient(invoker)` 提供 `Lookup`、`ListByCustomer`、`Bind`、`CreateAndBind`，实现 `ExternalIdentityStore`。读写分别调用 Core 的 `customer.external_identities.service_read/service_manage`，固定 `core://customer/external-identities`，不转用 Admin 接口、不回退本地。Lookup found=false 明确表示当前范围未关联，不会自动调用 Resolve。Local adapter 应实现同接口和相同事务、幂等与只读语义。
+
+API Key 必须有精确 grant 和 Core 管理员绑定的唯一 plugin_id；STS 必须有实例 grant。provider_subject 包含渠道实例；Shopify 与登录一致使用店铺域名和完整 GID。`NormalizeBasicAccountLabels` 允许仅邮箱输入成为展示标签，不填充真实姓、名。Core 完整交接见其 `docs/contracts/customer-external-identity-management.md`。

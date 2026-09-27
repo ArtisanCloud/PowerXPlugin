@@ -67,6 +67,7 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	knowledge.GET("/spaces/:spaceID/ingestions", knowledgeHandler.Ingestions)
 	knowledge.GET("/spaces/:spaceID/policy", knowledgeHandler.Policy)
 	knowledge.POST("/search", knowledgeHandler.Search)
+	registerKnowledgeLabRoutes(router, deps)
 
 	agentLifecycle := NewAgentLifecycleHandler(deps)
 	agent := router.Group("/agent-lifecycle")

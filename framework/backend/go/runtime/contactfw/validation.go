@@ -2,6 +2,7 @@ package contactfw
 
 import (
 	"fmt"
+	"net/mail"
 	"regexp"
 	"strings"
 
@@ -56,6 +57,9 @@ func ValidateCreateInput(input CreateContactInput) error {
 	if strings.TrimSpace(input.DisplayName) == "" {
 		return NewError(CodeInvalidArgument, fmt.Errorf("customer_uuid and display_name are required"))
 	}
+	if err := validateContactChannels(input.Email, input.Phone); err != nil {
+		return err
+	}
 	if input.Status != StatusActive && input.Status != StatusInactive && input.Status != StatusTemporary {
 		return NewError(CodeInvalidArgument, fmt.Errorf("invalid contact status"))
 	}
@@ -84,6 +88,18 @@ func ValidateUpdateInput(input UpdateContactInput) error {
 	if strings.TrimSpace(input.CustomerUUID) == "" || strings.TrimSpace(input.ContactUUID) == "" {
 		return NewError(CodeInvalidArgument, fmt.Errorf("customer_uuid and contact_uuid are required"))
 	}
+	if input.Email != nil || input.Phone != nil {
+		email, phone := "", ""
+		if input.Email != nil {
+			email = *input.Email
+		}
+		if input.Phone != nil {
+			phone = *input.Phone
+		}
+		if err := validateContactChannels(email, phone); err != nil {
+			return err
+		}
+	}
 	if input.Status != nil && *input.Status != StatusActive && *input.Status != StatusInactive && *input.Status != StatusTemporary {
 		return NewError(CodeInvalidArgument, fmt.Errorf("invalid contact status"))
 	}
@@ -94,6 +110,25 @@ func ValidateUpdateInput(input UpdateContactInput) error {
 	}
 	if input.Tags != nil {
 		return ValidateTags(*input.Tags)
+	}
+	return nil
+}
+
+func validateContactChannels(email, phone string) error {
+	email, phone = strings.TrimSpace(email), strings.TrimSpace(phone)
+	if len(email) > 255 || len(phone) > 32 {
+		return NewError(CodeInvalidArgument, fmt.Errorf("contact channel too long"))
+	}
+	if email != "" {
+		parsed, err := mail.ParseAddress(email)
+		if err != nil || parsed.Address != email || parsed.Name != "" {
+			return NewError(CodeInvalidArgument, fmt.Errorf("invalid contact email"))
+		}
+	}
+	for _, char := range phone {
+		if !(char >= '0' && char <= '9') && char != '+' && char != '-' && char != ' ' && char != '(' && char != ')' {
+			return NewError(CodeInvalidArgument, fmt.Errorf("invalid contact phone"))
+		}
 	}
 	return nil
 }

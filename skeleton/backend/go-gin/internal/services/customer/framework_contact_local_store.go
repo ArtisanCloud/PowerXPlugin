@@ -40,7 +40,7 @@ func (s *FrameworkContactLocalStore) Create(ctx context.Context, in contactfw.Cr
 	metadata, _ := json.Marshal(map[string]string{"creation_intent": string(in.CreationIntent)})
 	row := &customermodel.Contact{
 		ContactUUID: uuid.NewString(), TenantUUID: tenantUUID, CustomerUUID: customerUUID,
-		DisplayName: strings.TrimSpace(in.DisplayName), GivenName: strings.TrimSpace(in.GivenName), FamilyName: strings.TrimSpace(in.FamilyName),
+		DisplayName: strings.TrimSpace(in.DisplayName), GivenName: strings.TrimSpace(in.GivenName), FamilyName: strings.TrimSpace(in.FamilyName), Email: strings.TrimSpace(in.Email), Phone: strings.TrimSpace(in.Phone),
 		Status: string(in.Status), Roles: roles, Tags: tags, Metadata: datatypes.JSON(metadata),
 	}
 	if err := s.db.WithContext(ctx).Create(row).Error; err != nil {
@@ -86,6 +86,12 @@ func (s *FrameworkContactLocalStore) Update(ctx context.Context, in contactfw.Up
 		}
 		if in.FamilyName != nil {
 			row.FamilyName = strings.TrimSpace(*in.FamilyName)
+		}
+		if in.Email != nil {
+			row.Email = strings.TrimSpace(*in.Email)
+		}
+		if in.Phone != nil {
+			row.Phone = strings.TrimSpace(*in.Phone)
 		}
 		if in.Status != nil {
 			row.Status = string(*in.Status)
@@ -369,7 +375,7 @@ func contactFromModel(row *customermodel.Contact) (*contactfw.Contact, error) {
 	if len(row.Metadata) > 0 {
 		_ = json.Unmarshal(row.Metadata, &metadata)
 	}
-	return &contactfw.Contact{ContactUUID: row.ContactUUID, TenantUUID: row.TenantUUID, CustomerUUID: row.CustomerUUID, DisplayName: row.DisplayName, GivenName: row.GivenName, FamilyName: row.FamilyName, Status: contactfw.Status(row.Status), Roles: roles, Tags: tags, Metadata: metadata, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, nil
+	return &contactfw.Contact{ContactUUID: row.ContactUUID, TenantUUID: row.TenantUUID, CustomerUUID: row.CustomerUUID, DisplayName: row.DisplayName, GivenName: row.GivenName, FamilyName: row.FamilyName, Email: row.Email, Phone: row.Phone, Status: contactfw.Status(row.Status), Roles: roles, Tags: tags, Metadata: metadata, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}, nil
 }
 func identityFromModel(row *customermodel.ContactIdentity) (*contactfw.ContactIdentity, error) {
 	if row == nil {

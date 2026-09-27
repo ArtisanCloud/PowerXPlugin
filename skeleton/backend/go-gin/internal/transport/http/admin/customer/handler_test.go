@@ -28,7 +28,7 @@ func (s *customerInvokerStub) Invoke(_ context.Context, req gateway.InvokeReques
 	s.called = true
 	s.last = req
 	if req.CapabilityID == customerfw.CapabilityCustomerAccountsServiceManage {
-		return &gateway.Response{Data: map[string]any{"payload": map[string]any{"item": map[string]any{"uuid": "11111111-1111-4111-8111-111111111111", "display_name": "Customer A", "status": "active"}}}}, nil
+		return &gateway.Response{Data: map[string]any{"payload": map[string]any{"item": map[string]any{"uuid": "11111111-1111-4111-8111-111111111111", "type": "person", "primary_contact_uuid": "22222222-2222-4222-8222-222222222222", "display_name": "Customer A", "status": "active"}}}}, nil
 	}
 	return &gateway.Response{
 		TraceID: "trace-customer",
@@ -53,7 +53,7 @@ func TestCustomerHandlerDebugCreateUsesTypedManageCapability(t *testing.T) {
 	}
 	h := NewHandler(&app.Deps{ProviderMode: fwprovider.ModeLocal, CustomerAccountSelector: client})
 	rec := httptest.NewRecorder()
-	body := []byte(`{"display_name":"Customer A","status":"active"}`)
+	body := []byte(`{"type":"person","display_name":"Customer A","status":"active"}`)
 	req := httptest.NewRequest(http.MethodPost, "/customers/debug/basic-accounts?framework_debug_route=delegated&tenant_uuid="+uuid.NewString(), bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	c, _ := gin.CreateTestContext(rec)
@@ -92,9 +92,10 @@ func TestCustomerHandlerDebugLocalCreateAddsMembershipWithoutIdentity(t *testing
 		t.Fatal(err)
 	}
 	for _, ddl := range []string{
-		`CREATE TABLE customer_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, customer_uuid TEXT UNIQUE NOT NULL, tenant_uuid TEXT NOT NULL, status TEXT NOT NULL, primary_email TEXT, primary_phone TEXT, display_name TEXT, nickname TEXT, given_name TEXT, family_name TEXT, avatar_url TEXT, locale TEXT, timezone TEXT, metadata TEXT, email TEXT, phone TEXT, password_hash TEXT, email_verified BOOLEAN, phone_verified BOOLEAN);`,
-		`CREATE TABLE customer_tenant_memberships (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, membership_uuid TEXT UNIQUE NOT NULL, tenant_uuid TEXT NOT NULL, customer_uuid TEXT NOT NULL, status TEXT NOT NULL, roles TEXT, scopes TEXT, source TEXT, expires_at DATETIME, metadata TEXT);`,
-		`CREATE TABLE customer_auth_identities (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, customer_uuid TEXT, provider TEXT, provider_subject TEXT, email TEXT, phone TEXT, password_hash TEXT, status TEXT, verified_at DATETIME, metadata TEXT);`,
+		`CREATE TABLE customer_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, customer_uuid TEXT UNIQUE NOT NULL, tenant_uuid TEXT NOT NULL, type TEXT, primary_contact_uuid TEXT, status TEXT NOT NULL, primary_email TEXT, primary_phone TEXT, display_name TEXT, nickname TEXT, given_name TEXT, family_name TEXT, avatar_url TEXT, locale TEXT, timezone TEXT, metadata TEXT, email TEXT, phone TEXT, password_hash TEXT, email_verified BOOLEAN, phone_verified BOOLEAN);`,
+		`CREATE TABLE customer_tenant_memberships (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, membership_uuid TEXT UNIQUE NOT NULL, tenant_uuid TEXT NOT NULL, customer_uuid TEXT NOT NULL, primary_contact_uuid TEXT, status TEXT NOT NULL, roles TEXT, scopes TEXT, source TEXT, expires_at DATETIME, metadata TEXT);`,
+		`CREATE TABLE customer_contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, contact_uuid TEXT UNIQUE NOT NULL, tenant_uuid TEXT NOT NULL, customer_uuid TEXT NOT NULL, display_name TEXT NOT NULL, given_name TEXT, family_name TEXT, email TEXT, phone TEXT, status TEXT NOT NULL, roles TEXT, tags TEXT, metadata TEXT);`,
+		`CREATE TABLE customer_auth_identities (identity_uuid TEXT UNIQUE, id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, customer_uuid TEXT, provider TEXT, provider_subject TEXT, email TEXT, phone TEXT, password_hash TEXT, status TEXT, verified_at DATETIME, metadata TEXT);`,
 	} {
 		if err := db.Exec(ddl).Error; err != nil {
 			t.Fatal(err)
@@ -103,7 +104,7 @@ func TestCustomerHandlerDebugLocalCreateAddsMembershipWithoutIdentity(t *testing
 	h := NewHandler(&app.Deps{ProviderMode: fwprovider.ModeDelegated, DB: db})
 	tenantUUID := uuid.NewString()
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/customers/debug/basic-accounts?framework_debug_route=local&tenant_uuid="+tenantUUID, bytes.NewBufferString(`{"display_name":"Local Customer","status":"active"}`))
+	req := httptest.NewRequest(http.MethodPost, "/customers/debug/basic-accounts?framework_debug_route=local&tenant_uuid="+tenantUUID, bytes.NewBufferString(`{"type":"person","display_name":"Local Customer","status":"active"}`))
 	req.Header.Set("Content-Type", "application/json")
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = req
@@ -111,18 +112,37 @@ func TestCustomerHandlerDebugLocalCreateAddsMembershipWithoutIdentity(t *testing
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	var accounts, memberships, identities int64
+	var accounts, memberships, contacts, identities int64
 	if err := db.Model(&customermodel.CustomerAccount{}).Where("tenant_uuid = ?", tenantUUID).Count(&accounts).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Model(&customermodel.CustomerTenantMembership{}).Where("tenant_uuid = ?", tenantUUID).Count(&memberships).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := db.Model(&customermodel.Contact{}).Where("tenant_uuid = ?", tenantUUID).Count(&contacts).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Model(&customermodel.CustomerAuthIdentity{}).Count(&identities).Error; err != nil {
 		t.Fatal(err)
 	}
-	if accounts != 1 || memberships != 1 || identities != 0 {
-		t.Fatalf("accounts=%d memberships=%d identities=%d", accounts, memberships, identities)
+	if accounts != 1 || memberships != 1 || contacts != 1 || identities != 0 {
+		t.Fatalf("accounts=%d memberships=%d contacts=%d identities=%d", accounts, memberships, contacts, identities)
+	}
+
+	emailRec := httptest.NewRecorder()
+	emailCtx, _ := gin.CreateTestContext(emailRec)
+	emailCtx.Request = httptest.NewRequest(http.MethodPost, "/customers/debug/basic-accounts?framework_debug_route=local&tenant_uuid="+tenantUUID, bytes.NewBufferString(`{"primary_email":"only@example.test"}`))
+	emailCtx.Request.Header.Set("Content-Type", "application/json")
+	h.CreateBasicAccount(emailCtx)
+	if emailRec.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", emailRec.Code, emailRec.Body.String())
+	}
+	var saved customermodel.CustomerAccount
+	if err := db.Where("primary_email = ?", "only@example.test").First(&saved).Error; err != nil {
+		t.Fatal(err)
+	}
+	if saved.DisplayName != "only@example.test" || saved.GivenName != "" || saved.FamilyName != "" || saved.Type != "person" {
+		t.Fatalf("unexpected label contract: %+v", saved)
 	}
 }
 

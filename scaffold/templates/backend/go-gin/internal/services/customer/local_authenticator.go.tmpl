@@ -57,9 +57,11 @@ type RegisterInput struct {
 }
 
 type RegisterOutput struct {
-	CustomerUUID string `json:"customer_uuid"`
-	TenantUUID   string `json:"tenant_uuid"`
-	Status       string `json:"status"`
+	CustomerUUID       string `json:"customer_uuid"`
+	Type               string `json:"type"`
+	PrimaryContactUUID string `json:"primary_contact_uuid"`
+	TenantUUID         string `json:"tenant_uuid"`
+	Status             string `json:"status"`
 }
 
 type LoginInput struct {
@@ -110,6 +112,7 @@ func (s *LocalAuthService) Register(ctx context.Context, in RegisterInput) (*Reg
 
 	entity := &customermodel.CustomerAccount{
 		CustomerUUID:  customerUUID,
+		Type:          "person",
 		Email:         email,
 		Phone:         phone,
 		PasswordHash:  string(hash),
@@ -132,9 +135,11 @@ func (s *LocalAuthService) Register(ctx context.Context, in RegisterInput) (*Reg
 	}
 
 	return &RegisterOutput{
-		CustomerUUID: customerUUID,
-		TenantUUID:   tenantUUID,
-		Status:       status,
+		CustomerUUID:       customerUUID,
+		Type:               entity.Type,
+		PrimaryContactUUID: entity.PrimaryContactUUID,
+		TenantUUID:         tenantUUID,
+		Status:             status,
 	}, nil
 }
 

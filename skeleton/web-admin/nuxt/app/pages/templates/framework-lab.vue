@@ -23,8 +23,8 @@
         <div>
       <div class="mb-5 flex items-center gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">
         <span class="mr-2 text-xs text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.testRoute") }}</span>
-        <UButton size="xs" :variant="testRoute === 'local' ? 'solid' : 'soft'" color="success" @click="selectTestRoute('local')">{{ $t("frameworkLab.localAdapter") }}</UButton>
-        <UButton size="xs" :variant="testRoute === 'delegated' ? 'solid' : 'soft'" color="primary" @click="selectTestRoute('delegated')">{{ $t("frameworkLab.delegatedHost") }}</UButton>
+        <UButton size="xs" :variant="testRoute === 'local' ? 'solid' : 'soft'" color="success" :disabled="customerProbeCreating || contactProbeCreating" @click="selectTestRoute('local')">{{ $t("frameworkLab.localAdapter") }}</UButton>
+        <UButton size="xs" :variant="testRoute === 'delegated' ? 'solid' : 'soft'" color="primary" :disabled="customerProbeCreating || contactProbeCreating" @click="selectTestRoute('delegated')">{{ $t("frameworkLab.delegatedHost") }}</UButton>
       </div>
 
       <div v-if="activeModule === 'notification'" class="space-y-6 pt-4">
@@ -109,68 +109,62 @@
         </div>
         <div class="flex flex-wrap items-end gap-3">
           <UButton color="neutral" variant="soft" icon="i-heroicons-arrow-path" :loading="contactProbeLoading" @click="loadContactProbeCustomers">{{ $t("frameworkLab.loadCustomers") }}</UButton>
-          <UButton color="secondary" icon="i-heroicons-plus" :disabled="!contactProbeReady" @click="showCustomerCreateModal = true">{{ $t("frameworkLab.createCustomer") }}</UButton>
-          <UButton color="secondary" icon="i-heroicons-user-group" :disabled="!contactProbeCustomerUUID || !contactProbeReady" :loading="contactProbeLoading" @click="listContactProbe">{{ $t("frameworkLab.listContacts") }}</UButton>
-          <UButton color="secondary" icon="i-heroicons-plus" :disabled="!contactProbeCustomerUUID || !contactProbeReady" @click="showContactCreateModal = true">{{ $t("frameworkLab.createContact") }}</UButton>
+          <UButton color="secondary" icon="i-heroicons-plus" :disabled="!contactProbeReady" @click="openCustomerCreate">{{ $t("frameworkLab.createCustomer") }}</UButton>
         </div>
         <div v-if="contactProbeReady" class="overflow-x-auto rounded-lg border border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100">
           <table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"><tr><th class="px-3 py-2">{{ $t('frameworkLab.customerLabel') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.customerEmail') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.customerPhone') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.contactStatusLabel') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.selectCustomer') }}</th></tr></thead>
-            <tbody><tr v-for="customer in contactProbeCustomers" :key="customer.customer_uuid" :class="['border-t border-gray-200 text-gray-900 dark:border-gray-700 dark:text-gray-100', customer.customer_uuid === contactProbeCustomerUUID ? 'bg-blue-50 dark:bg-blue-900/30' : '']"><td class="px-3 py-2">{{ customerLabel(customer) }}</td><td class="px-3 py-2">{{ customer.primary_email || customer.email || '—' }}</td><td class="px-3 py-2">{{ customer.primary_phone || customer.phone || '—' }}</td><td class="px-3 py-2">{{ customerStatusLabel(customer.status) }}</td><td class="px-3 py-2"><UButton size="xs" :variant="customer.customer_uuid === contactProbeCustomerUUID ? 'solid' : 'soft'" color="secondary" @click="selectContactProbeCustomer(customer.customer_uuid)">{{ customer.customer_uuid === contactProbeCustomerUUID ? $t('frameworkLab.selectedCustomer') : $t('frameworkLab.selectCustomer') }}</UButton></td></tr><tr v-if="contactProbeCustomers.length === 0"><td colspan="5" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t('frameworkLab.noCustomers') }}</td></tr></tbody></table>
+            <tbody><tr v-for="customer in contactProbeCustomers" :key="customer.customer_uuid" :class="['border-t border-gray-200 text-gray-900 dark:border-gray-700 dark:text-gray-100', customer.customer_uuid === contactProbeCustomerUUID ? 'bg-blue-50 dark:bg-blue-900/30' : '']"><td class="px-3 py-2">{{ customerLabel(customer) }}</td><td class="px-3 py-2">{{ customer.primary_email || customer.email || '—' }}</td><td class="px-3 py-2">{{ customer.primary_phone || customer.phone || '—' }}</td><td class="px-3 py-2">{{ customerStatusLabel(customer.status) }}</td><td class="px-3 py-2"><UButton size="xs" :variant="customer.customer_uuid === contactProbeCustomerUUID ? 'solid' : 'soft'" color="secondary" @click="selectContactProbeCustomer(customer.customer_uuid)">{{ customer.customer_uuid === contactProbeCustomerUUID ? $t('frameworkLab.selectedCustomer') : $t('frameworkLab.selectCustomer') }}</UButton><UButton class="ml-2" size="xs" variant="soft" :disabled="customerProbeCreating" @click="openCustomerEdit(customer)">{{ $t("frameworkLab.editCustomer") }}</UButton></td></tr><tr v-if="contactProbeCustomers.length === 0"><td colspan="5" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t('frameworkLab.noCustomers') }}</td></tr></tbody></table>
         </div>
         <div v-if="contactProbeReady && contactProbeTotalPages > 1" class="flex items-center justify-end gap-3 text-sm text-gray-300"><UButton size="xs" color="neutral" variant="soft" :disabled="contactProbePage <= 1 || contactProbeLoading" @click="loadContactProbeCustomers(contactProbePage - 1)">{{ $t('frameworkLab.previousPage') }}</UButton><span>{{ contactProbePage }} / {{ contactProbeTotalPages }}</span><UButton size="xs" color="neutral" variant="soft" :disabled="contactProbePage >= contactProbeTotalPages || contactProbeLoading" @click="loadContactProbeCustomers(contactProbePage + 1)">{{ $t('frameworkLab.nextPage') }}</UButton></div>
-        <UModal v-model:open="showCustomerCreateModal" :title="$t('frameworkLab.createCustomer')">
+        <UModal v-model:open="showCustomerCreateModal" :title="customerEditUUID ? $t('frameworkLab.editCustomer') : $t('frameworkLab.createCustomer')">
           <template #content><form class="space-y-4 bg-white p-6 text-gray-900 dark:bg-gray-900 dark:text-gray-100" @submit.prevent="createCustomerProbe">
-            <h3 class="text-lg font-semibold">{{ $t('frameworkLab.createCustomer') }}</h3><p class="text-xs text-gray-400">{{ $t('frameworkLab.customerCreationHint') }}</p>
+            <h3 class="text-lg font-semibold">{{ customerEditUUID ? $t('frameworkLab.editCustomer') : $t('frameworkLab.createCustomer') }}</h3><p v-if="!customerEditUUID" class="text-xs text-gray-400">{{ $t('frameworkLab.customerCreationHint') }}</p>
+            <UFormField v-if="!customerEditUUID" :label="$t('frameworkLab.customerType')" required><USelect v-model="customerProbeForm.type" :items="[{ label: $t('frameworkLab.customerTypePerson'), value: 'person' }, { label: $t('frameworkLab.customerTypeCompany'), value: 'company' }]" class="w-full" /></UFormField>
+            <label v-if="!customerEditUUID && customerProbeForm.type === 'person'" class="flex gap-2 text-sm"><input v-model="customerProbeForm.explicitContact" type="checkbox">{{ $t('frameworkLab.explicitPrimaryContact') }}</label>
+            <div v-if="!customerEditUUID && (customerProbeForm.type === 'company' || customerProbeForm.explicitContact)" class="grid gap-3 md:grid-cols-2"><UFormField :label="$t('frameworkLab.primaryContactName')" class="md:col-span-2" required><UInput v-model="customerProbeForm.contactName" /></UFormField><UFormField :label="$t('frameworkLab.customerEmail')"><UInput v-model="customerProbeForm.contactEmail" type="email" /></UFormField><UFormField :label="$t('frameworkLab.customerPhone')"><UInput v-model="customerProbeForm.contactPhone" /></UFormField></div>
             <div class="grid gap-3 md:grid-cols-2"><UFormField :label="$t('frameworkLab.customerName')" class="md:col-span-2"><UInput v-model="customerProbeForm.displayName" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerNickname')"><UInput v-model="customerProbeForm.nickname" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactStatusLabel')"><USelect v-model="customerProbeForm.status" :items="customerProbeStatusOptions" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactFamilyName')"><UInput v-model="customerProbeForm.familyName" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactGivenName')"><UInput v-model="customerProbeForm.givenName" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerEmail')"><UInput v-model="customerProbeForm.email" type="email" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerPhone')"><UInput v-model="customerProbeForm.phone" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerAvatar')"><UInput v-model="customerProbeForm.avatarURL" type="url" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerLocale')"><UInput v-model="customerProbeForm.locale" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerTimezone')"><UInput v-model="customerProbeForm.timezone" class="w-full" /></UFormField></div>
-            <UAlert v-if="customerProbeFormError" color="error" variant="soft" :title="customerProbeFormError" /><div class="flex justify-end gap-2"><UButton color="neutral" variant="ghost" type="button" :disabled="customerProbeCreating" @click="showCustomerCreateModal = false">{{ $t('frameworkLab.cancel') }}</UButton><UButton color="secondary" type="submit" :loading="customerProbeCreating">{{ $t('frameworkLab.createCustomer') }}</UButton></div>
+            <UAlert v-if="customerProbeFormError" color="error" variant="soft" :title="customerProbeFormError" /><div class="flex justify-end gap-2"><UButton color="neutral" variant="ghost" type="button" :disabled="customerProbeCreating" @click="showCustomerCreateModal = false">{{ $t('frameworkLab.cancel') }}</UButton><UButton color="secondary" type="submit" :loading="customerProbeCreating">{{ customerEditUUID ? $t('frameworkLab.saveChanges') : $t('frameworkLab.createCustomer') }}</UButton></div>
           </form></template>
         </UModal>
-        <UModal v-model:open="showContactCreateModal" :title="$t('frameworkLab.createContact')">
+        <UModal v-model:open="showContactCreateModal" :title="contactEditUUID ? $t('frameworkLab.editContact') : $t('frameworkLab.createContact')">
           <template #content>
             <form class="space-y-4 bg-white p-6 text-gray-900 dark:bg-gray-900 dark:text-gray-100" @submit.prevent="createContactProbe">
-              <h3 class="text-lg font-semibold">{{ $t("frameworkLab.createContact") }}</h3>
+              <h3 class="text-lg font-semibold">{{ contactEditUUID ? $t("frameworkLab.editContact") : $t("frameworkLab.createContact") }}</h3>
               <p class="text-sm text-gray-500">{{ $t("frameworkLab.customerLabel") }}: {{ selectedContactProbeCustomerLabel }}</p>
               <div class="grid gap-3 md:grid-cols-2">
                 <UFormField :label="$t('frameworkLab.contactNameLabel')" required class="md:col-span-2"><UInput v-model="contactProbeForm.displayName" :placeholder="$t('frameworkLab.contactNamePlaceholder')" class="w-full" /></UFormField>
                 <UFormField :label="$t('frameworkLab.contactFamilyName')"><UInput v-model="contactProbeForm.familyName" class="w-full" /></UFormField>
                 <UFormField :label="$t('frameworkLab.contactGivenName')"><UInput v-model="contactProbeForm.givenName" class="w-full" /></UFormField>
                 <UFormField :label="$t('frameworkLab.contactStatusLabel')"><USelect v-model="contactProbeForm.status" :items="contactProbeStatusOptions" class="w-full" /></UFormField>
-                <UFormField :label="$t('frameworkLab.contactTagsLabel')"><UInput v-model="contactProbeForm.tags" :placeholder="$t('frameworkLab.contactTagsPlaceholder')" class="w-full" /></UFormField>
+                <UFormField :label="$t('frameworkLab.customerEmail')"><UInput v-model="contactProbeForm.email" type="email" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.customerPhone')"><UInput v-model="contactProbeForm.phone" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.contactTagsLabel')"><UInput v-model="contactProbeForm.tags" :placeholder="$t('frameworkLab.contactTagsPlaceholder')" class="w-full" /></UFormField>
               </div>
-              <p class="text-xs text-gray-500">{{ $t('frameworkLab.contactCreationIntentHint') }}</p>
+              <p v-if="!contactEditUUID" class="text-xs text-gray-500">{{ $t('frameworkLab.contactCreationIntentHint') }}</p>
               <div class="space-y-2">
                 <p class="text-sm font-medium">{{ $t('frameworkLab.contactRolesLabel') }}</p>
-                <UCheckbox v-model="contactProbeForm.primaryRole" :label="$t('frameworkLab.contactRolePrimary')" />
+                <p v-if="contactEditUUID" class="text-xs text-gray-500">{{ $t("frameworkLab.primaryRoleEditHint") }}</p><UCheckbox v-model="contactProbeForm.primaryRole" :label="$t('frameworkLab.contactRolePrimary')" />
                 <UCheckbox v-model="contactProbeForm.legalRepresentativeRole" :label="$t('frameworkLab.contactRoleLegalRepresentative')" />
               </div>
               <UAlert v-if="contactProbeFormError" color="error" variant="soft" :title="contactProbeFormError" />
               <div class="flex justify-end gap-2">
                 <UButton color="neutral" variant="ghost" type="button" :disabled="contactProbeCreating" @click="showContactCreateModal = false">{{ $t('frameworkLab.cancel') }}</UButton>
-                <UButton color="secondary" type="submit" :loading="contactProbeCreating">{{ $t('frameworkLab.createContact') }}</UButton>
+                <UButton color="secondary" type="submit" :loading="contactProbeCreating">{{ contactEditUUID ? $t('frameworkLab.saveChanges') : $t('frameworkLab.createContact') }}</UButton>
               </div>
             </form>
           </template>
         </UModal>
+        <UTabs v-model="customerRecordsTab" :items="customerRecordsTabs" :content="false" class="w-full" />
+        <CustomerExternalIdentityLab v-show="customerRecordsTab === 'identities'" :active="customerRecordsTab === 'identities'" :route="testRoute" :customerUUID="contactProbeCustomerUUID" :customer-name="selectedContactProbeCustomerLabel" @created="selectIdentityCustomer" />
         <UAlert v-if="contactProbeError" color="error" variant="soft" :title="contactProbeError" />
-        <div v-else-if="contactProbeLoaded && contactProbeReady" class="overflow-x-auto rounded-lg border border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100"><table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"><tr><th class="px-3 py-2">{{ $t("frameworkLab.contactNameLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.contactStatusLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.contactTagsLabel") }}</th></tr></thead><tbody><tr v-for="contact in contactProbeContacts" :key="contact.contact_uuid" class="border-t border-gray-200 text-gray-900 dark:border-gray-700 dark:text-gray-100"><td class="px-3 py-2">{{ contact.display_name }}</td><td class="px-3 py-2">{{ contactStatusLabel(contact.status) }}</td><td class="px-3 py-2">{{ contact.tags?.join(', ') || '—' }}</td></tr><tr v-if="contactProbeContacts.length === 0"><td colspan="3" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.noContacts") }}</td></tr></tbody></table></div>
+        <div v-show="customerRecordsTab === 'contacts'" class="space-y-3">
+          <div class="flex items-center justify-between gap-3"><p class="text-sm">{{ contactProbeCustomerUUID ? $t('identityLab.selected', { name: selectedContactProbeCustomerLabel }) : $t('frameworkLab.selectCustomerForRecords') }}</p>
+          <UButton color="secondary" icon="i-heroicons-plus" :disabled="!contactProbeCustomerUUID || !contactProbeReady" @click="openContactCreate">{{ $t("frameworkLab.createContact") }}</UButton>
+          </div>
+          <p v-if="contactRecordsLoading" role="status" class="text-sm text-gray-500">{{ $t('common.loading') }}</p>
+        <div v-if="!contactRecordsLoading && contactProbeLoaded && contactProbeReady" class="overflow-x-auto rounded-lg border border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100"><table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"><tr><th class="px-3 py-2">{{ $t("frameworkLab.contactNameLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.customerEmail") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.customerPhone") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.contactStatusLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.contactTagsLabel") }}</th><th class="px-3 py-2">{{ $t("frameworkLab.editContact") }}</th></tr></thead><tbody><tr v-for="contact in contactProbeContacts" :key="contact.contact_uuid" class="border-t border-gray-200 text-gray-900 dark:border-gray-700 dark:text-gray-100"><td class="px-3 py-2">{{ contact.display_name }}</td><td class="px-3 py-2">{{ contact.email || "—" }}</td><td class="px-3 py-2">{{ contact.phone || "—" }}</td><td class="px-3 py-2">{{ contactStatusLabel(contact.status) }}</td><td class="px-3 py-2">{{ contact.tags?.join(', ') || '—' }}</td><td class="px-3 py-2"><UButton size="xs" variant="soft" @click="openContactEdit(contact)">{{ $t('frameworkLab.editContact') }}</UButton></td></tr><tr v-if="contactProbeContacts.length === 0"><td colspan="6" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t("frameworkLab.noContacts") }}</td></tr></tbody></table></div>
       </div>
-      <div v-else-if="activeModule === 'metadata'" class="space-y-5 pt-1">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 class="font-medium text-gray-900 dark:text-gray-100">{{ $t('frameworkLab.metadataTitle') }}</h2><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $t('frameworkLab.metadataDescription') }}</p></div>
-          <div class="flex gap-2"><UButton color="secondary" variant="soft" icon="i-heroicons-arrow-path" :loading="metadataProbeLoading" @click="listMetadataTags">{{ $t('frameworkLab.listTags') }}</UButton><UButton @click="showMetadataTagModal = true">{{ $t('frameworkLab.metadataCreateTag') }}</UButton></div>
-        </div>
-        <div class="grid gap-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-2">
-          <UFormField :label="$t('frameworkLab.metadataResourceType')"><UInput v-model="metadataResourceType" :placeholder="$t('frameworkLab.metadataResourceTypePlaceholder')" /></UFormField>
-          <UFormField :label="$t('frameworkLab.metadataResourceUUID')"><UInput v-model="metadataResourceUUID" :placeholder="$t('frameworkLab.metadataResourceUUIDPlaceholder')" /></UFormField>
-          <UFormField :label="$t('frameworkLab.metadataTagUUIDs')"><UInput v-model="metadataTagUUIDs" :placeholder="$t('frameworkLab.metadataTagUUIDsPlaceholder')" /></UFormField>
-          <div class="flex items-end gap-2"><UButton color="secondary" variant="soft" :loading="metadataProbeLoading" :disabled="testRoute === 'delegated'" @click="listMetadataBindings">{{ $t('frameworkLab.listBindings') }}</UButton><UButton color="secondary" :loading="metadataProbeLoading" :disabled="testRoute === 'delegated'" @click="replaceMetadataBindings">{{ $t('frameworkLab.replaceBindings') }}</UButton></div>
-        </div>
-        <UAlert v-if="testRoute === 'delegated'" color="warning" variant="soft" :title="$t('frameworkLab.metadataHostOperationsPending')" />
-        <UAlert v-if="metadataProbeError" color="error" variant="soft" :title="metadataProbeError" />
-        <div v-else class="overflow-x-auto rounded-lg border border-gray-200 bg-white text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100"><table class="min-w-full text-left text-sm"><thead class="bg-gray-50 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"><tr><th class="px-3 py-2">{{ $t('frameworkLab.metadataTagCode') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.metadataTagStatus') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.metadataAction') }}</th></tr></thead><tbody><tr v-for="tag in metadataTags" :key="tag.uuid" class="border-t border-gray-200 dark:border-gray-700"><td class="px-3 py-2">{{ metadataTagLabel(tag) }}</td><td class="px-3 py-2">{{ metadataStatusLabel(tag.status) }}</td><td class="px-3 py-2"><UButton size="xs" variant="soft" :loading="metadataProbeLoading" :disabled="testRoute === 'delegated'" @click="toggleMetadataTag(tag)">{{ tag.status === 'active' ? $t('frameworkLab.metadataDeactivate') : $t('frameworkLab.metadataActivate') }}</UButton></td></tr><tr v-if="metadataTags.length === 0"><td colspan="3" class="px-3 py-6 text-center text-gray-500 dark:text-gray-400">{{ $t('frameworkLab.noMetadataTags') }}</td></tr></tbody></table></div>
-        <p v-if="metadataBindings.length" class="text-xs text-gray-500 dark:text-gray-400">{{ $t('frameworkLab.bindingResult') }} {{ metadataBindings.map((item: any) => metadataTagLabel(item.tag || metadataTags.find((tag: any) => tag.uuid === item.tag_uuid))).join(', ') }}</p>
-        <UModal v-model:open="showMetadataTagModal" :title="$t('frameworkLab.metadataCreateTag')"><template #body><form class="space-y-4" @submit.prevent="createMetadataTag"><UFormField :label="$t('frameworkLab.metadataNamespace')"><UInput v-model="metadataTagForm.namespace" class="w-full" required /></UFormField><UFormField :label="$t('frameworkLab.metadataResourceType')"><UInput v-model="metadataTagForm.resourceType" class="w-full" required /></UFormField><UFormField :label="$t('frameworkLab.metadataTagCode')"><UInput v-model="metadataTagForm.code" class="w-full" required /></UFormField><UFormField :label="$t('frameworkLab.metadataLabelZh')"><UInput v-model="metadataTagForm.labelZh" class="w-full" required /></UFormField><UFormField :label="$t('frameworkLab.metadataLabelEn')"><UInput v-model="metadataTagForm.labelEn" class="w-full" /></UFormField><UFormField :label="$t('frameworkLab.metadataColor')"><UInput v-model="metadataTagForm.color" class="w-full" /></UFormField><div class="flex justify-end gap-2"><UButton color="neutral" variant="soft" @click="showMetadataTagModal = false">{{ $t('frameworkLab.cancel') }}</UButton><UButton type="submit" :loading="metadataProbeLoading">{{ $t('frameworkLab.metadataCreateTag') }}</UButton></div></form></template></UModal>
-        <div class="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800"><div class="flex flex-wrap items-end gap-3"><UFormField :label="$t('frameworkLab.metadataTaxonomyUUID')"><UInput v-model="metadataTaxonomyUUID" :placeholder="$t('frameworkLab.metadataTaxonomyUUIDPlaceholder')" /></UFormField><UButton color="secondary" variant="soft" :loading="metadataProbeLoading" @click="listMetadataTaxonomyNodes">{{ $t('frameworkLab.metadataListNodes') }}</UButton></div><div v-if="metadataNodes.length" class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead><tr><th class="px-3 py-2">{{ $t('frameworkLab.metadataNode') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.metadataTagStatus') }}</th><th class="px-3 py-2">{{ $t('frameworkLab.metadataAction') }}</th></tr></thead><tbody><tr v-for="node in metadataNodes" :key="node.uuid" class="border-t border-gray-200 dark:border-gray-700"><td class="px-3 py-2">{{ metadataTagLabel(node) }}</td><td class="px-3 py-2">{{ metadataStatusLabel(node.status) }}</td><td class="px-3 py-2"><UButton size="xs" variant="soft" :loading="metadataProbeLoading" @click="toggleMetadataNode(node)">{{ node.status === 'active' ? $t('frameworkLab.metadataDeactivate') : $t('frameworkLab.metadataActivate') }}</UButton></td></tr></tbody></table></div></div>
+      </div>
+      <div v-else-if="activeModule === 'metadata'" class="pt-1">
+        <MetadataGovernanceExplorer :key="testRoute" :debug-route="testRoute" />
       </div>
       <div v-else-if="activeModule === 'scheduler'" class="space-y-6 pt-4">
         <div class="flex items-center gap-3 flex-wrap">
@@ -253,6 +247,7 @@ import { useUserStore } from "~/stores/user"
 import { useApiClient } from "~/composables/api/_client"
 import { useSchedulerApi, type SchedulerJob } from "~/composables/api/useScheduler"
 import { useCustomerBaseApi, type CustomerAccount, type CustomerContact } from "~/composables/api/useCustomerBase"
+import MetadataGovernanceExplorer from "~/components/settings/metadata-governance/MetadataGovernanceExplorer.vue"
 
 type ToastColor = "primary" | "secondary" | "success" | "info" | "warning" | "error" | "neutral"
 
@@ -266,17 +261,6 @@ const schedulerPausing = ref(false)
 const schedulerResuming = ref(false)
 const contactProbeLoading = ref(false)
 const contactProbeCreating = ref(false)
-const metadataProbeLoading = ref(false)
-const metadataProbeError = ref("")
-const metadataTags = ref<any[]>([])
-const metadataBindings = ref<any[]>([])
-const metadataNodes = ref<any[]>([])
-const metadataTaxonomyUUID = ref("")
-const showMetadataTagModal = ref(false)
-const metadataTagForm = reactive({ namespace: "", resourceType: "", code: "", labelZh: "", labelEn: "", color: "" })
-const metadataResourceType = ref("")
-const metadataResourceUUID = ref("")
-const metadataTagUUIDs = ref("")
 const schedulerJobs = ref<SchedulerJob[]>([])
 const selectedSchedulerJobID = ref("")
 const schedulerLastAction = ref("")
@@ -312,10 +296,14 @@ const contactProbeContacts = ref<CustomerContact[]>([])
 const showCustomerCreateModal = ref(false)
 const customerProbeCreating = ref(false)
 const customerProbeFormError = ref("")
-const customerProbeForm = reactive({ displayName: "", nickname: "", givenName: "", familyName: "", email: "", phone: "", avatarURL: "", locale: "", timezone: "", status: "active" as "active" | "pending" | "suspended" | "disabled" })
+const emptyCustomerForm = () => ({ type: "person" as "person" | "company", explicitContact: false, contactName: "", contactEmail: "", contactPhone: "", displayName: "", nickname: "", givenName: "", familyName: "", email: "", phone: "", avatarURL: "", locale: "", timezone: "", status: "active" as "active" | "pending" | "suspended" | "disabled" | "expired" | "deleted" })
+const customerProbeForm = reactive(emptyCustomerForm())
+const customerEditUUID = ref("")
+const contactEditUUID = ref("")
 const showContactCreateModal = ref(false)
 const contactProbeFormError = ref("")
-const contactProbeForm = reactive({ displayName: "", givenName: "", familyName: "", status: "active" as "active" | "inactive" | "temporary", tags: "", primaryRole: false, legalRepresentativeRole: false })
+const emptyContactForm = () => ({ email: "", phone: "", displayName: "", givenName: "", familyName: "", status: "active" as "active" | "inactive" | "temporary", tags: "", primaryRole: false, legalRepresentativeRole: false })
+const contactProbeForm = reactive(emptyContactForm())
 const contactProbeError = ref("")
 const contactProbeLoaded = ref(false)
 const contactProbeAuthScheme = ref("")
@@ -375,8 +363,15 @@ const selectedContactProbeCustomerLabel = computed(() => contactProbeCustomerOpt
 const customerLabel = (customer: CustomerAccount) => String(customer.display_name || customer.nickname || customer.primary_email || customer.email || t("frameworkLab.unnamedCustomer"))
 const customerStatusLabel = (status: string) => t(`frameworkLab.customerStatus.${status || 'unknown'}`)
 const contactStatusLabel = (status: string) => t(`frameworkLab.contactStatus.${status || 'unknown'}`)
-const customerProbeStatusOptions = computed(() => (["active", "pending", "suspended", "disabled"] as const).map((value) => ({ value, label: customerStatusLabel(value) })))
-const selectContactProbeCustomer = (customerUUID: string) => { contactProbeCustomerUUID.value = customerUUID; contactProbeContacts.value = []; contactProbeLoaded.value = false }
+const customerProbeStatusOptions = computed(() => ((customerEditUUID.value ? ["active", "pending", "suspended", "disabled", "expired", "deleted"] : ["active", "pending", "suspended", "disabled"]) as string[]).map((value) => ({ value, label: customerStatusLabel(value) })))
+const customerRecordsTab = ref('contacts')
+const customerRecordsTabs = computed(() => [
+  { value: 'contacts', label: t('frameworkLab.contactsTab') },
+  { value: 'identities', label: t('frameworkLab.identitiesTab') },
+])
+const contactRecordsLoading = ref(false)
+let contactRecordsRequest = 0
+const selectContactProbeCustomer = (customerUUID: string) => { if (contactProbeCustomerUUID.value === customerUUID) return; contactProbeCustomerUUID.value = customerUUID; contactProbeContacts.value = []; contactProbeLoaded.value = false }
 const contactProbeStatusOptions = computed(() => [
   { label: t("frameworkLab.contactStatusActive"), value: "active" },
   { label: t("frameworkLab.contactStatusInactive"), value: "inactive" },
@@ -384,7 +379,6 @@ const contactProbeStatusOptions = computed(() => [
 ])
 const contactProbeReady = computed(() => contactProbeMode.value === testRoute.value)
 const contactProbeRouteQuery = computed(() => ({ framework_debug_route: testRoute.value }))
-const metadataProbeQuery = computed(() => ({ framework_debug_route: testRoute.value }))
 const selectedSchedulerJob = computed(() => schedulerJobs.value.find((job) => job.job_id === selectedSchedulerJobID.value) || null)
 const selectedSchedulerNextRunAt = computed(() => String(selectedSchedulerJob.value?.schedule_expr || selectedSchedulerJob.value?.next_run_at || ""))
 const selectModule = (module: typeof activeModule.value) => { activeModule.value = module }
@@ -413,11 +407,6 @@ const selectTestRoute = async (route: "local" | "delegated") => {
   showContactCreateModal.value = false
   showCustomerCreateModal.value = false
   contactProbeFormError.value = ""
-  metadataTags.value = []
-  metadataBindings.value = []
-  metadataNodes.value = []
-  metadataProbeError.value = ""
-  showMetadataTagModal.value = false
 
   if (activeModule.value === "customer") await loadContactProbeCustomers()
 }
@@ -460,14 +449,66 @@ const loadContactProbeCustomers = async (page = 1) => {
   }
 }
 
+// Locate the authoritative customer, including idempotent replays on older pages.
+const selectIdentityCustomer = async (customerUUID: string) => {
+  const route = testRoute.value
+  selectContactProbeCustomer("")
+  contactProbeLoading.value = true
+  contactProbeError.value = ""
+  try {
+    let page = 1
+    let totalPages = 1
+    do {
+      const response = await customerBaseApi.listAccounts({ page, page_size: 20, framework_debug_route: route })
+      if (route !== testRoute.value) return
+      const customers = response.data?.items || []
+      totalPages = response.data?.total_pages || 1
+      if (customers.some(item => item.customer_uuid === customerUUID)) {
+        contactProbeCustomers.value = customers
+        contactProbePage.value = page
+        contactProbeTotalPages.value = totalPages
+        selectContactProbeCustomer(customerUUID)
+        return
+      }
+      page++
+    } while (page <= totalPages)
+    contactProbeError.value = t("identityLab.customerNotFound")
+  } catch (error: any) {
+    if (route === testRoute.value) contactProbeError.value = contactProbeErrorMessage(error)
+  } finally {
+    contactProbeLoading.value = false
+  }
+}
+
+const openCustomerCreate = () => { customerEditUUID.value = ""; Object.assign(customerProbeForm, emptyCustomerForm()); customerProbeFormError.value = ""; showCustomerCreateModal.value = true }
+const openContactCreate = () => { contactEditUUID.value = ""; Object.assign(contactProbeForm, emptyContactForm()); contactProbeFormError.value = ""; showContactCreateModal.value = true }
+const openCustomerEdit = (customer: CustomerAccount) => {
+  customerEditUUID.value = customer.customer_uuid
+  Object.assign(customerProbeForm, emptyCustomerForm(), { type: customer.type, displayName: customer.display_name || "", nickname: customer.nickname || "", givenName: customer.given_name || "", familyName: customer.family_name || "", email: customer.primary_email || "", phone: customer.primary_phone || "", avatarURL: customer.avatar_url || "", locale: customer.locale || "", timezone: customer.timezone || "", status: customer.status })
+  customerProbeFormError.value = ""; showCustomerCreateModal.value = true
+}
+const openContactEdit = (contact: CustomerContact) => {
+  contactEditUUID.value = contact.contact_uuid
+  Object.assign(contactProbeForm, { displayName: contact.display_name, givenName: contact.given_name || "", familyName: contact.family_name || "", email: contact.email || "", phone: contact.phone || "", status: contact.status, tags: contact.tags?.join(", ") || "", primaryRole: contact.roles?.includes("primary") || false, legalRepresentativeRole: contact.roles?.includes("legal_representative") || false })
+  contactProbeFormError.value = ""; showContactCreateModal.value = true
+}
+
 const createCustomerProbe = async () => {
+  if (customerEditUUID.value && !customerProbeForm.displayName.trim()) { customerProbeFormError.value = t("frameworkLab.customerNameRequired"); return }
   if (![customerProbeForm.displayName, customerProbeForm.nickname, customerProbeForm.email, customerProbeForm.phone].some((value) => value.trim())) { customerProbeFormError.value = t("frameworkLab.customerIdentityRequired"); return }
+  if (!customerEditUUID.value && (customerProbeForm.type === "company" || customerProbeForm.explicitContact) && !customerProbeForm.contactName.trim()) { customerProbeFormError.value = t("frameworkLab.primaryContactRequired"); return }
   customerProbeCreating.value = true
   customerProbeFormError.value = ""
   try {
-    const result = await customerBaseApi.createBasicAccount({ display_name: customerProbeForm.displayName.trim(), nickname: customerProbeForm.nickname.trim(), given_name: customerProbeForm.givenName.trim(), family_name: customerProbeForm.familyName.trim(), primary_email: customerProbeForm.email.trim(), primary_phone: customerProbeForm.phone.trim(), avatar_url: customerProbeForm.avatarURL.trim(), locale: customerProbeForm.locale.trim(), timezone: customerProbeForm.timezone.trim(), status: customerProbeForm.status }, testRoute.value)
+    if (customerEditUUID.value) {
+      await customerBaseApi.updateAccount(customerEditUUID.value, { display_name: customerProbeForm.displayName.trim(), nickname: customerProbeForm.nickname.trim(), given_name: customerProbeForm.givenName.trim(), family_name: customerProbeForm.familyName.trim(), primary_email: customerProbeForm.email.trim(), primary_phone: customerProbeForm.phone.trim(), avatar_url: customerProbeForm.avatarURL.trim(), locale: customerProbeForm.locale.trim(), timezone: customerProbeForm.timezone.trim(), status: customerProbeForm.status }, { query: contactProbeRouteQuery.value })
+      showCustomerCreateModal.value = false
+      await loadContactProbeCustomers(contactProbePage.value)
+      return
+    }
+    const result = await customerBaseApi.createBasicAccount({ type: customerProbeForm.type, ...((customerProbeForm.type === "company" || customerProbeForm.explicitContact) ? { primary_contact: { display_name: customerProbeForm.contactName.trim(), email: customerProbeForm.contactEmail.trim(), phone: customerProbeForm.contactPhone.trim() } } : {}), display_name: customerProbeForm.displayName.trim(), nickname: customerProbeForm.nickname.trim(), given_name: customerProbeForm.givenName.trim(), family_name: customerProbeForm.familyName.trim(), primary_email: customerProbeForm.email.trim(), primary_phone: customerProbeForm.phone.trim(), avatar_url: customerProbeForm.avatarURL.trim(), locale: customerProbeForm.locale.trim(), timezone: customerProbeForm.timezone.trim(), status: customerProbeForm.status as "active" | "pending" | "suspended" | "disabled" }, testRoute.value)
     showCustomerCreateModal.value = false
-    Object.assign(customerProbeForm, { displayName: "", nickname: "", givenName: "", familyName: "", email: "", phone: "", avatarURL: "", locale: "", timezone: "", status: "active" })
+    Object.assign(customerProbeForm, { type: "person", explicitContact: false, contactName: "", contactEmail: "", contactPhone: "", displayName: "", nickname: "", givenName: "", familyName: "", email: "", phone: "", avatarURL: "", locale: "", timezone: "", status: "active" })
     await loadContactProbeCustomers(1)
     if (result.data?.customer_uuid) {
       if (!contactProbeCustomers.value.some((item) => item.customer_uuid === result.data.customer_uuid)) contactProbeCustomers.value.unshift(result.data)
@@ -478,22 +519,33 @@ const createCustomerProbe = async () => {
 }
 
 const listContactProbe = async () => {
-  if (!contactProbeCustomerUUID.value) return
-  contactProbeLoading.value = true
-  contactProbeError.value = ""
-  contactProbeContactStatus.value = "pending"
+  const request = ++contactRecordsRequest
+  const customer = contactProbeCustomerUUID.value
+  const route = testRoute.value
+  contactProbeContacts.value = []; contactProbeLoaded.value = false
+  if (!customer) { contactRecordsLoading.value = false; return }
+  contactRecordsLoading.value = true
+  contactProbeError.value = ''
+  contactProbeContactStatus.value = 'pending'
+  const current = () => request === contactRecordsRequest && customer === contactProbeCustomerUUID.value && route === testRoute.value
   try {
-    const result = await customerBaseApi.listContacts(contactProbeCustomerUUID.value, { page: 1, page_size: 20, ...contactProbeRouteQuery.value })
+    const result = await customerBaseApi.listContacts(customer, { page: 1, page_size: 20, ...contactProbeRouteQuery.value })
+    if (!current()) return
     contactProbeContacts.value = result.data?.items || []
     contactProbeLoaded.value = true
-    contactProbeContactStatus.value = "success"
+    contactProbeContactStatus.value = 'success'
   } catch (error: any) {
-    contactProbeContactStatus.value = "failed"
+    if (!current()) return
+    contactProbeContactStatus.value = 'failed'
     contactProbeError.value = contactProbeErrorMessage(error)
-  } finally {
-    contactProbeLoading.value = false
-  }
+  } finally { if (request === contactRecordsRequest) contactRecordsLoading.value = false }
 }
+watch([contactProbeCustomerUUID, testRoute, customerRecordsTab], () => {
+  ++contactRecordsRequest
+  contactRecordsLoading.value = false
+  contactProbeContacts.value = []; contactProbeLoaded.value = false
+  if (customerRecordsTab.value === 'contacts') void listContactProbe()
+})
 
 const createContactProbe = async () => {
   const displayName = contactProbeForm.displayName.trim()
@@ -513,15 +565,21 @@ const createContactProbe = async () => {
   contactProbeFormError.value = ""
   contactProbeContactStatus.value = "pending"
   try {
-    await customerBaseApi.createContact(contactProbeCustomerUUID.value, {
+    const input = {
       display_name: displayName,
+      email: contactProbeForm.email.trim(),
+      phone: contactProbeForm.phone.trim(),
       given_name: contactProbeForm.givenName.trim(),
       family_name: contactProbeForm.familyName.trim(),
       status: contactProbeForm.status,
       roles,
       tags,
-      creation_intent: contactProbeForm.status === "temporary" ? "explicit_temporary" : "explicit_create",
-    }, { query: contactProbeRouteQuery.value })
+    }
+    if (contactEditUUID.value) {
+      await customerBaseApi.updateContact(contactProbeCustomerUUID.value, contactEditUUID.value, input, { query: contactProbeRouteQuery.value })
+    } else {
+      await customerBaseApi.createContact(contactProbeCustomerUUID.value, { ...input, creation_intent: contactProbeForm.status === "temporary" ? "explicit_temporary" : "explicit_create" }, { query: contactProbeRouteQuery.value })
+    }
     contactProbeForm.displayName = ""
     contactProbeForm.givenName = ""
     contactProbeForm.familyName = ""
@@ -537,70 +595,6 @@ const createContactProbe = async () => {
   } finally {
     contactProbeCreating.value = false
   }
-}
-
-const metadataProbeErrorMessage = (error: any) => String(error?.data?.error?.code || error?.response?._data?.error?.code || error?.message || t("frameworkLab.metadataOperationFailed"))
-const metadataTagLabel = (item: any) => item?.label_i18n?.[locale.value] || item?.display_name || item?.label_i18n?.["zh-CN"] || item?.label_i18n?.en || item?.code || t("frameworkLab.metadataUnknownTag")
-const metadataStatusLabel = (status: string) => status === "active" ? t("frameworkLab.metadataStatusActive") : status === "inactive" ? t("frameworkLab.metadataStatusInactive") : t("frameworkLab.metadataStatusUnknown")
-const listMetadataTags = async () => {
-  const selectedRoute = testRoute.value
-  metadataProbeLoading.value = true; metadataProbeError.value = ""
-  try {
-    const response: any = await apiClient.get("/admin/metadata/debug/tags", { query: { framework_debug_route: selectedRoute, resource_type: metadataResourceType.value.trim(), page: 1, page_size: 50 } })
-    if (testRoute.value === selectedRoute) metadataTags.value = response?.data?.items || response?.items || []
-  } catch (error: any) { if (testRoute.value === selectedRoute) { metadataTags.value = []; metadataProbeError.value = metadataProbeErrorMessage(error) } } finally { metadataProbeLoading.value = false }
-}
-const listMetadataBindings = async () => {
-  if (!metadataResourceType.value.trim() || !metadataResourceUUID.value.trim()) { metadataProbeError.value = t("frameworkLab.metadataBindingScopeRequired"); return }
-  const selectedRoute = testRoute.value
-  metadataProbeLoading.value = true; metadataProbeError.value = ""
-  try {
-    const response: any = await apiClient.get("/admin/metadata/debug/tag-bindings", { query: { framework_debug_route: selectedRoute, resource_type: metadataResourceType.value.trim(), resource_uuid: metadataResourceUUID.value.trim() } })
-    if (testRoute.value === selectedRoute) metadataBindings.value = response?.data?.items || response?.items || []
-  } catch (error: any) { if (testRoute.value === selectedRoute) { metadataBindings.value = []; metadataProbeError.value = metadataProbeErrorMessage(error) } } finally { metadataProbeLoading.value = false }
-}
-const replaceMetadataBindings = async () => {
-  if (!metadataResourceType.value.trim() || !metadataResourceUUID.value.trim()) { metadataProbeError.value = t("frameworkLab.metadataBindingScopeRequired"); return }
-  metadataProbeLoading.value = true; metadataProbeError.value = ""
-  try {
-    const tagUUIDs = metadataTagUUIDs.value.split(/[,，;；\s]+/).map((item) => item.trim()).filter(Boolean)
-    const response: any = await apiClient.put("/admin/metadata/debug/tag-bindings:replace", { resource_type: metadataResourceType.value.trim(), resource_uuid: metadataResourceUUID.value.trim(), tag_uuids: tagUUIDs }, { query: metadataProbeQuery.value })
-    metadataBindings.value = response?.data?.items || response?.items || []
-  } catch (error: any) { metadataProbeError.value = metadataProbeErrorMessage(error) } finally { metadataProbeLoading.value = false }
-}
-const createMetadataTag = async () => {
-  metadataProbeLoading.value = true; metadataProbeError.value = ""
-  try {
-    const labelI18n: Record<string, string> = { "zh-CN": metadataTagForm.labelZh.trim() }
-    if (metadataTagForm.labelEn.trim()) labelI18n.en = metadataTagForm.labelEn.trim()
-    await apiClient.post("/admin/metadata/debug/tags", { namespace: metadataTagForm.namespace.trim(), resource_type: metadataTagForm.resourceType.trim(), code: metadataTagForm.code.trim(), color: metadataTagForm.color.trim(), label_i18n: labelI18n }, { query: metadataProbeQuery.value })
-    showMetadataTagModal.value = false
-    metadataResourceType.value = metadataTagForm.resourceType.trim()
-    await listMetadataTags()
-  } catch (error: any) { metadataProbeError.value = metadataProbeErrorMessage(error) } finally { metadataProbeLoading.value = false }
-}
-const toggleMetadataTag = async (tag: any) => {
-  metadataProbeLoading.value = true; metadataProbeError.value = ""
-  try {
-    await apiClient.patch(`/admin/metadata/debug/tags/${encodeURIComponent(tag.uuid)}`, { status: tag.status === "active" ? "inactive" : "active" }, { query: metadataProbeQuery.value })
-    await listMetadataTags()
-  } catch (error: any) { metadataProbeError.value = metadataProbeErrorMessage(error) } finally { metadataProbeLoading.value = false }
-}
-const listMetadataTaxonomyNodes = async () => {
-  if (!metadataTaxonomyUUID.value.trim()) { metadataProbeError.value = t("frameworkLab.metadataTaxonomyRequired"); return }
-  const selectedRoute = testRoute.value
-  metadataProbeLoading.value = true; metadataProbeError.value = ""
-  try {
-    const response: any = await apiClient.get(`/admin/metadata/debug/taxonomies/${encodeURIComponent(metadataTaxonomyUUID.value.trim())}/nodes`, { query: { framework_debug_route: selectedRoute, page: 1, page_size: 50 } })
-    if (testRoute.value === selectedRoute) metadataNodes.value = response?.data?.items || response?.items || []
-  } catch (error: any) { if (testRoute.value === selectedRoute) { metadataNodes.value = []; metadataProbeError.value = metadataProbeErrorMessage(error) } } finally { metadataProbeLoading.value = false }
-}
-const toggleMetadataNode = async (node: any) => {
-  metadataProbeLoading.value = true; metadataProbeError.value = ""
-  try {
-    await apiClient.patch(`/admin/metadata/debug/taxonomy-nodes/${encodeURIComponent(node.uuid)}`, { status: node.status === "active" ? "inactive" : "active", version: node.version }, { query: metadataProbeQuery.value })
-    await listMetadataTaxonomyNodes()
-  } catch (error: any) { metadataProbeError.value = metadataProbeErrorMessage(error) } finally { metadataProbeLoading.value = false }
 }
 
 const shouldSkipSchedulerRequest = () => {

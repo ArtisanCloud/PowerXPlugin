@@ -2,7 +2,9 @@ package customer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
 	"strings"
 
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
@@ -10,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // LocalExternalIdentityResolver is the local-mode counterpart of Core's
@@ -41,12 +44,12 @@ func (r *LocalExternalIdentityResolver) ResolveExternalIdentity(ctx context.Cont
 	}
 	subject := strings.TrimSpace(input.ProviderSubject)
 	displayName := strings.TrimSpace(input.DisplayName)
-	if subject == "" || displayName == "" {
+	if !customerfw.ValidExternalIdentitySubject(subject) || displayName == "" {
 		return nil, customerfw.NewError(customerfw.CodeCustomerIdentitySourceBlocked, "provider_subject and display_name are required")
 	}
 
 	var result *customerfw.ExternalIdentityResolution
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := customerrepo.IdentityTransaction(r.db.WithContext(ctx), r.provider, subject, func(tx *gorm.DB) error {
 		var identity customermodel.CustomerAuthIdentity
 		err := tx.Where("provider = ? AND provider_subject = ?", r.provider, subject).First(&identity).Error
 		switch {
@@ -77,14 +80,22 @@ func (r *LocalExternalIdentityResolver) resolveExisting(tx *gorm.DB, tenantUUID 
 	if !isActiveCustomerStatus(account.Status) {
 		return customerfw.NewError(customerfw.CodeCustomerMembershipDisabled, "customer account is inactive")
 	}
+	if account.Type != "person" && account.Type != "company" {
+		return customerfw.NewError(customerfw.CodeCustomerMembershipRequired, "customer type is missing or incompatible")
+	}
 	membership, err := ensureLocalMembership(tx, tenantUUID, identity.CustomerUUID)
 	if err != nil {
 		return err
 	}
+	if err := ensureLocalPrimaryContact(tx, tenantUUID, &account, membership); err != nil {
+		return err
+	}
 	*result = &customerfw.ExternalIdentityResolution{
-		CustomerUUID:   identity.CustomerUUID,
-		MembershipUUID: membership.MembershipUUID,
-		DisplayName:    strings.TrimSpace(account.DisplayName),
+		CustomerUUID:       identity.CustomerUUID,
+		MembershipUUID:     membership.MembershipUUID,
+		Type:               account.Type,
+		PrimaryContactUUID: membership.PrimaryContactUUID,
+		DisplayName:        strings.TrimSpace(account.DisplayName),
 	}
 	return nil
 }
@@ -92,6 +103,7 @@ func (r *LocalExternalIdentityResolver) resolveExisting(tx *gorm.DB, tenantUUID 
 func (r *LocalExternalIdentityResolver) createIdentity(tx *gorm.DB, tenantUUID, subject, displayName string, result **customerfw.ExternalIdentityResolution) error {
 	account := customermodel.CustomerAccount{
 		CustomerUUID: uuid.NewString(),
+		Type:         "person",
 		TenantUuid:   tenantUUID,
 		DisplayName:  displayName,
 		Status:       customermodel.StatusActive,
@@ -114,17 +126,83 @@ func (r *LocalExternalIdentityResolver) createIdentity(tx *gorm.DB, tenantUUID, 
 	if err != nil {
 		return err
 	}
+	contact := customermodel.Contact{ContactUUID: uuid.NewString(), TenantUUID: tenantUUID, CustomerUUID: account.CustomerUUID, DisplayName: displayName, Status: "active", Roles: datatypes.JSON([]byte(`["primary"]`)), Tags: datatypes.JSON([]byte(`[]`)), Metadata: datatypes.JSON([]byte(`{"creation_intent":"explicit_create","source":"external_identity"}`))}
+	if err := tx.Create(&contact).Error; err != nil {
+		return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local primary contact create failed", err)
+	}
+	if err := tx.Model(membership).Update("primary_contact_uuid", contact.ContactUUID).Error; err != nil {
+		return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local primary contact bind failed", err)
+	}
+	if err := tx.Model(&account).Update("primary_contact_uuid", contact.ContactUUID).Error; err != nil {
+		return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local account primary contact bind failed", err)
+	}
 	*result = &customerfw.ExternalIdentityResolution{
-		CustomerUUID:   account.CustomerUUID,
-		MembershipUUID: membership.MembershipUUID,
-		DisplayName:    account.DisplayName,
+		CustomerUUID:       account.CustomerUUID,
+		MembershipUUID:     membership.MembershipUUID,
+		Type:               "person",
+		PrimaryContactUUID: contact.ContactUUID,
+		DisplayName:        account.DisplayName,
 	}
 	return nil
 }
 
+func ensureLocalPrimaryContact(tx *gorm.DB, tenantUUID string, account *customermodel.CustomerAccount, membership *customermodel.CustomerTenantMembership) error {
+	if membership.PrimaryContactUUID != "" {
+		var count int64
+		if err := tx.Model(&customermodel.Contact{}).Where("tenant_uuid = ? AND customer_uuid = ? AND contact_uuid = ? AND status = ?", tenantUUID, account.CustomerUUID, membership.PrimaryContactUUID, "active").Count(&count).Error; err != nil {
+			return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local primary contact lookup failed", err)
+		}
+		if count != 1 {
+			return customerfw.NewError(customerfw.CodeCustomerMembershipRequired, "primary contact is stale")
+		}
+		return nil
+	}
+	var contacts []customermodel.Contact
+	if err := tx.Where("tenant_uuid = ? AND customer_uuid = ? AND status = ?", tenantUUID, account.CustomerUUID, "active").Limit(2).Find(&contacts).Error; err != nil {
+		return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local contact lookup failed", err)
+	}
+	if len(contacts) > 1 {
+		return customerfw.NewError(customerfw.CodeCustomerMembershipRequired, "primary contact is ambiguous")
+	}
+	var contact customermodel.Contact
+	if len(contacts) == 1 {
+		contact = contacts[0]
+		var roles []string
+		if err := json.Unmarshal(contact.Roles, &roles); err != nil {
+			return customerfw.NewError(customerfw.CodeCustomerMembershipRequired, "contact roles are invalid")
+		}
+		primary := false
+		for _, role := range roles {
+			primary = primary || role == "primary"
+		}
+		if !primary {
+			roles = append(roles, "primary")
+			raw, err := json.Marshal(roles)
+			if err != nil {
+				return err
+			}
+			if err := tx.Model(&contact).Update("roles", datatypes.JSON(raw)).Error; err != nil {
+				return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local contact role update failed", err)
+			}
+		}
+	} else {
+		if account.Type == "company" || strings.TrimSpace(account.DisplayName) == "" {
+			return customerfw.NewError(customerfw.CodeCustomerMembershipRequired, "customer display name is missing")
+		}
+		contact = customermodel.Contact{ContactUUID: uuid.NewString(), TenantUUID: tenantUUID, CustomerUUID: account.CustomerUUID, DisplayName: account.DisplayName, GivenName: account.GivenName, FamilyName: account.FamilyName, Email: account.PrimaryEmail, Phone: account.PrimaryPhone, Status: "active", Roles: datatypes.JSON([]byte(`["primary"]`)), Tags: datatypes.JSON([]byte(`[]`)), Metadata: datatypes.JSON([]byte(`{"creation_intent":"explicit_create","source":"external_identity"}`))}
+		if err := tx.Create(&contact).Error; err != nil {
+			return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local primary contact create failed", err)
+		}
+	}
+	if err := tx.Model(membership).Update("primary_contact_uuid", contact.ContactUUID).Error; err != nil {
+		return customerfw.WrapError(customerfw.CodeCustomerDelegateUnavailable, "local primary contact bind failed", err)
+	}
+	return tx.Model(account).Update("primary_contact_uuid", contact.ContactUUID).Error
+}
+
 func ensureLocalMembership(tx *gorm.DB, tenantUUID, customerUUID string) (*customermodel.CustomerTenantMembership, error) {
 	var membership customermodel.CustomerTenantMembership
-	err := tx.Where("tenant_uuid = ? AND customer_uuid = ?", tenantUUID, customerUUID).First(&membership).Error
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_uuid = ? AND customer_uuid = ?", tenantUUID, customerUUID).First(&membership).Error
 	switch {
 	case err == nil:
 		if !isActiveCustomerStatus(membership.Status) {

@@ -8,11 +8,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type externalIdentityInvokerStub struct{ request gateway.InvokeRequest }
+type externalIdentityInvokerStub struct {
+	request gateway.InvokeRequest
+	kind    string
+}
 
 func (s *externalIdentityInvokerStub) Invoke(_ context.Context, req gateway.InvokeRequest) (*gateway.Response, error) {
 	s.request = req
-	return &gateway.Response{Data: map[string]any{"payload": map[string]any{"item": map[string]any{"customer_uuid": "11111111-1111-1111-1111-111111111111", "membership_uuid": "22222222-2222-2222-2222-222222222222", "display_name": "Customer"}}}}, nil
+	kind := s.kind
+	if kind == "" {
+		kind = "person"
+	}
+	return &gateway.Response{Data: map[string]any{"payload": map[string]any{"item": map[string]any{"customer_uuid": "11111111-1111-1111-1111-111111111111", "membership_uuid": "22222222-2222-2222-2222-222222222222", "type": kind, "primary_contact_uuid": "33333333-3333-4333-8333-333333333333", "display_name": "Customer"}}}}, nil
 }
 
 func TestExternalIdentityResolverUsesStrictCoreInternalContract(t *testing.T) {
@@ -29,4 +36,13 @@ func TestExternalIdentityResolverUsesStrictCoreInternalContract(t *testing.T) {
 	require.Equal(t, "INVOKE", payload["method"])
 	require.Equal(t, "core://customer/external-identities/resolve", payload["endpoint"])
 	require.Equal(t, map[string]string{"provider_subject": "shop:123:customer:456", "display_name": "Customer"}, payload["body"])
+}
+
+func TestExternalIdentityPreservesCompanyType(t *testing.T) {
+	stub := &externalIdentityInvokerStub{kind: "company"}
+	client, err := NewExternalIdentityResolver(ExternalIdentityResolverConfig{Invoker: stub})
+	require.NoError(t, err)
+	result, err := client.Resolve(context.Background(), ResolveExternalIdentityRequest{ProviderSubject: "shop:test.example:customer:company", DisplayName: "Company"})
+	require.NoError(t, err)
+	require.Equal(t, "company", result.Type)
 }

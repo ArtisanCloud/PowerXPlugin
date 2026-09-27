@@ -47,6 +47,8 @@ type Contact struct {
 	DisplayName  string         `json:"display_name"`
 	GivenName    string         `json:"given_name,omitempty"`
 	FamilyName   string         `json:"family_name,omitempty"`
+	Email        string         `json:"email,omitempty"`
+	Phone        string         `json:"phone,omitempty"`
 	Status       Status         `json:"status"`
 	Roles        []Role         `json:"roles"`
 	Tags         []string       `json:"tags"`
@@ -75,6 +77,8 @@ type CreateContactInput struct {
 	DisplayName    string         `json:"display_name"`
 	GivenName      string         `json:"given_name,omitempty"`
 	FamilyName     string         `json:"family_name,omitempty"`
+	Email          string         `json:"email,omitempty"`
+	Phone          string         `json:"phone,omitempty"`
 	Status         Status         `json:"status"`
 	Roles          []Role         `json:"roles,omitempty"`
 	Tags           []string       `json:"tags,omitempty"`
@@ -92,6 +96,8 @@ type UpdateContactInput struct {
 	DisplayName  *string   `json:"display_name,omitempty"`
 	GivenName    *string   `json:"given_name,omitempty"`
 	FamilyName   *string   `json:"family_name,omitempty"`
+	Email        *string   `json:"email,omitempty"`
+	Phone        *string   `json:"phone,omitempty"`
 	Status       *Status   `json:"status,omitempty"`
 	Roles        *[]Role   `json:"roles,omitempty"`
 	Tags         *[]string `json:"tags,omitempty"`

@@ -38,7 +38,7 @@ func (c *CapabilityClient) Create(ctx context.Context, in CreateContactInput) (*
 		return nil, err
 	}
 	var out contactItemWire
-	err := c.invoke(ctx, CapabilityContactsServiceManage, "create", contactOperation{CustomerUUID: in.CustomerUUID, DisplayName: &in.DisplayName, GivenName: &in.GivenName, FamilyName: &in.FamilyName, Status: statusPtr(in.Status), Roles: &in.Roles, Tags: &in.Tags, CreationIntent: string(in.CreationIntent)}, &out)
+	err := c.invoke(ctx, CapabilityContactsServiceManage, "create", contactOperation{CustomerUUID: in.CustomerUUID, DisplayName: &in.DisplayName, GivenName: &in.GivenName, FamilyName: &in.FamilyName, Email: &in.Email, Phone: &in.Phone, Status: statusPtr(in.Status), Roles: &in.Roles, Tags: &in.Tags, CreationIntent: string(in.CreationIntent)}, &out)
 	return out.Item.contact(), err
 }
 func (c *CapabilityClient) Get(ctx context.Context, in GetContactInput) (*Contact, error) {
@@ -54,7 +54,7 @@ func (c *CapabilityClient) Update(ctx context.Context, in UpdateContactInput) (*
 		return nil, err
 	}
 	var out contactItemWire
-	err := c.invoke(ctx, CapabilityContactsServiceManage, "update", contactOperation{CustomerUUID: in.CustomerUUID, ContactUUID: in.ContactUUID, DisplayName: in.DisplayName, GivenName: in.GivenName, FamilyName: in.FamilyName, Status: in.Status, Roles: in.Roles, Tags: in.Tags}, &out)
+	err := c.invoke(ctx, CapabilityContactsServiceManage, "update", contactOperation{CustomerUUID: in.CustomerUUID, ContactUUID: in.ContactUUID, DisplayName: in.DisplayName, GivenName: in.GivenName, FamilyName: in.FamilyName, Email: in.Email, Phone: in.Phone, Status: in.Status, Roles: in.Roles, Tags: in.Tags}, &out)
 	return out.Item.contact(), err
 }
 func (c *CapabilityClient) ListByCustomer(ctx context.Context, in ListByCustomerInput) (ContactPage, error) {
@@ -162,6 +162,8 @@ type contactOperation struct {
 	DisplayName               *string   `json:"display_name,omitempty"`
 	GivenName                 *string   `json:"given_name,omitempty"`
 	FamilyName                *string   `json:"family_name,omitempty"`
+	Email                     *string   `json:"email,omitempty"`
+	Phone                     *string   `json:"phone,omitempty"`
 	Roles                     *[]Role   `json:"roles,omitempty"`
 	Tags                      *[]string `json:"tags,omitempty"`
 	CreationIntent            string    `json:"creation_intent,omitempty"`
@@ -173,6 +175,8 @@ type contactWire struct {
 	DisplayName  string         `json:"display_name"`
 	GivenName    string         `json:"given_name"`
 	FamilyName   string         `json:"family_name"`
+	Email        string         `json:"email"`
+	Phone        string         `json:"phone"`
 	Status       Status         `json:"status"`
 	Roles        []Role         `json:"roles"`
 	Tags         []string       `json:"tags"`
@@ -182,7 +186,7 @@ type contactWire struct {
 }
 
 func (w contactWire) toContact() Contact {
-	return Contact{ContactUUID: w.UUID, TenantUUID: w.TenantUUID, CustomerUUID: w.CustomerUUID, DisplayName: w.DisplayName, GivenName: w.GivenName, FamilyName: w.FamilyName, Status: w.Status, Roles: w.Roles, Tags: w.Tags, Metadata: w.Metadata, CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt}
+	return Contact{ContactUUID: w.UUID, TenantUUID: w.TenantUUID, CustomerUUID: w.CustomerUUID, DisplayName: w.DisplayName, GivenName: w.GivenName, FamilyName: w.FamilyName, Email: w.Email, Phone: w.Phone, Status: w.Status, Roles: w.Roles, Tags: w.Tags, Metadata: w.Metadata, CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt}
 }
 func (w contactWire) contact() *Contact { item := w.toContact(); return &item }
 

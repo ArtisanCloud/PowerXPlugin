@@ -41,6 +41,13 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.POST("/resource-types", h.CreateResourceType)
 	// Framework-lab endpoints take an explicit debug route and never inherit
 	// the production ProviderMode selection.
+	group.GET("/debug/dictionaries", h.DebugListDictionaryNamespaces)
+	group.POST("/debug/dictionaries", h.DebugCreateDictionaryNamespace)
+	group.GET("/debug/dictionaries/:namespace_uuid/items", h.DebugListDictionaryItems)
+	group.POST("/debug/dictionaries/:namespace_uuid/items", h.DebugCreateDictionaryItem)
+	group.GET("/debug/taxonomies", h.DebugListTaxonomies)
+	group.POST("/debug/taxonomies", h.DebugCreateTaxonomy)
+	group.POST("/debug/taxonomies/:taxonomy_uuid/nodes", h.DebugCreateTaxonomyNode)
 	group.GET("/debug/tags", h.DebugListTags)
 	group.POST("/debug/tags", h.DebugCreateTag)
 	group.PATCH("/debug/tags/:tag_uuid", h.DebugUpdateTag)
@@ -48,6 +55,8 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	group.PUT("/debug/tag-bindings:replace", h.DebugReplaceTagBindings)
 	group.PATCH("/debug/taxonomy-nodes/:node_uuid", h.DebugUpdateTaxonomyNode)
 	group.GET("/debug/taxonomies/:taxonomy_uuid/nodes", h.DebugListTaxonomyNodes)
+	group.GET("/debug/resource-types", h.DebugListResourceTypes)
+	group.POST("/debug/resource-types", h.DebugCreateResourceType)
 }
 
 type Handler struct {
@@ -182,7 +191,7 @@ func (h *Handler) DebugListTaxonomyNodes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	page, err := service.ListTaxonomyNodes(ctx, fwmetadata.ListTaxonomyNodesRequest{TaxonomyUUID: strings.TrimSpace(c.Param("taxonomy_uuid")), Page: intQuery(c, "page", 1), PageSize: intQuery(c, "page_size", fwmetadata.DefaultPageSize), RequestID: requestID(c)})
+	page, err := service.ListTaxonomyNodes(ctx, fwmetadata.ListTaxonomyNodesRequest{TaxonomyUUID: strings.TrimSpace(c.Param("taxonomy_uuid")), Status: c.Query("status"), Query: c.Query("q"), Locale: c.Query("locale"), Page: intQuery(c, "page", 1), PageSize: intQuery(c, "page_size", fwmetadata.DefaultPageSize), RequestID: requestID(c)})
 	respondPage(c, page, err)
 }
 

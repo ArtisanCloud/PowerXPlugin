@@ -31,9 +31,24 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type Client struct {
-	baseURL string
-	http    *http.Client
-	token   tokenProvider
+	baseURL    string
+	http       *http.Client
+	token      tokenProvider
+	authScheme string
+}
+
+// NewClientWithAPIKey uses a server-configured credential for Local + proxy
+// diagnostics. It never forwards the plugin's local user token to Core.
+func NewClientWithAPIKey(cfg Config, apiKey string, httpClient *http.Client) (*Client, error) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, errors.New("knowledge.api_key_required")
+	}
+	c, err := NewClientWithTokenProvider(cfg, staticToken(strings.TrimSpace(apiKey)), httpClient)
+	if err != nil {
+		return nil, err
+	}
+	c.authScheme = "ApiKey"
+	return c, nil
 }
 
 // QABridge is the Framework boundary for the currently published knowledge
@@ -172,7 +187,11 @@ func (c *Client) request(ctx context.Context, method, path string, input, output
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	scheme := c.authScheme
+	if scheme == "" {
+		scheme = "Bearer"
+	}
+	req.Header.Set("Authorization", scheme+" "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err

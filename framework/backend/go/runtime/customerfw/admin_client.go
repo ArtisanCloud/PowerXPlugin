@@ -146,6 +146,7 @@ func (c *AdminClient) pageQuery(req ListAccountsRequest) map[string]any {
 func createAccountBody(req CreateAccountRequest) (map[string]any, string) {
 	return map[string]any{
 		"tenant_uuid":  strings.TrimSpace(req.TenantUUID),
+		"type":         strings.TrimSpace(req.Type),
 		"email":        strings.TrimSpace(req.Email),
 		"phone":        strings.TrimSpace(req.Phone),
 		"password":     req.Password,

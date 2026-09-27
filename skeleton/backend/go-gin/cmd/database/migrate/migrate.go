@@ -153,6 +153,9 @@ func MigratePluginModelsWithConfig(ctx context.Context, db *gorm.DB, cfg *config
 	// Existing databases can have an earlier nullable UUID column. Backfill it
 	// before AutoMigrate attempts to enforce the model's NOT NULL constraint.
 	// New tables are intentionally skipped here and created by AutoMigrate.
+	if err := ensureCustomerIdentityUUIDs(ctx, db); err != nil {
+		return err
+	}
 	if err := ensureTemplateUUIDs(ctx, db); err != nil {
 		return err
 	}

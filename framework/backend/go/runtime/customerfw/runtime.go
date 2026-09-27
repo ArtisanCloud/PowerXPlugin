@@ -22,12 +22,14 @@ type LocalCustomerStore interface {
 
 type Runtime struct {
 	mode       provider.Mode
+	identities *module.Factory[ExternalIdentityStore]
 	auth       *module.Factory[CustomerAuthClient]
 	external   *module.Factory[ExternalIdentityService]
 	membership *module.Factory[CustomerMembershipResolver]
 }
 
 type RuntimeAdapters struct {
+	Identities ExternalIdentityStore
 	Auth       CustomerAuthClient
 	External   ExternalIdentityService
 	Membership CustomerMembershipResolver
@@ -69,7 +71,13 @@ func NewRuntime(mode provider.Mode, local RuntimeAdapters, delegated RuntimeAdap
 	if err != nil {
 		return nil, err
 	}
-	return &Runtime{mode: mode, auth: auth, external: external, membership: membership}, nil
+	identities, err := module.NewFactory("customer.identity_management", mode,
+		module.Binding[ExternalIdentityStore]{Value: local.Identities, Available: local.Identities != nil},
+		module.Binding[ExternalIdentityStore]{Value: delegated.Identities, Available: delegated.Identities != nil})
+	if err != nil {
+		return nil, err
+	}
+	return &Runtime{mode: mode, identities: identities, auth: auth, external: external, membership: membership}, nil
 }
 
 func (r *Runtime) Mode() provider.Mode {
@@ -95,4 +103,11 @@ func (r *Runtime) Membership() (CustomerMembershipResolver, error) {
 		return nil, module.NewError("FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE", "customer runtime is unavailable")
 	}
 	return r.membership.Resolve()
+}
+
+func (r *Runtime) Identities() (ExternalIdentityStore, error) {
+	if r == nil {
+		return nil, module.NewError("FRAMEWORK_MODULE_ADAPTER_UNAVAILABLE", "CUSTOMER_IDENTITY_UNAVAILABLE")
+	}
+	return r.identities.Resolve()
 }

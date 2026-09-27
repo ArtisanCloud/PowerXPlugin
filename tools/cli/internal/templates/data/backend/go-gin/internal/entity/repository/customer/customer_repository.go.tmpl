@@ -105,6 +105,9 @@ func (r *Repository) CreateCustomer(ctx context.Context, customer *customermodel
 	if customer == nil {
 		return nil, errors.New("customer is required")
 	}
+	if customer.Type != "person" {
+		return nil, errors.New("password registration requires person customer type")
+	}
 	tenantUUID := strings.ToLower(strings.TrimSpace(customer.TenantUuid))
 	if tenantUUID == "" {
 		return nil, repository.ErrTenantUuidRequired
@@ -192,6 +195,31 @@ func (r *Repository) CreateCustomer(ctx context.Context, customer *customermodel
 		_ = tx.Rollback()
 		return nil, err
 	}
+	contactName := strings.TrimSpace(customer.DisplayName)
+	if contactName == "" {
+		contactName = strings.TrimSpace(customer.GivenName + " " + customer.FamilyName)
+	}
+	if contactName == "" {
+		contactName = strings.TrimSpace(customer.Nickname)
+	}
+	if contactName == "" {
+		_ = tx.Rollback()
+		return nil, errors.New("person customer name is required for primary contact")
+	}
+	contact := &customermodel.Contact{ContactUUID: uuid.NewString(), TenantUUID: tenantUUID, CustomerUUID: customer.CustomerUUID, DisplayName: contactName, GivenName: customer.GivenName, FamilyName: customer.FamilyName, Email: customer.Email, Phone: customer.Phone, Status: "active", Roles: datatypes.JSON([]byte(`["primary"]`)), Tags: datatypes.JSON([]byte(`[]`)), Metadata: datatypes.JSON([]byte(`{"creation_intent":"explicit_create"}`))}
+	if err := tx.Create(contact).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Model(membership).Update("primary_contact_uuid", contact.ContactUUID).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Model(customer).Update("primary_contact_uuid", contact.ContactUUID).Error; err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	customer.PrimaryContactUUID = contact.ContactUUID
 
 	if err := tx.Commit().Error; err != nil {
 		return nil, err

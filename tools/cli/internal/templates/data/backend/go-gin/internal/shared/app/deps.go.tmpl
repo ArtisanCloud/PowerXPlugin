@@ -72,20 +72,22 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
-	KnowledgeProvider             fwknowledge.KnowledgeProvider
-	CacheRuntime                  *cache.Runtime
-	TaskCenterRuntime             *taskcenter.Runtime
-	DB                            *gorm.DB
-	Ctx                           context.Context
-	PowerXClient                  *client.PowerXServiceClient
-	CapabilityGateway             gatewayClient
-	Metadata                      *fwmetadata.Runtime
-	MetadataDebugLocalRuntime     *fwmetadata.Runtime
-	MetadataDebugDelegatedRuntime *fwmetadata.Runtime
-	CustomerAdmin                 *customerfw.AdminClient
-	CustomerAccountSelector       *customerfw.AccountSelectorClient
-	CustomerRuntime               *customerfw.Runtime
-	ContactRuntime                *contactfw.Runtime
+	KnowledgeProvider              fwknowledge.KnowledgeProvider
+	CacheRuntime                   *cache.Runtime
+	TaskCenterRuntime              *taskcenter.Runtime
+	DB                             *gorm.DB
+	Ctx                            context.Context
+	PowerXClient                   *client.PowerXServiceClient
+	CapabilityGateway              gatewayClient
+	Metadata                       *fwmetadata.Runtime
+	MetadataDebugLocalRuntime      *fwmetadata.Runtime
+	MetadataDebugDelegatedRuntime  *fwmetadata.Runtime
+	CustomerAdmin                  *customerfw.AdminClient
+	CustomerAccountSelector        *customerfw.AccountSelectorClient
+	CustomerRuntime                *customerfw.Runtime
+	CustomerIdentityDebugLocal     *customerfw.Runtime
+	CustomerIdentityDebugDelegated *customerfw.Runtime
+	ContactRuntime                 *contactfw.Runtime
 	// ContactDebug* are deliberately separate from ContactRuntime. They exist
 	// only for the Framework lab where an administrator explicitly selects a
 	// route per request; normal business traffic remains startup-mode bound.

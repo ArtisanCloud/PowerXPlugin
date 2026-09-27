@@ -1,0 +1,253 @@
+package customer
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	audit "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	"strings"
+	"sync"
+	"time"
+
+	fw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	m "{{ .BackendModulePath }}/internal/entity/models/customer"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+// SQLite serializes local writes; PostgreSQL shares a transaction lock with login Resolve.
+var identityWriteMu sync.Mutex
+
+func IdentityTransaction(db *gorm.DB, provider, subject string, fn func(*gorm.DB) error) error {
+	if db.Dialector.Name() == "sqlite" {
+		identityWriteMu.Lock()
+		defer identityWriteMu.Unlock()
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		if tx.Dialector.Name() == "postgres" {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", provider+":"+subject).Error; err != nil {
+				return err
+			}
+		}
+		return fn(tx)
+	})
+}
+
+type ExternalIdentityStore struct {
+	db       *gorm.DB
+	provider string
+}
+
+func NewExternalIdentityStore(db *gorm.DB, provider string) *ExternalIdentityStore {
+	return &ExternalIdentityStore{db: db, provider: provider}
+}
+
+var _ fw.ExternalIdentityStore = (*ExternalIdentityStore)(nil)
+
+func identityError(code string, status int) error {
+	return &fw.Error{Code: fw.ErrorCode(code), ReasonCode: code, StatusCode: status, Message: code}
+}
+func (s *ExternalIdentityStore) scope(ctx context.Context) (string, error) {
+	t, ok := fw.TenantUUIDFromContext(ctx)
+	if !ok || strings.TrimSpace(t) == "" {
+		return "", identityError("CUSTOMER_TENANT_REQUIRED", 400)
+	}
+	if s == nil || s.db == nil || s.provider == "" {
+		return "", identityError("CUSTOMER_IDENTITY_UNAVAILABLE", 503)
+	}
+	return t, nil
+}
+func (s *ExternalIdentityStore) customer(tx *gorm.DB, tenant, id string) (*m.CustomerAccount, *m.CustomerTenantMembership, error) {
+	var account m.CustomerAccount
+	var member m.CustomerTenantMembership
+	if parsed, err := uuid.Parse(id); err != nil || parsed == uuid.Nil {
+		return nil, nil, identityError("CUSTOMER_ACCOUNT_INVALID_ARGUMENT", 400)
+	}
+	if err := tx.Where("tenant_uuid = ? AND customer_uuid = ?", tenant, id).First(&member).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil, identityError("CUSTOMER_ACCOUNT_NOT_FOUND", 404)
+		}
+		return nil, nil, err
+	}
+	if err := tx.Where("customer_uuid = ?", id).First(&account).Error; err != nil {
+		return nil, nil, err
+	}
+	return &account, &member, nil
+}
+func (s *ExternalIdentityStore) item(tx *gorm.DB, tenant string, identity m.CustomerAuthIdentity) (*fw.ExternalIdentityItem, error) {
+	account, member, err := s.customer(tx, tenant, identity.CustomerUUID)
+	if err != nil {
+		return nil, err
+	}
+	if identity.IdentityUUID == "" {
+		return nil, identityError("CUSTOMER_IDENTITY_UUID_MIGRATION_REQUIRED", 503)
+	}
+	return &fw.ExternalIdentityItem{IdentityUUID: identity.IdentityUUID, CustomerUUID: account.CustomerUUID, ProviderSubject: identity.ProviderSubject, Status: identity.Status, Type: account.Type, PrimaryContactUUID: member.PrimaryContactUUID}, nil
+}
+func (s *ExternalIdentityStore) Lookup(ctx context.Context, subject string) (*fw.ExternalIdentityLookup, error) {
+	tenant, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !fw.ValidExternalIdentitySubject(subject) {
+		return nil, identityError("CUSTOMER_ACCOUNT_INVALID_ARGUMENT", 400)
+	}
+	var identity m.CustomerAuthIdentity
+	tx := s.db.WithContext(ctx)
+	err = tx.Where("provider = ? AND provider_subject = ?", s.provider, subject).First(&identity).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return &fw.ExternalIdentityLookup{Found: false}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.item(tx, tenant, identity)
+	if fw.HTTPStatus(err) == 404 {
+		return &fw.ExternalIdentityLookup{Found: false}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &fw.ExternalIdentityLookup{Found: true, Item: item}, nil
+}
+func (s *ExternalIdentityStore) ListByCustomer(ctx context.Context, id string, page, size int) (*fw.ExternalIdentityPage, error) {
+	tenant, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tx := s.db.WithContext(ctx)
+	if _, _, err = s.customer(tx, tenant, id); err != nil {
+		return nil, err
+	}
+	if size > 100 || page < 0 || size < 0 {
+		return nil, identityError("CUSTOMER_ACCOUNT_INVALID_ARGUMENT", 400)
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+
+	out := &fw.ExternalIdentityPage{Items: []fw.ExternalIdentityItem{}, Page: page, PageSize: size}
+	query := tx.Model(&m.CustomerAuthIdentity{}).Where("provider = ? AND customer_uuid = ?", s.provider, id)
+	if err = query.Count(&out.Total).Error; err != nil {
+		return nil, err
+	}
+	var rows []m.CustomerAuthIdentity
+	if err = query.Order("identity_uuid").Offset((page - 1) * size).Limit(size).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		item, e := s.item(tx, tenant, row)
+		if e != nil {
+			return nil, e
+		}
+		out.Items = append(out.Items, *item)
+	}
+	return out, nil
+}
+func (s *ExternalIdentityStore) Bind(ctx context.Context, id, subject string) (*fw.ExternalIdentityItem, error) {
+	return s.write(ctx, id, subject, nil)
+}
+func (s *ExternalIdentityStore) CreateAndBind(ctx context.Context, subject string, p fw.ExternalIdentityCustomer) (*fw.ExternalIdentityItem, error) {
+	return s.write(ctx, "", subject, &p)
+}
+func (s *ExternalIdentityStore) write(ctx context.Context, id, subject string, p *fw.ExternalIdentityCustomer) (*fw.ExternalIdentityItem, error) {
+	tenant, err := s.scope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !fw.ValidExternalIdentitySubject(subject) {
+		return nil, identityError("CUSTOMER_ACCOUNT_INVALID_ARGUMENT", 400)
+	}
+	if p != nil {
+		if err := fw.ValidateIdentityCustomer(*p); err != nil {
+			return nil, err
+		}
+	}
+	var out *fw.ExternalIdentityItem
+	err = IdentityTransaction(s.db.WithContext(ctx), s.provider, subject, func(tx *gorm.DB) error {
+		if p == nil {
+			if _, _, e := s.customer(tx, tenant, id); e != nil {
+				return e
+			}
+		}
+		var identity m.CustomerAuthIdentity
+		e := tx.Unscoped().Where("provider = ? AND provider_subject = ?", s.provider, subject).First(&identity).Error
+		if e == nil {
+			if identity.DeletedAt.Valid || identity.Status != "active" || (id != "" && identity.CustomerUUID != id) {
+				return identityError("CUSTOMER_EXTERNAL_IDENTITY_CONFLICT", 409)
+			}
+			out, e = s.item(tx, tenant, identity)
+			if fw.HTTPStatus(e) == 404 {
+				return identityError("CUSTOMER_EXTERNAL_IDENTITY_CONFLICT", 409)
+			}
+			if e != nil {
+				return e
+			}
+			if p != nil {
+				if out.Type != "person" && out.Type != "company" {
+					return identityError("CUSTOMER_PRIMARY_CONTACT_REQUIRED", 400)
+				}
+				var count int64
+				if e = tx.Model(&m.Contact{}).Where("tenant_uuid = ? AND customer_uuid = ? AND contact_uuid = ? AND status = ?", tenant, out.CustomerUUID, out.PrimaryContactUUID, "active").Count(&count).Error; e != nil {
+					return e
+				}
+				if count != 1 {
+					return identityError("CUSTOMER_PRIMARY_CONTACT_REQUIRED", 400)
+				}
+			}
+			return nil
+		}
+		if !errors.Is(e, gorm.ErrRecordNotFound) {
+			return e
+		}
+		if p != nil {
+			normalized := fw.NormalizeBasicAccountLabels(fw.CreateBasicAccountRequest{Type: p.Type, DisplayName: p.DisplayName, Nickname: p.Nickname, GivenName: p.GivenName, FamilyName: p.FamilyName, PrimaryEmail: p.PrimaryEmail, PrimaryPhone: p.PrimaryPhone, PrimaryContact: p.PrimaryContact})
+			if normalized.DisplayName == "" || (normalized.Type != "person" && normalized.Type != "company") {
+				return identityError("CUSTOMER_ACCOUNT_INVALID_ARGUMENT", 400)
+			}
+			contact := normalized.PrimaryContact
+			if contact == nil {
+				if normalized.Type == "company" {
+					return identityError("CUSTOMER_PRIMARY_CONTACT_REQUIRED", 400)
+				}
+				contact = &fw.PrimaryContactInput{DisplayName: normalized.DisplayName, GivenName: p.GivenName, FamilyName: p.FamilyName, Email: p.PrimaryEmail, Phone: p.PrimaryPhone}
+			}
+			if contact.DisplayName == "" {
+				return identityError("CUSTOMER_PRIMARY_CONTACT_REQUIRED", 400)
+			}
+			id = uuid.NewString()
+			contactID := uuid.NewString()
+			account := m.CustomerAccount{CustomerUUID: id, TenantUuid: tenant, Type: normalized.Type, DisplayName: normalized.DisplayName, Nickname: p.Nickname, GivenName: p.GivenName, FamilyName: p.FamilyName, PrimaryEmail: p.PrimaryEmail, PrimaryPhone: p.PrimaryPhone, Status: "active", PrimaryContactUUID: contactID, Metadata: datatypes.JSONMap{}}
+			if e = tx.Create(&account).Error; e != nil {
+				return e
+			}
+			member := m.CustomerTenantMembership{MembershipUUID: uuid.NewString(), TenantUUID: tenant, CustomerUUID: id, PrimaryContactUUID: contactID, Status: "active", Source: "local_dev", Roles: datatypes.JSON([]byte(`[]`)), Scopes: datatypes.JSON([]byte(`[]`)), Metadata: datatypes.JSONMap{}}
+			if e = tx.Create(&member).Error; e != nil {
+				return e
+			}
+			person := m.Contact{ContactUUID: contactID, TenantUUID: tenant, CustomerUUID: id, DisplayName: contact.DisplayName, GivenName: contact.GivenName, FamilyName: contact.FamilyName, Email: contact.Email, Phone: contact.Phone, Status: "active", Roles: datatypes.JSON([]byte(`["primary"]`)), Tags: datatypes.JSON([]byte(`[]`)), Metadata: datatypes.JSON([]byte(`{"creation_intent":"explicit_create"}`))}
+			if e = tx.Create(&person).Error; e != nil {
+				return e
+			}
+		}
+		identity = m.CustomerAuthIdentity{CustomerUUID: id, Provider: s.provider, ProviderSubject: subject, Status: "active", Metadata: datatypes.JSONMap{}}
+		if e = tx.Create(&identity).Error; e != nil {
+			return e
+		}
+		out, e = s.item(tx, tenant, identity)
+		if e != nil {
+			return e
+		}
+		payload, _ := json.Marshal(map[string]string{"identity_uuid": out.IdentityUUID, "customer_uuid": out.CustomerUUID})
+		operation := "bind"
+		if p != nil {
+			operation = "create_and_bind"
+		}
+		return tx.Create(&audit.AuditEvent{ID: uuid.NewString(), PluginID: s.provider, TenantUuid: &tenant, ActorID: s.provider, PermissionCode: "customer.external_identities.service_manage", Action: operation, ResourceType: "customer_external_identity", ResourceRef: &out.IdentityUUID, Diff: datatypes.JSON(payload), OccurredAt: time.Now().UTC()}).Error
+	})
+	return out, err
+}

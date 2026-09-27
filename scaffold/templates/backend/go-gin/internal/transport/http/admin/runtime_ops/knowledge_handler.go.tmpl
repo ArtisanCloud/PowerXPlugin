@@ -47,6 +47,7 @@ var localVectorTablePattern = regexp.MustCompile(`^local_knowledge_vectors_v1_[1
 
 type KnowledgeHandler struct {
 	deps              *app.Deps
+	labOnly           bool
 	providerOnce      sync.Once
 	knowledgeProvider fwknowledge.KnowledgeProvider
 	providerErr       error
@@ -125,7 +126,6 @@ func (a knowledgeMediaGatewayAdapter) Invoke(ctx context.Context, req fwgateway.
 	}
 	result, err := a.gateway.Invoke(ctx, capgateway.InvokeParams{
 		CapabilityID:      req.CapabilityID,
-		Action:            req.Action,
 		PreferredProtocol: req.PreferredProtocol,
 		Payload:           req.Payload,
 		Headers:           req.Headers,
@@ -484,26 +484,42 @@ func (h *KnowledgeHandler) DeleteSpace(c *gin.Context) {
 }
 
 func knowledgeGatewayErrorStatus(err error) (int, fwknowledge.ErrorCode) {
+	status := http.StatusBadGateway
 	var apiErr *capgateway.PlatformAPIError
+	var invokeErr *fwgateway.InvocationError
 	if errors.As(err, &apiErr) && apiErr != nil {
-		switch apiErr.StatusCode {
-		case http.StatusUnauthorized:
-			return http.StatusUnauthorized, fwknowledge.CodeUnauthorized
-		case http.StatusForbidden:
-			return http.StatusForbidden, fwknowledge.CodeForbidden
-		case http.StatusConflict:
-			return http.StatusConflict, fwknowledge.CodeConflict
-		case http.StatusNotFound:
-			return http.StatusNotFound, fwknowledge.CodeNotFound
-		case http.StatusTooManyRequests:
-			return http.StatusTooManyRequests, fwknowledge.CodeRateLimited
-		default:
-			if apiErr.StatusCode >= 400 && apiErr.StatusCode < 500 {
-				return apiErr.StatusCode, fwknowledge.CodeInvalidDocument
-			}
+		status = apiErr.StatusCode
+	}
+	if errors.As(err, &invokeErr) && invokeErr != nil {
+		status = invokeErr.StatusCode
+	}
+	switch status {
+	case http.StatusUnauthorized:
+		return status, fwknowledge.CodeUnauthorized
+	case http.StatusForbidden:
+		return status, fwknowledge.CodeForbidden
+	case http.StatusConflict:
+		return status, fwknowledge.CodeConflict
+	case http.StatusNotFound:
+		return status, fwknowledge.CodeNotFound
+	case http.StatusTooManyRequests:
+		return status, fwknowledge.CodeRateLimited
+	default:
+		if status >= 400 && status < 500 {
+			return status, fwknowledge.CodeInvalidDocument
 		}
 	}
 	return http.StatusBadGateway, fwknowledge.CodeProviderUnavailable
+}
+
+func respondKnowledgeGatewayError(c *gin.Context, err error) {
+	status, code := knowledgeGatewayErrorStatus(err)
+	var invokeErr *fwgateway.InvocationError
+	traceID := ""
+	if errors.As(err, &invokeErr) && invokeErr != nil {
+		traceID = invokeErr.TraceID
+	}
+	c.JSON(status, gin.H{"success": false, "error": "knowledgeLab.gatewayFailed", "code": code, "trace_id": traceID})
 }
 
 func (h *KnowledgeHandler) Ingestions(c *gin.Context) {
@@ -527,7 +543,7 @@ func (h *KnowledgeHandler) Ingestions(c *gin.Context) {
 			},
 		})
 		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeProviderUnavailable})
+			respondKnowledgeGatewayError(c, err)
 			return
 		}
 		records := ingestionJobRecordsFromGatewayResult(result)
@@ -680,7 +696,7 @@ func (h *KnowledgeHandler) IngestSpace(c *gin.Context) {
 			},
 		})
 		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeProviderUnavailable})
+			respondKnowledgeGatewayError(c, err)
 			return
 		}
 		c.JSON(http.StatusAccepted, gin.H{"success": true, "data": gin.H{
@@ -756,7 +772,7 @@ func (h *KnowledgeHandler) UploadIngestionSource(c *gin.Context) {
 		RequestID:        strings.TrimSpace(c.GetHeader("X-Request-ID")),
 	})
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeProviderUnavailable})
+		respondKnowledgeGatewayError(c, err)
 		return
 	}
 	uploadTicket, err := mediaClient.PresignAsset(c.Request.Context(), fwmedia.PresignAssetInput{
@@ -769,7 +785,7 @@ func (h *KnowledgeHandler) UploadIngestionSource(c *gin.Context) {
 		RequestID:        strings.TrimSpace(c.GetHeader("X-Request-ID")),
 	})
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeProviderUnavailable})
+		respondKnowledgeGatewayError(c, err)
 		return
 	}
 	uploadTicket.URL = h.resolveMediaURL(uploadTicket.URL)
@@ -778,7 +794,7 @@ func (h *KnowledgeHandler) UploadIngestionSource(c *gin.Context) {
 		return
 	}
 	if err := mediaClient.UploadBytes(c.Request.Context(), uploadTicket, bytes.NewReader(raw), contentType); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeProviderUnavailable})
+		respondKnowledgeGatewayError(c, err)
 		return
 	}
 	status := fwmedia.BusinessStatusUnderReview
@@ -798,7 +814,7 @@ func (h *KnowledgeHandler) UploadIngestionSource(c *gin.Context) {
 		RequestID:        strings.TrimSpace(c.GetHeader("X-Request-ID")),
 	})
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeProviderUnavailable})
+		respondKnowledgeGatewayError(c, err)
 		return
 	}
 	downloadTicket.URL = h.resolveMediaURL(downloadTicket.URL)
@@ -882,7 +898,7 @@ func (h *KnowledgeHandler) Policy(c *gin.Context) {
 			"query":    map[string]string{"limit": "20"},
 		})
 		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeProviderUnavailable})
+			respondKnowledgeGatewayError(c, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
@@ -1803,6 +1819,9 @@ func localRetrievalTerms(value string) []string {
 }
 
 func (h *KnowledgeHandler) provider() (fwknowledge.KnowledgeProvider, error) {
+	if h != nil && h.labOnly {
+		return h.knowledgeProvider, h.providerErr
+	}
 	if h != nil && h.deps != nil && h.deps.KnowledgeProvider != nil {
 		return h.deps.KnowledgeProvider, nil
 	}
@@ -1863,9 +1882,10 @@ type knowledgeInvokeResult struct {
 }
 
 func knowledgeInvokeParams(capabilityID string, action string, payload map[string]any, c *gin.Context) capgateway.InvokeParams {
+	// Core's tenant invocation envelope identifies the operation through the
+	// published capability. The retired top-level action field is rejected.
 	return capgateway.InvokeParams{
 		CapabilityID:      capabilityID,
-		Action:            action,
 		PreferredProtocol: knowledgePreferredProtocol(payload),
 		Payload:           payload,
 		RequestID:         strings.TrimSpace(c.GetHeader("X-Request-ID")),

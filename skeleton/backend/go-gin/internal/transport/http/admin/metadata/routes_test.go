@@ -84,6 +84,24 @@ func (s *debugTagStore) ListTags(ctx context.Context, _ fwmetadata.ListTagsReque
 	return &fwmetadata.Page[fwmetadata.Tag]{Items: []fwmetadata.Tag{}}, nil
 }
 
+func (s *debugTagStore) ListDictionaryNamespaces(ctx context.Context, _ fwmetadata.ListDictionaryNamespacesRequest) (*fwmetadata.Page[fwmetadata.DictionaryNamespace], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.DictionaryNamespace]{Items: []fwmetadata.DictionaryNamespace{}}, nil
+}
+
+func (s *debugTagStore) ListTaxonomies(ctx context.Context, _ fwmetadata.ListTaxonomiesRequest) (*fwmetadata.Page[fwmetadata.Taxonomy], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.Taxonomy]{Items: []fwmetadata.Taxonomy{}}, nil
+}
+
+func (s *debugTagStore) ListResourceTypes(ctx context.Context, _ fwmetadata.ListResourceTypesRequest) (*fwmetadata.Page[fwmetadata.ResourceType], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.ResourceType]{Items: []fwmetadata.ResourceType{}}, nil
+}
+
 func TestMetadataDebugUsesOnlySelectedFrameworkRuntime(t *testing.T) {
 	local, delegated := &debugTagStore{}, &debugTagStore{}
 	localRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeLocal, local, nil)
@@ -112,5 +130,41 @@ func TestMetadataDebugUsesOnlySelectedFrameworkRuntime(t *testing.T) {
 	}
 	if local.tenant == "" || delegated.tenant != "" {
 		t.Fatalf("tenant context local=%q delegated=%q", local.tenant, delegated.tenant)
+	}
+}
+
+func TestMetadataGovernanceDebugSectionsUseSelectedRuntime(t *testing.T) {
+	local, delegated := &debugTagStore{}, &debugTagStore{}
+	localRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeLocal, local, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegatedRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeDelegated, nil, delegated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{debugLocal: localRuntime, debugDelegated: delegatedRuntime}
+	sections := []struct {
+		name   string
+		handle func(*gin.Context)
+	}{
+		{"dictionaries", h.DebugListDictionaryNamespaces},
+		{"taxonomies", h.DebugListTaxonomies},
+		{"tags", h.DebugListTags},
+		{"resource-types", h.DebugListResourceTypes},
+	}
+	for _, route := range []string{"local", "delegated"} {
+		for _, section := range sections {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodGet, "/metadata/debug/"+section.name+"?framework_debug_route="+route+"&tenant_uuid=11111111-1111-4111-8111-111111111111", nil)
+			section.handle(c)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("route=%s section=%s status=%d body=%s", route, section.name, rec.Code, rec.Body.String())
+			}
+		}
+	}
+	if local.calls != len(sections) || delegated.calls != len(sections) || local.tenant == "" || delegated.tenant != "" {
+		t.Fatalf("local=%d/%q delegated=%d/%q", local.calls, local.tenant, delegated.calls, delegated.tenant)
 	}
 }

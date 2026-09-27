@@ -12,6 +12,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 	handler := NewHandler(deps)
 	group := admin.Group("/customers")
 	group.GET("/mode", handler.Mode)
+	group.POST("/debug/external-identities", handler.ExternalIdentities)
 	group.GET("/overview", handler.Overview)
 	group.GET("/accounts", handler.ListAccounts)
 	group.POST("/accounts", handler.CreateAccount)

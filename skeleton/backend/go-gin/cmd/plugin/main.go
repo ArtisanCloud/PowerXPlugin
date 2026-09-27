@@ -674,7 +674,26 @@ func main() {
 		localCustomerExternal,
 		customersvc.NewFrameworkMembershipResolver(queryDB),
 	)
-	customerRuntime, err := customerfw.NewRuntime(providerResolver.Mode(), customerfw.AdaptersFromLocalStore(localCustomerStore), customerfw.RuntimeAdapters{
+	localIdentityStore := customerrepo.NewExternalIdentityStore(queryDB, app.PluginID)
+	var delegatedIdentityStore customerfw.ExternalIdentityStore
+	if capabilityGateway != nil && capabilityGateway.Enabled() {
+		delegatedIdentityStore, err = customerfw.NewExternalIdentityClient(metadataintegration.NewGatewayInvokerAdapter(capabilityGateway))
+		if err != nil {
+			logger.WithError(err).Fatal("CUSTOMER_IDENTITY_INITIALIZATION_FAILED")
+		}
+	}
+	localCustomerAdapters := customerfw.AdaptersFromLocalStore(localCustomerStore)
+	localCustomerAdapters.Identities = localIdentityStore
+	identityDebugLocal, err := customerfw.NewRuntime(fwprovider.ModeLocal, customerfw.RuntimeAdapters{Identities: localIdentityStore}, customerfw.RuntimeAdapters{})
+	if err != nil {
+		logger.WithError(err).Fatal("CUSTOMER_IDENTITY_INITIALIZATION_FAILED")
+	}
+	identityDebugDelegated, err := customerfw.NewRuntime(fwprovider.ModeDelegated, customerfw.RuntimeAdapters{}, customerfw.RuntimeAdapters{Identities: delegatedIdentityStore})
+	if err != nil {
+		logger.WithError(err).Fatal("CUSTOMER_IDENTITY_INITIALIZATION_FAILED")
+	}
+	customerRuntime, err := customerfw.NewRuntime(providerResolver.Mode(), localCustomerAdapters, customerfw.RuntimeAdapters{
+		Identities: delegatedIdentityStore,
 		Auth:       delegatedCustomerAuth,
 		External:   delegatedCustomerExternal,
 		Membership: delegatedCustomerMembership,
@@ -755,61 +774,63 @@ func main() {
 		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
 	}
 	deps := &app.Deps{
-		DB:                            queryDB,
-		Ctx:                           rootCtx,
-		PowerXClient:                  pxc,
-		CapabilityGateway:             capabilityGateway,
-		Metadata:                      metadataRuntime,
-		MetadataDebugLocalRuntime:     metadataDebugLocalRuntime,
-		MetadataDebugDelegatedRuntime: metadataDebugDelegatedRuntime,
-		CustomerAdmin:                 customerAdminClient,
-		CustomerAccountSelector:       customerAccountSelector,
-		CustomerRuntime:               customerRuntime,
-		ContactRuntime:                contactRuntime,
-		ContactDebugLocalRuntime:      contactDebugLocalRuntime,
-		ContactDebugDelegatedRuntime:  contactDebugDelegatedRuntime,
-		KnowledgeProvider:             selectedKnowledge,
-		CacheRuntime:                  cacheRuntime,
-		TaskCenterRuntime:             taskCenterRuntime,
-		AISettings:                    selectedAISettings,
-		PowerXAISettings:              aiSettingsClient,
-		LocalAISettings:               localAISettings,
-		LocalAI:                       localAI,
-		AIInvocation:                  aiInvocationRuntime,
-		AI:                            aiRuntime,
-		AgentLifecycle:                agentLifecycleRuntime,
-		AgentRuntime:                  agentRuntime,
-		CapabilityAccess:              capabilityAccessRuntime,
-		CapabilityRegistry:            capabilityRegistry,
-		IntegrationGateway:            integrationGatewayRuntime,
-		MediaCatalog:                  mediaCatalogRuntime,
-		Media:                         mediaRuntime,
-		PluginRuntime:                 pluginRuntimeRuntime,
-		PluginRelease:                 pluginReleaseRuntime,
-		KnowledgeQABridge:             knowledgeQABridge,
-		KnowledgeDirectory:            knowledgeDirectory,
-		NotificationDelivery:          notificationDeliveryRuntime,
-		Notifications:                 notificationsRuntime,
-		SkillInvocation:               skillInvocationRuntime,
-		Skills:                        skillsRuntime,
-		Config:                        cfg,
-		CapabilitiesManager:           capManager,
-		CapabilityMetrics:             capMetrics,
-		TaxProviderClient:             taxClient,
-		MarketplaceBilling:            nil,
-		LicenseAuthority:              nil,
-		LicenseCache:                  licenseCache,
-		OperationsMetrics:             opsmetrics.NewMetrics(),
-		AdminConsoleMetrics:           adminmetrics.NewMetrics(),
-		EventEmitter:                  bridgeEmitter,
-		WSBusHub:                      wsHub,
-		RealtimeDescriptors:           realtimeDescriptors,
-		ProviderMode:                  providerResolver.Mode(),
-		ProviderModeSource:            providerResolver.Source(),
-		IAMAdapterMode:                providerResolver.IAMAdapterMode(),
-		IAMAdapterModeSource:          providerResolver.Source(),
-		AuthProxy:                     authClient,
-		IAMDirectory:                  localIAM,
+		DB:                             queryDB,
+		Ctx:                            rootCtx,
+		PowerXClient:                   pxc,
+		CapabilityGateway:              capabilityGateway,
+		Metadata:                       metadataRuntime,
+		MetadataDebugLocalRuntime:      metadataDebugLocalRuntime,
+		MetadataDebugDelegatedRuntime:  metadataDebugDelegatedRuntime,
+		CustomerAdmin:                  customerAdminClient,
+		CustomerAccountSelector:        customerAccountSelector,
+		CustomerRuntime:                customerRuntime,
+		CustomerIdentityDebugLocal:     identityDebugLocal,
+		CustomerIdentityDebugDelegated: identityDebugDelegated,
+		ContactRuntime:                 contactRuntime,
+		ContactDebugLocalRuntime:       contactDebugLocalRuntime,
+		ContactDebugDelegatedRuntime:   contactDebugDelegatedRuntime,
+		KnowledgeProvider:              selectedKnowledge,
+		CacheRuntime:                   cacheRuntime,
+		TaskCenterRuntime:              taskCenterRuntime,
+		AISettings:                     selectedAISettings,
+		PowerXAISettings:               aiSettingsClient,
+		LocalAISettings:                localAISettings,
+		LocalAI:                        localAI,
+		AIInvocation:                   aiInvocationRuntime,
+		AI:                             aiRuntime,
+		AgentLifecycle:                 agentLifecycleRuntime,
+		AgentRuntime:                   agentRuntime,
+		CapabilityAccess:               capabilityAccessRuntime,
+		CapabilityRegistry:             capabilityRegistry,
+		IntegrationGateway:             integrationGatewayRuntime,
+		MediaCatalog:                   mediaCatalogRuntime,
+		Media:                          mediaRuntime,
+		PluginRuntime:                  pluginRuntimeRuntime,
+		PluginRelease:                  pluginReleaseRuntime,
+		KnowledgeQABridge:              knowledgeQABridge,
+		KnowledgeDirectory:             knowledgeDirectory,
+		NotificationDelivery:           notificationDeliveryRuntime,
+		Notifications:                  notificationsRuntime,
+		SkillInvocation:                skillInvocationRuntime,
+		Skills:                         skillsRuntime,
+		Config:                         cfg,
+		CapabilitiesManager:            capManager,
+		CapabilityMetrics:              capMetrics,
+		TaxProviderClient:              taxClient,
+		MarketplaceBilling:             nil,
+		LicenseAuthority:               nil,
+		LicenseCache:                   licenseCache,
+		OperationsMetrics:              opsmetrics.NewMetrics(),
+		AdminConsoleMetrics:            adminmetrics.NewMetrics(),
+		EventEmitter:                   bridgeEmitter,
+		WSBusHub:                       wsHub,
+		RealtimeDescriptors:            realtimeDescriptors,
+		ProviderMode:                   providerResolver.Mode(),
+		ProviderModeSource:             providerResolver.Source(),
+		IAMAdapterMode:                 providerResolver.IAMAdapterMode(),
+		IAMAdapterModeSource:           providerResolver.Source(),
+		AuthProxy:                      authClient,
+		IAMDirectory:                   localIAM,
 	}
 
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)

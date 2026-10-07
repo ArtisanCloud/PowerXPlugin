@@ -205,13 +205,18 @@ func (c *Client) request(ctx context.Context, method, path string, input, output
 		var envelope struct {
 			ReasonCode string `json:"reason_code"`
 			ErrorCode  string `json:"error_code"`
+			RequestID  string `json:"request_id"`
 		}
 		_ = json.Unmarshal(raw, &envelope)
 		reason := strings.TrimSpace(envelope.ReasonCode)
 		if reason == "" {
 			reason = strings.TrimSpace(envelope.ErrorCode)
 		}
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: reason, Body: string(raw)}
+		trace := resp.Header.Get("X-Trace-Id")
+		if trace == "" {
+			trace = envelope.RequestID
+		}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: reason, TraceID: trace, Body: string(raw)}
 	}
 	var envelope struct {
 		Data json.RawMessage `json:"data"`
@@ -226,6 +231,7 @@ func (c *Client) request(ctx context.Context, method, path string, input, output
 }
 
 type HTTPError struct {
+	TraceID    string
 	StatusCode int
 	ReasonCode string
 	Body       string
@@ -239,6 +245,7 @@ func (e *HTTPError) Error() string {
 // Contract. Unsupported filters and document-level rebuilds fail explicitly.
 func (c *Client) DelegatedCapabilities(context.Context) fwknowledge.ProviderCapabilities {
 	return fwknowledge.BasicCapabilities("powerx_knowledge_host", fwknowledge.ProviderModeDelegated,
+		fwknowledge.OperationCatalog, fwknowledge.OperationCreate,
 		fwknowledge.OperationRetrieve, fwknowledge.OperationSearch, fwknowledge.OperationUpsert,
 		fwknowledge.OperationDelete, fwknowledge.OperationReindex, fwknowledge.OperationHealth)
 }
@@ -301,6 +308,11 @@ func (c *Client) SearchKnowledge(ctx context.Context, query fwknowledge.Knowledg
 }
 
 func (c *Client) UpsertKnowledgeDocument(ctx context.Context, document fwknowledge.KnowledgeDocument) (*fwknowledge.KnowledgeIndexJob, error) {
+	// The published Host document DTO has no ingestion snapshot contract.
+	// Reject before sending: Core would otherwise ignore these settings.
+	if document.Ingestion != nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "knowledgeLab.workspace.snapshotBlockedDescription")
+	}
 	document, err := fwknowledge.ValidateDocument(document)
 	if err != nil {
 		return nil, err
@@ -311,27 +323,6 @@ func (c *Client) UpsertKnowledgeDocument(ctx context.Context, document fwknowled
 	var response hostIndexJob
 	path := "/api/v1/tenant/knowledge/spaces/" + url.PathEscape(document.SpaceID) + "/documents"
 	payload := map[string]any{"title": document.Title, "uri": document.URI, "content": document.Content, "content_type": document.ContentType, "checksum": document.Checksum, "version": document.Version, "tags": document.Tags}
-	if ingestion := document.Ingestion; ingestion != nil {
-		payload["ingestionProfile"] = ingestion.IngestionProfile
-		payload["processorProfile"] = ingestion.ProcessorProfile
-		payload["maskingProfile"] = ingestion.MaskingProfile
-		payload["priority"] = ingestion.Priority
-		payload["ragSceneKey"] = ingestion.RAGSceneKey
-		payload["ragBundleKey"] = ingestion.RAGBundleKey
-		payload["ragPrimary"] = ingestion.RAGPrimary
-		payload["segmentMode"] = ingestion.SegmentMode
-		payload["chunkSize"] = ingestion.ChunkSize
-		payload["chunkOverlap"] = ingestion.ChunkOverlap
-		payload["segmentSizePolicy"] = ingestion.SegmentSizePolicy
-		payload["segmentOrder"] = ingestion.SegmentOrder
-		payload["separators"] = ingestion.Separators
-		payload["pagePriority"] = ingestion.PagePriority
-		payload["anchorHeadingPath"] = ingestion.AnchorHeadingPath
-		payload["anchorClauseId"] = ingestion.AnchorClauseID
-		payload["anchorRowNumber"] = ingestion.AnchorRowNumber
-		payload["anchorSpeaker"] = ingestion.AnchorSpeaker
-		payload["anchorSentenceIndex"] = ingestion.AnchorSentenceIndex
-	}
 	if err := c.request(ctx, http.MethodPost, path, payload, &response); err != nil {
 		return nil, mapHostError(err)
 	}
@@ -397,22 +388,28 @@ func mapHostError(err error) error {
 	if !errors.As(err, &hostErr) {
 		return err
 	}
+	code := fwknowledge.CodeProviderUnavailable
 	switch hostErr.StatusCode {
 	case http.StatusBadRequest:
-		return fwknowledge.WrapError(fwknowledge.CodeInvalidDocument, "knowledge Host request is invalid", err)
+		code = fwknowledge.CodeInvalidDocument
 	case http.StatusUnauthorized:
-		return fwknowledge.WrapError(fwknowledge.CodeUnauthorized, "knowledge Host request was rejected", err)
+		code = fwknowledge.CodeUnauthorized
 	case http.StatusForbidden:
-		return fwknowledge.WrapError(fwknowledge.CodeForbidden, "knowledge Host capability was forbidden", err)
+		code = fwknowledge.CodeForbidden
 	case http.StatusNotFound:
-		return fwknowledge.WrapError(fwknowledge.CodeNotFound, "knowledge Host object was not found", err)
+		code = fwknowledge.CodeNotFound
 	case http.StatusConflict:
-		return fwknowledge.WrapError(fwknowledge.CodeConflict, "knowledge Host index operation conflicts", err)
-	case http.StatusBadGateway, http.StatusServiceUnavailable:
-		return fwknowledge.WrapError(fwknowledge.CodeProviderUnavailable, "knowledge Host dependency is unavailable", err)
-	default:
-		return fwknowledge.WrapError(fwknowledge.CodeProviderUnavailable, "knowledge Host request failed", err)
+		code = fwknowledge.CodeConflict
+	case http.StatusPreconditionFailed:
+		code = fwknowledge.CodeStrategyUnavailable
+	case http.StatusTooManyRequests:
+		code = fwknowledge.CodeRateLimited
 	}
+	if hostErr.ReasonCode != "" {
+		code = fwknowledge.ErrorCode(hostErr.ReasonCode)
+	}
+	return &fwknowledge.Error{Code: code, StatusCode: hostErr.StatusCode, TraceID: hostErr.TraceID, Message: "knowledge.host.request_failed", Cause: err}
+
 }
 
 var _ fwknowledge.DelegatedClient = (*Client)(nil)
@@ -430,3 +427,37 @@ func (t stsToken) Token(ctx context.Context) (string, error) {
 	}
 	return token.AccessToken, nil
 }
+
+func (c *Client) GetKnowledgeCatalog(ctx context.Context) (*fwknowledge.KnowledgeCatalog, error) {
+	var response struct {
+		Catalog *fwknowledge.KnowledgeCatalog `json:"catalog"`
+	}
+	if err := c.request(ctx, http.MethodGet, "/api/v1/tenant/knowledge/catalog", nil, &response); err != nil {
+		return nil, mapHostError(err)
+	}
+	if err := fwknowledge.ValidateHostCatalog(response.Catalog); err != nil {
+		return nil, err
+	}
+	return response.Catalog, nil
+}
+func (c *Client) CreateKnowledgeSpace(ctx context.Context, input fwknowledge.CreateSpaceInput) (*fwknowledge.CreatedSpace, error) {
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+	var response struct {
+		Item *fwknowledge.CreatedSpace `json:"item"`
+	}
+	if err := c.request(ctx, http.MethodPost, "/api/v1/tenant/knowledge/spaces", input, &response); err != nil {
+		return nil, mapHostError(err)
+	}
+	if err := fwknowledge.ValidateCreatedSpace(response.Item); err != nil {
+		return nil, err
+	}
+	if response.Item.DepartmentUUID != input.DepartmentUUID || response.Item.StrategyKey != input.StrategyKey {
+		return nil, fwknowledge.NewError(fwknowledge.CodeInvalidResponse, "knowledge.provisioning.invalid_response")
+	}
+	return response.Item, nil
+}
+
+var _ fwknowledge.CatalogDelegatedClient = (*Client)(nil)
+var _ fwknowledge.SpaceProvisioningDelegatedClient = (*Client)(nil)

@@ -36,10 +36,11 @@ type CoreClientConfig struct {
 // and authorization Host Contracts. Tenant scope is never serialised: Core
 // derives it from the service credential.
 type CoreClient struct {
-	baseURL string
-	tokens  TokenProvider
-	timeout time.Duration
-	client  *http.Client
+	baseURL    string
+	tokens     TokenProvider
+	timeout    time.Duration
+	client     *http.Client
+	authScheme string
 }
 
 func NewCoreClient(cfg CoreClientConfig) (*CoreClient, error) {
@@ -57,8 +58,34 @@ func NewCoreClient(cfg CoreClientConfig) (*CoreClient, error) {
 	if client == nil {
 		client = &http.Client{Timeout: timeout + 500*time.Millisecond}
 	}
-	return &CoreClient{baseURL: apiBase(cfg.BaseURL), tokens: cfg.Tokens, timeout: timeout, client: client}, nil
+	return &CoreClient{baseURL: apiBase(cfg.BaseURL), tokens: cfg.Tokens, timeout: timeout, client: client, authScheme: "Bearer"}, nil
 }
+
+// NewCoreClientWithAPIKey uses a server-owned credential for Local + proxy.
+// The caller's browser token is never forwarded to the Core IAM directory.
+func NewCoreClientWithAPIKey(cfg CoreClientConfig, apiKey string) (*CoreClient, error) {
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return nil, errors.New("iam.api_key_required")
+	}
+	cfg.Tokens = TokenProviderFunc(func(context.Context) (string, error) { return apiKey, nil })
+	client, err := NewCoreClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	client.authScheme = "ApiKey"
+	return client, nil
+}
+
+// CoreRequestError retains the actual denial status and Core trace for diagnostics.
+type CoreRequestError struct {
+	Status  int
+	TraceID string
+	Err     error
+}
+
+func (e *CoreRequestError) Error() string { return e.Err.Error() }
+func (e *CoreRequestError) Unwrap() error { return e.Err }
 
 func (c *CoreClient) GetTenant(ctx context.Context, asserted string) (*contracts.Tenant, error) {
 	var out contracts.Tenant
@@ -79,6 +106,29 @@ func (c *CoreClient) ListDepartments(ctx context.Context, tenant string) ([]cont
 	}
 	return checkTenant(out.Items, tenant, func(v contracts.Department) string { return v.TenantUUID })
 }
+
+// coreMember is the numeric-status DTO published by Core's member directory.
+// Keep the wire contract separate from the Framework's string-status model.
+type coreMember struct {
+	MemberUUID  string `json:"member_uuid"`
+	TenantUUID  string `json:"tenant_uuid"`
+	UserUUID    string `json:"user_uuid"`
+	DisplayName string `json:"display_name,omitempty"`
+	Status      int16  `json:"status"`
+}
+
+func (m coreMember) member() contracts.Member {
+	return contracts.Member{MemberUUID: m.MemberUUID, TenantUUID: m.TenantUUID, UserUUID: m.UserUUID, DisplayName: m.DisplayName, Status: strconv.FormatInt(int64(m.Status), 10)}
+}
+
+func coreMembers(items []coreMember, tenant string) ([]contracts.Member, error) {
+	out := make([]contracts.Member, 0, len(items))
+	for _, item := range items {
+		out = append(out, item.member())
+	}
+	return checkTenant(out, tenant, func(v contracts.Member) string { return v.TenantUUID })
+}
+
 func (c *CoreClient) ListMembers(ctx context.Context, tenant string) ([]contracts.Member, error) {
 	page, err := c.ListMembersPage(ctx, tenant, contracts.MemberPageRequest{Page: 1, PageSize: 200})
 	if err != nil {
@@ -103,7 +153,7 @@ func (c *CoreClient) ListMembersPage(ctx context.Context, tenant string, req con
 	}
 	path := "/tenant/iam/members?page=" + strconv.Itoa(req.Page) + "&page_size=" + strconv.Itoa(req.PageSize)
 	var out struct {
-		Items      []contracts.Member `json:"items"`
+		Items      []coreMember `json:"items"`
 		Pagination struct {
 			Page     int   `json:"page"`
 			PageSize int   `json:"page_size"`
@@ -113,7 +163,7 @@ func (c *CoreClient) ListMembersPage(ctx context.Context, tenant string, req con
 	if err := c.call(ctx, http.MethodGet, path, nil, &out, ""); err != nil {
 		return nil, err
 	}
-	items, err := checkTenant(out.Items, tenant, func(v contracts.Member) string { return v.TenantUUID })
+	items, err := coreMembers(out.Items, tenant)
 	if err != nil {
 		return nil, err
 	}
@@ -123,35 +173,44 @@ func (c *CoreClient) GetMember(ctx context.Context, tenant, member string) (*con
 	if strings.TrimSpace(member) == "" {
 		return nil, iamerrors.New(iamerrors.CodeInvalidArgument, "member_uuid is required")
 	}
-	var out contracts.Member
+	var out coreMember
 	if err := c.call(ctx, http.MethodGet, "/tenant/iam/members/"+url.PathEscape(strings.TrimSpace(member)), nil, &out, ""); err != nil {
 		return nil, err
 	}
 	if tenant != "" && out.TenantUUID != tenant {
 		return nil, iamerrors.New(iamerrors.CodeMemberNotFound, "member not found")
 	}
-	return &out, nil
+	result := out.member()
+	return &result, nil
 }
 func (c *CoreClient) BatchGetMembers(ctx context.Context, tenant string, ids []string) ([]contracts.Member, error) {
 	var out struct {
-		Items []contracts.Member `json:"items"`
+		Items []coreMember `json:"items"`
 	}
 	if err := c.call(ctx, http.MethodPost, "/tenant/iam/members:batch-get", map[string]any{"member_uuids": ids}, &out, ""); err != nil {
 		return nil, err
 	}
-	return checkTenant(out.Items, tenant, func(v contracts.Member) string { return v.TenantUUID })
+	return coreMembers(out.Items, tenant)
 }
 func (c *CoreClient) BatchResolveMembers(ctx context.Context, tenant string, ids []string) (*contracts.MemberResolution, error) {
-	var out contracts.MemberResolution
+	// Core's tolerant resolver intentionally omits tenant and status. The tenant
+	// is scoped by the service credential, not supplied in the request body.
+	var out struct {
+		Items []struct {
+			MemberUUID  string `json:"member_uuid"`
+			UserUUID    string `json:"user_uuid"`
+			DisplayName string `json:"display_name,omitempty"`
+		} `json:"items"`
+		MissingMemberUUIDs []string `json:"missing_member_uuids"`
+	}
 	if err := c.call(ctx, http.MethodPost, "/tenant/iam/members:batch-resolve", map[string]any{"member_uuids": ids}, &out, ""); err != nil {
 		return nil, err
 	}
-	items, err := checkTenant(out.Items, tenant, func(v contracts.Member) string { return v.TenantUUID })
-	if err != nil {
-		return nil, err
+	result := &contracts.MemberResolution{Items: make([]contracts.Member, 0, len(out.Items)), MissingMemberUUIDs: out.MissingMemberUUIDs}
+	for _, item := range out.Items {
+		result.Items = append(result.Items, contracts.Member{MemberUUID: item.MemberUUID, TenantUUID: tenant, UserUUID: item.UserUUID, DisplayName: item.DisplayName})
 	}
-	out.Items = items
-	return &out, nil
+	return result, nil
 }
 func (c *CoreClient) BatchResolveMembersByDisplayNames(ctx context.Context, tenant string, names []string) (*contracts.MemberDisplayNameResolution, error) {
 	var out contracts.MemberDisplayNameResolution
@@ -194,6 +253,9 @@ func (c *CoreClient) Authorize(ctx context.Context, in contracts.AuthorizationRe
 }
 func (c *CoreClient) ResolveIdentity(ctx context.Context, bearer string) (*contracts.IdentityContext, error) {
 	var out contracts.IdentityContext
+	if c.authScheme == "ApiKey" && strings.TrimSpace(bearer) != "" {
+		return nil, iamerrors.New(iamerrors.CodeInvalidArgument, "iam.caller_token_not_allowed")
+	}
 	if strings.TrimSpace(bearer) == "" {
 		return nil, iamerrors.New(iamerrors.CodeUnauthorized, "bearer token is required")
 	}
@@ -228,7 +290,7 @@ func (c *CoreClient) call(ctx context.Context, method, path string, body any, ou
 		}
 		bearer = token
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(bearer))
+	req.Header.Set("Authorization", c.authScheme+" "+strings.TrimSpace(bearer))
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -240,7 +302,7 @@ func (c *CoreClient) call(ctx context.Context, method, path string, body any, ou
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return mapCoreError(resp.StatusCode, raw)
+		return &CoreRequestError{Status: resp.StatusCode, TraceID: resp.Header.Get("X-Trace-Id"), Err: mapCoreError(resp.StatusCode, raw)}
 	}
 	return decodeCoreEnvelope(raw, out)
 }

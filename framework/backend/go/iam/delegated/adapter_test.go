@@ -82,3 +82,26 @@ func TestNewBundleRejectsNilHost(t *testing.T) {
 		t.Fatal("expected missing host to fail")
 	}
 }
+
+func TestCoreClientAPIKeyDepartmentDirectoryDoesNotForwardTenant(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/tenant/iam/departments" || r.Header.Get("Authorization") != "ApiKey server-key" || r.URL.RawQuery != "" || r.Header.Get("tenant_uuid") != "" {
+			t.Error("incorrect service credential or tenant override")
+		}
+		_, _ = w.Write([]byte(`{"data":{"items":[]}}`))
+	}))
+	defer server.Close()
+	client, err := NewCoreClientWithAPIKey(CoreClientConfig{BaseURL: server.URL}, "server-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.ListDepartments(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.ResolveIdentity(context.Background(), "browser-token"); err == nil {
+		t.Fatal("caller token must be rejected by the API-key client")
+	}
+	if _, err = NewCoreClientWithAPIKey(CoreClientConfig{BaseURL: server.URL}, ""); err == nil {
+		t.Fatal("empty service key must fail")
+	}
+}

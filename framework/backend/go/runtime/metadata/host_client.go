@@ -132,7 +132,7 @@ func (c *HostClient) UpdateDictionaryItem(ctx context.Context, in UpdateDictiona
 		return nil, hostInvalid("metadata.dictionary.items.update")
 	}
 	var out DictionaryItem
-	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/metadata/dictionary-items/"+url.PathEscape(in.ItemUUID), nil, map[string]any{"label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "sort_order": in.SortOrder, "status": in.Status, "metadata": in.Metadata}, &out)
+	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/metadata/dictionary-items/"+url.PathEscape(in.ItemUUID), nil, map[string]any{"label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "sort_order": in.SortOrder, "status": in.Status, "metadata": in.Metadata, "expected_version": in.ExpectedVersion}, &out)
 	return &out, err
 }
 func (c *HostClient) ResolveDictionaryItem(ctx context.Context, namespace, code string) (*DictionaryItem, error) {
@@ -186,7 +186,7 @@ func (c *HostClient) CreateTaxonomyNode(ctx context.Context, in CreateTaxonomyNo
 		return nil, hostInvalid("metadata.taxonomy.nodes.create")
 	}
 	var out TaxonomyNode
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/metadata/taxonomies/"+url.PathEscape(in.TaxonomyUUID)+"/nodes", nil, map[string]any{"parent_uuid": in.ParentUUID, "code": strings.TrimSpace(in.Code), "label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "sort_order": in.SortOrder}, &out)
+	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/metadata/taxonomies/"+url.PathEscape(in.TaxonomyUUID)+"/nodes", nil, map[string]any{"metadata": in.Metadata, "parent_uuid": in.ParentUUID, "code": strings.TrimSpace(in.Code), "label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "sort_order": in.SortOrder}, &out)
 	return &out, err
 }
 func (c *HostClient) UpdateTaxonomyNode(ctx context.Context, in UpdateTaxonomyNodeRequest) (*TaxonomyNode, error) {
@@ -194,7 +194,7 @@ func (c *HostClient) UpdateTaxonomyNode(ctx context.Context, in UpdateTaxonomyNo
 		return nil, hostInvalid("metadata.taxonomy.nodes.update")
 	}
 	var out TaxonomyNode
-	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/metadata/taxonomy-nodes/"+url.PathEscape(in.NodeUUID), nil, map[string]any{"label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "sort_order": in.SortOrder, "status": in.Status, "version": in.Version}, &out)
+	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/metadata/taxonomy-nodes/"+url.PathEscape(in.NodeUUID), nil, map[string]any{"metadata": in.Metadata, "move_parent": in.MoveParent, "parent_uuid": in.ParentUUID, "label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "sort_order": in.SortOrder, "status": in.Status, "version": in.Version}, &out)
 	return &out, err
 }
 func (c *HostClient) ResolveTaxonomyNode(ctx context.Context, namespace, code string) (*TaxonomyNode, error) {
@@ -222,7 +222,7 @@ func (c *HostClient) CreateTag(ctx context.Context, in CreateTagRequest) (*Tag, 
 		return nil, hostInvalid("metadata.tag.create")
 	}
 	var out Tag
-	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/metadata/tags", nil, map[string]any{"namespace": strings.TrimSpace(in.Namespace), "resource_type": strings.TrimSpace(in.ResourceType), "code": strings.TrimSpace(in.Code), "color": strings.TrimSpace(in.Color), "label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n}, &out)
+	err := c.do(ctx, http.MethodPost, "/api/v1/tenant/metadata/tags", nil, map[string]any{"metadata": in.Metadata, "namespace": strings.TrimSpace(in.Namespace), "resource_type": strings.TrimSpace(in.ResourceType), "code": strings.TrimSpace(in.Code), "color": strings.TrimSpace(in.Color), "label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n}, &out)
 	return &out, err
 }
 func (c *HostClient) UpdateTag(ctx context.Context, in UpdateTagRequest) (*Tag, error) {
@@ -230,7 +230,7 @@ func (c *HostClient) UpdateTag(ctx context.Context, in UpdateTagRequest) (*Tag, 
 		return nil, hostInvalid("metadata.tag.update")
 	}
 	var out Tag
-	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/metadata/tags/"+url.PathEscape(in.TagUUID), nil, map[string]any{"label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "color": in.Color, "status": in.Status}, &out)
+	err := c.do(ctx, http.MethodPatch, "/api/v1/tenant/metadata/tags/"+url.PathEscape(in.TagUUID), nil, map[string]any{"metadata": in.Metadata, "expected_version": in.ExpectedVersion, "label_i18n": in.LabelI18n, "description_i18n": in.DescriptionI18n, "color": in.Color, "status": in.Status}, &out)
 	return &out, err
 }
 func (c *HostClient) ResolveTag(ctx context.Context, resourceType, namespace, code string) (*Tag, error) {

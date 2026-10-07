@@ -203,7 +203,7 @@ func (c *Client) CreateTaxonomyNode(ctx context.Context, req CreateTaxonomyNodeR
 	if strings.TrimSpace(req.Code) == "" {
 		return nil, invalid("metadata.taxonomy.create_node", "metadata: code is required")
 	}
-	body := map[string]any{
+	body := map[string]any{"metadata": req.Metadata,
 		"parent_uuid":      req.ParentUUID,
 		"code":             strings.TrimSpace(req.Code),
 		"label_i18n":       req.LabelI18n,
@@ -262,7 +262,7 @@ func (c *Client) CreateTag(ctx context.Context, req CreateTagRequest) (*Tag, err
 	if strings.TrimSpace(req.Code) == "" {
 		return nil, invalid("metadata.tag.create", "metadata: code is required")
 	}
-	body := map[string]any{
+	body := map[string]any{"metadata": req.Metadata,
 		"namespace":        strings.TrimSpace(req.Namespace),
 		"resource_type":    strings.TrimSpace(req.ResourceType),
 		"code":             strings.TrimSpace(req.Code),
@@ -281,7 +281,7 @@ func (c *Client) UpdateTag(ctx context.Context, req UpdateTagRequest) (*Tag, err
 	if strings.TrimSpace(req.TagUUID) == "" {
 		return nil, invalid("metadata.tag.update", "metadata: tag_uuid is required")
 	}
-	body := map[string]any{"label_i18n": req.LabelI18n, "description_i18n": req.DescriptionI18n, "color": req.Color, "status": req.Status}
+	body := map[string]any{"label_i18n": req.LabelI18n, "description_i18n": req.DescriptionI18n, "color": req.Color, "status": req.Status, "metadata": req.Metadata, "expected_version": req.ExpectedVersion}
 	var out Tag
 	if err := c.invokePayload(ctx, "metadata.tag.update", CapabilityTagManage, http.MethodPatch, "/api/v1/tenant/metadata/tags/"+url.PathEscape(req.TagUUID), nil, body, req.RequestID, &out); err != nil {
 		return nil, err

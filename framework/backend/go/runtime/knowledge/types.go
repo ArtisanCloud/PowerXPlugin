@@ -29,6 +29,7 @@ const (
 	OperationReindex  = "reindex"
 	OperationHealth   = "health"
 	OperationCatalog  = "catalog"
+	OperationCreate   = "create"
 
 	IndexOperationUpsert  = "upsert"
 	IndexOperationDelete  = "delete"
@@ -118,9 +119,9 @@ type KnowledgeDocument struct {
 	Ingestion   *IngestionConfig `json:"ingestion,omitempty"`
 }
 
-// IngestionConfig is the immutable, task-scoped ingestion snapshot. It mirrors
-// PowerX's ingestion contract so a document submitted locally has the same
-// segmentation semantics as one submitted to the delegated Host.
+// IngestionConfig is the provider-neutral task-scoped ingestion configuration.
+// The Local provider supports it; the published PowerX Host document contract
+// does not yet accept snapshots, so its client rejects non-nil configurations.
 type IngestionConfig struct {
 	IngestionProfile    string   `json:"ingestion_profile,omitempty"`
 	ProcessorProfile    string   `json:"processor_profile,omitempty"`
@@ -250,16 +251,20 @@ type KnowledgeScene struct {
 }
 
 type StrategyPackage struct {
-	Key                   string             `json:"key"`
-	Label                 string             `json:"label"`
-	Summary               string             `json:"summary,omitempty"`
-	DisplayLabel          string             `json:"display_label,omitempty"`
-	UseCase               string             `json:"use_case,omitempty"`
-	NotFor                string             `json:"not_for,omitempty"`
-	RecommendedProfileKey string             `json:"recommended_profile_key,omitempty"`
-	RecommendedScenes     []string           `json:"recommended_scenes,omitempty"`
-	Dependencies          StrategyDependency `json:"dependencies,omitempty"`
-	Metadata              map[string]any     `json:"metadata,omitempty"`
+	Profiles               ProfileMapping     `json:"profiles"`
+	Available              bool               `json:"available"`
+	UnavailableReasons     []string           `json:"unavailable_reasons"`
+	ActivationDependencies []string           `json:"activation_dependencies"`
+	Key                    string             `json:"key"`
+	Label                  string             `json:"label"`
+	Summary                string             `json:"summary,omitempty"`
+	DisplayLabel           string             `json:"display_label,omitempty"`
+	UseCase                string             `json:"use_case,omitempty"`
+	NotFor                 string             `json:"not_for,omitempty"`
+	RecommendedProfileKey  string             `json:"recommended_profile_key,omitempty"`
+	RecommendedScenes      []string           `json:"recommended_scenes,omitempty"`
+	Dependencies           StrategyDependency `json:"dependencies,omitempty"`
+	Metadata               map[string]any     `json:"metadata,omitempty"`
 }
 
 type StrategyBundle struct {
@@ -271,12 +276,17 @@ type StrategyBundle struct {
 }
 
 type KnowledgeCatalog struct {
-	Version          string            `json:"version,omitempty"`
-	Source           string            `json:"source,omitempty"`
-	Scenes           []KnowledgeScene  `json:"scenes"`
-	StrategyPackages []StrategyPackage `json:"strategy_packages"`
-	StrategyBundles  []StrategyBundle  `json:"strategy_bundles,omitempty"`
-	Metadata         map[string]any    `json:"metadata,omitempty"`
+	PolicyTemplates           []PolicyTemplateRef `json:"policy_templates"`
+	DefaultPolicyTemplateUUID string              `json:"default_policy_template_uuid,omitempty"`
+	QuotaDefaults             SpaceQuotas         `json:"quota_defaults"`
+	QuotaMinimums             SpaceQuotas         `json:"quota_minimums"`
+	QuotaOverrideAllowed      bool                `json:"quota_override_allowed"`
+	Version                   string              `json:"version,omitempty"`
+	Source                    string              `json:"source,omitempty"`
+	Scenes                    []KnowledgeScene    `json:"scenes"`
+	StrategyPackages          []StrategyPackage   `json:"strategy_packages"`
+	StrategyBundles           []StrategyBundle    `json:"strategy_bundles,omitempty"`
+	Metadata                  map[string]any      `json:"metadata,omitempty"`
 }
 
 func (q KnowledgeQuery) Normalized() KnowledgeQuery {

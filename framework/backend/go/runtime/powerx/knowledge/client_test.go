@@ -62,11 +62,9 @@ func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
 		case "POST /api/v1/tenant/knowledge/spaces/11111111-1111-1111-1111-111111111111/documents":
 			var body map[string]any
 			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
-			require.Equal(t, "semantic", body["segmentMode"])
-			require.Equal(t, float64(640), body["chunkSize"])
-			require.Equal(t, []any{"size", "segment", "separator"}, body["segmentOrder"])
-			require.Equal(t, []any{"\\n\\n", "。"}, body["separators"])
-			require.Equal(t, true, body["anchorHeadingPath"])
+			require.ElementsMatch(t, []string{"title", "uri", "content", "content_type", "checksum", "version", "tags"}, mapKeys(body))
+			require.Equal(t, "text/markdown", body["content_type"])
+			require.NotEmpty(t, body["checksum"])
 			return knowledgeResponse(http.StatusAccepted, `{"data":{"job_uuid":"33333333-3333-3333-3333-333333333333","status":"queued","operation":"upsert","document_uuid":"22222222-2222-2222-2222-222222222222"}}`), nil
 		case "DELETE /api/v1/tenant/knowledge/spaces/11111111-1111-1111-1111-111111111111/documents/22222222-2222-2222-2222-222222222222":
 			return knowledgeResponse(http.StatusAccepted, `{"data":{"job_uuid":"44444444-4444-4444-4444-444444444444","status":"queued","operation":"delete","document_uuid":"22222222-2222-2222-2222-222222222222"}}`), nil
@@ -95,11 +93,6 @@ func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
 
 	upsert, err := client.UpsertKnowledgeDocument(context.Background(), fwknowledge.KnowledgeDocument{
 		SpaceID: spaces[0].SpaceID, Title: "Refund FAQ", URI: "powerx://faq/refund", Content: "Refund policy", ContentType: "text/markdown", Version: "v1",
-		Ingestion: &fwknowledge.IngestionConfig{
-			IngestionProfile: "p0_basic", ProcessorProfile: "builtin/default", Priority: "high",
-			SegmentMode: "semantic", ChunkSize: 640, ChunkOverlap: 80, SegmentSizePolicy: "target",
-			SegmentOrder: []string{"size", "segment", "separator"}, Separators: []string{"\\n\\n", "。"}, AnchorHeadingPath: true,
-		},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "22222222-2222-2222-2222-222222222222", upsert.DocumentID)
@@ -152,4 +145,45 @@ func TestKnowledgeAPIKeyUsesTenantHostContract(t *testing.T) {
 	require.Equal(t, fwknowledge.CodeForbidden, fwknowledge.CodeOf(err))
 	_, err = NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, " ", nil)
 	require.Error(t, err)
+}
+
+func mapKeys(value map[string]any) []string {
+	keys := make([]string, 0, len(value))
+	for key := range value {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func TestClientRejectsIngestionSnapshotBeforeHostWrite(t *testing.T) {
+	for _, auth := range []string{"api_key", "sts"} {
+		t.Run(auth, func(t *testing.T) {
+			calls := 0
+			tokenCalls := 0
+			transport := &http.Client{Transport: knowledgeRoundTrip(func(*http.Request) (*http.Response, error) {
+				calls++
+				return knowledgeResponse(http.StatusAccepted, `{}`), nil
+			})}
+			var client *Client
+			var err error
+			if auth == "api_key" {
+				client, err = NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, "server-key", transport)
+			} else {
+				client, err = NewClientWithTokenProvider(Config{BaseURL: "https://core.example"}, TokenProviderFunc(func(context.Context) (string, error) {
+					tokenCalls++
+					return "service-token", nil
+				}), transport)
+			}
+			require.NoError(t, err)
+			for _, snapshot := range []*fwknowledge.IngestionConfig{{}, {IngestionProfile: "p0_basic", Priority: "high", ChunkSize: 640}} {
+				job, err := client.UpsertKnowledgeDocument(context.Background(), fwknowledge.KnowledgeDocument{
+					SpaceID: "11111111-1111-4111-8111-111111111111", Title: "fixture", URI: "plugin-knowledge://fixture", Content: "fixture", ContentType: "text/plain", Version: "v1", Ingestion: snapshot,
+				})
+				require.Nil(t, job)
+				require.Equal(t, fwknowledge.CodeUnsupportedCapability, fwknowledge.CodeOf(err))
+			}
+			require.Zero(t, calls)
+			require.Zero(t, tokenCalls)
+		})
+	}
 }

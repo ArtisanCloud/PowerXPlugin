@@ -55,6 +55,8 @@ type Registry interface {
 type HTTPError struct {
 	StatusCode int
 	ReasonCode string
+	TraceID    string
+	RequestID  string
 	Body       string
 }
 
@@ -331,7 +333,19 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		return &HTTPError{StatusCode: 502, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "CAPABILITY_UPSTREAM_DEPENDENCY"), Body: string(raw)}
+		var identity struct {
+			TraceID   string `json:"trace_id"`
+			RequestID string `json:"request_id"`
+		}
+		_ = json.Unmarshal(raw, &identity)
+		traceID, requestID := resp.Header.Get("X-Trace-ID"), resp.Header.Get("X-Request-ID")
+		if traceID == "" {
+			traceID = identity.TraceID
+		}
+		if requestID == "" {
+			requestID = identity.RequestID
+		}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "CAPABILITY_UPSTREAM_DEPENDENCY"), TraceID: traceID, RequestID: requestID, Body: string(raw)}
 	}
 	if err := hostcontract.DecodeData(raw, out); err != nil {
 		return &HTTPError{StatusCode: 502, ReasonCode: "CAPABILITY_UPSTREAM_DEPENDENCY"}

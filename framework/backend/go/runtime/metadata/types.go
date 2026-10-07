@@ -81,14 +81,15 @@ type DictionaryNamespace struct {
 }
 
 type DictionaryItem struct {
-	UUID            string  `json:"uuid"`
-	NamespaceUUID   string  `json:"namespace_uuid"`
-	Code            string  `json:"code"`
-	LabelI18n       I18nMap `json:"label_i18n"`
-	DescriptionI18n I18nMap `json:"description_i18n,omitempty"`
-	Status          string  `json:"status"`
-	SortOrder       int     `json:"sort_order"`
-	ReferenceCount  int64   `json:"reference_count"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	UUID            string         `json:"uuid"`
+	NamespaceUUID   string         `json:"namespace_uuid"`
+	Code            string         `json:"code"`
+	LabelI18n       I18nMap        `json:"label_i18n"`
+	DescriptionI18n I18nMap        `json:"description_i18n,omitempty"`
+	Status          string         `json:"status"`
+	SortOrder       int            `json:"sort_order"`
+	ReferenceCount  int64          `json:"reference_count"`
 	Display
 }
 
@@ -104,31 +105,33 @@ type Taxonomy struct {
 }
 
 type TaxonomyNode struct {
-	UUID            string  `json:"uuid"`
-	TaxonomyUUID    string  `json:"taxonomy_uuid"`
-	ParentUUID      *string `json:"parent_uuid,omitempty"`
-	Code            string  `json:"code"`
-	LabelI18n       I18nMap `json:"label_i18n"`
-	DescriptionI18n I18nMap `json:"description_i18n,omitempty"`
-	Path            string  `json:"path"`
-	Depth           int     `json:"depth"`
-	SortOrder       int     `json:"sort_order"`
-	Status          string  `json:"status"`
-	ReferenceCount  int64   `json:"reference_count"`
-	Version         int64   `json:"version"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	UUID            string         `json:"uuid"`
+	TaxonomyUUID    string         `json:"taxonomy_uuid"`
+	ParentUUID      *string        `json:"parent_uuid,omitempty"`
+	Code            string         `json:"code"`
+	LabelI18n       I18nMap        `json:"label_i18n"`
+	DescriptionI18n I18nMap        `json:"description_i18n,omitempty"`
+	Path            string         `json:"path"`
+	Depth           int            `json:"depth"`
+	SortOrder       int            `json:"sort_order"`
+	Status          string         `json:"status"`
+	ReferenceCount  int64          `json:"reference_count"`
+	Version         int64          `json:"version"`
 	Display
 }
 
 type Tag struct {
-	UUID            string  `json:"uuid"`
-	Namespace       string  `json:"namespace"`
-	ResourceType    string  `json:"resource_type"`
-	Code            string  `json:"code"`
-	LabelI18n       I18nMap `json:"label_i18n"`
-	DescriptionI18n I18nMap `json:"description_i18n,omitempty"`
-	Color           string  `json:"color,omitempty"`
-	Status          string  `json:"status"`
-	UsageCount      int64   `json:"usage_count"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	UUID            string         `json:"uuid"`
+	Namespace       string         `json:"namespace"`
+	ResourceType    string         `json:"resource_type"`
+	Code            string         `json:"code"`
+	LabelI18n       I18nMap        `json:"label_i18n"`
+	DescriptionI18n I18nMap        `json:"description_i18n,omitempty"`
+	Color           string         `json:"color,omitempty"`
+	Status          string         `json:"status"`
+	UsageCount      int64          `json:"usage_count"`
 	Display
 }
 
@@ -264,6 +267,7 @@ type CreateTaxonomyRequest struct {
 }
 
 type CreateTaxonomyNodeRequest struct {
+	Metadata        map[string]any
 	TaxonomyUUID    string
 	ParentUUID      *string
 	Code            string
@@ -274,6 +278,7 @@ type CreateTaxonomyNodeRequest struct {
 }
 
 type CreateTagRequest struct {
+	Metadata        map[string]any
 	Namespace       string
 	ResourceType    string
 	Code            string
@@ -304,6 +309,7 @@ type UpdateDictionaryNamespaceRequest struct {
 }
 
 type UpdateDictionaryItemRequest struct {
+	ExpectedVersion *int64
 	ItemUUID        string
 	LabelI18n       *I18nMap
 	DescriptionI18n *I18nMap
@@ -314,6 +320,9 @@ type UpdateDictionaryItemRequest struct {
 }
 
 type UpdateTaxonomyNodeRequest struct {
+	Metadata        *map[string]any
+	MoveParent      bool
+	ParentUUID      *string
 	NodeUUID        string
 	LabelI18n       *I18nMap
 	DescriptionI18n *I18nMap
@@ -327,6 +336,8 @@ type UpdateTaxonomyNodeRequest struct {
 // physically deleted: callers set Status to inactive when a used tag must no
 // longer be offered for new bindings.
 type UpdateTagRequest struct {
+	Metadata        *map[string]any
+	ExpectedVersion *int64
 	TagUUID         string
 	LabelI18n       *I18nMap
 	DescriptionI18n *I18nMap

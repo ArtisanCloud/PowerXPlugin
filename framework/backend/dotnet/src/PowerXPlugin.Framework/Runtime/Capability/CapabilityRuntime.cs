@@ -3,7 +3,12 @@ using PowerXPlugin.Framework.Runtime.Common;
 
 namespace PowerXPlugin.Framework.Runtime.Capability;
 
-public sealed record CapabilityProtocol(string Channel, string? Endpoint = null, string? Method = null, string? Rpc = null, string? SchemaRef = null);
+public sealed record CapabilityProtocol(string Channel, string? Endpoint = null, string? Method = null, string? Rpc = null, string? SchemaRef = null, string? ToolRef = null);
+public sealed record PublishedCapability(string CapabilityId, string Title, string? Description, string Source, IReadOnlyList<string> Categories, IReadOnlyList<string> Intents, IReadOnlyList<string> ToolScope, string Status);
+public interface ICapabilityCatalogDiscovery
+{
+    Task<IReadOnlyList<PublishedCapability>> ListPublishedAsync(int page = 1, int pageSize = 200, CancellationToken ct = default);
+}
 public sealed record CapabilityDescriptor(string CapabilityId, string PluginId, string PluginVersion, string Title, string Source, IReadOnlyCollection<CapabilityProtocol> Protocols, string Status, string? Description = null);
 public sealed record CapabilityListQuery(int Page = 1, int PageSize = 50, string? PluginId = null, string? Intent = null, string? ToolScope = null, string? Protocol = null, string? Source = null);
 public sealed record CapabilityResolveQuery(string Method, string Endpoint, string? Source = null);

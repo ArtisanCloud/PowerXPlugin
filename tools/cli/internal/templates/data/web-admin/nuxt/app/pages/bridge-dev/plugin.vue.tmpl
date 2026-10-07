@@ -59,12 +59,12 @@ function requestFullscreen(action: 'enter' | 'exit' | 'toggle') {
 
 <template>
   <div class="wrap">
-    <h3>{{ `{{ t('common.appName') }}` }}</h3>
+    <h3>{{ "{{ t('common.appName') }}" }}</h3>
     <div class="badges">
-      <span class="badge">locale: <b>{{ `{{ loc }}` }}</b></span>
-      <span class="badge">theme:  <b>{{ `{{ thm }}` }}</b></span>
+      <span class="badge">locale: <b>{{ "{{ loc }}" }}</b></span>
+      <span class="badge">theme:  <b>{{ "{{ thm }}" }}</b></span>
     </div>
-    <p>{{ `{{ t('common.welcome') }}` }}</p>
+    <p>{{ "{{ t('common.welcome') }}" }}</p>
 
     <div class="ops">
       <button @click="localSetZh">中文</button>
@@ -75,11 +75,11 @@ function requestFullscreen(action: 'enter' | 'exit' | 'toggle') {
     </div>
 
     <div class="ops fullscreen-ops">
-      <button @click="requestFullscreen('enter')">{{ `{{ t('demo.enterFullscreen') }}` }}</button>
-      <button @click="requestFullscreen('exit')">{{ `{{ t('demo.exitFullscreen') }}` }}</button>
-      <button @click="requestFullscreen('toggle')">{{ `{{ t('demo.toggleFullscreen') }}` }}</button>
+      <button @click="requestFullscreen('enter')">{{ "{{ t('demo.enterFullscreen') }}" }}</button>
+      <button @click="requestFullscreen('exit')">{{ "{{ t('demo.exitFullscreen') }}" }}</button>
+      <button @click="requestFullscreen('toggle')">{{ "{{ t('demo.toggleFullscreen') }}" }}</button>
     </div>
-    <p v-if="fullscreenResult" class="result">{{ `{{ fullscreenResult }}` }}</p>
+    <p v-if="fullscreenResult" class="result">{{ "{{ fullscreenResult }}" }}</p>
   </div>
 </template>
 

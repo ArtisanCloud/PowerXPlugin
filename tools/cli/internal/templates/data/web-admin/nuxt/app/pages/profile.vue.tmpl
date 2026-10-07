@@ -16,15 +16,15 @@
           <UAvatar :src="avatarUrl" :text="avatarText" size="xl" />
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-              <h2 class="truncate text-xl font-semibold">{{ `{{ displayName }}` }}</h2>
+              <h2 class="truncate text-xl font-semibold">{{ "{{ displayName }}" }}</h2>
               <UBadge :color="userStore.isActive ? 'success' : 'error'" variant="soft">
-                {{ `{{ userStore.isActive ? "启用" : "停用" }}` }}
+                {{ "{{ userStore.isActive ? \"启用\" : \"停用\" }}" }}
               </UBadge>
               <UBadge :color="userStore.isCurrentTenantAdmin ? 'primary' : 'neutral'" variant="soft">
-                {{ `{{ userStore.isCurrentTenantAdmin ? "插件租户管理员" : "普通成员" }}` }}
+                {{ "{{ userStore.isCurrentTenantAdmin ? \"插件租户管理员\" : \"普通成员\" }}" }}
               </UBadge>
             </div>
-            <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{{ `{{ user?.email || "-" }}` }}</p>
+            <p class="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">{{ "{{ user?.email || \"-\" }}" }}</p>
           </div>
         </div>
       </section>
@@ -35,19 +35,19 @@
           <dl class="mt-4 space-y-3 text-sm">
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">用户 UUID</dt>
-              <dd class="max-w-[65%] truncate font-mono text-xs">{{ `{{ userStore.currentUserUuid || "-" }}` }}</dd>
+              <dd class="max-w-[65%] truncate font-mono text-xs">{{ "{{ userStore.currentUserUuid || \"-\" }}" }}</dd>
             </div>
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">用户名</dt>
-              <dd class="max-w-[65%] truncate">{{ `{{ user?.username || "-" }}` }}</dd>
+              <dd class="max-w-[65%] truncate">{{ "{{ user?.username || \"-\" }}" }}</dd>
             </div>
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">手机</dt>
-              <dd class="max-w-[65%] truncate">{{ `{{ user?.phone || "-" }}` }}</dd>
+              <dd class="max-w-[65%] truncate">{{ "{{ user?.phone || \"-\" }}" }}</dd>
             </div>
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">IAM 模式</dt>
-              <dd>{{ `{{ providerModeLabel }}` }}</dd>
+              <dd>{{ "{{ providerModeLabel }}" }}</dd>
             </div>
           </dl>
         </div>
@@ -57,19 +57,19 @@
           <dl class="mt-4 space-y-3 text-sm">
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">租户名称</dt>
-              <dd class="max-w-[65%] truncate">{{ `{{ currentTenant?.tenant_name || "-" }}` }}</dd>
+              <dd class="max-w-[65%] truncate">{{ "{{ currentTenant?.tenant_name || \"-\" }}" }}</dd>
             </div>
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">租户 UUID</dt>
-              <dd class="max-w-[65%] truncate font-mono text-xs">{{ `{{ userStore.currentTenantUuid || "-" }}` }}</dd>
+              <dd class="max-w-[65%] truncate font-mono text-xs">{{ "{{ userStore.currentTenantUuid || \"-\" }}" }}</dd>
             </div>
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">成员 UUID</dt>
-              <dd class="max-w-[65%] truncate font-mono text-xs">{{ `{{ userStore.currentMemberUuid || "-" }}` }}</dd>
+              <dd class="max-w-[65%] truncate font-mono text-xs">{{ "{{ userStore.currentMemberUuid || \"-\" }}" }}</dd>
             </div>
             <div class="flex justify-between gap-4">
               <dt class="text-gray-500 dark:text-gray-400">租户角色</dt>
-              <dd>{{ `{{ userStore.isRoot ? "Root" : userStore.isCurrentTenantAdmin ? "Admin" : "Member" }}` }}</dd>
+              <dd>{{ "{{ userStore.isRoot ? \"Root\" : userStore.isCurrentTenantAdmin ? \"Admin\" : \"Member\" }}" }}</dd>
             </div>
           </dl>
         </div>

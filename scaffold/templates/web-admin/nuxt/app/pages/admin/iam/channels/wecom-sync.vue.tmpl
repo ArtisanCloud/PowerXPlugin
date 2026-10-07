@@ -7,7 +7,7 @@
       <div class="min-w-[260px] rounded-xl border border-slate-700 bg-slate-900 px-6 py-5 text-slate-100 shadow-xl">
         <div class="flex items-center gap-3">
           <UIcon name="i-lucide-loader-circle" class="h-5 w-5 animate-spin text-cyan-300" />
-          <span class="text-sm">{{ `{{ globalLoadingText }}` }}</span>
+          <span class="text-sm">{{ "{{ globalLoadingText }}" }}</span>
         </div>
       </div>
     </div>
@@ -22,9 +22,9 @@
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
+          <UBadge color="neutral" variant="soft">{{ "{{ providerModeLabel }}" }}</UBadge>
           <UBadge :color="configReady ? 'success' : 'warning'" variant="soft">
-            {{ `{{ configReady ? "配置已就绪" : "配置未完成" }}` }}
+            {{ "{{ configReady ? \"配置已就绪\" : \"配置未完成\" }}" }}
           </UBadge>
           <UButton to="/admin/iam/channels/wecom" variant="soft" color="neutral" size="sm">去基础配置</UButton>
           <UButton variant="outline" size="sm" :loading="tasksLoading" @click="fetchSyncTasks">刷新任务</UButton>
@@ -45,19 +45,19 @@
     <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       <UCard class="stat-card">
         <p class="stat-title">任务总数</p>
-        <p class="stat-value">{{ `{{ stats.total }}` }}</p>
+        <p class="stat-value">{{ "{{ stats.total }}" }}</p>
       </UCard>
       <UCard class="stat-card">
         <p class="stat-title">运行中</p>
-        <p class="stat-value text-amber-400">{{ `{{ stats.running }}` }}</p>
+        <p class="stat-value text-amber-400">{{ "{{ stats.running }}" }}</p>
       </UCard>
       <UCard class="stat-card">
         <p class="stat-title">成功</p>
-        <p class="stat-value text-emerald-400">{{ `{{ stats.success }}` }}</p>
+        <p class="stat-value text-emerald-400">{{ "{{ stats.success }}" }}</p>
       </UCard>
       <UCard class="stat-card">
         <p class="stat-title">失败</p>
-        <p class="stat-value text-rose-400">{{ `{{ stats.failed }}` }}</p>
+        <p class="stat-value text-rose-400">{{ "{{ stats.failed }}" }}</p>
       </UCard>
     </section>
 
@@ -65,13 +65,13 @@
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h3 class="text-lg font-semibold text-slate-100">同步执行面板</h3>
-          <UBadge color="neutral" variant="soft">{{ `{{ tenantUUID }}` }}</UBadge>
+          <UBadge color="neutral" variant="soft">{{ "{{ tenantUUID }}" }}</UBadge>
         </div>
       </template>
 
       <div v-if="!configReady" class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
         <p>当前租户尚未完成企业微信配置，无法触发同步任务。</p>
-        <p class="mt-1 text-amber-200/80">{{ `{{ configMessage }}` }}</p>
+        <p class="mt-1 text-amber-200/80">{{ "{{ configMessage }}" }}</p>
       </div>
 
       <div class="mt-4">
@@ -99,7 +99,7 @@
       <div class="mt-4 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
         <div class="mb-2 flex items-center justify-between text-xs text-slate-300">
           <span>任务进度</span>
-          <span>{{ `{{ syncProgressText }}` }}</span>
+          <span>{{ "{{ syncProgressText }}" }}</span>
         </div>
         <div class="sync-progress-track">
           <div
@@ -114,10 +114,10 @@
       </div>
 
       <div class="mt-4 rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
-        {{ `{{ lastSyncMessage }}` }}
+        {{ "{{ lastSyncMessage }}" }}
       </div>
       <div v-if="lastErrorMessage" class="mt-3 rounded-lg border border-rose-500/50 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-        {{ `{{ lastErrorMessage }}` }}
+        {{ "{{ lastErrorMessage }}" }}
       </div>
     </UCard>
 
@@ -163,20 +163,20 @@
           <UTable :data="pagedTasks" :columns="columns" :meta="{ class: { tr: 'align-middle' } }">
             <template #status-cell="{ row }">
               <UBadge :color="statusColor(row.original.status)" variant="soft">
-                {{ `{{ statusLabel(row.original.status) }}` }}
+                {{ "{{ statusLabel(row.original.status) }}" }}
               </UBadge>
             </template>
             <template #action-cell="{ row }">
-              <span class="text-slate-100">{{ `{{ actionNameMap[row.original.action] || row.original.action }}` }}</span>
+              <span class="text-slate-100">{{ "{{ actionNameMap[row.original.action] || row.original.action }}" }}</span>
             </template>
             <template #summary-cell="{ row }">
-              <span class="text-slate-300">{{ `{{ row.original.summary || "-" }}` }}</span>
+              <span class="text-slate-300">{{ "{{ row.original.summary || \"-\" }}" }}</span>
             </template>
             <template #created_at-cell="{ row }">
-              <span class="text-slate-400">{{ `{{ formatTime(row.original.created_at) }}` }}</span>
+              <span class="text-slate-400">{{ "{{ formatTime(row.original.created_at) }}" }}</span>
             </template>
             <template #error_message-cell="{ row }">
-              <span class="text-rose-300">{{ `{{ row.original.error_message || "-" }}` }}</span>
+              <span class="text-rose-300">{{ "{{ row.original.error_message || \"-\" }}" }}</span>
             </template>
           </UTable>
         </template>
@@ -190,19 +190,19 @@
             >
               <div class="flex flex-wrap items-center gap-2">
                 <UBadge :color="statusColor(task.status)" variant="soft">
-                  {{ `{{ statusLabel(task.status) }}` }}
+                  {{ "{{ statusLabel(task.status) }}" }}
                 </UBadge>
-                <span class="text-sm font-medium text-slate-100">{{ `{{ actionNameMap[task.action] || task.action }}` }}</span>
-                <span class="text-xs text-slate-500">{{ `{{ formatTime(task.created_at) }}` }}</span>
+                <span class="text-sm font-medium text-slate-100">{{ "{{ actionNameMap[task.action] || task.action }}" }}</span>
+                <span class="text-xs text-slate-500">{{ "{{ formatTime(task.created_at) }}" }}</span>
               </div>
-              <p class="mt-1 text-sm text-slate-300">{{ `{{ task.summary || "-" }}` }}</p>
-              <p v-if="task.error_message" class="mt-1 text-sm text-rose-300">{{ `{{ task.error_message }}` }}</p>
+              <p class="mt-1 text-sm text-slate-300">{{ "{{ task.summary || \"-\" }}" }}</p>
+              <p v-if="task.error_message" class="mt-1 text-sm text-rose-300">{{ "{{ task.error_message }}" }}</p>
             </div>
           </div>
         </template>
 
         <div class="mt-4 flex items-center justify-between">
-          <p class="text-xs text-slate-500">共 {{ `{{ filteredTasks.length }}` }} 条，当前第 {{ `{{ page }}` }} / {{ `{{ totalPages }}` }} 页</p>
+          <p class="text-xs text-slate-500">共 {{ "{{ filteredTasks.length }}" }} 条，当前第 {{ "{{ page }}" }} / {{ "{{ totalPages }}" }} 页</p>
           <UPagination v-model:page="page" :total="filteredTasks.length" :items-per-page="pageSize" show-edges />
         </div>
       </template>

@@ -231,7 +231,7 @@ onMounted(async () => {
       <div class="flex justify-between items-start mb-4">
         <div>
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-            {{ `{{ $t("organization.user.title") }}` }}
+            {{ "{{ $t(\"organization.user.title\") }}" }}
           </h2>
           <p class="text-sm text-gray-500 mt-1 dark:text-slate-200">
             查看同事信息（只读权限）
@@ -239,7 +239,7 @@ onMounted(async () => {
         </div>
         <div class="text-right">
           <p class="text-sm text-gray-600 dark:text-slate-200">
-            当前用户：{{ `{{ displayName }}` }}
+            当前用户：{{ "{{ displayName }}" }}
           </p>
         </div>
       </div>
@@ -264,10 +264,10 @@ onMounted(async () => {
           <div v-if="selectedTenant" class="flex-1">
             <div class="flex items-center gap-2">
               <UBadge color="primary" variant="subtle">
-                {{ `{{ selectedTenant.name }}` }}
+                {{ "{{ selectedTenant.name }}" }}
               </UBadge>
               <span class="text-sm text-gray-500 dark:text-slate-200">
-                {{ `{{ selectedTenant.domain }}` }}
+                {{ "{{ selectedTenant.domain }}" }}
               </span>
             </div>
           </div>
@@ -287,7 +287,7 @@ onMounted(async () => {
           />
         </div>
         <div class="text-sm text-gray-500 dark:text-slate-200">
-          共 {{ `{{ filteredUsers.length }}` }} 位同事
+          共 {{ "{{ filteredUsers.length }}" }} 位同事
         </div>
       </div>
     </div>
@@ -317,7 +317,7 @@ onMounted(async () => {
         />
         <p class="text-lg font-medium mb-2">暂无同事信息</p>
         <p class="text-sm">
-          {{ `{{ searchQuery ? "没有找到匹配的同事" : "当前租户暂无其他成员" }}` }}
+          {{ "{{ searchQuery ? \"没有找到匹配的同事\" : \"当前租户暂无其他成员\" }}" }}
         </p>
       </div>
 

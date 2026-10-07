@@ -12,7 +12,7 @@ namespace PowerXPlugin.Framework.Runtime.EventFabric.Delegated;
 public sealed class PowerXEventFabricClient : IEventRuntime, IDisposable
 {
     private readonly PowerXEventFabricClientOptions _options;
-    private readonly GrpcChannel _channel;
+    private readonly GrpcChannel? _channel;
     private readonly EventSubscriberService.EventSubscriberServiceClient _subscriber;
     private readonly EventDeliveryService.EventDeliveryServiceClient _delivery;
 
@@ -25,9 +25,20 @@ public sealed class PowerXEventFabricClient : IEventRuntime, IDisposable
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         EnsureConfigured();
-        _channel = channel ?? GrpcChannel.ForAddress(NormalizeEndpoint(_options.Endpoint));
-        _subscriber = new EventSubscriberService.EventSubscriberServiceClient(_channel);
-        _delivery = new EventDeliveryService.EventDeliveryServiceClient(_channel);
+        var activeChannel = channel ?? GrpcChannel.ForAddress(NormalizeEndpoint(_options.Endpoint));
+        _channel = activeChannel;
+        _subscriber = new EventSubscriberService.EventSubscriberServiceClient(activeChannel);
+        _delivery = new EventDeliveryService.EventDeliveryServiceClient(activeChannel);
+    }
+
+    internal PowerXEventFabricClient(PowerXEventFabricClientOptions options,
+        EventSubscriberService.EventSubscriberServiceClient subscriber,
+        EventDeliveryService.EventDeliveryServiceClient delivery)
+    {
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        EnsureConfigured();
+        _subscriber = subscriber ?? throw new ArgumentNullException(nameof(subscriber));
+        _delivery = delivery ?? throw new ArgumentNullException(nameof(delivery));
     }
 
     public async Task ConsumeAsync(EventFabricSubscription subscription, EventFabricHandler handler, CancellationToken ct = default)
@@ -77,7 +88,7 @@ public sealed class PowerXEventFabricClient : IEventRuntime, IDisposable
         }
     }
 
-    public void Dispose() => _channel.Dispose();
+    public void Dispose() => _channel?.Dispose();
 
     private Grpc.Core.Metadata Headers() => new()
     {

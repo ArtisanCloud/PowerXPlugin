@@ -19,3 +19,6 @@ export {
 } from "./_client";
 export { resolveApiBase, getAuthToken, getTenantUuid } from "./_base";
 export type { Page, ApiResponse, ListQuery } from "./_base";
+
+export { useKnowledgeWorkspace, knowledgeWorkspaceKey } from "./useKnowledgeWorkspace";
+export { usePowerXKnowledgeWorkspace } from "./usePowerXKnowledgeWorkspace";

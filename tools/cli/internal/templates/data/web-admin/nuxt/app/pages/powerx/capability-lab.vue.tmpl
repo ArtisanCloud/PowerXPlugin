@@ -44,7 +44,7 @@
                 class="w-full"
               />
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                当前 source：{{ `{{ selectedSource || 'all' }}` }}，用于筛选 `GET /admin/capabilities` 来源。
+                当前 source：{{ "{{ selectedSource || 'all' }}" }}，用于筛选 `GET /admin/capabilities` 来源。
               </span>
             </label>
 
@@ -74,8 +74,8 @@
               />
               <span class="text-xs text-gray-500 dark:text-gray-400">
                 <span v-if="capabilityListLoading">正在加载能力列表...</span>
-                <span v-else-if="capabilityLoadError">{{ `{{ capabilityLoadError }}` }}</span>
-                <span v-else>模块 {{ `{{ selectedModule || '全部' }}` }} · 共 {{ `{{ filteredCapabilityOptions.length }}` }} 个能力</span>
+                <span v-else-if="capabilityLoadError">{{ "{{ capabilityLoadError }}" }}</span>
+                <span v-else>模块 {{ "{{ selectedModule || '全部' }}" }} · 共 {{ "{{ filteredCapabilityOptions.length }}" }} 个能力</span>
               </span>
               <div class="flex flex-wrap gap-2 pt-1 text-xs text-gray-500 dark:text-gray-400">
                 <span v-if="selectedCapabilityProtocols.length">
@@ -85,11 +85,11 @@
                     :key="protocol"
                     class="inline-flex items-center px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full"
                   >
-                    {{ `{{ protocol }}` }}
+                    {{ "{{ protocol }}" }}
                   </span>
                 </span>
-                <span v-else-if="isCoreXCatalogEntry && coreXContractLoading">{{ `{{ t('capabilityLab.corexCatalog.contractLoading') }}` }}</span>
-                <span v-else-if="isCoreXCatalogEntry">{{ `{{ t('capabilityLab.corexCatalog.contractUnavailable') }}` }}</span>
+                <span v-else-if="isCoreXCatalogEntry && coreXContractLoading">{{ "{{ t('capabilityLab.corexCatalog.contractLoading') }}" }}</span>
+                <span v-else-if="isCoreXCatalogEntry">{{ "{{ t('capabilityLab.corexCatalog.contractUnavailable') }}" }}</span>
                 <span v-else>该能力未在 catalog 声明额外协议（默认 REST）</span>
                 <UButton
                   v-if="hostContractModule && !isCoreXCatalogEntry"
@@ -98,7 +98,7 @@
                   variant="link"
                   size="xs"
                 >
-                  {{ `{{ t('capabilityLab.openHostContract') }}` }}
+                  {{ "{{ t('capabilityLab.openHostContract') }}" }}
                 </UButton>
               </div>
               <UAlert
@@ -112,13 +112,13 @@
               />
               <div v-if="selectedCatalogCapability" class="mt-2 flex items-center gap-2 text-xs">
                 <UButton size="xs" variant="soft" :loading="grantStatusLoading" @click="checkSelectedGrantStatus">
-                  {{ `{{ grantStatusLoading ? t('capabilityLab.grantStatus.loading') : t('capabilityLab.grantStatus.check') }}` }}
+                  {{ "{{ grantStatusLoading ? t('capabilityLab.grantStatus.loading') : t('capabilityLab.grantStatus.check') }}" }}
                 </UButton>
                 <span v-if="selectedGrantStatus" class="text-gray-600 dark:text-gray-300">
-                  {{ `{{ grantStatusLabel }}` }} · {{ `{{ selectedGrantStatus.reason_code }}` }}
+                  {{ "{{ grantStatusLabel }}" }} · {{ "{{ selectedGrantStatus.reason_code }}" }}
                 </span>
                 <span v-else-if="grantStatusError" class="text-red-600 dark:text-red-300">
-                  {{ `{{ t('capabilityLab.grantStatus.failed') }}` }}
+                  {{ "{{ t('capabilityLab.grantStatus.failed') }}" }}
                 </span>
               </div>
             </label>
@@ -142,7 +142,7 @@
                 class="w-full"
               />
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                <span v-if="isCoreXCatalogEntry">{{ `{{ t('capabilityLab.corexCatalog.protocolHelp') }}` }}</span>
+                <span v-if="isCoreXCatalogEntry">{{ "{{ t('capabilityLab.corexCatalog.protocolHelp') }}" }}</span>
                 <span v-else>Action 仅用于语义标记，真正的路由由 `preferredProtocol + method + endpoint` 决定。默认根据能力/Action 自动切换，必要时可手动覆盖。</span>
               </span>
             </label>
@@ -159,7 +159,7 @@
                 class="w-full"
               />
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                <span v-if="actionOptions.length && isCoreXCatalogEntry">{{ `{{ t('capabilityLab.corexCatalog.actionHelp') }}` }}</span>
+                <span v-if="actionOptions.length && isCoreXCatalogEntry">{{ "{{ t('capabilityLab.corexCatalog.actionHelp') }}" }}</span>
                 <span v-else-if="actionOptions.length">可直接选择 REST/gRPC/Workflow 对应的动作，必要时可编辑输入框覆盖</span>
                 <span v-else>请先选择 Capability ID</span>
               </span>
@@ -167,7 +167,7 @@
                 v-if="isCoreXCatalogEntry && selectedFormalTarget"
                 class="rounded border border-primary-200 bg-primary-50 px-3 py-2 text-xs text-primary-900 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-100"
               >
-                {{ `{{ t('capabilityLab.corexCatalog.formalTarget', selectedFormalTarget) }}` }}
+                {{ "{{ t('capabilityLab.corexCatalog.formalTarget', selectedFormalTarget) }}" }}
               </div>
             </label>
 
@@ -182,7 +182,7 @@
                 />
                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
                   <span>
-                    {{ `{{ isPayloadValid ? 'JSON 解析正常' : 'JSON 无法解析，将阻止调用' }}` }}
+                    {{ "{{ isPayloadValid ? 'JSON 解析正常' : 'JSON 无法解析，将阻止调用' }}" }}
                   </span>
                   <div class="flex items-center gap-2">
                     <UButton color="gray" variant="link" size="xs" @click="resetPayload">
@@ -201,7 +201,7 @@
                 </div>
               </div>
               <span class="text-xs text-gray-500 dark:text-gray-400">
-                {{ `{{ t('capabilityLab.payloadHelp') }}` }}
+                {{ "{{ t('capabilityLab.payloadHelp') }}" }}
               </span>
             </label>
 
@@ -241,7 +241,7 @@
 
             <div class="flex items-center justify-between">
               <div class="text-xs text-gray-500 dark:text-gray-400">
-                目标接口：{{ `{{ requestPreview.url }}` }}
+                目标接口：{{ "{{ requestPreview.url }}" }}
               </div>
               <UButton
                 type="submit"
@@ -275,7 +275,7 @@
             v-if="showRequestPreview"
             :class="[codeBlockClass, 'p-4']"
           >
-{{ `{{ requestPreviewText }}` }}
+{{ "{{ requestPreviewText }}" }}
           </pre>
           <div v-else class="text-xs text-gray-500 dark:text-gray-400">
             已折叠请求预览，点击右上角箭头展开。
@@ -301,11 +301,11 @@
                     'text-red-600 dark:text-red-400': !!errorMessage
                   }"
                 >
-                  {{ `{{ result?.status ?? (errorMessage ? '失败' : '等待调用') }}` }}
+                  {{ "{{ result?.status ?? (errorMessage ? '失败' : '等待调用') }}" }}
                 </strong>
               </span>
-              <span v-if="durationMs !== null">耗时：{{ `{{ durationMs.toFixed(1) }}` }} ms</span>
-              <span v-if="lastTraceId">TraceId：<code>{{ `{{ lastTraceId }}` }}</code></span>
+              <span v-if="durationMs !== null">耗时：{{ "{{ durationMs.toFixed(1) }}" }} ms</span>
+              <span v-if="lastTraceId">TraceId：<code>{{ "{{ lastTraceId }}" }}</code></span>
             </div>
 
             <UAlert
@@ -317,7 +317,7 @@
               :ui="{ title: 'text-gray-900 dark:text-gray-100', description: 'text-gray-700 dark:text-gray-200' }"
             >
               <ul class="list-disc pl-5 space-y-1 text-sm text-gray-700 dark:text-gray-200">
-                <li v-for="warning in warnings" :key="warning">{{ `{{ warning }}` }}</li>
+                <li v-for="warning in warnings" :key="warning">{{ "{{ warning }}" }}</li>
               </ul>
             </UAlert>
 
@@ -333,21 +333,21 @@
             <div v-if="errorDetails" class="space-y-2">
               <p class="text-sm font-medium text-gray-700 dark:text-gray-200">错误详情</p>
               <pre :class="[codeBlockClass, 'p-4 border-red-200 dark:border-red-800 bg-red-50/70 dark:bg-red-900/30']">
-{{ `{{ formatJson(errorDetails) }}` }}
+{{ "{{ formatJson(errorDetails) }}" }}
               </pre>
             </div>
 
             <div v-if="showDataBlock" class="space-y-2">
               <p class="text-sm font-medium text-gray-700 dark:text-gray-200">响应数据</p>
               <pre :class="[codeBlockClass, 'p-4']">
-{{ `{{ formatJson(result.data) }}` }}
+{{ "{{ formatJson(result.data) }}" }}
               </pre>
             </div>
 
             <div v-if="showRawBlock" class="space-y-2">
               <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Raw 响应</p>
               <pre :class="[codeBlockClass, 'p-4']">
-{{ `{{ formatJson(result.raw) }}` }}
+{{ "{{ formatJson(result.raw) }}" }}
               </pre>
             </div>
 
@@ -385,33 +385,33 @@
             >
               <div class="flex items-center justify-between">
                 <div class="font-medium">
-                  {{ `{{ entry.capabilityId }}` }} · {{ `{{ entry.action }}` }}
+                  {{ "{{ entry.capabilityId }}" }} · {{ "{{ entry.action }}" }}
                 </div>
                 <span
                   :class="entry.success ? 'text-green-600 dark:text-green-400' : 'text-red-500'"
                   class="text-xs font-semibold uppercase"
                 >
-                  {{ `{{ entry.success ? '成功' : '失败' }}` }}
+                  {{ "{{ entry.success ? '成功' : '失败' }}" }}
                 </span>
               </div>
               <div class="text-gray-500 dark:text-gray-400 text-xs space-y-1">
-                <div>TraceId：<code>{{ `{{ entry.traceId || '—' }}` }}</code></div>
-                <div>耗时：{{ `{{ entry.duration.toFixed(1) }}` }} ms</div>
+                <div>TraceId：<code>{{ "{{ entry.traceId || '—' }}" }}</code></div>
+                <div>耗时：{{ "{{ entry.duration.toFixed(1) }}" }} ms</div>
                 <div v-if="entry.warnings?.length">
-                  警告：{{ `{{ entry.warnings.join(" / ") }}` }}
+                  警告：{{ "{{ entry.warnings.join(\" / \") }}" }}
                 </div>
-                <div v-if="entry.error" class="text-red-500">{{ `{{ entry.error }}` }}</div>
+                <div v-if="entry.error" class="text-red-500">{{ "{{ entry.error }}" }}</div>
               </div>
               <details class="text-xs">
                 <summary class="cursor-pointer text-primary">查看请求</summary>
                 <pre :class="[miniCodeBlockClass, 'mt-2 p-2']">
-{{ `{{ entry.payloadText }}` }}
+{{ "{{ entry.payloadText }}" }}
                 </pre>
               </details>
               <details v-if="entry.rawText" class="text-xs">
                 <summary class="cursor-pointer text-primary">查看原始响应</summary>
                 <pre :class="[miniCodeBlockClass, 'mt-2 p-2']">
-{{ `{{ entry.rawText }}` }}
+{{ "{{ entry.rawText }}" }}
                 </pre>
               </details>
             </li>

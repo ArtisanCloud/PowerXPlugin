@@ -44,7 +44,10 @@ public delegate Task<EventFabricDisposition> EventFabricHandler(EventFabricDeliv
 
 public interface IEventFabricSubscriber
 {
-    /// <summary>Runs until cancellation or the host stream terminates.</summary>
+    /// <summary>
+    /// Local mode registers handlers and returns; delegated mode runs until
+    /// cancellation or the host stream terminates.
+    /// </summary>
     Task ConsumeAsync(EventFabricSubscription subscription, EventFabricHandler handler, CancellationToken ct = default);
 }
 

@@ -1,37 +1,37 @@
 <template>
   <section class="space-y-4 rounded-lg border border-gray-200 bg-white p-4 text-gray-900 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-100">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <div><h3 class="font-medium text-gray-900 dark:text-white">{{ `{{ t('identityLab.title') }}` }}</h3><p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ t('identityLab.description') }}` }}</p></div>
+      <div><h3 class="font-medium text-gray-900 dark:text-white">{{ "{{ t('identityLab.title') }}" }}</h3><p class="text-sm text-gray-600 dark:text-gray-300">{{ "{{ t('identityLab.description') }}" }}</p></div>
       <div class="flex flex-wrap gap-2">
-        <UButton :disabled="busy || !customerUUID" @click="openDialog('bind')">{{ `{{ t('identityLab.add') }}` }}</UButton>
-        <UButton variant="soft" :disabled="busy" @click="openDialog('create')">{{ `{{ t('identityLab.create') }}` }}</UButton>
+        <UButton :disabled="busy || !customerUUID" @click="openDialog('bind')">{{ "{{ t('identityLab.add') }}" }}</UButton>
+        <UButton variant="soft" :disabled="busy" @click="openDialog('create')">{{ "{{ t('identityLab.create') }}" }}</UButton>
       </div>
     </div>
-    <p class="text-sm">{{ `{{ t('identityLab.selected', { name: customerName || t('identityLab.noCustomer') }) }}` }}</p>
+    <p class="text-sm">{{ "{{ t('identityLab.selected', { name: customerName || t('identityLab.noCustomer') }) }}" }}</p>
     <UAlert v-if="error" color="error" variant="soft" :title="error" />
-    <p v-if="loadingRecords" role="status" class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ t('common.loading') }}` }}</p>
-    <p v-else-if="!customerUUID" class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ t('frameworkLab.selectCustomerForRecords') }}` }}</p>
-    <div v-else class="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800"><table class="w-full text-left text-sm"><thead class="bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-200"><tr><th class="p-3">{{ `{{ t('identityLab.subject') }}` }}</th><th class="p-3">{{ `{{ t('frameworkLab.contactStatusLabel') }}` }}</th></tr></thead><tbody><tr v-for="item in items" :key="item.identity_uuid" class="border-t border-gray-200 dark:border-gray-800"><td class="p-3 break-all">{{ `{{ item.provider_subject }}` }}</td><td class="p-3">{{ `{{ t(`frameworkLab.customerStatus.${item.status}`) }}` }}</td></tr><tr v-if="!items.length"><td colspan="2" class="p-3 text-gray-600 dark:text-gray-300">{{ `{{ t('identityLab.empty') }}` }}</td></tr></tbody></table></div>
-    <div v-if="total > size" class="flex justify-end gap-3"><UButton variant="soft" :disabled="busy || page === 1" @click="changePage(-1)">{{ `{{ t('frameworkLab.previousPage') }}` }}</UButton><span>{{ `{{ page }}` }} / {{ `{{ Math.ceil(total / size) }}` }}</span><UButton variant="soft" :disabled="busy || page * size >= total" @click="changePage(1)">{{ `{{ t('frameworkLab.nextPage') }}` }}</UButton></div>
+    <p v-if="loadingRecords" role="status" class="text-sm text-gray-600 dark:text-gray-300">{{ "{{ t('common.loading') }}" }}</p>
+    <p v-else-if="!customerUUID" class="text-sm text-gray-600 dark:text-gray-300">{{ "{{ t('frameworkLab.selectCustomerForRecords') }}" }}</p>
+    <div v-else class="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800"><table class="w-full text-left text-sm"><thead class="bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-200"><tr><th class="p-3">{{ "{{ t('identityLab.subject') }}" }}</th><th class="p-3">{{ "{{ t('frameworkLab.contactStatusLabel') }}" }}</th></tr></thead><tbody><tr v-for="item in items" :key="item.identity_uuid" class="border-t border-gray-200 dark:border-gray-800"><td class="p-3 break-all">{{ "{{ item.provider_subject }}" }}</td><td class="p-3">{{ "{{ t(`frameworkLab.customerStatus.${item.status}`) }}" }}</td></tr><tr v-if="!items.length"><td colspan="2" class="p-3 text-gray-600 dark:text-gray-300">{{ "{{ t('identityLab.empty') }}" }}</td></tr></tbody></table></div>
+    <div v-if="total > size" class="flex justify-end gap-3"><UButton variant="soft" :disabled="busy || page === 1" @click="changePage(-1)">{{ "{{ t('frameworkLab.previousPage') }}" }}</UButton><span>{{ "{{ page }}" }} / {{ "{{ Math.ceil(total / size) }}" }}</span><UButton variant="soft" :disabled="busy || page * size >= total" @click="changePage(1)">{{ "{{ t('frameworkLab.nextPage') }}" }}</UButton></div>
     <UModal v-model:open="open" :title="t(dialogMode === 'bind' ? 'identityLab.add' : 'identityLab.create')" :description="t(dialogMode === 'bind' ? 'identityLab.bindHint' : 'identityLab.createHint')" :ui="{ content: 'w-full max-w-2xl' }">
       <template #body><div class="space-y-5 text-gray-900 dark:text-gray-100">
-        <p v-if="dialogMode === 'bind'" class="font-medium">{{ `{{ t('identityLab.selected', { name: customerName }) }}` }}</p>
+        <p v-if="dialogMode === 'bind'" class="font-medium">{{ "{{ t('identityLab.selected', { name: customerName }) }}" }}</p>
         <div class="flex items-end gap-3">
           <UFormField :label="t('identityLab.mockPlatform')" class="flex-1"><USelect v-model="platform" :items="platformOptions" class="w-full" :disabled="busy" /></UFormField>
-          <UButton variant="soft" :disabled="busy" @click="applyMock(true)">{{ `{{ t('identityLab.newMock') }}` }}</UButton>
+          <UButton variant="soft" :disabled="busy" @click="applyMock(true)">{{ "{{ t('identityLab.newMock') }}" }}</UButton>
         </div>
-        <p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ t('identityLab.mockHint') }}` }}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-300">{{ "{{ t('identityLab.mockHint') }}" }}</p>
         <UFormField :label="t('identityLab.subject')" :description="t('identityLab.subjectHelp')" required><UInput v-model="subject" class="w-full" :disabled="busy" /></UFormField>
-        <div class="flex flex-wrap gap-2"><UButton variant="soft" :loading="busy" @click="lookup">{{ `{{ t('identityLab.lookup') }}` }}</UButton><UButton v-if="dialogMode === 'bind'" :disabled="!customerUUID || busy" @click="bind">{{ `{{ t('identityLab.bind', { name: customerName }) }}` }}</UButton></div>
+        <div class="flex flex-wrap gap-2"><UButton variant="soft" :loading="busy" @click="lookup">{{ "{{ t('identityLab.lookup') }}" }}</UButton><UButton v-if="dialogMode === 'bind'" :disabled="!customerUUID || busy" @click="bind">{{ "{{ t('identityLab.bind', { name: customerName }) }}" }}</UButton></div>
         <UAlert v-if="result" color="info" variant="soft" :title="result" />
         <div v-if="dialogMode === 'create'" class="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-800">
-          <h4 class="font-medium text-gray-900 dark:text-white">{{ `{{ t('identityLab.create') }}` }}</h4>
-          <p class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ t('identityLab.createHint') }}` }}</p>
+          <h4 class="font-medium text-gray-900 dark:text-white">{{ "{{ t('identityLab.create') }}" }}</h4>
+          <p class="text-sm text-gray-600 dark:text-gray-300">{{ "{{ t('identityLab.createHint') }}" }}</p>
           <UFormField :label="t('frameworkLab.customerType')"><USelect v-model="profile.type" :items="types" class="w-full" :disabled="busy" /></UFormField>
           <div class="grid gap-3 sm:grid-cols-2"><UFormField v-for="field in profileFields" :key="field.key" :label="t(field.label)"><UInput v-model="profile[field.key]" class="w-full" :disabled="busy" :type="field.key === 'primary_email' ? 'email' : 'text'" /></UFormField></div>
           <UCheckbox v-if="profile.type === 'person'" v-model="explicitContact" :label="t('frameworkLab.explicitPrimaryContact')" :disabled="busy" />
           <div v-if="profile.type === 'company' || explicitContact" class="grid gap-3 sm:grid-cols-2"><UFormField v-for="field in contactFields" :key="field.key" :label="t(field.label)"><UInput v-model="contact[field.key]" class="w-full" :disabled="busy" /></UFormField></div>
-          <div class="flex justify-end"><UButton :loading="busy" @click="create">{{ `{{ t('identityLab.create') }}` }}</UButton></div>
+          <div class="flex justify-end"><UButton :loading="busy" @click="create">{{ "{{ t('identityLab.create') }}" }}</UButton></div>
         </div>
         <UAlert v-if="error" color="error" variant="soft" :title="error" />
       </div></template>

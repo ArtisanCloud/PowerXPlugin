@@ -1,0 +1,34 @@
+<template>
+  <main class="mx-auto w-full max-w-[1600px] space-y-6 px-5 py-6 lg:px-8">
+    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-[#172536]">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p class="text-sm text-gray-500 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.overview.eyebrow') }}" }}</p>
+          <h1 class="mt-1 text-2xl font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.overview.title') }}" }}</h1>
+          <p class="mt-2 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t(descriptionKey || 'knowledgeSpaces.overview.description') }}" }}</p>
+        </div>
+        <div class="flex gap-2"><slot name="header-actions" /></div>
+      </div>
+    </section>
+    <slot name="notices" />
+    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]">
+      <header class="border-b border-slate-200 p-5 dark:border-slate-700"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.overview.listTitle') }}" }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.overview.listDescription') }}" }}</p></header>
+      <div v-if="loading" class="p-12 text-center text-sm text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('common.loading') }}" }}</div>
+      <div v-else-if="error" class="p-6"><UAlert color="error" :title="t('knowledgeSpaces.ui.loadFailed')" :description="error" /></div>
+      <div v-else-if="!spaces.length" class="p-12 text-center"><UIcon name="i-heroicons-circle-stack" class="mx-auto size-9 text-gray-400 dark:text-slate-300" /><p class="mt-3 font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ui.noSpaces') }}" }}</p><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.overview.emptyDescription') }}" }}</p><slot name="empty-actions" /></div>
+      <div v-else class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="border-b border-slate-200 text-gray-600 dark:border-slate-700 dark:text-[#d6e2ff]"><tr><th class="px-5 py-3 font-medium">{{ "{{ t('knowledgeSpaces.ui.spaceName') }}" }}</th><th class="px-5 py-3 font-medium">{{ "{{ t('knowledgeSpaces.ui.department') }}" }}</th><th class="px-5 py-3 font-medium">{{ "{{ t('knowledgeSpaces.ui.documentStatus') }}" }}</th><th class="px-5 py-3 font-medium">{{ "{{ t('knowledgeSpaces.ui.lastUpdated') }}" }}</th><th class="px-5 py-3 font-medium">{{ "{{ t('knowledgeSpaces.ui.actions') }}" }}</th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-800"><tr v-for="space in spaces" :key="space.id"><td class="min-w-44 px-5 py-4 font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ space.name }}" }}</td><td class="px-5 py-4 text-gray-600 dark:text-[#d6e2ff]">{{ "{{ space.department }}" }}</td><td class="px-5 py-4"><UBadge :color="space.statusColor" variant="soft">{{ "{{ space.statusLabel }}" }}</UBadge></td><td class="px-5 py-4 text-gray-600 dark:text-[#d6e2ff]">{{ "{{ space.updatedAt || '-' }}" }}</td><td class="px-5 py-4"><div class="flex min-w-80 max-w-2xl flex-wrap gap-2"><slot name="row-actions" :space="space" /></div></td></tr></tbody></table></div>
+    </section>
+  </main>
+</template>
+<script setup lang="ts">
+export interface KnowledgeOverviewRow {
+  id: string
+  name: string
+  department: string
+  statusLabel: string
+  statusColor: 'success' | 'warning' | 'neutral' | 'error' | 'info'
+  updatedAt?: string
+}
+defineProps<{ spaces: KnowledgeOverviewRow[]; loading: boolean; error?: string; descriptionKey?: string }>()
+const { t } = useI18n()
+</script>

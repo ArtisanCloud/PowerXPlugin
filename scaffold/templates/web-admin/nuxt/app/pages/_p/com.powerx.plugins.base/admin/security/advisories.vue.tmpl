@@ -37,16 +37,16 @@
       <UTable :rows="advisories" :columns="columns" :loading="loading">
         <template #severity-cell="{ row }">
           <UBadge :color="severityColor(row.severity)" variant="soft" class="uppercase tracking-wide">
-            {{ `{{ row.severity }}` }}
+            {{ "{{ row.severity }}" }}
           </UBadge>
         </template>
         <template #status-cell="{ row }">
           <UBadge :color="statusBadgeColor(row.status)" variant="soft" class="uppercase tracking-wide">
-            {{ `{{ row.status }}` }}
+            {{ "{{ row.status }}" }}
           </UBadge>
         </template>
         <template #published_at-cell="{ row }">
-          {{ `{{ formatDate(row.published_at) }}` }}
+          {{ "{{ formatDate(row.published_at) }}" }}
         </template>
         <template #actions-cell="{ row }">
           <div class="flex flex-wrap gap-2">
@@ -115,7 +115,7 @@
               <span class="font-semibold">Publish Advisory</span>
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400">
-              {{ `{{ selectedAdvisory?.reference }}` }} · {{ `{{ selectedAdvisory?.summary }}` }}
+              {{ "{{ selectedAdvisory?.reference }}" }} · {{ "{{ selectedAdvisory?.summary }}" }}
             </p>
           </div>
         </template>

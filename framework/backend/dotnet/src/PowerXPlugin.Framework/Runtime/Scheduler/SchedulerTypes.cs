@@ -46,11 +46,16 @@ public record JobSpec(
     [property: JsonPropertyName("topic")] string? Topic = null,
     [property: JsonPropertyName("payload")] Dictionary<string, object?>? Payload = null,
     [property: JsonPropertyName("paused")] bool Paused = false,
-    [property: JsonPropertyName("retry_policy")] RetryPolicy? Retry = null
+    [property: JsonPropertyName("retry_policy")] RetryPolicy? Retry = null,
+    [property: JsonPropertyName("idempotency_key")] string? IdempotencyKey = null
 );
 
 public record Job
 {
+    [JsonIgnore]
+    public long Revision { get; set; }
+    [JsonPropertyName("idempotency_key")]
+    public string? IdempotencyKey { get; set; }
     [JsonPropertyName("uuid")]
     public string Uuid { get; set; } = Guid.NewGuid().ToString();
     [JsonPropertyName("job_id")]
@@ -68,9 +73,9 @@ public record Job
     [JsonPropertyName("schedule_expr")]
     public string ScheduleExpr { get; set; } = "";
     [JsonPropertyName("timezone")]
-    public string? Timezone { get; init; }
+    public string? Timezone { get; set; }
     [JsonPropertyName("topic")]
-    public string Topic { get; init; } = "powerx.runtime.scheduler.triggered.v1";
+    public string Topic { get; set; } = "powerx.runtime.scheduler.triggered.v1";
     [JsonPropertyName("status")]
     public string Status { get; set; } = JobStatus.Active;
     [JsonPropertyName("next_run_at")]
@@ -82,7 +87,7 @@ public record Job
     [JsonPropertyName("updated_at")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     [JsonPropertyName("payload")]
-    public Dictionary<string, object?>? Payload { get; init; }
+    public Dictionary<string, object?>? Payload { get; set; }
 }
 
 /// <summary>
@@ -119,6 +124,7 @@ public sealed class SchedulerAdapterException : Exception
 
 public static class SchedulerErrors
 {
+    public const string CodeConflict = "SCHEDULER_JOB_CONFLICT";
     public const string CodeInvalidMode = "SCHEDULER_ADAPTER_MODE_INVALID";
     public const string CodeInvalidJob = "SCHEDULER_INVALID_JOB_SPEC";
     public const string CodeUnavailable = "SCHEDULER_ADAPTER_UNAVAILABLE";

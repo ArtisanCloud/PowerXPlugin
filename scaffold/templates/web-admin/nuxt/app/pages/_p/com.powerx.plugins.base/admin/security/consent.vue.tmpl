@@ -50,7 +50,7 @@
                       size="xs"
                       color="primary"
                     >
-                      {{ `{{ status }}` }}
+                      {{ "{{ status }}" }}
                     </UBadge>
                     <span
                       v-if="!selectedStatuses.length"
@@ -95,7 +95,7 @@
 
             <UTable :rows="rows" :columns="columns" :loading="loading">
               <template #token-cell="{ row }">
-                <span class="font-mono">{{ `{{ row.token }}` }}</span>
+                <span class="font-mono">{{ "{{ row.token }}" }}</span>
               </template>
               <template #scope-cell="{ row }">
                 <div class="flex flex-wrap gap-2">
@@ -106,7 +106,7 @@
                     color="primary"
                     variant="soft"
                   >
-                    {{ `{{ scope }}` }}
+                    {{ "{{ scope }}" }}
                   </UBadge>
                 </div>
               </template>
@@ -116,7 +116,7 @@
                   size="xs"
                   class="uppercase"
                 >
-                  {{ `{{ row.status }}` }}
+                  {{ "{{ row.status }}" }}
                 </UBadge>
               </template>
             </UTable>
@@ -127,9 +127,7 @@
                 class="text-4xl text-gray-300 dark:text-gray-600"
               />
               <p class="mt-3 text-gray-500 dark:text-gray-400">
-              {{ `{{ tenantUuid
-                  ? "No consent tokens found for this tenant."
-                  : "Enter a tenant UUID to begin." }}` }}
+              {{ "{{\n                tenantUuid\n                  ? \"No consent tokens found for this tenant.\"\n                  : \"Enter a tenant UUID to begin.\"\n              }}" }}
               </p>
             </div>
           </div>

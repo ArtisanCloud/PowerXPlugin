@@ -54,10 +54,10 @@
               :loading="loading"
             >
               <template #revokedAt-cell="{ row }">
-                {{ `{{ formatDate(row.revokedAt) }}` }}
+                {{ "{{ formatDate(row.revokedAt) }}" }}
               </template>
               <template #ttlExpiry-cell="{ row }">
-                {{ `{{ formatDate(row.ttlExpiry) }}` }}
+                {{ "{{ formatDate(row.ttlExpiry) }}" }}
               </template>
             </UTable>
             <div
@@ -81,7 +81,7 @@
               :loading="loading"
             >
               <template #occurredAt-cell="{ row }">
-                {{ `{{ formatDate(row.occurredAt) }}` }}
+                {{ "{{ formatDate(row.occurredAt) }}" }}
               </template>
               <template #metadata-cell="{ row }">
                 <UButton

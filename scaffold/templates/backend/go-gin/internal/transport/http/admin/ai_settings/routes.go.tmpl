@@ -201,8 +201,10 @@ func (h *Handler) invokeDelegatedLLM(c *gin.Context, req localSettingRequest, pr
 	}
 	out, err := service.LLMInvoke(c.Request.Context(), powerxai.LLMInvokeInput{
 		ModelKey: req.ModelKey,
-		Inputs:   []powerxai.ContentItem{{Role: "user", Type: "text", Content: prompt}},
-		Params:   req.Parameters,
+		Inputs: []powerxai.ContentItem{
+			{Role: "user", Type: "text", Content: prompt},
+		},
+		Params: req.Parameters,
 	})
 	if err != nil {
 		return "", err

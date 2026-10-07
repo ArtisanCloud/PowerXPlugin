@@ -17,6 +17,8 @@ public static class KnowledgeOperations
     public const string Delete = "delete";
     public const string Reindex = "reindex";
     public const string Health = "health";
+    public const string Catalog = "catalog";
+    public const string Create = "create";
 }
 
 public static class KnowledgeIndexStatuses
@@ -128,14 +130,14 @@ public sealed class LocalKnowledgeAdapter(ILocalKnowledgeStore store) : IKnowled
 }
 
 /// <summary>Typed delegated client for Core's published /api/v1/tenant/knowledge contract.</summary>
-public sealed class PowerXKnowledgeClient(string baseUrl, string tenantUuid, IServiceCredentialProvider credentials, HttpClient? http = null) : IKnowledgeService
+public sealed partial class PowerXKnowledgeClient(string baseUrl, string tenantUuid, IServiceCredentialProvider credentials, HttpClient? http = null) : IKnowledgeService, IKnowledgeProvisioningService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string _baseUrl = string.IsNullOrWhiteSpace(baseUrl) ? throw new KnowledgeException(KnowledgeErrors.Unavailable) : baseUrl.TrimEnd('/');
     private readonly string _tenantUuid = tenantUuid;
     private readonly IServiceCredentialProvider _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
     private readonly HttpClient _http = http ?? new HttpClient();
-    public KnowledgeCapabilities Capabilities { get; } = new("powerx_knowledge_host", ProviderMode.Delegated, new HashSet<string> { KnowledgeOperations.Retrieve, KnowledgeOperations.Search, KnowledgeOperations.Upsert, KnowledgeOperations.Delete, KnowledgeOperations.Reindex, KnowledgeOperations.Health });
+    public KnowledgeCapabilities Capabilities { get; } = new("powerx_knowledge_host", ProviderMode.Delegated, new HashSet<string> { KnowledgeOperations.Retrieve, KnowledgeOperations.Search, KnowledgeOperations.Upsert, KnowledgeOperations.Delete, KnowledgeOperations.Reindex, KnowledgeOperations.Health, KnowledgeOperations.Catalog, KnowledgeOperations.Create });
     public async Task<IReadOnlyList<KnowledgeSpace>> ListSpacesAsync(ListKnowledgeSpacesRequest request, CancellationToken ct = default)
     {
         CheckTenant(request.TenantUuid); LocalKnowledgeAdapter.ValidateList(request);
@@ -180,7 +182,7 @@ public sealed class PowerXKnowledgeClient(string baseUrl, string tenantUuid, ISe
     {
         var credential = (await _credentials.GetCredentialAsync(ct)).Validate(); using var request = new HttpRequestMessage(method, _baseUrl + path);
         request.Headers.Authorization = new AuthenticationHeaderValue(credential.NormalizedAuthScheme, credential.Value); if (body is not null) request.Content = new StringContent(JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
-        try { using var response = await _http.SendAsync(request, ct); var raw = await response.Content.ReadAsStringAsync(ct); if (!response.IsSuccessStatusCode) throw new KnowledgeException(response.StatusCode switch { HttpStatusCode.BadRequest => KnowledgeErrors.InvalidDocument, HttpStatusCode.Unauthorized => KnowledgeErrors.Unauthorized, HttpStatusCode.Forbidden => KnowledgeErrors.Forbidden, HttpStatusCode.NotFound => KnowledgeErrors.NotFound, HttpStatusCode.Conflict => KnowledgeErrors.Conflict, _ => KnowledgeErrors.Upstream }); using var json = JsonDocument.Parse(raw); if (!json.RootElement.TryGetProperty("data", out var data)) throw new KnowledgeException(KnowledgeErrors.InvalidResponse); return JsonSerializer.Deserialize<T>(data.GetRawText(), JsonOptions) ?? throw new KnowledgeException(KnowledgeErrors.InvalidResponse); } catch (KnowledgeException) { throw; } catch (HttpRequestException exception) { throw new KnowledgeException(KnowledgeErrors.Upstream, exception); } catch (JsonException exception) { throw new KnowledgeException(KnowledgeErrors.InvalidResponse, exception); }
+        try { using var response = await _http.SendAsync(request, ct); var raw = await response.Content.ReadAsStringAsync(ct); if (!response.IsSuccessStatusCode) throw HostError(response, raw); using var json = JsonDocument.Parse(raw); if (!json.RootElement.TryGetProperty("data", out var data)) throw new KnowledgeException(KnowledgeErrors.InvalidResponse); return JsonSerializer.Deserialize<T>(data.GetRawText(), JsonOptions) ?? throw new KnowledgeException(KnowledgeErrors.InvalidResponse); } catch (KnowledgeException) { throw; } catch (HttpRequestException exception) { throw new KnowledgeException(KnowledgeErrors.Upstream, exception); } catch (JsonException exception) { throw new KnowledgeException(KnowledgeErrors.InvalidResponse, exception); }
     }
     private static string Require(string? value) => string.IsNullOrWhiteSpace(value) ? throw new KnowledgeException(KnowledgeErrors.InvalidResponse) : value.Trim();
     private static KnowledgeIndexJob ToJob(HostIndexJob job) { var result = new KnowledgeIndexJob(Require(job.JobUuid), Require(job.SpaceUuid), job.DocumentUuid?.Trim() ?? string.Empty, job.Operation?.Trim() ?? string.Empty, Require(job.Status), job.ErrorCode?.Trim() ?? string.Empty); return LocalKnowledgeAdapter.ValidateJob(result, string.Empty, null); }
@@ -210,4 +212,9 @@ public static class KnowledgeErrors
     public const string Conflict = "FRAMEWORK_KNOWLEDGE_CONFLICT";
     public const string Upstream = "FRAMEWORK_KNOWLEDGE_UPSTREAM_DEPENDENCY";
 }
-public sealed class KnowledgeException(string code, Exception? inner = null) : InvalidOperationException(code, inner) { public string Code { get; } = code; }
+public sealed class KnowledgeException(string code, Exception? inner = null, int? statusCode = null, string traceId = "") : InvalidOperationException(code, inner)
+{
+    public string Code { get; } = code;
+    public int? StatusCode { get; } = statusCode;
+    public string TraceId { get; } = traceId;
+}

@@ -52,7 +52,7 @@
                 class="flex max-w-[45%] shrink-0 items-center truncate bg-muted px-3 text-sm text-muted"
                 :title="namespacePrefix"
               >
-                {{ `{{ namespacePrefix }}` }}
+                {{ "{{ namespacePrefix }}" }}
               </div>
               <UInput
                 v-model="form.namespaceSuffix"
@@ -113,7 +113,7 @@
                 class="flex max-w-[45%] shrink-0 items-center truncate bg-muted px-3 text-sm text-muted"
                 :title="namespacePrefix"
               >
-                {{ `{{ namespacePrefix }}` }}
+                {{ "{{ namespacePrefix }}" }}
               </div>
               <UInput
                 v-model="form.namespaceSuffix"
@@ -171,14 +171,14 @@
           <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <div class="text-sm font-medium text-gray-900 dark:text-white">
-                {{ `{{ t("metadataGovernance.form.requiredLocaleSection") }}` }}
+                {{ "{{ t(\"metadataGovernance.form.requiredLocaleSection\") }}" }}
               </div>
               <div class="text-xs text-gray-500">
-                {{ `{{ t("metadataGovernance.form.requiredLocaleDescription") }}` }}
+                {{ "{{ t(\"metadataGovernance.form.requiredLocaleDescription\") }}" }}
               </div>
             </div>
             <UBadge color="primary" variant="subtle">
-              {{ `{{ requiredLocaleLabel }}` }}
+              {{ "{{ requiredLocaleLabel }}" }}
             </UBadge>
           </div>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -199,10 +199,10 @@
         <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
           <div class="mb-3">
             <div class="text-sm font-medium text-gray-900 dark:text-white">
-              {{ `{{ t("metadataGovernance.form.optionalLocaleSection") }}` }}
+              {{ "{{ t(\"metadataGovernance.form.optionalLocaleSection\") }}" }}
             </div>
             <div class="text-xs text-gray-500">
-              {{ `{{ t("metadataGovernance.form.optionalLocaleDescription") }}` }}
+              {{ "{{ t(\"metadataGovernance.form.optionalLocaleDescription\") }}" }}
             </div>
           </div>
 
@@ -237,17 +237,17 @@
 
           <div v-if="filledOptionalLocales.length > 0" class="mt-3 flex flex-wrap gap-2">
             <UBadge v-for="localeItem in filledOptionalLocales" :key="localeItem.value" color="neutral" variant="subtle">
-              {{ `{{ localeItem.label }}` }}
+              {{ "{{ localeItem.label }}" }}
             </UBadge>
           </div>
         </div>
 
         <div class="flex justify-end gap-2">
           <UButton type="button" color="neutral" variant="subtle" @click="openModel = false">
-            {{ `{{ t("common.cancel") }}` }}
+            {{ "{{ t(\"common.cancel\") }}" }}
           </UButton>
           <UButton type="submit" color="primary" :loading="submitting">
-            {{ `{{ t("common.save") }}` }}
+            {{ "{{ t(\"common.save\") }}" }}
           </UButton>
         </div>
       </form>

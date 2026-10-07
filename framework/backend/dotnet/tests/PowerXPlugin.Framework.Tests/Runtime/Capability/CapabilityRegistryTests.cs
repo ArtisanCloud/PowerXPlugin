@@ -16,7 +16,7 @@ public sealed class CapabilityRegistryTests
         {
             Assert.Equal("/api/v1/tenant/capabilities", request.RequestUri!.AbsolutePath);
             Assert.Equal("Bearer sts", request.Headers.Authorization!.ToString());
-            return Json("{\"data\":{\"items\":[{\"capabilityId\":\"crm.read\",\"pluginId\":\"crm\",\"pluginVersion\":\"1\",\"title\":\"Read\",\"source\":\"corex\",\"protocols\":[],\"status\":\"published\"}]}}");
+            return Json("{\"data\":{\"items\":[{\"capability_id\":\"crm.read\",\"plugin_id\":\"crm\",\"plugin_version\":\"1\",\"title\":\"Read\",\"source\":\"corex\",\"protocols\":[],\"status\":\"published\"}]}}");
         })));
         var list = await client.ListAsync(new CapabilityListQuery(Source: "corex"));
         Assert.Equal("crm.read", Assert.Single(list).CapabilityId);

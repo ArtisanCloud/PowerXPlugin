@@ -112,6 +112,7 @@ type Deps struct {
 	KnowledgeDirectory           fwknowledge.DelegatedClient
 	NotificationDelivery         *fwnotifications.Runtime
 	Notifications                powerxnotifications.Publisher
+	LocalSkillInvoker            fwskills.Invoker
 	SkillInvocation              *fwskills.Runtime
 	Skills                       powerxskills.Invoker
 	Config                       *config.Config

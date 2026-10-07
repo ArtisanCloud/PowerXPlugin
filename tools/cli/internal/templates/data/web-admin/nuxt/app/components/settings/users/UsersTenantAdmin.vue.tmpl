@@ -733,10 +733,10 @@ onMounted(async () => {
     <div class="flex justify-between items-center mb-6">
       <div>
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ $t("organization.user.title") }}` }}
+          {{ "{{ $t(\"organization.user.title\") }}" }}
         </h2>
         <p class="text-sm text-gray-500 mt-1 dark:text-slate-200">
-          {{ `{{ $t("organization.user.description") }}` }}
+          {{ "{{ $t(\"organization.user.description\") }}" }}
         </p>
         <p v-if="props.readonly" class="text-xs text-amber-600 mt-1 dark:text-amber-300">当前为只读视图，隐藏联系方式与角色详情</p>
       </div>
@@ -747,11 +747,11 @@ onMounted(async () => {
             variant="outline"
             icon="i-heroicons-arrow-up-tray"
           >
-            {{ `{{ $t("organization.user.importExport") }}` }}
+            {{ "{{ $t(\"organization.user.importExport\") }}" }}
           </UButton>
         </UDropdownMenu>
         <UButton v-if="!props.readonly" color="primary" icon="i-heroicons-plus" @click="openAddForm">
-          {{ `{{ $t("organization.user.add") }}` }}
+          {{ "{{ $t(\"organization.user.add\") }}" }}
         </UButton>
       </div>
     </div>
@@ -764,7 +764,7 @@ onMounted(async () => {
         size="sm"
         @click="applyCategory('all')"
       >
-        全部 ({{ `{{ categoryStats.all }}` }})
+        全部 ({{ "{{ categoryStats.all }}" }})
       </UButton>
       <UButton
         :variant="userCategory === 'active' ? 'solid' : 'soft'"
@@ -772,7 +772,7 @@ onMounted(async () => {
         size="sm"
         @click="applyCategory('active')"
       >
-        启用 ({{ `{{ categoryStats.active }}` }})
+        启用 ({{ "{{ categoryStats.active }}" }})
       </UButton>
       <UButton
         :variant="userCategory === 'inactive' ? 'solid' : 'soft'"
@@ -780,7 +780,7 @@ onMounted(async () => {
         size="sm"
         @click="applyCategory('inactive')"
       >
-        停用 ({{ `{{ categoryStats.inactive }}` }})
+        停用 ({{ "{{ categoryStats.inactive }}" }})
       </UButton>
     </div>
 
@@ -833,7 +833,7 @@ onMounted(async () => {
           icon="i-heroicons-arrow-path"
           @click="resetFilters"
         >
-          {{ `{{ $t("organization.user.filter.reset") }}` }}
+          {{ "{{ $t(\"organization.user.filter.reset\") }}" }}
         </UButton>
       </div>
     </div>
@@ -858,7 +858,7 @@ onMounted(async () => {
       >
         <div class="text-sm text-gray-600 dark:text-slate-200 flex items-center gap-3">
           <span>
-            第 {{ `{{ pagination.page }}` }} / {{ `{{ normalizedTotalPages }}` }} 页，共 {{ `{{ pagination.total }}` }} 条
+            第 {{ "{{ pagination.page }}" }} / {{ "{{ normalizedTotalPages }}" }} 页，共 {{ "{{ pagination.total }}" }} 条
           </span>
           <USelect
             :model-value="String(pagination.pageSize)"
@@ -888,7 +888,7 @@ onMounted(async () => {
             :disabled="loading"
             @click="changePage(p)"
           >
-            {{ `{{ p }}` }}
+            {{ "{{ p }}" }}
           </UButton>
           <UButton
             :disabled="!hasNextPage || loading"
@@ -988,9 +988,9 @@ onMounted(async () => {
                 color="neutral"
                 variant="outline"
                 @click="showForm = false"
-                >{{ `{{ $t("organization.common.cancel") }}` }}</UButton
+                >{{ "{{ $t(\"organization.common.cancel\") }}" }}</UButton
               >
-              <UButton type="submit" color="primary">{{ `{{ $t("organization.common.save") }}` }}</UButton>
+              <UButton type="submit" color="primary">{{ "{{\n                $t(\"organization.common.save\")\n              }}" }}</UButton>
             </div>
           </form>
         </div>

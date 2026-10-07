@@ -2,25 +2,25 @@
   <div class="mx-auto max-w-7xl space-y-6 p-6">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ `{{ t("hostContract.title") }}` }}</h1>
-        <p class="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-300">{{ `{{ t("hostContract.description") }}` }}</p>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ "{{ t(\"hostContract.title\") }}" }}</h1>
+        <p class="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-300">{{ "{{ t(\"hostContract.description\") }}" }}</p>
       </div>
-      <UButton icon="i-heroicons-arrow-path" :loading="refreshing" @click="refreshAll">{{ `{{ t("hostContract.refresh") }}` }}</UButton>
+      <UButton icon="i-heroicons-arrow-path" :loading="refreshing" @click="refreshAll">{{ "{{ t(\"hostContract.refresh\") }}" }}</UButton>
     </div>
     <UAlert color="info" icon="i-heroicons-information-circle" :title="t('hostContract.boundaryTitle')" :description="t('hostContract.boundaryDescription')" />
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <UCard v-for="item in visibleModules" :key="item.module" class="bg-white/95 dark:bg-gray-900">
         <template #header>
           <div class="flex items-center justify-between gap-3">
-            <div><h2 class="font-semibold text-gray-900 dark:text-white">{{ `{{ t(["hostContract", "modules", item.module].join(".")) }}` }}</h2><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">status</p></div>
-            <UBadge :color="badgeColor(item)" variant="subtle">{{ `{{ statusLabel(item) }}` }}</UBadge>
+            <div><h2 class="font-semibold text-gray-900 dark:text-white">{{ "{{ t([\"hostContract\", \"modules\", item.module].join(\".\")) }}" }}</h2><p class="mt-1 text-xs text-gray-500 dark:text-gray-400">status</p></div>
+            <UBadge :color="badgeColor(item)" variant="subtle">{{ "{{ statusLabel(item) }}" }}</UBadge>
           </div>
         </template>
         <dl class="space-y-2 text-sm">
-          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.capability") }}` }}</dt><dd class="break-all font-mono text-xs">{{ `{{ item.capabilityID || t("hostContract.notDeclared") }}` }}</dd></div>
-          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.providerMode") }}` }}</dt><dd>{{ `{{ item.providerMode || "-" }}` }}</dd></div>
-          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.trace") }}` }}</dt><dd class="break-all font-mono text-xs">{{ `{{ item.traceID || "-" }}` }}</dd></div>
-          <div><dt class="text-gray-500 dark:text-gray-400">{{ `{{ t("hostContract.reason") }}` }}</dt><dd class="break-all font-mono text-xs">{{ `{{ item.reasonCode || "-" }}` }}</dd></div>
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ "{{ t(\"hostContract.capability\") }}" }}</dt><dd class="break-all font-mono text-xs">{{ "{{ item.capabilityID || t(\"hostContract.notDeclared\") }}" }}</dd></div>
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ "{{ t(\"hostContract.providerMode\") }}" }}</dt><dd>{{ "{{ item.providerMode || \"-\" }}" }}</dd></div>
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ "{{ t(\"hostContract.trace\") }}" }}</dt><dd class="break-all font-mono text-xs">{{ "{{ item.traceID || \"-\" }}" }}</dd></div>
+          <div><dt class="text-gray-500 dark:text-gray-400">{{ "{{ t(\"hostContract.reason\") }}" }}</dt><dd class="break-all font-mono text-xs">{{ "{{ item.reasonCode || \"-\" }}" }}</dd></div>
         </dl>
       </UCard>
     </div>

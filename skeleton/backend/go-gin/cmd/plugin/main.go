@@ -811,6 +811,7 @@ func main() {
 		KnowledgeDirectory:             knowledgeDirectory,
 		NotificationDelivery:           notificationDeliveryRuntime,
 		Notifications:                  notificationsRuntime,
+		LocalSkillInvoker:              localSkillInvoker,
 		SkillInvocation:                skillInvocationRuntime,
 		Skills:                         skillsRuntime,
 		Config:                         cfg,

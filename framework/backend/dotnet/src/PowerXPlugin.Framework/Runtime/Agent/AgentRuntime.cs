@@ -32,7 +32,10 @@ public sealed record AgentHealthHistory(IReadOnlyList<AgentHealthSummary> Snapsh
 public sealed record AgentBridgeControlRequest(string Reason = "", string TraceUuid = "");
 public sealed record AgentBridgeRebalanceRequest(int TargetCapacityInstances, string Reason = "", string TraceUuid = "");
 public sealed record AgentBridgeIdentity(string AgentUuid, string TenantUuid, string Alias, string Status);
-public sealed record AgentBridgeLifecycleResult(AgentBridgeIdentity Agent, object? Event = null);
+public sealed record AgentBridgeCapacity(int Default, int Current, int? Max);
+public sealed record AgentBridgeEvent(string Id, string Type, string FromStatus, string ToStatus, string Reason, string TriggeredBy, string TraceUuid, DateTimeOffset OccurredAt);
+public sealed record AgentBridgeState(AgentBridgeIdentity Agent, AgentBridgeCapacity Capacity, AgentHealthSummary? Health, IReadOnlyList<AgentBridgeEvent> Events);
+public sealed record AgentBridgeLifecycleResult(AgentBridgeIdentity Agent, AgentBridgeEvent? Event = null);
 public sealed record AgentSessionEvent(string Type, AgentInvocation? Invocation = null, string Status = "", string ReasonCode = "");
 
 /// <summary>
@@ -84,7 +87,7 @@ public interface IAgentLifecycleService
 {
     Task<AgentHealthSummary> GetHealthSummaryAsync(AgentLifecycleScope scope, CancellationToken ct = default);
     Task<AgentHealthHistory> ListHealthHistoryAsync(AgentLifecycleScope scope, int rangeHours, int limit, CancellationToken ct = default);
-    Task<object> GetBridgeStateAsync(AgentLifecycleScope scope, int limit, CancellationToken ct = default);
+    Task<AgentBridgeState> GetBridgeStateAsync(AgentLifecycleScope scope, int limit, CancellationToken ct = default);
     Task<AgentBridgeLifecycleResult> FreezeAsync(AgentLifecycleScope scope, AgentBridgeControlRequest request, CancellationToken ct = default);
     Task<AgentBridgeLifecycleResult> RecoverAsync(AgentLifecycleScope scope, AgentBridgeControlRequest request, CancellationToken ct = default);
     Task<AgentBridgeLifecycleResult> RebalanceAsync(AgentLifecycleScope scope, AgentBridgeRebalanceRequest request, CancellationToken ct = default);
@@ -106,11 +109,14 @@ public sealed class LocalAgentLifecycleService(ILocalAgentLifecycleStore store) 
         foreach (var item in history.Snapshots) Validate(item, scope);
         return history;
     }
-    public async Task<object> GetBridgeStateAsync(AgentLifecycleScope scope, int limit, CancellationToken ct = default)
+    public async Task<AgentBridgeState> GetBridgeStateAsync(AgentLifecycleScope scope, int limit, CancellationToken ct = default)
     {
         Validate(scope);
         if (limit is < 0 or > 1000) throw InvalidArgument();
-        return await _store.GetBridgeStateAsync(scope, limit, ct) ?? throw InvalidResponse();
+        var state = await _store.GetBridgeStateAsync(scope, limit, ct);
+        if (state?.Agent is null || state.Agent.TenantUuid != scope.TenantUuid || state.Agent.AgentUuid != scope.AgentUuid || state.Capacity is null || state.Events is null) throw InvalidResponse();
+        if (state.Health is not null) Validate(state.Health, scope);
+        return state;
     }
     public async Task<AgentBridgeLifecycleResult> FreezeAsync(AgentLifecycleScope scope, AgentBridgeControlRequest request, CancellationToken ct = default) => Validate(await _store.FreezeAsync(Validate(scope), Validate(request), ct), scope);
     public async Task<AgentBridgeLifecycleResult> RecoverAsync(AgentLifecycleScope scope, AgentBridgeControlRequest request, CancellationToken ct = default) => Validate(await _store.RecoverAsync(Validate(scope), Validate(request), ct), scope);

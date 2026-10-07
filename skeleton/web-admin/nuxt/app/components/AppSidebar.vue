@@ -19,73 +19,119 @@
         </UButton>
       </div>
 
-      <div v-if="canReadTemplates">
+      <div v-if="canReadTemplates || canReadCustomers">
         <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          {{ t('navigation.templates') }}
+          {{ t('navigation.businessOperations') }}
+        </div>
+        <div v-if="canReadTemplates">
+          <div class="space-y-1">
+            <UButton
+              variant="ghost"
+              color="neutral"
+              class="w-full justify-start"
+              @click="toggleTemplatesMenu"
+              :class="{
+                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                  isGroupActive(['/templates']),
+              }"
+            >
+              <UIcon name="i-heroicons-clipboard-document-list" class="w-4 h-4 mr-3" />
+              {{ t('navigation.templates') }}
+              <UIcon
+                :name="showTemplatesMenu ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
+                class="w-4 h-4 ml-auto"
+              />
+            </UButton>
+
+            <div v-show="showTemplatesMenu" class="ml-6 mt-1 space-y-1">
+              <UButton
+                to="/templates"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                class="w-full justify-start text-sm"
+                :class="{
+                  'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                    isExactActive('/templates'),
+                }"
+              >
+                <UIcon name="i-heroicons-document-text" class="w-3 h-3 mr-2" />
+                {{ t('templates.overview.title') }}
+              </UButton>
+              <UButton
+                to="/templates/develop"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                class="w-full justify-start text-sm"
+                :class="{
+                  'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                    isExactActive('/templates/develop'),
+                }"
+              >
+                <UIcon name="i-heroicons-cpu-chip" class="w-3 h-3 mr-2" />
+                {{ t('navigation.templatesDevelop') }}
+              </UButton>
+              <UButton
+                to="/templates/crud"
+                variant="ghost"
+                color="neutral"
+                size="sm"
+                class="w-full justify-start text-sm"
+                :class="{
+                  'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+                    isExactActive('/templates/crud'),
+                }"
+              >
+                <UIcon name="i-heroicons-wrench" class="w-3 h-3 mr-2" />
+                {{ t('navigation.templatesCrud') }}
+              </UButton>
+            </div>
+          </div>
+        </div>
+        <UButton
+          v-if="canReadCustomers"
+          to="/admin/business/customers"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/admin/business/customers'),
+          }"
+        >
+          <UIcon name="i-heroicons-user-group" class="w-4 h-4 mr-3" />
+          {{ t('navigation.customerBase') }}
+        </UButton>
+      </div>
+
+      <div v-if="isRoot">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{{ t('localIntelligence.category') }}</div>
+        <UButton v-for="entry in ['agents', 'skills']" :key="entry" :to="'/intelligence/' + entry" variant="ghost" color="neutral" class="w-full justify-start mt-1"
+          :class="{ 'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400': isExactActive('/intelligence/' + entry) }">
+          <UIcon :name="entry === 'agents' ? 'i-heroicons-user-circle' : 'i-heroicons-command-line'" class="w-4 h-4 mr-3" />
+          {{ t('localIntelligence.' + entry) }}
+        </UButton>
+      </div>
+
+      <div v-if="isLoggedIn">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+          {{ t('navigation.knowledgeSpaces') }}
         </div>
         <div class="space-y-1">
           <UButton
+            :to="knowledgeSpacePath"
             variant="ghost"
             color="neutral"
             class="w-full justify-start"
-            @click="toggleTemplatesMenu"
             :class="{
               'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-                isGroupActive(['/templates']),
+                isKnowledgeSpaceRoute,
             }"
           >
-            <UIcon name="i-heroicons-clipboard-document-list" class="w-4 h-4 mr-3" />
-            {{ t('navigation.templates') }}
-            <UIcon
-              :name="showTemplatesMenu ? 'i-heroicons-chevron-down' : 'i-heroicons-chevron-right'"
-              class="w-4 h-4 ml-auto"
-            />
+            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
+            {{ t('navigation.knowledgeSpaces') }}
           </UButton>
-
-          <div v-show="showTemplatesMenu" class="ml-6 mt-1 space-y-1">
-            <UButton
-              to="/templates"
-              variant="ghost"
-              color="neutral"
-              size="sm"
-              class="w-full justify-start text-sm"
-              :class="{
-                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-                  isExactActive('/templates'),
-              }"
-            >
-              <UIcon name="i-heroicons-document-text" class="w-3 h-3 mr-2" />
-              {{ t('templates.overview.title') }}
-            </UButton>
-            <UButton
-              to="/templates/develop"
-              variant="ghost"
-              color="neutral"
-              size="sm"
-              class="w-full justify-start text-sm"
-              :class="{
-                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-                  isExactActive('/templates/develop'),
-              }"
-            >
-              <UIcon name="i-heroicons-cpu-chip" class="w-3 h-3 mr-2" />
-              {{ t('navigation.templatesDevelop') }}
-            </UButton>
-            <UButton
-              to="/templates/crud"
-              variant="ghost"
-              color="neutral"
-              size="sm"
-              class="w-full justify-start text-sm"
-              :class="{
-                'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-                  isExactActive('/templates/crud'),
-              }"
-            >
-              <UIcon name="i-heroicons-wrench" class="w-3 h-3 mr-2" />
-              {{ t('navigation.templatesCrud') }}
-            </UButton>
-          </div>
         </div>
       </div>
 
@@ -147,32 +193,6 @@
           {{ t('navigation.knowledgeQALab') }}
         </UButton>
         <UButton
-          to="/powerx/agents"
-          variant="ghost"
-          color="neutral"
-          class="w-full justify-start mt-1"
-          :class="{
-            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-              isExactActive('/powerx/agents'),
-          }"
-        >
-          <UIcon name="i-heroicons-user-circle" class="w-4 h-4 mr-3" />
-          {{ t('navigation.powerxPluginAgents') }}
-        </UButton>
-        <UButton
-          to="/powerx/skills"
-          variant="ghost"
-          color="neutral"
-          class="w-full justify-start mt-1"
-          :class="{
-            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-              isExactActive('/powerx/skills'),
-          }"
-        >
-          <UIcon name="i-heroicons-command-line" class="w-4 h-4 mr-3" />
-          {{ t('navigation.powerxPluginSkills') }}
-        </UButton>
-        <UButton
           to="/agent-skill-bridge"
           variant="ghost"
           color="neutral"
@@ -189,7 +209,7 @@
 
       <div v-if="isRoot">
         <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          {{ t('navigation.capabilities') }}
+          {{ t('navigation.pluginCapabilities') }}
         </div>
         <UButton
           to="/capabilities/register"
@@ -217,46 +237,6 @@
           <UIcon name="i-heroicons-clock" class="w-4 h-4 mr-3" />
           {{ t('navigation.capabilitiesLifecycle') }}
         </UButton>
-      </div>
-
-      <div v-if="canReadCustomers">
-        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          {{ t('navigation.businessOperations') }}
-        </div>
-        <UButton
-          to="/admin/business/customers"
-          variant="ghost"
-          color="neutral"
-          class="w-full justify-start"
-          :class="{
-            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-              isExactActive('/admin/business/customers'),
-          }"
-        >
-          <UIcon name="i-heroicons-user-group" class="w-4 h-4 mr-3" />
-          {{ t('navigation.customerBase') }}
-        </UButton>
-      </div>
-
-      <div v-if="isLoggedIn">
-        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          {{ t('navigation.knowledgeSpaces') }}
-        </div>
-        <div class="space-y-1">
-          <UButton
-            :to="knowledgeSpacePath"
-            variant="ghost"
-            color="neutral"
-            class="w-full justify-start"
-            :class="{
-              'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
-                isKnowledgeSpaceRoute,
-            }"
-          >
-            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 mr-3" />
-            {{ t('navigation.knowledgeSpaces') }}
-          </UButton>
-        </div>
       </div>
 
       <div v-if="showIAMMenu">
@@ -319,11 +299,13 @@
             {{ t('navigation.iamSettings') }}
           </UButton>
         </div>
+      </div>
 
-        <div v-if="canManageIAM" class="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+      <div v-if="showIAMMenu && canManageIAM">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {{ t('navigation.channelConfig') }}
         </div>
-        <div v-if="canManageIAM" class="space-y-1">
+        <div class="space-y-1">
           <UButton
             variant="ghost"
             color="neutral"

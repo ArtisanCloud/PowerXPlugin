@@ -35,14 +35,17 @@ public static class RuntimeRegistrationExtensions
         string module,
         ProviderMode mode,
         Func<IServiceProvider, TService> localFactory,
-        Func<IServiceProvider, TService> delegatedFactory)
+        Func<IServiceProvider, TService> delegatedFactory,
+        ServiceLifetime lifetime = ServiceLifetime.Singleton)
         where TService : class
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(localFactory);
         ArgumentNullException.ThrowIfNull(delegatedFactory);
 
-        services.AddSingleton(sp =>
+        if (lifetime is not (ServiceLifetime.Singleton or ServiceLifetime.Scoped))
+            throw new ArgumentOutOfRangeException(nameof(lifetime));
+        DualModeRuntime<TService> Build(IServiceProvider sp)
         {
             var selected = mode switch
             {
@@ -55,9 +58,10 @@ public static class RuntimeRegistrationExtensions
             };
 
             return new DualModeRuntime<TService>(mode, selected, module);
-        });
-        services.AddSingleton<TService>(sp => sp.GetRequiredService<DualModeRuntime<TService>>().Service);
+        }
+        // EF-backed consumers retain the same bootstrap mode with a request-scoped unit of work.
+        services.Add(new ServiceDescriptor(typeof(DualModeRuntime<TService>), sp => Build(sp), lifetime));
+        services.Add(new ServiceDescriptor(typeof(TService), sp => sp.GetRequiredService<DualModeRuntime<TService>>().Service, lifetime));
         return services;
     }
 }
-

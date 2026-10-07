@@ -520,7 +520,7 @@ onBeforeUnmount(() => {
               d="M15 19l-7-7 7-7"
             ></path>
           </svg>
-          {{ `{{ $t("auth.backToHome") }}` }}
+          {{ "{{ $t(\"auth.backToHome\") }}" }}
         </NuxtLink>
       </div>
 
@@ -535,9 +535,9 @@ onBeforeUnmount(() => {
               PowerX
             </h1>
             <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              {{ `{{ $t("auth.welcomeBack") }}` }}
+              {{ "{{ $t(\"auth.welcomeBack\") }}" }}
             </h2>
-            <p class="text-slate-600 dark:text-slate-400 text-sm">{{ `{{ $t("auth.loginSubtitle") }}` }}</p>
+            <p class="text-slate-600 dark:text-slate-400 text-sm">{{ "{{ $t(\"auth.loginSubtitle\") }}" }}</p>
           </div>
         </template>
 
@@ -554,7 +554,7 @@ onBeforeUnmount(() => {
               ]"
               @click="activeTab = 'password'"
             >
-              {{ `{{ $t("auth.login.tabPassword") }}` }}
+              {{ "{{ $t(\"auth.login.tabPassword\") }}" }}
             </button>
             <button
               v-if="scanModeEnabled"
@@ -563,12 +563,12 @@ onBeforeUnmount(() => {
               :class="activeTab === 'federated' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100'"
               @click="activeTab = 'federated'"
             >
-              {{ `{{ $t("auth.login.tabScan") }}` }}
+              {{ "{{ $t(\"auth.login.tabScan\") }}" }}
             </button>
           </div>
           <div v-if="scanModeEnabled && activeTab === 'federated'" class="mb-5">
             <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              {{ `{{ $t("auth.tenant.label") }}` }}
+              {{ "{{ $t(\"auth.tenant.label\") }}" }}
             </label>
             <UInput
               v-model="tenantForm.identifier"
@@ -588,13 +588,13 @@ onBeforeUnmount(() => {
                 v-if="tenantSearching"
                 class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400"
               >
-                {{ `{{ $t("auth.tenant.searching") }}` }}
+                {{ "{{ $t(\"auth.tenant.searching\") }}" }}
               </div>
               <div
                 v-else-if="tenantCandidates.length === 0"
                 class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400"
               >
-                {{ `{{ $t("auth.tenant.emptyHint") }}` }}
+                {{ "{{ $t(\"auth.tenant.emptyHint\") }}" }}
               </div>
               <button
                 v-for="item in tenantCandidates"
@@ -603,12 +603,12 @@ onBeforeUnmount(() => {
                 class="w-full px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 border-b border-slate-100 dark:border-slate-800 last:border-b-0"
                 @mousedown.prevent="selectTenant(item)"
               >
-                <div class="text-sm text-slate-800 dark:text-slate-100">{{ `{{ item.tenant_name || item.tenant_key }}` }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">{{ `{{ item.tenant_key }}` }}</div>
+                <div class="text-sm text-slate-800 dark:text-slate-100">{{ "{{ item.tenant_name || item.tenant_key }}" }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">{{ "{{ item.tenant_key }}" }}</div>
               </button>
             </div>
             <p v-if="resolvedTenant?.tenant_name" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-              {{ `{{ $t("auth.tenant.resolvedAs", { name: resolvedTenant.tenant_name, key: resolvedTenant.tenant_key }) }}` }}
+              {{ "{{ $t(\"auth.tenant.resolvedAs\", { name: resolvedTenant.tenant_name, key: resolvedTenant.tenant_key }) }}" }}
             </p>
           </div>
 
@@ -645,7 +645,7 @@ onBeforeUnmount(() => {
                 for="identifier"
                 class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3"
               >
-                {{ `{{ $t("auth.identifier") }}` }} <span class="text-red-500">*</span>
+                {{ "{{ $t(\"auth.identifier\") }}" }} <span class="text-red-500">*</span>
               </label>
               <UInput
                 id="identifier"
@@ -665,7 +665,7 @@ onBeforeUnmount(() => {
                 for="password"
                 class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3"
               >
-                {{ `{{ $t("auth.password") }}` }} <span class="text-red-500">*</span>
+                {{ "{{ $t(\"auth.password\") }}" }} <span class="text-red-500">*</span>
               </label>
               <UInput
                 id="password"
@@ -690,7 +690,7 @@ onBeforeUnmount(() => {
                 :to="$localePath('/users/forgot-password')"
                 class="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
               >
-                {{ `{{ $t("auth.login.forgotPassword") }}` }}
+                {{ "{{ $t(\"auth.login.forgotPassword\") }}" }}
               </NuxtLink>
             </div>
 
@@ -704,7 +704,7 @@ onBeforeUnmount(() => {
                 :disabled="isDelegatedMode"
                 color="primary"
               >
-                {{ `{{ loading ? $t("auth.signingIn") : $t("auth.loginButton") }}` }}
+                {{ "{{ loading ? $t(\"auth.signingIn\") : $t(\"auth.loginButton\") }}" }}
               </UButton>
             </div>
           </form>
@@ -726,7 +726,7 @@ onBeforeUnmount(() => {
               />
             </div>
             <p class="text-sm text-slate-600 dark:text-slate-400">
-              {{ `{{ $t("auth.login.scanDesc") }}` }}
+              {{ "{{ $t(\"auth.login.scanDesc\") }}" }}
             </p>
             <UButton
               v-for="item in federatedProviders"
@@ -740,7 +740,7 @@ onBeforeUnmount(() => {
               :disabled="federatedLoading"
               @click="handleFederatedLogin(item.key)"
             >
-              {{ `{{ $t("auth.login.scanWith", { provider: item.label }) }}` }}
+              {{ "{{ $t(\"auth.login.scanWith\", { provider: item.label }) }}" }}
             </UButton>
             <UAlert
               v-if="processingCallback"
@@ -753,12 +753,12 @@ onBeforeUnmount(() => {
           <!-- 注册链接 -->
           <div class="text-center mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
             <p class="text-slate-600 dark:text-slate-400 text-sm">
-              {{ `{{ $t("auth.login.noAccount") }}` }}
+              {{ "{{ $t(\"auth.login.noAccount\") }}" }}
               <NuxtLink
                 :to="$localePath('/users/register')"
                 class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
               >
-                {{ `{{ $t("auth.signUpNow") }}` }}
+                {{ "{{ $t(\"auth.signUpNow\") }}" }}
               </NuxtLink>
             </p>
           </div>

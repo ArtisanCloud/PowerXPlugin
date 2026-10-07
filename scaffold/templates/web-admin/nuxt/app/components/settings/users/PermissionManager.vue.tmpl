@@ -551,10 +551,10 @@ const isFormModulePartiallySelected = (module: string) => {
     <div class="flex justify-between items-center mb-6">
       <div>
         <h2 class="text-xl font-semibold text-gray-800 dark:text-white">
-          {{ `{{ $t("organization.permission.title") }}` }}
+          {{ "{{ $t(\"organization.permission.title\") }}" }}
         </h2>
         <p class="text-sm text-gray-500 mt-1 dark:text-gray-300">
-          {{ `{{ $t("organization.permission.description") }}` }}
+          {{ "{{ $t(\"organization.permission.description\") }}" }}
         </p>
       </div>
       <div class="flex gap-3">
@@ -572,7 +572,7 @@ const isFormModulePartiallySelected = (module: string) => {
           icon="i-heroicons-plus"
           @click="openAddRoleForm"
         >
-          {{ `{{ $t("organization.permission.add") }}` }}
+          {{ "{{ $t(\"organization.permission.add\") }}" }}
         </UButton>
       </div>
     </div>
@@ -583,7 +583,7 @@ const isFormModulePartiallySelected = (module: string) => {
         <div class="bg-white rounded-lg shadow dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
           <div class="p-4 border-b">
             <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-              {{ `{{ $t("organization.permission.roleList") }}` }}
+              {{ "{{ $t(\"organization.permission.roleList\") }}" }}
             </h3>
             <UInput
               v-model="searchQuery"
@@ -608,7 +608,7 @@ const isFormModulePartiallySelected = (module: string) => {
               <div class="flex justify-between items-start">
                 <div>
                   <div class="flex items-center">
-                    <h4 class="font-medium text-gray-900 dark:text-white">{{ `{{ role.name }}` }}</h4>
+                    <h4 class="font-medium text-gray-900 dark:text-white">{{ "{{ role.name }}" }}</h4>
                     <UBadge
                       v-if="role.builtin"
                       color="primary"
@@ -616,20 +616,20 @@ const isFormModulePartiallySelected = (module: string) => {
                       size="sm"
                       class="ml-2"
                     >
-                      {{ `{{ $t("organization.permission.systemRole") }}` }}
+                      {{ "{{ $t(\"organization.permission.systemRole\") }}" }}
                     </UBadge>
                   </div>
-                  <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">{{ `{{ role.code }}` }}</p>
+                  <p class="text-sm text-gray-500 mt-1 dark:text-gray-400">{{ "{{ role.code }}" }}</p>
                   <p class="text-sm text-gray-600 mt-1 dark:text-gray-300">
-                    {{ `{{ role.description }}` }}
+                    {{ "{{ role.description }}" }}
                   </p>
                   <p class="text-xs text-gray-500 mt-2 dark:text-gray-400">
                     <UIcon
                       name="i-heroicons-users"
                       class="w-4 h-4 inline-block mr-1"
                     />
-                    {{ `{{ role.userCount ?? 0 }}` }}
-                    {{ `{{ $t("organization.permission.userCount") }}` }}
+                    {{ "{{ role.userCount ?? 0 }}" }}
+                    {{ "{{ $t(\"organization.permission.userCount\") }}" }}
                   </p>
                 </div>
                 <div class="flex space-x-1">
@@ -659,19 +659,17 @@ const isFormModulePartiallySelected = (module: string) => {
                 class="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4"
               />
               <h3 class="text-lg font-medium text-gray-900 mb-2 dark:text-white">
-                {{ `{{ $t("organization.permission.empty.title") }}` }}
+                {{ "{{ $t(\"organization.permission.empty.title\") }}" }}
               </h3>
               <p class="text-gray-500 mb-4 dark:text-gray-300">
-                {{ `{{ searchQuery
-                    ? $t("organization.permission.empty.noResults")
-                    : $t("organization.permission.empty.create") }}` }}
+                {{ "{{\n                  searchQuery\n                    ? $t(\"organization.permission.empty.noResults\")\n                    : $t(\"organization.permission.empty.create\")\n                }}" }}
               </p>
               <UButton
                 v-if="!searchQuery"
                 color="primary"
                 @click="openAddRoleForm"
               >
-                {{ `{{ $t("organization.permission.add") }}` }}
+                {{ "{{ $t(\"organization.permission.add\") }}" }}
               </UButton>
             </div>
           </div>
@@ -683,11 +681,10 @@ const isFormModulePartiallySelected = (module: string) => {
         <div class="bg-white rounded-lg shadow dark:bg-slate-950/70 dark:border dark:border-slate-800/60">
           <div class="p-4 border-b">
             <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-              {{ `{{ (selectedRole && selectedRole.name) ||
-                $t("organization.permission.roleConfig") }}` }}
+              {{ "{{\n                (selectedRole && selectedRole.name) ||\n                $t(\"organization.permission.roleConfig\")\n              }}" }}
             </h3>
             <p class="text-sm text-gray-500 mt-1 dark:text-gray-300">
-              {{ `{{ $t("organization.permission.configDesc") }}` }}
+              {{ "{{ $t(\"organization.permission.configDesc\") }}" }}
             </p>
           </div>
 
@@ -706,7 +703,7 @@ const isFormModulePartiallySelected = (module: string) => {
                   "
                 />
                 <h4 class="ml-2 font-bold text-gray-900 text-lg dark:text-white">
-                  {{ `{{ module }}` }}
+                  {{ "{{ module }}" }}
                 </h4>
               </div>
 
@@ -719,7 +716,7 @@ const isFormModulePartiallySelected = (module: string) => {
                   <h5
                     class="text-sm font-medium text-gray-600 border-b border-gray-100 pb-1 dark:text-gray-300 dark:border-slate-800/60"
                   >
-                    {{ `{{ getPermissionTypeLabel(type) }}` }}权限
+                    {{ "{{ getPermissionTypeLabel(type) }}" }}权限
                   </h5>
 
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-4">
@@ -738,12 +735,12 @@ const isFormModulePartiallySelected = (module: string) => {
                             class="text-sm font-medium"
                             :class="getPermissionTextColor(perm.type)"
                           >
-                            {{ `{{ getPermissionDisplayName(perm) }}` }}
+                            {{ "{{ getPermissionDisplayName(perm) }}" }}
                           </span>
                         </div>
                         <UTooltip :text="perm.name">
                           <div class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ `{{ perm.description }}` }}
+                            {{ "{{ perm.description }}" }}
                           </div>
                         </UTooltip>
                         <div
@@ -754,15 +751,15 @@ const isFormModulePartiallySelected = (module: string) => {
                             size="xs"
                             :color="getPermissionTypeColor(perm.httpMethod)"
                           >
-                            {{ `{{ perm.httpMethod }}` }}
+                            {{ "{{ perm.httpMethod }}" }}
                           </UBadge>
-                          <code class="text-xs ml-1">{{ `{{ perm.apiEndpoint }}` }}</code>
+                          <code class="text-xs ml-1">{{ "{{\n                            perm.apiEndpoint\n                          }}" }}</code>
                         </div>
                         <div
                           v-if="perm.type === 'data'"
                           class="text-xs text-green-600 mt-1"
                         >
-                          数据范围: {{ `{{ getDataScopeLabel(perm.dataScope) }}` }}
+                          数据范围: {{ "{{ getDataScopeLabel(perm.dataScope) }}" }}
                         </div>
                       </div>
                     </div>
@@ -791,9 +788,7 @@ const isFormModulePartiallySelected = (module: string) => {
       <template #content>
         <div class="py-12 px-24">
           <h3 class="text-lg font-medium text-gray-900 mb-4 dark:text-white">
-            {{ `{{ isEditing
-                ? $t("organization.permission.edit")
-                : $t("organization.permission.add") }}` }}
+            {{ "{{\n              isEditing\n                ? $t(\"organization.permission.edit\")\n                : $t(\"organization.permission.add\")\n            }}" }}
           </h3>
 
           <form @submit.prevent="saveRole">
@@ -865,7 +860,7 @@ const isFormModulePartiallySelected = (module: string) => {
                         "
                       />
                       <h4 class="ml-2 font-semibold text-gray-900 dark:text-white">
-                        {{ `{{ module }}` }}
+                        {{ "{{ module }}" }}
                       </h4>
                     </div>
 
@@ -878,7 +873,7 @@ const isFormModulePartiallySelected = (module: string) => {
                         class="space-y-2"
                       >
                         <h5 class="text-xs font-medium text-gray-600 dark:text-gray-300">
-                          {{ `{{ getPermissionTypeLabel(type) }}` }}
+                          {{ "{{ getPermissionTypeLabel(type) }}" }}
                         </h5>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -899,7 +894,7 @@ const isFormModulePartiallySelected = (module: string) => {
                                   class="text-sm font-medium"
                                   :class="getPermissionTextColor(perm.type)"
                                 >
-                                  {{ `{{ perm.name }}` }}
+                                  {{ "{{ perm.name }}" }}
                                 </span>
                                 <UBadge
                                   v-if="perm.type === 'api'"
@@ -908,20 +903,20 @@ const isFormModulePartiallySelected = (module: string) => {
                                     getPermissionTypeColor(perm.httpMethod)
                                   "
                                 >
-                                  {{ `{{ perm.httpMethod }}` }}
+                                  {{ "{{ perm.httpMethod }}" }}
                                 </UBadge>
                               </div>
                               <div class="text-xs text-gray-500 dark:text-gray-400">
-                                {{ `{{ perm.description }}` }}
+                                {{ "{{ perm.description }}" }}
                                 <template
                                   v-if="perm.type === 'api' && perm.apiEndpoint"
                                 >
-                                  · <code>{{ `{{ perm.apiEndpoint }}` }}</code>
+                                  · <code>{{ "{{ perm.apiEndpoint }}" }}</code>
                                 </template>
                                 <template
                                   v-if="perm.type === 'data' && perm.dataScope"
                                 >
-                                  · {{ `{{ getDataScopeLabel(perm.dataScope) }}` }}
+                                  · {{ "{{ getDataScopeLabel(perm.dataScope) }}" }}
                                 </template>
                               </div>
                             </div>
@@ -942,10 +937,10 @@ const isFormModulePartiallySelected = (module: string) => {
                 variant="outline"
                 @click="showRoleForm = false"
               >
-                {{ `{{ $t("organization.common.cancel") }}` }}
+                {{ "{{ $t(\"organization.common.cancel\") }}" }}
               </UButton>
               <UButton type="submit" color="primary">
-                {{ `{{ $t("organization.common.save") }}` }}
+                {{ "{{ $t(\"organization.common.save\") }}" }}
               </UButton>
             </div>
           </form>

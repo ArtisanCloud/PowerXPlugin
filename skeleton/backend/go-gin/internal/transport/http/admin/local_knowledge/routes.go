@@ -1608,7 +1608,9 @@ func (h *handler) extractLocalKnowledgeGraph(ctx context.Context, content string
 		return nil, fmt.Errorf("LOCAL_KG_MODEL_NOT_CONFIGURED")
 	}
 	prompt := "Extract a compact knowledge graph from this document. Return JSON only in exactly this shape: {\"entities\":[{\"name\":\"...\",\"type\":\"entity\",\"chunk_ordinals\":[0]}],\"relations\":[{\"subject\":\"...\",\"predicate\":\"...\",\"object\":\"...\"}]}. Use only entities stated by the document. Chunk ordinals may be 0 when the document is not yet chunked.\n\nDocument:\n" + content
-	result, err := h.ai.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}})
+	result, err := h.ai.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{
+		{Role: "user", Type: "text", Content: prompt},
+	}})
 	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
 		return nil, fmt.Errorf("LOCAL_KG_EXTRACTION_FAILED")
 	}

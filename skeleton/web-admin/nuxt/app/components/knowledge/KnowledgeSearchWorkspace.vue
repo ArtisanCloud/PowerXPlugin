@@ -1,0 +1,33 @@
+<template>
+  <main class="mx-auto w-full max-w-5xl space-y-6 px-5 py-6 lg:px-8">
+    <header class="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-[#172536]">
+      <div class="flex items-center justify-between gap-4"><h1 class="text-2xl font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.ui.playground') }}</h1><UButton color="neutral" variant="outline" :to="workspace.basePath">{{ t('knowledgeSpaces.detail.backToOverview') }}</UButton></div>
+      <p class="mt-2 text-gray-600 dark:text-[#d6e2ff]">{{ space?.name }}</p>
+    </header>
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-[#0f192a]">
+      <UAlert v-if="error" color="error" class="mb-5" :description="error" />
+      <form class="space-y-5" @submit.prevent="search">
+        <UFormField :label="t('knowledgeLab.copy.text154')" required><UTextarea v-model="query" class="w-full" :disabled="loading" /></UFormField>
+        <UFormField :label="t('knowledgeLab.copy.text153')"><UInput v-model.number="limit" type="number" min="1" max="100" /></UFormField>
+        <UButton type="submit" :loading="loading" :disabled="!space || !query.trim() || limit < 1 || limit > 100">{{ t('knowledgeLab.copy.text156') }}</UButton>
+      </form>
+    </section>
+    <section v-if="result" class="space-y-3">
+      <article v-for="(chunk, index) in result.chunks" :key="chunk.chunk_id || index" class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-[#0f192a]"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ chunk.citation?.title }}</h2><p class="mt-3 whitespace-pre-wrap text-gray-700 dark:text-[#d6e2ff]">{{ chunk.text }}</p></article>
+      <p v-if="!result.chunks?.length" class="text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeLab.copy.text133') }}</p>
+    </section>
+  </main>
+</template>
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { useKnowledgeWorkspace } from '~/composables/api/useKnowledgeWorkspace'
+import type { LocalKnowledgeSpace } from '~/composables/api/useLocalKnowledge'
+const workspace = useKnowledgeWorkspace()
+const { t } = useI18n()
+const route = useRoute()
+const space = ref<LocalKnowledgeSpace>()
+const query = ref(''); const limit = ref(5); const loading = ref(false); const error = ref(''); const result = ref<any>(null)
+function message(e: any) { const body = e?.data || e?.response?._data; return t('knowledgeLab.workspace.requestFailed', { code: body?.code || 'KNOWLEDGE_UPSTREAM_DEPENDENCY' }) + (body?.trace_id ? ` (${body.trace_id})` : '') }
+onMounted(async () => { try { const out = await workspace.api.spaces(); space.value = out.items.find(item => item.uuid === String(route.params.uuid)); if (!space.value) error.value = t('knowledgeSpaces.detail.notFound') } catch (e) { error.value = message(e) } })
+async function search() { if (!space.value || loading.value || !query.value.trim() || limit.value < 1 || limit.value > 100) return; loading.value = true; error.value = ''; result.value = null; try { result.value = await workspace.search(space.value.uuid, query.value.trim(), limit.value) } catch (e) { error.value = message(e) } finally { loading.value = false } }
+</script>

@@ -22,6 +22,11 @@ public sealed class LocalEventFabricAdapter : IEventRuntime
         {
             await _dispatcher.RegisterHandlerAsync(topic, async (evt, token) =>
             {
+                // A shared bridge may carry the same topic for multiple tenants.
+                // Route before serializing so another tenant's payload never
+                // reaches this subscription or its consumer.
+                if (!string.Equals(evt.Meta.TenantUUID, subscription.TenantUuid, StringComparison.Ordinal))
+                    return;
                 var payload = JsonSerializer.SerializeToUtf8Bytes(evt.Payload);
                 var delivery = new EventFabricDelivery(
                     Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), evt.Topic,

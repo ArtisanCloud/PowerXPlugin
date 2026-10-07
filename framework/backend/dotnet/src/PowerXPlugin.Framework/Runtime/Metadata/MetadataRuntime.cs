@@ -28,7 +28,9 @@ public sealed record CreateTaxonomyRequest(string Namespace, string Module, IRea
 public sealed record CreateTaxonomyNodeRequest(string TaxonomyUuid, string? ParentUuid, string Code, IReadOnlyDictionary<string, string> LabelI18n, IReadOnlyDictionary<string, string>? DescriptionI18n = null, int SortOrder = 0);
 public sealed record UpdateTaxonomyNodeRequest(string NodeUuid, long Version, IReadOnlyDictionary<string, string>? LabelI18n = null, IReadOnlyDictionary<string, string>? DescriptionI18n = null, int? SortOrder = null, string? Status = null);
 public sealed record CreateTagRequest(string Namespace, string ResourceType, string Code, IReadOnlyDictionary<string, string> LabelI18n, IReadOnlyDictionary<string, string>? DescriptionI18n = null, string Color = "");
+public sealed record UpdateTagRequest(string TagUuid, IReadOnlyDictionary<string, string>? LabelI18n = null, IReadOnlyDictionary<string, string>? DescriptionI18n = null, string? Color = null, string? Status = null);
 public sealed record CreateTagBindingRequest(string TagUuid, string ResourceType, string ResourceUuid);
+public sealed record ReplaceTagBindingsRequest(string ResourceType, string ResourceUuid, IReadOnlyList<string> TagUuids);
 public sealed record CreateResourceTypeRequest(string ResourceType, string Module, IReadOnlyDictionary<string, string> NameI18n, IReadOnlyDictionary<string, string>? DescriptionI18n = null, string ValidatorKey = "", bool BindingEnabled = false);
 public sealed record UpdateResourceTypeRequest(string ResourceTypeUuid, IReadOnlyDictionary<string, string>? NameI18n = null, IReadOnlyDictionary<string, string>? DescriptionI18n = null, string? ValidatorKey = null, bool? BindingEnabled = null, string? Status = null);
 
@@ -48,8 +50,11 @@ public interface IMetadataService
     Task<TaxonomyNode> UpdateTaxonomyNodeAsync(MetadataScope scope, UpdateTaxonomyNodeRequest request, CancellationToken ct = default);
     Task<MetadataPage<Tag>> ListTagsAsync(MetadataScope scope, MetadataListRequest request, string resourceType = "", string nameSpace = "", CancellationToken ct = default);
     Task<Tag> CreateTagAsync(MetadataScope scope, CreateTagRequest request, CancellationToken ct = default);
+    Task<Tag> UpdateTagAsync(MetadataScope scope, UpdateTagRequest request, CancellationToken ct = default);
     Task<TagBinding> CreateTagBindingAsync(MetadataScope scope, CreateTagBindingRequest request, CancellationToken ct = default);
     Task DeleteTagBindingAsync(MetadataScope scope, string bindingUuid, CancellationToken ct = default);
+    Task<IReadOnlyList<TagBinding>> ListTagBindingsAsync(MetadataScope scope, string resourceType, string resourceUuid, CancellationToken ct = default);
+    Task<IReadOnlyList<TagBinding>> ReplaceTagBindingsAsync(MetadataScope scope, ReplaceTagBindingsRequest request, CancellationToken ct = default);
     Task<MetadataPage<ResourceType>> ListResourceTypesAsync(MetadataScope scope, MetadataListRequest request, CancellationToken ct = default);
     Task<ResourceType> CreateResourceTypeAsync(MetadataScope scope, CreateResourceTypeRequest request, CancellationToken ct = default);
     Task<ResourceType> UpdateResourceTypeAsync(MetadataScope scope, UpdateResourceTypeRequest request, CancellationToken ct = default);
@@ -76,8 +81,11 @@ public sealed class LocalMetadataAdapter(ILocalMetadataStore store) : IMetadataS
     public Task<TaxonomyNode> UpdateTaxonomyNodeAsync(MetadataScope s, UpdateTaxonomyNodeRequest r, CancellationToken ct = default) { Scope(s); Uuid(r.NodeUuid); if (r.Version < 1) throw new MetadataException(MetadataErrors.InvalidArgument); return _store.UpdateTaxonomyNodeAsync(s, r, ct); }
     public Task<MetadataPage<Tag>> ListTagsAsync(MetadataScope s, MetadataListRequest r, string t = "", string n = "", CancellationToken ct = default) { Scope(s); return _store.ListTagsAsync(s, r, t, n, ct); }
     public Task<Tag> CreateTagAsync(MetadataScope s, CreateTagRequest r, CancellationToken ct = default) { Scope(s); Required(r.Namespace); Required(r.ResourceType); Required(r.Code); return _store.CreateTagAsync(s, r, ct); }
+    public Task<Tag> UpdateTagAsync(MetadataScope s, UpdateTagRequest r, CancellationToken ct = default) { Scope(s); Uuid(r.TagUuid); return _store.UpdateTagAsync(s, r, ct); }
     public Task<TagBinding> CreateTagBindingAsync(MetadataScope s, CreateTagBindingRequest r, CancellationToken ct = default) { Scope(s); Uuid(r.TagUuid); Uuid(r.ResourceUuid); Required(r.ResourceType); return _store.CreateTagBindingAsync(s, r, ct); }
     public Task DeleteTagBindingAsync(MetadataScope s, string id, CancellationToken ct = default) { Scope(s); Uuid(id); return _store.DeleteTagBindingAsync(s, id, ct); }
+    public Task<IReadOnlyList<TagBinding>> ListTagBindingsAsync(MetadataScope s, string type, string id, CancellationToken ct = default) { Scope(s); Required(type); Uuid(id); return _store.ListTagBindingsAsync(s, type, id, ct); }
+    public Task<IReadOnlyList<TagBinding>> ReplaceTagBindingsAsync(MetadataScope s, ReplaceTagBindingsRequest r, CancellationToken ct = default) { Scope(s); Required(r.ResourceType); Uuid(r.ResourceUuid); foreach (var id in r.TagUuids) Uuid(id); return _store.ReplaceTagBindingsAsync(s, r, ct); }
     public Task<MetadataPage<ResourceType>> ListResourceTypesAsync(MetadataScope s, MetadataListRequest r, CancellationToken ct = default) { Scope(s); return _store.ListResourceTypesAsync(s, r, ct); }
     public Task<ResourceType> CreateResourceTypeAsync(MetadataScope s, CreateResourceTypeRequest r, CancellationToken ct = default) { Scope(s); Required(r.ResourceType); Required(r.Module); return _store.CreateResourceTypeAsync(s, r, ct); }
     public Task<ResourceType> UpdateResourceTypeAsync(MetadataScope s, UpdateResourceTypeRequest r, CancellationToken ct = default) { Scope(s); Uuid(r.ResourceTypeUuid); return _store.UpdateResourceTypeAsync(s, r, ct); }
@@ -103,14 +111,56 @@ public sealed class PowerXMetadataClient(string baseUrl, string tenantUuid, ISer
     public Task<TaxonomyNode> UpdateTaxonomyNodeAsync(MetadataScope s, UpdateTaxonomyNodeRequest r, CancellationToken ct = default) => Send<TaxonomyNode>(s, HttpMethod.Patch, Path("/api/v1/tenant/metadata/taxonomy-nodes", r.NodeUuid), new { label_i18n = r.LabelI18n, description_i18n = r.DescriptionI18n, sort_order = r.SortOrder, status = r.Status, version = r.Version }, ct);
     public Task<MetadataPage<Tag>> ListTagsAsync(MetadataScope s, MetadataListRequest r, string type = "", string ns = "", CancellationToken ct = default) => Page<Tag>(s, HttpMethod.Get, "/api/v1/tenant/metadata/tags" + Query(r, ("resource_type", type), ("namespace", ns)), null, ct);
     public Task<Tag> CreateTagAsync(MetadataScope s, CreateTagRequest r, CancellationToken ct = default) => Send<Tag>(s, HttpMethod.Post, "/api/v1/tenant/metadata/tags", new { @namespace = r.Namespace, resource_type = r.ResourceType, code = r.Code, color = r.Color, label_i18n = r.LabelI18n, description_i18n = r.DescriptionI18n }, ct);
+    public Task<Tag> UpdateTagAsync(MetadataScope s, UpdateTagRequest r, CancellationToken ct = default) => Send<Tag>(s, HttpMethod.Patch, Path("/api/v1/tenant/metadata/tags", r.TagUuid), new { label_i18n = r.LabelI18n, description_i18n = r.DescriptionI18n, color = r.Color, status = r.Status }, ct);
     public Task<TagBinding> CreateTagBindingAsync(MetadataScope s, CreateTagBindingRequest r, CancellationToken ct = default) => Send<TagBinding>(s, HttpMethod.Post, "/api/v1/tenant/metadata/tag-bindings", new { tag_uuid = r.TagUuid, resource_type = r.ResourceType, resource_uuid = r.ResourceUuid }, ct);
     public async Task DeleteTagBindingAsync(MetadataScope s, string id, CancellationToken ct = default) { Check(s); await Send<object>(s, HttpMethod.Delete, Path("/api/v1/tenant/metadata/tag-bindings", id), null, ct, allowEmpty: true); }
+    public async Task<IReadOnlyList<TagBinding>> ListTagBindingsAsync(MetadataScope s, string type, string id, CancellationToken ct = default) => (await Send<BindingPage>(s, HttpMethod.Get, "/api/v1/tenant/metadata/tag-bindings?resource_type=" + Uri.EscapeDataString(type) + "&resource_uuid=" + Uri.EscapeDataString(id), null, ct)).Items ?? throw new MetadataException(MetadataErrors.InvalidResponse);
+    public async Task<IReadOnlyList<TagBinding>> ReplaceTagBindingsAsync(MetadataScope s, ReplaceTagBindingsRequest r, CancellationToken ct = default) => (await Send<BindingPage>(s, HttpMethod.Put, "/api/v1/tenant/metadata/tag-bindings:replace", new { resource_type = r.ResourceType, resource_uuid = r.ResourceUuid, tag_uuids = r.TagUuids }, ct)).Items ?? throw new MetadataException(MetadataErrors.InvalidResponse);
     public Task<MetadataPage<ResourceType>> ListResourceTypesAsync(MetadataScope s, MetadataListRequest r, CancellationToken ct = default) => Page<ResourceType>(s, HttpMethod.Get, "/api/v1/tenant/metadata/resource-types" + Query(r), null, ct);
     public Task<ResourceType> CreateResourceTypeAsync(MetadataScope s, CreateResourceTypeRequest r, CancellationToken ct = default) => Send<ResourceType>(s, HttpMethod.Post, "/api/v1/tenant/metadata/resource-types", new { resource_type = r.ResourceType, module = r.Module, name_i18n = r.NameI18n, description_i18n = r.DescriptionI18n, validator_key = r.ValidatorKey, binding_enabled = r.BindingEnabled }, ct);
     public Task<ResourceType> UpdateResourceTypeAsync(MetadataScope s, UpdateResourceTypeRequest r, CancellationToken ct = default) => Send<ResourceType>(s, HttpMethod.Patch, Path("/api/v1/tenant/metadata/resource-types", r.ResourceTypeUuid), new { name_i18n = r.NameI18n, description_i18n = r.DescriptionI18n, validator_key = r.ValidatorKey, binding_enabled = r.BindingEnabled, status = r.Status }, ct);
-    private async Task<MetadataPage<T>> Page<T>(MetadataScope s, HttpMethod m, string path, object? body, CancellationToken ct) { var x = await Send<PagePayload<T>>(s, m, path, body, ct); return new(x.Items ?? [], x.Pagination?.Total ?? 0, x.Pagination?.Page ?? 1, x.Pagination?.PageSize ?? 0); }
-    private async Task<T> Send<T>(MetadataScope s, HttpMethod m, string path, object? body, CancellationToken ct, bool allowEmpty = false) { Check(s); var c = (await _credentials.GetCredentialAsync(ct)).Validate(); using var request = new HttpRequestMessage(m, _base + path); request.Headers.Authorization = new AuthenticationHeaderValue(c.NormalizedAuthScheme, c.Value); if (body is not null) request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json"); try { using var response = await _http.SendAsync(request, ct); var raw = await response.Content.ReadAsStringAsync(ct); if (!response.IsSuccessStatusCode) throw new MetadataException(response.StatusCode switch { HttpStatusCode.Unauthorized => MetadataErrors.Unauthorized, HttpStatusCode.Forbidden => MetadataErrors.Forbidden, HttpStatusCode.NotFound => MetadataErrors.NotFound, HttpStatusCode.Conflict => MetadataErrors.Conflict, HttpStatusCode.BadRequest => MetadataErrors.InvalidArgument, _ => MetadataErrors.Upstream }); if (allowEmpty && string.IsNullOrWhiteSpace(raw)) return default!; using var json = JsonDocument.Parse(raw); if (!json.RootElement.TryGetProperty("data", out var data)) throw new MetadataException(MetadataErrors.InvalidResponse); return JsonSerializer.Deserialize<T>(data.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? throw new MetadataException(MetadataErrors.InvalidResponse); } catch (MetadataException) { throw; } catch (HttpRequestException e) { throw new MetadataException(MetadataErrors.Upstream, e); } catch (JsonException e) { throw new MetadataException(MetadataErrors.InvalidResponse, e); } }
+    private async Task<MetadataPage<T>> Page<T>(MetadataScope s, HttpMethod m, string path, object? body, CancellationToken ct) { var x = await Send<PagePayload<T>>(s, m, path, body, ct); if (x.Items is null || x.Pagination is null || x.Pagination.Page < 1 || x.Pagination.PageSize < 1 || x.Pagination.Total < x.Items.Count) throw new MetadataException(MetadataErrors.InvalidResponse); return new(x.Items, x.Pagination.Total, x.Pagination.Page, x.Pagination.PageSize); }
+    private static readonly JsonSerializerOptions WireJson = new(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+    private async Task<T> Send<T>(MetadataScope s, HttpMethod m, string path, object? body, CancellationToken ct, bool allowEmpty = false)
+    {
+        Check(s);
+        var c = (await _credentials.GetCredentialAsync(ct)).Validate();
+        using var request = new HttpRequestMessage(m, _base + path);
+        request.Headers.Authorization = new AuthenticationHeaderValue(c.NormalizedAuthScheme, c.Value);
+        if (body is not null) request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        try
+        {
+            using var response = await _http.SendAsync(request, ct);
+            var raw = await response.Content.ReadAsStringAsync(ct);
+            if (!response.IsSuccessStatusCode) throw new MetadataException(response.StatusCode switch { HttpStatusCode.Unauthorized => MetadataErrors.Unauthorized, HttpStatusCode.Forbidden => MetadataErrors.Forbidden, HttpStatusCode.NotFound => MetadataErrors.NotFound, HttpStatusCode.Conflict => MetadataErrors.Conflict, HttpStatusCode.BadRequest => MetadataErrors.InvalidArgument, _ => MetadataErrors.Upstream });
+            if (allowEmpty && string.IsNullOrWhiteSpace(raw)) return default!;
+            var root = System.Text.Json.Nodes.JsonNode.Parse(raw);
+            var payload = root?["data"]?["payload"] ?? throw new MetadataException(MetadataErrors.InvalidResponse);
+            if (allowEmpty) return default!;
+            if (payload is System.Text.Json.Nodes.JsonObject obj)
+            {
+                if (obj["items"] is System.Text.Json.Nodes.JsonArray items)
+                    foreach (var item in items) NormalizeObject(item);
+                else NormalizeObject(obj);
+            }
+            return payload.Deserialize<T>(WireJson) ?? throw new MetadataException(MetadataErrors.InvalidResponse);
+        }
+        catch (MetadataException) { throw; }
+        catch (HttpRequestException e) { throw new MetadataException(MetadataErrors.Upstream, e); }
+        catch (OperationCanceledException e) when (!ct.IsCancellationRequested) { throw new MetadataException(MetadataErrors.Upstream, e); }
+        catch (JsonException e) { throw new MetadataException(MetadataErrors.InvalidResponse, e); }
+    }
+    private static void NormalizeObject(System.Text.Json.Nodes.JsonNode? node)
+    {
+        if (node is not System.Text.Json.Nodes.JsonObject obj) throw new MetadataException(MetadataErrors.InvalidResponse);
+        var id = (obj["binding_uuid"] ?? obj["uuid"])?.GetValue<string>();
+        if (!Guid.TryParse(id, out var uuid) || uuid == Guid.Empty) throw new MetadataException(MetadataErrors.InvalidResponse);
+        obj["display"] = new System.Text.Json.Nodes.JsonObject { ["display_name"] = obj["display_name"]?.DeepClone(), ["display_description"] = obj["display_description"]?.DeepClone() };
+        if (obj["resource_type"] is not null && obj["code"] is null && obj["tag_uuid"] is null) obj["key"] = obj["resource_type"]!.DeepClone();
+        if (obj["tag"] is not null) NormalizeObject(obj["tag"]);
+    }
     private sealed class PagePayload<T> { public List<T>? Items { get; init; } public PaginationPayload? Pagination { get; init; } }
+    private sealed class BindingPage { public List<TagBinding>? Items { get; init; } }
     private sealed class PaginationPayload { public long Total { get; init; } public int Page { get; init; } [JsonPropertyName("page_size")] public int PageSize { get; init; } }
 }
 public static class MetadataRuntimeExtensions { public static IServiceCollection AddPowerXMetadataRuntime(this IServiceCollection s, ProviderMode m, Func<IServiceProvider, IMetadataService> l, Func<IServiceProvider, IMetadataService> d) => s.AddPowerXRuntime("metadata", m, l, d); }

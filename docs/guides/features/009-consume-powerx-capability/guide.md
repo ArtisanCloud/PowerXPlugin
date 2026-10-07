@@ -25,6 +25,7 @@
 | 文档 | 适用角色 | 独立验收口径 |
 |---|---|---|
 | [local adapter 实施步骤](usecase-local-adapter.md) | 插件后端开发 | 接口编译通过、真实 local 数据与隔离测试通过、不调用 Core |
+| [本地智能体与 Skill 管理](usecase-local-agent-skill.md) | Skeleton 开发与 QA | 本地定义持久化、启停、Skill 关联与单次调试；迁移和验收边界 |
 | [Skeleton 本地 AI／Agent](usecase-skeleton-local-ai-agent.md) | Skeleton 开发与 QA | 本地模型配置、会话执行／取消与租户隔离；明确当前驱动和未实现范围 |
 | [Skeleton 本地能力目录／集成网关](usecase-skeleton-local-capability.md) | Skeleton 开发与 QA | 模板 UUID 迁移、声明能力执行、幂等及租户隔离；不模拟 Core grant |
 | [delegated 装配与安装验收](usecase-delegated-runtime.md) | 插件后端、部署与 QA | 可信 STS、最小 grant、真实成功/拒绝/撤权，且不访问 local 表 |

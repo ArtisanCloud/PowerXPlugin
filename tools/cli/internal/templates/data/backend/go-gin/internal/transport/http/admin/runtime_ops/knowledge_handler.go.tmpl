@@ -46,11 +46,12 @@ const (
 var localVectorTablePattern = regexp.MustCompile(`^local_knowledge_vectors_v1_[1-9][0-9]*$`)
 
 type KnowledgeHandler struct {
-	deps              *app.Deps
-	labOnly           bool
-	providerOnce      sync.Once
-	knowledgeProvider fwknowledge.KnowledgeProvider
-	providerErr       error
+	deps                *app.Deps
+	labOnly             bool
+	providerOnce        sync.Once
+	knowledgeProvider   fwknowledge.KnowledgeProvider
+	providerErr         error
+	departmentDirectory knowledgeLabDepartmentDirectory
 }
 
 type knowledgeSearchRequest struct {
@@ -330,14 +331,26 @@ func (h *KnowledgeHandler) Catalog(c *gin.Context) {
 	}
 	catalog, err := provider.Catalog(c.Request.Context())
 	if err != nil {
-		status := fwknowledge.HTTPStatusForCode(fwknowledge.CodeOf(err))
-		c.JSON(status, gin.H{"success": false, "error": err.Error(), "code": fwknowledge.CodeOf(err)})
+		if h.labOnly {
+			writeLabKnowledgeError(c, err)
+			return
+		}
+		status := fwknowledge.HTTPStatus(err)
+		message := err.Error()
+		if h.labOnly && fwknowledge.CodeOf(err) == fwknowledge.CodeUnsupportedCapability {
+			message = "knowledgeLab.catalogNotExposed"
+		}
+		c.JSON(status, gin.H{"success": false, "error": message, "code": fwknowledge.CodeOf(err)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": catalog})
 }
 
 func (h *KnowledgeHandler) CreateSpace(c *gin.Context) {
+	if h.labOnly {
+		h.LabCreateSpace(c)
+		return
+	}
 	var req knowledgeCreateSpaceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid knowledge space create request"})
@@ -1035,11 +1048,13 @@ func (h *KnowledgeHandler) searchPersistedLocal(c *gin.Context, req knowledgeSea
 		}
 		generated, generateErr := h.deps.LocalAI.LLMInvoke(c.Request.Context(), dto.LLMInvokeInput{
 			ModelKey: keys[0],
-			Inputs: []dto.ContentItem{{
-				Role:    "user",
-				Type:    "text",
-				Content: prompt,
-			}},
+			Inputs: []dto.ContentItem{
+				{
+					Role:    "user",
+					Type:    "text",
+					Content: prompt,
+				},
+			},
 		})
 		if generateErr != nil || generated == nil || strings.TrimSpace(generated.Text) == "" {
 			return nil, true, fmt.Errorf("LOCAL_QUERY_TRANSFORM_FAILED")
@@ -1387,7 +1402,9 @@ func (h *KnowledgeHandler) localLLMRerank(ctx context.Context, query string, can
 		prompt += "\n\nDomain lexicon: " + strings.Join(lexicon, ", ") + "\nUse the lexicon only to expand the query semantics before ranking."
 	}
 	prompt += "\n\nCandidates: " + string(rawCandidates)
-	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}})
+	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{
+		{Role: "user", Type: "text", Content: prompt},
+	}})
 	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
 		return nil, fmt.Errorf("LOCAL_RERANK_FAILED")
 	}
@@ -1473,7 +1490,9 @@ func (h *KnowledgeHandler) localEvidenceReview(ctx context.Context, query string
 		return localEvidenceReviewResult{}, err
 	}
 	prompt := "Check whether the candidate evidence supports the query. Return JSON only in exactly this shape: {\"sufficient\":true,\"approved_ids\":[\"candidate uuid\"],\"followup_query\":\"\"}. approved_ids must contain only supported candidate ids. If insufficient, set sufficient=false and provide a concise followup_query.\n\nQuery: " + query + "\n\nCandidates: " + string(rawCandidates)
-	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}})
+	result, err := h.deps.LocalAI.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: keys[0], Inputs: []dto.ContentItem{
+		{Role: "user", Type: "text", Content: prompt},
+	}})
 	if err != nil || result == nil || strings.TrimSpace(result.Text) == "" {
 		return localEvidenceReviewResult{}, fmt.Errorf("LOCAL_EVIDENCE_CHECK_FAILED")
 	}

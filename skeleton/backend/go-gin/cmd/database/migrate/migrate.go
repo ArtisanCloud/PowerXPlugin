@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	localAgentModel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/localagent"
 	"log"
 	"strings"
 
@@ -60,6 +61,8 @@ var businessTables = []interface{}{
 	&models.LocalKnowledgeReleaseBatch{},
 	&agentRegistryModel.PluginSkill{},
 	&agentRegistryModel.PluginAgent{},
+	&localAgentModel.Agent{},
+	&localAgentModel.Skill{},
 	&templateModel.Template{},
 	&marketplaceModel.Listing{},
 	&marketplaceModel.ListingAsset{},

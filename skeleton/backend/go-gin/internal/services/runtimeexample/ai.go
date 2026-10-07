@@ -221,7 +221,9 @@ func (s *LocalAI) testConnection(ctx context.Context, m config.LocalAIModel) err
 
 // QuickCall verifies the complete chat path using the selected model.
 func (s *LocalAI) QuickCall(ctx context.Context, key string) (string, error) {
-	out, err := s.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: key, Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: "Reply with OK."}}})
+	out, err := s.LLMInvoke(ctx, dto.LLMInvokeInput{ModelKey: key, Inputs: []dto.ContentItem{
+		{Role: "user", Type: "text", Content: "Reply with OK."},
+	}})
 	if err != nil {
 		return "", err
 	}
@@ -239,7 +241,9 @@ func (s *LocalAI) quickCallWithProfile(ctx context.Context, profile config.Local
 	if err != nil {
 		return "", err
 	}
-	body, err := chatBody(m, dto.LLMInvokeInput{Inputs: []dto.ContentItem{{Role: "user", Type: "text", Content: prompt}}}, false, false)
+	body, err := chatBody(m, dto.LLMInvokeInput{Inputs: []dto.ContentItem{
+		{Role: "user", Type: "text", Content: prompt},
+	}}, false, false)
 	if err != nil {
 		return "", err
 	}

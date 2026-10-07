@@ -218,8 +218,52 @@ Factory 和定向测试，不存在 raw HTTP consumer。
 
 ## 9. 建议下一步
 
+2026-10-04 Go Skeleton 三个调试入口对齐：新增 .NET `HostContractProbe`，仅解析
+启动时已选择的 typed runtime，返回真实装配状态并保持 `connectivity_verified=false`。
+Capability Registry 客户端按 Core 正式 snake_case 编解码，新增安全目录发现接口，
+与有效 grant、正式协议合同分开；拒绝非法/缺失响应，不返回部分成功。新增 typed
+`PowerXWSBusClient`，服务凭证调用 Core grant → publish 和通知测试合同，无本地回退，
+不伪造宿主 echo。CRM 消费入口、WS 验证和 local Scheduler → Event Fabric → WS
+诊断事件桥接已落地；未绑定的九个业务模块及生产通知 outbox 仍未完成。
+真实 Core 安全目录/正式合同只读检查成功；三个页面运行态验收仍待用户重启 CRM。
+
 逐项核对第 6 节的强制交付物，并更新 Core/Framework 覆盖台账。Agent Session 的
-N402 transport 与 SSE 恢复已完成，但 Agent Lifecycle 的 .NET delegated typed client
-仍缺失，不能将 18 项 Agent 操作整体标为 `ready_for_integration`。CRM 按第 7 节
+N402 transport 与 SSE 恢复、Agent Lifecycle 六项 .NET delegated typed client 已完成
+定向测试；生产 local store、实际插件消费和 Core 安装态 grant/撤权及跨租户联调仍缺，
+18 项 Agent 操作整体保持 `partial`。CRM 按第 7 节
 验收已消费的 Media、IAM、Scheduler 和 Event Fabric；Core 安装、grant、撤权和
 跨租户的真实结果单独记录，未执行时保持 `ready_for_integration` 或 `partial`。
+
+2026-10-02：Event Fabric .NET delegated subscriber 已增加定向 gRPC 客户端合同测试，
+覆盖 Subscribe、Ack/Nack、回调失败、403/401/依赖错误和发包前 tenant 检查；CRM 的
+正常 EOF 重连加入固定间隔。Core 已安装环境中的 grant、撤权和跨租户传输仍须单独验收。
+
+同日补齐 local 租户边界：`LocalEventFabricAdapter` 在序列化前按元数据 tenant
+筛选订阅；CRM local 消费改用 `IEventRuntime`，并核对 payload tenant 与启动时绑定的
+可信租户，delegated 消费者也不再随配置变化重绑 tenant。`LocalScheduler` 按 tenant
+与 job_id 寻址，单任务读取/更新/暂停/恢复/触发要求有效 tenant UUID；不同租户的
+同名任务相互独立。对应测试覆盖跨租户零业务写入、订阅隔离、同名任务和非法租户。
+
+2026-10-02 IAM 消费者收尾：CRM 负责人、审计及合同成员消费已使用 Registry，
+保留内部数字键并显式关联 UUID；delegated 映射由部署文件提供，测试以已释放的
+DbContext 证明不读 local IAM。`.NET PowerXIamClient.ListMembers` 已按 Core 正式
+`items/pagination` 遍历全部分页，校验页号、总数、条数和重复成员；后续页 403 或
+非法分页明确失败，不返回部分目录。CRM 本机历史 UUID 经备份后独立修复 9 行，
+修复后六类缺失/非法/重复均为 0。完整测试 Framework 92/92、CRM 95/95。
+操作记录见 CRM `docs/plan/08-system/mechanisms/iam-framework-consumers.md`；
+真实 Core 安装态 Scheduler/Event Fabric、IAM grant/撤权和页面验收仍未完成。
+
+2026-10-03 当前 CRM 交付目标确认为 local + POWERX_PROXY=1；Scheduler/IAM/Event
+Fabric 按 provider mode 保持 local，安装态验收后置。Local Scheduler runner 增加
+每任务失败隔离与稳定 due-time 幂等重试；once 成功后 completed，once 时间表达式
+规范为 UTC，trigger_source 使用实际 schedule_type。Framework runner 测试覆盖
+一次性执行、时区、失败后其他租户继续、稳定重试键和取消；CRM 联接测试覆盖
+local runner → Event Fabric → 回收服务，两个 delegated factory 零调用。模拟 Core
+RPC 的 CRM/Framework 联接测试还覆盖 Ack 丢失重连与重复事件；不算真实安装态证据。
+
+2026-10-03 Local Scheduler 持久化：新增 `ILocalSchedulerStore`，以 detached Job 快照
+和 revision CAS 保存任务；runner 派发后持久化完成状态，失败保留到期时间和重试键。
+`AddPowerXScheduler` 可显式注入 local store factory，CRM 使用 PostgreSQL store；
+默认无 factory 的内存 store 保留开发/测试用途，不计生产持久化。CRM 重建 DI 和
+真实 PostgreSQL 临时 schema 测试覆盖恢复、暂停/完成、payload、重复创建和 CAS。
+未运行用户服务重启或业务 schema 迁移，多副本调度租约后置。

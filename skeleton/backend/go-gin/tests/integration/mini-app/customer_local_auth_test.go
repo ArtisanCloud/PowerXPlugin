@@ -31,9 +31,10 @@ func TestMiniAppLocalAuth_RegisterLoginAndCallProtected(t *testing.T) {
 
 	// register
 	regBody := map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "demo@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "demo@example.com",
+		"display_name": "demo@example.com",
+		"password":     "P@ssword1!",
 	}
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, regBody, nil)
 	if rec.Code != http.StatusOK {
@@ -87,9 +88,10 @@ func TestMiniAppLocalAuth_LoginWithoutTenantAutoSelect(t *testing.T) {
 
 	// register under a single tenant
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "single-tenant@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "single-tenant@example.com",
+		"display_name": "single-tenant@example.com",
+		"password":     "P@ssword1!",
 	}, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("register expected 200, got %d body=%s", rec.Code, rec.Body.String())
@@ -132,9 +134,10 @@ func TestMiniAppLocalAuth_LoginWithoutTenantMultipleTenantsReturns409(t *testing
 	// same login registered in 2 tenants
 	for _, tenant := range []string{tenantA, tenantB} {
 		rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenant, map[string]any{
-			"tenant_uuid": tenant,
-			"email":       "multi-tenant@example.com",
-			"password":    "P@ssword1!",
+			"tenant_uuid":  tenant,
+			"email":        "multi-tenant@example.com",
+			"display_name": "multi-tenant@example.com",
+			"password":     "P@ssword1!",
 		}, nil)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("register expected 200, got %d body=%s", rec.Code, rec.Body.String())
@@ -158,9 +161,10 @@ func TestMiniAppLocalAuth_MiniAppTemplatesPublishedOnly(t *testing.T) {
 
 	// register + login to get token
 	doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "tpl@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "tpl@example.com",
+		"display_name": "tpl@example.com",
+		"password":     "P@ssword1!",
 	}, nil)
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/login", tenantUUID, map[string]any{
 		"tenant_uuid": tenantUUID,
@@ -215,9 +219,10 @@ func TestMiniAppLocalAuth_LoginDisabledReturns423(t *testing.T) {
 	tenantUUID := "00000000-0000-0000-0000-000000000001"
 
 	regBody := map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "disabled@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "disabled@example.com",
+		"display_name": "disabled@example.com",
+		"password":     "P@ssword1!",
 	}
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, regBody, nil)
 	if rec.Code != http.StatusOK {
@@ -333,12 +338,15 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 func createCustomerMirrorTables(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	ddls := []string{
+		`CREATE TABLE customer_contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, contact_uuid TEXT NOT NULL UNIQUE, tenant_uuid TEXT NOT NULL, customer_uuid TEXT NOT NULL, display_name TEXT NOT NULL, given_name TEXT, family_name TEXT, email TEXT, phone TEXT, status TEXT NOT NULL, roles TEXT, tags TEXT, metadata TEXT);`,
 		`CREATE TABLE IF NOT EXISTS customer_accounts (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME,
 			updated_at DATETIME,
 			deleted_at DATETIME,
 			customer_uuid TEXT NOT NULL,
+			type TEXT,
+			primary_contact_uuid TEXT,
 			primary_email TEXT,
 			primary_phone TEXT,
 			display_name TEXT,
@@ -358,6 +366,7 @@ func createCustomerMirrorTables(t *testing.T, db *gorm.DB) {
 			tenant_uuid TEXT
 		);`,
 		`CREATE TABLE IF NOT EXISTS customer_auth_identities (
+			identity_uuid TEXT,
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME,
 			updated_at DATETIME,
@@ -378,6 +387,7 @@ func createCustomerMirrorTables(t *testing.T, db *gorm.DB) {
 			updated_at DATETIME,
 			deleted_at DATETIME,
 			membership_uuid TEXT NOT NULL,
+			primary_contact_uuid TEXT,
 			tenant_uuid TEXT NOT NULL,
 			customer_uuid TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',

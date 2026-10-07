@@ -2,6 +2,7 @@ using PowerXPlugin.Framework.Runtime.Agent;
 using PowerXPlugin.Framework.Runtime.Common;
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace PowerXPlugin.Framework.Tests.Runtime.Agent;
@@ -62,6 +63,56 @@ public sealed class AgentRuntimeTests
         var service = new LocalAgentLifecycleService(new CrossTenantLifecycleStore());
         var error = await Assert.ThrowsAsync<AgentRuntimeException>(() => service.GetHealthSummaryAsync(new(Tenant, Agent)));
         Assert.Equal(AgentRuntimeErrors.InvalidResponse, error.Code);
+    }
+
+    [Fact]
+    public void Lifecycle_local_mode_never_constructs_delegated_adapter()
+    {
+        var local = new LocalAgentLifecycleService(new CrossTenantLifecycleStore());
+        var delegatedCalls = 0;
+        var services = new ServiceCollection();
+        services.AddPowerXAgentLifecycleRuntime(ProviderMode.Local, _ => local, _ =>
+        {
+            delegatedCalls++;
+            throw new Xunit.Sdk.XunitException("delegated adapter must not be constructed");
+        });
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<DualModeRuntime<IAgentLifecycleService>>();
+        Assert.Equal(ProviderMode.Local, runtime.Mode);
+        Assert.Same(local, provider.GetRequiredService<IAgentLifecycleService>());
+        Assert.Equal(0, delegatedCalls);
+    }
+
+    [Fact]
+    public async Task Lifecycle_delegated_forbidden_never_constructs_or_calls_local_adapter()
+    {
+        var localCalls = 0;
+        var services = new ServiceCollection();
+        services.AddPowerXAgentLifecycleRuntime(ProviderMode.Delegated, _ =>
+        {
+            localCalls++;
+            throw new Xunit.Sdk.XunitException("local adapter must not be constructed");
+        }, _ => new PowerXAgentLifecycleClient("https://core", Tenant,
+            new StaticServiceCredentialProvider(new ServiceCredential("sts")),
+            new HttpClient(new Handler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)))));
+        using var provider = services.BuildServiceProvider();
+        var runtime = provider.GetRequiredService<DualModeRuntime<IAgentLifecycleService>>();
+        Assert.Equal(ProviderMode.Delegated, runtime.Mode);
+        var error = await Assert.ThrowsAsync<AgentRuntimeException>(() => runtime.Service.GetHealthSummaryAsync(new(Tenant, Agent)));
+        Assert.Equal("FRAMEWORK_AGENT_FORBIDDEN", error.Code);
+        Assert.Equal(0, localCalls);
+    }
+
+    [Theory]
+    [InlineData(ProviderMode.Local)]
+    [InlineData(ProviderMode.Delegated)]
+    public void Lifecycle_missing_selected_adapter_fails_during_resolution(ProviderMode mode)
+    {
+        var services = new ServiceCollection();
+        services.AddPowerXAgentLifecycleRuntime(mode, _ => null!, _ => null!);
+        using var provider = services.BuildServiceProvider();
+        var error = Assert.Throws<FrameworkAdapterException>(() => provider.GetRequiredService<IAgentLifecycleService>());
+        Assert.Equal(FrameworkRuntimeErrors.AdapterUnavailable, error.Code);
     }
 
     [Fact]
@@ -170,7 +221,7 @@ public sealed class AgentRuntimeTests
     {
         public Task<AgentHealthSummary> GetHealthSummaryAsync(AgentLifecycleScope s, CancellationToken c = default) => Task.FromResult(new AgentHealthSummary(Agent, Tenant, "healthy", 100, DateTimeOffset.UtcNow, 60, new(1, 1, 1, 1, 0), [], []));
         public Task<AgentHealthHistory> ListHealthHistoryAsync(AgentLifecycleScope s, int h, int l, CancellationToken c = default) => throw new NotImplementedException();
-        public Task<object> GetBridgeStateAsync(AgentLifecycleScope s, int l, CancellationToken c = default) => throw new NotImplementedException();
+        public Task<AgentBridgeState> GetBridgeStateAsync(AgentLifecycleScope s, int l, CancellationToken c = default) => throw new NotImplementedException();
         public Task<AgentBridgeLifecycleResult> FreezeAsync(AgentLifecycleScope s, AgentBridgeControlRequest r, CancellationToken c = default) => throw new NotImplementedException();
         public Task<AgentBridgeLifecycleResult> RecoverAsync(AgentLifecycleScope s, AgentBridgeControlRequest r, CancellationToken c = default) => throw new NotImplementedException();
         public Task<AgentBridgeLifecycleResult> RebalanceAsync(AgentLifecycleScope s, AgentBridgeRebalanceRequest r, CancellationToken c = default) => throw new NotImplementedException();

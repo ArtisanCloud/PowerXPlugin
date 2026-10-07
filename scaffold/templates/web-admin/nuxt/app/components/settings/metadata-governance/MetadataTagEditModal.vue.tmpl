@@ -22,8 +22,8 @@
         </div>
         <UAlert v-if="error" color="error" variant="soft" :title="error" />
         <div class="flex justify-end gap-2">
-          <UButton variant="soft" :disabled="saving" @click="emit('close')">{{ `{{ t('metadataGovernance.editTag.cancel') }}` }}</UButton>
-          <UButton type="submit" :loading="saving">{{ `{{ t('metadataGovernance.editTag.save') }}` }}</UButton>
+          <UButton variant="soft" :disabled="saving" @click="emit('close')">{{ "{{ t('metadataGovernance.editTag.cancel') }}" }}</UButton>
+          <UButton type="submit" :loading="saving">{{ "{{ t('metadataGovernance.editTag.save') }}" }}</UButton>
         </div>
       </form>
     </template>

@@ -6,15 +6,15 @@
           Organization &amp; Access
         </p>
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ $t("iam.overview.title") }}` }}
+          {{ "{{ $t(\"iam.overview.title\") }}" }}
         </h1>
         <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl">
-          {{ `{{ $t("iam.overview.caption") }}` }}
+          {{ "{{ $t(\"iam.overview.caption\") }}" }}
         </p>
       </div>
       <div class="flex flex-wrap gap-3">
         <UButton icon="i-heroicons-plus-circle" color="primary" @click="openCreateTenant">
-          {{ `{{ $t("iam.overview.createTenant") }}` }}
+          {{ "{{ $t(\"iam.overview.createTenant\") }}" }}
         </UButton>
         <UButton
           icon="i-heroicons-squares-2x2"
@@ -22,10 +22,10 @@
           :disabled="!tenantRows.length"
           @click="openPlanModal"
         >
-          {{ `{{ $t("iam.overview.planDrawer.title") }}` }}
+          {{ "{{ $t(\"iam.overview.planDrawer.title\") }}" }}
         </UButton>
         <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="fetchTenants">
-          {{ `{{ $t("common.refresh") }}` }}
+          {{ "{{ $t(\"common.refresh\") }}" }}
         </UButton>
       </div>
     </section>
@@ -43,10 +43,10 @@
           </div>
           <div>
             <p class="text-sm font-semibold text-gray-900 dark:text-white">
-              {{ `{{ category.title }}` }}
+              {{ "{{ category.title }}" }}
             </p>
             <p class="text-xs text-gray-500 dark:text-gray-400">
-              {{ `{{ category.description }}` }}
+              {{ "{{ category.description }}" }}
             </p>
           </div>
         </div>
@@ -58,10 +58,10 @@
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-lg font-semibold">
-              {{ `{{ $t("iam.overview.tenantTable.title") }}` }}
+              {{ "{{ $t(\"iam.overview.tenantTable.title\") }}" }}
             </h2>
             <p class="text-sm text-gray-500">
-              {{ `{{ $t("iam.overview.tenantTable.caption") }}` }}
+              {{ "{{ $t(\"iam.overview.tenantTable.caption\") }}" }}
             </p>
           </div>
         </div>
@@ -69,7 +69,7 @@
       <UTable :rows="tenantRows" :data="tenantRows" :columns="columns" :loading="loading">
         <template #status-cell="{ row }">
           <UBadge :color="resolveTenantRow(row).status === 'active' ? 'green' : 'yellow'">
-            {{ `{{ formatStatus(resolveTenantRow(row).status) }}` }}
+            {{ "{{ formatStatus(resolveTenantRow(row).status) }}" }}
           </UBadge>
         </template>
         <template #actions-cell="{ row }">
@@ -88,7 +88,7 @@
               color="neutral"
               @click="() => openPlanDrawer(resolveTenantRow(row))"
             >
-              {{ `{{ $t("iam.overview.adjustPlan") }}` }}
+              {{ "{{ $t(\"iam.overview.adjustPlan\") }}" }}
             </UButton>
           </div>
         </template>
@@ -101,15 +101,15 @@
       :ui="{ content: 'max-w-md w-full' }"
     >
       <template #title>
-        {{ `{{ $t("iam.overview.planDrawer.title") }}` }}
+        {{ "{{ $t(\"iam.overview.planDrawer.title\") }}" }}
       </template>
       <template #description>
-        {{ `{{ $t("iam.overview.planDrawer.caption") }}` }}
+        {{ "{{ $t(\"iam.overview.planDrawer.caption\") }}" }}
       </template>
       <template #body>
         <div class="space-y-4" v-if="selectedTenant">
           <p class="text-sm text-gray-500">
-            {{ `{{ selectedTenantHint }}` }}
+            {{ "{{ selectedTenantHint }}" }}
           </p>
           <UForm :state="planForm" class="space-y-4">
             <UFormField :label="$t('iam.overview.planDrawer.planLabel')">
@@ -127,16 +127,16 @@
           </UForm>
         </div>
         <div v-else class="text-sm text-gray-500">
-          {{ `{{ $t('iam.notifications.selectTenant') }}` }}
+          {{ "{{ $t('iam.notifications.selectTenant') }}" }}
         </div>
       </template>
       <template #footer>
         <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <UButton variant="soft" @click="closePlanModal">
-            {{ `{{ $t("common.cancel") }}` }}
+            {{ "{{ $t(\"common.cancel\") }}" }}
           </UButton>
           <UButton color="primary" :loading="planSaving" @click="submitPlanForm">
-            {{ `{{ $t("common.save") }}` }}
+            {{ "{{ $t(\"common.save\") }}" }}
           </UButton>
         </div>
       </template>
@@ -148,10 +148,10 @@
       :ui="{ width: 'w-full', content: 'max-w-2xl w-full' }"
     >
       <template #title>
-        {{ `{{ $t("iam.overview.createModal.title") }}` }}
+        {{ "{{ $t(\"iam.overview.createModal.title\") }}" }}
       </template>
       <template #description>
-        {{ `{{ $t("iam.overview.createModal.caption") }}` }}
+        {{ "{{ $t(\"iam.overview.createModal.caption\") }}" }}
       </template>
       <template #body>
         <UForm :state="createForm" class="space-y-4 p-4 sm:p-5">
@@ -186,10 +186,10 @@
       <template #footer>
         <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <UButton color="neutral" variant="soft" :disabled="creating" @click="closeCreate">
-            {{ `{{ $t("common.cancel") }}` }}
+            {{ "{{ $t(\"common.cancel\") }}" }}
           </UButton>
           <UButton color="primary" :loading="creating" @click="submitCreate">
-            {{ `{{ $t("common.save") }}` }}
+            {{ "{{ $t(\"common.save\") }}" }}
           </UButton>
         </div>
       </template>

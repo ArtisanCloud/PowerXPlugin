@@ -475,15 +475,15 @@ function buildUpdatePayload(): DepartmentUpdateParams {
     <div class="flex justify-between items-center mb-6">
       <div>
         <h2 class="text-xl font-semibold text-gray-800 dark:text-white">
-          {{ `{{ $t("organization.department.title") }}` }}
+          {{ "{{ $t(\"organization.department.title\") }}" }}
         </h2>
         <p class="text-sm text-gray-500 mt-1 dark:text-gray-300">
-          {{ `{{ $t("organization.department.description") }}` }}
+          {{ "{{ $t(\"organization.department.description\") }}" }}
           <span v-if="props.readonly" class="block text-xs text-amber-600 mt-1 dark:text-amber-300">当前为只读视图，仅可浏览组织架构</span>
         </p>
       </div>
       <UButton v-if="!props.readonly" color="primary" icon="i-heroicons-plus" @click="openAddForm">
-        {{ `{{ $t("organization.department.add") }}` }}
+        {{ "{{ $t(\"organization.department.add\") }}" }}
       </UButton>
     </div>
 
@@ -501,7 +501,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
         <template #header>
           <div class="flex justify-between items-center">
             <h3 class="text-lg font-medium">
-              {{ `{{ $t("organization.department.title") }}` }}
+              {{ "{{ $t(\"organization.department.title\") }}" }}
             </h3>
             <UButton
               v-if="!props.readonly"
@@ -511,7 +511,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
               variant="ghost"
               @click="openAddForm"
             >
-              {{ `{{ $t("organization.department.add") }}` }}
+              {{ "{{ $t(\"organization.department.add\") }}" }}
             </UButton>
           </div>
         </template>
@@ -520,13 +520,13 @@ function buildUpdatePayload(): DepartmentUpdateParams {
           <UIcon name="i-heroicons-arrow-path" class="animate-spin h-6 w-6" />
         </div>
         <div v-else-if="loadError" class="text-center text-red-500 py-4">
-          {{ `{{ loadError }}` }}
+          {{ "{{ loadError }}" }}
         </div>
         <div
           v-else-if="treeItems.length === 0"
           class="text-center py-4 text-gray-500 dark:text-gray-400"
         >
-          {{ `{{ $t("organization.department.empty.title") }}` }}
+          {{ "{{ $t(\"organization.department.empty.title\") }}" }}
         </div>
         <div v-else class="department-tree">
           <UTree
@@ -557,7 +557,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
             </template>
 
             <template #item-label="{ item }">
-              <span>{{ `{{ item.label }}` }}</span>
+              <span>{{ "{{ item.label }}" }}</span>
             </template>
 
             <template v-if="!props.readonly" #item-trailing="{ item }">
@@ -594,12 +594,10 @@ function buildUpdatePayload(): DepartmentUpdateParams {
         <template #header>
           <div class="flex justify-between items-center">
             <h3 class="text-lg font-medium">
-              {{ `{{ activeNode
-                  ? activeNode.name + " - " + $t("organization.department.title")
-                  : $t("organization.department.title") }}` }}
+              {{ "{{\n                activeNode\n                  ? activeNode.name + \" - \" + $t(\"organization.department.title\")\n                  : $t(\"organization.department.title\")\n              }}" }}
             </h3>
             <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-600 dark:text-gray-300">{{ `{{ $t("organization.department.table.name") }}` }}</span>
+              <span class="text-sm text-gray-600 dark:text-gray-300">{{ "{{\n                $t(\"organization.department.table.name\")\n              }}" }}</span>
             </div>
           </div>
         </template>
@@ -617,9 +615,9 @@ function buildUpdatePayload(): DepartmentUpdateParams {
           >
             <div class="flex justify-between items-center">
               <div class="text-sm text-gray-600 dark:text-gray-300">
-                第 {{ `{{ pagination.page }}` }} /
-                {{ `{{ pagination.totalPages }}` }} 页；本级子部门
-                {{ `{{ pagination.total }}` }} 个
+                第 {{ "{{ pagination.page }}" }} /
+                {{ "{{ pagination.totalPages }}" }} 页；本级子部门
+                {{ "{{ pagination.total }}" }} 个
               </div>
               <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2">
@@ -659,11 +657,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
         <template #footer>
           <div class="flex justify-between items-center text-sm text-gray-500 dark:text-gray-300">
             <span>
-              {{ `{{ t("organization.department.pagination.showing", {
-                  start: paginationInfo.start,
-                  end: paginationInfo.end,
-                  total: paginationInfo.total,
-                }) }}` }}
+              {{ "{{\n                t(\"organization.department.pagination.showing\", {\n                  start: paginationInfo.start,\n                  end: paginationInfo.end,\n                  total: paginationInfo.total,\n                })\n              }}" }}
             </span>
           </div>
         </template>
@@ -675,7 +669,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
       v-if="!isLoadingTree && filteredDepartments.length === 0"
       class="text-center py-10 text-gray-500 dark:text-gray-400"
     >
-      {{ `{{ $t("organization.department.empty.noResults") }}` }}
+      {{ "{{ $t(\"organization.department.empty.noResults\") }}" }}
     </div>
 
     <!-- 表单 -->
@@ -690,9 +684,7 @@ function buildUpdatePayload(): DepartmentUpdateParams {
         <UCard>
           <template #header>
             <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-              {{ `{{ isEditing
-                  ? $t("organization.department.edit")
-                  : $t("organization.department.add") }}` }}
+              {{ "{{\n                isEditing\n                  ? $t(\"organization.department.edit\")\n                  : $t(\"organization.department.add\")\n              }}" }}
             </h3>
           </template>
 
@@ -751,10 +743,10 @@ function buildUpdatePayload(): DepartmentUpdateParams {
                 variant="outline"
                 @click="showForm = false"
               >
-                {{ `{{ $t("organization.common.cancel") }}` }}
+                {{ "{{ $t(\"organization.common.cancel\") }}" }}
               </UButton>
               <UButton type="submit" color="primary">
-                {{ `{{ $t("organization.common.save") }}` }}
+                {{ "{{ $t(\"organization.common.save\") }}" }}
               </UButton>
             </div>
           </UForm>

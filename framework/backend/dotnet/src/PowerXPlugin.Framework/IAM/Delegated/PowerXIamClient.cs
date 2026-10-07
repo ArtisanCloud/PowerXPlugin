@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using PowerXPlugin.Framework.IAM.Contracts;
 using PowerXPlugin.Framework.IAM.Models;
 
@@ -51,9 +53,39 @@ public sealed class PowerXIamClient : IDirectoryService, IAuthzService, IIdentit
 
     public async Task<IReadOnlyList<Member>> ListMembers(string tenantUuid, CancellationToken ct = default)
     {
-        var items = await GetItemsAsync<Member>("/tenant/iam/members?page=1&page_size=200", ct);
-        AssertTenants(tenantUuid, items.Select(item => item.TenantUUID));
-        return items;
+        try
+        {
+            var result = new List<Member>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            long? expectedTotal = null;
+            for (var page = 1; ; page++)
+            {
+                using var response = await SendAsync(HttpMethod.Get, $"/tenant/iam/members?page={page}&page_size=200", null, null, ct);
+                var data = Unwrap(response);
+                var pagination = data.GetProperty("pagination");
+                var total = pagination.GetProperty("total").GetInt64();
+                if (pagination.GetProperty("page").GetInt32() != page || pagination.GetProperty("page_size").GetInt32() != 200
+                    || total < 0 || (expectedTotal.HasValue && expectedTotal != total))
+                    throw new IAMAdapterException(IAMErrors.CodeUpstreamDependency);
+                expectedTotal = total;
+                var items = JsonSerializer.Deserialize<List<CoreMember>>(data.GetProperty("items").GetRawText(), JsonOptions)
+                    ?? throw new IAMAdapterException(IAMErrors.CodeUpstreamDependency);
+                if (items.Count != Math.Min(200L, total - result.Count))
+                    throw new IAMAdapterException(IAMErrors.CodeUpstreamDependency);
+                AssertTenants(tenantUuid, items.Select(item => item.TenantUUID));
+                foreach (var item in items)
+                {
+                    if (string.IsNullOrWhiteSpace(item.MemberUUID) || !seen.Add(item.MemberUUID))
+                        throw new IAMAdapterException(IAMErrors.CodeUpstreamDependency);
+                    result.Add(item.ToMember());
+                }
+                if (result.Count == total) return result;
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            throw new IAMAdapterException(IAMErrors.CodeUpstreamDependency, exception);
+        }
     }
 
     public async Task<IReadOnlyList<Role>> ListRoles(string tenantUuid, CancellationToken ct = default)
@@ -85,6 +117,23 @@ public sealed class PowerXIamClient : IDirectoryService, IAuthzService, IIdentit
         // service-to-host client. Core must expose a dedicated delegated
         // identity-exchange contract before this operation can be enabled.
         return Task.FromException<IdentityContext?>(new IAMAdapterException(IAMErrors.CodeIdentityDelegationUnavailable));
+    }
+
+    // Core publishes numeric member status; the public Framework model retains
+    // the same string representation as the local and Skeleton adapters.
+    private sealed record CoreMember
+    {
+        [JsonPropertyName("member_uuid")] public string MemberUUID { get; init; } = "";
+        [JsonPropertyName("tenant_uuid")] public string TenantUUID { get; init; } = "";
+        [JsonPropertyName("user_uuid")] public string UserUUID { get; init; } = "";
+        [JsonPropertyName("display_name")] public string? DisplayName { get; init; }
+        [JsonPropertyName("status"), JsonNumberHandling(JsonNumberHandling.Strict)] public short Status { get; init; }
+
+        public Member ToMember() => new()
+        {
+            MemberUUID = MemberUUID, TenantUUID = TenantUUID, UserUUID = UserUUID,
+            DisplayName = DisplayName, Status = Status.ToString(CultureInfo.InvariantCulture)
+        };
     }
 
     private async Task<List<T>> GetItemsAsync<T>(string path, CancellationToken ct)

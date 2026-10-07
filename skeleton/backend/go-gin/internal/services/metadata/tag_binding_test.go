@@ -22,7 +22,7 @@ func TestReplaceTagBindingsIsIdempotentAndConcurrent(t *testing.T) {
 		t.Fatal(err)
 	}
 	sqlDB.SetMaxOpenConns(1)
-	if err := db.Exec(`CREATE TABLE metadata_tags (id integer primary key autoincrement, uuid text not null unique, tenant_uuid text not null, namespace text not null, resource_type text not null, code text not null, color text, label_i18n text, description_i18n text, status text not null, usage_count integer not null, created_at datetime, updated_at datetime, deleted_at datetime)`).Error; err != nil {
+	if err := db.Exec(`CREATE TABLE metadata_tags (id integer primary key autoincrement, uuid text not null unique, tenant_uuid text not null, namespace text not null, resource_type text not null, code text not null, metadata text, color text, label_i18n text, description_i18n text, status text not null, usage_count integer not null, created_at datetime, updated_at datetime, deleted_at datetime)`).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Exec(`CREATE UNIQUE INDEX uk_tags ON metadata_tags(tenant_uuid, namespace, resource_type, code)`).Error; err != nil {

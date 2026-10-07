@@ -3,10 +3,10 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ $t("templates.crud.title") }}` }}
+          {{ "{{ $t(\"templates.crud.title\") }}" }}
         </h1>
         <p class="text-gray-600 dark:text-gray-300">
-          {{ `{{ $t("templates.crud.description") }}` }}
+          {{ "{{ $t(\"templates.crud.description\") }}" }}
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -16,7 +16,7 @@
           :disabled="isDelegatedReadOnly"
           @click="startCreate"
         >
-          {{ `{{ $t("templates.crud.create") }}` }}
+          {{ "{{ $t(\"templates.crud.create\") }}" }}
         </UButton>
       </div>
     </div>
@@ -27,9 +27,9 @@
       variant="soft"
       icon="i-heroicons-information-circle"
     >
-      <template #title>{{ `{{ $t("templates.crud.readonlyTitle") }}` }}</template>
+      <template #title>{{ "{{ $t(\"templates.crud.readonlyTitle\") }}" }}</template>
       <template #description>
-        {{ `{{ $t("templates.crud.readonlyDescription") }}` }}
+        {{ "{{ $t(\"templates.crud.readonlyDescription\") }}" }}
       </template>
     </UAlert>
 
@@ -46,10 +46,10 @@
     <UCard>
       <template #header>
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <span class="font-medium text-gray-900 dark:text-gray-100">{{ `{{ $t("templates.crud.listTitle") }}` }}</span>
+          <span class="font-medium text-gray-900 dark:text-gray-100">{{ "{{ $t(\"templates.crud.listTitle\") }}" }}</span>
           <div class="flex items-center gap-3">
             <span class="text-sm text-gray-500 dark:text-gray-400">
-              {{ `{{ $t("templates.crud.pagination.total", { total: pagination.total }) }}` }}
+              {{ "{{ $t(\"templates.crud.pagination.total\", { total: pagination.total }) }}" }}
             </span>
             <USelect
               v-model="pagination.pageSize"
@@ -68,22 +68,22 @@
         <!-- 注意：v3 是 -cell，不是 -data；row.original 才是你的对象 -->
         <template #description-header="{ column }">
           <span class="block w-64">
-            {{ `{{ column.columnDef.header }}` }}
+            {{ "{{ column.columnDef.header }}" }}
           </span>
         </template>
         <template #content-header="{ column }">
           <span class="block w-80">
-            {{ `{{ column.columnDef.header }}` }}
+            {{ "{{ column.columnDef.header }}" }}
           </span>
         </template>
         <template #description-cell="{ row }">
           <div class="description-cell">
-            {{ `{{ row.original.description }}` }}
+            {{ "{{ row.original.description }}" }}
           </div>
         </template>
         <template #content-cell="{ row }">
           <div class="content-cell">
-            {{ `{{ row.original.content }}` }}
+            {{ "{{ row.original.content }}" }}
           </div>
         </template>
         <template #actions-cell="{ row }">
@@ -95,7 +95,7 @@
               :disabled="isDelegatedReadOnly"
               @click="startEdit(row.original)"
             >
-              {{ `{{ $t('common.edit') }}` }}
+              {{ "{{ $t('common.edit') }}" }}
             </UButton>
             <UButton
               size="xs"
@@ -105,7 +105,7 @@
               :disabled="isDelegatedReadOnly"
               @click="confirmDelete(row.original)"
             >
-              {{ `{{ $t('common.delete') }}` }}
+              {{ "{{ $t('common.delete') }}" }}
             </UButton>
           </div>
         </template>
@@ -113,7 +113,7 @@
 
       <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
         <span class="text-sm text-gray-500 dark:text-gray-400">
-          {{ `{{ paginationSummary }}` }}
+          {{ "{{ paginationSummary }}" }}
         </span>
         <UPagination
           v-if="pagination.total > 0"

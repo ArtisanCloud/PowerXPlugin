@@ -1,11 +1,17 @@
 <template>
   <main class="mx-auto w-full max-w-6xl space-y-6 px-5 py-6 lg:px-8">
     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-[#172536]"><div class="flex items-start justify-between gap-4"><div><p class="text-sm text-gray-500 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.overview.eyebrow') }}</p><h1 class="mt-1 text-2xl font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.records.title') }}</h1><p class="mt-2 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ space?.name }}</p></div><div class="flex flex-wrap gap-2"><UButton color="neutral" variant="outline" :loading="loading" @click="load">{{ t('common.refresh') }}</UButton><UButton color="neutral" variant="outline" :to="detailPath">{{ t('knowledgeSpaces.detail.backToOverview') }}</UButton></div></div></section>
+    <UAlert v-if="!workspace.capabilities.documents" color="warning" :description="t('knowledgeLab.workspace.documentsUnavailable')" />
+    <section v-if="submittedJobs.length" class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-[#0f192a]">
+      <h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeLab.workspace.submittedJobs') }}</h2>
+      <article v-for="(job, index) in submittedJobs" :key="job.job_id" class="mt-4 flex items-center justify-between gap-4"><p class="text-gray-700 dark:text-[#d6e2ff]">{{ submittedTitles[index] || t('knowledgeLab.workspace.jobNumber', { number: index + 1 }) }}</p><UBadge :color="job.status === 'succeeded' ? 'success' : job.status === 'failed' ? 'error' : 'warning'">{{ t(`knowledgeLab.workspace.jobStatuses.${job.status}`) }}</UBadge><p v-if="job.error_code" class="text-error">{{ job.error_code }}</p></article>
+    </section>
+    <UAlert v-if="loadError" color="error" :description="loadError" />
     <section class="grid gap-3 md:grid-cols-2">
       <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-[#0f192a]"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.records.currentVersionTitle') }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.records.currentVersionDescription') }}</p></div>
       <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-[#0f192a]"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.records.historyTitle') }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.records.historyDescription') }}</p></div>
     </section>
-    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]"><header class="border-b border-slate-200 p-5 dark:border-slate-700"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.records.listTitle') }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.records.description') }}</p></header><div v-if="loading" class="p-10 text-center text-sm text-gray-700 dark:text-slate-200">{{ t('common.loading') }}</div><div v-else-if="!documents.length" class="p-10 text-center text-sm text-gray-700 dark:text-slate-200">{{ t('knowledgeSpaces.ui.noDocuments') }}</div><div v-else class="divide-y divide-slate-100 dark:divide-slate-800"><article v-for="document in documents" :key="document.uuid" class="flex flex-wrap items-center justify-between gap-4 p-5"><div><p class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ document.title }}</p><p class="mt-1 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.records.chunkTotal', { count: document.chunk_count }) }} · {{ formatDate(document.updated_at) }}</p></div><div class="flex gap-2"><UBadge :color="document.status === 'indexed' ? 'success' : document.status === 'failed' ? 'error' : 'warning'" variant="soft">{{ documentStatus(document.status) }}</UBadge><UButton size="xs" color="primary" variant="soft" @click="inspect(document)">{{ t('knowledgeSpaces.records.inspect') }}</UButton><UButton size="xs" color="neutral" variant="soft" @click="openJobs(document)">{{ t('knowledgeSpaces.records.jobsAction') }}</UButton><UButton size="xs" :loading="indexing === document.uuid" @click="reindex(document)">{{ t('knowledgeSpaces.records.reindex') }}</UButton></div></article></div></section>
+    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]"><header class="border-b border-slate-200 p-5 dark:border-slate-700"><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ t('knowledgeSpaces.records.listTitle') }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.records.description') }}</p></header><div v-if="loading" class="p-10 text-center text-sm text-gray-700 dark:text-slate-200">{{ t('common.loading') }}</div><div v-else-if="!workspace.capabilities.documents" class="p-10 text-center text-sm text-gray-700 dark:text-slate-200">{{ t(workspace.capabilities.documents ? 'knowledgeSpaces.ui.noDocuments' : 'knowledgeLab.workspace.documentsUnavailable') }}</div><div v-else class="divide-y divide-slate-100 dark:divide-slate-800"><article v-for="document in documents" :key="document.uuid" class="flex flex-wrap items-center justify-between gap-4 p-5"><div><p class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ document.title }}</p><p class="mt-1 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.records.chunkTotal', { count: document.chunk_count }) }} · {{ formatDate(document.updated_at) }}</p></div><div class="flex gap-2"><UBadge :color="document.status === 'indexed' ? 'success' : document.status === 'failed' ? 'error' : 'warning'" variant="soft">{{ documentStatus(document.status) }}</UBadge><UButton size="xs" color="primary" variant="soft" @click="inspect(document)">{{ t('knowledgeSpaces.records.inspect') }}</UButton><UButton size="xs" color="neutral" variant="soft" @click="openJobs(document)">{{ t('knowledgeSpaces.records.jobsAction') }}</UButton><UButton size="xs" :loading="indexing === document.uuid" @click="reindex(document)">{{ t('knowledgeSpaces.records.reindex') }}</UButton></div></article></div></section>
     <UModal v-model:open="jobListOpen" :title="t('knowledgeSpaces.records.jobsTitle')" :description="jobDocument?.title || ''" :ui="{ content: 'max-w-5xl w-[88vw] mx-auto', body: 'p-0' }"><template #body><section class="rounded-2xl bg-white dark:bg-[#0f192a]">
       <header class="border-b border-slate-200 p-5 text-sm text-gray-600 dark:border-slate-700 dark:text-[#d6e2ff]">{{ t('knowledgeSpaces.records.jobsDescription') }}</header>
       <div v-if="jobListLoading" class="p-8 text-center text-sm">{{ t('common.loading') }}</div>
@@ -68,13 +74,14 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useLocalKnowledgeApi, type LocalKnowledgeChunk, type LocalKnowledgeChunkPage, type LocalKnowledgeDocument, type LocalKnowledgeDocumentInspection, type LocalKnowledgeIngestionJob, type LocalKnowledgeIngestionJobPage, type LocalKnowledgeJobChunkPage, type LocalKnowledgeSpace } from '~/composables/api/useLocalKnowledge'
+import { useKnowledgeWorkspace } from '~/composables/api/useKnowledgeWorkspace'
+import { type LocalKnowledgeChunk, type LocalKnowledgeChunkPage, type LocalKnowledgeDocument, type LocalKnowledgeDocumentInspection, type LocalKnowledgeIngestionJob, type LocalKnowledgeIngestionJobPage, type LocalKnowledgeJobChunkPage, type LocalKnowledgeSpace } from '~/composables/api/useLocalKnowledge'
 import { getAuthToken, resolveApiBase } from '~/composables/api/_base'
 import { createPluginWsClient } from '@artisan-cloud/plugin-framework-client'
 
 const { t, locale } = useI18n()
 const toast = useToast()
-const api = useLocalKnowledgeApi()
+const workspace = useKnowledgeWorkspace(); const api = workspace.api
 const route = useRoute()
 const runtimeConfig = useRuntimeConfig()
 const documents = ref<LocalKnowledgeDocument[]>([])
@@ -89,6 +96,10 @@ const jobChunks = ref<LocalKnowledgeJobChunkPage>({ items: [], page: 1, page_siz
 let ingestionWS: WebSocket | null = null
 const space = ref<LocalKnowledgeSpace | null>(null)
 const loading = ref(false)
+const loadError = ref('')
+const submittedJobs = ref<Array<{ job_id: string; status: string; error_code?: string }>>([])
+function queryArray(value: unknown): string[] { return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : typeof value === 'string' ? [value] : [] }
+const submittedTitles = queryArray(route.query.job_title)
 const indexing = ref('')
 const inspectionOpen = ref(false)
 const inspectionLoading = ref(false)
@@ -104,8 +115,8 @@ const chunkEditOpen = ref(false)
 const chunkDraft = ref('')
 const savingChunk = ref(false)
 const uuid = computed(() => String(route.params.uuid || ''))
-const adminBase = computed(() => String(runtimeConfig.public?.pluginAdminBase || '/_p/com.powerx.plugins.base/admin/').replace(/\/+$/, ''))
-const detailPath = computed(() => `${adminBase.value}/knowledge/${uuid.value}`)
+
+const detailPath = computed(() => workspace.mode === 'local' ? `${workspace.basePath}/${uuid.value}` : workspace.basePath)
 const vectorStatusColor = computed(() => inspection.value?.vector_status === 'verified' ? 'success' : inspection.value?.vector_status === 'mismatch' ? 'error' : 'warning')
 
 function formatDate(value: string) { return value ? new Intl.DateTimeFormat(locale.value).format(new Date(value)) : '-' }
@@ -119,7 +130,7 @@ function jobError(code: string) { const key = `knowledgeSpaces.ingestion.uploadE
 function hasMetadata(metadata: Record<string, unknown> | undefined) { return Boolean(metadata && Object.keys(metadata).length) }
 function prettyMetadata(metadata: Record<string, unknown> | undefined) { return JSON.stringify(metadata, null, 2) }
 function showError(message: string) { toast.add({ title: message, color: 'error' }) }
-async function load() { if (!uuid.value) return; loading.value = true; try { const [out, spaces] = await Promise.all([api.documents(uuid.value), api.spaces()]); documents.value = out.items || []; space.value = (spaces.items || []).find(item => item.uuid === uuid.value) || null; if (jobListOpen.value) await loadJobs(jobPage.value.page) } catch { showError(t('knowledgeSpaces.records.loadFailed')) } finally { loading.value = false } }
+async function load() { if (!uuid.value) return; loading.value = true; loadError.value = ''; try { if (workspace.indexJob) { submittedJobs.value = await Promise.all(queryArray(route.query.job_uuid).slice(0,100).map(id => workspace.indexJob!(id))) }; const [out, spaces] = await Promise.all([workspace.capabilities.documents ? api.documents(uuid.value) : Promise.resolve(null), api.spaces()]); documents.value = out?.items || []; space.value = (spaces.items || []).find(item => item.uuid === uuid.value) || null; if (jobListOpen.value) await loadJobs(jobPage.value.page) } catch (e: any) { submittedJobs.value = []; loadError.value = t('knowledgeLab.workspace.requestFailed', { code: e?.data?.code || 'KNOWLEDGE_UPSTREAM_DEPENDENCY' }) + (e?.data?.trace_id ? ` (${e.data.trace_id})` : ''); showError(loadError.value) } finally { loading.value = false } }
 async function loadJobs(page: number) { if (!uuid.value || !jobDocument.value) return; jobListLoading.value = true; try { jobPage.value = await api.ingestionJobs(uuid.value, page, jobPage.value.page_size, jobDocument.value.uuid) } catch { showError(t('knowledgeSpaces.records.loadFailed')) } finally { jobListLoading.value = false } }
 async function openJobs(document: LocalKnowledgeDocument) { jobDocument.value = document; jobPage.value = { items: [], page: 1, page_size: 25, total: 0 }; jobListOpen.value = true; await loadJobs(1) }
 async function openJobFromList(job: LocalKnowledgeIngestionJob) { jobListOpen.value = false; await openJob(job) }
@@ -134,7 +145,7 @@ async function saveSourceAndReindex() { if (!inspection.value || !sourceDraft.va
 function openChunkEditor() { if (!selectedChunk.value) return; chunkDraft.value = selectedChunk.value.content; chunkEditOpen.value = true }
 async function saveChunk() { if (!inspection.value || !selectedChunk.value || !chunkDraft.value.trim()) return; savingChunk.value = true; try { selectedChunk.value = await api.updateDocumentChunk(inspection.value.document.uuid, selectedChunk.value.uuid, chunkDraft.value); chunkEditOpen.value = false; await loadChunks(chunkPage.value.page); inspection.value = await api.inspectDocument(inspection.value.document.uuid); toast.add({ title: t('knowledgeSpaces.records.chunkSaved'), color: 'success' }) } catch { showError(t('knowledgeSpaces.records.chunkSaveFailed')) } finally { savingChunk.value = false } }
 function startIngestionWS() {
-  if (typeof window === 'undefined' || ingestionWS) return
+  if (!workspace.capabilities.realtime || typeof window === 'undefined' || ingestionWS) return
   const apiBase = new URL(resolveApiBase(), window.location.origin)
   const protocol = apiBase.protocol === 'https:' ? 'wss:' : 'ws:'
   ingestionWS = createPluginWsClient({ pluginId: String(runtimeConfig.public?.powerxPluginId || 'com.powerx.plugins.base'), wsBaseURL: `${protocol}//${apiBase.host}`, wsPath: '/api/ws', token: getAuthToken() }).connect()

@@ -354,7 +354,7 @@ const handleRegister = async () => {
               d="M15 19l-7-7 7-7"
             ></path>
           </svg>
-          {{ `{{ $t("auth.backToHome") }}` }}
+          {{ "{{ $t(\"auth.backToHome\") }}" }}
         </NuxtLink>
       </div>
 
@@ -369,10 +369,10 @@ const handleRegister = async () => {
               PowerX
             </h1>
             <h2 class="text-xl font-semibold text-gray-900 mb-2">
-              {{ `{{ $t("auth.createAccount") }}` }}
+              {{ "{{ $t(\"auth.createAccount\") }}" }}
             </h2>
             <p class="text-gray-600 text-sm">
-              {{ `{{ $t("auth.registerSubtitle") }}` }}
+              {{ "{{ $t(\"auth.registerSubtitle\") }}" }}
             </p>
           </div>
         </template>
@@ -387,28 +387,28 @@ const handleRegister = async () => {
                   class="w-5 h-5 text-green-500"
                 />
                 <span class="text-green-800 font-semibold">
-                  {{ `{{ $t("auth.registerSuccessTitle") }}` }}
+                  {{ "{{ $t(\"auth.registerSuccessTitle\") }}" }}
                 </span>
               </div>
             </template>
             <template #description>
               <p class="text-green-700">
-                {{ `{{ $t("auth.registerSuccessDesc", { seconds: countdown }) }}` }}
+                {{ "{{ $t(\"auth.registerSuccessDesc\", { seconds: countdown }) }}" }}
               </p>
             </template>
           </UAlert>
 
           <div v-if="success" class="text-center space-y-4">
             <UButton :to="localePath('/')" color="primary">
-              {{ `{{ $t("auth.backToHome") }}` }}
+              {{ "{{ $t(\"auth.backToHome\") }}" }}
             </UButton>
             <p class="text-sm text-gray-500">
-              {{ `{{ $t("auth.hasAccount") }}` }}
+              {{ "{{ $t(\"auth.hasAccount\") }}" }}
               <NuxtLink
                 :to="localePath('/users/login')"
                 class="text-blue-600 hover:text-blue-700 font-medium"
               >
-                {{ `{{ $t("auth.signInNow") }}` }}
+                {{ "{{ $t(\"auth.signInNow\") }}" }}
               </NuxtLink>
             </p>
           </div>
@@ -436,7 +436,7 @@ const handleRegister = async () => {
                 for="username"
                 class="block text-sm font-medium text-gray-700 mb-3"
               >
-                {{ `{{ $t("auth.register.username") }}` }}
+                {{ "{{ $t(\"auth.register.username\") }}" }}
                 <span class="text-red-500">*</span>
               </label>
               <UInput
@@ -456,7 +456,7 @@ const handleRegister = async () => {
                 for="email"
                 class="block text-sm font-medium text-gray-700 mb-3"
               >
-                {{ `{{ $t("auth.email") }}` }} <span class="text-red-500">*</span>
+                {{ "{{ $t(\"auth.email\") }}" }} <span class="text-red-500">*</span>
               </label>
               <UInput
                 id="email"
@@ -476,7 +476,7 @@ const handleRegister = async () => {
                 for="password"
                 class="block text-sm font-medium text-gray-700 mb-3"
               >
-                {{ `{{ $t("auth.password") }}` }} <span class="text-red-500">*</span>
+                {{ "{{ $t(\"auth.password\") }}" }} <span class="text-red-500">*</span>
               </label>
               <UInput
                 id="password"
@@ -512,7 +512,7 @@ const handleRegister = async () => {
                       'text-green-600': passwordStrength.color === 'green',
                     }"
                   >
-                    {{ `{{ passwordStrength.text }}` }}
+                    {{ "{{ passwordStrength.text }}" }}
                   </span>
                 </div>
               </div>
@@ -524,7 +524,7 @@ const handleRegister = async () => {
                 for="confirmPassword"
                 class="block text-sm font-medium text-gray-700 mb-3"
               >
-                {{ `{{ $t("auth.register.confirmPassword") }}` }}
+                {{ "{{ $t(\"auth.register.confirmPassword\") }}" }}
                 <span class="text-red-500">*</span>
               </label>
               <UInput
@@ -547,23 +547,23 @@ const handleRegister = async () => {
                 class="mt-0.5"
               />
               <p class="text-sm text-gray-600 leading-relaxed">
-                {{ `{{ $t("auth.agreeTerms") }}` }}
+                {{ "{{ $t(\"auth.agreeTerms\") }}" }}
                 <a
                   href="#"
                   role="button"
                   aria-controls="terms-modal"
                   @click="openTermsModal"
                   class="text-blue-600 hover:text-blue-700 underline"
-                  >{{ `{{ $t("termsOfService") }}` }}</a
+                  >{{ "{{ $t(\"termsOfService\") }}" }}</a
                 >
-                {{ `{{ $t("auth.and") }}` }}
+                {{ "{{ $t(\"auth.and\") }}" }}
                 <a
                   href="#"
                   role="button"
                   aria-controls="privacy-modal"
                   @click="openPrivacyModal"
                   class="text-blue-600 hover:text-blue-700 underline"
-                  >{{ `{{ $t("privacyPolicy") }}` }}</a
+                  >{{ "{{ $t(\"privacyPolicy\") }}" }}</a
                 >
               </p>
             </div>
@@ -574,21 +574,21 @@ const handleRegister = async () => {
               class="text-xs text-amber-600 dark:text-amber-400 flex items-center space-x-1"
             >
               <UIcon name="i-heroicons-information-circle" class="w-4 h-4" />
-              <span>{{ `{{ $t("auth.terms.mustRead") }}` }}</span>
+              <span>{{ "{{ $t(\"auth.terms.mustRead\") }}" }}</span>
             </div>
             <div
               v-else-if="ENABLE_FORCED_READING && canAgree && !form.agree"
               class="text-xs text-green-600 dark:text-green-400 flex items-center space-x-1"
             >
               <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
-              <span>{{ `{{ $t("auth.terms.ready") }}` }}</span>
+              <span>{{ "{{ $t(\"auth.terms.ready\") }}" }}</span>
             </div>
             <div
               v-else-if="!ENABLE_FORCED_READING"
               class="text-xs text-blue-600 dark:text-blue-400 flex items-center space-x-1"
             >
               <UIcon name="i-heroicons-information-circle" class="w-4 h-4" />
-              <span>{{ `{{ $t("auth.termsInfo") }}` }}</span>
+              <span>{{ "{{ $t(\"auth.termsInfo\") }}" }}</span>
             </div>
 
             <!-- 注册按钮 -->
@@ -601,9 +601,7 @@ const handleRegister = async () => {
                 :disabled="!form.agree"
                 class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
-                {{ `{{ loading
-                    ? $t("auth.creatingAccount")
-                    : $t("auth.createAccount") }}` }}
+                {{ "{{\n                  loading\n                    ? $t(\"auth.creatingAccount\")\n                    : $t(\"auth.createAccount\")\n                }}" }}
               </UButton>
             </div>
           </form>
@@ -611,12 +609,12 @@ const handleRegister = async () => {
           <!-- 登录链接 -->
           <div class="text-center mt-6 pt-4 border-t border-gray-200">
             <p class="text-gray-600 text-sm">
-              {{ `{{ $t("auth.hasAccount") }}` }}
+              {{ "{{ $t(\"auth.hasAccount\") }}" }}
               <NuxtLink
                 :to="$localePath('/users/login')"
                 class="text-blue-600 hover:text-blue-700 font-medium"
               >
-                {{ `{{ $t("auth.signInNow") }}` }}
+                {{ "{{ $t(\"auth.signInNow\") }}" }}
               </NuxtLink>
             </p>
           </div>
@@ -638,7 +636,7 @@ const handleRegister = async () => {
         <header
           class="px-4 py-3 border-b shrink-0 flex justify-between items-center"
         >
-          <h3 class="text-base font-semibold">{{ `{{ $t("auth.termsModal.title") }}` }}</h3>
+          <h3 class="text-base font-semibold">{{ "{{ $t(\"auth.termsModal.title\") }}" }}</h3>
           <UButton
             variant="ghost"
             icon="i-heroicons-x-mark"
@@ -674,9 +672,7 @@ const handleRegister = async () => {
                       termsScrolledToBottom ? 'text-green-600' : 'text-gray-500'
                     "
                   >
-                    {{ `{{ termsScrolledToBottom
-                        ? $t("auth.reading.complete")
-                        : $t("auth.reading.scroll") }}` }}
+                    {{ "{{\n                      termsScrolledToBottom\n                        ? $t(\"auth.reading.complete\")\n                        : $t(\"auth.reading.scroll\")\n                    }}" }}
                   </span>
                 </div>
 
@@ -701,11 +697,7 @@ const handleRegister = async () => {
                         : 'text-gray-500'
                     "
                   >
-                    {{ `{{ termsRemainingTime === 0
-                        ? $t("auth.reading.enough")
-                        : $t("auth.reading.remainingTime", {
-                            seconds: termsRemainingTime,
-                          }) }}` }}
+                    {{ "{{\n                      termsRemainingTime === 0\n                        ? $t(\"auth.reading.enough\")\n                        : $t(\"auth.reading.remainingTime\", {\n                            seconds: termsRemainingTime,\n                          })\n                    }}" }}
                   </span>
                 </div>
               </div>
@@ -716,7 +708,7 @@ const handleRegister = async () => {
                 class="flex items-center space-x-2 text-green-600"
               >
                 <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
-                <span class="text-sm font-medium">{{ `{{ $t("auth.reading.readyTerms") }}` }}</span>
+                <span class="text-sm font-medium">{{ "{{ $t(\"auth.reading.readyTerms\") }}" }}</span>
               </div>
             </div>
           </div>
@@ -729,13 +721,13 @@ const handleRegister = async () => {
             variant="soft"
             :disabled="!canCloseTerms"
             @click="handleTermsAgree(false)"
-            >{{ `{{ $t("common.close") }}` }}</UButton
+            >{{ "{{ $t(\"common.close\") }}" }}</UButton
           >
           <UButton
             color="primary"
             :disabled="!canCloseTerms"
             @click="handleTermsAgree(true)"
-            >{{ `{{ $t("auth.modal.accept") }}` }}</UButton
+            >{{ "{{ $t(\"auth.modal.accept\") }}" }}</UButton
           >
         </footer>
       </template>
@@ -755,7 +747,7 @@ const handleRegister = async () => {
         <header
           class="px-4 py-3 border-b shrink-0 flex justify-between items-center"
         >
-          <h3 class="text-base font-semibold">{{ `{{ $t("auth.privacyModal.title") }}` }}</h3>
+          <h3 class="text-base font-semibold">{{ "{{ $t(\"auth.privacyModal.title\") }}" }}</h3>
           <UButton
             variant="ghost"
             icon="i-heroicons-x-mark"
@@ -795,9 +787,7 @@ const handleRegister = async () => {
                         : 'text-gray-500'
                     "
                   >
-                    {{ `{{ privacyScrolledToBottom
-                        ? $t("auth.reading.complete")
-                        : $t("auth.reading.scroll") }}` }}
+                    {{ "{{\n                      privacyScrolledToBottom\n                        ? $t(\"auth.reading.complete\")\n                        : $t(\"auth.reading.scroll\")\n                    }}" }}
                   </span>
                 </div>
 
@@ -822,11 +812,7 @@ const handleRegister = async () => {
                         : 'text-gray-500'
                     "
                   >
-                    {{ `{{ privacyRemainingTime === 0
-                        ? $t("auth.reading.enough")
-                        : $t("auth.reading.remainingTime", {
-                            seconds: privacyRemainingTime,
-                          }) }}` }}
+                    {{ "{{\n                      privacyRemainingTime === 0\n                        ? $t(\"auth.reading.enough\")\n                        : $t(\"auth.reading.remainingTime\", {\n                            seconds: privacyRemainingTime,\n                          })\n                    }}" }}
                   </span>
                 </div>
               </div>
@@ -837,7 +823,7 @@ const handleRegister = async () => {
                 class="flex items-center space-x-2 text-green-600"
               >
                 <UIcon name="i-heroicons-check-circle" class="w-4 h-4" />
-                <span class="text-sm font-medium">{{ `{{ $t("auth.reading.readyPrivacy") }}` }}</span>
+                <span class="text-sm font-medium">{{ "{{ $t(\"auth.reading.readyPrivacy\") }}" }}</span>
               </div>
             </div>
           </div>
@@ -850,13 +836,13 @@ const handleRegister = async () => {
             variant="soft"
             :disabled="!canClosePrivacy"
             @click="handlePrivacyAgree(false)"
-            >{{ `{{ $t("common.close") }}` }}</UButton
+            >{{ "{{ $t(\"common.close\") }}" }}</UButton
           >
           <UButton
             color="primary"
             :disabled="!canClosePrivacy"
             @click="handlePrivacyAgree(true)"
-            >{{ `{{ $t("auth.modal.accept") }}` }}</UButton
+            >{{ "{{ $t(\"auth.modal.accept\") }}" }}</UButton
           >
         </footer>
       </template>

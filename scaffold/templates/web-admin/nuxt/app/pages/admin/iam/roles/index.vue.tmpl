@@ -30,8 +30,8 @@ onMounted(async () => {
 <template>
   <div class="p-6 space-y-4">
     <div class="flex flex-wrap items-center gap-2">
-      <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
-      <UBadge v-if="readonlyMode" color="warning" variant="soft">{{ `{{ t("providerMode.readOnly") }}` }}</UBadge>
+      <UBadge color="neutral" variant="soft">{{ "{{ providerModeLabel }}" }}</UBadge>
+      <UBadge v-if="readonlyMode" color="warning" variant="soft">{{ "{{ t(\"providerMode.readOnly\") }}" }}</UBadge>
     </div>
     <RoleManager :readonly="readonlyMode" />
   </div>

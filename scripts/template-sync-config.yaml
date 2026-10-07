@@ -25,7 +25,7 @@ mappings:
       - globs: ["**/*.vue"]
         regex: "{{\\s*(?!print)(.*?)\\s*}}"
         flags: "gs"
-        replace: "{{ `{{ $1 }}` }}"
+        quoteMatch: true
       - globs: ["nuxt.config.ts", "app/**/*.ts", "i18n/**/*.json", "package.json"]
         literal: "'com.powerx.plugins.base'"
         replace: "'{{ .PluginID }}'"

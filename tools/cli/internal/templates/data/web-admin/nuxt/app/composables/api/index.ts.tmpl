@@ -2,10 +2,12 @@
 
 export * from "./useTemplate";
 export * from "./useStream";
+export * from "./useAgentSessions";
 export * from "./useCapabilityRegistry";
 export * from "./useCapabilityExposure";
 export * from "./useCapabilityLifecycle";
 export * from "./useCapabilityCatalog";
+export * from "./useHostContractLab";
 export * from "./useScheduler";
 export {
   useApiClient,
@@ -17,3 +19,6 @@ export {
 } from "./_client";
 export { resolveApiBase, getAuthToken, getTenantUuid } from "./_base";
 export type { Page, ApiResponse, ListQuery } from "./_base";
+
+export { useKnowledgeWorkspace, knowledgeWorkspaceKey } from "./useKnowledgeWorkspace";
+export { usePowerXKnowledgeWorkspace } from "./usePowerXKnowledgeWorkspace";

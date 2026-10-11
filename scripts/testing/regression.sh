@@ -206,6 +206,8 @@ server:
   dev_mode: true
 context:
   provider_mode: "local"
+ai_catalog:
+  directory: "${ROOT_DIR}/skeleton/backend/etc/ai/providers.d"
 database:
   driver: "memory"
   dsn: "file:powerxplugin-regression?mode=memory&cache=shared"

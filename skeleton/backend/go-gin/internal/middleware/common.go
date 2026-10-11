@@ -10,6 +10,7 @@ import (
 	"time"
 
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	fwmiddleware "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -29,7 +30,7 @@ func CORS() gin.HandlerFunc {
 				"Content-Type, Content-Length, Accept-Encoding, "+
 					"X-CSRF-Token, Authorization, accept, origin, Cache-Control, "+
 					"X-Requested-With, tenant_uuid, X-PowerX-CTX, X-PowerX-CTX-SIG, X-PowerX-CTX-JWT, "+
-					"X-Request-ID, X-Trace-Id, X-Scheduler-Provider-Mode",
+					"X-Request-ID, X-Trace-Id, X-Scheduler-Provider-Mode, X-Local-Media-Ticket",
 			)
 			c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 			c.Header("Access-Control-Expose-Headers", "X-Trace-Id, X-Correlation-Id, X-Request-Id")
@@ -83,7 +84,16 @@ func RequestLogger() gin.HandlerFunc {
 		}
 
 		if raw != "" {
-			fields["query"] = raw
+			query := c.Request.URL.Query()
+			for key := range query {
+				switch strings.ToLower(key) {
+				case "authorization", "access_token", "token", "context_ticket", "api_key":
+					query.Del(key)
+				}
+			}
+			if clean := query.Encode(); clean != "" {
+				fields["query"] = clean
+			}
 		}
 
 		if strings.TrimSpace(tenantUUID) != "" {
@@ -146,48 +156,8 @@ func Recovery() gin.HandlerFunc {
 }
 
 // Timeout 超时中间件
-func Timeout(timeout time.Duration) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if isRealtimeStreamRequest(c.Request) {
-			c.Next()
-			return
-		}
-
-		// 简单的超时处理，实际使用中可能需要更复杂的实现
-		finish := make(chan struct{})
-		panicChan := make(chan interface{}, 1)
-
-		go func() {
-			defer func() {
-				if p := recover(); p != nil {
-					panicChan <- p
-				}
-			}()
-			c.Next()
-			finish <- struct{}{}
-		}()
-
-		select {
-		case p := <-panicChan:
-			panic(p)
-		case <-finish:
-			// 请求正常完成
-		case <-time.After(timeout):
-			requestID := strings.TrimSpace(c.GetString("request_id"))
-			if requestID != "" {
-				c.Header("X-Request-ID", requestID)
-			}
-			c.JSON(http.StatusRequestTimeout, gin.H{
-				"request_id": requestID,
-				"timestamp":  time.Now().UTC(),
-				"error": gin.H{
-					"code":    "REQUEST_TIMEOUT",
-					"message": "Request timeout",
-				},
-			})
-			c.Abort()
-		}
-	}
+func Timeout(timeout time.Duration, next http.Handler) http.Handler {
+	return fwmiddleware.TimeoutHandler(next, timeout, isRealtimeStreamRequest)
 }
 
 func isRealtimeStreamRequest(req *http.Request) bool {

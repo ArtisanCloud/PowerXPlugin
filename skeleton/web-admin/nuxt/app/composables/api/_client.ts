@@ -4,12 +4,13 @@ import { resolveApiBase, getAuthToken, getTenantUuid } from "./_base";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
 import {
   createPowerXApiFetchClient,
-  requestPowerXHostAuthToken,
+  classifyPowerXApiAuthError,
+  getPowerXHostSession,
+  isPowerXEmbedded,
   type PowerXApiClientRequestOptions,
   type PowerXApiFetchClient,
 } from "@artisan-cloud/plugin-framework-client";
-import { useRouter, useRuntimeConfig, useToast } from "#imports";
-import { useHostCtxStore } from "~/stores/hostCtx";
+import { useRuntimeConfig, useToast } from "#imports";
 import { PLUGIN_ID } from "~/utils/powerx-bridge";
 import { createFrameworkLogger } from "@artisan-cloud/plugin-framework-client";
 
@@ -36,53 +37,16 @@ export function useApiClient() {
   }
 
   const baseURL = resolveApiBase();
-  const router = useRouter();
   const toast = process.client ? useToast() : null;
-  const hostCtxStore = process.client ? useHostCtxStore() : null;
   const runtimeConfig = useRuntimeConfig();
-  const insidePowerX =
-    runtimeConfig.public?.insidePowerX === true ||
-    runtimeConfig.public?.insidePowerX === "true";
+  const insidePowerX = isPowerXEmbedded(runtimeConfig.public?.insidePowerX);
+  const translate = (key: string) => useNuxtApp().$i18n.t(key);
   _baseURL = baseURL;
 
   const resolveAuth = async () => {
     if (!process.client) return null;
     const mod = await import("~/composables/useAuth");
     return mod.useAuth();
-  };
-
-  const readErrorPayload = (response?: { _data?: any }) => {
-    const data = response?._data || {};
-    const code = String(data?.error?.code || data?.code || "").trim();
-    const message = String(
-      data?.error?.message || data?.message || data?.error || ""
-    ).trim();
-    return { code, message };
-  };
-
-  const isDelegatedAuthUnavailable = (response?: { status?: number; _data?: any }) => {
-    if (!response || response.status !== 503) return false;
-    const { code, message } = readErrorPayload(response);
-    if (!message) return false;
-    const lower = message.toLowerCase();
-    if (lower.includes("宿主认证") || lower.includes("delegated auth")) return true;
-    return code === "SERVICE_UNAVAILABLE" && lower.includes("auth");
-  };
-
-  const isStsAuthError = (response?: { _data?: any }) => {
-    const { code } = readErrorPayload(response);
-    return code === "AUTH_STS_EXPIRED";
-  };
-
-  const isSessionAuthError = (response?: { _data?: any }) => {
-    const { code } = readErrorPayload(response);
-    return [
-      "AUTH_TOKEN_INVALID",
-      "AUTH_TOKEN_EXPIRED",
-      "AUTH_STS_EXPIRED",
-      "TOKEN_EXPIRED",
-      "TOKEN_INVALID",
-    ].includes(code);
   };
 
   const handleAuthError = async ({
@@ -95,25 +59,10 @@ export function useApiClient() {
     prepared?: Record<string, any>;
   }) => {
     if (!response || prepared?.silentAuthError) return;
-    const auth = await resolveAuth();
-    if (!auth) return;
-    if (isDelegatedAuthUnavailable(response)) {
-      logger.error("api delegated auth unavailable", {
-        status: response.status,
-        data: response._data,
-      });
-      const { message } = readErrorPayload(response);
-      auth.failClosed?.(message || "宿主认证不可用，请稍后重试");
-      if (process.client && !insidePowerX) {
-        const redirect = window.location.pathname + window.location.search;
-        router?.push({ path: "/users/login", query: { redirect } });
-      }
-      return;
-    }
-    if (response.status !== 401) return;
-
-    const stsExpired = isStsAuthError(response);
-    const sessionAuthError = isSessionAuthError(response);
+    if (insidePowerX && !getPowerXHostSession(PLUGIN_ID).isCurrent(prepared?.__powerxHostSnapshot)) return;
+    const { kind, code } = classifyPowerXApiAuthError(response);
+    if (response.status !== 401 && kind !== 'identity-unavailable') return;
+    const sessionAuthError = kind === 'user-session-expired' || kind === 'user-session-invalid';
     const hasAuthHeader = Boolean(
       prepared?.headers instanceof Headers
         ? prepared.headers.get("Authorization")
@@ -123,22 +72,19 @@ export function useApiClient() {
       process.client &&
       /\/users\/login(?:$|[?#/])/i.test(window.location.pathname);
     if (!insidePowerX && hasAuthHeader && sessionAuthError) {
-      auth.clearAuth?.("token_invalid", true);
+      const auth = await resolveAuth();
+      auth?.clearAuth?.("token_invalid", true);
     }
+    logger.error('api auth request rejected', { status: response.status, code });
     if (process.client && !onLoginPage) {
+      const descriptionKey = sessionAuthError ? 'hostSession.required'
+        : kind === 'identity-proof' ? 'hostSession.identityProofRejected'
+        : kind === 'service-credential' ? 'hostSession.serviceCredentialRejected'
+        : kind === 'identity-unavailable' ? 'hostSession.upstreamUnavailable'
+        : 'hostSession.requestFailed';
       toast?.add?.({
-        title: sessionAuthError
-          ? stsExpired
-            ? "STS 令牌已过期"
-            : "登录状态已失效"
-          : "请求未授权",
-        description: !hasAuthHeader
-          ? "该请求缺少 Authorization，已保留当前登录态"
-          : stsExpired
-          ? "短期 STS 令牌已失效，请重新登录刷新上下文"
-          : sessionAuthError
-            ? "请重新登录后再试"
-            : `当前账号不能访问该接口：${String(request || "")}`,
+        title: translate('hostSession.requestRejected'),
+        description: translate(descriptionKey),
         color: "red",
       });
     }
@@ -150,10 +96,8 @@ export function useApiClient() {
     pluginId: PLUGIN_ID,
     insidePowerX,
     getAuth: resolveAuth,
-    getFallbackToken: getAuthToken,
+    getFallbackToken: insidePowerX ? undefined : getAuthToken,
     getTenantUuid: () => resolveTenantUUIDForRequest() || getTenantUuid(),
-    getHostCtx: (key) => hostCtxStore?.getCtx(key),
-    requestHostToken: () => requestPowerXHostAuthToken(PLUGIN_ID),
     onAuthError: handleAuthError,
     logger,
   });

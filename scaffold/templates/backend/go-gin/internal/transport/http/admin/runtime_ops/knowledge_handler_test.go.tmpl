@@ -37,7 +37,7 @@ func (g *knowledgeGatewayStub) Invoke(_ context.Context, params capgateway.Invok
 	}
 	return &capgateway.InvokeResult{TraceID: "trace-knowledge", Status: "ok", Data: data, Raw: g.invokeRaw}, nil
 }
-func (g *knowledgeGatewayStub) ListPlatformCapabilities(context.Context, capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
+func (g *knowledgeGatewayStub) ListPlatformCapabilityCatalog(context.Context, capgateway.ListPlatformCapabilityCatalogOptions) ([]capgateway.PlatformCapabilityCatalogRecord, error) {
 	return nil, nil
 }
 func (g *knowledgeGatewayStub) ListKnowledgeSpaces(_ context.Context, opts capgateway.KnowledgeSpaceListOptions) ([]capgateway.KnowledgeSpaceRuntimeRecord, error) {

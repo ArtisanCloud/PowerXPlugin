@@ -3,10 +3,10 @@ package templates
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"io"
 	"math"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -59,12 +59,12 @@ func (h *TemplateHandler) GetTemplates(c *gin.Context) {
 
 func (h *TemplateHandler) GetTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.read
-	id, err := parseUint64(c.Param("id"))
+	id, err := parseTemplateUUID(c.Param("uuid"))
 	if err != nil {
-		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
 		return
 	}
-	tpl, err := h.TemplateService.GetByID(c.Request.Context(), id)
+	tpl, err := h.TemplateService.GetByUUID(c.Request.Context(), id)
 	if err != nil {
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
@@ -100,9 +100,9 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 
 func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.update
-	id, err := parseUint64(c.Param("id"))
+	id, err := parseTemplateUUID(c.Param("uuid"))
 	if err != nil {
-		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
 		return
 	}
 	var req UpdateTemplateRequest
@@ -126,9 +126,9 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 
 func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
 	// capability: com.powerx.plugins.base.template.delete
-	id, err := parseUint64(c.Param("id"))
+	id, err := parseTemplateUUID(c.Param("uuid"))
 	if err != nil {
-		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
 		return
 	}
 	if err := h.TemplateService.Delete(c.Request.Context(), id); err != nil {
@@ -156,7 +156,7 @@ func (h *TemplateHandler) BatchCloneTemplates(c *gin.Context) {
 	}
 	result, err := h.TemplateService.BatchClone(
 		c.Request.Context(),
-		req.SourceIDs,
+		req.SourceUUIDs,
 		req.Copies,
 		srvtemplates.BatchCloneOptions{
 			NamePrefix:        req.NamePrefix,
@@ -176,9 +176,9 @@ func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
 		contracts.ResponseServiceUnavailable(c, "template service not available", nil)
 		return
 	}
-	id, err := parseUint64(c.Param("id"))
+	id, err := parseTemplateUUID(c.Param("uuid"))
 	if err != nil {
-		respondTemplateValidationError(c, newInvalidTemplateIDError())
+		respondTemplateValidationError(c, newInvalidTemplateUUIDError())
 		return
 	}
 	var req ValidateTemplateRequest
@@ -194,9 +194,12 @@ func (h *TemplateHandler) ValidateTemplateCapability(c *gin.Context) {
 	contracts.ResponseSuccess(c, res)
 }
 
-func parseUint64(s string) (uint64, error) {
-	u, err := strconv.ParseUint(s, 10, 64)
-	return uint64(u), err
+func parseTemplateUUID(s string) (string, error) {
+	u, err := uuid.Parse(s)
+	if err != nil || u == uuid.Nil || u.String() != s {
+		return "", gorm.ErrInvalidData
+	}
+	return s, nil
 }
 
 func totalPages(total int64, pageSize int) int {
@@ -241,7 +244,7 @@ func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action stri
 
 	payload := gin.H{
 		"action":        strings.TrimSpace(action),
-		"template_id":   tpl.ID,
+		"template_uuid": tpl.UUID,
 		"name":          tpl.Name,
 		"status":        tpl.Status,
 		"review_status": tpl.ReviewStatus,
@@ -296,11 +299,11 @@ func (h *TemplateHandler) publishTemplateUpdateEvent(c *gin.Context, action stri
 	}
 
 	h.deps.RuntimeLogger(c.Request.Context(), "templates.wsbus_publish", map[string]any{
-		"topic":        templateUpdateTopic,
-		"action":       strings.TrimSpace(action),
-		"template_id":  tpl.ID,
-		"tenant_uuid":  tenantUUID,
-		"error_code":   strings.TrimSpace(result.ErrorCode),
-		"error_reason": strings.TrimSpace(result.ErrorMessage),
+		"topic":         templateUpdateTopic,
+		"action":        strings.TrimSpace(action),
+		"template_uuid": tpl.UUID,
+		"tenant_uuid":   tenantUUID,
+		"error_code":    strings.TrimSpace(result.ErrorCode),
+		"error_reason":  strings.TrimSpace(result.ErrorMessage),
 	}).Warn("template ws event publish failed")
 }

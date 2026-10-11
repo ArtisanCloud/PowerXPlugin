@@ -102,8 +102,8 @@ func (r *Router) setupGlobalMiddleware() {
 	// 请求 ID
 	r.engine.Use(middleware.RequestID())
 
-	// 超时（默认 5 分钟）；SSE/WS 长连接在 middleware 内跳过。
-	r.engine.Use(middleware.Timeout(5 * time.Minute))
+	// HTTP timeout wraps the whole engine in server.ginHandler; it must not
+	// execute this Gin Context concurrently with the request goroutine.
 
 	// 速率限制（每分钟最多 100 个请求）
 	r.engine.Use(middleware.RateLimiter(100, time.Minute))
@@ -197,6 +197,9 @@ func (r *Router) setupRoutes() {
 	gProtected := r.engine.Group(prefix)
 	gProtected.Use(middleware2.RequestTrace())
 	gProtected.Use(middleware2.JWTAuth(jwtCfg))
+	if shouldUseDelegatedIAM(r.cfg) {
+		gProtected.Use(middleware2.RefreshFrameworkIAMContext(r.deps, prefix))
+	}
 	gProtected.Use(middleware2.RBAC(rbacCfg, nil, nil))
 	apiRegistry.RegisterAPIRoutes(gProtected)
 	r.injectRBACFromRegistry(rbacCfg, apiRegistry)
@@ -291,7 +294,7 @@ func (r *Router) buildJWT() middleware.JWTAuthConfig {
 			AcceptAudiences:    []string{aud},
 			HMACSecret:         strings.TrimSpace(os.Getenv("POWERX_SECURITY_JWT_SECRET")), // 可为空：只走签名上下文
 			ContextHMACSecret:  strings.TrimSpace(os.Getenv("POWERX_SECURITY_CTX_HMAC_SECRET")),
-			AllowSignedContext: true,  // 允许 X-PowerX-CTX / X-PowerX-CTX-SIG
+			AllowSignedContext: false, // Delegated uses business JWT plus Core request proof.
 			Optional:           false, // 严格：失败即 401
 			ClockSkewSeconds:   60,
 			MaxCtxAgeSeconds:   300,

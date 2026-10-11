@@ -1,29 +1,35 @@
 package knowledge
 
 import (
-	"context"
-	"strings"
 	"time"
 
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 )
 
 type Factory struct {
 	cfg    *config.Config
+	mode   fwprovider.Mode
 	client fwknowledge.DelegatedClient
 	logger *pxlog.Entry
 }
 
-func NewProviderFactory(cfg *config.Config, client fwknowledge.DelegatedClient, logger *pxlog.Entry) *Factory {
+// NewProviderFactory selects exactly one provider from the bootstrap-resolved
+// ProviderMode. KnowledgeConfig configures that adapter; it never selects a
+// different source at request time.
+func NewProviderFactory(cfg *config.Config, mode fwprovider.Mode, client fwknowledge.DelegatedClient, logger *pxlog.Entry) *Factory {
 	if logger == nil {
 		logger = pxlog.WithComponent("knowledge.provider_factory")
 	}
-	return &Factory{cfg: cfg, client: client, logger: logger}
+	return &Factory{cfg: cfg, mode: mode, client: client, logger: logger}
 }
 
 func (f *Factory) Build() (fwknowledge.KnowledgeProvider, error) {
+	if f == nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge.factory_unavailable")
+	}
 	cfg := &config.Config{}
 	if f != nil && f.cfg != nil {
 		cfg = f.cfg
@@ -34,55 +40,26 @@ func (f *Factory) Build() (fwknowledge.KnowledgeProvider, error) {
 	if err := cfg.NormalizeKnowledgeConfig(); err != nil {
 		return nil, err
 	}
-	mode := strings.ToLower(strings.TrimSpace(cfg.Knowledge.Mode))
-	switch mode {
-	case fwknowledge.ProviderModeDelegated, fwknowledge.ProviderModeThirdParty:
+	var local, delegated fwknowledge.KnowledgeProvider
+	switch f.mode {
+	case fwprovider.ModeDelegated:
+		if f == nil || f.client == nil {
+			return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
+		}
 		timeout, _ := time.ParseDuration(cfg.Knowledge.DelegateTimeout)
-		return fwknowledge.NewDelegatedProvider(fwknowledge.DelegatedProviderConfig{
+		delegated = fwknowledge.NewDelegatedProvider(fwknowledge.DelegatedProviderConfig{
 			Name:    "powerx_delegated",
-			Client:  f.delegatedClient(),
+			Client:  f.client,
 			Timeout: timeout,
-		}), nil
-	case fwknowledge.ProviderModeMock:
-		return fwknowledge.NewMockProvider(), nil
+		})
+	case fwprovider.ModeLocal:
+		local = fwknowledge.NewLocalProvider(fwknowledge.LocalProviderConfig{RequireTenant: cfg.Knowledge.RequireTenant})
 	default:
-		return fwknowledge.NewLocalProvider(fwknowledge.LocalProviderConfig{RequireTenant: cfg.Knowledge.RequireTenant}), nil
+		return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge provider mode is not configured")
 	}
-}
-
-func (f *Factory) delegatedClient() fwknowledge.DelegatedClient {
-	if f != nil && f.client != nil {
-		return f.client
+	runtime, err := fwknowledge.NewRuntime(f.mode, local, delegated)
+	if err != nil {
+		return nil, err
 	}
-	return unavailableDelegatedClient{}
-}
-
-type unavailableDelegatedClient struct{}
-
-func (unavailableDelegatedClient) ListKnowledgeSpaces(context.Context, fwknowledge.ListSpacesInput) ([]fwknowledge.KnowledgeSpace, error) {
-	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
-}
-
-func (unavailableDelegatedClient) GetKnowledgeCatalog(context.Context) (*fwknowledge.KnowledgeCatalog, error) {
-	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
-}
-
-func (unavailableDelegatedClient) SearchKnowledge(context.Context, fwknowledge.KnowledgeQuery) (*fwknowledge.KnowledgeSearchResult, error) {
-	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
-}
-
-func (unavailableDelegatedClient) UpsertKnowledgeDocument(context.Context, fwknowledge.KnowledgeDocument) (*fwknowledge.KnowledgeIndexJob, error) {
-	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
-}
-
-func (unavailableDelegatedClient) DeleteKnowledgeDocument(context.Context, fwknowledge.DeleteDocumentInput) (*fwknowledge.KnowledgeIndexJob, error) {
-	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
-}
-
-func (unavailableDelegatedClient) ReindexKnowledgeDocument(context.Context, fwknowledge.ReindexInput) (*fwknowledge.KnowledgeIndexJob, error) {
-	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
-}
-
-func (unavailableDelegatedClient) GetKnowledgeIndexJob(context.Context, fwknowledge.IndexJobQuery) (*fwknowledge.KnowledgeIndexJob, error) {
-	return nil, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge delegated client is not configured")
+	return runtime.Provider()
 }

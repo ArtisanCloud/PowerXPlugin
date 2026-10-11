@@ -1,0 +1,15 @@
+export type RetrievalMode = 'semantic' | 'hybrid'
+export type ArtifactRole = 'source_chunk' | 'knowledge_profile'
+export type EmbeddingRef = {uuid:string;version:number}
+export type SemanticIndexing = {mode:RetrievalMode;embedding_profile:EmbeddingRef;artifact_roles:ArtifactRole[]}
+export type SemanticIndexSnapshot = SemanticIndexing & {env:string;configuration_generation:string;model_key:string;model_revision:string;config_checksum:string;dimensions:number;vector_index_key:string}
+export type SemanticGeneration = {env:string;space_uuid:string;configuration_generation:string;corpus_generation:string;embedding_profile:EmbeddingRef;model_key:string;model_revision:string;dimensions:number;distance_metric:string}
+export type SemanticCapabilities = {schema:string;configured:boolean;ready:boolean;indexed:boolean;query_modes:RetrievalMode[];indexed_query_modes?:RetrievalMode[];index_modes?:RetrievalMode[];index_counts?:{mode:RetrievalMode;documents:number;chunks:number}[];artifact_roles?:ArtifactRole[];supported_filters?:string[];generation?:SemanticGeneration;pending_generation?:SemanticGeneration|null;reason_code?:string;limits?:{max_query_codepoints:number;max_top_k:number;max_spaces:number;max_artifacts:number}}
+export type SourceRef = {kind:string;source_uuid:string;version:string;checksum:string;position_unit:'unicode_codepoint';char_start:number;char_end:number}
+export type SemanticArtifact = {uuid:string;role:ArtifactRole;text:string;checksum:string;version:string;source_ref:SourceRef;knowledge_profile_uuid?:string|null;case_uuid?:string|null;category_codes:string[];tag_uuids:string[]}
+export type SemanticFilters = {document_uuids:string[];category_codes:string[];tag_uuids:string[];artifact_roles:ArtifactRole[]}
+export type SemanticQuery = {schema:'powerx.knowledge.retrieval-query/v1';query:string;space_uuids:string[];mode:RetrievalMode;top_k:number;filters:SemanticFilters;required_generations?:Record<string,string>}
+export type SemanticScore = {source:string;score:number;score_type:string;direction:'higher_better'|'lower_better'}
+export type SemanticMatch = {space_uuid:string;document_uuid:string;chunk_uuid:string;artifact_uuid:string;artifact_role:ArtifactRole;knowledge_profile_uuid?:string|null;case_uuid?:string|null;title:string;text:string;score:number;score_type:string;scores:SemanticScore[];retrieval_sources:string[];external_ref?:{document_uuid:string};source_ref:SourceRef;document_version:string;bundle_generation:string}
+export type SemanticResult = {schema:string;query_uuid:string;requested_mode:RetrievalMode;effective_mode:RetrievalMode;generations:SemanticGeneration[];items:SemanticMatch[];trace_id:string;invocation_trace_id?:string;request_id?:string}
+export type SemanticDocument = {indexing?:SemanticIndexing;external_ref?:{document_uuid:string};artifacts?:SemanticArtifact[];idempotency_key?:string;uri?:string;version?:string;checksum?:string}

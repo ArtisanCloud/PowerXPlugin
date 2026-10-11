@@ -29,6 +29,7 @@ const (
 	OperationReindex  = "reindex"
 	OperationHealth   = "health"
 	OperationCatalog  = "catalog"
+	OperationCreate   = "create"
 
 	IndexOperationUpsert  = "upsert"
 	IndexOperationDelete  = "delete"
@@ -103,18 +104,49 @@ func (in ListSpacesInput) Normalized() ListSpacesInput {
 }
 
 type KnowledgeDocument struct {
-	DocumentID  string         `json:"document_id,omitempty"`
-	SpaceID     string         `json:"space_id,omitempty"`
-	Title       string         `json:"title,omitempty"`
-	URI         string         `json:"uri,omitempty"`
-	Content     string         `json:"content,omitempty"`
-	ContentType string         `json:"content_type,omitempty"`
-	Checksum    string         `json:"checksum,omitempty"`
-	Version     string         `json:"version,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
-	Visibility  string         `json:"visibility,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	TenantUUID  string         `json:"tenant_uuid,omitempty"`
+	Indexing       *SemanticIndexingSettings  `json:"indexing,omitempty"`
+	Artifacts      []SemanticArtifact         `json:"artifacts,omitempty"`
+	ExternalRef    *SemanticExternalRef       `json:"external_ref,omitempty"`
+	IdempotencyKey string                     `json:"idempotency_key,omitempty"`
+	DocumentID     string                     `json:"document_id,omitempty"`
+	SpaceID        string                     `json:"space_id,omitempty"`
+	Title          string                     `json:"title,omitempty"`
+	URI            string                     `json:"uri,omitempty"`
+	Content        string                     `json:"content,omitempty"`
+	ContentType    string                     `json:"content_type,omitempty"`
+	Checksum       string                     `json:"checksum,omitempty"`
+	Version        string                     `json:"version,omitempty"`
+	Tags           []string                   `json:"tags,omitempty"`
+	Visibility     string                     `json:"visibility,omitempty"`
+	Metadata       map[string]any             `json:"metadata,omitempty"`
+	TenantUUID     string                     `json:"tenant_uuid,omitempty"`
+	Ingestion      *IngestionConfig           `json:"ingestion,omitempty"`
+	HostIngestion  *DocumentIngestionSettings `json:"host_ingestion,omitempty"`
+}
+
+// IngestionConfig is the provider-neutral task-scoped ingestion configuration.
+// Local providers use this type. PowerX Host snapshots use the separate
+// DocumentIngestionSettings DTO via KnowledgeDocument.HostIngestion.
+type IngestionConfig struct {
+	IngestionProfile    string   `json:"ingestion_profile,omitempty"`
+	ProcessorProfile    string   `json:"processor_profile,omitempty"`
+	MaskingProfile      string   `json:"masking_profile,omitempty"`
+	Priority            string   `json:"priority,omitempty"`
+	RAGSceneKey         string   `json:"rag_scene_key,omitempty"`
+	RAGBundleKey        string   `json:"rag_bundle_key,omitempty"`
+	RAGPrimary          string   `json:"rag_primary,omitempty"`
+	SegmentMode         string   `json:"segment_mode,omitempty"`
+	ChunkSize           int      `json:"chunk_size,omitempty"`
+	ChunkOverlap        int      `json:"chunk_overlap,omitempty"`
+	SegmentSizePolicy   string   `json:"segment_size_policy,omitempty"`
+	SegmentOrder        []string `json:"segment_order,omitempty"`
+	Separators          []string `json:"separators,omitempty"`
+	PagePriority        bool     `json:"page_priority,omitempty"`
+	AnchorHeadingPath   bool     `json:"anchor_heading_path,omitempty"`
+	AnchorClauseID      bool     `json:"anchor_clause_id,omitempty"`
+	AnchorRowNumber     bool     `json:"anchor_row_number,omitempty"`
+	AnchorSpeaker       bool     `json:"anchor_speaker,omitempty"`
+	AnchorSentenceIndex bool     `json:"anchor_sentence_index,omitempty"`
 }
 
 type KnowledgePosition map[string]any
@@ -171,6 +203,22 @@ type KnowledgeSearchResult struct {
 }
 
 type KnowledgeIndexJob struct {
+	ArtifactCount      *int                       `json:"artifact_count,omitempty"`
+	VectorCount        *int                       `json:"vector_count,omitempty"`
+	BundleGeneration   string                     `json:"bundle_generation,omitempty"`
+	InvocationTraceID  string                     `json:"invocation_trace_id,omitempty"`
+	RequestID          string                     `json:"request_id,omitempty"`
+	RebuildMode        DocumentRebuildMode        `json:"rebuild_mode,omitempty"`
+	DocumentCount      *int                       `json:"document_count,omitempty"`
+	ProcessedDocuments *int                       `json:"processed_documents,omitempty"`
+	DocumentConfigs    []DocumentJobConfig        `json:"document_configs,omitempty"`
+	Priority           string                     `json:"priority,omitempty"`
+	TraceID            string                     `json:"trace_id,omitempty"`
+	EffectiveConfig    *DocumentIngestionSnapshot `json:"effective_config,omitempty"`
+	RequestedConfig    *DocumentIngestionSettings `json:"requested_config,omitempty"`
+	SnapshotChecksum   string                     `json:"snapshot_checksum,omitempty"`
+	ChunkCount         *int                       `json:"chunk_count,omitempty"`
+
 	JobID      string    `json:"job_id,omitempty"`
 	SpaceID    string    `json:"space_id,omitempty"`
 	DocumentID string    `json:"document_id,omitempty"`
@@ -199,11 +247,12 @@ type DeleteDocumentInput struct {
 
 type ReindexInput struct {
 	SpaceID string `json:"space_id,omitempty"`
-	// DocumentID is optional. Empty requests a complete space rebuild when the
-	// delegated Host publishes only a space-level index operation.
-	DocumentID string `json:"document_id,omitempty"`
-	TenantUUID string `json:"tenant_uuid,omitempty"`
-	TraceID    string `json:"trace_id,omitempty"`
+	// DocumentID is optional. Empty requests a complete space rebuild; a
+	// document UUID always addresses only that document's Host rebuild route.
+	DocumentID  string                   `json:"document_id,omitempty"`
+	HostRebuild *DocumentRebuildSettings `json:"host_rebuild,omitempty"`
+	TenantUUID  string                   `json:"tenant_uuid,omitempty"`
+	TraceID     string                   `json:"trace_id,omitempty"`
 }
 
 type StrategyDependency struct {
@@ -224,16 +273,22 @@ type KnowledgeScene struct {
 }
 
 type StrategyPackage struct {
-	Key                   string             `json:"key"`
-	Label                 string             `json:"label"`
-	Summary               string             `json:"summary,omitempty"`
-	DisplayLabel          string             `json:"display_label,omitempty"`
-	UseCase               string             `json:"use_case,omitempty"`
-	NotFor                string             `json:"not_for,omitempty"`
-	RecommendedProfileKey string             `json:"recommended_profile_key,omitempty"`
-	RecommendedScenes     []string           `json:"recommended_scenes,omitempty"`
-	Dependencies          StrategyDependency `json:"dependencies,omitempty"`
-	Metadata              map[string]any     `json:"metadata,omitempty"`
+	UUID                   string             `json:"uuid,omitempty"`
+	Version                int                `json:"version,omitempty"`
+	Profiles               ProfileMapping     `json:"profiles"`
+	Available              bool               `json:"available"`
+	UnavailableReasons     []string           `json:"unavailable_reasons"`
+	ActivationDependencies []string           `json:"activation_dependencies"`
+	Key                    string             `json:"key"`
+	Label                  string             `json:"label"`
+	Summary                string             `json:"summary,omitempty"`
+	DisplayLabel           string             `json:"display_label,omitempty"`
+	UseCase                string             `json:"use_case,omitempty"`
+	NotFor                 string             `json:"not_for,omitempty"`
+	RecommendedProfileKey  string             `json:"recommended_profile_key,omitempty"`
+	RecommendedScenes      []string           `json:"recommended_scenes,omitempty"`
+	Dependencies           StrategyDependency `json:"dependencies,omitempty"`
+	Metadata               map[string]any     `json:"metadata,omitempty"`
 }
 
 type StrategyBundle struct {
@@ -245,12 +300,18 @@ type StrategyBundle struct {
 }
 
 type KnowledgeCatalog struct {
-	Version          string            `json:"version,omitempty"`
-	Source           string            `json:"source,omitempty"`
-	Scenes           []KnowledgeScene  `json:"scenes"`
-	StrategyPackages []StrategyPackage `json:"strategy_packages"`
-	StrategyBundles  []StrategyBundle  `json:"strategy_bundles,omitempty"`
-	Metadata         map[string]any    `json:"metadata,omitempty"`
+	DocumentIngestion         *DocumentIngestionCapabilities `json:"document_ingestion,omitempty"`
+	PolicyTemplates           []PolicyTemplateRef            `json:"policy_templates"`
+	DefaultPolicyTemplateUUID string                         `json:"default_policy_template_uuid,omitempty"`
+	QuotaDefaults             SpaceQuotas                    `json:"quota_defaults"`
+	QuotaMinimums             SpaceQuotas                    `json:"quota_minimums"`
+	QuotaOverrideAllowed      bool                           `json:"quota_override_allowed"`
+	Version                   string                         `json:"version,omitempty"`
+	Source                    string                         `json:"source,omitempty"`
+	Scenes                    []KnowledgeScene               `json:"scenes"`
+	StrategyPackages          []StrategyPackage              `json:"strategy_packages"`
+	StrategyBundles           []StrategyBundle               `json:"strategy_bundles,omitempty"`
+	Metadata                  map[string]any                 `json:"metadata,omitempty"`
 }
 
 func (q KnowledgeQuery) Normalized() KnowledgeQuery {

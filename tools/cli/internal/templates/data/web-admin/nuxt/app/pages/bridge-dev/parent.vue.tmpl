@@ -69,22 +69,22 @@ onMounted(() => {
 
 <template>
   <div class="wrap" :class="{ 'is-fullscreen': fullscreen }">
-    <h2>{{ `{{ t('host.title') }}` }}</h2>
+    <h2>{{ "{{ t('host.title') }}" }}</h2>
     <div class="row">
-      <label>{{ `{{ t('host.locale') }}` }} <input v-model="locale" /></label>
-      <label>{{ `{{ t('host.theme') }}` }}
+      <label>{{ "{{ t('host.locale') }}" }} <input v-model="locale" /></label>
+      <label>{{ "{{ t('host.theme') }}" }}
         <select v-model="theme">
           <option value="light">light</option>
           <option value="dark">dark</option>
           <option value="system">system</option>
         </select>
       </label>
-      <button @click="sendLocale">{{ `{{ t('host.broadcastLocale') }}` }}</button>
-      <button @click="sendTheme">{{ `{{ t('host.broadcastTheme') }}` }}</button>
-      <button @click="sendSync">{{ `{{ t('host.broadcastSync') }}` }}</button>
+      <button @click="sendLocale">{{ "{{ t('host.broadcastLocale') }}" }}</button>
+      <button @click="sendTheme">{{ "{{ t('host.broadcastTheme') }}" }}</button>
+      <button @click="sendSync">{{ "{{ t('host.broadcastSync') }}" }}</button>
       <span class="status" :data-active="fullscreen">
-        {{ `{{ fullscreen ? t('host.fullscreenOn') : t('host.fullscreenOff') }}` }}
-        <small v-if="fullscreenAction">({{ `{{ fullscreenAction }}` }})</small>
+        {{ "{{ fullscreen ? t('host.fullscreenOn') : t('host.fullscreenOff') }}" }}
+        <small v-if="fullscreenAction">({{ "{{ fullscreenAction }}" }})</small>
       </span>
     </div>
 
@@ -96,7 +96,7 @@ onMounted(() => {
       :class="{ 'demo-iframe-fullscreen': fullscreen }"
     />
 
-    <pre class="log">{{ `{{ log }}` }}</pre>
+    <pre class="log">{{ "{{ log }}" }}</pre>
   </div>
 </template>
 

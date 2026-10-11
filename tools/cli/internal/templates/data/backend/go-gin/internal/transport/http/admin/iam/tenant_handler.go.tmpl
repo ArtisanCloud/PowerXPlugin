@@ -2,7 +2,6 @@ package iam
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
@@ -12,6 +11,7 @@ import (
 	srviam "{{ .BackendModulePath }}/internal/services/iam"
 	admincommon "{{ .BackendModulePath }}/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type TenantHandler struct {
@@ -162,9 +162,9 @@ func (h *TenantHandler) Update(c *gin.Context) {
 		contracts.ResponseError(c, http.StatusMethodNotAllowed, "IAM_DELEGATED_READ_ONLY", "tenant write operations are not allowed in delegated mode")
 		return
 	}
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		contracts.ResponseBadRequest(c, "invalid tenant id")
+	tenantUUID := strings.TrimSpace(c.Param("tenant_uuid"))
+	if _, err := uuid.Parse(tenantUUID); err != nil {
+		contracts.ResponseBadRequest(c, "invalid tenant_uuid")
 		return
 	}
 	var req UpdateTenantRequest
@@ -178,7 +178,7 @@ func (h *TenantHandler) Update(c *gin.Context) {
 		uid := uint64(tc.UserID)
 		actorID = &uid
 	}
-	tenant, err := h.service.Update(c.Request.Context(), id, srviam.UpdateTenantInput{
+	tenant, err := h.service.UpdateByUUID(c.Request.Context(), tenantUUID, srviam.UpdateTenantInput{
 		Name:    req.Name,
 		Status:  req.Status,
 		Plan:    req.Plan,

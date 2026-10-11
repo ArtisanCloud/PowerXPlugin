@@ -5,6 +5,8 @@
 
 ## Summary
 
+后续增量必须补 `CustomerRuntime` Factory：local 由插件注入 `LocalCustomerStore`，delegated 使用 Framework Core adapter。插件业务层不读取 customer auth mode；local adapter 保持 contract 语义，不复制 Core 内部 schema。
+
 将 C 端 Customer Identity/Auth 从 skeleton 内部实现上提为 PowerXPlugin Framework 通用能力。Framework 负责 customer context、token 校验契约、tenant 解析、membership 校验、bootstrap 入口解析、委托身份源契约、稳定错误、观测和测试 helper；skeleton 迁移现有 mini-app customer auth 到 framework adapter 装配层。生产环境以 PowerX Core 或平台身份源为权威，local/mock 仅用于开发、测试或显式 break-glass。
 
 ## Technical Context

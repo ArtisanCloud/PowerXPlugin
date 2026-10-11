@@ -1,0 +1,54 @@
+{
+  "schema": "powerx.framework.iam-display-name-scope-repair/v1",
+  "date": "2026-10-11",
+  "operation": "BatchResolveMembersByDisplayNames",
+  "reproduction": {
+    "transport": "contract-shaped-http-fixture",
+    "upstream_member_has_tenant_uuid": false,
+    "before_fix_import_reason": "IAM_UPSTREAM_DEPENDENCY",
+    "before_fix_member_tenant_uuid": ""
+  },
+  "implementation": {
+    "scope_endpoint": "/api/v1/tenant/iam/tenant",
+    "lookup_endpoint": "/api/v1/tenant/iam/members:batch-find-by-display-names",
+    "credential_pinned_across_requests": true,
+    "scope_cache": false,
+    "unchecked_tenant_assignment": false,
+    "cross_tenant_reason": "IAM_FORBIDDEN",
+    "local_iam_fallback": false,
+    "additional_scope_reads_per_batch": 1
+  },
+  "verification": [
+    {
+      "module": "framework/backend/go",
+      "command": "go test -race ./iam/... -count=1",
+      "result": "passed"
+    },
+    {
+      "module": "framework/backend/go",
+      "command": "go test -race ./iam/delegated -run '^TestCoreDisplayName' -count=1",
+      "result": "passed",
+      "coverage": ["api_key", "sts", "found", "not_found", "ambiguous", "request_order", "duplicate_names", "invalid_response", "cross_tenant", "http_401_403_503", "trace_preservation"]
+    },
+    {
+      "module": "ai-craft/backend",
+      "command": "go test -race ./internal/services/admin/operations/ai_craft -run '^TestOrderImportService_' -count=1",
+      "result": "passed",
+      "new_test": "order_import_core_directory_test.go",
+      "fixture": "testdata/order_import_core_directory.json",
+      "coverage": ["preview", "commit", "persisted_planner_member_uuid", "no_local_iam_tables", "tenant_guard_retained", "cross_tenant_rejected", "forbidden_with_trace"]
+    }
+  ],
+  "consumer": {
+    "module_version": "v0.0.23",
+    "dependency_source": "existing-local-framework-replace",
+    "required_action": "rebuild_and_restart_aicraft_backend"
+  },
+  "boundaries": {
+    "core_mutations_performed": false,
+    "aicraft_production_code_changed": false,
+    "user_services_restarted": false,
+    "sdk_release_published": false,
+    "live_core_browser_acceptance_performed": false
+  }
+}

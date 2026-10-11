@@ -7,8 +7,11 @@ import (
 	admincapability "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/capability"
 	adminconsole "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/console"
 	admincustomer "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/customer"
+	adminhostcontract "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/host_contract"
 	adminiam "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/iam"
 	adminintegration "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/integration"
+	adminlocalknowledge "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/local_knowledge"
+	adminlocalagent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/localagent"
 	adminmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/marketplace"
 	adminmetadata "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/metadata"
 	adminoperations "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/operations"
@@ -36,8 +39,11 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 		adminconsole.RegisterRoutes(admin, deps)
 		admincapability.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		admincustomer.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminhostcontract.RegisterRoutes(admin, deps)
 		adminmetadata.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminaisettings.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminlocalknowledge.RegisterRoutes(adminTenantGroup(admin, deps), deps)
+		adminlocalagent.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminintegration.RegisterRoutes(admin, deps)
 		adminsecurity.RegisterRoutes(adminTenantGroup(admin, deps), deps)
 		adminiam.RegisterRoutes(admin, deps)

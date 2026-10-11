@@ -1,101 +1,63 @@
-// app/composables/useHostBridgeAdapter.ts
-import { initPowerXBridge } from "~/bridge/powerx-bridge-client";
-import { applyPowerXHostAuthToken } from "@artisan-cloud/plugin-framework-client";
-import { useI18n, useRuntimeConfig } from "#imports";
-import { useTheme } from "~/composables/useTheme";
-import { useAuth } from "~/composables/useAuth";
-import { useHostCtxStore } from "~/stores/hostCtx";
-import { useUserStore } from "~/stores/user";
+import { getCurrentScope, onScopeDispose } from 'vue';
+import { useNuxtApp, useRuntimeConfig, useRouter } from '#imports';
+import { initPowerXBridge, getPowerXHostSession, createPowerXRouterNavigator, createFrameworkLogger } from '@artisan-cloud/plugin-framework-client';
+import { useTheme } from '~/composables/useTheme';
+import { useUserStore } from '~/stores/user';
+import { useMe } from '~/composables/useMe';
+import { validatePowerXUserContext } from '~/utils/host-context';
 
-type BridgeOptions = { pluginId?: string; instanceId?: string; debug?: boolean };
-
-/** 将宿主广播适配到项目内现有的语言/主题切换实现 */
-export function setupHostBridgeAdapter(opts: BridgeOptions = {}) {
-  const { setLocale, locale } = useI18n();
-  const { setTheme } = useTheme(); // ← 不再解构 currentTheme
-  const runtimeConfig = useRuntimeConfig();
-  const auth = useAuth();
-  const hostCtxStore = useHostCtxStore();
-  const userStore = useUserStore();
-
-  // 宿主 'system' ↔ 本地 'auto'
-  const fromHostTheme = (t: string) => (t === "system" ? "auto" : t);
-
-  const applyLocale = async (code: string) => {
-    if (!code || code === String(locale.value)) return;
-    await setLocale(code);
-  };
-
-  const applyTheme = (t: string) => {
-    setTheme(fromHostTheme(t) as any);
-  };
-
-  const defaultDebug =
-    typeof runtimeConfig.public?.bridgeDebug === "boolean"
-      ? runtimeConfig.public.bridgeDebug
-      : import.meta.dev;
-  const resolvedPluginId =
-    opts.pluginId ||
-    String(runtimeConfig.public?.powerxPluginId || "").trim() ||
-    "{{ .PluginID }}";
-  const shouldLog =
-    typeof opts.debug === "boolean" ? opts.debug : defaultDebug;
-  const insidePowerX =
-    runtimeConfig.public?.insidePowerX === true ||
-    runtimeConfig.public?.insidePowerX === "true";
-
-  if (shouldLog) {
-    console.info("[Bridge][Plugin] debug mode enabled");
-  }
-
-  const applyAuthToken = async (payload: Record<string, any>) => {
-    if (!insidePowerX) {
-      if (shouldLog) {
-        console.info("[Bridge][Plugin] ignore auth-token because insidePowerX=false");
-      }
-      return;
-    }
-    const result = await applyPowerXHostAuthToken({
-      payload,
-      pluginId: resolvedPluginId,
-      storeHostCtx: (key, ctx) => hostCtxStore.setCtx(key, ctx),
-      setAuth: (authPayload) => auth.setAuth(authPayload as any),
-      fetchUserContext: (input) => userStore.fetchUserContext(input),
-      validateIdentity: () => {
-        if (!userStore.isRoot && !String(userStore.currentTenantUuid || "").trim()) {
-          throw new Error("missing current tenant uuid");
-        }
-      },
-    });
-    if (shouldLog) {
-      console.info("[Bridge][Plugin] applyAuthToken -> setAuth", {
-        pluginId: resolvedPluginId,
-        expiresIn: result.expiresIn,
-        token: `${result.accessToken.slice(0, 4)}...${result.accessToken.slice(-4)}`,
-      });
+export function setupHostBridgeAdapter(opts: { pluginId?: string; debug?: boolean } = {}) {
+  const app = useNuxtApp();
+  const config = useRuntimeConfig();
+  const router = useRouter();
+  const theme = useTheme();
+  const user = useUserStore();
+  const me = useMe();
+  const pluginId = opts.pluginId || String(config.public?.powerxPluginId || '{{ .PluginID }}');
+  const session = getPowerXHostSession(pluginId);
+  const logger = createFrameworkLogger('bridge.session');
+  const clearContext = () => {
+    user.clearUserState();
+    // These are this iframe application's stores, never the host application's stores.
+    const pinia = app.$pinia;
+    for (const store of Array.from(pinia._s.values())) {
+      if (store.$id === 'user') continue;
+      store.$dispose(); delete pinia.state.value[store.$id];
     }
   };
-
+  const request = () => bridge.consumer.requestAuth();
   const bridge = initPowerXBridge({
-    debug: shouldLog,
-    pluginId: resolvedPluginId,
-    instanceId: opts.instanceId ?? "dev-bridge",
-    allowedOrigins: ["*"],
-    // allowedOrigins: import.meta.env.DEV ? ['*'] : ['https://admin.powerx.cloud'],
-    onLocale: (code) => applyLocale(code),
-    onTheme: (t) => applyTheme(t),
-    onSync: ({ locale, theme }) => {
-      applyLocale(locale);
-      applyTheme(theme);
+    pluginId, debug: opts.debug, logger,
+    onSync: async payload => {
+      session.bindInstance(payload.instanceId);
+      theme.setTheme(payload.theme === 'system' ? 'auto' : payload.theme);
+      if (payload.locale !== app.$i18n.locale.value) await app.$i18n.setLocale(payload.locale);
     },
-    onAuthToken: (p) => {
-      applyAuthToken(p).catch((error) => {
-        console.error("[Bridge][Plugin] applyAuthToken failed", error);
-        userStore.clearUserState?.();
-        auth.failClosed?.("PowerX 会话已失效，请回到宿主重新登录");
-      });
+    onAuthToken: async payload => {
+      try {
+        await session.apply(payload, {
+          readContext: (snapshot, signal) => me.getUserContext({ hostSnapshot: snapshot, signal }),
+          validateContext: validatePowerXUserContext,
+          commitContext: context => user.commitHostContext(context),
+          clearContext,
+        });
+      } catch (cause) {
+        logger.warn('PLUGIN_AUTH_CONTEXT_FAILED', { pluginId, instanceId: payload.instanceId, sequence: payload.sequence });
+        throw cause;
+      }
     },
+    navigator: createPowerXRouterNavigator(router, config.app.baseURL, window.location.origin),
   });
-
-  return { bridge };
+  const stopRequester = session.setRequester(request);
+  const stopState = session.subscribe(state => { if (state.status === 'cleared' || state.status === 'rejected') clearContext(); });
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    const ownsSession = session.ownsRequester(request);
+    bridge.stop(); stopState(); stopRequester();
+    if (ownsSession) clearContext();
+  };
+  if (getCurrentScope()) onScopeDispose(dispose);
+  return { bridge, dispose };
 }

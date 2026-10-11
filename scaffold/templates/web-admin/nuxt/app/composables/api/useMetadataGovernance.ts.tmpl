@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "./_client";
+import { apiGet, apiPost, apiPatch } from "./_client";
 import type { ApiResponse } from "./_base";
 
 export interface MetadataPagination {
@@ -56,7 +56,16 @@ export interface TaxonomyNode extends MetadataDisplay {
   reference_count: number;
 }
 
+export interface UpdateTagPayload {
+  label_i18n: I18nMap;
+  description_i18n: I18nMap;
+  color: string;
+  status: string;
+}
+
 export interface MetadataTag extends MetadataDisplay {
+  label_i18n: I18nMap;
+  description_i18n?: I18nMap;
   uuid: string;
   namespace: string;
   resource_type: string;
@@ -137,61 +146,68 @@ const cleanQuery = (query: MetadataQuery = {}) =>
     Object.entries(query).filter(([, value]) => value !== undefined && value !== "" && value !== "__all__")
   );
 
-export function useMetadataGovernanceApi() {
+export function useMetadataGovernanceApi(debugRoute?: () => "local" | "delegated" | undefined) {
+  const route = () => debugRoute?.();
+  const path = (suffix: string) => `admin/metadata/${route() ? "debug/" : ""}${suffix}`;
+  const queryFor = (query: MetadataQuery = {}) => ({ ...cleanQuery(query), ...(route() ? { framework_debug_route: route() } : {}) });
+  const createOptions = (init?: any) => ({ ...init, query: { ...init?.query, ...(route() ? { framework_debug_route: route() } : {}) } });
   const mode = (init?: any) =>
     apiGet<ApiResponse<Record<string, any>>>("admin/metadata/mode", undefined, init);
 
   const listDictionaryNamespaces = (query?: MetadataQuery, init?: any) =>
-    apiGet<ApiResponse<MetadataPage<DictionaryNamespace>>>("admin/metadata/dictionaries", cleanQuery(query), init);
+    apiGet<ApiResponse<MetadataPage<DictionaryNamespace>>>(path("dictionaries"), queryFor(query), init);
 
   const createDictionaryNamespace = (payload: CreateDictionaryNamespacePayload, init?: any) =>
-    apiPost<ApiResponse<{ payload: DictionaryNamespace }>>("admin/metadata/dictionaries", payload, init);
+    apiPost<ApiResponse<{ payload: DictionaryNamespace }>>(path("dictionaries"), payload, createOptions(init));
 
   const listDictionaryItems = (namespaceUuid: string, query?: MetadataQuery, init?: any) =>
     apiGet<ApiResponse<MetadataPage<DictionaryItem>>>(
-      `admin/metadata/dictionaries/${encodeURIComponent(namespaceUuid)}/items`,
-      cleanQuery(query),
+      path(`dictionaries/${encodeURIComponent(namespaceUuid)}/items`),
+      queryFor(query),
       init
     );
 
   const createDictionaryItem = (namespaceUuid: string, payload: CreateDictionaryItemPayload, init?: any) =>
     apiPost<ApiResponse<{ payload: DictionaryItem }>>(
-      `admin/metadata/dictionaries/${encodeURIComponent(namespaceUuid)}/items`,
+      path(`dictionaries/${encodeURIComponent(namespaceUuid)}/items`),
       payload,
-      init
+      createOptions(init)
     );
 
   const listTaxonomies = (query?: MetadataQuery, init?: any) =>
-    apiGet<ApiResponse<MetadataPage<Taxonomy>>>("admin/metadata/taxonomies", cleanQuery(query), init);
+    apiGet<ApiResponse<MetadataPage<Taxonomy>>>(path("taxonomies"), queryFor(query), init);
 
   const createTaxonomy = (payload: CreateTaxonomyPayload, init?: any) =>
-    apiPost<ApiResponse<{ payload: Taxonomy }>>("admin/metadata/taxonomies", payload, init);
+    apiPost<ApiResponse<{ payload: Taxonomy }>>(path("taxonomies"), payload, createOptions(init));
 
   const listTaxonomyNodes = (taxonomyUuid: string, query?: MetadataQuery, init?: any) =>
     apiGet<ApiResponse<MetadataPage<TaxonomyNode>>>(
-      `admin/metadata/taxonomies/${encodeURIComponent(taxonomyUuid)}/nodes`,
-      cleanQuery(query),
+      path(`taxonomies/${encodeURIComponent(taxonomyUuid)}/nodes`),
+      queryFor(query),
       init
     );
 
   const createTaxonomyNode = (taxonomyUuid: string, payload: CreateTaxonomyNodePayload, init?: any) =>
     apiPost<ApiResponse<{ payload: TaxonomyNode }>>(
-      `admin/metadata/taxonomies/${encodeURIComponent(taxonomyUuid)}/nodes`,
+      path(`taxonomies/${encodeURIComponent(taxonomyUuid)}/nodes`),
       payload,
-      init
+      createOptions(init)
     );
 
   const listTags = (query?: MetadataQuery, init?: any) =>
-    apiGet<ApiResponse<MetadataPage<MetadataTag>>>("admin/metadata/tags", cleanQuery(query), init);
+    apiGet<ApiResponse<MetadataPage<MetadataTag>>>(path("tags"), queryFor(query), init);
+
+  const updateTag = (uuid: string, payload: UpdateTagPayload, init?: any) =>
+    apiPatch<ApiResponse<MetadataTag>>(path(`tags/${encodeURIComponent(uuid)}`), payload, createOptions(init));
 
   const createTag = (payload: CreateTagPayload, init?: any) =>
-    apiPost<ApiResponse<{ payload: MetadataTag }>>("admin/metadata/tags", payload, init);
+    apiPost<ApiResponse<{ payload: MetadataTag }>>(path("tags"), payload, createOptions(init));
 
   const listResourceTypes = (query?: MetadataQuery, init?: any) =>
-    apiGet<ApiResponse<MetadataPage<ResourceType>>>("admin/metadata/resource-types", cleanQuery(query), init);
+    apiGet<ApiResponse<MetadataPage<ResourceType>>>(path("resource-types"), queryFor(query), init);
 
   const createResourceType = (payload: CreateResourceTypePayload, init?: any) =>
-    apiPost<ApiResponse<{ payload: ResourceType }>>("admin/metadata/resource-types", payload, init);
+    apiPost<ApiResponse<{ payload: ResourceType }>>(path("resource-types"), payload, createOptions(init));
 
   return {
     mode,
@@ -205,6 +221,7 @@ export function useMetadataGovernanceApi() {
     createTaxonomyNode,
     listTags,
     createTag,
+    updateTag,
     listResourceTypes,
     createResourceType,
   };

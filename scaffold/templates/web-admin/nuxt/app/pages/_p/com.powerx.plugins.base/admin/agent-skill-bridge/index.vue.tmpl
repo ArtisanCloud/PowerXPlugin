@@ -18,7 +18,7 @@
             />
           </div>
           <div class="flex items-center gap-2">
-            <UButton icon="i-heroicons-plus" class="flex-1 justify-center" :loading="sessionLoading" :disabled="loading || sessionLoading || !agentId.trim()" @click="createSession()">
+            <UButton data-testid="agent-chat-create-session" icon="i-heroicons-plus" class="flex-1 justify-center" :loading="sessionLoading" :disabled="loading || sessionLoading || !agentId.trim()" @click="createSession()">
               新建会话
             </UButton>
             <UButton icon="i-heroicons-arrow-path" color="neutral" variant="soft" square :loading="agentsLoading || sessionLoading" :disabled="loading" @click="loadSessions(currentAgent, false)" />
@@ -30,7 +30,7 @@
             正在加载底座 Agent...
           </div>
           <div v-else-if="agentsError" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-            {{ `{{ agentsError }}` }}
+            {{ "{{ agentsError }}" }}
           </div>
           <template v-else-if="agentOptions.length">
             <div class="mb-2 px-2 py-1 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">最近</div>
@@ -46,8 +46,8 @@
             >
               <UIcon name="i-heroicons-chat-bubble-left-right" class="mt-0.5 h-4 w-4 shrink-0" />
               <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium">{{ `{{ item.title }}` }}</div>
-                <div class="mt-1 truncate text-xs opacity-80">{{ `{{ item.summary }}` }}</div>
+                <div class="truncate text-sm font-medium">{{ "{{ item.title }}" }}</div>
+                <div class="mt-1 truncate text-xs opacity-80">{{ "{{ item.summary }}" }}</div>
               </div>
               <button
                 type="button"
@@ -68,7 +68,7 @@
         <div class="border-t border-gray-200 p-4 dark:border-gray-800">
           <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>PowerX Agent Runtime</span>
-            <UBadge :color="statusColor" variant="soft" data-testid="agent-chat-status">{{ `{{ statusLabel }}` }}</UBadge>
+            <UBadge :color="statusColor" variant="soft" data-testid="agent-chat-status">{{ "{{ statusLabel }}" }}</UBadge>
           </div>
         </div>
       </aside>
@@ -79,11 +79,11 @@
             <div class="flex min-w-0 items-center gap-3">
               <UAvatar :text="currentAgent.avatarText" size="lg" class="bg-primary text-white" />
               <div class="min-w-0">
-                <div class="truncate text-lg font-semibold text-gray-900 dark:text-white">{{ `{{ currentAgent.label }}` }}</div>
+                <div class="truncate text-lg font-semibold text-gray-900 dark:text-white">{{ "{{ currentAgent.label }}" }}</div>
                 <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                  <span :class="connectionReady ? (loading ? 'text-primary' : 'text-green-500') : 'text-red-500'">{{ `{{ connectionLabel }}` }}</span>
+                  <span :class="connectionReady ? (loading ? 'text-primary' : 'text-green-500') : 'text-red-500'">{{ "{{ connectionLabel }}" }}</span>
                   <span class="hidden sm:inline">/</span>
-                  <span class="truncate" data-testid="agent-chat-target">{{ `{{ agentProxyPath }}` }}</span>
+                  <span class="truncate" data-testid="agent-chat-target">{{ "{{ agentProxyPath }}" }}</span>
                 </div>
               </div>
             </div>
@@ -99,7 +99,7 @@
             <div class="max-w-md space-y-3 text-gray-500 dark:text-gray-400">
               <UIcon name="i-heroicons-chat-bubble-left-right" class="mx-auto h-10 w-10" />
               <div class="text-xl font-semibold text-gray-800 dark:text-gray-100">欢迎</div>
-              <div>{{ `{{ welcomeText }}` }}</div>
+              <div>{{ "{{ welcomeText }}" }}</div>
             </div>
           </div>
 
@@ -136,9 +136,9 @@
                         class="font-medium underline underline-offset-2"
                         :class="item.role === 'user' ? 'text-white' : 'text-primary'"
                       >
-                        {{ `{{ part.text }}` }}
+                        {{ "{{ part.text }}" }}
                       </NuxtLink>
-                      <template v-else>{{ `{{ part.text }}` }}</template>
+                      <template v-else>{{ "{{ part.text }}" }}</template>
                     </template>
                   </div>
                   <div v-if="item.pending" class="mt-2 flex items-center gap-2 text-xs opacity-70">
@@ -155,12 +155,12 @@
                       <div class="flex min-w-0 items-center gap-2">
                         <UIcon name="i-heroicons-bolt" class="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-300" />
                         <span class="shrink-0 font-medium text-gray-800 dark:text-gray-100">执行链路</span>
-                        <UBadge :color="taskBadgeColor(messageRunStatus(item))" variant="soft">{{ `{{ runStatusLabel(messageRunStatus(item)) }}` }}</UBadge>
+                        <UBadge :color="taskBadgeColor(messageRunStatus(item))" variant="soft">{{ "{{ runStatusLabel(messageRunStatus(item)) }}" }}</UBadge>
                       </div>
                       <div class="flex shrink-0 items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
-                        <span v-if="messageRunParticipants(item).length">参与 {{ `{{ messageRunParticipants(item).length }}` }}</span>
-                        <span>{{ `{{ messageRunSummary(item).completed }}` }}/{{ `{{ messageRunSummary(item).total }}` }}</span>
-                        <span>{{ `{{ messageRunSummary(item).percent }}` }}%</span>
+                        <span v-if="messageRunParticipants(item).length">参与 {{ "{{ messageRunParticipants(item).length }}" }}</span>
+                        <span>{{ "{{ messageRunSummary(item).completed }}" }}/{{ "{{ messageRunSummary(item).total }}" }}</span>
+                        <span>{{ "{{ messageRunSummary(item).percent }}" }}%</span>
                         <UIcon name="i-heroicons-chevron-down" class="h-3.5 w-3.5 transition-transform group-open:rotate-180" />
                       </div>
                     </summary>
@@ -174,8 +174,8 @@
                           class="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-primary-700 dark:bg-primary-500/10 dark:text-primary-200"
                         >
                           <UIcon name="i-heroicons-user-circle" class="h-3.5 w-3.5" />
-                          <span>{{ `{{ participant.label }}` }}</span>
-                          <span class="text-primary-500 dark:text-primary-300">×{{ `{{ participant.count }}` }}</span>
+                          <span>{{ "{{ participant.label }}" }}</span>
+                          <span class="text-primary-500 dark:text-primary-300">×{{ "{{ participant.count }}" }}</span>
                         </span>
                       </div>
                       <div
@@ -186,14 +186,14 @@
                       >
                         <div class="flex items-center gap-2.5">
                           <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[11px] font-semibold text-primary-700 dark:bg-primary-500/20 dark:text-primary-100">
-                            {{ `{{ taskAvatarText(task) }}` }}
+                            {{ "{{ taskAvatarText(task) }}" }}
                           </div>
                           <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between gap-2">
-                              <div class="truncate font-medium text-gray-900 dark:text-white">{{ `{{ taskTitle(task) }}` }}</div>
-                              <div class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{{ `{{ taskProgressPercent(task) }}` }}%</div>
+                              <div class="truncate font-medium text-gray-900 dark:text-white">{{ "{{ taskTitle(task) }}" }}</div>
+                              <div class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{{ "{{ taskProgressPercent(task) }}" }}%</div>
                             </div>
-                            <div class="mt-0.5 truncate text-gray-500 dark:text-gray-400">{{ `{{ taskSubtitle(task) || runStatusLabel(task.status) }}` }}</div>
+                            <div class="mt-0.5 truncate text-gray-500 dark:text-gray-400">{{ "{{ taskSubtitle(task) || runStatusLabel(task.status) }}" }}</div>
                             <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
                               <div
                                 class="h-full rounded-full transition-all"
@@ -202,18 +202,18 @@
                               />
                             </div>
                           </div>
-                          <UBadge class="shrink-0" :color="taskBadgeColor(task.status)" variant="soft">{{ `{{ runStatusLabel(task.status) }}` }}</UBadge>
+                          <UBadge class="shrink-0" :color="taskBadgeColor(task.status)" variant="soft">{{ "{{ runStatusLabel(task.status) }}" }}</UBadge>
                         </div>
                         <div v-if="task.status === 'awaiting_params' && task.missing_fields?.length" class="mt-1.5 rounded bg-amber-50 px-2 py-1 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                          需要补充：{{ `{{ task.missing_fields.join("、") }}` }}
+                          需要补充：{{ "{{ task.missing_fields.join(\"、\") }}" }}
                         </div>
                         <div v-if="task.status === 'completed' && resultSummary(task.result)" class="mt-1.5 rounded bg-green-50 px-2 py-1 text-green-800 dark:bg-green-950 dark:text-green-200">
-                          {{ `{{ resultSummary(task.result) }}` }}
+                          {{ "{{ resultSummary(task.result) }}" }}
                         </div>
                         <div v-if="task.status === 'failed' && task.error" class="mt-1.5 flex items-start justify-between gap-2 rounded bg-red-50 px-2 py-1 text-red-800 dark:bg-red-950 dark:text-red-200">
-                          <span class="line-clamp-2 min-w-0">{{ `{{ errorSummary(task.error) }}` }}</span>
+                          <span class="line-clamp-2 min-w-0">{{ "{{ errorSummary(task.error) }}" }}</span>
                           <div class="flex shrink-0 items-center gap-1">
-                            <span v-if="copyStatusText" class="text-[11px] text-red-700 dark:text-red-200">{{ `{{ copyStatusText }}` }}</span>
+                            <span v-if="copyStatusText" class="text-[11px] text-red-700 dark:text-red-200">{{ "{{ copyStatusText }}" }}</span>
                             <button
                               type="button"
                               class="relative z-10 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-red-700 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900"
@@ -228,15 +228,15 @@
                       </div>
                       <details v-if="messageRunEvents(item).length" class="pt-1 text-xs">
                         <summary class="cursor-pointer text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                          查看事件 {{ `{{ messageRunEvents(item).length }}` }}
+                          查看事件 {{ "{{ messageRunEvents(item).length }}" }}
                         </summary>
                         <div class="mt-2 max-h-48 space-y-1 overflow-auto rounded-md bg-gray-950 p-2 text-gray-100">
                           <div v-for="event in messageRunEvents(item)" :key="event.id" class="border-b border-gray-800 pb-1 last:border-0">
                             <div class="flex items-center justify-between gap-2">
-                              <span class="font-medium">{{ `{{ event.type }}` }}</span>
-                              <span class="text-gray-500">{{ `{{ event.time }}` }}</span>
+                              <span class="font-medium">{{ "{{ event.type }}" }}</span>
+                              <span class="text-gray-500">{{ "{{ event.time }}" }}</span>
                             </div>
-                            <div v-if="event.summary" class="mt-0.5 text-gray-400">{{ `{{ event.summary }}` }}</div>
+                            <div v-if="event.summary" class="mt-0.5 text-gray-400">{{ "{{ event.summary }}" }}</div>
                           </div>
                         </div>
                       </details>
@@ -254,7 +254,8 @@
                     color="neutral"
                     variant="ghost"
                     :disabled="loading"
-                    @click="openRegenerateDialog(item, index)"
+                    :title="t('agentSession.unsupportedEdit')"
+                    @click="errorText = t('agentSession.unsupportedEdit')"
                   >
                     重新编辑
                   </UButton>
@@ -296,8 +297,8 @@
               color="neutral"
               variant="ghost"
               square
-              :disabled="!loading"
-              @click="abortStream"
+              :disabled="!activeInvocationId"
+              @click="cancelCurrentRun"
             />
           </div>
         </footer>
@@ -338,9 +339,9 @@
             <div class="mb-3 flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <div class="text-sm font-semibold text-gray-900 dark:text-white">运行状态</div>
-                <span v-if="copyStatusText" class="text-[11px] text-gray-500 dark:text-gray-400">{{ `{{ copyStatusText }}` }}</span>
+                <span v-if="copyStatusText" class="text-[11px] text-gray-500 dark:text-gray-400">{{ "{{ copyStatusText }}" }}</span>
               </div>
-              <UBadge :color="runStateBadgeColor" variant="soft" data-testid="agent-run-state-status">{{ `{{ runStateStatus }}` }}</UBadge>
+              <UBadge :color="runStateBadgeColor" variant="soft" data-testid="agent-run-state-status">{{ "{{ runStateStatus }}" }}</UBadge>
             </div>
             <div v-if="runStateParticipants.length" class="mb-2 flex flex-wrap items-center gap-1.5 text-[11px]">
               <span class="text-gray-500 dark:text-gray-400">参与</span>
@@ -350,35 +351,35 @@
                 class="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-primary-700 dark:bg-primary-500/10 dark:text-primary-200"
               >
                 <UIcon name="i-heroicons-user-circle" class="h-3.5 w-3.5" />
-                <span>{{ `{{ participant.label }}` }}</span>
-                <span class="text-primary-500 dark:text-primary-300">×{{ `{{ participant.count }}` }}</span>
+                <span>{{ "{{ participant.label }}" }}</span>
+                <span class="text-primary-500 dark:text-primary-300">×{{ "{{ participant.count }}" }}</span>
               </span>
             </div>
             <div v-if="runStateTasks.length" class="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
               <span class="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-                总 {{ `{{ runStateSummary.total }}` }}
+                总 {{ "{{ runStateSummary.total }}" }}
               </span>
               <span class="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-                进度 {{ `{{ runStateSummary.completed }}` }}/{{ `{{ runStateSummary.total }}` }}
+                进度 {{ "{{ runStateSummary.completed }}" }}/{{ "{{ runStateSummary.total }}" }}
               </span>
               <span class="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-                阶段 {{ `{{ runStateSummary.currentStage }}` }}/{{ `{{ runStateSummary.totalStages }}` }}
+                阶段 {{ "{{ runStateSummary.currentStage }}" }}/{{ "{{ runStateSummary.totalStages }}" }}
               </span>
               <span class="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 dark:bg-amber-950 dark:text-amber-200">
-                运行 {{ `{{ runStateSummary.running }}` }}
+                运行 {{ "{{ runStateSummary.running }}" }}
               </span>
               <span class="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 dark:bg-blue-950 dark:text-blue-200">
-                待补 {{ `{{ runStateSummary.awaiting }}` }}
+                待补 {{ "{{ runStateSummary.awaiting }}" }}
               </span>
               <span class="rounded-full bg-red-50 px-2 py-0.5 text-red-700 dark:bg-red-950 dark:text-red-200">
-                失败 {{ `{{ runStateSummary.failed }}` }}
+                失败 {{ "{{ runStateSummary.failed }}" }}
               </span>
             </div>
             <div v-if="runStateTasks.length" class="space-y-2" data-testid="agent-run-state-panel">
               <div v-for="group in runStateStageGroups" :key="group.key" class="rounded-md border border-gray-200 p-2 dark:border-gray-800">
                 <div class="mb-2 flex items-center justify-between gap-2 text-xs">
-                  <div class="font-medium text-gray-900 dark:text-white">{{ `{{ group.label }}` }}</div>
-                  <UBadge color="neutral" variant="soft">{{ `{{ group.parallel ? "并行" : "串行" }}` }}</UBadge>
+                  <div class="font-medium text-gray-900 dark:text-white">{{ "{{ group.label }}" }}</div>
+                  <UBadge color="neutral" variant="soft">{{ "{{ group.parallel ? \"并行\" : \"串行\" }}" }}</UBadge>
                 </div>
                 <div class="space-y-2">
                   <div
@@ -389,14 +390,14 @@
                   >
                     <div class="flex items-center gap-2.5">
                       <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[11px] font-semibold text-primary-700 dark:bg-primary-500/20 dark:text-primary-100">
-                        {{ `{{ taskAvatarText(task) }}` }}
+                        {{ "{{ taskAvatarText(task) }}" }}
                       </div>
                       <div class="min-w-0 flex-1">
                         <div class="flex items-center justify-between gap-2">
-                          <div class="truncate font-medium text-gray-900 dark:text-white">{{ `{{ taskTitle(task) }}` }}</div>
-                          <div class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{{ `{{ taskProgressPercent(task) }}` }}%</div>
+                          <div class="truncate font-medium text-gray-900 dark:text-white">{{ "{{ taskTitle(task) }}" }}</div>
+                          <div class="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{{ "{{ taskProgressPercent(task) }}" }}%</div>
                         </div>
-                        <div class="mt-1 truncate text-gray-500 dark:text-gray-400">{{ `{{ taskSubtitle(task) || runStatusLabel(task.status) }}` }}</div>
+                        <div class="mt-1 truncate text-gray-500 dark:text-gray-400">{{ "{{ taskSubtitle(task) || runStatusLabel(task.status) }}" }}</div>
                         <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
                           <div
                             class="h-full rounded-full transition-all"
@@ -405,21 +406,21 @@
                           />
                         </div>
                       </div>
-                      <UBadge class="shrink-0" :color="taskBadgeColor(task.status)" variant="soft">{{ `{{ runStatusLabel(task.status) }}` }}</UBadge>
+                      <UBadge class="shrink-0" :color="taskBadgeColor(task.status)" variant="soft">{{ "{{ runStatusLabel(task.status) }}" }}</UBadge>
                     </div>
                     <div v-if="task.depends_on?.length" class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
-                      依赖：{{ `{{ task.depends_on.join("、") }}` }}
+                      依赖：{{ "{{ task.depends_on.join(\"、\") }}" }}
                     </div>
                     <div v-if="task.status === 'awaiting_params' && task.missing_fields?.length" class="mt-2 rounded-md bg-amber-50 p-2 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                      需要补充：{{ `{{ task.missing_fields.join("、") }}` }}
+                      需要补充：{{ "{{ task.missing_fields.join(\"、\") }}" }}
                     </div>
                     <div v-if="task.status === 'completed' && resultSummary(task.result)" class="mt-2 rounded-md bg-green-50 p-2 text-green-800 dark:bg-green-950 dark:text-green-200">
-                      {{ `{{ resultSummary(task.result) }}` }}
+                      {{ "{{ resultSummary(task.result) }}" }}
                     </div>
                     <div v-if="task.status === 'failed' && task.error" class="mt-2 flex items-start justify-between gap-2 rounded-md bg-red-50 p-2 text-red-800 dark:bg-red-950 dark:text-red-200">
-                      <span class="line-clamp-2 min-w-0">{{ `{{ errorSummary(task.error) }}` }}</span>
+                      <span class="line-clamp-2 min-w-0">{{ "{{ errorSummary(task.error) }}" }}</span>
                       <div class="flex shrink-0 items-center gap-1">
-                        <span v-if="copyStatusText" class="text-[11px] text-red-700 dark:text-red-200">{{ `{{ copyStatusText }}` }}</span>
+                        <span v-if="copyStatusText" class="text-[11px] text-red-700 dark:text-red-200">{{ "{{ copyStatusText }}" }}</span>
                         <button
                           type="button"
                           class="relative z-10 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-red-700 hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-900"
@@ -442,7 +443,7 @@
                         :to="String(link.url || link.href || '') || undefined"
                         target="_blank"
                       >
-                        {{ `{{ String(link.label || link.title || "查看结果") }}` }}
+                        {{ "{{ String(link.label || link.title || \"查看结果\") }}" }}
                       </UButton>
                     </div>
                   </div>
@@ -457,7 +458,7 @@
           <section class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
             <div class="mb-3 flex items-center justify-between">
               <div class="text-sm font-semibold text-gray-900 dark:text-white">执行过程</div>
-              <UBadge variant="soft">{{ `{{ eventCount }}` }} events</UBadge>
+              <UBadge variant="soft">{{ "{{ eventCount }}" }} events</UBadge>
             </div>
             <div v-if="timeline.length" class="space-y-2" data-testid="agent-chat-timeline">
               <button
@@ -470,17 +471,17 @@
                 @click="selectedEventId = item.id"
               >
                 <div class="flex items-center justify-between gap-2">
-                  <span class="font-medium text-gray-900 dark:text-white">{{ `{{ item.type }}` }}</span>
-                  <span class="text-gray-400">{{ `{{ item.time }}` }}</span>
+                  <span class="font-medium text-gray-900 dark:text-white">{{ "{{ item.type }}" }}</span>
+                  <span class="text-gray-400">{{ "{{ item.time }}" }}</span>
                 </div>
-                <div v-if="item.summary" class="mt-1 text-gray-500 dark:text-gray-400">{{ `{{ item.summary }}` }}</div>
+                <div v-if="item.summary" class="mt-1 text-gray-500 dark:text-gray-400">{{ "{{ item.summary }}" }}</div>
               </button>
               <div v-if="selectedEvent" class="rounded-md border border-gray-200 bg-gray-950 p-3 dark:border-gray-800">
                 <div class="mb-2 flex items-center justify-between text-xs">
-                  <span class="font-medium text-gray-100">{{ `{{ selectedEvent.type }}` }} payload</span>
-                  <span class="text-gray-500">{{ `{{ selectedEvent.time }}` }}</span>
+                  <span class="font-medium text-gray-100">{{ "{{ selectedEvent.type }}" }} payload</span>
+                  <span class="text-gray-500">{{ "{{ selectedEvent.time }}" }}</span>
                 </div>
-                <pre class="max-h-48 overflow-auto whitespace-pre-wrap text-xs text-gray-200">{{ `{{ formatPayload(selectedEvent.payload) }}` }}</pre>
+                <pre class="max-h-48 overflow-auto whitespace-pre-wrap text-xs text-gray-200">{{ "{{ formatPayload(selectedEvent.payload) }}" }}</pre>
               </div>
             </div>
             <div v-else class="rounded-md bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-900 dark:text-gray-400">
@@ -493,38 +494,38 @@
             <dl class="space-y-2 text-xs">
               <div class="flex items-center justify-between gap-3">
                 <dt class="text-gray-500">skill_id</dt>
-                <dd class="font-mono text-gray-900 dark:text-white">{{ `{{ skillTarget.skill_id }}` }}</dd>
+                <dd class="font-mono text-gray-900 dark:text-white">{{ "{{ skillTarget.skill_id }}" }}</dd>
               </div>
               <div class="flex items-center justify-between gap-3">
                 <dt class="text-gray-500">capability</dt>
-                <dd class="font-mono text-gray-900 dark:text-white">{{ `{{ skillTarget.capability }}` }}</dd>
+                <dd class="font-mono text-gray-900 dark:text-white">{{ "{{ skillTarget.capability }}" }}</dd>
               </div>
               <div class="flex items-center justify-between gap-3">
                 <dt class="text-gray-500">executor</dt>
-                <dd class="font-mono text-gray-900 dark:text-white">{{ `{{ skillTarget.executor }}` }}</dd>
+                <dd class="font-mono text-gray-900 dark:text-white">{{ "{{ skillTarget.executor }}" }}</dd>
               </div>
             </dl>
           </section>
 
           <section class="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
             <div class="mb-3 flex items-center justify-between gap-2">
-              <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ `{{ t("agentSkillBridge.permissions.title") }}` }}</div>
+              <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ "{{ t(\"agentSkillBridge.permissions.title\") }}" }}</div>
               <UBadge :color="agentPermissionBadgeColor" variant="soft">
-                {{ `{{ agentPermissionStatusLabel }}` }}
+                {{ "{{ agentPermissionStatusLabel }}" }}
               </UBadge>
             </div>
             <div v-if="agentPermissionsLoading" class="rounded-md bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-900 dark:text-gray-400">
-              {{ `{{ t("agentSkillBridge.permissions.loading") }}` }}
+              {{ "{{ t(\"agentSkillBridge.permissions.loading\") }}" }}
             </div>
             <div v-else-if="agentPermissionsError" class="rounded-md bg-red-50 p-3 text-xs text-red-700 dark:bg-red-950 dark:text-red-200">
-              {{ `{{ agentPermissionsError }}` }}
+              {{ "{{ agentPermissionsError }}" }}
             </div>
             <div v-else-if="agentPermissions" class="space-y-3 text-xs">
               <dl class="space-y-2">
                 <div class="flex items-center justify-between gap-3">
-                  <dt class="text-gray-500">{{ `{{ t("agentSkillBridge.permissions.root") }}` }}</dt>
+                  <dt class="text-gray-500">{{ "{{ t(\"agentSkillBridge.permissions.root\") }}" }}</dt>
                   <dd class="font-mono text-gray-900 dark:text-white">
-                    {{ `{{ agentPermissions.user.is_root ? t("agentSkillBridge.permissions.yes") : t("agentSkillBridge.permissions.no") }}` }}
+                    {{ "{{ agentPermissions.user.is_root ? t(\"agentSkillBridge.permissions.yes\") : t(\"agentSkillBridge.permissions.no\") }}" }}
                   </dd>
                 </div>
               </dl>
@@ -535,29 +536,29 @@
                   class="rounded-md border border-gray-200 p-2 dark:border-gray-800"
                 >
                   <div class="mb-1 flex items-center justify-between gap-2">
-                    <div class="font-medium text-gray-900 dark:text-white">{{ `{{ action.action }}` }}</div>
+                    <div class="font-medium text-gray-900 dark:text-white">{{ "{{ action.action }}" }}</div>
                     <UBadge :color="action.allowed ? 'success' : 'error'" variant="soft">
-                      {{ `{{ action.allowed ? t("agentSkillBridge.permissions.allowed") : t("agentSkillBridge.permissions.denied") }}` }}
+                      {{ "{{ action.allowed ? t(\"agentSkillBridge.permissions.allowed\") : t(\"agentSkillBridge.permissions.denied\") }}" }}
                     </UBadge>
                   </div>
-                  <div class="truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">{{ `{{ action.capability_id }}` }}</div>
+                  <div class="truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">{{ "{{ action.capability_id }}" }}</div>
                   <div class="mt-1 flex flex-wrap gap-1">
                     <span
                       v-for="permission in action.required_permissions"
                       :key="permission"
                       class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-700 dark:bg-gray-900 dark:text-gray-300"
                     >
-                      {{ `{{ permission }}` }}
+                      {{ "{{ permission }}" }}
                     </span>
                   </div>
                   <div v-if="action.deny_code" class="mt-1 text-[11px] text-red-600 dark:text-red-300">
-                    {{ `{{ action.deny_code }}` }}
+                    {{ "{{ action.deny_code }}" }}
                   </div>
                 </div>
               </div>
             </div>
             <div v-else class="rounded-md bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-900 dark:text-gray-400">
-              {{ `{{ t("agentSkillBridge.permissions.empty") }}` }}
+              {{ "{{ t(\"agentSkillBridge.permissions.empty\") }}" }}
             </div>
           </section>
 
@@ -566,16 +567,16 @@
               <div class="text-sm font-semibold text-gray-900 dark:text-white">Raw SSE</div>
               <UButton icon="i-heroicons-clipboard" size="xs" variant="ghost" @click="copyRaw">复制</UButton>
             </div>
-            <pre data-testid="agent-chat-events" class="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-gray-950 p-3 text-xs text-gray-100">{{ `{{ rawLog || "尚无事件。" }}` }}</pre>
+            <pre data-testid="agent-chat-events" class="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-gray-950 p-3 text-xs text-gray-100">{{ "{{ rawLog || \"尚无事件。\" }}" }}</pre>
           </section>
 
           <section v-if="errorText" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
             <div class="mb-1 font-medium">错误</div>
-            <div data-testid="agent-chat-error">{{ `{{ errorText }}` }}</div>
+            <div data-testid="agent-chat-error">{{ "{{ errorText }}" }}</div>
           </section>
           <section v-if="agentsError" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
             <div class="mb-1 font-medium">Agent 清单加载失败</div>
-            <div data-testid="agent-chat-agents-error">{{ `{{ agentsError }}` }}</div>
+            <div data-testid="agent-chat-agents-error">{{ "{{ agentsError }}" }}</div>
           </section>
         </div>
       </aside>
@@ -621,7 +622,8 @@
 </template>
 
 <script setup lang="ts">
-import { createFetchSSE, type SSEStreamEvent } from "~/composables/api/useStream";
+import { type SSEStreamEvent } from "~/composables/api/useStream";
+import { useAgentSessionsApi, type AgentSession, type AgentMessage, type AgentAttempt } from "~/composables/api/useAgentSessions";
 import { getAuthToken } from "~/composables/api/_base";
 import { useAuth } from "~/composables/useAuth";
 import { resolveTenantUUIDForRequest } from "~/utils/tenant-context";
@@ -716,28 +718,8 @@ type SessionItem = {
   createdAt: number;
 };
 
-type AgentSessionRecord = {
-  id?: number | string;
-  uuid?: string;
-  session_id?: string;
-  sessionId?: string;
-  agentId?: number | string;
-  agent_id?: number | string;
-  title?: string;
-  status?: string;
-  latestAt?: string;
-  latest_at?: string;
-  createdAt?: string;
-  created_at?: string;
-};
-
-type AgentSessionMessageRecord = {
-  id?: number | string;
-  role?: string;
-  content?: string;
-  meta?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-};
+type AgentSessionRecord = AgentSession;
+type AgentSessionMessageRecord = AgentMessage;
 
 type PowerXAgentRecord = {
   id?: number | string;
@@ -789,7 +771,9 @@ type AgentEffectivePermissions = {
   actions: AgentPermissionAction[];
 };
 
-const agentProxyPath = "plugin/agent/stream/sse";
+const agentProxyPath = "plugin/agent/sessions";
+const sessionAPI = useAgentSessionsApi();
+const pendingAttempts = new Map<string, AgentAttempt>();
 
 const agentOptions = ref<AgentOption[]>([]);
 const agentsLoading = ref(false);
@@ -799,6 +783,7 @@ const agentsError = ref("");
 const selectedAgentId = ref("");
 const agentId = ref("");
 const sessionId = ref("");
+const activeInvocationId = ref("");
 const traceId = ref(`trace_${Date.now()}`);
 const message = ref("");
 const bearerToken = ref("");
@@ -877,7 +862,7 @@ const skillTarget = computed(() => ({
 const currentSessionSummary = computed(() => {
   const lastUserMessage = [...chatMessages.value].reverse().find((item) => item.role === "user");
   if (lastUserMessage?.content) return lastUserMessage.content;
-  return sessionId.value.trim() || "本地调试会话";
+  return currentSessionItem.value?.title || t("agentSession.untitled");
 });
 
 const currentSessionItem = computed(() => {
@@ -1167,77 +1152,25 @@ async function loadAgentEffectivePermissions(agent = currentAgent.value) {
   }
 }
 
-function extractSessionID(payload: unknown) {
-  const root = payload as Record<string, any>;
-  const data = root?.data ?? root;
-  const candidates = [
-    data?.uuid,
-    data?.session_uuid,
-    data?.session_id,
-    data?.sessionId,
-    data?.id,
-  ];
-  for (const item of candidates) {
-    const text = String(item || "").trim();
-    if (text) return text;
-  }
-  throw new Error("PowerX Agent session response missing session uuid");
+function extractSessionID(payload: AgentSession) {
+  if (!payload.session_uuid) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return payload.session_uuid;
 }
 
 async function createSession(agent = currentAgent.value) {
-  if (typeof window === "undefined") return;
   if (sessionLoading.value) return;
-  const targetAgent = agent || currentAgent.value;
-  if (!String(targetAgent.value || "").trim()) {
-    errorText.value = "agent_id is required";
-    return;
-  }
+  if (!agent.uuid) { errorText.value = t("agentSession.agentRequired"); return; }
   abortStream();
   sessionLoading.value = true;
-  errorText.value = "";
   try {
-    const body: Record<string, unknown> = {
-      title: targetAgent.sessionTitle,
-      env: "dev",
-      meta: {
-        source: "powerxplugin.local_chat",
-      },
-    };
-    if (targetAgent.uuid) {
-      body.agent_uuid = targetAgent.uuid;
-    } else {
-      body.agent_id = String(targetAgent.id || targetAgent.value).trim();
-    }
-    const headers = requestHeaders(true);
-    const response = await fetch("/api/v1/plugin/agent/sessions", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      throw new Error(`PowerX Agent session proxy failed: HTTP ${response.status}`);
-    }
-    const payload = await response.json();
-    const createdSessionId = extractSessionID(payload);
-    sessionId.value = createdSessionId;
-    upsertSessionItem({
-      id: createdSessionId,
-      agentId: targetAgent.value,
-      title: targetAgent.sessionTitle,
-      summary: createdSessionId,
-      createdAt: Date.now(),
-    });
-    resetRuntimeState();
-    chatMessages.value = [];
-    await loadSessions(targetAgent, false);
-    await loadSessionMessages(createdSessionId);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    errorText.value = message;
-    status.value = "error";
-  } finally {
-    sessionLoading.value = false;
-  }
+    const created = await sessionAPI.create(agent.uuid, agent.sessionTitle);
+    sessionId.value = extractSessionID(created);
+    upsertSessionItem(normalizeSessionRecord(created, agent));
+    resetRuntimeState(); chatMessages.value = [];
+    await loadSessions(agent, false);
+    await loadSessionMessages(created.session_uuid);
+  } catch (error) { errorText.value = sessionErrorText(error); }
+  finally { sessionLoading.value = false; }
 }
 
 function upsertSessionItem(item: SessionItem) {
@@ -1245,62 +1178,24 @@ function upsertSessionItem(item: SessionItem) {
   sessionItems.value = [item, ...existing].slice(0, 20);
 }
 
-async function loadSessions(agent = currentAgent.value, selectFirst = false) {
-  if (typeof window === "undefined") return;
-  const targetAgent = agent || currentAgent.value;
-  const agentUUID = String(targetAgent.uuid || targetAgent.value || "").trim();
-  if (!agentUUID) return;
+async function loadSessions(agent = currentAgent.value, selectFirst = true) {
+  if (!agent.uuid) return;
   try {
-    const url = new URL("/api/v1/plugin/agent/sessions", window.location.origin);
-    url.searchParams.set("agent_uuid", agentUUID);
-    url.searchParams.set("env", "dev");
-    url.searchParams.set("status", "active");
-    url.searchParams.set("limit", "50");
-    const response = await fetch(url.toString(), { headers: requestHeaders() });
-    if (!response.ok) {
-      throw new Error(`PowerX Agent sessions proxy failed: HTTP ${response.status}`);
-    }
-    const payload = await response.json();
-    const items = extractSessionItems(payload).map((record) => normalizeSessionRecord(record, targetAgent));
-    const otherAgentItems = sessionItems.value.filter((item) => item.agentId !== targetAgent.value);
-    sessionItems.value = [...items, ...otherAgentItems].slice(0, 50);
-    const currentStillExists = items.some((item) => item.id === sessionId.value);
-    if (selectFirst && items.length > 0) {
-      await selectSession(items[0]);
-    } else if (selectFirst && items.length === 0 && targetAgent.value === agentId.value) {
-      await createSession(targetAgent);
-    } else if (!currentStillExists && items.length > 0 && targetAgent.value === agentId.value) {
-      await selectSession(items[0]);
-    } else if (!currentStillExists && targetAgent.value === agentId.value) {
-      sessionId.value = "";
-      resetConversation();
-    }
-  } catch (error) {
-    errorText.value = error instanceof Error ? error.message : String(error);
-  }
+    const items = (await sessionAPI.list()).filter(record => record.agent_uuid === agent.uuid && record.status === "active").map(record => normalizeSessionRecord(record, agent));
+    sessionItems.value = [...items, ...sessionItems.value.filter(item => item.agentId !== agent.value)];
+    if (selectFirst && items.length) await selectSession(items[0]);
+    else if (!items.some(item => item.id === sessionId.value) && agent.value === agentId.value) { sessionId.value = ""; resetConversation(); }
+  } catch (error) { errorText.value = sessionErrorText(error); }
 }
 
-function extractSessionItems(payload: unknown): AgentSessionRecord[] {
-  const root = payload as Record<string, any>;
-  const candidates = [root?.data?.items, root?.items, root?.data];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate as AgentSessionRecord[];
-  }
-  return [];
+function extractSessionItems(payload: { data: { items: AgentSessionRecord[] } }): AgentSessionRecord[] {
+  if (!Array.isArray(payload?.data?.items)) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return payload.data.items;
 }
 
 function normalizeSessionRecord(record: AgentSessionRecord, agent: AgentOption): SessionItem {
-  const id = String(record.uuid || record.session_id || record.sessionId || record.id || "").trim();
-  const title = String(record.title || agent.sessionTitle || "Agent 会话").trim();
-  const createdText = String(record.latestAt || record.latest_at || record.createdAt || record.created_at || "").trim();
-  const createdAt = createdText ? Date.parse(createdText) || Date.now() : Date.now();
-  return {
-    id,
-    agentId: agent.value,
-    title,
-    summary: id,
-    createdAt,
-  };
+  if (!record.session_uuid) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return { id: record.session_uuid, agentId: agent.value, title: record.title || t("agentSession.untitled"), summary: "", createdAt: Date.parse(record.created_at) };
 }
 
 async function selectSession(item: SessionItem) {
@@ -1314,77 +1209,29 @@ async function selectSession(item: SessionItem) {
     suppressAgentWatch = false;
   }
   sessionId.value = item.id;
+  activeInvocationId.value = pendingAttempts.get(item.id)?.invocationUUID || "";
   resetRuntimeState();
   await loadSessionMessages(item.id);
 }
 
-async function loadSessionMessages(id: string, options: { preserveCurrentOnEmpty?: boolean } = {}) {
-  const sessionUUID = String(id || "").trim();
-  if (!sessionUUID) return;
-  try {
-    const url = new URL(`/api/v1/plugin/agent/sessions/${encodeURIComponent(sessionUUID)}/messages`, window.location.origin);
-    url.searchParams.set("env", "dev");
-    url.searchParams.set("limit", "200");
-    const response = await fetch(url.toString(), { headers: requestHeaders() });
-    if (!response.ok) {
-      throw new Error(`PowerX Agent messages proxy failed: HTTP ${response.status}`);
-    }
-    const payload = await response.json();
-    const nextMessages = extractMessageItems(payload)
-      .map(normalizeChatMessage)
-      .filter((item): item is ChatMessage => Boolean(item));
-    if (options.preserveCurrentOnEmpty && nextMessages.length === 0 && chatMessages.value.length > 0) {
-      errorText.value = "Agent final 已返回，但会话历史尚未包含 assistant 消息。";
-      return;
-    }
-    if (options.preserveCurrentOnEmpty && activeAssistantMessageID) {
-      const current = chatMessages.value.find((item) => item.id === activeAssistantMessageID);
-      if (current?.runState?.tasks?.length && !nextMessages.some((item) => item.role === "assistant" && item.runState?.tasks?.length)) {
-        return;
-      }
-    }
-    chatMessages.value = nextMessages;
-  } catch (error) {
-    errorText.value = error instanceof Error ? error.message : String(error);
-  }
+async function loadSessionMessages(id: string, _options: { preserveCurrentOnEmpty?: boolean } = {}) {
+  if (!id) return;
+  try { chatMessages.value = (await sessionAPI.messages(id)).map(normalizeChatMessage).filter((item): item is ChatMessage => item !== null); }
+  catch (error) { errorText.value = sessionErrorText(error); }
 }
 
-function extractMessageItems(payload: unknown): AgentSessionMessageRecord[] {
-  const root = payload as Record<string, any>;
-  const candidates = [root?.data?.items, root?.items, root?.data];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate as AgentSessionMessageRecord[];
-  }
-  return [];
+function extractMessageItems(payload: { data: { items: AgentSessionMessageRecord[] } }): AgentSessionMessageRecord[] {
+  if (!Array.isArray(payload?.data?.items)) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return payload.data.items;
 }
 
 function normalizeChatMessage(record: AgentSessionMessageRecord): ChatMessage | null {
-  const role = String(record.role || "").trim();
-  const rawId = String(record.id || "").trim();
-  if (role !== "user" && role !== "assistant") return null;
-  return {
-    id: rawId ? `${role}_${rawId}` : `${role}_${Date.now()}`,
-    rawId,
-    role,
-    content: String(record.content || ""),
-    pending: false,
-    runState: normalizeMessageRunState(record),
-  };
+  if (!record.message_uuid || !["user","assistant"].includes(record.role)) throw new Error("AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return { id: record.message_uuid, rawId: record.message_uuid, role: record.role, content: record.content, pending: false };
 }
 
-function normalizeMessageRunState(record: AgentSessionMessageRecord): RunState | undefined {
-  const meta = record.meta || record.metadata || {};
-  const raw = (meta.run_state || meta.runState) as Record<string, unknown> | undefined;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-  const tasks = Array.isArray(raw.tasks) ? raw.tasks.filter(isPlainObject).map((task) => taskFromRunPayload(task)) : [];
-  if (!tasks.length) return undefined;
-  const state = createEmptyRunState();
-  state.run = isPlainObject(raw.run) ? raw.run : {};
-  state.summary = isPlainObject(raw.summary) ? raw.summary : undefined;
-  state.tasks = tasks;
-  state.ended = Boolean(raw.ended);
-  refreshRunStateCollections(state);
-  return state;
+function normalizeMessageRunState(_record: AgentSessionMessageRecord): RunState | undefined {
+  return undefined; // Service-session messages do not expose a legacy run_state payload.
 }
 
 async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -1399,34 +1246,11 @@ async function responseErrorMessage(response: Response, fallback: string): Promi
 }
 
 async function deleteSession(item: SessionItem) {
-  const id = String(item?.id || "").trim();
-  if (!id) return;
-  abortStream();
-  deletingSessionId.value = id;
-  try {
-    const url = new URL(`/api/v1/plugin/agent/sessions/${encodeURIComponent(id)}`, window.location.origin);
-    url.searchParams.set("env", "dev");
-    const response = await fetch(url.toString(), {
-      method: "DELETE",
-      headers: requestHeaders(),
-    });
-    if (!response.ok) {
-      throw new Error(await responseErrorMessage(response, `PowerX Agent session delete failed: HTTP ${response.status}`));
-    }
-    sessionItems.value = sessionItems.value.filter((item) => item.id !== id);
-    await loadSessions(currentAgent.value, false);
-    const next = visibleSessionItems.value[0];
-    if (id === sessionId.value.trim() && next) {
-      await selectSession(next);
-    } else if (id === sessionId.value.trim()) {
-      sessionId.value = "";
-      resetConversation();
-    }
-  } catch (error) {
-    errorText.value = error instanceof Error ? error.message : String(error);
-  } finally {
-    deletingSessionId.value = "";
-  }
+  if (!item.id) return;
+  abortStream(); deletingSessionId.value = item.id;
+  try { await sessionAPI.remove(item.id); pendingAttempts.delete(item.id); await loadSessions(currentAgent.value, false); }
+  catch (error) { errorText.value = sessionErrorText(error); }
+  finally { deletingSessionId.value = ""; }
 }
 
 function resetConversation() {
@@ -1436,6 +1260,7 @@ function resetConversation() {
 
 function resetRuntimeState() {
   abortStream();
+  activeInvocationId.value = pendingAttempts.get(sessionId.value)?.invocationUUID || "";
   rawLog.value = "";
   finalMessage.value = "";
   timeline.value = [];
@@ -1580,92 +1405,46 @@ async function send() {
 }
 
 async function sendMessageText(input: string, options: { clearInput?: boolean; replaceFromIndex?: number; regenerateFromMessageId?: string } = {}) {
+  if (options.regenerateFromMessageId || options.replaceFromIndex !== undefined) { errorText.value = t("agentSession.unsupportedEdit"); return; }
   if (!canSendText(input)) return;
-  const userMessage = input.trim();
-  if (!userMessage) return;
-  abortStream();
-  loading.value = true;
-  status.value = "streaming";
-  errorText.value = "";
-  rawLog.value = "";
-  finalMessage.value = "";
-  timeline.value = [];
-  selectedEventId.value = "";
-  eventCount.value = 0;
-  assistantBuffer = "";
-  if (typeof options.replaceFromIndex === "number" && options.replaceFromIndex >= 0) {
-    chatMessages.value = chatMessages.value.slice(0, options.replaceFromIndex);
-  }
-  appendChatMessage("user", userMessage);
-  if (currentSessionItem.value) {
-    currentSessionItem.value.summary = userMessage;
-  }
-  activeAssistantMessageID = appendChatMessage("assistant", "正在连接 PowerX Agent Runtime...", true);
-  if (options.clearInput !== false) {
-    message.value = "";
-  }
-  traceId.value = `trace_${Date.now()}`;
-
-  abortController = new AbortController();
+  const sid = sessionId.value, content = input.trim();
+  let attempt = pendingAttempts.get(sid);
+  if (attempt && attempt.content !== content) { errorText.value = t("agentSession.pendingRetry"); return; }
+  if (!attempt) { attempt = { session: sid, content, appendKey: crypto.randomUUID(), invokeKey: crypto.randomUUID() }; pendingAttempts.set(sid, attempt); }
+  abortStream(); loading.value = true; status.value = "streaming"; errorText.value = ""; finalMessage.value = "";
+  activeAssistantMessageID = appendChatMessage("assistant", t("agentSession.connecting"), true);
+  if (options.clearInput !== false) message.value = "";
+  const controller = new AbortController(); abortController = controller;
   try {
-    const headers: Record<string, string> = {
-    };
-    const token = authToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-    const params: Record<string, string> = {
-      agent_uuid: currentAgent.value.uuid,
-      session_uuid: sessionId.value.trim(),
-      trace_id: traceId.value.trim(),
-      q: userMessage,
-      source: "powerxplugin.local_chat",
-      env: "dev",
-    };
-    const tenantUUID = resolveTenantUUIDForRequest();
-    if (!tenantUUID) {
-      throw new Error("当前租户为空，不能发起 Agent Skill Bridge 调试请求");
-    }
-    params.tenant_uuid = tenantUUID;
-    params.origin_tenant_uuid = tenantUUID;
-    if (options.regenerateFromMessageId) {
-      params.regen_from_message_id = options.regenerateFromMessageId;
-    }
-    await createFetchSSE({
-      path: agentProxyPath,
-      params,
-      headers,
-      signal: abortController.signal,
-      onEvent: consumeSSEEvent,
-    });
-    if (status.value === "streaming") {
-      status.value = "ended";
-    }
-    if (!finalMessage.value) {
-      status.value = "error";
-      errorText.value = "Agent Run State 协议错误：运行已结束但未收到 agent_run.final。";
-      updateAssistantMessage(errorText.value);
-    }
-    markAssistantPending(false);
-    await loadSessionMessages(sessionId.value.trim(), { preserveCurrentOnEmpty: Boolean(finalMessage.value) });
+    const invocation = await sessionAPI.submit(attempt);
+    if (controller.signal.aborted) return;
+    activeInvocationId.value = invocation.invocation_uuid;
+    traceId.value = invocation.trace_uuid;
+    await sessionAPI.subscribe(sid, invocation.invocation_uuid, controller.signal, (event) => {
+      const payload = event.payload as Record<string, any>;
+      rawLog.value += event.raw + "\n\n";
+      if (event.event === "final") { finalMessage.value = payload.output; setAssistantText(payload.output); }
+      if (event.event === "error") { errorText.value = sessionErrorText(new Error(String(payload.reason_code))); status.value = "error"; }
+      if (event.event === "end") { pendingAttempts.delete(sid); activeInvocationId.value = ""; if (payload.status === "succeeded") status.value = "ended"; }
+    }, requestHeaders());
+    await loadSessionMessages(sid);
   } catch (error) {
-    markAssistantPending(false);
-    if ((error as Error)?.name === "AbortError") {
-      status.value = "aborted";
-      updateAssistantMessage("已停止本次会话。");
-      return;
-    }
-    status.value = "error";
-    errorText.value = error instanceof Error ? error.message : String(error);
-    markRunStateFailed(errorText.value);
-    updateAssistantMessage(errorText.value);
-  } finally {
-    loading.value = false;
-    abortController = null;
-    if (status.value === "ended") {
-      await loadSessions(currentAgent.value, false);
-    }
-  }
+    if (controller.signal.aborted) { status.value = "aborted"; errorText.value = t("agentSession.detached"); }
+    else { status.value = "error"; errorText.value = sessionErrorText(error); }
+  } finally { if (abortController === controller) { markAssistantPending(false); loading.value = false; abortController = null; } }
+}
+
+function sessionErrorText(error: unknown) {
+  const value = error as any;
+  const reason = String(value?.data?.error?.reason_code || value?.data?.reason_code || value?.message || "AGENT_SESSION_UPSTREAM_DEPENDENCY");
+  return t("agentSession.failed", { reason });
+}
+
+async function cancelCurrentRun() {
+  const attempt = pendingAttempts.get(sessionId.value);
+  if (!attempt?.invocationUUID) { errorText.value = t("agentSession.pendingRetry"); return; }
+  try { await sessionAPI.cancel(attempt.session, attempt.invocationUUID); }
+  catch (error) { errorText.value = sessionErrorText(error); }
 }
 
 function markRunStateFailed(message: string) {

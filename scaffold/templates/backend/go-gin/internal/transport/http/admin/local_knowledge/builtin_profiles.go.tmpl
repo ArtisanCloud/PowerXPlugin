@@ -1,0 +1,49 @@
+package local_knowledge
+
+import (
+	"encoding/json"
+	"time"
+
+	"{{ .BackendModulePath }}/internal/entity/models"
+	"gorm.io/gorm"
+)
+
+// ensureBuiltinProfiles materializes the Core-compatible baseline bundle for a
+// tenant only when a space selects it. Profile versions remain ordinary local
+// records and can subsequently be reviewed from Knowledge Settings.
+func (h *handler) ensureBuiltinProfiles(tenantUUID, profileKey string) error {
+	publishedAt := time.Now()
+	ingestionConfig, _ := json.Marshal(map[string]int{"chunk_size": 800, "chunk_overlap": 120})
+	indexConfig, _ := json.Marshal(map[string]any{"channels": []string{"text"}})
+	ragConfig, _ := json.Marshal(map[string]any{"top_k": 8, "minimum_score": 0.2, "strategy": "text"})
+	return h.db.Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&models.LocalIngestionProfileVersion{}).Where("tenant_uuid=? AND profile_key=? AND status=?", tenantUUID, profileKey, "published").Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			if err := tx.Create(&models.LocalIngestionProfileVersion{TenantUUID: tenantUUID, ProfileKey: profileKey, Version: 1, Status: "published", DisplayName: profileKey, Config: ingestionConfig, PublishedAt: &publishedAt}).Error; err != nil {
+				return err
+			}
+		}
+		count = 0
+		if err := tx.Model(&models.LocalIndexProfileVersion{}).Where("tenant_uuid=? AND profile_key=? AND status=?", tenantUUID, profileKey, "published").Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			if err := tx.Create(&models.LocalIndexProfileVersion{TenantUUID: tenantUUID, ProfileKey: profileKey, Version: 1, Status: "published", DisplayName: profileKey, Config: indexConfig, PublishedAt: &publishedAt}).Error; err != nil {
+				return err
+			}
+		}
+		count = 0
+		if err := tx.Model(&models.LocalRAGProfileVersion{}).Where("tenant_uuid=? AND profile_key=? AND status=?", tenantUUID, profileKey, "published").Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			if err := tx.Create(&models.LocalRAGProfileVersion{TenantUUID: tenantUUID, ProfileKey: profileKey, Version: 1, Status: "published", DisplayName: profileKey, Config: ragConfig, PublishedAt: &publishedAt}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

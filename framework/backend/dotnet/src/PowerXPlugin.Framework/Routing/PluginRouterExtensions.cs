@@ -8,9 +8,11 @@ public static class PluginRouterExtensions
     public const string ApiPrefix = "/api/v1";
     public const string CapabilityInvokePath = "/api/v1/integration/capabilities/invoke";
 
-    public static WebApplication UseFrameworkRoutes(this WebApplication app)
+    public static WebApplication UseFrameworkRoutes(this WebApplication app, bool mapCapabilityInvoke = true)
     {
         app.MapHealthChecks(HealthzPath);
+
+        if (!mapCapabilityInvoke) return app;
 
         app.MapPost(CapabilityInvokePath, async (HttpContext ctx, PluginApp pluginApp) =>
         {

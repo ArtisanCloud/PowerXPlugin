@@ -16,12 +16,12 @@
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 p-4 dark:border-gray-800">
         <div>
           <div class="text-sm font-semibold">插件 Agent</div>
-          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">共 {{ `{{ items.length }}` }} 个 Agent，已同步 {{ `{{ syncedCount }}` }} 个。</div>
+          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">共 {{ "{{ items.length }}" }} 个 Agent，已同步 {{ "{{ syncedCount }}" }} 个。</div>
         </div>
         <div class="flex gap-2">
-          <UBadge color="neutral" variant="soft">draft {{ `{{ draftCount }}` }}</UBadge>
-          <UBadge color="success" variant="soft">synced {{ `{{ syncedCount }}` }}</UBadge>
-          <UBadge color="error" variant="soft">failed {{ `{{ failedCount }}` }}</UBadge>
+          <UBadge color="neutral" variant="soft">draft {{ "{{ draftCount }}" }}</UBadge>
+          <UBadge color="success" variant="soft">synced {{ "{{ syncedCount }}" }}</UBadge>
+          <UBadge color="error" variant="soft">failed {{ "{{ failedCount }}" }}</UBadge>
         </div>
       </div>
 
@@ -45,20 +45,20 @@
         >
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <div class="truncate text-sm font-semibold">{{ `{{ item.name }}` }}</div>
+              <div class="truncate text-sm font-semibold">{{ "{{ item.name }}" }}</div>
             </div>
           </div>
 
           <div>
-            <UBadge :color="agentTypeColor(item)" variant="soft">{{ `{{ agentTypeLabel(item) }}` }}</UBadge>
+            <UBadge :color="agentTypeColor(item)" variant="soft">{{ "{{ agentTypeLabel(item) }}" }}</UBadge>
           </div>
 
           <div class="min-w-0 font-mono text-xs text-gray-600 dark:text-gray-300">
-            {{ `{{ item.agent_key }}` }}
+            {{ "{{ item.agent_key }}" }}
           </div>
 
           <div>
-            <UBadge :color="statusColor(item.sync_status)" variant="soft">{{ `{{ item.sync_status }}` }}</UBadge>
+            <UBadge :color="statusColor(item.sync_status)" variant="soft">{{ "{{ item.sync_status }}" }}</UBadge>
           </div>
 
           <div class="flex justify-start md:justify-end">
@@ -86,7 +86,7 @@
         <div class="space-y-5 p-5">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h2 class="text-lg font-semibold">{{ `{{ form.id ? "编辑 Agent" : "新建 Agent" }}` }}</h2>
+              <h2 class="text-lg font-semibold">{{ "{{ form.id ? \"编辑 Agent\" : \"新建 Agent\" }}" }}</h2>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">配置插件 Agent 的源定义，同步后由 PowerX 创建运行态 Agent。</p>
             </div>
             <UButton icon="i-heroicons-x-mark" color="neutral" variant="ghost" square @click="formOpen = false" />
@@ -95,18 +95,18 @@
           <div v-if="editingAgent" class="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900/70 dark:text-gray-200 md:grid-cols-3">
             <div>
               <div class="text-xs text-gray-500 dark:text-gray-400">类型</div>
-              <div class="mt-1"><UBadge :color="agentTypeColor(editingAgent)" variant="soft">{{ `{{ agentTypeLabel(editingAgent) }}` }}</UBadge></div>
+              <div class="mt-1"><UBadge :color="agentTypeColor(editingAgent)" variant="soft">{{ "{{ agentTypeLabel(editingAgent) }}" }}</UBadge></div>
             </div>
             <div>
               <div class="text-xs text-gray-500 dark:text-gray-400">PowerX UUID</div>
-              <div class="mt-1 break-all font-mono text-xs text-gray-700 dark:text-gray-200">{{ `{{ editingAgent.powerx_agent_uuid || "-" }}` }}</div>
+              <div class="mt-1 break-all font-mono text-xs text-gray-700 dark:text-gray-200">{{ "{{ editingAgent.powerx_agent_uuid || \"-\" }}" }}</div>
             </div>
             <div>
               <div class="text-xs text-gray-500 dark:text-gray-400">同步时间</div>
-              <div class="mt-1 text-xs text-gray-700 dark:text-gray-200">{{ `{{ editingAgent.last_sync_at || "-" }}` }}</div>
+              <div class="mt-1 text-xs text-gray-700 dark:text-gray-200">{{ "{{ editingAgent.last_sync_at || \"-\" }}" }}</div>
             </div>
             <div v-if="editingAgent.sync_error_message" class="md:col-span-3 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-200">
-              {{ `{{ editingAgent.sync_error_message }}` }}
+              {{ "{{ editingAgent.sync_error_message }}" }}
             </div>
           </div>
 

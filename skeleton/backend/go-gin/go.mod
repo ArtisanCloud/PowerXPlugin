@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/ArtisanCloud/PowerWeChat/v3 v3.4.38
-	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.22
+	github.com/ArtisanCloud/PowerXPlugin/framework/backend/go v0.0.24
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
@@ -97,3 +97,5 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+replace github.com/ArtisanCloud/PowerXPlugin/framework/backend/go => ../../../framework/backend/go

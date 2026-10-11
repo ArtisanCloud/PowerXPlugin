@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-11",
+  "scope": "Framework Go/.NET WS identity revalidation and consumer compile checks",
+  "contract": "PowerX/docs/contracts/plugin-ws-revalidation.md",
+  "capability": "com.corex.iam.identity_context.service_read",
+  "operation": "revalidate_ws_identity",
+  "protocol": "core_internal",
+  "fixes": [
+    "NET WS query handle excluded from default JSON serialization; empty handles still rejected before HTTP",
+    "NET null revalidation result becomes IAM_CONTEXT_RESPONSE_INVALID and closes the lease",
+    "Dedicated Go and NET revalidation error-status and trace tests; reflected upstream handle excluded from error output",
+    "Updated handoff documentation to replace the obsolete missing-Core-contract state"
+  ],
+  "verified": [
+    {
+      "command": "go test -race ./iam/contracts ./iam/delegated ./runtime/realtime -count=1",
+      "cwd": "framework/backend/go",
+      "exit_code": 0
+    },
+    {
+      "command": "go test -race ./internal/transport/http/wsbus ./internal/transport/http/admin/runtime_ops -run 'WS|Ws|Identity|Delegated' -count=1",
+      "cwd": "skeleton/backend/go-gin",
+      "exit_code": 0
+    },
+    {
+      "command": "dotnet test --no-restore --filter 'FullyQualifiedName~RequestIdentityTests|FullyQualifiedName~WSRevalidation'",
+      "cwd": "framework/backend/dotnet/tests/PowerXPlugin.Framework.Tests",
+      "exit_code": 0,
+      "tests": 45
+    },
+    {
+      "command": "go test ./internal/bootstrap ./internal/transport/http/wsbus -run 'Identity|Delegated|FrameworkIAM' -count=1",
+      "cwd": "CraftWorkspace/com.powerx.plugin.ai-craft/backend",
+      "exit_code": 0
+    },
+    {
+      "command": "go test ./tools/cli/internal/templates -run 'TestRender|Test.*Template' -count=1",
+      "exit_code": 0
+    },
+    {
+      "command": "node scripts/sync-templates.mjs --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "behavior": [
+    "Subscription and business event delivery use current returned permissions",
+    "401/403/409/503 and invalid or late identity results fail closed",
+    "Original ticket expiry does not limit valid WS handle revalidation",
+    "Connection expiry bounded by original access, fixed WS handle deadline and plugin TTL",
+    "No identity polling or cached-permission fallback",
+    "Server-only handles are not browser credentials"
+  ],
+  "acceptance_boundaries": {
+    "core_http": "contract fixtures, not live Core",
+    "websocket": "real local socket with Core contract fixture",
+    "ai_craft": "local replace source and targeted tests; user process not rebuilt or restarted",
+    "live_core_logout_disable_permission_grant_revocation": "not_run",
+    "installed_browser": "not_run",
+    "framework_release": "not_published"
+  },
+  "ownership": {
+    "core_modified": false,
+    "ai_craft_source_modified": false,
+    "databases_modified": false,
+    "daily_services_restarted": false,
+    "test_listeners": "httptest servers closed by their tests"
+  }
+}

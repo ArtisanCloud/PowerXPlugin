@@ -11,6 +11,7 @@ import (
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	capgateway "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/integrations/gateway"
 	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -27,6 +28,43 @@ type knowledgeGatewayStub struct {
 	createErr  error
 }
 
+func TestLocalBM25AndFusionScoreRankRelevantChunkFirst(t *testing.T) {
+	rows := []localSearchRow{
+		{LocalKnowledgeChunk: models.LocalKnowledgeChunk{Content: "退款政策支持七天无理由退款"}},
+		{LocalKnowledgeChunk: models.LocalKnowledgeChunk{Content: "物流配送时效说明"}},
+	}
+	scores := localBM25Scores(rows, "退款政策")
+	if scores[0] <= scores[1] || scores[0] == 0 {
+		t.Fatalf("BM25 should rank matching chunk first: %#v", scores)
+	}
+	if got := localCosineSimilarity([]float32{1, 0}, []float32{1, 0}); got != 1 {
+		t.Fatalf("cosine=%v want 1", got)
+	}
+	if got := localCosineSimilarity([]float32{1, 0}, []float32{0, 1}); got != 0 {
+		t.Fatalf("cosine=%v want 0", got)
+	}
+}
+
+func TestLocalKnowledgeACLGatesDepartmentAndMemberScopes(t *testing.T) {
+	acl := localKnowledgeACL{memberUUID: "member-a", department: "support", spaceDepartment: "support"}
+	if !acl.allows(localSearchRow{AccessScope: "space_department"}) {
+		t.Fatal("member in the owning department should be allowed")
+	}
+	if (localKnowledgeACL{memberUUID: "member-a", department: "sales", spaceDepartment: "support"}).allows(localSearchRow{AccessScope: "space_department"}) {
+		t.Fatal("member outside the owning department must be denied")
+	}
+	allowed, err := json.Marshal([]string{"member-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !acl.allows(localSearchRow{AccessScope: "members", AllowedMemberUUIDs: allowed}) {
+		t.Fatal("explicitly allowed member should be allowed")
+	}
+	if !(localKnowledgeACL{root: true}).allows(localSearchRow{AccessScope: "members"}) {
+		t.Fatal("root should bypass document scope")
+	}
+}
+
 func (g *knowledgeGatewayStub) Enabled() bool { return true }
 func (g *knowledgeGatewayStub) Invoke(_ context.Context, params capgateway.InvokeParams) (*capgateway.InvokeResult, error) {
 	g.last = params
@@ -36,7 +74,7 @@ func (g *knowledgeGatewayStub) Invoke(_ context.Context, params capgateway.Invok
 	}
 	return &capgateway.InvokeResult{TraceID: "trace-knowledge", Status: "ok", Data: data, Raw: g.invokeRaw}, nil
 }
-func (g *knowledgeGatewayStub) ListPlatformCapabilities(context.Context, capgateway.ListPlatformCapabilitiesOptions) ([]capgateway.PlatformCapabilityRecord, error) {
+func (g *knowledgeGatewayStub) ListPlatformCapabilityCatalog(context.Context, capgateway.ListPlatformCapabilityCatalogOptions) ([]capgateway.PlatformCapabilityCatalogRecord, error) {
 	return nil, nil
 }
 func (g *knowledgeGatewayStub) ListKnowledgeSpaces(_ context.Context, opts capgateway.KnowledgeSpaceListOptions) ([]capgateway.KnowledgeSpaceRuntimeRecord, error) {
@@ -97,24 +135,7 @@ func (g *knowledgeGatewayStub) SyncPluginAgent(context.Context, capgateway.Plugi
 func (g *knowledgeGatewayStub) RegisterCatalog(context.Context, *capabilities.CatalogSnapshot, []capabilities.ProtocolAsset) error {
 	return nil
 }
-func (g *knowledgeGatewayStub) CreateAgentSession(context.Context, capgateway.AgentSessionParams) (*capgateway.AgentSessionRecord, error) {
-	return nil, nil
-}
-func (g *knowledgeGatewayStub) ListAgentSessions(context.Context, capgateway.AgentSessionListOptions) ([]capgateway.AgentSessionRecord, error) {
-	return nil, nil
-}
-func (g *knowledgeGatewayStub) ListAgentSessionMessages(context.Context, capgateway.AgentSessionMessageListOptions) ([]capgateway.AgentSessionMessageRecord, error) {
-	return nil, nil
-}
-func (g *knowledgeGatewayStub) DeleteAgentSession(context.Context, capgateway.AgentSessionMutationOptions) error {
-	return nil
-}
-func (g *knowledgeGatewayStub) ArchiveAgentSession(context.Context, capgateway.AgentSessionMutationOptions) error {
-	return nil
-}
-func (g *knowledgeGatewayStub) StreamAgentSSE(context.Context, capgateway.AgentStreamParams) (*capgateway.AgentStream, error) {
-	return nil, nil
-}
+
 func (g *knowledgeGatewayStub) Close() error { return nil }
 
 func TestKnowledgeHandlerProvider(t *testing.T) {
@@ -226,7 +247,8 @@ func TestKnowledgeHandlerDelegatedPolicyUsesGatewayCapability(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/policy", handler.Policy)
 
@@ -273,7 +295,8 @@ func TestKnowledgeHandlerDelegatedIngestionsUsesPowerXIngestionJobsCapability(t 
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/ingestions", handler.Ingestions)
 
@@ -314,7 +337,8 @@ func TestKnowledgeHandlerDelegatedIngestionsReadsArrayRawData(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/ingestions", handler.Ingestions)
 
@@ -352,7 +376,8 @@ func TestKnowledgeHandlerDelegatedIngestionsReadsTenantInvocationNestedResult(t 
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces/:spaceID/ingestions", handler.Ingestions)
 
@@ -407,7 +432,8 @@ func TestKnowledgeHandlerSpacesRejectsTenantMismatch(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.GET("/spaces", handler.Spaces)
 
@@ -437,7 +463,8 @@ func TestKnowledgeHandlerCreateSpaceConflictUsesKnowledgeConflictCode(t *testing
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces", handler.CreateSpace)
 
@@ -466,7 +493,8 @@ func TestKnowledgeHandlerRetireSpaceUsesGateway(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces/:spaceID/retire", handler.RetireSpace)
 
@@ -494,7 +522,8 @@ func TestKnowledgeHandlerDeleteSpaceUsesGateway(t *testing.T) {
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.DELETE("/spaces/:spaceID", handler.DeleteSpace)
 
@@ -522,7 +551,8 @@ func TestKnowledgeHandlerDelegatedSearchRejectsUnavailableHostContract(t *testin
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/search", handler.Search)
 
@@ -551,7 +581,8 @@ func TestKnowledgeHandlerDelegatedIngestSpaceUsesPowerXIngestionJobsCapability(t
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces/:spaceID/ingest", handler.IngestSpace)
 
@@ -601,7 +632,8 @@ func TestKnowledgeHandlerDelegatedIngestSpaceRejectsMissingSourceURI(t *testing.
 			Logging:   &config.LoggingConfig{DebugMode: false},
 			Knowledge: &config.KnowledgeConfig{Mode: "delegated", RequireTenant: true, DelegateTimeout: "1s"},
 		},
-		CapabilityGateway: gateway,
+		CapabilityGateway:  gateway,
+		KnowledgeDirectory: knowledgeGatewayDelegatedClient{gateway: gateway},
 	})
 	router.POST("/spaces/:spaceID/ingest", handler.IngestSpace)
 

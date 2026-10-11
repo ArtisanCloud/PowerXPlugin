@@ -706,13 +706,13 @@ onMounted(async () => {
     >
       <div>
         <p class="text-xs font-semibold uppercase text-gray-500">
-          {{ `{{ t("iam.roles.hero.kicker") }}` }}
+          {{ "{{ t(\"iam.roles.hero.kicker\") }}" }}
         </p>
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ t("iam.roles.hero.title") }}` }}
+          {{ "{{ t(\"iam.roles.hero.title\") }}" }}
         </h1>
         <p class="text-sm text-gray-600 dark:text-gray-400 max-w-2xl">
-          {{ `{{ t("iam.roles.hero.description") }}` }}
+          {{ "{{ t(\"iam.roles.hero.description\") }}" }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -731,7 +731,7 @@ onMounted(async () => {
           :disabled="props.readonly"
           @click="openAddForm"
         >
-          {{ `{{ t("iam.roles.actions.create") }}` }}
+          {{ "{{ t(\"iam.roles.actions.create\") }}" }}
         </UButton>
       </div>
     </div>
@@ -781,11 +781,7 @@ onMounted(async () => {
             class="flex flex-col gap-3 border-t border-gray-100 dark:border-gray-800 pt-4 mt-4 md:flex-row md:items-center md:justify-between"
           >
             <p class="text-sm text-gray-500">
-              {{ `{{ t("iam.roles.pagination.summary", {
-                  start: paginationInfo.start,
-                  end: paginationInfo.end,
-                  total: pagination.total,
-                }) }}` }}
+              {{ "{{\n                t(\"iam.roles.pagination.summary\", {\n                  start: paginationInfo.start,\n                  end: paginationInfo.end,\n                  total: pagination.total,\n                })\n              }}" }}
             </p>
             <div class="flex items-center gap-2">
               <UButton
@@ -796,7 +792,7 @@ onMounted(async () => {
                 @click="changePage(pagination.page - 1)"
               />
               <span class="text-sm text-gray-600">
-                {{ `{{ pagination.page }}` }} / {{ `{{ pagination.totalPages }}` }}
+                {{ "{{ pagination.page }}" }} / {{ "{{ pagination.totalPages }}" }}
               </span>
               <UButton
                 size="sm"
@@ -863,10 +859,10 @@ onMounted(async () => {
       <template #footer>
         <div class="flex w-full flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
           <UButton color="neutral" variant="subtle" @click="showForm = false">
-            {{ `{{ t("common.cancel") }}` }}
+            {{ "{{ t(\"common.cancel\") }}" }}
           </UButton>
           <UButton color="primary" type="submit" form="role-form" :disabled="props.readonly">
-            {{ `{{ t("common.save") }}` }}
+            {{ "{{ t(\"common.save\") }}" }}
           </UButton>
         </div>
       </template>
@@ -895,10 +891,10 @@ onMounted(async () => {
             variant="subtle"
             @click="permissionDrawerOpen = false"
           >
-            {{ `{{ t("common.cancel") }}` }}
+            {{ "{{ t(\"common.cancel\") }}" }}
           </UButton>
           <UButton color="primary" :disabled="props.readonly" @click="savePermissionSelection">
-            {{ `{{ t("common.save") }}` }}
+            {{ "{{ t(\"common.save\") }}" }}
           </UButton>
         </div>
       </template>
@@ -912,10 +908,10 @@ onMounted(async () => {
       <template #header>
         <div>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ `{{ t("iam.roles.membersDrawer.caption") }}` }}
+            {{ "{{ t(\"iam.roles.membersDrawer.caption\") }}" }}
           </p>
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-            {{ `{{ activeRole?.name }}` }}
+            {{ "{{ activeRole?.name }}" }}
           </h3>
         </div>
       </template>
@@ -939,9 +935,9 @@ onMounted(async () => {
               class="flex items-center justify-between gap-3 py-2"
             >
               <div>
-                <p class="font-medium text-sm text-gray-900 dark:text-white">{{ `{{ member.display_name }}` }}</p>
+                <p class="font-medium text-sm text-gray-900 dark:text-white">{{ "{{ member.display_name }}" }}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ `{{ member.email || member.username }}` }}
+                  {{ "{{ member.email || member.username }}" }}
                 </p>
               </div>
               <UCheckbox
@@ -953,7 +949,7 @@ onMounted(async () => {
               v-if="!filteredMemberCandidates.length"
               class="text-sm text-gray-500 dark:text-gray-400 py-6 text-center"
             >
-              {{ `{{ t("iam.roles.membersDrawer.empty") }}` }}
+              {{ "{{ t(\"iam.roles.membersDrawer.empty\") }}" }}
             </p>
           </div>
         </div>
@@ -961,13 +957,11 @@ onMounted(async () => {
       <template #footer>
         <div class="flex justify-between items-center border-t border-gray-100 dark:border-gray-800 p-4">
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ `{{ t("iam.roles.membersDrawer.selectionSummary", {
-				count: selectedMemberUUIDs.length,
-              }) }}` }}
+            {{ "{{\n              t(\"iam.roles.membersDrawer.selectionSummary\", {\n\t\t\t\tcount: selectedMemberUUIDs.length,\n              })\n            }}" }}
           </p>
           <div class="flex gap-2">
             <UButton variant="ghost" @click="membersDrawerOpen = false">
-              {{ `{{ t("common.cancel") }}` }}
+              {{ "{{ t(\"common.cancel\") }}" }}
             </UButton>
             <UButton
               color="primary"
@@ -975,7 +969,7 @@ onMounted(async () => {
               :disabled="props.readonly"
               @click="saveMembers"
             >
-              {{ `{{ t("common.save") }}` }}
+              {{ "{{ t(\"common.save\") }}" }}
             </UButton>
           </div>
         </div>

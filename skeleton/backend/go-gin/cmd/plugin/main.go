@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
+	knowledgeprovider "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/admin/knowledge"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/runtimeexample"
+	"github.com/gin-gonic/gin"
 	"net"
 	"net/http"
 	"os"
@@ -16,26 +20,43 @@ import (
 	"time"
 
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
+	fwagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
+	fwai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai"
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
+	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
+	contactfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/media"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	fwnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/notifications"
+	fwpluginrelease "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginrelease"
+	fwpluginruntime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginruntime"
 	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
 	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
+	powerxintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/integration"
 	powerxknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/knowledge"
+	powerxmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/media"
 	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
+	powerxpluginrelease "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/pluginrelease"
+	powerxpluginruntime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/pluginruntime"
 	powerxskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/skills"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	fwskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	runtimecap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/cmd/plugin/runtime"
 	pluginbootstrap "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/bootstrap"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
+	localaisettingsrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/ai_settings"
+	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
 	grpcclient "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
@@ -47,6 +68,7 @@ import (
 	marketplacejobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/jobs/marketplace"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	manifestx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/manifestx"
+	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
@@ -57,13 +79,18 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/security"
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
+	localaisettings "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/ai_settings"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	integrationservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
+	metadatasvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/metadata"
+	localnotifications "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/notifications"
 	recommendation "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/recommendation"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/utils"
+	skeletonskills "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/skills"
 	"golang.org/x/sync/errgroup"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
@@ -326,42 +353,35 @@ func main() {
 	if err := registerLocalDebugHostIfNeeded(ctx, cfg, capabilityGateway); err != nil {
 		logger.WithError(err).Warn("Failed to register local plugin debug host; continuing without host debug registration")
 	}
-	metadataClient, err := buildMetadataClient(cfg, capabilityGateway)
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to initialize metadata client")
-	}
 	customerAdminClient, err := buildCustomerAdminClient(cfg, capabilityGateway)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize customer admin client")
+	}
+	var customerAccountSelector *customerfw.AccountSelectorClient
+	if capabilityGateway != nil && capabilityGateway.Enabled() {
+		customerAccountSelector, err = customerfw.NewAccountSelectorClient(metadataintegration.NewGatewayInvokerAdapter(capabilityGateway))
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize customer account selector")
+		}
 	}
 	aiSettingsClient, err := buildAISettingsClient(cfg, capabilityGateway)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize AI settings client")
 	}
 
-	// 初始化 WS Bus Hub（standalone 可选 Redis，默认内存）
-	wsLogger := logger.WithField("component", "ws_bus")
-	var wsHub fwwsbus.LocalHub
-	if cfg != nil && cfg.WSBus != nil && strings.EqualFold(cfg.WSBus.Provider, "redis") {
-		hub, err := fwwsbus.NewRedisHub(fwwsbus.RedisHubConfig{
-			RedisURL: cfg.WSBus.RedisURL,
-			Channel:  cfg.WSBus.Channel,
-			Logger:   nil,
-		})
-		if err != nil {
-			wsLogger.WithError(err).Warn("Failed to initialize redis ws bus; falling back to memory")
-			wsHub = fwwsbus.NewMemoryHub()
-		} else {
-			if err := hub.Start(ctx); err != nil {
-				wsLogger.WithError(err).Warn("Failed to start redis ws bus; falling back to memory")
-				wsHub = fwwsbus.NewMemoryHub()
-			} else {
-				wsHub = hub
-			}
-		}
-	} else {
-		wsHub = fwwsbus.NewMemoryHub()
+	// Explicit Redis configuration must be usable before serving realtime.
+	wsProvider := "memory"
+	wsConfig := fwwsbus.RedisHubConfig{}
+	if cfg != nil && cfg.WSBus != nil {
+		wsProvider = cfg.WSBus.Provider
+		wsConfig.RedisURL = cfg.WSBus.RedisURL
+		wsConfig.Channel = cfg.WSBus.Channel
 	}
+	wsHub, closeWSHub, err := fwwsbus.OpenLocalHub(ctx, wsProvider, wsConfig)
+	if err != nil {
+		logger.WithError(err).Fatal("WSBUS_START_FAILED")
+	}
+	defer closeWSHub()
 
 	manifestPath := security.DefaultManifestPath()
 	eventsData, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "plugin.d", "events.yaml"))
@@ -374,17 +394,38 @@ func main() {
 	}
 
 	var agentRuntime *powerxagent.Client
+	var agentLifecycleRuntime *fwagent.Runtime
 	var aiRuntime *powerxai.Client
+	var aiInvocationRuntime *fwai.Runtime
 	var capabilityRegistry *powerxcapability.Client
+	var capabilityAccessRuntime *fwcapability.Runtime
+	var integrationGatewayClient *powerxintegration.Client
+	var integrationGatewayRuntime *fwintegration.Runtime
+	var pluginRuntimeClient *powerxpluginruntime.Client
+	var pluginRuntimeRuntime *fwpluginruntime.Runtime
+	var localPluginRuntime *runtimeexample.LocalPluginRuntime
+	var pluginReleaseClient *powerxpluginrelease.Client
+	var pluginReleaseRuntime *fwpluginrelease.Runtime
+	var mediaRuntime *powerxmedia.HostClient
+	var mediaCatalogRuntime *fwmedia.Runtime
 	var knowledgeQABridge *powerxknowledge.Client
 	var knowledgeDirectory fwknowledge.DelegatedClient
 	var notificationsRuntime *powerxnotifications.Client
+	var notificationDeliveryRuntime *fwnotifications.Runtime
 	var skillsRuntime *powerxskills.Client
+	var skillInvocationRuntime *fwskills.Runtime
+	var delegatedCustomerMembership customerfw.CustomerMembershipResolver
+	var delegatedCustomerAuth customerfw.CustomerAuthClient
+	var delegatedMetadata *fwmetadata.HostClient
+	var runtimeTokens hostapi.TokenProvider
+	runtimeHostConfig := hostapi.Config{}
 	if providerResolver.IsDelegated() {
 		if cfg == nil || cfg.Gateway == nil || strings.TrimSpace(cfg.Gateway.BaseURL) == "" || pxc == nil {
 			logger.Fatal("Delegated Agent runtime requires Gateway base URL and PowerX STS client")
 		}
 		stsTokens := grpcclient.NewPowerXSTSTokenProvider(pxc)
+		runtimeTokens = stsTokens
+		runtimeHostConfig.BaseURL = strings.TrimSpace(cfg.Gateway.BaseURL)
 		agentRuntime, err = powerxagent.NewClientWithTokenProvider(powerxagent.PowerXAgentClientConfig{
 			Mode:    powerxagent.ModeDelegated,
 			BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL),
@@ -400,6 +441,21 @@ func main() {
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Capability Registry client")
 		}
+		requiredHostCapabilities, err := capabilities.LoadRequiredHostCapabilities(manifestPath)
+		if err != nil {
+			logger.WithError(err).Fatal("FRAMEWORK_CAPABILITY_REQUIREMENTS_INVALID")
+		}
+		if err := fwcapability.RequireGrants(ctx, capabilityRegistry, requiredHostCapabilities); err != nil {
+			logger.WithError(err).Fatal("FRAMEWORK_REQUIRED_CAPABILITY_PREFLIGHT_FAILED")
+		}
+		mediaRuntime, err = powerxmedia.NewHostClientWithTokenProvider(powerxmedia.HostClientConfig{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxmedia.HostTokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Media Host client")
+		}
+		delegatedMetadata, err = fwmetadata.NewHostClientWithTokenProvider(fwmetadata.HostClientConfig{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, fwmetadata.HostTokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Metadata Host client")
+		}
 		knowledgeQABridge, err = powerxknowledge.NewClientWithTokenProvider(powerxknowledge.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxknowledge.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Knowledge QA bridge client")
@@ -412,6 +468,287 @@ func main() {
 		skillsRuntime, err = powerxskills.NewClientWithTokenProvider(powerxskills.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxskills.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Skills runtime client")
+		}
+		integrationGatewayClient, err = powerxintegration.NewClientWithTokenProvider(powerxintegration.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxintegration.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Integration Gateway client")
+		}
+		pluginRuntimeClient, err = powerxpluginruntime.NewClientWithTokenProvider(powerxpluginruntime.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxpluginruntime.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Plugin Runtime client")
+		}
+		pluginReleaseClient, err = powerxpluginrelease.NewClientWithTokenProvider(powerxpluginrelease.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxpluginrelease.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Plugin Release client")
+		}
+		delegatedCustomerAuth, err = customerfw.NewDelegatedCoreAuthClient(customerfw.DelegatedCoreAuthClientConfig{
+			BaseURL:       strings.TrimSpace(cfg.Gateway.BaseURL),
+			ServiceTokens: customerfw.ServiceTokenProviderFunc(stsTokens.TokenFunc()),
+		})
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Customer Auth client")
+		}
+		delegatedCustomerMembership, err = customerfw.NewDelegatedMembershipResolver(customerfw.DelegatedMembershipResolverConfig{
+			BaseURL:       strings.TrimSpace(cfg.Gateway.BaseURL),
+			ServiceTokens: customerfw.ServiceTokenProviderFunc(stsTokens.TokenFunc()),
+		})
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Customer membership resolver")
+		}
+	} else if cfg != nil && cfg.Gateway != nil && strings.TrimSpace(cfg.Gateway.BaseURL) != "" && strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
+		capabilityRegistry, err = powerxcapability.NewClient(powerxcapability.Config{
+			BaseURL:    strings.TrimSpace(cfg.Gateway.BaseURL),
+			AuthScheme: "apikey",
+			APIKey:     strings.TrimSpace(cfg.Gateway.APIKey),
+			Timeout:    cfg.Gateway.Timeout,
+		}, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize local API-key Capability Registry client")
+		}
+	}
+	if providerResolver.IsDelegated() {
+		if authClient == nil {
+			logger.Fatal("IAM_ADAPTER_NOT_BOUND")
+		}
+		identityConfig := fwiamdelegated.CoreClientConfig{BaseURL: cfg.Gateway.BaseURL, PluginID: app.PluginID}
+		var identityClient *fwiamdelegated.CoreClient
+		if strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") {
+			identityClient, err = fwiamdelegated.NewCoreClientWithAPIKey(identityConfig, cfg.Gateway.APIKey)
+		} else {
+			identityConfig.Tokens = fwiamdelegated.TokenProviderFunc(grpcclient.NewPowerXSTSTokenProvider(pxc).TokenFunc())
+			identityClient, err = fwiamdelegated.NewCoreClient(identityConfig)
+		}
+		if err != nil {
+			logger.WithError(err).Fatal("IAM_ADAPTER_NOT_BOUND")
+		}
+		authClient.SetIdentityResolver(identityClient)
+	}
+	cacheRuntime, taskCenterRuntime, err := runtimeexample.Build(providerResolver.Mode(), runtimeHostConfig, runtimeTokens, nil)
+	selectedKnowledge, knowledgeErr := knowledgeprovider.NewProviderFactory(cfg, providerResolver.Mode(), knowledgeDirectory, nil).Build()
+	if knowledgeErr != nil {
+		logger.WithError(knowledgeErr).Fatal("KNOWLEDGE_PROVIDER_INITIALIZATION_FAILED")
+	}
+	if err != nil {
+		logger.WithError(err).Fatal("RUNTIME_HOST_INITIALIZATION_FAILED")
+	}
+	localMetadata := metadatasvc.NewFrameworkLocalAdapter(metadatasvc.NewService(queryDB))
+	metadataRuntime, err := fwmetadata.NewRuntime(providerResolver.Mode(), localMetadata, delegatedMetadata)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Metadata runtime")
+	}
+	if err := metadataRuntime.ValidateRequired(); err != nil {
+		logger.WithError(err).Fatal("METADATA_RUNTIME_REQUIRED")
+	}
+	metadataDebugLocalRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeLocal, localMetadata, nil)
+	if err != nil {
+		logger.WithError(err).Fatal("METADATA_DEBUG_LOCAL_RUNTIME_INITIALIZATION_FAILED")
+	}
+	if delegatedMetadata == nil && cfg != nil && cfg.Gateway != nil && strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") && strings.TrimSpace(cfg.Gateway.BaseURL) != "" && strings.TrimSpace(cfg.Gateway.APIKey) != "" {
+		delegatedMetadata, err = fwmetadata.NewHostClientWithAPIKey(fwmetadata.HostClientConfig{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), Timeout: cfg.Gateway.Timeout}, cfg.Gateway.APIKey, nil)
+		if err != nil {
+			logger.WithError(err).Fatal("METADATA_DEBUG_API_KEY_CLIENT_INITIALIZATION_FAILED")
+		}
+	}
+	var metadataDebugDelegatedRuntime *fwmetadata.Runtime
+	if delegatedMetadata != nil {
+		metadataDebugDelegatedRuntime, err = fwmetadata.NewRuntime(fwprovider.ModeDelegated, nil, delegatedMetadata)
+		if err != nil {
+			logger.WithError(err).Fatal("METADATA_DEBUG_DELEGATED_RUNTIME_INITIALIZATION_FAILED")
+		}
+	}
+	var localAI *runtimeexample.LocalAI
+	var localGenerative fwai.GenerativeService
+	localAI, err = runtimeexample.NewLocalAI(cfg.LocalAI, nil)
+	if err != nil {
+		logger.WithError(err).Fatal("AI_LOCAL_INITIALIZATION_FAILED")
+	}
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		localGenerative = localAI
+	}
+	var selectedAISettings fwaisettings.Service
+	var localAISettings *localaisettings.LocalSettingsService
+	{
+		// This is the plugin-owned settings page configuration. It remains
+		// available even when runtime calls are proxied to PowerX.
+		localSettingsRepo, repoErr := localaisettingsrepo.NewLocalSettingsRepository(queryDB)
+		if repoErr != nil {
+			logger.WithError(repoErr).Fatal("AI_LOCAL_SETTINGS_REPOSITORY_INITIALIZATION_FAILED")
+		}
+		localAISettings, err = localaisettings.NewLocalSettingsService(localSettingsRepo, cfg.LocalAI, localAI)
+		if err != nil {
+			logger.WithError(err).Fatal("AI_LOCAL_SETTINGS_INITIALIZATION_FAILED")
+		}
+		if cfg.AICatalog == nil || strings.TrimSpace(cfg.AICatalog.Directory) == "" {
+			logger.Fatal("AI_CATALOG_NOT_CONFIGURED")
+		}
+		localAISettings.Catalog, err = localaisettings.LoadCatalog(cfg.AICatalog.Directory)
+		if err != nil {
+			logger.WithError(err).Fatal("AI_CATALOG_INITIALIZATION_FAILED")
+		}
+	}
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		selectedAISettings = localAI
+	} else if aiSettingsClient != nil {
+		selectedAISettings = aiSettingsClient
+	}
+	aiInvocationRuntime, err = fwai.NewRuntime(providerResolver.Mode(), localGenerative, aiRuntime)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize AI invocation runtime")
+	}
+	var localAgentLifecycle fwagent.LifecycleService
+	var localAgentSessions fwagent.SessionService
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		localAgent, buildErr := runtimeexample.NewLocalAgent(app.PluginID, cfg.LocalAI, localAI)
+		if buildErr != nil {
+			logger.WithError(buildErr).Fatal("AGENT_LOCAL_INITIALIZATION_FAILED")
+		}
+		localAgentLifecycle, localAgentSessions = localAgent, localAgent
+	}
+	agentLifecycleRuntime, err = fwagent.NewRuntime(providerResolver.Mode(), localAgentLifecycle, agentRuntime, fwagent.WithSessions(localAgentSessions, agentRuntime))
+	if err != nil {
+		logger.WithError(err).Fatal("AGENT_RUNTIME_INITIALIZATION_FAILED")
+	}
+	localSkillRegistry, err := skeletonskills.NewTemplateRegistry(queryDB)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize local Skills registry")
+	}
+	localSkillInvoker := skeletonskills.NewFrameworkLocalInvoker(localSkillRegistry, authx.TenantUUIDFromContext, app.PluginID)
+	skillInvocationRuntime, err = fwskills.NewRuntime(providerResolver.Mode(), localSkillInvoker, skillsRuntime)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Skills runtime")
+	}
+	localNotificationPublisher, err := localnotifications.NewLocalPublisher(queryDB, authx.TenantUUIDFromContext)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize local Notifications publisher")
+	}
+	notificationDeliveryRuntime, err = fwnotifications.NewRuntime(providerResolver.Mode(), localNotificationPublisher, notificationsRuntime)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Notifications runtime")
+	}
+	var localCapabilityRegistry fwcapability.Registry
+	var localIntegrationGateway fwintegration.Gateway
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		entries, loadErr := capManager.ListCapabilities(ctx)
+		if loadErr != nil {
+			logger.WithError(loadErr).Fatal("CAPABILITY_LOCAL_CATALOG_FAILED")
+		}
+		localRuntime, buildErr := integrationservice.NewLocalCapabilityRuntime(app.PluginID, entries, queryDB)
+		if buildErr != nil {
+			logger.WithError(buildErr).Fatal("CAPABILITY_LOCAL_INITIALIZATION_FAILED")
+		}
+		localCapabilityRegistry, localIntegrationGateway = localRuntime, localRuntime
+	}
+	capabilityAccessRuntime, err = fwcapability.NewRuntime(providerResolver.Mode(), localCapabilityRegistry, capabilityRegistry)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Capability Registry runtime")
+	}
+	integrationGatewayRuntime, err = fwintegration.NewRuntime(providerResolver.Mode(), localIntegrationGateway, integrationGatewayClient)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Integration Gateway runtime")
+	}
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		localPluginRuntime, err = runtimeexample.NewLocalPluginRuntime(localAI, selectedKnowledge)
+		if err != nil {
+			logger.WithError(err).Fatal("PLUGIN_RUNTIME_LOCAL_INITIALIZATION_FAILED")
+		}
+	}
+	pluginRuntimeRuntime, err = fwpluginruntime.NewRuntime(providerResolver.Mode(), localPluginRuntime, pluginRuntimeClient)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Plugin Runtime")
+	}
+	pluginReleaseRuntime, err = fwpluginrelease.NewRuntime(providerResolver.Mode(), nil, pluginReleaseClient)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Plugin Release runtime")
+	}
+	var localMedia *runtimeexample.LocalMedia
+	var localMediaService fwmedia.Service
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		host, port, splitErr := net.SplitHostPort(cfg.Server.BindAddr)
+		if splitErr != nil {
+			logger.WithError(splitErr).Fatal("MEDIA_LOCAL_BIND_ADDR_INVALID")
+		}
+		if host == "" || host == "0.0.0.0" || host == "::" {
+			host = "127.0.0.1"
+		}
+		localMedia = runtimeexample.NewLocalMedia("http://" + net.JoinHostPort(host, port))
+		localMediaService = localMedia
+	}
+	mediaCatalogRuntime, err = fwmedia.NewRuntime(providerResolver.Mode(), localMediaService, mediaRuntime)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Media catalog runtime")
+	}
+	localCustomerService := customersvc.NewLocalAuthService(cfg, customerrepo.NewRepository(queryDB))
+	localCustomerValidator := customersvc.NewFrameworkValidator(customersvc.NewAuthenticatorFactory(cfg, nil).Build())
+	localCustomerExternal, err := customersvc.NewLocalExternalIdentityResolver(queryDB, app.PluginID)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize local Customer external identity resolver")
+	}
+	delegatedCustomerExternal, err := buildCustomerExternalIdentityResolver(capabilityGateway)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize delegated Customer external identity resolver")
+	}
+	localCustomerStore := customersvc.NewLocalFrameworkCustomerStore(
+		customersvc.NewLocalFrameworkAuthClient(localCustomerService, localCustomerValidator),
+		localCustomerExternal,
+		customersvc.NewFrameworkMembershipResolver(queryDB),
+	)
+	localIdentityStore := customerrepo.NewExternalIdentityStore(queryDB, app.PluginID)
+	var delegatedIdentityStore customerfw.ExternalIdentityStore
+	if capabilityGateway != nil && capabilityGateway.Enabled() {
+		delegatedIdentityStore, err = customerfw.NewExternalIdentityClient(metadataintegration.NewGatewayInvokerAdapter(capabilityGateway))
+		if err != nil {
+			logger.WithError(err).Fatal("CUSTOMER_IDENTITY_INITIALIZATION_FAILED")
+		}
+	}
+	localCustomerAdapters := customerfw.AdaptersFromLocalStore(localCustomerStore)
+	localCustomerAdapters.Identities = localIdentityStore
+	identityDebugLocal, err := customerfw.NewRuntime(fwprovider.ModeLocal, customerfw.RuntimeAdapters{Identities: localIdentityStore}, customerfw.RuntimeAdapters{})
+	if err != nil {
+		logger.WithError(err).Fatal("CUSTOMER_IDENTITY_INITIALIZATION_FAILED")
+	}
+	identityDebugDelegated, err := customerfw.NewRuntime(fwprovider.ModeDelegated, customerfw.RuntimeAdapters{}, customerfw.RuntimeAdapters{Identities: delegatedIdentityStore})
+	if err != nil {
+		logger.WithError(err).Fatal("CUSTOMER_IDENTITY_INITIALIZATION_FAILED")
+	}
+	customerRuntime, err := customerfw.NewRuntime(providerResolver.Mode(), localCustomerAdapters, customerfw.RuntimeAdapters{
+		Identities: delegatedIdentityStore,
+		Auth:       delegatedCustomerAuth,
+		External:   delegatedCustomerExternal,
+		Membership: delegatedCustomerMembership,
+	})
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Customer runtime")
+	}
+	localContactStore := contactfw.LocalStore(customersvc.NewFrameworkContactLocalStore(queryDB))
+	var delegatedContactClient contactfw.DelegatedContactClient
+	if capabilityGateway != nil && capabilityGateway.Enabled() {
+		delegatedContactClient, err = contactfw.NewCapabilityClient(contactfw.CapabilityClientConfig{
+			Invoker: metadataintegration.NewGatewayInvokerAdapter(capabilityGateway),
+		})
+		if err != nil {
+			logger.WithError(err).Fatal("Failed to initialize delegated Contact client")
+		}
+	}
+	var selectedLocalContactStore contactfw.LocalStore
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		selectedLocalContactStore = localContactStore
+	}
+	contactRuntime, err := contactfw.NewRuntime(providerResolver.Mode(), selectedLocalContactStore, delegatedContactClient)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize Contact runtime")
+	}
+	if err := contactRuntime.ValidateRequired(); err != nil {
+		logger.WithError(err).Fatal("CONTACT_RUNTIME_REQUIRED")
+	}
+	contactDebugLocalRuntime, err := contactfw.NewRuntime(fwprovider.ModeLocal, localContactStore, nil)
+	if err != nil {
+		logger.WithError(err).Fatal("CONTACT_DEBUG_LOCAL_RUNTIME_INITIALIZATION_FAILED")
+	}
+	var contactDebugDelegatedRuntime *contactfw.Runtime
+	if delegatedContactClient != nil {
+		contactDebugDelegatedRuntime, err = contactfw.NewRuntime(fwprovider.ModeDelegated, nil, delegatedContactClient)
+		if err != nil {
+			logger.WithError(err).Fatal("CONTACT_DEBUG_DELEGATED_RUNTIME_INITIALIZATION_FAILED")
 		}
 	}
 
@@ -455,38 +792,64 @@ func main() {
 		bridgeEmitter = security.NewPermissionedEmitter(bridgeEmitter, perms, eventLogger)
 	}
 	deps := &app.Deps{
-		DB:                   queryDB,
-		Ctx:                  rootCtx,
-		PowerXClient:         pxc,
-		CapabilityGateway:    capabilityGateway,
-		Metadata:             metadataClient,
-		CustomerAdmin:        customerAdminClient,
-		AISettings:           aiSettingsClient,
-		AI:                   aiRuntime,
-		AgentRuntime:         agentRuntime,
-		CapabilityRegistry:   capabilityRegistry,
-		KnowledgeQABridge:    knowledgeQABridge,
-		KnowledgeDirectory:   knowledgeDirectory,
-		Notifications:        notificationsRuntime,
-		Skills:               skillsRuntime,
-		Config:               cfg,
-		CapabilitiesManager:  capManager,
-		CapabilityMetrics:    capMetrics,
-		TaxProviderClient:    taxClient,
-		MarketplaceBilling:   nil,
-		LicenseAuthority:     nil,
-		LicenseCache:         licenseCache,
-		OperationsMetrics:    opsmetrics.NewMetrics(),
-		AdminConsoleMetrics:  adminmetrics.NewMetrics(),
-		EventEmitter:         bridgeEmitter,
-		WSBusHub:             wsHub,
-		RealtimeDescriptors:  realtimeDescriptors,
-		ProviderMode:         providerResolver.Mode(),
-		ProviderModeSource:   providerResolver.Source(),
-		IAMAdapterMode:       providerResolver.IAMAdapterMode(),
-		IAMAdapterModeSource: providerResolver.Source(),
-		AuthProxy:            authClient,
-		IAMDirectory:         localIAM,
+		DB:                             queryDB,
+		Ctx:                            rootCtx,
+		PowerXClient:                   pxc,
+		CapabilityGateway:              capabilityGateway,
+		Metadata:                       metadataRuntime,
+		MetadataDebugLocalRuntime:      metadataDebugLocalRuntime,
+		MetadataDebugDelegatedRuntime:  metadataDebugDelegatedRuntime,
+		CustomerAdmin:                  customerAdminClient,
+		CustomerAccountSelector:        customerAccountSelector,
+		CustomerRuntime:                customerRuntime,
+		CustomerIdentityDebugLocal:     identityDebugLocal,
+		CustomerIdentityDebugDelegated: identityDebugDelegated,
+		ContactRuntime:                 contactRuntime,
+		ContactDebugLocalRuntime:       contactDebugLocalRuntime,
+		ContactDebugDelegatedRuntime:   contactDebugDelegatedRuntime,
+		KnowledgeProvider:              selectedKnowledge,
+		CacheRuntime:                   cacheRuntime,
+		TaskCenterRuntime:              taskCenterRuntime,
+		AISettings:                     selectedAISettings,
+		PowerXAISettings:               aiSettingsClient,
+		LocalAISettings:                localAISettings,
+		LocalAI:                        localAI,
+		AIInvocation:                   aiInvocationRuntime,
+		AI:                             aiRuntime,
+		AgentLifecycle:                 agentLifecycleRuntime,
+		AgentRuntime:                   agentRuntime,
+		CapabilityAccess:               capabilityAccessRuntime,
+		CapabilityRegistry:             capabilityRegistry,
+		IntegrationGateway:             integrationGatewayRuntime,
+		MediaCatalog:                   mediaCatalogRuntime,
+		Media:                          mediaRuntime,
+		PluginRuntime:                  pluginRuntimeRuntime,
+		PluginRelease:                  pluginReleaseRuntime,
+		KnowledgeQABridge:              knowledgeQABridge,
+		KnowledgeDirectory:             knowledgeDirectory,
+		NotificationDelivery:           notificationDeliveryRuntime,
+		Notifications:                  notificationsRuntime,
+		LocalSkillInvoker:              localSkillInvoker,
+		SkillInvocation:                skillInvocationRuntime,
+		Skills:                         skillsRuntime,
+		Config:                         cfg,
+		CapabilitiesManager:            capManager,
+		CapabilityMetrics:              capMetrics,
+		TaxProviderClient:              taxClient,
+		MarketplaceBilling:             nil,
+		LicenseAuthority:               nil,
+		LicenseCache:                   licenseCache,
+		OperationsMetrics:              opsmetrics.NewMetrics(),
+		AdminConsoleMetrics:            adminmetrics.NewMetrics(),
+		EventEmitter:                   bridgeEmitter,
+		WSBusHub:                       wsHub,
+		RealtimeDescriptors:            realtimeDescriptors,
+		ProviderMode:                   providerResolver.Mode(),
+		ProviderModeSource:             providerResolver.Source(),
+		IAMAdapterMode:                 providerResolver.IAMAdapterMode(),
+		IAMAdapterModeSource:           providerResolver.Source(),
+		AuthProxy:                      authClient,
+		IAMDirectory:                   localIAM,
 	}
 
 	listingRepo := marketplacerepo.NewListingRepository(queryDB)
@@ -516,16 +879,6 @@ func main() {
 		}))
 	}
 
-	// 设置 gin engine 路由
-	r := pluginrouter.NewRouter(cfg, deps)
-	engine := r.Setup()
-
-	// 创建 gRPC 服务器（可选）
-	gs, err := grpcserver.NewGRPCServer(ctx, deps, cfg.GRPCServer)
-	if err != nil {
-		logger.WithError(err).Fatal("Failed to create gRPC server")
-	}
-
 	appCfg := &fwbootstrap.Config{
 		Listen:     cfg.Server.BindAddr,
 		Env:        cfg.Server.Mode,
@@ -547,6 +900,17 @@ func main() {
 	}
 	if err := pluginbootstrap.ValidateIAMBinding(deps); err != nil {
 		logger.WithError(err).Fatal("Framework IAM registry binding is incomplete")
+	}
+	// All identity services must be bound before handlers capture dependencies.
+	r := pluginrouter.NewRouter(cfg, deps)
+	engine := r.Setup()
+	if localMedia != nil {
+		engine.GET(runtimeexample.MediaTransferPath, gin.WrapH(http.HandlerFunc(localMedia.ServeTransfer)))
+		engine.PUT(runtimeexample.MediaTransferPath, gin.WrapH(http.HandlerFunc(localMedia.ServeTransfer)))
+	}
+	gs, err := grpcserver.NewGRPCServer(ctx, deps, cfg.GRPCServer)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to create gRPC server")
 	}
 	fwApp.RegisterCapabilityInvoker(integrationservice.NewFrameworkCapabilityInvoker(deps, deps.RuntimeLogger(ctx, "framework_capability_invoker", nil)))
 
@@ -652,6 +1016,9 @@ func main() {
 
 		cancel()
 
+		if deps.WSIdentityLifecycle != nil {
+			deps.WSIdentityLifecycle.Close()
+		}
 		if err := fwApp.Shutdown(); err != nil {
 			logger.WithError(err).Error("HTTP server shutdown error")
 		} else {
@@ -877,6 +1244,15 @@ func buildCustomerAdminClient(cfg *config.Config, gatewayClient *capgateway.Clie
 		Invoker:    metadataintegration.NewGatewayInvokerAdapter(gatewayClient),
 		TenantUUID: tenantUUID,
 		PageSize:   20,
+	})
+}
+
+func buildCustomerExternalIdentityResolver(gatewayClient *capgateway.Client) (*customerfw.ExternalIdentityResolver, error) {
+	if gatewayClient == nil {
+		return nil, nil
+	}
+	return customerfw.NewExternalIdentityResolver(customerfw.ExternalIdentityResolverConfig{
+		Invoker: metadataintegration.NewGatewayInvokerAdapter(gatewayClient),
 	})
 }
 

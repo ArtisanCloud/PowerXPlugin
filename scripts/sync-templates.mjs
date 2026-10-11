@@ -128,7 +128,9 @@ function applyReplacements(input, relativePath, replacements) {
     if (entry.regex) {
       const flags = entry.flags || 'g'
       const re = new RegExp(entry.regex, flags)
-      result = result.replace(re, entry.replace ?? '')
+      result = entry.quoteMatch
+        ? result.replace(re, (match) => `{{ ${JSON.stringify(match)} }}`)
+        : result.replace(re, entry.replace ?? '')
     }
   }
   return result

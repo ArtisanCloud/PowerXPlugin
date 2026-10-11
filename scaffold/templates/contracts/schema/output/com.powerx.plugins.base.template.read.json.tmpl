@@ -3,39 +3,78 @@
   "title": "TemplateReadOutput",
   "type": "object",
   "properties": {
-    "content": { "type": "string" },
+    "content": {
+      "type": "string"
+    },
     "links": {
       "type": "array",
-      "items": { "$ref": "#/definitions/AgentResponseLink" }
+      "items": {
+        "$ref": "#/definitions/AgentResponseLink"
+      }
     },
-    "template": { "$ref": "#/definitions/Template" }
+    "template": {
+      "$ref": "#/definitions/Template"
+    }
   },
-  "required": ["template"],
+  "required": [
+    "template"
+  ],
   "additionalProperties": false,
   "definitions": {
     "AgentResponseLink": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "kind": { "type": "string" },
-        "label": { "type": "string" },
-        "href": { "type": "string" }
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "href": {
+          "type": "string"
+        }
       },
-      "required": ["label", "href"],
+      "required": [
+        "label",
+        "href"
+      ],
       "additionalProperties": true
     },
     "Template": {
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "content": { "type": "string" },
-        "status": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "uuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["id", "name"],
+      "required": [
+        "uuid",
+        "name"
+      ],
       "additionalProperties": true
     }
   }

@@ -1,6 +1,8 @@
 package customer
 
 import (
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 	"time"
 
 	"{{ .BackendModulePath }}/internal/entity/models"
@@ -21,24 +23,26 @@ const (
 type CustomerAccount struct {
 	models.BaseNoTenantModel
 
-	CustomerUUID  string            `gorm:"column:customer_uuid;type:uuid;not null;uniqueIndex" json:"customer_uuid"`
-	PrimaryEmail  string            `gorm:"column:primary_email;type:varchar(255);index" json:"primary_email,omitempty"`
-	PrimaryPhone  string            `gorm:"column:primary_phone;type:varchar(32);index" json:"primary_phone,omitempty"`
-	DisplayName   string            `gorm:"column:display_name;type:varchar(128)" json:"display_name,omitempty"`
-	Nickname      string            `gorm:"column:nickname;type:varchar(128)" json:"nickname,omitempty"`
-	GivenName     string            `gorm:"column:given_name;type:varchar(128)" json:"given_name,omitempty"`
-	FamilyName    string            `gorm:"column:family_name;type:varchar(128)" json:"family_name,omitempty"`
-	AvatarURL     string            `gorm:"column:avatar_url;type:text" json:"avatar_url,omitempty"`
-	Locale        string            `gorm:"column:locale;type:varchar(32)" json:"locale,omitempty"`
-	Timezone      string            `gorm:"column:timezone;type:varchar(64)" json:"timezone,omitempty"`
-	Status        string            `gorm:"column:status;type:varchar(32);not null;default:'active';index" json:"status"`
-	Metadata      datatypes.JSONMap `gorm:"column:metadata;type:jsonb;default:'{}'::jsonb" json:"metadata,omitempty"`
-	Email         string            `gorm:"column:email;type:varchar(255);index" json:"email,omitempty"`
-	Phone         string            `gorm:"column:phone;type:varchar(32);index" json:"phone,omitempty"`
-	PasswordHash  string            `gorm:"column:password_hash;type:text" json:"password_hash,omitempty"`
-	EmailVerified bool              `gorm:"column:email_verified;not null;default:false" json:"email_verified"`
-	PhoneVerified bool              `gorm:"column:phone_verified;not null;default:false" json:"phone_verified"`
-	TenantUuid    string            `gorm:"column:tenant_uuid;type:uuid;index" json:"tenant_uuid,omitempty"`
+	CustomerUUID       string            `gorm:"column:customer_uuid;type:uuid;not null;uniqueIndex" json:"customer_uuid"`
+	Type               string            `gorm:"column:type;type:varchar(16);index" json:"type"`
+	PrimaryContactUUID string            `gorm:"column:primary_contact_uuid;type:uuid;index" json:"primary_contact_uuid,omitempty"`
+	PrimaryEmail       string            `gorm:"column:primary_email;type:varchar(255);index" json:"primary_email,omitempty"`
+	PrimaryPhone       string            `gorm:"column:primary_phone;type:varchar(32);index" json:"primary_phone,omitempty"`
+	DisplayName        string            `gorm:"column:display_name;type:varchar(128)" json:"display_name,omitempty"`
+	Nickname           string            `gorm:"column:nickname;type:varchar(128)" json:"nickname,omitempty"`
+	GivenName          string            `gorm:"column:given_name;type:varchar(128)" json:"given_name,omitempty"`
+	FamilyName         string            `gorm:"column:family_name;type:varchar(128)" json:"family_name,omitempty"`
+	AvatarURL          string            `gorm:"column:avatar_url;type:text" json:"avatar_url,omitempty"`
+	Locale             string            `gorm:"column:locale;type:varchar(32)" json:"locale,omitempty"`
+	Timezone           string            `gorm:"column:timezone;type:varchar(64)" json:"timezone,omitempty"`
+	Status             string            `gorm:"column:status;type:varchar(32);not null;default:'active';index" json:"status"`
+	Metadata           datatypes.JSONMap `gorm:"column:metadata;type:jsonb;default:'{}'::jsonb" json:"metadata,omitempty"`
+	Email              string            `gorm:"column:email;type:varchar(255);index" json:"email,omitempty"`
+	Phone              string            `gorm:"column:phone;type:varchar(32);index" json:"phone,omitempty"`
+	PasswordHash       string            `gorm:"column:password_hash;type:text" json:"password_hash,omitempty"`
+	EmailVerified      bool              `gorm:"column:email_verified;not null;default:false" json:"email_verified"`
+	PhoneVerified      bool              `gorm:"column:phone_verified;not null;default:false" json:"phone_verified"`
+	TenantUuid         string            `gorm:"column:tenant_uuid;type:uuid;index" json:"tenant_uuid,omitempty"`
 }
 
 func (c *CustomerAccount) TableName() string {
@@ -47,6 +51,7 @@ func (c *CustomerAccount) TableName() string {
 
 type CustomerAuthIdentity struct {
 	models.BaseNoTenantModel
+	IdentityUUID string `gorm:"column:identity_uuid;type:uuid;not null;uniqueIndex" json:"identity_uuid"`
 
 	CustomerUUID    string            `gorm:"column:customer_uuid;type:uuid;not null;index" json:"customer_uuid"`
 	Provider        string            `gorm:"column:provider;type:varchar(32);not null;uniqueIndex:uk_customer_identity_subject,priority:1;index" json:"provider"`
@@ -66,15 +71,16 @@ func (c *CustomerAuthIdentity) TableName() string {
 type CustomerTenantMembership struct {
 	models.BaseNoTenantModel
 
-	MembershipUUID string            `gorm:"column:membership_uuid;type:uuid;not null;uniqueIndex" json:"membership_uuid"`
-	TenantUUID     string            `gorm:"column:tenant_uuid;type:uuid;not null;uniqueIndex:uk_customer_tenant_membership,priority:1;index" json:"tenant_uuid"`
-	CustomerUUID   string            `gorm:"column:customer_uuid;type:uuid;not null;uniqueIndex:uk_customer_tenant_membership,priority:2;index" json:"customer_uuid"`
-	Status         string            `gorm:"column:status;type:varchar(32);not null;default:'active';index" json:"status"`
-	Roles          datatypes.JSON    `gorm:"column:roles;type:jsonb;default:'[]'::jsonb" json:"roles,omitempty"`
-	Scopes         datatypes.JSON    `gorm:"column:scopes;type:jsonb;default:'[]'::jsonb" json:"scopes,omitempty"`
-	Source         string            `gorm:"column:source;type:varchar(32);not null;default:'local_dev';index" json:"source"`
-	ExpiresAt      *time.Time        `gorm:"column:expires_at;index" json:"expires_at,omitempty"`
-	Metadata       datatypes.JSONMap `gorm:"column:metadata;type:jsonb;default:'{}'::jsonb" json:"metadata,omitempty"`
+	MembershipUUID     string            `gorm:"column:membership_uuid;type:uuid;not null;uniqueIndex" json:"membership_uuid"`
+	TenantUUID         string            `gorm:"column:tenant_uuid;type:uuid;not null;uniqueIndex:uk_customer_tenant_membership,priority:1;index" json:"tenant_uuid"`
+	CustomerUUID       string            `gorm:"column:customer_uuid;type:uuid;not null;uniqueIndex:uk_customer_tenant_membership,priority:2;index" json:"customer_uuid"`
+	PrimaryContactUUID string            `gorm:"column:primary_contact_uuid;type:uuid;index" json:"primary_contact_uuid,omitempty"`
+	Status             string            `gorm:"column:status;type:varchar(32);not null;default:'active';index" json:"status"`
+	Roles              datatypes.JSON    `gorm:"column:roles;type:jsonb;default:'[]'::jsonb" json:"roles,omitempty"`
+	Scopes             datatypes.JSON    `gorm:"column:scopes;type:jsonb;default:'[]'::jsonb" json:"scopes,omitempty"`
+	Source             string            `gorm:"column:source;type:varchar(32);not null;default:'local_dev';index" json:"source"`
+	ExpiresAt          *time.Time        `gorm:"column:expires_at;index" json:"expires_at,omitempty"`
+	Metadata           datatypes.JSONMap `gorm:"column:metadata;type:jsonb;default:'{}'::jsonb" json:"metadata,omitempty"`
 }
 
 func (c *CustomerTenantMembership) TableName() string {
@@ -141,4 +147,11 @@ type CustomerLoginEvent struct {
 
 func (c *CustomerLoginEvent) TableName() string {
 	return models.S(models.TableCustomerLoginEvents)
+}
+
+func (c *CustomerAuthIdentity) BeforeCreate(tx *gorm.DB) error {
+	if c.IdentityUUID == "" {
+		c.IdentityUUID = uuid.NewString()
+	}
+	return nil
 }

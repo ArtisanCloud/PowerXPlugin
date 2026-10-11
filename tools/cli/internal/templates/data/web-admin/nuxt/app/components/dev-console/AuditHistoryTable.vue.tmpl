@@ -30,14 +30,14 @@
 
     <UTable :rows="events" :columns="columns" :loading="loading">
       <template #occurred_at-cell="{ row }">
-        {{ `{{ formatDate(row.occurred_at) }}` }}
+        {{ "{{ formatDate(row.occurred_at) }}" }}
       </template>
       <template #actor-cell="{ row }">
-        <span>{{ `{{ row.actor.name || row.actor.id }}` }}</span>
-        <span v-if="row.actor.email" class="block text-xs text-gray-500">{{ `{{ row.actor.email }}` }}</span>
+        <span>{{ "{{ row.actor.name || row.actor.id }}" }}</span>
+        <span v-if="row.actor.email" class="block text-xs text-gray-500">{{ "{{\n          row.actor.email\n        }}" }}</span>
       </template>
       <template #summary-cell="{ row }">
-        <span>{{ `{{ row.summary || "-" }}` }}</span>
+        <span>{{ "{{ row.summary || \"-\" }}" }}</span>
       </template>
     </UTable>
 

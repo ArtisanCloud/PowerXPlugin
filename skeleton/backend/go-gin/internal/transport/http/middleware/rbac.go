@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	fwiamcontext "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/context"
+
 	authx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	authobs "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/auth"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
@@ -54,9 +56,22 @@ func RBAC(cfg *authx.RBACConfig, _ authx.ABACClient, _ func(string, string) (boo
 				})
 				return
 			}
+			identity, valid := fwiamcontext.DelegatedIdentityFromContext(c.Request.Context())
+			if !valid {
+				c.AbortWithStatusJSON(401, gin.H{"error": gin.H{"code": "IAM_CONTEXT_PROOF_REQUIRED"}})
+				return
+			}
+			// The proof carries Core's canonical business permission for this exact
+			// route, avoiding the legacy technical resource/action alias mapping.
+			if identity.IsRoot || (identity.SourceRequiredPermission != "" && identity.HasPermission(identity.SourceRequiredPermission)) {
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(403, gin.H{"error": gin.H{"code": "IAM_CONTEXT_REQUEST_FORBIDDEN"}})
+			return
 		}
 
-		if tc.IsRoot || authx.IsSuperAdmin(tc.Roles, cfg.SuperAdminRoles) {
+		if tc.IsRoot || (!cfg.DelegateToPowerX && authx.IsSuperAdmin(tc.Roles, cfg.SuperAdminRoles)) {
 			c.Next()
 			return
 		}
@@ -131,7 +146,7 @@ func validateDelegatedAuthzSnapshot(tc authx.TenantContext) error {
 	}
 	source := strings.TrimSpace(tc.AuthzSource)
 	switch source {
-	case "claims", "signed_claims", "signed_context", "introspection":
+	case "core_identity_ticket":
 		return nil
 	case "":
 		return errors.New("source missing")

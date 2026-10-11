@@ -122,15 +122,15 @@ const localResponsePreview = computed(() =>
     <div class="state-grid">
       <div>
         <span>Trace ID</span>
-        <strong data-testid="trace-output">{{ `{{ lastTraceId || 'pending' }}` }}</strong>
+        <strong data-testid="trace-output">{{ "{{ lastTraceId || 'pending' }}" }}</strong>
       </div>
       <div>
         <span>状态</span>
-        <strong data-testid="status-indicator">{{ `{{ lastStatus }}` }}</strong>
+        <strong data-testid="status-indicator">{{ "{{ lastStatus }}" }}</strong>
       </div>
       <div>
         <span>错误</span>
-        <strong data-testid="error-indicator">{{ `{{ lastError ? 'error' : 'none' }}` }}</strong>
+        <strong data-testid="error-indicator">{{ "{{ lastError ? 'error' : 'none' }}" }}</strong>
       </div>
     </div>
 
@@ -138,7 +138,7 @@ const localResponsePreview = computed(() =>
       <header>
         <h2>响应数据</h2>
       </header>
-      <pre data-testid="payload-viewer">{{ `{{ lastPayload }}` }}</pre>
+      <pre data-testid="payload-viewer">{{ "{{ lastPayload }}" }}</pre>
     </section>
 
     <section class="payload">
@@ -148,25 +148,25 @@ const localResponsePreview = computed(() =>
       <div class="local-state">
         <div>
           <span>Trace ID</span>
-          <strong data-testid="local-trace">{{ `{{ localTraceText }}` }}</strong>
+          <strong data-testid="local-trace">{{ "{{ localTraceText }}" }}</strong>
         </div>
         <div>
           <span>状态</span>
-          <strong data-testid="local-status">{{ `{{ localStatus }}` }}</strong>
+          <strong data-testid="local-status">{{ "{{ localStatus }}" }}</strong>
         </div>
         <div>
           <span>错误</span>
-          <strong data-testid="local-error">{{ `{{ localErrorText }}` }}</strong>
+          <strong data-testid="local-error">{{ "{{ localErrorText }}" }}</strong>
         </div>
       </div>
       <div class="local-panels">
         <div>
           <h3>请求 Payload</h3>
-          <pre data-testid="local-request-preview">{{ `{{ localPayloadPreview }}` }}</pre>
+          <pre data-testid="local-request-preview">{{ "{{ localPayloadPreview }}" }}</pre>
         </div>
         <div>
           <h3>响应数据</h3>
-          <pre data-testid="local-response-preview">{{ `{{ localResponsePreview }}` }}</pre>
+          <pre data-testid="local-response-preview">{{ "{{ localResponsePreview }}" }}</pre>
         </div>
       </div>
     </section>

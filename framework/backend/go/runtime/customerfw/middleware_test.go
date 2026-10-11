@@ -20,6 +20,10 @@ func TestAuthenticateInjectsCustomerContextAndAudit(t *testing.T) {
 		audits = append(audits, fields)
 	})), func(c *gin.Context) {
 		cc := MustContextFromGin(c)
+		credential, ok := CustomerCredentialFromContext(c.Request.Context())
+		if !ok || credential != "token" {
+			t.Fatalf("expected retained customer credential")
+		}
 		c.JSON(http.StatusOK, gin.H{"tenant_uuid": cc.TenantUUID, "customer_uuid": cc.CustomerUUID})
 	})
 

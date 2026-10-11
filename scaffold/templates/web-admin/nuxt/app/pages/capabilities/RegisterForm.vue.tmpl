@@ -3,10 +3,10 @@
     <section class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex flex-col gap-1">
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ $t("capabilities.list.title") }}` }}
+          {{ "{{ $t(\"capabilities.list.title\") }}" }}
         </h1>
         <p class="text-gray-600 dark:text-gray-300">
-          {{ `{{ $t("capabilities.list.description") }}` }}
+          {{ "{{ $t(\"capabilities.list.description\") }}" }}
         </p>
       </div>
       <div class="flex flex-wrap gap-3">
@@ -17,24 +17,24 @@
           :loading="catalogLoading"
           @click="loadCatalog"
         >
-      {{ `{{ $t("capabilities.list.refresh") }}` }}
+      {{ "{{ $t(\"capabilities.list.refresh\") }}" }}
     </UButton>
     <UButton icon="i-heroicons-plus" color="primary" @click="openForm">
-      {{ `{{ $t("capabilities.list.createButton") }}` }}
+      {{ "{{ $t(\"capabilities.list.createButton\") }}" }}
     </UButton>
   </div>
 </section>
 
     <UAlert variant="soft" color="neutral" class="bg-white/5 dark:bg-white/5">
       <template #title>
-        {{ `{{ $t("capabilities.catalogSync.title") }}` }}
+        {{ "{{ $t(\"capabilities.catalogSync.title\") }}" }}
       </template>
       <template #description>
         <p class="text-sm text-gray-600 dark:text-gray-300">
-          {{ `{{ $t("capabilities.catalogSync.desc") }}` }}
+          {{ "{{ $t(\"capabilities.catalogSync.desc\") }}" }}
         </p>
         <code class="mt-1 inline-flex select-all rounded bg-gray-900/80 px-2 py-1 font-mono text-xs text-white">
-          {{ `{{ catalogCommand }}` }}
+          {{ "{{ catalogCommand }}" }}
         </code>
       </template>
     </UAlert>
@@ -43,15 +43,15 @@
       <template #header>
         <div class="flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-            {{ `{{ $t("capabilities.list.tableTitle") }}` }}
+            {{ "{{ $t(\"capabilities.list.tableTitle\") }}" }}
           </h2>
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ `{{ $t("capabilities.list.tableHint") }}` }}
+            {{ "{{ $t(\"capabilities.list.tableHint\") }}" }}
           </p>
         </div>
       </template>
       <div v-if="catalogLoading" class="flex items-center justify-center py-16 text-gray-500 dark:text-gray-400">
-        {{ `{{ $t("common.loading") }}` }}
+        {{ "{{ $t(\"common.loading\") }}" }}
       </div>
       <div v-else>
         <div v-if="groupedCatalog.length" class="space-y-4">
@@ -67,10 +67,10 @@
             >
               <div>
                 <p class="text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ `{{ group.displayName }}` }}
+                  {{ "{{ group.displayName }}" }}
                 </p>
                 <p class="text-xs text-blue-600 dark:text-[#93c5fd]">
-                  {{ `{{ group.module }}` }} · {{ `{{ group.items.length }}` }} 个能力
+                  {{ "{{ group.module }}" }} · {{ "{{ group.items.length }}" }} 个能力
                 </p>
               </div>
               <div class="flex items-center gap-2">
@@ -97,10 +97,10 @@
                 <template #capability_id-cell="{ row }">
                   <div class="flex flex-col">
                     <span class="font-semibold text-gray-900 dark:text-white">
-                      {{ `{{ row.original.capability_id }}` }}
+                      {{ "{{ row.original.capability_id }}" }}
                     </span>
                     <small class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ `{{ $t("capabilities.list.versionLabel", { version: row.original.version }) }}` }}
+                      {{ "{{ $t(\"capabilities.list.versionLabel\", { version: row.original.version }) }}" }}
                     </small>
                   </div>
                 </template>
@@ -118,7 +118,7 @@
                     variant="soft"
                   />
                   <p v-if="row.original.execution.callback_url" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {{ `{{ row.original.execution.callback_url }}` }}
+                    {{ "{{ row.original.execution.callback_url }}" }}
                   </p>
                 </template>
                 <template #tags-cell="{ row }">
@@ -130,7 +130,7 @@
                       variant="subtle"
                     />
                     <span v-if="!row.original.tags.length" class="text-xs text-gray-400">
-                      {{ `{{ $t("capabilities.list.noTags") }}` }}
+                      {{ "{{ $t(\"capabilities.list.noTags\") }}" }}
                     </span>
                   </div>
                 </template>
@@ -142,12 +142,12 @@
                       variant="soft"
                     />
                     <span v-if="row.original.updatedAt" class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ `{{ $t("capabilities.exposure.list.updatedAt", { time: row.original.updatedAt }) }}` }}
+                      {{ "{{ $t(\"capabilities.exposure.list.updatedAt\", { time: row.original.updatedAt }) }}" }}
                     </span>
                   </div>
                 </template>
                 <template #checksum-cell="{ row }">
-                  <code class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ row.original.checksum }}` }}</code>
+                  <code class="text-xs text-gray-500 dark:text-gray-400">{{ "{{ row.original.checksum }}" }}</code>
                 </template>
                 <template #actions-cell="{ row }">
                   <UButton
@@ -155,7 +155,7 @@
                     icon="i-heroicons-adjustments-horizontal"
                     @click="openExposureForm(row.original.capability_id)"
                   >
-                    {{ `{{ $t("capabilities.exposure.list.actions.configure") }}` }}
+                    {{ "{{ $t(\"capabilities.exposure.list.actions.configure\") }}" }}
                   </UButton>
                   <UButton
                     v-if="isWorkflowKind(row.original.kind)"
@@ -166,7 +166,7 @@
                     icon="i-heroicons-command-line"
                     @click="openMcpPanelForCapability(row.original.capability_id)"
                   >
-                    {{ `{{ $t("capabilities.mcp.actions.debugCapability") }}` }}
+                    {{ "{{ $t(\"capabilities.mcp.actions.debugCapability\") }}" }}
                   </UButton>
                   <UButton
                     v-if="!isWorkflowKind(row.original.kind)"
@@ -175,7 +175,7 @@
                     icon="i-heroicons-beaker-20-solid"
                     @click="openDebugPanelFromCatalog(row.original)"
                   >
-                    {{ `{{ $t("capabilities.form.debug.openExisting") }}` }}
+                    {{ "{{ $t(\"capabilities.form.debug.openExisting\") }}" }}
                   </UButton>
                 </template>
               </UTable>
@@ -184,7 +184,7 @@
         </div>
         <div v-else class="py-16 text-center">
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ `{{ $t("capabilities.list.empty") }}` }}
+            {{ "{{ $t(\"capabilities.list.empty\") }}" }}
           </p>
         </div>
       </div>
@@ -201,10 +201,10 @@
             <div class="flex items-center justify-between">
               <div>
                 <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                  {{ `{{ $t("capabilities.form.title") }}` }}
+                  {{ "{{ $t(\"capabilities.form.title\") }}" }}
                 </h2>
                 <p class="text-gray-600 dark:text-gray-300">
-                  {{ `{{ $t("capabilities.form.description") }}` }}
+                  {{ "{{ $t(\"capabilities.form.description\") }}" }}
                 </p>
               </div>
               <UButton icon="i-heroicons-x-mark" variant="ghost" color="neutral" @click="closeForm" />
@@ -212,9 +212,9 @@
             <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
               <div class="inline-flex items-center gap-1">
                 <UIcon name="i-heroicons-identification" />
-                <span class="font-medium">{{ `{{ $t("capabilities.form.capabilityId") }}` }}:</span>
+                <span class="font-medium">{{ "{{ $t(\"capabilities.form.capabilityId\") }}" }}:</span>
                 <code class="rounded bg-gray-100 px-2 py-0.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
-                  {{ `{{ capabilityId || "—" }}` }}
+                  {{ "{{ capabilityId || \"—\" }}" }}
                 </code>
               </div>
               <UBadge :label="validationBadge.label" :color="validationBadge.color" variant="soft" />
@@ -241,13 +241,13 @@
                         ? 'bg-primary-600 text-white'
                         : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300'"
                     >
-                      {{ `{{ idx + 1 }}` }}
+                      {{ "{{ idx + 1 }}" }}
                     </span>
-                    {{ `{{ item.label }}` }}
+                    {{ "{{ item.label }}" }}
                   </button>
                 </div>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ `{{ stepItems[currentStep]?.description }}` }}
+                  {{ "{{ stepItems[currentStep]?.description }}" }}
                 </p>
               </div>
             </template>
@@ -256,7 +256,7 @@
               v-if="loadingTemplate"
               class="flex items-center justify-center py-16 text-gray-500 dark:text-gray-400"
             >
-              {{ `{{ $t("common.loading") }}` }}
+              {{ "{{ $t(\"common.loading\") }}" }}
             </div>
 
             <template v-else>
@@ -299,7 +299,7 @@
 
           <div class="space-y-2">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
-              {{ `{{ $t("capabilities.form.displayName") }}` }}
+              {{ "{{ $t(\"capabilities.form.displayName\") }}" }}
               <span class="text-red-500">*</span>
             </p>
             <div class="grid gap-4 md:grid-cols-2">
@@ -314,7 +314,7 @@
 
           <div class="space-y-2">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
-              {{ `{{ $t("capabilities.form.summary") }}` }}
+              {{ "{{ $t(\"capabilities.form.summary\") }}" }}
               <span class="text-red-500">*</span>
             </p>
             <div class="grid gap-4 md:grid-cols-2">
@@ -329,7 +329,7 @@
 
           <div class="space-y-2">
             <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
-              {{ `{{ $t("capabilities.form.descriptionField") }}` }}
+              {{ "{{ $t(\"capabilities.form.descriptionField\") }}" }}
             </p>
             <div class="grid gap-4 md:grid-cols-2">
               <UFormField :label="$t('capabilities.form.localeZh')">
@@ -376,7 +376,7 @@
 
           <div class="border-t border-gray-200 pt-4 dark:border-gray-800">
             <h3 class="text-base font-semibold">
-              {{ `{{ $t("capabilities.form.asyncTitle") }}` }}
+              {{ "{{ $t(\"capabilities.form.asyncTitle\") }}" }}
             </h3>
             <div class="mt-3 grid gap-4 md:grid-cols-3">
               <UFormField :label="$t('capabilities.form.executionMode')">
@@ -412,10 +412,10 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <h3 class="text-base font-semibold">
-                {{ `{{ $t("capabilities.form.errorCodes") }}` }}
+                {{ "{{ $t(\"capabilities.form.errorCodes\") }}" }}
               </h3>
               <UButton icon="i-heroicons-plus" size="xs" variant="soft" @click="addErrorCode">
-                {{ `{{ $t("capabilities.form.addRow") }}` }}
+                {{ "{{ $t(\"capabilities.form.addRow\") }}" }}
               </UButton>
             </div>
             <div class="space-y-2">
@@ -432,7 +432,7 @@
                 </div>
               </div>
               <p v-if="!form.samples.errors.length" class="text-sm text-gray-500">
-                {{ `{{ $t("capabilities.form.errorEmpty") }}` }}
+                {{ "{{ $t(\"capabilities.form.errorEmpty\") }}" }}
               </p>
             </div>
           </div>
@@ -460,22 +460,22 @@
               <div class="flex items-center gap-2">
                 <UIcon name="i-heroicons-document-text" class="text-gray-400" />
                 <h3 class="text-base font-semibold">
-                  {{ `{{ $t("capabilities.form.previewTitle") }}` }}
+                  {{ "{{ $t(\"capabilities.form.previewTitle\") }}" }}
                 </h3>
               </div>
             </template>
             <dl class="grid gap-2 md:grid-cols-2">
               <div>
-                <dt class="text-sm text-gray-500">{{ `{{ $t("capabilities.form.previewName") }}` }}</dt>
-                <dd class="font-medium">{{ `{{ form.name.zh || "—" }}` }}</dd>
+                <dt class="text-sm text-gray-500">{{ "{{ $t(\"capabilities.form.previewName\") }}" }}</dt>
+                <dd class="font-medium">{{ "{{ form.name.zh || \"—\" }}" }}</dd>
               </div>
               <div>
-                <dt class="text-sm text-gray-500">{{ `{{ $t("capabilities.form.previewOwner") }}` }}</dt>
-                <dd class="font-medium">{{ `{{ form.owner.email || "—" }}` }}</dd>
+                <dt class="text-sm text-gray-500">{{ "{{ $t(\"capabilities.form.previewOwner\") }}" }}</dt>
+                <dd class="font-medium">{{ "{{ form.owner.email || \"—\" }}" }}</dd>
               </div>
               <div class="md:col-span-2">
-                <dt class="text-sm text-gray-500">{{ `{{ $t("capabilities.form.previewSummary") }}` }}</dt>
-                <dd class="font-medium">{{ `{{ form.summary.zh || $t("capabilities.form.previewPlaceholder") }}` }}</dd>
+                <dt class="text-sm text-gray-500">{{ "{{ $t(\"capabilities.form.previewSummary\") }}" }}</dt>
+                <dd class="font-medium">{{ "{{ form.summary.zh || $t(\"capabilities.form.previewPlaceholder\") }}" }}</dd>
               </div>
             </dl>
           </UCard>
@@ -488,13 +488,13 @@
           variant="soft"
         >
           <template #title>
-            {{ `{{ $t("capabilities.form.validationFailed") }}` }}
+            {{ "{{ $t(\"capabilities.form.validationFailed\") }}" }}
           </template>
           <template #description>
             <ul class="list-disc pl-5 text-sm">
               <li v-for="err in validationResult.errors" :key="`${err.field}-${err.message}`">
-                <span class="font-semibold">{{ `{{ err.field }}` }}:</span> {{ `{{ err.message }}` }}
-                <span v-if="err.suggestion" class="text-gray-500">({{ `{{ err.suggestion }}` }})</span>
+                <span class="font-semibold">{{ "{{ err.field }}" }}:</span> {{ "{{ err.message }}" }}
+                <span v-if="err.suggestion" class="text-gray-500">({{ "{{ err.suggestion }}" }})</span>
               </li>
             </ul>
           </template>
@@ -503,27 +503,27 @@
         <div class="flex flex-col gap-3 border-t border-gray-200 pt-4 dark:border-gray-800 md:flex-row md:items-center md:justify-between">
           <div class="text-sm text-gray-500">
             <span v-if="savedAt">
-              {{ `{{ $t("capabilities.form.lastSaved", { time: savedAt }) }}` }}
+              {{ "{{ $t(\"capabilities.form.lastSaved\", { time: savedAt }) }}" }}
             </span>
           </div>
           <div class="flex flex-wrap gap-3">
             <UButton variant="ghost" color="neutral" :disabled="currentStep === 0" @click="currentStep = Math.max(0, currentStep - 1)">
-              {{ `{{ $t("common.previous") }}` }}
+              {{ "{{ $t(\"common.previous\") }}" }}
             </UButton>
             <UButton variant="ghost" color="neutral" :disabled="currentStep === stepItems.length - 1" @click="currentStep = Math.min(stepItems.length - 1, currentStep + 1)">
-              {{ `{{ $t("common.next") }}` }}
+              {{ "{{ $t(\"common.next\") }}" }}
             </UButton>
             <UButton variant="outline" color="primary" :loading="validating" @click="handleValidate">
-              {{ `{{ $t("capabilities.form.validateButton") }}` }}
+              {{ "{{ $t(\"capabilities.form.validateButton\") }}" }}
             </UButton>
             <UButton variant="soft" color="primary" :loading="savingDraft" @click="handleSaveDraft">
-              {{ `{{ $t("capabilities.form.saveDraft") }}` }}
+              {{ "{{ $t(\"capabilities.form.saveDraft\") }}" }}
             </UButton>
             <UButton variant="soft" color="neutral" @click="openDebugPanelForDraft">
-              {{ `{{ $t("capabilities.form.debug.openDraft") }}` }}
+              {{ "{{ $t(\"capabilities.form.debug.openDraft\") }}" }}
             </UButton>
             <UButton color="primary" :loading="submitting" @click="handleSubmit">
-              {{ `{{ $t("common.submit") }}` }}
+              {{ "{{ $t(\"common.submit\") }}" }}
             </UButton>
           </div>
         </div>
@@ -547,7 +547,7 @@
           rel="noreferrer"
           class="text-xs text-primary-600 dark:text-primary-200 hover:underline"
         >
-          {{ `{{ $t("capabilities.form.debug.docLink") }}` }}
+          {{ "{{ $t(\"capabilities.form.debug.docLink\") }}" }}
         </NuxtLink>
       </template>
 	      <template #body>
@@ -591,7 +591,7 @@
                     </UFormField>
                     <div class="lg:col-span-12 space-y-3">
 	                      <label class="text-sm font-medium text-gray-900 dark:text-white">
-	                        {{ `{{ $t("capabilities.form.debug.payload") }}` }}
+	                        {{ "{{ $t(\"capabilities.form.debug.payload\") }}" }}
 	                      </label>
                       <UTextarea
                         v-model="debugForm.payloadText"
@@ -600,11 +600,11 @@
                       />
 	                      <div class="flex flex-wrap items-center justify-between text-xs text-gray-600 dark:text-gray-300">
                         <span>
-                          {{ `{{ debugPayloadValid ? "JSON OK" : $t("capabilities.form.debug.payloadInvalid") }}` }}
+                          {{ "{{ debugPayloadValid ? \"JSON OK\" : $t(\"capabilities.form.debug.payloadInvalid\") }}" }}
                         </span>
                         <div class="flex items-center gap-3">
                           <UButton variant="link" size="xs" color="neutral" @click="resetDebugPayload">
-                            {{ `{{ $t("capabilities.form.debug.resetTemplate") }}` }}
+                            {{ "{{ $t(\"capabilities.form.debug.resetTemplate\") }}" }}
                           </UButton>
                           <UButton
                             variant="link"
@@ -613,7 +613,7 @@
                             :disabled="!debugPayloadTemplate"
                             @click="applyDebugPayloadTemplate"
                           >
-                            {{ `{{ $t("capabilities.form.debug.applyTemplate") }}` }}
+                            {{ "{{ $t(\"capabilities.form.debug.applyTemplate\") }}" }}
                           </UButton>
                         </div>
                       </div>
@@ -640,7 +640,7 @@
                     <div class="lg:col-span-12 space-y-2">
                       <div class="flex items-center justify-between">
 	                        <p class="text-sm font-medium text-gray-900 dark:text-white">
-	                          {{ `{{ $t("capabilities.form.debug.requestPreview") }}` }}
+	                          {{ "{{ $t(\"capabilities.form.debug.requestPreview\") }}" }}
 	                        </p>
                         <UButton
                           color="gray"
@@ -654,10 +654,10 @@
 	                        v-if="debugShowRequestPreview"
 	                        class="rounded bg-gray-100 p-4 text-xs text-gray-800 dark:bg-black/40 dark:text-white/80"
 	                      >
-{{ `{{ debugRequestPreviewText }}` }}
+{{ "{{ debugRequestPreviewText }}" }}
 	                      </pre>
 	                      <p v-else class="text-xs text-gray-600 dark:text-gray-300">
-	                        {{ `{{ $t("capabilities.form.debug.collapsedPreview") }}` }}
+	                        {{ "{{ $t(\"capabilities.form.debug.collapsedPreview\") }}" }}
 	                      </p>
                     </div>
                   </div>
@@ -665,7 +665,7 @@
 	                <div class="border-t border-gray-200 px-5 py-4 dark:border-white/10">
 	                  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 	                    <p class="text-xs text-gray-500 dark:text-white/60">
-	                      {{ `{{ $t("capabilities.form.debug.payloadHint") }}` }}
+	                      {{ "{{ $t(\"capabilities.form.debug.payloadHint\") }}" }}
 	                    </p>
                     <UButton
                       color="primary"
@@ -673,7 +673,7 @@
                       :disabled="!debugPayloadValid"
                       @click="handleDebugInvoke"
                     >
-                      {{ `{{ $t("capabilities.form.debug.invoke") }}` }}
+                      {{ "{{ $t(\"capabilities.form.debug.invoke\") }}" }}
                     </UButton>
                   </div>
                 </div>
@@ -688,74 +688,71 @@
                 <div class="flex-1 space-y-4 overflow-y-auto px-5 py-5 text-sm">
                   <div class="flex flex-wrap gap-3">
                     <span>
-                      {{ `{{ $t("capabilities.form.debug.status") }}` }}：
+                      {{ "{{ $t(\"capabilities.form.debug.status\") }}" }}：
                       <strong
                         :class="{
                           'text-green-400': !!debugResult,
                           'text-rose-400': !!debugErrorMessage,
                         }"
                       >
-                        {{ `{{ debugResult?.status ||
-                            (debugErrorMessage
-                              ? $t("capabilities.form.debug.statusFailed")
-                              : $t("capabilities.form.debug.statusIdle")) }}` }}
+                        {{ "{{\n                          debugResult?.status ||\n                            (debugErrorMessage\n                              ? $t(\"capabilities.form.debug.statusFailed\")\n                              : $t(\"capabilities.form.debug.statusIdle\"))\n                        }}" }}
                       </strong>
                     </span>
                     <span v-if="debugDuration">
-                      {{ `{{ $t("capabilities.form.debug.duration") }}` }}：{{ `{{ debugDuration.toFixed(1) }}` }} ms
+                      {{ "{{ $t(\"capabilities.form.debug.duration\") }}" }}：{{ "{{ debugDuration.toFixed(1) }}" }} ms
                     </span>
                     <span>
-                      {{ `{{ $t("capabilities.form.debug.traceId") }}` }}：
-                      {{ `{{ debugLastTraceId || "—" }}` }}
+                      {{ "{{ $t(\"capabilities.form.debug.traceId\") }}" }}：
+                      {{ "{{ debugLastTraceId || \"—\" }}" }}
                     </span>
                   </div>
 
                   <div v-if="debugWarnings.length" class="space-y-1">
                     <p class="text-xs uppercase tracking-wide text-yellow-300">
-                      {{ `{{ $t("capabilities.form.debug.warnings") }}` }}
+                      {{ "{{ $t(\"capabilities.form.debug.warnings\") }}" }}
                     </p>
                     <ul class="list-disc pl-4 text-xs text-yellow-200">
-                      <li v-for="warn in debugWarnings" :key="warn">{{ `{{ warn }}` }}</li>
+                      <li v-for="warn in debugWarnings" :key="warn">{{ "{{ warn }}" }}</li>
                     </ul>
                   </div>
 
                   <div v-if="debugErrorMessage" class="space-y-2">
                     <p class="text-xs uppercase tracking-wide text-rose-300">
-                      {{ `{{ $t("capabilities.form.debug.errors") }}` }}
+                      {{ "{{ $t(\"capabilities.form.debug.errors\") }}" }}
                     </p>
 	                    <p class="rounded bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-500/10 dark:text-rose-100">
-	                      {{ `{{ debugErrorMessage }}` }}
+	                      {{ "{{ debugErrorMessage }}" }}
 	                    </p>
 	                    <pre
 	                      v-if="debugErrorDetails"
 	                      class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80"
 	                    >
-{{ `{{ JSON.stringify(debugErrorDetails, null, 2) }}` }}
+{{ "{{ JSON.stringify(debugErrorDetails, null, 2) }}" }}
 	                    </pre>
                   </div>
 
                   <div v-if="debugResult?.data" class="space-y-2">
 	                    <p class="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-200">
-	                      {{ `{{ $t("capabilities.form.debug.responseData") }}` }}
+	                      {{ "{{ $t(\"capabilities.form.debug.responseData\") }}" }}
 	                    </p>
 	                    <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
-{{ `{{ JSON.stringify(debugResult.data, null, 2) }}` }}
+{{ "{{ JSON.stringify(debugResult.data, null, 2) }}" }}
 	                    </pre>
                   </div>
 
                   <div v-if="debugResult?.raw" class="space-y-2">
 	                    <p class="text-xs uppercase tracking-wide text-gray-700 dark:text-gray-200">
-	                      {{ `{{ $t("capabilities.form.debug.rawResponse") }}` }}
+	                      {{ "{{ $t(\"capabilities.form.debug.rawResponse\") }}" }}
 	                    </p>
 	                    <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
-{{ `{{ JSON.stringify(debugResult.raw, null, 2) }}` }}
+{{ "{{ JSON.stringify(debugResult.raw, null, 2) }}" }}
 	                    </pre>
                   </div>
 
                   <div class="space-y-2">
                     <div class="flex items-center justify-between">
 	                      <p class="text-sm font-medium text-gray-900 dark:text-white">
-	                        {{ `{{ $t("capabilities.form.debug.history") }}` }}
+	                        {{ "{{ $t(\"capabilities.form.debug.history\") }}" }}
 	                      </p>
                       <UButton
                         size="xs"
@@ -763,7 +760,7 @@
                         color="neutral"
                         @click="clearDebugHistory"
                       >
-                        {{ `{{ $t("capabilities.form.debug.clearHistory") }}` }}
+                        {{ "{{ $t(\"capabilities.form.debug.clearHistory\") }}" }}
                       </UButton>
                     </div>
                     <div v-if="debugHistoryEntries.length" class="space-y-3">
@@ -775,26 +772,24 @@
                         <template #header>
                           <div class="flex flex-wrap items-center gap-2">
                             <span class="text-sm font-semibold">
-                              {{ `{{ entry.capabilityId }}` }} · {{ `{{ entry.action }}` }}
+                              {{ "{{ entry.capabilityId }}" }} · {{ "{{ entry.action }}" }}
                             </span>
                             <UBadge :color="entry.success ? 'green' : 'rose'" variant="soft">
-                              {{ `{{ entry.success
-                                  ? $t("capabilities.form.debug.historySuccess")
-                                  : $t("capabilities.form.debug.historyFail") }}` }}
+                              {{ "{{\n                                entry.success\n                                  ? $t(\"capabilities.form.debug.historySuccess\")\n                                  : $t(\"capabilities.form.debug.historyFail\")\n                              }}" }}
                             </UBadge>
                           </div>
 	                          <p class="text-[11px] text-gray-500 dark:text-white/60">
-	                            {{ `{{ $t("capabilities.form.debug.duration") }}` }}：{{ `{{ entry.duration.toFixed(1) }}` }} ms ·
-	                            {{ `{{ $t("capabilities.form.debug.traceId") }}` }}：{{ `{{ entry.traceId || "—" }}` }}
+	                            {{ "{{ $t(\"capabilities.form.debug.duration\") }}" }}：{{ "{{ entry.duration.toFixed(1) }}" }} ms ·
+	                            {{ "{{ $t(\"capabilities.form.debug.traceId\") }}" }}：{{ "{{ entry.traceId || \"—\" }}" }}
 	                          </p>
                         </template>
                         <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
-{{ `{{ entry.rawText }}` }}
+{{ "{{ entry.rawText }}" }}
                         </pre>
                       </UCard>
                     </div>
 	                    <p v-else class="text-xs text-gray-500 dark:text-gray-400">
-	                      {{ `{{ $t("capabilities.form.debug.noHistory") }}` }}
+	                      {{ "{{ $t(\"capabilities.form.debug.noHistory\") }}" }}
 	                    </p>
                   </div>
                 </div>
@@ -819,7 +814,7 @@
           rel="noreferrer"
           class="text-xs text-primary-600 dark:text-primary-200 hover:underline"
         >
-          {{ `{{ $t("capabilities.mcp.docLink") }}` }}
+          {{ "{{ $t(\"capabilities.mcp.docLink\") }}" }}
         </NuxtLink>
       </template>
 	      <template #body>
@@ -828,10 +823,10 @@
 	            <template #header>
 	              <div>
 	                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-	                  {{ `{{ $t("capabilities.mcp.session.title") }}` }}
+	                  {{ "{{ $t(\"capabilities.mcp.session.title\") }}" }}
 	                </h2>
 	                <p class="text-sm text-gray-600 dark:text-white/70">
-	                  {{ `{{ $t("capabilities.mcp.session.description") }}` }}
+	                  {{ "{{ $t(\"capabilities.mcp.session.description\") }}" }}
 	                </p>
 	              </div>
 	            </template>
@@ -866,7 +861,7 @@
                   :loading="mcpRegisterLoading"
                   @click="handleMcpRegister"
                 >
-                  {{ `{{ $t("capabilities.mcp.actions.register") }}` }}
+                  {{ "{{ $t(\"capabilities.mcp.actions.register\") }}" }}
                 </UButton>
               </div>
               <div class="grid gap-4 lg:grid-cols-3">
@@ -882,7 +877,7 @@
                     :loading="mcpAckLoading"
                     @click="handleMcpAck"
                   >
-                    {{ `{{ $t("capabilities.mcp.actions.ack") }}` }}
+                    {{ "{{ $t(\"capabilities.mcp.actions.ack\") }}" }}
                   </UButton>
                 </div>
                 <div class="space-y-2">
@@ -901,7 +896,7 @@
                     :loading="mcpHeartbeatLoading"
                     @click="handleMcpHeartbeat"
                   >
-                    {{ `{{ $t("capabilities.mcp.actions.heartbeat") }}` }}
+                    {{ "{{ $t(\"capabilities.mcp.actions.heartbeat\") }}" }}
                   </UButton>
                 </div>
                 <div class="space-y-2">
@@ -916,7 +911,7 @@
                     :loading="mcpCloseLoading"
                     @click="handleMcpClose"
                   >
-                    {{ `{{ $t("capabilities.mcp.actions.close") }}` }}
+                    {{ "{{ $t(\"capabilities.mcp.actions.close\") }}" }}
                   </UButton>
                 </div>
               </div>
@@ -925,25 +920,25 @@
 	                class="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-800 dark:border-white/10 dark:bg-black/20 dark:text-white/80"
 	              >
                 <div class="flex flex-wrap items-center gap-2 text-sm">
-                  <span class="font-semibold">ID：{{ `{{ mcpSession.id }}` }}</span>
+                  <span class="font-semibold">ID：{{ "{{ mcpSession.id }}" }}</span>
                   <UBadge :label="mcpSession.state" :color="mcpSession.state === 'ready' ? 'green' : 'gray'" />
                 </div>
 	                <dl class="mt-3 grid gap-2 md:grid-cols-2">
 	                  <div>
-	                    <dt class="text-gray-500 dark:text-white/60">{{ `{{ $t("capabilities.mcp.fields.tenantUuid") }}` }}</dt>
-	                    <dd>{{ `{{ mcpSession.tenant_uuid }}` }}</dd>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ "{{ $t(\"capabilities.mcp.fields.tenantUuid\") }}" }}</dt>
+	                    <dd>{{ "{{ mcpSession.tenant_uuid }}" }}</dd>
 	                  </div>
 	                  <div>
-	                    <dt class="text-gray-500 dark:text-white/60">{{ `{{ $t("capabilities.mcp.fields.lastPing") }}` }}</dt>
-	                    <dd>{{ `{{ mcpSession.last_ping_at || "—" }}` }}</dd>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ "{{ $t(\"capabilities.mcp.fields.lastPing\") }}" }}</dt>
+	                    <dd>{{ "{{ mcpSession.last_ping_at || \"—\" }}" }}</dd>
 	                  </div>
 	                  <div>
-	                    <dt class="text-gray-500 dark:text-white/60">{{ `{{ $t("capabilities.mcp.fields.createdAt") }}` }}</dt>
-	                    <dd>{{ `{{ mcpSession.created_at }}` }}</dd>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ "{{ $t(\"capabilities.mcp.fields.createdAt\") }}" }}</dt>
+	                    <dd>{{ "{{ mcpSession.created_at }}" }}</dd>
 	                  </div>
 	                  <div>
-	                    <dt class="text-gray-500 dark:text-white/60">{{ `{{ $t("capabilities.mcp.fields.updatedAt") }}` }}</dt>
-	                    <dd>{{ `{{ mcpSession.updated_at }}` }}</dd>
+	                    <dt class="text-gray-500 dark:text-white/60">{{ "{{ $t(\"capabilities.mcp.fields.updatedAt\") }}" }}</dt>
+	                    <dd>{{ "{{ mcpSession.updated_at }}" }}</dd>
 	                  </div>
 	                </dl>
 	              </div>
@@ -955,10 +950,10 @@
 	              <div class="flex items-center justify-between">
 	                <div>
 	                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-	                    {{ `{{ $t("capabilities.mcp.invoke.title") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.invoke.title\") }}" }}
 	                  </h2>
 	                  <p class="text-sm text-gray-600 dark:text-white/70">
-	                    {{ `{{ $t("capabilities.mcp.invoke.description") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.invoke.description\") }}" }}
 	                  </p>
 	                </div>
                 <UButton
@@ -967,7 +962,7 @@
                   color="neutral"
                   @click="applyCurrentCapabilityToMcp"
                 >
-                  {{ `{{ $t("capabilities.mcp.actions.applyCapability") }}` }}
+                  {{ "{{ $t(\"capabilities.mcp.actions.applyCapability\") }}" }}
                 </UButton>
               </div>
             </template>
@@ -1024,7 +1019,7 @@
                       size="xs"
                       @click="setIssuedAtNow"
                     >
-                      {{ `{{ $t("capabilities.mcp.actions.issuedNow") }}` }}
+                      {{ "{{ $t(\"capabilities.mcp.actions.issuedNow\") }}" }}
                     </UButton>
                   </div>
                 </UFormField>
@@ -1032,7 +1027,7 @@
 	              <div class="grid gap-4 md:grid-cols-2">
 	                <div>
 	                  <label class="text-xs font-medium text-gray-700 dark:text-white/80">
-	                    {{ `{{ $t("capabilities.mcp.fields.payload") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.fields.payload\") }}" }}
 	                  </label>
                   <UTextarea
                     v-model="mcpInvokeForm.payloadText"
@@ -1042,7 +1037,7 @@
 	                </div>
 	                <div>
 	                  <label class="text-xs font-medium text-gray-700 dark:text-white/80">
-	                    {{ `{{ $t("capabilities.mcp.fields.metadata") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.fields.metadata\") }}" }}
 	                  </label>
                   <UTextarea
                     v-model="mcpInvokeForm.metadataText"
@@ -1056,63 +1051,63 @@
                 :loading="mcpInvokeLoading"
                 @click="handleMcpInvoke"
               >
-                {{ `{{ $t("capabilities.mcp.actions.invoke") }}` }}
+                {{ "{{ $t(\"capabilities.mcp.actions.invoke\") }}" }}
               </UButton>
               <div class="space-y-2 text-xs">
                 <div class="flex flex-wrap gap-3">
                   <span>
-                    {{ `{{ $t("capabilities.mcp.invoke.status") }}` }}：
+                    {{ "{{ $t(\"capabilities.mcp.invoke.status\") }}" }}：
                     <strong
                       :class="{
                         'text-green-400': !!mcpInvokeResult,
                         'text-rose-400': !!mcpInvokeErrorMessage,
                       }"
                     >
-                      {{ `{{ mcpInvokeResult?.status || (mcpInvokeErrorMessage ? $t("capabilities.mcp.invoke.failed") : $t("capabilities.mcp.invoke.idle")) }}` }}
+                      {{ "{{ mcpInvokeResult?.status || (mcpInvokeErrorMessage ? $t(\"capabilities.mcp.invoke.failed\") : $t(\"capabilities.mcp.invoke.idle\")) }}" }}
                     </strong>
                   </span>
                   <span>
-                    Trace：{{ `{{ mcpInvokeResult?.trace_id || "—" }}` }}
+                    Trace：{{ "{{ mcpInvokeResult?.trace_id || \"—\" }}" }}
                   </span>
                   <span>
-                    Correlation：{{ `{{ mcpInvokeResult?.correlation_id || "—" }}` }}
+                    Correlation：{{ "{{ mcpInvokeResult?.correlation_id || \"—\" }}" }}
                   </span>
                 </div>
 	                <div v-if="mcpInvokeResult?.payload" class="space-y-1">
 	                  <p class="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-200">
-	                    {{ `{{ $t("capabilities.mcp.fields.payload") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.fields.payload\") }}" }}
 	                  </p>
 	                  <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
-{{ `{{ JSON.stringify(mcpInvokeResult.payload, null, 2) }}` }}
+{{ "{{ JSON.stringify(mcpInvokeResult.payload, null, 2) }}" }}
 	                  </pre>
 	                </div>
 	                <div v-if="mcpInvokeResult?.metadata" class="space-y-1">
 	                  <p class="text-xs uppercase tracking-wide text-primary-700 dark:text-primary-200">
-	                    {{ `{{ $t("capabilities.mcp.fields.metadata") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.fields.metadata\") }}" }}
 	                  </p>
 	                  <pre class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80">
-{{ `{{ JSON.stringify(mcpInvokeResult.metadata, null, 2) }}` }}
+{{ "{{ JSON.stringify(mcpInvokeResult.metadata, null, 2) }}" }}
 	                  </pre>
 	                </div>
 	                <div v-if="mcpInvokeErrorMessage" class="space-y-1">
 	                  <p class="text-xs uppercase tracking-wide text-rose-300">
-	                    {{ `{{ $t("capabilities.mcp.invoke.failed") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.invoke.failed\") }}" }}
 	                  </p>
 	                  <p class="rounded bg-rose-50 p-3 text-xs text-rose-700 dark:bg-rose-500/10 dark:text-rose-100">
-	                    {{ `{{ mcpInvokeErrorMessage }}` }}
+	                    {{ "{{ mcpInvokeErrorMessage }}" }}
 	                  </p>
 	                  <pre
 	                    v-if="mcpInvokeErrorDetails"
 	                    class="rounded bg-gray-100 p-3 text-xs text-gray-800 dark:bg-black/30 dark:text-white/80"
 	                  >
-{{ `{{ JSON.stringify(mcpInvokeErrorDetails, null, 2) }}` }}
+{{ "{{ JSON.stringify(mcpInvokeErrorDetails, null, 2) }}" }}
 	                  </pre>
 	                </div>
               </div>
 	              <div class="space-y-2">
 	                <div class="flex items-center justify-between">
 	                  <p class="text-sm font-medium text-gray-900 dark:text-white">
-	                    {{ `{{ $t("capabilities.mcp.invoke.history") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.invoke.history\") }}" }}
 	                  </p>
                   <UButton
                     size="xs"
@@ -1120,7 +1115,7 @@
                     color="neutral"
                     @click="clearMcpInvokeHistory"
                   >
-                    {{ `{{ $t("capabilities.mcp.actions.clearHistory") }}` }}
+                    {{ "{{ $t(\"capabilities.mcp.actions.clearHistory\") }}" }}
                   </UButton>
                 </div>
 	                <div v-if="mcpInvokeHistory.length" class="space-y-3">
@@ -1132,26 +1127,26 @@
                     <template #header>
                       <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-semibold">
-                          {{ `{{ entry.status }}` }}
+                          {{ "{{ entry.status }}" }}
                         </span>
                         <UBadge
                           :color="entry.success ? 'green' : 'rose'"
                           variant="soft"
                           :label="entry.success ? $t('capabilities.mcp.invoke.historySuccess') : $t('capabilities.mcp.invoke.historyFail')"
                         />
-	                        <span class="text-gray-500 dark:text-white/60">{{ `{{ entry.timestamp }}` }}</span>
+	                        <span class="text-gray-500 dark:text-white/60">{{ "{{ entry.timestamp }}" }}</span>
 	                      </div>
 	                      <p class="text-gray-500 dark:text-white/60">
-	                        Trace：{{ `{{ entry.traceId || "—" }}` }} · Correlation：{{ `{{ entry.correlationId || "—" }}` }}
+	                        Trace：{{ "{{ entry.traceId || \"—\" }}" }} · Correlation：{{ "{{ entry.correlationId || \"—\" }}" }}
 	                      </p>
                     </template>
                     <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
-{{ `{{ entry.payload ? JSON.stringify(entry.payload, null, 2) : entry.error }}` }}
+{{ "{{ entry.payload ? JSON.stringify(entry.payload, null, 2) : entry.error }}" }}
                     </pre>
                   </UCard>
                 </div>
 	                <p v-else class="text-xs text-gray-500 dark:text-white/60">
-	                  {{ `{{ $t("capabilities.mcp.invoke.noHistory") }}` }}
+	                  {{ "{{ $t(\"capabilities.mcp.invoke.noHistory\") }}" }}
 	                </p>
 	              </div>
             </div>
@@ -1162,10 +1157,10 @@
 	              <div class="flex items-center justify-between">
 	                <div>
 	                  <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-	                    {{ `{{ $t("capabilities.mcp.stream.title") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.stream.title\") }}" }}
 	                  </h2>
 	                  <p class="text-sm text-gray-600 dark:text-white/70">
-	                    {{ `{{ $t("capabilities.mcp.stream.description") }}` }}
+	                    {{ "{{ $t(\"capabilities.mcp.stream.description\") }}" }}
 	                  </p>
 	                </div>
                 <div class="flex items-center gap-2">
@@ -1182,7 +1177,7 @@
                     :disabled="!mcpSessionForm.sessionId"
                     @click="toggleMcpStream"
                   >
-                    {{ `{{ mcpStreamConnected ? $t("capabilities.mcp.actions.disconnectStream") : $t("capabilities.mcp.actions.connectStream") }}` }}
+                    {{ "{{ mcpStreamConnected ? $t(\"capabilities.mcp.actions.disconnectStream\") : $t(\"capabilities.mcp.actions.connectStream\") }}" }}
                   </UButton>
                   <UButton
                     size="xs"
@@ -1190,14 +1185,14 @@
                     color="neutral"
                     @click="clearMcpEvents"
                   >
-                    {{ `{{ $t("capabilities.mcp.actions.clearEvents") }}` }}
+                    {{ "{{ $t(\"capabilities.mcp.actions.clearEvents\") }}" }}
                   </UButton>
                 </div>
               </div>
             </template>
             <div class="space-y-3 text-xs">
               <p v-if="mcpStreamError" class="text-rose-300">
-                {{ `{{ mcpStreamError }}` }}
+                {{ "{{ mcpStreamError }}" }}
               </p>
 	              <div v-if="mcpEvents.length" data-testid="mcp-stream-events" class="space-y-3">
 	                <UCard
@@ -1207,17 +1202,17 @@
 	                >
                   <template #header>
                     <div class="flex items-center justify-between">
-                      <span class="font-semibold">{{ `{{ event.type }}` }}</span>
-	                      <span class="text-gray-500 dark:text-white/60">{{ `{{ event.timestamp }}` }}</span>
+                      <span class="font-semibold">{{ "{{ event.type }}" }}</span>
+	                      <span class="text-gray-500 dark:text-white/60">{{ "{{ event.timestamp }}" }}</span>
 	                    </div>
 	                  </template>
                   <pre class="overflow-x-auto whitespace-pre-wrap text-[11px]">
-{{ `{{ JSON.stringify(event.payload, null, 2) }}` }}
+{{ "{{ JSON.stringify(event.payload, null, 2) }}" }}
                   </pre>
                 </UCard>
               </div>
 	              <p v-else class="text-gray-500 dark:text-white/60">
-	                {{ `{{ $t("capabilities.mcp.stream.empty") }}` }}
+	                {{ "{{ $t(\"capabilities.mcp.stream.empty\") }}" }}
 	              </p>
             </div>
           </UCard>
@@ -1236,10 +1231,10 @@
             <div class="flex items-start justify-between gap-4">
               <div>
                 <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                  {{ `{{ $t("capabilities.exposure.title") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.title\") }}" }}
                 </h2>
                 <p class="text-gray-600 dark:text-gray-300">
-                  {{ `{{ $t("capabilities.exposure.description") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.description\") }}" }}
                 </p>
               </div>
               <UButton icon="i-heroicons-x-mark" variant="ghost" color="neutral" @click="closeExposureForm" />
@@ -1247,15 +1242,15 @@
             <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
               <div class="inline-flex items-center gap-1">
                 <UIcon name="i-heroicons-cube" />
-                <span class="font-medium">{{ `{{ $t("capabilities.exposure.capability") }}` }}:</span>
+                <span class="font-medium">{{ "{{ $t(\"capabilities.exposure.capability\") }}" }}:</span>
                 <code class="rounded bg-gray-100 px-2 py-0.5 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
-                  {{ `{{ exposureForm.capability_id || "—" }}` }}
+                  {{ "{{ exposureForm.capability_id || \"—\" }}" }}
                 </code>
               </div>
               <div class="inline-flex items-center gap-2">
                 <UBadge :label="exposureModalStatus.label" :color="exposureModalStatus.color" variant="soft" />
                 <span class="text-xs text-gray-500">
-                  {{ `{{ $t("capabilities.exposure.updatedAt", { time: exposurePackageInfo?.updated_at || "—" }) }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.updatedAt\", { time: exposurePackageInfo?.updated_at || \"—\" }) }}" }}
                 </span>
               </div>
             </div>
@@ -1276,13 +1271,13 @@
               </div>
               <div class="flex flex-wrap gap-3">
                 <UButton variant="ghost" color="neutral" :loading="exposureLoading" @click="handleExposureLoad">
-                  {{ `{{ $t("capabilities.exposure.actions.load") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.actions.load\") }}" }}
                 </UButton>
                 <UButton variant="ghost" color="neutral" @click="resetExposureChannels">
-                  {{ `{{ $t("capabilities.exposure.actions.resetChannels") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.actions.resetChannels\") }}" }}
                 </UButton>
                 <UButton color="primary" :disabled="!exposureForm.capability_id" :loading="exposureSaving" @click="handleExposureSave">
-                  {{ `{{ $t("common.save") }}` }}
+                  {{ "{{ $t(\"common.save\") }}" }}
                 </UButton>
               </div>
             </section>
@@ -1290,11 +1285,11 @@
             <section class="space-y-4">
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold">
-                  {{ `{{ $t("capabilities.exposure.sections.channels") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.sections.channels\") }}" }}
                 </h2>
                 <span class="text-sm text-gray-500">
-                  {{ `{{ selectedExposureChannels.length }}` }}/{{ `{{ exposureForm.channels.length }}` }}
-                  {{ `{{ $t("capabilities.exposure.sections.enabled") }}` }}
+                  {{ "{{ selectedExposureChannels.length }}" }}/{{ "{{ exposureForm.channels.length }}" }}
+                  {{ "{{ $t(\"capabilities.exposure.sections.enabled\") }}" }}
                 </span>
               </div>
               <div class="grid gap-4 lg:grid-cols-2">
@@ -1305,16 +1300,13 @@
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex flex-col">
-                      <span class="font-semibold">{{ `{{ channel.name }}` }}</span>
+                      <span class="font-semibold">{{ "{{ channel.name }}" }}</span>
                       <span class="text-xs text-gray-500">
                         <template v-if="channel.definitionKey && selectedCapability">
-                          {{ `{{ $t("capabilities.exposure.sections.descriptorNote", {
-                            path: selectedCapability.descriptor,
-                            key: channel.definitionKey,
-                          }) }}` }}
+                          {{ "{{ $t(\"capabilities.exposure.sections.descriptorNote\", {\n                            path: selectedCapability.descriptor,\n                            key: channel.definitionKey,\n                          }) }}" }}
                         </template>
                         <template v-else>
-                          {{ `{{ $t("capabilities.exposure.sections.channelHint") }}` }}
+                          {{ "{{ $t(\"capabilities.exposure.sections.channelHint\") }}" }}
                         </template>
                       </span>
                     </div>
@@ -1330,12 +1322,12 @@
                         :key="`${channel.type}-${entry.label}`"
                         class="flex items-start justify-between gap-3"
                       >
-                        <span class="text-gray-500">{{ `{{ entry.label }}` }}</span>
-                        <span class="font-semibold text-gray-200 dark:text-white break-all">{{ `{{ entry.value }}` }}</span>
+                        <span class="text-gray-500">{{ "{{ entry.label }}" }}</span>
+                        <span class="font-semibold text-gray-200 dark:text-white break-all">{{ "{{ entry.value }}" }}</span>
                       </div>
                     </div>
                     <div v-else class="text-xs text-gray-500">
-                      {{ `{{ $t("capabilities.exposure.sections.channelHint") }}` }}
+                      {{ "{{ $t(\"capabilities.exposure.sections.channelHint\") }}" }}
                     </div>
                     <UFormField :label="$t('capabilities.exposure.fields.scopes')">
                       <UInput
@@ -1352,7 +1344,7 @@
             <section class="grid gap-4 md:grid-cols-2">
               <div class="space-y-3">
                 <h2 class="text-lg font-semibold">
-                  {{ `{{ $t("capabilities.exposure.sections.auth") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.sections.auth\") }}" }}
                 </h2>
                 <UFormField :label="$t('capabilities.exposure.fields.strategy')">
                   <USelectMenu v-model="exposureForm.auth.strategy" :options="exposureTemplate?.auth_strategies || []" />
@@ -1370,7 +1362,7 @@
               </div>
               <div class="space-y-3">
                 <h2 class="text-lg font-semibold">
-                  {{ `{{ $t("capabilities.exposure.sections.rateLimit") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.sections.rateLimit\") }}" }}
                 </h2>
                 <UFormField :label="$t('capabilities.exposure.fields.rpm')">
                   <UInput v-model.number="exposureForm.rate_limit.requests_per_minute" type="number" min="1" />
@@ -1387,41 +1379,41 @@
             <section class="space-y-4">
               <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold">
-                  {{ `{{ $t("capabilities.exposure.sections.quotas") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.sections.quotas\") }}" }}
                 </h2>
                 <div class="text-sm text-gray-500">
-                  {{ `{{ $t("capabilities.exposure.sections.tenantHint") }}` }}
+                  {{ "{{ $t(\"capabilities.exposure.sections.tenantHint\") }}" }}
                 </div>
               </div>
               <div class="overflow-x-auto border rounded-lg border-gray-200 dark:border-gray-800">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800 text-sm">
                   <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                      <th class="px-4 py-2 text-left font-semibold">{{ `{{ $t("capabilities.exposure.fields.tenant") }}` }}</th>
-                      <th class="px-4 py-2 text-left font-semibold">{{ `{{ $t("capabilities.exposure.fields.quota") }}` }}</th>
-                      <th class="px-4 py-2 text-left font-semibold">{{ `{{ $t("capabilities.exposure.fields.status") }}` }}</th>
-                      <th class="px-4 py-2 text-left font-semibold w-48">{{ `{{ $t("capabilities.exposure.fields.notes") }}` }}</th>
+                      <th class="px-4 py-2 text-left font-semibold">{{ "{{ $t(\"capabilities.exposure.fields.tenant\") }}" }}</th>
+                      <th class="px-4 py-2 text-left font-semibold">{{ "{{ $t(\"capabilities.exposure.fields.quota\") }}" }}</th>
+                      <th class="px-4 py-2 text-left font-semibold">{{ "{{ $t(\"capabilities.exposure.fields.status\") }}" }}</th>
+                      <th class="px-4 py-2 text-left font-semibold w-48">{{ "{{ $t(\"capabilities.exposure.fields.notes\") }}" }}</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     <tr v-if="exposureQuotasList.length === 0">
                       <td colspan="4" class="px-4 py-4 text-center text-gray-500">
-                        {{ `{{ $t("capabilities.exposure.sections.noQuotas") }}` }}
+                        {{ "{{ $t(\"capabilities.exposure.sections.noQuotas\") }}" }}
                       </td>
                     </tr>
                     <tr v-for="quota in exposureQuotasList" :key="quota.tenant_id">
                       <td class="px-4 py-2">
-                        <div class="font-medium">{{ `{{ quota.tenant_id }}` }}</div>
-                        <div class="text-xs text-gray-500">{{ `{{ quota.tenant_name }}` }}</div>
+                        <div class="font-medium">{{ "{{ quota.tenant_id }}" }}</div>
+                        <div class="text-xs text-gray-500">{{ "{{ quota.tenant_name }}" }}</div>
                       </td>
                       <td class="px-4 py-2">
-                        {{ `{{ quota.used || 0 }}` }} / {{ `{{ quota.quota }}` }}
+                        {{ "{{ quota.used || 0 }}" }} / {{ "{{ quota.quota }}" }}
                       </td>
                       <td class="px-4 py-2">
                         <UBadge :label="quota.status || 'active'" color="primary" variant="soft" />
                       </td>
                       <td class="px-4 py-2 break-words">
-                        <span class="text-xs text-gray-500">{{ `{{ quota.notes }}` }}</span>
+                        <span class="text-xs text-gray-500">{{ "{{ quota.notes }}" }}</span>
                       </td>
                     </tr>
                   </tbody>
@@ -1453,7 +1445,7 @@
                     :loading="exposureQuotaSaving"
                     @click="handleExposureQuotaSave"
                   >
-                    {{ `{{ $t("capabilities.exposure.actions.addTenant") }}` }}
+                    {{ "{{ $t(\"capabilities.exposure.actions.addTenant\") }}" }}
                   </UButton>
                 </div>
               </div>

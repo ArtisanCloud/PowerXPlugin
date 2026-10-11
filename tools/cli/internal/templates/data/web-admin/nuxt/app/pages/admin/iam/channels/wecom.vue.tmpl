@@ -11,7 +11,7 @@
         </p>
       </div>
       <div class="flex gap-2">
-        <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
+        <UBadge color="neutral" variant="soft">{{ "{{ providerModeLabel }}" }}</UBadge>
         <UButton to="/admin/iam/channels/wecom-sync" variant="soft" color="neutral">同步中心</UButton>
         <UButton variant="outline" :loading="refreshing" @click="reloadConfig">刷新</UButton>
         <UButton color="primary" :loading="saving" :disabled="readonlyMode" @click="saveForm">保存配置</UButton>
@@ -87,7 +87,7 @@
               class="w-full rounded-md border px-3 py-2 text-sm leading-6 whitespace-pre-wrap break-all font-mono"
               style="border-color:#475569;background:#020617;color:#e2e8f0 !important;"
             >
-              {{ `{{ callbackPreview }}` }}
+              {{ "{{ callbackPreview }}" }}
             </div>
             <div class="flex justify-end">
               <UButton color="primary" variant="soft" size="sm" @click="copyCallbackUrl">复制回调 URL</UButton>

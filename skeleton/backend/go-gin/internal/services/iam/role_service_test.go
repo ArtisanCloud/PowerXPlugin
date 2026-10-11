@@ -187,6 +187,65 @@ func TestRoleService_AddMembersRejectCrossTenantMember(t *testing.T) {
 	}
 }
 
+func TestRoleServiceUUIDOnlyRolePermissionAndMemberBinding(t *testing.T) {
+	db := newRoleServiceTestDB(t)
+	ctx := context.Background()
+	svc := NewRoleService(db, NewAuditService(db), "test.plugin")
+	tenant := seedTestTenant(t, db, "tenant-uuid-only")
+	permissions := seedTestPermissions(t, db, []string{"iam.member:read", "iam.member:write"})
+	members := seedTestMembers(t, db, tenant, 2)
+
+	role, err := svc.CreateByUUID(ctx, CreateRoleUUIDInput{
+		TenantUUID:      tenant.UUID,
+		Code:            "uuid.only.role",
+		Name:            "UUID Only",
+		ScopeType:       iamm.RoleScopeTenant,
+		PermissionUUIDs: []string{permissions[0].UUID},
+		MemberUUIDs:     []string{members[0].UUID},
+	})
+	if err != nil {
+		t.Fatalf("CreateByUUID() error: %v", err)
+	}
+	if role.RoleUUID == "" || len(role.PermissionUUIDs) != 1 || role.PermissionUUIDs[0] != permissions[0].UUID || len(role.MemberUUIDs) != 1 || role.MemberUUIDs[0] != members[0].UUID {
+		t.Fatalf("CreateByUUID() returned non-UUID relation view: %#v", role)
+	}
+
+	updated, err := svc.ReplacePermissionsByUUID(ctx, ReplaceRolePermissionsUUIDInput{
+		RoleUUID:        role.RoleUUID,
+		TenantUUID:      tenant.UUID,
+		PermissionUUIDs: []string{permissions[1].UUID},
+	})
+	if err != nil {
+		t.Fatalf("ReplacePermissionsByUUID() error: %v", err)
+	}
+	if len(updated.PermissionUUIDs) != 1 || updated.PermissionUUIDs[0] != permissions[1].UUID {
+		t.Fatalf("ReplacePermissionsByUUID() = %#v", updated)
+	}
+
+	if err := svc.AddMembersByUUID(ctx, RoleMembersUUIDInput{RoleUUID: role.RoleUUID, TenantUUID: tenant.UUID, MemberUUIDs: []string{members[1].UUID}}); err != nil {
+		t.Fatalf("AddMembersByUUID() error: %v", err)
+	}
+	if err := svc.RemoveMembersByUUID(ctx, RoleMembersUUIDInput{RoleUUID: role.RoleUUID, TenantUUID: tenant.UUID, MemberUUIDs: []string{members[0].UUID}}); err != nil {
+		t.Fatalf("RemoveMembersByUUID() error: %v", err)
+	}
+
+	view, err := svc.GetByUUID(ctx, role.RoleUUID)
+	if err != nil {
+		t.Fatalf("GetByUUID() error: %v", err)
+	}
+	if len(view.MemberUUIDs) != 1 || view.MemberUUIDs[0] != members[1].UUID || len(view.PermissionUUIDs) != 1 || view.PermissionUUIDs[0] != permissions[1].UUID {
+		t.Fatalf("GetByUUID() = %#v", view)
+	}
+
+	var memberRole iamm.MemberRole
+	if err := db.Where("role_uuid = ?", role.RoleUUID).First(&memberRole).Error; err != nil {
+		t.Fatalf("load UUID member relation: %v", err)
+	}
+	if memberRole.MemberUUID != members[1].UUID || memberRole.RoleUUID != role.RoleUUID {
+		t.Fatalf("member relation must retain UUIDs: %#v", memberRole)
+	}
+}
+
 func newRoleServiceTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	basemodels.ForceSchemaForTests("")

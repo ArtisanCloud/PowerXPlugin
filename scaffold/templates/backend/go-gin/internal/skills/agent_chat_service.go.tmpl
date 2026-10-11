@@ -7,16 +7,16 @@ import (
 )
 
 type AgentChatService struct {
-	client *agent.Client
+	client agent.SessionService
 }
 
-func NewAgentChatService(client *agent.Client) *AgentChatService {
+func NewAgentChatService(client agent.SessionService) *AgentChatService {
 	return &AgentChatService{client: client}
 }
 
-func (s *AgentChatService) Send(ctx context.Context, req agent.AgentInvokeRequest) (agent.AgentInvokeResponse, error) {
+func (s *AgentChatService) Send(ctx context.Context, sessionUUID, messageUUID, idempotencyKey string) (*agent.ServiceInvocation, error) {
 	if s == nil || s.client == nil {
-		return agent.AgentInvokeResponse{}, &agent.Error{Code: agent.ErrCodeConfigInvalid, Message: "agent client is not configured"}
+		return nil, &agent.Error{Code: "AGENT_SESSION_UNAVAILABLE", ReasonCode: "AGENT_SESSION_UNAVAILABLE", StatusCode: 503}
 	}
-	return s.client.Invoke(ctx, req)
+	return s.client.InvokeSession(ctx, sessionUUID, messageUUID, idempotencyKey)
 }

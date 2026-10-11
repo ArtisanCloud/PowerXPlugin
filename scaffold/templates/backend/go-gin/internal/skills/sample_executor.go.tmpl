@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"strconv"
 	"strings"
 
@@ -64,18 +65,18 @@ func (e *TemplateSkillExecutor) create(ctx context.Context, inv runtime.PluginSk
 		return runtime.PluginSkillResult{}, err
 	}
 	return runtime.SuccessResult(inv, runtime.ResultCompleted, "模板已创建", map[string]any{
-		"action":      "create",
-		"template_id": fmt.Sprintf("%d", created.ID),
-		"template":    templateResult(created.ID, created.Name, created.Description, created.Content),
+		"action":        "create",
+		"template_uuid": created.UUID,
+		"template":      templateResult(created.UUID, created.Name, created.Description, created.Content),
 	}), nil
 }
 
 func (e *TemplateSkillExecutor) get(ctx context.Context, inv runtime.PluginSkillInvocation) (runtime.PluginSkillResult, error) {
-	id, err := templateID(inv.Input)
+	id, err := templateUUID(inv.Input)
 	if err != nil {
 		return runtime.PluginSkillResult{}, err
 	}
-	tpl, err := e.templates.GetByID(ctx, id)
+	tpl, err := e.templates.GetByUUID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return runtime.PluginSkillResult{}, runtime.NewError(runtime.ErrCodeNotFound, "template not found")
@@ -83,14 +84,14 @@ func (e *TemplateSkillExecutor) get(ctx context.Context, inv runtime.PluginSkill
 		return runtime.PluginSkillResult{}, err
 	}
 	return runtime.SuccessResult(inv, runtime.ResultCompleted, "模板查询完成", map[string]any{
-		"action":      "get",
-		"template_id": fmt.Sprintf("%d", tpl.ID),
-		"template":    templateResult(tpl.ID, tpl.Name, tpl.Description, tpl.Content),
+		"action":        "get",
+		"template_uuid": tpl.UUID,
+		"template":      templateResult(tpl.UUID, tpl.Name, tpl.Description, tpl.Content),
 	}), nil
 }
 
 func (e *TemplateSkillExecutor) update(ctx context.Context, inv runtime.PluginSkillInvocation) (runtime.PluginSkillResult, error) {
-	id, err := templateID(inv.Input)
+	id, err := templateUUID(inv.Input)
 	if err != nil {
 		return runtime.PluginSkillResult{}, err
 	}
@@ -103,14 +104,14 @@ func (e *TemplateSkillExecutor) update(ctx context.Context, inv runtime.PluginSk
 		return runtime.PluginSkillResult{}, err
 	}
 	return runtime.SuccessResult(inv, runtime.ResultCompleted, "模板已更新", map[string]any{
-		"action":      "update",
-		"template_id": fmt.Sprintf("%d", updated.ID),
-		"template":    templateResult(updated.ID, updated.Name, updated.Description, updated.Content),
+		"action":        "update",
+		"template_uuid": updated.UUID,
+		"template":      templateResult(updated.UUID, updated.Name, updated.Description, updated.Content),
 	}), nil
 }
 
 func (e *TemplateSkillExecutor) delete(ctx context.Context, inv runtime.PluginSkillInvocation) (runtime.PluginSkillResult, error) {
-	id, err := templateID(inv.Input)
+	id, err := templateUUID(inv.Input)
 	if err != nil {
 		return runtime.PluginSkillResult{}, err
 	}
@@ -118,8 +119,8 @@ func (e *TemplateSkillExecutor) delete(ctx context.Context, inv runtime.PluginSk
 		return runtime.PluginSkillResult{}, err
 	}
 	return runtime.SuccessResult(inv, runtime.ResultCompleted, "模板已删除", map[string]any{
-		"action":      "delete",
-		"template_id": fmt.Sprintf("%d", id),
+		"action":        "delete",
+		"template_uuid": id,
 	}), nil
 }
 
@@ -133,7 +134,7 @@ func (e *TemplateSkillExecutor) list(ctx context.Context, inv runtime.PluginSkil
 	}
 	items := make([]map[string]any, 0, len(res.List))
 	for _, tpl := range res.List {
-		items = append(items, templateResult(tpl.ID, tpl.Name, tpl.Description, tpl.Content))
+		items = append(items, templateResult(tpl.UUID, tpl.Name, tpl.Description, tpl.Content))
 	}
 	return runtime.SuccessResult(inv, runtime.ResultCompleted, "模板列表查询完成", map[string]any{
 		"action":    "list",
@@ -178,19 +179,13 @@ func templatePayload(input map[string]any) (templateInput, error) {
 	return out, nil
 }
 
-func templateID(input map[string]any) (uint64, error) {
-	raw := stringFromMap(input, "template_id")
-	if raw == "" {
-		raw = stringFromMap(input, "id")
+func templateUUID(input map[string]any) (string, error) {
+	raw, ok := input["template_uuid"].(string)
+	parsed, err := uuid.Parse(raw)
+	if !ok || err != nil || parsed == uuid.Nil || parsed.String() != raw {
+		return "", invalidInvocation("TEMPLATE_INVALID_UUID", "template_uuid")
 	}
-	if raw == "" {
-		return 0, invalidInvocation("template_id is required", "template_id")
-	}
-	id, err := strconv.ParseUint(raw, 10, 64)
-	if err != nil || id == 0 {
-		return 0, invalidInvocation("template_id must be a positive integer", "template_id")
-	}
-	return id, nil
+	return raw, nil
 }
 
 func invalidInvocation(message, field string) *runtime.SkillError {
@@ -200,18 +195,11 @@ func invalidInvocation(message, field string) *runtime.SkillError {
 }
 
 func stringFromMap(input map[string]any, key string) string {
-	if input == nil {
-		return ""
-	}
 	switch v := input[key].(type) {
 	case string:
 		return strings.TrimSpace(v)
-	case fmt.Stringer:
-		return strings.TrimSpace(v.String())
 	case float64:
-		if v == float64(uint64(v)) {
-			return strconv.FormatUint(uint64(v), 10)
-		}
+		return strconv.FormatFloat(v, 'f', -1, 64)
 	case int:
 		return strconv.Itoa(v)
 	case int64:
@@ -234,10 +222,10 @@ func intFromMap(input map[string]any, key string, fallback int) int {
 	return v
 }
 
-func templateResult(id uint64, name, description, content string) map[string]any {
-	detailPath := fmt.Sprintf("/templates/crud?template_id=%d", id)
+func templateResult(id string, name, description, content string) map[string]any {
+	detailPath := fmt.Sprintf("/templates/crud?template_uuid=%s", id)
 	return map[string]any{
-		"id":          id,
+		"uuid":        id,
 		"title":       name,
 		"description": description,
 		"content":     content,

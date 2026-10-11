@@ -1,0 +1,40 @@
+{
+  "schema": "powerx.plugin.knowledge.rejection-browser-acceptance/v1",
+  "page": "http://127.0.0.1:3131/powerx/knowledge-lab/30a6d654-c4c5-4a33-9806-6d66c6728187/ingestion",
+  "space_name": "dev",
+  "error_code": "KNOWLEDGE_PROFILE_UNAVAILABLE",
+  "http_status": 422,
+  "fixture_names": [
+    "dev-profile-validation-one.md",
+    "dev-profile-validation-two.md"
+  ],
+  "initial_traces": [
+    "0582266c-9c12-4265-972e-c5806229809d",
+    "003bf988-aceb-43b3-98a7-91288b0809b5"
+  ],
+  "explicit_retry_traces": [
+    "1177058c-fed3-42f6-9675-e0ec1f04a408",
+    "87bbbd9d-bc14-4e4e-b831-9e4af3a7b079"
+  ],
+  "ui": {
+    "profile_binding_explanation": true,
+    "retry_failed_enabled": true,
+    "create_task_disabled_after_failure": true,
+    "original_contents_retained": true,
+    "settings_retained": {
+      "schema": "powerx.knowledge.document-ingestion/v1",
+      "segment_mode": "unit",
+      "chunk_size": 1024,
+      "chunk_overlap": 0
+    }
+  },
+  "request_counts": {
+    "initial_submission": 2,
+    "explicit_retry": 2,
+    "automatic_retries": 0,
+    "local_knowledge": 0
+  },
+  "verification_scope": "Live browser verifies rejection display and explicit retry while Core binding remains unavailable. Successful retry after repair is not claimed. Mixed success/rejection retries covered by unit tests.",
+  "core_mutations": 0,
+  "fixture_policy": "Generated nonsensitive Markdown drafts only; Core rejected submissions before writes. No credentials or headers retained."
+}

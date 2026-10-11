@@ -5,6 +5,8 @@
 
 ## Summary
 
+Realtime Transport 是被业务模块 Runtime 使用的基础设施，不定义业务对象 local/Core adapter，也不参与业务模块 Factory 的数据源选择。
+
 将 PowerXPlugin Framework 的实时通信能力从局部 WS/SSE helper 收敛为统一 Realtime Transport：前端统一 client、后端统一 server/publish/subscribe helper、manifest/RBAC 事件治理、租户/member 作用域 builder、Agent SSE stream-through 适配，并迁移 skeleton 中现有手写 MCP SSE、能力注册页 stream、Agent Chat SSE。
 
 ## Technical Context

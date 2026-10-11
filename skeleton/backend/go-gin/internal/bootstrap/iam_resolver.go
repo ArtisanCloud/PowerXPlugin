@@ -38,5 +38,13 @@ func ValidateIAMBinding(deps *sharedapp.Deps) error {
 	if !ok || string(mode) != deps.IAMAdapterMode.String() {
 		return fmt.Errorf("framework IAM registry mode does not match resolved mode")
 	}
+	if mode == "delegated" {
+		if _, err := deps.IAMRegistry.DelegatedIdentity(); err != nil {
+			return err
+		}
+		if _, err := deps.IAMRegistry.WSIdentityRevalidator(); err != nil {
+			return err
+		}
+	}
 	return nil
 }

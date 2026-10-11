@@ -27,6 +27,8 @@ const (
 
 // Config 插件配置结构
 type Config struct {
+	LocalAI   *LocalAIConfig   `yaml:"local_ai" json:"local_ai"`
+	AICatalog *AICatalogConfig `yaml:"ai_catalog" json:"ai_catalog"`
 	// 服务配置
 	Server *ServerConfig `yaml:"server" json:"server"`
 
@@ -502,6 +504,9 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 		if configDir != "" {
 			cfg.Database.ResolvePaths(configDir)
 		}
+	}
+	if cfg.AICatalog != nil && strings.TrimSpace(cfg.AICatalog.Directory) != "" && configDir != "" && !filepath.IsAbs(cfg.AICatalog.Directory) {
+		cfg.AICatalog.Directory = filepath.Join(configDir, cfg.AICatalog.Directory)
 	}
 
 	// 同步向后兼容字段

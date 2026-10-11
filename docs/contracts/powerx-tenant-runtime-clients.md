@@ -9,7 +9,7 @@
 | `POST /tenant/invocations` | `runtime/powerx/capability.Client.Invoke` | tenant-scoped STS service token | `InvokeInput`、`InvokeResult` |
 | `GET /tenant/invocations/{traceId}` | `runtime/powerx/capability.Client.GetInvocation` | tenant-scoped STS service token | `Invocation` |
 | `POST /tenant/skills/invoke` | `runtime/powerx/skills.Client.Invoke` | tenant-scoped STS service token | `InvokeInput`、`InvokeOutput` |
-| `POST /tenant/notifications` | `runtime/powerx/notifications.Client.Create` | tenant-scoped STS service token | `CreateInput`、`Notification` |
+| `POST /notifications` | `runtime/powerx/notifications.Client.Create` | tenant-scoped STS service token | `CreateInput`、`Notification` |
 | `POST /openapi/knowledge-spaces/qa/retrieval-plan` | `runtime/powerx/knowledge.Client.RetrievalPlan` | tenant-scoped STS service token | `RetrievalPlanInput`、`RetrievalPlan` |
 | `POST /openapi/knowledge-spaces/qa/memory-snapshot` | `runtime/powerx/knowledge.Client.UpsertMemorySnapshot` | tenant-scoped STS service token | `MemorySnapshotInput`、`MemorySnapshot` |
 

@@ -1,0 +1,244 @@
+package local_knowledge
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	dto "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	localvector "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/knowledge/vectorstore"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+)
+
+var localVectorTablePattern = regexp.MustCompile(`^local_knowledge_vectors_v1_[1-9][0-9]*$`)
+
+type vectorIndexActivationInput struct {
+	EmbeddingProfileKey string `json:"embedding_profile_key" binding:"omitempty,max=128"`
+}
+
+type vectorIndexActivationResult struct {
+	Active       models.LocalKnowledgeVectorIndex `json:"active"`
+	CreatedTable bool                             `json:"created_table"`
+}
+
+func localVectorTableName(dimensions int) string {
+	return fmt.Sprintf("local_knowledge_vectors_v1_%d", dimensions)
+}
+
+func isLocalVectorTableName(table string) bool {
+	return localVectorTablePattern.MatchString(strings.TrimSpace(table))
+}
+
+func quoteLocalVectorTable(table string) (string, error) {
+	table = strings.TrimSpace(table)
+	if !isLocalVectorTableName(table) {
+		return "", fmt.Errorf("invalid local vector table")
+	}
+	return `"` + table + `"`, nil
+}
+
+func vectorLiteral(vector []float32) (string, error) {
+	if len(vector) == 0 {
+		return "", fmt.Errorf("vector is empty")
+	}
+	values := make([]string, len(vector))
+	for i, value := range vector {
+		values[i] = strconv.FormatFloat(float64(value), 'g', -1, 32)
+	}
+	return "[" + strings.Join(values, ",") + "]", nil
+}
+
+func denseIndexKey(modelKey string, dimensions int) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(modelKey)))
+	return fmt.Sprintf("dense_v1_%d_%x", dimensions, sum[:4])
+}
+
+func (h *handler) provisionLocalVectorTable(tx *gorm.DB, dimensions int) (string, bool, error) {
+	if tx == nil || tx.Dialector == nil || tx.Dialector.Name() != "postgres" {
+		return "", false, fmt.Errorf("VECTOR_STORE_POSTGRES_REQUIRED")
+	}
+	if dimensions <= 0 {
+		return "", false, fmt.Errorf("VECTOR_DIMENSIONS_INVALID")
+	}
+	table := localVectorTableName(dimensions)
+	if _, err := quoteLocalVectorTable(table); err != nil {
+		return "", false, err
+	}
+	var exists *string
+	defaultSchema := ""
+	lists := 100
+	if h != nil && h.config != nil && h.config.Database != nil {
+		defaultSchema = h.config.Database.Schema
+	}
+	if h != nil && h.config != nil && h.config.Knowledge != nil {
+		defaultSchema = h.config.Knowledge.VectorStore.PGVector.Schema
+		lists = h.config.Knowledge.VectorStore.PGVector.Lists
+	}
+	if err := tx.Raw("SELECT to_regclass(?)", defaultSchema+"."+table).Scan(&exists).Error; err != nil {
+		return "", false, err
+	}
+	created := exists == nil || strings.TrimSpace(*exists) == ""
+	ctx := context.Background()
+	if tx.Statement != nil && tx.Statement.Context != nil {
+		ctx = tx.Statement.Context
+	}
+	if err := localvector.EnsurePGVectorTable(ctx, tx, localvector.PGVectorConfig{Schema: defaultSchema, Table: table, Dimensions: dimensions, Lists: lists}, defaultSchema); err != nil {
+		return "", false, err
+	}
+	return table, created, nil
+}
+
+// deleteLocalVectorRows removes only this tenant's/space's rows from every
+// provisioned vector table referenced by the space. Tables are shared by
+// dimension, so deleting the table itself would destroy other spaces' data.
+func (h *handler) deleteLocalVectorRows(tx *gorm.DB, tenantUUID, spaceUUID, documentUUID string) error {
+	if tx == nil || tx.Dialector == nil || tx.Dialector.Name() != "postgres" {
+		return nil
+	}
+	var indexes []models.LocalKnowledgeVectorIndex
+	if err := tx.Where("tenant_uuid=? AND space_uuid=?", tenantUUID, spaceUUID).Find(&indexes).Error; err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(indexes))
+	for _, index := range indexes {
+		quoted, err := quoteLocalVectorTable(index.VectorTable)
+		if err != nil {
+			return err
+		}
+		if _, ok := seen[quoted]; ok {
+			continue
+		}
+		seen[quoted] = struct{}{}
+		query := "DELETE FROM " + quoted + " WHERE space_uuid = ?"
+		args := []any{spaceUUID}
+		if strings.TrimSpace(documentUUID) != "" {
+			query += " AND chunk_uuid IN (SELECT uuid FROM " + models.LocalKnowledgeChunk{}.TableName() + " WHERE tenant_uuid = ? AND document_uuid = ?)"
+			args = append(args, tenantUUID, documentUUID)
+		}
+		if err := tx.Exec(query, args...).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *handler) getVectorIndexStatus(c *gin.Context) {
+	tenantUUID, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var space models.LocalKnowledgeSpace
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", tenantUUID, c.Param("uuid")).First(&space).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	var indexes []models.LocalKnowledgeVectorIndex
+	if err := h.db.Where("tenant_uuid=? AND space_uuid=?", tenantUUID, space.UUID).Order("updated_at desc").Limit(200).Find(&indexes).Error; err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	var active *models.LocalKnowledgeVectorIndex
+	for i := range indexes {
+		if indexes[i].IndexKey == space.ActiveVectorIndexKey && indexes[i].Status == "active" {
+			active = &indexes[i]
+			break
+		}
+	}
+	contracts.ResponseSuccess(c, gin.H{"embedding_profile_key": space.EmbeddingProfileKey, "active_vector_index_key": space.ActiveVectorIndexKey, "active": active, "indexes": indexes})
+}
+
+func (h *handler) activateVectorIndex(c *gin.Context) {
+	tenantUUID, ok := tenant(c)
+	if !ok {
+		return
+	}
+	var input vectorIndexActivationInput
+	if c.ShouldBindJSON(&input) != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "INVALID_ARGUMENT", "INVALID_ARGUMENT")
+		return
+	}
+	modelKey := strings.TrimSpace(input.EmbeddingProfileKey)
+	if modelKey == "" {
+		modelKey = h.localEmbeddingModelKey()
+	}
+	if modelKey == "" || h.ai == nil {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "EMBEDDING_MODEL_NOT_CONFIGURED", "EMBEDDING_MODEL_NOT_CONFIGURED")
+		return
+	}
+	if h.config == nil || !h.config.LocalPGVectorEnabled() {
+		contracts.ResponseError(c, http.StatusServiceUnavailable, "LOCAL_PGVECTOR_NOT_ENABLED", "LOCAL_PGVECTOR_NOT_ENABLED")
+		return
+	}
+	if _, configured := h.localEmbeddingModel(modelKey); !configured {
+		contracts.ResponseError(c, http.StatusBadRequest, "EMBEDDING_PROFILE_NOT_CONFIGURED", "EMBEDDING_PROFILE_NOT_CONFIGURED")
+		return
+	}
+	var space models.LocalKnowledgeSpace
+	if err := h.db.Where("tenant_uuid=? AND uuid=?", tenantUUID, c.Param("uuid")).First(&space).Error; err != nil {
+		contracts.ResponseError(c, http.StatusNotFound, "SPACE_NOT_FOUND", "SPACE_NOT_FOUND")
+		return
+	}
+	probe, err := h.ai.EmbeddingInvoke(c.Request.Context(), dto.EmbeddingInvokeInput{ModelKey: modelKey, Inputs: []string{"PowerXPlugin local knowledge vector index readiness probe"}})
+	if err != nil || probe == nil || len(probe.Vectors) != 1 || len(probe.Vectors[0]) == 0 {
+		contracts.ResponseError(c, http.StatusBadGateway, "EMBEDDING_INDEX_PROBE_FAILED", "EMBEDDING_INDEX_PROBE_FAILED")
+		return
+	}
+	dimensions := len(probe.Vectors[0])
+	var result vectorIndexActivationResult
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		table, created, provisionErr := h.provisionLocalVectorTable(tx, dimensions)
+		if provisionErr != nil {
+			return provisionErr
+		}
+		indexKey := denseIndexKey(modelKey, dimensions)
+		if err := tx.Model(&models.LocalKnowledgeVectorIndex{}).Where("tenant_uuid=? AND space_uuid=? AND index_key <> ? AND status=?", tenantUUID, space.UUID, indexKey, "active").Updates(map[string]any{"status": "retired"}).Error; err != nil {
+			return err
+		}
+		var index models.LocalKnowledgeVectorIndex
+		err := tx.Where("tenant_uuid=? AND space_uuid=? AND index_key=?", tenantUUID, space.UUID, indexKey).First(&index).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		now := time.Now()
+		if err == gorm.ErrRecordNotFound {
+			index = models.LocalKnowledgeVectorIndex{TenantUUID: tenantUUID, SpaceUUID: space.UUID, IndexKey: indexKey, VectorTable: table, Dimensions: dimensions, EmbeddingProfileRef: modelKey, Status: "active", LastUsedAt: &now}
+			model, _ := h.localEmbeddingModel(modelKey)
+			index.EmbeddingProvider, index.EmbeddingModel = model.Provider, model.Model
+			if err := tx.Create(&index).Error; err != nil {
+				return err
+			}
+		} else {
+			index.VectorTable, index.Dimensions, index.EmbeddingProfileRef, index.Status, index.LastUsedAt, index.LastError = table, dimensions, modelKey, "active", &now, ""
+			if err := tx.Save(&index).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Model(&models.LocalKnowledgeSpace{}).Where("tenant_uuid=? AND uuid=?", tenantUUID, space.UUID).Updates(map[string]any{"embedding_profile_key": modelKey, "active_vector_index_key": indexKey}).Error; err != nil {
+			return err
+		}
+		result = vectorIndexActivationResult{Active: index, CreatedTable: created}
+		return nil
+	})
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "VECTOR_INDEX_ACTIVATION_FAILED", "VECTOR_INDEX_ACTIVATION_FAILED")
+		return
+	}
+	contracts.ResponseSuccess(c, result)
+}
+
+func vectorMetadata(chunk models.LocalKnowledgeChunk) (string, error) {
+	value, err := json.Marshal(map[string]any{"tenant_uuid": chunk.TenantUUID, "document_uuid": chunk.DocumentUUID})
+	if err != nil {
+		return "", err
+	}
+	return string(value), nil
+}

@@ -5,6 +5,7 @@ import (
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
 	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 )
@@ -24,7 +25,7 @@ type delegatedProxy interface {
 }
 
 type identityResolver interface {
-	ResolveIdentityContext(ctx context.Context, accessToken string) (*fwiamcontracts.IdentityContext, error)
+	fwiamcontracts.DelegatedIdentityService
 }
 
 // Adapter 将 delegated proxy 能力映射到 framework IAM 契约。
@@ -37,12 +38,14 @@ func NewBundle(proxy delegatedProxy) (fwiamadapters.Bundle, error) {
 	if proxy == nil {
 		return fwiamadapters.Bundle{}, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, "delegated auth proxy is nil")
 	}
+	if _, ok := proxy.(identityResolver); !ok {
+		return fwiamadapters.Bundle{}, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	if ready, ok := proxy.(interface{ IdentityResolverReady() bool }); ok && !ready.IdentityResolverReady() {
+		return fwiamadapters.Bundle{}, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
 	adapter := &Adapter{proxy: proxy}
-	return fwiamadapters.Bundle{
-		Directory: adapter,
-		Authz:     adapter,
-		Context:   adapter,
-	}, nil
+	return fwiamdelegated.NewBundle(adapter)
 }
 
 func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {
@@ -63,12 +66,19 @@ func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.Authorizatio
 }
 
 func (a *Adapter) ResolveIdentity(ctx context.Context, bearerToken string) (*fwiamcontracts.IdentityContext, error) {
-	if resolver, ok := a.proxy.(identityResolver); ok {
-		return resolver.ResolveIdentityContext(ctx, bearerToken)
+	return nil, fwiamerrors.New(fwiamerrors.CodeIdentityMigrationRequired, fwiamerrors.CodeIdentityMigrationRequired)
+}
+func (a *Adapter) ResolveDelegatedIdentity(ctx context.Context, in fwiamcontracts.DelegatedIdentityQuery) (*fwiamcontracts.DelegatedIdentity, error) {
+	resolver, ok := a.proxy.(identityResolver)
+	if !ok {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
 	}
-	me, err := a.proxy.MeContext(ctx, bearerToken)
-	if err != nil {
-		return nil, err
+	return resolver.ResolveDelegatedIdentity(ctx, in)
+}
+func (a *Adapter) RevalidateWSIdentity(ctx context.Context, in fwiamcontracts.WSIdentityQuery) (*fwiamcontracts.WSIdentity, error) {
+	resolver, ok := a.proxy.(fwiamcontracts.WSIdentityRevalidationService)
+	if !ok {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
 	}
-	return authproxy.IdentityContextFromMeContext(me)
+	return resolver.RevalidateWSIdentity(ctx, in)
 }

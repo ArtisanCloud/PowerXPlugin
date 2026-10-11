@@ -1,0 +1,39 @@
+{
+  "schema": "powerx.framework.iam-tenant-numeric-status-repair/v1",
+  "date": "2026-10-11",
+  "scope": "framework-go-only",
+  "upstream_contract": "PowerX/backend/internal/service/iam/tenant_directory_service.go:TenantDirectoryTenant",
+  "reproduction": {
+    "fixture": "framework/backend/go/iam/delegated/testdata/core_tenant.json",
+    "complete_fields": ["tenant_uuid", "key", "name", "status", "type", "plan"],
+    "before_fix_numeric_status": "IAM_UPSTREAM_DEPENDENCY",
+    "before_fix_get_tenant": "failed",
+    "before_fix_display_name_scope_validation": "failed"
+  },
+  "implementation": {
+    "shared_reader": "CoreClient.readTenant",
+    "wire_dto": "coreTenant",
+    "wire_status_type": "int16",
+    "model_status_type": "string",
+    "key_mapping": "key_to_TenantKey",
+    "entrypoints": ["GetTenant", "BatchResolveMembersByDisplayNames"],
+    "credential_scope_validation_retained": true
+  },
+  "verification": {
+    "module": "framework/backend/go",
+    "command": "go test -race ./iam/... -count=1",
+    "result": "passed",
+    "auth_schemes": ["ApiKey", "Bearer"],
+    "numeric_status_values": [0, 1, 2],
+    "invalid_status_cases": ["string", "fractional", "int16_overflow"],
+    "display_name_tests_use_complete_tenant_fixture": true,
+    "cross_tenant_and_upstream_failure_tests": "passed"
+  },
+  "boundaries": {
+    "aicraft_files_modified_this_repair": false,
+    "core_files_modified": false,
+    "user_services_restarted": false,
+    "sdk_release_published": false,
+    "live_browser_acceptance_performed": false
+  }
+}

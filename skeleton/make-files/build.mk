@@ -35,6 +35,23 @@ DIST_WEBADMIN_DIR   ?= $(DIST_DIR)/web-admin
 DIST_WEBADMIN_OUTPUT?= $(DIST_WEBADMIN_DIR)/.output
 DIST_VERIFY         ?= 1
 
+# Only artifact manifests receive target metadata. TARGET_ARCH is Linux-only.
+ifeq ($(BACKEND),fastapi)
+DIST_TARGET_KIND     := non-go
+DIST_TARGET_OS       := $(strip $(DIST_OS))
+DIST_TARGET_ARCH     := $(strip $(DIST_ARCH))
+else
+DIST_TARGET_KIND     := go
+ifeq ($(PLATFORM),linux)
+DIST_TARGET_OS       := linux
+DIST_TARGET_ARCH     := $(strip $(TARGET_ARCH))
+else
+DIST_TARGET_OS       := $(shell go env GOOS)
+DIST_TARGET_ARCH     := $(shell go env GOARCH)
+endif
+endif
+DIST_TARGET_SCRIPT   := scripts/manifest/dist-target.mjs
+
 # Release（完整发布包）
 RELEASE_ROOT        ?= target
 RELEASE_DIR         ?= $(RELEASE_ROOT)/$(VERSION)
@@ -111,7 +128,7 @@ build-linux: ## 构建后端（Linux amd64）
 	fi
 
 .PHONY: dist-backend
-dist-backend:
+dist-backend: dist-target-check
 	@if [ "$(PLATFORM)" = "linux" ]; then \
 	  $(MAKE) build-linux BACKEND=$(BACKEND) BUILD_DIR="$(BUILD_DIR)" TARGET_ARCH="$(TARGET_ARCH)" GO_BUILD_CACHE="$(GO_BUILD_CACHE)"; \
 	else \
@@ -212,13 +229,18 @@ check-base-standalone: frontend-build-standalone
 	  kill $$(cat .nuxt_pid) 2>/dev/null || true; rm -f .nuxt_pid
 
 # ===== 生成 dist（目录安装包，给 PowerX 的 install/local 用）=====
+.PHONY: dist-target-check
+dist-target-check:
+	@node "$(DIST_TARGET_SCRIPT)" validate --os "$(DIST_TARGET_OS)" --arch "$(DIST_TARGET_ARCH)" --backend "$(DIST_TARGET_KIND)" --platform "$(PLATFORM)" --source "$(PLUGIN_MANIFEST)" --dist-dir "$(DIST_DIR)"
+
 .PHONY: dist
-dist: plugin-yaml-check plugin-permission-declaration-check dist-backend frontend-build
+dist: dist-target-check plugin-yaml-check plugin-permission-declaration-check dist-backend frontend-build
 	@echo "==> 生成 dist 安装包目录：$(DIST_DIR)"
-	@rm -rf $(DIST_DIR)
-	@mkdir -p $(DIST_BACKEND_BIN) $(DIST_WEBADMIN_OUTPUT)
+	@rm -rf "$(DIST_DIR)"
+	@mkdir -p "$(DIST_BACKEND_BIN)" "$(DIST_WEBADMIN_OUTPUT)"
 	@echo "写入插件清单 -> $(DIST_DIR)/plugin.yaml (version=$(VERSION))"
-	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' plugin.yaml > $(DIST_DIR)/plugin.yaml
+	@awk -v ver="$(VERSION)" 'BEGIN{patched=0} /^[[:space:]]*version:[[:space:]]*/ && !patched {print "version: " ver; patched=1; next} {print} END{if(!patched) print "version: " ver}' "$(PLUGIN_MANIFEST)" > "$(DIST_DIR)/plugin.yaml"
+	@node "$(DIST_TARGET_SCRIPT)" write --manifest "$(DIST_DIR)/plugin.yaml" --source "$(PLUGIN_MANIFEST)" --os "$(DIST_TARGET_OS)" --arch "$(DIST_TARGET_ARCH)" --frontend-dir "$(FRONTEND_DIR)"
 	@if [ -d "plugin.d" ]; then \
 	  mkdir -p $(DIST_DIR)/plugin.d; \
 	  cp -R plugin.d/. $(DIST_DIR)/plugin.d/; \
@@ -231,8 +253,16 @@ dist: plugin-yaml-check plugin-permission-declaration-check dist-backend fronten
 	  mkdir -p $(DIST_DIR)/skills; \
 	  cp -R skills/. $(DIST_DIR)/skills/; \
 	fi
-	@cp $(BUILD_DIR)/plugin $(DIST_BACKEND_BIN)/
-	@if [ -f "$(BUILD_DIR)/migrate" ]; then cp $(BUILD_DIR)/migrate $(DIST_BACKEND_BIN)/; fi
+	@set -e; if [ "$(BACKEND)" = "fastapi" ]; then \
+	  mkdir -p "$(DIST_DIR)/backend"; \
+	  cp -R "$(BACKEND_DIR)/app" "$(DIST_DIR)/backend/"; \
+	  for item in requirements.txt pyproject.toml poetry.lock uv.lock alembic.ini alembic; do \
+	    if [ -e "$(BACKEND_DIR)/$$item" ]; then cp -R "$(BACKEND_DIR)/$$item" "$(DIST_DIR)/backend/"; fi; \
+	  done; \
+	else \
+	  cp "$(BUILD_DIR)/plugin" "$(DIST_BACKEND_BIN)/"; \
+	  if [ -f "$(BUILD_DIR)/migrate" ]; then cp "$(BUILD_DIR)/migrate" "$(DIST_BACKEND_BIN)/"; fi; \
+	fi
 	@if [ -d "$(FRONTEND_OUTPUT)" ] && [ -n "$$(ls -A $(FRONTEND_OUTPUT) 2>/dev/null)" ]; then \
 	  echo "复制前端构建产物 -> $(DIST_WEBADMIN_OUTPUT)"; \
 	  cp -R $(FRONTEND_OUTPUT)/. $(DIST_WEBADMIN_OUTPUT)/; \
@@ -270,6 +300,13 @@ dist: plugin-yaml-check plugin-permission-declaration-check dist-backend fronten
 	    echo "❌ dist 验证失败：缺少 $(DIST_DIR)/plugin.d/rbac.yaml"; exit 1; \
 	  fi; \
 	fi
+	@if [ "$(DIST_TARGET_KIND)" = "go" ]; then \
+	  set -- --binary "$(DIST_BACKEND_BIN)/plugin"; \
+	  if [ -f "$(DIST_BACKEND_BIN)/migrate" ]; then set -- "$$@" --binary "$(DIST_BACKEND_BIN)/migrate"; fi; \
+	else \
+	  set --; \
+	fi; \
+	node "$(DIST_TARGET_SCRIPT)" verify --manifest "$(DIST_DIR)/plugin.yaml" --os "$(DIST_TARGET_OS)" --arch "$(DIST_TARGET_ARCH)" --backend "$(DIST_TARGET_KIND)" --frontend-dir "$(FRONTEND_DIR)" "$$@"
 
 .PHONY: dist-linux
 dist-linux: ## 兼容别名：等价于 `make dist PLATFORM=linux`

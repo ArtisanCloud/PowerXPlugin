@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
+
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -101,6 +103,7 @@ func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *
 }
 
 func (c *Client) LLMInvoke(ctx context.Context, input LLMInvokeInput) (*LLMInvokeOutput, error) {
+	var traceID string
 	var raw struct {
 		Output struct {
 			Type string `json:"type"`
@@ -109,10 +112,10 @@ func (c *Client) LLMInvoke(ctx context.Context, input LLMInvokeInput) (*LLMInvok
 		Meta  map[string]any `json:"meta"`
 		Usage map[string]any `json:"usage"`
 	}
-	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/ai/llm/invoke", input, &raw); err != nil {
+	if err := c.doJSONWithHeaders(ctx, http.MethodPost, "/api/v1/ai/llm/invoke", input, &raw, func(h http.Header) { traceID = h.Get("X-Trace-ID") }); err != nil {
 		return nil, err
 	}
-	return &LLMInvokeOutput{Type: raw.Output.Type, Text: raw.Output.Text, FinishReason: stringValue(raw.Meta, "finish_reason"), Usage: raw.Usage}, nil
+	return &LLMInvokeOutput{TraceID: traceID, Type: raw.Output.Type, Text: raw.Output.Text, FinishReason: stringValue(raw.Meta, "finish_reason"), Usage: raw.Usage}, nil
 }
 
 func (c *Client) ListLLMModels(ctx context.Context, provider string) (*ListLLMModelsOutput, error) {
@@ -178,6 +181,10 @@ func (c *Client) modalInvoke(ctx context.Context, path string, input ModalInvoke
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, input any, output any) error {
+	return c.doJSONWithHeaders(ctx, method, path, input, output, nil)
+}
+
+func (c *Client) doJSONWithHeaders(ctx context.Context, method, path string, input any, output any, receiveHeaders func(http.Header)) error {
 	if c == nil || c.http == nil || c.authorization == nil {
 		return errors.New("powerx ai client is not configured")
 	}
@@ -206,12 +213,15 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input any, out
 		return err
 	}
 	defer resp.Body.Close()
+	if receiveHeaders != nil {
+		receiveHeaders(resp.Header)
+	}
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(payload)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(payload, "AI_UPSTREAM_DEPENDENCY"), Body: string(payload)}
 	}
 	if output == nil {
 		return nil
@@ -230,6 +240,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input any, out
 
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 

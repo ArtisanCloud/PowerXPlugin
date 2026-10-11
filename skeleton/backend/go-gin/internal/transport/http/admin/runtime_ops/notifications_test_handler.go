@@ -26,6 +26,8 @@ type notificationTestRequest struct {
 	Title      string `json:"title"`
 	Message    string `json:"message"`
 	TraceID    string `json:"trace_id"`
+	ForceLocal bool   `json:"force_local"`
+	ForceHost  bool   `json:"force_host"`
 }
 
 func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
@@ -38,6 +40,10 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 		var req notificationTestRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			contracts.ResponseBadRequest(c, "invalid payload")
+			return
+		}
+		if req.ForceLocal && req.ForceHost {
+			contracts.ResponseBadRequest(c, "force_local and force_host cannot both be enabled")
 			return
 		}
 
@@ -72,10 +78,6 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 		if traceID == "" {
 			traceID = "ws-notify-" + time.Now().UTC().Format("20060102T150405.000Z")
 		}
-		if !allowWSBusPublish(c, deps, topic, tenantUUID, req.MemberUUID, traceID) {
-			return
-		}
-
 		payload := gin.H{
 			"type":        "notification.test",
 			"title":       title,
@@ -86,7 +88,20 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 			"created_at":  time.Now().UTC().Format(time.RFC3339Nano),
 		}
 
-		hostCfg, useHost := resolveWSBusHostClientConfig(deps)
+		hostCfg, useHost := resolveWSBusHostClientConfigForTest(deps, req.ForceHost)
+		if req.ForceLocal {
+			useHost = false
+		}
+		if req.ForceHost && !useHost {
+			contracts.ResponseServiceUnavailable(c, "powerx host notification is not configured", nil)
+			return
+		}
+		// Plugin descriptors only govern local publishing. Host notification
+		// tests are authorized by the Core gateway and must not depend on the
+		// plugin-local events.yaml catalog.
+		if !useHost && !allowWSBusPublish(c, deps, topic, tenantUUID, req.MemberUUID, traceID) {
+			return
+		}
 		hostPublishOK := false
 		hostReachable := false
 		powerxProxy := strings.TrimSpace(os.Getenv("POWERX_PROXY"))
@@ -143,7 +158,7 @@ func NotificationTestHandler(deps *app.Deps) gin.HandlerFunc {
 }
 
 func sendHostNotification(ctx context.Context, cfg fwwsbus.HostClientConfig, req notificationTestRequest, title, message string) error {
-	endpoint, err := url.JoinPath(strings.TrimRight(cfg.BaseURL, "/"), strings.Trim(strings.TrimSpace(cfg.APIPrefix), "/"), "notifications/test")
+	endpoint, err := url.JoinPath(strings.TrimRight(cfg.BaseURL, "/"), strings.Trim(strings.TrimSpace(cfg.APIPrefix), "/"), "admin/notifications/test")
 	if err != nil {
 		return fmt.Errorf("build host notification endpoint failed: %w", err)
 	}

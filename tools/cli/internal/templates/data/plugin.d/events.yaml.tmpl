@@ -66,6 +66,12 @@ events:
       scope: tenant
       event_types: [message]
       description: 飞书同步进度事件
+    - key: _topic.knowledge.ingestion.progress
+      protocols: [ws]
+      actions: [publish, subscribe]
+      scope: tenant
+      event_types: [message]
+      description: 本地知识入库进度事件
   channels:
     - key: _channel.mcp.session
       protocols: [sse, ws]

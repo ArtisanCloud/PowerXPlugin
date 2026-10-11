@@ -13,6 +13,24 @@ func TestKnowledgeConfigDefaults(t *testing.T) {
 	}
 }
 
+func TestLocalPGVectorEnabledOnlyForLocalPostgresKnowledge(t *testing.T) {
+	t.Setenv("POWERX_PROXY", "0")
+	cfg := getDefaultConfig()
+	cfg.Database.Driver = "postgres"
+	cfg.Database.Schema = "plugin_knowledge"
+	cfg.Database.DSN = "postgres://plugin:plugin@localhost:5432/plugin?sslmode=disable"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if !cfg.LocalPGVectorEnabled() {
+		t.Fatalf("local postgres knowledge should enable pgvector: %+v", cfg.Knowledge)
+	}
+	cfg.Knowledge.Mode = "delegated"
+	if cfg.LocalPGVectorEnabled() {
+		t.Fatal("delegated knowledge must not provision plugin-local pgvector")
+	}
+}
+
 func TestKnowledgeConfigDefaultsDelegatedInProxyModeWithLocalIAM(t *testing.T) {
 	t.Setenv("POWERX_PROXY", "1")
 	cfg := getDefaultConfig()

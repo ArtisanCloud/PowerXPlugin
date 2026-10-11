@@ -1,0 +1,166 @@
+id: qwen-cn
+name: Qwen（官方国内）
+aliases: ["qwen-mainland", "tongyi-cn", "dashscope-cn", "alibaba-cn"]
+
+drivers:
+  llm: openai
+  image: qwen
+  audio_tts: qwen
+
+auth:
+  scheme: bearer
+  fields: ["api_key", "base_url"]
+  defaults:
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+modalities:
+  llm:
+    models:
+      - id: qwen-max-latest
+        label: "Qwen Max Latest"
+      - id: qwen-plus-latest
+        label: "Qwen Plus Latest"
+      - id: qwen-turbo-latest
+        label: "Qwen Turbo Latest"
+      - id: qwen-flash
+        label: "Qwen Flash"
+      - id: qwen-flash-latest
+        label: "Qwen Flash Latest"
+      - id: qwen-plus
+        label: "Qwen Plus"
+      - id: qwen-turbo
+        label: "Qwen Turbo"
+      - id: qwen-max
+        label: "Qwen Max"
+      - id: qwen-long
+        label: "Qwen Long"
+
+      - id: qwen3.5-plus
+        label: "Qwen3.5 Plus"
+      - id: qwen3.5-plus-2026-02-15
+        label: "Qwen3.5 Plus 2026-02-15"
+      - id: qwen3.5-flash
+        label: "Qwen3.5 Flash"
+      - id: qwen3.5-flash-2026-02-23
+        label: "Qwen3.5 Flash 2026-02-23"
+
+      - id: qwen3.7-plus
+        label: "Qwen3.7 Plus"
+      - id: deepseek-v4-flash
+        label: "DeepSeek V4 Flash (Bailian)"
+
+      - id: qwen3-max
+        label: "Qwen3 Max"
+      - id: qwen3-max-latest
+        label: "Qwen3 Max Latest"
+      - id: qwen3-plus
+        label: "Qwen3 Plus"
+      - id: qwen3-plus-latest
+        label: "Qwen3 Plus Latest"
+      - id: qwen3-turbo
+        label: "Qwen3 Turbo"
+      - id: qwen3-turbo-latest
+        label: "Qwen3 Turbo Latest"
+      - id: qwen3-flash
+        label: "Qwen3 Flash"
+      - id: qwen3-flash-latest
+        label: "Qwen3 Flash Latest"
+      - id: qwen3-235b-a22b
+        label: "Qwen3 235B A22B"
+      - id: qwen3-30b-a3b
+        label: "Qwen3 30B A3B"
+      - id: qwen3-32b
+        label: "Qwen3 32B"
+      - id: qwen3-14b
+        label: "Qwen3 14B"
+      - id: qwen3-8b
+        label: "Qwen3 8B"
+      - id: qwen3-4b
+        label: "Qwen3 4B"
+      - id: qwen3-1.7b
+        label: "Qwen3 1.7B"
+      - id: qwen3-0.6b
+        label: "Qwen3 0.6B"
+
+      - id: qwen3-coder-plus
+        label: "Qwen3 Coder Plus"
+      - id: qwen3-coder-flash
+        label: "Qwen3 Coder Flash"
+      - id: qwen3-coder-30b-a3b-instruct
+        label: "Qwen3 Coder 30B A3B Instruct"
+      - id: qwen2.5-coder-32b-instruct
+        label: "Qwen2.5 Coder 32B Instruct"
+      - id: qwen2.5-coder-14b-instruct
+        label: "Qwen2.5 Coder 14B Instruct"
+      - id: qwen2.5-coder-7b-instruct
+        label: "Qwen2.5 Coder 7B Instruct"
+      - id: qwen2.5-coder-3b-instruct
+        label: "Qwen2.5 Coder 3B Instruct"
+      - id: qwen2.5-coder-1.5b-instruct
+        label: "Qwen2.5 Coder 1.5B Instruct"
+
+      - id: qwen2.5-72b-instruct
+        label: "Qwen2.5 72B Instruct"
+      - id: qwen2.5-32b-instruct
+        label: "Qwen2.5 32B Instruct"
+      - id: qwen2.5-14b-instruct
+        label: "Qwen2.5 14B Instruct"
+      - id: qwen2.5-7b-instruct
+        label: "Qwen2.5 7B Instruct"
+      - id: qwen2.5-3b-instruct
+        label: "Qwen2.5 3B Instruct"
+      - id: qwen2.5-1.5b-instruct
+        label: "Qwen2.5 1.5B Instruct"
+      - id: qwen2.5-0.5b-instruct
+        label: "Qwen2.5 0.5B Instruct"
+      - id: qwen2.5-math-72b-instruct
+        label: "Qwen2.5 Math 72B Instruct"
+      - id: qwen2.5-math-7b-instruct
+        label: "Qwen2.5 Math 7B Instruct"
+      - id: qwen2.5-omni-7b
+        label: "Qwen2.5 Omni 7B"
+      - id: qwen2.5-omni-3b
+        label: "Qwen2.5 Omni 3B"
+
+      - id: qwq-plus
+        label: "QwQ Plus"
+      - id: qwq-32b
+        label: "QwQ 32B"
+      - id: "*"
+        label: "Qwen LLM (Any)"
+  image:
+    models:
+      - id: qwen-vl-max-latest
+        label: "Qwen VL Max Latest"
+      - id: qwen-vl-plus-latest
+        label: "Qwen VL Plus Latest"
+      - id: qwen-vl-max
+        label: "Qwen VL Max"
+      - id: qwen-vl-plus
+        label: "Qwen VL Plus"
+      - id: qwen3-vl-plus
+        label: "Qwen3 VL Plus"
+      - id: qwen3-vl-flash
+        label: "Qwen3 VL Flash"
+      - id: qwen2.5-vl-72b-instruct
+        label: "Qwen 2.5 VL 72B Instruct"
+      - id: "*"
+        label: "Qwen VLM (Any)"
+  audio_tts:
+    models:
+      - id: qwen-tts-latest
+        label: "Qwen TTS Latest"
+      - id: qwen-tts-1
+        label: "Qwen TTS 1"
+      - id: qwen3-tts-flash
+        label: "Qwen3 TTS Flash"
+      - id: qwen3-tts-instruct-flash
+        label: "Qwen3 TTS Instruct Flash"
+      - id: qwen3-tts-vd
+        label: "Qwen3 TTS VD"
+      - id: qwen3-tts-vc
+        label: "Qwen3 TTS VC"
+      - id: "*"
+        label: "Qwen TTS (Any)"
+  audio_asr:
+    models: []

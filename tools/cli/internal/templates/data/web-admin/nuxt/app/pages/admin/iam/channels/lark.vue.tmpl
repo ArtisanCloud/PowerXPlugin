@@ -7,7 +7,7 @@
         <p class="text-sm text-gray-600 dark:text-slate-300">配置完成后可用于扫码挑战重写与同步任务鉴权。</p>
       </div>
       <div class="flex gap-2">
-        <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
+        <UBadge color="neutral" variant="soft">{{ "{{ providerModeLabel }}" }}</UBadge>
         <UButton variant="outline" :loading="refreshing" @click="reloadConfig">刷新</UButton>
         <UButton color="primary" :loading="saving" :disabled="readonlyMode" @click="saveForm">保存配置</UButton>
       </div>

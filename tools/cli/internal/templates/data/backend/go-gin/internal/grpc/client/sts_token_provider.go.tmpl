@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
 )
 
 type PowerXSTSTokenProvider struct {
@@ -35,4 +37,18 @@ func (p *PowerXSTSTokenProvider) InvalidateToken() {
 
 func (p *PowerXSTSTokenProvider) TokenFunc() func(context.Context) (string, error) {
 	return p.Token
+}
+
+// Credential binds the backend STS provider to its bootstrap tenant, never a
+// tenant supplied in an HTTP request. Core validates the signed token itself.
+func (p *PowerXSTSTokenProvider) Credential(ctx context.Context) (hostapi.Credential, error) {
+	token, err := p.Token(ctx)
+	if err != nil {
+		return hostapi.Credential{}, err
+	}
+	tenant := p.Client.GetTenantUUID()
+	if tenant == "" {
+		return hostapi.Credential{}, fmt.Errorf("STS_TENANT_UNAVAILABLE")
+	}
+	return hostapi.Credential{Token: token, TenantUUID: tenant}, nil
 }

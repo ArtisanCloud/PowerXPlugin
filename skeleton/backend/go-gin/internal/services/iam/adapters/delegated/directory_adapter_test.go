@@ -27,6 +27,9 @@ type directoryProxyStub struct {
 func (s directoryProxyStub) MeContext(context.Context, string) (*authproxy.MeContext, error) {
 	return nil, errors.New("not used")
 }
+func (s directoryProxyStub) ResolveDelegatedIdentity(context.Context, fwiamcontracts.DelegatedIdentityQuery) (*fwiamcontracts.DelegatedIdentity, error) {
+	return nil, errors.New("not used")
+}
 func (s directoryProxyStub) GetDirectoryTenant(context.Context) (*authproxy.DirectoryTenant, error) {
 	return s.tenant, s.err
 }

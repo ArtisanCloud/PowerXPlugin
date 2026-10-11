@@ -49,20 +49,20 @@
           :sort="{ column: 'updated_at', direction: 'desc' }"
         >
           <template #status-cell="{ row }">
-            <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ `{{ row.status }}` }}</UBadge>
+            <UBadge :color="statusBadgeColor(row.status)" class="uppercase tracking-wide">{{ "{{ row.status }}" }}</UBadge>
           </template>
           <template #title-cell="{ row }">
             <div class="space-y-0.5">
-              <span class="font-medium">{{ `{{ row.title }}` }}</span>
+              <span class="font-medium">{{ "{{ row.title }}" }}</span>
               <p class="text-xs text-gray-500 dark:text-gray-400">
-                {{ `{{ row.plugin_id }}` }} · {{ `{{ row.vendor_id }}` }}
+                {{ "{{ row.plugin_id }}" }} · {{ "{{ row.vendor_id }}" }}
               </p>
             </div>
           </template>
           <template #ready_checklist_score-cell="{ row }">
             <div class="flex items-center gap-2">
               <UProgress :value="row.ready_checklist_score" :max="100" size="xs" />
-              <span class="text-xs text-gray-500">{{ `{{ row.ready_checklist_score }}` }}%</span>
+              <span class="text-xs text-gray-500">{{ "{{ row.ready_checklist_score }}" }}%</span>
             </div>
           </template>
         </UTable>
@@ -79,14 +79,14 @@
               <div class="space-y-1">
                 <div class="flex items-center gap-2">
                   <UBadge :color="statusBadgeColor(selectedListing.status)" class="uppercase tracking-wide">
-                    {{ `{{ selectedListing.status }}` }}
+                    {{ "{{ selectedListing.status }}" }}
                   </UBadge>
                   <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                    {{ `{{ selectedListing.title }}` }}
+                    {{ "{{ selectedListing.title }}" }}
                   </h2>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
-                  插件 {{ `{{ selectedListing.plugin_id }}` }} · Vendor {{ `{{ selectedListing.vendor_id }}` }}
+                  插件 {{ "{{ selectedListing.plugin_id }}" }} · Vendor {{ "{{ selectedListing.vendor_id }}" }}
                 </p>
               </div>
               <div class="flex flex-wrap gap-2">

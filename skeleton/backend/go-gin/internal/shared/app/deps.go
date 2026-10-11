@@ -62,6 +62,7 @@ type Deps struct {
 	PowerXClient         *client.PowerXServiceClient
 	CapabilityGateway    gatewayClient
 	Metadata             *fwmetadata.Client
+	CustomerRuntime      *customerfw.Runtime
 	CustomerAdmin        *customerfw.AdminClient
 	AISettings           *fwaisettings.Client
 	AI                   *powerxai.Client
@@ -90,6 +91,7 @@ type Deps struct {
 	AuthProxy            DelegatedAuthProxy
 	IAMDirectory         iamservice.IAMDirectory
 	IAMRegistry          *fwiamadapters.Registry
+	WSIdentityLifecycle  *frameworkrealtime.IdentityLifecycle
 	IAMDirectoryService  fwiamcontracts.DirectoryService
 	IAMAuthzService      fwiamcontracts.AuthzService
 	IAMContextService    fwiamcontracts.IdentityContextService

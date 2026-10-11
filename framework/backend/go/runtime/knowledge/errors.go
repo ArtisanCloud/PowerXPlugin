@@ -12,6 +12,10 @@ const (
 	CodeUnauthorized          ErrorCode = "KNOWLEDGE_UNAUTHORIZED"
 	CodeForbidden             ErrorCode = "KNOWLEDGE_FORBIDDEN"
 	CodeConflict              ErrorCode = "KNOWLEDGE_CONFLICT"
+	CodeSpaceConflict         ErrorCode = "KNOWLEDGE_SPACE_CONFLICT"
+	CodeStrategyUnavailable   ErrorCode = "KNOWLEDGE_STRATEGY_UNAVAILABLE"
+	CodeInvalidArgument       ErrorCode = "KNOWLEDGE_INVALID_ARGUMENT"
+	CodeInvalidResponse       ErrorCode = "KNOWLEDGE_INVALID_RESPONSE"
 	CodeNotFound              ErrorCode = "KNOWLEDGE_NOT_FOUND"
 	CodeRateLimited           ErrorCode = "KNOWLEDGE_RATE_LIMITED"
 	CodeUnsupportedCapability ErrorCode = "KNOWLEDGE_UNSUPPORTED_CAPABILITY"
@@ -23,14 +27,17 @@ const (
 )
 
 type Error struct {
-	Code        ErrorCode      `json:"code"`
-	Message     string         `json:"message"`
-	Provider    string         `json:"provider,omitempty"`
-	Operation   string         `json:"operation,omitempty"`
-	Retryable   bool           `json:"retryable,omitempty"`
-	TraceID     string         `json:"trace_id,omitempty"`
-	SafeDetails map[string]any `json:"safe_details,omitempty"`
-	Cause       error          `json:"-"`
+	RequestID         string         `json:"request_id,omitempty"`
+	InvocationTraceID string         `json:"invocation_trace_id,omitempty"`
+	StatusCode        int            `json:"status_code,omitempty"`
+	Code              ErrorCode      `json:"code"`
+	Message           string         `json:"message"`
+	Provider          string         `json:"provider,omitempty"`
+	Operation         string         `json:"operation,omitempty"`
+	Retryable         bool           `json:"retryable,omitempty"`
+	TraceID           string         `json:"trace_id,omitempty"`
+	SafeDetails       map[string]any `json:"safe_details,omitempty"`
+	Cause             error          `json:"-"`
 }
 
 func (e *Error) Error() string {
@@ -75,15 +82,19 @@ func HTTPStatusForCode(code ErrorCode) int {
 		return http.StatusUnauthorized
 	case CodeForbidden, CodeTenantMismatch, CodeRedactionRequired:
 		return http.StatusForbidden
-	case CodeConflict:
+	case CodeConflict, CodeSpaceConflict:
 		return http.StatusConflict
 	case CodeNotFound:
 		return http.StatusNotFound
 	case CodeRateLimited:
 		return http.StatusTooManyRequests
+	case CodeStrategyUnavailable:
+		return http.StatusPreconditionFailed
 	case CodeProviderUnavailable:
 		return http.StatusServiceUnavailable
-	case CodeUnsupportedCapability, CodeTenantRequired, CodeInvalidDocument, CodeIndexFailed:
+	case CodeInvalidResponse:
+		return http.StatusBadGateway
+	case CodeInvalidArgument, CodeUnsupportedCapability, CodeTenantRequired, CodeInvalidDocument, CodeIndexFailed:
 		return http.StatusBadRequest
 	default:
 		return http.StatusInternalServerError
@@ -96,4 +107,13 @@ func Unsupported(operation string) *Error {
 		Message:   "knowledge operation is unsupported",
 		Operation: operation,
 	}
+}
+
+// HTTPStatus preserves the status of a real Core response, including unknown codes.
+func HTTPStatus(err error) int {
+	var typed *Error
+	if errors.As(err, &typed) && typed.StatusCode != 0 {
+		return typed.StatusCode
+	}
+	return HTTPStatusForCode(CodeOf(err))
 }

@@ -72,7 +72,7 @@
               <h3
                 class="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2"
               >
-                {{ `{{ selectedPlan.plan_code }}` }}
+                {{ "{{ selectedPlan.plan_code }}" }}
                 <UBadge
                   v-if="selectedPlan.is_default"
                   color="primary"
@@ -81,9 +81,9 @@
                 >
               </h3>
               <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                类型：{{ `{{ selectedPlan.plan_type }}` }} · 币种：{{ `{{ selectedPlan.currency }}` }}
+                类型：{{ "{{ selectedPlan.plan_type }}" }} · 币种：{{ "{{\n                  selectedPlan.currency\n                }}" }}
                 <span v-if="selectedPlan.amount != null">
-                  · 金额：{{ `{{ selectedPlan.amount }}` }}</span
+                  · 金额：{{ "{{ selectedPlan.amount }}" }}</span
                 >
               </p>
               <ul
@@ -91,8 +91,8 @@
                 class="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-300"
               >
                 <li v-for="tier in selectedPlan.tiers" :key="tier.id">
-                  {{ `{{ tier.metric }}` }}: {{ `{{ tier.range_from }}` }} -
-                  {{ `{{ tier.range_to ?? "∞" }}` }} → {{ `{{ tier.unit_amount }}` }}/{{ `{{ tier.unit_name || "unit" }}` }}
+                  {{ "{{ tier.metric }}" }}: {{ "{{ tier.range_from }}" }} -
+                  {{ "{{ tier.range_to ?? \"∞\" }}" }} → {{ "{{ tier.unit_amount }}" }}/{{ "{{\n                    tier.unit_name || \"unit\"\n                  }}" }}
                 </li>
               </ul>
             </div>
@@ -140,22 +140,22 @@
                 <h3
                   class="text-base font-semibold text-gray-900 dark:text-white"
                 >
-                  License #{{ `{{ license.id }}` }}
+                  License #{{ "{{ license.id }}" }}
                 </h3>
-                <UBadge :color="licenseBadgeColor" class="uppercase">{{ `{{ license.status }}` }}</UBadge>
+                <UBadge :color="licenseBadgeColor" class="uppercase">{{ "{{\n                  license.status\n                }}" }}</UBadge>
               </div>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                计划 {{ `{{ license.plan_id }}` }} · 过期时间
-                {{ `{{ formatIso(license.expires_at) }}` }}
+                计划 {{ "{{ license.plan_id }}" }} · 过期时间
+                {{ "{{ formatIso(license.expires_at) }}" }}
               </p>
               <p
                 v-if="license.offline_until"
                 class="text-sm text-gray-500 dark:text-gray-400"
               >
-                离线可用至 {{ `{{ formatIso(license.offline_until) }}` }}
+                离线可用至 {{ "{{ formatIso(license.offline_until) }}" }}
               </p>
               <p class="text-xs break-words text-gray-400">
-                Token: {{ `{{ license.token }}` }}
+                Token: {{ "{{ license.token }}" }}
               </p>
             </div>
 

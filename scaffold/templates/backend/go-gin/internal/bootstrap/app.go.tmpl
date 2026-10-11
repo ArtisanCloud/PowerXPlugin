@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	"os"
 	"strings"
 	"sync"
@@ -170,6 +171,7 @@ func BindFrameworkIAM(deps *sharedapp.Deps, registry *fwiamadapters.Registry) er
 	}
 
 	deps.IAMRegistry = registry
+	deps.WSIdentityLifecycle = frameworkrealtime.NewIdentityLifecycle()
 	deps.IAMDirectoryService, _ = registry.Directory()
 	deps.IAMAuthzService, _ = registry.Authz()
 	deps.IAMContextService, _ = registry.IdentityContext()

@@ -2,36 +2,22 @@ package customer
 
 import (
 	"context"
-	"strings"
 
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
-	"{{ .BackendModulePath }}/internal/config"
 )
 
 type FrameworkAuthClient struct {
-	cfg       *config.Config
 	local     *LocalAuthService
-	delegated customerfw.CustomerAuthClient
 	validator customerfw.CustomerTokenValidator
 }
 
-func NewFrameworkAuthClient(cfg *config.Config, local *LocalAuthService, validator customerfw.CustomerTokenValidator) *FrameworkAuthClient {
-	var delegated customerfw.CustomerAuthClient
-	if cfg != nil && cfg.CustomerAuth != nil && strings.TrimSpace(cfg.CustomerAuth.DelegateEndpoint) != "" {
-		delegated = customerfw.NewDelegatedCustomerAuthClient(customerfw.DelegatedClientConfig{
-			BaseURL: strings.TrimRight(strings.TrimSpace(cfg.CustomerAuth.DelegateEndpoint), "/"),
-		})
-	}
-	return &FrameworkAuthClient{cfg: cfg, local: local, delegated: delegated, validator: validator}
+// NewLocalFrameworkAuthClient pins this adapter to plugin-local persistence.
+// Runtime mode selection belongs to customerfw.Runtime, not this adapter.
+func NewLocalFrameworkAuthClient(local *LocalAuthService, validator customerfw.CustomerTokenValidator) *FrameworkAuthClient {
+	return &FrameworkAuthClient{local: local, validator: validator}
 }
 
 func (c *FrameworkAuthClient) Register(ctx context.Context, input customerfw.RegisterInput) (*customerfw.AuthResult, error) {
-	if c.useDelegate() {
-		if c.delegated == nil {
-			return nil, customerfw.NewError(customerfw.CodeCustomerDelegateUnavailable, "customer auth delegate unavailable")
-		}
-		return c.delegated.Register(ctx, input)
-	}
 	if c.local == nil {
 		return nil, ErrCustomerAuthNotImplemented
 	}
@@ -61,12 +47,6 @@ func (c *FrameworkAuthClient) Register(ctx context.Context, input customerfw.Reg
 }
 
 func (c *FrameworkAuthClient) Login(ctx context.Context, input customerfw.LoginInput) (*customerfw.AuthResult, error) {
-	if c.useDelegate() {
-		if c.delegated == nil {
-			return nil, customerfw.NewError(customerfw.CodeCustomerDelegateUnavailable, "customer auth delegate unavailable")
-		}
-		return c.delegated.Login(ctx, input)
-	}
 	if c.local == nil {
 		return nil, ErrCustomerAuthNotImplemented
 	}
@@ -91,15 +71,8 @@ func (c *FrameworkAuthClient) Login(ctx context.Context, input customerfw.LoginI
 }
 
 func (c *FrameworkAuthClient) Validate(ctx context.Context, token string) (*customerfw.CustomerContext, error) {
-	if c.useDelegate() && c.delegated != nil {
-		return c.delegated.Validate(ctx, token)
-	}
 	if c.validator == nil {
 		return nil, customerfw.NewError(customerfw.CodeCustomerDelegateUnavailable, "customer token validator unavailable")
 	}
 	return c.validator.Validate(ctx, token, "")
-}
-
-func (c *FrameworkAuthClient) useDelegate() bool {
-	return c != nil && c.cfg != nil && c.cfg.CustomerAuth != nil && strings.TrimSpace(strings.ToLower(c.cfg.CustomerAuth.Mode)) == "delegate"
 }

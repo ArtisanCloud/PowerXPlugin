@@ -25,7 +25,7 @@ mappings:
       - globs: ["**/*.vue"]
         regex: "{{\\s*(?!print)(.*?)\\s*}}"
         flags: "gs"
-        replace: "{{ `{{ $1 }}` }}"
+        quoteMatch: true
       - globs: ["nuxt.config.ts", "app/**/*.ts", "i18n/**/*.json", "package.json"]
         literal: "'com.powerx.plugins.base'"
         replace: "'{{ .PluginID }}'"
@@ -42,10 +42,10 @@ mappings:
         literal: '"name": "powerxplugin-skeleton-web-admin"'
         replace: '"name": "{{ .PluginSlug }}-web-admin"'
       - globs: ["package.json"]
-        literal: '"@artisan-cloud/plugin-framework-admin": "0.0.10"'
+        literal: '"@artisan-cloud/plugin-framework-admin": "0.0.11"'
         replace: '"@artisan-cloud/plugin-framework-admin": "{{ .FrameworkAdminRef }}"'
       - globs: ["package.json"]
-        literal: '"@artisan-cloud/plugin-framework-client": "0.0.10"'
+        literal: '"@artisan-cloud/plugin-framework-client": "0.0.12"'
         replace: '"@artisan-cloud/plugin-framework-client": "{{ .FrameworkClientRef }}"'
       - globs:
           - "app/pages/agent-skill-bridge.vue"

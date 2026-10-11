@@ -47,6 +47,7 @@ type CustomerAttributes struct {
 }
 
 type customerContextKey struct{}
+type customerCredentialKey struct{}
 
 const GinCustomerContextKey = "customer_ctx"
 
@@ -57,6 +58,29 @@ func WithContext(ctx context.Context, cc *CustomerContext) context.Context {
 		ctx = context.Background()
 	}
 	return context.WithValue(ctx, customerContextKey{}, NormalizeContext(cc))
+}
+
+// WithCustomerCredential keeps the authenticated customer bearer credential in
+// request context for a delegated self-service call. It is intentionally not
+// part of CustomerContext: CustomerContext is safe to expose to application
+// code and audit output, whereas a credential never is.
+func WithCustomerCredential(ctx context.Context, token string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, customerCredentialKey{}, strings.TrimSpace(token))
+}
+
+// CustomerCredentialFromContext returns the opaque customer JWT previously
+// accepted by Authenticate. Callers must forward it only to Core's dedicated
+// customer-delegation header and must never log it.
+func CustomerCredentialFromContext(ctx context.Context) (string, bool) {
+	if ctx == nil {
+		return "", false
+	}
+	token, ok := ctx.Value(customerCredentialKey{}).(string)
+	token = strings.TrimSpace(token)
+	return token, ok && token != ""
 }
 
 func ContextFrom(ctx context.Context) (*CustomerContext, bool) {

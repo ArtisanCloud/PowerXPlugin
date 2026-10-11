@@ -1,0 +1,10 @@
+{
+  "data": {
+    "tenant_uuid": "12e90d14-53e9-4598-a6c2-7ce30d080883",
+    "key": "tenant-fixture",
+    "name": "tenant-name-fixture",
+    "status": 1,
+    "type": "company",
+    "plan": "free"
+  }
+}

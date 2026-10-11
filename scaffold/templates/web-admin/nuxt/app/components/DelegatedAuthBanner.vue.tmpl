@@ -7,19 +7,19 @@
     class="mb-4"
   >
     <template #title>
-      {{ `{{ $t("auth.delegated.bannerTitle") }}` }}
+      {{ "{{ $t(\"auth.delegated.bannerTitle\") }}" }}
     </template>
     <template #description>
       <p class="text-sm leading-relaxed">
-        {{ `{{ message || $t("auth.delegated.bannerDescription") }}` }}
+        {{ "{{ message || $t(\"auth.delegated.bannerDescription\") }}" }}
       </p>
     </template>
     <template #actions>
       <UButton size="xs" color="primary" @click="$emit('retry')">
-        {{ `{{ $t("auth.delegated.retry") }}` }}
+        {{ "{{ $t(\"auth.delegated.retry\") }}" }}
       </UButton>
       <UButton size="xs" variant="ghost" @click="$emit('dismiss')">
-        {{ `{{ $t("common.close") }}` }}
+        {{ "{{ $t(\"common.close\") }}" }}
       </UButton>
     </template>
   </UAlert>

@@ -9,6 +9,28 @@ type CustomerTokenValidator interface {
 	Validate(ctx context.Context, token string, tenantUUID string) (*CustomerContext, error)
 }
 
+// AuthClientValidator adapts a selected CustomerAuthClient to the HTTP
+// middleware validator contract. Tenant consistency is enforced by
+// Authenticate after validation; the client is never asked to trust a tenant
+// supplied by the request.
+type AuthClientValidator struct {
+	client CustomerAuthClient
+}
+
+func NewAuthClientValidator(client CustomerAuthClient) *AuthClientValidator {
+	return &AuthClientValidator{client: client}
+}
+
+func (v *AuthClientValidator) Validate(ctx context.Context, token, _ string) (*CustomerContext, error) {
+	if v == nil || v.client == nil {
+		return nil, NewError(CodeCustomerDelegateUnavailable, "customer auth client unavailable")
+	}
+	// Delegated Core validation requires the original customer JWT in its
+	// dedicated header. Retain it only in request context; never place it in
+	// CustomerContext or an outbound JSON body.
+	return v.client.Validate(WithCustomerCredential(ctx, token), token)
+}
+
 type CustomerTokenValidationResult struct {
 	TokenName string
 	Token     string

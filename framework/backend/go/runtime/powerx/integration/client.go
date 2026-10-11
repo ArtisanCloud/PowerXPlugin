@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -23,6 +24,13 @@ type Config struct {
 type TokenProvider interface {
 	Token(context.Context) (string, error)
 }
+
+// TokenProviderFunc adapts Skeleton's shared STS token manager without
+// creating a second client-credential flow for Integration Gateway calls.
+type TokenProviderFunc func(context.Context) (string, error)
+
+func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
+
 type Client struct {
 	baseURL string
 	http    *http.Client
@@ -98,6 +106,28 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	return c, nil
 }
 
+// NewClientWithTokenProvider constructs a delegated client from a
+// server-owned tenant service-token provider.
+func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *http.Client) (*Client, error) {
+	if strings.TrimSpace(cfg.BaseURL) == "" {
+		return nil, errors.New("powerx integration base_url is required")
+	}
+	if provider == nil {
+		return nil, errors.New("powerx integration token provider is required")
+	}
+	c := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), tokens: provider}
+	if httpClient != nil {
+		c.http = httpClient
+	} else {
+		timeout := cfg.Timeout
+		if timeout <= 0 {
+			timeout = 30 * time.Second
+		}
+		c.http = &http.Client{Timeout: timeout}
+	}
+	return c, nil
+}
+
 func (c *Client) ListRoutes(ctx context.Context, input ListRoutesInput) ([]RouteSummary, error) {
 	query := url.Values{}
 	if v := strings.TrimSpace(input.CapabilityID); v != "" {
@@ -159,44 +189,48 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 		req.Header.Set("Content-Type", "application/json")
 	}
 	token, err := c.tokens.Token(ctx)
-	if err != nil {
-		return err
+	if err != nil || strings.TrimSpace(token) == "" {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "INTEGRATION_UPSTREAM_DEPENDENCY"}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "INTEGRATION_UPSTREAM_DEPENDENCY"}
 	}
 	defer resp.Body.Close()
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 502, ReasonCode: "INTEGRATION_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(payload)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(payload, "INTEGRATION_UPSTREAM_DEPENDENCY"), Body: string(payload)}
 	}
 	if output == nil {
 		return nil
 	}
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
+	if err := hostcontract.DecodeData(payload, output); err != nil {
+		return &HTTPError{StatusCode: 502, ReasonCode: "INTEGRATION_UPSTREAM_DEPENDENCY"}
 	}
-	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return err
-	}
-	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return errors.New("powerx integration response missing data")
-	}
-	return json.Unmarshal(envelope.Data, output)
+	return nil
 }
 
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("powerx integration request failed: status=%d", e.StatusCode)
+	return fmt.Sprintf("powerx integration request failed: reason=%s status=%d", e.ReasonCode, e.StatusCode)
 }
 
 type staticToken string

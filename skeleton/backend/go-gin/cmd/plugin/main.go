@@ -16,6 +16,7 @@ import (
 	"time"
 
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
@@ -36,6 +37,7 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/capabilities"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbpkg "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
+	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
 	marketplacerepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/marketplace"
 	repository "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/plugin"
 	grpcclient "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/grpc/client"
@@ -58,6 +60,7 @@ import (
 	httpserver "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/server"
 	agent "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/agent"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
+	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	integrationservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/integration"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
@@ -415,6 +418,43 @@ func main() {
 		}
 	}
 
+	if providerResolver.IsDelegated() {
+		if authClient == nil {
+			logger.Fatal("IAM_ADAPTER_NOT_BOUND")
+		}
+		identityConfig := fwiamdelegated.CoreClientConfig{BaseURL: cfg.Gateway.BaseURL, PluginID: app.PluginID}
+		var identityClient *fwiamdelegated.CoreClient
+		if strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") {
+			identityClient, err = fwiamdelegated.NewCoreClientWithAPIKey(identityConfig, cfg.Gateway.APIKey)
+		} else {
+			identityConfig.Tokens = fwiamdelegated.TokenProviderFunc(grpcclient.NewPowerXSTSTokenProvider(pxc).TokenFunc())
+			identityClient, err = fwiamdelegated.NewCoreClient(identityConfig)
+		}
+		if err != nil {
+			logger.WithError(err).Fatal("IAM_ADAPTER_NOT_BOUND")
+		}
+		authClient.SetIdentityResolver(identityClient)
+	}
+
+	localCustomerService := customersvc.NewLocalAuthService(cfg, customerrepo.NewRepository(queryDB))
+	localCustomerValidator := customersvc.NewFrameworkValidator(customersvc.NewAuthenticatorFactory(cfg, nil).Build())
+	var delegatedCustomerAuth customerfw.CustomerAuthClient
+	if providerResolver.IsDelegated() {
+		delegatedCustomerAuth, err = customerfw.NewDelegatedCoreAuthClient(customerfw.DelegatedCoreAuthClientConfig{
+			BaseURL:       cfg.Gateway.BaseURL,
+			ServiceTokens: customerfw.ServiceTokenProviderFunc(grpcclient.NewPowerXSTSTokenProvider(pxc).TokenFunc()),
+		})
+		if err != nil {
+			logger.WithError(err).Fatal("CUSTOMER_AUTH_INITIALIZATION_FAILED")
+		}
+	}
+	customerRuntime, err := customerfw.NewRuntime(providerResolver.Mode(),
+		customerfw.RuntimeAdapters{Auth: customersvc.NewLocalFrameworkAuthClient(localCustomerService, localCustomerValidator)},
+		customerfw.RuntimeAdapters{Auth: delegatedCustomerAuth})
+	if err != nil {
+		logger.WithError(err).Fatal("CUSTOMER_AUTH_INITIALIZATION_FAILED")
+	}
+
 	// 初始化 EventBridge Emitter（本地/TaskBus/双写；TaskBus SDK 未就绪时可自动降级到本地 emitter）
 	eventLogger := logger.WithField("component", "event_bridge")
 	eventCfg := cfg.EventBridge
@@ -461,6 +501,7 @@ func main() {
 		CapabilityGateway:    capabilityGateway,
 		Metadata:             metadataClient,
 		CustomerAdmin:        customerAdminClient,
+		CustomerRuntime:      customerRuntime,
 		AISettings:           aiSettingsClient,
 		AI:                   aiRuntime,
 		AgentRuntime:         agentRuntime,
@@ -652,6 +693,9 @@ func main() {
 
 		cancel()
 
+		if deps.WSIdentityLifecycle != nil {
+			deps.WSIdentityLifecycle.Close()
+		}
 		if err := fwApp.Shutdown(); err != nil {
 			logger.WithError(err).Error("HTTP server shutdown error")
 		} else {

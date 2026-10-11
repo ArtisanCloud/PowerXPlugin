@@ -73,7 +73,7 @@
           <section class="w-full rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-slate-950">
             <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
               <h3 class="text-base font-semibold text-gray-900 dark:text-white">知识库类型与检索策略</h3>
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ `{{ selectedScene.description }}` }}</p>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ "{{ selectedScene.description }}" }}</p>
             </div>
             <div class="grid gap-5 p-6">
               <UFormField label="知识库类型" required>
@@ -90,7 +90,7 @@
                   @update:model-value="onKnowledgeSceneChange"
                 />
                 <template #help>
-                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ selectedScene.description }}` }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ "{{ selectedScene.description }}" }}</span>
                 </template>
               </UFormField>
 
@@ -108,29 +108,29 @@
                   @update:model-value="onStrategyPackageChange"
                 />
                 <template #help>
-                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ strategyUseCase(selectedStrategyPackage) }}` }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ "{{ strategyUseCase(selectedStrategyPackage) }}" }}</span>
                 </template>
               </UFormField>
               <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-slate-900 dark:text-gray-300">
                 <div class="font-medium text-gray-900 dark:text-white">推荐配置</div>
-                <div class="mt-2">知识库类型：{{ `{{ selectedScene.label }}` }}</div>
-                <div class="mt-1">检索策略：{{ `{{ strategyDisplayLabel(selectedStrategyPackage) }}` }}</div>
-                <div class="mt-1">策略说明：{{ `{{ strategyUseCase(selectedStrategyPackage) }}` }}</div>
-                <div class="mt-1">推荐 Profile：{{ `{{ profileLabel(selectedStrategyPackage.recommended_profile_key) }}` }}</div>
-                <div class="mt-1">适用场景：{{ `{{ selectedScene.label }}` }}</div>
-                <div class="mt-1">不适合：{{ `{{ strategyNotFor(selectedStrategyPackage) }}` }}</div>
+                <div class="mt-2">知识库类型：{{ "{{ selectedScene.label }}" }}</div>
+                <div class="mt-1">检索策略：{{ "{{ strategyDisplayLabel(selectedStrategyPackage) }}" }}</div>
+                <div class="mt-1">策略说明：{{ "{{ strategyUseCase(selectedStrategyPackage) }}" }}</div>
+                <div class="mt-1">推荐 Profile：{{ "{{ profileLabel(selectedStrategyPackage.recommended_profile_key) }}" }}</div>
+                <div class="mt-1">适用场景：{{ "{{ selectedScene.label }}" }}</div>
+                <div class="mt-1">不适合：{{ "{{ strategyNotFor(selectedStrategyPackage) }}" }}</div>
               </div>
               <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-slate-950">
                 <UAlert color="success" variant="soft" title="策略依赖校验通过" />
                 <div class="mt-4 flex flex-wrap items-center gap-2">
                   <span class="text-sm font-medium text-gray-900 dark:text-white">将启用的索引通道：</span>
-                  <UBadge v-for="channel in enabledIndexChannels" :key="channel" color="neutral" variant="soft">{{ `{{ channelLabel(channel) }}` }}</UBadge>
+                  <UBadge v-for="channel in enabledIndexChannels" :key="channel" color="neutral" variant="soft">{{ "{{ channelLabel(channel) }}" }}</UBadge>
                   <span v-if="!enabledIndexChannels.length" class="text-sm text-gray-500 dark:text-gray-400">无额外索引通道</span>
                 </div>
                 <div class="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
-                  <div class="text-gray-500 dark:text-gray-400">IngestionProfileKey：<span class="text-gray-900 dark:text-white">{{ `{{ createForm.ingestionProfileKey }}` }}</span></div>
-                  <div class="text-gray-500 dark:text-gray-400">IndexProfileKey：<span class="text-gray-900 dark:text-white">{{ `{{ createForm.indexProfileKey }}` }}</span></div>
-                  <div class="text-gray-500 dark:text-gray-400">RAGProfileKey：<span class="text-gray-900 dark:text-white">{{ `{{ createForm.ragProfileKey }}` }}</span></div>
+                  <div class="text-gray-500 dark:text-gray-400">IngestionProfileKey：<span class="text-gray-900 dark:text-white">{{ "{{ createForm.ingestionProfileKey }}" }}</span></div>
+                  <div class="text-gray-500 dark:text-gray-400">IndexProfileKey：<span class="text-gray-900 dark:text-white">{{ "{{ createForm.indexProfileKey }}" }}</span></div>
+                  <div class="text-gray-500 dark:text-gray-400">RAGProfileKey：<span class="text-gray-900 dark:text-white">{{ "{{ createForm.ragProfileKey }}" }}</span></div>
                 </div>
               </div>
             </div>
@@ -176,13 +176,13 @@
           </UFormField>
 
           <div v-if="ingestionSpace.id" class="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-slate-950">
-            <div class="font-medium text-gray-900 dark:text-white">{{ `{{ ingestionSpace.spaceName || ingestionSpace.name }}` }}</div>
+            <div class="font-medium text-gray-900 dark:text-white">{{ "{{ ingestionSpace.spaceName || ingestionSpace.name }}" }}</div>
             <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ `{{ ingestionSpace.departmentCode || ingestionSpace.department || '-' }}` }} · {{ `{{ ingestionSpace.statusLabel || ingestionSpace.status }}` }}
+              {{ "{{ ingestionSpace.departmentCode || ingestionSpace.department || '-' }}" }} · {{ "{{ ingestionSpace.statusLabel || ingestionSpace.status }}" }}
             </div>
             <div class="mt-2 flex flex-wrap gap-2">
-              <UBadge :color="modeColor" variant="soft">{{ `{{ providerModeLabel(providerState.mode || ingestionSpace.provider_mode || 'local') }}` }}</UBadge>
-              <UBadge color="neutral" variant="soft">{{ `{{ providerState.provider || ingestionSpace.provider || 'local' }}` }}</UBadge>
+              <UBadge :color="modeColor" variant="soft">{{ "{{ providerModeLabel(providerState.mode || ingestionSpace.provider_mode || 'local') }}" }}</UBadge>
+              <UBadge color="neutral" variant="soft">{{ "{{ providerState.provider || ingestionSpace.provider || 'local' }}" }}</UBadge>
             </div>
           </div>
 
@@ -244,9 +244,9 @@
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
               <UIcon name="i-heroicons-document-magnifying-glass" class="text-primary-600 dark:text-primary-300" />
-              <span class="font-semibold text-gray-900 dark:text-white">{{ `{{ resultPanelTitle }}` }}</span>
+              <span class="font-semibold text-gray-900 dark:text-white">{{ "{{ resultPanelTitle }}" }}</span>
             </div>
-            <UBadge color="neutral" variant="soft">{{ `{{ resultCountLabel }}` }}</UBadge>
+            <UBadge color="neutral" variant="soft">{{ "{{ resultCountLabel }}" }}</UBadge>
           </div>
 
           <UAlert
@@ -282,14 +282,14 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                   <tr v-for="job in pagedIngestionJobs" :key="job.jobId || job.id" class="hover:bg-gray-50 dark:hover:bg-slate-800/70">
-                    <td class="px-3 py-3 font-mono text-xs text-gray-700 dark:text-gray-200">{{ `{{ compactId(job.jobId || job.id || '-') }}` }}</td>
+                    <td class="px-3 py-3 font-mono text-xs text-gray-700 dark:text-gray-200">{{ "{{ compactId(job.jobId || job.id || '-') }}" }}</td>
                     <td class="px-3 py-3">
-                      <UBadge :color="ingestionStatusColor(job.status)" variant="soft">{{ `{{ job.status || '-' }}` }}</UBadge>
+                      <UBadge :color="ingestionStatusColor(job.status)" variant="soft">{{ "{{ job.status || '-' }}" }}</UBadge>
                     </td>
-                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ job.chunkTotal ?? '-' }}` }}</td>
-                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ formatPercent(job.chunkCoveragePct) }}` }}</td>
-                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ formatPercent(job.embeddingSuccessPct) }}` }}</td>
-                    <td class="max-w-[260px] px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{{ `{{ job.reason || job.errorCode || '-' }}` }}</td>
+                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ "{{ job.chunkTotal ?? '-' }}" }}</td>
+                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ "{{ formatPercent(job.chunkCoveragePct) }}" }}</td>
+                    <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ "{{ formatPercent(job.embeddingSuccessPct) }}" }}</td>
+                    <td class="max-w-[260px] px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{{ "{{ job.reason || job.errorCode || '-' }}" }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -303,12 +303,12 @@
               description="当你开始入库后，这里会显示入库作业与结果摘要。"
             />
             <div v-if="ingestionJobs.length" class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-              <div>显示 {{ `{{ ingestionPageStart }}` }}-{{ `{{ ingestionPageEnd }}` }} / 共 {{ `{{ ingestionJobs.length }}` }} 条</div>
+              <div>显示 {{ "{{ ingestionPageStart }}" }}-{{ "{{ ingestionPageEnd }}" }} / 共 {{ "{{ ingestionJobs.length }}" }} 条</div>
               <div class="flex items-center gap-2">
                 <span>每页</span>
                 <USelect v-model="ingestionPageSize" :items="ingestionPageSizeItems" class="w-24" />
                 <UButton size="xs" color="neutral" variant="soft" :disabled="ingestionPage <= 1" @click="ingestionPage--">上一页</UButton>
-                <span>第 {{ `{{ ingestionPage }}` }} / {{ `{{ ingestionPageCount }}` }} 页</span>
+                <span>第 {{ "{{ ingestionPage }}" }} / {{ "{{ ingestionPageCount }}" }} 页</span>
                 <UButton size="xs" color="neutral" variant="soft" :disabled="ingestionPage >= ingestionPageCount" @click="ingestionPage++">下一页</UButton>
               </div>
             </div>
@@ -318,20 +318,20 @@
               <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
                 <div class="font-medium text-gray-900 dark:text-white">当前空间配置</div>
                 <div class="mt-3 space-y-2 text-gray-600 dark:text-gray-300">
-                  <div>空间：{{ `{{ selectedSpace.spaceName || selectedSpace.name || '-' }}` }}</div>
-                  <div>状态：{{ `{{ selectedSpace.statusLabel || selectedSpace.status || '-' }}` }}</div>
-                  <div>入库 Profile：{{ `{{ selectedSpace.ingestionProfileKey || '-' }}` }}</div>
-                  <div>索引 Profile：{{ `{{ selectedSpace.indexProfileKey || '-' }}` }}</div>
-                  <div>RAG Profile：{{ `{{ selectedSpace.ragProfileKey || '-' }}` }}</div>
+                  <div>空间：{{ "{{ selectedSpace.spaceName || selectedSpace.name || '-' }}" }}</div>
+                  <div>状态：{{ "{{ selectedSpace.statusLabel || selectedSpace.status || '-' }}" }}</div>
+                  <div>入库 Profile：{{ "{{ selectedSpace.ingestionProfileKey || '-' }}" }}</div>
+                  <div>索引 Profile：{{ "{{ selectedSpace.indexProfileKey || '-' }}" }}</div>
+                  <div>RAG Profile：{{ "{{ selectedSpace.ragProfileKey || '-' }}" }}</div>
                 </div>
               </div>
               <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
                 <div class="font-medium text-gray-900 dark:text-white">策略包</div>
                 <div class="mt-3 space-y-2 text-gray-600 dark:text-gray-300">
-                  <div>当前策略：{{ `{{ strategyDisplayLabel(selectedPolicyPackage) }}` }}</div>
-                  <div>推荐 Profile：{{ `{{ profileLabel(selectedPolicyPackage.recommended_profile_key) }}` }}</div>
-                  <div>策略模板：{{ `{{ selectedSpace.policyTemplateVersionId || '-' }}` }}</div>
-                  <div>运行模式：{{ `{{ providerModeLabel(providerState.mode || String(policyPayload?.provider_mode || 'local')) }}` }}</div>
+                  <div>当前策略：{{ "{{ strategyDisplayLabel(selectedPolicyPackage) }}" }}</div>
+                  <div>推荐 Profile：{{ "{{ profileLabel(selectedPolicyPackage.recommended_profile_key) }}" }}</div>
+                  <div>策略模板：{{ "{{ selectedSpace.policyTemplateVersionId || '-' }}" }}</div>
+                  <div>运行模式：{{ "{{ providerModeLabel(providerState.mode || String(policyPayload?.provider_mode || 'local')) }}" }}</div>
                 </div>
               </div>
             </div>
@@ -339,21 +339,21 @@
               <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
                 <div class="font-medium text-gray-900 dark:text-white">索引通道依赖</div>
                 <div class="mt-3 flex flex-wrap gap-2">
-                  <UBadge v-for="channel in selectedPolicyIndexChannels" :key="channel" color="primary" variant="soft">{{ `{{ channelLabel(channel) }}` }}</UBadge>
+                  <UBadge v-for="channel in selectedPolicyIndexChannels" :key="channel" color="primary" variant="soft">{{ "{{ channelLabel(channel) }}" }}</UBadge>
                   <span v-if="!selectedPolicyIndexChannels.length" class="text-gray-500 dark:text-gray-400">无额外索引通道</span>
                 </div>
               </div>
               <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
                 <div class="font-medium text-gray-900 dark:text-white">运行时能力</div>
                 <div class="mt-3 flex flex-wrap gap-2">
-                  <UBadge v-for="item in selectedPolicyRuntimeDeps" :key="item" color="neutral" variant="soft">{{ `{{ item }}` }}</UBadge>
+                  <UBadge v-for="item in selectedPolicyRuntimeDeps" :key="item" color="neutral" variant="soft">{{ "{{ item }}" }}</UBadge>
                   <span v-if="!selectedPolicyRuntimeDeps.length" class="text-gray-500 dark:text-gray-400">无</span>
                 </div>
               </div>
               <div class="rounded-md border border-gray-200 p-4 text-sm dark:border-gray-800">
                 <div class="font-medium text-gray-900 dark:text-white">离线/索引产物</div>
                 <div class="mt-3 flex flex-wrap gap-2">
-                  <UBadge v-for="item in selectedPolicyAssetDeps" :key="item" color="neutral" variant="soft">{{ `{{ item }}` }}</UBadge>
+                  <UBadge v-for="item in selectedPolicyAssetDeps" :key="item" color="neutral" variant="soft">{{ "{{ item }}" }}</UBadge>
                   <span v-if="!selectedPolicyAssetDeps.length" class="text-gray-500 dark:text-gray-400">无</span>
                 </div>
               </div>
@@ -364,7 +364,7 @@
                   <div class="font-medium text-gray-900 dark:text-white">融合策略</div>
                   <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">底座融合策略接口返回后，这里显示策略状态、权重和说明。</div>
                 </div>
-                <UBadge color="neutral" variant="soft">{{ `{{ policyStrategies.length }}` }} 条</UBadge>
+                <UBadge color="neutral" variant="soft">{{ "{{ policyStrategies.length }}" }} 条</UBadge>
               </div>
               <div v-if="policyStrategies.length" class="mt-4 overflow-x-auto">
                 <table class="min-w-[720px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
@@ -378,10 +378,10 @@
                   </thead>
                   <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     <tr v-for="strategy in policyStrategies" :key="String(strategy.id || strategy.uuid || strategy.name || strategy.strategyId)" class="hover:bg-gray-50 dark:hover:bg-slate-800/70">
-                      <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ strategy.name || strategy.strategyName || strategy.strategyId || '-' }}` }}</td>
-                      <td class="px-3 py-3"><UBadge color="neutral" variant="soft">{{ `{{ strategy.status || '-' }}` }}</UBadge></td>
-                      <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ `{{ strategy.weight ?? strategy.scoreWeight ?? '-' }}` }}</td>
-                      <td class="px-3 py-3 text-gray-500 dark:text-gray-400">{{ `{{ strategy.description || strategy.reason || '-' }}` }}</td>
+                      <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ "{{ strategy.name || strategy.strategyName || strategy.strategyId || '-' }}" }}</td>
+                      <td class="px-3 py-3"><UBadge color="neutral" variant="soft">{{ "{{ strategy.status || '-' }}" }}</UBadge></td>
+                      <td class="px-3 py-3 text-gray-700 dark:text-gray-200">{{ "{{ strategy.weight ?? strategy.scoreWeight ?? '-' }}" }}</td>
+                      <td class="px-3 py-3 text-gray-500 dark:text-gray-400">{{ "{{ strategy.description || strategy.reason || '-' }}" }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -404,12 +404,12 @@
               class="rounded-md border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-slate-950"
             >
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="font-medium text-gray-900 dark:text-white">{{ `{{ chunk.citation?.title || chunk.document_id }}` }}</div>
-                <UBadge color="success" variant="soft">得分 {{ `{{ formatScore(chunk.score) }}` }}</UBadge>
+                <div class="font-medium text-gray-900 dark:text-white">{{ "{{ chunk.citation?.title || chunk.document_id }}" }}</div>
+                <UBadge color="success" variant="soft">得分 {{ "{{ formatScore(chunk.score) }}" }}</UBadge>
               </div>
-              <p class="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200">{{ `{{ chunk.text }}` }}</p>
+              <p class="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200">{{ "{{ chunk.text }}" }}</p>
               <div class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                {{ `{{ chunk.document_id }}` }} · {{ `{{ chunk.space_id }}` }} · {{ `{{ chunk.citation?.provider || result.provider }}` }}
+                {{ "{{ chunk.document_id }}" }} · {{ "{{ chunk.space_id }}" }} · {{ "{{ chunk.citation?.provider || result.provider }}" }}
               </div>
             </div>
           </div>
@@ -442,8 +442,8 @@
               <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">知识空间</h2>
                 <div class="flex flex-wrap items-center gap-2">
-                  <UBadge :color="modeColor" variant="soft">{{ `{{ providerModeLabel(providerState.mode || 'local') }}` }}</UBadge>
-                  <UBadge color="neutral" variant="soft">{{ `{{ spaces.length }}` }} 个空间</UBadge>
+                  <UBadge :color="modeColor" variant="soft">{{ "{{ providerModeLabel(providerState.mode || 'local') }}" }}</UBadge>
+                  <UBadge color="neutral" variant="soft">{{ "{{ spaces.length }}" }} 个空间</UBadge>
                 </div>
               </div>
               <div class="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px]">
@@ -483,34 +483,34 @@
                       </div>
                       <div>
                         <div class="flex flex-wrap items-center gap-2">
-                          <span class="font-semibold text-gray-900 dark:text-white">{{ `{{ space.spaceName || space.name }}` }}</span>
-                          <UBadge v-if="space.department" color="neutral" variant="soft">{{ `{{ space.department }}` }}</UBadge>
+                          <span class="font-semibold text-gray-900 dark:text-white">{{ "{{ space.spaceName || space.name }}" }}</span>
+                          <UBadge v-if="space.department" color="neutral" variant="soft">{{ "{{ space.department }}" }}</UBadge>
                         </div>
-                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">ID: {{ `{{ compactId(space.id) }}` }}</div>
+                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">ID: {{ "{{ compactId(space.id) }}" }}</div>
                       </div>
                     </div>
                   </td>
                   <td class="px-4 py-4">
                     <div class="space-y-1">
-                      <div class="font-medium text-gray-900 dark:text-white">{{ `{{ space.departmentCode || space.department || '-' }}` }}</div>
-                      <UBadge color="info" variant="soft">{{ `{{ spaceTypeLabel(space) }}` }}</UBadge>
+                      <div class="font-medium text-gray-900 dark:text-white">{{ "{{ space.departmentCode || space.department || '-' }}" }}</div>
+                      <UBadge color="info" variant="soft">{{ "{{ spaceTypeLabel(space) }}" }}</UBadge>
                     </div>
                   </td>
                   <td class="px-4 py-4">
-                    <UBadge :color="space.statusColor" variant="soft">{{ `{{ space.statusLabel }}` }}</UBadge>
+                    <UBadge :color="space.statusColor" variant="soft">{{ "{{ space.statusLabel }}" }}</UBadge>
                   </td>
                   <td class="px-4 py-4">
                     <div class="max-w-[260px] space-y-1 text-xs text-gray-600 dark:text-gray-300">
-                      <div>策略：{{ `{{ space.policyTemplateVersionId || '-' }}` }}</div>
-                      <div>入库：{{ `{{ space.ingestionProfileKey || '-' }}` }}</div>
-                      <div>索引：{{ `{{ space.indexProfileKey || '-' }}` }}</div>
-                      <div>RAG：{{ `{{ space.ragProfileKey || '-' }}` }}</div>
+                      <div>策略：{{ "{{ space.policyTemplateVersionId || '-' }}" }}</div>
+                      <div>入库：{{ "{{ space.ingestionProfileKey || '-' }}" }}</div>
+                      <div>索引：{{ "{{ space.indexProfileKey || '-' }}" }}</div>
+                      <div>RAG：{{ "{{ space.ragProfileKey || '-' }}" }}</div>
                     </div>
                   </td>
                   <td class="px-4 py-4 text-xs text-gray-600 dark:text-gray-300">
-                    <div>CPU {{ `{{ quotaValue(space, 'cpuCores') }}` }}</div>
-                    <div>存储 {{ `{{ quotaValue(space, 'storageGb') }}` }} GB</div>
-                    <div>并发 {{ `{{ quotaValue(space, 'ingestionConcurrency') }}` }}</div>
+                    <div>CPU {{ "{{ quotaValue(space, 'cpuCores') }}" }}</div>
+                    <div>存储 {{ "{{ quotaValue(space, 'storageGb') }}" }} GB</div>
+                    <div>并发 {{ "{{ quotaValue(space, 'ingestionConcurrency') }}" }}</div>
                   </td>
                   <td class="px-4 py-4">
                     <div class="grid grid-cols-2 justify-end gap-2">
@@ -529,7 +529,7 @@
           </div>
 
             <div v-if="!filteredSpaces.length" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-              {{ `{{ spaces.length ? "没有匹配的知识空间。" : "当前 provider 没有返回真实知识空间。" }}` }}
+              {{ "{{ spaces.length ? \"没有匹配的知识空间。\" : \"当前 provider 没有返回真实知识空间。\" }}" }}
             </div>
         </UCard>
 
@@ -552,13 +552,13 @@
               <UInput v-model="form.local_space_id" placeholder="例如：kb-after-sales" />
             </UFormField>
             <div v-if="selectedSpaceId" class="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm dark:border-gray-800 dark:bg-slate-950">
-              <div class="font-medium text-gray-900 dark:text-white">{{ `{{ selectedSpace.spaceName || selectedSpace.name }}` }}</div>
+              <div class="font-medium text-gray-900 dark:text-white">{{ "{{ selectedSpace.spaceName || selectedSpace.name }}" }}</div>
               <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {{ `{{ selectedSpace.departmentCode || selectedSpace.department || '-' }}` }} · {{ `{{ selectedSpace.statusLabel || selectedSpace.status }}` }}
+                {{ "{{ selectedSpace.departmentCode || selectedSpace.department || '-' }}" }} · {{ "{{ selectedSpace.statusLabel || selectedSpace.status }}" }}
               </div>
               <div class="mt-2 flex flex-wrap gap-2">
-                <UBadge :color="modeColor" variant="soft">{{ `{{ providerModeLabel(providerState.mode || selectedSpace.provider_mode || 'local') }}` }}</UBadge>
-                <UBadge color="neutral" variant="soft">{{ `{{ providerState.provider || selectedSpace.provider || 'local' }}` }}</UBadge>
+                <UBadge :color="modeColor" variant="soft">{{ "{{ providerModeLabel(providerState.mode || selectedSpace.provider_mode || 'local') }}" }}</UBadge>
+                <UBadge color="neutral" variant="soft">{{ "{{ providerState.provider || selectedSpace.provider || 'local' }}" }}</UBadge>
               </div>
             </div>
             <UAlert
@@ -594,27 +594,27 @@
           <template #header>
             <div class="flex items-center justify-between">
               <span class="font-semibold text-gray-900 dark:text-white">Provider 诊断</span>
-              <UBadge :color="healthColor" variant="soft">{{ `{{ healthLabel(capabilities.health) }}` }}</UBadge>
+              <UBadge :color="healthColor" variant="soft">{{ "{{ healthLabel(capabilities.health) }}" }}</UBadge>
             </div>
           </template>
           <div class="grid grid-cols-2 gap-3 text-sm">
             <div>
               <div class="text-xs text-gray-500 dark:text-gray-400">Provider</div>
-              <div class="font-semibold text-gray-900 dark:text-white">{{ `{{ providerState.provider || '-' }}` }}</div>
+              <div class="font-semibold text-gray-900 dark:text-white">{{ "{{ providerState.provider || '-' }}" }}</div>
             </div>
             <div>
               <div class="text-xs text-gray-500 dark:text-gray-400">生产模式</div>
-              <div class="font-semibold text-gray-900 dark:text-white">{{ `{{ providerState.production ? '是' : '否' }}` }}</div>
+              <div class="font-semibold text-gray-900 dark:text-white">{{ "{{ providerState.production ? '是' : '否' }}" }}</div>
             </div>
           </div>
           <div class="mt-4 flex flex-wrap gap-2">
-            <UBadge v-for="op in capabilities.operations || []" :key="op" color="info" variant="soft">{{ `{{ op }}` }}</UBadge>
+            <UBadge v-for="op in capabilities.operations || []" :key="op" color="info" variant="soft">{{ "{{ op }}" }}</UBadge>
             <span v-if="!capabilities.operations?.length" class="text-sm text-gray-500 dark:text-gray-400">暂无能力信息</span>
           </div>
           <div v-if="selectedSpace.contract_gaps?.length" class="mt-4 space-y-2">
             <div class="text-xs font-medium text-gray-500 dark:text-gray-400">协议缺口</div>
             <div v-for="gap in selectedSpace.contract_gaps" :key="gap" class="rounded-md bg-gray-50 p-2 text-xs text-gray-600 dark:bg-slate-950 dark:text-gray-300">
-              {{ `{{ gap }}` }}
+              {{ "{{ gap }}" }}
             </div>
           </div>
         </UCard>
@@ -626,12 +626,12 @@
           <div class="space-y-4">
             <div class="space-y-2">
               <div v-for="citation in result?.citations || []" :key="`${citation.document_id}:${citation.chunk_id}`" class="rounded-md bg-gray-50 p-3 text-sm dark:bg-slate-950">
-                <div class="font-medium text-gray-900 dark:text-white">{{ `{{ citation.title }}` }}</div>
-                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ `{{ citation.document_id }}` }} · {{ `{{ citation.version || '-' }}` }}</div>
+                <div class="font-medium text-gray-900 dark:text-white">{{ "{{ citation.title }}" }}</div>
+                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ "{{ citation.document_id }}" }} · {{ "{{ citation.version || '-' }}" }}</div>
               </div>
               <div v-if="!result?.citations?.length" class="text-sm text-gray-500 dark:text-gray-400">暂无引用。</div>
             </div>
-            <pre class="max-h-56 overflow-auto rounded-md bg-gray-950 p-3 text-xs text-gray-100">{{ `{{ diagnosticsText }}` }}</pre>
+            <pre class="max-h-56 overflow-auto rounded-md bg-gray-950 p-3 text-xs text-gray-100">{{ "{{ diagnosticsText }}" }}</pre>
           </div>
         </UCard>
       </div>

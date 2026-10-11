@@ -30,8 +30,8 @@ func JWTAuth(cfg authx.JWTAuthConfig) gin.HandlerFunc {
 		}
 
 		rawAuth := c.GetHeader("Authorization")
-		log.Printf("[PLUGIN-JWT-AUTH] JWTAuth failed. cfg{Issuer=%s, AcceptAudiences=%v, Optional=%v}. RawAuth=%s",
-			cfg.Issuer, cfg.AcceptAudiences, cfg.Optional, shorten(rawAuth, 40),
+		log.Printf("[PLUGIN-JWT-AUTH] JWTAuth failed. cfg{Issuer=%s, AcceptAudiences=%v, Optional=%v}. has_bearer=%t",
+			cfg.Issuer, cfg.AcceptAudiences, cfg.Optional, strings.HasPrefix(strings.ToLower(rawAuth), "bearer "),
 		)
 		if os.Getenv("POWERX_DEBUG_TRAFFIC") == "1" && strings.HasPrefix(strings.ToLower(rawAuth), "bearer ") {
 			tok := strings.TrimSpace(rawAuth[len("Bearer "):])

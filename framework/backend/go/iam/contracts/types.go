@@ -11,6 +11,7 @@ const (
 )
 
 // Tenant 为统一租户模型。
+// Core 的数字 status 显式转换为字符串，key 映射为 TenantKey。
 type Tenant struct {
 	TenantUUID string `json:"tenant_uuid"`
 	TenantKey  string `json:"tenant_key,omitempty"`
@@ -28,6 +29,8 @@ type Department struct {
 }
 
 // Member 为统一成员模型。
+// Status 保留数字状态的字符串表示（"1"=启用、"2"=停用）；
+// Core 的数字 JSON 状态由 delegated transport DTO 显式转换。
 type Member struct {
 	MemberUUID  string `json:"member_uuid"`
 	TenantUUID  string `json:"tenant_uuid"`

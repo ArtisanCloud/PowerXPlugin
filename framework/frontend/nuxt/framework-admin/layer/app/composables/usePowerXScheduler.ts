@@ -1,12 +1,12 @@
 import { computed, ref } from 'vue'
-import { usePluginApi } from '../../../../framework-client/api'
+import { usePluginApi } from '@artisan-cloud/plugin-framework-client'
 import {
   createSchedulerClient,
   type ListSchedulerJobsInput,
   type SchedulerClient,
   type SchedulerJob,
   type SchedulerJobSpec
-} from '../../../../framework-client/scheduler'
+} from '@artisan-cloud/plugin-framework-client'
 
 export interface UsePowerXSchedulerOptions {
   pluginId: string

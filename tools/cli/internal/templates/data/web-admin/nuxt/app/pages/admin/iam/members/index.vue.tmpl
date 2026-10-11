@@ -76,14 +76,14 @@ onMounted(async () => {
   <div class="p-6">
     <div class="mb-6">
       <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-        {{ `{{ t("menu.userManagement") }}` }}
+        {{ "{{ t(\"menu.userManagement\") }}" }}
       </h1>
       <p class="mt-2 text-gray-600 dark:text-gray-300">
-        {{ `{{ t("organization.description") }}` }}
+        {{ "{{ t(\"organization.description\") }}" }}
       </p>
       <div class="mt-3 flex flex-wrap items-center gap-2">
-        <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
-        <UBadge v-if="readonlyMode" color="warning" variant="soft">{{ `{{ t("providerMode.readOnly") }}` }}</UBadge>
+        <UBadge color="neutral" variant="soft">{{ "{{ providerModeLabel }}" }}</UBadge>
+        <UBadge v-if="readonlyMode" color="warning" variant="soft">{{ "{{ t(\"providerMode.readOnly\") }}" }}</UBadge>
       </div>
     </div>
 
@@ -105,7 +105,7 @@ onMounted(async () => {
           ]"
         >
           <UIcon :name="tab.icon" class="h-4 w-4" />
-          {{ `{{ tab.label }}` }}
+          {{ "{{ tab.label }}" }}
         </button>
       </div>
 

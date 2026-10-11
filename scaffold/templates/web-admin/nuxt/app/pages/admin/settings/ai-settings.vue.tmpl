@@ -3,18 +3,18 @@
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
-          <UBadge color="info" variant="soft">{{ `{{ $t("aiSettings.badge") }}` }}</UBadge>
-          <UBadge color="neutral" variant="soft">{{ `{{ providerModeLabel }}` }}</UBadge>
+          <UBadge color="info" variant="soft">{{ "{{ $t(\"aiSettings.badge\") }}" }}</UBadge>
+          <UBadge color="neutral" variant="soft">{{ "{{ providerModeLabel }}" }}</UBadge>
         </div>
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
-          {{ `{{ $t("aiSettings.title") }}` }}
+          {{ "{{ $t(\"aiSettings.title\") }}" }}
         </h1>
         <p class="max-w-3xl text-sm text-gray-600 dark:text-gray-300">
-          {{ `{{ $t("aiSettings.description") }}` }}
+          {{ "{{ $t(\"aiSettings.description\") }}" }}
         </p>
       </div>
       <UButton icon="i-heroicons-arrow-path" variant="soft" :loading="loading" @click="loadAll">
-        {{ `{{ $t("common.refresh") }}` }}
+        {{ "{{ $t(\"common.refresh\") }}" }}
       </UButton>
     </div>
 
@@ -29,60 +29,60 @@
 
     <div class="grid gap-4 md:grid-cols-3">
       <UCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ `{{ $t("aiSettings.cards.provider") }}` }}</p>
-        <p class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{{ `{{ providerMode.provider }}` }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ "{{ $t(\"aiSettings.cards.provider\") }}" }}</p>
+        <p class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{{ "{{ providerMode.provider }}" }}</p>
       </UCard>
       <UCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ `{{ $t("aiSettings.cards.delegatedAvailable") }}` }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ "{{ $t(\"aiSettings.cards.delegatedAvailable\") }}" }}</p>
         <UBadge class="mt-2" :color="providerMode.delegated_available ? 'success' : 'neutral'" variant="soft">
-          {{ `{{ providerMode.delegated_available ? $t("common.enabled") : $t("common.disabled") }}` }}
+          {{ "{{ providerMode.delegated_available ? $t(\"common.enabled\") : $t(\"common.disabled\") }}" }}
         </UBadge>
       </UCard>
       <UCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ `{{ $t("aiSettings.cards.health") }}` }}</p>
-        <p class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{{ `{{ healthLabel }}` }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ "{{ $t(\"aiSettings.cards.health\") }}" }}</p>
+        <p class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{{ "{{ healthLabel }}" }}</p>
       </UCard>
     </div>
 
     <div class="grid gap-4 xl:grid-cols-2">
       <UCard>
         <template #header>
-          <h2 class="text-base font-semibold">{{ `{{ $t("aiSettings.sections.summary") }}` }}</h2>
+          <h2 class="text-base font-semibold">{{ "{{ $t(\"aiSettings.sections.summary\") }}" }}</h2>
         </template>
         <dl class="grid gap-3 sm:grid-cols-2">
           <div v-for="item in summaryEntries" :key="item.key" class="rounded-md border border-gray-200 p-3 dark:border-gray-800">
-            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ item.key }}` }}</dt>
-            <dd class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ `{{ item.value }}` }}</dd>
+            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ "{{ item.key }}" }}</dt>
+            <dd class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ "{{ item.value }}" }}</dd>
           </div>
         </dl>
-        <p v-if="!summaryEntries.length" class="text-sm text-gray-500 dark:text-gray-400">{{ `{{ $t("aiSettings.empty") }}` }}</p>
+        <p v-if="!summaryEntries.length" class="text-sm text-gray-500 dark:text-gray-400">{{ "{{ $t(\"aiSettings.empty\") }}" }}</p>
       </UCard>
 
       <UCard>
         <template #header>
-          <h2 class="text-base font-semibold">{{ `{{ $t("aiSettings.sections.routing") }}` }}</h2>
+          <h2 class="text-base font-semibold">{{ "{{ $t(\"aiSettings.sections.routing\") }}" }}</h2>
         </template>
         <dl class="grid gap-3 sm:grid-cols-2">
           <div v-for="item in routingEntries" :key="item.key" class="rounded-md border border-gray-200 p-3 dark:border-gray-800">
-            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ `{{ item.key }}` }}</dt>
-            <dd class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ `{{ item.value }}` }}</dd>
+            <dt class="text-xs text-gray-500 dark:text-gray-400">{{ "{{ item.key }}" }}</dt>
+            <dd class="mt-1 break-all text-sm font-medium text-gray-900 dark:text-white">{{ "{{ item.value }}" }}</dd>
           </div>
         </dl>
-        <p v-if="!routingEntries.length" class="text-sm text-gray-500 dark:text-gray-400">{{ `{{ $t("aiSettings.empty") }}` }}</p>
+        <p v-if="!routingEntries.length" class="text-sm text-gray-500 dark:text-gray-400">{{ "{{ $t(\"aiSettings.empty\") }}" }}</p>
       </UCard>
     </div>
 
     <div class="grid gap-4 xl:grid-cols-2">
       <UCard>
         <template #header>
-          <h2 class="text-base font-semibold">{{ `{{ $t("aiSettings.sections.providers") }}` }}</h2>
+          <h2 class="text-base font-semibold">{{ "{{ $t(\"aiSettings.sections.providers\") }}" }}</h2>
         </template>
         <UTable :data="providerProfiles" :columns="profileColumns" :loading="loading" />
       </UCard>
 
       <UCard>
         <template #header>
-          <h2 class="text-base font-semibold">{{ `{{ $t("aiSettings.sections.models") }}` }}</h2>
+          <h2 class="text-base font-semibold">{{ "{{ $t(\"aiSettings.sections.models\") }}" }}</h2>
         </template>
         <UTable :data="modelProfiles" :columns="profileColumns" :loading="loading" />
       </UCard>

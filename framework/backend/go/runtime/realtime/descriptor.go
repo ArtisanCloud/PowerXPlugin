@@ -30,6 +30,7 @@ const (
 // Keys are declaration templates, for example
 // _topic.job.tenant_{{tenant_uuid}}.member_{{member_uuid}}.
 type Descriptor struct {
+	Permission  string     `yaml:"permission,omitempty" json:"permission,omitempty"`
 	Key         string     `yaml:"key" json:"key"`
 	Protocols   []Protocol `yaml:"protocols" json:"protocols"`
 	Actions     []Action   `yaml:"actions" json:"actions"`
@@ -128,12 +129,13 @@ func validDescriptorKey(key string) bool {
 
 // PermissionDecision is a deterministic, transport-neutral authorization result.
 type PermissionDecision struct {
-	Allowed  bool   `json:"allowed"`
-	Action   Action `json:"action"`
-	Key      string `json:"key"`
-	Reason   string `json:"reason"`
-	Resource string `json:"resource"`
-	TraceID  string `json:"trace_id,omitempty"`
+	RequiredPermission string `json:"required_permission,omitempty"`
+	Allowed            bool   `json:"allowed"`
+	Action             Action `json:"action"`
+	Key                string `json:"key"`
+	Reason             string `json:"reason"`
+	Resource           string `json:"resource"`
+	TraceID            string `json:"trace_id,omitempty"`
 }
 
 // Decide returns deny-by-default authorization for a declared realtime action.
@@ -170,6 +172,7 @@ func Decide(descriptors []Descriptor, action Action, key string, protocol Protoc
 			return decision
 		}
 		decision.Allowed = true
+		decision.RequiredPermission = descriptor.Permission
 		decision.Reason = "REALTIME_ALLOWED"
 		return decision
 	}

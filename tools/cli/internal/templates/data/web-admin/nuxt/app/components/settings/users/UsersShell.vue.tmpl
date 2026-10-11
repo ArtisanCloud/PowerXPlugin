@@ -48,7 +48,7 @@ onMounted(async () => {
         name="i-heroicons-arrow-path"
         class="animate-spin h-8 w-8 text-blue-600"
       />
-      <span class="ml-3">{{ `{{ $t("common.loading") }}` }}</span>
+      <span class="ml-3">{{ "{{ $t(\"common.loading\") }}" }}</span>
     </div>
 
     <!-- 错误状态 -->
@@ -61,9 +61,9 @@ onMounted(async () => {
           name="i-heroicons-exclamation-triangle"
           class="h-5 w-5 text-red-600 dark:text-red-200"
         />
-        <span class="ml-2 text-red-800 font-medium dark:text-red-200">{{ `{{ $t("common.error") }}` }}</span>
+        <span class="ml-2 text-red-800 font-medium dark:text-red-200">{{ "{{\n          $t(\"common.error\")\n        }}" }}</span>
       </div>
-      <p class="mt-2 text-red-700 dark:text-red-200/80">{{ `{{ error }}` }}</p>
+      <p class="mt-2 text-red-700 dark:text-red-200/80">{{ "{{ error }}" }}</p>
       <UButton
         class="mt-3"
         color="primary"
@@ -71,7 +71,7 @@ onMounted(async () => {
         size="sm"
         @click="userStore.fetchUserContext"
       >
-        {{ `{{ $t("common.retry") }}` }}
+        {{ "{{ $t(\"common.retry\") }}" }}
       </UButton>
     </div>
 

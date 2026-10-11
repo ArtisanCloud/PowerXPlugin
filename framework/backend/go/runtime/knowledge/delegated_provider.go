@@ -14,6 +14,16 @@ type DelegatedClient interface {
 	GetKnowledgeIndexJob(ctx context.Context, input IndexJobQuery) (*KnowledgeIndexJob, error)
 }
 
+type SpaceProvisioningDelegatedClient interface {
+	CreateKnowledgeSpace(context.Context, CreateSpaceInput) (*CreatedSpace, error)
+}
+
+// SpaceProvisioningProvider is an explicit extension; Local providers do not
+// acquire Core provisioning or a fallback merely by implementing KnowledgeProvider.
+type SpaceProvisioningProvider interface {
+	CreateSpace(context.Context, CreateSpaceInput) (*CreatedSpace, error)
+}
+
 type CatalogDelegatedClient interface {
 	GetKnowledgeCatalog(ctx context.Context) (*KnowledgeCatalog, error)
 }
@@ -126,7 +136,7 @@ func (p *DelegatedProvider) UpsertDocument(ctx context.Context, document Knowled
 	if p.client == nil {
 		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationUpsert, Retryable: true}
 	}
-	document, err := ValidateDocument(document)
+	document, err := ValidateHostDocument(document)
 	if err != nil {
 		return nil, err
 	}
@@ -207,4 +217,46 @@ func (p *DelegatedProvider) mapError(operation, traceID string, err error) error
 		return &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider timeout", Provider: p.name, Operation: operation, Retryable: true, TraceID: traceID, Cause: err}
 	}
 	return &Error{Code: CodeProviderUnavailable, Message: RedactString(err.Error()), Provider: p.name, Operation: operation, Retryable: true, TraceID: traceID, Cause: err}
+}
+
+func (p *DelegatedProvider) CreateSpace(ctx context.Context, input CreateSpaceInput) (*CreatedSpace, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationCreate); err != nil {
+		return nil, err
+	}
+	client, ok := p.client.(SpaceProvisioningDelegatedClient)
+	if !ok || client == nil {
+		return nil, Unsupported(OperationCreate)
+	}
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+	callCtx, cancel := p.withTimeout(ctx)
+	defer cancel()
+	item, err := client.CreateKnowledgeSpace(callCtx, input)
+	if err != nil {
+		return nil, p.mapError(OperationCreate, "", err)
+	}
+	if err := ValidateCreatedSpace(item); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
+func (p *DelegatedProvider) GetIndexJobChunks(ctx context.Context, input IndexJobQuery) ([]IndexJobChunk, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationUpsert); err != nil {
+		return nil, err
+	}
+	client, ok := p.client.(interface {
+		GetKnowledgeIndexJobChunks(context.Context, IndexJobQuery) ([]IndexJobChunk, error)
+	})
+	if !ok {
+		return nil, Unsupported(OperationUpsert)
+	}
+	callCtx, cancel := p.withTimeout(ctx)
+	defer cancel()
+	chunks, err := client.GetKnowledgeIndexJobChunks(callCtx, input)
+	if err != nil {
+		return nil, p.mapError(OperationUpsert, input.TraceID, err)
+	}
+	return chunks, nil
 }

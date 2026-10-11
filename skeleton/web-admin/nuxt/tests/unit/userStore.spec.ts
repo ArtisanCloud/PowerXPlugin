@@ -48,6 +48,7 @@ const createSampleContext = () => ({
 
 describe("useUserStore", () => {
   beforeEach(() => {
+    vi.stubGlobal("useRuntimeConfig", () => ({ public: { insidePowerX: false } }));
     vi.clearAllMocks();
     setActivePinia(createPinia());
     getUserContextMock.mockReset();
@@ -120,4 +121,17 @@ describe("useUserStore", () => {
     expect(store.isLoading).toBe(false);
     expect(persistTenantUUIDMock).toHaveBeenCalledWith(null);
   });
+  it('discard_context_returned_after_local_state_is_cleared', async () => {
+    let finish!: (context: any) => void;
+    getUserContextMock.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    const { useUserStore } = await import('~/stores/user'); const store = useUserStore();
+    const pending = expect(store.fetchUserContext()).rejects.toMatchObject({ code: 'AUTH_SESSION_CHANGED' });
+    store.clearUserState(); finish(createSampleContext()); await pending; expect(store.context).toBeNull();
+  });
+  it('host_commit_uses_authoritative_permission_codes_without_persistence', async () => {
+    const { useUserStore } = await import('~/stores/user'); const store = useUserStore();
+    const context = { ...createSampleContext(), permission_codes: ['base.templates.read'] };
+    store.commitHostContext(context); expect(store.context?.permissions).toEqual(['base.templates.read']); expect(persistTenantUUIDMock).not.toHaveBeenCalled();
+  });
+
 });

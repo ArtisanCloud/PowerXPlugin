@@ -782,8 +782,6 @@
       "confirmPassword": "确认密码"
     },
     "hasAccount": "已经有账号？",
-    "signInNow": "立即登录",
-    "backToLogin": "返回登录",
     "reading": {
       "complete": "已阅读完整内容",
       "scroll": "请滚动到底部",
@@ -1137,7 +1135,6 @@
         "rpm": "每分钟请求数",
         "burst": "突发上限",
         "concurrency": "并发数",
-        "tenant": "租户",
         "tenantId": "租户 ID",
         "tenantName": "租户名称",
         "quota": "额度",
@@ -1401,5 +1398,16 @@
     "noData": "暂无数据",
     "networkError": "网络异常，请检查连接",
     "templateCreated": "模板创建成功"
+  },
+  "hostSession": {
+    "required": "PowerX 会话不可用，请回到宿主重新登录或重新同步。",
+    "bridgeUnavailable": "PowerX 桥接 v2 未就绪，请确认宿主与插件版本并重新加载。",
+    "contextFailed": "当前用户身份验证失败，请回到 PowerX 检查会话与权限。",
+    "requestRejected": "请求未授权",
+    "identityProofRejected": "插件请求的身份票据或 WS 复核凭证缺失、无效或已过期。请检查 Core 与插件后端的身份链路。",
+    "serviceCredentialRejected": "插件后端的服务凭据失效。请检查 STS 或 API Key 配置与授权。",
+    "upstreamUnavailable": "身份服务暂时不可用，请检查 Core 依赖状态后重试。",
+    "requestFailed": "请求的身份验证失败。请检查接口错误码与 Trace；当前会话保持不变。",
+    "loading": "正在同步并验证 PowerX 会话…"
   }
 }

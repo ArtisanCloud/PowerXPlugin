@@ -1,3 +1,4 @@
+import { isPowerXEmbedded, PowerXHostSessionError, type PowerXHostSessionSnapshot } from '@artisan-cloud/plugin-framework-client';
 import { useApiClient } from "../_client";
 import type { ApiResponse } from "../types/types";
 import { useAuth } from "~/composables/useAuth";
@@ -15,6 +16,7 @@ export interface UserContextData {
   members: ContextMember[];
   roles?: string[];
   permissions?: string[];
+  permission_codes?: string[];
   capabilities?: UserContextCapabilities;
 }
 
@@ -64,7 +66,7 @@ export const useMeService = () => {
     : ["/admin/user/auth"];
 
   const withAuthToken = async (options: Record<string, any> = {}) => {
-    if (!process.client) return options;
+    if (!process.client || isPowerXEmbedded(runtimeConfig.public?.insidePowerX)) return options;
     const explicitToken = String(options.authToken || "").trim();
     const refreshed = explicitToken ? "" : await auth.ensureFreshToken?.();
     const token = String(explicitToken || refreshed || auth.getToken?.() || "").trim();
@@ -126,7 +128,7 @@ export const useMeService = () => {
      * 获取当前用户的上下文信息
      * 包含用户基本信息、当前租户、所属成员信息等
      */
-    getMyContext: (options?: { authToken?: string; tenantUuid?: string }) => {
+    getMyContext: (options?: { authToken?: string; tenantUuid?: string; hostSnapshot?: PowerXHostSessionSnapshot; signal?: AbortSignal }) => {
       return requestWithFallback<ApiResponse<UserContextData>>(
         "get",
         "/me/context",
@@ -140,6 +142,7 @@ export const useMeService = () => {
      * @param tenantUuid 要切换到的租户 UUID
      */
     switchTenant: (tenantUuid: string) => {
+      if (isPowerXEmbedded(runtimeConfig.public?.insidePowerX)) throw new PowerXHostSessionError('AUTH_SESSION_HOST_MANAGED');
       return requestWithFallback<ApiResponse<UserContextData>>(
         "post",
         "/me/switch-tenant",

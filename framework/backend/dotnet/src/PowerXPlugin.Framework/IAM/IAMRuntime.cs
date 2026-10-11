@@ -46,7 +46,7 @@ public static class IAMRuntime
     }
 }
 
-public sealed class IAMAdapterException : Exception
+public class IAMAdapterException : Exception
 {
     public string Code { get; }
 

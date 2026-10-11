@@ -1,4 +1,52 @@
 {
+  "knowledgeTaskProcess": {
+    "title": "Task processing",
+    "counts": {
+      "total": "Total",
+      "ready": "Ready",
+      "waiting": "Waiting",
+      "running": "Processing",
+      "succeeded": "Succeeded",
+      "failed": "Failed"
+    },
+    "phases": {
+      "ready": "Ready",
+      "reading": "Reading file",
+      "submitting": "Submitting",
+      "accepted": "Accepted",
+      "queued": "Queued",
+      "running": "Running",
+      "succeeded": "Completed",
+      "failed": "Failed",
+      "blocked": "Blocked",
+      "unknown": "Unavailable"
+    },
+    "ended": "{count} / {total} tasks reached a terminal state",
+    "progress": "Execution progress {count}%",
+    "runningWithoutPercent": "Processing; the backend has not provided a percentage.",
+    "refreshStatus": "Refresh status",
+    "empty": "No tasks from this submission.",
+    "unavailable": "Task status cannot be loaded. Review the error and refresh to retry.",
+    "traceDetails": "Trace details",
+    "viewTask": "View task",
+    "loadChunks": "Load chunks",
+    "chunksPending": "Saved chunks are available after the task succeeds.",
+    "chunks": "{count} chunks",
+    "duration": {
+      "request": "Request duration: {value}",
+      "execution": "Execution duration: {value}"
+    },
+    "milliseconds": "{count} ms",
+    "seconds": "{count} s",
+    "modes": {
+      "lexical_chunks": "Text chunks / lexical index",
+      "local_vector": "Local vector index",
+      "other": "Other index mode"
+    },
+    "acceptanceHint": "Acceptance confirms submission only. View and refresh the task to read its backend terminal state.",
+    "manualRefreshHint": "Refresh to read the latest backend state. Live progress is not connected.",
+    "historyScope": "This page shows the current submission. Full document and task history is not connected."
+  },
   "localIntelligence": {
     "category": "Agents",
     "agents": "Agent management",
@@ -2577,7 +2625,7 @@
       "requestFailed": "Knowledge request failed ({code}). Check the API status and retry.",
       "accepted": "Submitted; awaiting Core indexing",
       "ingestionSettingsUnavailable": "The PowerX document API currently accepts Markdown/plain text only, without ingestion or segmentation snapshots. Strategy and segmentation configuration is unavailable and is not submitted. Acceptance does not mean indexing is complete; this integration does not expose ingestion progress events.",
-      "documentsUnavailable": "The PowerX delegated API does not expose document lists, ingestion history or chunk inspection. These records cannot be loaded.",
+      "documentsUnavailable": "The PowerX delegated API does not expose full document lists or ingestion history. Configuration and chunk snapshots are available for submitted jobs.",
       "sourcesUnavailable": "The PowerX delegated API does not expose connector catalogs or source creation.",
       "strategyUnavailable": "PowerX strategy catalogs can be read, but space strategy details and updates are not exposed.",
       "submittedJobs": "Jobs from this submission (not full ingestion history)",
@@ -2592,8 +2640,43 @@
       "uploadFilesHelp": "Supports TXT and Markdown. Select multiple files; each file is submitted separately to PowerX.",
       "snapshotBlockedTitle": "Configuration cannot yet be submitted to PowerX",
       "snapshotBlockedDescription": "The strategy and segmentation settings above are a draft for this ingestion. The PowerX document API does not yet accept ingestion snapshots, so this task cannot be submitted. Settings will not be discarded to upload content alone. Core must expose snapshot acceptance, validation, execution and readback before retrying.",
+      "boundStrategy": "Use the space-bound strategy",
+      "boundProfile": "Use the space-bound published Profile",
+      "boundStrategyHint": "This task uses the strategy and Profiles bound to the space. Core freezes their UUIDs and versions. Task-level strategy overrides are unsupported.",
+      "lexicalHint": "TXT/Markdown uses persisted chunks and a lexical index. Semantic segmentation, PDF pages and independent processor/masking Profiles are unsupported.",
+      "hostSeparatorsHint": "One literal separator per line. \\n and \\t are converted to newline and tab. Empty input remains an empty array.",
+      "invalidSegmentation": "Check length, overlap, format, mode and matching anchors. TXT/Markdown does not support page priority.",
+      "snapshotDetails": "Configuration snapshot and technical details",
+      "traceId": "Trace ID",
+      "profileUnavailableTitle": "Profile unavailable for space “{space}”",
+      "profileUnavailableHint": "This space has no valid published Profile binding, or its UUID/version is unavailable. Ask PowerX Core to repair the binding, then retry the failed files. File contents and task settings remain in this page; no other Profile is substituted.",
+      "retryFailed": "Retry failed files ({count})",
+      "ingestionErrors": {
+        "KNOWLEDGE_PROFILE_UNAVAILABLE": "The published Profile binding for space “{space}” is unavailable. Ask PowerX Core to repair it before retrying.",
+        "KNOWLEDGE_UNSUPPORTED_INGESTION_SETTING": "PowerX does not support these ingestion settings. Go back and update them before retrying.",
+        "KNOWLEDGE_INVALID_ARGUMENT": "PowerX rejected the parameters. Go back and review the settings before retrying.",
+        "KNOWLEDGE_INVALID_DOCUMENT": "The document parameters do not meet PowerX requirements. Check its content and format before retrying.",
+        "KNOWLEDGE_FORBIDDEN": "The service credential lacks document ingestion authorization. Repair the grant before retrying.",
+        "KNOWLEDGE_UNAUTHORIZED": "The PowerX service credential is unavailable. Restore it before retrying.",
+        "KNOWLEDGE_SPACE_NOT_FOUND": "The service tenant cannot access space “{space}”. Check the space and tenant before retrying."
+      },
       "snapshotDraftTitle": "Task configuration draft",
-      "snapshotDraftDescription": "These are editable draft settings. They will not be saved or applied to an indexing job until PowerX exposes the snapshot contract."
+      "snapshotDraftDescription": "These are editable draft settings. They will not be saved or applied to an indexing job until PowerX exposes the snapshot contract.",
+      "rebuild": {
+        "document": "Rebuild this document",
+        "space": "Rebuild entire space",
+        "description": "Choose the configuration source and submit an asynchronous rebuild.",
+        "documentScope": "Only the selected document is processed; its UUID is preserved.",
+        "spaceScope": "This rebuild processes documents in the current space. Confirm the scope.",
+        "mode": "Configuration source",
+        "reuse_snapshot": "Reuse last successful snapshot",
+        "apply_config": "Apply new configuration",
+        "reuseHint": "Use the last successful frozen configuration without reading the latest profiles.",
+        "applyHint": "Validate and freeze the current space strategy and profiles with the following chunking settings.",
+        "indexHint": "The old successful index remains available. Core switches only after success; failure preserves it.",
+        "submit": "Submit rebuild",
+        "progress": "Processed {count} / {total} documents"
+      }
     }
   },
   "identityLab": {
@@ -2639,6 +2722,129 @@
       "CAPABILITY_FORBIDDEN": "This credential has no capability grant.",
       "CUSTOMER_EXTERNAL_IDENTITY_SERVICE_ACTOR_INVALID": "The credential has no trusted plugin identity."
     }
+  },
+  "knowledgeSemantic": {
+    "setup": {
+      "configureTitle": "Configure a semantic indexing model first",
+      "configureHint": "This space has no semantic Embedding model binding. Expand model configuration, enter an Embedding Profile Key already configured in Core, then validate and freeze it.",
+      "dependencyTitle": "The semantic index channel is not ready",
+      "dependencyHint": "Check the model and vector storage, then refresh after recovery. Retrieval will not switch to lexical automatically.",
+      "indexTitle": "The model is ready; no vector index has been published",
+      "indexHint": "Lexical chunks are not vector data. Submit or rebuild with semantic or hybrid indexing, wait for success, then refresh this page.",
+      "reason": "Current readiness state: {code}",
+      "retrievalOnly": "Validate retrieval with relevant excerpts, scores and sources. This page does not generate an LLM answer yet.",
+      "queryBlocked": "Complete model binding and vector indexing above before entering a natural-language retrieval question.",
+      "modeUnavailable": "The corpus does not support the selected retrieval mode. Select a supported mode or build the matching index, then refresh."
+    },
+    "errors": {
+      "routeUnavailable": "The semantic retrieval endpoint is unavailable (HTTP {status}). Confirm the plugin backend has loaded the current routes, then refresh.",
+      "httpFailed": "The knowledge request failed (HTTP {status}). Check the endpoint response before retrying.",
+      "requestFailed": "The knowledge request failed without a recognized error code or HTTP status. Check the endpoint response before retrying."
+    },
+    "indexTitle": "Semantic index and model versions",
+    "configured": "Configured",
+    "unconfigured": "Not configured",
+    "ready": "Channels ready",
+    "notReady": "Channels unavailable",
+    "indexed": "Published index exists",
+    "notIndexed": "No published index",
+    "activeModel": "Active model",
+    "dimensions": "Vector dimensions",
+    "environment": "Environment",
+    "pendingModel": "Pending model: {model}, {dimensions} dimensions. Queries still use the published generation.",
+    "indexCount": "{mode}: {documents} documents, {chunks} chunks",
+    "configure": "Configure or update the model binding",
+    "configureHint": "Activate the space embedding model in PowerX first, then enter its bound profile key. Pending changes require an explicit space rebuild to publish.",
+    "profileKey": "Embedding profile key",
+    "configureAction": "Validate and freeze configuration",
+    "versionDetails": "Version and call diagnostics",
+    "queryMode": "Retrieval mode",
+    "localLexical": "Local retrieval",
+    "requireGeneration": "Require the currently loaded corpus generation",
+    "filters": "Structured filters and diagnostics",
+    "artifactRoles": "Artifact roles",
+    "categoryCodes": "Category codes",
+    "documentUUIDs": "Core document UUIDs (technical filter)",
+    "tagUUIDs": "Tag UUIDs (technical filter)",
+    "resultMode": "Effective retrieval mode: {mode}",
+    "sourcePosition": "Source: {kind} · version {version} · Unicode range [{start}, {end})",
+    "sourceDetails": "Source and version diagnostics",
+    "hideDocument": "Remove document query eligibility",
+    "hideHint": "The document will immediately be excluded from new searches. Current results will also be cleared.",
+    "indexMode": "Index mode",
+    "modelGeneration": "Model generation",
+    "pendingChoice": "Pending model",
+    "profileMock": "Test knowledge profile text (optional)",
+    "profileMockHint": "Supply a test profile alongside the source. Framework does not extract business profiles.",
+    "pendingRebuildHint": "The pending model may require a complete space rebuild. A failed document task never widens its scope automatically.",
+    "artifactCount": "Actual artifact count",
+    "vectorCount": "Published vector count",
+    "indexHint": "Use actual Core task state and artifacts. Accepted or running does not mean published.",
+    "modes": {
+      "lexical_chunks": "Lexical chunk index",
+      "semantic": "Vector semantic retrieval",
+      "hybrid": "Hybrid retrieval"
+    },
+    "roles": {
+      "source_chunk": "Source text",
+      "knowledge_profile": "Knowledge profile"
+    },
+    "scores": {
+      "cosine_distance": "Cosine distance",
+      "cosine_similarity": "Cosine similarity",
+      "postgres_text_rank": "Text rank",
+      "rrf": "RRF"
+    },
+    "directions": {
+      "higher_better": "Higher ranks first",
+      "lower_better": "Lower ranks first"
+    },
+    "sources": {
+      "raw_document": "Raw document",
+      "cleaned_document": "Cleaned document",
+      "knowledge_profile": "Profile snapshot"
+    }
+  },
+  "knowledgeSearch": {
+    "title": "Knowledge search test",
+    "checking": "Checking",
+    "statusUnavailable": "Knowledge status unavailable",
+    "ready": "Knowledge ready",
+    "notReady": "Knowledge not ready",
+    "documentCount": "{count} documents",
+    "description": "Ask a question to find relevant excerpts and sources. This page tests retrieval and does not generate AI answers.",
+    "indexSettings": "Index settings",
+    "prepareHint": "Configure a model and index documents before searching.",
+    "prepareAction": "View index settings",
+    "questionLabel": "What would you like to find?",
+    "questionPlaceholder": "Ask about a process, configuration steps, or usage restrictions.",
+    "activeSettings": "{mode} · Up to {count} excerpts",
+    "searchAction": "Search knowledge",
+    "advancedSettings": "Advanced search settings",
+    "optionalFilters": "Filters (optional)",
+    "resultsTitle": "Related knowledge ({count} excerpts)",
+    "resultsHint": "Excerpts come from source documents. Expand to read more.",
+    "sourceLabel": "Source: {kind}",
+    "collapseSnippet": "Collapse excerpt",
+    "expandSnippet": "Expand excerpt",
+    "resultDetails": "Scores and source details"
+  },
+  "knowledgeContent": {
+    "title": "Content in this space",
+    "viewDocuments": "View articles ({count})",
+    "unavailable": "The current connection does not yet provide an article directory. Content guidance is unavailable; search is still available.",
+    "empty": "No articles in this directory.",
+    "browseHint": "Browse source previews, then choose what you would like to learn about.",
+    "suggestedQuestions": "Suggested questions:",
+    "startFromArticle": "Start from an article:",
+    "directoryTitle": "Space articles",
+    "queryableScope": "These articles are searchable in the current retrieval mode and corpus version. Previews come from their source text.",
+    "spaceScope": "This directory lists articles in the space. Source previews are not AI summaries or proof that every article has been indexed.",
+    "originalPreview": "Source preview",
+    "noPreview": "No source preview is available for this article.",
+    "askArticle": "Ask about this article",
+    "articleQuestion": "What does “{title}” mainly cover?",
+    "moreArticles": "Load more articles"
   },
   "hostSession": {
     "required": "The PowerX session is unavailable. Sign in through the host or synchronize again.",

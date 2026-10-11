@@ -73,8 +73,15 @@ func registerKnowledgeLabRoutes(router *gin.RouterGroup, deps *app.Deps) {
 		c.Next()
 	})
 	g.GET("/provider", h.Provider)
+	g.GET("/spaces/:spaceID/semantic-index", h.LabSemanticCapabilities)
+	g.POST("/spaces/:spaceID/semantic-index", h.LabConfigureSemantic)
+	g.POST("/retrieval/query", h.LabSemanticQuery)
+	g.PATCH("/spaces/:spaceID/documents/:documentID/visibility", h.LabSemanticVisibility)
 	g.GET("/catalog", h.Catalog)
 	g.GET("/index-jobs/:jobID", h.LabIndexJob)
+	g.POST("/spaces/:spaceID/indexes:operation", h.LabRebuildIndex)
+	g.POST("/spaces/:spaceID/documents/:documentID/indexes:operation", h.LabRebuildIndex)
+	g.GET("/index-jobs/:jobID/chunks", h.LabIndexJobChunks)
 	g.GET("/departments", h.LabDepartments)
 	g.GET("/spaces", h.Spaces)
 	g.POST("/spaces", h.CreateSpace)
@@ -112,7 +119,7 @@ func (h *KnowledgeHandler) LabDepartments(c *gin.Context) {
 			status = coreErr.Status
 			trace = coreErr.TraceID
 		}
-		c.JSON(status, gin.H{"success": false, "code": iamerrors.CodeOf(err), "error": "knowledgeLab.gatewayFailed", "trace_id": trace})
+		c.JSON(status, gin.H{"success": false, "code": iamerrors.CodeOf(err), "error": "knowledgeLab.gatewayFailed", "trace_id": trace, "request_id": knowledgeRequestID(err)})
 		return
 	}
 	tenant := ""
@@ -172,7 +179,12 @@ func writeLabKnowledgeError(c *gin.Context, err error) {
 	if errors.As(err, &typed) {
 		trace = typed.TraceID
 	}
-	c.JSON(fwknowledge.HTTPStatus(err), gin.H{"success": false, "code": fwknowledge.CodeOf(err), "error": "knowledgeLab.gatewayFailed", "trace_id": trace})
+	body := gin.H{"success": false, "code": fwknowledge.CodeOf(err), "error": "knowledgeLab.gatewayFailed", "trace_id": trace, "request_id": knowledgeRequestID(err)}
+	if typed != nil {
+		body["details"] = typed.SafeDetails
+		body["invocation_trace_id"] = typed.InvocationTraceID
+	}
+	c.JSON(fwknowledge.HTTPStatus(err), body)
 }
 
 // LabUpsertDocument uses only the typed Host service plane. Core owns tenant,
@@ -184,22 +196,48 @@ func (h *KnowledgeHandler) LabUpsertDocument(c *gin.Context) {
 		return
 	}
 	var input struct {
-		Title       string   `json:"title"`
-		Content     string   `json:"content"`
-		ContentType string   `json:"content_type"`
-		Tags        []string `json:"tags"`
+		Title          string                                 `json:"title"`
+		Content        string                                 `json:"content"`
+		ContentType    string                                 `json:"content_type"`
+		Tags           []string                               `json:"tags"`
+		URI            string                                 `json:"uri,omitempty"`
+		Version        string                                 `json:"version,omitempty"`
+		Checksum       string                                 `json:"checksum,omitempty"`
+		Ingestion      *fwknowledge.DocumentIngestionSettings `json:"ingestion,omitempty"`
+		Indexing       *fwknowledge.SemanticIndexingSettings  `json:"indexing,omitempty"`
+		Artifacts      []fwknowledge.SemanticArtifact         `json:"artifacts,omitempty"`
+		ExternalRef    *fwknowledge.SemanticExternalRef       `json:"external_ref,omitempty"`
+		IdempotencyKey string                                 `json:"idempotency_key,omitempty"`
 	}
-	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 8<<20))
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, (8<<20)+(64<<10)))
 	decoder.DisallowUnknownFields()
 	var trailing any
 	if err := decoder.Decode(&input); err != nil || decoder.Decode(&trailing) != io.EOF || strings.TrimSpace(input.Title) == "" || strings.TrimSpace(input.Content) == "" || (input.ContentType != "text/plain" && input.ContentType != "text/markdown") {
 		writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument"))
 		return
 	}
+	if err := input.Ingestion.Validate(); err != nil {
+		writeLabKnowledgeError(c, err)
+		return
+	}
+	checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(input.Content)))
+	if input.Checksum != "" && input.Checksum != checksum {
+		writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledge.semantic.invalid_argument"))
+		return
+	}
+	if input.URI == "" {
+		if input.IdempotencyKey != "" {
+			input.URI = "plugin-knowledge://" + uuid.NewSHA1(uuid.NameSpaceURL, []byte(input.IdempotencyKey)).String()
+		} else {
+			input.URI = "plugin-knowledge://" + uuid.NewString()
+		}
+	}
+	if input.Version == "" {
+		input.Version = checksum
+	}
 	job, err := provider.UpsertDocument(c.Request.Context(), fwknowledge.KnowledgeDocument{
-		SpaceID: c.Param("spaceID"), Title: strings.TrimSpace(input.Title), Content: input.Content,
-		ContentType: input.ContentType, Checksum: fmt.Sprintf("%x", sha256.Sum256([]byte(input.Content))),
-		URI: "plugin-knowledge://" + uuid.NewString(), Version: "v1", Tags: input.Tags,
+		SpaceID: c.Param("spaceID"), Title: strings.TrimSpace(input.Title), Content: input.Content, ContentType: input.ContentType, Checksum: checksum, URI: input.URI, Version: input.Version, Tags: input.Tags, HostIngestion: input.Ingestion,
+		Indexing: input.Indexing, Artifacts: input.Artifacts, ExternalRef: input.ExternalRef, IdempotencyKey: input.IdempotencyKey,
 	})
 	if err != nil {
 		writeLabKnowledgeError(c, err)
@@ -229,4 +267,81 @@ func (h *KnowledgeHandler) LabIndexJob(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"item": job}})
+}
+
+func (h *KnowledgeHandler) LabIndexJobChunks(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("jobID"))
+	if err != nil || id == uuid.Nil || c.Query("tenant_uuid") != "" {
+		writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument"))
+		return
+	}
+	provider, err := h.provider()
+	if err != nil {
+		writeLabKnowledgeError(c, err)
+		return
+	}
+	reader, ok := provider.(fwknowledge.IndexJobChunksReader)
+	if !ok {
+		writeLabKnowledgeError(c, fwknowledge.Unsupported(fwknowledge.OperationUpsert))
+		return
+	}
+	chunks, err := reader.GetIndexJobChunks(c.Request.Context(), fwknowledge.IndexJobQuery{JobID: id.String()})
+	if err != nil {
+		writeLabKnowledgeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"items": chunks}})
+}
+
+// LabRebuildIndex never translates a document request into a space operation.
+func (h *KnowledgeHandler) LabRebuildIndex(c *gin.Context) {
+	if strings.TrimPrefix(c.Param("operation"), ":") != "rebuild" {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if c.Query("tenant_uuid") != "" {
+		writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument"))
+		return
+	}
+	space, err := uuid.Parse(c.Param("spaceID"))
+	if err != nil || space == uuid.Nil {
+		writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument"))
+		return
+	}
+	document := c.Param("documentID")
+	if document != "" {
+		id, e := uuid.Parse(document)
+		if e != nil || id == uuid.Nil {
+			writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument"))
+			return
+		}
+		document = id.String()
+	}
+	var input fwknowledge.DocumentRebuildSettings
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20))
+	decoder.DisallowUnknownFields()
+	var trailing any
+	if err := decoder.Decode(&input); err != nil || decoder.Decode(&trailing) != io.EOF {
+		writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument"))
+		return
+	}
+	if err := input.Validate(); err != nil {
+		writeLabKnowledgeError(c, err)
+		return
+	}
+	provider, err := h.provider()
+	if err != nil {
+		writeLabKnowledgeError(c, err)
+		return
+	}
+	job, err := provider.Reindex(c.Request.Context(), fwknowledge.ReindexInput{SpaceID: space.String(), DocumentID: document, HostRebuild: &input})
+	if err != nil {
+		writeLabKnowledgeError(c, err)
+		return
+	}
+	if job == nil || job.DocumentID != document {
+		writeLabKnowledgeError(c, fwknowledge.NewError(fwknowledge.CodeInvalidResponse, "knowledgeLab.workspace.invalidResponse"))
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"success": true, "data": gin.H{"item": job}})
 }

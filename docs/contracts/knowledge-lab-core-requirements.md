@@ -198,3 +198,142 @@ Framework Go Host 客户端已移除未经正式 DTO 支持的顶层 camelCase �
 4. 浏览器使用多文件队列完成提交、逐文件任务复读和检索引用验证，并确认没有 `admin/local-knowledge` 请求。保留逐文件失败状态，不把 queued 视作入库完成。
 
 当前没有修改 Core、数据库、授权或运行进程；上述后续实施项尚未完成。
+
+
+## 2026-10-07：Core 快照 v1 已接入并完成插件浏览器验收
+
+本节替代 2026-10-05/06 的“快照合同缺失”当前状态描述；前文保留为历史记录。Core 的 `docs/contracts/knowledge-host-provisioning.md:103` 与 OpenAPI 已发布 `powerx.knowledge.document-ingestion/v1`，用户确认正式 8077 已按原方式重启。此次只修改 PowerXPlugin，没有修改或重启 Core。
+
+- Go Framework 用 `KnowledgeDocument.HostIngestion` / `DocumentIngestionSettings` 发送正式嵌套 snake_case `ingestion`；Local 的 `IngestionConfig` 仍独立。保留 false、0、空数组、数组顺序及精确 Profile UUID/版本，避免旧顶层字段。原文 UTF-8 内容保持原样，与服务端 SHA-256 一致。
+- .NET Framework 提供同一 typed settings、目录支持范围、不可变快照/任务详情和 `IKnowledgeJobChunksService`，错误保留机器码、HTTP 状态与 Trace。其 Local adapter 拒绝 Host DTO，避免跨 Provider 写入。
+- Lab Handler 接收/验证正式配置，服务端生成 URI/checksum/version；新增 `GET /admin/runtime/knowledge-lab/index-jobs/:jobID/chunks`。没有 Local 文档双写、用户租户覆盖或旧协议降级。
+- 共享向导根据 Core 目录 `document_ingestion` 开启配置提交，使用真实目录默认值。任务固定使用空间绑定策略/Profile，由 Core 冻结 UUID 与版本；本版本不提供任务策略覆盖。semantic、PDF、独立 processor/masking 不支持；TXT/Markdown 分页优先禁用，锚点必须匹配模式，Markdown 专用模式不允许用于 TXT。
+- 共享记录页提供本次任务生效配置、分块数量、冻结 Profile 版本、技术详情及按需分块读取。显示的是本次提交，不假装完整历史；完整文档目录/历史、文档修改与向量核验仍未接通。实时进度事件未发布，继续由用户手动刷新读取真实状态，不增加自动轮询。
+
+浏览器使用已有空间 `test-base-space` 提交两份生成的非敏感测试文件，每份 2000 rune，配置 `unit/cap/640/80`、空 separators、全部 anchors=false。两次提交 202；任务详情、分块回读均 200，两个任务达到 succeeded。每份实际四块，长度 640/640/640/320，相邻块重叠 80；请求、生效快照及 Profile 版本均可回读。检索 `snapshot20261007` 返回两份文档。整个 Lab 流程未请求 `admin/local-knowledge`。测试资料保留在 Core，未自动删除。
+
+脱敏证据见 [插件浏览器快照验收](evidence/knowledge-lab-snapshot-20261007.json)。这是 Local+proxy API Key 浏览器验收；Go/.NET 的 STS 路径由 transport 合同测试覆盖，未声称插件新增一次真实 STS Exchange。Core 自身的真实 STS、不可变性和非法请求验收见其交付证据。
+
+验证结果：Go Knowledge/Host client 与插件 runtime_ops 包测试通过；.NET Knowledge 19 项、Nuxt 单测 48 项通过；14 个 Knowledge SFC 编译、`sync-templates --check` 和 diff 检查通过。8078 插件后端已重启加载最终代码。最后一次 Local 页面视觉回归因浏览器实例占用及 CUA 连接错误未完成；这不替代或撤销上述已完成的 PowerX 浏览器闭环，Local 行为由共用组件定向测试覆盖。
+
+## 2026-10-07：快照与重建消费端对齐
+
+Core 已交付 `HostIngestionSettings`、任务快照回读及分块接口，此前“快照合同缺失”的说明为历史状态。Go SDK 使用独立 Host DTO 提交 snake_case 配置，保留显式 false、0、空数组和顺序；Lab 从 Core 目录启用受支持的分段选项，Local 参数不作为 Host Profile 引用发送。
+
+本轮按 Core 新 `HostRebuildInput` 对齐单篇及空间重建：显式模式、幂等键和可选 typed 配置；`reuse_snapshot` 不读取新 Profile 配置，`apply_config` 重新校验当前空间绑定。页面在任务记录中提供“重建本篇”和“重建整个空间”弹窗，显示作用范围、实际任务状态、分块数量、生效配置和逐文档配置。同一次提交的网络重试沿用请求键；任务失败后重新发起操作、修改配置或开始新重建时使用新键，以创建独立任务并保留失败历史。没有轮询兜底或 Local 数据回退。
+
+Core 路由与 Service 正在同一轮交付；新路由、迁移、能力授权与运行进程须由 Core 完成部署。当前 SDK/Handler/UI 回归不代替真实 API Key/STS 验收。最终联调需同时验证单篇、空间、跨租户、非法配置、重复/并发、失败重试、策略变化、其他文档未受影响，以及失败后旧索引仍可检索。本仓库不直接修改 Core 或重启运行进程。本次代码尚未发布新 Go 版本。
+
+
+### 2026-10-07 后续复验：运行恢复与 Local 页面回归完成
+
+Core 当前进程 PID 11316，8077 正常监听，`GET /healthz` 为 200。浏览器已重新连接，复读两份 PowerX 测试任务及 chunks 均为 200，状态 succeeded，每份仍为 640/640/640/320 四块。没有修改或重启 Core。
+
+Local 知识空间 `test` 的两文件向导已逐步检查至第 4 步，策略、分段、锚点保持 Local 行为，提交按钮可用，请求仅访问 Local API。仅生成浏览器草稿，没有提交 Local 文档或触发 Embedding。截图发现 UProgress 使用过时 `value` 绑定导致 0% 时显示不定进度动画，已将两处绑定改为当前 Nuxt UI 的 `model-value`。复验三条进度的 aria-valuenow 均为 0，indicator 为 translateX(-100%)，显示与待提交状态一致。
+
+此前未完成的 Local 视觉回归现已补齐；当前前端 51 项测试、15 个 Knowledge SFC 编译、模板同步和 diff 检查通过。最新结果记录在同一脱敏证据的 `recheck` 字段。
+
+
+## dev 历史空间 Profile 绑定修复要求（2026-10-07）
+
+用户在 `dev` 提交五份 Markdown，Core 返回 `KNOWLEDGE_PROFILE_UNAVAILABLE`。只读核查空间 `30a6d654-c4c5-4a33-9806-6d66c6728187`：三个 Profile key 都为 `p1_general`，三个 UUID 字段均为 NULL。空间策略仍为 `h_fusion`，场景为 `product_specs`。同租户对应的三个 published v1 Profile 实际存在：
+
+| 空间绑定字段 | 对应已发布对象 UUID | key / version |
+| --- | --- | --- |
+| ingestion_profile_uuid | 4245b851-0710-4566-9f53-ecf3dd7e04cc | p1_general / 1 |
+| index_profile_uuid | 81e39770-93dd-4903-918c-9847224d30a4 | p1_general / 1 |
+| rag_profile_uuid | aa8c8f9c-6558-435d-a352-4727adb8163f | p1_general / 1 |
+
+**Core 团队负责数据修复**：执行前重新校验空间租户、Profile 类型、key、UUID、published 状态与版本，在受控事务中补齐历史空间绑定；保留空间已有策略/场景，不自动更换为 p0 或其他策略。若状态或映射已变化须明确失败，不能拿首个目录项代替绑定。修复后使用 dev 真实提交、快照回读、任务终态与 chunks 验收，并给出 HTTP/Trace 证据。此前 test-base-space 的成功记录不代表 dev 已就绪。本仓库没有修改 Core 数据。
+
+Plugin 已将 Profile 不可用及其他正式的写入前拒绝映射为 zh/en 可读提示，并保留 Trace。队列提供显式“重试失败文件”：仅重试有完整原文、未受理且错误属于已发布写入前校验/鉴权拒绝的文件。保留用户配置和之前已受理任务，不重复提交成功项；没有自动重试、Profile 替换、Local 回退。读取失败或结果不明确的请求不自动提供同一重试路径。
+
+验证：前端 53 项单测、15 个 Knowledge SFC 编译、模板同步及 diff 检查通过。真实 dev 浏览器初次两份提交与一次显式重试均返回 422；页面保留原文/配置、可读绑定说明和 Trace。没有自动重试或 Local 请求。成功修复后的实际重试仍待 Core 完成数据修复，不能把负向 UI 验收当成 dev 可入库。证据见 [dev 拒绝与重试复验](evidence/knowledge-lab-dev-profile-rejection-20261007.json)。
+
+
+## 2026-10-08：dev Profile 绑定修复已完成，插件浏览器提交验收通过
+
+Core 交付 `docs/contracts/evidence/knowledge-dev-profile-bindings-20261008.json`，仅变更三个 Profile UUID 及 updated_at，保留 h_fusion/product_specs 和原空间配置。当前正式 8077、插件 8078、前端 3131 正常运行。本次没有修改或重启 Core，没有修改插件源码。前节 dev 不可入库的描述保留为修复前历史。
+
+浏览器在 dev 生成并提交四份非敏感 TXT/Markdown 测试文件，每份 2000 rune：
+
+- 默认 1024/0：两次 POST 202，两个任务均 succeeded；每份实际两块，长度 1024/976。
+- 640/80：两次 POST 202，两个任务均 succeeded；每份实际四块，长度 640/640/640/320，三个相邻边界均保留 80 字符重叠。
+- 两组任务/分块回读均为 200，冻结三个 p1_general v1 Profile，strategy 为 h_fusion；请求与生效配置一致。
+- 检索 devbrowser20261008 为 200，命中四份测试文档；全程没有 admin/local-knowledge 请求。
+
+证据见 [dev 修复后插件浏览器验收](evidence/knowledge-lab-dev-profile-success-20261008.json)。调试浏览器已重建会话，Chrome 插件连接无法取回用户原五文件的内存队列，因此本次用独立测试文件验证，**没有声称已重试或上传用户原五文件**。原页面若仍保留队列，可直接点击“重试失败文件”；队列已丢失则重新选取文件。无需重启。四份测试资料保留在 Core，未自动删除。
+
+## 2026-10-08：任务过程页优化与剩余 Core 合同
+
+Plugin 的 Local 入库向导与 PowerX 任务记录现共用 `KnowledgeTaskProcessList`。展示真实待提交/受理/排队/执行/终态、成功与失败数量、任务结束比例、分块数量和耗时。批次进度明确表示“已结束任务数 / 总任务数”，失败计入终态但不计成功；单任务执行百分比仅使用实际事件数值，没有数值时使用不定进度动画，不模拟百分比或延迟。
+
+入库向导记录的是请求耗时；记录页使用 Core started_at/completed_at 计算执行耗时，未结束任务不显示虚构耗时。PowerX 列表收敛为紧凑行，参数、分块与 Trace 进入共用任务详情弹窗；索引模式集中展示，完整历史缺口改为中性范围说明。Core 当前只返回单任务状态，页面继续提供显式“刷新状态”，不添加自动轮询。Core 分块的用户显示序号按展示顺序计数，不改变实际 ordinal 或 metadata。
+
+本节中的以下能力仍需 Core 正式交付；本仓库不创建临时 Core 路由，不直接读取 Core 数据库作为插件运行时接口，不修改 Core。
+
+### Core A：空间入库就绪检查
+
+请发布 typed、只读的空间就绪合同，最终路径/DTO 由 Core 确认并写入 OpenAPI。接受空间 UUID 和声明的索引模式，按当前 API Key/STS 租户与权限校验：三个 Profile UUID/key/精确版本/published 状态、策略/场景与索引绑定、文档入库授权、格式及模型/存储依赖。返回 ready、稳定 blocked reason code、可读名称/locale key、支持模式与能力版本，保留 HTTP/Trace。检查不修复数据、不创建 Profile、不替换默认策略；明确检查到提交之间状态可能变化，提交仍须重新校验。
+
+Plugin 现仅能校验已经公布的格式、长度、模式/锚点等参数与目录支持范围，不能根据目录总体可用性假装空间依赖已检查。当前已发布的 semantic-index 能力属于语义/向量配置，不能拿它替代所有 lexical 空间的就绪结果。
+
+### Core B：文档目录与任务历史
+
+请发布受租户和对象授权约束的 typed 分页文档列表、任务列表/详情，支持空间 UUID、文档 UUID、状态与分页筛选。文档提供可读标题、source_type、当前版本/状态、当前及生效任务 UUID、分块数量；任务提供可读来源名、operation、status、started/completed/created、priority、错误码/Trace、冻结快照和 processed/total 的真实语义。查询不依赖 Plugin URL 中的 job_uuid 数组，能够刷新/重新进入后回看；未知统计使用缺失值，不能填 0。
+
+Profile/文档/任务引用使用 UUID。合同需区分当前文档与不可变任务快照，说明排序、删除后的历史保留、分页边界及权限错误。不通过 admin 用户 JWT 路由或 raw proxy 绕过服务凭证合同。
+
+### Core C：任务实时进度
+
+请发布并验收 WS/SSE 或可由 Framework EventBridge 接收的正式任务事件合同。至少提供 tenant/space/document/job UUID、事件版本、seq/cursor、operation、phase/status、processed/total、可选真实 progress_percent、错误码、时间与 Trace。区分 queued、running、chunking、embedding、writing、succeeded、failed 等实际支持阶段；不存在的阶段不发布，百分比未知必须缺失。定义订阅授权、断线恢复、乱序/重复去重以及终态与持久化状态的一致性。
+
+Local+proxy 通过服务端 API Key，Delegated 通过 STS/可信上下文订阅；浏览器不能持有 Core 服务凭证，不能将 Local JWT 转发为 Core 身份。Framework 桥接到 Plugin WS 时必须校验宿主租户与插件订阅租户的授权映射，不转发到无权会话。请给出准确 capability/scope 及是否复用既有 grant，避免无依据地重复授权。
+
+### 接入与验收顺序
+
+Core 分别交付 A/B/C 的 OpenAPI、DTO、能力声明、真实 API Key/STS 请求/响应及 Trace。Framework 再添加 typed readiness/page/subscription 映射；Plugin 最后启用对应 capability。不能单独翻转 `documents`/`realtime`，不能使用 SQL 或 Local 数据回退、自动轮询、计时百分比或仅会话缓存冒充历史/实时状态。当前剩余合同没有交付，完整预检、历史、实时进度不得标为已完成。
+
+本次验证：60 项前端测试通过；16 个 Knowledge SFC 编译、模板同步和 diff 检查通过。浏览器复用用户已有五个 Core 任务验证成功 5/5、结束比例 100%、实际分块及执行耗时；详情弹窗读到第一份文档的两块内容，显示序号为 1/2。Local 两文件草稿至确认页显示待提交 2、结束 0/2，没有写入文档。queued/running 的无百分比呈现、手动状态刷新和详情授权失败通过定向测试验证。未修改/重启 Core，未重传用户原文件。证据见 [任务过程页复验](evidence/knowledge-task-process-ui-20261008.json)。
+
+
+## 2026-10-08：Playground 语义接口加载与就绪状态修复
+
+页面语义能力请求原为 Plugin 8078 的 404/plain text，旧进程 PID 82692 尚未加载新增 semantic 路由；此前前端把没有结构化错误码的响应错误显示为 KNOWLEDGE_UPSTREAM_DEPENDENCY。本次定向 Go 回归通过后，仅重启获授权的插件后端，新进程 PID 65141。当前正式能力接口 200，dev 实际 configured=false/ready=false/indexed=false，reason_code=KNOWLEDGE_SEMANTIC_INDEX_NOT_READY。Core 服务未修改或重启。
+
+新增共用 requestFailure 提取器：读取结构化 machine code、真实 HTTP 状态和 Trace，不从 free-text body 解析、不杜撰上游错误码。Semantic Panel 与 Playground 区分传输错误和正常未就绪状态，显示模型配置/索引准备引导，检索仍由真实 ready+indexed+indexed_query_modes 阻止。页面明确返回召回片段、分数和来源，未添加生成答案；没有自动 lexical 回退。
+
+68 项前端测试、17 个 Knowledge SFC 编译、Go Knowledge/Host 与 Plugin runtime_ops 定向回归、模板同步及 diff 检查通过。模型绑定和向量重建会改变 Core 业务配置/数据，当前等待用户明确扩展授权，尚未执行；不能把接口修复当作真实向量 QA 验收。证据见 [Playground 接口修复](evidence/knowledge-playground-interface-fix-20261008.json)。
+
+
+## 2026-10-08：dev 语义/混合检索插件浏览器验收通过
+
+Core 完成 dev 的模型配置和原五文档语义准备，交付报告为 `PowerX/docs/contracts/repairs/knowledge-dev-semantic-preparation-20261008.md`。插件页面当前已配置/通道就绪/已有发布索引，模型 ollama/bge-m3，真实 1024 维，Embedding Profile UUID 2ff1b71c-5fbe-4753-9c17-8ca3a85cdce2 v1，hybrid 文档5份/分块23个。上节未配置状态属于准备前历史，当前无需再为本轮验收重启或配置数据。
+
+在实际 Playground 页面，围绕 Provider 模式和宿主全屏接入各提出完整自然语言问题，semantic/hybrid 各测试一次，共4次服务请求均200，目标文档排名1。保持 top_k=5、空过滤、required_generations=已读取的实际 corpus generation；语义结果显示余弦原始距离/相似度，hybrid 显示 RRF，来源/version/generation/Trace保留。同文档多个相关分块没有去重。
+
+只读核对浏览器返回的20个片段：与Core持久化原文的codepoint区间、完整原文SHA256及source version全部一致。此SQL只用于独立验收，插件运行时仍走 typed Host合同；没有Local knowledge或旧lexical fallback请求，没有修改Core配置/数据、没有重启任何服务。本轮没有修改插件源码。
+
+本阶段仅验收知识召回，不宣称已接入LLM生成答案或完成新的插件STS Exchange。证据见 [语义检索浏览器验收](evidence/knowledge-playground-semantic-browser-20261008.json)。
+
+
+## 2026-10-08：共用知识检索页面交互收敛
+
+Local 与 PowerX 的 Playground 继续共用 `KnowledgeSearchWorkspace`，页面标题改为“知识检索测试”。主流程为输入问题、检索、阅读原文片段及查看来源；顶部只显示空间与实际就绪状态，模型配置移入“索引设置”弹窗，检索模式、数量、版本锁定和过滤进入折叠的“高级检索设置”。结果优先展示标题与片段，分数、来源偏移、UUID、版本和 Trace 默认折叠。示例按钮只填入问题，不自动发起查询。
+
+索引设置默认关闭时，页面仍会读取实际 capability；打开/关闭设置不会清空已有问题与结果，刷新或配置变更才使旧结果失效。读取失败明确阻止 semantic 查询并提供手动刷新，查询失败保留问题，不添加 Local/lexical 回退。默认 semantic、top_k=5、required_generations 保持，未新增 LLM 生成答案。
+
+71 项前端测试、17 个 Knowledge SFC 编译、zh/en 文案键检查、本次知识库模板双目标同步及 diff 检查通过。浏览器 semantic/hybrid 各一条自然语言查询均 200，各返回 5 个真实片段；Local 检索 200，provider=plugin_local，返回 5 个片段。已检查弹窗往返、片段展开/收起、默认详情折叠，以及 1435/1024 宽度下工作区无横向溢出。全仓模板检查仅剩当前工作树 AGENTS.md 对应两份模板的既有差异，未扩展修改。
+
+本次只调整前端共用交互、locale、回归测试和生成模板；没有修改或重启 Core，没有操作模型绑定、隐藏文档、重建或重新入库。浏览器保持在 PowerX 检索页，可直接刷新使用。证据见 [知识检索页面优化复验](evidence/knowledge-playground-ui-20261008.json)。
+
+
+## 2026-10-09：内容导览组件与 Core 目录交付边界
+
+共用检索页新增 `KnowledgeContentOverview`：文章目录与原文预览进入弹窗，问题选择仅填入输入框。Local 从已有空间文档 API 读取真实标题与原文前 320 个 Unicode codepoint；这是目录预览，不表示所有文章都已发布索引，不生成 AI 摘要。固定的 Framework 示例问题已移除，组件不会用验收样本或检索采样结果冒充空间目录。
+
+PowerX Host 尚未发布空间文档目录读取合同，Lab 内容导览 accessor 没有启用。页面明确说明内容导览尚未接入，检索继续独立使用；没有添加猜测的 Core URL、Local 回退或 Core SQL 读取。Framework 的 typed wire DTO/client/adapter 需等 Core 正式合同后实施，不能把前端 view model 当作已发布合同。
+
+Core 最小交付是当前授权、当前检索 mode/corpus generation 下的真实文章目录、原文预览、稳定分页及授权/版本冲突错误；概要和来源文章绑定的推荐问题属于可选真实产物。具体职责、字段语义与 API Key/STS 验收见 [内容导览 Core 交付要求](knowledge-content-overview-core-requirements.md)。
+
+验证：80 项前端测试、18 个 Knowledge SFC 编译及 locale 检查通过，新增组件在运行中的 Nuxt 服务编译为 JavaScript 并返回 200；内容导览相关双目标模板同步与 diff 检查通过。目录失败/空目录、跨空间响应、语料 generation 不匹配、分页重复以及检索中的问题替换已覆盖。浏览器工具连接失败，未完成真实 UI/Local 目录数据浏览器验收；PowerX 真实导览数据待 Core 交付，不标记为完成。未启动、停止或重启服务，没有修改 Core。

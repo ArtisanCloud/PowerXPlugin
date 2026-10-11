@@ -1,0 +1,717 @@
+{
+  "schema": "powerx.plugin.knowledge.semantic-browser-acceptance/v1",
+  "date": "2026-10-08",
+  "page": "http://127.0.0.1:3131/powerx/knowledge-lab/30a6d654-c4c5-4a33-9806-6d66c6728187/playground",
+  "mode": "local+proxy",
+  "credential_path": "server-side API Key; browser Bearer authenticates only to plugin",
+  "readiness": {
+    "configured": true,
+    "ready": true,
+    "indexed": true,
+    "indexed_query_modes": [
+      "semantic",
+      "hybrid"
+    ],
+    "model_key": "ollama/bge-m3",
+    "dimensions": 1024,
+    "embedding_profile": {
+      "uuid": "2ff1b71c-5fbe-4753-9c17-8ca3a85cdce2",
+      "version": 1
+    },
+    "indexed_documents": 5,
+    "indexed_chunks": 23
+  },
+  "queries": [
+    {
+      "mode": "semantic",
+      "query": "插件在独立运行时和安装到 PowerX 中时，应如何选择 Local 或 Delegated 模式？",
+      "http_status": 200,
+      "top_k": 5,
+      "required_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+      "version": {
+        "generations": [
+          {
+            "env": "dev",
+            "space_uuid": "30a6d654-c4c5-4a33-9806-6d66c6728187",
+            "configuration_generation": "5dc82f2a-89ec-4e76-b4ea-aa2c47bc7087",
+            "corpus_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+            "embedding_profile": {
+              "uuid": "2ff1b71c-5fbe-4753-9c17-8ca3a85cdce2",
+              "version": 1
+            },
+            "model_key": "ollama/bge-m3",
+            "model_revision": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab",
+            "dimensions": 1024,
+            "distance_metric": "cosine"
+          }
+        ],
+        "trace_id": "e734701a-8658-425d-a163-1ebe1967932f",
+        "request_id": "6da9dc5c-5e2b-4700-acc4-219290cfc6ca"
+      },
+      "matches": [
+        {
+          "title": "framework-provider-mode",
+          "score_display": "余弦相似度: 0.7131325815061583",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.2868674184938417"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.7131325815061583"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "81767ec9-0199-4112-9044-51a634541344",
+              "version": "v1",
+              "checksum": "4e19e6a39b726e96265f8540055c0dad94e49097d13f9585e44e2ed1c72da8b5",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1022
+            },
+            "external_ref": {
+              "document_uuid": "75589a3a-56bb-4624-8542-1501e91217b4"
+            },
+            "document_version": "v1",
+            "bundle_generation": "592ec405-0501-4cb7-887a-8ae8935fc0cd",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-dual-mode-business-modules",
+          "score_display": "余弦相似度: 0.6783171840085596",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.32168281599144044"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6783171840085596"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "aebd5f7a-384a-4c19-9b73-0165000c5a19",
+              "version": "v1",
+              "checksum": "a1139f26fd5d7b8dfaf7ca700758ac05e9f65641e374f616b8adc0b6bb8c6a70",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1024
+            },
+            "external_ref": {
+              "document_uuid": "201e2cf0-ef19-4aec-8d48-f5c65d1295cd"
+            },
+            "document_version": "v1",
+            "bundle_generation": "927a248a-679a-4126-af0e-bc9973516f3b",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-dual-mode-business-modules",
+          "score_display": "余弦相似度: 0.6734328470657199",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.32656715293428007"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6734328470657199"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "aebd5f7a-384a-4c19-9b73-0165000c5a19",
+              "version": "v1",
+              "checksum": "a1139f26fd5d7b8dfaf7ca700758ac05e9f65641e374f616b8adc0b6bb8c6a70",
+              "position_unit": "unicode_codepoint",
+              "char_start": 3072,
+              "char_end": 4096
+            },
+            "external_ref": {
+              "document_uuid": "201e2cf0-ef19-4aec-8d48-f5c65d1295cd"
+            },
+            "document_version": "v1",
+            "bundle_generation": "927a248a-679a-4126-af0e-bc9973516f3b",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-business-modules",
+          "score_display": "余弦相似度: 0.6495128258627225",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.3504871741372775"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6495128258627225"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "f2a361a2-597d-46fc-808b-49ce6be70a0b",
+              "version": "v1",
+              "checksum": "d88d344e9ead086a4028ab48df46b6282de34836a4eee520d3c77b45a5e28250",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1024
+            },
+            "external_ref": {
+              "document_uuid": "9bf6a6cb-cf8e-4a2b-b799-63b7ad0cc5c3"
+            },
+            "document_version": "v1",
+            "bundle_generation": "ed5f803e-bd47-44e0-99aa-7e1ea10de8fb",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-dual-mode-business-modules",
+          "score_display": "余弦相似度: 0.6311822565333245",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.3688177434666755"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6311822565333245"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "aebd5f7a-384a-4c19-9b73-0165000c5a19",
+              "version": "v1",
+              "checksum": "a1139f26fd5d7b8dfaf7ca700758ac05e9f65641e374f616b8adc0b6bb8c6a70",
+              "position_unit": "unicode_codepoint",
+              "char_start": 1024,
+              "char_end": 2048
+            },
+            "external_ref": {
+              "document_uuid": "201e2cf0-ef19-4aec-8d48-f5c65d1295cd"
+            },
+            "document_version": "v1",
+            "bundle_generation": "927a248a-679a-4126-af0e-bc9973516f3b",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "mode": "hybrid",
+      "query": "插件在独立运行时和安装到 PowerX 中时，应如何选择 Local 或 Delegated 模式？",
+      "http_status": 200,
+      "top_k": 5,
+      "required_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+      "version": {
+        "generations": [
+          {
+            "env": "dev",
+            "space_uuid": "30a6d654-c4c5-4a33-9806-6d66c6728187",
+            "configuration_generation": "5dc82f2a-89ec-4e76-b4ea-aa2c47bc7087",
+            "corpus_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+            "embedding_profile": {
+              "uuid": "2ff1b71c-5fbe-4753-9c17-8ca3a85cdce2",
+              "version": 1
+            },
+            "model_key": "ollama/bge-m3",
+            "model_revision": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab",
+            "dimensions": 1024,
+            "distance_metric": "cosine"
+          }
+        ],
+        "trace_id": "70046cc2-a46b-4b7b-a6cd-ca044792f033",
+        "request_id": "2092badd-4556-4ab1-83af-614cca5c2924"
+      },
+      "matches": [
+        {
+          "title": "framework-provider-mode",
+          "score_display": "RRF 融合分: 0.01639344262295082",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.2868674184938417"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.7131325815061583"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "81767ec9-0199-4112-9044-51a634541344",
+              "version": "v1",
+              "checksum": "4e19e6a39b726e96265f8540055c0dad94e49097d13f9585e44e2ed1c72da8b5",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1022
+            },
+            "external_ref": {
+              "document_uuid": "75589a3a-56bb-4624-8542-1501e91217b4"
+            },
+            "document_version": "v1",
+            "bundle_generation": "592ec405-0501-4cb7-887a-8ae8935fc0cd",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-dual-mode-business-modules",
+          "score_display": "RRF 融合分: 0.016129032258064516",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.32168281599144044"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6783171840085596"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "aebd5f7a-384a-4c19-9b73-0165000c5a19",
+              "version": "v1",
+              "checksum": "a1139f26fd5d7b8dfaf7ca700758ac05e9f65641e374f616b8adc0b6bb8c6a70",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1024
+            },
+            "external_ref": {
+              "document_uuid": "201e2cf0-ef19-4aec-8d48-f5c65d1295cd"
+            },
+            "document_version": "v1",
+            "bundle_generation": "927a248a-679a-4126-af0e-bc9973516f3b",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-dual-mode-business-modules",
+          "score_display": "RRF 融合分: 0.015873015873015872",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.32656715293428007"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6734328470657199"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "aebd5f7a-384a-4c19-9b73-0165000c5a19",
+              "version": "v1",
+              "checksum": "a1139f26fd5d7b8dfaf7ca700758ac05e9f65641e374f616b8adc0b6bb8c6a70",
+              "position_unit": "unicode_codepoint",
+              "char_start": 3072,
+              "char_end": 4096
+            },
+            "external_ref": {
+              "document_uuid": "201e2cf0-ef19-4aec-8d48-f5c65d1295cd"
+            },
+            "document_version": "v1",
+            "bundle_generation": "927a248a-679a-4126-af0e-bc9973516f3b",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-business-modules",
+          "score_display": "RRF 融合分: 0.015625",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.3504871741372775"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6495128258627225"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "f2a361a2-597d-46fc-808b-49ce6be70a0b",
+              "version": "v1",
+              "checksum": "d88d344e9ead086a4028ab48df46b6282de34836a4eee520d3c77b45a5e28250",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1024
+            },
+            "external_ref": {
+              "document_uuid": "9bf6a6cb-cf8e-4a2b-b799-63b7ad0cc5c3"
+            },
+            "document_version": "v1",
+            "bundle_generation": "ed5f803e-bd47-44e0-99aa-7e1ea10de8fb",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-dual-mode-business-modules",
+          "score_display": "RRF 融合分: 0.015384615384615385",
+          "score_displays": [
+            {
+              "label": "余弦距离 · 越小越靠前",
+              "value": "0.3688177434666755"
+            },
+            {
+              "label": "余弦相似度 · 越大越靠前",
+              "value": "0.6311822565333245"
+            }
+          ],
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "aebd5f7a-384a-4c19-9b73-0165000c5a19",
+              "version": "v1",
+              "checksum": "a1139f26fd5d7b8dfaf7ca700758ac05e9f65641e374f616b8adc0b6bb8c6a70",
+              "position_unit": "unicode_codepoint",
+              "char_start": 1024,
+              "char_end": 2048
+            },
+            "external_ref": {
+              "document_uuid": "201e2cf0-ef19-4aec-8d48-f5c65d1295cd"
+            },
+            "document_version": "v1",
+            "bundle_generation": "927a248a-679a-4126-af0e-bc9973516f3b",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "mode": "semantic",
+      "query": "插件安装到 PowerX 宿主后，如何让管理页面以全屏方式展示，需要调整哪些接入配置？",
+      "http_status": 200,
+      "top_k": 5,
+      "required_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+      "version": {
+        "generations": [
+          {
+            "env": "dev",
+            "space_uuid": "30a6d654-c4c5-4a33-9806-6d66c6728187",
+            "configuration_generation": "5dc82f2a-89ec-4e76-b4ea-aa2c47bc7087",
+            "corpus_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+            "embedding_profile": {
+              "uuid": "2ff1b71c-5fbe-4753-9c17-8ca3a85cdce2",
+              "version": 1
+            },
+            "model_key": "ollama/bge-m3",
+            "model_revision": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab",
+            "dimensions": 1024,
+            "distance_metric": "cosine"
+          }
+        ],
+        "trace_id": "e02bac01-afb9-4872-8f0e-48334b059ba1",
+        "request_id": "7acf14da-165d-444b-bd9d-7199471f0328"
+      },
+      "matches": [
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "余弦相似度: 0.7562459206195485",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1024
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "余弦相似度: 0.7412646104413649",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 2048,
+              "char_end": 3072
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "余弦相似度: 0.7188272811382128",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 3072,
+              "char_end": 4096
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "余弦相似度: 0.6976659533580087",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 5120,
+              "char_end": 6144
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "余弦相似度: 0.6973339970113641",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 6144,
+              "char_end": 6696
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "mode": "hybrid",
+      "query": "插件安装到 PowerX 宿主后，如何让管理页面以全屏方式展示，需要调整哪些接入配置？",
+      "http_status": 200,
+      "top_k": 5,
+      "required_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+      "version": {
+        "generations": [
+          {
+            "env": "dev",
+            "space_uuid": "30a6d654-c4c5-4a33-9806-6d66c6728187",
+            "configuration_generation": "5dc82f2a-89ec-4e76-b4ea-aa2c47bc7087",
+            "corpus_generation": "6aaa1cae-0670-4317-b6b6-0dc963fce17f",
+            "embedding_profile": {
+              "uuid": "2ff1b71c-5fbe-4753-9c17-8ca3a85cdce2",
+              "version": 1
+            },
+            "model_key": "ollama/bge-m3",
+            "model_revision": "7907646426070047a77226ac3e684fbbe8410524f7b4a74d02837e43f2146bab",
+            "dimensions": 1024,
+            "distance_metric": "cosine"
+          }
+        ],
+        "trace_id": "5393947f-048a-4cf8-bcac-c97cc9277fb9",
+        "request_id": "200ed8fe-dd08-43f9-8a9f-709c4990e68f"
+      },
+      "matches": [
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "RRF 融合分: 0.01639344262295082",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 0,
+              "char_end": 1024
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "RRF 融合分: 0.016129032258064516",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 2048,
+              "char_end": 3072
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "RRF 融合分: 0.015873015873015872",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 3072,
+              "char_end": 4096
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "RRF 融合分: 0.015625",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 5120,
+              "char_end": 6144
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        },
+        {
+          "title": "framework-host-fullscreen",
+          "score_display": "RRF 融合分: 0.015384615384615385",
+          "source": {
+            "source_ref": {
+              "kind": "raw_document",
+              "source_uuid": "dc579694-39a1-43ec-9526-22bb9d107f0e",
+              "version": "v1",
+              "checksum": "755262328304177b4520e6ae7701c7c73aca6e8645f2e9c69be7afdcee3cb468",
+              "position_unit": "unicode_codepoint",
+              "char_start": 6144,
+              "char_end": 6696
+            },
+            "external_ref": {
+              "document_uuid": "60445bbb-065f-4a6f-8291-c5a9d83ff5fb"
+            },
+            "document_version": "v1",
+            "bundle_generation": "989df2ce-68f5-4139-825b-04a615017416",
+            "retrieval_sources": [
+              "vector"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "source_validation": {
+    "checked_matches": 20,
+    "source_documents": 4,
+    "all_offsets_match": true,
+    "all_checksums_match": true,
+    "all_versions_match": true,
+    "method": "Read-only comparison of browser-displayed source ranges/text against Core persisted documents; not used as plugin runtime fallback."
+  },
+  "read_only": true,
+  "core_restart": false,
+  "core_business_mutations": 0,
+  "local_knowledge_requests": 0,
+  "lexical_fallback_requests": 0,
+  "llm_answer_generation": false,
+  "limitations": "This is semantic retrieval browser acceptance with excerpts, scores and source/version details. It does not claim generated QA answers or a new live plugin STS exchange."
+}

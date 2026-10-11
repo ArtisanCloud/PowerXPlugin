@@ -37,23 +37,6 @@ ci-agent-assets: ## Check .codex/.specify path normalization
 
 skeleton-dist: ## Build skeleton dist package from repo root
 	@$(MAKE) -C $(SKELETON_DIR) dist BACKEND=$(BACKEND) $(FORWARD_OPTIONAL_VARS)
-	@dist_version="$(VERSION)"; \
-	if [ -z "$$dist_version" ]; then dist_version="$$(awk -F': *' '/^version:/ {print $$2; exit}' $(SKELETON_DIR)/plugin.yaml)"; fi; \
-	dist_src="$(DIST_DIR)"; \
-	if [ -z "$$dist_src" ]; then dist_src="dist/$$dist_version"; fi; \
-	case "$$dist_src" in /*) abs_src="$$dist_src" ;; *) abs_src="$(SKELETON_DIR)/$$dist_src" ;; esac; \
-	alias_dir="$(SKELETON_DIR)/dist/mac"; \
-	test -d "$$abs_src" || { echo "❌ dist alias sync failed: source not found: $$abs_src"; exit 1; }; \
-	abs_src_real="$$(cd "$$abs_src" && pwd -P)"; \
-	mkdir -p "$(SKELETON_DIR)/dist"; \
-	abs_alias_real="$$(cd "$(SKELETON_DIR)/dist" && pwd -P)/mac"; \
-	if [ "$$abs_src_real" = "$$abs_alias_real" ]; then \
-	  echo "==> install upload alias already at: $$alias_dir"; \
-	else \
-	  rm -rf "$$alias_dir"; \
-	  cp -R "$$abs_src" "$$alias_dir"; \
-	  echo "==> synced install upload alias: $$alias_dir"; \
-	fi
 
 skeleton-install: ## Install skeleton dist to PowerX host (requires API_BASE/TOKEN)
 	@$(MAKE) -C $(SKELETON_DIR) local-install BACKEND=$(BACKEND) $(if $(API_BASE),API_BASE=$(API_BASE),) $(if $(TOKEN),TOKEN=$(TOKEN),) $(if $(ENABLE),ENABLE=$(ENABLE),) $(if $(FORCE),FORCE=$(FORCE),)
@@ -83,22 +66,3 @@ install-px-plugin \
 migrate migrate-cmd seed setup-db reset-db \
 test-admin lint-admin build-admin test-coverage lint fmt mod-tidy test-all integration-smoke check:
 	@$(MAKE) -C $(SKELETON_DIR) $@ BACKEND=$(BACKEND) $(FORWARD_OPTIONAL_VARS)
-	@if [ "$@" = "dist" ]; then \
-	  dist_version="$(VERSION)"; \
-	  if [ -z "$$dist_version" ]; then dist_version="$$(awk -F': *' '/^version:/ {print $$2; exit}' $(SKELETON_DIR)/plugin.yaml)"; fi; \
-	  dist_src="$(DIST_DIR)"; \
-	  if [ -z "$$dist_src" ]; then dist_src="dist/$$dist_version"; fi; \
-	  case "$$dist_src" in /*) abs_src="$$dist_src" ;; *) abs_src="$(SKELETON_DIR)/$$dist_src" ;; esac; \
-	  alias_dir="$(SKELETON_DIR)/dist/mac"; \
-	  test -d "$$abs_src" || { echo "❌ dist alias sync failed: source not found: $$abs_src"; exit 1; }; \
-	  abs_src_real="$$(cd "$$abs_src" && pwd -P)"; \
-	  mkdir -p "$(SKELETON_DIR)/dist"; \
-	  abs_alias_real="$$(cd "$(SKELETON_DIR)/dist" && pwd -P)/mac"; \
-	  if [ "$$abs_src_real" = "$$abs_alias_real" ]; then \
-	    echo "==> install upload alias already at: $$alias_dir"; \
-	  else \
-	    rm -rf "$$alias_dir"; \
-	    cp -R "$$abs_src" "$$alias_dir"; \
-	    echo "==> synced install upload alias: $$alias_dir"; \
-	  fi; \
-	fi

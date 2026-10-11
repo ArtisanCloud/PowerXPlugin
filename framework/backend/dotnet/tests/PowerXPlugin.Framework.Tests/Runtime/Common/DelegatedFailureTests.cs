@@ -17,11 +17,11 @@ public sealed class DelegatedFailureTests
     public async Task Scheduler_maps_unauthorized_and_missing_configuration()
     {
         var missing = new PowerXSchedulerClient(new PowerXSchedulerClientOptions(), new HttpClient(new StatusHandler(HttpStatusCode.OK)));
-        var unavailable = await Assert.ThrowsAsync<SchedulerAdapterException>(() => missing.GetJobAsync("job-1", "tenant-a"));
+        var unavailable = await Assert.ThrowsAsync<SchedulerAdapterException>(() => missing.GetJobAsync("00000000-0000-4000-8000-000000000010", "tenant-a"));
         Assert.Equal(SchedulerErrors.CodeUnavailable, unavailable.Code);
 
         var client = new PowerXSchedulerClient(Options(), new HttpClient(new StatusHandler(HttpStatusCode.Unauthorized)));
-        var unauthorized = await Assert.ThrowsAsync<SchedulerAdapterException>(() => client.GetJobAsync("job-1", "tenant-a"));
+        var unauthorized = await Assert.ThrowsAsync<SchedulerAdapterException>(() => client.GetJobAsync("00000000-0000-4000-8000-000000000010", "tenant-a"));
         Assert.Equal(SchedulerErrors.CodeUnauthorized, unauthorized.Code);
     }
 
@@ -44,7 +44,7 @@ public sealed class DelegatedFailureTests
 
         var iam = new PowerXIamClient(new PowerXIamClientOptions { BaseUrl = "https://core.example", Credential = "service-sts" }, new HttpClient(new ThrowingHandler()));
         var blocked = await Assert.ThrowsAsync<IAMAdapterException>(() => iam.ResolveIdentity("incoming-user-bearer"));
-        Assert.Equal(IAMErrors.CodeIdentityDelegationUnavailable, blocked.Code);
+        Assert.Equal(IAMErrors.CodeIdentityMigrationRequired, blocked.Code);
 
         var deniedIam = new PowerXIamClient(new PowerXIamClientOptions { BaseUrl = "https://core.example", Credential = "service-sts" }, new HttpClient(new StatusHandler(HttpStatusCode.Forbidden)));
         var iamForbidden = await Assert.ThrowsAsync<IAMAdapterException>(() => deniedIam.GetTenant("tenant-a"));

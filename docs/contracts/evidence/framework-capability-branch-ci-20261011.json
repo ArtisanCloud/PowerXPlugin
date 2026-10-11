@@ -1,0 +1,124 @@
+{
+  "verified_at": "2026-10-11T10:33:41.782877+00:00",
+  "branch": "009-consume-powerx-capability",
+  "base_branch": "develop",
+  "head_sha": "b087233162509da55c43dc62b9d4f87c73e61deb",
+  "original_head_preserved": "e93869ca9e42388441cc624bdbb02bab682b0e82",
+  "commits_added": [
+    "132f47934a885a6d648dac2776e3cecc9beced3c",
+    "f7623f61c81e692dee3029f53acc987e23acebf6",
+    "b087233162509da55c43dc62b9d4f87c73e61deb"
+  ],
+  "published_sdk_source": "f397b9f048449dfd1cca25847ed6976178356b97",
+  "published_sdk_source_matches": true,
+  "ci": {
+    "run_id": 38131414492,
+    "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/38131414492",
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 114446345195,
+        "name": "frontend",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 114446345278,
+        "name": "delegated-contract-guard",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 114446345296,
+        "name": "contracts",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 114446345308,
+        "name": "template-sync",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 114446345326,
+        "name": "cli",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 114446345342,
+        "name": "backend",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 114447312743,
+        "name": "smoke",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 114447657841,
+        "name": "regression",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "previous_attempts": [
+    {
+      "run_id": 38129583576,
+      "reason": "regression container missing CGO compiler"
+    },
+    {
+      "run_id": 38130471357,
+      "reason": "regression startup fixture missing ai_catalog.directory"
+    }
+  ],
+  "local_checks": {
+    "framework_go": "passed",
+    "skeleton_go": "passed",
+    "cli_go": "passed",
+    "frontend_auth_test_files": 7,
+    "frontend_auth_tests_passed": 122,
+    "nuxt_build": "passed",
+    "generated_backend_without_local_replace": "passed",
+    "template_sync": "passed",
+    "regression": "passed",
+    "regression_seconds": 102
+  },
+  "workflow_scope": {
+    "playwright_browser_e2e_enabled": false
+  },
+  "temporary_service": {
+    "parent_pid": 4937,
+    "script_pid": 4947,
+    "process_group": 4947,
+    "cwd": "/private/tmp/powerx-009-verify-myu439_e",
+    "command": "CI=true CGO_ENABLED=1 CC=clang REGRESSION_RUN_E2E=0 bash scripts/testing/regression.sh",
+    "backend_processes": [
+      {
+        "pid": 12316,
+        "ppid": 4947,
+        "pgid": 4947,
+        "command": "/private/tmp/powerx-009-verify-myu439_e/tmp/regression-plugin-bin"
+      }
+    ],
+    "port": 18078,
+    "all_owned_processes_stopped": true,
+    "port_released": true,
+    "exit_code": 0
+  },
+  "workspace_checkpoint_changed_files": [
+    ".github/workflows/ci.yml",
+    "AGENTS.md",
+    "scaffold/templates/AGENTS.md.tmpl",
+    "tools/cli/internal/templates/data/AGENTS.md.tmpl",
+    "docs/reviews/framework-ci-alignment-20261011.md"
+  ],
+  "additional_agents_rule_updates_preserved": true,
+  "pull_request_created": false,
+  "auxiliary_branches_merged_or_deleted": false
+}

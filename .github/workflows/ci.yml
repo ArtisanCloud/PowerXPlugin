@@ -10,6 +10,24 @@ permissions:
   contents: read
 
 jobs:
+  dist-target:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          token: ${{ secrets.CI_CHECKOUT_TOKEN || github.token }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: Install manifest tooling
+        run: npm ci --ignore-scripts --workspaces=false
+      - name: Verify artifact target and actual Go binaries
+        run: node --test tests/packaging/dist-target.test.mjs
+
   delegated-contract-guard:
     runs-on: ubuntu-latest
     steps:

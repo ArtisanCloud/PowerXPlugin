@@ -1,4 +1,52 @@
 {
+  "knowledgeTaskProcess": {
+    "title": "任务执行过程",
+    "counts": {
+      "total": "总任务",
+      "ready": "待提交",
+      "waiting": "待执行",
+      "running": "处理中",
+      "succeeded": "成功",
+      "failed": "失败"
+    },
+    "phases": {
+      "ready": "待提交",
+      "reading": "读取文件",
+      "submitting": "提交中",
+      "accepted": "已受理",
+      "queued": "排队中",
+      "running": "执行中",
+      "succeeded": "已完成",
+      "failed": "失败",
+      "blocked": "等待处理",
+      "unknown": "状态不可用"
+    },
+    "ended": "已结束 {count} / {total} 个任务",
+    "progress": "执行进度 {count}%",
+    "runningWithoutPercent": "正在处理，后台尚未提供执行百分比。",
+    "refreshStatus": "刷新状态",
+    "empty": "暂无本次提交任务。",
+    "unavailable": "暂时无法读取任务状态，请查看错误信息并刷新重试。",
+    "traceDetails": "追踪信息",
+    "viewTask": "查看任务",
+    "loadChunks": "读取分块",
+    "chunksPending": "任务成功后可读取已保存的分块。",
+    "chunks": "{count} 个分块",
+    "duration": {
+      "request": "请求耗时：{value}",
+      "execution": "执行耗时：{value}"
+    },
+    "milliseconds": "{count} 毫秒",
+    "seconds": "{count} 秒",
+    "modes": {
+      "lexical_chunks": "文本分块 / lexical 索引",
+      "local_vector": "Local 向量索引",
+      "other": "其他索引模式"
+    },
+    "acceptanceHint": "受理只表示任务已提交。可查看任务并刷新状态，以后台返回的终态为准。",
+    "manualRefreshHint": "点击“刷新状态”读取后台最新结果；当前未连接实时进度。",
+    "historyScope": "当前显示本次提交任务，完整文档和任务历史尚未接入。"
+  },
   "localIntelligence": {
     "category": "智能体",
     "agents": "智能体管理",
@@ -2639,7 +2687,7 @@
       "requestFailed": "知识库请求失败（{code}），请检查接口状态后重试。",
       "accepted": "已提交，等待 Core 索引处理",
       "ingestionSettingsUnavailable": "PowerX 当前文档接口仅支持 Markdown／纯文本内容，不接收入库策略和分段快照；策略和分段配置暂不可用，且不会提交。任务接收不代表索引完成，当前链路未提供入库进度事件。",
-      "documentsUnavailable": "PowerX 当前委托接口未提供文档列表、入库历史和 chunk 检查；无法读取这些记录。",
+      "documentsUnavailable": "PowerX 当前委托接口尚未提供完整文档列表和入库历史。可读取本次提交任务的配置与分块快照。",
       "sourcesUnavailable": "PowerX 当前委托接口未提供连接器目录及创建数据源能力。",
       "strategyUnavailable": "可读取 PowerX 策略目录，但当前委托接口未提供空间策略详情与修改能力。",
       "submittedJobs": "本次提交任务（非完整入库历史）",
@@ -2654,8 +2702,43 @@
       "uploadFilesHelp": "支持 TXT 和 Markdown；可一次选择多个文件，每个文件独立提交至 PowerX。",
       "snapshotBlockedTitle": "配置尚不能提交到 PowerX",
       "snapshotBlockedDescription": "以上策略与分段设置为本次入库草稿。PowerX 文档接口尚未接收入库配置快照，当前无法提交此任务；不会忽略配置后仅上传文档。请由 Core 补齐快照的接收、校验、执行和回读合同后重试。",
+      "boundStrategy": "使用空间绑定策略",
+      "boundProfile": "使用空间绑定的已发布 Profile",
+      "boundStrategyHint": "本任务使用空间已绑定的策略与 Profile；Core 会冻结其 UUID 和版本。本接口不支持任务级策略覆盖。",
+      "lexicalHint": "当前执行 TXT/Markdown 实际分块与 lexical 索引；语义分段、PDF 分页和独立处理/脱敏 Profile 暂不支持。",
+      "hostSeparatorsHint": "每行一个字面分隔符；填写 \\n 或 \\t 时会转换为实际换行或制表符。允许留空，不会自动补充分隔符。",
+      "invalidSegmentation": "请检查分段参数：长度、重叠、格式与模式必须匹配，锚点只能用于对应分段模式，TXT/Markdown 不支持分页优先。",
+      "snapshotDetails": "配置快照与技术详情",
+      "traceId": "Trace ID",
+      "profileUnavailableTitle": "空间“{space}”的 Profile 不可用",
+      "profileUnavailableHint": "当前空间未绑定有效的已发布 Profile，或其 UUID/版本已失效。请由 PowerX Core 修复该空间的 Profile 绑定后，点击“重试失败文件”。文件内容和本次参数仍保留，不会自动改用其他 Profile。",
+      "retryFailed": "重试失败文件（{count}）",
+      "ingestionErrors": {
+        "KNOWLEDGE_PROFILE_UNAVAILABLE": "空间“{space}”的已发布 Profile 绑定不可用，请由 PowerX Core 修复后重试。",
+        "KNOWLEDGE_UNSUPPORTED_INGESTION_SETTING": "PowerX 不支持本次入库配置，请返回修改配置后重试。",
+        "KNOWLEDGE_INVALID_ARGUMENT": "PowerX 拒绝了本次参数，请返回检查配置后重试。",
+        "KNOWLEDGE_INVALID_DOCUMENT": "文档参数不符合 PowerX 要求，请检查内容及格式后重试。",
+        "KNOWLEDGE_FORBIDDEN": "当前服务凭证未获文档入库授权，请修复授权后重试。",
+        "KNOWLEDGE_UNAUTHORIZED": "PowerX 服务凭证不可用，请恢复连接凭证后重试。",
+        "KNOWLEDGE_SPACE_NOT_FOUND": "当前服务租户无法访问空间“{space}”，请检查空间与租户后重试。"
+      },
       "snapshotDraftTitle": "本次任务配置草稿",
-      "snapshotDraftDescription": "此处是可编辑的配置草稿；PowerX 快照合同接通前，不会保存或应用到索引任务。"
+      "snapshotDraftDescription": "此处是可编辑的配置草稿；PowerX 快照合同接通前，不会保存或应用到索引任务。",
+      "rebuild": {
+        "document": "重建本篇文档",
+        "space": "重建整个空间",
+        "description": "选择配置来源，提交异步重建任务。",
+        "documentScope": "本次仅处理所选文档；文档 UUID 保持不变。",
+        "spaceScope": "本次将重建当前空间中的文档，请确认操作范围。",
+        "mode": "配置来源",
+        "reuse_snapshot": "沿用上次成功配置",
+        "apply_config": "应用新配置",
+        "reuseHint": "使用上次成功任务的冻结配置，不读取最新 Profile。",
+        "applyHint": "重新校验并冻结当前空间绑定的策略与 Profile，应用以下分段参数。",
+        "indexHint": "处理期间保留旧成功索引；Core 在新任务全部成功后切换，失败不会替换旧索引。",
+        "submit": "提交重建任务",
+        "progress": "已处理 {count} / {total} 篇文档"
+      }
     }
   },
   "identityLab": {
@@ -2701,6 +2784,129 @@
       "CAPABILITY_FORBIDDEN": "当前凭证未获得能力授权。",
       "CUSTOMER_EXTERNAL_IDENTITY_SERVICE_ACTOR_INVALID": "凭证缺少可信插件身份。"
     }
+  },
+  "knowledgeSemantic": {
+    "setup": {
+      "configureTitle": "先配置语义索引模型",
+      "configureHint": "此空间尚未绑定语义索引的 Embedding 模型。展开“配置或更新模型绑定”，填写 Core 已配置的 Embedding Profile Key，再校验并冻结配置。",
+      "dependencyTitle": "语义索引通道尚未就绪",
+      "dependencyHint": "请核对模型与向量存储状态，待通道恢复后刷新。不会自动改用字面检索。",
+      "indexTitle": "模型已就绪，尚无发布向量索引",
+      "indexHint": "已有 lexical 分块不等于向量数据。使用语义或混合配置提交/重建索引，等任务成功后刷新本页。",
+      "reason": "当前就绪状态：{code}",
+      "retrievalOnly": "验证知识召回：返回相关片段、分数和来源。本页暂不生成大模型答案。",
+      "queryBlocked": "请先完成上方模型绑定和向量索引准备，检索就绪后即可输入自然语言问题。",
+      "modeUnavailable": "当前语料未发布所选检索模式。请选择已支持模式，或按该模式建立索引后刷新。"
+    },
+    "errors": {
+      "routeUnavailable": "语义检索接口地址不可用（HTTP {status}）。请确认插件后端已加载当前版本的路由后刷新。",
+      "httpFailed": "知识库请求失败（HTTP {status}），请检查接口响应后重试。",
+      "requestFailed": "知识库请求失败，响应未提供可识别的错误码或 HTTP 状态。请检查接口响应后重试。"
+    },
+    "indexTitle": "语义索引与模型版本",
+    "configured": "已配置",
+    "unconfigured": "未配置",
+    "ready": "通道就绪",
+    "notReady": "通道未就绪",
+    "indexed": "已有发布索引",
+    "notIndexed": "尚无发布索引",
+    "activeModel": "当前模型",
+    "dimensions": "向量维度",
+    "environment": "环境",
+    "pendingModel": "待发布模型：{model}，{dimensions} 维；当前查询继续使用已发布版本。",
+    "indexCount": "{mode}：{documents} 篇文档，{chunks} 个分块",
+    "configure": "配置或更新模型绑定",
+    "configureHint": "先在 PowerX 激活空间的 Embedding 模型，再填写空间绑定的 Profile 标识。新配置可能进入待发布状态，需要明确执行空间重建后发布。",
+    "profileKey": "Embedding Profile 标识",
+    "configureAction": "校验并冻结配置",
+    "versionDetails": "版本与调用技术详情",
+    "queryMode": "检索模式",
+    "localLexical": "本地检索",
+    "requireGeneration": "要求当前已读取的语料版本",
+    "filters": "结构化过滤与技术参数",
+    "artifactRoles": "检索内容类型",
+    "categoryCodes": "分类编码",
+    "documentUUIDs": "Core 文档 UUID（技术过滤）",
+    "tagUUIDs": "标签 UUID（技术过滤）",
+    "resultMode": "实际检索模式：{mode}",
+    "sourcePosition": "来源：{kind} · 版本 {version} · Unicode 字符区间 [{start}, {end})",
+    "sourceDetails": "来源与版本技术详情",
+    "hideDocument": "取消文档的可查询资格",
+    "hideHint": "提交后，此文档会立即从新的检索结果中排除。当前结果也会清空。",
+    "indexMode": "索引模式",
+    "modelGeneration": "模型版本选择",
+    "pendingChoice": "待发布模型",
+    "profileMock": "联调画像文本（可选）",
+    "profileMockHint": "手动提供测试画像，与原文一起提交；Framework 不负责抽取业务画像。",
+    "pendingRebuildHint": "选择待发布模型可能要求重建整个空间。单篇任务失败时不会自动扩大范围。",
+    "artifactCount": "实际 artifact 数",
+    "vectorCount": "实际发布向量数",
+    "indexHint": "以 Core 任务终态和真实产物为准；受理与运行中不代表已经发布。",
+    "modes": {
+      "lexical_chunks": "字面分块索引",
+      "semantic": "向量语义检索",
+      "hybrid": "混合检索"
+    },
+    "roles": {
+      "source_chunk": "原文",
+      "knowledge_profile": "知识画像"
+    },
+    "scores": {
+      "cosine_distance": "余弦距离",
+      "cosine_similarity": "余弦相似度",
+      "postgres_text_rank": "全文排序分",
+      "rrf": "RRF 融合分"
+    },
+    "directions": {
+      "higher_better": "越大越靠前",
+      "lower_better": "越小越靠前"
+    },
+    "sources": {
+      "raw_document": "原始文档",
+      "cleaned_document": "清洗文档",
+      "knowledge_profile": "画像快照"
+    }
+  },
+  "knowledgeSearch": {
+    "title": "知识检索测试",
+    "checking": "正在检查",
+    "statusUnavailable": "知识库状态不可用",
+    "ready": "知识库已就绪",
+    "notReady": "知识库尚未就绪",
+    "documentCount": "{count} 份文档",
+    "description": "输入问题，查看知识库中的相关片段和来源。此处仅测试检索，不生成 AI 回答。",
+    "indexSettings": "索引设置",
+    "prepareHint": "完成模型配置和文档索引后，即可开始检索。",
+    "prepareAction": "查看索引设置",
+    "questionLabel": "想查什么？",
+    "questionPlaceholder": "输入你想了解的问题，例如某个流程的步骤、配置方法或使用限制。",
+    "activeSettings": "{mode} · 最多 {count} 个片段",
+    "searchAction": "检索知识",
+    "advancedSettings": "高级检索设置",
+    "optionalFilters": "筛选条件（选填）",
+    "resultsTitle": "相关知识（{count} 个片段）",
+    "resultsHint": "片段来自原文，可展开阅读全文。",
+    "sourceLabel": "来源：{kind}",
+    "collapseSnippet": "收起片段",
+    "expandSnippet": "展开片段",
+    "resultDetails": "分数与来源详情"
+  },
+  "knowledgeContent": {
+    "title": "本空间内容",
+    "viewDocuments": "查看文章（{count}）",
+    "unavailable": "当前链路尚未接入文章目录，暂时无法展示内容导览。检索仍可使用。",
+    "empty": "这个目录暂无文章。",
+    "browseHint": "先浏览文章的原文预览，再选择你想了解的内容提问。",
+    "suggestedQuestions": "推荐问题：",
+    "startFromArticle": "从文章开始：",
+    "directoryTitle": "空间文章",
+    "queryableScope": "这里展示当前检索模式与语料版本下可检索的文章；预览来自对应原文。",
+    "spaceScope": "这里展示本空间的文章目录。原文预览不是 AI 摘要，也不代表每篇文章都已完成索引。",
+    "originalPreview": "原文预览",
+    "noPreview": "这篇文章尚无可用的原文预览。",
+    "askArticle": "围绕这篇提问",
+    "articleQuestion": "《{title}》主要介绍了哪些内容？",
+    "moreArticles": "加载更多文章"
   },
   "hostSession": {
     "required": "PowerX 会话不可用，请回到宿主重新登录或重新同步。",

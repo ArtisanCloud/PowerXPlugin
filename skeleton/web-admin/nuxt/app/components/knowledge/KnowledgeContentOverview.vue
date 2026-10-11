@@ -1,0 +1,298 @@
+<template>
+  <section
+    class="rounded-xl border border-slate-200 bg-white p-4 text-gray-900 dark:border-slate-700 dark:bg-[#0f192a] dark:text-slate-100"
+  >
+    <header class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-sm font-semibold">{{ t('knowledgeContent.title') }}</h2>
+      <UButton
+        v-if="state === 'ready' && overview?.total"
+        type="button"
+        size="xs"
+        color="neutral"
+        variant="outline"
+        @click="directoryOpen = true"
+      >
+        {{ t('knowledgeContent.viewDocuments', { count: overview.total }) }}
+      </UButton>
+      <span v-else-if="state === 'loading'" class="text-xs text-gray-500 dark:text-slate-400">
+        {{ t('common.loading') }}
+      </span>
+    </header>
+    <p v-if="state === 'unavailable'" class="mt-2 text-xs text-gray-600 dark:text-slate-300">
+      {{ t('knowledgeContent.unavailable') }}
+    </p>
+    <div v-else-if="state === 'error'" class="mt-2 space-y-2">
+      <p class="text-sm text-red-600 dark:text-red-300">{{ error }}</p>
+      <UButton type="button" size="xs" color="neutral" variant="outline" @click="load()">
+        {{ t('common.retry') }}
+      </UButton>
+    </div>
+    <template v-else-if="state === 'ready' && overview">
+      <p v-if="!overview.total" class="mt-2 text-sm text-gray-600 dark:text-slate-300">
+        {{ t('knowledgeContent.empty') }}
+      </p>
+      <template v-else>
+        <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-slate-300">
+          {{ overview.summary || t('knowledgeContent.browseHint') }}
+        </p>
+        <div v-if="overview.topics.length" class="mt-2 flex flex-wrap gap-2">
+          <UBadge v-for="topic in overview.topics" :key="topic" color="neutral" variant="soft">
+            {{ topic }}
+          </UBadge>
+        </div>
+        <div v-if="suggestions.length" class="mt-3 flex flex-wrap items-center gap-2">
+          <span class="text-xs text-gray-500 dark:text-slate-400">
+            {{ t('knowledgeContent.suggestedQuestions') }}
+          </span>
+          <UButton
+            v-for="suggestion in suggestions"
+            :key="suggestion.documentUUID + suggestion.text"
+            type="button"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :title="suggestion.title"
+            :disabled="disabled"
+            @click="pickQuestion(suggestion.text)"
+          >
+            {{ suggestion.text }}
+          </UButton>
+        </div>
+        <div v-else class="mt-3 flex flex-wrap items-center gap-2">
+          <span class="text-xs text-gray-500 dark:text-slate-400">
+            {{ t('knowledgeContent.startFromArticle') }}
+          </span>
+          <UButton
+            v-for="document in overview.documents.slice(0, 3)"
+            :key="document.uuid"
+            type="button"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            :disabled="disabled"
+            @click="askDocument(document)"
+          >
+            {{ document.title }}
+          </UButton>
+        </div>
+      </template>
+    </template>
+    <UModal
+      v-model:open="directoryOpen"
+      :title="t('knowledgeContent.directoryTitle')"
+      :description="spaceName"
+      :close="{ 'aria-label': t('common.close') }"
+      :ui="{ content: 'max-w-3xl w-[94vw] mx-auto', body: 'p-4 sm:p-5' }"
+      @after:leave="emitPendingQuestion"
+    >
+      <template #body>
+        <p class="mb-4 text-xs text-gray-600 dark:text-slate-300">
+          {{
+            t(
+              overview?.scope === 'queryable_documents'
+                ? 'knowledgeContent.queryableScope'
+                : 'knowledgeContent.spaceScope'
+            )
+          }}
+        </p>
+        <div class="space-y-3">
+          <article
+            v-for="document in overview?.documents"
+            :key="document.uuid"
+            class="rounded-xl border border-slate-200 p-4 text-gray-900 dark:border-slate-700 dark:text-slate-100"
+          >
+            <h3 class="break-words font-semibold">{{ document.title }}</h3>
+            <p class="mt-2 text-xs text-gray-500 dark:text-slate-400">
+              {{ t('knowledgeContent.originalPreview') }}
+            </p>
+            <p
+              v-if="document.preview"
+              class="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600 dark:text-slate-300"
+            >
+              {{ document.preview }}
+            </p>
+            <p v-else class="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              {{ t('knowledgeContent.noPreview') }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <UButton
+                v-for="question in document.suggested_questions"
+                :key="question"
+                type="button"
+                size="xs"
+                color="neutral"
+                variant="soft"
+                :disabled="disabled"
+                @click="pickQuestion(question)"
+              >
+                {{ question }}
+              </UButton>
+              <UButton
+                type="button"
+                size="xs"
+                color="neutral"
+                variant="outline"
+                :disabled="disabled"
+                @click="askDocument(document)"
+              >
+                {{ t('knowledgeContent.askArticle') }}
+              </UButton>
+            </div>
+          </article>
+          <p v-if="pageError" class="text-sm text-red-600 dark:text-red-300">{{ pageError }}</p>
+          <UButton
+            v-if="overview?.next_cursor"
+            type="button"
+            color="neutral"
+            variant="outline"
+            :loading="pageLoading"
+            @click="loadMore"
+          >
+            {{ t('knowledgeContent.moreArticles') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
+  </section>
+</template>
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import type { RetrievalMode } from '~/composables/api/knowledgeSemanticTypes'
+import { useKnowledgeWorkspace } from '~/composables/api/useKnowledgeWorkspace'
+import {
+  validateContentOverview,
+  type KnowledgeContentDocument,
+  type KnowledgeContentOverview,
+  type KnowledgeContentRequest
+} from '~/composables/knowledge/contentOverview'
+import { formatKnowledgeRequestFailure } from '~/composables/knowledge/requestFailure'
+const props = defineProps<{
+  spaceUUID: string
+  spaceName: string
+  disabled?: boolean
+  retrievalMode?: RetrievalMode
+  corpusGeneration?: string
+}>()
+const emit = defineEmits<{ question: [string] }>()
+const { t } = useI18n()
+const workspace = useKnowledgeWorkspace()
+const state = ref<'unavailable' | 'loading' | 'ready' | 'error'>('unavailable')
+const overview = ref<KnowledgeContentOverview>()
+const error = ref('')
+const pageError = ref('')
+const pageLoading = ref(false)
+const directoryOpen = ref(false)
+let sequence = 0
+let pendingQuestion: string | undefined
+const suggestions = computed(() =>
+  (overview.value?.documents || [])
+    .flatMap((document) =>
+      document.suggested_questions.map((text) => ({
+        documentUUID: document.uuid,
+        title: document.title,
+        text
+      }))
+    )
+    .slice(0, 4)
+)
+function request(cursor?: string): KnowledgeContentRequest {
+  return {
+    ...(props.retrievalMode ? { mode: props.retrievalMode } : {}),
+    ...(props.corpusGeneration ? { corpus_generation: props.corpusGeneration } : {}),
+    ...(cursor ? { cursor } : {})
+  }
+}
+async function load() {
+  const current = ++sequence
+  directoryOpen.value = false
+  pendingQuestion = undefined
+  overview.value = undefined
+  error.value = ''
+  pageError.value = ''
+  pageLoading.value = false
+  if (!workspace.contentOverview) {
+    state.value = 'unavailable'
+    return
+  }
+  state.value = 'loading'
+  const space = props.spaceUUID
+  const input = request()
+  try {
+    const value = validateContentOverview(
+      await workspace.contentOverview(space, input),
+      space,
+      input
+    )
+    if (current !== sequence) return
+    overview.value = value
+    state.value = 'ready'
+  } catch (e) {
+    if (current !== sequence) return
+    error.value = formatKnowledgeRequestFailure(e, t)
+    state.value = 'error'
+  }
+}
+async function loadMore() {
+  if (!overview.value?.next_cursor || !workspace.contentOverview || pageLoading.value) return
+  const current = sequence
+  const previous = overview.value
+  const input = request(previous.next_cursor)
+  pageLoading.value = true
+  pageError.value = ''
+  try {
+    const value = validateContentOverview(
+      await workspace.contentOverview(props.spaceUUID, input),
+      props.spaceUUID,
+      input
+    )
+    if (current !== sequence) return
+    const seen = new Set(previous.documents.map((document) => document.uuid))
+    if (
+      value.total !== previous.total ||
+      value.scope !== previous.scope ||
+      value.corpus_generation !== previous.corpus_generation ||
+      value.next_cursor === previous.next_cursor ||
+      value.documents.some((document) => seen.has(document.uuid)) ||
+      previous.documents.length + value.documents.length > value.total ||
+      (!value.next_cursor && previous.documents.length + value.documents.length !== value.total)
+    )
+      throw { data: { code: 'KNOWLEDGE_INVALID_RESPONSE' } }
+    overview.value = {
+      ...previous,
+      documents: [...previous.documents, ...value.documents],
+      next_cursor: value.next_cursor
+    }
+  } catch (e) {
+    if (current === sequence) pageError.value = formatKnowledgeRequestFailure(e, t)
+  } finally {
+    if (current === sequence) pageLoading.value = false
+  }
+}
+function pickQuestion(question: string) {
+  if (props.disabled) return
+  if (directoryOpen.value) {
+    pendingQuestion = question
+    directoryOpen.value = false
+  } else emit('question', question)
+}
+function askDocument(document: KnowledgeContentDocument) {
+  pickQuestion(t('knowledgeContent.articleQuestion', { title: document.title }))
+}
+function emitPendingQuestion() {
+  if (pendingQuestion !== undefined) {
+    emit('question', pendingQuestion)
+    pendingQuestion = undefined
+  }
+}
+watch(
+  () => [props.spaceUUID, props.retrievalMode, props.corpusGeneration],
+  () => {
+    void load()
+  },
+  { immediate: true }
+)
+onBeforeUnmount(() => {
+  sequence++
+  pendingQuestion = undefined
+})
+</script>

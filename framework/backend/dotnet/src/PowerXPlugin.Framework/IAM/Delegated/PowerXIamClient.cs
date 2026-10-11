@@ -11,6 +11,8 @@ namespace PowerXPlugin.Framework.IAM.Delegated;
 
 public sealed class PowerXIamClientOptions
 {
+    public string PluginId { get; init; } = "";
+    public PowerXPlugin.Framework.Runtime.Common.IServiceCredentialProvider? Credentials { get; init; }
     public string BaseUrl { get; init; } = string.Empty;
     public string Credential { get; init; } = string.Empty;
     public string AuthScheme { get; init; } = "Bearer";
@@ -22,7 +24,7 @@ public sealed class PowerXIamClientOptions
 /// configured service credential for directory and authorization operations;
 /// it never promotes an incoming administrator bearer into that credential.
 /// </summary>
-public sealed class PowerXIamClient : IDirectoryService, IAuthzService, IIdentityContextService
+public sealed partial class PowerXIamClient : IDirectoryService, IAuthzService, IIdentityContextService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http;
@@ -31,7 +33,7 @@ public sealed class PowerXIamClient : IDirectoryService, IAuthzService, IIdentit
     public PowerXIamClient(PowerXIamClientOptions options, HttpClient? httpClient = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _http = httpClient ?? new HttpClient();
+        _http = httpClient ?? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
         if (httpClient == null && options.Timeout > TimeSpan.Zero) _http.Timeout = options.Timeout;
     }
 
@@ -116,7 +118,7 @@ public sealed class PowerXIamClient : IDirectoryService, IAuthzService, IIdentit
         // The Framework never forwards an inbound user bearer through its
         // service-to-host client. Core must expose a dedicated delegated
         // identity-exchange contract before this operation can be enabled.
-        return Task.FromException<IdentityContext?>(new IAMAdapterException(IAMErrors.CodeIdentityDelegationUnavailable));
+        return Task.FromException<IdentityContext?>(new IAMAdapterException("IAM_IDENTITY_MIGRATION_REQUIRED"));
     }
 
     // Core publishes numeric member status; the public Framework model retains

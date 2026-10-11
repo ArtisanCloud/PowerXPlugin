@@ -23,7 +23,9 @@ BUILD_DIR=backend/out VERSION=0.1.1 make build
 | --- | --- | --- |
 | `VERSION` | `0.1.0` | 当前插件版本号，影响产物目录与包名 |
 | `PLATFORM` | `host` | `dist` 后端目标平台：`host`（本机）或 `linux` |
-| `TARGET_ARCH` | `amd64` | 目标架构（当 `PLATFORM=linux` 时生效） |
+| `TARGET_ARCH` | `amd64` | Linux 编译架构，只允许 `amd64` / `arm64`；不参与本机构建的 target 写入 |
+| `DIST_OS` / `DIST_ARCH` | 无 | 无 Go 二进制的构建必须显式成对提供；例如 `BACKEND=fastapi` |
+| `DIST_DIR` | `dist/$(VERSION)` | 本次唯一的产物目录；不同平台分别指定不同目录 |
 | `BUILD_DIR` | `backend/bin` | Go 二进制输出目录 |
 | `FRONTEND_BUILD_CMD` | `npm --prefix web-admin run build` | 前端构建命令，可结合 CI 需求调整 |
 | `DIST_ROOT` | `dist` | 提供给 PowerX `install/local` 的目录根 |
@@ -64,7 +66,7 @@ make help
    ```
    Linux 目标（常用于在 macOS 上构建可部署到 Linux 的后端）：
    ```bash
-   make dist DIST_VERSION=0.1.1-linux PLATFORM=linux TARGET_ARCH=amd64
+   make dist VERSION=0.1.1 PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/linux-amd64
    ```
 3. 调用 PowerX 的安装接口时，`src_dir` 指向 `$(pwd)/dist/$(VERSION)` 即可，目录内至少包含：
    - `plugin.yaml`
@@ -78,6 +80,41 @@ make help
 - `plugin.yaml` 中 `POWERX_BIND_ADDR` 使用 `:__POWERX_DYNAMIC_PORT__`，插件后端端口由 PowerX 宿主在启用时分配并注入。
 - 插件后端访问宿主网关使用运行时注入的 `PX_GATEWAY_BASE_URL`，浏览器侧 public 地址使用运行时注入的 `NUXT_PUBLIC_POWERX_CORE_BASE` / `NUXT_PUBLIC_WS_ORIGIN`。
 - dev 环境若 PowerX 后端为 `server.port: 8081`、Web Admin 为 `web_admin_port: 3001`，这些值应来自 `/etc/powerx-dev/config.yaml` 和 systemd env，而不是 dist 目录。
+
+## 产物目标系统与架构
+
+`make dist` 在复制清单并写入本次版本号之后，只修改产物目录里的 `plugin.yaml`，补上唯一的目标声明：
+
+```yaml
+target:
+  os: darwin
+  arch: arm64
+```
+
+源码 `plugin.yaml` 保持原样，不写系统或架构；产物中已有的 `target` 会被本次构建结果完整覆盖。两个字段必须成对出现：`os` 只允许 `linux`、`darwin`、`windows`，`arch` 只允许 `amd64`、`arm64`。
+
+- 默认 `PLATFORM=host` 使用 `go env GOOS`、`go env GOARCH`，与本次 Go 编译目标一致。Apple Silicon 默认得到 `darwin/arm64`；默认的 `TARGET_ARCH=amd64` 不用于本机构建。
+- `PLATFORM=linux` 使用 `os=linux`、`arch=$(TARGET_ARCH)`。
+- 打包结束必须用 `go version -m` 校验产物的主程序及可选迁移程序；它们的 `GOOS`、`GOARCH` 必须与清单的 `target` 一致。缺少构建元数据或目标不一致会使 `make dist` 失败，此检查不受 `DIST_VERIFY=0` 影响。
+- 没有 Go 二进制的插件由构建命令显式传入 `DIST_OS`、`DIST_ARCH`，不从目录名或本机 Go 配置猜测。FastAPI 示例：
+
+  ```bash
+  make dist BACKEND=fastapi DIST_OS=linux DIST_ARCH=arm64 DIST_DIR=dist/linux-arm64
+  ```
+
+  该路径复制 Python 应用及依赖/迁移声明，不要求 Go 二进制；声明的目标由构建命令负责。
+
+多个系统或架构使用相同版本号、分别打一个目录：
+
+```bash
+make dist VERSION=0.1.1 DIST_DIR=dist/darwin-arm64
+make dist VERSION=0.1.1 PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/linux-amd64
+make dist VERSION=0.1.1 PLATFORM=linux TARGET_ARCH=arm64 DIST_DIR=dist/linux-arm64
+```
+
+以上本机构建例子针对 Apple Silicon。每次只生成指定的 `DIST_DIR`，仓库根入口不再额外复制到 `dist/mac`；目录名 `mac` 不作为系统/架构约定。在本仓库根目录使用代理入口时，相对 `DIST_DIR` 仍相对于 `skeleton/`；生成插件项目中相对于项目根目录。
+
+市场后续应只读产物 `plugin.yaml` 的 `target` 来填写上传页系统与架构。**当前这段信息尚未接入上传页**。
 
 ## Release 产物
 `make release` 会在项目根目录下创建 `target/<version>/`，目录结构示例：
@@ -103,7 +140,7 @@ make package-release
   ```
 - 选择不同二进制平台：
   ```bash
-  make dist DIST_VERSION=0.1.1-linux PLATFORM=linux TARGET_ARCH=amd64
+  make dist VERSION=0.1.1 PLATFORM=linux TARGET_ARCH=amd64 DIST_DIR=dist/linux-amd64
   ```
 - 更换发布目录根位置：
   ```bash

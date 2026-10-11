@@ -1,4 +1,27 @@
 permissions:
+  - action: read
+    business_permission_code: runtime.realtime:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    description_i18n:
+      en: Allows opening realtime connections; topic and identity scope are checked separately.
+      zh-CN: 允许建立实时连接；订阅仍需检查 topic 和身份作用域。
+    module: runtime
+    permission_code: runtime.realtime_api:read
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /ws
+        resource_scope: tenant
+    resource: realtime_api
+    risk_level: low
+    title_i18n:
+      en: Realtime connection
+      zh-CN: 实时连接
+    type: api
   - data_scope: tenant
     default_role_grants:
       - role_owner
@@ -2232,6 +2255,11 @@ routes:
   adminManifest: /api/v1/admin/manifest
   basePath: /api/v1
   permissions:
+    - method: GET
+      path: /ws
+      permission:
+        action: read
+        resource: runtime.realtime
     - method: POST
       path: /admin/notifications/test
       permission:

@@ -262,7 +262,8 @@ func (c *Client) DelegatedCapabilities(context.Context) fwknowledge.ProviderCapa
 		fwknowledge.OperationCatalog, fwknowledge.OperationCreate,
 		fwknowledge.OperationRetrieve, fwknowledge.OperationSearch, fwknowledge.OperationUpsert,
 		fwknowledge.OperationDelete, fwknowledge.OperationReindex, fwknowledge.OperationHealth,
-		fwknowledge.OperationSemanticCapabilities, fwknowledge.OperationSemanticQuery, fwknowledge.OperationSemanticConfigure, fwknowledge.OperationDocumentVisibility)
+		fwknowledge.OperationSemanticCapabilities, fwknowledge.OperationSemanticQuery, fwknowledge.OperationSemanticConfigure, fwknowledge.OperationDocumentVisibility,
+		fwknowledge.OperationContentOverview)
 }
 
 func (c *Client) ListKnowledgeSpaces(ctx context.Context, input fwknowledge.ListSpacesInput) ([]fwknowledge.KnowledgeSpace, error) {

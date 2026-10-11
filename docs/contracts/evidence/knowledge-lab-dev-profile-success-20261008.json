@@ -1,0 +1,491 @@
+{
+  "schema": "powerx.plugin.knowledge.dev-profile-browser-acceptance/v1",
+  "date": "2026-10-08",
+  "space_name": "dev",
+  "space_uuid": "30a6d654-c4c5-4a33-9806-6d66c6728187",
+  "mode": "local+proxy",
+  "core_evidence": "PowerX/docs/contracts/evidence/knowledge-dev-profile-bindings-20261008.json",
+  "default_case": {
+    "records_url": "http://127.0.0.1:3131/powerx/knowledge-lab/30a6d654-c4c5-4a33-9806-6d66c6728187/records?job_uuid=9f3f27bc-1a50-4166-a6b9-c92ee8802084&job_uuid=8f6c43ad-b3e4-46a2-a051-c81836b78006&job_title=dev-browser-20261008-default-one.md&job_title=dev-browser-20261008-default-two.txt",
+    "documents": [
+      {
+        "job_uuid": "9f3f27bc-1a50-4166-a6b9-c92ee8802084",
+        "title": "dev-browser-20261008-default-one.md",
+        "status": "succeeded",
+        "chunk_lengths": [
+          1024,
+          976
+        ],
+        "snapshot": {
+          "requested_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 1024,
+            "chunk_overlap": 0,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false
+          },
+          "effective_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "index_mode": "lexical_chunks",
+            "length_unit": "unicode_rune",
+            "strategy": {
+              "uuid": "b3641cd5-6fa3-543c-a3ff-34c169ab39dd",
+              "key": "h_fusion",
+              "version": 1
+            },
+            "ingestion_profile": {
+              "uuid": "4245b851-0710-4566-9f53-ecf3dd7e04cc",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "index_profile": {
+              "uuid": "81e39770-93dd-4903-918c-9847224d30a4",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "rag_profile": {
+              "uuid": "aa8c8f9c-6558-435d-a352-4727adb8163f",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 1024,
+            "chunk_overlap": 0,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false,
+            "source_checksum": "35338614fb0faf1d178b06cecc7690a501ad66c9ad07f7fc1a821fa63b610e79",
+            "source_version": "v1"
+          },
+          "snapshot_checksum": "50a09fc8993b8255624676197fdf86662d02068c4e69862a58a904d832979c09",
+          "trace_id": "c6a42535-4830-499c-8308-83d5f5c7aaaa"
+        }
+      },
+      {
+        "job_uuid": "8f6c43ad-b3e4-46a2-a051-c81836b78006",
+        "title": "dev-browser-20261008-default-two.txt",
+        "status": "succeeded",
+        "chunk_lengths": [
+          1024,
+          976
+        ],
+        "snapshot": {
+          "requested_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 1024,
+            "chunk_overlap": 0,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false
+          },
+          "effective_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "index_mode": "lexical_chunks",
+            "length_unit": "unicode_rune",
+            "strategy": {
+              "uuid": "b3641cd5-6fa3-543c-a3ff-34c169ab39dd",
+              "key": "h_fusion",
+              "version": 1
+            },
+            "ingestion_profile": {
+              "uuid": "4245b851-0710-4566-9f53-ecf3dd7e04cc",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "index_profile": {
+              "uuid": "81e39770-93dd-4903-918c-9847224d30a4",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "rag_profile": {
+              "uuid": "aa8c8f9c-6558-435d-a352-4727adb8163f",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 1024,
+            "chunk_overlap": 0,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false,
+            "source_checksum": "95f0b9824087cf69545be03bc02c8899577058e1bc7d4e22850151e413187da0",
+            "source_version": "v1"
+          },
+          "snapshot_checksum": "da8bb44ad5d89aea572001f3cfec3e2aec74bd5560a5de274dbf9ba2c1b80436",
+          "trace_id": "b9e4f461-44e1-4892-a943-536ec49a11e8"
+        }
+      }
+    ],
+    "network": [
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/catalog",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces/30a6d654-c4c5-4a33-9806-6d66c6728187/documents",
+        "status": 202
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces/30a6d654-c4c5-4a33-9806-6d66c6728187/documents",
+        "status": 202
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/9f3f27bc-1a50-4166-a6b9-c92ee8802084",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/8f6c43ad-b3e4-46a2-a051-c81836b78006",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/9f3f27bc-1a50-4166-a6b9-c92ee8802084/chunks",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/8f6c43ad-b3e4-46a2-a051-c81836b78006/chunks",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/catalog",
+        "status": 200
+      }
+    ]
+  },
+  "custom_case": {
+    "records_url": "http://127.0.0.1:3131/powerx/knowledge-lab/30a6d654-c4c5-4a33-9806-6d66c6728187/records?job_uuid=3d5246ce-475e-411f-8a84-85b0371729e6&job_uuid=15e30217-ac5f-441b-b97a-8c883668f79e&job_title=dev-browser-20261008-640-one.md&job_title=dev-browser-20261008-640-two.txt",
+    "documents": [
+      {
+        "job_uuid": "3d5246ce-475e-411f-8a84-85b0371729e6",
+        "title": "dev-browser-20261008-640-one.md",
+        "status": "succeeded",
+        "chunk_lengths": [
+          640,
+          640,
+          640,
+          320
+        ],
+        "overlap_80": [
+          true,
+          true,
+          true
+        ],
+        "snapshot": {
+          "requested_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 640,
+            "chunk_overlap": 80,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false
+          },
+          "effective_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "index_mode": "lexical_chunks",
+            "length_unit": "unicode_rune",
+            "strategy": {
+              "uuid": "b3641cd5-6fa3-543c-a3ff-34c169ab39dd",
+              "key": "h_fusion",
+              "version": 1
+            },
+            "ingestion_profile": {
+              "uuid": "4245b851-0710-4566-9f53-ecf3dd7e04cc",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "index_profile": {
+              "uuid": "81e39770-93dd-4903-918c-9847224d30a4",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "rag_profile": {
+              "uuid": "aa8c8f9c-6558-435d-a352-4727adb8163f",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 640,
+            "chunk_overlap": 80,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false,
+            "source_checksum": "9c4f8377367c280dc0563bc8ebe314cdb249a763b11f5329c998dfd8e9d5f066",
+            "source_version": "v1"
+          },
+          "snapshot_checksum": "3c971167132d1c100f875f8580f6b3095edc83ada0937b21f1cf9960204f4b27",
+          "trace_id": "b95a0df9-51b7-4726-8e5e-def681dd421b"
+        }
+      },
+      {
+        "job_uuid": "15e30217-ac5f-441b-b97a-8c883668f79e",
+        "title": "dev-browser-20261008-640-two.txt",
+        "status": "succeeded",
+        "chunk_lengths": [
+          640,
+          640,
+          640,
+          320
+        ],
+        "overlap_80": [
+          true,
+          true,
+          true
+        ],
+        "snapshot": {
+          "requested_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 640,
+            "chunk_overlap": 80,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false
+          },
+          "effective_config": {
+            "schema": "powerx.knowledge.document-ingestion/v1",
+            "index_mode": "lexical_chunks",
+            "length_unit": "unicode_rune",
+            "strategy": {
+              "uuid": "b3641cd5-6fa3-543c-a3ff-34c169ab39dd",
+              "key": "h_fusion",
+              "version": 1
+            },
+            "ingestion_profile": {
+              "uuid": "4245b851-0710-4566-9f53-ecf3dd7e04cc",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "index_profile": {
+              "uuid": "81e39770-93dd-4903-918c-9847224d30a4",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "rag_profile": {
+              "uuid": "aa8c8f9c-6558-435d-a352-4727adb8163f",
+              "version": 1,
+              "key": "p1_general",
+              "config_checksum": "f3cc9140a2d895067d09322029e09b9140c020e3757afa58991f0d21f1f14c03"
+            },
+            "priority": "normal",
+            "segment_mode": "unit",
+            "segment_size_policy": "cap",
+            "chunk_size": 640,
+            "chunk_overlap": 80,
+            "segment_order": [
+              "page",
+              "segment",
+              "separator",
+              "size"
+            ],
+            "separators": [],
+            "page_priority": false,
+            "anchor_heading_path": false,
+            "anchor_clause_id": false,
+            "anchor_row_number": false,
+            "anchor_speaker": false,
+            "anchor_sentence_index": false,
+            "source_checksum": "86739e32bc636607b3c3cf1a8ab018a045775e25da7c12802c4b0c714429b812",
+            "source_version": "v1"
+          },
+          "snapshot_checksum": "eba6096c3680e8b6aaec5d809fae053921a681a76cd2fdc535545b2228648ec9",
+          "trace_id": "b96968ff-1db9-4f9a-8d06-dab64bcefb25"
+        }
+      }
+    ],
+    "network": [
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/catalog",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces/30a6d654-c4c5-4a33-9806-6d66c6728187/documents",
+        "status": 202
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces/30a6d654-c4c5-4a33-9806-6d66c6728187/documents",
+        "status": 202
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/3d5246ce-475e-411f-8a84-85b0371729e6",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/15e30217-ac5f-441b-b97a-8c883668f79e",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/3d5246ce-475e-411f-8a84-85b0371729e6/chunks",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/index-jobs/15e30217-ac5f-441b-b97a-8c883668f79e/chunks",
+        "status": 200
+      }
+    ]
+  },
+  "search": {
+    "query": "devbrowser20261008",
+    "matched_document_titles": [
+      "dev-browser-20261008-default-one",
+      "dev-browser-20261008-default-two",
+      "dev-browser-20261008-640-one",
+      "dev-browser-20261008-640-two"
+    ],
+    "network": [
+      {
+        "method": "GET",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/spaces",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:8078/api/v1/admin/runtime/knowledge-lab/search",
+        "status": 200
+      }
+    ]
+  },
+  "local_knowledge_requests": 0,
+  "core_mutations_outside_test_submissions": 0,
+  "core_restarted": false,
+  "original_failed_queue_retried": false,
+  "verification_scope": "Core bindings repair verified from delivery evidence and actual dev submissions. The original user browser queue could not be accessed after browser session recreation. Fresh generated nonsensitive TXT/Markdown fixtures were submitted; original five files were not resubmitted. Retry UI mixed-success behavior remains covered by unit tests.",
+  "fixture_policy": "Four generated documents of 2000 runes retained in dev; no automatic deletion. Evidence excludes credentials and request headers."
+}

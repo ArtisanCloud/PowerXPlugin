@@ -30,6 +30,8 @@ func (c *Client) invokeContract(ctx context.Context, capability string, operatio
 		request.Payload.Endpoint = "core://knowledge/retrieval"
 	case documentManageCapability:
 		request.Payload.Endpoint = "core://knowledge/documents"
+	case fw.ContentOverviewCapability:
+		request.Payload.Endpoint = "core://knowledge/content-overview"
 	default:
 		return responseMeta{}, fw.NewError(fw.CodeInvalidArgument, "knowledge.semantic.invalid_argument")
 	}

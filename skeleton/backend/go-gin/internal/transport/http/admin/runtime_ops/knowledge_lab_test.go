@@ -265,3 +265,81 @@ func TestKnowledgeLabDocumentUsesTypedCoreWithoutLocalWrite(t *testing.T) {
 	}
 	require.Equal(t, 1, calls)
 }
+
+func TestKnowledgeLabSnapshotUsesFormalNestedDTO(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const space = "11111111-1111-4111-8111-111111111111"
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "ApiKey server-key", r.Header.Get("Authorization"))
+		require.Equal(t, "/api/v1/tenant/knowledge/spaces/"+space+"/documents", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NotContains(t, body, "tenant_uuid")
+		require.NotContains(t, body, "ingestionProfile")
+		settings := body["ingestion"].(map[string]any)
+		require.Equal(t, float64(640), settings["chunk_size"])
+		require.Equal(t, float64(80), settings["chunk_overlap"])
+		require.Equal(t, false, settings["page_priority"])
+		require.Equal(t, []any{}, settings["separators"])
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(202)
+		_, _ = w.Write([]byte(`{"data":{"job_uuid":"22222222-2222-4222-8222-222222222222","document_uuid":"33333333-3333-4333-8333-333333333333","status":"queued"}}`))
+	}))
+	defer core.Close()
+	deps := &app.Deps{ProviderMode: fwprovider.ModeLocal, CapabilityGateway: &knowledgeGatewayStub{}, Config: &config.Config{Gateway: &config.GatewayConfig{BaseURL: core.URL, AuthScheme: "apikey", APIKey: "server-key"}}}
+	router := gin.New()
+	registerKnowledgeLabRoutes(router.Group("/admin/runtime"), deps)
+	out := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/admin/runtime/knowledge-lab/spaces/"+space+"/documents", strings.NewReader(`{"title":"fixture","content":"fixture","content_type":"text/plain","ingestion":{"schema":"powerx.knowledge.document-ingestion/v1","chunk_size":640,"chunk_overlap":80,"page_priority":false,"separators":[]}}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(out, req)
+	require.Equal(t, 202, out.Code)
+}
+
+func TestKnowledgeLabRebuildPreservesDocumentScopeAndMode(t *testing.T) {
+	const space = "11111111-1111-4111-8111-111111111111"
+	const document = "22222222-2222-4222-8222-222222222222"
+	const job = "33333333-3333-4333-8333-333333333333"
+	for _, doc := range []string{"", document} {
+		t.Run(doc, func(t *testing.T) {
+			calls := 0
+			path := "/spaces/" + space
+			if doc != "" {
+				path += "/documents/" + doc
+			}
+			path += "/indexes:rebuild"
+			core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				require.Equal(t, "ApiKey fixture-key", r.Header.Get("Authorization"))
+				require.Equal(t, "/api/v1/tenant/knowledge"+path, r.URL.Path)
+				var request map[string]any
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
+				require.Equal(t, "reuse_snapshot", request["mode"])
+				require.Equal(t, "fixture-request", request["idempotency_key"])
+				require.NotContains(t, request, "ingestion")
+				require.NotContains(t, request, "tenant_uuid")
+				item := gin.H{"job_uuid": job, "operation": "rebuild", "status": "queued"}
+				if doc != "" {
+					item["document_uuid"] = doc
+				}
+				w.WriteHeader(202)
+				require.NoError(t, json.NewEncoder(w).Encode(gin.H{"data": item}))
+			}))
+			defer core.Close()
+			deps := &app.Deps{ProviderMode: fwprovider.ModeLocal, KnowledgeProvider: fwknowledge.NewLocalProvider(fwknowledge.LocalProviderConfig{}), CapabilityGateway: &knowledgeGatewayStub{}, Config: &config.Config{Gateway: &config.GatewayConfig{BaseURL: core.URL, AuthScheme: "apikey", APIKey: "fixture-key"}}}
+			router := gin.New()
+			registerKnowledgeLabRoutes(router.Group("/runtime"), deps)
+			for _, body := range []string{`{"mode":"reuse_snapshot","idempotency_key":"fixture-request","tenant_uuid":"fixture"}`, `{"mode":"apply_config","idempotency_key":"fixture-request"}`} {
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/runtime/knowledge-lab"+path, strings.NewReader(body)))
+				require.Equal(t, 400, rec.Code, rec.Body.String())
+			}
+			require.Zero(t, calls)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/runtime/knowledge-lab"+path, strings.NewReader(`{"mode":"reuse_snapshot","idempotency_key":"fixture-request"}`)))
+			require.Equal(t, 202, rec.Code, rec.Body.String())
+			require.Equal(t, 1, calls)
+			require.Equal(t, fwprovider.ModeLocal, deps.ProviderMode)
+		})
+	}
+}

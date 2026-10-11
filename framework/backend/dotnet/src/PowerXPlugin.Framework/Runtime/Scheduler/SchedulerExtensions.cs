@@ -29,7 +29,7 @@ public static class SchedulerExtensions
         {
             services.AddLocalEventBridge();
             services.AddSingleton(sp => new LocalScheduler(localStoreFactory == null
-                ? new InMemorySchedulerStore() : localStoreFactory(sp)));
+                ? new InMemorySchedulerStore() : localStoreFactory(sp), sp.GetRequiredService<IEventEmitter>()));
             services.AddHostedService<SchedulerRunner>();
         }
         return services.AddPowerXRuntime<IScheduler>("scheduler", mode,
@@ -44,12 +44,10 @@ internal class SchedulerRunner : BackgroundService
 {
     private readonly LocalScheduler _scheduler;
     private readonly ILogger<SchedulerRunner> _logger;
-    private readonly IEventEmitter _eventEmitter;
 
-    public SchedulerRunner(LocalScheduler scheduler, IEventEmitter eventEmitter, ILogger<SchedulerRunner> logger)
+    public SchedulerRunner(LocalScheduler scheduler, ILogger<SchedulerRunner> logger)
     {
         _scheduler = scheduler;
-        _eventEmitter = eventEmitter;
         _logger = logger;
     }
 
@@ -78,28 +76,7 @@ internal class SchedulerRunner : BackgroundService
             ct.ThrowIfCancellationRequested();
             try
             {
-                var scheduledAt = job.NextRunAt;
-                var traceId = Guid.NewGuid().ToString();
-                var payload = new SchedulerTriggeredPayload(
-                    job.JobId, job.Name, job.OwnerType, job.OwnerId, job.TenantUuid,
-                    job.ScheduleType, scheduledAt, now, traceId,
-                    $"{job.Uuid}:{scheduledAt.Ticks}",
-                    TryGetString(job.Payload, "business_action"), job.Payload ?? []);
-                await _eventEmitter.EmitAsync(new FrameworkEvent
-                {
-                    Topic = job.Topic,
-                    Meta = new EventMeta
-                    {
-                        TenantUUID = job.TenantUuid, SourcePlugin = job.OwnerId,
-                        TraceID = traceId, OccurredAt = now
-                    },
-                    Payload = payload
-                }, ct);
-                job.LastRunAt = now;
-                if (job.ScheduleType == ScheduleType.Once) job.Status = JobStatus.Completed;
-                else job.NextRunAt = LocalScheduler.ComputeNextRun(job.ScheduleType, job.ScheduleExpr, now);
-                job.UpdatedAt = now;
-                await _scheduler.SaveAsync(job, ct);
+                await _scheduler.ExecuteDueAsync(job, now, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -109,7 +86,4 @@ internal class SchedulerRunner : BackgroundService
             }
         }
     }
-
-    private static string? TryGetString(IReadOnlyDictionary<string, object?>? payload, string key) =>
-        payload != null && payload.TryGetValue(key, out var value) ? value?.ToString() : null;
 }

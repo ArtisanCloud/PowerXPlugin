@@ -1,0 +1,87 @@
+{
+  "schema": "powerx.plugin.knowledge.task-process-ui-acceptance/v1",
+  "date": "2026-10-08",
+  "shared_component": "KnowledgeTaskProcessList",
+  "core_records": {
+    "space_name": "dev",
+    "job_uuids": [
+      "a1320cca-a499-44fa-831f-1f1eabe01e67",
+      "0853ac8f-54e1-4208-b60b-3c0d34c7e6f5",
+      "733709aa-5188-4a23-a5af-d58609b7c780",
+      "4e54da1a-67ed-4c50-9936-9bc41fde1efc",
+      "8a989c46-624e-4f78-9370-bca69ccbc2e4"
+    ],
+    "counts": {
+      "total": 5,
+      "ready": 0,
+      "waiting": 0,
+      "running": 0,
+      "succeeded": 5,
+      "failed": 0
+    },
+    "ended_percent": 100,
+    "chunk_counts": [
+      2,
+      6,
+      7,
+      2,
+      6
+    ],
+    "execution_duration_ms": [
+      12,
+      15,
+      17,
+      4,
+      5
+    ],
+    "index_mode": "lexical_chunks",
+    "detail_modal_opened": true,
+    "first_job_chunks_read": true,
+    "first_chunk_display_labels": [
+      1,
+      2
+    ],
+    "first_chunk_lengths": [
+      1024,
+      161
+    ],
+    "technical_details_collapsed": true,
+    "updates": "Explicit refresh only"
+  },
+  "local_draft": {
+    "space_name": "test",
+    "selected_files": 2,
+    "wizard_steps": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "counts": {
+      "total": 2,
+      "ready": 2,
+      "waiting": 0,
+      "running": 0,
+      "succeeded": 0,
+      "failed": 0
+    },
+    "ended_percent": 0,
+    "index_mode": "local_vector",
+    "documents_submitted": 0
+  },
+  "tests": {
+    "frontend": 60,
+    "knowledge_sfc_compile": true,
+    "templates_sync": true,
+    "diff_check": true,
+    "queued_running_and_unknown_percentage": "Unit cases verify queued stays 0 and running has indeterminate progress unless reported; no synthetic percent or polling",
+    "detail_authorization_failure": "Unit case rejects cached detail display and preserves trace"
+  },
+  "remaining_contracts": [
+    "Core space readiness",
+    "Core paginated documents and task history",
+    "Core authorized WS/SSE task progress"
+  ],
+  "core_code_or_database_mutations": 0,
+  "original_file_resubmissions": 0
+}

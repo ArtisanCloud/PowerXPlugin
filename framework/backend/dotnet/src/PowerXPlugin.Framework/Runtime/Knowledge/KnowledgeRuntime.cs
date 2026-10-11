@@ -61,7 +61,7 @@ public sealed record KnowledgeDocument(
     string ContentType,
     string Checksum,
     string Version,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null, DocumentIngestionSettings? HostIngestion = null);
 
 public sealed record KnowledgeQuery(
     string TenantUuid,
@@ -77,7 +77,7 @@ public sealed record KnowledgeQuery(
 public sealed record KnowledgeCitation(string DocumentId, string Title, string Uri, string Provider, DateTimeOffset RetrievedAt);
 public sealed record KnowledgeChunk(string DocumentId, string SpaceId, string Text, KnowledgeCitation Citation, IReadOnlyList<string>? Tags = null);
 public sealed record KnowledgeSearchResult(string Provider, IReadOnlyList<KnowledgeChunk> Chunks, int Total, string TraceId = "");
-public sealed record KnowledgeIndexJob(string JobId, string SpaceId, string DocumentId, string Operation, string Status, string ErrorCode = "", string Message = "");
+public sealed record KnowledgeIndexJob(string JobId, string SpaceId, string DocumentId, string Operation, string Status, string ErrorCode = "", string Message = "", string Priority = "", string TraceId = "", DocumentIngestionSnapshot? EffectiveConfig = null, DocumentIngestionSettings? RequestedConfig = null, string SnapshotChecksum = "", int? ChunkCount = null, DateTimeOffset? StartedAt = null, DateTimeOffset? CompletedAt = null);
 public sealed record DeleteKnowledgeDocumentRequest(string TenantUuid, string SpaceId, string DocumentId, string TraceId = "");
 public sealed record ReindexKnowledgeRequest(string TenantUuid, string SpaceId, string DocumentId = "", string TraceId = "");
 public sealed record GetKnowledgeIndexJobRequest(string TenantUuid, string JobId, string TraceId = "");
@@ -112,7 +112,7 @@ public sealed class LocalKnowledgeAdapter(ILocalKnowledgeStore store) : IKnowled
         if (result is null || result.Total < 0 || result.Chunks.Any(chunk => chunk is null || string.IsNullOrWhiteSpace(chunk.DocumentId) || string.IsNullOrWhiteSpace(chunk.SpaceId) || string.IsNullOrWhiteSpace(chunk.Text) || chunk.Citation is null)) throw new KnowledgeException(KnowledgeErrors.InvalidResponse);
         return result;
     }
-    public async Task<KnowledgeIndexJob> UpsertDocumentAsync(KnowledgeDocument document, CancellationToken ct = default) { ValidateDocument(document); return ValidateJob(await _store.UpsertDocumentAsync(document, ct), document.TenantUuid, document.SpaceId); }
+    public async Task<KnowledgeIndexJob> UpsertDocumentAsync(KnowledgeDocument document, CancellationToken ct = default) { if (document.HostIngestion is not null) throw new KnowledgeException(KnowledgeErrors.Unsupported); ValidateDocument(document); return ValidateJob(await _store.UpsertDocumentAsync(document, ct), document.TenantUuid, document.SpaceId); }
     public async Task<KnowledgeIndexJob> DeleteDocumentAsync(DeleteKnowledgeDocumentRequest request, CancellationToken ct = default) { ValidateDelete(request); return ValidateJob(await _store.DeleteDocumentAsync(request, ct), request.TenantUuid, request.SpaceId); }
     public async Task<KnowledgeIndexJob> ReindexAsync(ReindexKnowledgeRequest request, CancellationToken ct = default) { ValidateReindex(request, allowDocument: true); return ValidateJob(await _store.ReindexAsync(request, ct), request.TenantUuid, request.SpaceId); }
     public async Task<KnowledgeIndexJob> GetIndexJobAsync(GetKnowledgeIndexJobRequest request, CancellationToken ct = default) { ValidateJobRequest(request); return ValidateJob(await _store.GetIndexJobAsync(request, ct), request.TenantUuid, null); }
@@ -157,8 +157,8 @@ public sealed partial class PowerXKnowledgeClient(string baseUrl, string tenantU
     }
     public async Task<KnowledgeIndexJob> UpsertDocumentAsync(KnowledgeDocument document, CancellationToken ct = default)
     {
-        CheckTenant(document.TenantUuid); LocalKnowledgeAdapter.ValidateDelegatedDocument(document);
-        var job = await SendAsync<HostIndexJob>(HttpMethod.Post, "/api/v1/tenant/knowledge/spaces/" + Uri.EscapeDataString(document.SpaceId) + "/documents", new { title = document.Title.Trim(), uri = document.Uri?.Trim() ?? string.Empty, content = document.Content.Trim(), content_type = document.ContentType.Trim(), checksum = document.Checksum.Trim(), version = document.Version.Trim(), tags = document.Tags ?? [] }, ct);
+        CheckTenant(document.TenantUuid); ValidateSnapshot(document.HostIngestion); LocalKnowledgeAdapter.ValidateDelegatedDocument(document);
+        var job = await SendAsync<HostIndexJob>(HttpMethod.Post, "/api/v1/tenant/knowledge/spaces/" + Uri.EscapeDataString(document.SpaceId) + "/documents", new { title = document.Title.Trim(), uri = document.Uri?.Trim() ?? string.Empty, content = document.Content, content_type = document.ContentType.Trim(), checksum = document.Checksum.Trim(), version = document.Version.Trim(), tags = document.Tags ?? [], ingestion = document.HostIngestion }, ct);
         return ToJob(job);
     }
     public async Task<KnowledgeIndexJob> DeleteDocumentAsync(DeleteKnowledgeDocumentRequest request, CancellationToken ct = default)
@@ -185,12 +185,27 @@ public sealed partial class PowerXKnowledgeClient(string baseUrl, string tenantU
         try { using var response = await _http.SendAsync(request, ct); var raw = await response.Content.ReadAsStringAsync(ct); if (!response.IsSuccessStatusCode) throw HostError(response, raw); using var json = JsonDocument.Parse(raw); if (!json.RootElement.TryGetProperty("data", out var data)) throw new KnowledgeException(KnowledgeErrors.InvalidResponse); return JsonSerializer.Deserialize<T>(data.GetRawText(), JsonOptions) ?? throw new KnowledgeException(KnowledgeErrors.InvalidResponse); } catch (KnowledgeException) { throw; } catch (HttpRequestException exception) { throw new KnowledgeException(KnowledgeErrors.Upstream, exception); } catch (JsonException exception) { throw new KnowledgeException(KnowledgeErrors.InvalidResponse, exception); }
     }
     private static string Require(string? value) => string.IsNullOrWhiteSpace(value) ? throw new KnowledgeException(KnowledgeErrors.InvalidResponse) : value.Trim();
-    private static KnowledgeIndexJob ToJob(HostIndexJob job) { var result = new KnowledgeIndexJob(Require(job.JobUuid), Require(job.SpaceUuid), job.DocumentUuid?.Trim() ?? string.Empty, job.Operation?.Trim() ?? string.Empty, Require(job.Status), job.ErrorCode?.Trim() ?? string.Empty); return LocalKnowledgeAdapter.ValidateJob(result, string.Empty, null); }
+    private static KnowledgeIndexJob ToJob(HostIndexJob job) { var result = new KnowledgeIndexJob(Require(job.JobUuid), Require(job.SpaceUuid), job.DocumentUuid?.Trim() ?? string.Empty, job.Operation?.Trim() ?? string.Empty, Require(job.Status), job.ErrorCode?.Trim() ?? string.Empty, Priority: job.Priority ?? string.Empty, TraceId: job.TraceId ?? string.Empty, EffectiveConfig: job.EffectiveConfig, RequestedConfig: job.RequestedConfig, SnapshotChecksum: job.SnapshotChecksum ?? string.Empty, ChunkCount: job.ChunkCount, StartedAt: job.StartedAt, CompletedAt: job.CompletedAt); return LocalKnowledgeAdapter.ValidateJob(result, string.Empty, null); }
     private sealed class SpaceListResponse { public List<HostSpace> Items { get; init; } = []; }
     private sealed class HostSpace { [JsonPropertyName("space_uuid")] public string? SpaceUuid { get; init; } public string? Name { get; init; } public string? Status { get; init; } }
     private sealed class SearchResponse { public List<HostSearchItem> Items { get; init; } = []; }
     private sealed class HostSearchItem { [JsonPropertyName("space_uuid")] public string? SpaceUuid { get; init; } [JsonPropertyName("document_uuid")] public string? DocumentUuid { get; init; } public string? Title { get; init; } public string? Uri { get; init; } public string? Excerpt { get; init; } public IReadOnlyList<string>? Tags { get; init; } }
-    private sealed class HostIndexJob { [JsonPropertyName("job_uuid")] public string? JobUuid { get; init; } [JsonPropertyName("space_uuid")] public string? SpaceUuid { get; init; } [JsonPropertyName("document_uuid")] public string? DocumentUuid { get; init; } public string? Operation { get; init; } public string? Status { get; init; } [JsonPropertyName("error_code")] public string? ErrorCode { get; init; } }
+    private sealed class HostIndexJob {
+    [JsonPropertyName("job_uuid"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? JobUuid { get; init; }
+    [JsonPropertyName("space_uuid"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? SpaceUuid { get; init; }
+    [JsonPropertyName("document_uuid"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? DocumentUuid { get; init; }
+    [JsonPropertyName("operation"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Operation { get; init; }
+    [JsonPropertyName("status"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Status { get; init; }
+    [JsonPropertyName("error_code"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? ErrorCode { get; init; }
+    [JsonPropertyName("priority"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Priority { get; init; }
+    [JsonPropertyName("trace_id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? TraceId { get; init; }
+    [JsonPropertyName("effective_config"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DocumentIngestionSnapshot? EffectiveConfig { get; init; }
+    [JsonPropertyName("requested_config"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DocumentIngestionSettings? RequestedConfig { get; init; }
+    [JsonPropertyName("snapshot_checksum"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? SnapshotChecksum { get; init; }
+    [JsonPropertyName("chunk_count"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public int? ChunkCount { get; init; }
+    [JsonPropertyName("started_at"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DateTimeOffset? StartedAt { get; init; }
+    [JsonPropertyName("completed_at"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public DateTimeOffset? CompletedAt { get; init; }
+    }
 }
 
 public static class KnowledgeRuntimeExtensions

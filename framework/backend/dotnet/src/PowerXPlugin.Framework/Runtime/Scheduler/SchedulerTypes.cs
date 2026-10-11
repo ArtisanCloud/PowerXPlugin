@@ -52,7 +52,7 @@ public record JobSpec(
 
 public record Job
 {
-    [JsonIgnore]
+    [JsonPropertyName("revision")]
     public long Revision { get; set; }
     [JsonPropertyName("idempotency_key")]
     public string? IdempotencyKey { get; set; }
@@ -79,9 +79,12 @@ public record Job
     [JsonPropertyName("status")]
     public string Status { get; set; } = JobStatus.Active;
     [JsonPropertyName("next_run_at")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public DateTime NextRunAt { get; set; }
     [JsonPropertyName("last_run_at")]
     public DateTime? LastRunAt { get; set; }
+    [JsonPropertyName("last_execution_id")]
+    public string? LastExecutionId { get; set; }
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     [JsonPropertyName("updated_at")]
@@ -113,21 +116,29 @@ public sealed class SchedulerAdapterException : Exception
 {
     public string Code { get; }
     public int? UpstreamStatusCode { get; }
+    public string? UpstreamRequestId { get; }
+    public string? UpstreamTraceId { get; }
 
-    public SchedulerAdapterException(string code, int? upstreamStatusCode = null, Exception? innerException = null)
+    public SchedulerAdapterException(string code, int? upstreamStatusCode = null, Exception? innerException = null,
+        string? upstreamRequestId = null, string? upstreamTraceId = null)
         : base(code, innerException)
     {
         Code = code;
         UpstreamStatusCode = upstreamStatusCode;
+        UpstreamRequestId = upstreamRequestId;
+        UpstreamTraceId = upstreamTraceId;
     }
 }
 
 public static class SchedulerErrors
 {
+    public const string CodeNotFound = "SCHEDULER_JOB_NOT_FOUND";
+    public const string CodeNotActive = "SCHEDULER_JOB_NOT_ACTIVE";
     public const string CodeConflict = "SCHEDULER_JOB_CONFLICT";
     public const string CodeInvalidMode = "SCHEDULER_ADAPTER_MODE_INVALID";
     public const string CodeInvalidJob = "SCHEDULER_INVALID_JOB_SPEC";
     public const string CodeUnavailable = "SCHEDULER_ADAPTER_UNAVAILABLE";
+    public const string CodeServiceRouteUnavailable = "SCHEDULER_SERVICE_ROUTE_UNAVAILABLE";
     public const string CodeUnauthorized = "SCHEDULER_UNAUTHORIZED";
     public const string CodeForbidden = "SCHEDULER_FORBIDDEN";
     public const string CodeUpstreamDependency = "SCHEDULER_UPSTREAM_DEPENDENCY";

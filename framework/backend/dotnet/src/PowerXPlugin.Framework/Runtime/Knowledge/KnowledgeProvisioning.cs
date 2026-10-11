@@ -22,14 +22,15 @@ public sealed record KnowledgeStrategyPackage(string Key, string Label, string S
     [property: JsonPropertyName("recommended_scenes")] IReadOnlyList<string> RecommendedScenes,
     KnowledgeStrategyDependencies Dependencies, KnowledgeProfileMapping Profiles, bool Available,
     [property: JsonPropertyName("unavailable_reasons")] IReadOnlyList<string> UnavailableReasons,
-    [property: JsonPropertyName("activation_dependencies")] IReadOnlyList<string> ActivationDependencies);
+    [property: JsonPropertyName("activation_dependencies")] IReadOnlyList<string> ActivationDependencies, string? Uuid = null, int? Version = null);
 public sealed record KnowledgeCatalog(string Version, string Source, IReadOnlyList<KnowledgeScene> Scenes,
     [property: JsonPropertyName("strategy_packages")] IReadOnlyList<KnowledgeStrategyPackage> StrategyPackages,
     [property: JsonPropertyName("policy_templates")] IReadOnlyList<KnowledgePolicyTemplateRef> PolicyTemplates,
     [property: JsonPropertyName("default_policy_template_uuid")] string? DefaultPolicyTemplateUuid,
     [property: JsonPropertyName("quota_defaults")] KnowledgeSpaceQuotas QuotaDefaults,
     [property: JsonPropertyName("quota_minimums")] KnowledgeSpaceQuotas QuotaMinimums,
-    [property: JsonPropertyName("quota_override_allowed")] bool QuotaOverrideAllowed);
+    [property: JsonPropertyName("quota_override_allowed")] bool QuotaOverrideAllowed,
+    [property: JsonPropertyName("document_ingestion")] DocumentIngestionCapabilities? DocumentIngestion = null);
 public sealed record CreateKnowledgeSpaceRequest(string Name,
     [property: JsonPropertyName("department_uuid")] string DepartmentUuid,
     [property: JsonPropertyName("strategy_key")] string StrategyKey,

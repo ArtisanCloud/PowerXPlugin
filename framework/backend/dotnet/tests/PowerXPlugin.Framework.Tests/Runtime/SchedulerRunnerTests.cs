@@ -13,8 +13,8 @@ public sealed class SchedulerRunnerTests
     [Fact]
     public async Task Once_completes_after_success_and_is_not_emitted_again()
     {
-        var scheduler = new LocalScheduler();
         var bridge = new LocalEventBridge();
+        var scheduler = new LocalScheduler(new InMemorySchedulerStore(), bridge);
         var payloads = new List<SchedulerTriggeredPayload>();
         await bridge.RegisterHandlerAsync("topic", (evt, _) =>
         {
@@ -23,7 +23,7 @@ public sealed class SchedulerRunnerTests
         });
         var now = DateTime.UtcNow;
         var job = await scheduler.CreateJobAsync(Spec(Tenant, now));
-        using var runner = new SchedulerRunner(scheduler, bridge, NullLogger<SchedulerRunner>.Instance);
+        using var runner = new SchedulerRunner(scheduler, NullLogger<SchedulerRunner>.Instance);
         await runner.TickAsync(now.AddSeconds(1));
         await runner.TickAsync(now.AddMinutes(1));
         job = (await scheduler.GetJobAsync(job.JobId, Tenant))!;
@@ -35,8 +35,8 @@ public sealed class SchedulerRunnerTests
     [Fact]
     public async Task Failing_tenant_does_not_block_other_jobs_and_retry_keeps_same_key()
     {
-        var scheduler = new LocalScheduler();
         var bridge = new LocalEventBridge();
+        var scheduler = new LocalScheduler(new InMemorySchedulerStore(), bridge);
         var attempts = new List<SchedulerTriggeredPayload>();
         var fail = true;
         await bridge.RegisterHandlerAsync("topic", (evt, _) =>
@@ -50,7 +50,7 @@ public sealed class SchedulerRunnerTests
         var failed = await scheduler.CreateJobAsync(Spec(Tenant, now));
         var succeeded = await scheduler.CreateJobAsync(Spec(Other, now));
         var dueAt = failed.NextRunAt;
-        using var runner = new SchedulerRunner(scheduler, bridge, NullLogger<SchedulerRunner>.Instance);
+        using var runner = new SchedulerRunner(scheduler, NullLogger<SchedulerRunner>.Instance);
         await runner.TickAsync(now.AddSeconds(1));
         failed = (await scheduler.GetJobAsync(failed.JobId, Tenant))!;
         succeeded = (await scheduler.GetJobAsync(succeeded.JobId, Other))!;
@@ -71,8 +71,8 @@ public sealed class SchedulerRunnerTests
     [Fact]
     public async Task Cancellation_stops_tick_without_completing_job()
     {
-        var scheduler = new LocalScheduler();
         var bridge = new LocalEventBridge();
+        var scheduler = new LocalScheduler(new InMemorySchedulerStore(), bridge);
         using var cts = new CancellationTokenSource();
         await bridge.RegisterHandlerAsync("topic", (_, _) =>
         {
@@ -81,7 +81,7 @@ public sealed class SchedulerRunnerTests
         });
         var now = DateTime.UtcNow;
         var job = await scheduler.CreateJobAsync(Spec(Tenant, now));
-        using var runner = new SchedulerRunner(scheduler, bridge, NullLogger<SchedulerRunner>.Instance);
+        using var runner = new SchedulerRunner(scheduler, NullLogger<SchedulerRunner>.Instance);
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.TickAsync(now.AddSeconds(1), cts.Token));
         Assert.Null(job.LastRunAt);
         Assert.Equal(JobStatus.Active, job.Status);

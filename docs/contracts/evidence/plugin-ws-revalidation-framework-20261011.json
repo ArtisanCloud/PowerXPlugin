@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-11",
+  "scope": "framework_ws_message_triggered_identity_revalidation",
+  "core_contract": "PowerX/docs/contracts/plugin-ws-revalidation.md",
+  "capability": "com.corex.iam.identity_context.service_read",
+  "operation": "revalidate_ws_identity",
+  "query_schema": "powerx.iam.plugin-ws-identity-query/v1",
+  "result_schema": "powerx.iam.plugin-ws-identity/v1",
+  "implementation": {
+    "go_dotnet_typed_api_key_sts_clients": true,
+    "handle_excluded_from_default_json_and_formatting": true,
+    "lease_revalidator_required": true,
+    "fresh_identity_before_inbound_subscription_and_delivery": true,
+    "current_topic_permissions": true,
+    "binding_and_fixed_access_deadline_checked": true,
+    "no_cached_authorization": true,
+    "no_polling_or_idle_revocation_push": true,
+    "reject_closes_connection_and_drops_message": true,
+    "cancelled_or_expired_queued_delivery_dropped": true,
+    "skeleton_scaffold_cli_synced": true
+  },
+  "checks": [
+    {"command":"go test ./...","cwd":"framework/backend/go","exit_code":0},
+    {"command":"go test -race ./iam/delegated ./iam/middleware ./runtime/realtime -count=1","cwd":"framework/backend/go","exit_code":0},
+    {"command":"go test -race ./internal/transport/http/wsbus -count=1","cwd":"skeleton/backend/go-gin","exit_code":0},
+    {"command":"go test ./internal/bootstrap ./internal/services/authproxy ./internal/services/iam/adapters/delegated ./internal/router ./internal/transport/http/middleware ./internal/transport/http/admin/runtime_ops","cwd":"skeleton/backend/go-gin","exit_code":0},
+    {"command":"go test ./cmd/plugin -run '^$'","cwd":"skeleton/backend/go-gin","exit_code":0},
+    {"command":"dotnet test --no-restore","cwd":"framework/backend/dotnet/tests/PowerXPlugin.Framework.Tests","exit_code":0,"tests":196},
+    {"command":"npm run test:unit","cwd":"skeleton/web-admin/nuxt","exit_code":0,"files":19,"tests":186},
+    {"command":"tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --lib ES2022,DOM,DOM.Iterable --skipLibCheck framework/frontend/nuxt/framework-client/index.ts","exit_code":0},
+    {"command":"node scripts/sync-templates.mjs --check","exit_code":0},
+    {"command":"GOWORK=off go test ./internal/templates","cwd":"tools/cli","exit_code":0},
+    {"command":"git diff --check","exit_code":0}
+  ],
+  "live_core": {
+    "scope": "api_key_negative_unissued_handle_only",
+    "address": "http://127.0.0.1:8077",
+    "operation_reached": true,
+    "grant_or_database_mutations": false,
+    "expected_http": 401,
+    "actual_http": 502,
+    "code": "IAM_CONTEXT_WS_HANDLE_EXPIRED",
+    "trace_id": "9b62e1d2-398a-423b-9800-6a037c301c12",
+    "request_id": "751e58f0-f819-46d1-b74a-54ec2f28f403",
+    "exit_code": 1,
+    "status": "failed_core_typed_business_status_mapping",
+    "followup_sdk_retest": "blocked_at_link_no_space_left_on_device",
+    "followup_direct_http_probe": "connection_refused_8077_no_response"
+  },
+  "acceptance_boundaries": {
+    "valid_live_handle": "not_run",
+    "live_sts_revalidation": "not_run",
+    "live_logout_member_disable_permissions_or_service_grant_revocation": "not_run",
+    "installed_browser": "not_run",
+    "websocket_101": "real_local_socket_with_core_contract_fixture",
+    "versions_bumped": false,
+    "packages_published": false,
+    "user_services_restarted_by_framework": false,
+    "temporary_services_started": [],
+    "test_listeners": "closed_by_test_cleanup"
+  }
+}

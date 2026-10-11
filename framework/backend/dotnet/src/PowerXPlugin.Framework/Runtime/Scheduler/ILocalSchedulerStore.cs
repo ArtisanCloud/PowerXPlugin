@@ -9,6 +9,7 @@ public interface ILocalSchedulerStore
     Task<Job?> GetAsync(string tenantUuid, string jobId, CancellationToken ct = default);
     Task<List<Job>> ListAsync(CancellationToken ct = default);
     Task<bool> SaveAsync(Job job, long expectedRevision, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string tenantUuid, string jobId, string jobUuid, long expectedRevision, CancellationToken ct = default);
 }
 
 /// <summary>Explicit development/test storage; CRM production injects its PostgreSQL store.</summary>
@@ -43,6 +44,18 @@ public sealed class InMemorySchedulerStore : ILocalSchedulerStore
             var key = (job.TenantUuid, job.JobId);
             if (!_jobs.TryGetValue(key, out var current) || current.Revision != expectedRevision) return Task.FromResult(false);
             _jobs[key] = Copy(job) with { Revision = expectedRevision + 1 };
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<bool> DeleteAsync(string tenantUuid, string jobId, string jobUuid, long expectedRevision, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var key = (tenantUuid, jobId);
+            if (!_jobs.TryGetValue(key, out var job) || job.Uuid != jobUuid || job.Revision != expectedRevision) return Task.FromResult(false);
+            _jobs.Remove(key);
             return Task.FromResult(true);
         }
     }

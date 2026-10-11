@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-11",
+  "scope": "framework_go_dotnet_skeleton_scaffold_cli_frontend_identity",
+  "core_contract": "PowerX/docs/contracts/plugin-request-identity.md",
+  "schema": "powerx.iam.plugin-request-identity/v1",
+  "implementation": {
+    "typed_service_identity": true,
+    "go_api_key_and_sts": true,
+    "dotnet_api_key_and_sts": true,
+    "root_nullable_member": true,
+    "all_identity_source_and_expiry_fields": true,
+    "old_delegated_bearer_rejected_without_http": true,
+    "proof_before_business_rbac": true,
+    "frontend_user_service_proof_errors_separated": true,
+    "ws_topic_expiry_and_revocation_api": true,
+    "templates_synced": true
+  },
+  "checks": [
+    {"command":"go test ./...","cwd":"framework/backend/go","exit_code":0},
+    {"command":"go test -race ./iam/delegated ./iam/middleware ./runtime/realtime","cwd":"framework/backend/go","exit_code":0},
+    {"command":"go test -race ./internal/transport/http/wsbus","cwd":"skeleton/backend/go-gin","exit_code":0},
+    {"command":"go test ./internal/bootstrap ./internal/services/authproxy ./internal/services/iam/adapters/delegated ./internal/router ./internal/transport/http/middleware ./internal/transport/http/admin/runtime_ops","cwd":"skeleton/backend/go-gin","exit_code":0},
+    {"command":"go test ./cmd/plugin -run '^$'","cwd":"skeleton/backend/go-gin","exit_code":0},
+    {"command":"dotnet test --no-restore","cwd":"framework/backend/dotnet/tests/PowerXPlugin.Framework.Tests","exit_code":0,"tests":177},
+    {"command":"npm run test:unit","cwd":"skeleton/web-admin/nuxt","exit_code":0,"files":19,"tests":181},
+    {"command":"tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --lib ES2022,DOM,DOM.Iterable --skipLibCheck framework/frontend/nuxt/framework-client/index.ts","exit_code":0},
+    {"command":"npm run build","cwd":"skeleton/web-admin/nuxt","exit_code":0,"log":"/tmp/powerx-identity-nuxt-build-20261011.log"},
+    {"command":"GOWORK=off go test ./internal/templates","cwd":"tools/cli","exit_code":0},
+    {"command":"node scripts/sync-templates.mjs --check","exit_code":0},
+    {"command":"git diff --check","exit_code":0},
+    {"command":"node .codex/skills/ci/manifest-align/scripts/manifest-align-check.mjs --fix","exit_code":1,"basic_catalog_validation":"passed","failure":"existing knowledge ingestion progress topic lacks execution mapping and plugin service publish ACL","topic":"_topic.knowledge.ingestion.progress","unrelated_acl_modified":false}
+  ],
+  "acceptance_boundaries": {
+    "sdk_http_tests": "core_contract_fixtures_not_live_core",
+    "websocket_101": "real_local_socket_with_typed_framework_resolver_and_fixture_core",
+    "real_core_api_key_sts": "not_run",
+    "installed_plugin_browser": "not_run",
+    "core_ws_revocation_source": "awaiting_formal_topic_payload_or_revalidation_contract",
+    "server_revocation_api_tested": true,
+    "real_core_revocation_integration": false
+  },
+  "development_dependencies": {"go":"local_replace","frontend":"file:../../../framework/frontend/nuxt/framework-client","dotnet":"source_project_reference"},
+  "frontend_client_version_declaration":"0.0.11",
+  "versions_bumped":false,
+  "packages_published":false,
+  "tags_created":false,
+  "user_services_restarted":false,
+  "long_running_services_started":[],
+  "test_listener_cleanup":"httptest server and socket cleanup deferred; test processes exited"
+}

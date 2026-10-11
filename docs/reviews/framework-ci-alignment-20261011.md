@@ -11,6 +11,7 @@
 - Skeleton 在 JWT 后、RBAC 前验证 Core 请求身份；启动时绑定正式 resolver，WS 在收发消息和订阅时复核身份及授权，退出时关闭生命周期。补齐 UUID 身份及访问凭据到期时间；原分支成员目录测试替身增加正式身份接口。
 - 同步 CLI 默认版本、Skeleton 依赖和 lockfile、两个模板副本。修正 admin/client 版本参数替换；生成项目直接编译真实发布依赖，不使用仓库 workspace 或本地 Framework replace。
 - CI 支持 009-consume-powerx-capability 的 push、PR 和手动触发；frontend 增加 7 个鉴权/传输合同测试文件，backend 增加生成项目编译检查。旧工具 token 禁用检查只扫描实现代码，允许文档描述禁止使用的名称。
+- 回归容器安装 C 编译器和开发头文件，明确启用 CGO，使原分支已有 SQLite 测试可以执行。
 
 ## 本地验证
 

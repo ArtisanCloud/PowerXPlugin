@@ -208,6 +208,8 @@ jobs:
     needs: [smoke]
     env:
       GOTOOLCHAIN: local
+      CGO_ENABLED: "1"
+      CC: gcc
       GOPROXY: https://goproxy.cn,direct
       GOSUMDB: sum.golang.org
       LIGHTNINGCSS_FORCE_WASM: "1"
@@ -220,7 +222,7 @@ jobs:
       - name: Install system dependencies
         run: |
           apt-get update
-          apt-get install -y make
+          apt-get install -y build-essential
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'

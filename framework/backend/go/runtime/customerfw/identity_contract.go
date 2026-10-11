@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	common "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common"
 	"net/mail"
 	"strings"
 	"unicode"
@@ -71,12 +72,15 @@ func ValidateIdentityCustomer(p ExternalIdentityCustomer) error {
 	if n.Type != "person" && n.Type != "company" || n.DisplayName == "" {
 		return invalid()
 	}
-	for _, value := range []string{n.DisplayName, p.Nickname, p.GivenName, p.FamilyName} {
-		if !utf8.ValidString(value) || utf8.RuneCountInString(strings.TrimSpace(value)) > 128 || strings.IndexFunc(value, unicode.IsControl) >= 0 {
+	for _, value := range []string{n.DisplayName, p.DisplayName, p.Nickname, p.GivenName, p.FamilyName} {
+		if !common.ValidText(value, 128, false) {
 			return invalid()
 		}
 	}
 	checkChannels := func(email, phone string) bool {
+		if !common.ValidText(email, 255, false) || !common.ValidText(phone, 32, false) {
+			return false
+		}
 		email = strings.TrimSpace(email)
 		phone = strings.TrimSpace(phone)
 		if utf8.RuneCountInString(email) > 255 || utf8.RuneCountInString(phone) > 32 {
@@ -109,9 +113,21 @@ func ValidateIdentityCustomer(p ExternalIdentityCustomer) error {
 	if n.Type == "company" && n.PrimaryContact == nil {
 		return invalid()
 	}
+	if c := p.PrimaryContact; c != nil {
+		for _, name := range []string{c.DisplayName, c.GivenName, c.FamilyName} {
+			if !common.ValidText(name, 128, false) {
+				return invalid()
+			}
+		}
+	}
 	if c := n.PrimaryContact; c != nil {
 		if c.DisplayName == "" || !checkChannels(c.Email, c.Phone) {
 			return invalid()
+		}
+		for _, name := range []string{c.DisplayName, c.GivenName, c.FamilyName} {
+			if !common.ValidText(name, 128, false) {
+				return invalid()
+			}
 		}
 	}
 	return nil

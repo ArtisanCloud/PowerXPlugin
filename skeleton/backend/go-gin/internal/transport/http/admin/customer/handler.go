@@ -220,6 +220,9 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	}
 	items := make([]accountDTO, 0, len(accounts))
 	for _, item := range accounts {
+		if !h.bindPrimaryReference(c, &item) {
+			return
+		}
 		items = append(items, newAccountDTO(item))
 	}
 	contracts.ResponseSuccess(c, makePage(items, query, total))
@@ -290,6 +293,10 @@ func (h *Handler) CreateBasicAccount(c *gin.Context) {
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
 		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_CREATE_INVALID_BODY")
+		return
+	}
+	if err := customerfw.ValidateIdentityCustomer(customerfw.ExternalIdentityCustomer{Type: req.Type, DisplayName: req.DisplayName, Nickname: req.Nickname, GivenName: req.GivenName, FamilyName: req.FamilyName, PrimaryEmail: req.PrimaryEmail, PrimaryPhone: req.PrimaryPhone, PrimaryContact: req.PrimaryContact}); err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "CUSTOMER_ACCOUNT_INVALID_ARGUMENT", "CUSTOMER_ACCOUNT_INVALID_ARGUMENT")
 		return
 	}
 	req = customerfw.NormalizeBasicAccountLabels(req)
@@ -516,6 +523,9 @@ func (h *Handler) GetAccount(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !h.bindPrimaryReference(c, &account) {
+		return
+	}
 	contracts.ResponseSuccess(c, newAccountDTO(account))
 }
 
@@ -646,6 +656,9 @@ func (h *Handler) UpdateAccount(c *gin.Context) {
 		updates["metadata"] = req.Metadata
 	}
 	if len(updates) == 0 {
+		if !h.bindPrimaryReference(c, &account) {
+			return
+		}
 		contracts.ResponseSuccess(c, newAccountDTO(account))
 		return
 	}
@@ -656,6 +669,9 @@ func (h *Handler) UpdateAccount(c *gin.Context) {
 	}
 	if err := h.db.Where("customer_uuid = ?", account.CustomerUUID).First(&account).Error; err != nil {
 		contracts.ResponseInternalError(c, err)
+		return
+	}
+	if !h.bindPrimaryReference(c, &account) {
 		return
 	}
 	contracts.ResponseSuccess(c, newAccountDTO(account))
@@ -722,6 +738,17 @@ func (h *Handler) findAccount(c *gin.Context, customerUUID string) (customermode
 		return account, false
 	}
 	return account, true
+}
+
+// The membership is authoritative; CustomerAccount carries a legacy cache.
+func (h *Handler) bindPrimaryReference(c *gin.Context, account *customermodel.CustomerAccount) bool {
+	ref, err := customerrepo.NewContactRepository(h.db).PrimaryReference(c.Request.Context(), account.TenantUuid, account.CustomerUUID)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusInternalServerError, "CUSTOMER_ACCOUNT_REFERENCE_UNAVAILABLE", "CUSTOMER_ACCOUNT_REFERENCE_UNAVAILABLE")
+		return false
+	}
+	account.PrimaryContactUUID = ref
+	return true
 }
 
 func newAccountDTO(item customermodel.CustomerAccount) accountDTO {

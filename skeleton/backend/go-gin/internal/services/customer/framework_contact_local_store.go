@@ -10,6 +10,7 @@ import (
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	customermodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/customer"
 	metadatamodel "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models/metadata"
+	contactrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -17,12 +18,15 @@ import (
 
 // FrameworkContactLocalStore is Skeleton's local Contact master-data adapter.
 // Its only tenant input is the trusted request context set by the admin route.
-type FrameworkContactLocalStore struct{ db *gorm.DB }
+type FrameworkContactLocalStore struct {
+	db         *gorm.DB
+	repository *contactrepo.ContactRepository
+}
 
 const contactIdentityChannelNamespace = "corex.customer.contact_identity_channel"
 
 func NewFrameworkContactLocalStore(db *gorm.DB) *FrameworkContactLocalStore {
-	return &FrameworkContactLocalStore{db: db}
+	return &FrameworkContactLocalStore{db: db, repository: contactrepo.NewContactRepository(db)}
 }
 
 func (s *FrameworkContactLocalStore) Create(ctx context.Context, in contactfw.CreateContactInput) (*contactfw.Contact, error) {
@@ -73,10 +77,25 @@ func (s *FrameworkContactLocalStore) Update(ctx context.Context, in contactfw.Up
 		return nil, err
 	}
 	var updated *customermodel.Contact
-	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		row, err := s.scopedContactWithDB(ctx, tx, tenantUUID, customerUUID, in.ContactUUID)
+	err = s.repository.Transaction(ctx, tenantUUID, customerUUID, func(tx *contactrepo.ContactTransaction) error {
+		row, err := tx.Contact(in.ContactUUID)
 		if err != nil {
 			return err
+		}
+		isPrimary := tx.Membership.PrimaryContactUUID == row.ContactUUID
+		if isPrimary && in.Status != nil && *in.Status != contactfw.StatusActive {
+			return contactfw.NewError(contactfw.CodePrimaryChangeRequired, nil)
+		}
+		if in.Roles != nil {
+			hasPrimary := false
+			for _, role := range *in.Roles {
+				if role == contactfw.RolePrimary {
+					hasPrimary = true
+				}
+			}
+			if hasPrimary != isPrimary {
+				return contactfw.NewError(contactfw.CodePrimaryOperationRequired, nil)
+			}
 		}
 		if in.DisplayName != nil {
 			row.DisplayName = strings.TrimSpace(*in.DisplayName)
@@ -110,7 +129,7 @@ func (s *FrameworkContactLocalStore) Update(ctx context.Context, in contactfw.Up
 			}
 			row.Tags = datatypes.JSON(raw)
 		}
-		if err := tx.Save(row).Error; err != nil {
+		if err := tx.Save(row); err != nil {
 			return err
 		}
 		updated = row

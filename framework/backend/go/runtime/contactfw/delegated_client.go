@@ -78,7 +78,7 @@ func normalizeDelegatedError(err error) error {
 	if err == nil || CodeOf(err) != "" {
 		return err
 	}
-	return NewError(CodeDelegateUnavailable, err)
+	return mapCapabilityError(err)
 }
 
 var _ DelegatedContactClient = (*CoreDelegatedClient)(nil)

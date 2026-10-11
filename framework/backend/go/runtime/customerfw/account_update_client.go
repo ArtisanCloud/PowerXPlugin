@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
+	common "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common"
 	"github.com/google/uuid"
 )
 
@@ -29,6 +31,9 @@ type UpdateBasicAccountRequest struct {
 
 // UnmarshalJSON rejects unknown fields, aliases and null instead of losing presence.
 func (r *UpdateBasicAccountRequest) UnmarshalJSON(data []byte) error {
+	if !utf8.Valid(data) {
+		return IdentityContractError("CUSTOMER_ACCOUNT_INVALID_ARGUMENT", 400)
+	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
@@ -54,6 +59,21 @@ func (c *AccountSelectorClient) UpdateBasicAccount(ctx context.Context, req Upda
 	id, err := uuid.Parse(strings.TrimSpace(req.CustomerUUID))
 	if err != nil || id == uuid.Nil {
 		return nil, errors.New("CUSTOMER_ACCOUNT_INVALID_ARGUMENT")
+	}
+	// Check the original strings before JSON replaces invalid UTF-8.
+	for _, field := range []struct {
+		value    *string
+		limit    int
+		required bool
+	}{
+		{req.DisplayName, 128, true}, {req.Nickname, 128, false},
+		{req.GivenName, 128, false}, {req.FamilyName, 128, false},
+		{req.PrimaryEmail, 255, false}, {req.PrimaryPhone, 32, false},
+		{req.Locale, 32, false}, {req.Timezone, 64, false},
+	} {
+		if field.value != nil && !common.ValidText(*field.value, field.limit, field.required) {
+			return nil, IdentityContractError("CUSTOMER_ACCOUNT_INVALID_ARGUMENT", 400)
+		}
 	}
 	raw, err := json.Marshal(req)
 	if err != nil {

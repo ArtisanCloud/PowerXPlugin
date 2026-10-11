@@ -94,8 +94,8 @@ jobs:
         run: cd framework/backend/go && go test ./...
       - name: Go test (skeleton backend)
         run: cd skeleton/backend/go-gin && go test ./... -count=1
-      - name: Generated backend without repository workspace
-        run: PX_TEST_GENERATED_BUILD=1 go test ./tools/cli/internal/templates -run '^TestGeneratedBackendBuild$' -count=1 -timeout=10m
+      - name: Generated backend with packaged Framework snapshot
+        run: PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^TestGeneratedBackendBuild$' -count=1 -timeout=10m
 
   frontend:
     runs-on: ubuntu-latest

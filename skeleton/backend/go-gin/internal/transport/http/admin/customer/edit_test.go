@@ -3,6 +3,7 @@ package customer
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -99,6 +100,13 @@ func TestCustomerDebugUpdateUsesLocalEvenWhenStartupDelegated(t *testing.T) {
 		t.Fatal(err)
 	}
 	customerUUID, tenantUUID := uuid.NewString(), uuid.NewString()
+	if err = db.Exec(`CREATE TABLE customer_tenant_memberships (id INTEGER PRIMARY KEY, membership_uuid TEXT, tenant_uuid TEXT, customer_uuid TEXT, primary_contact_uuid TEXT, status TEXT, deleted_at DATETIME)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	primaryUUID := uuid.NewString()
+	if err = db.Exec(`INSERT INTO customer_tenant_memberships (id,membership_uuid,tenant_uuid,customer_uuid,primary_contact_uuid,status) VALUES (1,?,?,?,?,'active')`, uuid.NewString(), tenantUUID, customerUUID, primaryUUID).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err = db.Exec(`INSERT INTO customer_accounts (id,customer_uuid,tenant_uuid,display_name,status) VALUES (1,?,?,?,'active')`, customerUUID, tenantUUID, "before").Error; err != nil {
 		t.Fatal(err)
 	}
@@ -115,6 +123,14 @@ func TestCustomerDebugUpdateUsesLocalEvenWhenStartupDelegated(t *testing.T) {
 	}
 	if rec.Code != http.StatusOK || name != "after" {
 		t.Fatalf("status=%d name=%s body=%s", rec.Code, name, rec.Body.String())
+	}
+	var response struct {
+		Data struct {
+			Primary string `json:"primary_contact_uuid"`
+		} `json:"data"`
+	}
+	if err = json.Unmarshal(rec.Body.Bytes(), &response); err != nil || response.Data.Primary != primaryUUID {
+		t.Fatal("CONTACT_PRIMARY_READBACK_INVALID", err)
 	}
 }
 

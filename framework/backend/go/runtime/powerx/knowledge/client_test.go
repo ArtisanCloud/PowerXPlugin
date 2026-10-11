@@ -53,7 +53,7 @@ func TestClientReturnsTypedHTTPError(t *testing.T) {
 
 func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
 	transport := knowledgeRoundTrip(func(req *http.Request) (*http.Response, error) {
-		require.Equal(t, "Bearer service-token", req.Header.Get("Authorization"))
+		require.Equal(t, "ApiKey service-token", req.Header.Get("Authorization"))
 		switch req.Method + " " + req.URL.Path {
 		case "GET /api/v1/tenant/knowledge/spaces":
 			return knowledgeResponse(http.StatusOK, `{"data":{"items":[{"space_uuid":"11111111-1111-1111-1111-111111111111","name":"FAQ","status":"active"}]}}`), nil
@@ -77,9 +77,7 @@ func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
 			return nil, nil
 		}
 	})
-	client, err := NewClientWithTokenProvider(Config{BaseURL: "https://core.example"}, TokenProviderFunc(func(context.Context) (string, error) {
-		return "service-token", nil
-	}), &http.Client{Transport: transport})
+	client, err := NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, "service-token", &http.Client{Transport: transport})
 	require.NoError(t, err)
 
 	spaces, err := client.ListKnowledgeSpaces(context.Background(), fwknowledge.ListSpacesInput{TenantUUID: "tenant-a"})
@@ -99,7 +97,7 @@ func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
 
 	_, err = client.DeleteKnowledgeDocument(context.Background(), fwknowledge.DeleteDocumentInput{SpaceID: spaces[0].SpaceID, DocumentID: upsert.DocumentID})
 	require.NoError(t, err)
-	rebuild, err := client.ReindexKnowledgeDocument(context.Background(), fwknowledge.ReindexInput{SpaceID: spaces[0].SpaceID})
+	rebuild, err := client.ReindexKnowledgeDocument(context.Background(), fwknowledge.ReindexInput{SpaceID: spaces[0].SpaceID, HostRebuild: &fwknowledge.DocumentRebuildSettings{Mode: fwknowledge.RebuildReuseSnapshot, IdempotencyKey: "fixture-request"}})
 	require.NoError(t, err)
 	require.Equal(t, fwknowledge.IndexOperationReindex, rebuild.Operation)
 	job, err := client.GetKnowledgeIndexJob(context.Background(), fwknowledge.IndexJobQuery{JobID: rebuild.JobID, TenantUUID: "tenant-a"})
@@ -113,7 +111,7 @@ func TestClientRejectsUnsupportedHostQueryFilters(t *testing.T) {
 	_, err = client.SearchKnowledge(context.Background(), fwknowledge.KnowledgeQuery{Query: "refund", Tags: []string{"refund"}})
 	require.Equal(t, fwknowledge.CodeUnsupportedCapability, fwknowledge.CodeOf(err))
 	_, err = client.ReindexKnowledgeDocument(context.Background(), fwknowledge.ReindexInput{SpaceID: "space-a", DocumentID: "document-a"})
-	require.Equal(t, fwknowledge.CodeUnsupportedCapability, fwknowledge.CodeOf(err))
+	require.Equal(t, fwknowledge.CodeInvalidArgument, fwknowledge.CodeOf(err))
 }
 
 func TestClientMapsKnowledgeHostErrorEnvelope(t *testing.T) {

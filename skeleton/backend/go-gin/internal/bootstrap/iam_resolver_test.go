@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	fwiamadapters "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/adapters"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
@@ -70,6 +71,9 @@ func (resolverProxyStub) Refresh(context.Context, string) (*iamservice.AuthToken
 }
 func (resolverProxyStub) Logout(context.Context, string) error { return errors.New("not used") }
 func (resolverProxyStub) MeContext(context.Context, string) (*authproxy.MeContext, error) {
+	return nil, errors.New("not used")
+}
+func (resolverProxyStub) ResolveDelegatedIdentity(context.Context, fwiamcontracts.DelegatedIdentityQuery) (*fwiamcontracts.DelegatedIdentity, error) {
 	return nil, errors.New("not used")
 }
 func (resolverProxyStub) GetDirectoryTenant(context.Context) (*authproxy.DirectoryTenant, error) {

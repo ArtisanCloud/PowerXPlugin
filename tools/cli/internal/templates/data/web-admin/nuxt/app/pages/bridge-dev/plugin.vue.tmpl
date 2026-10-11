@@ -33,7 +33,7 @@ const thm = computed(() => {
 const loc = computed(() => String(locale.value))
 
 onMounted(() => {
-  setupHostBridgeAdapter({ debug: true, pluginId, instanceId })
+  setupHostBridgeAdapter({ debug: true, pluginId })
 })
 
 // 自测按钮（可删）

@@ -134,6 +134,7 @@ type Deps struct {
 	AuthProxy                    DelegatedAuthProxy
 	IAMDirectory                 iamservice.IAMDirectory
 	IAMRegistry                  *fwiamadapters.Registry
+	WSIdentityLifecycle          *frameworkrealtime.IdentityLifecycle
 	IAMDirectoryService          fwiamcontracts.DirectoryService
 	IAMAuthzService              fwiamcontracts.AuthzService
 	IAMContextService            fwiamcontracts.IdentityContextService

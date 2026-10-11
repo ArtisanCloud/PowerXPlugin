@@ -15,6 +15,7 @@ import (
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	iamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
+	"github.com/google/uuid"
 )
 
 // TokenProvider obtains the plugin's short-lived STS credential.
@@ -26,16 +27,18 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type CoreClientConfig struct {
-	BaseURL string
-	Tokens  TokenProvider
-	Timeout time.Duration
-	Client  *http.Client
+	PluginID string
+	BaseURL  string
+	Tokens   TokenProvider
+	Timeout  time.Duration
+	Client   *http.Client
 }
 
 // CoreClient is the official Framework STS transport for the IAM directory
 // and authorization Host Contracts. Tenant scope is never serialised: Core
 // derives it from the service credential.
 type CoreClient struct {
+	pluginID   string
 	baseURL    string
 	tokens     TokenProvider
 	timeout    time.Duration
@@ -58,7 +61,7 @@ func NewCoreClient(cfg CoreClientConfig) (*CoreClient, error) {
 	if client == nil {
 		client = &http.Client{Timeout: timeout + 500*time.Millisecond}
 	}
-	return &CoreClient{baseURL: apiBase(cfg.BaseURL), tokens: cfg.Tokens, timeout: timeout, client: client, authScheme: "Bearer"}, nil
+	return &CoreClient{pluginID: strings.TrimSpace(cfg.PluginID), baseURL: apiBase(cfg.BaseURL), tokens: cfg.Tokens, timeout: timeout, client: client, authScheme: "Bearer"}, nil
 }
 
 // NewCoreClientWithAPIKey uses a server-owned credential for Local + proxy.
@@ -87,15 +90,41 @@ type CoreRequestError struct {
 func (e *CoreRequestError) Error() string { return e.Err.Error() }
 func (e *CoreRequestError) Unwrap() error { return e.Err }
 
+// coreTenant is Core's directory DTO. Its status is numeric and its business
+// key is named key; neither field has the Framework model's wire shape.
+type coreTenant struct {
+	TenantUUID string `json:"tenant_uuid"`
+	Key        string `json:"key"`
+	Name       string `json:"name"`
+	Status     int16  `json:"status"`
+	Type       string `json:"type"`
+	Plan       string `json:"plan"`
+}
+
+func (t coreTenant) tenant() contracts.Tenant {
+	return contracts.Tenant{TenantUUID: t.TenantUUID, TenantKey: t.Key, Name: t.Name, Status: strconv.FormatInt(int64(t.Status), 10)}
+}
+
+// readTenant is shared by the public directory method and credential-scope
+// validation. A supplied credential stays pinned across a multi-read operation.
+func (c *CoreClient) readTenant(ctx context.Context, credential string) (*contracts.Tenant, error) {
+	var out coreTenant
+	if err := c.call(ctx, http.MethodGet, "/tenant/iam/tenant", nil, &out, credential); err != nil {
+		return nil, err
+	}
+	result := out.tenant()
+	return &result, nil
+}
+
 func (c *CoreClient) GetTenant(ctx context.Context, asserted string) (*contracts.Tenant, error) {
-	var out contracts.Tenant
-	if err := c.call(ctx, http.MethodGet, "/tenant/iam/tenant", nil, &out, ""); err != nil {
+	out, err := c.readTenant(ctx, "")
+	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(asserted) != "" && strings.TrimSpace(asserted) != out.TenantUUID {
 		return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, "delegated tenant response does not match assertion")
 	}
-	return &out, nil
+	return out, nil
 }
 func (c *CoreClient) ListDepartments(ctx context.Context, tenant string) ([]contracts.Department, error) {
 	var out struct {
@@ -213,13 +242,76 @@ func (c *CoreClient) BatchResolveMembers(ctx context.Context, tenant string, ids
 	return result, nil
 }
 func (c *CoreClient) BatchResolveMembersByDisplayNames(ctx context.Context, tenant string, names []string) (*contracts.MemberDisplayNameResolution, error) {
-	var out contracts.MemberDisplayNameResolution
-	if err := c.call(ctx, http.MethodPost, "/tenant/iam/members:batch-find-by-display-names", map[string]any{"display_names": names}, &out, ""); err != nil {
+	asserted, err := uuid.Parse(strings.TrimSpace(tenant))
+	if err != nil || asserted == uuid.Nil || len(names) == 0 || len(names) > 200 {
+		return nil, iamerrors.New(iamerrors.CodeInvalidArgument, iamerrors.CodeInvalidArgument)
+	}
+	for _, name := range names {
+		if strings.TrimSpace(name) == "" {
+			return nil, iamerrors.New(iamerrors.CodeInvalidArgument, iamerrors.CodeInvalidArgument)
+		}
+	}
+	if c == nil || c.client == nil || c.tokens == nil {
+		return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+	}
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	credential, err := c.tokens.Token(ctx)
+	if err != nil || strings.TrimSpace(credential) == "" {
+		return nil, iamerrors.Wrap(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency, err)
+	}
+	// Core's name resolver deliberately omits tenant_uuid. Verify the caller's
+	// assertion against the credential's tenant before binding that scope to
+	// the shared Member model. Pin one credential for both reads; never label
+	// a result using an unchecked request parameter or a decoded token claim.
+	scope, err := c.readTenant(ctx, credential)
+	if err != nil {
 		return nil, err
 	}
-	for _, item := range out.Items {
-		if item.Member != nil && tenant != "" && item.Member.TenantUUID != "" && item.Member.TenantUUID != tenant {
-			return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, "delegated display-name response crosses tenant")
+	scoped, err := uuid.Parse(strings.TrimSpace(scope.TenantUUID))
+	if err != nil || scoped == uuid.Nil {
+		return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+	}
+	if scoped != asserted {
+		return nil, iamerrors.New(iamerrors.CodeForbidden, iamerrors.CodeForbidden)
+	}
+	var out contracts.MemberDisplayNameResolution
+	if err := c.call(ctx, http.MethodPost, "/tenant/iam/members:batch-find-by-display-names", map[string]any{"display_names": names}, &out, credential); err != nil {
+		return nil, err
+	}
+	if len(out.Items) != len(names) {
+		return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+	}
+	for i := range out.Items {
+		item := &out.Items[i]
+		if !strings.EqualFold(strings.TrimSpace(item.DisplayName), strings.TrimSpace(names[i])) {
+			return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+		}
+		switch item.Status {
+		case contracts.MemberDisplayNameResolutionFound:
+			if item.Member == nil || !strings.EqualFold(strings.TrimSpace(item.Member.DisplayName), strings.TrimSpace(item.DisplayName)) {
+				return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+			}
+			memberUUID, memberErr := uuid.Parse(strings.TrimSpace(item.Member.MemberUUID))
+			userUUID, userErr := uuid.Parse(strings.TrimSpace(item.Member.UserUUID))
+			if memberErr != nil || memberUUID == uuid.Nil || userErr != nil || userUUID == uuid.Nil {
+				return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+			}
+			if item.Member.TenantUUID != "" {
+				returnedTenant, tenantErr := uuid.Parse(strings.TrimSpace(item.Member.TenantUUID))
+				if tenantErr != nil || returnedTenant != scoped {
+					return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+				}
+			}
+			item.Member.TenantUUID = scoped.String()
+			item.Member.MemberUUID = memberUUID.String()
+			item.Member.UserUUID = userUUID.String()
+		case contracts.MemberDisplayNameResolutionNotFound, contracts.MemberDisplayNameResolutionAmbiguous:
+			if item.Member != nil {
+				return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
+			}
+		default:
+			return nil, iamerrors.New(iamerrors.CodeUpstreamDependency, iamerrors.CodeUpstreamDependency)
 		}
 	}
 	return &out, nil
@@ -252,17 +344,7 @@ func (c *CoreClient) Authorize(ctx context.Context, in contracts.AuthorizationRe
 	return &out, nil
 }
 func (c *CoreClient) ResolveIdentity(ctx context.Context, bearer string) (*contracts.IdentityContext, error) {
-	var out contracts.IdentityContext
-	if c.authScheme == "ApiKey" && strings.TrimSpace(bearer) != "" {
-		return nil, iamerrors.New(iamerrors.CodeInvalidArgument, "iam.caller_token_not_allowed")
-	}
-	if strings.TrimSpace(bearer) == "" {
-		return nil, iamerrors.New(iamerrors.CodeUnauthorized, "bearer token is required")
-	}
-	if err := c.call(ctx, http.MethodGet, "/admin/user/auth/me/context", nil, &out, bearer); err != nil {
-		return nil, err
-	}
-	return &out, nil
+	return nil, iamerrors.New(iamerrors.CodeIdentityMigrationRequired, iamerrors.CodeIdentityMigrationRequired)
 }
 
 func (c *CoreClient) call(ctx context.Context, method, path string, body any, out any, bearer string) error {

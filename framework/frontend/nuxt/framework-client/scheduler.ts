@@ -31,12 +31,14 @@ export interface SchedulerJobSpec {
 }
 
 export interface SchedulerJob extends SchedulerJobSpec {
+  uuid?: string
   job_id: string
   status: SchedulerJobStatus
   created_at?: string
   updated_at?: string
   next_run_at?: string
   last_run_at?: string
+  last_execution_id?: string
 }
 
 export interface ListSchedulerJobsInput {
@@ -62,6 +64,9 @@ export interface ListSchedulerJobsResult {
 export interface SchedulerActionResult {
   job_id: string
   status: string
+  execution_completed?: boolean
+  last_run_at?: string | null
+  last_execution_id?: string | null
 }
 
 export interface SchedulerClient {

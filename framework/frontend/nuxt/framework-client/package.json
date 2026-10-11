@@ -1,6 +1,6 @@
 {
   "name": "@artisan-cloud/plugin-framework-client",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "type": "module",
   "exports": {
     ".": "./index.ts"
@@ -8,6 +8,7 @@
   "files": [
     "index.ts",
     "api.ts",
+    "api-errors.ts",
     "api-fetch.ts",
     "bridge.ts",
     "host-session.ts",
@@ -15,7 +16,8 @@
     "realtime.ts",
     "sse.ts",
     "ws.ts",
-    "logger.ts"
+    "logger.ts",
+    "navigation.ts"
   ],
   "peerDependencies": {
     "nuxt": "^4.2.0"

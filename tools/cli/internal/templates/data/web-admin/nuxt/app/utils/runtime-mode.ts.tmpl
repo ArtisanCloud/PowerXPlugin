@@ -1,3 +1,4 @@
+import { isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client';
 export type FrontendRuntimeMode = "host_delegated" | "local_proxy" | "standalone_local";
 
 export interface FrontendRuntimeModeState {
@@ -32,7 +33,7 @@ function normalizeGatewayAuthScheme(value: unknown): "bearer" | "apikey" | "" {
 export function resolveFrontendRuntimeMode(): FrontendRuntimeModeState {
   const runtimeConfig = useRuntimeConfig();
   const pub = runtimeConfig.public || {};
-  const insidePowerX = toBool(pub.insidePowerX);
+  const insidePowerX = isPowerXEmbedded(pub.insidePowerX);
   const providerMode = normalizeProviderMode(pub.providerMode);
   const powerxProxy: "0" | "1" = toBool(pub.powerxProxy) || insidePowerX ? "1" : "0";
   const gatewayAuthScheme = normalizeGatewayAuthScheme(pub.gatewayAuthScheme);

@@ -69,7 +69,6 @@ function buildWsURL(scope: string) {
     insidePowerX: runtimeMode.insidePowerX,
     wsBaseURL,
     wsPath,
-    wsURL: url,
     tenantUuid: getTenantUuid(),
   });
   return url;
@@ -210,11 +209,12 @@ export function useNotificationProbe(scope = "default", defaultTopic = "") {
       pluginId: String(useRuntimeConfig().public?.powerxPluginId || "{{ .PluginID }}"),
       wsBaseURL: `${parsedWsURL.protocol}//${parsedWsURL.host}`,
       wsPath: parsedWsURL.pathname,
+      insidePowerX: resolveFrontendRuntimeMode().insidePowerX,
       token: getAuthToken(),
       tenantUuid: getTenantUuid(),
     }).connect();
     wsConn = socket;
-    logger.info("ws connecting", { mode: resolveFrontendRuntimeMode().mode, tenantUuid: getTenantUuid(), wsURL });
+    logger.info("ws connecting", { mode: resolveFrontendRuntimeMode().mode, tenantUuid: getTenantUuid(), });
 
     socket.onopen = () => {
       wsState.value = "connected";
@@ -276,7 +276,7 @@ export function useNotificationProbe(scope = "default", defaultTopic = "") {
     socket.onerror = () => {
       wsState.value = "error";
       wsError.value = "WebSocket 连接异常";
-      logger.error("ws connection error", { wsURL });
+      logger.error("ws connection error", { });
     };
 
     socket.onclose = () => {
@@ -289,7 +289,7 @@ export function useNotificationProbe(scope = "default", defaultTopic = "") {
       }
       wsState.value = "reconnecting";
       resetDiag();
-      logger.warn("ws closed, scheduling reconnect", { wsURL });
+      logger.warn("ws closed, scheduling reconnect", { });
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }

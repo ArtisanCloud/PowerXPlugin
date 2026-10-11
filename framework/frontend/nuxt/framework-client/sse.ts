@@ -1,3 +1,5 @@
+import { getPowerXHostSession, PowerXHostSessionError } from './host-session';
+import { isPowerXEmbedded } from './bridge';
 export interface PluginSSEOptions {
   pluginId: string;
   apiBaseURL?: string;
@@ -82,6 +84,7 @@ const normalizeBearer = (token: string) => {
 export function createPluginSSEClient(
   options: PluginSSEOptions,
 ): PluginSSEClient {
+  const hostSession = isPowerXEmbedded(options.insidePowerX) ? getPowerXHostSession(options.pluginId) : null;
   const apiBase = String(
     options.apiBaseURL || `/_p/${options.pluginId}/api/v1`,
   ).replace(/\/+$/, "");
@@ -113,10 +116,10 @@ export function createPluginSSEClient(
         : new URL(cleanPath, `${base}/`);
     appendParams(url, params);
 
-    const token = normalizeBearer(String(input?.token || options.token || ""));
-    const tenantUuid = String(
-      input?.tenantUuid || options.tenantUuid || "",
-    ).trim();
+    const snapshot = hostSession?.getReadySnapshot();
+    if (hostSession && !snapshot) throw new PowerXHostSessionError('PLUGIN_AUTH_REQUIRED');
+    const token = normalizeBearer(String(snapshot?.accessToken || input?.token || options.token || ""));
+    const tenantUuid = String(hostSession ? snapshot?.identity?.tenantUuid || '' : input?.tenantUuid || options.tenantUuid || '').trim();
     if (token) url.searchParams.set("authorization", token);
     if (tenantUuid) url.searchParams.set("tenant_uuid", tenantUuid);
     return url.toString();
@@ -131,15 +134,22 @@ export function createPluginSSEClient(
       withCredentials:
         connectOptions.withCredentials ?? options.withCredentials ?? true,
     });
-    if (connectOptions.onOpen) source.onopen = connectOptions.onOpen;
-    if (connectOptions.onError) source.onerror = connectOptions.onError;
-    if (connectOptions.onMessage) source.onmessage = connectOptions.onMessage;
+    const snapshot = hostSession?.getReadySnapshot();
+    const guard = <T extends Event>(handler?: (event: T) => void) => (event: T) => { if (!snapshot || hostSession!.isCurrent(snapshot)) handler?.(event); };
+    if (hostSession && snapshot) {
+      const close = source.close.bind(source);
+      const unsubscribe = hostSession.subscribe(() => { if (!hostSession.isCurrent(snapshot)) source.close(); });
+      source.close = () => { unsubscribe(); close(); };
+    }
+    if (connectOptions.onOpen) source.onopen = guard(connectOptions.onOpen);
+    if (connectOptions.onError) source.onerror = guard(connectOptions.onError);
+    if (connectOptions.onMessage) source.onmessage = guard(connectOptions.onMessage);
     if (connectOptions.forwardEventsToMessage && connectOptions.onMessage) {
       for (const eventName of connectOptions.forwardEventsToMessage) {
         if (!eventName) continue;
         source.addEventListener(
           eventName,
-          connectOptions.onMessage as EventListener,
+          guard(connectOptions.onMessage) as EventListener,
         );
       }
     }
@@ -147,12 +157,19 @@ export function createPluginSSEClient(
       connectOptions.events || {},
     )) {
       if (!eventName || !handler) continue;
-      source.addEventListener(eventName, handler as EventListener);
+      source.addEventListener(eventName, guard(handler) as EventListener);
     }
     return source;
   };
 
   const stream = async (streamOptions: PluginSSEStreamOptions) => {
+    const snapshot = hostSession?.getReadySnapshot();
+    if (hostSession && !snapshot) throw new PowerXHostSessionError('PLUGIN_AUTH_REQUIRED');
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (streamOptions.signal?.aborted) abort();
+    streamOptions.signal?.addEventListener('abort', abort, { once: true });
+    const unsubscribe = hostSession?.subscribe(() => { if (!hostSession.isCurrent(snapshot!)) abort(); });
     try {
       const url = buildURL(streamOptions.path, streamOptions.params, {
         tenantUuid: streamOptions.tenantUuid,
@@ -163,13 +180,13 @@ export function createPluginSSEClient(
         ...(streamOptions.headers || {}),
       };
       const token = normalizeBearer(
-        String(streamOptions.token || options.token || ""),
+        String(snapshot?.accessToken || streamOptions.token || options.token || ""),
       );
       if (token) {
         headers.Authorization = token;
       }
       const tenantUuid = String(
-        streamOptions.tenantUuid || options.tenantUuid || "",
+        hostSession ? snapshot?.identity?.tenantUuid || '' : streamOptions.tenantUuid || options.tenantUuid || '',
       ).trim();
       if (tenantUuid) {
         headers.tenant_uuid = tenantUuid;
@@ -177,7 +194,7 @@ export function createPluginSSEClient(
       const response = await fetch(url, {
         method: "GET",
         headers,
-        signal: streamOptions.signal,
+        signal: controller.signal,
         credentials: options.withCredentials === false ? "same-origin" : "include",
       });
       if (!response.ok) {
@@ -186,12 +203,15 @@ export function createPluginSSEClient(
       if (!response.body) {
         throw new Error("SSE stream response body is empty");
       }
-      await readSSEStream(response.body, streamOptions.onEvent);
+      await readSSEStream(response.body, event => {
+        if (controller.signal.aborted || (snapshot && !hostSession!.isCurrent(snapshot))) throw new PowerXHostSessionError('AUTH_SESSION_CHANGED');
+        streamOptions.onEvent?.(event);
+      }, controller.signal);
     } catch (cause) {
       const error = cause instanceof Error ? cause : new Error(String(cause));
-      streamOptions.onError?.(error);
+      if (!snapshot || hostSession!.isCurrent(snapshot)) streamOptions.onError?.(error);
       throw error;
-    }
+    } finally { unsubscribe?.(); streamOptions.signal?.removeEventListener('abort', abort); }
   };
 
   return {
@@ -257,13 +277,18 @@ export function createManagedPluginSSEConnection(
 export async function readSSEStream(
   body: ReadableStream<Uint8Array>,
   onEvent?: (event: PluginSSEStreamEvent) => void,
+  signal?: AbortSignal,
 ) {
   const reader = body.getReader();
+  const abort = () => { void reader.cancel().catch(() => {}); };
+  if (signal?.aborted) abort();
+  signal?.addEventListener('abort', abort, { once: true });
   const decoder = new TextDecoder();
   let buffer = "";
   try {
     while (true) {
       const { value, done } = await reader.read();
+      if (signal?.aborted) throw new PowerXHostSessionError('AUTH_REQUEST_ABORTED');
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       let splitIndex = findSSEBoundary(buffer);
@@ -279,6 +304,7 @@ export async function readSSEStream(
       emitSSEChunk(buffer, onEvent);
     }
   } finally {
+    signal?.removeEventListener('abort', abort);
     reader.releaseLock();
   }
 }

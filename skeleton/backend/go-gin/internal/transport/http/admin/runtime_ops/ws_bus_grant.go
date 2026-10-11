@@ -4,6 +4,10 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
+
+	fwiamcontext "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/context"
+	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
@@ -33,6 +37,26 @@ func WSBusGrantHandler(deps *app.Deps) gin.HandlerFunc {
 		if !result.OK {
 			contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
 			return
+		}
+		var expiresAt time.Time
+		if identity, ok := fwiamcontext.DelegatedIdentityFromContext(c.Request.Context()); ok {
+			member := ""
+			if identity.MemberUUID != nil {
+				member = *identity.MemberUUID
+			}
+			for _, topic := range topics {
+				decision := frameworkrealtime.Decide(deps.RealtimeDescriptors, frameworkrealtime.ActionSubscribe, topic, frameworkrealtime.ProtocolWS, "message", frameworkrealtime.Scope{TenantUUID: identity.TenantUUID, MemberUUID: member})
+				if !decision.Allowed || (decision.RequiredPermission != "" && !identity.HasPermission(decision.RequiredPermission)) {
+					contracts.ResponseError(c, 403, frameworkrealtime.WSTopicForbidden, frameworkrealtime.WSTopicForbidden)
+					return
+				}
+			}
+			var err error
+			expiresAt, err = frameworkrealtime.BoundIdentityExpiry(identity, time.Minute, time.Now())
+			if err != nil {
+				contracts.ResponseError(c, 401, "IAM_CONTEXT_USER_SESSION_EXPIRED", "IAM_CONTEXT_USER_SESSION_EXPIRED")
+				return
+			}
 		}
 
 		tenantUUID, tenantMismatch := resolveGatewayTenantUUID(c, deps, req.TenantUUID)
@@ -64,7 +88,11 @@ func WSBusGrantHandler(deps *app.Deps) gin.HandlerFunc {
 				contracts.ResponseError(c, http.StatusBadRequest, result.ErrorCode, result.ErrorMessage)
 				return
 			}
-			contracts.ResponseSuccess(c, gin.H{"ok": true, "topics": topics})
+			response := gin.H{"ok": true, "topics": topics}
+			if !expiresAt.IsZero() {
+				response["expires_at"] = expiresAt.UTC().Format(time.RFC3339Nano)
+			}
+			contracts.ResponseSuccess(c, response)
 			return
 		}
 

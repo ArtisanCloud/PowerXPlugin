@@ -1,5 +1,5 @@
 import { resolveApiBase } from "./_base";
-import { createRealtimeClient } from "@artisan-cloud/plugin-framework-client";
+import { getPowerXHostSession, isPowerXEmbedded, createRealtimeClient } from "@artisan-cloud/plugin-framework-client";
 
 export interface SSEStreamEvent {
   event: string;
@@ -37,6 +37,7 @@ function createRealtime() {
     token: getOptionalAuthToken(),
     tenantUuid: getOptionalTenantUUID(),
     withCredentials: false,
+    insidePowerX: isPowerXEmbedded(useRuntimeConfig().public?.insidePowerX),
   });
 }
 
@@ -50,6 +51,7 @@ function resolvePluginId() {
 
 function getOptionalAuthToken() {
   if (typeof window === "undefined") return "";
+  if (isPowerXEmbedded(useRuntimeConfig().public?.insidePowerX)) return getPowerXHostSession(resolvePluginId()).getReadySnapshot()?.accessToken || '';
   return (
     window.localStorage.getItem("access_token") ||
     window.localStorage.getItem("auth_token") ||
@@ -59,6 +61,7 @@ function getOptionalAuthToken() {
 
 function getOptionalTenantUUID() {
   if (typeof window === "undefined") return "";
+  if (isPowerXEmbedded(useRuntimeConfig().public?.insidePowerX)) return getPowerXHostSession(resolvePluginId()).getReadySnapshot()?.identity?.tenantUuid || '';
   return (
     window.localStorage.getItem("px_current_tenant_uuid") ||
     window.localStorage.getItem("tenant_uuid") ||

@@ -15,7 +15,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
 const { setAuth, consumeAuthError } = auth;
-const isDelegatedMode = computed(() => auth.delegatedIAM?.value ?? false);
+const isDelegatedMode = computed(() => auth.hostManagedAuth?.value ?? false);
 const { get, post } = useApiClient();
 const runtimeConfig = useRuntimeConfig();
 const insidePowerX = computed(

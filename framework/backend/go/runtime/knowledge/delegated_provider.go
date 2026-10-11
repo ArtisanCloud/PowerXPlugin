@@ -136,7 +136,7 @@ func (p *DelegatedProvider) UpsertDocument(ctx context.Context, document Knowled
 	if p.client == nil {
 		return nil, &Error{Code: CodeProviderUnavailable, Message: "knowledge delegated provider unavailable", Provider: p.name, Operation: OperationUpsert, Retryable: true}
 	}
-	document, err := ValidateDocument(document)
+	document, err := ValidateHostDocument(document)
 	if err != nil {
 		return nil, err
 	}
@@ -240,4 +240,23 @@ func (p *DelegatedProvider) CreateSpace(ctx context.Context, input CreateSpaceIn
 		return nil, err
 	}
 	return item, nil
+}
+
+func (p *DelegatedProvider) GetIndexJobChunks(ctx context.Context, input IndexJobQuery) ([]IndexJobChunk, error) {
+	if err := RequireCapability(p.Capabilities(ctx), OperationUpsert); err != nil {
+		return nil, err
+	}
+	client, ok := p.client.(interface {
+		GetKnowledgeIndexJobChunks(context.Context, IndexJobQuery) ([]IndexJobChunk, error)
+	})
+	if !ok {
+		return nil, Unsupported(OperationUpsert)
+	}
+	callCtx, cancel := p.withTimeout(ctx)
+	defer cancel()
+	chunks, err := client.GetKnowledgeIndexJobChunks(callCtx, input)
+	if err != nil {
+		return nil, p.mapError(OperationUpsert, input.TraceID, err)
+	}
+	return chunks, nil
 }

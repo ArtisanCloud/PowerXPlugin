@@ -119,6 +119,9 @@ type contractDelegatedProxy struct {
 func (contractDelegatedProxy) MeContext(context.Context, string) (*authproxy.MeContext, error) {
 	return nil, errors.New("not implemented")
 }
+func (contractDelegatedProxy) ResolveDelegatedIdentity(context.Context, fwcontracts.DelegatedIdentityQuery) (*fwcontracts.DelegatedIdentity, error) {
+	return nil, errors.New("TEST_IDENTITY_NOT_USED")
+}
 func (contractDelegatedProxy) GetDirectoryTenant(context.Context) (*authproxy.DirectoryTenant, error) {
 	return &authproxy.DirectoryTenant{TenantUUID: contractTenantUUID}, nil
 }

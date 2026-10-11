@@ -7,23 +7,26 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 type TenantContext struct {
-	TenantUUID    string   `json:"tenant_uuid"`
-	MemberUUID    string   `json:"member_uuid,omitempty"`
-	TenantID      int64    `json:"tenant_id"`
-	UserID        int64    `json:"user_id"`
-	MemberID      int64    `json:"member_id"`
-	IsRoot        bool     `json:"is_root"`
-	Roles         []string `json:"roles"`
-	Permissions   []string `json:"permissions"`
-	PolicyVersion string   `json:"policy_version"`
-	PermsHash     string   `json:"perms_hash"`
-	AuthzSource   string   `json:"source"`
-	PluginID      string   `json:"plugin_id"`
+	AccessExpiresAt time.Time `json:"-"`
+	UserUUID        string    `json:"user_uuid,omitempty"`
+	TenantUUID      string    `json:"tenant_uuid"`
+	MemberUUID      string    `json:"member_uuid,omitempty"`
+	TenantID        int64     `json:"tenant_id"`
+	UserID          int64     `json:"user_id"`
+	MemberID        int64     `json:"member_id"`
+	IsRoot          bool      `json:"is_root"`
+	Roles           []string  `json:"roles"`
+	Permissions     []string  `json:"permissions"`
+	PolicyVersion   string    `json:"policy_version"`
+	PermsHash       string    `json:"perms_hash"`
+	AuthzSource     string    `json:"source"`
+	PluginID        string    `json:"plugin_id"`
 }
 
 const (

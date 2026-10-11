@@ -20,6 +20,7 @@ import (
 	"time"
 
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
 	fwagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
@@ -504,6 +505,23 @@ func main() {
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize local API-key Capability Registry client")
 		}
+	}
+	if providerResolver.IsDelegated() {
+		if authClient == nil {
+			logger.Fatal("IAM_ADAPTER_NOT_BOUND")
+		}
+		identityConfig := fwiamdelegated.CoreClientConfig{BaseURL: cfg.Gateway.BaseURL, PluginID: app.PluginID}
+		var identityClient *fwiamdelegated.CoreClient
+		if strings.EqualFold(strings.TrimSpace(cfg.Gateway.AuthScheme), "apikey") {
+			identityClient, err = fwiamdelegated.NewCoreClientWithAPIKey(identityConfig, cfg.Gateway.APIKey)
+		} else {
+			identityConfig.Tokens = fwiamdelegated.TokenProviderFunc(grpcclient.NewPowerXSTSTokenProvider(pxc).TokenFunc())
+			identityClient, err = fwiamdelegated.NewCoreClient(identityConfig)
+		}
+		if err != nil {
+			logger.WithError(err).Fatal("IAM_ADAPTER_NOT_BOUND")
+		}
+		authClient.SetIdentityResolver(identityClient)
 	}
 	cacheRuntime, taskCenterRuntime, err := runtimeexample.Build(providerResolver.Mode(), runtimeHostConfig, runtimeTokens, nil)
 	selectedKnowledge, knowledgeErr := knowledgeprovider.NewProviderFactory(cfg, providerResolver.Mode(), knowledgeDirectory, nil).Build()
@@ -998,6 +1016,9 @@ func main() {
 
 		cancel()
 
+		if deps.WSIdentityLifecycle != nil {
+			deps.WSIdentityLifecycle.Close()
+		}
 		if err := fwApp.Shutdown(); err != nil {
 			logger.WithError(err).Error("HTTP server shutdown error")
 		} else {

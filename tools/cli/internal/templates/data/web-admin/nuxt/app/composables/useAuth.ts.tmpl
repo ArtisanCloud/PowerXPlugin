@@ -1,4 +1,6 @@
-import { getCurrentScope, onScopeDispose, readonly } from "vue";
+import { getCurrentScope, onScopeDispose, readonly, ref } from "vue";
+import { isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client';
+import { useEmbeddedAuth } from './useEmbeddedAuth';
 import { useRuntimeConfig } from "#imports";
 import type { LoginResponse } from "~/composables/api/services/authService";
 import { useAuthService } from "~/composables/api/services/authService";
@@ -173,13 +175,14 @@ const resolveDelegatedMode = (value: unknown, fallback: boolean) => {
 
 export const useAuth = () => {
   const runtimeConfig = useRuntimeConfig();
+  if (isPowerXEmbedded(runtimeConfig.public?.insidePowerX)) return useEmbeddedAuth();
   const insidePowerX = resolveInsidePowerX(runtimeConfig.public?.insidePowerX);
   const delegatedMode = resolveDelegatedMode(
     runtimeConfig.public?.delegatedMode,
     insidePowerX
   );
   // Standalone 模式下宿主/脚手架可能只广播 access token（无 refresh token），允许继续维持会话。
-  const allowRefreshlessSession = !delegatedMode;
+  const allowRefreshlessSession = true;
 
   const isAuthenticated = useState("auth.isAuthenticated", () => false);
   const user = useState("auth.user", () => null);
@@ -610,9 +613,6 @@ export const useAuth = () => {
     if (fallbackMessage) {
       rememberAuthError(fallbackMessage);
     }
-    if (delegatedMode) {
-      return;
-    }
     if (
       process.client &&
       typeof window !== "undefined" &&
@@ -635,6 +635,7 @@ export const useAuth = () => {
   };
 
   return {
+    hostManagedAuth: readonly(ref(false)),
     isAuthenticated: readonly(isAuthenticated),
     user: readonly(user),
     token,

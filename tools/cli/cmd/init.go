@@ -20,10 +20,10 @@ import (
 const (
 	defaultVersion          = "0.1.0"
 	defaultGoVersion        = "1.24"
-	defaultFrameworkVersion = "v0.0.23"
+	defaultFrameworkVersion = "v0.0.24"
 	schemaDependency        = "github.com/santhosh-tekuri/jsonschema/v5 v5.3.0"
-	defaultAdminVersion     = "0.0.10"
-	defaultClientVersion    = "0.0.11"
+	defaultAdminVersion     = "0.0.11"
+	defaultClientVersion    = "0.0.12"
 )
 
 var pluginIDPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`)

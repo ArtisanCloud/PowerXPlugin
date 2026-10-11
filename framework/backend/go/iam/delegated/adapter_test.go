@@ -65,13 +65,19 @@ func (hostStub) Authorize(context.Context, contracts.AuthorizationRequest) (*con
 func (hostStub) ResolveIdentity(context.Context, string) (*contracts.IdentityContext, error) {
 	return &contracts.IdentityContext{TenantUUID: "tenant"}, nil
 }
+func (hostStub) ResolveDelegatedIdentity(context.Context, contracts.DelegatedIdentityQuery) (*contracts.DelegatedIdentity, error) {
+	return &contracts.DelegatedIdentity{TenantUUID: "tenant"}, nil
+}
+func (hostStub) RevalidateWSIdentity(context.Context, contracts.WSIdentityQuery) (*contracts.WSIdentity, error) {
+	return nil, nil
+}
 
 func TestNewBundleForwardsToCoreHost(t *testing.T) {
 	bundle, err := NewBundle(hostStub{})
 	if err != nil {
 		t.Fatalf("NewBundle: %v", err)
 	}
-	member, err := bundle.Context.ResolveIdentity(context.Background(), "customer-token")
+	member, err := bundle.Context.(contracts.DelegatedIdentityService).ResolveDelegatedIdentity(context.Background(), contracts.DelegatedIdentityQuery{ContextTicket: "proof"})
 	if err != nil || member.TenantUUID != "tenant" {
 		t.Fatalf("ResolveIdentity = %#v, %v", member, err)
 	}

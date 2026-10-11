@@ -1,3 +1,4 @@
+import { getPowerXHostSession, isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client';
 import { useCookie } from "#app";
 
 export const TENANT_UUID_STORAGE_KEY = "px_current_tenant_uuid";
@@ -34,7 +35,14 @@ const decodeJwtPayload = (token?: string | null): Record<string, any> | null => 
   }
 };
 
+const embedded = () => {
+  const config = typeof useRuntimeConfig === 'function' ? useRuntimeConfig() : { public: {} };
+  return { enabled: isPowerXEmbedded(config.public?.insidePowerX), pluginId: String(config.public?.powerxPluginId || '{{ .PluginID }}') };
+};
+
 export const getStoredTenantUUID = (): string | null => {
+  const host = embedded();
+  if (host.enabled) return typeof window === 'undefined' ? null : getPowerXHostSession(host.pluginId).getReadySnapshot()?.identity?.tenantUuid || null;
   if (process.client) {
     const candidates = [
       localStorage.getItem(TENANT_UUID_STORAGE_KEY),
@@ -55,6 +63,7 @@ export const getStoredTenantUUID = (): string | null => {
 };
 
 export const persistTenantUUID = (tenantUUID: string | null) => {
+  if (embedded().enabled) return;
   const normalized = normalize(tenantUUID);
 
   if (process.client) {
@@ -81,8 +90,9 @@ export const persistTenantUUID = (tenantUUID: string | null) => {
   cookie.value = normalized || null;
 };
 
-export const resolveTenantUUIDForRequest = () =>
-  (() => {
+export const resolveTenantUUIDForRequest = () => {
+  if (embedded().enabled) return getStoredTenantUUID() || undefined;
+  return (() => {
     if (!process.client) return undefined;
     const tokenKeys = ["access_token", "__px_access_token", "auth_token", "token"];
     for (const key of tokenKeys) {
@@ -99,3 +109,4 @@ export const resolveTenantUUIDForRequest = () =>
   })() ||
   getStoredTenantUUID() ||
   undefined;
+};

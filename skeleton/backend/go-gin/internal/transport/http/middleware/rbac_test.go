@@ -12,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func TestRBACAcceptsVerifiedDelegatedClaimsWithoutExplicitSource(t *testing.T) {
+func TestRBACRejectsDelegatedClaimsWithoutAuthoritativeTicket(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	jwtCfg := authx.JWTAuthConfig{
@@ -61,8 +61,8 @@ func TestRBACAcceptsVerifiedDelegatedClaimsWithoutExplicitSource(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", w.Code, w.Body.String())
 	}
 }
 

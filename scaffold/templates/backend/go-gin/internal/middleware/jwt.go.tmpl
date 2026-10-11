@@ -224,22 +224,28 @@ func parseHS256(raw string, cfg JWTAuthConfig) (TenantContext, error) {
 		return TenantContext{}, errors.New("invalid token")
 	}
 	authzSource := strings.TrimSpace(claims.AuthzSource)
+	accessExpiry := time.Time{}
+	if claims.ExpiresAt != nil {
+		accessExpiry = claims.ExpiresAt.Time
+	}
 	if authzSource == "" && hasDelegatedAuthzSnapshot(claims.PermissionCodes, claims.PolicyVersion, claims.PermsHash) {
 		authzSource = "signed_claims"
 	}
 	return TenantContext{
-		TenantUUID:    strings.TrimSpace(claims.TenantUUID.String()),
-		MemberUUID:    strings.TrimSpace(claims.MemberUUID),
-		TenantID:      claims.TenantID,
-		UserID:        claims.UserID,
-		MemberID:      claims.MemberID,
-		IsRoot:        claims.IsRoot,
-		Roles:         claims.Roles,
-		Permissions:   claims.Permissions,
-		PolicyVersion: claims.PolicyVersion,
-		PermsHash:     claims.PermsHash,
-		AuthzSource:   authzSource,
-		PluginID:      strings.TrimSpace(claims.PluginID),
+		UserUUID:        claims.UserUUID,
+		AccessExpiresAt: accessExpiry,
+		TenantUUID:      strings.TrimSpace(claims.TenantUUID.String()),
+		MemberUUID:      strings.TrimSpace(claims.MemberUUID),
+		TenantID:        claims.TenantID,
+		UserID:          claims.UserID,
+		MemberID:        claims.MemberID,
+		IsRoot:          claims.IsRoot,
+		Roles:           claims.Roles,
+		Permissions:     claims.Permissions,
+		PolicyVersion:   claims.PolicyVersion,
+		PermsHash:       claims.PermsHash,
+		AuthzSource:     authzSource,
+		PluginID:        strings.TrimSpace(claims.PluginID),
 	}, nil
 }
 

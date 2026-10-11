@@ -42,10 +42,10 @@ mappings:
         literal: '"name": "powerxplugin-skeleton-web-admin"'
         replace: '"name": "{{ .PluginSlug }}-web-admin"'
       - globs: ["package.json"]
-        literal: '"@artisan-cloud/plugin-framework-admin": "0.0.10"'
+        literal: '"@artisan-cloud/plugin-framework-admin": "0.0.11"'
         replace: '"@artisan-cloud/plugin-framework-admin": "{{ .FrameworkAdminRef }}"'
       - globs: ["package.json"]
-        literal: '"@artisan-cloud/plugin-framework-client": "0.0.10"'
+        literal: '"@artisan-cloud/plugin-framework-client": "file:../../../framework/frontend/nuxt/framework-client"'
         replace: '"@artisan-cloud/plugin-framework-client": "{{ .FrameworkClientRef }}"'
       - globs:
           - "app/pages/agent-skill-bridge.vue"
@@ -176,6 +176,10 @@ mappings:
         regex: "github\\.com/ArtisanCloud/PowerXPlugin/framework/backend/go\\s+v[0-9A-Za-z._-]+"
         flags: "g"
         replace: "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go {{ .FrameworkVersion }}"
+      # Local Skeleton replacement must not leak into generated plugins.
+      - globs: ["go.mod"]
+        literal: "\nreplace github.com/ArtisanCloud/PowerXPlugin/framework/backend/go => ../../../framework/backend/go\n"
+        replace: ""
       - globs: ["internal/config/config.go"]
         literal: "BindAddr: \":8078\","
         replace: "BindAddr: \":{{ .BackendPort }}\","

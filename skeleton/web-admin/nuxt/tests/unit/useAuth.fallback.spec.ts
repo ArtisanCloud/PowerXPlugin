@@ -26,6 +26,7 @@ vi.mock("~/stores/user", () => ({
 let runtimeConfigStub = { public: { insidePowerX: false } };
 vi.mock("#imports", () => ({
   useRuntimeConfig: () => runtimeConfigStub,
+  useNuxtApp: () => ({ $i18n: { t: (key: string) => key }, vueApp: { onUnmount: vi.fn() } }),
 }));
 
 const loadAuth = async () => (await import("~/composables/useAuth")).useAuth();
@@ -246,15 +247,17 @@ describe("useAuth", () => {
     expect(auth.consumeAuthError()).toBe("");
   });
 
-  it("delegated failClosed 仅展示 Banner 而不跳转登录", async () => {
+  it("embedded_fail_closed_does_not_use_local_auth_or_storage", async () => {
     runtimeConfigStub.public.insidePowerX = true;
     const auth = await loadAuth();
-    auth.setAuth(sampleTokens() as any);
-
-    (window.location as any).pathname = "/templates";
-    auth.failClosed?.("PowerX 会话已失效");
-
-    expect(auth.delegatedError.value).toContain("PowerX 会话已失效");
+    expect(() => auth.setAuth(sampleTokens() as any)).toThrow('AUTH_SESSION_HOST_MANAGED');
+    auth.failClosed('HOST_AUTH_UNAVAILABLE');
+    expect(auth.delegatedError.value).toBe('HOST_AUTH_UNAVAILABLE');
     expect(navigateTo).not.toHaveBeenCalled();
+    expect(window.localStorage.setItem).not.toHaveBeenCalled();
+    expect(window.localStorage.removeItem).not.toHaveBeenCalled();
+    expect(sessionStorage.clear).not.toHaveBeenCalled();
+    expect(refreshMock).not.toHaveBeenCalled();
+    expect(logoutMock).not.toHaveBeenCalled();
   });
 });

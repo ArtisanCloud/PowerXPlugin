@@ -45,6 +45,12 @@ func (r *Registry) Bind(mode contracts.IAMAdapterMode, bundle Bundle) error {
 	if r.bound {
 		return iamerrors.New(iamerrors.CodeAdapterAlreadyBind, "iam adapter has already been bound")
 	}
+	if mode == contracts.IAMAdapterModeDelegated {
+		resolver, ok := bundle.Context.(contracts.DelegatedIdentityService)
+		if !ok || nilAdapter(resolver) {
+			return iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+		}
+	}
 
 	r.bound = true
 	r.mode = mode
@@ -112,6 +118,36 @@ func (r *Registry) IdentityContext() (contracts.IdentityContextService, error) {
 		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, "iam context adapter not bound")
 	}
 	return r.bundle.Context, nil
+}
+
+// DelegatedIdentity exposes only the selected delegated resolver. Local mode
+// never falls back to a Host proof or a different identity provider.
+func (r *Registry) DelegatedIdentity() (contracts.DelegatedIdentityService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if !r.bound || r.mode != contracts.IAMAdapterModeDelegated {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	resolver, ok := r.bundle.Context.(contracts.DelegatedIdentityService)
+	if !ok || nilAdapter(resolver) {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	return resolver, nil
+}
+func (r *Registry) WSIdentityRevalidator() (contracts.WSIdentityRevalidationService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	resolver, ok := r.bundle.Context.(contracts.WSIdentityRevalidationService)
+	if !r.bound || r.mode != contracts.IAMAdapterModeDelegated || !ok || nilAdapter(resolver) {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	return resolver, nil
 }
 
 func nilAdapter(adapter any) bool {

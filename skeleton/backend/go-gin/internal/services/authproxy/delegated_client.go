@@ -25,11 +25,12 @@ type HTTPClient interface {
 
 // DelegatedClient proxies auth calls to PowerX Core.
 type DelegatedClient struct {
-	apiBase      string
-	httpClient   HTTPClient
-	serviceToken string
-	apiKey       string
-	pluginID     string
+	identityClient fwiamcontracts.DelegatedIdentityService
+	apiBase        string
+	httpClient     HTTPClient
+	serviceToken   string
+	apiKey         string
+	pluginID       string
 }
 
 // Option allows tweaking DelegatedClient construction.
@@ -172,11 +173,32 @@ func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*M
 
 // ResolveIdentityContext resolves framework identity context from delegated /me/context payload.
 func (c *DelegatedClient) ResolveIdentityContext(ctx context.Context, accessToken string) (*fwiamcontracts.IdentityContext, error) {
-	me, err := c.MeContext(ctx, accessToken)
-	if err != nil {
-		return nil, err
+	return nil, fwiamerrors.New(fwiamerrors.CodeIdentityMigrationRequired, fwiamerrors.CodeIdentityMigrationRequired)
+}
+
+// SetIdentityResolver binds the Framework-owned service client once at startup.
+func (c *DelegatedClient) SetIdentityResolver(resolver fwiamcontracts.DelegatedIdentityService) {
+	c.identityClient = resolver
+}
+func (c *DelegatedClient) IdentityResolverReady() bool {
+	if c == nil || c.identityClient == nil {
+		return false
 	}
-	return IdentityContextFromMeContext(me)
+	_, ok := c.identityClient.(fwiamcontracts.WSIdentityRevalidationService)
+	return ok
+}
+func (c *DelegatedClient) ResolveDelegatedIdentity(ctx context.Context, in fwiamcontracts.DelegatedIdentityQuery) (*fwiamcontracts.DelegatedIdentity, error) {
+	if c == nil || c.identityClient == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	return c.identityClient.ResolveDelegatedIdentity(ctx, in)
+}
+func (c *DelegatedClient) RevalidateWSIdentity(ctx context.Context, in fwiamcontracts.WSIdentityQuery) (*fwiamcontracts.WSIdentity, error) {
+	resolver, ok := c.identityClient.(fwiamcontracts.WSIdentityRevalidationService)
+	if !ok {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	return resolver.RevalidateWSIdentity(ctx, in)
 }
 
 type DirectoryMember struct {

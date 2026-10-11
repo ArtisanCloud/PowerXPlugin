@@ -84,7 +84,16 @@ func RequestLogger() gin.HandlerFunc {
 		}
 
 		if raw != "" {
-			fields["query"] = raw
+			query := c.Request.URL.Query()
+			for key := range query {
+				switch strings.ToLower(key) {
+				case "authorization", "access_token", "token", "context_ticket", "api_key":
+					query.Del(key)
+				}
+			}
+			if clean := query.Encode(); clean != "" {
+				fields["query"] = clean
+			}
 		}
 
 		if strings.TrimSpace(tenantUUID) != "" {

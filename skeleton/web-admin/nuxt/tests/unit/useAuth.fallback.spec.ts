@@ -3,6 +3,14 @@ import { ref } from "vue";
 
 const refreshMock = vi.fn();
 const logoutMock = vi.fn();
+const cookieRefs = new Map<string, ReturnType<typeof ref>>();
+
+vi.mock("#app", () => ({
+  useCookie: (name: string) => {
+    if (!cookieRefs.has(name)) cookieRefs.set(name, ref(null));
+    return cookieRefs.get(name)!;
+  },
+}));
 
 vi.mock("~/composables/api/services/authService", () => ({
   useAuthService: () => ({
@@ -18,6 +26,7 @@ vi.mock("~/stores/user", () => ({
 let runtimeConfigStub = { public: { insidePowerX: false } };
 vi.mock("#imports", () => ({
   useRuntimeConfig: () => runtimeConfigStub,
+  useNuxtApp: () => ({ $i18n: { t: (key: string) => key }, vueApp: { onUnmount: vi.fn() } }),
 }));
 
 const loadAuth = async () => (await import("~/composables/useAuth")).useAuth();
@@ -38,6 +47,8 @@ describe("useAuth", () => {
 
   beforeEach(() => {
     vi.resetModules();
+    cookieRefs.clear();
+    storageHandler = undefined;
 
     const stateMap = new Map<string, ReturnType<typeof ref>>();
     vi.stubGlobal("useState", (key: string, init?: () => any) => {
@@ -139,7 +150,7 @@ describe("useAuth", () => {
     expect(auth.isAuthenticated.value).toBe(true);
   });
 
-  it("强制清理过期 token 并要求重新登录", async () => {
+  it("expired access is withheld while refresh credentials remain available", async () => {
     const auth = await loadAuth();
     auth.setAuth(sampleTokens() as any);
     auth.expiresAt.value = Date.now() - 10_000;
@@ -148,7 +159,16 @@ describe("useAuth", () => {
 
     expect(value).toBeNull();
     expect(auth.isAuthenticated.value).toBe(false);
-    expect(auth.token.value).toBeNull();
+    expect(auth.refreshToken.value).toBe("refresh-token");
+    expect(localStore["refresh_token"]).toBe("refresh-token");
+    expect(navigateTo).not.toHaveBeenCalled();
+
+    refreshMock.mockResolvedValueOnce({
+      success: true,
+      data: { ...sampleTokens(), access_token: "renewed-token" },
+    });
+    expect(await auth.ensureFreshToken()).toBe("renewed-token");
+    expect(auth.isAuthenticated.value).toBe(true);
   });
 
   it("ensureFreshToken 会在过期时调用 refreshToken 并落盘新 token", async () => {
@@ -227,15 +247,17 @@ describe("useAuth", () => {
     expect(auth.consumeAuthError()).toBe("");
   });
 
-  it("delegated failClosed 仅展示 Banner 而不跳转登录", async () => {
+  it("embedded_fail_closed_does_not_use_local_auth_or_storage", async () => {
     runtimeConfigStub.public.insidePowerX = true;
     const auth = await loadAuth();
-    auth.setAuth(sampleTokens() as any);
-
-    (window.location as any).pathname = "/templates";
-    auth.failClosed?.("PowerX 会话已失效");
-
-    expect(auth.delegatedError.value).toContain("PowerX 会话已失效");
+    expect(() => auth.setAuth(sampleTokens() as any)).toThrow('AUTH_SESSION_HOST_MANAGED');
+    auth.failClosed('HOST_AUTH_UNAVAILABLE');
+    expect(auth.delegatedError.value).toBe('HOST_AUTH_UNAVAILABLE');
     expect(navigateTo).not.toHaveBeenCalled();
+    expect(window.localStorage.setItem).not.toHaveBeenCalled();
+    expect(window.localStorage.removeItem).not.toHaveBeenCalled();
+    expect(sessionStorage.clear).not.toHaveBeenCalled();
+    expect(refreshMock).not.toHaveBeenCalled();
+    expect(logoutMock).not.toHaveBeenCalled();
   });
 });

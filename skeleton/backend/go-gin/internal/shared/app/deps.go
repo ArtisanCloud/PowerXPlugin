@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/cache"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/taskcenter"
 	"os"
 	"strings"
 
@@ -16,24 +18,38 @@ import (
 	adminmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/admin_console"
 	capmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/capability"
 	opsmetrics "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/observability/operations"
+	localaisettings "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/ai_settings"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/authproxy"
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 	marketplacesvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/marketplace"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/runtimeexample"
 	"gorm.io/gorm"
 
 	fweventbridge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/eventbridge"
+	fwagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/agent"
+	fwai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/ai"
 	fwaisettings "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/aisettings"
+	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
 	runtimelogging "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/logging"
+	contactfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwintegration "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/integration"
+	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	fwmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/media"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
+	fwnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/notifications"
+	fwpluginrelease "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginrelease"
+	fwpluginruntime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/pluginruntime"
 	powerxagent "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/agent"
 	powerxai "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/ai"
 	powerxcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/capability"
 	powerxknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/knowledge"
+	powerxmedia "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/media"
 	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
 	powerxskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/skills"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
+	fwskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
 	fwwsbus "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/wsbus"
 )
 
@@ -42,6 +58,8 @@ type DelegatedAuthProxy interface {
 	Refresh(ctx context.Context, refreshToken string) (*iamservice.AuthTokens, error)
 	Logout(ctx context.Context, refreshToken string) error
 	MeContext(ctx context.Context, accessToken string) (*authproxy.MeContext, error)
+	GetDirectoryTenant(ctx context.Context) (*authproxy.DirectoryTenant, error)
+	ListDirectoryMembers(ctx context.Context, page, pageSize int) (*authproxy.DirectoryMemberPage, error)
 	GetDirectoryMember(ctx context.Context, memberUUID string) (*authproxy.DirectoryMember, error)
 	BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]authproxy.DirectoryMember, error)
 	BatchResolveDirectoryMembers(ctx context.Context, memberUUIDs []string) (*authproxy.DirectoryMemberResolution, error)
@@ -54,47 +72,78 @@ type DelegatedAuthProxy interface {
 
 // Deps bundles shared infrastructure dependencies for handlers and services.
 type Deps struct {
-	DB                   *gorm.DB
-	Ctx                  context.Context
-	PowerXClient         *client.PowerXServiceClient
-	CapabilityGateway    gatewayClient
-	Metadata             *fwmetadata.Client
-	CustomerAdmin        *customerfw.AdminClient
-	AISettings           *fwaisettings.Client
-	AI                   *powerxai.Client
-	AgentRuntime         *powerxagent.Client
-	CapabilityRegistry   powerxcapability.Registry
-	KnowledgeQABridge    powerxknowledge.QABridge
-	Notifications        powerxnotifications.Publisher
-	Skills               powerxskills.Invoker
-	Config               *config.Config
-	CapabilitiesManager  capabilities.Manager
-	CapabilityMetrics    *capmetrics.Metrics
-	TaxProviderClient    *marketplacesvc.TaxProviderClient
-	MarketplaceBilling   marketplacesvc.BillingClient
-	LicenseAuthority     marketplacesvc.LicenseAuthority
-	LicenseCache         marketplacesvc.LicenseCache
-	OperationsMetrics    *opsmetrics.Metrics
-	AdminConsoleMetrics  *adminmetrics.Metrics
-	EventEmitter         fweventbridge.Emitter
-	WSBusHub             fwwsbus.LocalHub
-	RealtimeDescriptors  []frameworkrealtime.Descriptor
-	ProviderMode         fwprovider.Mode
-	ProviderModeSource   string
-	IAMAdapterMode       iamservice.IAMAdapterMode
-	IAMAdapterModeSource string
-	AuthProxy            DelegatedAuthProxy
-	IAMDirectory         iamservice.IAMDirectory
-	IAMRegistry          *fwiamadapters.Registry
-	IAMDirectoryService  fwiamcontracts.DirectoryService
-	IAMAuthzService      fwiamcontracts.AuthzService
-	IAMContextService    fwiamcontracts.IdentityContextService
+	KnowledgeProvider              fwknowledge.KnowledgeProvider
+	CacheRuntime                   *cache.Runtime
+	TaskCenterRuntime              *taskcenter.Runtime
+	DB                             *gorm.DB
+	Ctx                            context.Context
+	PowerXClient                   *client.PowerXServiceClient
+	CapabilityGateway              gatewayClient
+	Metadata                       *fwmetadata.Runtime
+	MetadataDebugLocalRuntime      *fwmetadata.Runtime
+	MetadataDebugDelegatedRuntime  *fwmetadata.Runtime
+	CustomerAdmin                  *customerfw.AdminClient
+	CustomerAccountSelector        *customerfw.AccountSelectorClient
+	CustomerRuntime                *customerfw.Runtime
+	CustomerIdentityDebugLocal     *customerfw.Runtime
+	CustomerIdentityDebugDelegated *customerfw.Runtime
+	ContactRuntime                 *contactfw.Runtime
+	// ContactDebug* are deliberately separate from ContactRuntime. They exist
+	// only for the Framework lab where an administrator explicitly selects a
+	// route per request; normal business traffic remains startup-mode bound.
+	ContactDebugLocalRuntime     *contactfw.Runtime
+	ContactDebugDelegatedRuntime *contactfw.Runtime
+	AISettings                   fwaisettings.Service
+	PowerXAISettings             *fwaisettings.Client
+	LocalAISettings              *localaisettings.LocalSettingsService
+	LocalAI                      *runtimeexample.LocalAI
+	AIInvocation                 *fwai.Runtime
+	AI                           *powerxai.Client
+	AgentLifecycle               *fwagent.Runtime
+	AgentRuntime                 *powerxagent.Client
+	CapabilityAccess             *fwcapability.Runtime
+	CapabilityRegistry           powerxcapability.Registry
+	IntegrationGateway           *fwintegration.Runtime
+	MediaCatalog                 *fwmedia.Runtime
+	Media                        powerxmedia.AssetReader
+	PluginRuntime                *fwpluginruntime.Runtime
+	PluginRelease                *fwpluginrelease.Runtime
+	KnowledgeQABridge            powerxknowledge.QABridge
+	KnowledgeDirectory           fwknowledge.DelegatedClient
+	NotificationDelivery         *fwnotifications.Runtime
+	Notifications                powerxnotifications.Publisher
+	LocalSkillInvoker            fwskills.Invoker
+	SkillInvocation              *fwskills.Runtime
+	Skills                       powerxskills.Invoker
+	Config                       *config.Config
+	CapabilitiesManager          capabilities.Manager
+	CapabilityMetrics            *capmetrics.Metrics
+	TaxProviderClient            *marketplacesvc.TaxProviderClient
+	MarketplaceBilling           marketplacesvc.BillingClient
+	LicenseAuthority             marketplacesvc.LicenseAuthority
+	LicenseCache                 marketplacesvc.LicenseCache
+	OperationsMetrics            *opsmetrics.Metrics
+	AdminConsoleMetrics          *adminmetrics.Metrics
+	EventEmitter                 fweventbridge.Emitter
+	WSBusHub                     fwwsbus.LocalHub
+	RealtimeDescriptors          []frameworkrealtime.Descriptor
+	ProviderMode                 fwprovider.Mode
+	ProviderModeSource           string
+	IAMAdapterMode               iamservice.IAMAdapterMode
+	IAMAdapterModeSource         string
+	AuthProxy                    DelegatedAuthProxy
+	IAMDirectory                 iamservice.IAMDirectory
+	IAMRegistry                  *fwiamadapters.Registry
+	WSIdentityLifecycle          *frameworkrealtime.IdentityLifecycle
+	IAMDirectoryService          fwiamcontracts.DirectoryService
+	IAMAuthzService              fwiamcontracts.AuthzService
+	IAMContextService            fwiamcontracts.IdentityContextService
 }
 
 type gatewayClient interface {
 	Enabled() bool
 	Invoke(ctx context.Context, params gateway.InvokeParams) (*gateway.InvokeResult, error)
-	ListPlatformCapabilities(ctx context.Context, opts gateway.ListPlatformCapabilitiesOptions) ([]gateway.PlatformCapabilityRecord, error)
+	ListPlatformCapabilityCatalog(ctx context.Context, opts gateway.ListPlatformCapabilityCatalogOptions) ([]gateway.PlatformCapabilityCatalogRecord, error)
 	ListKnowledgeSpaces(ctx context.Context, opts gateway.KnowledgeSpaceListOptions) ([]gateway.KnowledgeSpaceRuntimeRecord, error)
 	CreateKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceCreateParams) (*gateway.KnowledgeSpaceRecord, error)
 	RetireKnowledgeSpace(ctx context.Context, params gateway.KnowledgeSpaceRetireParams) (*gateway.KnowledgeSpaceRecord, error)
@@ -105,12 +154,6 @@ type gatewayClient interface {
 	SyncPluginSkill(ctx context.Context, params gateway.PluginSkillSyncParams) (*gateway.PluginSkillSyncResult, error)
 	SyncPluginAgent(ctx context.Context, params gateway.PluginAgentSyncParams) (*gateway.PluginAgentSyncResult, error)
 	RegisterCatalog(ctx context.Context, catalog *capabilities.CatalogSnapshot, assets []capabilities.ProtocolAsset) error
-	CreateAgentSession(ctx context.Context, params gateway.AgentSessionParams) (*gateway.AgentSessionRecord, error)
-	ListAgentSessions(ctx context.Context, opts gateway.AgentSessionListOptions) ([]gateway.AgentSessionRecord, error)
-	ListAgentSessionMessages(ctx context.Context, opts gateway.AgentSessionMessageListOptions) ([]gateway.AgentSessionMessageRecord, error)
-	DeleteAgentSession(ctx context.Context, opts gateway.AgentSessionMutationOptions) error
-	ArchiveAgentSession(ctx context.Context, opts gateway.AgentSessionMutationOptions) error
-	StreamAgentSSE(ctx context.Context, params gateway.AgentStreamParams) (*gateway.AgentStream, error)
 	Close() error
 }
 

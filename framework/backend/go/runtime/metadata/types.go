@@ -39,6 +39,20 @@ type Client struct {
 
 type I18nMap map[string]string
 
+type tenantUUIDContextKey struct{}
+
+// WithTenantUUID adds the tenant scope resolved by the trusted transport.
+// Local adapters must use it for every read and write; callers must never
+// source tenant identity from a request body.
+func WithTenantUUID(ctx context.Context, tenantUUID string) context.Context {
+	return context.WithValue(ctx, tenantUUIDContextKey{}, tenantUUID)
+}
+
+func TenantUUIDFromContext(ctx context.Context) (string, bool) {
+	value, ok := ctx.Value(tenantUUIDContextKey{}).(string)
+	return value, ok && value != ""
+}
+
 type Display struct {
 	DisplayName        string `json:"display_name,omitempty"`
 	DisplayDescription string `json:"display_description,omitempty"`
@@ -67,14 +81,15 @@ type DictionaryNamespace struct {
 }
 
 type DictionaryItem struct {
-	UUID            string  `json:"uuid"`
-	NamespaceUUID   string  `json:"namespace_uuid"`
-	Code            string  `json:"code"`
-	LabelI18n       I18nMap `json:"label_i18n"`
-	DescriptionI18n I18nMap `json:"description_i18n,omitempty"`
-	Status          string  `json:"status"`
-	SortOrder       int     `json:"sort_order"`
-	ReferenceCount  int64   `json:"reference_count"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	UUID            string         `json:"uuid"`
+	NamespaceUUID   string         `json:"namespace_uuid"`
+	Code            string         `json:"code"`
+	LabelI18n       I18nMap        `json:"label_i18n"`
+	DescriptionI18n I18nMap        `json:"description_i18n,omitempty"`
+	Status          string         `json:"status"`
+	SortOrder       int            `json:"sort_order"`
+	ReferenceCount  int64          `json:"reference_count"`
 	Display
 }
 
@@ -90,35 +105,38 @@ type Taxonomy struct {
 }
 
 type TaxonomyNode struct {
-	UUID            string  `json:"uuid"`
-	TaxonomyUUID    string  `json:"taxonomy_uuid"`
-	ParentUUID      *string `json:"parent_uuid,omitempty"`
-	Code            string  `json:"code"`
-	LabelI18n       I18nMap `json:"label_i18n"`
-	DescriptionI18n I18nMap `json:"description_i18n,omitempty"`
-	Path            string  `json:"path"`
-	Depth           int     `json:"depth"`
-	SortOrder       int     `json:"sort_order"`
-	Status          string  `json:"status"`
-	ReferenceCount  int64   `json:"reference_count"`
-	Version         int64   `json:"version"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	UUID            string         `json:"uuid"`
+	TaxonomyUUID    string         `json:"taxonomy_uuid"`
+	ParentUUID      *string        `json:"parent_uuid,omitempty"`
+	Code            string         `json:"code"`
+	LabelI18n       I18nMap        `json:"label_i18n"`
+	DescriptionI18n I18nMap        `json:"description_i18n,omitempty"`
+	Path            string         `json:"path"`
+	Depth           int            `json:"depth"`
+	SortOrder       int            `json:"sort_order"`
+	Status          string         `json:"status"`
+	ReferenceCount  int64          `json:"reference_count"`
+	Version         int64          `json:"version"`
 	Display
 }
 
 type Tag struct {
-	UUID            string  `json:"uuid"`
-	Namespace       string  `json:"namespace"`
-	ResourceType    string  `json:"resource_type"`
-	Code            string  `json:"code"`
-	LabelI18n       I18nMap `json:"label_i18n"`
-	DescriptionI18n I18nMap `json:"description_i18n,omitempty"`
-	Color           string  `json:"color,omitempty"`
-	Status          string  `json:"status"`
-	UsageCount      int64   `json:"usage_count"`
+	Metadata        map[string]any `json:"metadata,omitempty"`
+	UUID            string         `json:"uuid"`
+	Namespace       string         `json:"namespace"`
+	ResourceType    string         `json:"resource_type"`
+	Code            string         `json:"code"`
+	LabelI18n       I18nMap        `json:"label_i18n"`
+	DescriptionI18n I18nMap        `json:"description_i18n,omitempty"`
+	Color           string         `json:"color,omitempty"`
+	Status          string         `json:"status"`
+	UsageCount      int64          `json:"usage_count"`
 	Display
 }
 
 type TagBinding struct {
+	UUID         string `json:"uuid"`
 	TagUUID      string `json:"tag_uuid"`
 	ResourceType string `json:"resource_type"`
 	ResourceUUID string `json:"resource_uuid"`
@@ -230,6 +248,7 @@ type CreateDictionaryNamespaceRequest struct {
 }
 
 type CreateDictionaryItemRequest struct {
+	Metadata        map[string]any
 	NamespaceUUID   string
 	Code            string
 	LabelI18n       I18nMap
@@ -248,6 +267,7 @@ type CreateTaxonomyRequest struct {
 }
 
 type CreateTaxonomyNodeRequest struct {
+	Metadata        map[string]any
 	TaxonomyUUID    string
 	ParentUUID      *string
 	Code            string
@@ -258,6 +278,7 @@ type CreateTaxonomyNodeRequest struct {
 }
 
 type CreateTagRequest struct {
+	Metadata        map[string]any
 	Namespace       string
 	ResourceType    string
 	Code            string
@@ -275,4 +296,62 @@ type CreateResourceTypeRequest struct {
 	ValidatorKey    string
 	BindingEnabled  bool
 	RequestID       string
+}
+
+// UpdateDictionaryNamespaceRequest is a partial update addressed only by the
+// namespace UUID. Tenant identity is deliberately not part of this DTO.
+type UpdateDictionaryNamespaceRequest struct {
+	NamespaceUUID   string
+	NameI18n        *I18nMap
+	DescriptionI18n *I18nMap
+	Status          *string
+	RequestID       string
+}
+
+type UpdateDictionaryItemRequest struct {
+	ExpectedVersion *int64
+	ItemUUID        string
+	LabelI18n       *I18nMap
+	DescriptionI18n *I18nMap
+	SortOrder       *int
+	Status          *string
+	Metadata        *map[string]any
+	RequestID       string
+}
+
+type UpdateTaxonomyNodeRequest struct {
+	Metadata        *map[string]any
+	MoveParent      bool
+	ParentUUID      *string
+	NodeUUID        string
+	LabelI18n       *I18nMap
+	DescriptionI18n *I18nMap
+	SortOrder       *int
+	Status          *string
+	Version         int64
+	RequestID       string
+}
+
+// UpdateTagRequest changes the mutable attributes of a tag. Tags are never
+// physically deleted: callers set Status to inactive when a used tag must no
+// longer be offered for new bindings.
+type UpdateTagRequest struct {
+	Metadata        *map[string]any
+	ExpectedVersion *int64
+	TagUUID         string
+	LabelI18n       *I18nMap
+	DescriptionI18n *I18nMap
+	Color           *string
+	Status          *string
+	RequestID       string
+}
+
+type UpdateResourceTypeRequest struct {
+	ResourceTypeUUID string
+	NameI18n         *I18nMap
+	DescriptionI18n  *I18nMap
+	ValidatorKey     *string
+	BindingEnabled   *bool
+	Status           *string
+	RequestID        string
 }

@@ -152,7 +152,7 @@ func (c *Client) lifecycleJSON(ctx context.Context, method, path string, input, 
 		return err
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return transportError(resp)
+		return transportErrorPayload(resp, payload)
 	}
 	if output == nil {
 		return nil

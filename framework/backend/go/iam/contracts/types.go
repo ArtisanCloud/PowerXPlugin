@@ -11,6 +11,7 @@ const (
 )
 
 // Tenant 为统一租户模型。
+// Core 的数字 status 显式转换为字符串，key 映射为 TenantKey。
 type Tenant struct {
 	TenantUUID string `json:"tenant_uuid"`
 	TenantKey  string `json:"tenant_key,omitempty"`
@@ -28,12 +29,30 @@ type Department struct {
 }
 
 // Member 为统一成员模型。
+// Status 保留数字状态的字符串表示（"1"=启用、"2"=停用）；
+// Core 的数字 JSON 状态由 delegated transport DTO 显式转换。
 type Member struct {
 	MemberUUID  string `json:"member_uuid"`
 	TenantUUID  string `json:"tenant_uuid"`
 	UserUUID    string `json:"user_uuid,omitempty"`
 	DisplayName string `json:"display_name,omitempty"`
 	Status      string `json:"status,omitempty"`
+}
+
+// MemberPageRequest is the explicit bounded member-directory query shared by
+// local and delegated IAM modes. Tenant identity remains a separate argument
+// and is never accepted from a Host request body.
+type MemberPageRequest struct {
+	Page     int `json:"page"`
+	PageSize int `json:"page_size"`
+}
+
+// MemberPage is a stable UUID-only member-directory page.
+type MemberPage struct {
+	Items    []Member `json:"items"`
+	Page     int      `json:"page"`
+	PageSize int      `json:"page_size"`
+	Total    int64    `json:"total"`
 }
 
 // MemberResolution is the tolerant batch directory result used by historical

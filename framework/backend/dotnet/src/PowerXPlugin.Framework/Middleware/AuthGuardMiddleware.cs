@@ -23,6 +23,20 @@ public static class AuthGuardMiddlewareExtensions
             var reg = app.ApplicationServices.GetService(typeof(IAMRegistry)) as IAMRegistry;
             if (reg == null || !reg.IsBound)
             {
+                ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                await ctx.Response.WriteAsJsonAsync(new { code = IAMErrors.CodeAdapterNotBound });
+                return;
+            }
+
+            if (reg.Mode == IAMAdapterMode.Delegated)
+            {
+                var identity = ctx.GetDelegatedIdentity();
+                if (identity == null || !identity.HasPermission(options.Resource + ":" + options.Action))
+                {
+                    ctx.Response.StatusCode = identity == null ? StatusCodes.Status401Unauthorized : StatusCodes.Status403Forbidden;
+                    await ctx.Response.WriteAsJsonAsync(new { code = identity == null ? "IAM_CONTEXT_PROOF_REQUIRED" : "IAM_CONTEXT_REQUEST_FORBIDDEN" });
+                    return;
+                }
                 await next(ctx);
                 return;
             }
@@ -45,7 +59,7 @@ public static class AuthGuardMiddlewareExtensions
             var req = new AuthorizationRequest
             {
                 TenantUUID = tenantUuid,
-                UserID = userId,
+                UserUUID = userId,
                 Resource = options.Resource,
                 Action = options.Action,
                 TraceID = traceId

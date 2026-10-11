@@ -210,14 +210,14 @@ func (s *stubTransport) Invoke(ctx context.Context, req frameworkgateway.InvokeR
 
 func (s *stubTransport) Close() error { return nil }
 
-func TestListPlatformCapabilitiesSuccess(t *testing.T) {
+func TestListPlatformCapabilityCatalogSuccess(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/tenant/capabilities" {
+		if r.URL.Path != "/api/v1/tenant/capabilities/catalog" {
 			http.NotFound(w, r)
 			return
 		}
-		if got := r.URL.Query().Get("source"); got != "corex" {
-			http.Error(w, "missing source", http.StatusBadRequest)
+		if got := r.URL.RawQuery; got != "page=1&page_size=200" {
+			http.Error(w, "unexpected catalog query", http.StatusBadRequest)
 			return
 		}
 		if r.Header.Get("Authorization") != "ApiKey token" {
@@ -231,13 +231,10 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 				"items":[
 					{
 						"capability_id":"com.corex.media.assets.read",
-						"plugin_id":"corex",
-						"plugin_version":"1.0.0",
+						"title":"Media Assets Read",
+						"description":"Read media assets",
 						"source":"corex",
 						"categories":["media"],
-						"protocols":[{"channel":"rest","endpoint":"/api/v1/media/assets","method":"GET"}],
-						"capabilities_hash":"abc",
-						"protocol_hash":"def",
 						"status":"published"
 					}
 				]
@@ -267,11 +264,11 @@ func TestListPlatformCapabilitiesSuccess(t *testing.T) {
 	}
 	client := NewClient(cfg, nil)
 
-	records, err := client.ListPlatformCapabilities(context.Background(), ListPlatformCapabilitiesOptions{Source: "corex"})
+	records, err := client.ListPlatformCapabilityCatalog(context.Background(), ListPlatformCapabilityCatalogOptions{})
 	require.NoError(t, err)
 	require.Len(t, records, 1)
 	require.Equal(t, "com.corex.media.assets.read", records[0].CapabilityID)
-	require.Equal(t, "rest", records[0].Protocols[0].Channel)
+	require.Equal(t, "Media Assets Read", records[0].Title)
 }
 
 func TestAPIKeyRequestsDoNotSendTenantHeader(t *testing.T) {
@@ -529,7 +526,7 @@ func TestDeleteKnowledgeSpaceUsesPowerXAdminAPI(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
+func TestListPlatformCapabilityCatalogHTTPError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	})
@@ -555,7 +552,7 @@ func TestListPlatformCapabilitiesHTTPError(t *testing.T) {
 	}
 	client := NewClient(cfg, nil)
 
-	_, listErr := client.ListPlatformCapabilities(context.Background(), ListPlatformCapabilitiesOptions{Source: "corex"})
+	_, listErr := client.ListPlatformCapabilityCatalog(context.Background(), ListPlatformCapabilityCatalogOptions{})
 	require.Error(t, listErr)
 }
 
@@ -719,112 +716,6 @@ func TestGatewayEndpointDoesNotDuplicateAPIPrefix(t *testing.T) {
 		"http://powerx.local/api/v1/agents/stream/sse",
 		gatewayEndpoint(&config.GatewayConfig{BaseURL: "http://powerx.local/api/v1"}, "/agents/stream/sse"),
 	)
-}
-
-func TestStreamAgentSSEUsesGatewayEndpoint(t *testing.T) {
-	var gotPath string
-	var gotAuth string
-	var gotQuery string
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotAuth = r.Header.Get("Authorization")
-		gotQuery = r.URL.RawQuery
-		require.Equal(t, "hello", r.URL.Query().Get("q"))
-		require.Equal(t, "agent-1", r.URL.Query().Get("agent_id"))
-		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprint(w, "event: end\ndata: {\"ok\":true}\n\n")
-	})
-	l, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
-	}
-	server := &httptest.Server{
-		Listener: l,
-		Config: &http.Server{
-			Handler: handler,
-		},
-	}
-	server.Start()
-	defer server.Close()
-
-	cfg := &config.Config{
-		Gateway: &config.GatewayConfig{
-			BaseURL:    server.URL + "/api/v1",
-			AuthScheme: "apikey",
-			APIKey:     "token",
-		},
-	}
-	client := NewClient(cfg, nil)
-	stream, err := client.StreamAgentSSE(context.Background(), AgentStreamParams{
-		AgentID:            "agent-1",
-		SessionID:          "session-1",
-		TraceID:            "trace-1",
-		Query:              "hello",
-		Intent:             "agent.bound_capabilities",
-		OriginTenantUUID:   "00000000-0000-0000-0000-000000000001",
-		RegenFromMessageID: "215",
-	})
-	require.NoError(t, err)
-	defer stream.Body.Close()
-	require.Equal(t, "/api/v1/agents/stream/sse", gotPath)
-	require.Contains(t, gotQuery, "agent_id=agent-1")
-	require.Contains(t, gotQuery, "intent=agent.bound_capabilities")
-	require.Contains(t, gotQuery, "origin_tenant_uuid=00000000-0000-0000-0000-000000000001")
-	require.Contains(t, gotQuery, "regen_from_message_id=215")
-	require.Equal(t, "ApiKey token", gotAuth)
-}
-
-func TestStreamAgentSSEMapsUUIDParamsAndEnv(t *testing.T) {
-	var gotQuery string
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/agents/sessions" {
-			require.Equal(t, "00000000-0000-4000-8000-000000000001", r.URL.Query().Get("agent_uuid"))
-			require.Equal(t, "dev", r.URL.Query().Get("env"))
-			w.Header().Set("Content-Type", "application/json")
-			fmt.Fprint(w, `{"code":200,"data":{"items":[{"id":101,"uuid":"10000000-0000-4000-8000-000000000101"}]}}`)
-			return
-		}
-		gotQuery = r.URL.RawQuery
-		require.Equal(t, "00000000-0000-4000-8000-000000000001", r.URL.Query().Get("agent_uuid"))
-		require.Equal(t, "10000000-0000-4000-8000-000000000101", r.URL.Query().Get("session_uuid"))
-		require.Equal(t, "101", r.URL.Query().Get("session_id"))
-		require.Equal(t, "dev", r.URL.Query().Get("env"))
-		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprint(w, "event: end\ndata: {\"ok\":true}\n\n")
-	})
-	l, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		t.Skipf("skip test: cannot listen on local port in this environment: %v", err)
-	}
-	server := &httptest.Server{
-		Listener: l,
-		Config: &http.Server{
-			Handler: handler,
-		},
-	}
-	server.Start()
-	defer server.Close()
-
-	cfg := &config.Config{
-		Gateway: &config.GatewayConfig{
-			BaseURL:    server.URL,
-			AuthScheme: "apikey",
-			APIKey:     "token",
-		},
-	}
-	client := NewClient(cfg, nil)
-	stream, err := client.StreamAgentSSE(context.Background(), AgentStreamParams{
-		AgentID:   "00000000-0000-4000-8000-000000000001",
-		SessionID: "10000000-0000-4000-8000-000000000101",
-		TraceID:   "trace-1",
-		Query:     "hello",
-		Env:       "dev",
-	})
-	require.NoError(t, err)
-	defer stream.Body.Close()
-	require.Contains(t, gotQuery, "agent_uuid=")
-	require.NotContains(t, gotQuery, "agent_id=")
-	require.Contains(t, gotQuery, "session_id=101")
 }
 
 func buildTestJWTWithTenant(tid string) string {

@@ -34,3 +34,16 @@ public enum EventBridgeMode
     TaskBus,
     Dual
 }
+
+public sealed class EventBridgeAdapterException : Exception
+{
+    public string Code { get; }
+
+    public EventBridgeAdapterException(string code) : base(code) => Code = code;
+}
+
+public static class EventBridgeErrors
+{
+    public const string CodeInvalidTopic = "EVENT_BRIDGE_INVALID_TOPIC";
+    public const string CodeAdapterUnavailable = "EVENT_BRIDGE_ADAPTER_UNAVAILABLE";
+}

@@ -40,7 +40,7 @@
       "name": "模板巡检",
       "description": "运行一组规则校验模板。",
       "transport": "http",
-      "endpoint": "/api/v1/templates/{id}/validate",
+      "endpoint": "/api/v1/templates/{uuid}/validate",
       "method": "POST",
       "input_schema": "contracts/schema/input/com.powerx.plugins.base.template.validate.json",
       "output_schema": "contracts/schema/output/com.powerx.plugins.base.template.validate.json"

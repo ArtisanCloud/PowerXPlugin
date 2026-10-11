@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 )
 
 type LLMStreamEvent struct {
@@ -29,7 +31,7 @@ type LLMStreamInput struct {
 }
 
 func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent func(LLMStreamEvent) error) error {
-	if c == nil || c.http == nil || c.tokens == nil {
+	if c == nil || c.http == nil || c.authorization == nil {
 		return errors.New("powerx ai client is not configured")
 	}
 	body := struct {
@@ -51,24 +53,25 @@ func (c *Client) LLMStream(ctx context.Context, input LLMStreamInput, onEvent fu
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	token, err := c.tokens.Token(ctx)
+	authorization, err := c.authorization.Authorization(ctx)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", authorization)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &HTTPError{StatusCode: resp.StatusCode}
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "AI_UPSTREAM_DEPENDENCY")}
 	}
 	return decodeLLMSSE(resp.Body, onEvent)
 }
 
 func (c *Client) LLMSessionStream(ctx context.Context, sessionID string, onEvent func(LLMStreamEvent) error) error {
-	if c == nil || c.http == nil || c.tokens == nil {
+	if c == nil || c.http == nil || c.authorization == nil {
 		return errors.New("powerx ai client is not configured")
 	}
 	if strings.TrimSpace(sessionID) == "" {
@@ -79,24 +82,29 @@ func (c *Client) LLMSessionStream(ctx context.Context, sessionID string, onEvent
 		return err
 	}
 	req.Header.Set("Accept", "text/event-stream")
-	token, err := c.tokens.Token(ctx)
+	authorization, err := c.authorization.Authorization(ctx)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", authorization)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode}
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "AI_UPSTREAM_DEPENDENCY")}
 	}
 	return decodeLLMSSE(resp.Body, onEvent)
 }
 
 func decodeLLMSSE(r io.Reader, onEvent func(LLMStreamEvent) error) error {
+	if onEvent == nil {
+		return errors.New("ai.stream_callback_required")
+	}
 	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 4096), 1<<20)
 	var kind string
 	var data strings.Builder
 	flush := func() error {
@@ -135,7 +143,10 @@ func decodeLLMSSE(r io.Reader, onEvent func(LLMStreamEvent) error) error {
 			kind = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
 		}
 		if strings.HasPrefix(line, "data:") {
-			data.WriteString(strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+			if data.Len() > 0 {
+				data.WriteByte('\n')
+			}
+			data.WriteString(strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
 		}
 	}
 	if err := scanner.Err(); err != nil {

@@ -1,0 +1,26 @@
+version: 1
+kind: scene_strategy_catalog
+strategy_packages:
+  A_simple: { recommended_profile_key: p0_basic, dependencies: { index: [index.dense], runtime: [], assets: [] } }
+  A0_acl: { recommended_profile_key: p1_general, dependencies: { index: [], runtime: [acl_enforcer], assets: [metadata.normalized] } }
+  A1_routing: { recommended_profile_key: p1_general, dependencies: { index: [], runtime: [routing_policy], assets: [domain_router_map] } }
+  A2_time_aware: { recommended_profile_key: p2_high_accuracy, dependencies: { index: [index.time_fields], runtime: [versioning_policy], assets: [effective_date_fields] } }
+  B_semantic_chunking: { recommended_profile_key: p1_general, dependencies: { index: [index.dense], runtime: [], assets: [semantic_boundaries] } }
+  C_context_enriched: { recommended_profile_key: p1_general, dependencies: { index: [index.hier], runtime: [], assets: [section_neighbors] } }
+  D_doc_augmentation: { recommended_profile_key: p2_high_accuracy, dependencies: { index: [index.structured_fields], runtime: [offline_pipeline], assets: [augmented_fields] } }
+  E_query_transform: { recommended_profile_key: p1_general, dependencies: { index: [index.structured_fields], runtime: [query_rewrite], assets: [synonyms_rules] } }
+  F_rerank: { recommended_profile_key: p1_general, dependencies: { index: [index.dense], runtime: [reranker_model], assets: [] } }
+  G_rse: { recommended_profile_key: p2_high_accuracy, dependencies: { index: [index.dense], runtime: [reranker_model], assets: [domain_lexicon] } }
+  H_fusion: { recommended_profile_key: p1_general, dependencies: { index: [index.dense, index.sparse], runtime: [score_normalizer], assets: [] } }
+  I_hyde: { recommended_profile_key: p1_general, dependencies: { index: [index.dense], runtime: [llm_generate], assets: [] } }
+  J_hier: { recommended_profile_key: p1_general, dependencies: { index: [index.hier], runtime: [], assets: [section_summaries] } }
+  K_kg: { recommended_profile_key: p3_kg_strong, dependencies: { index: [index.kg], runtime: [graph_query], assets: [kg_entities_relations] } }
+  L_feedback: { recommended_profile_key: p1_general, dependencies: { index: [], runtime: [feedback_workflow], assets: [feedback_case] } }
+  M_adaptive: { recommended_profile_key: p2_high_accuracy, dependencies: { index: [], runtime: [policy_router], assets: [observability_metrics] } }
+  N_self_rag: { recommended_profile_key: p2_high_accuracy, dependencies: { index: [], runtime: [consistency_checker], assets: [evidence_guardrails] } }
+  O_crag: { recommended_profile_key: p2_high_accuracy, dependencies: { index: [index.dense, index.sparse], runtime: [consistency_checker], assets: [] } }
+strategy_bundles:
+  p0_basic: { prerequisites: [index.dense] }
+  p1_general: { prerequisites: [index.dense, index.sparse] }
+  p2_high_accuracy: { prerequisites: [index.dense, index.sparse, runtime.evidence_checker] }
+  p3_kg_strong: { prerequisites: [index.kg, index.sparse, index.dense] }

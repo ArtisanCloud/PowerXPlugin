@@ -3,47 +3,96 @@
   "title": "TemplateQualityDistributeOutput",
   "type": "object",
   "properties": {
-    "scanned_total": { "type": "integer", "minimum": 0 },
+    "scanned_total": {
+      "type": "integer",
+      "minimum": 0
+    },
     "violations": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "template_id": { "type": "integer" },
-          "field": { "type": "string" },
-          "message": { "type": "string" },
-          "severity": { "type": "string" }
+          "template_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          }
         },
-        "required": ["template_id", "field", "message", "severity"],
+        "required": [
+          "template_uuid",
+          "field",
+          "message",
+          "severity"
+        ],
         "additionalProperties": true
       }
     },
-    "cloned_ids": {
+    "cloned_uuids": {
       "type": "array",
-      "items": { "type": "integer" }
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
     },
     "failed_clones": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "source_id": { "type": "integer" },
-          "reason": { "type": "string" }
+          "source_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
         },
-        "required": ["source_id", "reason"],
+        "required": [
+          "source_uuid",
+          "reason"
+        ],
         "additionalProperties": false
       }
     },
-    "publish_status": { "type": "string" },
-    "validated_template_id": { "type": "string" },
-    "validation_passed": { "type": "boolean" },
-    "created_template_ids": {
-      "type": "array",
-      "items": { "type": "integer" }
+    "publish_status": {
+      "type": "string"
     },
-    "updated_template_id": { "type": "string" },
-    "published_template_id": { "type": "string" }
+    "validated_template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "validation_passed": {
+      "type": "boolean"
+    },
+    "created_template_uuids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "updated_template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "published_template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    }
   },
-  "required": ["scanned_total", "violations", "cloned_ids", "failed_clones"],
+  "required": [
+    "scanned_total",
+    "violations",
+    "cloned_uuids",
+    "failed_clones"
+  ],
   "additionalProperties": false
 }

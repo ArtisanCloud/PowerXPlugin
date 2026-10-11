@@ -8,7 +8,7 @@
 
 framework 应沉淀的是 Customer Identity/Auth 的公共契约与工具，以及 `display_name`、`nickname`、`given_name`、`family_name`、`avatar_url`、`locale`、`timezone` 这类 PowerX Core customer 基础展示属性，而不是“客户标签、跟进、会员权益、学员、患者、粉丝”等行业实体。
 
-生产数据权威源在 PowerX Core。PowerXPlugin framework 不定义生产 customer 表结构，只定义运行时 contract、middleware、adapter 和 local dev mirror 约束。插件 local 模式的 customer 表只是开发调试镜像，必须对齐 PowerX Core customer schema；如果 Core 缺表，应先补齐 Core，再同步 framework skeleton/scaffold 和插件 local mirror。
+生产数据权威源在 PowerX Core。PowerXPlugin framework 不定义生产 customer 表结构，只定义运行时 contract、middleware、adapter 和 local adapter 约束。插件 local 模式的 Customer 存储由插件通过 Framework contract 注入，必须对齐 CustomerContext、UUID、身份状态和 membership 语义，但不得依赖或镜像 Core 内部 schema。模式选择应由 Framework Runtime Factory 完成，而不是插件业务层自行判断。
 
 ## 2. 目标
 

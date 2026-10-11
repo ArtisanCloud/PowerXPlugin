@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -67,11 +68,12 @@ type Notification struct {
 
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("powerx notifications request failed: status=%d", e.StatusCode)
+	return fmt.Sprintf("powerx notifications request failed: reason=%s status=%d", e.ReasonCode, e.StatusCode)
 }
 
 func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
@@ -128,7 +130,7 @@ func (c *Client) Create(ctx context.Context, input CreateInput) (*Notification, 
 		return nil, errors.New("notification content is required")
 	}
 	var out Notification
-	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/tenant/notifications", input, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/notifications", input, &out); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(out.UUID) == "" {
@@ -148,8 +150,11 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 	}
 	req.Header.Set("Content-Type", "application/json")
 	token, err := c.tokens.Token(ctx)
-	if err != nil {
-		return err
+	if err != nil || strings.TrimSpace(token) == "" {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "NOTIFICATION_UPSTREAM_DEPENDENCY"}
 	}
 	if strings.TrimSpace(token) == "" {
 		return errors.New("powerx notifications token provider returned an empty token")
@@ -157,26 +162,26 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "NOTIFICATION_UPSTREAM_DEPENDENCY"}
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 502, ReasonCode: "NOTIFICATION_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(raw)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "NOTIFICATION_UPSTREAM_DEPENDENCY"), Body: string(raw)}
 	}
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
+	if err := hostcontract.DecodeData(raw, output); err != nil {
+		return &HTTPError{StatusCode: 502, ReasonCode: "NOTIFICATION_UPSTREAM_DEPENDENCY"}
 	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return err
-	}
-	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return errors.New("powerx notifications response missing data")
-	}
-	return json.Unmarshal(envelope.Data, output)
+	return nil
 }
 
 type staticToken string

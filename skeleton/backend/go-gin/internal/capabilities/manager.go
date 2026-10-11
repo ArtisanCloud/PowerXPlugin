@@ -63,18 +63,20 @@ type CatalogSnapshot struct {
 
 // CatalogEntry describes a single capability definition.
 type CatalogEntry struct {
-	ID          string                 `json:"id"`
-	Version     string                 `json:"version"`
-	Descriptor  string                 `json:"descriptor"`
-	Title       string                 `json:"title,omitempty"`
-	Description string                 `json:"description,omitempty"`
-	Schemas     map[string]string      `json:"schemas"`
-	Protocols   map[string]interface{} `json:"protocols"`
-	Tags        []string               `json:"tags"`
-	Execution   ExecutionConfig        `json:"execution"`
-	Checksum    string                 `json:"checksum"`
-	Module      string                 `json:"module,omitempty"`
-	Kind        string                 `json:"kind,omitempty"`
+	ID               string                 `json:"id"`
+	Version          string                 `json:"version"`
+	Descriptor       string                 `json:"descriptor"`
+	Title            string                 `json:"title,omitempty"`
+	Description      string                 `json:"description,omitempty"`
+	Schemas          map[string]string      `json:"schemas"`
+	Protocols        map[string]interface{} `json:"protocols"`
+	Tags             []string               `json:"tags"`
+	Execution        ExecutionConfig        `json:"execution"`
+	Checksum         string                 `json:"checksum"`
+	Module           string                 `json:"module,omitempty"`
+	Kind             string                 `json:"kind,omitempty"`
+	ProviderPluginID string                 `json:"provider_plugin_id,omitempty"`
+	Source           string                 `json:"source,omitempty"`
 }
 
 // ExecutionConfig controls sync/async semantics of a capability.

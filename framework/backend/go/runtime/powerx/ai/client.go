@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
+
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -26,8 +28,12 @@ type TokenProviderFunc func(context.Context) (string, error)
 func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type Config struct {
-	BaseURL         string
+	BaseURL string
+	// AuthScheme is either "bearer" (the default) or "apikey".  API-key
+	// authentication is required by local PowerX gateway deployments.
+	AuthScheme      string
 	BearerToken     string
+	APIKey          string
 	STSClientID     string
 	STSClientSecret string
 	STSTokenURL     string
@@ -35,10 +41,18 @@ type Config struct {
 }
 
 type Client struct {
-	baseURL string
-	http    *http.Client
-	tokens  TokenProvider
+	baseURL       string
+	http          *http.Client
+	authorization authorizationProvider
 }
+
+type authorizationProvider interface {
+	Authorization(context.Context) (string, error)
+}
+
+type authorizationProviderFunc func(context.Context) (string, error)
+
+func (f authorizationProviderFunc) Authorization(ctx context.Context) (string, error) { return f(ctx) }
 
 func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	if strings.TrimSpace(cfg.BaseURL) == "" {
@@ -54,15 +68,22 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 		}
 		client.http = &http.Client{Timeout: timeout}
 	}
+	if strings.EqualFold(strings.TrimSpace(cfg.AuthScheme), "apikey") || strings.EqualFold(strings.TrimSpace(cfg.AuthScheme), "api_key") || strings.EqualFold(strings.TrimSpace(cfg.AuthScheme), "api-key") {
+		if key := strings.TrimSpace(cfg.APIKey); key != "" {
+			client.authorization = staticAuthorization("ApiKey " + key)
+			return client, nil
+		}
+		return nil, errors.New("powerx ai api key is required")
+	}
 	if token := strings.TrimSpace(cfg.BearerToken); token != "" {
-		client.tokens = staticToken(token)
+		client.authorization = bearerToken(token)
 		return client, nil
 	}
 	stsClient, err := sts.NewClient(sts.Config{TokenEndpoint: cfg.STSTokenURL, ClientID: cfg.STSClientID, ClientSecret: cfg.STSClientSecret})
 	if err != nil {
 		return nil, fmt.Errorf("powerx ai delegated sts configuration: %w", err)
 	}
-	client.tokens = stsToken{client: stsClient}
+	client.authorization = stsAuthorization{client: stsClient}
 	return client, nil
 }
 
@@ -78,10 +99,11 @@ func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: timeout}
 	}
-	return &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), http: httpClient, tokens: provider}, nil
+	return &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), http: httpClient, authorization: bearerTokenProvider{provider: provider}}, nil
 }
 
 func (c *Client) LLMInvoke(ctx context.Context, input LLMInvokeInput) (*LLMInvokeOutput, error) {
+	var traceID string
 	var raw struct {
 		Output struct {
 			Type string `json:"type"`
@@ -90,10 +112,10 @@ func (c *Client) LLMInvoke(ctx context.Context, input LLMInvokeInput) (*LLMInvok
 		Meta  map[string]any `json:"meta"`
 		Usage map[string]any `json:"usage"`
 	}
-	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/ai/llm/invoke", input, &raw); err != nil {
+	if err := c.doJSONWithHeaders(ctx, http.MethodPost, "/api/v1/ai/llm/invoke", input, &raw, func(h http.Header) { traceID = h.Get("X-Trace-ID") }); err != nil {
 		return nil, err
 	}
-	return &LLMInvokeOutput{Type: raw.Output.Type, Text: raw.Output.Text, FinishReason: stringValue(raw.Meta, "finish_reason"), Usage: raw.Usage}, nil
+	return &LLMInvokeOutput{TraceID: traceID, Type: raw.Output.Type, Text: raw.Output.Text, FinishReason: stringValue(raw.Meta, "finish_reason"), Usage: raw.Usage}, nil
 }
 
 func (c *Client) ListLLMModels(ctx context.Context, provider string) (*ListLLMModelsOutput, error) {
@@ -159,7 +181,11 @@ func (c *Client) modalInvoke(ctx context.Context, path string, input ModalInvoke
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, input any, output any) error {
-	if c == nil || c.http == nil || c.tokens == nil {
+	return c.doJSONWithHeaders(ctx, method, path, input, output, nil)
+}
+
+func (c *Client) doJSONWithHeaders(ctx context.Context, method, path string, input any, output any, receiveHeaders func(http.Header)) error {
+	if c == nil || c.http == nil || c.authorization == nil {
 		return errors.New("powerx ai client is not configured")
 	}
 	var body io.Reader
@@ -177,22 +203,25 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input any, out
 	if input != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	token, err := c.tokens.Token(ctx)
+	authorization, err := c.authorization.Authorization(ctx)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", authorization)
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	if receiveHeaders != nil {
+		receiveHeaders(resp.Header)
+	}
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(payload)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(payload, "AI_UPSTREAM_DEPENDENCY"), Body: string(payload)}
 	}
 	if output == nil {
 		return nil
@@ -211,6 +240,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input any, out
 
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 
@@ -218,18 +248,43 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("powerx ai request failed: status=%d", e.StatusCode)
 }
 
-type staticToken string
+type staticAuthorization string
 
-func (t staticToken) Token(context.Context) (string, error) {
+func (a staticAuthorization) Authorization(context.Context) (string, error) {
+	if strings.TrimSpace(string(a)) == "" {
+		return "", errors.New("powerx ai authorization is required")
+	}
+	return string(a), nil
+}
+
+type bearerToken string
+
+func (t bearerToken) Authorization(context.Context) (string, error) {
 	if strings.TrimSpace(string(t)) == "" {
 		return "", errors.New("powerx ai bearer token is required")
 	}
-	return string(t), nil
+	return "Bearer " + string(t), nil
 }
 
-type stsToken struct{ client *sts.Client }
+type bearerTokenProvider struct{ provider TokenProvider }
 
-func (t stsToken) Token(ctx context.Context) (string, error) {
+func (p bearerTokenProvider) Authorization(ctx context.Context) (string, error) {
+	if p.provider == nil {
+		return "", errors.New("powerx ai token provider is required")
+	}
+	token, err := p.provider.Token(ctx)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(token) == "" {
+		return "", errors.New("powerx ai bearer token is required")
+	}
+	return "Bearer " + token, nil
+}
+
+type stsAuthorization struct{ client *sts.Client }
+
+func (t stsAuthorization) Authorization(ctx context.Context) (string, error) {
 	if t.client == nil {
 		return "", errors.New("powerx ai sts client is required")
 	}
@@ -237,7 +292,10 @@ func (t stsToken) Token(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return token.AccessToken, nil
+	if strings.TrimSpace(token.AccessToken) == "" {
+		return "", errors.New("powerx ai sts token is empty")
+	}
+	return "Bearer " + token.AccessToken, nil
 }
 
 func stringValue(values map[string]any, key string) string {

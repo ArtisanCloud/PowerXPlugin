@@ -12,12 +12,19 @@ import (
 	iamservice "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/iam"
 )
 
-func (a *Adapter) GetTenant(_ context.Context, tenantUUID string) (*fwiamcontracts.Tenant, error) {
+func (a *Adapter) GetTenant(ctx context.Context, tenantUUID string) (*fwiamcontracts.Tenant, error) {
 	tenantUUID = strings.TrimSpace(tenantUUID)
 	if tenantUUID == "" {
 		return nil, fwiamerrors.New(fwiamerrors.CodeModeInvalid, "tenant uuid is required")
 	}
-	return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated directory host contract is not configured")
+	tenant, err := a.proxy.GetDirectoryTenant(ctx)
+	if err != nil {
+		return nil, mapDirectoryError(err)
+	}
+	if tenant == nil || strings.TrimSpace(tenant.TenantUUID) != tenantUUID {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated tenant directory response is invalid")
+	}
+	return &fwiamcontracts.Tenant{TenantUUID: tenantUUID, TenantKey: strings.TrimSpace(tenant.TenantKey), Name: strings.TrimSpace(tenant.Name), Status: strings.TrimSpace(tenant.Status)}, nil
 }
 
 func (a *Adapter) ListDepartments(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Department, error) {
@@ -35,8 +42,49 @@ func (a *Adapter) ListDepartments(ctx context.Context, tenantUUID string) ([]fwi
 	return out, nil
 }
 
-func (a *Adapter) ListMembers(_ context.Context, _ string) ([]fwiamcontracts.Member, error) {
-	return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated directory host contract is not configured")
+func (a *Adapter) ListMembers(ctx context.Context, tenantUUID string) ([]fwiamcontracts.Member, error) {
+	const pageSize = 200
+	first, err := a.ListMembersPage(ctx, tenantUUID, fwiamcontracts.MemberPageRequest{Page: 1, PageSize: pageSize})
+	if err != nil {
+		return nil, err
+	}
+	result := append([]fwiamcontracts.Member(nil), first.Items...)
+	for page := 2; int64(len(result)) < first.Total; page++ {
+		next, err := a.ListMembersPage(ctx, tenantUUID, fwiamcontracts.MemberPageRequest{Page: page, PageSize: pageSize})
+		if err != nil {
+			return nil, err
+		}
+		if next.Total != first.Total || len(next.Items) == 0 {
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated member directory pagination is inconsistent")
+		}
+		result = append(result, next.Items...)
+	}
+	if int64(len(result)) != first.Total {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated member directory pagination is inconsistent")
+	}
+	return result, nil
+}
+
+func (a *Adapter) ListMembersPage(ctx context.Context, tenantUUID string, request fwiamcontracts.MemberPageRequest) (*fwiamcontracts.MemberPage, error) {
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" || request.Page < 1 || request.PageSize < 1 || request.PageSize > 200 {
+		return nil, fwiamerrors.New(fwiamerrors.CodeInvalidArgument, "tenant_uuid and pagination are required")
+	}
+	response, err := a.proxy.ListDirectoryMembers(ctx, request.Page, request.PageSize)
+	if err != nil {
+		return nil, mapDirectoryError(err)
+	}
+	if response == nil || response.Pagination.Page != request.Page || response.Pagination.PageSize != request.PageSize || response.Pagination.Total < 0 || int64(len(response.Items)) > response.Pagination.Total {
+		return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated member directory page is invalid")
+	}
+	items := make([]fwiamcontracts.Member, 0, len(response.Items))
+	for _, member := range response.Items {
+		if strings.TrimSpace(member.MemberUUID) == "" || strings.TrimSpace(member.UserUUID) == "" || strings.TrimSpace(member.TenantUUID) != tenantUUID {
+			return nil, fwiamerrors.New(fwiamerrors.CodeUpstreamDependency, "delegated member directory page is invalid")
+		}
+		items = append(items, *memberFromHost(member))
+	}
+	return &fwiamcontracts.MemberPage{Items: items, Page: response.Pagination.Page, PageSize: response.Pagination.PageSize, Total: response.Pagination.Total}, nil
 }
 
 func (a *Adapter) GetMember(ctx context.Context, tenantUUID, memberUUID string) (*fwiamcontracts.Member, error) {

@@ -16,9 +16,10 @@ type APIResponse struct {
 
 // APIError 统一错误模型
 type APIError struct {
-	Code    string      `json:"code"`
-	Message string      `json:"message"`
-	Details interface{} `json:"details,omitempty"`
+	ReasonCode string      `json:"reason_code,omitempty"`
+	Code       string      `json:"code"`
+	Message    string      `json:"message"`
+	Details    interface{} `json:"details,omitempty"`
 }
 
 // PaginationRequest 通用分页请求

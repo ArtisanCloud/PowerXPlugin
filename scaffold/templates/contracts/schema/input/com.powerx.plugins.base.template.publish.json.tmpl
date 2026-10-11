@@ -3,10 +3,19 @@
   "title": "TemplatePublishInput",
   "type": "object",
   "properties": {
-    "template_id": { "type": "integer", "minimum": 1 },
-    "channel": { "type": "string" },
-    "version": { "type": "string" }
+    "template_uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "channel": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    }
   },
-  "required": ["template_id"],
+  "required": [
+    "template_uuid"
+  ],
   "additionalProperties": false
 }

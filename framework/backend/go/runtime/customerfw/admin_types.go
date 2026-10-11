@@ -27,26 +27,28 @@ type AdminClient struct {
 type CustomerOverview map[string]any
 
 type Account struct {
-	ID            uint64         `json:"id,omitempty"`
-	CustomerUUID  string         `json:"customer_uuid"`
-	TenantUUID    string         `json:"tenant_uuid,omitempty"`
-	PrimaryEmail  string         `json:"primary_email,omitempty"`
-	PrimaryPhone  string         `json:"primary_phone,omitempty"`
-	Email         string         `json:"email,omitempty"`
-	Phone         string         `json:"phone,omitempty"`
-	DisplayName   string         `json:"display_name,omitempty"`
-	Nickname      string         `json:"nickname,omitempty"`
-	GivenName     string         `json:"given_name,omitempty"`
-	FamilyName    string         `json:"family_name,omitempty"`
-	AvatarURL     string         `json:"avatar_url,omitempty"`
-	Locale        string         `json:"locale,omitempty"`
-	Timezone      string         `json:"timezone,omitempty"`
-	Status        string         `json:"status,omitempty"`
-	EmailVerified bool           `json:"email_verified,omitempty"`
-	PhoneVerified bool           `json:"phone_verified,omitempty"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
-	CreatedAt     string         `json:"created_at,omitempty"`
-	UpdatedAt     string         `json:"updated_at,omitempty"`
+	ID                 uint64         `json:"id,omitempty"`
+	CustomerUUID       string         `json:"customer_uuid"`
+	Type               string         `json:"type"`
+	PrimaryContactUUID string         `json:"primary_contact_uuid,omitempty"`
+	TenantUUID         string         `json:"tenant_uuid,omitempty"`
+	PrimaryEmail       string         `json:"primary_email,omitempty"`
+	PrimaryPhone       string         `json:"primary_phone,omitempty"`
+	Email              string         `json:"email,omitempty"`
+	Phone              string         `json:"phone,omitempty"`
+	DisplayName        string         `json:"display_name,omitempty"`
+	Nickname           string         `json:"nickname,omitempty"`
+	GivenName          string         `json:"given_name,omitempty"`
+	FamilyName         string         `json:"family_name,omitempty"`
+	AvatarURL          string         `json:"avatar_url,omitempty"`
+	Locale             string         `json:"locale,omitempty"`
+	Timezone           string         `json:"timezone,omitempty"`
+	Status             string         `json:"status,omitempty"`
+	EmailVerified      bool           `json:"email_verified,omitempty"`
+	PhoneVerified      bool           `json:"phone_verified,omitempty"`
+	Metadata           map[string]any `json:"metadata,omitempty"`
+	CreatedAt          string         `json:"created_at,omitempty"`
+	UpdatedAt          string         `json:"updated_at,omitempty"`
 }
 
 type AccountPage struct {
@@ -68,6 +70,7 @@ type ListAccountsRequest struct {
 
 type CreateAccountRequest struct {
 	TenantUUID  string         `json:"tenant_uuid,omitempty"`
+	Type        string         `json:"type"`
 	Email       string         `json:"email,omitempty"`
 	Phone       string         `json:"phone,omitempty"`
 	Password    string         `json:"password,omitempty"`

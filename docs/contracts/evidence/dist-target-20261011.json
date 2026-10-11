@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-11",
+  "scope": "make dist artifact-only target metadata",
+  "source_manifest_unchanged": true,
+  "source_manifest_sha256": "bca268e7c6b6786e15c53c0a280ce5b4c0ec14db60fd1f6927afee2592e5a8e7",
+  "real_skeleton_backend": {
+    "compile": "passed",
+    "target": {
+      "os": "darwin",
+      "arch": "arm64"
+    },
+    "binaries": [
+      {
+        "name": "plugin",
+        "os": "darwin",
+        "arch": "arm64"
+      },
+      {
+        "name": "migrate",
+        "os": "darwin",
+        "arch": "arm64"
+      }
+    ]
+  },
+  "regression": {
+    "command": "node --test tests/packaging/dist-target.test.mjs",
+    "tests": 10,
+    "passed": 10,
+    "fixture_frontend": "minimal deterministic build fixture; not a full Nuxt release build",
+    "targets": [
+      "host (darwin/arm64 on this machine)",
+      "linux/amd64",
+      "linux/arm64",
+      "windows/amd64"
+    ],
+    "negative_checks": [
+      "incomplete pair",
+      "unsupported OS/arch",
+      "source overwrite and symlink alias",
+      "wrong Go target with DIST_VERIFY=0",
+      "migrate target mismatch",
+      "missing Go metadata"
+    ],
+    "python": "Explicit target pairing and no-Go artifact assembly tested in an isolated make fixture; full Skeleton FastAPI manifest-check pipeline not validated"
+  },
+  "generated_templates": "both scaffold and embedded CLI target files match",
+  "template_render_tests": "passed",
+  "full_repository_template_check": "4 pre-existing/concurrent router and delegated_identity template differences outside this change",
+  "upload_page_target_integration": false,
+  "services_started_or_restarted": false,
+  "temporary_artifacts_removed": true
+}

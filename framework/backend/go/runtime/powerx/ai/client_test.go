@@ -22,6 +22,7 @@ func TestClientUsesTypedAIEndpointsAndResponseEnvelope(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "hello back", llm.Text)
 	require.Equal(t, "stop", llm.FinishReason)
+	require.Equal(t, "core-trace", llm.TraceID)
 
 	models, err := client.ListLLMModels(context.Background(), "openai")
 	require.NoError(t, err)
@@ -67,6 +68,16 @@ func TestClientReturnsHTTPErrorWithoutFabricatingData(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, apiErr.StatusCode)
 }
 
+func TestClientUsesAPIKeyAuthorizationForLocalGateway(t *testing.T) {
+	transport := &recordingTransport{}
+	client, err := NewClient(Config{BaseURL: "https://core.example", AuthScheme: "apikey", APIKey: "local-key"}, &http.Client{Transport: transport})
+	require.NoError(t, err)
+
+	_, err = client.LLMInvoke(context.Background(), LLMInvokeInput{ModelKey: "model", Inputs: []ContentItem{{Role: "user", Type: "text", Content: "hello"}}})
+	require.NoError(t, err)
+	require.Equal(t, []string{"ApiKey local-key"}, transport.authorizations)
+}
+
 type recordingTransport struct {
 	calls          []string
 	authorizations []string
@@ -88,7 +99,7 @@ func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error
 	case "/api/v1/ai/image/invoke":
 		data = `{"data":{"url":"https://media.example/tree.png"}}`
 	}
-	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(data)), Request: req}, nil
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"X-Trace-Id": []string{"core-trace"}}, Body: io.NopCloser(strings.NewReader(data)), Request: req}, nil
 }
 
 type failingTransport struct{}

@@ -1,0 +1,34 @@
+package middleware
+
+import (
+	fwcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwidentity "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/middleware"
+	authx "{{ .BackendModulePath }}/internal/middleware"
+	"{{ .BackendModulePath }}/internal/shared/app"
+	"github.com/gin-gonic/gin"
+	"strings"
+)
+
+func DelegatedIdentityOptions(deps *app.Deps, apiPrefix string) fwidentity.DelegatedIdentityOptions {
+	var resolver fwcontracts.DelegatedIdentityService
+	if deps != nil && deps.IAMRegistry != nil {
+		resolver, _ = deps.IAMRegistry.DelegatedIdentity()
+	}
+	return fwidentity.DelegatedIdentityOptions{Resolver: resolver, PluginID: app.PluginID, APIPrefix: apiPrefix,
+		TenantAssertion: func(c *gin.Context) string { tc, _ := authx.GetTenantContext(c); return tc.TenantUUID },
+		UserAssertion:   func(c *gin.Context) string { tc, _ := authx.GetTenantContext(c); return tc.UserUUID },
+		Commit: func(c *gin.Context, v *fwcontracts.DelegatedIdentity) {
+			member := ""
+			if v.MemberUUID != nil {
+				member = *v.MemberUUID
+			}
+			authx.SetTenantContext(c, authx.TenantContext{TenantUUID: v.TenantUUID, UserUUID: v.UserUUID, MemberUUID: member, IsRoot: v.IsRoot, Roles: v.Roles, Permissions: v.Permissions, PolicyVersion: v.PolicyVersion, PermsHash: v.PermsHash, AuthzSource: "core_identity_ticket", PluginID: v.PluginID})
+			c.Set("tenant_uuid", v.TenantUUID)
+			c.Request = c.Request.WithContext(authx.ContextWithTenantUUID(c.Request.Context(), v.TenantUUID))
+		},
+	}
+}
+
+func RefreshFrameworkIAMContext(deps *app.Deps, apiPrefix string) gin.HandlerFunc {
+	return fwidentity.RefreshDelegatedIdentity(DelegatedIdentityOptions(deps, strings.TrimRight(apiPrefix, "/")))
+}

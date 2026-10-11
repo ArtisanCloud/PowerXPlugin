@@ -1,3 +1,5 @@
+import { getPowerXHostSession } from './host-session';
+import { isPowerXEmbedded } from './bridge';
 import {
   createPluginSSEClient,
   type PluginSSEClient,
@@ -42,6 +44,9 @@ export function createRealtimeClient(options: RealtimeClientOptions): RealtimeCl
     tenantUuid: normalize(options.tenantUuid),
     memberUuid: normalize(options.memberUuid),
   };
+  const hostSession = isPowerXEmbedded(options.insidePowerX) ? getPowerXHostSession(options.pluginId) : null;
+  let currentSnapshot = hostSession?.getReadySnapshot();
+  const streams = new Set<AbortController>();
   const sources = new Set<EventSource>();
   const sockets = new Set<WebSocket>();
   const wsClients = new Set<PluginWsBusClient>();
@@ -51,7 +56,8 @@ export function createRealtimeClient(options: RealtimeClientOptions): RealtimeCl
     token: context.token,
     tenantUuid: context.tenantUuid,
   });
-  const close = () => {
+  const closeConnections = () => {
+    streams.forEach(controller => controller.abort()); streams.clear();
     sources.forEach((source) => source.close());
     sources.clear();
     sockets.forEach((socket) => socket.close());
@@ -66,10 +72,15 @@ export function createRealtimeClient(options: RealtimeClientOptions): RealtimeCl
       memberUuid: normalize(next.memberUuid),
     };
     if (normalized.token === context.token && normalized.tenantUuid === context.tenantUuid && normalized.memberUuid === context.memberUuid) return;
-    close();
+    closeConnections();
     context = normalized;
   };
 
+  const unsubscribe = hostSession?.subscribe(() => {
+    const next = hostSession.getReadySnapshot();
+    if (next !== currentSnapshot) { closeConnections(); currentSnapshot = next; }
+  });
+  const close = () => { unsubscribe?.(); closeConnections(); };
   return {
     setContext,
     getContext: () => ({ ...context }),
@@ -91,7 +102,14 @@ export function createRealtimeClient(options: RealtimeClientOptions): RealtimeCl
       sockets.add(socket);
       return socket;
     },
-    streamSSE: (streamOptions) => sseClient().stream({ ...streamOptions, token: streamOptions.token || context.token, tenantUuid: streamOptions.tenantUuid || context.tenantUuid }),
+    streamSSE: async streamOptions => {
+      const controller = new AbortController(); streams.add(controller);
+      const abort = () => controller.abort();
+      if (streamOptions.signal?.aborted) abort();
+      streamOptions.signal?.addEventListener('abort', abort, { once: true });
+      try { await sseClient().stream({ ...streamOptions, signal: controller.signal, token: streamOptions.token || context.token, tenantUuid: streamOptions.tenantUuid || context.tenantUuid }); }
+      finally { streams.delete(controller); streamOptions.signal?.removeEventListener('abort', abort); }
+    },
     createWSBus: (wsOptions = {}) => {
       const client = createPluginWsBusClient({ ...wsOptions, pluginId: options.pluginId, apiBaseURL: options.apiBaseURL, hostBaseURL: options.hostBaseURL, insidePowerX: options.insidePowerX, token: context.token, tenantUuid: context.tenantUuid, memberUuid: context.memberUuid });
       wsClients.add(client);

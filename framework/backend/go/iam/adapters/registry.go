@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"reflect"
 	"sync"
 
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
@@ -29,10 +30,13 @@ func NewRegistry() *Registry {
 
 // Bind 在启动阶段绑定唯一 adapter。
 func (r *Registry) Bind(mode contracts.IAMAdapterMode, bundle Bundle) error {
+	if r == nil {
+		return iamerrors.New(iamerrors.CodeAdapterNotBound, "iam.registry_unavailable")
+	}
 	if mode != contracts.IAMAdapterModeLocal && mode != contracts.IAMAdapterModeDelegated {
 		return iamerrors.New(iamerrors.CodeModeInvalid, "invalid iam mode for adapter binding")
 	}
-	if bundle.Directory == nil || bundle.Authz == nil || bundle.Context == nil {
+	if nilAdapter(bundle.Directory) || nilAdapter(bundle.Authz) || nilAdapter(bundle.Context) {
 		return iamerrors.New(iamerrors.CodeAdapterNotBound, "adapter bundle requires directory/authz/context")
 	}
 
@@ -40,6 +44,12 @@ func (r *Registry) Bind(mode contracts.IAMAdapterMode, bundle Bundle) error {
 	defer r.mu.Unlock()
 	if r.bound {
 		return iamerrors.New(iamerrors.CodeAdapterAlreadyBind, "iam adapter has already been bound")
+	}
+	if mode == contracts.IAMAdapterModeDelegated {
+		resolver, ok := bundle.Context.(contracts.DelegatedIdentityService)
+		if !ok || nilAdapter(resolver) {
+			return iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+		}
 	}
 
 	r.bound = true
@@ -50,6 +60,9 @@ func (r *Registry) Bind(mode contracts.IAMAdapterMode, bundle Bundle) error {
 
 // IsBound 返回是否已绑定 adapter。
 func (r *Registry) IsBound() bool {
+	if r == nil {
+		return false
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.bound
@@ -57,6 +70,9 @@ func (r *Registry) IsBound() bool {
 
 // Mode 返回当前绑定模式；未绑定时 ok=false。
 func (r *Registry) Mode() (mode contracts.IAMAdapterMode, ok bool) {
+	if r == nil {
+		return "", false
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.bound {
@@ -67,6 +83,9 @@ func (r *Registry) Mode() (mode contracts.IAMAdapterMode, ok bool) {
 
 // Directory 返回目录服务。
 func (r *Registry) Directory() (contracts.DirectoryService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, "iam.registry_unavailable")
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.bound || r.bundle.Directory == nil {
@@ -77,6 +96,9 @@ func (r *Registry) Directory() (contracts.DirectoryService, error) {
 
 // Authz 返回授权服务。
 func (r *Registry) Authz() (contracts.AuthzService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, "iam.registry_unavailable")
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.bound || r.bundle.Authz == nil {
@@ -87,10 +109,55 @@ func (r *Registry) Authz() (contracts.AuthzService, error) {
 
 // IdentityContext 返回身份上下文服务。
 func (r *Registry) IdentityContext() (contracts.IdentityContextService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, "iam.registry_unavailable")
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if !r.bound || r.bundle.Context == nil {
 		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, "iam context adapter not bound")
 	}
 	return r.bundle.Context, nil
+}
+
+// DelegatedIdentity exposes only the selected delegated resolver. Local mode
+// never falls back to a Host proof or a different identity provider.
+func (r *Registry) DelegatedIdentity() (contracts.DelegatedIdentityService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if !r.bound || r.mode != contracts.IAMAdapterModeDelegated {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	resolver, ok := r.bundle.Context.(contracts.DelegatedIdentityService)
+	if !ok || nilAdapter(resolver) {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	return resolver, nil
+}
+func (r *Registry) WSIdentityRevalidator() (contracts.WSIdentityRevalidationService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	resolver, ok := r.bundle.Context.(contracts.WSIdentityRevalidationService)
+	if !r.bound || r.mode != contracts.IAMAdapterModeDelegated || !ok || nilAdapter(resolver) {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	return resolver, nil
+}
+
+func nilAdapter(adapter any) bool {
+	value := reflect.ValueOf(adapter)
+	if !value.IsValid() {
+		return true
+	}
+	switch value.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Func, reflect.Slice, reflect.Chan:
+		return value.IsNil()
+	}
+	return false
 }

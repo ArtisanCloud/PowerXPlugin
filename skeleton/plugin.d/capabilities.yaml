@@ -100,6 +100,27 @@ capabilities:
         output: contracts/schema/output/com.powerx.plugins.base.template.validate.json
       version: 1.0.0
   required:
+    - com.corex.agent.invoke
+    - com.corex.agent.session.manage
+    - com.corex.ai.catalog.models.read
+    - com.corex.ai.catalog.providers.read
+    - com.corex.capabilities.catalog.read
+    - com.corex.capabilities.grant_status.read
+    - com.corex.customer.memberships.delegated_read
     - com.corex.eventfabric.publish
+    - com.corex.iam.authorization.check
+    - com.corex.iam.directory.read
+    - com.corex.iam.identity_context.service_read
+    - com.corex.iam.members.read
+    - com.corex.knowledge.catalog.read
+    - com.corex.knowledge.directory.read
+    - com.corex.knowledge.document.manage
+    - com.corex.knowledge.search.read
+    - com.corex.knowledge.space.create
     - com.corex.media.assets.manage
-    - com.corex.notifications.test
+    - com.corex.media.assets.read
+    - com.corex.notifications.create
+    - com.corex.runtime.cache.manage
+    - com.corex.runtime.cache.read
+    - com.corex.runtime.taskcenter.manage
+    - com.corex.runtime.taskcenter.read

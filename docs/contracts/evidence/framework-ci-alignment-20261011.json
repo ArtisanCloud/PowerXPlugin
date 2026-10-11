@@ -1,0 +1,52 @@
+{
+  "schema": "powerx.framework.pr-ci-evidence/v1",
+  "date": "2026-10-11",
+  "base_branch": "develop",
+  "base_commit": "654a37427ec9fcdea1de350961e9775fb40c7e27",
+  "branch": "fix/framework-ci-alignment-20261011",
+  "commit": "b11c88972525db9c52798fe54ee6406712b14a6c",
+  "ci": {
+    "run_id": 38128040956,
+    "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/38128040956",
+    "status": "completed",
+    "conclusion": "success",
+    "passed_jobs": [
+      "frontend",
+      "cli",
+      "delegated-contract-guard",
+      "contracts",
+      "template-sync",
+      "backend",
+      "smoke",
+      "regression"
+    ]
+  },
+  "scope": [
+    "published-go-framework-v0.0.24",
+    "published-nuxt-client-0.0.12",
+    "published-nuxt-admin-0.0.11",
+    "required-skeleton-integration",
+    "ci",
+    "versions-and-templates"
+  ],
+  "excluded": [
+    "dotnet-scheduler",
+    "knowledge-ui",
+    "dist-target",
+    "unaccepted-content-overview"
+  ],
+  "local_verification": {
+    "framework_go": "passed",
+    "skeleton_go": "passed",
+    "cli_go": "passed",
+    "generated_without_workspace_or_replace": "passed",
+    "frontend_tests": 122,
+    "nuxt_build": "passed",
+    "template_sync": "passed",
+    "logger_guard": "passed"
+  },
+  "pull_request_created": false,
+  "merge_performed": false,
+  "core_or_aicraft_modified": false,
+  "user_services_restarted": false
+}

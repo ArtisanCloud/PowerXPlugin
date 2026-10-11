@@ -1,0 +1,100 @@
+package notifications
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	powerxnotifications "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/notifications"
+	marketplacemodel "{{ .BackendModulePath }}/internal/entity/models/marketplace"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+// TrustedTenantResolver supplies tenant scope from authentication context.
+// Notification input deliberately has no tenant field.
+type TrustedTenantResolver func(context.Context) (string, bool)
+
+// LocalPublisher persists in-app notification records for local mode while
+// preserving the same typed create contract as PowerX delegated delivery.
+type LocalPublisher struct {
+	db            *gorm.DB
+	resolveTenant TrustedTenantResolver
+	now           func() time.Time
+}
+
+func NewLocalPublisher(db *gorm.DB, resolveTenant TrustedTenantResolver) (*LocalPublisher, error) {
+	if db == nil {
+		return nil, errors.New("local notification publisher requires database")
+	}
+	if resolveTenant == nil {
+		return nil, errors.New("local notification publisher requires trusted tenant resolver")
+	}
+	return &LocalPublisher{db: db, resolveTenant: resolveTenant, now: time.Now}, nil
+}
+
+func (p *LocalPublisher) Create(ctx context.Context, input powerxnotifications.CreateInput) (*powerxnotifications.Notification, error) {
+	if p == nil || p.db == nil || p.resolveTenant == nil {
+		return nil, errors.New("local notification publisher is unavailable")
+	}
+	tenantUUID, ok := p.resolveTenant(ctx)
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if !ok || tenantUUID == "" {
+		return nil, errors.New("trusted tenant context is required")
+	}
+	title := strings.TrimSpace(input.Title)
+	content := strings.TrimSpace(input.Content)
+	if title == "" || content == "" {
+		return nil, errors.New("notification title and content are required")
+	}
+	now := p.now().UTC()
+	memberUUID := strings.TrimSpace(input.MemberUUID)
+	recipientType, recipientID := "tenant", tenantUUID
+	if memberUUID != "" {
+		recipientType, recipientID = "member", memberUUID
+	}
+	category := strings.TrimSpace(input.Category)
+	if category == "" {
+		category = strings.TrimSpace(input.Type)
+	}
+	if category == "" {
+		category = "framework.notification"
+	}
+	record := marketplacemodel.Notification{
+		ID:            uuid.NewString(),
+		TenantUuid:    tenantUUID,
+		RecipientType: recipientType,
+		RecipientID:   recipientID,
+		Channel:       "in_app",
+		TemplateCode:  category,
+		Payload: datatypes.JSONMap{
+			"title":        title,
+			"content":      content,
+			"type":         strings.TrimSpace(input.Type),
+			"category":     category,
+			"is_important": input.IsImportant,
+			"metadata":     input.Metadata,
+		},
+		Status:    marketplacemodel.NotificationStatusSent,
+		SentAt:    &now,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := p.db.WithContext(ctx).Create(&record).Error; err != nil {
+		return nil, err
+	}
+	return &powerxnotifications.Notification{
+		UUID:        record.ID,
+		Title:       title,
+		Content:     content,
+		Type:        strings.TrimSpace(input.Type),
+		Category:    category,
+		IsImportant: input.IsImportant,
+		CreatedAt:   record.CreatedAt,
+		UpdatedAt:   record.UpdatedAt,
+		MemberUUID:  memberUUID,
+		Metadata:    input.Metadata,
+	}, nil
+}

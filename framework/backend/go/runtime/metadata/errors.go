@@ -8,23 +8,26 @@ import (
 type ErrorCode string
 
 const (
-	CodeClientUnavailable ErrorCode = "METADATA_CLIENT_UNAVAILABLE"
-	CodeInvalidRequest    ErrorCode = "METADATA_INVALID_REQUEST"
-	CodeUnauthorized      ErrorCode = "METADATA_UNAUTHORIZED"
-	CodeForbidden         ErrorCode = "METADATA_FORBIDDEN"
-	CodeNotFound          ErrorCode = "METADATA_NOT_FOUND"
-	CodeConflict          ErrorCode = "METADATA_CONFLICT"
-	CodeDecodeFailed      ErrorCode = "METADATA_DECODE_FAILED"
-	CodeGatewayFailed     ErrorCode = "METADATA_GATEWAY_FAILED"
+	CodeClientUnavailable    ErrorCode = "METADATA_CLIENT_UNAVAILABLE"
+	CodeOperationUnavailable ErrorCode = "METADATA_OPERATION_UNAVAILABLE"
+	CodeInvalidRequest       ErrorCode = "METADATA_INVALID_REQUEST"
+	CodeInvalidArgument      ErrorCode = "METADATA_INVALID_ARGUMENT"
+	CodeUnauthorized         ErrorCode = "METADATA_UNAUTHORIZED"
+	CodeForbidden            ErrorCode = "METADATA_FORBIDDEN"
+	CodeNotFound             ErrorCode = "METADATA_NOT_FOUND"
+	CodeConflict             ErrorCode = "METADATA_CONFLICT"
+	CodeDecodeFailed         ErrorCode = "METADATA_DECODE_FAILED"
+	CodeGatewayFailed        ErrorCode = "METADATA_GATEWAY_FAILED"
 )
 
 type Error struct {
-	Code      ErrorCode      `json:"code"`
-	Message   string         `json:"message"`
-	Operation string         `json:"operation,omitempty"`
-	TraceID   string         `json:"trace_id,omitempty"`
-	Details   map[string]any `json:"details,omitempty"`
-	Cause     error          `json:"-"`
+	StatusCode int            `json:"-"`
+	Code       ErrorCode      `json:"code"`
+	Message    string         `json:"message"`
+	Operation  string         `json:"operation,omitempty"`
+	TraceID    string         `json:"trace_id,omitempty"`
+	Details    map[string]any `json:"details,omitempty"`
+	Cause      error          `json:"-"`
 }
 
 func (e *Error) Error() string {
@@ -65,9 +68,9 @@ func HTTPStatusForCode(code ErrorCode) int {
 		return http.StatusNotFound
 	case CodeConflict:
 		return http.StatusConflict
-	case CodeInvalidRequest, CodeDecodeFailed:
+	case CodeInvalidRequest, CodeInvalidArgument:
 		return http.StatusBadRequest
-	case CodeClientUnavailable:
+	case CodeClientUnavailable, CodeOperationUnavailable:
 		return http.StatusServiceUnavailable
 	default:
 		return http.StatusBadGateway

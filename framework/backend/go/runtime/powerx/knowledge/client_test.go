@@ -2,12 +2,14 @@ package knowledge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,10 +51,137 @@ func TestClientReturnsTypedHTTPError(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, httpErr.StatusCode)
 }
 
+func TestClientUsesTenantKnowledgeHostContract(t *testing.T) {
+	transport := knowledgeRoundTrip(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "ApiKey service-token", req.Header.Get("Authorization"))
+		switch req.Method + " " + req.URL.Path {
+		case "GET /api/v1/tenant/knowledge/spaces":
+			return knowledgeResponse(http.StatusOK, `{"data":{"items":[{"space_uuid":"11111111-1111-1111-1111-111111111111","name":"FAQ","status":"active"}]}}`), nil
+		case "POST /api/v1/tenant/knowledge/search":
+			return knowledgeResponse(http.StatusOK, `{"data":{"items":[{"space_uuid":"11111111-1111-1111-1111-111111111111","document_uuid":"22222222-2222-2222-2222-222222222222","title":"Refund FAQ","uri":"powerx://faq/refund","excerpt":"Refund policy","tags":["refund"]}]}}`), nil
+		case "POST /api/v1/tenant/knowledge/spaces/11111111-1111-1111-1111-111111111111/documents":
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			require.ElementsMatch(t, []string{"title", "uri", "content", "content_type", "checksum", "version", "tags"}, mapKeys(body))
+			require.Equal(t, "text/markdown", body["content_type"])
+			require.NotEmpty(t, body["checksum"])
+			return knowledgeResponse(http.StatusAccepted, `{"data":{"job_uuid":"33333333-3333-3333-3333-333333333333","status":"queued","operation":"upsert","document_uuid":"22222222-2222-2222-2222-222222222222"}}`), nil
+		case "DELETE /api/v1/tenant/knowledge/spaces/11111111-1111-1111-1111-111111111111/documents/22222222-2222-2222-2222-222222222222":
+			return knowledgeResponse(http.StatusAccepted, `{"data":{"job_uuid":"44444444-4444-4444-4444-444444444444","status":"queued","operation":"delete","document_uuid":"22222222-2222-2222-2222-222222222222"}}`), nil
+		case "POST /api/v1/tenant/knowledge/spaces/11111111-1111-1111-1111-111111111111/indexes:rebuild":
+			return knowledgeResponse(http.StatusAccepted, `{"data":{"job_uuid":"55555555-5555-5555-5555-555555555555","status":"queued","operation":"rebuild"}}`), nil
+		case "GET /api/v1/tenant/knowledge/index-jobs/55555555-5555-5555-5555-555555555555":
+			return knowledgeResponse(http.StatusOK, `{"data":{"job_uuid":"55555555-5555-5555-1111-555555555555","space_uuid":"11111111-1111-1111-1111-111111111111","status":"succeeded","operation":"rebuild"}}`), nil
+		default:
+			t.Fatalf("unexpected host request: %s %s", req.Method, req.URL.Path)
+			return nil, nil
+		}
+	})
+	client, err := NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, "service-token", &http.Client{Transport: transport})
+	require.NoError(t, err)
+
+	spaces, err := client.ListKnowledgeSpaces(context.Background(), fwknowledge.ListSpacesInput{TenantUUID: "tenant-a"})
+	require.NoError(t, err)
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", spaces[0].SpaceID)
+
+	result, err := client.SearchKnowledge(context.Background(), fwknowledge.KnowledgeQuery{Query: "refund", TenantUUID: "tenant-a", Visibility: fwknowledge.VisibilityTenant})
+	require.NoError(t, err)
+	require.Equal(t, "Refund policy", result.Chunks[0].Text)
+	require.Equal(t, "22222222-2222-2222-2222-222222222222", result.Chunks[0].Citation.DocumentID)
+
+	upsert, err := client.UpsertKnowledgeDocument(context.Background(), fwknowledge.KnowledgeDocument{
+		SpaceID: spaces[0].SpaceID, Title: "Refund FAQ", URI: "powerx://faq/refund", Content: "Refund policy", ContentType: "text/markdown", Version: "v1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "22222222-2222-2222-2222-222222222222", upsert.DocumentID)
+
+	_, err = client.DeleteKnowledgeDocument(context.Background(), fwknowledge.DeleteDocumentInput{SpaceID: spaces[0].SpaceID, DocumentID: upsert.DocumentID})
+	require.NoError(t, err)
+	rebuild, err := client.ReindexKnowledgeDocument(context.Background(), fwknowledge.ReindexInput{SpaceID: spaces[0].SpaceID, HostRebuild: &fwknowledge.DocumentRebuildSettings{Mode: fwknowledge.RebuildReuseSnapshot, IdempotencyKey: "fixture-request"}})
+	require.NoError(t, err)
+	require.Equal(t, fwknowledge.IndexOperationReindex, rebuild.Operation)
+	job, err := client.GetKnowledgeIndexJob(context.Background(), fwknowledge.IndexJobQuery{JobID: rebuild.JobID, TenantUUID: "tenant-a"})
+	require.NoError(t, err)
+	require.Equal(t, fwknowledge.IndexStatusSucceeded, job.Status)
+}
+
+func TestClientRejectsUnsupportedHostQueryFilters(t *testing.T) {
+	client, err := NewClient(Config{BaseURL: "https://core.example", BearerToken: "service-token"}, nil)
+	require.NoError(t, err)
+	_, err = client.SearchKnowledge(context.Background(), fwknowledge.KnowledgeQuery{Query: "refund", Tags: []string{"refund"}})
+	require.Equal(t, fwknowledge.CodeUnsupportedCapability, fwknowledge.CodeOf(err))
+	_, err = client.ReindexKnowledgeDocument(context.Background(), fwknowledge.ReindexInput{SpaceID: "space-a", DocumentID: "document-a"})
+	require.Equal(t, fwknowledge.CodeInvalidArgument, fwknowledge.CodeOf(err))
+}
+
+func TestClientMapsKnowledgeHostErrorEnvelope(t *testing.T) {
+	client, err := NewClient(Config{BaseURL: "https://core.example", BearerToken: "service-token"}, &http.Client{Transport: knowledgeRoundTrip(func(*http.Request) (*http.Response, error) {
+		return knowledgeResponse(http.StatusForbidden, `{"error_code":"KNOWLEDGE_FORBIDDEN","reason_code":"KNOWLEDGE_FORBIDDEN"}`), nil
+	})})
+	require.NoError(t, err)
+	_, err = client.ListKnowledgeSpaces(context.Background(), fwknowledge.ListSpacesInput{})
+	require.Equal(t, fwknowledge.CodeForbidden, fwknowledge.CodeOf(err))
+}
+
 type knowledgeRoundTrip func(*http.Request) (*http.Response, error)
 
 func (f knowledgeRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
 func knowledgeResponse(status int, body string) *http.Response {
 	return &http.Response{StatusCode: status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}
+}
+
+func TestKnowledgeAPIKeyUsesTenantHostContract(t *testing.T) {
+	client, err := NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, "server-key", &http.Client{Transport: knowledgeRoundTrip(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "ApiKey server-key", req.Header.Get("Authorization"))
+		require.Empty(t, req.Header.Get("tenant_uuid"))
+		require.Equal(t, "/api/v1/tenant/knowledge/spaces", req.URL.Path)
+		return knowledgeResponse(http.StatusForbidden, `{"reason_code":"KNOWLEDGE_FORBIDDEN"}`), nil
+	})})
+	require.NoError(t, err)
+	_, err = client.ListKnowledgeSpaces(context.Background(), fwknowledge.ListSpacesInput{})
+	require.Equal(t, fwknowledge.CodeForbidden, fwknowledge.CodeOf(err))
+	_, err = NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, " ", nil)
+	require.Error(t, err)
+}
+
+func mapKeys(value map[string]any) []string {
+	keys := make([]string, 0, len(value))
+	for key := range value {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func TestClientRejectsIngestionSnapshotBeforeHostWrite(t *testing.T) {
+	for _, auth := range []string{"api_key", "sts"} {
+		t.Run(auth, func(t *testing.T) {
+			calls := 0
+			tokenCalls := 0
+			transport := &http.Client{Transport: knowledgeRoundTrip(func(*http.Request) (*http.Response, error) {
+				calls++
+				return knowledgeResponse(http.StatusAccepted, `{}`), nil
+			})}
+			var client *Client
+			var err error
+			if auth == "api_key" {
+				client, err = NewClientWithAPIKey(Config{BaseURL: "https://core.example"}, "server-key", transport)
+			} else {
+				client, err = NewClientWithTokenProvider(Config{BaseURL: "https://core.example"}, TokenProviderFunc(func(context.Context) (string, error) {
+					tokenCalls++
+					return "service-token", nil
+				}), transport)
+			}
+			require.NoError(t, err)
+			for _, snapshot := range []*fwknowledge.IngestionConfig{{}, {IngestionProfile: "p0_basic", Priority: "high", ChunkSize: 640}} {
+				job, err := client.UpsertKnowledgeDocument(context.Background(), fwknowledge.KnowledgeDocument{
+					SpaceID: "11111111-1111-4111-8111-111111111111", Title: "fixture", URI: "plugin-knowledge://fixture", Content: "fixture", ContentType: "text/plain", Version: "v1", Ingestion: snapshot,
+				})
+				require.Nil(t, job)
+				require.Equal(t, fwknowledge.CodeUnsupportedCapability, fwknowledge.CodeOf(err))
+			}
+			require.Zero(t, calls)
+			require.Zero(t, tokenCalls)
+		})
+	}
 }

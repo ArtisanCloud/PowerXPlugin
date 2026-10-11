@@ -15,7 +15,7 @@ func TestRenderAll_EmbeddedTemplatesParse(t *testing.T) {
 		FrontendType:       FrontendNuxt,
 		BackendPort:        8078,
 		FrontendPort:       3131,
-		FrameworkVersion:   "v0.0.21",
+		FrameworkVersion:   "v0.0.22",
 		FrameworkAdminRef:  "0.0.10",
 		FrameworkClientRef: "0.0.11",
 		AppFrontendType:    FrontendNuxt,

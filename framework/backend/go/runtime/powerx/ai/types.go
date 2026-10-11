@@ -19,6 +19,7 @@ type LLMInvokeInput struct {
 }
 
 type LLMInvokeOutput struct {
+	TraceID      string         `json:"trace_id,omitempty"`
 	Type         string         `json:"type"`
 	Text         string         `json:"text"`
 	FinishReason string         `json:"finish_reason,omitempty"`

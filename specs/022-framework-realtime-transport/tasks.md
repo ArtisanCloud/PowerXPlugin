@@ -45,7 +45,7 @@
 
 - [x] T020 Migrate `skeleton/backend/go-gin/internal/transport/http/mcp/handler.go` from `gin-contrib/sse` and `internal/mcp/stream` to framework SSE bus.
 - [x] T021 Remove direct `github.com/gin-contrib/sse` dependency from `skeleton/backend/go-gin/go.mod` and update sums.
-- [x] T022 Migrate `/plugin/agent/stream/sse` proxy to framework stream-through helper.
+- [x] T022 Historical stream-through migration; superseded by 009 T079: the old `/plugin/agent/stream/sse` route is removed. The new UUID invocation events route consumes Framework SessionService, with execution and cancellation separate from subscriptions.
 - [x] T023 Add stable error mapping for Agent stream-through failures.
 - [x] T024 Ensure WSBus subscribe path validates declared topics and tenant/member scope.
 - [x] T025 Add integration tests for MCP SSE migrated path.
@@ -60,7 +60,7 @@
 - [x] T029 Migrate Agent Skill Bridge page to framework fetch-based Agent SSE client.
 - [x] T030 Ensure page unload/HMR cleanup closes MCP and Agent stream connections.
 - [x] T031 Add or update E2E tests for capability MCP stream.
-- [ ] T032 Add or update E2E tests for Agent Chat SSE stream.
+- [X] T032 Add or update E2E tests for Agent Chat SSE stream in `skeleton/web-admin/nuxt/tests/e2e/agent-skill-bridge.spec.ts` and `agent-run-state.spec.ts`; covers plugin proxy-only routing, UUID params, SSE event lifecycle and terminal/error states. Runtime execution remains an installed/dev-server acceptance activity.
 
 ---
 

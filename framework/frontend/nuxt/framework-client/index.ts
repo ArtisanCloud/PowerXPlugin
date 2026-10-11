@@ -1,5 +1,7 @@
 export { usePluginApi } from "./api";
 export type { PluginApi, PluginApiOptions } from "./api";
+export { classifyPowerXApiAuthError, readPowerXApiErrorCode } from './api-errors';
+export type { PowerXApiErrorResponse, PowerXApiAuthError, PowerXApiAuthErrorKind } from './api-errors';
 export {
   exitPowerXHostFullscreen,
   initPowerXBridge,
@@ -20,17 +22,12 @@ export type {
   PowerXSyncPayload,
   PowerXThemeKey,
 } from "./bridge";
-export {
-  applyPowerXHostAuthToken,
-  normalizeBearerToken,
-  normalizePowerXAuthTokenPayload,
-} from "./host-session";
-export type {
-  AppliedPowerXHostAuthToken,
-  ApplyPowerXHostAuthTokenOptions,
-  PowerXHostCtx,
-  PowerXLoginPayload,
-} from "./host-session";
+export { getPowerXFrameBridge, isPowerXEmbedded } from './bridge';
+export type { PowerXAuthMessage, PowerXAuthClearedPayload, PowerXFrameBridgeClient, PowerXNavigationRequest } from './bridge';
+export { getPowerXHostSession, PowerXHostSession, PowerXHostSessionError, normalizeBearerToken } from './host-session';
+export type { PowerXHostIdentity, PowerXHostSessionSnapshot, PowerXHostSessionState, PowerXHostSessionAdapter, HostSessionStatus } from './host-session';
+export { createPowerXRouterNavigator, resolvePowerXRouterPath } from './navigation';
+export type { PowerXRouterAdapter } from './navigation';
 export {
   createPowerXApiFetchClient,
   normalizePowerXBodyPayload,

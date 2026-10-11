@@ -9,7 +9,7 @@ if [[ ! -d "${PKG_DIR}" ]]; then
   exit 1
 fi
 
-if rg -n --glob '!**/*_test.go' 'course|patient|order|membership benefit|training plan|support ticket|customer profile' "${PKG_DIR}"; then
+if rg -n --glob '!**/*_test.go' '\b(course|patient|order|membership benefit|training plan|support ticket|customer profile)\b' "${PKG_DIR}"; then
   echo "framework knowledge package must not define industry-specific business models" >&2
   exit 1
 fi

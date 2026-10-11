@@ -4,6 +4,7 @@ info:
   version: 0.1.0
   description: |
     插件通过 Integration Gateway 访问 PowerX 核心能力时需遵循的 HTTP 契约。
+    tenant 只从 STS service token 或 Gateway API Key 推导，调用方不得通过 header、query 或 body 注入 tenant_uuid。
 servers:
   - url: https://gateway.powerx.dev
     description: Dev Gateway
@@ -15,15 +16,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-  parameters:
-    XTenantUUID:
-      name: tenant_uuid
+    gatewayApiKey:
+      type: apiKey
       in: header
-      required: true
-      schema:
-        type: string
-        format: uuid
-      description: 插件上下文中的租户 UUID。
+      name: Authorization
+      description: 仅 Skeleton 开发调试可使用，值格式为 `ApiKey <key>`。
   schemas:
     CapabilityRecord:
       type: object
@@ -99,8 +96,7 @@ paths:
       summary: 列出授权能力
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/XTenantUUID'
+        - gatewayApiKey: []
       responses:
         '200':
           description: 成功
@@ -123,8 +119,7 @@ paths:
       description: 请求由 Gateway 路由至 PowerX 核心能力。
       security:
         - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/XTenantUUID'
+        - gatewayApiKey: []
       requestBody:
         required: true
         content:

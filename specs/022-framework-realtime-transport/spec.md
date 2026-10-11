@@ -5,6 +5,8 @@
 **Status**: Draft  
 **Input**: 统一 PowerXPlugin Framework 的 WS/SSE 实时通信传输层，覆盖 standalone/host/proxy 模式下的 URL、认证、租户/member 作用域、事件 envelope、连接生命周期、manifest/RBAC 治理与业务侧接入规范。
 
+> 2026-09-04 对齐：Realtime 是 Framework 基础设施，不属于业务模块 Runtime Factory；业务模块可依赖它发布事件，但不为它实现 local/Core 数据 adapter。
+
 ## Clarifications
 
 ### Session 2026-06-11

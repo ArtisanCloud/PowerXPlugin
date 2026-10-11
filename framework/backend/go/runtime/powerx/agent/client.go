@@ -85,6 +85,9 @@ func WithTokenProvider(provider TokenProvider) func(*Client) {
 
 func (c *Client) Invoke(ctx context.Context, req AgentInvokeRequest) (AgentInvokeResponse, error) {
 	var out AgentInvokeResponse
+	if c != nil && c.cfg.Mode == ModeDelegated {
+		return out, sessionError(400, "AGENT_SESSION_REQUIRED")
+	}
 	body, err := json.Marshal(req)
 	if err != nil {
 		return out, err

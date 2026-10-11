@@ -45,16 +45,10 @@ function buildWsURL(scope: string) {
   const pluginId =
     String(runtimeConfig.public?.powerxPluginId || "").trim() ||
     "com.powerx.plugins.base";
-  const isGatewayScope = scope === "gateway";
   const wsBaseURL = String(
-    isGatewayScope
-      ? runtimeConfig.public?.pxWsBaseUrl ||
-          runtimeConfig.public?.wsOrigin ||
-          runtimeConfig.public?.powerxCoreBase ||
-          (typeof window !== "undefined" ? window.location.origin : "")
-      : runtimeConfig.public?.wsOrigin ||
-          resolveApiBase() ||
-          (typeof window !== "undefined" ? window.location.origin : "")
+    runtimeConfig.public?.wsOrigin ||
+      resolveApiBase() ||
+      (typeof window !== "undefined" ? window.location.origin : "")
   ).trim();
   const wsPath = String(
     runtimeConfig.public?.wsUrl || runtimeConfig.public?.wsPath || "/api/ws"
@@ -64,7 +58,7 @@ function buildWsURL(scope: string) {
     apiBaseURL: resolveApiBase(),
     wsBaseURL,
     wsPath,
-    insidePowerX: isGatewayScope ? true : runtimeMode.insidePowerX,
+    insidePowerX: runtimeMode.insidePowerX,
     token,
     tenantUuid: getTenantUuid(),
   });
@@ -75,14 +69,13 @@ function buildWsURL(scope: string) {
     insidePowerX: runtimeMode.insidePowerX,
     wsBaseURL,
     wsPath,
-    wsURL: url,
     tenantUuid: getTenantUuid(),
   });
   return url;
 }
 
 function resolveDefaultTopic(fallback?: string) {
-  return String(fallback || "_topic.system.notification").trim();
+  return String(fallback || "").trim();
 }
 
 function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent {
@@ -101,7 +94,10 @@ function parseIncomingEvent(topic: string, payload: any): NotificationProbeEvent
   };
 }
 
-export function useNotificationProbe(scope = "default", defaultTopic = "_topic.system.notification") {
+// Plugin-local consumers must opt in to a declared topic. A PowerX system
+// topic belongs to the host WS endpoint and must never be subscribed through
+// the plugin-local /api/ws transport by default.
+export function useNotificationProbe(scope = "default", defaultTopic = "") {
   let wsConn: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let closedByClient = false;
@@ -213,11 +209,12 @@ export function useNotificationProbe(scope = "default", defaultTopic = "_topic.s
       pluginId: String(useRuntimeConfig().public?.powerxPluginId || "com.powerx.plugins.base"),
       wsBaseURL: `${parsedWsURL.protocol}//${parsedWsURL.host}`,
       wsPath: parsedWsURL.pathname,
+      insidePowerX: resolveFrontendRuntimeMode().insidePowerX,
       token: getAuthToken(),
       tenantUuid: getTenantUuid(),
     }).connect();
     wsConn = socket;
-    logger.info("ws connecting", { mode: resolveFrontendRuntimeMode().mode, tenantUuid: getTenantUuid(), wsURL });
+    logger.info("ws connecting", { mode: resolveFrontendRuntimeMode().mode, tenantUuid: getTenantUuid(), });
 
     socket.onopen = () => {
       wsState.value = "connected";
@@ -279,7 +276,7 @@ export function useNotificationProbe(scope = "default", defaultTopic = "_topic.s
     socket.onerror = () => {
       wsState.value = "error";
       wsError.value = "WebSocket 连接异常";
-      logger.error("ws connection error", { wsURL });
+      logger.error("ws connection error", { });
     };
 
     socket.onclose = () => {
@@ -292,7 +289,7 @@ export function useNotificationProbe(scope = "default", defaultTopic = "_topic.s
       }
       wsState.value = "reconnecting";
       resetDiag();
-      logger.warn("ws closed, scheduling reconnect", { wsURL });
+      logger.warn("ws closed, scheduling reconnect", { });
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
       }

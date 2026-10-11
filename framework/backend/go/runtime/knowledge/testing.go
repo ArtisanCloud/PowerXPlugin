@@ -3,16 +3,18 @@ package knowledge
 import "context"
 
 type MockProvider struct {
-	ProviderName string
-	ProviderMode string
-	Caps         ProviderCapabilities
-	Spaces       []KnowledgeSpace
+	ProviderName  string
+	ProviderMode  string
+	Caps          ProviderCapabilities
+	Spaces        []KnowledgeSpace
 	ListSpacesErr error
-	SearchResult *KnowledgeSearchResult
-	SearchErr    error
-	UpsertErr    error
-	DeleteErr    error
-	ReindexErr   error
+	SearchResult  *KnowledgeSearchResult
+	SearchErr     error
+	UpsertErr     error
+	DeleteErr     error
+	ReindexErr    error
+	IndexJobErr   error
+	IndexJob      *KnowledgeIndexJob
 }
 
 func NewMockProvider() *MockProvider {
@@ -96,6 +98,17 @@ func (p *MockProvider) Reindex(ctx context.Context, input ReindexInput) (*Knowle
 		return nil, p.ReindexErr
 	}
 	return &KnowledgeIndexJob{JobID: "mock-reindex", SpaceID: input.SpaceID, DocumentID: input.DocumentID, Operation: IndexOperationReindex, Status: IndexStatusSucceeded}, nil
+}
+
+func (p *MockProvider) GetIndexJob(context.Context, IndexJobQuery) (*KnowledgeIndexJob, error) {
+	if p.IndexJobErr != nil {
+		return nil, p.IndexJobErr
+	}
+	if p.IndexJob == nil {
+		return nil, NewError(CodeNotFound, "knowledge index job not found")
+	}
+	copy := *p.IndexJob
+	return &copy, nil
 }
 
 func FixtureDocument(spaceID, documentID, title, content string) KnowledgeDocument {

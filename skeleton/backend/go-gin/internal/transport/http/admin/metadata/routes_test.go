@@ -6,45 +6,26 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/gateway"
 	fwmetadata "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/metadata"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/gin-gonic/gin"
 )
 
-type metadataInvokerStub struct {
-	called bool
-	last   gateway.InvokeRequest
-}
-
-func (s *metadataInvokerStub) Invoke(_ context.Context, req gateway.InvokeRequest) (*gateway.Response, error) {
-	s.called = true
-	s.last = req
-	return &gateway.Response{
-		TraceID: "trace-metadata",
-		Status:  "ok",
-		Data: map[string]any{
-			"payload": map[string]any{
-				"items": []any{
-					map[string]any{
-						"uuid":         "dict-1",
-						"namespace":    "customer_status",
-						"module":       "customer",
-						"name_i18n":    map[string]any{"zh-CN": "客户状态"},
-						"status":       "active",
-						"display_name": "客户状态",
-					},
-				},
-				"pagination": map[string]any{"total": 1, "page": 1, "page_size": 20},
-			},
-		},
-	}, nil
-}
-
 func TestMetadataHandlerDelegatedUsesFrameworkClient(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	invoker := &metadataInvokerStub{}
-	client, err := fwmetadata.NewClient(fwmetadata.Config{Invoker: invoker})
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		if r.URL.Path != "/api/v1/tenant/metadata/dictionaries" {
+			t.Fatalf("path=%s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer service-sts" {
+			t.Fatalf("authorization=%q", r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"data":{"payload":{"items":[{"uuid":"11111111-1111-4111-8111-111111111111","namespace":"customer_status","module":"customer","name_i18n":{"zh-CN":"客户状态"},"status":"active"}],"pagination":{"total":1,"page":1,"page_size":20}}}}`))
+	}))
+	defer server.Close()
+	client, err := fwmetadata.NewHostClientWithTokenProvider(fwmetadata.HostClientConfig{BaseURL: server.URL}, fwmetadata.HostTokenProviderFunc(func(context.Context) (string, error) { return "service-sts", nil }), server.Client())
 	if err != nil {
 		t.Fatalf("metadata client: %v", err)
 	}
@@ -60,18 +41,17 @@ func TestMetadataHandlerDelegatedUsesFrameworkClient(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if !invoker.called {
-		t.Fatal("expected delegated metadata handler to call framework gateway invoker")
-	}
-	if invoker.last.CapabilityID != fwmetadata.CapabilityDictionaryRead {
-		t.Fatalf("capability=%s", invoker.last.CapabilityID)
+	if !called {
+		t.Fatal("expected delegated metadata handler to call tenant Host Contract")
 	}
 }
 
 func TestMetadataHandlerLocalDoesNotCallDelegatedClient(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	invoker := &metadataInvokerStub{}
-	client, err := fwmetadata.NewClient(fwmetadata.Config{Invoker: invoker})
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
+	defer server.Close()
+	client, err := fwmetadata.NewHostClientWithTokenProvider(fwmetadata.HostClientConfig{BaseURL: server.URL}, fwmetadata.HostTokenProviderFunc(func(context.Context) (string, error) { return "service-sts", nil }), server.Client())
 	if err != nil {
 		t.Fatalf("metadata client: %v", err)
 	}
@@ -87,7 +67,104 @@ func TestMetadataHandlerLocalDoesNotCallDelegatedClient(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	if invoker.called {
-		t.Fatal("local metadata handler must not call delegated framework gateway invoker")
+	if called {
+		t.Fatal("local metadata handler must not call delegated Metadata Host Contract")
+	}
+}
+
+type debugTagStore struct {
+	fwmetadata.Service
+	calls  int
+	tenant string
+}
+
+func (s *debugTagStore) ListTags(ctx context.Context, _ fwmetadata.ListTagsRequest) (*fwmetadata.Page[fwmetadata.Tag], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.Tag]{Items: []fwmetadata.Tag{}}, nil
+}
+
+func (s *debugTagStore) ListDictionaryNamespaces(ctx context.Context, _ fwmetadata.ListDictionaryNamespacesRequest) (*fwmetadata.Page[fwmetadata.DictionaryNamespace], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.DictionaryNamespace]{Items: []fwmetadata.DictionaryNamespace{}}, nil
+}
+
+func (s *debugTagStore) ListTaxonomies(ctx context.Context, _ fwmetadata.ListTaxonomiesRequest) (*fwmetadata.Page[fwmetadata.Taxonomy], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.Taxonomy]{Items: []fwmetadata.Taxonomy{}}, nil
+}
+
+func (s *debugTagStore) ListResourceTypes(ctx context.Context, _ fwmetadata.ListResourceTypesRequest) (*fwmetadata.Page[fwmetadata.ResourceType], error) {
+	s.calls++
+	s.tenant, _ = fwmetadata.TenantUUIDFromContext(ctx)
+	return &fwmetadata.Page[fwmetadata.ResourceType]{Items: []fwmetadata.ResourceType{}}, nil
+}
+
+func TestMetadataDebugUsesOnlySelectedFrameworkRuntime(t *testing.T) {
+	local, delegated := &debugTagStore{}, &debugTagStore{}
+	localRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeLocal, local, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegatedRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeDelegated, nil, delegated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{debugLocal: localRuntime, debugDelegated: delegatedRuntime}
+	for _, test := range []struct {
+		route, tenant              string
+		localCalls, delegatedCalls int
+	}{
+		{"local", "11111111-1111-4111-8111-111111111111", 1, 0},
+		{"delegated", "", 1, 1},
+	} {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodGet, "/metadata/debug/tags?framework_debug_route="+test.route+"&tenant_uuid=11111111-1111-4111-8111-111111111111", nil)
+		h.DebugListTags(c)
+		if rec.Code != http.StatusOK || local.calls != test.localCalls || delegated.calls != test.delegatedCalls {
+			t.Fatalf("route=%s status=%d local=%d delegated=%d", test.route, rec.Code, local.calls, delegated.calls)
+		}
+	}
+	if local.tenant == "" || delegated.tenant != "" {
+		t.Fatalf("tenant context local=%q delegated=%q", local.tenant, delegated.tenant)
+	}
+}
+
+func TestMetadataGovernanceDebugSectionsUseSelectedRuntime(t *testing.T) {
+	local, delegated := &debugTagStore{}, &debugTagStore{}
+	localRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeLocal, local, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegatedRuntime, err := fwmetadata.NewRuntime(fwprovider.ModeDelegated, nil, delegated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{debugLocal: localRuntime, debugDelegated: delegatedRuntime}
+	sections := []struct {
+		name   string
+		handle func(*gin.Context)
+	}{
+		{"dictionaries", h.DebugListDictionaryNamespaces},
+		{"taxonomies", h.DebugListTaxonomies},
+		{"tags", h.DebugListTags},
+		{"resource-types", h.DebugListResourceTypes},
+	}
+	for _, route := range []string{"local", "delegated"} {
+		for _, section := range sections {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodGet, "/metadata/debug/"+section.name+"?framework_debug_route="+route+"&tenant_uuid=11111111-1111-4111-8111-111111111111", nil)
+			section.handle(c)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("route=%s section=%s status=%d body=%s", route, section.name, rec.Code, rec.Body.String())
+			}
+		}
+	}
+	if local.calls != len(sections) || delegated.calls != len(sections) || local.tenant == "" || delegated.tenant != "" {
+		t.Fatalf("local=%d/%q delegated=%d/%q", local.calls, local.tenant, delegated.calls, delegated.tenant)
 	}
 }

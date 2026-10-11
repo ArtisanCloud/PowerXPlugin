@@ -1,0 +1,483 @@
+<template>
+  <main class="mx-auto w-full max-w-5xl space-y-6 px-5 py-6 lg:px-8">
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-[#172536]">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p class="text-sm text-gray-500 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.overview.eyebrow') }}" }}</p>
+          <h1 class="mt-1 text-2xl font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ingestion.title') }}" }}</h1>
+          <p class="mt-2 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t(workspace.mode === 'powerx' ? 'knowledgeLab.workspace.ingestionDescription' : 'knowledgeSpaces.ingestion.description') }}" }}</p>
+        </div>
+        <UButton color="neutral" variant="outline" :to="overviewPath">{{ "{{ t('knowledgeSpaces.detail.backToOverview') }}" }}</UButton>
+      </div>
+    </section>
+    <KnowledgeSemanticIndexPanel v-if="workspace.semanticCapabilities && spaceUUID" :spaceUUID="spaceUUID" @changed="setSemanticCapabilities" />
+    <section v-if="workspace.mode==='powerx'" class="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 text-gray-900 dark:border-slate-700 dark:bg-[#0f192a] dark:text-slate-100 sm:grid-cols-2">
+      <UFormField :label="t('knowledgeSemantic.indexMode')"><USelect v-model="indexingMode" :items="indexingItems" class="w-full" /></UFormField>
+      <UFormField v-if="indexingMode!=='lexical_chunks'" :label="t('knowledgeSemantic.modelGeneration')"><USelect v-model="semanticGeneration" :items="generationItems" class="w-full" /></UFormField>
+      <UFormField v-if="indexingMode!=='lexical_chunks'" class="sm:col-span-2" :label="t('knowledgeSemantic.profileMock')" :description="t('knowledgeSemantic.profileMockHint')"><UTextarea v-model="profileMock" class="w-full" /></UFormField>
+      <details v-if="indexingMode!=='lexical_chunks'" class="space-y-3 sm:col-span-2"><summary class="cursor-pointer text-sm">{{ "{{ t('knowledgeSemantic.filters') }}" }}</summary><UFormField :label="t('knowledgeSemantic.categoryCodes')"><div v-for="(_,index) in categoryCodes" :key="index" class="mb-2 flex gap-2"><UInput v-model="categoryCodes[index]" class="flex-1" /><UButton variant="soft" @click="categoryCodes.splice(index,1)">{{ "{{ t('common.delete') }}" }}</UButton></div><UButton variant="soft" @click="categoryCodes.push('')">{{ "{{ t('common.add') }}" }}</UButton></UFormField><UFormField :label="t('knowledgeSemantic.tagUUIDs')"><div v-for="(_,index) in tagUUIDs" :key="index" class="mb-2 flex gap-2"><UInput v-model="tagUUIDs[index]" class="flex-1" /><UButton variant="soft" @click="tagUUIDs.splice(index,1)">{{ "{{ t('common.delete') }}" }}</UButton></div><UButton variant="soft" @click="tagUUIDs.push('')">{{ "{{ t('common.add') }}" }}</UButton></UFormField></details>
+
+    </section>
+
+    <section class="rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#0f192a]">
+      <div class="border-b border-slate-200 p-5 dark:border-slate-700">
+        <UAlert v-if="workspace.capabilities.profiles" color="warning" variant="soft" :title="t('knowledgeSpaces.ingestion.embeddingLimitTitle')" :description="t('knowledgeSpaces.ingestion.embeddingLimitDescription')" />
+        <div class="mt-5 flex items-center justify-between text-sm text-gray-600 dark:text-[#d6e2ff]">
+          <span>{{ "{{ t('knowledgeSpaces.ingestion.step', { current: step, total: 4 }) }}" }}</span>
+          <UBadge color="neutral" variant="soft">{{ "{{ t('knowledgeSpaces.ingestion.stepBadge', { current: step }) }}" }}</UBadge>
+        </div>
+      </div>
+      <UAlert v-if="loadError" class="m-5" color="error" :title="t('knowledgeSpaces.ui.loadFailed')" :description="loadError" />
+      <fieldset :disabled="saving || !!loadError" class="p-5">
+        <div v-if="step === 1" class="space-y-5">
+          <UFormField :label="t('knowledgeSpaces.ingestion.space')" required>
+            <USelectMenu v-model="spaceUUID" :items="spaceItems" value-key="value" label-key="label" class="w-full" :disabled="Boolean(route.params.uuid)" />
+          </UFormField>
+          <div class="grid gap-5 md:grid-cols-2">
+            <UFormField :label="t('knowledgeSpaces.ingestion.sourceType')">
+              <USelectMenu v-model="sourceType" :items="sourceTypeItems" value-key="value" label-key="label" class="w-full" />
+            </UFormField>
+            <UFormField :label="t('knowledgeSpaces.ingestion.sourceMethod')">
+              <USelectMenu v-model="sourceMethod" :items="sourceMethodItems" value-key="value" label-key="label" class="w-full" />
+            </UFormField>
+          </div>
+          <UAlert v-if="sourceType === 'pdf'" color="warning" variant="soft" :title="t('knowledgeSpaces.ingestion.sourceUnavailableTitle')" :description="t('knowledgeSpaces.ingestion.sourceUnavailableDescription')" />
+          <template v-if="sourceMethod === 'upload'">
+            <UFormField :label="t('knowledgeSpaces.ingestion.uploadFiles')" required>
+              <input :key="fileInputKey" type="file" multiple :accept="workspace.mode === 'powerx' ? '.txt,.md,.markdown' : '.txt,.md,.markdown,.html,.htm,.csv'" class="block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-gray-700 dark:border-slate-700 dark:bg-slate-950 dark:text-gray-100" :disabled="saving" @change="readFiles">
+              <template #help>{{ "{{ t(workspace.mode === 'powerx' ? 'knowledgeLab.workspace.uploadFilesHelp' : 'knowledgeSpaces.ingestion.uploadFilesHelp') }}" }}</template>
+            </UFormField>
+            <div v-if="uploadFiles.length" class="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+              <div v-for="item in uploadFiles" :key="item.id" class="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-800">
+                <div class="min-w-0">
+                  <p class="truncate font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ item.file.name }}" }}</p>
+                  <p class="mt-1 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ "{{ uploadStatusLabel(item.status) }}" }}</p>
+                </div>
+                <UButton color="neutral" variant="ghost" size="xs" :disabled="saving" @click="removeUploadFile(item.id)">{{ "{{ t('knowledgeSpaces.ingestion.removeFile') }}" }}</UButton>
+              </div>
+            </div>
+            <div v-else class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-gray-600 dark:border-slate-700 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ingestion.uploadQueueEmpty') }}" }}</div>
+          </template>
+          <template v-else>
+            <UFormField :label="t('knowledgeSpaces.ui.documentTitle')" required><UInput v-model="title" class="w-full" /></UFormField>
+            <UFormField :label="t('knowledgeSpaces.ui.documentContent')" required><UTextarea v-model="content" :rows="14" class="w-full" /></UFormField>
+          </template>
+        </div>
+        <fieldset v-else-if="step === 2" class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.62fr)]">
+          <div class="space-y-5">
+            <UFormField :label="t('knowledgeSpaces.ingestion.strategyPackage')" required>
+              <USelect v-model="strategyPackageKey" :disabled="workspace.mode === 'powerx'" :items="strategyPackageItems" class="w-full" />
+              <template #help><span class="text-xs text-gray-600 dark:text-[#d6e2ff]">{{ "{{ selectedStrategySummary }}" }}</span></template>
+            </UFormField>
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField :label="t('knowledgeSpaces.ingestion.priority')"><USelect v-model="ingestion.priority" :items="priorityItems" class="w-full" /></UFormField>
+              <div class="flex items-end">
+                <UButton color="neutral" variant="soft" class="w-full justify-center" @click="advancedOpen = !advancedOpen">{{ "{{ advancedOpen ? t('knowledgeSpaces.ui.advancedHide') : t('knowledgeSpaces.ui.advancedShow') }}" }}</UButton>
+              </div>
+            </div>
+            <section v-if="advancedOpen" class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <p class="text-sm font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ingestion.effectiveIngestionProfile') }}" }}</p>
+              <p class="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm text-gray-900 dark:border-slate-700 dark:bg-[#1b2a3d] dark:text-[#fdfcff]">{{ "{{ workspace.mode === 'powerx' ? selectedProfileLabel : ingestion.ingestion_profile }}" }}</p>
+              <p class="mt-2 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t(workspace.mode === 'powerx' ? 'knowledgeLab.workspace.boundStrategyHint' : 'knowledgeSpaces.ingestion.effectiveIngestionProfileHint') }}" }}</p>
+            </section>
+          </div>
+          <aside class="space-y-5 rounded-xl border border-slate-200 p-5 text-sm dark:border-slate-700 dark:bg-[#111a2b]">
+            <div class="flex items-start justify-between gap-3">
+              <div><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ui.guidanceTitle') }}" }}</h2><p class="mt-1 text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ui.guidanceDescription') }}" }}</p></div>
+              <UBadge color="neutral" variant="soft">{{ "{{ t('knowledgeSpaces.ui.strategyBadge') }}" }}</UBadge>
+            </div>
+            <p class="text-gray-700 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ui.currentSelection') }}" }}：{{ "{{ selectedStrategyLabel }}" }}</p>
+            <div><p class="text-xs text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ui.recommendedProfile') }}" }}</p><div class="mt-2 flex flex-wrap gap-2"><UBadge color="primary" variant="soft">{{ "{{ selectedProfileLabel }}" }}</UBadge><UBadge v-if="workspace.mode === 'local'" color="neutral" variant="soft">{{ "{{ t('knowledgeSpaces.ui.couplingLow') }}" }}</UBadge></div></div>
+            <div v-if="selectedSceneLabels.length"><p class="text-xs text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ui.applicableScenes') }}" }}</p><div class="mt-2 flex flex-wrap gap-2"><UBadge v-for="scene in selectedSceneLabels" :key="scene" color="neutral" variant="soft">{{ "{{ scene }}" }}</UBadge></div></div>
+            <p class="text-gray-600 dark:text-[#d6e2ff]">{{ "{{ selectedStrategyDecisionHint }}" }}</p>
+            <p class="border-t border-slate-200 pt-4 text-xs text-gray-600 dark:border-slate-700 dark:text-[#d6e2ff]">{{ "{{ t(workspace.mode === 'powerx' && workspace.capabilities.ingestionSettings ? 'knowledgeLab.workspace.lexicalHint' : workspace.capabilities.ingestionSettings ? 'knowledgeSpaces.ui.strategyNextHint' : 'knowledgeLab.workspace.snapshotDraftDescription') }}" }}</p>
+          </aside>
+        </fieldset>
+        <fieldset v-else-if="step === 3" class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.62fr)]">
+          <div class="space-y-5">
+            <UAlert v-if="workspace.mode === 'powerx' && !segmentationReady" color="warning" variant="soft" :description="t('knowledgeLab.workspace.invalidSegmentation')" />
+            <section class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ingestion.segmentOrder') }}" }}</h2>
+              <p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ingestion.segmentOrderDescription') }}" }}</p>
+              <div class="mt-4 space-y-3">
+                <div v-for="(order, index) in ingestion.segment_order" :key="order" class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-[#1b2a3d]">
+                  <div><p class="font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ segmentOrderLabel(order) }}" }}</p><p class="mt-1 text-xs text-gray-600 dark:text-[#d6e2ff]">{{ "{{ segmentOrderHelp(order) }}" }}</p></div>
+                  <div class="flex items-center gap-1"><UButton icon="i-heroicons-chevron-up" size="xs" color="neutral" variant="ghost" :disabled="index === 0" @click="moveSegmentOrder(index, index - 1)" /><UButton icon="i-heroicons-chevron-down" size="xs" color="neutral" variant="ghost" :disabled="index === ingestion.segment_order.length - 1" @click="moveSegmentOrder(index, index + 1)" /></div>
+                </div>
+              </div>
+            </section>
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField :label="t('knowledgeSpaces.ingestion.segmentMode')"><USelect v-model="ingestion.segment_mode" :items="segmentModeItems" class="w-full" /><template #help>{{ "{{ segmentModeHint }}" }}</template></UFormField>
+              <UFormField :label="t('knowledgeSpaces.ingestion.segmentSizePolicy')"><USelect v-model="ingestion.segment_size_policy" :items="sizePolicyItems" class="w-full" /><template #help>{{ "{{ sizePolicyHint }}" }}</template></UFormField>
+              <UFormField :label="t('knowledgeSpaces.ingestion.chunkSize')"><UInput v-model.number="ingestion.chunk_size" type="number" class="w-full" /><template #help>{{ "{{ t('knowledgeSpaces.ingestion.chunkSizeHint') }}" }}</template></UFormField>
+              <UFormField :label="t('knowledgeSpaces.ingestion.chunkOverlap')"><UInput v-model.number="ingestion.chunk_overlap" type="number" class="w-full" /><template #help>{{ "{{ t('knowledgeSpaces.ingestion.chunkOverlapHint') }}" }}</template></UFormField>
+            </div>
+            <section class="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ingestion.anchorsTitle') }}" }}</h2><p class="mt-1 text-sm text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ingestion.anchorsDescription') }}" }}</p></div>
+              <UFormField :label="t('knowledgeSpaces.ingestion.separators')"><UTextarea v-model="separatorsText" :rows="4" class="w-full" /><template #help>{{ "{{ t(workspace.mode === 'powerx' ? 'knowledgeLab.workspace.hostSeparatorsHint' : 'knowledgeSpaces.ingestion.separatorsHint') }}" }}</template></UFormField>
+              <div class="grid gap-3 text-sm md:grid-cols-2">
+                <UCheckbox v-model="ingestion.page_priority" :disabled="!anchorSupported('page_priority') && !ingestion.page_priority" :label="t('knowledgeSpaces.ingestion.pagePriority')" />
+                <UCheckbox v-model="ingestion.anchor_heading_path" :disabled="!anchorSupported('anchor_heading_path') && !ingestion.anchor_heading_path" :label="t('knowledgeSpaces.ingestion.anchorHeadingPath')" />
+                <UCheckbox v-model="ingestion.anchor_clause_id" :disabled="!anchorSupported('anchor_clause_id') && !ingestion.anchor_clause_id" :label="t('knowledgeSpaces.ingestion.anchorClauseId')" />
+                <UCheckbox v-model="ingestion.anchor_row_number" :disabled="!anchorSupported('anchor_row_number') && !ingestion.anchor_row_number" :label="t('knowledgeSpaces.ingestion.anchorRowNumber')" />
+                <UCheckbox v-model="ingestion.anchor_speaker" :disabled="!anchorSupported('anchor_speaker') && !ingestion.anchor_speaker" :label="t('knowledgeSpaces.ingestion.anchorSpeaker')" />
+                <UCheckbox v-model="ingestion.anchor_sentence_index" :disabled="!anchorSupported('anchor_sentence_index') && !ingestion.anchor_sentence_index" :label="t('knowledgeSpaces.ingestion.anchorSentenceIndex')" />
+              </div>
+            </section>
+          </div>
+          <aside class="space-y-4 rounded-xl border border-slate-200 p-5 text-sm dark:border-slate-700 dark:bg-[#111a2b]">
+            <div><h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ingestion.effectivePolicy') }}" }}</h2><p class="mt-1 text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t(workspace.mode === 'powerx' && workspace.capabilities.ingestionSettings ? 'knowledgeLab.workspace.lexicalHint' : workspace.capabilities.ingestionSettings ? 'knowledgeSpaces.ingestion.effectivePolicyDescription' : 'knowledgeLab.workspace.snapshotDraftDescription') }}" }}</p></div>
+            <dl class="space-y-3 text-gray-700 dark:text-[#d6e2ff]"><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ "{{ t('knowledgeSpaces.ingestion.segmentOrder') }}" }}</dt><dd class="mt-1">{{ "{{ effectiveOrderLabel }}" }}</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ "{{ t('knowledgeSpaces.ingestion.segmentMode') }}" }}</dt><dd class="mt-1">{{ "{{ segmentModeLabel }}" }}</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ "{{ t('knowledgeSpaces.ingestion.chunkSummary') }}" }}</dt><dd class="mt-1">{{ "{{ ingestion.chunk_size }}" }} / {{ "{{ ingestion.chunk_overlap }}" }}（{{ "{{ sizePolicyLabel }}" }}）</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ "{{ t('knowledgeSpaces.ingestion.separators') }}" }}</dt><dd class="mt-1 break-all">{{ "{{ effectiveSeparators }}" }}</dd></div><div><dt class="text-xs text-gray-600 dark:text-[#9db0cb]">{{ "{{ t('knowledgeSpaces.ingestion.anchorsTitle') }}" }}</dt><dd class="mt-1">{{ "{{ effectiveAnchors }}" }}</dd></div></dl>
+          </aside>
+        </fieldset>
+        <div v-else class="space-y-4">
+          <h2 class="font-semibold text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ingestion.confirmTitle') }}" }}</h2>
+          <UAlert v-if="!workspace.capabilities.ingestionSettings" color="warning" variant="soft" :title="t('knowledgeLab.workspace.snapshotBlockedTitle')" :description="t('knowledgeLab.workspace.snapshotBlockedDescription')" />
+          <dl class="grid gap-4 rounded-xl border border-slate-200 p-4 text-sm md:grid-cols-2 dark:border-slate-700">
+            <div><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ingestion.space') }}" }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ space?.name }}" }}</dd></div>
+            <div><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ingestion.sourceMethod') }}" }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ sourceMethodLabel }}" }}</dd></div>
+            <div v-if="sourceMethod === 'upload'"><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ingestion.uploadFiles') }}" }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ t('knowledgeSpaces.ingestion.fileCount', { count: uploadFiles.length }) }}" }}</dd></div>
+            <div v-else><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t('knowledgeSpaces.ui.documentTitle') }}" }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ title }}" }}</dd></div>
+            <div><dt class="text-gray-600 dark:text-[#d6e2ff]">{{ "{{ t(workspace.capabilities.ingestionSettings ? 'knowledgeSpaces.ingestion.snapshotPreview' : 'knowledgeLab.workspace.snapshotDraftTitle') }}" }}</dt><dd class="mt-1 font-medium text-gray-900 dark:text-[#fdfcff]">{{ "{{ ingestion.segment_mode }}" }} · {{ "{{ ingestion.chunk_size }}" }} / {{ "{{ ingestion.chunk_overlap }}" }}</dd></div>
+          </dl>
+          <UAlert v-if="profileUnavailable" color="error" variant="soft" :title="t('knowledgeLab.workspace.profileUnavailableTitle', {space: space?.name})" :description="t('knowledgeLab.workspace.profileUnavailableHint')" />
+          <KnowledgeTaskProcessList v-if="sourceMethod === 'upload'" :items="uploadTasks" :title="t('knowledgeSpaces.ingestion.progressTitle')" :status-hint="workspace.mode === 'powerx' ? t('knowledgeTaskProcess.acceptanceHint') : ''">
+            <template #actions="{item}"><UButton v-if="acceptedJobLink(item.id)" :to="acceptedJobLink(item.id)" target="_blank" size="xs" color="neutral" variant="outline">{{ "{{ t('knowledgeTaskProcess.viewTask') }}" }}</UButton></template>
+          </KnowledgeTaskProcessList>
+        </div>
+      </fieldset>
+      <footer class="flex justify-between border-t border-slate-200 p-5 dark:border-slate-700">
+        <UButton color="neutral" variant="ghost" :disabled="step === 1 || saving" @click="step--">{{ "{{ t('common.back') }}" }}</UButton>
+        <UButton v-if="step < 4" :disabled="!canContinue" @click="step++">{{ "{{ t('common.next') }}" }}</UButton>
+        <div v-else class="flex flex-wrap justify-end gap-2">
+          <UButton v-if="workspace.mode === 'powerx' && retryableFiles.length" color="neutral" variant="outline" :loading="saving" :disabled="!canRetryFailed" @click="submit(true)">{{ "{{ t('knowledgeLab.workspace.retryFailed', {count: retryableFiles.length}) }}" }}</UButton>
+          <UButton :loading="saving" :disabled="!canSubmit" @click="submit()">{{ "{{ t('knowledgeSpaces.ingestion.submit') }}" }}</UButton>
+        </div>
+      </footer>
+    </section>
+  </main>
+</template>
+
+<script setup lang="ts">
+import KnowledgeTaskProcessList from './KnowledgeTaskProcessList.vue'
+import { newSemanticDraft, semanticBundle, type SemanticDraft } from '~/composables/knowledge/semanticBundle'
+import type {SemanticCapabilities,SemanticIndexing} from '~/composables/api/knowledgeSemanticTypes'
+import { taskPhase, type TaskProcessItem } from '~/composables/knowledge/taskProcess'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useKnowledgeWorkspace } from '~/composables/api/useKnowledgeWorkspace'
+import { documentIngestionSchema, type HostIngestionSettings } from '~/composables/api/knowledgeHostTypes'
+import { type KnowledgeStrategyPackage, type LocalKnowledgeIngestionSnapshot, type LocalKnowledgeSpace, type KnowledgeProfileVersion } from '~/composables/api/useLocalKnowledge'
+import { getAuthToken, resolveApiBase } from '~/composables/api/_base'
+import { createPluginWsClient } from '@artisan-cloud/plugin-framework-client'
+
+type UploadFileStatus = 'ready' | 'reading' | 'processing' | 'completed' | 'accepted' | 'failed'
+type UploadFileItem = { id: string; file: File; content: string; status: UploadFileStatus; progress: number; stage: string; documentUUID?: string; jobUUID?: string; errorCode?: string; errorTrace?: string; requestStarted?: number; requestFinished?: number; eventProgress?: number }
+type IngestionProgressEvent = { document_uuid?: string; status?: string; stage?: string; progress_percent?: number; error_code?: string }
+
+const { t } = useI18n()
+const toast = useToast()
+const workspace = useKnowledgeWorkspace(); const api = workspace.api
+const route = useRoute()
+const runtimeConfig = useRuntimeConfig()
+const step = ref(1)
+const spaceUUID = ref(String(route.params.uuid || ''))
+const spaces = ref<LocalKnowledgeSpace[]>([])
+const profiles = ref<KnowledgeProfileVersion[]>([])
+const strategyPackages = ref<KnowledgeStrategyPackage[]>([])
+const vectorActive = ref(false)
+const title = ref('')
+const content = ref('')
+const sourceType = ref('markdown')
+const sourceMethod = ref<'upload' | 'manual'>('upload')
+const uploadFiles = ref<UploadFileItem[]>([])
+const fileInputKey = ref(0)
+const saving = ref(false)
+const loadError = ref('')
+const advancedOpen = ref(false)
+const strategyPackageKey = ref(workspace.mode === 'local' ? 'A_simple' : '')
+const indexingMode=ref<'lexical_chunks'|'semantic'|'hybrid'>('lexical_chunks')
+const semanticState=ref<SemanticCapabilities>()
+const semanticGeneration=ref<'active'|'pending'>('active')
+const profileMock=ref('')
+const categoryCodes=ref<string[]>([]);const tagUUIDs=ref<string[]>([])
+const semanticDrafts=new Map<string,SemanticDraft>()
+const indexingItems=computed(()=>['lexical_chunks','semantic','hybrid'].map(value=>({value,label:t(`knowledgeSemantic.modes.${value}`),disabled:value!=='lexical_chunks'&&!semanticState.value?.ready})))
+const generationItems=computed(()=>[{value:'active',label:t('knowledgeSemantic.activeModel')},{value:'pending',label:t('knowledgeSemantic.pendingChoice'),disabled:!semanticState.value?.pending_generation}])
+const selectedGeneration=computed(()=>semanticGeneration.value==='pending'?semanticState.value?.pending_generation:semanticState.value?.generation)
+function setSemanticCapabilities(value:SemanticCapabilities|undefined){semanticState.value=value;if(!value?.pending_generation)semanticGeneration.value='active'}
+async function semanticSubmission(key:string,text:string,kind:'raw_document'|'cleaned_document',sourceTitle:string){
+ if(workspace.mode!=='powerx'||indexingMode.value==='lexical_chunks')return {}
+ const generation=selectedGeneration.value
+ if(!generation||!semanticState.value?.ready)throw {data:{code:'KNOWLEDGE_SEMANTIC_INDEX_NOT_READY'}}
+ let draft=semanticDrafts.get(key);if(!draft){draft=newSemanticDraft();semanticDrafts.set(key,draft)}
+ const indexing:SemanticIndexing={mode:indexingMode.value,embedding_profile:generation.embedding_profile,artifact_roles:['source_chunk']}
+ return semanticBundle(draft,text,indexing,profileMock.value,hostSettings(),kind,sourceTitle,categoryCodes.value,tagUUIDs.value)
+}
+const ingestion = reactive<Omit<LocalKnowledgeIngestionSnapshot, 'separators'>>({
+  ingestion_profile: '', processor_profile: 'builtin/default', masking_profile: '', priority: 'normal',
+  segment_mode: 'unit', chunk_size: 800, chunk_overlap: 120, segment_size_policy: 'target',
+  segment_order: ['page', 'size', 'segment', 'separator'], page_priority: false, anchor_heading_path: true,
+  anchor_clause_id: false, anchor_row_number: false, anchor_speaker: false, anchor_sentence_index: false,
+})
+const separatorsText = ref('\\n\\n\n\\n\n。\n. \n! \n? ')
+let ingestionWS: WebSocket | null = null
+
+
+const overviewPath = computed(() => workspace.basePath)
+const space = computed(() => spaces.value.find(item => item.uuid === spaceUUID.value))
+const spaceItems = computed(() => spaces.value.map(item => ({ label: item.name, value: item.uuid })))
+const strategyPackageItems = computed(() => workspace.mode === 'powerx' ? [{label: t('knowledgeLab.workspace.boundStrategy'), value: 'space_bound'}] : strategyPackages.value.filter(item => item.ready).map(item => ({ label: item.label || item.key, value: item.key })))
+const selectedStrategy = computed(() => strategyPackages.value.find(item => item.key === strategyPackageKey.value))
+const selectedStrategyLabel = computed(() => workspace.mode === 'powerx' ? t('knowledgeLab.workspace.boundStrategy') : t(`knowledgeSpaces.ui.strategyLabels.${strategyPackageKey.value}`))
+const selectedProfileLabel = computed(() => workspace.mode === 'powerx' ? t('knowledgeLab.workspace.boundProfile') : t(`knowledgeSpaces.ui.profileLabels.${selectedStrategy.value?.profile_key || ingestion.ingestion_profile}`))
+const selectedStrategySummary = computed(() => workspace.mode === 'powerx' ? t('knowledgeLab.workspace.boundStrategyHint') : t('knowledgeSpaces.ui.strategySummary', { profile: selectedProfileLabel.value }))
+const selectedSceneLabels = computed(() => {
+  if (workspace.mode === 'powerx') return selectedStrategy.value?.scene_labels || []
+  const scenes = selectedStrategy.value?.profile_key === 'p0_basic' ? ['faq', 'sop'] : selectedStrategy.value?.profile_key === 'p3_kg_strong' ? ['structured', 'traceable'] : ['sop', 'faq', 'runbook']
+  return scenes.map(scene => t(`knowledgeSpaces.ui.sceneLabels.${scene}`))
+})
+const selectedStrategyDecisionHint = computed(() => workspace.mode === 'powerx' ? t('knowledgeLab.workspace.boundStrategyHint') : t('knowledgeSpaces.ui.strategyDecisionHint', { profile: selectedProfileLabel.value }))
+const sourceTypeItems = computed(() => [
+  { label: t('knowledgeSpaces.ingestion.markdown'), value: 'markdown' },
+  { label: t('knowledgeSpaces.ingestion.text'), value: 'text' },
+  { label: t('knowledgeSpaces.ingestion.html'), value: 'html', disabled: workspace.mode === 'powerx' },
+  { label: t('knowledgeSpaces.ingestion.csv'), value: 'csv', disabled: workspace.mode === 'powerx' },
+  { label: t('knowledgeSpaces.ingestion.pdf'), value: 'pdf', disabled: true },
+])
+const sourceMethodItems = computed(() => [
+  { label: t('knowledgeSpaces.ingestion.localUpload'), value: 'upload' },
+  { label: t('knowledgeSpaces.ingestion.manual'), value: 'manual' },
+])
+const sourceMethodLabel = computed(() => sourceMethodItems.value.find(item => item.value === sourceMethod.value)?.label || '')
+const profile = computed(() => profiles.value.find(item => item.profile_key === space.value?.ingestion_profile_key && item.status === 'published'))
+const chunkSize = computed(() => Number(profile.value?.config?.chunk_size || 800))
+const chunkOverlap = computed(() => Number(profile.value?.config?.chunk_overlap || 120))
+const priorityItems = computed(() => [
+  { label: t('knowledgeSpaces.ingestion.normal'), value: 'normal' },
+  { label: t('knowledgeSpaces.ingestion.high'), value: 'high' },
+])
+const segmentModeItems = computed(() => ['unit', 'heading', 'clause', 'semantic', 'table_row', 'code_block', 'conversation'].map(value => ({ label: t(`knowledgeSpaces.ingestion.modeOptions.${value}`), value, disabled: workspace.mode === 'powerx' && (!workspace.ingestionContract?.segment_modes.includes(value) || ['heading', 'table_row', 'code_block'].includes(value) && !allMarkdown.value) })))
+const sizePolicyItems = computed(() => ['target', 'cap'].map(value => ({ label: t(`knowledgeSpaces.ingestion.sizePolicyOptions.${value}`), value })))
+const allMarkdown = computed(() => sourceMethod.value === 'manual' ? sourceType.value === 'markdown' : uploadFiles.value.length > 0 && uploadFiles.value.every(item => /\.(md|markdown)$/i.test(item.file.name)))
+const taskIngestion = computed<LocalKnowledgeIngestionSnapshot>(() => ({ ...ingestion, segment_order: [...ingestion.segment_order], separators: separatorsText.value.split('\n').map(value => value.trim()).filter(Boolean) }))
+const effectiveOrderLabel = computed(() => ingestion.segment_order.map(segmentOrderLabel).join(' → '))
+const segmentModeLabel = computed(() => t(`knowledgeSpaces.ingestion.modeOptions.${ingestion.segment_mode}`))
+const sizePolicyLabel = computed(() => t(`knowledgeSpaces.ingestion.sizePolicyOptions.${ingestion.segment_size_policy}`))
+const effectiveSeparators = computed(() => taskIngestion.value.separators.join(' / '))
+const effectiveAnchors = computed(() => {
+  const items = [
+    ingestion.anchor_heading_path ? t('knowledgeSpaces.ingestion.anchorHeadingPath') : '',
+    ingestion.anchor_clause_id ? t('knowledgeSpaces.ingestion.anchorClauseId') : '',
+    ingestion.anchor_row_number ? t('knowledgeSpaces.ingestion.anchorRowNumber') : '',
+    ingestion.anchor_speaker ? t('knowledgeSpaces.ingestion.anchorSpeaker') : '',
+    ingestion.anchor_sentence_index ? t('knowledgeSpaces.ingestion.anchorSentenceIndex') : '',
+  ].filter(Boolean)
+  return items.length ? items.join(' / ') : t('knowledgeSpaces.ingestion.none')
+})
+const segmentModeHint = computed(() => t(`knowledgeSpaces.ingestion.modeHints.${ingestion.segment_mode}`))
+const sizePolicyHint = computed(() => t(`knowledgeSpaces.ingestion.sizePolicyHints.${ingestion.segment_size_policy}`))
+const uploadReady = computed(() => uploadFiles.value.length > 0 && uploadFiles.value.every(item => item.status === 'ready'))
+const sourceReady = computed(() => !loadError.value && Boolean(space.value) && sourceType.value !== 'pdf' && (sourceMethod.value === 'upload' ? uploadReady.value : Boolean(title.value.trim() && content.value.trim())))
+const strategyReady = computed(() => workspace.mode === 'powerx' ? Boolean(workspace.capabilities.ingestionSettings && workspace.ingestionContract?.priorities.includes(ingestion.priority) && (indexingMode.value==='lexical_chunks'||semanticState.value?.ready && selectedGeneration.value)) : Boolean(ingestion.ingestion_profile.trim() && ingestion.processor_profile.trim() && ingestion.priority))
+const segmentationReady = computed(() => workspace.mode === 'powerx' ? hostSegmentationValid() : Boolean(ingestion.segment_mode && ingestion.chunk_size > 0 && ingestion.chunk_overlap >= 0 && ingestion.chunk_overlap < ingestion.chunk_size && taskIngestion.value.segment_order.length && taskIngestion.value.separators.length))
+const canContinue = computed(() => step.value === 1 ? sourceReady.value : step.value === 2 ? strategyReady.value : segmentationReady.value)
+const canSubmit = computed(() => Boolean(workspace.capabilities.ingestionSettings && space.value && (!workspace.capabilities.vectorStatus || vectorActive.value) && sourceReady.value && strategyReady.value && segmentationReady.value))
+const preAcceptanceErrors = new Set(['KNOWLEDGE_PROFILE_UNAVAILABLE', 'KNOWLEDGE_UNSUPPORTED_INGESTION_SETTING', 'KNOWLEDGE_INVALID_ARGUMENT', 'KNOWLEDGE_INVALID_DOCUMENT', 'KNOWLEDGE_FORBIDDEN', 'KNOWLEDGE_UNAUTHORIZED', 'KNOWLEDGE_SPACE_NOT_FOUND'])
+const retryableFiles = computed(() => uploadFiles.value.filter(item => item.status === 'failed' && item.content.trim() && !item.documentUUID && !item.jobUUID && preAcceptanceErrors.has(item.errorCode || '')))
+const profileUnavailable = computed(() => workspace.mode === 'powerx' && uploadFiles.value.some(item => item.errorCode === 'KNOWLEDGE_PROFILE_UNAVAILABLE'))
+const canRetryFailed = computed(() => Boolean(workspace.mode === 'powerx' && sourceMethod.value === 'upload' && !saving.value && !loadError.value && space.value && workspace.capabilities.ingestionSettings && strategyReady.value && segmentationReady.value && retryableFiles.value.length && uploadFiles.value.every(item => !['reading','processing'].includes(item.status))))
+const uploadTasks = computed<TaskProcessItem[]>(() => uploadFiles.value.map(item => {
+  let phase = taskPhase(item.status)
+  if (item.status === 'processing' && item.stage === 'creating') phase = 'submitting'
+  if (item.status === 'accepted' && ['queued','running','succeeded','failed'].includes(item.stage)) phase = taskPhase(item.stage)
+  return {id:item.id,title:item.file.name,phase,progress:item.eventProgress,error:item.errorCode ? uploadErrorLabel(item.errorCode) : undefined,traceId:item.errorTrace,durationMs:item.requestStarted !== undefined && item.requestFinished !== undefined ? item.requestFinished-item.requestStarted : undefined,durationKind:'request',indexMode:workspace.mode === 'powerx' ? workspace.ingestionContract?.index_mode : 'local_vector'}
+}))
+function acceptedJobLink(id:string) {
+ const item=uploadFiles.value.find(file=>file.id===id)
+ return workspace.mode === 'powerx' && item?.jobUUID ? {path:`${workspace.basePath}/${spaceUUID.value}/records`,query:{job_uuid:item.jobUUID,job_title:item.file.name}} : undefined
+}
+
+async function load() {
+  loadError.value = ''
+  try {
+    const [out, profileOut, strategyOut] = await Promise.all([api.spaces(), workspace.capabilities.profiles ? api.profileVersions('ingestion') : Promise.resolve(null), api.strategyPackages()])
+    spaces.value = out.items || []
+    profiles.value = profileOut?.items || []
+    strategyPackages.value = strategyOut.items || []
+    await loadVector()
+    applySpaceDefaults()
+    if (workspace.mode === 'powerx') {
+      strategyPackageKey.value = 'space_bound'
+      applyHostDefaults()
+    }
+  } catch (error) {
+    loadError.value = t('knowledgeLab.workspace.requestFailed', { code: errorCodeOf(error) })
+    toast.add({ title: t('common.error'), description: loadError.value, color: 'error' })
+  }
+}
+function applySpaceDefaults() {
+  if (workspace.mode === 'powerx' || !space.value || !workspace.capabilities.ingestionSettings) return
+  ingestion.ingestion_profile = space.value.ingestion_profile_key || 'default'
+  ingestion.chunk_size = chunkSize.value
+  ingestion.chunk_overlap = chunkOverlap.value
+  strategyPackageKey.value = spaceStrategyPackage(space.value)
+  applyStrategyPackageDefaults()
+}
+function spaceStrategyPackage(value: LocalKnowledgeSpace) {
+  return value.feature_flags?.find(flag => flag.startsWith('rag.strategy_package:'))?.replace('rag.strategy_package:', '') || 'A_simple'
+}
+function applyStrategyPackageDefaults() {
+  if (workspace.mode === 'powerx') return
+  const selected = strategyPackages.value.find(item => item.key === strategyPackageKey.value)
+  if (!selected) return
+  ingestion.ingestion_profile = selected.profile_key
+  ingestion.rag_bundle_key = selected.profile_key
+  ingestion.rag_primary = selected.key
+  if (workspace.mode === 'local') ingestion.rag_scene_key = 'custom_expert'
+}
+function applyHostDefaults() {
+  const defaults = workspace.ingestionContract?.defaults
+  if (!defaults) return
+  for (const key of ['priority', 'segment_mode', 'segment_size_policy', 'chunk_size', 'chunk_overlap', 'page_priority'] as const) {
+    if (defaults[key] !== undefined) (ingestion as any)[key] = defaults[key]
+  }
+  ingestion.segment_order = [...(defaults.segment_order || [])]
+  for (const key of ['anchor_heading_path', 'anchor_clause_id', 'anchor_row_number', 'anchor_speaker', 'anchor_sentence_index'] as const) ingestion[key] = false
+  ingestion.ingestion_profile = ''; ingestion.processor_profile = ''; ingestion.masking_profile = ''
+  separatorsText.value = (defaults.separators || []).map(s => s.replace(/\n/g, '\\n').replace(/\t/g, '\\t')).join('\n')
+}
+function anchorSupported(field: string) {
+  if (workspace.mode === 'local') return true
+  const contract = workspace.ingestionContract
+  if (field === 'page_priority') return contract?.page_priority_supported === true
+  return contract?.anchor_mode_requirements[field] === ingestion.segment_mode
+}
+function hostSettings(): HostIngestionSettings {
+  const separators = separatorsText.value === '' ? [] : separatorsText.value.split('\n').filter(s => s.length > 0).map(s => s.replace(/\\n/g, '\n').replace(/\\t/g, '\t'))
+  const { priority, segment_mode, segment_size_policy, chunk_size, chunk_overlap, page_priority, anchor_heading_path, anchor_clause_id, anchor_row_number, anchor_speaker, anchor_sentence_index } = ingestion
+  return { schema: documentIngestionSchema, priority, segment_mode, segment_size_policy, chunk_size, chunk_overlap, segment_order: [...ingestion.segment_order], separators, page_priority, anchor_heading_path, anchor_clause_id, anchor_row_number, anchor_speaker, anchor_sentence_index }
+}
+function hostSegmentationValid() {
+  const contract = workspace.ingestionContract; const settings = hostSettings()
+  if (!contract || !contract.segment_modes.includes(ingestion.segment_mode) || !contract.segment_size_policies.includes(ingestion.segment_size_policy)) return false
+  if (['heading','table_row','code_block'].includes(ingestion.segment_mode) && !allMarkdown.value) return false
+  if (!Number.isInteger(ingestion.chunk_size) || !Number.isInteger(ingestion.chunk_overlap) || ingestion.chunk_size < contract.chunk_size_min || ingestion.chunk_size > contract.chunk_size_max || ingestion.chunk_overlap < 0 || (ingestion.chunk_size === 0 ? ingestion.chunk_overlap !== 0 || ingestion.segment_size_policy !== 'cap' : ingestion.chunk_overlap >= ingestion.chunk_size)) return false
+  if (ingestion.segment_order.length !== contract.segment_order_items.length || new Set(ingestion.segment_order).size !== contract.segment_order_items.length || ingestion.segment_order.some(s => !contract.segment_order_items.includes(s))) return false
+  if (settings.separators!.length > 16 || new Set(settings.separators).size !== settings.separators!.length || settings.separators!.some(s => Array.from(s).length > 32)) return false
+  for (const field of ['page_priority','anchor_heading_path','anchor_clause_id','anchor_row_number','anchor_speaker','anchor_sentence_index'] as const) if (ingestion[field] && !anchorSupported(field)) return false
+  return true
+}
+function submissionSettings() { return workspace.mode === 'powerx' ? { host_ingestion: hostSettings() } : { ingestion: taskIngestion.value } }
+function moveSegmentOrder(from: number, to: number) {
+  if (from < 0 || to < 0 || from >= ingestion.segment_order.length || to >= ingestion.segment_order.length) return
+  const [item] = ingestion.segment_order.splice(from, 1)
+  ingestion.segment_order.splice(to, 0, item)
+}
+function segmentOrderLabel(value: string) { return t(`knowledgeSpaces.ingestion.segmentOrderLabels.${value}`) }
+function segmentOrderHelp(value: string) { return t(`knowledgeSpaces.ingestion.segmentOrderHelp.${value}`) }
+async function loadVector() {
+  if (!spaceUUID.value || !workspace.capabilities.vectorStatus) return
+  vectorActive.value = Boolean((await api.vectorIndexStatus(spaceUUID.value)).active)
+}
+function clearUploadFiles() { uploadFiles.value = []; fileInputKey.value++ }
+function removeUploadFile(id: string) { uploadFiles.value = uploadFiles.value.filter(item => item.id !== id) }
+function uploadStatusLabel(status: UploadFileStatus) { return status === 'accepted' ? t('knowledgeLab.workspace.accepted') : t(`knowledgeSpaces.ingestion.uploadStatus.${status}`) }
+function itemProgressText(item: UploadFileItem) { if (!workspace.capabilities.realtime) return uploadStatusLabel(item.status); return `${item.stage ? t(`knowledgeSpaces.ingestion.progressStages.${item.stage}`) : uploadStatusLabel(item.status)} · ${item.progress}%` }
+function uploadErrorLabel(code: string) {
+  if (workspace.mode === 'powerx' && preAcceptanceErrors.has(code)) return t(`knowledgeLab.workspace.ingestionErrors.${code}`, {space: space.value?.name})
+  const supported = ['FILE_READ_FAILED', 'DOCUMENT_URI_CONFLICT', 'EMBEDDING_MODEL_NOT_CONFIGURED', 'VECTOR_INDEX_NOT_ACTIVATED', 'INGESTION_PROFILE_NOT_PUBLISHED', 'EMBEDDING_INVOKE_FAILED', 'INDEX_WRITE_FAILED']
+  return supported.includes(code) ? t(`knowledgeSpaces.ingestion.uploadErrors.${code}`) : t('knowledgeSpaces.ingestion.uploadErrors.UNKNOWN', { code })
+}
+function errorCodeOf(error: unknown) {
+  const value = error as { data?: { error?: { code?: string }; code?: string }; response?: { _data?: { error?: { code?: string }; code?: string } } }
+  return String(value?.data?.error?.code || value?.data?.code || value?.response?._data?.error?.code || value?.response?._data?.code || 'UNKNOWN').trim()
+}
+function errorTraceOf(error: unknown): string | undefined {
+ const value = error as { data?: { trace_id?: string }; response?: { _data?: { trace_id?: string } } }
+ return value?.data?.trace_id || value?.response?._data?.trace_id
+}
+async function readFiles(event: Event) {
+  const files = Array.from((event.target as HTMLInputElement).files || [])
+  fileInputKey.value++
+  if (!files.length) return
+  const existing = new Set(uploadFiles.value.map(item => item.id))
+  const additions = await Promise.all(files.filter(file => !existing.has(`${file.name}:${file.size}:${file.lastModified}`)).map(async (file) => {
+    const item: UploadFileItem = { id: `${file.name}:${file.size}:${file.lastModified}`, file, content: '', status: 'reading', progress: 0, stage: 'reading' }
+    if (workspace.mode === 'powerx' && !/\.(txt|md|markdown)$/i.test(file.name)) { item.status = 'failed'; item.errorCode = 'KNOWLEDGE_UNSUPPORTED_FORMAT'; return item }
+    try { item.content = await file.text(); item.status = item.content.trim() ? 'ready' : 'failed'; item.progress = item.status === 'ready' ? 0 : 100; item.stage = item.status === 'ready' ? 'ready' : 'failed' } catch { item.status = 'failed'; item.progress = 100; item.stage = 'failed'; item.errorCode = 'FILE_READ_FAILED' }
+    return item
+  }))
+  uploadFiles.value = [...uploadFiles.value, ...additions]
+}
+async function submit(retryFailures = false) {
+  if (saving.value || !space.value || !(retryFailures ? canRetryFailed.value : canSubmit.value)) return
+  saving.value = true
+  try {
+    if (sourceMethod.value === 'manual') {
+      const submission = await workspace.submitDocument(space.value.uuid, { title: title.value.trim(), content: workspace.mode === 'powerx' ? content.value : content.value.trim(), source_type: 'manual', content_type: sourceType.value === 'text' ? 'text/plain' : 'text/markdown', tags: [], ...submissionSettings(),...await semanticSubmission('manual',content.value,'cleaned_document',title.value.trim()) })
+      toast.add({ title: t('common.success'), description: t('knowledgeSpaces.ingestion.submitted'), color: 'success' })
+      await navigateTo(workspace.mode === 'powerx' ? { path: `${workspace.basePath}/${space.value.uuid}/records`, query: { job_uuid: submission.jobUUID, job_title: title.value.trim() } } : `${workspace.basePath}/${space.value.uuid}/records`)
+      return
+    }
+    const candidates = retryFailures ? [...retryableFiles.value] : uploadFiles.value.filter(item => item.status === 'ready')
+    for (const item of candidates) {
+      item.status = 'processing'
+      item.stage = 'creating'
+      item.progress = 2
+      item.errorCode = undefined
+      item.errorTrace = undefined
+      item.requestStarted = Date.now()
+      item.requestFinished = undefined
+      item.eventProgress = undefined
+      try {
+        const submission = await workspace.submitDocument(space.value.uuid, { title: item.file.name.replace(/\.[^.]+$/, '') || item.file.name, content: item.content, source_type: 'upload', content_type: /\.txt$/i.test(item.file.name) ? 'text/plain' : 'text/markdown', tags: [], ...submissionSettings(),...await semanticSubmission(item.id,item.content,'raw_document',item.file.name.replace(/\.[^.]+$/, '') || item.file.name) })
+        item.documentUUID = submission.documentUUID
+        item.jobUUID = submission.jobUUID
+        item.status = workspace.mode === 'powerx' ? 'accepted' : 'completed'
+        item.stage = workspace.mode === 'powerx' ? submission.status : 'completed'
+        item.progress = workspace.mode === 'powerx' ? 0 : 100
+      } catch (error) { item.status = 'failed'; item.stage = 'failed'; item.progress = 100; item.errorCode = errorCodeOf(error); item.errorTrace = errorTraceOf(error) } finally { item.requestFinished = Date.now() }
+    }
+    const acceptedFiles = uploadFiles.value.filter(item => item.status === 'accepted' || item.status === 'completed')
+    const completed = acceptedFiles.length
+    if (completed === uploadFiles.value.length) {
+      toast.add({ title: t('common.success'), description: t('knowledgeSpaces.ingestion.batchSubmitted', { count: completed }), color: 'success' })
+      await navigateTo(workspace.mode === 'powerx' ? { path: `${workspace.basePath}/${space.value.uuid}/records`, query: { job_uuid: uploadFiles.value.map(item => item.jobUUID!), job_title: uploadFiles.value.map(item => item.file.name) } } : `${workspace.basePath}/${space.value.uuid}/records`)
+    } else {
+      toast.add({ title: t('common.error'), description: t('knowledgeSpaces.ingestion.batchSubmitFailed', { count: completed, total: uploadFiles.value.length }), color: 'error' })
+    }
+  } catch (error) { toast.add({ title: t('common.error'), description: (workspace.mode === 'powerx' && preAcceptanceErrors.has(errorCodeOf(error)) ? uploadErrorLabel(errorCodeOf(error)) : t('knowledgeLab.workspace.requestFailed', { code: errorCodeOf(error) })) + (errorTraceOf(error) ? ` (${errorTraceOf(error)})` : ''), color: 'error' }) } finally { saving.value = false }
+}
+watch(spaceUUID, async () => { await loadVector(); applySpaceDefaults() })
+watch(strategyPackageKey, applyStrategyPackageDefaults)
+watch(sourceMethod, clearUploadFiles)
+watch(sourceType, () => { if (sourceMethod.value === 'upload') clearUploadFiles() })
+function wsEndpoint() {
+  if (typeof window === 'undefined') return ''
+  const apiBase = new URL(resolveApiBase(), window.location.origin)
+  const protocol = apiBase.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${apiBase.host}`
+}
+function startIngestionWS() {
+  const endpoint = wsEndpoint()
+  if (!workspace.capabilities.realtime || !endpoint || ingestionWS) return
+  ingestionWS = createPluginWsClient({ pluginId: String(runtimeConfig.public?.powerxPluginId || 'com.powerx.plugins.base'), wsBaseURL: endpoint, wsPath: '/api/ws', token: getAuthToken() }).connect()
+  ingestionWS.onopen = () => ingestionWS?.send(JSON.stringify({ type: 'subscribe', topics: ['_topic.knowledge.ingestion.progress'] }))
+  ingestionWS.onmessage = (event) => {
+    let message: { type?: string; topic?: string; payload?: IngestionProgressEvent }
+    try { message = JSON.parse(String(event.data || '{}')) } catch { return }
+    if (message.type !== 'event' || message.topic !== '_topic.knowledge.ingestion.progress') return
+    const payload = message.payload || {}
+    const item = uploadFiles.value.find(candidate => candidate.documentUUID === payload.document_uuid)
+    if (!item) return
+    item.status = payload.status === 'completed' ? 'completed' : payload.status === 'failed' ? 'failed' : 'processing'
+    item.stage = payload.stage || item.stage
+    if (typeof payload.progress_percent === 'number') item.eventProgress = Math.max(0, Math.min(100, payload.progress_percent))
+    item.progress = Math.max(0, Math.min(100, Number(payload.progress_percent ?? item.progress)))
+    item.errorCode = payload.error_code || item.errorCode
+  }
+  ingestionWS.onclose = () => { ingestionWS = null }
+}
+onMounted(async () => { await load(); startIngestionWS() })
+onBeforeUnmount(() => { ingestionWS?.close(); ingestionWS = null })
+</script>

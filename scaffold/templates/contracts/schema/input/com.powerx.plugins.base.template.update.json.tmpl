@@ -3,11 +3,23 @@
   "title": "TemplateUpdateInput",
   "type": "object",
   "properties": {
-    "template_id": { "type": "integer", "minimum": 1, "description": "模板主键 ID。Agent capability payload 统一使用 template_id；REST path {id} 只属于 REST transport。" },
-    "name": { "type": "string" },
-    "description": { "type": "string" },
-    "content": { "type": "string" }
+    "template_uuid": {
+      "type": "string",
+      "description": "UUID",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    }
   },
-  "required": ["template_id"],
+  "required": [
+    "template_uuid"
+  ],
   "additionalProperties": false
 }

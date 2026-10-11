@@ -67,8 +67,11 @@ func RegisterRoutes(router *gin.RouterGroup, deps *app.Deps) {
 	knowledge.GET("/spaces/:spaceID/ingestions", knowledgeHandler.Ingestions)
 	knowledge.GET("/spaces/:spaceID/policy", knowledgeHandler.Policy)
 	knowledge.POST("/search", knowledgeHandler.Search)
+	registerKnowledgeLabRoutes(router, deps)
 
 	agentLifecycle := NewAgentLifecycleHandler(deps)
 	agent := router.Group("/agent-lifecycle")
 	agent.GET("/:agentUUID/health", agentLifecycle.Health)
+	agent.GET("/:agentUUID/health/history", agentLifecycle.HealthHistory)
+	agent.GET("/:agentUUID/bridge/state", agentLifecycle.BridgeState)
 }

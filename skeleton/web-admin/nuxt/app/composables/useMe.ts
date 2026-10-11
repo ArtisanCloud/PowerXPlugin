@@ -1,3 +1,4 @@
+import type { PowerXHostSessionSnapshot } from '@artisan-cloud/plugin-framework-client';
 import { useMeService, useUserContext } from "./api/services/meService";
 
 /**
@@ -10,7 +11,7 @@ export const useMe = () => {
 
   return {
     // 从 meService 获取的方法
-    getUserContext: async (options?: { authToken?: string; tenantUuid?: string }) => {
+    getUserContext: async (options?: { authToken?: string; tenantUuid?: string; hostSnapshot?: PowerXHostSessionSnapshot; signal?: AbortSignal }) => {
       const response = await meService.getMyContext(options);
       return response.data;
     },

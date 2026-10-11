@@ -1,0 +1,93 @@
+package customer
+
+import (
+	"encoding/json"
+	fw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
+	authmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
+	"github.com/gin-gonic/gin"
+	"io"
+	"net/http"
+)
+
+func (h *Handler) ExternalIdentities(c *gin.Context) {
+	fail := func(status int, code string) { contracts.ResponseError(c, status, code, code) }
+	if h.deps == nil {
+		fail(503, "CUSTOMER_IDENTITY_UNAVAILABLE")
+		return
+	}
+	runtime := h.deps.CustomerRuntime
+	switch c.Query("framework_debug_route") {
+	case "local":
+		runtime = h.deps.CustomerIdentityDebugLocal
+	case "delegated":
+		runtime = h.deps.CustomerIdentityDebugDelegated
+	case "":
+	default:
+		fail(400, "CUSTOMER_DEBUG_ROUTE_INVALID")
+		return
+	}
+	if runtime == nil {
+		fail(503, "CUSTOMER_IDENTITY_UNAVAILABLE")
+		return
+	}
+	store, err := runtime.Identities()
+	if err != nil {
+		fail(503, "CUSTOMER_IDENTITY_UNAVAILABLE")
+		return
+	}
+	var body struct {
+		Operation       string                       `json:"operation"`
+		ProviderSubject string                       `json:"provider_subject"`
+		CustomerUUID    string                       `json:"customer_uuid"`
+		Page            int                          `json:"page"`
+		PageSize        int                          `json:"page_size"`
+		Customer        *fw.ExternalIdentityCustomer `json:"customer"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(c.Writer, c.Request.Body, 16384))
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&body); err != nil {
+		fail(400, "CUSTOMER_ACCOUNT_INVALID_ARGUMENT")
+		return
+	}
+	if err = decoder.Decode(&struct{}{}); err != io.EOF {
+		fail(400, "CUSTOMER_ACCOUNT_INVALID_ARGUMENT")
+		return
+	}
+	if (body.Operation == "create_and_bind") != (body.Customer != nil) || (body.Operation != "list_by_customer" && (body.Page != 0 || body.PageSize != 0)) || ((body.Operation == "lookup" || body.Operation == "create_and_bind") && body.CustomerUUID != "") || (body.Operation == "list_by_customer" && body.ProviderSubject != "") {
+		fail(400, "CUSTOMER_ACCOUNT_INVALID_ARGUMENT")
+		return
+	}
+	// Query tenant input is never an authority for identity management.
+	tenant, ok := authmw.TenantUUIDFromContext(c.Request.Context())
+	if !ok {
+		if tc, exists := authmw.GetTenantContext(c); exists {
+			tenant = tc.TenantUUID
+		}
+	}
+	if tenant == "" {
+		fail(400, "CUSTOMER_TENANT_REQUIRED")
+		return
+	}
+	ctx := fw.WithTenantUUID(c.Request.Context(), tenant)
+	var result any
+	switch body.Operation {
+	case "lookup":
+		result, err = store.Lookup(ctx, body.ProviderSubject)
+	case "list_by_customer":
+		result, err = store.ListByCustomer(ctx, body.CustomerUUID, body.Page, body.PageSize)
+	case "bind":
+		result, err = store.Bind(ctx, body.CustomerUUID, body.ProviderSubject)
+	case "create_and_bind":
+		result, err = store.CreateAndBind(ctx, body.ProviderSubject, *body.Customer)
+	default:
+		fail(400, "CUSTOMER_ACCOUNT_INVALID_ARGUMENT")
+		return
+	}
+	if err != nil {
+		err = fw.NormalizeIdentityError(err)
+		fail(fw.HTTPStatus(err), fw.ReasonOf(err))
+		return
+	}
+	contracts.ResponseSuccess(c, result)
+}

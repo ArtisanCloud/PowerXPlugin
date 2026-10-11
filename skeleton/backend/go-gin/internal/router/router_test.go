@@ -34,8 +34,8 @@ func TestBuildJWTInDelegatedProviderMode(t *testing.T) {
 	if jwtCfg.Optional {
 		t.Fatal("expected strict JWT validation when running in delegated provider mode")
 	}
-	if !jwtCfg.AllowSignedContext {
-		t.Fatal("expected signed context to be allowed in delegated provider mode")
+	if jwtCfg.AllowSignedContext {
+		t.Fatal("obsolete signed context must not replace delegated business JWT authentication")
 	}
 	if jwtCfg.Issuer != "powerx-auth" {
 		t.Fatalf("unexpected issuer, got %s", jwtCfg.Issuer)

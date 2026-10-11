@@ -72,6 +72,20 @@ database:
   devMode: false
   healthTimeout: 5s
 
+# 本地知识空间的 pgvector 基础设施。make migrate 会在 local + PostgreSQL 时校验并创建默认表。
+knowledge:
+  mode: "local"
+  delegate_timeout: "3s"
+  require_tenant: true
+  vector_store:
+    driver: "pgvector"
+    pgvector:
+      schema: "public"
+      table: "local_knowledge_vectors_v1_1536"
+      dimensions: 1536
+      enable_migrations: false
+      ivfflat_lists: 100
+
 runtime:
   run_migrate: false
   event_bridge:

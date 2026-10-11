@@ -1,12 +1,16 @@
 package customer
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	contactfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/contracts"
@@ -16,6 +20,8 @@ import (
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	admincommon "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/common"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -50,30 +56,33 @@ type pageResult struct {
 }
 
 type accountDTO struct {
-	ID            uint64    `json:"id"`
-	CustomerUUID  string    `json:"customer_uuid"`
-	TenantUUID    string    `json:"tenant_uuid,omitempty"`
-	PrimaryEmail  string    `json:"primary_email,omitempty"`
-	PrimaryPhone  string    `json:"primary_phone,omitempty"`
-	Email         string    `json:"email,omitempty"`
-	Phone         string    `json:"phone,omitempty"`
-	DisplayName   string    `json:"display_name,omitempty"`
-	Nickname      string    `json:"nickname,omitempty"`
-	GivenName     string    `json:"given_name,omitempty"`
-	FamilyName    string    `json:"family_name,omitempty"`
-	AvatarURL     string    `json:"avatar_url,omitempty"`
-	Locale        string    `json:"locale,omitempty"`
-	Timezone      string    `json:"timezone,omitempty"`
-	Status        string    `json:"status"`
-	EmailVerified bool      `json:"email_verified"`
-	PhoneVerified bool      `json:"phone_verified"`
-	Metadata      any       `json:"metadata,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID                 uint64    `json:"id"`
+	CustomerUUID       string    `json:"customer_uuid"`
+	Type               string    `json:"type"`
+	PrimaryContactUUID string    `json:"primary_contact_uuid,omitempty"`
+	TenantUUID         string    `json:"tenant_uuid,omitempty"`
+	PrimaryEmail       string    `json:"primary_email,omitempty"`
+	PrimaryPhone       string    `json:"primary_phone,omitempty"`
+	Email              string    `json:"email,omitempty"`
+	Phone              string    `json:"phone,omitempty"`
+	DisplayName        string    `json:"display_name,omitempty"`
+	Nickname           string    `json:"nickname,omitempty"`
+	GivenName          string    `json:"given_name,omitempty"`
+	FamilyName         string    `json:"family_name,omitempty"`
+	AvatarURL          string    `json:"avatar_url,omitempty"`
+	Locale             string    `json:"locale,omitempty"`
+	Timezone           string    `json:"timezone,omitempty"`
+	Status             string    `json:"status"`
+	EmailVerified      bool      `json:"email_verified"`
+	PhoneVerified      bool      `json:"phone_verified"`
+	Metadata           any       `json:"metadata,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type createAccountRequest struct {
 	TenantUUID  string         `json:"tenant_uuid"`
+	Type        string         `json:"type"`
 	Email       string         `json:"email"`
 	Phone       string         `json:"phone"`
 	Password    string         `json:"password"`
@@ -150,20 +159,32 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if h.isDelegated() {
-		if h.deps == nil || h.deps.CustomerAdmin == nil {
+	mode, err := h.listAccountsMode(c)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "CUSTOMER_DEBUG_ROUTE_INVALID", "CUSTOMER_DEBUG_ROUTE_INVALID")
+		return
+	}
+	if mode == fwprovider.ModeDelegated {
+		debugSelector := strings.TrimSpace(c.Query("framework_debug_route")) == "delegated"
+		if h.deps == nil || (debugSelector && h.deps.CustomerAccountSelector == nil) || (!debugSelector && h.deps.CustomerAdmin == nil) {
 			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
 			return
 		}
 		query.TenantUUID, _ = admincommon.ResolveTenantUUIDStrict(c, query.TenantUUID)
-		page, err := h.deps.CustomerAdmin.ListAccounts(c.Request.Context(), customerfw.ListAccountsRequest{
+		listRequest := customerfw.ListAccountsRequest{
 			TenantUUID: query.TenantUUID,
 			Query:      query.Query,
 			Status:     query.Status,
 			Page:       query.Page,
 			PageSize:   query.PageSize,
 			RequestID:  requestID(c),
-		})
+		}
+		var page *customerfw.AccountPage
+		if debugSelector {
+			page, err = h.deps.CustomerAccountSelector.ListAccounts(c.Request.Context(), listRequest)
+		} else {
+			page, err = h.deps.CustomerAdmin.ListAccounts(c.Request.Context(), listRequest)
+		}
 		if err != nil {
 			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
 			return
@@ -204,8 +225,39 @@ func (h *Handler) ListAccounts(c *gin.Context) {
 	contracts.ResponseSuccess(c, makePage(items, query, total))
 }
 
+// listAccountsMode is deliberately limited to the Framework Lab's explicit
+// per-request probe. Normal Customer traffic still follows startup ProviderMode.
+func (h *Handler) listAccountsMode(c *gin.Context) (fwprovider.Mode, error) {
+	route := strings.TrimSpace(c.Query("framework_debug_route"))
+	if route == "" || route == "runtime" {
+		if h != nil && h.deps != nil {
+			return h.deps.ProviderMode, nil
+		}
+		return fwprovider.ModeLocal, nil
+	}
+	mode := fwprovider.Mode(route)
+	if mode != fwprovider.ModeLocal && mode != fwprovider.ModeDelegated {
+		return "", fmt.Errorf("invalid framework debug route")
+	}
+	return mode, nil
+}
+
 func (h *Handler) Mode(c *gin.Context) {
-	contracts.ResponseSuccess(c, h.diagnostics())
+	diagnostics := h.diagnostics()
+	authScheme := ""
+	if h != nil && h.deps != nil && h.deps.Config != nil && h.deps.Config.Gateway != nil {
+		authScheme = strings.ToLower(strings.TrimSpace(h.deps.Config.Gateway.AuthScheme))
+	}
+	contracts.ResponseSuccess(c, gin.H{
+		"mode": diagnostics.Mode, "provider": diagnostics.Provider,
+		"delegated_available":         h != nil && h.deps != nil && h.deps.CustomerAccountSelector != nil && h.deps.ContactDebugDelegatedRuntime != nil,
+		"local_available":             diagnostics.LocalAvailable,
+		"gateway_auth_scheme":         authScheme,
+		"account_selector_capability": customerfw.CapabilityCustomerAccountsServiceRead,
+		"account_manage_capability":   customerfw.CapabilityCustomerAccountsServiceManage,
+		"contact_read_capability":     contactfw.CapabilityContactsServiceRead,
+		"contact_manage_capability":   contactfw.CapabilityContactsServiceManage,
+	})
 }
 
 func (h *Handler) diagnostics() admincommon.ProviderDiagnostics {
@@ -220,6 +272,102 @@ func (h *Handler) isDelegated() bool {
 	return h != nil && h.deps != nil && h.deps.ProviderMode == fwprovider.ModeDelegated
 }
 
+// CreateBasicAccount is reserved for the Framework Lab's explicit route probe.
+// It creates a customer profile and tenant membership, without a login identity.
+func (h *Handler) CreateBasicAccount(c *gin.Context) {
+	mode, err := h.listAccountsMode(c)
+	if err != nil || strings.TrimSpace(c.Query("framework_debug_route")) == "" {
+		contracts.ResponseError(c, http.StatusBadRequest, "CUSTOMER_DEBUG_ROUTE_INVALID", "CUSTOMER_DEBUG_ROUTE_INVALID")
+		return
+	}
+	var req customerfw.CreateBasicAccountRequest
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_CREATE_INVALID_BODY")
+		return
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_CREATE_INVALID_BODY")
+		return
+	}
+	req = customerfw.NormalizeBasicAccountLabels(req)
+	if strings.TrimSpace(req.DisplayName) == "" && strings.TrimSpace(req.Nickname) == "" && strings.TrimSpace(req.PrimaryEmail) == "" && strings.TrimSpace(req.PrimaryPhone) == "" {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_IDENTITY_REQUIRED")
+		return
+	}
+	if req.Type != "person" && req.Type != "company" {
+		contracts.ResponseBadRequest(c, "CUSTOMER_TYPE_REQUIRED")
+		return
+	}
+	primary := req.PrimaryContact
+	if primary == nil {
+		if req.Type == "company" {
+			contracts.ResponseBadRequest(c, "CUSTOMER_PRIMARY_CONTACT_REQUIRED")
+			return
+		}
+		primary = &customerfw.PrimaryContactInput{DisplayName: req.DisplayName, GivenName: req.GivenName, FamilyName: req.FamilyName, Email: req.PrimaryEmail, Phone: req.PrimaryPhone}
+	}
+	if strings.TrimSpace(primary.DisplayName) == "" {
+		contracts.ResponseBadRequest(c, "CUSTOMER_PRIMARY_CONTACT_REQUIRED")
+		return
+	}
+	if req.Status != "" && req.Status != customermodel.StatusActive && req.Status != customermodel.StatusPending && req.Status != customermodel.StatusSuspended && req.Status != customermodel.StatusDisabled {
+		contracts.ResponseBadRequest(c, "CUSTOMER_ACCOUNT_STATUS_INVALID")
+		return
+	}
+	tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, "")
+	if mismatch {
+		contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeForbidden, "CUSTOMER_TENANT_MISMATCH")
+		return
+	}
+	if _, err := uuid.Parse(tenantUUID); err != nil {
+		contracts.ResponseBadRequest(c, "CUSTOMER_TENANT_UUID_REQUIRED")
+		return
+	}
+	if mode == fwprovider.ModeDelegated {
+		if h.deps == nil || h.deps.CustomerAccountSelector == nil {
+			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "CUSTOMER_PROVIDER_NOT_CONFIGURED", h.diagnostics())
+			return
+		}
+		req.RequestID = requestID(c)
+		item, err := h.deps.CustomerAccountSelector.CreateBasicAccount(c.Request.Context(), req)
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		contracts.ResponseCreated(c, item)
+		return
+	}
+	if h.db == nil {
+		admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "CUSTOMER_PROVIDER_NOT_CONFIGURED", h.diagnostics())
+		return
+	}
+	status := strings.TrimSpace(req.Status)
+	if status == "" {
+		status = customermodel.StatusActive
+	}
+	primaryContactUUID := uuid.NewString()
+	item := customermodel.CustomerAccount{CustomerUUID: uuid.NewString(), Type: req.Type, PrimaryContactUUID: primaryContactUUID, TenantUuid: tenantUUID, Status: status, PrimaryEmail: strings.TrimSpace(req.PrimaryEmail), PrimaryPhone: strings.TrimSpace(req.PrimaryPhone), DisplayName: strings.TrimSpace(req.DisplayName), Nickname: strings.TrimSpace(req.Nickname), GivenName: strings.TrimSpace(req.GivenName), FamilyName: strings.TrimSpace(req.FamilyName), AvatarURL: strings.TrimSpace(req.AvatarURL), Locale: strings.TrimSpace(req.Locale), Timezone: strings.TrimSpace(req.Timezone), Metadata: datatypes.JSONMap{}}
+	membership := customermodel.CustomerTenantMembership{MembershipUUID: uuid.NewString(), TenantUUID: tenantUUID, CustomerUUID: item.CustomerUUID, PrimaryContactUUID: primaryContactUUID, Status: status, Roles: datatypes.JSON([]byte("[]")), Scopes: datatypes.JSON([]byte("[]")), Source: "local_dev", Metadata: datatypes.JSONMap{}}
+	contact := customermodel.Contact{ContactUUID: primaryContactUUID, TenantUUID: tenantUUID, CustomerUUID: item.CustomerUUID, DisplayName: strings.TrimSpace(primary.DisplayName), GivenName: strings.TrimSpace(primary.GivenName), FamilyName: strings.TrimSpace(primary.FamilyName), Email: strings.TrimSpace(primary.Email), Phone: strings.TrimSpace(primary.Phone), Status: "active", Roles: datatypes.JSON([]byte(`["primary"]`)), Tags: datatypes.JSON([]byte(`[]`)), Metadata: datatypes.JSON([]byte(`{"creation_intent":"explicit_create"}`))}
+	err = h.db.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&item).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&membership).Error; err != nil {
+			return err
+		}
+		return tx.Create(&contact).Error
+	})
+	if err != nil {
+		contracts.ResponseInternalError(c, err)
+		return
+	}
+	contracts.ResponseCreated(c, newAccountDTO(item))
+}
+
 func (h *Handler) CreateAccount(c *gin.Context) {
 	if h.isDelegated() {
 		if h.deps == nil || h.deps.CustomerAdmin == nil {
@@ -231,6 +379,10 @@ func (h *Handler) CreateAccount(c *gin.Context) {
 			contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
 			return
 		}
+		if req.Type != "person" {
+			contracts.ResponseBadRequest(c, "password registration requires type=person")
+			return
+		}
 		tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, req.TenantUUID)
 		if mismatch {
 			contracts.ResponseError(c, http.StatusForbidden, contracts.ErrCodeForbidden, "tenant_uuid mismatch")
@@ -238,6 +390,7 @@ func (h *Handler) CreateAccount(c *gin.Context) {
 		}
 		item, err := h.deps.CustomerAdmin.CreateAccount(c.Request.Context(), customerfw.CreateAccountRequest{
 			TenantUUID:  tenantUUID,
+			Type:        req.Type,
 			Email:       req.Email,
 			Phone:       req.Phone,
 			Password:    req.Password,
@@ -265,6 +418,10 @@ func (h *Handler) CreateAccount(c *gin.Context) {
 	var req createAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		contracts.ResponseBadRequest(c, "invalid body: "+err.Error())
+		return
+	}
+	if req.Type != "person" {
+		contracts.ResponseBadRequest(c, "password registration requires type=person")
 		return
 	}
 	tenantUUID, mismatch := admincommon.ResolveTenantUUIDStrict(c, req.TenantUUID)
@@ -363,7 +520,32 @@ func (h *Handler) GetAccount(c *gin.Context) {
 }
 
 func (h *Handler) UpdateAccount(c *gin.Context) {
-	if h.isDelegated() {
+	mode, err := h.listAccountsMode(c)
+	if err != nil {
+		contracts.ResponseError(c, http.StatusBadRequest, "CUSTOMER_DEBUG_ROUTE_INVALID", "CUSTOMER_DEBUG_ROUTE_INVALID")
+		return
+	}
+	// Debug probes must never substitute the admin-user update contract for a service actor.
+	if strings.TrimSpace(c.Query("framework_debug_route")) != "" && mode == fwprovider.ModeDelegated {
+		if h.deps == nil || h.deps.CustomerAccountSelector == nil {
+			contracts.ResponseError(c, http.StatusServiceUnavailable, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "CUSTOMER_PROVIDER_NOT_CONFIGURED")
+			return
+		}
+		var req customerfw.UpdateBasicAccountRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			contracts.ResponseError(c, http.StatusBadRequest, "CUSTOMER_ACCOUNT_INVALID_ARGUMENT", "CUSTOMER_ACCOUNT_INVALID_ARGUMENT")
+			return
+		}
+		req.CustomerUUID, req.RequestID = strings.TrimSpace(c.Param("customerUUID")), requestID(c)
+		item, err := h.deps.CustomerAccountSelector.UpdateBasicAccount(c.Request.Context(), req)
+		if err != nil {
+			contracts.ResponseError(c, http.StatusBadGateway, "CUSTOMER_GATEWAY_FAILED", err.Error())
+			return
+		}
+		contracts.ResponseSuccess(c, item)
+		return
+	}
+	if mode == fwprovider.ModeDelegated {
 		if h.deps == nil || h.deps.CustomerAdmin == nil {
 			admincommon.ProviderUnavailable(c, "CUSTOMER_PROVIDER_NOT_CONFIGURED", "customer delegated provider is not configured", h.diagnostics())
 			return
@@ -544,26 +726,28 @@ func (h *Handler) findAccount(c *gin.Context, customerUUID string) (customermode
 
 func newAccountDTO(item customermodel.CustomerAccount) accountDTO {
 	return accountDTO{
-		ID:            item.ID,
-		CustomerUUID:  item.CustomerUUID,
-		TenantUUID:    item.TenantUuid,
-		PrimaryEmail:  item.PrimaryEmail,
-		PrimaryPhone:  item.PrimaryPhone,
-		Email:         item.Email,
-		Phone:         item.Phone,
-		DisplayName:   item.DisplayName,
-		Nickname:      item.Nickname,
-		GivenName:     item.GivenName,
-		FamilyName:    item.FamilyName,
-		AvatarURL:     item.AvatarURL,
-		Locale:        item.Locale,
-		Timezone:      item.Timezone,
-		Status:        item.Status,
-		EmailVerified: item.EmailVerified,
-		PhoneVerified: item.PhoneVerified,
-		Metadata:      item.Metadata,
-		CreatedAt:     item.CreatedAt,
-		UpdatedAt:     item.UpdatedAt,
+		ID:                 item.ID,
+		CustomerUUID:       item.CustomerUUID,
+		Type:               item.Type,
+		PrimaryContactUUID: item.PrimaryContactUUID,
+		TenantUUID:         item.TenantUuid,
+		PrimaryEmail:       item.PrimaryEmail,
+		PrimaryPhone:       item.PrimaryPhone,
+		Email:              item.Email,
+		Phone:              item.Phone,
+		DisplayName:        item.DisplayName,
+		Nickname:           item.Nickname,
+		GivenName:          item.GivenName,
+		FamilyName:         item.FamilyName,
+		AvatarURL:          item.AvatarURL,
+		Locale:             item.Locale,
+		Timezone:           item.Timezone,
+		Status:             item.Status,
+		EmailVerified:      item.EmailVerified,
+		PhoneVerified:      item.PhoneVerified,
+		Metadata:           item.Metadata,
+		CreatedAt:          item.CreatedAt,
+		UpdatedAt:          item.UpdatedAt,
 	}
 }
 

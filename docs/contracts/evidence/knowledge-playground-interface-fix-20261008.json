@@ -1,0 +1,44 @@
+{
+  "schema": "powerx.plugin.knowledge.qa-interface-repair/v1",
+  "date": "2026-10-08",
+  "page": "http://127.0.0.1:3131/powerx/knowledge-lab/30a6d654-c4c5-4a33-9806-6d66c6728187/playground",
+  "before": {
+    "plugin_pid": 82692,
+    "started_at": "2026-10-07T15:39:50+08:00",
+    "http_status": 404,
+    "response_body": "404 page not found",
+    "incorrect_ui_code": "KNOWLEDGE_UPSTREAM_DEPENDENCY"
+  },
+  "after": {
+    "plugin_pid": 65141,
+    "http_status": 200,
+    "response": {
+      "data": {
+        "capabilities": {
+          "schema": "powerx.knowledge.semantic-capabilities/v1",
+          "configured": false,
+          "ready": false,
+          "indexed": false,
+          "query_modes": [],
+          "strict_sources": false,
+          "pending_generation": null,
+          "reason_code": "KNOWLEDGE_SEMANTIC_INDEX_NOT_READY"
+        }
+      },
+      "success": true
+    },
+    "readiness_hint_visible": true,
+    "query_disabled": true,
+    "model_binding_changed": false,
+    "vector_index_rebuilt": false
+  },
+  "verification": {
+    "go_runtime_ops": "passed",
+    "go_knowledge_host": "passed",
+    "frontend_tests": 68,
+    "sfc_compile": "passed",
+    "templates_sync": "passed",
+    "diff_check": "passed"
+  },
+  "scope": "Restarted only the authorized plugin backend and repaired error/readiness presentation. Existing Core service was not restarted or modified. Model configuration and vector rebuild remain pending explicit scope authorization. No lexical fallback and no LLM answer generation added."
+}

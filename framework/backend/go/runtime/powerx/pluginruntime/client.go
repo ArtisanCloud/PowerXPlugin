@@ -13,12 +13,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
 type TokenProvider interface {
 	Token(context.Context) (string, error)
 }
+
+type TokenProviderFunc func(context.Context) (string, error)
+
+func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f(ctx) }
 
 type Config struct {
 	BaseURL         string
@@ -125,6 +130,28 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	return c, nil
 }
 
+// NewClientWithTokenProvider reuses the plugin-owned STS flow for tenant
+// runtime calls, so individual Framework modules do not create credentials.
+func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *http.Client) (*Client, error) {
+	if strings.TrimSpace(cfg.BaseURL) == "" {
+		return nil, errors.New("powerx plugin runtime base_url is required")
+	}
+	if provider == nil {
+		return nil, errors.New("powerx plugin runtime token provider is required")
+	}
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	client := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"), tokens: provider}
+	if httpClient != nil {
+		client.http = httpClient
+	} else {
+		client.http = &http.Client{Timeout: timeout}
+	}
+	return client, nil
+}
+
 func (c *Client) ListKnowledgeSpaces(ctx context.Context, input ListKnowledgeSpacesInput) (*ListKnowledgeSpacesOutput, error) {
 	query := url.Values{}
 	if input.Page > 0 {
@@ -209,44 +236,48 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 		req.Header.Set("Content-Type", "application/json")
 	}
 	token, err := c.tokens.Token(ctx)
-	if err != nil {
-		return err
+	if err != nil || strings.TrimSpace(token) == "" {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 503, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
 	defer resp.Body.Close()
 	payload, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return &HTTPError{StatusCode: 502, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return &HTTPError{StatusCode: resp.StatusCode, Body: string(payload)}
+		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(payload, "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"), Body: string(payload)}
 	}
 	if output == nil {
 		return nil
 	}
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
+	if err := hostcontract.DecodeData(payload, output); err != nil {
+		return &HTTPError{StatusCode: 502, ReasonCode: "PLUGIN_RUNTIME_UPSTREAM_DEPENDENCY"}
 	}
-	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return err
-	}
-	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return errors.New("powerx plugin runtime response missing data")
-	}
-	return json.Unmarshal(envelope.Data, output)
+	return nil
 }
 
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("powerx plugin runtime request failed: status=%d", e.StatusCode)
+	return fmt.Sprintf("powerx plugin runtime request failed: reason=%s status=%d", e.ReasonCode, e.StatusCode)
 }
 
 type staticToken string

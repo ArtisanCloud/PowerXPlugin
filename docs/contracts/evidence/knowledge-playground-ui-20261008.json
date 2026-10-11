@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-08",
+  "scope": "Shared Local/PowerX search UI simplification; retrieval contracts unchanged",
+  "powerx_page": "http://127.0.0.1:3131/powerx/knowledge-lab/30a6d654-c4c5-4a33-9806-6d66c6728187/playground",
+  "local_page": "http://127.0.0.1:3131/_p/com.powerx.plugins.base/admin/knowledge/43c06db3-016d-4674-beca-05ce13789fd9/playground",
+  "ui": {
+    "primary_flow": [
+      "question",
+      "search",
+      "excerpts",
+      "source_details"
+    ],
+    "index_settings": "modal",
+    "advanced_settings": "collapsed by default",
+    "result_scores_sources_generations_trace": "collapsed by default",
+    "snippet_expand_collapse_verified": true,
+    "open_close_settings_preserves_question_and_five_results": true,
+    "uuid_absent_from_default_visible_content": true,
+    "example_only_fills_question": true,
+    "default_mode": "semantic",
+    "default_top_k": 5,
+    "default_require_generation": true,
+    "layout_checked_widths": [
+      1435,
+      1024
+    ],
+    "workspace_horizontal_overflow": false,
+    "console_errors_or_warnings": 0
+  },
+  "retrieval": [
+    {
+      "mode": "semantic",
+      "query": "插件在独立运行时和安装到 PowerX 中时，应如何选择 Local 或 Delegated 模式？",
+      "status": 200,
+      "count": 5,
+      "top_title": "framework-provider-mode",
+      "trace_id": "f1c5fd5f-c382-415b-bc3f-0fd4aae9abc9",
+      "request_id": "7ecc032d-4160-4a3d-9e43-34a1969cb67b"
+    },
+    {
+      "mode": "hybrid",
+      "query": "插件安装到 PowerX 宿主后，如何让管理页面以全屏方式展示，需要调整哪些接入配置？",
+      "status": 200,
+      "count": 5,
+      "top_title": "framework-host-fullscreen",
+      "trace_id": "303bc674-90a6-4604-b061-cee8e145f2e8",
+      "request_id": "3d57079b-84ee-4ffd-9fed-fb5f590d112d"
+    },
+    {
+      "provider": "plugin_local",
+      "query": "PowerX",
+      "status": 200,
+      "count": 5,
+      "top_title": "README",
+      "route": "/admin/runtime/knowledge/search"
+    }
+  ],
+  "powerx_request_contract": {
+    "schema": "powerx.knowledge.retrieval-query/v1",
+    "top_k": 5,
+    "filters": {
+      "document_uuids": [],
+      "category_codes": [],
+      "tag_uuids": [],
+      "artifact_roles": []
+    },
+    "required_generations": {
+      "30a6d654-c4c5-4a33-9806-6d66c6728187": "6aaa1cae-0670-4317-b6b6-0dc963fce17f"
+    }
+  },
+  "validation": {
+    "unit_tests": 71,
+    "unit_test_files": 14,
+    "knowledge_sfc_compilation": 17,
+    "zh_en_locale_literal_key_parity": "passed",
+    "knowledge_scoped_template_check": "passed",
+    "git_diff_check": "passed",
+    "repository_template_check": "only existing AGENTS.md template drift: scaffold/templates/AGENTS.md.tmpl and tools/cli/internal/templates/data/AGENTS.md.tmpl"
+  },
+  "boundaries": {
+    "core_code_config_or_documents_changed": false,
+    "services_restarted": false,
+    "llm_answer_generation_added": false,
+    "semantic_fallback_added": false,
+    "model_configuration_visibility_rebuild_actions_executed": false,
+    "ingestion_scope_resumed": false,
+    "this_turn_source_range_database_reverification": false
+  }
+}

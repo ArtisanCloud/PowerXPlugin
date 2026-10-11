@@ -7,7 +7,8 @@
         @dismiss="handleDelegatedDismiss"
       />
     </div>
-    <slot />
+    <slot v-if="!insidePowerX || auth.isAuthenticated.value" />
+    <p v-else-if="!showDelegatedBanner" class="p-4 text-gray-600 dark:text-slate-200">{{ t('hostSession.loading') }}</p>
   </div>
   <div v-else class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- 顶部导航栏 - 根据环境变量控制显示 -->
@@ -27,15 +28,16 @@
           @retry="handleDelegatedRetry"
           @dismiss="handleDelegatedDismiss"
         />
-        <slot />
+        <slot v-if="!insidePowerX || auth.isAuthenticated.value" />
+    <p v-else-if="!showDelegatedBanner" class="p-4 text-gray-600 dark:text-slate-200">{{ t('hostSession.loading') }}</p>
       </main>
     </div>
   </div>
 </template>
 
 <script setup>
-import { watch } from "vue";
-import { setupHostBridgeAdapter } from "~/composables/useHostBridgeAdapter";
+
+import { isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client';
 import { useTheme } from "~/composables/useTheme";
 import { PLUGIN_ID, isPluginAdminPath } from "~/utils/powerx-bridge";
 import { useAuth } from "~/composables/useAuth";
@@ -43,6 +45,7 @@ import DelegatedAuthBanner from "~/components/DelegatedAuthBanner.vue";
 import { createFrameworkLogger } from "@artisan-cloud/plugin-framework-client";
 
 // 获取运行时配置
+const { t } = useI18n();
 const runtimeConfig = useRuntimeConfig();
 const route = useRoute();
 const theme = useTheme();
@@ -59,7 +62,7 @@ const disableShell = computed(() => {
 // 是否处于 PowerX 宿主的插件嵌入路径下
 const insidePowerX = computed(() => {
   const value = runtimeConfig.public.insidePowerX;
-  return value === true || value === 'true';
+  return isPowerXEmbedded(value);
 });
 
 const isEmbeddedInPowerX = computed(() => {
@@ -104,90 +107,8 @@ const showDelegatedBanner = computed(
   () => insidePowerX.value && Boolean(delegatedBannerMessage.value)
 );
 
-const requestHostToken = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    window.parent?.postMessage(
-      {
-        source: "powerx-plugin",
-        type: "auth-token:request",
-        pluginId: PLUGIN_ID,
-        instanceId:
-          typeof route.query.instanceId === "string"
-            ? route.query.instanceId
-            : route.fullPath,
-      },
-      "*"
-    );
-  } catch (error) {
-    logger.warn("failed to request auth token", { error: String(error) });
-  }
+const handleDelegatedRetry = async () => {
+  try { await auth.restoreFromStorage(); } catch { /* Auth composable exposes the error banner. */ }
 };
-
-const handleDelegatedRetry = () => {
-  auth.restoreFromStorage?.();
-  requestHostToken();
-};
-
-const handleDelegatedDismiss = () => {
-  auth.clearDelegatedError?.();
-};
-
-const getAdapterRegistry = (win) => {
-  if (!win.__PX_ADAPTERS__) {
-    win.__PX_ADAPTERS__ = {};
-  }
-  return win.__PX_ADAPTERS__;
-};
-
-const mountBridgeIfNeeded = () => {
-  if (!import.meta.client) {
-    return;
-  }
-
-  const win = window;
-  if (!isEmbeddedInPowerX.value) {
-    return;
-  }
-
-  try {
-    theme.initTheme?.();
-  } catch {}
-
-  const pluginId = typeof route.query.pluginId === "string" ? route.query.pluginId : PLUGIN_ID;
-  const instanceId = typeof route.query.instanceId === "string" ? route.query.instanceId : route.fullPath;
-  const registry = getAdapterRegistry(win);
-  const adapterKey = `${pluginId}::${instanceId}`;
-
-  if (registry[adapterKey]) {
-    logger.info("adapter already mounted, reuse existing instance", { pluginId, instanceId });
-    return;
-  }
-
-  const { bridge } = setupHostBridgeAdapter({
-    pluginId,
-    instanceId,
-  });
-
-  bridge.start?.();
-  logger.info("adapter mounted", { pluginId, instanceId });
-  registry[adapterKey] = { bridge };
-  win.__PX_ADAPTER_BOUND__ = true;
-  win.__PX_ADAPTER__ = registry[adapterKey];
-  logger.info("host bridge adapter mounted", { pluginId, instanceId });
-};
-
-if (import.meta.client) {
-  watch(
-    () => isEmbeddedInPowerX.value,
-    (value) => {
-      if (value) {
-        mountBridgeIfNeeded();
-      }
-    },
-    { immediate: true }
-  );
-}
+const handleDelegatedDismiss = () => auth.clearDelegatedError?.();
 </script>

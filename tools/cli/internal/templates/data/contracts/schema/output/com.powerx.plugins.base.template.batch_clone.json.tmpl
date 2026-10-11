@@ -3,9 +3,12 @@
   "title": "TemplateBatchCloneOutput",
   "type": "object",
   "properties": {
-    "created_ids": {
+    "created_uuids": {
       "type": "array",
-      "items": { "type": "integer", "minimum": 1 },
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      },
       "description": "成功克隆出的模板 ID 列表。"
     },
     "failed": {
@@ -13,15 +16,26 @@
       "items": {
         "type": "object",
         "properties": {
-          "source_id": { "type": "integer", "minimum": 1 },
-          "reason": { "type": "string" }
+          "source_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
         },
-        "required": ["source_id", "reason"],
+        "required": [
+          "source_uuid",
+          "reason"
+        ],
         "additionalProperties": false
       },
       "description": "失败的模板 ID 以及原因。"
     }
   },
-  "required": ["created_ids", "failed"],
+  "required": [
+    "created_uuids",
+    "failed"
+  ],
   "additionalProperties": false
 }

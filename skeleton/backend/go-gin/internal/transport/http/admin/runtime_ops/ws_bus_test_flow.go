@@ -16,6 +16,7 @@ type wsBusTestFlowRequest struct {
 	Topic      string `json:"topic"`
 	TraceID    string `json:"trace_id"`
 	ForceLocal bool   `json:"force_local"`
+	ForceHost  bool   `json:"force_host"`
 	MemberUUID string `json:"member_uuid"`
 	Payload    any    `json:"payload"`
 }
@@ -45,6 +46,10 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 			contracts.ResponseBadRequest(c, "topic is required")
 			return
 		}
+		if req.ForceLocal && req.ForceHost {
+			contracts.ResponseBadRequest(c, "force_local and force_host cannot both be enabled")
+			return
+		}
 		traceID := strings.TrimSpace(req.TraceID)
 		if traceID == "" {
 			traceID = strings.TrimSpace(c.GetHeader("X-Request-ID"))
@@ -52,14 +57,20 @@ func WSBusTestFlowHandler(deps *app.Deps) gin.HandlerFunc {
 		if traceID == "" {
 			traceID = "ws-bus-flow-" + time.Now().UTC().Format("20060102T150405.000Z")
 		}
-		if !allowWSBusPublish(c, deps, topic, tenantUUID, req.MemberUUID, traceID) {
-			return
-		}
-
 		outboundBearer := ""
-		hostCfg, useHost := resolveWSBusHostClientConfig(deps)
+		hostCfg, useHost := resolveWSBusHostClientConfigForTest(deps, req.ForceHost)
 		if req.ForceLocal {
 			useHost = false
+		}
+		if req.ForceHost && !useHost {
+			contracts.ResponseServiceUnavailable(c, "powerx host ws bus is not configured", nil)
+			return
+		}
+		// Plugin events.yaml governs only plugin-local topics. A forced Host
+		// diagnostic is authorized by the Host catalog instead and must not be
+		// rejected because a PowerX-owned topic is absent from this plugin.
+		if !useHost && !allowWSBusPublish(c, deps, topic, tenantUUID, req.MemberUUID, traceID) {
+			return
 		}
 		if useHost {
 			outboundBearer = resolveGatewayBearerToken(c, deps)

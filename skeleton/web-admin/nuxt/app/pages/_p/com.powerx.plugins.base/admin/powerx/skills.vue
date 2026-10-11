@@ -124,7 +124,7 @@ const form = reactive({
     required: ["action"],
     properties: {
       action: { type: "string", enum: ["create", "get", "update", "delete", "list"] },
-      template_id: { type: "string" },
+      template_uuid: { type: "string", format: "uuid" },
       template: { type: "object" }
     }
   }, null, 2)

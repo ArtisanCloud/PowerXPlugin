@@ -87,7 +87,7 @@ func resolveSchedulerFacade(deps *app.Deps) fwscheduler.Scheduler {
 }
 
 func resolveHostSchedulerFacade(deps *app.Deps) fwscheduler.Scheduler {
-	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil || !schedulerHostLinkEnabled(deps) {
+	if deps == nil || deps.Config == nil || deps.Config.Gateway == nil {
 		return fwscheduler.NewHostProvider(fwscheduler.HostProviderConfig{}, nil)
 	}
 	cfg := resolveSchedulerHostProviderConfig(deps)

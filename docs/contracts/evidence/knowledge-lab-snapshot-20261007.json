@@ -1,0 +1,136 @@
+{
+  "schema": "powerx.plugin.knowledge.snapshot-browser-acceptance/v1",
+  "page": "http://127.0.0.1:3131/powerx/knowledge-lab/11ceff5f-c6eb-4194-a024-2ade98e5d763/ingestion",
+  "mode": "local+proxy",
+  "scope": "Plugin browser using server-side API Key; Framework STS transport covered by contract tests, not a new live plugin STS exchange.",
+  "documents": [
+    {
+      "name": "plugin-snapshot-20261007-one.md",
+      "job_uuid": "4baa0100-aa2c-4f11-8ae6-73bf50cb7827",
+      "submit_status": 202,
+      "job_status": 200,
+      "status": "succeeded",
+      "chunk_read_status": 200,
+      "chunk_lengths": [
+        640,
+        640,
+        640,
+        320
+      ],
+      "adjacent_overlap_80": [
+        true,
+        true,
+        true
+      ],
+      "snapshot_checksum": "b2f07e75e4cb95b8cca7e8e924ac372031512809e48eab7ec0544aecac6ba6ec",
+      "trace_id": "2a05115a-8c2e-4517-94c6-e294d35b2098"
+    },
+    {
+      "name": "plugin-snapshot-20261007-two.txt",
+      "job_uuid": "aa4f87f3-839c-4d13-9012-a5d7d8177503",
+      "submit_status": 202,
+      "job_status": 200,
+      "status": "succeeded",
+      "chunk_read_status": 200,
+      "chunk_lengths": [
+        640,
+        640,
+        640,
+        320
+      ],
+      "adjacent_overlap_80": [
+        true,
+        true,
+        true
+      ],
+      "snapshot_checksum": "471f88bac65c0f05caae35b5904068ffe26f64d86bdb5adb5b2be0eb38771c6c",
+      "trace_id": "038b242f-4644-4a06-842a-59a97806e4e7"
+    }
+  ],
+  "requested_config": {
+    "schema": "powerx.knowledge.document-ingestion/v1",
+    "priority": "normal",
+    "segment_mode": "unit",
+    "segment_size_policy": "cap",
+    "chunk_size": 640,
+    "chunk_overlap": 80,
+    "segment_order": [
+      "page",
+      "segment",
+      "separator",
+      "size"
+    ],
+    "separators": [],
+    "page_priority": false,
+    "anchor_heading_path": false,
+    "anchor_clause_id": false,
+    "anchor_row_number": false,
+    "anchor_speaker": false,
+    "anchor_sentence_index": false
+  },
+  "effective_index_mode": "lexical_chunks",
+  "effective_length_unit": "unicode_rune",
+  "effective_ingestion_profile": {
+    "key": "p0_basic",
+    "version": 1
+  },
+  "search": {
+    "query": "snapshot20261007",
+    "status": 200,
+    "matched_document_titles": [
+      "plugin-snapshot-20261007-one",
+      "plugin-snapshot-20261007-two"
+    ]
+  },
+  "local_knowledge_requests": 0,
+  "fixture_policy": "Generated nonsensitive test documents retained in test-base-space; no automatic deletion. No credentials, tokens or request headers recorded.",
+  "recheck": {
+    "core_health": {
+      "endpoint": "http://127.0.0.1:8077/healthz",
+      "status": 200,
+      "pid": 11316
+    },
+    "local_visual_regression": {
+      "page": "http://127.0.0.1:3131/_p/com.powerx.plugins.base/admin/knowledge/43c06db3-016d-4674-beca-05ce13789fd9/ingestion",
+      "selected_files": 2,
+      "steps_completed": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "submit_enabled": true,
+      "progress_values": [
+        0,
+        0,
+        0
+      ],
+      "progress_max": 100,
+      "indicator_transform": "translateX(-100%)",
+      "local_api_only": true,
+      "documents_submitted": 0
+    },
+    "powerx_readback": {
+      "job_statuses": [
+        "succeeded",
+        "succeeded"
+      ],
+      "chunk_read_http_statuses": [
+        200,
+        200
+      ],
+      "chunk_lengths_per_document": [
+        640,
+        640,
+        640,
+        320
+      ]
+    },
+    "checks": {
+      "frontend_unit_tests": 51,
+      "sfc_compile": true,
+      "templates_sync": true,
+      "diff_check": true
+    }
+  }
+}

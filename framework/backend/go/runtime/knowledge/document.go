@@ -3,8 +3,9 @@ package knowledge
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func ValidateDocument(document KnowledgeDocument) (KnowledgeDocument, error) {
@@ -26,7 +27,7 @@ func ValidateDocument(document KnowledgeDocument) (KnowledgeDocument, error) {
 func CompletedIndexJob(operation string, document KnowledgeDocument) *KnowledgeIndexJob {
 	now := time.Now().UTC()
 	return &KnowledgeIndexJob{
-		JobID:      strings.Join(trimStrings([]string{operation, document.SpaceID, document.DocumentID, document.Version}), ":"),
+		JobID:      uuid.NewString(),
 		SpaceID:    document.SpaceID,
 		DocumentID: document.DocumentID,
 		Operation:  operation,

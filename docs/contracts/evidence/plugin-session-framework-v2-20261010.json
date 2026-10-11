@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-10",
+  "scope": "frontend_framework_skeleton_generated_templates",
+  "client_version": "0.0.11",
+  "npm_published": false,
+  "checks": [
+    {
+      "command": "npm run test:unit",
+      "cwd": "skeleton/web-admin/nuxt",
+      "exit_code": 0,
+      "files": 19,
+      "tests": 168
+    },
+    {
+      "command": "npm run build",
+      "cwd": "skeleton/web-admin/nuxt",
+      "exit_code": 0,
+      "artifact": "skeleton/web-admin/nuxt/.output",
+      "log": "/tmp/powerx-bridge-v2-build-20261010.log",
+      "verification_scope": "bridge_v2_before_identity_error_classification_changes",
+      "rerun_for_identity_error_classification": false
+    },
+    {
+      "command": "tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --lib ES2022,DOM,DOM.Iterable --skipLibCheck framework/frontend/nuxt/framework-client/index.ts",
+      "exit_code": 0
+    },
+    {
+      "command": "node scripts/sync-templates.mjs --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "GOWORK=off go test ./internal/templates",
+      "cwd": "tools/cli",
+      "exit_code": 0
+    },
+    {
+      "command": "GOWORK=off go test ./internal/templates ./cmd",
+      "cwd": "tools/cli",
+      "exit_code": 1,
+      "limitation": "existing_cli_go_sum_missing_pgx_v5_7_6_go_mod"
+    },
+    {
+      "command": "go test -mod=mod -modfile=<temporary-copy-with-absolute-replaces> ./cmd",
+      "cwd": "tools/cli",
+      "exit_code": 0,
+      "repository_go_mod_sum_changed": false
+    }
+  ],
+  "core_fixture": {
+    "source": "PowerX/web-admin/public/powerx-bridge-client.js",
+    "protocol_version": 2,
+    "date": "2026-10-10",
+    "sha256": "502d943cb15a91bb5abbc4289aebde72429cced4fecb9321df4ef6d46ef452a3",
+    "usage": "contract_interoperability_fixture_not_live_browser_acceptance"
+  },
+  "browser_acceptance": {
+    "status": "deferred_by_user",
+    "tools": [
+      "cua_nodeRepl_fetch_failed",
+      "chrome_profile_already_running"
+    ],
+    "real_browser_cases_completed": 0
+  },
+  "long_running_services_started": [],
+  "backend_sts_api_key_capability_changes": false,
+  "version_declaration_only": true,
+  "dependency_mode": {
+    "go": "local_replace",
+    "frontend_client": "file:../../../framework/frontend/nuxt/framework-client"
+  },
+  "release_preparation_withdrawn": true,
+  "identity_context_alignment": {
+    "frontend_error_classification": "implemented",
+    "browser_identity_header_removed": true,
+    "native_http_body_trace_preserved": true,
+    "skeleton_scaffold_cli_synced": true,
+    "core_contract_status": "draft_pending_review",
+    "core_resolve_request_identity_implementation_found": false,
+    "backend_audience_root_cause_fixed": false,
+    "backend_typed_ticket_client": "waiting_for_formal_core_contract_and_implementation",
+    "real_api_key_sts_ticket_acceptance": "not_run"
+  }
+}

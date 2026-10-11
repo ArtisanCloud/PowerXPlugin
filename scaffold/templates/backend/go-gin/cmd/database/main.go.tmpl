@@ -53,7 +53,7 @@ func main() {
 
 	switch cmd {
 	case "migrate":
-		if err := migrate.MigratePluginModels(ctx, db, includeIAM); err != nil {
+		if err := migrate.MigratePluginModelsWithConfig(ctx, db, cfg, includeIAM); err != nil {
 			log.Fatal("migrate failed:", err)
 		}
 		fmt.Println("migrate ok")
@@ -70,7 +70,7 @@ func main() {
 		fmt.Println("seed ok")
 
 	case "setup":
-		if err := migrate.MigratePluginModels(ctx, db, includeIAM); err != nil {
+		if err := migrate.MigratePluginModelsWithConfig(ctx, db, cfg, includeIAM); err != nil {
 			log.Fatal("migrate failed:", err)
 		}
 		fmt.Println("migrate ok")
@@ -93,7 +93,7 @@ func main() {
 		fmt.Println("reset ok")
 
 		// 再 migrate
-		if err := migrate.MigratePluginModels(ctx, db, includeIAM); err != nil {
+		if err := migrate.MigratePluginModelsWithConfig(ctx, db, cfg, includeIAM); err != nil {
 			log.Fatal("migrate failed:", err)
 		}
 		fmt.Println("migrate ok")

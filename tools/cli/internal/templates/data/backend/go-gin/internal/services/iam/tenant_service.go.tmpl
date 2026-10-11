@@ -287,6 +287,23 @@ func (s *TenantService) Update(ctx context.Context, id uint64, input UpdateTenan
 	return &tenant, nil
 }
 
+// UpdateByUUID is the UUID-only business boundary for tenant administration.
+// Numeric primary keys remain internal to the persistence implementation.
+func (s *TenantService) UpdateByUUID(ctx context.Context, tenantUUID string, input UpdateTenantInput) (*iamm.Tenant, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("iam: tenant service unavailable")
+	}
+	tenantUUID = strings.TrimSpace(tenantUUID)
+	if tenantUUID == "" {
+		return nil, ErrTenantRequired
+	}
+	var tenant iamm.Tenant
+	if err := s.db.WithContext(ctx).Where("uuid = ?", tenantUUID).First(&tenant).Error; err != nil {
+		return nil, err
+	}
+	return s.Update(ctx, tenant.ID, input)
+}
+
 func normalizeTenantStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "", iamm.StatusActive:

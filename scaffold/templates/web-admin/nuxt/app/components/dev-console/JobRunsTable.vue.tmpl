@@ -18,21 +18,21 @@
 
     <UTable :rows="runs" :columns="columns" :loading="loading">
       <template #created_at-cell="{ row }">
-        {{ `{{ formatDate(row.created_at) }}` }}
+        {{ "{{ formatDate(row.created_at) }}" }}
       </template>
       <template #status-cell="{ row }">
-        <UBadge :color="statusColor(row.status)">{{ `{{ formatStatus(row.status) }}` }}</UBadge>
+        <UBadge :color="statusColor(row.status)">{{ "{{\n          formatStatus(row.status)\n        }}" }}</UBadge>
       </template>
       <template #scope-cell="{ row }">
         <span>
-          {{ `{{ row.safe_op.scope_type || "-" }}` }}
+          {{ "{{ row.safe_op.scope_type || \"-\" }}" }}
           <template v-if="row.safe_op.scope_ref">
-            :{{ `{{ row.safe_op.scope_ref }}` }}
+            :{{ "{{ row.safe_op.scope_ref }}" }}
           </template>
         </span>
       </template>
       <template #message-cell="{ row }">
-        {{ `{{ row.message || "-" }}` }}
+        {{ "{{ row.message || \"-\" }}" }}
       </template>
       <template #actions-cell="{ row }">
         <UButton

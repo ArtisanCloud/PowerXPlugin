@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-09",
+  "scope": "Shared knowledge content guidance and Core handoff requirements",
+  "implemented": [
+    "shared article directory modal",
+    "exact Local source previews limited to 320 Unicode codepoints",
+    "source-bound suggested-question rendering",
+    "localized ask-about-article action",
+    "question fill without automatic retrieval",
+    "explicit directory error and retry",
+    "old-space response suppression",
+    "corpus-generation validation",
+    "explicit pagination validation",
+    "prevent question replacement during active retrieval"
+  ],
+  "local_source": "Existing authorized admin/local-knowledge/spaces/:uuid/documents API; titles and content fields verified in handler source",
+  "powerx_status": "contentOverview accessor not enabled; formal Core Host directory/read contract absent",
+  "core_requirements": "docs/contracts/knowledge-content-overview-core-requirements.md",
+  "validation": {
+    "unit_tests": 80,
+    "unit_test_files": 15,
+    "knowledge_sfc_compiled": 18,
+    "zh_en_locale_keys": "passed",
+    "scoped_templates": "both targets match",
+    "git_diff_check": "passed",
+    "live_nuxt_component_module": {
+      "status": 200,
+      "content_type": "text/javascript",
+      "compiled_vue_template": true
+    }
+  },
+  "not_verified": [
+    "real browser UI acceptance",
+    "real Local directory browser acceptance",
+    "PowerX content overview data acceptance"
+  ],
+  "browser_blocker": "Chrome DevTools profile already in use; selected Chrome extension API connection failed. No browser or user service was stopped.",
+  "repository_template_check": "Existing AGENTS.md template drift only: scaffold/templates/AGENTS.md.tmpl and tools/cli/internal/templates/data/AGENTS.md.tmpl",
+  "ownership": {
+    "core_modified": false,
+    "database_modified": false,
+    "services_started": false,
+    "services_restarted": false,
+    "fallback_added": false,
+    "sample_documents_hardcoded": false,
+    "core_wire_contract_invented_or_enabled": false
+  }
+}

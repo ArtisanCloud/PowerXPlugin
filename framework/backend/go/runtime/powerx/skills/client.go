@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
@@ -56,11 +57,12 @@ func (f TokenProviderFunc) Token(ctx context.Context) (string, error) { return f
 // authorization or validation failure as a transport success.
 type HTTPError struct {
 	StatusCode int
+	ReasonCode string
 	Body       string
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("powerx skills request failed: status=%d", e.StatusCode)
+	return fmt.Sprintf("powerx skills request failed: reason=%s status=%d", e.ReasonCode, e.StatusCode)
 }
 
 func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
@@ -131,34 +133,34 @@ func (c *Client) Invoke(ctx context.Context, in InvokeInput) (*InvokeOutput, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	token, err := c.token(ctx)
-	if err != nil {
-		return nil, err
+	if err != nil || strings.TrimSpace(token) == "" {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, &HTTPError{StatusCode: 503, ReasonCode: "SKILL_UPSTREAM_DEPENDENCY"}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, &HTTPError{StatusCode: 503, ReasonCode: "SKILL_UPSTREAM_DEPENDENCY"}
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, &HTTPError{StatusCode: 502, ReasonCode: "SKILL_UPSTREAM_DEPENDENCY"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, &HTTPError{StatusCode: resp.StatusCode, Body: string(body)}
-	}
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return nil, err
-	}
-	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return nil, errors.New("powerx skills response missing data")
+		return nil, &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(body, "SKILL_UPSTREAM_DEPENDENCY"), Body: string(body)}
 	}
 	var out InvokeOutput
-	if err := json.Unmarshal(envelope.Data, &out); err != nil {
-		return nil, err
+	if err := hostcontract.DecodeData(body, &out); err != nil {
+		return nil, &HTTPError{StatusCode: 502, ReasonCode: "SKILL_UPSTREAM_DEPENDENCY"}
 	}
 	return &out, nil
 }

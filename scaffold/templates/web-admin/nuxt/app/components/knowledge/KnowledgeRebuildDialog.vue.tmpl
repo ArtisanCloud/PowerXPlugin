@@ -1,0 +1,92 @@
+<template>
+  <UModal v-model:open="open" :title="t(documentUUID ? 'knowledgeLab.workspace.rebuild.document' : 'knowledgeLab.workspace.rebuild.space')" :description="title || t('knowledgeLab.workspace.rebuild.description')" :ui="{ content: 'max-w-2xl w-full' }">
+    <template #body><div class="space-y-5 text-gray-900 dark:text-slate-100">
+      <UAlert color="info" variant="soft" :description="t(documentUUID ? 'knowledgeLab.workspace.rebuild.documentScope' : 'knowledgeLab.workspace.rebuild.spaceScope')" />
+      <UAlert v-if="error" color="error" variant="soft" :description="error" />
+      <UFormField :label="t('knowledgeLab.workspace.rebuild.mode')"><USelect v-model="mode" :items="modeItems" :disabled="busy" class="w-full" /></UFormField>
+      <p class="text-sm text-gray-600 dark:text-slate-300">{{ "{{ t(mode === 'reuse_snapshot' ? 'knowledgeLab.workspace.rebuild.reuseHint' : 'knowledgeLab.workspace.rebuild.applyHint') }}" }}</p>
+      <div v-if="mode === 'apply_config'" class="grid gap-4 sm:grid-cols-2">
+        <UFormField :label="t('knowledgeSemantic.indexMode')"><USelect v-model="indexMode" :items="indexItems" :disabled="busy || !ready" class="w-full" /></UFormField>
+        <UFormField v-if="indexMode!=='lexical_chunks'" :label="t('knowledgeSemantic.modelGeneration')"><USelect v-model="generationChoice" :items="generationItems" :disabled="busy" class="w-full" /></UFormField>
+        <UFormField v-if="indexMode!=='lexical_chunks'" :label="t('knowledgeSemantic.artifactRoles')"><USelectMenu v-model="artifactRoles" multiple :items="roleItems" value-key="value" :portal="false" :disabled="busy" class="w-full" /></UFormField>
+        <p v-if="generationChoice==='pending'" class="text-sm sm:col-span-2">{{ "{{ t('knowledgeSemantic.pendingRebuildHint') }}" }}</p>
+
+        <UFormField :label="t('knowledgeSpaces.ingestion.priority')"><USelect v-model="settings.priority" :items="priorityItems" :disabled="busy || !ready" class="w-full" /></UFormField>
+        <UFormField :label="t('knowledgeSpaces.ingestion.segmentMode')"><USelect v-model="settings.segment_mode" :items="modeOptions" :disabled="busy || !ready" class="w-full" /></UFormField>
+        <UFormField :label="t('knowledgeSpaces.ingestion.segmentSizePolicy')"><USelect v-model="settings.segment_size_policy" :items="policyItems" :disabled="busy || !ready" class="w-full" /></UFormField>
+        <UFormField :label="t('knowledgeSpaces.ingestion.chunkSize')"><UInput v-model.number="settings.chunk_size" type="number" :disabled="busy || !ready" class="w-full" /></UFormField>
+        <UFormField :label="t('knowledgeSpaces.ingestion.chunkOverlap')"><UInput v-model.number="settings.chunk_overlap" type="number" :disabled="busy || !ready" class="w-full" /></UFormField>
+        <UCheckbox v-for="field in anchorFields" :key="field.key" v-model="settings[field.key]" :label="t(field.label)" :disabled="busy || !ready || !settings[field.key] && !anchorSupported(field.key)" />
+      </div>
+      <p class="text-sm text-gray-600 dark:text-slate-300">{{ "{{ t('knowledgeLab.workspace.rebuild.indexHint') }}" }}</p>
+    </div></template>
+    <template #footer><div class="flex w-full justify-end gap-3"><UButton color="neutral" variant="soft" :disabled="busy" @click="open = false">{{ "{{ t('common.cancel') }}" }}</UButton><UButton :loading="busy" :disabled="!canSubmit" @click="submit">{{ "{{ t('knowledgeLab.workspace.rebuild.submit') }}" }}</UButton></div></template>
+  </UModal>
+</template>
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import type {SemanticCapabilities,SemanticIndexing,ArtifactRole} from '~/composables/api/knowledgeSemanticTypes'
+import { useKnowledgeWorkspace } from '~/composables/api/useKnowledgeWorkspace'
+import { documentIngestionSchema, type HostIngestionSettings, type HostIngestionSnapshot, type HostIndexJob, type HostRebuildRequest } from '~/composables/api/knowledgeHostTypes'
+const props = defineProps<{ spaceUUID: string; documentUUID?: string; title?: string; snapshot?: HostIngestionSnapshot }>()
+const open = defineModel<boolean>('open', { default: false })
+const emit = defineEmits<{ submitted: [HostIndexJob] }>()
+const { t } = useI18n()
+const workspace = useKnowledgeWorkspace()
+const mode = ref<'reuse_snapshot' | 'apply_config'>('reuse_snapshot')
+const semanticState=ref<SemanticCapabilities>()
+const indexMode=ref<'lexical_chunks'|'semantic'|'hybrid'>('lexical_chunks')
+const generationChoice=ref<'active'|'pending'>('active')
+const artifactRoles=ref<ArtifactRole[]>(['source_chunk'])
+const generation=computed(()=>generationChoice.value==='pending'?semanticState.value?.pending_generation:semanticState.value?.generation)
+const indexItems=computed(()=>['lexical_chunks','semantic','hybrid'].map(value=>({value,label:t(`knowledgeSemantic.modes.${value}`),disabled:value==='lexical_chunks'&&Boolean(props.snapshot?.indexing||!props.documentUUID&&semanticState.value?.indexed)||value!=='lexical_chunks'&&!semanticState.value?.ready})))
+const generationItems=computed(()=>[{value:'active',label:t('knowledgeSemantic.activeModel')},{value:'pending',label:t('knowledgeSemantic.pendingChoice'),disabled:!semanticState.value?.pending_generation}])
+const roleItems=computed(()=>(semanticState.value?.artifact_roles||[]).map(value=>({value,label:t(`knowledgeSemantic.roles.${value}`)})))
+const indexingReady=computed(()=>indexMode.value==='lexical_chunks'? !props.snapshot?.indexing : semanticState.value?.ready&&generation.value&&artifactRoles.value.length>0)
+function indexing():SemanticIndexing|undefined {return indexMode.value==='lexical_chunks'||!generation.value?undefined:{mode:indexMode.value,embedding_profile:generation.value.embedding_profile,artifact_roles:[...artifactRoles.value]}}
+const settings = ref<HostIngestionSettings>({schema:documentIngestionSchema})
+const busy = ref(false); const ready = ref(false); const error = ref('')
+let idempotencyKey = ''; let lastBody = ''
+const modeItems = computed(() => ['reuse_snapshot','apply_config'].map(value=>({value,label:t(`knowledgeLab.workspace.rebuild.${value}`)})))
+const priorityItems = computed(()=> (workspace.ingestionContract?.priorities || []).map(value=>({value,label:t(`knowledgeSpaces.ingestion.${value}`)})))
+const modeOptions = computed(()=> (workspace.ingestionContract?.segment_modes || []).map(value=>({value,label:t(`knowledgeSpaces.ingestion.modeOptions.${value}`)})))
+const policyItems = computed(()=> (workspace.ingestionContract?.segment_size_policies || []).map(value=>({value,label:t(`knowledgeSpaces.ingestion.sizePolicyOptions.${value}`)})))
+const anchorFields = [
+ {key:'page_priority',label:'knowledgeSpaces.ingestion.pagePriority'},
+ {key:'anchor_heading_path',label:'knowledgeSpaces.ingestion.anchorHeadingPath'},
+ {key:'anchor_clause_id',label:'knowledgeSpaces.ingestion.anchorClauseId'},
+ {key:'anchor_row_number',label:'knowledgeSpaces.ingestion.anchorRowNumber'},
+ {key:'anchor_speaker',label:'knowledgeSpaces.ingestion.anchorSpeaker'},
+ {key:'anchor_sentence_index',label:'knowledgeSpaces.ingestion.anchorSentenceIndex'},
+] as const
+function anchorSupported(field:string) {return field==='page_priority'?workspace.ingestionContract?.page_priority_supported===true:workspace.ingestionContract?.anchor_mode_requirements[field]===settings.value.segment_mode}
+const settingsValid = computed(()=> workspace.ingestionContract?.segment_modes.includes(settings.value.segment_mode || '') && workspace.ingestionContract.priorities.includes(settings.value.priority || '') && workspace.ingestionContract.segment_size_policies.includes(settings.value.segment_size_policy || '') && anchorFields.every(field=>!settings.value[field.key] || anchorSupported(field.key)))
+const canSubmit = computed(()=> !busy.value && Boolean(workspace.rebuildIndex) && (mode.value==='reuse_snapshot' || ready.value && indexingReady.value && settingsValid.value && Number.isInteger(settings.value.chunk_size) && Number.isInteger(settings.value.chunk_overlap) && settings.value.chunk_size!>=0 && settings.value.chunk_size!<=(workspace.ingestionContract?.chunk_size_max ?? -1) && settings.value.chunk_overlap!>=0 && (settings.value.chunk_size===0 ? settings.value.chunk_overlap===0 && settings.value.segment_size_policy==='cap' : settings.value.chunk_overlap!<settings.value.chunk_size!)))
+watch(open, (value)=>{
+ if(!value)return
+ mode.value='reuse_snapshot';error.value='';ready.value=false;semanticState.value=undefined;generationChoice.value='active';indexMode.value=props.snapshot?.indexing?.mode||'lexical_chunks';lastBody='';idempotencyKey=crypto.randomUUID()
+})
+watch(mode, async(value)=>{
+ if(value!=='apply_config' || ready.value)return
+ try{
+  await workspace.api.strategyPackages()
+  if(workspace.semanticCapabilities){semanticState.value=await workspace.semanticCapabilities(props.spaceUUID);if(!props.documentUUID&&semanticState.value.indexed)indexMode.value=semanticState.value.indexed_query_modes?.includes('hybrid')?'hybrid':'semantic';artifactRoles.value=[...(props.snapshot?.indexing?.artifact_roles||semanticState.value.artifact_roles||['source_chunk'])]}
+  const source=props.snapshot || workspace.ingestionContract?.defaults
+  if(!source)return
+  const keys=['priority','segment_mode','segment_size_policy','chunk_size','chunk_overlap','segment_order','separators','page_priority','anchor_heading_path','anchor_clause_id','anchor_row_number','anchor_speaker','anchor_sentence_index'] as const
+  const copy:HostIngestionSettings={schema:documentIngestionSchema}
+  for(const key of keys)if(source[key]!==undefined)(copy as any)[key]=Array.isArray(source[key])?[...(source[key] as string[])]:source[key]
+  settings.value=copy;ready.value=Boolean(workspace.capabilities.ingestionSettings)
+ }catch(e:any){error.value=t('knowledgeLab.workspace.requestFailed',{code:e?.data?.code || 'UNKNOWN'})}
+})
+async function submit(){
+ if(!canSubmit.value || !workspace.rebuildIndex)return
+ const body=JSON.stringify({mode:mode.value,ingestion:mode.value==='apply_config'?settings.value:undefined,indexing:mode.value==='apply_config'?indexing():undefined})
+ if(lastBody && lastBody!==body)idempotencyKey=crypto.randomUUID()
+ lastBody=body;busy.value=true;error.value=''
+ const request:HostRebuildRequest=mode.value==='reuse_snapshot'?{mode:mode.value,idempotency_key:idempotencyKey}:{mode:mode.value,idempotency_key:idempotencyKey,ingestion:settings.value,...(indexing()?{indexing:indexing()}: {})}
+ try{const job=await workspace.rebuildIndex(props.spaceUUID,props.documentUUID,request);emit('submitted',job);open.value=false}
+ catch(e:any){error.value=t('knowledgeLab.workspace.requestFailed',{code:e?.data?.code || 'UNKNOWN'})+(e?.data?.trace_id?` (${e.data.trace_id})`:'')}
+ finally{busy.value=false}
+}
+</script>

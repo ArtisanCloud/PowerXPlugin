@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,11 +25,12 @@ type HTTPClient interface {
 
 // DelegatedClient proxies auth calls to PowerX Core.
 type DelegatedClient struct {
-	apiBase      string
-	httpClient   HTTPClient
-	serviceToken string
-	apiKey       string
-	pluginID     string
+	identityClient fwiamcontracts.DelegatedIdentityService
+	apiBase        string
+	httpClient     HTTPClient
+	serviceToken   string
+	apiKey         string
+	pluginID       string
 }
 
 // Option allows tweaking DelegatedClient construction.
@@ -171,11 +173,32 @@ func (c *DelegatedClient) MeContext(ctx context.Context, accessToken string) (*M
 
 // ResolveIdentityContext resolves framework identity context from delegated /me/context payload.
 func (c *DelegatedClient) ResolveIdentityContext(ctx context.Context, accessToken string) (*fwiamcontracts.IdentityContext, error) {
-	me, err := c.MeContext(ctx, accessToken)
-	if err != nil {
-		return nil, err
+	return nil, fwiamerrors.New(fwiamerrors.CodeIdentityMigrationRequired, fwiamerrors.CodeIdentityMigrationRequired)
+}
+
+// SetIdentityResolver binds the Framework-owned service client once at startup.
+func (c *DelegatedClient) SetIdentityResolver(resolver fwiamcontracts.DelegatedIdentityService) {
+	c.identityClient = resolver
+}
+func (c *DelegatedClient) IdentityResolverReady() bool {
+	if c == nil || c.identityClient == nil {
+		return false
 	}
-	return IdentityContextFromMeContext(me)
+	_, ok := c.identityClient.(fwiamcontracts.WSIdentityRevalidationService)
+	return ok
+}
+func (c *DelegatedClient) ResolveDelegatedIdentity(ctx context.Context, in fwiamcontracts.DelegatedIdentityQuery) (*fwiamcontracts.DelegatedIdentity, error) {
+	if c == nil || c.identityClient == nil {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	return c.identityClient.ResolveDelegatedIdentity(ctx, in)
+}
+func (c *DelegatedClient) RevalidateWSIdentity(ctx context.Context, in fwiamcontracts.WSIdentityQuery) (*fwiamcontracts.WSIdentity, error) {
+	resolver, ok := c.identityClient.(fwiamcontracts.WSIdentityRevalidationService)
+	if !ok {
+		return nil, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	return resolver.RevalidateWSIdentity(ctx, in)
 }
 
 type DirectoryMember struct {
@@ -184,6 +207,21 @@ type DirectoryMember struct {
 	UserUUID    string `json:"user_uuid"`
 	DisplayName string `json:"display_name,omitempty"`
 	Status      int16  `json:"status"`
+}
+type DirectoryTenant struct {
+	TenantUUID string `json:"tenant_uuid"`
+	TenantKey  string `json:"tenant_key"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+}
+type DirectoryMemberPage struct {
+	Items      []DirectoryMember   `json:"items"`
+	Pagination DirectoryPagination `json:"pagination"`
+}
+type DirectoryPagination struct {
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+	Total    int64 `json:"total"`
 }
 type DirectoryMemberResolution struct {
 	Items              []DirectoryMember `json:"items"`
@@ -287,6 +325,30 @@ func (c *DelegatedClient) GetDirectoryMember(ctx context.Context, memberUUID str
 		return nil, err
 	}
 	return &member, nil
+}
+
+// GetDirectoryTenant reads the tenant determined by the Host credential.
+func (c *DelegatedClient) GetDirectoryTenant(ctx context.Context) (*DirectoryTenant, error) {
+	var tenant DirectoryTenant
+	if err := c.get(ctx, "/tenant/iam/tenant", &tenant, nil); err != nil {
+		return nil, err
+	}
+	return &tenant, nil
+}
+
+// ListDirectoryMembers reads exactly one Host-controlled member page.
+func (c *DelegatedClient) ListDirectoryMembers(ctx context.Context, page, pageSize int) (*DirectoryMemberPage, error) {
+	if page < 1 || pageSize < 1 || pageSize > 200 {
+		return nil, fmt.Errorf("authproxy: invalid directory pagination")
+	}
+	query := url.Values{}
+	query.Set("page", strconv.Itoa(page))
+	query.Set("page_size", strconv.Itoa(pageSize))
+	var response DirectoryMemberPage
+	if err := c.get(ctx, "/tenant/iam/members?"+query.Encode(), &response, nil); err != nil {
+		return nil, err
+	}
+	return &response, nil
 }
 
 func (c *DelegatedClient) BatchGetDirectoryMembers(ctx context.Context, memberUUIDs []string) ([]DirectoryMember, error) {

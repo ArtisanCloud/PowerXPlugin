@@ -19,6 +19,9 @@ func (stubDirectory) ListDepartments(context.Context, string) ([]contracts.Depar
 func (stubDirectory) ListMembers(context.Context, string) ([]contracts.Member, error) {
 	return nil, nil
 }
+func (stubDirectory) ListMembersPage(context.Context, string, contracts.MemberPageRequest) (*contracts.MemberPage, error) {
+	return &contracts.MemberPage{}, nil
+}
 func (stubDirectory) GetMember(context.Context, string, string) (*contracts.Member, error) {
 	return &contracts.Member{MemberUUID: "member-1", TenantUUID: "tenant-1"}, nil
 }

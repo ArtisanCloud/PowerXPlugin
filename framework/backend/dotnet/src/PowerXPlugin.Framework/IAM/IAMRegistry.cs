@@ -11,6 +11,8 @@ public class IAMRegistry
     public IDirectoryService? Directory { get; private set; }
     public IAuthzService? Authz { get; private set; }
     public IIdentityContextService? IdentityContext { get; private set; }
+    public IDelegatedIdentityService? DelegatedIdentity => _mode == IAMAdapterMode.Delegated ? IdentityContext as IDelegatedIdentityService : null;
+    public IWSIdentityRevalidationService? WSIdentityRevalidator => _mode==IAMAdapterMode.Delegated ? IdentityContext as IWSIdentityRevalidationService : null;
 
     public bool IsBound => Directory != null && Authz != null && IdentityContext != null;
 
@@ -26,6 +28,8 @@ public class IAMRegistry
         {
             if (IsBound)
                 throw new InvalidOperationException($"{IAMErrors.CodeAdapterAlreadyBound}: IAM adapters are already bound and cannot be re-bound");
+            if (mode == IAMAdapterMode.Delegated && identityContext is not IDelegatedIdentityService)
+                throw new IAMAdapterException(IAMErrors.CodeAdapterNotBound);
 
             _mode = mode;
             Directory = directory;

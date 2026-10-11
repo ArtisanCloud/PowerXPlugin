@@ -1,3 +1,4 @@
+import { isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client';
 import { useAuth } from "~/composables/useAuth";
 import { useUserStore } from "~/stores/user";
 
@@ -11,9 +12,7 @@ const ROOT_ONLY_ROUTE_PREFIXES = [
 export default defineNuxtRouteMiddleware(async (to) => {
   if (!process.client) return;
   const runtimeConfig = useRuntimeConfig();
-  const insidePowerX =
-    runtimeConfig.public?.insidePowerX === true ||
-    runtimeConfig.public?.insidePowerX === "true";
+  const insidePowerX = isPowerXEmbedded(runtimeConfig.public?.insidePowerX);
 
   if (to.meta?.public === true) {
     return;
@@ -24,12 +23,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   const auth = useAuth();
-  await auth.ensureFreshToken();
+  try { await auth.ensureFreshToken(); } catch (error) { if (!insidePowerX) throw error; return; }
 
   if (!auth.token.value) {
     if (insidePowerX) {
       if (!auth.delegatedError?.value) {
-        auth.rememberAuthError?.("PowerX 会话已失效，请回到宿主重新登录");
+        auth.rememberAuthError?.();
       }
       return;
     }

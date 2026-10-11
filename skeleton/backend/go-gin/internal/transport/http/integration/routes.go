@@ -16,6 +16,7 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	{
 		group.POST("/dispatch", handler.Dispatch)
 		group.POST("/capabilities/invoke", handler.InvokeCapability)
+		group.POST("/corex/capabilities/invoke", handler.InvokeCoreXCapability)
 
 		group.GET("/grant-matrix", handler.ListGrantMatrix)
 		group.POST("/grant-matrix", handler.SubmitGrantMatrix)

@@ -62,7 +62,7 @@ func RegisterRoutes(admin *gin.RouterGroup, deps *app.Deps) {
 
 	group.GET("/tenants", tenantHandler.List)
 	group.POST("/tenants", tenantHandler.Create)
-	group.PATCH("/tenants/:id", tenantHandler.Update)
+	group.PATCH("/tenants/:tenant_uuid", tenantHandler.Update)
 
 	group.GET("/departments", departmentHandler.List)
 	group.GET("/departments/tree", departmentHandler.Tree)

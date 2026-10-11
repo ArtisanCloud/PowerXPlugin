@@ -24,18 +24,7 @@ public static class MediaPresignActions
 public class PowerXMediaClientOptions
 {
     public string BaseUrl { get; set; } = string.Empty;
-    public string ApiPrefix { get; set; } = "/api/v1";
-    public string AuthScheme { get; set; } = "apikey";
-    public string Credential { get; set; } = string.Empty;
-    public string? TenantUuid { get; set; }
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
-}
-
-public class PowerXMediaRuntimeOptions : PowerXMediaClientOptions
-{
-    public string ProviderMode { get; set; } = string.Empty;
-    public string Proxy { get; set; } = string.Empty;
-    public string LocalRoot { get; set; } = string.Empty;
 }
 
 public class PowerXMediaCapabilities
@@ -118,6 +107,8 @@ public class MediaPresignTicket
     public uint ExpiresInSeconds { get; set; }
     public Dictionary<string, string> Headers { get; set; } = new();
     public Dictionary<string, string> Fields { get; set; } = new();
+    [JsonPropertyName("expires_at")]
+    public string ExpiresAt { get; set; } = string.Empty;
     [JsonPropertyName("object_key")]
     public string ObjectKey { get; set; } = string.Empty;
 }

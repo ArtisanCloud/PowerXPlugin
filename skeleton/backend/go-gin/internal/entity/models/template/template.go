@@ -3,14 +3,18 @@ package template
 // internal/entity/models/template/template.go
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // Template represents a reusable snippet that can be shared across the Base plugin.
 type Template struct {
 	models.BaseModel
+	UUID           string     `gorm:"type:uuid;not null;uniqueIndex:idx_template_uuid" json:"uuid"`
 	Name           string     `gorm:"type:varchar(255);not null;comment:模板名称" json:"name"`
 	Description    string     `gorm:"type:text;comment:模板描述" json:"description"`
 	Content        string     `gorm:"type:text;comment:模板内容" json:"content"`
@@ -27,4 +31,21 @@ type Template struct {
 
 func (t *Template) TableName() string {
 	return models.S(models.TableTemplate)
+}
+
+func (t *Template) BeforeCreate(*gorm.DB) error {
+	if t.UUID == "" {
+		t.UUID = uuid.NewString()
+	}
+	parsed, err := uuid.Parse(t.UUID)
+	if err != nil || parsed == uuid.Nil || parsed.String() != t.UUID {
+		return gorm.ErrInvalidData
+	}
+	return nil
+}
+
+// Raw model responses (mini-app and capability consumers) must not expose the
+// inherited storage key. HTTP/gRPC DTOs use the same UUID identity.
+func (t Template) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]any{"uuid": t.UUID, "tenant_uuid": t.TenantUuid, "name": t.Name, "description": t.Description, "content": t.Content, "status": t.Status, "review_status": t.ReviewStatus, "review_comment": t.ReviewComment, "reviewed_by": t.ReviewedBy, "reviewed_at": t.ReviewedAt, "publish_channel": t.PublishChannel, "published_at": t.PublishedAt, "cleanup_reason": t.CleanupReason, "cleaned_at": t.CleanedAt, "created_at": t.CreatedAt, "updated_at": t.UpdatedAt})
 }

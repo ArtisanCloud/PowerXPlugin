@@ -1,7 +1,9 @@
 package server
 
 import (
+	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/middleware"
 	"net/http"
+	"time"
 
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
 	"github.com/gin-gonic/gin"
@@ -31,13 +33,14 @@ func RegisterGinRoutes(r fwbootstrap.Router, engine *gin.Engine) {
 }
 
 func ginHandler(engine *gin.Engine) fwbootstrap.Handler {
+	handler := middleware.Timeout(5*time.Minute, engine)
 	return func(ctx fwbootstrap.Context) {
 		writer, req := unwrapHTTP(ctx)
 		if writer == nil || req == nil {
 			ctx.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to bridge request to gin"})
 			return
 		}
-		engine.ServeHTTP(writer, req)
+		handler.ServeHTTP(writer, req)
 	}
 }
 

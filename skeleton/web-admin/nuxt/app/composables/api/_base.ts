@@ -1,5 +1,5 @@
 // 解析 API 基址 + 获取 Token/Tenant 的小工具
-import { createFrameworkLogger } from "@artisan-cloud/plugin-framework-client";
+import { getPowerXHostSession, isPowerXEmbedded, createFrameworkLogger } from "@artisan-cloud/plugin-framework-client";
 
 const logger = createFrameworkLogger("api.base");
 
@@ -8,6 +8,11 @@ export function resolveApiBase(pathname?: string): string {
     (typeof useRuntimeConfig === "function"
       ? (useRuntimeConfig() as any)?.public
       : undefined) ?? (globalThis as any).__NUXT__?.config?.public;
+
+  if (isPowerXEmbedded(runtimePublic?.insidePowerX)) {
+    const pluginId = String(runtimePublic?.powerxPluginId || 'com.powerx.plugins.base');
+    return `/_p/${pluginId}/api/v1`;
+  }
 
   if (runtimePublic?.apiBaseUrl) {
     return runtimePublic.apiBaseUrl;
@@ -37,8 +42,8 @@ export function getAuthToken(): string | undefined {
     (typeof useRuntimeConfig === "function"
       ? (useRuntimeConfig() as any)?.public
       : undefined) ?? (globalThis as any).__NUXT__?.config?.public;
-  const insidePowerX =
-    runtimePublic?.insidePowerX === true || runtimePublic?.insidePowerX === "true";
+  const insidePowerX = isPowerXEmbedded(runtimePublic?.insidePowerX);
+  if (insidePowerX) return getPowerXHostSession(String(runtimePublic?.powerxPluginId || 'com.powerx.plugins.base')).getReadySnapshot()?.accessToken;
 
   // 优先读取 localStorage，保持与 useAuth/Bridge 注入兼容
   if (typeof window !== "undefined") {
@@ -95,6 +100,8 @@ export function getAuthToken(): string | undefined {
 }
 
 export function getTenantUuid(): string | undefined {
+  const runtime = typeof useRuntimeConfig === 'function' ? useRuntimeConfig() : ({} as any);
+  if (isPowerXEmbedded(runtime.public?.insidePowerX)) return typeof window === 'undefined' ? undefined : getPowerXHostSession(String(runtime.public?.powerxPluginId || 'com.powerx.plugins.base')).getReadySnapshot()?.identity?.tenantUuid || undefined;
   // TODO: 换成你的 Pinia/Cookie 逻辑
   if (typeof document !== "undefined") {
     const m = document.cookie.match(/(?:^|;\s*)tenant_uuid=([^;]+)/);

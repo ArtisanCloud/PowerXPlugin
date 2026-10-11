@@ -5,7 +5,23 @@
 **Status**: Draft  
 **Input**: User description: "Spec for plugin consumption of PowerX open capabilities per docs/plan/009-consume-powerx-capability.md"
 
+> 2026-09-04 对齐：通用 Capability Lab 仅作诊断；正式业务调用经 Framework Runtime Factory。local 使用插件注入 adapter，delegated 使用 Core Host Contract adapter；业务层不得自行选择模式、传 tenant 或以通用 invoke 代替 typed contract。
+
+## 当前对外接入基线（2026-09-08）
+
+插件统一使用 [业务模块接入指南](../../docs/guides/features/009-consume-powerx-capability/guide.md)。该指南的接口、构造入口和示例需与源码一起维护；[双模式规范](../../docs/guides/develop/framework-dual-mode-business-modules.md)维护规则，[覆盖台账](../../docs/contracts/powerx-core-framework-coverage.md)维护状态，本文不重复宣布模块完成。
+
+- **FR-034**：Framework 提供模块 contract、Factory 和 delegated transport；插件提供真实 local adapter、存储、迁移与事务。业务层不能独立选择模式。
+- **FR-035**：必需 accessor、STS provider 与 required grant 在 bootstrap 验证；Factory 不自动执行这些外部装配步骤，失败不得静默降级。
+- **FR-036**：文档提供按模块的接口/构造入口、版本锁定、local 与 delegated 实施步骤及可编译示例；未发布源码不能被描述为某个已发布包的能力。
+- **FR-037**：安装态 STS、API Key 开发验证、插件 local 数据验收分开记录；插件未实现 local 存储不被误报为 Framework delegated 缺失。
+- **FR-038**：新实现只消费正式 typed Host Contract；Agent Session 采用独立 append/invoke/events/cancel，Customer 保留双凭证。不得复制下面的历史 Tool Token/Mock/旧 Media URL 示例。
+
+下面历史段落仅保留追溯。当前实施以本节、2026-09-03 重基线及主指南的源码映射为准。
+
 ## User Scenarios & Testing *(mandatory)*
+
+> **历史基线（仅供追溯）**：本节记录 2025 年的通用 Gateway 设计。其关于 Tool Token、调用方提供 `tenant_uuid`、Mock 回退和 `requiredCapabilities` 的描述已被本文末尾“2026-09-03 重基线”替代，不得作为新实现或验收依据。
 
 ### User Story 1 - 宿主插件统一调用核心能力 (Priority: P1)
 
@@ -22,7 +38,7 @@
 
 ---
 
-### User Story 2 - Skeleton 模式复用同一封装 (Priority: P2)
+### User Story 2 - Skeleton 模式复用同一封装（历史） (Priority: P2)
 
 Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GATEWAY_BASE_URL`、`PX_PLUGIN_TOOL_TOKEN` 写入 `.env.local`，并使用框架内置的 Go Client 在 Skeleton 后端发起远程调用（前端通过插件后端提供的 API 间接访问 Gateway）或在 Gateway 不可用时切换到 Mock，实现与宿主一致的行为以便预先验证调用链与权限配置。
 
@@ -51,7 +67,7 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 2. **Given** 插件在 1 分钟内连续调用超过额度，**When** 限流器生效，**Then** Gateway 返回标准化错误并触发框架记录 `rateLimitExceeded` 事件供运维订阅。
 3. **Given** Skeleton 开发者在 web-admin 的 Capability Lab 页面填写 `capabilityId/action/payload`，**When** 点击 Invoke，**Then** 插件后端收到请求并调用 Gateway 或 Mock，页面需展示响应/TraceId/耗时，并在后端返回 `warnings`（如契约版本过期或 Mock 提示）时显式告警。
 
-### Edge Cases
+### Edge Cases（历史）
 
 - 当 manifest 未声明任何 `source=corex` 能力却尝试调用 Gateway 时，框架必须阻止请求并提示缺失的能力 ID。
 - 当 Tool Token 已过期或缺失 `tenant_uuid`，系统需阻止调用并提供刷新指引，避免出现匿名请求。
@@ -61,7 +77,7 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 
 ## Requirements *(mandatory)*
 
-### Functional Requirements
+### Functional Requirements（历史）
 
 - **FR-001**: 插件 manifest 与 `skeleton/plugin.yaml` 必须支持声明 `requiredCapabilities`，并在 CI 中通过 `px-plugin capabilities plan|apply --manifest ./skeleton/plugin.yaml` 进行校验，未声明即调用时需阻断。
 - **FR-002**: 框架需提供宿主与 Skeleton 共享的 Gateway Client（Go SDK），并通过插件后端对前端暴露统一 API（禁止前端直连 Gateway）。
@@ -90,7 +106,7 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 - **FR-025**: 宿主（PowerX）在 PostEnable 阶段必须执行一次插件进程内凭证探活；失败时将插件状态标记为 `enable_failed_missing_gateway_credential`。
 - **FR-026**: 观测必须包含启动日志字段（`provider_mode`、`gateway_base_url_present`、`tool_token_present`、`auth_scheme`）与指标（`plugin_gateway_config_valid{plugin_id,mode}`、`plugin_gateway_invoke_fail_total{code}`）。
 
-### Key Entities *(include if feature involves data)*
+### Key Entities（历史） *(include if feature involves data)*
 
 - **Capability Registry Entry**：包含 `capabilityId`、来源（corex/plugin）、描述、协议入口与限流/配额策略，是 manifest 与授权的依据。
 - **Tool Grant Token**：承载租户、插件、权限范围与过期时间的凭证，由宿主或 `px-plugin login` 生成，是调用 Gateway 的唯一凭证。
@@ -100,21 +116,21 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 
 ## Success Criteria *(mandatory)*
 
-### Measurable Outcomes
+### Measurable Outcomes（历史）
 
 - **SC-001**: 100% 的插件能力调用必须通过 Gateway Client 完成，且开发者在 30 分钟内即可完成首个核心能力调用（含宿主和 Skeleton 指南）。
 - **SC-002**: Skeleton 环境调用真实 Gateway 的成功率 ≥95%，若降级至 Mock 需在 5 秒内提示，并记录降级原因。
 - **SC-003**: 所有核心能力调用都写入观测指标，Trace 覆盖率达到 99%，且限流告警可在 1 分钟内到达运维群。
 - **SC-004**: 能力速查与 CLI 校验使 manifest 申领错误率低于 2%，能力契约升级后 3 个工作日内完成 100% 插件的兼容性验证。
 
-## Assumptions
+## Assumptions（历史）
 
 - Integration Gateway 已在宿主环境提供统一的 HTTP/gRPC 接口，并遵守 `IntegrationGatewayTenantService` 契约。
 - 插件框架可在宿主部署时获取环境变量并安全注入到后端/前端进程。
 - Skeleton 模式允许开发者访问 Dev Gateway，且 `px-plugin login` 能获取可调用核心能力的临时凭证。
 - 平台观测系统已具备聚合能力，新增指标/日志只需提供结构化字段即可接入。
 
-## Delegated Gateway Contract v1（Breaking）
+## Delegated Gateway Contract v1（历史，已由 STS provider 基线替代）
 
 - 本契约仅适用于 `delegated` 模式，作为 PowerX 与插件之间的强约束接口。
 - 认证策略唯一真相：
@@ -124,7 +140,39 @@ Skeleton 本地开发者通过 `px-plugin login` 获取 Tool Token，把 `PX_GAT
 - 插件侧禁止在 `delegated` 模式读取 `PX_TOOL_TOKEN`、`PX_GATEWAY_API_KEY`。
 - 本契约为 breaking change，不提供兼容回退路径。
 
-## Manifest / Docs Consistency（2025-12-22）
+## Manifest / Docs Consistency（2025-12-22，历史）
 
 - `skeleton/plugin.yaml` → `capabilities.required` 默认示例保持与 Quickstart/Plan 中一致的 CoreX 能力（`com.corex.media.assets.manage`、`com.corex.eventfabric.publish`），`capabilities.provides` 指向 `contracts/capabilities/com.powerx.plugins.base.template.*`，方便 docs/plan/009 引用。
 - `docs/plan/009-consume-powerx-capability.md` 与本 spec 均引用同一套环境变量（`PX_GATEWAY_BASE_URL/PX_PLUGIN_TOOL_TOKEN/PX_GATEWAY_AUTH_SCHEME/NUXT_PUBLIC_POWERX_*`），并统一说明 delegated/local 的凭证策略与诊断输出，确保读者可在三个入口间互相对照。
+
+## 2026-09-03 重基线：Core Host Contract 调试台
+
+本节为本 feature 的当前规范，优先于本文中关于 Tool Token、调用方提供 `tenant_uuid`、自动 Mock/回退及仅经 `/tenant/invocations` 调用正式 Core Host API 的历史描述。历史阶段保留仅用于追溯已完成工作，不构成新实现依据。
+
+### 新增用户故事：已封装 Core 模块的安装态验收（P1）
+
+插件维护者需要在 Skeleton Web Admin 中，以受控、可追踪的方式验证 Framework 已封装的 PowerX Core Host Contract。调试台必须调用 Framework 的强类型客户端，不能让前端拼接 Core URL 或直接持有 Gateway 凭证。
+
+首批模块为：IAM、Knowledge、Media、Agent、AI、Capability Registry、Integration Gateway、Skills、Notifications、Plugin Runtime。`Capability Lab` 继续承担通用 capability discovery/invoke；有正式 Host API 的模块不以通用 invoke 代替强类型合同验证。
+
+**验收场景：**
+
+1. 给定安装态插件具备一个模块声明的 capability grant，当管理员运行只读 probe 时，页面显示 provider mode、能力 ID、trace（如 Host 返回）与强类型结果摘要。
+2. 给定缺失认证、capability 或上游依赖，后端保留并返回稳定 `reason_code`；页面显示本地化失败状态，绝不以本地数据、空成功或 UUID 文本降级。
+3. 给定 Knowledge 等异步模块，页面展示 `queued`、`running`、`succeeded` 或 `failed`；不得把 `202 Accepted` 表示为操作已完成。
+
+### 当前强制要求
+
+- **FR-027**：tenant 只从 Gateway API Key 或 STS service actor 推导；调试请求体、query 与前端状态不得传入或覆盖 `tenant_uuid`。
+- **FR-028**：安装态 delegated 调用使用由 Framework 注入的 STS token provider；Skeleton local 调试可使用显式 Gateway API Key。两种凭证都必须通过 Core 的 capability 发布、tenant registration 与精确 grant 校验。
+- **FR-029**：Gateway/Host 不可达、认证失败、授权失败或协议不支持时必须显式失败；不得自动切换 mock、local provider、其他 credential 或其他协议。
+- **FR-030**：所有调试 API 必须由插件后端实现 allowlist；仅暴露已封装的模块操作。写操作必须单独确认并使用测试对象，默认 probe 只读。
+- **FR-031**：调试响应至少包含 `module`、`operation`、`provider_mode`、`capability_id`、`reason_code`（如失败）和 `trace_id`（如可用）；人类可读文本仅由前端 i18n 提供。
+- **FR-032**：插件 manifest 使用正式 `capabilities.required` 声明所需 Core capability。安装或升级后由 Core 同步 STS `allowed_capabilities`；仅重启不得视为 grant 已更新。
+- **FR-033**：每个模块必须有 transport/handler 合同测试，覆盖成功、401、403 与上游失败；实际安装态测试作为独立验收记录，不能由 mock 测试替代。
+
+### 新增成功标准
+
+- **SC-005**：十个已封装 Core 模块均可在调试台发现，并且每个模块至少有一个确定的只读 probe。
+- **SC-006**：所有失败结果均保留机器可读 `reason_code`，且不存在自动 fallback 成功。
+- **SC-007**：安装态验收记录逐项标记 capability grant、请求 trace、结果与验证时间；未验证模块维持 `ready_for_integration`。

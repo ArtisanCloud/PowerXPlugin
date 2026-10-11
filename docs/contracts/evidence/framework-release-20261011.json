@@ -1,0 +1,83 @@
+{
+  "schema": "powerx.framework.release-evidence/v1",
+  "date": "2026-10-11",
+  "status": "published_verified",
+  "release_branch": "release/framework-20261011",
+  "versions": {
+    "go": "v0.0.24",
+    "client": "0.0.12",
+    "admin": "0.0.11"
+  },
+  "excluded": [
+    "knowledge-content-overview-unaccepted-adapter"
+  ],
+  "checks": {
+    "go_full_module": "passed",
+    "go_changed_domains_race": "passed",
+    "cli_full_module": "passed",
+    "frontend_tests": {
+      "files": 4,
+      "passed": 90
+    },
+    "npm_tarballs": "packed",
+    "npm_tarball_consumer_install": "passed",
+    "nuxt_4_2_0_production_build": "passed",
+    "template_sync": "passed",
+    "npm_registry_consumer_install": "passed",
+    "npm_registry_consumer_build": "passed",
+    "npm_registry_files_match_release_commit": {
+      "client": 14,
+      "admin": 13
+    },
+    "source_workspace_version_sync": "passed",
+    "source_workspace_template_sync": "passed"
+  },
+  "publication": {
+    "go": {
+      "status": "published",
+      "tag": "framework/backend/go/v0.0.24",
+      "proxy_download": "passed",
+      "checksum": "h1:hwJdczF1Wk5pmCtC4XNcf2rk7i8vJUTdlTFI7NpmYRI=",
+      "origin_commit": "f397b9f048449dfd1cca25847ed6976178356b97",
+      "consumer_without_replace": "passed"
+    },
+    "client": {
+      "status": "published",
+      "version": "0.0.12",
+      "dist_tag": "latest",
+      "registry_verified": true,
+      "sha1": "febc708d14a608f54b469c867fbbcc442a96cc69",
+      "integrity": "sha512-pOcPfTK91Tc9H4rnBYBWzSKsIOKc57Kng4wwE2L/XHpyI3mo31voXNh6z/QlZhsKSYuVNrxWFxZNXvWr5Z4zQw==",
+      "source_tag": "framework/frontend/nuxt/framework-client/v0.0.12"
+    },
+    "admin": {
+      "status": "published",
+      "version": "0.0.11",
+      "dist_tag": "latest",
+      "registry_verified": true,
+      "sha1": "17a8febfe318bde55baa3ded6bebc73c1a2451d8",
+      "integrity": "sha512-wA1rNTRL5cZ5oWYZEahpl/W0lIaqghFa72aPIpmbGxo4A1+5z37tw/rQZN4wA3cKUk0c5XwqFPqmELvwWOyKdg==",
+      "source_tag": "framework/frontend/nuxt/framework-admin/v0.0.11"
+    }
+  },
+  "boundaries": {
+    "core_mutations": false,
+    "aicraft_mutations": false,
+    "dotnet_release": false,
+    "user_service_restarts": false,
+    "live_browser_acceptance": false
+  },
+  "release_commit": "f397b9f048449dfd1cca25847ed6976178356b97",
+  "npm_artifacts": {
+    "client": {
+      "filename": "artisan-cloud-plugin-framework-client-0.0.12.tgz",
+      "sha1": "febc708d14a608f54b469c867fbbcc442a96cc69",
+      "files_match_release_commit": 14
+    },
+    "admin": {
+      "filename": "artisan-cloud-plugin-framework-admin-0.0.11.tgz",
+      "sha1": "17a8febfe318bde55baa3ded6bebc73c1a2451d8",
+      "files_match_release_commit": 13
+    }
+  }
+}

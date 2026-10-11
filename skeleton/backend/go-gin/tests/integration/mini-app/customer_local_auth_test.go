@@ -6,15 +6,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
+	fwprovider "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/provider"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/config"
 	dbx "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/db"
 	models "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/models"
 	customerrepo "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/entity/repository/customer"
+	customersvc "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/services/customer"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
 	"github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/mini-app"
 	"github.com/gin-gonic/gin"
@@ -29,9 +31,10 @@ func TestMiniAppLocalAuth_RegisterLoginAndCallProtected(t *testing.T) {
 
 	// register
 	regBody := map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "demo@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "demo@example.com",
+		"display_name": "demo@example.com",
+		"password":     "P@ssword1!",
 	}
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, regBody, nil)
 	if rec.Code != http.StatusOK {
@@ -85,9 +88,10 @@ func TestMiniAppLocalAuth_LoginWithoutTenantAutoSelect(t *testing.T) {
 
 	// register under a single tenant
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "single-tenant@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "single-tenant@example.com",
+		"display_name": "single-tenant@example.com",
+		"password":     "P@ssword1!",
 	}, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("register expected 200, got %d body=%s", rec.Code, rec.Body.String())
@@ -130,9 +134,10 @@ func TestMiniAppLocalAuth_LoginWithoutTenantMultipleTenantsReturns409(t *testing
 	// same login registered in 2 tenants
 	for _, tenant := range []string{tenantA, tenantB} {
 		rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenant, map[string]any{
-			"tenant_uuid": tenant,
-			"email":       "multi-tenant@example.com",
-			"password":    "P@ssword1!",
+			"tenant_uuid":  tenant,
+			"email":        "multi-tenant@example.com",
+			"display_name": "multi-tenant@example.com",
+			"password":     "P@ssword1!",
 		}, nil)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("register expected 200, got %d body=%s", rec.Code, rec.Body.String())
@@ -156,9 +161,10 @@ func TestMiniAppLocalAuth_MiniAppTemplatesPublishedOnly(t *testing.T) {
 
 	// register + login to get token
 	doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "tpl@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "tpl@example.com",
+		"display_name": "tpl@example.com",
+		"password":     "P@ssword1!",
 	}, nil)
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/login", tenantUUID, map[string]any{
 		"tenant_uuid": tenantUUID,
@@ -170,12 +176,12 @@ func TestMiniAppLocalAuth_MiniAppTemplatesPublishedOnly(t *testing.T) {
 	token := loginOut["data"].(map[string]any)["token"].(string)
 
 	// seed templates: 1 published+approved, 1 draft
-	if err := deps.DB.Exec(`INSERT INTO template (tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?)`,
-		tenantUUID, "Published", "Desc", "Content", "published", "approved").Error; err != nil {
+	if err := deps.DB.Exec(`INSERT INTO template (uuid, tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"11111111-1111-4111-8111-111111111111", tenantUUID, "Published", "Desc", "Content", "published", "approved").Error; err != nil {
 		t.Fatalf("insert published template: %v", err)
 	}
-	if err := deps.DB.Exec(`INSERT INTO template (tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?)`,
-		tenantUUID, "Draft", "Desc", "Content", "draft", "pending").Error; err != nil {
+	if err := deps.DB.Exec(`INSERT INTO template (uuid, tenant_uuid, name, description, content, status, review_status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"22222222-2222-4222-8222-222222222222", tenantUUID, "Draft", "Desc", "Content", "draft", "pending").Error; err != nil {
 		t.Fatalf("insert draft template: %v", err)
 	}
 
@@ -198,8 +204,8 @@ func TestMiniAppLocalAuth_MiniAppTemplatesPublishedOnly(t *testing.T) {
 	}
 
 	// read published template
-	id := int(item["id"].(float64))
-	rec = doJSON(t, engine, http.MethodGet, "/api/v1/mini-app/templates/"+strconv.Itoa(id), tenantUUID, nil, map[string]string{
+	id := item["uuid"].(string)
+	rec = doJSON(t, engine, http.MethodGet, "/api/v1/mini-app/templates/"+id, tenantUUID, nil, map[string]string{
 		"Authorization": "Bearer " + token,
 	})
 	if rec.Code != http.StatusOK {
@@ -213,9 +219,10 @@ func TestMiniAppLocalAuth_LoginDisabledReturns423(t *testing.T) {
 	tenantUUID := "00000000-0000-0000-0000-000000000001"
 
 	regBody := map[string]any{
-		"tenant_uuid": tenantUUID,
-		"email":       "disabled@example.com",
-		"password":    "P@ssword1!",
+		"tenant_uuid":  tenantUUID,
+		"email":        "disabled@example.com",
+		"display_name": "disabled@example.com",
+		"password":     "P@ssword1!",
 	}
 	rec := doJSON(t, engine, http.MethodPost, "/api/v1/mini-app/auth/register", tenantUUID, regBody, nil)
 	if rec.Code != http.StatusOK {
@@ -270,6 +277,7 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 	}
 	createCustomerMirrorTables(t, db)
 	templateDDL := `CREATE TABLE IF NOT EXISTS template (
+		uuid TEXT NOT NULL UNIQUE,
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		tenant_uuid TEXT NOT NULL,
 		created_at DATETIME,
@@ -306,6 +314,22 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 		},
 	}
 	deps := &app.Deps{Config: cfg, Ctx: context.Background(), DB: db}
+	localExternal, err := customersvc.NewLocalExternalIdentityResolver(db, "test-plugin")
+	if err != nil {
+		t.Fatalf("new local external identity resolver: %v", err)
+	}
+	localStore := customersvc.NewLocalFrameworkCustomerStore(
+		customersvc.NewLocalFrameworkAuthClient(
+			customersvc.NewLocalAuthService(cfg, customerrepo.NewRepository(db)),
+			customersvc.NewFrameworkValidator(customersvc.NewAuthenticatorFactory(cfg, nil).Build()),
+		),
+		localExternal,
+		customersvc.NewFrameworkMembershipResolver(db),
+	)
+	deps.CustomerRuntime, err = customerfw.NewRuntime(fwprovider.ModeLocal, customerfw.AdaptersFromLocalStore(localStore), customerfw.RuntimeAdapters{})
+	if err != nil {
+		t.Fatalf("new local customer runtime: %v", err)
+	}
 
 	miniapp.RegisterAPIRoutes(g, deps)
 	return engine, deps
@@ -314,12 +338,15 @@ func setupMiniAppLocalAuthRouter(t *testing.T) (*gin.Engine, *app.Deps) {
 func createCustomerMirrorTables(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	ddls := []string{
+		`CREATE TABLE customer_contacts (id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME, updated_at DATETIME, deleted_at DATETIME, contact_uuid TEXT NOT NULL UNIQUE, tenant_uuid TEXT NOT NULL, customer_uuid TEXT NOT NULL, display_name TEXT NOT NULL, given_name TEXT, family_name TEXT, email TEXT, phone TEXT, status TEXT NOT NULL, roles TEXT, tags TEXT, metadata TEXT);`,
 		`CREATE TABLE IF NOT EXISTS customer_accounts (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME,
 			updated_at DATETIME,
 			deleted_at DATETIME,
 			customer_uuid TEXT NOT NULL,
+			type TEXT,
+			primary_contact_uuid TEXT,
 			primary_email TEXT,
 			primary_phone TEXT,
 			display_name TEXT,
@@ -339,6 +366,7 @@ func createCustomerMirrorTables(t *testing.T, db *gorm.DB) {
 			tenant_uuid TEXT
 		);`,
 		`CREATE TABLE IF NOT EXISTS customer_auth_identities (
+			identity_uuid TEXT,
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			created_at DATETIME,
 			updated_at DATETIME,
@@ -359,6 +387,7 @@ func createCustomerMirrorTables(t *testing.T, db *gorm.DB) {
 			updated_at DATETIME,
 			deleted_at DATETIME,
 			membership_uuid TEXT NOT NULL,
+			primary_contact_uuid TEXT,
 			tenant_uuid TEXT NOT NULL,
 			customer_uuid TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',

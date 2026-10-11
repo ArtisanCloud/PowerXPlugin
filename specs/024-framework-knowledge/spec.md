@@ -1,5 +1,7 @@
 # Feature Specification: Framework Knowledge Base
 
+> 2026-09-04 对齐：`KnowledgeProvider` 是双模式业务模块 contract；Factory 选择 local/delegated provider。历史 QA bridge 不得作为正式 Host Contract fallback。
+
 **Feature Branch**: `024-framework-knowledge`  
 **Created**: 2026-06-30  
 **Status**: Draft  

@@ -14,7 +14,7 @@ import (
 func TestClientCreateUsesTenantNotificationsContract(t *testing.T) {
 	transport := notificationRoundTrip(func(req *http.Request) (*http.Response, error) {
 		require.Equal(t, http.MethodPost, req.Method)
-		require.Equal(t, "/api/v1/tenant/notifications", req.URL.Path)
+		require.Equal(t, "/api/v1/notifications", req.URL.Path)
 		require.Equal(t, "Bearer service-token", req.Header.Get("Authorization"))
 		body, err := io.ReadAll(req.Body)
 		require.NoError(t, err)

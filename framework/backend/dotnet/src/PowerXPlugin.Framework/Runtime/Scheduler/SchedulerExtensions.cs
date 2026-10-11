@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PowerXPlugin.Framework.EventBridge;
+using PowerXPlugin.Framework.Runtime.Common;
 
 namespace PowerXPlugin.Framework.Runtime.Scheduler;
 
@@ -8,10 +10,30 @@ public static class SchedulerExtensions
 {
     public static IServiceCollection AddLocalScheduler(this IServiceCollection services)
     {
-        services.AddSingleton<LocalScheduler>();
-        services.AddSingleton<IScheduler>(sp => sp.GetRequiredService<LocalScheduler>());
-        services.AddHostedService<SchedulerRunner>();
-        return services;
+        return services.AddPowerXScheduler(ProviderMode.Local, _ => throw new InvalidOperationException(SchedulerErrors.CodeInvalidMode));
+    }
+
+    /// <summary>
+    /// Registers exactly one scheduler implementation selected at application
+    /// startup. Delegated mode never starts the in-process runner.
+    /// </summary>
+    public static IServiceCollection AddPowerXScheduler(
+        this IServiceCollection services,
+        ProviderMode mode,
+        Func<IServiceProvider, IScheduler> delegatedFactory,
+        Func<IServiceProvider, ILocalSchedulerStore>? localStoreFactory = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(delegatedFactory);
+        if (mode == ProviderMode.Local)
+        {
+            services.AddLocalEventBridge();
+            services.AddSingleton(sp => new LocalScheduler(localStoreFactory == null
+                ? new InMemorySchedulerStore() : localStoreFactory(sp), sp.GetRequiredService<IEventEmitter>()));
+            services.AddHostedService<SchedulerRunner>();
+        }
+        return services.AddPowerXRuntime<IScheduler>("scheduler", mode,
+            sp => sp.GetRequiredService<LocalScheduler>(), delegatedFactory);
     }
 }
 
@@ -22,15 +44,12 @@ internal class SchedulerRunner : BackgroundService
 {
     private readonly LocalScheduler _scheduler;
     private readonly ILogger<SchedulerRunner> _logger;
-    private readonly Dictionary<string, SchedulerHandler> _handlers = new();
 
     public SchedulerRunner(LocalScheduler scheduler, ILogger<SchedulerRunner> logger)
     {
         _scheduler = scheduler;
         _logger = logger;
     }
-
-    public void RegisterHandler(string jobName, SchedulerHandler handler) => _handlers[jobName] = handler;
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
@@ -40,21 +59,31 @@ internal class SchedulerRunner : BackgroundService
             {
                 try
                 {
-                    var now = DateTime.UtcNow;
-                    var jobs = await _scheduler.ListJobsAsync(status: JobStatus.Active);
-                    foreach (var job in jobs.Where(j => j.NextRunAt <= now))
-                    {
-                        if (_handlers.TryGetValue(job.Name, out var handler))
-                        {
-                            await handler(job, ct);
-                            job.NextRunAt = LocalScheduler.ComputeNextRun(job.ScheduleType, job.ScheduleExpr, now);
-                        }
-                    }
+                    await TickAsync(DateTime.UtcNow, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException) { _logger.LogError(ex, "Scheduler tick failed"); }
                 await Task.Delay(TimeSpan.FromMinutes(1), ct);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+    }
+
+    internal async Task TickAsync(DateTime now, CancellationToken ct = default)
+    {
+        var jobs = await _scheduler.ListJobsAsync(status: JobStatus.Active, ct: ct);
+        foreach (var job in jobs.Where(j => j.NextRunAt <= now))
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await _scheduler.ExecuteDueAsync(job, now, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Keep the due time and idempotency key for retry. One failing
+                // job must not prevent another tenant's due jobs from running.
+                _logger.LogError(ex, "Scheduler job failed. TenantUuid={TenantUuid} JobId={JobId}", job.TenantUuid, job.JobId);
+            }
+        }
     }
 }

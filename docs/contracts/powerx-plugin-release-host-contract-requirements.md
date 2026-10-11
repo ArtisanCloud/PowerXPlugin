@@ -2,17 +2,19 @@
 
 Framework 暂不为当前 Plugin Release tenant 路由提供客户端。原因不是缺少 transport，而是现有接口违反插件间的 UUID-only 与 tenant-scoped 合同，直接封装会把安全和数据模型问题带入已发布 SDK。
 
-## 必须由 PowerX 修订
+## 2026-09-03 复核结果
 
-1. `POST /api/v1/tenant/plugin-release/local/sessions` 不再接收 `tenant_uuid` 与 numeric `developerId`。
-   - tenant 只能从已认证的 STS service actor / Gateway credential 上下文获得。
-   - developer 身份应由 service actor 推导；若确实需要显式目标，字段必须为 `developer_member_uuid`，并验证属于当前 tenant。
-2. `LocalInstallSession.DeveloperID uint64` 和关联的 repository/service/permission/cache 键迁移为 `developer_member_uuid`；不新增 numeric 兼容输入。
-3. `GET` / `DELETE /api/v1/tenant/plugin-release/local/sessions/{session_uuid}` 必须以 credential tenant 查询并验证归属。跨 tenant 与不存在统一返回 404，避免泄露对象存在性。
-4. `POST /api/v1/tenant/offline-imports` 也不得接受 body `tenant_uuid`；`GET /api/v1/tenant/offline-imports/{job_uuid}` 必须用 tenant 范围查询。返回字段统一为 `job_uuid`，不得暴露非 UUID 的临时 ID。
-5. 所有五个路由使用稳定错误信封和 `reason_code`：至少覆盖 401 未认证、403 capability 未授予、404 对象不存在/跨租户、409 活跃本地安装会话、422 签名或校验失败、503 依赖不可用。
-6. 发布独立 capability：目录读取与有副作用的本地安装/离线导入必须分离，并确认 `sts_direct: true` 同时执行 tenant registration/grant 检查。
-7. 更新 OpenAPI 到最终 UUID DTO，并增加 Host 合同测试：成功、跨 tenant、无 capability、body 伪造 tenant、numeric developer 输入拒绝、无效 UUID、状态查询与停止操作。
+Core 已完成一部分 UUID/tenant 修订：本地安装的创建请求不再接收 `tenant_uuid` 或 numeric `developerId`，而是从请求上下文取得 tenant 与当前 member；本地安装 session 和离线导入 job 的持久化标识也已经是 UUID，并以 tenant 范围查询。
+
+但该路由组仍不是可供插件 service actor 调用的正式 Host Contract：没有独立 capability/grant 校验；本地安装要求请求上下文中存在人类 member UUID；离线导入仍以 `jobId`、camelCase 字段和非稳定错误文本对外；五个路由未形成统一 OpenAPI/错误信封合同。因此 Framework 继续保持不接入。
+
+## 仍必须由 PowerX 完成
+
+1. 明确 service actor 的业务语义：不能从 STS 插件凭证假定存在人类 `member_uuid`。创建本地安装应由 service actor 作为审计主体；如需管理员审批，改为显式的 member-scoped Admin Contract，而不是让插件伪造 member。
+2. 发布独立 capability，并按最小权限拆分只读状态查询与有副作用的本地安装/离线导入；Gateway API Key 与 STS 均必须校验发布记录、tenant registration 和 credential grant。`sts_direct: true` 不能替代 grant 校验。
+3. 统一全部五个路由的 UUID DTO 与命名：路径参数为 `session_uuid`/`job_uuid`，响应字段同名；不得再对外输出 `sessionId`、`jobId` 或 body tenant。
+4. 所有路由使用稳定错误信封和 `reason_code`：至少覆盖 401 未认证、403 capability 未授予、404 对象不存在/跨租户、409 活跃本地安装会话、422 签名或校验失败、503 依赖不可用。
+5. 发布最终 OpenAPI 和 Host 合同测试：成功、跨 tenant、无 capability、service actor 调用、body 伪造 tenant、无效 UUID、状态查询与停止操作。
 
 ## Framework 后续接入范围
 

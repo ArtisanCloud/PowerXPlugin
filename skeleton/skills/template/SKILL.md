@@ -7,10 +7,10 @@ version: 1.0.0
 description: 管理 PowerXPlugin 的基础模板对象。该对象仅包含标题、描述和内容，用于开发者验证插件侧 CRUD、能力注册和 Agent 调用链路。
 intent_examples:
   - 帮我创建一个标题为测试模板的模板，描述是用于验证插件 CRUD，内容是这是一条测试内容
-  - 查询 ID 为 123 的模板
-  - 把 ID 为 123 的模板内容更新成新的测试内容
+  - 查询名称为周报的模板
+  - 把名称为周报的模板内容更新成新的测试内容
   - 列出所有模板
-  - 删除 ID 为 123 的模板
+  - 删除名称为周报的模板
 response_guidance:
   capability_intro:
     - 说明这是 PowerXPlugin 的基础模板对象能力，不是媒体、内容生产或具体业务模板能力。
@@ -19,7 +19,7 @@ response_guidance:
   capability_howto:
     - create 和 update 需要用户提供标题、描述和内容。
     - 不要询问额外类型、分类或业务归属；这个对象没有这些字段。
-    - get、update、delete 优先使用模板名称定位；不要要求用户输入内部 template_id。
+    - get、update、delete 优先使用模板名称定位；不要要求用户输入内部 template_uuid。
     - delete 在唯一定位到模板后也必须二次确认，确认消息必须包含可点击的模板详情链接。
   clarify_params:
     - 只追问缺失信息，不要把缺参当成执行失败。
@@ -105,7 +105,6 @@ result_presentation:
     title: "模板已创建"
     primary_link: "template.detail_path"
     visible_fields:
-      - template.id
       - template.title
       - template.detail_path
 capability: powerxplugin.template
@@ -157,9 +156,9 @@ output_schema: ./schema.output.json
 - `action` 是必要字段，可取 `create`、`get`、`update`、`delete`、`list`。
 - `create` 和 `update` 需要标题、描述和内容。内部执行时会映射到 `template.title`、`template.description`、`template.content`。
 - 模板对象没有额外类型、分类或业务归属字段；不要要求用户提供这些信息。
-- `get`、`update` 和 `delete` 优先提取用户给出的模板名称，写入 `template_ref` 或 `template_name`；不要要求用户输入内部 `template_id`。
-- 删除模板必须二次确认。唯一命中时先返回模板名称、详情链接和模板 ID；用户明确确认后才执行删除。
-- `list` 可以不传 `template_id`，但可以携带关键词筛选条件。
+- `get`、`update` 和 `delete` 优先提取用户给出的模板名称，写入 `template_ref` 或 `template_name`；不要要求用户输入内部 `template_uuid`。
+- 删除模板必须二次确认。唯一命中时先返回模板名称和详情链接；用户明确确认后才执行删除。
+- `list` 可以不传 `template_uuid`，但可以携带关键词筛选条件。
 
 ## Conversation Guidance
 
@@ -176,7 +175,7 @@ output_schema: ./schema.output.json
 - 识别用户对模板对象的管理意图，并转换为结构化 `action`。
 - `create` 和 `update` 时提取 `template.title`、`template.description`、`template.content`。
 - 如果用户说“名称”，可视为“标题”。
-- `get`、`update` 和 `delete` 时提取模板名称；只有用户明确给出数字 ID 时才写入 `template_id`。
+- `get`、`update` 和 `delete` 时提取模板名称；只有用户明确给出有效 UUID 时才写入 `template_uuid`，不接受 numeric ID。
 - 用户回复“确认删除”“确定删除”“yes”等明确确认语义时，写入 `confirmed: true` 或 `confirmation: "确认删除"`。
-- `list` 时可以不传 `template_id`。
+- `list` 时可以不传 `template_uuid`。
 - 返回简洁、结构化、可审计的执行结果。

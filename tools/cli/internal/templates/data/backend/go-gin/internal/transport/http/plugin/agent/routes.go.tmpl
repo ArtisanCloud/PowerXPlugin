@@ -8,13 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	frameworkrealtime "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/realtime"
 	runtimeskills "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/skills"
 	"{{ .BackendModulePath }}/internal/contracts"
 	capabilitycontract "{{ .BackendModulePath }}/internal/contracts/capability"
 	dbm "{{ .BackendModulePath }}/internal/entity/models/agent_registry"
-	"{{ .BackendModulePath }}/internal/integrations/gateway"
-	"{{ .BackendModulePath }}/internal/logger"
 	authx "{{ .BackendModulePath }}/internal/middleware"
 	"{{ .BackendModulePath }}/internal/shared/app"
 	"github.com/gin-gonic/gin"
@@ -30,20 +27,18 @@ func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	group := rg.Group("/plugin/agent")
 	group.GET("/agents", h.ListAgents)
 	group.GET("/agents/:agentUUID/effective-permissions", h.GetAgentEffectivePermissions)
-	group.POST("/sessions", h.CreateSession)
-	group.GET("/sessions", h.ListSessions)
-	group.GET("/sessions/:sessionID/messages", h.ListSessionMessages)
-	group.POST("/sessions/:sessionID/archive", h.ArchiveSession)
-	group.DELETE("/sessions/:sessionID", h.DeleteSession)
-	group.GET("/stream/sse", h.StreamSSE)
-}
-
-type createSessionRequest struct {
-	AgentID   string         `json:"agent_id"`
-	AgentUUID string         `json:"agent_uuid"`
-	Title     string         `json:"title"`
-	Env       string         `json:"env"`
-	Meta      map[string]any `json:"meta"`
+	group.POST("/sessions", h.Session)
+	group.GET("/sessions", h.Session)
+	group.GET("/sessions/:session_uuid", h.Session)
+	group.PATCH("/sessions/:session_uuid", h.Session)
+	group.DELETE("/sessions/:session_uuid", h.Session)
+	group.POST("/sessions/:session_uuid/archive", h.Session)
+	group.GET("/sessions/:session_uuid/messages", h.Session)
+	group.POST("/sessions/:session_uuid/messages", h.Session)
+	group.POST("/sessions/:session_uuid/invocations", h.Session)
+	group.GET("/sessions/:session_uuid/invocations/:invocation_uuid", h.Session)
+	group.POST("/sessions/:session_uuid/invocations/:invocation_uuid/cancel", h.Session)
+	group.GET("/sessions/:session_uuid/invocations/:invocation_uuid/events", h.Session)
 }
 
 type agentEffectivePermissionResponse struct {
@@ -168,193 +163,6 @@ func (h *Handler) GetAgentEffectivePermissions(c *gin.Context) {
 		CanUseAgent: anyActionAllowed(actions),
 		Actions:     actions,
 	})
-}
-
-func (h *Handler) CreateSession(c *gin.Context) {
-	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
-		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
-		return
-	}
-
-	var req createSessionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_SESSION_INVALID_REQUEST", err.Error())
-		return
-	}
-	agentUUID := strings.TrimSpace(req.AgentUUID)
-	agentID := strings.TrimSpace(req.AgentID)
-	if agentUUID == "" && agentID == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_SESSION_AGENT_REQUIRED", "agent_uuid or agent_id is required")
-		return
-	}
-
-	session, err := h.deps.CapabilityGateway.CreateAgentSession(c.Request.Context(), gateway.AgentSessionParams{
-		AgentID:    agentID,
-		AgentUUID:  agentUUID,
-		Title:      strings.TrimSpace(req.Title),
-		Env:        strings.TrimSpace(req.Env),
-		Meta:       req.Meta,
-		TenantUUID: h.tenantUUID(c),
-	})
-	if err != nil {
-		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_SESSION_CREATE_FAILED", err.Error())
-		return
-	}
-	contracts.ResponseSuccess(c, session)
-}
-
-func (h *Handler) ListSessions(c *gin.Context) {
-	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
-		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
-		return
-	}
-	agentID := firstNonEmpty(c.Query("agent_uuid"), c.Query("agent_id"))
-	if agentID == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_SESSION_AGENT_REQUIRED", "agent_uuid or agent_id is required")
-		return
-	}
-	sessions, err := h.deps.CapabilityGateway.ListAgentSessions(c.Request.Context(), gateway.AgentSessionListOptions{
-		AgentID:    agentID,
-		Env:        strings.TrimSpace(c.Query("env")),
-		Status:     strings.TrimSpace(c.Query("status")),
-		Limit:      parsePositiveInt(c.Query("limit"), 50),
-		TenantUUID: h.tenantUUID(c),
-	})
-	if err != nil {
-		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_SESSION_LIST_FAILED", err.Error())
-		return
-	}
-	contracts.ResponseSuccess(c, gin.H{"items": sessions})
-}
-
-func (h *Handler) ListSessionMessages(c *gin.Context) {
-	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
-		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
-		return
-	}
-	sessionID := strings.TrimSpace(c.Param("sessionID"))
-	if sessionID == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_SESSION_REQUIRED", "session_id is required")
-		return
-	}
-	messages, err := h.deps.CapabilityGateway.ListAgentSessionMessages(c.Request.Context(), gateway.AgentSessionMessageListOptions{
-		SessionID:  sessionID,
-		Env:        strings.TrimSpace(c.Query("env")),
-		AfterID:    strings.TrimSpace(c.Query("after_id")),
-		Limit:      parsePositiveInt(c.Query("limit"), 200),
-		TenantUUID: h.tenantUUID(c),
-	})
-	if err != nil {
-		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_SESSION_MESSAGES_FAILED", err.Error())
-		return
-	}
-	contracts.ResponseSuccess(c, gin.H{"items": messages})
-}
-
-func (h *Handler) DeleteSession(c *gin.Context) {
-	h.mutateSession(c, false)
-}
-
-func (h *Handler) ArchiveSession(c *gin.Context) {
-	h.mutateSession(c, true)
-}
-
-func (h *Handler) mutateSession(c *gin.Context, archive bool) {
-	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
-		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
-		return
-	}
-	sessionID := strings.TrimSpace(c.Param("sessionID"))
-	if sessionID == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_SESSION_REQUIRED", "session_id is required")
-		return
-	}
-	opts := gateway.AgentSessionMutationOptions{
-		SessionID:  sessionID,
-		Env:        strings.TrimSpace(c.Query("env")),
-		TenantUUID: h.tenantUUID(c),
-	}
-	var err error
-	if archive {
-		err = h.deps.CapabilityGateway.ArchiveAgentSession(c.Request.Context(), opts)
-	} else {
-		err = h.deps.CapabilityGateway.DeleteAgentSession(c.Request.Context(), opts)
-	}
-	if err != nil {
-		contracts.ResponseError(c, http.StatusBadGateway, "POWERX_AGENT_SESSION_MUTATION_FAILED", err.Error())
-		return
-	}
-	contracts.ResponseSuccess(c, gin.H{"ok": true})
-}
-
-func (h *Handler) StreamSSE(c *gin.Context) {
-	if h == nil || h.deps == nil || h.deps.CapabilityGateway == nil || !h.deps.CapabilityGateway.Enabled() {
-		contracts.ResponseError(c, http.StatusServiceUnavailable, "POWERX_AGENT_GATEWAY_UNAVAILABLE", "PowerX gateway client is not configured")
-		return
-	}
-
-	params := gateway.AgentStreamParams{
-		AgentID:            firstNonEmpty(c.Query("agent_uuid"), c.Query("agent_id")),
-		SessionID:          firstNonEmpty(c.Query("session_uuid"), c.Query("session_id")),
-		TraceID:            strings.TrimSpace(c.Query("trace_id")),
-		Query:              strings.TrimSpace(c.Query("q")),
-		Intent:             strings.TrimSpace(c.Query("intent")),
-		Source:             strings.TrimSpace(c.Query("source")),
-		Env:                strings.TrimSpace(c.Query("env")),
-		TenantUUID:         h.tenantUUID(c),
-		OriginTenantUUID:   h.originTenantUUID(c),
-		RegenFromMessageID: strings.TrimSpace(c.Query("regen_from_message_id")),
-	}
-	if strings.TrimSpace(params.OriginTenantUUID) == "" {
-		contracts.ResponseError(c, http.StatusBadRequest, "POWERX_AGENT_ORIGIN_TENANT_REQUIRED", "origin_tenant_uuid is required for plugin agent stream resource ownership")
-		return
-	}
-	stream, err := h.deps.CapabilityGateway.StreamAgentSSE(c.Request.Context(), params)
-	if err != nil {
-		logger.ErrorCtx(logger.WithLogFields(c.Request.Context(), map[string]interface{}{
-			"module":                "agent",
-			"biz_scene":             "plugin_agent_stream_sse",
-			"biz_domain":            "agent",
-			"component":             "plugin.agent_handler",
-			"agent_id":              params.AgentID,
-			"session_id":            params.SessionID,
-			"trace_id":              params.TraceID,
-			"env":                   params.Env,
-			"tenant_uuid":           params.TenantUUID,
-			"origin_tenant_uuid":    params.OriginTenantUUID,
-			"regen_from_message_id": params.RegenFromMessageID,
-			"error":                 err.Error(),
-		}), "powerx agent stream proxy failed")
-		status, code := mapAgentStreamError(err)
-		contracts.ResponseError(c, status, code, code)
-		return
-	}
-	defer stream.Body.Close()
-
-	_ = frameworkrealtime.ProxySSEStream(c.Request.Context(), c.Writer, frameworkrealtime.StreamThroughOptions{
-		StatusCode: stream.StatusCode,
-		Header:     stream.Header,
-		Body:       stream.Body,
-		RequestID:  stream.Header.Get("X-Request-ID"),
-		TraceID:    firstNonEmpty(stream.Header.Get("X-Trace-ID"), params.TraceID),
-	})
-}
-
-func mapAgentStreamError(err error) (int, string) {
-	var upstream *gateway.PlatformAPIError
-	if errors.As(err, &upstream) {
-		switch upstream.StatusCode {
-		case http.StatusUnauthorized:
-			return http.StatusUnauthorized, "POWERX_AGENT_STREAM_UNAUTHORIZED"
-		case http.StatusForbidden:
-			return http.StatusForbidden, "POWERX_AGENT_STREAM_FORBIDDEN"
-		case http.StatusNotFound:
-			return http.StatusNotFound, "POWERX_AGENT_STREAM_NOT_FOUND"
-		case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-			return http.StatusBadGateway, "POWERX_AGENT_STREAM_UPSTREAM_DEPENDENCY"
-		}
-	}
-	return http.StatusBadGateway, "POWERX_AGENT_STREAM_FAILED"
 }
 
 func parsePositiveInt(raw string, fallback int) int {

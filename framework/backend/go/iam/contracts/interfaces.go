@@ -7,6 +7,9 @@ type DirectoryService interface {
 	GetTenant(ctx context.Context, tenantUUID string) (*Tenant, error)
 	ListDepartments(ctx context.Context, tenantUUID string) ([]Department, error)
 	ListMembers(ctx context.Context, tenantUUID string) ([]Member, error)
+	// ListMembersPage reads one bounded directory page. Callers that need a
+	// complete snapshot must choose that intentionally through ListMembers.
+	ListMembersPage(ctx context.Context, tenantUUID string, request MemberPageRequest) (*MemberPage, error)
 	GetMember(ctx context.Context, tenantUUID, memberUUID string) (*Member, error)
 	BatchGetMembers(ctx context.Context, tenantUUID string, memberUUIDs []string) ([]Member, error)
 	// BatchResolveMembers resolves historical member references without turning

@@ -12,7 +12,7 @@
         />
         <div class="flex items-center gap-2">
           <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
-            {{ $t("common.appName") }}
+            {{ t("common.appName") }}
           </h1>
           <UBadge color="neutral" variant="outline" class="text-[11px] font-medium">
             v{{ pluginVersion }}
@@ -237,8 +237,7 @@ const formatTime = (value?: string) => {
 };
 
 const subscribeNotificationTopics = () => {
-  subscribeTopic("_topic.system.notification");
-  const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim();
+	const tenantUUID = String(getTenantUuid() || resolveTenantUUIDForRequest() || "").trim();
   if (tenantUUID) {
     subscribeTopic(`_topic.notify.tenant.${tenantUUID}`);
   }

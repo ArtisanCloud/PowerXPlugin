@@ -12,6 +12,7 @@
 - 同步 CLI 默认版本、Skeleton 依赖和 lockfile、两个模板副本。修正 admin/client 版本参数替换；生成项目直接编译真实发布依赖，不使用仓库 workspace 或本地 Framework replace。
 - CI 支持 009-consume-powerx-capability 的 push、PR 和手动触发；frontend 增加 7 个鉴权/传输合同测试文件，backend 增加生成项目编译检查。旧工具 token 禁用检查只扫描实现代码，允许文档描述禁止使用的名称。
 - 回归容器安装 C 编译器和开发头文件，明确启用 CGO，使原分支已有 SQLite 测试可以执行。
+- 回归临时配置明确指定仓库内的 AI provider 目录，满足原分支既有的启动校验。
 
 ## 本地验证
 

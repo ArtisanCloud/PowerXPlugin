@@ -117,7 +117,7 @@ func TestProvisioningMissingEnvelopeAndUUIDFailClosed(t *testing.T) {
 	_, err := client.GetKnowledgeCatalog(context.Background())
 	var typed *fw.Error
 	require.True(t, errors.As(err, &typed))
-	require.Equal(t, "core-request", typed.TraceID)
+	require.Equal(t, "core-request", typed.RequestID)
 	require.Equal(t, 403, fw.HTTPStatus(err))
 }
 

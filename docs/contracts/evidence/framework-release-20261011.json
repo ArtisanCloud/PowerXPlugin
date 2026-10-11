@@ -1,0 +1,34 @@
+{
+  "schema": "powerx.framework.release-evidence/v1",
+  "date": "2026-10-11",
+  "status": "prepared",
+  "release_branch": "release/framework-20261011",
+  "versions": {
+    "go": "v0.0.24",
+    "client": "0.0.12",
+    "admin": "0.0.11"
+  },
+  "excluded": ["knowledge-content-overview-unaccepted-adapter"],
+  "checks": {
+    "go_full_module": "passed",
+    "go_changed_domains_race": "passed",
+    "cli_full_module": "passed",
+    "frontend_tests": { "files": 4, "passed": 90 },
+    "npm_tarballs": "packed",
+    "npm_tarball_consumer_install": "passed",
+    "nuxt_4_2_0_production_build": "passed",
+    "template_sync": "passed"
+  },
+  "publication": {
+    "go": "pending",
+    "client": "pending_npm_authentication",
+    "admin": "pending_npm_authentication"
+  },
+  "boundaries": {
+    "core_mutations": false,
+    "aicraft_mutations": false,
+    "dotnet_release": false,
+    "user_service_restarts": false,
+    "live_browser_acceptance": false
+  }
+}

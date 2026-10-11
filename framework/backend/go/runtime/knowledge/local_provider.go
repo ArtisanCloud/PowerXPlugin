@@ -156,6 +156,9 @@ func (p *LocalProvider) Search(ctx context.Context, query KnowledgeQuery) (*Know
 }
 
 func (p *LocalProvider) UpsertDocument(ctx context.Context, document KnowledgeDocument) (*KnowledgeIndexJob, error) {
+	if document.HostIngestion != nil || document.Indexing != nil || len(document.Artifacts) > 0 || document.ExternalRef != nil {
+		return nil, Unsupported(OperationUpsert)
+	}
 	_ = ctx
 	document, err := ValidateDocument(document)
 	if err != nil {
@@ -196,6 +199,9 @@ func (p *LocalProvider) DeleteDocument(ctx context.Context, input DeleteDocument
 
 func (p *LocalProvider) Reindex(ctx context.Context, input ReindexInput) (*KnowledgeIndexJob, error) {
 	_ = ctx
+	if input.HostRebuild != nil {
+		return nil, Unsupported(OperationReindex)
+	}
 	input.SpaceID = strings.TrimSpace(input.SpaceID)
 	input.DocumentID = strings.TrimSpace(input.DocumentID)
 	if input.SpaceID == "" {

@@ -1,3 +1,5 @@
+import { getPowerXHostSession, PowerXHostSessionError } from './host-session';
+import { isPowerXEmbedded } from './bridge';
 export interface PluginWsOptions {
   pluginId: string;
   apiBaseURL?: string;
@@ -110,8 +112,11 @@ export function createPluginWsClient(options: PluginWsOptions): PluginWsClient {
       const wsPath = normalizeWsPath(parsed.pathname || "");
       url = new URL(`${protocol}//${parsed.host}${wsPath}`);
     }
-    const token = String(options.token || "").trim();
-    const tenant = String(options.tenantUuid || "").trim();
+    const session = isPowerXEmbedded(options.insidePowerX) ? getPowerXHostSession(options.pluginId) : null;
+    const snapshot = session?.getReadySnapshot();
+    if (session && !snapshot) throw new PowerXHostSessionError('PLUGIN_AUTH_REQUIRED');
+    const token = String(snapshot?.accessToken || options.token || "").trim();
+    const tenant = String(session ? snapshot?.identity?.tenantUuid || '' : options.tenantUuid || "").trim();
     if (token) {
       const authValue = /^Bearer\s/i.test(token) ? token : `Bearer ${token}`;
       url.searchParams.set("authorization", authValue);
@@ -124,7 +129,16 @@ export function createPluginWsClient(options: PluginWsOptions): PluginWsClient {
 
   return {
     buildURL,
-    connect: () => new WebSocket(buildURL()),
+    connect: () => {
+      const socket = new WebSocket(buildURL());
+      if (isPowerXEmbedded(options.insidePowerX)) {
+        const session = getPowerXHostSession(options.pluginId);
+        const snapshot = session.getReadySnapshot()!;
+        const unsubscribe = session.subscribe(() => { if (!session.isCurrent(snapshot)) { socket.close(1000, 'AUTH_SESSION_CHANGED'); unsubscribe(); } });
+        socket.addEventListener('close', unsubscribe, { once: true });
+      }
+      return socket;
+    },
   };
 }
 
@@ -144,6 +158,8 @@ const cleanTopics = (topics: Array<string | null | undefined>) =>
 export function createPluginWsBusClient(
   options: PluginWsBusClientOptions,
 ): PluginWsBusClient {
+  const hostSession = isPowerXEmbedded(options.insidePowerX) ? getPowerXHostSession(options.pluginId) : null;
+  let stopHostSession: (() => void) | null = null;
   let ws: WebSocket | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let manualClosing = false;
@@ -218,6 +234,7 @@ export function createPluginWsBusClient(
   };
 
   const disconnect = () => {
+    stopHostSession?.(); stopHostSession = null;
     manualClosing = true;
     if (retryTimer) {
       clearTimeout(retryTimer);
@@ -238,6 +255,11 @@ export function createPluginWsBusClient(
   };
 
   const connect = () => {
+    const hostSnapshot = hostSession?.getReadySnapshot();
+    if (hostSession) {
+      if (!hostSnapshot) { state.status = 'error'; emitStatus(); return; }
+      token = hostSnapshot.accessToken; tenantUuid = hostSnapshot.identity!.tenantUuid || ''; memberUuid = hostSnapshot.identity!.memberUuid || '';
+    }
     if (!tenantUuid) return;
     if (
       ws &&
@@ -249,6 +271,12 @@ export function createPluginWsBusClient(
     }
     disconnect();
     manualClosing = false;
+    if (hostSession && hostSnapshot) stopHostSession = hostSession.subscribe(() => {
+      if (!hostSession.isCurrent(hostSnapshot)) {
+        if (!hostSession.isSameSession(hostSnapshot)) queuedTopics.clear();
+        disconnect();
+      }
+    });
     state.status = "connecting";
     state.tenantUuid = tenantUuid;
     state.welcomeReceived = false;
@@ -261,12 +289,14 @@ export function createPluginWsBusClient(
     state.lastCloseCode = 0;
     state.lastCloseReason = "";
     const resolved = buildURL();
-    state.lastUrl = resolved.url;
+    const diagnostic = new URL(resolved.url);
+    diagnostic.searchParams.delete('authorization');
+    state.lastUrl = diagnostic.toString();
     state.lastUrlSource = resolved.source;
     emitStatus();
-    logInfo("connect", { url: state.lastUrl, source: state.lastUrlSource });
+    logInfo("connect", { source: state.lastUrlSource });
     try {
-      ws = new WebSocket(state.lastUrl);
+      ws = new WebSocket(resolved.url);
     } catch {
       ws = null;
       state.status = "error";
@@ -276,6 +306,7 @@ export function createPluginWsBusClient(
     }
 
     ws.onopen = () => {
+      if (hostSnapshot && !hostSession!.isCurrent(hostSnapshot)) return;
       state.connected = true;
       state.status = "connected";
       state.reconnectAttempts = 0;
@@ -327,6 +358,7 @@ export function createPluginWsBusClient(
       emitStatus();
     };
     ws.onmessage = (event) => {
+      if (hostSnapshot && !hostSession!.isCurrent(hostSnapshot)) return;
       if (!event?.data) return;
       try {
         const msg = JSON.parse(String(event.data)) as PluginWsBusMessage;

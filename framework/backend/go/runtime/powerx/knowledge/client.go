@@ -14,7 +14,9 @@ import (
 	"time"
 
 	fwknowledge "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/knowledge"
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
+	"github.com/google/uuid"
 )
 
 type Config struct {
@@ -164,29 +166,38 @@ func (c *Client) do(ctx context.Context, path string, input, output any) error {
 	return c.request(ctx, http.MethodPost, path, input, output)
 }
 
+type responseMeta struct{ TraceID, RequestID, InvocationTraceID string }
+
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
+	_, err := c.requestMeta(ctx, method, path, input, output)
+	return err
+}
+func (c *Client) requestMeta(ctx context.Context, method, path string, input, output any) (responseMeta, error) {
+	meta := responseMeta{}
 	if c == nil || c.http == nil || c.token == nil {
-		return errors.New("powerx knowledge client is not configured")
+		return meta, fwknowledge.NewError(fwknowledge.CodeProviderUnavailable, "knowledge.host.unavailable")
 	}
 	var body io.Reader
 	if input != nil {
 		encoded, err := json.Marshal(input)
 		if err != nil {
-			return err
+			return meta, err
 		}
 		body = bytes.NewReader(encoded)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
-		return err
+		return meta, err
 	}
 	if input != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	token, err := c.token.Token(ctx)
 	if err != nil {
-		return err
+		return meta, err
 	}
+	req.Header.Set("X-Trace-ID", uuid.NewString())
+	req.Header.Set("X-Request-ID", uuid.NewString())
 	scheme := c.authScheme
 	if scheme == "" {
 		scheme = "Bearer"
@@ -194,43 +205,46 @@ func (c *Client) request(ctx context.Context, method, path string, input, output
 	req.Header.Set("Authorization", scheme+" "+token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return meta, err
 	}
 	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	if err != nil {
-		return err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var envelope struct {
-			ReasonCode string `json:"reason_code"`
-			ErrorCode  string `json:"error_code"`
-			RequestID  string `json:"request_id"`
-		}
-		_ = json.Unmarshal(raw, &envelope)
-		reason := strings.TrimSpace(envelope.ReasonCode)
-		if reason == "" {
-			reason = strings.TrimSpace(envelope.ErrorCode)
-		}
-		trace := resp.Header.Get("X-Trace-Id")
-		if trace == "" {
-			trace = envelope.RequestID
-		}
-		return &HTTPError{StatusCode: resp.StatusCode, ReasonCode: reason, TraceID: trace, Body: string(raw)}
+		return meta, err
 	}
 	var envelope struct {
-		Data json.RawMessage `json:"data"`
+		Data      json.RawMessage `json:"data"`
+		TraceID   string          `json:"trace_id"`
+		RequestID string          `json:"request_id"`
+		Details   map[string]any  `json:"details"`
 	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return err
+	_ = json.Unmarshal(raw, &envelope)
+	meta.TraceID = resp.Header.Get("X-Trace-Id")
+	if meta.TraceID == "" {
+		meta.TraceID = envelope.TraceID
+	}
+	if meta.TraceID == "" {
+		meta.TraceID = req.Header.Get("X-Trace-ID")
+	}
+	meta.RequestID = envelope.RequestID
+	if meta.RequestID == "" {
+		meta.RequestID = resp.Header.Get("X-Request-Id")
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return meta, &HTTPError{StatusCode: resp.StatusCode, ReasonCode: hostcontract.ParseReasonCode(raw, "KNOWLEDGE_UPSTREAM_DEPENDENCY"), TraceID: meta.TraceID, RequestID: meta.RequestID, Details: fwknowledge.RedactMap(envelope.Details), Body: string(raw)}
 	}
 	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return errors.New("powerx knowledge response missing data")
+		return meta, fwknowledge.NewError(fwknowledge.CodeInvalidResponse, "knowledge.semantic.invalid_response")
 	}
-	return json.Unmarshal(envelope.Data, output)
+	if err := json.Unmarshal(envelope.Data, output); err != nil {
+		return meta, fwknowledge.WrapError(fwknowledge.CodeInvalidResponse, "knowledge.semantic.invalid_response", err)
+	}
+	return meta, nil
 }
 
 type HTTPError struct {
+	RequestID  string
+	Details    map[string]any
 	TraceID    string
 	StatusCode int
 	ReasonCode string
@@ -247,7 +261,8 @@ func (c *Client) DelegatedCapabilities(context.Context) fwknowledge.ProviderCapa
 	return fwknowledge.BasicCapabilities("powerx_knowledge_host", fwknowledge.ProviderModeDelegated,
 		fwknowledge.OperationCatalog, fwknowledge.OperationCreate,
 		fwknowledge.OperationRetrieve, fwknowledge.OperationSearch, fwknowledge.OperationUpsert,
-		fwknowledge.OperationDelete, fwknowledge.OperationReindex, fwknowledge.OperationHealth)
+		fwknowledge.OperationDelete, fwknowledge.OperationReindex, fwknowledge.OperationHealth,
+		fwknowledge.OperationSemanticCapabilities, fwknowledge.OperationSemanticQuery, fwknowledge.OperationSemanticConfigure, fwknowledge.OperationDocumentVisibility)
 }
 
 func (c *Client) ListKnowledgeSpaces(ctx context.Context, input fwknowledge.ListSpacesInput) ([]fwknowledge.KnowledgeSpace, error) {
@@ -308,12 +323,17 @@ func (c *Client) SearchKnowledge(ctx context.Context, query fwknowledge.Knowledg
 }
 
 func (c *Client) UpsertKnowledgeDocument(ctx context.Context, document fwknowledge.KnowledgeDocument) (*fwknowledge.KnowledgeIndexJob, error) {
-	// The published Host document DTO has no ingestion snapshot contract.
-	// Reject before sending: Core would otherwise ignore these settings.
-	if document.Ingestion != nil {
-		return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "knowledgeLab.workspace.snapshotBlockedDescription")
+	if err := document.ValidateSemantic(); err != nil {
+		return nil, err
 	}
-	document, err := fwknowledge.ValidateDocument(document)
+	// Local configuration is not the published Host snapshot DTO.
+	if document.Ingestion != nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeUnsupportedCapability, "knowledgeLab.workspace.unsupported")
+	}
+	if err := document.HostIngestion.Validate(); err != nil {
+		return nil, err
+	}
+	document, err := fwknowledge.ValidateHostDocument(document)
 	if err != nil {
 		return nil, err
 	}
@@ -322,11 +342,28 @@ func (c *Client) UpsertKnowledgeDocument(ctx context.Context, document fwknowled
 	}
 	var response hostIndexJob
 	path := "/api/v1/tenant/knowledge/spaces/" + url.PathEscape(document.SpaceID) + "/documents"
-	payload := map[string]any{"title": document.Title, "uri": document.URI, "content": document.Content, "content_type": document.ContentType, "checksum": document.Checksum, "version": document.Version, "tags": document.Tags}
-	if err := c.request(ctx, http.MethodPost, path, payload, &response); err != nil {
+	payload := hostDocumentInput{Title: document.Title, URI: document.URI, Content: document.Content, ContentType: document.ContentType, Checksum: document.Checksum, Version: document.Version, Tags: document.Tags, Ingestion: document.HostIngestion, Indexing: document.Indexing, Artifacts: document.Artifacts, ExternalRef: document.ExternalRef, IdempotencyKey: document.IdempotencyKey}
+	var meta responseMeta
+	if c.authScheme == "ApiKey" {
+		meta, err = c.requestMeta(ctx, http.MethodPost, path, payload, &response)
+	} else {
+		var out struct {
+			Job hostIndexJob `json:"job"`
+		}
+		meta, err = c.invokeContract(ctx, documentManageCapability, struct {
+			Operation string            `json:"operation"`
+			SpaceUUID string            `json:"space_uuid"`
+			Document  hostDocumentInput `json:"document"`
+		}{"submit_document", document.SpaceID, payload}, &out)
+		response = out.Job
+	}
+	if err != nil {
 		return nil, mapHostError(err)
 	}
-	return response.toFramework(), nil
+	job := response.toFramework()
+	job.InvocationTraceID = meta.InvocationTraceID
+	job.RequestID = meta.RequestID
+	return job, nil
 }
 
 func (c *Client) DeleteKnowledgeDocument(ctx context.Context, input fwknowledge.DeleteDocumentInput) (*fwknowledge.KnowledgeIndexJob, error) {
@@ -342,19 +379,55 @@ func (c *Client) DeleteKnowledgeDocument(ctx context.Context, input fwknowledge.
 }
 
 func (c *Client) ReindexKnowledgeDocument(ctx context.Context, input fwknowledge.ReindexInput) (*fwknowledge.KnowledgeIndexJob, error) {
-	if strings.TrimSpace(input.SpaceID) == "" {
-		return nil, fwknowledge.NewError(fwknowledge.CodeInvalidDocument, "knowledge space_id is required")
+	if err := input.HostRebuild.Validate(); err != nil {
+		return nil, err
 	}
-	if strings.TrimSpace(input.DocumentID) != "" {
-		return nil, fwknowledge.Unsupported(fwknowledge.OperationReindex)
+	space, err := uuid.Parse(input.SpaceID)
+	if err != nil || space == uuid.Nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument")
 	}
+	path := "/api/v1/tenant/knowledge/spaces/" + space.String()
+	if input.DocumentID != "" {
+		document, err := uuid.Parse(input.DocumentID)
+		if err != nil || document == uuid.Nil {
+			return nil, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument")
+		}
+		input.DocumentID = document.String()
+		path += "/documents/" + input.DocumentID
+	}
+	path += "/indexes:rebuild"
 	var response hostIndexJob
-	path := "/api/v1/tenant/knowledge/spaces/" + url.PathEscape(strings.TrimSpace(input.SpaceID)) + "/indexes:rebuild"
-	if err := c.request(ctx, http.MethodPost, path, nil, &response); err != nil {
-		return nil, mapHostError(err)
+	var meta responseMeta
+	var requestErr error
+	if c.authScheme == "ApiKey" {
+		meta, requestErr = c.requestMeta(ctx, http.MethodPost, path, input.HostRebuild, &response)
+	} else {
+		operation := "rebuild_space"
+		if input.DocumentID != "" {
+			operation = "rebuild_document"
+		}
+		var out struct {
+			Job hostIndexJob `json:"job"`
+		}
+		meta, requestErr = c.invokeContract(ctx, documentManageCapability, struct {
+			Operation    string                               `json:"operation"`
+			SpaceUUID    string                               `json:"space_uuid"`
+			DocumentUUID string                               `json:"document_uuid,omitempty"`
+			Rebuild      *fwknowledge.DocumentRebuildSettings `json:"rebuild"`
+		}{operation, input.SpaceID, input.DocumentID, input.HostRebuild}, &out)
+		response = out.Job
+	}
+	if requestErr != nil {
+		return nil, mapHostError(requestErr)
+	}
+	jobID, err := uuid.Parse(response.JobUUID)
+	if err != nil || jobID == uuid.Nil || response.Operation != "rebuild" || (response.Status != "queued" && response.Status != "running" && response.Status != "succeeded" && response.Status != "failed") || response.DocumentUUID != input.DocumentID {
+		return nil, fwknowledge.NewError(fwknowledge.CodeInvalidResponse, "knowledgeLab.workspace.invalidResponse")
 	}
 	job := response.toFramework()
 	job.Operation = fwknowledge.IndexOperationReindex
+	job.InvocationTraceID = meta.InvocationTraceID
+	job.RequestID = meta.RequestID
 	return job, nil
 }
 
@@ -364,13 +437,49 @@ func (c *Client) GetKnowledgeIndexJob(ctx context.Context, input fwknowledge.Ind
 	}
 	var response hostIndexJob
 	path := "/api/v1/tenant/knowledge/index-jobs/" + url.PathEscape(strings.TrimSpace(input.JobID))
-	if err := c.request(ctx, http.MethodGet, path, nil, &response); err != nil {
+	if !fwknowledge.SemanticUUID(input.JobID) {
+		return nil, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledge.semantic.invalid_argument")
+	}
+	var meta responseMeta
+	var err error
+	if c.authScheme == "ApiKey" {
+		meta, err = c.requestMeta(ctx, http.MethodGet, path, nil, &response)
+	} else {
+		var out struct {
+			Job hostIndexJob `json:"job"`
+		}
+		meta, err = c.invokeContract(ctx, documentManageCapability, struct {
+			Operation string `json:"operation"`
+			JobUUID   string `json:"job_uuid"`
+		}{"get_job", input.JobID}, &out)
+		response = out.Job
+	}
+	if err != nil {
 		return nil, mapHostError(err)
 	}
-	return response.toFramework(), nil
+	job := response.toFramework()
+	job.InvocationTraceID = meta.InvocationTraceID
+	job.RequestID = meta.RequestID
+	return job, nil
 }
 
 type hostIndexJob struct {
+	ArtifactCount      *int                                   `json:"artifact_count"`
+	VectorCount        *int                                   `json:"vector_count"`
+	BundleGeneration   string                                 `json:"bundle_generation"`
+	RebuildMode        fwknowledge.DocumentRebuildMode        `json:"rebuild_mode"`
+	DocumentCount      *int                                   `json:"document_count"`
+	ProcessedDocuments *int                                   `json:"processed_documents"`
+	DocumentConfigs    []fwknowledge.DocumentJobConfig        `json:"document_configs"`
+	Priority           string                                 `json:"priority"`
+	TraceID            string                                 `json:"trace_id"`
+	EffectiveConfig    *fwknowledge.DocumentIngestionSnapshot `json:"effective_config"`
+	RequestedConfig    *fwknowledge.DocumentIngestionSettings `json:"requested_config"`
+	SnapshotChecksum   string                                 `json:"snapshot_checksum"`
+	ChunkCount         *int                                   `json:"chunk_count"`
+	StartedAt          time.Time                              `json:"started_at"`
+	CompletedAt        time.Time                              `json:"completed_at"`
+
 	JobUUID      string `json:"job_uuid"`
 	SpaceUUID    string `json:"space_uuid"`
 	DocumentUUID string `json:"document_uuid"`
@@ -380,13 +489,17 @@ type hostIndexJob struct {
 }
 
 func (job hostIndexJob) toFramework() *fwknowledge.KnowledgeIndexJob {
-	return &fwknowledge.KnowledgeIndexJob{JobID: strings.TrimSpace(job.JobUUID), SpaceID: strings.TrimSpace(job.SpaceUUID), DocumentID: strings.TrimSpace(job.DocumentUUID), Operation: strings.TrimSpace(job.Operation), Status: strings.TrimSpace(job.Status), ErrorCode: strings.TrimSpace(job.ErrorCode)}
+	return &fwknowledge.KnowledgeIndexJob{ArtifactCount: job.ArtifactCount, VectorCount: job.VectorCount, BundleGeneration: job.BundleGeneration, RebuildMode: job.RebuildMode, DocumentCount: job.DocumentCount, ProcessedDocuments: job.ProcessedDocuments, DocumentConfigs: job.DocumentConfigs, Priority: job.Priority, TraceID: job.TraceID, EffectiveConfig: job.EffectiveConfig, RequestedConfig: job.RequestedConfig, SnapshotChecksum: job.SnapshotChecksum, ChunkCount: job.ChunkCount, StartedAt: job.StartedAt, FinishedAt: job.CompletedAt, JobID: strings.TrimSpace(job.JobUUID), SpaceID: strings.TrimSpace(job.SpaceUUID), DocumentID: strings.TrimSpace(job.DocumentUUID), Operation: strings.TrimSpace(job.Operation), Status: strings.TrimSpace(job.Status), ErrorCode: strings.TrimSpace(job.ErrorCode)}
 }
 
 func mapHostError(err error) error {
 	var hostErr *HTTPError
 	if !errors.As(err, &hostErr) {
-		return err
+		var typed *fwknowledge.Error
+		if errors.As(err, &typed) {
+			return err
+		}
+		return &fwknowledge.Error{Code: fwknowledge.CodeProviderUnavailable, StatusCode: 503, Message: "knowledge.host.request_failed", Cause: err}
 	}
 	code := fwknowledge.CodeProviderUnavailable
 	switch hostErr.StatusCode {
@@ -408,7 +521,7 @@ func mapHostError(err error) error {
 	if hostErr.ReasonCode != "" {
 		code = fwknowledge.ErrorCode(hostErr.ReasonCode)
 	}
-	return &fwknowledge.Error{Code: code, StatusCode: hostErr.StatusCode, TraceID: hostErr.TraceID, Message: "knowledge.host.request_failed", Cause: err}
+	return &fwknowledge.Error{Code: code, StatusCode: hostErr.StatusCode, TraceID: hostErr.TraceID, RequestID: hostErr.RequestID, SafeDetails: hostErr.Details, Message: "knowledge.host.request_failed", Cause: err}
 
 }
 
@@ -461,3 +574,31 @@ func (c *Client) CreateKnowledgeSpace(ctx context.Context, input fwknowledge.Cre
 
 var _ fwknowledge.CatalogDelegatedClient = (*Client)(nil)
 var _ fwknowledge.SpaceProvisioningDelegatedClient = (*Client)(nil)
+
+func (c *Client) GetKnowledgeIndexJobChunks(ctx context.Context, input fwknowledge.IndexJobQuery) ([]fwknowledge.IndexJobChunk, error) {
+	id, err := uuid.Parse(input.JobID)
+	if err != nil || id == uuid.Nil {
+		return nil, fwknowledge.NewError(fwknowledge.CodeInvalidArgument, "knowledgeLab.workspace.invalidDocument")
+	}
+	var response struct {
+		Items []fwknowledge.IndexJobChunk `json:"items"`
+	}
+	var requestErr error
+	if c.authScheme == "ApiKey" {
+		requestErr = c.request(ctx, http.MethodGet, "/api/v1/tenant/knowledge/index-jobs/"+id.String()+"/chunks", nil, &response)
+	} else {
+		_, requestErr = c.invokeContract(ctx, documentManageCapability, struct {
+			Operation string `json:"operation"`
+			JobUUID   string `json:"job_uuid"`
+		}{"get_job_chunks", id.String()}, &response)
+	}
+	if requestErr != nil {
+		return nil, mapHostError(requestErr)
+	}
+	for _, chunk := range response.Items {
+		if chunk.JobUUID != id.String() || chunk.UUID == "" || chunk.DocumentUUID == "" || chunk.SpaceUUID == "" || chunk.Checksum == "" {
+			return nil, fwknowledge.NewError(fwknowledge.CodeInvalidResponse, "knowledgeLab.workspace.invalidResponse")
+		}
+	}
+	return response.Items, nil
+}

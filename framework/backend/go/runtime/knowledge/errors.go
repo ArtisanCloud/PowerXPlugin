@@ -27,15 +27,17 @@ const (
 )
 
 type Error struct {
-	StatusCode  int            `json:"status_code,omitempty"`
-	Code        ErrorCode      `json:"code"`
-	Message     string         `json:"message"`
-	Provider    string         `json:"provider,omitempty"`
-	Operation   string         `json:"operation,omitempty"`
-	Retryable   bool           `json:"retryable,omitempty"`
-	TraceID     string         `json:"trace_id,omitempty"`
-	SafeDetails map[string]any `json:"safe_details,omitempty"`
-	Cause       error          `json:"-"`
+	RequestID         string         `json:"request_id,omitempty"`
+	InvocationTraceID string         `json:"invocation_trace_id,omitempty"`
+	StatusCode        int            `json:"status_code,omitempty"`
+	Code              ErrorCode      `json:"code"`
+	Message           string         `json:"message"`
+	Provider          string         `json:"provider,omitempty"`
+	Operation         string         `json:"operation,omitempty"`
+	Retryable         bool           `json:"retryable,omitempty"`
+	TraceID           string         `json:"trace_id,omitempty"`
+	SafeDetails       map[string]any `json:"safe_details,omitempty"`
+	Cause             error          `json:"-"`
 }
 
 func (e *Error) Error() string {
@@ -90,6 +92,8 @@ func HTTPStatusForCode(code ErrorCode) int {
 		return http.StatusPreconditionFailed
 	case CodeProviderUnavailable:
 		return http.StatusServiceUnavailable
+	case CodeInvalidResponse:
+		return http.StatusBadGateway
 	case CodeInvalidArgument, CodeUnsupportedCapability, CodeTenantRequired, CodeInvalidDocument, CodeIndexFailed:
 		return http.StatusBadRequest
 	default:

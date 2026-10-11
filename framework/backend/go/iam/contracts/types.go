@@ -11,6 +11,7 @@ const (
 )
 
 // Tenant 为统一租户模型。
+// Core 的数字 status 显式转换为字符串，key 映射为 TenantKey。
 type Tenant struct {
 	TenantUUID string `json:"tenant_uuid"`
 	TenantKey  string `json:"tenant_key,omitempty"`

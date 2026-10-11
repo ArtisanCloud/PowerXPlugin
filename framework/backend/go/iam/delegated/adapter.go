@@ -20,6 +20,8 @@ type Host interface {
 	contracts.DirectoryService
 	contracts.AuthzService
 	contracts.IdentityContextService
+	contracts.DelegatedIdentityService
+	contracts.WSIdentityRevalidationService
 }
 
 // Adapter publishes a Host as the Framework IAM adapter bundle.
@@ -67,7 +69,13 @@ func (a *Adapter) Authorize(ctx context.Context, req contracts.AuthorizationRequ
 	return a.host.Authorize(ctx, req)
 }
 func (a *Adapter) ResolveIdentity(ctx context.Context, bearerToken string) (*contracts.IdentityContext, error) {
-	return a.host.ResolveIdentity(ctx, bearerToken)
+	return nil, iamerrors.New(iamerrors.CodeIdentityMigrationRequired, iamerrors.CodeIdentityMigrationRequired)
+}
+func (a *Adapter) ResolveDelegatedIdentity(ctx context.Context, in contracts.DelegatedIdentityQuery) (*contracts.DelegatedIdentity, error) {
+	return a.host.ResolveDelegatedIdentity(ctx, in)
+}
+func (a *Adapter) RevalidateWSIdentity(ctx context.Context, in contracts.WSIdentityQuery) (*contracts.WSIdentity, error) {
+	return a.host.RevalidateWSIdentity(ctx, in)
 }
 
 var _ contracts.DirectoryService = (*Adapter)(nil)

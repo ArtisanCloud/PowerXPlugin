@@ -17,3 +17,5 @@ Nuxt admin 的 Scheduler composable 改为从正式 client 包导入，并声明
 发布准备已验证：Go 全模块测试；IAM、Realtime、Knowledge 的 race 测试；CLI 全模块测试；Nuxt 客户端相关 90 个测试；两个包的 tarball 打包、安装及 Nuxt 4.2.0 生产构建；模板同步检查。
 
 Go tag 使用 framework/backend/go/v0.0.24；npm 发布的默认渠道为 latest。远端发布和完整性核验结果单独记录在 [发布证据](../contracts/evidence/framework-release-20261011.json)。
+
+Go 与两个 npm 包均已发布并完成远端核验；npm latest 分别指向 client 0.0.12 和 admin 0.0.11。通过公开 registry 安装的 27 个包文件与发布提交一致，独立 Nuxt 生产构建通过。

@@ -1,0 +1,43 @@
+{
+  "schema": "powerx.framework.go-release-evidence/v1",
+  "date": "2026-10-12",
+  "status": "published_verified",
+  "module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+  "version": "v0.0.25",
+  "tag": "framework/backend/go/v0.0.25",
+  "tag_object": "a5f0a5875e81b29331b60ce57cb22479100a800f",
+  "release_commit": "fea5e58a81b67d2c879e57efa04d11d34c30b896",
+  "pull_request": 84,
+  "ci": {
+    "run_id": 38189973959,
+    "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/38189973959",
+    "status": "success",
+    "jobs_passed": 9
+  },
+  "publication": {
+    "remote_tag_verified": true,
+    "proxy": "https://proxy.golang.org",
+    "checksum_database": "sum.golang.org",
+    "sum": "h1:xBXZFV8r2U2NWnsji68ob9GPJ30ezpxfClSH5Pxcwwo=",
+    "go_mod_sum": "h1:C1asdU7a8tjju++G5jN9YN3ihXqrjfHnqNt4/gaUwiI=",
+    "origin_commit_verified": true,
+    "published_source_files_matched": 450,
+    "verification_toolchain": "go1.26.5 darwin/arm64"
+  },
+  "consumer": {
+    "test": "TestGeneratedBackendBuild",
+    "status": "passed",
+    "gowork": "off",
+    "framework_local_replace": false,
+    "framework_source_snapshot": false
+  },
+  "boundaries": {
+    "npm_release": false,
+    "dotnet_release": false,
+    "core_mutations": false,
+    "aicraft_mutations": false,
+    "user_service_restarts": false,
+    "live_core_browser_acceptance": false,
+    "publication_documents_recorded_after_tag": true
+  }
+}

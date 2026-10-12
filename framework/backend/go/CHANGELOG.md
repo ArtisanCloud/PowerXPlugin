@@ -1,6 +1,6 @@
 # Go Framework 发布记录
 
-## v0.0.25（待发布） — 2026-10-12
+## v0.0.25 — 2026-10-12
 
 发布模块：`github.com/ArtisanCloud/PowerXPlugin/framework/backend/go`。
 
@@ -11,9 +11,9 @@
 - 新增知识内容导览的类型、可选 Provider 接口及固定 Host 客户端，校验文章预览、语料版本和分页响应。本项真实 Core／浏览器验收仍待完成。
 - Skeleton Local 设主事务维护 membership 主引用、角色和审计，保护当前主联系人；Local 模型目录补齐文本生成声明。相关 Go 生成模板已同步。
 
-本版本尚未打 tag。CLI/Skeleton 已预置 v0.0.25；正式升级须在发布后验证真实 Go 模块依赖，并重新构建插件。Core 精确授权和业务 HTTP 状态透传仍需目标环境验收。
+本版本已通过 `framework/backend/go/v0.0.25` 发布，指向 CI 通过的 develop 合并提交 `fea5e58a`。Go proxy 下载、发布源码核对和无本地替换的生成项目测试通过。CLI/Skeleton 已预置 v0.0.25；消费方升级后需重新构建插件。Core 精确授权和业务 HTTP 状态透传仍需目标环境验收。
 
-详细变更、测试记录与升级步骤见 [v0.0.25 发布准备说明](../../../docs/releases/framework-20261012.md)。v0.0.24 的已发布内容和证据见 [上一版发布说明](../../../docs/releases/framework-20261011.md)。
+详细变更、测试记录与升级步骤见 [v0.0.25 发布说明](../../../docs/releases/framework-20261012.md)。v0.0.24 的已发布内容和证据见 [上一版发布说明](../../../docs/releases/framework-20261011.md)。
 
 ## v0.0.23 — 2026-10-07
 

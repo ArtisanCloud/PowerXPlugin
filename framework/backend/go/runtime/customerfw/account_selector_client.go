@@ -69,7 +69,6 @@ func (c *AccountSelectorClient) CreateBasicAccount(ctx context.Context, req Crea
 	if c == nil || c.invoker == nil {
 		return nil, errors.New("CUSTOMER_ACCOUNT_SELECTOR_GATEWAY_REQUIRED")
 	}
-	req = NormalizeBasicAccountLabels(req)
 	req.Type = strings.TrimSpace(req.Type)
 	if req.Type == "" {
 		req.Type = "person"
@@ -77,9 +76,13 @@ func (c *AccountSelectorClient) CreateBasicAccount(ctx context.Context, req Crea
 	if req.Type != "person" && req.Type != "company" {
 		return nil, errors.New("CUSTOMER_TYPE_REQUIRED")
 	}
-	if req.Type == "company" && (req.PrimaryContact == nil || strings.TrimSpace(req.PrimaryContact.DisplayName) == "") {
+	if normalized := NormalizeBasicAccountLabels(req); req.Type == "company" && (normalized.PrimaryContact == nil || strings.TrimSpace(normalized.PrimaryContact.DisplayName) == "") {
 		return nil, errors.New("CUSTOMER_PRIMARY_CONTACT_REQUIRED")
 	}
+	if err := ValidateIdentityCustomer(ExternalIdentityCustomer{Type: req.Type, DisplayName: req.DisplayName, Nickname: req.Nickname, GivenName: req.GivenName, FamilyName: req.FamilyName, PrimaryEmail: req.PrimaryEmail, PrimaryPhone: req.PrimaryPhone, PrimaryContact: req.PrimaryContact}); err != nil {
+		return nil, err
+	}
+	req = NormalizeBasicAccountLabels(req)
 	body := map[string]any{"operation": "create", "type": req.Type, "status": req.Status, "primary_email": req.PrimaryEmail, "primary_phone": req.PrimaryPhone, "display_name": req.DisplayName, "nickname": req.Nickname, "given_name": req.GivenName, "family_name": req.FamilyName, "avatar_url": req.AvatarURL, "locale": req.Locale, "timezone": req.Timezone}
 	if req.PrimaryContact != nil {
 		body["primary_contact"] = req.PrimaryContact

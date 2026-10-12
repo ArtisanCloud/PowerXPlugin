@@ -28,6 +28,8 @@ type LLMInvokeOutput struct {
 
 type LLMModel struct {
 	ModelKey          string         `json:"model_key"`
+	Modality          string         `json:"modality"`
+	Capabilities      []string       `json:"capabilities"`
 	Provider          string         `json:"provider"`
 	Model             string         `json:"model"`
 	Label             string         `json:"label,omitempty"`

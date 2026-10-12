@@ -733,7 +733,12 @@ func main() {
 	if providerResolver.Mode() == fwprovider.ModeLocal {
 		selectedLocalContactStore = localContactStore
 	}
-	contactRuntime, err := contactfw.NewRuntime(providerResolver.Mode(), selectedLocalContactStore, delegatedContactClient)
+	var primaryLocal, primaryDelegated contactfw.PrimaryContactManager
+	if providerResolver.Mode() == fwprovider.ModeLocal {
+		primaryLocal = customersvc.NewFrameworkPrimaryContactManager(customerrepo.NewContactRepository(queryDB), app.PluginID)
+	}
+	primaryDelegated, _ = delegatedContactClient.(contactfw.PrimaryContactManager)
+	contactRuntime, err := contactfw.NewRuntime(providerResolver.Mode(), selectedLocalContactStore, delegatedContactClient, contactfw.WithPrimaryContactManagers(primaryLocal, primaryDelegated))
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize Contact runtime")
 	}

@@ -110,6 +110,9 @@ func (c *CapabilityClient) invoke(ctx context.Context, capabilityID, operation s
 	if resp == nil || resp.Data == nil {
 		return NewError(CodeDelegateUnavailable, errors.New("contact capability response is empty"))
 	}
+	if operation == "set_primary" && (resp.Data["protocol_used"] != "core_internal" || resp.Data["fallback_used"] != false || resp.Data["status"] != "completed") {
+		return NewError(CodeDelegateUnavailable, errors.New("CONTACT_PRIMARY_RESPONSE_INVALID"))
+	}
 	payload, ok := resp.Data["payload"]
 	if !ok {
 		return NewError(CodeDelegateUnavailable, errors.New("contact capability payload is missing"))
@@ -127,17 +130,38 @@ func (c *CapabilityClient) invoke(ctx context.Context, capabilityID, operation s
 func mapCapabilityError(err error) error {
 	var invokeErr *gateway.InvocationError
 	if errors.As(err, &invokeErr) {
+		var body struct {
+			ErrorCode string `json:"error_code"`
+			RequestID string `json:"request_id"`
+			Details   struct {
+				TraceID string `json:"trace_id"`
+			} `json:"details"`
+		}
+		if json.Unmarshal(invokeErr.Body, &body) == nil && knownContactCode(ErrorCode(body.ErrorCode)) {
+			out := NewError(ErrorCode(body.ErrorCode), err)
+			if out.TraceID == "" {
+				out.TraceID = body.Details.TraceID
+			}
+			if out.RequestID == "" {
+				out.RequestID = body.RequestID
+			}
+			return out
+		}
 		for _, item := range invokeErr.Errors {
 			if code := ErrorCode(strings.TrimSpace(item.Code)); knownContactCode(code) {
 				return NewError(code, err)
 			}
+		}
+		if invokeErr.StatusCode == 403 {
+			return NewError(CodeCapabilityForbidden, err)
 		}
 	}
 	return NewError(CodeDelegateUnavailable, err)
 }
 func knownContactCode(code ErrorCode) bool {
 	switch code {
-	case CodeInvalidArgument, CodeNotFound, CodeCustomerMismatch, CodeCustomerMembershipInactive, CodeIdentityNotFound, CodeIdentityConflict, CodeChannelDictionaryInvalid, CodeIdentityChannelMigrationRequired, CodeCapabilityForbidden:
+	case CodeInvalidArgument, CodeNotFound, CodeCustomerMismatch, CodeCustomerMembershipInactive, CodeIdentityNotFound, CodeIdentityConflict, CodeChannelDictionaryInvalid, CodeIdentityChannelMigrationRequired, CodeCapabilityForbidden,
+		CodePrimaryExpectedRequired, CodePrimaryChanged, CodePrimaryNotActive, CodePrimaryOperationRequired, CodePrimaryChangeRequired, CodePrimaryOperationFailed, CodeRequestInvalid:
 		return true
 	}
 	return false
@@ -150,23 +174,24 @@ func statusPtr(value Status) *Status {
 }
 
 type contactOperation struct {
-	Operation                 string    `json:"operation"`
-	CustomerUUID              string    `json:"customer_uuid"`
-	ContactUUID               string    `json:"contact_uuid,omitempty"`
-	Query                     string    `json:"q,omitempty"`
-	Status                    *Status   `json:"status,omitempty"`
-	Page                      int       `json:"page,omitempty"`
-	PageSize                  int       `json:"page_size,omitempty"`
-	ChannelDictionaryItemUUID string    `json:"channel_dictionary_item_uuid,omitempty"`
-	ExternalSubject           string    `json:"external_subject,omitempty"`
-	DisplayName               *string   `json:"display_name,omitempty"`
-	GivenName                 *string   `json:"given_name,omitempty"`
-	FamilyName                *string   `json:"family_name,omitempty"`
-	Email                     *string   `json:"email,omitempty"`
-	Phone                     *string   `json:"phone,omitempty"`
-	Roles                     *[]Role   `json:"roles,omitempty"`
-	Tags                      *[]string `json:"tags,omitempty"`
-	CreationIntent            string    `json:"creation_intent,omitempty"`
+	ExpectedPrimaryContactUUID *string   `json:"expected_primary_contact_uuid,omitempty"`
+	Operation                  string    `json:"operation"`
+	CustomerUUID               string    `json:"customer_uuid"`
+	ContactUUID                string    `json:"contact_uuid,omitempty"`
+	Query                      string    `json:"q,omitempty"`
+	Status                     *Status   `json:"status,omitempty"`
+	Page                       int       `json:"page,omitempty"`
+	PageSize                   int       `json:"page_size,omitempty"`
+	ChannelDictionaryItemUUID  string    `json:"channel_dictionary_item_uuid,omitempty"`
+	ExternalSubject            string    `json:"external_subject,omitempty"`
+	DisplayName                *string   `json:"display_name,omitempty"`
+	GivenName                  *string   `json:"given_name,omitempty"`
+	FamilyName                 *string   `json:"family_name,omitempty"`
+	Email                      *string   `json:"email,omitempty"`
+	Phone                      *string   `json:"phone,omitempty"`
+	Roles                      *[]Role   `json:"roles,omitempty"`
+	Tags                       *[]string `json:"tags,omitempty"`
+	CreationIntent             string    `json:"creation_intent,omitempty"`
 }
 type contactWire struct {
 	UUID         string         `json:"uuid"`

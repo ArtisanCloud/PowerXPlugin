@@ -106,7 +106,7 @@ func (s *LocalAI) ListLLMModels(ctx context.Context, env string) (*dto.ListLLMMo
 	for _, m := range s.models {
 		for _, mod := range m.Modalities {
 			if mod == "llm" {
-				out.Items = append(out.Items, dto.LLMModel{ModelKey: m.Key, Provider: m.Provider, Model: m.Model, Source: "local", Configured: true, ProfileConfigured: true})
+				out.Items = append(out.Items, dto.LLMModel{ModelKey: m.Key, Modality: "llm", Capabilities: []string{"text_generation"}, Provider: m.Provider, Model: m.Model, Source: "local", Configured: true, ProfileConfigured: true})
 				break
 			}
 		}

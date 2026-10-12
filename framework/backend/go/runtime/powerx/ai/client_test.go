@@ -28,6 +28,9 @@ func TestClientUsesTypedAIEndpointsAndResponseEnvelope(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "tenant-prod", models.Environment)
 	require.Equal(t, "gpt-test", models.Items[0].ModelKey)
+	require.Equal(t, "llm", models.Items[0].Modality)
+	require.Equal(t, []string{"text_generation"}, models.Items[0].Capabilities)
+	require.Equal(t, "tenant_profile", models.Items[0].Source)
 
 	session, err := client.CreateLLMSession(context.Background(), CreateLLMSessionInput{ModelKey: "gpt-test"})
 	require.NoError(t, err)
@@ -91,7 +94,7 @@ func (t *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error
 	case "/api/v1/ai/llm/invoke":
 		data = `{"data":{"output":{"type":"text","text":"hello back"},"meta":{"finish_reason":"stop"},"usage":{"total_tokens":2}}}`
 	case "/api/v1/ai/llm/models":
-		data = `{"data":{"env":"tenant-prod","items":[{"model_key":"gpt-test","provider":"openai","model":"gpt-test","label":"GPT Test","source":"profile","configured":true,"profile_configured":true}]}}`
+		data = `{"data":{"env":"tenant-prod","items":[{"model_key":"gpt-test","provider":"openai","model":"gpt-test","label":"GPT Test","source":"tenant_profile","configured":true,"profile_configured":true,"modality":"llm","capabilities":["text_generation"]}]}}`
 	case "/api/v1/ai/llm/sessions":
 		data = `{"data":{"session_id":"4e5b9a11-a9f4-4253-a0e8-f1eed119c5f4"}}`
 	case "/api/v1/ai/embedding/invoke":

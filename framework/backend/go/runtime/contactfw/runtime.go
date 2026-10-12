@@ -34,11 +34,19 @@ type IdentityChannelMigrator interface {
 type DelegatedContactClient interface{ Store }
 
 type Runtime struct {
-	mode  provider.Mode
-	store *module.Factory[Store]
+	mode    provider.Mode
+	store   *module.Factory[Store]
+	primary *module.Factory[PrimaryContactManager]
 }
 
-func NewRuntime(mode provider.Mode, local LocalStore, delegated DelegatedContactClient) (*Runtime, error) {
+type RuntimeOption func(*primaryBindings)
+type primaryBindings struct{ local, delegated PrimaryContactManager }
+
+func WithPrimaryContactManagers(local, delegated PrimaryContactManager) RuntimeOption {
+	return func(b *primaryBindings) { b.local, b.delegated = local, delegated }
+}
+
+func NewRuntime(mode provider.Mode, local LocalStore, delegated DelegatedContactClient, options ...RuntimeOption) (*Runtime, error) {
 	store, err := module.NewFactory("contact.store", mode,
 		module.Binding[Store]{Value: local, Available: local != nil},
 		module.Binding[Store]{Value: delegated, Available: delegated != nil},
@@ -46,7 +54,31 @@ func NewRuntime(mode provider.Mode, local LocalStore, delegated DelegatedContact
 	if err != nil {
 		return nil, err
 	}
-	return &Runtime{mode: mode, store: store}, nil
+	b := &primaryBindings{}
+	b.local, _ = local.(PrimaryContactManager)
+	b.delegated, _ = delegated.(PrimaryContactManager)
+	for _, option := range options {
+		option(b)
+	}
+	primary, err := module.NewFactory("contact.primary", mode, module.Binding[PrimaryContactManager]{Value: b.local, Available: b.local != nil}, module.Binding[PrimaryContactManager]{Value: b.delegated, Available: b.delegated != nil})
+	if err != nil {
+		return nil, err
+	}
+	return &Runtime{mode: mode, store: store, primary: primary}, nil
+}
+
+func (r *Runtime) PrimaryContactManager() (PrimaryContactManager, error) {
+	if r == nil || r.primary == nil {
+		return nil, NewError(CodeRuntimeRequired, nil)
+	}
+	m, err := r.primary.Resolve()
+	if err != nil {
+		if r.mode == provider.ModeDelegated {
+			return nil, NewError(CodeDelegateUnavailable, err)
+		}
+		return nil, NewError(CodeLocalUnavailable, err)
+	}
+	return m, nil
 }
 
 func (r *Runtime) Mode() provider.Mode {

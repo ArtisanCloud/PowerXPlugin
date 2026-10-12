@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	common "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common"
 	"github.com/google/uuid"
 )
 
@@ -54,8 +55,8 @@ func ValidateCreateInput(input CreateContactInput) error {
 	if err := validateUUID(input.CustomerUUID, "customer_uuid"); err != nil {
 		return err
 	}
-	if strings.TrimSpace(input.DisplayName) == "" {
-		return NewError(CodeInvalidArgument, fmt.Errorf("customer_uuid and display_name are required"))
+	if !common.ValidText(input.DisplayName, 128, true) || !common.ValidText(input.GivenName, 128, false) || !common.ValidText(input.FamilyName, 128, false) {
+		return NewError(CodeInvalidArgument, fmt.Errorf("CONTACT_TEXT_INVALID"))
 	}
 	if err := validateContactChannels(input.Email, input.Phone); err != nil {
 		return err
@@ -75,10 +76,23 @@ func ValidateCreateInput(input CreateContactInput) error {
 	if err := ValidateRoles(input.Roles); err != nil {
 		return err
 	}
+	for _, role := range input.Roles {
+		if role == RolePrimary {
+			return NewError(CodePrimaryOperationRequired, nil)
+		}
+	}
 	return ValidateTags(input.Tags)
 }
 
 func ValidateUpdateInput(input UpdateContactInput) error {
+	for _, field := range []struct {
+		value    *string
+		required bool
+	}{{input.DisplayName, true}, {input.GivenName, false}, {input.FamilyName, false}} {
+		if field.value != nil && !common.ValidText(*field.value, 128, field.required) {
+			return NewError(CodeInvalidArgument, nil)
+		}
+	}
 	if err := validateUUID(input.CustomerUUID, "customer_uuid"); err != nil {
 		return err
 	}
@@ -115,20 +129,27 @@ func ValidateUpdateInput(input UpdateContactInput) error {
 }
 
 func validateContactChannels(email, phone string) error {
-	email, phone = strings.TrimSpace(email), strings.TrimSpace(phone)
-	if len(email) > 255 || len(phone) > 32 {
-		return NewError(CodeInvalidArgument, fmt.Errorf("contact channel too long"))
+	if !common.ValidText(email, 255, false) || !common.ValidText(phone, 32, false) {
+		return NewError(CodeInvalidArgument, fmt.Errorf("CONTACT_CHANNEL_INVALID"))
 	}
+	email, phone = strings.TrimSpace(email), strings.TrimSpace(phone)
 	if email != "" {
 		parsed, err := mail.ParseAddress(email)
 		if err != nil || parsed.Address != email || parsed.Name != "" {
 			return NewError(CodeInvalidArgument, fmt.Errorf("invalid contact email"))
 		}
 	}
+	digit := false
 	for _, char := range phone {
+		if char >= '0' && char <= '9' {
+			digit = true
+		}
 		if !(char >= '0' && char <= '9') && char != '+' && char != '-' && char != ' ' && char != '(' && char != ')' {
 			return NewError(CodeInvalidArgument, fmt.Errorf("invalid contact phone"))
 		}
+	}
+	if phone != "" && !digit {
+		return NewError(CodeInvalidArgument, nil)
 	}
 	return nil
 }
@@ -184,7 +205,7 @@ func ValidateMigrateIdentityChannelInput(input MigrateContactIdentityChannelInpu
 }
 
 func validateUUID(value, field string) error {
-	if _, err := uuid.Parse(strings.TrimSpace(value)); err != nil {
+	if id, err := uuid.Parse(strings.TrimSpace(value)); err != nil || id == uuid.Nil {
 		return NewError(CodeInvalidArgument, fmt.Errorf("%s must be a UUID", field))
 	}
 	return nil
@@ -195,7 +216,7 @@ func validateIdentity(channelDictionaryItemUUID, subject string) error {
 		return err
 	}
 	subject = strings.TrimSpace(subject)
-	if subject == "" || len(subject) > 255 {
+	if !common.ValidText(subject, 255, true) {
 		return NewError(CodeInvalidArgument, fmt.Errorf("channel_dictionary_item_uuid and external_subject are required"))
 	}
 	return nil

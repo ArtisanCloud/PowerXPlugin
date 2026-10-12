@@ -56,6 +56,10 @@ func TestLocalAIExecution(t *testing.T) {
 	if e != nil || len(models.Items) != 1 {
 		t.Fatalf("%+v %v", models, e)
 	}
+	model := models.Items[0]
+	if model.Modality != "llm" || len(model.Capabilities) != 1 || model.Capabilities[0] != "text_generation" || model.Source != "local" {
+		t.Fatalf("AI_MODEL_CATALOG_METADATA_INVALID: %+v", model)
+	}
 	in := dto.LLMInvokeInput{ModelKey: "chat", Inputs: []dto.ContentItem{{Type: "text", Content: "question"}}}
 	out, e := s.LLMInvoke(ctx, in)
 	if e != nil || out.Text != "answer" {

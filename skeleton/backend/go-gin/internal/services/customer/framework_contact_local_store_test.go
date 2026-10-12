@@ -51,7 +51,7 @@ func TestFrameworkContactLocalStoreScopesAndNeverCreatesOnResolveMiss(t *testing
 	}
 	store := NewFrameworkContactLocalStore(db)
 	ctx := customerfw.WithTenantUUID(context.Background(), tenantUUID)
-	created, err := store.Create(ctx, contactfw.CreateContactInput{CustomerUUID: customerUUID, DisplayName: "Ada", Email: "ada@example.test", Phone: "+12025550123", Status: contactfw.StatusActive, Roles: []contactfw.Role{contactfw.RolePrimary}, Tags: []string{"vip"}, CreationIntent: contactfw.CreationIntentExplicitCreate})
+	created, err := store.Create(ctx, contactfw.CreateContactInput{CustomerUUID: customerUUID, DisplayName: "Ada", Email: "ada@example.test", Phone: "+12025550123", Status: contactfw.StatusActive, Roles: []contactfw.Role{contactfw.RoleLegalRepresentative}, Tags: []string{"vip"}, CreationIntent: contactfw.CreationIntentExplicitCreate})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,96 @@
+package customer
+
+import (
+	"context"
+	"errors"
+
+	fw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/contactfw"
+	audit "{{ .BackendModulePath }}/internal/entity/models/admin_console"
+	m "{{ .BackendModulePath }}/internal/entity/models/customer"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+type ContactRepository struct{ db *gorm.DB }
+type ContactTransaction struct {
+	db               *gorm.DB
+	Membership       m.CustomerTenantMembership
+	tenant, customer string
+}
+
+func NewContactRepository(db *gorm.DB) *ContactRepository { return &ContactRepository{db: db} }
+
+func (r *ContactRepository) PrimaryReference(ctx context.Context, tenant, customer string) (string, error) {
+	if r == nil || r.db == nil {
+		return "", fw.NewError(fw.CodeLocalUnavailable, nil)
+	}
+	var membership m.CustomerTenantMembership
+	if err := r.db.WithContext(ctx).Where("tenant_uuid = ? AND customer_uuid = ?", tenant, customer).First(&membership).Error; err != nil {
+		return "", err
+	}
+	return membership.PrimaryContactUUID, nil
+}
+
+// All primary changes and contact updates lock the same membership. SQLite
+// uses the shared local write lock; PostgreSQL locks persistent rows.
+func (r *ContactRepository) Transaction(ctx context.Context, tenant, customer string, fn func(*ContactTransaction) error) error {
+	if r == nil || r.db == nil {
+		return fw.NewError(fw.CodeLocalUnavailable, nil)
+	}
+	if r.db.Dialector.Name() == "sqlite" {
+		identityWriteMu.Lock()
+		defer identityWriteMu.Unlock()
+	}
+	return r.db.WithContext(ctx).Transaction(func(db *gorm.DB) error {
+		var account m.CustomerAccount
+		if err := db.Clauses(clause.Locking{Strength: "SHARE"}).Where("tenant_uuid = ? AND customer_uuid = ? AND status = ?", tenant, customer, m.StatusActive).First(&account).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fw.NewError(fw.CodeCustomerMembershipInactive, nil)
+			}
+			return err
+		}
+		t := &ContactTransaction{db: db, tenant: tenant, customer: customer}
+		if err := db.Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_uuid = ? AND customer_uuid = ? AND status = ?", tenant, customer, m.StatusActive).First(&t.Membership).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fw.NewError(fw.CodeCustomerMembershipInactive, nil)
+			}
+			return err
+		}
+		return fn(t)
+	})
+}
+
+func (t *ContactTransaction) Contact(id string) (*m.Contact, error) {
+	var row m.Contact
+	err := t.db.Where("tenant_uuid = ? AND customer_uuid = ? AND contact_uuid = ?", t.tenant, t.customer, id).First(&row).Error
+	if err == nil {
+		return &row, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	var count int64
+	if err := t.db.Model(&m.Contact{}).Where("tenant_uuid = ? AND contact_uuid = ?", t.tenant, id).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		return nil, fw.NewError(fw.CodeCustomerMismatch, nil)
+	}
+	return nil, fw.NewError(fw.CodeNotFound, nil)
+}
+
+func (t *ContactTransaction) Contacts() ([]m.Contact, error) {
+	var rows []m.Contact
+	err := t.db.Where("tenant_uuid = ? AND customer_uuid = ?", t.tenant, t.customer).Find(&rows).Error
+	return rows, err
+}
+func (t *ContactTransaction) Save(row *m.Contact) error {
+	if row.TenantUUID != t.tenant || row.CustomerUUID != t.customer {
+		return fw.NewError(fw.CodeCustomerMismatch, nil)
+	}
+	return t.db.Save(row).Error
+}
+func (t *ContactTransaction) SetPrimaryReference(id string) error {
+	return t.db.Model(&m.CustomerTenantMembership{}).Where("membership_uuid = ? AND tenant_uuid = ? AND customer_uuid = ?", t.Membership.MembershipUUID, t.tenant, t.customer).Update("primary_contact_uuid", id).Error
+}
+func (t *ContactTransaction) Audit(event *audit.AuditEvent) error { return t.db.Create(event).Error }

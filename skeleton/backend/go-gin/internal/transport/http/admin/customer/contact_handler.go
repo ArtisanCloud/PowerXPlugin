@@ -2,6 +2,7 @@ package customer
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -214,10 +215,24 @@ func (h *ContactHandler) respondError(c *gin.Context, err error) {
 		status = http.StatusForbidden
 	case contactfw.CodeIdentityConflict:
 		status = http.StatusConflict
+	case contactfw.CodePrimaryChanged, contactfw.CodePrimaryNotActive, contactfw.CodePrimaryOperationRequired, contactfw.CodePrimaryChangeRequired:
+		status = http.StatusConflict
+	case contactfw.CodePrimaryOperationFailed:
+		status = http.StatusInternalServerError
 	case contactfw.CodeDelegateUnavailable, contactfw.CodeLocalUnavailable, contactfw.CodeRuntimeRequired:
 		status = http.StatusServiceUnavailable
 	case contactfw.CodeChannelDictionaryInvalid, contactfw.CodeIdentityChannelMigrationRequired:
 		status = http.StatusConflict
+	}
+	var typed *contactfw.Error
+	if errors.As(err, &typed) && typed != nil {
+		if typed.StatusCode >= 400 && typed.StatusCode <= 599 {
+			status = typed.StatusCode
+		}
+		if typed.TraceID != "" || typed.RequestID != "" {
+			contracts.ResponseErrorWithDetails(c, status, string(code), string(code), gin.H{"trace_id": typed.TraceID, "upstream_request_id": typed.RequestID})
+			return
+		}
 	}
 	contracts.ResponseError(c, status, string(code), string(code))
 }

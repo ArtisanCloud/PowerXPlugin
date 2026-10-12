@@ -248,7 +248,7 @@ func TestCapabilityClientUsesPublishedCreateAndListWires(t *testing.T) {
 		CustomerUUID:   testCustomerUUID,
 		DisplayName:    "Ada",
 		Status:         StatusActive,
-		Roles:          []Role{RolePrimary},
+		Roles:          []Role{RoleLegalRepresentative},
 		Tags:           []string{"vip"},
 		CreationIntent: CreationIntentExplicitCreate,
 	})

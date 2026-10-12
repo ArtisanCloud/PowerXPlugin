@@ -1,5 +1,20 @@
 # Go Framework 发布记录
 
+## v0.0.25（待发布） — 2026-10-12
+
+发布模块：`github.com/ArtisanCloud/PowerXPlugin/framework/backend/go`。
+
+- 新增独立 `contactfw.PrimaryContactManager.SetPrimary` 和对应 DTO，通过固定 `core_internal` 能力更换主联系人；原六项 `Store` 接口保持不变。
+- 识别 `CONTACT_PRIMARY_*` / `CONTACT_REQUEST_INVALID`，保留 Core 实际 HTTP 状态、Trace、request ID 和原始错误；普通联系人创建/编辑不能绕过设主操作。
+- Customer/Contact 姓名按 Unicode codepoint 校验，拒绝超长、控制字符和非法 UTF-8；更新请求在 JSON 编码前校验，避免非法编码被替换后漏检。
+- AI 模型 DTO 保留 Core 的 `modality` 和 `capabilities`；测试使用正式 `tenant_profile` 来源枚举。
+- 新增知识内容导览的类型、可选 Provider 接口及固定 Host 客户端，校验文章预览、语料版本和分页响应。本项真实 Core／浏览器验收仍待完成。
+- Skeleton Local 设主事务维护 membership 主引用、角色和审计，保护当前主联系人；Local 模型目录补齐文本生成声明。相关 Go 生成模板已同步。
+
+本版本尚未打 tag。CLI/Skeleton 已预置 v0.0.25；正式升级须在发布后验证真实 Go 模块依赖，并重新构建插件。Core 精确授权和业务 HTTP 状态透传仍需目标环境验收。
+
+详细变更、测试记录与升级步骤见 [v0.0.25 发布准备说明](../../../docs/releases/framework-20261012.md)。v0.0.24 的已发布内容和证据见 [上一版发布说明](../../../docs/releases/framework-20261011.md)。
+
 ## v0.0.23 — 2026-10-07
 
 发布模块：`github.com/ArtisanCloud/PowerXPlugin/framework/backend/go`。

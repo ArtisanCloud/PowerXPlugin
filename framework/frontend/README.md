@@ -7,7 +7,7 @@
 - `nuxt/framework-client/scheduler.ts` 提供统一 Scheduler client，页面通过它调用插件侧 `/admin/runtime/scheduler/jobs` 管理接口。
 - `nuxt/framework-admin/layer/app/composables/usePowerXScheduler.ts` 提供 Nuxt 管理端 composable，供插件页面统一创建、查询、暂停、恢复与手动触发 scheduler job。
 
-本次候选版本为 `@artisan-cloud/plugin-framework-admin@0.0.12` 与 `@artisan-cloud/plugin-framework-client@0.0.13`，本地 tarball 安装与 Nuxt 构建已通过，尚未正式发布；发布状态见 [发布准备记录](../../docs/releases/framework-20261019.md)。admin 的 client peer 范围已更新为 `^0.0.13`，不能与旧 `0.0.12` client 混用新回归组件。
+当前已发布版本为 `@artisan-cloud/plugin-framework-admin@0.0.12` 与 `@artisan-cloud/plugin-framework-client@0.0.13`，已通过正式 npm registry 安装与 Nuxt 构建验证；发布状态见 [发布记录](../../docs/releases/framework-20261019.md)。admin 的 client peer 范围已更新为 `^0.0.13`，不能与旧 `0.0.12` client 混用新回归组件。
 
 在 monorepo 内调试本地 Layer 时，可在执行 `px-plugin init` 前设置 `POWERXPLUGIN_USE_LOCAL_FRONTEND=1`，此时脚手架会写入 file: 引用；若 unset，则默认指向 npm 版本。开发工具、workspace 示例仍保留在 `sdk/`，但必须显式依赖此框架层。
 

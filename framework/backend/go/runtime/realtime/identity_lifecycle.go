@@ -118,6 +118,29 @@ func (r *IdentityLifecycle) Open(opts IdentityLeaseOptions) (*IdentityLease, err
 }
 
 func (l *IdentityLease) Done() <-chan struct{} { return l.done }
+
+// CheckActive is the final local guard after remote revalidation and any wait
+// for the transport's send lock. It never polls Core or extends the lease.
+func (l *IdentityLease) CheckActive(ctx context.Context) error {
+	if l == nil {
+		return iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	if err := ctx.Err(); err != nil {
+		l.Close(WSIdentityRevoked)
+		return err
+	}
+	select {
+	case <-l.done:
+		return iamerrors.New(WSIdentityRevoked, WSIdentityRevoked)
+	default:
+	}
+	if !time.Now().Before(l.ExpiresAt) {
+		l.Close(WSIdentityExpired)
+		return iamerrors.New(WSIdentityExpired, WSIdentityExpired)
+	}
+	return nil
+}
+
 func (l *IdentityLease) Revalidate(ctx context.Context) (*contracts.WSIdentity, error) {
 	select {
 	case <-l.done:

@@ -3,6 +3,9 @@ package iamerrors
 import "errors"
 
 const (
+	CodeBaselineInvalidArgument   = "IAM_BASELINE_INVALID_ARGUMENT"
+	CodeBaselineResponseInvalid   = "IAM_BASELINE_RESPONSE_INVALID"
+	CodeBaselineUnavailable       = "IAM_BASELINE_DEPENDENCY_UNAVAILABLE"
 	CodeIdentityMigrationRequired = "IAM_IDENTITY_MIGRATION_REQUIRED"
 	CodeIdentityResponseInvalid   = "IAM_CONTEXT_RESPONSE_INVALID"
 	CodeContextInvalidArgument    = "IAM_CONTEXT_INVALID_ARGUMENT"
@@ -91,6 +94,12 @@ func StatusCode(err error) int {
 		return status.HTTPStatus()
 	}
 	switch CodeOf(err) {
+	case CodeBaselineInvalidArgument, "IAM_BASELINE_REQUIREMENTS_INVALID":
+		return 400
+	case CodeBaselineResponseInvalid:
+		return 502
+	case CodeBaselineUnavailable:
+		return 503
 	case "IAM_CONTEXT_WS_HANDLE_REQUIRED", "IAM_CONTEXT_WS_HANDLE_INVALID", "IAM_CONTEXT_WS_HANDLE_EXPIRED":
 		return 401
 	case "IAM_WS_IDENTITY_MISMATCH":

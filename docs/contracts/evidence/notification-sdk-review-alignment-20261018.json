@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-18",
+  "scope": ["framework_notification_api_prefix", "read_receipt_error_classification", "unconfigured_go_client"],
+  "source_status": "aligned_and_verified",
+  "verification": [
+    {
+      "directory": "framework/backend/go",
+      "command": "go test -race ./runtime/powerx/notifications ./runtime/notifications ./runtime/common/hosthttp -count=1 -timeout=90s",
+      "status": "passed",
+      "note": "Shared endpoint builder is exercised through notification HTTP contract tests."
+    },
+    {
+      "command": "dotnet test framework/backend/dotnet/tests/PowerXPlugin.Framework.Tests/PowerXPlugin.Framework.Tests.csproj --no-restore --filter FullyQualifiedName~NotificationRuntimeTests --nologo -v:q",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "status": "passed"
+    },
+    {
+      "directory": "framework/backend/go",
+      "command": "go test ./bootstrap -count=1 -timeout=90s",
+      "status": "passed"
+    },
+    {
+      "directory": "skeleton/backend/go-gin",
+      "command": "go test ./cmd/plugin ./internal/bootstrap -count=1 -timeout=120s",
+      "status": "passed"
+    },
+    {
+      "command": "npm run sync:templates -- --check",
+      "initial_mismatches": [
+        "scaffold/templates/backend/go-gin/cmd/plugin/main.go.tmpl",
+        "tools/cli/internal/templates/data/backend/go-gin/cmd/plugin/main.go.tmpl"
+      ],
+      "resolution": "Forward the loaded Gateway.APIPrefix to the notification client in both templates.",
+      "final_status": "passed"
+    },
+    {
+      "checks": ["git diff --check", "contract relative links", "notification resource paths contain no fixed API prefix", "evidence JSON parse"],
+      "status": "passed"
+    }
+  ],
+  "sdk_path_matrix": ["default", "/api/v1", "/api/v2", "api/v2/", "/core/custom", "/", "explicit_reverse_proxy_mount"],
+  "error_contract": {
+    "invalid_read_receipt_arguments": {"http_status": 400, "reason_code": "NOTIFICATION_READ_RECEIPT_INVALID", "http_requests": 0},
+    "invalid_read_receipt_response": {"http_status": 502, "reason_code": "NOTIFICATION_READ_RECEIPT_RESPONSE_INVALID"},
+    "unconfigured_read_client": {"http_status": 503, "reason_code": "NOTIFICATION_CLIENT_UNAVAILABLE"},
+    "upstream_http_errors": "preserve_existing_status_and_reason",
+    "cancellation": "preserve_context_cancellation"
+  },
+  "ownership": "Core policy remains plugin ID for STS and Key UUID for API Key. Credential changes do not automatically inherit old ownership.",
+  "deferred": ["core_frontend_session_pagination_reconnect_fixes", "real_core_read_receipts_grant", "installed_end_to_end_acceptance", "global_api_prefix_migration", "sdk_publication", "cli_build_and_install"],
+  "runtime_actions": {"user_services_restarted": false, "database_changes": false, "grant_changes": false, "deployment": false}
+}

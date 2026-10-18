@@ -1,0 +1,42 @@
+{
+  "schema": "powerx.iam.authorization-baseline-result/v1",
+  "tenant_uuid": "20000000-0000-4000-8000-000000000001",
+  "plugin_id": "com.powerx.fixture",
+  "evaluated_at": "2026-10-15T02:15:00.000001Z",
+  "items": [
+    {
+      "member_uuid": "10000000-0000-4000-8000-000000000001",
+      "permission_code": "orders:read",
+      "status": "decided",
+      "allowed": true,
+      "baseline_kind": "initialized",
+      "granted_at": null,
+      "known_since": "2026-10-15T02:00:00.000001Z",
+      "visible_since": "2026-10-15T02:00:00.000001Z",
+      "authorization_revision": "opaque-read-revision",
+      "data_scope": "TENANT",
+      "scope_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "valid_until": "2026-10-15T06:00:00.000001Z",
+      "recheck_at": "2026-10-15T03:00:00.000001Z"
+    },
+    {
+      "member_uuid": "10000000-0000-4000-8000-000000000001",
+      "permission_code": "cost:read",
+      "status": "decided",
+      "allowed": false,
+      "authorization_revision": "opaque-cost-denied-revision",
+      "data_scope": "TENANT",
+      "scope_fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "granted_at": null,
+      "visible_since": null,
+      "valid_until": null,
+      "recheck_at": null
+    },
+    {
+      "member_uuid": "10000000-0000-4000-8000-000000000001",
+      "permission_code": "scope:read",
+      "status": "error",
+      "error_code": "IAM_BASELINE_UNSUPPORTED_SCOPE"
+    }
+  ]
+}

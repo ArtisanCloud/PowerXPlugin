@@ -45,3 +45,16 @@ func (r *Runtime) Publisher() (Publisher, error) {
 	}
 	return r.publisher.Resolve()
 }
+
+// ReadAcknowledger resolves the same selected adapter; it never switches mode.
+func (r *Runtime) ReadAcknowledger() (powerxnotifications.ReadAcknowledger, error) {
+	publisher, err := r.Publisher()
+	if err != nil {
+		return nil, err
+	}
+	reader, ok := publisher.(powerxnotifications.ReadAcknowledger)
+	if !ok {
+		return nil, module.NewError("FRAMEWORK_NOTIFICATION_READ_ADAPTER_UNAVAILABLE", "FRAMEWORK_NOTIFICATION_READ_ADAPTER_UNAVAILABLE")
+	}
+	return reader, nil
+}

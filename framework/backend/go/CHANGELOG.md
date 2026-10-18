@@ -1,5 +1,18 @@
 # Go Framework 发布记录
 
+## v0.0.26 — 2026-10-19
+
+发布模块 tag 为 `framework/backend/go/v0.0.26`。发布状态与正式依赖验证见本版本发布记录。
+
+- 新增独立 IAM 连续授权基线批量合同、严格响应校验、typed Core client 和可选 Registry／Bundle 入口；local 权威存储继续由插件注入。
+- WebSocket 在最终发送前复核当前身份与 topic，并阻断到期、撤权、取消及迟到结果。
+- Media Host 响应保留可选标准图片 `derivatives` 快照，区分原图上传与预览处理状态；既有 Service 接口保持不变。
+- 通知支持可选业务导航、动作响应和独立已读回执；通知创建／回执共享配置的 Core API 前缀，本地参数、上游合同和未配置客户端分别返回明确错误。
+- 新增业务回归运行时、场景／断言／证据合同及可选存储适配；配套 client/admin 使用各自 npm 版本。
+- 更新 SDK 的生成默认版本；插件仍需接入启动装配与所选 provider，升级 SDK 不会覆盖插件已经生成的内部实现。
+
+本地打包、正式发布、真实 Core grant 和安装态验收分别记录，不能互相替代。当前候选包及验证边界见 [2026-10-19 发布准备](../../../docs/releases/framework-20261019.md)。
+
 ## v0.0.25 — 2026-10-12
 
 发布模块：`github.com/ArtisanCloud/PowerXPlugin/framework/backend/go`。

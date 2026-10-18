@@ -42,7 +42,7 @@ mappings:
         literal: '"name": "powerxplugin-skeleton-web-admin"'
         replace: '"name": "{{ .PluginSlug }}-web-admin"'
       - globs: ["package.json"]
-        literal: '"@artisan-cloud/plugin-framework-admin": "0.0.11"'
+        literal: '"@artisan-cloud/plugin-framework-admin": "file:../../../framework/frontend/nuxt/framework-admin"'
         replace: '"@artisan-cloud/plugin-framework-admin": "{{ .FrameworkAdminRef }}"'
       - globs: ["package.json"]
         literal: '"@artisan-cloud/plugin-framework-client": "file:../../../framework/frontend/nuxt/framework-client"'

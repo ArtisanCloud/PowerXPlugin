@@ -86,3 +86,5 @@ export type {
   FrameworkLogLevel,
   FrameworkLoggerOptions,
 } from "./logger";
+export { createRegressionClient, validateRegressionEvent, applyRegressionEvent, regressionUUID, regressionTerminal } from './regression';
+export type { RegressionClient, RegressionClientOptions, SuiteDefinition, CaseDefinition, ProfileDefinition, RunDetail, Run, CaseExecution, AssertionResult, Evidence, FixtureResource, RegressionEvent, EventMeta, Report, CreateRun } from './regression';

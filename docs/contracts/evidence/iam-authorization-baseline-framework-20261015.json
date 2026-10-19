@@ -1,0 +1,115 @@
+{
+  "date": "2026-10-15",
+  "guide_version": "1.2",
+  "scope": ["F01", "F02", "F03", "F04"],
+  "source_status": "implemented",
+  "sdk_publication": "not_performed",
+  "ci_execution": "not_performed",
+  "verification": [
+    {
+      "layer": "framework_go",
+      "directory": "framework/backend/go",
+      "command": "go test ./... -count=1 -timeout=120s",
+      "status": "passed"
+    },
+    {
+      "layer": "framework_contract_race",
+      "directory": "framework/backend/go",
+      "command": "go test -race ./iam/contracts ./iam/delegated ./iam/adapters ./runtime/realtime -count=1 -timeout=90s",
+      "status": "passed"
+    },
+    {
+      "layer": "skeleton_affected_race",
+      "directory": "skeleton/backend/go-gin",
+      "command": "go test -race ./internal/bootstrap ./internal/services/authproxy ./internal/services/iam/adapters/... ./internal/transport/http/wsbus ./cmd/plugin -count=1 -timeout=90s",
+      "status": "passed"
+    },
+    {
+      "layer": "dotnet",
+      "command": "dotnet test framework/backend/dotnet/tests/PowerXPlugin.Framework.Tests/PowerXPlugin.Framework.Tests.csproj --no-restore --nologo -v:q",
+      "passed": 218,
+      "failed": 0,
+      "skipped": 0,
+      "status": "passed"
+    },
+    {
+      "layer": "cli",
+      "directory": "tools/cli",
+      "command": "go test ./... -count=1 -timeout=120s",
+      "status": "passed"
+    },
+    {
+      "layer": "generated_plugin",
+      "command": "PX_TEST_GENERATED_BUILD=1 go test ./tools/cli/internal/templates -run '^TestIAMBaselineGeneratedPlugin$' -count=1 -timeout=10m -v",
+      "generator": "newly_built_cli_binary",
+      "framework_dependency": "immutable_local_module_proxy_snapshot",
+      "local_replace": false,
+      "generated_tests": ["cmd/plugin", "internal/bootstrap", "internal/transport/http/wsbus"],
+      "race": true,
+      "status": "passed"
+    },
+    {
+      "layer": "core_schema",
+      "validator": "kin-openapi BaselineResult.VisitJSON",
+      "core_contract": "specs/026-iam/contracts/authorization-baseline.openapi.yaml",
+      "fixture": "framework/backend/go/iam/contracts/testdata/authorization_baseline_result.json",
+      "status": "passed"
+    },
+    {
+      "layer": "template_sync",
+      "command": "npm run sync:templates -- --check",
+      "intermediate_unrelated_frontend_drift": 4,
+      "final_recheck": "passed",
+      "status": "passed"
+    },
+    {
+      "layer": "backend_template_sync",
+      "mapping": "scripts/template-sync-config.yaml:backend",
+      "checked": 998,
+      "mismatches": [],
+      "status": "passed"
+    },
+    {
+      "layer": "cli_build",
+      "command": "make build-px-plugin",
+      "status": "passed"
+    },
+    {
+      "layer": "static_boundaries",
+      "commands": [
+        "node scripts/check-agent-paths.mjs",
+        "bash scripts/contracts/validate-iam-directory-boundary.sh",
+        "bash scripts/contracts/validate-realtime-transport.sh",
+        "git diff --check"
+      ],
+      "status": "passed"
+    }
+  ],
+  "framework_fixture_coverage": {
+    "B10": "passed",
+    "B13": "passed",
+    "B14": "microsecond_and_cross_language_contract_passed",
+    "B19": "real_websocket_final_send_with_fixture_revalidator_passed",
+    "B21": "optional_binding_required_declarations_and_fixture_grants_passed",
+    "B22": "fresh_cli_generated_plugin_compile_and_behavior_passed",
+    "B24": "final_send_denial_dependency_cancellation_expiry_late_result_passed"
+  },
+  "deferred": [
+    "published_sdk_consumption",
+    "real_core_api_key_grant_and_revocation",
+    "real_core_sts_grant_and_revocation",
+    "target_database_migration_and_explicit_initialization",
+    "plugin_order_content_authorization_v2",
+    "plugin_reconnect_and_read_cursor_B20",
+    "delegated_worker_pagination_and_retries_B23",
+    "full_B01_B24_installed_acceptance"
+  ],
+  "runtime_actions": {
+    "standalone_services_started": false,
+    "user_services_restarted": false,
+    "grant_changes": false,
+    "database_initialization": false,
+    "deployment": false,
+    "test_servers_and_generated_directories": "test_owned_and_cleaned"
+  }
+}

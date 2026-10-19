@@ -1,10 +1,10 @@
-# Go Framework v0.0.25 发布准备说明
+# Go Framework v0.0.25 发布说明
 
-准备日期：2026-10-12。当前状态：本地代码与测试准备，尚未发布 v0.0.25。
+发布日期：2026-10-12。当前状态：已发布并完成正式依赖验证。Tag 为 `framework/backend/go/v0.0.25`，发布提交为 `fea5e58a81b67d2c879e57efa04d11d34c30b896`（PR #84 的 develop 合并提交）。
 
 | 交付 | 版本 | 本次状态 |
 |---|---|---|
-| Go Framework | v0.0.25 | 待 CI、合并及发布 tag |
+| Go Framework | v0.0.25 | 已发布并验证 |
 | Nuxt framework-client | 0.0.12 | 沿用已发布版本 |
 | Nuxt framework-admin | 0.0.11 | 沿用已发布版本 |
 
@@ -52,7 +52,13 @@ Customer/Contact 姓名上限为 128 个 Unicode codepoint，邮箱 255、电话
 
 2026-10-12 只读核对 Core 源码，`selectInvokeErrorTemplate` 仍未把 `CONTACT_*` 加入业务 HTTP 状态透传分支，调用入口可能把业务冲突包装为 HTTP 502。Framework 保留实际状态及业务码；Core 团队需补状态透传，并在目标实例验证 400/409/500、Trace 和精确授权。
 
-当前分支 CI 的生成项目检查使用显式 Framework 源码快照，不能作为 v0.0.25 已发布或可下载的证明。包含本次提交的 GitHub CI、真实 Go proxy 下载、无本地替换的生成项目构建均待后续完成。
+合并提交的 [GitHub CI](https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/38189973959) 9 项检查全部通过。CI 的生成项目检查使用显式 Framework 源码快照；发布后又完成了正式依赖验证：
+
+- 从 `https://proxy.golang.org` 下载 v0.0.25，通过 `sum.golang.org` 校验，Origin 指向上述合并提交。
+- 发布模块中的 450 个文件与合并提交逐文件匹配。
+- 关闭 workspace、无本地 Framework replace、关闭源码快照的生成后端测试通过。
+
+完整发布结果见 [v0.0.25 验证证据](../contracts/evidence/framework-go-v0.0.25-20261012.json)。
 
 ## 发布与消费方升级
 
@@ -71,4 +77,4 @@ go test ./...
 
 正式验收需确保 `GOWORK=off` 且该模块没有本地 `replace`。保留本地替换时，编译使用本地源码；已运行的进程需重新构建和重启才能加载修改。遇到 `CONTACT_PRIMARY_CHANGED` 应回读客户并让操作者再次确认，不自动覆盖旧引用。
 
-截至本说明编写，只准备发布内容和本地提交；不宣称已推送本次提交、已通过对应远端 CI、已发布 tag 或已重启服务。
+本次已推送 Go SDK tag 并验证正式模块依赖；发布结果文档在 tag 发布后补录。Tag 固定于经 CI 验证的合并提交，不包含后补文档。本次不发布 npm 或 .NET 包，不修改 AI Craft/Core，也不重启用户服务。

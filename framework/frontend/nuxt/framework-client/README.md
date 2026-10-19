@@ -1,6 +1,6 @@
 # PowerX Plugin Framework Client
 
-PowerX iframe bridge v2 client, version `0.0.12`. This release includes structured authentication error classification, verified host-session handling, Router navigation, and WS/SSE session binding. Go service authentication is provided by the separately versioned backend Framework.
+PowerX iframe bridge v2 client, version `0.0.13`. This version adds the typed business regression client, event validation and public regression types used by the admin layer. It retains structured authentication error classification, verified host-session handling, Router navigation, and WS/SSE session binding. Go service authentication is provided by the separately versioned backend Framework.
 
 ## Embedded authentication
 

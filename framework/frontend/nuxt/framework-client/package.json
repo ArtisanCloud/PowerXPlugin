@@ -1,11 +1,12 @@
 {
   "name": "@artisan-cloud/plugin-framework-client",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "type": "module",
   "exports": {
     ".": "./index.ts"
   },
   "files": [
+    "regression.ts",
     "index.ts",
     "api.ts",
     "api-errors.ts",

@@ -1,0 +1,29 @@
+{
+  "data": {
+    "asset_uuid": "00000000-0000-4000-8000-000000000001",
+    "name": "fixture.png",
+    "size_bytes": 4096,
+    "mime_type": "image/png",
+    "status": "ready",
+    "derivatives": {
+      "asset_uuid": "00000000-0000-4000-8000-000000000001",
+      "upload_state": "ready",
+      "status": "processing",
+      "recipe": "standard-image-v1",
+      "job_uuid": "00000000-0000-4000-8000-000000000002",
+      "attempts": 1,
+      "retryable": false,
+      "items": [
+        {
+          "variant": "preview",
+          "status": "ready",
+          "variant_uuid": "00000000-0000-4000-8000-000000000003"
+        },
+        {
+          "variant": "thumbnail",
+          "status": "processing"
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "@artisan-cloud/plugin-framework-admin",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "type": "module",
   "exports": {
     ".": "./index.ts",
@@ -14,7 +14,8 @@
   ],
   "peerDependencies": {
     "nuxt": "^4.2.0",
-    "@artisan-cloud/plugin-framework-client": "^0.0.12"
+    "@artisan-cloud/plugin-framework-client": "^0.0.13",
+    "valibot": "^1.2.0"
   },
   "devDependencies": {
     "nuxt": "^4.2.0"

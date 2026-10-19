@@ -32,7 +32,19 @@ func NewBundle(host Host) (adapters.Bundle, error) {
 		return adapters.Bundle{}, iamerrors.New(iamerrors.CodeAdapterNotBound, "delegated IAM Host client is nil")
 	}
 	adapter := &Adapter{host: host}
-	return adapters.Bundle{Directory: adapter, Authz: adapter, Context: adapter}, nil
+	bundle := adapters.Bundle{Directory: adapter, Authz: adapter, Context: adapter}
+	if _, ok := host.(contracts.AuthorizationBaselineService); ok {
+		bundle.AuthorizationBaselines = adapter
+	}
+	return bundle, nil
+}
+
+func (a *Adapter) ReadMemberBaselines(ctx context.Context, query contracts.AuthorizationBaselineQuery) (*contracts.AuthorizationBaselineResult, error) {
+	service, ok := a.host.(contracts.AuthorizationBaselineService)
+	if !ok {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	return service.ReadMemberBaselines(ctx, query)
 }
 
 func (a *Adapter) GetTenant(ctx context.Context, tenantUUID string) (*contracts.Tenant, error) {

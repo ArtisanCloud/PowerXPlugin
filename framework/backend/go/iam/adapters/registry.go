@@ -10,9 +10,10 @@ import (
 
 // Bundle 为启动期单选绑定的 IAM 能力集合。
 type Bundle struct {
-	Directory contracts.DirectoryService
-	Authz     contracts.AuthzService
-	Context   contracts.IdentityContextService
+	Directory              contracts.DirectoryService
+	Authz                  contracts.AuthzService
+	Context                contracts.IdentityContextService
+	AuthorizationBaselines contracts.AuthorizationBaselineService
 }
 
 // Registry 维护 IAM adapter 的启动期单选绑定。
@@ -118,6 +119,20 @@ func (r *Registry) IdentityContext() (contracts.IdentityContextService, error) {
 		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, "iam context adapter not bound")
 	}
 	return r.bundle.Context, nil
+}
+
+// AuthorizationBaselines is optional for existing IAM users. Consumers which
+// enable the feature must obtain it during startup; there is no empty adapter.
+func (r *Registry) AuthorizationBaselines() (contracts.AuthorizationBaselineService, error) {
+	if r == nil {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if !r.bound || nilAdapter(r.bundle.AuthorizationBaselines) {
+		return nil, iamerrors.New(iamerrors.CodeAdapterNotBound, iamerrors.CodeAdapterNotBound)
+	}
+	return r.bundle.AuthorizationBaselines, nil
 }
 
 // DelegatedIdentity exposes only the selected delegated resolver. Local mode

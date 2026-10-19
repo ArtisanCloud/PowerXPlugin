@@ -1,0 +1,291 @@
+{
+  "schema": "framework_release_preparation.v1",
+  "recorded_at": "2026-10-18T17:05:12.352444+00:00",
+  "status": "local_packages_verified_not_published",
+  "versions": {
+    "go": "v0.0.26",
+    "client": "0.0.13",
+    "admin": "0.0.12"
+  },
+  "source": {
+    "branch": "025-framework-business-regression",
+    "head_before": "16c7cf2d42fb74bc6a4ecbd38fc9df94e1179cd7",
+    "release_commit": null,
+    "preexisting_dirty_worktree": true,
+    "package_represents": "current_worktree_snapshot_including_uncommitted_files",
+    "baseline_status": "artifacts/framework-release-20261019/worktree-before.txt",
+    "go_manifest": "artifacts/framework-release-20261019/go-source-manifest.json",
+    "go_files": 480,
+    "client_files": 15,
+    "admin_files": 19,
+    "package_contents_match_source": true
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/framework-release-20261019/powerxplugin-framework-go-v0.0.26.zip",
+      "sha256": "8f12664af5fc6b17958cfd2b05643789698f2a67abdfff0a6739d95e38406d08",
+      "bytes": 666032
+    },
+    {
+      "path": "artifacts/framework-release-20261019/powerxplugin-framework-go-v0.0.26.mod",
+      "sha256": "7e07b6d896470e34473738b54f2346ec97bf01f29b39f905c4021bb2b1327d84",
+      "bytes": 3116
+    },
+    {
+      "path": "artifacts/framework-release-20261019/powerxplugin-framework-go-v0.0.26.info",
+      "sha256": "4400b874ef4b71ea44943d574cc16fb168b932a7be67ab39c2cf06b5048c5dbc",
+      "bytes": 55
+    },
+    {
+      "path": "artifacts/framework-release-20261019/artisan-cloud-plugin-framework-client-0.0.13.tgz",
+      "sha256": "418c9c7d5fa65eb3684efe964a0b469b4e6fee1b47db9c35e7b03b50786b967f",
+      "bytes": 23553
+    },
+    {
+      "path": "artifacts/framework-release-20261019/artisan-cloud-plugin-framework-admin-0.0.12.tgz",
+      "sha256": "a443fbb2ba8c057a1e58add08820e56a95ec469c7e4c436f71b8495df079b55c",
+      "bytes": 17742
+    }
+  ],
+  "go_package_consumption": {
+    "module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "version": "v0.0.26",
+    "sum": "h1:k09RTPqW6Tf5wdHgEs8ahXMtla4wBryHrNuHeOdsI88=",
+    "go_mod_sum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w=",
+    "proxy": "local_file_proxy",
+    "isolated_module_cache": true,
+    "local_framework_replace": false,
+    "public_proxy_verified": false,
+    "generated_test_sources": "Skeleton IAM bootstrap and WS tests copied to generated module; generated implementation unchanged",
+    "toolchain": "go1.26.7 darwin/arm64",
+    "minimum_go_1_24_tested": false
+  },
+  "frontend_package_consumption": {
+    "source": "actual_installed_npm_tarballs",
+    "outside_repository": true,
+    "source_symlinks": false,
+    "node": "v22.23.2",
+    "npm": "10.9.8",
+    "nuxt": "4.2.0",
+    "typescript": "5.9.3",
+    "client": "0.0.13",
+    "admin": "0.0.12",
+    "public_exports": [
+      "SuiteDefinition",
+      "AssertionResult",
+      "Evidence",
+      "FixtureResource",
+      "createRegressionClient",
+      "RegressionClient"
+    ],
+    "status": "passed"
+  },
+  "generated_defaults": {
+    "module": "github.com/powerx-release/consumer/backend",
+    "go": "v0.0.26",
+    "client": "0.0.13",
+    "admin": "0.0.12",
+    "local_go_replace": false,
+    "source_links": false,
+    "frontend_directory": "web-admin"
+  },
+  "verification": [
+    {
+      "check": "go_framework_full",
+      "directory": "framework/backend/go",
+      "command": "GOWORK=off go test ./... -count=1 -timeout=120s",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/go-framework-full.log",
+      "log_sha256": "74ceaba13349f87077c0314c09ba2329b8c7b231d4bd6c34b16ebb45a6691afb"
+    },
+    {
+      "check": "go_framework_race",
+      "directory": "framework/backend/go",
+      "command": "GOWORK=off go test -race ./iam/contracts ./iam/adapters ./iam/delegated ./runtime/realtime ./runtime/powerx/media ./runtime/powerx/notifications ./runtime/notifications ./runtime/regression/... -count=1 -timeout=120s",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/go-framework-race.log",
+      "log_sha256": "9dc6da7c6405ef1d44a51ec9f5fc1758dc904ba73950256218a6a4daf3a6ae10"
+    },
+    {
+      "check": "skeleton_backend_full",
+      "directory": "skeleton/backend/go-gin",
+      "command": "go test ./... -count=1 -timeout=120s",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/skeleton-backend-full.log",
+      "log_sha256": "2db378e98433e68eedd24f341251799750a53a30d4dd652c8e8770dbaf621ef4"
+    },
+    {
+      "check": "cli_full",
+      "directory": "tools/cli",
+      "command": "go test ./... -count=1 -timeout=120s",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/cli-full.log",
+      "log_sha256": "e0679801e7987949a1b5cb9accf9c8816ab5b4358d37cddb86a87de1622ec798"
+    },
+    {
+      "check": "generated_backend_local_package",
+      "directory": "artifacts/framework-release-20261019/consumer/backend",
+      "command": "go test -race -mod=mod ./cmd/plugin ./internal/bootstrap ./internal/transport/http/wsbus -count=1 -timeout=120s",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/consumer-go.log",
+      "log_sha256": "103574968a4a88e95ce67f5c16acf0bbec96b94dc779e0592b3b67d8d9e4b66f"
+    },
+    {
+      "check": "client_regression",
+      "directory": "repository",
+      "command": "node --experimental-strip-types --test framework/frontend/nuxt/framework-client/__tests__/regression.test.ts",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/client-regression.log",
+      "log_sha256": "1843285b17b1ded005e274f216a2de93d9e67c8f4be8aa4fda0a8adcfdc81e43",
+      "tests_passed": 4
+    },
+    {
+      "check": "frontend_unit",
+      "directory": "skeleton/web-admin/nuxt",
+      "command": "node ./node_modules/vitest/dist/cli.js run --dir tests/unit",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/frontend-unit.log",
+      "log_sha256": "f696e2fc253dd490c4c45c6f5eaab906a19028459b54a1615b61d9a5df575eb7",
+      "test_files_passed": 21,
+      "tests_passed": 197
+    },
+    {
+      "check": "root_contract_checks",
+      "directory": "repository",
+      "command": "npm test",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/contracts.log",
+      "log_sha256": "66fa95031d1dec29dc8e7eaa57ac48e4905fd53c41a362f278287089799a5a5a"
+    },
+    {
+      "check": "ci_guardrails",
+      "directory": "repository",
+      "command": "node .codex/skills/ci/audit/scripts/ci-guardrails.mjs",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/ci-guardrails.log",
+      "log_sha256": "e3248b4e5a2cf47458193c80e8ac682554647ba5c8a20b1374d89c4697e98015"
+    },
+    {
+      "check": "templates",
+      "directory": "repository",
+      "command": "npm run sync:templates -- --check",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/template-sync-check.log",
+      "log_sha256": "3fb3c21910151ecd74d5eeecd81e057aad357882d899f9f097639bb108382cd2"
+    },
+    {
+      "check": "tarball_consumer_clean_install",
+      "directory": "temporary directory outside repository",
+      "command": "npm ci --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=1",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/consumer-npm-ci-node22-final.log",
+      "log_sha256": "4f283dcac6bf683f24236e15638e14bc430c36d70821fdd5910286e2c0470764"
+    },
+    {
+      "check": "tarball_consumer_nuxt_build",
+      "directory": "temporary directory outside repository",
+      "command": "node ./node_modules/nuxi/bin/nuxi.mjs build",
+      "status": "passed",
+      "exit_code": 0,
+      "log": "artifacts/framework-release-20261019/logs/consumer-nuxt-build-node22.log",
+      "log_sha256": "e6a3b3675ad4a4a1fd0c11c0734f123b252e2a0e65e51404339a24fa1bca2c55"
+    }
+  ],
+  "lint": {
+    "command": "npm run lint",
+    "exit_code": 0,
+    "status": "placeholder_only",
+    "meaningful_static_analysis": false,
+    "log": "artifacts/framework-release-20261019/logs/lint.log"
+  },
+  "failed_attempts": [
+    {
+      "stage": "generated_consumer_setup",
+      "failure": "Initial assumed web-admin/nuxt path did not exist",
+      "resolution": "Wait for CLI generation and use its actual web-admin directory"
+    },
+    {
+      "stage": "initial_npm_install",
+      "failure": "npm 11.3.0 dependency-tree internal error: Cannot read properties of null (reading edgesOut)",
+      "log": "logs/consumer-npm-install-initial.log",
+      "resolution": "Retry using an explicitly selected npm executable and an external consumer directory"
+    },
+    {
+      "stage": "npm_exec_launcher",
+      "failure": "Cannot find module ../lib/cli.js",
+      "log": "logs/consumer-npm-launcher-error.log",
+      "resolution": "Invoke npm CLI through an explicit Node executable"
+    },
+    {
+      "stage": "first_successful_frontend_build",
+      "status": "passed_with_engine_warnings",
+      "toolchain": "Node 22.13.0 / npm 11.6.2",
+      "logs": [
+        "logs/consumer-npm-install.log",
+        "logs/consumer-nuxt-build.log"
+      ],
+      "resolution": "Validate again with Node 22.23.2 and its bundled npm 10.9.8"
+    },
+    {
+      "stage": "first_clean_install",
+      "failure": "npm 11.6.2 lockfile omitted commander 11.1.0; npm ci failed",
+      "log": "logs/consumer-npm-ci-node22.log",
+      "resolution": "Regenerate consumer lockfile with Node 22.23.2 bundled npm 10.9.8, then npm ci and production build both passed"
+    }
+  ],
+  "remaining_warnings": [
+    "vue-i18n, unplugin-vue-router and glob dependency deprecation warnings",
+    "Vite dynamic/static import and chunk-size warnings",
+    "Lint script is a placeholder, not a real lint check",
+    "Existing CLI templates include old backend bin/plugin and bin/migrate, copied into generated plugin; tests compiled source and did not run these files; CLI is not released in this task"
+  ],
+  "publication": {
+    "committed": false,
+    "git_tag_created": false,
+    "git_tag_pushed": false,
+    "npm_published": false,
+    "go_tag": "framework/backend/go/v0.0.26",
+    "npm_order": [
+      "@artisan-cloud/plugin-framework-client@0.0.13",
+      "@artisan-cloud/plugin-framework-admin@0.0.12"
+    ],
+    "required_before_publication": [
+      "Review and commit the intended source snapshot and version/template changes on the current branch",
+      "Require CI for that exact release commit before tagging",
+      "Confirm candidate package contents still match the approved release commit",
+      "Publish client before admin",
+      "Verify public Go proxy with GOWORK=off and no local replace, and npm registry consumption after publication"
+    ],
+    "cli_separate_release_blocker": "Remove preexisting compiled binaries from source/embedded templates and verify generated output before a separate CLI release"
+  },
+  "acceptance_not_claimed": [
+    "Real Core service grants and live notification receipt capability",
+    "IAM migration/initialization and B01-B24 installed acceptance",
+    "Plugin adoption of local authorization, delegated worker, media preview and business read cursors",
+    "Minimum Go 1.24 toolchain compatibility",
+    "Remote GitHub CI and official package registry acceptance"
+  ],
+  "runtime_actions": {
+    "branch_changed": false,
+    "user_services_restarted": false,
+    "persistent_services_started": false,
+    "database_changed": false,
+    "grants_changed": false,
+    "cli_built_for_verification": true,
+    "installed_cli_replaced": false,
+    "dotnet_published": false,
+    "temporary_frontend_dependencies_removed": true,
+    "isolated_go_cache_removed": true
+  }
+}

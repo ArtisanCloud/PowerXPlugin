@@ -79,6 +79,9 @@ type HostAsset struct {
 	Status           string `json:"status"`
 	CreatedAt        string `json:"created_at,omitempty"`
 	UpdatedAt        string `json:"updated_at,omitempty"`
+	// Derivatives is a snapshot of Core's standard image processing state.
+	// Nil means the host did not supply it; Status still describes the original upload.
+	Derivatives *ImageDerivatives `json:"derivatives,omitempty"`
 }
 type CreateAssetInput struct {
 	Name             string `json:"name"`

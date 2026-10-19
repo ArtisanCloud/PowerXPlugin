@@ -12,13 +12,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/hosthttp"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/hostcontract"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/powerx/sts"
 )
 
 type Config struct {
 	BaseURL, BearerToken, STSClientID, STSClientSecret, STSTokenURL string
-	Timeout                                                         time.Duration
+	// APIPrefix comes from Gateway.APIPrefix / PX_GATEWAY_API_PREFIX.
+	APIPrefix string
+	Timeout   time.Duration
 }
 
 type TokenProvider interface {
@@ -42,7 +45,21 @@ type Publisher interface {
 
 // CreateInput is a tenant-scoped notification command. The target member is
 // optional; omitting it delegates delivery to the host's tenant policy.
+type Navigation struct {
+	Label string `json:"label"`
+	Path  string `json:"path"`
+}
+
+type Action struct {
+	ID     string            `json:"id"`
+	Label  string            `json:"label"`
+	Type   string            `json:"type"`
+	Action string            `json:"action"`
+	Params map[string]string `json:"params"`
+}
+
 type CreateInput struct {
+	Navigation  *Navigation    `json:"navigation,omitempty"`
 	Title       string         `json:"title"`
 	Content     string         `json:"content"`
 	Type        string         `json:"type,omitempty"`
@@ -53,6 +70,7 @@ type CreateInput struct {
 }
 
 type Notification struct {
+	Actions     []Action       `json:"actions,omitempty"`
 	UUID        string         `json:"id"`
 	Title       string         `json:"title"`
 	Content     string         `json:"content"`
@@ -80,7 +98,10 @@ func NewClient(cfg Config, httpClient *http.Client) (*Client, error) {
 	if strings.TrimSpace(cfg.BaseURL) == "" {
 		return nil, errors.New("powerx notifications base_url is required")
 	}
-	c := newClient(cfg, httpClient)
+	c, err := newClient(cfg, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	if token := strings.TrimSpace(cfg.BearerToken); token != "" {
 		c.tokens = staticToken(token)
 		return c, nil
@@ -100,23 +121,30 @@ func NewClientWithTokenProvider(cfg Config, provider TokenProvider, httpClient *
 	if provider == nil {
 		return nil, errors.New("powerx notifications token provider is required")
 	}
-	c := newClient(cfg, httpClient)
+	c, err := newClient(cfg, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	c.tokens = provider
 	return c, nil
 }
 
-func newClient(cfg Config, httpClient *http.Client) *Client {
-	c := &Client{baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")}
+func newClient(cfg Config, httpClient *http.Client) (*Client, error) {
+	baseURL, err := hosthttp.APIBaseURL(cfg.BaseURL, cfg.APIPrefix)
+	if err != nil {
+		return nil, err
+	}
+	c := &Client{baseURL: baseURL}
 	if httpClient != nil {
 		c.http = httpClient
-		return c
+		return c, nil
 	}
 	timeout := cfg.Timeout
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
 	c.http = &http.Client{Timeout: timeout}
-	return c
+	return c, nil
 }
 
 func (c *Client) Create(ctx context.Context, input CreateInput) (*Notification, error) {
@@ -130,11 +158,23 @@ func (c *Client) Create(ctx context.Context, input CreateInput) (*Notification, 
 		return nil, errors.New("notification content is required")
 	}
 	var out Notification
-	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/notifications", input, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, "/notifications", input, &out); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(out.UUID) == "" {
 		return nil, errors.New("powerx notifications response missing notification uuid")
+	}
+	if input.Navigation != nil {
+		matched := false
+		for _, action := range out.Actions {
+			if action.Type == "primary" && action.Action == "navigate" && action.Label == input.Navigation.Label && action.Params["path"] == input.Navigation.Path {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return nil, &HTTPError{StatusCode: 502, ReasonCode: "NOTIFICATION_NAVIGATION_RESPONSE_INVALID"}
+		}
 	}
 	return &out, nil
 }

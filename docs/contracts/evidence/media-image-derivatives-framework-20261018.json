@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-18",
+  "scope": "optional_media_derivatives_response_mapping",
+  "source_status": "implemented",
+  "core_contract": "PowerX/docs/contracts/media-image-derivatives.md",
+  "sdk_publication": "not_performed",
+  "cli_build_or_install": "not_performed",
+  "service_interfaces_changed": false,
+  "verification": [
+    {
+      "layer": "go_media_race",
+      "directory": "framework/backend/go",
+      "command": "go test -race ./runtime/powerx/media ./runtime/media -count=1 -timeout=90s",
+      "status": "passed"
+    },
+    {
+      "layer": "dotnet_media",
+      "command": "dotnet test framework/backend/dotnet/tests/PowerXPlugin.Framework.Tests/PowerXPlugin.Framework.Tests.csproj --no-restore --filter FullyQualifiedName~Runtime.Media --nologo -v:q",
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "status": "passed"
+    },
+    {
+      "layer": "skeleton_media_consumers",
+      "directory": "skeleton/backend/go-gin",
+      "command": "go test ./internal/services/runtimeexample ./internal/transport/http/admin/host_contract -count=1 -timeout=90s",
+      "status": "passed"
+    },
+    {
+      "layer": "shared_fixture_core_schema",
+      "fixture": "framework/backend/go/runtime/powerx/media/testdata/host_asset_derivatives.json",
+      "core_schema": "specs/001-media-storage/contracts/image-derivatives.openapi.yaml#/components/schemas/ImageDerivatives",
+      "validator": "Python jsonschema.Draft4Validator with FormatChecker, fixture.data.derivatives",
+      "status": "passed"
+    },
+    {
+      "layer": "template_sync",
+      "command": "npm run sync:templates -- --check",
+      "template_source_changes_needed": false,
+      "status": "passed"
+    },
+    {
+      "layer": "format_and_document_links",
+      "checks": ["git diff --check", "new alignment document relative links", "evidence JSON parse"],
+      "status": "passed"
+    }
+  ],
+  "coverage": [
+    "create_complete_get_with_sts_and_api_key",
+    "original_ready_derivatives_still_processing",
+    "ready_variant_uuid_and_pending_variant_without_uuid",
+    "absent_and_null_derivatives_remain_absent",
+    "queued_ready_failed_unsupported_unavailable_states",
+    "malformed_derivatives_not_silently_ignored",
+    "variant_reuse_preserves_core_mime_and_size",
+    "one_request_per_explicit_host_operation"
+  ],
+  "deferred": [
+    "core_service_identity_event_subscription_contract",
+    "framework_authenticated_state_change_event_adapter",
+    "plugin_delegated_generator_switch_and_duplicate_create_path",
+    "plugin_local_actual_variant_metadata_persistence",
+    "plugin_page_automatic_state_refresh",
+    "published_sdk_consumption",
+    "real_core_grants_generation_repair_and_installed_acceptance"
+  ],
+  "runtime_actions": {
+    "database_changes": false,
+    "service_grant_changes": false,
+    "user_services_restarted": false,
+    "deployment": false,
+    "standalone_services_started": false,
+    "http_test_servers": "test_owned_and_closed"
+  }
+}

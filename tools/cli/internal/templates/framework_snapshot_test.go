@@ -55,7 +55,7 @@ func frameworkSnapshot(t *testing.T) (string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version := "v0.0.25-dev.g" + hex.EncodeToString(hash.Sum(nil))[:16]
+	version := "v0.0.26-dev.g" + hex.EncodeToString(hash.Sum(nil))[:16]
 	proxy := t.TempDir()
 	escaped := "github.com/!artisan!cloud/!power!x!plugin/framework/backend/go"
 	dir := filepath.Join(proxy, escaped, "@v")

@@ -1,0 +1,242 @@
+{
+  "schema": "framework_publication.v1",
+  "recorded_at": "2026-10-18T17:45:30.809804+00:00",
+  "release_commit": "d1fc3b25a881fb9e0bc2477f6f2cf3673456133b",
+  "branch": "025-framework-business-regression",
+  "ci": {
+    "run": 39148704898,
+    "url": "https://github.com/ArtisanCloud/PowerXPlugin/actions/runs/39148704898",
+    "head_sha": "d1fc3b25a881fb9e0bc2477f6f2cf3673456133b",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "delegated-contract-guard",
+        "conclusion": "success"
+      },
+      {
+        "name": "frontend",
+        "conclusion": "success"
+      },
+      {
+        "name": "dist-target",
+        "conclusion": "success"
+      },
+      {
+        "name": "cli",
+        "conclusion": "success"
+      },
+      {
+        "name": "backend",
+        "conclusion": "success"
+      },
+      {
+        "name": "template-sync",
+        "conclusion": "success"
+      },
+      {
+        "name": "contracts",
+        "conclusion": "success"
+      },
+      {
+        "name": "smoke",
+        "conclusion": "success"
+      },
+      {
+        "name": "regression",
+        "conclusion": "success"
+      }
+    ],
+    "go_toolchain": "go1.24.13 linux/amd64",
+    "node_toolchain": "22.23.2"
+  },
+  "go": {
+    "module": "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go",
+    "version": "v0.0.26",
+    "sum": "h1:KfX72k7QMeo3Ut9UgeKrUNlBr1T8Sto6hzyG8yPFwKg=",
+    "go_mod_sum": "h1:Xmb97ZEMwaN9kaz32/7GHXR/oQESdc3ILbiCtOHh+2w=",
+    "origin": {
+      "VCS": "git",
+      "URL": "https://github.com/ArtisanCloud/PowerXPlugin",
+      "Subdir": "framework/backend/go",
+      "Hash": "d1fc3b25a881fb9e0bc2477f6f2cf3673456133b",
+      "Ref": "refs/tags/framework/backend/go/v0.0.26"
+    },
+    "source_files": 480,
+    "source_matches_release_commit": true,
+    "public_proxy": "https://proxy.golang.org",
+    "checksum_service": "sum.golang.org",
+    "status": "passed",
+    "published": true,
+    "release_url": "https://github.com/ArtisanCloud/PowerXPlugin/releases/tag/framework/backend/go/v0.0.26",
+    "official_consumer": {
+      "status": "passed",
+      "command": "GOWORK=off GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=0 go test ./internal/templates -run '^TestGeneratedBackendBuild$' -count=1 -timeout=300s",
+      "framework_local_replace": false,
+      "source_snapshot": false
+    }
+  },
+  "npm": {
+    "publisher": "matrix-x",
+    "login_refreshed": true,
+    "client": {
+      "version": "0.0.13",
+      "published": true,
+      "status": "published_and_verified",
+      "attempts": [
+        {
+          "result": "not_published",
+          "failure": "Interactive publish authentication expired or became invalid; registry done endpoint returned E404"
+        },
+        {
+          "result": "publish_accepted",
+          "publish_2fa": "completed"
+        }
+      ],
+      "publish_command_exit": 0,
+      "publish_accepted": true,
+      "registry_available": true,
+      "package": "@artisan-cloud/plugin-framework-client",
+      "latest": "0.0.13",
+      "alpha": "0.0.9",
+      "publisher": "matrix-x",
+      "published_at": "2026-10-18T17:37:46.328Z",
+      "integrity": "sha512-pYW9wwFJ04HkLupi5zQhDC/yxnQ8nPwRLgbAEaa8y2tfglafGcqxmWQztrMuKcjxIEhUzpODY7C67RlCS8tk7A==",
+      "sha256": "418c9c7d5fa65eb3684efe964a0b469b4e6fee1b47db9c35e7b03b50786b967f",
+      "files": 15,
+      "source_matches_release_commit": true,
+      "matches_prepublication_tested_package": true,
+      "git_tag": "framework/frontend/nuxt/framework-client/v0.0.13",
+      "public_url": "https://www.npmjs.com/package/@artisan-cloud/plugin-framework-client/v/0.0.13"
+    },
+    "admin": {
+      "version": "0.0.12",
+      "published": true,
+      "status": "published_and_verified",
+      "publish_command_exit": 0,
+      "publish_accepted": true,
+      "registry_available": true,
+      "publish_2fa": "No additional challenge after client authorization",
+      "package": "@artisan-cloud/plugin-framework-admin",
+      "latest": "0.0.12",
+      "alpha": "0.0.9",
+      "publisher": "matrix-x",
+      "published_at": "2026-10-18T17:39:07.978Z",
+      "integrity": "sha512-jQlomRv9/68rfn/KfHEwvVlwcNlYnsf1A8rY9s7m+ILM6GZGVogLzFQSZpipq48JiQZ5DmNqMjkTUu+vFtLBeg==",
+      "sha256": "a443fbb2ba8c057a1e58add08820e56a95ec469c7e4c436f71b8495df079b55c",
+      "files": 19,
+      "source_matches_release_commit": true,
+      "matches_prepublication_tested_package": true,
+      "git_tag": "framework/frontend/nuxt/framework-admin/v0.0.12",
+      "public_url": "https://www.npmjs.com/package/@artisan-cloud/plugin-framework-admin/v/0.0.12"
+    },
+    "official_consumer": {
+      "source": "npm_registry_exact_versions",
+      "outside_repository": true,
+      "source_symlinks": false,
+      "node": "v22.23.2",
+      "npm": "12.2.0",
+      "nuxt": "4.2.0",
+      "typescript": "5.9.3",
+      "packages": {
+        "client": {
+          "version": "0.0.13",
+          "resolved": "https://registry.npmjs.org/@artisan-cloud/plugin-framework-client/-/plugin-framework-client-0.0.13.tgz",
+          "integrity": "sha512-pYW9wwFJ04HkLupi5zQhDC/yxnQ8nPwRLgbAEaa8y2tfglafGcqxmWQztrMuKcjxIEhUzpODY7C67RlCS8tk7A=="
+        },
+        "admin": {
+          "version": "0.0.12",
+          "resolved": "https://registry.npmjs.org/@artisan-cloud/plugin-framework-admin/-/plugin-framework-admin-0.0.12.tgz",
+          "integrity": "sha512-jQlomRv9/68rfn/KfHEwvVlwcNlYnsf1A8rY9s7m+ILM6GZGVogLzFQSZpipq48JiQZ5DmNqMjkTUu+vFtLBeg=="
+        }
+      },
+      "public_exports": [
+        "SuiteDefinition",
+        "AssertionResult",
+        "Evidence",
+        "FixtureResource",
+        "createRegressionClient",
+        "RegressionClient"
+      ],
+      "status": "passed",
+      "production_build": "passed",
+      "install_exit_code": 0,
+      "build_exit_code": 0,
+      "install_scripts": "npm 12 default script-approval policy retained; no blanket approval added; production build passed",
+      "failures": [
+        {
+          "stage": "initial_install",
+          "reason": "New client publication metadata had not propagated; npm reported undefined client version and peer resolution error",
+          "log": "artifacts/framework-release-20261019/logs/npm-official-consumer-install.log"
+        },
+        {
+          "stage": "npm_10_prefer_online_retry",
+          "reason": "npm 10.9.8 Arborist internal edgesOut error",
+          "log": "artifacts/framework-release-20261019/logs/npm-official-consumer-install-online.log"
+        }
+      ],
+      "resolution": "Temporary npm 12.2.0 and isolated fresh cache; exact public versions installed without force/legacy-peer-deps; Nuxt 4.2.0 production build passed"
+    }
+  },
+  "initial_ci_failure": {
+    "run": 39148497035,
+    "commit": "bfe32be5f163e051317b8276f2c8e53c88bf6154",
+    "failed_jobs": [
+      "frontend",
+      "regression"
+    ],
+    "stage": "Install dependencies",
+    "reason": "Skeleton still referenced admin 0.0.11 with client ^0.0.12 peer, conflicting with client 0.0.13",
+    "resolution_commit": "d1fc3b25a881fb9e0bc2477f6f2cf3673456133b",
+    "final_ci_conclusion": "success"
+  },
+  "not_claimed": [
+    "Core service grant acceptance",
+    "Installed end-to-end acceptance",
+    "CLI publication",
+    "Dotnet publication"
+  ],
+  "remaining_worktree_changes_preserved": true,
+  "services_restarted": false,
+  "database_modified": false,
+  "status": "all_versions_published_and_verified",
+  "verification_logs": {
+    "go-official-consumer.log": {
+      "path": "artifacts/framework-release-20261019/logs/go-official-consumer.log",
+      "sha256": "70da6df13778f6c6ebbbd8daaca7aa7661cc1c6414e9b0b8236e53d018ddfc37"
+    },
+    "npm-client-publish-first.log": {
+      "path": "artifacts/framework-release-20261019/logs/npm-client-publish-first.log",
+      "sha256": "4c2e54a897c4cbd36f8f84aa7975c3facf3a9cb2f037f61254505f5902420130"
+    },
+    "npm-client-publish.log": {
+      "path": "artifacts/framework-release-20261019/logs/npm-client-publish.log",
+      "sha256": "de702cac2010ab33ab7e8c8d37b64d4c6c74e0f7e67b67b4061835c3f5445353"
+    },
+    "npm-admin-publish.log": {
+      "path": "artifacts/framework-release-20261019/logs/npm-admin-publish.log",
+      "sha256": "e6e6858bf2ed6a2ed259ec005e77b10dd95fdd366c0c3267159ceb790d611d3c"
+    },
+    "npm-official-consumer-install.log": {
+      "path": "artifacts/framework-release-20261019/logs/npm-official-consumer-install.log",
+      "sha256": "86c43adf21ab5d3a3c48eb765b2a26ea34830a4968fa2851dbc6e95ad92db67e"
+    },
+    "npm-official-consumer-install-online.log": {
+      "path": "artifacts/framework-release-20261019/logs/npm-official-consumer-install-online.log",
+      "sha256": "c32a303b5ca7ff2586bcc8e679094a3e629544f47012ac4abfdd4ddacbcc8782"
+    },
+    "npm-official-consumer-install-final.log": {
+      "path": "artifacts/framework-release-20261019/logs/npm-official-consumer-install-final.log",
+      "sha256": "e6800e25a37dc3bee11d2de1dac4ac8da1247cc2eb25af0e3ebfeabe52bb4c62"
+    },
+    "npm-official-consumer-build.log": {
+      "path": "artifacts/framework-release-20261019/logs/npm-official-consumer-build.log",
+      "sha256": "506eaaefd406c1bcd8d757006a35945b0d2a633059ae2e2b8faabe0afb9b7f54"
+    }
+  },
+  "temporary_verification_cleanup": {
+    "frontend_removed": true,
+    "temporary_npm12_removed": true,
+    "temporary_npm_cache_removed": true,
+    "persistent_services_started": false
+  }
+}

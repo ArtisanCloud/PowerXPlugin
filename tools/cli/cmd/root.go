@@ -38,6 +38,8 @@ func Execute(args []string) error {
 		return runDev(args[1:])
 	case "doctor":
 		return runDoctor(args[1:])
+	case "regression":
+		return runRegression(args[1:])
 	case "iam":
 		return runIAM(args[1:])
 	default:

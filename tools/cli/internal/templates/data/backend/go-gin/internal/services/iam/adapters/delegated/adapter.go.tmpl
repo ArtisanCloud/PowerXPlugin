@@ -45,7 +45,16 @@ func NewBundle(proxy delegatedProxy) (fwiamadapters.Bundle, error) {
 		return fwiamadapters.Bundle{}, fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
 	}
 	adapter := &Adapter{proxy: proxy}
-	return fwiamdelegated.NewBundle(adapter)
+	bundle, err := fwiamdelegated.NewBundle(adapter)
+	if err != nil {
+		return bundle, err
+	}
+	if source, ok := proxy.(interface {
+		AuthorizationBaselineProvider() fwiamcontracts.AuthorizationBaselineService
+	}); ok {
+		bundle.AuthorizationBaselines = source.AuthorizationBaselineProvider()
+	}
+	return bundle, nil
 }
 
 func (a *Adapter) Authorize(ctx context.Context, req fwiamcontracts.AuthorizationRequest) (*fwiamcontracts.AuthorizationDecision, error) {

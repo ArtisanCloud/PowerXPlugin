@@ -2,26 +2,27 @@
   <div
     class="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
   >
-    <div class="flex h-16 items-center justify-between px-6">
+    <div class="flex h-16 min-w-0 items-center justify-between gap-2 px-3 sm:px-6">
       <!-- 左侧品牌 -->
-      <div class="flex items-center">
+      <div class="flex min-w-0 items-center">
+        <UButton class="mr-2 shrink-0 lg:hidden" color="neutral" variant="ghost" icon="i-heroicons-bars-3" :aria-label="t('navigation.openMenu')" :aria-expanded="navigationOpen" aria-controls="standalone-mobile-navigation" @click="emit('toggleNavigation')" />
         <img
           :src="logoSrc"
-          alt="PowerX Plugin Logo"
-          class="h-8 w-auto mr-3"
+          :alt="t('navigation.pluginLogo')"
+          class="mr-2 h-6 w-auto shrink-0 sm:mr-3 sm:h-8"
         />
-        <div class="flex items-center gap-2">
-          <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
+        <div class="flex min-w-0 items-center gap-2">
+          <h1 class="truncate text-sm font-semibold text-gray-900 sm:text-xl dark:text-white">
             {{ t("common.appName") }}
           </h1>
-          <UBadge color="neutral" variant="outline" class="text-[11px] font-medium">
+          <UBadge color="neutral" variant="outline" class="hidden shrink-0 text-[11px] font-medium sm:inline-flex">
             v{{ pluginVersion }}
           </UBadge>
         </div>
       </div>
 
       <!-- 中间快捷操作 -->
-      <div class="flex items-center space-x-3">
+      <div class="hidden items-center space-x-3 lg:flex">
         <UBadge
           :color="providerModeBadge.color"
           variant="outline"
@@ -35,7 +36,7 @@
       </div>
 
       <!-- 右侧控制区 -->
-      <div class="flex items-center space-x-4">
+      <div class="flex shrink-0 items-center gap-2 sm:gap-4">
         <!-- 通知 -->
         <div class="relative">
           <UButton
@@ -44,6 +45,7 @@
             :color="wsStateColor"
             size="sm"
             square
+            :aria-label="t('navigation.notifications')"
             @click="toggleNotifications"
           >
             <UIcon name="i-heroicons-bell" class="w-5 h-5" />
@@ -57,8 +59,7 @@
           </span>
         </div>
 
-        <ThemeSelector />
-        <LanguageSelector />
+        <div class="hidden items-center gap-4 sm:flex"><ThemeSelector /><LanguageSelector /></div>
 
         <!-- 用户头像和下拉菜单 -->
         <UDropdownMenu
@@ -67,7 +68,7 @@
         >
           <UAvatar
             src="https://avatars.githubusercontent.com/u/739984?v=4"
-            alt="管理员"
+            :alt="t('navigation.userMenu')"
             size="sm"
             class="cursor-pointer"
           />
@@ -126,6 +127,8 @@
 </template>
 
 <script setup lang="ts">
+withDefaults(defineProps<{ navigationOpen?: boolean }>(), { navigationOpen: false });
+const emit = defineEmits<{ toggleNavigation: [] }>();
 import { computed } from "vue";
 import { useAuth } from "~/composables/useAuth";
 import { getTenantUuid } from "~/composables/api/_base";

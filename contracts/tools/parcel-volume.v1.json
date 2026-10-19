@@ -1,0 +1,88 @@
+{
+  "schema": "powerx.plugin-tool-contract/v1",
+  "tool_key": "com.powerx.plugins.base.parcel.volume",
+  "version": "1.0.0",
+  "semantics": "pure_computation",
+  "input": {
+    "id": "powerx.base.parcel-volume.input/v1",
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length_cm",
+        "width_cm",
+        "height_cm"
+      ],
+      "properties": {
+        "length_cm": {
+          "type": "number"
+        },
+        "width_cm": {
+          "type": "number"
+        },
+        "height_cm": {
+          "type": "number"
+        }
+      }
+    },
+    "fields": {
+      "/length_cm": {
+        "field_key": "length",
+        "label_key": "parcel.length",
+        "unit": "cm",
+        "scope": "parcel"
+      },
+      "/width_cm": {
+        "field_key": "width",
+        "label_key": "parcel.width",
+        "unit": "cm",
+        "scope": "parcel"
+      },
+      "/height_cm": {
+        "field_key": "height",
+        "label_key": "parcel.height",
+        "unit": "cm",
+        "scope": "parcel"
+      }
+    }
+  },
+  "output": {
+    "id": "powerx.base.parcel-volume.output/v1",
+    "definition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "volume_cm3"
+      ],
+      "properties": {
+        "volume_cm3": {
+          "type": "string",
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$",
+          "maxLength": 80
+        }
+      }
+    },
+    "fields": {
+      "/volume_cm3": {
+        "field_key": "volume",
+        "label_key": "parcel.volume",
+        "unit": "cm3",
+        "scope": "parcel"
+      }
+    }
+  },
+  "labels": {
+    "en-US": {
+      "parcel.length": "Length",
+      "parcel.width": "Width",
+      "parcel.height": "Height",
+      "parcel.volume": "Parcel volume"
+    },
+    "zh-CN": {
+      "parcel.length": "长度",
+      "parcel.width": "宽度",
+      "parcel.height": "高度",
+      "parcel.volume": "包裹体积"
+    }
+  }
+}

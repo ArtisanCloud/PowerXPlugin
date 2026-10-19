@@ -240,7 +240,14 @@
     "aiSettings": "AI Settings",
     "profile": "Profile",
     "help": "Help",
-    "logout": "Logout"
+    "logout": "Logout",
+    "primaryMenu": "Main navigation",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
+    "menuHelp": "Choose a page, or close this menu to continue your task.",
+    "pluginLogo": "Plugin logo",
+    "userMenu": "User menu",
+    "notifications": "Notifications"
   },
   "knowledgeSpaces": {
     "ui": {
@@ -2856,5 +2863,473 @@
     "upstreamUnavailable": "The identity service is unavailable. Check Core dependencies and retry.",
     "requestFailed": "Request identity validation failed. Check the API error code and Trace; the current session is unchanged.",
     "loading": "Synchronizing and validating the PowerX session…"
+  },
+  "regression": {
+    "title": "Business regression",
+    "description": "Review business test cases, run checks and track results.",
+    "suites": {
+      "business": "Business scenarios",
+      "description": "Plugin business regression scenarios"
+    },
+    "dependencyModes": {
+      "real": "Real dependency",
+      "test_double": "Declared test double",
+      "unavailable": "Dependency unavailable"
+    },
+    "boundaries": {
+      "storage": "Plugin storage",
+      "core_host": "Core Host Contract",
+      "service": "Business service",
+      "http": "In-process plugin HTTP routes"
+    },
+    "profiles": {
+      "controlled": "Plugin business test environment",
+      "live": "Core integration test environment"
+    },
+    "scenarios": {
+      "template": {
+        "title": "Template creation and update",
+        "description": "Verify that a template can be created, updated and read back with matching content.",
+        "impact": "Creates and updates a test template, then cleans it up. The cleanup result is shown separately."
+      },
+      "metadata": {
+        "title": "Core tag bindings",
+        "description": "Verify live tag bindings, idempotency and cleanup.",
+        "impact": "Temporarily changes tags on a dedicated test resource and restores the original set afterwards. Check the dedicated resource and authorization first."
+      },
+      "search": {
+        "title": "Search by name and description",
+        "description": "Verify matching by name, description and case-insensitive keywords, with no results for an unmatched query.",
+        "impact": "Creates 3 isolated templates and cleans them up. Existing templates are not used."
+      },
+      "pagination": {
+        "title": "Template list pagination",
+        "description": "Verify 5 templates across pages of 2 without duplicates or omissions, and an empty page beyond the last page.",
+        "impact": "Creates 5 uniquely scoped test templates, queries only this run and cleans up all fixtures."
+      },
+      "deletion": {
+        "title": "Deleted templates are inaccessible",
+        "description": "Verify a deleted template cannot be read or listed, while another template remains unchanged.",
+        "impact": "Creates 2 test templates, deletes one during execution and cleans up the remaining template."
+      },
+      "clone": {
+        "title": "Batch clone and copy independence",
+        "description": "Verify two copies of each source preserve names and content, and editing one copy does not change sources or siblings.",
+        "impact": "Creates 2 sources and 4 copies, updates one copy and cleans up all fixtures."
+      },
+      "partialClone": {
+        "title": "Partial batch clone failure",
+        "description": "Verify a valid source is copied while a missing source has its own failure, and the successful copy can be read back.",
+        "impact": "Creates 1 source and 1 copy. The other source identifier is randomly generated and absent. Cleans up created templates. Correct handling of the expected partial failure passes this case."
+      },
+      "invalidInput": {
+        "title": "Invalid input leaves data unchanged",
+        "description": "Submit blank names and oversized content through the real in-process HTTP routes; verify create and update are rejected without changing stored data.",
+        "impact": "Creates 1 template and sends 4 invalid requests scoped to this run. Uses the trusted execution actor to verify HTTP validation, not login or host authorization. Cleans up fixtures. Expected rejection passes this case."
+      },
+      "validation": {
+        "title": "Content validation and repair",
+        "description": "Verify an empty draft produces a warning in normal mode and an error in strict mode, then passes validation after repair.",
+        "impact": "Creates an empty draft through the business service, repairs its content, reads it back and cleans it up. This checks service-level validation; HTTP rejection is covered by a separate case."
+      }
+    },
+    "steps": {
+      "create": "Create a template",
+      "update": "Update template content",
+      "readback": "Read back and verify",
+      "binding": "Bind tags",
+      "replay": "Repeat binding",
+      "cleanup": "Clean up",
+      "seedSearch": "Create search fixtures",
+      "search": "Search names, descriptions and mixed case",
+      "seedPagination": "Create 5 pagination fixtures",
+      "paginate": "Read pages and verify totals",
+      "seedDeletion": "Create a target and a control template",
+      "deleteTemplate": "Delete the target template",
+      "verifyDeletion": "Verify deletion and the control template",
+      "seedClone": "Create isolated source templates",
+      "cloneTemplates": "Create two copies of each source",
+      "verifyClones": "Read copies and verify edit independence",
+      "partialClone": "Clone valid and absent sources together",
+      "verifyPartial": "Read successful copies and verify counts",
+      "seedInvalid": "Create a valid control template",
+      "rejectCreate": "Submit invalid HTTP create requests",
+      "rejectUpdate": "Submit invalid HTTP update requests",
+      "verifyUnchanged": "Verify original data and no extra writes",
+      "seedValidation": "Create an empty draft through the service",
+      "validateContent": "Compare normal and strict validation",
+      "repairContent": "Repair, validate and read back"
+    },
+    "assertions": {
+      "created": "Created content is correct",
+      "updated": "Updated content is correct",
+      "readback": "Read-back content matches the update",
+      "binding": "Tag binding matches",
+      "idempotency": "No duplicate bindings",
+      "searchName": "Name search returns only the intended template",
+      "searchDescription": "Description search returns only the intended template",
+      "searchCase": "Search results are case-insensitive",
+      "searchAbsent": "Unmatched searches return no templates",
+      "pagination": "Page totals are correct without duplicates or omissions",
+      "pageOverflow": "An overflow page is empty with an unchanged total",
+      "deletedRead": "The deleted template cannot be read",
+      "deletedList": "The deleted template is absent from lists",
+      "survivor": "The control template is unchanged",
+      "cloneCount": "Four copies have independent object identities",
+      "cloneContents": "Copy names, descriptions, content and initial states match",
+      "cloneIndependent": "Editing a copy leaves sources and siblings unchanged",
+      "partialClone": "The valid source succeeds and the missing source fails separately",
+      "partialReadback": "The successful copy can be read without extra copies",
+      "rejectedCreate": "Create requests with blank names or oversized content are rejected",
+      "rejectedUpdate": "Update requests with blank names or oversized content are rejected",
+      "noPollution": "Original data is unchanged and no invalid templates were created",
+      "validationWarning": "Normal validation reports a content warning",
+      "validationStrict": "Strict validation reports a content error",
+      "validationRepaired": "Repaired content can be read and passes validation"
+    },
+    "fixtures": {
+      "name": "Regression test template",
+      "description": "An isolated regression fixture",
+      "content": "Initial regression content",
+      "updatedContent": "Updated regression content",
+      "validationContent": "Repaired regression content that passes template validation."
+    },
+    "actions": {
+      "run": "Run selected",
+      "refresh": "Refresh",
+      "cancel": "Cancel run",
+      "cleanup": "Retry cleanup",
+      "reconnect": "Reconnect",
+      "report": "Download report",
+      "rerun": "Rerun failures",
+      "details": "Details",
+      "runCase": "Run",
+      "runAll": "Run all ({count})",
+      "runFiltered": "Run filtered cases ({count})",
+      "runSelected": "Run {count} selected cases",
+      "selectCase": "Select case: {name}",
+      "viewCase": "View details",
+      "viewResult": "View result",
+      "viewRuns": "View execution records",
+      "start": "Start run",
+      "cancelPreparation": "Back",
+      "close": "Close",
+      "technical": "Technical details",
+      "backToCases": "Back to test cases",
+      "backToRuns": "Back to execution records",
+      "selectVisible": "Select all visible test cases"
+    },
+    "tabs": {
+      "cases": "Regression test cases",
+      "runs": "Execution records"
+    },
+    "fields": {
+      "profile": "Execution environment",
+      "scenario": "Scenario",
+      "inputs": "Custom test data (JSON)",
+      "phase": "Execution phase",
+      "verdict": "Verdict",
+      "expected": "Expected",
+      "actual": "Actual",
+      "evidence": "Evidence",
+      "cleanup": "Data cleanup",
+      "started": "Started",
+      "duration": "Duration",
+      "tags": "Tags",
+      "boundary": "Boundary",
+      "missing": "Missing assertions",
+      "suite": "Suite",
+      "allSuites": "All suites",
+      "dependencies": "Dependency modes",
+      "filter": "Search cases",
+      "caseVersion": "Scenario version",
+      "executionTimeout": "Execution timeout",
+      "cleanupTimeout": "Cleanup timeout",
+      "declaredSteps": "Scenario steps and validation boundaries",
+      "latestRun": "Latest batch result",
+      "pluginVersion": "Plugin version",
+      "sourceRevision": "Source revision",
+      "actualDependencies": "Observed dependencies",
+      "declaredMode": "Declared mode",
+      "actualMode": "Actual mode",
+      "requiredAssertion": "Required assertion",
+      "optionalAssertion": "Optional assertion",
+      "fixtureDetails": "Test resource technical details"
+    },
+    "states": {
+      "empty": "No runnable cases match the current profile or filters.",
+      "loading": "Loading",
+      "disconnected": "Connection interrupted",
+      "pending": "Pending",
+      "queued": "Queued",
+      "running": "Running",
+      "cancelling": "Cancelling",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "interrupted": "Interrupted",
+      "passed": "Passed",
+      "failed": "Failed",
+      "blocked": "Blocked",
+      "skipped": "Skipped",
+      "not_required": "Not required",
+      "succeeded": "Succeeded",
+      "preflight": "Preflight",
+      "preparing": "Preparing",
+      "executing": "Executing",
+      "verifying": "Verifying",
+      "cleaning": "Cleaning",
+      "finished": "Finished",
+      "unrecorded": "Not recorded",
+      "noRecentRun": "No run for this profile in the loaded history.",
+      "noRuns": "No execution history"
+    },
+    "errors": {
+      "REGRESSION_INVALID_REQUEST": "The test input or execution identity is invalid. Check the form and execution permissions.",
+      "REGRESSION_NOT_FOUND": "Record not found.",
+      "REGRESSION_BUSY": "Another run or cleanup is active.",
+      "REGRESSION_REQUEST_CONFLICT": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_DEPENDENCY_BLOCKED": "Required dependencies or authorization are missing. The run cannot continue.",
+      "REGRESSION_TIMEOUT": "The scenario timed out.",
+      "REGRESSION_CLEANUP_FAILED": "Some test data was not cleaned up. Retry cleanup or inspect technical details.",
+      "REGRESSION_INTERRUPTED": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_STORE_UNAVAILABLE": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_CLEANUP_UNAVAILABLE": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_EVENT_META_INVALID": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_ASSERTION_FAILED": "The check result does not match the expected value.",
+      "REGRESSION_ASSERTION_MISSING": "Some checks did not return results. This run cannot pass.",
+      "REGRESSION_ASSERTION_DUPLICATE": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_EVIDENCE_MISSING": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_CANCELLED": "The run was cancelled. Check the data cleanup result.",
+      "REGRESSION_STREAM_INVALID": "The regression operation could not be completed. Inspect its recorded reason.",
+      "REGRESSION_STREAM_INTERRUPTED": "The result connection was interrupted. Reconnect to resume.",
+      "REGRESSION_API_UNAVAILABLE": "The business regression API is unavailable. Check the backend regression setting, API address and running server version.",
+      "REGRESSION_REQUEST_FAILED": "The business regression request failed. Check the network, API response and backend logs, then retry.",
+      "REGRESSION_PRESENTATION_MISSING": "The business explanation or input form for this case is incomplete. Ask the plugin developer to configure it before running.",
+      "REGRESSION_PROFILE_UNAVAILABLE": "The original environment is unavailable. Select a valid environment in the case list and run again."
+    },
+    "stepPhases": {
+      "preflight": "Preflight",
+      "prepare": "Prepare data",
+      "execute": "Business operation",
+      "verify": "Verify facts",
+      "cleanup": "Clean up resources"
+    },
+    "timing": {
+      "milliseconds": "{value} ms",
+      "incomplete": "Complete timing unavailable"
+    },
+    "overview": {
+      "available": "{count} regression test cases available",
+      "unavailable": "Test catalog is not ready",
+      "profile": "Profile: {name}",
+      "selected": "{count} selected",
+      "showing": "Showing {count} of {total} cases",
+      "caseNumber": "Test case {number}",
+      "steps": "{count} steps",
+      "busy": "A run or cleanup is in progress. Wait for it to finish."
+    },
+    "instructions": {
+      "choose": "Review the cases below to see what each one verifies.",
+      "run": "Click “Run this case”, or select cases for a batch.",
+      "inspect": "Check the results for passed cases, failures and cleanup.",
+      "inputReady": "Test data is ready. Run directly; registered test resources are cleaned up afterwards.",
+      "inputRequired": "Expand “Test data and case details” and fill in the required inputs before running."
+    },
+    "advanced": {
+      "environment": "Execution profile and dependencies",
+      "caseDetails": "Test data and case details",
+      "inputHelp": "Use JSON and follow the case requirements. Inputs are validated when the run starts.",
+      "runDetails": "View execution profile and versions",
+      "resultDetails": "View validation boundaries and resources"
+    },
+    "profileDescriptions": {
+      "controlled": "Run tests against the current plugin business service and database.",
+      "live": "Run against the configured live Core environment. Dedicated resources and authorization are required."
+    },
+    "results": {
+      "title": "Run results",
+      "total": "{count} cases in this run",
+      "count": "{status}: {count}",
+      "assertions": "Inspect {count} checks: expected values, actual values and evidence",
+      "failedCheck": "Failed check: {name}",
+      "headlines": {
+        "queued": "Waiting to start",
+        "running": "Verifying business behavior",
+        "cancelling": "Cancelling and cleaning up",
+        "cancelled": "This run was cancelled",
+        "interrupted": "This run was interrupted",
+        "passed": "This regression passed",
+        "failed": "This regression failed",
+        "blocked": "This regression is blocked",
+        "pending": "Waiting for results"
+      },
+      "failureLocation": "Failed at: {name} / {step}"
+    },
+    "catalog": {
+      "environment": "Environment: {name}",
+      "selection": "Select cases",
+      "case": "Test case",
+      "purpose": "What it verifies",
+      "latest": "Latest batch result",
+      "actions": "Actions",
+      "notRun": "No record",
+      "historyScope": "Latest results describe the whole batch containing this case. Open its execution record for individual case results."
+    },
+    "caseDetail": {
+      "description": "Review the business goal, passing conditions and data impact.",
+      "purpose": "Test purpose",
+      "steps": "Execution flow · {count} steps",
+      "expected": "Passing conditions",
+      "impact": "Data impact and cleanup"
+    },
+    "preparation": {
+      "title": "Prepare to run {count} test cases",
+      "description": "Default test data is filled in. Review the environment and inputs, then start the run.",
+      "reviewInputs": "Review or edit test inputs"
+    },
+    "inputs": {
+      "templateName": "Test template name",
+      "templateDescription": "Test template description",
+      "initialContent": "Initial content",
+      "updatedContent": "Updated content",
+      "resourceType": "Dedicated resource type",
+      "testTag": "Dedicated test tag identifier",
+      "testTagHelp": "Technical input: enter the UUID of a dedicated test tag. Do not use a normal business tag.",
+      "repairedContent": "Repaired content"
+    },
+    "history": {
+      "description": "Review the cases, results and cleanup for each execution.",
+      "emptyHelp": "Run a business case from the test case list first. Its result will be saved here.",
+      "time": "Execution time",
+      "cases": "Test cases",
+      "result": "Result",
+      "cleanup": "Data cleanup",
+      "actions": "Actions"
+    },
+    "technical": {
+      "description": "Execution snapshots, versions, dependencies and evidence for further diagnosis.",
+      "definition": "Case definition, input schema, timeouts and dependency configuration.",
+      "snapshot": "Full execution snapshot and evidence"
+    },
+    "validation": {
+      "required": "Enter {field}.",
+      "minLength": "{field} requires at least {count} characters.",
+      "maxLength": "{field} must not exceed {count} characters.",
+      "uuid": "{field} must be a valid UUID."
+    },
+    "resultSections": {
+      "overview": "Overview",
+      "checks": "Business checks",
+      "resources": "Test data and cleanup",
+      "diagnostics": "Execution and diagnostics"
+    },
+    "resultActions": {
+      "locateFailure": "Locate failure",
+      "inspectResources": "Inspect cleanup",
+      "inspectChecks": "Inspect checks",
+      "compare": "Compare all fields",
+      "evidence": "Inspect technical evidence",
+      "cleanupEvidence": "Inspect cleanup evidence"
+    },
+    "resultLabels": {
+      "cases": "Test cases",
+      "checks": "Required checks passed",
+      "resourcesCleaned": "{passed} / {total} registered objects cleaned",
+      "sections": "Result sections",
+      "currentCase": "Current test case",
+      "field": "Checked field",
+      "source": "Source object",
+      "finished": "Finished",
+      "expectedFields": "Verify {total} business fields",
+      "matchingFields": "{passed} / {total} fields match",
+      "readbackRecorded": "{count} cleanup read-back evidence records",
+      "readbackMissing": "Cleanup read-back evidence not recorded"
+    },
+    "resultHelp": {
+      "overview": "Review each case, then inspect expected and observed business values.",
+      "checks": "Both passing and failing checks expose business facts. Open the complete comparison for multiple objects, or inspect technical evidence.",
+      "noChecks": "No checks have been recorded yet. Running cases will update here.",
+      "presentationMissing": "The plugin has not configured this business comparison. Ask its developer to complete the mapping; original evidence remains available.",
+      "valueMissing": "Some comparison fields are missing or do not match the declared types. Check the case version and technical evidence.",
+      "resources": "Only objects registered by this case appear here. Source links are explicitly recorded, and successful cleanup requires business read-back evidence.",
+      "resourceGaps": "Some resource names, roles or cleanup evidence were not recorded. Missing facts cannot be reconstructed. Rerun the case to obtain complete records.",
+      "noResources": "This case has not registered any test objects.",
+      "comparison": "Compare expected and observed business fields. Differences are highlighted.",
+      "evidence": "Original structured evidence for diagnosis, including observation time, validation boundary and technical identifiers.",
+      "noEvidence": "No technical evidence was recorded."
+    },
+    "resultValues": {
+      "yes": "Yes",
+      "no": "No",
+      "none": "None",
+      "ratio": "{passed} / {total}",
+      "matches": "Matches",
+      "differs": "Differs",
+      "fieldValue": "{field}: {value}",
+      "groupField": "{group} / {field}",
+      "separator": "; ",
+      "selectedReference": "Selected test object",
+      "otherReference": "Another object (identifier in evidence)",
+      "referencesCount": "{count} object references (identifiers in evidence)",
+      "noParent": "Independent test object"
+    },
+    "resourceRoles": {
+      "fixture": "Test template",
+      "source": "Source template",
+      "copy": "Copy",
+      "binding": "Dedicated resource tag bindings"
+    },
+    "resultGroups": {
+      "copy": "Copy {index}",
+      "object": "Object {index}",
+      "request": "Request {index}",
+      "tag": "Test tag {index}"
+    },
+    "resultFields": {
+      "name": "Name",
+      "description": "Description",
+      "content": "Content",
+      "count": "Object count",
+      "failed": "Failure count",
+      "independent_uuids": "Independent object identities",
+      "status": "Status",
+      "review_status": "Review status",
+      "total": "Total",
+      "matching_templates": "Matches intended templates",
+      "counts": "Items returned per page",
+      "totals": "Reported total per page",
+      "complete_without_duplicates": "Complete without duplicates",
+      "not_found": "Target is inaccessible",
+      "only_control_template": "Only the control template remains",
+      "created": "Successful copies",
+      "only_missing_source_failed": "Only the absent source failed",
+      "source_content": "Source content",
+      "copy_content": "Copy content",
+      "success": "Request succeeded",
+      "field": "Invalid field",
+      "code": "Business error code",
+      "only_original": "Only the original template remains",
+      "valid": "Content satisfies the rules",
+      "violations": "Reported issues",
+      "rule": "Validation rule",
+      "severity": "Severity",
+      "tag": "Bound object",
+      "tag_uuids": "Bound tag set"
+    },
+    "resultEnums": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived",
+      "pending": "Pending review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "warning": "Warning",
+      "error": "Error",
+      "content": "Content",
+      "name": "Name",
+      "description": "Description",
+      "content_min_length": "Minimum content length",
+      "VALIDATION_FAILED": "Input validation failed"
+    }
   }
 }

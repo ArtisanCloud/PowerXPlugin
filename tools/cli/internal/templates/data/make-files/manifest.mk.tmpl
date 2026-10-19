@@ -20,7 +20,7 @@ ABS_MANIFEST_SCHEMA := $(abspath $(MANIFEST_SCHEMA))
 EVENT_FABRIC_FILE ?= config/event_fabric.yaml
 ABS_EVENT_FABRIC_FILE := $(abspath $(EVENT_FABRIC_FILE))
 MANIFESTCHECK_DIR := $(BACKEND_DIR)/cmd/manifestcheck
-BACKEND_GOCACHE := $(abspath $(BACKEND_DIR)/.cache/go-build)
+BACKEND_GOCACHE ?= $(GO_BUILD_CACHE)
 
 .PHONY: plugin-yaml-sync
 plugin-yaml-sync: ## 根据 contracts/capabilities 自动同步 plugin.d/capabilities.yaml 与 exposure.yaml
@@ -30,8 +30,8 @@ plugin-yaml-sync: ## 根据 contracts/capabilities 自动同步 plugin.d/capabil
 		echo "   当前 BACKEND_DIR=$(BACKEND_DIR)"; \
 		exit 1; \
 	fi
-	@mkdir -p $(BACKEND_GOCACHE)
-	@cd $(BACKEND_DIR) && GOCACHE=$(BACKEND_GOCACHE) go run ./cmd/manifestcheck \
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
 		--plugin "$(ABS_PLUGIN_FILE)" \
 		--sync-catalogs \
 		--sync-only
@@ -44,8 +44,8 @@ verify-manifest:
 		echo "   当前 BACKEND_DIR=$(BACKEND_DIR)"; \
 		exit 1; \
 	fi
-	@mkdir -p $(BACKEND_GOCACHE)
-	@cd $(BACKEND_DIR) && GOCACHE=$(BACKEND_GOCACHE) go run ./cmd/manifestcheck \
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
 		--plugin "$(ABS_PLUGIN_FILE)" \
 		--manifest "$(ABS_MANIFEST_FILE)" \
 		--schema "$(ABS_MANIFEST_SCHEMA)"
@@ -58,8 +58,8 @@ check-capability:
 		echo "   当前 BACKEND_DIR=$(BACKEND_DIR)"; \
 		exit 1; \
 	fi
-	@mkdir -p $(BACKEND_GOCACHE)
-	@cd $(BACKEND_DIR) && GOCACHE=$(BACKEND_GOCACHE) go run ./cmd/manifestcheck \
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
 		--plugin "$(ABS_PLUGIN_FILE)" \
 		--manifest "$(ABS_MANIFEST_FILE)" \
 		--schema "$(ABS_MANIFEST_SCHEMA)" \
@@ -77,8 +77,8 @@ plugin-yaml-check: plugin-yaml-sync plugin-id-check ## 一条命令校验 plugin
 		echo "❌ 未找到 $(EVENT_FABRIC_FILE)，无法执行 events topic 对齐校验"; \
 		exit 1; \
 	fi
-	@mkdir -p $(BACKEND_GOCACHE)
-	@cd $(BACKEND_DIR) && GOCACHE=$(BACKEND_GOCACHE) go run ./cmd/manifestcheck \
+	@mkdir -p "$(BACKEND_GOCACHE)"
+	@cd $(BACKEND_DIR) && GOCACHE="$(BACKEND_GOCACHE)" go run ./cmd/manifestcheck \
 		--plugin "$(ABS_PLUGIN_FILE)" \
 		--manifest "" \
 		--schema "$(ABS_MANIFEST_SCHEMA)" \

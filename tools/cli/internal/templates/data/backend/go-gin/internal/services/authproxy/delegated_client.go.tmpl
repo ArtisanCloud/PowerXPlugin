@@ -180,6 +180,15 @@ func (c *DelegatedClient) ResolveIdentityContext(ctx context.Context, accessToke
 func (c *DelegatedClient) SetIdentityResolver(resolver fwiamcontracts.DelegatedIdentityService) {
 	c.identityClient = resolver
 }
+
+// AuthorizationBaselineProvider exposes only the Framework-owned service client.
+func (c *DelegatedClient) AuthorizationBaselineProvider() fwiamcontracts.AuthorizationBaselineService {
+	if c == nil {
+		return nil
+	}
+	provider, _ := c.identityClient.(fwiamcontracts.AuthorizationBaselineService)
+	return provider
+}
 func (c *DelegatedClient) IdentityResolverReady() bool {
 	if c == nil || c.identityClient == nil {
 		return false

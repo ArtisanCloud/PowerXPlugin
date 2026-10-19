@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/hostapi"
 	knowledgeprovider "{{ .BackendModulePath }}/internal/services/admin/knowledge"
+	Regression "{{ .BackendModulePath }}/internal/services/admin/regression"
 	"{{ .BackendModulePath }}/internal/services/runtimeexample"
 	"github.com/gin-gonic/gin"
 	"net"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	fwbootstrap "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/bootstrap"
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
 	fwiamdelegated "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/delegated"
 	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/manifest"
 	fwrouter "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/router"
@@ -140,10 +142,6 @@ func main() {
 	rootCtx := context.Background()
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
-
-	if os.Getenv("CONFIG_PATH") == "" && os.Getenv("POWERX_PLUGIN_CONFIG_DIR") != "" {
-		os.Setenv("CONFIG_PATH", os.Getenv("POWERX_PLUGIN_CONFIG_DIR"))
-	}
 
 	// 加载配置
 	cfg, err := config.Load()
@@ -461,7 +459,7 @@ func main() {
 			logger.WithError(err).Fatal("Failed to initialize delegated Knowledge QA bridge client")
 		}
 		knowledgeDirectory = knowledgeQABridge
-		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL)}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
+		notificationsRuntime, err = powerxnotifications.NewClientWithTokenProvider(powerxnotifications.Config{BaseURL: strings.TrimSpace(cfg.Gateway.BaseURL), APIPrefix: cfg.Gateway.APIPrefix}, powerxnotifications.TokenProviderFunc(stsTokens.TokenFunc()), nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Failed to initialize delegated Notifications client")
 		}
@@ -906,8 +904,33 @@ func main() {
 	if err := pluginbootstrap.ValidateIAMBinding(deps); err != nil {
 		logger.WithError(err).Fatal("Framework IAM registry binding is incomplete")
 	}
+	requiredIAMCapabilities, err := capabilities.LoadRequiredHostCapabilities(manifestPath)
+	if err != nil {
+		logger.WithError(err).Fatal("FRAMEWORK_CAPABILITY_REQUIREMENTS_INVALID")
+	}
+	for _, capabilityID := range requiredIAMCapabilities {
+		if capabilityID == fwiamcontracts.AuthorizationBaselineCapability {
+			deps.IAMAuthorizationBaselineEnabled = true
+		}
+	}
+	if err := pluginbootstrap.ValidateAuthorizationBaselineFeature(ctx, deps, deps.IAMAuthorizationBaselineEnabled, requiredIAMCapabilities, capabilityRegistry); err != nil {
+		logger.WithError(err).Fatal("IAM_BASELINE_STARTUP_FAILED")
+	}
 	// All identity services must be bound before handlers capture dependencies.
 	r := pluginrouter.NewRouter(cfg, deps)
+	deps.Regression, err = Regression.NewService(ctx, deps)
+	if err != nil {
+		logger.WithError(err).Fatal("REGRESSION_STARTUP_FAILED")
+	}
+	if deps.Regression != nil {
+		defer func() {
+			stopCtx, stopCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer stopCancel()
+			if err := deps.Regression.Close(stopCtx); err != nil {
+				logger.WithError(err).Error("REGRESSION_STOP_FAILED")
+			}
+		}()
+	}
 	engine := r.Setup()
 	if localMedia != nil {
 		engine.GET(runtimeexample.MediaTransferPath, gin.WrapH(http.HandlerFunc(localMedia.ServeTransfer)))
@@ -980,34 +1003,38 @@ func main() {
 		})
 	}
 
-	if integrationScheduler != nil {
-		safeGo("integration_scheduler", func() error {
-			integrationScheduler.Start(groupCtx)
-			<-groupCtx.Done()
-			stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancelStop()
-			integrationScheduler.Stop(stopCtx)
-			return nil
-		})
-	}
+	if !dbpkg.BackgroundWorkersDisabled() {
+		if integrationScheduler != nil {
+			safeGo("integration_scheduler", func() error {
+				integrationScheduler.Start(groupCtx)
+				<-groupCtx.Done()
+				stopCtx, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancelStop()
+				integrationScheduler.Stop(stopCtx)
+				return nil
+			})
+		}
 
-	if syncJob != nil {
-		safeGo("marketplace_sync_job", func() error {
-			syncJob.Run(groupCtx)
-			return nil
-		})
-	}
-	if renewalJob != nil {
-		safeGo("license_renewal_job", func() error {
-			renewalJob.Run(groupCtx)
-			return nil
-		})
-	}
-	if taskBusRuntime.StartConsumer != nil {
-		safeGo("taskbus_consumer", func() error {
-			taskBusRuntime.StartConsumer(groupCtx)
-			return nil
-		})
+		if syncJob != nil {
+			safeGo("marketplace_sync_job", func() error {
+				syncJob.Run(groupCtx)
+				return nil
+			})
+		}
+		if renewalJob != nil {
+			safeGo("license_renewal_job", func() error {
+				renewalJob.Run(groupCtx)
+				return nil
+			})
+		}
+		if taskBusRuntime.StartConsumer != nil {
+			safeGo("taskbus_consumer", func() error {
+				taskBusRuntime.StartConsumer(groupCtx)
+				return nil
+			})
+		}
+	} else {
+		logger.WithField("read_only", dbpkg.IsReadOnly()).Info("RECOVERY_BACKGROUND_WORKERS_DISABLED")
 	}
 
 	// 等待中断信号

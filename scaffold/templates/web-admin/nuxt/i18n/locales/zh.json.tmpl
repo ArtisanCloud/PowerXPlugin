@@ -240,7 +240,14 @@
     "aiSettings": "AI 设置",
     "profile": "个人中心",
     "help": "帮助",
-    "logout": "退出"
+    "logout": "退出",
+    "primaryMenu": "主导航",
+    "openMenu": "打开导航菜单",
+    "closeMenu": "关闭导航菜单",
+    "menuHelp": "选择功能页面，返回后继续当前任务。",
+    "pluginLogo": "插件标志",
+    "userMenu": "用户菜单",
+    "notifications": "通知"
   },
   "knowledgeSpaces": {
     "ui": {
@@ -2918,5 +2925,473 @@
     "upstreamUnavailable": "身份服务暂时不可用，请检查 Core 依赖状态后重试。",
     "requestFailed": "请求的身份验证失败。请检查接口错误码与 Trace；当前会话保持不变。",
     "loading": "正在同步并验证 PowerX 会话…"
+  },
+  "regression": {
+    "title": "业务回归",
+    "description": "查看业务回归用例，执行验证并跟踪结果。",
+    "suites": {
+      "business": "业务场景",
+      "description": "插件业务回归测试场景"
+    },
+    "dependencyModes": {
+      "real": "真实依赖",
+      "test_double": "已声明的测试替身",
+      "unavailable": "依赖不可用"
+    },
+    "boundaries": {
+      "storage": "插件业务存储",
+      "core_host": "Core 宿主接口",
+      "service": "业务服务",
+      "http": "插件内 HTTP 路由"
+    },
+    "profiles": {
+      "controlled": "插件业务测试环境",
+      "live": "Core 集成测试环境"
+    },
+    "scenarios": {
+      "template": {
+        "title": "模板创建与修改",
+        "description": "验证模板能否创建、修改，并在重新读取后保持内容一致。",
+        "impact": "会创建一条测试模板并修改内容，执行结束后清理该模板；清理结果会单独显示。"
+      },
+      "metadata": {
+        "title": "Core 标签绑定",
+        "description": "验证真实标签绑定、幂等与资源清理。",
+        "impact": "会临时修改专用测试资源的标签集合，结束后恢复原集合；请先核对专用资源和授权。"
+      },
+      "search": {
+        "title": "按名称和说明搜索",
+        "description": "验证名称、说明和大小写搜索能准确找到目标模板，不匹配的搜索返回空列表。",
+        "impact": "创建 3 条独立测试模板，搜索结束后全部清理，不使用现有模板。"
+      },
+      "pagination": {
+        "title": "模板列表分页",
+        "description": "验证 5 条模板按每页 2 条查询时，没有重复或遗漏，超出末页返回空列表。",
+        "impact": "创建 5 条带独立标记的测试模板，只查询本次数据，结束后全部清理。"
+      },
+      "deletion": {
+        "title": "删除后不可再访问",
+        "description": "验证删除的模板无法读取、从列表消失，同时另一条模板保持正确。",
+        "impact": "创建 2 条测试模板，业务步骤删除其中 1 条，结束后清理剩余模板。"
+      },
+      "clone": {
+        "title": "批量复制与副本独立",
+        "description": "验证两个源模板各复制两份后，数量、名称和内容正确，修改副本不影响源模板及其他副本。",
+        "impact": "创建 2 条源模板和 4 条副本，修改 1 条副本，结束后全部清理。"
+      },
+      "partialClone": {
+        "title": "批量复制部分失败",
+        "description": "验证有效来源正常复制，不存在的来源单独报告失败，成功结果可重新读取。",
+        "impact": "创建 1 条源模板和 1 条副本；另一个来源是随机生成且不存在的标识。结束后清理真实创建的模板。预期的部分失败被正确处理时，本用例通过。"
+      },
+      "invalidInput": {
+        "title": "非法输入不污染数据",
+        "description": "通过插件内真实 HTTP 路由提交空白名称和超长内容，验证创建与修改均被拒绝，原数据保持正确。",
+        "impact": "创建 1 条测试模板，对本次数据执行 4 次非法请求。使用已确认的执行身份验证接口校验，不验证登录或宿主授权。结束后清理测试模板。请求按预期被拒绝时，本用例通过。"
+      },
+      "validation": {
+        "title": "内容校验与修复",
+        "description": "验证空内容草稿在普通、严格模式下分别报告警告和错误，补充内容后校验通过。",
+        "impact": "通过业务服务创建 1 条空内容草稿用于校验，再写入修复内容并重新读取，结束后清理。这是服务层内容校验场景，HTTP 输入拒绝由另一条用例验证。"
+      }
+    },
+    "steps": {
+      "create": "创建模板",
+      "update": "修改模板内容",
+      "readback": "重新读取并验证",
+      "binding": "绑定标签",
+      "replay": "重复绑定",
+      "cleanup": "清理",
+      "seedSearch": "创建搜索测试数据",
+      "search": "按名称、说明和大小写查询",
+      "seedPagination": "创建 5 条分页测试数据",
+      "paginate": "逐页查询并核对总数",
+      "seedDeletion": "创建目标模板和对照模板",
+      "deleteTemplate": "删除目标模板",
+      "verifyDeletion": "验证删除结果与对照数据",
+      "seedClone": "创建独立源模板",
+      "cloneTemplates": "每个源模板复制两份",
+      "verifyClones": "读取副本并验证修改独立性",
+      "partialClone": "混合提交有效和不存在的来源",
+      "verifyPartial": "读取成功副本并核对实际数量",
+      "seedInvalid": "创建有效的对照模板",
+      "rejectCreate": "通过 HTTP 提交非法创建请求",
+      "rejectUpdate": "通过 HTTP 提交非法修改请求",
+      "verifyUnchanged": "核对原数据且没有额外新增",
+      "seedValidation": "通过业务服务创建空内容草稿",
+      "validateContent": "对比普通和严格内容校验",
+      "repairContent": "修复内容后重新校验并读取"
+    },
+    "assertions": {
+      "created": "创建后内容正确",
+      "updated": "修改后内容正确",
+      "readback": "重新读取的内容与修改后内容一致",
+      "binding": "标签绑定一致",
+      "idempotency": "没有重复绑定",
+      "searchName": "按名称搜索只返回目标模板",
+      "searchDescription": "按说明搜索只返回目标模板",
+      "searchCase": "大小写搜索结果一致",
+      "searchAbsent": "不匹配的搜索返回空列表",
+      "pagination": "分页总数正确且没有重复或遗漏",
+      "pageOverflow": "超出末页返回空列表且总数不变",
+      "deletedRead": "删除后无法再读取目标模板",
+      "deletedList": "删除后列表不再包含目标模板",
+      "survivor": "另一条模板的内容没有变化",
+      "cloneCount": "生成 4 条副本且每个对象标识独立",
+      "cloneContents": "副本名称、说明、内容和初始状态正确",
+      "cloneIndependent": "修改副本后源模板及其他副本保持正确",
+      "partialClone": "有效来源成功，不存在的来源单独失败",
+      "partialReadback": "成功副本可读取且没有额外复制",
+      "rejectedCreate": "空白名称和超长内容的创建请求均被拒绝",
+      "rejectedUpdate": "空白名称和超长内容的修改请求均被拒绝",
+      "noPollution": "原模板不变且没有新增脏数据",
+      "validationWarning": "普通校验指出内容问题并标为警告",
+      "validationStrict": "严格校验将内容问题标为错误",
+      "validationRepaired": "修复后的内容可读取且校验通过"
+    },
+    "fixtures": {
+      "name": "回归测试模板",
+      "description": "隔离的回归测试数据",
+      "content": "初始回归内容",
+      "updatedContent": "修改后的回归内容",
+      "validationContent": "已修复的完整回归测试内容，可以通过模板内容校验。"
+    },
+    "actions": {
+      "run": "执行所选",
+      "refresh": "刷新",
+      "cancel": "取消执行",
+      "cleanup": "重试清理",
+      "reconnect": "重新连接",
+      "report": "下载报告",
+      "rerun": "重跑失败场景",
+      "details": "详情",
+      "runCase": "运行",
+      "runAll": "运行全部（{count}）",
+      "runFiltered": "运行筛选结果（{count}）",
+      "runSelected": "运行选中的 {count} 个用例",
+      "selectCase": "选择用例：{name}",
+      "viewCase": "查看详情",
+      "viewResult": "查看结果",
+      "viewRuns": "查看执行记录",
+      "start": "开始执行",
+      "cancelPreparation": "返回",
+      "close": "关闭",
+      "technical": "技术详情",
+      "backToCases": "返回回归用例",
+      "backToRuns": "返回执行记录",
+      "selectVisible": "全选当前列表中的用例"
+    },
+    "tabs": {
+      "cases": "回归用例",
+      "runs": "执行记录"
+    },
+    "fields": {
+      "profile": "执行环境",
+      "scenario": "业务场景",
+      "inputs": "自定义测试数据（JSON）",
+      "phase": "执行阶段",
+      "verdict": "测试结论",
+      "expected": "预期值",
+      "actual": "实际值",
+      "evidence": "证据",
+      "cleanup": "数据清理",
+      "started": "开始时间",
+      "duration": "耗时",
+      "tags": "标签",
+      "boundary": "验证边界",
+      "missing": "缺失断言",
+      "suite": "测试套件",
+      "allSuites": "全部套件",
+      "dependencies": "依赖验证方式",
+      "filter": "搜索用例",
+      "caseVersion": "场景版本",
+      "executionTimeout": "执行时限",
+      "cleanupTimeout": "清理时限",
+      "declaredSteps": "场景步骤与验证边界",
+      "latestRun": "最近批次结果",
+      "pluginVersion": "插件版本",
+      "sourceRevision": "源码版本",
+      "actualDependencies": "实际依赖验证",
+      "declaredMode": "声明方式",
+      "actualMode": "实际方式",
+      "requiredAssertion": "必要断言",
+      "optionalAssertion": "可选断言",
+      "fixtureDetails": "测试资源技术详情"
+    },
+    "states": {
+      "empty": "当前配置或筛选条件下没有可运行的用例。",
+      "loading": "加载中",
+      "disconnected": "结果连接已中断",
+      "pending": "待执行",
+      "queued": "已接受",
+      "running": "执行中",
+      "cancelling": "停止中",
+      "completed": "已结束",
+      "cancelled": "已取消",
+      "interrupted": "已中断",
+      "passed": "通过",
+      "failed": "失败",
+      "blocked": "阻塞",
+      "skipped": "跳过",
+      "not_required": "无需清理",
+      "succeeded": "清理成功",
+      "preflight": "检查依赖",
+      "preparing": "准备数据",
+      "executing": "业务操作",
+      "verifying": "验证事实",
+      "cleaning": "清理资源",
+      "finished": "结束",
+      "unrecorded": "未记录",
+      "noRecentRun": "当前历史列表中暂无运行记录。",
+      "noRuns": "暂无执行历史"
+    },
+    "errors": {
+      "REGRESSION_INVALID_REQUEST": "测试输入或执行身份不符合要求，请核对表单输入与执行权限。",
+      "REGRESSION_NOT_FOUND": "执行记录不存在。",
+      "REGRESSION_BUSY": "已有执行或清理作业正在运行。",
+      "REGRESSION_REQUEST_CONFLICT": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_DEPENDENCY_BLOCKED": "缺少必要的依赖或授权，无法继续执行。",
+      "REGRESSION_TIMEOUT": "场景执行超时。",
+      "REGRESSION_CLEANUP_FAILED": "测试数据未完全清理，请重试清理或查看技术详情。",
+      "REGRESSION_INTERRUPTED": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_STORE_UNAVAILABLE": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_CLEANUP_UNAVAILABLE": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_EVENT_META_INVALID": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_ASSERTION_FAILED": "校验结果与预期不一致。",
+      "REGRESSION_ASSERTION_MISSING": "部分校验没有返回结果，无法判定为通过。",
+      "REGRESSION_ASSERTION_DUPLICATE": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_EVIDENCE_MISSING": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_CANCELLED": "执行已取消，请核对数据清理结果。",
+      "REGRESSION_STREAM_INVALID": "回归操作未完成，请查看记录中的具体原因。",
+      "REGRESSION_STREAM_INTERRUPTED": "结果连接中断，请重新连接以恢复。",
+      "REGRESSION_API_UNAVAILABLE": "业务回归接口不可用。请检查后端是否已启用 regression，以及当前 API 地址和服务版本。",
+      "REGRESSION_REQUEST_FAILED": "业务回归请求失败。请检查网络、接口响应和后端服务日志后重试。",
+      "REGRESSION_PRESENTATION_MISSING": "这条用例尚未配置完整的业务说明或输入表单，请由插件开发者补齐后执行。",
+      "REGRESSION_PROFILE_UNAVAILABLE": "原执行环境已不可用，请在用例列表选择有效环境后重新运行。"
+    },
+    "stepPhases": {
+      "preflight": "前置检查",
+      "prepare": "准备数据",
+      "execute": "业务操作",
+      "verify": "验证事实",
+      "cleanup": "清理资源"
+    },
+    "timing": {
+      "milliseconds": "{value} 毫秒",
+      "incomplete": "尚无完整计时"
+    },
+    "overview": {
+      "available": "当前可运行 {count} 个回归用例",
+      "unavailable": "用例目录尚未就绪",
+      "profile": "执行配置：{name}",
+      "selected": "已选 {count} 个",
+      "showing": "显示 {count} / {total} 个用例",
+      "caseNumber": "用例 {number}",
+      "steps": "包含 {count} 个步骤",
+      "busy": "回归正在执行或清理，请等待本次运行结束。"
+    },
+    "instructions": {
+      "choose": "查看下方用例，了解要验证的业务。",
+      "run": "点击“运行此用例”；批量执行可先勾选。",
+      "inspect": "在运行结果中查看通过、失败和清理情况。",
+      "inputReady": "测试数据已准备好，可直接运行；结束后会清理登记的测试资源。",
+      "inputRequired": "请展开“测试数据与用例详情”，填写必需的测试输入后运行。"
+    },
+    "advanced": {
+      "environment": "执行配置与依赖设置",
+      "caseDetails": "测试数据与用例详情",
+      "inputHelp": "JSON 格式；按用例要求修改字段。运行时会校验输入是否符合用例规范。",
+      "runDetails": "查看本次运行的配置与版本",
+      "resultDetails": "查看验证边界与资源详情"
+    },
+    "profileDescriptions": {
+      "controlled": "在当前插件的业务服务和数据库中执行测试。",
+      "live": "在配置的真实 Core 环境中执行测试，需要专用资源和相应授权。"
+    },
+    "results": {
+      "title": "运行结果",
+      "total": "本次执行 {count} 个用例",
+      "count": "{status} {count} 个",
+      "assertions": "查看 {count} 项校验的预期值、实际值与证据",
+      "failedCheck": "未通过：{name}",
+      "headlines": {
+        "queued": "等待执行",
+        "running": "正在验证业务",
+        "cancelling": "正在取消并清理",
+        "cancelled": "本次执行已取消",
+        "interrupted": "本次执行已中断",
+        "passed": "本次回归通过",
+        "failed": "本次回归失败",
+        "blocked": "本次回归受阻",
+        "pending": "等待执行结果"
+      },
+      "failureLocation": "失败位置：{name} / {step}"
+    },
+    "catalog": {
+      "environment": "当前环境：{name}",
+      "selection": "选择用例",
+      "case": "回归用例",
+      "purpose": "验证什么",
+      "latest": "最近批次结果",
+      "actions": "操作",
+      "notRun": "暂无记录",
+      "historyScope": "最近结果为包含该用例的整批结论；单个用例的结果请进入执行记录查看。"
+    },
+    "caseDetail": {
+      "description": "了解这条用例验证的业务、通过条件和数据影响。",
+      "purpose": "测试目的",
+      "steps": "执行过程 · {count} 个步骤",
+      "expected": "通过条件",
+      "impact": "数据影响与清理"
+    },
+    "preparation": {
+      "title": "准备执行 {count} 个回归用例",
+      "description": "默认测试数据已填写。核对执行环境与输入后，点击“开始执行”。",
+      "reviewInputs": "核对或修改测试输入"
+    },
+    "inputs": {
+      "templateName": "测试模板名称",
+      "templateDescription": "测试模板说明",
+      "initialContent": "初始内容",
+      "updatedContent": "修改后内容",
+      "resourceType": "专用资源类型",
+      "testTag": "专用测试标签标识",
+      "testTagHelp": "技术输入：填写专用测试标签的 UUID，不能使用普通业务标签。",
+      "repairedContent": "修复后的完整内容"
+    },
+    "history": {
+      "description": "查看每次执行的用例、结果和数据清理情况。",
+      "emptyHelp": "先在“回归用例”中选择业务并运行，结果会保存在这里。",
+      "time": "执行时间",
+      "cases": "执行用例",
+      "result": "执行结果",
+      "cleanup": "数据清理",
+      "actions": "操作"
+    },
+    "technical": {
+      "description": "执行快照、版本、依赖与证据，仅用于进一步诊断。",
+      "definition": "用例定义、输入规范、执行时限和依赖配置。",
+      "snapshot": "完整执行快照与证据"
+    },
+    "validation": {
+      "required": "请填写{field}。",
+      "minLength": "{field}至少需要 {count} 个字符。",
+      "maxLength": "{field}不能超过 {count} 个字符。",
+      "uuid": "{field}必须是有效的 UUID。"
+    },
+    "resultSections": {
+      "overview": "结果概览",
+      "checks": "业务校验",
+      "resources": "测试数据与清理",
+      "diagnostics": "执行与诊断"
+    },
+    "resultActions": {
+      "locateFailure": "定位失败",
+      "inspectResources": "查看清理记录",
+      "inspectChecks": "查看业务校验",
+      "compare": "查看完整对比",
+      "evidence": "查看技术证据",
+      "cleanupEvidence": "查看清理证据"
+    },
+    "resultLabels": {
+      "cases": "执行用例",
+      "checks": "必要校验通过",
+      "resourcesCleaned": "已清理 {passed} / {total} 个登记对象",
+      "sections": "结果查看分区",
+      "currentCase": "当前查看的用例",
+      "field": "校验字段",
+      "source": "来源对象",
+      "finished": "结束时间",
+      "expectedFields": "核对 {total} 项业务字段",
+      "matchingFields": "{passed} / {total} 项与预期一致",
+      "readbackRecorded": "已记录 {count} 项清理读回证据",
+      "readbackMissing": "未记录清理读回证据"
+    },
+    "resultHelp": {
+      "overview": "先查看各用例结论，再进入业务校验核对预期与实际。",
+      "checks": "通过和失败的校验均展示业务事实。多对象校验可进入完整对比，技术证据按需查看。",
+      "noChecks": "当前还没有已记录的校验结果；运行中的用例请等待更新。",
+      "presentationMissing": "这项校验尚未配置完整的业务展示，请由插件开发者补齐；原始证据仍可查看。",
+      "valueMissing": "部分对比字段未记录或类型与展示声明不符，请核对用例版本和技术证据。",
+      "resources": "这里只列出本用例登记的对象。来源关联由执行时明确记录，清理成功需有业务读回证据。",
+      "resourceGaps": "部分资源名称、角色或清理读回证据未记录，不能据此补全业务事实。可重新运行用例获取完整记录。",
+      "noResources": "本用例尚未登记测试对象。",
+      "comparison": "逐项核对业务字段的预期与实际，差异直接标出。",
+      "evidence": "用于进一步诊断的原始结构化证据，包含观察时间、验证边界和技术标识。",
+      "noEvidence": "没有记录可查看的技术证据。"
+    },
+    "resultValues": {
+      "yes": "是",
+      "no": "否",
+      "none": "无",
+      "ratio": "{passed} / {total}",
+      "matches": "一致",
+      "differs": "不一致",
+      "fieldValue": "{field}：{value}",
+      "groupField": "{group} / {field}",
+      "separator": "；",
+      "selectedReference": "选定的测试对象",
+      "otherReference": "其他对象（标识见技术证据）",
+      "referencesCount": "{count} 个对象引用（标识见技术证据）",
+      "noParent": "独立测试对象"
+    },
+    "resourceRoles": {
+      "fixture": "测试模板",
+      "source": "源模板",
+      "copy": "副本",
+      "binding": "专用资源标签绑定"
+    },
+    "resultGroups": {
+      "copy": "副本 {index}",
+      "object": "对象 {index}",
+      "request": "请求 {index}",
+      "tag": "测试标签 {index}"
+    },
+    "resultFields": {
+      "name": "名称",
+      "description": "说明",
+      "content": "内容",
+      "count": "对象数量",
+      "failed": "失败数量",
+      "independent_uuids": "对象标识各自独立",
+      "status": "状态",
+      "review_status": "审核状态",
+      "total": "总数",
+      "matching_templates": "匹配目标模板",
+      "counts": "各页返回数量",
+      "totals": "各页报告总数",
+      "complete_without_duplicates": "完整且没有重复",
+      "not_found": "目标已不可读取",
+      "only_control_template": "仅保留对照模板",
+      "created": "成功复制数量",
+      "only_missing_source_failed": "仅不存在的来源失败",
+      "source_content": "源模板内容",
+      "copy_content": "副本内容",
+      "success": "请求成功",
+      "field": "问题字段",
+      "code": "业务错误码",
+      "only_original": "仅保留原模板",
+      "valid": "内容符合规则",
+      "violations": "发现的问题",
+      "rule": "校验规则",
+      "severity": "严重程度",
+      "tag": "绑定对象",
+      "tag_uuids": "绑定标签集合"
+    },
+    "resultEnums": {
+      "draft": "草稿",
+      "published": "已发布",
+      "archived": "已归档",
+      "pending": "待审核",
+      "approved": "审核通过",
+      "rejected": "审核驳回",
+      "warning": "警告",
+      "error": "错误",
+      "content": "内容",
+      "name": "名称",
+      "description": "说明",
+      "content_min_length": "内容最短长度",
+      "VALIDATION_FAILED": "输入校验未通过"
+    }
   }
 }

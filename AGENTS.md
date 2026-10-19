@@ -1,6 +1,6 @@
 # PowerXPlugin Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-10-29
+Auto-generated from all feature plans. Last updated: 2026-10-13
 
 ## Active Technologies
 - Go 1.24+, TypeScript 5.x (Nuxt 4.2) + Gin 框架、Nuxt 4.2、`@artisan-cloud/plugin-framework-admin` Layer、`@artisan-cloud/plugin-framework-client` (001-powerxplugin-foundation)
@@ -33,6 +33,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-29
 - N/A（不新增业务持久化表；仅复用现有配置来源与日志后端） (020-framework-logger)
 - Go 1.24 + Gin middleware/context, existing skeleton customer auth, PowerX STS/delegated client patterns, framework runtime common logging/errors (023-framework-customer-auth)
 - Framework 不新增生产 customer 持久化；skeleton local/dev 可复用现有 customer 表；生产 membership/customer 数据由 PowerX Core 或平台身份源权威维护 (023-framework-customer-auth)
+- Go 1.24, TypeScript 5.x, Node.js 20, Nuxt 4.2 + Gin, GORM, Nuxt UI 3.3.x, Pinia, Framework Client/Admin Layer, Framework realtime/common logging 与现有 IAM/STS (025-framework-business-regression)
+- 插件 PostgreSQL schema powerx_plugin_base；隔离本地测试可使用 SQLite；三类回归记录表，Framework Store 接口与可选 GORM adapter (025-framework-business-regression)
 
 ## Project Structure
 
@@ -50,9 +52,9 @@ npm test && npm run lint
 Go 1.24+, TypeScript 5.x (Nuxt 4.2): Follow standard conventions
 
 ## Recent Changes
+- 025-framework-business-regression: Added Go 1.24, TypeScript 5.x, Node.js 20, Nuxt 4.2 + Gin, GORM, Nuxt UI 3.3.x, Pinia, Framework Client/Admin Layer, Framework realtime/common logging 与现有 IAM/STS
 - 023-framework-customer-auth: Added Go 1.24 + Gin middleware/context, existing skeleton customer auth, PowerX STS/delegated client patterns, framework runtime common logging/errors
 - 020-framework-logger: Added Go 1.24（backend runtime/framework）, TypeScript 4.x（web-admin 验证） + framework runtime/common logging, slog/logrus adapter, skeleton logger bridge, observability hooks
-- 019-iam-federated-channel-login: Added Go 1.24, TypeScript 5.x (Nuxt 4.2) + framework IAM contracts/context/errors, skeleton IAM/auth service, RBAC, observability/audi
 
 ## Manifest 迁移公告（2025-12-08）
 - 开发态唯一清单移动到 `skeleton/plugin.yaml`，仓库根目录的 `plugin.yaml` 仅保留 symlink，所有脚本/文档示例已更新。
@@ -84,4 +86,12 @@ UI 默认不得直接把对象 UUID 作为用户可见显示文本，除非用�
 中间表可以没有自己的 `uuid`，但关联字段必须使用两端业务对象的 `uuid`。如果中间表演进为可审计、可引用或具备独立状态的业务对象，也必须补充自己的稳定 `uuid`。
 
 新增迁移、GORM 模型、Proto、OpenAPI、前端类型与测试必须按 UUID 规则设计和校验。修正旧 numeric id 引用时不做兼容兜底；缺少必要 UUID 必须明确失败，并提供迁移说明。
+
+页面设计必须具备产品思维，以用户目标、使用场景和实际操作路径为依据，不得只追求功能、字段和组件齐全而忽视用户体验。具体要求：
+
+- 信息呈现必须有清晰的层次与优先级，首屏优先展示核心信息、关键状态和主要操作，让用户能够快速理解当前情况与下一步动作。
+- 按用户的查看与操作逻辑组织内容，遵循“先概览、再详情、后深入”的渐进式呈现；次要信息、低频操作和复杂配置可通过明确的按钮进入弹层、抽屉或详情页继续查看，避免在同一页面一次性堆叠全部内容。
+- 对相对独立的主题或任务，可使用 TabView（标签页）分块组织；标签名称应体现业务含义，分组与层级应符合用户认知，避免过度拆分、重复入口和多层嵌套。
+- 保持主次操作、视觉层级与导航关系清晰，展开或切换内容时保留必要上下文；不得为了精简界面而隐藏完成主要任务所必需的信息、关键风险或错误提示。验收时应检查用户能否顺畅完成核心任务，而非仅检查功能是否全部出现。
+
 <!-- MANUAL ADDITIONS END -->

@@ -262,12 +262,6 @@ func (w *wsConn) subscribe(subscriber wsSubscriber, topics []string, descriptors
 			if w.memberUUID != "" && ev.MemberUUID != "" && w.memberUUID != ev.MemberUUID {
 				return
 			}
-			if w.lease != nil {
-				if err := w.lease.AuthorizeTopic(w.ctx, clean); err != nil {
-					w.recordIdentityError(err)
-					return
-				}
-			}
 			w.send(wsResponse{Type: "event", Topic: ev.Topic, Payload: ev.Payload})
 		})
 		if w.ctx != nil && w.ctx.Err() != nil {
@@ -318,16 +312,26 @@ func (w *wsConn) close() {
 func (w *wsConn) send(msg wsResponse) {
 	w.sendMu.Lock()
 	defer w.sendMu.Unlock()
+	if msg.Type == "event" && w.lease != nil {
+		if err := w.lease.AuthorizeTopic(w.ctx, msg.Topic); err != nil {
+			w.recordIdentityError(err)
+			return
+		}
+	}
 	if w.ctx != nil && w.ctx.Err() != nil {
 		return
 	}
-	if w.lease != nil && !time.Now().Before(w.lease.ExpiresAt) {
-		w.lease.Close(frameworkrealtime.WSIdentityExpired)
-		return
+	if w.lease != nil {
+		if err := w.lease.CheckActive(w.ctx); err != nil {
+			w.recordIdentityError(err)
+			return
+		}
 	}
 	if w.sendHook != nil {
 		w.sendHook(msg)
 		return
 	}
-	_ = w.conn.WriteJSON(msg)
+	if err := w.conn.WriteJSON(msg); err != nil && w.lease != nil {
+		w.lease.Close(frameworkrealtime.WSIdentityRevoked)
+	}
 }

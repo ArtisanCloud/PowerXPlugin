@@ -1,5 +1,6 @@
 capabilities:
   imports:
+    - contracts/capabilities/com.powerx.plugins.base.parcel.volume.yaml
     - contracts/capabilities/com.powerx.plugins.base.auth.me_context.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.audit.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.batch_clone.yaml
@@ -15,6 +16,12 @@ capabilities:
     - contracts/capabilities/com.powerx.plugins.base.template.update.yaml
     - contracts/capabilities/com.powerx.plugins.base.template.validate.yaml
   provides:
+    - descriptor: contracts/capabilities/com.powerx.plugins.base.parcel.volume.yaml
+      id: com.powerx.plugins.base.parcel.volume
+      schemas:
+        input: contracts/tools/parcel-volume.v1.json
+        output: contracts/tools/parcel-volume.v1.json
+      version: 1.0.0
     - descriptor: contracts/capabilities/com.powerx.plugins.base.auth.me_context.yaml
       id: com.powerx.plugins.base.auth.me_context
       schemas:

@@ -1,4 +1,18 @@
 permissions:
+  - permission_code: parcel.volumes:compute
+    module: parcel
+    resource: volumes
+    action: compute
+    type: action
+    data_scope: tenant
+    default_role_grants: [role_owner, role_admin]
+    risk_level: low
+    title_i18n:
+      zh-CN: 包裹体积计算
+      en: Parcel volume computation
+    description_i18n:
+      zh-CN: 允许通过宿主固定工具通道计算当前输入的包裹体积。
+      en: Allows computing supplied parcel dimensions through the pinned Host tool channel.
   - action: read
     business_permission_code: runtime.realtime:read
     data_scope: tenant
@@ -2045,8 +2059,114 @@ permissions:
       en: Plugin agent APIs
       zh-CN: 插件智能体接口
     type: api
+  - type: api
+    module: regression
+    resource: regression
+    action: read
+    permission_code: regression:read
+    business_permission_code: regression:read
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    title_i18n:
+      en: Business regression
+      zh-CN: 业务回归
+    description_i18n:
+      en: Manage business regression scenarios in an explicitly enabled test environment.
+      zh-CN: 在显式启用的测试环境中管理业务回归场景。
+    risk_level: low
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/regression/suites
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/regression/cases
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/regression/profiles
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/regression/runs
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/regression/runs/*
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/regression/runs/*/events
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: GET
+        path: /admin/regression/runs/*/report
+        resource_scope: tenant
+  - type: api
+    module: regression
+    resource: regression
+    action: invoke
+    permission_code: regression:invoke
+    business_permission_code: regression:invoke
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    title_i18n:
+      en: Business regression
+      zh-CN: 业务回归
+    description_i18n:
+      en: Manage business regression scenarios in an explicitly enabled test environment.
+      zh-CN: 在显式启用的测试环境中管理业务回归场景。
+    risk_level: medium
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/regression/runs
+        resource_scope: tenant
+  - type: api
+    module: regression
+    resource: regression
+    action: manage
+    permission_code: regression:manage
+    business_permission_code: regression:manage
+    data_scope: tenant
+    default_role_grants:
+      - role_owner
+      - role_admin
+    title_i18n:
+      en: Business regression
+      zh-CN: 业务回归
+    description_i18n:
+      en: Manage business regression scenarios in an explicitly enabled test environment.
+      zh-CN: 在显式启用的测试环境中管理业务回归场景。
+    risk_level: medium
+    protocol_bindings:
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/regression/runs/*/cancel
+        resource_scope: tenant
+      - actor_context: admin_user
+        channel: rest
+        method: POST
+        path: /admin/regression/runs/*/cleanup
+        resource_scope: tenant
 rbac:
   resources:
+    - resource: parcel.volumes
+      actions: [compute]
     - actions:
         - read
       resource: admin
@@ -2251,6 +2371,11 @@ rbac:
         - read
         - update
       resource: template.template
+    - resource: regression
+      actions:
+        - read
+        - invoke
+        - manage
 routes:
   adminManifest: /api/v1/admin/manifest
   basePath: /api/v1
@@ -2325,4 +2450,54 @@ routes:
       permission:
         action: read
         resource: customer
+    - method: GET
+      path: /admin/regression/suites
+      permission:
+        resource: regression
+        action: read
+    - method: GET
+      path: /admin/regression/cases
+      permission:
+        resource: regression
+        action: read
+    - method: GET
+      path: /admin/regression/profiles
+      permission:
+        resource: regression
+        action: read
+    - method: GET
+      path: /admin/regression/runs
+      permission:
+        resource: regression
+        action: read
+    - method: GET
+      path: /admin/regression/runs/*
+      permission:
+        resource: regression
+        action: read
+    - method: GET
+      path: /admin/regression/runs/*/events
+      permission:
+        resource: regression
+        action: read
+    - method: GET
+      path: /admin/regression/runs/*/report
+      permission:
+        resource: regression
+        action: read
+    - method: POST
+      path: /admin/regression/runs
+      permission:
+        resource: regression
+        action: invoke
+    - method: POST
+      path: /admin/regression/runs/*/cancel
+      permission:
+        resource: regression
+        action: manage
+    - method: POST
+      path: /admin/regression/runs/*/cleanup
+      permission:
+        resource: regression
+        action: manage
   rbac: /api/v1/admin/rbac

@@ -1,0 +1,44 @@
+id: com.powerx.plugins.base.parcel.volume
+type: Tool
+version: 1.0.0
+title_i18n:
+  zh-CN: 包裹体积
+  en-US: Parcel volume
+description_i18n:
+  zh-CN: 用原始长宽高计算包裹体积；不读取业务数据、不产生业务写入。
+  en-US: Computes parcel volume from raw dimensions without business reads or writes.
+agent:
+  usable: true
+  risk_level: low
+security:
+  permission_code: parcel.volumes:compute
+  risk_level: low
+  default_role_grants: [role_owner, role_admin]
+rbac:
+  resource: parcel.volumes
+  actions: [compute]
+metadata:
+  protocols:
+    http:
+      method: POST
+      path: /internal/tools/parcel-volumes
+      schema_ref: contracts/tools/parcel-volume.v1.json
+      actor_context: admin_user
+      auth_type: core_internal_token
+      resource_scope: tenant
+      sts_direct: false
+permissions:
+  - permission_code: parcel.volumes:compute
+    module: parcel
+    resource: volumes
+    action: compute
+    type: action
+    data_scope: tenant
+    default_role_grants: [role_owner, role_admin]
+    risk_level: low
+    title_i18n:
+      zh-CN: 包裹体积计算
+      en: Parcel volume computation
+    description_i18n:
+      zh-CN: 允许通过宿主固定工具通道计算当前输入的包裹体积。
+      en: Allows computing supplied parcel dimensions through the pinned Host tool channel.

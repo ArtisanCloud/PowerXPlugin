@@ -11,11 +11,17 @@
 - **规格 OpenAPI 不是自动上线证明**：`specs/*/contracts` 的条目必须另标注为 `active`、`design_only`、`admin_only` 或 `retired`。
 - **状态定义**：`implemented`、`ready_for_integration`、`partial`、`contract_only`、`generic_only`、`not_started`。`ready_for_integration` 表示稳定 DTO、业务接口、实际 delegated transport、模式装配和单元/合同测试均已完成，真实业务插件安装联调后置。local 的权威持久化由插件注入同一 contract；Framework 只负责 Factory 选择，不能以空实现或内存 mock 冒充 local adapter。
 
+## IAM 连续授权基线实施对齐
+
+2026-10-15：按 [Core 权威实施指导 1.2](../../../../PowerX/docs/guides/features/iam-authorization-baseline/guide.md) 完成 Framework F01–F04 源码适配：Go／.NET 独立批量合同与客户端、可选 Registry／Bundle、Skeleton bootstrap 与启用门禁、模板同步及 WS 最终发送复核。消费方式和测试边界见 [Framework 接入记录](iam-authorization-baseline-framework.md)。Core 源码状态为 `core_source_implemented`；真实服务 grant、业务库迁移／初始化、插件 v2／worker 与安装态联调仍分别待验证，本项不混入下表现有 IAM 的验收范围。SDK 发布及完整 B01–B24 不能以本地打包快照／fixture 测试替代。
+
+目标为通用 `ReadMemberBaselines`，通过固定 typed capability `com.corex.iam.authorization_baseline.service_read` 读取。Framework 必须校验 schema、可信租户、自身配置的插件身份、时间精度及每个成员/权限组合的唯一完整结果；`status=error` 不得转成 `allowed=false`。初始化真实起点可为 null，插件必须升级 v2 并使用独立 visible_since；不得将 T0 静默填入旧 GrantedAt。具体分仓任务、错误码、范围与 Root 规则及验收统一维护在权威正文。
+
 ## 当前运行时开放面（审计基线）
 
 | Core 模块 | 当前路由数 | Framework 对应包 | 状态 | 事实与缺口 |
 |---|---:|---|---|---|
-| Media | 13 | `runtime/media`、`runtime/powerx/media` | ready_for_integration | Asset 与 Variant 三项传输已接入：创建必填 checksum，响应 status/completed_at；票据 TTL、完成响应与错误传播有测试。local Service 新增三项方法，需插件补齐。Core 已交付代码但尚未迁移/seed/重启，实际传输、票据撤销与安装验收后置。 |
+| Media | 13 | `runtime/media`、`runtime/powerx/media` | ready_for_integration | Asset 与 Variant 三项传输已接入：创建必填 checksum，响应 status/completed_at；票据 TTL、完成响应与错误传播有测试。local Service 的三项变体方法需插件补齐。2026-10-18 Go/.NET 已映射可选 derivatives 与变体 UUID，不改 Service；处理状态推送尚缺插件服务态订阅合同，插件接管与安装验收后置。详见 [标准图片预览对齐](media-image-derivatives-framework.md)。 |
 | IAM | 10 | `iam/contracts`、`iam/adapters` | ready_for_integration | 已覆盖 credential-scoped tenant、显式分页成员目录、单成员/严格批量/容错批量 UUID 查询、精确显示名解析、部门、角色、权限与 `authorization:check`。Framework local/delegated DTO、Bootstrap、Gateway API Key/STS transport 和错误映射均有合同测试；Skeleton local 管理 API、模型迁移和部门/成员/角色/权限关联均已 UUID-only。真实已安装插件的 capability grant 联调后置。 |
 | Knowledge Space | 9 | `runtime/knowledge`、`runtime/powerx/knowledge` | ready_for_integration | 已覆盖 QA Retrieval Plan、Memory Snapshot，以及正式 tenant Host Contract 的空间列表、Search、文档异步写入/删除、空间索引重建和索引任务查询。Skeleton delegated 模式复用共享 STS token，Host DTO/错误映射/本地模式任务语义均有测试；搜索筛选与文档级重建未被 Core 声明时明确失败。2026-09-03：Core 已发布三项 capability 与 API-Key 精确 scope；当日 Skeleton 开发 Key 返回 `403 KNOWLEDGE_FORBIDDEN`，该历史结果不代表当前 Key 状态。安装态由 capabilities.required + 插件升级同步 STS grant 后另行验收，API Key 验证单列记录。 |
 | Agent | 18（6 lifecycle + 12 Session） | `runtime/powerx/agent`、`runtime/agent` | partial | .NET 已有 Lifecycle 与 Session UUID DTO、显式 `ILocalAgentLifecycleStore` / `ILocalAgentStore`、启动期 local/delegated 选择点；Session 的 N402 delegated 12 项 transport 与 SSE `Last-Event-ID` 恢复已实现。Lifecycle 六项 delegated typed client 已对齐 Core OpenAPI 路由、STS Bearer 服务凭证、请求体和响应 DTO；定向 HTTP 测试覆盖六项操作、租户阻断、403、非法响应和取消。Framework 本身不提供插件的生产 local store，尚缺实际插件消费、安装态 grant/撤权及跨租户联调，故整体保持 partial，不以 local fallback 冒充成功。 |

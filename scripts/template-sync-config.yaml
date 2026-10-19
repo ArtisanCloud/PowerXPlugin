@@ -158,6 +158,9 @@ mappings:
       - ".cache/**"
       - "etc/config.yaml"
     replacements:
+      - globs: ["cmd/database/migrate/regression.go", "internal/**/regression/**/*.go"]
+        literal: "{{"
+        replace: '{{ "{{" }}'
       - globs: ["**/*.go", "**/*.proto", "go.mod", "go.sum"]
         regex: "github\\.com/ArtisanCloud/PowerXPlugin/skeleton/backend/go-gin"
         flags: "g"
@@ -186,6 +189,9 @@ mappings:
       - globs: ["internal/transport/http/admin/admin_handler.go"]
         literal: "Port:   8078,"
         replace: "Port:   {{ .BackendPort }},"
+      - globs: ["internal/shared/app/consts.go"]
+        literal: '"com.powerx.plugins.base"'
+        replace: '"{{ .PluginID }}"'
       - globs: ["internal/manifestx/manifest.go"]
         literal: 'Name: "PowerX Base Plugin"'
         replace: 'Name: "{{ .PluginName }}"'

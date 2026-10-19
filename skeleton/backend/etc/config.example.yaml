@@ -268,3 +268,17 @@ operations:
 #   driver: "postgres"
 #   dsn: "postgres://powerx:powerx@localhost:5432/com_powerx_plugins_base?sslmode=disable"
 #   schema: "public"
+
+regression:
+  enabled: false
+  environment: development
+  profiles:
+    - uuid: "44444444-4444-4444-8444-444444444444"
+      key: controlled
+      kind: controlled
+      title_key: regression.profiles.controlled
+      fixture_namespace: regression
+
+# Versioned provider catalog packaged with this plugin build.
+ai_catalog:
+  directory: ai/providers.d

@@ -95,7 +95,7 @@ jobs:
       - name: Go test (skeleton backend)
         run: cd skeleton/backend/go-gin && go test ./... -count=1
       - name: Generated backend with packaged Framework snapshot
-        run: PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^TestGeneratedBackendBuild$' -count=1 -timeout=10m
+        run: PX_TEST_GENERATED_BUILD=1 PX_TEST_FRAMEWORK_SNAPSHOT=1 go test ./tools/cli/internal/templates -run '^(TestGeneratedBackendBuild|TestIAMBaselineGeneratedPlugin)$' -count=1 -timeout=10m
 
   frontend:
     runs-on: ubuntu-latest
@@ -276,3 +276,28 @@ jobs:
             tmp/regression-frontend.log
             tmp/coverage.html
             skeleton/web-admin/nuxt/test-results/
+
+  business-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --workspaces=false
+      - run: npm ci --ignore-scripts --prefix skeleton/web-admin/nuxt
+      - name: Install Chromium for business regression
+        run: cd skeleton/web-admin/nuxt && npx playwright install --with-deps chromium
+      - name: Controlled business regression and generated consumers
+        env:
+          REGRESSION_BROWSER: '1'
+        run: bash scripts/testing/regression.sh
+      - name: Archive business evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: business-regression
+          path: artifacts/regression/

@@ -1,5 +1,6 @@
 capabilities:
   imports:
+    - contracts/capabilities/{{ .PluginID }}.parcel.volume.yaml
     - contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
     - contracts/capabilities/{{ .PluginID }}.template.audit.yaml
     - contracts/capabilities/{{ .PluginID }}.template.batch_clone.yaml
@@ -15,6 +16,12 @@ capabilities:
     - contracts/capabilities/{{ .PluginID }}.template.update.yaml
     - contracts/capabilities/{{ .PluginID }}.template.validate.yaml
   provides:
+    - descriptor: contracts/capabilities/{{ .PluginID }}.parcel.volume.yaml
+      id: {{ .PluginID }}.parcel.volume
+      schemas:
+        input: contracts/tools/parcel-volume.v1.json
+        output: contracts/tools/parcel-volume.v1.json
+      version: 1.0.0
     - descriptor: contracts/capabilities/{{ .PluginID }}.auth.me_context.yaml
       id: {{ .PluginID }}.auth.me_context
       schemas:

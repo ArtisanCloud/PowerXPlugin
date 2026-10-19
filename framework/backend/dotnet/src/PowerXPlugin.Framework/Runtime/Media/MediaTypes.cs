@@ -66,6 +66,44 @@ public class MediaAsset
     public string OwnerSubjectId { get; set; } = string.Empty;
     [JsonPropertyName("download_url")]
     public string DownloadUrl { get; set; } = string.Empty;
+    /// <summary>Original upload state, independent of derivative processing.</summary>
+    public string Status { get; set; } = string.Empty;
+    [JsonPropertyName("derivatives")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImageDerivatives? Derivatives { get; set; }
+}
+
+/// <summary>
+/// Core's standard-image processing snapshot. Absence does not imply ready.
+/// A ready item's UUID identifies a variant; its actual MIME and size come from
+/// the variant contract. This response does not establish a subscription.
+/// </summary>
+public sealed class ImageDerivatives
+{
+    [JsonPropertyName("asset_uuid")]
+    public string AssetUuid { get; set; } = string.Empty;
+    [JsonPropertyName("upload_state")]
+    public string UploadState { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string Recipe { get; set; } = string.Empty;
+    [JsonPropertyName("job_uuid")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? JobUuid { get; set; }
+    public int Attempts { get; set; }
+    [JsonPropertyName("error_code")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ErrorCode { get; set; }
+    public bool Retryable { get; set; }
+    public List<ImageDerivativeItem> Items { get; set; } = new();
+}
+
+public sealed class ImageDerivativeItem
+{
+    public string Variant { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    [JsonPropertyName("variant_uuid")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? VariantUuid { get; set; }
 }
 
 public class CreateMediaAssetRequest

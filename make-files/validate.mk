@@ -14,8 +14,7 @@ validate-capabilities: ## Validate capability contracts (set VALIDATE_MANIFEST=/
 validate-taskbus-contracts: ## Validate TaskBus event contracts (set TASKBUS_CONTRACTS=/path/to/contracts.yaml)
 	@if [ -f "tools/contracts/validate-taskbus-contracts.go" ] && [ -f "$(TASKBUS_CONTRACTS)" ]; then \
 		echo "[validate] taskbus contracts: $(TASKBUS_CONTRACTS)"; \
-		mkdir -p tmp/go-build; \
-		(cd tools/contracts && GOWORK=off GOCACHE="$(abspath ./tmp/go-build)" go run . "$(abspath $(TASKBUS_CONTRACTS))"); \
+		(cd tools/contracts && GOWORK=off go run . "$(abspath $(TASKBUS_CONTRACTS))"); \
 	else \
 		echo "Skip TaskBus contracts validation (missing validator or contracts file)"; \
 	fi

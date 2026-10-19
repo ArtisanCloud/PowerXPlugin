@@ -15,6 +15,7 @@ import (
 	adminmarketplace "{{ .BackendModulePath }}/internal/transport/http/admin/marketplace"
 	adminmetadata "{{ .BackendModulePath }}/internal/transport/http/admin/metadata"
 	adminoperations "{{ .BackendModulePath }}/internal/transport/http/admin/operations"
+	Regression "{{ .BackendModulePath }}/internal/transport/http/admin/regression"
 	adminruntime "{{ .BackendModulePath }}/internal/transport/http/admin/runtime_ops"
 	adminsecurity "{{ .BackendModulePath }}/internal/transport/http/admin/security"
 	httpmw "{{ .BackendModulePath }}/internal/transport/http/middleware"
@@ -25,6 +26,7 @@ import (
 func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	adminHandler := NewAdminHandler(deps)
 	admin := rg.Group("/admin")
+	Regression.RegisterRoutes(admin, deps)
 	{
 		// 基础管理功能
 		admin.GET("/manifest", adminHandler.GetManifest) // 获取插件清单

@@ -58,6 +58,13 @@ public sealed class PowerXMediaClient
         return ToMediaAsset(asset, null);
     }
 
+    public async Task<MediaAsset> GetAssetAsync(string mediaAssetUuid, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(mediaAssetUuid)) throw new ArgumentException("MEDIA_INVALID_ARGUMENT", nameof(mediaAssetUuid));
+        var asset = await SendAsync<HostAsset>(HttpMethod.Get, $"/api/v1/tenant/media/assets/{Uri.EscapeDataString(mediaAssetUuid)}", null, ct);
+        return ToMediaAsset(asset, null);
+    }
+
     public async Task UploadBytesAsync(MediaPresignTicket ticket, Stream body, string contentType, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(ticket); ArgumentNullException.ThrowIfNull(body);
@@ -95,7 +102,28 @@ public sealed class PowerXMediaClient
 
     private static Uri RequireTransferUrl(string value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) ? uri : throw new InvalidOperationException("Media transfer ticket URL is invalid.");
     private static void ApplyTransferHeaders(HttpRequestMessage request, Dictionary<string, string>? headers) { foreach (var (name, value) in headers ?? new()) if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(value)) request.Headers.TryAddWithoutValidation(name, value); }
-    private static MediaAsset ToMediaAsset(HostAsset asset, CreateMediaAssetRequest? request) => new() { Uuid = asset.AssetUuid, Name = asset.Name, MimeType = asset.MimeType, SizeBytes = asset.SizeBytes, TenantUuid = request?.TenantUuid ?? string.Empty, Folder = request?.Folder ?? string.Empty, OwnerSubjectType = request?.OwnerSubjectType ?? string.Empty, OwnerSubjectId = request?.OwnerSubjectId ?? string.Empty, Driver = "powerx_media" };
-    private sealed class HostAsset { [JsonPropertyName("asset_uuid")] public string AssetUuid { get; set; } = string.Empty; public string Name { get; set; } = string.Empty; [JsonPropertyName("size_bytes")] public long SizeBytes { get; set; } [JsonPropertyName("mime_type")] public string MimeType { get; set; } = string.Empty; }
+    private static MediaAsset ToMediaAsset(HostAsset asset, CreateMediaAssetRequest? request) => new()
+    {
+        Uuid = asset.AssetUuid,
+        Name = asset.Name,
+        MimeType = asset.MimeType,
+        SizeBytes = asset.SizeBytes,
+        Status = asset.Status,
+        Derivatives = asset.Derivatives,
+        TenantUuid = request?.TenantUuid ?? string.Empty,
+        Folder = request?.Folder ?? string.Empty,
+        OwnerSubjectType = request?.OwnerSubjectType ?? string.Empty,
+        OwnerSubjectId = request?.OwnerSubjectId ?? string.Empty,
+        Driver = "powerx_media"
+    };
+    private sealed class HostAsset
+    {
+        [JsonPropertyName("asset_uuid")] public string AssetUuid { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        [JsonPropertyName("size_bytes")] public long SizeBytes { get; set; }
+        [JsonPropertyName("mime_type")] public string MimeType { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public ImageDerivatives? Derivatives { get; set; }
+    }
     private sealed class HostTransferTicket { public string Url { get; set; } = string.Empty; public string Method { get; set; } = string.Empty; [JsonPropertyName("expires_at")] public string ExpiresAt { get; set; } = string.Empty; public Dictionary<string, string>? Headers { get; set; } }
 }

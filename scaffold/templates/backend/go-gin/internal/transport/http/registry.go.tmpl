@@ -2,6 +2,7 @@ package http
 
 import (
 	"fmt"
+	Regression "{{ .BackendModulePath }}/internal/transport/http/admin/regression"
 	"strings"
 
 	oprepo "{{ .BackendModulePath }}/internal/entity/repository/operations"
@@ -59,6 +60,7 @@ func (r *Registry) RegisterAPIRoutes(gApi *gin.RouterGroup) {
 	}
 
 	r.mergeRBAC(adminruntime.RBACEntries(r.apiPrefix()))
+	r.mergeRBAC(Regression.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminsecurity.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminintegration.RBACEntries(r.apiPrefix()))
 	r.mergeRBAC(adminoperations.RBACEntries(r.apiPrefix()))

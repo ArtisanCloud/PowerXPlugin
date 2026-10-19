@@ -15,6 +15,7 @@ import (
 	adminmarketplace "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/marketplace"
 	adminmetadata "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/metadata"
 	adminoperations "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/operations"
+	Regression "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/regression"
 	adminruntime "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/runtime_ops"
 	adminsecurity "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/admin/security"
 	httpmw "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/transport/http/middleware"
@@ -25,6 +26,7 @@ import (
 func RegisterAPIRoutes(rg *gin.RouterGroup, deps *app.Deps) {
 	adminHandler := NewAdminHandler(deps)
 	admin := rg.Group("/admin")
+	Regression.RegisterRoutes(admin, deps)
 	{
 		// 基础管理功能
 		admin.GET("/manifest", adminHandler.GetManifest) // 获取插件清单

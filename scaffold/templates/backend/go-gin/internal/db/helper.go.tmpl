@@ -15,6 +15,28 @@ func qi(ident string) string {
 	return `"` + ident + `"`
 }
 
+// prepareSchema never issues DDL against a read-only recovery database.
+// A restored schema must already exist; missing structure is a failed recovery,
+// not an opportunity to migrate or seed the candidate during verification.
+func prepareSchema(schema string) error {
+	var readOnly bool
+	if err := db.Raw("SELECT current_setting('transaction_read_only') = 'on'").Scan(&readOnly).Error; err != nil {
+		return err
+	}
+	readOnlyDatabase = readOnly
+	if !readOnly {
+		return createSchema(schema)
+	}
+	var exists bool
+	if err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = ?)", schema).Scan(&exists).Error; err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("RECOVERY_SCHEMA_MISSING: %s", schema)
+	}
+	return nil
+}
+
 // createSchema: CREATE SCHEMA IF NOT EXISTS
 func createSchema(schema string) error {
 	if db == nil || db.Dialector == nil || db.Dialector.Name() != "postgres" {

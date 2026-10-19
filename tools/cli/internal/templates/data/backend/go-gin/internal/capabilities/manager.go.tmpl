@@ -617,6 +617,9 @@ func resolveManifestPath() string {
 			return p
 		}
 	}
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ROOT")); root != "" {
+		return filepath.Join(root, "plugin.yaml")
+	}
 	cwd, _ := os.Getwd()
 	candidates := []string{
 		filepath.Join(cwd, "plugin.yaml"),

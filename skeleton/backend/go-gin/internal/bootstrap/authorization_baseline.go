@@ -1,0 +1,53 @@
+package bootstrap
+
+import (
+	"context"
+	"strings"
+
+	fwiamcontracts "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/contracts"
+	fwiamerrors "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/iam/errors"
+	fwcapability "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/capability"
+	sharedapp "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/shared/app"
+)
+
+// ValidateAuthorizationBaselineFeature checks a trusted startup opt-in. Plugins
+// set enabled from their own feature state; the manifest must also declare it.
+// Existing IAM users acquire no new dependency when the feature is disabled.
+func ValidateAuthorizationBaselineFeature(ctx context.Context, deps *sharedapp.Deps, enabled bool, required []string, checker fwcapability.GrantChecker) error {
+	if !enabled {
+		return nil
+	}
+	declared := map[string]bool{}
+	for _, id := range required {
+		if id == "" || strings.TrimSpace(id) != id || declared[id] {
+			return fwiamerrors.New("IAM_BASELINE_REQUIREMENTS_INVALID", "IAM_BASELINE_REQUIREMENTS_INVALID")
+		}
+		declared[id] = true
+	}
+	if !declared[fwiamcontracts.AuthorizationBaselineCapability] {
+		return fwiamerrors.New("IAM_BASELINE_REQUIREMENTS_INVALID", "IAM_BASELINE_REQUIREMENTS_INVALID")
+	}
+	if err := ValidateIAMBinding(deps); err != nil {
+		return err
+	}
+	provider, err := deps.IAMRegistry.AuthorizationBaselines()
+	if err != nil {
+		return err
+	}
+	if deps.IAMAuthorizationBaselines == nil || provider == nil || sharedapp.PluginID == "" {
+		return fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	if deps.IAMAdapterMode.String() == "local" {
+		return nil
+	}
+	dependencies := []string{fwiamcontracts.AuthorizationBaselineCapability, "com.corex.iam.directory.read", fwiamcontracts.IdentityContextCapability, "com.corex.capabilities.grant_status.read"}
+	for _, id := range dependencies {
+		if !declared[id] {
+			return fwiamerrors.New("IAM_BASELINE_REQUIREMENTS_INVALID", "IAM_BASELINE_REQUIREMENTS_INVALID")
+		}
+	}
+	if deps.WSIdentityLifecycle == nil {
+		return fwiamerrors.New(fwiamerrors.CodeAdapterNotBound, fwiamerrors.CodeAdapterNotBound)
+	}
+	return fwcapability.RequireGrants(ctx, checker, dependencies)
+}

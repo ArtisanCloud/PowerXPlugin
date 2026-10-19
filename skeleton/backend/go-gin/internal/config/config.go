@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/common/hosthttp"
 	customerfw "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go/runtime/customerfw"
 	pxlog "github.com/ArtisanCloud/PowerXPlugin/skeleton/backend/internal/logger"
 	"github.com/google/uuid"
@@ -71,6 +72,7 @@ type Config struct {
 
 	// Operations 配置。
 	Operations *OperationsConfig `yaml:"operations" json:"operations"`
+	Regression RegressionConfig  `yaml:"regression" json:"regression"`
 
 	// AdminConsole 配置。
 	AdminConsole *AdminConsoleConfig `yaml:"admin_console" json:"admin_console"`
@@ -488,6 +490,13 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 	if strings.TrimSpace(configDir) != "" {
 		loadEnvFiles(configDir, filepath.Dir(configDir))
 	}
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ROOT")); root != "" {
+		pxlog.InfoCtx(pxlog.WithLogFields(context.Background(), map[string]interface{}{
+			"component": "config.loader", "plugin_root": root,
+			"config_directory": configDir, "ai_catalog_configured": cfg.AICatalog != nil,
+		}), "HOST_CONFIG_SOURCE_RESOLVED")
+	}
+
 	applyRuntimeNamespacesToLegacy(cfg)
 
 	loadSecurityBaselineConfig(cfg)
@@ -515,6 +524,9 @@ func loadWithOptions(opts loadOptions) (*Config, error) {
 
 	// 验证配置
 	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	if err := applyRecoveryRedisBindings(cfg); err != nil {
 		return nil, err
 	}
 
@@ -696,7 +708,7 @@ func getDefaultConfig() *Config {
 		SecurityBaseline: defaultSecurityBaselineConfig(),
 		Gateway: &GatewayConfig{
 			BaseURL:   "http://127.0.0.1:8077",
-			APIPrefix: "/api/v1",
+			APIPrefix: hosthttp.DefaultAPIPrefix,
 			UseMock:   []string{},
 		},
 		CustomerAuth: &CustomerAuthConfig{
@@ -908,6 +920,17 @@ func resolveConfigCandidates() []string {
 				)
 			}
 		}
+	}
+
+	// Host-managed and recovery processes do not run from the plugin directory.
+	// Resolve the packaged application configuration only within the explicit
+	// host root; host-values contains env bindings, not application defaults.
+	if root := strings.TrimSpace(os.Getenv("POWERX_PLUGIN_ROOT")); root != "" {
+		return uniqueNonEmptyStrings(append(candidates,
+			filepath.Join(root, "config", "config.yaml"),
+			filepath.Join(root, "backend", "etc", "config.yaml"),
+			filepath.Join(root, "etc", "config.yaml"),
+		))
 	}
 
 	candidates = append(candidates,
@@ -1476,16 +1499,9 @@ func normalizeGatewayAuthScheme(raw string) string {
 func normalizeGatewayAPIPrefix(raw string) string {
 	value := strings.TrimSpace(raw)
 	if value == "" {
-		return "/api/v1"
+		return hosthttp.DefaultAPIPrefix
 	}
-	if !strings.HasPrefix(value, "/") {
-		value = "/" + value
-	}
-	value = "/" + strings.Trim(strings.TrimSpace(value), "/")
-	if value == "/" {
-		return "/api/v1"
-	}
-	return value
+	return "/" + strings.Trim(value, "/")
 }
 
 func inferGatewayAuthScheme(cfg *Config) string {
@@ -1569,6 +1585,9 @@ func (c *Config) IsJWTMode() bool {
 
 // Validate 验证配置
 func (c *Config) Validate() error {
+	if err := c.Regression.Validate(); err != nil {
+		return err
+	}
 	// 数据库配置验证
 	if c.Database == nil {
 		return NewConfigError("database config is required")

@@ -12,6 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PowerXPlugin.Framework/PowerXPlugin.Framework.csproj" />
+    <None Include="../../../go/iam/contracts/testdata/authorization_baseline_result.json" Link="Fixtures/authorization_baseline_result.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../go/runtime/powerx/media/testdata/host_asset_derivatives.json" Link="Fixtures/host_asset_derivatives.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
 

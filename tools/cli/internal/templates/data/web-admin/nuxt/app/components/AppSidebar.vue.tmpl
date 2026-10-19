@@ -1,6 +1,7 @@
 <template>
   <aside
-    class="h-full min-h-0 w-64 min-w-64 max-w-64 flex-shrink-0 overflow-y-auto overscroll-contain border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+    class="h-full min-h-0 flex-shrink-0 overflow-y-auto overscroll-contain border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+    :class="inDrawer ? 'w-full' : 'w-64 min-w-64 max-w-64'"
   >
     <nav class="p-4 space-y-6">
       <div>
@@ -207,11 +208,12 @@
         </UButton>
       </div>
 
-      <div v-if="isRoot">
+      <div v-if="isRoot || canReadRegression">
         <div class="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
           {{ "{{ t('navigation.pluginCapabilities') }}" }}
         </div>
         <UButton
+          v-if="isRoot"
           to="/capabilities/register"
           variant="ghost"
           color="neutral"
@@ -225,6 +227,7 @@
           {{ "{{ t('navigation.capabilities') }}" }}
         </UButton>
         <UButton
+          v-if="isRoot"
           to="/capabilities/lifecycle"
           variant="ghost"
           color="neutral"
@@ -236,6 +239,20 @@
         >
           <UIcon name="i-heroicons-clock" class="w-4 h-4 mr-3" />
           {{ "{{ t('navigation.capabilitiesLifecycle') }}" }}
+        </UButton>
+        <UButton
+          v-if="canReadRegression"
+          to="/admin/regression"
+          variant="ghost"
+          color="neutral"
+          class="w-full justify-start mt-1"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400':
+              isExactActive('/admin/regression'),
+          }"
+        >
+          <UIcon name="i-heroicons-beaker" class="w-4 h-4 mr-3" />
+          {{ "{{ t('regression.title') }}" }}
         </UButton>
       </div>
 
@@ -420,6 +437,7 @@
 </template>
 
 <script setup lang="ts">
+withDefaults(defineProps<{ inDrawer?: boolean }>(), { inDrawer: false });
 import { onMounted } from "vue";
 import { storeToRefs } from "pinia";
 import { useUserStore } from "~/stores/user";
@@ -437,6 +455,7 @@ const showIAMMenu = computed(() => {
 });
 const userStore = useUserStore();
 const { isRoot, isCurrentTenantAdmin, canReadTemplates, canReadCustomers, isLoggedIn } = storeToRefs(userStore);
+const canReadRegression = computed(() => String(runtimeConfig.public.regressionEnabled) === "true" && (userStore.isRoot || (userStore.context?.permissions || []).some(code => code === "regression:read" || code === "*")));
 const canManageIAM = computed(() => Boolean(isRoot.value) || Boolean(isCurrentTenantAdmin.value));
 const showCapabilityLab = computed(() => {
   const envFlag = runtimeConfig.public?.showCapabilityLab;

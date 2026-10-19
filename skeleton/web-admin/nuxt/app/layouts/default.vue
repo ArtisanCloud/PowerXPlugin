@@ -12,13 +12,13 @@
   </div>
   <div v-else class="min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- 顶部导航栏 - 根据环境变量控制显示 -->
-    <UContainer v-if="showNavigation" class="max-w-none">
-      <AppNavbar />
+    <UContainer v-if="showNavigation" class="max-w-none px-0 sm:px-6 lg:px-8">
+      <AppNavbar :navigation-open="mobileNavigationOpen" @toggle-navigation="mobileNavigationOpen = !mobileNavigationOpen" />
     </UContainer>
 
     <div :class="shellClass">
       <!-- 左侧边栏 - 根据环境变量控制显示 -->
-      <AppSidebar v-if="showNavigation" />
+      <AppSidebar v-if="showNavigation" class="hidden lg:block" data-testid="standalone-desktop-navigation" />
 
       <!-- 主内容区 -->
       <main :class="mainContentClass">
@@ -32,11 +32,16 @@
     <p v-else-if="!showDelegatedBanner" class="p-4 text-gray-600 dark:text-slate-200">{{ t('hostSession.loading') }}</p>
       </main>
     </div>
+    <USlideover v-if="showNavigation" v-model:open="mobileNavigationOpen" side="left" :title="t('navigation.primaryMenu')" :description="t('navigation.menuHelp')" :close="{ 'aria-label': t('navigation.closeMenu') }" :ui="{ content: 'w-full max-w-80', body: 'p-0 min-h-0' }">
+      <template #body><div id="standalone-mobile-navigation" class="h-full" @click="closeNavigationOnLink"><AppSidebar in-drawer /></div></template>
+      <template #footer><div class="flex w-full items-center justify-between gap-3"><div class="flex items-center gap-2 sm:hidden"><ThemeSelector /><LanguageSelector /></div><UButton color="neutral" variant="outline" :label="t('navigation.closeMenu')" @click="closeMobileNavigation" /></div></template>
+    </USlideover>
   </div>
 </template>
 
 <script setup>
 
+import { useMediaQuery } from '@vueuse/core';
 import { isPowerXEmbedded } from '@artisan-cloud/plugin-framework-client';
 import { useTheme } from "~/composables/useTheme";
 import { PLUGIN_ID, isPluginAdminPath } from "~/utils/powerx-bridge";
@@ -51,6 +56,17 @@ const route = useRoute();
 const theme = useTheme();
 const auth = useAuth();
 const logger = createFrameworkLogger("layout.default");
+const mobileNavigationOpen = ref(false);
+const desktopNavigation = useMediaQuery('(min-width: 1024px)');
+function closeMobileNavigation() {
+  if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  mobileNavigationOpen.value = false;
+}
+function closeNavigationOnLink(event) {
+  if (event.target instanceof Element && event.target.closest('a[href]')) closeMobileNavigation();
+}
+watch(() => route.fullPath, closeMobileNavigation);
+watch(desktopNavigation, value => { if (value) closeMobileNavigation(); });
 
 const disableShell = computed(() => {
   if (route.meta?.fullBleed === true) {
@@ -94,7 +110,7 @@ const mainContentClass = computed(() => {
   if (disableShell.value) {
     return "w-full";
   }
-  return showNavigation.value ? "min-h-0 flex-1 overflow-y-auto p-6" : "min-h-0 w-full overflow-y-auto p-6";
+  return showNavigation.value ? "min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6" : "min-h-0 min-w-0 w-full overflow-y-auto p-4 sm:p-6";
 });
 
 const shellClass = computed(() => {

@@ -8,9 +8,11 @@ from pathlib import Path
 import shutil
 import subprocess
 import tarfile
-import zipfile
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts/release"))
+from framework_archive import source_files as files_under, write_module_zip
 MODULE = "github.com/ArtisanCloud/PowerXPlugin/framework/backend/go"
 ESCAPED_MODULE = "github.com/!artisan!cloud/!power!x!plugin/framework/backend/go"
 AI_CONTRACT_FILES = (
@@ -18,12 +20,6 @@ AI_CONTRACT_FILES = (
     "fixtures/ai-media-v2.json", "fixtures/ai-media-v2-registration.json",
     "fixtures/capability-version-upgrade-errors.v1.json",
 )
-
-
-def files_under(directory):
-    return {p.relative_to(directory).as_posix(): p.read_bytes()
-            for p in sorted(directory.rglob("*")) if p.is_file()
-            and not any(part.startswith(".") for part in p.relative_to(directory).parts)}
 
 
 def digest(files):
@@ -60,6 +56,7 @@ def main():
                 continue
             cli[name + "/" + path] = raw
     cli["bundle-builder.py"] = Path(__file__).read_bytes()
+    cli["framework_archive.py"] = (ROOT / "scripts/release/framework_archive.py").read_bytes()
     hashes = {"go": digest(framework), "nuxt": digest(client), "generator": digest(cli),
               "contracts": hashlib.sha256((ROOT / "docs/contracts/media-thumbnail64-source.json").read_bytes()).hexdigest()}
     if profile == "ai-settings":
@@ -77,9 +74,7 @@ def main():
     (proxy / (version + ".mod")).write_bytes(framework["go.mod"])
     (proxy / (version + ".info")).write_text(json.dumps({"Version": version, "Time": "2026-10-22T00:00:00Z"}))
     (proxy / "list").write_text(version + "\n")
-    with zipfile.ZipFile(proxy / (version + ".zip"), "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for name, raw in sorted(framework.items()):
-            archive.writestr(MODULE + "@" + version + "/" + name, raw)
+    write_module_zip(proxy / (version + ".zip"), MODULE, version, framework)
     staging = bundle / "client"
     staging.mkdir()
     for name, raw in client.items():

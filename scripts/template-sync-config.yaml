@@ -149,6 +149,10 @@ mappings:
     prune:
       - "**/*_test.go.tmpl"
       - "bin/**"
+      - "**/.DS_Store"
+      - "**/*.log"
+      - "**/*.out"
+      - "**/*.test"
     targets:
       - path: scaffold/templates/backend/go-gin
         suffix: .tmpl
@@ -267,6 +271,11 @@ mappings:
         replace: 'return "{{ .PluginID }}"'
   - name: backend-fastapi
     source: skeleton/backend/python-fastapi
+    prune:
+      - "**/__pycache__/**"
+      - "**/*.pyc"
+      - "**/.DS_Store"
+      - "**/*.log"
     targets:
       - path: scaffold/templates/backend/python-fastapi
         suffix: .tmpl

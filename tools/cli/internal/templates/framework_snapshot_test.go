@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -24,36 +25,37 @@ func frameworkSnapshot(t *testing.T) (string, string) {
 	}
 	files := map[string][]byte{}
 	hash := sha256.New()
-	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	cmd := exec.Command("git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ".")
+	cmd.Dir = root
+	listed, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs := strings.Split(string(listed), "\x00")
+	sort.Strings(inputs)
+	for _, name := range inputs {
+		if name == "" {
+			continue
+		}
+		path := filepath.Join(root, filepath.FromSlash(name))
+		info, err := os.Lstat(path)
+		if os.IsNotExist(err) {
+			continue
+		}
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") && path != root {
-				return filepath.SkipDir
-			}
-			return nil
+		if !info.Mode().IsRegular() {
+			continue
 		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		name, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		name = filepath.ToSlash(name)
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
 		files[name] = raw
 		hash.Write([]byte(name))
 		hash.Write([]byte{0})
 		hash.Write(raw)
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	version := "v0.0.27-dev.g" + hex.EncodeToString(hash.Sum(nil))[:16]
 	proxy := t.TempDir()
@@ -95,4 +97,25 @@ func frameworkSnapshot(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	return proxy, version
+}
+
+func TestFrameworkSnapshotIncludesGitInputs(t *testing.T) {
+	proxy, version := frameworkSnapshot(t)
+	archive, err := zip.OpenReader(filepath.Join(proxy, "github.com/!artisan!cloud/!power!x!plugin/framework/backend/go/@v", version+".zip"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	found := false
+	for _, file := range archive.File {
+		if strings.HasSuffix(file.Name, "/coverage.out") {
+			t.Fatal("FRAMEWORK_COVERAGE_ARTIFACT_NOT_ALLOWED")
+		}
+		if strings.HasSuffix(file.Name, "/iam/contracts/.gitkeep") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("FRAMEWORK_GIT_INPUT_MISSING")
+	}
 }
